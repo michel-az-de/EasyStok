@@ -56,4 +56,8 @@ public sealed class ClienteOtpRepository(EasyStockDbContext db) : IClienteOtpRep
         await db.ClienteOtps
             .Where(o => o.Id == otpId && !o.Consumido)
             .ExecuteUpdateAsync(s => s.SetProperty(o => o.Consumido, true), ct) == 1;
+
+    public Task<bool> ConsumidoAsync(Guid otpId, CancellationToken ct = default) =>
+        // A entidade rastreada guarda o Consumido de antes do UPDATE da outra requisição: lê o banco.
+        db.ClienteOtps.AsNoTracking().AnyAsync(o => o.Id == otpId && o.Consumido, ct);
 }

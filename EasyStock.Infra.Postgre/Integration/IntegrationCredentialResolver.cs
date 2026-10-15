@@ -269,7 +269,9 @@ public sealed class IntegrationCredentialResolver(
     /// Resolve a KEK pelo id. Lança em ausência ou tamanho inválido.
     /// Retorno: array de bytes (32 bytes) que o caller deve zerar após uso.
     /// </summary>
-    private byte[] ResolveKek(string kekId)
+    private byte[] ResolveKek(string kekId) => ResolveKek(config, kekId);
+
+    internal static byte[] ResolveKek(IConfiguration config, string kekId)
     {
         var kekBase64 = config[$"Crypto:Keks:{kekId}"];
         if (string.IsNullOrWhiteSpace(kekBase64))
@@ -311,7 +313,7 @@ public sealed class IntegrationCredentialResolver(
         return (cipher, iv, tag);
     }
 
-    private static byte[] DecryptAesGcm(byte[] cipher, byte[] iv, byte[] tag, byte[] key)
+    internal static byte[] DecryptAesGcm(byte[] cipher, byte[] iv, byte[] tag, byte[] key)
     {
         var plaintext = new byte[cipher.Length];
         using var aes = new AesGcm(key, TagSizeBytes);

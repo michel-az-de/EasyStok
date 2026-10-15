@@ -1,3 +1,4 @@
+using EasyStock.Application.Seguranca;
 using Serilog.Events;
 using Serilog.Formatting;
 using Serilog.Formatting.Display;

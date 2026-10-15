@@ -47,5 +47,5 @@ export function useLarguras() {
     })
   }, [])
 
-  return { larguras: largurasDaTela(escolhidas, tela), padrao: padraoPorTela(tela), definir }
+  return { larguras: largurasDaTela(escolhidas, tela), padrao: padraoPorTela(tela), definir, tela }
 }

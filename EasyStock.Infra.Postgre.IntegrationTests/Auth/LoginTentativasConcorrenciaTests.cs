@@ -200,6 +200,69 @@ public sealed class LoginTentativasConcorrenciaTests(PostgreSqlDatabaseFixture f
             .Consumido.Should().BeTrue();
     }
 
+    [SkippableFact]
+    public async Task FalhaAoCriarSessaoPreservaOtpParaRetentarSemDevolverTentativa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresaId = Guid.NewGuid();
+        const string telefone = "+5511997573992";
+        var otp = ClienteOtp.Criar(empresaId, ClienteOtp.CalcularTelefoneHash(telefone),
+            Bcrypt.Hash("123456"), TimeProvider.System);
+        var cliente = Cliente.Criar(empresaId, "Cliente da loja");
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Empresas.Add(new Empresa
+            {
+                Id = empresaId, Nome = "Empresa OTP rollback", Documento = empresaId.ToString("N")[..14],
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+            });
+            seed.Clientes.Add(cliente);
+            seed.ClienteOtps.Add(otp);
+            await seed.SaveChangesAsync();
+        }
+        var storefront = Domain.Entities.Storefront.Storefront.Criar(empresaId, "sf-rollback", "SF", 0m);
+        storefront.Ativar();
+        var storefronts = Substitute.For<IStorefrontRepository>();
+        storefronts.GetBySlugAsync("sf-rollback", Arg.Any<CancellationToken>()).Returns(storefront);
+        var clientes = Substitute.For<IClienteStorefrontRepository>();
+        clientes.GetByTelefoneHashAsync(empresaId, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(cliente);
+        var input = new ValidarOtpInput("sf-rollback", telefone, "123456", null, null, null);
+
+        ValidarOtpUseCase Criar(EasyStockDbContext db, IClienteSessionRepository sessoes) => new(
+            storefronts, new ClienteOtpRepository(db), clientes, sessoes,
+            new IdentificarClientePorTelefoneUseCase(Substitute.For<IClienteRepository>(), clientes,
+                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+            Bcrypt, db, TimeProvider.System, NullLogger<ValidarOtpUseCase>.Instance);
+
+        await using (var db = ContextoDoTenant(empresaId))
+        {
+            var sessoes = Substitute.For<IClienteSessionRepository>();
+            sessoes.AddAsync(Arg.Any<ClienteSession>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromException(new InvalidOperationException("Falha de persistência simulada")));
+            var erro = await Capturar(() => Criar(db, sessoes).ExecuteAsync(input));
+            erro.Should().BeOfType<InvalidOperationException>();
+        }
+        await using (var leitura = fixture.CreateDbContext())
+        {
+            var gravado = await leitura.ClienteOtps.IgnoreQueryFilters().SingleAsync(o => o.Id == otp.Id);
+            gravado.Consumido.Should().BeFalse("não houve sessão para o código consumido");
+            gravado.Tentativas.Should().Be(1, "rollback da sessão não devolve tentativa de autenticação");
+            (await leitura.ClienteSessions.IgnoreQueryFilters().AnyAsync(s => s.EmpresaId == empresaId)).Should().BeFalse();
+        }
+        await using (var db = ContextoDoTenant(empresaId))
+        {
+            var resultado = await Criar(db, new ClienteSessionRepository(db)).ExecuteAsync(input);
+            resultado.SessionId.Should().NotBeEmpty();
+        }
+        await using (var leitura = fixture.CreateDbContext())
+        {
+            var gravado = await leitura.ClienteOtps.IgnoreQueryFilters().SingleAsync(o => o.Id == otp.Id);
+            gravado.Consumido.Should().BeTrue();
+            gravado.Tentativas.Should().Be(2);
+            (await leitura.ClienteSessions.IgnoreQueryFilters().CountAsync(s => s.EmpresaId == empresaId)).Should().Be(1);
+        }
+    }
+
     private async Task<Usuario> SemearUsuarioAsync(Usuario usuario)
     {
         await using var db = fixture.CreateDbContext();
