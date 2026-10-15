@@ -19,6 +19,44 @@ function VisualFoto({ imagem, previa }) {
 const ids = (imagem) => JSON.parse(imagem.itensJson || '[]')
 const formatos = ['1:1', '4:5', '16:9', '9:16', '3:2', 'livre']
 
+function EscolhaDeImagem({ listar, ocupado, pratoId, aoEscolher }) {
+  const [busca, setBusca] = useState('')
+  const [pagina, setPagina] = useState(0)
+  const [tentativa, setTentativa] = useState(0)
+  const [resultado, setResultado] = useState(null)
+  useEffect(() => {
+    let ativo = true
+    const tempo = setTimeout(() => {
+      listar(pagina, { busca }).then(imagens => {
+        if (ativo) setResultado({ busca, pagina, tentativa, imagens, erro: '' })
+      }).catch(e => {
+        if (ativo) setResultado({ busca, pagina, tentativa, imagens: [], erro: e.message })
+      })
+    }, 250)
+    return () => { ativo = false; clearTimeout(tempo) }
+  }, [busca, pagina, tentativa, listar])
+  const carregando = !resultado || resultado.busca !== busca || resultado.pagina !== pagina || resultado.tentativa !== tentativa
+  const imagens = carregando ? [] : resultado.imagens
+  const erro = carregando ? '' : resultado.erro
+  return <div className={css.formulario}>
+    <label>Buscar imagem aprovada<input type="search" value={busca} disabled={ocupado} onChange={e => { setBusca(e.target.value); setPagina(0) }} placeholder="Título da imagem" /></label>
+    <div className={css.acoes}>
+      <Botao disabled={!pagina || carregando || ocupado} onClick={() => setPagina(pagina - 1)}>Anterior</Botao>
+      <output>Página {pagina + 1}</output>
+      <Botao disabled={imagens.length < 60 || carregando || ocupado} onClick={() => setPagina(pagina + 1)}>Próxima</Botao>
+      {busca && <Botao disabled={ocupado} onClick={() => { setBusca(''); setPagina(0) }}>Limpar busca</Botao>}
+    </div>
+    {carregando ? <output>Carregando imagens…</output> : erro ? <div><p role="alert" className={css.erro}>{erro}</p><Botao disabled={ocupado} onClick={() => setTentativa(tentativa + 1)}>Tentar novamente</Botao></div> : <>
+      <div className={css.grade}>{imagens.filter(i => i.aprovadoEm).map(i =>
+        <button type="button" key={i.id} className={css.cartao} disabled={ocupado} onClick={() => aoEscolher(i)}>
+          <Foto imagem={i} /><strong>{i.titulo}</strong><span>{ids(i).includes(pratoId) ? 'Já vinculada a este prato' : i.origem + ' · ' + i.formato}</span>
+        </button>)}</div>
+      {!imagens.some(i => i.aprovadoEm) && <div><p>Nenhuma imagem aprovada nesta página.</p><p>Tente outra busca{imagens.length === 60 ? ' ou avance para a próxima página' : ''}. Para aprovar uma imagem, feche esta janela e abra sua ficha no acervo.</p></div>}
+    </>}
+  </div>
+}
+
+
 export function AbaAcervo() {
   const a = useAcervo()
   const [busca, setBusca] = useState('')
@@ -34,6 +72,7 @@ export function AbaAcervo() {
   const setDialogo = (novo) => { fluxoAtual.current++; definirDialogo(novo) }
   const [historico, setHistorico] = useState([])
   const [publicacao, setPublicacao] = useState(null)
+  const [imagemEscolhida, setImagemEscolhida] = useState(null)
   const [aviso, setAviso] = useState('')
   const [solicitacaoId, setSolicitacaoId] = useState(null)
   // #1808: o prato escolhido na ficha ("Usar em um prato") e o prato clicado em "Fotos do cardápio".
@@ -41,7 +80,7 @@ export function AbaAcervo() {
   const [pratoAlvo, setPratoAlvo] = useState(null)
   const [paraGaleria, setParaGaleria] = useState(false)
   const detalhe = useRef(null)
-  const imagem = a.imagens.find((i) => i.id === selecionada)
+  const imagem = dialogo === 'publicar' && imagemEscolhida ? imagemEscolhida : a.imagens.find((i) => i.id === selecionada)
   const previa = useMiniaturaAcervo(imagem?.id)
   useEffect(() => {
     if (selecionada && detalhe.current) {
@@ -56,10 +95,11 @@ export function AbaAcervo() {
     if (resultado !== false && fluxoAtual.current === fluxo) { setDialogo(null); setAviso(mensagem) }
     return resultado
   }
-  async function prepararPublicacao(itemId, galeria, imagemId = imagem.id) {
+  async function prepararPublicacao(itemId, galeria, imagemId = imagem.id, imagemDoSeletor = null) {
     const fluxo = fluxoAtual.current
     const item = await a.fazer(() => a.obterItem(itemId))
     if (item !== false && selecionadaAtual.current === imagemId && fluxoAtual.current === fluxo) {
+      setImagemEscolhida(imagemDoSeletor)
       setPublicacao({ imagemId, itemId, galeria, capaEsperada: item.fotoUrl, nome: item.nome, operacaoId: crypto.randomUUID() })
       setDialogo('publicar')
     }
@@ -67,10 +107,11 @@ export function AbaAcervo() {
   const selecionar = (id) => { selecionadaAtual.current = id; setSelecionada(id); setHistorico([]); setPublicacao(null); setPratoEscolhido('') }
   // #1808: na grade "Fotos do cardápio", o clique no prato abre a escolha de uma imagem aprovada.
   const escolherImagemParaPrato = (item) => { setPratoAlvo({ id: item.cardapioItemId, nome: item.nome }); setParaGaleria(false); setDialogo('escolherImagem') }
-  async function usarImagemNoPrato(imagemId) {
+  async function usarImagemNoPrato(imagemDoSeletor) {
+    const imagemId = imagemDoSeletor.id
     selecionar(imagemId)
     setPratoEscolhido(pratoAlvo.id)
-    await prepararPublicacao(pratoAlvo.id, paraGaleria, imagemId)
+    await prepararPublicacao(pratoAlvo.id, paraGaleria, imagemId, imagemDoSeletor)
   }
   async function enviarArquivo(e) {
     e.preventDefault()
@@ -168,11 +209,7 @@ export function AbaAcervo() {
       {dialogo === 'escolherImagem' && pratoAlvo && <div className={css.formulario}>
         <p>Escolha uma imagem aprovada do acervo. Você confere a prévia antes de publicar.</p>
         <fieldset><label><input type="checkbox" checked={paraGaleria} disabled={a.ocupado} onChange={(e) => setParaGaleria(e.target.checked)} /> Adicionar à galeria em vez de trocar a capa</label></fieldset>
-        <div className={css.grade}>{a.imagens.filter((i) => i.aprovadoEm).map((i) =>
-          <button type="button" key={i.id} className={css.cartao} disabled={a.ocupado} onClick={() => usarImagemNoPrato(i.id)}>
-            <Foto imagem={i} /><strong>{i.titulo}</strong><span>{ids(i).includes(pratoAlvo.id) ? 'Já vinculada a este prato' : `${i.origem} · ${i.formato}`}</span>
-          </button>)}</div>
-        {!a.imagens.some((i) => i.aprovadoEm) && <p>Nenhuma imagem aprovada nesta página do acervo. Aprove uma imagem ou mude os filtros abaixo.</p>}
+        <EscolhaDeImagem listar={a.api.listarImagens} ocupado={a.ocupado} pratoId={pratoAlvo.id} aoEscolher={usarImagemNoPrato} />
       </div>}
       {dialogo === 'solicitar' && <form className={css.formulario} onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); executar(() => a.api.solicitarImagem({ operacaoId: solicitacaoId, itemId: f.get('itemId'), formato: f.get('formato'), brief: f.get('brief'), referencias: imagem ? [imagem.id] : [] }), 'Solicitação registrada na fila.') }}>
         <label>Item<select name="itemId" required>{a.itens.map((i) => <option key={i.cardapioItemId} value={i.cardapioItemId}>{i.nome}</option>)}</select></label>
