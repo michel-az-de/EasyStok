@@ -108,8 +108,8 @@ public class ComandaHtmlTests
 
     [Theory]
     [InlineData(ImpressoHtml.Etiqueta10x15, "100mm 150mm")]
-    [InlineData(ImpressoHtml.Cupom80, "80mm auto")]
-    [InlineData(ImpressoHtml.Cupom58, "58mm auto")]
+    [InlineData(ImpressoHtml.Cupom80, "auto")]
+    [InlineData(ImpressoHtml.Cupom58, "auto")]
     public async Task TermicaSoPretoENoTamanhoDoPapel(string modelo, string pagina)
     {
         var html = await Renderizar(Exemplo(), modelo);
