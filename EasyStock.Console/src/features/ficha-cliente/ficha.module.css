@@ -495,9 +495,9 @@
 
 /* #1839: cartão do cliente no Resumo, sempre à vista. */
 .cartaoCliente { display: grid; gap: var(--e-2); margin: 0 var(--e-4); padding: var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
-.cartaoClienteAbrir { all: unset; display: grid; gap: var(--e-1); cursor: pointer; border-radius: var(--r-1); }
+.cartaoClienteAbrir { all: unset; display: grid; text-align: left; gap: var(--e-1); cursor: pointer; border-radius: var(--r-1); }
 .cartaoClienteAbrir:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
-.resumoIa { margin: 0; color: var(--tinta); line-height: 1.45; }
+.resumoIa { display: block; margin: 0; color: var(--tinta); line-height: 1.45; }
 .resumoIaCarregando { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .numerosCliente { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .tagsCliente { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1); }

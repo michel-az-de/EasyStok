@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Cliente.Dossie;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EasyStock.Application.UseCases.Atendimento;
 
@@ -13,10 +14,11 @@ public sealed record ResumoClienteResult(string? Texto, bool PorIa);
 /// Resumo do cliente no topo do Resumo do Balcão (#1839): quem é, como costuma comprar e o que pede.
 /// Lê o mesmo dossiê do painel (<see cref="ObterDossieClienteUseCase"/>) e o mesmo texto que o agente
 /// recebe (<see cref="ResumoDossieParaAgente"/>), numa chamada só, sem ferramentas. Nunca sai para o
-/// cliente. Sem IA configurada ou com falha, devolve texto nulo: a tela mostra só os números.
+/// cliente. Sem IA configurada ou com falha, devolve texto nulo: a tela mostra só os números. O texto fica 12 h
+/// em cache por cliente, pedidos, última compra e notas: abrir de novo não paga outra chamada.
 /// </summary>
 public sealed class ResumirClienteUseCase(
-    IAgenteLlmClient llm, ObterDossieClienteUseCase dossies, ILogger<ResumirClienteUseCase> logger)
+    IAgenteLlmClient llm, ObterDossieClienteUseCase dossies, IMemoryCache cache, ILogger<ResumirClienteUseCase> logger)
 {
     public const string SystemPrompt =
         "Você resume para a atendente de uma casa de massas artesanais quem é o cliente da conversa, a partir do " +
@@ -33,6 +35,8 @@ public sealed class ResumirClienteUseCase(
             ?? throw new ConversaNaoEncontradaException(conversaId);
         if (dossie.TotalPedidos == 0 && dossie.Notas.Count == 0) return new(SemCompra, false);
         if (!llm.Disponivel) return new(null, false);
+        var chave = $"resumo-cliente:{empresaId:N}:{dossie.Cliente.Id ?? conversaId:N}:{dossie.TotalPedidos}:{dossie.UltimaCompraEm:O}:{dossie.Notas.Count}";
+        if (cache.TryGetValue(chave, out ResumoClienteResult? guardado) && guardado is not null) return guardado;
         try
         {
             var resposta = await llm.EnviarAsync(new RequisicaoLlm(
@@ -43,9 +47,12 @@ public sealed class ResumirClienteUseCase(
                 string.Join(" ", resposta.Conteudo.OfType<BlocoTextoLlm>().Select(b => b.Texto)).Trim());
             logger.LogInformation("Resumo do cliente por IA: empresa {EmpresaId}, conversa {ConversaId}, {TokensEntrada}+{TokensSaida} tokens",
                 empresaId, conversaId, resposta.TokensEntrada, resposta.TokensSaida);
-            return new(texto.Length == 0 ? null : texto, texto.Length > 0);
+            var resultado = new ResumoClienteResult(texto.Length == 0 ? null : texto, texto.Length > 0);
+            if (resultado.PorIa) cache.Set(chave, resultado, TimeSpan.FromHours(12));
+            return resultado;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        // O timeout do cliente HTTP também é OperationCanceledException; só o cancelamento de quem pediu sobe.
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Resumo do cliente por IA falhou: empresa {EmpresaId}, conversa {ConversaId}", empresaId, conversaId);
             return new(null, false);

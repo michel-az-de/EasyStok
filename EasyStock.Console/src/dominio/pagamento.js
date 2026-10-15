@@ -92,12 +92,16 @@ export function extratoDoPedido(pedido) {
   if (!pedido?.pedidoId || typeof pedido.totalApi !== 'number') return null
   const frete = pedido.frete ?? 0
   const pagamentos = [...(pedido.pagamentosApi ?? [])].sort((a, b) => (a.em ?? 0) - (b.em ?? 0))
-  const pago = pedido.totalPagoApi ?? pagamentos.reduce((soma, p) => soma + p.valor, 0)
+  const recebido = pedido.totalPagoApi ?? pagamentos.reduce((soma, p) => soma + p.valor, 0)
+  // O saldo vem do alocado do servidor (recebido menos devolvido, com cupom), o mesmo da Cobrança;
+  // a diferença para o recebido vira uma linha de ajuste para o extrato fechar.
+  const pago = pedido.alocadoApi ?? recebido
   return {
     itens: Math.max(pedido.totalApi - frete, 0),
     frete,
     total: pedido.totalApi,
     pagamentos: pagamentos.map((p) => ({ id: p.pagamentoId, em: p.em, meio: p.meio, valor: p.valor })),
+    ajuste: Math.round((pago - recebido) * 100) / 100,
     pago,
     saldo: Math.max(pedido.totalApi - pago, 0),
   }

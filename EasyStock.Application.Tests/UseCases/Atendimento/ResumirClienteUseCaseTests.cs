@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento;
@@ -30,9 +31,11 @@ public class ResumirClienteUseCaseTests
             .Returns(new RespostaLlm("end_turn", [new BlocoTextoLlm("Cliente frequente — pede lasanha bolonhesa.")], 300, 30));
     }
 
+    private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions());
+
     private ResumirClienteUseCase Criar() => new(_llm,
         new ObterDossieClienteUseCase(_clientes, _crm, _pedidos, Substitute.For<IDomicilioQueries>(), _conversas),
-        NullLogger<ResumirClienteUseCase>.Instance);
+        _cache, NullLogger<ResumirClienteUseCase>.Instance);
 
     private void ClienteComPedidos()
     {
@@ -42,6 +45,7 @@ public class ResumirClienteUseCaseTests
         _pedidos.ListarAsync(_empresaId, cliente.Id, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([
             new PedidoResumoCliente(Guid.NewGuid(), "entregue", Agora.AddDays(-3), 90m, [new ItemPedidoResumo("Lasanha Bolonhesa", 2)]),
             new PedidoResumoCliente(Guid.NewGuid(), "entregue", Agora.AddDays(-10), 45m, [new ItemPedidoResumo("Lasanha Bolonhesa", 1)]),
+            new PedidoResumoCliente(Guid.NewGuid(), "aguardando_pagamento", Agora, 70m, [new ItemPedidoResumo("Nhoque", 1)]),
         ]);
         _conversa.VincularCliente(cliente.Id);
     }
@@ -65,7 +69,7 @@ public class ResumirClienteUseCaseTests
         resultado.PorIa.Should().BeTrue();
         resultado.Texto.Should().NotContain("—").And.Contain("lasanha bolonhesa");
         await _llm.Received(1).EnviarAsync(Arg.Is<RequisicaoLlm>(r => r.Ferramentas.Count == 0
-            && r.Mensagens.Single().Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Contains("Pedidos: 2")), Arg.Any<CancellationToken>());
+            && r.Mensagens.Single().Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Contains("Pedidos: 3")), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -78,10 +82,23 @@ public class ResumirClienteUseCaseTests
         _llm.Disponivel.Returns(true);
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns<RespostaLlm>(_ => throw new HttpRequestException("fora"));
         (await Criar().ExecuteAsync(_empresaId, _conversa.Id)).Should().Be(new ResumoClienteResult(null, false));
+
+        // Timeout do HttpClient chega como TaskCanceledException sem cancelamento de quem pediu.
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns<RespostaLlm>(_ => throw new TaskCanceledException("timeout"));
+        (await Criar().ExecuteAsync(_empresaId, _conversa.Id)).Should().Be(new ResumoClienteResult(null, false));
     }
 
     [Fact]
-    public async Task Dossie_soma_o_total_gasto_das_compras()
+    public async Task Abrir_de_novo_o_mesmo_cliente_nao_paga_outra_chamada()
+    {
+        ClienteComPedidos();
+        await Criar().ExecuteAsync(_empresaId, _conversa.Id);
+        await Criar().ExecuteAsync(_empresaId, _conversa.Id);
+        await _llm.Received(1).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Dossie_soma_o_total_gasto_das_compras_sem_o_pedido_ainda_nao_pago()
     {
         ClienteComPedidos();
         var dossie = await new ObterDossieClienteUseCase(_clientes, _crm, _pedidos, Substitute.For<IDomicilioQueries>(), _conversas)

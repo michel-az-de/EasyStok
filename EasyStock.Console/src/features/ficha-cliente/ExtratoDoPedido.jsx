@@ -22,6 +22,7 @@ export function ExtratoDoPedido({ pedido }) {
         {extrato.pagamentos.map((p) => (
           <div key={p.id}><dt>{p.em ? quando(p.em) : 'Pagamento'} · {nomeDoMeio(p.meio)}</dt><dd>− {moeda(p.valor)}</dd></div>
         ))}
+        {extrato.ajuste !== 0 && <div><dt>{extrato.ajuste < 0 ? 'Devoluções' : 'Cupom e créditos'}</dt><dd>{extrato.ajuste < 0 ? '+ ' : '− '}{moeda(Math.abs(extrato.ajuste))}</dd></div>}
         <div className={css.extratoTotal}><dt>{extrato.saldo > 0 ? 'A receber' : 'Quitado'}</dt><dd>{moeda(extrato.saldo)}</dd></div>
       </dl>
     </section>

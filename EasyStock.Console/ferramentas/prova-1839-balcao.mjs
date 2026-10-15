@@ -26,6 +26,8 @@ await provar('extrato separa itens e frete, lista os pagamentos em ordem e mostr
   assert.deepEqual(extrato.pagamentos.map((p) => p.id), ['a', 'b'])
   assert.equal(extratoDoPedido({ pedidoId: 'p', totalApi: 50, frete: 0, pagamentosApi: [{ pagamentoId: 'x', em: 1, valor: 20 }] }).saldo, 30)
   assert.equal(extratoDoPedido({ totalApi: 50 }), null, 'sem pedido no EasyStok não há extrato')
+  const estornado = extratoDoPedido({ pedidoId: 'p', totalApi: 100, frete: 0, totalPagoApi: 100, alocadoApi: 60, pagamentosApi: [{ pagamentoId: 'x', em: 1, valor: 100 }] })
+  assert.deepEqual([estornado.ajuste, estornado.pago, estornado.saldo], [-40, 60, 40], 'estorno sai do pago e volta a receber')
 })
 
 const { clienteDoDossie } = await import('../src/infra/api/traducaoCliente.js')
@@ -48,10 +50,12 @@ await provar('o Resumo diz Comanda no EasyStok e mostra o cartão do cliente sem
   assert.match(painel, /\{fonteApi && <ExtratoDoPedido pedido=\{pedido\} \/>\}/)
 })
 
-await provar('a nota interna abre como post-it pequeno, não como modal', () => {
+await provar('a nota interna abre como post-it pequeno, foca só ao abrir e o Esc é dela', () => {
   const nota = ler('features/notas/ModalNota.jsx')
   assert.doesNotMatch(nota, /from '..\/..\/componentes\/Modal'/)
-  assert.match(nota, /<dialog open className=\{css\.postit\}/)
+  assert.match(nota, /<dialog open className=\{css\.postit\} aria-label="Nota interna" onKeyDown=\{aoTeclar\}>/)
+  assert.match(nota, /useEffect\(\(\) => \{ campo\.current\?\.focus\(\) \}, \[\]\)/)
+  assert.doesNotMatch(nota, /document\.addEventListener/)
 })
 
 console.log(`${passou} cenários da #1839 (Balcão) aprovados.`)

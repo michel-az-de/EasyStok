@@ -31,15 +31,13 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar }) {
     }
   }
 
-  useEffect(() => {
-    campo.current?.focus()
-    const aoTeclar = (e) => { if (e.key === 'Escape' && !salvando.current) aoFechar() }
-    document.addEventListener('keydown', aoTeclar)
-    return () => document.removeEventListener('keydown', aoTeclar)
-  }, [aoFechar])
+  // Foco só ao abrir: `aoFechar` muda de identidade a cada render do App e não pode refazer o foco.
+  useEffect(() => { campo.current?.focus() }, [])
+  // Esc só fecha quando o foco está no post-it: o Esc de um modal ou da barra "/" não apaga a nota.
+  const aoTeclar = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !salvando.current) { e.stopPropagation(); aoFechar() } }
 
   return (
-    <dialog open className={css.postit} aria-label="Nota interna">
+    <dialog open className={css.postit} aria-label="Nota interna" onKeyDown={aoTeclar}>
       <p className={css.titulo}>Nota interna <span>· {nomeCliente} nunca vê</span></p>
       <CampoArea
         rotulo="Texto da nota"
