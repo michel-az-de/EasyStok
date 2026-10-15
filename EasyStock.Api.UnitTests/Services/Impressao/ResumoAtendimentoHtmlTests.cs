@@ -68,4 +68,13 @@ public class ResumoAtendimentoHtmlTests
         (await Renderizar(Exemplo(), ImpressoHtml.Cupom80)).Should().Contain("<div class=\"wm\">Casa da Baba</div>");
         (await Renderizar(Exemplo(), ImpressoHtml.A4)).Should().Contain("src=\"https://api.test/lojas/a/b/logo/x.png\"");
     }
+
+    [Fact]
+    public void Corpo_grande_ou_com_item_nulo_e_recusado()
+    {
+        ResumoAtendimentoHtml.Valido(Exemplo()).Should().BeTrue();
+        ResumoAtendimentoHtml.Valido(Exemplo(anotacao: new string('a', 2001))).Should().BeFalse();
+        ResumoAtendimentoHtml.Valido(Exemplo(vendas: [null!])).Should().BeFalse();
+        ResumoAtendimentoHtml.Valido(Exemplo(cliente: " ")).Should().BeFalse();
+    }
 }

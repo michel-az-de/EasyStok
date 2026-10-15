@@ -44,6 +44,21 @@ public sealed record ResumoAtendimentoImpresso(
 public sealed class ResumoAtendimentoHtml(IRendererTemplate renderer)
 {
     public const string Documento = "resumo";
+    private const int TextoCurto = 200;
+    private const int TextoLongo = 2000;
+    private const int MaxLinhas = 60;
+
+    /// <summary>Corpo vindo do console: tamanho limitado e sem item nulo, para não virar papel arbitrário.</summary>
+    public static bool Valido(ResumoAtendimentoImpresso r) =>
+        !string.IsNullOrWhiteSpace(r.Cliente) && Cabe(r.Cliente, TextoCurto) && Cabe(r.Contato, TextoCurto) && Cabe(r.Numero, 40)
+        && Cabe(r.Duracao, 40) && Cabe(r.Faixa, 40) && Cabe(r.Converteu, 40) && Cabe(r.AvaliacaoCliente, 40)
+        && Cabe(r.Autoavaliacao, 40) && Cabe(r.Anotacao, TextoLongo)
+        && r.MensagensCliente >= 0 && r.MensagensVoce >= 0 && r.MensagensAutomatico >= 0
+        && r.Vendas is { Count: <= MaxLinhas } && r.Vendas.All(v => v is not null && Cabe(v.Numero, 40) && Cabe(v.Itens, TextoLongo)
+            && Cabe(v.Meio, 40) && Cabe(v.Situacao, 60))
+        && r.Marcos is { Count: <= MaxLinhas } && r.Marcos.All(m => m is not null && Cabe(m.Hora, 10) && Cabe(m.Rotulo, TextoCurto));
+
+    private static bool Cabe(string? s, int max) => s is null || s.Length <= max;
 
     public async Task<string> RenderizarAsync(
         ResumoAtendimentoImpresso resumo, PedidoImpressoCasaLeitura casa, string modelo, string baseUrl, DateTime agora, CancellationToken ct = default)

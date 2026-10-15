@@ -21,7 +21,7 @@ const rotuloDe = (opcoes, valor) => opcoes.find((o) => o.valor === valor)?.rotul
 // (o "Ver canhoto" do Balcão), sem um modal intermediário.
 export function ImprimirPedido({
   documentos, papeis, papelPadrao, perfis = perfilLivre(papeis), perfilPadrao = () => perfis[0].valor, orientacao,
-  preparar, obterPrevia, historico, confirmar, documentoInicial, aoImprimir, abrirImpressao = imprimirHtml,
+  preparar, obterPrevia, historico, confirmar, documentoInicial, aoImprimir, aoAbrirImpressao, abrirImpressao = imprimirHtml,
   rotulo = 'Imprimir', variante = 'secundario', titulo = 'Imprimir pedido', contexto, clienteNome,
   semGatilho = false, semHistorico = false, semCodigo = false, aoFechar, ...resto
 }) {
@@ -43,6 +43,7 @@ export function ImprimirPedido({
   const [erroHistorico, setErroHistorico] = useState(null)
   const [carregandoHistorico, setCarregandoHistorico] = useState(false)
   const operacao = useRef(null)
+  const solicitacao = useRef(null)
   const focoEstado = useRef(null)
   const historicoRef = useRef(historico)
   const previaRef = useRef(obterPrevia)
@@ -79,7 +80,7 @@ export function ImprimirPedido({
   }, [aberto, pagina, revisao, semHistorico])
 
   const fechar = () => { operacao.current?.abort(); operacao.current = null; setAberto(false); aoFechar?.() }
-  const limpar = () => { setRegistro(null); setReimpressao(null); setSituacao({ estado: 'ocioso' }) }
+  const limpar = () => { solicitacao.current = null; setRegistro(null); setReimpressao(null); setSituacao({ estado: 'ocioso' }) }
   const perfilDe = (valor) => perfis.find((p) => p.valor === valor) ?? perfis[0]
   // Documento traz o perfil e o papel guardados no aparelho; perfil dedicado puxa o papel dele.
   const escolherDocumento = (valor) => { limpar(); setDocumento(valor); setPerfil(perfilDe(perfilPadrao(valor)).valor); setPapel(papelPadrao(valor)) }
@@ -88,33 +89,46 @@ export function ImprimirPedido({
     const compativeis = perfilDe(valor).papeis
     if (!compativeis.includes(papel)) setPapel(compativeis[0])
   }
-  const abrir = () => { escolherDocumento(documento); setPagina(1); setAberto(true) }
+  // Prévia de uma abertura anterior não vale: o pedido ou o resumo podem ter mudado (#1839).
+  const abrir = () => { escolherDocumento(documento); setPrevia(null); setPagina(1); setAberto(true) }
 
-  // Abre o diálogo com o papel em tela e, em paralelo, guarda a tentativa. A reimpressão já foi
-  // guardada ao buscar o original, então só abre o diálogo.
+  // Guarda a tentativa e imprime o documento guardado: o papel e o histórico são o mesmo HTML (#1839).
+  // A prévia é para conferir; se o pedido mudou desde que ela abriu, sai o estado atual. A solicitação
+  // repete o mesmo identificador até dar certo, então rede que cai depois do servidor gravar não duplica.
+  // O resumo do atendimento (`semHistorico`) não é de um pedido: imprime a própria prévia.
   async function imprimir() {
-    if (operacao.current) return
-    const html = reimpressao?.html ?? (previaAtual?.estado === 'pronta' ? previaAtual.html : null)
-    if (!html) return
+    if (operacao.current || !papelNaTela) return
     const controle = new AbortController()
     operacao.current = controle
     setSituacao({ estado: 'imprimindo' })
-    const guardar = semHistorico ? Promise.resolve(null) : reimpressao && registro ? Promise.resolve(registro)
-      : preparar({ documento, modelo: papel, codigo, perfil: perfilDe(perfil).rotulo, solicitacaoId: crypto.randomUUID() }, controle.signal)
-        .then((pronto) => { if (!controle.signal.aborted) { setRegistro(pronto); setRevisao((r) => r + 1) } return pronto })
-    guardar.catch(() => {})
-    let abriu = false
     try {
+      let html
+      if (semHistorico) html = papelNaTela.html
+      else if (reimpressao && registro) html = reimpressao.html
+      else {
+        setRegistro(null)
+        const opcoes = { documento, modelo: papel, codigo, perfil: perfilDe(perfil).rotulo }
+        const pronto = await prepararUmaVez(opcoes, controle.signal)
+        setRegistro(pronto)
+        setRevisao((r) => r + 1)
+        html = pronto.html
+      }
       const destino = await abrirImpressao(html, { sinal: controle.signal })
       controle.signal.throwIfAborted()
-      abriu = true
       setSituacao(semHistorico ? { estado: 'ocioso' } : { estado: 'aguardando', destino })
-      await guardar
+      await aoAbrirImpressao?.(reimpressao?.documento ?? documento)
     } catch (erro) {
-      if (!controle.signal.aborted) setSituacao(abriu
-        ? { estado: 'aguardando', mensagem: `A impressão abriu, mas o histórico não registrou. ${erro.message}`, semRegistro: true }
-        : { estado: 'erro', mensagem: erro.message })
+      if (!controle.signal.aborted) setSituacao({ estado: 'erro', mensagem: erro.message })
     } finally { if (operacao.current === controle) operacao.current = null }
+  }
+
+  async function prepararUmaVez(opcoes, sinal) {
+    const chave = JSON.stringify(opcoes)
+    if (solicitacao.current?.chave !== chave) solicitacao.current = { chave, id: crypto.randomUUID() }
+    const pronto = await preparar({ ...opcoes, solicitacaoId: solicitacao.current.id }, sinal)
+    sinal.throwIfAborted()
+    solicitacao.current = null
+    return pronto
   }
 
   async function confirmarSaida() {
@@ -146,10 +160,7 @@ export function ImprimirPedido({
     operacao.current = controle
     setSituacao({ estado: 'carregando' })
     try {
-      const pronto = await preparar({
-        documento: item.documento, modelo: item.modelo, codigo: item.codigo, perfil: item.perfil, originalId: item.id, solicitacaoId: crypto.randomUUID(),
-      }, controle.signal)
-      controle.signal.throwIfAborted()
+      const pronto = await prepararUmaVez({ documento: item.documento, modelo: item.modelo, codigo: item.codigo, perfil: item.perfil, originalId: item.id }, controle.signal)
       setRegistro(pronto)
       setReimpressao({ ...item, html: pronto.html })
       setRevisao((r) => r + 1)

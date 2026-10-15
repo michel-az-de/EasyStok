@@ -66,7 +66,7 @@ public sealed class DocumentosImpressosController(PrepararDocumentoImpressoUseCa
     {
         if (!TryResolveEmpresaId(usuario, null, out var empresa, out var erro)) return erro!;
         var papel = string.IsNullOrWhiteSpace(modelo) ? ImpressoHtml.A4 : modelo.Trim().ToLowerInvariant();
-        if (body is null || !ImpressoHtml.Papeis.Contains(papel) || string.IsNullOrWhiteSpace(body.Cliente))
+        if (body is null || !ImpressoHtml.Papeis.Contains(papel) || !ResumoAtendimentoHtml.Valido(body))
             return DataBadRequest("Papel ou resumo inválidos.");
         var origem = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
         var casa = await casas.ObterCasaAsync(empresa, null, ct);

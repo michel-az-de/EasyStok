@@ -76,7 +76,7 @@ await provar('abre com o papel na tela; um clique imprime a prévia e grava a te
   assert.equal(papelNaTela(t).html, '<p>pedido-a4-qr</p>'); assert.equal(papelNaTela(t).modelo, 'a4')
   assert.equal(preparadas.length, 0, 'abrir não grava tentativa')
   await clicar(t, 'Imprimir')
-  assert.deepEqual(impressas, ['<p>pedido-a4-qr</p>'])
+  assert.deepEqual(impressas, ['<h1>x</h1>'], 'imprime o documento guardado, o mesmo do histórico')
   assert.equal(preparadas.length, 1); assert.deepEqual([preparadas[0].documento, preparadas[0].modelo, preparadas[0].codigo], ['pedido', 'a4', 'qr'])
   assert.ok(conteudo(t).includes('Saiu certo?')); assert.ok(botao(t, 'Fechar'))
   await clicar(t, 'Sim, saiu')
@@ -126,11 +126,32 @@ await provar('falha ao registrar a confirmação repete só a confirmação, sem
   assert.equal(impressas, 1); assert.equal(confirmadas, 2); assert.equal(callbacks, 1); assert.ok(conteudo(t).includes('Saída registrada no histórico'))
   t.encerrar()
 })
-await provar('o diálogo abre mesmo se o histórico não gravar, e avisa sem pedir confirmação', async () => {
+await provar('sem gravar não imprime; tentar de novo repete a mesma solicitação e a próxima impressão é outra', async () => {
+  const ids = []
   let impressas = 0
-  const t = new Tela(props({ preparar: async () => { throw new Error('Sem conexão') }, abrirImpressao: async () => { impressas++; return 'dialogo' } }))
+  const t = new Tela(props({ preparar: async o => { ids.push(o.solicitacaoId); if (ids.length === 1) throw new Error('Sem conexão'); return { ...o, id: 'r' + ids.length, html: '<h1>x</h1>' } }, abrirImpressao: async () => { impressas++; return 'dialogo' } }))
   await clicar(t, 'Imprimir'); await clicar(t, 'Imprimir')
-  assert.equal(impressas, 1); assert.ok(conteudo(t).includes('o histórico não registrou')); assert.equal(botao(t, 'Sim, saiu'), undefined)
+  assert.equal(impressas, 0); assert.ok(conteudo(t).includes('Sem conexão'))
+  await clicar(t, 'Imprimir')
+  assert.equal(impressas, 1); assert.equal(ids[1], ids[0], 'mesma solicitação na repetição')
+  await clicar(t, 'Imprimir de novo')
+  assert.notEqual(ids[2], ids[1], 'nova impressão, nova solicitação')
+  t.encerrar()
+})
+await provar('a conferência é sempre da última impressão: "Não saiu" e nova impressão não confirmam a anterior', async () => {
+  const confirmados = []
+  let n = 0
+  const t = new Tela(props({ preparar: async o => ({ ...o, id: 'r' + (++n), html: '<h1>x</h1>' }), confirmar: async r => { confirmados.push(r.id) } }))
+  await clicar(t, 'Imprimir'); await clicar(t, 'Imprimir'); await clicar(t, 'Não saiu')
+  await clicar(t, 'Imprimir'); await clicar(t, 'Sim, saiu')
+  assert.deepEqual(confirmados, ['r2'])
+  t.encerrar()
+})
+await provar('a fila anda quando o diálogo abre (aoAbrirImpressao), sem esperar a conferência', async () => {
+  const abertos = []
+  const t = new Tela(props({ documentoInicial: 'cozinha', aoAbrirImpressao: d => { abertos.push(d) } }))
+  await clicar(t, 'Imprimir'); await clicar(t, 'Imprimir')
+  assert.deepEqual(abertos, ['cozinha'])
   t.encerrar()
 })
 await provar('confirmação registrada continua registrada quando só a atualização da lista falha', async () => {
