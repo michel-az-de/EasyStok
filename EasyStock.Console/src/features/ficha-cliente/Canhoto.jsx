@@ -65,12 +65,20 @@ export function PapelCanhoto({
 export function ModalCanhoto({
   pedido, itens, linhas, nomeCliente, endereco, faixa, aoFechar, aoImprimir, pedidoIdApi = null,
 }) {
-  // Rodada 11 (issue #9): a Modal é a pré-visualização; "Baixar PDF" e
-  // "Imprimir" usam o mesmo PDF de 80 mm (dominio/impressao.js). O ponto onde
-  // a impressora térmica real entra depois continua sendo o Imprimir;
-  // `aoImprimir` é o gancho que marca o canhoto como impresso (RN-27).
-  // #1632: com o pedido já no EasyStok (`pedidoIdApi`, só no modo API), "Imprimir" passa a ser o
-  // impresso em HTML da API, com escolha de documento e papel; o PDF fica ao lado como alternativa.
+  // Rodada 11 (issue #9): sem o pedido no EasyStok (demonstração), a Modal é a pré-visualização e
+  // "Baixar PDF" e "Imprimir" usam o mesmo PDF de 80 mm (dominio/impressao.js); `aoImprimir` é o
+  // gancho que marca o canhoto como impresso (RN-27).
+  // #1839: com o pedido no EasyStok (`pedidoIdApi`, modo API) o "Ver canhoto" abre direto o impresso
+  // da API, já no canhoto de cozinha e com o papel na tela: um modal só e o layout aprovado (#1632).
+  if (pedidoIdApi) {
+    return (
+      <ImprimirPedido
+        {...impressaoDoPedido(pedidoIdApi, null, nomeCliente)} semGatilho titulo={`Imprimir comanda ${numeroCurto(pedido.numero)}`} contexto={null}
+        documentoInicial="cozinha" aoFechar={aoFechar}
+        aoAbrirImpressao={(documento) => { if (documento === 'pedido' || documento === 'cozinha') aoImprimir?.() }}
+      />
+    )
+  }
   const gerar = () => pdfDoCanhoto({ pedido, itens, linhas, nomeCliente, endereco, faixa })
   return (
     <>
@@ -80,14 +88,7 @@ export function ModalCanhoto({
         rodape={(
           <>
             <Botao variante="texto" onClick={aoFechar}>Fechar</Botao>
-            {pedidoIdApi ? (
-              <>
-                {/* #1802: "Imprimir PDF" mandava a bobina de 80 mm ao diálogo do navegador, que a esticava
-                    em A4. Com o pedido no EasyStok só imprime o impresso da API, pelo perfil do documento. */}
-                <AcoesPdf gerar={gerar} soBaixar />
-                <ImprimirPedido {...impressaoDoPedido(pedidoIdApi)} documentoInicial="pedido" variante="primario" aoImprimir={(documento) => { if (documento === 'pedido' || documento === 'cozinha') aoImprimir?.() }} />
-              </>
-            ) : <AcoesPdf gerar={gerar} aoImprimir={aoImprimir} planoB={() => window.print()} />}
+            <AcoesPdf gerar={gerar} aoImprimir={aoImprimir} planoB={() => window.print()} />
           </>
         )}
       >

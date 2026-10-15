@@ -1,0 +1,20 @@
+<article class="im {{ m.papel.classes }}">
+<header class="cab">{{ if m.logo }}<img class="logo" src="{{ m.logo }}" alt="{{ m.casa.nome }}">{{ else }}<div class="wm">{{ m.casa.nome }}</div>{{ end }}<div class="lema">Resumo de atendimento</div></header>
+<div class="id"><span class="chip">{{ if m.numero }}Atendimento {{ m.numero }}{{ else }}Prévia{{ end }}</span><span class="quando">{{ m.data }}</span></div>
+<h1>{{ m.cliente }}</h1>
+{{ if m.contato }}<p class="nota">{{ m.contato }}</p>{{ end }}
+{{ if m.virou_cliente }}<p class="barra">Lead que virou cliente neste atendimento</p>{{ end }}
+<div class="sec"><h2>Em números</h2><div class="tot">
+<div class="ln"><span>Duração</span><span>{{ m.duracao }} · {{ m.faixa }}</span></div>
+<div class="ln"><span>Mensagens</span><span>{{ m.mensagens.total }}</span></div>
+<div class="ln"><span>Converteu</span><span>{{ m.converteu }}</span></div>
+<div class="ln total"><span>Receita</span><span>{{ m.receita }}</span></div>
+{{ if m.estorno }}<p class="nota">Estorno {{ m.estorno }}</p>{{ end }}{{ if m.falta_receber }}<p class="nota">A receber {{ m.falta_receber }}</p>{{ end }}
+</div></div>
+<div class="f"><div class="sec"><h2>Mensagens</h2>{{ if m.mensagens.total == 0 }}<p>Nenhuma mensagem neste atendimento.</p>{{ else }}<p>Cliente {{ m.mensagens.cliente }} · Você {{ m.mensagens.voce }} · Automático {{ m.mensagens.automatico }}</p>{{ end }}</div></div>
+<div class="f"><div class="sec"><h2>Vendas</h2>{{ if m.vendas.size == 0 }}<p>Sem pedido com movimento neste atendimento.</p>{{ else }}<div class="its">{{ for v in m.vendas }}<div class="it"><span class="q">{{ v.numero }}</span><span class="n">{{ v.itens }}<small>{{ v.detalhe }}</small></span><span class="v">{{ v.valor }}</span></div>{{ end }}</div><div class="tot"><div class="ln total"><span>Total</span><span>{{ m.vendas_total }}</span></div></div>{{ end }}</div></div>
+{{ if m.marcos.size > 0 }}<div class="f"><div class="sec"><h2>Marcos</h2>{{ for x in m.marcos }}<div class="ln"><span>{{ x.hora }}</span><span>{{ x.rotulo }}</span></div>{{ end }}</div></div>{{ end }}
+{{ if m.avaliacao_cliente || m.autoavaliacao }}<div class="f"><div class="sec"><h2>Avaliação</h2>{{ if m.avaliacao_cliente }}<div class="ln"><span>Do cliente</span><span>{{ m.avaliacao_cliente }}</span></div>{{ end }}{{ if m.autoavaliacao }}<div class="ln"><span>Como foi para você</span><span>{{ m.autoavaliacao }}</span></div>{{ end }}</div></div>{{ end }}
+{{ if m.anotacao }}<div class="f"><div class="sec"><h2>Anotação</h2><p class="barra">{{ m.anotacao }}</p></div></div>{{ end }}
+<footer class="pe">{{ for c in m.casa.contatos }}<span>{{ c }}</span>{{ if !for.last }} · {{ end }}{{ end }}<br><span>impresso {{ m.impresso }}</span></footer>
+</article>

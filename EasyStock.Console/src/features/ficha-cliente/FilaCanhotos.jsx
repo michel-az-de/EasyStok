@@ -116,15 +116,18 @@ export function FilaCanhotos() {
           {fila.length === 1 ? '1 canhoto na fila' : `${fila.length} canhotos na fila`}
         </span>
       </span>
-      {/* #1761 (L5): o primário da coluna é o próximo passo do pedido; imprimir é apoio. */}
-      <Botao variante="secundario" icone="printer" className={css.botaoImprimir} onClick={imprimir}>
-        Imprimir
-      </Botao>
-      {pedidoIdApi && (
+      {/* #1761 (L5): o primário da coluna é o próximo passo do pedido; imprimir é apoio.
+          #1839: com o pedido no EasyStok, um botão só, o impresso da API no canhoto de cozinha;
+          a fila anda quando o diálogo abre, como andava com o PDF. */}
+      {pedidoIdApi ? (
         <ImprimirPedido
-          key={pedidoIdApi} {...impressaoDoPedido(pedidoIdApi)} documentoInicial="pedido"
-          rotulo="Escolher papel" aoImprimir={(documento) => { if (documento === 'pedido' || documento === 'cozinha') concluir() }}
+          key={pedidoIdApi} {...impressaoDoPedido(pedidoIdApi)} documentoInicial="cozinha" className={css.botaoImprimir}
+          aoAbrirImpressao={(documento) => { if (documento === 'pedido' || documento === 'cozinha') concluir() }}
         />
+      ) : (
+        <Botao variante="secundario" icone="printer" className={css.botaoImprimir} onClick={imprimir}>
+          Imprimir
+        </Botao>
       )}
     </output>
   )

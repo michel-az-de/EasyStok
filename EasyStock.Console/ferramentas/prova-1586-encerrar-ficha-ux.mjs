@@ -456,7 +456,9 @@ await confere('B  modal: no modo API a folha vai sem avaliação e sem anotaçã
   comoApi()
   ctx.acoes = acoesDoModal({ encerrarComResumo: nada })
   const api = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
-  assert.deepEqual(doTipo(api, 'FolhaResumo').map((n) => n.props.comAvaliacaoEAnotacao), [false, false])
+  // #1839: no modo API a impressão é o impresso da API (ImprimirPedido do resumo), não a folha da tela.
+  assert.deepEqual(doTipo(api, 'FolhaResumo').map((n) => n.props.comAvaliacaoEAnotacao), [false])
+  assert.deepEqual(doTipo(api, 'ImprimirPedido').map((n) => [n.props.semHistorico, n.props.rotulo]), [[true, 'Imprimir resumo']])
   api.encerrar()
   comoDemonstracao()
   const demo = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
