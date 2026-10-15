@@ -190,8 +190,11 @@
 .configOpcao svg { flex: none; width: 32px; color: var(--marca-forte); }
 .acaoDestaque:focus-visible, .modelo:has(:focus-visible), .configOpcao:has(:focus-visible) { outline: 3px solid var(--marca); outline-offset: 3px; }
 .semMovimentos *, .semMovimentos *::before, .semMovimentos *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-@media (max-width: 1000px) {
+/* #1852: abaixo da largura desktop, ilustração e nome precisam de duas colunas. */
+@media (max-width: 1279px) {
   .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 1000px) {
   .destaque { flex-wrap: wrap; gap: var(--e-3); }
   .acaoDestaque { margin-left: auto; }
 }
@@ -214,4 +217,6 @@
   .cartao { grid-template-columns: minmax(0, 1fr); align-content: start; }
   .ilustracaoCartao { grid-row: auto; width: 72px; }
   .nome, .resumo, .pendencia, .abrir, .selo { grid-column: 1; }
+  /* #1852: a seta junto da ilustração deixa o nome inteiro nos cartões estreitos. */
+  .cartao:not(.organizando) .abrir > svg { position: absolute; top: var(--e-3); right: var(--e-3); }
 }

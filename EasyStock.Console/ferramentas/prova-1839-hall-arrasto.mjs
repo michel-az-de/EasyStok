@@ -112,8 +112,23 @@ provar('sem pendência a linha acalma; caixa de outro dia aberto pede atenção'
   const vazio = { estado: 'ok', dados: { itens: [] } }
   assert.deepEqual(pendenciaDoModulo('atendimento', { atendimento: vazio }), { texto: 'Nenhuma conversa esperando', atencao: false })
   assert.deepEqual(pendenciaDoModulo('cozinha', { pedidos: vazio }), { texto: 'Fila de preparo vazia', atencao: false })
+  assert.deepEqual(pendenciaDoModulo('entregas', { pedidos: vazio }), { texto: 'Nada pronto para sair', atencao: false })
   assert.deepEqual(pendenciaDoModulo('cardapio', { cardapio: { estado: 'ok', dados: { itens: [{ hoje: true, pendencias: [] }] } } }), { texto: '1 prato no cardápio de hoje', atencao: false })
   assert.deepEqual(pendenciaDoModulo('financeiro', { financeiro: { estado: 'ok', dados: { aberturaPendenteCrossDay: true } } }), { texto: 'Caixa de outro dia aberto', atencao: true })
+})
+
+provar('zero numa leitura parcial não declara fila vazia', () => {
+  const parcial = { estado: 'ok', dados: { itens: [{ situacao: 'Encerrada', status: 'saiu_para_entrega' }], parcial: true } }
+  for (const id of ['atendimento', 'cozinha', 'entregas']) {
+    assert.equal(pendenciaDoModulo(id, { atendimento: parcial, pedidos: parcial }), null, id)
+  }
+})
+
+provar('contagens positivas parciais preservam o aviso de mais itens', () => {
+  const parciais = Object.fromEntries(Object.entries(fontes).map(([id, fonte]) => [id, { ...fonte, dados: { ...fonte.dados, parcial: true } }]))
+  assert.deepEqual(pendenciaDoModulo('atendimento', parciais), { texto: '2+ conversas sem resposta', atencao: true })
+  assert.deepEqual(pendenciaDoModulo('cozinha', parciais), { texto: '2+ pedidos no preparo', atencao: true })
+  assert.deepEqual(pendenciaDoModulo('entregas', parciais), { texto: '1+ pedido pronto para sair', atencao: true })
 })
 
 provar('leitura falha, ausente ou módulo sem fonte não inventa linha', () => {

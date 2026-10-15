@@ -13,14 +13,17 @@ export function pendenciaDoModulo(id, fontes) {
   const mais = dados.parcial ? '+' : ''
   if (id === 'atendimento') {
     const n = aguardandoResposta(dados)
+    if (!n && dados.parcial) return null
     return n ? { texto: `${plural(n, 'conversa', 'conversas', mais)} sem resposta`, atencao: true } : { texto: 'Nenhuma conversa esperando', atencao: false }
   }
   if (id === 'cozinha') {
     const n = naFila(dados)
+    if (!n && dados.parcial) return null
     return n ? { texto: `${plural(n, 'pedido', 'pedidos', mais)} no preparo`, atencao: true } : { texto: 'Fila de preparo vazia', atencao: false }
   }
   if (id === 'entregas') {
     const n = prontos(dados)
+    if (!n && dados.parcial) return null
     return n ? { texto: `${plural(n, 'pedido pronto', 'pedidos prontos', mais)} para sair`, atencao: true } : { texto: 'Nada pronto para sair', atencao: false }
   }
   if (id === 'financeiro') {
