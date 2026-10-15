@@ -134,7 +134,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                     endereco.Bairro ?? "", endereco.Cidade ?? "", endereco.Estado ?? "", endereco.Complemento));
         }
         // Endereço em branco é endereço não informado (#1839): a cliente finaliza sem ele e a atendente registra pela Ficha.
-        if (dados.Endereco is not null && Informado(dados.Endereco) is null) dados = dados with { Endereco = null };
+        dados = dados with { Endereco = Informado(dados.Endereco) };
         // Rascunhos anteriores podem ter itens e ainda não ter recebido o endereço do cadastro.
         if (dados.Endereco is null && cliente is not null)
         {
