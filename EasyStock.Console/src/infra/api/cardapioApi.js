@@ -56,6 +56,7 @@ export const detalheDaApi = (d) => ({
   porcao: d.porcao ?? '',
   preco: d.preco ?? 0,
   foto: urlDeExibicaoDaFoto(d.fotoUrl, API_BASE),
+  fotoOriginal: d.fotoUrl ?? null,
   fotos: (d.fotos ?? []).map((url) => urlDeExibicaoDaFoto(url, API_BASE)).filter(Boolean),
   produtoId: d.produtoId ?? null,
   descricao: d.descricao ?? '',

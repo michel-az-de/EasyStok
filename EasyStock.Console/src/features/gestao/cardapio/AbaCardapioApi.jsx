@@ -140,7 +140,11 @@ export function AbaCardapioApi({ renderizarEditor }) {
       ) : (
         <ol className={css.lista}>
           {itens.map((item, indice) => (
-            <li key={item.sku} className={css.prato} aria-busy={ocupado === item.sku}>
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Atalho opcional; o botão Editar mantém o acesso por teclado.
+            <li key={item.sku} className={css.prato} aria-busy={ocupado === item.sku}
+              onDoubleClick={(e) => {
+                if (temEditor && ocupado !== item.sku && !e.target.closest('button, input, label, a, summary, select, textarea')) abrirEditor(item)
+              }}>
               <div className={css.cabecalhoPrato}>
                 {temEditor ? (
                   <button type="button" className={css.abrirFoto} disabled={ocupado === item.sku}
