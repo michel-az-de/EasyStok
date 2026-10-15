@@ -1,4 +1,5 @@
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { Icone } from '../../componentes/Icone'
 import { Marca } from '../../componentes/Marca'
 import { HASH_HALL } from '../../dominio/rota'
 import { MODULOS, hashDoModulo, telasDoMenu } from '../../dominio/modulos'
@@ -15,6 +16,11 @@ export function MenuDosModulos({ moduloId, telaId, fonteApi, aoNavegar }) {
       {areas.map((item) => <a key={item.id} href={hashDoModulo(item.id)} onClick={aoNavegar} className={`${css.itemTrilho} ${item.id === moduloId ? css.moduloAtivo : ''}`} aria-current={item.id === moduloId ? 'true' : undefined}>
         <IconeDoModulo modulo={item} /><span>{item.nome}</span>
       </a>)}
+      {/* #1839 (F1): as automáticas só abriam pelo trilho do Balcão. O atalho leva à tela que as liga e escreve. */}
+      {permite('atendimento') && <a href={hashDoModulo('atendimento', 'respostas')} onClick={aoNavegar}
+        className={css.itemTrilho} title="Respostas e mensagens automáticas">
+        <Icone nome="raio" tamanho={24} /><span>Automáticas</span>
+      </a>}
     </nav>
     <nav className={css.menu} aria-label={`Telas de ${modulo.nome}`}>
       <h2 className={css.nomeMenu}><IconeDoModulo modulo={modulo} />{modulo.nome}</h2>
