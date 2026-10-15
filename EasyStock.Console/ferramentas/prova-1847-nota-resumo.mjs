@@ -34,8 +34,11 @@ import{createRoot}from '${raiz}/node_modules/react-dom/client.js';
 import{ModalNota}from '${raiz}/src/features/notas/ModalNota.jsx';
 import{CartaoDoCliente}from '${raiz}/src/features/ficha-cliente/CartaoDoCliente.jsx';
 import{ExtratoDoPedido}from '${raiz}/src/features/ficha-cliente/ExtratoDoPedido.jsx';
-function Prova(){const[visivel,mostrar]=useState(true);const[terminou,terminar]=useState(false);const[geracao,mudar]=useState(0);const[caso,proximo]=useState(0);
+import{BlocoCobranca}from '${raiz}/src/features/ficha-cliente/BlocoCobranca.jsx';
+function Prova(){const[visivel,mostrar]=useState(true);const[terminou,terminar]=useState(false);const[geracao,mudar]=useState(0);const[caso,proximo]=useState(0);const[cenaCobranca,proximaCobranca]=useState(0);
 const pedidos=[{estado:'cancelado',totalPagoApi:0,alocadoApi:0},{estado:'cancelado',totalPagoApi:100,alocadoApi:0},{estado:'cancelado',totalPagoApi:100,alocadoApi:50},{estado:'aguardando',totalPagoApi:100,alocadoApi:50},{estado:'aguardando',totalPagoApi:50,alocadoApi:75},{estado:'pago',totalPagoApi:100,alocadoApi:100}];
+const cancelado=cenaCobranca%2===1;const manual=cenaCobranca>1;
+const cobranca={id:'cb',valor:15.5,link:manual?null:'https://mp.test/link',meio:'pix',criadaEm:1792065600000,expiraEm:1792067400000,canceladaEm:cancelado?1792065660000:null};
 const notas=Array.from({length:20},(_,i)=>({id:'nota'+(i+geracao),criadoEm:i+geracao,texto:'texto'+(i+geracao)}));
 return React.createElement(React.Fragment,null,
 React.createElement('button',{onClick:()=>mostrar(v=>!v)},'Alternar ferramenta'),
@@ -43,13 +46,15 @@ React.createElement('button',{onClick:()=>window.responder()},'Responder gravaç
 React.createElement('button',{onClick:()=>mudar(1)},'Adicionar vigésima primeira nota'),
 React.createElement('output',null,terminou?'Gravou':'Aguardando'),
 React.createElement('button',{onClick:()=>proximo(c=>c+1)},'Próximo extrato'),
+React.createElement('button',{onClick:()=>proximaCobranca(c=>c+1)},'Próxima cobrança'),
+React.createElement('section',{'aria-label':'Cobrança em teste'},React.createElement(BlocoCobranca,{pedido:{pedidoId:'p',estado:cancelado?'cancelado':'aguardando',statusApi:cancelado?'cancelado':'aguardando_pagamento',totalApi:31,sinalNaReserva:true,itens:[],cobranca},conversaId:'c',editavel:true,nomeCliente:'Maria',agora:1792065600000})),
 React.createElement(ExtratoDoPedido,{pedido:{pedidoId:'pedido',totalApi:100,frete:0,...pedidos[caso]}}),
 !terminou&&React.createElement(ModalNota,{visivel,nomeCliente:'Maria',outraConversa:true,aoFechar:()=>terminar(true),aoSalvar:async texto=>{window.textoSalvo=texto;await new Promise(r=>window.responder=r);return true}}),
 React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cliente',nome:'Maria',cliente:{pedidos:2,totalGasto:100,notas}},fonteApi:true,aoAbrir:()=>{}}))};createRoot(document.getElementById('root')).render(React.createElement(Prova));`
   const compilado = await build({ root: raiz, configFile: false, logLevel: 'silent', define: { 'process.env.NODE_ENV': '"production"' }, plugins: [react(), {
     name: 'prova-isolada', enforce: 'pre',
-    resolveId(id) { if (id.endsWith('/infra/api/conversasApi')) return '\0api-resumo'; if (id === 'prova' || id.replaceAll('\\', '/').endsWith('/prova')) return '\0prova' },
-    load(id) { if (id === '\0prova') return entrada; if (id === '\0api-resumo') return "export async function obterResumoDoCliente(){window.resumos=(window.resumos??0)+1;return {texto:'Resumo '+window.resumos}}" },
+    resolveId(id) { if (/(^|\/)contextos(?:\.js)?$/.test(id)) return '\0contextos'; if (id.endsWith('/infra/api/conversasApi')) return '\0api-resumo'; if (id === 'prova' || id.replaceAll('\\', '/').endsWith('/prova')) return '\0prova' },
+    load(id) { if (id === '\0prova') return entrada; if (id === '\0contextos') return "export const useAtendimento=()=>({fonteApi:true,fidelidade:{}});export const useCatalogo=()=>({cardapio:[]});export const useAcoes=()=>({})"; if (id === '\0api-resumo') return "export async function obterResumoDoCliente(){window.resumos=(window.resumos??0)+1;return {texto:'Resumo '+window.resumos}}" },
   }], build: { write: false, minify: false, lib: { entry: 'prova', formats: ['iife'], name: 'Prova' } } })
   const arquivos = (Array.isArray(compilado) ? compilado[0] : compilado).output
   const codigo = arquivos.find(a => a.type === 'chunk').code
@@ -95,4 +100,19 @@ React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cli
   await componente.getByRole('button', { name: 'Próximo extrato' }).click()
   assert.match(await extrato.innerText(), /Quitado\s+R\$\s*0,00/)
   console.log('ok extrato real: cancelados sem dívida, ajustes neutros e ativos preservados')
+  const cobranca = componente.getByRole('region', { name: 'Cobrança em teste' })
+  assert.match(await cobranca.innerText(), /Sinal agora: R\$\s*15,50/)
+  for (const cena of [1, 2, 3]) {
+    await componente.getByRole('button', { name: 'Próxima cobrança' }).click()
+    const texto = await cobranca.innerText()
+    if (cena === 2) {
+      assert.match(texto, /Sinal a receber/)
+      assert.equal(await cobranca.getByRole('button', { name: 'Registrar sinal', exact: true }).isVisible(), true)
+    } else {
+      assert.match(texto, /Cobrança original/)
+      assert.doesNotMatch(texto, /Sinal agora|Sinal a receber|Receber na entrega|Restante na entrega|Saldo na entrega/)
+      assert.equal(await cobranca.getByRole('button', { name: /Registrar sinal|Marcar pago|Ainda não recebi|Refazer cobrança/ }).count(), 0)
+    }
+  }
+  console.log('ok cobrança real: cancelados preservam histórico sem instruir novo recebimento; ativos mantêm sinal e ação')
 } finally { await navegador.close() }
