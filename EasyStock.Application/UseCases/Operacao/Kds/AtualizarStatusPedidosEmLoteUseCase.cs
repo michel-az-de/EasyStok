@@ -1,18 +1,25 @@
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 
 namespace EasyStock.Application.UseCases.Operacao.Kds;
 
 /// <param name="OcorridoEm">Quando o toque aconteceu no aparelho (fila offline). Vai para o evento de auditoria.</param>
-public sealed record KdsStatusLoteItem(Guid Id, string Status, DateTime? OcorridoEm = null);
+/// <param name="ConfirmarSaldoAReceber">#1863: "entregue" com saldo a receber só com a confirmação de quem marcou, como no PATCH.</param>
+public sealed record KdsStatusLoteItem(Guid Id, string Status, DateTime? OcorridoEm = null, bool ConfirmarSaldoAReceber = false);
 
-public sealed record KdsStatusLoteResultado(Guid Id, bool Sucesso, string? Status, string? Erro);
+/// <param name="Codigo">#1863: <see cref="SaldoAReceberNaEntregaException.Codigo"/> quando o item parou no saldo a receber.</param>
+/// <param name="Valor">Quanto falta receber, junto do código.</param>
+public sealed record KdsStatusLoteResultado(Guid Id, bool Sucesso, string? Status, string? Erro, string? Codigo = null, decimal? Valor = null);
 
+/// <param name="ConferirSaldoNaEntrega">#1863: o KDS confere o saldo a receber no "entregue"; o lote de papel
+/// (registro do que já aconteceu na queda) não confere.</param>
 public sealed record AtualizarStatusPedidosEmLoteCommand(
     Guid EmpresaId,
     IReadOnlyList<KdsStatusLoteItem> Itens,
     Guid? UsuarioId = null,
     string? Origem = "kds",
-    NivelAcesso NivelSolicitante = NivelAcesso.Operador) : ICommand;
+    NivelAcesso NivelSolicitante = NivelAcesso.Operador,
+    bool ConferirSaldoNaEntrega = true) : ICommand;
 
 /// <summary>
 /// Marcação em lote do KDS quando a internet volta (S19, US-042): aplica em sequência, cada item no seu
@@ -48,10 +55,17 @@ public class AtualizarStatusPedidosEmLoteUseCase(
         {
             var pedido = await atualizarStatus.ExecuteAsync(new AtualizarStatusPedidoCommand(
                 cmd.EmpresaId, item.Id, item.Status, cmd.UsuarioId, Origem: cmd.Origem, OcorridoEm: item.OcorridoEm,
-                NivelSolicitante: cmd.NivelSolicitante));
+                NivelSolicitante: cmd.NivelSolicitante,
+                ConferirSaldoNaEntrega: cmd.ConferirSaldoNaEntrega, SaldoAReceberConfirmado: item.ConfirmarSaldoAReceber));
             return pedido is null
                 ? new KdsStatusLoteResultado(item.Id, false, null, "Pedido não encontrado.")
                 : new KdsStatusLoteResultado(item.Id, true, pedido.Status, null);
+        }
+        catch (SaldoAReceberNaEntregaException ex)
+        {
+            // #1863: não é falha; a tela da fila pergunta e reenvia o item confirmado.
+            uow.DescartarAlteracoesPendentes();
+            return new KdsStatusLoteResultado(item.Id, false, null, ex.Message, SaldoAReceberNaEntregaException.Codigo, ex.Valor);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

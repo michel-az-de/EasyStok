@@ -44,7 +44,9 @@ public class LancarLotePapelUseCase(AtualizarStatusPedidosEmLoteUseCase lote)
             cmd.EmpresaId,
             ordenadas.Select(x => new KdsStatusLoteItem(x.Item.PedidoId, x.Item.Passo, x.Item.OcorreuEm)).ToList(),
             cmd.UsuarioId,
-            OrigemLotePapel, cmd.NivelSolicitante), ct);
+            OrigemLotePapel, cmd.NivelSolicitante,
+            // #1863: o papel registra a entrega que já aconteceu; a conferência do saldo é do KDS.
+            ConferirSaldoNaEntrega: false), ct);
 
         var linhas = ordenadas.Zip(resultados, (o, r) => new ResultadoLinhaLotePapel(
                 o.Linha, o.Item.PedidoId, o.Item.Passo, o.Item.OcorreuEm, r.Sucesso, r.Status, r.Erro))
