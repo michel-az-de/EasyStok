@@ -34,6 +34,7 @@ jobs:
       - run: npm run qualidade
       - run: node ferramentas/prova-comanda-compartilhada.mjs
       - run: node ferramentas/prova-1683-ficha-comanda.mjs
+      - run: node ferramentas/prova-1785-ficha.mjs
       - run: node ferramentas/prova-1426-notificacoes-console.mjs
       - run: node ferramentas/prova-1255-pagamento-manual-api.mjs
       - run: node ferramentas/prova-1586-encerrar-ficha-ux.mjs
@@ -116,3 +117,12 @@ jobs:
       - run: node ferramentas/prova-1653-configuracoes.mjs
       - run: node ferramentas/prova-1653-configuracao-sessao.mjs
       - run: node ferramentas/prova-1653-expediente-concorrente.mjs
+      - run: node ferramentas/prova-1804-balcao-fim.mjs
+      - run: node ferramentas/prova-1803-categorias.mjs
+      - run: node ferramentas/prova-1808-acervo-prato.mjs
+      - run: node ferramentas/prova-1809-producao-cardapio.mjs
+      - run: node ferramentas/prova-1806-paineis.mjs
+      - run: node ferramentas/prova-1806-lead-cadastro.mjs
+      - run: node ferramentas/prova-1807-avisos.mjs
+      - run: node ferramentas/prova-1810-entrada-google.mjs
+      - run: node ferramentas/prova-r11-impressao.mjs

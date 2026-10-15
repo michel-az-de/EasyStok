@@ -12,6 +12,8 @@ public class AutenticarUsuarioUseCaseTests
         var unitOfWork = new FakeUnitOfWork();
         var hasher = new FakePasswordHasher();
         var logger = Substitute.For<ILogger<AutenticarUsuarioUseCase>>();
+        // #1781: o banco aceita a reserva da tentativa de senha (a conta não está bloqueada).
+        usuarioRepository.ReservarTentativaDeSenhaAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(true);
         return new AutenticarUsuarioUseCase(usuarioRepository, unitOfWork, hasher, logger);
     }
 
@@ -347,7 +349,7 @@ public class AutenticarUsuarioUseCaseTests
         var repo = Substitute.For<IUsuarioRepository>();
         repo.GetByEmailAsync(usuario.Email).Returns(usuario);
         var passo1 = new ListarEmpresasParaLoginUseCase(
-            repo, new FakeUnitOfWork(), new FakePasswordHasher(), Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>());
+            repo, new FakePasswordHasher(), Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>());
         var login = CriarUseCase(repo);
 
         for (var falha = 1; falha <= 3; falha++)
@@ -365,7 +367,7 @@ public class AutenticarUsuarioUseCaseTests
         usuario.EstaBloqueado().Should().BeTrue();
         var recusa = await Assert.ThrowsAsync<CredenciaisInvalidasException>(
             () => login.ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senhaCorreta", null)));
-        recusa.Message.Should().Be("Conta bloqueada temporariamente.");
+        recusa.Message.Should().Be(new CredenciaisInvalidasException().Message, "#1781: bloqueio responde como senha errada");
     }
 
     [Fact]

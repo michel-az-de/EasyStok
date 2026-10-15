@@ -8,13 +8,17 @@
 // inteira. Isso já existia pronta do passo zero, a F5 só consome.
 
 import { nomeDoMeio } from './cobranca'
-import { pagamentosDoPedido } from './pagamento'
+import { faltaPagar, pagamentosDoPedido, totalPago } from './pagamento'
 import { atendimentoDesde, ehLead, indiceInicioDoAtendimento } from './conversa'
 import { duracao, horaCurta } from './formato'
 import { itensDetalhados, totalDoPedido } from './pedido'
 import { passoPorId } from './esteira'
 
 const emMs = (iso) => new Date(iso).getTime()
+
+// #1761: no EasyStok o total do pedido é o do servidor, com o frete. A soma pelo cardápio
+// (só os itens) mostrava R$ 57,00 num pedido de R$ 69,00 e errava o "a receber" em R$ 12,00.
+export const totalDaVenda = (pedido, cardapio) => pedido?.totalApi ?? totalDoPedido(pedido, cardapio)
 
 // Mensagens do trecho, separadas em quem falou (seção 5, "Como cada número é
 // calculado"). `in` é o cliente, `out` sem `automatica` é ela, `automatica` é
@@ -43,8 +47,9 @@ export function mensagensDoTrecho(mensagensDoAtendimento) {
 // depois que o dinheiro é reconhecido"), então esse avanço sozinho já prova
 // que a venda aconteceu, mesmo sem o objeto estruturado. Só entra como último
 // recurso, quando não há cobrança nenhuma para medir por data.
+// #1761: pedido do EasyStok traz os pagamentos do servidor; ali avanço sem pagamento não é venda.
 const semCobrancaMasAvancado = (pedido) =>
-  Boolean(pedido) && !pedido.cobranca && pedido.estado !== 'aguardando'
+  Boolean(pedido) && !pedido.pagamentosApi && !pedido.cobranca && pedido.estado !== 'aguardando'
 
 // Receita do trecho (seção 5): soma do que caiu, estorno separado e negativo.
 // `pedido.pagamentos` é o contrato oficial de dominio/pagamento.js (F4), mas a
@@ -76,8 +81,17 @@ export function receitaDoTrecho(pedido, cardapio, desde) {
 // esteira (achado 4: situação sem Pílula na tabela). "Cancelado" fica fora da
 // trilha da esteira (dominio/pedido.js), por isso não tem entrada em `PASSOS`
 // e precisa do próprio rótulo e tom aqui.
-function situacaoDoPedido(pedido) {
+// #1761: "Pago" com dinheiro a receber era mentira na folha (sinal de 50% pago, resto na
+// entrega). O passo "pago" só vale quando o pedido inteiro está coberto.
+function situacaoDoPedido(pedido, cardapio) {
   if (pedido.estado === 'cancelado') return { rotulo: 'Cancelado', tom: 'perigo' }
+  if (pedido.estado === 'pago' && faltaPagar(pedido, cardapio) > 0) {
+    // "Sinal pago" e "Pago em parte" só com dinheiro registrado. Pedido do EasyStok que avançou
+    // sem receber nada (maquininha na entrega) não pagou parte nenhuma. Na demonstração, o pedido
+    // nascido pago não tem registro de pagamento e segue "Pago", como sempre.
+    if (totalPago(pedido) > 0) return { rotulo: pedido.sinalNaReserva ? 'Sinal pago' : 'Pago em parte', tom: 'aviso' }
+    if (Array.isArray(pedido.pagamentosApi)) return { rotulo: 'A receber na entrega', tom: 'aviso' }
+  }
   const passo = passoPorId(pedido.estado)
   return passo ? { rotulo: passo.rotulo, tom: passo.tom } : { rotulo: pedido.estado, tom: 'neutro' }
 }
@@ -89,7 +103,8 @@ function situacaoDoPedido(pedido) {
 export function vendaDoTrecho(pedido, cardapio, desde) {
   if (!pedido || pedido.itens.length === 0) return null
   const desdeMs = emMs(desde)
-  const pagamentoNoTrecho = pagamentosDoPedido(pedido).some((p) => emMs(p.em) >= desdeMs)
+  const pagamentosNoTrecho = pagamentosDoPedido(pedido).filter((p) => emMs(p.em) >= desdeMs)
+  const pagamentoNoTrecho = pagamentosNoTrecho.length > 0
   const cobrancaEmitidaNoTrecho = pedido.cobranca?.criadaEm && emMs(pedido.cobranca.criadaEm) >= desdeMs
   const canceladoNoTrecho = pedido.estado === 'cancelado'
   const teveMovimento = pagamentoNoTrecho || cobrancaEmitidaNoTrecho
@@ -100,17 +115,22 @@ export function vendaDoTrecho(pedido, cardapio, desde) {
     .join(', ')
   // Integração: a F4 grava `meio` na cobrança; a linha lê de lá. Sem
   // cobrança (venda antiga), não inventa meio.
-  const nome = pedido.cobranca ? nomeDoMeio(pedido.cobranca.meio) : null
+  // #1761: com dinheiro recebido no trecho, o meio é o que entrou. A cobrança ativa do EasyStok
+  // depois do sinal é a do restante na entrega, e a folha dizia "Maquininha" de um Pix.
+  const recebidos = [...new Set(pagamentosNoTrecho.map((p) => nomeDoMeio(p.meio)))]
+  const nome = recebidos.length > 0
+    ? recebidos.join(' e ')
+    : pedido.cobranca ? nomeDoMeio(pedido.cobranca.meio) : null
   const meio = nome ? nome[0].toUpperCase() + nome.slice(1) : '—'
   // Número completo (achado 3, pendência 22 da banca 64: "mesmo número do
   // pedido em toda a folha"): o aviso do Encerrar já mostra "2026-0184"; a
   // tabela usava numeroCurto ("0184"), um formato diferente para o mesmo dado.
-  const situacao = situacaoDoPedido(pedido)
+  const situacao = situacaoDoPedido(pedido, cardapio)
   return {
     numero: pedido.numero,
     itensTexto,
     meio,
-    valor: totalDoPedido(pedido, cardapio),
+    valor: totalDaVenda(pedido, cardapio),
     situacao: situacao.rotulo,
     situacaoTom: situacao.tom,
   }
@@ -160,6 +180,9 @@ export const MARCA_DE_CONVERSAO = 'Cliente criado a partir do primeiro pagamento
 
 function eraLeadAntesDoTrecho(conversa, desde) {
   if (ehLead(conversa)) return true
+  // #1761: conversa do EasyStok não tem a marca de sistema. Cadastro com um pedido só, o desta
+  // conversa, é a primeira compra: antes dizia "Já era cliente" de quem chegou hoje.
+  if (conversa.pedido?.pedidoId && conversa.cliente?.pedidos === 1) return true
   const marca = (conversa.mensagens ?? []).find((m) => m.dir === 'sistema' && m.texto === MARCA_DE_CONVERSAO)
   if (!marca) return false
   return emMs(marca.em) >= emMs(desde)
@@ -168,6 +191,24 @@ function eraLeadAntesDoTrecho(conversa, desde) {
 export function converteuNoTrecho(conversa, desde, houvePagamentoNoTrecho) {
   if (!eraLeadAntesDoTrecho(conversa, desde)) return 'ja-cliente'
   return houvePagamentoNoTrecho ? 'sim' : 'nao'
+}
+
+// #1761: caixa "Mandar mensagem de encerramento" marcada com o campo vazio encerrava e o cliente
+// não recebia nada. Sem texto não encerra: ou ela escreve, ou desmarca a caixa.
+export const PEDE_TEXTO_DA_DESPEDIDA = 'Escreva a mensagem de encerramento ou desmarque a caixa acima.'
+export const faltaTextoDaDespedida = (enviarMensagem, texto) => Boolean(enviarMensagem) && !String(texto ?? '').trim()
+
+// #1761: "o pedido 3 segue na esteira" falava esteira, que não é palavra da casa, e chamava de
+// pedido o número da comanda. No EasyStok a conversa tem comanda; na demonstração, só o pedido.
+export function avisoDoPedidoAoEncerrar(conversa, { fonteApi = false } = {}) {
+  const pedido = conversa?.pedido
+  if (!pedido) return null
+  const comanda = fonteApi ? conversa.numeroComanda : null
+  const quem = comanda ? `A comanda ${comanda}` : `O pedido Nº ${pedido.numero}`
+  if (pedido.estado === 'aguardando') {
+    return `${quem} ainda não foi ${comanda ? 'paga' : 'pago'}. ${comanda ? 'Ela' : 'Ele'} continua valendo depois de encerrar.`
+  }
+  return `${quem} segue em preparo e entrega depois de encerrar.`
 }
 
 export const ROTULO_CONVERTEU = {
@@ -196,7 +237,7 @@ export function montarResumoAtendimento(conversa, cardapio, agora, draft = {}) {
   // acusaria falta mesmo quando `receitaDoTrecho` já reconheceu o valor pela
   // cobrança ou pelo avanço do pedido.
   const faltaReceber = conversa.pedido
-    ? Math.max(totalDoPedido(conversa.pedido, cardapio) - receita.bruto, 0)
+    ? Math.max(totalDaVenda(conversa.pedido, cardapio) - receita.bruto, 0)
     : 0
   const venda = vendaDoTrecho(conversa.pedido, cardapio, desde)
   const marcos = marcosDoTrecho(mensagensDoAtendimento)

@@ -5,6 +5,7 @@ import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { horaCurta } from '../../dominio/formato'
+import { falhaDeEnvio, textoDaFalhaDeEnvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
 import { useAcoes } from '../../aplicacao/contextos'
 import css from './caixa.module.css'
 
@@ -29,9 +30,10 @@ function Item({ item, aoReenviar, aoAbrir, ocupado, reenviando }) {
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
       </div>
       <p className={css.textoNaoEntregue}>{mensagem.texto}</p>
-      {mensagem.erro && <p className={css.erroNaoEntregue}>{mensagem.erro}</p>}
+      {/* #1761: o erro cru do canal (em inglês) vira a frase do mapa do domínio. */}
+      {mensagem.erro && <p className={css.erroNaoEntregue}>{textoDaFalhaDeEnvio(mensagem.erro)}</p>}
       <div className={css.acoesNaoEntregue}>
-        {!mensagem.aguardaCliente && (
+        {!mensagem.aguardaCliente && falhaDeEnvio(mensagem.erro).tipo !== TIPOS_DE_FALHA.FORA_DA_JANELA && (
           <Botao variante="secundario" disabled={ocupado} onClick={() => aoReenviar(item)} aria-label={`Reenviar mensagem para ${item.contato}`}>{reenviando ? 'Reenviando…' : 'Reenviar'}</Botao>
         )}
         <Botao variante="texto" onClick={() => aoAbrir(item)}>Abrir conversa</Botao>
@@ -98,7 +100,7 @@ export function NaoEntregues({ aoAbrir }) {
       const mensagem = await reenviar(item.conversaId, item.mensagem.id)
       const falhou = !mensagem || mensagem.status === 'falhou'
       setResultado({ erro: falhou, texto: falhou
-        ? `Não foi possível reenviar para ${item.contato}. ${mensagem?.erro || 'Confira a conversa antes de tentar novamente.'}`
+        ? `Não foi possível reenviar para ${item.contato}. ${mensagem?.erro ? textoDaFalhaDeEnvio(mensagem.erro) : 'Confira a conversa antes de tentar novamente.'}`
         : `Reenvio solicitado para ${item.contato}. Confira o estado na conversa; a entrega ainda depende do canal.` })
       await carregar()
     } catch (e) {

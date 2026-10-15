@@ -226,55 +226,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         Conversa conversa;
         Mensagem mensagemEntidade;
         ConfiguracaoAtendimento configuracao;
-        IdentificacaoCliente? identificacao = null;
+        IdentificacaoCliente? identificacao;
         try
         {
-            var existenteConversa = await conversaRepository.ObterAbertaPorContatoAsync(empresaId, CanalConversa.WhatsApp, msg.De, ct);
-            var nomePerfil = entrada.Contatos.FirstOrDefault(c => c.WaId == msg.De)?.Nome;
-            conversa = existenteConversa ?? Conversa.Abrir(empresaId, msg.De, enviadaEm, nomePerfil);
-            // #1332: responder no wa_id que escreveu, não na grafia antiga com/sem o nono dígito.
-            existenteConversa?.AtualizarContatoWhatsApp(msg.De);
-
-            if (existenteConversa is null)
-            {
-                // S05: identifica (ou cria o lead) na mesma transação que abre a conversa.
-                identificacao = await identificarCliente.ExecuteAsync(
-                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, nomePerfil), ct);
-                conversa.VincularCliente(identificacao.Cliente.Id);
-            }
-
-            conversa.RegistrarEntrada(enviadaEm);
-            if (existenteConversa is null)
-                await conversaRepository.AddAsync(conversa, ct);
-
-            var botaoId = msg.BotaoRespostaId ?? msg.BotaoPayload;
-            var texto = msg.Tipo is "interactive" or "button" ? null : CortarNoLimite(msg.TextoCorpo);
-            // Resposta de lista ou de fluxo não traz o id do botão: fica o registro, sem o tipo Botao.
-            var tipoConteudo = MapearTipoConteudo(msg.Tipo);
-            if (tipoConteudo == TipoConteudoMensagem.Botao && string.IsNullOrWhiteSpace(botaoId))
-                tipoConteudo = TipoConteudoMensagem.Outro;
-
-            mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, enviadaEm, tipoConteudo, texto, msg.Wamid, botaoId);
-            if (msg.MidiaId is not null)
-                mensagemEntidade.AguardarMidia(msg.MidiaId, DateTime.UtcNow); // #1397: pendência durável
-            await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
-
-            // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
-            // dona (Assumir + nota interna + aviso). O evento entra no outbox deste mesmo commit (ADR-0030).
-            if (identificacao?.Cliente.Bloqueado == true)
-                await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(identificacao.Cliente), DateTime.UtcNow, ct);
-
-            // S42: conversa nova dispara a automática de entrada (primeiro contato, fora do horário ou loja
-            // fechada) pelo outbox deste mesmo commit. Cliente bloqueado não recebe nada automático (S24),
-            // nem entrada que o agente não vai responder (botão "acao:", reação; issue 1285).
-            if (existenteConversa is null && identificacao?.Cliente.Bloqueado != true
-                && !SemRespostaAutomatica(msg.Tipo, botaoId) && publicadorEventos is not null)
-                await publicadorEventos.PublicarAsync(empresaId, ConversaAbertaEvent.TipoEvento, "Conversa", conversa.Id,
-                    new ConversaAbertaEvent(conversa.Id, conversa.ClienteId), ct: ct);
-
-            configuracao = await AtualizarUltimaMensagemRecebidaAsync(empresaId, enviadaEm);
-
-            await unitOfWork.CommitAsync();
+            // #1792: a conversa fica travada até o commit; outro webhook ou o marcar-lida não grava não lidas velhas por cima.
+            (conversa, mensagemEntidade, configuracao, identificacao) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
+                token => GravarEntradaAsync(empresaId, entrada, msg, enviadaEm, token), ct);
             await webhookRecebidoRepository.MarcarProcessadoAsync(registro!.Id, sucesso: true, ct: ct);
         }
         catch (Exception ex)
@@ -293,6 +250,59 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
         await DispararEfeitosAposGravarAsync(empresaId, conversa, mensagemEntidade, msg, configuracao, identificacao, ct);
         return true;
+    }
+
+    private async Task<(Conversa, Mensagem, ConfiguracaoAtendimento, IdentificacaoCliente?)> GravarEntradaAsync(
+        Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, DateTime enviadaEm, CancellationToken ct)
+    {
+        IdentificacaoCliente? identificacao = null;
+        var existenteConversa = await conversaRepository.ObterAbertaPorContatoComLockAsync(empresaId, CanalConversa.WhatsApp, msg.De, ct);
+        var nomePerfil = entrada.Contatos.FirstOrDefault(c => c.WaId == msg.De)?.Nome;
+        var conversa = existenteConversa ?? Conversa.Abrir(empresaId, msg.De, enviadaEm, nomePerfil);
+        // #1332: responder no wa_id que escreveu, não na grafia antiga com/sem o nono dígito.
+        existenteConversa?.AtualizarContatoWhatsApp(msg.De);
+
+        if (existenteConversa is null)
+        {
+            // S05: identifica (ou cria o lead) na mesma transação que abre a conversa.
+            identificacao = await identificarCliente.ExecuteAsync(
+                new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, nomePerfil), ct);
+            conversa.VincularCliente(identificacao.Cliente.Id);
+        }
+
+        conversa.RegistrarEntrada(enviadaEm);
+        if (existenteConversa is null)
+            await conversaRepository.AddAsync(conversa, ct);
+
+        var botaoId = msg.BotaoRespostaId ?? msg.BotaoPayload;
+        var texto = msg.Tipo is "interactive" or "button" ? null : CortarNoLimite(msg.TextoCorpo);
+        // Resposta de lista ou de fluxo não traz o id do botão: fica o registro, sem o tipo Botao.
+        var tipoConteudo = MapearTipoConteudo(msg.Tipo);
+        if (tipoConteudo == TipoConteudoMensagem.Botao && string.IsNullOrWhiteSpace(botaoId))
+            tipoConteudo = TipoConteudoMensagem.Outro;
+
+        var mensagemEntidade = Mensagem.Entrada(empresaId, conversa.Id, enviadaEm, tipoConteudo, texto, msg.Wamid, botaoId);
+        if (msg.MidiaId is not null)
+            mensagemEntidade.AguardarMidia(msg.MidiaId, DateTime.UtcNow); // #1397: pendência durável
+        await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
+
+        // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
+        // dona (Assumir + nota interna + aviso). O evento entra no outbox deste mesmo commit (ADR-0030).
+        if (identificacao?.Cliente.Bloqueado == true)
+            await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(identificacao.Cliente), DateTime.UtcNow, ct);
+
+        // S42: conversa nova dispara a automática de entrada (primeiro contato, fora do horário ou loja
+        // fechada) pelo outbox deste mesmo commit. Cliente bloqueado não recebe nada automático (S24),
+        // nem entrada que o agente não vai responder (botão "acao:", reação; issue 1285).
+        if (existenteConversa is null && identificacao?.Cliente.Bloqueado != true
+            && !SemRespostaAutomatica(msg.Tipo, botaoId) && publicadorEventos is not null)
+            await publicadorEventos.PublicarAsync(empresaId, ConversaAbertaEvent.TipoEvento, "Conversa", conversa.Id,
+                new ConversaAbertaEvent(conversa.Id, conversa.ClienteId), ct: ct);
+
+        var configuracao = await AtualizarUltimaMensagemRecebidaAsync(empresaId, enviadaEm);
+
+        await unitOfWork.CommitAsync();
+        return (conversa, mensagemEntidade, configuracao, identificacao);
     }
 
     /// <summary>
@@ -357,6 +367,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         catch (Exception ex)
         {
             logger.LogError(ex, "Webhook WhatsApp: mensagem {Wamid} gravada, mas falhou ao enfileirar o que vem depois.", msg.Wamid);
+            // #1787: o opt-out pela metade não pode entrar no commit da próxima mensagem do lote.
+            unitOfWork.DescartarAlteracoesPendentes();
         }
     }
 
@@ -374,6 +386,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         catch (Exception ex)
         {
             logger.LogError(ex, "Webhook WhatsApp: falha executando ação de botão na conversa {ConversaId}.", conversa.Id);
+            unitOfWork.DescartarAlteracoesPendentes();
         }
     }
 
@@ -390,6 +403,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
         var novoStatus = MapearStatus(status.Status);
         if (novoStatus is null) return;
+
+        // #1787: "failed" reentregue pela Meta não conta outra tentativa nem reagenda o reenvio. A falha incerta
+        // (sem resposta do canal) ainda aceita o veredito da Meta, que pode agendar o reenvio.
+        if (novoStatus == StatusMensagem.Falhou && mensagem.Status == StatusMensagem.Falhou
+            && mensagem.UltimaFalhaEnvio != TipoFalhaEnvio.Incerta)
+            return;
 
         // #1396: falha temporária da Meta agenda o reenvio automático (S57); permanente ou sem código, não.
         if (novoStatus == StatusMensagem.Falhou)

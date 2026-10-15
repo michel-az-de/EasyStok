@@ -10,7 +10,9 @@ using EasyStock.Domain.Sales;
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
 /// <summary>Reemissão ou cobrança de um pedido já gravado (job, troca de forma, operadora).</summary>
-public sealed record GerarCobrancaPedidoInput(Guid EmpresaId, Guid PedidoId, Guid? ConversaId = null, int Tentativa = 1, bool CobrarSaldo = false);
+/// <param name="NaEntregaSemProvedor">Pedido confirmado pela atendente (#1726): sem link possível, a dívida fica a receber na entrega em vez de falhar.</param>
+public sealed record GerarCobrancaPedidoInput(Guid EmpresaId, Guid PedidoId, Guid? ConversaId = null, int Tentativa = 1, bool CobrarSaldo = false,
+    bool NaEntregaSemProvedor = false);
 
 public sealed record CobrancaPedidoResult(
     Guid CobrancaId,
@@ -73,7 +75,7 @@ public sealed class GerarCobrancaPedidoUseCase(
         var itens = reservado.Itens.Append(reservado.ItemFrete).ToList();
         var dados = new DadosCobranca(
             reservado.Pedido.EmpresaId, reservado.Pedido.Id, reservado.Storefront.Id,
-            reservado.Storefront.TituloPublico, reservado.Total, itens, reservado.Pedido.AgendadoParaEm);
+            reservado.Storefront.TituloPublico, reservado.Total, itens, reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm);
         try
         {
             return await CobrarAsync(dados, conversaId, tentativa: 1, ct);
@@ -103,6 +105,20 @@ public sealed class GerarCobrancaPedidoUseCase(
         }
     }
 
+    /// <summary>
+    /// Reemissão pedida por uma pessoa (console). Trava o pedido antes de olhar as cobranças (#1724): sem a
+    /// trava, cliques simultâneos liam "sem pendente" e cada um criava um link pagável para o mesmo pedido.
+    /// </summary>
+    public Task<CobrancaPedidoResult> ExecuteComTravaAsync(GerarCobrancaPedidoInput input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            await pedidoRepository.TravarAsync(input.EmpresaId, input.PedidoId, token);
+            return await ExecuteAsync(input, token);
+        }, ct);
+    }
+
     /// <summary>Pedido já gravado: carrega itens e frete do banco.</summary>
     public async Task<CobrancaPedidoResult> ExecuteAsync(GerarCobrancaPedidoInput input, CancellationToken ct = default)
     {
@@ -117,7 +133,7 @@ public sealed class GerarCobrancaPedidoUseCase(
                 "Pedido cancelado ou entregue não recebe cobrança.");
         // Mesma conta da confirmação (#1289): com os pagamentos cobrindo o total, o webhook trataria
         // o pagamento deste link como duplicado e o devolveria sozinho.
-        var alocado = input.CobrarSaldo && saldoFinanceiro is not null
+        var alocado = saldoFinanceiro is not null
             ? (await saldoFinanceiro.ConsultarAsync(pedido, ct)).Alocado : pedido.TotalPago;
         if (pedido.Total.Valor > 0m && alocado >= pedido.Total.Valor)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
@@ -125,14 +141,15 @@ public sealed class GerarCobrancaPedidoUseCase(
         var storefront = await storefrontRepository.GetByEmpresaAsync(input.EmpresaId, ct);
         var dados = new DadosCobranca(
             pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
-            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, input.CobrarSaldo ? alocado : 0m, input.CobrarSaldo);
+            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, input.CobrarSaldo,
+            input.NaEntregaSemProvedor);
         return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
     }
 
     private async Task<CobrancaPedidoResult> CobrarAsync(DadosCobranca dados, Guid? conversaId, int tentativa, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var valorCobrado = dados.CobrarSaldo ? dados.Total - dados.Alocado : PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, agora)
+        var valorCobrado = dados.CobrarSaldo ? dados.Total - dados.Alocado : PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm)
             ? PlanoPagamentoEncomenda.Sinal(dados.Total)
             : dados.Total;
         var existentes = await cobrancaRepository.ListarDoPedidoAsync(dados.EmpresaId, dados.PedidoId, ct);
@@ -142,8 +159,21 @@ public sealed class GerarCobrancaPedidoUseCase(
 
         var pendente = existentes.FirstOrDefault(c => c.EstaPendente);
         if (pendente is not null && !pendente.EhOnline)
+        {
+            if (PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm))
+            {
+                var saldoManual = dados.Total - dados.Alocado;
+                if (pendente.Valor == saldoManual) return CobrancaPedidoResult.De(pendente, reutilizada: true);
+                pendente.Cancelar(MotivoValorAlterado, agora);
+                var manual = CobrancaPedido.CriarNaEntrega(dados.EmpresaId, dados.PedidoId,
+                    saldoManual, agora, conversaId ?? pendente.ConversaId);
+                await cobrancaRepository.AddAsync(manual, ct);
+                await unitOfWork.CommitAsync();
+                return CobrancaPedidoResult.De(manual);
+            }
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.FormaNaEntrega,
                 "O pedido está combinado para pagar na entrega; troque a forma para gerar link.");
+        }
         if (pendente is not null && pendente.Venceu(agora))
             pendente.Expirar(agora);
         else if (pendente is not null && pendente.Valor != valorCobrado)
@@ -164,7 +194,23 @@ public sealed class GerarCobrancaPedidoUseCase(
             ExpiraEm: expiraEm,
             IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}");
 
-        var preferencia = await CriarPreferenciaAsync(command, ct);
+        PreferenceCriadaResult preferencia;
+        try
+        {
+            preferencia = await CriarPreferenciaAsync(command, ct);
+        }
+        catch (MercadoPagoIndisponivelException ex) when (dados.NaEntregaSemProvedor
+            || (ex.InnerException is MercadoPagoNaoConfiguradoException
+                && PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm)))
+        {
+            // Sem provedor configurado, a encomenda conserva a dívida e aguarda sinal externo, sem prazo de link.
+            // O pedido confirmado pela atendente faz o mesmo com o provedor fora: nunca nasce sem cobrança (#1726).
+            var manual = CobrancaPedido.CriarNaEntrega(dados.EmpresaId, dados.PedidoId,
+                dados.Total - dados.Alocado, agora, conversaId);
+            await cobrancaRepository.AddAsync(manual, ct);
+            await unitOfWork.CommitAsync();
+            return CobrancaPedidoResult.De(manual);
+        }
 
         var cobranca = CobrancaPedido.CriarOnline(
             dados.EmpresaId, dados.PedidoId, valorCobrado, preferencia.PreferenceId, preferencia.InitPointUrl,
@@ -222,5 +268,6 @@ public sealed class GerarCobrancaPedidoUseCase(
 
     private sealed record DadosCobranca(
         Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total,
-        IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm, decimal Alocado = 0m, bool CobrarSaldo = false);
+        IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm, DateTime CriadoEm, decimal Alocado = 0m, bool CobrarSaldo = false,
+        bool NaEntregaSemProvedor = false);
 }

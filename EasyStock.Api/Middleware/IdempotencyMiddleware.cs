@@ -68,7 +68,8 @@ public sealed class IdempotencyMiddleware(
                 ctx.Response.Headers["X-Idempotency-Missing"] = "true";
                 return Task.CompletedTask;
             }, context);
-            logger.LogWarning("POST {Path} em rota idempotente sem header {Header}.", path, HeaderName);
+            // Debug: o matcher e por prefixo e cobre POSTs que nao mandam chave (marcar-lida, assumir); Warning enchia o log (#1786).
+            logger.LogDebug("POST {Path} em rota idempotente sem header {Header}.", path, HeaderName);
             await next(context);
             return;
         }

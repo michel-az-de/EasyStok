@@ -163,7 +163,7 @@ await confere('A no cardápio, somar e tirar prato ficam desligados com o motivo
 // ── B. De quem é a comanda ───────────────────────────────────────────────────────────────
 await confere('B o painel do cardápio mostra o primeiro nome do cliente no cabeçalho e no rodapé', () => {
   assert.match(painelCardapio, /const nomeCliente = selecionada\?\.nome \? primeiroNome\(selecionada\.nome\) : ''/)
-  assert.match(painelCardapio, /<h2>Cardápio de hoje<\/h2>\s*\{nomeCliente && <p className=\{css\.donoDaComanda\} aria-live="polite">Comanda de <b>\{nomeCliente\}<\/b><\/p>\}/)
+  assert.match(painelCardapio, /<h2>\{travada && papel === 'escolher' \? 'Consulta do cardápio' : 'Cardápio de hoje'\}<\/h2>\s*\{nomeCliente && <p className=\{css\.donoDaComanda\} aria-live="polite">Comanda de <b>\{nomeCliente\}<\/b><\/p>\}/)
   assert.match(painelCardapio, /<RodapeComanda pedido=\{pedido\} cardapio=\{cardapio\} linhas=\{linhas\} nomeCliente=\{nomeCliente\} \/>/)
   assert.match(painelCardapio, /Comanda\{nomeCliente \? ` de \$\{nomeCliente\}` : ''\} · /)
 })
@@ -223,7 +223,8 @@ await confere('C o composer recusa ao escolher e não promete PDF no modo API', 
   assert.match(composer, /validarArquivo\(\{ tipo: arquivo\.type, tamanho: arquivo\.size, soImagem: fonteApi \}\)/)
   assert.match(composer, /const bloqueioCanal = motivoDeAnexo\(canal, tipo, \{ fonteApi \}\)/)
   assert.match(composer, /soImagem=\{fonteApi\}/)
-  assert.match(composer, /titulo=\{fonteApi \? 'Anexar foto do computador \(imagem, até 8 MB\)' : /)
+  // #1761: canal que não aceita anexo mostra a restrição no lugar; o resto segue igual.
+  assert.match(composer, /titulo=\{!podeAnexar \? restricao : fonteApi \? 'Anexar foto do computador \(imagem, até 8 MB\)' : /)
   const anexos = fonte('features/atendimento/ComposerAnexos.jsx')
   assert.match(anexos, /accept=\{`image\/jpeg,image\/png,image\/webp,image\/gif\$\{soImagem \? '' : ',application\/pdf'\}`\}/)
 })

@@ -118,4 +118,6 @@ export const itemGestaoDaApi = (i) => ({
   arquivado: i.arquivado === true,
   emValidacao: i.emValidacao === true,
   novidadeAte: i.novidadeAte ?? null,
+  // #1803: a seção (categoria nova) do item; null = ainda só no texto livre antigo.
+  secaoId: i.secaoId ?? null,
 })

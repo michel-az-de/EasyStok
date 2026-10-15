@@ -9,9 +9,11 @@ const evidencias = process.env.EVIDENCIAS_UX ?? '../.build/1693-ux'
 mkdirSync(evidencias, { recursive: true })
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1050 }, reducedMotion: 'reduce' })
-const erros = [], chaves = []
-const pedidos = Array.from({ length: 10 }, (_, i) => ({ id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, numero: `P${i + 1}`, cliente: `Cliente ${i + 1}`, endereco: `Destino de teste ${i + 1}`, bairro: `Região ${i % 3}`, janelaInicio: '2026-10-13T13:00:00Z', janelaFim: '2026-10-13T14:00:00Z', status: 'pronto', freteCentavos: 500 }))
+const erros = [], chaves = [], escritas = [], chamadasLalamove = []
+context.on('request', r => { if (new URL(r.url()).hostname === 'web.lalamove.com') chamadasLalamove.push(r.url()) })
+const pedidos = Array.from({ length: 10 }, (_, i) => ({ id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, numero: `P${i + 1}`, cliente: `Cliente ${i + 1}`, endereco: `Destino de teste ${i + 1}`, bairro: `Região ${i % 3}`, telefone: '+5500000000000', latitude: -23.55, longitude: -46.63, clienteBloqueado: false, janelaInicio: '2026-10-13T13:00:00Z', janelaFim: '2026-10-13T14:00:00Z', status: 'pronto', freteCentavos: 500 }))
 let despachos = [], cotados = [], falharContratacao = true, gerente = true, ultimoPedidoCotacao = null
+let empresaReal = false, falharContexto = false
 let politica = { automatico: false, tetoCentavos: 4000, permitirAgrupar: true }
 await context.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'prova-local', expiraEm: Date.now() + 3600000, empresa: { id: '11111111-1111-4111-8111-111111111111' }, usuario: { id: '22222222-2222-4222-8222-222222222222', nome: 'Revisora' } })))
 await context.route('**/api/**', async (route) => {
@@ -19,7 +21,12 @@ await context.route('**/api/**', async (route) => {
   if (!path.startsWith('/api/')) return route.continue()
   const ok = (data) => route.fulfill({ json: { data } })
   const body = r.method() === 'GET' ? null : r.postDataJSON()
-  if (path.endsWith('/logistica/contexto')) return ok({ demonstracao: true, politica, pedidos, despachos })
+  if (r.method() !== 'GET') escritas.push(path)
+  if (path.endsWith('/logistica/contexto')) {
+    if (falharContexto) return route.fulfill({ status: 503, json: { error: { message: 'Serviço indisponível temporariamente.' } } })
+    return ok(empresaReal ? { demonstracao: false, politica: { automatico: false }, pedidos: [], despachos: [], indisponibilidade: 'A contratação de transporte ainda não está conectada nesta empresa. Consulte o prestador e combine o frete com o cliente.' }
+      : { demonstracao: true, politica, pedidos, despachos })
+  }
   if (path.endsWith('/logistica/cotacoes')) {
     ultimoPedidoCotacao = body
     cotados = body.pedidoIds
@@ -95,8 +102,57 @@ try {
   await modal.getByText('Lalamove · Devolvido à loja', { exact: true }).waitFor()
   assert.equal(await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).count(), 0)
   assert.equal(await modal.getByText('Preferências de contratação', { exact: true }).count(), 0)
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 1366, height: 900 })
+  empresaReal = true
+  const escritasAntes = escritas.length
+  await page.getByRole('button', { name: 'Organizar transportes', exact: true }).click()
+  const orientacao = modal.getByRole('region', { name: 'Combinar transporte com o prestador' })
+  await orientacao.waitFor()
+  assert.equal(await orientacao.evaluate(e => e === document.activeElement), true)
+  assert.equal(await modal.getByRole('alert').count(), 0)
+  assert.equal(await modal.getByRole('button', { name: 'Tentar novamente' }).count(), 0)
+  assert.equal(await modal.getByRole('button', { name: 'Comparar transportes' }).count(), 0)
+  assert.doesNotMatch(await modal.innerText(), /laboratório|demonstração/iu)
+  assert.match(await orientacao.innerText(), /Com o cliente de acordo, revise a seleção e use Criar pedido no Atendimento/)
+  const consultaLalamove = modal.getByRole('link', { name: 'Consultar Lalamove (site externo, abre em nova aba)', exact: true })
+  assert.equal(await consultaLalamove.getAttribute('href'), 'https://web.lalamove.com/')
+  assert.equal(await consultaLalamove.getAttribute('target'), '_blank')
+  assert.equal(await consultaLalamove.getAttribute('rel'), 'noopener noreferrer')
+  assert.deepEqual(chamadasLalamove, [])
+  assert.equal(await modal.getByRole('link', { name: 'Abrir Entregas' }).getAttribute('href'), '#/m/entregas')
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
+  await page.screenshot({ path: `${evidencias}/desktop-empresa-real.png`, fullPage: true })
+  await modal.getByRole('link', { name: 'Abrir Entregas' }).click()
+  await modal.waitFor({ state: 'hidden' })
+  assert.equal(new URL(page.url()).hash, '#/m/entregas')
+  assert.equal(escritas.length, escritasAntes)
+
+  falharContexto = true
+  await page.getByRole('button', { name: 'Organizar transportes', exact: true }).click()
+  await modal.getByRole('alert').filter({ hasText: 'Serviço indisponível temporariamente.' }).waitFor()
+  assert.equal(await orientacao.count(), 0)
+  falharContexto = false
+  await modal.getByRole('button', { name: 'Tentar novamente' }).click()
+  await orientacao.waitFor()
+  assert.equal(await orientacao.evaluate(e => e === document.activeElement), true)
+  await page.keyboard.press('Escape')
+
+  empresaReal = false
+  pedidos[0].latitude = null
+  await page.getByRole('button', { name: 'Organizar transportes', exact: true }).click()
+  await modal.getByText('Ambiente de demonstração.', { exact: false }).waitFor()
+  const pedidosParaCotar = modal.locator('details').first()
+  if (await pedidosParaCotar.getAttribute('open') === null) await pedidosParaCotar.locator('summary').click()
+  await modal.getByText('Localização não validada.', { exact: false }).waitFor()
+  const semLocalizacao = modal.getByLabel('Pedido P1, Cliente 1', { exact: true })
+  assert.equal(await semLocalizacao.isDisabled(), true)
+  assert.ok(await semLocalizacao.getAttribute('aria-describedby'))
+  await modal.getByLabel('Pedido P3, Cliente 3', { exact: true }).check()
+  assert.equal(await modal.getByRole('button', { name: 'Comparar transportes', exact: true }).isEnabled(), true)
+  await page.screenshot({ path: `${evidencias}/desktop-requisitos.png`, fullPage: true })
   assert.deepEqual(erros, [])
-  console.log('OK: 10 pedidos; cotação/manual em centavos; custo negativo bloqueado; retentativa idempotente; pagamento; saída/problema/retorno; celular; Escape/foco; permissões atendente; sem erros de render. HTTP controlado, não integração real.')
+  console.log('OK: laboratório; empresa real orientada sem escritas; falha de rede com retentativa; localização pendente descrita; cotação/manual; idempotência; pagamento; saída/retorno; Escape/foco; permissões. HTTP controlado, não integração externa.')
 } catch (erro) {
   console.error(erros); console.error((await page.locator('body').innerText()).slice(0, 1800))
   throw erro

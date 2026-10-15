@@ -101,10 +101,30 @@ public sealed partial class PedidoConversaConcorrenciaTests
             combinado.EntregaACombinar.Should().BeFalse();
             combinado.FreteCombinado.Should().Be(13.5m);
             combinado.TotalPrevisto.Should().Be(33.5m);
+            var janelaAtual = await banco.JanelasEntrega.SingleAsync(j => j.Id == c.JanelaId);
+            var outraJanela = EasyStock.Domain.Entities.Storefront.JanelaEntrega.Criar(janelaAtual.StorefrontId,
+                janelaAtual.DiaDaSemana, new TimeOnly(14, 0), new TimeOnly(17, 0), 10, "Tarde");
+            banco.JanelasEntrega.Add(outraJanela);
+            await banco.SaveChangesAsync();
+            await Salvar(client, token, combinado, combinado.Rascunho with { JanelaId = outraJanela.Id });
+            combinado = await Estado(client, token);
+            combinado.FreteCombinado.Should().Be(13.5m, "trocar somente o horário no mesmo dia preserva o frete combinado");
+            combinado.EntregaACombinar.Should().BeFalse();
+            combinado.TotalPrevisto.Should().Be(33.5m);
             await Salvar(client, token, combinado, combinado.Rascunho with { Observacoes = "Conferir transporte novamente" });
             var alterado = await Estado(client, token);
             alterado.FreteCombinado.Should().BeNull();
             (await client.PostAsJsonAsync(rotaFrete, new { combinado.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.Conflict);
+            (await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { alterado.Revisao })).StatusCode.Should().Be(HttpStatusCode.OK);
+            cobrancas.Should().BeEmpty();
+            (await client.PostAsJsonAsync(rotaFrete, new { alterado.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.OK);
+            combinado = await Estado(client, token);
+            await Salvar(client, token, combinado, combinado.Rascunho with { Endereco = combinado.Rascunho.Endereco! with { Numero = "43" } });
+            alterado = await Estado(client, token);
+            alterado.FreteCombinado.Should().BeNull("mudar o destino exige conferir a cotação novamente");
+            await Salvar(client, token, alterado, combinado.Rascunho);
+            alterado = await Estado(client, token);
+            alterado.FreteCombinado.Should().BeNull("restaurar o destino não recupera uma cotação invalidada");
             (await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { alterado.Revisao })).StatusCode.Should().Be(HttpStatusCode.OK);
             cobrancas.Should().BeEmpty();
             (await client.PostAsJsonAsync(rotaFrete, new { alterado.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.OK);
@@ -532,6 +552,14 @@ public sealed partial class PedidoConversaConcorrenciaTests
             var operacao = await db.Set<PedidoEstornoOnline>().SingleAsync();
             operacaoId = operacao.Id;
             operacao.Situacao.Should().Be(PedidoEstornoOnline.Pendente);
+            var avisos = await db.NotifEventos.Where(e => e.RefEntidadeId == envio.PedidoId)
+                .Select(e => e.PayloadJson).ToListAsync();
+            var payload = avisos.Single(p => p.Contains($"comanda:{estado.LinkId:N}:estorno_pendente"));
+            using var aviso = JsonDocument.Parse(payload);
+            aviso.RootElement.GetProperty("mensagem").GetString().Should()
+                .Contain("Seu pedido foi atualizado. Total: R$ 15,00.")
+                .And.Contain("Solicitamos a devolução de R$ 20,00 pelo Mercado Pago. Aguarde a confirmação.")
+                .And.NotContain("foi devolvido");
             operacao.EstornoExternoId.Should().BeNull();
             operacao.MovimentoCaixaId.Should().BeNull();
             operacao.Detalhe.Should().Contain("sem confirmação válida");

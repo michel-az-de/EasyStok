@@ -15,9 +15,9 @@ import { prazoDoPagamento } from './lembrete'
 import { duracao } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
 import { pedidoAtrasado } from './cozinha.js'
-import { MOTIVO_PADRAO, origemDaPassagem } from './passagem.js'
+import { MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
 import { pedidoEncerrado } from './pedido.js'
-import { ehPerguntaSemResposta, mensagensSemRespostaReal } from './mensagem.js'
+import { ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
 import { sinalDoCliente } from './agente.js'
 
@@ -74,13 +74,13 @@ const DESCRICOES = {
   [MODOS.PAUSADO]: {
     rotulo: 'Pausado porque você escreveu',
     tom: 'info',
-    detalhe: 'Aviso de esteira continua saindo. O resto espera você devolver.',
+    detalhe: 'Os avisos de preparo e entrega do pedido continuam saindo. O resto espera você devolver.',
   },
   // Mesma pausa, outra porta de entrada: ela apertou Assumir sem escrever nada.
   assumiu: {
     rotulo: 'Pausado porque você assumiu',
     tom: 'info',
-    detalhe: 'Aviso de esteira continua saindo. O resto espera você devolver.',
+    detalhe: 'Os avisos de preparo e entrega do pedido continuam saindo. O resto espera você devolver.',
   },
   // Modo API: a conversa está com outro atendente (F07, item 3).
   outro: {
@@ -125,9 +125,11 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
   // Passou para você e ninguém pegou ainda: é o estado que grita. A linha
   // diz a origem inteira (quem, por quê, que horas), a mesma do cartão do
   // Balcão e do lembrete (dominio/passagem.js, rodada 12).
-  if (conversa.passagem && !conversa.passagem.assumida) {
+  if (passagemPendente(conversa)) {
     const base = DESCRICOES[MODOS.COM_VOCE]
-    return { chave: MODOS.COM_VOCE, ...base, detalhe: origemDaPassagem(conversa.passagem).longo }
+    return { chave: MODOS.COM_VOCE, ...base,
+      ...(conversa.passagem.origem === 'chat-site' ? { rotulo: 'Aguardando equipe' } : {}),
+      detalhe: origemDaPassagem(conversa.passagem).longo }
   }
   if (pausado) {
     const base = DESCRICAO_DA_PAUSA[pausado] ?? DESCRICOES[MODOS.PAUSADO]
@@ -173,13 +175,12 @@ export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida
 // última fala da conversa é dela. Nota interna e aviso do sistema não contam
 // como fala. Pedido em andamento nunca sugere encerrar: a conversa ainda vai
 // levar os avisos da esteira até a entrega.
-const ultimaFala = (conversa) =>
-  [...(conversa.mensagens ?? [])].reverse().find((m) => m.dir === 'in' || m.dir === 'out') ?? null
-
 export function proximoPassoDepoisDeResponder(conversa, pausado) {
   if (!conversa || !pausado || conversa.estado === 'Encerrado') return null
   const fala = ultimaFala(conversa)
-  if (!fala || fala.dir !== 'out') return null
+  // #1761: "Respondido." aparecia sem ninguém ter respondido: a última fala era a automática (o
+  // resumo do pedido) ou uma mensagem que nem saiu. Só vale a que ela escreveu e foi enviada.
+  if (!fala || fala.dir !== 'out' || fala.automatica || ['falhou', 'enviando'].includes(fala.status)) return null
   if (conversa.pedido && !pedidoEncerrado(conversa.pedido)) {
     return {
       chave: 'aguardar',
@@ -404,7 +405,7 @@ function sinalUrgente(conversa, agora) {
 // resposta pausa fora do horário. Default `null` conta o relógio inteiro.
 export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true, janelas = [], expediente = null) {
   if (!conversa) return null
-  if (conversa.passagem && !conversa.passagem.assumida) {
+  if (passagemPendente(conversa)) {
     return {
       chave: 'passagem',
       rotulo: 'Precisa de você',

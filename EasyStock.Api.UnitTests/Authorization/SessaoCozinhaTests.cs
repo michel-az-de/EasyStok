@@ -48,6 +48,7 @@ public class SessaoCozinhaTests
         var usuarios = Substitute.For<IUsuarioRepository>();
         usuarios.GetByEmailAsync(usuario.Email).Returns(usuario);
         usuarios.GetByIdAsync(usuario.Id).Returns(usuario);
+        usuarios.ReservarTentativaDeSenhaAsync(usuario.Id, Arg.Any<DateTime>()).Returns(true);
         var uow = Substitute.For<IUnitOfWork>();
         var hasher = Substitute.For<IPasswordHasher>();
         hasher.Verify("senha-fixture", usuario.SenhaHash).Returns(true);

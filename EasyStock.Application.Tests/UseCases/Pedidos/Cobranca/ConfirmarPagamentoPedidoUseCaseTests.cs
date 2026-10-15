@@ -27,8 +27,10 @@ public class ConfirmarPagamentoPedidoUseCaseTests
     public async Task SinalPago_GeraSaldoManualSemQuitar_AQuitacaoSaiAposSaldo()
     {
         var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
         f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
         var sinal = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+        sinal.Valor.Should().Be(12.50m);
 
         var confirmado = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, sinal.Valor));
 
@@ -290,6 +292,41 @@ public class ConfirmarPagamentoPedidoUseCaseTests
 
         await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>();
         await f.ConversaRepo.DidNotReceive().ObterPorIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>#1724: o estorno automático recusado sumia com a transação; o pedido não mostrava o dinheiro retido.</summary>
+    [Fact]
+    public async Task PagoDepoisDeCancelado_EstornoRecusadoDeixaTrilhaUmaVezEContinuaPedindoReenvio()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Cancelado);
+        var cobranca = f.AdicionarOnline(conversaId: Guid.NewGuid());
+        f.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Falha("saldo_insuficiente"));
+
+        var act = () => f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+        await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>();
+        await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>("o reenvio do provedor tenta de novo");
+
+        f.Eventos.Should().ContainSingle(e => e.Tipo == ConfirmarPagamentoPedidoUseCase.EventoEstornoFalhou)
+            .Which.Detalhes.Should().Contain("saldo_insuficiente").And.Contain("25,00");
+        cobranca.Motivo.Should().StartWith(ConfirmarPagamentoPedidoUseCase.MarcaEstornoFalhou);
+        await f.Estorno.Received(2).EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>#1724: depois da falha registrada, o reenvio que consegue estornar fecha o caso como antes.</summary>
+    [Fact]
+    public async Task PagoDepoisDeCancelado_ReenvioQueEstornaSubstituiAFalha()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Cancelado);
+        var cobranca = f.AdicionarOnline(conversaId: Guid.NewGuid());
+        f.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Falha("indisponivel"), EstornoPedidoResult.Ok("estorno-9"));
+
+        await f.Confirmar().Invoking(c => c.ExecuteAsync(Aprovado(f.Pedido.Id))).Should().ThrowAsync<EstornoAutomaticoFalhouException>();
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PedidoCancelado);
+        cobranca.Motivo.Should().Contain("estorno estorno-9");
     }
 
     [Fact]

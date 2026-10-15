@@ -166,6 +166,26 @@
   padding: var(--e-4) 0;
 }
 
+.resumoAtual { padding: 0 var(--e-4); }
+.resumoAtual[data-recebendo-prato] { outline: 2px solid var(--marca); outline-offset: -2px; background: var(--fundo); }
+.resumoAtual h3 { margin: var(--e-2) 0; font-size: var(--t-titulo); }
+.resumoAtual p { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: 1.5; }
+.resumoAtual .fase { color: var(--tinta-3); font-size: var(--t-micro); font-weight: 600; }
+.acessosFicha { padding: 0 var(--e-4); }
+.acessoFicha {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
+  width: 100%; min-height: 64px; padding: var(--e-3) 0; border: 0; border-bottom: 1px solid var(--linha);
+  background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer;
+}
+.acessoFicha span { min-width: 0; }
+.acessoFicha strong, .acessoFicha small { display: block; overflow-wrap: anywhere; }
+.acessoFicha strong { font-size: var(--t-corpo); }
+.acessoFicha small { margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-apoio); }
+.acessoFicha svg { flex-shrink: 0; color: var(--tinta-3); }
+.acessoFicha:hover { background: var(--fundo); }
+.acessoFicha:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.acaoMontar { margin: 0; padding: 0 var(--e-4); }
+
 .alerta {
   display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
   padding: var(--e-3) var(--e-4); background: var(--papel); color: var(--alerta);

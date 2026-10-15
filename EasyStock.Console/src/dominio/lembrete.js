@@ -5,7 +5,7 @@
 // Puro. O relógio chega por parâmetro e nada aqui olha Date.now(), senão o
 // relógio da tela e o do lembrete andariam separados.
 
-import { FUSO, dataIsoNoFuso, horaMono, instanteNoFuso, partesNoFuso } from './formato'
+import { FUSO, dataIsoNoFuso, horaCurta, horaMono, instanteNoFuso, partesNoFuso } from './formato'
 import { mensagensSemRespostaReal, primeiroNome } from './mensagem'
 import { origemDaPassagem } from './passagem'
 
@@ -56,6 +56,22 @@ export function descreverAtraso(quando, agora) {
   if (atraso < 60) return `há ${atraso} min`
   const horas = Math.round(atraso / 60)
   return horas < 24 ? `há ${horas} h` : `há ${Math.round(horas / 24)} d`
+}
+
+// #1761: o aviso de cliente sem resposta já diz o tempo no título ("está há 5 min sem resposta.")
+// e a linha de baixo somava outra conta ("há 0 min"). Para ele a linha diz a hora do aviso.
+export const tempoDoItem = (lembrete, agora) => (lembrete.fonte === FONTES.LEMBRETE && lembrete.origem === ORIGENS.PASSAGEM
+  ? `avisado às ${horaCurta(lembrete.quando)}`
+  : descreverAtraso(lembrete.quando, agora))
+
+// #1761: o painel do sino abre para baixo de um botão que, no trilho lateral, fica no meio da
+// tela: com 70% da altura da janela passava do pé (de 476 a 1106 px em 900). Sobe o que der e
+// limita a altura ao que cabe; a rolagem interna cuida do resto. `null` quando já cabe.
+export function encaixeNaJanela({ topo, altura, janela, margem = 12 }) {
+  const limite = janela - margem
+  if (topo + altura <= limite) return null
+  const sobe = Math.max(0, Math.min(topo + altura - limite, topo - margem))
+  return { sobe, alturaMaxima: Math.max(1, Math.min(altura, limite - (topo - sobe))) }
 }
 
 // Chave de "visto" (seção 8): id + quando, não só id. Um lembrete automático

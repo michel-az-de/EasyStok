@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Events;
+using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Events;
 
@@ -20,7 +21,8 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
     IMovimentacaoEstoqueRepository movimentacaoRepository,
     IUnitOfWork unitOfWork,
     ILogger<ProcessarRecebimentoPedidoFornecedorUseCase> logger,
-    IPublicadorEventos? publicadorEventos = null)
+    IPublicadorEventos? publicadorEventos = null,
+    GerarContaPagarDePedidoFornecedorUseCase? gerarContaPagarUseCase = null)
 {
     // #306: o publicador e opcional na assinatura (DI o registra), mas se um evento
     // precisa ser publicado e ele esta null, falhamos explicito em vez de descartar
@@ -29,7 +31,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
         publicadorEventos ?? throw new InvalidOperationException(
             "IPublicadorEventos nao injetado: eventos de ProcessarRecebimentoPedidoFornecedor seriam perdidos silenciosamente (#306).");
 
-    public Task<ProcessarRecebimentoPedidoFornecedorResult> ExecuteAsync(
+    public async Task<ProcessarRecebimentoPedidoFornecedorResult> ExecuteAsync(
         ProcessarRecebimentoPedidoFornecedorCommand command,
         CancellationToken ct = default)
     {
@@ -42,8 +44,32 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
         // chama CommitAsync (= SaveChanges) internamente; dentro de uma transacao aberta
         // isso e apenas flush — o commit real e feito aqui no fim. Se qualquer item falhar,
         // rollback reverte entradas de estoque ja salvas + atualizacoes de QuantidadeRecebida.
-        return unitOfWork.ExecuteInTransactionSemRetryAsync(
+        var resultado = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             token => ExecutarDentroDaTransacaoAsync(command, token), ct);
+
+        await GerarContaPagarSeRecebidoAsync(command, ct);
+        return resultado;
+    }
+
+    // #1784: so o PATCH receber (que nao da entrada no estoque) gerava a conta a pagar automatica;
+    // o recebimento com estoque fechava o pedido sem ela. Fora da transacao e best-effort, como no
+    // PATCH: falha aqui nao desfaz o recebimento e o OrigemRefId torna a chamada idempotente.
+    private async Task GerarContaPagarSeRecebidoAsync(ProcessarRecebimentoPedidoFornecedorCommand command, CancellationToken ct)
+    {
+        if (gerarContaPagarUseCase is null) return;
+        try
+        {
+            var pedido = await pedidoRepository.GetByIdAsync(command.PedidoId);
+            if (pedido is null || pedido.Status != Domain.Enums.StatusPedidoFornecedor.Recebido) return;
+            await gerarContaPagarUseCase.ExecuteAsync(
+                new GerarContaPagarDePedidoFornecedorCommand(pedido.EmpresaId, pedido), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex,
+                "Falha ao gerar ContaPagar automatica pra PedidoFornecedor {PedidoId} — recebimento mantido.",
+                command.PedidoId);
+        }
     }
 
     private async Task<ProcessarRecebimentoPedidoFornecedorResult> ExecutarDentroDaTransacaoAsync(
@@ -99,6 +125,12 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                 logger.LogDebug("Item {ItemId} sem delta a aplicar, pulando.", item.Id);
                 continue;
             }
+
+            // Sem teto, um digito a mais (1000 em vez de 10) virava +1000 no estoque e Recebido.
+            // So vale para entrada nova: item antigo ja sobre-recebido nao pode travar os outros.
+            if (novoTotalRecebido > item.Quantidade)
+                throw new UseCaseValidationException(
+                    $"Item {item.Id}: recebido ({novoTotalRecebido}) passa do pedido ({item.Quantidade}).");
 
             // Validar produto (obrigatório para criar entrada)
             if (!item.ProdutoId.HasValue)

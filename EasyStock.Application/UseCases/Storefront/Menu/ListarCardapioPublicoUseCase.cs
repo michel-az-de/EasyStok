@@ -94,7 +94,9 @@ public sealed class ListarCardapioPublicoUseCase(
                 // capitalizados) são preservados pelo guard de NomeCardapio.Exibicao.
                 Nome: NomeCardapio.Exibicao(i.NomeEfetivo()) ?? string.Empty,
                 Descricao: i.DescricaoPublica,
-                PrecoCentavos: (long)Math.Round(i.PrecoEfetivo() * 100m, MidpointRounding.AwayFromZero),
+                // #1784: com porções o checkout cobra a porção padrão (PorcaoParaVenda); mostrar o preço do
+                // item fazia o site anunciar R$ 38 e o pagamento cobrar R$ 45.
+                PrecoCentavos: (long)Math.Round(i.PrecoAPartirDe() * 100m, MidpointRounding.AwayFromZero),
                 ImagemUrl: i.FotoUrl,
                 // Avulso: null (frontend usa disponivel; estoqueAtual não se aplica).
                 // Vinculado (#1171): saldo produzido, somado dos lotes com saldo e não vencidos.
@@ -103,7 +105,8 @@ public sealed class ListarCardapioPublicoUseCase(
                 Ordem: i.OrdemExibicao,
                 // #1171: segue flag manual. Saldo 0 NÃO esgota o item: o checkout recusa
                 // !Disponivel (#1158) e falta de estoque avisa, não trava o pedido (S17).
-                Disponivel: i.Disponivel,
+                // Porções todas esgotadas: o checkout recusa, então o site não oferece o prato.
+                Disponivel: i.Disponivel && (!i.TemVariacoes() || i.Variacoes.Any(v => v.Disponivel)),
                 Tag: i.Tag,
                 PesoExibicao: i.PesoExibicao,
                 Linha: i.Linha.ParaContrato(),

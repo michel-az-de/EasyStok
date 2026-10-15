@@ -38,6 +38,15 @@
 .comparativo { padding: var(--e-2); border-left: 3px solid var(--linha-forte); }
 .historicoFinanceiro summary { display: list-item; min-height: 44px; align-content: center; cursor: pointer; color: var(--tinta); }
 .historicoFinanceiro summary:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+.ajudaCompartilhada { display: grid; gap: var(--e-1); margin-block: var(--e-2); padding: var(--e-2) var(--e-3); border-left: var(--trilho) solid var(--alerta); background: var(--alerta-pastel); border-radius: var(--r-1); }
+.transporteCompartilhado { margin-block: var(--e-2); }
+.transporteCompartilhado > summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 600; }
+.consultaTransporte { font-size: var(--t-apoio); }
+.consultaTransporte p { margin-block: var(--e-2); }
+.consultaTransporte a { display: inline-flex; align-items: center; min-height: 44px; color: var(--marca); text-underline-offset: 3px; }
+.consultaTransporte a:focus-visible, .transporteCompartilhado > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.freteCompartilhado { margin-block: var(--e-3); }
+.confirmarCompartilhado { margin-block: var(--e-3); }
 
 /* O único gesto "de papel": dois triângulos diagonais por dente de 8×5 px,
    pintados na cor da comanda. Onde não há tinta, o fundo por trás aparece,
@@ -88,7 +97,8 @@
 .itens { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-3); }
 .item { display: flex; flex-direction: column; gap: var(--e-1); }
 .linhaItem { display: flex; gap: var(--e-2); align-items: baseline; }
-.linhaItem:has(.controlesItem) { display: grid; grid-template-columns: 3ch minmax(0, 1fr); align-items: start; }
+/* #1761 (L18): nome e seletor de quantidade na mesma linha. */
+.linhaItem:has(.controlesItem) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 .linhaItem .controlesItem { grid-column: 2; justify-self: end; }
 
 /* "2×" fixo em 3ch para o nome do prato começar sempre na mesma coluna,
@@ -144,6 +154,8 @@
 }
 .total b { font-family: var(--f-corpo); font-weight: 700; font-size: var(--t-valor); font-variant-numeric: tabular-nums; }
 .total > span { flex: 1 1 140px; }
+.resumoTotal { padding-bottom: var(--e-3); }
+.resumoTotal .total { padding-top: 0; border-top: 0; }
 .total b { white-space: nowrap; }
 .notaTotal { margin: var(--e-2) 0 0; font-family: var(--f-corpo); font-size: var(--t-apoio); color: var(--tinta-2); }
 
@@ -235,3 +247,15 @@
   .gavetaNoPe .gavetaLabel { overflow: visible; text-overflow: clip; }
   .gavetaNoPe > button { padding-inline: var(--e-2); font-size: var(--t-apoio); }
 }
+.resumoCompartilhado { display: grid; gap: var(--e-2); padding: var(--e-3) 0; }
+.resumoCompartilhado + .resumoCompartilhado { border-top: 1px solid var(--linha); }
+.resumoCompartilhado p { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.estadoDaSelecao { font-size: var(--t-apoio); font-weight: 600; }
+.etapaCompartilhada { padding: var(--e-3); margin-bottom: var(--e-3); border-left: var(--trilho) solid var(--marca); background: var(--elevado); }
+.etapaCompartilhada p { margin-bottom: 0; }
+.pedidoAtualCompartilhado { margin-block: var(--e-3); padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); }
+.pedidoAtualCompartilhado summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 600; }
+.pedidoAtualCompartilhado summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.entregaDaSelecao { margin-block: var(--e-3); border-block: var(--b-1) solid var(--linha); }
+.entregaDaSelecao > summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 600; }
+.entregaDaSelecao > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }

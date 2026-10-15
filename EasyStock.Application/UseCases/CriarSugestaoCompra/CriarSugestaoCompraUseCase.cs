@@ -71,7 +71,10 @@ public class CriarSugestaoCompraUseCase(
             var agora = DateTime.UtcNow;
             foreach (var (grupo, fornecedor) in fornecedoresValidados)
             {
-                decimal valorEstimado = grupo.Itens.Sum(i => i.Quantidade * i.CustoUnitario);
+                // Arredonda como a coluna numeric(18,2): sem isso a resposta e o aviso ao fornecedor
+                // mostravam 15,28125 enquanto o banco guardava 15,28.
+                decimal valorEstimado = Math.Round(
+                    grupo.Itens.Sum(i => i.Quantidade * i.CustoUnitario), 2, MidpointRounding.AwayFromZero);
 
                 var pf = new PedidoFornecedorEntity
                 {

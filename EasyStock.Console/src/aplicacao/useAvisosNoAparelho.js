@@ -42,7 +42,7 @@ export function useAvisosNoAparelho({ sessao }) {
     const pendente = desligar
       ? desinscreverPushNoNavegador(identidade).then(() => ({ estado: ESTADOS_AVISO.DESLIGADO, mensagem: null }))
       : ativarAvisosNoAparelho(contexto)
-    setSituacao({ estado: ESTADOS_AVISO.ATIVANDO, mensagem: null })
+    setSituacao({ estado: desligar ? ESTADOS_AVISO.DESATIVANDO : ESTADOS_AVISO.ATIVANDO, mensagem: null })
     try {
       const resultado = await pendente
       if (vivo.current && atual === geracao.current) setSituacao(resultado)

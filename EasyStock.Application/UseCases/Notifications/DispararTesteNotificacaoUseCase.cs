@@ -62,6 +62,9 @@ public sealed class DispararTesteNotificacaoUseCase(
             ["teste"] = true,
         };
 
+        if (tipo == TipoEventoNotificacao.ContatoAlterado)
+            payload[CanaisDaRotina.CanaisPayload] = new[] { nameof(CanalNotificacao.Email) };
+
         var eventoId = await notificador.EnfileirarEventoAsync(tipo, empresaId, JsonSerializer.Serialize(payload), ct: ct);
         await unitOfWork.CommitAsync();
 

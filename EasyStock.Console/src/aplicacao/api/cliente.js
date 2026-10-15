@@ -4,6 +4,7 @@ import {
 } from '../../infra/api/conversasApi'
 import { clienteDoDossie, enderecoParaApi } from '../../infra/api/traducaoCliente'
 import { textoNaoLigado } from './naoLigadas'
+import { recusaDoEndereco } from '../../dominio/cliente'
 
 // Cadastro do cliente da conversa no modo API (#1276). Sem cliente vinculado o EasyStok não
 // gera pedido; aqui a dona cadastra nome, telefone e endereço pela Ficha. Nada muda na tela
@@ -35,6 +36,9 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
   // #1586: a recusa volta como `{ erro }` para a Ficha mostrar no campo ou ao lado do botão; a
   // tela só diz "Salvo" depois desta resposta.
   function cadastrar(id, { nome = null, telefone = null, endereco = null }) {
+    // #1761: texto que não vira endereço não vai como nulo no lugar do que ela digitou.
+    const recusa = recusaDoEndereco(endereco)
+    if (recusa) return Promise.resolve({ erro: recusa })
     const corpo = { nome: nome?.trim() || null, telefone: telefone || null, endereco: endereco ? enderecoParaApi(endereco) : null }
     return cadastrarClienteDaConversa(id, corpo)
       .then(async (salvo) => {

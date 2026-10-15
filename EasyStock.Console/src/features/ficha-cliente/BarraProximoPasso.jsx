@@ -6,7 +6,7 @@ import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
 import {
-  aguardaAprovacao, avisoDeLinkVencidoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca,
+  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
 import { ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR } from '../../dominio/resumoPedido'
@@ -54,6 +54,8 @@ const PROXIMO_DE_AGUARDANDO = proximoPasso('aguardando')?.rotulo ?? 'Pago'
 // O passo "aguardando pagamento" não tem um botão único: o próximo passo
 // muda com a situação da cobrança (secao 2, "Alerta do Pix"). Substitui a
 // antiga trava, que só mostrava texto e travava a barra inteira.
+const GERANDO_COBRANCA = 'Gerando cobrança…'
+
 function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoApi, aoAbrirBaixa, aoGerarPix, aoReenviarPix }) {
   switch (situacaoCob.chave) {
     case 'nenhuma':
@@ -119,6 +121,8 @@ export function BarraProximoPasso({
   const disponivel = useAcaoDisponivel()
   const [erroAcao, setErroAcao] = useState(null)
   const [marcoEmVoo, setMarcoEmVoo] = useState(null)
+  // #1761: "Confirmando alteração…" aparecia ao gerar cobrança, que não é alteração.
+  const [esperaEmVoo, setEsperaEmVoo] = useState(null)
   const emVoo = Boolean(marcoEmVoo)
   const [executarUmaVez] = useState(criarExecucaoDaEtapa)
   const [trilhaAberta, setTrilhaAberta] = useState(false)
@@ -151,19 +155,19 @@ export function BarraProximoPasso({
 
   // O retorno pertence ao pedido e à etapa que iniciaram a ação. A espera só termina
   // com a Promise, inclusive quando o rascunho ganha pedidoId durante a recarga.
-  const executar = (fazer) => {
+  const executar = (fazer, espera = null) => {
     if (emVoo) return
     setErroAcao(null)
     const marcoNaHora = marco
     return executarUmaVez(fazer, {
-      aoOcupar: () => setMarcoEmVoo(marcoNaHora),
+      aoOcupar: () => { setMarcoEmVoo(marcoNaHora); setEsperaEmVoo(espera) },
       aoFalhar: texto => setErroAcao({ ...marcoNaHora, texto }),
       aoLiberar: () => setMarcoEmVoo(null),
     })
   }
   const erroVisivel = erroAcao?.chave === marco.chave && erroAcao.estado === marco.estado ? erroAcao.texto : null
   const textoDaEspera = marcoEmVoo?.chave === marco.chave
-    ? 'Confirmando alteração…' : 'Concluindo a ação iniciada nesta conversa…'
+    ? (esperaEmVoo ?? 'Confirmando alteração…') : 'Concluindo a ação iniciada nesta conversa…'
 
   useEffect(() => {
     if (!emDesfazer) return undefined
@@ -215,10 +219,11 @@ export function BarraProximoPasso({
       rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
       aoAbrirBaixa: () => setAbrindoBaixa(true),
-      aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio)) : setPedindoMeio(true)),
+      aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio), GERANDO_COBRANCA) : setPedindoMeio(true)),
       aoReenviarPix: () => executar(() => aoReenviarPix()),
     })
-    rotuloEstado = info.rotuloEstado
+    rotuloEstado = fonteApi && aguardaSinalManual(pedido) ? 'Aguardando sinal' : info.rotuloEstado
+    if (fonteApi && aguardaSinalManual(pedido)) depoisTexto = pedido.requerAprovacao ? 'Próximo: Aprovação da loja' : 'Próximo: Fila de preparo'
 
     if (info.divergente) {
       const falta = faltaPagar(pedido.cobranca)
@@ -241,13 +246,15 @@ export function BarraProximoPasso({
               key={b.rotulo} largo variante="primario" icone={b.icone}
               disabled={b.desabilitado || emVoo} onClick={b.onClick}
             >
-              {b.rotulo}
+              {fonteApi && aguardaSinalManual(pedido) && b.rotulo === 'Marcar pago' ? 'Registrar sinal' : b.rotulo}
             </Botao>
           ))}
           {pedindoMeio && situacaoCob.chave === 'nenhuma' && !pedido.meio && (
             <EscolhaDeMeio
               escolhido={null}
-              aoEscolher={(meio) => { setPedindoMeio(false); executar(() => aoGerarPix(meio)) }}
+              pedido={pedido}
+              geraAoEscolher
+              aoEscolher={(meio) => { setPedindoMeio(false); executar(() => aoGerarPix(meio), GERANDO_COBRANCA) }}
               pergunta="Como o cliente vai pagar?"
             />
           )}
@@ -294,6 +301,12 @@ export function BarraProximoPasso({
     } else if (!proximo) {
       corpoAcao = (
         <div className={css.botoesPrimarios}>
+          {/* #1804: pedido concluído sem nada a cobrar: o atendimento acabou e só falta mandar ao histórico. */}
+          {pedido.estado === 'entregue' && !complementoEmAberto && (
+            <p className={css.motivoDesabilitado}>
+              Pedido concluído, nada pendente. Encerre para a conversa ir ao histórico do cliente.
+            </p>
+          )}
           <Botao largo variante="primario" icone="log-out" onClick={aoEncerrarAtendimento}>
             Encerrar atendimento
           </Botao>
@@ -499,7 +512,7 @@ export function BarraProximoPasso({
       )}
       {abrindoBaixa && (
         <BaixaAMao
-          valorCobrado={Math.max(0, (pedido.totalApi ?? pedido.cobranca.valor) - (alocadoApi ?? 0))}
+          valorCobrado={valorSugeridoParaBaixa(pedido)}
           pedido={pedido}
           aoAprovar={aoAprovarPedido}
           aoCancelar={() => setAbrindoBaixa(false)}

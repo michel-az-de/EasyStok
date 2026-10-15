@@ -6,6 +6,7 @@ namespace EasyStock.Application.Services.Atendimento;
 
 public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnitOfWork unitOfWork)
 {
+    public const string MotivoFilaHumana = "Visitante do site aguardando atendimento da equipe.";
     public Task<Conversa> ObterOuCriarAsync(SessaoChatSite sessao, Guid? clienteVerificadoId, DateTime agora,
         CancellationToken ct = default) => unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
     {
@@ -28,7 +29,7 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
         if (conversa is null)
         {
             conversa = Conversa.Abrir(sessao.EmpresaId, contato, agora, "Visitante do site", clienteVerificadoId, CanalConversa.ChatSite);
-            conversa.Assumir(agora);
+            conversa.Escalar(agora, MotivoFilaHumana);
             await conversas.AddAsync(conversa, token);
         }
         if (clienteVerificadoId is { } verificado) conversa.VincularCliente(verificado);
@@ -36,5 +37,29 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
         sessao.RegistrarUso(agora);
         await unitOfWork.CommitAsync();
         return conversa;
+    }, ct);
+
+    /// <summary>
+    /// Pedido feito pela página do chat: fica em andamento na conversa, conta como entrada do cliente e deixa a nota
+    /// interna <paramref name="resumo"/>. Repetição do mesmo pedido (checkpoint refeito) não grava de novo.
+    /// #1797: a conversa é relida sob a trava. A leitura do início do checkout é velha: gravá-la desfazia o marcar-lida.
+    /// Encerrada no meio, o pedido fica nela (já foi criado) sem contar como entrada.
+    /// </summary>
+    public Task RegistrarPedidoAsync(Guid empresaId, Guid conversaId, Guid pedidoId, string resumo, DateTime agora,
+        CancellationToken ct = default) => unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+    {
+        if (await conversas.TravarParaPedidoAsync(empresaId, conversaId, token) == pedidoId)
+        {
+            await unitOfWork.CommitAsync();
+            return false;
+        }
+        var conversa = await conversas.ObterPorIdComLockAsync(empresaId, conversaId, token)
+            ?? throw new InvalidOperationException("Conversa do pedido não encontrada.");
+        conversa.DefinirPedidoEmAndamento(pedidoId);
+        if (conversa.EstaAberta) conversa.RegistrarEntrada(agora);
+        await conversas.AddMensagemAsync(Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora,
+            TipoConteudoMensagem.Texto, resumo), token);
+        await unitOfWork.CommitAsync();
+        return true;
     }, ct);
 }

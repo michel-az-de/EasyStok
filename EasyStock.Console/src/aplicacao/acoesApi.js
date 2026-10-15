@@ -6,7 +6,10 @@ import { mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra
 import { lerSessao } from '../infra/api/sessao'
 import { proximoId } from '../infra/repositorioConversas'
 import { avisoDeVariaveisNaoResolvidas } from '../dominio/respostas'
+import { FRASE_DA_FALHA, TIPOS_DE_FALHA, textoDaFalhaDeEnvio } from '../dominio/falhaDeEnvio'
 import { deveCarregarDossie } from './planoDeSincronizacao'
+import { envioBloqueado } from '../dominio/janela'
+import { canalDaConversa } from '../dominio/canal'
 import { criarAcoesExpedienteApi } from './api/expediente'
 import { criarAcoesCaixaApi } from './api/caixa'
 import { criarAcoesLembretesApi } from './api/lembretes'
@@ -25,14 +28,23 @@ import { criarAcoesCardapioApi } from './api/cardapio'
 import { criarAcoesMensagensProgramadasApi } from './api/mensagensProgramadas'
 import { criarAcoesModelosApi } from './api/modelos'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
+import { criarChavesDeMensagem } from './chavesDeMensagem'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
 const CANAL_FALHOU = 'CANAL_FALHOU'
 
+// #1786: respostas da proteção contra envio repetido. A mensagem não ficou sem sair: já saiu ou está saindo.
+const ENVIO_REPETIDO = {
+  IDEMPOTENCY_PAYLOAD_MISMATCH: 'Esta mensagem já tinha saído. Confira na conversa antes de mandar de novo.',
+  IDEMPOTENCY_IN_FLIGHT: 'Esta mensagem ainda está saindo. Confira na conversa em instantes.',
+}
+
 const motivoDaRecusa = (erro) => {
-  if (erro.codigo === FORA_DA_JANELA) return 'Não enviada: passou a janela de 24 h. Só modelo aprovado sai até o cliente responder.'
-  if (erro.codigo === CANAL_FALHOU && erro.detalhe) return `Não enviada: ${erro.detalhe}`
+  // #1761: o detalhe do canal é o erro cru do provedor, em inglês; a frase sai do mapa do domínio.
+  if (erro.codigo === FORA_DA_JANELA) return FRASE_DA_FALHA[TIPOS_DE_FALHA.FORA_DA_JANELA]
+  if (ENVIO_REPETIDO[erro.codigo]) return ENVIO_REPETIDO[erro.codigo]
+  if (erro.codigo === CANAL_FALHOU && erro.detalhe) return textoDaFalhaDeEnvio(erro.detalhe)
   return `Não enviada: ${erro.message}`
 }
 
@@ -52,9 +64,19 @@ const falhaDoEnvio = (id, mensagemId, erro) => ({
 // O despacho local vem antes, para a tela responder na hora; a próxima sincronização
 // traz o estado do servidor. As ações ainda não ligadas (lista única em
 // `api/naoLigadas.js`) não mexem na memória do navegador: só avisam na faixa.
-export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
+export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef = null }) {
   const avisar = (erro) => despachar({ tipo: acao.AVISO_API, mensagem: erro.message })
+  // #1787: o reducer recusa o envio sem criar balão; sem esta guarda o texto saía pela API e a falha ficava muda.
+  // A mesma regra do reducer (envioBloqueado); conversa que o estado não conhece segue para o EasyStok decidir.
+  const envioRecusado = (id) => {
+    const { conversas = [], catalogo } = estadoRef.current
+    const conversa = conversas.find((c) => c.id === id)
+    if (!conversa || !envioBloqueado(conversa, agoraRef.current, canalDaConversa(catalogo?.canais, conversa))) return false
+    despachar({ tipo: acao.AVISO_API, mensagem: 'Cadastro bloqueado: a mensagem não saiu. Desbloqueie na ficha para escrever.' })
+    return true
+  }
   const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
+  const chaves = criarChavesDeMensagem()
   const confirmarResponsavel = (id, chamada) => chamada(id)
     .then((resumo) => { despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) }); return true })
     .catch((erro) => { avisar(erro); return false })
@@ -63,7 +85,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     ...acoes,
     listarAtendentes,
     ...criarAvisosNaoLigadas(despachar),
-    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio }),
+    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves }),
     // #1474: sem `fixo`, fecha só o aviso de ação; o persistente (configuração) só com `fixo: true`.
     fecharAvisoApi: ({ fixo = false } = {}) => despachar({ tipo: acao.FECHAR_AVISO_API, fixo }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
@@ -82,7 +104,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
     // #1241: lote de papel no EasyStok.
     ...criarAcoesLoteApi({ despachar, estadoRef }),
     // #1241: cardápio do dia (disponibilidade e saldo) no EasyStok.
-    ...criarAcoesCardapioApi({ despachar, estadoRef }),
+    ...criarAcoesCardapioApi({ despachar, estadoRef, comItensForaRef }),
     ...criarAcoesMensagensProgramadasApi({ estadoRef }),
     ...criarAcoesModelosApi({ despachar }),
     enviar: (id, texto, opcoes = {}) => {
@@ -103,9 +125,10 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef }) {
         despachar({ tipo: acao.AVISO_API, mensagem: variavelSobrando })
         return false
       }
+      if (envioRecusado(id)) return false
       const mensagemId = proximoId('msg')
       despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
-      return enviarTexto(id, texto)
+      return chaves.enviar(id, { texto }, (chave) => enviarTexto(id, texto, { chave }))
         .then((m) => {
           despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
           return true

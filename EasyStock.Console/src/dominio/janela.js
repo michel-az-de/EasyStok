@@ -58,6 +58,23 @@ export function estadoDaJanela(conversa, agora, canal) {
   }
 }
 
+// #1761 (L4): o prazo da janela de 24 h só vai para o cabeçalho da conversa quando pede atenção,
+// faltando menos de 2 h ou já fechada. Longe do fim era uma conta a mais na linha, que quebrava
+// em duas. Canal sem janela não mostra nada; canal sem regra segue avisando.
+export const MINUTOS_PARA_MOSTRAR_PRAZO = 120
+export function prazoNoCabecalho(janela) {
+  if (!janela) return null
+  if (!janela.textoLivre) return janela.rotulo
+  if (janela.restam == null || janela.restam >= MINUTOS_PARA_MOSTRAR_PRAZO) return null
+  return `escreve livre por ${janela.rotuloCurto}`
+}
+
+// #1761 (L9): "Modelos aprovados" só ocupa a linha acima do campo quando a janela fechou ou falta
+// menos de 1 h. Antes disso o texto livre resolve; a recusa fora da janela leva ao modelo pela bolha.
+export const MINUTOS_PARA_OFERECER_MODELO = 60
+export const modelosAVista = (janela) => Boolean(janela) && janela.restam != null
+  && (!janela.textoLivre || janela.restam < MINUTOS_PARA_OFERECER_MODELO)
+
 // Fora da janela, quem não tem modelo aprovado não tem saída nenhuma: o texto
 // que a pessoa digitasse cairia calado na mensageria.
 function motivoForaDaJanela(janela, canal) {
@@ -65,11 +82,13 @@ function motivoForaDaJanela(janela, canal) {
     return {
       titulo: `${janela.rotulo}.`,
       detalhe: 'Só modelo aprovado sai até ele responder.',
+      acao: 'janela',
     }
   }
   return {
     titulo: `${janela.rotulo} no ${canal.nome}.`,
     detalhe: 'Sem modelo aqui. Chame pelo WhatsApp ou espere ele escrever.',
+    acao: 'janela',
   }
 }
 
