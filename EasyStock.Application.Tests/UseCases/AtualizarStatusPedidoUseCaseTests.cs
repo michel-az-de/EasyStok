@@ -81,7 +81,7 @@ public class AtualizarStatusPedidoUseCaseTests
     }
 
     // #1776 (item 19): o console marca entregue pelo KDS com conferência do saldo; com R$ 25 a receber, só confirmando.
-    private static (AtualizarStatusPedidoUseCase uc, Pedido pedido, Guid empresaId) PedidoNaRuaComSinal()
+    private static (AtualizarStatusPedidoUseCase uc, Pedido pedido, Guid empresaId, IPedidoRepository repo) PedidoNaRuaComSinal()
     {
         var pedidos = Substitute.For<IPedidoRepository>();
         pedidos.ListarEstornosManuaisAsync(default, default, default).ReturnsForAnyArgs([]);
@@ -96,13 +96,13 @@ public class AtualizarStatusPedidoUseCaseTests
         pedido.Total = Dinheiro.FromDecimal(50m);
         pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 25m });
         repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
-        return (uc, pedido, empresaId);
+        return (uc, pedido, empresaId, repo);
     }
 
     [Fact]
     public async Task Entregue_PeloConsole_ComSaldoAReceber_RecusaSemConfirmar()
     {
-        var (uc, pedido, empresaId) = PedidoNaRuaComSinal();
+        var (uc, pedido, empresaId, _) = PedidoNaRuaComSinal();
 
         var act = () => uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "entregue", ConferirSaldoNaEntrega: true));
 
@@ -115,11 +115,67 @@ public class AtualizarStatusPedidoUseCaseTests
     [InlineData(false, false)] // balcão, PWA e mobile não pedem conferência
     public async Task Entregue_ComSaldoAReceber_ConfirmadoOuSemConferencia_Passa(bool conferir, bool confirmado)
     {
-        var (uc, pedido, empresaId) = PedidoNaRuaComSinal();
+        var (uc, pedido, empresaId, _) = PedidoNaRuaComSinal();
 
         await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "entregue",
             ConferirSaldoNaEntrega: conferir, SaldoAReceberConfirmado: confirmado));
 
+        pedido.Status.Should().Be("entregue");
+    }
+
+    // #1863: o lote da fila offline (status-lote) não é porta lateral da trava; recusa o item com o código
+    // e o valor, e os demais itens seguem.
+    [Fact]
+    public async Task Lote_Entregue_ComSaldoAReceber_RecusaOItemComCodigoESegue()
+    {
+        var (uc, pedido, empresaId, repo) = PedidoNaRuaComSinal();
+        var outro = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 1);
+        repo.GetByIdWithDetailsAsync(empresaId, outro.Id).Returns(outro);
+        var lote = new EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase(
+            uc, Substitute.For<IUnitOfWork>(), NullLogger<EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase>.Instance);
+
+        var resultados = await lote.ExecuteAsync(new EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteCommand(empresaId,
+        [
+            new(pedido.Id, "entregue"),
+            new(outro.Id, "preparando"),
+        ]));
+
+        resultados[0].Sucesso.Should().BeFalse();
+        resultados[0].Codigo.Should().Be(SaldoAReceberNaEntregaException.Codigo);
+        resultados[0].Valor.Should().Be(25m);
+        resultados[0].Erro.Should().Contain("Falta receber");
+        pedido.Status.Should().Be("saiu_para_entrega");
+        resultados[1].Sucesso.Should().BeTrue();
+        resultados[1].Codigo.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Lote_Entregue_ComSaldoAReceber_ConfirmadoNoItem_Passa()
+    {
+        var (uc, pedido, empresaId, _) = PedidoNaRuaComSinal();
+        var lote = new EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase(
+            uc, Substitute.For<IUnitOfWork>(), NullLogger<EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase>.Instance);
+
+        var resultados = await lote.ExecuteAsync(new EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteCommand(empresaId,
+            [new(pedido.Id, "entregue", ConfirmarSaldoAReceber: true)]));
+
+        resultados.Should().ContainSingle().Which.Sucesso.Should().BeTrue();
+        pedido.Status.Should().Be("entregue");
+    }
+
+    // #1863: o lote de papel registra a entrega que já aconteceu na queda; não confere o saldo.
+    [Fact]
+    public async Task LotePapel_Entregue_ComSaldoAReceber_Passa()
+    {
+        var (uc, pedido, empresaId, _) = PedidoNaRuaComSinal();
+        var papel = new EasyStock.Application.UseCases.Atendimento.Esteira.LancarLotePapelUseCase(
+            new EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase(
+                uc, Substitute.For<IUnitOfWork>(), NullLogger<EasyStock.Application.UseCases.Operacao.Kds.AtualizarStatusPedidosEmLoteUseCase>.Instance));
+
+        var r = await papel.ExecuteAsync(new EasyStock.Application.UseCases.Atendimento.Esteira.LancarLotePapelCommand(empresaId,
+            [new(pedido.Id, "entregue", DateTime.UtcNow.AddMinutes(-30))]));
+
+        r.Aplicados.Should().Be(1);
         pedido.Status.Should().Be("entregue");
     }
 

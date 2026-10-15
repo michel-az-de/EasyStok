@@ -14,6 +14,12 @@ export const mudarStatusKds = (id, status, { confirmarSaldoAReceber = false } = 
     metodo: 'PATCH', corpo: confirmarSaldoAReceber ? { status, confirmarSaldoAReceber } : { status },
   })
 
+// Fila offline do tablet (S19, US-042): aplica em sequência e responde por item. #1863: item "entregue" com
+// saldo a receber volta `sucesso: false, codigo: 'SALDO_A_RECEBER', valor` até ir com `confirmarSaldoAReceber`
+// (ver `itensDoLoteComSaldoAReceber`). Itens: [{ id, status, ocorridoEm?, confirmarSaldoAReceber? }].
+export const mudarStatusKdsEmLote = (itens) =>
+  chamarApi('/api/kds/pedidos/status-lote', { metodo: 'POST', corpo: itens })
+
 export const reimprimirCanhoto = (id) => chamarApi(`/api/pedidos/${id}/reimprimir`, { metodo: 'POST' })
 
 // Fila de impressão (S20) consumida pela aba da Cozinha (issue #1446): o pedido pago entra
