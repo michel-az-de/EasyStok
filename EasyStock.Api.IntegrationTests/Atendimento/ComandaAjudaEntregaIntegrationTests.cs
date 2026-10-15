@@ -169,6 +169,79 @@ public sealed partial class PedidoConversaConcorrenciaTests
     }
 
     [SkippableFact]
+    public async Task Comanda1839_EnderecoIncompletoVaiParaAtendenteSemCadastrarEPreservaRascunho()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory(Provedor(new()));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        Guid conversaId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            var lead = Conversa.Abrir(EmpresaId, "5511912345603", DateTime.UtcNow, "Lead com rua");
+            db.AtendimentoConversas.Add(lead);
+            await db.SaveChangesAsync();
+            conversaId = lead.Id;
+        }
+        var token = await Link(factory, conversaId);
+        var estado = await Estado(client, token);
+        await Salvar(client, token, estado, new([new(c.CardapioItemId, 1)], JanelaId: c.JanelaId, DataEntrega: c.DataEntrega,
+            Endereco: new("", "Rua sem número", "", "", "", "", "Fundos"), Nome: "Lead com rua", Telefone: "11912345603"));
+        estado = await Estado(client, token);
+        var resposta = await client.PostAsJsonAsync($"{Rota(token)}/encaminhar-entrega", new { estado.Revisao });
+        resposta.StatusCode.Should().Be(HttpStatusCode.OK, await resposta.Content.ReadAsStringAsync());
+        var final = await Estado(client, token);
+        final.EntregaACombinar.Should().BeTrue();
+        final.Pedido.Should().BeNull();
+        final.Rascunho.Endereco!.Logradouro.Should().Be("Rua sem número", "o rascunho incompleto fica para a atendente conferir");
+        using var verificacao = factory.Services.CreateScope();
+        var banco = verificacao.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var conversa = await banco.AtendimentoConversas.SingleAsync(x => x.Id == conversaId);
+        (await banco.Clientes.Include(x => x.Enderecos).SingleAsync(x => x.Id == conversa.ClienteId)).Enderecos.Should().BeEmpty();
+        (await banco.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId && x.Texto!.Contains("Endereço pendente"))).Should().Be(1);
+        (await banco.Pedidos.CountAsync()).Should().Be(0);
+        // A atendente registra o endereço pela Ficha, combina o frete e a cliente confirma o pedido.
+        (await client.PostAsJsonAsync($"/api/atendimento/conversas/{conversaId}/cliente", new
+        {
+            Endereco = new { Cep = "01310100", Logradouro = "Av. Paulista", Numero = "900", Bairro = "Bela Vista", Cidade = "São Paulo", Uf = "SP" },
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+        var comFicha = await Estado(client, token);
+        comFicha.Rascunho.Endereco!.Numero.Should().Be("900", "com a comanda na mão da atendente, o endereço da Ficha substitui o parcial");
+        (await client.PostAsJsonAsync($"/api/atendimento/conversas/{conversaId}/comandas-cliente/{comFicha.LinkId}/combinar-frete",
+            new { comFicha.Revisao, Valor = 5m })).StatusCode.Should().Be(HttpStatusCode.OK);
+        var envio = await Enviar(client, token, comFicha.Revisao);
+        envio.Total.Should().Be(15m, "um prato de R$ 10 e o frete combinado de R$ 5");
+        (await banco.Pedidos.CountAsync()).Should().Be(1);
+        (await Estado(client, token)).Pedido!.Frete.Should().Be(5m);
+    }
+
+    [SkippableFact]
+    public async Task Comanda1839_ConfirmarComEnderecoParcialSemAtendenteRecusaENaoUsaOEnderecoDoCadastro()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        var cobrancas = new System.Collections.Concurrent.ConcurrentDictionary<string, EasyStock.Application.Ports.Output.Pagamentos.CriarPreferenceCommand>();
+        await using var factory = CriarFactory(Provedor(cobrancas));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var token = await Link(factory, c.ConversaId);
+        var estado = await Estado(client, token);
+        await Salvar(client, token, estado, new([new(c.CardapioItemId, 1)], JanelaId: c.JanelaId, DataEntrega: c.DataEntrega,
+            Endereco: new("", "Rua nova sem número", "", "", "", "", "")));
+        estado = await Estado(client, token);
+        estado.Rascunho.Endereco!.Logradouro.Should().Be("Rua nova sem número");
+        var resposta = await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { estado.Revisao });
+        ((int)resposta.StatusCode).Should().BeInRange(400, 499, "o pedido não pode ir para o endereço do cadastro enquanto a comanda mostra outro");
+        var final = await Estado(client, token);
+        final.Pedido.Should().BeNull();
+        final.PodeEditar.Should().BeTrue();
+        final.Rascunho.Endereco!.Logradouro.Should().Be("Rua nova sem número");
+        cobrancas.Should().BeEmpty();
+        using var scope = factory.Services.CreateScope();
+        (await scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().Pedidos.CountAsync()).Should().Be(0);
+    }
+
+    [SkippableFact]
     public async Task Comanda1712_AjudaSemRascunhoEscalaUmaVezNotificaEPreservaEdicaoConcorrente()
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
