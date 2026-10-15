@@ -263,6 +263,28 @@ await confere('#1776/20: janela igual ou sobreposta no mesmo dia é recusada ant
   assert.equal(entregasApi.erroDoFormularioJanela(novaJanela('12:00', '15:00'), JANELAS_DA_LOJA, 'a'), null, 'a própria janela não conta')
   assert.equal(entregasApi.erroDoFormularioJanela({ ...novaJanela('12:00', '14:00'), dias: [5] }, JANELAS_DA_LOJA), null)
 })
+const JANELAS_LEGADAS = [...JANELAS_DA_LOJA,
+  { ...JANELAS_DA_LOJA[0], id: 'legada', horaInicio: '13:00:00', horaFim: '15:00:00' },
+]
+await confere('#1860: janela legada sobreposta permite mudar somente nome ou vagas', () => {
+  const form = entregasApi.camposDaJanela(JANELAS_DA_LOJA[0])
+  for (const alteracao of [{ label: 'Nome novo' }, { capacidadeMaxima: '6' }]) {
+    assert.equal(entregasApi.erroDoFormularioJanela({ ...form, ...alteracao }, JANELAS_LEGADAS, 'a'), null)
+  }
+})
+await confere('#1860: criar janela ou mudar dia/horário ainda recusa sobreposição', () => {
+  const form = entregasApi.camposDaJanela(JANELAS_DA_LOJA[0])
+  assert.match(entregasApi.erroDoFormularioJanela(form, JANELAS_LEGADAS), /cruza/)
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, horaInicio: '12:30' }, JANELAS_LEGADAS, 'a'), /cruza/)
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, horaFim: '15:00' }, JANELAS_LEGADAS, 'a'), /cruza/)
+  const outroDia = [...JANELAS_LEGADAS, { ...JANELAS_LEGADAS[1], id: 'sexta', diaDaSemana: 5 }]
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, dias: [5] }, outroDia, 'a'), /cruza/)
+})
+await confere('#1860: editar janela legada mantém os limites de vagas', () => {
+  const form = entregasApi.camposDaJanela(JANELAS_DA_LOJA[0])
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, capacidadeMaxima: '0' }, JANELAS_LEGADAS, 'a'), /Capacidade/)
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, capacidadeMaxima: '501' }, JANELAS_LEGADAS, 'a'), /até 500/)
+})
 await confere('#1776/20: 99.999 vagas é recusado; o teto é o da API', () => {
   assert.match(entregasApi.erroDoFormularioJanela(novaJanela('09:00', '10:00', { capacidadeMaxima: '99999' })), /até 500/)
   assert.equal(entregasApi.erroDoFormularioJanela(novaJanela('09:00', '10:00', { capacidadeMaxima: '500' })), null)
