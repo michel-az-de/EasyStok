@@ -78,7 +78,10 @@ public sealed class CadastroJanelasEntregaUseCase(
     public async Task<JanelaEntregaResult> AtualizarAsync(Guid empresaId, Guid id, JanelaEntregaInput input, CancellationToken ct = default)
     {
         var loja = await LojaDoTenant.ObterAsync(lojas, empresaId, ct);
-        await ExigirSemSobreposicaoAsync(loja.Id, input, id, ct);
+        var atual = await ObterDaLojaAsync(janelas, loja.Id, id, ct);
+        // Só quem muda dia ou horário confere: janela duplicada de antes da regra ainda troca vagas e nome.
+        if (atual.DiaDaSemana != input.DiaDaSemana || atual.HoraInicio != input.HoraInicio || atual.HoraFim != input.HoraFim)
+            await ExigirSemSobreposicaoAsync(loja.Id, input, id, ct);
         return await AlterarAsync(empresaId, id, j => j.Atualizar(input.DiaDaSemana, input.HoraInicio, input.HoraFim, input.CapacidadeMaxima, input.Label), ct);
     }
 

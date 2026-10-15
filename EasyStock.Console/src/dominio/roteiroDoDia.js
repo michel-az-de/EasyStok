@@ -94,8 +94,10 @@ function novoGrupo({ chave, label, inicio, fim, capacidade = null, janelaId = nu
 }
 
 // O que a porta precisa saber do dinheiro (#1776, item 19): tela e papel dizem o mesmo.
+// Aguardando pagamento ainda espera o link: a porta não cobra (o cliente pagaria duas vezes).
 export const situacaoDoPagamento = (p) => {
   if (p.pago) return 'Pago'
+  if (p.status === 'aguardando_pagamento') return 'Não pago'
   return p.aReceber > 0 ? `Receber ${moeda(p.aReceber)} na entrega` : 'Não pago'
 }
 

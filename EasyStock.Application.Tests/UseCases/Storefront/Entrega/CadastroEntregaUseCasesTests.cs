@@ -231,6 +231,18 @@ public class CadastroEntregaUseCasesTests
     }
 
     [Fact]
+    public async Task AtualizarJanela_DuplicataAntiga_MudaVagasSemMudarHorario()
+    {
+        var a = JanelaDaLoja(2, 12, 14);
+        var b = JanelaDaLoja(2, 12, 14);
+        JanelasDaLoja(a, b);
+
+        await Janelas().AtualizarAsync(_empresaId, a.Id, new JanelaEntregaInput(2, new TimeOnly(12, 0), new TimeOnly(14, 0), 9, "Almoço"));
+
+        a.CapacidadeMaxima.Should().Be(9);
+    }
+
+    [Fact]
     public async Task ExcluirZona_DaLoja_RemoveESoDaLoja()
     {
         var minha = FreteZona.CriarPorBairros(_loja.Id, "Centro", ["Centro"], 8m, 30, 1);

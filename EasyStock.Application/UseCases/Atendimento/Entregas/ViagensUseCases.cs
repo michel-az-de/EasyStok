@@ -300,11 +300,12 @@ public sealed class MarcarParadaEntregueUseCase(
     {
         await ViagemContratadaGuard.ExigirFluxoManualAsync(viagens, empresaId, viagemId, ct);
         var viagem = await viagens.ObterAsync(empresaId, viagemId, ct) ?? throw new ViagemNaoEncontradaException(viagemId);
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        Regra.Validar(() => viagem.MarcarParadaEntregue(pedidoId, agora));
+        // Depois de saber que é parada desta viagem; a recusa não grava nada (o commit vem no fim).
         var pedido = await pedidos.GetByIdWithDetailsAsync(empresaId, pedidoId) ?? throw new PedidoNaoEncontradoParaViagemException(pedidoId);
         if (pedido.StatusEnum != StatusPedido.Entregue)
             await saldos.ExigirQuitadoParaEntregarAsync(pedido, saldoConfirmado, ct);
-        var agora = relogio.GetUtcNow().UtcDateTime;
-        Regra.Validar(() => viagem.MarcarParadaEntregue(pedidoId, agora));
 
         var mudanca = await TransicaoPedidoViagem.AplicarAsync(
             pedidos, publicador, empresaId, pedidoId, StatusPedido.Entregue, agora, ct);

@@ -108,7 +108,7 @@ export function TelaCozinhaApi({ linhas }) {
     setFeedback({ ...feedback, confirmado: true, requerConferencia: false,
       texto: `Pedido ${feedback.numero} confirmado em ${rotuloDaColuna(feedback.destino)}.` })
   } else if (feedback?.destino && !feedback.confirmado && !feedback.requerConferencia
-    && erro && !movendo.has(feedback.id)) {
+    && (erro || saldoPendente?.id === feedback.id) && !movendo.has(feedback.id)) {
     // Uma leitura posterior pode limpar o alerta sem confirmar o destino.
     // Esse pedido continua pedindo conferência até chegar o estado real.
     setFeedback({ ...feedback, requerConferencia: true })

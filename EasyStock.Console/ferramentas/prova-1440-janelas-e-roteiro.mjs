@@ -241,6 +241,7 @@ await confere('#1776/19: sinal pago com saldo a receber não é "Pago"; a tela e
   assert.match(roteiro.situacaoDoPagamento(de('s')), /^Receber R\$\s25,00 na entrega$/)
   assert.equal(roteiro.situacaoDoPagamento(de('q')), 'Pago')
   assert.equal(roteiro.situacaoDoPagamento(de('v')), 'Pago', 'API sem aReceber segue o "tem pagamento" de antes')
+  assert.equal(roteiro.situacaoDoPagamento({ pago: false, aReceber: 50, status: 'aguardando_pagamento' }), 'Não pago', 'link pendente: a porta não cobra')
   const pdf = impressao.pdfDoRoteiro({ roteiro: r, papel: 'a4', agora: AGORA })
   assert.match(lidos(pdf.bytes), /Receber R\$\s25,00 na entrega/, 'o roteiro impresso diz quanto cobrar')
 })

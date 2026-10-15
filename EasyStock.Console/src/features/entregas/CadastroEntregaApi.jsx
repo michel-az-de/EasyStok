@@ -7,7 +7,6 @@ import { faixaDeHorarios } from '../../dominio/entrega'
 import { DIAS_BLOQUEIO, DIAS_DA_SEMANA, avisoDeSobreposicao, camposDaZona, corpoBloqueio, corpoZona } from '../../dominio/entregasApi'
 import { dataCurtaComSemana, dataIsoNoFuso, faixaDeCep, moeda } from '../../dominio/formato'
 import { diaDaSemanaDaData } from '../../dominio/roteiroDoDia'
-import { useRelogio } from '../../hooks/useRelogio'
 import { JanelasDaLoja } from './JanelasDaLoja'
 import { FreteRaioDaLoja } from './FreteRaioDaLoja'
 import css from './entregasApi.module.css'
@@ -106,7 +105,8 @@ function LinhaZona({ zona, zonas, acoes, ocupado, focoAlternativo }) {
 export function CadastroEntregaApi() {
   const { janelas, zonas, bloqueios, freteRaio, erro, enviando, acoes, recarregar, limparErro } = useCadastroEntregaApi()
   const b = useFormulario(BLOQUEIO_VAZIO, enviando)
-  const agora = useRelogio(null, undefined, { real: true })
+  // O dia de abertura basta para o calendário; a API confere o dia certo na gravação.
+  const [agora] = useState(() => Date.now())
   // #1584: remover o bloqueio reabre a data para pedidos; confirma em linha, como "Excluir janela".
   const [removendo, setRemovendo] = useState(null)
   const [aba, setAba] = useState('janelas')
