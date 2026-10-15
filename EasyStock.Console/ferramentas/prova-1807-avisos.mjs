@@ -16,6 +16,8 @@
 
 import assert from 'node:assert/strict'
 import { registerHooks } from 'node:module'
+import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
 
 registerHooks({
   resolve(especificador, contexto, proximo) {
@@ -235,6 +237,25 @@ await confere('F1. o aviso não leva o texto da mensagem, só nome e evento', ()
   const depois = retrato([['c1', { ...linha({ ultimaMensagemClienteId: 'm2' }), texto: 'meu cpf 123' }]])
   const [primeiro] = avisosDe(antes, depois)
   assert.ok(!JSON.stringify(primeiro).includes('cpf'))
+})
+
+await confere('G1. aba focada sem confirmação de toast não descarta o push', async () => {
+  const eventos = new Map()
+  let mostradas = 0, fechadas = 0, tarefa
+  const self = {
+    addEventListener: (tipo, fn) => eventos.set(tipo, fn),
+    registration: {
+      scope: 'https://app.exemplo/',
+      showNotification: async () => { mostradas++ },
+      getNotifications: async () => [{ close: () => { fechadas++ } }],
+    },
+    clients: { matchAll: async () => [{ url: 'https://app.exemplo/#/login', visibilityState: 'visible', focused: true }] },
+  }
+  runInNewContext(readFileSync(new URL('../public/sw-avisos.js', import.meta.url), 'utf8'), { self, URL })
+  eventos.get('push')({ data: { json: () => ({ title: 'Contato novo', tag: 'contato-c1' }) }, waitUntil: (p) => { tarefa = p } })
+  await tarefa
+  assert.equal(mostradas, 1)
+  assert.equal(fechadas, 0)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

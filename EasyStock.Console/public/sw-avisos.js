@@ -18,23 +18,10 @@ self.addEventListener('push', (evento) => {
       tag,
       data: carga.data || {},
     })
-    // #1807: com o console na frente, o aviso já apareceu na tela (toast). O navegador exige mostrar algo a cada
-    // push, então mostra e fecha. Com a aba escondida, a tag igual à do console substitui em vez de duplicar.
-    if (await consoleNaFrente()) {
-      for (const aviso of await self.registration.getNotifications({ tag })) aviso.close()
-    }
+    // Aba visível não comprova entrega do toast (login, sessão expirada ou SSE desconectado).
+    // Preserve o push; a tag substitui o aviso anterior do mesmo evento e conversa.
   })())
 })
-
-// As janelas avulsas da Cozinha, das Entregas e do Cardápio por link não têm a pilha de avisos:
-// com uma delas na frente, o aviso do aparelho fica.
-const JANELAS_SEM_AVISO = ['#/cozinha', '#/entregas', '#/cardapio-link/']
-
-async function consoleNaFrente() {
-  const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  return janelas.some((janela) => janela.url.startsWith(self.registration.scope) && janela.visibilityState === 'visible'
-    && janela.focused && !JANELAS_SEM_AVISO.some((hash) => new URL(janela.url).hash.startsWith(hash)))
-}
 
 // Tocar no aviso traz o console para a frente; sem aba aberta, abre uma.
 self.addEventListener('notificationclick', (evento) => {
