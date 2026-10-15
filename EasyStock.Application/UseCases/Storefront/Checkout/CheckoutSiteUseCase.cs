@@ -27,7 +27,7 @@ public sealed class CheckoutSiteUseCase(
         endereco = endereco?.Validar(input.Cep, input.Numero);
         var sessao = await SessaoAsync(input.Slug, chatToken, ct);
         if (sessao is null)
-            return await logado.ExecuteAsync(input with { Numero = endereco?.Numero ?? input.Numero,
+            return await logado.ExecuteAsync(input with { Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
                 Observacoes = endereco?.Snapshot(input.Observacoes) ?? input.Observacoes }, ct);
         var cliente = await clientes.GetByIdAsync(input.ClienteId, ct);
         if (cliente is null || cliente.EmpresaId != sessao.EmpresaId)
@@ -42,7 +42,7 @@ public sealed class CheckoutSiteUseCase(
         {
             var conversa = await conversaChat.ObterOuCriarAsync(sessao, cliente.Id, relogio.GetUtcNow().UtcDateTime, ct);
             var result = await logado.ExecuteAsync(input with { IdempotencyKey = null, ContentHash = null,
-                ConversaId = conversa.Id, Numero = endereco?.Numero ?? input.Numero,
+                ConversaId = conversa.Id, Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
                 Observacoes = endereco?.Snapshot(input.Observacoes) ?? input.Observacoes }, ct,
                 (id, token) => CheckpointAsync(sessao, conversa, key, hash, id, token));
             await RegistrarAsync(key, hash, result.PedidoId, result.InitPointUrl, ct);
@@ -61,7 +61,7 @@ public sealed class CheckoutSiteUseCase(
         endereco = endereco?.Validar(input.Cep, input.Numero);
         var sessao = await SessaoAsync(input.Slug, chatToken, ct);
         if (sessao is null)
-            return await guest.ExecuteAsync(input with { Numero = endereco?.Numero ?? input.Numero,
+            return await guest.ExecuteAsync(input with { Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
                 Observacoes = endereco?.Snapshot(input.Observacoes) ?? input.Observacoes }, ct);
         var key = ChaveEscopada(sessao, null, chave);
         var hash = Hash(new { input.Slug, input.Nome, input.Telefone, input.Items, input.JanelaId, input.DataEntrega,
@@ -79,7 +79,7 @@ public sealed class CheckoutSiteUseCase(
         try
         {
             var conversa = await conversaChat.ObterOuCriarAsync(sessao, null, relogio.GetUtcNow().UtcDateTime, ct);
-            var result = await guest.ExecuteAsync(input with { ConversaId = conversa.Id, Numero = endereco?.Numero ?? input.Numero,
+            var result = await guest.ExecuteAsync(input with { ConversaId = conversa.Id, Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
                 Observacoes = endereco?.Snapshot(input.Observacoes) ?? input.Observacoes }, ct,
                 (id, token) => CheckpointAsync(sessao, conversa, key, hash, id, token));
             await RegistrarAsync(key, hash, result.PedidoId, result.LinkPagamento ?? "sem-cobranca", ct);
@@ -91,6 +91,10 @@ public sealed class CheckoutSiteUseCase(
             throw;
         }
     }
+
+    // O que o cliente digitou vai para o endereço de entrega do pedido, não só para a observação (#1704).
+    private static EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega? Entrega(EnderecoCheckout? e) => e is null ? null
+        : new(e.Logradouro, e.Numero, e.Complemento, e.Bairro, e.Cidade, e.Uf, e.Cep);
 
     private async Task<SessaoChatSite?> SessaoAsync(string slug, string? token, CancellationToken ct)
     {

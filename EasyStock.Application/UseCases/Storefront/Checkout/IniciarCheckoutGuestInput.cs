@@ -17,4 +17,5 @@ public sealed record IniciarCheckoutGuestInput(
     Guid? JanelaId,
     DateOnly? DataEntrega,
     string? Observacoes = null,
-    Guid? ConversaId = null);
+    Guid? ConversaId = null,
+    EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega? EnderecoEntrega = null);

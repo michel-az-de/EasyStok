@@ -83,7 +83,7 @@ public sealed class IniciarCheckoutUseCase(
                 Cep: input.Cep,
                 Origem: OrigemPedido.Storefront,
                 Slug: input.Slug,
-                Observacoes: input.Observacoes, Numero: input.Numero),
+                Observacoes: input.Observacoes, Numero: input.Numero, EnderecoEntrega: input.EnderecoEntrega),
             ct);
         var pedido = reservado.Pedido;
         var storefront = reservado.Storefront;

@@ -12,8 +12,8 @@ public sealed record EnderecoCheckout(string Cep, string Logradouro, string Nume
         if (cep.Length != 8 || (cepEsperado is not null && cep != CheckoutCoreService.NormalizarCep(cepEsperado)))
             throw new CepInvalidoException();
         var e = this with { Cep = cep, Logradouro = Limpar(Logradouro, 200), Numero = Limpar(Numero, 20),
-            Bairro = Limpar(Bairro, 120), Cidade = Limpar(Cidade, 120), Uf = Limpar(Uf, 2).ToUpperInvariant(),
-            Complemento = string.IsNullOrWhiteSpace(Complemento) ? null : Limpar(Complemento, 120) };
+            Bairro = Limpar(Bairro, 100), Cidade = Limpar(Cidade, 100), Uf = Limpar(Uf, 2).ToUpperInvariant(),
+            Complemento = string.IsNullOrWhiteSpace(Complemento) ? null : Limpar(Complemento, 100) };
         if (e.Uf.Length != 2 || !e.Uf.All(char.IsLetter)
             || (!string.IsNullOrWhiteSpace(numeroEsperado) && e.Numero != numeroEsperado.Trim()))
             throw new RegraDeDominioVioladaException("Endereço diverge da cotação de entrega.");

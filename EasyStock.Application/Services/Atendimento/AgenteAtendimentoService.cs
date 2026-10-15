@@ -139,9 +139,20 @@ public sealed class AgenteAtendimentoService(
                 respondeu = await EnviarRespostaAsync(gravacao, conversa, verificada, ct) || respondeu;
             else if (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu)
             {
-                respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct) || respondeu;
-                motivoEscalada ??= concluiu ? "resposta sem resultado verificado; precisa de conferência humana"
-                    : $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
+                // #1704: a conversa vai ao cliente; afirmação que nenhuma fonte do turno sustenta fica para a equipe.
+                var barrada = !concluiu || motivoEscalada is not null ? null
+                    : contexto.FerramentaFalhou ? "ferramenta falhou no turno"
+                    : GuardaRespostaAgente.Avaliar(geracao.Texto,
+                        contexto.ResultadosDasFerramentas,
+                        _ferramentas.Keys);
+                if (concluiu && motivoEscalada is null && barrada is null)
+                    respondeu = await EnviarRespostaAsync(gravacao, conversa, geracao.Texto!, ct) || respondeu;
+                else
+                {
+                    respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct) || respondeu;
+                    motivoEscalada ??= concluiu ? $"resposta do agente barrada ({barrada}); precisa de conferência humana"
+                        : $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
+                }
             }
         }
 
