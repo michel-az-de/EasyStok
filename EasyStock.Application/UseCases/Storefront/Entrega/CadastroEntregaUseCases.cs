@@ -69,13 +69,36 @@ public sealed class CadastroJanelasEntregaUseCase(
     {
         var loja = await LojaDoTenant.ObterAsync(lojas, empresaId, ct);
         var janela = JanelaEntrega.Criar(loja.Id, input.DiaDaSemana, input.HoraInicio, input.HoraFim, input.CapacidadeMaxima, input.Label);
+        await ExigirSemSobreposicaoAsync(loja.Id, input, null, ct);
         await janelas.AddAsync(janela, ct);
         await unitOfWork.CommitAsync();
         return JanelaEntregaResult.De(janela);
     }
 
-    public Task<JanelaEntregaResult> AtualizarAsync(Guid empresaId, Guid id, JanelaEntregaInput input, CancellationToken ct = default) =>
-        AlterarAsync(empresaId, id, j => j.Atualizar(input.DiaDaSemana, input.HoraInicio, input.HoraFim, input.CapacidadeMaxima, input.Label), ct);
+    public async Task<JanelaEntregaResult> AtualizarAsync(Guid empresaId, Guid id, JanelaEntregaInput input, CancellationToken ct = default)
+    {
+        var loja = await LojaDoTenant.ObterAsync(lojas, empresaId, ct);
+        await ExigirSemSobreposicaoAsync(loja.Id, input, id, ct);
+        return await AlterarAsync(empresaId, id, j => j.Atualizar(input.DiaDaSemana, input.HoraInicio, input.HoraFim, input.CapacidadeMaxima, input.Label), ct);
+    }
+
+    /// <summary>
+    /// #1776 (item 20): duas janelas no mesmo dia que se cruzam dividem o mesmo horário e a mesma cozinha;
+    /// a vaga de uma não conta na outra. Encostadas (12h a 14h e 14h a 16h) não se cruzam. Pausada conta:
+    /// reativar não pode trazer o conflito de volta.
+    /// </summary>
+    private async Task ExigirSemSobreposicaoAsync(Guid lojaId, JanelaEntregaInput input, Guid? propria, CancellationToken ct)
+    {
+        var conflito = (await janelas.GetTodasDoStorefrontAsync(lojaId, ct)).FirstOrDefault(j =>
+            j.Id != propria && j.DiaDaSemana == input.DiaDaSemana
+            && j.HoraInicio < input.HoraFim && input.HoraInicio < j.HoraFim);
+        if (conflito is not null)
+            throw new UseCaseValidationException(
+                $"Já existe a janela de {DiasDaSemana[conflito.DiaDaSemana]} das {conflito.HoraInicio:HH\\:mm} às {conflito.HoraFim:HH\\:mm}, "
+                + "que cruza com este horário. Edite essa janela ou escolha outro horário.");
+    }
+
+    internal static readonly string[] DiasDaSemana = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 
     public Task<JanelaEntregaResult> DefinirAtivaAsync(Guid empresaId, Guid id, bool ativa, CancellationToken ct = default) =>
         AlterarAsync(empresaId, id, j => { if (ativa) j.Ativar(); else j.Desativar(); }, ct);
@@ -152,12 +175,29 @@ public sealed class CadastroZonasFreteUseCase(
     public Task<FreteZonaResult> DefinirAtivaAsync(Guid empresaId, Guid id, bool ativa, CancellationToken ct = default) =>
         AlterarAsync(empresaId, id, z => { if (ativa) z.Ativar(); else z.Desativar(); }, ct);
 
-    private async Task<FreteZonaResult> AlterarAsync(Guid empresaId, Guid id, Action<FreteZona> alteracao, CancellationToken ct)
+    /// <summary>
+    /// #1776 (item 22): apaga a zona. Nenhuma tabela aponta para ela (o pedido guarda o frete como linha
+    /// própria, com o nome da zona na hora da compra), então o histórico não muda.
+    /// </summary>
+    public async Task ExcluirAsync(Guid empresaId, Guid id, CancellationToken ct = default)
+    {
+        var zona = await ObterDaLojaAsync(empresaId, id, ct);
+        await zonas.RemoveAsync(zona, ct);
+        await unitOfWork.CommitAsync();
+    }
+
+    private async Task<FreteZona> ObterDaLojaAsync(Guid empresaId, Guid id, CancellationToken ct)
     {
         var loja = await LojaDoTenant.ObterAsync(lojas, empresaId, ct);
         var zona = await zonas.GetByIdAsync(id, ct);
-        if (zona is null || zona.StorefrontId != loja.Id)
-            throw new CadastroEntregaNaoEncontradoException("Zona de frete", id);
+        return zona is not null && zona.StorefrontId == loja.Id
+            ? zona
+            : throw new CadastroEntregaNaoEncontradoException("Zona de frete", id);
+    }
+
+    private async Task<FreteZonaResult> AlterarAsync(Guid empresaId, Guid id, Action<FreteZona> alteracao, CancellationToken ct)
+    {
+        var zona = await ObterDaLojaAsync(empresaId, id, ct);
         alteracao(zona);
         await zonas.UpdateAsync(zona, ct);
         await unitOfWork.CommitAsync();
@@ -179,7 +219,8 @@ public sealed class CadastroZonasFreteUseCase(
 
 /// <summary>S45: bloqueios pontuais (feriado, férias) do dia inteiro ou de uma janela da loja.</summary>
 public sealed class CadastroBloqueiosEntregaUseCase(
-    IStorefrontRepository lojas, IBloqueioEntregaRepository bloqueios, IJanelaEntregaRepository janelas, IUnitOfWork unitOfWork)
+    IStorefrontRepository lojas, IBloqueioEntregaRepository bloqueios, IJanelaEntregaRepository janelas, IUnitOfWork unitOfWork,
+    TimeProvider relogio)
 {
     public const int PeriodoMaximoDias = 366;
 
@@ -197,9 +238,28 @@ public sealed class CadastroBloqueiosEntregaUseCase(
 
     public async Task<BloqueioEntregaResult> CriarAsync(Guid empresaId, BloqueioEntregaInput input, CancellationToken ct = default)
     {
+        // #1776 (item 21): o "hoje" é o da loja (Brasília); depois das 21 h, em UTC, já seria amanhã.
+        var hoje = HorarioBrasil.DataOperacional(relogio.GetUtcNow().UtcDateTime);
+        if (input.Data < hoje)
+            throw new UseCaseValidationException("Esta data já passou. Bloqueie de hoje em diante.");
+        if (input.Data.DayNumber - hoje.DayNumber > PeriodoMaximoDias)
+            throw new UseCaseValidationException($"Bloqueie no máximo {PeriodoMaximoDias} dias à frente.");
+
         var loja = await LojaDoTenant.ObterAsync(lojas, empresaId, ct);
         if (input.JanelaEspecificaId is { } janelaId && janelaId != Guid.Empty)
-            await CadastroJanelasEntregaUseCase.ObterDaLojaAsync(janelas, loja.Id, janelaId, ct);
+        {
+            var janela = await CadastroJanelasEntregaUseCase.ObterDaLojaAsync(janelas, loja.Id, janelaId, ct);
+            if (janela.DiaDaSemana != (int)input.Data.DayOfWeek)
+                throw new UseCaseValidationException(
+                    $"Essa janela é de {CadastroJanelasEntregaUseCase.DiasDaSemana[janela.DiaDaSemana]}, e o dia escolhido é "
+                    + $"{CadastroJanelasEntregaUseCase.DiasDaSemana[(int)input.Data.DayOfWeek]}.");
+        }
+
+        // Dia inteiro já fechado cobre qualquer janela; a mesma janela duas vezes é duplicata. Fechar o dia
+        // inteiro com uma janela já fechada é válido: cobre o resto do dia.
+        var doDia = await bloqueios.GetByStorefrontPeriodoAsync(loja.Id, input.Data, input.Data, ct);
+        if (doDia.Any(b => b.JanelaEspecificaId is null || (input.JanelaEspecificaId is not null && b.JanelaEspecificaId == input.JanelaEspecificaId)))
+            throw new UseCaseValidationException("Este dia ou horário já está bloqueado.");
 
         var bloqueio = BloqueioEntrega.Criar(loja.Id, input.Data, input.Motivo, input.JanelaEspecificaId);
         await bloqueios.AddAsync(bloqueio, ct);

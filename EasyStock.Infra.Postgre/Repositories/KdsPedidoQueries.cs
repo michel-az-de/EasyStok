@@ -110,7 +110,9 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                     .ToList(),
                 Endereco: p.EnderecoEntrega ?? cliente?.Endereco,
                 RequerAprovacao: p.RequerAprovacao,
-                MotivoRequerAprovacao: p.MotivoRequerAprovacao);
+                MotivoRequerAprovacao: p.MotivoRequerAprovacao,
+                Total: p.Total.Valor,
+                TotalPago: p.TotalPago);
         }).ToList();
     }
 

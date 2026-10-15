@@ -86,6 +86,15 @@ public class TenantVitrineEntregaController(
     public Task<IActionResult> DefinirZonaAtiva(Guid id, [FromBody] AtivaBody body, CancellationToken ct) =>
         Tratar(async () => DataOk(await zonas.DefinirAtivaAsync(Empresa, id, body.Ativa, ct)));
 
+    [SwaggerOperation(Summary = "Delete a shipping zone", Description = "O pedido guarda o frete como linha própria: o histórico não muda.")]
+    [HttpDelete("zonas/{id:guid}")]
+    public Task<IActionResult> ExcluirZona(Guid id, CancellationToken ct) =>
+        Tratar(async () =>
+        {
+            await zonas.ExcluirAsync(Empresa, id, ct);
+            return NoContent();
+        });
+
     // ── Frete por raio ─────────────────────────────────────────────────
 
     [SwaggerOperation(Summary = "Get the stored distance shipping setup", Description = "O endereço da cozinha não é guardado; `configurado` diz se há coordenada.")]

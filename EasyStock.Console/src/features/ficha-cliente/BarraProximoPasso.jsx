@@ -166,6 +166,14 @@ export function BarraProximoPasso({
     })
   }
   const erroVisivel = erroAcao?.chave === marco.chave && erroAcao.estado === marco.estado ? erroAcao.texto : null
+  // #1776 (item 19): a API recusou "entregue" por saldo a receber; a barra oferece confirmar nesta etapa.
+  const [saldoAConfirmar, setSaldoAConfirmar] = useState(null)
+  const pedeSaldo = Boolean(erroVisivel) && saldoAConfirmar?.chave === marco.chave && saldoAConfirmar.estado === marco.estado
+  const avancarPasso = (passo, opcoes) => {
+    const marcoNaHora = marco
+    return executar(() => aoAvancar(passo, undefined, opcoes))
+      ?.then?.((r) => setSaldoAConfirmar(r?.saldoAReceber ? marcoNaHora : null))
+  }
   const textoDaEspera = marcoEmVoo?.chave === marco.chave
     ? (esperaEmVoo ?? 'Confirmando alteração…') : 'Concluindo a ação iniciada nesta conversa…'
 
@@ -327,10 +335,15 @@ export function BarraProximoPasso({
           {motivo && <p className={css.motivoDesabilitado}>{motivo}</p>}
           <Botao
             largo variante="primario" icone={acao.icone} disabled={Boolean(motivo) || emVoo}
-            onClick={() => (precisaDeEntregador ? setPedindoEntregador(true) : executar(() => aoAvancar(proximo.id)))}
+            onClick={() => (precisaDeEntregador ? setPedindoEntregador(true) : avancarPasso(proximo.id))}
           >
             {acao.rotulo}
           </Botao>
+          {pedeSaldo && (
+            <Botao largo variante="secundario" disabled={emVoo} onClick={() => avancarPasso(proximo.id, { confirmarSaldoAReceber: true })}>
+              Marcar entregue mesmo assim
+            </Botao>
+          )}
           {botaoComplemento}
           {pedindoEntregador && precisaDeEntregador && (
             <EscolhaDeEntregador

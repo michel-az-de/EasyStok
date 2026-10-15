@@ -5,6 +5,7 @@ import {
   STATUS_KDS_DIA, STATUS_KDS_ENTREGAS, recarregaEntregasCom, releCadastroDeEntregas,
 } from '../dominio/entregasApi'
 import { dataIsoNoFuso } from '../dominio/formato'
+import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { criarRecargaDeAcao } from './recargaDeAcao'
 
 // Entregas no modo API (F04). Pedidos e viagens recarregam a cada evento de
@@ -142,7 +143,9 @@ export function useEntregasApi() {
   }, [recarregar])
 
   // Toda ação: trava os botões, chama a API e só solta com a tela relida. O erro da API vira a faixa.
-  const executar = useCallback((chamada, falha, rele) => {
+  // #1776 (item 19): a recusa que só pede confirmação (saldo a receber) não é erro: volta para a tela
+  // perguntar, como `{ confirmar: valor }`.
+  const executar = useCallback((chamada, falha, rele, pedeConfirmacao = null) => {
     setOcupado(true)
     const recarga = recargaRef.current
     const marca = recarga.marcar()
@@ -152,7 +155,11 @@ export function useEntregasApi() {
         else await recarregar(rele === RELE_TUDO ? undefined : SO_OPERACAO)
         return true
       })
-      .catch((e) => { setErro(`${falha}: ${e.message}`); return false })
+      .catch((e) => {
+        if (pedeConfirmacao?.(e)) return { confirmar: Number(e.dados?.valor) || 0 }
+        setErro(`${falha}: ${e.message}`)
+        return false
+      })
       .finally(() => setOcupado(false))
   }, [recarregar])
 
@@ -165,7 +172,8 @@ export function useEntregasApi() {
     retirarParada: (id, pedidoId) => executar(() => api.retirarParada(id, pedidoId), 'O pedido não saiu da viagem'),
     reordenar: (id, pedidoId, ordem) => executar(() => api.reordenarParada(id, pedidoId, ordem), 'A ordem não mudou'),
     sair: (id) => executar(() => api.sairParaEntrega(id), 'A viagem não saiu', RELE_PELO_EVENTO),
-    entregue: (id, pedidoId) => executar(() => api.marcarParadaEntregue(id, pedidoId), 'A entrega não foi marcada', RELE_PELO_EVENTO),
+    entregue: (id, pedidoId, confirmarSaldo = false) => executar(() => api.marcarParadaEntregue(id, pedidoId, confirmarSaldo),
+      'A entrega não foi marcada', RELE_PELO_EVENTO, pedeConfirmacaoDoSaldo),
     desfazer: (id) => executar(() => api.desfazerViagem(id), 'A viagem não foi desfeita'),
     criarEntregador: (corpo) => executar(() => api.criarEntregador(corpo), 'O entregador não foi cadastrado', RELE_TUDO),
     desativarEntregador: (id) => executar(() => api.desativarEntregador(id), 'O entregador não foi desativado', RELE_TUDO),

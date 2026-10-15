@@ -3,6 +3,7 @@
 // rede aqui; quem busca é `infra/api/entregasApi.js`.
 import { faixaDeHorarios, minutosDoDia } from './entrega'
 import { dataIsoNoFuso, moeda } from './formato'
+import { normalizarBusca } from './respostas'
 
 // Status que a gaveta pede ao KDS: aprovação manual, pronto e em rota.
 export const STATUS_KDS_ENTREGAS = 'aguardando_aprovacao_baba,pronto,saiu_para_entrega'
@@ -119,14 +120,31 @@ export const corpoBloqueio = (f) => ({
 // da semana, então sai um corpo por dia. Sem nome, a janela leva a própria faixa.
 const diasOrdenados = (dias) => [...new Set((dias ?? []).map(Number))].sort((a, b) => a - b)
 
-export function erroDoFormularioJanela(f) {
+// #1776 (item 21): bloqueios de hoje a um ano, o mesmo limite que a API aceita na criação (o
+// bloqueio além de 60 dias entrava e sumia da lista).
+export const DIAS_BLOQUEIO = 365
+
+// #1776 (item 20): mesmo teto da API (`JanelaEntrega.CapacidadeTeto`).
+export const CAPACIDADE_TETO = 500
+
+// #1776 (item 20): `janelas` e `propria` (id em edição) deixam a tela dizer antes da API que o
+// horário cruza com outra janela do mesmo dia. Encostadas (12h a 14h e 14h a 16h) não cruzam.
+export function erroDoFormularioJanela(f, janelas = [], propria = null) {
   const inicio = minutosDoDia(f.horaInicio)
   const fim = minutosDoDia(f.horaFim)
   if (inicio == null || fim == null) return 'Informe início e fim da janela.'
   if (fim <= inicio) return 'O fim da janela tem que vir depois do início.'
   const capacidade = Number(f.capacidadeMaxima)
   if (!Number.isInteger(capacidade) || capacidade < 1) return 'Capacidade tem que ser um número inteiro de 1 ou mais.'
-  if (diasOrdenados(f.dias).length === 0) return 'Escolha pelo menos um dia da semana.'
+  if (capacidade > CAPACIDADE_TETO) return `Uma janela aceita até ${CAPACIDADE_TETO} pedidos.`
+  const dias = diasOrdenados(f.dias)
+  if (dias.length === 0) return 'Escolha pelo menos um dia da semana.'
+  const cruza = (janelas ?? []).find((j) => j.id !== propria && dias.includes(j.diaDaSemana)
+    && minutosDoDia(String(j.horaInicio).slice(0, 5)) < fim && inicio < minutosDoDia(String(j.horaFim).slice(0, 5)))
+  if (cruza) {
+    const faixa = faixaDeHorarios(String(cruza.horaInicio).slice(0, 5), String(cruza.horaFim).slice(0, 5))
+    return `Já existe a janela de ${DIAS_DA_SEMANA[cruza.diaDaSemana]} ${faixa}, que cruza com este horário.`
+  }
   return null
 }
 
@@ -136,13 +154,48 @@ export const corposJanela = (f) => {
 }
 
 // Janela da API -> campos do formulário de edição (um dia só: cada janela é de um dia).
-export const camposDaJanela = (j) => ({
-  dias: [j.diaDaSemana],
-  horaInicio: String(j.horaInicio).slice(0, 5),
-  horaFim: String(j.horaFim).slice(0, 5),
-  capacidadeMaxima: String(j.capacidadeMaxima),
-  label: j.label ?? '',
+// #1776 (item 20): nome igual à própria faixa é o nome automático; vem vazio para acompanhar o
+// horário novo (antes a janela editada de 12h para 13h seguia chamada "12h00 às 14h00").
+export const camposDaJanela = (j) => {
+  const horaInicio = String(j.horaInicio).slice(0, 5)
+  const horaFim = String(j.horaFim).slice(0, 5)
+  const label = j.label ?? ''
+  return {
+    dias: [j.diaDaSemana], horaInicio, horaFim, capacidadeMaxima: String(j.capacidadeMaxima),
+    label: label === faixaDeHorarios(horaInicio, horaFim) ? '' : label,
+  }
+}
+
+// #1776 (item 22): zona da API -> campos do formulário (o mesmo da criação).
+export const camposDaZona = (z) => ({
+  label: z.label ?? '',
+  valor: String(z.valor ?? '').replace('.', ','),
+  tempoEstimadoMinutos: String(z.tempoEstimadoMinutos ?? ''),
+  ordem: String(z.ordem ?? 0),
+  cobertura: z.cepInicio ? 'cep' : 'bairros',
+  cepInicio: z.cepInicio ?? '',
+  cepFim: z.cepFim ?? '',
+  bairros: (z.bairros ?? []).join(', '),
 })
+
+// #1776 (item 22): faixa de CEP ou bairro que outra zona ativa já cobre. Não bloqueia (a ordem
+// decide qual vale), só avisa: "Centro" em duas zonas costuma ser engano.
+export function avisoDeSobreposicao(f, zonas, propria = null) {
+  const outras = (zonas ?? []).filter((z) => z.id !== propria && z.ativa)
+  if (f.cobertura === 'cep') {
+    const ini = Number(digitos(f.cepInicio))
+    const fim = Number(digitos(f.cepFim))
+    if (!ini || !fim) return null
+    const z = outras.find((o) => o.cepInicio && Number(o.cepInicio) <= fim && ini <= Number(o.cepFim))
+    return z ? `Esta faixa cruza com a zona ${z.label}. Vale a de menor ordem.` : null
+  }
+  const meus = new Set(String(f.bairros ?? '').split(',').map(normalizarBusca).filter(Boolean))
+  for (const o of outras) {
+    const repetido = (o.bairros ?? []).find((b) => meus.has(normalizarBusca(b)))
+    if (repetido) return `${repetido} já está na zona ${o.label}. Vale a de menor ordem.`
+  }
+  return null
+}
 
 // I2.2 (#1651): frete por distância. A tela fala km e reais; a API (`FreteRaioInput`), metros e
 // centavos. O endereço da cozinha não volta da API (só a coordenada fica gravada): em branco no

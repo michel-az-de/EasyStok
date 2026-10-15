@@ -78,6 +78,19 @@ export function complementoAReceber(pedido, cardapio) {
   return diferencaAposPagamento(pedido, cardapio)
 }
 
+// #1776 (item 19): no cartão do KDS (Entregas, Cozinha) "pago" é o saldo do servidor zerado
+// (`aReceber`, de `SaldoFinanceiroPedido`), não "tem pagamento": o sinal de R$ 25 num pedido de
+// R$ 50 deixa R$ 25 para a porta. API antiga, sem o campo, cai no "tem pagamento" de antes.
+export const aReceberDoCartao = (p) => (typeof p?.aReceber === 'number' ? Math.max(p.aReceber, 0) : null)
+export const quitadoNoCartao = (p) => {
+  const falta = aReceberDoCartao(p)
+  return falta === null ? Boolean(p?.pagoEm) : falta === 0
+}
+
+// Marcar entregue com saldo a receber: a API responde 409 com este código até a confirmação.
+export const CODIGO_SALDO_A_RECEBER = 'SALDO_A_RECEBER'
+export const pedeConfirmacaoDoSaldo = (erro) => erro?.codigo === CODIGO_SALDO_A_RECEBER
+
 // Pagamentos de um trecho de atendimento (seção 5, resumo): tudo que caiu
 // a partir de `desde` (instante numérico). Sem `desde`, devolve tudo.
 export function pagamentosDoTrecho(pedido, desde = null) {

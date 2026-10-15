@@ -10,6 +10,9 @@ public interface IFreteZonaRepository
     Task AddAsync(FreteZona zona, CancellationToken ct = default);
     Task UpdateAsync(FreteZona zona, CancellationToken ct = default);
 
+    /// <summary>#1776 (item 22): remove a zona; nenhuma tabela aponta para ela.</summary>
+    Task RemoveAsync(FreteZona zona, CancellationToken ct = default);
+
     /// <summary>
     /// Retorna a primeira <see cref="FreteZona"/> ativa do storefront cuja
     /// cobertura case com o CEP informado (zona tipo <c>cep_range</c>) ou com

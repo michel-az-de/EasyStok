@@ -21,7 +21,9 @@ public sealed record AtualizarStatusPedidoCommand(
     [property: MaxLength(120)] string? UsuarioNome = null,
     [property: MaxLength(20)] string? Origem = "web",
     DateTime? OcorridoEm = null,
-    NivelAcesso NivelSolicitante = NivelAcesso.Operador);
+    NivelAcesso NivelSolicitante = NivelAcesso.Operador,
+    bool ConferirSaldoNaEntrega = false,
+    bool SaldoAReceberConfirmado = false);
 
 /// <summary>
 /// Atualiza o status do pedido (aguardando → preparando → pronto → entregue).
@@ -53,7 +55,8 @@ public class AtualizarStatusPedidoUseCase(
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     CancelarPedidoUseCase cancelarPedido,
     ICobrancaPedidoRepository? cobrancas = null,
-    Lazy<TrocarFormaPagamentoPedidoUseCase>? trocarForma = null)
+    Lazy<TrocarFormaPagamentoPedidoUseCase>? trocarForma = null,
+    SaldoFinanceiroPedido? saldos = null)
 {
     public async Task<PedidoResult?> ExecuteAsync(AtualizarStatusPedidoCommand cmd)
     {
@@ -109,6 +112,11 @@ public class AtualizarStatusPedidoUseCase(
             }
             return CriarPedidoUseCase.Map(pedido);
         }
+
+        // #1776 (item 19): o toque de "Marcar entregue" do console (Cozinha, Balcão) confere o saldo; com valor a
+        // receber, só com a confirmação de quem marca. Balcão, PWA e mobile seguem como antes (não pedem conferência).
+        if (statusNovo == StatusPedido.Entregue && cmd.ConferirSaldoNaEntrega && saldos is not null)
+            await saldos.ExigirQuitadoParaEntregarAsync(pedido, cmd.SaldoAReceberConfirmado, CancellationToken.None);
 
         var statusAntigoStr = pedido.Status;
         var eraEstoqueDescontado = PedidoStateMachine.DescontaEstoque(statusAtual);

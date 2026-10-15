@@ -8,8 +8,11 @@ import { chamarApi } from './cliente'
 export const listarPedidosKds = (data = null) =>
   chamarApi(data ? `/api/kds/pedidos?data=${encodeURIComponent(data)}` : '/api/kds/pedidos')
 
-export const mudarStatusKds = (id, status) =>
-  chamarApi(`/api/kds/pedidos/${id}/status`, { metodo: 'PATCH', corpo: { status } })
+// #1776 (item 19): "entregue" com saldo a receber volta 409 SALDO_A_RECEBER até `confirmarSaldoAReceber`.
+export const mudarStatusKds = (id, status, { confirmarSaldoAReceber = false } = {}) =>
+  chamarApi(`/api/kds/pedidos/${id}/status`, {
+    metodo: 'PATCH', corpo: confirmarSaldoAReceber ? { status, confirmarSaldoAReceber } : { status },
+  })
 
 export const reimprimirCanhoto = (id) => chamarApi(`/api/pedidos/${id}/reimprimir`, { metodo: 'POST' })
 

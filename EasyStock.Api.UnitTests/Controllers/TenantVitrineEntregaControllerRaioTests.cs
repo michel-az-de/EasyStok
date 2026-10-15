@@ -38,7 +38,7 @@ public class TenantVitrineEntregaControllerRaioTests
         _controller = new TenantVitrineEntregaController(
             new CadastroJanelasEntregaUseCase(_lojas, janelas, _uow),
             new CadastroZonasFreteUseCase(_lojas, Substitute.For<IFreteZonaRepository>(), _uow),
-            new CadastroBloqueiosEntregaUseCase(_lojas, Substitute.For<IBloqueioEntregaRepository>(), janelas, _uow),
+            new CadastroBloqueiosEntregaUseCase(_lojas, Substitute.For<IBloqueioEntregaRepository>(), janelas, _uow, TimeProvider.System),
             new ConfigurarFreteRaioUseCase(_lojas, ceps, _geocoding, _uow),
             new TestarFreteRaioUseCase(_lojas, ceps, _geocoding, Substitute.For<IRotaClient>()),
             currentUser);

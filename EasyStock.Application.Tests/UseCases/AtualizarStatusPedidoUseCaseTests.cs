@@ -17,7 +17,7 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class AtualizarStatusPedidoUseCaseTests
 {
-    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow, IPublicadorEventoIntegracao publicador) Build(bool permiteNegativo = true, IOperacaoEventPublisher? operacaoEventos = null, IPrazoPreparoPedidoQueries? prazoQueries = null, IContaReceberRepository? crRepo = null, IVagaOcupadaRepository? vagaRepo = null)
+    private static (AtualizarStatusPedidoUseCase uc, IPedidoRepository repo, IItemEstoqueRepository itemRepo, IMovimentacaoEstoqueRepository movRepo, IUnitOfWork uow, IPublicadorEventoIntegracao publicador) Build(bool permiteNegativo = true, IOperacaoEventPublisher? operacaoEventos = null, IPrazoPreparoPedidoQueries? prazoQueries = null, IContaReceberRepository? crRepo = null, IVagaOcupadaRepository? vagaRepo = null, SaldoFinanceiroPedido? saldos = null)
     {
         var pedidoRepo = Substitute.For<IPedidoRepository>();
         var itemRepo = Substitute.For<IItemEstoqueRepository>();
@@ -39,7 +39,8 @@ public class AtualizarStatusPedidoUseCaseTests
             operacaoEventos ?? Substitute.For<IOperacaoEventPublisher>(), uow, NullLogger<AtualizarStatusPedidoUseCase>.Instance,
             new CalculadoraInicioPrevistoPedido(prazoQueries ?? Substitute.For<IPrazoPreparoPedidoQueries>()),
             new EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase(pedidoRepo, integ, new EfeitosCancelamentoPedido(contaReceberRepo, vagaRepo ?? Substitute.For<IVagaOcupadaRepository>(),
-                NullLogger<EfeitosCancelamentoPedido>.Instance), uow, Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase>.Instance, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), publicador, operacaoEventos ?? Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>()));
+                NullLogger<EfeitosCancelamentoPedido>.Instance), uow, Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase>.Instance, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository>(), publicador, operacaoEventos ?? Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>()),
+            saldos: saldos);
         return (uc, pedidoRepo, itemRepo, movRepo, uow, publicador);
     }
 
@@ -77,6 +78,49 @@ public class AtualizarStatusPedidoUseCaseTests
         await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "aguardando"));
 
         pedido.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
+    }
+
+    // #1776 (item 19): o console marca entregue pelo KDS com conferência do saldo; com R$ 25 a receber, só confirmando.
+    private static (AtualizarStatusPedidoUseCase uc, Pedido pedido, Guid empresaId) PedidoNaRuaComSinal()
+    {
+        var pedidos = Substitute.For<IPedidoRepository>();
+        pedidos.ListarEstornosManuaisAsync(default, default, default).ReturnsForAnyArgs([]);
+        var estornos = Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.IEstornoOnlineRepository>();
+        estornos.ListarAsync(default, default, default).ReturnsForAnyArgs([]);
+        estornos.RecebimentosAsync(default, default, default).ReturnsForAnyArgs([]);
+        var creditos = Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICreditoClienteComandaRepository>();
+        creditos.TotaisDoPedidoAsync(default, default, default).ReturnsForAnyArgs((0m, 0m));
+        var (uc, repo, _, _, _, _) = Build(saldos: new SaldoFinanceiroPedido(pedidos, estornos, creditos));
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 5, "saiu_para_entrega");
+        pedido.Total = Dinheiro.FromDecimal(50m);
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 25m });
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        return (uc, pedido, empresaId);
+    }
+
+    [Fact]
+    public async Task Entregue_PeloConsole_ComSaldoAReceber_RecusaSemConfirmar()
+    {
+        var (uc, pedido, empresaId) = PedidoNaRuaComSinal();
+
+        var act = () => uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "entregue", ConferirSaldoNaEntrega: true));
+
+        (await act.Should().ThrowAsync<SaldoAReceberNaEntregaException>()).Which.Valor.Should().Be(25m);
+        pedido.Status.Should().Be("saiu_para_entrega");
+    }
+
+    [Theory]
+    [InlineData(true, true)]   // console, confirmado
+    [InlineData(false, false)] // balcão, PWA e mobile não pedem conferência
+    public async Task Entregue_ComSaldoAReceber_ConfirmadoOuSemConferencia_Passa(bool conferir, bool confirmado)
+    {
+        var (uc, pedido, empresaId) = PedidoNaRuaComSinal();
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "entregue",
+            ConferirSaldoNaEntrega: conferir, SaldoAReceberConfirmado: confirmado));
+
+        pedido.Status.Should().Be("entregue");
     }
 
     [Fact]

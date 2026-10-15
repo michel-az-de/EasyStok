@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.Operacao.Kds;
@@ -14,7 +15,7 @@ public sealed record ListarPedidosKdsQuery(
 /// <summary>
 /// Lista os cards do KDS do console (S19) a partir de <see cref="Pedido"/>, não do espelho mobile.
 /// </summary>
-public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider relogio)
+public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider relogio, SaldoFinanceiroPedido? saldos = null)
 {
     private static readonly string[] StatusPadrao =
     [
@@ -36,10 +37,15 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
         var pedidos = await queries.ListarAsync(query.EmpresaId, ParsearStatus(query.Status), dataInicial, dataFinal, ct);
 
         var linha = NormalizarLinha(query.Linha);
-        return pedidos
-            .Where(p => linha is null || p.Itens.Any(i => NormalizarLinha(i.Linha) == linha))
-            .Select(p => Mapear(p, hoje, agora))
-            .ToList();
+        var cards = new List<KdsPedidoDto>();
+        foreach (var p in pedidos.Where(p => linha is null || p.Itens.Any(i => NormalizarLinha(i.Linha) == linha)))
+        {
+            // #1776 (item 19): o cartão diz quanto cobrar na porta. Em sequência: o DbContext é um só.
+            var aReceber = saldos is null ? (decimal?)null
+                : await saldos.AReceberAsync(query.EmpresaId, p.Id, p.Total, p.TotalPago, ct);
+            cards.Add(Mapear(p, hoje, agora) with { AReceber = aReceber });
+        }
+        return cards;
     }
 
     private static IReadOnlyCollection<string> ParsearStatus(string? raw)

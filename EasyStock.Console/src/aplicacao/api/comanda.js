@@ -6,7 +6,7 @@ import {
 import { mudarStatusKds } from '../../infra/api/kdsApi'
 import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
 import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao } from '../../dominio/cobranca'
-import { ultimoPagamentoApi } from '../../dominio/pagamento'
+import { pedeConfirmacaoDoSaldo, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
 import { criarChaveDeEnvio } from '../chaveDeEnvio'
 import { SO_NO_EASYSTOK } from './naoLigadas'
@@ -196,14 +196,16 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   // #1474 (R1): a esteira da Ficha anda pelo mesmo PATCH da Cozinha (máquina de estados da
   // API). O aviso ao cliente em preparo, saída e entrega sai do EasyStok. O erro volta para a
   // barra mostrar ao lado do botão; nada muda na tela até a API responder.
-  const avancar = (id, passo) => {
+  // #1776 (item 19): "Marcar entregue" com saldo a receber volta `saldoAReceber` para a barra perguntar;
+  // a confirmação reenvia com `confirmarSaldoAReceber`.
+  const avancar = (id, passo, _entregador, { confirmarSaldoAReceber = false } = {}) => {
     const pedidoId = pedidoCriado(id)
     if (!pedidoId) return soNoEasyStok('Avançar a esteira')(id)
     const status = STATUS_DO_PASSO[passo]
     if (!status) return Promise.resolve({ erro: 'Esta etapa não se marca pela Ficha.' })
-    return umaPorConversa(id, 'avancar', () => mudarStatusKds(pedidoId, status).then(
+    return umaPorConversa(id, 'avancar', () => mudarStatusKds(pedidoId, status, { confirmarSaldoAReceber }).then(
       () => { limparAviso(); return recarregar(id).then(() => undefined, () => undefined) },
-      (erro) => ({ erro: erro.message }),
+      (erro) => ({ erro: erro.message, saldoAReceber: pedeConfirmacaoDoSaldo(erro) }),
     ))
   }
 
