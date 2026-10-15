@@ -33,13 +33,17 @@ try {
 import{createRoot}from '${raiz}/node_modules/react-dom/client.js';
 import{ModalNota}from '${raiz}/src/features/notas/ModalNota.jsx';
 import{CartaoDoCliente}from '${raiz}/src/features/ficha-cliente/CartaoDoCliente.jsx';
-function Prova(){const[visivel,mostrar]=useState(true);const[terminou,terminar]=useState(false);const[geracao,mudar]=useState(0);
+import{ExtratoDoPedido}from '${raiz}/src/features/ficha-cliente/ExtratoDoPedido.jsx';
+function Prova(){const[visivel,mostrar]=useState(true);const[terminou,terminar]=useState(false);const[geracao,mudar]=useState(0);const[caso,proximo]=useState(0);
+const pedidos=[{estado:'cancelado',totalPagoApi:0,alocadoApi:0},{estado:'cancelado',totalPagoApi:100,alocadoApi:0},{estado:'cancelado',totalPagoApi:100,alocadoApi:50},{estado:'aguardando',totalPagoApi:100,alocadoApi:50},{estado:'aguardando',totalPagoApi:50,alocadoApi:75},{estado:'pago',totalPagoApi:100,alocadoApi:100}];
 const notas=Array.from({length:20},(_,i)=>({id:'nota'+(i+geracao),criadoEm:i+geracao,texto:'texto'+(i+geracao)}));
 return React.createElement(React.Fragment,null,
 React.createElement('button',{onClick:()=>mostrar(v=>!v)},'Alternar ferramenta'),
 React.createElement('button',{onClick:()=>window.responder()},'Responder gravação'),
 React.createElement('button',{onClick:()=>mudar(1)},'Adicionar vigésima primeira nota'),
 React.createElement('output',null,terminou?'Gravou':'Aguardando'),
+React.createElement('button',{onClick:()=>proximo(c=>c+1)},'Próximo extrato'),
+React.createElement(ExtratoDoPedido,{pedido:{pedidoId:'pedido',totalApi:100,frete:0,...pedidos[caso]}}),
 !terminou&&React.createElement(ModalNota,{visivel,nomeCliente:'Maria',outraConversa:true,aoFechar:()=>terminar(true),aoSalvar:async texto=>{window.textoSalvo=texto;await new Promise(r=>window.responder=r);return true}}),
 React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cliente',nome:'Maria',cliente:{pedidos:2,totalGasto:100,notas}},fonteApi:true,aoAbrir:()=>{}}))};createRoot(document.getElementById('root')).render(React.createElement(Prova));`
   const compilado = await build({ root: raiz, configFile: false, logLevel: 'silent', define: { 'process.env.NODE_ENV': '"production"' }, plugins: [react(), {
@@ -74,4 +78,21 @@ React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cli
   await componente.getByText('Resumo 2', { exact: true }).waitFor()
   assert.equal(await componente.evaluate(() => window.resumos), 2)
   console.log('ok cache: 21ª nota invalida o resumo apesar do limite de 20')
+  const extrato = componente.getByRole('region', { name: 'Extrato do pedido' })
+  for (const caso of [0, 1, 2]) {
+    const texto = await extrato.innerText()
+    assert.match(texto, /Cancelado · nada a cobrar\s+R\$\s*0,00/)
+    assert.doesNotMatch(texto, /A receber|Quitado|Devoluções|Cupom e créditos/)
+    if (caso > 0) assert.match(texto, /Ajuste de saldo/)
+    if (caso === 2) assert.match(texto, /Saldo em pagamentos e créditos\s+R\$\s*50,00/)
+    await componente.getByRole('button', { name: 'Próximo extrato' }).click()
+  }
+  assert.match(await extrato.innerText(), /Ajuste de saldo/)
+  assert.doesNotMatch(await extrato.innerText(), /Devoluções/)
+  assert.match(await extrato.innerText(), /A receber\s+R\$\s*50,00/)
+  await componente.getByRole('button', { name: 'Próximo extrato' }).click()
+  assert.match(await extrato.innerText(), /A receber\s+R\$\s*25,00/)
+  await componente.getByRole('button', { name: 'Próximo extrato' }).click()
+  assert.match(await extrato.innerText(), /Quitado\s+R\$\s*0,00/)
+  console.log('ok extrato real: cancelados sem dívida, ajustes neutros e ativos preservados')
 } finally { await navegador.close() }
