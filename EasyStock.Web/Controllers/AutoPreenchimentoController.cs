@@ -45,12 +45,10 @@ public class AutoPreenchimentoController(
 
         try
         {
-            while (!reader.EndOfStream)
+            while (await reader.ReadLineAsync(HttpContext.RequestAborted) is { } line)
             {
-                var line = await reader.ReadLineAsync(HttpContext.RequestAborted);
-                if (line is null) break;
-                await Response.WriteAsync(line + "\n");
-                await Response.Body.FlushAsync();
+                await Response.WriteAsync(line + "\n", HttpContext.RequestAborted);
+                await Response.Body.FlushAsync(HttpContext.RequestAborted);
             }
         }
         catch (OperationCanceledException) { /* cliente desconectou */ }

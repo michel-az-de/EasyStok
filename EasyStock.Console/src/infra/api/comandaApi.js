@@ -1,5 +1,9 @@
+import { API_BASE } from '../fonteDados'
+import { urlDeExibicaoDaFoto } from '../../dominio/vitrineCardapio'
+import { partesDoSku, skuDaPorcao } from '../../dominio/cardapio'
 import { chamarApi } from './cliente'
 import { instante } from './traducaoConversas'
+import { lerSessao } from './sessao'
 
 // Comanda da conversa na API real (F03): cardápio e janelas da vitrine da empresa logada,
 // o pedido da conversa (S10) com a cobrança do Mercado Pago (S11) e o estado dos dois.
@@ -11,15 +15,28 @@ const LINHA_DO_CONTRATO = { paraServir: 'servir', prepararEmCasa: 'casa' }
 
 // Item do cardápio público → produto do console. O `sku` é o `cardapioItemId`, que é o que
 // o pedido recebe. Sem controle de saldo, `estoque` fica nulo (o domínio lê como sem limite).
-export const produtoDaApi = (item) => ({
+export const produtoDaApi = (item, porcoes = []) => ({
   sku: item.id,
+  // M1.4b (#1531): porções do prato (só a comanda as vê por enquanto); vazio = preço único.
+  porcoes: (porcoes ?? []).map((p) => ({
+    id: p.id, rotulo: p.rotulo, preco: p.preco, peso: p.peso ?? '', disponivel: p.disponivel !== false, padrao: p.padrao === true,
+  })),
   nome: item.nome,
+  descricao: item.descricao ?? '',
+  tempoPreparoMinutos: item.tempoPreparoMinutos ?? null,
   linha: LINHA_DO_CONTRATO[item.linha] ?? 'servir',
   porcao: item.pesoExibicao ?? '',
   preco: item.precoCentavos / 100,
   estoque: item.estoqueAtual ?? null,
   disponivelHoje: item.disponivel !== false,
   categoria: item.categoria ?? null,
+  // #1448: a foto passa pela rota de mídia da API, de qualquer host gravado na URL.
+  foto: urlDeExibicaoDaFoto(item.imagemUrl, API_BASE),
+  fotos: (item.fotos?.length ? item.fotos : item.imagemUrl ? [item.imagemUrl] : [])
+    .map((url) => urlDeExibicaoDaFoto(url, API_BASE)).filter(Boolean),
+  // M1.2 (#1482): item novo em validação (RN-15) e novidade com prazo (fim do dia, hora da loja).
+  emValidacao: item.emValidacao === true,
+  novidadeAte: item.novidadeAte ? `${item.novidadeAte}T23:59:59-03:00` : null,
 })
 
 const DIA_DA_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
@@ -39,7 +56,7 @@ export function janelaDoId(id) {
 
 export const janelaDaApi = (j) => ({
   id: idDaJanela(j.janelaId, j.data),
-  rotulo: `${rotuloDoDia(j.data)} · ${j.label}`,
+  rotulo: `${rotuloDoDia(j.data)} · ${j.horaInicio && j.horaFim ? `${j.horaInicio.slice(0, 5)} às ${j.horaFim.slice(0, 5)} · ` : ''}${j.label}`,
   vagas: j.vagasRestantes,
   capacidade: j.capacidade,
 })
@@ -55,6 +72,15 @@ const ESTADO_DO_STATUS = {
   saiu_para_entrega: 'entrega',
   entregue: 'entregue',
   cancelado: 'cancelado',
+}
+
+// #1474 (R1): etapa da esteira do console → status da API (`StatusPedidoMapper`), o mesmo que a
+// Cozinha manda. "Pago" não se marca por aqui: entra pela cobrança ou pela baixa à mão.
+export const STATUS_DO_PASSO = {
+  preparo: 'preparando',
+  embalado: 'pronto',
+  entrega: 'saiu_para_entrega',
+  entregue: 'entregue',
 }
 
 export const FORMA_NA_ENTREGA = 'na_entrega'
@@ -78,6 +104,8 @@ function cobrancaDaApi(c, meioAnterior) {
   return {
     id: c.cobrancaId,
     meio,
+    metodoRecebido: c.metodoPagamento ?? null,
+    manual: naEntrega,
     valor: c.valor,
     copiaECola: null,
     link: c.linkPagamento ?? null,
@@ -95,39 +123,59 @@ function cobrancaDaApi(c, meioAnterior) {
   }
 }
 
-// Pedido da API → pedido do console. A janela escolhida e o meio ficam do lado de cá
-// (`anterior`): a API devolve o pedido, não a escolha da tela.
+// Pedido persistido: a janela vem da vaga no servidor, inclusive após recarregar a página.
 export function pedidoDaApi(p, anterior = null) {
   if (!p) return null
   const cobranca = cobrancaDaApi(p.cobranca, anterior?.meio)
+  const cobertura = p.alocado ?? p.totalPago ?? 0
+  if (cobranca) cobranca.diferenca = cobertura > 0
+    && ['Pendente', 'Expirada'].includes(cobranca.statusApi)
+    && Math.round(cobranca.valor * 100) === Math.round((p.total - cobertura) * 100)
   return {
     pedidoId: p.pedidoId,
     // Mesmo código curto do backend (VariaveisAtendimento.CodigoCurto): o que o cliente lê.
-    numero: p.pedidoId.replace(/-/g, '').slice(0, 8).toUpperCase(),
+    numero: p.numeroComanda || p.pedidoId.replace(/-/g, '').slice(0, 8).toUpperCase(),
     estado: ESTADO_DO_STATUS[p.status] ?? 'aguardando',
     statusApi: p.status,
-    janela: anterior?.janela ?? null,
+    // #1474: pedido fora da área liberado espera aprovação; a baixa manual é barrada antes.
+    requerAprovacao: Boolean(p.requerAprovacao),
+    janela: p.janela ? idDaJanela(p.janela.janelaId, p.janela.data) : null,
+    janelaRotulo: p.janela ? janelaDaApi(p.janela).rotulo : null,
     entregador: anterior?.entregador ?? null,
     itens: p.itens.map((i) => ({
-      sku: i.cardapioItemId, qtd: i.quantidade, obs: i.observacao ?? '', acrescimo: false, entrouEm: null,
+      // M1.4b (#1531): linha de porção volta com o sku composto, o mesmo que a comanda somou.
+      sku: i.variacaoId ? skuDaPorcao(i.cardapioItemId, i.variacaoId) : i.cardapioItemId,
+      qtd: i.quantidade, obs: i.observacao ?? '', acrescimo: false, entrouEm: null,
+      // #1683: retrato da linha no pedido; a Ficha usa quando o prato saiu do cardápio visível.
+      nome: i.nome, precoUnitario: i.precoUnitario, porcao: i.porcao ?? '',
     })),
+    observacoes: p.observacoes ?? '',
     agradecimentoEnviado: anterior?.agradecimentoEnviado ?? false,
     pagamentos: [],
+    totalPagoApi: p.totalPago ?? 0,
+    alocadoApi: p.alocado ?? undefined,
+    sinalNaReserva: Boolean(p.sinalNaReserva),
+    pagamentosApi: p.pagamentos?.map((pag) => ({
+      valor: pag.valor, coberto: pag.valor, em: ms(pag.pagoEm), meio: pag.metodo, pagamentoId: pag.id,
+    })),
     meio: cobranca?.meio ?? anterior?.meio ?? null,
     cobranca,
     frete: p.frete,
     totalApi: p.total,
+    ...(p.leitura ? { leitura: p.leitura } : {}),
   }
 }
 
-export const listarCardapio = async () =>
-  ((await chamarApi(`${BASE}/comanda/cardapio`))?.itens ?? []).map(produtoDaApi)
+export const listarCardapio = async () => {
+  const r = await chamarApi(`${BASE}/comanda/cardapio`)
+  return (r?.itens ?? []).map((item) => produtoDaApi(item, r?.porcoes?.[item.id]))
+}
 
 export async function listarJanelas({ itens = [], dataInicio = null, dataFim = null } = {}) {
   const busca = new URLSearchParams()
   if (dataInicio) busca.set('dataInicio', dataInicio)
   if (dataFim) busca.set('dataFim', dataFim)
-  for (const sku of itens) busca.append('itens', sku)
+  for (const sku of itens) busca.append('itens', partesDoSku(sku).itemSku)
   const resposta = await chamarApi(`${BASE}/comanda/janelas?${busca}`)
   return {
     lojaDisponivel: Boolean(resposta?.lojaDisponivel),
@@ -135,14 +183,40 @@ export async function listarJanelas({ itens = [], dataInicio = null, dataFim = n
   }
 }
 
-export const obterPedido = (conversaId) => chamarApi(pedidoDaConversa(conversaId))
+// #1548: a API não carimba o pedido, então cada leitura leva a ordem em que SAIU. A polling e a
+// recarga de uma ação se cruzam; o reducer descarta a que saiu antes (`pedidoMesclado`).
+let ultimaLeitura = 0
+export async function obterPedido(conversaId) {
+  ultimaLeitura = Math.max(Date.now(), ultimaLeitura + 1)
+  const leitura = ultimaLeitura
+  const pedido = await chamarApi(pedidoDaConversa(conversaId))
+  return pedido && { ...pedido, leitura }
+}
+
+export async function listarJanelasPedido(pedidoId, data = '') {
+  const busca = data ? `?dataInicio=${encodeURIComponent(data)}&dataFim=${encodeURIComponent(data)}` : ''
+  const resposta = await chamarApi(`/api/pedidos/${pedidoId}/janelas${busca}`)
+  return {
+    lojaDisponivel: resposta.lojaDisponivel,
+    janelas: resposta.janelas.map(janelaDaApi),
+    atual: resposta.atual ? janelaDaApi(resposta.atual) : null,
+  }
+}
+
+export const trocarJanelaPedido = (pedidoId, janela, avisarCliente) =>
+  chamarApi(`/api/pedidos/${pedidoId}/janela`, {
+    metodo: 'PATCH', corpo: { ...janelaDoId(janela), avisarCliente }, sinal: AbortSignal.timeout(15000),
+  })
 
 // Comanda local → corpo do POST. Itens com o mesmo sku e anotações diferentes seguem como
 // linhas próprias (RN-20); acréscimo só existe depois do pagamento, fora deste caminho.
 export function corpoDoPedido(pedido) {
   const janela = janelaDoId(pedido?.janela)
   return {
-    itens: (pedido?.itens ?? []).map((l) => ({ cardapioItemId: l.sku, qtd: l.qtd, observacao: l.obs || null })),
+    itens: (pedido?.itens ?? []).map((l) => {
+      const { itemSku, variacaoId } = partesDoSku(l.sku)
+      return { cardapioItemId: itemSku, qtd: l.qtd, observacao: l.obs || null, ...(variacaoId ? { variacaoId } : {}) }
+    }),
     janelaId: janela?.janelaId ?? null,
     dataEntrega: janela?.data ?? null,
     forma: formaDoMeio(pedido?.meio),
@@ -159,3 +233,20 @@ export const reemitirCobranca = (pedidoId) =>
 // Troca de forma da S11: com conversa aberta, o link novo sai ao cliente pelo EasyStok.
 export const trocarFormaPagamento = (pedidoId, forma) =>
   chamarApi(`/api/pedidos/${pedidoId}/cobranca/forma`, { metodo: 'POST', corpo: { forma } })
+
+export const registrarPagamentoManual = (pedidoId, valor, metodo, chave = null) =>
+  chamarApi(`/api/pedidos/${pedidoId}/pagamentos`, {
+    metodo: 'POST', chave, corpo: { empresaId: lerSessao()?.empresa?.id, pedidoId, valor, metodo },
+  })
+
+// Com o id, repetir o pedido depois de resposta perdida não desfaz o pagamento anterior.
+export const desfazerPagamentoManual = (pedidoId, motivo, pagamentoId = null) =>
+  chamarApi(`/api/pedidos/${pedidoId}/pagamento-manual/desfazer`, {
+    metodo: 'POST', corpo: pagamentoId ? { motivo, pagamentoId } : { motivo },
+  })
+
+export const cancelarPedido = (pedidoId, motivo) =>
+  chamarApi(`/api/pedidos/${pedidoId}/cancelar`, {
+    metodo: 'POST', corpo: { empresaId: lerSessao()?.empresa?.id, id: pedidoId, motivo, origem: 'console' },
+    sinal: AbortSignal.timeout(15000),
+  })

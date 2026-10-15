@@ -12,6 +12,9 @@ public sealed class SessaoChatSiteRepository(EasyStockDbContext db) : ISessaoCha
     public Task<SessaoChatSite?> ObterPorTokenHashAsync(Guid empresaId, string tokenHash, CancellationToken ct = default) =>
         db.SessoesChatSite.FirstOrDefaultAsync(s => s.EmpresaId == empresaId && s.TokenHash == tokenHash, ct);
 
+    public Task<SessaoChatSite?> ObterSnapshotPorTokenHashAsync(Guid empresaId, string tokenHash, CancellationToken ct = default) =>
+        db.SessoesChatSite.AsNoTracking().FirstOrDefaultAsync(s => s.EmpresaId == empresaId && s.TokenHash == tokenHash, ct);
+
     public async Task<int> RemoverVencidasAsync(DateTime limiteUtc, CancellationToken ct = default)
     {
         // Cross-tenant: roda do serviço de limpeza, sem requisição e sem tenant.

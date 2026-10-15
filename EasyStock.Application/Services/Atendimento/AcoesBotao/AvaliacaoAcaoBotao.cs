@@ -78,7 +78,7 @@ public sealed class AvaliacaoAcaoBotao(
             // A avaliação já foi gravada: a resposta é cortesia e não desfaz o registro.
             logger.LogWarning(ex, "Avaliação gravada, mas a resposta não saiu na conversa {ConversaId}.", conversa.Id);
             saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow, TipoConteudoMensagem.Texto, texto);
-            saida.AtualizarStatusEntrega(StatusMensagem.Falhou, ex.Message);
+            saida.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), saida.EnviadaEm);
         }
 
         conversa.RegistrarSaida(saida.EnviadaEm);

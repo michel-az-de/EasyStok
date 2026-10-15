@@ -39,6 +39,9 @@ public class AdminTenantsController(
 
         try
         {
+            // A ação SuperAdmin cria uma empresa que ainda não existe no JWT. Escopo restrito
+            // ao provisionamento: os repositórios precisam gravar os vínculos do novo tenant.
+            using var tenantProvisionamento = db.UseRowLevelSecurityBypass();
             var resultado = await criarTenantUseCase.ExecuteAsync(new CriarTenantPorAdminCommand(
                 NomeEmpresa: req!.NomeEmpresa ?? string.Empty,
                 Documento: req.Documento,
@@ -176,6 +179,8 @@ public class AdminTenantsController(
                 return DataNotFound("Tenant não encontrado.");
             case StatusVinculoWhatsApp.NumeroEmUsoPorOutraEmpresa:
                 return DataConflict("Este phone_number_id já está vinculado a outra empresa.");
+            case StatusVinculoWhatsApp.NumeroReservadoDaPlataforma:
+                return DataConflict("Este phone_number_id é o número de plataforma do EasyStok e não pode ser vinculado a uma empresa.");
         }
 
         await audit.LogAsync(

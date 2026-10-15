@@ -1,6 +1,6 @@
-using System.Text;
 using System.Text.RegularExpressions;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -11,10 +11,6 @@ namespace EasyStock.Application.Services.Atendimento;
 /// </summary>
 public static class NormalizadorTelefone
 {
-    /// <summary>E.164 BR: <c>+55</c> + DDD (2 dígitos) + número (8 ou 9 dígitos).</summary>
-    private static readonly Regex TelefoneE164BrRegex =
-        new(@"^\+55[1-9][0-9]\d{8,9}$", RegexOptions.Compiled);
-
     /// <summary>
     /// Celular BR sem o nono dígito, como a Meta ainda entrega o <c>wa_id</c> de números antigos:
     /// 55 + DDD + 8 dígitos começando em 6 a 9.
@@ -31,46 +27,7 @@ public static class NormalizadorTelefone
     /// <c>"+55 11 9 9757 3992"</c> e <c>"5511997573992"</c>. Lança <see cref="TelefoneInvalidoException"/> quando o resultado
     /// não é E.164 BR.
     /// </summary>
-    public static string NormalizarE164Br(string telefone)
-    {
-        if (string.IsNullOrWhiteSpace(telefone))
-            throw new TelefoneInvalidoException();
-
-        // Mantém apenas dígitos e o '+' inicial. Espaços, hífens, parênteses e pontos somem.
-        var span = telefone.Trim();
-        var digitos = new StringBuilder(span.Length);
-        var primeiro = true;
-        foreach (var c in span)
-        {
-            if (primeiro && c == '+')
-                digitos.Append('+');
-            else if (char.IsDigit(c))
-                digitos.Append(c);
-            else if (c is not (' ' or '(' or ')' or '-' or '.'))
-                throw new TelefoneInvalidoException();
-            primeiro = false;
-        }
-
-        var normalizado = digitos.ToString();
-
-        // Sem prefixo: DDD + número BR puro (10 ou 11 dígitos) ganha o +55; "55" + DDD + número
-        // (12 ou 13 dígitos, como o VO Telefone grava o que foi digitado sem '+') ganha só o '+'.
-        // Os comprimentos não se cruzam: número nacional nunca passa de 11 dígitos (#1290).
-        if (!normalizado.StartsWith('+'))
-        {
-            if (normalizado.Length is 10 or 11)
-                normalizado = "+55" + normalizado;
-            else if (normalizado.Length is 12 or 13 && normalizado.StartsWith("55", StringComparison.Ordinal))
-                normalizado = "+" + normalizado;
-            else
-                throw new TelefoneInvalidoException();
-        }
-
-        if (!TelefoneE164BrRegex.IsMatch(normalizado))
-            throw new TelefoneInvalidoException();
-
-        return normalizado;
-    }
+    public static string NormalizarE164Br(string telefone) => TelefoneE164.From(telefone).Value;
 
     /// <summary>
     /// Números E.164 a procurar para um <c>wa_id</c> da Meta (dígitos, sem <c>+</c>), o canônico

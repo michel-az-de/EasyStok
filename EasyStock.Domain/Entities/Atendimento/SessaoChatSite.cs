@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace EasyStock.Domain.Entities.Atendimento;
 
 /// <summary>
@@ -58,6 +60,14 @@ public class SessaoChatSite
         var instante = Utc(agora);
         UltimoUsoEm = instante;
         ExpiraEm = instante + Validade;
+    }
+
+    public void Encerrar(DateTime agora)
+    {
+        // Renovacoes ja em voo podem gravar datas antigas. Trocar o hash torna o bearer
+        // irrecuperavel mesmo nesses casos; a renovacao nunca altera esta propriedade.
+        TokenHash = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(TokenHashTamanho / 2));
+        if (Utc(agora) < ExpiraEm) ExpiraEm = Utc(agora);
     }
 
     public void VincularConversa(Guid conversaId)

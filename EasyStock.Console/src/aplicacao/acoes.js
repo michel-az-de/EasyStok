@@ -53,6 +53,8 @@ export const EDITAR_REGRA = 'editar-regra'
 export const CRIAR_LEMBRETE = 'criar-lembrete'
 export const CONCLUIR_LEMBRETE = 'concluir-lembrete'
 export const SINCRONIZAR_LEMBRETES = 'sincronizar-lembretes'
+// Modo API (#1426): lembretes manuais e notificações que vêm do EasyStok, por fonte.
+export const SINCRONIZAR_LEMBRETES_API = 'sincronizar-lembretes-api'
 
 // Bloqueio de cliente por cadastro.
 export const BLOQUEAR_CLIENTE = 'bloquear-cliente'
@@ -164,6 +166,9 @@ export const CONFIRMAR_VALIDACAO_ITEM = 'confirmar-validacao-item'
 // Frente Horário e loja (rodada 5, pedido do dono 24/09/2026): controle do
 // topo (Aberta/Fechada) e horário de funcionamento configurável por dia.
 export const ALTERNAR_LOJA = 'alternar-loja'
+// #1443: gesto com conferência ao abrir (abre o caixa) ou fechar no horário (justificativa).
+export const PEDIR_GESTO_LOJA = 'pedir-gesto-loja'
+export const FECHAR_GESTO_LOJA = 'fechar-gesto-loja'
 export const EDITAR_FUNCIONAMENTO = 'editar-funcionamento'
 
 // Frente Cardápio por link (rodada 7, US-021): o pedido fechado na janela do
@@ -190,6 +195,10 @@ export const ALTERNAR_ARQUIVAMENTO_RESPOSTA_PRONTA = 'alternar-arquivamento-resp
 export const CONEXAO_CAIU = 'conexao-caiu'
 export const CONEXAO_VOLTOU = 'conexao-voltou'
 export const LANCAR_LOTE_PAPEL = 'lancar-lote-papel'
+// #1241: no modo API o EasyStok aplicou o lote; a tela só fecha a pendência, sem mensagem.
+export const LOTE_PAPEL_LANCADO_API = 'lote-papel-lancado-api'
+// #1241: alertas de produto vendido sem saldo lidos do EasyStok (S22).
+export const ALERTAS_DE_ESTOQUE_DA_API = 'alertas-de-estoque-da-api'
 
 // Frente Simulação (rodada 10, pedido do dono 25/09/2026 23h42): o cliente
 // simulado reage às ações da Thatiane, não só manda falas por tempo fixo.
@@ -258,8 +267,11 @@ export const RESGATAR_RECOMPENSA = 'resgatar-recompensa'
 // Modo API (ADR-0054, F01): a lista vem do EasyStok por polling e o envio da dona
 // é confirmado ou recusado pela API depois do balão otimista.
 export const SINCRONIZAR_CONVERSAS = 'sincronizar-conversas'
+export const CONFIRMAR_REABERTURA_API = 'confirmar-reabertura-api'
+export const CONFIRMAR_RESPONSAVEL_API = 'confirmar-responsavel-api'
 export const SINCRONIZACAO_FALHOU = 'sincronizacao-falhou'
 export const CONFIRMAR_ENVIO_API = 'confirmar-envio-api'
+export const RECEBER_MODELO_API = 'receber-modelo-api'
 export const FALHAR_ENVIO_API = 'falhar-envio-api'
 export const AVISO_API = 'aviso-api'
 // F02: horário, controle manual e mensagens do expediente (S40) como a API devolveu.
@@ -273,3 +285,8 @@ export const FECHAR_AVISO_API = 'fechar-aviso-api'
 export const CLIENTE_DA_API = 'cliente-da-api'
 // #1276: nome que a dona escreveu para o lead ainda sem cadastro; vai junto no cadastro.
 export const RENOMEAR_LEAD_API = 'renomear-lead-api'
+// #1441: respostas prontas e mensagens automáticas como o EasyStok devolveu (S42).
+export const RESPOSTAS_DA_API = 'respostas-da-api'
+export const REGRAS_DA_API = 'regras-da-api'
+// #1474: a leitura das automáticas falhou (a tela separa carregando, erro e vazio).
+export const REGRAS_FALHARAM = 'regras-falharam'

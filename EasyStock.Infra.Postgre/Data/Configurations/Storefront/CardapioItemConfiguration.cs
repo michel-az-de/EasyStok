@@ -10,6 +10,7 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
     {
         builder.ToTable("cardapio_item");
         builder.HasKey(c => c.Id);
+        builder.Property<uint>("xmin").HasColumnName("xmin").IsRowVersion();
 
         builder.Property(c => c.StorefrontId).IsRequired();
 
@@ -28,6 +29,11 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.Property(c => c.Disponivel)
             .IsRequired()
             .HasDefaultValue(true);
+        // M1.2 (#1482): tirar arquiva (≠ ocultar do site); item novo em validação; novidade com prazo.
+        builder.Property(c => c.ArquivadoEm);
+        builder.Property(c => c.EmValidacao).IsRequired().HasDefaultValue(false);
+        builder.Property(c => c.NovidadeAte);
+        builder.Ignore(c => c.EstaArquivado);
 
         builder.Property(c => c.OrdemExibicao)
             .IsRequired()
@@ -43,6 +49,7 @@ public class CardapioItemConfiguration : IEntityTypeConfiguration<CardapioItem>
         builder.Property(c => c.TempoPreparoMinutos);
         builder.Property(c => c.InstrucaoFinalizacao).HasMaxLength(500);
         builder.Property(c => c.FotoUrl).HasMaxLength(500);
+        builder.Property(c => c.FotosJson).IsRequired().HasColumnType("jsonb").HasDefaultValue("[]");
         builder.Property(c => c.PesoExibicao).HasMaxLength(50);
 
         builder.Property(c => c.PrecoStorefront)

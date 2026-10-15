@@ -32,23 +32,25 @@ jobs:
     timeout-minutes: 30
     if: ${{ vars.BACKUP_ENABLED == 'true' }}
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: restoretest
-          POSTGRES_DB: easystok_restore_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # #1796: o Postgres sobe num passo, e não em `services:`, para a imagem vir por espelhos com
+      # nova tentativa (scripts/ci/puxar-imagem.sh). O `services:` puxa de uma fonte só e reprova o
+      # job inteiro quando ela limita o runner.
+      - name: Postgres efemero
+        run: |
+          set -euo pipefail
+          bash scripts/ci/puxar-imagem.sh postgres:16
+          docker run -d --name postgres -p 5432:5432 \
+            -e POSTGRES_PASSWORD=restoretest -e POSTGRES_DB=easystok_restore_test postgres:16
+          for i in $(seq 1 30); do
+            docker exec postgres pg_isready -U postgres -d easystok_restore_test && exit 0
+            sleep 2
+          done
+          docker logs postgres
+          exit 1
 
       - name: Install PostgreSQL client + rclone
         run: |

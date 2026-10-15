@@ -55,6 +55,8 @@ public sealed class DispararMensagemProgramadaUseCase(
         {
             var cliente = await clientes.GetByIdAsync(empresaId, mensagem.ClienteId)
                 ?? throw new RegraDeDominioVioladaException("Cliente não existe mais.");
+            if (cliente.Bloqueado)
+                throw new RegraDeDominioVioladaException("Cliente bloqueado: mensagem programada não enviada.");
             conversa = await DestinoMensagemProgramada.ConversaAsync(conversas, empresaId, cliente, mensagem.Canal, mensagem.ConversaId, ct);
             var contato = DestinoMensagemProgramada.Contato(cliente, mensagem.Canal, conversa);
 
@@ -72,8 +74,9 @@ public sealed class DispararMensagemProgramadaUseCase(
             if (conversa is not null)
                 await RegistrarNoHistoricoAsync(empresaId, conversa, mensagem, idExterno, agora, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
+            // #1787: o timeout do HttpClient também é OperationCanceledException; só o desligamento relança.
             logger.LogWarning(ex, "Mensagem programada {Id} não saiu.", id);
             mensagem.RegistrarFalha(ex.Message, agora);
         }

@@ -21,6 +21,11 @@ public sealed class ArmazenadorMidiaWhatsApp(IWhatsAppCloudClient cloudClient, I
         "video/mp4", "video/3gpp",
         "application/pdf", "text/plain", "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        // #1397: demais documentos que a Cloud API entrega (planilha, apresentação, compactado).
+        "application/vnd.ms-excel", "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/zip",
     };
 
     public async Task<(string Chave, string Mime)> ArmazenarAsync(
@@ -59,6 +64,11 @@ public sealed class ArmazenadorMidiaWhatsApp(IWhatsAppCloudClient cloudClient, I
         "text/plain" => ".txt",
         "application/msword" => ".doc",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => ".docx",
+        "application/vnd.ms-excel" => ".xls",
+        "application/vnd.ms-powerpoint" => ".ppt",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => ".xlsx",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation" => ".pptx",
+        "application/zip" => ".zip",
         _ => ""
     };
 }

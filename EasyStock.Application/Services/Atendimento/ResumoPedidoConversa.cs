@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Text;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Storefront;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -12,24 +14,45 @@ namespace EasyStock.Application.Services.Atendimento;
 /// </summary>
 public static class ResumoPedidoConversa
 {
-    public static string Texto(PedidoReservado reservado, DateOnly dataEntrega, string forma, string cabecalho)
+    public static string Texto(PedidoReservado reservado, DateOnly dataEntrega, string forma, string cabecalho, bool cobrarTotal = false)
     {
         ArgumentNullException.ThrowIfNull(reservado);
         var reais = CultureInfo.GetCultureInfo("pt-BR");
         var sb = new StringBuilder(cabecalho);
         foreach (var item in reservado.Itens)
         {
-            sb.Append(CultureInfo.InvariantCulture, $"\n- {item.Quantidade:0.##}x {item.Nome}");
+            // #1474: o item sai como no cardápio da vitrine, não em minúsculo como o avulso é gravado.
+            sb.Append(CultureInfo.InvariantCulture, $"\n- {item.Quantidade:0.##}x {NomeCardapio.Exibicao(item.Nome)}");
             if (!string.IsNullOrWhiteSpace(item.Observacao)) sb.Append($" ({item.Observacao})");
             sb.Append(": ").Append(item.Subtotal.ToString("C", reais));
         }
         sb.Append("\nFrete: ").Append(reservado.ItemFrete.PrecoUnitario.ToString("C", reais));
         sb.Append("\nTotal: ").Append(reservado.Total.ToString("C", reais));
-        sb.Append("\nEntrega: ").Append(dataEntrega.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
-        sb.Append(forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
-            ? "\nPagamento: na entrega"
-            : "\nPagamento: link online (Pix ou cartão)");
+        sb.Append("\nEntrega: ").Append(Entrega(dataEntrega, reservado.Janela));
+        if (cobrarTotal)
+            sb.Append("\nPagamento: este envio cobra o saldo integral; acréscimos posteriores cobram apenas a diferença.");
+        else if (PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
+        {
+            var sinal = PlanoPagamentoEncomenda.Sinal(reservado.Total);
+            sb.Append("\nSinal agora por link: ").Append(sinal.ToString("C", reais));
+            sb.Append("\nRestante na entrega: ").Append((reservado.Total - sinal).ToString("C", reais));
+        }
+        else
+            sb.Append(forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
+                ? "\nPagamento: na entrega"
+                : "\nPagamento: link online (Pix ou cartão)");
         return Limitar(sb.ToString());
+    }
+
+    private static readonly string[] DiasDaSemana = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+    /// <summary>"sex 09/10, das 12:00 às 14:00"; sem janela, só o dia (#1474).</summary>
+    private static string Entrega(DateOnly data, JanelaEntrega? janela)
+    {
+        var dia = string.Create(CultureInfo.InvariantCulture, $"{DiasDaSemana[(int)data.DayOfWeek]} {data:dd/MM}");
+        return janela is null
+            ? dia
+            : string.Create(CultureInfo.InvariantCulture, $"{dia}, das {janela.HoraInicio:HH:mm} às {janela.HoraFim:HH:mm}");
     }
 
     /// <summary>Corta no limite de texto da mensagem, como toda saída gravada na conversa.</summary>

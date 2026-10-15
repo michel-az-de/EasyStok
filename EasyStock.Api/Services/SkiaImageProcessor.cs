@@ -4,7 +4,7 @@ using SkiaSharp;
 namespace EasyStock.Api.Services;
 
 /// <summary>
-/// Otimiza imagens usando SkiaSharp: redimensiona e converte para WebP.
+/// Otimiza imagens usando SkiaSharp: redimensiona e converte para WebP ou JPEG.
 /// Fallback seguro: se falhar, retorna a imagem original.
 /// </summary>
 public sealed class SkiaImageProcessor(ILogger<SkiaImageProcessor> logger) : IImageProcessor
@@ -13,7 +13,8 @@ public sealed class SkiaImageProcessor(ILogger<SkiaImageProcessor> logger) : IIm
         byte[] source,
         string originalContentType,
         int maxSide = 1920,
-        int quality = 85)
+        int quality = 85,
+        bool jpeg = false)
     {
         try
         {
@@ -43,28 +44,28 @@ public sealed class SkiaImageProcessor(ILogger<SkiaImageProcessor> logger) : IIm
                 target = original;
             }
 
-            // Encodar como WebP
+            // O atendimento precisa de JPEG; o catálogo mantém WebP.
             using var image = SKImage.FromBitmap(target);
-            using var data = image.Encode(SKEncodedImageFormat.Webp, quality);
+            using var data = image.Encode(jpeg ? SKEncodedImageFormat.Jpeg : SKEncodedImageFormat.Webp, quality);
 
             if (target != original)
                 target.Dispose();
 
             if (data is null || data.Size == 0)
             {
-                logger.LogWarning("SkiaSharp falhou ao encodar WebP. Retornando original.");
+                logger.LogWarning("SkiaSharp falhou ao encodar a imagem. Retornando original.");
                 return FallbackOriginal(source, originalContentType);
             }
 
             var result = data.ToArray();
 
             logger.LogInformation(
-                "Imagem otimizada: {OrigW}x{OrigH} ({OrigSize:F1}KB) -> {NewW}x{NewH} WebP ({NewSize:F1}KB, -{Reduction:F0}%)",
+                "Imagem otimizada: {OrigW}x{OrigH} ({OrigSize:F1}KB) -> {NewW}x{NewH} {Formato} ({NewSize:F1}KB, -{Reduction:F0}%)",
                 original.Width, original.Height, source.Length / 1024.0,
-                newWidth, newHeight, result.Length / 1024.0,
+                newWidth, newHeight, jpeg ? "JPEG" : "WebP", result.Length / 1024.0,
                 (1.0 - (double)result.Length / source.Length) * 100);
 
-            return (result, "image/webp", ".webp");
+            return (result, jpeg ? "image/jpeg" : "image/webp", jpeg ? ".jpg" : ".webp");
         }
         catch (Exception ex)
         {

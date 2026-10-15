@@ -29,6 +29,24 @@ internal sealed class LembreteRepositoryEmMemoria : ILembreteRepository
     public Task<bool> ExisteAutomaticoAsync(Guid empresaId, TipoLembrete tipo, string referencia, CancellationToken ct = default) =>
         Task.FromResult(_itens.Any(l => l.EmpresaId == empresaId && l.Tipo == tipo && l.Referencia == referencia));
 
+    public int ConsultasDeExistentes { get; private set; }
+    public Task<IReadOnlyCollection<(Guid EmpresaId, string Referencia)>> ListarAutomaticosExistentesAsync(
+        TipoLembrete tipo, IReadOnlyCollection<(Guid EmpresaId, string Referencia)> fatos, CancellationToken ct = default)
+    {
+        ConsultasDeExistentes++;
+        return Task.FromResult<IReadOnlyCollection<(Guid EmpresaId, string Referencia)>>(fatos
+            .Where(f => _itens.Any(l => l.EmpresaId == f.EmpresaId && l.Tipo == tipo && l.Referencia == f.Referencia)).ToList());
+    }
+
+    public Task<int> MarcarVencidosVistosAsync(Guid empresaId, Guid usuarioId, DateTime agoraUtc, CancellationToken ct = default)
+    {
+        var vencidos = _itens.Where(l => l.EmpresaId == empresaId && l.EstaAberto
+            && (l.ParaUsuarioId is null || l.ParaUsuarioId == usuarioId)
+            && l.VistoEm is null && l.VenceEm <= agoraUtc).ToList();
+        foreach (var lembrete in vencidos) lembrete.MarcarVisto(agoraUtc);
+        return Task.FromResult(vencidos.Count);
+    }
+
     public Task<IReadOnlyList<Lembrete>> ListarAutomaticosAbertosAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<Lembrete>>(_itens.Where(l => l.Tipo != TipoLembrete.Manual && l.EstaAberto).ToList());
 

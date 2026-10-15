@@ -44,7 +44,7 @@ public class GerenciarComposicaoUseCaseTests
     {
         var empresaId = Guid.NewGuid();
         var produto = BuildProduto(empresaId);
-        _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        _produtoRepo.GetByIdParaAtualizarAsync(empresaId, produto.Id).Returns(produto);
 
         var insumoId = Guid.NewGuid();
         var insumo = BuildProduto(empresaId, "Farinha");
@@ -67,7 +67,7 @@ public class GerenciarComposicaoUseCaseTests
     {
         var empresaId = Guid.NewGuid();
         var produto = BuildProduto(empresaId);
-        _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        _produtoRepo.GetByIdParaAtualizarAsync(empresaId, produto.Id).Returns(produto);
 
         var uc = Build();
         var command = new SubstituirComposicaoCommand(
@@ -85,7 +85,7 @@ public class GerenciarComposicaoUseCaseTests
     {
         var empresaId = Guid.NewGuid();
         var produto = BuildProduto(empresaId);
-        _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        _produtoRepo.GetByIdParaAtualizarAsync(empresaId, produto.Id).Returns(produto);
 
         var insumoId = Guid.NewGuid();
         var insumo = BuildProduto(empresaId, "Farinha");
@@ -111,7 +111,7 @@ public class GerenciarComposicaoUseCaseTests
     {
         var empresaId = Guid.NewGuid();
         var produto = BuildProduto(empresaId);
-        _produtoRepo.GetByIdAsync(empresaId, produto.Id).Returns(produto);
+        _produtoRepo.GetByIdParaAtualizarAsync(empresaId, produto.Id).Returns(produto);
 
         var insumoId = Guid.NewGuid();
         _produtoRepo.GetByIdAsync(empresaId, insumoId).Returns((Produto?)null);  // nao pertence

@@ -37,6 +37,24 @@ public class PedidoTotalTests
     }
 
     [Fact]
+    public void Subtotal_do_item_fica_em_centavos_e_o_total_bate_com_o_gravado()
+    {
+        // #1506: 2 itens de 0,35 kg a 47,90 = 16,765 cada; o banco grava 16,77.
+        var pedido = Pedido.Criar(Guid.NewGuid());
+        for (var n = 0; n < 2; n++)
+        {
+            var item = new PedidoItem { Nome = "Bolo kg", Quantidade = 0.35m, PrecoUnitario = 47.90m };
+            item.RecalcularSubtotal();
+            pedido.Itens.Add(item);
+        }
+
+        pedido.RecalcularTotal();
+
+        pedido.Itens.Should().OnlyContain(i => i.Subtotal == 16.77m);
+        pedido.Total.Should().Be(Dinheiro.FromDecimal(33.54m));
+    }
+
+    [Fact]
     public void RecalcularTotal_soma_subtotais_dos_itens()
     {
         var pedido = Pedido.Criar(Guid.NewGuid());

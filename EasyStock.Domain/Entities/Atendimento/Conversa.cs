@@ -11,7 +11,7 @@ namespace EasyStock.Domain.Entities.Atendimento;
 /// E o estado que o agente e o console precisam: se a dona assumiu (o agente cala,
 /// RN-04), qual pedido esta em andamento, o contexto do carrinho e a janela de 24 h
 /// da Meta (contada da ultima mensagem de entrada). Uma conversa fica aberta ate ser
-/// encerrada; a proxima mensagem do contato abre outra. A unicidade "uma aberta por
+/// encerrada; sem reabertura explícita, a proxima mensagem do contato abre outra. A unicidade "uma aberta por
 /// canal, contato e empresa" e garantida por indice parcial no banco.
 /// </para>
 ///
@@ -25,8 +25,11 @@ public class Conversa
     public const int ContatoWaIdTamanhoMaximo = 15;
     public const int ContatoIdExternoTamanhoMaximo = 256;
     public const int ContatoNomeTamanhoMaximo = 120;
+    public const int MotivoEscaladaTamanhoMaximo = 500;
+    public const string ChaveAjudaComandaSolicitadaEm = "comandaAjudaSolicitadaEm";
 
     public Guid Id { get; private set; }
+    public long NumeroComanda { get; private set; }
     public Guid EmpresaId { get; private set; }
     public Guid? ClienteId { get; private set; }
 
@@ -56,7 +59,20 @@ public class Conversa
     public DateTime? EncerradaEm { get; private set; }
     public Guid? AssumidaPorUsuarioId { get; private set; }
 
+    /// <summary>
+    /// Por que o agente (ou o escalador) passou a conversa para humano. Some quando alguém assume, recebe
+    /// a transferência ou devolve ao automático: aí deixa de ser pendência da fila "Precisa de você".
+    /// </summary>
+    public string? MotivoEscalada { get; private set; }
+
     public bool EstaAberta => Situacao != SituacaoConversa.Encerrada;
+
+    /// <summary>
+    /// O cliente falou por ultimo e a conversa segue aberta: e o que o SLA de primeira resposta da loja
+    /// conta (#1427). Qualquer saida registrada depois (agente, dona ou sistema) zera a espera.
+    /// </summary>
+    public bool AguardaResposta =>
+        EstaAberta && UltimaMensagemEntradaEm is { } entrada && entrada >= UltimaMensagemEm;
 
     /// <summary>
     /// O agente so responde no WhatsApp (envia pelo cliente da Cloud API). Nos demais canais quem
@@ -151,6 +167,17 @@ public class Conversa
     public void AtualizarContatoNome(string? nome) => ContatoNome = NormalizarNome(nome);
 
     /// <summary>
+    /// #1332: a conversa pode ter sido achada pela outra grafia do celular (com/sem o nono dígito, #1290).
+    /// A resposta sai para <see cref="ContatoIdExterno"/>, então ele passa a ser o <c>wa_id</c> que escreveu,
+    /// o endereço que a Meta comprovadamente entrega. Só WhatsApp.
+    /// </summary>
+    public void AtualizarContatoWhatsApp(string waId)
+    {
+        if (Canal != CanalConversa.WhatsApp) return;
+        ContatoIdExterno = NormalizarContato(CanalConversa.WhatsApp, waId);
+    }
+
+    /// <summary>
     /// A dona assumiu (escreveu pelo console) ou o agente escalou. Idempotente.
     /// Em conversa encerrada e erro: quem quer falar de novo abre outra conversa.
     /// </summary>
@@ -159,8 +186,22 @@ public class Conversa
         GarantirAberta("assumir");
         Situacao = SituacaoConversa.Assumida;
         if (usuarioId is { } u && u != Guid.Empty)
+        {
             AssumidaPorUsuarioId = u;
+            MotivoEscalada = null;
+        }
         UltimaMensagemEm = Max(UltimaMensagemEm, Utc(agora));
+    }
+
+    /// <summary>
+    /// O agente ou o escalador passou a conversa para a fila humana, sem responsável, guardando o motivo
+    /// (aparado e cortado em <see cref="MotivoEscaladaTamanhoMaximo"/>).
+    /// </summary>
+    public void Escalar(DateTime agora, string? motivo)
+    {
+        Assumir(agora);
+        var limpo = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
+        MotivoEscalada = limpo is { Length: > MotivoEscaladaTamanhoMaximo } ? limpo[..MotivoEscaladaTamanhoMaximo] : limpo;
     }
 
     /// <summary>
@@ -174,6 +215,7 @@ public class Conversa
             throw new RegraDeDominioVioladaException("Destino da transferencia e obrigatorio.");
         Situacao = SituacaoConversa.Assumida;
         AssumidaPorUsuarioId = paraUsuarioId;
+        MotivoEscalada = null;
         UltimaMensagemEm = Max(UltimaMensagemEm, Utc(agora));
     }
 
@@ -188,14 +230,30 @@ public class Conversa
             throw new RegraDeDominioVioladaException($"O canal {Canal} nao tem agente: a conversa fica com a dona.");
         Situacao = SituacaoConversa.Automatica;
         AssumidaPorUsuarioId = null;
+        MotivoEscalada = null;
+        // Um novo atendimento humano não reativa a solicitação já encerrada.
+        var contexto = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson)!;
+        if (contexto.Remove(ChaveAjudaComandaSolicitadaEm)) ContextoJson = JsonSerializer.Serialize(contexto);
     }
 
-    /// <summary>Terminal e idempotente: preserva o primeiro carimbo de encerramento.</summary>
+    /// <summary>Idempotente: preserva o carimbo até uma reabertura explícita.</summary>
     public void Encerrar(DateTime agora)
     {
         if (!EstaAberta) return;
         Situacao = SituacaoConversa.Encerrada;
         EncerradaEm = Utc(agora);
+    }
+
+    /// <summary>Volta à fila humana sem renovar a janela do canal. Repetição não toma o atendimento de ninguém.</summary>
+    public bool Reabrir(DateTime agora)
+    {
+        if (EstaAberta) return false;
+        Situacao = SituacaoConversa.Assumida;
+        EncerradaEm = null;
+        AssumidaPorUsuarioId = null;
+        MotivoEscalada = "Conversa reaberta para atendimento.";
+        UltimaMensagemEm = Max(UltimaMensagemEm, Utc(agora));
+        return true;
     }
 
     /// <summary>Mensagem do cliente: move a janela de 24 h e conta como nao lida.</summary>
@@ -254,10 +312,13 @@ public class Conversa
     /// 24 h depois da ultima mensagem do cliente. Canal sem janela (site, e-mail, SMS) esta
     /// sempre dentro.
     /// </summary>
-    public bool DentroDaJanela(DateTime agora)
+    public bool DentroDaJanela(DateTime agora) => DentroDaJanela(Canal, UltimaMensagemEntradaEm, agora);
+
+    /// <summary>A mesma janela para quem leu so as colunas da conversa, sem a entidade (inbox, #1575).</summary>
+    public static bool DentroDaJanela(CanalConversa canal, DateTime? ultimaMensagemEntradaEm, DateTime agora)
     {
-        if (Capacidades.HorasJanela is not { } horas) return true;
-        return UltimaMensagemEntradaEm is { } ultima && Utc(agora) - ultima < TimeSpan.FromHours(horas);
+        if (CapacidadesCanal.Para(canal).HorasJanela is not { } horas) return true;
+        return ultimaMensagemEntradaEm is { } ultima && Utc(agora) - ultima < TimeSpan.FromHours(horas);
     }
 
     /// <summary>

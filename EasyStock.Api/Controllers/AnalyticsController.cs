@@ -169,6 +169,7 @@ public class AnalyticsController(
     [SwaggerOperation(Summary = "Get revenue by month")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("receita")]
     public async Task<IActionResult> Receita([FromQuery] Guid empresaId, [FromQuery] int meses = 12)
     {
@@ -182,6 +183,7 @@ public class AnalyticsController(
     [SwaggerOperation(Summary = "Get product margin analysis (paginated)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("margem")]
     public async Task<IActionResult> Margem(
         [FromQuery] Guid empresaId,
@@ -272,6 +274,7 @@ public class AnalyticsController(
     [SwaggerOperation(Summary = "Get revenue vs cost time series", Description = "Série temporal de Receita/Custo/Lucro: por dia (≤30d) ou por mês (>30d). Receita = Vendas confirmadas; Custo = Entradas de estoque no período.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("receita-custo")]
     public async Task<IActionResult> ReceitaCusto(
         [FromQuery] Guid empresaId,

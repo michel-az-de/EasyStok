@@ -6,14 +6,15 @@
 //   opções: --paralelo 3   --servidor http://127.0.0.1:5245
 //
 // Nota por conversa: a ação obtida bate com a esperada? Alguma frase proibida
-// saiu no texto? Quantos itens de "deveConter" apareceram? O relatório vai para
+// saiu no texto? Quantos itens de "deveConter" apareceram? O texto passa da régua
+// de objetividade (#1445: até 3 frases, 320 caracteres, sem floreio)? O relatório vai para
 // dados/avaliacoes/<modo>-<data>.json e um resumo sai no console.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  acaoSugerida, classificarIntencao, interpretarResposta, montarPrompt, rascunhoSugerido,
+  acaoSugerida, classificarIntencao, interpretarResposta, montarPrompt, objetividade, rascunhoSugerido,
 } from '../src/dominio/agente.js'
 import { CARDAPIO, JANELAS_ENTREGA, PREFIXOS_CEP_ATENDIDOS } from '../src/infra/catalogo.js'
 
@@ -67,7 +68,10 @@ function avaliar(conversa, obtido) {
   const proibidosQueSairam = (esperado.proibido ?? []).filter((p) => texto.includes(normalizar(p)))
   const deveConter = esperado.deveConter ?? []
   const contidos = deveConter.filter((d) => texto.includes(normalizar(d)))
-  return { acaoOk, proibidosQueSairam, contidos: contidos.length, deveConter: deveConter.length }
+  return {
+    acaoOk, proibidosQueSairam, contidos: contidos.length, deveConter: deveConter.length,
+    objetividade: objetividade(obtido.texto),
+  }
 }
 
 async function emLotes(itens, tamanho, fn) {
@@ -92,8 +96,11 @@ const linhas = await emLotes(conversas, opcoes.modo === 'simulado' ? 30 : opcoes
     const nota = avaliar(conversa, obtido)
     const marca = nota.acaoOk === null ? ' · ' : nota.acaoOk ? ' ok' : 'ERR'
     const proib = nota.proibidosQueSairam.length ? ` PROIBIDO: ${nota.proibidosQueSairam.join(' | ')}` : ''
+    const prolixo = nota.objetividade.prolixo
+      ? ` PROLIXO: ${nota.objetividade.frases} frases, ${nota.objetividade.caracteres} car.${nota.objetividade.floreios.length ? ', ' + nota.objetividade.floreios.join(' | ') : ''}`
+      : ''
     console.log(`${marca} ${conversa.id.padEnd(4)} ${conversa.esperado.cenario.slice(0, 44).padEnd(44)} `
-      + `esp ${conversa.esperado.acao.padEnd(16)} obt ${obtido.acao.padEnd(16)}${proib}`)
+      + `esp ${conversa.esperado.acao.padEnd(16)} obt ${obtido.acao.padEnd(16)}${proib}${prolixo}`)
     return { id: conversa.id, cenario: conversa.esperado.cenario, esperado: conversa.esperado.acao, obtido, nota }
   } catch (erro) {
     console.log(`ERR ${conversa.id.padEnd(4)} falhou: ${erro.message}`)
@@ -105,6 +112,7 @@ const comNota = linhas.filter((l) => l.nota && l.nota.acaoOk !== null)
 const acertos = comNota.filter((l) => l.nota.acaoOk).length
 const violacoes = linhas.filter((l) => l.nota && l.nota.proibidosQueSairam.length > 0).length
 const falhas = linhas.filter((l) => l.erro).length
+const prolixas = linhas.filter((l) => l.nota?.objetividade.prolixo).length
 const custo = linhas.reduce((s, l) => s + (l.obtido?.custoUsd ?? 0), 0)
 const tokens = linhas.reduce((s, l) => s + (l.obtido?.tokens ?? 0), 0)
 const latencias = linhas.map((l) => l.obtido?.latenciaMs).filter((v) => v != null)
@@ -112,11 +120,11 @@ const latenciaMedia = latencias.length ? Math.round(latencias.reduce((s, v) => s
 
 const resumo = {
   modo: opcoes.modo, em: new Date().toISOString(), conversas: linhas.length,
-  acaoAcertos: acertos, acaoAvaliadas: comNota.length, violacoesProibido: violacoes, falhas,
+  acaoAcertos: acertos, acaoAvaliadas: comNota.length, violacoesProibido: violacoes, prolixas, falhas,
   custoUsd: Number(custo.toFixed(4)), tokens, latenciaMediaMs: latenciaMedia,
 }
 console.log('')
-console.log(`ação certa: ${acertos} de ${comNota.length} · proibido saiu em ${violacoes} · falhas ${falhas}`
+console.log(`ação certa: ${acertos} de ${comNota.length} · proibido saiu em ${violacoes} · prolixa em ${prolixas} · falhas ${falhas}`
   + (opcoes.modo === 'simulado' ? '' : ` · US$ ${custo.toFixed(4)} · ${tokens} tokens · ${latenciaMedia} ms por resposta`))
 
 const pasta = path.join(RAIZ, 'dados', 'avaliacoes')

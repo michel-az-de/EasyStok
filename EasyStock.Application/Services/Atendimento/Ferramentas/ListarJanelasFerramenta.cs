@@ -100,6 +100,7 @@ public sealed class ListarJanelasFerramenta(
         {
             var envio = await cloudClient.EnviarBotoesAsync(
                 conversa.ContatoIdExterno, CorpoBotoes, botoes.Select(b => (b.Id, b.Titulo)).ToList(), ct);
+            contexto.RegistrarEnvioVerificado();
 
             if (conversa.EstaAberta) conversa.RegistrarSaida(contexto.Agora);
             var texto = $"{CorpoBotoes} {string.Join(" | ", botoes.Select(b => b.Titulo))}";
@@ -107,11 +108,12 @@ public sealed class ListarJanelasFerramenta(
                 Mensagem.Saida(contexto.EmpresaId, conversa.Id, AutorMensagem.Agente, contexto.Agora,
                     TipoConteudoMensagem.Texto, texto, envio.Wamid),
                 ct);
+            await contexto.GravarSaidaAsync(ct);
             return botoes.Count;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Sem botões o agente lista as janelas em texto.
+            // Sem envio verificado, o atendimento automático encaminha para a equipe.
             logger.LogWarning(ex, "listar_janelas: falha ao enviar os botões da conversa {ConversaId}.", conversa.Id);
             return 0;
         }

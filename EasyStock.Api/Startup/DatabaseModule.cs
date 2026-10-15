@@ -61,7 +61,8 @@ public static class DatabaseModule
                     .AddNpgSql(postgresConnectionString!, name: "PostgreSQL", tags: ["ready", "api"])
                     .AddCheck<RedisHealthCheck>("Redis", tags: ["api"])           // sem tag "ready" — Redis degradado não remove pod do LB
                     .AddCheck<ConfigurationHealthCheck>("Configuracao", tags: ["ready", "api"])
-                    .AddNotificationsHosting();
+                    .AddNotificationsHosting()
+                    .AddNotificacoesBacklog();
                 // Polly pipelines compartilhados pelas integracoes HTTP
                 builder.Services.AddEasyStockIntegrationResilience();
                 // Atendimento WhatsApp (S02) — cliente da Cloud API que MetaCloudWhatsAppProvider delega.
@@ -71,6 +72,11 @@ public static class DatabaseModule
                 builder.Services.AddEasyStockAgenteLlm(builder.Configuration);
                 // Integrações por loja (F16, #1246): teste de conexão de cada provider e chaves globais.
                 builder.Services.AddEasyStockTestesIntegracao();
+                // Login com Google (#1324): Auth:Google:ClientId; desligado sem ele.
+                builder.Services.Configure<EasyStock.Infra.Integrations.Auth.GoogleAuthOptions>(
+                    builder.Configuration.GetSection(EasyStock.Infra.Integrations.Auth.GoogleAuthOptions.Secao));
+                builder.Services.AddSingleton<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator,
+                    EasyStock.Infra.Integrations.Auth.GoogleIdTokenValidator>();
                 // Key ring compartilhado com o Worker via Postgres (#1035). O certificado A1
                 // cifrado aqui e decifrado la na emissao/reprocessamento fiscal — com o
                 // registro default cada processo tinha o seu key ring e o Unprotect cruzado

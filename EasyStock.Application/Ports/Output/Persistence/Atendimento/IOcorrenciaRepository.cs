@@ -14,6 +14,10 @@ public interface IOcorrenciaRepository
     /// <summary>Rastreada; null quando não é da empresa.</summary>
     Task<Ocorrencia?> ObterAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
+    Task<Ocorrencia?> ObterTravadaAsync(Guid empresaId, Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<Ocorrencia>> ListarDoPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
+
     /// <summary>Mais recentes primeiro.</summary>
     Task<IReadOnlyList<Ocorrencia>> ListarAsync(Guid empresaId, StatusOcorrencia? status, int limite, CancellationToken ct = default);
 }

@@ -1,4 +1,4 @@
-import { precisaDeVoce } from './automatico'
+import { precisaDeVoce, respostaAtrasada } from './automatico'
 import { inicioDoPedidoAtivo } from './entrega'
 
 export const ehLead = (conversa) => conversa.conta === 'lead'
@@ -15,15 +15,16 @@ const ROTULO_DO_FORMATO = {
 // dona, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
 // string só porque só o prefixo é 600 (seção 1); quem monta o texto plano
 // (título, aria-label) faz `prefixo + corpo`.
+//
+// #1474 (R11): nota de sistema ("escalado para a dona", "retomado pelo usuário") é evento da
+// conversa, não fala. A prévia mostra a última mensagem do cliente ou da loja.
 export function previaDaConversa(conversa) {
-  const ultima = conversa.mensagens.at(-1)
+  const ultima = conversa.mensagens.findLast((m) => m.dir !== 'sistema')
   // Modo API: conversa encerrada não carrega mensagens na inbox; o resumo traz o texto (#1287).
   if (!ultima) return { prefixo: '', corpo: conversa.ultimaMensagemTexto || 'Sem mensagens' }
-  const prefixo = ultima.dir === 'sistema'
-    ? 'Sistema: '
-    : ultima.dir === 'out'
-      ? (ultima.automatica ? 'Automático: ' : 'Você: ')
-      : ''
+  const prefixo = ultima.dir === 'out'
+    ? (ultima.automatica ? 'Automático: ' : 'Você: ')
+    : ''
   return { prefixo, corpo: ROTULO_DO_FORMATO[ultima.formato] ?? ultima.texto }
 }
 
@@ -62,6 +63,7 @@ export const combinaBusca = (conversa, busca) => {
   const termo = (busca ?? '').trim().toLowerCase()
   if (!termo) return true
   return conversa.nome.toLowerCase().includes(termo)
+    || conversa.numeroComanda != null && ('comanda ' + conversa.numeroComanda).includes(termo)
     || (conversa.cliente?.telefone ?? '').includes(termo)
     || (conversa.cliente?.tags ?? []).some((tag) => tag.toLowerCase().includes(termo))
     || conversa.mensagens.some((m) => (m.texto ?? '').toLowerCase().includes(termo))
@@ -84,52 +86,76 @@ export function tagCorrespondida(conversa, busca) {
 export const combinaCanal = (conversa, canais) =>
   !canais || canais.length === 0 || canais.includes(conversa.canal)
 
+export function combinaResponsavel(conversa, filtro, usuario) {
+  if (filtro === 'sem-dono') return !conversa.assumidaPorUsuarioId && !conversa.responsavel
+  if (filtro !== 'minhas') return true
+  if (conversa.situacaoApi) return Boolean(usuario?.id && conversa.assumidaPorUsuarioId === usuario.id)
+  return Boolean(usuario?.nome && conversa.responsavel === usuario.nome)
+}
+
 const foraDoTopo = (conversa) => estaBloqueada(conversa) || conversa.estado === 'Encerrado'
 
 // Lista principal do Balcão: nunca traz bloqueado nem encerrado (grupo próprio
 // no fim de "Todas"), respeita canal e busca sempre, e a aba "Precisa de você"
 // some com quem o automático ainda vai responder sozinho.
-export function conversasDoBalcao(conversas, filtros, agora, automaticoPausado = {}, aberta = true, janelas = []) {
+export function conversasDoBalcao(
+  conversas, filtros, agora, automaticoPausado = {}, aberta = true, janelas = [], expediente = null, usuario = null,
+) {
   const base = conversas.filter((c) =>
-    !foraDoTopo(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+    !foraDoTopo(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca)
+    && combinaResponsavel(c, filtros.responsavel, usuario))
   if (filtros.aba !== 'precisa') return base
-  return base.filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas))
+  return base.filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, expediente))
 }
 
 // Os dois grupos recolhidos do fim de "Todas" (seção 1): mesma busca e mesmo
 // canal da lista de cima, sem a aba, porque nenhum dos dois existe em
 // "Precisa de você".
-export const conversasEncerradasDoBalcao = (conversas, filtros) =>
+export const conversasEncerradasDoBalcao = (conversas, filtros, usuario = null) =>
   conversas.filter((c) =>
     !estaBloqueada(c) && c.estado === 'Encerrado'
-    && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+    && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca) && combinaResponsavel(c, filtros.responsavel, usuario))
 
-export const conversasBloqueadasDoBalcao = (conversas, filtros) =>
+export const conversasBloqueadasDoBalcao = (conversas, filtros, usuario = null) =>
   conversas.filter((c) =>
-    estaBloqueada(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+    estaBloqueada(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca) && combinaResponsavel(c, filtros.responsavel, usuario))
 
 // Contador por canal do topo do Balcão (issue #2). Conta o que está aberto na
 // lista de cima (nem encerrada nem bloqueada) e, dentro disso, quantas
 // precisam de você. Ignora busca e canal ligado de propósito: ligar um canal
 // ou digitar na busca não pode mudar o número dos outros canais.
-export function contarPorCanal(conversas, canais, agora, automaticoPausado = {}, aberta = true, janelas = []) {
+export function contarPorCanal(conversas, canais, agora, automaticoPausado = {}, aberta = true, janelas = [], expediente = null) {
   return (canais ?? []).map((canal) => {
     const abertas = conversas.filter((c) => c.canal === canal.nome && !foraDoTopo(c))
     return {
       nome: canal.nome,
       abertas: abertas.length,
       precisam: abertas
-        .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas)).length,
+        .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, expediente)).length,
     }
   })
 }
 
 // Três ordens (seção 1), um botão só. `janelas` só importa para "entrega": sem
 // pedido ativo ou sem janela escolhida, a conversa vai para o fim dessa ordem.
+//
+// #1427: na aba "Precisa de você" o SLA de resposta estourado vai para o topo
+// em qualquer das três ordens (a ordem escolhida vale dentro de cada grupo);
+// em "Urgência" ele já é o primeiro degrau de prioridade em qualquer aba.
 export function ordenarBalcao(conversas, agora, {
-  ordenacao = 'urgencia', automaticoPausado = {}, janelas = [], aberta = true,
+  ordenacao = 'urgencia', automaticoPausado = {}, janelas = [], aberta = true, expediente = null, aba = null,
 } = {}) {
-  const lista = [...conversas]
+  // Uma conta por conversa, não uma por comparação do sort: com expediente, o
+  // SLA anda pelo horário da loja.
+  const atrasadas = new Set(conversas
+    .filter((c) => respostaAtrasada(c, agora, automaticoPausado[c.id] ?? false, expediente)).map((c) => c.id))
+  const atrasada = (c) => atrasadas.has(c.id)
+  const ordenada = ordenarSemSla([...conversas], agora, { ordenacao, automaticoPausado, janelas, aberta, expediente, atrasada })
+  if (aba !== 'precisa' || ordenacao === 'urgencia') return ordenada
+  return [...ordenada.filter(atrasada), ...ordenada.filter((c) => !atrasada(c))]
+}
+
+function ordenarSemSla(lista, agora, { ordenacao, automaticoPausado, janelas, aberta, expediente, atrasada }) {
   if (ordenacao === 'recentes') {
     return lista.sort((a, b) => new Date(b.ultimaEm).getTime() - new Date(a.ultimaEm).getTime())
   }
@@ -141,11 +167,13 @@ export function ordenarBalcao(conversas, agora, {
       return new Date(a.ultimaEm).getTime() - new Date(b.ultimaEm).getTime()
     })
   }
-  // Padrão "Urgência": quem precisa dela sobe primeiro, e dentro de cada
-  // grupo quem espera há mais tempo sobe.
+  // Padrão "Urgência": SLA de resposta estourado no topo (#1427), depois quem
+  // precisa dela, e dentro de cada grupo quem espera há mais tempo sobe.
+  const prioridades = new Map(lista.map((c) => [c.id, atrasada(c) ? 2
+    : precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, expediente) ? 1 : 0]))
   return lista.sort((a, b) => {
-    const prioridadeA = precisaDeVoce(a, agora, automaticoPausado[a.id] ?? false, aberta, janelas) ? 1 : 0
-    const prioridadeB = precisaDeVoce(b, agora, automaticoPausado[b.id] ?? false, aberta, janelas) ? 1 : 0
+    const prioridadeA = prioridades.get(a.id)
+    const prioridadeB = prioridades.get(b.id)
     if (prioridadeA !== prioridadeB) return prioridadeB - prioridadeA
     return new Date(a.ultimaEm).getTime() - new Date(b.ultimaEm).getTime()
   })
@@ -250,6 +278,10 @@ export function fronteirasDoFio(atendimentos) {
     .filter((a) => a.ateIndice != null)
     .map((a) => ({ numero: a.numero, aposIndice: a.ateIndice }))
 }
+
+// #1761 (L15): canal sem conversa aberta não ganha chip no Balcão ("Instagram 0"). Fica o que
+// está ligado como filtro, para dar como desligar.
+export const mostraChipDoCanal = (contagem, ligado = false) => ligado || (contagem?.abertas ?? 0) > 0
 
 export function bloqueioDeSemente(conversa) {
   if (conversa.bloqueio) {

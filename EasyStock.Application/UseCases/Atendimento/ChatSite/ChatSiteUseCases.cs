@@ -3,6 +3,7 @@ using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -12,11 +13,17 @@ namespace EasyStock.Application.UseCases.Atendimento.ChatSite;
 
 public sealed record SessaoChatSiteAberta(Guid SessaoId, string Token, DateTime ExpiraEm);
 
-/// <summary>Mensagem como o visitante vê: a dele ou a da loja. Notas internas não aparecem.</summary>
-public sealed record MensagemChatSiteResult(Guid Id, bool DoVisitante, string? Texto, DateTime EnviadaEm)
+/// <summary>
+/// Mensagem como o visitante vê: a dele ou a da loja. Notas internas não aparecem. <c>Tipo</c>
+/// (<c>texto</c>, <c>imagem</c>...) e <c>TemMidia</c> (#1448): com mídia, o widget busca o arquivo em
+/// <c>GET mensagens/{id}/midia</c> com o mesmo <c>X-Chat-Token</c>; foto pode vir sem texto.
+/// </summary>
+public sealed record MensagemChatSiteResult(
+    Guid Id, bool DoVisitante, string? Texto, DateTime EnviadaEm, string Tipo = "texto", bool TemMidia = false)
 {
     internal static MensagemChatSiteResult De(Mensagem m) =>
-        new(m.Id, m.Direcao == DirecaoMensagem.Entrada, m.Texto, m.EnviadaEm);
+        new(m.Id, m.Direcao == DirecaoMensagem.Entrada, m.Texto, m.EnviadaEm,
+            m.TipoConteudo.ToString().ToLowerInvariant(), m.MidiaChave is not null);
 }
 
 /// <summary>Loja inexistente, inativa ou sem o chat ligado: 404, sem dizer qual dos três.</summary>
@@ -62,7 +69,7 @@ public sealed class AcessoChatSite(
             throw new SessaoChatSiteInvalidaException();
 
         var sessao = await sessaoRepository.ObterPorTokenHashAsync(loja.EmpresaId, HashDoToken(token.Trim()), ct);
-        if (sessao is null || sessao.StorefrontId != loja.Id || !sessao.EstaValida(agora))
+        if (sessao is null || sessao.EmpresaId != loja.EmpresaId || sessao.StorefrontId != loja.Id || !sessao.EstaValida(agora))
             throw new SessaoChatSiteInvalidaException();
         return sessao;
     }
@@ -98,9 +105,11 @@ public sealed class EnviarMensagemVisitanteUseCase(
     IConversaRepository conversaRepository,
     IOperacaoEventPublisher eventPublisher,
     IUnitOfWork unitOfWork,
-    ILogger<EnviarMensagemVisitanteUseCase> logger)
+    ILogger<EnviarMensagemVisitanteUseCase> logger,
+    EasyStock.Application.Services.Atendimento.ConversaChatSiteService conversaChat)
 {
     public const int TextoTamanhoMaximo = 1000;
+    public const string PrefixoConfirmacaoRecebimento = "chatsite:recepcao:";
 
     public async Task<MensagemChatSiteResult> ExecuteAsync(string slug, string? token, string? texto, CancellationToken ct = default)
     {
@@ -114,16 +123,31 @@ public sealed class EnviarMensagemVisitanteUseCase(
         var sessao = await acesso.ResolverSessaoAsync(slug, token, agora, ct);
         sessao.RegistrarUso(agora);
 
-        var conversa = await ConversaDaSessaoAsync(sessao, agora, ct);
-        var mensagem = Mensagem.Entrada(sessao.EmpresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, limpo);
-        conversa.RegistrarEntrada(agora);
-        await conversaRepository.AddMensagemAsync(mensagem, ct);
-        await unitOfWork.CommitAsync();
+        // A trava de contato do serviço dura até entrada e confirmação estarem persistidas.
+        var mensagem = await unitOfWork.ExecuteInTransactionSemRetryAsync(async tokenCt =>
+        {
+            var conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
+            // #1797: a trava do contato não exclui o console. A linha travada e relida não grava não lidas velhas por cima
+            // do marcar-lida; encerrada enquanto esperava, a mensagem abre outra conversa (nova, ninguém mais a vê).
+            conversa = await conversaRepository.ObterPorIdComLockAsync(sessao.EmpresaId, conversa.Id, tokenCt)
+                ?? throw new ConversaNaoEncontradaException(conversa.Id);
+            if (!conversa.EstaAberta) conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
+            var entrada = Mensagem.Entrada(sessao.EmpresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, limpo);
+            conversa.RegistrarEntrada(agora);
+            await conversaRepository.AddMensagemAsync(entrada, tokenCt);
+            var confirmacaoId = PrefixoConfirmacaoRecebimento + conversa.Id.ToString("N");
+            if (await conversaRepository.ObterMensagemPorExternoIdAsync(sessao.EmpresaId, confirmacaoId, tokenCt) is null)
+                await conversaRepository.AddMensagemAsync(Mensagem.Saida(sessao.EmpresaId, conversa.Id,
+                    AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+                    "Recebemos sua mensagem. A equipe da loja responde por aqui.", confirmacaoId), tokenCt);
+            await unitOfWork.CommitAsync();
+            return entrada;
+        }, ct);
 
         try
         {
             await eventPublisher.PublicarAsync("conversa.mensagem_recebida", sessao.EmpresaId,
-                new { conversaId = conversa.Id, mensagemId = mensagem.Id }, ct);
+                new { conversaId = mensagem.ConversaId, mensagemId = mensagem.Id }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -133,23 +157,7 @@ public sealed class EnviarMensagemVisitanteUseCase(
         return MensagemChatSiteResult.De(mensagem);
     }
 
-    private async Task<Conversa> ConversaDaSessaoAsync(SessaoChatSite sessao, DateTime agora, CancellationToken ct)
-    {
-        if (sessao.ConversaId is { } id
-            && await conversaRepository.ObterPorIdAsync(sessao.EmpresaId, id, ct) is { EstaAberta: true } existente)
-            return existente;
 
-        var conversa = await conversaRepository.ObterAbertaPorContatoAsync(sessao.EmpresaId, CanalConversa.ChatSite, sessao.ContatoIdExterno, ct);
-        if (conversa is null)
-        {
-            conversa = Conversa.Abrir(sessao.EmpresaId, sessao.ContatoIdExterno, agora, contatoNome: "Visitante do site", canal: CanalConversa.ChatSite);
-            conversa.Assumir(agora); // fila humana, sem responsável
-            await conversaRepository.AddAsync(conversa, ct);
-        }
-
-        sessao.VincularConversa(conversa.Id);
-        return conversa;
-    }
 }
 
 /// <summary>
@@ -175,7 +183,7 @@ public sealed class ListarMensagensChatSiteUseCase(
     public async Task<IReadOnlyList<MensagemChatSiteResult>> ListarParaStreamAsync(
         Guid empresaId, string tokenHash, DateTime? depoisDe, CancellationToken ct = default)
     {
-        var sessao = await sessaoRepository.ObterPorTokenHashAsync(empresaId, tokenHash, ct);
+        var sessao = await sessaoRepository.ObterSnapshotPorTokenHashAsync(empresaId, tokenHash, ct);
         if (sessao is null || !sessao.EstaValida(DateTime.UtcNow))
             throw new SessaoChatSiteInvalidaException();
         return await ListarAsync(sessao, depoisDe, ct);

@@ -1,9 +1,12 @@
+using EasyStock.Application.Services.Auth;
+
 namespace EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 
 public sealed class AtualizarUsuarioAtualUseCase(
     IUsuarioRepository usuarioRepository,
     ICurrentUserAccessor currentUserAccessor,
     IUnitOfWork unitOfWork,
+    TrocaDeContatoService trocaDeContato,
     ILogger<AtualizarUsuarioAtualUseCase> logger) : IUseCase<AtualizarUsuarioAtualCommand, AtualizarUsuarioAtualResult>
 {
     public async Task<AtualizarUsuarioAtualResult> ExecuteAsync(AtualizarUsuarioAtualCommand command)
@@ -22,21 +25,18 @@ public sealed class AtualizarUsuarioAtualUseCase(
             throw new RegraDeDominioVioladaException("Usuario nao encontrado.");
         }
 
+        // N4: trocar o e-mail é o caminho mais curto para tomar a conta de alguém. Exige a senha atual (a errada é 403 e
+        // conta como falha de login) e vira duas etapas: o Email só muda no clique do link enviado ao endereço novo.
         if (!string.IsNullOrWhiteSpace(command.Email) &&
-            !string.Equals(usuario.Email, command.Email, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(usuario.Email, command.Email.Trim(), StringComparison.OrdinalIgnoreCase))
         {
-            var existente = await usuarioRepository.GetByEmailAsync(command.Email);
-            if (existente != null && existente.Id != usuario.Id)
-            {
-                throw new RegraDeDominioVioladaException("Email ja cadastrado.");
-            }
+            await trocaDeContato.ExigirSenhaAtualAsync(usuario, command.SenhaAtual);
+            var empresaId = await trocaDeContato.ResolverEmpresaDoEventoAsync();
+            await trocaDeContato.SolicitarTrocaDeEmailAsync(usuario, command.Email, command.BaseUrl, empresaId);
         }
 
         if (!string.IsNullOrWhiteSpace(command.Nome))
             usuario.Nome = command.Nome;
-
-        if (!string.IsNullOrWhiteSpace(command.Email))
-            usuario.Email = command.Email;
 
         if (!string.IsNullOrWhiteSpace(command.TemaPreferido))
             usuario.TemaPreferido = string.Equals(command.TemaPreferido, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
@@ -47,6 +47,7 @@ public sealed class AtualizarUsuarioAtualUseCase(
         await unitOfWork.CommitAsync();
 
         logger.LogInformation("Usuario {UsuarioId} atualizado", usuario.Id);
-        return new AtualizarUsuarioAtualResult(usuario.Id, usuario.Nome, usuario.Email, usuario.TemaPreferido);
+        return new AtualizarUsuarioAtualResult(
+            usuario.Id, usuario.Nome, usuario.Email, usuario.TemaPreferido, usuario.EmailPendente);
     }
 }

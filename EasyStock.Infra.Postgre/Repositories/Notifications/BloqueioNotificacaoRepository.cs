@@ -14,7 +14,10 @@ public sealed class BloqueioNotificacaoRepository(EasyStockDbContext db) : IBloq
         Guid? empresaId, CanalNotificacao? canal = null, CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
-        var q = db.NotifBloqueios.AsNoTracking()
+        // N1: o filtro do EF esconderia o kill switch global de quem está no escopo de uma empresa (e, no Worker, está
+        // desligado). O predicado abaixo já delimita global + empresa; a policy catalogo_global_leitura deixa o
+        // tenant ler o global no banco.
+        var q = db.NotifBloqueios.IgnoreQueryFilters().AsNoTracking()
             .Where(b => b.RemovidoEm == null && (b.ExpiraEm == null || b.ExpiraEm > agora));
 
         // Inclui bloqueios globais (EmpresaId=null) + específicos da empresa

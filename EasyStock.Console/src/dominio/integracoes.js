@@ -13,8 +13,9 @@
 export const PROVEDORES_LOGISTICA = [
   { chave: 'proprio', rotulo: 'Entregador próprio', exigeCredencial: false, icone: 'moto' },
   { chave: 'lalamove', rotulo: 'Lalamove', exigeCredencial: true, icone: 'moto' },
-  { chave: '99entrega', rotulo: '99 Entregas', exigeCredencial: true, icone: 'moto' },
 ]
+// I9.2 (#1691): a 99 saiu daqui. Não há API confirmada, então nada de cotação nem corrida inventada;
+// a corrida pedida pelo app da 99 é anotada à mão na viagem, com o custo (`dominio/entregasApi.js`).
 
 export const provedorPorChave = (chave) => PROVEDORES_LOGISTICA.find((p) => p.chave === chave) ?? null
 
@@ -28,7 +29,6 @@ export function configuracaoPadraoIntegracoes() {
     provedores: {
       proprio: { ativo: true, credencial: null },
       lalamove: { ativo: false, credencial: null },
-      '99entrega': { ativo: false, credencial: null },
     },
   }
 }
@@ -94,5 +94,5 @@ export function provedoresParaDespacho(config) {
     .map((p) => ({ chave: p.chave, rotulo: p.rotulo, exigeCredencial: p.exigeCredencial }))
 }
 
-export const AVISO_SIMULADO = 'Simulado: nenhuma chamada sai para a internet. Lalamove e 99 Entregas ainda não '
-  + 'estão ligados de verdade ao sistema.'
+export const AVISO_SIMULADO = 'Simulado: nenhuma chamada sai para a internet. A Lalamove ainda não '
+  + 'está ligada de verdade ao sistema.'

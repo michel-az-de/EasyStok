@@ -129,14 +129,16 @@ public class RecusarPedidoStorefrontUseCaseTests
     private static RecusarPedidoStorefrontInput InputValido(
         Guid? empresaId = null,
         MotivoRecusa motivo = MotivoRecusa.EstoqueInsuficiente,
-        string? mensagem = "Item esgotou. Posso te oferecer outra opção?") =>
+        string? mensagem = "Item esgotou. Posso te oferecer outra opção?",
+        NivelAcesso nivel = NivelAcesso.Operador) =>
         new(
             PedidoId: PedidoId,
             EmpresaId: empresaId ?? EmpresaId,
             UsuarioId: UsuarioId,
             Motivo: motivo,
             MensagemCliente: mensagem,
-            UsuarioNome: UsuarioNome);
+            UsuarioNome: UsuarioNome,
+            NivelSolicitante: nivel);
 
     // ── Happy path ─────────────────────────────────────────────────────────
 
@@ -172,7 +174,7 @@ public class RecusarPedidoStorefrontUseCaseTests
         var sut = BuildSut(pedido);
         var cobranca = sut.AdicionarCobrancaPaga("pay-1");
 
-        var result = await sut.UseCase.ExecuteAsync(InputValido());
+        var result = await sut.UseCase.ExecuteAsync(InputValido(nivel: NivelAcesso.Gerente));
 
         await sut.Estorno.Received(1).EstornarAsync("pay-1", 120m, $"recusa-{PedidoId}-pay-1", Arg.Any<CancellationToken>());
         cobranca.Status.Should().Be(StatusCobrancaPedido.Estornada);
@@ -202,7 +204,7 @@ public class RecusarPedidoStorefrontUseCaseTests
         sut.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(EstornoPedidoResult.Falha("estorno_recusado"));
 
-        var act = async () => await sut.UseCase.ExecuteAsync(InputValido());
+        var act = async () => await sut.UseCase.ExecuteAsync(InputValido(nivel: NivelAcesso.Gerente));
 
         await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>();
         pedido.Status.Should().Be(StatusPedidoMapper.AguardandoAprovacaoBaba, "sem estorno a dona decide de novo");
@@ -254,7 +256,7 @@ public class RecusarPedidoStorefrontUseCaseTests
         var conversaId = Guid.NewGuid();
         sut.AdicionarCobrancaPaga("pay-1", conversaId: conversaId);
 
-        await sut.UseCase.ExecuteAsync(InputValido());
+        await sut.UseCase.ExecuteAsync(InputValido(nivel: NivelAcesso.Gerente));
 
         await sut.ConversaRepo.Received(1).ObterPorIdAsync(EmpresaId, conversaId, Arg.Any<CancellationToken>());
     }
@@ -300,6 +302,25 @@ public class RecusarPedidoStorefrontUseCaseTests
         await sut.PedidoRepo.Received(1).AddEventoAsync(
             Arg.Is<PedidoEvento>(e => e.Detalhes == "estoque_insuficiente"),
             Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Operador_nao_recusa_com_pagamento_online_ou_manual_parcial(bool online)
+    {
+        var pedido = PedidoAguardandoAprovacaoBaba();
+        var sut = BuildSut(pedido);
+        if (online) sut.AdicionarCobrancaPaga("pay-parcial", 10m);
+        else pedido.Pagamentos.Add(new PedidoPagamento { Valor = 10m, Metodo = "dinheiro" });
+
+        await FluentActions.Invoking(() => sut.UseCase.ExecuteAsync(InputValido()))
+            .Should().ThrowAsync<UnauthorizedAccessException>();
+
+        pedido.Status.Should().Be(StatusPedidoMapper.AguardandoAprovacaoBaba);
+        await sut.Estorno.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
+        await sut.PedidoRepo.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
+        await sut.Publicador.DidNotReceiveWithAnyArgs().PublicarAsync(default, default!, default!, default, default(object)!, default, default, default, default);
     }
 
     // ── Falhas ──────────────────────────────────────────────────────────────

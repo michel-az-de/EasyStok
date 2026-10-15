@@ -29,10 +29,13 @@ export const registroDaCobranca = (cobranca) => ({
 // (`receitaDoTrecho`) lê o bruto por este caminho e subtrai o estorno como
 // linha própria (`bruto - estorno = líquido`, decisão 36). Tirar a estornada
 // daqui faria o líquido subtrair duas vezes o mesmo valor.
-export const pagamentosDoPedido = (pedido) => [
+export const pagamentosDoPedido = (pedido) => pedido?.pagamentosApi ?? [
   ...(pedido?.pagamentos ?? []),
   ...(pedido?.cobranca?.pagaEm ? [registroDaCobranca(pedido.cobranca)] : []),
 ]
+
+// O pagamento que "Desfazer o último" mostra e manda: a tela e a chamada leem daqui.
+export const ultimoPagamentoApi = (pedido) => pedido?.pagamentosApi?.toSorted((a, b) => b.em - a.em)[0] ?? null
 
 // Dinheiro que entrou no pedido.
 export const totalPago = (pedido) =>
@@ -40,7 +43,7 @@ export const totalPago = (pedido) =>
 
 // Parte da comanda já quitada por cobrança paga.
 const totalCoberto = (pedido) =>
-  pagamentosDoPedido(pedido).reduce((soma, p) => soma + p.coberto, 0)
+  pedido?.alocadoApi ?? pagamentosDoPedido(pedido).reduce((soma, p) => soma + p.coberto, 0)
 
 // Falta pagar do PEDIDO inteiro (comanda menos o que as cobranças pagas
 // quitaram), diferente do `faltaPagar` de dominio/cobranca.js, que é só a
@@ -54,7 +57,7 @@ const totalCoberto = (pedido) =>
 // um valor que o cliente não deve (achado ao validar na tela, registro 107).
 export function faltaPagar(pedido, cardapio) {
   if (!pedido) return 0
-  const totalLiquido = totalDoPedido(pedido, cardapio) - (pedido.valorDesconto ?? 0)
+  const totalLiquido = (pedido.totalApi ?? totalDoPedido(pedido, cardapio)) - (pedido.valorDesconto ?? 0)
   return Math.max(totalLiquido - totalCoberto(pedido), 0)
 }
 
@@ -62,7 +65,7 @@ export function faltaPagar(pedido, cardapio) {
 // cobrança ativa já foi paga e a comanda cresceu além do que foi quitado.
 // Vale para o segundo, terceiro acréscimo: o que já caiu está no arquivo.
 export function diferencaAposPagamento(pedido, cardapio) {
-  if (!pedido?.cobranca?.pagaEm) return 0
+  if (!pedido?.cobranca?.pagaEm || pedido.estado === 'cancelado') return 0
   return faltaPagar(pedido, cardapio)
 }
 

@@ -1,5 +1,8 @@
 using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Configuration;
+using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Notifications.Collectors;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,6 +65,22 @@ public class BackgroundJobRegistrationTests
             .Should().Contain(typeof(MensagensProgramadasBackgroundService));
         desligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
             .Should().NotContain(typeof(MensagensProgramadasBackgroundService));
+    }
+
+    [Fact]
+    public void AddEasyStockBackgroundJobs_RegistraReenvioDeMensagens_EDesligaPorFlag()
+    {
+        var ligado = new ServiceCollection().AddLogging();
+        ligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder().Build());
+        var desligado = new ServiceCollection().AddLogging();
+        desligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{BackgroundJobOptions.SectionName}:EnableReenvioMensagens"] = "false" })
+            .Build());
+
+        ligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().Contain(typeof(ReenvioMensagensBackgroundService));
+        desligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().NotContain(typeof(ReenvioMensagensBackgroundService));
     }
 
     [Fact]
@@ -128,4 +147,24 @@ public class BackgroundJobRegistrationTests
             descriptor.ServiceType == typeof(IPedidoFornecedorRecebimentoProcessor) &&
             descriptor.ImplementationType == typeof(NoOpPedidoFornecedorRecebimentoProcessor));
     }
+
+    [Fact]
+    public void ColetorDeProdutosVencendoNaoNasceRegistrado()
+    {
+        // N12: o coletor tem três defeitos conhecidos (data UTC, CorrelationId de 65 caracteres e payload que não casa com o
+        // template). Sem a flag ele falharia a cada 5 min e poluiria o log; só liga quem aceitar os defeitos.
+        var desligado = new ServiceCollection();
+        desligado.AddEasyStockNotificationsRepositories(new ConfigurationBuilder().Build());
+        var ligado = new ServiceCollection();
+        ligado.AddEasyStockNotificationsRepositories(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Notifications:Coletores:ProdutosVencendo:Habilitado"] = "true" })
+            .Build());
+
+        ColetoresRegistrados(desligado).Should().NotContain(typeof(ColetorProdutosVencendo));
+        ColetoresRegistrados(desligado).Should().Contain(typeof(ColetorRotinasAgendadas));
+        ColetoresRegistrados(ligado).Should().Contain(typeof(ColetorProdutosVencendo));
+    }
+
+    private static IEnumerable<Type?> ColetoresRegistrados(IServiceCollection services) =>
+        services.Where(d => d.ServiceType == typeof(IColetorEventoNotificacao)).Select(d => d.ImplementationType);
 }

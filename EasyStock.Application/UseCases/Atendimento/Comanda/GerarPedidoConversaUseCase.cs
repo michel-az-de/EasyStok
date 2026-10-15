@@ -1,10 +1,12 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Exceptions.Storefront;
-using EasyStock.Domain.Sales;
+
+using EasyStock.Domain.Entities.Pagamentos;
 
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
@@ -21,7 +23,7 @@ public sealed record GerarPedidoConversaInput(
     string? Observacoes = null,
     string? UsuarioNome = null);
 
-/// <param name="Cobranca">Nula quando o Mercado Pago não respondeu: o link sai pela reemissão (job ou operadora).</param>
+/// <param name="Cobranca">Cobrança da forma escolhida. Mercado Pago fora: <see cref="MercadoPagoIndisponivelException"/> com o pedido já desfeito (#1301).</param>
 /// <param name="EnviadoAoCliente">O resumo saiu pelo canal da conversa (falso fora da janela ou com o canal fora).</param>
 public sealed record PedidoConversaGeradoResult(
     Guid PedidoId,
@@ -37,19 +39,17 @@ public sealed record PedidoConversaGeradoResult(
 ///
 /// <para>
 /// Um pedido por vez: com pedido em andamento ainda não finalizado na conversa, recusa (clique duplo
-/// não cria dois pedidos nem ocupa duas vagas).
+/// não cria dois pedidos nem ocupa duas vagas). A regra vive no núcleo, com a conversa travada (#1238).
 /// </para>
 /// </summary>
 public sealed class GerarPedidoConversaUseCase(
     IConversaRepository conversaRepository,
     IClienteRepository clienteRepository,
-    IPedidoRepository pedidoRepository,
     CriarPedidoAtendimentoUseCase criarPedido,
     GerarCobrancaPedidoUseCase gerarCobranca,
     TrocarFormaPagamentoPedidoUseCase trocarForma,
     AvisoCobrancaConversa aviso,
-    TimeProvider relogio,
-    ILogger<GerarPedidoConversaUseCase> logger)
+    TimeProvider relogio)
 {
     public const string CabecalhoResumo = "Resumo do seu pedido:";
 
@@ -69,7 +69,6 @@ public sealed class GerarPedidoConversaUseCase(
             ?? throw new ConversaNaoEncontradaException(input.ConversaId);
         if (!conversa.EstaAberta)
             throw new RegraDeDominioVioladaException("A conversa está encerrada.");
-        await GarantirSemPedidoEmAndamentoAsync(input.EmpresaId, conversa.PedidoEmAndamentoId);
 
         if (conversa.ClienteId is not { } clienteId)
             throw new RegraDeDominioVioladaException("Cadastre o cliente desta conversa antes de gerar o pedido.");
@@ -89,36 +88,24 @@ public sealed class GerarPedidoConversaUseCase(
         return new PedidoConversaGeradoResult(reservado.Pedido.Id, reservado.Total, forma, cobranca, enviado);
     }
 
-    private async Task GarantirSemPedidoEmAndamentoAsync(Guid empresaId, Guid? pedidoEmAndamentoId)
-    {
-        if (pedidoEmAndamentoId is not { } pedidoId) return;
-        var anterior = await pedidoRepository.GetByIdWithDetailsAsync(empresaId, pedidoId);
-        if (anterior is not null && !PedidoStateMachine.EstaFinalizado(anterior.StatusEnum))
-            throw new RegraDeDominioVioladaException("Esta conversa já tem um pedido em andamento.");
-    }
-
+    /// <summary>Mercado Pago fora propaga: a cobrança já desfez o pedido e a vaga, e a operadora tenta de novo (#1301).</summary>
     private async Task<CobrancaPedidoResult?> CobrarAsync(
         PedidoReservado reservado, Guid conversaId, string forma, string? usuarioNome, CancellationToken ct)
     {
-        try
-        {
-            if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
-                return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
-                    reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: usuarioNome ?? "console"), ct)).Cobranca;
-            return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
-        }
-        catch (MercadoPagoIndisponivelException ex)
-        {
-            // Pedido criado e vaga reservada; o link sai pela reemissão (operadora ou job), como na criar_pedido.
-            logger.LogWarning(ex, "Console: pedido {PedidoId} criado sem link de pagamento.", reservado.Pedido.Id);
-            return null;
-        }
+        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
+            return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
+                reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: usuarioNome ?? "console"), ct)).Cobranca;
+        return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
     }
 
     private static string TextoAoCliente(PedidoReservado reservado, DateOnly dataEntrega, string forma, CobrancaPedidoResult? cobranca)
     {
         var resumo = ResumoPedidoConversa.Texto(reservado, dataEntrega, forma, CabecalhoResumo);
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega) return resumo;
+        if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega }
+            && PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
+            return ResumoPedidoConversa.Limitar($"{resumo}\n\nSinal a receber: {PlanoPagamentoEncomenda.Sinal(reservado.Total).ToString("C", Cultura.PtBr)} por Pix, dinheiro ou maquininha. Restante na entrega.");
+        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
+            && !PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm)) return resumo;
         var pagamento = cobranca?.LinkPagamento is { } link
             ? $"Pague por este link, válido por 30 minutos: {link}"
             : "O link de pagamento chega em instantes.";

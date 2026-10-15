@@ -2,10 +2,12 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -29,7 +31,8 @@ public sealed class AvisoStatusPedidoCliente(
     PoliticaEnvioCliente politicaEnvio,
     INotificadorService notificador,
     ITenantContextAccessor tenantContext,
-    ILogger<AvisoStatusPedidoCliente> logger)
+    ILogger<AvisoStatusPedidoCliente> logger, IConversaRepository? conversas = null,
+    EasyStock.Application.UseCases.Atendimento.Entregas.ConfiguracaoLogistica? logistica = null)
 {
     /// <summary>Previsão quando o pedido não tem vaga de entrega (ex.: balcão).</summary>
     public const string PrevisaoSemJanela = "a confirmar";
@@ -46,21 +49,29 @@ public sealed class AvisoStatusPedidoCliente(
     /// </param>
     public async Task<bool> EnfileirarAsync(
         TipoEventoNotificacao tipo, Guid empresaId, Guid pedidoId, string marco, CancellationToken ct,
-        DateTime? enviarApos = null, bool respeitaPreferenciaAvisos = false)
+        DateTime? enviarApos = null, bool respeitaPreferenciaAvisos = false, string? previsao = null,
+        string? mensagem = null)
     {
         // O dispatcher de integração roda sem claim JWT: sem o tenant, o filtro global e a RLS zeram a busca.
+        if (logistica is not null && logistica.EmpresaDemonstracaoId != Guid.Empty && empresaId == logistica.EmpresaDemonstracaoId)
+            return false;
         tenantContext.SetCurrentTenant(empresaId);
 
         var pedido = await pedidoRepository.GetByIdAsync(empresaId, pedidoId);
-        if (pedido is null)
+        if (pedido is null || pedido.EmpresaId != empresaId)
         {
             logger.LogWarning("Aviso {Tipo} sem pedido: pedidoId={PedidoId}", tipo, pedidoId);
             return false;
         }
 
+        if (tipo == TipoEventoNotificacao.PedidoPagoConfirmado && pedido.StatusEnum == StatusPedido.Cancelado)
+            return false;
+
         var cliente = pedido.ClienteId is { } clienteId
             ? await clienteRepository.GetByIdAsync(empresaId, clienteId)
             : null;
+
+        if (cliente is { Bloqueado: true } || cliente is not null && cliente.EmpresaId != empresaId) return false;
 
         if (respeitaPreferenciaAvisos && cliente is { AvisosStatusAtivos: false })
         {
@@ -83,15 +94,20 @@ public sealed class AvisoStatusPedidoCliente(
         }
 
         var nome = cliente?.Nome ?? pedido.ClienteNome;
+        var conversaId = conversas is null ? null : await conversas.ObterIdPorPedidoAsync(empresaId, pedidoId, ct);
+        var conversa = conversaId is { } cid ? await conversas!.ObterPorIdAsync(empresaId, cid, ct) : null;
         var payload = new Dictionary<string, string?>
         {
             ["pedidoId"] = pedido.Id.ToString(),
+            ["clienteId"] = pedido.ClienteId?.ToString(),
             ["telefone"] = telefone,
             ["nome"] = PrimeiroNome(nome),
-            ["numero"] = pedido.Id.ToString("N")[..8].ToUpperInvariant(),
-            ["previsao"] = await PrevisaoAsync(pedido.Id, ct),
+            ["numero"] = conversa is { NumeroComanda: > 0 } ? conversa.NumeroComanda.ToString(CultureInfo.InvariantCulture)
+                : pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+            ["previsao"] = previsao ?? await PrevisaoAsync(pedido.Id, ct),
             [NotificadorService.ChaveIdempotenciaPayload] = $"{pedido.Id:N}|{marco}",
         };
+        if (mensagem is not null) payload["mensagem"] = mensagem;
         if (enviarApos is { } instante)
             payload[NotificadorService.EnviarAposPayload] = DateTime.SpecifyKind(instante, DateTimeKind.Utc)
                 .ToString("O", CultureInfo.InvariantCulture);

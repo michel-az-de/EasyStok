@@ -1,5 +1,5 @@
 import { itensDetalhados, totalDoPedido } from './pedido'
-import { horaCurta, moeda } from './formato'
+import { dataIsoNoFuso, horaCurta, moeda } from './formato'
 import { faixaDepoisDeEntre } from './entrega'
 import { nomeDoMeio } from './cobranca'
 
@@ -27,11 +27,61 @@ export const pedidoPodeSerGerado = (pedido) =>
 // envia, ou a linha diz por que não (enviada, já pago, vazia, bloqueado).
 export const ROTULO_ENVIAR = 'Enviar ao cliente'
 
+// #1474 (R4): no modo API "Enviar ao cliente", "Gerar cobrança" do bloco e o da barra criavam
+// o mesmo pedido. Fica um botão só, o da barra fixa, e a comanda diz que vai junto.
+export const ROTULO_GERAR_E_ENVIAR = 'Gerar cobrança e enviar'
+export const LINHA_COMANDA_VAI_JUNTO = 'A comanda vai ao cliente junto com a cobrança.'
+// #1587: pedido já criado (`comandaTravada`). O console não troca item de pedido criado; a frase
+// diz só isso, sem prometer caminho que não existe.
+export const LINHA_COMANDA_TRAVADA = 'O pedido já está no EasyStok: os itens não mudam mais por aqui.'
+
+export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Date.now(), meio = pedido?.meio } = {}) {
+  if (!fonteApi || pedido?.pedidoId || pedido?.cobranca || pedido?.estado !== 'aguardando'
+    || !pedido.itens?.length || (meio && meio !== 'maquininha')) return null
+  const [janelaId, data] = String(pedido.janela ?? '').split('|')
+  if (!janelaId || !/^\d{4}-\d{2}-\d{2}$/.test(data) || !Number.isFinite(Date.parse(data + 'T12:00:00Z'))
+    || data <= dataIsoNoFuso(agora)) return null
+  return 'Encomenda para outro dia: sinal de 50% antes da produção. Restante na entrega.'
+}
+
+// #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que a dona resolve, para o
+// botão nascer desabilitado com o motivo à vista em vez de falhar depois do clique. Cadastro,
+// endereço e janela são exigências do EasyStok; na demonstração só a comanda vazia trava.
+// #1805: "Gerar cobrança e enviar" manda a comanda pela conversa. Com a janela de 24 h fechada
+// nada sai, então a trava vem primeiro e diz onde fica o que já foi anotado e a alternativa. Só a
+// janela trava aqui: bloqueio e canal sem regra têm o motivo próprio. `escrita` é o
+// `permissaoDeEscrita` da conversa (dominio/janela.js).
+export function motivoAntesDeCobrar({ pedido, clienteId, endereco }, { fonteApi = false, escrita = null } = {}) {
+  if (!pedido?.itens?.length) return 'A comanda está vazia.'
+  if (!fonteApi) return null
+  if (!pedido.pedidoId && escrita?.motivo?.acao === 'janela') {
+    const saida = escrita.ofereceModelo ? 'mande um modelo aprovado e espere a resposta' : 'espere o cliente escrever'
+    return `${escrita.motivo.titulo} A cobrança sai pela conversa: ${saida}, ou copie o Link de compra `
+      + 'e envie por outro meio. Até lá a comanda fica como rascunho neste atendimento.'
+  }
+  if (!clienteId) return 'Salve o cadastro do cliente (Contato e endereço).'
+  if (!endereco) return 'Falta o endereço de entrega (Contato e endereço).'
+  if (!pedido.janela) return 'Escolha a janela de entrega, logo abaixo da comanda.'
+  return null
+}
+
+// #1474 (R5): antes de o pedido existir o frete ainda não foi calculado (é da zona, no EasyStok).
+export const rotuloDoTotal = (pedido, { fonteApi = false } = {}) =>
+  (fonteApi && !pedido?.pedidoId ? 'Total dos itens (o frete entra ao gerar a cobrança)' : 'Total')
+
 export function situacaoDoEnvio(pedido, { bloqueado = false } = {}) {
+  // #1683: o EasyStok criou a cobrança mas o resumo não saiu (janela de 24 h, canal fora do ar).
+  if (pedido?.cobranca && pedido.resumoNaoEnviado) {
+    return {
+      chave: 'nao-enviada', pode: false,
+      texto: 'Cobrança criada, mas a mensagem não saiu. '
+        + (pedido.cobranca.link ? 'Abra Pagamento no resumo, copie o link e envie pela conversa.' : 'Avise o cliente pela conversa.'),
+    }
+  }
   if (pedido?.cobranca) {
     return {
       chave: 'enviada', pode: false,
-      texto: `Enviada ao cliente às ${horaCurta(pedido.cobranca.criadaEm)}. Para mudar, use a Cobrança abaixo.`,
+      texto: `Enviada ao cliente às ${horaCurta(pedido.cobranca.criadaEm)}. Para mudar a cobrança, abra Pagamento no resumo.`,
     }
   }
   if (pedido && pedido.estado !== 'aguardando') {

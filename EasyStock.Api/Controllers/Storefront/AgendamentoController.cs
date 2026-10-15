@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.Storefront.Agendamento;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
@@ -35,7 +36,7 @@ public sealed class AgendamentoController(
     [SwaggerOperation(
         Summary = "Listar janelas de entrega disponíveis",
         Description = "Retorna matriz (data × janela) com vagasRestantes e flag esgotado. " +
-                      "Período padrão: hoje..hoje+14d. Máximo: 60 dias. " +
+                      "Período padrão: hoje..hoje+14d. Consulta de até 60 dias, limitada a hoje+14d. " +
                       "CEP opcional filtra por zona coberta. Cache de 60s.")]
     [ProducesResponseType(typeof(IReadOnlyList<JanelaDisponivelDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -58,6 +59,11 @@ public sealed class AgendamentoController(
             return Ok(result);
         }
         catch (CepInvalidoException ex)
+        {
+            SetNoStore();
+            return DataBadRequest(ex.Message);
+        }
+        catch (UseCaseValidationException ex)
         {
             SetNoStore();
             return DataBadRequest(ex.Message);

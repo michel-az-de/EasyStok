@@ -1,21 +1,40 @@
+/* A sessão ocupa espaço no layout: avisos longos não cobrem as abas do celular. */
+@media screen {
+  :global(#root):has(.faixa) { display: flex; flex-direction: column; }
+  :global(#root):has(.faixa) > :global([data-conteudo-console]) { flex: 1; min-height: 0; height: auto; }
+}
+
 .faixa {
-  position: fixed;
-  inset: auto 0 0 0;
+  position: relative;
+  flex-shrink: 0;
   z-index: 50;
   display: flex;
   justify-content: space-between;
   gap: 12px;
   padding: 6px 16px;
-  font-size: var(--t-13);
+  font-size: var(--t-micro);
   color: var(--tinta-2);
   background: var(--elevado);
   border-top: 1px solid var(--linha);
 }
 
-.alerta {
-  color: var(--perigo);
-  background: var(--perigo-fundo);
+.aviso {
+  color: var(--tinta);
+  background: var(--alerta-pastel);
 }
+
+.falha {
+  color: var(--erro);
+  background: var(--erro-pastel);
+}
+
+.avisoModal {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2);
+  width: 100%; padding: var(--e-3); border-radius: var(--r-1);
+  background: var(--alerta-pastel); color: var(--tinta);
+  font-size: var(--t-apoio);
+}
+.avisoModal > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 .quem {
   display: flex;
@@ -27,7 +46,7 @@
 .sair {
   border: 0;
   background: none;
-  color: var(--ragu);
+  color: var(--marca-forte);
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
@@ -41,5 +60,18 @@
 }
 
 .vence {
-  color: var(--perigo);
+  color: var(--erro);
+}
+
+@media (max-width: 767px) {
+  .faixa, .quem { flex-wrap: wrap; gap: 4px 12px; }
+  .quem { white-space: normal; overflow-wrap: anywhere; }
+}
+
+@media screen and (max-width: 767px) {
+  /* A fila de impressão é irmã da moldura e também precisa ceder espaço às abas. */
+  :global(#root):has(.faixa) > :global(output[aria-live="polite"]) {
+    position: relative; inset: auto; flex-shrink: 0;
+    justify-content: space-between; border-radius: 0;
+  }
 }

@@ -34,6 +34,28 @@ public class CobrancaPedidoJobTests
         await f.ConversaRepo.Received().ObterPorIdAsync(f.EmpresaId, vencida.ConversaId!.Value, Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// #1719: a cobrança da comanda é complementar (saldo depois do cupom). Reemitida como cobrança comum, o
+    /// link novo saía pelo total e o cliente pagava de novo o que o cupom já tinha abatido.
+    /// </summary>
+    [Fact]
+    public async Task ComplementarVencidaReemitePeloSaldo()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        f.Creditos.TotaisDoPedidoAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns((0m, 10m));
+        var vencida = f.AdicionarOnline(tentativa: 1, conversaId: Guid.NewGuid(), valor: 15m);
+        vencida.MarcarComplementar();
+
+        var r = await f.ProcessarVencida().ExecuteAsync(Item(f, vencida.Id));
+
+        r.Should().Be(ResultadoExpiracaoCobranca.Reemitida);
+        var nova = f.Cobrancas.Should().ContainSingle(c => c.Status == StatusCobrancaPedido.Pendente).Subject;
+        nova.Valor.Should().Be(15m, "o cupom de R$ 10 já abateu o pedido de R$ 25");
+        nova.Complementar.Should().BeTrue();
+        nova.Tentativa.Should().Be(2);
+    }
+
     [Fact]
     public async Task SegundaExpiracaoCancela()
     {

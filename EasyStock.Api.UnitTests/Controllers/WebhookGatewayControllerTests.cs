@@ -90,7 +90,8 @@ public class WebhookGatewayControllerTests
         {
             ["MercadoPago:WebhookSecret"] = SegredoMp,
         }).Build();
-        var validator = new MercadoPagoSignatureValidator(config, NullLogger<MercadoPagoSignatureValidator>.Instance);
+        var validator = new MercadoPagoSignatureValidator(config, NullLogger<MercadoPagoSignatureValidator>.Instance,
+            Substitute.For<Microsoft.Extensions.Hosting.IHostEnvironment>());
         var controller = new WebhookGatewayController(
             new IGatewayWebhookProcessor[] { f.Processor() }, new IWebhookSignatureValidator[] { validator }, repo,
             NullLogger<WebhookGatewayController>.Instance);
@@ -165,5 +166,31 @@ public class WebhookGatewayControllerTests
 
         result.Should().BeOfType<OkResult>();
         await _repo.Received(1).MarcarProcessadoAsync(registro.Id, false, "txid_desconhecido", Arg.Any<CancellationToken>());
+    }
+
+    // I4.5 (#1698): o texto do erro fica em WebhookRecebido.Erro e aparece em tela de suporte.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Erro_do_provedor_persistido_sem_segredo(bool porExcecao)
+    {
+        const string canario = "CANARIO-9f3a7c21d4";
+        var corpo = "Mercado Pago respondeu 401 em /v1/payments/1: {\"access_token\":\"" + canario + "\"} Bearer " + canario;
+        var registro = WebhookRecebido.Criar(Provedor, "evt-1", "hash");
+        _repo.TryRegistrarAsync(Provedor, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(registro);
+        var controller = CriarController();
+        if (porExcecao)
+            _processor.ProcessarAsync(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>(), Arg.Any<CancellationToken>())
+                .Returns<ResultadoWebhookGateway>(_ => throw new HttpRequestException(corpo));
+        else
+            _processor.ProcessarAsync(Arg.Any<string>(), Arg.Any<IDictionary<string, string?>>(), Arg.Any<CancellationToken>())
+                .Returns(ResultadoWebhookGateway.Falha(corpo));
+
+        await controller.Receber(Provedor);
+
+        await _repo.Received(1).MarcarProcessadoAsync(registro.Id, false,
+            Arg.Is<string?>(e => e != null && !e.Contains(canario) && e.Contains("401") && e.Contains("[REDACTED]")),
+            Arg.Any<CancellationToken>());
     }
 }

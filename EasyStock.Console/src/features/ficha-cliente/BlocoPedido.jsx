@@ -7,11 +7,14 @@ import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { moeda } from '../../dominio/formato'
 import {
-  agruparPorLinha, itensDetalhados, numeroCurto, pedidoEncerrado, totalDoPedido,
+  LINHA_CLIENTE_ESCOLHENDO, agruparPorLinha, comandaTravada, itensDetalhados, numeroDaComanda, pedidoEncerrado, porcaoForaDoNome,
+  precoDaLinha, totalDoPedido,
 } from '../../dominio/pedido'
 import { diferencaAposPagamento, totalPago } from '../../dominio/pagamento'
 import { situacaoDoItem } from '../../dominio/cardapio'
-import { ROTULO_ENVIAR, avisoDoEnvio, situacaoDoEnvio } from '../../dominio/resumoPedido'
+import {
+  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, rotuloDoTotal, situacaoDoEnvio,
+} from '../../dominio/resumoPedido'
 import { Cabecalho } from './Cabecalho'
 import { ModalCanhoto } from './Canhoto'
 import { SeletorJanela } from './SeletorJanela'
@@ -39,6 +42,9 @@ function ItemComanda({
   // (`aria-hidden`); quem lê por teclado ou leitor de tela usa o rótulo do
   // próprio botão do nome.
   const podeAnotar = !observacaoTravada
+  // #1761 (L18): sem a porção que o nome já diz; e o "1×" só no item fechado, porque aberto a
+  // quantidade está no seletor, que fica na mesma linha do nome.
+  const porcao = porcaoForaDoNome(linha.produto)
   const corpo = (
     <>
       <span className={css.nomeItem}>
@@ -46,19 +52,19 @@ function ItemComanda({
         <MarcaDoItem produto={linha.produto} />
         {podeAnotar && <Icone nome="lapis" tamanho={16} />}
       </span>
-      <span className={css.porcao}>{linha.produto?.porcao}</span>
+      {porcao && <span className={css.porcao}>{porcao}</span>}
     </>
   )
   return (
     <li className={css.item}>
       <div className={css.linhaItem}>
-        <span className={css.qtd}>{linha.qtd}×</span>
+        {fechado && <span className={css.qtd}>{linha.qtd}×</span>}
         {podeAnotar ? (
           <button
             type="button"
             className={`${css.corpo} ${css.corpoAnotar}`}
             aria-pressed={obsAberta}
-            aria-label={`Anotar na ${linha.produto?.nome}`}
+            aria-label={`Anotação para ${linha.produto?.nome}`}
             onClick={aoAlternarObs}
           >
             {corpo}
@@ -67,7 +73,7 @@ function ItemComanda({
           <span className={css.corpo}>{corpo}</span>
         )}
         {fechado
-          ? <span className={css.preco}>{moeda((linha.produto?.preco ?? 0) * linha.qtd)}</span>
+          ? <span className={css.preco}>{moeda(precoDaLinha(linha))}</span>
           : (
             <span className={css.controlesItem}>
               <span className={css.contador}>
@@ -102,7 +108,8 @@ function ItemComanda({
 
 export function BlocoPedido({
   pedido, editavel, aoTrocarJanela, aoAbrirCardapio, aoAjustar, aoAjustarObservacao, aoGerarPedido,
-  aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false,
+  aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false, conversaId, numeroComanda,
+  clienteEscolhendo = false,
 }) {
   const { cardapio, linhas } = useCatalogo()
   const { marcarCanhotoImpresso } = useAcoes()
@@ -132,6 +139,11 @@ export function BlocoPedido({
   // toque, não fica sempre à vista").
   const [obsAbertas, setObsAbertas] = useState(() => new Set())
   const fechado = pedidoEncerrado(pedido) || !editavel
+  // #1587: pedido já criado no EasyStok não troca item por aqui. Antes o "+", o "−" e o
+  // "Adicionar itens" seguiam ativos e só avisavam no rodapé; agora os itens travam e a linha
+  // diz o motivo. Janela e cobrança continuam como estavam (dependem só de `fechado`).
+  // #1683: enquanto o cliente escolhe pelo link, os itens são os da escolha dele, no bloco de cima.
+  const itensTravados = fechado || comandaTravada(pedido, { fonteApi }) || clienteEscolhendo
 
   // Soltar aqui (seção 9): só acende quando o que está sendo arrastado é um
   // prato do cardápio. useDndContext em vez de prop: BlocoPedido não muda de
@@ -141,13 +153,13 @@ export function BlocoPedido({
   const arrastandoPrato = active?.data?.current?.type === 'prato'
   const alvoDoArrasto = arrastandoPrato && over?.id === 'comanda-solta'
   const { setNodeRef: soltarRef } = useDroppable({
-    id: 'comanda-solta', data: { type: 'comanda' }, disabled: fechado,
+    id: 'comanda-solta', data: { type: 'comanda' }, disabled: itensTravados,
   })
   // A mensagem com a observação já saiu assim que a comanda foi mandada
   // (mesmo sinal que o resto da tela usa para "já mandou": `pedido.cobranca`
   // nasce em GERAR_PEDIDO). Reescrever o campo depois disso não reenvia nada,
   // e a ficha passava a divergir do que o cliente já leu (achado QA5).
-  const observacaoTravada = fechado || Boolean(pedido.cobranca)
+  const observacaoTravada = itensTravados || Boolean(pedido.cobranca)
   const envio = situacaoDoEnvio(pedido, { bloqueado })
   const podeGerar = envio.pode
   const enviar = (meio) => {
@@ -177,21 +189,35 @@ export function BlocoPedido({
       <section
         ref={soltarRef}
         id="comanda-pedido"
+        tabIndex={-1}
         className={`${css.comanda} ${alvoDoArrasto ? css.alvoArrasto : ''}`}
-        aria-label={`Comanda número ${numeroCurto(pedido.numero)}`}
+        aria-label={numeroComanda ? `Comanda número ${numeroComanda}` : 'Comanda em rascunho'}
       >
+        {/* #1474 (R6, R3): o número é o do EasyStok quando o pedido existe; sem janela, o
+            cabeçalho avisa. A faixa do modo API vem do seletor, não do catálogo local. */}
         <Cabecalho
-          numero={pedido.numero}
+          numero={numeroComanda || numeroDaComanda(pedido, { fonteApi })}
           nomeCliente={nomeCliente}
-          faixa={faixa}
+          faixa={fonteApi ? pedido.janelaRotulo : faixa}
+          semJanela={!fechado && !pedido.janela}
           enviadaEm={pedido.cobranca?.criadaEm ?? null}
         />
         <hr className={css.separador} />
 
+        {/* O total fica à vista antes de percorrer os itens da montagem. */}
+        <div className={css.resumoTotal}>
+          {pedido.frete > 0 && <p className={css.vazio}>Frete {moeda(pedido.frete)}</p>}
+          <p className={css.total}>
+            <span>{fonteApi && !pedido.pedidoId ? 'Total dos itens' : rotuloDoTotal(pedido, { fonteApi })}</span>
+            <b>{moeda(pedido.totalApi ?? total)}</b>
+          </p>
+          {fonteApi && !pedido.pedidoId && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
+        </div>
+
         {alvoDoArrasto && <p className={css.soltarAqui}>Soltar aqui</p>}
 
         {grupos.length === 0 && (
-          <p className={css.vazio}>Comanda vazia. Abra o cardápio para montar o pedido.</p>
+          <p className={css.vazio}>{clienteEscolhendo ? LINHA_CLIENTE_ESCOLHENDO : 'Comanda vazia. Abra o cardápio para montar o pedido.'}</p>
         )}
 
         {grupos.map((grupo) => (
@@ -202,7 +228,7 @@ export function BlocoPedido({
                 <ItemComanda
                   key={linha.sku}
                   linha={linha}
-                  fechado={fechado}
+                  fechado={itensTravados}
                   observacaoTravada={observacaoTravada}
                   obsAberta={obsAbertas.has(linha.sku)}
                   aoAlternarObs={() => alternarObs(linha.sku)}
@@ -213,16 +239,10 @@ export function BlocoPedido({
             </ul>
           </div>
         ))}
+        {/* #1683: observação geral que o cliente deixou no pedido (a do item fica na linha). */}
+        {pedido.observacoes && <p className={css.notaTotal}>Observação do pedido: {pedido.observacoes}</p>}
 
         <hr className={css.separador} />
-        {/* F03: pedido criado no EasyStok traz o frete da zona; o total é o que foi cobrado. */}
-        {pedido.frete > 0 && (
-          <p className={css.vazio}>Frete {moeda(pedido.frete)}</p>
-        )}
-        <p className={css.total}>
-          <span>Total</span>
-          <b>{moeda(pedido.totalApi ?? total)}</b>
-        </p>
         {diferencaPosPagamento > 0 && (
           <p className={css.diferencaPaga} role="alert">
             <Icone nome="alerta" />
@@ -232,13 +252,31 @@ export function BlocoPedido({
         )}
       </section>
 
+      {/* No modo API a janela é da vitrine, com data; pedido criado troca a vaga no servidor.
+          #1474 (R3): vem antes das ações, logo abaixo da comanda, onde o motivo da barra aponta.
+          #1551: remonta por conversa; o "Dia da entrega" de um cliente não vale para o seguinte. */}
+      {!fechado && fonteApi && (
+        <SeletorJanelaApi key={conversaId} pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
+      )}
+
       <div className={css.acoesPedido}>
         {!fechado && (
           <>
-            <Botao largo onClick={aoAbrirCardapio}>Abrir cardápio</Botao>
+            {/* #1587: travada, o cardápio segue abrindo para consulta e foto, com o nome certo. */}
+            {!clienteEscolhendo && (
+              <>
+                {itensTravados && <p className={css.situacaoEnvio}>{LINHA_COMANDA_TRAVADA}</p>}
+                <Botao largo onClick={aoAbrirCardapio}>{itensTravados ? 'Ver cardápio' : 'Adicionar itens'}</Botao>
+              </>
+            )}
             {/* Rodada 12 (issue #14): sem botão morto. Ou ele envia, ou a
-                linha diz por que não; comanda vazia já se explica no papel. */}
-            {(podeGerar || envio.chave === 'vazia') ? (
+                linha diz por que não; comanda vazia já se explica no papel.
+                #1474 (R4): no modo API quem cria o pedido é a barra fixa ("Gerar cobrança e
+                enviar"); aqui só a linha que diz que a comanda vai junto.
+                #1587: com o pedido já criado ela não vai mais a lugar nenhum; fica só o motivo acima. */}
+            {fonteApi && (podeGerar || envio.chave === 'vazia') ? (
+              !itensTravados && <p className={css.situacaoEnvio}>{LINHA_COMANDA_VAI_JUNTO}</p>
+            ) : (podeGerar || envio.chave === 'vazia') ? (
               <Botao
                 largo variante="primario" icone="enviar" disabled={!podeGerar || enviando}
                 onClick={() => (pedido.meio ? enviar(pedido.meio) : setPedindoMeio(true))}
@@ -282,13 +320,10 @@ export function BlocoPedido({
           faixa={faixa}
           aoFechar={() => setCanhotoAberto(false)}
           aoImprimir={() => marcarCanhotoImpresso(pedido.numero)}
+          pedidoIdApi={fonteApi ? pedido.pedidoId ?? null : null}
         />
       )}
 
-      {/* F03: no modo API a janela é da vitrine, com data, e só se escolhe antes do envio. */}
-      {!fechado && fonteApi && !pedido.pedidoId && (
-        <SeletorJanelaApi pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
-      )}
       {!fechado && !fonteApi && (
         <SeletorJanela
           pedido={pedido}

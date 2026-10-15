@@ -18,6 +18,8 @@ public class TenantVitrineEntregaController(
     CadastroJanelasEntregaUseCase janelas,
     CadastroZonasFreteUseCase zonas,
     CadastroBloqueiosEntregaUseCase bloqueios,
+    ConfigurarFreteRaioUseCase configurarRaio,
+    TestarFreteRaioUseCase testarRaio,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase, IActionFilter
 {
     void IActionFilter.OnActionExecuting(ActionExecutingContext context)
@@ -53,6 +55,15 @@ public class TenantVitrineEntregaController(
     public Task<IActionResult> DefinirJanelaAtiva(Guid id, [FromBody] AtivaBody body, CancellationToken ct) =>
         Tratar(async () => DataOk(await janelas.DefinirAtivaAsync(Empresa, id, body.Ativa, ct)));
 
+    [SwaggerOperation(Summary = "Delete an unused delivery window", Description = "Com pedido ou bloqueio na janela, recusa: pause em vez de excluir.")]
+    [HttpDelete("janelas/{id:guid}")]
+    public Task<IActionResult> ExcluirJanela(Guid id, CancellationToken ct) =>
+        Tratar(async () =>
+        {
+            await janelas.ExcluirAsync(Empresa, id, ct);
+            return NoContent();
+        });
+
     // ── Zonas ──────────────────────────────────────────────────────────
 
     [SwaggerOperation(Summary = "List shipping zones (including inactive)")]
@@ -74,6 +85,25 @@ public class TenantVitrineEntregaController(
     [HttpPost("zonas/{id:guid}/ativa")]
     public Task<IActionResult> DefinirZonaAtiva(Guid id, [FromBody] AtivaBody body, CancellationToken ct) =>
         Tratar(async () => DataOk(await zonas.DefinirAtivaAsync(Empresa, id, body.Ativa, ct)));
+
+    // ── Frete por raio ─────────────────────────────────────────────────
+
+    [SwaggerOperation(Summary = "Get the stored distance shipping setup", Description = "O endereço da cozinha não é guardado; `configurado` diz se há coordenada.")]
+    [HttpGet("raio")]
+    public Task<IActionResult> ObterRaio(CancellationToken ct) =>
+        Tratar(async () => DataOk(await configurarRaio.ObterAsync(Empresa, ct)));
+
+    [SwaggerOperation(Summary = "Set kitchen address, max radius and distance price bands", Description = "A cozinha é geocodificada no servidor; só grava com localização confiável.")]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [HttpPut("raio")]
+    public Task<IActionResult> ConfigurarRaio([FromBody] FreteRaioInput body, CancellationToken ct) =>
+        Tratar(async () => DataOk(await configurarRaio.ExecuteAsync(Empresa, body, ct)));
+
+    [SwaggerOperation(Summary = "Quote a customer address with the checkout's distance calculation")]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [HttpPost("raio/testar")]
+    public Task<IActionResult> TestarRaio([FromBody] TestarFreteRaioInput body, CancellationToken ct) =>
+        Tratar(async () => DataOk(await testarRaio.ExecuteAsync(Empresa, body, ct)));
 
     // ── Bloqueios ──────────────────────────────────────────────────────
 
@@ -109,6 +139,10 @@ public class TenantVitrineEntregaController(
         catch (CadastroEntregaNaoEncontradoException ex)
         {
             return DataNotFound(ex.Message);
+        }
+        catch (GeocodificadorIndisponivelException ex)
+        {
+            return UnprocessableEntity(new ApiErrorResponse(new ApiError("GEOCODIFICADOR_INDISPONIVEL", ex.Message, null, null)));
         }
         catch (UseCaseValidationException ex)
         {

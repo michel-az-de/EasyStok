@@ -69,12 +69,9 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
 
         // Single shard nesta versão. Multi-shard com advisory lock fica pra
         // F4.d quando volume justificar (>10k eventos pendentes simultâneos).
-        var pendentes = new List<OutboxEventoIntegracao>();
-        for (int shard = 0; shard < 4 && pendentes.Count < batchSize; shard++)
-        {
-            var batch = await _repo.ProximosPendentesAsync(shard, batchSize - pendentes.Count, ct);
-            pendentes.AddRange(batch);
-        }
+        // #1575: uma consulta para todos os shards, na ordem em que o laço os percorria (a rodada ociosa
+        // custava uma consulta por shard a cada tick).
+        var pendentes = await _repo.ProximosPendentesDeTodosOsShardsAsync(batchSize, ct);
 
         if (pendentes.Count == 0) return 0;
 
@@ -143,6 +140,10 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
         }
         catch (Exception ex)
         {
+            // #1507: o lote divide o DbContext do escopo. O handler que falhou pode ter deixado entidades sujas
+            // rastreadas; sem descartá-las, o commit da falha (e o de cada evento seguinte) as reenviaria. O evento é
+            // reanexado pelo UpdateAsync do finally.
+            _uow.DescartarAlteracoesPendentes();
             var backoff = ComputarBackoff(evt.Tentativas + 1);
             evt.MarcarFalhaTentativa(ex.GetType().Name + ": " + ex.Message, backoff);
             _logger.LogError(ex,
@@ -162,6 +163,8 @@ public sealed class IntegrationEventDispatcher : IIntegrationEventDispatcher
                 _logger.LogError(persistEx,
                     "Outbox {EventId} persistência do estado pós-handler falhou — evento fica em EmEnvio; o watchdog o reclama após o lease e re-despacha (#928, handlers idempotentes).",
                     evt.Id);
+                // O commit que falhou deixou o evento sujo no contexto do lote: descarta para não envenenar o próximo.
+                _uow.DescartarAlteracoesPendentes();
             }
 
             sw.Stop();

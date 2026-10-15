@@ -92,7 +92,21 @@ public sealed class ImpressaoController(
     private async Task<IActionResult> RegistrarAsync(Guid id, Guid? empresaId, bool impressa, string? erro, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
-        var impressao = await registrarRetorno.ExecuteAsync(new RegistrarRetornoImpressaoInput(emp, id, impressa, erro), ct);
+        var impressao = await registrarRetorno.ExecuteAsync(new RegistrarRetornoImpressaoInput(emp, id, impressa, erro,
+            currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId), ct);
         return impressao is null ? DataNotFound("Impressão não encontrada.") : DataOk(impressao);
+    }
+
+    public sealed record ConfirmarDocumentoRequest(Guid? CanhotoId = null);
+
+    [HttpPost("api/impressao/{id:guid}/confirmar-documento")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> ConfirmarDocumento(Guid id, [FromBody] ConfirmarDocumentoRequest body, CancellationToken ct)
+    {
+        if (!TryResolveEmpresaId(currentUser, null, out var emp, out var erro)) return erro!;
+        var resultado = await registrarRetorno.ExecuteAsync(new(emp, id, true,
+            UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
+            CanhotoId: body.CanhotoId), ct);
+        return resultado is null ? DataNotFound("Impressão não encontrada.") : DataOk(resultado);
     }
 }

@@ -30,7 +30,8 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
         if (p is null) return null;
 
         var c = p.Cliente;
-        var pago = p.Pagamentos.Sum(g => g.Valor) >= p.Total;
+        var recebido = p.Pagamentos.Sum(g => g.Valor);
+        var pago = recebido >= p.Total;
         var ultimoPagamento = p.Pagamentos.OrderBy(g => g.PagoEm).LastOrDefault();
 
         return new PedidoImpressoDto(
@@ -41,7 +42,7 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
                 c.Id is { } id ? id.ToString("N")[..6].ToUpperInvariant() : null,
                 Limpo(c.Nome),
                 Limpo(c.Telefone),
-                EnderecoImpresso.Montar(c.Endereco, c.Complemento, c.Apt, c.Bairro, c.Cidade, c.Cep)),
+                c.EnderecoEntrega ?? EnderecoImpresso.Montar(c.Endereco, c.Complemento, c.Apt, c.Bairro, c.Cidade, c.Cep)),
             p.Entrega is { } e ? new PedidoImpressoEntregaDto(e.Tipo, Limpo(e.Nome)) : null,
             p.Itens.Select(i => new PedidoImpressoItemDto(
                     i.Quantidade,
@@ -53,7 +54,7 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
                 .ToList(),
             Limpo(p.Observacoes),
             Nota(input.Nota),
-            new PedidoImpressoCobrancaDto(p.Total, pago, Limpo(p.FormaCobranca) ?? Limpo(ultimoPagamento?.Metodo)),
+            new PedidoImpressoCobrancaDto(p.Total, pago, Limpo(p.FormaCobranca) ?? Limpo(ultimoPagamento?.Metodo), recebido),
             p.Itens.Where(i => i.EhProduto).Sum(Volumes),
             HorarioBrasil.ConverterParaBrasilia(p.CriadoEm),
             HorarioBrasil.ConverterParaBrasilia(p.AlteradoEm),

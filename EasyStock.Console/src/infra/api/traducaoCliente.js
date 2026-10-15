@@ -1,4 +1,5 @@
 import { enderecoDasPartes, mascaraCep, partesDoEndereco } from '../../dominio/formato'
+import { instante } from './traducaoConversas'
 
 // Cliente da conversa entre o console e o EasyStok (#1276). A Ficha guarda o endereço numa
 // string só ("Rua X, 120, apto 12, Bairro, 05500-000"); a API recebe e devolve em partes.
@@ -23,6 +24,36 @@ export function clienteDoDossie(dossie) {
   return {
     clienteId: dados.id,
     nome: dados.nome || null,
-    cliente: { telefone: dados.telefone || null, endereco: endereco || null },
+    // #1474 (R2): bloqueio do cadastro, no formato de `dominio/conversa.js` (novoBloqueio). O
+    // dossiê não traz quando nem quem bloqueou; `resumoDoBloqueio` lida com os dois nulos.
+    bloqueio: dossie.bloqueado
+      ? { motivo: dados.motivoBloqueio || 'Sem motivo registrado.', em: null, por: null, alcance: 'todos os canais' }
+      : null,
+    cliente: {
+      telefone: dados.telefone || null,
+      endereco: endereco || null,
+      pedidos: dossie.totalPedidos ?? 0,
+      notas: (dossie.notas ?? []).map(notaDaApi),
+      // #1441: tags do cadastro (S24), já normalizadas pelo EasyStok.
+      tags: (dossie.tags ?? []).map((t) => t.tag),
+      // #1436: últimos pedidos no formato do modal Histórico (o mesmo da massa de demonstração).
+      // Fica em `cliente` porque a sincronização de 5 s preserva o cliente lido da API.
+      historico: (dossie.ultimosPedidos ?? []).map(pedidoDaApi),
+    },
   }
 }
+
+const quando = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+// `criadoEm` (ISO, UTC) põe a nota no lugar certo do fio como post-it (#1441). Sem o Z o
+// navegador leria como hora local e a nota cairia três horas depois.
+const notaDaApi = (n) => ({ id: n.id, texto: n.texto, autor: n.autor, em: quando(instante(n.criadoEm)), criadoEm: instante(n.criadoEm) })
+
+const pedidoDaApi = (p) => ({
+  numero: `#${p.id.slice(0, 8)}`,
+  em: p.criadoEm.slice(0, 10),
+  total: p.total,
+  estado: String(p.status ?? '').toLowerCase().replaceAll('_', ' '),
+  itens: (p.itens ?? []).map((i) => `${i.quantidade}× ${i.nome}`),
+  nota: null,
+})

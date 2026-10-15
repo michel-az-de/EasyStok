@@ -2,7 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
-using ClienteEntity = EasyStock.Domain.Entities.Cliente;
+using EasyStock.Application.UseCases.Atendimento;
 
 namespace EasyStock.Application.UseCases.Storefront.Auth;
 
@@ -18,10 +18,11 @@ namespace EasyStock.Application.UseCases.Storefront.Auth;
 /// </para>
 ///
 /// <para>
-/// <strong>Anti-brute force</strong>: cada tentativa incorreta incrementa
-/// <c>ClienteOtp.Tentativas</c>. Na 5ª tentativa <see cref="ClienteOtp.RegistrarTentativa"/>
-/// lança <see cref="RegraDeDominioVioladaException"/> que mapeia para
-/// <see cref="OtpTentativasExcedidasException"/>.
+/// <strong>Anti-brute force</strong>: cada tentativa é reservada em <c>ClienteOtp.Tentativas</c> num
+/// UPDATE atômico, com o limite no WHERE, antes de conferir o código (#1781): rajada paralela não passa de
+/// <see cref="ClienteOtp.MaxTentativas"/>. Sem tentativa a reservar, ou errando a última, responde
+/// <see cref="OtpTentativasExcedidasException"/>; reserva recusada porque outra requisição já consumiu o OTP
+/// responde <see cref="OtpInvalidoException"/>.
 /// </para>
 ///
 /// <para>
@@ -40,6 +41,7 @@ public sealed class ValidarOtpUseCase(
     IClienteOtpRepository clienteOtpRepository,
     IClienteStorefrontRepository clienteRepository,
     IClienteSessionRepository clienteSessionRepository,
+    IdentificarClientePorTelefoneUseCase identificarCliente,
     IPasswordHasher passwordHasher,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
@@ -91,25 +93,31 @@ public sealed class ValidarOtpUseCase(
         }
 
         // ── 5. Verificar código ────────────────────────────────────────
-        if (!otp.ValidarCodigo(input.Codigo, passwordHasher.Verify, timeProvider))
+        // #1781: a tentativa é contada no banco, num UPDATE atômico, antes do BCrypt; rajada paralela não passa
+        // do limite. Recusada: as tentativas acabaram (ou outra requisição consumiu o OTP).
+        if (!await clienteOtpRepository.ReservarTentativaAsync(otp.Id, ct))
         {
-            // Registra tentativa — lança RegraDeDominioVioladaException se já estava no limite
-            try
+            // Dois códigos certos em paralelo: quem leu o OTP antes do consumo da outra requisição tem a reserva
+            // recusada pelo NOT Consumido. É código já usado, não tentativa esgotada.
+            if (await clienteOtpRepository.ConsumidoAsync(otp.Id, ct))
             {
-                otp.RegistrarTentativa();
-            }
-            catch (Domain.Exceptions.RegraDeDominioVioladaException)
-            {
-                await clienteOtpRepository.UpdateAsync(otp, ct);
-                await unitOfWork.CommitAsync();
                 logger.LogWarning(
-                    "OTP tentativas esgotadas: empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
+                    "OTP já consumido por outra requisição (na reserva): empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
                     empresaId, otp.Id, telefoneMascarado);
-                throw new OtpTentativasExcedidasException();
+                throw new OtpInvalidoException();
             }
 
-            await clienteOtpRepository.UpdateAsync(otp, ct);
-            await unitOfWork.CommitAsync();
+            logger.LogWarning(
+                "OTP tentativas esgotadas: empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
+                empresaId, otp.Id, telefoneMascarado);
+            throw new OtpTentativasExcedidasException();
+        }
+
+        if (!otp.ValidarCodigo(input.Codigo, passwordHasher.Verify, timeProvider))
+        {
+            // #1781: a reserva já gravou a tentativa; a entidade só espelha. Gravar o OTP lido antes da reserva
+            // devolveria o contador ao valor velho e perderia as tentativas paralelas.
+            otp.RegistrarTentativa();
 
             // Após incrementar, verifica se acabou de atingir o limite
             if (otp.Tentativas >= ClienteOtp.MaxTentativas)
@@ -126,48 +134,63 @@ public sealed class ValidarOtpUseCase(
             throw new OtpInvalidoException();
         }
 
-        // ── 6. Consumir OTP ────────────────────────────────────────────
-        otp.Consumir();
-        await clienteOtpRepository.UpdateAsync(otp, ct);
+        // O consumo só vale se cliente e sessão forem persistidos. A tentativa acima não é devolvida no rollback.
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            // ── 6. Consumir OTP ────────────────────────────────────────────
+            // #1781: consumo atômico no banco. Dois códigos certos em paralelo: só um afeta a linha; o outro
+            // responde como código inválido, sem sessão e sem tentar criar o cliente de novo.
+            if (!await clienteOtpRepository.ConsumirAsync(otp.Id, token))
+            {
+                logger.LogWarning(
+                    "OTP já consumido por outra requisição: empresaId={EmpresaId} otpId={OtpId} telefone={Telefone}",
+                    empresaId, otp.Id, telefoneMascarado);
+                throw new OtpInvalidoException();
+            }
 
-        // ── 7. Criar ou atualizar Cliente ──────────────────────────────
-        var cliente = await clienteRepository.GetByTelefoneHashAsync(empresaId, telefoneHash, ct);
-        if (cliente is null)
-        {
-            cliente = ClienteEntity.CriarParaStorefront(empresaId, telefoneHash, timeProvider);
-            await clienteRepository.AddAsync(cliente, ct);
-            logger.LogInformation(
-                "Novo cliente storefront criado: empresaId={EmpresaId} clienteId={ClienteId} telefone={Telefone}",
-                empresaId, cliente.Id, telefoneMascarado);
-        }
-        else
-        {
+            // ── 7. Criar ou atualizar Cliente ──────────────────────────────
+            var cliente = await clienteRepository.GetByTelefoneHashAsync(empresaId, telefoneHash, token);
+            var clienteNovo = false;
+            if (cliente is null)
+            {
+                // Só após comprovar posse pelo OTP pode reutilizar o cadastro do WhatsApp/ERP.
+                var identificacao = await identificarCliente.ExecuteAsync(
+                    new IdentificarClientePorTelefoneInput(empresaId, telefoneE164.TrimStart('+'), null), token);
+                cliente = identificacao.Cliente;
+                clienteNovo = identificacao.EhNovo;
+                logger.LogInformation(
+                    "Novo cliente storefront criado: empresaId={EmpresaId} clienteId={ClienteId} telefone={Telefone}",
+                    empresaId, cliente.Id, telefoneMascarado);
+            }
+            if (cliente.EmpresaId != empresaId)
+                throw new OtpInvalidoException();
             cliente.RegistrarAcessoStorefront(timeProvider);
-            await clienteRepository.UpdateAsync(cliente, ct);
-        }
+            if (!clienteNovo)
+                await clienteRepository.UpdateAsync(cliente, token);
 
-        // ── 8. Criar ClienteSession com fingerprint ────────────────────
-        var fingerprint = ClienteFingerprintCalculator.Calcular(input.UserAgent, input.AcceptLanguage);
-        var session = ClienteSession.Criar(
-            clienteId: cliente.Id,
-            empresaId: empresaId,
-            time: timeProvider,
-            ipInicial: input.IpOrigem,
-            uaInicial: input.UserAgent,
-            fingerprint: fingerprint);
+            // ── 8. Criar ClienteSession com fingerprint ────────────────────
+            var fingerprint = ClienteFingerprintCalculator.Calcular(input.UserAgent, input.AcceptLanguage);
+            var session = ClienteSession.Criar(
+                clienteId: cliente.Id,
+                empresaId: empresaId,
+                time: timeProvider,
+                ipInicial: input.IpOrigem,
+                uaInicial: input.UserAgent,
+                fingerprint: fingerprint);
 
-        await clienteSessionRepository.AddAsync(session, ct);
-        await unitOfWork.CommitAsync();
+            await clienteSessionRepository.AddAsync(session, token);
+            await unitOfWork.CommitAsync();
 
-        logger.LogInformation(
-            "Sessão storefront criada: empresaId={EmpresaId} clienteId={ClienteId} sessionId={SessionId} telefone={Telefone}",
-            empresaId, cliente.Id, session.Id, telefoneMascarado);
+            logger.LogInformation(
+                "Sessão storefront criada: empresaId={EmpresaId} clienteId={ClienteId} telefone={Telefone}",
+                empresaId, cliente.Id, telefoneMascarado);
 
-        return new ValidarOtpResult(
-            SessionId: session.Id,
-            TelefoneOfuscado: telefoneMascarado,
-            PrimeiroNome: string.IsNullOrWhiteSpace(cliente.Nome) ? "Olá" : cliente.Nome.Split(' ')[0],
-            MaxAgeSecs: MaxAgeSecs);
+            return new ValidarOtpResult(
+                SessionId: session.Id,
+                TelefoneOfuscado: telefoneMascarado,
+                PrimeiroNome: (string.IsNullOrWhiteSpace(cliente.Nome) || cliente.Nome == IdentificarClientePorTelefoneUseCase.NomePadraoLead) ? "Olá" : cliente.Nome.Split(' ')[0],
+                MaxAgeSecs: MaxAgeSecs);
+        }, ct);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────

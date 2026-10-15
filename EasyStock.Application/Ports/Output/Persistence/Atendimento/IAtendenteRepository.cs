@@ -1,7 +1,8 @@
 namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
 
 /// <summary>Perfil que o usuário tem na empresa: nível e permissões explícitas (vazio = vale o nível).</summary>
-public sealed record PerfilNaEmpresa(NivelAcesso Nivel, IReadOnlyCollection<Permissao> Permissoes);
+public sealed record PerfilNaEmpresa(NivelAcesso Nivel, IReadOnlyCollection<Permissao> Permissoes,
+    bool PermissoesExplicitas = false);
 
 /// <summary>Usuário ativo vinculado à empresa, com os perfis que tem nela.</summary>
 public sealed record UsuarioDaEmpresa(Guid UsuarioId, string Nome, string Email, IReadOnlyList<PerfilNaEmpresa> Perfis);

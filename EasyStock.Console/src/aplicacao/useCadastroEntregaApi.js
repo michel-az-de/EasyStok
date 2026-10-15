@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/entregasApi'
 import { dataIsoNoFuso } from '../dominio/formato'
 
@@ -12,13 +12,20 @@ export function useCadastroEntregaApi() {
   const [janelas, setJanelas] = useState(null)
   const [zonas, setZonas] = useState([])
   const [bloqueios, setBloqueios] = useState([])
+  const [freteRaio, setFreteRaio] = useState(null)
   const [erro, setErro] = useState(null)
+  // #1510: um envio por vez; toque duplo em "Criar janela" duplicava a janela (overbooking).
+  const [enviando, setEnviando] = useState(false)
+  const enviandoRef = useRef(false)
 
   const recarregar = useCallback(() => {
     const hoje = new Date()
     const ate = new Date(hoje.getTime() + DIAS_BLOQUEIO * 86400000)
-    return Promise.all([api.listarJanelas(), api.listarZonas(), api.listarBloqueios(dataIso(hoje), dataIso(ate))])
-      .then(([j, z, b]) => {
+    return Promise.all([api.listarJanelas(), api.listarZonas(), api.listarBloqueios(dataIso(hoje), dataIso(ate)),
+      // #1651: console e API publicam em separado; API sem a rota não derruba janelas, zonas e bloqueios.
+      api.obterFreteRaio().catch((e) => { if (e.status === 404) return undefined; throw e })])
+      .then(([j, z, b, raio]) => {
+        setFreteRaio(raio)
         setJanelas(j ?? [])
         setZonas(z ?? [])
         setBloqueios(b ?? [])
@@ -29,18 +36,44 @@ export function useCadastroEntregaApi() {
 
   useEffect(() => { recarregar() }, [recarregar])
 
-  const executar = (chamada, falha) => chamada()
-    .then(() => recarregar())
-    .catch((e) => setErro(`${falha}: ${e.message}`))
+  // Devolve se deu certo: o formulário só limpa (ou fecha) quando a API aceitou.
+  // A lista recarrega também na falha: na criação em série parte das janelas já entrou.
+  const executar = async (chamada, falha) => {
+    if (enviandoRef.current) return false
+    enviandoRef.current = true
+    setEnviando(true)
+    let motivo = null
+    try {
+      await chamada()
+    } catch (e) {
+      motivo = `${falha}: ${e.message}`
+    } finally {
+      await recarregar()
+      if (motivo) setErro(motivo)
+      enviandoRef.current = false
+      setEnviando(false)
+    }
+    return !motivo
+  }
 
   const acoes = {
     criarJanela: (corpo) => executar(() => api.criarJanela(corpo), 'A janela não foi criada'),
     alternarJanela: (j) => executar(() => api.definirJanelaAtiva(j.id, !j.ativa), 'A janela não mudou'),
+    // #1440: uma janela por dia marcado, em sequência (a lista recarrega no fim, com o que entrou).
+    criarJanelas: (corpos) => executar(
+      () => corpos.reduce((anterior, corpo) => anterior.then(() => api.criarJanela(corpo)), Promise.resolve()),
+      'A janela não foi criada',
+    ),
+    atualizarJanela: (id, corpo) => executar(() => api.atualizarJanela(id, corpo), 'A janela não mudou'),
+    excluirJanela: (id) => executar(() => api.excluirJanela(id), 'A janela não foi excluída'),
     criarZona: (corpo) => executar(() => api.criarZona(corpo), 'A zona não foi criada'),
     alternarZona: (z) => executar(() => api.definirZonaAtiva(z.id, !z.ativa), 'A zona não mudou'),
     criarBloqueio: (corpo) => executar(() => api.criarBloqueio(corpo), 'O bloqueio não foi criado'),
     removerBloqueio: (id) => executar(() => api.removerBloqueio(id), 'O bloqueio não foi removido'),
+    salvarFreteRaio: (corpo) => executar(() => api.salvarFreteRaio(corpo), 'O frete por distância não foi gravado'),
+    // #1651: só consulta, não mexe no cadastro; quem chama mostra o resultado ou o motivo.
+    testarFreteRaio: (corpo) => api.testarFreteRaio(corpo),
   }
 
-  return { janelas, zonas, bloqueios, erro, acoes, limparErro: () => setErro(null) }
+  return { janelas, zonas, bloqueios, freteRaio, erro, enviando, acoes, recarregar, limparErro: () => setErro(null) }
 }

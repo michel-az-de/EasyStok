@@ -73,7 +73,7 @@ public sealed class MercadoPagoGatewayAdapter(
     {
         try
         {
-            var estorno = await mercadoPagoClient.EstornarAsync(transactionId, valor, ct: ct);
+            var estorno = await mercadoPagoClient.EstornarAsync(transactionId, valor, $"gateway-{transactionId}-{Guid.NewGuid():N}", ct);
             return new EstornoResult(true, ProtocoloEstorno: estorno.EstornoId);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Infra.Integrations.Geocoding;
 using EasyStock.Infra.Integrations.Rotas;
+using EasyStock.Infra.Integrations.TomTom;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -9,6 +10,12 @@ namespace EasyStock.Infra.Integrations.DependencyInjection;
 
 /// <summary>
 /// Registro do adapter <see cref="IGeocodingClient"/> (frete por raio, ADR-0017).
+///
+/// <para>
+/// Os provedores formam uma cadeia (I8.1): o de <c>Storefront:Frete:GeocodingProvider</c> com chave
+/// (<c>tomtom</c> ou <c>google</c>) vem primeiro e o Nominatim, se ligado, depois. Falha ou resultado
+/// não confiável de um cai no seguinte (<see cref="CadeiaGeocodingClient"/>). Sem nenhum, NoOp.
+/// </para>
 ///
 /// <para>
 /// Feature flag <c>ENABLE_NOMINATIM_GEOCODING</c> (default: <see langword="false"/>):
@@ -36,7 +43,7 @@ public static class GeocodingServiceCollectionExtensions
     /// <summary>Base URL default (Nominatim público). Override pra apontar pro self-host.</summary>
     public const string NominatimDefaultBaseUrl = "https://nominatim.openstreetmap.org/";
 
-    /// <summary>Provedor explícito (<c>google</c>). Ausente = comportamento Nominatim acima (issue #1217).</summary>
+    /// <summary>Provedor explícito (<c>google</c> ou <c>tomtom</c>). Ausente = comportamento Nominatim acima (issues #1217, #1322).</summary>
     public const string ProviderKey = "Storefront:Frete:GeocodingProvider";
 
     /// <summary>Chave da Google Maps Platform. Env var alternativa: <see cref="GoogleApiKeyEnvVar"/>.</summary>
@@ -48,28 +55,63 @@ public static class GeocodingServiceCollectionExtensions
 
     public const string GoogleRoutesBaseUrl = "https://routes.googleapis.com/";
 
+    /// <summary>Chave da TomTom (plano gratuito, sem cartão — issue #1322). Env var: <see cref="TomTomApiKeyEnvVar"/>.</summary>
+    public const string TomTomApiKeyKey = "Storefront:Frete:TomTomApiKey";
+
+    public const string TomTomApiKeyEnvVar = "TOMTOM_API_KEY";
+
+    public const string TomTomBaseUrl = "https://api.tomtom.com/";
+
     public static IServiceCollection AddEasyStockGeocoding(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var google = string.Equals(configuration[ProviderKey], "google", StringComparison.OrdinalIgnoreCase);
-        var googleKey = google ? ResolveGoogleKey(configuration) : null;
+        // Cadeia (I8.1, #1658): provedor com chave, depois Nominatim. Um elo só é registrado direto;
+        // nenhum é NoOp (frete por zona, nada bate na rede).
+        var elos = new List<Func<IServiceProvider, IGeocodingClient>>();
 
-        AddRotas(services, googleKey);
+        var provider = configuration[ProviderKey];
+        var tomTomKey = string.Equals(provider, "tomtom", StringComparison.OrdinalIgnoreCase)
+            ? ResolveKey(configuration, TomTomApiKeyKey, TomTomApiKeyEnvVar)
+            : null;
+        var googleKey = string.Equals(provider, "google", StringComparison.OrdinalIgnoreCase)
+            ? ResolveGoogleKey(configuration)
+            : null;
 
-        if (google)
-            return AddGoogle(services, googleKey);
+        if (tomTomKey is not null)
+            elos.Add(AddTomTom(services, tomTomKey));
+        else
+            AddRotas(services, googleKey);
 
-        var enabled = ResolveEnabled(configuration);
-        if (!enabled)
+        if (googleKey is not null)
+            elos.Add(AddGoogle(services, googleKey));
+
+        if (ResolveEnabled(configuration))
+            elos.Add(AddNominatim(services, configuration));
+
+        switch (elos.Count)
         {
-            services.AddScoped<IGeocodingClient, NoOpGeocodingClient>();
-            return services;
+            case 0:
+                services.AddScoped<IGeocodingClient, NoOpGeocodingClient>();
+                break;
+            case 1:
+                services.AddScoped(elos[0]);
+                break;
+            default:
+                services.AddScoped<IGeocodingClient>(sp => new CadeiaGeocodingClient(
+                    [.. elos.Select(criar => criar(sp))],
+                    sp.GetRequiredService<ILogger<CadeiaGeocodingClient>>()));
+                break;
         }
 
+        return services;
+    }
+
+    private static Func<IServiceProvider, IGeocodingClient> AddNominatim(IServiceCollection services, IConfiguration configuration)
+    {
         var baseUrl = configuration["Storefront:Frete:NominatimBaseUrl"] ?? NominatimDefaultBaseUrl;
 
-        services.AddHttpClient<IGeocodingClient, NominatimGeocodingClient>(client =>
+        services.AddHttpClient(nameof(NominatimGeocodingClient), client =>
         {
             client.BaseAddress = new Uri(baseUrl);
             client.Timeout = TimeSpan.FromSeconds(2);
@@ -77,31 +119,23 @@ public static class GeocodingServiceCollectionExtensions
             client.DefaultRequestHeaders.UserAgent.ParseAdd("EasyStok-Storefront/1.0 (+contato@casadababa.app)");
         });
 
-        return services;
+        return sp => new NominatimGeocodingClient(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(NominatimGeocodingClient)),
+            sp.GetRequiredService<ILogger<NominatimGeocodingClient>>());
     }
 
-    /// <summary>
-    /// Google sem chave cai em NoOp: o frete continua pela zona e nada bate na rede.
-    /// </summary>
-    private static IServiceCollection AddGoogle(IServiceCollection services, string? apiKey)
+    private static Func<IServiceProvider, IGeocodingClient> AddGoogle(IServiceCollection services, string apiKey)
     {
-        if (apiKey is null)
-        {
-            services.AddScoped<IGeocodingClient, NoOpGeocodingClient>();
-            return services;
-        }
-
         services.AddHttpClient(nameof(GoogleGeocodingClient), client =>
         {
             client.BaseAddress = new Uri(GoogleDefaultBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(2);
         });
-        services.AddScoped<IGeocodingClient>(sp => new GoogleGeocodingClient(
+
+        return sp => new GoogleGeocodingClient(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GoogleGeocodingClient)),
             apiKey,
-            sp.GetRequiredService<ILogger<GoogleGeocodingClient>>()));
-
-        return services;
+            sp.GetRequiredService<ILogger<GoogleGeocodingClient>>());
     }
 
     /// <summary>
@@ -127,11 +161,33 @@ public static class GeocodingServiceCollectionExtensions
             sp.GetRequiredService<ILogger<GoogleRotasClient>>()));
     }
 
-    private static string? ResolveGoogleKey(IConfiguration configuration)
+    /// <summary>TomTom: geocoding e rota de carro com a mesma chave (issue #1322).</summary>
+    private static Func<IServiceProvider, IGeocodingClient> AddTomTom(IServiceCollection services, string apiKey)
     {
-        var apiKey = configuration[GoogleApiKeyKey];
+        services.AddHttpClient(nameof(TomTomBaseUrl), client =>
+        {
+            client.BaseAddress = new Uri(TomTomBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(2);
+        });
+        services.AddScoped<IRotaClient>(sp => new TomTomRotasClient(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(TomTomBaseUrl)),
+            apiKey,
+            sp.GetRequiredService<ILogger<TomTomRotasClient>>()));
+
+        return sp => new TomTomGeocodingClient(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(TomTomBaseUrl)),
+            apiKey,
+            sp.GetRequiredService<ILogger<TomTomGeocodingClient>>());
+    }
+
+    private static string? ResolveGoogleKey(IConfiguration configuration) =>
+        ResolveKey(configuration, GoogleApiKeyKey, GoogleApiKeyEnvVar);
+
+    private static string? ResolveKey(IConfiguration configuration, string configKey, string envVar)
+    {
+        var apiKey = configuration[configKey];
         if (string.IsNullOrWhiteSpace(apiKey))
-            apiKey = Environment.GetEnvironmentVariable(GoogleApiKeyEnvVar);
+            apiKey = Environment.GetEnvironmentVariable(envVar);
         return string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
     }
 

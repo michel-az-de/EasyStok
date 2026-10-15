@@ -45,8 +45,8 @@ public interface IIntegrationCredentialResolver
         T payload,
         Guid criadoPorUsuarioId,
         DateTime? validoAte = null,
-        string? mascara = null,
-        CancellationToken ct = default) where T : class;
+        CancellationToken ct = default,
+        string? mascara = null) where T : class;
 
     /// <summary>
     /// Desativa as credenciais ativas do provider na empresa (qualquer ambiente) e invalida o

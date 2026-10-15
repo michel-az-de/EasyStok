@@ -5,32 +5,36 @@ using static EasyStock.Api.Services.Impressao.ImpressoHtml;
 namespace EasyStock.Api.Services.Impressao;
 
 /// <summary>
-/// Comanda de cozinha em HTML (S52), na etiqueta 10×15 ou no cupom 58 mm, sobre as peças de
-/// <see cref="ImpressoHtml"/>. Layout aprovado em <c>docs/plan/atendimento-whatsapp/impressos/comanda-aprovada.html</c>.
+/// Canhoto de cozinha em HTML (S52, #1632), em qualquer papel de <see cref="ImpressoHtml.Papeis"/>, sobre as
+/// peças de <see cref="ImpressoHtml"/>. Papel de produção: sem marca, sem preço, sem endereço. Layout aprovado em
+/// <c>docs/plan/atendimento-whatsapp/impressos/impressos-v4-proposta.html</c>.
 /// </summary>
 public sealed class ComandaHtml(IRendererTemplate renderer)
 {
-    public static readonly IReadOnlyList<string> Modelos = [Etiqueta10x15, Cupom58];
+    public const string Documento = "cozinha";
 
-    public async Task<string> RenderizarAsync(ComandaDto comanda, string modelo, string baseUrl, CancellationToken ct = default)
+    public static readonly IReadOnlyList<string> Modelos = Papeis;
+
+    public async Task<string> RenderizarAsync(ComandaDto comanda, string modelo, string baseUrl, CancellationToken ct = default, string codigo = "qr")
     {
         ArgumentNullException.ThrowIfNull(comanda);
         if (!Modelos.Contains(modelo))
             throw new ArgumentException($"Modelo desconhecido: {modelo}.", nameof(modelo));
 
         var corpo = await renderer.RenderizarAsync(
-            Recurso($"comanda.{modelo}.sbn"),
-            new Dictionary<string, object?> { ["m"] = Modelo(comanda) },
+            Recurso("comanda.sbn"),
+            new Dictionary<string, object?> { ["m"] = Modelo(comanda, modelo, codigo) },
             htmlEscape: false,
             ct);
-        return Pagina("Comanda #" + comanda.Numero, modelo, baseUrl, corpo, "comanda.css");
+        return CodigoImpresso.AjustarPagina(Pagina("Comanda #" + comanda.Numero, modelo, baseUrl, corpo), codigo);
     }
 
-    private static Dictionary<string, object?> Modelo(ComandaDto c)
+    private static Dictionary<string, object?> Modelo(ComandaDto c, string modelo, string codigo)
     {
         var hoje = DateOnly.FromDateTime(c.ImpressoEm);
         return new Dictionary<string, object?>
         {
+            ["papel"] = Papel(modelo, Documento),
             ["numero"] = T(c.Numero),
             ["numero_dia"] = c.NumeroDoDia is { } n ? n.ToString("000") : null,
             ["prazo"] = Prazo(c.Prazo, hoje),
@@ -43,17 +47,16 @@ public sealed class ComandaHtml(IRendererTemplate renderer)
                 ["contagem"] = Linhas(g.Itens.Count),
                 ["itens"] = g.Itens.Select(i => new Dictionary<string, object?>
                 {
-                    ["quantidade"] = Quantidade(i.Quantidade),
-                    ["unidade"] = T(i.Unidade),
+                    ["quantidade"] = T(QuantidadeComUnidade(i.Quantidade, i.Unidade)),
                     ["nome"] = T(i.Nome),
                     ["porcao"] = T(i.Porcao),
-                    ["molho"] = T(i.Molho),
+                    ["molho"] = T(i.Molho?.ToUpperInvariant()),
                     ["observacao"] = T(i.Observacao),
                 }).ToList(),
             }).ToList(),
             ["total_linhas"] = Linhas(c.TotalLinhas),
             ["observacao"] = T(c.Observacao),
-            ["barras"] = Code128Svg.Gerar(c.Numero),
+            ["qr"] = CodigoImpresso.Gerar(codigo, c.Numero, c.Numero),
             ["solicitado"] = T(DataCurta(c.SolicitadoEm, hoje) + " " + Hora(c.SolicitadoEm)),
             ["impresso"] = Curta(c.ImpressoEm),
         };

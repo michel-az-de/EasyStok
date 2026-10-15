@@ -11,16 +11,32 @@
 // `dominio/pagamento.js: pagamentosDoPedido` já devolve) e o resumo do caixa
 // SOMA os dois mundos sem misturar os dados de um dentro do outro.
 
+import { inicioDoDiaNoFuso, moeda } from './formato.js'
 import { pagamentosDoPedido } from './pagamento.js'
+import { itemPorSku } from './cardapio.js'
 
 export const TIPOS_MOVIMENTO = {
   ABERTURA: 'abertura', ENTRADA: 'entrada', SAIDA: 'saida', FECHAMENTO: 'fechamento',
 }
 
-// Sugestões de categoria da saída (mapa EasyStok: "sangria e despesa são
-// `saida` com categoria diferente"). Texto livre por baixo: a dona pode
-// digitar outra categoria, estas três são só atalho de um toque.
-export const CATEGORIAS_SAIDA_SUGERIDAS = ['Sangria', 'Despesa', 'Suprimento']
+// Sugestões de categoria (mapa EasyStok: "sangria e despesa são `saida` com
+// categoria diferente"). Texto livre por baixo: a dona pode digitar outra
+// categoria, estas são só atalho de um toque. #1474: suprimento é reforço de
+// troco, dinheiro que ENTRA na gaveta; como saída ele subtraía da conta dela.
+export const CATEGORIAS_SAIDA_SUGERIDAS = ['Sangria', 'Despesa']
+// #1683: a venda de balcão recebida na hora não tinha atalho; a única entrada sugerida era o troco.
+export const CATEGORIAS_ENTRADA_SUGERIDAS = ['Venda no balcão', 'Suprimento']
+
+// #1683: fechar o caixa também decide a loja. O caixa do dia não reabre e a loja só abre com ele
+// aberto (`aberturaDaLoja.js`, situação `fechadoHoje`).
+export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechar, o caixa de hoje não reabre. Sem caixa aberto, a loja não abre mais hoje. Os lançamentos de hoje não podem mais ser estornados.'
+
+// #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada
+// rotulada Sangria. A sugerida do outro tipo sai; a que a dona digitou fica.
+export function categoriaAoTrocarTipo(categoria, novoTipo) {
+  const doOutroTipo = novoTipo === TIPOS_MOVIMENTO.SAIDA ? CATEGORIAS_ENTRADA_SUGERIDAS : CATEGORIAS_SAIDA_SUGERIDAS
+  return doOutroTipo.includes(categoria) ? '' : categoria
+}
 
 // Métodos de pagamento do CAIXA (mapa EasyStok, campo fechado, diferente do
 // meio da cobrança por conversa: pix/dinheiro/credito/debito/transferencia/outro).
@@ -47,16 +63,8 @@ export const metodoCaixaDoMeio = (meio) => (
 )
 
 // Mesmo dia de calendário (o dia do caixa segue o relógio simulado da tela,
-// nunca o relógio real da máquina). Duplicado de propósito em vez de importar
-// de `dominio/formato.js` (privado lá dentro, `inicioDoDiaMs` não é
-// exportado): arquivo de outra frente, evitar tocar nele por uma função de
-// três linhas reduz conflito entre as seis frentes da rodada.
-const inicioDoDiaMs = (ms) => {
-  const d = new Date(ms)
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
-}
-const mesmoDia = (a, b) => inicioDoDiaMs(a) === inicioDoDiaMs(b)
+// nunca o relógio real da máquina). #1600: dia da loja, não do aparelho.
+const mesmoDia = (a, b) => inicioDoDiaNoFuso(a) === inicioDoDiaNoFuso(b)
 
 export const movimentosDoDia = (movimentos, agora) =>
   (movimentos ?? []).filter((m) => mesmoDia(m.criadoEm, agora))
@@ -234,7 +242,7 @@ export function resumoCaixa(movimentos, conversas, cardapio, agora) {
   // com estorno parcial continua vendido por inteiro, só recebeu menos.
   const totalVendas = pedidosPagosNoDia(conversas, agora)
     .reduce((soma, pedido) => soma + (pedido.itens ?? []).reduce((s, linha) => {
-      const item = (cardapio ?? []).find((i) => i.sku === linha.sku)
+      const item = itemPorSku(cardapio ?? [], linha.sku) // M1.4b: linha de porção tem sku composto
       return s + (item?.preco ?? 0) * linha.qtd
     }, 0), 0)
 
@@ -295,4 +303,116 @@ export function fecharCaixaMovimento(resumo, contado, agora, autorNome) {
       diferenca: saldoContado - resumo.saldoEsperado,
     },
   }
+}
+
+// --- Caixa do dia no modo API: gaveta separada (#1474) ----------------------
+// O "saldo esperado" da API soma tudo que entrou no dia, Pix e cartão também. A dona
+// confere a GAVETA, então a conta dela é só dinheiro: saldo inicial + entradas em
+// dinheiro - saídas em dinheiro + pagamentos e vendas em dinheiro. Lançamento estornado
+// não conta. Movimento sem método é do caixa físico (nasceu antes de o método existir);
+// pagamento sem método fica fora da gaveta, porque ninguém sabe onde ele caiu.
+const centavos = (v) => Math.round((Number(v) || 0) * 100)
+const ehDinheiro = (meio, semMetodoEhDinheiro) => meio === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
+const sinalDoMovimento = (tipo) => (tipo === TIPOS_MOVIMENTO.ENTRADA ? 1 : tipo === TIPOS_MOVIMENTO.SAIDA ? -1 : 0)
+
+// #1627: o que veio sem forma de pagamento fica à parte (`semForma`). A venda do pedido entregue
+// pelo PWA nasce sem forma no EasyStok (#1630); somada em "Pix e cartão", a tela afirmava que
+// dinheiro vivo estava fora da gaveta e a conferência do fechamento dava sobra.
+// #1683: `pixECartao` soma tudo o que não é dinheiro (transferência, outro e vale também); o
+// rótulo passou a dizer isso. A conta não mudou.
+export const ROTULO_FORA_DA_GAVETA = 'Fora da gaveta (Pix, cartão e outros)'
+export const ROTULO_FORA_DO_DINHEIRO = 'Pix, cartão e outros'
+export function gavetaDoDia(dia) {
+  let gaveta = centavos(dia?.saldoInicial)
+  let fora = 0
+  let semForma = 0
+  for (const m of dia?.movimentos ?? []) {
+    if (m.estornadoEm) continue
+    const valor = sinalDoMovimento(m.tipo) * centavos(m.valor)
+    if (ehDinheiro(m.meio, true)) gaveta += valor
+    else fora += valor
+  }
+  for (const l of dia?.linhasExtras ?? []) {
+    if (ehDinheiro(l.meio, false)) gaveta += centavos(l.valor)
+    else if (l.meio == null) semForma += centavos(l.valor)
+    else fora += centavos(l.valor)
+  }
+  return { naGaveta: gaveta / 100, pixECartao: fora / 100, semForma: semForma / 100 }
+}
+
+// --- Fluxo de caixa de vários dias (#1624) ----------------------------------
+// Uma linha por dia, com as palavras da dona: entrou (vendas, pagamentos de pedido e outras
+// entradas), saiu (saídas) e o saldo do dia. O saldo inicial fica de fora: é dinheiro que já
+// estava na gaveta, não entrou no dia. `sem-abertura` é dia com dinheiro e sem "abrir o caixa":
+// o PWA não abre caixa, e Pix de pedido entra de qualquer jeito.
+//
+// #1627: suprimento (reforço de troco) e sangria (retirada para o cofre) só trocam o dinheiro de
+// lugar: ficam fora de entrou e de saiu, senão um dia de 300 em vendas com 100 de suprimento e 350
+// de sangria mostrava "saldo do dia 50". Vale para a categoria sugerida pela tela; categoria que a
+// dona escreveu de outro jeito continua contando.
+// `depoisDoFechamento`: a API recalcula o dia fechado ao vivo; Pix que entra depois de fechar muda
+// o dia e o retrato do fechamento não. A diferença vai na linha, para as duas tabelas não se
+// contradizerem em silêncio.
+const TROCAS_DE_GAVETA = new Set(['suprimento', 'sangria'])
+const ehTrocaDeGaveta = (movimento) => TROCAS_DE_GAVETA.has(String(movimento.categoria ?? '').trim().toLocaleLowerCase('pt-BR'))
+const trocasDoDia = (dia, tipo) => (dia?.movimentos ?? [])
+  .filter((m) => m.tipo === tipo && !m.estornadoEm && ehTrocaDeGaveta(m))
+  .reduce((soma, m) => soma + centavos(m.valor), 0)
+const resultadoEmCentavos = (totais) =>
+  centavos(totais?.totalVendas) + centavos(totais?.totalPagamentosPedidos) + centavos(totais?.totalEntradasExtras) - centavos(totais?.totalSaidasExtras)
+
+export function linhaDoFluxo(dia) {
+  const entrou = centavos(dia?.totalVendas) + centavos(dia?.totalPagamentosPedidos) + centavos(dia?.totalEntradasExtras) - trocasDoDia(dia, TIPOS_MOVIMENTO.ENTRADA)
+  const saiu = centavos(dia?.totalSaidasExtras) - trocasDoDia(dia, TIPOS_MOVIMENTO.SAIDA)
+  // A API manda `aberto` também no dia que já fechou: fechado vem primeiro.
+  const situacao = dia?.fechado ? 'fechado' : dia?.aberto ? 'aberto' : entrou !== 0 || saiu !== 0 ? 'sem-abertura' : 'sem-movimento'
+  const depois = dia?.fechado && dia?.fechamento ? resultadoEmCentavos(dia) - resultadoEmCentavos(dia.fechamento) : 0
+  return { data: dia?.data ?? null, entrou: entrou / 100, saiu: saiu / 100, saldo: (entrou - saiu) / 100, situacao, depoisDoFechamento: depois / 100 }
+}
+
+// As linhas da tabela: hoje primeiro, depois os dias anteriores. Caixa esquecido aberto (#596): a
+// linha de hoje soma a sessão desde a abertura, então os dias que já estão dentro dela saem da
+// tabela (somariam duas vezes) e a linha diz desde quando (`desde`).
+export function linhasDoFluxo(hoje, anteriores) {
+  const desde = hoje?.esquecidoAberto ? hoje.abertoDesde ?? null : null
+  return [
+    { ...linhaDoFluxo(hoje), desde },
+    ...(anteriores ?? []).filter((d) => !desde || d.data < desde).map((d) => ({ ...linhaDoFluxo(d), desde: null })),
+  ]
+}
+
+export function totaisDoFluxo(linhas) {
+  const soma = (campo) => (linhas ?? []).reduce((total, l) => total + centavos(l[campo]), 0) / 100
+  return { entrou: soma('entrou'), saiu: soma('saiu'), saldo: soma('saldo') }
+}
+
+// O dia tem dinheiro para mostrar mesmo sem abertura? A rota do dia não devolve lançamento estornado:
+// dia cujo único lançamento foi estornado não tem movimento.
+export const temMovimentoNoDia = (dia) =>
+  (dia?.movimentos ?? []).some((m) => m.tipo !== TIPOS_MOVIMENTO.ABERTURA && m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
+  || (dia?.linhasExtras ?? []).length > 0
+  || [dia?.totalVendas, dia?.totalPagamentosPedidos, dia?.totalEntradasExtras, dia?.totalSaidasExtras].some((v) => centavos(v) !== 0)
+
+// Lançamentos do dia numa lista só, na ordem da hora (movimentos e pagamentos vinham em
+// dois blocos e a sangria das 20:30 aparecia entre 20:18 e 20:28). DateTime sem fuso vem
+// da API em UTC: o Z completa antes de comparar.
+const instanteDe = (valor) => Date.parse(/[zZ]|[+-]\d{2}:\d{2}$/.test(valor ?? '') ? valor : `${valor}Z`)
+
+export function lancamentosEmOrdem(dia) {
+  const movimentos = (dia?.movimentos ?? [])
+    .filter((m) => m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
+    .map((m) => ({ ...m, origemLinha: 'movimento' }))
+  const extras = (dia?.linhasExtras ?? []).map((l) => ({ ...l, origemLinha: 'extra' }))
+  return [...movimentos, ...extras].sort((a, b) => instanteDe(a.em) - instanteDe(b.em))
+}
+
+// Conferência da gaveta (#1474): o campo "contei" nasce vazio (`null`), porque nascer com o
+// esperado mostrava "bate certo" sem ninguém contar. Diferença dita do jeito que ela fala:
+// faltam, sobram ou bate certo. Até 5 reais de diferença é aviso; acima, perigo.
+export function conferenciaDaGaveta(centavosContados, esperado) {
+  if (centavosContados == null) return { pronta: false, texto: null, tom: 'neutro', diferenca: null }
+  const diferenca = (centavosContados - centavos(esperado)) / 100
+  if (diferenca === 0) return { pronta: true, texto: 'Bate certo', tom: 'ok', diferenca }
+  const texto = `${diferenca < 0 ? 'Faltam' : 'Sobram'} ${moeda(Math.abs(diferenca))}`
+  return { pronta: true, texto, tom: Math.abs(diferenca) <= 5 ? 'aviso' : 'perigo', diferenca }
 }

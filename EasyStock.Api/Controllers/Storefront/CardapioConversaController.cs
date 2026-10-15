@@ -33,6 +33,7 @@ public sealed class CardapioConversaController(CriarPedidoPeloCardapioConversaUs
     [ProducesResponseType(StatusCodes.Status410Gone)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [EnableRateLimiting("public-post")]
     [HttpPost("pedido")]
     public async Task<IActionResult> EnviarPedido(
@@ -53,7 +54,7 @@ public sealed class CardapioConversaController(CriarPedidoPeloCardapioConversaUs
                 DataEntrega: body.DataEntrega,
                 EnderecoId: body.EnderecoId,
                 Forma: body.Forma,
-                Observacoes: body.Observacoes), ct);
+                Observacoes: body.Observacoes, Endereco: body.Endereco), ct);
             return StatusCode(StatusCodes.Status201Created, result);
         }
         catch (LinkCardapioConversaIndisponivelException ex)
@@ -73,6 +74,11 @@ public sealed class CardapioConversaController(CriarPedidoPeloCardapioConversaUs
             return Problema(StatusCodes.Status409Conflict,
                 ex is LojaFechadaException ? "Loja fechada" : "Janela esgotada", ex.Message);
         }
+        catch (MercadoPagoIndisponivelException ex)
+        {
+            // #1301: pedido desfeito e link devolvido; o cliente reenvia o carrinho.
+            return Problema(StatusCodes.Status503ServiceUnavailable, "Gateway de pagamento indisponível", ex.Message);
+        }
         catch (RegraDeDominioVioladaException ex)
         {
             return Problema(StatusCodes.Status422UnprocessableEntity, "Pedido recusado", ex.Message);
@@ -90,6 +96,7 @@ public sealed record PedidoCardapioConversaRequestBody(
     DateOnly DataEntrega,
     Guid? EnderecoId = null,
     string? Forma = null,
-    string? Observacoes = null);
+    string? Observacoes = null,
+    EnderecoCheckout? Endereco = null);
 
 public sealed record ItemCardapioConversaRequest(Guid CardapioItemId, int Qtd, string? Observacao = null);

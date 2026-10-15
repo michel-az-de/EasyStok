@@ -1,9 +1,26 @@
+// Última fala de verdade da conversa: nota interna e aviso do sistema não contam (#1804 reaproveita).
+export const ultimaFala = (conversa) =>
+  [...(conversa?.mensagens ?? [])].reverse().find((m) => m.dir === 'in' || m.dir === 'out') ?? null
+
 // Substituição de variável de modelo aprovado. Sem React e sem catálogo fixo.
 export function preencherModelo(modelo, valores) {
   return modelo.texto.replace(/\{\{(\d+)\}\}/g, (todo, indice) => valores[Number(indice) - 1] ?? todo)
 }
 
 export const primeiroNome = (nomeCompleto) => nomeCompleto.split(' ')[0]
+
+// Tique da mensagem que saiu (#1761). O EasyStok distingue entregue de lida; a bolha juntava as
+// duas em "✓✓ entregue" e a atendente nunca via que o cliente leu. Lida ganha a palavra na tela:
+// cor sozinha não informa. Enviando e falhou têm aviso próprio e não têm tique.
+const TIQUES = {
+  enviada: { marca: '✓', rotulo: 'enviada', lida: false },
+  entregue: { marca: '✓✓', rotulo: 'entregue', lida: false },
+  lida: { marca: '✓✓', rotulo: 'lida', lida: true },
+}
+export function tiqueDaMensagem(status) {
+  if (status === 'falhou' || status === 'enviando') return null
+  return TIQUES[status] ?? TIQUES.enviada
+}
 
 // --- Pergunta fora do roteiro nunca fica muda -------------------------------
 // Achado P2.6 (rodada 10, `aplicacao/casos/simulacao.js`): "D3 pede
@@ -33,7 +50,7 @@ const ehAvisoDeEsteira = (mensagem) => Boolean(mensagem?.automatica) && (mensage
 // Resposta que conversa de verdade com o cliente: a dona escrevendo, ou o
 // automático respondendo alguma coisa que não seja aviso de esteira (FAQ,
 // captura de lead, agradecimento pós-entrega...). Nota de sistema não conta.
-export const respondeAoCliente = (mensagem) => mensagem.dir === 'out' && !ehAvisoDeEsteira(mensagem)
+export const respondeAoCliente = (mensagem) => mensagem.dir === 'out' && !['falhou', 'enviando'].includes(mensagem.status) && !ehAvisoDeEsteira(mensagem)
 
 // Mensagens do cliente ainda sem essa resposta, na ordem em que chegaram.
 // Anda de trás para frente: aviso de esteira e nota de sistema são
@@ -48,7 +65,9 @@ export function mensagensSemRespostaReal(conversa) {
   const pendentes = []
   for (let i = mensagens.length - 1; i >= 0; i -= 1) {
     const mensagem = mensagens[i]
-    if (respondeAoCliente(mensagem)) break
+    // #1600: conversa reaberta recomeça na nota de reabertura (mesma regra da lista da API): a
+    // entrada de antes do encerramento não volta como cliente esperando há dias.
+    if (respondeAoCliente(mensagem) || mensagem.reabertura) break
     if (mensagem.dir === 'in') pendentes.unshift(mensagem)
   }
   return pendentes

@@ -100,6 +100,8 @@ const TRACOS = {
   'credit-card': 'M3 6h18a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1ZM2 10h20M6 15h4',
   'flask-conical': 'M9 3h6M10 3v6.5L4.5 19a1.5 1.5 0 0 0 1.3 2.3h12.4a1.5 1.5 0 0 0 1.3-2.3L14 9.5V3M7 16h10',
   'chevron-up': 'M6 15l6-6 6 6',
+  // M1.1 (#1481): descer um item na lista de gestão do cardápio.
+  'chevron-down': 'M6 9l6 6 6-6',
   'chevron-right': 'M9 18l6-6-6-6',
   // F2 · Ficha do cliente (rodada 5, seção 2): "Copiar telefone" no menu ⋯.
   // Rodada 6c: ícones do trilho, da ficha e do composer.
@@ -124,26 +126,6 @@ const TRACOS = {
   // resumo na ficha/composer.
   'shopping-cart': 'M3 4h2.2l2.68 13.4a2 2 0 0 0 2 1.6h8.24a2 2 0 0 0 1.97-1.66L21.4 8H6'
     + 'M9 21a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6ZM18 21a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6Z',
-  // Rodada 6d: pedidos da frente de anexos e do assistente (rodada 7) e da banca
-  // estética (glifo de canal reconhecível). Aplicado à mão a partir do commit
-  // dece28c (mesmo traço, byte a byte): meu branch partiu de antes de
-  // `respostas`/`inbox`/`arrow-up` existirem, cherry-pick puro conflitava no
-  // ponto de inserção.
-  // Rodada 6c: ícones do trilho, da ficha e do composer.
-  phone: 'M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.8.7a2 2 0 0 1 1.7 2Z',
-  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4',
-  moon: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z',
-  inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z',
-  'arrow-up': 'M12 19V5M5 12l7-7 7 7',
-  respostas: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2ZM8 9h8M8 13h5',
-  mic: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3ZM19 10v2a7 7 0 0 1-14 0v-2M12 19v3',
-  link: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
-  sparkles: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3ZM19 3v4M17 5h4M5 17v4M3 19h4',
-  play: 'M7 4.5v15a1 1 0 0 0 1.5.9l12-7.5a1 1 0 0 0 0-1.8l-12-7.5A1 1 0 0 0 7 4.5Z',
-  pause: 'M7 4h3v16H7zM14 4h3v16h-3z',
-  whatsapp: 'M3 21l1.7-4.9A9 9 0 1 1 8 19.6L3 21ZM9 8.5c0 3.3 3.2 6.5 6.5 6.5l1.5-1.5-2-1.2-1 1a4.5 4.5 0 0 1-2.8-2.8l1-1-1.2-2L9 8.5Z',
-  instagram: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4ZM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM17.5 6.5h.01',
-
   // Frente Anexos (rodada 7, pedido do dono 24/09/2026 04h12): "tirar" peça
   // da galeria. Sem par pronto no lote do visual, entra sozinho.
   lixeira: 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6',
@@ -162,6 +144,17 @@ const TRACOS = {
   // Lucide, byte a byte como os outros ícones emprestados dele.
   estrela: 'M11.48 3.5a.56.56 0 0 1 1.04 0l2.13 5.11a.56.56 0 0 0 .47.35l5.52.44c.5.04.7.66.32.99l-4.2 3.6a.56.56 0 0 0-.19.56l1.29 5.39a.56.56 0 0 1-.84.6l-4.73-2.88a.56.56 0 0 0-.58 0l-4.73 2.88a.56.56 0 0 1-.84-.6l1.29-5.39a.56.56 0 0 0-.19-.56l-4.2-3.6a.56.56 0 0 1 .32-.99l5.52-.44a.56.56 0 0 0 .47-.35Z',
   presente: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7ZM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7Z',
+
+  // #1806 · painéis do Balcão reposicionáveis: ampliar e reduzir (setas nas diagonais), trocar
+  // de lado, encaixar à esquerda ou à direita (janela com a faixa ocupada), solto (janela dentro
+  // da tela) e a pega de arrastar (seis pontos).
+  ampliar: 'M14 4h6v6M20 4l-6 6M10 20H4v-6M4 20l6-6',
+  reduzir: 'M20 10h-6V4M14 10l6-6M4 14h6v6M10 14l-6 6',
+  trocarLado: 'M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4',
+  encaixarEsquerda: 'M4 4h16v16H4zM9 4v16',
+  encaixarDireita: 'M4 4h16v16H4zM15 4v16',
+  solto: 'M3 5h18v14H3zM11 10h7v6h-7z',
+  pega: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
 }
 
 export function Icone({ nome, tamanho = '1.15em', rotulo, className }) {

@@ -47,7 +47,7 @@ public class NotificadorServicePushTests
             triggerTipo: TriggerTipoRotina.Evento, templateCodigo: "conversa_escalada_push_v1",
             categoria: CategoriaConteudoNotificacao.Operacional);
         rotina.DefinirFallback("[\"Push\"]", "system");
-        _rotinaRepository.ListarAtivasAsync(TipoEventoNotificacao.ConversaEscalada, Arg.Any<CancellationToken>())
+        _rotinaRepository.ListarAtivasAsync(TipoEventoNotificacao.ConversaEscalada, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns([rotina]);
 
         _templateRepository.GetAtivoAsync("conversa_escalada_push_v1", CanalNotificacao.Push, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())

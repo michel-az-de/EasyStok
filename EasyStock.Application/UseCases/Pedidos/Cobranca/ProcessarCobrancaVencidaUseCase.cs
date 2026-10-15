@@ -1,11 +1,10 @@
-using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Domain.Entities.Pagamentos;
-using EasyStock.Domain.Events.Storefront;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -26,6 +25,12 @@ public enum ResultadoExpiracaoCobranca
 
     /// <summary>S32: o Mercado Pago tinha um pagamento aprovado (webhook perdido); o pedido foi confirmado.</summary>
     ConfirmadaPelaConsulta = 5,
+
+    /// <summary>
+    /// I3.2: a credencial atual não alcança a conta da cobrança (trocada, ausente ou recusada). Nada expira e
+    /// nada é cancelado; a cobrança sai da varredura até a credencial voltar.
+    /// </summary>
+    AguardandoCredencial = 6,
 }
 
 /// <summary>
@@ -36,7 +41,7 @@ public enum ResultadoExpiracaoCobranca
 ///   <item>Pedido fora de <c>AguardandoPagamento</c> (pago, na fila na entrega, cancelado): só expira a cobrança.</item>
 ///   <item>Tentativa 1 e pedido da conversa: gera a tentativa 2 e envia o link na conversa.</item>
 ///   <item>Tentativa 2, ou pedido do site (sem conversa): <see cref="CancelarPedidoUseCase"/> com motivo
-///     <c>pagamento_expirado</c>, libera a vaga (<see cref="LiberarVagaOnPedidoCanceladoHandler"/>) e avisa
+///     <c>pagamento_expirado</c>, libera a vaga (pelo próprio <see cref="CancelarPedidoUseCase"/>, #1506) e avisa
 ///     na conversa quando houver. Aviso ao cliente do site: S13.</item>
 /// </list>
 ///
@@ -51,14 +56,14 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     ICobrancaPedidoRepository cobrancaRepository,
     GerarCobrancaPedidoUseCase gerarCobranca,
     CancelarPedidoUseCase cancelarPedido,
-    LiberarVagaOnPedidoCanceladoHandler liberarVaga,
     AvisoCobrancaConversa aviso,
     IMercadoPagoClient mercadoPagoClient,
     ConfirmarPagamentoPedidoUseCase confirmarPagamento,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<ProcessarCobrancaVencidaUseCase> logger)
+    ILogger<ProcessarCobrancaVencidaUseCase> logger,
+    IOperacaoEventPublisher operacaoEventos)
 {
     public const string MotivoCancelamento = "pagamento_expirado";
 
@@ -66,6 +71,14 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     {
         ArgumentNullException.ThrowIfNull(item);
         tenantContext.SetCurrentTenant(item.EmpresaId);
+
+        if (await CredencialNaoAlcancaAsync(item, ct))
+        {
+            await MarcarAguardandoCredencialAsync(item, ct);
+            logger.LogWarning("Cobranca vencida aguardando credencial cobrancaId={CobrancaId} pedidoId={PedidoId}",
+                item.CobrancaId, item.PedidoId);
+            return ResultadoExpiracaoCobranca.AguardandoCredencial;
+        }
 
         if (await ConfirmarPagamentoPerdidoAsync(item, ct))
         {
@@ -76,6 +89,10 @@ public sealed class ProcessarCobrancaVencidaUseCase(
 
         var (resultado, conversaId, link) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             async token => await ProcessarNoLockAsync(item, token), ct);
+
+        if (resultado == ResultadoExpiracaoCobranca.PedidoCancelado)
+            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, item.EmpresaId,
+                new PedidoMudouStatusOperacao(item.PedidoId, StatusPedidoMapper.AguardandoPagamento, StatusPedidoMapper.Cancelado), ct);
 
         var agora = relogio.GetUtcNow().UtcDateTime;
         if (conversaId is { } conversa)
@@ -91,6 +108,40 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         return resultado;
     }
 
+    /// <summary>
+    /// I3.2 (invariante 4): sem credencial, com credencial recusada ou com credencial de outra conta, a busca
+    /// por pagamento voltaria vazia e o job cancelaria um pedido pago. Instabilidade do provedor (5xx, timeout)
+    /// não entra aqui: propaga e o job tenta na próxima rodada.
+    /// </summary>
+    private async Task<bool> CredencialNaoAlcancaAsync(CobrancaPedidoVencida item, CancellationToken ct)
+    {
+        string contaAtual;
+        try
+        {
+            contaAtual = await mercadoPagoClient.ObterContaRecebedoraAsync(ct);
+        }
+        catch (MercadoPagoNaoConfiguradoException)
+        {
+            return true;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+        {
+            return true;
+        }
+
+        return item.ContaRecebedoraId is { } contaDaCobranca
+               && !string.Equals(contaDaCobranca, contaAtual, StringComparison.Ordinal);
+    }
+
+    private async Task MarcarAguardandoCredencialAsync(CobrancaPedidoVencida item, CancellationToken ct)
+    {
+        var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(item.EmpresaId, item.PedidoId, ct);
+        var cobranca = cobrancas.FirstOrDefault(c => c.Id == item.CobrancaId);
+        if (cobranca is null || !cobranca.EstaPendente) return;
+        cobranca.AguardarCredencial(relogio.GetUtcNow().UtcDateTime);
+        await unitOfWork.CommitAsync();
+    }
+
     /// <summary>Pagamento aprovado no Mercado Pago que o webhook não entregou, do mais novo para o mais antigo.</summary>
     private async Task<bool> ConfirmarPagamentoPerdidoAsync(CobrancaPedidoVencida item, CancellationToken ct)
     {
@@ -99,7 +150,8 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         {
             var r = await confirmarPagamento.ExecuteAsync(new ConfirmarPagamentoPedidoInput(
                 item.PedidoId, pagamento.Id, pagamento.Status, pagamento.TransactionAmount,
-                pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved), ct);
+                pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved,
+                ContaRecebedoraId: pagamento.CollectorId), ct);
             if (r.Confirmado) return true;
         }
         return false;
@@ -129,13 +181,15 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         if (cobranca.Tentativa < CobrancaPedido.TentativaMaxima && cobranca.ConversaId is { } conversaId)
         {
             var nova = await gerarCobranca.ExecuteAsync(
-                new GerarCobrancaPedidoInput(item.EmpresaId, item.PedidoId, conversaId, cobranca.Tentativa + 1), ct);
+                // Complementar reemite pelo saldo (#1719): como cobrança comum, o cupom já abatido voltava ao link.
+                new GerarCobrancaPedidoInput(item.EmpresaId, item.PedidoId, conversaId, cobranca.Tentativa + 1,
+                    CobrarSaldo: cobranca.Complementar), ct);
             return (ResultadoExpiracaoCobranca.Reemitida, conversaId, nova.LinkPagamento);
         }
 
         await cancelarPedido.ExecuteAsync(new CancelarPedidoCommand(
-            item.EmpresaId, item.PedidoId, UsuarioNome: "Sistema", Motivo: MotivoCancelamento, Origem: "sistema"));
-        await liberarVaga.HandleAsync(new PedidoCanceladoEvent(item.PedidoId, Guid.Empty, MotivoCancelamento), ct);
+            item.EmpresaId, item.PedidoId, UsuarioNome: "Sistema", Motivo: MotivoCancelamento, Origem: "sistema"),
+            publicarOperacao: false); // O evento de UI espera o commit da transação externa.
         return (ResultadoExpiracaoCobranca.PedidoCancelado, cobranca.ConversaId, null);
     }
 }

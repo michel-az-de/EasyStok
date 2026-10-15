@@ -43,7 +43,6 @@ confere('configuração padrão: só "próprio" ligado, sem credencial (comporta
   assert.equal(cfg.padrao, 'proprio')
   assert.equal(cfg.provedores.proprio.ativo, true)
   assert.equal(cfg.provedores.lalamove.ativo, false)
-  assert.equal(cfg.provedores['99entrega'].ativo, false)
 })
 
 confere('Lalamove/99 não ligam sem credencial, e o motivo explica por quê', () => {
@@ -76,11 +75,11 @@ confere('desligar o provedor padrão devolve o padrão para "próprio"', () => {
 })
 
 confere('só provedor ligado entra na lista do despacho, padrão primeiro', () => {
-  let cfg = integracoes.salvarCredencial(integracoes.configuracaoPadraoIntegracoes(), '99entrega', 'chave-99')
-  cfg = integracoes.alternarProvedor(cfg, '99entrega')
-  cfg = integracoes.definirPadrao(cfg, '99entrega')
+  let cfg = integracoes.salvarCredencial(integracoes.configuracaoPadraoIntegracoes(), 'lalamove', 'chave-lm')
+  cfg = integracoes.alternarProvedor(cfg, 'lalamove')
+  cfg = integracoes.definirPadrao(cfg, 'lalamove')
   const lista = integracoes.provedoresParaDespacho(cfg)
-  assert.deepEqual(lista.map((p) => p.chave), ['99entrega', 'proprio'])
+  assert.deepEqual(lista.map((p) => p.chave), ['lalamove', 'proprio'])
 })
 
 confere('textos novos sem travessão', () => {
@@ -96,7 +95,7 @@ confere('cotação: preço e prazo estáveis para o mesmo pedido e provedor (dem
   assert.deepEqual(c1, c2)
   assert.ok(c1.preco > 0)
   assert.ok(c1.prazoMin > 0)
-  const outroProvedor = await provedores.cotar({ provedor: '99entrega', pedido, bairro: 'Pinheiros' })
+  const outroProvedor = await provedores.cotar({ provedor: 'proprio', pedido, bairro: 'Pinheiros' })
   assert.notDeepEqual(c1, outroProvedor, 'provedores diferentes cotam diferente')
 })
 
@@ -106,8 +105,9 @@ confere('chamar: código com o prefixo do provedor, um por corrida', async () =>
   const { codigo: c2 } = await provedores.chamar({ provedor: 'lalamove', pedido })
   assert.match(c1, /^LM\d{5}$/)
   assert.notEqual(c1, c2, 'corridas diferentes não repetem código')
-  const { codigo: c99 } = await provedores.chamar({ provedor: '99entrega', pedido })
-  assert.match(c99, /^99E\d{5}$/)
+  // #1691: a 99 simulada saiu; provedor sem prefixo próprio leva o genérico.
+  const { codigo: outro } = await provedores.chamar({ provedor: '99entrega', pedido })
+  assert.match(outro, /^COR\d{5}$/)
 })
 
 confere('consultarStatus: sem sorte de falha, avança a sequência feliz até "entregue"', async () => {
@@ -127,11 +127,11 @@ confere('consultarStatus: sem sorte de falha, avança a sequência feliz até "e
 
 confere('consultarStatus: com a sorte virada, cai em falha antes de coletar', async () => {
   const semprefalha = () => 0
-  const r = await provedores.consultarStatus({ provedor: '99entrega', status: 'procurando', aleatorio: semprefalha })
+  const r = await provedores.consultarStatus({ provedor: 'lalamove', status: 'procurando', aleatorio: semprefalha })
   assert.equal(r.status, 'falha')
   // Depois de coletado a falha não é mais sorteada (corrida já está com a
   // casa, só falta terminar).
-  const semFalha = await provedores.consultarStatus({ provedor: '99entrega', status: 'coletado', aleatorio: semprefalha })
+  const semFalha = await provedores.consultarStatus({ provedor: 'lalamove', status: 'coletado', aleatorio: semprefalha })
   assert.equal(semFalha.status, 'entregue')
 })
 
@@ -188,8 +188,8 @@ confere('"coletado" tira o pedido para "Em entrega" sozinho, com aviso ao client
 confere('"entregue" fecha sozinho com agradecimento (UC-10), sem confirmação da dona', () => {
   let e = reducer(inicio, { tipo: acao.CRIAR_VIAGEM, id: 'c1', viagemId: 'v1', modo: 'entregador' })
   e = reducer(e, {
-    tipo: acao.CHAMAR_ENTREGADOR_PROVEDOR, viagemId: 'v1', agora: AGORA, provedor: '99entrega',
-    cotacao: { preco: 9.5, prazoMin: 20 }, codigo: '99E00071',
+    tipo: acao.CHAMAR_ENTREGADOR_PROVEDOR, viagemId: 'v1', agora: AGORA, provedor: 'lalamove',
+    cotacao: { preco: 9.5, prazoMin: 20 }, codigo: 'LM00071',
   })
   e = reducer(e, {
     tipo: acao.AVANCAR_CORRIDA, viagemId: 'v1', agora: AGORA, status: 'coletado', mensagemId: 'm1',

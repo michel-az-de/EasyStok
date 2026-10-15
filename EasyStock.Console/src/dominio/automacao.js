@@ -127,3 +127,91 @@ export function contextoDePrevia(conversa, faixa, agora) {
     linkCardapio: rotaDoCardapioLink(conversa?.id ?? 'preview'),
   }
 }
+
+// ---------------------------------------------------------------------------
+// Modo API (#1441): as seis automáticas do EasyStok (S42, `GatilhoAutomacao`)
+// casadas com as regras desta tela pelo gatilho. A descrição diz quando o
+// EasyStok dispara de verdade (AutomacoesAtendimentoHandlers), não o roteiro
+// da demonstração. Na primeira mensagem sai uma só: loja fechada na mão vence
+// fora do horário, que vence a primeira resposta.
+// ---------------------------------------------------------------------------
+export const GATILHOS_DA_API = {
+  PrimeiroContato: {
+    id: 'boas-vindas', gatilho: GATILHOS.PRIMEIRO_CONTATO, nome: 'Primeira resposta',
+    descricao: 'Primeira mensagem de uma conversa nova, com a loja aberta no horário.',
+  },
+  ForaDoHorario: {
+    id: 'fora-do-horario', gatilho: GATILHOS.FORA_DO_HORARIO, nome: 'Fora do horário',
+    descricao: 'Primeira mensagem de uma conversa nova, fora do horário do expediente.',
+  },
+  LojaFechada: {
+    id: 'loja-fechada', gatilho: GATILHOS.LOJA_FECHADA, nome: 'Loja fechada',
+    descricao: 'Primeira mensagem de uma conversa nova, com a loja fechada na mão.',
+  },
+  PagamentoConfirmado: {
+    id: 'recibo', gatilho: GATILHOS.PAGAMENTO_CONFIRMADO, nome: 'Pagamento confirmado',
+    descricao: 'Quando o pagamento do pedido é confirmado.',
+  },
+  PosEntrega: {
+    id: 'agradecimento', gatilho: GATILHOS.POS_ENTREGA, nome: 'Depois da entrega',
+    descricao: 'Quando o pedido é marcado como entregue.',
+  },
+  Encerramento: {
+    id: 'encerramento', gatilho: GATILHOS.ENCERRAMENTO, nome: 'Encerramento',
+    descricao: 'Quando o atendimento é encerrado pelo console.',
+  },
+}
+
+// Automáticas de entrada (#1474): a primeira mensagem de conversa nova já leva a saudação ou a
+// mensagem do expediente da tela Horários e mensagens, ligada ou não a regra. Dizer "não sai
+// nada" quando ela está sem texto era mentira; com ela ligada, o cliente recebe duas.
+const GATILHOS_DE_ENTRADA = new Set([GATILHOS.PRIMEIRO_CONTATO, GATILHOS.FORA_DO_HORARIO, GATILHOS.LOJA_FECHADA])
+export const ehAutomaticaDeEntrada = (regra) => GATILHOS_DE_ENTRADA.has(regra?.gatilho)
+
+// O que a primeira mensagem leva em cada gatilho: no primeiro contato, a saudação; fora do
+// horário e com a loja fechada, a mensagem do expediente (seção "Quando a loja não atende").
+const MENSAGEM_DE_ENTRADA = {
+  [GATILHOS.PRIMEIRO_CONTATO]: 'a saudação de Horários e mensagens',
+  [GATILHOS.FORA_DO_HORARIO]: 'a mensagem de Horários e mensagens › Fora do horário',
+  [GATILHOS.LOJA_FECHADA]: 'a mensagem de Horários e mensagens › Loja fechada',
+}
+
+// #1474: no pagamento e na entrega o EasyStok já avisa o cliente pelo status do pedido
+// ("Recebemos seu pagamento…", "pedido entregue"); a automática sai além desse aviso.
+const AVISO_DO_PEDIDO = {
+  [GATILHOS.PAGAMENTO_CONFIRMADO]: 'o aviso de pagamento confirmado do pedido',
+  [GATILHOS.POS_ENTREGA]: 'o aviso de pedido entregue',
+}
+
+export function avisoDaAutomaticaDeEntrada(regra) {
+  const doPedido = AVISO_DO_PEDIDO[regra?.gatilho]
+  if (doPedido) {
+    if (regra.ativa && regra.texto) return `Ligada: o cliente recebe duas mensagens, ${doPedido} e este texto.`
+    return `Mesmo desligada, o cliente já recebe ${doPedido}.`
+  }
+  if (!ehAutomaticaDeEntrada(regra)) return null
+  const entrada = MENSAGEM_DE_ENTRADA[regra.gatilho]
+  if (regra.ativa && regra.texto) return `Ligada: o cliente recebe duas mensagens, ${entrada} e este texto.`
+  if (regra.ativa) return `Sem texto: a primeira mensagem leva só ${entrada}.`
+  return `Mesmo desligada, a primeira mensagem já leva ${entrada}.`
+}
+
+// O EasyStok só preenche estas três (ModeloTextoAtendimento); qualquer outra
+// chave entre chaves sai para o cliente do jeito que está escrita.
+export const VARIAVEIS_DA_API = [
+  { chave: 'nome', descricao: 'primeiro nome do cliente' },
+  { chave: 'pedido', descricao: 'código do pedido em andamento' },
+  { chave: 'faixa', descricao: 'dia e hora agendados da entrega' },
+]
+
+export function variaveisForaDaApi(texto) {
+  const conhecidas = new Set(VARIAVEIS_DA_API.map((v) => v.chave))
+  const chaves = [...String(texto ?? '').matchAll(/\{(\w+)\}/g)].map((m) => m[1])
+  return [...new Set(chaves.filter((c) => !conhecidas.has(c)))]
+}
+
+// O que a casa mandou sozinha nesta conversa, do mais novo ao mais antigo:
+// agente (IA) e mensagens do sistema (automáticas, avisos de pedido).
+export const enviosAutomaticos = (mensagens) => (mensagens ?? [])
+  .filter((m) => m.dir === 'out' && m.automatica)
+  .sort((a, b) => new Date(b.em) - new Date(a.em))

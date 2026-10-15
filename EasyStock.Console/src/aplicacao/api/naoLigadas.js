@@ -12,30 +12,25 @@
 import * as acao from '../acoes'
 
 export const SO_DA_TELA = [
-  'mudarFiltro', 'definirRascunho', 'abrirEncerramento', 'fecharEncerramento', 'fecharAlerta',
-  'trocarModoAgente', 'limparAgente', 'alternarSom', 'ouvirAmostraDeSom', 'marcarLembretesVistos',
+  'mudarFiltro', 'definirRascunho', 'descarregarRascunho', 'abrirEncerramento', 'fecharEncerramento', 'fecharAlerta',
+  'trocarModoAgente', 'limparAgente', 'alternarSom', 'ouvirAmostraDeSom',
   'pedirNotificacaoDoNavegador',
   // Rascunho da comanda: o meio escolhido segue no corpo do pedido (F03).
   'escolherMeioPagamento',
   // Marca de canhoto já impresso nesta tela; a impressão em si não depende dela.
   'marcarCanhotoImpresso',
+  // Fechar o modal do gesto da loja (#1443): abrir e fechar de verdade são ligadas.
+  'fecharGestoLoja',
+  // Queda e volta da conexão (#1241): só a faixa e a foto dos pedidos abertos; o lote é ligado.
+  'conexaoCaiu', 'conexaoVoltou',
 ]
 
 const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, rotulo]))
 
-// Nome da ação -> rótulo que abre o aviso ("<rótulo>: ainda não ligado nesta versão.").
+// Nome da ação -> rótulo que abre o aviso de indisponibilidade.
 export const NAO_LIGADAS = {
-  consultarAgente: 'Sugestão do agente',
-  reabrir: 'Reabrir conversa',
   trocarJanela: 'Trocar a janela do pedido',
-  salvarNota: 'Nota do cliente',
-  ...grupo('Mensagens automáticas', ['alternarRegra', 'editarRegra']),
-  ...grupo('Lembretes', ['criarLembrete', 'concluirLembrete']),
-  ...grupo('Bloqueio do cliente', ['bloquearCliente', 'desbloquearCliente']),
-  ...grupo('Cardápio do dia', ['alternarDisponibilidade', 'ajustarSaldo']),
-  ...grupo('Cardápio', ['incluirItemCardapio', 'editarItemCardapio', 'alternarRemocaoItemCardapio', 'confirmarValidacaoItem']),
   mudarEnderecoDoPedido: 'Endereço do pedido',
-  ...grupo('Tags do cliente', ['adicionarTag', 'removerTag', 'editarTag']),
   marcarRecebidoEntrega: 'Recebido na entrega',
   refazerCobranca: 'Refazer cobrança',
   ...grupo('Avaliação e anotação do encerramento', ['salvarAvaliacaoCliente', 'salvarAutoavaliacao', 'salvarAnotacaoFechamento']),
@@ -50,11 +45,10 @@ export const NAO_LIGADAS = {
   ]),
   decidirAreaEntrega: 'Área de entrega',
   ...grupo('Galeria de fotos', ['incluirPeca', 'editarPeca', 'tirarPeca']),
-  ...grupo('Respostas prontas', ['incluirRespostaPronta', 'editarRespostaPronta', 'alternarArquivamentoRespostaPronta']),
-  ...grupo('Lote de papel', ['conexaoCaiu', 'conexaoVoltou', 'lancarLotePapel']),
   ...grupo('Janelas de entrega', ['criarJanela', 'editarJanela', 'pausarJanela', 'reativarJanela', 'excluirJanela', 'ajustarRespiroMinimo']),
   ...grupo('Produção', ['registrarProducao', 'ajustarContagemProducao']),
-  ...grupo('Caixa', ['abrirCaixa', 'lancarMovimentoCaixa', 'estornarMovimentoCaixa', 'fecharCaixa', 'lancarVendaAvulsa']),
+  // Caixa (#1443): abrir, lançar, estornar e fechar ligados; a venda avulsa ainda não tem rota.
+  ...grupo('Venda avulsa', ['lancarVendaAvulsa']),
   ...grupo('Integrações', [
     'alternarProvedorLogistica', 'salvarCredencialProvedor', 'definirProvedorPadrao', 'cotarEntrega',
     'chamarEntregadorComProvedor', 'cancelarCorrida', 'avancarCorrida',
@@ -64,16 +58,28 @@ export const NAO_LIGADAS = {
     'alternarRecompensaAtiva', 'criarSorteio',
   ]),
   ...grupo('Cupom e recompensa no pedido', ['aplicarCupom', 'removerCupomDoPedido', 'resgatarRecompensa']),
-  ...grupo('Ocorrência', ['apurarOcorrencia', 'encerrarOcorrenciaSemEstorno']),
 }
 
-export const textoNaoLigado = (rotulo) => `${rotulo}: ainda não ligado nesta versão.`
+export const textoNaoLigado = (rotulo) => `${rotulo}: indisponível nesta versão.`
 
-// Variações do `enviar` (ligado só para texto livre) que a API ainda não tem (#1287): modelo
-// aprovado da Meta e mensagem automática disparada pela biblioteca. Mandar como texto livre
-// assumiria a conversa e cairia no 409 fora da janela, que é justamente onde o modelo serve.
+// Ações da comanda que só o EasyStok faz (`api/comanda.js`): no modo API elas avisam e não
+// mexem no pedido. A esteira anda pelo PATCH do KDS; cancelar usa a rota com motivo e
+// autorização por pagamento. Estorno e volta de etapa continuam fora.
+export const SO_NO_EASYSTOK = {
+  marcarComprovante: 'Comprovante',
+  aceitarDivergencia: 'Aceitar diferença',
+  marcarEstorno: 'Estorno',
+  corrigirPasso: 'Voltar a etapa',
+  desfazerEsteira: 'Desfazer a etapa',
+}
+
+// #1474: botão de ação que no modo API só avisaria não aparece (botão morto engana a dona).
+// Fora do modo API toda ação é da demonstração e vale.
+export const acaoDisponivel = (nome, { fonteApi = false } = {}) =>
+  !fonteApi || !(nome in NAO_LIGADAS || nome in SO_NO_EASYSTOK)
+
+// Modelos usam a ação própria enviarModelo. Automática pela biblioteca ainda não tem rota.
 export const ENVIOS_NAO_LIGADOS = {
-  modelo: 'Modelo aprovado',
   automatica: 'Mensagem automática pela biblioteca',
 }
 

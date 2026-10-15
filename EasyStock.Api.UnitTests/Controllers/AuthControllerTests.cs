@@ -1,10 +1,10 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
-using EasyStock.Application.UseCases.CadastrarUsuario;
 using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.EsqueciSenha;
 using EasyStock.Application.UseCases.Logout;
@@ -12,6 +12,7 @@ using EasyStock.Application.UseCases.ObterUsuarioAtual;
 using EasyStock.Application.UseCases.RefreshToken;
 using EasyStock.Application.UseCases.ResetarSenha;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
@@ -28,12 +29,23 @@ public class AuthControllerTests
     private readonly IAuditLogRepository _auditLogRepository = Substitute.For<IAuditLogRepository>();
     private readonly ILogger<AutenticarUsuarioUseCase> _autenticarLogger = Substitute.For<ILogger<AutenticarUsuarioUseCase>>();
     private readonly EasyStock.Api.Services.IJwtTokenService _mockJwtService = Substitute.For<EasyStock.Api.Services.IJwtTokenService>();
+    private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
     private readonly AutenticarUsuarioUseCase _autenticarUseCase;
     private readonly AuthController _controller;
 
+    // N8: o esqueci a senha e o reset usam estes para o teste ver o que o controller monta e o que vai ao motor.
+    private readonly IUsuarioRepository _acessoUsuarios = Substitute.For<IUsuarioRepository>();
+    private readonly IResetTokenRepository _acessoTokens = Substitute.For<IResetTokenRepository>();
+    private readonly EasyStock.Application.Ports.Output.Notifications.INotificadorService _notificador =
+        Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>();
+    private readonly ICacheService _cacheDoLimite = Substitute.For<ICacheService>();
+    private readonly List<string> _payloadsEnfileirados = [];
+
     public AuthControllerTests()
     {
-        var passwordHasher = Substitute.For<IPasswordHasher>();
+        var passwordHasher = _passwordHasher;
+        // #1781: o banco aceita a reserva da tentativa de senha (a conta não está bloqueada).
+        _usuarioRepository.ReservarTentativaDeSenhaAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(true);
         _autenticarUseCase = new AutenticarUsuarioUseCase(_usuarioRepository, _unitOfWork, passwordHasher, _autenticarLogger);
 
         _mockJwtService.GerarToken(Arg.Any<AutenticarUsuarioResult>()).Returns("mocked-jwt-token");
@@ -49,7 +61,6 @@ public class AuthControllerTests
         var resetTokenRepo = Substitute.For<IResetTokenRepository>();
         var currentUser = Substitute.For<ICurrentUserAccessor>();
 
-        var cadastrarLogger = Substitute.For<ILogger<CadastrarUsuarioUseCase>>();
         var refreshTokenLogger = Substitute.For<ILogger<RefreshTokenUseCase>>();
         var logoutLogger = Substitute.For<ILogger<LogoutUseCase>>();
         var esqueciSenhaLogger = Substitute.For<ILogger<EsqueciSenhaUseCase>>();
@@ -60,23 +71,60 @@ public class AuthControllerTests
         var jwtServiceApp = Substitute.For<EasyStock.Application.Ports.Output.IJwtTokenService>();
 
         var emailTokenRepo = Substitute.For<IEmailConfirmationTokenRepository>();
-        var config = new ConfigurationBuilder().Build();
-        var cadastrarUseCase = new CadastrarUsuarioUseCase(usuarioRepo2, auditLogRepo2, emailTokenRepo, null, unitOfWork2, passwordHasher, config, cadastrarLogger);
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Auth:LinkRedefinirSenha"] = "https://app.easystok.com.br/auth/redefinir-senha?token={0}",
+            })
+            .Build();
         var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
         var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
-        var esqueciSenhaUseCase = new EsqueciSenhaUseCase(usuarioRepo2, resetTokenRepo, auditLogRepo2, unitOfWork2, config, esqueciSenhaLogger);
-        var resetarSenhaUseCase = new ResetarSenhaUseCase(resetTokenRepo, refreshTokenRepo2, usuarioRepo2, auditLogRepo2, unitOfWork2, passwordHasher, resetarSenhaLogger);
+        var revogadorSessoes = new RevogadorSessoes(
+            usuarioRepo2, refreshTokenRepo2, Substitute.For<ICacheService>(), TimeProvider.System, Substitute.For<ILogger<RevogadorSessoes>>());
+
+        // N8: pedido e reset de acesso sobre os substitutos de campo (o teste le o que foi gravado e enfileirado).
+        var empresaDoEvento = new EmpresaDoEventoAnonimo(
+            Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(),
+            Substitute.For<ILogger<EmpresaDoEventoAnonimo>>());
+        _cacheDoLimite.IncrementAsync(Arg.Any<string>(), Arg.Any<long>()).Returns(1L);
+        _acessoTokens.ContarPedidosAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(new ContagemPedidosReset(0, 0, null));
+        _notificador.EnfileirarEventoAsync(
+                Arg.Any<EasyStock.Domain.Enums.Notifications.TipoEventoNotificacao>(), Arg.Any<Guid>(), Arg.Any<string>(),
+                Arg.Any<Guid?>(), Arg.Any<CancellationToken>(), Arg.Any<string?>())
+            .Returns(call => { _payloadsEnfileirados.Add(call.ArgAt<string>(2)); return Task.FromResult(Guid.NewGuid()); });
+        var limite = new LimitePedidosAcesso(_cacheDoLimite);
+        var esqueciSenhaUseCase = new EsqueciSenhaUseCase(
+            _acessoUsuarios, _acessoTokens, auditLogRepo2,
+            Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(),
+            _notificador, empresaDoEvento, limite,
+            new ConvitesDeAcesso(
+                _acessoTokens, _notificador,
+                Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(),
+                Substitute.For<IEmpresaRepository>(), config, TimeProvider.System, Substitute.For<ILogger<ConvitesDeAcesso>>()),
+            unitOfWork2, config, TimeProvider.System, esqueciSenhaLogger);
+        var concluidor = new ConcluidorDeReset(
+            usuarioRepo2, _acessoTokens, auditLogRepo2, revogadorSessoes, _notificador, empresaDoEvento, passwordHasher,
+            TimeProvider.System, Substitute.For<ILogger<ConcluidorDeReset>>());
+        var resetarSenhaUseCase = new ResetarSenhaUseCase(
+            _acessoTokens, usuarioRepo2, concluidor, limite, unitOfWork2, TimeProvider.System, resetarSenhaLogger);
+        var resetarSenhaPorCodigoUseCase = new ResetarSenhaPorCodigoUseCase(
+            _acessoTokens, usuarioRepo2, concluidor, limite, unitOfWork2, TimeProvider.System,
+            Substitute.For<ILogger<ResetarSenhaPorCodigoUseCase>>());
         var obterUsuarioAtualUseCase = new ObterUsuarioAtualUseCase(usuarioRepo2, currentUser, obterUsuarioAtualLogger);
-        var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, atualizarUsuarioAtualLogger);
-        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, unitOfWork2, passwordHasher, alterarSenhaLogger);
+        var trocaDeContato = new TrocaDeContatoService(
+            usuarioRepo2, emailTokenRepo, Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>(),
+            Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(), currentUser, passwordHasher,
+            unitOfWork2, config, TimeProvider.System, Substitute.For<ILogger<TrocaDeContatoService>>());
+        var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, trocaDeContato, atualizarUsuarioAtualLogger);
+        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, revogadorSessoes, unitOfWork2, passwordHasher, alterarSenhaLogger);
         var confirmEmailLogger = Substitute.For<ILogger<ConfirmEmailUseCase>>();
-        var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, unitOfWork2, confirmEmailLogger);
+        var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, revogadorSessoes, unitOfWork2, confirmEmailLogger);
 
         var exportarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase>>();
         var anonimizarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase>>();
         var usuarioEmpresaRepo = Substitute.For<IUsuarioEmpresaRepository>();
-        var exportarUseCase = new EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase(usuarioRepo2, usuarioEmpresaRepo, refreshTokenRepo2, currentUser, exportarLogger);
-        var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, currentUser, unitOfWork2, anonimizarLogger);
+        var exportarUseCase = new EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase(usuarioRepo2, usuarioEmpresaRepo, refreshTokenRepo2, Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Notifications.IPreferenciaNotificacaoRepository>(), currentUser, exportarLogger);
+        var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Notifications.IPreferenciaNotificacaoRepository>(), currentUser, unitOfWork2, anonimizarLogger);
 
         var listarEmpresasLogger = Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>();
         var listarEmpresasUseCase = new ListarEmpresasParaLoginUseCase(
@@ -91,11 +139,11 @@ public class AuthControllerTests
             _refreshTokenRepository,
             _auditLogRepository,
             _unitOfWork,
-            cadastrarUseCase,
             refreshTokenUseCase,
             logoutUseCase,
             esqueciSenhaUseCase,
             resetarSenhaUseCase,
+            resetarSenhaPorCodigoUseCase,
             confirmEmailUseCase,
             obterUsuarioAtualUseCase,
             atualizarUsuarioAtualUseCase,
@@ -117,5 +165,197 @@ public class AuthControllerTests
 
         // Assert
         await act.Should().ThrowAsync<CredenciaisInvalidasException>();
+    }
+
+    [Fact]
+    public async Task Login_RevogaORefreshDosOutrosAparelhosMasNaoGravaOCarimboDeSessao()
+    {
+        // #1352: logar em outro aparelho revoga só o refresh dos outros; o JWT deles segue valendo, então o
+        // carimbo de sessão não pode mudar no login (logar o tablet derrubaria o balcão).
+        var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+        // Sem vínculo ativo o login é recusado (#1541).
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+        _passwordHasher.Verify("Senha@12345", "hash").Returns(true);
+        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() };
+
+        await _controller.Login(new LoginRequest(usuario.Email, "Senha@12345", null));
+
+        await _refreshTokenRepository.Received(1).RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
+        await _usuarioRepository.DidNotReceiveWithAnyArgs().AtualizarSessoesValidasDesdeAsync(default, default);
+        usuario.SessoesValidasDesde.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(NivelAcesso.Admin, Modulo.Producao, true, true, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Producao, true, true, false, false)]
+    [InlineData(NivelAcesso.SuperAdmin, Modulo.Producao, true, true, false, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Producao, true, false, false, false)]
+    [InlineData(NivelAcesso.Visualizador, Modulo.Producao, true, false, false, false)]
+    [InlineData(NivelAcesso.Admin, Modulo.Producao, false, false, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Caixa, true, false, true, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Caixa, true, false, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Cardapio, true, false, false, true)]
+    [InlineData(NivelAcesso.Operador, Modulo.Cardapio, true, false, false, false)]
+    [InlineData(NivelAcesso.Admin, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.SuperAdmin, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Gerente, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Admin, Modulo.Atendimento, false, false, false, false)]
+    public void CapacidadesDeEdicaoExigemNivelEmpresaEModulo(
+        NivelAcesso nivel, Modulo modulo, bool comEmpresa, bool producao, bool caixa, bool cardapio)
+    {
+        UsarContextoHttp();
+        _controller.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+        [
+            new("nivel", nivel.ToString()),
+            new("empresaId", (comEmpresa ? Guid.NewGuid() : Guid.Empty).ToString()),
+            new("permissao", EasyStock.Domain.Services.AcessoModulos.PermissaoDe(modulo).ToString()),
+            new("permissoesExplicitas", "true")
+        ], "test"));
+        var usuario = new EasyStock.Api.Services.CurrentUserAccessor(
+            new Microsoft.AspNetCore.Http.HttpContextAccessor { HttpContext = _controller.HttpContext });
+
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+
+        acoes.GetProperty("editarProducao").GetBoolean().Should().Be(producao);
+        acoes.GetProperty("gerenciarCaixa").GetBoolean().Should().Be(caixa);
+        acoes.GetProperty("editarCardapio").GetBoolean().Should().Be(cardapio);
+        acoes.GetProperty("editarAtendimento").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin);
+        acoes.GetProperty("controlarLoja").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
+        acoes.GetProperty("cancelarPedidoPago").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
+        acoes.GetProperty("devolverPagamentoManual").GetBoolean().Should().Be(
+            comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void ReabrirExigeModuloEPermissaoDeAtender(bool modulo, bool atender, bool esperado)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(Guid.NewGuid());
+        usuario.TemPermissao(EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Atendimento)).Returns(modulo);
+        usuario.TemPermissao(Permissao.AtenderConversas).Returns(atender);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        acoes.GetProperty("reabrirConversa").GetBoolean().Should().Be(esperado);
+    }
+
+    // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void FinanceiroExigeModuloECapacidadeEspecifica(bool modulo, bool capacidade, bool esperado)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(Guid.NewGuid());
+        usuario.TemPermissao(EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Caixa)).Returns(modulo);
+        var capacidades = new Dictionary<string, Permissao>
+        {
+            ["visualizarContasPagar"] = Permissao.VisualizarContasAPagar,
+            ["visualizarContasReceber"] = Permissao.VisualizarContasAReceber,
+            ["gerenciarContasPagar"] = Permissao.GerenciarContasAPagar,
+            ["gerenciarContasReceber"] = Permissao.GerenciarContasAReceber,
+            ["gerenciarCategoriasFinanceiras"] = Permissao.GerenciarCategoriasFinanceiras,
+            ["gerenciarCentrosCusto"] = Permissao.GerenciarCentrosCusto
+        };
+        foreach (var permissao in capacidades.Values) usuario.TemPermissao(permissao).Returns(capacidade);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        foreach (var nome in capacidades.Keys) acoes.GetProperty(nome).GetBoolean().Should().Be(esperado);
+    }
+
+
+    private void UsarContextoHttp(string ip = "203.0.113.7")
+    {
+        var http = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        http.Connection.RemoteIpAddress = System.Net.IPAddress.Parse(ip);
+        http.Request.Headers.UserAgent = "TesteNavegador/1.0";
+        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = http };
+    }
+
+    private Usuario UsuarioDoAcesso(string email = "ana@casadababa.com")
+    {
+        var usuario = Usuario.Criar("Ana", email, "hash");
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
+        _acessoUsuarios.GetByEmailAsync(usuario.Email).Returns(usuario);
+        return usuario;
+    }
+
+    [Fact]
+    public async Task ForgotPasswordDevolve202ComMesmoCorpo()
+    {
+        UsarContextoHttp();
+        var existente = UsuarioDoAcesso();
+        _acessoUsuarios.GetByEmailAsync("ninguem@casadababa.com").Returns((Usuario?)null);
+
+        var comConta = await _controller.ForgotPassword(new EsqueciSenhaRequest(existente.Email)) as Microsoft.AspNetCore.Mvc.ObjectResult;
+        var semConta = await _controller.ForgotPassword(new EsqueciSenhaRequest("ninguem@casadababa.com")) as Microsoft.AspNetCore.Mvc.ObjectResult;
+
+        comConta!.StatusCode.Should().Be(202);
+        semConta!.StatusCode.Should().Be(202);
+        System.Text.Json.JsonSerializer.Serialize(comConta.Value).Should().Be(System.Text.Json.JsonSerializer.Serialize(semConta.Value));
+    }
+
+    [Fact]
+    public async Task ForgotPasswordIgnoraBaseUrlDoCorpo()
+    {
+        UsarContextoHttp();
+        var usuario = UsuarioDoAcesso();
+        var corpo = System.Text.Json.JsonSerializer.Deserialize<EsqueciSenhaRequest>(
+            "{\"email\":\"" + usuario.Email + "\",\"baseUrl\":\"https://evil.example\"}",
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+
+        await _controller.ForgotPassword(corpo);
+
+        _payloadsEnfileirados.Should().ContainSingle().Which.Should()
+            .Contain("https://app.easystok.com.br/auth/redefinir-senha?token=").And.NotContain("evil.example");
+    }
+
+    [Fact]
+    public async Task ForgotPasswordGravaOIpEOAgenteDaConexao()
+    {
+        UsarContextoHttp(ip: "198.51.100.77");
+        var usuario = UsuarioDoAcesso();
+
+        await _controller.ForgotPassword(new EsqueciSenhaRequest(usuario.Email));
+
+        await _acessoTokens.Received().AddAsync(Arg.Is<ResetToken>(t => t.IpCriacao == "198.51.100.77" && t.UserAgent == "TesteNavegador/1.0"));
+    }
+
+    [Fact]
+    public async Task ResetPasswordCodeMapeiaLimiteParaQuatrocentosEVinteENove()
+    {
+        UsarContextoHttp();
+        _cacheDoLimite.IncrementAsync(Arg.Any<string>(), Arg.Any<long>()).Returns(6L);
+
+        var resposta = await _controller.ResetPasswordCode(new ResetarSenhaPorCodigoRequest("ana@casadababa.com", "123456", "Nova@Senha123"))
+            as Microsoft.AspNetCore.Mvc.ObjectResult;
+
+        resposta!.StatusCode.Should().Be(429);
+        _controller.Response.Headers["Retry-After"].ToString().Should().Be("900");
+    }
+
+    [Fact]
+    public async Task ForgotPasswordMapeiaLimiteDeIpParaQuatrocentosEVinteENove()
+    {
+        UsarContextoHttp();
+        _cacheDoLimite.IncrementAsync(Arg.Any<string>(), Arg.Any<long>()).Returns(6L);
+
+        var resposta = await _controller.ForgotPassword(new EsqueciSenhaRequest("ana@casadababa.com")) as Microsoft.AspNetCore.Mvc.ObjectResult;
+
+        resposta!.StatusCode.Should().Be(429);
     }
 }

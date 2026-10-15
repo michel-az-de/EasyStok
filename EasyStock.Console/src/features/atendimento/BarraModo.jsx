@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
-import { MODOS, modoDoAtendimento, proximoPassoDepoisDeResponder } from '../../dominio/automatico'
+import { MODOS } from '../../dominio/automatico'
+import { resumoDoModo } from '../../dominio/resumoDoModo'
 import { primeiroNome } from '../../dominio/mensagem'
+import { automaticoDesligadoNaConversa } from '../../dominio/motivoDeEscalada'
 import css from './atendimento.module.css'
 
 // Quem responde esta conversa. Um lugar só, no topo da thread, com os três
@@ -16,20 +18,24 @@ import css from './atendimento.module.css'
 // Rodada 12 (issue #16, dúvidas da Thatiane): "Devolver ao automático" agora
 // explica o efeito e pede confirmação, e depois que ela responde a barra
 // sugere o próximo passo (encerrar x aguardar o cliente).
+//
+// #1442 (homologação de 07/10, "muito prolixo"): uma linha só. Rótulo curto,
+// uma frase objetiva e as ações; a frase inteira fica no `title` da linha.
 export function BarraModo({
   conversa, pausado, bloqueada = false, aoAssumir, aoDevolver, aoEncerrar,
 }) {
   const [confirmandoDevolver, setConfirmandoDevolver] = useState(false)
-  const modo = modoDoAtendimento(conversa, pausado, bloqueada)
-  const encerrada = modo.chave === MODOS.ENCERRADO
+  const resumo = resumoDoModo(conversa, pausado, bloqueada)
+  const encerrada = resumo.chave === MODOS.ENCERRADO
   // Assumir só faz sentido em conversa que ainda está no automático ou que
   // acabou de ser devolvida. Devolver só onde o automático está parado.
-  const podeAssumir = modo.chave === MODOS.LIGADO || modo.chave === MODOS.COM_VOCE
-  const podeDevolver = modo.chave === MODOS.PAUSADO || modo.chave === MODOS.COM_VOCE
-  const proximo = !bloqueada && modo.chave === MODOS.PAUSADO
-    ? proximoPassoDepoisDeResponder(conversa, pausado)
-    : null
-  const sugereEncerrar = proximo?.chave === 'encerrar-ou-aguardar' && Boolean(aoEncerrar)
+  const podeAssumir = resumo.chave === MODOS.LIGADO || resumo.chave === MODOS.COM_VOCE
+  // #1761 (L6): com o automático desligado na loja não há para quem devolver.
+  const semAutomatico = automaticoDesligadoNaConversa(conversa)
+  const podeDevolver = (resumo.chave === MODOS.PAUSADO || resumo.chave === MODOS.COM_VOCE) && !semAutomatico
+  // Automático desligado não está "pausado" nem "volta": a faixa diz só o que é verdade.
+  const linha = semAutomatico && !encerrada && resumo.chave !== MODOS.LIGADO ? 'O atendimento automático está desligado.' : resumo.linha
+  const sugereEncerrar = resumo.sugereEncerrar && Boolean(aoEncerrar)
   const nome = primeiroNome(conversa.nome)
 
   const devolver = () => {
@@ -38,25 +44,27 @@ export function BarraModo({
   }
 
   return (
-    <section className={`${css.modo} ${css['modo_' + modo.chave]}`} aria-label="Quem responde esta conversa">
+    <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
-        <Pilula tom={modo.tom}>{modo.rotulo}</Pilula>
+        <Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula>
+        <p className={css.modoTexto} title={linha === resumo.linha ? resumo.detalhe : undefined}>{linha}</p>
         {!encerrada && !bloqueada && (
           <span className={css.modoAcoes}>
             {podeAssumir && (
-              <Botao variante="primario" className={css.acaoToque} onClick={aoAssumir}>
+              <Botao variante="primario" className={css.acaoModo} onClick={aoAssumir}>
                 Assumir
               </Botao>
             )}
             {sugereEncerrar && (
-              <Botao variante="padrao" icone="log-out" className={css.acaoToque} onClick={aoEncerrar}>
-                Encerrar conversa
+              <Botao variante="padrao" icone="log-out" className={css.acaoModo} onClick={aoEncerrar}>
+                Encerrar
               </Botao>
             )}
             {podeDevolver && (
               <Botao
-                variante={podeAssumir ? 'padrao' : 'primario'}
-                className={css.acaoToque}
+                // #1761 (L5): nunca é o próximo passo; o primário da tela é o do pedido.
+                variante="padrao"
+                className={css.acaoModo}
                 title="O atendimento automático volta a responder esta conversa"
                 aria-haspopup="dialog"
                 onClick={() => setConfirmandoDevolver(true)}
@@ -67,9 +75,6 @@ export function BarraModo({
           </span>
         )}
       </div>
-
-      {modo.detalhe && <p className={css.modoDetalhe}>{modo.detalhe}</p>}
-      {proximo && <p className={css.modoProximo}>{proximo.texto}</p>}
 
       {confirmandoDevolver && (
         <Modal

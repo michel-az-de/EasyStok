@@ -173,7 +173,7 @@ public class IntegracoesTests
         await useCase.ExecuteAsync(new SalvarChaveIntegracaoCommand(_empresaId, Guid.NewGuid(), "lalamove", campos, "sandbox", null));
 
         await _resolver.Received(1).SalvarAsync(_empresaId, CategoriaIntegracao.Logistics, "lalamove", AmbienteIntegracao.Sandbox,
-            Arg.Is<Dictionary<string, string>>(d => d["apiSecret"] == "sk_test_segredo"), Arg.Any<Guid>(), null, "1234", Arg.Any<CancellationToken>());
+            Arg.Is<Dictionary<string, string>>(d => d["apiSecret"] == "sk_test_segredo"), Arg.Any<Guid>(), null, Arg.Any<CancellationToken>(), "1234");
     }
 
     private sealed class TestadorFalso(string provider) : ITestadorIntegracao
@@ -214,6 +214,15 @@ public class IntegracoesTests
 
         public Task<IReadOnlyList<CredencialIntegracao>> ListarAtivasDaEmpresaAsync(Guid empresaId, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<CredencialIntegracao>>(Itens.Where(c => c.EmpresaId == empresaId && c.Ativo).ToList());
+
+        public Task<IReadOnlyList<CredencialIntegracao>> ListarAtivasAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<CredencialIntegracao>>(Itens.Where(c => c.Ativo).ToList());
+
+        public Task RegistrarUsoAsync(Guid id, DateTime em, CancellationToken ct = default)
+        {
+            Itens.Single(c => c.Id == id).RegistrarUso();
+            return Task.CompletedTask;
+        }
 
         public Task AddAsync(CredencialIntegracao credencial, CancellationToken ct = default)
         {

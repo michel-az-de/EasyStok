@@ -1,9 +1,11 @@
+using System.Text.Json;
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Domain.Entities.Atendimento;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,13 +19,36 @@ public class AtendimentoAssistenteControllerTests
 {
     private readonly IAgenteLlmClient _llm = Substitute.For<IAgenteLlmClient>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
+    private readonly IConversaRepository _conversas = Substitute.For<IConversaRepository>();
+    private readonly Guid _empresaId = Guid.NewGuid();
 
     private AtendimentoAssistenteController Criar()
     {
-        _currentUser.EmpresaId.Returns(Guid.NewGuid());
+        _currentUser.EmpresaId.Returns(_empresaId);
         return new AtendimentoAssistenteController(
-            new AssistenteDonaUseCase(_llm, Substitute.For<IConversaRepository>(), NullLogger<AssistenteDonaUseCase>.Instance),
+            new AssistenteDonaUseCase(_llm, _conversas, NullLogger<AssistenteDonaUseCase>.Instance),
             _currentUser);
+    }
+
+    [Fact]
+    public async Task ComConversa_DevolveAcoesPropostasSemEnviar()
+    {
+        // #1445: "manda o cardápio" volta como ação proposta; o envio é do clique no console.
+        _llm.Disponivel.Returns(true);
+        var conversa = Conversa.Abrir(_empresaId, "5511999998888", DateTime.UtcNow, "Maria");
+        _conversas.ObterComMensagensAsync(_empresaId, conversa.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new ConversaComMensagens(conversa, []));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm(
+            RespostaLlm.StopToolUse,
+            [new BlocoUsoFerramentaLlm("toolu_1", "propor_envio_cardapio", JsonDocument.Parse("{}").RootElement.Clone())],
+            100, 10));
+
+        var result = await Criar().Perguntar(new PerguntarAssistenteBody("manda o cardápio", conversa.Id));
+
+        var dados = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should()
+            .BeOfType<ApiResponse<RespostaAssistenteDonaResult>>().Subject.Data;
+        dados.Acoes.Should().ContainSingle().Which.Tipo.Should().Be(AcaoPropostaAssistente.EnviarCardapio);
+        await _conversas.DidNotReceive().AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

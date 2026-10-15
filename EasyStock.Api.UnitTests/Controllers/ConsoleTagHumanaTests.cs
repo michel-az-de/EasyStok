@@ -1,3 +1,5 @@
+using EasyStock.Api.UnitTests.Helpers;
+using Microsoft.Extensions.Logging.Abstractions;
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
@@ -7,6 +9,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Atendimento.Reenvio;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Entities.Atendimento;
@@ -36,6 +39,10 @@ public class ConsoleTagHumanaTests
     public ConsoleTagHumanaTests()
     {
         _whatsApp.Canal.Returns(CanalConversa.WhatsApp);
+        // #1792: o envio relê a conversa travada numa transação; no dublê, a mesma leitura sem trava.
+        _uow.SetupExecuteInTransactionSemRetry<MensagemAtendimentoResult>();
+        _conversas.ObterPorIdComLockAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(c => _conversas.ObterPorIdAsync(c.ArgAt<Guid>(0), c.ArgAt<Guid>(1), c.ArgAt<CancellationToken>(2)));
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.EmpresaId.Returns(_empresaId);
         currentUser.UsuarioId.Returns(Guid.NewGuid());
@@ -47,14 +54,20 @@ public class ConsoleTagHumanaTests
         var resolvedor = new ResolvedorCanal([_whatsApp, new CanalMessenger(_meta), new CanalInstagram(_meta)]);
 
         _controller = new AtendimentoConversasController(
-            new ListarConversasAtendimentoUseCase(_conversas),
+            new ListarConversasAtendimentoUseCase(_conversas, ConfiguracoesPadrao(), Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions())),
             new ListarMensagensConversaUseCase(_conversas),
             new EnviarMensagemConsoleUseCase(_conversas, resolvedor, uploads, _uow),
+            new ReenviarMensagemUseCase(_conversas, ConfiguracoesPadrao(), resolvedor,
+                new ReservaSmsAtendimento(resolvedor, ReservaSmsOpcoes.Desligada, NullLogger<ReservaSmsAtendimento>.Instance),
+                _uow, TimeProvider.System),
+            new ListarNaoEntreguesUseCase(_conversas),
             new GerenciarConversaAtendimentoUseCase(_conversas, _uow),
             new TransferirConversaUseCase(_conversas, Substitute.For<IAtendenteRepository>(), _uow),
             new ObterDossieClienteUseCase(
                 Substitute.For<IClienteRepository>(), Substitute.For<IClienteCrmRepository>(),
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _conversas),
+            new GerarLinkCardapioConversaUseCase(_conversas,
+                AtendimentoConversasControllerTests.LinkCardapio(Substitute.For<ILinkCardapioConversaRepository>()), _uow, TimeProvider.System),
             currentUser);
     }
 
@@ -80,6 +93,14 @@ public class ConsoleTagHumanaTests
         _meta.Enviados.Single().Should().Contain("\"messaging_type\":\"MESSAGE_TAG\"").And.Contain("\"tag\":\"HUMAN_AGENT\"")
             .And.Contain(contato);
         await _uow.Received(1).CommitAsync();
+    }
+
+    private static IConfiguracaoAtendimentoRepository ConfiguracoesPadrao()
+    {
+        var configuracoes = Substitute.For<IConfiguracaoAtendimentoRepository>();
+        configuracoes.GetOrDefaultAsync(Arg.Any<Guid>()).Returns(c => ConfiguracaoAtendimento.CriarPadrao(c.Arg<Guid>()));
+        configuracoes.GetByEmpresaIdAsync(Arg.Any<Guid>()).Returns(c => ConfiguracaoAtendimento.CriarPadrao(c.Arg<Guid>()));
+        return configuracoes;
     }
 
     [Fact]
@@ -113,5 +134,19 @@ public class ConsoleTagHumanaTests
 
         result.Should().BeOfType<ConflictObjectResult>();
         await _whatsApp.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+    [Fact]
+    public async Task WhatsAppTimeoutDoHttpClient_GravaMensagemComoFalhou()
+    {
+        // #1411: o timeout do HttpClient chega como TaskCanceledException sem o ct cancelado; a mensagem não pode sumir.
+        var conversa = Conversa(CanalConversa.WhatsApp, "5511999997777", TimeSpan.FromHours(1));
+        _whatsApp.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new TaskCanceledException("timeout"));
+
+        await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("oi"), default);
+
+        await _conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Status == StatusMensagem.Falhou), Arg.Any<CancellationToken>());
+        await _uow.Received(1).CommitAsync();
     }
 }

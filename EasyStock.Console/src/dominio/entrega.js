@@ -1,12 +1,17 @@
 // Extensão .js: este arquivo é alcançado por agente.js, que o Node carrega
 // direto (ferramentas/avaliar-agente.mjs), e o ESM do Node não resolve
 // caminho sem extensão.
-import { horaMono } from './formato.js'
+import { horaMono, noDiaDaLojaAs } from './formato.js'
 import { itemPorSku } from './cardapio.js'
 
 export const janelaPorId = (janelas, id) => janelas.find((j) => j.id === id) ?? null
 
 export const faixaDaJanela = (janelas, id) => janelaPorId(janelas, id)?.faixa ?? null
+
+// #1802: no modo API a janela do pedido chega como "id|data" com o rótulo pronto do EasyStok;
+// o catálogo local não a conhece e o canhoto saía sem janela com a entrega marcada.
+export const faixaDoPedido = (janelas, pedido) =>
+  pedido?.janelaRotulo ?? faixaDaJanela(janelas, pedido?.janela)
 
 export const janelaLotada = (janela, atual) =>
   janela.ocupadas >= janela.capacidade && janela.id !== atual
@@ -43,17 +48,14 @@ export const MINUTOS_DE_CORTE = 60
 export function inicioDaFaixa(faixa, agora) {
   const casado = /(\d{1,2})h(\d{2})?/.exec(faixa ?? '')
   if (!casado) return null
-  const dia = new Date(agora)
-  dia.setHours(Number(casado[1]), Number(casado[2] ?? 0), 0, 0)
-  return dia.getTime()
+  // #1600: a faixa é hora da loja, no dia da loja em que `agora` cai.
+  return noDiaDaLojaAs(agora, Number(casado[1]), Number(casado[2] ?? 0))
 }
 
 function fimDaFaixaBruta(faixa, agora) {
   const casado = /às\s*(\d{1,2})h(\d{2})?/.exec(faixa ?? '')
   if (!casado) return null
-  const dia = new Date(agora)
-  dia.setHours(Number(casado[1]), Number(casado[2] ?? 0), 0, 0)
-  return dia.getTime()
+  return noDiaDaLojaAs(agora, Number(casado[1]), Number(casado[2] ?? 0))
 }
 
 // RN-06 e RN-22 (US-028, áudio 06: "tem que considerar pelo menos uns 40

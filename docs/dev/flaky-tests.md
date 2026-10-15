@@ -10,6 +10,43 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#1680) — teste do canário de telemetria dependia do timeout de produção
+
+Visto em `TelemetriaGeocodingTests.Sem_a_protecao_o_canario_vaza_no_span_e_no_log` (os três testes da
+classe tinham a mesma exposição).
+
+- **Por que era flaky:** o teste (I8.2, #1661) usa os clientes reais de CEP e de geocodificação contra
+  um servidor local, e eles vinham com o timeout de produção (1 s no ViaCEP, 2 s no Nominatim). No run
+  38318901505 (master `8831b2a9`) a primeira chamada, fria, passou de 1 s; o cliente do ViaCEP devolveu
+  nulo, como manda o contrato dele, e o teste caiu em `NullReferenceException` na linha 93, com duração
+  de 1 s. Já tinha falhado uma vez na máquina de dev antes do merge e foi mal diagnosticado como
+  contagem de spans.
+- **Como foi confirmado:** com o servidor local respondendo em 1,5 s, os três testes falhavam em 3 de 3.
+- **Fix (#1680):** `PrazoLargoSoNoTeste` sobrepõe o timeout dos `HttpClient` só dentro do teste, e o
+  servidor local passou a demorar 1,2 s de propósito. Assim o teste é determinístico nos dois sentidos:
+  quem tirar o prazo largo vê a falha sempre, não de vez em quando.
+- **Se voltar a falhar:** não é mais prazo. Olhar o que foi para span ou log.
+
+---
+## ✅ CORRIGIDO (#1822) — OTP em rajada e trava de outro host nos jobs
+
+Vistos em PRs só de console, em 14/10/2026, e passando no master minutos antes.
+
+- **`LoginTentativasConcorrenciaTests.RajadaDeCodigosCertosConsomeOOtpUmaVezSo`** (run 38642604450, PR #1815):
+  uma das quatro requisições com o código certo recebeu `OtpTentativasExcedidasException`. **Era bug do código**,
+  não do teste: a requisição que leu o OTP antes do consumo da outra tinha a reserva de tentativa recusada pelo
+  `NOT Consumido` do WHERE, e o caso de uso tratava toda reserva recusada como tentativas esgotadas. Fix: reserva
+  recusada com o OTP já consumido (lido sem rastreamento, `ConsumidoAsync`) responde `OtpInvalidoException`.
+  Teste unitário determinístico: `ExecuteAsync_ReservaRecusadaPorqueOutraRequisicaoConsumiu_LancaOtpInvalido`.
+- **`JobsEmDoisHostsIntegrationTests.*_ComATravaDoOutroHost_PulaARodada`** (run 38643283929, PR #1818): a rodada
+  com a trava livre não registrou nada. **Era corrida do teste**: `DeterTravaAsync` soltava a trava fechando a
+  conexão sem pool, e fechar não espera o backend do PostgreSQL sair; o `pg_try_advisory_lock` da rodada seguinte
+  ainda achava a trava presa e pulava. Fix: `pg_advisory_unlock` explícito antes de fechar (`TravaDeOutroHost`).
+- **Medição:** no master, 19 de 19 verdes numa máquina ociosa (a corrida não aparece fora da carga do CI; o OTP foi provado pelo teste unitário). Na branch, 40 de 40 verdes nos quatro testes. No CI a falha do OTP apareceu 3 vezes em 14/10 (#1815, #1818, #1821).
+- **Se voltar a falhar:** no OTP, olhar quem mais recusa a reserva; nos jobs, conferir se outra conexão do
+  mesmo teste segura a chave.
+
+---
 ## ✅ CORRIGIDO (#1117) — gate de worktrees paralelos compartilhava a pasta de build
 
 Visto em `MigrationDesignerHygieneTests` (qualquer arch-test pode ser a vitima).

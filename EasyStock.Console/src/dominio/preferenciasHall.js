@@ -1,0 +1,80 @@
+import { MODULOS } from './modulos'
+
+const idsDoCatalogo = MODULOS.map((modulo) => modulo.id)
+const idsValidos = (valor) => Array.isArray(valor)
+  ? [...new Set(valor.filter((id) => idsDoCatalogo.includes(id)))] : []
+
+export function normalizarPreferenciasHall(valor) {
+  const ordem = idsValidos(valor?.ordem)
+  return {
+    versao: 1,
+    ordem: [...ordem, ...idsDoCatalogo.filter((id) => !ordem.includes(id))],
+    favoritos: idsValidos(valor?.favoritos),
+    foco: ['atendimento', 'gestao', 'producao'].includes(valor?.foco) ? valor.foco : 'atendimento',
+    compacto: valor?.compacto === true,
+    movimentos: valor?.movimentos !== false,
+    paineis: Array.isArray(valor?.paineis)
+      ? [...new Set(valor.paineis.filter((id) => ['atendimento', 'cozinha', 'entregas', 'financeiro'].includes(id)))]
+      : ['atendimento', 'cozinha', 'entregas', 'financeiro'],
+  }
+}
+
+export const FOCOS_DO_HALL = [
+  { id: 'atendimento', nome: 'Cliente primeiro', ordem: ['atendimento', 'entregas', 'cozinha', 'cardapio', 'financeiro', 'producao'] },
+  { id: 'gestao', nome: 'Gestão da casa', ordem: ['financeiro', 'atendimento', 'producao', 'cardapio', 'entregas', 'cozinha'] },
+  { id: 'producao', nome: 'Produção e entregas', ordem: ['producao', 'cozinha', 'entregas', 'atendimento', 'cardapio', 'financeiro'] },
+]
+
+export function aplicarFocoDoHall(preferencia, foco) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  const modelo = FOCOS_DO_HALL.find((item) => item.id === foco)
+  return modelo ? normalizarPreferenciasHall({ ...atual, foco, ordem: modelo.ordem }) : atual
+}
+
+export function ordenarPaineisDoHall(preferencia, permitidos) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  return FOCOS_DO_HALL.find((item) => item.id === atual.foco).ordem
+    .filter((id) => atual.paineis.includes(id) && permitidos.includes(id))
+}
+
+export function ordenarModulosDoHall(modulos, preferencia) {
+  const { ordem } = normalizarPreferenciasHall(preferencia)
+  // A entrada já contém só os módulos permitidos. Preferência nunca dá acesso.
+  return [...modulos].sort((a, b) => ordem.indexOf(a.id) - ordem.indexOf(b.id))
+}
+
+export function favoritosDoHall(modulos, preferencia) {
+  const { favoritos } = normalizarPreferenciasHall(preferencia)
+  return ordenarModulosDoHall(modulos, preferencia)
+    .filter((modulo) => modulo.disponivel && favoritos.includes(modulo.id))
+}
+
+export function alternarFavoritoDoHall(preferencia, id) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  if (!idsDoCatalogo.includes(id)) return atual
+  return { ...atual, favoritos: atual.favoritos.includes(id)
+    ? atual.favoritos.filter((favorito) => favorito !== id) : [...atual.favoritos, id] }
+}
+
+export function moverModuloDoHall(preferencia, id, destino) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  const origem = atual.ordem.indexOf(id)
+  const chegada = atual.ordem.indexOf(destino)
+  if (origem < 0 || chegada < 0 || origem === chegada) return atual
+  const ordem = [...atual.ordem]
+  ordem.splice(origem, 1)
+  ordem.splice(chegada, 0, id)
+  return { ...atual, ordem }
+}
+
+export function favoritosPrimeiroNoHall(preferencia) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  return { ...atual, ordem: [
+    ...idsDoCatalogo.filter((id) => atual.favoritos.includes(id)),
+    ...idsDoCatalogo.filter((id) => !atual.favoritos.includes(id)),
+  ] }
+}
+
+export function restaurarOrdemDoHall(preferencia) {
+  return { ...normalizarPreferenciasHall(preferencia), ordem: [...idsDoCatalogo] }
+}

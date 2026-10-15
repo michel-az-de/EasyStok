@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Domain.Entities.Atendimento;
@@ -34,12 +35,18 @@ public class Mensagem
     public TipoConteudoMensagem TipoConteudo { get; private set; }
     public string? Texto { get; private set; }
 
+    public string? ModeloJson { get; private set; }
+    public ModeloMensagem? Modelo => ModeloJson is null ? null : JsonSerializer.Deserialize<ModeloMensagem>(ModeloJson);
+
     /// <summary>Id do botao interativo respondido (ex.: <c>acao:avaliacao:positiva:{pedidoId}</c>).</summary>
     public string? BotaoId { get; private set; }
 
     /// <summary>Chave da midia no storage interno (a URL da Meta expira em minutos).</summary>
     public string? MidiaChave { get; private set; }
     public string? MidiaMime { get; private set; }
+
+    /// <summary>#1398: texto do áudio recebido, transcrito depois que a mídia é armazenada.</summary>
+    public string? Transcricao { get; private set; }
 
     public StatusMensagem Status { get; private set; }
     public string? Erro { get; private set; }
@@ -49,8 +56,75 @@ public class Mensagem
     public bool Programada { get; private set; }
     public DateTime? ProcessadaEm { get; private set; }
 
-    /// <summary>Usuario do console que enviou a mensagem (S41). So em saida humana (<see cref="AutorMensagem.Dona"/>).</summary>
+    /// <summary>Usuário do console que enviou a mensagem (S41) ou praticou a ação registrada em nota interna.</summary>
     public Guid? EnviadaPorUsuarioId { get; private set; }
+
+    /// <summary>S57 (#1355): esperas do reenvio automático depois de cada falha temporária.</summary>
+    public static readonly TimeSpan[] EsperasReenvio =
+        [TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(60)];
+
+    /// <summary>Depois disto, contado do primeiro envio, a mensagem não é mais reenviada sozinha.</summary>
+    public static readonly TimeSpan PrazoReenvio = TimeSpan.FromHours(6);
+
+    /// <summary>Tentativas de envio que falharam (S57).</summary>
+    public int TentativasEnvio { get; private set; }
+
+    /// <summary>Quando o reenvio automático tenta de novo; nulo quando não há reenvio agendado (S57).</summary>
+    public DateTime? ProximoReenvioEm { get; private set; }
+
+    /// <summary>Tipo da última falha de envio (S57); decide se a reserva por SMS cabe (S60).</summary>
+    public TipoFalhaEnvio? UltimaFalhaEnvio { get; private set; }
+
+    /// <summary>
+    /// S58 (#1391): fora da janela de 24 h, o modelo de retomada saiu e a mensagem espera o cliente responder.
+    /// Nulo quando não espera.
+    /// </summary>
+    public DateTime? AguardaClienteDesde { get; private set; }
+
+    /// <summary>#1397: tentativas de baixar o anexo antes de desistir.</summary>
+    public const int MaxTentativasMidia = 3;
+    public const int MidiaIdExternoTamanhoMaximo = 200;
+    public const int ErroMidiaTamanhoMaximo = 500;
+
+    /// <summary>#1397: esperas entre as tentativas de baixar o anexo (depois da 1ª e da 2ª falha).</summary>
+    public static readonly TimeSpan[] EsperasMidia = [TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5)];
+
+    /// <summary>
+    /// #1397: folga dada à fila em memória (ou ao processo que reservou) antes de a varredura assumir o anexo.
+    /// Se a API reiniciar no meio, a varredura retoma depois deste prazo.
+    /// </summary>
+    public static readonly TimeSpan PrazoFilaMidia = TimeSpan.FromMinutes(2);
+
+    /// <summary>#1397: id da mídia na Cloud API, guardado para a varredura baixar de novo depois de um restart.</summary>
+    public string? MidiaIdExterno { get; private set; }
+
+    /// <summary>#1397: tentativas de baixar o anexo que falharam.</summary>
+    public int TentativasMidia { get; private set; }
+
+    /// <summary>#1397: quando a varredura tenta baixar o anexo; nulo quando não há anexo pendente.</summary>
+    public DateTime? ProximaTentativaMidiaEm { get; private set; }
+
+    /// <summary>#1397: erro da última tentativa de baixar o anexo.</summary>
+    public string? ErroMidia { get; private set; }
+
+    /// <summary>#1397: o anexo não veio e não haverá nova tentativa.</summary>
+    public bool MidiaFalhou => MidiaChave is null && TentativasMidia >= MaxTentativasMidia;
+
+    /// <summary>S60: quando o texto saiu pela reserva por SMS; nulo se não saiu.</summary>
+    public DateTime? ReservaSmsEm { get; private set; }
+
+    /// <summary>
+    /// S60: o WhatsApp desistiu (sem reenvio agendado, sem esperar o cliente), a falha não é incerta e o SMS
+    /// ainda não saiu.
+    /// </summary>
+    public bool PrecisaDeReservaSms =>
+        PodeReenviar && ProximoReenvioEm is null && AguardaClienteDesde is null && ReservaSmsEm is null
+        && UltimaFalhaEnvio is TipoFalhaEnvio.Temporaria or TipoFalhaEnvio.Permanente;
+
+    /// <summary>Texto que falhou e pode ser reenviado (automático ou pelo console).</summary>
+    public bool PodeReenviar =>
+        Direcao == DirecaoMensagem.Saida && Status == StatusMensagem.Falhou
+        && ModeloJson is null && TipoConteudo == TipoConteudoMensagem.Texto && !string.IsNullOrWhiteSpace(Texto);
 
     // EF Core ctor sem parametros
     private Mensagem() { }
@@ -88,6 +162,20 @@ public class Mensagem
         return msg;
     }
 
+    // A intenção tem o id da tentativa do console e nasce persistida antes da chamada externa.
+    public static Mensagem SaidaModelo(Guid id, Guid empresaId, Guid conversaId, Guid usuarioId,
+        DateTime em, ModeloMensagem modelo, string texto)
+    {
+        if (id == Guid.Empty || usuarioId == Guid.Empty || string.IsNullOrWhiteSpace(modelo.Nome)
+            || string.IsNullOrWhiteSpace(modelo.Idioma))
+            throw new RegraDeDominioVioladaException("Tentativa, usuário, nome e idioma do modelo são obrigatórios.");
+        var mensagem = Saida(empresaId, conversaId, AutorMensagem.Dona, em, TipoConteudoMensagem.Modelo, texto);
+        mensagem.Id = id;
+        mensagem.ModeloJson = JsonSerializer.Serialize(modelo);
+        mensagem.RegistrarEnviadaPor(usuarioId);
+        return mensagem;
+    }
+
     /// <summary>A Meta aceitou a mensagem e devolveu o <c>wamid</c>.</summary>
     public void ConfirmarEnvio(string externoId)
     {
@@ -97,6 +185,22 @@ public class Mensagem
             ?? throw new RegraDeDominioVioladaException("ExternoId e obrigatorio para confirmar o envio.");
         if (Status == StatusMensagem.Pendente)
             Status = StatusMensagem.Enviada;
+    }
+
+    /// <summary>
+    /// #1599: o canal confirmou depois de a varredura de intenção presa marcar falha incerta. A entrega vence:
+    /// sai de <see cref="StatusMensagem.Falhou"/> e desfaz o que aquela falha gravou.
+    /// </summary>
+    public void ConfirmarEnvioAposFalhaIncerta(string externoId)
+    {
+        if (Status != StatusMensagem.Falhou || UltimaFalhaEnvio != TipoFalhaEnvio.Incerta || ExternoId is not null)
+            throw new RegraDeDominioVioladaException("Só falha incerta sem confirmação anterior pode ser desfeita pelo canal.");
+        ConfirmarEnvio(externoId);
+        Status = StatusMensagem.Enviada;
+        Erro = null;
+        UltimaFalhaEnvio = null;
+        ProximoReenvioEm = null;
+        TentativasEnvio = Math.Max(0, TentativasEnvio - 1);
     }
 
     /// <summary>Callback de status da Meta. Nunca regride; <see cref="StatusMensagem.Falhou"/> e terminal.</summary>
@@ -116,6 +220,66 @@ public class Mensagem
         if (novo > Status) Status = novo;
     }
 
+    /// <summary>
+    /// S57: falha de envio. Temporária agenda o reenvio pela próxima espera de <see cref="EsperasReenvio"/>,
+    /// dentro do <see cref="PrazoReenvio"/>; permanente e incerta não agendam (a incerta avisa no erro).
+    /// </summary>
+    public void RegistrarFalhaEnvio(string? erro, TipoFalhaEnvio tipo, DateTime agora)
+    {
+        var motivo = tipo == TipoFalhaEnvio.Incerta ? $"Envio incerto (sem resposta do canal): {erro}" : erro;
+        AtualizarStatusEntrega(StatusMensagem.Falhou, motivo);
+        TentativasEnvio++;
+        UltimaFalhaEnvio = tipo;
+
+        var podeAgendar = tipo == TipoFalhaEnvio.Temporaria
+            && PodeReenviar
+            && TentativasEnvio <= EsperasReenvio.Length
+            && agora - EnviadaEm <= PrazoReenvio;
+        ProximoReenvioEm = podeAgendar ? agora + EsperasReenvio[TentativasEnvio - 1] : null;
+    }
+
+    /// <summary>S57: tira do agendamento antes de enviar, para outro processo não pegar a mesma mensagem.</summary>
+    public void ReservarReenvio() => ProximoReenvioEm = null;
+
+    /// <summary>S57: o reenvio saiu. Saída de <see cref="StatusMensagem.Falhou"/> para texto reenviável.</summary>
+    public void RegistrarReenviada(string externoId)
+    {
+        if (!PodeReenviar)
+            throw new RegraDeDominioVioladaException("Só texto que falhou pode ser reenviado.");
+        ExternoId = Truncar(externoId, ExternoIdTamanhoMaximo);
+        Status = StatusMensagem.Enviada;
+        Erro = null;
+        ProximoReenvioEm = null;
+        AguardaClienteDesde = null;
+    }
+
+    /// <summary>S58: o modelo de retomada saiu; a mensagem espera o cliente responder para reabrir a janela.</summary>
+    public void AguardarCliente(DateTime agora, string motivo)
+    {
+        if (!PodeReenviar)
+            throw new RegraDeDominioVioladaException("Só texto que falhou pode esperar o cliente.");
+        AguardaClienteDesde = Utc(agora);
+        ProximoReenvioEm = null;
+        Erro = Truncar(motivo, ErroTamanhoMaximo);
+    }
+
+    /// <summary>S58: o cliente respondeu e a janela reabriu: reenvio na hora.</summary>
+    public void LiberarAposResposta(DateTime agora)
+    {
+        if (AguardaClienteDesde is null)
+            throw new RegraDeDominioVioladaException("Mensagem não está esperando o cliente.");
+        AguardaClienteDesde = null;
+        ProximoReenvioEm = Utc(agora);
+    }
+
+    /// <summary>S60: o texto saiu por SMS. Uma vez por mensagem.</summary>
+    public void RegistrarReservaSms(DateTime agora)
+    {
+        if (!PrecisaDeReservaSms)
+            throw new RegraDeDominioVioladaException("Reserva por SMS não cabe nesta mensagem.");
+        ReservaSmsEm = Utc(agora);
+    }
+
     public void MarcarComoProgramada()
     {
         if (Direcao != DirecaoMensagem.Saida)
@@ -131,6 +295,38 @@ public class Mensagem
             throw new RegraDeDominioVioladaException("Mime da midia e obrigatorio.");
         MidiaChave = Truncar(chave.Trim(), MidiaChaveTamanhoMaximo);
         MidiaMime = Truncar(mime.Trim(), MidiaMimeTamanhoMaximo);
+        ProximaTentativaMidiaEm = null;
+        ErroMidia = null;
+    }
+
+    /// <summary>#1397: anexo a baixar; fica no banco para sobreviver a restart da fila em memória.</summary>
+    public void AguardarMidia(string mediaId, DateTime agora)
+    {
+        if (string.IsNullOrWhiteSpace(mediaId))
+            throw new RegraDeDominioVioladaException("Id da midia e obrigatorio.");
+        MidiaIdExterno = Truncar(mediaId.Trim(), MidiaIdExternoTamanhoMaximo);
+        ProximaTentativaMidiaEm = Utc(agora) + PrazoFilaMidia;
+    }
+
+    /// <summary>#1397: a varredura assumiu o anexo; outro processo não o pega dentro do prazo.</summary>
+    public void ReservarTentativaMidia(DateTime agora) => ProximaTentativaMidiaEm = Utc(agora) + PrazoFilaMidia;
+
+    /// <summary>#1397: falha ao baixar o anexo. Reagenda com espera crescente até <see cref="MaxTentativasMidia"/>.</summary>
+    public void RegistrarFalhaMidia(string? erro, DateTime agora)
+    {
+        TentativasMidia++;
+        ErroMidia = Truncar(string.IsNullOrWhiteSpace(erro) ? "Falha ao baixar o anexo." : erro.Trim(), ErroMidiaTamanhoMaximo);
+        ProximaTentativaMidiaEm = TentativasMidia < MaxTentativasMidia
+            ? Utc(agora) + EsperasMidia[Math.Min(TentativasMidia, EsperasMidia.Length) - 1]
+            : null;
+    }
+
+    public void RegistrarTranscricao(string texto)
+    {
+        if (TipoConteudo != TipoConteudoMensagem.Audio)
+            throw new RegraDeDominioVioladaException("So mensagem de audio guarda transcricao.");
+        if (string.IsNullOrWhiteSpace(texto)) return;
+        Transcricao = Truncar(texto.Trim(), TextoTamanhoMaximo);
     }
 
     public void MarcarProcessada(DateTime em) => ProcessadaEm = Utc(em);
@@ -141,6 +337,15 @@ public class Mensagem
             throw new RegraDeDominioVioladaException("So mensagem enviada por humano da empresa guarda quem enviou.");
         if (usuarioId == Guid.Empty)
             throw new RegraDeDominioVioladaException("Usuario que enviou e obrigatorio.");
+        EnviadaPorUsuarioId = usuarioId;
+    }
+
+    /// <summary>Autoria de ação humana registrada como nota interna, sem envio ao canal.</summary>
+    public void RegistrarAutorNotaInterna(Guid usuarioId)
+    {
+        if (Autor != AutorMensagem.Sistema || Direcao != DirecaoMensagem.Saida
+            || Status != StatusMensagem.Pendente || ExternoId is not null || usuarioId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Nota interna exige usuário e mensagem do sistema sem envio ao canal.");
         EnviadaPorUsuarioId = usuarioId;
     }
 

@@ -8,11 +8,12 @@ const BASE = '/api/atendimento/expediente'
 export const obterExpediente = () => chamarApi(BASE)
 
 // Horários omitidos mantêm os atuais na API; por isso as mensagens sozinhas não mexem na semana.
-export const atualizarExpediente = ({ horarios, mensagemForaDoHorario, mensagemLojaFechada }) =>
-  chamarApi(BASE, { metodo: 'PUT', corpo: { horarios, mensagemForaDoHorario, mensagemLojaFechada } })
+export const atualizarExpediente = ({ horarios, mensagemForaDoHorario, mensagemLojaFechada }, { identidadeEsperada = null } = {}) =>
+  chamarApi(BASE, { metodo: 'PUT', corpo: { horarios, mensagemForaDoHorario, mensagemLojaFechada }, identidadeEsperada })
 
-export const definirControleExpediente = (controle) =>
-  chamarApi(`${BASE}/controle`, { metodo: 'POST', corpo: { controle } })
+// `justificativa` só vale para fechar dentro do horário (#1443); sem ela o corpo é o de sempre.
+export const definirControleExpediente = (controle, justificativa) =>
+  chamarApi(`${BASE}/controle`, { metodo: 'POST', corpo: justificativa ? { controle, justificativa } : { controle } })
 
 // O console guarda o controle como o protótipo: `null` segue o horário, `true`/`false` é
 // a dona decidindo na mão (dominio/funcionamento.js). A API usa ControleManualLoja.

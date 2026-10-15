@@ -1,56 +1,108 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { primeiroNome } from '../../dominio/mensagem'
 import css from './atendimento.module.css'
 
-// Rodada 12 (issue #16), dúvida da Thatiane: "esse link do cardápio vem de
-// onde?". Antes o botão mandava na hora, sem mostrar nada. Agora ela vê o
-// texto, o endereço e de onde ele vem ANTES de enviar. O link e o texto
-// continuam os mesmos de `dominio/cardapioLink.js` (quem chama monta).
 export function ModalEnviarCardapio({
-  nomeCliente, canalNome, link, texto, aoEnviar, aoFechar,
+  nomeCliente, canalNome, link, daLoja = false, texto, aoGerar, aoEnviar, aoFechar, numeroComanda, podeEnviar = true,
 }) {
+  const [conteudo, setConteudo] = useState(link ? { link, texto, daLoja, numeroComanda } : null)
   const [copiado, setCopiado] = useState(false)
+  const [copiando, setCopiando] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState('')
+  const trava = useRef(false)
+  const ocupado = enviando || copiando
+  const numero = conteudo?.numeroComanda || numeroComanda
   const endereco = (() => {
-    try { return new URL(link).host } catch { return link }
+    try { return new URL(conteudo?.link).host } catch { return conteudo?.link }
   })()
 
+  async function preparar() {
+    if (conteudo) return conteudo
+    const resultado = await aoGerar()
+    if (!resultado?.link) throw new Error('Não foi possível obter o link da comanda. Tente novamente.')
+    setConteudo(resultado)
+    return resultado
+  }
+
   const copiar = async () => {
+    if (trava.current) return
+    trava.current = true; setCopiando(true); setErro('')
     try {
-      await navigator.clipboard.writeText(link)
-      setCopiado(true)
-    } catch {
-      setCopiado(false)
-    }
+      const dados = await preparar()
+      try {
+        await navigator.clipboard.writeText(dados.link)
+        setCopiado(true)
+      } catch {
+        setCopiado(false)
+        setErro('Não foi possível copiar. Abra "Detalhes do link" e selecione o endereço para copiá-lo.')
+      }
+    } catch (e) { setErro(e.message) }
+    finally { trava.current = false; setCopiando(false) }
+  }
+
+  async function enviar() {
+    if (trava.current) return
+    trava.current = true
+    setEnviando(true); setErro('')
+    try {
+      const dados = await preparar()
+      if (await aoEnviar(dados.texto) === false) throw new Error('A comanda não foi enviada. Confira o motivo na conversa. O link continua disponível para copiar ou tentar novamente.')
+      aoFechar()
+    } catch (e) { setErro(e.message) }
+    finally { trava.current = false; setEnviando(false) }
   }
 
   return (
     <Modal
-      titulo="Enviar o cardápio"
-      descricao={`Vai para ${primeiroNome(nomeCliente)} pelo ${canalNome}, com o link para escolher os pratos.`}
-      aoFechar={aoFechar}
+      titulo="Link de compra"
+      descricao={`${primeiroNome(nomeCliente)}${numero ? ` · Comanda ${numero}` : ''} · ${canalNome}`}
+      aoFechar={() => { if (!trava.current) aoFechar() }}
       rodape={(
         <>
-          <Botao onClick={aoFechar}>Cancelar</Botao>
-          <Botao variante="primario" icone="enviar" onClick={aoEnviar}>Enviar cardápio</Botao>
+          <Botao disabled={ocupado} onClick={copiar}>{copiando ? 'Copiando…' : copiado ? 'Link copiado' : conteudo ? 'Copiar link' : 'Gerar e copiar'}</Botao>
+          <Botao variante="primario" icone="enviar" disabled={ocupado || !podeEnviar} onClick={enviar}>
+            {enviando ? 'Enviando…' : conteudo ? 'Enviar link' : 'Gerar e enviar'}
+          </Botao>
         </>
       )}
     >
       <div className={css.cardapioEnvio}>
-        <p className={css.cardapioRotulo}>Mensagem</p>
-        <p className={css.cardapioMensagem}>{texto}</p>
+        {erro && <p role="alert">{erro}</p>}
+        {!podeEnviar && <p>O canal não permite enviar texto agora. Você pode copiar o link ou usar um modelo aprovado na conversa.</p>}
+        {!conteudo && <>
+          <p>O cliente escolhe pelo link. Você acompanha a seleção nesta conversa.</p>
+          <p>Se houver um link ainda não confirmado, ele será substituído ao gerar outro.</p>
+        </>}
+        {conteudo && <><p className={css.cardapioRotulo}>Mensagem</p>
+          <p className={css.cardapioMensagem}>{conteudo.texto}</p></>}
 
-        <p className={css.cardapioRotulo}>De onde vem o link</p>
-        <p>
-          É a página de pedido da própria Casa da Baba, neste sistema
-          (<strong>{endereco}</strong>). Mostra só o que está disponível hoje. O cliente escolhe,
-          paga e o pedido volta sozinho para esta conversa.
+        {conteudo && <><p className={css.cardapioLink}>
+          <a href={conteudo.link} target="_blank" rel="noreferrer">Abrir página de compra</a>
         </p>
+        <details>
+        <summary>Detalhes do link</summary>
+        {conteudo.daLoja ? (
+          // #1353: o mesmo link que o agente manda (S48). Vale 24 h e um pedido.
+          <p>
+            É a comanda pessoal no site da Casa da Baba (<strong>{endereco}</strong>). Cliente e
+            atendimento acompanham a mesma seleção. Cada link aceita uma confirmação; outro link permite
+            acrescentar ou solicitar uma troca antes da entrega. O pagamento é por pedido ou diferença.
+            Um novo link mantém o número e substitui a edição anterior ainda não confirmada.
+          </p>
+        ) : (
+          <p>
+            É a página de pedido da própria Casa da Baba, neste sistema
+            (<strong>{endereco}</strong>). Mostra só o que está disponível hoje. O cliente escolhe,
+            paga e o pedido volta sozinho para esta conversa.
+          </p>
+        )}
         <p className={css.cardapioLink}>
-          <code>{link}</code>
-          <Botao variante="texto" onClick={copiar}>{copiado ? 'Link copiado' : 'Copiar link'}</Botao>
+          <code>{conteudo.link}</code>
         </p>
+        </details></>}
       </div>
     </Modal>
   )

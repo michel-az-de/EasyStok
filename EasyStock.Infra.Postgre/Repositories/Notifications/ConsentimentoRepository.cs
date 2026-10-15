@@ -34,6 +34,34 @@ public sealed class ConsentimentoRepository(EasyStockDbContext db) : IConsentime
             .ToList();
     }
 
+    public async Task<IReadOnlyList<ConsentimentoNotificacao>> ListarPorUsuariosAsync(
+        IReadOnlyCollection<Guid> usuarioIds, CancellationToken ct = default)
+    {
+        if (usuarioIds.Count == 0) return [];
+
+        var all = await db.NotifConsentimentos
+            .AsNoTracking()
+            .Where(c => usuarioIds.Contains(c.UsuarioId))
+            .OrderByDescending(c => c.AtualizadoEm)
+            .ToListAsync(ct);
+
+        return all
+            .GroupBy(c => new { c.UsuarioId, c.Canal, c.Categoria })
+            .Select(g => g.First())
+            .ToList();
+    }
+
+    public Task<int> RevogarPorAnonimizacaoAsync(Guid usuarioId, CancellationToken ct = default) =>
+        db.NotifConsentimentos
+            .Where(c => c.UsuarioId == usuarioId)
+            .ExecuteUpdateAsync(
+                set => set
+                    .SetProperty(c => c.OptIn, false)
+                    .SetProperty(c => c.MotivoOptOut, ConsentimentoNotificacao.MotivoAnonimizacao)
+                    .SetProperty(c => c.IpOrigem, (string?)null)
+                    .SetProperty(c => c.AtualizadoEm, DateTime.UtcNow),
+                ct);
+
     public async Task AddAsync(ConsentimentoNotificacao consentimento, CancellationToken ct = default) =>
         await db.NotifConsentimentos.AddAsync(consentimento, ct);
 

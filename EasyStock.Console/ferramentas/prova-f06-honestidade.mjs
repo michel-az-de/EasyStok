@@ -6,7 +6,9 @@
 //      ou "avisa" (`aplicacao/api/naoLigadas.js`), e as listas não citam ação que não existe;
 //   2. cada "avisa" só despacha AVISO_API e não chama a API;
 //   3. Encerrar pelo modal faz POST .../encerrar (e manda a despedida marcada pelo envio real);
-//   4. foto no WhatsApp vai por multipart ao S02; áudio, arquivo, peça e outros canais avisam;
+//   4. foto do computador no WhatsApp vai por multipart e a peça da galeria do cardápio pelo id do
+//      item (#1437), sem o navegador baixar a foto; áudio no WhatsApp vai por multipart (#1444);
+//      arquivo, figurinha e outros canais avisam;
 //   5. o aviso sobrevive à sincronização de 5 s e só some quando a dona fecha.
 //
 //   node ferramentas/prova-f06-honestidade.mjs
@@ -106,7 +108,7 @@ function montar() {
     chamadas.length = 0
     try { api[nome]('c1', { id: 'x', sku: 'x', numero: '1' }, 'x', 'x') } catch (erro) { mexeram.push(`${nome} (lançou: ${erro.message})`); continue }
     await esvaziar()
-    const soAviso = despachos.length === 1 && despachos[0].tipo === acao.AVISO_API && /ainda não ligado/.test(despachos[0].mensagem)
+    const soAviso = despachos.length === 1 && despachos[0].tipo === acao.AVISO_API && /indisponível nesta versão/.test(despachos[0].mensagem)
     if (!soAviso || chamadas.length > 0) mexeram.push(`${nome} -> ${despachos.map((d) => d.tipo).join('+') || 'nada'}${chamadas.length ? ` + ${chamadas.length} chamada(s)` : ''}`)
   }
   confere(`as ${Object.keys(NAO_LIGADAS).length} ações "avisa" só despacham AVISO_API`, mexeram.length === 0, mexeram.slice(0, 8).join('; '))
@@ -148,10 +150,21 @@ const FOTO = 'data:image/png;base64,iVBORw0KGgo='
   confere('foto nasce "enviando" e não "lida"', despachos.some((d) => d.tipo === acao.ENVIAR_MIDIA && d.status === 'enviando'),
     despachos.map((d) => `${d.tipo}:${d.status ?? ''}`).join(', '))
 }
+{
+  const { api, despachos } = montar()
+  chamadas.length = 0
+  api.enviarMidia('c1', { formato: 'audio', arte: 'data:audio/webm;base64,AAAA', duracaoMs: 1000, texto: 'Mensagem de áudio' })
+  await esvaziar()
+  const envio = chamadas.find((c) => c.url === '/api/atendimento/conversas/c1/mensagens/audio')
+  confere('áudio no WhatsApp vai por POST .../mensagens/audio com o arquivo (#1444)',
+    Boolean(envio?.metodo === 'POST' && envio.corpo instanceof FormData && envio.corpo.get('file') instanceof Blob),
+    chamadas.map((c) => c.url).join(', ') || 'nenhuma chamada')
+  confere('áudio nasce "enviando"', despachos.some((d) => d.tipo === acao.ENVIAR_MIDIA && d.formato === 'audio' && d.status === 'enviando'),
+    despachos.map((d) => `${d.tipo}:${d.status ?? ''}`).join(', '))
+}
 for (const [descricao, id, molde] of [
-  ['áudio', 'c1', { formato: 'audio', arte: 'data:audio/webm;base64,AAAA', duracaoMs: 1000, texto: 'Mensagem de áudio' }],
+  ['áudio em canal sem envio de áudio (Instagram)', 'c2', { formato: 'audio', arte: 'data:audio/webm;base64,AAAA', duracaoMs: 1000, texto: 'Mensagem de áudio' }],
   ['arquivo PDF', 'c1', { formato: 'arquivo', arte: 'data:application/pdf;base64,AAAA', texto: 'a.pdf' }],
-  ['peça da galeria', 'c1', { formato: 'peca', arte: FOTO, nome: 'Lasanha', texto: 'Lasanha' }],
   ['figurinha', 'c1', { formato: 'figurinha', arte: FOTO, texto: 'oi' }],
   ['foto em canal sem envio de mídia (Instagram)', 'c2', { formato: 'imagem', arte: FOTO, texto: 'x', nomeArquivo: 'x.png' }],
 ]) {
@@ -161,6 +174,36 @@ for (const [descricao, id, molde] of [
   await esvaziar()
   confere(`${descricao} avisa e não sai`, chamadas.length === 0 && despachos.length === 1 && despachos[0].tipo === acao.AVISO_API,
     `${despachos.map((d) => d.tipo).join(', ')} / ${chamadas.length} chamada(s)`)
+}
+
+// Foto da galeria do cardápio (#1437): vai pelo id do item; o navegador nunca baixa a URL da foto
+// (cross-origin, host antigo gravado). Falha nunca vira "Enviado".
+{
+  const { mensagemDePeca } = await import('../src/dominio/anexos.js')
+  const URL_ANTIGA = 'https://ez-api.92.113.33.60.sslip.io/files/cardapios/e/s/i/angulo.webp'
+  let estado = estadoInicial({ conversas: [], catalogo: { cardapio: [], janelas: [], canais: [] }, regras: [] })
+  estado = reducer(estado, { tipo: acao.SINCRONIZAR_CARDAPIO, cardapio: [{ sku: 'item-1', nome: 'Lasanha', porcao: '600 g', fotos: ['https://x.test/capa.webp', URL_ANTIGA] }] })
+  const peca = estado.catalogo.galeria[1]
+  confere('galeria do cardápio guarda o id do item e o índice da foto', peca?.cardapioItemId === 'item-1' && peca?.indice === 1,
+    JSON.stringify(peca))
+
+  const { api, despachos } = montar()
+  chamadas.length = 0
+  const enviado = await api.enviarMidia('c1', mensagemDePeca(peca))
+  const rota = chamadas.map((c) => `${c.metodo} ${c.url}`)
+  confere('peça do cardápio vai por POST .../mensagens/imagem-cardapio', enviado === true && chamadas.length === 1
+    && rota[0] === 'POST /api/atendimento/conversas/c1/mensagens/imagem-cardapio', rota.join(', ') || 'nenhuma chamada')
+  const corpo = chamadas[0] && typeof chamadas[0].corpo === 'string' ? JSON.parse(chamadas[0].corpo) : {}
+  // #1474: "Foto N" é só da tela da galeria; a legenda do cliente é nome e porção (e preço, se houver).
+  confere('peça manda id, índice e legenda, sem baixar a foto', corpo.cardapioItemId === 'item-1' && corpo.indice === 1
+    && corpo.legenda === 'Lasanha\n600 g' && !chamadas.some((c) => String(c.url).startsWith('https://')), JSON.stringify(corpo))
+  confere('peça espera a confirmação do EasyStok', despachos.at(-1)?.tipo === acao.CONFIRMAR_ENVIO_API)
+
+  chamadas.length = 0
+  const semId = montar()
+  const saiu = await semId.api.enviarMidia('c1', { formato: 'peca', arte: URL_ANTIGA, texto: 'Lasanha' })
+  confere('foto por URL sem id do item não é baixada nem confirmada', saiu === false && chamadas.length === 0
+    && !semId.despachos.some((d) => d.tipo === acao.CONFIRMAR_ENVIO_API), chamadas.map((c) => c.url).join(', '))
 }
 
 // 5. O aviso sobrevive à sincronização e some quando a dona fecha.

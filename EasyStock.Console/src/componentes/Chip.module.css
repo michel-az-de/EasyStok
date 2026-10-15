@@ -14,8 +14,8 @@ button.chip { cursor: pointer; }
 button.chip:hover:not(.ativo):not(.emBreve) { background: var(--preenchimento-forte); }
 /* Ligado/marcado: fundo e borda mudam, não só a cor do texto. */
 .ativo {
-  background: var(--ragu-claro); color: var(--ragu);
-  border-color: color-mix(in srgb, var(--ragu) 45%, transparent);
+  background: var(--marca-claro); color: var(--marca);
+  border-color: color-mix(in srgb, var(--marca) 45%, transparent);
 }
 /* "Em breve" (seção 4): não é clicável, rótulo inteiro escreve o motivo. */
 .emBreve {
@@ -35,3 +35,5 @@ button.chip:hover:not(.ativo):not(.emBreve) { background: var(--preenchimento-fo
   background: none; border: 0; border-radius: var(--r-pilula); color: inherit; opacity: .7;
 }
 .remover:hover { opacity: 1; background: var(--preenchimento-forte); }
+/* #1474: lugar do ✓ quando desligado, mesmo tamanho do ícone (sem pulo de largura). */
+.lugarDoIcone { display: inline-block; width: 20px; height: 20px; flex-shrink: 0; }

@@ -90,4 +90,61 @@ public class RotinaNotificacao
         AtualizadaPor = atualizadaPor;
         AtualizadaEm = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Janela diária de envio (N13). Fora dela o dispatcher adia a mensagem; as duas pontas são obrigatórias e
+    /// <paramref name="inicio"/> precisa ser diferente de <paramref name="fim"/>.
+    /// </summary>
+    public void DefinirJanela(TimeOnly inicio, TimeOnly fim)
+    {
+        if (inicio == fim)
+            throw new ArgumentException("A janela precisa de início diferente do fim.", nameof(fim));
+
+        JanelaInicio = inicio;
+        JanelaFim = fim;
+        AtualizadaEm = DateTime.UtcNow;
+    }
+
+    /// <summary>A rotina é do sistema, isto é, nenhuma pessoa a alterou desde o seed (N13)?</summary>
+    public bool EhDoSistema => AtualizadaPor == "system";
+
+    /// <summary>A rotina já tem o conteúdo da entrada do catálogo (N13)? Não compara <c>Ativa</c>: quem liga ou desliga é a pessoa.</summary>
+    public bool EquivaleAoCatalogo(RotinaNotificacao catalogo) =>
+        Nome == catalogo.Nome
+        && TipoEvento == catalogo.TipoEvento
+        && TemplateCodigo == catalogo.TemplateCodigo
+        && Categoria == catalogo.Categoria
+        && JsonEquivalente(CanaisOrdemFallbackJson, catalogo.CanaisOrdemFallbackJson)
+        && JsonEquivalente(ParametrosJson, catalogo.ParametrosJson)
+        && JanelaInicio == catalogo.JanelaInicio
+        && JanelaFim == catalogo.JanelaFim;
+
+    /// <summary>Copia o conteúdo da entrada do catálogo (N13), sem tocar em <c>Ativa</c>. Fica como atualização do sistema.</summary>
+    public void AplicarCatalogo(RotinaNotificacao catalogo)
+    {
+        Nome = catalogo.Nome;
+        TipoEvento = catalogo.TipoEvento;
+        TemplateCodigo = catalogo.TemplateCodigo;
+        Categoria = catalogo.Categoria;
+        CanaisOrdemFallbackJson = catalogo.CanaisOrdemFallbackJson;
+        ParametrosJson = catalogo.ParametrosJson;
+        JanelaInicio = catalogo.JanelaInicio;
+        JanelaFim = catalogo.JanelaFim;
+        AtualizadaPor = "system";
+        AtualizadaEm = DateTime.UtcNow;
+    }
+
+    /// <summary>O Postgres guarda <c>jsonb</c> e devolve o texto normalizado (espaço depois de vírgula e de dois-pontos), então a comparação é pelo valor.</summary>
+    private static bool JsonEquivalente(string a, string b)
+    {
+        try
+        {
+            return System.Text.Json.Nodes.JsonNode.DeepEquals(
+                System.Text.Json.Nodes.JsonNode.Parse(a), System.Text.Json.Nodes.JsonNode.Parse(b));
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return a == b;
+        }
+    }
 }

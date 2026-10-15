@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { Anel } from '../../componentes/Anel'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
-import { faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
+import { useAtendimento } from '../../aplicacao/contextos'
+import { useTiqueLocal } from '../../hooks/useTiqueLocal'
+import { avisoDeLinkVencidoApi, faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
 import { horaCurta, moeda } from '../../dominio/formato'
 import css from './RelogioPix.module.css'
 
@@ -33,26 +36,8 @@ const mmss = (restamMs) => {
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
 
-// Tique local de 1s por cima do relogio da tela, que anda de 30 em 30s. A
-// contagem base vem de `situacaoDaCobranca` (o dominio continua sendo a
-// fonte); aqui so interpolamos os segundos entre um tique grande e outro.
-// `ancora` muda a cada tique grande OU a cada cobranca nova (reenvio), e e
-// nesse instante que o tique local zera.
-function useTiqueLocal(restamMsBase, ancora) {
-  const [decorrido, setDecorrido] = useState(0)
-
-  useEffect(() => {
-    setDecorrido(0)
-    const id = setInterval(() => setDecorrido((d) => d + 1000), 1000)
-    return () => clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ancora])
-
-  return Math.max(restamMsBase - decorrido, 0)
-}
-
 export function RelogioPix({
-  cobranca, agora, editavel, numeroPedido, nomeCliente,
+  cobranca, agora, editavel, numeroPedido, nomeCliente, statusApi,
   aoReenviar, aoCancelarPedido, aoEncerrarAtendimento, aoAceitarDivergencia, aoCobrarDiferenca,
 }) {
   const situacao = situacaoDaCobranca(cobranca, agora)
@@ -60,14 +45,16 @@ export function RelogioPix({
   // O relógio grande do app anda de 30 em 30s: entre um tique e outro, o
   // tique local do anel pode chegar a zero antes dele, ou o tique grande
   // pode alcançar "expirada" antes do anel. Os dois caminhos levam ao mesmo
-  // "ao zerar", nunca a um reinício de contagem.
-  const restam = useTiqueLocal(
-    situacao.chave === 'aguardando' ? situacao.restamMs : 0,
-    agora + '·' + cobranca.id,
-  )
+  // "ao zerar", nunca a um reinício de contagem. Só "aguardando" tem contagem:
+  // nos outros estados o tique local nem liga (#1577).
+  const contando = situacao.chave === 'aguardando'
+  const restam = useTiqueLocal(contando ? situacao.restamMs : 0, agora + '·' + cobranca.id, contando)
   const zerado = situacao.chave === 'expirada' || (situacao.chave === 'aguardando' && restam <= 0)
 
   const [confirmando, setConfirmando] = useState(null)
+  const { fonteApi } = useAtendimento()
+  // No modo API o cancelamento fica na barra do pedido, com motivo e permissão.
+  const disponivel = useAcaoDisponivel()
   const [recolhido, setRecolhido] = useState(false)
 
   // Recolhe a linha "Pago" 3s depois de cair. `cobranca` chega com `key` do
@@ -106,7 +93,7 @@ export function RelogioPix({
   }
 
   // Pago (por qualquer via): conciliado sozinho, marcado à mão, ou com
-  // diferença aceita. A cor fica sempre em --ok, o rótulo diz a via.
+  // diferença aceita. A cor fica sempre em --sucesso, o rótulo diz a via.
   // Divergente também tem `pagaEm` (a baixa chegou, só não bateu o valor),
   // então sai daqui e cai no ramo próprio logo abaixo.
   if (cobranca.pagaEm && situacao.chave !== 'divergente') {
@@ -174,7 +161,9 @@ export function RelogioPix({
         </Anel>
         {editavel && (
           <div className={css.botoesZerado}>
-            <Botao largo variante="primario" onClick={aoAceitarDivergencia}>Aceitar diferença</Botao>
+            {disponivel('aceitarDivergencia') && (
+              <Botao largo variante="primario" onClick={aoAceitarDivergencia}>Aceitar diferença</Botao>
+            )}
             {falta > 0 && (
               <Botao largo variante="secundario" onClick={aoCobrarDiferenca}>Cobrar diferença</Botao>
             )}
@@ -184,7 +173,7 @@ export function RelogioPix({
     )
   }
 
-  // Ao zerar: numero "0:00", trilho inteiro --parado, pisca e para. Os tres
+  // Ao zerar: numero "0:00", trilho inteiro --erro, pisca e para. Os tres
   // botoes empilhados cobrem os tres caminhos dali: tentar de novo, desistir
   // com o pedido aberto, ou desistir fechando a conversa tambem.
   if (zerado) {
@@ -195,12 +184,20 @@ export function RelogioPix({
           <span className={css.numero}>0:00</span>
           <span className={css.legenda}>Venceu</span>
         </Anel>
+        {/* #1616: no modo API quem trata o link vencido é o job do EasyStok (segundo link, depois
+            cancelamento). O botão só avisava no rodapé; no lugar dele, o que vai acontecer.
+            #1683: isso só vale com o pedido esperando o pagamento; "Marcar pago" fica na barra. */}
+        {fonteApi && <p className={css.legenda}>{avisoDeLinkVencidoApi(cobranca, statusApi)}</p>}
         {editavel && confirmando === null && (
           <div className={css.botoesZerado}>
-            <Botao largo variante="primario" icone="refresh-cw" onClick={aoReenviar}>Reenviar cobrança</Botao>
-            <Botao largo variante="secundario" icone="circle-x" onClick={() => setConfirmando('cancelar')}>
-              Cancelar pedido
-            </Botao>
+            {!fonteApi && (
+              <Botao largo variante="primario" icone="refresh-cw" onClick={aoReenviar}>Reenviar cobrança</Botao>
+            )}
+            {!fonteApi && disponivel('cancelarPedido') && (
+              <Botao largo variante="secundario" icone="circle-x" onClick={() => setConfirmando('cancelar')}>
+                Cancelar pedido
+              </Botao>
+            )}
             <Botao largo variante="secundario" icone="log-out" onClick={aoEncerrarAtendimento}>
               Encerrar atendimento
             </Botao>
@@ -212,7 +209,7 @@ export function RelogioPix({
               Cancelar o pedido {numeroPedido}? {nomeCliente} recebe aviso de cancelamento.
             </p>
             <div className={css.botoesZerado}>
-              <Botao variante="primario" onClick={() => { aoCancelarPedido(); setConfirmando(null) }}>
+              <Botao variante="perigo" onClick={() => { aoCancelarPedido(); setConfirmando(null) }}>
                 Cancelar pedido
               </Botao>
               <Botao variante="texto" onClick={() => setConfirmando(null)}>Manter</Botao>

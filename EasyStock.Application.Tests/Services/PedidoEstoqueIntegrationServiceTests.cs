@@ -77,6 +77,141 @@ public class PedidoEstoqueIntegrationServiceTests
     }
 
     [Fact]
+    public async Task DescontarAsync_ignora_lote_vazio_e_baixa_o_lote_com_saldo()
+    {
+        var (svc, itemRepo, movRepo) = Build(permiteNegativo: true);
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 5);
+
+        ItemEstoque Lote(decimal qtd, int dias) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(qtd), Status = StatusItemEstoque.Ok,
+            ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(dias))
+        };
+        var vazio = Lote(0, -10);   // mais antigo: o FEFO antigo o escolhia sempre
+        var cheio = Lote(50, 30);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { vazio, cheio });
+
+        await svc.DescontarAsync(pedido);
+
+        cheio.QuantidadeAtual.Value.Should().Be(45);
+        cheio.QuantidadeDescoberta.Value.Should().Be(0);
+        vazio.QuantidadeDescoberta.Value.Should().Be(0);
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.ItemEstoqueId == cheio.Id));
+    }
+
+    [Fact]
+    public async Task DescontarAsync_recusa_falta_de_saldo_apos_lock_quando_descoberto_desabilitado()
+    {
+        var (svc, itemRepo, movRepo) = Build(permiteNegativo: false);
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var loteId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 5);
+        ItemEstoque Lote(decimal saldo) => new()
+        {
+            Id = loteId, EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(saldo)
+        };
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { Lote(5) });
+        // Outro pedido consumiu o lote antes de esta transação adquirir o lock.
+        var atual = Lote(2);
+        itemRepo.GetByIdComLockAsync(empresaId, loteId).Returns(atual);
+
+        await Assert.ThrowsAsync<EstoqueInsuficienteException>(() => svc.DescontarAsync(pedido));
+
+        atual.QuantidadeDescoberta.Value.Should().Be(0);
+        await movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+    }
+
+    [Fact]
+    public async Task DescontarAsync_distribui_quantidade_fracionaria_entre_lotes_em_fefo()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 2.5m);
+        ItemEstoque Lote(decimal saldo, int dias) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(saldo), ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(dias))
+        };
+        var primeiro = Lote(1.5m, 1);
+        var segundo = Lote(3m, 2);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { segundo, primeiro });
+
+        await svc.DescontarAsync(pedido);
+
+        primeiro.QuantidadeAtual.Value.Should().Be(0);
+        segundo.QuantidadeAtual.Value.Should().Be(2m);
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.ItemEstoqueId == primeiro.Id && m.Quantidade.Value == 1.5m));
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.ItemEstoqueId == segundo.Id && m.Quantidade.Value == 1m));
+    }
+
+    [Fact]
+    public async Task DevolverItemAsync_restaura_os_lotes_originais_e_abate_descoberto()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 5);
+        var item = pedido.Itens.Single();
+        var referencia = $"{pedido.Id}:{item.Id}";
+        ItemEstoque Lote(decimal descoberto) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(0), QuantidadeDescoberta = Quantidade.From(descoberto)
+        };
+        var primeiro = Lote(0);
+        var segundo = Lote(1);
+        MovimentacaoEstoque Saida(ItemEstoque lote, decimal quantidade) => new()
+        {
+            EmpresaId = empresaId, ProdutoId = produtoId, ItemEstoqueId = lote.Id,
+            DocumentoReferencia = referencia, Tipo = TipoMovimentacaoEstoque.Saida,
+            Natureza = NaturezaMovimentacaoEstoque.Venda, Quantidade = Quantidade.From(quantidade)
+        };
+        movRepo.ExisteReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        movRepo.GetPorReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[] { Saida(primeiro, 2), Saida(segundo, 3) });
+        itemRepo.GetByIdComLockAsync(empresaId, primeiro.Id).Returns(primeiro);
+        itemRepo.GetByIdComLockAsync(empresaId, segundo.Id).Returns(segundo);
+
+        await svc.DevolverItemAsync(pedido, item);
+
+        primeiro.QuantidadeAtual.Value.Should().Be(2);
+        segundo.QuantidadeAtual.Value.Should().Be(2);
+        segundo.QuantidadeDescoberta.Value.Should().Be(0);
+        await movRepo.Received(2).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno));
+    }
+
+    [Fact]
+    public async Task DescontarAsync_nao_baixa_lote_bloqueado()
+    {
+        var (svc, itemRepo, _) = Build(permiteNegativo: false);
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 2);
+        var bloqueado = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(10), Status = StatusItemEstoque.Bloqueado
+        };
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { bloqueado });
+
+        // Sem lote operavel e sem requerer estoque: ignora o desconto, nao toca no bloqueado.
+        await svc.DescontarAsync(pedido);
+
+        bloqueado.QuantidadeAtual.Value.Should().Be(10);
+    }
+
+    [Fact]
     public void PermiteEstoqueNegativo_default_true()
     {
         new PedidoEstoqueOptions().PermiteEstoqueNegativo.Should().BeTrue();
@@ -243,6 +378,145 @@ public class PedidoEstoqueIntegrationServiceTests
         await movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
     }
 
+    private static Pedido PedidoSemLoja(Guid empresaId, Guid produtoId, decimal qty)
+    {
+        // Como o checkout do site e da comanda cria: Pedido.Criar(empresaId, origem), sem loja.
+        var p = Pedido.Criar(empresaId, cliente: null, lojaId: null, "atendimento");
+        p.Itens.Add(new PedidoItem { Id = Guid.NewGuid(), PedidoId = p.Id, ProdutoId = produtoId, Nome = "X", Quantidade = qty, PrecoUnitario = 10m });
+        return p;
+    }
+
+    [Fact] // #1534: pedido do site e da comanda nasce sem loja e não baixava nada.
+    public async Task DescontarAsync_pedido_sem_loja_baixa_do_estoque_da_empresa_em_fefo()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoSemLoja(empresaId, produtoId, qty: 3);
+        // A produção do console grava o lote sem loja; o PWA grava com loja. Os dois são da empresa.
+        var semLoja = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = null, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(2), ValidadeEm = Validade.From(new DateTime(2026, 10, 12))
+        };
+        var comLoja = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = Guid.NewGuid(), ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(5), ValidadeEm = Validade.From(new DateTime(2026, 10, 20))
+        };
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { comLoja, semLoja });
+        itemRepo.GetByIdComLockAsync(empresaId, semLoja.Id).Returns(semLoja);
+        itemRepo.GetByIdComLockAsync(empresaId, comLoja.Id).Returns(comLoja);
+
+        await svc.DescontarAsync(pedido);
+
+        (semLoja.QuantidadeAtual!.Value, comLoja.QuantidadeAtual!.Value).Should().Be((0m, 4m), "o que vence antes sai primeiro");
+        await movRepo.Received(2).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.Natureza == NaturezaMovimentacaoEstoque.Venda));
+    }
+
+    [Fact] // #1534: o cancelamento do pedido sem loja também devolve.
+    public async Task DevolverAsync_pedido_sem_loja_devolve_ao_lote_que_baixou()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoSemLoja(empresaId, produtoId, qty: 2);
+        var item = pedido.Itens.Single();
+        var refDoc = $"{pedido.Id}:{item.Id}";
+        var lote = new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = null, ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0) };
+        movRepo.ExisteReferenciaAsync(empresaId, produtoId, refDoc, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        movRepo.GetPorReferenciaAsync(empresaId, produtoId, refDoc, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(new[]
+        {
+            new MovimentacaoEstoque
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, ItemEstoqueId = lote.Id, ItemEstoque = lote,
+                Tipo = TipoMovimentacaoEstoque.Saida, Natureza = NaturezaMovimentacaoEstoque.Venda,
+                Quantidade = Quantidade.From(2), DocumentoReferencia = refDoc
+            }
+        });
+        itemRepo.GetByIdComLockAsync(empresaId, lote.Id).Returns(lote);
+
+        await svc.DevolverAsync(pedido);
+
+        lote.QuantidadeAtual!.Value.Should().Be(2);
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno));
+    }
+
+    // ── M1.4c (#1537): a linha de porção baixa do saldo da porção ─────────
+
+    private static ItemEstoque LoteDaVariacao(Guid empresaId, Guid produtoId, Guid? variacaoId, decimal saldo, int diaValidade) => new()
+    {
+        Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, ProdutoVariacaoId = variacaoId,
+        QuantidadeAtual = Quantidade.From(saldo), ValidadeEm = Validade.From(new DateTime(2026, 10, diaValidade))
+    };
+
+    private static (Pedido Pedido, PedidoItem Item) PedidoDaPorcao(Guid empresaId, Guid produtoId, Guid variacaoId, decimal qty)
+    {
+        var p = PedidoSemLoja(empresaId, produtoId, qty);
+        var item = p.Itens.Single();
+        item.ProdutoVariacaoId = variacaoId;
+        item.VariacaoRotuloSnapshot = "800 g";
+        return (p, item);
+    }
+
+    [Fact]
+    public async Task DescontarAsync_linha_de_porcao_baixa_so_do_saldo_da_porcao_e_grava_a_variacao()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var v800 = Guid.NewGuid();
+        var (pedido, _) = PedidoDaPorcao(empresaId, produtoId, v800, qty: 2);
+        // O lote da 300 g vence antes: sem o filtro, o FEFO o escolheria.
+        var lote300 = LoteDaVariacao(empresaId, produtoId, Guid.NewGuid(), 5, 11);
+        var lote800 = LoteDaVariacao(empresaId, produtoId, v800, 5, 20);
+        var semPorcao = LoteDaVariacao(empresaId, produtoId, null, 5, 10);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { semPorcao, lote300, lote800 });
+        foreach (var l in new[] { semPorcao, lote300, lote800 }) itemRepo.GetByIdComLockAsync(empresaId, l.Id).Returns(l);
+
+        await svc.DescontarAsync(pedido);
+
+        (lote300.QuantidadeAtual!.Value, lote800.QuantidadeAtual!.Value, semPorcao.QuantidadeAtual!.Value).Should().Be((5m, 3m, 5m));
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.ItemEstoqueId == lote800.Id && m.ProdutoVariacaoId == v800));
+    }
+
+    [Fact]
+    public async Task DescontarAsync_sem_nenhum_lote_da_porcao_cai_no_lote_sem_porcao_do_prato()
+    {
+        // Estoque antigo e lote do PWA não têm porção: não podem ficar invisíveis para a venda.
+        var (svc, itemRepo, _) = Build();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var (pedido, _) = PedidoDaPorcao(empresaId, produtoId, Guid.NewGuid(), qty: 2);
+        var outraPorcao = LoteDaVariacao(empresaId, produtoId, Guid.NewGuid(), 5, 10);
+        var semPorcao = LoteDaVariacao(empresaId, produtoId, null, 5, 20);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { outraPorcao, semPorcao });
+        foreach (var l in new[] { outraPorcao, semPorcao }) itemRepo.GetByIdComLockAsync(empresaId, l.Id).Returns(l);
+
+        await svc.DescontarAsync(pedido);
+
+        (outraPorcao.QuantidadeAtual!.Value, semPorcao.QuantidadeAtual!.Value).Should().Be((5m, 3m), "nunca baixa da porção errada");
+    }
+
+    [Fact]
+    public async Task DescontarAsync_porcao_zerada_fica_descoberta_nela_e_nao_come_o_saldo_de_outra()
+    {
+        var (svc, itemRepo, _) = BuildComPublicador(permiteNegativo: true) is var b ? (b.svc, b.itemRepo, b.movRepo) : default;
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var v800 = Guid.NewGuid();
+        var (pedido, _) = PedidoDaPorcao(empresaId, produtoId, v800, qty: 2);
+        var lote300 = LoteDaVariacao(empresaId, produtoId, Guid.NewGuid(), 5, 10);
+        var lote800 = LoteDaVariacao(empresaId, produtoId, v800, 0, 20);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { lote300, lote800 });
+        foreach (var l in new[] { lote300, lote800 }) itemRepo.GetByIdComLockAsync(empresaId, l.Id).Returns(l);
+
+        await svc.DescontarAsync(pedido);
+
+        lote300.QuantidadeAtual!.Value.Should().Be(5m);
+        lote800.QuantidadeDescoberta.Value.Should().Be(2m, "vendeu a 800 g sem saldo: o descoberto é dela (S17)");
+    }
+
     [Fact] // #939: estorno por item quando houve saída (Venda) anterior por este pedido+item.
     public async Task DevolverItemAsync_estorna_quando_houve_venda_anterior()
     {
@@ -269,6 +543,84 @@ public class PedidoEstoqueIntegrationServiceTests
             m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno));
     }
 
+    [Fact] // #1506: estorno manual de UMA saida nao pode fazer o cancelamento pular as outras.
+    public async Task DevolverItemAsync_devolve_as_saidas_nao_estornadas_depois_de_estorno_manual_parcial()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 5);
+        var item = pedido.Itens.Single();
+        var referencia = $"{pedido.Id}:{item.Id}";
+        ItemEstoque Lote() => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(0)
+        };
+        var primeiro = Lote();
+        var segundo = Lote();
+        MovimentacaoEstoque Saida(ItemEstoque lote, decimal quantidade) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, ItemEstoqueId = lote.Id,
+            DocumentoReferencia = referencia, Tipo = TipoMovimentacaoEstoque.Saida,
+            Natureza = NaturezaMovimentacaoEstoque.Venda, Quantidade = Quantidade.From(quantidade)
+        };
+        var jaEstornada = Saida(primeiro, 2);
+        jaEstornada.MarcarComoEstornada(DateTime.UtcNow.AddHours(-1));
+        var pendente = Saida(segundo, 3);
+        movRepo.ExisteReferenciaAsync(empresaId, produtoId, referencia, Arg.Any<NaturezaMovimentacaoEstoque>(), Arg.Any<CancellationToken>()).Returns(true);
+        movRepo.GetPorReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[] { jaEstornada, pendente });
+        itemRepo.GetByIdComLockAsync(empresaId, primeiro.Id).Returns(primeiro);
+        itemRepo.GetByIdComLockAsync(empresaId, segundo.Id).Returns(segundo);
+
+        await svc.DevolverItemAsync(pedido, item);
+
+        primeiro.QuantidadeAtual.Value.Should().Be(0);
+        segundo.QuantidadeAtual.Value.Should().Be(3);
+        pendente.EstornadaEm.Should().NotBeNull();
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.Natureza == NaturezaMovimentacaoEstoque.Estorno));
+
+        // Segunda chamada (retry) nao devolve de novo.
+        await svc.DevolverItemAsync(pedido, item);
+        segundo.QuantidadeAtual.Value.Should().Be(3);
+    }
+
+    [Fact] // #1564: o cancelamento pede só as saídas do pedido+item, e não o histórico do produto.
+    public async Task DevolverItemAsync_consulta_so_as_saidas_do_pedido_item()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 2);
+        var item = pedido.Itens.Single();
+        var referencia = $"{pedido.Id}:{item.Id}";
+        var lote = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(0)
+        };
+        movRepo.ExisteReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>()).Returns(true);
+        movRepo.GetPorReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new MovimentacaoEstoque
+                {
+                    Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, ItemEstoqueId = lote.Id,
+                    DocumentoReferencia = referencia, Tipo = TipoMovimentacaoEstoque.Saida,
+                    Natureza = NaturezaMovimentacaoEstoque.Venda, Quantidade = Quantidade.From(2)
+                }
+            });
+        itemRepo.GetByIdComLockAsync(empresaId, lote.Id).Returns(lote);
+
+        await svc.DevolverItemAsync(pedido, item);
+
+        lote.QuantidadeAtual.Value.Should().Be(2);
+        await movRepo.Received(1).GetPorReferenciaAsync(empresaId, produtoId, referencia, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>());
+        await movRepo.DidNotReceive().GetByProdutoAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
+
     [Fact] // #939: sem Venda anterior, não há o que estornar (idempotência).
     public async Task DevolverItemAsync_pula_quando_sem_venda_anterior()
     {
@@ -281,5 +633,151 @@ public class PedidoEstoqueIntegrationServiceTests
         await svc.DevolverItemAsync(pedido, pedido.Itens.Single());
 
         await movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+    }
+
+    // ── #1571: pedido que nasceu no PWA também baixa pelo aparelho, com outro documento ─────────
+
+    private const string IdNoAparelho = "o-171";
+
+    private static Pedido PedidoDoAparelho(Guid empresaId, Guid lojaId, Guid produtoId, params decimal[] quantidades)
+    {
+        var p = Pedido.Criar(empresaId, cliente: null, lojaId, "mobile");
+        p.MobileOrderId = IdNoAparelho;
+        foreach (var qty in quantidades)
+            p.Itens.Add(new PedidoItem { Id = Guid.NewGuid(), PedidoId = p.Id, ProdutoId = produtoId, Nome = "X", Quantidade = qty, PrecoUnitario = 10m });
+        return p;
+    }
+
+    private static MovimentacaoEstoque SaidaDoAparelho(ItemEstoque lote, decimal quantidade) => new()
+    {
+        Id = Guid.NewGuid(), EmpresaId = lote.EmpresaId, ProdutoId = lote.ProdutoId, ItemEstoqueId = lote.Id,
+        Tipo = TipoMovimentacaoEstoque.Saida, Natureza = NaturezaMovimentacaoEstoque.Venda,
+        Quantidade = Quantidade.From(quantidade), DocumentoReferencia = IdNoAparelho
+    };
+
+    private static ItemEstoque LoteComSaldo(Guid empresaId, Guid lojaId, Guid produtoId, decimal saldo, IItemEstoqueRepository itemRepo)
+    {
+        var lote = new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(saldo) };
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { lote });
+        itemRepo.GetByIdComLockAsync(empresaId, lote.Id).Returns(lote);
+        return lote;
+    }
+
+    [Fact]
+    public async Task DescontarAsync_pedido_do_aparelho_nao_baixa_de_novo_o_que_o_aparelho_ja_baixou()
+    {
+        // O aparelho deu o pedido como pronto (baixou 2) e o console o avança por conta própria.
+        var (svc, itemRepo, movRepo) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var lote = LoteComSaldo(empresaId, lojaId, produtoId, saldo: 8, itemRepo);
+        var pedido = PedidoDoAparelho(empresaId, lojaId, produtoId, 2);
+        movRepo.GetSaidasAbertasPorDocumentoAsync(empresaId, IdNoAparelho, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[] { SaidaDoAparelho(lote, 2) });
+
+        await svc.DescontarAsync(pedido);
+
+        lote.QuantidadeAtual!.Value.Should().Be(8m, "as 2 unidades já saíram pelo aparelho");
+        await movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+    }
+
+    [Fact]
+    public async Task DescontarAsync_pedido_do_aparelho_baixa_so_o_que_o_aparelho_nao_baixou()
+    {
+        // O aparelho baixou 2; depois o console acrescentou 1 unidade do mesmo produto ao pedido.
+        var (svc, itemRepo, movRepo) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var lote = LoteComSaldo(empresaId, lojaId, produtoId, saldo: 8, itemRepo);
+        var pedido = PedidoDoAparelho(empresaId, lojaId, produtoId, 2, 1);
+        movRepo.GetSaidasAbertasPorDocumentoAsync(empresaId, IdNoAparelho, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[] { SaidaDoAparelho(lote, 2) });
+
+        await svc.DescontarAsync(pedido);
+
+        lote.QuantidadeAtual!.Value.Should().Be(7m, "só a unidade acrescentada sai");
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m =>
+            m.Natureza == NaturezaMovimentacaoEstoque.Venda && m.Quantidade.Value == 1m));
+    }
+
+    [Fact]
+    public async Task DevolverAsync_pedido_do_aparelho_devolve_tambem_o_que_o_aparelho_baixou()
+    {
+        // O aparelho baixou e o console cancela: a esteira não tem saída própria, mas a do aparelho tem de voltar.
+        var (svc, itemRepo, movRepo) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var lote = LoteComSaldo(empresaId, lojaId, produtoId, saldo: 6, itemRepo);
+        var pedido = PedidoDoAparelho(empresaId, lojaId, produtoId, 2);
+        var saida = SaidaDoAparelho(lote, 2);
+        movRepo.GetSaidasAbertasPorDocumentoAsync(empresaId, IdNoAparelho, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[] { saida });
+        movRepo.GetByIdComLockAsync(empresaId, saida.Id, Arg.Any<CancellationToken>()).Returns(saida);
+
+        await svc.DevolverAsync(pedido);
+
+        lote.QuantidadeAtual!.Value.Should().Be(8m);
+        saida.EstornadaEm.Should().NotBeNull("a saída devolvida fica marcada, para não voltar duas vezes");
+        await movRepo.Received(1).UpdateAsync(saida);
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m =>
+            m.Natureza == NaturezaMovimentacaoEstoque.Estorno && m.MovimentacaoEstornadaId == saida.Id
+            && m.MotivoEstorno == PedidoEstoqueIntegrationService.MotivoDoEstornoPorCancelamento));
+    }
+
+    [Fact]
+    public async Task DevolverAsync_nao_devolve_de_novo_a_saida_que_o_aparelho_devolveu_no_meio_do_caminho()
+    {
+        // O aparelho cancelou entre a leitura das saídas e a trava: relida com trava, a saída já está estornada.
+        var (svc, itemRepo, movRepo) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var lote = LoteComSaldo(empresaId, lojaId, produtoId, saldo: 8, itemRepo);
+        var pedido = PedidoDoAparelho(empresaId, lojaId, produtoId, 2);
+        var lida = SaidaDoAparelho(lote, 2);
+        var jaDevolvida = SaidaDoAparelho(lote, 2);
+        jaDevolvida.Id = lida.Id;
+        jaDevolvida.MarcarComoEstornada(DateTime.UtcNow);
+        movRepo.GetSaidasAbertasPorDocumentoAsync(empresaId, IdNoAparelho, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[] { lida });
+        movRepo.GetByIdComLockAsync(empresaId, lida.Id, Arg.Any<CancellationToken>()).Returns(jaDevolvida);
+
+        await svc.DevolverAsync(pedido);
+
+        lote.QuantidadeAtual!.Value.Should().Be(8m, "o lote não volta duas vezes");
+        await movRepo.DidNotReceive().InsertAsync(Arg.Any<MovimentacaoEstoque>());
+    }
+
+    [Fact]
+    public async Task DescontarAsync_item_que_o_console_acrescentou_sai_inteiro_mesmo_com_baixa_do_aparelho_no_pedido()
+    {
+        // O item antigo já tem documento da esteira (ela baixou, o console cancelou e o aparelho rebaixou
+        // as 2). O item novo não pode ser dado por coberto pela baixa do aparelho, que não o conhece.
+        var (svc, itemRepo, movRepo) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var lote = LoteComSaldo(empresaId, lojaId, produtoId, saldo: 8, itemRepo);
+        var pedido = PedidoDoAparelho(empresaId, lojaId, produtoId, 2, 1);
+        var (antigo, novo) = (pedido.Itens.First(), pedido.Itens.Last());
+        movRepo.ExisteReferenciaAsync(empresaId, produtoId, $"{pedido.Id}:{antigo.Id}", NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(true);
+        movRepo.GetSaidasAbertasPorDocumentoAsync(empresaId, IdNoAparelho, NaturezaMovimentacaoEstoque.Venda, Arg.Any<CancellationToken>())
+            .Returns(new[] { SaidaDoAparelho(lote, 2) });
+
+        await svc.DescontarAsync(pedido, itemNovo: novo);
+
+        lote.QuantidadeAtual!.Value.Should().Be(7m);
+        await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m =>
+            m.Natureza == NaturezaMovimentacaoEstoque.Venda && m.Quantidade.Value == 1m
+            && m.DocumentoReferencia == $"{pedido.Id}:{novo.Id}"));
+    }
+
+    [Fact]
+    public async Task Pedido_que_nao_veio_do_aparelho_nao_consulta_baixa_do_aparelho()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        LoteComSaldo(empresaId, lojaId, produtoId, saldo: 8, itemRepo);
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 2);
+
+        await svc.DescontarAsync(pedido);
+        await svc.DevolverAsync(pedido);
+
+        await movRepo.DidNotReceive().GetSaidasAbertasPorDocumentoAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<NaturezaMovimentacaoEstoque>(), Arg.Any<CancellationToken>());
     }
 }

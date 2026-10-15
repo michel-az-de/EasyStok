@@ -92,7 +92,7 @@ public sealed class VigiarIntegracoesUseCase(
 
     private async Task<bool> CriarAsync(Guid empresaId, TipoLembrete tipo, string referencia, string texto, DateTime agora, CancellationToken ct)
     {
-        if (await lembretes.ExisteAutomaticoAsync(empresaId, tipo, referencia, ct)) return false;
+        if ((await lembretes.ListarAutomaticosExistentesAsync(tipo, [(empresaId, referencia)], ct)).Count > 0) return false;
         var limpo = texto.Length > Lembrete.TextoTamanhoMaximo ? texto[..Lembrete.TextoTamanhoMaximo] : texto;
         await lembretes.AddAsync(Lembrete.Automatico(empresaId, tipo, referencia, limpo, agora), ct);
         return true;

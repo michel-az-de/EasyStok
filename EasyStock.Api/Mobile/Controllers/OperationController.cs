@@ -54,8 +54,8 @@ public class OperationController(
         if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
 
         // Isolamento de tenant: usuários normais só podem ver dados da própria empresa.
+        // Token sem empresa também para aqui: não escolhe empresa pela query.
         if (_currentUser.Nivel != NivelAcesso.SuperAdmin &&
-            _currentUser.EmpresaId != Guid.Empty &&
             _currentUser.EmpresaId != empresaId)
             return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
 
@@ -216,8 +216,8 @@ public class OperationController(
         if (empresaId == Guid.Empty) return BadRequest(new { error = "empresaId obrigatório" });
 
         // Isolamento de tenant: usuários normais só podem ver devices da própria empresa.
+        // Token sem empresa também para aqui: não escolhe empresa pela query.
         if (_currentUser.Nivel != NivelAcesso.SuperAdmin &&
-            _currentUser.EmpresaId != Guid.Empty &&
             _currentUser.EmpresaId != empresaId)
             return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
 

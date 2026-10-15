@@ -30,7 +30,7 @@ public class ProcessarTurnoAgenteUseCaseTests
             Substitute.For<IUsoIaRepository>(), Substitute.For<IUnitOfWork>(),
             new ObterDossieClienteUseCase(clientes, Substitute.For<IClienteCrmRepository>(),
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _conversaRepository),
-            NullLogger<AgenteAtendimentoService>.Instance);
+            Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance);
         return new ProcessarTurnoAgenteUseCase(agente, _tenant, NullLogger<ProcessarTurnoAgenteUseCase>.Instance);
     }
 

@@ -134,8 +134,8 @@ public sealed class SalvarChaveIntegracaoUseCase(
         try
         {
             await resolver.SalvarAsync(command.EmpresaId, definicao.Categoria, definicao.Provider, ambiente, campos,
-                command.UsuarioId, command.ValidoAte,
-                CatalogoIntegracoes.Mascara(definicao.CampoMascara is null ? null : campos[definicao.CampoMascara]), ct);
+                command.UsuarioId, command.ValidoAte, ct,
+                CatalogoIntegracoes.Mascara(definicao.CampoMascara is null ? null : campos[definicao.CampoMascara]));
         }
         catch (ArgumentException ex) when (ex.ParamName == "validoAte")
         {

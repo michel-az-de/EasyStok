@@ -4,7 +4,12 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
+using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.Tests.Helpers;
+using Microsoft.Extensions.Logging.Abstractions;
 using EasyStock.Domain.Entities.Operacao;
+using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Operacao;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
@@ -18,6 +23,43 @@ namespace EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
 /// </summary>
 public class ConfirmarPagamentoPedidoUseCaseTests
 {
+    [Fact]
+    public async Task SinalPago_GeraSaldoManualSemQuitar_AQuitacaoSaiAposSaldo()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        var sinal = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+        sinal.Valor.Should().Be(12.50m);
+
+        var confirmado = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, sinal.Valor));
+
+        confirmado.Confirmado.Should().BeTrue();
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        f.Pedido.TotalPago.Should().Be(12.50m);
+        var saldo = f.Cobrancas.Should().ContainSingle(c => c.Provedor == "na_entrega").Subject;
+        saldo.Valor.Should().Be(12.50m);
+        saldo.EstaPendente.Should().BeTrue();
+        await f.Publicador.DidNotReceive().PublicarAsync(
+            f.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", f.Pedido.Id,
+            Arg.Any<PedidoPagoEvent>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+
+        var quitacao = QuitacaoPedidoTeste.Criar(f.PedidoRepo, f.CobrancaRepo, f.ConversaRepo,
+            f.ImpressaoRepo, f.Publicador, f.OperacaoEventos);
+        var registrar = new RegistrarPagamentoPedidoUseCase(f.PedidoRepo, f.Uow,
+            NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
+            new CalculadoraInicioPrevistoPedido(f.PrazoQueries), quitacao);
+        await registrar.ExecuteAsync(new RegistrarPagamentoPedidoCommand(
+            f.EmpresaId, f.Pedido.Id, "dinheiro", 12.50m, Origem: "web"));
+
+        f.Pedido.TotalPago.Should().Be(25m);
+        saldo.Status.Should().Be(StatusCobrancaPedido.Paga);
+        saldo.ValorPago.Should().Be(12.50m);
+        await f.Publicador.Received(1).PublicarAsync(
+            f.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", f.Pedido.Id,
+            Arg.Any<PedidoPagoEvent>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+    }
+
     private static ConfirmarPagamentoPedidoInput Aprovado(Guid pedidoId, decimal valor = 25m) =>
         new(pedidoId, PagamentoExternoId: "pay-9", StatusPagamento: "approved", ValorPago: valor,
             MetodoPagamentoExterno: "pix", TipoPagamentoExterno: "bank_transfer",
@@ -137,6 +179,50 @@ public class ConfirmarPagamentoPedidoUseCaseTests
     }
 
     [Fact]
+    public async Task LinkAntigoPagoDepoisDeOPedidoAumentar_RegistraOValorEDeixaOSaldoNaEntrega()
+    {
+        // #1615: o pedido ganhou um item, o link de 15 foi trocado pelo de 25 e o cliente pagou o antigo, que
+        // continua pagável no Mercado Pago. O dinheiro ficava retido como valor_menor e o pedido era cancelado.
+        var f = new CobrancaPedidoFixture();
+        var antiga = CobrancaPedido.CriarOnline(f.EmpresaId, f.Pedido.Id, 15m, "pref-antiga",
+            "https://mp.test/pref-antiga", CobrancaPedidoFixture.Agora.AddMinutes(30), 1, CobrancaPedidoFixture.Agora.AddMinutes(-5));
+        antiga.Cancelar("valor_do_pedido_alterado", CobrancaPedidoFixture.Agora.AddMinutes(-2));
+        f.Cobrancas.Add(antiga);
+        var nova = f.AdicionarOnline(tentativa: 2, referencia: "pref-nova");
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 15m));
+
+        r.Confirmado.Should().BeTrue();
+        antiga.Status.Should().Be(StatusCobrancaPedido.Paga);
+        nova.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Valor.Should().Be(15m);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        var saldo = f.Cobrancas.Should().ContainSingle(c => c.Provedor == "na_entrega").Subject;
+        saldo.Valor.Should().Be(10m);
+        saldo.EstaPendente.Should().BeTrue();
+        f.Eventos.Should().Contain(e => e.Tipo == "pagamento_link_antigo", "a dona vê no histórico por que ficou saldo");
+    }
+
+    [Fact]
+    public async Task LinkAntigoPago_ComOLinkNovoJaVencido_TambemRegistra()
+    {
+        // Sem cobrança pendente o alvo era a mais recente (25) e o pagamento de 15 voltava a ficar retido.
+        var f = new CobrancaPedidoFixture();
+        var antiga = CobrancaPedido.CriarOnline(f.EmpresaId, f.Pedido.Id, 15m, "pref-antiga",
+            "https://mp.test/pref-antiga", CobrancaPedidoFixture.Agora.AddMinutes(30), 1, CobrancaPedidoFixture.Agora.AddMinutes(-5));
+        antiga.Cancelar("valor_do_pedido_alterado", CobrancaPedidoFixture.Agora.AddMinutes(-2));
+        f.Cobrancas.Add(antiga);
+        var nova = f.AdicionarOnline(tentativa: 2, referencia: "pref-nova");
+        nova.Cancelar("forma_trocada", CobrancaPedidoFixture.Agora);
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, valor: 15m));
+
+        r.Confirmado.Should().BeTrue();
+        antiga.Status.Should().Be(StatusCobrancaPedido.Paga);
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Valor.Should().Be(15m);
+    }
+
+    [Fact]
     public async Task StatusNaoAprovado_NaoMexeEmNada()
     {
         var f = new CobrancaPedidoFixture();
@@ -206,6 +292,41 @@ public class ConfirmarPagamentoPedidoUseCaseTests
 
         await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>();
         await f.ConversaRepo.DidNotReceive().ObterPorIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>#1724: o estorno automático recusado sumia com a transação; o pedido não mostrava o dinheiro retido.</summary>
+    [Fact]
+    public async Task PagoDepoisDeCancelado_EstornoRecusadoDeixaTrilhaUmaVezEContinuaPedindoReenvio()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Cancelado);
+        var cobranca = f.AdicionarOnline(conversaId: Guid.NewGuid());
+        f.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Falha("saldo_insuficiente"));
+
+        var act = () => f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+        await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>();
+        await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>("o reenvio do provedor tenta de novo");
+
+        f.Eventos.Should().ContainSingle(e => e.Tipo == ConfirmarPagamentoPedidoUseCase.EventoEstornoFalhou)
+            .Which.Detalhes.Should().Contain("saldo_insuficiente").And.Contain("25,00");
+        cobranca.Motivo.Should().StartWith(ConfirmarPagamentoPedidoUseCase.MarcaEstornoFalhou);
+        await f.Estorno.Received(2).EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>#1724: depois da falha registrada, o reenvio que consegue estornar fecha o caso como antes.</summary>
+    [Fact]
+    public async Task PagoDepoisDeCancelado_ReenvioQueEstornaSubstituiAFalha()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Cancelado);
+        var cobranca = f.AdicionarOnline(conversaId: Guid.NewGuid());
+        f.Estorno.EstornarAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(EstornoPedidoResult.Falha("indisponivel"), EstornoPedidoResult.Ok("estorno-9"));
+
+        await f.Confirmar().Invoking(c => c.ExecuteAsync(Aprovado(f.Pedido.Id))).Should().ThrowAsync<EstornoAutomaticoFalhouException>();
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PedidoCancelado);
+        cobranca.Motivo.Should().Contain("estorno estorno-9");
     }
 
     [Fact]
@@ -290,9 +411,9 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         enfileirada.Tipo.Should().Be(TipoImpressao.Canhoto);
         enfileirada.Status.Should().Be(StatusImpressao.Pendente);
         // O flush do RegistrarPagamentoPedido e o commit final ficam dentro da mesma transação.
-        ordem.Distinct().Should().Equal(
-            new[] { "abre transacao", "enfileira", "commit", "fecha transacao", "sse impressao" },
-            "a impressão é gravada dentro da transação do pagamento e só vira evento de UI depois dela");
+        ordem.Should().Equal(
+            new[] { "abre transacao", "commit", "enfileira", "commit", "fecha transacao", "sse impressao" },
+            "pagamento e impressão são gravados antes de fechar a transação e o SSE sai depois");
         await f.OperacaoEventos.Received(1).PublicarAsync(
             EventosOperacao.ImpressaoPendente, f.EmpresaId,
             Arg.Is<ImpressaoPendenteOperacao>(e => e.ImpressaoId == enfileirada.Id && e.PedidoId == f.Pedido.Id),

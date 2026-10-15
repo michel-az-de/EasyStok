@@ -33,15 +33,37 @@ public sealed class ObterViagemUseCase(IViagemRepository viagens, IPedidoReposit
         return await MontarAsync(viagem, ct);
     }
 
-    internal async Task<ViagemResult> MontarAsync(Viagem viagem, CancellationToken ct)
+    internal async Task<ViagemResult> MontarAsync(Viagem viagem, CancellationToken ct) =>
+        (await MontarAsync(viagem.EmpresaId, [viagem], ct))[0];
+
+    /// <summary>
+    /// #1564: os pedidos e os clientes de todas as paradas vêm em uma consulta cada, e não uma por parada.
+    /// Todas as viagens são de <paramref name="empresaId"/>.
+    /// </summary>
+    internal async Task<IReadOnlyList<ViagemResult>> MontarAsync(Guid empresaId, IReadOnlyList<Viagem> lista, CancellationToken ct)
+    {
+        var pedidoIds = lista.SelectMany(v => v.Paradas).Select(p => p.PedidoId).Distinct().ToList();
+        var pedidosPorId = pedidoIds.Count == 0
+            ? []
+            : (await pedidos.ListarPorIdsAsync(empresaId, pedidoIds, ct)).ToDictionary(p => p.Id);
+        var clienteIds = pedidosPorId.Values.Where(p => p.ClienteId.HasValue).Select(p => p.ClienteId!.Value).Distinct().ToList();
+        var clientesPorId = clienteIds.Count == 0
+            ? []
+            : (await clientes.ListarPorIdsAsync(empresaId, clienteIds, ct)).ToDictionary(c => c.Id);
+        return lista.Select(v => Montar(v, pedidosPorId, clientesPorId)).ToList();
+    }
+
+    private static ViagemResult Montar(
+        Viagem viagem, Dictionary<Guid, Domain.Entities.Pedido> pedidosPorId, Dictionary<Guid, Domain.Entities.Cliente> clientesPorId)
     {
         var paradas = new List<ParadaViagemResult>();
         foreach (var p in viagem.Paradas.OrderBy(p => p.Ordem))
         {
-            var pedido = await pedidos.GetByIdAsync(viagem.EmpresaId, p.PedidoId);
-            var cliente = pedido?.ClienteId is { } cid ? await clientes.GetByIdAsync(viagem.EmpresaId, cid) : null;
+            var pedido = pedidosPorId.GetValueOrDefault(p.PedidoId);
+            var cliente = pedido?.ClienteId is { } cid ? clientesPorId.GetValueOrDefault(cid) : null;
             paradas.Add(new ParadaViagemResult(
-                p.PedidoId, NumeroPedido(p.PedidoId), p.Ordem, cliente?.Nome ?? pedido?.ClienteNome, Endereco(cliente),
+                p.PedidoId, NumeroPedido(p.PedidoId), p.Ordem, cliente?.Nome ?? pedido?.ClienteNome,
+                pedido?.EnderecoEntrega ?? Endereco(cliente),
                 p.EntregueEm, p.EntregadorNome, p.Veiculo, p.Placa, p.EmpresaEntregador));
         }
         return new ViagemResult(viagem.Id, viagem.EntregadorId, viagem.Situacao, viagem.CriadaEm, viagem.SaiuEm,
@@ -65,10 +87,7 @@ public sealed class ListarViagensUseCase(IViagemRepository viagens, ObterViagemU
 
     public async Task<IReadOnlyList<ViagemResult>> ExecuteAsync(Guid empresaId, SituacaoViagem? situacao, CancellationToken ct = default)
     {
-        var resultado = new List<ViagemResult>();
-        foreach (var v in await viagens.ListarAsync(empresaId, situacao, LimitePadrao, ct))
-            resultado.Add(await obter.MontarAsync(v, ct));
-        return resultado;
+        return await obter.MontarAsync(empresaId, await viagens.ListarAsync(empresaId, situacao, LimitePadrao, ct), ct);
     }
 }
 
@@ -96,6 +115,7 @@ public sealed class DefinirEntregadorViagemUseCase(
 {
     public async Task ExecuteAsync(Guid empresaId, Guid viagemId, Guid? entregadorId, CancellationToken ct = default)
     {
+        await ViagemContratadaGuard.ExigirFluxoManualAsync(viagens, empresaId, viagemId, ct);
         var viagem = await viagens.ObterAsync(empresaId, viagemId, ct) ?? throw new ViagemNaoEncontradaException(viagemId);
         Entregador? entregador = null;
         if (entregadorId is { } eid)
@@ -114,6 +134,7 @@ public sealed class IncluirParadaViagemUseCase(
 {
     public async Task ExecuteAsync(Guid empresaId, Guid viagemId, Guid pedidoId, CancellationToken ct = default)
     {
+        await ViagemContratadaGuard.ExigirFluxoManualAsync(viagens, empresaId, viagemId, ct);
         var viagem = await viagens.ObterAsync(empresaId, viagemId, ct) ?? throw new ViagemNaoEncontradaException(viagemId);
         var pedido = await pedidos.GetByIdAsync(empresaId, pedidoId) ?? throw new PedidoNaoEncontradoParaViagemException(pedidoId);
         if (pedido.EstaFinalizado || pedido.StatusEnum == StatusPedido.SaiuParaEntrega)
@@ -122,7 +143,8 @@ public sealed class IncluirParadaViagemUseCase(
             throw new UseCaseValidationException("Pedido já está em outra viagem.");
 
         var bloqueado = pedido.ClienteId is { } cid && (await clientes.GetByIdAsync(empresaId, cid))?.Bloqueado == true;
-        Regra.Validar(() => viagem.IncluirParada(pedidoId, bloqueado));
+        var parada = Regra.Validar(() => viagem.IncluirParada(pedidoId, bloqueado));
+        await viagens.RegistrarParadaNovaAsync(parada, ct);
         await unitOfWork.CommitAsync();
     }
 }
@@ -131,6 +153,7 @@ public sealed class RetirarParadaViagemUseCase(IViagemRepository viagens, IUnitO
 {
     public async Task ExecuteAsync(Guid empresaId, Guid viagemId, Guid pedidoId, CancellationToken ct = default)
     {
+        await ViagemContratadaGuard.ExigirFluxoManualAsync(viagens, empresaId, viagemId, ct);
         var viagem = await viagens.ObterAsync(empresaId, viagemId, ct) ?? throw new ViagemNaoEncontradaException(viagemId);
         Regra.Validar(() => viagem.RetirarParada(pedidoId));
         await unitOfWork.CommitAsync();
@@ -142,6 +165,7 @@ public sealed class ReordenarParadaViagemUseCase(IViagemRepository viagens, IUni
 {
     public async Task ExecuteAsync(Guid empresaId, Guid viagemId, Guid pedidoId, int novaOrdem, CancellationToken ct = default)
     {
+        await ViagemContratadaGuard.ExigirFluxoManualAsync(viagens, empresaId, viagemId, ct);
         var viagem = await viagens.ObterAsync(empresaId, viagemId, ct) ?? throw new ViagemNaoEncontradaException(viagemId);
         Regra.Validar(() => viagem.ReordenarParada(pedidoId, novaOrdem));
         await unitOfWork.CommitAsync();
@@ -153,6 +177,7 @@ public sealed class DesfazerViagemUseCase(IViagemRepository viagens, IUnitOfWork
 {
     public async Task ExecuteAsync(Guid empresaId, Guid viagemId, CancellationToken ct = default)
     {
+        await ViagemContratadaGuard.ExigirFluxoManualAsync(viagens, empresaId, viagemId, ct);
         var viagem = await viagens.ObterAsync(empresaId, viagemId, ct) ?? throw new ViagemNaoEncontradaException(viagemId);
         Regra.Validar(viagem.Desfazer);
         await unitOfWork.CommitAsync();
@@ -229,6 +254,7 @@ public sealed class SairParaEntregaUseCase(
 {
     public async Task<ViagemResult> ExecuteAsync(Guid empresaId, Guid viagemId, CancellationToken ct = default)
     {
+        await ViagemContratadaGuard.ExigirFluxoManualAsync(viagens, empresaId, viagemId, ct);
         var viagem = await viagens.ObterAsync(empresaId, viagemId, ct) ?? throw new ViagemNaoEncontradaException(viagemId);
         var entregador = viagem.EntregadorId is { } eid ? await entregadores.ObterAsync(empresaId, eid, ct) : null;
         var agora = relogio.GetUtcNow().UtcDateTime;
@@ -267,6 +293,7 @@ public sealed class MarcarParadaEntregueUseCase(
 {
     public async Task ExecuteAsync(Guid empresaId, Guid viagemId, Guid pedidoId, CancellationToken ct = default)
     {
+        await ViagemContratadaGuard.ExigirFluxoManualAsync(viagens, empresaId, viagemId, ct);
         var viagem = await viagens.ObterAsync(empresaId, viagemId, ct) ?? throw new ViagemNaoEncontradaException(viagemId);
         var agora = relogio.GetUtcNow().UtcDateTime;
         Regra.Validar(() => viagem.MarcarParadaEntregue(pedidoId, agora));

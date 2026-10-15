@@ -50,6 +50,9 @@ public sealed class RefreshTokenUseCase(
 
         var nivel = NivelAcesso.Visualizador;
         IReadOnlyCollection<Permissao> permissoes = [];
+        string? moduloInicial = null;
+        var permissoesExplicitas = false;
+        var sessaoPersistente = false;
 
         if (empresaId.HasValue && usuario.Perfis is not null)
         {
@@ -60,6 +63,9 @@ public sealed class RefreshTokenUseCase(
             if (perfil?.Perfil is not null)
             {
                 nivel = perfil.Perfil.Nivel;
+                moduloInicial = perfil.Perfil.ModuloInicial;
+                permissoesExplicitas = perfil.Perfil.PermissoesExplicitas;
+                sessaoPersistente = Domain.Services.PerfisCasaDaBaba.PermiteSessaoPersistente(perfil.Perfil, empresaId.Value);
                 permissoes = perfil.Perfil.Permissoes?.Select(p => p.Permissao).Distinct().ToArray() ?? [];
             }
         }
@@ -70,7 +76,10 @@ public sealed class RefreshTokenUseCase(
             usuario.Nome,
             usuario.Email,
             nivel,
-            permissoes);
+            permissoes,
+            moduloInicial,
+            permissoesExplicitas,
+            sessaoPersistente);
         var accessToken = jwtTokenService.GerarToken(autenticarResult);
 
         var auditLog = AuditLogEntity.Criar(

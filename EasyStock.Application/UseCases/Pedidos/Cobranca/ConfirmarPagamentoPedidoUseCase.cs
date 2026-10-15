@@ -2,7 +2,6 @@ using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
-using EasyStock.Application.Ports.Output.Persistence.Operacao;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -29,6 +28,7 @@ namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 /// <param name="ReferenciaExterna">Id da preferência paga, quando o processor souber; sem ele, vale a
 /// cobrança online pendente do pedido ou, não havendo, a mais recente.</param>
 /// <param name="Provedor">Provedor da cobrança (<c>mercadopago</c>).</param>
+/// <param name="ContaRecebedoraId"><c>collector_id</c> do pagamento (I3.2): tem de ser a conta da cobrança.</param>
 public sealed record ConfirmarPagamentoPedidoInput(
     Guid PedidoId,
     string PagamentoExternoId,
@@ -38,7 +38,8 @@ public sealed record ConfirmarPagamentoPedidoInput(
     string? TipoPagamentoExterno = null,
     DateTime? PagoEm = null,
     string? ReferenciaExterna = null,
-    string Provedor = CobrancaPedido.ProvedorMercadoPago);
+    string Provedor = CobrancaPedido.ProvedorMercadoPago,
+    string? ContaRecebedoraId = null);
 
 /// <summary>Desfecho da confirmação. Nenhum deles lança: o processor responde 200 ao Mercado Pago.</summary>
 public enum SituacaoConfirmacaoPagamento
@@ -52,12 +53,15 @@ public enum SituacaoConfirmacaoPagamento
     PedidoNaoEncontrado = 7,
     /// <summary>Pedido já pago por outro pagamento: o novo foi estornado na hora (#1289).</summary>
     PagamentoDuplicado = 8,
+    /// <summary>I3.2: o pagamento é de outra conta do Mercado Pago que não a da cobrança. Não confirma nem estorna.</summary>
+    ContaDivergente = 9,
 }
 
 public sealed record ConfirmarPagamentoPedidoResult(
     SituacaoConfirmacaoPagamento Situacao,
     Guid? CobrancaId = null,
-    string? StatusPedido = null)
+    string? StatusPedido = null,
+    string? EstornoFalhou = null)
 {
     public bool Confirmado => Situacao == SituacaoConfirmacaoPagamento.Confirmado;
 }
@@ -114,7 +118,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
     RegistrarPagamentoPedidoUseCase registrarPagamento,
     IPublicadorEventoIntegracao publicador,
     IOperacaoEventPublisher operacaoEventos,
-    IImpressaoPendenteRepository impressoes,
+    QuitacaoPedido quitacao,
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
@@ -122,11 +126,16 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     IEstornoPedidoGateway estorno,
     AvisoCobrancaConversa aviso,
-    IPedidoRepository pedidos)
+    IPedidoRepository pedidos,
+    SaldoFinanceiroPedido? saldoFinanceiro = null, AvisoStatusPedidoCliente? avisoCliente = null)
 {
     public const string StatusAprovado = "approved";
     private const string Origem = "mercadopago";
     private const string MarcaEstornoAutomatico = "estorno_automatico: pagamento ";
+
+    /// <summary>#1724: estorno automático que o provedor não fez. O dinheiro segue retido até alguém devolver.</summary>
+    public const string MarcaEstornoFalhou = "estorno_automatico_falhou: pagamento ";
+    public const string EventoEstornoFalhou = "estorno_automatico_falhou";
 
     public async Task<ConfirmarPagamentoPedidoResult> ExecuteAsync(ConfirmarPagamentoPedidoInput input, CancellationToken ct = default)
     {
@@ -154,6 +163,10 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         var (resultado, pago, impressao, conversaEstorno) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             token => ConfirmarNoLockAsync(input, empresaId.Value, token), ct);
 
+        // A trilha da falha já foi gravada; a exceção sai depois do commit para o provedor reenviar (#1724).
+        if (resultado.EstornoFalhou is { } erroEstorno)
+            throw new EstornoAutomaticoFalhouException(input.PagamentoExternoId, erroEstorno);
+
         // Aviso do estorno automático: só depois do commit; best-effort, não desfaz nada se falhar.
         if (conversaEstorno is { } conversaId)
             await aviso.EnviarAsync(empresaId.Value, conversaId,
@@ -167,6 +180,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             await operacaoEventos.PublicarAsync(EventosOperacao.PedidoPago, empresaId.Value, pago, ct);
         if (impressao is not null)
             await operacaoEventos.PublicarAsync(EventosOperacao.ImpressaoPendente, empresaId.Value, impressao, ct);
+        if (resultado.Confirmado)
+            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoPagamentoAtualizado, empresaId.Value, new { pedidoId = input.PedidoId }, ct);
         return resultado;
     }
 
@@ -186,6 +201,26 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         var alvo = EscolherCobranca(cobrancas, input);
         if (alvo is null)
             return (new(SituacaoConfirmacaoPagamento.SemCobranca, null, pedido.Status), null, null, null);
+
+        // I3.2 (invariante 3): o external_reference diz qual é o pedido, não de quem é o dinheiro. Pagamento
+        // de outra conta não confirma, e também não é estornado: a credencial desta loja não alcança a outra.
+        // O pagamento vem sempre da reconsulta na fonte. Se ela não disser a conta, não se sabe: confirma
+        // como antes e avisa no log, em vez de recusar dinheiro que pode ser desta loja.
+        var contaDoPagamento = string.IsNullOrWhiteSpace(input.ContaRecebedoraId) ? null : input.ContaRecebedoraId.Trim();
+        if (alvo.ContaRecebedoraId is { } contaDaCobranca)
+        {
+            if (contaDoPagamento is null)
+                logger.LogWarning("Pagamento sem conta recebedora informada pedidoId={PedidoId} pagamento={Pagamento}; conta nao conferida.",
+                    input.PedidoId, input.PagamentoExternoId);
+            else if (!string.Equals(contaDaCobranca, contaDoPagamento, StringComparison.Ordinal))
+            {
+                var motivoConta = $"conta_divergente: pagamento {input.PagamentoExternoId} recebido por outra conta do Mercado Pago";
+                // A notificação reentregue acha o motivo já gravado e não repete o evento no histórico.
+                if (alvo.Motivo == motivoConta)
+                    return (new(SituacaoConfirmacaoPagamento.ContaDivergente, alvo.Id, pedido.Status), null, null, null);
+                return (await RecusarAsync(pedido, alvo, motivoConta, SituacaoConfirmacaoPagamento.ContaDivergente, agora, ct), null, null, null);
+            }
+        }
 
         // Antes do valor: pedido cancelado devolve qualquer quantia recebida, a menor inclusive.
         if (pedido.StatusEnum == StatusPedido.Cancelado)
@@ -208,6 +243,18 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
         var pagoEm = input.PagoEm ?? agora;
         var metodo = CobrancaPedido.MapearMetodo(input.MetodoPagamentoExterno, input.TipoPagamentoExterno);
+        // #1615: a dona não escolheu receber o resto na entrega; o histórico do pedido diz por que ficou assim.
+        if (EhLinkSubstituido(alvo) && input.ValorPago < pedido.Total.Valor)
+            await pedidoRepository.AddEventoAsync(new PedidoEvento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = pedido.Id,
+                Tipo = "pagamento_link_antigo",
+                Detalhes = $"Cliente pagou o link antigo de {input.ValorPago.ToString("F2", Cultura.PtBr)}; o saldo fica para a entrega.",
+                UsuarioNome = "Mercado Pago",
+                Origem = Origem,
+                OcorridoEm = agora,
+            }, ct);
         alvo.MarcarPaga(input.PagamentoExternoId, input.ValorPago, metodo, pagoEm);
         foreach (var outra in cobrancas.Where(c => c.EstaPendente && c.Id != alvo.Id))
             outra.Cancelar($"pago_por_outra_cobranca: {alvo.Id}", agora);
@@ -230,15 +277,6 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
                 correlationId: pedido.Id.ToString(), ct: ct);
         }
 
-        await publicador.PublicarAsync(
-            empresaId, PedidoPagoEvent.TipoEvento, "pedido", pedido.Id,
-            new PedidoPagoEvent(pedido.Id, empresaId, pedido.LojaId, pedido.ClienteId, alvo.ConversaId, alvo.Id,
-                alvo.Provedor, input.PagamentoExternoId, metodo, input.ValorPago, pedido.Status, pagoEm),
-            correlationId: pedido.Id.ToString(), ct: ct);
-
-        var canhoto = ImpressaoPendente.CriarCanhoto(empresaId, pedido.LojaId, pedido.Id, agora);
-        await impressoes.AddAsync(canhoto, ct);
-
         // Registra o PedidoPagamento na mesma transação (o use case reusa a transação aberta e faz o flush).
         // Excedente permitido: o valor veio do provedor, não de digitação.
         await registrarPagamento.ExecuteAsync(new RegistrarPagamentoPedidoCommand(
@@ -253,15 +291,31 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             PermitirExcedente: true,
             ConfirmadoPeloProvedor: true), ct);
 
+        var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
+        EfeitosQuitacao? efeito = null;
+        var alocadoDepois = alvo.Complementar && saldoFinanceiro is not null
+            ? (await saldoFinanceiro.ConsultarAsync(comPagamentos, ct)).Alocado : comPagamentos.TotalPago;
+        if (alocadoDepois >= comPagamentos.Total.Valor)
+            efeito = await quitacao.PrepararAsync(comPagamentos, alvo, pagoEm, ct);
+        else if (!alvo.Complementar && alvo.Valor < comPagamentos.Total.Valor)
+        {
+            var saldo = comPagamentos.Total.Valor - comPagamentos.TotalPago;
+            var naEntrega = CobrancaPedido.CriarNaEntrega(empresaId, pedido.Id, saldo, pagoEm, alvo.ConversaId);
+            await cobrancaRepository.AddAsync(naEntrega, ct);
+        }
+
+        if (alvo.Complementar && comPagamentos.Pagamentos.Count > 1 && efeito is null && avisoCliente is not null)
+            await avisoCliente.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+                empresaId, pedido.Id, $"pagamento:{alvo.Id:N}:{input.PagamentoExternoId}", ct,
+                mensagem: $"Pagamento complementar de {input.ValorPago.ToString("C", Cultura.PtBr)} confirmado pelo Mercado Pago ({metodo}). " +
+                    $"Saldo a pagar: {Math.Max(0, comPagamentos.Total.Valor - alocadoDepois).ToString("C", Cultura.PtBr)}.");
         await unitOfWork.CommitAsync();
 
         logger.LogInformation(
             "Pagamento confirmado pedidoId={PedidoId} cobrancaId={CobrancaId} pagamento={Pagamento} status={Status}",
             pedido.Id, alvo.Id, input.PagamentoExternoId, pedido.Status);
-        var pago = new PedidoPagoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
-            pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm);
-        return (new(SituacaoConfirmacaoPagamento.Confirmado, alvo.Id, pedido.Status), pago,
-            new ImpressaoPendenteOperacao(canhoto.Id, pedido.Id), null);
+        return (new(SituacaoConfirmacaoPagamento.Confirmado, alvo.Id, pedido.Status), efeito?.Pago,
+            efeito?.Impressao, null);
     }
 
     /// <summary>
@@ -281,7 +335,31 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
         var r = await estorno.EstornarAsync(input.PagamentoExternoId, input.ValorPago, chaveIdempotencia, ct);
         if (!r.Sucesso)
-            throw new EstornoAutomaticoFalhouException(input.PagamentoExternoId, r.Erro);
+        {
+            // #1724: lançar aqui desfazia a transação e o pedido ficava sem sinal do dinheiro retido. A falha
+            // fica na cobrança e na trilha (uma vez por pagamento) e a exceção sai depois do commit.
+            var falhou = MarcaEstornoFalhou + input.PagamentoExternoId;
+            if (!cobrancas.Any(c => c.Motivo?.StartsWith(falhou, StringComparison.Ordinal) == true))
+            {
+                var detalhe = $"{falhou} de {input.ValorPago.ToString("F2", Cultura.PtBr)} {descricao}; " +
+                    $"o Mercado Pago não devolveu ({r.Erro ?? "sem_detalhe"}). Valor retido: devolver ao cliente.";
+                alvo.RegistrarMotivo(detalhe, agora);
+                await pedidoRepository.AddEventoAsync(new PedidoEvento
+                {
+                    Id = Guid.NewGuid(),
+                    PedidoId = pedido.Id,
+                    Tipo = EventoEstornoFalhou,
+                    Detalhes = detalhe,
+                    UsuarioNome = "Mercado Pago",
+                    Origem = Origem,
+                    OcorridoEm = agora,
+                }, ct);
+                await unitOfWork.CommitAsync();
+                logger.LogError("Estorno automatico falhou pedidoId={PedidoId} pagamento={Pagamento} erro={Erro}",
+                    pedido.Id, input.PagamentoExternoId, r.Erro);
+            }
+            return (new(situacao, alvo.Id, pedido.Status, r.Erro ?? "sem_detalhe"), null, null, null);
+        }
 
         var motivo = $"{marca} de {input.ValorPago.ToString("F2", Cultura.PtBr)} {descricao}; estorno {r.IdSolicitacao}";
         var resultado = await RecusarAsync(pedido, alvo, motivo, situacao, agora, ct);
@@ -297,11 +375,16 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         PedidoEntity pedido, IReadOnlyList<CobrancaPedido> cobrancas, ConfirmarPagamentoPedidoInput input,
         Guid empresaId, CancellationToken ct)
     {
-        if (cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga && c.PagamentoExternoId != input.PagamentoExternoId))
+        var alvo = EscolherCobranca(cobrancas, input);
+        if (alvo?.Complementar != true && cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga && c.PagamentoExternoId != input.PagamentoExternoId))
             return true;
 
         var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
-        return comPagamentos.Total.Valor > 0m && comPagamentos.TotalPago >= comPagamentos.Total.Valor;
+        var alocado = saldoFinanceiro is not null && alvo?.Complementar == true
+            ? (await saldoFinanceiro.ConsultarAsync(comPagamentos, ct)).Alocado : comPagamentos.TotalPago;
+        // Preferência antiga paga depois de uma edição não vira complemento de valor diferente.
+        return comPagamentos.Total.Valor > 0m && (alocado >= comPagamentos.Total.Valor
+            || alvo?.Complementar == true && input.ValorPago > comPagamentos.Total.Valor - alocado);
     }
 
     private static CobrancaPedido? EscolherCobranca(IReadOnlyList<CobrancaPedido> cobrancas, ConfirmarPagamentoPedidoInput input)
@@ -310,8 +393,19 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             return cobrancas.FirstOrDefault(c => c.Provedor == input.Provedor && c.ReferenciaExterna == input.ReferenciaExterna);
 
         var online = cobrancas.Where(c => c.Provedor == input.Provedor).ToList();
-        return online.FirstOrDefault(c => c.EstaPendente) ?? online.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
+        var atual = online.FirstOrDefault(c => c.EstaPendente) ?? online.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
+        if (atual is null || input.ValorPago >= atual.Valor) return atual;
+
+        // #1615: o link trocado (item a mais, sinal que virou total) continua pagável no Mercado Pago, e o
+        // webhook não diz qual link foi pago. Valor menor que a cobrança atual e igual ao de uma substituída
+        // é o link antigo: o dinheiro entra nela e o saldo fica para a entrega, em vez de ficar retido.
+        return online.Where(c => EhLinkSubstituido(c) && c.Valor == input.ValorPago)
+            .OrderByDescending(c => c.CriadaEm)
+            .FirstOrDefault() ?? atual;
     }
+
+    private static bool EhLinkSubstituido(CobrancaPedido c) =>
+        c.Status is StatusCobrancaPedido.Cancelada or StatusCobrancaPedido.Expirada;
 
     private async Task<ConfirmarPagamentoPedidoResult> RecusarAsync(
         PedidoEntity pedido, CobrancaPedido alvo, string motivo, SituacaoConfirmacaoPagamento situacao, DateTime agora, CancellationToken ct)

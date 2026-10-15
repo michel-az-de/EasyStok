@@ -25,7 +25,8 @@ public enum ResultadoAutomacao
     SemConsentimento = 6,
     VariavelSemValor = 7,
     Falhou = 8,
-    ClienteBloqueado = 9
+    ClienteBloqueado = 9,
+    ConversaReaberta = 10
 }
 
 /// <summary>
@@ -81,6 +82,10 @@ public sealed class DispararAutomacaoUseCase(
         if (clienteId is { } bloqueavel && (await clientes.GetByIdAsync(disparo.EmpresaId, bloqueavel))?.Bloqueado == true)
             return Registrar(disparo, ResultadoAutomacao.ClienteBloqueado);
 
+        // O encerramento pode estar no outbox quando o operador reabre. Não despedir de uma conversa retomada.
+        if (disparo.Gatilho == GatilhoAutomacao.Encerramento && conversa.EstaAberta)
+            return Registrar(disparo, ResultadoAutomacao.ConversaReaberta);
+
         if (clienteId is { } c
             && !await politica.PodeEnviarAsync(disparo.EmpresaId, c, conversa.Canal, FinalidadeContato.Transacional, ct))
             return Registrar(disparo, ResultadoAutomacao.SemConsentimento);
@@ -102,7 +107,7 @@ public sealed class DispararAutomacaoUseCase(
         {
             idExterno = await canais.Obter(conversa.Canal).EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Automática {Gatilho} falhou no canal da conversa {ConversaId}.", disparo.Gatilho, conversa.Id);
             return ResultadoAutomacao.Falhou;
@@ -127,7 +132,10 @@ public sealed class DispararAutomacaoUseCase(
 
         if (disparo.ClienteId is not { } clienteId) return null;
         var recentes = await conversas.ListarPorClienteAsync(disparo.EmpresaId, clienteId, 1, ct);
-        return recentes.FirstOrDefault();
+        // #1787: a lista vem sem rastreio; relida pelo id, a saída atualiza UltimaMensagemEm e a conversa sobe na inbox.
+        return recentes.FirstOrDefault() is { } recente
+            ? await conversas.ObterPorIdAsync(disparo.EmpresaId, recente.Id, ct)
+            : null;
     }
 
     private ResultadoAutomacao Registrar(DisparoAutomacao disparo, ResultadoAutomacao resultado)

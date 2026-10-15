@@ -50,4 +50,17 @@ public class CanalWhatsAppTests
 
         id.Should().Be("wamid.3");
     }
+
+    [Fact]
+    public async Task AudioDelegaAoCloudClientComONotaDeVoz()
+    {
+        // #1444: o console grava e o EasyStok manda pelo link público, como a foto.
+        _cloud.EnviarAudioAsync("5511999990001", "https://cdn.test/a.ogg", true, Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.audio"));
+        ICanalComAudio canal = new CanalWhatsApp(_cloud);
+
+        var id = await canal.EnviarAudioAsync("5511999990001", "https://cdn.test/a.ogg", notaDeVoz: true);
+
+        id.Should().Be("wamid.audio");
+    }
 }

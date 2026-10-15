@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { cursorDeMoeda, digitosDeMoeda } from './moedaNoCampo'
 import css from './CampoMascarado.module.css'
 
 // Campo para dado que só existe em dígito por dentro: moeda, telefone e cep
@@ -15,13 +16,25 @@ import css from './CampoMascarado.module.css'
 // igual a digitar, o navegador já mistura o texto no campo sozinho.
 //
 // Sem `maxLength` nunca (seção 2): ele corta o que foi colado sem avisar.
+//
+// #1595: em "moeda" a tecla conta sempre como último dígito (`digitosDeMoeda`) e o cursor volta
+// para o fim (`cursorDeMoeda`), que é onde ela entra. Telefone e cep não: neles corrigir um
+// dígito no meio faz sentido.
+function manterCursorNoFim(evento) {
+  const campo = evento.target
+  const destino = cursorDeMoeda({ inicio: campo.selectionStart, fim: campo.selectionEnd, tamanho: campo.value.length })
+  if (destino !== null) campo.setSelectionRange(destino, destino)
+}
+
 export function CampoMascarado({
-  tipo, rotulo, rotuloOculto, dica, erro, valor, aoMudarDigitos, aoColarTexto, ...resto
+  tipo, rotulo, rotuloOculto, dica, erro, valor, aoMudarDigitos, aoColarTexto, id: idInformado, className, ...resto
 }) {
-  const id = useId()
+  const idGerado = useId()
+  const id = idInformado ?? idGerado
 
   function aoDigitar(evento) {
-    aoMudarDigitos(evento.target.value.replace(/\D/g, ''))
+    const texto = evento.target.value
+    aoMudarDigitos(tipo === 'moeda' ? digitosDeMoeda(String(valor ?? ''), texto) : texto.replace(/\D/g, ''))
   }
 
   function aoColar(evento) {
@@ -31,20 +44,23 @@ export function CampoMascarado({
   }
 
   return (
-    <div>
+    <div className={css.campo}>
       <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}</label>
       <input
         id={id}
         inputMode="numeric"
-        className={[css.controle, erro ? css.erro : ''].filter(Boolean).join(' ')}
+        data-tipo={tipo}
+        className={[css.controle, erro ? css.erro : '', className].filter(Boolean).join(' ')}
         value={valor}
         onChange={aoDigitar}
         onPaste={aoColar}
+        onSelect={tipo === 'moeda' ? manterCursorNoFim : undefined}
         aria-invalid={Boolean(erro) || undefined}
         {...resto}
+        aria-describedby={[resto['aria-describedby'], erro ? `${id}-erro` : dica ? `${id}-dica` : null].filter(Boolean).join(' ') || undefined}
       />
-      {erro && <p className={css.erroTexto} role="alert">{erro}</p>}
-      {!erro && dica && <p className={css.dica}>{dica}</p>}
+      {erro && <p id={`${id}-erro`} className={css.erroTexto} role="alert">{erro}</p>}
+      {!erro && dica && <p id={`${id}-dica`} className={css.dica}>{dica}</p>}
     </div>
   )
 }

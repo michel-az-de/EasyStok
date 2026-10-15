@@ -37,6 +37,16 @@ public class ChatSiteUseCasesTests
         _flags.ListarAtivasAsync(_loja.EmpresaId, Arg.Any<CancellationToken>())
             .Returns([FeatureCatalogo.ModuloAtendimento, FeatureCatalogo.CanalChatSite]);
         _acesso = new AcessoChatSite(_lojas, _flags, _tenant, _sessoes);
+        // #1797: a mensagem relê a conversa travada; no dublê, a já cadastrada ou a recém-criada.
+        var criadas = new List<Conversa>();
+        _conversas.When(x => x.AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>())).Do(ci => criadas.Add(ci.Arg<Conversa>()));
+        _conversas.ObterPorIdComLockAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(async ci => await _conversas.ObterPorIdAsync(ci.ArgAt<Guid>(0), ci.ArgAt<Guid>(1), ci.ArgAt<CancellationToken>(2))
+                ?? criadas.FirstOrDefault(c => c.Id == ci.ArgAt<Guid>(1)));
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Conversa>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<Conversa>>>()(ci.Arg<CancellationToken>()));
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Mensagem>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<Mensagem>>>()(ci.Arg<CancellationToken>()));
     }
 
     private (SessaoChatSite Sessao, string Token) SessaoValida(Guid? storefrontId = null, DateTime? abertaEm = null)
@@ -48,7 +58,7 @@ public class ChatSiteUseCasesTests
     }
 
     private EnviarMensagemVisitanteUseCase Enviar() => new(
-        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance);
+        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new ConversaChatSiteService(_conversas, _uow));
 
     [Fact]
     public async Task AbrirSessao_DevolveTokenEGuardaSoOHash()
@@ -101,13 +111,14 @@ public class ChatSiteUseCasesTests
         criada.ContatoIdExterno.Should().Be(sessao.ContatoIdExterno);
         criada.Situacao.Should().Be(SituacaoConversa.Assumida);
         criada.AssumidaPorUsuarioId.Should().BeNull();
+        criada.MotivoEscalada.Should().Be(ConversaChatSiteService.MotivoFilaHumana);
         criada.NaoLidas.Should().Be(1);
         sessao.ConversaId.Should().Be(criada.Id);
         resultado.DoVisitante.Should().BeTrue();
         resultado.Texto.Should().Be("Oi, vocês entregam hoje?");
         await _conversas.Received(1).AddMensagemAsync(
             Arg.Is<Mensagem>(m => m.ConversaId == criada.Id && m.Direcao == DirecaoMensagem.Entrada), Arg.Any<CancellationToken>());
-        await _uow.Received(1).CommitAsync();
+        await _uow.Received(2).CommitAsync();
     }
 
     [Fact]
@@ -117,11 +128,36 @@ public class ChatSiteUseCasesTests
         var conversa = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, DateTime.UtcNow, canal: CanalConversa.ChatSite);
         sessao.VincularConversa(conversa.Id);
         _conversas.ObterPorIdAsync(_loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var confirmacao = Mensagem.Saida(_loja.EmpresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
+            TipoConteudoMensagem.Texto, "Recebemos sua mensagem.", EnviarMensagemVisitanteUseCase.PrefixoConfirmacaoRecebimento + conversa.Id.ToString("N"));
+        _conversas.ObterMensagemPorExternoIdAsync(_loja.EmpresaId, confirmacao.ExternoId!, Arg.Any<CancellationToken>()).Returns(confirmacao);
 
         await Enviar().ExecuteAsync(Slug, token, "mais uma");
 
         await _conversas.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
         conversa.NaoLidas.Should().Be(1);
+        await _conversas.DidNotReceive().AddMensagemAsync(Arg.Is<Mensagem>(m => m.Direcao == DirecaoMensagem.Saida), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("Conversa reaberta para atendimento.", false)]
+    [InlineData("Motivo real preservado", false)]
+    [InlineData(null, true)]
+    public async Task Entrada_PreservaMotivoRealEResponsavel(string? motivo, bool assumida)
+    {
+        var (sessao, token) = SessaoValida();
+        var agora = DateTime.UtcNow;
+        var conversa = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, agora, canal: CanalConversa.ChatSite);
+        var dona = assumida ? Guid.NewGuid() : (Guid?)null;
+        if (assumida) conversa.Assumir(agora, dona); else conversa.Escalar(agora, motivo);
+        sessao.VincularConversa(conversa.Id);
+        _conversas.ObterPorIdAsync(_loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        await Enviar().ExecuteAsync(Slug, token, "Mais uma dúvida");
+
+        conversa.MotivoEscalada.Should().Be(motivo);
+        conversa.AssumidaPorUsuarioId.Should().Be(dona);
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
     }
 
     [Fact]
@@ -160,13 +196,52 @@ public class ChatSiteUseCasesTests
     }
 
     [Fact]
-    public async Task CanalChatSite_DevolveIdExternoESoTexto()
+    public async Task CanalChatSite_DevolveIdExternoParaTextoEFoto()
     {
         var canal = new CanalChatSite();
 
         (await canal.EnviarTextoAsync("sessao", "olá")).Should().StartWith(CanalChatSite.PrefixoIdExterno);
         canal.Canal.Should().Be(CanalConversa.ChatSite);
-        var imagem = () => canal.EnviarImagemAsync("sessao", "https://x/y.png");
-        await imagem.Should().ThrowAsync<NotSupportedException>();
+        // #1448: a foto da loja é a mensagem gravada (o visitante busca a mídia pela sessão). O que ainda
+        // segura o envio é a capacidade do canal, desligada até o widget do site desenhar imagem.
+        (await canal.EnviarImagemAsync("sessao", "https://x/y.png")).Should().StartWith(CanalChatSite.PrefixoIdExterno);
+        var botoes = () => canal.EnviarBotoesAsync("sessao", "x", [("a", "A")]);
+        await botoes.Should().ThrowAsync<NotSupportedException>();
     }
+
+    [Fact]
+    public async Task MensagemDoChat_DizOTipoESeTemMidia()
+    {
+        var (sessao, token) = SessaoValida();
+        var conversaId = Guid.NewGuid();
+        sessao.VincularConversa(conversaId);
+        var foto = Mensagem.Saida(_loja.EmpresaId, conversaId, AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Imagem, null, "chatsite:1");
+        foto.AnexarMidia("atendimento/e/c/f.jpg", "image/jpeg");
+        var texto = Mensagem.Saida(_loja.EmpresaId, conversaId, AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Texto, "oi", "chatsite:2");
+        _conversas.ListarMensagensDepoisAsync(_loja.EmpresaId, conversaId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([foto, texto]);
+
+        var lista = await new ListarMensagensChatSiteUseCase(_acesso, _sessoes, _conversas).ExecuteAsync(Slug, token, null);
+
+        lista.Select(m => (m.Tipo, m.TemMidia)).Should().Equal(("imagem", true), ("texto", false));
+    }
+
+    [Fact]
+    public void ChatSite_SegueSemAceitarFotoAteOWidgetDesenhar()
+    {
+        // #1448: dependência do widget (repo casa-da-baba). Ligar só quando ele desenhar `tipo: imagem`.
+        EasyStock.Domain.ValueObjects.CapacidadesCanal.Para(CanalConversa.ChatSite).AceitaImagem.Should().BeFalse();
+    }
+    [Fact]
+    public async Task Stream_UsaSnapshotAtualENaoSessaoRastreadaAntesDoLogout()
+    {
+        var (sessao, token) = SessaoValida();
+        _sessoes.ObterSnapshotPorTokenHashAsync(_loja.EmpresaId, sessao.TokenHash, Arg.Any<CancellationToken>())
+            .Returns((SessaoChatSite?)null);
+        var sut = new ListarMensagensChatSiteUseCase(_acesso, _sessoes, _conversas);
+        await sut.Invoking(x => x.ListarParaStreamAsync(_loja.EmpresaId, AcessoChatSite.HashDoToken(token), null))
+            .Should().ThrowAsync<SessaoChatSiteInvalidaException>();
+        await _conversas.DidNotReceiveWithAnyArgs().ListarMensagensDepoisAsync(default, default, default, default, default);
+    }
+
 }

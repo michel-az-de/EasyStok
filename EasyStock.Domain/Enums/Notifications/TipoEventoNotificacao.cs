@@ -73,5 +73,22 @@ public enum TipoEventoNotificacao
 
     // Lembretes da dona (S43): lembrete venceu (manual) ou nasceu do avaliador (pagamento sem baixa,
     // cliente sem resposta). Push para quem e o lembrete, ou para a empresa toda.
-    LembreteVencido = 47
+    LembreteVencido = 47,
+
+    // Catalogo de plataforma (N13): faixa 48 a 63 reservada pela S0. A N4 e a N8 usam a faixa livre a partir de 80.
+    ConviteAcesso = 48,
+    IncidenteSistema = 49,
+    PrazoEstourado = 50,
+    ResumoDiario = 51,
+
+    // Contato do usuario trocado (N4): aviso ao endereco antigo ou ao e-mail atual. Faixa livre da S0, a partir de 80.
+    ContatoAlterado = 80,
+
+    // Senha trocada (N8): aviso por todos os canais verificados depois de um reset concluido. Faixa livre da S0.
+    SenhaAlterada = 81,
+
+    // Loja fechada na mao dentro do horario de funcionamento (#1443): aviso aos donos com quem fechou e a justificativa.
+    LojaFechadaNoHorario = 82,
+    PedidoReagendado = 83,
+    ComandaAtualizada = 84
 }

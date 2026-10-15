@@ -1,12 +1,12 @@
 /* Lote de papel (US-042, D6, UC-04 E1): faixa de queda, faixa de pendência
    e a lista da modal. Mesmos tokens de .gavetaCanhoto (comanda.module.css) e
-   .diferencaPaga (aviso de --atencao), nada novo inventado. */
+   .diferencaPaga (aviso de --alerta), nada novo inventado. */
 
 .bannerOffline, .faixaPendente {
   position: fixed; top: 0; left: 0; right: 0; z-index: 60;
   display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
   padding: var(--e-2) var(--e-4);
-  background: var(--atencao-pastel); color: var(--atencao);
+  background: var(--alerta-pastel); color: var(--alerta);
   border-bottom: var(--b-1) solid var(--linha-forte);
   font-size: var(--t-apoio); font-weight: 600;
 }

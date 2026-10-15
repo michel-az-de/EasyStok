@@ -1,0 +1,1058 @@
+# Casa da Baba · EasyStok: levantamento e desenvolvimento em ondas
+
+Data: 09/10/2026. Solicitante: Felipe. Escopo: nova versão dedicada à Casa da Baba.
+Base do levantamento: master 6763af349510f84db1c9c9bb7434be039588f164, igual ao origin/master na consulta. Árvore de trabalho limpa antes desta documentação.
+
+## 1. Conclusão e alcance da verificação
+
+Existe uma base ampla de regras, APIs e fluxos operacionais. A nova versão ainda não está fechada como produto: partes estão conectadas ao console, outras continuam no Web antigo, outras são demonstração, e várias correções estão em PR aberta. O principal trabalho é concluir jornadas completas, com UX consistente e integrações comprovadas.
+
+Este levantamento cobre as áreas do produto, os planos M0–M8, o histórico recente, as ações conectadas e não conectadas do console, as PRs abertas e verificações locais. Não é uma certificação linha a linha de todo o ERP, nem homologação de produção. Não foram criados pedidos reais, realizadas cobranças, chamados entregadores ou acionadas impressoras.
+
+Classificação usada:
+
+- **Código integrado:** encontrado no master; não significa publicação nem aceite operacional.
+- **Parcial:** existe backend, tela ou parte da jornada, mas o conjunto não está fechado.
+- **Em PR:** trabalho localizado fora do master; precisa de revisão e validação na base atual.
+- **Pendente:** não encontrado na superfície examinada ou explicitamente bloqueado pelo código/plano. A indicação informa qual superfície foi examinada.
+- **Operação não comprovada:** depende de conta, dispositivo ou uso real que não foi exercitado nesta demanda.
+
+Não atribuí percentual de conclusão: contar endpoints ou commits produziria uma medida enganosa do funcionamento da loja.
+
+## 2. Direção já decidida
+
+Fontes: [plano M0–M8](README.md), [ADR-0056](../../adr/0056-erp-da-casa-da-baba-front-unico.md), [ADR-0059](../../adr/0059-web-sai-pwa-continua-e-merge-de-conflitos.md) e [homologação de 07/10](../atendimento-whatsapp/homologacao-2026-10-07.md).
+
+1. Produto voltado somente à Casa da Baba; a pessoa não escolhe empresa para operar. Manter proteção por EmpresaId e RLS enquanto existir essa estrutura.
+2. EasyStock.Console é o novo frontend, com hall, módulos e menus próprios. Nome decidido: Casa da Baba · EasyStok.
+3. Toda área do EasyStock.Web deve ganhar equivalente no console. Inclui estoque, compras, fornecedores, financeiro, etiquetas e relatórios. O Web só sai de cada área depois da substituição comprovada.
+4. PWA de produção e cadastro continua como backup offline. O console permanece online.
+5. Edição concorrente PWA/console deve gerar conflito resolvido pela dona. Até a resolução, vale o servidor; não sobrescrever silenciosamente.
+6. Perfis pretendidos: Dona, Atendimento e Cozinha. Permissões por módulo ainda precisam ser concluídas.
+7. Preservar claro/escuro e as interações já aprovadas. Aplicar identidade Casa da Baba a partir dos ativos válidos; o plano M0 registra que o DS de impressos ainda tinha status de proposta, portanto essa referência não equivale a aprovação visual de todas as telas.
+8. Pix e cartão de pedidos pelo link do Checkout Pro; maquininha e vale com registro manual, conforme decisão registrada no plano de pagamentos.
+
+O pedido atual é de levantamento e plano. As ondas abaixo são proposta de execução, não autorização automática para excluir dados, publicar alterações ou efetuar transações.
+
+## 3. Código disponível versus ambiente publicado
+
+Consultas públicas, somente leitura, realizadas em 09/10:
+
+| Superfície | Resultado observado | Consequência |
+|---|---|---|
+| origin/master | 6763af34 | Referência deste inventário |
+| app.easystok.online | HTTP 200; metadado easystok-console-sha = 888eeab7 | Console servido anterior ao master |
+| api.easystok.online/health/version | HTTP 200; apiVersion 1.10.0; buildSha = 701dbf4b | API servida em outro commit, também anterior ao master |
+| casadababa.com | HTTP 200 | A informação antiga de HTTP 503 não descreve esta consulta; checkout não foi exercitado |
+
+Código mergeado não é necessariamente o código que a dona está usando. Comparar SHA do console e da API é o primeiro passo antes de classificar uma funcionalidade como quebrada ou ausente.
+
+Há documentação desatualizada: AGENTS e arquivos da .knowledge ainda citam diferentes infraestruturas, MAUI e .NET 9. O projeto [EasyStock.Api.csproj](../../../EasyStock.Api/EasyStock.Api.csproj) hoje aponta net10.0, confirmado pela compilação dos testes. O [script do console](../../../scripts/deploy/console-deploy.sh) aponta app.easystok.online e VPS hostinger. Os documentos antigos ficam como histórico, não como evidência operacional atual. Não foi feita auditoria interna da VPS nesta demanda.
+
+## 4. Inventário por área
+
+| Área | O que já existe no código examinado | Falta para a nova versão | Situação |
+|---|---|---|---|
+| Fundação e navegação | Hall M1–M8, rotas por módulo, menus, login senha/Google e tema claro/escuro | Matriz perfil × módulo, UX de navegação, consistência entre telas de operação e ajuste, entrada por perfil e sessão da cozinha | Parcial |
+| Design system | Tokens centrais, componentes comuns, CSS por área, temas e regras de movimento | Identidade Casa da Baba aplicada e aprovada; tipografia, estados, formulários, tabelas, acessibilidade e responsividade uniformes | Parcial; tokens ainda trazem a paleta do protótipo |
+| M1 Cardápio | Lista e gestão via API; disponibilidade do dia/site, ordem no servidor, arquivamento, item novo em validação, novidade com prazo e categorias | Fechar ficha de produto, variações/porções, adicionais, combos, alergênicos e coerência do preço/saldo entre canais | M1.1–M1.3 integradas; restante parcial |
+| M2 Produção | Backend de produção/lotes/estoque e receitas; ajustes recentes no sync da PWA; lote de papel e cardápio do dia ligados no balcão | Módulo próprio completo, insumos, fichas técnicas, planejamento, peso real, perdas, embalagens, etiquetas e conflitos offline | No master o módulo tem telas vazias; M2.1 em PR; M2.2 em issue |
+| M3 Balcão | Conversas, assumir/devolver ao automático, texto, reenvio, cadastro/ficha, tags, notas, respostas, galeria, áudio WhatsApp, sugestão e ações confirmadas do assistente | Fechar alterações do pedido na ficha, ocorrências, reabertura, mudança de endereço/janela, lembretes, modelos aprovados, nova conversa e recuperação de falhas | Ampla implementação, jornada incompleta |
+| Pedido e cobrança manual | Comanda por API, geração de pedido, cobrança, troca de forma, registro/desfazimento manual e máquina de estados | Unificar a interação no balcão, pagamentos parciais/acréscimos conforme regra definida, cancelamento/estorno e consistência com cozinha, caixa e estoque | Parcial; provas locais passaram |
+| Mercado Pago | Cliente HTTP Checkout Pro, consulta de pagamento, webhook, assinatura, confirmação, estorno e testes | Configuração efetiva, eliminar divergência de chave global/por loja, sandbox completo, retorno à conversa/site, conciliação e teste operacional | Código integrado; operação real não comprovada |
+| M4 Cozinha | KDS no modo API, fila, comanda/canhoto, integração de atualização e fila de impressão | Sessão por perfil, prioridades/prazos, expedição e homologação no dispositivo real | Parcial; prova da cozinha passou |
+| Impressão | Modelos de pedido/comanda, fila persistida, retorno de sucesso/falha e reimpressão; PDF/canhoto no console | Consumidor da fila conectado ao equipamento, escolha por dispositivo, recuperação de falha, corte/tamanho/acentos e prova no papel | Geração implementada; impressão física não comprovada |
+| M5 Caixa | Abrir loja com caixa, movimentos, fechamento, justificativa ao fechar no horário e pagamento manual | Venda avulsa no console, gaveta versus pagamentos eletrônicos, reconciliação de totais, reabertura, histórico e relatórios completos | Parcial; prova do caixa passou |
+| Financeiro gerencial | Casos de uso de contas a pagar/receber, parcelas, baixas, estornos, categorias, centros de custo, dashboard e integração com pedidos/compras | UX no console, regras conciliadas com o caixa e tratamento do legado de gateways | Backend reaproveitável; módulo novo incompleto |
+| Compras e fornecedores | Casos de uso de fornecedor, listas/pedidos de compra, recebimento e entrada de estoque; histórico de testes de recebimento | Jornada completa no console: necessidade → compra → recebimento → estoque → obrigação financeira | Backend/legado; UX nova pendente |
+| M8 Entregas | Janelas, zonas, capacidade, entregadores, viagens, painel e roteiro impresso; geocodificação Google/Nominatim no backend | Configuração utilizável de origem/raio/frete, tratamento de endereço inválido, mapa/rota e conexão real com transportadora | Parcial; TomTom em PR; Lalamove em issue |
+| Transportadoras | Fachada de demonstração no frontend para cotar/chamar/cancelar/consultar | Adapter real, credencial, cotação válida, criação, acompanhamento, cancelamento e fallback manual | Simulação não conta como integração |
+| Automático e assistente | Processamento do agente, catálogo/caderno, transcrição, sugestão, execução com confirmação e transferência humano/automático | Homologar ciclo completo, coleta de dados, limites das ações, primeira resposta, transferência, erros de canal, horário e reconexão | Parcial; desligar automático transfere à dona no master |
+| Notificações | Motor/outbox, tipos/canais, rotinas e avisos; trabalhos recentes de acesso por convite e recuperação | Sino, lembretes e Web Push conectados no console; comprovar entrega dos canais configurados | Backend; PRs de frontend abertas |
+| M6 CRM/campanhas | Cadastro/dossiê, tags/consentimento/interesses e backend de campanhas com público e ondas | Listagem CRM, editor de campanha, resultados por venda paga, promoções, fidelidade e cupons de loja | Motor parcial; fidelidade/integrações desabilitadas no modo API |
+| M7 Configurações | Horários/respostas/canais distribuídos; usuários e parâmetros no backend | Gestão única de equipe, perfis, chaves, testes de conexão, impressão, loja, backup e operação | Parcial; gestão de chaves em PR |
+| Site | Vitrine/checkout e ligação ao atendimento registrados no código/histórico | Homologar catálogo, frete, pagamento, identificação do visitante e retorno do pedido com o console | Integração parcial; lead do chat em PR; repo do site não auditado nesta demanda |
+| Continuidade operacional | PWA offline com sync; correções recentes de lotes, descarte, custos e estoque mínimo | Conflitos entre dispositivos, precache/reconexão comprovados, restauração de backup, alerta e recuperação | Parcial; módulo de conflitos ainda é decisão/spec pendente |
+
+### Evidências de código para navegar
+
+- Fundação e identidade: [modulos.js](../../../EasyStock.Console/src/dominio/modulos.js), [tokens.css](../../../EasyStock.Console/src/estilos/tokens.css), [App.jsx](../../../EasyStock.Console/src/app/App.jsx).
+- Conexão com backend: [acoesApi.js](../../../EasyStock.Console/src/aplicacao/acoesApi.js), [naoLigadas.js](../../../EasyStock.Console/src/aplicacao/api/naoLigadas.js), [ModalGestao.jsx](../../../EasyStock.Console/src/features/gestao/ModalGestao.jsx), [comandaApi.js](../../../EasyStock.Console/src/infra/api/comandaApi.js).
+- Pedido: [PedidoStateMachine.cs](../../../EasyStock.Domain/Sales/PedidoStateMachine.cs).
+- Pagamento: [MercadoPagoClient.cs](../../../EasyStock.Infra.Integrations/Pagamentos/MercadoPago/MercadoPagoClient.cs), [MercadoPagoWebhookProcessor.cs](../../../EasyStock.Infra.Async/Pagamentos/Webhooks/MercadoPagoWebhookProcessor.cs).
+- Impressão: [ImpressaoController.cs](../../../EasyStock.Api/Controllers/ImpressaoController.cs), [casos de uso de impressão](../../../EasyStock.Application/UseCases/Operacao/Impressao).
+- Entregas: [casos de uso](../../../EasyStock.Application/UseCases/Atendimento/Entregas), [provedoresDeEntrega.js](../../../EasyStock.Console/src/infra/provedoresDeEntrega.js), [Geocoding](../../../EasyStock.Infra.Integrations/Geocoding).
+- Bastidor: [Financeiro](../../../EasyStock.Application/UseCases/Financeiro), [Fornecedor](../../../EasyStock.Application/UseCases/Fornecedor), [Campanhas](../../../EasyStock.Application/UseCases/Campanhas).
+- Backup offline e migração: [ADR-0059](../../adr/0059-web-sai-pwa-continua-e-merge-de-conflitos.md).
+
+### Ações com aviso explícito de não conectadas
+
+A lista naoLigadas.js registra reabrir conversa, alterar janela/endereço do pedido, lembretes, bloqueio de cliente, recebido na entrega, refazer cobrança, avaliações, parte das ocorrências, venda avulsa, integrações, fidelidade e cupons. Também há envio de modelo aprovado e automática da biblioteca ainda bloqueados.
+
+Essa lista é por caminho de interface: janelas e entregas, por exemplo, já têm telas próprias conectadas; reemitir cobrança tem chamada real em comandaApi.js. Portanto uma ação bloqueada na ficha não significa ausência de toda a funcionalidade no ERP. Fechar essa diferença entre caminhos é parte central da UX do balcão.
+
+## 5. Trabalho em andamento a reaproveitar
+
+Snapshot do GitHub de 09/10. PR aberta não é entrega incorporada. Checks aprovados não substituem teste visual ou operação real.
+
+| PR / issue | Trabalho existente | Destino no plano |
+|---|---|---|
+| [PR 1480](https://github.com/michel-az-de/EasyStok/pull/1480) / #1474 | Revisão visual do pedido e PWA | Revisar na onda 0; absorver nas ondas 1 e 2 |
+| [PR 1492](https://github.com/michel-az-de/EasyStok/pull/1492) / #1490 | M2.1 estoque do dia | Onda 7; não iniciar implementação duplicada |
+| [Issue 1491](https://github.com/michel-az-de/EasyStok/issues/1491) | M2.2 produção por item com peso real | Onda 7 |
+| [PR 1304](https://github.com/michel-az-de/EasyStok/pull/1304) / #1246 | Chaves por loja, teste e vigia | Fundação de integração da onda 3 e reuso na 4 |
+| [PR 1323](https://github.com/michel-az-de/EasyStok/pull/1323) / #1322 | Geocodificação e rotas TomTom | Onda 4; conferir provider selecionado |
+| [Issue 1247](https://github.com/michel-az-de/EasyStok/issues/1247) | Lalamove e rota | Onda 4 |
+| [PR 1401](https://github.com/michel-az-de/EasyStok/pull/1401) / #1399 | Estorno de estoque, descoberto e lote do pedido | Corrigir antes de homologar cancelamento na onda 2; regressão na 7 |
+| [PR 1293](https://github.com/michel-az-de/EasyStok/pull/1293) / #1283 | Número do pedido do dia e congelado na comanda | Onda 5 |
+| [PR 1425](https://github.com/michel-az-de/EasyStok/pull/1425) / #1424 | Mensagem programada no compositor | Onda 2 e validação do automático na 9 |
+| [PR 1428](https://github.com/michel-az-de/EasyStok/pull/1428) / #1426 | Sino, lembretes e Web Push | Integrada e homologada localmente na seção 21; entrega externa de push pendente |
+| [PR 1429](https://github.com/michel-az-de/EasyStok/pull/1429) / #1427 | SLA de primeira resposta | Integrada e homologada localmente na seção 22; aceite operacional na onda 9 |
+| [PR 1431](https://github.com/michel-az-de/EasyStok/pull/1431) / #1430 | Identificação do lead do site | Onda 2 |
+| [PR 1433](https://github.com/michel-az-de/EasyStok/pull/1433) / #1432 | Atendimento por e-mail | Onda 9, após fechar WhatsApp/site |
+| [Issues 1407](https://github.com/michel-az-de/EasyStok/issues/1407) e [1408](https://github.com/michel-az-de/EasyStok/issues/1408) | Modelo aprovado e iniciar conversa | Onda 2 para operação manual; onda 9 para automação |
+| [Issue 1245](https://github.com/michel-az-de/EasyStok/issues/1245) | Fidelidade e cupons de loja | Onda 10 |
+| [PR 871](https://github.com/michel-az-de/EasyStok/pull/871) | Testes de integração no CI | Onda 0: investigar; estava draft com falha em Build + dotnet test |
+
+A PR 1492 tinha checks em andamento na consulta. Diversas outras tinham checks verdes e homologação HTTP manual ignorada. Revisar diferenças contra o master antes de qualquer merge. As issues antigas #1237, #1239, #1240, #1242, #1243 e #1244 continuam abertas apesar de entregas posteriores; reconciliar seus aceites em vez de assumir que tudo falta.
+
+## 6. Plano de execução por ondas
+
+Recomendação: uma onda operacional por vez, dividida em pequenas entregas verticais. Cada fatia entrega tela, regra/API, persistência, permissões, erros e prova da jornada correspondente. Design e UX entram no aceite de toda onda.
+
+### Onda 0. Estabelecer uma base confiável
+
+**Resultado:** saber exatamente qual versão está sendo testada, usada e planejada.
+
+1. Reconciliar este inventário com PRs e issues; registrar cada item como integrado, publicado ou homologado separadamente.
+2. Revisar as PRs corretivas aplicáveis, principalmente #1480 e #1401; não juntar todas as PRs em lote.
+3. Preparar ambiente de homologação com dados controlados e configuração real de API, sem demonstração disfarçada.
+4. Alinhar a versão testada do console/API; registrar a versão pública antes e depois de uma futura publicação.
+5. Revisar CI efetivo, instruções desatualizadas, backup e processo de restauração. Estabelecer baseline de falhas e avisos.
+
+**Aceite:** um roteiro reproduzível abre loja/caixa, cria pedido manual, acompanha cozinha, conclui ou cancela e confere os efeitos. Falhas encontradas têm evidência e destino. Nenhum defeito impeditivo sem solução/fallback impede seguir.
+
+**Dependência:** nenhuma. O acesso ao ambiente é necessário para homologação autenticada. Este levantamento entrega o inventário inicial, não conclui a onda.
+
+### Onda 1. Navegação, design system e acessos
+
+**Resultado:** a dona e a equipe encontram suas tarefas numa interface coerente.
+
+1. Fechar mapa de módulos e telas; menu próprio, voltar ao hall, links entre pedido/cozinha/entrega e manutenção de contexto.
+2. Aplicar tokens e componentes Casa da Baba: cores, fontes, espaçamento, estados, foco, contraste, campos, filtros, tabelas, diálogos e mensagens.
+3. Implementar perfil × módulo na API e no frontend; entrada por perfil, convites e sessão da cozinha.
+4. Tratar tela vazia, carregamento, erro, sem permissão e ação ainda indisponível. Evitar botão que promete operação inexistente.
+5. Validar balcão desktop, cozinha tablet e consulta móvel; claro/escuro e teclado. Propagar o padrão a cada módulo quando ele for entregue.
+
+**Aceite:** Dona, Atendimento e Cozinha executam seus acessos permitidos; URL direta não contorna a API; refresh e voltar preservam navegação; o mesmo controle tem comportamento visual consistente. A dona aprova telas representativas antes da aplicação geral.
+
+**Dependência:** onda 0. Base: M0.1–M0.3 e M7 de usuários/perfis. A poda destrutiva M0.5 não é pré-requisito da navegação.
+
+### Onda 2. Balcão e ciclo manual do pedido completos
+
+**Resultado:** atender e resolver um pedido inteiro a partir do balcão, com cobrança manual e despacho próprio já disponível.
+
+1. Consolidar conversa, cliente, comanda, resumo do pedido e próxima ação. Preservar o rascunho quando mudar de tela.
+2. Cadastrar/editar cliente; tratar identificação do site, endereço, retirada/entrega, janela, observações e alterações antes/depois do pagamento conforme regra explícita.
+3. Criar, revisar, enviar, registrar recebimento manual, preparar, concluir, cancelar e tratar ocorrência com confirmação e histórico.
+4. Fechar os caminhos ainda não conectados da ficha: reabertura, troca de janela/endereço, recebimento na entrega, bloqueios e ocorrências, reaproveitando APIs existentes.
+5. Integrar lembretes, SLA, notificações e mensagens programadas das PRs existentes; fechar iniciar conversa e modelos aprovados para o operador.
+6. Unificar status e falhas de texto, áudio/foto, reenvio e transferência entre pessoas/automático. Imprimir via navegador o documento já disponível como fallback até a onda 5.
+
+**Aceite:** cenários de retirada, entrega, pagamento na entrega, cancelamento e erro de envio passam sem alterar banco manualmente. Após recarregar e abrir em outra sessão, pedido, pagamento, estoque e caixa continuam coerentes. Duplo clique e reenvio não duplicam efeitos.
+
+**Dependência:** ondas 0–1; correção de estorno de estoque quando aplicável. Integração paga de frete e pagamento online chegam nas ondas seguintes.
+
+### Onda 3. Mercado Pago e conciliação do pedido
+
+**Resultado:** gerar cobrança no balcão/site e enxergar a confirmação real no mesmo pedido.
+
+1. Revisar #1304, definir uma fonte efetiva das credenciais e mostrar o estado da conexão sem revelar segredos.
+2. Validar conta/aplicação/ambientes e configuração de entrega mínima para o checkout, usando retirada quando o cenário permitir.
+3. Fechar jornada com Checkout Pro: gerar/reemitir link, enviar, pagar, receber webhook e atualizar conversa, pedido, caixa e autorização de preparo.
+4. Tratar recusa, pendência, expiração, abandono, indisponibilidade, pagamento duplicado/tardio, cancelamento e estorno. Revisar #1302, sobre liberação de vaga.
+5. Conferir reconciliação quando o webhook atrasar ou não chegar; status de pagamento vem do provedor/backend, nunca de um retorno visual do site.
+
+**Aceite:** sandbox comprova sucesso, recusa, expiração, repetição e estorno sem baixa duplicada. Depois, transação de produção controlada com responsável autorizado, referência rastreável e conferência financeira. Cada ambiente tem evidência própria.
+
+**Dependência:** onda 2; acesso à conta e credenciais pelo responsável. Não criar outra integração de pedidos se a existente puder atender.
+
+### Onda 4. Entrega e geolocalização completas
+
+**Resultado:** do endereço informado à entrega confirmada, com preço e acompanhamento compreensíveis no balcão.
+
+1. Definir/configurar endereço e coordenadas da cozinha, áreas, faixas de frete, capacidade, janelas e exceções.
+2. Diferenciar localização do cliente, busca de endereço/CEP, cálculo de cobertura e rota rodoviária. Permissão de localização negada deve permitir digitação manual.
+3. Rever #1323 antes de escolher/manter o provedor de mapas. Conferir quotas, configuração e tratamento de endereço ambíguo ou não localizado.
+4. Fechar primeiro o despacho próprio: atribuir entregador, roteiro, saída, acompanhamento, entregue, falha/devolução e pagamento recebido.
+5. Integrar uma transportadora por vez, começando pela escolhida pela operação: cotar → confirmar custo → solicitar → acompanhar → concluir/cancelar. Lalamove tem issue #1247; 99/Uber dependem de viabilidade comercial/técnica confirmada, sem supor API disponível.
+6. Em falha do provedor, exibir motivo e permitir despacho manual registrado. Não confundir frete cobrado do cliente com custo da transportadora.
+
+**Aceite:** endereço dentro/fora da área, janela cheia, localização negada e falha de cotação têm resposta clara. Uma entrega própria e uma da transportadora escolhida fecham com referências reais e retorno ao pedido, sem duplicar chamada.
+
+**Dependência:** ondas 2–3 e contas/configurações. A parte de mapas/entrega própria pode avançar se a credencial da transportadora estiver pendente; a integração externa continua sem aceite até a prova real.
+
+### Onda 5. Cozinha, expedição e impressão física
+
+**Resultado:** um pedido apto entra na cozinha, gera papel legível, é preparado e expedido com conferência.
+
+1. Fechar fila, prioridades, prazos, encomendas e atualização em tempo real; cancelamento deve aparecer claramente para a cozinha.
+2. Separar preparo, conferência/embalagem e expedição; ligar retirada/entrega ao balcão. Rever #1293 para número do dia e identificação de congelado.
+3. Conectar o consumidor da fila à Oasis OIA-8381-B informada por Felipe e ao computador/tablet que a usará. Proposta inicial: validar driver e impressão via USB no Windows; depois testar Bluetooth no dispositivo escolhido. Definir padrão por dispositivo, sem presumir impressão direta do navegador por Bluetooth.
+4. Distinguir recibo não fiscal do cliente, comanda da cozinha, etiqueta de lote e roteiro de entrega; usar cada modelo no lugar correto.
+5. Registrar tentativas, falha, sucesso e reimpressão. Tratar impressora desconectada, sem papel e reinício; retorno de software não comprova sozinho que saiu papel.
+
+**Aceite:** pedido real controlado gera recibo e comanda físicos com número, itens, observações, status do pagamento e acentos corretos, sem corte indevido. Desconexão e reconexão preservam fila; reimpressão é explícita e rastreável.
+
+**Dependência:** onda 2 e acesso ao equipamento; testar os meios da onda 3 e a expedição da 4 no aceite conjunto. Equipamento informado: Oasis OIA-8381-B, USB e Bluetooth, 203 dpi, área de impressão anunciada de 100 × 150 mm, sem Wi-Fi nem Ethernet. São dados do anúncio fornecido por Felipe, ainda sem validação física. O anúncio descreve uma etiquetadora: usar pedido/comanda 100 × 150 mm como primeiro cenário; confirmar mídia, sensor, margens, protocolo e suporte a papel contínuo antes de prometer recibo em rolo. Não assumir ESC/POS nem reutilizar automaticamente o caminho da WTP05.
+
+### Onda 6. Cardápio comercial completo
+
+**Resultado:** a dona cadastra e altera a oferta uma vez e os canais vendem a mesma oferta.
+
+1. Partir de M1.1–M1.3 já integradas; não reimplementar lista/categorias.
+2. Concluir edição de produto, fotos, porções/variações, disponibilidade, preços, observações e alergênicos.
+3. Definir e implementar adicionais/combos com efeito claro no preço, preparo e estoque. Decisões pendentes de M1 viram regra antes da respectiva fatia.
+4. Exibir a mesma oferta no balcão, site e agente; preservar dados históricos de pedidos quando o cardápio mudar.
+
+**Aceite:** cadastrar, alterar, pausar e arquivar item reflete nos canais; pedido usa preço correto, não vende oferta indisponível por erro de cache e mantém sua composição histórica. Combo/adicional chega corretamente à cozinha.
+
+**Dependência:** ondas 1–2; integrações das ondas 3–5 usadas nos cenários. Base: [M1](02-m1-cardapio.md).
+
+### Onda 7. Produção, estoque, etiquetas e backup offline
+
+**Resultado:** produzir e vender atualiza saldo, lotes e custos sem divergência entre console e PWA.
+
+1. Incorporar M2.1 (#1492) e desenvolver M2.2 (#1491) na sequência, com UX do módulo próprio.
+2. Fechar insumos, fichas técnicas, rendimento/peso real, planejamento, produção do dia, perdas, embalagens e etiquetas de lote.
+3. Definir quando baixar insumo/embalagem, como contar porções e como tratar saldo descoberto. Reaproveitar a regra existente de venda sem bloqueio por saldo, salvo nova decisão explícita.
+4. Validar entradas/saídas, validade, ajustes com motivo, cancelamento e estorno de lote; conferir as correções recentes do PWA no aparelho.
+5. Implementar versão-base no sync, fila de conflitos, aviso e resolução pela dona conforme ADR-0059. Proteger reenvio, reconexão e duplicação.
+
+**Aceite:** insumo → produção → lote/etiqueta → venda → baixa/perda/estorno bate nos dois clientes. Editar a mesma entidade offline e online gera conflito visível; a decisão da dona propaga sem perder o registro original nem duplicar saldo.
+
+**Dependência:** ondas 1, 2 e 6; impressão de etiquetas validada com o dispositivo correspondente. Base: [M2](03-m2-producao.md) e ADR-0059.
+
+### Onda 8. Compras, fornecedores e financeiro gerencial
+
+**Resultado:** comprar, receber, pagar e fechar a operação pelo novo console.
+
+1. Colocar fornecedores, listas/pedidos de compra e recebimento parcial/total no console, integrados ao estoque da onda 7.
+2. Fechar contas a pagar/receber, parcelas, vencimentos, baixas, estornos, categorias e centros de custo necessários à Casa da Baba.
+3. Unificar fonte dos totais de caixa e distinguir dinheiro físico, cartão/Pix, contas pendentes, taxa e custo de entrega.
+4. Entregar venda avulsa, conferência da gaveta, fechamento/reabertura com motivo, histórico, extrato e relatórios de vendas/canais, custos/perdas e caixa.
+5. Resolver o destino do caixa da PWA antes de retirar qualquer função; o ADR-0059 preservou produção/cadastro e deixou essa parte pendente.
+
+**Aceite:** compra recebida movimenta estoque e obrigação financeira; pagamento baixa uma vez; venda recebida e estornada reconcilia pedido/caixa/contas. Fechamento explica diferenças, e relatório rastreia valores até as operações de origem.
+
+**Dependência:** ondas 3 e 7, com despacho da 4 para custos de entrega. Base: [M5](06-m5-caixa.md), revisado conforme ADR-0059. O menu pode acomodar compras/estoque em M2 e financeiro em M5 sem inventar módulos novos antes de validar a navegação.
+
+### Onda 9. Atendimento automático de ponta a ponta
+
+**Resultado:** o automático resolve cenários autorizados e transfere o restante com contexto preservado.
+
+1. Usar catálogo, horários, entrega e pagamentos que já passaram pelos aceites anteriores; não automatizar um fluxo ainda inconsistente.
+2. Fechar identificação do cliente, entendimento de texto/áudio, montagem/revisão da comanda, cobrança e acompanhamento.
+3. Definir quais ações são sugestões, quais exigem confirmação e quais podem ocorrer automaticamente. Preservar as decisões de controle da dona.
+4. Homologar primeira resposta, ausência de operador, fora de horário, mensagens em rajada, retomada, limite do canal, falha da IA e transferência humano/automático.
+5. Revisar notificações e a PR de e-mail #1433; fechar WhatsApp e site antes de expandir canais. Histórico para RAG exige decisão específica sobre fonte e uso; não tratar como já autorizado/implementado.
+
+**Aceite:** conjunto acordado de conversas realistas cobre sucesso, dúvida, indisponibilidade, mudança de pedido, recusa de pagamento, falha de entrega e intervenção humana. O agente não inventa preço/prazo/saldo nem executa ação fora da permissão; desligar automático entrega a conversa à pessoa.
+
+**Dependência:** ondas 2–7. Melhorias locais do agente e transferência não precisam esperar esta onda; o que fica para cá é a homologação da autonomia sobre o ciclo completo.
+
+### Onda 10. CRM, campanhas, promoções e fidelidade
+
+**Resultado:** selecionar público e executar campanhas mensuráveis dentro da operação da loja.
+
+1. Entregar lista CRM com busca, tags, histórico, consentimentos e interesses.
+2. Ligar tela de campanhas ao motor existente: público, exclusões, conteúdo, aprovação, agenda, ondas e cancelamento.
+3. Implementar promoções com validade, cupons e fidelidade por loja; definir acumulação, resgate, cancelamento e devolução dos benefícios.
+4. Medir envio, falha, resposta e pedido pago atribuível; impedir que pedido apenas criado seja apresentado como receita.
+
+**Aceite:** campanha pequena autorizada percorre seleção, revisão, envio e resultado; exclusões são respeitadas; cupom/resgate altera o pedido corretamente, inclusive no estorno.
+
+**Dependência:** ondas 3, 6, 8 e 9 para os canais automatizados. Base: [M6](07-m6-campanhas.md) e #1245. A execução de campanhas reais precisa de autorização específica.
+
+### Onda 11. Encerrar a transição e operar só na nova versão
+
+**Resultado:** todas as tarefas acordadas da Casa da Baba são executadas no console e no backup offline previsto.
+
+1. Conferir matriz Web → console por área: catálogo, clientes, produção, estoque, compras, fornecedores, caixa, financeiro, etiquetas, relatórios e configurações.
+2. Homologar jornada completa com dona/equipe: abrir loja → produzir → atender/vender → cobrar → preparar/imprimir → entregar → fechar caixa → conferir relatórios.
+3. Exercitar restauração de backup em ambiente isolado, reconexão da PWA, impressora indisponível, queda de provedor, monitoramento e retorno a uma versão anterior.
+4. Desativar cada área antiga só depois do uso aprovado do equivalente. Poda de dados/tabelas exige inventário, backup recuperável e escopo confirmado; não fazer limpeza só para o menu ficar simples.
+5. Registrar versão publicada, evidência de aceite, responsáveis e procedimento de suporte. Confirmar os acessos de Configurações e o estado dos canais.
+
+**Aceite:** ciclo operacional acordado concluído pela equipe sem recurso às telas antigas, sem divergência não explicada de pedido/pagamento/estoque/caixa; recuperação demonstrada. Pendências residuais têm impacto, responsável e prioridade explícitos.
+
+**Dependência:** ondas operacionais anteriores. Homologação e retirada parcial do Web acontecem ao longo delas; esta onda fecha o conjunto.
+
+## 7. Ordem e marcos
+
+Sequência sugerida: 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11.
+
+As dependências técnicas permitem adiantar trabalho já iniciado: M2.1/#1492 pode continuar sem esperar todas as integrações; verificar driver/mídia da Oasis, credenciais e condições de entrega deve começar na onda 0. Isso não muda o critério de concluir cada jornada com provas.
+
+| Marco | Evidência de resultado |
+|---|---|
+| Após 2 | Balcão manual utilizável, com pedido e efeitos consistentes |
+| Após 5 | Operação vende, cobra online, despacha, prepara e imprime fisicamente |
+| Após 8 | Oferta, produção, estoque, compras e financeiro operados no console |
+| Após 9 | Atendimento automático homologado sobre processos confiáveis |
+| Após 11 | Transição concluída com backup offline e recuperação demonstrada |
+
+Não há prazo ou orçamento fechado: faltam capacidade da equipe, decisões de negócio e validação das integrações. Estimar cada fatia depois do roteiro e das dependências definidos, usando a velocidade real de entrega. Prazo de credencial/aprovação externa fica separado de esforço de código.
+
+## 8. Definição de concluído para toda fatia
+
+1. Cenário e regra claros, incluindo quem pode agir e quais dados serão persistidos.
+2. UX com carregamento, vazio, erro, sucesso, confirmação quando necessária e recuperação.
+3. Backend e frontend conectados em modo API; sem simulação apresentada como gravação.
+4. Testes adequados ao risco: unitário/integração para dinheiro, estoque e permissões; percurso visual para navegação; dispositivo real para impressão/offline.
+5. Recarregar/outra sessão confirma persistência; repetição e falha não duplicam efeitos.
+6. Revisão e merge separados da publicação. Publicação separada de homologação. Registrar SHA e evidência de cada estado.
+7. Aceite operacional da dona/equipe no ambiente correto e procedimento de recuperação aplicável.
+
+Campos mínimos do acompanhamento: onda, fatia, resultado, dependência, responsável, issue/PR, SHA integrado, SHA publicado, prova e pendência. Estados sugeridos: planejada → em execução → em revisão → integrada → publicada → homologada. Dependência externa é uma marca adicional, não equivale a conclusão.
+
+## 9. Decisões e dependências que não devem ser inventadas
+
+| Informação | Necessária para | Encaminhamento |
+|---|---|---|
+| Oasis OIA-8381-B: USB/Bluetooth, 203 dpi, área anunciada 100 × 150 mm | Onda 5 | Modelo informado por Felipe em 09/10; falta verificar driver/protocolo, mídia carregada e dispositivo hospedeiro. USB/Windows é proposta inicial |
+| Motoboy próprio e transportadora prioritária; conta/acesso técnico | Onda 4 | Perguntado a Felipe; não presumir APIs de 99/Uber |
+| Endereço/origem, raio, valores, horários e capacidade | Ondas 3–4 | Conferir cadastro com a dona; snapshot antigo não prova estado atual |
+| Conta e acesso Mercado Pago em teste/produção | Onda 3 | Responsável configura em canal seguro; sem segredos na documentação |
+| Matriz de permissões e exceções de operação | Ondas 1–2 | Partir dos três perfis já decididos; confirmar apenas exceções |
+| D3-04: cancelamento de pedido pago | Onda 2 | Felipe decidiu em 09/10: Atendimento cancela sem pagamento; com qualquer valor recebido, inclusive parcial, só Dona/gerente. Implementação e limites na seção 23 |
+| Regras de combos, adicionais, insumos e embalagens | Ondas 6–7 | Resolver as D-M1/D-M2 correspondentes antes da fatia |
+| Destino do caixa offline da PWA | Onda 8 | Decisão pendente explicitamente no ADR-0059 |
+| Identidade de tela e ativos aprovados | Onda 1 | Validar aplicação visual; não refazer marca por conta própria |
+| Fonte/uso de histórico para RAG e limites da autonomia | Onda 9 | Definir caso de uso e confirmação das ações |
+
+Dependência externa bloqueia o aceite correspondente, não o restante do levantamento ou as frentes independentes.
+
+## 10. Validação executada nesta demanda
+
+| Verificação | Resultado | Limite da evidência |
+|---|---|---|
+| npm run qualidade no console | Passou: lint, camadas e build; build com 392 módulos | Lint emitiu avisos de acessibilidade, chaves duplicadas e outros; não representa aceite visual |
+| 14 scripts de prova do console | Todos saíram com código 0 | Provas de funções/contratos e chamadas simuladas, não E2E de produção |
+| dotnet test Api.UnitTests com filtro MercadoPago ou Impressao | 103 aprovados, 0 falhas, 0 ignorados; net10.0 | Não chama Mercado Pago real nem imprime em dispositivo |
+| Git local/remoto e PRs | Base identificada e PRs consultadas ao vivo | Snapshot de 09/10; pode mudar depois |
+| HTTP público e metadados de versão | Console/API/site responderam 200; divergência de SHA registrada | Disponibilidade HTTP não comprova login, checkout ou rotina da loja |
+
+Provas do console executadas: prova-1447-hall-modulos, prova-f06-honestidade, prova-f03-pedido-api, prova-1255-pagamento-manual-api, prova-1446-cozinha-viva, prova-1440-janelas-e-roteiro, prova-1443-loja-abre-caixa, prova-1441-respostas-tags-notas, prova-1481-gestao-cardapio, prova-1482-item-cardapio, prova-1483-categorias-cardapio, prova-f11-lote-papel, prova-1445-assistente-acoes e prova-f07-sincronizacao, todos em EasyStock.Console/ferramentas com extensão .mjs.
+
+Não executados: suíte completa de backend, integração com banco real, teste visual autenticado, pagamento real, cotação/corrida real, impressão física e validação no aparelho offline. São aceites previstos nas ondas, não entregas desta análise.
+
+## 11. Primeira execução recomendada
+
+Começar pela onda 0, revisar a PR visual #1480 e a correção #1401 e preparar o roteiro único do pedido. Na sequência, fechar navegação/DS/perfis da onda 1 e a operação manual da onda 2. Em paralelo apenas no planejamento, confirmar driver/mídia da Oasis, conta de pagamentos e entregas para não descobrir esses bloqueios no fim.
+
+Não abrir outro conjunto de implementações duplicadas: atualizar as issues existentes com a onda e o aceite, abrindo novas somente para lacunas confirmadas. Este documento não cria nem modifica issues e não realiza merge ou deploy das PRs listadas.
+
+## 12. Execução autorizada da onda 0, 09/10/2026
+
+Felipe aprovou a continuação após o levantamento. As seções anteriores preservam o snapshot da análise inicial; esta seção registra o trabalho de implementação posterior. Desenvolvimento em worktree isolado, mantendo os demais trabalhos locais.
+
+### Correções e conciliação
+
+- PR #1401 revisada e atualizada para `425324a34fb48876ada782a982db3523f835137a`: estornos de estoque/caixa e consumo FEFO. A revisão reproduziu uma corrida em que o saldo diminuía entre a consulta inicial e o lock; agora o serviço recusa descoberto quando a política não permite estoque negativo. Novos testes cobrem saldo concorrente, quantidades fracionadas e devolução aos lotes originais.
+- PR #1480 revisada e atualizada para `d7a21b59aacb71fbff76a1bd6d46f41dcf201eb4`: três conflitos resolvidos preservando as entregas atuais do cardápio e do controle de atendimento. A revisão corrigiu itens avulsos excluídos da cozinha/PWA, pareamento cruzado entre empresas e seleção de cliente homônimo por nome. Bloqueio agora usa a conversa escolhida.
+- Sync PWA: erro de gravação mantém o cursor para reenvio; timeout não pula dados antigos ainda não recebidos. Duas regressões foram reproduzidas antes da correção. Isso não implementa a resolução de conflitos entre edições offline, que continua na onda 7.
+- Provas da cozinha e da revisão #1474 incluídas no workflow do console. Avisos adicionados à entrada da `.knowledge` para distinguir os snapshots antigos da base atual.
+- PR #1401 integrada em `master` como `96516cb2` após build/testes, análise CodeQL e secret-scan aprovados. O job manual de homologação HTTP do GitHub foi ignorado; a prova HTTP desta seção foi executada localmente.
+- PR #1480 integrada em `master` como `1a8cbdb9` após build/testes, CodeQL, secret-scan, console e PWA aprovados. A homologação HTTP manual do GitHub permaneceu ignorada; não houve deploy. As correções da revisão e a conciliação com M2 foram preservadas.
+- Durante esta execução, outro trabalho integrou #1492 e #1495: estoque do dia e produção por prato com peso real/etiquetas. Essas entregas foram conciliadas, preservadas e revalidadas aqui. Não são implementações feitas por esta revisão; o inventário inicial as listava antes do merge. A seção de M2 em `03-m2-producao.md` contém seu escopo atualizado.
+
+### Evidência local
+
+| Verificação | Resultado |
+|---|---|
+| Correção de estoque, Application | 63 aprovados, sem ignorados |
+| ItemEstoque, Domain | 14 aprovados, sem ignorados |
+| Estoque, pedido, caixa, PostgreSQL real | 18 aprovados, sem ignorados |
+| Criação concorrente de pedido por HTTP, PostgreSQL real | 1 aprovado, sem ignorados |
+| Atendimento, checkout e cardápio, Application | 630 aprovados, sem ignorados |
+| Controllers, pareamento, calculadora e sync, API | 105 aprovados, sem ignorados |
+| Cozinha/KDS e atendimento, PostgreSQL real | 9 aprovados, sem ignorados |
+| Console | lint/camadas/build aprovados; 47 scripts de prova aprovados; ficha novamente aprovada com 23 verificações após correção de homônimos |
+| PWA | 167 aprovados, 1 ignorado por IndexedDB ausente no sandbox; 2 scripts ESM não executados pelo runner |
+| Gate de commit | build aprovado e 36 testes de arquitetura aprovados |
+| Verificador HTTP | 8 testes aprovados e console/API locais respondendo com o mesmo SHA `d7a21b59` |
+| Conciliação com #1492/#1495 | 242 testes de aplicação e 11 de integração PostgreSQL aprovados; qualidade do console e provas 1490, 1491, 1447 e ambas 1474 aprovadas novamente |
+
+Jornada executada por `scripts/homologacao/onda0-http.ps1` em API real com autenticação JWT e PostgreSQL 17 descartável, sem usar os bancos das outras stacks. Abriu loja/caixa, criou pedido avulso de 2,5 unidades a R$ 10, confirmou a cozinha, recebeu R$ 25, percorreu preparando/pronto/entregue e releu cada estado. Recebeu/cancelou outro pedido de R$ 15 e conferiu fechamento de R$ 125, incluindo R$ 100 de abertura. Identificadores de teste: entregue `9520d7ca-59be-4a2a-808a-d0016ac02c3a`; cancelado `c281d1ba-d3f7-490a-bf7a-95e7a7326412`.
+
+Backup local: `pg_dump -Fc` e `pg_restore --exit-on-error` para outra base descartável. Quantidade e hash do conteúdo de pedidos (2), itens (2), pagamentos (2) e fechamentos (1) iguais ao original. SHA-256 do dump de teste: `CA7D215D0AE30FCA1513678D2380FF8ADF8D617E44B0777A543B12D0F788CC4C`. Logs/TRX/dump ficam no worktree em `.build/onda0-tests`, fora do Git.
+
+Backup externo: acesso SSH `hostinger` confirmado. O log de 09/10 registra envio e `cryptcheck` de dois arquivos sem diferenças. Executado o script existente `scripts/infra/backup-externo/testar-restauracao.ps1`: baixou `diario/2026-10-09`, restaurou o dump em PostgreSQL 17 descartável na VPS e confirmou **159 tabelas** e **230 entradas legíveis** no tar de uploads. Execução com saída 0; container descartável removido pelo próprio script, sem restauração sobre o banco de produção. Isso verifica recuperação técnica do backup, não aceite funcional da aplicação restaurada.
+
+Pendências encontradas no backup: a cópia de `enviar.sh` instalada na VPS registra `tmp: unbound variable` na limpeza após o envio; o arquivo canônico local já usa expansão antecipada no trap. Reconciliar essa instalação separadamente. O rclone emite aviso sobre descontinuação do `client_id` compartilhado do Google Drive; configurar cliente próprio com o responsável pela conta antes de depender da continuidade desse acesso. Nenhuma credencial foi alterada nesta execução.
+
+### Limites e próximos aceites
+
+- Revisão e teste local não são publicação. Os SHAs públicos registrados na seção 3 não foram substituídos por um deploy nesta execução.
+- A abertura do navegador automatizado falhou no início por `windows sandbox failed: apply deny-read ACLs`. O aceite visual autenticado permanece pendente; as provas JavaScript e HTTP não o substituem.
+- Recuperação técnica do backup externo comprovada acima. Teste funcional da aplicação restaurada, correção do script instalado e continuidade da autenticação do rclone seguem pendentes.
+- Não há workflow `build-casa-da-baba-apk.yml` na árvore atual, nem cópia MAUI ativa para sincronizar. O workflow PWA vigente roda `node tests/pwa/run.js`; não foi gerado APK nem testada a Oasis.
+- Não fechar a onda 0 como homologada visualmente. A próxima fatia é completar esse aceite e então apresentar navegação/DS/perfis da onda 1 para aprovação das telas representativas. API pública `701dbf4b` e console público `888eeab7` foram reconferidos após os testes e continuam anteriores às correções; não houve deploy nesta execução.
+
+## 13. Continuação autorizada: identidade e navegação, 09/10/2026
+
+Felipe autorizou concluir os aceites por ele e continuar. Base desta fatia: `a680c639`, incluindo insumos #1497 entregues em outro trabalho. Esta seção atualiza as pendências da seção 12; não transforma o inventário inicial em funcionalidades publicadas.
+
+### Implementado
+
+- Identidade do Console unificada: cacau/caramelo/creme, Lora e Nunito Sans, escala maior, claro/escuro e estados sem os aliases antigos dos tokens. Ragu nos nomes dos pratos continua sendo conteúdo válido.
+- Logo completa no login, hall e balcão, com placa clara no escuro. Derivada PNG 420 × 280, 88.397 bytes, sem recorte/redesenho. SHA-256 da fonte: `785C453D6A011A0002EFB8173C3E27D42508E9792D75826E7314B2EF63DB56BC`.
+- Login por uma chamada a `/api/auth/login`; a API resolve a empresa e o Console confere sua presença no JWT antes de guardar sessão. Não chama mais `lista-empresas`. Google preservado, mas OAuth real não exercitado aqui.
+- Um guarda de sessão para todas as rotas. Busca de módulos e telas por nome, ignorando acentos/caixa, com estado vazio e atalhos diretos.
+- Corrigido o corte lateral da ficha: colunas cedem espaço respeitando mínimos, inclusive com larguras salvas maiores que a janela.
+- Na demonstração, navegar para Cozinha/Entregas dentro do módulo mantém o provider do balcão vivo; antes o espelho perdia sua origem. Apelidos de janelas avulsas continuam independentes. Rascunho preservado no percurso balcão → módulos → cozinha → balcão.
+- Verificador de contraste no `npm run qualidade`; prova de busca/autenticação no workflow do Console.
+
+### Evidência
+
+| Verificação | Resultado e limite |
+|---|---|
+| Console | Lint/camadas/build aprovados; avisos preexistentes do lint permanecem |
+| Provas JavaScript | 51 scripts aprovados, incluindo busca e login de uma etapa |
+| Contraste | 264 pares aprovados nos dois temas, incluindo texto, ações, estados, avisos, bordas e foco; não equivale a auditoria WCAG completa |
+| API local atual | Compilada em net10.0 e conectada ao PostgreSQL descartável da onda 0 |
+| Navegador autenticado | Login real, busca por Insumos, abertura/volta de módulo, aliases e logout; 5 telas × 2 temas × 2 tamanhos (1280 × 800 e 1024 × 768), sem excesso de largura do documento/root |
+| Demonstração preenchida | Conversa, ficha, cozinha no mesmo tab, rascunho e larguras salvas conferidos; massa simulada não comprova envio a clientes |
+| Peso | Base de 1.218.522 bytes; final de 1.335.434 bytes; crescimento de 116.912 bytes, abaixo dos 150.000 da M0.1 |
+| Gate de commit | Build aprovado e 36 testes de arquitetura aprovados |
+| Integração | Commit `e0d401bd` integrado por fast-forward e enviado ao master; check remoto do Console aprovado |
+| Capturas | 12 imagens antes/depois autenticadas e 2 do balcão demonstrativo, em `evidencias-onda1/` |
+
+Capturas: [balcão claro demonstrativo](evidencias-onda1/depois-balcao-demonstracao-light.png), [balcão escuro demonstrativo](evidencias-onda1/depois-balcao-demonstracao-dark.png), [cozinha autenticada](evidencias-onda1/depois-cozinha-light.png) e [caixa autenticado](evidencias-onda1/depois-gestao-dark.png). A base local tinha caixa fechado e pedidos da jornada HTTP anterior, mas nenhuma conversa aberta; o aceite autenticado do balcão cobre seu estado vazio. Ciclo completo de pedido real por interação no balcão continua sendo aceite da onda 2.
+
+Playwright já instalado permitiu executar o navegador após o CUA continuar falhando na inicialização do sandbox. Antes de encerrar o worktree, logs, scripts locais, TRX, dump da onda 0 e capturas adicionais foram preservados em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009`, fora do Git: 163 arquivos conferidos por SHA-256. A API/servidores locais foram encerrados; o container PostgreSQL de teste foi parado, com os dados mantidos. Isso não homologa a versão publicada.
+
+### Backup e próximo trabalho
+
+A cópia instalada de `/home/felipe/backup-externo/enviar.sh` diferia da canônica apenas pelo trap. Preservada como `enviar.sh.antes-onda1-20261009` e substituída após conferir seu hash. `bash -n` aprovado; ensaio do trap instalado em processo isolado saiu com 0 e removeu o diretório temporário. SHA-256 instalado: `8a3d114b844c6a06eb6a2a00dbba4f1425dfaac592992c8d5ef88b886bade5f1`. Nenhum banco restaurado sobre produção, nenhuma credencial alterada e nenhum novo expurgo/envio disparado para testar a limpeza.
+
+Confirmada a ausência de `client_id` próprio do Google Drive, sem imprimir valores de credenciais. Essa configuração depende do acesso à conta/projeto OAuth responsável e permanece pendente.
+
+**A onda 1 não está integralmente concluída.** Próxima fatia: M0.3, matriz Dona/Atendimento/Cozinha aplicada pela API e shell, porta por perfil, bloqueio de rota digitada e classificação dos controllers. Sino real transversal e sessão longa da cozinha também permanecem pendentes. Tenant, permissões de backend e migrations não foram alterados nesta fatia. Mercado Pago real, transportadoras/geolocalização e Oasis mantêm os aceites das respectivas ondas. Não houve deploy da aplicação nesta execução.
+
+## 14. Continuação autorizada: perfis e acesso aos módulos, 09/10/2026
+
+Fatia funcional da M0.3 implementada sobre `771da5c6`, incluindo produção M2.4b. Não representa encerramento da onda 1 nem deploy. A referência anterior da seção 13 passa a ser histórica.
+
+| Perfil | Módulos liberados | Entrada |
+|---|---|---|
+| Dona | Todos os 8 | Sala de módulos |
+| Atendimento | Cardápio, Atendimento, Cozinha, Financeiro e Entregas | Balcão |
+| Cozinha | Produção e Cozinha | Fila de preparo |
+
+### O que mudou
+
+- Enum de módulos, oito permissões de acesso e fallback por nível conforme a matriz decidida. Lista explícita continua prevalecendo sobre o nível. Claims explícitas inválidas negam acesso, sem transformá-las em fallback permissivo.
+- `GET /api/auth/me/modulos` fornece matriz, entrada e capacidade de editar o Cardápio. O identificador do caixa é `financeiro`, compatível com as rotas existentes do Console.
+- Classificação explícita de todos os controllers em `Api/Authorization/ModulosConvention.cs`. Um controller novo sem classificação falha no teste e na inicialização. A convenção MVC acrescenta requisito de módulo às policies e permissões finas existentes. Catálogo compartilhado, leitura KDS de Entregas e impressão têm exceções restritas. Controllers públicos, de infraestrutura, do bastidor Web e do backup Mobile permanecem com seus contratos próprios.
+- Migração aditiva `20261009170822_AddPerfilModuloInicial`: uma coluna anulável de até 30 caracteres. Login por senha, finalização de login Google e refresh transportam a entrada no JWT.
+- Seed idempotente de Dona, Atendimento e Cozinha na empresa resolvida pela configuração existente `Auth:Google:EmpresaPadrao`. Não cria usuários, não atribui perfis automaticamente e não sobrescreve perfis existentes de mesmo nome. Sem empresa configurada, registra que o seed não foi executado. Não usa empresa fictícia como destino de produção.
+- Corrigido defeito encontrado no teste HTTP: `UsuarioRepository.GetByIdAsync` não carregava as permissões, e o refresh ampliava o acesso ao fallback do nível. A consulta agora carrega permissões, com teste de regressão em contexto novo e confirmação HTTP.
+- Console aguarda a matriz antes de montar módulos, filtra cartões e atalhos, respeita entrada por perfil, bloqueia links digitados e aliases e oferece saída/retentativa quando a matriz falha. A produção da Cozinha lê o catálogo sem carregar conversas, expediente ou respostas prontas. Eventos de conversa não são enviados ao SSE da Cozinha/Entregas sem acesso a Atendimento.
+- Atendimento consulta itens e categorias do Cardápio. Edição de cadastro continua exigindo Gerente na API; controles reservados ficam desabilitados/ocultos. Ligar/desligar a disponibilidade de hoje mantém a regra anterior de Operador. Fechamento de caixa continua reservado a Gerente.
+
+### Evidência da fatia
+
+| Verificação | Resultado |
+|---|---|
+| API unitária | 952 testes aprovados, incluindo classificação, requisitos, seed, claims, refresh e SSE |
+| Domínio | 53 testes de acesso/permissão aprovados; inclui 5 níveis × 8 módulos |
+| Login | 12 testes de aplicação aprovados |
+| Console | Lint, camadas, 264 pares de contraste e build aprovados; 54 provas JavaScript aprovadas |
+| PostgreSQL 17 local | 157 migrations aplicadas em base nova; reinícios preservaram um perfil de cada nome, com 19/7/3 permissões |
+| HTTP real | 51 verificações em `scripts/homologacao/onda1-perfis-http.ps1`; três logins, matriz, portas, 200/401/403, consulta de Cardápio, bloqueio de edição/fechamento e refresh sem ampliar acesso |
+| Navegador real | Três logins e saídas; 8/5/2 cartões; entrada correta; Cozinha navega na produção sem buscar conversas; rotas proibidas não consultam caixa; consulta de Cardápio pelo Atendimento; falha de carga de permissões bloqueia e permite retentar; sem erros JavaScript |
+| Limites | Base de teste local, sem OAuth Google real, usuários reais, envio a clientes ou pagamento externo |
+
+Capturas: [Dona](evidencias-onda1/perfis-dona-hall.png), [Atendimento](evidencias-onda1/perfis-atendimento-hall.png), [Cozinha](evidencias-onda1/perfis-cozinha-hall.png) e [rota bloqueada no celular](evidencias-onda1/perfis-cozinha-negado-celular.png). Logs, TRX e roteiro do navegador ficam em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\perfis`, fora do Git. O banco isolado chama-se `easystock_onda1_perfis`.
+
+### Pendências e próxima sequência
+
+1. **M0.3 ainda parcial:** mantidas as 18 permissões legadas no enum nesta entrega. Sua retirada e a limpeza de dados exigem a migration e o teste de login legado previstos na especificação. Não apagar a última permissão explícita de um perfil sem avaliar o efeito do fallback. A lista atual tem 37 membros, não os 19 finais.
+2. Preparar a publicação e conferir a empresa configurada e os vínculos de pessoas reais. Perfis antigos e seus vínculos foram preservados. Perfil com lista explícita sem permissões de módulo será negado no Console, conforme a regra decidida; a implantação precisa revisar esses perfis. Nenhuma atribuição de função a pessoa real foi inferida.
+3. Completar a UX por ação dos outros módulos, sino transversal e sessão longa da Cozinha. O CRUD/editor de perfis permanece na M7.2. Algumas telas antigas continuam exibindo aviso de ainda não ligadas.
+4. Seguir para a onda 2: ciclo completo de pedido, interação e exceções no balcão. Mercado Pago, entregas/geolocalização e impressão física Oasis conservam seus próprios aceites e dependências. A matriz de perfis não comprova essas integrações.
+
+Não houve deploy nem alteração do banco de produção nesta execução.
+
+## 15. Continuação: arquivo de permissões antigas da Casa da Baba, 09/10/2026
+
+Implementado sobre `4ffef29a`. Os cinco workflows dessa base passaram no GitHub: CI, Console, CodeQL, imagens e secret-scan. Esta fatia conclui a limpeza da lista ativa no tenant configurado, com histórico preservado. Não encerra a onda 1 nem representa deploy.
+
+### Comportamento entregue
+
+- A migration `20261009175941_RemoverPermissoesLegadas` é aditiva: inclui `PermissoesExplicitas` e o arquivo JSON `PermissoesLegadas` em `perfis`. Apesar do nome histórico, ela não apaga nem modifica permissões existentes.
+- Na inicialização, o seed usa a empresa já resolvida por `Auth:Google:EmpresaPadrao`. Só os perfis cujo `EmpresaId` coincide com essa empresa têm as 18 permissões antigas retiradas da lista ativa. Perfis globais e de outras empresas permanecem intactos.
+- Cada registro retirado fica arquivado no próprio perfil com `Id`, `PerfilId` e o nome original da permissão. Arquivo, marcador de lista explícita e retirada são gravados na mesma transação do EF. Reexecutar o seed não duplica o arquivo. Não muda usuários ou seus vínculos.
+- Uma lista que fica vazia continua explícita e nega acesso; não passa a usar o nível do perfil. Login por senha, finalização do Google, JWT, refresh e seleção de atendente preservam essa decisão. O accessor HTTP do Worker respeita as claims; os jobs de sistema mantêm seu acesso anterior.
+- Perfis que já usavam fallback por nível continuam usando-o. Lista mista preserva as permissões atuais. Os três perfis iniciais mantêm as capacidades da seção 14.
+
+### Limite de compatibilidade e revisão de escopo
+
+O catálogo operacional da Casa da Baba tem as 19 permissões previstas. O enum continua com 37 membros para ler os dados preservados das demais empresas e dos perfis globais. Remover esses membros agora quebraria essa leitura. A poda global do enum permanece pendente de uma decisão explícita sobre esses dados e seu alcance; não declarar o aceite original de enum com 19 membros como concluído.
+
+A revisão automática recusou as propostas de limpeza global, inclusive a reversível, por ultrapassarem o escopo exclusivo da Casa da Baba. A implementação final aceita restringe a alteração de dados à empresa configurada e preserva um arquivo recuperável.
+
+O `Down` automático é bloqueado: apagar o arquivo ou retirar o marcador sem restauração prévia poderia perder histórico ou ampliar acesso. Reversão exige restauração planejada dos registros arquivados e revisão dos perfis explícitos, ou recuperação do backup anterior. Nenhuma reversão foi executada em produção.
+
+### Evidência
+
+- Suite da API: 961 testes aprovados, incluindo claims, lista explícita vazia, transferências, seed e Worker.
+- Domínio: 55 testes de acesso/permissão aprovados. Aplicação: 12 testes de login aprovados.
+- PostgreSQL 17 real: teste de migração desde a versão anterior, seed repetido, arquivo com os IDs originais, vínculos preservados e bloqueio de downgrade. Cinco cenários: apenas legado, lista mista, fallback vazio, outra empresa e perfil global. Login, finalização Google e refresh verificados com repositórios e JWT reais; transferência filtra os perfis bloqueados. O teste não autentica no provedor Google externo.
+- HTTP real: 51 verificações aprovadas no roteiro `scripts/homologacao/onda1-perfis-http.ps1`, incluindo login, módulos, portas, respostas 200/401/403 e refresh de Dona/Atendimento/Cozinha.
+- Logs e TRX desta fatia: `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\permissoes-legadas`, fora do Git.
+
+### Próximo trecho executável
+
+1. Onda 1: revisar a UX das ações permitidas em cada módulo, concluir sino transversal e sessão longa da Cozinha. Validar navegação, saída, falha de sessão e operação em celular/computador.
+2. Onda 2: fechar o ciclo de pedido no balcão, da montagem/revisão à confirmação, preparo, entrega/retirada e cancelamento, incluindo exceções e histórico.
+3. Publicação continua separada: conferir a empresa real configurada, os perfis personalizados e os vínculos das pessoas, além de backup e homologação. Não foi inferido o papel de nenhuma pessoa real.
+4. Mercado Pago, transportadoras/geolocalização, impressão física Oasis e atendimento automático completo seguem com as dependências e aceites das ondas 3–5 e 9. Esta fatia não comprova essas integrações.
+
+Não houve deploy, alteração de banco de produção, envio externo ou cobrança real nesta execução.
+## 16. Continuação: sessão longa da Cozinha, 09/10/2026
+
+Implementada a decisão D-05 da M0.2 sobre `7c3314dd`. Login por senha e finalização Google emitem a capacidade de permanência somente para o perfil Cozinha da empresa ativa única, com nível e permissões da matriz inicial. Perfil global, outra empresa, nível maior, permissões adicionais ou usuário com várias empresas não recebem essa capacidade. Nenhum perfil ou vínculo foi alterado no banco.
+
+- A Cozinha conserva a sessão no aparelho e renova antes de consultar a API com o acesso vencido. Dona e Atendimento continuam no armazenamento da aba. Navegador sem coordenação segura entre abas ou sem armazenamento disponível usa sessão temporária.
+- A renovação usa o contrato existente de refresh, recalcula permissões e nunca troca silenciosamente de empresa. A validade continua a da API: 30 dias no refresh inicial e 7 dias a cada renovação; não é acesso indefinido sem validação.
+- Duas abas compartilham uma renovação. Falha de rede/429/5xx preserva a chave para retentar; credencial revogada encerra a sessão. Uma resposta antiga não encerra uma conta que entrou depois.
+- Sair limpa o aparelho e solicita a revogação no servidor. Se um refresh estava em andamento, sua chave recebida depois também é revogada. Falha de comunicação no logout é informada na tela de login.
+- A renovação mantém a busca, a rota e o estado de tela da mesma pessoa/empresa. A matriz é relida; troca de identidade reinicia o estado. O canal ao vivo também aguarda uma sessão válida antes de conectar.
+
+Validação: 970 testes da API aprovados, incluindo 9 cenários de senha/Google/refresh/logout; prova JavaScript de concorrência, offline, revogação e armazenamento; qualidade do Console aprovada (lint, camadas, 264 pares de contraste e build). As 54 provas anteriores foram executadas; a de login precisou incluir o EventTarget do navegador em sua fixture e passou após o ajuste. A nova prova da sessão também está no CI.
+
+Navegador Chromium e PostgreSQL reais: Dona/Atendimento pedem login em uma nova aba; Cozinha reabre o navegador com a sessão vencida e renova na API; duas abas geram um único refresh; a busca e o hall sobrevivem à renovação; offline conserva a chave e reconexão renova; logout invalida a chave (refresh retorna 401); celular de 390 px sem rolagem horizontal. Nenhum erro JavaScript. O roteiro HTTP de perfis manteve suas 51 verificações aprovadas. Google externo e tablet físico não foram usados nesta prova.
+
+Evidências em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\sessao`. Não houve deploy. O reparo do Down da migration anterior está na PR #1505 de outra frente, ainda não integrado neste registro. Sino transversal e revisão das ações dos módulos continuam na próxima fatia da onda 1.
+
+## 17. Continuação: sino transversal e destinatários dos avisos, 09/10/2026
+
+O sino agora consulta badge e avisos recentes da API no hall, nos módulos e nas duas navegações do balcão. Não depende do contexto de Atendimento. A lista mostra até 10 avisos não lidos, permite atualizar e marcar individualmente como lido, mantém o aviso quando a gravação falha e distingue falha de consulta de uma lista vazia. Atualiza a cada 30 segundos enquanto a página está visível e ao voltar à página/conexão. Modal reutiliza foco, Esc e componentes do design system.
+
+Corrigida uma falha encontrada na conexão: a API filtrava a empresa mas não o `UsuarioId` das notificações InApp. Listagem, recentes, badge, resumo e marcação em lote agora recebem o usuário do JWT; leitura/exclusão individual recusam outro destinatário. Avisos sem destinatário continuam gerais da equipe e sua leitura é compartilhada, comportamento informado na tela. Nenhum aviso real foi enviado.
+
+Validação: 973 testes da API aprovados; teste de integração PostgreSQL com aviso geral, próprio, de colega e de outra empresa, incluindo marcação em lote; 56 provas JavaScript; lint, camadas, 264 contrastes e build do Console aprovados. Chromium com API/PostgreSQL locais confirmou ausência dos avisos da colega, respostas 404 para leitura/exclusão alheias, atualização do contador após gravação, preservação em erro 503, falha de rede sem falso vazio, retentativa, retorno de foco com Esc e uso no hall/balcão/Cozinha em 390 px. Capturas e logs em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\sessao`.
+
+Os lembretes do balcão permanecem separados. A PR #1428, ainda não integrada, inclui lembretes e Web Push; seu consumo de notificações deverá ser conciliado com este sino para evitar duplicação. Esta entrega não ativa Web Push nem notificações externas. Não houve deploy.
+
+## 18. Consolidação: reversão segura e CI, 09/10/2026
+
+A PR #1505 corrigiu os seis testes que precisavam reverter migrations em banco sem dados novos a preservar. Incorporado o reparo e acrescentadas duas proteções: a reversão recusa um papel sujeito a RLS, que poderia enxergar uma tabela aparentemente vazia, e bloqueia alterações concorrentes na tabela antes de conferir os dados. Não desliga RLS, não concede bypass e não restaura/apaga arquivos de permissões automaticamente.
+
+Prova em PostgreSQL 17: banco vazio desce e sobe; perfil explícito/arquivado continua bloqueando; um papel proprietário sem privilégio de bypass enxerga zero perfis pela policy, mas a reversão é recusada e o perfil permanece intacto. As classes afetadas pelo CI, o teste do arquivo legado e o teste de destinatários somaram 27 testes aprovados, sem ignorados. Build e testes de arquitetura permanecem no gate de cada commit.
+
+Estado desta execução: sessão longa da Cozinha e sino transversal implementados/homologados localmente. A onda 1 ainda exige a revisão contínua das ações por perfil nas telas restantes e o aceite da operação real. O próximo trecho da onda 2 deve consolidar as PRs existentes de lembretes/mensagens/SLA antes de ligar as ações restantes. A especificação M3 registra decisão pendente sobre quem pode cancelar pedido já pago; não foi presumida autorização para estorno externo. Mercado Pago real, transportadora escolhida e impressão física Oasis conservam suas dependências. Nenhum deploy ou operação real foi executado.
+
+## 19. Continuação: ações por perfil e cadastro real da Produção, 09/10/2026
+
+A matriz da sessão agora informa `editarProducao` e `gerenciarCaixa`, além de `editarCardapio`. Exige empresa, módulo liberado e nível Gerente/Admin/SuperAdmin. A interface assume leitura quando a capacidade não vem na resposta; as políticas da API continuam protegendo cada gravação.
+
+- **Cozinha:** consulta insumos e abre receitas completas, com rendimento, ingredientes e quantidades. Cadastro/ajuste de insumo, edição de receita e baixa automática ficam com a dona ou gerente. Falha ao abrir a receita apresenta erro e permite nova consulta.
+- **Atendimento:** continua abrindo caixa e lançando entradas/saídas. Fechamento e estorno deixam de aparecer sem a capacidade; a tela explica quem pode executá-los, inclusive para caixa esquecido aberto.
+- **Dona:** conserva as edições da Produção, a baixa automática, o fechamento e o estorno. Não houve ampliação dos perfis nem mudança nas políticas dos endpoints.
+
+A prova com API/PostgreSQL encontrou dois defeitos anteriores. O cadastro de insumo gravava um produto e depois tentava anexar outra instância com a mesma chave, deixando o cadastro incompleto. Agora os atributos de insumo são gravados no primeiro cadastro; o insumo nasce ativo sem exigir preço de venda, enquanto o produto comum sem preço continua inativo. As edições de insumo, composição e baixa automática também perdiam o `xmin` na leitura sem rastreamento. Esses três caminhos usam uma leitura rastreada, limitada à empresa, e conservam a recusa de alterações concorrentes. Nenhuma migration nova foi necessária.
+
+Validação desta fatia: **2.336 testes de aplicação**, **983 da API**, **2 de integração PostgreSQL** e **70 verificações HTTP** aprovados, sem testes ignorados nessas suítes. O teste com banco real cria, lista e ajusta o insumo pelos serviços de produção, nega a leitura de outra empresa e comprova a exceção ao tentar gravar uma versão antiga. Provas JavaScript de insumos/receitas/baixa/perfis e qualidade do Console aprovadas. A arquitetura e a compilação completa são verificadas pelo gate do commit.
+
+Chromium com API local comprovou consulta da Cozinha em 390 px sem rolagem horizontal, erro de consulta recuperável, abertura/lançamento pelo Atendimento, ajuste de mínimo, salvamento de receita e ativação/desativação da baixa pela Dona. Também simulou resposta sem capacidades e confirmou edição indisponível. Sem erros JavaScript. Scripts, capturas e TRX ficam em `C:\rep\EasyStok\.build\validacao-casa-da-baba-20261009\sessao`, com prefixos `capacidades` e `insumos`; dados exclusivamente sintéticos.
+
+O CI de `98e87ae2` completou os passos de build e testes com sucesso, mas o workflow foi marcado como cancelado pela atualização concorrente do master. Console, CodeQL, imagens e secret-scan dessa base passaram. A PR #1503 de planejamento da produção foi publicada por outra frente em `7a71d596` durante esta execução e incorporada sem conflito à entrega `9da944b1`. Build, push e homologação de produção continuam estados separados.
+
+Após essa integração: **2.344 testes de aplicação**, **984 da API** e **6 de integração PostgreSQL** aprovados, sem ignorados. Os seis últimos cobrem insumos, produção e demanda agendada; a prova de planejamento passou em seus oito cenários. Qualidade e build do Console também passaram no código combinado.
+
+Conferência local da impressão: a fila do Windows contém a HP Smart Tank e impressoras virtuais; nenhuma Oasis está instalada nessa lista. A busca por dispositivos presentes com nomes Oasis/OIA-8381/Label Printer/Thermal Printer também não encontrou correspondência. Isso não comprova ausência física; conexão, driver e teste de saída 100 × 150 mm da OIA-8381-B permanecem pendentes. Nenhuma impressão foi disparada.
+
+Próxima sequência: completar os gestos do balcão com as PRs existentes de lembretes, mensagens programadas e SLA; revisar as ações por perfil das telas restantes; manter pagamentos reais, fornecedor de entregas, Google externo e impressão física Oasis nos aceites próprios. As correções acima não concluem a onda inteira nem comprovam essas integrações.
+
+## 20. Continuação: mensagens programadas no balcão, 09/10/2026
+
+Primeira fatia da onda 2 integrada em `5df6b5e1`, sobre `a447b476`. Incorpora a PR #1425, incluindo a exposição de `programada` no histórico, e resolve seus conflitos preservando as funcionalidades atuais do Console. Lembretes/WebPush (#1428) e SLA (#1429) continuam pendentes; esta entrega não encerra a onda 2.
+
+### Comportamento entregue
+
+- O botão **Programar** permite escolher data/hora, finalidade e texto ou modelo aprovado, consultar as mensagens da conversa e cancelar as que continuam agendadas. Datas locais são convertidas para UTC; erros de horário, janela, consentimento e destino ficam visíveis. O histórico identifica a mensagem enviada como programada.
+- Cliques concorrentes compartilham a mesma chamada. Uma retentativa após perda da resposta conserva a chave de idempotência até a confirmação; a rota da API agora participa do middleware existente. O rascunho só é limpo após sucesso. Marcadores sem valor, como `{pedido}`, são recusados antes do envio.
+- Falha ao atualizar a lista preserva os itens já conhecidos e oferece nova consulta. Falha no cancelamento preserva a situação anterior. Campos e fechamento ficam bloqueados durante a operação, com prazo de 15 segundos nas chamadas do Console para permitir recuperação.
+- Cliente bloqueado não recebe novos agendamentos. O disparador confere novamente o bloqueio antes de enviar texto ou modelo. A consulta e o cancelamento dos agendamentos existentes continuam disponíveis.
+- Corrigida uma disputa reproduzida no PostgreSQL: o cancelamento lia `Agendada` enquanto o disparador reservava a mensagem e podia sobrescrever `Enviando`. Agora a leitura para cancelar usa lock da linha dentro de transação, com filtro de empresa e checagem no caso de uso. Se o disparo já foi reservado, o cancelamento é recusado com o motivo correto. Não houve migration nem dependência nova.
+
+### Evidência
+
+| Verificação | Resultado |
+|---|---|
+| Aplicação | 2.346 testes aprovados, incluindo cliente bloqueado antes e depois do agendamento |
+| API | 986 testes aprovados, incluindo rota idempotente e selo no histórico |
+| PostgreSQL real | 3 testes aprovados, sem ignorados: isolamento por empresa/cancelamento, dois disparadores concorrentes e cancelamento concorrente com a reserva; a última regressão falhou antes da correção |
+| Console | 58 provas JavaScript aprovadas; lint, camadas, 264 pares de contraste e build aprovados |
+| Gate do commit | Build de `EasyStok.CI.slnf` e 36 testes de arquitetura aprovados |
+| HTTP e Chromium | Sem login: 401; Cozinha: 403 ao listar/programar. Rascunho, duplo clique com um POST, persistência após recarregar e em outra sessão, falhas 503 recuperáveis, resposta perdida após gravação sem duplicar, consentimento, marcador e bloqueio de cliente conferidos |
+| Apresentação | Tema escuro no computador e fluxo de agendar/cancelar em 390 × 844 px, com modal dentro da tela, sem rolagem horizontal e sem erros JavaScript |
+| Disparo | Serviço real entregou exatamente uma mensagem ao ChatSite local de teste; histórico e caixa do visitante confirmaram o mesmo texto e o selo `programada` |
+
+Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-balcao`, fora do Git. A API usou banco isolado `easystock_onda2_balcao` e dados sintéticos. As provas de navegador estão em `programadas-browser.cjs` e `programadas-celular.cjs`, com resultados JSON; o roteiro do celular começa diretamente em 390 px e comprova a área visível da modal. O ChatSite desta validação é local: não houve envio a cliente real, homologação de modelo na Meta ou teste de entrega externa de WhatsApp/SMS/e-mail. Não foi executado deploy nesta sessão.
+
+### Próximo trecho executável
+
+1. Revisar e integrar a PR #1428 de lembretes/WebPush, conciliando seus avisos com o sino transversal já entregue na seção 17. Homologar destinatário, leitura, falha e retentativa antes de declarar conclusão.
+2. Revisar e integrar a PR #1429 de SLA, incluindo os controles permitidos por perfil e a persistência da configuração.
+3. Continuar o ciclo completo de pedido e as exceções do balcão. Homologação externa dos canais, pagamentos, entregas e impressão física conserva os aceites próprios.
+
+## 21. Continuação: lembretes persistidos e WebPush por conta, 09/10/2026
+
+A PR #1428 foi incorporada em `0aafbafb`, sobre `b45dc855`. Os avisos InApp continuam exclusivamente no sino transversal da seção 17; o painel do balcão consulta os lembretes manuais e conserva os automáticos calculados das conversas. A configuração de avisos no aparelho fica no sino transversal, disponível nos módulos autorizados. A Cozinha não consulta nem oferece os lembretes do balcão.
+
+### Comportamento entregue
+
+- **Gravação e retentativa:** programar aguarda a API antes de fechar a modal. Falha conserva texto e horário; dois cliques compartilham uma chamada. Se a resposta se perder depois da gravação, a nova tentativa conserva a chave de idempotência e o instante escolhido. A rota usa o middleware existente. Consulta iniciada antes da gravação não apaga o item novo.
+- **Consulta, visto e conclusão:** a falha de consulta fica visível, conserva a lista e permite atualizar. Visto e conclusão são gravados no servidor. Falha ao concluir mantém o item; resposta atrasada não o faz reaparecer após a confirmação. Não se cria mensagem de sistema só no navegador.
+- **Empresa e destinatário:** o caso de uso valida conversa, pedido e vínculo ativo do destinatário com a empresa. A lista padrão, a marcação de visto e a conclusão conferem empresa e destinatário além do filtro do repositório. O contrato existente de consulta da equipe com `todos=true` permanece. Lembretes gerais mantêm o visto compartilhado definido pela API.
+- **WebPush:** a permissão é solicitada pelo clique. Sem VAPID, bloqueio do navegador e falha de inscrição têm estados próprios. Ativação só aparece após confirmação da API. A inscrição pertence à pessoa e empresa atuais; outra conta não pode reassociar nem desativar o endpoint. O envio também filtra empresa e destinatário, inclusive se o repositório devolver assinaturas de outra empresa.
+- **Saída e troca de conta:** desligar ou sair invalida a assinatura no navegador e fecha os avisos já exibidos. Uma ativação cuja resposta chega depois da saída é invalidada. Login de outra conta não reaproveita a assinatura anterior. Essa invalidação é do navegador; não equivale a atualizar a linha do servidor no logout. O transporte existente desativa endpoints que respondem 404/410.
+- **Celular:** a prova em 390 px reproduziu o painel saindo pela direita, com o botão de programar fora da tela. O painel agora se posiciona pela barra inteira. Ajustados os espaços e o botão Mais para conservar o acesso aos controles; tema escuro e modal também conferidos.
+
+Esta fatia não adiciona dependência nem migration. Durante o trabalho, `47bf16a2` chegou ao master com a correção de formas de pagamento do PWA; essa atualização foi incorporada sem conflito, preservando a entrega da outra frente. A base combinada passou em 1.007 testes da API e repetiu os dois testes PostgreSQL com sucesso, sem ignorados.
+
+### Evidência local
+
+| Verificação | Resultado |
+|---|---|
+| Aplicação | 2.352 testes aprovados, sem ignorados |
+| API após integrar o master | 1.007 testes aprovados, sem ignorados; eram 994 antes de incorporar a atualização de pagamentos |
+| PostgreSQL real | 2 testes aprovados, sem ignorados: avaliador/idempotência e persistência de visto/conclusão com isolamento de empresa e destinatário |
+| Console | 59 provas JavaScript; lint, camadas, 264 pares de contraste e build aprovados |
+| Gate do código | Build de `EasyStok.CI.slnf` e 36 testes de arquitetura aprovados |
+| HTTP e Chromium | 401 sem login; 403 para a Cozinha; vínculos inválidos recusados; destinatário protegido; rascunho preservado; um POST no duplo clique; resposta perdida sem duplicar; visto após recarregar; consulta/conclusão 503 com recuperação |
+| Apresentação | Fluxo completo no computador e gravação em 390 × 844 px; painel, botão de programar, Mais e modal acessíveis; temas claro/escuro; nenhum erro JavaScript |
+| Push | Inscrição 201 real na API/PostgreSQL, recusa de reassociação e desativação alheias, troca de conta e desligamento comprovados com PushManager controlado; VAPID ausente retorna 404 real e não mostra ativação; bloqueio nativo do Chromium respeitado |
+
+Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-lembretes`. O navegador usou a API local e o banco isolado `easystock_onda2_lembretes`, com usuários e dados sintéticos. `lembretes-browser.cjs`, `push-browser.cjs` e `celular-escuro.cjs` registram os fluxos; a prova versionada `prova-1426-notificacoes-console.mjs` cobre os contratos, as retentativas, as trocas de conta e os eventos do service worker.
+
+**Limite:** não foi comprovada entrega externa por Google, Apple ou outro serviço de WebPush. A prova de inscrição controla PushManager e permissão; o teste do service worker usa eventos controlados. A entrega real exige VAPID e aceite no aparelho/ambiente final. Não foi executado deploy nesta sessão. Esses resultados não encerram a onda 2 nem substituem os aceites de pagamentos reais, entregas, Google externo e impressão física.
+
+### Próximo trecho executável
+
+1. Revisar e integrar a PR #1429 de SLA de primeira resposta por loja, incluindo persistência, permissões de edição e comportamento visual do atraso.
+2. Continuar o ciclo completo do pedido e as exceções do balcão; revisar as ações restantes por perfil.
+3. Homologar entrega externa dos avisos e os demais canais no ambiente próprio, com as dependências já registradas neste plano.
+
+## 22. Continuação: SLA de resposta e pausa pelo expediente, 09/10/2026
+
+A PR #1429 foi incorporada em `e560915c`, sobre `0be7a82a`, preservando as mensagens programadas, os lembretes e as funcionalidades atuais do Console. A revisão corrigiu divergências entre o relógio do navegador e o avaliador do servidor. Esta fatia substitui o comportamento descrito na seção 21 para os lembretes automáticos: no modo API, todos os lembretes do balcão vêm do servidor. O modo de demonstração conserva o cálculo local.
+
+### Comportamento entregue
+
+- **Prazo persistido:** configuração entre 1 e 240 minutos, com validação na API e no domínio. A migration `20261007100720_AddSlaRespostaConfiguracaoAtendimento` acrescenta a coluna com padrão de 5 minutos, inclusive nas configurações já existentes. O modelo atual guarda a configuração por empresa, sem um prazo separado por `LojaId`. Quando não existe configuração persistida, inbox e avaliador usam o fallback existente de `Notifications:Prazos`, cujo padrão é 10 minutos; criar/salvar a configuração aplica o valor escolhido.
+- **Expediente e atraso:** servidor e Console contam somente os minutos dos turnos configurados, incluindo virada de dia, semanas sucessivas e turnos sobrepostos sem contagem duplicada. Exatamente no limite ainda não há atraso; um segundo além já ultrapassa o prazo. O Console aguarda o carregamento do expediente antes de calcular. A conversa atrasada sobe em Precisa de você e pisca; movimento reduzido mantém destaque estático.
+- **Resposta efetiva:** envio pendente, envio falho e nota interna não encerram a espera. Uma resposta enviada ao cliente encerra o atraso e permite concluir o lembrete automático. Consultas e configurações validam a empresa também nos casos de uso.
+- **Lembretes coerentes:** fechar manualmente a loja ou aumentar o SLA não conclui falsamente um lembrete de conversa ainda sem resposta. O envio do aviso aguarda novamente o prazo aplicável; a retomada reutiliza o mesmo lembrete. O painel não acrescenta um segundo alerta local com prazo fixo de 10 minutos.
+- **Permissões:** o Atendimento pode ler o expediente para calcular o prazo. Configuração continua exigindo Admin/SuperAdmin, e controle manual de abertura continua exigindo Gerente/Admin/SuperAdmin. As capacidades `editarAtendimento` e `controlarLoja` refletem essas regras e exigem o módulo liberado. Sem capacidade, o Console não apresenta a ação; a API conserva suas políticas de gravação.
+- **Gravação recuperável:** falha mantém o rascunho, duplo clique produz uma chamada e campos ficam bloqueados enquanto a gravação está em andamento. Uma consulta atrasada não sobrescreve a edição. Chamadas têm prazo de 15 segundos. Alterar apenas o SLA não regrava o modelo de mensagem; se a alteração adicional do modelo falhar, a tela distingue essa falha da configuração já salva.
+
+**Limite do controle manual:** usa-se o estado atual. Forçar fechada conta zero; forçar aberta conta todo o intervalo. Não existe histórico de mudanças manuais para reconstruir pausas passadas, e esta entrega não cria esse histórico. Servidor e Console aplicam a mesma regra.
+
+### Evidência local
+
+| Verificação | Resultado |
+|---|---|
+| Domínio | 1.541 testes aprovados, sem ignorados |
+| Aplicação | 2.368 testes aprovados, sem ignorados |
+| API | 1.018 testes aprovados, sem ignorados, incluindo as capacidades de edição e controle manual |
+| PostgreSQL real | 5 testes aprovados, sem ignorados: persistência e destinatários, idempotência/conclusão, SLA por empresa, expediente/resposta efetiva e execução do SQL de Up/Down/Up da migration |
+| Migration | Up preenche 5 em linha existente; Down conserva os demais campos; novo Up restaura o padrão. EF não detectou alterações pendentes no modelo |
+| Console | 61 provas JavaScript aprovadas, incluindo 17 verificações de SLA; lint, camadas, 264 pares de contraste e build aprovados |
+| Gate do código | Build de `EasyStok.CI.slnf` e 36 testes de arquitetura aprovados |
+| HTTP e Chromium | Autenticação, faixa 1..240, edição da Dona e leitura do Atendimento; falha conserva rascunho e banco; duplo clique com um PUT; persistência após recarregar |
+| Fluxo real local | Conversa atrasada antes da recente; expediente fechado pausa e sua restauração retoma o destaque; resposta enviada ao ChatSite encerra o atraso na API e no cartão |
+| Apresentação | Movimento reduzido, tema escuro e gravação em 390 × 844 px sem rolagem horizontal; ausência de capacidade não libera edição; nenhum erro JavaScript nos três contextos |
+
+Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-sla`, fora do Git. `sla-browser.cjs` usa API e PostgreSQL reais no banco isolado `easystock_onda2_sla`, com usuários e conversas sintéticos. Resultados estão em `browser-resultados.json`; capturas em `sla-configuracao.png`, `sla-balcao.png` e `sla-celular-escuro.png`. O ChatSite usado é local, sem envio a cliente real. Não houve deploy nem homologação de entrega externa nesta sessão.
+
+Durante a finalização chegaram ao master `f8cec0ab` (espelho do PostgreSQL no CI), `64af5147` (regras de pedidos), `0759e10d` (correções do Console) e `a3e0a521` (sincronização offline). Essas entregas de outra frente foram incorporadas sem conflito. A validação combinada passou em **1.542 testes de domínio**, **2.380 de aplicação**, **1.024 da API** e **5 de integração PostgreSQL**, sem ignorados. As **62 provas JavaScript** e a qualidade completa do Console também passaram após a integração. Os resultados adicionais usam os sufixos `combinado` e `integracao-final` na pasta de evidências. Isso comprova compatibilidade local, sem substituir a homologação operacional do ciclo completo do pedido.
+
+### Próximo trecho executável
+
+1. Continuar o ciclo completo do pedido e as exceções do balcão, com as decisões pendentes da seção 9 respeitadas.
+2. Revisar as ações restantes por perfil e homologar a rotina da operação real.
+3. Homologar WebPush e os demais canais externos no ambiente próprio. Pagamento real, fornecedor de entregas, Google externo e impressão física Oasis mantêm seus aceites separados.
+
+## 23. Continuação: cancelamento operacional na Ficha, 09/10/2026
+
+**Decisão D3-04 confirmada por Felipe:** Atendimento cancela pedido sem pagamento; com qualquer valor recebido, inclusive parcial, só Dona/gerente. A regra usa o nível da sessão autenticada, incluindo Admin/SuperAdmin para a Dona e Gerente para gestão. O corpo da requisição não pode elevar esse nível.
+
+### Comportamento entregue
+
+- **Ficha ligada à API:** Mais ações do pedido abre a confirmação com motivo de 3 a 500 caracteres. Duplo clique compartilha uma chamada; campos bloqueiam durante a gravação. Falha conserva o motivo e não simula cancelamento em memória. Falha ao reler depois de sucesso informa que o cancelamento foi confirmado e que a tela precisa ser atualizada.
+- **Permissão em todos os caminhos:** cancelamento direto, troca de status, KDS, lotes e recusa do site verificam pagamento recebido. Atendimento não vê a opção quando há pagamento; formulário aberto antes de um recebimento recebe 403 com explicação. A capacidade `cancelarPedidoPago` exige gestão e módulo Atendimento autorizado.
+- **Concorrência:** cancelamento usa o mesmo lock do pedido que o recebimento. Se o pagamento confirma primeiro, Atendimento perde a autorização; se o cancelamento confirma primeiro, o recebimento manual é recusado. A expiração automática reutiliza sua transação e só publica atualização da tela depois do commit externo.
+- **Efeitos persistidos:** status, motivo, autor, horário, evento de integração, liberação da vaga e devolução do estoque já baixado ficam na transação. Cobrança pendente é cancelada. Repetir a operação não duplica auditoria, evento, vaga ou devolução de estoque. O SSE publica `pedido.mudou_status` depois do commit; o horário informado pelo lote offline é preservado na auditoria.
+- **Dinheiro recebido:** cancelamento operacional não remove `PedidoPagamento` nem solicita devolução ao provedor. Corrigidas as consultas de total e lista do Caixa: pedido cancelado continua contribuindo com dinheiro recebido e ainda não devolvido. Cobrança com estorno confirmado exclui somente seu pagamento correspondente; pedido já consolidado em Venda continua sem contagem duplicada. O roteiro HTTP da onda 0 foi ajustado para esse comportamento.
+- **Comunicação honesta:** a confirmação informa que a devolução deve ser tratada separadamente e orienta avisar o cliente pela conversa. O fluxo existente de recusa do site conserva seu estorno, agora com a mesma proteção por perfil.
+
+Durante a finalização, as melhorias de telas em `ed2c95ba` e a embalagem pela receita em `5f152c11` chegaram ao master e foram incorporadas sem conflito. As contagens abaixo refletem a base combinada.
+
+### Evidência local
+
+| Verificação | Resultado |
+|---|---|
+| Aplicação | 2.396 testes aprovados, sem ignorados |
+| API | 1.049 testes aprovados, sem ignorados |
+| PostgreSQL real | 15 testes aprovados, sem ignorados: ciclo pedido/estoque/pagamento/caixa, vaga, idempotência, corrida pagamento/cancelamento nas duas ordens, soma/lista do Caixa e aprovação/recusa concorrentes |
+| Console | 64 provas JavaScript aprovadas; lint, camadas, contraste e build aprovados |
+| HTTP e Chromium | 403 para pagamento parcial, nível/empresa forjados, status e KDS; lotes rejeitam a linha; motivo obrigatório, falha 503 preservando texto, um POST no duplo clique e persistência após recarregar |
+| Fluxo ao vivo | Stream SSE real recebeu o cancelamento; Atendimento com tela anterior ao pagamento recebeu 403; Dona cancelou pedido parcial conservando o recebimento e uma auditoria |
+| Apresentação | Computador e celular 390 × 844 px, tema escuro, confirmação acessível sem rolagem horizontal; nenhum erro JavaScript |
+
+Scripts, capturas, logs e TRX estão em `C:\rep\EasyStok\.build\onda2-ciclo-pedido`. A prova `cancelamento-browser.cjs` usa API local e PostgreSQL real no banco isolado `easystock_onda2_ciclo`. Usuários, conversas e pedidos foram criados pelas APIs; a preparação da fixture habilita os módulos e vincula os pedidos às conversas no banco sintético. As ações testadas de cancelar e pagar passam pelas APIs reais, sem alteração manual de resultado.
+
+**Limites:** não houve envio a cliente real, devolução de dinheiro real, impressão física ou deploy. O estorno da Ficha e a homologação externa de pagamento continuam pendentes. Esta entrega fecha o cancelamento operacional desta fatia, sem encerrar M3.3 ou a onda 2.
+
+### Próximo trecho executável
+
+1. Continuar o ciclo completo e as exceções do pedido, incluindo reagendamento com troca efetiva da vaga (M3.4).
+2. Implementar e homologar o estorno pela Ficha com resposta do provedor e reflexo financeiro explícito, respeitando D3-04.
+3. Conferir as ações restantes por perfil e realizar o aceite da operação real. Canais externos, entregas e impressão física conservam seus aceites separados.
+
+
+## 24. Continuação: reagendamento com troca de vaga (09/10/2026)
+
+**Fatia executada:** M3.4 da Onda 2, reagendamento de pedido criado pela Ficha e por Entregas, com ocupação real da janela e validação local em desktop e celular.
+
+### 24.1 Implementado
+
+- `GET api/pedidos/{id}/janelas` consulta a vaga atual e as opções pelo prazo real dos itens, incluindo preparo padrão e respiro. `PATCH api/pedidos/{id}/janela` usa empresa e autor da sessão e exige o módulo Atendimento ou Entregas, além do nível Operador.
+- A troca trava o pedido e, na mesma transação, libera a vaga antiga com motivo `reagendado`, ocupa a nova com a regra de capacidade da S16, atualiza `AgendadoParaEm`, recalcula o início previsto e limpa o aviso de atraso. Janela cheia retorna 409; rollback preserva a reserva anterior.
+- A auditoria registra faixa, autor e situação do aviso. Repetir a mesma janela/data não duplica vaga, evento ou aviso. Depois do commit, `pedido.reagendado` atualiza os consumidores SSE, incluindo KDS e Entregas.
+- A consulta de vagas prioriza a ativa sobre o histórico. A Ficha passa a receber a janela do servidor e o reducer não restaura a escolha local antiga. A rota antiga `/agendamento` recusa pedidos com vaga para impedir a divergência entre horário e ocupação.
+- Ficha e Entregas compartilham a escolha de data/janela e a operação da API. Uma falha conserva a escolha, duplo clique envia uma chamada e recarga indisponível após confirmação não é apresentada como falha da gravação. Pedidos entregues ou cancelados não podem ser reagendados.
+- Aviso por WhatsApp é opcional e fica desmarcado inicialmente. Quando solicitado e permitido pelas preferências e pelo telefone do cliente, o evento `PedidoReagendado` entra no outbox de notificações na mesma transação, com faixa/data e chave distinta por troca. O remetente é a Loja, declarado no catálogo e coberto por regressão no domínio. A tela diferencia aviso na fila de aviso não enfileirado.
+
+### 24.2 Validação executada
+
+| Camada | Evidência local |
+|---|---|
+| Domain | 1.543 testes aprovados, incluindo classificação do remetente do reagendamento como Loja |
+| Application | 2.397 testes aprovados, incluindo mensagem de reagendamento com remetente Loja no outbox |
+| API | 1.050 testes aprovados, incluindo classificação de módulo do novo controller |
+| PostgreSQL | 25 testes aprovados, nenhum ignorado: 15 da troca e 10 de capacidade/KDS/jornada do atendimento |
+| Arquitetura | 37 testes aprovados no gate de commit, junto ao build da solução de CI |
+| Concorrência | Duas transações reais aguardaram o mesmo lock para a última vaga; uma confirmou e a outra restaurou a vaga antiga |
+| Atomicidade | Falha controlada ao gravar o aviso, depois do INSERT da nova vaga, reverteu a troca inteira e não publicou SSE |
+| Console | 65 scripts de prova aprovados; lint, camadas, contraste e build aprovados |
+| HTTP e navegador | Atendimento autorizado; Cozinha e empresa forjada 403; janela inválida 400; pedido inexistente 404; janela que lotou depois de abrir a Ficha recusada sem perder a reserva |
+| Jornada local | Chromium 1440 × 1000 e 390 × 844, tema claro/escuro: Ficha, Entregas, falha 503, duplo clique, recarga persistida, pagamento parcial conservado, KDS e SSE |
+
+Evidências fora do Git: `C:\rep\EasyStok\.build\onda2-reagendamento`, com TRX, logs, script de navegador, resultados e capturas. Banco de homologação isolado: `easystock_onda2_janela`, no PostgreSQL local. Sem migration ou dependência nova.
+
+### 24.3 Limites e próxima fatia
+
+- Gravação e fila de aviso homologadas localmente; não houve envio a cliente real. Entrega externa pelo WhatsApp depende do canal configurado. Fora da janela de 24 horas, é necessário configurar um modelo aprovado pela Meta; o seed não presume essa aprovação.
+- Não houve publicação pública verificada nesta fatia. Commit/push e deploy são estados distintos.
+- Próxima fatia: estorno pela Ficha, com resposta efetiva do provedor, reflexo financeiro e regra D3-04. Depois, continuar as ações restantes por perfil e os aceites operacionais, mantendo separados canais externos, logística e impressão física.
+
+## 25. Continuação: devolução manual pela Ficha e registro no Caixa (09/10/2026)
+
+**Fatia executada:** devolução manual de recebimentos fora do Mercado Pago, parcial ou total, com confirmação de Dona/gerente. O estorno online é a próxima fatia. Esta execução não encerra M3.3, M5 ou a Onda 2.
+
+**Decisão D3-05, informada por Felipe nesta rodada:** para dinheiro, Pix direto ou maquininha fora do Mercado Pago, Dona/gerente confirma que já devolveu o valor, informa motivo e comprovante/referência; o sistema registra no Caixa. A regra não autoriza tratar um pedido cancelado como dinheiro automaticamente devolvido.
+
+### 25.1 Implementado
+
+- A Ficha tem o bloco **Devoluções**, inclusive para pedidos cancelados. Mostra os recebimentos e as devoluções confirmadas, com valor, meio, motivo, referência, responsável e horário. Dona/gerente seleciona o recebimento, informa o valor parcial ou total e o meio efetivamente usado para devolver. Atendimento consulta o histórico.
+- `GET/POST api/pedidos/{id}/estornos-manuais` usam a empresa autenticada, exigem módulo Atendimento e, para gravar, nível Gerente. A capacidade `devolverPagamentoManual` segue a mesma regra. Empresa divergente no body é recusada; autor, nome e nível são derivados da sessão.
+- `PedidoEstornoManual` vincula a confirmação ao pagamento e à saída do Caixa. Recebimento original e cobrança manual permanecem intactos. A saída tem origem `devolucao_pedido` e a data do registro. A contagem do Caixa conserva receita no dia original e desconta a devolução no dia novo, inclusive se o pedido está cancelado ou consolidado em Venda.
+- Registro, saída e evento de auditoria são uma transação. O lock do pedido serializa a devolução com recebimentos, remoções e outras devoluções. A soma de parciais não supera o recebimento; repetir o identificador com os mesmos dados devolve o registro anterior, sem duplicar saída ou auditoria. Reutilizar o identificador com dados diferentes é conflito.
+- O registro exige confirmação explícita de que o dinheiro já foi devolvido, motivo, referência e valor positivo em centavos. Recebimento do Mercado Pago é recusado neste caminho. O dia do Caixa precisa estar sem fechamento; a operação não reabre períodos nem altera snapshots encerrados. A saída registra um fato confirmado, sem exigir que a receita esteja no Caixa do mesmo dia.
+- A solicitação sem resposta conclusiva fica no navegador, separada por empresa, usuário e pedido. Recarga consulta o histórico real para reconhecer uma confirmação já gravada; se necessário, repete a mesma solicitação. A tela orienta não devolver o dinheiro novamente. Recebimentos novos atualizam o bloco e há consulta manual ao histórico.
+- Os atalhos de desfazer/remover pagamento e de estornar lançamento do Caixa recusam recebimentos/saídas com devolução confirmada. A migration `20261010012555_AddEstornosManuaisPedido` tem chaves restritivas, filtro de empresa e RLS forçada. A reversão recusa apagar confirmações existentes.
+
+### 25.2 Validação executada
+
+As alterações de UX (`8317abee`), consultas financeiras (`6afa7ccb`) e segurança (`d52c1afd`) que chegaram ao master durante a rodada foram incorporadas. Aplicação, API, PostgreSQL, Console e navegador foram verificados novamente nessa base.
+
+| Camada | Evidência local |
+|---|---|
+| Domain | 1.543 testes aprovados, sem ignorados |
+| Application | 2.408 testes aprovados, sem ignorados, incluindo proteção do pagamento com devolução |
+| API | 1.111 testes aprovados, sem ignorados, incluindo políticas de consulta/gravação e capacidade por perfil |
+| PostgreSQL real | 19 testes aprovados, sem ignorados: parciais, excesso, replay, concorrência, rollback, Caixa em dias diferentes, pedido cancelado/consolidado, empresa, RLS, provedor e preservação do recebimento |
+| Arquitetura | 61 testes do filtro de CI `Category!=ArchitectureDebt` aprovados. Os dois testes históricos de dívida de tamanho do Program e dependência direta de controllers continuam fora desse filtro |
+| Console | 65 provas JavaScript aprovadas; lint, camadas, contraste e build aprovados |
+| Migration | Aplicação, reversão sem dados e reaplicação executadas. Reversão com devoluções confirmadas recusada pelo guard, preservando registros e saídas |
+| HTTP e Chromium | Perfis e empresa forjada; confirmação/referência obrigatórias; pedido cancelado; um POST no duplo clique; perda da resposta após commit; 503 antes do commit e retomada com o mesmo identificador após recarga; quatro parciais totalizando R$100; Caixa e histórico persistidos |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844, sem rolagem horizontal ou erro JavaScript. Nome do responsável conferido a partir da sessão |
+
+Evidência fora do Git: `C:\rep\EasyStok\.build\onda2-estorno`, com TRX, logs, script `browser.cjs`, resultados e capturas. Banco sintético isolado `easystock_onda2_estorno` no PostgreSQL local. Usuários, recebimentos, cancelamento e devoluções passam pelas APIs reais; o preparo da fixture habilita módulos e vincula pedido e conversa no banco. As falhas HTTP controladas exercitam perda de resposta e indisponibilidade sem alterar o resultado financeiro manualmente.
+
+### 25.3 Limites e próxima fatia
+
+- Não houve transferência de dinheiro real, envio a cliente real ou publicação pública verificada. A confirmação manual é uma declaração da responsável sobre uma devolução já realizada; referência é textual, sem upload de comprovante nesta fatia.
+- Não há correção/reversão de devolução confirmada nesta entrega. Reabertura, concorrência com fechamento e reconciliação financeira ampla pertencem ao M5 e precisam de validação própria.
+- Próxima fatia: estorno pelo Mercado Pago pela Ficha, com confirmação efetiva do provedor, tratamento de resposta pendente/indeterminada, soma de parciais e idempotência persistida. Integrar com ocorrência/webhook e Caixa sem duplicar saídas. A ação genérica `marcarEstorno` continua não ligada no modo API; a devolução manual usa o bloco próprio.
+- Continuar depois as ações restantes por perfil e os aceites operacionais, mantendo canais externos, logística e impressão física com evidências separadas.
+
+## 26. Continuação: estorno pelo Mercado Pago na Ficha (09/10/2026)
+
+**Fatia implementada:** solicitação parcial ou total pelo bloco Devoluções, com confirmação do provedor, intenção persistida e retomada da mesma operação. Ocorrência e webhook compartilham a conciliação financeira. A verificação local usa o cliente HTTP de produção contra um provedor controlado; a homologação externa continua pendente. Esta fatia não encerra M3.3, M5 ou a Onda 2.
+
+### 26.1 Implementado
+
+- Dona/gerente escolhe o recebimento do Mercado Pago, informa valor e motivo e confirma a solicitação. Atendimento consulta valores recebidos, devolvidos, disponíveis e em confirmação, além do histórico com responsável e referência do provedor. Devolução manual conserva o fluxo da seção 25.
+- Consulta, solicitação e retomada usam `api/pedidos/{id}/estornos-online`. A escrita exige Gerente e módulo Atendimento; a empresa, o responsável e o nível vêm da sessão. Pagamento, pedido, cobrança e registros são conferidos na mesma empresa, com filtro automático e RLS forçada na nova tabela.
+- `PedidoEstornoOnline` grava a intenção antes de chamar o provedor. O identificador persistido vira `X-Idempotency-Key`; recarga, resposta perdida, ocorrência e webhook retomam essa operação. Uma solicitação pendente reserva saldo e impede outra para o mesmo recebimento. Reutilizar o identificador com dados diferentes é conflito.
+- Só uma resposta `approved`, com identificador, pagamento e valor válidos, confirma o estorno. Respostas pendentes, ausentes ou divergentes não geram saída. Indisponibilidade conserva a intenção; uma recusa HTTP inicial 400/422 registra recusa, mas a mesma resposta após uma tentativa indeterminada mantém a reserva até conciliação.
+- Antes do primeiro envio, a consulta incorpora devoluções externas confirmadas e confere o total devolvido. A retomada consulta um estorno já identificado ou repete o POST com a mesma chave. O navegador guarda solicitações sem resposta por empresa, usuário e pedido e reconhece operações já persistidas após recarga.
+- Confirmação, saída do Caixa e evento no pedido são atômicos. Parciais acumulam sem superar o recebimento; a devolução integral encerra a cobrança. O recebimento original permanece como receita e cada estorno confirmado gera uma saída no dia da confirmação, inclusive após cancelamento ou consolidação em Venda. O identificador do movimento é gerado pelo servidor, separado da operação informada pelo cliente.
+- O webhook concilia parciais, estornos externos e contestação, sem repetir a saída nem retirar a receita novamente. Estornos integrais legados, sem registro na nova tabela, conservam o tratamento anterior. A ocorrência só declara reembolso efetuado depois da confirmação; recusa ou pendência mantém a ocorrência aberta. Aviso ao cliente continua pelo outbox existente.
+- Remoção de recebimento com intenção online é bloqueada. A saída usa a origem protegida `devolucao_pedido`. A migration `20261010020629_AddEstornosOnlinePedido` tem vínculos restritivos, unicidade por referência externa e guard de reversão, inclusive para solicitações ainda pendentes.
+
+O contrato do provedor foi conferido nas referências oficiais de [criação de estorno](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro-preferences/create-refund/post), [consulta de estorno](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro-preferences/get-refund/get) e [listagem de estornos](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro-preferences/get-refunds/get).
+
+### 26.2 Validação local
+
+Base integrada: `c1e12576`, incluindo a remoção do job legado de avaliação da PR #1530 (`a3f8e91e`) e a recuperação de janelas e contexto do Balcão. Evidências, TRX, logs, provedor controlado `mp-local.cjs`, script `browser.cjs` e capturas ficam em `C:\rep\EasyStok\.build\onda2-estorno-online`. Bancos sintéticos: `easystock_onda2_online` e `easystock_onda2_online_migration`.
+
+| Camada | Evidência local |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilou sem erros; seis avisos existentes de obsolescência de `KnownNetworks`/`IPNetwork` em API/Web |
+| Domain / Application | 1.543 e 2.409 testes aprovados, sem ignorados |
+| API | 1.116 testes aprovados, sem ignorados, na execução sequencial |
+| Arquitetura | 61 testes do filtro de CI `Category!=ArchitectureDebt` aprovados, sem ignorados; dívidas históricas continuam fora desse filtro |
+| Gate de commit | Build e 37 testes obrigatórios de arquitetura aprovados |
+| Integrações | 196 testes aprovados, sem ignorados, incluindo recusa de respostas de estorno sem confirmação |
+| PostgreSQL real | 25 testes aprovados, sem ignorados: parciais, replay, concorrência, perda de resposta, rollback após aceite externo, estornos externos, contestação, legado, perfis, empresa, RLS, Caixa e colisão de identificadores |
+| Console | 65 scripts de prova aprovados; lint, camadas, contraste e build aprovados |
+| Migration | Aplicação, reversão vazia e reaplicação aprovadas; reversão com solicitações recusada, preservando registros e saídas; modelo sem mudanças pendentes |
+| HTTP / Chromium | Sete cenários completos com API/PostgreSQL reais e transporte controlado do Mercado Pago; duplo clique, `pending`, perda de conexão após aceite, 503 antes da API e retomada após recarga; cinco estornos somam R$100, com recebimento original preservado e nenhuma duplicação no replay |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844; sem rolagem horizontal ou erro JavaScript; histórico somente para consulta no Atendimento |
+
+As duas primeiras execuções completas da API tiveram uma falha temporal cada: renderização de impressão pelo Scriban e prazo do stream do ChatSite. A classe de impressão passou isoladamente e os 1.116 testes passaram depois com `xUnit.ParallelizeTestCollections=false` e `xUnit.MaxParallelThreads=1`, sem alterar os testes ou seus limites. Não se apresenta a execução paralela anterior como verde.
+
+Usuários e operações são sintéticos. A preparação associa pedido e conversa e cria a cobrança recebida no banco; pedidos, cancelamentos, solicitações, retomadas e consultas do Caixa passam pelas APIs reais. Nenhum saldo ou resultado de estorno é corrigido diretamente no banco durante os cenários.
+
+### 26.3 Limites e próxima fatia
+
+- Não houve transferência real, envio a cliente real ou publicação pública verificada. A prova exercita o adaptador HTTP real, mas não comprova credenciais, disponibilidade, liquidação ou regras da conta externa do Mercado Pago.
+- Solicitação nova é recusada se o Caixa do dia já estiver fechado. Se o provedor aceitar e o fechamento ocorrer antes da confirmação local, o fato financeiro é registrado sem reabrir o snapshot. Reconciliação com períodos fechados e concorrência ampla do fechamento continuam no M5.
+- A atualização da Ficha ocorre por consulta, retomada ou retorno do foco à janela. Não foi criado novo evento SSE para estornos. O atalho genérico `marcarEstorno` permanece fora do modo API; os dois tipos de devolução usam o bloco próprio.
+- Próxima fatia: conectar apuração e encerramento de ocorrências na Ficha e continuar as ações restantes por perfil. Depois, executar os aceites externos de pagamentos, canais, logística e impressão física com evidências próprias.
+
+## 27. Execução da Onda 2: apuração e encerramento de ocorrências na Ficha
+
+Data: 10/10/2026. Base de implementação: `d0a4cdb6`, incluindo as porções do cardápio e da comanda das PRs #1532 e #1533. Integração sobre `0ba8504c`, com a correção da gaveta de dinheiro da PR #1535; testes de aplicação e PostgreSQL repetidos sobre essa base. Fatia implementada e homologada localmente. M3 e a Onda 2 continuam parciais; publicação pública e aceites externos não foram verificados nesta rodada.
+
+### 27.1 Implementado
+
+- A Ficha consulta todas as ocorrências do pedido, incluindo encerradas, pelo filtro `pedidoId` de `api/ocorrencias`. Mostra relato, categoria, origem, apuração, responsável, data e resolução. Falha de consulta tem mensagem e retentativa; não vira histórico vazio. O modo simulado conserva seu fluxo próprio.
+- Dona/gerente inicia apuração e encerra com resolução obrigatória. Atendimento consulta; Cozinha não acessa o módulo. A capacidade `gerenciarOcorrencias` vem da sessão, e as rotas de abertura manual, apuração e resolução exigem Gerente e Atendimento. Empresa e autor vêm do JWT; os use cases conferem propriedade e nível, além dos filtros de tenant e RLS.
+- Apuração grava o primeiro responsável e horário sem reabrir uma ocorrência encerrada. Resolução repetida com o mesmo conteúdo devolve o resultado anterior; conteúdo divergente recebe 409. Lock da ocorrência e transação impedem sobrescrita concorrente e duplicação de nota. A resolução integral fica na ocorrência; o resumo no CRM respeita o limite de 500 caracteres da nota.
+- Intenção financeira e motivo da ocorrência são persistidos juntos antes do HTTP do provedor. O encerramento comum é impedido enquanto essa operação estiver pendente ou confirmada sem conclusão da ocorrência. A Ficha permite conferir a mesma solicitação e concluir; uma recusa definitiva permite registrar outra solução sem declarar devolução. Solicitações anteriores ao novo campo também são recuperadas do registro financeiro.
+- Confirmação da ocorrência, nota de reembolso e evento do outbox são gravados juntos, uma vez. Se essa conclusão falhar depois do aceite financeiro, a ocorrência permanece aberta e a retomada reutiliza o mesmo estorno, sem outra saída. O encerramento comum não gera transferência; novos estornos usam o bloco Devoluções. O valor manual legado continua explicitamente sem confirmação de dinheiro devolvido.
+- Migration `20261010121307_AddApuracaoOcorrencia`: cinco campos opcionais de auditoria e intenção. Reversão bloqueada quando apagaria auditoria ou solicitação persistida. O snapshot também incorpora o `ValueGeneratedNever` de variações já presente na configuração da PR #1532, sem DDL adicional para variações.
+
+### 27.2 Validação local
+
+Evidências, TRX, scripts, provedor HTTP controlado e capturas em `C:\rep\EasyStok\.build\onda2-ocorrencias`. Bancos sintéticos: `easystock_onda2_ocorrencias` e `easystock_onda2_ocorrencias_migration`. Somente esses ambientes locais foram usados.
+
+| Camada | Evidência |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilou sem erros; avisos existentes de API obsoleta em API/Web |
+| Domain / Application | 1.544 e 2.433 testes aprovados, sem ignorados |
+| API / Arquitetura | 1.117 testes de API e 61 do filtro de CI `Category!=ArchitectureDebt` aprovados, sem ignorados |
+| Gate de commit | Build e 37 testes obrigatórios de arquitetura aprovados |
+| PostgreSQL real | 24 testes aprovados, sem ignorados: concorrência de apuração e resolução, dois reembolsos simultâneos com a mesma chave, tentativa de encerramento durante HTTP, rollback da nota após aceite financeiro, consulta com 102 ocorrências, tenant/RLS e regressões de estorno |
+| Console | 67 scripts de prova aprovados; lint, camadas, 264 pares de contraste e build aprovados |
+| Migration | Aplicação, reversão sem auditoria e reaplicação aprovadas; reversão com auditoria recusada e registro preservado; modelo sem alterações pendentes |
+| HTTP / Chromium | Perfis e empresa forjada bloqueados; resolução vazia recusada; duplo clique, replay, 409 divergente, resposta perdida após commit, falha de consulta e retomada de reembolso pendente conferidos com API/PostgreSQL reais |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844, incluindo encerramento real no celular; sem rolagem horizontal ou erros JavaScript; Atendimento somente consulta |
+
+A primeira execução PostgreSQL falhou em dois testes novos por ambiguidade do argumento do substituto de outbox. O helper foi corrigido e os 24 testes passaram na repetição, incluindo duas conclusões financeiras concorrentes. O primeiro roteiro do navegador também precisou delimitar o seletor do título, pois o cliente sintético tinha o mesmo nome do bloco. Nenhuma dessas execuções iniciais é apresentada como verde.
+
+### 27.3 Limites e próxima fatia
+
+- A consulta atualiza ao abrir a Ficha, retornar o foco, usar Atualizar ou concluir uma ação. Não há novo evento SSE de ocorrência nesta fatia. Formulários e respostas são isolados por pedido; não há mudança otimista de estado.
+- O bloco trabalha ocorrências existentes; abertura automática e abertura manual pela API conservam seus contratos. Não foi adicionada uma nova tela de abertura. O aviso financeiro continua no outbox existente, sem envio externo comprovado.
+- Não houve transferência real, mensagem a cliente real ou verificação de publicação pública. A prova financeira usa o adaptador de produção com provedor HTTP local controlado.
+- Próxima fatia: continuar as ações operacionais ainda não ligadas no modo API, seguindo M3 e a matriz por perfil. Os aceites externos de pagamentos, canais, logística e impressão física seguem separados.
+
+## 28. Execução da Onda 2: reabertura de conversa (M3.6), 10/10/2026
+
+### 28.1 Entrega
+
+- `POST api/atendimento/conversas/{id}/reabrir` exige módulo Atendimento e `AtenderConversas`. A capacidade `reabrirConversa` da sessão controla o botão no Console. Empresa e autor vêm do JWT; tenant, identidade e propriedade são conferidos no caso de uso, no repositório e no RLS.
+- Conversa encerrada volta a `Assumida`, sem responsável, na fila humana. Limpa `EncerradaEm` e registra nota interna com nome, usuário e encerramento anterior. Conserva cliente, pedido, contexto, mensagens e última entrada do cliente. Reabrir não renova a janela de 24 horas nem envia mensagem ao canal.
+- Cliente bloqueado e outra conversa aberta do mesmo contato/canal impedem reabertura com 409. A consulta reconhece as grafias de WhatsApp com e sem nono dígito; no ChatSite também confere outra sessão do cliente vinculado. O operador recebe orientação para continuar pela conversa aberta.
+- Transação, trava do contato e releitura com lock da linha tornam repetição e reaberturas simultâneas idempotentes. Uma entrada concorrente com o mesmo identificador é protegida pelo índice único existente; conflito faz rollback completo, incluindo a nota. Não há migration.
+- O Console aguarda confirmação, bloqueia duplo clique e conserva o estado se a chamada falhar. A sincronização existente recupera confirmação cuja resposta se perdeu. O texto do cartão identifica reabertura humana. Despedida de encerramento ainda na fila é ignorada quando o disparador encontra a conversa novamente aberta.
+
+### 28.2 Validação local
+
+Evidências, TRX, scripts e capturas em `C:\rep\EasyStok\.build\onda2-reabrir`; banco sintético `easystock_onda2_reabrir`. PostgreSQL de concorrência usa Testcontainers separado.
+
+| Camada | Evidência |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilado sem erros; avisos existentes de API obsoleta |
+| Domain / Application | 1.549 e 2.451 testes aprovados, sem ignorados |
+| API / Arquitetura | 1.172 testes de API e 61 do filtro `Category!=ArchitectureDebt` aprovados, sem ignorados |
+| Gate de commit | Build e 37 testes obrigatórios de arquitetura aprovados; prova de reabertura incluída no workflow do Console |
+| PostgreSQL real | 5 testes aprovados, sem ignorados: repetição simultânea com estado já rastreado, disputa entre históricos com contato igual ou variante, disputa com entrada ainda não confirmada, rollback da nota e RLS com usuário sem bypass |
+| Console | 69 scripts de prova aprovados; lint, camadas, 264 pares de contraste e build aprovados |
+| HTTP / Chromium | Atendimento autorizado, Cozinha 403, sem sessão 401 e inexistente 404; cliente bloqueado e outra conversa aberta recusados; duplo clique, recarga, resposta perdida e nova entrada do ChatSite na mesma conversa conferidos; nota interna não aparece ao cliente |
+| Janela do WhatsApp | Conversa sintética reaberta na API real; texto livre fora da janela retorna 409 `fora_da_janela_24h`, antes de qualquer envio externo |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844; reabertura real nos dois, sem rolagem horizontal ou erros JavaScript |
+
+Na primeira rodada, os testes detectaram que o registro de remetente aceitava apenas mensagem enviada pela atendente. Foi criado o registro específico de autoria de nota interna, com validação de tipo e ausência de envio externo; os testes posteriores passaram. O roteiro do navegador foi corrigido para aguardar o carregamento do Balcão após recarga, inclusive no celular. As execuções iniciais não são apresentadas como aprovadas.
+
+### 28.3 Limites e próxima fatia
+
+- A confirmação da própria ação é imediata após o POST; outras abas e o histórico usam a sincronização existente de cinco segundos. Não foi criado evento SSE nesta fatia.
+- Modelos aprovados na Meta eram a próxima fatia do M3.6 e foram ligados na seção 29. Mensagens programadas conservam a integração já entregue. Ações por atendente do M3.7 seguem pendentes.
+- Não houve mensagem a cliente real, chamada à Meta nem verificação de publicação pública. Reabertura e roteamento seguintes foram homologados pelo ChatSite local; os aceites de canais externos continuam separados.
+
+## 29. Execução da Onda 2: modelos aprovados no Composer (M3.6), 10/10/2026
+
+### 29.1 Entrega
+
+- `GET api/atendimento/modelos` consulta os modelos aprovados da WABA vinculada à empresa pela conexão por coexistência existente. Confere número e credencial da mesma empresa, sem recorrer à conta global. Lista nome, idioma, categoria, corpo, parâmetros e motivo quando o formato não é suportado. Cache de um minuto por empresa; atualização explícita na tela. Paginação usa cursores na mesma origem e conta, sem seguir URLs que possam carregar tokens.
+- `POST api/atendimento/conversas/{id}/mensagens/modelo` recebe `tentativaId`, nome, idioma e parâmetros. Exige módulo Atendimento e `AtenderConversas`; empresa e autor vêm do JWT. `ValidateEmpresaId` recusa empresa divergente no corpo/query; use case, filtro global e RLS protegem a conversa. Cliente precisa estar cadastrado e desbloqueado. Conversa encerrada ou canal sem modelos são recusados.
+- A aprovação é consultada novamente antes de reservar o envio. Idioma, quantidade e conteúdo dos parâmetros são validados. Categoria da Meta determina a finalidade: marketing exige consentimento concedido; transacional respeita revogação. Cabeçalho/rodapé estáticos e parâmetros posicionais no corpo compõem a prévia persistida.
+- A tentativa nasce como mensagem pendente, com autoria e metadados, antes de chamar `ICanalMensageria.EnviarModeloAsync`. Transação e lock da conversa serializam a reserva. Repetir o mesmo identificador devolve a tentativa registrada; conteúdo ou autor divergentes são recusados. O POST externo não é repetido automaticamente. Falha de rede ou resultado incerto conserva o registro, inclusive após reinício; modelos não entram no reenvio de texto nem na reserva por SMS.
+- O Composer oferece seleção, preenchimento e prévia. Aguarda a resposta, protege clique duplo e conserva o identificador da tentativa durante perda de resposta/recarga na mesma aba. O histórico mostra o selo de modelo e o estado informado pelo servidor. Para iniciar outro envio após resultado incerto, o operador confirma que conferiu a conversa no WhatsApp. Enviar modelo não renova a janela de 24 horas.
+- Migration `20261010212747_AddModeloMensagemAtendimento` acrescenta apenas `ModeloJson` nullable em `atendimento_mensagens`. Tipo `Modelo` diferencia a mensagem do texto livre. Linhas existentes permanecem válidas. Na reversão de código, conservar a coluna e os dados; `Down` remove os metadados novos e exige backup prévio.
+
+Contrato de consulta conferido no [SDK oficial da Meta](https://github.com/facebook/facebook-python-business-sdk/blob/main/facebook_business/adobjects/whatsappbusinessaccount.py), método `get_message_templates`. O envio reutiliza o adaptador existente.
+
+### 29.2 Validação local
+
+Evidências, TRX, scripts e capturas em `C:\rep\EasyStok\.build\onda2-modelos`; banco sintético `easystock_onda2_modelos`, provedor HTTP em loopback e PostgreSQL de concorrência em Testcontainers.
+
+| Camada | Evidência |
+|---|---|
+| Build / schema | `EasyStok.CI.slnf` compilado; migration aplicada no banco com dados anteriores; EF sem alteração de modelo pendente |
+| Domain / Application | 1.556 e 2.471 testes aprovados, sem ignorados |
+| API / Integrações / Arquitetura | 1.179, 208 e 61 testes aprovados, sem ignorados; arquitetura usa o filtro do CI `Category!=ArchitectureDebt` |
+| Gate de commit | Build e 37 testes obrigatórios de arquitetura aprovados |
+| PostgreSQL real | 4 testes aprovados, sem ignorados: intenção visível antes da resposta externa, concorrência/replay, recuperação de pendente e falha sem reenvio, JSON persistido e RLS sem bypass |
+| Console | 71 provas aprovadas; lint, fronteiras de camada, 264 pares de contraste e build aprovados; nova prova incluída no CI |
+| HTTP / Chromium | 401/403/404, empresa forjada, modelo inexistente, idioma/parâmetros inválidos, marketing sem consentimento, cliente bloqueado e conversa encerrada recusados; texto livre continua 409 |
+| Envio e recuperação | Um envio ao provedor com duas requisições simultâneas; clique duplo, recarga, perda da resposta após aceite, aprovação revogada entre seleção/envio e conexão interrompida conferidos |
+| Apresentação | Computador 1440 × 1000 e celular 390 × 844; seleção, prévia, envio e histórico, sem erro JavaScript nem rolagem horizontal; botão reposicionado após inspeção visual do celular |
+
+A primeira execução HTTP mostrou que o campo extra `empresaId` era ignorado pelo DTO: a empresa continuava vindo do JWT, mas faltava a recusa explícita. O DTO e o filtro foram ajustados e a execução posterior confirmou 403. A prova antiga do envio genérico foi atualizada para exigir a orientação ao seletor de modelos, mantendo a proibição de enviar o modelo como texto livre.
+
+Após incorporar `b840ae96`, com a ficha do prato e as fotos do cardápio, foram repetidos build, testes de Domain/Application/API, qualidade e todas as provas do Console. O workflow conserva as provas de cardápio e modelos. Nova conferência no navegador validou prévia, envio único, recarga do histórico, texto livre desabilitado e layout móvel na versão integrada.
+
+### 29.3 Limites e próxima fatia
+
+- Homologação com conta, contatos e token sintéticos. Não houve contato com clientes reais, aceite de entrega na Meta nem verificação de publicação pública. Aceitação HTTP, entrega ao aparelho e publicação continuam sendo estados separados.
+- Modelos com mídia, botões, autenticação, parâmetros nomeados ou variáveis no cabeçalho não são enviados por esta tela; o catálogo informa a limitação. Criação e aprovação continuam no Gerenciador da Meta. Conta apenas com vínculo manual de número, sem a credencial/WABA da coexistência, recebe orientação para conectar em Integrações.
+- Mensagens programadas mantêm seu fluxo anterior. Esta fatia trata o envio avulso pelo Composer. Histórico em outras abas continua na sincronização existente de cinco segundos.
+- M3.7, filtros Minhas/Sem dono/Todas e nome do atendente, foi executado na seção 30. Aceite externo do modelo textual segue pendente com Felipe.
+
+## 30. Execução da Onda 2: responsáveis no Balcão (M3.7), 10/10/2026
+
+### 30.1 Entrega
+
+- O resumo da inbox acrescenta `assumidaPorNome`. O repositório consulta o nome junto com a conversa, pelo vínculo de usuário da mesma empresa. Não há consulta por cartão nem nova tabela. Filtro explícito de empresa, filtro global e RLS continuam ativos; um responsável sem vínculo nesta empresa recebe nome nulo.
+- O Balcão oferece Todas, Minhas e Sem dono. Todas é o padrão. Minhas compara `assumidaPorUsuarioId` com o ID da sessão, sem comparar nomes. Sem dono inclui conversas sem atribuição. Busca, canais, contagens, abertas, encerradas e bloqueadas respeitam o responsável escolhido. A conversa selecionada e o rascunho permanecem disponíveis ao trocar o filtro.
+- O selo de outra atendente mostra seu nome. Respostas anteriores, sem o campo novo, conservam o rótulo Outro atendente. A demonstração mantém Thatiane e o layout anterior.
+- O controle só aparece com mais de um atendente ativo, usando `GET api/atendimento/atendentes` existente. Falha nessa consulta mostra mensagem e Tentar novamente. O filtro de responsável atua sobre a inbox carregada; a API conserva seus filtros existentes `responsavel=eu|ninguem|{usuarioId}`.
+- Assumir e devolver ao automático atualizam o responsável após confirmação da API. Uma recusa conserva a atribuição. Transferências feitas pelo contrato existente entram na próxima sincronização da inbox. Não houve alteração na distribuição de conversas, permissões, regra do canal ou schema.
+
+### 30.2 Validação local
+
+Evidências, TRX, scripts e capturas em `C:\rep\EasyStok\.build\onda2-atendentes`. Banco sintético `easystock_onda2_atendentes`, clonado da homologação local anterior; os testes PostgreSQL usam Testcontainers separado.
+
+| Camada | Evidência |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilou sem erros; avisos existentes de API obsoleta na primeira compilação |
+| Application / API / Arquitetura | 2.471, 1.179 e 61 testes aprovados, sem ignorados; arquitetura com `Category!=ArchitectureDebt` |
+| PostgreSQL real | 13 testes aprovados, sem ignorados: novos casos de nomes, homônimos, responsável de outra empresa, filtros e transferência, com e sem cliente sujeito a RLS; regressões existentes de atendentes e conversas |
+| Console | 72 provas aprovadas; lint, fronteiras de camada, 264 pares de contraste e build aprovados; `prova-m37-atendentes.mjs` incluída no workflow |
+| HTTP | Nomes reais dos usuários locais e filtros eu/ninguém conferidos; 401 sem sessão, 403 para Cozinha e 400 para responsável inválido |
+| Chromium | Dois usuários veem somente suas conversas em Minhas; nome do outro no selo; transferência entra/sai das listas; Assumir e Devolver confirmados na tela; recarga volta ao padrão Todas |
+| Equipe e falha | Com um atendente ativo no banco real, o controle fica oculto e as quatro conversas sintéticas seguem na lista padrão; falha de consulta mostra erro e a retentativa recupera o filtro |
+| Apresentação | Capturas em 1440 × 1000, 1024 × 768 e 390 × 844; sem erro JavaScript e sem rolagem horizontal no celular |
+
+O roteiro inicial do navegador usava uma origem direta bloqueada pelo CORS; passou a usar o proxy de desenvolvimento existente. A devolução ao automático em ChatSite foi recusada conforme o domínio e conservou a atendente. O fluxo permitido foi conferido em conversa sintética de WhatsApp. Também foram corrigidos o seletor do erro e a leitura da empresa no helper local; a captura da equipe com uma pessoa passou a aguardar o carregamento da inbox. As execuções incompletas não são apresentadas como aprovadas.
+
+### 30.3 Limites e próxima fatia
+
+- A inbox mantém a sincronização de cinco segundos e o limite existente de dez páginas de cem conversas. O filtro opera sobre esse conjunto carregado. A lista de atendentes é relida ao montar o Balcão ou tentar novamente após erro; não foi criado evento de alteração da equipe.
+- O nome reflete o vínculo de usuário atual da empresa, inclusive no histórico. Não foi criado snapshot de nome por atribuição. Controles de transferência conservam seu escopo da F09.
+- Validação somente local com usuários e contatos sintéticos. Não houve envio a cliente real nem verificação de publicação pública.
+- Próxima fatia: M3.8, lembrete de pedido agendado sobre `Pedido`, conferindo a dependência de encomendas do M8.2. Aceites externos de canais e publicação seguem separados.
+
+## 31. Execução da Onda 2: lembretes de encomendas (M3.8), 10/10/2026
+
+### 31.1 Entrega
+
+- O avaliador de lembretes existente na API passa a ler pedidos agendados. Reutiliza o lock de avaliação, a persistência, o outbox e o SSE da F10. A proposta inicial de outro job no Worker foi substituída pelo reuso do avaliador já ativo, sem dois disparadores para o mesmo pedido. O job antigo de `mobile_orders` permanece para a retirada da PWA em P05.
+- A vaga ativa da mesma empresa define dia e início da janela; histórico liberado não entra. Sem vaga ativa, usa `AgendadoParaEm`. Pedidos cancelados, entregues e rascunhos ficam fora. Conversa vinculada e expediente respeitam a empresa do pedido, além dos filtros e do RLS nas leituras do operador.
+- Na véspera, o aviso começa na abertura do expediente daquele dia, em horário de Brasília. Sem expediente salvo, aplica o padrão existente de 08h às 22h. Dia anterior sem turno não recebe aviso de véspera; o avaliador não recupera esse aviso depois da data. O segundo marco usa `InicioPrevistoEm` já calculado por S21, sem regra nova de preparo.
+- `PedidoAgendado` usa o valor inteiro 4 do enum existente. Cada referência inclui o pedido, o marco e sua data ou instante. Repetir a avaliação não duplica o aviso, inclusive após conclusão manual. Reagendar conclui o marco antigo e permite lembrar a nova data; cancelar ou finalizar conclui os avisos que deixaram de ser vigentes. Não houve alteração de schema nem migração.
+- O painel de lembretes reconhece a origem Agendamento. A comanda no modo API ganhou Dia da entrega opcional, usando `dataInicio` e `dataFim` do contrato existente. Mudar o dia limpa a janela anteriormente escolhida. Esta é a dependência mínima de criação do M8.2, cuja agenda completa continua pendente.
+
+### 31.2 Validação local
+
+Evidências, TRX, scripts e capturas em `C:\rep\EasyStok\.build\onda2-agendados`. Banco sintético `easystock_onda2_agendados`, clonado da homologação anterior; os testes PostgreSQL usam Testcontainers separado. API local com notificações externas desabilitadas.
+
+| Camada | Evidência |
+|---|---|
+| Build | `EasyStok.CI.slnf` compilou sem erros; compilação após integração do master conserva avisos existentes de `ForwardedHeaders`/`IPNetwork` obsoletos |
+| Domain / Application / API / Arquitetura | 1.556, 2.484, 1.198 e 61 testes aprovados, sem ignorados; arquitetura com `Category!=ArchitectureDebt` |
+| PostgreSQL real | 13 testes aprovados, sem ignorados: lembretes, expediente e demanda agendada. Novos casos cobrem os dois marcos, repetição, cancelamento, vaga ativa, histórico liberado, vínculos de outra empresa e leitura sob RLS com usuário sem bypass |
+| Console | 75 provas aprovadas; lint, fronteiras de camada, 264 pares de contraste e build aprovados; `prova-m38-lembretes-agendados.mjs` incluída no workflow |
+| Chromium e API | Pedido criado pela comanda para daqui a dez dias, janela confirmada na API e uma única vaga ativa no banco. Troca de dia limpa a escolha anterior |
+| Avaliador em execução | Reagendamento do pedido sintético para amanhã gerou aviso de véspera na lista e no painel; conexão SSE recebeu `lembrete.vencido` com `PedidoId`. Início previsto controlado no banco local gerou o segundo aviso sem repetir o primeiro |
+| Cancelamento e permissão | Status controlado no banco local concluiu os dois avisos; recarga retirou ambos do painel. Cozinha recebeu 403 na consulta de lembretes |
+| Apresentação | Capturas inspecionadas em 1440 × 1000 e 390 × 844; lembrete visível no painel em ambas, sem erro JavaScript no roteiro |
+
+O roteiro local precisou ajustar os dados sintéticos de cardápio e frete e aguardar a posição do aviso no painel antes das capturas. Na repetição integrada, passou a expandir Vistos no celular para também encontrar o aviso já visto no computador; a tentativa que esperava o item recolhido foi incompleta. A execução completa posterior passou. Alterações controladas de início previsto e cancelamento servem como estímulos do avaliador; os casos automatizados também verificam esses estados. Não representam uma nova homologação do fluxo de cancelamento pela Ficha.
+
+As correções `604b64f9` e `e03ea319` chegaram ao master durante esta execução e foram incorporadas sem conflito. Na versão integrada, foram repetidos build, testes de Application/API/PostgreSQL/arquitetura, qualidade e todas as provas do Console, além do roteiro completo no navegador. As contagens da tabela refletem essa integração; Domain já havia passado e não recebeu alteração nesses commits. Os TRX anteriores e integrados foram preservados separadamente.
+
+### 31.3 Limites e próxima fatia
+
+- Homologação somente local, com usuários, pedidos e contatos sintéticos. Não houve mensagem para cliente real, entrega externa de WebPush nem deploy ou verificação de publicação pública.
+- O aviso é da equipe e usa os destinatários já definidos pela F10. Não foi criada atribuição específica por pedido nem alteração da política de notificações.
+- M8.2 continua parcial: falta a agenda de encomendas e decidir o horizonte futuro D8-02 e o pagamento D8-03. O limite atual de 60 dias restringe a extensão da consulta de janelas, sem definir o horizonte futuro. A escolha de dia desta fatia conserva o contrato existente.
+- Próxima fatia: completar agenda/encomendas do M8.2 com suas decisões operacionais. M3.9 permanece condicionado a D3-02 e ao contrato do iFood. Aceites externos de canais e publicação seguem separados.
+
+### 32. M8.2, agenda de encomendas e horizonte de 14 dias (10/10/2026)
+
+- D8-02 decidido por Felipe: agendar no máximo até hoje + 14 dias. A oferta pública, a comanda e o reagendamento usam a mesma validação. O núcleo da reserva valida novamente antes de criar pedido ou ocupar vaga; data além do horizonte volta 400. O limite de 60 dias continua restrito à extensão da consulta.
+- `GET api/atendimento/agenda?de&ate` exige Operador e empresa do JWT. A leitura mostra sete dias na Console, vagas ativas por janela, pedidos vinculados e bloqueios. A consulta de pedidos filtra empresa e vitrine; a contagem usa a mesma origem `VagaOcupada` da oferta.
+- D8-03 decidido por Felipe: sinal de 50% no momento da reserva e restante na entrega. **Pendente:** a cobrança atual ainda é integral. A fatia de pagamento precisa tratar confirmação parcial, reemissão do sinal, quitação final e Caixa antes de ativar essa regra.
+- Validação local: 37 testes focados, 2.488 testes da aplicação, 1.198 testes unitários da API e 37 testes de arquitetura aprovados; integração PostgreSQL/RLS da consulta aprovada; `dotnet build EasyStok.CI.slnf`, gate Poka-Yoke e `npm run qualidade` aprovados. API local com dados sintéticos: cinco vagas ativas, mesmo número de ocupadas na agenda e na oferta, 400 para o 15º dia na comanda, na oferta pública e no checkout guest direto, 403 para Cozinha e 401 sem autenticação. A tela abriu sem erro em desktop e celular. Capturas e resultado em `C:\rep\EasyStok\.build\onda2-agenda\` (artefatos locais). CI do commit ainda não verificado.
+- Próxima fatia: implementar D8-03 e fechar os aceites operacionais de M8.2. M3.9 continua condicionado a D3-02 e ao contrato do iFood.
+
+### 33. M8.2, sinal de 50% e saldo na entrega (10/10/2026)
+
+- A reserva para data futura grava o agendamento no pedido e emite link do Mercado Pago somente para o sinal de 50%, arredondado ao centavo. O pedido do dia conserva a cobrança integral. O link pendente é reutilizado; após expirar, a reemissão mantém o valor do sinal.
+- A confirmação do sinal registra um `PedidoPagamento` e coloca o pedido na fila, mas não emite `PedidoPagoEvent`, canhoto ou marco de quitação. Cria uma cobrança `na_entrega` para o saldo. A Ficha mostra sinal recebido e saldo, e a baixa manual não tenta trocar a forma nem cancelar o pagamento online confirmado. O resumo enviado ao cliente discrimina as duas parcelas.
+- A baixa do saldo pela Ficha soma o segundo `PedidoPagamento`, marca a cobrança manual como paga e emite quitação e canhoto uma vez. O Caixa lê os recebimentos registrados. A troca para pagamento integral na entrega antes do sinal é recusada para encomenda futura.
+- Validação local: testes de cobrança, checkout e resumo; API compilada; `npm run qualidade` e prova da Ficha aprovados. Teste de integração com PostgreSQL/Testcontainers percorreu confirmação do sinal, persistência parcial, baixa final em outra sessão e soma dos dois recebimentos no Caixa. Sem homologação com Mercado Pago real, operação real ou deploy nesta fatia.
+- Próxima fatia: fechar os aceites operacionais de M8.2 e seguir a M8.3 (endereço de entrega no pedido). M3.9 continua condicionado a D3-02 e ao contrato do iFood.
+
+### 34. M8.3, preservar o endereço na criação do pedido (11/10/2026)
+
+- Migração aditiva com endereço de entrega em texto, bairro, CEP, latitude, longitude e instante de confirmação. Os campos são opcionais para conservar o legado. Um registro vazio preserva a ausência de endereço em pedido novo; `null` permite o fallback do legado.
+- A conversa copia o endereço escolhido, incluindo número e complemento. O site grava CEP/número informados e resolve o texto pela consulta de CEP disponível, inclusive no guest sem janela. A API copia o cadastro ao criar um pedido de entrega; balcão/retirada mantém os campos nulos. A criação valida a empresa do cliente antes de gravar.
+- A porta `IGeocodingClient` já existente resolve coordenadas quando confiáveis. Falha ou imprecisão mantém o texto e registra aviso no log, sem bloquear a criação. Não houve homologação com provedor real nesta fatia.
+- KDS, viagem/rota Maps, canhoto, impresso do pedido e agregação de entregas por bairro usam o endereço salvo no pedido. O cadastro atual só serve de fallback para o legado.
+- Validação local: suítes da aplicação e da API aprovadas (1.201 testes da API), build da solução CI e 37 testes de arquitetura aprovados no gate Poka-Yoke. Cinco provas do KDS com PostgreSQL/Testcontainers aprovadas: migração aplicada e endereço preservado no KDS e na consulta do impresso após alterar o cadastro em outra sessão; bairro original conservado na agregação; fallback do legado e isolamento por empresa conferidos. Testes de criação pela conversa, site, API, retirada, geocodificação indisponível/imprecisa, viagens e impressos aprovados. Sem deploy.
+- Próxima fatia de M8.3: troca do endereço do pedido antes da saída, com revalidação de área/frete, aprovação fora da área, isolamento do `PATCH` e aviso operacional no Console. M8.3 permanece parcial.

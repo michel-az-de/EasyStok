@@ -3,6 +3,10 @@ import { createPortal } from 'react-dom'
 import { useEscape } from '../hooks/useEscape'
 import css from './Popover.module.css'
 
+const SELETOR_ITENS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
+const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) ?? [])]
+  .filter((item) => !item.disabled && item.getAttribute('aria-disabled') !== 'true')
+
 // `posicao` decide de que lado a camada abre. O padrão continua sendo acima,
 // que é onde o composer precisa; 'abaixo' serve para gatilho no topo da tela.
 // `children` substitui `grupos`/`aoEscolher` quando o conteúdo não é lista de
@@ -18,21 +22,100 @@ import css from './Popover.module.css'
 // marcador `display:none` nasce no lugar de sempre só para achar, via
 // `parentElement`, o retângulo do ancestral `position:relative` de cada
 // chamador (todos já têm um, é a âncora do próprio popover hoje), e o
-// conteúdo de verdade é replantado em `document.body` nesse retângulo. O
+// conteúdo é replantado no dialog aberto mais próximo ou no body. Assim,
+// um menu da Ficha permanece na camada modal e não fica no fundo inerte. O
 // CSS de .popover continua o mesmo (bottom/top: 100% relativo ao wrapper
 // plantado), então quem não passa `portal` renderiza exatamente como antes.
 export function Popover({
-  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false,
+  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu',
 }) {
   const caixaRef = useRef(null)
   const marcadorRef = useRef(null)
+  const origemRef = useRef(null)
   const [retangulo, setRetangulo] = useState(null)
-  useEscape(true, aoFechar)
+  useEscape(true, (evento) => {
+    if (evento.isComposing || evento.keyCode === 229) return
+    // Uma janela aberta sobre este menu recebe seu próprio Escape nativo.
+    const janelaDoMenu = caixaRef.current?.closest('dialog[open]') ?? null
+    const janelaDoFoco = document.activeElement?.closest('dialog[open]') ?? null
+    if (janelaDoMenu !== janelaDoFoco) return
+    evento.preventDefault()
+    evento.stopImmediatePropagation()
+    aoFechar()
+    if (origemRef.current?.isConnected) origemRef.current.focus()
+  }, { capturar: true })
 
   useLayoutEffect(() => {
+    if (!origemRef.current) origemRef.current = document.activeElement
     if (!portal) return
-    setRetangulo(marcadorRef.current?.parentElement?.getBoundingClientRect() ?? null)
+    const ancora = marcadorRef.current?.parentElement
+    if (!ancora) return
+    let quadro = null
+    const medir = () => {
+      quadro = null
+      const medida = ancora.getBoundingClientRect()
+      const dialogo = ancora.closest('dialog[open]')
+      const referencia = dialogo?.getBoundingClientRect()
+      const escalaX = dialogo ? referencia.width / dialogo.offsetWidth : 1
+      const escalaY = dialogo ? referencia.height / dialogo.offsetHeight : 1
+      const proximo = {
+        left: dialogo ? (medida.left - referencia.left) / escalaX + dialogo.scrollLeft - dialogo.clientLeft : medida.left,
+        top: dialogo ? (medida.top - referencia.top) / escalaY + dialogo.scrollTop - dialogo.clientTop : medida.top,
+        width: medida.width / escalaX, height: medida.height / escalaY,
+        destino: dialogo ?? document.body, emDialogo: !!dialogo,
+        larguraLimite: dialogo?.clientWidth ?? window.visualViewport?.width ?? window.innerWidth,
+        alturaLimite: dialogo?.clientHeight ?? window.visualViewport?.height ?? window.innerHeight,
+        inicioX: dialogo ? 0 : window.visualViewport?.offsetLeft ?? 0,
+        inicioY: dialogo ? 0 : window.visualViewport?.offsetTop ?? 0,
+      }
+      setRetangulo((atual) => atual && Object.keys(proximo).every((chave) => atual[chave] === proximo[chave]) ? atual : proximo)
+    }
+    const agendar = (evento) => {
+      if (evento?.type === 'scroll' && evento.target?.nodeType && caixaRef.current?.contains(evento.target)) return
+      if (quadro === null) quadro = window.requestAnimationFrame(medir)
+    }
+    const viewport = window.visualViewport
+    medir()
+    window.addEventListener('scroll', agendar, true)
+    window.addEventListener('resize', agendar)
+    viewport?.addEventListener('scroll', agendar)
+    viewport?.addEventListener('resize', agendar)
+    return () => {
+      window.removeEventListener('scroll', agendar, true)
+      window.removeEventListener('resize', agendar)
+      viewport?.removeEventListener('scroll', agendar)
+      viewport?.removeEventListener('resize', agendar)
+      if (quadro !== null) window.cancelAnimationFrame(quadro)
+    }
   }, [portal])
+
+  useLayoutEffect(() => {
+    if (!retangulo || posicao !== 'abaixo') return
+    const caixa = caixaRef.current
+    // Ao mudar de desktop para celular, devolve ao CSS a folha fixa no rodapé.
+    for (const propriedade of ['position', 'width', 'left', 'right', 'top', 'bottom', 'maxHeight', 'transformOrigin']) caixa.style[propriedade] = ''
+    const estilo = getComputedStyle(caixa)
+    if (!retangulo.emDialogo && estilo.position === 'fixed') return
+    const margem = parseFloat(estilo.getPropertyValue('--e-4'))
+    const espaco = parseFloat(estilo.getPropertyValue('--e-2'))
+    const { larguraLimite, alturaLimite, inicioX, inicioY } = retangulo
+    const largura = Math.max(1, Math.min(360, larguraLimite - 2 * margem))
+    const esquerda = Math.max(inicioX + margem, Math.min(retangulo.left + retangulo.width - largura, inicioX + larguraLimite - largura - margem))
+    // O limite é o dialog ou a viewport. Menus do rodapé também precisam abrir para cima.
+    Object.assign(caixa.style, {
+      position: 'absolute', width: `${largura}px`, left: `${esquerda - retangulo.left}px`, right: 'auto',
+      maxHeight: `${Math.max(1, alturaLimite - 2 * margem)}px`,
+    })
+    const abaixo = inicioY + alturaLimite - retangulo.top - retangulo.height - espaco - margem
+    const acima = retangulo.top - inicioY - espaco - margem
+    const inverter = caixa.offsetHeight > abaixo && acima > abaixo
+    Object.assign(caixa.style, {
+      top: inverter ? 'auto' : `${retangulo.height + espaco}px`,
+      bottom: inverter ? `${retangulo.height + espaco}px` : 'auto',
+      maxHeight: `${Math.max(1, inverter ? acima : abaixo)}px`,
+      transformOrigin: inverter ? 'bottom right' : 'top right',
+    })
+  }, [retangulo, posicao])
 
   // Sugestão presa ao campo de texto (atalho "/" do composer) não pode
   // roubar o foco: ela está digitando, e o Popover de clique de sempre foca
@@ -40,32 +123,66 @@ export function Popover({
   // prop continua exatamente igual.
   useEffect(() => {
     if (semAutoFoco) return
-    caixaRef.current?.querySelector('button')?.focus()
-  }, [semAutoFoco])
+    const itens = itensHabilitados(caixaRef.current)
+    if (papel === 'menu') itens.forEach((item) => { item.tabIndex = -1 })
+    const destino = papel === 'menu' ? itens[0] : caixaRef.current?.querySelector('button, input, select, textarea')
+    destino?.focus()
+  }, [semAutoFoco, retangulo?.destino, papel])
 
   useEffect(() => {
     const aoClicarFora = (evento) => {
+      // O próprio gatilho alterna aberto/fechado no click, depois deste pointerdown.
+      if (origemRef.current?.matches('button') && origemRef.current.contains(evento.target)) return
       if (!caixaRef.current?.contains(evento.target)) aoFechar()
     }
-    // captura na fase de captura para o clique no gatilho também fechar
     document.addEventListener('pointerdown', aoClicarFora)
     return () => document.removeEventListener('pointerdown', aoClicarFora)
   }, [aoFechar])
 
   const corpo = (
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Papel explícito varia entre menu de ações e grupo com busca/listbox.
     <div
       className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''}`}
-      role="menu"
+      role={papel === 'group' ? 'group' : 'menu'}
+      tabIndex={-1}
       aria-label={rotulo}
       ref={caixaRef}
+      onClickCapture={(evento) => {
+        // A ação pode desmontar o menu e abrir um Modal no mesmo clique.
+        // Devolve o foco antes disso, para a nova janela guardar o acionador.
+        if (evento.target.closest(SELETOR_ITENS) && origemRef.current?.isConnected) origemRef.current.focus()
+      }}
+      onKeyDown={(evento) => {
+        if (papel !== 'menu' || evento.altKey || evento.ctrlKey || evento.metaKey
+          || !evento.target.closest(SELETOR_ITENS)) return
+        if (evento.key === 'Tab') {
+          origemRef.current?.focus()
+          aoFechar()
+          return
+        }
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(evento.key)
+          || !evento.target.matches(SELETOR_ITENS)) return
+        const itens = itensHabilitados(caixaRef.current)
+        const atual = itens.indexOf(document.activeElement)
+        const proximo = evento.key === 'Home' ? 0 : evento.key === 'End' ? itens.length - 1
+          : (atual + (evento.key === 'ArrowDown' ? 1 : -1) + itens.length) % itens.length
+        evento.preventDefault()
+        itens[proximo]?.focus()
+      }}
     >
       {children ?? grupos.map((grupo) => (
         <div className={css.grupo} key={grupo.titulo}>
           <p className={css.titulo}>{grupo.titulo}</p>
-          {grupo.itens.map((item) => (
+          {grupo.itens.map((item) => item.informativo ? (
+            <div className={`${css.item} ${css.informativo}`} key={item.chave}>
+              <strong>{item.titulo}</strong>
+              <span>{item.detalhe}</span>
+            </div>
+          ) : (
             <button
               type="button"
               role="menuitem"
+              tabIndex={-1}
               className={css.item}
               key={item.chave}
               onClick={() => aoEscolher(item)}
@@ -86,17 +203,18 @@ export function Popover({
       <span ref={marcadorRef} style={{ display: 'none' }} />
       {retangulo && createPortal(
         <div style={{
-          position: 'fixed',
+          position: retangulo.emDialogo ? 'absolute' : 'fixed',
           left: retangulo.left,
           width: retangulo.width,
           top: retangulo.top,
           height: retangulo.height,
-          zIndex: 30,
+          zIndex: 70,
+          pointerEvents: 'none',
         }}
         >
           {corpo}
         </div>,
-        document.body,
+        retangulo.destino,
       )}
     </>
   )

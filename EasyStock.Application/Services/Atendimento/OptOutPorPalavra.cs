@@ -51,7 +51,7 @@ public sealed class OptOutPorPalavra(
             // O consentimento já foi revogado: a confirmação é cortesia e não desfaz a revogação.
             logger.LogWarning(ex, "Opt-out gravado, mas a confirmação não saiu na conversa {ConversaId}.", conversa.Id);
             saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow, TipoConteudoMensagem.Texto, Confirmacao);
-            saida.AtualizarStatusEntrega(StatusMensagem.Falhou, ex.Message);
+            saida.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), saida.EnviadaEm);
         }
 
         conversa.RegistrarSaida(saida.EnviadaEm);

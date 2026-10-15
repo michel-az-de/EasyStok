@@ -1,36 +1,66 @@
 import { useEffect, useState } from 'react'
 import { Bloco } from '../../componentes/Bloco'
+import { Botao } from '../../componentes/Botao'
+import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
+import { dataIsoNoFuso, somarDiasIso } from '../../dominio/formato'
+import { janelaRecolhidaDePadrao, resumoDaJanela } from '../../dominio/ficha'
 import { useAcoes } from '../../aplicacao/contextos'
+import { useReagendamentoPedido } from '../../aplicacao/useReagendamentoPedido'
+import { EscolhaJanelaPedido } from '../../componentes/EscolhaJanelaPedido'
 import css from './ficha.module.css'
 
-// Janelas no modo API (F03): as da vitrine com vaga que respeitam o prazo dos itens da
-// comanda (S16), já filtradas pelo EasyStok. Diferente do seletor da demonstração, a janela
-// tem data e a lotação é a do servidor; cheia não aparece porque não dá para reservar.
-export function SeletorJanelaApi({ pedido, editavel, aoEscolher }) {
+
+// Rascunho escolhe a janela localmente; pedido criado troca a vaga no servidor (M3.4).
+// Ambos usam vagas da vitrine que respeitam o prazo de preparo (S16).
+export function SeletorJanelaApi({ pedido, editavel, aoEscolher, dataInicial = '', aoLerJanelas }) {
+  if (pedido.pedidoId) return <ReagendamentoPedido key={pedido.pedidoId} pedidoId={pedido.pedidoId} aoEscolher={aoEscolher} />
+  return <EscolhaRascunho pedido={pedido} editavel={editavel} aoEscolher={aoEscolher} dataInicial={dataInicial} aoLerJanelas={aoLerJanelas} />
+}
+
+function ReagendamentoPedido({ pedidoId, aoEscolher }) {
+  const campos = useReagendamentoPedido(pedidoId, aoEscolher)
+  // #1697: pedido criado já tem a vaga; o formulário de troca abre pelo título, que mostra a atual.
+  return <Bloco titulo="Janela de entrega" chave="janela-pedido" recolhidoDePadrao={janelaRecolhidaDePadrao(campos)} resumo={resumoDaJanela(campos)}><EscolhaJanelaPedido {...campos} /></Bloco>
+}
+
+function EscolhaRascunho({ pedido, editavel, aoEscolher, dataInicial, aoLerJanelas }) {
   const { carregarJanelasComanda } = useAcoes()
   const [janelas, setJanelas] = useState(null)
   const [erro, setErro] = useState(null)
+  const [data, setData] = useState(dataInicial)
+  // #1761: "Janelas não carregaram" não tinha como tentar de novo sem mexer no dia.
+  const [naoCarregou, setNaoCarregou] = useState(false)
+  const [tentativa, setTentativa] = useState(0)
+  const [hoje] = useState(() => dataIsoNoFuso(Date.now()))
   // Recarrega quando muda o que entra no prazo (os itens), não a cada quantidade.
   const skus = [...new Set(pedido.itens.map((l) => l.sku))].sort().join(',')
 
   useEffect(() => {
     let vivo = true
-    carregarJanelasComanda(skus ? skus.split(',') : [])
+    setJanelas(null)
+    setErro(null)
+    setNaoCarregou(false)
+    aoLerJanelas?.([])
+    carregarJanelasComanda(skus ? skus.split(',') : [], data)
       .then((lidas) => {
         if (!vivo) return
         setJanelas(lidas.janelas)
+        aoLerJanelas?.(lidas.janelas)
         setErro(lidas.lojaDisponivel ? null : 'A empresa não tem vitrine ativa para entrega.')
       })
-      .catch((e) => { if (vivo) setErro(`Janelas não carregaram: ${e.message}`) })
+      .catch((e) => { if (vivo) { setErro(`Janelas não carregaram: ${e.message}`); setNaoCarregou(true) } })
     return () => { vivo = false }
-  }, [skus, carregarJanelasComanda])
+  }, [skus, data, carregarJanelasComanda, aoLerJanelas, tentativa])
 
   return (
     <Bloco titulo="Janela de entrega">
+      <CampoTexto rotulo="Dia da entrega (opcional)" tipo="date" value={data} disabled={!editavel}
+        min={hoje} max={somarDiasIso(hoje, 14)}
+        onChange={(e) => { setData(e.target.value); aoEscolher(null) }} />
       {janelas === null && !erro && <p className={css.corpoBloco}>Carregando janelas…</p>}
       {janelas?.length === 0 && !erro && (
-        <p className={css.corpoBloco}>Nenhuma janela com vaga no prazo dos itens nos próximos dias.</p>
+        <p className={css.corpoBloco}>Nenhuma janela com vaga no prazo dos itens. Escolha outro dia.</p>
       )}
       {janelas?.length > 0 && (
         <ul className={css.janelas}>
@@ -50,7 +80,7 @@ export function SeletorJanelaApi({ pedido, editavel, aoEscolher }) {
                     {escolhida && <Icone nome="check" rotulo="Janela escolhida" />}
                   </span>
                   <span className={css.vagas}>
-                    {janela.vagas} de {janela.capacidade} vaga{janela.capacidade === 1 ? '' : 's'}
+                    {janela.vagas} {janela.vagas === 1 ? 'vaga livre' : 'vagas livres'} de {janela.capacidade}
                   </span>
                 </button>
               </li>
@@ -59,6 +89,7 @@ export function SeletorJanelaApi({ pedido, editavel, aoEscolher }) {
         </ul>
       )}
       {erro && <output className={css.avisoErro} role="alert">{erro}</output>}
+      {naoCarregou && <Botao onClick={() => setTentativa((t) => t + 1)}>Tentar de novo</Botao>}
     </Bloco>
   )
 }

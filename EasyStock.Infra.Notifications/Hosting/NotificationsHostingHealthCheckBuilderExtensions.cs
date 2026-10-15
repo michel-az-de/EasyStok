@@ -20,4 +20,15 @@ public static class NotificationsHostingHealthCheckBuilderExtensions
         var tagList = tags?.ToArray() ?? new[] { "dispatcher" };
         return builder.AddCheck<NotificationsHostingHealthCheck>(name, failureStatus, tagList);
     }
+
+    /// <summary>
+    /// Registra <see cref="NotificacoesBacklogHealthCheck"/> com a tag <c>notificacoes</c> (N1): o endpoint
+    /// <c>/health/notificacoes</c> e o ping do Worker o selecionam por ela, e ele fica de fora de <c>/health</c> e
+    /// <c>/health/ready</c> para um backlog ruim não tirar a API do balanceador.
+    /// </summary>
+    public static IHealthChecksBuilder AddNotificacoesBacklog(
+        this IHealthChecksBuilder builder,
+        string name = "NotificacoesBacklog",
+        HealthStatus? failureStatus = null)
+        => builder.AddCheck<NotificacoesBacklogHealthCheck>(name, failureStatus, [NotificacoesBacklogHealthCheck.Tag]);
 }

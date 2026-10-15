@@ -50,8 +50,11 @@ namespace EasyStock.Api.Services
             if (!IsAuthenticated)
                 return false;
 
-            // Claims explicitas mandam; sem elas, fallback por nivel (regra unica no dominio).
-            return PoliticaPermissao.Tem(Nivel, GetPermissaoClaims(), permissao);
+            var permissoes = GetPermissaoClaims();
+            // Claims antigas removidas e listas explicitamente vazias nunca ativam o fallback.
+            var explicitas = CurrentUser!.HasClaim(c => c.Type == PermissaoClaim)
+                || CurrentUser.HasClaim("permissoesExplicitas", "true");
+            return PoliticaPermissao.Tem(Nivel, permissoes, permissao, explicitas);
         }
 
         private ClaimsPrincipal? CurrentUser => httpContextAccessor.HttpContext?.User;
@@ -84,7 +87,7 @@ namespace EasyStock.Api.Services
 
             foreach (var value in values)
             {
-                if (Enum.TryParse<Permissao>(value, ignoreCase: true, out var permissao))
+                if (Enum.TryParse<Permissao>(value, ignoreCase: true, out var permissao) && Enum.IsDefined(permissao))
                     permissoes.Add(permissao);
             }
 

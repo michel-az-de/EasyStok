@@ -201,11 +201,13 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Campanhas.InteresseItem> InteressesItem { get; set; } = null!; // S31
         public DbSet<EasyStock.Domain.Entities.Atendimento.Lembrete> Lembretes { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.RespostaPronta> RespostasProntas { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.TrechoCaderno> CadernoTrechos { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.RegraAutomatica> RegrasAutomaticas { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.Entregador> Entregadores { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.Viagem> Viagens { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.ParadaViagem> ParadasViagem { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.ChamadoEntregador> ChamadosEntregador { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.CorridaExterna> CorridasExternas { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.ExpedienteLoja> ExpedientesLoja { get; set; } = null!;
         public DbSet<PreferenciaMenuUsuario> PreferenciasMenuUsuario { get; set; } = null!;
         public DbSet<UsoIa> UsoIa { get; set; } = null!;
@@ -327,6 +329,9 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<PreferenciaNotificacaoUsuario> NotifPreferenciasUsuario { get; set; } = null!;
         public DbSet<WebPushSubscription> NotifWebPushSubscriptions { get; set; } = null!;
 
+        // N6: categoria atual de cada template da Meta (recategorização para marketing). Global, sem tenant.
+        public DbSet<TemplateMetaEstado> NotifTemplatesMetaEstado { get; set; } = null!;
+
         // Storefront — autenticação (TASK-EZ-005)
         public DbSet<EasyStock.Domain.Entities.Storefront.ClienteOtp> ClienteOtps { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Storefront.ClienteSession> ClienteSessions { get; set; } = null!;
@@ -339,6 +344,14 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
         public void DescartarAlteracoesPendentes() => ChangeTracker.Clear();
+
+        public bool EhViolacaoDeUnicidade(Exception ex)
+        {
+            for (var atual = ex; atual is not null; atual = atual.InnerException)
+                if (atual is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation })
+                    return true;
+            return false;
+        }
 
         public async Task<int> CommitAsync()
         {

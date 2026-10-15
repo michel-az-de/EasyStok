@@ -24,6 +24,8 @@ public sealed class EntregadorRepository(EasyStockDbContext db) : IEntregadorRep
 
 public sealed class ViagemRepository(EasyStockDbContext db) : IViagemRepository
 {
+    public Task<bool> VinculadaLogisticaAsync(Guid empresaId, Guid viagemId, CancellationToken ct = default) =>
+        db.Set<DespachoLogistica>().AnyAsync(d => d.EmpresaId == empresaId && d.ViagemId == viagemId, ct);
     public Task AddAsync(Viagem viagem, CancellationToken ct = default) =>
         db.Viagens.AddAsync(viagem, ct).AsTask();
 
@@ -41,6 +43,12 @@ public sealed class ViagemRepository(EasyStockDbContext db) : IViagemRepository
         db.Viagens.AnyAsync(v => v.EmpresaId == empresaId
             && (v.Situacao == SituacaoViagem.Montando || v.Situacao == SituacaoViagem.EmRota)
             && v.Paradas.Any(p => p.PedidoId == pedidoId), ct);
+
+    public Task RegistrarParadaNovaAsync(ParadaViagem parada, CancellationToken ct = default)
+    {
+        db.ParadasViagem.Add(parada);
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class ChamadoEntregadorRepository(EasyStockDbContext db) : IChamadoEntregadorRepository
@@ -70,7 +78,7 @@ public sealed class EntregasPorBairroQuery(EasyStockDbContext db) : IEntregasPor
             .Where(p => p.EmpresaId == empresaId
                 && p.Status == StatusPedidoMapper.Entregue
                 && p.EntreguEm >= inicio && p.EntreguEm < fim)
-            .Select(p => new { Bairro = p.Cliente != null ? p.Cliente.Bairro : null, p.Total })
+            .Select(p => new { Bairro = p.EnderecoEntrega != null ? p.BairroEntrega : p.Cliente != null ? p.Cliente.Bairro : null, p.Total })
             .ToListAsync(ct);
         return linhas.Select(l => new PedidoEntregueLinha(l.Bairro, l.Total.Valor)).ToList();
     }

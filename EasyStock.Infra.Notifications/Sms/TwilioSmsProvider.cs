@@ -2,22 +2,23 @@ using System.Net.Http.Headers;
 using System.Text;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Notifications.Options;
-using EasyStock.Infra.Notifications.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Polly;
 
 namespace EasyStock.Infra.Notifications.Sms;
 
+/// <summary>
+/// SMS pelo Twilio. Uma chamada só (N2): quem repete é o outbox, com backoff de minutos. O Polly que embrulhava o
+/// <c>EnsureSuccessStatusCode</c> repetia todo 4xx três vezes e, num 5xx ou timeout, podia entregar o SMS duas vezes.
+/// Pelo status: 4xx (menos 408 e 429) é falha permanente; 408 e 429 são transitórios; 5xx, timeout e queda de
+/// conexão são <see cref="DesfechoEnvio.Indeterminado"/>, porque o Twilio pode já ter aceitado.
+/// </summary>
 public sealed class TwilioSmsProvider(
     IHttpClientFactory httpClientFactory,
     IOptions<TwilioSmsOptions> options,
     ILogger<TwilioSmsProvider> logger) : IProvedorSms
 {
     public string Nome => "twilio";
-
-    private static readonly ResiliencePipeline Pipeline =
-        NotificationResiliencePipelineFactory.CreateHttpProviderPipeline();
 
     public async Task<ResultadoEnvio> EnviarAsync(MensagemPronta mensagem, CancellationToken ct = default)
     {
@@ -26,35 +27,39 @@ public sealed class TwilioSmsProvider(
 
         try
         {
-            await Pipeline.ExecuteAsync(async pollyToken =>
-            {
-                using var client = httpClientFactory.CreateClient("TwilioSms");
+            using var client = httpClientFactory.CreateClient("TwilioSms");
 
-                var credentials = Convert.ToBase64String(
-                    Encoding.UTF8.GetBytes($"{opts.AccountSid}:{opts.AuthToken}"));
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Basic", credentials);
+            var credentials = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes($"{opts.AccountSid}:{opts.AuthToken}"));
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Basic", credentials);
 
-                var url = $"https://api.twilio.com/2010-04-01/Accounts/{opts.AccountSid}/Messages.json";
-                var content = new FormUrlEncodedContent([
-                    new("To", mensagem.Destinatario),
-                    new("From", opts.From),
-                    new("Body", mensagem.Corpo)
-                ]);
+            var url = $"https://api.twilio.com/2010-04-01/Accounts/{opts.AccountSid}/Messages.json";
+            var content = new FormUrlEncodedContent([
+                new("To", mensagem.Destinatario),
+                new("From", opts.From),
+                new("Body", mensagem.Corpo)
+            ]);
 
-                var response = await client.PostAsync(url, content, pollyToken);
-                response.EnsureSuccessStatusCode();
-            }, ct);
-
+            using var response = await client.PostAsync(url, content, ct);
             sw.Stop();
-            return new ResultadoEnvio(Sucesso: true, ProviderUsado: "twilio", DuracaoMs: sw.ElapsedMilliseconds);
+
+            var status = (int)response.StatusCode;
+            if (response.IsSuccessStatusCode)
+                return new ResultadoEnvio(Sucesso: true, ProviderUsado: "twilio", StatusHttp: status, DuracaoMs: sw.ElapsedMilliseconds);
+
+            logger.LogWarning("Twilio SMS recusou outbox={OutboxId} HTTP {Status}", mensagem.OutboxId, status);
+            return ClassificadorDeFalha.DeRespostaHttpDeEnvioUnico("twilio", status, sw.ElapsedMilliseconds);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw; // o host está parando: não é falha do Twilio nem timeout
         }
         catch (Exception ex)
         {
             sw.Stop();
             logger.LogError(ex, "Falha Twilio SMS outbox={OutboxId}", mensagem.OutboxId); // sem telefone: LGPD (#1292)
-            return new ResultadoEnvio(Sucesso: false, ProviderUsado: "twilio",
-                ErroDetalhado: ex.Message, DuracaoMs: sw.ElapsedMilliseconds);
+            return ClassificadorDeFalha.DeExcecaoDeEnvioUnico("twilio", ex, sw.ElapsedMilliseconds);
         }
     }
 }

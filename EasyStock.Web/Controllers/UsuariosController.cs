@@ -30,7 +30,9 @@ public class UsuariosController(UsuariosService svc, LojasService lojasSvc, Sess
                 Id = u.UsuarioId.ToString(),
                 Nome = u.Nome,
                 Email = u.Email,
-                Role = u.Nivel
+                Role = u.Nivel,
+                ConviteEstado = u.Convite?.Estado ?? "nenhum",
+                ConviteVia = u.Convite?.Via
             }).ToList();
 
             vm.TotalAdmins = usuarios.Count(u => u.Nivel is "Admin" or "SuperAdmin");
@@ -44,7 +46,7 @@ public class UsuariosController(UsuariosService svc, LojasService lojasSvc, Sess
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Convidar(ConvidarUsuarioViewModel vm)
     {
-        if (!ModelState.IsValid || string.IsNullOrWhiteSpace(vm.Senha))
+        if (!ModelState.IsValid || string.IsNullOrWhiteSpace(vm.Nome) || string.IsNullOrWhiteSpace(vm.Email))
         {
             Toast("error", "Preencha todos os campos obrigatórios.");
             return RedirectToAction(nameof(Index));
@@ -57,10 +59,23 @@ public class UsuariosController(UsuariosService svc, LojasService lojasSvc, Sess
             return RedirectToAction(nameof(Index));
         }
 
-        var result = await svc.CriarAsync(empresaId, vm.Nome, vm.Email, vm.Senha, vm.PerfilId, vm.LojaId);
+        // N9: sem senha. A pessoa recebe um convite com link e define a propria senha ao aceitar.
+        var result = await svc.CriarAsync(
+            empresaId, vm.Nome, vm.Email, vm.PerfilId, vm.LojaId, vm.Telefone, vm.AtestaOptInWhatsApp);
         if (HasError(result)) return RedirectToAction(nameof(Index));
 
-        Toast("success", $"Usuário {vm.Nome} criado com sucesso!");
+        Toast("success", $"Convite enviado para {vm.Nome}. A senha é escolhida pelo link do convite.");
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("/usuarios/{id}/convite")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReenviarConvite(string id)
+    {
+        var result = await svc.ReenviarConviteAsync(id);
+        if (HasError(result)) return RedirectToAction(nameof(Index));
+
+        Toast("success", "Convite reenviado.");
         return RedirectToAction(nameof(Index));
     }
 

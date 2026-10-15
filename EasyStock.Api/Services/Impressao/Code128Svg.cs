@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Encodings.Web;
 
 namespace EasyStock.Api.Services.Impressao;
 
@@ -63,7 +64,7 @@ public static class Code128Svg
         var largura = modulos.Length + 2 * ZonaSilencio;
         var sb = new StringBuilder();
         sb.Append(CultureInfo.InvariantCulture,
-            $"<svg class=\"barras\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {largura} {altura}\" preserveAspectRatio=\"none\" shape-rendering=\"crispEdges\" role=\"img\" aria-label=\"Código de barras {valor}\">");
+            $"<svg class=\"barras\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {largura} {altura}\" preserveAspectRatio=\"none\" shape-rendering=\"crispEdges\" role=\"img\" aria-label=\"Código de barras {HtmlEncoder.Default.Encode(valor)}\">");
         var i = 0;
         while (i < modulos.Length)
         {

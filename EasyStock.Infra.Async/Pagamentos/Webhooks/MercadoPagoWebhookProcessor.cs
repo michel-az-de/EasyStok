@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using Microsoft.Extensions.Logging;
 
@@ -42,7 +43,9 @@ public sealed class MercadoPagoWebhookProcessor(
     IMercadoPagoClient mercadoPagoClient,
     ConfirmarPagamentoPedidoUseCase confirmarPagamento,
     AtualizarCobrancaPorPagamentoUseCase atualizarCobranca,
-    ILogger<MercadoPagoWebhookProcessor> logger) : IGatewayWebhookProcessor
+    ILogger<MercadoPagoWebhookProcessor> logger,
+    IEstornosOnlineService estornosOnline,
+    ICobrancaPedidoRepository cobrancas) : IGatewayWebhookProcessor
 {
     public const string TopicoPagamento = "payment";
 
@@ -57,6 +60,14 @@ public sealed class MercadoPagoWebhookProcessor(
         var pagamento = await mercadoPagoClient.ConsultarPagamentoAsync(pagamentoId, ct);
         if (pagamento is null)
         {
+            // I3.1 (invariante 7): 404 na reconsulta com cobrança online esperando pede reenvio (5xx).
+            // Pode ser consulta com a credencial errada ou atraso do provedor; 200 perderia a baixa.
+            if (await cobrancas.ExistePendenteOnlineAsync(ct))
+            {
+                logger.LogError("Webhook MercadoPago: pagamento {PagamentoId} desconhecido na consulta e ha cobranca pendente. Pedindo reenvio.", pagamentoId);
+                throw new ReconsultaMercadoPagoSemRespostaException(pagamentoId);
+            }
+
             logger.LogWarning("Webhook MercadoPago: pagamento {PagamentoId} desconhecido na consulta. Ignorando.", pagamentoId);
             return ResultadoWebhookGateway.Falha("pagamento_desconhecido");
         }
@@ -71,13 +82,24 @@ public sealed class MercadoPagoWebhookProcessor(
         {
             var r = await confirmarPagamento.ExecuteAsync(new ConfirmarPagamentoPedidoInput(
                 pedidoId, pagamentoId, PagamentoMercadoPago.Approved, pagamento.TransactionAmount,
-                pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved), ct);
+                pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved,
+                ContaRecebedoraId: pagamento.CollectorId), ct);
             logger.LogInformation("Webhook MercadoPago: pagamento {PagamentoId} pedido {PedidoId} confirmacao={Situacao}",
                 pagamentoId, pedidoId, r.Situacao);
-            return r.Situacao is SituacaoConfirmacaoPagamento.SemCobranca or SituacaoConfirmacaoPagamento.PedidoNaoEncontrado
-                ? ResultadoWebhookGateway.Falha("pedido_sem_cobranca")
-                : ResultadoWebhookGateway.Ok;
+            if (pagamento.TransactionAmountRefunded > 0)
+                await estornosOnline.SincronizarPagamentoAsync(pagamento, ct);
+            return r.Situacao switch
+            {
+                SituacaoConfirmacaoPagamento.SemCobranca or SituacaoConfirmacaoPagamento.PedidoNaoEncontrado
+                    => ResultadoWebhookGateway.Falha("pedido_sem_cobranca"),
+                // I3.2: pagamento de outra conta apontando para pedido desta loja. Fica registrado, não confirma.
+                SituacaoConfirmacaoPagamento.ContaDivergente => ResultadoWebhookGateway.Falha("conta_divergente"),
+                _ => ResultadoWebhookGateway.Ok,
+            };
         }
+
+        if (pagamento.Estornado && await estornosOnline.SincronizarPagamentoAsync(pagamento, ct))
+            return ResultadoWebhookGateway.Ok;
 
         var situacao = await atualizarCobranca.ExecuteAsync(
             new AtualizarCobrancaPorPagamentoInput(pedidoId, pagamentoId, pagamento.Status, pagamento.StatusDetail), ct);

@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.AutenticarUsuario;
@@ -18,11 +19,34 @@ namespace EasyStock.Application.Tests.UseCases;
 /// </summary>
 public class ListarEmpresasParaLoginUseCaseTests
 {
-    private static ListarEmpresasParaLoginUseCase CriarUseCase(IUsuarioRepository usuarioRepository)
+    private static ListarEmpresasParaLoginUseCase CriarUseCase(
+        IUsuarioRepository usuarioRepository,
+        IPasswordHasher? hasher = null)
     {
-        var hasher = new FakePasswordHasher();
         var logger = Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>();
-        return new ListarEmpresasParaLoginUseCase(usuarioRepository, hasher, logger);
+        // #1781: o banco aceita a reserva da tentativa de senha (a conta não está bloqueada).
+        usuarioRepository.ReservarTentativaDeSenhaAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(true);
+        return new ListarEmpresasParaLoginUseCase(
+            usuarioRepository, hasher ?? new FakePasswordHasher(), logger);
+    }
+
+    private static Usuario UsuarioDeSenha(string senha, int falhas = 0) => new()
+    {
+        Id = Guid.NewGuid(),
+        Nome = "Carlos",
+        Email = "carlos@empresa.com",
+        SenhaHash = FakePasswordHasher.MakeHash(senha),
+        Ativo = true,
+        FailedLoginAttempts = falhas,
+        CriadoEm = DateTime.UtcNow,
+        AlteradoEm = DateTime.UtcNow,
+    };
+
+    private static IUsuarioRepository RepoCom(Usuario usuario)
+    {
+        var repo = Substitute.For<IUsuarioRepository>();
+        repo.GetByEmailAsync(usuario.Email).Returns(usuario);
+        return repo;
     }
 
     private static UsuarioEmpresa Vinculo(Guid usuarioId, Guid empresaId, string nomeEmpresa, bool ativo = true)
@@ -210,5 +234,102 @@ public class ListarEmpresasParaLoginUseCaseTests
 
         Assert.Single(result.Empresas);
         Assert.Equal(idAtiva, result.Empresas[0].Id);
+    }
+
+    // ── #1352 (N7): o passo 1 conta a falha de senha com o mesmo bloqueio do login ─────────────
+
+    [Fact]
+    public async Task SenhaErradaIncrementaAsTentativas()
+    {
+        var usuario = UsuarioDeSenha("senhaCorreta");
+        var repo = RepoCom(usuario);
+
+        await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+            () => CriarUseCase(repo).ExecuteAsync(new ListarEmpresasParaLoginCommand(usuario.Email, "senhaErrada")));
+
+        usuario.FailedLoginAttempts.Should().Be(1);
+        // #1781: a falha é gravada pela reserva atômica no banco, não regravando a linha lida.
+        await repo.Received(1).ReservarTentativaDeSenhaAsync(usuario.Id, Arg.Any<DateTime>());
+        await repo.DidNotReceive().UpdateAsync(Arg.Any<Usuario>());
+    }
+
+    [Fact]
+    public async Task QuintaFalhaBloqueiaAConta()
+    {
+        // Aceite: 5 senhas erradas no passo 1; a 6ª, mesmo com a senha certa, é recusada por 15 min
+        // no passo 1 e no login completo.
+        var usuario = UsuarioDeSenha("senhaCorreta");
+        var repo = RepoCom(usuario);
+        var passo1 = CriarUseCase(repo);
+        var login = new AutenticarUsuarioUseCase(
+            repo, new FakeUnitOfWork(), new FakePasswordHasher(), Substitute.For<ILogger<AutenticarUsuarioUseCase>>());
+
+        for (var falha = 1; falha <= 5; falha++)
+        {
+            await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+                () => passo1.ExecuteAsync(new ListarEmpresasParaLoginCommand(usuario.Email, "senhaErrada")));
+        }
+
+        usuario.FailedLoginAttempts.Should().Be(5);
+        usuario.LockoutEnd.Should().BeCloseTo(DateTime.UtcNow.AddMinutes(15), TimeSpan.FromSeconds(5));
+
+        var recusaPasso1 = await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+            () => passo1.ExecuteAsync(new ListarEmpresasParaLoginCommand(usuario.Email, "senhaCorreta")));
+        var recusaLogin = await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+            () => login.ExecuteAsync(new AutenticarUsuarioCommand(usuario.Email, "senhaCorreta", null)));
+
+        // #1781: bloqueio responde como senha errada (não confirma a conta).
+        recusaPasso1.Message.Should().Be(new CredenciaisInvalidasException().Message);
+        recusaLogin.Message.Should().Be(new CredenciaisInvalidasException().Message);
+    }
+
+    [Fact]
+    public async Task ContaBloqueadaRecusaSemVerificarASenha()
+    {
+        var usuario = UsuarioDeSenha("senhaCorreta", falhas: 5);
+        usuario.LockoutEnd = DateTime.UtcNow.AddMinutes(10);
+        var hasher = Substitute.For<IPasswordHasher>();
+        var repo = RepoCom(usuario);
+
+        var recusa = await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+            () => CriarUseCase(repo, hasher)
+                .ExecuteAsync(new ListarEmpresasParaLoginCommand(usuario.Email, "senhaCorreta")));
+
+        recusa.Message.Should().Be(new CredenciaisInvalidasException().Message, "#1781: bloqueio responde como senha errada");
+        // #1781: o BCrypt roda só contra o hash fictício (mesmo tempo), nunca contra a senha real.
+        hasher.DidNotReceive().Verify(Arg.Any<string>(), usuario.SenhaHash);
+        usuario.FailedLoginAttempts.Should().Be(5, "tentar de novo bloqueado não estende a contagem");
+        await repo.DidNotReceiveWithAnyArgs().ReservarTentativaDeSenhaAsync(default, default);
+        await repo.DidNotReceive().UpdateAsync(Arg.Any<Usuario>());
+    }
+
+    [Fact]
+    public async Task SenhaCertaNoPasso1NaoZeraOContador()
+    {
+        var usuario = UsuarioDeSenha("senhaCorreta", falhas: 3);
+        var repo = RepoCom(usuario);
+
+        var resultado = await CriarUseCase(repo)
+            .ExecuteAsync(new ListarEmpresasParaLoginCommand(usuario.Email, "senhaCorreta"));
+
+        resultado.IsSuperAdmin.Should().BeFalse();
+        usuario.FailedLoginAttempts.Should().Be(3, "quem zera é o login completo");
+        await repo.DidNotReceive().UpdateAsync(Arg.Any<Usuario>());
+        // #1781: a tentativa reservada antes do BCrypt volta; o contador fica como estava.
+        await repo.Received(1).DevolverTentativaDeSenhaAsync(usuario.Id);
+    }
+
+    [Fact]
+    public async Task BloqueioVencidoRecomecaAContagemNoPasso1()
+    {
+        var usuario = UsuarioDeSenha("senhaCorreta", falhas: 5);
+        usuario.LockoutEnd = DateTime.UtcNow.AddMinutes(-1);
+
+        await Assert.ThrowsAsync<CredenciaisInvalidasException>(
+            () => CriarUseCase(RepoCom(usuario))
+                .ExecuteAsync(new ListarEmpresasParaLoginCommand(usuario.Email, "senhaErrada")));
+
+        usuario.FailedLoginAttempts.Should().Be(1);
+        usuario.EstaBloqueado().Should().BeFalse("a falha herdada de uma janela vencida não bloqueia de novo");
     }
 }

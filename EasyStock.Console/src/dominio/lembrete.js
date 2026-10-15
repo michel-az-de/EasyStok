@@ -5,12 +5,16 @@
 // Puro. O relógio chega por parâmetro e nada aqui olha Date.now(), senão o
 // relógio da tela e o do lembrete andariam separados.
 
+import { FUSO, dataIsoNoFuso, horaCurta, horaMono, instanteNoFuso, partesNoFuso } from './formato'
 import { mensagensSemRespostaReal, primeiroNome } from './mensagem'
 import { origemDaPassagem } from './passagem'
 
 export const TIPOS = { DONA: 'dona' }
 
-export const ORIGENS = { MANUAL: 'manual', PASSAGEM: 'passagem', PAGAMENTO: 'pagamento' }
+export const ORIGENS = { MANUAL: 'manual', PASSAGEM: 'passagem', PAGAMENTO: 'pagamento', AGENDAMENTO: 'agendamento' }
+
+// As notificações InApp ficam no sino transversal. Aqui só entram lembretes.
+export const FONTES = { LEMBRETE: 'lembrete' }
 
 export const MINUTOS_SEM_RESPOSTA = 10
 export const MINUTOS_SEM_PAGAMENTO = 15
@@ -40,7 +44,7 @@ export function descreverPrazo(quando, agora) {
   const horas = Math.round(minutos / 60)
   if (horas < 24) return `em ${horas} h`
   return new Date(quando).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: FUSO,
   })
 }
 
@@ -52,6 +56,22 @@ export function descreverAtraso(quando, agora) {
   if (atraso < 60) return `há ${atraso} min`
   const horas = Math.round(atraso / 60)
   return horas < 24 ? `há ${horas} h` : `há ${Math.round(horas / 24)} d`
+}
+
+// #1761: o aviso de cliente sem resposta já diz o tempo no título ("está há 5 min sem resposta.")
+// e a linha de baixo somava outra conta ("há 0 min"). Para ele a linha diz a hora do aviso.
+export const tempoDoItem = (lembrete, agora) => (lembrete.fonte === FONTES.LEMBRETE && lembrete.origem === ORIGENS.PASSAGEM
+  ? `avisado às ${horaCurta(lembrete.quando)}`
+  : descreverAtraso(lembrete.quando, agora))
+
+// #1761: o painel do sino abre para baixo de um botão que, no trilho lateral, fica no meio da
+// tela: com 70% da altura da janela passava do pé (de 476 a 1106 px em 900). Sobe o que der e
+// limita a altura ao que cabe; a rolagem interna cuida do resto. `null` quando já cabe.
+export function encaixeNaJanela({ topo, altura, janela, margem = 12 }) {
+  const limite = janela - margem
+  if (topo + altura <= limite) return null
+  const sobe = Math.max(0, Math.min(topo + altura - limite, topo - margem))
+  return { sobe, alturaMaxima: Math.max(1, Math.min(altura, limite - (topo - sobe))) }
 }
 
 // Chave de "visto" (seção 8): id + quando, não só id. Um lembrete automático
@@ -167,38 +187,32 @@ export const OPCOES_QUANDO = [
 
 export const OPCAO_OUTRO_HORARIO = 'outro'
 
-const horaComH = (ms) => {
-  const data = new Date(ms)
-  return `${data.getHours()}h${String(data.getMinutes()).padStart(2, '0')}`
-}
-
+// #1563: "amanhã às 9" e "outro horário" são hora DA LOJA, a mesma que o sininho mostra. Um
+// aparelho em outro fuso não desloca o lembrete.
 export function quandoDaOpcao(opcaoId, agora) {
   const opcao = OPCOES_QUANDO.find((o) => o.id === opcaoId)
   if (!opcao) return agora
   if (opcao.minutos != null) return agora + opcao.minutos * 60000
-  const alvo = new Date(agora)
-  alvo.setDate(alvo.getDate() + 1)
-  alvo.setHours(opcao.hora, 0, 0, 0)
-  return alvo.getTime()
+  const { ano, mes, dia } = partesNoFuso(agora)
+  return instanteNoFuso({ ano, mes, dia: dia + 1, horas: opcao.hora })
 }
 
 export const rotuloDaOpcao = (opcaoId, agora) => {
   const opcao = OPCOES_QUANDO.find((o) => o.id === opcaoId)
-  return opcao ? `${opcao.prefixo} · ${horaComH(quandoDaOpcao(opcaoId, agora))}` : ''
+  return opcao ? `${opcao.prefixo} · ${horaMono(quandoDaOpcao(opcaoId, agora))}` : ''
 }
 
 // "Outro horário": ela escolhe a hora do relógio. Se já passou hoje, vale
 // amanhã, porque um horário no passado não é lembrete, é registro.
 export function quandoDoHorario(horario, agora) {
-  const [h, m] = horario.split(':').map(Number)
-  const alvo = new Date(agora)
-  alvo.setHours(h, m, 0, 0)
-  if (alvo.getTime() <= agora) alvo.setDate(alvo.getDate() + 1)
-  return alvo.getTime()
+  const [horas, minutos] = horario.split(':').map(Number)
+  const { ano, mes, dia } = partesNoFuso(agora)
+  const hoje = instanteNoFuso({ ano, mes, dia, horas, minutos })
+  return hoje > agora ? hoje : instanteNoFuso({ ano, mes, dia: dia + 1, horas, minutos })
 }
 
 export function rotuloDoHorario(horario, agora) {
   const quando = quandoDoHorario(horario, agora)
-  const amanha = new Date(quando).getDate() !== new Date(agora).getDate()
-  return `${amanha ? 'Amanhã' : 'Hoje'} · ${horaComH(quando)}`
+  const amanha = dataIsoNoFuso(quando) !== dataIsoNoFuso(agora)
+  return `${amanha ? 'Amanhã' : 'Hoje'} · ${horaMono(quando)}`
 }

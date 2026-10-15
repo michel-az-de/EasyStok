@@ -18,6 +18,12 @@ public static class ConfigurationKeys
     public const string JwtIssuer               = "Jwt:Issuer";
     public const string JwtAudience             = "Jwt:Audience";
 
+    /// <summary>
+    /// #1352: confere a cada requisição se o JWT foi emitido depois da última revogação de sessão do usuário.
+    /// Padrão <c>true</c>; <c>false</c> desliga a checagem sem migração (rollback).
+    /// </summary>
+    public const string AuthSessoesRevogaveis   = "Auth:SessoesRevogaveis";
+
     // ── CORS ─────────────────────────────────────────────────────────────────
     public const string CorsAllowedOrigins      = "Cors:AllowedOrigins";
 

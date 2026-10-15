@@ -119,12 +119,11 @@ public sealed class IntegrationCredentialResolver(
 
         if (payload is null) return null;
 
-        // Telemetria de uso (não bloqueia retorno se falhar persistir).
+        // Telemetria de uso (não bloqueia retorno se falhar persistir). Isolada do change tracker (#1417): a leitura
+        // roda no meio do envio do atendimento, e um commit aqui gravaria pela metade o que o chamador tem pendente.
         try
         {
-            credencial.RegistrarUso();
-            await repo.UpdateAsync(credencial, ct);
-            await uow.CommitAsync();
+            await repo.RegistrarUsoAsync(credencial.Id, DateTime.UtcNow, ct);
         }
         catch (Exception ex)
         {
@@ -145,8 +144,8 @@ public sealed class IntegrationCredentialResolver(
         T payload,
         Guid criadoPorUsuarioId,
         DateTime? validoAte = null,
-        string? mascara = null,
-        CancellationToken ct = default) where T : class
+        CancellationToken ct = default,
+        string? mascara = null) where T : class
     {
         ArgumentNullException.ThrowIfNull(payload);
 
@@ -305,7 +304,9 @@ public sealed class IntegrationCredentialResolver(
     /// Resolve a KEK pelo id. Lança em ausência ou tamanho inválido.
     /// Retorno: array de bytes (32 bytes) que o caller deve zerar após uso.
     /// </summary>
-    private byte[] ResolveKek(string kekId)
+    private byte[] ResolveKek(string kekId) => ResolveKek(config, kekId);
+
+    internal static byte[] ResolveKek(IConfiguration config, string kekId)
     {
         var kekBase64 = config[$"Crypto:Keks:{kekId}"];
         if (string.IsNullOrWhiteSpace(kekBase64))
@@ -347,7 +348,7 @@ public sealed class IntegrationCredentialResolver(
         return (cipher, iv, tag);
     }
 
-    private static byte[] DecryptAesGcm(byte[] cipher, byte[] iv, byte[] tag, byte[] key)
+    internal static byte[] DecryptAesGcm(byte[] cipher, byte[] iv, byte[] tag, byte[] key)
     {
         var plaintext = new byte[cipher.Length];
         using var aes = new AesGcm(key, TagSizeBytes);

@@ -42,6 +42,13 @@ namespace EasyStock.Domain.Entities
         public string? ClienteApt { get; set; }
         public string? ClienteTelefone { get; set; }
 
+        public string? EnderecoEntrega { get; set; }
+        public string? BairroEntrega { get; set; }
+        public string? CepEntrega { get; set; }
+        public double? EntregaLat { get; set; }
+        public double? EntregaLng { get; set; }
+        public DateTime? EnderecoConfirmadoEm { get; set; }
+
         /// <summary>
         /// Status legado em string lowercase: "aguardando" | "preparando" |
         /// "pronto" | "entregue" | "cancelado". Mantido público e mutable
@@ -288,6 +295,22 @@ namespace EasyStock.Domain.Entities
 
         public void MarcarEntregue() => MudarStatus(StatusPedido.Entregue);
 
+        /// <summary>Retorno físico confirmado, sem cancelar venda, estornar pagamento ou devolver estoque.</summary>
+        public void RegistrarRetornoEntrega()
+        {
+            if (StatusEnum != StatusPedido.SaiuParaEntrega)
+                throw new RegraDeDominioVioladaException("Só pedido em entrega pode retornar à fila de entregas.");
+            Status = StatusPedidoMapper.Pronto;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        public void RetomarPreparoPorAlteracao()
+        {
+            if (StatusEnum != StatusPedido.Pronto) throw new RegraDeDominioVioladaException("Só pedido pronto pode retomar o preparo por alteração.");
+            Status = StatusPedidoMapper.Preparando;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
         public void Cancelar() => MudarStatus(StatusPedido.Cancelado);
 
         /// <summary>
@@ -319,6 +342,13 @@ namespace EasyStock.Domain.Entities
     /// <summary>Item do pedido. Snapshot de nome/preço pra preservar histórico.</summary>
     public class PedidoItem
     {
+        /// <summary>
+        /// Linha de frete do checkout ("Entrega — Zona"): sem item de cardápio, produto nem linha
+        /// de preparo. Não é prato; cozinha e PWA não a tratam como item (#1474).
+        /// </summary>
+        public bool EhLinhaDeFrete => CardapioItemId is null && ProdutoId is null && LinhaSnapshot is null
+            && Nome.StartsWith("Entrega — ", StringComparison.Ordinal);
+
         public Guid Id { get; set; }
         public Guid PedidoId { get; set; }
 
@@ -358,7 +388,9 @@ namespace EasyStock.Domain.Entities
 
         public void RecalcularSubtotal()
         {
-            Subtotal = Quantidade * PrecoUnitario;
+            // #1506: centavos como a coluna numeric(14,2) grava. Sem arredondar, 0,35 kg x 47,90
+            // (16,765) somava 33,53 no Total em memoria e 33,54 depois de recarregar do banco.
+            Subtotal = Math.Round(Quantidade * PrecoUnitario, 2, MidpointRounding.AwayFromZero);
         }
     }
 

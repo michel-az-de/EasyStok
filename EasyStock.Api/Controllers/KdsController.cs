@@ -45,7 +45,7 @@ public class KdsController(
         try
         {
             var result = await statusUseCase.ExecuteAsync(new AtualizarStatusPedidoCommand(
-                emp, id, request.Status, UsuarioIdAtual(), Origem: Origem));
+                emp, id, request.Status, UsuarioIdAtual(), Origem: Origem, NivelSolicitante: currentUser.Nivel));
             return result is null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
         }
         catch (UseCaseValidationException ex)
@@ -68,7 +68,7 @@ public class KdsController(
             return DataBadRequest($"Lote acima de {AtualizarStatusPedidosEmLoteUseCase.MaximoItens} itens.");
 
         var resultados = await loteUseCase.ExecuteAsync(
-            new AtualizarStatusPedidosEmLoteCommand(emp, itens, UsuarioIdAtual(), Origem), ct);
+            new AtualizarStatusPedidosEmLoteCommand(emp, itens, UsuarioIdAtual(), Origem, currentUser.Nivel), ct);
         return DataOk(resultados);
     }
 

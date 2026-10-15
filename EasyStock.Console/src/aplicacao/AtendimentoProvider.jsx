@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { estadoInicial, reducer } from './reducer'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { ATENDENTE, estadoInicial, reducer } from './reducer'
 import * as acao from './acoes'
 import { ContextoAcoes, ContextoCatalogo, ContextoEstado } from './contextos'
 import { carregarConversas, proximoId } from '../infra/repositorioConversas'
@@ -25,19 +25,28 @@ import { entregaPassouDoPrazo, ocorrenciaAberta, ORIGENS_OCORRENCIA } from '../d
 import { pedirPermissaoDeNotificacao, permissaoDeNotificacao } from '../infra/notificacaoNavegador'
 import { lembretesAutomaticos, listaDeLembretes } from '../dominio/lembrete'
 import { useAvisoSonoro } from './useAvisoSonoro'
+import { useFilaDeAvisos } from './useFilaDeAvisos'
 import { audioDestravado, destravarAudio } from '../infra/som'
 import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom'
 import { conectarPrincipal } from '../infra/canalEntreJanelas'
 import { FONTE_API } from '../infra/fonteDados'
+import { useAcessoModulos } from './acessoModulos'
+import { podeVerItensFora } from '../dominio/acessoModulos'
 import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
+import { deveCarregarDossie } from './planoDeSincronizacao'
+import { useLembretesApi } from './useLembretesApi'
 import { gravarRascunhos, lerRascunhos } from '../infra/api/rascunhosDaSessao'
+import { comRascunhoDoCampo } from './rascunhoLocal'
+import { comandasLocaisDaVisita, restaurarComandasDaVisita } from './comandasDaVisita'
 
 const carregar = () => ({
   conversas: carregarConversas(),
-  catalogo: carregarCatalogo(),
-  regras: REGRAS_PADRAO,
+  // #1441: no modo API as respostas prontas são as do EasyStok, nunca as da demonstração.
+  catalogo: FONTE_API ? { ...carregarCatalogo(), respostasProntas: [] } : carregarCatalogo(),
+  // #1441: no modo API as automáticas chegam do EasyStok; até lá, nenhuma (não as da demonstração).
+  regras: FONTE_API ? [] : REGRAS_PADRAO,
   funcionamento: FUNCIONAMENTO_PADRAO,
   // Integração 48, decisão do gerente: a massa nasce com a loja ABERTA pela
   // Thatiane, no modo manual, coerente com os pedidos em preparo do dia. Sem
@@ -51,19 +60,29 @@ const carregar = () => ({
   som: lerPreferenciaSom(),
 })
 
-export function AtendimentoProvider({ agora, sessao = null, children }) {
-  const [estado, despachar] = useReducer(reducer, null, () => ({
+export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco = null, children }) {
+  const reduzir = (atual, evento) => reducer(restaurarComandasDaVisita(atual, evento, lerComandasDaVisita?.()), evento)
+  const [estado, despachar] = useReducer(reduzir, null, () => ({
     ...estadoInicial(carregar()),
     // Modo API (F01): a lista nasce vazia e chega pelo polling.
     sincronizacao: { estado: FONTE_API ? 'carregando' : 'desligada', mensagem: null, aviso: null },
     // Modo API (F02): mensagens do expediente (S40); horário e controle vivem em
     // `funcionamento` e `lojaAberta`, os mesmos do modo demonstração.
     expediente: { carregado: false, mensagemForaDoHorario: '', mensagemLojaFechada: '' },
+    // #1474: carregando, ok ou erro das automáticas da API, para a tela não confundir com vazio.
+    cargaDasRegras: { estado: FONTE_API ? 'carregando' : 'ok', mensagem: null },
     // F07, item 6: o rascunho de antes do 401 volta depois do novo login.
     ...(FONTE_API ? { rascunhos: lerRascunhos(sessao) } : {}),
   }))
+  useLayoutEffect(() => {
+    if (estado.sincronizacao.estado === 'ok' || estado.conversas.length) aoGuardarComandas?.(comandasLocaisDaVisita(estado.conversas))
+  }, [aoGuardarComandas, estado.conversas, estado.sincronizacao.estado])
   useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
-  useSincronizacaoApi({ ativo: FONTE_API, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId })
+  const { acoes: acoesDoPerfil } = useAcessoModulos()
+  const comItensFora = podeVerItensFora(acoesDoPerfil)
+  const comItensForaRef = useRef(comItensFora)
+  useEffect(() => { comItensForaRef.current = comItensFora }, [comItensFora])
+  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, comItensFora, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a
@@ -78,6 +97,15 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   // porque quem lê "Precisa de você", o Balcão e o aviso sonoro precisam da
   // MESMA resposta.
   const aberta = estaAberta(agoraEfetivo, { funcionamento: estado.funcionamento, lojaAberta: estado.lojaAberta })
+  // #1427: o SLA de primeira resposta só conta com a loja aberta. Mesmo par
+  // de `aberta`, entregue inteiro para o domínio andar pelo horário.
+  const horarioDaLoja = useMemo(
+    () => ({
+      funcionamento: estado.funcionamento,
+      lojaAberta: FONTE_API && !estado.expediente.carregado ? false : estado.lojaAberta,
+    }),
+    [estado.funcionamento, estado.lojaAberta, estado.expediente.carregado],
+  )
 
   const pendentes = useRef([])
   useEffect(() => () => pendentes.current.forEach(clearTimeout), [])
@@ -86,6 +114,15 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   // não precisarem de dependência e não recriarem o objeto de ações.
   const estadoRef = useRef(estado)
   useEffect(() => { estadoRef.current = estado }, [estado])
+  const consultaLembretes = useLembretesApi({ ativo: FONTE_API && atendimentoAtivo, despachar, estadoRef })
+
+  // #1577: o campo de escrever descarrega com a tela saindo (401, ida ao Hall, aba oculta). O despacho pode
+  // não render mais e o efeito de `gravarRascunhos` lá em cima não roda; aqui o texto vai direto ao storage.
+  const sessaoRef = useRef(sessao)
+  useEffect(() => { sessaoRef.current = sessao }, [sessao])
+  const guardarRascunhoJa = useCallback((despacho) => {
+    if (FONTE_API) gravarRascunhos(sessaoRef.current, comRascunhoDoCampo(estadoRef.current, despacho).rascunhos)
+  }, [])
 
   // Sincronia com a janela de Entregas (seção 6): esta janela é sempre a
   // "principal" do canal. Sem nenhuma janela de Entregas aberta, o canal só
@@ -141,6 +178,7 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
             leitura.intencao.chave,
             itensSemSaldoCitados(conversa, atual.catalogo),
             precisaEscalarPorArea(conversa),
+            leitura.pedidoParaDona?.texto,
           ),
         })
       }
@@ -187,7 +225,8 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
 
   const acoes = useMemo(() => criarAcoes({
     despachar, agoraRef, estadoRef, pendentes, consultarAgente, perguntarAssistente, pedirNotificacaoDoNavegador,
-  }), [consultarAgente, perguntarAssistente, pedirNotificacaoDoNavegador])
+    guardarRascunhoJa,
+  }), [consultarAgente, perguntarAssistente, pedirNotificacaoDoNavegador, guardarRascunhoJa])
 
   // Item 7 (Sininho revê o que soou enquanto ela estava fora) e item 2 (selo
   // "novo, não visto" do pagamento, independente do prazo de 10 min do sinal
@@ -201,9 +240,13 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   // `janelas` liga o motivo "pedido atrasado" (achado 3); `aoTocar` alimenta
   // o registro de sons recentes do Sininho (achado 7, item 7) e a marca de
   // "pagamento não visto" independente do sinal verde (item 2).
+  // #1807: o mesmo aviso que toca também aparece na tela e, com a aba
+  // escondida, no navegador (`useFilaDeAvisos`, montado só aqui).
+  const filaDeAvisos = useFilaDeAvisos()
   useAvisoSonoro({
-    conversas: estado.conversas, som: estado.som, agora: agoraEfetivo, aberta,
+    conversas: estado.conversas, som: estado.som, agora: agoraEfetivo, aberta, expediente: horarioDaLoja,
     janelas: estado.catalogo.janelas,
+    aoAvisar: filaDeAvisos.avisar,
     aoTocar: (evento, conversaId) => {
       setEventosSonoros((atual) => [
         ...atual, { id: proximoId('som'), evento, conversaId, quando: agoraRef.current },
@@ -252,7 +295,7 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   useEffect(() => {
     despachar({
       tipo: acao.SINCRONIZAR_LEMBRETES,
-      automaticos: lembretesAutomaticos(conversasAgora, agoraRef.current),
+      automaticos: FONTE_API ? [] : lembretesAutomaticos(conversasAgora, agoraRef.current),
     })
   }, [conversasAgora, agoraEfetivo])
 
@@ -288,18 +331,34 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
   }, [conversasAgora, agoraEfetivo, estado.catalogo.janelas])
 
   const acoesAtivas = useMemo(
-    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef }) : acoes),
+    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef }) : acoes),
     [acoes],
   )
 
   // Modo API (F02): o expediente vem da API uma vez ao entrar; depois, a cada gravação.
   useEffect(() => {
-    if (FONTE_API) acoesAtivas.recarregarExpediente()
-  }, [acoesAtivas])
+    if (FONTE_API && atendimentoAtivo) acoesAtivas.recarregarExpediente()
+    // #1441: respostas prontas e automáticas também vêm do EasyStok ao entrar.
+    if (FONTE_API && atendimentoAtivo) acoesAtivas.recarregarRespostas()
+  }, [acoesAtivas, atendimentoAtivo])
   useEffect(() => () => acoesAtivas.cancelarHorarioPendente?.(), [acoesAtivas])
+
+  // #1474: a conversa restaurada na carga (ou escolhida pela sincronização antes de qualquer
+  // clique) não passa por `selecionar`; sem isto a Ficha ficava sem telefone, tags e notas.
+  // A ação junta pedidos em voo, então o clique e este efeito não duplicam a chamada.
+  const precisaDossie = FONTE_API
+    && deveCarregarDossie(estado.conversas.find((c) => c.id === estado.selecionadaId))
+  useEffect(() => {
+    if (precisaDossie) acoesAtivas.carregarClienteDaConversa(estado.selecionadaId)
+  }, [precisaDossie, estado.selecionadaId, acoesAtivas])
+  const pedidoDoCliente = FONTE_API && estado.conversas.find((c) => c.id === estado.selecionadaId)?.pedido?.pedidoId
+  useEffect(() => {
+    if (pedidoDoCliente) acoesAtivas.carregarClienteDaConversa(estado.selecionadaId)
+  }, [pedidoDoCliente, estado.selecionadaId, acoesAtivas])
 
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
+    const usuario = FONTE_API ? sessao?.usuario : { nome: ATENDENTE }
     return {
       conversas: estado.conversas,
       selecionadaId: estado.selecionadaId,
@@ -308,11 +367,14 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       funcionamento: estado.funcionamento,
       lojaAberta: estado.lojaAberta,
       aberta,
+      horarioDaLoja,
       modoAgente: estado.modoAgente,
       agente: estado.agente,
       automaticoPausado: estado.automaticoPausado,
       alertasEstoque: estado.alertasEstoque,
       rascunho: estado.rascunhos[estado.selecionadaId] ?? '',
+      // #1577: carimbo de escrita de fora do campo; é por ele que o campo adota o rascunho global.
+      escritaDeFora: estado.escritasDeFora?.[estado.selecionadaId] ?? 0,
       // Ordenado aqui, uma vez só: quem lê `visiveis` (Balcão e o "abrir
       // primeira conversa" da ficha e do atendimento) precisa enxergar a
       // mesma ordem, senão o botão de estado vazio abre uma conversa
@@ -320,6 +382,7 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       visiveis: ordenarBalcao(
         conversasDoBalcao(
           estado.conversas, estado.filtros, agoraEfetivo, estado.automaticoPausado, aberta, estado.catalogo.janelas,
+          horarioDaLoja, usuario,
         ),
         agoraEfetivo,
         {
@@ -327,14 +390,16 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
           automaticoPausado: estado.automaticoPausado,
           janelas: estado.catalogo.janelas,
           aberta,
+          expediente: horarioDaLoja,
+          aba: estado.filtros.aba,
         },
       ),
       // Os dois grupos recolhidos do fim de "Todas" (seção 1): mesmo canal e
       // busca da lista de cima, sem aba, porque nenhum dos dois existe em
       // "Precisa de você".
-      encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros),
-      bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros),
-      historico: selecionada ? historicoComPedidoVivo(carregarHistorico(selecionada.id), selecionada.pedido) : [],
+      encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros, usuario),
+      bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros, usuario),
+      historico: selecionada ? historicoComPedidoVivo(selecionada.cliente?.historico ?? carregarHistorico(selecionada.id), selecionada.pedido) : [],
       ultimoAvanco: estado.ultimoAvanco,
       // Lote de papel (US-042): banner de queda e a modal de lançamento leem
       // só este campo, tirado de `estado.conexao` sem transformação nenhuma.
@@ -355,10 +420,16 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       eventosSonoros,
       pagamentosNaoVistos,
       permissaoNotificacao,
+      consultaLembretes,
+      // #1807: pilha de avisos da tela (toast) e quem tira um da pilha.
+      avisosNaTela: filaDeAvisos.avisos,
+      dispensarAviso: filaDeAvisos.dispensar,
       // `ui.encerrando` (seção 5): id da conversa com a modal de
       // encerramento aberta, ou `null`.
       encerrando: estado.ui.encerrando,
       encerrandoNumero: estado.ui.encerrandoNumero ?? null,
+      // #1443: gesto da loja pedido ('abrir' | 'fechar'), ou null.
+      gestoLoja: estado.ui.gestoLoja ?? null,
       // Rodada 13 (issue #43): lotes, descobertos e ajustes lidos pela aba
       // Produção e cardápio de Gestão.
       producao: estado.producao,
@@ -373,9 +444,10 @@ export function AtendimentoProvider({ agora, sessao = null, children }) {
       fonteApi: FONTE_API,
       sincronizacao: estado.sincronizacao,
       expediente: estado.expediente,
+      cargaDasRegras: estado.cargaDasRegras,
       sessao,
     }
-  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes, filaDeAvisos.avisos, filaDeAvisos.dispensar])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>

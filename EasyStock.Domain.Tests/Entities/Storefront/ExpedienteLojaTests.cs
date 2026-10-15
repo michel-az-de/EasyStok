@@ -12,6 +12,41 @@ namespace EasyStock.Domain.Tests.Entities.Storefront;
 /// </summary>
 public class ExpedienteLojaTests
 {
+    [Theory]
+    [InlineData("2026-10-06T21:58:00-03:00", "2026-10-06T23:30:00-03:00", 2)]
+    [InlineData("2026-10-06T21:58:00-03:00", "2026-10-07T08:03:01-03:00", 5.016666666666667)]
+    [InlineData("2026-10-06T22:30:00-03:00", "2026-10-07T08:00:00-03:00", 0)]
+    [InlineData("2026-10-06T12:00:00-03:00", "2026-10-06T11:00:00-03:00", 0)]
+    public void Sla_SomaApenasMinutosAbertos(string inicio, string fim, double esperado)
+    {
+        ExpedienteLoja.CriarPadrao(Empresa).MinutosAbertosEntre(
+            DateTimeOffset.Parse(inicio).UtcDateTime, DateTimeOffset.Parse(fim).UtcDateTime)
+            .Should().BeApproximately(esperado, 0.00001);
+    }
+
+    [Fact]
+    public void Sla_TurnosCurtosContamMaisDeUmaSemana_SemDuplicarMadrugada()
+    {
+        var expediente = ExpedienteLoja.CriarPadrao(Empresa);
+        expediente.DefinirHorarios([new HorarioFuncionamento(1, new TimeOnly(8, 0), new TimeOnly(8, 1))]);
+        expediente.MinutosAbertosEntre(Local(28, 8), LocalOutubro(12, 9)).Should().Be(3);
+        expediente.DefinirHorarios([
+            new HorarioFuncionamento(5, new TimeOnly(18, 0), new TimeOnly(2, 0)),
+            new HorarioFuncionamento(6, new TimeOnly(0, 0), new TimeOnly(3, 0))]);
+        expediente.MinutosAbertosEntre(LocalOutubro(2, 23), LocalOutubro(3, 3)).Should().Be(240);
+        expediente.DefinirHorarios([]);
+        expediente.MinutosAbertosEntre(Local(28, 8), LocalOutubro(12, 9)).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(ControleManualLoja.ForcarFechada, 0)]
+    [InlineData(ControleManualLoja.ForcarAberta, 30)]
+    public void Sla_ControleManualSegueOMesmoContratoDoConsole(ControleManualLoja controle, double esperado)
+    {
+        var expediente = ExpedienteLoja.CriarPadrao(Empresa);
+        expediente.DefinirControle(controle, null, Local(28, 23));
+        expediente.MinutosAbertosEntre(Local(28, 23), Local(28, 23, 30)).Should().Be(esperado);
+    }
     private static readonly Guid Empresa = Guid.NewGuid();
 
     // 28/09/2026 é segunda-feira. Local = UTC - 3 h.

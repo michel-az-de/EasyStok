@@ -2,6 +2,19 @@
 
 Issue: #1203 · Levantamento: 2026-09-30 · Status: DECIDIDO em 2026-09-30 (seção 6)
 
+> **SUPERADO EM PARTE em 2026-10-12.** O plano vigente é [`01-plug-and-play.md`](01-plug-and-play.md) (épico #1633).
+> Este arquivo fica como levantamento histórico dos provedores (seção 4) e registro das decisões de 30/09.
+>
+> | O que mudou | Onde ver |
+> |---|---|
+> | D3 (Pix pelo PSP da loja) revogada: Pix do pedido vai todo pelo Mercado Pago | `01-plug-and-play.md`, seção 2 |
+> | D4 vale para produção; o adapter Lalamove é codado antes, no sandbox | `01-plug-and-play.md`, seção 2 |
+> | Lacuna 3 ("sem retry") não procede: há Polly no master, usado só pelo WhatsApp | `01-plug-and-play.md`, spec I3.1 |
+> | Lacuna 1 (credencial por tenant): o cofre existe e o WhatsApp já o usa (#1417) | `01-plug-and-play.md`, seção 4 |
+> | Webhook do Mercado Pago por OAuth: um segredo por aplicação, loja pelo `user_id` | `01-plug-and-play.md`, seção 4 |
+> | Webhook da Lalamove: a assinatura é documentada | `01-plug-and-play.md`, spec I10.2 |
+> | Fatias F1 a F10 | Tabela da seção 5, coluna "Substituída por" |
+
 Provedores: Mercado Pago, PayPal, Pix direto (PSP), 99 Entrega, Lalamove.
 
 > Taxas, validade de token e cidades atendidas marcadas como **não confirmado** vieram de fontes
@@ -111,18 +124,18 @@ Princípios:
 
 ## 5. Fatiamento proposto (issues filhas)
 
-| # | Fatia | Tier | Depende de |
-|---|---|---|---|
-| F1 | `TenantIntegracao`: credencial cifrada por tenant + expiração | ALTO (migração) | Decisão D2 |
-| F2 | Núcleo de webhook: despacho por provedor, dedupe, reconsulta | ALTO | F1 |
-| F3 | Resiliência (Polly) + saúde do gateway real | ALTO | nenhuma |
-| F4 | Mercado Pago completo: OAuth, `/v1/orders`, processor, refresh | ALTO | F1, F2 |
-| F5 | Pagamento confirmado avança o pedido (outbox) | ALTO | F4 |
-| F6 | Porta `ILogisticaGateway` + adapter Interno | ALTO | nenhuma |
-| F7 | Lalamove adapter | ALTO | F1, F6 |
-| F8 | ~~PayPal adapter~~ fora (D1) | n/a | n/a |
-| F9 | 99 Entrega adapter | ALTO | contato comercial |
-| F10 | Pix Automático para assinaturas | ALTO | F1 |
+| # | Fatia | Tier | Depende de | Substituída por (12/10) |
+|---|---|---|---|---|
+| F1 | `TenantIntegracao`: credencial cifrada por tenant + expiração | ALTO (migração) | Decisão D2 | E4 e E5 (o cofre já existe; falta RLS, KEK nos dois hosts e a tela) |
+| F2 | Núcleo de webhook: despacho por provedor, dedupe, reconsulta | ALTO | F1 | I6.2 |
+| F3 | Resiliência (Polly) + saúde do gateway real | ALTO | nenhuma | I3.1 e E11 (`IGatewayHealthStore` não é usado: issue de poda em I1.2) |
+| F4 | Mercado Pago completo: OAuth, `/v1/orders`, processor, refresh | ALTO | F1, F2 | E3 e E6 (Checkout Pro mantido; `/v1/orders` fora) |
+| F5 | Pagamento confirmado avança o pedido (outbox) | ALTO | F4 | Feito no master (`ConfirmarPagamentoPedidoUseCase`) |
+| F6 | Porta `ILogisticaGateway` + adapter Interno | ALTO | nenhuma | Adiada: a porta só é extraída com o segundo provedor (I10.2) |
+| F7 | Lalamove adapter | ALTO | F1, F6 | E10 |
+| F8 | ~~PayPal adapter~~ fora (D1) | n/a | n/a | n/a |
+| F9 | 99 Entrega adapter | ALTO | contato comercial | E9 (registro manual com custo); adapter só com API confirmada |
+| F10 | Pix Automático para assinaturas | ALTO | F1 | Fora do plano de 12/10 |
 
 ## 6. Decisões (Felipe, 2026-09-30)
 
@@ -130,7 +143,7 @@ Princípios:
 |---|---|---|---|
 | D1 | PayPal | **Não por ora** | F8 fora do escopo; reabrir só com demanda |
 | D2 | Quem recebe | **Conta do tenant** | OAuth MP por tenant + `marketplace_fee`; sem subcredenciamento |
-| D3 | Pix de pedido | **PSP próprio do tenant** | Pix sai do MP e vai para o PSP do tenant (Efí primeiro). Revisa em parte a decisão A de 22/09: MP fica para cartão/boleto. F1 precisa guardar certificado `.p12` com validade e rotação |
+| D3 | Pix de pedido | ~~**PSP próprio do tenant**~~ **REVOGADA em 12/10: tudo pelo Mercado Pago** | ~~Pix sai do MP e vai para o PSP do tenant (Efí primeiro). Revisa em parte a decisão A de 22/09: MP fica para cartão/boleto. F1 precisa guardar certificado `.p12` com validade e rotação~~ Volta a valer a decisão A de 22/09; sem `.p12` |
 | D4 | Ordem | **Pagamento primeiro** | F1 → F2 → F3 → F4 → F5; logística (F6, F7) depois |
 
 ## 7. Ações comerciais (dependem do Felipe, não do agente)

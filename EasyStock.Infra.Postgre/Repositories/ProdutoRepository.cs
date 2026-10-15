@@ -27,6 +27,19 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
 
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<Produto>> GetByIdsAsync(Guid empresaId, IEnumerable<Guid> ids, CancellationToken ct = default)
+        {
+            var lista = ids?.Distinct().ToList() ?? new List<Guid>();
+            if (lista.Count == 0)
+                return [];
+
+            return await dbContext.Produtos
+                .AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && lista.Contains(p.Id))
+                .ToListAsync(ct);
+        }
+
         public Task<Produto?> GetDetalheAsync(Guid empresaId, Guid id) =>
             dbContext.Produtos
                 .AsNoTracking()
@@ -34,6 +47,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(p => p.Embalagens)
                 .Include(p => p.Variacoes)
                 .FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
+
+        // xmin é shadow property: a leitura rastreada preserva a versão original para o UPDATE.
+        public Task<Produto?> GetByIdParaAtualizarAsync(Guid empresaId, Guid id) =>
+            dbContext.Produtos.AsTracking().FirstOrDefaultAsync(p => p.EmpresaId == empresaId && p.Id == id);
 
         public Task<bool> ExistsSkuBaseAsync(Guid empresaId, string skuBase, Guid? ignoreProdutoId = null)
         {
@@ -201,6 +218,13 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .CountAsync(p => p.EmpresaId == empresaId);
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<Produto>> GetInsumosAsync(Guid empresaId, CancellationToken ct = default) =>
+            await dbContext.Produtos
+                .AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && p.EhInsumo && p.Status == StatusProduto.Ativo)
+                .OrderBy(p => p.Nome)
+                .ToListAsync(ct);
+
         public async Task<IReadOnlyDictionary<Guid, TipoEmbalagem>> GetTipoEmbalagemMapAsync(
             Guid empresaId, IEnumerable<Guid> produtoIds)
         {

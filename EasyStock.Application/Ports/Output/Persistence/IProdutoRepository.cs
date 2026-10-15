@@ -4,6 +4,11 @@ namespace EasyStock.Application.Ports.Output.Persistence
     {
         Task<Produto?> GetByIdAsync(Guid id);
         Task<Produto?> GetByIdAsync(Guid empresaId, Guid id);
+
+        /// <summary>#1566: os produtos da empresa pelos ids, sem tracking, numa query só. Id ausente ou de outra empresa não volta.</summary>
+        Task<IReadOnlyList<Produto>> GetByIdsAsync(Guid empresaId, IEnumerable<Guid> ids, CancellationToken ct = default);
+
+        Task<Produto?> GetByIdParaAtualizarAsync(Guid empresaId, Guid id);
         Task<Produto?> GetDetalheAsync(Guid empresaId, Guid id);
         Task<bool> ExistsSkuBaseAsync(Guid empresaId, string skuBase, Guid? ignoreProdutoId = null);
         Task<bool> ExistsCodigoBarrasAsync(Guid empresaId, string codigoBarras, Guid? ignoreProdutoId = null);
@@ -37,6 +42,9 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// se peso e obrigatorio (RDC 727/2022 - peso so obrigatorio para Embalado).
         /// Inserido 2026-05-16 (correcao C2).
         /// </summary>
+        /// <summary>M2.3 (#1496): insumos ativos da empresa (<c>EhInsumo</c>), por nome, numa query só.</summary>
+        Task<IReadOnlyList<Produto>> GetInsumosAsync(Guid empresaId, CancellationToken ct = default);
+
         Task<IReadOnlyDictionary<Guid, TipoEmbalagem>> GetTipoEmbalagemMapAsync(
             Guid empresaId, IEnumerable<Guid> produtoIds);
     }

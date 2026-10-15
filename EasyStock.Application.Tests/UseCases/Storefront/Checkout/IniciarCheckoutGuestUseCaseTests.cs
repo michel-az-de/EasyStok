@@ -126,13 +126,14 @@ public class IniciarCheckoutGuestUseCaseTests
             var frete = new CalcularFreteUseCase(StorefrontRepo, FreteZonaRepo, Substitute.For<ICepLookupClient>(),
                 Geocoding, Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance);
             var core = new CheckoutCoreService(StorefrontRepo, CardapioRepo, JanelaRepo, BloqueioRepo, frete,
-                VagaRepo, PedidoRepo, ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance, TimeProvider.System);
+                VagaRepo, PedidoRepo, ExpedienteRepo, NullLogger<CheckoutCoreService>.Instance,
+                new EasyStock.TestHelpers.FakeTimeProvider(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero)) /* #1506: antes das entregas de 02/06 */, EnderecoEntregaPedidoTeste.Criar());
             var cobranca = new GerarCobrancaPedidoUseCase(Substitute.For<IPedidoRepository>(), StorefrontRepo, CobrancaRepo,
-                MpClient, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
+                MpClient, core, Uow, TimeProvider.System, NullLogger<GerarCobrancaPedidoUseCase>.Instance);
             return new IniciarCheckoutGuestUseCase(StorefrontRepo, core, cobranca, ClienteRepo, PedidoRepo, Uow,
                 new AcompanhamentoTokenService(config, TimeProvider.System),
                 new AtribuicaoPedidoCampanha(CampanhaRepo, TimeProvider.System), Tenant, TimeProvider.System,
-                NullLogger<IniciarCheckoutGuestUseCase>.Instance);
+                NullLogger<IniciarCheckoutGuestUseCase>.Instance, EnderecoEntregaPedidoTeste.Criar());
         }
     }
 
@@ -184,6 +185,24 @@ public class IniciarCheckoutGuestUseCaseTests
     }
 
     [Fact]
+    public async Task MercadoPagoFora_CancelaPedidoELiberaVaga()
+    {
+        // #1301: o guest recebe 503 e não vê o pedido; sem desfazer, a vaga ficava presa.
+        var f = new Fixture();
+        f.MpClient.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("500"));
+
+        var act = () => f.UseCase().ExecuteAsync(Input());
+
+        await act.Should().ThrowAsync<MercadoPagoIndisponivelException>();
+        var pedido = f.Pedidos.Should().ContainSingle().Subject;
+        pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
+        await f.VagaRepo.Received(1).LiberarPorPedidoAsync(
+            pedido.Id, Arg.Is<string>(m => m.Contains("mercado_pago_indisponivel")), Arg.Any<CancellationToken>());
+        f.Cobrancas.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SemVagaLancaJanelaSemVagasSemCobrar()
     {
         var f = new Fixture();
@@ -221,7 +240,7 @@ public class IniciarCheckoutGuestUseCaseTests
     }
 
     [Fact]
-    public async Task PedidoGuestDeQuemRecebeuCampanhaMarcaPediu()
+    public async Task TelefoneAlegadoNaoAssociaPedidoACadastroOuCampanhaSemOtp()
     {
         var f = new Fixture();
         var empresaId = f.Storefront.EmpresaId;
@@ -242,8 +261,10 @@ public class IniciarCheckoutGuestUseCaseTests
 
         var resultado = await f.UseCase().ExecuteAsync(Input());
 
-        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Pediu);
-        destinatario.PedidoId.Should().Be(resultado.PedidoId);
+        destinatario.Status.Should().Be(StatusCampanhaDestinatario.Enviado);
+        destinatario.PedidoId.Should().BeNull();
+        f.Pedidos.Single().ClienteId.Should().NotBe(cliente.Id);
+        await f.ClienteRepo.DidNotReceive().UpdateAsync(cliente, Arg.Any<CancellationToken>());
         f.Tenant.Received().SetCurrentTenant(empresaId);
     }
 
@@ -293,5 +314,79 @@ public class IniciarCheckoutGuestUseCaseTests
         await f.Geocoding.Received().GeocodificarAsync(
             Arg.Is<GeocodeQuery>(q => q.Numero == "120" && q.Cep == CepValido), Arg.Any<CancellationToken>());
         r.FreteEstimado.Should().Be(25m);
+    }
+
+    // ── Ponte #1306: o site ainda não manda janela; sem ela, o guest segue o modo antigo ──
+
+    [Fact]
+    public async Task SemJanela_ModoAntigoVaiParaAprovacaoSemVagaNemCobranca()
+    {
+        var f = new Fixture();
+
+        var r = await f.UseCase().ExecuteAsync(Input() with { JanelaId = null, DataEntrega = null });
+
+        var pedido = f.Pedidos.Should().ContainSingle().Subject;
+        pedido.Id.Should().Be(r.PedidoId);
+        pedido.Status.Should().Be(StatusPedidoMapper.AguardandoAprovacaoBaba);
+        pedido.Origem.Should().Be("storefront-guest");
+        pedido.ClienteNome.Should().Be("Maria Silva");
+        pedido.ClienteTelefone.Should().Be("+5511987654321");
+        pedido.Observacoes.Should().Contain("[Guest] CEP 01310-100, numero 120");
+        r.LinkPagamento.Should().BeNull();
+        r.ExpiresIn.Should().Be(0);
+        r.AcompanhamentoToken.Should().NotBeNullOrWhiteSpace();
+        await f.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+        await f.MpClient.DidNotReceiveWithAnyArgs().CriarPreferenceAsync(default!, default);
+        f.Cobrancas.Should().BeEmpty();
+        await f.Uow.Received().CommitAsync();
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task SoJanelaOuSoDataRecusa(bool comJanela, bool comData)
+    {
+        var f = new Fixture();
+        var input = Input() with
+        {
+            JanelaId = comJanela ? JanelaId : null,
+            DataEntrega = comData ? DataEntrega : null,
+        };
+
+        var act = () => f.UseCase().ExecuteAsync(input);
+
+        await act.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*janela*data*");
+        f.Pedidos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SemJanela_ClienteBloqueadoRecusa()
+    {
+        var f = new Fixture();
+        var bloqueado = DomainCliente.CriarParaStorefront(f.Storefront.EmpresaId, "hash", TimeProvider.System);
+        bloqueado.Bloquear("calote", DateTime.UtcNow);
+        f.ClienteRepo.GetByTelefoneHashAsync(f.Storefront.EmpresaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(bloqueado);
+
+        var act = () => f.UseCase().ExecuteAsync(Input() with { JanelaId = null, DataEntrega = null });
+
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.ClienteBloqueadoException>();
+        f.Pedidos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SemJanela_LojaFechadaNaMaoRecusa()
+    {
+        // #1784: o modo sem janela não passa pelo core e criava pedido com a pausa manual ligada.
+        var f = new Fixture();
+        var expediente = ExpedienteLoja.CriarPadrao(f.Storefront.EmpresaId);
+        expediente.DefinirControle(EasyStock.Domain.Enums.Storefront.ControleManualLoja.ForcarFechada, null, DateTime.UtcNow);
+        f.ExpedienteRepo.GetPublicoAsync(f.Storefront.EmpresaId, Arg.Any<CancellationToken>()).Returns(expediente);
+
+        var act = () => f.UseCase().ExecuteAsync(Input() with { JanelaId = null, DataEntrega = null });
+
+        await act.Should().ThrowAsync<LojaFechadaException>();
+        f.Pedidos.Should().BeEmpty();
+        await f.Uow.DidNotReceive().CommitAsync();
     }
 }

@@ -5,6 +5,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         // ── Pedido raiz ───────────────────────────────────────────
         Task<Pedido?> GetByIdAsync(Guid empresaId, Guid id);
 
+        /// <summary>
+        /// Vários pedidos da empresa em uma consulta (#1564), sem itens nem pagamentos. Somente leitura.
+        /// Id que não existe ou é de outra empresa não vem na lista.
+        /// </summary>
+        Task<IReadOnlyList<Pedido>> ListarPorIdsAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
+
         /// <summary>Carrega pedido com itens, eventos e pagamentos — pra tela de detalhe.</summary>
         Task<Pedido?> GetByIdWithDetailsAsync(Guid empresaId, Guid id);
 
@@ -34,7 +40,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task AddItemAsync(PedidoItem item);
         Task AddEventoAsync(PedidoEvento evento);
         Task<IEnumerable<PedidoEvento>> GetEventosAsync(Guid pedidoId, int max = 200);
+        Task TravarAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
         Task AddPagamentoAsync(PedidoPagamento pagamento);
+        Task<IReadOnlyList<PedidoEstornoManual>> ListarEstornosManuaisAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
+        Task AdicionarEstornoManualAsync(PedidoEstornoManual estorno);
+        Task<bool> TemEstornoOnlineAsync(Guid empresaId, Guid pagamentoId, CancellationToken ct = default);
+        Task<bool> ExisteEventoAsync(Guid empresaId, Guid pedidoId, string tipo, CancellationToken ct = default);
 
         /// <summary>
         /// Verifica se existe pedido aberto (status aguardando/preparando/pronto)
@@ -42,5 +53,14 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// itens em produção/preparação.
         /// </summary>
         Task<bool> ExistemPedidosAbertosComProdutoAsync(Guid empresaId, Guid produtoId);
+
+        /// <summary>
+        /// M2.5 (#1502): porções dos pedidos agendados antes de <paramref name="antesDeUtc"/> que ainda vão
+        /// consumir estoque (<see cref="PedidoStateMachine.DemandaAConsumir"/>), somadas por prato.
+        /// </summary>
+        Task<IReadOnlyList<DemandaDePedido>> GetDemandaAgendadaAsync(Guid empresaId, DateTime antesDeUtc, CancellationToken ct = default);
     }
+
+    /// <summary>Porções pedidas de um prato (pelo item do cardápio e/ou pelo produto do estoque).</summary>
+    public sealed record DemandaDePedido(Guid? CardapioItemId, Guid? ProdutoId, decimal Quantidade);
 }

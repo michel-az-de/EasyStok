@@ -11,4 +11,5 @@ public enum StatusImpressao
 
     /// <summary>O consumidor desistiu (sem papel, impressora fora); a dona reimprime pelo console.</summary>
     Falhou = 3,
+    Preparada = 4,
 }

@@ -2,6 +2,9 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 using Microsoft.Extensions.Logging;
+using EasyStock.Application.Tests.Helpers;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.Pedidos;
 
 namespace EasyStock.Application.Tests.UseCases;
 
@@ -15,9 +18,9 @@ public class AlterarAgendamentoPedidoUseCaseTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly IPrazoPreparoPedidoQueries _prazoQueries = Substitute.For<IPrazoPreparoPedidoQueries>();
 
-    private AlterarAgendamentoPedidoUseCase Sut() => new(_pedidoRepo, _uow,
+    private AlterarAgendamentoPedidoUseCase Sut() => new(_pedidoRepo, _uow.SetupExecuteInTransactionSemRetry<PedidoResult?>(),
         Substitute.For<ILogger<AlterarAgendamentoPedidoUseCase>>(),
-        new CalculadoraInicioPrevistoPedido(_prazoQueries));
+        new CalculadoraInicioPrevistoPedido(_prazoQueries), Substitute.For<IVagaOcupadaRepository>());
 
     [Fact]
     public async Task RecalculaInicioPrevisto()

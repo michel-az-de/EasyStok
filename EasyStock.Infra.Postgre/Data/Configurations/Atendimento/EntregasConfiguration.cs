@@ -59,6 +59,12 @@ public class ParadaViagemConfiguration : IEntityTypeConfiguration<ParadaViagem>
         builder.HasOne<Domain.Entities.Pedido>().WithMany().HasForeignKey(p => p.PedidoId).OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(p => new { p.ViagemId, p.PedidoId }).IsUnique().HasDatabaseName("ux_viagem_paradas_viagem_pedido");
         builder.HasIndex(p => p.PedidoId).HasDatabaseName("ix_viagem_paradas_pedido");
+        // #1238: um pedido em uma viagem ativa por vez. Parada ainda não entregue = viagem montando ou em
+        // rota (concluída tem todas entregues; desfeita apaga as paradas). Pega a corrida que a checagem
+        // PedidoEmViagemAtivaAsync do use case deixa passar.
+        builder.HasIndex(p => p.PedidoId, "ux_viagem_paradas_pedido_ativo")
+            .IsUnique()
+            .HasFilter("\"EntregueEm\" IS NULL");
     }
 }
 

@@ -35,6 +35,7 @@ public class ProdutoComposicaoController(
         Summary = "Substituir composicao (replace-all transacional)",
         Description = "Substitui rendimento e todas as linhas. Validacoes: ciclo, tenant do insumo, qty minima 0.0001. Grava auditoria diff.")]
     [HttpPut]
+    [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> Substituir(
         [FromRoute] Guid produtoId,
         [FromBody] SubstituirComposicaoRequest body,

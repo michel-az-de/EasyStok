@@ -326,6 +326,39 @@ public class ListarCardapioPublicoUseCaseTests
     // ── Item avulso (ADR-0031) ─────────────────────────────────────────
 
     [Fact]
+    public async Task ExecuteAsync_ComPorcoes_MostraOPrecoQueOCheckoutCobra()
+    {
+        // #1784: o site mostrava R$ 38 (preço do item) e o link de pagamento cobrava R$ 45 (porção padrão).
+        var f = BuildFakes();
+        var lasanha = CriarItemAvulso(f.Storefront.Id, "Lasanha", 38.00m);
+        lasanha.AdicionarVariacao(CardapioItemVariacao.Criar(lasanha.Id, "1 kg", 45.00m, ehPadrao: true));
+        lasanha.AdicionarVariacao(CardapioItemVariacao.Criar(lasanha.Id, "600 g", 38.00m, ordemExibicao: 1));
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { lasanha });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens.Single().PrecoCentavos.Should().Be(4500);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TodasAsPorcoesEsgotadas_ItemIndisponivel()
+    {
+        // O checkout recusa porção esgotada; o site não pode oferecer o prato como disponível.
+        var f = BuildFakes();
+        var lasanha = CriarItemAvulso(f.Storefront.Id, "Lasanha", 38.00m);
+        var unica = CardapioItemVariacao.Criar(lasanha.Id, "1 kg", 45.00m, ehPadrao: true);
+        unica.MarcarEsgotado();
+        lasanha.AdicionarVariacao(unica);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { lasanha });
+
+        var result = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        result.Itens.Single().Disponivel.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_AvulsoPreco35Reais_PrecoCentavos3500()
     {
         var f = BuildFakes();
@@ -367,6 +400,24 @@ public class ListarCardapioPublicoUseCaseTests
         // pública aplica title-case pt-BR (5b84447b, #643) — preposição "de" fica minúscula.
         dto.Nome.Should().Be("Pão de Alho", "avulso lowercase recebe title-case pt-BR na vitrine");
         dto.Categoria.Should().Be("Acompanhamentos", "CategoriaTexto avulso lowercase recebe title-case na vitrine");
+    }
+
+    [Theory]
+    [InlineData("molho pomodoro 500 ml", "Molho Pomodoro 500 ml")]
+    [InlineData("capeletti de carne 1 kg", "Capeletti de Carne 1 kg")]
+    [InlineData("nhoque artesanal 500 g", "Nhoque Artesanal 500 g")]
+    [InlineData("suco de uva 1 l", "Suco de Uva 1 l")]
+    public async Task ExecuteAsync_AvulsoComUnidade_MantemUnidadeMinuscula(string armazenado, string esperado)
+    {
+        // #1334: o cardápio real tem um item por tamanho; "500 G" e "250 Ml" chegavam ao cliente e ao agente.
+        var f = BuildFakes();
+        var avulso = CriarItemAvulso(f.Storefront.Id, armazenado, 18.00m);
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new[] { avulso });
+
+        var dto = (await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido))).Itens.Single();
+
+        dto.Nome.Should().Be(esperado);
     }
 
     [Fact]
@@ -506,5 +557,33 @@ public class ListarCardapioPublicoUseCaseTests
         result.Itens[0].EstoqueAtual.Should().BeNull();
         await f.ItemEstoqueRepository.DidNotReceiveWithAnyArgs().GetSaldoDisponivelPorProdutosAsync(
             default, default!, default);
+    }
+
+    // M1.3 (#1483): a ordem das categorias é a das seções que a dona definiu, não a alfabética;
+    // categoria escondida esconde os pratos dela.
+    [Fact]
+    public async Task OrdemDasSecoes_VemAntesDoAlfabeto_ESecaoOcultaSome()
+    {
+        var f = BuildFakes();
+        var sobremesas = CardapioSecao.CriarRaiz(f.Storefront.Id, "Sobremesas", 1);
+        var massas = CardapioSecao.CriarRaiz(f.Storefront.Id, "Massas", 2);
+        var bebidas = CardapioSecao.CriarRaiz(f.Storefront.Id, "Bebidas", 3);
+        bebidas.AlterarVisibilidade(false);
+        CardapioItem NaSecao(string nome, CardapioSecao secao)
+        {
+            var i = CardapioItem.CriarAvulso(f.Storefront.Id, nome, 10m);
+            i.TornarVisivel();
+            i.DefinirSecao(secao.Id);
+            i.Secao = secao;
+            return i;
+        }
+        var semSecao = CardapioItem.CriarAvulso(f.Storefront.Id, "Avulso", 10m, "Aaa");
+        semSecao.TornarVisivel();
+        f.CardapioItemRepository.GetVisiveisDoStorefrontAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<CardapioItem> { semSecao, NaSecao("Lasanha", massas), NaSecao("Pudim", sobremesas), NaSecao("Suco", bebidas) });
+
+        var r = await BuildUseCase(f).ExecuteAsync(new ListarCardapioPublicoInput(SlugValido));
+
+        r.Itens.Select(i => i.Categoria).Should().Equal("Sobremesas", "Massas", "Aaa");
     }
 }

@@ -15,8 +15,10 @@ public enum TipoLembrete
     ClienteSemResposta = 3,
 
     /// <summary>Teste de conexão de uma integração falhou (vigia da F16, #1246).</summary>
-    IntegracaoParada = 4,
+    IntegracaoParada = 5,
 
     /// <summary>A chave de uma integração vence em até 7 dias (vigia da F16, #1246).</summary>
-    IntegracaoVencendo = 5
+    IntegracaoVencendo = 6,
+    /// <summary>Véspera ou início previsto do preparo de uma encomenda.</summary>
+    PedidoAgendado = 4
 }

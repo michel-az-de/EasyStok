@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
@@ -53,7 +54,7 @@ public sealed class AnonimizarLogsAntigosService(
         }
     }
 
-    private async Task ExecutarAnonimizacaoAsync(int retencaoDias, CancellationToken ct)
+    public async Task ExecutarAnonimizacaoAsync(int retencaoDias, CancellationToken ct)
     {
         var limiteAnonimizacao = DateTime.UtcNow.AddDays(-retencaoDias);
 
@@ -61,6 +62,9 @@ public sealed class AnonimizarLogsAntigosService(
         {
             using var scope = serviceProvider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            // O UPDATE do outbox atravessa todas as empresas: sem o bypass de RLS, ligado pela porta antes da primeira
+            // conexão, a policy tenant_isolation faz o UPDATE afetar 0 linhas e a retenção nunca vale (N1).
+            using var _ = scope.ServiceProvider.GetRequiredService<IRowLevelSecurityBypass>().Begin();
 
             var totalOutbox = await db.NotifOutboxMensagens
                 .Where(m => m.CriadoEm < limiteAnonimizacao

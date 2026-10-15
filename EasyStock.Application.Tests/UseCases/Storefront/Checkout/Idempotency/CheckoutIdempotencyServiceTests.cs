@@ -1,4 +1,4 @@
-﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Entities.Storefront;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -75,7 +75,7 @@ public class CheckoutIdempotencyServiceTests
     }
 
     [Fact]
-    public async Task TentarReservar_InFlight_SemFaturaId_RetornaNull()
+    public async Task TentarReservar_InFlight_RecusaDuplicacao()
     {
         // Registro existe mas FaturaId ainda não vinculado (Fase 3 não concluiu)
         var registroSemResposta = CheckoutIdempotency.Criar(Key, Hash);
@@ -86,9 +86,8 @@ public class CheckoutIdempotencyServiceTests
 
         var svc = BuildService(repo);
 
-        var result = await svc.TentarReservarAsync(Key, Hash);
-
-        result.Should().BeNull();
+        await svc.Invoking(s => s.TentarReservarAsync(Key, Hash))
+            .Should().ThrowAsync<CheckoutEmAndamentoException>();
         await repo.DidNotReceive().TentarReservarAsync(Arg.Any<CheckoutIdempotency>(), Arg.Any<CancellationToken>());
     }
 

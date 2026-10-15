@@ -131,12 +131,15 @@ public class NotificarClienteStatusPedidoHandlerTests
     [Fact]
     public async Task EntregueAgendaAvaliacaoEm30Min()
     {
-        var entregueEm = new DateTime(2026, 10, 1, 13, 0, 0, DateTimeKind.Utc);
+        // O outbox nasce com o relógio real e AgendarPara não adia para o passado: a entrega fica no
+        // futuro, senão o teste quebra quando o relógio passa da data fixa (#1307).
+        var agora = DateTime.UtcNow;
+        var entregueEm = new DateTime(agora.Year, agora.Month, agora.Day, agora.Hour, 0, 0, DateTimeKind.Utc).AddHours(2);
 
         await MudarStatusAsync(StatusPedidoMapper.SaiuParaEntrega, StatusPedidoMapper.Entregue, entregueEm);
 
         var avaliacao = _outbox.Should().ContainSingle(m => m.CorpoRenderizado.Contains("como foi")).Subject;
-        avaliacao.ProximaTentativaEm.Should().Be(new DateTime(2026, 10, 1, 13, 30, 0, DateTimeKind.Utc));
+        avaliacao.ProximaTentativaEm.Should().Be(entregueEm.AddMinutes(30));
         var metadados = avaliacao.LerMetadados()!;
         metadados["template"].Should().Be("avaliacao");
         metadados["botao1"].Should().Be($"acao:avaliacao:positiva:{_pedido.Id}|Gostei");
@@ -181,7 +184,6 @@ public class NotificarClienteStatusPedidoHandlerTests
     }
 
     [Theory]
-    [InlineData(StatusPedidoMapper.Cancelado)]
     [InlineData(StatusPedidoMapper.Pronto)]
     [InlineData(StatusPedidoMapper.Aguardando)]
     public async Task StatusSemAvisoNaoGeraNada(string statusNovo)
@@ -223,12 +225,41 @@ public class NotificarClienteStatusPedidoHandlerTests
             "pay-1", "pix", 25m, StatusPedidoMapper.Aguardando, DateTime.UtcNow);
 
         await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, payload), CancellationToken.None);
+        await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, payload), CancellationToken.None);
         await AvaliarEventosAsync();
 
         var mensagem = _outbox.Should().ContainSingle().Subject;
         mensagem.CorpoRenderizado.Should().Contain("Recebemos seu pagamento").And.Contain("Tarde (14h às 18h), 01/10");
         mensagem.IdempotencyKey.Should().Be(OutboxMensagemNotificacao.ComputarIdempotencyKey(
-            $"{_pedido.Id:N}|pago", CanalNotificacao.WhatsApp));
+            $"{_pedido.Id:N}|pagamento:{payload.CobrancaPedidoId:N}:{payload.PagamentoExternoId}", CanalNotificacao.WhatsApp));
+    }
+
+    [Fact]
+    public async Task PagamentoConfirmadoDepoisDoCancelamentoNaoAvisaQuePedidoEstaConfirmado()
+    {
+        _pedido.Cancelar();
+        var payload = new PedidoPagoEvent(_pedido.Id, _empresaId, null, _cliente.Id, null, Guid.NewGuid(), "mercadopago",
+            "pay-atrasado", "pix", 25m, StatusPedidoMapper.Aguardando, DateTime.UtcNow);
+
+        await new NotificarClientePedidoPagoHandler(Aviso()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, payload), CancellationToken.None);
+        await AvaliarEventosAsync();
+
+        _eventos.Should().BeEmpty();
+        _outbox.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CancelamentoAvisaClienteSemAfirmarDevolucaoFinanceira()
+    {
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ mensagem }}");
+        _pedido.Cancelar();
+        _cliente.DefinirAvisosStatus(false, DateTime.UtcNow);
+
+        await MudarStatusAsync(StatusPedidoMapper.Aguardando, StatusPedidoMapper.Cancelado);
+        await MudarStatusAsync(StatusPedidoMapper.Aguardando, StatusPedidoMapper.Cancelado);
+
+        var mensagem = _outbox.Should().ContainSingle().Subject;
+        mensagem.CorpoRenderizado.Should().Contain("pedido foi cancelado").And.NotContain("devolvido").And.NotContain("estornado");
     }
 
     private async Task MudarStatusAsync(string antigo, string novo, DateTime? ocorridoEm = null)
@@ -250,6 +281,29 @@ public class NotificarClienteStatusPedidoHandlerTests
         _pedidos, _clientes, _vagas, _storefronts, new PoliticaEnvioCliente(_consentimentos), _notificador, _tenant,
         NullLogger<AvisoStatusPedidoCliente>.Instance);
 
+    [Fact]
+    public async Task AlteracoesDistintasTemAvisosDistintosERepeticaoNaoDuplicaOutbox()
+    {
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ mensagem }}");
+        var aviso = Aviso();
+        foreach (var marco in new[] { "pagamento:primeiro", "pagamento:complementar", "pagamento:complementar" })
+            await aviso.EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, _empresaId, _pedido.Id, marco,
+                CancellationToken.None, mensagem: "Recebemos R$ 10,00 via pix.");
+        await AvaliarEventosAsync();
+
+        _outbox.Should().HaveCount(2);
+        _outbox.Select(o => o.IdempotencyKey).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public async Task ClienteBloqueadoNaoEnfileiraAlteracao()
+    {
+        _cliente.Bloquear("teste", DateTime.UtcNow);
+        (await Aviso().EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, _empresaId, _pedido.Id,
+            "comanda:teste", CancellationToken.None, mensagem: "Ajuste confirmado")).Should().BeFalse();
+        _eventos.Should().BeEmpty();
+    }
+
     private OutboxEventoIntegracao Evento<T>(string tipo, T payload) =>
         OutboxEventoIntegracao.Criar(_empresaId, tipo, "pedido", _pedido.Id, JsonSerializer.Serialize(payload, Camel));
 
@@ -258,7 +312,7 @@ public class NotificarClienteStatusPedidoHandlerTests
         var rotina = RotinaNotificacao.Criar(templateCodigo + "_rotina", templateCodigo, tipo, TriggerTipoRotina.Evento,
             templateCodigo, CategoriaConteudoNotificacao.Transacional);
         rotina.DefinirFallback("[\"WhatsApp\"]", "system");
-        _rotinaRepository.ListarAtivasAsync(tipo, Arg.Any<CancellationToken>()).Returns([rotina]);
+        _rotinaRepository.ListarAtivasAsync(tipo, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns([rotina]);
         _templateRepository.GetAtivoAsync(templateCodigo, CanalNotificacao.WhatsApp, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { EVENTOS, tocarAviso } from '../infra/som'
+import { tocarAviso } from '../infra/som'
 import { motivoVisivel, precisaDeVoce } from '../dominio/automatico'
-import { notificarPrecisaDeVoce } from '../infra/notificacaoNavegador'
-import { mudancasDoRetrato } from '../dominio/avisoSonoro'
+import { notificar } from '../infra/notificacaoNavegador'
+import { TIPOS_DE_AVISO, avisosDoRetrato } from '../dominio/aviso'
 
 // Quando o som toca (D6, US-010, RN-25). O COMO mora em infra/som.js.
 //
@@ -24,10 +24,20 @@ import { mudancasDoRetrato } from '../dominio/avisoSonoro'
 // de um contexto que essas janelas não têm. Devolve `destacados` (achado 1,
 // "destaque"): ids que acabaram de mudar, por ~1,5 s, para o cartão piscar
 // sem precisar de outro observador.
+//
+// #1807: cada mudança vira um aviso (`dominio/aviso.js`), com contato novo e
+// pedido que mudou de etapa além dos três sons. O som e o destaque são desta
+// janela; o resto (toast e navegador) vai para `aoAvisar`, o despachante do
+// Provider. Sem `aoAvisar` (Cozinha e Entregas espelho), segue o de antes:
+// só "precisa de você" vai ao navegador.
 const DURACAO_DESTAQUE_MS = 1500
 
+const avisarSoNoNavegador = (aviso) => {
+  if (aviso.tipo === TIPOS_DE_AVISO.PASSOU_PARA_VOCE) notificar(aviso.tipo, aviso.conversaId, aviso.titulo, aviso.corpo)
+}
+
 export function useAvisoSonoro({
-  conversas, som, agora, aberta = true, janelas = [], aoTocar,
+  conversas, som, agora, aberta = true, janelas = [], expediente = null, aoTocar, aoAvisar = avisarSoNoNavegador,
 }) {
   const anterior = useRef(null)
   const [destacados, setDestacados] = useState(() => new Set())
@@ -46,40 +56,29 @@ export function useAvisoSonoro({
   useEffect(() => {
     const retrato = new Map((conversas ?? []).map((c) => {
       const ultimaDoCliente = (c.mensagens ?? []).filter((m) => m.dir === 'in').at(-1)
+      const precisa = precisaDeVoce(c, agora, true, aberta, janelas, expediente)
       return [c.id, {
         pago: c.pedido?.estado === 'pago',
-        precisa: precisaDeVoce(c, agora, true, aberta, janelas),
+        precisa,
         ultimaMensagemClienteId: ultimaDoCliente?.id ?? null,
+        etapa: c.pedido?.estado ?? null,
+        nome: c.nome ?? '',
+        motivo: precisa ? motivoVisivel(c, agora, true, aberta, janelas, expediente) : null,
       }]
     }))
     const antes = anterior.current
     anterior.current = retrato
     // Primeira volta (ou lista ainda vazia, modo API) é só retrato: `dominio/avisoSonoro.js`.
-    for (const { id, mensagemNova, pagouAgora, passouAgora } of mudancasDoRetrato(antes, retrato)) {
-      // Achado 6 (rodada 10): quando a mesma mensagem faz "passou para você"
-      // E conta como "novo atendimento" no mesmo retrato, só o mais
-      // importante toca (precisa de ação > chegou mensagem), nunca os dois
-      // timbres sobrepostos.
-      if (passouAgora) {
-        tocarAviso(EVENTOS.PASSOU_PARA_VOCE, som)
-        aoTocar?.(EVENTOS.PASSOU_PARA_VOCE, id)
-        destacarPorInstante(id)
-        const conversa = conversas.find((c) => c.id === id)
-        notificarPrecisaDeVoce(
-          id, 'Precisa de você', motivoVisivel(conversa, agora, true, aberta, janelas) ?? conversa?.nome ?? '',
-        )
-      } else if (mensagemNova) {
-        tocarAviso(EVENTOS.NOVO_ATENDIMENTO, som)
-        aoTocar?.(EVENTOS.NOVO_ATENDIMENTO, id)
+    for (const aviso of avisosDoRetrato(antes, retrato)) {
+      if (aviso.som) {
+        tocarAviso(aviso.som, som)
+        aoTocar?.(aviso.som, aviso.conversaId)
       }
-      if (pagouAgora) {
-        tocarAviso(EVENTOS.PAGAMENTO_CONFIRMADO, som)
-        aoTocar?.(EVENTOS.PAGAMENTO_CONFIRMADO, id)
-        destacarPorInstante(id)
-      }
+      if (aviso.destaca) destacarPorInstante(aviso.conversaId)
+      aoAvisar?.(aviso)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversas, som, agora, aberta, janelas])
+  }, [conversas, som, agora, aberta, janelas, expediente])
 
   return destacados
 }

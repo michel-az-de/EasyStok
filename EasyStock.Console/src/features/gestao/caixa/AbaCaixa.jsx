@@ -6,7 +6,7 @@ import { Chip } from '../../../componentes/Chip'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
 import {
-  CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, caixaAberto, caixaAberturaDoDia,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, caixaAberto, caixaAberturaDoDia,
   caixaFechamentoDoDia, movimentosDoDia, nomeDoMetodoCaixa, resumoCaixa, vendasDoDia,
 } from '../../../dominio/caixa'
 import {
@@ -24,28 +24,28 @@ const OPCOES_METODO = METODOS_CAIXA.map((id) => ({ valor: id, rotulo: nomeDoMeto
 // reaproveitando a MESMA ação `marcarEstorno`). Mesmo padrão de campo e
 // validação de `features/ficha-cliente/BlocoOcorrencia.jsx` ("Confirmar
 // reembolso"), só que sem valor parcial: aqui é o toque único do caixa.
-function PromptEstorno({ rotulo, aoCancelar, aoConfirmar }) {
+export function PromptEstorno({ rotulo, aoCancelar, aoConfirmar, enviando = false }) {
   const [motivo, setMotivo] = useState('')
   return (
     <div className={css.promptEstorno}>
       <p className={css.corpoBloco}>Estornar {rotulo}?</p>
       <CampoArea
         rotulo="Motivo do estorno"
-        rotuloOculto
-        dica="Obrigatório. Fica gravado no lançamento."
+        dica="Descreva o motivo com pelo menos 3 caracteres. Fica gravado no lançamento."
         rows={2}
         value={motivo}
+        disabled={enviando}
         onChange={(e) => setMotivo(e.target.value)}
       />
       <p className={css.confirmarAcoes}>
-        <Botao variante="texto" onClick={aoCancelar}>Manter</Botao>
+        <Botao variante="texto" disabled={enviando} onClick={aoCancelar}>Manter lançamento</Botao>
         <Botao
           variante="primario"
           icone="undo-2"
-          disabled={motivo.trim().length < 3}
+          disabled={enviando || motivo.trim().length < 3}
           onClick={() => aoConfirmar(motivo.trim())}
         >
-          Confirmar estorno
+          {enviando ? 'Estornando…' : 'Confirmar estorno'}
         </Botao>
       </p>
     </div>
@@ -176,8 +176,8 @@ export function AbaCaixa() {
 
       <dl className={css.resumoLista}>
         <div><dt>Saldo inicial</dt><dd>{moeda(resumo.saldoInicial)}</dd></div>
-        <div><dt>Entradas extras</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
-        <div><dt>Saídas extras</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
+        <div><dt>Outras entradas</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
+        <div><dt>Outras saídas</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
         <div><dt>Pagamentos de pedidos ({resumo.quantidadeVendas})</dt><dd>{moeda(resumo.totalPagamentosPedidos)}</dd></div>
         <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{moeda(resumo.saldoEsperado)}</dd></div>
       </dl>
@@ -196,7 +196,7 @@ export function AbaCaixa() {
             Venda avulsa
           </Botao>
           <Botao variante="secundario" icone="log-out" onClick={() => setFecharAberto(true)}>
-            Fechar o dia
+            Fechar o caixa
           </Botao>
         </div>
       )}
@@ -222,20 +222,18 @@ export function AbaCaixa() {
             </Chip>
           </div>
 
-          {tipoLancamento === TIPOS_MOVIMENTO.SAIDA && (
-            <div className={css.categoriasSugeridas}>
-              {CATEGORIAS_SAIDA_SUGERIDAS.map((sugestao) => (
-                <Chip key={sugestao} papel="filtro" ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>
-                  {sugestao}
-                </Chip>
-              ))}
-            </div>
-          )}
+          <div className={css.categoriasSugeridas}>
+            {(tipoLancamento === TIPOS_MOVIMENTO.SAIDA ? CATEGORIAS_SAIDA_SUGERIDAS : CATEGORIAS_ENTRADA_SUGERIDAS).map((sugestao) => (
+              <Chip key={sugestao} papel="filtro" ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>
+                {sugestao}
+              </Chip>
+            ))}
+          </div>
 
           <div className={css.formGrade}>
             <CampoTexto
               rotulo="Categoria"
-              placeholder={tipoLancamento === TIPOS_MOVIMENTO.SAIDA ? 'Ex.: Sangria, Despesa, Suprimento' : 'Ex.: Adiantamento, Reforço de troco'}
+              placeholder={tipoLancamento === TIPOS_MOVIMENTO.SAIDA ? 'Ex.: Sangria, Despesa' : 'Ex.: Suprimento (reforço de troco)'}
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
             />

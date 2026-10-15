@@ -13,6 +13,9 @@ public sealed class BackgroundJobOptions
     /// <summary>S39: disparador das mensagens programadas ao cliente. Desligar é o rollback.</summary>
     public bool EnableMensagensProgramadas { get; set; } = true;
 
+    /// <summary>S57: reenvio automático das mensagens com falha temporária. Desligar é o rollback.</summary>
+    public bool EnableReenvioMensagens { get; set; } = true;
+
     /// <summary>S43: avaliador dos lembretes da dona. Desligar é o rollback.</summary>
     public bool EnableAvaliadorLembretes { get; set; } = true;
 
@@ -37,6 +40,14 @@ public sealed class BackgroundJobOptions
     /// como vencidas e atualizando status agregado. Default true em producao.
     /// </summary>
     public bool EnableContaFinanceiraVencimentoJob { get; set; } = true;
+
+    /// <summary>
+    /// N12 (Q3, decisão do Felipe): quando <c>true</c>, o <c>ContaFinanceiraVencimentoJob</c> publica os avisos de conta a
+    /// pagar e a receber vencendo (D-3, D-1) e vencida. Padrão <c>false</c>: o job só marca a parcela vencida, sem evento e
+    /// sem carimbar o dedup, porque o aviso nasceria sem rotina semeada e sem destinatário no payload e o carimbo faria o
+    /// aviso sumir para sempre. Religar é <c>BackgroundJobs:EnableContaFinanceiraNotificacoes=true</c>.
+    /// </summary>
+    public bool EnableContaFinanceiraNotificacoes { get; set; }
 
     /// <summary>
     /// Quando <c>true</c>, registra o <c>ContaReceberPixReconciliacaoJob</c>

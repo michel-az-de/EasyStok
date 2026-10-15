@@ -41,10 +41,13 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
         // SISTEMA nao vem no SELECT * — sem ela o EF falha com "column e.xmin does not
         // exist" e TODO aprovar/recusar de pedido storefront morre (pego via #822).
         const string sql = "SELECT *, xmin FROM pedidos WHERE \"Id\" = {0} FOR UPDATE";
-        return await db.Pedidos
+        var pedido = await db.Pedidos
             .FromSqlRaw(sql, pedidoId)
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ct);
+        if (pedido is not null)
+            await db.Entry(pedido).Collection(p => p.Pagamentos).LoadAsync(ct);
+        return pedido;
     }
 
     public async Task AddAsync(Pedido pedido, CancellationToken ct = default)
@@ -97,22 +100,6 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
             .Take(maxBatch)
             .ToListAsync(ct);
     }
-
-    public Task<IReadOnlyList<Pedido>> GetEntreguesElegiveisPraAvaliacaoAsync(
-        DateTime entregueAntesDe,
-        int maxBatch = 50,
-        CancellationToken ct = default) =>
-        db.Pedidos
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(p => p.Status == StatusPedidoMapper.Entregue
-                     && p.Origem == "storefront"
-                     && p.EntreguEm <= entregueAntesDe
-                     && p.AvaliacaoSolicitadaEm == null)
-            .OrderBy(p => p.EntreguEm)
-            .Take(maxBatch)
-            .ToListAsync(ct)
-            .ContinueWith<IReadOnlyList<Pedido>>(t => t.Result, ct, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
 
     public async Task<IReadOnlyList<Pedido>> ListarPorClienteAsync(
         Guid empresaId,

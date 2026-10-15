@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef } from 'react'
 import { Icone } from './Icone'
 import css from './Modal.module.css'
 
@@ -20,7 +20,8 @@ import css from './Modal.module.css'
 // dentro fica por cima, sai com o foco que showModal() já dá de graça, e Esc
 // fecha só ele. A pilha de close-watcher nativa do navegador segue a mesma
 // ordem do top layer.
-export function Modal({ titulo, descricao, aoFechar, rodape, largura, children }) {
+export function Modal({ titulo, descricao, aoFechar, rodape, largura, className, children }) {
+  const id = useId()
   const dialogoRef = useRef(null)
   const focoAnterior = useRef(null)
   const aoFecharRef = useRef(aoFechar)
@@ -30,12 +31,13 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, children }
 
   useEffect(() => {
     const dialogo = dialogoRef.current
+    const dialogoPai = dialogo.parentElement?.closest('dialog[open]')
     focoAnterior.current = document.activeElement
     if (!dialogo.open) dialogo.showModal()
 
-    const aoCancelar = (evento) => { evento.preventDefault(); aoFecharRef.current() }
+    const aoCancelar = (evento) => { evento.preventDefault(); aoFecharRef.current?.() }
     // Clique no ::backdrop chega no próprio <dialog>, nunca no conteúdo.
-    const aoClicar = (evento) => { if (evento.target === dialogo) aoFecharRef.current() }
+    const aoClicar = (evento) => { if (evento.target === dialogo) aoFecharRef.current?.() }
     dialogo.addEventListener('cancel', aoCancelar)
     dialogo.addEventListener('click', aoClicar)
 
@@ -45,30 +47,37 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, children }
       if (dialogo.open) dialogo.close()
       // O nó que abriu pode ter desmontado. Sem isto o foco cairia no body.
       const anterior = focoAnterior.current
-      if (anterior?.isConnected) anterior.focus()
-      else document.querySelector('[data-foco-reserva]')?.focus()
+      const paiAberto = dialogoPai?.isConnected && dialogoPai.open ? dialogoPai : null
+      if (anterior?.isConnected && anterior !== document.body && anterior !== document.documentElement
+        && (!paiAberto || paiAberto.contains(anterior))) anterior.focus()
+      else if (paiAberto) {
+        const destino = paiAberto.querySelector('[data-foco-reserva]')
+          ?? paiAberto.querySelector('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')
+          ?? paiAberto
+        destino.focus()
+      } else document.querySelector('[data-foco-reserva]')?.focus()
     }
   }, [])
 
   return (
     <dialog
       ref={dialogoRef}
-      className={css.caixa}
+      className={[css.caixa, className].filter(Boolean).join(' ')}
       style={largura ? { width: largura } : undefined}
-      aria-label={titulo}
+      aria-labelledby={`${id}-titulo`}
+      aria-describedby={descricao ? `${id}-descricao` : undefined}
+      aria-modal="true"
     >
-      {/* X no canto (banca, item 10). Nome "Sair" e não "Fechar": várias provas
-          clicam no botão "Fechar" do rodapé pelo nome, e dois iguais na mesma
-          janela quebrariam esse clique. */}
-      <button type="button" className={css.fecharCanto} aria-label="Sair" title="Fechar (Esc)" onClick={aoFechar}>
+      {/* Distingue fechar a janela de sair da sessão e do botão do rodapé. */}
+      <button type="button" className={css.fecharCanto} aria-label="Fechar janela" title="Fechar (Esc)" disabled={!aoFechar} onClick={aoFechar}>
         <Icone nome="x" tamanho={18} />
       </button>
       {/* Integração: título e rodapé fora da rolagem. Folha comprida (resumo
           do Encerrar, canhoto) rolava o título para fora e escondia o botão de
           ação lá embaixo; agora só o miolo rola. */}
-      <h2 className={css.titulo}>{titulo}</h2>
+      <h2 id={`${id}-titulo`} className={css.titulo}>{titulo}</h2>
       <div className={css.conteudo}>
-        {descricao && <p className={css.sub}>{descricao}</p>}
+        {descricao && <p id={`${id}-descricao`} className={css.sub}>{descricao}</p>}
         {children}
       </div>
       {rodape && <div className={css.rodape}>{rodape}</div>}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Avatar } from '../../componentes/Avatar'
 import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
@@ -7,6 +7,7 @@ import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { Popover } from '../../componentes/Popover'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import {
   bloqueioDe, conversasDoCadastro, ehLead, estaBloqueada, resumoDoBloqueio,
 } from '../../dominio/conversa'
@@ -17,9 +18,13 @@ import {
 import { indiceDoPasso } from '../../dominio/esteira'
 import { numeroCurto, pedidoEncerrado } from '../../dominio/pedido'
 import { SITUACOES, situacaoDoCep } from '../../dominio/areaEntrega'
-import { chegouQuando, mesmoDomicilio, resumoFinanceiro } from '../../dominio/cliente'
+import {
+  chegouQuando, dicaDoCep, mesmoDomicilio, motivoParaNaoBloquear, recusaDoEndereco, resumoFinanceiro,
+} from '../../dominio/cliente'
 import { SELO_CAPTADO, automaticoConduzindo } from '../../dominio/captura'
 import { historicoElegivelParaFidelidade, saldoDePontos } from '../../dominio/fidelidade'
+import { notasRecentes } from '../../dominio/notas'
+import { mostraHistorico, resumoDasTags } from '../../dominio/ficha'
 import { CampoEmLinha } from './CampoEmLinha'
 import { TagsDoCliente } from './TagsDoCliente'
 import { ModalHistorico } from './ModalHistorico'
@@ -60,9 +65,13 @@ function SeloCaptado({ quando }) {
   )
 }
 
-export function BlocoCliente({ conversa }) {
+const NADA_RECOLHIDO = { contato: false, tags: false, historico: false }
+
+export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
   const { cliente } = conversa
-  const { conversas, historico, agora, automaticoPausado, fidelidade } = useAtendimento()
+  const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
+  // #1474 (R2): no modo API, mudar a entrega do pedido e os pontos não têm endpoint e somem.
+  const disponivel = useAcaoDisponivel()
   const { canais, motivosBloqueio, prefixosCepAtendidos } = useCatalogo()
   const {
     bloquearCliente, desbloquearCliente, selecionar,
@@ -73,6 +82,11 @@ export function BlocoCliente({ conversa }) {
   const [menuAberto, setMenuAberto] = useState(false)
   const [avisoEndereco, setAvisoEndereco] = useState(null)
   const [form, setForm] = useState(() => estadoInicialDoForm(conversa))
+  // #1586: espera e erro do "Salvar cadastro", presos à conversa que iniciou (a Ficha troca de
+  // conversa sem remontar este bloco). A ref trava o segundo toque.
+  const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null })
+  const cadastrando = useRef(false)
+  const idMotivoBloqueio = useId()
 
   // Troca de conversa: recarrega o rascunho do cadastro rápido e limpa avisos
   // que eram da conversa anterior. Só depende do id: editar o formulário não
@@ -125,259 +139,323 @@ export function BlocoCliente({ conversa }) {
   const situacaoCep = form.cep ? situacaoDoCep(form.cep, prefixosCepAtendidos) : SITUACOES.SEM_CEP
   const cepForaDaArea = situacaoCep === SITUACOES.FORA || situacaoCep === SITUACOES.LIMITE
   const podeSalvarCadastro = form.nome.trim() && form.telefone.replace(/\D/g, '').length >= 10
+  const salvandoCadastro = cadastro.salvando && cadastro.id === conversa.id
+  const erroCadastro = cadastro.id === conversa.id ? cadastro.erro : null
+  // #1586: lead sem cadastro no modo API não tem o que bloquear; o item nasce desabilitado.
+  const motivoSemBloqueio = bloqueada ? null : motivoParaNaoBloquear(conversa, { fonteApi })
 
-  function aoSalvarCadastro() {
+  // Na demonstração a ação é síncrona e não devolve nada: o `await` segue como sucesso.
+  async function aoSalvarCadastro() {
+    if (cadastrando.current) return
+    cadastrando.current = true
+    const id = conversa.id
     const endereco = [form.enderecoSemCep.trim(), form.cep ? mascaraCep(form.cep) : '']
       .filter(Boolean).join(', ') || null
-    salvarCadastroRapido(conversa.id, { nome: form.nome, telefone: form.telefone, endereco }, agora)
+    setCadastro({ id, salvando: true, erro: null })
+    let erro = null
+    try {
+      const resultado = await salvarCadastroRapido(id, { nome: form.nome, telefone: form.telefone, endereco }, agora)
+      erro = resultado?.erro ?? null
+    } catch (falha) {
+      erro = falha.message || 'Não foi possível salvar o cadastro. Tente de novo.'
+    } finally {
+      cadastrando.current = false
+    }
+    setCadastro({ id, salvando: false, erro })
   }
 
   const validarNome = (v) => (v.trim() ? null : 'Escreva o nome')
   const validarTelefone = (v) => (v.replace(/\D/g, '').length >= 10 ? null : 'Telefone com DDD')
 
-  function aoSalvarEndereco(valor) {
-    editarDadoCliente(conversa.id, 'endereco', valor, agora)
+  function avisarDoEnderecoNoPedido() {
+    // Modo API: rascunho de comanda leva o endereço do cadastro quando vira pedido, então não
+    // há o que perguntar; pedido já criado segue com o endereço antigo (sem endpoint para trocar).
+    if (fonteApi && !conversa.pedido?.pedidoId) return
     if (conversa.pedido && !pedidoEncerrado(conversa.pedido)) {
       const antesDeEntrega = indiceDoPasso(conversa.pedido.estado) < indiceDoPasso('entrega')
-      setAvisoEndereco(antesDeEntrega ? 'perguntar' : 'aviso')
+      setAvisoEndereco(antesDeEntrega && disponivel('mudarEnderecoDoPedido') ? 'perguntar' : 'aviso')
     }
   }
 
+  // #1586: devolve a ida ao EasyStok para o campo esperar; o aviso sobre o pedido só vale
+  // depois de o cadastro mudar de verdade.
+  function aoSalvarEndereco(valor) {
+    const ida = editarDadoCliente(conversa.id, 'endereco', valor, agora)
+    if (!ida?.then) { avisarDoEnderecoNoPedido(); return ida }
+    return ida.then((resultado) => {
+      if (!resultado?.erro) avisarDoEnderecoNoPedido()
+      return resultado
+    })
+  }
+
+  // #1442: quatro seções que recolhem e lembram (Bloco com `chave`), para a
+  // rolagem da ficha não ficar extensa. Recolhida, cada uma deixa um resumo.
+  const resumoTags = resumoDasTags(cliente.tags.length)
+  const resgataPontos = !lead && disponivel('resgatarRecompensa')
+  const resumoHistorico = cliente.pedidos === 1 ? '1 pedido' : `${cliente.pedidos} pedidos`
+
   return (
-    <Bloco titulo="Cliente">
-      <div className={css.identidade}>
-        <Avatar nome={conversa.nome} foto={fotoDoCliente(canal, cliente)} tamanho="enorme" />
-        <div className={css.identidadeTextos}>
-          <div key={`nome-${captado.nome ?? ''}`} className={captado.nome ? css.captadoAgora : undefined}>
-            <CampoEmLinha rotulo="Nome do cliente" valor={conversa.nome} validar={validarNome}
-              aoSalvar={(v) => editarDadoCliente(conversa.id, 'nome', v.trim(), agora)} />
-            <SeloCaptado quando={captado.nome} />
+    <>
+      <Bloco titulo="Cliente" chave="cliente" resumo={conversa.nome}>
+        <div className={css.identidade}>
+          <Avatar nome={conversa.nome} foto={fotoDoCliente(canal, cliente)} tamanho="enorme" />
+          <div className={css.identidadeTextos}>
+            <div key={`nome-${captado.nome ?? ''}`} className={captado.nome ? css.captadoAgora : undefined}>
+              <CampoEmLinha rotulo="Nome do cliente" valor={conversa.nome} validar={validarNome}
+                aoSalvar={(v) => editarDadoCliente(conversa.id, 'nome', v.trim(), agora)} />
+              <SeloCaptado quando={captado.nome} />
+            </div>
+            {lead ? (
+              <span className={css.situacao}>Lead · {chegouQuando(conversa, agora)}</span>
+            ) : cliente.desde && (
+              // #1474: o cadastro da API não traz a data; sem ela, a linha não aparece vazia.
+              <span className={css.situacao}>Cliente desde {cliente.desde}</span>
+            )}
           </div>
-          {lead ? (
-            <span className={css.situacao}>Lead · {chegouQuando(conversa, agora)}</span>
-          ) : (
-            <span className={css.situacao}>Cliente desde {cliente.desde}</span>
-          )}
-        </div>
-        <span className={css.menuCliente}>
-          <Botao
-            className={css.gatilhoMenu}
-            aria-haspopup="menu"
-            aria-expanded={menuAberto}
-            aria-label="Mais ações do cliente"
-            title="Mais ações do cliente"
-            onClick={() => setMenuAberto((v) => !v)}
-          >
-            <Icone nome="ellipsis" tamanho={24} />
-          </Botao>
-          {menuAberto && (
-            <Popover rotulo="Mais ações do cliente" posicao="abaixo" aoFechar={() => setMenuAberto(false)}>
-              <div className={css.menuAcoes}>
-                <button
-                  type="button" role="menuitem" className={css.itemMenu}
-                  onClick={() => { setMenuAberto(false); setModal(bloqueada ? 'desbloquear' : 'bloquear') }}
-                >
-                  <Icone nome="bloqueio" />
-                  {bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente'}
-                </button>
-              </div>
-            </Popover>
-          )}
-        </span>
-      </div>
-
-      {/* Sinal forte de bloqueio: ícone, palavra e motivo. A cor sozinha não
-          informa nada, então o texto diz tudo o que o vermelho sugeriria. */}
-      {bloqueada && (
-        <div className={css.avisoBloqueio}>
-          <p className={css.tituloBloqueio}>
-            <Icone nome="bloqueio" />
-            <strong>Cadastro bloqueado</strong>
-            <span className={css.alcanceBloqueio}>vale em todos os canais</span>
-          </p>
-          <p className={css.motivoBloqueio}>{bloqueio.motivo}</p>
-          <p className={css.rodapeBloco}>{resumoDoBloqueio(bloqueio)}</p>
-        </div>
-      )}
-
-      {!lead && cliente.pedidos > 0 && (
-        <div className={css.numerosCliente}>
-          <span>
-            <b>{cliente.pedidos}</b>
-            <i>{cliente.pedidos === 1 ? 'pedido' : 'pedidos'}</i>
+          <span className={css.menuCliente}>
+            <Botao
+              className={css.gatilhoMenu}
+              aria-haspopup="menu"
+              aria-expanded={menuAberto}
+              aria-label="Mais ações do cliente"
+              title="Mais ações do cliente"
+              onClick={() => setMenuAberto((v) => !v)}
+            >
+              <Icone nome="ellipsis" tamanho={24} />
+            </Botao>
+            {menuAberto && (
+              <Popover rotulo="Mais ações do cliente" posicao="abaixo" aoFechar={() => setMenuAberto(false)}>
+                <div className={css.menuAcoes}>
+                  <button
+                    type="button" role="menuitem" className={css.itemMenu}
+                    disabled={Boolean(motivoSemBloqueio)}
+                    aria-describedby={motivoSemBloqueio ? idMotivoBloqueio : undefined}
+                    onClick={() => { setMenuAberto(false); setModal(bloqueada ? 'desbloquear' : 'bloquear') }}
+                  >
+                    <Icone nome="bloqueio" />
+                    {bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente'}
+                  </button>
+                  {motivoSemBloqueio && <p id={idMotivoBloqueio} className={css.motivoMenu}>{motivoSemBloqueio}</p>}
+                </div>
+              </Popover>
+            )}
           </span>
-          {/* Sem histórico carregado não há soma: "R$ 0,00" dizia um valor falso. */}
-          {financeiro.total > 0 && (
-            <span>
-              <b>{moeda(financeiro.total)}</b>
-              <i>valor total</i>
-            </span>
-          )}
-          {financeiro.ultimoEm && (
-            <span>
-              <b>{dataCurta(financeiro.ultimoEm)}</b>
-              <i>último pedido</i>
-            </span>
-          )}
         </div>
-      )}
 
-      {/* Selo discreto de fidelidade (pedido do Felipe: "sem sujar a UX
-          atual"): só saldo e o botão de resgate, o catálogo mora na Gestão. */}
-      {!lead && (
-        <div className={css.linhaFidelidade}>
-          <span className={css.seloPontos}>
-            <Icone nome="estrela" tamanho={13} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
-          </span>
-          <Botao variante="texto" onClick={() => setModal('fidelidade')}>Resgatar</Botao>
-        </div>
-      )}
-
-      {precisaCadastro ? (
-        <div className={css.cadastroRapido}>
-          {!cliente.telefone && (
-            <CampoMascarado
-              tipo="telefone" rotulo="Telefone"
-              valor={form.telefone}
-              aoMudarDigitos={(d) => setForm((f) => ({ ...f, telefone: mascaraTelefone(d) }))}
-              placeholder="(11) 98765-4321"
-            />
-          )}
-          {!cliente.endereco && (
-            <>
-              <CampoTexto
-                rotulo="Endereço"
-                value={form.enderecoSemCep}
-                onChange={(e) => setForm((f) => ({ ...f, enderecoSemCep: e.target.value }))}
-                placeholder="Rua, número, complemento e bairro"
-                dica={cliente.enderecoCapturado ? 'Lido da conversa' : undefined}
-              />
-              <CampoMascarado
-                tipo="cep" rotulo="CEP"
-                valor={form.cep}
-                aoMudarDigitos={(d) => setForm((f) => ({ ...f, cep: mascaraCep(d) }))}
-                placeholder="00000-000"
-                dica={cepForaDaArea ? 'Fora da área de entrega' : undefined}
-              />
-            </>
-          )}
-          <Botao largo variante="primario" icone="user-plus" disabled={!podeSalvarCadastro} onClick={aoSalvarCadastro}>
-            Salvar cadastro
-          </Botao>
-        </div>
-      ) : (
-        <div className={css.dadosCliente}>
-          <div key={`tel-${captado.telefone ?? ''}`} className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
-            <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={15} /></span>
-            <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
-            <CampoEmLinha rotulo="Telefone" valor={cliente.telefone}
-              vazio={automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
-              validar={validarTelefone} aoSalvar={(v) => editarDadoCliente(conversa.id, 'telefone', v, agora)} />
-          </div>
-          <div
-            key={`end-${captado.endereco ?? ''}`}
-            className={`${css.linhaDado} ${enderecoPendente ? css.linhaDadoPendente : ''} ${captado.endereco ? css.captadoAgora : ''}`}
-          >
-            <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={15} /></span>
-            <span className={css.rotuloDado}>Endereço <SeloCaptado quando={captado.endereco} /></span>
-            <CampoEmLinha rotulo="Endereço" valor={cliente.endereco}
-              vazio={enderecoPendente ? 'Aguardando confirmação acima'
-                : automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar endereço'}
-              aoSalvar={aoSalvarEndereco} />
-          </div>
-          <div className={css.linhaDado}>
-            <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={15} /></span>
-            <span className={css.rotuloDado}>Canal</span>
-            <span className={css.valorCanal}>
-              {canal.nome}{cliente.usuario ? ` · @${cliente.usuario}` : ''}
-            </span>
-          </div>
-          {/* Canais de aviso: e-mail e SMS (AvisosDoCliente.jsx, que no modo API
-              grava o consentimento do cadastro, F02). */}
-          <div className={css.linhaDado}>
-            <span className={css.rotuloDado}>Avisos</span>
-            <span className={css.avisosCanais}>
-              <AvisosDoCliente conversa={conversa} />
-            </span>
-          </div>
-
-          {avisoEndereco === 'perguntar' && (
-            <p className={css.avisoEmLinha}>
-              Mudar também a entrega do pedido {numeroCurto(conversa.pedido.numero)}?
-              <Botao variante="secundario" onClick={() => { mudarEnderecoDoPedido(conversa.id, agora); setAvisoEndereco(null) }}>
-                Mudar entrega
-              </Botao>
-              <Botao variante="texto" onClick={() => setAvisoEndereco(null)}>Só o cadastro</Botao>
+        {/* Sinal forte de bloqueio: ícone, palavra e motivo. A cor sozinha não
+            informa nada, então o texto diz tudo o que o vermelho sugeriria. */}
+        {bloqueada && (
+          <div className={css.avisoBloqueio}>
+            <p className={css.tituloBloqueio}>
+              <Icone nome="bloqueio" />
+              <strong>Cadastro bloqueado</strong>
+              <span className={css.alcanceBloqueio}>vale em todos os canais</span>
             </p>
-          )}
-          {avisoEndereco === 'aviso' && (
-            <p className={css.avisoEmLinha}>Pedido {numeroCurto(conversa.pedido.numero)} já saiu com o endereço antigo.</p>
-          )}
-        </div>
+            <p className={css.motivoBloqueio}>{bloqueio.motivo}</p>
+            <p className={css.rodapeBloco}>{resumoDoBloqueio(bloqueio)}</p>
+          </div>
+        )}
+      </Bloco>
+
+      <Bloco titulo="Contato e endereço" chave="contato" recolhidoDePadrao={recolhidas.contato && !avisoEndereco} resumo={cliente.telefone ?? ''}>
+        {precisaCadastro ? (
+          <div className={css.cadastroRapido}>
+            {!cliente.telefone && (
+              <CampoMascarado
+                tipo="telefone" rotulo="Telefone"
+                valor={form.telefone}
+                aoMudarDigitos={(d) => setForm((f) => ({ ...f, telefone: mascaraTelefone(d) }))}
+                placeholder="(11) 98765-4321"
+              />
+            )}
+            {!cliente.endereco && (
+              <>
+                <CampoTexto
+                  rotulo="Endereço"
+                  value={form.enderecoSemCep}
+                  onChange={(e) => setForm((f) => ({ ...f, enderecoSemCep: e.target.value }))}
+                  placeholder="Rua, número, complemento e bairro"
+                  dica={cliente.enderecoCapturado ? 'Lido da conversa' : undefined}
+                />
+                <CampoMascarado
+                  tipo="cep" rotulo="CEP"
+                  valor={form.cep}
+                  aoMudarDigitos={(d) => setForm((f) => ({ ...f, cep: mascaraCep(d) }))}
+                  placeholder="00000-000"
+                  dica={dicaDoCep(cepForaDaArea, { fonteApi })}
+                />
+              </>
+            )}
+            {erroCadastro && <p className={css.erroEmLinha} role="alert">{erroCadastro}</p>}
+            <Botao largo variante="primario" icone="user-plus" disabled={!podeSalvarCadastro || cadastro.salvando} onClick={aoSalvarCadastro}>
+              {salvandoCadastro ? 'Salvando…' : 'Salvar cadastro'}
+            </Botao>
+          </div>
+        ) : (
+          <div className={css.dadosCliente}>
+            <div key={`tel-${captado.telefone ?? ''}`} className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
+              <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={15} /></span>
+              <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
+              <CampoEmLinha rotulo="Telefone" valor={cliente.telefone}
+                vazio={automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
+                validar={validarTelefone} aoSalvar={(v) => editarDadoCliente(conversa.id, 'telefone', v, agora)} />
+            </div>
+            <div
+              key={`end-${captado.endereco ?? ''}`}
+              className={`${css.linhaDado} ${enderecoPendente ? css.linhaDadoPendente : ''} ${captado.endereco ? css.captadoAgora : ''}`}
+            >
+              <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={15} /></span>
+              <span className={css.rotuloDado}>Endereço <SeloCaptado quando={captado.endereco} /></span>
+              <CampoEmLinha rotulo="Endereço" valor={cliente.endereco}
+                vazio={enderecoPendente ? 'Aguardando confirmação acima'
+                  : automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar endereço'}
+                validar={fonteApi ? recusaDoEndereco : undefined}
+                aoSalvar={aoSalvarEndereco} />
+            </div>
+            {/* #1761 (L22): o canal já está no cabeçalho da conversa; aqui só o que ele não diz, o usuário. */}
+            {cliente.usuario && (
+              <div className={css.linhaDado}>
+                <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={15} /></span>
+                <span className={css.rotuloDado}>Canal</span>
+                <span className={css.valorCanal}>{canal.nome} · @{cliente.usuario}</span>
+              </div>
+            )}
+            {/* Canais de aviso: e-mail e SMS (AvisosDoCliente.jsx, que no modo API
+                grava o consentimento do cadastro, F02). */}
+            <div className={css.linhaDado}>
+              <span className={css.rotuloDado}>Avisos</span>
+              <span className={css.avisosCanais}>
+                <AvisosDoCliente conversa={conversa} />
+              </span>
+            </div>
+
+            {avisoEndereco === 'perguntar' && (
+              <p className={css.avisoEmLinha}>
+                Mudar também a entrega do pedido {numeroCurto(conversa.pedido.numero)}?
+                <Botao variante="secundario" onClick={() => { mudarEnderecoDoPedido(conversa.id, agora); setAvisoEndereco(null) }}>
+                  Mudar entrega
+                </Botao>
+                <Botao variante="texto" onClick={() => setAvisoEndereco(null)}>Só o cadastro</Botao>
+              </p>
+            )}
+            {avisoEndereco === 'aviso' && (
+              <p className={css.avisoEmLinha}>
+                {indiceDoPasso(conversa.pedido.estado) < indiceDoPasso('entrega')
+                  ? `O cadastro mudou; o pedido ${numeroCurto(conversa.pedido.numero)} segue com o endereço antigo.`
+                  : `Pedido ${numeroCurto(conversa.pedido.numero)} já saiu com o endereço antigo.`}
+              </p>
+            )}
+          </div>
+        )}
+
+        {domicilio && (
+          <p className={css.mesmoDomicilio}>
+            Mesmo endereço de{' '}
+            <button type="button" className={css.linkDomicilio} onClick={() => selecionar(domicilio.id)}>
+              {domicilio.nome}
+            </button>
+          </p>
+        )}
+      </Bloco>
+
+      <Bloco titulo="Tags" chave="tags" recolhidoDePadrao={recolhidas.tags} resumo={resumoTags}>
+        <TagsDoCliente conversa={conversa} />
+
+        {/* #1441: as notas internas mais recentes como post-its, ao lado da conversa. */}
+        {cliente.notas.length > 0 && (
+          <ul className={css.postIts} aria-label="Notas internas">
+            {notasRecentes(cliente.notas).map((nota) => (
+              <li key={nota.id ?? nota.em + nota.texto.slice(0, 12)} className={css.ultimaNota}>
+                <span className={css.rotuloNota}>Nota · {nota.em.slice(0, 5)}{nota.autor ? ` · ${nota.autor}` : ''}</span>
+                <span className={css.textoNota}>{nota.texto}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Bloco>
+
+      {/* #1761 (L22): sem pedido e sem pontos, o Histórico não tem o que abrir. */}
+      {mostraHistorico({ pedidos: cliente.pedidos, fonteApi, resgataPontos }) && (
+      <Bloco titulo="Histórico" chave="historico" recolhidoDePadrao={recolhidas.historico} resumo={resumoHistorico}>
+        {!lead && cliente.pedidos > 0 && (
+          <div className={css.numerosCliente}>
+            <span>
+              <b>{cliente.pedidos}</b>
+              <i>{cliente.pedidos === 1 ? 'pedido' : 'pedidos'}</i>
+            </span>
+            {/* Sem histórico carregado não há soma: "R$ 0,00" dizia um valor falso. */}
+            {financeiro.total > 0 && (
+              <span>
+                <b>{moeda(financeiro.total)}</b>
+                <i>valor total</i>
+              </span>
+            )}
+            {financeiro.ultimoEm && (
+              <span>
+                <b>{dataCurta(financeiro.ultimoEm)}</b>
+                <i>último pedido</i>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Selo discreto de fidelidade (pedido do Felipe: "sem sujar a UX
+            atual"): só saldo e o botão de resgate, o catálogo mora na Gestão. */}
+        {resgataPontos && (
+          <div className={css.linhaFidelidade}>
+            <span className={css.seloPontos}>
+              <Icone nome="estrela" tamanho={13} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
+            </span>
+            <Botao variante="texto" onClick={() => setModal('fidelidade')}>Resgatar</Botao>
+          </div>
+        )}
+
+        <Botao largo icone="historico" onClick={() => setModal('historico')}>
+          Histórico · {cliente.pedidos}
+        </Botao>
+      </Bloco>
       )}
 
-      {domicilio && (
-        <p className={css.mesmoDomicilio}>
-          Mesmo endereço de{' '}
-          <button type="button" className={css.linkDomicilio} onClick={() => selecionar(domicilio.id)}>
-            {domicilio.nome}
-          </button>
-        </p>
-      )}
+        {modal === 'bloquear' && (
+          <ModalBloqueio
+            nome={conversa.nome}
+            canais={nomesDeCanal}
+            quantasConversas={doCadastro}
+            motivos={motivosBloqueio}
+            aoFechar={() => setModal(null)}
+            aoConfirmar={(motivo) => { bloquearCliente(conversa.nome, motivo, conversa.id); setModal(null) }}
+          />
+        )}
 
-      <TagsDoCliente conversa={conversa} />
+        {modal === 'desbloquear' && (
+          <ModalDesbloqueio
+            nome={conversa.nome}
+            aoFechar={() => setModal(null)}
+            aoConfirmar={() => { desbloquearCliente(conversa.nome, conversa.id); setModal(null) }}
+          />
+        )}
 
-      {cliente.notas.length > 0 && (
-        <p className={css.ultimaNota}>
-          <span className={css.rotuloNota}>Nota · {cliente.notas[0].em.slice(0, 5)}</span>
-          <span className={css.textoNota}>{cliente.notas[0].texto}</span>
-        </p>
-      )}
+        {modal === 'historico' && (
+          <ModalHistorico
+            conversa={conversa}
+            historico={historico}
+            agora={agora}
+            aoFechar={() => setModal(null)}
+          />
+        )}
 
-      <Botao largo icone="historico" onClick={() => setModal('historico')}>
-        Histórico · {cliente.pedidos}
-      </Botao>
-
-      {modal === 'bloquear' && (
-        <ModalBloqueio
-          nome={conversa.nome}
-          canais={nomesDeCanal}
-          quantasConversas={doCadastro}
-          motivos={motivosBloqueio}
-          aoFechar={() => setModal(null)}
-          aoConfirmar={(motivo) => { bloquearCliente(conversa.nome, motivo); setModal(null) }}
-        />
-      )}
-
-      {modal === 'desbloquear' && (
-        <ModalDesbloqueio
-          nome={conversa.nome}
-          aoFechar={() => setModal(null)}
-          aoConfirmar={() => { desbloquearCliente(conversa.nome); setModal(null) }}
-        />
-      )}
-
-      {modal === 'historico' && (
-        <ModalHistorico
-          conversa={conversa}
-          historico={historico}
-          agora={agora}
-          aoFechar={() => setModal(null)}
-        />
-      )}
-
-      {modal === 'fidelidade' && (
-        <ModalFidelidade
-          nome={conversa.nome}
-          saldo={saldoPontos}
-          recompensas={fidelidade.recompensas}
-          sorteios={fidelidade.sorteios}
-          aoResgatar={(recompensa) => resgatarRecompensa(
-            conversa.cadastroId, conversa.nome, recompensa.id, saldoPontos, agora,
-          )}
-          aoFechar={() => setModal(null)}
-        />
-      )}
-    </Bloco>
+        {modal === 'fidelidade' && (
+          <ModalFidelidade
+            nome={conversa.nome}
+            saldo={saldoPontos}
+            recompensas={fidelidade.recompensas}
+            sorteios={fidelidade.sorteios}
+            aoResgatar={(recompensa) => resgatarRecompensa(
+              conversa.cadastroId, conversa.nome, recompensa.id, saldoPontos, agora,
+            )}
+            aoFechar={() => setModal(null)}
+          />
+        )}
+    </>
   )
 }

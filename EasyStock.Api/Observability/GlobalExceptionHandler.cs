@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Infra.Postgre.Data;
@@ -21,7 +22,10 @@ public class GlobalExceptionHandler(
         }
 
         var correlationId = httpContext.Items["CorrelationId"] as string ?? "unknown";
-        var requestPath = httpContext.Request.Path + httpContext.Request.QueryString;
+        // I4.5 (#1698): webhook entra no log pelo molde da rota e sem query.
+        var requestPath = CaminhoDoLog.EhWebhook(httpContext)
+            ? CaminhoDoLog.De(httpContext)
+            : httpContext.Request.Path + httpContext.Request.QueryString;
         var requestMethod = httpContext.Request.Method;
 
         var (statusCode, code, title, detail, logAsError) = MapException(exception);
@@ -258,6 +262,8 @@ public class GlobalExceptionHandler(
     {
         "ix_movimentos_caixa_abertura_unica" =>
             "O caixa deste dia/loja já foi aberto por outra operação. Recarregue a tela antes de tentar de novo.",
+        "ux_viagem_paradas_pedido_ativo" =>
+            "Pedido já está em outra viagem. Recarregue as viagens antes de tentar de novo.",
         _ => "Já existe um registro com esses dados (SKU, email, documento ou outro campo único).",
     };
 

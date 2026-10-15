@@ -22,7 +22,7 @@
          GHSA-g8r8-53c2-pm3f / GHSA-mmjf-rqrv-855v, HIGH). Mesmo override top-level ja
          usado em EasyStock.Infra.Integrations — aqui cobre quem chega por Infra.Postgre
          (Infra.Async.UnitTests, Inventario.IntegrationTests). -->
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.7" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.7">

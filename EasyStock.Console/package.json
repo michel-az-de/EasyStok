@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "oxlint",
     "camadas": "node ferramentas/verificar-camadas.mjs",
-    "qualidade": "npm run lint && npm run camadas && npm run build",
+    "contraste": "node ferramentas/verificar-contraste.mjs",
+    "qualidade": "npm run lint && npm run camadas && npm run contraste && npm run build",
     "agente": "node servidor/agente.mjs",
     "local": "npm run build && node servidor/agente.mjs"
   },

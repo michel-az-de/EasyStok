@@ -36,13 +36,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 context.EmailConfirmationTokens.Remove(token);
         }
 
-        public async Task DeleteExpiredAsync()
-        {
-            var expired = await context.EmailConfirmationTokens
-                .Where(t => t.ExpiraEm < DateTime.UtcNow)
-                .ToListAsync();
-            context.EmailConfirmationTokens.RemoveRange(expired);
-        }
+        public Task<int> DeleteExpiredAsync(DateTime expiradosAntesDe, CancellationToken ct = default) =>
+            context.EmailConfirmationTokens.Where(t => t.ExpiraEm < expiradosAntesDe).ExecuteDeleteAsync(ct);
 
         public Task<int> DeleteAllByUsuarioIdAsync(Guid usuarioId) =>
             context.EmailConfirmationTokens.Where(t => t.UsuarioId == usuarioId).ExecuteDeleteAsync();

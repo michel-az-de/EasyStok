@@ -4,8 +4,11 @@ import { chamarApi } from './cliente'
 // entregadores, viagens e chamados (S44, `api/atendimento`), aprovação manual
 // (S12, `api/storefront/pedidos`) e o cadastro da loja (S45, `api/minha-vitrine/entrega`).
 // Toda rota usa a empresa do token; a API confere cada id contra ela.
-export const listarPedidosEntrega = (status) =>
-  chamarApi(`/api/kds/pedidos?status=${encodeURIComponent(status)}`)
+export const listarPedidosEntrega = (status, data) =>
+  chamarApi(`/api/kds/pedidos?status=${encodeURIComponent(status)}${data ? `&data=${data}` : ''}`)
+
+export const listarAgendaEncomendas = (de, ate) =>
+  chamarApi(`/api/atendimento/agenda?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}`)
 
 // Entregadores (policy Operador).
 export const listarEntregadores = () => chamarApi('/api/atendimento/entregadores')
@@ -23,6 +26,10 @@ export const retirarParada = (id, pedidoId) => chamarApi(`${V}/${id}/paradas/${p
 export const reordenarParada = (id, pedidoId, ordem) =>
   chamarApi(`${V}/${id}/paradas/${pedidoId}/ordem`, { metodo: 'PUT', corpo: { ordem } })
 export const sairParaEntrega = (id) => chamarApi(`${V}/${id}/sair`, { metodo: 'POST' })
+// I9.2 (#1691): corrida externa da viagem, com custo.
+export const listarCorridas = (id) => chamarApi(`${V}/${id}/corridas`)
+export const registrarCorrida = (id, corpo) => chamarApi(`${V}/${id}/corridas`, { metodo: 'POST', corpo })
+export const corrigirCorrida = (id, corridaId, corpo) => chamarApi(`${V}/${id}/corridas/${corridaId}`, { metodo: 'PUT', corpo })
 export const marcarParadaEntregue = (id, pedidoId) => chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST' })
 export const desfazerViagem = (id) => chamarApi(`${V}/${id}/desfazer`, { metodo: 'POST' })
 
@@ -42,6 +49,8 @@ export const recusarPedido = (id, motivo) =>
 const E = '/api/minha-vitrine/entrega'
 export const listarJanelas = () => chamarApi(`${E}/janelas`)
 export const criarJanela = (corpo) => chamarApi(`${E}/janelas`, { metodo: 'POST', corpo })
+export const atualizarJanela = (id, corpo) => chamarApi(`${E}/janelas/${id}`, { metodo: 'PUT', corpo })
+export const excluirJanela = (id) => chamarApi(`${E}/janelas/${id}`, { metodo: 'DELETE' })
 export const definirJanelaAtiva = (id, ativa) => chamarApi(`${E}/janelas/${id}/ativa`, { metodo: 'POST', corpo: { ativa } })
 export const listarZonas = () => chamarApi(`${E}/zonas`)
 export const criarZona = (corpo) => chamarApi(`${E}/zonas`, { metodo: 'POST', corpo })
@@ -49,3 +58,7 @@ export const definirZonaAtiva = (id, ativa) => chamarApi(`${E}/zonas/${id}/ativa
 export const listarBloqueios = (de, ate) => chamarApi(`${E}/bloqueios?de=${de}&ate=${ate}`)
 export const criarBloqueio = (corpo) => chamarApi(`${E}/bloqueios`, { metodo: 'POST', corpo })
 export const removerBloqueio = (id) => chamarApi(`${E}/bloqueios/${id}`, { metodo: 'DELETE' })
+// I2.2 (#1651): frete por distância (cozinha, raio e faixas) e o "testar um endereço".
+export const obterFreteRaio = () => chamarApi(`${E}/raio`)
+export const salvarFreteRaio = (corpo) => chamarApi(`${E}/raio`, { metodo: 'PUT', corpo })
+export const testarFreteRaio = (corpo) => chamarApi(`${E}/raio/testar`, { metodo: 'POST', corpo })

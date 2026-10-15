@@ -67,4 +67,23 @@ public static class LockKeys
     /// nem lembrar em dobro. "Integra" em hex ASCII.
     /// </summary>
     public const long VigiaIntegracoes = 0x496E_7465_6772_6100L;
+
+    /// <summary>
+    /// Retenção de <c>entity_alteracoes</c> (EntityAlteracaoRetentionService), 1x/dia. API e Worker registram
+    /// o serviço (#1575): uma rodada por vez. "AudRete" em hex ASCII.
+    /// </summary>
+    public const long RetencaoAuditoria = 0x4175_6452_6574_6500L;
+
+    /// <summary>
+    /// Alerta de aparelho sem sinal (MobileAlertService), a cada 30 min. API e Worker registram o serviço
+    /// (#1575): uma rodada por vez. "MobAler" em hex ASCII.
+    /// </summary>
+    public const long MobileAlerta = 0x4D6F_6241_6C65_7200L;
+
+    /// <summary>
+    /// Cancelamento de pedido abandonado (CancelarPedidosAbandonadosBackgroundService), a cada 5 min. API e
+    /// Worker registram o serviço (#1575): uma rodada por vez, para não cancelar o mesmo pedido em dobro.
+    /// "PedAban" em hex ASCII.
+    /// </summary>
+    public const long PedidosAbandonados = 0x5065_6441_6261_6E00L;
 }
