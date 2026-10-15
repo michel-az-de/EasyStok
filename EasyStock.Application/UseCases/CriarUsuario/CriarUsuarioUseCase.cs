@@ -39,6 +39,7 @@ namespace EasyStock.Application.UseCases.CriarUsuario
         IConsentimentoRepository consentimentoRepository,
         ConvitesDeAcesso convites,
         ICurrentUserAccessor currentUser,
+        IAuditLogRepository auditLogRepository,
         IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
         ILogger<CriarUsuarioUseCase> logger)
@@ -58,7 +59,7 @@ namespace EasyStock.Application.UseCases.CriarUsuario
                 telefone = LerTelefone(command.Telefone);
             }
             // Vale tambem para o cadastro legado com senha: antes so o convite barrava SuperAdmin.
-            await ExigirQueNaoSejaSuperAdminAsync(command.PerfilId);
+            var perfil = await ExigirPerfilAtribuivelAsync(command.PerfilId, command.EmpresaId);
 
             var emailExistente = await usuarioRepository.GetByEmailAsync(command.Email);
             if (emailExistente is not null)
@@ -97,7 +98,8 @@ namespace EasyStock.Application.UseCases.CriarUsuario
                     EmpresaId = command.EmpresaId,
                     PerfilId = command.PerfilId.Value,
                     LojaId = command.LojaId,
-                    AtribuidoEm = agora
+                    AtribuidoEm = agora,
+                    AtribuidoPorId = currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId
                 };
 
                 await usuarioPerfilRepository.AddAsync(usuarioPerfil);
@@ -105,6 +107,14 @@ namespace EasyStock.Application.UseCases.CriarUsuario
 
             if (convidar)
                 await EmitirConviteAsync(usuario, command, telefone is not null && command.AtestaOptInWhatsApp);
+
+            // #1753: o nascimento do acesso deixa rastro com o perfil dado e o nome de quem convidou.
+            var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
+            var comPerfil = perfil is null ? "sem perfil" : $"com o perfil {perfil.Nome}";
+            var fato = convidar ? "Convite enviado" : "Acesso criado";
+            await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
+                usuario.Id, convidar ? RastroDeUsuarios.Convidado : RastroDeUsuarios.Criado,
+                $"{fato} {comPerfil} por {autor}", currentUser, command.EmpresaId));
 
             await unitOfWork.CommitAsync();
 
@@ -141,15 +151,21 @@ namespace EasyStock.Application.UseCases.CriarUsuario
             }
         }
 
-        /// <summary>Superadmin nunca nasce por convite: o perfil global exige a criação administrativa, com senha própria.</summary>
-        private async Task ExigirQueNaoSejaSuperAdminAsync(Guid? perfilId)
+        /// <summary>
+        /// Superadmin nunca nasce por convite: o perfil global exige a criação administrativa, com senha própria.
+        /// #1753: perfil de outra empresa também não entra, a mesma regra de <c>PUT {id}/perfis</c>.
+        /// </summary>
+        private async Task<Perfil?> ExigirPerfilAtribuivelAsync(Guid? perfilId, Guid empresaId)
         {
-            if (perfilId is null) return;
+            if (perfilId is null) return null;
 
             var perfil = await perfilRepository.GetByIdAsync(perfilId.Value);
             if (perfil is { Nivel: NivelAcesso.SuperAdmin })
                 throw new UseCaseValidationException(
                     "CONVITE_SUPERADMIN", "Superadmin não é criado por convite.");
+            if (perfil is null || (perfil.EmpresaId is not null && perfil.EmpresaId != empresaId))
+                throw new UseCaseValidationException("Perfil invalido.");
+            return perfil;
         }
     }
 }

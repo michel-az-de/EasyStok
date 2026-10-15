@@ -21,7 +21,9 @@ assert.deepEqual(destinos(api, 'pratos preços'), [
 ], 'busca pelo resumo preserva a descoberta da área')
 assert.deepEqual(destinos(api.filter((modulo) => modulo.id === 'atendimento'), 'impressão'), [])
 assert.deepEqual(destinos(modulosDoHall(), 'impressão'), [], 'tela só da API não surge na demonstração')
-assert.deepEqual(destinos(api, 'usuários'), [], 'resumo não promete uma tela inexistente')
+// #1753: a tela de Usuários passou a existir no Console; a busca leva a ela.
+assert.deepEqual(destinos(api, 'usuários'), ['#/m/configuracoes/usuarios'], 'a busca acha a tela de Usuários')
+assert.deepEqual(destinos(api, 'fornecedores'), [], 'a busca não promete uma tela inexistente')
 for (const busca of ['', '   ', 'nenhum-destino-com-este-nome']) assert.deepEqual(destinos(api, busca), [])
 
 const antes = JSON.stringify(api)

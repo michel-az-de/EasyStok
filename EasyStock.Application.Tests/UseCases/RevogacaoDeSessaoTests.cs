@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
+using EasyStock.Application.Tests.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AtribuirPerfilUsuario;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
@@ -165,7 +166,8 @@ public class RevogacaoDeSessaoTests
         vinculos.GetByUsuarioEEmpresaAsync(_usuario.Id, empresaId).Returns(vinculo);
 
         await new DesativarUsuarioUseCase(
-                _usuarios, vinculos, _revogador, _unitOfWork, Substitute.For<ILogger<DesativarUsuarioUseCase>>())
+                _usuarios, vinculos, _revogador, new CenarioDeAcesso().Convites(), Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+                Substitute.For<ILogger<DesativarUsuarioUseCase>>())
             .ExecuteAsync(new DesativarUsuarioCommand(_usuario.Id, empresaId));
 
         vinculo.Ativo.Should().BeFalse();
@@ -178,7 +180,8 @@ public class RevogacaoDeSessaoTests
         var vinculos = Substitute.For<IUsuarioEmpresaRepository>();
 
         await Assert.ThrowsAsync<UseCaseValidationException>(() => new DesativarUsuarioUseCase(
-                _usuarios, vinculos, _revogador, _unitOfWork, Substitute.For<ILogger<DesativarUsuarioUseCase>>())
+                _usuarios, vinculos, _revogador, new CenarioDeAcesso().Convites(), Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+                Substitute.For<ILogger<DesativarUsuarioUseCase>>())
             .ExecuteAsync(new DesativarUsuarioCommand(_usuario.Id, Guid.NewGuid())));
 
         await NaoDeveTerRevogadoNada();
@@ -200,7 +203,8 @@ public class RevogacaoDeSessaoTests
     public async Task AtribuirPerfil_DeveRecusarPerfilSuperAdmin()
     {
         var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
-            PerfilComum(NivelAcesso.SuperAdmin), _revogador, _unitOfWork, Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+            PerfilComum(NivelAcesso.SuperAdmin), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
         var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
 
@@ -211,7 +215,8 @@ public class RevogacaoDeSessaoTests
     public async Task AtribuirPerfil_DeveRecusarPerfilDeOutraEmpresa()
     {
         var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
-            PerfilComum(NivelAcesso.Admin, Guid.NewGuid()), _revogador, _unitOfWork, Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+            PerfilComum(NivelAcesso.Admin, Guid.NewGuid()), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
         var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
 
@@ -219,7 +224,8 @@ public class RevogacaoDeSessaoTests
     }
 
     private AtribuirPerfilUsuarioUseCase AtribuirPerfil(IUsuarioPerfilRepository perfis) =>
-        new(_usuarios, perfis, PerfilComum(), _revogador, _unitOfWork, Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+        new(_usuarios, perfis, PerfilComum(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
     [Fact]
     public async Task TrocaDePerfilRevoga()
@@ -228,7 +234,7 @@ public class RevogacaoDeSessaoTests
         var perfilId = Guid.NewGuid();
         VincularA(empresaId);
         var perfis = Substitute.For<IUsuarioPerfilRepository>();
-        perfis.GetByUsuarioEmpresaEPerfilAsync(_usuario.Id, empresaId, perfilId).Returns((UsuarioPerfil?)null);
+        perfis.ListarPorUsuarioEEmpresaAsync(_usuario.Id, empresaId).Returns([]);
 
         await AtribuirPerfil(perfis)
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, perfilId, LojaId: null));
@@ -245,7 +251,7 @@ public class RevogacaoDeSessaoTests
         VincularA(empresaId);
         var existente = new UsuarioPerfil { Id = Guid.NewGuid(), UsuarioId = _usuario.Id, EmpresaId = empresaId, PerfilId = perfilId, AtribuidoEm = DateTime.UtcNow.AddDays(-3) };
         var perfis = Substitute.For<IUsuarioPerfilRepository>();
-        perfis.GetByUsuarioEmpresaEPerfilAsync(_usuario.Id, empresaId, perfilId).Returns(existente);
+        perfis.ListarPorUsuarioEEmpresaAsync(_usuario.Id, empresaId).Returns([existente]);
 
         await AtribuirPerfil(perfis)
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, perfilId, LojaId: Guid.NewGuid()));
@@ -266,6 +272,7 @@ public class RevogacaoDeSessaoTests
         VincularA(Guid.NewGuid()); // vínculo ativo, mas com outra empresa
         if (temVinculoInativo) VincularA(empresaDoAdmin, ativo: false);
         var perfis = Substitute.For<IUsuarioPerfilRepository>();
+        perfis.ListarPorUsuarioEEmpresaAsync(_usuario.Id, empresaDoAdmin).Returns([]);
 
         await AtribuirPerfil(perfis)
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaDoAdmin, perfilId, LojaId: null));

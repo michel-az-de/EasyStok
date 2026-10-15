@@ -783,8 +783,9 @@ public static class NotificacoesGlobaisSeed
             nome: "Convite de Acesso · Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ConviteAcesso,
-            assuntoTemplate: "EasyStok: convite para acessar {{ empresa }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("convite_acesso_email_v1"));
+            assuntoTemplate: "{{ empresa }}: seu convite para entrar no sistema",
+            corpoTemplate: EmailTemplateLoader.LoadBody("convite_acesso_email_v2"))
+            .ComVersao(2); // #1753: mesmo código, corpo novo com a marca da casa e sem supor gênero.
 
         // O convite ja nasceu (N13) como o modelo "convite_acesso_link" (botao URL), para nao aprovar dois modelos na
         // Meta. N9: versao 2, que liga o botao ao token do WhatsApp (botaoUrl0 = token_convite_whatsapp, um token por

@@ -28,6 +28,8 @@ import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
 import { Modal } from '../componentes/Modal'
 import { TelaLogin } from '../features/login/TelaLogin'
+import { TelaConvite } from '../features/login/TelaConvite'
+import { ehRotaDeConvite, tokenDoConvite } from '../dominio/usuarios'
 import { AvisoDaAcaoApi, FaixaApi, LimparAvisoAoNavegar } from './FaixaApi'
 import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
 import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
@@ -457,12 +459,36 @@ function EntregasApi({ rota, sessao }) {
   return <NoModulo rota={rota}><TelaEntregasApi key={`${identidadeDaSessao(sessao)}:${rota.tela}`} tela={rota.tela} /></NoModulo>
 }
 
+const CHAVE_DO_CONVITE = 'easystok.convite'
+
 export function App() {
   const hash = useHash()
   const { sessao, entrarNaEmpresa, google, encerrarSessao, avisoSaida } = useSessaoApi()
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
   // #1582: cada tela diz o próprio nome na aba. No Balcão quem escreve é a `Composicao`, com a contagem.
   useTituloDaAba(FONTE_API && !sessao ? TITULO_BASE : rota.tipo === ROTA_PRINCIPAL ? null : tituloDaAba(rota))
+  // #1753: o token sai da barra de endereço assim que é lido, para não ficar no histórico do navegador.
+  // Fica guardado só nesta aba até concluir: recarregar a página não pode virar "convite não vale".
+  const [tokenGuardado, setTokenGuardado] = useState(() => { try { return sessionStorage.getItem(CHAVE_DO_CONVITE) } catch { return null } })
+  const tokenNaBarra = FONTE_API ? tokenDoConvite(hash) : null
+  useEffect(() => {
+    if (!tokenNaBarra) return
+    setTokenGuardado(tokenNaBarra)
+    try { sessionStorage.setItem(CHAVE_DO_CONVITE, tokenNaBarra) } catch { /* sem armazenamento, vale a memória */ }
+    window.history.replaceState(window.history.state, '', '#/convite')
+  }, [tokenNaBarra])
+  // O link do convite abre antes do login e vale mesmo com outra pessoa logada neste aparelho. Ao concluir, a sessão
+  // dessa outra pessoa é encerrada: senão quem acabou de criar a senha clicava "Entrar" e caía no Console dela.
+  if (FONTE_API && ehRotaDeConvite(hash)) {
+    const token = tokenNaBarra ?? tokenGuardado
+    const aoConcluir = () => {
+      if (sessao) encerrarSessao()
+      setTokenGuardado(null)
+      try { sessionStorage.removeItem(CHAVE_DO_CONVITE) } catch { /* nada a limpar */ }
+      window.location.hash = ''
+    }
+    return <TelaConvite key={token ?? 'sem-token'} token={token} aoConcluir={aoConcluir} />
+  }
   if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} avisoSaida={avisoSaida} />
   if (FONTE_API) return <><NavegacaoDoConsole hash={hash} /><AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} /></>
   if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />
@@ -529,9 +555,9 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     notificacoes: <SinoDaSessao avisos={avisos} aparelho={avisosNoAparelho} /> }
   let tela
   if (!permiteRota(dados, rota)) tela = (
-    <main className={css.estadoAcesso} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Módulo sem acesso">
-    <Vazio titulo="Seu perfil não tem acesso a este módulo" acao={<><a href={HASH_HALL}>Voltar aos módulos</a><ControleAjuda rota={rota} /><Botao variante="texto" onClick={sair}>Sair</Botao></>}>
-      Peça à dona para revisar seu acesso, se precisar trabalhar aqui.
+    <main className={css.estadoAcesso} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Tela sem acesso para o seu perfil">
+    <Vazio titulo="Seu perfil não abre esta tela" acao={<><Botao variante="primario" onClick={() => { window.location.hash = HASH_HALL }}>Voltar ao início</Botao><Botao variante="texto" onClick={sair}>Sair</Botao></>}>
+      Se você precisa trabalhar aqui, peça à dona para mudar o seu perfil.
     </Vazio>
     </main>
   )

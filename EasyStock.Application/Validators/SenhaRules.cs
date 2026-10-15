@@ -16,10 +16,10 @@ public static class SenhaRules
     /// Aplica a política canônica de senha forte a uma propriedade string.
     /// </summary>
     public static IRuleBuilderOptions<T, string> AplicarPoliticaSenha<T>(this IRuleBuilder<T, string> rule) =>
-        rule.NotEmpty().WithMessage("Nova senha e obrigatoria.")
-            .MinimumLength(TamanhoMinimo).WithMessage($"Senha deve ter pelo menos {TamanhoMinimo} caracteres.")
-            .Matches("[A-Z]").WithMessage("Senha deve conter pelo menos uma letra maiuscula.")
-            .Matches("[a-z]").WithMessage("Senha deve conter pelo menos uma letra minuscula.")
-            .Matches("[0-9]").WithMessage("Senha deve conter pelo menos um numero.")
-            .Matches("[\\W]").WithMessage("Senha deve conter pelo menos um caractere especial.");
+        rule.NotEmpty().WithMessage("Escolha uma senha.")
+            .MinimumLength(TamanhoMinimo).WithMessage($"A senha precisa ter {TamanhoMinimo} caracteres ou mais.")
+            .Matches("[A-Z]").WithMessage("A senha precisa ter uma letra maiúscula.")
+            .Matches("[a-z]").WithMessage("A senha precisa ter uma letra minúscula.")
+            .Matches("[0-9]").WithMessage("A senha precisa ter um número.")
+            .Matches("[\\W]").WithMessage("A senha precisa ter um símbolo, como ! ou @.");
 }

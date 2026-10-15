@@ -90,12 +90,15 @@ export const MODULOS = [
   },
   {
     numero: 7, id: 'configuracoes', nome: 'Configurações', icone: 'automacao',
-    resumo: 'Canais e integrações da loja',
+    resumo: 'Usuários, canais e integrações da loja',
     telas: [
       { id: 'canais', rotulo: 'Canais', tipo: TELA_AJUSTE, aba: 'canais', soApi: true },
       { id: 'integracoes', rotulo: 'Integrações de entrega', tipo: TELA_AJUSTE, aba: 'integracoes', indisponivelNaApi: true },
       // #1632: logo da loja e papel padrão dos impressos em HTML da API (só modo API).
       { id: 'impressao', rotulo: 'Impressão', tipo: TELA_AJUSTE, aba: 'impressao', soApi: true },
+      // #1753 (M7.2): quem tem acesso à casa e o histórico de acesso (só modo API, só a dona).
+      { id: 'usuarios', rotulo: 'Usuários', tipo: TELA_AJUSTE, aba: 'usuarios', soApi: true },
+      { id: 'auditoria', rotulo: 'Histórico de acesso', tipo: TELA_AJUSTE, aba: 'auditoria', soApi: true },
     ],
   },
   {

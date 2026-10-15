@@ -21,4 +21,26 @@ public class AuditLogRepository(EasyStockDbContext context) : IAuditLogRepositor
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
+
+    // Eventos antigos sem empresa não podem ser atribuídos a uma loja pelo vínculo atual do usuário.
+    public async Task<(IReadOnlyList<AuditoriaDeAcessoLinha> Itens, int Total)> ListarPorEmpresaAsync(
+        Guid empresaId, Guid? usuarioId, int page, int pageSize, CancellationToken ct = default)
+    {
+        var consulta = _context.AuditLogs.AsNoTracking()
+            .Where(al => al.EmpresaId == empresaId
+                && _context.UsuariosEmpresas.Any(ue => ue.UsuarioId == al.UsuarioId && ue.EmpresaId == empresaId));
+        if (usuarioId is { } id) consulta = consulta.Where(al => al.UsuarioId == id);
+
+        var total = await consulta.CountAsync(ct);
+        var itens = await consulta
+            .OrderByDescending(al => al.DataHora)
+            // Desempate estável: duas linhas no mesmo instante não trocam de página entre uma busca e outra.
+            .ThenByDescending(al => al.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(al => new AuditoriaDeAcessoLinha(
+                al.Id, al.DataHora, al.Acao, al.Sucesso, al.UsuarioId, al.Usuario!.Nome, al.Detalhes))
+            .ToListAsync(ct);
+        return (itens, total);
+    }
 }

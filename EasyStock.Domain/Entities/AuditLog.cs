@@ -4,6 +4,7 @@ namespace EasyStock.Domain.Entities
     {
         public Guid Id { get; set; }
         public Guid UsuarioId { get; set; }
+        public Guid? EmpresaId { get; set; }
         public string Acao { get; set; } = null!; // login, logout, reset-password, etc.
         public DateTime DataHora { get; set; }
         public bool Sucesso { get; set; }

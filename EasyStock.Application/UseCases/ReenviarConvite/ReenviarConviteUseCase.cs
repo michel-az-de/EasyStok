@@ -44,10 +44,11 @@ public sealed class ReenviarConviteUseCase(
         var comWhatsApp = await convites.ElegivelAoWhatsAppAsync(usuario);
         await convites.EmitirAsync(usuario, empresaId, comWhatsApp, currentUser.Ip, currentUser.UserAgent);
 
-        await auditLogRepository.AddAsync(AuditLog.Criar(
-            usuario.Id, "convite-reenviado", true,
-            $"Convite reenviado por {currentUser.UsuarioId} ({nivel}); WhatsApp: {(comWhatsApp ? "sim" : "nao")}",
-            currentUser.Ip, currentUser.UserAgent));
+        var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
+        await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
+            usuario.Id, "convite-reenviado",
+            $"Convite reenviado por {autor}{(comWhatsApp ? ", também pelo WhatsApp" : string.Empty)}",
+            currentUser, empresaId));
         await unitOfWork.CommitAsync();
 
         logger.LogInformation("Convite reenviado ao usuario {UsuarioId} por {Executor}", usuario.Id, currentUser.UsuarioId);
