@@ -167,8 +167,10 @@ export function TelaCozinhaApi({ linhas }) {
             Pedido {(pedidos ?? []).find((p) => p.id === saldoPendente.id)?.numeroCurto ?? ''}: falta receber {moeda(saldoPendente.valor)}.
             Marque entregue se recebeu na porta ou combinou a cobrança.
           </span>
-          <Botao variante="primario" onClick={() => avancar(saldoPendente.id, saldoPendente.status, true)}>Marcar entregue</Botao>
-          <Botao variante="texto" onClick={descartarSaldoPendente}>Voltar</Botao>
+          <span>
+            <Botao variante="primario" onClick={() => avancar(saldoPendente.id, saldoPendente.status, true)}>Marcar entregue</Botao>
+            <Botao variante="texto" onClick={descartarSaldoPendente}>Voltar</Botao>
+          </span>
         </div>
       )}
       {avisoDeFilaNoTeto(lista.length) && (
