@@ -35,6 +35,15 @@ public abstract class EasyStockControllerBase : ControllerBase
         base.Conflict(new ApiErrorResponse(new ApiError("CONFLICT", message, detail, null)));
 
     /// <summary>
+    /// #1776 (item 19): 409 SALDO_A_RECEBER com o valor em <c>details.valor</c>. Toda rota que marca entregue
+    /// (KDS e viagem) responde igual, e o console pede a confirmação pelo mesmo código.
+    /// </summary>
+    protected IActionResult SaldoAReceber(EasyStock.Application.Services.Pedidos.SaldoAReceberNaEntregaException ex) =>
+        base.Conflict(new ApiErrorResponse(new ApiError(
+            EasyStock.Application.Services.Pedidos.SaldoAReceberNaEntregaException.Codigo, ex.Message, null, null)
+        { Details = new { valor = ex.Valor } }));
+
+    /// <summary>
     /// Guarda HTTP-aware: se <paramref name="id"/> for <see cref="Guid.Empty"/>,
     /// devolve 400 <see cref="DataBadRequest(string, string?)"/> com mensagem
     /// "X inválido." Caller usa: <c>if (!TryEnsureNotEmpty(tenantId, "Cliente", out var err)) return err;</c>

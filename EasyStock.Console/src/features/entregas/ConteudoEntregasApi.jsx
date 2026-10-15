@@ -7,6 +7,8 @@ import {
   EMPRESAS_ENTREGADOR, TIPOS_ENTREGADOR, confirmacaoDaRecusa, motivoDaAprovacao, motivoDeSaida, paineisDeEntregas,
   rotuloSituacaoViagem, situacaoDaLista, viagensConcluidasNoDia,
 } from '../../dominio/entregasApi'
+import { moeda } from '../../dominio/formato'
+import { aReceberDoCartao } from '../../dominio/pagamento'
 import { roteiroDoDia } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
 import { CorridasDaViagem } from './CorridasDaViagem'
@@ -187,10 +189,15 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
   )
 }
 
-function Viagem({ viagem, indice, opcoesEntregador, entregadores, ocupado, acoes }) {
+function Viagem({ viagem, indice, pedidoPorId, opcoesEntregador, entregadores, ocupado, acoes }) {
   const montando = viagem.situacao === 'Montando'
   const motivo = montando ? motivoDeSaida(viagem) : null
   const n = viagem.paradas.length
+  // #1776 (item 19): entregar com saldo a receber pede confirmação. A tela pergunta pelo saldo que já
+  // conhece; se ele mudou desde a leitura, a API recusa com o valor certo e a pergunta aparece igual.
+  const [confirmando, setConfirmando] = useState(null) // { pedidoId, valor }
+  const marcarEntregue = (pedidoId, confirmado = false) => acoes.entregue(viagem.id, pedidoId, confirmado)
+    .then((r) => setConfirmando(r?.confirmar ? { pedidoId, valor: r.confirmar } : null))
 
   return (
     <section className={css.secao} aria-label={`Viagem ${indice}`}>
@@ -206,7 +213,9 @@ function Viagem({ viagem, indice, opcoesEntregador, entregadores, ocupado, acoes
       )}
       {n === 0 && <p className={css.vazio}>Viagem vazia. Ponha um pedido pronto nela.</p>}
       <ul className={css.lista}>
-        {viagem.paradas.map((parada) => (
+        {viagem.paradas.map((parada) => {
+          const aReceber = aReceberDoCartao(pedidoPorId?.get(parada.pedidoId)) ?? 0
+          return (
           <li key={parada.pedidoId} className={css.cartao}>
             <div className={css.linha}>
               <span className={css.numero}>{parada.ordem}. {parada.numeroPedido}</span>
@@ -217,6 +226,16 @@ function Viagem({ viagem, indice, opcoesEntregador, entregadores, ocupado, acoes
             {parada.entregadorNome && (
               <p className={css.apoio}>{[parada.entregadorNome, parada.veiculo, parada.placa].filter(Boolean).join(' · ')}</p>
             )}
+            {!parada.entregueEm && aReceber > 0 && <p className={css.linha}><strong>Receber {moeda(aReceber)} na entrega</strong></p>}
+            {confirmando?.pedidoId === parada.pedidoId ? (
+              <div className={css.linha} role="alertdialog" aria-label={`Confirmar a entrega do pedido ${parada.numeroPedido}`}>
+                <span className={`${css.apoio} ${css.cresce}`}>
+                  Falta receber {moeda(confirmando.valor)}. Marque entregue se recebeu na porta ou combinou a cobrança; o valor segue em aberto até o pagamento ser lançado.
+                </span>
+                <Botao variante="primario" disabled={ocupado} onClick={() => marcarEntregue(parada.pedidoId, true)}>Marcar entregue</Botao>
+                <Botao variante="texto" disabled={ocupado} onClick={() => setConfirmando(null)}>Voltar</Botao>
+              </div>
+            ) : (
             <div className={css.linha}>
               {montando && parada.ordem > 1 && (
                 <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem - 1)}>Subir</Botao>
@@ -228,11 +247,15 @@ function Viagem({ viagem, indice, opcoesEntregador, entregadores, ocupado, acoes
                 <Botao variante="texto" disabled={ocupado} onClick={() => acoes.retirarParada(viagem.id, parada.pedidoId)}>Tirar</Botao>
               )}
               {!montando && !parada.entregueEm && (
-                <Botao variante="primario" disabled={ocupado} onClick={() => acoes.entregue(viagem.id, parada.pedidoId)}>Entregue</Botao>
+                <Botao variante="primario" disabled={ocupado} onClick={() => (aReceber > 0
+                  ? setConfirmando({ pedidoId: parada.pedidoId, valor: aReceber })
+                  : marcarEntregue(parada.pedidoId))}>Entregue</Botao>
               )}
             </div>
+            )}
           </li>
-        ))}
+          )
+        })}
       </ul>
       <CorridasDaViagem viagem={viagem} entregadores={entregadores} ocupado={ocupado} />
       {montando && (

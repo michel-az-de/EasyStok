@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Operacao.Kds;
@@ -45,8 +46,13 @@ public class KdsController(
         try
         {
             var result = await statusUseCase.ExecuteAsync(new AtualizarStatusPedidoCommand(
-                emp, id, request.Status, UsuarioIdAtual(), Origem: Origem, NivelSolicitante: currentUser.Nivel));
+                emp, id, request.Status, UsuarioIdAtual(), Origem: Origem, NivelSolicitante: currentUser.Nivel,
+                ConferirSaldoNaEntrega: true, SaldoAReceberConfirmado: request.ConfirmarSaldoAReceber));
             return result is null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
+        }
+        catch (SaldoAReceberNaEntregaException ex)
+        {
+            return SaldoAReceber(ex);
         }
         catch (UseCaseValidationException ex)
         {
@@ -76,4 +82,5 @@ public class KdsController(
 }
 
 /// <param name="EmpresaId">Só para SuperAdmin; os demais usam a empresa do token.</param>
-public sealed record KdsAtualizarStatusRequest(string Status, Guid? EmpresaId = null);
+/// <param name="ConfirmarSaldoAReceber">#1776 (item 19): "entregue" com saldo a receber só com a confirmação de quem marca.</param>
+public sealed record KdsAtualizarStatusRequest(string Status, Guid? EmpresaId = null, bool ConfirmarSaldoAReceber = false);

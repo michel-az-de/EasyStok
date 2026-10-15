@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Entrega;
 using EasyStock.Domain.Entities.Storefront;
+using Microsoft.Extensions.Time.Testing;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.Tests.UseCases.Storefront.Entrega;
@@ -28,7 +29,9 @@ public class CadastroEntregaUseCasesTests
 
     private CadastroJanelasEntregaUseCase Janelas() => new(_lojas, _janelas, _uow);
     private CadastroZonasFreteUseCase Zonas() => new(_lojas, _zonas, _uow);
-    private CadastroBloqueiosEntregaUseCase Bloqueios() => new(_lojas, _bloqueios, _janelas, _uow);
+    // 15/10/2026, 9 h em Brasília (quinta-feira): o "hoje" da loja nos bloqueios (#1776, item 21).
+    private readonly FakeTimeProvider _relogio = new(new DateTimeOffset(2026, 10, 15, 12, 0, 0, TimeSpan.Zero));
+    private CadastroBloqueiosEntregaUseCase Bloqueios() => new(_lojas, _bloqueios, _janelas, _uow, _relogio);
 
     [Fact]
     public async Task SemVitrine_Lanca()
@@ -173,5 +176,141 @@ public class CadastroEntregaUseCasesTests
         await _bloqueios.Received(1).RemoveAsync(meu, Arg.Any<CancellationToken>());
         await _bloqueios.DidNotReceive().RemoveAsync(alheio, Arg.Any<CancellationToken>());
         await _uow.Received(1).CommitAsync();
+    }
+
+    // ── #1776, itens 20 a 22 ───────────────────────────────────────────
+
+    private JanelaEntrega JanelaDaLoja(int dia, int inicio, int fim)
+    {
+        var janela = JanelaEntrega.Criar(_loja.Id, dia, new TimeOnly(inicio, 0), new TimeOnly(fim, 0), 4, $"{inicio}h");
+        _janelas.GetByIdAsync(janela.Id, Arg.Any<CancellationToken>()).Returns(janela);
+        return janela;
+    }
+
+    private void JanelasDaLoja(params JanelaEntrega[] janelas) =>
+        _janelas.GetTodasDoStorefrontAsync(_loja.Id, Arg.Any<CancellationToken>()).Returns(janelas);
+
+    [Theory]
+    [InlineData(12, 14)] // igual
+    [InlineData(13, 15)] // sobreposta
+    [InlineData(11, 13)]
+    [InlineData(12, 13)] // dentro
+    public async Task CriarJanela_SobrepostaNoMesmoDia_Recusa(int inicio, int fim)
+    {
+        JanelasDaLoja(JanelaDaLoja(2, 12, 14));
+
+        var act = () => Janelas().CriarAsync(_empresaId, new JanelaEntregaInput(2, new TimeOnly(inicio, 0), new TimeOnly(fim, 0), 4, "Nova"));
+
+        (await act.Should().ThrowAsync<UseCaseValidationException>()).WithMessage("*terça*12:00*14:00*");
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task CriarJanela_EncostadaOuEmOutroDia_Aceita()
+    {
+        JanelasDaLoja(JanelaDaLoja(2, 12, 14));
+
+        await Janelas().CriarAsync(_empresaId, new JanelaEntregaInput(2, new TimeOnly(14, 0), new TimeOnly(16, 0), 4, "Tarde"));
+        await Janelas().CriarAsync(_empresaId, new JanelaEntregaInput(3, new TimeOnly(12, 0), new TimeOnly(14, 0), 4, "Almoço"));
+
+        await _uow.Received(2).CommitAsync();
+    }
+
+    [Fact]
+    public async Task AtualizarJanela_NaoConflitaConsigoMesma_MasConflitaComAOutra()
+    {
+        var almoco = JanelaDaLoja(2, 12, 14);
+        var tarde = JanelaDaLoja(2, 15, 17);
+        JanelasDaLoja(almoco, tarde);
+
+        await Janelas().AtualizarAsync(_empresaId, almoco.Id, new JanelaEntregaInput(2, new TimeOnly(11, 0), new TimeOnly(14, 0), 6, "11h"));
+        var act = () => Janelas().AtualizarAsync(_empresaId, almoco.Id, new JanelaEntregaInput(2, new TimeOnly(11, 0), new TimeOnly(16, 0), 6, "11h"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        almoco.HoraFim.Should().Be(new TimeOnly(14, 0));
+    }
+
+    [Fact]
+    public async Task AtualizarJanela_DuplicataAntiga_MudaVagasSemMudarHorario()
+    {
+        var a = JanelaDaLoja(2, 12, 14);
+        var b = JanelaDaLoja(2, 12, 14);
+        JanelasDaLoja(a, b);
+
+        await Janelas().AtualizarAsync(_empresaId, a.Id, new JanelaEntregaInput(2, new TimeOnly(12, 0), new TimeOnly(14, 0), 9, "Almoço"));
+
+        a.CapacidadeMaxima.Should().Be(9);
+    }
+
+    [Fact]
+    public async Task ExcluirZona_DaLoja_RemoveESoDaLoja()
+    {
+        var minha = FreteZona.CriarPorBairros(_loja.Id, "Centro", ["Centro"], 8m, 30, 1);
+        var alheia = FreteZona.CriarPorBairros(Guid.NewGuid(), "Centro", ["Centro"], 8m, 30, 1);
+        _zonas.GetByIdAsync(minha.Id, Arg.Any<CancellationToken>()).Returns(minha);
+        _zonas.GetByIdAsync(alheia.Id, Arg.Any<CancellationToken>()).Returns(alheia);
+
+        await Zonas().ExcluirAsync(_empresaId, minha.Id);
+        var act = () => Zonas().ExcluirAsync(_empresaId, alheia.Id);
+
+        await act.Should().ThrowAsync<CadastroEntregaNaoEncontradoException>();
+        await _zonas.Received(1).RemoveAsync(minha, Arg.Any<CancellationToken>());
+        await _zonas.DidNotReceive().RemoveAsync(alheia, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Bloqueio_NoPassado_Recusa()
+    {
+        var act = () => Bloqueios().CriarAsync(_empresaId, new BloqueioEntregaInput(new DateOnly(2026, 10, 14), "Ontem", null));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*passou*");
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Bloqueio_Hoje_Aceita()
+    {
+        await Bloqueios().CriarAsync(_empresaId, new BloqueioEntregaInput(new DateOnly(2026, 10, 15), "Falta gás", null));
+
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task Bloqueio_AlemDeUmAno_Recusa()
+    {
+        var act = () => Bloqueios().CriarAsync(_empresaId, new BloqueioEntregaInput(new DateOnly(2027, 10, 17), "Longe", null));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+    }
+
+    [Fact]
+    public async Task Bloqueio_JanelaDeOutroDiaDaSemana_Recusa()
+    {
+        var domingo = JanelaDaLoja(0, 12, 14);
+
+        // 21/10/2026 é quarta.
+        var act = () => Bloqueios().CriarAsync(_empresaId, new BloqueioEntregaInput(new DateOnly(2026, 10, 21), "Folga", domingo.Id));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*domingo*");
+    }
+
+    [Theory]
+    [InlineData(true, true)]   // dia inteiro de novo
+    [InlineData(true, false)]  // janela num dia já fechado
+    [InlineData(false, false)] // a mesma janela de novo
+    [InlineData(false, true)]  // dia inteiro com a janela já fechada: aceita, cobre o resto do dia
+    public async Task Bloqueio_JaCoberto_Recusa(bool existenteDiaInteiro, bool novoDiaInteiro)
+    {
+        var quarta = JanelaDaLoja(3, 12, 14);
+        var data = new DateOnly(2026, 10, 21);
+        var existente = BloqueioEntrega.Criar(_loja.Id, data, "Folga", existenteDiaInteiro ? null : quarta.Id);
+        _bloqueios.GetByStorefrontPeriodoAsync(_loja.Id, data, data, Arg.Any<CancellationToken>()).Returns([existente]);
+
+        var act = () => Bloqueios().CriarAsync(_empresaId, new BloqueioEntregaInput(data, "De novo", novoDiaInteiro ? null : quarta.Id));
+
+        if (!existenteDiaInteiro && novoDiaInteiro)
+            await act.Should().NotThrowAsync();
+        else
+            await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*já*bloque*");
     }
 }

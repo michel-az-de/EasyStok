@@ -37,6 +37,12 @@ public sealed class FreteZonaRepository(EasyStockDbContext db) : IFreteZonaRepos
         return Task.CompletedTask;
     }
 
+    public Task RemoveAsync(FreteZona zona, CancellationToken ct = default)
+    {
+        db.FreteZonas.Remove(zona);
+        return Task.CompletedTask;
+    }
+
     /// <inheritdoc />
     /// <remarks>
     /// Implementação in-memory deliberada: cada storefront tem poucas zonas

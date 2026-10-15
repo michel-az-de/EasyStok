@@ -38,7 +38,7 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
         var linha = NormalizarLinha(query.Linha);
         return pedidos
             .Where(p => linha is null || p.Itens.Any(i => NormalizarLinha(i.Linha) == linha))
-            .Select(p => Mapear(p, hoje, agora))
+            .Select(p => Mapear(p, hoje, agora) with { AReceber = p.AReceber })
             .ToList();
     }
 

@@ -279,7 +279,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           nomeCliente={primeiroNome}
           bloqueado={estaBloqueada(selecionada)}
           prerequisito={prerequisito}
-          aoAvancar={(passo, entregador) => avancarEsteira(selecionada.id, passo, entregador)}
+          aoAvancar={(passo, entregador, opcoes) => avancarEsteira(selecionada.id, passo, entregador, opcoes)}
           aoDesfazer={() => desfazerEsteira(selecionada.id, ultimoAvanco.mensagemId, ultimoAvanco.posEntregaId)}
           gerarSemEnviar={gerarSemEnviar}
           aoGerarPix={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarCobranca(selecionada.id, pedido, meio, !gerarSemEnviar) }}

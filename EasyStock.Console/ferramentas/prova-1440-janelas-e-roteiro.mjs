@@ -229,5 +229,92 @@ await confere('A4 com muitos pedidos quebra em páginas sem partir um pedido', (
   assert.ok(lidos(pdf.bytes).includes(`Página ${paginas} de ${paginas}`))
 })
 
+// --- 3. #1776 (itens 19 a 22, homologação de 13/10) -----------------------------------------
+await confere('#1776/19: sinal pago com saldo a receber não é "Pago"; a tela e o papel dizem quanto cobrar', () => {
+  const sinal = pedido('s', 'saiu_para_entrega', { janela: janela('Almoço', '12:00', '14:00'), pagoEm: '2026-10-08T11:00:00Z', aReceber: 25 })
+  const quitado = pedido('q', 'saiu_para_entrega', { janela: janela('Almoço', '12:00', '14:00'), pagoEm: '2026-10-08T11:00:00Z', aReceber: 0 })
+  const apiAntiga = pedido('v', 'aguardando', { janela: janela('Almoço', '12:00', '14:00'), pagoEm: '2026-10-08T11:00:00Z' })
+  const r = roteiro.roteiroDoDia({ data: DATA, pedidos: [sinal, quitado, apiAntiga], viagens: [], entregadores: [], janelas: JANELAS, bloqueios: [] })
+  const linhas = r.grupos.flatMap((g) => g.pedidos)
+  const de = (id) => linhas.find((p) => p.id === id)
+  assert.equal(de('s').pago, false)
+  assert.match(roteiro.situacaoDoPagamento(de('s')), /^Receber R\$\s25,00 na entrega$/)
+  assert.equal(roteiro.situacaoDoPagamento(de('q')), 'Pago')
+  assert.equal(roteiro.situacaoDoPagamento(de('v')), 'Pago', 'API sem aReceber segue o "tem pagamento" de antes')
+  assert.equal(roteiro.situacaoDoPagamento({ pago: false, aReceber: 50, status: 'aguardando_pagamento' }), 'Não pago', 'link pendente: a porta não cobra')
+  const pdf = impressao.pdfDoRoteiro({ roteiro: r, papel: 'a4', agora: AGORA })
+  assert.match(lidos(pdf.bytes), /Receber R\$\s25,00 na entrega/, 'o roteiro impresso diz quanto cobrar')
+})
+await confere('#1776/19: "Entregue" da viagem manda a confirmação do saldo à API', async () => {
+  chamadas.length = 0
+  await infra.marcarParadaEntregue('v1', 'p1')
+  await infra.marcarParadaEntregue('v1', 'p1', true)
+  assert.deepEqual(chamadas.map((c) => [c.url, c.corpo]), [
+    ['/api/atendimento/viagens/v1/paradas/p1/entregue', { confirmarSaldoAReceber: false }],
+    ['/api/atendimento/viagens/v1/paradas/p1/entregue', { confirmarSaldoAReceber: true }],
+  ])
+})
+const JANELAS_DA_LOJA = [{ id: 'a', diaDaSemana: 4, horaInicio: '12:00:00', horaFim: '14:00:00', capacidadeMaxima: 4, label: 'Almoço' }]
+const novaJanela = (horaInicio, horaFim, extra = {}) => ({ dias: [4], horaInicio, horaFim, capacidadeMaxima: '4', label: '', ...extra })
+await confere('#1776/20: janela igual ou sobreposta no mesmo dia é recusada antes da API; encostada passa', () => {
+  assert.match(entregasApi.erroDoFormularioJanela(novaJanela('12:00', '14:00'), JANELAS_DA_LOJA), /Quinta 12h00 às 14h00/)
+  assert.match(entregasApi.erroDoFormularioJanela(novaJanela('13:00', '15:00'), JANELAS_DA_LOJA), /cruza/)
+  assert.equal(entregasApi.erroDoFormularioJanela(novaJanela('14:00', '16:00'), JANELAS_DA_LOJA), null)
+  assert.equal(entregasApi.erroDoFormularioJanela(novaJanela('12:00', '15:00'), JANELAS_DA_LOJA, 'a'), null, 'a própria janela não conta')
+  assert.equal(entregasApi.erroDoFormularioJanela({ ...novaJanela('12:00', '14:00'), dias: [5] }, JANELAS_DA_LOJA), null)
+})
+const JANELAS_LEGADAS = [...JANELAS_DA_LOJA,
+  { ...JANELAS_DA_LOJA[0], id: 'legada', horaInicio: '13:00:00', horaFim: '15:00:00' },
+]
+await confere('#1860: janela legada sobreposta permite mudar somente nome ou vagas', () => {
+  const form = entregasApi.camposDaJanela(JANELAS_DA_LOJA[0])
+  for (const alteracao of [{ label: 'Nome novo' }, { capacidadeMaxima: '6' }]) {
+    assert.equal(entregasApi.erroDoFormularioJanela({ ...form, ...alteracao }, JANELAS_LEGADAS, 'a'), null)
+  }
+})
+await confere('#1860: criar janela ou mudar dia/horário ainda recusa sobreposição', () => {
+  const form = entregasApi.camposDaJanela(JANELAS_DA_LOJA[0])
+  assert.match(entregasApi.erroDoFormularioJanela(form, JANELAS_LEGADAS), /cruza/)
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, horaInicio: '12:30' }, JANELAS_LEGADAS, 'a'), /cruza/)
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, horaFim: '15:00' }, JANELAS_LEGADAS, 'a'), /cruza/)
+  const outroDia = [...JANELAS_LEGADAS, { ...JANELAS_LEGADAS[1], id: 'sexta', diaDaSemana: 5 }]
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, dias: [5] }, outroDia, 'a'), /cruza/)
+})
+await confere('#1860: editar janela legada mantém os limites de vagas', () => {
+  const form = entregasApi.camposDaJanela(JANELAS_DA_LOJA[0])
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, capacidadeMaxima: '0' }, JANELAS_LEGADAS, 'a'), /Capacidade/)
+  assert.match(entregasApi.erroDoFormularioJanela({ ...form, capacidadeMaxima: '501' }, JANELAS_LEGADAS, 'a'), /até 500/)
+})
+await confere('#1776/20: 99.999 vagas é recusado; o teto é o da API', () => {
+  assert.match(entregasApi.erroDoFormularioJanela(novaJanela('09:00', '10:00', { capacidadeMaxima: '99999' })), /até 500/)
+  assert.equal(entregasApi.erroDoFormularioJanela(novaJanela('09:00', '10:00', { capacidadeMaxima: '500' })), null)
+})
+await confere('#1776/20: nome automático acompanha o horário novo na edição; nome dado pela dona fica', () => {
+  const auto = { id: 'b', diaDaSemana: 4, horaInicio: '12:00:00', horaFim: '14:00:00', capacidadeMaxima: 4, label: '12h00 às 14h00' }
+  assert.equal(entregasApi.camposDaJanela(auto).label, '')
+  assert.equal(entregasApi.camposDaJanela({ ...auto, label: 'Almoço' }).label, 'Almoço')
+})
+const ZONAS = [
+  { id: 'z1', label: 'Icaraí', ativa: true, cepInicio: '24220000', cepFim: '24230999', bairros: [] },
+  { id: 'z2', label: 'Centro', ativa: true, cepInicio: null, cepFim: null, bairros: ['Centro', 'São Domingos'] },
+  { id: 'z3', label: 'Antiga', ativa: false, cepInicio: null, cepFim: null, bairros: ['Ingá'] },
+]
+await confere('#1776/22: faixa ou bairro já coberto por outra zona ativa vira aviso', () => {
+  const cep = { cobertura: 'cep', cepInicio: '24230-500', cepFim: '24240-000', bairros: '' }
+  assert.match(entregasApi.avisoDeSobreposicao(cep, ZONAS), /zona Icaraí/)
+  assert.equal(entregasApi.avisoDeSobreposicao(cep, ZONAS, 'z1'), null, 'editar a própria zona não avisa')
+  assert.match(entregasApi.avisoDeSobreposicao({ cobertura: 'bairros', bairros: 'sao domingos, Fonseca' }, ZONAS), /zona Centro/)
+  assert.equal(entregasApi.avisoDeSobreposicao({ cobertura: 'bairros', bairros: 'Ingá' }, ZONAS), null, 'zona desativada não conta')
+})
+await confere('#1776/22: editar a zona volta o formulário cheio, e editar e excluir falam com PUT e DELETE', async () => {
+  const campos = entregasApi.camposDaZona({ ...ZONAS[1], valor: 8.5, tempoEstimadoMinutos: 30, ordem: 2 })
+  assert.deepEqual(campos, { label: 'Centro', valor: '8,5', tempoEstimadoMinutos: '30', ordem: '2', cobertura: 'bairros', cepInicio: '', cepFim: '', bairros: 'Centro, São Domingos' })
+  assert.deepEqual(entregasApi.corpoZona(campos).bairros, ['Centro', 'São Domingos'])
+  chamadas.length = 0
+  await infra.atualizarZona('z2', entregasApi.corpoZona(campos))
+  await infra.excluirZona('z2')
+  assert.deepEqual(chamadas.map((c) => `${c.metodo} ${c.url}`), ['PUT /api/minha-vitrine/entrega/zonas/z2', 'DELETE /api/minha-vitrine/entrega/zonas/z2'])
+})
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length > 0) process.exit(1)

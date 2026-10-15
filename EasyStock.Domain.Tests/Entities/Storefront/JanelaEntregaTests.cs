@@ -129,6 +129,18 @@ public class JanelaEntregaTests
             .WithMessage("*Capacidade*");
     }
 
+    // #1776, item 20: 99.999 vagas passava. Teto plausível para uma cozinha numa janela.
+    [Fact]
+    public void Criar_rejeita_capacidade_acima_do_teto()
+    {
+        var act = () => JanelaEntrega.Criar(Guid.NewGuid(), 1, new TimeOnly(9, 0), new TimeOnly(12, 0),
+            JanelaEntrega.CapacidadeTeto + 1, "Manhã");
+
+        act.Should().Throw<RegraDeDominioVioladaException>().WithMessage($"*{JanelaEntrega.CapacidadeTeto}*");
+        JanelaEntrega.Criar(Guid.NewGuid(), 1, new TimeOnly(9, 0), new TimeOnly(12, 0), JanelaEntrega.CapacidadeTeto, "Manhã")
+            .CapacidadeMaxima.Should().Be(JanelaEntrega.CapacidadeTeto);
+    }
+
     [Fact]
     public void Criar_rejeita_storefront_id_vazio()
     {

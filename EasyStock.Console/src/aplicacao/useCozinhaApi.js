@@ -4,6 +4,7 @@ import {
 } from '../infra/api/kdsApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 import { transicaoDaFila } from '../dominio/kds'
+import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { criarRecargaDeAcao } from './recargaDeAcao'
 
 // Cozinha no modo API (F05). A fila vem do KDS sobre Pedido (S19) e recarrega a
@@ -53,6 +54,7 @@ export function useCozinhaApi({ data = null } = {}) {
   const [mudaram, setMudaram] = useState(() => new Set())
   const [saindo, setSaindo] = useState([])
   const [impressoes, setImpressoes] = useState([])
+  const [saldoPendente, setSaldoPendente] = useState(null) // { id, status, valor }
   const vivoRef = useRef(true)
   const anteriorRef = useRef(null)
   const timersRef = useRef(new Set())
@@ -157,13 +159,17 @@ export function useCozinhaApi({ data = null } = {}) {
 
   // Um toque (ou um soltar): a chamada vai e o cartão fica "movendo" até a fila nova chegar, pelo
   // `pedido.mudou_status` do SSE; sem ele (caído, ou mudo por 2 s), pela releitura da própria ação.
-  const avancar = useCallback((id, status) => {
+  // #1776 (item 19): "Marcar entregue" com saldo a receber não é erro: a tela pergunta e reenvia confirmado.
+  const avancar = useCallback((id, status, confirmarSaldoAReceber = false) => {
     setMovendo((s) => comId(s, id, true))
+    setSaldoPendente(null)
     const recarga = recargaRef.current
     const marca = recarga.marcar()
-    return mudarStatusKds(id, status)
+    return mudarStatusKds(id, status, { confirmarSaldoAReceber })
       .then(() => recarga.depoisDaAcao(marca))
-      .catch((e) => setErro(`O pedido não mudou: ${e.message}`))
+      .catch((e) => (pedeConfirmacaoDoSaldo(e)
+        ? setSaldoPendente({ id, status, valor: Number(e.dados?.valor) || 0 })
+        : setErro(`O pedido não mudou: ${e.message}`)))
       .finally(() => setMovendo((s) => comId(s, id, false)))
   }, [])
 
@@ -182,7 +188,8 @@ export function useCozinhaApi({ data = null } = {}) {
   const limparErro = useCallback(() => setErro(null), [])
 
   return {
-    pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes,
+    pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes, saldoPendente,
+    descartarSaldoPendente: () => setSaldoPendente(null),
     avancar, recarregar, reimprimir, confirmarImpressao: confirmar, avisar: setErro, limparErro,
   }
 }

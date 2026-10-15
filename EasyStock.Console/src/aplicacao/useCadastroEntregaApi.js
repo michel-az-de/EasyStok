@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/entregasApi'
 import { dataIsoNoFuso } from '../dominio/formato'
+import { DIAS_BLOQUEIO } from '../dominio/entregasApi'
 
 // Cadastro de entrega da loja (S45, policy Admin): janelas, zonas de frete e
-// bloqueios dos próximos 60 dias. Operador sem Admin recebe 403 e a tela diz isso.
-const DIAS_BLOQUEIO = 60
+// bloqueios de hoje até `DIAS_BLOQUEIO` à frente. Operador sem Admin recebe 403 e a tela diz isso.
 // Dia da loja (F07, item 8): em UTC, depois das 21 h o "hoje" já era amanhã.
 const dataIso = (d) => dataIsoNoFuso(d.getTime())
 
@@ -68,6 +68,8 @@ export function useCadastroEntregaApi() {
     excluirJanela: (id) => executar(() => api.excluirJanela(id), 'A janela não foi excluída'),
     criarZona: (corpo) => executar(() => api.criarZona(corpo), 'A zona não foi criada'),
     alternarZona: (z) => executar(() => api.definirZonaAtiva(z.id, !z.ativa), 'A zona não mudou'),
+    atualizarZona: (id, corpo) => executar(() => api.atualizarZona(id, corpo), 'A zona não mudou'),
+    excluirZona: (id) => executar(() => api.excluirZona(id), 'A zona não foi excluída'),
     criarBloqueio: (corpo) => executar(() => api.criarBloqueio(corpo), 'O bloqueio não foi criado'),
     removerBloqueio: (id) => executar(() => api.removerBloqueio(id), 'O bloqueio não foi removido'),
     salvarFreteRaio: (corpo) => executar(() => api.salvarFreteRaio(corpo), 'O frete por distância não foi gravado'),

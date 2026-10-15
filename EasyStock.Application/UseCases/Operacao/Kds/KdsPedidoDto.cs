@@ -9,6 +9,8 @@ namespace EasyStock.Application.UseCases.Operacao.Kds;
 /// dia de produção anterior a hoje.</param>
 /// <param name="Endereco">Endereço do cliente em texto (S14), para a gaveta de Entregas do console (F04).</param>
 /// <param name="RequerAprovacao">Exceção que a dona aprova à mão, como entrega fora de área (S12).</param>
+/// <param name="AReceber">Quanto falta receber, pelo saldo financeiro do servidor (#1776, item 19). "Pago" é zero aqui,
+/// não "tem pagamento": o sinal deixa o resto para a porta. Nulo quando o host não calcula o saldo.</param>
 public sealed record KdsPedidoDto(
     Guid Id,
     string NumeroCurto,
@@ -27,7 +29,8 @@ public sealed record KdsPedidoDto(
     string? Observacoes,
     string? Endereco,
     bool RequerAprovacao,
-    string? MotivoRequerAprovacao);
+    string? MotivoRequerAprovacao,
+    decimal? AReceber = null);
 
 public sealed record KdsJanelaDto(string Label, DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 

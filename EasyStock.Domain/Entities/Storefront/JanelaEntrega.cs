@@ -30,6 +30,9 @@ public class JanelaEntrega
     /// <summary>Vagas nominais. Capacidade efetiva = max - COUNT(VagaOcupada ativas) (ADR-0014).</summary>
     public int CapacidadeMaxima { get; private set; }
 
+    /// <summary>#1776 (item 20): teto de vagas numa janela; 99.999 passava e escondia o erro de digitação.</summary>
+    public const int CapacidadeTeto = 500;
+
     /// <summary>Rótulo público (ex: "Manhã 9-12h"). Aparece na UI do cliente.</summary>
     public string Label { get; private set; } = null!;
 
@@ -97,6 +100,10 @@ public class JanelaEntrega
         if (capacidadeMaxima <= 0)
             throw new RegraDeDominioVioladaException(
                 $"Capacidade máxima deve ser positiva (recebido: {capacidadeMaxima}).");
+
+        if (capacidadeMaxima > CapacidadeTeto)
+            throw new RegraDeDominioVioladaException(
+                $"Uma janela aceita até {CapacidadeTeto} pedidos (recebido: {capacidadeMaxima}).");
 
         if (string.IsNullOrWhiteSpace(label))
             throw new RegraDeDominioVioladaException("Label é obrigatório.");

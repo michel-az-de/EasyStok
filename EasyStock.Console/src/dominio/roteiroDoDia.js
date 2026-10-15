@@ -4,7 +4,8 @@
 // A mesma estrutura alimenta a tela "Entregas de hoje" e o roteiro impresso.
 import { faixaDeHorarios } from './entrega'
 import { rotuloEmpresaEntregador } from './entregasApi'
-import { dataIsoNoFuso, listaEmPortugues, plural } from './formato'
+import { dataIsoNoFuso, listaEmPortugues, moeda, plural } from './formato'
+import { aReceberDoCartao, quitadoNoCartao } from './pagamento'
 
 const SEM_JANELA = 'sem-janela'
 const hhmm = (h) => String(h ?? '').slice(0, 5)
@@ -63,7 +64,7 @@ const textoDoEntregador = (e) => (e.empresa ? `${e.nome} (${e.empresa})` : e.nom
 
 function linhaDoPedido(p, achado, entregadores) {
   const base = ETAPAS[p.status] ?? { etapa: 'outro', rotulo: p.statusRotulo ?? p.status, falta: null }
-  const pago = Boolean(p.pagoEm)
+  const pago = quitadoNoCartao(p)
   const rotulo = base.rotulo ?? (pago ? 'Pago, agendado' : 'Agendado')
   const viagem = achado?.viagem ?? null
   return {
@@ -76,6 +77,7 @@ function linhaDoPedido(p, achado, entregadores) {
     etapa: base.etapa,
     rotulo,
     pago,
+    aReceber: aReceberDoCartao(p) ?? 0,
     falta: p.status === 'pronto' ? faltaDoPronto(viagem) : base.falta,
     entregador: entregadorDe(achado, entregadores),
     viagem: viagem ? { id: viagem.id, situacao: viagem.situacao } : null,
@@ -89,6 +91,14 @@ function novoGrupo({ chave, label, inicio, fim, capacidade = null, janelaId = nu
     faixa: chave === SEM_JANELA ? 'Sem janela' : faixaDeHorarios(hhmm(inicio), hhmm(fim)),
     bloqueio: null, pedidos: [], quemLeva: [],
   }
+}
+
+// O que a porta precisa saber do dinheiro (#1776, item 19): tela e papel dizem o mesmo.
+// Aguardando pagamento ainda espera o link: a porta não cobra (o cliente pagaria duas vezes).
+export const situacaoDoPagamento = (p) => {
+  if (p.pago) return 'Pago'
+  if (p.status === 'aguardando_pagamento') return 'Não pago'
+  return p.aReceber > 0 ? `Receber ${moeda(p.aReceber)} na entrega` : 'Não pago'
 }
 
 export function roteiroDoDia({ data, pedidos, viagens, entregadores, janelas, bloqueios }) {

@@ -1,4 +1,8 @@
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.Services.Pedidos;
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Sales;
@@ -81,6 +85,8 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                 .Where(c => cardapioIds.Contains(c.Id) && c.SugestaoMolho != null)
                 .ToDictionaryAsync(c => c.Id, c => c.SugestaoMolho, ct);
 
+        var saldos = await SaldosAsync(empresaId, pedidos, ct);
+
         return pedidos.Select(p =>
         {
             var janela = janelas.GetValueOrDefault(p.Id);
@@ -110,8 +116,56 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                     .ToList(),
                 Endereco: p.EnderecoEntrega ?? cliente?.Endereco,
                 RequerAprovacao: p.RequerAprovacao,
-                MotivoRequerAprovacao: p.MotivoRequerAprovacao);
+                MotivoRequerAprovacao: p.MotivoRequerAprovacao,
+                AReceber: saldos[p.Id].AReceber(p.Total.Valor));
         }).ToList();
+    }
+
+    // #1859: cinco consultas para toda a página, sempre com EmpresaId e os IDs já selecionados.
+    // O legado só conta se nenhum estorno online representa aquele pagamento, como na leitura individual.
+    private async Task<Dictionary<Guid, SaldoFinanceiroComanda>> SaldosAsync(
+        Guid empresaId, IReadOnlyList<Pedido> pedidos, CancellationToken ct)
+    {
+        var ids = pedidos.Select(p => p.Id).ToList();
+        var online = await db.Set<PedidoEstornoOnline>().AsNoTracking()
+            .Where(e => e.EmpresaId == empresaId && ids.Contains(e.PedidoId))
+            .GroupBy(e => e.PedidoId)
+            .Select(g => new
+            {
+                PedidoId = g.Key,
+                Devolvido = g.Sum(e => e.Situacao == PedidoEstornoOnline.Confirmado ? e.Valor : 0m),
+                Reservado = g.Sum(e => e.Situacao == PedidoEstornoOnline.Pendente ? e.Valor : 0m)
+            })
+            .ToDictionaryAsync(e => e.PedidoId, ct);
+        var legado = await (from p in db.Pedidos.AsNoTracking()
+                            from r in p.Pagamentos
+                            join c in db.CobrancasPedido.AsNoTracking() on new { PedidoId = p.Id, Referencia = r.Referencia } equals
+                                new { c.PedidoId, Referencia = c.PagamentoExternoId }
+                            where p.EmpresaId == empresaId && ids.Contains(p.Id) && c.EmpresaId == empresaId
+                                && c.Provedor == CobrancaPedido.ProvedorMercadoPago && c.Status == StatusCobrancaPedido.Estornada
+                                && !db.Set<PedidoEstornoOnline>().Any(e => e.EmpresaId == empresaId && e.PedidoId == p.Id && e.PagamentoId == r.Id)
+                            group r by p.Id into g
+                            select new { PedidoId = g.Key, Valor = g.Sum(r => r.Valor) })
+            .ToDictionaryAsync(e => e.PedidoId, e => e.Valor, ct);
+        var manual = await db.Set<PedidoEstornoManual>().AsNoTracking()
+            .Where(e => e.EmpresaId == empresaId && ids.Contains(e.PedidoId))
+            .GroupBy(e => e.PedidoId)
+            .Select(g => new { PedidoId = g.Key, Valor = g.Sum(e => e.Valor) })
+            .ToDictionaryAsync(e => e.PedidoId, e => e.Valor, ct);
+        var emitido = await db.Set<CreditoClienteComanda>().AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId && ids.Contains(c.PedidoOrigemId))
+            .GroupBy(c => c.PedidoOrigemId)
+            .Select(g => new { PedidoId = g.Key, Valor = g.Sum(c => c.Valor) })
+            .ToDictionaryAsync(e => e.PedidoId, e => e.Valor, ct);
+        var utilizado = await db.Set<UsoCreditoClienteComanda>().AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId && ids.Contains(c.PedidoId))
+            .GroupBy(c => c.PedidoId)
+            .Select(g => new { PedidoId = g.Key, Valor = g.Sum(c => c.Valor) })
+            .ToDictionaryAsync(e => e.PedidoId, e => e.Valor, ct);
+
+        return pedidos.ToDictionary(p => p.Id, p => new SaldoFinanceiroComanda(p.TotalPago,
+            legado.GetValueOrDefault(p.Id) + (online.GetValueOrDefault(p.Id)?.Devolvido ?? 0m) + manual.GetValueOrDefault(p.Id),
+            emitido.GetValueOrDefault(p.Id), utilizado.GetValueOrDefault(p.Id), online.GetValueOrDefault(p.Id)?.Reservado ?? 0m));
     }
 
     private sealed record ClienteDoPedido(string? Nome, string? Endereco);

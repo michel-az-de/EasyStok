@@ -30,7 +30,9 @@ export const sairParaEntrega = (id) => chamarApi(`${V}/${id}/sair`, { metodo: 'P
 export const listarCorridas = (id) => chamarApi(`${V}/${id}/corridas`)
 export const registrarCorrida = (id, corpo) => chamarApi(`${V}/${id}/corridas`, { metodo: 'POST', corpo })
 export const corrigirCorrida = (id, corridaId, corpo) => chamarApi(`${V}/${id}/corridas/${corridaId}`, { metodo: 'PUT', corpo })
-export const marcarParadaEntregue = (id, pedidoId) => chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST' })
+// #1776 (item 19): com saldo a receber a API responde 409 SALDO_A_RECEBER até `confirmarSaldoAReceber`.
+export const marcarParadaEntregue = (id, pedidoId, confirmarSaldoAReceber = false) =>
+  chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST', corpo: { confirmarSaldoAReceber } })
 export const desfazerViagem = (id) => chamarApi(`${V}/${id}/desfazer`, { metodo: 'POST' })
 
 // Chamados de entregador (texto livre).
@@ -54,6 +56,8 @@ export const excluirJanela = (id) => chamarApi(`${E}/janelas/${id}`, { metodo: '
 export const definirJanelaAtiva = (id, ativa) => chamarApi(`${E}/janelas/${id}/ativa`, { metodo: 'POST', corpo: { ativa } })
 export const listarZonas = () => chamarApi(`${E}/zonas`)
 export const criarZona = (corpo) => chamarApi(`${E}/zonas`, { metodo: 'POST', corpo })
+export const atualizarZona = (id, corpo) => chamarApi(`${E}/zonas/${id}`, { metodo: 'PUT', corpo })
+export const excluirZona = (id) => chamarApi(`${E}/zonas/${id}`, { metodo: 'DELETE' })
 export const definirZonaAtiva = (id, ativa) => chamarApi(`${E}/zonas/${id}/ativa`, { metodo: 'POST', corpo: { ativa } })
 export const listarBloqueios = (de, ate) => chamarApi(`${E}/bloqueios?de=${de}&ate=${ate}`)
 export const criarBloqueio = (corpo) => chamarApi(`${E}/bloqueios`, { metodo: 'POST', corpo })

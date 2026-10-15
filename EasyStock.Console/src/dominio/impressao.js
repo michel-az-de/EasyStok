@@ -6,7 +6,7 @@ import { dataHora, horaCurta, listaEmPortugues, plural } from './formato'
 import { A4, LARGURA_BOBINA, larguraDoTexto, mm, montarPdf, quebrarLinhas } from './pdf'
 import { agruparPorLinha, itensDetalhados, numeroCurto, pedidoEncerrado, porcaoForaDoNome } from './pedido'
 import { entregadorDaViagem, marcosDaViagem } from './viagem'
-import { resumoDoRoteiro, rotuloDaData, textoDeQuemLeva } from './roteiroDoDia'
+import { resumoDoRoteiro, rotuloDaData, situacaoDoPagamento, textoDeQuemLeva } from './roteiroDoDia'
 
 // Caneta que desce a folha: guarda o `y` atual e empilha os desenhos. A
 // altura da linha é 1,3 vez o corpo, a mesma folga do texto corrido da tela.
@@ -242,7 +242,7 @@ export function documentoDoRoteiro({ roteiro, papel = 'a4', agora }) {
       const nome = `${indice + 1}. Nº ${p.numero} · ${p.cliente}${p.apto ? ` · apto ${p.apto}` : ''}`
       const endereco = p.endereco ?? 'Sem endereço no cadastro'
       const situacao = [
-        p.pago ? 'Pago' : 'Não pago', p.rotulo,
+        situacaoDoPagamento(p), p.rotulo,
         p.entregador ? `Leva ${textoDeQuemLeva(p.entregador)}` : null, p.falta,
       ].filter(Boolean).join(' · ')
       caber(alturaDe(nome, t.nome, true) + alturaDe(endereco, t.corpo) + alturaDe(situacao, t.apoio) + mm(4))

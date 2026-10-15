@@ -5,7 +5,7 @@ import { CampoTexto } from '../../componentes/Campo'
 import { Pilula } from '../../componentes/Pilula'
 import { DIAS_DA_SEMANA as DIAS_CURTOS, faixaDeHorarios } from '../../dominio/entrega'
 import {
-  DIAS_DA_SEMANA, camposDaJanela, corpoJanela, corposJanela, erroDoFormularioJanela,
+  CAPACIDADE_TETO, DIAS_DA_SEMANA, camposDaJanela, corpoJanela, corposJanela, erroDoFormularioJanela,
 } from '../../dominio/entregasApi'
 import { plural } from '../../dominio/formato'
 import css from './entregasApi.module.css'
@@ -37,7 +37,8 @@ function Dias({ dias, umSo, aoMudar, ocupado }) {
 
 // Um formulário só para criar e editar: os dois nunca divergem na validação. Editar mexe numa
 // janela, então o dia é um só; criar aceita vários e sai uma janela por dia.
-function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) {
+// #1776 (item 20): `janelas` e `propria` deixam o formulário recusar o horário que cruza com outro.
+function FormularioJanela({ inicial, editando, janelas, propria = null, aoSalvar, aoCancelar, ocupado }) {
   const [f, setF] = useState(inicial)
   const [erro, setErro] = useState(null)
   const formularioRef = useRef(null)
@@ -45,7 +46,7 @@ function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) 
   const campo = (k) => ({ value: f[k], disabled: ocupado, onChange: (e) => setF({ ...f, [k]: e.target.value }) })
   const salvar = (e) => {
     e.preventDefault()
-    const motivo = erroDoFormularioJanela(f)
+    const motivo = erroDoFormularioJanela(f, janelas, propria)
     if (motivo) { setErro(motivo); return }
     setErro(null)
     aoSalvar(f).then((ok) => { if (ok && !editando) setF(inicial) })
@@ -57,7 +58,7 @@ function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) 
       <div className={`${css.formulario} ${layout.formularioJanela}`}>
         <CampoTexto rotulo="Início" tipo="time" {...campo('horaInicio')} required />
         <CampoTexto rotulo="Fim" tipo="time" {...campo('horaFim')} required />
-        <CampoTexto rotulo="Vagas (pedidos)" tipo="number" min="1" step="1" {...campo('capacidadeMaxima')} required />
+        <CampoTexto rotulo="Vagas (pedidos)" tipo="number" min="1" max={CAPACIDADE_TETO} step="1" {...campo('capacidadeMaxima')} required />
         <CampoTexto rotulo="Nome" placeholder={faixa || 'Almoço'} {...campo('label')} />
       </div>
       {erro && <p className={css.erroCampo} role="alert">{erro}</p>}
@@ -71,7 +72,7 @@ function FormularioJanela({ inicial, editando, aoSalvar, aoCancelar, ocupado }) 
   )
 }
 
-function LinhaJanela({ janela, acoes, ocupado, aoExcluir, focoAlternativo }) {
+function LinhaJanela({ janela, janelas, acoes, ocupado, aoExcluir, focoAlternativo }) {
   const [modo, setModo] = useState(null) // null | 'editar' | 'excluir'
   const editarRef = useRef(null)
   const fechar = () => {
@@ -88,6 +89,8 @@ function LinhaJanela({ janela, acoes, ocupado, aoExcluir, focoAlternativo }) {
         <FormularioJanela
           inicial={camposDaJanela(janela)}
           editando
+          janelas={janelas}
+          propria={janela.id}
           ocupado={ocupado}
           aoSalvar={(f) => acoes.atualizarJanela(janela.id, corpoJanela({ ...f, diaDaSemana: f.dias[0], label: f.label || faixaDeHorarios(f.horaInicio, f.horaFim) }))
             .then((ok) => { if (ok) fechar() })}
@@ -144,7 +147,7 @@ export function JanelasDaLoja({ janelas, acoes, ocupado }) {
       </p>
       {criando && (
         <div className={css.cartao}>
-          <FormularioJanela inicial={JANELA_NOVA} ocupado={ocupado} aoSalvar={(f) => acoes.criarJanelas(corposJanela(f)).then((ok) => {
+          <FormularioJanela inicial={JANELA_NOVA} janelas={lista} ocupado={ocupado} aoSalvar={(f) => acoes.criarJanelas(corposJanela(f)).then((ok) => {
             if (ok) { setCriando(false); requestAnimationFrame(() => criarRef.current?.focus()) }
             return ok
           })} />
@@ -158,7 +161,7 @@ export function JanelasDaLoja({ janelas, acoes, ocupado }) {
             {lista
               .filter((j) => j.diaDaSemana === d)
               .sort((a, b) => String(a.horaInicio).localeCompare(String(b.horaInicio)))
-              .map((j) => <LinhaJanela key={j.id} janela={j} acoes={acoes} ocupado={ocupado} focoAlternativo={criarRef} aoExcluir={() => acoes.excluirJanela(j.id).then((ok) => {
+              .map((j) => <LinhaJanela key={j.id} janela={j} janelas={lista} acoes={acoes} ocupado={ocupado} focoAlternativo={criarRef} aoExcluir={() => acoes.excluirJanela(j.id).then((ok) => {
                 if (ok) requestAnimationFrame(() => criarRef.current?.focus())
               })} />)}
           </ul>

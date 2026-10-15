@@ -3,7 +3,7 @@ import {
   DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, useDroppable, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { useRelogio } from '../../hooks/useRelogio'
-import { dataIsoNoFuso, horaCurta } from '../../dominio/formato'
+import { dataIsoNoFuso, horaCurta, moeda } from '../../dominio/formato'
 import {
   COLUNAS_KDS, avisoDeFilaNoTeto, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
 } from '../../dominio/kds'
@@ -64,7 +64,7 @@ export function TelaCozinhaApi({ linhas }) {
   const [amanhaDesde, setAmanhaDesde] = useState(null)
   const { amanha, data: dataDaFila } = diaDaFilaDaCozinha(amanhaDesde, agora)
   const {
-    pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes,
+    pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes, saldoPendente, descartarSaldoPendente,
     avancar, recarregar, reimprimir, limparErro,
   } = useCozinhaApi({ data: dataDaFila })
   const [linhaFiltro, setLinhaFiltro] = useState(null)
@@ -108,7 +108,7 @@ export function TelaCozinhaApi({ linhas }) {
     setFeedback({ ...feedback, confirmado: true, requerConferencia: false,
       texto: `Pedido ${feedback.numero} confirmado em ${rotuloDaColuna(feedback.destino)}.` })
   } else if (feedback?.destino && !feedback.confirmado && !feedback.requerConferencia
-    && erro && !movendo.has(feedback.id)) {
+    && (erro || saldoPendente?.id === feedback.id) && !movendo.has(feedback.id)) {
     // Uma leitura posterior pode limpar o alerta sem confirmar o destino.
     // Esse pedido continua pedindo conferência até chegar o estado real.
     setFeedback({ ...feedback, requerConferencia: true })
@@ -159,6 +159,19 @@ export function TelaCozinhaApi({ linhas }) {
           <Botao variante="secundario" onClick={recarregar}>Atualizar fila</Botao>
           {pedidos !== null && <Botao variante="texto" onClick={limparErro}>Fechar aviso</Botao>}
         </p>
+      )}
+      {saldoPendente && (
+        <div className={css.motivoRecusa} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
+          <Icone nome="alerta" tamanho={16} />
+          <span>
+            Pedido {(pedidos ?? []).find((p) => p.id === saldoPendente.id)?.numeroCurto ?? ''}: falta receber {moeda(saldoPendente.valor)}.
+            Marque entregue se recebeu na porta ou combinou a cobrança.
+          </span>
+          <span>
+            <Botao variante="primario" onClick={() => avancar(saldoPendente.id, saldoPendente.status, true)}>Marcar entregue</Botao>
+            <Botao variante="texto" onClick={descartarSaldoPendente}>Voltar</Botao>
+          </span>
+        </div>
       )}
       {avisoDeFilaNoTeto(lista.length) && (
         <p className={css.motivoRecusa} role="alert">

@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Atendimento.Entregas;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Enums.Atendimento;
@@ -146,10 +147,12 @@ public class AtendimentoViagensController(
     public Task<IActionResult> Sair(Guid id, CancellationToken ct)
         => ExecutarEObter(id, () => sairUseCase.ExecuteAsync(EmpresaId, id, ct), ct);
 
-    [SwaggerOperation(Summary = "Mark a stop delivered", Description = "O pedido vai para entregue; a última parada conclui a viagem.")]
+    [SwaggerOperation(Summary = "Mark a stop delivered",
+        Description = "O pedido vai para entregue; a última parada conclui a viagem. Com saldo a receber, 409 SALDO_A_RECEBER até `confirmarSaldoAReceber`.")]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [HttpPost("viagens/{id:guid}/paradas/{pedidoId:guid}/entregue")]
-    public Task<IActionResult> MarcarEntregue(Guid id, Guid pedidoId, CancellationToken ct)
-        => ExecutarEObter(id, () => entregueUseCase.ExecuteAsync(EmpresaId, id, pedidoId, ct), ct);
+    public Task<IActionResult> MarcarEntregue(Guid id, Guid pedidoId, [FromBody] EntregueBody? body, CancellationToken ct)
+        => ExecutarEObter(id, () => entregueUseCase.ExecuteAsync(EmpresaId, id, pedidoId, body?.ConfirmarSaldoAReceber ?? false, ct), ct);
 
     [SwaggerOperation(Summary = "Undo a trip before dispatch")]
     [HttpPost("viagens/{id:guid}/desfazer")]
@@ -192,6 +195,7 @@ public class AtendimentoViagensController(
         catch (EntregadorNaoEncontradoException ex) { return DataNotFound(ex.Message); }
         catch (PedidoNaoEncontradoParaViagemException ex) { return DataNotFound(ex.Message); }
         catch (ChamadoEntregadorNaoEncontradoException ex) { return DataNotFound(ex.Message); }
+        catch (SaldoAReceberNaEntregaException ex) { return SaldoAReceber(ex); }
     }
 }
 
@@ -249,6 +253,9 @@ public sealed record CriarViagemBody(Guid? EntregadorId);
 public sealed record DefinirEntregadorBody(Guid? EntregadorId);
 
 public sealed record ParadaBody(Guid PedidoId);
+
+/// <param name="ConfirmarSaldoAReceber">#1776 (item 19): entrega com saldo a receber, confirmada por quem marca.</param>
+public sealed record EntregueBody(bool ConfirmarSaldoAReceber = false);
 
 public sealed record ReordenarBody(int Ordem);
 

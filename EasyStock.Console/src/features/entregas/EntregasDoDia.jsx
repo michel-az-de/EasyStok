@@ -7,7 +7,7 @@ import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { dataIsoNoFuso, listaEmPortugues, plural } from '../../dominio/formato'
 import { pdfDoRoteiro } from '../../dominio/impressao'
-import { resumoDoRoteiro, rotuloDaData, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
+import { resumoDoRoteiro, rotuloDaData, situacaoDoPagamento, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
 import { useRelogio } from '../../hooks/useRelogio'
 import css from './entregasApi.module.css'
 import { ModalAlterarAgendamentoApi } from './ModalAlterarAgendamento'
@@ -55,7 +55,7 @@ function EscolhaDoDia({ dia, mudarDia }) {
 
 function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
   const detalhes = [
-    pedido.pago ? 'Pago' : 'Não pago',
+    situacaoDoPagamento(pedido),
     pedido.entregador ? `Leva ${textoDeQuemLeva(pedido.entregador)}` : null,
     pedido.falta,
   ].filter(Boolean).join(' · ')
