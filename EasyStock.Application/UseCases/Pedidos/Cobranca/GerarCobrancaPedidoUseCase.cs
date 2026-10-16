@@ -139,9 +139,11 @@ public sealed class GerarCobrancaPedidoUseCase(
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
 
         var storefront = await storefrontRepository.GetByEmpresaAsync(input.EmpresaId, ct);
+        // #1865: com parte já recebida (o sinal da encomenda), reemitir cobra o restante em vez de recusar.
+        var cobrarSaldo = input.CobrarSaldo || alocado > 0m;
         var dados = new DadosCobranca(
             pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
-            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, input.CobrarSaldo,
+            pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, cobrarSaldo,
             input.NaEntregaSemProvedor);
         return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
     }
@@ -190,7 +192,7 @@ public sealed class GerarCobrancaPedidoUseCase(
             ValorTotal: valorCobrado,
             Items: valorCobrado == dados.Total
                 ? dados.Itens.Where(i => i.PrecoUnitario > 0m).Select(ItemDaPreferencia).ToList()
-                : [new PreferenceItemCommand(dados.CobrarSaldo ? "Saldo da comanda" : "Sinal da encomenda (50%)", 1, valorCobrado)],
+                : [new PreferenceItemCommand(dados.CobrarSaldo ? "Restante do pedido" :"Sinal da encomenda (50%)", 1, valorCobrado)],
             ExpiraEm: expiraEm,
             IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}");
 

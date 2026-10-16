@@ -224,7 +224,7 @@ await confere('R3 motivo antes de cobrar, na ordem: vazia, cadastro, endereço, 
   assert.equal(m({ itens: [], janela: null }, { clienteId: null, endereco: null }), 'A comanda está vazia.')
   assert.equal(m({ ...cheio, janela: null }, { clienteId: null, endereco: null }), 'Salve o cadastro do cliente (Contato e endereço).')
   assert.equal(m({ ...cheio, janela: null }, { endereco: null }), 'Falta o endereço de entrega (Contato e endereço).')
-  assert.equal(m({ ...cheio, janela: null }), 'Escolha a janela de entrega, logo abaixo da comanda.')
+  assert.equal(m({ ...cheio, janela: null }), 'Escolha a janela de entrega em Seleção do atendimento.')
   assert.equal(m(cheio), null)
   // Na demonstração só a comanda vazia trava: cadastro e janela são do EasyStok.
   assert.equal(resumoPedido.motivoAntesDeCobrar({ pedido: { ...cheio, janela: null }, clienteId: null, endereco: null }, { fonteApi: false }), null)

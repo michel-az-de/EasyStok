@@ -1,5 +1,7 @@
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Pedidos;
+using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
@@ -28,8 +30,13 @@ public class ObterPedidoGuestUseCaseTests
 
     private static ObterPedidoGuestUseCase BuildSut(
         Domain.Entities.Storefront.Storefront? storefront = null,
-        PedidoEntity? pedido = null)
+        PedidoEntity? pedido = null,
+        IReadOnlyList<CobrancaPedido>? cobrancas = null)
     {
+        var cobrancaRepo = Substitute.For<ICobrancaPedidoRepository>();
+        cobrancaRepo.ListarDoPedidoAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(cobrancas ?? (IReadOnlyList<CobrancaPedido>)[]));
+
         var storefrontRepo = Substitute.For<IStorefrontRepository>();
         storefrontRepo.GetBySlugAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(_ => storefront);
@@ -52,7 +59,7 @@ public class ObterPedidoGuestUseCaseTests
 
         return new ObterPedidoGuestUseCase(
             storefrontRepo, pedidoRepo, avaliacaoRepo, vagaRepo,
-            NullLogger<ObterPedidoGuestUseCase>.Instance);
+            NullLogger<ObterPedidoGuestUseCase>.Instance, cobrancaRepo);
     }
 
     private static Domain.Entities.Storefront.Storefront StorefrontAtivo()
@@ -175,5 +182,36 @@ public class ObterPedidoGuestUseCaseTests
         result.Should().NotBeNull();
         result!.Pedido.PedidoId.Should().Be(PedidoId);
         result.Pedido.Status.Should().Be("Entregue");
+    }
+
+    // #1865: a cliente que voltou do Mercado Pago sem pagar retoma pelo acompanhamento e vê quanto já pagou.
+    [Fact]
+    public async Task Pedido_guest_traz_valor_pago_e_link_da_cobranca_pendente()
+    {
+        var pedido = PedidoStub();
+        pedido.Status = StatusPedidoMapper.AguardandoPagamento;
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = PedidoId, Metodo = "pix", Valor = 50m, PagoEm = DateTime.UtcNow });
+        var agora = DateTime.UtcNow;
+        var vencida = CobrancaPedido.CriarOnline(EmpresaId, PedidoId, 50m, "pref-velha", "https://mp.test/velha",
+            agora.AddMinutes(-1), 1, agora.AddMinutes(-31), null, null);
+        var pendente = CobrancaPedido.CriarOnline(EmpresaId, PedidoId, 50m, "pref-nova", "https://mp.test/nova",
+            agora.AddMinutes(29), 2, agora, null, null);
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedido: pedido, cobrancas: [vencida, pendente]);
+
+        var result = await sut.ExecuteAsync(Slug, PedidoId);
+
+        result!.Pedido.PagoCentavos.Should().Be(5000);
+        result.Pedido.InitPointUrl.Should().Be("https://mp.test/nova");
+    }
+
+    [Fact]
+    public async Task Pedido_guest_sem_cobranca_pendente_nao_traz_link()
+    {
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedido: PedidoStub());
+
+        var result = await sut.ExecuteAsync(Slug, PedidoId);
+
+        result!.Pedido.InitPointUrl.Should().BeNull();
+        result.Pedido.PagoCentavos.Should().Be(0);
     }
 }

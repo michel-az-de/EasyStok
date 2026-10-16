@@ -1,4 +1,5 @@
 using System.Globalization;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -32,7 +33,7 @@ namespace EasyStock.Application.UseCases.Storefront.Pedidos;
 /// </para>
 /// <list type="bullet">
 ///   <item><c>Endereco</c> sempre null — o checkout atual não snapshota endereço de entrega no Pedido (ver TASK-EZ-PEDIDOS-002).</item>
-///   <item><c>InitPointUrl</c> sempre null — preference MP não é persistida (ver TASK-EZ-PEDIDOS-003 pra reabertura de pagamento).</item>
+///   <item><c>InitPointUrl</c> null na listagem; o acompanhamento de um pedido traz o link pendente (#1865).</item>
 /// </list>
 /// </summary>
 public sealed class ListarPedidosClienteUseCase(
@@ -108,10 +109,20 @@ public sealed class ListarPedidosClienteUseCase(
         return Math.Min(raw.Value, MaxLimit);
     }
 
+    /// <summary>Link da cobrança online pendente e não vencida do pedido (#1865); null sem o que pagar.</summary>
+    internal static async Task<string?> LinkPendenteAsync(ICobrancaPedidoRepository? cobrancas, PedidoEntity pedido,
+        DateTime agora, CancellationToken ct)
+    {
+        if (cobrancas is null) return null;
+        var lista = await cobrancas.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct);
+        return lista.LastOrDefault(c => c.EstaPendente && c.EhOnline && !c.Venceu(agora) && c.LinkPagamento is not null)?.LinkPagamento;
+    }
+
     internal static PedidoStorefrontDto MapearParaDto(
         PedidoEntity pedido,
         PedidoAvaliacao? avaliacao,
-        (VagaOcupada Vaga, JanelaEntrega Janela) vagaInfo)
+        (VagaOcupada Vaga, JanelaEntrega Janela) vagaInfo,
+        string? linkPagamento = null)
     {
         // Item de frete = ProdutoId null + Nome começa com "Entrega" (convenção do
         // IniciarCheckoutUseCase). Snapshot, então pode haver pedido legado sem item de frete.
@@ -202,10 +213,11 @@ public sealed class ListarPedidosClienteUseCase(
             JanelaEntrega: janelaDto,
             Endereco: null,         // MVP: ver TASK-EZ-PEDIDOS-002
             Avaliacao: avaliacaoDto,
-            InitPointUrl: null,     // MVP: ver TASK-EZ-PEDIDOS-003
+            InitPointUrl: linkPagamento,
             MotivoCancelamento: motivoCancelamento,
             Pagamento: pagamentoDto,
-            Historico: historicoDto);
+            Historico: historicoDto,
+            PagoCentavos: ToCentavos(pedido.TotalPago));
     }
 
     /// <summary>

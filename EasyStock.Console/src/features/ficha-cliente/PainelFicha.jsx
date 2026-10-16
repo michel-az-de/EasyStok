@@ -9,7 +9,7 @@ import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaPagar } from '../../dominio/cobranca'
 import { faixaDoPedido } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
-import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoEstado, totalDoPedido } from '../../dominio/pedido'
+import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoResumo, totalDoPedido } from '../../dominio/pedido'
 import { faltaPagar as saldoDoPedido } from '../../dominio/pagamento'
 import { moeda } from '../../dominio/formato'
 import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
@@ -159,7 +159,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           <p className={css.fase}>{!editavel ? 'Conversa encerrada' : posVenda ? 'Pós-venda' : pedidoCriado ? 'Pedido criado' : 'Antes da venda'}</p>
           <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `${fonteApi ? 'Comanda' : 'Pedido'} ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
           <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
-            : pedido ? `${pedidoCriado ? rotuloDoEstado(pedido.estado) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
+            : pedido ? `${pedidoCriado ? rotuloDoResumo(pedido.estado, saldo) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
               : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. O que a conversa trouxe já vem preenchido.'
                 : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
         </section>

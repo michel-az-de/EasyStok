@@ -113,6 +113,23 @@ public class GerarCobrancaPedidoUseCaseTests
         (await act.Should().ThrowAsync<CobrancaPedidoConflitoException>()).Which.Codigo.Should().Be("pedido_ja_pago");
     }
 
+    // #1865: a atendente reemite o link de uma encomenda com o sinal pago; antes recebia "Pedido já pago" com saldo em aberto.
+    [Fact]
+    public async Task SinalPago_ReemissaoCobraORestante()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        f.AdicionarOnline(valor: 12.5m).MarcarPaga("pay-1", 12.5m, "pix", CobrancaPedidoFixture.Agora);
+        f.AdicionarPagamento("pay-1", 12.5m);
+
+        var r = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+
+        r.Valor.Should().Be(12.5m);
+        f.Preferencias.Should().ContainSingle().Which.Items.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(new PreferenceItemCommand("Restante do pedido", 1, 12.5m));
+    }
+
     // #1540: depois do estorno total a cobrança fica Estornada e o pagamento permanece. A confirmação
     // (#1289) trata o próximo pagamento como duplicado e devolve sozinha, então o link não pode sair.
     [Fact]

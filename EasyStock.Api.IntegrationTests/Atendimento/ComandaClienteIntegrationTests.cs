@@ -40,6 +40,48 @@ public sealed partial class PedidoConversaConcorrenciaTests
         relido.PrecisaCadastro.Should().BeFalse();
     }
 
+    [SkippableFact]
+    public async Task Comanda_VisitanteComPedidoDoSiteNaoDerrubaOsLinksNemExpoeOPedido()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory(Provedor(new()));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var criado = await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/pedido", new
+        {
+            itens = new[] { new { cardapioItemId = c.CardapioItemId, qtd = 1 } },
+            janelaId = c.JanelaId, dataEntrega = c.DataEntrega.ToString("yyyy-MM-dd"), forma = "na_entrega",
+        });
+        criado.StatusCode.Should().Be(HttpStatusCode.OK, await criado.Content.ReadAsStringAsync());
+        Guid visitanteId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            // #1865: o checkout do site liga o pedido ao chat sem conceder identidade à conversa do visitante.
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            var pedidoId = (await db.AtendimentoConversas.SingleAsync(x => x.Id == c.ConversaId)).PedidoEmAndamentoId!.Value;
+            var visitante = Conversa.Abrir(EmpresaId, $"site:{Guid.NewGuid():N}", DateTime.UtcNow, "Visitante do site",
+                canal: EasyStock.Domain.Enums.Atendimento.CanalConversa.ChatSite);
+            visitante.DefinirPedidoEmAndamento(pedidoId);
+            db.AtendimentoConversas.Add(visitante);
+            await db.SaveChangesAsync();
+            visitanteId = visitante.Id;
+        }
+        var token = await Link(factory, visitanteId);
+
+        using var lista = await client.GetAsync($"/api/atendimento/conversas/{visitanteId}/comandas-cliente");
+        lista.StatusCode.Should().Be(HttpStatusCode.OK, await lista.Content.ReadAsStringAsync());
+        var estado = await Estado(client, token);
+        estado.Pedido.Should().BeNull("o visitante não comprovou ser o dono do pedido do site");
+        estado.PodeEditar.Should().BeTrue();
+        await Salvar(client, token, estado, new([new(c.CardapioItemId, 2)], JanelaId: c.JanelaId, DataEntrega: c.DataEntrega,
+            Endereco: new("01310100", "Rua do visitante", "7", "Centro", "São Paulo", "SP", null),
+            Nome: "Visitante identificado", Telefone: "11912340000"));
+        var enviado = await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { (await Estado(client, token)).Revisao });
+        enviado.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity, "o pedido do site segue em andamento nesta conversa");
+        (await enviado.Content.ReadAsStringAsync()).Should().Contain("já tem um pedido em andamento");
+        (await client.GetAsync($"/api/atendimento/conversas/{visitanteId}/comandas-cliente")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     [SkippableTheory]
     [InlineData("01310100", false)]
     [InlineData("20040002", true)]
