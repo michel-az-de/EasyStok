@@ -152,10 +152,8 @@ public sealed class CheckoutSiteUseCase(
             ?? throw new InvalidOperationException("Pedido recém-criado não foi encontrado.");
         if (pedido.EmpresaId != sessao.EmpresaId || conversa.EmpresaId != sessao.EmpresaId)
             throw new InvalidOperationException("Pedido e conversa pertencem a lojas diferentes.");
-        var linhas = string.Join("; ", pedido.Itens.Select(i => $"{i.Quantidade} × {i.Nome}"));
         // Nota interna: contém o snapshot informado, mas não concede identidade nem expõe cadastro ao visitante.
-        await conversaChat.RegistrarPedidoAsync(sessao.EmpresaId, conversa.Id, pedido.Id,
-            $"Pedido do site #{pedido.Id.ToString("N")[..8].ToUpperInvariant()}: {linhas}. Total R$ {pedido.Total}. {pedido.Observacoes}",
+        await conversaChat.RegistrarPedidoAsync(sessao.EmpresaId, conversa.Id, pedido.Id, NotaDoPedido(pedido),
             relogio.GetUtcNow().UtcDateTime, ct);
         try
         {
@@ -166,6 +164,13 @@ public sealed class CheckoutSiteUseCase(
         {
             logger.LogWarning(ex, "Pedido {PedidoId} vinculado ao chat; aviso ao console falhou.", pedidoId);
         }
+    }
+
+    /// <summary>#1865: quantidade e total no formato brasileiro ("2 × Lasanha", "R$ 65,00"), não "2.000" e "65.00".</summary>
+    public static string NotaDoPedido(Domain.Entities.Pedido pedido)
+    {
+        var linhas = string.Join("; ", pedido.Itens.Select(i => $"{i.Quantidade.ToString("0.###", Cultura.PtBr)} × {i.Nome}"));
+        return $"Pedido do site #{pedido.Id.ToString("N")[..8].ToUpperInvariant()}: {linhas}. Total {pedido.Total.Valor.ToString("C", Cultura.PtBr)}. {pedido.Observacoes}".TrimEnd();
     }
 
     private async Task CheckpointAsync(SessaoChatSite sessao, Conversa conversa, Guid chave, string hash, Guid pedidoId, CancellationToken ct)

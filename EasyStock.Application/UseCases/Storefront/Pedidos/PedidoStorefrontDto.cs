@@ -19,10 +19,11 @@
 /// <param name="JanelaEntrega">Detalhes da janela escolhida (via VagaOcupada). Null se vaga já liberada e sem histórico.</param>
 /// <param name="Endereco">Endereço de entrega. Null no MVP — backend ainda não snapshota endereço no checkout (ver task TASK-EZ-PEDIDOS-002).</param>
 /// <param name="Avaliacao">Avaliação do cliente (se Entregue + avaliado). Null caso contrário.</param>
-/// <param name="InitPointUrl">URL do MercadoPago para retomar pagamento. Null no MVP — preference URL não está persistida (ver task TASK-EZ-PEDIDOS-003).</param>
+/// <param name="InitPointUrl">Link do Mercado Pago da cobrança online pendente e não vencida, para retomar o pagamento (#1865). Null sem cobrança a pagar e sempre null na listagem.</param>
 /// <param name="MotivoCancelamento">Mensagem ao cliente quando status == Cancelado/Recusado. Null caso contrário.</param>
 /// <param name="Pagamento">Pagamento confirmado (método + timestamp). Null se ainda sem pagamento.</param>
 /// <param name="Historico">Mapa stepKey → timestamp (pagamento/aprovacao/preparo/entrega/entregue) derivado dos PedidoEvento. Null se sem eventos relevantes.</param>
+/// <param name="PagoCentavos">Soma dos pagamentos do pedido (#1865): com o sinal da encomenda, o restante é <c>TotalCentavos - PagoCentavos</c>.</param>
 public sealed record PedidoStorefrontDto(
     Guid PedidoId,
     DateTime CriadoEm,
@@ -37,7 +38,8 @@ public sealed record PedidoStorefrontDto(
     string? InitPointUrl,
     string? MotivoCancelamento,
     PedidoStorefrontPagamentoDto? Pagamento,
-    IReadOnlyDictionary<string, DateTime>? Historico);
+    IReadOnlyDictionary<string, DateTime>? Historico,
+    long PagoCentavos = 0);
 
 /// <summary>Item snapshotado do pedido (nome do produto no momento + qtd × preço unitário).</summary>
 /// <param name="Nome">Snapshot do nome no momento da compra.</param>

@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
@@ -11,7 +12,7 @@ namespace EasyStock.Application.UseCases.Storefront.Pedidos;
 /// <para>
 /// Reusa <see cref="ListarPedidosClienteUseCase.MapearParaDto"/> — mesma regra de
 /// itens/frete/status/janela/avaliação/motivo. As mesmas limitações de MVP do list
-/// valem aqui (Endereco e InitPointUrl null — ver TASK-EZ-PEDIDOS-002/003).
+/// valem aqui (Endereco null — ver TASK-EZ-PEDIDOS-002); o link de pagamento pendente vem preenchido (#1865).
 /// </para>
 ///
 /// <para>
@@ -25,7 +26,9 @@ public sealed class ObterPedidoClienteUseCase(
     IPedidoStorefrontRepository pedidoRepository,
     IPedidoAvaliacaoRepository avaliacaoRepository,
     IVagaOcupadaRepository vagaOcupadaRepository,
-    ILogger<ObterPedidoClienteUseCase> logger)
+    ILogger<ObterPedidoClienteUseCase> logger,
+    ICobrancaPedidoRepository? cobrancas = null,
+    TimeProvider? relogio = null)
 {
     public async Task<ObterPedidoClienteResult?> ExecuteAsync(
         ObterPedidoClienteInput input,
@@ -62,7 +65,9 @@ public sealed class ObterPedidoClienteUseCase(
         avaliacoes.TryGetValue(pedido.Id, out var avaliacao);
         vagas.TryGetValue(pedido.Id, out var vagaInfo);
 
-        var dto = ListarPedidosClienteUseCase.MapearParaDto(pedido, avaliacao, vagaInfo);
+        var link = await ListarPedidosClienteUseCase.LinkPendenteAsync(cobrancas, pedido,
+            (relogio ?? TimeProvider.System).GetUtcNow().UtcDateTime, ct);
+        var dto = ListarPedidosClienteUseCase.MapearParaDto(pedido, avaliacao, vagaInfo, link);
 
         logger.LogInformation(
             "ObterPedidoCliente ok empresaId={EmpresaId} clienteId={ClienteId} pedidoId={PedidoId}",

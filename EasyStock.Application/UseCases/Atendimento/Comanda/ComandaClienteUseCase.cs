@@ -120,6 +120,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             throw new UseCaseValidationException("Confirme seu cadastro no atendimento para abrir a comanda.");
         var pedidoId = link.PedidoRegistradoId ?? conversa.PedidoEmAndamentoId;
         var pedido = pedidoId is { } id ? await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, id) : null;
+        // Pedido do site ligado ao chat sem conceder identidade (#1865): de outro cadastro, o link começa comanda nova
+        // e não expõe o pedido. Só o pedido registrado pelo próprio link exige o mesmo cliente.
+        if (pedido is not null && link.PedidoRegistradoId is null && pedido.ClienteId != cliente?.Id) pedido = null;
         if (pedido is not null && pedido.ClienteId != cliente?.Id) throw new LinkCardapioConversaIndisponivelException();
         // Link novo depois da entrega começa outra comanda. O link usado conserva o acompanhamento.
         if (link.UsadoEm is null && pedido is not null && pedido.EstaFinalizado) pedido = null;

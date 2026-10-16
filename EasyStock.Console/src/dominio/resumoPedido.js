@@ -53,7 +53,8 @@ export function motivoAntesDeCobrar({ pedido, clienteId, endereco }, { fonteApi 
   if (!fonteApi) return null
   if (!clienteId) return 'Salve o cadastro do cliente (Contato e endereço).'
   if (!endereco) return 'Falta o endereço de entrega (Contato e endereço).'
-  if (!pedido.janela) return 'Escolha a janela de entrega, logo abaixo da comanda.'
+  // #1865: a barra fica fora do modal; o seletor de janela está em "Seleção do atendimento".
+  if (!pedido.janela) return 'Escolha a janela de entrega em Seleção do atendimento.'
   return null
 }
 

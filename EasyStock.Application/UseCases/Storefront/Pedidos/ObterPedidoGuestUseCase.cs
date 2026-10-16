@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
@@ -25,7 +26,9 @@ public sealed class ObterPedidoGuestUseCase(
     IPedidoStorefrontRepository pedidoRepository,
     IPedidoAvaliacaoRepository avaliacaoRepository,
     IVagaOcupadaRepository vagaOcupadaRepository,
-    ILogger<ObterPedidoGuestUseCase> logger)
+    ILogger<ObterPedidoGuestUseCase> logger,
+    ICobrancaPedidoRepository? cobrancas = null,
+    TimeProvider? relogio = null)
 {
     private const string OrigemGuest = "storefront-guest";
 
@@ -59,7 +62,9 @@ public sealed class ObterPedidoGuestUseCase(
         avaliacoes.TryGetValue(pedido.Id, out var avaliacao);
         vagas.TryGetValue(pedido.Id, out var vagaInfo);
 
-        var dto = ListarPedidosClienteUseCase.MapearParaDto(pedido, avaliacao, vagaInfo);
+        var link = await ListarPedidosClienteUseCase.LinkPendenteAsync(cobrancas, pedido,
+            (relogio ?? TimeProvider.System).GetUtcNow().UtcDateTime, ct);
+        var dto = ListarPedidosClienteUseCase.MapearParaDto(pedido, avaliacao, vagaInfo, link);
 
         logger.LogInformation(
             "ObterPedidoGuest ok empresaId={EmpresaId} pedidoId={PedidoId}",

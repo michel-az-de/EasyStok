@@ -156,6 +156,19 @@ public class CheckoutSiteUseCaseTests
         pedido.EnderecoConfirmadoEm.Should().NotBeNull();
     }
 
+    // #1865: a nota no Balcão saía com "2.000 × Lasanha" e "R$ 65.00".
+    [Fact]
+    public void Nota_do_pedido_no_chat_usa_formato_brasileiro()
+    {
+        var pedido = new Domain.Entities.Pedido { Id = Guid.Parse("13ef98f7-d0e4-441d-ad52-ea19b933a4db") };
+        var item = new Domain.Entities.PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, Nome = "Lasanha", Quantidade = 2m, PrecoUnitario = 32.5m };
+        item.RecalcularSubtotal();
+        pedido.Itens.Add(item);
+        pedido.RecalcularTotal();
+
+        CheckoutSiteUseCase.NotaDoPedido(pedido).Should().Be("Pedido do site #13EF98F7: 2 × Lasanha. Total R$ 65,00.");
+    }
+
     [Fact]
     public async Task Cadastro_guest_guarda_o_endereco_informado_no_site()
     {

@@ -180,6 +180,12 @@ export function rotuloDoEstado(estado) {
   return passoPorId(texto)?.rotulo ?? ROTULO_FORA_DA_ESTEIRA[texto] ?? texto.charAt(0).toUpperCase() + texto.slice(1)
 }
 
+// #1865: encomenda com só o sinal recebido entra como "aprovado baba"; com saldo em aberto não é "Pago".
+export function rotuloDoResumo(estado, saldo) {
+  const rotulo = rotuloDoEstado(estado)
+  return rotulo === 'Pago' && saldo > 0 ? 'Sinal pago' : rotulo
+}
+
 // #1709: CEP sem cobertura volta do EasyStok com a frase escrita para o cliente
 // (`CepSemCoberturaException`, sem código próprio na resposta). No console quem lê é a equipe:
 // a linha diz o motivo e os dois caminhos que existem hoje.
