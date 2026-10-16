@@ -34,7 +34,7 @@
 .cabeca { min-width: 0; }
 .titulo {
   margin: 0; font-family: var(--f-titulo-marca); font-weight: 500;
-  font-size: clamp(2rem, 2.5vw, 2.75rem); line-height: 1.15; color: var(--tinta);
+  font-size: var(--t-display); line-height: 1.15; color: var(--tinta);
 }
 .apoio { margin: var(--e-3) 0 0; max-width: 52ch; font-size: var(--t-apoio); color: var(--tinta-2); }
 
@@ -47,7 +47,7 @@
 /* #1839 D: ilustração da marca à esquerda; nome e linha viva à direita, na mesma altura de antes. */
 .cartao {
   position: relative;
-  display: grid; grid-template-columns: 88px minmax(0, 1fr); align-content: center; gap: var(--e-1) var(--e-3);
+  display: grid; grid-template-columns: 88px minmax(0, 1fr); align-content: start; gap: var(--e-1) var(--e-3);
   min-width: 0; padding: var(--e-3) var(--e-4);
   --il-fundo: var(--marca-claro); --il-tinta: var(--tinta); --il-ouro: var(--trigo);
   --il-papel: var(--papel); --il-marca: var(--marca); --il-chao: var(--linha);
@@ -175,7 +175,7 @@
 .indicador:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .cabecaIndicador { display: flex; align-items: center; gap: var(--e-2); min-width: 0; overflow-wrap: anywhere; font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
 .cabecaIndicador > svg { flex: none; color: var(--marca-forte); }
-.valor { font: 700 clamp(1.5rem, 2.2vw, 2rem)/1.2 var(--f-corpo); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.valor { font: 700 var(--t-valor)/1.2 var(--f-corpo); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .frescor { display: flex; align-items: center; gap: var(--e-1); font-size: var(--t-micro); color: var(--tinta-2); overflow-wrap: anywhere; }
 .rodapeHall { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--e-2); margin-top: var(--e-5); }
 .configGrupo { border: 0; padding: 0; margin: 0 0 var(--e-5); min-width: 0; }

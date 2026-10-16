@@ -123,10 +123,12 @@ confere('3  em notebook a conversa não fica menor que as colunas dos lados', ()
     assert.ok(p.balcao >= 300 && p.ficha >= 320, 'respeita os mínimos das alças')
   }
 })
-confere('3  em tela média nada muda; em tela larga a Ficha ganha largura', () => {
+confere('3  em tela média nada muda; em tela larga Balcão e Ficha ganham largura', () => {
   assert.deepEqual(larguras.padraoPorTela(1440), { balcao: 360, ficha: 420, cardapio: 460 })
-  assert.equal(larguras.padraoPorTela(1920).ficha, 520)
-  assert.equal(larguras.padraoPorTela(1920).balcao, 360)
+  // #1868: em 1920 a Ficha de 520 sobrava 200 px vazios; 60 deles foram para a prévia do Balcão.
+  assert.equal(larguras.padraoPorTela(1920).ficha, 480)
+  assert.equal(larguras.padraoPorTela(1920).balcao, 420)
+  assert.ok(1920 - TRILHO_E_FOLGAS - 420 - 480 >= 880, 'a conversa segue com cerca de 900 px')
 })
 confere('3  o que a pessoa arrastou vale em qualquer tela; padrão antigo gravado sozinho não conta', () => {
   assert.deepEqual(larguras.largurasDaTela({ ficha: 480 }, 1280), { ...larguras.padraoPorTela(1280), ficha: 480 })

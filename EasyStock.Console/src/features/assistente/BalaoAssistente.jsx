@@ -254,7 +254,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
       aria-controls={aberto ? painelId : undefined}
       onClick={() => aberto ? fechar() : setAberto(true)}
     >
-      <Icone nome="agente" tamanho={26} />
+      <Icone nome="agente" tamanho={cabecalhoDoAtendimento ? 20 : 26} />
       {cabecalhoDoAtendimento && <span className={css.rotuloGatilho}>Assistente</span>}
       {!aberto && pedeAtencao && <span className={css.pontoAtencao} aria-hidden="true" />}
     </Botao>

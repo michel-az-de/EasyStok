@@ -15,6 +15,13 @@
 }
 .destaque > h3 { color: var(--alerta); }
 
+/* #1868: dentro da modal a folha já tem margem; o bloco alinha à mesma régua do resto (Extrato,
+   papel da comanda) em vez de recuar 20 px. O título da seção sobe para o corpo, em tinta 2. */
+dialog .bloco { padding-inline: 0; }
+dialog .destaque { padding-left: var(--e-3); }
+dialog .bloco > h3 { font-size: var(--t-corpo); color: var(--tinta-2); }
+dialog .destaque > h3 { color: var(--alerta); }
+
 /* #1442: seção recolhível. O título vira o gatilho, linha inteira, com a seta
    no fim; recolhida, o resumo aparece entre os dois. */
 .gatilho {

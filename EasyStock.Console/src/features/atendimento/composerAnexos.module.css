@@ -8,7 +8,7 @@
   transition: background 180ms ease, border-color 180ms ease;
 }
 .botaoAnexo:hover { background: var(--elevado); }
-.botaoAnexo.desabilitado { opacity: .5; cursor: not-allowed; }
+.botaoAnexo.desabilitado { color: var(--tinta-3); cursor: not-allowed; }
 
 .previa {
   display: flex; align-items: center; gap: var(--e-2);

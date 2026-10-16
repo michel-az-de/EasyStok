@@ -58,6 +58,10 @@ button:active:not(:disabled) {
   outline: var(--b-3) solid var(--marca);
   outline-offset: 2px;
 }
+/* #1868: o foco programático do início da tela (focarInicioDaTela) leva o leitor de tela ao
+   título ou à área, mas não desenha moldura: parecia campo selecionado na 1ª tela do dia.
+   Quem navega pelo Tab nunca para em tabindex -1, então os controles mantêm o anel. */
+[data-inicio-tela]:focus-visible { outline: none; }
 
 h1, h2, h3 { text-wrap: balance; letter-spacing: var(--ls-titulo); }
 p { text-wrap: pretty; }

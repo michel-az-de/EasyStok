@@ -314,6 +314,9 @@
    --------------------------------------------------------------------------- */
 
 .janelas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+/* #1868: em grade, Manhã e Tarde do mesmo dia lado a lado; as vagas na mesma linha da faixa.
+   Eram 10 linhas de 61 px numa coluna só (2,4 telas de rolagem do modal em 1280). */
+.janelas { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
 /* Mesmo trilho de 3 px da esteira e das notas, no lugar da caixa colorida. */
 .janela {
   border: 0; border-left: var(--trilho) solid var(--linha);
@@ -328,6 +331,8 @@
   min-height: var(--toque); padding: var(--e-2) var(--e-3);
   background: none; border: 0; color: inherit;
 }
+.escolhaJanela { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--e-2); min-height: 44px; }
+.escolhaJanela > .trilho { grid-column: 1 / -1; }
 .escolhaJanela:hover:not(:disabled) { background: var(--elevado); }
 .escolhaJanela:disabled { opacity: .65; cursor: not-allowed; }
 
@@ -509,7 +514,7 @@
 }
 .rotuloPostit { display: block; color: var(--alerta); font-weight: 600; font-size: var(--t-apoio); }
 .extrato { margin-bottom: var(--e-4); }
-.extrato h3 { margin: 0 0 var(--e-2); }
+.extrato h3 { margin: 0 0 var(--e-2); font-size: var(--t-forte); }
 .extrato dl { margin: 0; display: grid; gap: var(--e-1); }
 .extrato dl > div { display: flex; justify-content: space-between; gap: var(--e-3); font-variant-numeric: tabular-nums; }
 .extrato dt { color: var(--tinta-2); }

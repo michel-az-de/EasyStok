@@ -17,7 +17,9 @@ const TELA_LARGA = 1700
 
 export function padraoPorTela(larguraDaTela) {
   if (larguraDaTela < NOTEBOOK) return { ...PADRAO, balcao: 320, ficha: 360 }
-  if (larguraDaTela >= TELA_LARGA) return { ...PADRAO, ficha: 520 }
+  // #1868: em 1920 a Ficha de 520 sobrava 200 px vazios; a lista ganha 60 px de prévia e a conversa
+  // segue com cerca de 900.
+  if (larguraDaTela >= TELA_LARGA) return { ...PADRAO, balcao: 420, ficha: 480 }
   return { ...PADRAO }
 }
 

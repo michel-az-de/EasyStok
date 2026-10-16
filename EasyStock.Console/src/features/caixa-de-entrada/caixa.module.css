@@ -70,6 +70,8 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
 }
 .topo strong.semResposta { font-weight: 700; }
+/* #1868: "· Comanda N" no degrau micro da escala (era 13,33 px, padrão do navegador). */
+.topo strong small { font-size: var(--t-micro); font-weight: 600; }
 .topo time {
   margin-left: auto; flex-shrink: 0;
   font-family: var(--f-dado); font-size: var(--t-micro); font-weight: 400;
