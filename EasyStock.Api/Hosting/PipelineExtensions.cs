@@ -23,6 +23,7 @@ namespace EasyStock.Api.Hosting;
 ///   <item>ResponseCompression + SecurityHeaders</item>
 ///   <item>Correlation ID middleware (X-Correlation-Id + LogContext.PushProperty)</item>
 ///   <item>SerilogRequestLogging (com GetLevel custom + EnrichDiagnosticContext)</item>
+///   <item>RequisicaoAbortada (cancelamento do cliente vira 499 sem exceção, #1874)</item>
 ///   <item>Swagger JSON cache in-memory (TTL 1h)</item>
 ///   <item>Swagger UI (Dev/Staging ou flag)</item>
 ///   <item>HttpsRedirection + StaticFiles (incluindo storage local pra uploaded files)</item>
@@ -127,6 +128,10 @@ public static class PipelineExtensions
                     diagnosticContext.Set("EmpresaId", empresaId);
             };
         });
+
+        // #1874: requisição abortada pelo cliente vira 499 sem exceção. Logo abaixo do log de requisição, que
+        // registra o 499 em vez de Error 500, e antes da autenticação, para cobrir tudo que vem depois.
+        app.UseMiddleware<RequisicaoAbortadaMiddleware>();
 
         // Swagger JSON cache (in-memory, TTL 1h — evita ~1900ms por request)
         {

@@ -362,6 +362,34 @@ public class CheckoutCoreServiceTests
     }
 
     [Fact]
+    public async Task SiteSemPrazo_RecusaJanelaEmCurso()
+    {
+        // #1874: a listagem do site já tira a janela que começou; o checkout revalida igual. 10:00 em Brasília,
+        // janela 9-12h do mesmo dia: começou há 1 h e ainda não terminou.
+        var c = new Cenario();
+        c.Relogio.Advance(new DateTimeOffset(2026, 6, 2, 13, 0, 0, TimeSpan.Zero) - c.Relogio.GetUtcNow());
+
+        var act = () => c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        (await act.Should().ThrowAsync<RegraDeDominioVioladaException>()).WithMessage("janela_abaixo_do_prazo");
+        c.PedidosAdicionados.Should().BeEmpty();
+        await c.VagaRepo.DidNotReceive().OcuparAsync(
+            Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SiteSemPrazo_AceitaJanelaQueAindaNaoComecou()
+    {
+        // 08:00 em Brasília, janela 9-12h do mesmo dia: ainda não começou.
+        var c = new Cenario();
+        c.Relogio.Advance(new DateTimeOffset(2026, 6, 2, 11, 0, 0, TimeSpan.Zero) - c.Relogio.GetUtcNow());
+
+        var reservado = await c.Servico().CriarPedidoComReservaAsync(Input(c));
+
+        reservado.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+    }
+
+    [Fact]
     public async Task AceitaJanelaNoPrazo()
     {
         // Agora 07:00 em Brasília; 100 min → 08:40, antes das 09:00.
