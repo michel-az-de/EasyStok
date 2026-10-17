@@ -42,6 +42,36 @@ automático.
 agente em cada uma. Ela é o padrão em qualquer build. Com `?massa=0` na URL a tela
 volta à semente curta de 5 conversas, útil para demonstração rápida.
 
+## Provas de navegador com fixtures do servidor
+
+`ferramentas/prova-1742-chat-recepcao.mjs` e `prova-1748-chat-comanda.mjs` montam os componentes
+reais do console e do site com as respostas HTTP que o servidor deu a testes .NET de integração. Sem
+as fixtures elas não rodam. Receita medida em 17/10/2026 (cerca de 4 min no total, com Docker):
+
+1. Gerar as fixtures, da raiz do repositório. Os testes sobem o PostgreSQL por Testcontainers e só
+   gravam os arquivos quando as variáveis existem (o teste continua valendo sem elas):
+
+   ```bash
+   EVIDENCIAS_CHAT_RECEPCAO=<pasta1> EVIDENCIAS_CHAT_COMANDA=<pasta2> \
+   dotnet test EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj \
+     --filter "FullyQualifiedName~ChatSite_FilaHumana|FullyQualifiedName~ChatSite_Comanda_"
+   ```
+
+   Saem `visitante.json`, `inbox.json` e `mensagens-console.json` em `<pasta1>` e nove arquivos
+   (`pedido`, `manual` e `frete`, cada um com `-inbox` e `-console`) em `<pasta2>`.
+2. Com o console servido (a prova monta o componente pela própria URL, por exemplo
+   `http://localhost:5731`) e o site em outra porta, rodar de dentro de `EasyStock.Console`:
+
+   ```bash
+   PLAYWRIGHT_MODULE=<pasta do playwright> CONSOLE_URL=http://localhost:5731 SITE_URL=http://localhost:5732 \
+   EVIDENCIAS_UX=<pasta3> EVIDENCIAS_CHAT_RECEPCAO=<pasta1> node ferramentas/prova-1742-chat-recepcao.mjs
+   PLAYWRIGHT_MODULE=<pasta do playwright> CONSOLE_URL=http://localhost:5731 SITE_URL=http://localhost:5732 \
+   EVIDENCIAS_UX=<pasta3> EVIDENCIAS_CHAT_COMANDA=<pasta2> node ferramentas/prova-1748-chat-comanda.mjs
+   ```
+
+   Cada uma imprime `OK` e grava as capturas (1440 e 390 px) em `<pasta3>`. O Vite precisa servir esta
+   mesma pasta `EasyStock.Console` (as provas escrevem `.build/` aqui e o navegador lê de lá).
+
 ## Arquitetura
 
 Camadas com dependência só para baixo, verificada por `ferramentas/verificar-camadas.mjs`:
