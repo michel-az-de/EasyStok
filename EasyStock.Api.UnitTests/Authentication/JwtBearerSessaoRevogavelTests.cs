@@ -5,6 +5,10 @@ using System.Text;
 using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Auth;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.Logout;
+using EasyStock.Domain.Entities;
 using EasyStock.Infra.Async;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
@@ -118,6 +122,37 @@ public sealed class JwtBearerSessaoRevogavelTests
         await cache.RemoveAsync(EasyStock.Application.UseCases.Common.CacheKeys.Sessao(_usuarioId));
 
         (await Chamar(app, token)).Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task LogoutDerrubaOJwtJaEmitidoNoPedidoSeguinte()
+    {
+        // #1879, o Aceite pelo caminho real: o logout (caso de uso de produção) grava o corte e o mesmo JWT, que
+        // valia 8 h, passa a receber 401. O validador estava com a sessão em cache; o logout a apaga.
+        var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+        usuario.Id = _usuarioId;
+        var sessao = new SessaoDoUsuario(true, null);
+        _usuarios.ObterSessaoAsync(_usuarioId).Returns(_ => sessao);
+        _usuarios.GetByIdAsync(_usuarioId).Returns(usuario);
+        _usuarios.AtualizarSessoesValidasDesdeAsync(_usuarioId, Arg.Any<DateTime>())
+            .Returns(chamada => { sessao = new SessaoDoUsuario(true, chamada.Arg<DateTime>()); return Task.FromResult(1); });
+        var refreshTokens = Substitute.For<IRefreshTokenRepository>();
+        var refresh = RefreshToken.Criar(_usuarioId, TokenHashHelper.ComputeSha256Hash("refresh-da-sessao"), DateTime.UtcNow.AddDays(7), null, null);
+        refreshTokens.GetByTokenHashAsync(refresh.TokenHash).Returns(refresh);
+        var cache = new RedisCacheService(
+            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())), NullLogger<RedisCacheService>.Instance);
+        var logout = new LogoutUseCase(
+            refreshTokens, _usuarios,
+            new RevogadorSessoes(_usuarios, refreshTokens, cache, TimeProvider.System, NullLogger<RevogadorSessoes>.Instance),
+            Substitute.For<IAuditLogRepository>(), Substitute.For<IUnitOfWork>(), NullLogger<LogoutUseCase>.Instance);
+        await using var app = await SubirAsync(cache: cache);
+        var token = Token(DateTime.UtcNow.AddMinutes(-1));
+
+        (await Chamar(app, token)).Should().Be(HttpStatusCode.OK);
+        (await logout.ExecuteAsync(new LogoutCommand("refresh-da-sessao"))).Success.Should().BeTrue();
+
+        (await Chamar(app, token)).Should().Be(HttpStatusCode.Unauthorized);
+        (await Chamar(app, Token(DateTime.UtcNow.AddSeconds(2)))).Should().Be(HttpStatusCode.OK, "novo login depois do logout vale");
     }
 
     [Fact]

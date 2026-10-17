@@ -81,7 +81,10 @@ public class SessaoCozinhaTests
         perfil.Permissoes.Add(new PerfilPermissao { Permissao = Permissao.AcessarModuloCaixa });
         var alterada = await renovar.ExecuteAsync(new RefreshTokenCommand(renovada.RefreshToken));
         Persistente(alterada.AccessToken).Should().BeFalse();
-        await new LogoutUseCase(repositorio, audit, uow, NullLogger<LogoutUseCase>.Instance)
+        var revogador = new EasyStock.Application.Services.Auth.RevogadorSessoes(
+            usuarios, repositorio, Substitute.For<EasyStock.Application.Ports.Output.ICacheService>(), TimeProvider.System,
+            NullLogger<EasyStock.Application.Services.Auth.RevogadorSessoes>.Instance);
+        await new LogoutUseCase(repositorio, usuarios, revogador, audit, uow, NullLogger<LogoutUseCase>.Instance)
             .ExecuteAsync(new LogoutCommand(alterada.RefreshToken));
         var tentar = () => renovar.ExecuteAsync(new RefreshTokenCommand(alterada.RefreshToken));
         await tentar.Should().ThrowAsync<CredenciaisInvalidasException>();
