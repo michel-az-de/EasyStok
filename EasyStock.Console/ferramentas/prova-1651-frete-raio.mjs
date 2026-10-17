@@ -149,6 +149,12 @@ await confere('grátis e fora do raio dizem isso no título', () => {
   assert.match(fora.detalhe, /7,2 km/)
   assert.equal(fora.tom, 'atencao')
 })
+await confere('cotação da Lalamove diz de onde veio o valor (#1882)', () => {
+  const r = dominio.resumoDoTesteDeFrete({ ...RAIO, faixaId: 'lalamove', valorCentavos: 1800 })
+  assert.match(r.titulo, /18,00/)
+  assert.match(r.detalhe, /Lalamove/)
+  assert.doesNotMatch(dominio.resumoDoTesteDeFrete(RAIO).detalhe, /Lalamove/)
+})
 await confere('quando a tabela de zonas decide, a tela repete o motivo da API', () => {
   const r = dominio.resumoDoTesteDeFrete({ modo: 'zona', motivo: 'Não localizamos este endereço com precisão.' })
   assert.match(r.titulo, /zonas/i)
