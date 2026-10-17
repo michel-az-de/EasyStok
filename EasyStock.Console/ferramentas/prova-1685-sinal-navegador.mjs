@@ -16,6 +16,7 @@ import React from 'react'; import { createRoot } from 'react-dom/client';
 import { ContextoEstado, ContextoAcoes, ContextoCatalogo } from '/src/aplicacao/contextos.js';
 import { ContextoAcessoModulos } from '/src/aplicacao/acessoModulos.jsx';
 import { BlocoCobranca } from '/src/features/ficha-cliente/BlocoCobranca.jsx';
+import { ExtratoDoPedido } from '/src/features/ficha-cliente/ExtratoDoPedido.jsx';
 import { BarraProximoPasso } from '/src/features/ficha-cliente/BarraProximoPasso.jsx';
 import '/src/estilos/base.css';
 const q = new URLSearchParams(location.search); const pago = Number(q.get('pago') || 0); const alocado = Number(q.get('alocado') ?? pago); const total = Number(q.get('total') || 100); const online = q.has('online'); const hoje = q.has('hoje');
@@ -23,7 +24,7 @@ const pedido = { pedidoId:'pedido-controlado', numero:'1', estado:alocado >= tot
  itens:[{sku:'massa',qtd:1,nome:'Massa de teste',precoUnitario:total}], pagamentos:[], pagamentosApi:[], cobranca:{id:'cobranca-controlada',valor:Number(q.get('cobranca') ?? (online ? total / 2 : total)),meio:online ? 'pix' : 'maquininha',link:online ? 'https://example.test/pagamento' : null,expiraEm:online ? Date.now()+600000 : null}, };
 window.recebimentosDaProva=[]; const confirmar = async (valor,metodo) => { window.recebimentosDaProva.push({valor,metodo}); return {}; };
 const props={pedido,conversaId:'conversa-controlada',nomeCliente:'Cliente de teste',agora:Date.now(),editavel:true,aoConfirmarPagamento:confirmar};
-createRoot(document.getElementById('root')).render(<ContextoAcessoModulos value={{permite:()=>true,acoes:{editarAtendimento:true}}}><ContextoEstado value={{fonteApi:true,fidelidade:{cupons:[]},conversas:[]}}><ContextoCatalogo value={{cardapio:[],entregadores:[]}}><ContextoAcoes value={{confirmarPagamento:(_id,valor,metodo)=>confirmar(valor,metodo)}}><main style={{maxWidth:420,margin:'24px auto',padding:16}}>{q.has('barra') ? <BarraProximoPasso {...props}/> : <BlocoCobranca {...props}/>}</main></ContextoAcoes></ContextoCatalogo></ContextoEstado></ContextoAcessoModulos>);
+createRoot(document.getElementById('root')).render(<ContextoAcessoModulos value={{permite:()=>true,acoes:{editarAtendimento:true}}}><ContextoEstado value={{fonteApi:true,fidelidade:{cupons:[]},conversas:[]}}><ContextoCatalogo value={{cardapio:[],entregadores:[]}}><ContextoAcoes value={{confirmarPagamento:(_id,valor,metodo)=>confirmar(valor,metodo)}}><main style={{maxWidth:420,margin:'24px auto',padding:16}}>{q.has('barra') ? <BarraProximoPasso {...props}/> : <><ExtratoDoPedido pedido={pedido}/><BlocoCobranca {...props}/></>}</main></ContextoAcoes></ContextoCatalogo></ContextoEstado></ContextoAcessoModulos>);
 `)
 const casos = [
   { nome:'sinal-inicial', query:'', valor:50, sinal:true, metodo:'pix' },
@@ -50,8 +51,10 @@ try {
       if (!barra && caso.nome === 'saldo-na-fila') assert.match(await page.locator('main').innerText(), /Receber na entrega[\s\S]*R\$\s*50,00/)
       if (!barra && caso.nome === 'saldo-com-cupom') {
         const texto = await page.locator('main').innerText()
-        assert.match(texto, /Recebido: R\$\s*20,00/)
-        assert.match(texto, /Saldo na entrega: R\$\s*50,00/)
+        // #1868: como no PainelFicha, o Extrato acima diz o total e o saldo; o bloco Cobrança não os repete.
+        assert.match(texto, /Total\s*R\$\s*100,00/)
+        assert.match(texto, /A receber\s*R\$\s*50,00/)
+        assert.doesNotMatch(texto, /Saldo na entrega:/)
       }
       if (!barra && caso.nome === 'total-editado') assert.match(await page.locator('main').innerText(), /Total\s*R\$\s*120,00/)
       if (barra && caso.sinal) {
