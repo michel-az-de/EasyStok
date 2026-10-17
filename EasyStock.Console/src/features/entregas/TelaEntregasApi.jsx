@@ -8,9 +8,8 @@ export function TelaEntregasApi({ tela }) {
   const agenda = tela === 'agenda'
   return (
     <div className={`${css.pagina} ${css.paginaApi}`}>
-      <header className={css.topoPagina}>
-        <h1>{agenda ? 'Agenda de encomendas' : 'Entregas'}</h1>
-      </header>
+      {/* #1870: a barra do módulo já diz Entregas e a tela aberta; o título fica para o leitor de tela. */}
+      <h1 className="sr">{agenda ? 'Agenda de encomendas' : 'Entregas'}</h1>
       {agenda ? <AgendaEncomendasApi /> : <ConteudoEntregasApi />}
     </div>
   )

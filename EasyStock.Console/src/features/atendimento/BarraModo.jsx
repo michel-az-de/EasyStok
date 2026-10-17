@@ -36,6 +36,9 @@ export function BarraModo({
   // Automático desligado não está "pausado" nem "volta": a faixa diz só o que é verdade.
   const linha = semAutomatico && !encerrada && resumo.chave !== MODOS.LIGADO ? 'O atendimento automático está desligado.' : resumo.linha
   const sugereEncerrar = resumo.sugereEncerrar && Boolean(aoEncerrar)
+  // #1870: "Passou para você" já é o estado e o Assumir, a ação; a frase repetia os dois (e o
+  // cartão do Balcão). Fica para o leitor de tela e no title da pílula; a faixa é uma linha só.
+  const fraseRepetida = resumo.chave === MODOS.COM_VOCE && linha === resumo.linha
   const nome = primeiroNome(conversa.nome)
 
   const devolver = () => {
@@ -46,8 +49,8 @@ export function BarraModo({
   return (
     <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
-        <Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula>
-        <p className={css.modoTexto} title={linha === resumo.linha ? resumo.detalhe : undefined}>{linha}</p>
+        <span title={fraseRepetida ? linha : undefined}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
+        <p className={fraseRepetida ? 'sr' : css.modoTexto} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>
         {!encerrada && !bloqueada && (
           <span className={css.modoAcoes}>
             {podeAssumir && (

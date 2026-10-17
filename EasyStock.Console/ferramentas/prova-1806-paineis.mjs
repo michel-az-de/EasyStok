@@ -8,7 +8,7 @@
 //   4  o modo flutuante fica dentro da tela;
 //   5  a composição usa a regra (App, PainelCardapio, BalaoAssistente).
 //
-// A geometria vem do CSS da moldura (trilho de 84 px, vão de 12 px, conversa com 320 px no
+// A geometria vem do CSS da moldura (trilho de 100 px em --largura-trilho, vão de 12 px, conversa com 320 px no
 // mínimo); a prova confere esses números no próprio CSS para não divergirem em silêncio.
 //
 //   node ferramentas/prova-1806-paineis.mjs
@@ -128,15 +128,18 @@ if (paineis && preferencia && larguras) {
     const molduraCss = fonte('app/moldura.module.css')
     assert.match(molduraCss, /\.palcoTres > \.centro \{ min-width: (\d+)px; \}/)
     assert.equal(Number(molduraCss.match(/\.palcoTres > \.centro \{ min-width: (\d+)px; \}/)[1]), CONVERSA_MINIMA)
-    assert.match(molduraCss, new RegExp(`\\.trilho \\{\\s*flex: 0 0 ${TRILHO}px`))
+    // #1870: o trilho é o token compartilhado com os módulos.
+    assert.match(molduraCss, /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\)/)
+    assert.match(fonte('estilos/tokens.css'), new RegExp(`--largura-trilho: ${TRILHO}px`), 'trilho = token')
     assert.match(fonte('componentes/AlcaLargura.module.css'), new RegExp(`width: ${VAO}px`))
     assert.match(fonte('estilos/tokens.css'), new RegExp(`--e-3: ${VAO}px`), 'padding do palco = vão')
     assert.match(fonte('estilos/tokens.css'), new RegExp(`--e-4: ${MARGEM_ASSISTENTE}px`), 'margem do assistente')
     assert.equal(CONVERSA_MINIMA, 320)
   })
 
-  const telas = [{ tela: 1280, esperado: { cardEsq: 492, cardDir: 532, assEsq: 472, assDir: 524 } },
-    { tela: 1440, esperado: { cardEsq: 592, cardDir: CARDAPIO.max, assEsq: ASSISTENTE.max, assDir: ASSISTENTE.max } }]
+  // #1870: trilho de 84 para 100 px; cada máxima que não bate no teto do painel cede os 16 px.
+  const telas = [{ tela: 1280, esperado: { cardEsq: 476, cardDir: 516, assEsq: 456, assDir: 508 } },
+    { tela: 1440, esperado: { cardEsq: 576, cardDir: CARDAPIO.max, assEsq: 556, assDir: ASSISTENTE.max } }]
   for (const { tela, esperado } of telas) {
     const { balcao, ficha } = larguras.padraoPorTela(tela)
     const area = { tela, balcao, ficha, colunas: true }

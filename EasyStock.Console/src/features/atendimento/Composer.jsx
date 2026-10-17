@@ -302,7 +302,11 @@ export function Composer({
             </div>
           </div>
 
-          {restricao && <p id={idRestricao} className={css.restricao}>{restricao}</p>}
+          {/* #1870: em coluna estreita a frase inteira quebrava em 2 linhas. Canal só de texto mostra
+              o curto; o motivo inteiro segue no title, no leitor de tela e no aria-describedby. */}
+          {restricao && (podeAnexar || podeAudio
+            ? <p id={idRestricao} className={css.restricao}>{restricao}</p>
+            : <p id={idRestricao} className={css.restricao} title={restricao}><span aria-hidden="true">Só texto neste canal</span><span className="sr">{restricao}</span></p>)}
         </>
       )}
 

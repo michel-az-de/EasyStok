@@ -123,6 +123,10 @@
      tablet da cozinha. */
   --toque: 40px;
   --coluna: 320px;
+  /* #1870: um trilho só, no Balcão e nos módulos. O item cabe "Atendimento" e "Automáticas"
+     em uma linha (76 px no rótulo de 13 px). */
+  --largura-trilho: 100px;
+  --largura-item-trilho: 84px;
   --gaveta: 400px;
 
   /* Nunito na operação; Lora nos marcos da marca; papel monoespaçado. */
@@ -148,6 +152,20 @@
     .847 17%, .95 21.2%, 1.012 25.6%, 1.038 29.6%, 1.043 33.2%, 1.035 37.8%,
     1.016 44.6%, 1.002 53%, .996 62%, .998 78%, 1);
 
+}
+
+/* #1870: densidade compacta da operação (a do protótipo). Balcão, moldura dos módulos e as
+   janelas de trabalho usam a escala inteira, nunca um pedaço dela: o título de área sai com
+   o mesmo tamanho em qualquer módulo. Quem quer a densidade compõe esta classe. */
+.densidade-compacta {
+  --t-micro: .8125rem;
+  --t-apoio: .9375rem;
+  --t-corpo: 1rem;
+  --t-forte: 1.0625rem;
+  --t-titulo: 1.25rem;
+  --t-valor: 1.5rem;
+  --t-display: 2rem;
+  font-size: var(--t-corpo);
 }
 
 :root[data-theme='light'] { color-scheme: only light; }

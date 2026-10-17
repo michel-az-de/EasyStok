@@ -13,7 +13,7 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Vazio } from '../../componentes/Vazio'
 import { Modal } from '../../componentes/Modal'
 import { HASH_HALL } from '../../dominio/rota'
-import { hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { TELA_OPERACAO, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 import { ehJanelaAvulsa, origemForaDoBalcao } from '../../dominio/janelaAvulsa'
 import { IconeDoModulo } from './IconeDoModulo'
 import { MenuDosModulos } from './MenuDosModulos'
@@ -50,12 +50,15 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
   const telas = telasDoMenu(modulo, { fonteApi })
   const tela = telas.find((t) => t.id === telaId) ?? null
   const [menuAberto, setMenuAberto] = useState(false)
+  // #1870: módulo de trabalho (Entregas, Cozinha, Atendimento) tem poucas telas e abas próprias;
+  // o menu lateral de 216 px deixava ~650 px vazios. As telas vão para a barra, ao lado do nome.
+  const telasNaBarra = telas.length > 1 && telas.some((t) => t.tipo === TELA_OPERACAO)
   const avulsa = ehJanelaAvulsa({ nome: window.name, origemAberta: janelaDeOrigem() !== null })
 
   return (
     <div className={css.moldura} data-conteudo-console>
       <aside className={css.lateral}>
-        <MenuDosModulos moduloId={moduloId} telaId={telaId} fonteApi={fonteApi} />
+        <MenuDosModulos moduloId={moduloId} telaId={telaId} fonteApi={fonteApi} semMenu={telasNaBarra} />
       </aside>
       <div className={css.areaTrabalho}>
       <header className={css.barra}>
@@ -81,6 +84,11 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
           <span className={css.modulo}>
             <IconeDoModulo modulo={modulo} /> {modulo.nome}
           </span>
+          {telasNaBarra && (
+            <nav className={css.telasNaBarra} aria-label={`Telas de ${modulo.nome}`}>
+              {telas.map((item) => <a key={item.id} href={hashDoModulo(modulo.id, item.id)} className={`${css.telaNaBarra} ${item.id === telaId ? css.telaAtiva : ''}`} aria-current={item.id === telaId ? 'page' : undefined}>{item.rotulo}</a>)}
+            </nav>
+          )}
         </div>
         <div className={css.acoes}>
           {ajuda}
@@ -114,7 +122,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
         )}
       </div>
       {menuAberto && <Modal titulo={`Menu de ${modulo.nome}`} aoFechar={() => setMenuAberto(false)} largura="min(600px, calc(100vw - 24px))">
-        <div className={css.menuModal}><MenuDosModulos moduloId={moduloId} telaId={telaId} fonteApi={fonteApi} aoNavegar={(evento) => { if (evento.target.closest('a')) setMenuAberto(false) }} /></div>
+        <div className={css.menuModal}><MenuDosModulos moduloId={moduloId} telaId={telaId} fonteApi={fonteApi} semMenu={telasNaBarra} aoNavegar={(evento) => { if (evento.target.closest('a')) setMenuAberto(false) }} /></div>
       </Modal>}
     </div>
   )

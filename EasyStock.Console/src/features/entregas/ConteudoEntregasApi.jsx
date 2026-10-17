@@ -20,7 +20,7 @@ import css from './entregasApi.module.css'
 // viagens (S44, RN-32), entregadores, chamados e o cadastro da loja (S45). Desde a #1440
 // "Entregas de hoje" vem organizada por janela do dia, com o roteiro para imprimir.
 // A máquina de estados e as regras são da API; a tela só mostra e chama.
-const ABAS = [['hoje', 'Entregas de hoje'], ['entregadores', 'Entregadores'], ['cadastro', 'Janelas e frete']]
+const ABAS = [['hoje', 'Do dia'], ['entregadores', 'Entregadores'], ['cadastro', 'Janelas e frete']]
 
 export function ConteudoEntregasApi() {
   const [aba, setAba] = useState('hoje')

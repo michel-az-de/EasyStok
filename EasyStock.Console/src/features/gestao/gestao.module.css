@@ -16,7 +16,7 @@
 .desligado { min-width: 0; margin: 0; padding: 0; border: 0; }
 
 .janelaGestao {
-  --t-apoio: .9375rem; --t-corpo: 1rem;
+  composes: densidade-compacta from global;
   display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start;
   gap: var(--e-5); min-height: 440px; padding-top: var(--e-3);
 }

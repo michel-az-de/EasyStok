@@ -22,10 +22,10 @@
 }
 .cortina:active:not(:disabled) { transform: none; }
 /* #1810: no desktop (1180 px ou mais) o trilho fica fora da cortina. Coberto, o primeiro clique em
-   Módulos só fechava a gaveta e a dona achava que a volta ao hall tinha travado. 84 px é a
-   largura do trilho em app/moldura.module.css. */
+   Módulos só fechava a gaveta e a dona achava que a volta ao hall tinha travado. O recorte é a
+   largura do trilho (`--largura-trilho`, a mesma de app/moldura.module.css). */
 @media (min-width: 1180px) {
-  .cortina { left: 84px; width: auto; }
+  .cortina { left: var(--largura-trilho); width: auto; }
 }
 .topoGaveta {
   display: flex; align-items: center; gap: var(--e-2); flex-shrink: 0;
@@ -44,15 +44,15 @@
   flex-shrink: 0;
 }
 .topoPagina h1 { margin: 0; font-size: var(--t-forte); font-weight: 700; flex: 1; }
-.paginaApi { --t-apoio: .9375rem; --t-corpo: 1rem; min-width: 0; background: var(--papel); }
+.paginaApi { composes: densidade-compacta from global; min-width: 0; background: var(--papel); }
 .paginaApi > * { width: 100%; max-width: 1384px; margin-inline: auto; }
 .paginaApi .topoPagina { padding: var(--e-4) var(--e-5) var(--e-3); border-bottom: 0; }
 .paginaApi .topoPagina h1 { font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 800; line-height: var(--lh-compacto); }
-.paginaApi > :last-child { padding: 0 var(--e-5) var(--e-4); }
+.paginaApi > :last-child { padding: var(--e-3) var(--e-5) var(--e-4); }
 @media (max-width: 640px) {
   .paginaApi .topoPagina { padding: var(--e-3); }
   .paginaApi .topoPagina h1 { font-size: var(--t-titulo); }
-  .paginaApi > :last-child { padding: 0 var(--e-3) var(--e-3); }
+  .paginaApi > :last-child { padding: var(--e-3); }
 }
 .horaTopo { font-family: var(--f-dado); color: var(--tinta-2); font-size: var(--t-apoio); }
 
