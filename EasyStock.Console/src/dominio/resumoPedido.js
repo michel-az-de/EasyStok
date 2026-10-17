@@ -64,13 +64,13 @@ export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi 
   if (simulacao && !simulacao.freteACombinar) {
     const base = `Pedido de ${moeda(simulacao.total)} com o frete de ${moeda(simulacao.frete)}`
     if (simulacao.encomenda && simulacao.sinal != null)
-      return `${base}. Encomenda para outro dia: ${rotuloMeio} cobra o sinal de ${moeda(simulacao.sinal)}; ${moeda(simulacao.restante)} ficam para a entrega.`
+      return `${base}. Encomenda para outro dia: sinal de ${moeda(simulacao.sinal)} por ${rotuloMeio}; ${moeda(simulacao.restante)} ficam para a entrega.`
     return `${base}, cobrança por ${rotuloMeio}.`
   }
   const itens = `Pedido de ${moeda(total)}${fonteApi && !pedido?.pedidoId ? ' nos itens (o frete entra ao gerar)' : ''}`
   const previa = previaDoSinal(pedido, { fonteApi, agora, total })
   if (!previa) return `${itens}, cobrança por ${rotuloMeio}.`
-  return `${itens}. Encomenda para outro dia: ${rotuloMeio} cobra o sinal de 50% do total com o frete (nos itens, ${moeda(previa.sinal)}); o restante fica para a entrega.`
+  return `${itens}. Encomenda para outro dia: sinal de 50% do total com o frete por ${rotuloMeio} (nos itens, ${moeda(previa.sinal)}); o restante fica para a entrega.`
 }
 
 // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que a dona resolve, para o

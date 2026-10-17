@@ -39,10 +39,10 @@ public class SimularPedidoConversaUseCaseTests
         }
 
         /// <summary>Dois itens de R$ 10,00 na janela das 9h do dia 02/06 (terça-feira).</summary>
-        public SimularPedidoConversaInput Input(int quantidade = 2, decimal? freteCombinado = null) => new(
+        public SimularPedidoConversaInput Input(int quantidade = 2) => new(
             EmpresaId, Conversa.Id,
             [new ItemPedidoCheckout(Checkout.CardapioItemId, quantidade)],
-            Checkout.JanelaId, Checkout.DataEntrega, FreteCombinado: freteCombinado);
+            Checkout.JanelaId, Checkout.DataEntrega);
 
         /// <summary>Nenhuma escrita: nem pedido, nem item, nem vaga.</summary>
         public async Task ConferirSemEfeitoColateralAsync()
@@ -100,19 +100,6 @@ public class SimularPedidoConversaUseCaseTests
         r.Encomenda.Should().BeFalse();
         r.Sinal.Should().BeNull();
         r.Restante.Should().BeNull();
-        await c.ConferirSemEfeitoColateralAsync();
-    }
-
-    [Fact]
-    public async Task FreteCombinadoSubstituiACotacaoDaZona()
-    {
-        var c = new Cenario();
-
-        var r = await c.UseCase.ExecuteAsync(c.Input(freteCombinado: 20m));
-
-        r.Frete.Should().Be(20m);
-        r.Total.Should().Be(40m);
-        r.Sinal.Should().Be(20m);
         await c.ConferirSemEfeitoColateralAsync();
     }
 

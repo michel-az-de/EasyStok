@@ -112,14 +112,16 @@ public class AtendimentoComandaControllerTests
     }
 
     [Fact]
-    public async Task SimularPedidoSemPermissaoDeAtenderDevolve403()
+    public async Task SimularPedidoNaoExigeAPermissaoDeAtender_SoLe()
     {
+        // A simulação só lê: sem AtenderConversas a conversa da empresa chega ao caso de uso (aqui para na vitrine
+        // inexistente), em vez de 403.
         var conversa = ConversaDaEmpresa(_empresaId);
         _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
 
         var resultado = await _controller.SimularPedido(conversa.Id, new SimularPedidoConversaBody(Comanda().Itens, Guid.NewGuid(), Comanda().DataEntrega));
 
-        resultado.Should().BeOfType<ForbidResult>();
+        resultado.Should().NotBeOfType<ForbidResult>();
     }
 
     [Fact]

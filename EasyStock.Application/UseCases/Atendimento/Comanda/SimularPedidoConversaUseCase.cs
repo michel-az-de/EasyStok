@@ -7,15 +7,13 @@ using EasyStock.Application.UseCases.CriarPedido;
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
 /// <param name="EnderecoId">Opcional: sem ele vale o endereço padrão (ou o único) do cliente, como no pedido.</param>
-/// <param name="FreteCombinado">Frete combinado pela equipe, em reais; substitui a cotação da zona.</param>
 public sealed record SimularPedidoConversaInput(
     Guid EmpresaId,
     Guid ConversaId,
     IReadOnlyList<ItemPedidoCheckout> Itens,
     Guid JanelaId,
     DateOnly DataEntrega,
-    Guid? EnderecoId = null,
-    decimal? FreteCombinado = null);
+    Guid? EnderecoId = null);
 
 /// <param name="Itens">Soma dos itens, com o preço da porção quando há.</param>
 /// <param name="Frete">Frete em reais; nulo quando a entrega e o frete são combinados com a equipe.</param>
@@ -73,8 +71,7 @@ public sealed class SimularPedidoConversaUseCase(
             Origem: OrigemPedido.WhatsApp,
             EmpresaId: input.EmpresaId,
             Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos),
-            Numero: endereco.Numero,
-            FreteCombinado: input.FreteCombinado), ct);
+            Numero: endereco.Numero), ct);
 
         var encomenda = PlanoPagamentoEncomenda.TemSinal(simulado.AgendadoParaEm, relogio.GetUtcNow().UtcDateTime);
         if (simulado.Frete is not { } frete)

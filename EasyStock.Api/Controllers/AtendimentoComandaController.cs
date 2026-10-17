@@ -80,14 +80,12 @@ public class AtendimentoComandaController(
                       + "CEP fora da área devolve freteACombinar com total, sinal e restante nulos. Sinal e restante só na encomenda (entrega em outro dia).")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [HttpPost("conversas/{id:guid}/pedido/simulacao")]
     public Task<IActionResult> SimularPedido(Guid id, [FromBody] SimularPedidoConversaBody body, CancellationToken ct = default)
     {
-        if (!currentUser.TemPermissao(Permissao.AtenderConversas))
-            return Task.FromResult<IActionResult>(Forbid());
+        // Só lê, como o GET do pedido: qualquer operador da empresa vê o que a comanda custaria; criar é que exige AtenderConversas.
         if (body?.Itens is not { Count: > 0 })
             return Task.FromResult(DataBadRequest("A comanda está vazia."));
 
