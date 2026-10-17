@@ -12,7 +12,9 @@
 // essa parte é pulada e dita.
 //
 //   node ferramentas/prova-1872-trilho.mjs
-//   CONSOLE_URL=http://localhost:5731 PLAYWRIGHT_MODULE=<pasta do playwright> node ferramentas/prova-1872-trilho.mjs
+//   CONSOLE_URL=http://localhost:5731 CONSOLE_USUARIO=<e-mail> CONSOLE_SENHA=<senha> PLAYWRIGHT_MODULE=<pasta do playwright> node ferramentas/prova-1872-trilho.mjs
+//
+// O usuário e a senha são os de demonstração do laboratório (EasyStock.Api/Data/Tenants/CasaDaBabaSeed.cs).
 
 import { createRequire } from 'node:module'
 import { readFileSync } from 'node:fs'
@@ -94,9 +96,9 @@ await confere('3  a camada da conta é popover (camada de topo) quando o navegad
 
 // --- 4. Na tela real (opcional) ----------------------------------------------------------------
 
-const origem = process.env.CONSOLE_URL
-if (!origem || !process.env.PLAYWRIGHT_MODULE) {
-  console.log('--  medida na tela real pulada: defina CONSOLE_URL e PLAYWRIGHT_MODULE')
+const { CONSOLE_URL: origem, CONSOLE_USUARIO: usuario, CONSOLE_SENHA: senha } = process.env
+if (!origem || !usuario || !senha || !process.env.PLAYWRIGHT_MODULE) {
+  console.log('--  medida na tela real pulada: defina CONSOLE_URL, CONSOLE_USUARIO, CONSOLE_SENHA e PLAYWRIGHT_MODULE')
 } else {
   const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE)
   const navegador = await chromium.launch()
@@ -104,9 +106,8 @@ if (!origem || !process.env.PLAYWRIGHT_MODULE) {
     const contexto = await navegador.newContext({ viewport: { width: largura, height: altura }, serviceWorkers: 'block', locale: 'pt-BR' })
     const pagina = await contexto.newPage()
     await pagina.goto(origem + '/', { waitUntil: 'networkidle' })
-    // Usuário de demonstração do laboratório (CasaDaBabaSeed.cs), só em loopback.
-    await pagina.fill('input[type=email]', 'gerente@casadababa.demo')
-    await pagina.fill('input[type=password]', 'gerente123')
+    await pagina.fill('input[type=email]', usuario)
+    await pagina.fill('input[type=password]', senha)
     await pagina.keyboard.press('Enter')
     await pagina.getByText(/Bo(a|m) (tarde|noite|dia)/).waitFor({ timeout: 20000 })
     return { contexto, pagina }
