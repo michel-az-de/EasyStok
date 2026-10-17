@@ -59,7 +59,14 @@ export function previaDoSinal(pedido, { fonteApi = false, agora = Date.now(), to
 }
 
 // #1875: a barra só marca o meio; este resumo diz o que o botão de confirmação vai fazer.
-export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi = false, agora = Date.now() }) {
+export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi = false, agora = Date.now(), simulacao = null }) {
+  // #1884: com a simulação do servidor os números são os que vão ser cobrados (frete, total e sinal sobre o total com o frete).
+  if (simulacao && !simulacao.freteACombinar) {
+    const base = `Pedido de ${moeda(simulacao.total)} com o frete de ${moeda(simulacao.frete)}`
+    if (simulacao.encomenda && simulacao.sinal != null)
+      return `${base}. Encomenda para outro dia: ${rotuloMeio} cobra o sinal de ${moeda(simulacao.sinal)}; ${moeda(simulacao.restante)} ficam para a entrega.`
+    return `${base}, cobrança por ${rotuloMeio}.`
+  }
   const itens = `Pedido de ${moeda(total)}${fonteApi && !pedido?.pedidoId ? ' nos itens (o frete entra ao gerar)' : ''}`
   const previa = previaDoSinal(pedido, { fonteApi, agora, total })
   if (!previa) return `${itens}, cobrança por ${rotuloMeio}.`

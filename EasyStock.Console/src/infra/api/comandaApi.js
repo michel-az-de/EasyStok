@@ -226,6 +226,16 @@ export function corpoDoPedido(pedido) {
 export const gerarPedido = (conversaId, corpo) =>
   chamarApi(pedidoDaConversa(conversaId), { metodo: 'POST', corpo })
 
+// #1884 ("Quanto fica?"): o corpo do pedido sem forma de pagamento nem envio.
+export function corpoDaSimulacao(pedido) {
+  const { itens, janelaId, dataEntrega } = corpoDoPedido(pedido)
+  return { itens, janelaId, dataEntrega }
+}
+
+// Só lê: o servidor calcula frete, total, sinal e restante com as regras do pedido e não cria nada.
+export const simularPedido = (conversaId, corpo, sinal = undefined) =>
+  chamarApi(`${pedidoDaConversa(conversaId)}/simulacao`, { metodo: 'POST', corpo, sinal })
+
 // Emissão do link da S11 para pedido que nasceu sem cobrança (Mercado Pago fora na hora).
 export const reemitirCobranca = (pedidoId) =>
   chamarApi(`/api/pedidos/${pedidoId}/cobranca`, { metodo: 'POST' })

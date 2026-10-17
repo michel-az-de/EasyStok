@@ -11,6 +11,7 @@ import {
   precoDaLinha, totalDoPedido,
 } from '../../dominio/pedido'
 import { diferencaAposPagamento, totalPago } from '../../dominio/pagamento'
+import { linhasDaSimulacao } from '../../dominio/simulacaoPedido'
 import { situacaoDoItem } from '../../dominio/cardapio'
 import {
   LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, previaDoSinal, rotuloDoTotal, situacaoDoEnvio,
@@ -110,7 +111,7 @@ function ItemComanda({
 export function BlocoPedido({
   pedido, editavel, aoTrocarJanela, aoAbrirCardapio, aoAjustar, aoAjustarObservacao, aoGerarPedido, gerarSemEnviar = false,
   aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false, conversaId, numeroComanda,
-  clienteEscolhendo = false,
+  clienteEscolhendo = false, simulacao = null,
 }) {
   const { cardapio, linhas } = useCatalogo()
   const { marcarCanhotoImpresso } = useAcoes()
@@ -180,6 +181,9 @@ export function BlocoPedido({
   const diferencaPosPagamento = diferencaAposPagamento(pedido, cardapio)
   // #1875 ("Quanto fica?"): o que já dá para dizer antes de gerar a cobrança. O frete é do servidor.
   const previaSinal = previaDoSinal(pedido, { fonteApi, agora, total: pedido.totalApi ?? total })
+  // #1884: com a simulação do servidor a comanda mostra frete, total com frete e sinal em número.
+  const linhasSimulacao = !pedido.pedidoId ? linhasDaSimulacao(simulacao) : null
+  const linhaDe = (chave) => linhasSimulacao?.find((l) => l.chave === chave)?.texto ?? null
   // #1875: na Seleção do atendimento (pedido ainda não criado) a janela vem antes da comanda: com a comanda
   // primeiro, em 1366x768 a lista de 10 janelas começava a 541 px de um conteúdo de 1026 e nenhuma cabia sem rolar.
   const janelaPrimeiro = !fechado && fonteApi && !pedido.pedidoId
@@ -218,12 +222,15 @@ export function BlocoPedido({
         {/* O total fica à vista antes de percorrer os itens da montagem. */}
         <div className={css.resumoTotal}>
           {pedido.frete > 0 && <p className={css.vazio}>Frete {moeda(pedido.frete)}</p>}
+          {linhasSimulacao && <p className={css.vazio} data-simulacao-frete>{linhaDe('frete')}</p>}
           <p className={css.total}>
             <span>{fonteApi && !pedido.pedidoId ? 'Total dos itens' : rotuloDoTotal(pedido, { fonteApi })}</span>
             <b>{moeda(pedido.totalApi ?? total)}</b>
           </p>
-          {fonteApi && !pedido.pedidoId && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
-          {previaSinal && (
+          {linhaDe('total') && <p className={css.total} data-simulacao-total><span>Total com frete</span><b>{moeda(simulacao.total)}</b></p>}
+          {fonteApi && !pedido.pedidoId && !linhasSimulacao && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
+          {linhaDe('sinal') && <p className={css.notaTotal} data-simulacao-sinal>{linhaDe('sinal')}</p>}
+          {previaSinal && !linhasSimulacao && (
             <p className={css.notaTotal}>
               Encomenda para outro dia: sinal de 50% do total com o frete antes da produção (nos itens, {moeda(previaSinal.sinal)}); o restante na entrega.
             </p>
