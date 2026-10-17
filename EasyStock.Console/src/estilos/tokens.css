@@ -123,10 +123,12 @@
      tablet da cozinha. */
   --toque: 40px;
   --coluna: 320px;
-  /* #1870: um trilho só, no Balcão e nos módulos. O item cabe "Atendimento" e "Automáticas"
-     em uma linha (76 px no rótulo de 13 px). */
-  --largura-trilho: 100px;
-  --largura-item-trilho: 84px;
+  /* #1870/#1872: um trilho só, no Balcão e nos módulos (`componentes/Trilho.module.css`). O item cabe
+     "Atendimento" e "Automáticas" em uma linha (76 px no rótulo de 13 px).
+     `--largura-trilho` não é declarado aqui: vem de `TRILHO` em `dominio/paineis.js` (a mesma conta
+     da conversa visível), aplicado na partida por `main.jsx`. O item é o trilho menos o respiro. */
+  --respiro-trilho: 8px;
+  --largura-item-trilho: calc(var(--largura-trilho) - 2 * var(--respiro-trilho));
   --altura-item-trilho: 54px;
   --gaveta: 400px;
 

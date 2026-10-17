@@ -141,33 +141,19 @@
 .appTrilho { flex-direction: row; }
 .appTrilho > .palco { flex: 1; min-width: 0; }
 .appTrilho > .palcoTres { padding-left: 0; }
+/* #1872: item, ativo, início, espaço e avatar vêm do CSS único do trilho (`componentes/Trilho.module.css`),
+   o mesmo dos módulos; aqui ficam só z-index, contadores e o que é do Balcão. */
 .trilho {
-  flex: 0 0 var(--largura-trilho); display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: var(--e-3) 8px var(--e-3);
+  composes: trilho from '../componentes/Trilho.module.css';
   padding-top: calc(var(--e-3) + env(safe-area-inset-top, 0px));
   position: relative; z-index: 20;
 }
-.inicioTrilho { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--tinta-2); text-decoration: none; font-size: var(--t-minimo); font-weight: 600; border-radius: var(--r-1); }
-.inicioTrilho:focus-visible { outline: 2px solid var(--marca); outline-offset: 3px; }
-.inicioTrilho:hover { color: var(--marca); }
-.itemTrilho,
-.avisosTrilho > button,
-.sinoTrilho > div > button {
-  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  width: var(--largura-item-trilho); min-height: var(--altura-item-trilho); padding: 4px; border: 0; border-radius: 14px;
-  background: transparent; color: var(--tinta-2); box-shadow: none;
-  font-size: var(--t-minimo); font-weight: 600; letter-spacing: 0; line-height: 1.1; text-align: center;
-}
-.itemTrilho:hover:not(:disabled),
-.avisosTrilho > button:hover:not(:disabled),
-.sinoTrilho > div > button:hover:not(:disabled) { background: var(--preenchimento); color: var(--tinta); }
+.inicioTrilho { composes: inicio from '../componentes/Trilho.module.css'; }
+.itemTrilho { composes: item from '../componentes/Trilho.module.css'; }
+.avisosTrilho { composes: filhos from '../componentes/Trilho.module.css'; }
 .itemTrilho svg, .sinoTrilho > div > button svg { transition: transform var(--dur-media) var(--ease-mola); }
 .itemTrilho:hover svg, .sinoTrilho > div > button:hover svg { transform: translateY(-2px) scale(1.06); }
-.itemAtual { color: var(--tinta); background: var(--preenchimento-forte); cursor: default; }
-.itemAtual::before {
-  content: ''; position: absolute; left: -8px; top: 14px; bottom: 14px; width: 3px;
-  border-radius: 0 3px 3px 0; background: var(--tinta);
-}
+.itemAtual { composes: ativo from '../componentes/Trilho.module.css'; cursor: default; }
 .itemTrilho[aria-pressed='true'] { color: var(--tinta); background: var(--preenchimento-forte); }
 .contaTrilho, .seloTrilho {
   position: absolute; top: 3px; left: calc(50% + 6px);
@@ -187,9 +173,9 @@
 }
 /* Lembretes no trilho: mesmo desenho de item, rótulo no próprio botão (#1807), e o
    painel abre para a direita em vez de para baixo. */
-.sinoTrilho { position: relative; }
+.sinoTrilho { composes: filhos from '../componentes/Trilho.module.css'; position: relative; }
 .sinoTrilho section[aria-label='Lembretes'] { top: 0; left: calc(100% + 10px); right: auto; transform-origin: top left; }
-.espacoTrilho { flex: 1; }
+.espacoTrilho { composes: espaco from '../componentes/Trilho.module.css'; }
 /* Controles compactos do Balcão. */
 @media (max-width: 759px) {
   .topo { flex-wrap: nowrap; }
@@ -230,7 +216,7 @@
 /* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
 .espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
 .espacoTrilho::after { content: ''; width: 32px; height: 1px; margin-bottom: 4px; background: var(--linha-media); }
-.atendente { margin-top: var(--e-2); display: grid; place-items: center; }
+.atendente { composes: avatar from '../componentes/Trilho.module.css'; }
 /* 12: no celular, o painel que entra desliza brevemente da direita. */
 @keyframes painelDesliza { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
 .palco > [role='tabpanel'] > * { animation: painelDesliza var(--dur-media) var(--ease-saida) backwards; }

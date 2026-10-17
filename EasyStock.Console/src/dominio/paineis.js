@@ -2,14 +2,17 @@
 // trocam de lado, mudam de largura e ampliam sem cobrir a conversa. Puro: a preferência chega
 // por parâmetro e sai normalizada; quem guarda é `aplicacao/preferenciaDosPaineis.js`.
 //
-// Geometria medida no CSS da moldura (`app/moldura.module.css`), no layout de três colunas:
+// Geometria medida no CSS da moldura (`app/moldura.module.css` e o trilho de `componentes/Trilho.module.css`),
+// no layout de três colunas:
 //   trilho de 100 px | Balcão | alça 12 | conversa (mínimo 320) | alça 12 | Resumo | folga 12
 // A conversa nunca fica com menos de CONVERSA_MINIMA visível com um painel encaixado: 320 é o
 // `min-width` de `.palcoTres > .centro`, a mesma leitura mínima que a moldura já garante.
 // `ferramentas/prova-1806-paineis.mjs` confere esses números no próprio CSS.
 
 export const CONVERSA_MINIMA = 320
-// #1870: `--largura-trilho` em tokens.css, o mesmo trilho do Balcão e dos módulos.
+// #1870/#1872: a largura do trilho do Balcão e dos módulos mora aqui e só aqui. O token CSS
+// `--largura-trilho` é gerado dela na partida (`tokensDaGeometria`, aplicado por `main.jsx`);
+// `tokens.css` deriva o item (`--largura-item-trilho`) do token.
 export const TRILHO = 100
 export const VAO = 12
 // Folga do assistente até a borda da tela (`--e-4`).
@@ -23,6 +26,9 @@ export const ASSISTENTE = { min: 320, max: 560, padrao: 432 }
 export const LADOS_CARDAPIO = ['esquerda', 'direita']
 export const LADOS_ASSISTENTE = ['esquerda', 'direita', 'flutuante']
 export const MODOS_CARDAPIO = ['compacto', 'amplo']
+
+// Tokens CSS que nascem da geometria acima, nome e valor, prontos para `style.setProperty`.
+export const tokensDaGeometria = () => ({ '--largura-trilho': `${TRILHO}px` })
 
 export const limitar = (valor, min, max) => Math.min(max, Math.max(min, valor))
 

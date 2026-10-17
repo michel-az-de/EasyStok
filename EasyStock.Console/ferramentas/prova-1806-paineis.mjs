@@ -128,9 +128,12 @@ if (paineis && preferencia && larguras) {
     const molduraCss = fonte('app/moldura.module.css')
     assert.match(molduraCss, /\.palcoTres > \.centro \{ min-width: (\d+)px; \}/)
     assert.equal(Number(molduraCss.match(/\.palcoTres > \.centro \{ min-width: (\d+)px; \}/)[1]), CONVERSA_MINIMA)
-    // #1870: o trilho é o token compartilhado com os módulos.
-    assert.match(molduraCss, /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\)/)
-    assert.match(fonte('estilos/tokens.css'), new RegExp(`--largura-trilho: ${TRILHO}px`), 'trilho = token')
+    // #1870/#1872: o trilho é o CSS e o token compartilhados com os módulos; o token nasce de TRILHO.
+    assert.match(molduraCss, /\.trilho \{\s*composes: trilho from '\.\.\/componentes\/Trilho\.module\.css'/)
+    assert.match(fonte('componentes/Trilho.module.css'), /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\)/)
+    assert.deepEqual(paineis.tokensDaGeometria(), { '--largura-trilho': `${TRILHO}px` }, 'trilho = token gerado da constante')
+    assert.doesNotMatch(fonte('estilos/tokens.css'), /--largura-trilho:/, 'o token não tem segunda cópia em tokens.css')
+    assert.match(fonte('main.jsx'), /tokensDaGeometria\(\)/, 'a partida aplica o token')
     assert.match(fonte('componentes/AlcaLargura.module.css'), new RegExp(`width: ${VAO}px`))
     assert.match(fonte('estilos/tokens.css'), new RegExp(`--e-3: ${VAO}px`), 'padding do palco = vão')
     assert.match(fonte('estilos/tokens.css'), new RegExp(`--e-4: ${MARGEM_ASSISTENTE}px`), 'margem do assistente')
