@@ -3,7 +3,7 @@
 .areaTrabalho { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .trilho { width: var(--largura-trilho); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--e-3) 8px; overflow-y: auto; flex: none; }
 .inicioTrilho { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: var(--t-minimo); font-weight: 600; text-decoration: none; color: var(--tinta-2); margin-bottom: var(--e-2); }
-.itemTrilho { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; gap: 4px; width: var(--largura-item-trilho); min-height: 58px; padding: 6px 4px; border-radius: 14px; color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 600; text-align: center; text-decoration: none; }
+.itemTrilho { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; gap: 4px; width: var(--largura-item-trilho); min-height: var(--altura-item-trilho); padding: 6px 4px; border-radius: 14px; color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 600; text-align: center; text-decoration: none; }
 .itemTrilho > span { max-width: 100%; overflow-wrap: anywhere; hyphens: auto; }
 .itemTrilho:hover { background: var(--preenchimento); color: var(--tinta); }
 .moduloAtivo { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }

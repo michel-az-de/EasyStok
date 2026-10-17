@@ -17,7 +17,7 @@ function posicaoDaCamada(gatilho, lado) {
 // do rodapé fixo e vêm para cá. `lado` diz para onde a camada abre: à direita do trilho ou
 // abaixo do canto do hall. `children` entra antes do Sair (o tema, no trilho do Balcão). Sem
 // `aoSair` (modo demonstração) a camada mostra só o nome e o que vier em `children`.
-export function MenuDaConta({ nome, detalhe, aoSair, rotuloSair = 'Sair', tituloSair, lado = 'direita', children }) {
+export function MenuDaConta({ nome: nomeDaSessao, detalhe, aoSair, rotuloSair = 'Sair', tituloSair, lado = 'direita', children }) {
   const [aberto, setAberto] = useState(false)
   const [posicao, setPosicao] = useState(null)
   const caixaRef = useRef(null)
@@ -33,7 +33,12 @@ export function MenuDaConta({ nome, detalhe, aoSair, rotuloSair = 'Sair', titulo
     const medir = () => setPosicao(posicaoDaCamada(botaoRef.current, lado))
     medir()
     window.addEventListener('resize', medir)
-    return () => window.removeEventListener('resize', medir)
+    // O trilho dos módulos rola: a camada acompanha o avatar.
+    document.addEventListener('scroll', medir, true)
+    return () => {
+      window.removeEventListener('resize', medir)
+      document.removeEventListener('scroll', medir, true)
+    }
   }, [aberto, lado])
   useEffect(() => {
     if (!aberto) return undefined
@@ -41,6 +46,8 @@ export function MenuDaConta({ nome, detalhe, aoSair, rotuloSair = 'Sair', titulo
     document.addEventListener('pointerdown', aoTocarFora)
     return () => document.removeEventListener('pointerdown', aoTocarFora)
   }, [aberto])
+  // Sessão sem nome ainda precisa sair: o avatar vira "Sua conta" (no desktop não há outro Sair).
+  const nome = nomeDaSessao || (aoSair ? 'Sua conta' : null)
   if (!nome) return null
   return (
     <div ref={caixaRef} className={`${css.conta} ${css[lado]}`}>

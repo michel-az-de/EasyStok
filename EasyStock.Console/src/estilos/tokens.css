@@ -127,6 +127,7 @@
      em uma linha (76 px no rótulo de 13 px). */
   --largura-trilho: 100px;
   --largura-item-trilho: 84px;
+  --altura-item-trilho: 54px;
   --gaveta: 400px;
 
   /* Nunito na operação; Lora nos marcos da marca; papel monoespaçado. */

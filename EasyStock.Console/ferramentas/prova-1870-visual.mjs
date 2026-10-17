@@ -43,6 +43,7 @@ confere('1  o Sair mora no menu do avatar: trilho do Balcão, trilho dos módulo
   assert.match(conta, /role="group" aria-label="Conta"/)
   assert.match(conta, /useEscape\(aberto, fechar\)/, 'Esc fecha e devolve o foco ao avatar')
   assert.match(conta, /botaoRef\.current\?\.focus\(\)/)
+  assert.match(conta, /const nome = nomeDaSessao \|\| \(aoSair \? 'Sua conta' : null\)/, 'sessão sem nome ainda sai')
   assert.match(fonte('app/Moldura.jsx'), /<MenuDaConta nome=\{atendente\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\}/)
   assert.match(fonte('features/hall/MenuDosModulos.jsx'), /<MenuDaConta nome=\{conta\?\.nome\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\}/)
   assert.match(fonte('features/hall/HallDeModulos.jsx'), /<MenuDaConta lado="abaixo"/)
@@ -59,7 +60,7 @@ confere('1  o tema do trilho do Balcão vai para o menu da conta (em 1280x720 o 
   const moldura = fonte('app/Moldura.jsx')
   assert.doesNotMatch(moldura, /<InterruptorTema vertical \/>/)
   assert.match(moldura, /rotuloSair=\{sessaoPersistente \? 'Sair deste aparelho' : 'Sair'\}>\s*<InterruptorTema \/>\s*<\/MenuDaConta>/)
-  assert.match(fonte('app/moldura.module.css'), /width: var\(--largura-item-trilho\); min-height: 54px;/)
+  assert.match(fonte('app/moldura.module.css'), /width: var\(--largura-item-trilho\); min-height: var\(--altura-item-trilho\);/)
   assert.match(fonte('componentes/MenuDaConta.module.css'), /position: fixed;/, 'a camada não é recortada pelo trilho')
 })
 
@@ -83,9 +84,10 @@ confere('3  Balcão e módulos usam o mesmo trilho, do token', () => {
   const tokens = fonte('estilos/tokens.css')
   assert.match(tokens, /--largura-trilho: 100px;/)
   assert.match(tokens, /--largura-item-trilho: 84px;/)
+  assert.match(tokens, /--altura-item-trilho: 54px;/)
   assert.match(fonte('app/moldura.module.css'), /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\)/)
   assert.match(fonte('features/hall/moldura.module.css'), /\.trilho \{ width: var\(--largura-trilho\);/)
-  assert.match(fonte('features/hall/moldura.module.css'), /width: var\(--largura-item-trilho\); min-height: 58px;/)
+  assert.match(fonte('features/hall/moldura.module.css'), /width: var\(--largura-item-trilho\); min-height: var\(--altura-item-trilho\);/)
   assert.match(fonte('dominio/paineis.js'), /export const TRILHO = 100/, 'a geometria dos painéis acompanha')
 })
 confere('3  o item do Balcão no trilho tem o nome e o ícone do módulo, como nos módulos', () => {

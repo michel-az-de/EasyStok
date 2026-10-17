@@ -154,7 +154,7 @@
 .avisosTrilho > button,
 .sinoTrilho > div > button {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  width: var(--largura-item-trilho); min-height: 54px; padding: 4px; border: 0; border-radius: 14px;
+  width: var(--largura-item-trilho); min-height: var(--altura-item-trilho); padding: 4px; border: 0; border-radius: 14px;
   background: transparent; color: var(--tinta-2); box-shadow: none;
   font-size: var(--t-minimo); font-weight: 600; letter-spacing: 0; line-height: 1.1; text-align: center;
 }
