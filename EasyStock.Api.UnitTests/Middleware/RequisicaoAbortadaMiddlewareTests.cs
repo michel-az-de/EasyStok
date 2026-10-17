@@ -57,6 +57,22 @@ public class RequisicaoAbortadaMiddlewareTests
     }
 
     [Fact]
+    public async Task Log_do_cancelamento_nao_leva_quebra_de_linha_vinda_da_requisicao()
+    {
+        // CodeQL cs/log-forging (#1877): metodo e caminho vem do cliente; CR e LF forjariam uma linha de log.
+        var ctx = Ctx(abortada: true);
+        ctx.Request.Method = "GET\r\nFORJADO";
+        ctx.Request.Path = "/api/x\nlinha-falsa";
+        var logger = new LoggerDeTeste();
+
+        await new RequisicaoAbortadaMiddleware(_ => throw new OperationCanceledException(), logger).InvokeAsync(ctx);
+
+        var mensagem = logger.Mensagens.Should().ContainSingle().Subject;
+        mensagem.Should().NotContainAny("\r", "\n");
+        mensagem.Should().Contain("GETFORJADO").And.Contain("/api/xlinha-falsa");
+    }
+
+    [Fact]
     public async Task Cancelamento_com_a_requisicao_viva_segue_para_o_tratamento_global()
     {
         // Timeout interno, token ligado a outro prazo: não foi o cliente, o tratamento de sempre vale.
@@ -137,6 +153,15 @@ public class RequisicaoAbortadaMiddlewareTests
         app.UseMiddleware<RequisicaoAbortadaMiddleware>();
         app.Run(terminal);
         return app.Build();
+    }
+
+    private sealed class LoggerDeTeste : Microsoft.Extensions.Logging.ILogger<RequisicaoAbortadaMiddleware>
+    {
+        public List<string> Mensagens { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter) => Mensagens.Add(formatter(state, exception));
     }
 
     private sealed class ColetorDeEventos : ILogEventSink
