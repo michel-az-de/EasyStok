@@ -148,9 +148,13 @@ export function aguardaSinalManual(pedido) {
     && pedido.cobranca && !pedido.cobranca.link && !pedido.cobranca.pagaEm && !pedido.cobranca.canceladaEm)
 }
 
+// #1875: o sinal da encomenda é metade do total, em centavos e arredondando para cima, como o servidor
+// (`PlanoPagamentoEncomenda.Sinal`).
+export const sinalDeEncomenda = (total) => Math.ceil(Math.round(total * 100) / 2) / 100
+
 export function valorSugeridoParaBaixa(pedido) {
   const total = pedido.totalApi ?? pedido.cobranca?.valor ?? 0
-  const alvo = aguardaSinalManual(pedido) ? Math.ceil(Math.round(total * 100) / 2) / 100 : total
+  const alvo = aguardaSinalManual(pedido) ? sinalDeEncomenda(total) : total
   return Math.max(0, Math.round((alvo - (pedido.alocadoApi ?? pedido.totalPagoApi ?? 0)) * 100) / 100)
 }
 

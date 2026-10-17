@@ -13,7 +13,7 @@ import {
 import { diferencaAposPagamento, totalPago } from '../../dominio/pagamento'
 import { situacaoDoItem } from '../../dominio/cardapio'
 import {
-  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, rotuloDoTotal, situacaoDoEnvio,
+  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, previaDoSinal, rotuloDoTotal, situacaoDoEnvio,
 } from '../../dominio/resumoPedido'
 import { Cabecalho } from './Cabecalho'
 import { ModalCanhoto } from './Canhoto'
@@ -114,7 +114,7 @@ export function BlocoPedido({
 }) {
   const { cardapio, linhas } = useCatalogo()
   const { marcarCanhotoImpresso } = useAcoes()
-  const { fonteApi } = useAtendimento()
+  const { fonteApi, agora } = useAtendimento()
   const [canhotoAberto, setCanhotoAberto] = useState(false)
   // Ponta (a): "Enviar comanda" sem meio marcado pergunta o meio antes de
   // mandar, em vez de mandar Pix por baixo.
@@ -178,6 +178,14 @@ export function BlocoPedido({
   // novo não fica calado sobre quanto falta cobrar (`dominio/pedido.js` tem
   // o porquê da conta e a lacuna conhecida de um segundo acréscimo).
   const diferencaPosPagamento = diferencaAposPagamento(pedido, cardapio)
+  // #1875 ("Quanto fica?"): o que já dá para dizer antes de gerar a cobrança. O frete é do servidor.
+  const previaSinal = previaDoSinal(pedido, { fonteApi, agora, total: pedido.totalApi ?? total })
+  // #1875: na Seleção do atendimento (pedido ainda não criado) a janela vem antes da comanda: com a comanda
+  // primeiro, em 1366x768 a lista de 10 janelas começava a 541 px de um conteúdo de 1026 e nenhuma cabia sem rolar.
+  const janelaPrimeiro = !fechado && fonteApi && !pedido.pedidoId
+  const seletorDeJanela = !fechado && fonteApi
+    ? <SeletorJanelaApi key={conversaId} pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
+    : null
 
   const alternarObs = (sku) => setObsAbertas((atual) => {
     const novo = new Set(atual)
@@ -187,6 +195,7 @@ export function BlocoPedido({
 
   return (
     <>
+      {janelaPrimeiro && seletorDeJanela}
       <section
         ref={soltarRef}
         id="comanda-pedido"
@@ -214,6 +223,11 @@ export function BlocoPedido({
             <b>{moeda(pedido.totalApi ?? total)}</b>
           </p>
           {fonteApi && !pedido.pedidoId && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
+          {previaSinal && (
+            <p className={css.notaTotal}>
+              Encomenda para outro dia: sinal de {moeda(previaSinal.sinal)} (50%) antes da produção; {moeda(previaSinal.restante)} na entrega, mais o frete.
+            </p>
+          )}
         </div>
 
         {alvoDoArrasto && <p className={css.soltarAqui}>Soltar aqui</p>}
@@ -257,9 +271,7 @@ export function BlocoPedido({
       {/* No modo API a janela é da vitrine, com data; pedido criado troca a vaga no servidor.
           #1474 (R3): vem antes das ações, logo abaixo da comanda, onde o motivo da barra aponta.
           #1551: remonta por conversa; o "Dia da entrega" de um cliente não vale para o seguinte. */}
-      {!fechado && fonteApi && (
-        <SeletorJanelaApi key={conversaId} pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
-      )}
+      {!janelaPrimeiro && seletorDeJanela}
 
       <div className={css.acoesPedido}>
         {!fechado && (

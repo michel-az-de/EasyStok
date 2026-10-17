@@ -58,6 +58,8 @@ const confere = async (descricao, fn) => {
 
 const AGORA = '2026-10-12T15:00:00Z'
 const barra = fonte('features/ficha-cliente/BarraProximoPasso.jsx')
+// #1875: `acaoDoPix` saiu da barra para o próprio módulo; as leituras de `case 'expirada'` vão para lá.
+const acaoDoPix = fonte('features/ficha-cliente/acaoDoPix.js')
 const bloco = fonte('features/ficha-cliente/BlocoCobranca.jsx')
 const relogio = fonte('features/ficha-cliente/RelogioPix.jsx')
 
@@ -93,7 +95,7 @@ const falha = (mensagem) => new Response(JSON.stringify({ error: { message: mens
 // ------------------------------------------------------------------ 1
 
 await confere('1  link vencido no modo API: a barra segue oferecendo "Marcar pago"', () => {
-  const vencida = trecho(barra, "case 'expirada':", "case 'em-conferencia':")
+  const vencida = trecho(acaoDoPix, "case 'expirada':", "case 'em-conferencia':")
   const ramoApi = trecho(vencida, 'if (linkVencidoApi)', 'return {\n        rotuloEstado')
   assert.match(ramoApi, /botoes: \[\{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa \}\]/)
   assert.doesNotMatch(ramoApi, /botoes: \[\]/)

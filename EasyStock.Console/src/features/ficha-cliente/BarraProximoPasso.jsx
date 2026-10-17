@@ -9,7 +9,8 @@ import {
   aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
 import { ultimoPagamentoApi } from '../../dominio/pagamento'
-import { ROTULO_GERAR_E_ENVIAR } from '../../dominio/resumoPedido'
+import { ROTULO_GERAR_E_ENVIAR, resumoDaCobrancaEscolhida } from '../../dominio/resumoPedido'
+import { totalDoPedido } from '../../dominio/pedido'
 import {
   PASSOS, motivoParaNaoAvancar, passoAnterior, passoPorId, proximoPasso, situacaoDoPasso,
   SEGUNDOS_PARA_DESFAZER,
@@ -24,6 +25,7 @@ import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { BaixaAMao } from './BlocoCobranca'
 import { MenuDoPedido } from './MenuDoPedido'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
+import { acaoDoPix } from './acaoDoPix'
 import { criarExecucaoDaEtapa, houveAvancoConfirmado, marcoDaComanda } from './progressoDaComanda'
 import css from './ficha.module.css'
 
@@ -41,7 +43,7 @@ const ICONE_DA_TRILHA = {
 }
 
 // Rótulo e ícone do botão primário de cada passo, exceto "aguardando": esse
-// depende da situação da cobrança (ver `acaoDoPix` abaixo).
+// depende da situação da cobrança (ver `acaoDoPix.js`).
 const ACAO_DO_PASSO = {
   pago: { rotulo: 'Iniciar preparo', icone: 'cooking-pot' },
   preparo: { rotulo: 'Marcar embalado', icone: 'package' },
@@ -51,51 +53,9 @@ const ACAO_DO_PASSO = {
 
 const PROXIMO_DE_AGUARDANDO = proximoPasso('aguardando')?.rotulo ?? 'Pago'
 
-// O passo "aguardando pagamento" não tem um botão único: o próximo passo
-// muda com a situação da cobrança (secao 2, "Alerta do Pix"). Substitui a
-// antiga trava, que só mostrava texto e travava a barra inteira.
+// O passo "aguardando pagamento" não tem um botão único: o próximo passo muda com a situação da
+// cobrança (`acaoDoPix.js`, secao 2, "Alerta do Pix").
 const GERANDO_COBRANCA = 'Gerando cobrança…'
-
-function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoApi, aoAbrirBaixa, aoGerarPix, aoReenviarPix }) {
-  switch (situacaoCob.chave) {
-    case 'nenhuma':
-      return {
-        rotuloEstado: 'Cobrança não gerada',
-        // #1474 (R3): o que falta vem pronto de quem monta a barra (comanda vazia, cadastro,
-        // endereço, janela), para o botão nascer desabilitado com o motivo à vista.
-        motivo: prerequisito,
-        // Atalho da barra: gera no meio marcado nos chips do bloco Cobrança;
-        // sem meio marcado, pergunta antes (ponta a da integração).
-        botoes: [{ rotulo: rotuloGerar, icone: 'dollar-sign', onClick: aoGerarPix, desabilitado: Boolean(prerequisito) }],
-      }
-    case 'expirada':
-      // #1586: no modo API quem reemite (ou cancela) é o job do EasyStok; o botão só avisava.
-      // No lugar dele, o texto diz o que vai acontecer.
-      // #1683: quem pagou por fora com o link vencido ainda precisa da baixa à mão.
-      if (linkVencidoApi) {
-        return {
-          rotuloEstado: 'Cobrança venceu', motivo: linkVencidoApi,
-          botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa }],
-        }
-      }
-      return {
-        rotuloEstado: 'Cobrança venceu',
-        botoes: [{ rotulo: 'Reenviar cobrança', icone: 'refresh-cw', onClick: aoReenviarPix }],
-      }
-    case 'em-conferencia':
-      return {
-        rotuloEstado: 'Conferindo comprovante',
-        botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa }],
-      }
-    case 'divergente':
-      return { rotuloEstado: 'Valor diferente', divergente: true }
-    default:
-      return {
-        rotuloEstado: 'Aguardando pagamento',
-        botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa }],
-      }
-  }
-}
 
 // O bloco Pedido: trilha, onde está e ação (secao 5 da direção visual). Um
 // alvo só, fixo no rodapé da coluna Ficha, no lugar de `BlocoEsteira` (que
@@ -113,10 +73,12 @@ export function BarraProximoPasso({
   const { acoes: capacidades } = useAcessoModulos()
   const [abrindoBaixa, setAbrindoBaixa] = useState(false)
   const [pedindoMeio, setPedindoMeio] = useState(false)
+  // #1875: o meio tocado na pergunta só fica marcado; criar o pedido e cobrar é o botão de confirmação.
+  const [meioNaBarra, setMeioNaBarra] = useState(null)
   const [pedindoEntregador, setPedindoEntregador] = useState(false)
   // Issue #17: entregador de um toque e os campos de veículo, placa e empresa.
   const { conversas, fonteApi } = useAtendimento()
-  const { entregadores } = useCatalogo()
+  const { entregadores, cardapio, meiosDePagamento } = useCatalogo()
   // No modo API, só ações ligadas aparecem. O erro fica ao lado do botão.
   const disponivel = useAcaoDisponivel()
   const [erroAcao, setErroAcao] = useState(null)
@@ -228,6 +190,7 @@ export function BarraProximoPasso({
       // #1474 (R4): no modo API este é o único botão que cria o pedido (cobra e manda a comanda).
       rotuloGerar: fonteApi && !pedido.pedidoId && !gerarSemEnviar ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
+      linkPendenteApi: fonteApi && Boolean(pedido.cobranca?.link),
       aoAbrirBaixa: () => setAbrindoBaixa(true),
       aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio), GERANDO_COBRANCA) : setPedindoMeio(true)),
       aoReenviarPix: () => executar(() => aoReenviarPix()),
@@ -252,22 +215,40 @@ export function BarraProximoPasso({
         <div className={css.botoesPrimarios}>
           {gerarSemEnviar && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: gere sem enviar. Depois copie o link em Pagamento ou use um modelo aprovado.</p>}
           {info.motivo && <p className={css.motivoDesabilitado}>{info.motivo}</p>}
+          {info.nota && <p className={css.motivoDesabilitado}>{info.nota}</p>}
           {info.botoes.map((b) => (
             <Botao
-              key={b.rotulo} largo variante="primario" icone={b.icone}
+              key={b.rotulo} largo variante={b.secundario ? 'secundario' : 'primario'} icone={b.icone}
               disabled={b.desabilitado || emVoo} onClick={b.onClick}
             >
               {fonteApi && aguardaSinalManual(pedido) && b.rotulo === 'Marcar pago' ? 'Registrar sinal' : b.rotulo}
             </Botao>
           ))}
           {pedindoMeio && situacaoCob.chave === 'nenhuma' && !pedido.meio && (
-            <EscolhaDeMeio
-              escolhido={null}
-              pedido={pedido}
-              geraAoEscolher
-              aoEscolher={(meio) => { setPedindoMeio(false); executar(() => aoGerarPix(meio), GERANDO_COBRANCA) }}
-              pergunta="Como o cliente vai pagar?"
-            />
+            <>
+              <EscolhaDeMeio
+                escolhido={meioNaBarra}
+                pedido={pedido}
+                geraAoEscolher
+                aoEscolher={setMeioNaBarra}
+                pergunta="Como o cliente vai pagar?"
+              />
+              {meioNaBarra && (
+                <p className={css.motivoDesabilitado} data-resumo-cobranca>
+                  {resumoDaCobrancaEscolhida(pedido, {
+                    meio: meioNaBarra, rotuloMeio: meiosDePagamento.find((m) => m.id === meioNaBarra)?.rotulo ?? meioNaBarra,
+                    total: pedido.totalApi ?? totalDoPedido(pedido, cardapio), fonteApi, agora,
+                  })}
+                </p>
+              )}
+              <Botao
+                largo variante="primario" icone="check" data-confirmar-cobranca
+                disabled={!meioNaBarra || emVoo}
+                onClick={() => { const meio = meioNaBarra; setPedindoMeio(false); setMeioNaBarra(null); executar(() => aoGerarPix(meio), GERANDO_COBRANCA) }}
+              >
+                {fonteApi && !pedido.pedidoId && !gerarSemEnviar ? 'Confirmar e enviar' : 'Confirmar e gerar'}
+              </Botao>
+            </>
           )}
         </div>
       )

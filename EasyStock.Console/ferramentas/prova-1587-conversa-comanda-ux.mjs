@@ -147,7 +147,8 @@ await confere('A na Ficha, contador, anotação, arrasto e "Adicionar itens" seg
   assert.match(blocoPedido, /!itensTravados && <p className=\{css\.situacaoEnvio\}>\{gerarSemEnviar \? [^\n]+ : LINHA_COMANDA_VAI_JUNTO\}<\/p>/)
 })
 await confere('A trocar a janela de pedido criado continua de pé (não depende da trava dos itens)', () => {
-  assert.match(blocoPedido, /\{!fechado && fonteApi && \(\s*<SeletorJanelaApi /)
+  // #1875: o seletor virou `seletorDeJanela` (antes ou depois da comanda); a condição de existir não mudou.
+  assert.match(blocoPedido, /const seletorDeJanela = !fechado && fonteApi\s*\? <SeletorJanelaApi /)
 })
 
 const painelCardapio = fonte('features/cardapio/PainelCardapio.jsx')
