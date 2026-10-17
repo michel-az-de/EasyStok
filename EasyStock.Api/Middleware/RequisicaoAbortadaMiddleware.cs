@@ -27,13 +27,19 @@ public sealed class RequisicaoAbortadaMiddleware(RequestDelegate next, ILogger<R
         }
         catch (Exception erro) when (context.RequestAborted.IsCancellationRequested && EhCancelamento(erro))
         {
-            logger.LogDebug("Requisição cancelada pelo cliente: {Method} {Path}.", context.Request.Method, CaminhoDoLog.De(context));
+            logger.LogDebug("Requisição cancelada pelo cliente: {Method} {Path}.",
+                SanitizarParaLog(context.Request.Method), SanitizarParaLog(CaminhoDoLog.De(context)));
 
             // Com a resposta já iniciada o status não muda (lançaria); só sobra encerrar.
             if (!context.Response.HasStarted)
                 context.Response.StatusCode = StatusClienteFechouRequisicao;
         }
     }
+
+    // Método e caminho vêm do cliente: sem CR e LF não dá para forjar uma linha de log (CodeQL cs/log-forging, #1877).
+    // Mesma regra do ProtecaoCsrfCookieMiddleware.
+    private static string SanitizarParaLog(string? valor) =>
+        (valor ?? "").Replace("\r", "").Replace("\n", "");
 
     /// <summary>
     /// O cancelamento chega direto ou embrulhado: o driver do banco e o <c>AggregateException</c> trazem o
