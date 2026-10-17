@@ -19,6 +19,7 @@ import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
 import { SeletorRespostas } from './SeletorRespostas'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
+import { acoesDoComposer } from './apresentacaoDaConversa'
 import css from './atendimento.module.css'
 
 export function Composer({
@@ -131,6 +132,9 @@ export function Composer({
   const podeFoto = aceitaFormato(canal, 'foto')
   const podeAnexar = podeFoto || aceitaFormato(canal, 'arquivo')
   const idRestricao = useId()
+  // #1868: o que o canal não entrega não ocupa a barra (eram 4 ícones apagados no chat do site).
+  // O motivo fica escrito na linha da restrição, embaixo do campo, e no title do Enviar.
+  const acoes = acoesDoComposer({ podeAnexar, podeFoto, podeAudio })
 
   // #1761 (L8): conversa encerrada eram três avisos do mesmo estado (botão no cabeçalho, faixa
   // amarela e o campo apagado com Programar e Nota ativos). Fica uma linha neutra no lugar do campo.
@@ -181,7 +185,7 @@ export function Composer({
               esquerda, o campo numa pílula que cresce com o texto, o enviar
               (ou o microfone, com o campo vazio) redondo à direita. A .caixa
               só agrupa; a .acoes some do layout no CSS. */}
-          <div className={css.caixa}>
+          <div className={`${css.caixa} ${acoes.enxuta ? css.caixaEnxuta : ''}`}>
             <div ref={campoRef}>
               <CampoArea
                 rotulo="Mensagem para o cliente"
@@ -244,7 +248,7 @@ export function Composer({
                   quê?"): os quatro vizinhos ganham nome visível, como o
                   Respostas. Em coluna estreita o nome some por container
                   query e fica o title com a explicação inteira. */}
-              <BotaoAnexarArquivo
+              {acoes.anexar && <BotaoAnexarArquivo
                 disabled={!podeEscrever || !podeAnexar}
                 descritoPor={!podeAnexar && restricao ? idRestricao : undefined}
                 soImagem={fonteApi}
@@ -252,14 +256,14 @@ export function Composer({
                 rotulo="Anexar"
                 classeRotulo={css.rotuloAcao}
                 aoEscolher={aoEscolherArquivo}
-              />
-              <Botao
+              />}
+              {acoes.fotos && <Botao
                 title={motivoDeFormato(canal, 'foto') ?? 'Fotos dos pratos cadastrados na casa'}
                 aria-describedby={!podeFoto && restricao ? idRestricao : undefined}
                 className={css.acaoComRotulo} disabled={!podeEscrever || !podeFoto} onClick={aoAbrirGaleria}
               >
                 <Icone nome="imagem" /><span className={css.rotuloAcao}>Fotos</span>
-              </Botao>
+              </Botao>}
               {/* #1424: a mensagem programada vai para o cliente cadastrado (a API exige o
                   clienteId). Não depende do `podeEscrever`: fora da janela sai por modelo. */}
               <Botao
@@ -279,8 +283,8 @@ export function Composer({
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
-              {temTexto || anexo ? (
-                <Botao variante="primario" className={css.enviar} aria-label="Enviar" title={variavelSobrando ?? 'Enviar (Enter)'} disabled={!podeEscrever || Boolean(variavelSobrando)} onClick={enviarComposer}>
+              {temTexto || anexo || !acoes.audio ? (
+                <Botao variante="primario" className={css.enviar} aria-label="Enviar" title={variavelSobrando ?? (temTexto || anexo ? 'Enviar (Enter)' : restricao ?? 'Escreva a mensagem para enviar')} disabled={!podeEscrever || Boolean(variavelSobrando) || !(temTexto || anexo)} onClick={enviarComposer}>
                   <Icone nome="arrow-up" tamanho={20} />
                 </Botao>
               ) : (

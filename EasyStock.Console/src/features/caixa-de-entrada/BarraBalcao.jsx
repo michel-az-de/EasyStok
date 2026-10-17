@@ -152,6 +152,10 @@ export function BarraBalcao({ filtros, aoMudar }) {
         </span>
       </div>
 
+      {/* #1868: com coluna de 396 px úteis ou mais, chips e Responsável na mesma linha (eram 45 px
+          a mais no topo da lista). Mais estreita, o Responsável desce com o rótulo, como antes:
+          o chip "Precisa de você" e a contagem nunca ficam escondidos atrás do seletor. */}
+      <div className={css.linhaB}>
       <fieldset className={css.filtros}>
         <legend className="sr">Filtros do Balcão</legend>
         <button
@@ -185,6 +189,7 @@ export function BarraBalcao({ filtros, aoMudar }) {
         ))}
       </fieldset>
       <FiltroResponsavel valor={filtros.responsavel ?? 'todas'} aoMudar={(valor) => aoMudar('responsavel', valor)} />
+      </div>
     </div>
   )
 }
@@ -210,7 +215,7 @@ function FiltroResponsavel({ valor, aoMudar }) {
   if (consulta.itens.length <= 1 && valor === 'todas') return null
   return (
     <label className={css.filtroResponsavel}>
-      Responsável
+      <span className={css.rotuloResponsavel}>Responsável</span>
       <select aria-label="Responsável pelas conversas" value={valor} onChange={(e) => aoMudar(e.target.value)}>
         <option value="todas">Todas</option>
         <option value="minhas">Minhas</option>

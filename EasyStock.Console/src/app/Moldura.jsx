@@ -33,14 +33,17 @@ import css from './moldura.module.css'
 // O ícone ficou para navegação, mídia e alerta.
 const ICONE_DA_COLUNA = { entrada: 'inbox', ficha: 'ficha' }
 
-function Coluna({ variante, titulo, contagem, children }) {
+// #1868: `semTitulo` no desktop de três colunas. O trilho já marca o Balcão como ativo e o cartão
+// do Resumo se identifica pelo h3; o cabeçalho de 64 px custava 1 cartão e meio da lista em 1280.
+// O nome da coluna continua no `aria-label` da seção.
+function Coluna({ variante, titulo, contagem, semTitulo = false, children }) {
   return (
     <section className={`${css.coluna} ${css[variante]}`} aria-label={titulo}>
-      <header className={css.tituloColuna}>
+      {!semTitulo && <header className={css.tituloColuna}>
         {ICONE_DA_COLUNA[variante] && <Icone nome={ICONE_DA_COLUNA[variante]} tamanho={20} />}
         {titulo}
         {contagem != null && <span className={css.contagem}>{contagem}</span>}
-      </header>
+      </header>}
       {children}
     </section>
   )
@@ -456,7 +459,7 @@ export function Moldura({
         <main className={`${css.palco} ${css.palcoTres}`} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Balcão">
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
-          <Coluna variante="entrada" titulo="Balcão">
+          <Coluna variante="entrada" titulo="Balcão" semTitulo>
             <PainelConversas />
           </Coluna>
           <AlcaLargura
@@ -477,7 +480,7 @@ export function Moldura({
             invertida
             aoMudar={(valor) => aoRedimensionar('ficha', valor)}
           />
-          <Coluna variante="ficha" titulo="Resumo">
+          <Coluna variante="ficha" titulo="Resumo" semTitulo>
             <div className={css.painelFicha}><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></div>
             {/* #1474: lugar da fila de canhotos (FilaCanhotos), no pé da Ficha e no fluxo da
                 coluna: a pílula não cobre mais o título nem o topo da coluna. Vazio, não ocupa. */}

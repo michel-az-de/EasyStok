@@ -8,6 +8,7 @@ import { tiqueDaMensagem } from '../../dominio/mensagem'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
 import { BolhaAvaliacaoPedido, BolhaAvaliacaoResposta } from './BolhaAvaliacao'
 import { BolhaMidiaApi } from './BolhaMidiaApi'
+import { avisoDePedido } from './apresentacaoDaConversa'
 import css from './atendimento.module.css'
 
 const CLASSE = { in: css.entrada, out: css.saida }
@@ -92,7 +93,7 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
 
   if (mensagem.dir === 'sistema') {
     return (
-      <p className={`${css.balao} ${css.sistema} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
+      <p className={`${css.balao} ${css.sistema} ${avisoDePedido(mensagem.texto) ? css.sistemaPedido : ''} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
         <Icone nome="check" /> {mensagem.texto}
       </p>
     )

@@ -473,3 +473,30 @@
   .identidade { flex-basis: auto; }
   .direita { width: auto; margin-left: auto; flex-wrap: nowrap; }
 }
+
+/* #1868: o pedido do site no fio (itens, total, endereço) se lê como documento, à esquerda,
+   no corpo de apoio e com o trilho do post-it; o aviso curto segue miúdo e centralizado. */
+.sistema.sistemaPedido {
+  align-self: flex-start; max-width: min(100%, 62ch); text-align: left;
+  font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-corpo);
+  padding: var(--e-2) var(--e-3); background: var(--papel);
+  border-left: var(--trilho) solid var(--linha-forte); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+}
+.sistema.sistemaPedido svg { display: inline-block; vertical-align: -3px; margin-right: var(--e-1); }
+
+/* #1868: sem Anexar e Fotos (canal que não aceita mídia), Respostas, Programar e Nota cabem ao
+   lado do campo; a barra só quebra em coluna muito estreita. */
+@container composer (max-width: 760px) {
+  .caixaEnxuta { flex-wrap: nowrap; }
+  .caixaEnxuta > :not(.acoes) { order: 2; flex-basis: auto; }
+  .caixaEnxuta > .acoes > .enviar { margin-left: 0; }
+}
+@container composer (max-width: 359px) {
+  .caixaEnxuta { flex-wrap: wrap; }
+  .caixaEnxuta > :not(.acoes) { order: 0; flex-basis: 100%; }
+  .caixaEnxuta > .acoes > .enviar { margin-left: auto; }
+}
+/* #1868: em coluna estreita os vizinhos viram ícones redondos de 36; Respostas acompanha a altura. */
+@container composer (max-width: 439px) {
+  .acoes > button.botaoRespostas { min-height: 36px; border-radius: var(--r-pilula); }
+}

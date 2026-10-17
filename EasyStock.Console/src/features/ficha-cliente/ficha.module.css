@@ -86,7 +86,7 @@
 .ondeEsta { display: flex; align-items: flex-start; gap: var(--e-3); }
 .ondeEsta > svg { flex-shrink: 0; width: 20px; height: 20px; margin-top: 2px; }
 .ondeEsta > div { display: flex; flex-direction: column; gap: var(--e-1); }
-.rotuloEstado { display: block; font-size: var(--t-titulo); font-weight: 700; }
+.rotuloEstado { display: block; font-size: var(--t-forte); font-weight: 700; }
 .depoisTexto { display: block; font-size: var(--t-apoio); color: var(--tinta-3); }
 .resumoAndamento {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
@@ -171,10 +171,15 @@
 .resumoAtual h3 { margin: var(--e-2) 0; font-size: var(--t-titulo); }
 .resumoAtual p { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: 1.5; }
 .resumoAtual .fase { color: var(--tinta-3); font-size: var(--t-micro); font-weight: 600; }
+/* #1868: o saldo é o número que ela diz ao cliente; o maior valor da coluna, em tinta cheia. */
+.resumoAtual .saldoFicha {
+  margin-top: var(--e-1); color: var(--tinta); font-family: var(--f-dado);
+  font-size: var(--t-valor); font-weight: 700; line-height: var(--lh-compacto); font-variant-numeric: tabular-nums;
+}
 .acessosFicha { padding: 0 var(--e-4); }
 .acessoFicha {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
-  width: 100%; min-height: 64px; padding: var(--e-3) 0; border: 0; border-bottom: 1px solid var(--linha);
+  width: 100%; min-height: 52px; padding: var(--e-2) 0; border: 0; border-bottom: 1px solid var(--linha);
   background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer;
 }
 .acessoFicha span { min-width: 0; }
