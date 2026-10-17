@@ -1,0 +1,24 @@
+.conta { position: relative; display: grid; place-items: center; }
+.gatilho {
+  display: grid; place-items: center; padding: 2px; border: 0; border-radius: var(--r-pilula);
+  background: transparent; cursor: pointer;
+}
+.gatilho:hover { box-shadow: 0 0 0 3px var(--preenchimento-forte); }
+.gatilho:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.camada {
+  position: fixed; z-index: 60; display: grid; gap: var(--e-3);
+  min-width: 220px; max-width: min(320px, calc(100vw - 24px)); padding: var(--e-3);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  background: var(--papel); box-shadow: var(--sombra-media);
+  animation: contaEntra var(--dur-media) var(--ease-saida);
+}
+/* Pé do trilho: abre à direita, alinhada pelo fundo, para não sair da tela. */
+.direita .camada { transform-origin: bottom left; }
+/* Canto do hall: abre embaixo, alinhada à direita. */
+.abaixo .camada { transform-origin: top right; }
+.quem { display: grid; gap: 2px; margin: 0; }
+.quem strong { font-size: var(--t-apoio); color: var(--tinta); overflow-wrap: anywhere; }
+.quem small { font-size: var(--t-micro); color: var(--tinta-2); overflow-wrap: anywhere; }
+.sair { justify-self: stretch; }
+@keyframes contaEntra { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .camada { animation: none; } }

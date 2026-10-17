@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react'
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
 import { avisoDeVencimento, rotuloDaSessao } from '../dominio/sessao'
 import { useHash } from '../hooks/useHash'
+import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
 import css from './faixaApi.module.css'
 
 // #1474: trocar de tela apaga o aviso da faixa, que era da tela de antes. Fica montado junto do
@@ -39,9 +40,12 @@ export function AvisoDaAcaoApi() {
 // Faixa fina do modo API (F01): quem está logado, em qual empresa, se a lista
 // está atualizando e o último aviso de ação recusada ou ainda não ligada. Some no
 // modo demonstração. O aviso fica até a dona fechar (F06): a sincronização não o apaga.
+// #1870: no desktop (e nos módulos, `somenteAvisos`) a faixa só aparece com aviso, falha,
+// integração parada ou sessão vencendo. Quem está logado e o Sair moram no avatar do trilho.
 export function FaixaApi({ aoSair, somenteAvisos = false }) {
   const { fonteApi, sincronizacao, sessao, agora } = useAtendimento()
   const { fecharAvisoApi } = useAcoes()
+  const enxuta = useTamanhoTela() === DESKTOP || somenteAvisos
   const { lista: integracoes } = useIntegracoesApi({ ativo: fonteApi, intervaloMs: 60_000 })
   const integracaoParada = textoDaFaixa(integracoes)
   if (!fonteApi) return null
@@ -52,6 +56,7 @@ export function FaixaApi({ aoSair, somenteAvisos = false }) {
   // O aviso de ação vem na frente; fechado ele, aparece o persistente, que só sai pelo botão.
   const avisoDeAcao = sincronizacao?.aviso ?? null
   const aviso = !carregando && !falhou ? avisoDeAcao ?? sincronizacao?.avisoFixo ?? null : null
+  if (enxuta && !falhou && !aviso && !integracaoParada && !vencimento) return null
   const texto = carregando
     ? 'Carregando conversas…'
     : falhou
@@ -59,7 +64,7 @@ export function FaixaApi({ aoSair, somenteAvisos = false }) {
       : aviso ?? 'Conversas ao vivo do EasyStok'
   return (
     <output className={`${css.faixa} ${falhou ? css.falha : aviso ? css.aviso : ''}`}>
-      {(!somenteAvisos || carregando || falhou || aviso) && <span className={css.texto}>
+      {(!enxuta || falhou || aviso) && <span className={css.texto}>
         {texto}
         {aviso && (
           <button type="button" className={css.sair} onClick={() => fecharAvisoApi({ fixo: !avisoDeAcao })}>Fechar aviso</button>
@@ -68,8 +73,8 @@ export function FaixaApi({ aoSair, somenteAvisos = false }) {
       {integracaoParada && <span className={css.texto}>{integracaoParada} <a href={hashDoModulo('configuracoes', 'integracoes')}>Ver integrações</a></span>}
       <span className={css.quem}>
         {vencimento && <strong className={css.vence}>{vencimento}</strong>}
-        {rotuloDaSessao(sessao)}
-        {!somenteAvisos && <button type="button" className={css.sair} onClick={aoSair}>Sair</button>}
+        {!enxuta && rotuloDaSessao(sessao)}
+        {!enxuta && <button type="button" className={css.sair} onClick={aoSair}>Sair</button>}
       </span>
     </output>
   )

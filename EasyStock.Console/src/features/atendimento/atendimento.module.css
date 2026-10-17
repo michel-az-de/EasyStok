@@ -220,6 +220,13 @@
   flex: 1 1 14rem; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
+/* #1870: no desktop a faixa é sempre uma linha. A frase cede com reticência (inteira no title e
+   no leitor de tela) em vez de empurrar os botões para uma segunda linha. */
+@media (min-width: 760px) {
+  .modo { padding-inline: var(--e-3); }
+  .modoLinha { flex-wrap: nowrap; }
+  .modoTexto { flex: 1 1 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 .modoAcoes { margin-left: auto; display: flex; gap: var(--e-2); flex-shrink: 0; }
 .acaoModo { min-height: var(--toque); padding-block: 0; }
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }

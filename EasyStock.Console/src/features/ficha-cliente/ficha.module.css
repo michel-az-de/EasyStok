@@ -85,17 +85,17 @@
 /* Onde está: ícone do passo atual, rótulo e "Próximo: X" (secao 5, item 2). */
 .ondeEsta { display: flex; align-items: flex-start; gap: var(--e-3); }
 .ondeEsta > svg { flex-shrink: 0; width: 20px; height: 20px; margin-top: 2px; }
-.ondeEsta > div { display: flex; flex-direction: column; gap: var(--e-1); }
+.ondeEsta > div { display: flex; flex-direction: column; gap: 0; }
 .rotuloEstado { display: block; font-size: var(--t-forte); font-weight: 700; }
 .depoisTexto { display: block; font-size: var(--t-apoio); color: var(--tinta-3); }
 .resumoAndamento {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
-  width: 100%; min-height: 44px; padding: 0; border: 0; background: transparent;
+  width: 100%; min-height: var(--toque); padding: 0; border: 0; background: transparent;
   color: var(--tinta); font-family: var(--f-corpo); font-size: var(--t-apoio); font-weight: 600;
   text-align: left; cursor: pointer; border-radius: var(--r-1);
 }
 .resumoAndamento:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
-.contagemEtapa { display: block; color: var(--tinta-2); font-size: var(--t-micro); font-weight: 400; }
+.contagemEtapa { margin-left: var(--e-2); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 400; }
 .abrirEtapas { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--marca); white-space: nowrap; }
 .retornoEtapa { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
 .barraPasso[data-etapa-confirmada] { animation: confirmarEtapa 650ms var(--ease-saida) 1; }
@@ -162,8 +162,8 @@
    entre regiões. É a regra que tira a ficha da pilha de faixas cinza. */
 .conteudo {
   overflow-y: auto; flex: 1; min-height: 0;
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-4); align-content: start;
-  padding: var(--e-4) 0;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-3); align-content: start;
+  padding: var(--e-3) 0;
 }
 
 .resumoAtual { padding: 0 var(--e-4); }
@@ -179,13 +179,13 @@
 .acessosFicha { padding: 0 var(--e-4); }
 .acessoFicha {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
-  width: 100%; min-height: 52px; padding: var(--e-2) 0; border: 0; border-bottom: 1px solid var(--linha);
+  width: 100%; min-height: 48px; padding: 6px 0; border: 0; border-bottom: 1px solid var(--linha);
   background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer;
 }
 .acessoFicha span { min-width: 0; }
 .acessoFicha strong, .acessoFicha small { display: block; overflow-wrap: anywhere; }
 .acessoFicha strong { font-size: var(--t-corpo); }
-.acessoFicha small { margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-apoio); }
+.acessoFicha small { margin-top: 2px; color: var(--tinta-2); font-size: var(--t-apoio); }
 .acessoFicha svg { flex-shrink: 0; color: var(--tinta-3); }
 .acessoFicha:hover { background: var(--fundo); }
 .acessoFicha:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
@@ -203,8 +203,8 @@
 .barraPasso {
   container-type: inline-size;
   flex-shrink: 0; display: grid; gap: var(--e-2);
-  padding: var(--e-3) var(--e-4);
-  padding-bottom: calc(var(--e-3) + env(safe-area-inset-bottom, 0px));
+  padding: var(--e-2) var(--e-4);
+  padding-bottom: calc(var(--e-2) + env(safe-area-inset-bottom, 0px));
   background: var(--papel); border-top: var(--b-1) solid var(--linha-forte);
 }
 .barraDesfazer {

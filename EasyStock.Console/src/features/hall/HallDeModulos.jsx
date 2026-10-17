@@ -10,6 +10,7 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { chaveDasPreferenciasHall, gravarPreferenciasHall, lerPreferenciasHall } from '../../aplicacao/preferenciasHall'
 import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
+import { MenuDaConta } from '../../componentes/MenuDaConta'
 import { Vazio } from '../../componentes/Vazio'
 import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
 import {
@@ -86,7 +87,7 @@ export function HallDeModulos(props) {
 }
 
 function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, painel = null, chavePreferencia }) {
-  const { permite, aoSair, notificacoes } = useAcessoModulos()
+  const { permite, aoSair, notificacoes, conta } = useAcessoModulos()
   const [busca, setBusca] = useState('')
   const [organizar, setOrganizar] = useState(false)
   const [preferencia, setPreferencia] = useState(() => lerPreferenciasHall(chavePreferencia))
@@ -166,14 +167,16 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           {ajuda}
           <InterruptorTema />
           {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
-          {aoSair && <Botao className={css.sair} variante="texto" onClick={aoSair}>{sessao?.persistente ? 'Sair deste aparelho' : 'Sair'}</Botao>}
+          {/* #1870: o Sair fica atrás do avatar, como no pé do trilho do Balcão e dos módulos. */}
+          {aoSair && <MenuDaConta lado="abaixo" nome={conta?.nome ?? sessao?.usuario?.nome} detalhe={conta?.casa} aoSair={aoSair}
+            rotuloSair={sessao?.persistente ? 'Sair deste aparelho' : 'Sair'} />}
         </div>
       </header>
       <main className={css.conteudo}>
         <div className={css.abertura}>
           <div className={css.cabeca}>
             <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
-            {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada neste aparelho. Use Sair ao trocar de pessoa.</p>}
+            {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada neste aparelho. Ao trocar de pessoa, toque no seu avatar e em Sair.</p>}
             {modulos.length === 0 && !busca && <output>Seu perfil ainda não tem módulos liberados. Peça à dona para revisar seu acesso.</output>}
           </div>
           <div className={css.busca}>

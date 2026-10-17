@@ -161,7 +161,10 @@ confere('4  o pedido do site no fio se lê como documento; aviso curto segue mi�
 // --- 5. Informação obrigatória -----------------------------------------------------------------
 
 confere('5  o motivo da restrição do canal continua escrito embaixo do campo', () => {
-  assert.match(fonte('features/atendimento/Composer.jsx'), /\{restricao && <p id=\{idRestricao\} className=\{css\.restricao\}>\{restricao\}<\/p>\}/)
+  // #1870: canal só de texto mostra "Só texto neste canal"; a frase inteira segue no title e no leitor de tela.
+  const composer = fonte('features/atendimento/Composer.jsx')
+  assert.match(composer, /\? <p id=\{idRestricao\} className=\{css\.restricao\}>\{restricao\}<\/p>/)
+  assert.match(composer, /: <p id=\{idRestricao\} className=\{css\.restricao\} title=\{restricao\}>.*<span className="sr">\{restricao\}<\/span><\/p>/)
 })
 confere('5  a janela continua no acesso "Pedido e entrega" do Resumo e o aviso da janela de 24 h no composer', () => {
   const painel = fonte('features/ficha-cliente/PainelFicha.jsx')

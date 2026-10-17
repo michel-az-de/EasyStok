@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlcaLargura } from '../componentes/AlcaLargura'
-import { Avatar } from '../componentes/Avatar'
+import { MenuDaConta } from '../componentes/MenuDaConta'
 import { Marca } from '../componentes/Marca'
 import { InterruptorTema } from '../componentes/InterruptorTema'
 import { trocarTema } from '../hooks/useTema'
@@ -25,6 +25,8 @@ import { Sininho } from '../features/lembretes/Sininho'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
 import { HASH_HALL, HASH_MODULO_COZINHA } from '../dominio/rota'
+import { moduloPorId } from '../dominio/modulos'
+import { IconeDoModulo } from '../componentes/IconeDoModulo'
 import { JANELA_COZINHA } from '../dominio/janelaAvulsa'
 import { AvisoDaAcaoApi } from './FaixaApi'
 import css from './moldura.module.css'
@@ -177,6 +179,8 @@ function ControleLoja({ aberta, aoAlternar }) {
 }
 
 // Modo API (F06): sem regra vinda da API, sem número. A massa mostrava "Automáticas 6".
+const MODULO_ATENDIMENTO = moduloPorId('atendimento')
+
 const rotuloAutomaticas = (regras) => (regras ? `Automáticas, ${contarAtivas(regras)} ligadas` : 'Automáticas')
 
 function Cabecalho({
@@ -254,7 +258,7 @@ function Trilho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, simulando, aoAlternarSimulacoes,
   atendente, aoAbrirAjuda,
 }) {
-  const { permite, notificacoes } = useAcessoModulos()
+  const { permite, notificacoes, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   return (
     <nav className={css.trilho} aria-label="Navegação">
       <a className={css.inicioTrilho} href={HASH_HALL} aria-label="Ir para os módulos" title="Módulos">
@@ -274,9 +278,10 @@ function Trilho({
         <Icone nome={aberta ? 'circle-check' : 'lock'} tamanho={22} />
         <span>{aberta ? 'Loja aberta' : 'Loja fechada'}</span>
       </button>
-      <span className={`${css.itemTrilho} ${css.itemAtual}`} aria-current="page">
-        <Icone nome="inbox" tamanho={22} />
-        <span>Balcão</span>
+      {/* #1870: o mesmo nome e o mesmo ícone do trilho dos módulos; a tela continua sendo o Balcão. */}
+      <span className={`${css.itemTrilho} ${css.itemAtual}`} aria-current="page" title="Balcão">
+        <IconeDoModulo modulo={MODULO_ATENDIMENTO} />
+        <span>{MODULO_ATENDIMENTO.nome}</span>
       </span>
       {permite('entregas') && <ResumoEntregas
         aoAbrir={aoAbrirEntregas}
@@ -310,12 +315,14 @@ function Trilho({
           <span>Simular</span>
         </Botao>
       )}
-      <InterruptorTema vertical />
-      {atendente && (
-        <span className={css.atendente} title={`${atendente}, atendendo`}>
-          <Avatar nome={atendente} tamanho="medio" />
-        </span>
-      )}
+      {/* #1870: o Sair saiu do rodapé fixo e mora aqui, atrás do avatar, como nos módulos. O tema
+          vem junto: em 1280x720 o trilho tinha 861 px e tema e avatar ficavam abaixo da dobra. */}
+      <div className={css.atendente}>
+        <MenuDaConta nome={atendente} detalhe={conta?.casa} aoSair={aoSair}
+          rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}>
+          <InterruptorTema />
+        </MenuDaConta>
+      </div>
     </nav>
   )
 }

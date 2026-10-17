@@ -1,14 +1,7 @@
 .areaAtendimento {
+  /* #1870: a densidade do protótipo mora em tokens.css; aqui só é aplicada. */
+  composes: densidade-compacta from global;
   position: relative; height: 100%; min-height: 0;
-  /* A densidade do protótipo, limitada ao Balcão e às suas janelas. */
-  --t-micro: .8125rem;
-  --t-apoio: .9375rem;
-  --t-corpo: 1rem;
-  --t-forte: 1.0625rem;
-  --t-titulo: 1.25rem;
-  --t-valor: 1.5rem;
-  --t-display: 2rem;
-  font-size: var(--t-corpo);
 }
 .estadoAcesso { display: grid; place-items: center; height: 100%; overflow-y: auto; padding: var(--e-4); }
 
@@ -149,8 +142,8 @@
 .appTrilho > .palco { flex: 1; min-width: 0; }
 .appTrilho > .palcoTres { padding-left: 0; }
 .trilho {
-  flex: 0 0 84px; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: var(--e-3) 8px var(--e-4);
+  flex: 0 0 var(--largura-trilho); display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: var(--e-3) 8px var(--e-3);
   padding-top: calc(var(--e-3) + env(safe-area-inset-top, 0px));
   position: relative; z-index: 20;
 }
@@ -161,7 +154,7 @@
 .avisosTrilho > button,
 .sinoTrilho > div > button {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  width: 68px; min-height: 58px; padding: 6px 2px; border: 0; border-radius: 14px;
+  width: var(--largura-item-trilho); min-height: var(--altura-item-trilho); padding: 4px; border: 0; border-radius: 14px;
   background: transparent; color: var(--tinta-2); box-shadow: none;
   font-size: var(--t-minimo); font-weight: 600; letter-spacing: 0; line-height: 1.1; text-align: center;
 }
@@ -237,7 +230,7 @@
 /* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
 .espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
 .espacoTrilho::after { content: ''; width: 32px; height: 1px; margin-bottom: 4px; background: var(--linha-media); }
-.atendente { margin-top: var(--e-3); display: grid; place-items: center; }
+.atendente { margin-top: var(--e-2); display: grid; place-items: center; }
 /* 12: no celular, o painel que entra desliza brevemente da direita. */
 @keyframes painelDesliza { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
 .palco > [role='tabpanel'] > * { animation: painelDesliza var(--dur-media) var(--ease-saida) backwards; }

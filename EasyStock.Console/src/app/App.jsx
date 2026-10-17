@@ -559,6 +559,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     </main>{confirmacaoSaida}</>
   )
   const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair: sair, sessaoPersistente: sessao.persistente,
+    conta: { nome: sessao.usuario?.nome ?? null, casa: sessao.empresa?.nome ?? null },
     notificacoes: <SinoDaSessao avisos={avisos} aparelho={avisosNoAparelho} /> }
   let tela
   if (!permiteRota(dados, rota)) tela = (

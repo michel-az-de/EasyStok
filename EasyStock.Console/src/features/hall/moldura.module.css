@@ -1,9 +1,9 @@
-.moldura { display: flex; height: 100%; min-height: 0; background: var(--fundo); }
+.moldura { composes: densidade-compacta from global; display: flex; height: 100%; min-height: 0; background: var(--fundo); }
 .lateral { display: flex; flex: none; min-height: 0; }
 .areaTrabalho { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
-.trilho { width: 100px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--e-3) 8px; overflow-y: auto; flex: none; }
+.trilho { width: var(--largura-trilho); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--e-3) 8px; overflow-y: auto; flex: none; }
 .inicioTrilho { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: var(--t-minimo); font-weight: 600; text-decoration: none; color: var(--tinta-2); margin-bottom: var(--e-2); }
-.itemTrilho { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; gap: 4px; width: 84px; min-height: 58px; padding: 6px 4px; border-radius: 14px; color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 600; text-align: center; text-decoration: none; }
+.itemTrilho { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; gap: 4px; width: var(--largura-item-trilho); min-height: var(--altura-item-trilho); padding: 6px 4px; border-radius: 14px; color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 600; text-align: center; text-decoration: none; }
 .itemTrilho > span { max-width: 100%; overflow-wrap: anywhere; hyphens: auto; }
 .itemTrilho:hover { background: var(--preenchimento); color: var(--tinta); }
 .moduloAtivo { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
@@ -31,11 +31,27 @@
 .titulo { display: flex; align-items: center; gap: var(--e-2); margin: 0 0 var(--e-4); font-size: var(--t-titulo); font-weight: 700; line-height: var(--lh-compacto); }
 .conteudo { min-width: 0; }
 .link { font-weight: 700; color: var(--marca); }
+.espacoTrilho { flex: 1; }
+/* #1870: telas do módulo de trabalho na barra, como abas, no lugar do menu lateral. */
+.telasNaBarra { display: flex; gap: var(--e-1); min-width: 0; overflow-x: auto; margin-left: var(--e-2); }
+.telaNaBarra {
+  display: inline-flex; align-items: center; min-height: var(--toque); padding: 0 var(--e-3);
+  border-radius: var(--r-1); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600;
+  text-decoration: none; white-space: nowrap;
+}
+.telaNaBarra:hover { background: var(--preenchimento); color: var(--tinta); }
+.telaNaBarra:focus-visible { outline: 2px solid var(--marca); outline-offset: -2px; }
+.telaAtiva, .telaAtiva:hover { background: var(--preenchimento-forte); color: var(--tinta); }
 .abrirMenu { display: none; }
 .nomeNoMenu { display: none; }
 .menuModal { display: flex; min-height: 0; }
 .menuModal .menu { flex: 1; width: auto; margin: 0; box-shadow: none; border: 0; }
 .menuModal .trilho { max-height: 60dvh; }
+/* #1870: com o trilho à vista, o Sair é o do avatar no pé dele; a barra não repete. */
+/* O trilho já leva aos módulos e ao Atendimento (Balcão): a barra não repete os dois links. */
+@media (min-width: 1101px) {
+  .barra .sair, .contexto > a.voltar { display: none; }
+}
 @media (max-width: 1100px) {
   .lateral > .trilho { display: none; }
   .abrirMenu { display: inline-flex; }
