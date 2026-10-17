@@ -25,7 +25,7 @@ public sealed class RequisicaoAbortadaMiddleware(RequestDelegate next, ILogger<R
         {
             await next(context);
         }
-        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        catch (Exception erro) when (context.RequestAborted.IsCancellationRequested && EhCancelamento(erro))
         {
             logger.LogDebug("Requisição cancelada pelo cliente: {Method} {Path}.", context.Request.Method, CaminhoDoLog.De(context));
 
@@ -33,5 +33,16 @@ public sealed class RequisicaoAbortadaMiddleware(RequestDelegate next, ILogger<R
             if (!context.Response.HasStarted)
                 context.Response.StatusCode = StatusClienteFechouRequisicao;
         }
+    }
+
+    /// <summary>
+    /// O cancelamento chega direto ou embrulhado: o driver do banco e o <c>AggregateException</c> trazem o
+    /// <see cref="OperationCanceledException"/> como causa interna.
+    /// </summary>
+    private static bool EhCancelamento(Exception erro)
+    {
+        for (var atual = erro; atual is not null; atual = atual.InnerException)
+            if (atual is OperationCanceledException) return true;
+        return false;
     }
 }

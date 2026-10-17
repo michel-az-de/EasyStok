@@ -39,7 +39,7 @@ public sealed record CheckoutCoreInput(
 
 /// <summary>
 /// Parâmetros do prazo mínimo (S16, RN-21): com eles o núcleo recusa a janela cujo início seja antes de
-/// agora + <c>CalculadoraPrazoPedido.PrazoMinimo</c> dos itens. Nulo (site) não corta.
+/// agora + <c>CalculadoraPrazoPedido.PrazoMinimo</c> dos itens. Nulo (site) vale 0: só corta a janela que já começou (#1874).
 /// </summary>
 public sealed record PrazoPreparoCheckout(int TempoPreparoPadraoMinutos, int RespiroMinutos);
 
@@ -192,17 +192,17 @@ public sealed class CheckoutCoreService(
                 $"A janela {janela.Label} de {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)} já passou. Escolha outro horário.");
 
         // ── Prazo mínimo (S16, RN-21) ─────────────────────────────────────
-        // Revalida o corte da listagem: a janela pode ter ficado curta entre listar e criar.
-        if (input.Prazo is { } prazo)
-        {
-            var prazoMinimo = CalculadoraPrazoPedido.PrazoMinimo(
+        // Revalida o corte da listagem: a janela pode ter ficado curta entre listar e criar. Sem prazo
+        // (site) vale 0, como na listagem (#1874): a janela que já começou não é aceita.
+        var prazoMinimo = input.Prazo is { } prazo
+            ? CalculadoraPrazoPedido.PrazoMinimo(
                 cardapioItens.Values.Select(ci => ci.TempoPreparoMinutos),
                 prazo.TempoPreparoPadraoMinutos,
-                prazo.RespiroMinutos);
-            if (!CalculadoraPrazoPedido.AtendePrazo(
-                    input.DataEntrega, janela.HoraInicio, timeProvider.GetUtcNow().UtcDateTime, prazoMinimo))
-                throw new RegraDeDominioVioladaException(JanelaAbaixoDoPrazo);
-        }
+                prazo.RespiroMinutos)
+            : 0;
+        if (!CalculadoraPrazoPedido.AtendePrazo(
+                input.DataEntrega, janela.HoraInicio, timeProvider.GetUtcNow().UtcDateTime, prazoMinimo))
+            throw new RegraDeDominioVioladaException(JanelaAbaixoDoPrazo);
 
         logger.LogInformation(
             "Checkout fase-validacao ok storefrontId={StorefrontId} clienteId={ClienteId} elapsed={Ms}ms",

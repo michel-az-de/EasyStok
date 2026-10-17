@@ -41,6 +41,8 @@ public class RequisicaoAbortadaMiddlewareTests
     {
         new OperationCanceledException(),
         new TaskCanceledException(),
+        new InvalidOperationException("consulta cancelada", new OperationCanceledException()),
+        new AggregateException(new OperationCanceledException()),
     };
 
     [Theory]
