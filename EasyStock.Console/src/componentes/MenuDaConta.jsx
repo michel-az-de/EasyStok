@@ -6,6 +6,14 @@ import css from './MenuDaConta.module.css'
 
 // Onde a camada abre, em coordenadas da janela. `fixed` porque o trilho rola (overflow) e
 // recortaria uma camada absoluta que sai pela direita dele.
+//
+// #1872: `fixed` só é relativo à janela se nenhum ancestral tiver `transform`. O `<dialog>` do Modal
+// guarda `transform: matrix(1,0,0,1,0,0)` da animação de entrada (fill `both`), vira o bloco de
+// contenção e a camada abria 213 px à direita e 100 px acima do avatar no menu do tablet. Como
+// popover (`popover="manual"`) a camada vai para a camada de topo do navegador, que sempre mede
+// pela janela, durante e depois da animação. Sem popover (navegador antigo) vale o `fixed` de antes.
+const COM_POPOVER = typeof HTMLElement !== 'undefined' && 'showPopover' in HTMLElement.prototype
+
 function posicaoDaCamada(gatilho, lado) {
   const r = gatilho.getBoundingClientRect()
   if (lado === 'abaixo') return { top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }
@@ -22,12 +30,15 @@ export function MenuDaConta({ nome: nomeDaSessao, detalhe, aoSair, rotuloSair = 
   const [posicao, setPosicao] = useState(null)
   const caixaRef = useRef(null)
   const botaoRef = useRef(null)
+  const camadaRef = useRef(null)
   const id = useId()
   const fechar = useCallback(() => {
     setAberto(false)
     botaoRef.current?.focus()
   }, [])
-  useEscape(aberto, fechar)
+  // Esc fecha só a camada: sem o preventDefault o <dialog> do menu do tablet também recebia o cancel.
+  const fecharComEsc = useCallback((evento) => { evento.preventDefault(); fechar() }, [fechar])
+  useEscape(aberto, fecharComEsc)
   useLayoutEffect(() => {
     if (!aberto || !botaoRef.current) return undefined
     const medir = () => setPosicao(posicaoDaCamada(botaoRef.current, lado))
@@ -40,6 +51,11 @@ export function MenuDaConta({ nome: nomeDaSessao, detalhe, aoSair, rotuloSair = 
       document.removeEventListener('scroll', medir, true)
     }
   }, [aberto, lado])
+  useLayoutEffect(() => {
+    const camada = camadaRef.current
+    if (!aberto || !camada || !COM_POPOVER || camada.matches(':popover-open')) return
+    camada.showPopover()
+  }, [aberto])
   useEffect(() => {
     if (!aberto) return undefined
     const aoTocarFora = (evento) => { if (!caixaRef.current?.contains(evento.target)) setAberto(false) }
@@ -57,7 +73,8 @@ export function MenuDaConta({ nome: nomeDaSessao, detalhe, aoSair, rotuloSair = 
         <span className="sr">Conta de {nome}</span>
       </button>
       {aberto && (
-        <div id={id} className={css.camada} role="group" aria-label="Conta" style={posicao ?? { visibility: 'hidden' }}>
+        <div ref={camadaRef} id={id} className={css.camada} role="group" aria-label="Conta" popover={COM_POPOVER ? 'manual' : undefined}
+          style={posicao ?? { visibility: 'hidden' }}>
           <p className={css.quem}>
             <strong>{nome}</strong>
             {detalhe && <small>{detalhe}</small>}

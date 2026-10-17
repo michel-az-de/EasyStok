@@ -164,9 +164,9 @@ confere('Entregas em outra janela abre a rota do módulo e não some com popup b
 // #1810 (revisão de 14/10): com a gaveta de Entregas aberta, o primeiro clique em Módulos caía na
 // cortina e só fechava a gaveta. No desktop a cortina começa depois do trilho, da mesma largura.
 confere('a cortina da gaveta de Entregas deixa o trilho do desktop clicável', () => {
-  // #1870: trilho e recorte leem o mesmo token (`--largura-trilho`).
-  assert.match(fonte('app/moldura.module.css'), /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\)/)
-  assert.match(fonte('estilos/tokens.css'), /--largura-trilho: \d+px/)
+  // #1870/#1872: trilho e recorte leem o mesmo token (`--largura-trilho`), gerado de `TRILHO`.
+  assert.match(fonte('componentes/Trilho.module.css'), /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\)/)
+  assert.match(fonte('dominio/paineis.js'), /export const TRILHO = \d+/)
   const cortina = fonte('features/entregas/dashboard.module.css').match(/@media \(min-width: (\d+)px\) \{\s*\.cortina \{ left: var\(--largura-trilho\)/)
   assert.ok(cortina, 'cortina sem recorte do trilho no desktop')
   assert.equal(Number(cortina[1]), 1180, 'mesmo corte de desktop do useTamanhoTela')

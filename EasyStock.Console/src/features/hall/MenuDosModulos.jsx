@@ -24,9 +24,11 @@ export function MenuDosModulos({ moduloId, telaId, fonteApi, aoNavegar, semMenu 
       </a>}
       {/* #1870: o Sair mora atrás do avatar, no pé do trilho, como no Balcão. */}
       <span className={css.espacoTrilho} />
-      <MenuDaConta nome={conta?.nome} detalhe={conta?.casa} aoSair={aoSair}
-        rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}
-        tituloSair={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined} />
+      <div className={css.avatarTrilho}>
+        <MenuDaConta nome={conta?.nome} detalhe={conta?.casa} aoSair={aoSair}
+          rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}
+          tituloSair={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined} />
+      </div>
     </nav>
     {!semMenu && <nav className={css.menu} aria-label={`Telas de ${modulo.nome}`}>
       <h2 className={css.nomeMenu}><IconeDoModulo modulo={modulo} />{modulo.nome}</h2>

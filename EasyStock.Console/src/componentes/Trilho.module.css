@@ -1,0 +1,42 @@
+/* Trilho do desktop (#1872): o CSS único dos dois trilhos, o do Balcão (`app/moldura.module.css`) e o
+   dos módulos (`features/hall/moldura.module.css`). Cada moldura compõe daqui com `composes` e
+   acrescenta só o que é dela (z-index e contadores no Balcão, rolagem e margem do início nos
+   módulos). A medida vem de tokens: `--largura-trilho` (gerado de `dominio/paineis.js`, a mesma
+   conta da conversa visível), `--respiro-trilho` e, derivados deles em `tokens.css`,
+   `--largura-item-trilho` e `--altura-item-trilho`. */
+.trilho {
+  flex: 0 0 var(--largura-trilho); width: var(--largura-trilho);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: var(--e-3) var(--respiro-trilho);
+}
+/* Selo da casa e "Módulos" no alto do trilho. */
+.inicio {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border-radius: var(--r-1); color: var(--tinta-2); text-decoration: none;
+  font-size: var(--t-minimo); font-weight: 600;
+}
+.inicio:hover { color: var(--marca); }
+/* `letter-spacing: inherit`: o rótulo "Atendimento" tem 76 px no espaçamento do corpo (-0,1 px) e só cabe no item de 84 px assim;
+   com 0 ele passava de 76 e quebrava em "Atendi-mento". */
+/* `.filhos` marca o contêiner de botões que outro componente desenha (avisos e lembretes). */
+.item, .filhos > button, .filhos > div > button {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  width: var(--largura-item-trilho); min-height: var(--altura-item-trilho); padding: 4px;
+  border: 0; border-radius: 14px; background: transparent; color: var(--tinta-2); box-shadow: none;
+  font-size: var(--t-minimo); font-weight: 600; letter-spacing: inherit; line-height: 1.1; text-align: center; text-decoration: none;
+}
+.item > span { max-width: 100%; overflow-wrap: anywhere; hyphens: auto; }
+.item > svg { flex: none; }
+.item:hover:not(:disabled), .filhos > button:hover:not(:disabled), .filhos > div > button:hover:not(:disabled) {
+  background: var(--preenchimento); color: var(--tinta);
+}
+.inicio:focus-visible, .item:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+/* O item da tela em que a pessoa está: fundo forte e a barrinha no canto do trilho. */
+.ativo, .ativo:hover:not(:disabled) { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
+.ativo::before {
+  content: ''; position: absolute; left: calc(-1 * var(--respiro-trilho)); top: 14px; bottom: 14px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--tinta);
+}
+.espaco { flex: 1; }
+/* Quem está logado, no pé do trilho; a conta (e o Sair) abre dele. */
+.avatar { margin-top: var(--e-2); display: grid; place-items: center; }
