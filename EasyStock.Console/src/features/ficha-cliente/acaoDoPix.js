@@ -36,22 +36,17 @@ export function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoA
       }
     case 'divergente':
       return { rotuloEstado: 'Valor diferente', divergente: true }
-    case 'aguardando':
+    default:
       // #1875: com o link do provedor aberto o Mercado Pago confirma sozinho; dar baixa à mão é a exceção
-      // (dinheiro que entrou por fora), então deixa de ser o botão mais forte da barra. Na demonstração
-      // não há provedor e o botão segue primário.
-      if (linkPendenteApi) {
+      // (dinheiro que entrou por fora), então deixa de ser o botão mais forte da barra. Na demonstração, na
+      // maquininha e no sinal manual não há link e o botão segue primário.
+      if (linkPendenteApi && situacaoCob.chave === 'aguardando') {
         return {
           rotuloEstado: 'Aguardando pagamento',
           nota: 'O Mercado Pago confirma sozinho quando o cliente pagar. Use Marcar pago só se o dinheiro entrou por fora.',
           botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa, secundario: true }],
         }
       }
-      return {
-        rotuloEstado: 'Aguardando pagamento',
-        botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa }],
-      }
-    default:
       return {
         rotuloEstado: 'Aguardando pagamento',
         botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa }],

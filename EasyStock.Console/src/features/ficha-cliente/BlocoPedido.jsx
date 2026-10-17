@@ -225,7 +225,7 @@ export function BlocoPedido({
           {fonteApi && !pedido.pedidoId && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
           {previaSinal && (
             <p className={css.notaTotal}>
-              Encomenda para outro dia: sinal de {moeda(previaSinal.sinal)} (50%) antes da produção; {moeda(previaSinal.restante)} na entrega, mais o frete.
+              Encomenda para outro dia: sinal de 50% do total com o frete antes da produção (nos itens, {moeda(previaSinal.sinal)}); o restante na entrega.
             </p>
           )}
         </div>

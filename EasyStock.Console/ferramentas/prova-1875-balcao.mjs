@@ -65,7 +65,19 @@ await confere('1  encomenda para outro dia na maquininha: o resumo traz o sinal 
   const { resumoDaCobrancaEscolhida } = await import('../src/dominio/resumoPedido.js')
   const texto = resumoDaCobrancaEscolhida(encomenda, { meio: 'maquininha', rotuloMeio: 'Maquininha na entrega', total: 118, fonteApi: true, agora: AGORA })
   assert.ok(texto.includes(moeda(59)), texto)
-  assert.match(texto, /sinal/i)
+  assert.match(texto, /sinal de 50% do total com o frete/i)
+})
+
+await confere('1  encomenda no Pix ou cartão: o resumo diz que o link cobra o sinal sobre o total com o frete, não o total', async () => {
+  const { resumoDaCobrancaEscolhida } = await import('../src/dominio/resumoPedido.js')
+  for (const [meio, rotuloMeio] of [['pix', 'Pix'], ['cartao-link', 'Cartão por link']]) {
+    const texto = resumoDaCobrancaEscolhida(encomenda, { meio, rotuloMeio, total: 118, fonteApi: true, agora: AGORA })
+    assert.match(texto, /sinal de 50% do total com o frete/i, texto)
+    assert.ok(texto.includes(moeda(59)), texto)
+    assert.ok(texto.includes(rotuloMeio), texto)
+  }
+  // O mesmo dia cobra o total.
+  assert.doesNotMatch(resumoDaCobrancaEscolhida(hoje, { meio: 'pix', rotuloMeio: 'Pix', total: 118, fonteApi: true, agora: AGORA }), /sinal/i)
 })
 
 await confere('1  tocar no meio na barra não cria o pedido: só o botão de confirmação', () => {
@@ -121,6 +133,7 @@ await confere('3  previaDoSinal: encomenda de outro dia no modo API antes do ped
 await confere('3  a comanda mostra a prévia do sinal junto da nota do frete', () => {
   const bloco = fonte('features/ficha-cliente/BlocoPedido.jsx')
   assert.match(bloco, /previaDoSinal\(pedido,/)
+  assert.match(bloco, /sinal de 50% do total com o frete/)
   assert.match(bloco, /O frete entra ao gerar a cobrança/)
 })
 

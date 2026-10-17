@@ -49,7 +49,9 @@ export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Dat
 }
 
 // #1875 ("Quanto fica?"): o que o console já sabe antes de gerar a cobrança. O frete depende da zona do
-// endereço e só o servidor calcula; o sinal da encomenda é metade do total dos itens.
+// endereço e só o servidor calcula, e o sinal da encomenda é metade do total COM o frete: aqui o sinal é o
+// dos itens, um piso, e a tela diz isso.
+// Vale para qualquer meio: o servidor cobra o sinal da encomenda também no Pix e no cartão por link.
 export function previaDoSinal(pedido, { fonteApi = false, agora = Date.now(), total = 0 } = {}) {
   if (!ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
   const sinal = sinalDeEncomenda(total)
@@ -57,12 +59,11 @@ export function previaDoSinal(pedido, { fonteApi = false, agora = Date.now(), to
 }
 
 // #1875: a barra só marca o meio; este resumo diz o que o botão de confirmação vai fazer.
-export function resumoDaCobrancaEscolhida(pedido, { meio, rotuloMeio, total, fonteApi = false, agora = Date.now() }) {
-  const semFrete = fonteApi && !pedido?.pedidoId
-  const partes = [`Pedido de ${moeda(total)}${semFrete ? ' nos itens (o frete entra ao gerar)' : ''}, cobrança por ${rotuloMeio}.`]
-  const sinal = avisoDeSinalAntesDeGerar(pedido, { fonteApi, agora, meio })
-  if (sinal) partes.push(`${sinal} Sinal de ${moeda(sinalDeEncomenda(total))}.`)
-  return partes.join(' ')
+export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi = false, agora = Date.now() }) {
+  const itens = `Pedido de ${moeda(total)}${fonteApi && !pedido?.pedidoId ? ' nos itens (o frete entra ao gerar)' : ''}`
+  const previa = previaDoSinal(pedido, { fonteApi, agora, total })
+  if (!previa) return `${itens}, cobrança por ${rotuloMeio}.`
+  return `${itens}. Encomenda para outro dia: ${rotuloMeio} cobra o sinal de 50% do total com o frete (nos itens, ${moeda(previa.sinal)}); o restante fica para a entrega.`
 }
 
 // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que a dona resolve, para o
