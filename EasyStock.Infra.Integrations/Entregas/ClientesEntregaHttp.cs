@@ -84,6 +84,9 @@ public sealed class LalamoveHttpClient(HttpClient http, string apiKey, string se
     public Task<LalamoveEntregaResponse> ConsultarAsync(string id, CancellationToken ct = default) =>
         EnviarAsync<LalamoveEntregaResponse>(HttpMethod.Get, "/v3/orders/" + Uri.EscapeDataString(id), null, ct);
 
+    public Task<IReadOnlyList<LalamoveCidade>> ListarCidadesAsync(CancellationToken ct = default) =>
+        EnviarAsync<IReadOnlyList<LalamoveCidade>>(HttpMethod.Get, "/v3/cities", null, ct);
+
     public async Task CancelarAsync(string id, CancellationToken ct = default)
     {
         using var request = CriarRequest(HttpMethod.Delete, "/v3/orders/" + Uri.EscapeDataString(id), null);
@@ -95,7 +98,28 @@ public sealed class LalamoveHttpClient(HttpClient http, string apiKey, string se
     {
         using var request = CriarRequest(metodo, caminho, dados);
         using var resposta = await http.SendAsync(request, ct);
+        if (!resposta.IsSuccessStatusCode)
+            throw new LalamoveErroException(resposta.StatusCode, PrimeiroErro(await resposta.Content.ReadAsStringAsync(ct)));
         return (await UberDirectHttpClient.LerAsync<LalamoveEnvelope<T>>(resposta, ct)).Data;
+    }
+
+    /// <summary>Formato de erro da v3: <c>{"errors":[{"id":"ERR_...","message":"..."}]}</c>. Só o id sai daqui.</summary>
+    private static string? PrimeiroErro(string corpo)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(corpo);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("errors", out var erros) && erros.ValueKind == JsonValueKind.Array
+                && erros.GetArrayLength() > 0 && erros[0].ValueKind == JsonValueKind.Object
+                && erros[0].TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
+                return id.GetString();
+        }
+        catch (JsonException)
+        {
+            // corpo fora do formato: fica só o status HTTP
+        }
+        return null;
     }
 
     private HttpRequestMessage CriarRequest(HttpMethod metodo, string caminho, object? dados)
@@ -110,6 +134,13 @@ public sealed class LalamoveHttpClient(HttpClient http, string apiKey, string se
         if (dados is not null) request.Content = new StringContent(corpo, Encoding.UTF8, "application/json");
         return request;
     }
+}
+
+/// <summary>Recusa da Lalamove com o status e o id do erro (<c>ERR_OUT_OF_SERVICE_AREA</c>), nunca o corpo.</summary>
+public sealed class LalamoveErroException(System.Net.HttpStatusCode status, string? erroId)
+    : HttpRequestException($"Lalamove recusou: {erroId ?? "HTTP " + (int)status}.", null, status)
+{
+    public string? ErroId { get; } = erroId;
 }
 
 public static class AssinaturasEntrega

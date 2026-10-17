@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EasyStock.Application.Ports.Output.Integrations;
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Frete;
@@ -176,7 +177,8 @@ public sealed class ConfigurarFreteRaioUseCase(
 /// mostrado à loja é o que o cliente pagaria. Não grava nada.
 /// </summary>
 public sealed class TestarFreteRaioUseCase(
-    IStorefrontRepository lojas, ICepLookupClient ceps, IGeocodingClient geocoding, IRotaClient rotas)
+    IStorefrontRepository lojas, ICepLookupClient ceps, IGeocodingClient geocoding, IRotaClient rotas,
+    ICotacaoFreteExterna? cotacaoExterna = null)
 {
     public async Task<FreteRaioTesteResult> ExecuteAsync(Guid empresaId, TestarFreteRaioInput input, CancellationToken ct = default)
     {
@@ -192,7 +194,8 @@ public sealed class TestarFreteRaioUseCase(
         if (config is null)
             return FreteRaioTesteResult.Zona("O frete por distância ainda não foi configurado. Vale a tabela de zonas.");
 
-        var cotacao = await FreteRaioCotador.CotarAsync(config, destino, geocoding, rotas, ct);
+        var cotacao = await FreteRaioCotador.CotarAsync(config, destino, geocoding, rotas, ct,
+            cotacaoExterna is null ? null : new CotacaoExternaDaLoja(cotacaoExterna, loja.EmpresaId, loja.TituloPublico));
         if (cotacao is null)
             return FreteRaioTesteResult.Zona("Não localizamos este endereço com precisão. No pedido, vale a tabela de zonas.");
 
@@ -202,8 +205,8 @@ public sealed class TestarFreteRaioUseCase(
             DistanciaMetros: r.DistanciaMetros,
             DistanciaRotaMetros: r.DistanciaRotaMetros,
             DistanciaEstimada: cotacao.Rota is null,
-            FaixaId: r.FaixaId,
-            ValorCentavos: r.ForaDeCobertura ? null : r.ValorCentavos,
+            FaixaId: cotacao.Externa?.Provedor ?? r.FaixaId,
+            ValorCentavos: r.ForaDeCobertura ? null : cotacao.ValorCobradoCentavos,
             Gratis: r.Gratis,
             ForaDeCobertura: r.ForaDeCobertura,
             Motivo: null);

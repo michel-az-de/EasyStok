@@ -273,7 +273,9 @@ export function resumoDoTesteDeFrete(r) {
   if (r.modo !== 'raio') return { tom: 'atencao', titulo: 'Vale a tabela de zonas', detalhe: r.motivo ?? '' }
   const rota = `${emKm(r.distanciaRotaMetros)} de rota${r.distanciaEstimada ? ' (estimada, sem rota medida)' : ''}`
   if (r.foraDeCobertura) return { tom: 'atencao', titulo: 'Fora do raio de entrega', detalhe: rota }
-  return { tom: 'ok', titulo: r.gratis ? 'Frete grátis' : `Frete de ${moeda(r.valorCentavos / 100)}`, detalhe: rota }
+  // #1882: com a chave da Lalamove, o valor é a cotação de moto arredondada para cima no real.
+  const origem = r.faixaId === 'lalamove' ? ' · cotação Lalamove de moto' : ''
+  return { tom: 'ok', titulo: r.gratis ? 'Frete grátis' : `Frete de ${moeda(r.valorCentavos / 100)}`, detalhe: rota + origem }
 }
 // I9.2 (#1691): corrida pedida por fora (app da 99, da Lalamove, da Uber), anotada na viagem com o
 // custo (`CorridaExternaBody` da API). Entregador próprio não é corrida externa.
