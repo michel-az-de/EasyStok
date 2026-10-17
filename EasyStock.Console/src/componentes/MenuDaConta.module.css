@@ -7,6 +7,8 @@
 .gatilho:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 .camada {
   position: fixed; z-index: 60; display: grid; gap: var(--e-3);
+  /* #1872: como popover o navegador põe `inset: 0`, `margin: auto` e `overflow: auto`; a posição vem do JS. */
+  inset: auto; margin: 0; overflow: visible; color: var(--tinta);
   min-width: 220px; max-width: min(320px, calc(100vw - 24px)); padding: var(--e-3);
   border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
   background: var(--papel); box-shadow: var(--sombra-media);
