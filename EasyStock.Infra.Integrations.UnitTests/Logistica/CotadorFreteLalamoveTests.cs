@@ -140,6 +140,21 @@ public class CotadorFreteLalamoveTests
     }
 
     [Fact]
+    public async Task Servico_recusado_pela_cidade_escolhe_de_novo_na_proxima()
+    {
+        _http.Quando(HttpMethod.Get, "/v3/cities").Responde(HttpStatusCode.OK, Cidades);
+        _http.Quando(HttpMethod.Post, "/v3/quotations")
+            .Responde(HttpStatusCode.UnprocessableEntity, """{"errors":[{"id":"ERR_INVALID_SERVICE_TYPE"}]}""")
+            .Responde(HttpStatusCode.Created, Cotacao);
+        var sut = Sut();
+
+        (await sut.CotarAsync(Empresa, Cozinha, Cliente)).Should().BeNull();
+        (await sut.CotarAsync(Empresa, Cozinha, Cliente)).Should().NotBeNull();
+
+        _http.Chamadas.Count(c => c.Metodo == HttpMethod.Get).Should().Be(2);
+    }
+
+    [Fact]
     public async Task Conta_sem_moto_nao_cota()
     {
         _http.Quando(HttpMethod.Get, "/v3/cities").Responde(HttpStatusCode.OK,

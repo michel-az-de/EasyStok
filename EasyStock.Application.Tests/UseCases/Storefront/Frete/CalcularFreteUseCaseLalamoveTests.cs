@@ -60,7 +60,7 @@ public class CalcularFreteUseCaseLalamoveTests
         var dto = await uc.ExecuteAsync(new CalcularFreteInput(Slug, Cep, "100"));
 
         dto.Valor.Should().Be(cobradoCentavos);
-        dto.ZonaLabel.Should().Be("Entrega Lalamove");
+        dto.ZonaLabel.Should().Be("Entrega por moto");
         dto.DistanciaMetros.Should().Be(4100);
         dto.GeocodeConfiavel.Should().BeTrue();
     }

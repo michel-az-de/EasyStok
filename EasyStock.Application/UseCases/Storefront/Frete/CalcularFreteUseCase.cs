@@ -175,7 +175,7 @@ public sealed class CalcularFreteUseCase(
                 Valor: cobrado,
                 ValorFormatado: FormatarValor(cobrado / 100m),
                 EtaLabel: FormatarEta(minutos),
-                ZonaLabel: "Entrega Lalamove",
+                ZonaLabel: "Entrega por moto",
                 TempoEstimadoMinutos: minutos,
                 GeocodeConfiavel: true,
                 DistanciaMetros: externa.DistanciaMetros ?? r.DistanciaRotaMetros,

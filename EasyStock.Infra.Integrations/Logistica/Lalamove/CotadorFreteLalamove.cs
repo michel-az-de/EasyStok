@@ -18,7 +18,9 @@ namespace EasyStock.Infra.Integrations.Logistica.Lalamove;
 /// <list type="bullet">
 ///   <item>Chave de sandbox nunca cota preço para cliente: devolve <see langword="null"/>.</item>
 ///   <item>O tipo de moto vem de <c>GET /v3/cities</c> (cache de 12 h), não de enum chutado.</item>
-///   <item>A mesma corrida fica 4 min em cache: a Lalamove honra a cotação por 5 e limita 100 por minuto.</item>
+///   <item>O preço da mesma corrida fica 30 min em cache: o frete é recalculado ao confirmar o pedido, e o
+///   cliente paga o que viu no carrinho. Também segura o limite de 100 cotações por minuto.</item>
+///   <item>As duas chamadas dividem um teto de 6 s: o cliente espera o frete no checkout.</item>
 ///   <item>Qualquer recusa ou falha vira <see langword="null"/> e o frete volta à tabela da loja.</item>
 /// </list>
 /// </summary>
@@ -34,8 +36,9 @@ public sealed class CotadorFreteLalamove(
     /// <summary>Preferência entre as chaves de moto que a Lalamove usa por mercado; depois, a descrição.</summary>
     private static readonly string[] ChavesMoto = ["MOTORCYCLE", "LALAGO", "MOTO"];
 
-    private static readonly TimeSpan CacheCotacao = TimeSpan.FromMinutes(4);
+    private static readonly TimeSpan CacheCotacao = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan CacheServico = TimeSpan.FromHours(12);
+    private static readonly TimeSpan TetoTotal = TimeSpan.FromSeconds(6);
 
     public async Task<CotacaoFreteExterna?> CotarAsync(
         Guid empresaId, PontoCotacaoFrete coleta, PontoCotacaoFrete entrega, CancellationToken ct = default)
@@ -48,9 +51,12 @@ public sealed class CotadorFreteLalamove(
             return emCache;
 
         var cliente = new LalamoveHttpClient(http, chave.Value.ApiKey, chave.Value.Secret, relogio);
+        var chaveServico = ChaveCacheServico(chave.Value.ApiKey);
+        using var teto = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        teto.CancelAfter(TetoTotal);
         try
         {
-            var servico = await ServicoDeMotoAsync(cliente, chave.Value.ApiKey, empresaId, ct);
+            var servico = await ServicoDeMotoAsync(cliente, chaveServico, empresaId, teto.Token);
             if (servico is null) return null;
 
             var resposta = await cliente.CotarAsync(new LalamoveCotacaoRequest(
@@ -58,7 +64,7 @@ public sealed class CotadorFreteLalamove(
                 ServiceType: servico,
                 Language: "pt_BR",
                 Stops: [Parada(coleta), Parada(entrega)],
-                IsRouteOptimized: false), ct);
+                IsRouteOptimized: false), teto.Token);
 
             var cotacao = new CotacaoFreteExterna(CatalogoIntegracoes.Lalamove, Centavos(resposta.PriceBreakdown), Metros(resposta.Distance));
             cache.Set(chaveCache, cotacao, CacheCotacao);
@@ -66,6 +72,8 @@ public sealed class CotadorFreteLalamove(
         }
         catch (LalamoveErroException ex)
         {
+            // Moto que não vale nesta cidade: escolhe de novo na próxima, em vez de errar por 12 h.
+            if (ex.ErroId == "ERR_INVALID_SERVICE_TYPE") cache.Remove(chaveServico);
             logger.LogWarning("Lalamove não cotou o frete ({Status} {Erro}); vale a tabela da loja. empresaId={EmpresaId}",
                 (int?)ex.StatusCode, ex.ErroId, empresaId);
             return null;
@@ -107,9 +115,11 @@ public sealed class CotadorFreteLalamove(
         return (apiKey.Trim(), secret.Trim());
     }
 
-    private async Task<string?> ServicoDeMotoAsync(LalamoveHttpClient cliente, string apiKey, Guid empresaId, CancellationToken ct)
+    private static string ChaveCacheServico(string apiKey) =>
+        "lalamove:servico-moto:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(apiKey)))[..16];
+
+    private async Task<string?> ServicoDeMotoAsync(LalamoveHttpClient cliente, string chaveCache, Guid empresaId, CancellationToken ct)
     {
-        var chaveCache = "lalamove:servico-moto:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(apiKey)))[..16];
         if (cache.TryGetValue(chaveCache, out string? emCache) && emCache is not null)
             return emCache;
 
