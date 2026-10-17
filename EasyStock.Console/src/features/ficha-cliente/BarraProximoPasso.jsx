@@ -61,7 +61,7 @@ const GERANDO_COBRANCA = 'Gerando cobrança…'
 // alvo só, fixo no rodapé da coluna Ficha, no lugar de `BlocoEsteira` (que
 // listava os seis passos soltos) e da barra antiga somados.
 export function BarraProximoPasso({
-  pedido, conversaId, nomeCliente, agora, emDesfazer, bloqueado = false, prerequisito = null, gerarSemEnviar = false, aoAvancar, aoDesfazer,
+  pedido, conversaId, nomeCliente, agora, emDesfazer, simulacao = null, bloqueado = false, prerequisito = null, gerarSemEnviar = false, aoAvancar, aoDesfazer,
   aoGerarPix, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
   aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento, aoAprovarPedido,
 }) {
@@ -237,7 +237,7 @@ export function BarraProximoPasso({
                 <p className={css.motivoDesabilitado} data-resumo-cobranca>
                   {resumoDaCobrancaEscolhida(pedido, {
                     meio: meioNaBarra, rotuloMeio: meiosDePagamento.find((m) => m.id === meioNaBarra)?.rotulo ?? meioNaBarra,
-                    total: pedido.totalApi ?? totalDoPedido(pedido, cardapio), fonteApi, agora,
+                    total: pedido.totalApi ?? totalDoPedido(pedido, cardapio), fonteApi, agora, simulacao,
                   })}
                 </p>
               )}

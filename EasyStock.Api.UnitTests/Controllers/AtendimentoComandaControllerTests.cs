@@ -52,6 +52,8 @@ public class AtendimentoComandaControllerTests
             // Os casos daqui param antes do núcleo do checkout e da cobrança.
             new GerarPedidoConversaUseCase(_conversas, Substitute.For<IClienteRepository>(),
                 null!, null!, null!, null!, TimeProvider.System),
+            new SimularPedidoConversaUseCase(_conversas, Substitute.For<IClienteRepository>(),
+                Substitute.For<IConfiguracaoAtendimentoRepository>(), null!, TimeProvider.System),
             _currentUser);
     }
 
@@ -97,6 +99,39 @@ public class AtendimentoComandaControllerTests
         var resultado = await _controller.GerarPedido(conversa.Id, Comanda());
 
         resultado.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task SimularPedidoEmConversaDeOutraEmpresaDevolve404()
+    {
+        var alheia = ConversaDaEmpresa(Guid.NewGuid());
+
+        var resultado = await _controller.SimularPedido(alheia.Id, new SimularPedidoConversaBody(Comanda().Itens, Guid.NewGuid(), Comanda().DataEntrega));
+
+        resultado.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task SimularPedidoNaoExigeAPermissaoDeAtender_SoLe()
+    {
+        // A simulação só lê: sem AtenderConversas a conversa da empresa chega ao caso de uso (aqui para na vitrine
+        // inexistente), em vez de 403.
+        var conversa = ConversaDaEmpresa(_empresaId);
+        _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
+
+        var resultado = await _controller.SimularPedido(conversa.Id, new SimularPedidoConversaBody(Comanda().Itens, Guid.NewGuid(), Comanda().DataEntrega));
+
+        resultado.Should().NotBeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task SimularPedidoComComandaVaziaDevolve400()
+    {
+        var conversa = ConversaDaEmpresa(_empresaId);
+
+        var resultado = await _controller.SimularPedido(conversa.Id, new SimularPedidoConversaBody([], Guid.NewGuid(), Comanda().DataEntrega));
+
+        resultado.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
