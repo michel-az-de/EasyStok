@@ -30,6 +30,7 @@ import { BlocoPedido } from './BlocoPedido'
 import { CartaoDoCliente } from './CartaoDoCliente'
 import { ExtratoDoPedido } from './ExtratoDoPedido'
 import { ComandaDoCliente } from './ComandaDoCliente'
+import { resumoDoPagamento, saldoEmDestaque } from './apresentacaoDaFicha'
 import css from './ficha.module.css'
 
 export function PainelFicha(props) {
@@ -97,8 +98,9 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   const total = pedido?.totalApi ?? totalDoPedido(pedido, cardapio)
   const saldo = saldoDoPedido(pedido, cardapio)
   const itens = pedido?.itens?.reduce((soma, item) => soma + item.qtd, 0) ?? 0
-  const resumoPagamento = pedido?.estado === 'cancelado' ? 'Confira recebimentos e devoluções'
-    : saldo > 0 ? `${moeda(saldo)} a receber` : 'Pagamento completo'
+  // #1868: o saldo ganha linha própria no Resumo; o acesso Pagamento não repete o valor.
+  const destacaSaldo = saldoEmDestaque({ editavel, pedidoCriado, saldo, cancelado: pedido?.estado === 'cancelado' })
+  const resumoPagamento = resumoDoPagamento({ cancelado: pedido?.estado === 'cancelado', saldo, destaque: destacaSaldo })
   // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que se resolve. A barra
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
   const gerarSemEnviar = fonteApi && permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).motivo?.acao === 'janela'
@@ -162,6 +164,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
             : pedido ? `${pedidoCriado ? rotuloDoResumo(pedido.estado, saldo) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
               : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. O que a conversa trouxe já vem preenchido.'
                 : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
+          {destacaSaldo && <p className={css.saldoFicha}>{moeda(saldo)} a receber</p>}
         </section>
 
         {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}

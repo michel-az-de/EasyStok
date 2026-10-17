@@ -20,6 +20,7 @@ import { ModalCanhoto } from './Canhoto'
 import { SeletorJanela } from './SeletorJanela'
 import { SeletorJanelaApi } from './SeletorJanelaApi'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
+import { janelaNoCabecalhoDoPapel } from './apresentacaoDaFicha'
 import css from './comanda.module.css'
 
 // Só o que pede ação aparece na comanda: esgotado e fora do dia. Saldo curto já
@@ -194,11 +195,12 @@ export function BlocoPedido({
         aria-label={numeroComanda ? `Comanda número ${numeroComanda}` : 'Comanda em rascunho'}
       >
         {/* #1474 (R6, R3): o número é o do EasyStok quando o pedido existe; sem janela, o
-            cabeçalho avisa. A faixa do modo API vem do seletor, não do catálogo local. */}
+            cabeçalho avisa. A faixa do modo API vem do seletor, não do catálogo local.
+            #1868: pedido criado no modo API mostra a janela só na linha "Janela de entrega" abaixo. */}
         <Cabecalho
           numero={numeroComanda || numeroDaComanda(pedido, { fonteApi })}
           nomeCliente={nomeCliente}
-          faixa={fonteApi ? pedido.janelaRotulo : faixa}
+          faixa={!janelaNoCabecalhoDoPapel({ fonteApi, pedidoCriado: Boolean(pedido.pedidoId), fechado }) ? null : fonteApi ? pedido.janelaRotulo : faixa}
           semJanela={!fechado && !pedido.janela}
           enviadaEm={pedido.cobranca?.criadaEm ?? null}
         />

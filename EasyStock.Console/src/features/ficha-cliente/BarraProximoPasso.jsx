@@ -218,6 +218,8 @@ export function BarraProximoPasso({
   let depoisTexto = 'Próximo: ' + PROXIMO_DE_AGUARDANDO
   let iconeEstado = 'dollar-sign'
   let corpoAcao
+  // #1868: o botão "Marcar pago (complemento R$ X)" já diz quanto falta.
+  let saldoNoBotao = false
 
   if (pedido.estado === 'aguardando') {
     const situacaoCob = situacaoDaCobranca(pedido.cobranca, agora)
@@ -288,6 +290,7 @@ export function BarraProximoPasso({
     const complementoEmAberto = Boolean(pedido.cobranca?.diferenca)
       && !pedido.cobranca?.pagaEm
       && situacaoComplemento.chave !== 'nenhuma'
+    saldoNoBotao = complementoEmAberto
     const botaoComplemento = complementoEmAberto && (
       <Botao largo variante="secundario" icone="dollar-sign" onClick={() => setAbrindoBaixa(true)}>
         Marcar pago (complemento {moeda(pedido.cobranca.valor)})
@@ -521,7 +524,10 @@ export function BarraProximoPasso({
         <p className={css.motivoDesabilitado} role="alert">{erroVisivel}</p>
       )}
 
-      {alocadoApi > 0 && alocadoApi < pedido.totalApi && (
+      {/* #1868: com o "Marcar pago (complemento R$ X)" na barra, o "Já coberto/Falta" era a terceira
+          vez do saldo na coluna (o Resumo o destaca no topo) e custava a barra em 720 px. Sem o
+          botão, a linha fica: é o rótulo financeiro honesto do pedido na fila sem quitação. */}
+      {!saldoNoBotao && alocadoApi > 0 && alocadoApi < pedido.totalApi && (
         <p className={css.corpoBloco}>Já coberto: {moeda(alocadoApi)}. Falta: {moeda(pedido.totalApi - alocadoApi)}.</p>
       )}
       {abrindoBaixa && (

@@ -123,7 +123,7 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
     <>
       <section className={css.secao} aria-label="Dia das entregas">
         <EscolhaDoDia dia={dia} mudarDia={mudarDia} />
-        <Botao variante="texto" onClick={() => fretes.abrir({ titulo: 'Transportes do dia', dia, selecionarTodos: false, pedidos: roteiro?.grupos.flatMap((g) => g.pedidos) ?? [] })}>Organizar transportes</Botao>
+        <Botao variante="texto" className={css.acaoDoDia} onClick={() => fretes.abrir({ titulo: 'Transportes do dia', dia, selecionarTodos: false, pedidos: roteiro?.grupos.flatMap((g) => g.pedidos) ?? [] })}>Organizar transportes</Botao>
         {roteiro && (
           <div className={css.cabecalhoDoDia}>
             <div className={css.cresce}>

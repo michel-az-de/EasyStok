@@ -36,7 +36,8 @@ try {
       try {
         assert.deepEqual(erros, []); const texto = await page.locator('main').innerText()
         assert.doesNotMatch(texto, /Automático não soube|preferiu não responder/)
-        assert.match(texto, /Aguardando equipe[\s\S]*Chat do site/)
+        // #1868: "Chat do site" saiu do texto do cartão (o selo do avatar diz o canal); o estado segue para o leitor de tela.
+        assert.match(texto, /Aguardando equipe/)
         console.log('ok console-' + width)
       } catch (e) { falhas.push('console-' + width + ': ' + e.message.split('\n')[0]) }
       const site = await context.newPage(); const errosSite = []; site.on('pageerror', e => errosSite.push(e.message))

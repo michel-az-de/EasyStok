@@ -8,7 +8,6 @@ import { faltaPagar } from '../../dominio/pagamento'
 import { ehLead, previaDaConversa, tagCorrespondida } from '../../dominio/conversa'
 import { motivoDePrecisar, respostaAtrasada } from '../../dominio/automatico'
 import { contextoDaLinha, estadoDaLinha, pendentesDaLinha } from '../../dominio/linhaDoBalcao'
-import { origemDaPassagem } from '../../dominio/passagem'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { estadoDaJanela } from '../../dominio/janela'
 import { passoPorId } from '../../dominio/esteira'
@@ -16,6 +15,7 @@ import { inicioDoPedidoAtivo } from '../../dominio/entrega'
 import { duracao, horaMono, moeda } from '../../dominio/formato'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
+import { mostraEtiquetaDoEstado, nomeDoCartao, origemNoCartao, temLinhaDeContexto } from './apresentacaoDoCartao'
 
 // Rótulo e ícone do motivo de precisar, por `chave` (dominio/automatico.js).
 // A direção 19 (seção 1) pede um texto de linha diferente do `rotulo` que o
@@ -91,7 +91,8 @@ export const CartaoConversa = memo(function CartaoConversa({
   const estado = estadoDaLinha(conversa, { pausado, grupo, motivo })
   // Rodada 12 (issue #16): "Passou para você" sem origem obrigava a abrir a
   // conversa para saber por quê. O contexto diz quem passou, a hora e o motivo.
-  const origem = motivo?.chave === 'passagem' ? origemDaPassagem(conversa.passagem) : null
+  // #1868: "Chat do site" repetia o selo do canal no avatar em 38 de 39 cartões e sai daqui.
+  const origem = motivo?.chave === 'passagem' ? origemNoCartao(conversa.passagem) : null
   // Item 2 (rodada 10, achado 4): selo "novo, não visto" do pagamento (`pagamentoNaoVisto`),
   // independente do sinal verde (RN-25) já ter expirado.
 
@@ -113,6 +114,10 @@ export const CartaoConversa = memo(function CartaoConversa({
   // Mensagens do cliente depois da última resposta de verdade (issue #41):
   // aviso de esteira e nota não zeram a contagem.
   const pendentes = pendentesDaLinha(conversa)
+  // #1868: o genérico "Visitante do site" cede o nome à comanda; a etiqueta da passagem vira o
+  // trilho lateral do cartão (`.precisa`) e o texto fica para o leitor de tela.
+  const nome = nomeDoCartao(conversa)
+  const etiqueta = mostraEtiquetaDoEstado(motivo)
 
   return (
     <button
@@ -131,9 +136,10 @@ export const CartaoConversa = memo(function CartaoConversa({
       </span>
       <span className={css.corpo}>
         <span className={css.topo}>
-          <strong className={pendentes > 0 ? css.semResposta : ''} title={conversa.nome}>
-            {conversa.nome}{conversa.numeroComanda && <small> · Comanda {conversa.numeroComanda}</small>}
+          <strong className={pendentes > 0 ? css.semResposta : ''} title={nome.titulo}>
+            {nome.principal}{nome.complemento && <small> · {nome.complemento}</small>}
           </strong>
+          {!etiqueta && <span className="sr">, {estado.texto}</span>}
           {selecionada && <span className="sr">, conversa aberta</span>}
           {slaEstourado && <span className="sr">, prazo de resposta estourado</span>}
           {pagamentoNaoVisto && (
@@ -168,18 +174,18 @@ export const CartaoConversa = memo(function CartaoConversa({
             </span>
           )}
         </span>
-        <span className={css.contextoLinha} title={[estado.texto, ...contexto.map((item) => item.texto)].join(' · ')}>
-          <span className={`${css.estado} ${css['estado_' + estado.tom]}`} title={estado.titulo ?? undefined}>
+        {temLinhaDeContexto({ etiqueta, contexto }) && <span className={css.contextoLinha} title={[etiqueta ? estado.texto : null, ...contexto.map((item) => item.texto)].filter(Boolean).join(' · ')}>
+          {etiqueta && <span className={`${css.estado} ${css['estado_' + estado.tom]}`} title={estado.titulo ?? undefined}>
             {estado.icone && <Icone nome={estado.icone} tamanho={14} />}
             {estado.texto}
-          </span>
+          </span>}
           {contexto.map((item) => (
             <span key={item.chave} className={`${css.itemContexto} ${css['contexto_' + item.tom] ?? ''}`}>
               {item.icone && <Icone nome={item.icone} tamanho={14} />}
               <span className={css.textoContexto}>{item.texto}</span>
             </span>
           ))}
-        </span>
+        </span>}
       </span>
     </button>
   )

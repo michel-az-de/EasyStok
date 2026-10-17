@@ -17,11 +17,12 @@ import { rotuloDoTotal } from '../../dominio/resumoPedido'
 import {
   horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
 } from '../../dominio/formato'
-import { diferencaAposPagamento } from '../../dominio/pagamento'
+import { diferencaAposPagamento, extratoDoPedido } from '../../dominio/pagamento'
 import { totalDoPedido } from '../../dominio/pedido'
 import { encontrarCupom, validarCupom } from '../../dominio/fidelidade'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { RelogioPix } from './RelogioPix'
+import { cobrancaRepeteExtrato } from './apresentacaoDaFicha'
 import css from './ficha.module.css'
 
 // Campo "Cupom" da Cobrança (frente Fidelidade e cupons, rodada 13, issue
@@ -425,19 +426,21 @@ export function BlocoCobranca({
     const recebido = pedido.totalPagoApi ?? 0
     const alocado = pedido.alocadoApi ?? recebido
     const faltaSinal = valorSugeridoParaBaixa(pedido)
+    // #1868: com o Extrato acima (PainelFicha), Total e "Recebido, saldo na entrega" já estão lá.
+    const repete = cobrancaRepeteExtrato({ extratoAcima: fonteApi && extratoDoPedido(pedido) != null })
     return (
       <Bloco titulo={cancelado ? 'Cobrança original' : 'Cobrança'}>
-        <div className={css.cabecaCobranca}>
+        {repete && <div className={css.cabecaCobranca}>
           <span className={css.rotuloTotal}>Total</span>
           <b className={css.valorForte}>{moeda(fonteApi ? pedido.totalApi ?? cobranca.valor : cobranca.valor)}</b>
-        </div>
+        </div>}
         {cancelado ? <p className={css.corpoBloco}>Pedido cancelado. Forma original: {nome}.</p> : <p className={css.linhaNaEntrega}>
           <Icone nome="credit-card" /> {sinalPendente ? 'Sinal a receber' : 'Receber na entrega'} · {nome} <b>{moeda(faltaSinal)}</b>
         </p>}
         {!cancelado && sinalPendente && (
           <p className={css.corpoBloco}>{recebido > 0 ? `Recebido: ${moeda(recebido)}. ` : ''}O sinal confirma a reserva. Restante na entrega: {moeda(pedido.totalApi - alocado - faltaSinal)}.</p>
         )}
-        {!cancelado && !sinalPendente && fonteApi && pedido.sinalNaReserva && alocado > 0 && alocado < pedido.totalApi && (
+        {repete && !cancelado && !sinalPendente && fonteApi && pedido.sinalNaReserva && alocado > 0 && alocado < pedido.totalApi && (
           <p className={css.corpoBloco}>Recebido: {moeda(recebido)}. Saldo na entrega: {moeda(pedido.totalApi - alocado)}.</p>
         )}
         {!cancelado && recebendo && (

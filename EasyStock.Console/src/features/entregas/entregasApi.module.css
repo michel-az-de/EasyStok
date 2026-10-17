@@ -7,6 +7,8 @@
 .abaInterna[aria-selected='true'], .abaInterna[aria-selected='true']:hover { background: transparent; color: var(--marca); border-bottom-color: var(--marca); }
 .painel { display: flex; flex-direction: column; gap: var(--e-4); min-width: 0; }
 .secao { display: flex; flex-direction: column; gap: var(--e-2); }
+/* #1868: "Organizar transportes" esticava sozinho numa linha de 1.060 px, centralizado. */
+.acaoDoDia { align-self: flex-start; }
 .secao h3 { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
 .lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e-2); }
 .cartao {
