@@ -78,9 +78,9 @@ public class AuthControllerTests
             })
             .Build();
         var refreshTokenUseCase = new RefreshTokenUseCase(refreshTokenRepo2, usuarioRepo2, auditLogRepo2, jwtServiceApp, unitOfWork2, refreshTokenLogger);
-        var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, auditLogRepo2, unitOfWork2, logoutLogger);
         var revogadorSessoes = new RevogadorSessoes(
             usuarioRepo2, refreshTokenRepo2, Substitute.For<ICacheService>(), TimeProvider.System, Substitute.For<ILogger<RevogadorSessoes>>());
+        var logoutUseCase = new LogoutUseCase(refreshTokenRepo2, usuarioRepo2, revogadorSessoes, auditLogRepo2, unitOfWork2, logoutLogger);
 
         // N8: pedido e reset de acesso sobre os substitutos de campo (o teste le o que foi gravado e enfileirado).
         var empresaDoEvento = new EmpresaDoEventoAnonimo(
