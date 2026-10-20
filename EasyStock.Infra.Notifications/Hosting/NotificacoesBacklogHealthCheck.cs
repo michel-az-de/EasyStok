@@ -99,20 +99,26 @@ public sealed class NotificacoesBacklogHealthCheck(
         return HealthCheckResult.Healthy("Backlog do motor de notificações dentro dos limites.", data);
     }
 
-    /// <summary>Canais cujo provider ativo não envia nada: <c>stub</c> (WhatsApp e SMS, o padrão sem configuração) e o e-mail de console.</summary>
+    /// <summary>
+    /// Canais cujo provider ativo não envia nada: <c>stub</c> (WhatsApp e SMS, o padrão sem configuração) e o e-mail de
+    /// console. Canal marcado como desligado de propósito (<c>Notifications:&lt;Canal&gt;:Desligado=true</c>) não conta:
+    /// o Worker mandava <c>/fail</c> ao Healthchecks.io a cada minuto por um canal que ninguém pretende ligar.
+    /// </summary>
     private IEnumerable<string> ProvidersDeTeste()
     {
         var whatsapp = configuration["Notifications:WhatsApp:Provider"] ?? "stub";
-        if (string.Equals(whatsapp, "stub", StringComparison.OrdinalIgnoreCase))
+        if (!Desligado("WhatsApp") && string.Equals(whatsapp, "stub", StringComparison.OrdinalIgnoreCase))
             yield return $"WhatsApp: provider {whatsapp} em Production";
 
         var sms = configuration["Notifications:Sms:Provider"] ?? "stub";
-        if (string.Equals(sms, "stub", StringComparison.OrdinalIgnoreCase))
+        if (!Desligado("Sms") && string.Equals(sms, "stub", StringComparison.OrdinalIgnoreCase))
             yield return $"SMS: provider {sms} em Production";
 
         // O NOME de ConsoleEmailService e contrato do diagnostico (documentado na propria classe): a marcadora
         // IEmailServiceSimulado da N2 saiu com a N3, que devolve Simulado direto do console.
-        if (string.Equals(services.GetService<IEmailService>()?.GetType().Name, "ConsoleEmailService", StringComparison.Ordinal))
+        if (!Desligado("Email") && string.Equals(services.GetService<IEmailService>()?.GetType().Name, "ConsoleEmailService", StringComparison.Ordinal))
             yield return "E-mail: provider console em Production";
     }
+
+    private bool Desligado(string canal) => configuration.GetValue<bool>($"Notifications:{canal}:Desligado");
 }

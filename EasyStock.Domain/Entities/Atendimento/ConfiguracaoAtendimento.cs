@@ -50,7 +50,11 @@ public class ConfiguracaoAtendimento
     public DateTime? WebhookVerificadoEm { get; set; }
     public DateTime? UltimaMensagemRecebidaEm { get; set; }
 
-    public bool Ativo { get; set; } = true;
+    /// <summary>
+    /// Agente automático da loja. Nasce desligado (#1889, decisão do Felipe em 20/10/2026): a dona liga em
+    /// Atendimento › Horários quando quiser que a IA responda sozinha.
+    /// </summary>
+    public bool Ativo { get; set; }
 
     public const int ModeloNomeTamanhoMaximo = 512;
     public const string IdiomaModeloPadrao = "pt_BR";

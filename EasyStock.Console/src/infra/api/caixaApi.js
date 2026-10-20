@@ -33,6 +33,8 @@ export const fechamentoDaApi = (f) => (f ? {
   totalEntradasExtras: f.totalEntradasExtras,
   totalSaidasExtras: f.totalSaidasExtras,
   saldoFinal: f.saldoFinal,
+  // #1776-11: dinheiro físico que ficou na gaveta; a API só informa no histórico (`/fechamentos`).
+  dinheiroNaGaveta: f.dinheiroNaGaveta ?? null,
   fechadoPorNome: f.fechadoPorNome ?? null,
   observacoes: f.observacoes ?? null,
   fechadoEm: f.fechadoEm,

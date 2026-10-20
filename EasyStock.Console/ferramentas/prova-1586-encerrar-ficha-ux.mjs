@@ -266,7 +266,7 @@ await confere('E  bloquear sem cadastro: motivo escrito só no modo API e só pa
 await confere('F  link vencido: o texto diz o que o job do EasyStok faz em cada tentativa', () => {
   // #1683: o job só reemite e cancela com o pedido esperando o pagamento; o status entra na pergunta.
   assert.match(cobrancaDom.avisoDeLinkVencidoApi({ tentativa: 1 }, 'aguardando_pagamento'), /manda um link novo ao cliente sozinho/)
-  assert.match(cobrancaDom.avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /cancela o pedido sozinho e avisa o cliente/)
+  assert.match(cobrancaDom.avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /continua guardado e o cliente foi avisado/)
   // A regra é do backend: se a tentativa máxima mudar lá, este texto precisa mudar junto.
   const dominio = readFileSync(new URL('../../EasyStock.Domain/Entities/Pagamentos/CobrancaPedido.cs', src), 'utf8')
   assert.match(dominio, /public const int TentativaMaxima = 2;/)

@@ -149,6 +149,11 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
         var conversa = Conversa.Abrir(EmpresaId, "5511999998888", agora, "Maria", cliente.Id);
         db.AtendimentoConversas.Add(conversa);
 
+        // #1889: o agente automático nasce desligado; estes cenários exercitam a loja que o ligou no console.
+        var atendimento = ConfiguracaoAtendimento.CriarPadrao(EmpresaId);
+        atendimento.Ativo = true;
+        db.ConfiguracoesAtendimento.Add(atendimento);
+
         await db.SaveChangesAsync();
         return new Cenario(conversa.Id, cliente.Id, item.Id, janela.Id, dia);
     }

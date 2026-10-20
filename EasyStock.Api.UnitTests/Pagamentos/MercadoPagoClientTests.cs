@@ -398,6 +398,9 @@ public class MercadoPagoClientTests
             ["MercadoPago:UseStub"] = "false",
             ["MercadoPago:AccessToken"] = "fake",
             ["MercadoPago:BaseUrl"] = "https://api.mp.test/",
+            // #1724-8: credencial que não é TEST- exige as URLs na subida.
+            ["MercadoPago:NotificationUrl"] = "https://api.mp.test/api/webhooks/mercadopago",
+            ["MercadoPago:BackUrlSuccess"] = "https://loja.test/pago",
         }).Build();
         var services = new ServiceCollection();
         services.AddLogging();

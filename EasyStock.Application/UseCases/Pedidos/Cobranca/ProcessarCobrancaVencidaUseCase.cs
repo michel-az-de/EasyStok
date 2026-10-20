@@ -31,6 +31,12 @@ public enum ResultadoExpiracaoCobranca
     /// nada é cancelado; a cobrança sai da varredura até a credencial voltar.
     /// </summary>
     AguardandoCredencial = 6,
+
+    /// <summary>
+    /// #1717-3 (decisão do Felipe, #1889): link vencido na última tentativa. A cobrança expira, o pedido continua
+    /// <c>AguardandoPagamento</c> e a conversa recebe o aviso; a atendente reemite ou cancela.
+    /// </summary>
+    AguardandoAtendente = 7,
 }
 
 /// <summary>
@@ -40,9 +46,10 @@ public enum ResultadoExpiracaoCobranca
 /// <list type="bullet">
 ///   <item>Pedido fora de <c>AguardandoPagamento</c> (pago, na fila na entrega, cancelado): só expira a cobrança.</item>
 ///   <item>Tentativa 1 e pedido da conversa: gera a tentativa 2 e envia o link na conversa.</item>
-///   <item>Tentativa 2, ou pedido do site (sem conversa): <see cref="CancelarPedidoUseCase"/> com motivo
-///     <c>pagamento_expirado</c>, libera a vaga (pelo próprio <see cref="CancelarPedidoUseCase"/>, #1506) e avisa
-///     na conversa quando houver. Aviso ao cliente do site: S13.</item>
+///   <item>Tentativa 2 e pedido da conversa (#1717-3, decisão do Felipe em #1889): não cancela. A cobrança expira,
+///     o pedido fica <c>AguardandoPagamento</c> e a conversa recebe o aviso; a atendente reemite ou cancela.</item>
+///   <item>Pedido do site (sem conversa): <see cref="CancelarPedidoUseCase"/> com motivo <c>pagamento_expirado</c>
+///     e libera a vaga (pelo próprio <see cref="CancelarPedidoUseCase"/>, #1506). Aviso ao cliente do site: S13.</item>
 /// </list>
 ///
 /// <para>
@@ -101,6 +108,8 @@ public sealed class ProcessarCobrancaVencidaUseCase(
                 await aviso.EnviarAsync(item.EmpresaId, conversa, AvisoCobrancaConversa.TextoNovoLink(link), agora, ct);
             else if (resultado == ResultadoExpiracaoCobranca.PedidoCancelado)
                 await aviso.EnviarAsync(item.EmpresaId, conversa, AvisoCobrancaConversa.TextoPedidoCancelado, agora, ct);
+            else if (resultado == ResultadoExpiracaoCobranca.AguardandoAtendente)
+                await aviso.EnviarAsync(item.EmpresaId, conversa, AvisoCobrancaConversa.TextoLinkVencidoAguardandoAtendente, agora, ct);
         }
 
         logger.LogInformation("Cobranca vencida cobrancaId={CobrancaId} pedidoId={PedidoId} resultado={Resultado}",
@@ -161,6 +170,13 @@ public sealed class ProcessarCobrancaVencidaUseCase(
                 new GerarCobrancaPedidoInput(item.EmpresaId, item.PedidoId, conversaId, cobranca.Tentativa + 1,
                     CobrarSaldo: cobranca.Complementar), ct);
             return (ResultadoExpiracaoCobranca.Reemitida, conversaId, nova.LinkPagamento);
+        }
+
+        // #1717-3: pedido da conversa não é cancelado pelo job ("avisa, não trava"). Fica aguardando a atendente.
+        if (cobranca.ConversaId is { } conversaDoPedido)
+        {
+            await unitOfWork.CommitAsync();
+            return (ResultadoExpiracaoCobranca.AguardandoAtendente, conversaDoPedido, null);
         }
 
         await cancelarPedido.ExecuteAsync(new CancelarPedidoCommand(
