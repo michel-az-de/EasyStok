@@ -63,7 +63,8 @@ public class MercadoPagoRegistroTests
     [InlineData("https://api.mercadopago.com/")]
     public void Production_com_credencial_de_producao_sobe_com_o_cliente_real(string? baseUrl)
     {
-        using var sp = Registrar("Production", ("MercadoPago:AccessToken", "APP_USR-abc"), ("MercadoPago:BaseUrl", baseUrl));
+        using var sp = Registrar("Production", ("MercadoPago:AccessToken", "APP_USR-abc"), ("MercadoPago:BaseUrl", baseUrl),
+            ("MercadoPago:NotificationUrl", "https://loja.test/api/webhooks/mercadopago"), ("MercadoPago:BackUrlSuccess", "https://loja.test/pago"));
 
         sp.GetRequiredService<IMercadoPagoClient>().Should().BeOfType<MercadoPagoClient>();
     }
@@ -114,5 +115,37 @@ public class MercadoPagoRegistroTests
 
         estorno.Status.Should().Be(EstornoMercadoPagoResult.Simulado).And.NotBe(PagamentoMercadoPago.Approved);
         desfecho.Desfecho.Should().Be(DesfechoEstornoPedido.Simulado);
+    }
+
+    /// <summary>
+    /// #1724-8: credencial real sem <c>notification_url</c> subia calada; sem ela nenhum webhook chega e o link real
+    /// nunca baixa sozinho. Vale em qualquer ambiente: o que define é a credencial, não o nome do host.
+    /// </summary>
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Development")]
+    public void Credencial_real_sem_NotificationUrl_nao_sobe(string ambiente)
+    {
+        var act = () => Registrar(ambiente, ("MercadoPago:AccessToken", "APP_USR-abc"),
+            ("MercadoPago:BackUrlSuccess", "https://loja.test/pago"));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*MercadoPago:NotificationUrl*");
+    }
+
+    [Fact]
+    public void Credencial_real_sem_BackUrlSuccess_nao_sobe()
+    {
+        var act = () => Registrar("Production", ("MercadoPago:AccessToken", "APP_USR-abc"),
+            ("MercadoPago:NotificationUrl", "https://loja.test/api/webhooks/mercadopago"));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*MercadoPago:BackUrlSuccess*");
+    }
+
+    [Fact]
+    public void Credencial_de_teste_sem_urls_sobe()
+    {
+        using var sp = Registrar("Development", ("MercadoPago:AccessToken", "TEST-abc"));
+
+        sp.GetRequiredService<IMercadoPagoClient>().Should().BeOfType<MercadoPagoClient>();
     }
 }

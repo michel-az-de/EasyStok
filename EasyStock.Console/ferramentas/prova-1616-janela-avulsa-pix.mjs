@@ -88,7 +88,7 @@ confere('o texto do link vencido diz o que o EasyStok faz em cada tentativa', ()
   // #1683: o job só reemite e cancela com o pedido esperando o pagamento; o status entra na pergunta.
   assert.match(avisoDeLinkVencidoApi({ tentativa: 1 }, 'aguardando_pagamento'), /manda um link novo ao cliente sozinho/)
   assert.match(avisoDeLinkVencidoApi({}, 'aguardando_pagamento'), /manda um link novo ao cliente sozinho/)
-  assert.match(avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /cancela o pedido sozinho/)
+  assert.match(avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /continua guardado/)
 })
 
 confere('no modo API o anel vencido mostra esse texto e não o botão "Reenviar cobrança"', () => {

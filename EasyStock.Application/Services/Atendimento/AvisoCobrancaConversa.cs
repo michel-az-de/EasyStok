@@ -51,6 +51,10 @@ public sealed class AvisoCobrancaConversa(
     public const string TextoPedidoCancelado =
         "Seu pedido foi cancelado porque o pagamento não foi confirmado a tempo. Se ainda quiser, é só pedir de novo por aqui.";
 
+    /// <summary>#1717-3: o link venceu de novo; o pedido fica guardado e a atendente manda outro link ou combina o pagamento.</summary>
+    public const string TextoLinkVencidoAguardandoAtendente =
+        "O link de pagamento venceu de novo, mas seu pedido continua guardado. Em instantes alguém da equipe te manda um novo link ou combina o pagamento por aqui.";
+
     public async Task<bool> EnviarAsync(Guid empresaId, Guid conversaId, string texto, DateTime agora, CancellationToken ct = default)
     {
         try

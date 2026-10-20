@@ -112,7 +112,7 @@ await confere('2  aviso de link novo e cancelamento só com o pedido em aguardan
   assert.equal(pagamento.totalPago(pedido), 32.5)
   assert.equal(pagamento.diferencaAposPagamento({ ...pedido, estado: 'pago' }, []), 32.5)
   assert.match(cobranca.avisoDeLinkVencidoApi({ tentativa: 1 }, 'aguardando_pagamento'), /manda um link novo ao cliente sozinho/)
-  assert.match(cobranca.avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /cancela o pedido sozinho/)
+  assert.match(cobranca.avisoDeLinkVencidoApi({ tentativa: 2 }, 'aguardando_pagamento'), /continua guardado/)
   for (const status of ['aguardando', 'aprovado_baba', 'preparando', 'pronto', 'saiu_para_entrega', undefined]) {
     for (const tentativa of [1, 2]) {
       const texto = cobranca.avisoDeLinkVencidoApi({ tentativa }, status)

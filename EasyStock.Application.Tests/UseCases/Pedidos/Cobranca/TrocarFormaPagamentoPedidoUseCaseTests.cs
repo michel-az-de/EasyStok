@@ -200,4 +200,35 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
 
         await f.MpClient.DidNotReceiveWithAnyArgs().ExpirarPreferenciaAsync(default!, default, default);
     }
+
+    /// <summary>#1724-6: com o sinal pago online, trocar a forma do restante não é "pedido já pago".</summary>
+    [Fact]
+    public async Task SinalPagoOnline_TrocaDoRestanteParaNaEntregaCobraSoORestante()
+    {
+        var f = new CobrancaPedidoFixture();
+        var sinal = f.AdicionarOnline(referencia: "pref-sinal", valor: 12.5m);
+        sinal.MarcarPaga("pay-sinal", 12.5m, "pix", CobrancaPedidoFixture.Agora);
+        f.Pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = f.Pedido.Id, Valor = 12.5m, Metodo = "pix", PagoEm = CobrancaPedidoFixture.Agora });
+
+        var r = await f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+
+        r.Cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorNaEntrega);
+        r.Cobranca.Valor.Should().Be(12.5m, "o sinal de R$ 12,50 já entrou; só o restante fica para a entrega");
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+    }
+
+    [Fact]
+    public async Task PedidoQuitado_NaoTrocaAForma()
+    {
+        var f = new CobrancaPedidoFixture();
+        var online = f.AdicionarOnline(referencia: "pref-total");
+        online.MarcarPaga("pay-total", 25m, "pix", CobrancaPedidoFixture.Agora);
+        f.Pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = f.Pedido.Id, Valor = 25m, Metodo = "pix", PagoEm = CobrancaPedidoFixture.Agora });
+
+        var act = () => f.Trocar().ExecuteAsync(new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega"));
+
+        await act.Should().ThrowAsync<CobrancaPedidoConflitoException>()
+            .Where(e => e.Codigo == CobrancaPedidoConflitoException.PedidoJaPago);
+    }
 }

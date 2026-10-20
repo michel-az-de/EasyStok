@@ -7,7 +7,6 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Pagamentos;
-using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
@@ -51,7 +50,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     IOperacaoEventPublisher operacaoEventos,
     QuitacaoPedido quitacao,
-    IConferenciaPagamentoPedido conferencia)
+    IConferenciaPagamentoPedido conferencia,
+    SaldoFinanceiroPedido? saldos = null)
 {
     public const string FormaOnline = "online";
     public const string FormaNaEntrega = "na_entrega";
@@ -140,7 +140,13 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoFinalizado,
                 "Pedido cancelado ou entregue não troca a forma de pagamento.");
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, ct);
-        if (cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga))
+        // #1724-6: sinal pago online não é "pedido já pago"; a guarda vale só sem saldo a receber. O que as
+        // cobranças pagas registram também conta: a confirmação do provedor pode ter gravado só a cobrança.
+        var alocado = Math.Max(
+            saldos is not null ? (await saldos.ConsultarAsync(pedido, ct)).Alocado : pedido.TotalPago,
+            cobrancas.Where(c => c.Status == Domain.Enums.Pagamentos.StatusCobrancaPedido.Paga).Sum(c => c.ValorPago ?? 0m));
+        var restante = pedido.Total.Valor - alocado;
+        if (pedido.Total.Valor > 0m && restante <= 0m)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
         // Encomenda com sinal: o link do sinal não vira pagamento na entrega (#1685); conferido acima.
         if (forma == FormaNaEntrega && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
@@ -168,7 +174,9 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         }
         else
         {
-            var naEntrega = CobrancaPedido.CriarNaEntrega(input.EmpresaId, pedido.Id, pedido.Total.Valor, agora, conversaId);
+            // Com algo já recebido (sinal, cupom), a cobrança na entrega é só do restante.
+            var naEntrega = CobrancaPedido.CriarNaEntrega(input.EmpresaId, pedido.Id,
+                alocado > 0m ? restante : pedido.Total.Valor, agora, conversaId);
             await cobrancaRepository.AddAsync(naEntrega, ct);
             mudanca = await ColocarNaFilaAsync(pedido, input, agora, ct);
             if (mudanca is not null) impressao = await quitacao.PrepararCanhotoAsync(pedido, agora, ct);

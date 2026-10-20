@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
@@ -32,6 +33,12 @@ public class RemoverItemPedidoUseCase(
 
         var item = pedido.Itens.FirstOrDefault(i => i.Id == cmd.ItemId);
         if (item == null) return CriarPedidoUseCase.Map(pedido);
+
+        // #1724-5: com valor recebido, tirar item deixaria o total abaixo do pago sem devolução. A comanda do
+        // cliente (ConfirmarAlteracaoComandaUseCase) confere o saldo e devolve; o DELETE direto não.
+        if (pedido.TotalPago > 0m)
+            throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.ValorRecebido,
+                "O pedido já tem valor recebido. Altere os itens pela comanda ou desfaça o pagamento antes de remover.");
 
         // #939: se o pedido já teve o estoque descontado (Pronto/Entregue), estornar o estoque
         // deste item ANTES de removê-lo — senão as unidades já baixadas ficariam perdidas (a

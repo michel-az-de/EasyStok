@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
@@ -180,11 +181,19 @@ public class PedidosController(
     public async Task<IActionResult> RemoveItem(Guid id, Guid itemId, [FromQuery] Guid? empresaId)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
-        var result = await removeItemUseCase.ExecuteAsync(new RemoverItemPedidoCommand(
-            emp, id, itemId,
-            currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            null, "web"));
-        return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
+        try
+        {
+            var result = await removeItemUseCase.ExecuteAsync(new RemoverItemPedidoCommand(
+                emp, id, itemId,
+                currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+                null, "web"));
+            return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
+        }
+        catch (CobrancaPedidoConflitoException ex)
+        {
+            // #1724-5: valor recebido não some com o item; a comanda confere a devolução.
+            return DataConflict(ex.Message, ex.Codigo);
+        }
     }
 
     // ── Pagamentos ─────────────────────────────────────────────────

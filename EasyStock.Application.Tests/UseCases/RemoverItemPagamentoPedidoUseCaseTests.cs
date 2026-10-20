@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services;
@@ -208,5 +209,27 @@ public class RemoverItemPagamentoPedidoUseCaseTests
             await act.Should().ThrowAsync<UnauthorizedAccessException>();
             pedido.Pagamentos.Should().ContainSingle();
         }
+    }
+
+    /// <summary>
+    /// #1724-5: a comanda do cliente confere o valor recebido antes de mexer nos itens; o DELETE direto do item
+    /// não conferia e deixava o pedido com total menor que o recebido, sem devolução.
+    /// </summary>
+    [Fact]
+    public async Task RemoverItem_ComValorRecebido_Recusa()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = Pedido.Criar(empresaId);
+        var item = NovoItem(pedido.Id, "A", 1, 30m);
+        pedido.Itens.Add(item);
+        pedido.RecalcularTotal();
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Valor = 10m, Metodo = "pix", PagoEm = DateTime.UtcNow });
+        _repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        var act = () => ItemUC().ExecuteAsync(new RemoverItemPedidoCommand(empresaId, pedido.Id, item.Id));
+
+        await act.Should().ThrowAsync<CobrancaPedidoConflitoException>().WithMessage("*valor recebido*");
+        pedido.Itens.Should().ContainSingle();
+        await _uow.DidNotReceive().CommitAsync();
     }
 }
