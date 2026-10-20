@@ -25,19 +25,59 @@ public class ConferirPagamentoPedidoUseCaseTests
     }
 
     [Theory]
-    [InlineData(null, "nao_encontrado")]
     [InlineData("pending", "em_processamento")]
     [InlineData("in_process", "em_processamento")]
-    public async Task SemAprovacao_NaoBaixaNemTrocaParaManual(string? status, string situacao)
+    public async Task EmProcessamento_NaoBaixaNemTrocaParaManual(string status, string situacao)
     {
         var f = new CobrancaPedidoFixture();
         var online = f.AdicionarOnline();
-        if (status is not null) f.PagamentosNoMercadoPago.Add(Pagamento(f, status));
+        f.PagamentosNoMercadoPago.Add(Pagamento(f, status));
         (await f.Conferir().ExecuteAsync(f.EmpresaId, f.Pedido.Id))
             .Should().Be(new ConferirPagamentoPedidoResult(situacao, false));
         var trocar = () => f.Trocar().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "na_entrega"));
-        await trocar.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*cobrança online pendente*");
+        await trocar.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*cobrança online pendente*processando*");
         f.Cobrancas.Should().ContainSingle().Which.Should().BeSameAs(online);
+        online.Status.Should().Be(StatusCobrancaPedido.Pendente);
+        f.Pedido.Pagamentos.Should().BeEmpty();
+        await f.MpClient.DidNotReceiveWithAnyArgs().ExpirarPreferenciaAsync(default!, default, default);
+    }
+
+    /// <summary>
+    /// #1726 convive com #1733: sem pagamento no provedor, liberar sem pagamento (ou "Marcar pago") ainda
+    /// cancela o link e conserva a dívida na entrega; o que muda é que a consulta vem antes do cancelamento.
+    /// </summary>
+    [Fact]
+    public async Task SemPagamentoNoProvedor_TrocaParaManualCancelaOLinkDepoisDeConferir()
+    {
+        var f = new CobrancaPedidoFixture();
+        var online = f.AdicionarOnline(referencia: "pref-1733");
+
+        var r = await f.Trocar().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "na_entrega"));
+
+        await f.MpClient.Received(1).BuscarPagamentosPorReferenciaAsync(f.Pedido.Id.ToString(), Arg.Any<CancellationToken>());
+        online.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        r.Cobranca.Provedor.Should().Be(EasyStock.Domain.Entities.Pagamentos.CobrancaPedido.ProvedorNaEntrega);
+        f.Pedido.Pagamentos.Should().BeEmpty();
+        await f.MpClient.Received(1).ExpirarPreferenciaAsync("pref-1733", Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("aguardando_credencial")]
+    [InlineData("nao_conciliado")]
+    public async Task CredencialQueNaoAlcancaOuPagamentoSemConciliar_NaoTrocaParaManual(string situacao)
+    {
+        var f = new CobrancaPedidoFixture();
+        var online = EasyStock.Domain.Entities.Pagamentos.CobrancaPedido.CriarOnline(f.EmpresaId, f.Pedido.Id,
+            25m, "pref-1733", "https://mp.test/1733", CobrancaPedidoFixture.Agora.AddMinutes(30), 1,
+            CobrancaPedidoFixture.Agora, contaRecebedoraId: "conta-original");
+        f.Cobrancas.Add(online);
+        f.MpClient.ObterContaRecebedoraAsync(Arg.Any<CancellationToken>())
+            .Returns(situacao == "aguardando_credencial" ? "outra-conta" : "conta-original");
+        f.PagamentosNoMercadoPago.Add(Pagamento(f, "approved") with { CollectorId = "outra-conta" });
+
+        var trocar = () => f.Trocar().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "na_entrega"));
+
+        await trocar.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*cobrança online pendente*");
         online.Status.Should().Be(StatusCobrancaPedido.Pendente);
         f.Pedido.Pagamentos.Should().BeEmpty();
         await f.MpClient.DidNotReceiveWithAnyArgs().ExpirarPreferenciaAsync(default!, default, default);

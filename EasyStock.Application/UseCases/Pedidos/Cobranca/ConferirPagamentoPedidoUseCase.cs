@@ -19,6 +19,14 @@ public sealed class ConferirPagamentoPedidoUseCase(
     IMercadoPagoClient mercadoPago,
     ConfirmarPagamentoPedidoUseCase confirmar) : IConferenciaPagamentoPedido
 {
+    public const string SituacaoConfirmado = "confirmado";
+    public const string SituacaoJaConferido = "ja_conferido";
+    public const string SituacaoNaoEncontrado = "nao_encontrado";
+    public const string SituacaoEmProcessamento = "em_processamento";
+    public const string SituacaoNaoConciliado = "nao_conciliado";
+    public const string SituacaoAguardandoCredencial = "aguardando_credencial";
+    public const string SituacaoSemCobrancaOnline = "sem_cobranca_online";
+
     public async Task<ConferirPagamentoPedidoResult> ExecuteAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
@@ -34,22 +42,22 @@ public sealed class ConferirPagamentoPedidoUseCase(
         var pendente = lista.FirstOrDefault(c => c.EmpresaId == empresaId && c.PedidoId == pedidoId && c.EhOnline && c.EstaPendente);
         if (pendente is null)
             return lista.Any(c => c.EmpresaId == empresaId && c.PedidoId == pedidoId && c.EhOnline && c.Status == StatusCobrancaPedido.Paga)
-                ? new("ja_conferido", true) : new("sem_cobranca_online", false);
+                ? new(SituacaoJaConferido, true) : new(SituacaoSemCobrancaOnline, false);
 
         var item = new CobrancaPedidoVencida(pendente.Id, empresaId, pedidoId, pendente.ContaRecebedoraId);
         try
         {
             if (await CredencialNaoAlcancaAsync(mercadoPago, item, ct))
-                return new("aguardando_credencial", false);
+                return new(SituacaoAguardandoCredencial, false);
             return await ConsultarAsync(mercadoPago, confirmar, item, ct);
         }
         catch (MercadoPagoNaoConfiguradoException)
         {
-            return new("aguardando_credencial", false);
+            return new(SituacaoAguardandoCredencial, false);
         }
         catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
         {
-            return new("aguardando_credencial", false);
+            return new(SituacaoAguardandoCredencial, false);
         }
         catch (HttpRequestException ex)
         {
@@ -82,9 +90,9 @@ public sealed class ConferirPagamentoPedidoUseCase(
                 item.PedidoId, pagamento.Id, pagamento.Status, pagamento.TransactionAmount,
                 pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved,
                 ContaRecebedoraId: pagamento.CollectorId), ct);
-            if (resultado.Confirmado) return new("confirmado", true);
+            if (resultado.Confirmado) return new(SituacaoConfirmado, true);
         }
-        return new(pagamentos.Any(p => p.Aprovado) ? "nao_conciliado"
-            : pagamentos.Count > 0 ? "em_processamento" : "nao_encontrado", false);
+        return new(pagamentos.Any(p => p.Aprovado) ? SituacaoNaoConciliado
+            : pagamentos.Count > 0 ? SituacaoEmProcessamento : SituacaoNaoEncontrado, false);
     }
 }

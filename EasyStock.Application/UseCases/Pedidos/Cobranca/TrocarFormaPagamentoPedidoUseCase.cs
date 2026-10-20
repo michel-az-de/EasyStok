@@ -70,11 +70,16 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
             var anteriores = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, input.PedidoId, ct);
             if (anteriores.Any(c => c.EmpresaId == input.EmpresaId && c.PedidoId == input.PedidoId && c.EhOnline && c.EstaPendente))
             {
+                // #1733: o link aberto é conferido no provedor antes de ser cancelado. Pago, o pedido já está
+                // quitado (409 e a tela atualiza). Sem pagamento no provedor, a troca segue e cancela o link
+                // (#1726: liberar sem pagamento conserva a dívida na entrega). Qualquer outra situação
+                // (em processamento, aprovado sem conciliar, credencial que não alcança) recusa a baixa manual.
                 var resultado = await conferencia.ExecuteAsync(input.EmpresaId, input.PedidoId, ct);
                 if (resultado.Confirmado)
                     throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago,
                         "Pagamento online conferido. Atualize o pedido antes de receber outro valor.");
-                throw new UseCaseValidationException("Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.");
+                if (resultado.Situacao != ConferirPagamentoPedidoUseCase.SituacaoNaoEncontrado)
+                    throw new UseCaseValidationException(MotivoLinkPendente(resultado.Situacao));
             }
         }
 
@@ -98,6 +103,19 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
 
         return new TrocarFormaPagamentoPedidoResult(cobranca, enviada);
     }
+
+    public const string MensagemLinkPendente = "Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.";
+
+    private static string MotivoLinkPendente(string situacao) => situacao switch
+    {
+        ConferirPagamentoPedidoUseCase.SituacaoEmProcessamento =>
+            "Há uma cobrança online pendente e o provedor ainda está processando o pagamento. Confira novamente em instantes.",
+        ConferirPagamentoPedidoUseCase.SituacaoNaoConciliado =>
+            "Há uma cobrança online pendente com pagamento aprovado que não pôde ser conciliado. Confira a conta do Mercado Pago.",
+        ConferirPagamentoPedidoUseCase.SituacaoAguardandoCredencial =>
+            "Há uma cobrança online pendente e o Mercado Pago não pôde ser consultado. Conecte a credencial antes de receber manualmente.",
+        _ => MensagemLinkPendente,
+    };
 
     private async Task ExpirarPreferenciaAsync(string preferenceId, CancellationToken ct)
     {
@@ -124,8 +142,10 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, ct);
         if (cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
-        if (forma == FormaNaEntrega && cobrancas.Any(c => c.EstaPendente && c.EhOnline))
-            throw new UseCaseValidationException("Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.");
+        // Encomenda com sinal: o link do sinal não vira pagamento na entrega (#1685); conferido acima.
+        if (forma == FormaNaEntrega && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
+            && cobrancas.Any(c => c.EstaPendente && c.EhOnline))
+            throw new UseCaseValidationException(MensagemLinkPendente);
 
         var pendente = cobrancas.FirstOrDefault(c => c.EstaPendente);
         var provedorPedido = forma == FormaOnline ? CobrancaPedido.ProvedorMercadoPago : CobrancaPedido.ProvedorNaEntrega;
