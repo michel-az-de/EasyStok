@@ -52,6 +52,9 @@ O agente automático nasce desligado. Testes de integração da API voltaram ao 
   `AdminNotificacoesController`. Tabelas ficam para a P06. (#1169)
 
 ### Fixed
+- **Laboratório volta a subir** (#1907): com a validação da #1901, o `laboratorio.ps1` caía porque o
+  token falso do Mercado Pago não é `TEST-` e faltavam `NotificationUrl` e `BackUrlSuccess`. Agora o
+  script declara as duas, como a produção.
 - **Template global de notificação no escopo da empresa**: `TemplateNotificacaoRepository.GetAtivoAsync`
   com empresa nula lê o global com bypass de RLS; antes o filtro de tenant e a policy
   `tenant_isolation` o escondiam de quem rodava no escopo de uma empresa. (#1202)
@@ -484,6 +487,8 @@ Revisão da onda 0: preserva itens avulsos na cozinha/PWA, recusa pareamento cru
   tem empresa. O caso de uso agora define o tenant da empresa alvo antes de gravar. (#1159)
 
 ### Added
+- **Roteiro da jornada pedido a dinheiro** (#1907): `scripts/homologacao/jornada_pedido_a_dinheiro.py`
+  percorre a versão 1.11.0 no laboratório, do chat do site ao fechamento do caixa.
 - **Console do operador no repositório** (ADR-0054): o protótipo `prototipo-omni` da Casa da Baba
   (React 19 + Vite, commit de origem a9831ab) passa a viver em `EasyStock.Console/`, ainda com dados
   simulados. CI própria (`console.yml`: lint, fronteira de camadas e build) só quando a pasta muda.
