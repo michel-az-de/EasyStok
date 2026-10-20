@@ -137,7 +137,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       {c.rascunho.endereco.complemento && ' · ' + c.rascunho.endereco.complemento} · {c.rascunho.endereco.bairro}
       {' · ' + c.rascunho.endereco.cidade + '/' + c.rascunho.endereco.uf + ' · CEP ' + c.rascunho.endereco.cep}</p>
     </details>
-  return <div ref={selecaoRef} tabIndex={-1} role="group" aria-label="Seleção da comanda">
+  return <section ref={selecaoRef} tabIndex={-1} aria-label="Seleção da comanda">
     <div className={css.etapaCompartilhada}>
       <strong>{etapa.estado}</strong><p>{etapa.orientacao}</p>
     </div>
@@ -228,7 +228,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
           rascunho: rascunhoMantendoEdicao(c.rascunho, rascunho, edicao.base) })}>Manter minha edição para conferir</Botao>
           : <Botao variante="primario" disabled={ocupado} onClick={persistir}>Salvar seleção</Botao>}
       </div>}
-      {edicao && <p role="status">Alterações ainda não salvas. Salvar seleção atualiza o link{c.pedido ? ', sem alterar o pedido atual.' : ', sem criar um pedido.'}</p>}
+      {edicao && <output className={css.avisoCompartilhado}>Alterações ainda não salvas. Salvar seleção atualiza o link{c.pedido ? ', sem alterar o pedido atual.' : ', sem criar um pedido.'}</output>}
       {!c.pedido && !edicao && <div className={css.confirmarCompartilhado}>
         <Botao variante="primario" disabled={ocupado || Boolean(faltaConfirmar)}
           onClick={() => setConfirmacao({ comanda: c, janela: rotuloJanela })}>Revisar e criar pedido</Botao>
@@ -246,7 +246,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
     {confirmacao && <ConfirmacaoPedidoCompartilhado {...confirmacao} ocupado={ocupado} erro={erro}
       desatualizado={confirmacao.comanda.revisao !== c.revisao || !c.podeEditar || Boolean(c.pedido)}
       aoFechar={() => setConfirmacao(null)} aoConfirmar={async () => { if (await confirmarPedido(confirmacao.comanda)) setConfirmacao(null) }} />}
-  </div>
+  </section>
 }
 
 // #1761 (L10): pedido vazio eram três textos em dois blocos. Fica um bloco: o título, "Adicionar
@@ -258,7 +258,7 @@ function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompar
   return <section className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
     <div className={css.adicionarCompartilhado}><h3>Link do cliente</h3>{acaoCompartilhar}</div>
     {erro && !aberta && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar comanda</Botao></>}
-    {carregando && !dados.length ? <p role="status">Consultando a comanda…</p> : <>
+    {carregando && !dados.length ? <output className={css.avisoCompartilhado}>Consultando a comanda…</output> : <>
       {acaoMontar}
       {!visiveis.length && !erro && !pedido && <p>O cliente também pode escolher pelo Link de compra.</p>}
       {visiveis.map(c => {

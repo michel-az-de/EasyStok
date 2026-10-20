@@ -35,7 +35,7 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado }) {
 
   const total = custoDasCorridas(corridas)
   return (
-    <div className={css.secao} role="group" aria-label="Corridas desta viagem">
+    <section className={css.secao} aria-label="Corridas desta viagem">
       {(corridas ?? []).length > 0 && (
         <ul className={css.lista}>
           {corridas.map((corrida) => (
@@ -66,6 +66,6 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado }) {
           {corridas !== null && corridas.length === 0 && <span className={css.apoio}>Chamou 99, Lalamove ou Uber pelo app? Anote o custo aqui.</span>}
         </div>
       )}
-    </div>
+    </section>
   )
 }

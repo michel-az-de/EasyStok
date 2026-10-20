@@ -5,6 +5,7 @@ import { Icone } from '../../componentes/Icone'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoStatusKds, tempoAteInicio, urgenciaDoPedido } from '../../dominio/kds'
+import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
 
 // Cartão do KDS no modo API (issue #1446), no desenho do cartão do protótipo
@@ -24,10 +25,12 @@ export function CartaoKds({
 }) {
   const proximo = saindo ? null : proximoStatusKds(pedido.status)
   const urgencia = urgenciaDoPedido(pedido, agora)
+  const nome = nomeDoPedido(pedido)
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({
     id: pedido.id,
     disabled: !proximo || movendo,
     attributes: { roleDescription: 'pedido arrastável' },
+    // Os anúncios do arrasto dizem "Pegou o pedido <numero>": fica o código curto, único e sem prefixo.
     data: { numero: pedido.numeroCurto, nome: nomeNaComanda(pedido), status: pedido.status },
   })
   const alcaRef = useRef(null)
@@ -54,7 +57,7 @@ export function CartaoKds({
           <button
             ref={(no) => { alcaRef.current = no; setActivatorNodeRef(no) }} type="button" className={css.alca}
             disabled={movendo}
-            aria-label={`Mover pedido ${pedido.numeroCurto} de ${nomeNaComanda(pedido)}`} {...attributes}
+            aria-label={`Mover ${nome.frase} de ${nomeNaComanda(pedido)}`} {...attributes}
           >
             <Icone nome="grip-vertical" tamanho={20} />
           </button>
@@ -98,13 +101,14 @@ export function CartaoKdsErguido({ pedido, agora, linhas, linhaFiltro }) {
 function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
   const aviso = avisoDeInicio(pedido, agora)
   const todos = gruposDoKds(pedido, linhas)
+  const nome = nomeDoPedido(pedido)
   const grupos = linhaFiltro ? todos.filter((g) => g.chave === linhaFiltro) : todos
   const fracao = tempoAteInicio(pedido, agora)
 
   return (
     <>
       <div className={css.cabecaCartao}>
-        <span className={css.numeroCartao}>{pedido.numeroCurto} · {nomeNaComanda(pedido)}</span>
+        <span className={css.numeroCartao} title={nome.titulo || undefined}>{nome.principal}{nome.referencia && <small className={css.referencia}>ref {nome.referencia}</small>} · {nomeNaComanda(pedido)}</span>
         {alca}
       </div>
       <p className={css.rotuloSituacao}>{aviso ? aviso.texto : rotuloDoStatusKds(pedido)}</p>

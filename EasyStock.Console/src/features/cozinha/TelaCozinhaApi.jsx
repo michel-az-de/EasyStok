@@ -7,7 +7,7 @@ import { dataIsoNoFuso, horaCurta, moeda } from '../../dominio/formato'
 import {
   COLUNAS_KDS, avisoDeFilaNoTeto, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
 } from '../../dominio/kds'
-import { ORDEM_DAS_LINHAS } from '../../dominio/pedido'
+import { ORDEM_DAS_LINHAS, nomeDoPedido } from '../../dominio/pedido'
 import { useCozinhaApi } from '../../aplicacao/useCozinhaApi'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
@@ -124,18 +124,18 @@ export function TelaCozinhaApi({ linhas }) {
     const pedido = lista.find((p) => p.id === active.id)
     if (!pedido) return
     if (!over) {
-      setFeedback({ texto: `Pedido ${pedido.numeroCurto} ficou em ${rotuloDaColuna(pedido.status)}.` })
+      setFeedback({ texto: `${nomeDoPedido(pedido).frase} ficou em ${rotuloDaColuna(pedido.status)}.` })
       return
     }
     if (movendo.has(pedido.id)) return
     const r = respostaAoSoltarKds(pedido.status, over.id)
     if (r.aceita) {
       setFeedback({ id: pedido.id, numero: pedido.numeroCurto, destino: over.id, porTeclado,
-        texto: `Pedido ${pedido.numeroCurto} solto em ${rotuloDaColuna(over.id)}. Aguardando confirmação da fila.` })
+        texto: `${nomeDoPedido(pedido).frase} solto em ${rotuloDaColuna(over.id)}. Aguardando confirmação da fila.` })
       avancar(pedido.id, over.id)
     } else {
       if (r.motivo) setRecusa({ id: pedido.id, motivo: r.motivo })
-      setFeedback({ texto: `Pedido ${pedido.numeroCurto} ficou em ${rotuloDaColuna(pedido.status)}.${r.motivo ? ` ${r.motivo}` : ''}` })
+      setFeedback({ texto: `${nomeDoPedido(pedido).frase} ficou em ${rotuloDaColuna(pedido.status)}.${r.motivo ? ` ${r.motivo}` : ''}` })
     }
   }
 
@@ -164,7 +164,7 @@ export function TelaCozinhaApi({ linhas }) {
         <div className={css.motivoRecusa} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
           <Icone nome="alerta" tamanho={16} />
           <span>
-            Pedido {(pedidos ?? []).find((p) => p.id === saldoPendente.id)?.numeroCurto ?? ''}: falta receber {moeda(saldoPendente.valor)}.
+            {nomeDoPedido((pedidos ?? []).find((p) => p.id === saldoPendente.id) ?? {}).frase}: falta receber {moeda(saldoPendente.valor)}.
             Marque entregue se recebeu na porta ou combinou a cobrança.
           </span>
           <span>
@@ -221,7 +221,7 @@ export function TelaCozinhaApi({ linhas }) {
               )}
               {filtroVazio && (
                 <div className={css.cozinhaEmDia}>
-                  <p role="status">Nenhum pedido nesta linha de produto.</p>
+                  <output className={css.textoStatus}>Nenhum pedido nesta linha de produto.</output>
                   <Botao variante="secundario" onClick={() => setLinhaFiltro(null)}>Ver todas as linhas</Botao>
                 </div>
               )}

@@ -6,6 +6,7 @@ import { faixaDeHorarios } from './entrega'
 import { rotuloEmpresaEntregador } from './entregasApi'
 import { dataIsoNoFuso, listaEmPortugues, moeda, plural } from './formato'
 import { aReceberDoCartao, quitadoNoCartao } from './pagamento'
+import { nomeDoPedido } from './pedido'
 
 const SEM_JANELA = 'sem-janela'
 const hhmm = (h) => String(h ?? '').slice(0, 5)
@@ -70,6 +71,8 @@ function linhaDoPedido(p, achado, entregadores) {
   return {
     id: p.id,
     numero: p.numeroCurto,
+    // #1899: "Comanda N" quando a API entrega o número; o curto segue como referência.
+    identificacao: nomeDoPedido(p),
     cliente: p.clienteNome ?? 'Cliente sem nome',
     apto: p.clienteApt ?? null,
     endereco: p.endereco ?? null,
