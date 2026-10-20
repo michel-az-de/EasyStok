@@ -25,6 +25,8 @@ public interface IKdsPedidoQueries
 /// <param name="Endereco">Endereço do cadastro do cliente (logradouro, bairro, cidade), para a entrega (S14).</param>
 /// <param name="RequerAprovacao"><c>Pedido.RequerAprovacao</c> (S12).</param>
 /// <param name="AReceber">Saldo financeiro calculado em lote para os pedidos desta leitura (#1859).</param>
+/// <param name="NumeroComanda">#1883: número da conversa dona do pedido ("Comanda N"), pela mesma regra de
+/// <c>IConversaRepository.ObterIdPorPedidoAsync</c>, resolvido em lote. Nulo quando nenhuma conversa é dona dele.</param>
 public sealed record KdsPedidoLeitura(
     Guid Id,
     string Status,
@@ -41,7 +43,8 @@ public sealed record KdsPedidoLeitura(
     string? Endereco = null,
     bool RequerAprovacao = false,
     string? MotivoRequerAprovacao = null,
-    decimal? AReceber = null);
+    decimal? AReceber = null,
+    long? NumeroComanda = null);
 
 public sealed record KdsJanelaLeitura(string Label, DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 

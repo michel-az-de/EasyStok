@@ -11,6 +11,8 @@ namespace EasyStock.Application.UseCases.Operacao.Kds;
 /// <param name="RequerAprovacao">Exceção que a dona aprova à mão, como entrega fora de área (S12).</param>
 /// <param name="AReceber">Quanto falta receber, pelo saldo financeiro do servidor (#1776, item 19). "Pago" é zero aqui,
 /// não "tem pagamento": o sinal deixa o resto para a porta. Nulo quando o host não calcula o saldo.</param>
+/// <param name="NumeroComanda">#1883: "Comanda N", o número da conversa dona do pedido (o mesmo de
+/// <c>/api/atendimento/conversas</c>). Nulo quando nenhuma conversa é dona dele; aí só o <c>NumeroCurto</c> identifica.</param>
 public sealed record KdsPedidoDto(
     Guid Id,
     string NumeroCurto,
@@ -30,7 +32,8 @@ public sealed record KdsPedidoDto(
     string? Endereco,
     bool RequerAprovacao,
     string? MotivoRequerAprovacao,
-    decimal? AReceber = null);
+    decimal? AReceber = null,
+    long? NumeroComanda = null);
 
 public sealed record KdsJanelaDto(string Label, DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 
