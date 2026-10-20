@@ -32,6 +32,7 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
 {
     private PostgreSqlContainer? _pg;
     private bool _isAvailable;
+    private readonly VariaveisDeProcesso _variaveis = new();
 
     private const string JwtIssuer = "EasyStock";
     private const string JwtAudience = "EasyStock";
@@ -58,6 +59,7 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        _variaveis.Dispose();
         if (_pg is not null) await _pg.DisposeAsync();
     }
 
@@ -84,13 +86,19 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
         }
 
         // ConfigureAppConfiguration chega tarde para o Program.cs ler a connection string (mesmo
-        // contorno do SeedFlowIntegrationTests).
-        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _pg.GetConnectionString());
-        Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
+        // contorno do SeedFlowIntegrationTests). Devolvido no DisposeAsync (#1890).
+        _variaveis
+            .Definir("ConnectionStrings__DefaultConnection", _pg.GetConnectionString())
+            .Definir("Database__Provider", "PostgreSql");
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseEnvironment("Development");
+            b.UseSetting("Database:Provider", "PostgreSql");
+            b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString()); // #1890: chega antes do Program.cs ler a conexao
+            b.UseSetting("Jwt:SecretKey", JwtSecret); // #1890: AddJwtBearer le o segredo no startup; sem isto a API valida com o segredo do appsettings e responde 401
+            b.UseSetting("Jwt:Issuer", JwtIssuer);
+            b.UseSetting("Jwt:Audience", JwtAudience);
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(config));
             b.ConfigureTestServices(s =>
             {

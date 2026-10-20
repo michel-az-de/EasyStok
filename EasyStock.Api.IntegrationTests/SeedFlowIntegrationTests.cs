@@ -27,6 +27,7 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
 {
     private PostgreSqlContainer? _pg;
     private bool _isAvailable;
+    private readonly VariaveisDeProcesso _variaveis = new();
 
     private const string JwtSecret = "EasyStock-Seed-Test-SuperSecretKey-Min32Chars!!";
     private const string SuperAdminEmail = "seed-test@easystok.test";
@@ -54,6 +55,7 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        _variaveis.Dispose();
         if (_pg is not null) await _pg.DisposeAsync();
     }
 
@@ -61,20 +63,26 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
     {
         if (_pg is null) throw new InvalidOperationException("Container Postgres indisponivel.");
 
-        // SuperAdminSeed le essas env vars do PROCESSO (nao do IConfiguration). Setamos antes da factory.
-        Environment.SetEnvironmentVariable("SEED_SUPERADMIN_EMAIL", SuperAdminEmail);
-        Environment.SetEnvironmentVariable("SEED_SUPERADMIN_PASSWORD", SuperAdminPassword);
-        Environment.SetEnvironmentVariable("SEED_DEMO_DATA", seedDemoData ? "true" : "false");
-        // ConfigureAppConfiguration nao chega em tempo p/ Program.cs ler ConnectionStrings
-        // antes do AddNpgSql (Program.cs:179) — sem essas env vars, NRE no startup.
-        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _pg.GetConnectionString());
-        Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
-        Environment.SetEnvironmentVariable("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001");
+        // SuperAdminSeed le essas env vars do PROCESSO (nao do IConfiguration). Setamos antes da factory
+        // e devolvemos no DisposeAsync: SEED_DEMO_DATA=false vazava para as outras classes (#1890).
+        _variaveis
+            .Definir("SEED_SUPERADMIN_EMAIL", SuperAdminEmail)
+            .Definir("SEED_SUPERADMIN_PASSWORD", SuperAdminPassword)
+            // Sem a variavel, Production nao semeia demo (R6): so se define quando o teste pede demo, para
+            // "false" nao vazar para as classes Development que rodam ao mesmo tempo (#1890).
+            .Definir("SEED_DEMO_DATA", seedDemoData ? "true" : null)
+            // ConfigureAppConfiguration nao chega em tempo p/ Program.cs ler ConnectionStrings
+            // antes do AddNpgSql (Program.cs:179) — sem essas env vars, NRE no startup.
+            .Definir("ConnectionStrings__DefaultConnection", _pg.GetConnectionString())
+            .Definir("Database__Provider", "PostgreSql")
+            .Definir("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001");
 
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
                 b.UseEnvironment("Production");
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg.GetConnectionString()); // #1890: chega antes do Program.cs ler a conexao
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>

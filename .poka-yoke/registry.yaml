@@ -50,10 +50,6 @@ canonical_commands:
     cmd: 'scripts/poka-yoke/commit-seguro.ps1'
     why: "stage por pathspec, diff cached, build-check, commit, valida HEAD (autor/arquivos/closes). Anti-race do auto-commit #448."
     status: active
-  deploy-verify:
-    cmd: 'scripts/poka-yoke/deploy-verify.ps1'
-    why: "az vm run-command + docker inspect GIT_SHA==HEAD nos containers (web/api, #572). Verificacao sem HTTP (TLS bare-IP nao funciona)."
-    status: active
   worktree-status:
     cmd: 'powershell -File scripts/poka-yoke/worktree-status.ps1'
     why: "inventario seguro de git worktrees (branch/merjado/dirty/atual); marca candidatos a remover SEM apagar a sessao atual nem o principal. O harness cria/remove worktree por sessao."
@@ -111,8 +107,8 @@ traps:
     evidence: "#290, #464, #465, ADR-0024"
   - id: deploy-manual-esquecido
     class: F
-    desc: "deploy manual da VM esquecido deixa prod em commit antigo; verify por HTTP nao funciona (TLS bare-IP)"
-    detector: "deploy-verify (GIT_SHA do container == HEAD)"
+    desc: "deploy esquecido deixa prod em commit antigo"
+    detector: "vps-deploy.sh espera healthy e confere GIT_SHA; /health/version e versao.json conferidos pelo console-deploy.sh (#1890)"
     status: active
     evidence: "#494"
   - id: worktree-vs-mainrepo
@@ -125,10 +121,11 @@ traps:
 # Gates de CI e o que cada um realmente cobre (medido 2026-06-08 via gh run list).
 ci_gates:
   green_real:
-    - ci.yml          # build EasyStok.CI.slnf + test (exclui ArchitectureDebt). Gate de merge.
+    - ci.yml          # build EasyStok.CI.slnf + test (exclui ArchitectureDebt) e job proprio de Api.IntegrationTests (#1890). Gate de merge.
+    - console.yml     # qualidade + provas node do console. Gate.
     - secret-scan.yml # gitleaks. Gate.
-    - deploy-fly.yml  # deploy prod Fly (API/Web + health). Gate de deploy.
-  quarantined:        # Fatia 2: tirados do gatilho por-commit (eram vermelho cronico = ruido)
-    - coverage.yml      # gatilho -> schedule + workflow_dispatch (era FAIL em todo commit)
-    - deploy-render.yml # gatilho -> workflow_dispatch (Render suspenso + build maui quebrado)
-  red_remaining: []   # vazio: dual-frontend-drift verdejado na Fatia 4 (mirror Mobile sincronizado, drift 0)
+    - codeql.yml      # CodeQL C#. Gate.
+    - build-images.yml # imagens GHCR no push do master.
+  quarantined:        # tirados do gatilho por-commit
+    - coverage.yml      # gatilho -> schedule + workflow_dispatch (#1890 tirou os 32 vermelhos de Api.IntegrationTests)
+  red_remaining: []   # deploy-render.yml e deploy-fly.yml removidos em #1890: Render e Fly desligados

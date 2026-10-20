@@ -42,7 +42,7 @@ public sealed class AuthControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_storefront_auth_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("senha-de-teste-descartavel") // #1890: StartupHardening recusa postgres/postgres
                 .Build();
 
             await _pg.StartAsync();
@@ -68,6 +68,8 @@ public sealed class AuthControllerTests : IAsyncLifetime
             .WithWebHostBuilder(b =>
             {
                 b.UseEnvironment("Development"); // Stub do WhatsApp so registra fora de Production
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString()); // #1890: chega antes do Program.cs ler a conexao
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -95,8 +97,23 @@ public sealed class AuthControllerTests : IAsyncLifetime
         var storefrontRepo = scope.ServiceProvider.GetRequiredService<IStorefrontRepository>();
         var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
+        // FK_storefront_empresas_EmpresaId: o storefront precisa de uma empresa real (#1890).
+        var db = scope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
+        var empresaId = empresaIdOverride ?? Guid.NewGuid();
+        using (db.UseRowLevelSecurityBypass())
+        {
+            db.Empresas.Add(new EasyStock.Domain.Entities.Empresa
+            {
+                Id = empresaId,
+                Nome = "Casa da Baba (test)",
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
         var storefront = StorefrontEntity.Criar(
-            empresaId: empresaIdOverride ?? Guid.NewGuid(),
+            empresaId: empresaId,
             slug: slug,
             tituloPublico: "Casa da Baba (test)",
             pedidoMinimoEntrega: 0m);

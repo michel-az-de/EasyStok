@@ -2,7 +2,9 @@
 using System.Net.Http.Json;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -39,7 +41,7 @@ public sealed class FreteControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_storefront_frete_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("senha-de-teste-descartavel") // #1890: StartupHardening recusa postgres/postgres
                 .Build();
 
             await _pg.StartAsync();
@@ -65,6 +67,8 @@ public sealed class FreteControllerTests : IAsyncLifetime
             .WithWebHostBuilder(b =>
             {
                 b.UseEnvironment("Development");
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString()); // #1890: chega antes do Program.cs ler a conexao
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -99,8 +103,21 @@ public sealed class FreteControllerTests : IAsyncLifetime
         var freteRepo = scope.ServiceProvider.GetRequiredService<IFreteZonaRepository>();
         var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
+        // FK_storefront_empresas_EmpresaId: o storefront precisa de uma empresa real (#1890).
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var bypass = db.UseRowLevelSecurityBypass();
+        var empresa = new Empresa
+        {
+            Id = Guid.NewGuid(),
+            Nome = "Casa da Baba (it-frete)",
+            CriadoEm = DateTime.UtcNow,
+            AlteradoEm = DateTime.UtcNow,
+        };
+        db.Empresas.Add(empresa);
+        await db.SaveChangesAsync();
+
         var storefront = StorefrontEntity.Criar(
-            empresaId: Guid.NewGuid(),
+            empresaId: empresa.Id,
             slug: slug,
             tituloPublico: "Casa da Baba (it-frete)",
             pedidoMinimoEntrega: 0m);

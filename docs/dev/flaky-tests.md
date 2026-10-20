@@ -103,4 +103,4 @@ Não é teste flaky, é bloqueio da máquina local. Fica aqui porque aparece com
 
 - **Não marcar teste como flaky sem documentar aqui.** Sem entrada neste arquivo + comment no próprio teste, o "sabe-se que é flaky" não é compartilhável (e some quando a memória do dev some).
 - **`[Trait("Category","Flaky")]`** não é usado intencionalmente — flaky deve ser visível em qualquer run, não escondido em categoria opcional.
-- **Re-run automático em CI:** quando GitHub Actions voltar (billing bloqueado em 2026-05-11), considerar `--retry 2` apenas para testes desta lista.
+- **Re-run automático em CI:** não há. Teste desta lista que voltar a falhar é corrigido, não repetido.

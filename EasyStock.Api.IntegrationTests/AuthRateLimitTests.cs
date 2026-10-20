@@ -30,7 +30,7 @@ public sealed class AuthRateLimitTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_ratelimit_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("senha-de-teste-descartavel") // #1890: StartupHardening recusa postgres/postgres
                 .Build();
 
             await _pg.StartAsync();
@@ -55,6 +55,8 @@ public sealed class AuthRateLimitTests : IAsyncLifetime
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(b =>
             {
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg.GetConnectionString()); // #1890: chega antes do Program.cs ler a conexao
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -81,7 +83,7 @@ public sealed class AuthRateLimitTests : IAsyncLifetime
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
 
-        // E-mail inexistente: a rota responde 200 sem efeito colateral (anti-enumeracao), entao so o
+        // E-mail inexistente: a rota responde 202 sem efeito colateral (anti-enumeracao), entao so o
         // permit da janela muda de uma chamada para a outra.
         var payload = new { Email = "naoexiste@easystock.com" };
 
@@ -89,7 +91,7 @@ public sealed class AuthRateLimitTests : IAsyncLifetime
         for (var i = 0; i < 20; i++)
         {
             var resp = await client.PostAsJsonAsync("/api/auth/forgot-password", payload);
-            resp.StatusCode.Should().Be(HttpStatusCode.OK,
+            resp.StatusCode.Should().Be(HttpStatusCode.Accepted,
                 $"tentativa {i + 1} ainda dentro da janela de 20 permits/min");
         }
 

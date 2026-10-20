@@ -33,6 +33,7 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
     private PostgreSqlContainer? _pg;
     private bool _isAvailable;
     private string? _connString;
+    private readonly VariaveisDeProcesso _variaveis = new();
 
     private const string JwtIssuer = "EasyStock";
     private const string JwtAudience = "EasyStock";
@@ -48,11 +49,12 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
         if (!string.IsNullOrWhiteSpace(externalPg))
         {
             _connString = externalPg;
-            Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", externalPg);
-            Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
-            Environment.SetEnvironmentVariable("RunMigrationsOnStartup", "true");
-            Environment.SetEnvironmentVariable("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001");
-            Environment.SetEnvironmentVariable("SEED_SUPERADMIN_PASSWORD", "Integr4cao-T3st-SuperAdmin");
+            _variaveis
+                .Definir("ConnectionStrings__DefaultConnection", externalPg)
+                .Definir("Database__Provider", "PostgreSql")
+                .Definir("RunMigrationsOnStartup", "true")
+                .Definir("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001")
+                .Definir("SEED_SUPERADMIN_PASSWORD", "Integr4cao-T3st-SuperAdmin");
             _isAvailable = true;
             return;
         }
@@ -80,6 +82,7 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        _variaveis.Dispose();
         if (_pg is not null)
             await _pg.DisposeAsync();
     }

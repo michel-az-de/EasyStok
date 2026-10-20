@@ -44,7 +44,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_storefront_menu_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("senha-de-teste-descartavel") // #1890: StartupHardening recusa postgres/postgres
                 .Build();
 
             await _pg.StartAsync();
@@ -70,6 +70,8 @@ public sealed class MenuControllerTests : IAsyncLifetime
             .WithWebHostBuilder(b =>
             {
                 b.UseEnvironment("Development");
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString()); // #1890: chega antes do Program.cs ler a conexao
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -238,7 +240,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
     }
 
     [SkippableFact]
-    public async Task GetMenu_ItemTemExatamenteAs10Chaves_InclusiveNulls()
+    public async Task GetMenu_ItemTemExatamenteAsChavesDoContrato_InclusiveNulls()
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
 
@@ -258,10 +260,10 @@ public sealed class MenuControllerTests : IAsyncLifetime
         var chaves = avulso.EnumerateObject().Select(p => p.Name).OrderBy(n => n).ToArray();
         chaves.Should().BeEquivalentTo(new[]
         {
-            "categoria", "descricao", "disponivel", "estoqueAtual", "id",
-            "imagemUrl", "linha", "nome", "ordem", "pesoExibicao", "precoCentavos", "tag",
+            "categoria", "descricao", "disponivel", "emValidacao", "estoqueAtual", "fotos", "id",
+            "imagemUrl", "linha", "nome", "novidadeAte", "ordem", "pesoExibicao", "precoCentavos", "tag",
             "tempoPreparoMinutos",
-        }, "as 11 chaves camelCase da v1 mais linha e tempoPreparoMinutos (S15, v2), inclusive as null");
+        }, "as 11 chaves camelCase da v1, linha e tempoPreparoMinutos (S15, v2) e emValidacao, fotos e novidadeAte (M1), inclusive as null");
         avulso.GetProperty("linha").GetString().Should().Be("paraServir");
 
         avulso.GetProperty("descricao").ValueKind.Should().Be(JsonValueKind.Null);
@@ -387,7 +389,8 @@ public sealed class MenuControllerTests : IAsyncLifetime
         resp.Headers.CacheControl?.NoStore.Should().BeTrue(
             "impressão carimba data/hora local — não pode ser cacheada");
 
-        var html = await resp.Content.ReadAsStringAsync();
+        // O título sai com entidades HTML (Bab&#225;): o guard de XSS (#658) codifica texto do tenant.
+        var html = System.Net.WebUtility.HtmlDecode(await resp.Content.ReadAsStringAsync());
         html.Should().Contain("Casa da Babá", "cabeçalho usa o título público do storefront");
         html.Should().Contain("Lasanha de berinjela", "item visível deve aparecer");
         html.Should().NotContain("Em rascunho", "item oculto (Visivel=false) não vai para impressão");

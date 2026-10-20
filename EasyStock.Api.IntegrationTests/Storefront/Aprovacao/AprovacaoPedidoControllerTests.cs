@@ -230,8 +230,11 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
         body.GetProperty("status").GetString().Should().Be(StatusPedidoMapper.Cancelado);
         body.GetProperty("motivo").GetString().Should().Be("estoque_insuficiente");
         body.GetProperty("vagaLiberada").GetBoolean().Should().BeTrue();
-        body.GetProperty("refund").GetProperty("enfileirado").GetBoolean().Should().BeTrue();
-        body.GetProperty("notificacaoCliente").GetProperty("enfileirada").GetBoolean().Should().BeTrue();
+        // Desde #1297 o estorno só é enfileirado quando havia cobrança paga; o pedido semeado não tem
+        // pagamento nem conversa, então nada é devolvido nem avisado (#1890 alinhou o teste ao produto).
+        body.GetProperty("refund").GetProperty("enfileirado").GetBoolean().Should().BeFalse();
+        body.GetProperty("refund").GetProperty("evento").GetString().Should().Be("sem_pagamento");
+        body.GetProperty("notificacaoCliente").GetProperty("enfileirada").GetBoolean().Should().BeFalse();
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();

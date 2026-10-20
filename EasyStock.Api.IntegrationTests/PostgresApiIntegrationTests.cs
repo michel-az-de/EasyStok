@@ -26,6 +26,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     private PostgreSqlContainer? _pg;
     private bool _isAvailable;
     private string? _connString;
+    private readonly VariaveisDeProcesso _variaveis = new();
 
     private const string JwtIssuer  = "EasyStock";
     private const string JwtAudience = "EasyStock";
@@ -52,12 +53,13 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
             // nem sempre sobrescreve o que o Program lê no startup (o GetConnectionString
             // saía null → AddNpgSql quebrava). Env vars são lidas pelo CreateBuilder de
             // forma confiável (precedência alta, cedo).
-            Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", externalPg);
-            Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
-            Environment.SetEnvironmentVariable("RunMigrationsOnStartup", "true");
-            Environment.SetEnvironmentVariable("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001");
-            // Production exige a senha do bootstrap de SuperAdmin via env var.
-            Environment.SetEnvironmentVariable("SEED_SUPERADMIN_PASSWORD", "Integr4cao-T3st-SuperAdmin");
+            _variaveis
+                .Definir("ConnectionStrings__DefaultConnection", externalPg)
+                .Definir("Database__Provider", "PostgreSql")
+                .Definir("RunMigrationsOnStartup", "true")
+                .Definir("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001")
+                // Production exige a senha do bootstrap de SuperAdmin via env var.
+                .Definir("SEED_SUPERADMIN_PASSWORD", "Integr4cao-T3st-SuperAdmin");
             _isAvailable = true;
             return;
         }
@@ -68,7 +70,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
             _pg = new PostgreSqlBuilder("postgres:17-alpine")
                 .WithDatabase("easystock_api_tests")
                 .WithUsername("postgres")
-                .WithPassword("postgres")
+                .WithPassword("senha-de-teste-descartavel") // #1890: StartupHardening recusa postgres/postgres
                 .Build();
 
             await _pg.StartAsync();
@@ -83,6 +85,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        _variaveis.Dispose();
         if (_pg is not null)
             await _pg.DisposeAsync();
     }
@@ -97,8 +100,10 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
                 // Development (padrão do WebApplicationFactory): roda migrations + seed
                 // demo (cria o admin de teste) no startup e liga ValidateOnBuild — que
                 // valida o container REAL de produção (branch postgresql). A connection
-                // string vai via env var (ConnectionStrings__DefaultConnection, ver
-                // InitializeAsync) — sem ela o resolver da-fail-fast (sem fallback, #261).
+                // string vai por UseSetting, que chega antes de o Program.cs ler a conexão
+                // (#1890); o ConfigureAppConfiguration abaixo chega tarde para isso.
+                b.UseSetting("Database:Provider", "PostgreSql");
+                b.UseSetting("ConnectionStrings:DefaultConnection", _connString);
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -128,7 +133,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     {
         var client = factory.CreateClient();
         var loginResp = await client.PostAsJsonAsync("/api/auth/login",
-            new { Email = "felipe@easystock.com", Senha = "Admin@2026!Secure" });
+            new { Email = "admin@casadababa.demo", Senha = "admin123" });
 
         Skip.IfNot(loginResp.IsSuccessStatusCode,
             "Login admin indisponível (seed não rodou) — fluxo autenticado web→API pulado.");
@@ -158,7 +163,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
             await using var factory = CriarFactory();
             using var client = factory.CreateClient();
             var loginResp = await client.PostAsJsonAsync("/api/auth/login",
-                new { Email = "felipe@easystock.com", Senha = "Admin@2026!Secure" });
+                new { Email = "admin@casadababa.demo", Senha = "admin123" });
             _seedDemoDisponivelCache = loginResp.IsSuccessStatusCode;
             return _seedDemoDisponivelCache.Value;
         }
@@ -204,13 +209,13 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     {
         Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
         Skip.IfNot(await SeedDemoDisponivelAsync(),
-            "Seed demo (felipe@easystock.com) indisponível neste ambiente.");
+            "Seed demo (admin@casadababa.demo, CasaDaBabaSeed) indisponível neste ambiente.");
 
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
 
         // O seed roda no startup, portanto os usuarios ja existem
-        var payload = new { Email = "felipe@easystock.com", Senha = "Admin@2026!Secure" };
+        var payload = new { Email = "admin@casadababa.demo", Senha = "admin123" };
         var response = await client.PostAsJsonAsync("/api/auth/login", payload);
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -227,7 +232,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
 
-        var payload = new { Email = "thatiane@easystock.com", Senha = "Thati@2026!Gerente" };
+        var payload = new { Email = "gerente@casadababa.demo", Senha = "gerente123" };
         var response = await client.PostAsJsonAsync("/api/auth/login", payload);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -243,7 +248,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         await using var factory = CriarFactory();
         using var client = factory.CreateClient();
 
-        var payload = new { Email = "operador.fone@easystock.com", Senha = "OpFone@2026!Access" };
+        var payload = new { Email = "operador.centro@casadababa.demo", Senha = "operador123" };
         var response = await client.PostAsJsonAsync("/api/auth/login", payload);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
