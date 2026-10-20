@@ -416,3 +416,6 @@ EasyStock.Api/easystock.db*
 # Cache NuGet local acidental (nunca deve existir no repo)
 .nuget/
 EasyStock.Console/ferramentas/*.generated.html
+
+# Saida de build local (nuget obj) que nao e versionada
+.build/
