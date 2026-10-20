@@ -5,6 +5,7 @@ import { Icone } from '../../componentes/Icone'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoStatusKds, tempoAteInicio, urgenciaDoPedido } from '../../dominio/kds'
+import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
 
 // Cartão do KDS no modo API (issue #1446), no desenho do cartão do protótipo
@@ -28,7 +29,7 @@ export function CartaoKds({
     id: pedido.id,
     disabled: !proximo || movendo,
     attributes: { roleDescription: 'pedido arrastável' },
-    data: { numero: pedido.numeroCurto, nome: nomeNaComanda(pedido), status: pedido.status },
+    data: { numero: nomeDoPedido(pedido).principal, nome: nomeNaComanda(pedido), status: pedido.status },
   })
   const alcaRef = useRef(null)
   useEffect(() => {
@@ -54,7 +55,7 @@ export function CartaoKds({
           <button
             ref={(no) => { alcaRef.current = no; setActivatorNodeRef(no) }} type="button" className={css.alca}
             disabled={movendo}
-            aria-label={`Mover pedido ${pedido.numeroCurto} de ${nomeNaComanda(pedido)}`} {...attributes}
+            aria-label={`Mover ${nomeDoPedido(pedido).frase} de ${nomeNaComanda(pedido)}`} {...attributes}
           >
             <Icone nome="grip-vertical" tamanho={20} />
           </button>
@@ -104,7 +105,7 @@ function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
   return (
     <>
       <div className={css.cabecaCartao}>
-        <span className={css.numeroCartao}>{pedido.numeroCurto} · {nomeNaComanda(pedido)}</span>
+        <span className={css.numeroCartao} title={nomeDoPedido(pedido).titulo || undefined}>{nomeDoPedido(pedido).principal}{nomeDoPedido(pedido).referencia && <small className={css.referencia}>ref {nomeDoPedido(pedido).referencia}</small>} · {nomeNaComanda(pedido)}</span>
         {alca}
       </div>
       <p className={css.rotuloSituacao}>{aviso ? aviso.texto : rotuloDoStatusKds(pedido)}</p>

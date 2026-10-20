@@ -198,6 +198,7 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
   }
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape em qualquer campo cancela a baixa; o form é o único ancestral comum.
     <form className={css.baixaDivergente} onKeyDown={teclaDaBaixa} onSubmit={(evento) => {
       evento.preventDefault()
       return valido && !enviando ? registrar() : undefined

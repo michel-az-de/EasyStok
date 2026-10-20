@@ -138,10 +138,12 @@ export function NaoEntregues({ aoAbrir }) {
           rodape={<><Botao ref={atualizarRef} disabled={carregando || Boolean(ocupado)} onClick={carregar}>Atualizar lista</Botao><Botao onClick={fechar}>Fechar</Botao></>}
         >
           {erro && <p className={css.erroNaoEntregue} role="alert">A lista não carregou: {erro}</p>}
-          {carregando && <p role="status" className={css.resumoNaoEntregues}>Atualizando mensagens…</p>}
-          {resultado && <p role={resultado.erro ? 'alert' : 'status'} className={resultado.erro ? css.erroNaoEntregue : css.resumoNaoEntregues}>{resultado.texto}</p>}
+          {carregando && <output className={`${css.resumoNaoEntregues} ${css.bloco}`}>Atualizando mensagens…</output>}
+          {resultado && (resultado.erro
+            ? <p role="alert" className={css.erroNaoEntregue}>{resultado.texto}</p>
+            : <output className={`${css.resumoNaoEntregues} ${css.bloco}`}>{resultado.texto}</output>)}
           {itens.length === 0 && !erro && !carregando && (
-            <Vazio titulo="Nenhuma mensagem nesta lista" icone="check" role="status">O estado de cada envio pode ser conferido na conversa.</Vazio>
+            <Vazio titulo="Nenhuma mensagem nesta lista" icone="check" como="output">O estado de cada envio pode ser conferido na conversa.</Vazio>
           )}
           {itens.length > 0 && <p className={css.resumoNaoEntregues}><strong>{itens.length} {itens.length === 1 ? 'mensagem para conferir' : 'mensagens para conferir'}</strong></p>}
           <ul className={css.listaNaoEntregues} aria-label="Mensagens não entregues" aria-busy={carregando || Boolean(ocupado)}>

@@ -40,8 +40,9 @@ export const DIAS_DA_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta
 
 const MOTIVOS_APROVACAO = { fora_de_area: 'Entrega fora da área' }
 // #1474 (R7): recusar cancela, estorna e avisa o cliente num toque só; a tela pergunta antes.
-export const confirmacaoDaRecusa = (numero, nome) =>
-  `Recusar o pedido ${numero} de ${nome}? O pedido é cancelado, o pagamento volta ao cliente e ele recebe aviso.`
+// #1899: `pedido` já vem nomeado ("Comanda 12" ou "Pedido 76A32A4D", `nomeDoPedido().frase`).
+export const confirmacaoDaRecusa = (pedido, nome) =>
+  `Recusar ${pedido} de ${nome}? O pedido é cancelado, o pagamento volta ao cliente e ele recebe aviso.`
 
 export const motivoDaAprovacao = (motivo) => (motivo ? MOTIVOS_APROVACAO[motivo] ?? motivo : 'Aprovação manual')
 

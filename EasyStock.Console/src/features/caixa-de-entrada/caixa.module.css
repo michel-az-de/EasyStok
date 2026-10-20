@@ -292,4 +292,6 @@
 .erroNaoEntregue { margin: 0; color: var(--erro); background: var(--erro-pastel); border-radius: var(--r-1); padding: var(--e-3); font-size: var(--t-micro); overflow-wrap: anywhere; }
 .acoesNaoEntregue { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .resumoNaoEntregues { margin-block: var(--e-3); color: var(--tinta-2); overflow-wrap: anywhere; }
+/* #1899: <output> de situação em bloco, como o <p> que substituiu. */
+.bloco { display: block; }
 .resumoNaoEntregues strong { color: var(--tinta); font-size: var(--t-titulo); }

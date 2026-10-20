@@ -38,6 +38,8 @@
 .comparativo { padding: var(--e-2); border-left: 3px solid var(--linha-forte); }
 .historicoFinanceiro summary { display: list-item; min-height: 44px; align-content: center; cursor: pointer; color: var(--tinta); }
 .historicoFinanceiro summary:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+/* #1899: aviso de situação como <output> (role status nativo), em bloco como o <p> que substituiu. */
+.avisoCompartilhado { display: block; }
 .ajudaCompartilhada { display: grid; gap: var(--e-1); margin-block: var(--e-2); padding: var(--e-2) var(--e-3); border-left: var(--trilho) solid var(--alerta); background: var(--alerta-pastel); border-radius: var(--r-1); }
 .transporteCompartilhado { margin-block: var(--e-2); }
 .transporteCompartilhado > summary { min-height: 44px; align-content: center; cursor: pointer; font-weight: 600; }

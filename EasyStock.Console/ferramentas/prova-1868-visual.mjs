@@ -64,12 +64,13 @@ confere('1  "Chat do site" sai da origem (o selo do avatar já diz); as outras o
   const naoSoube = cartao.origemNoCartao({ motivo: 'pediu desconto', em: '2026-10-16T14:00:00Z' })
   assert.match(naoSoube.curto, /^Automático não soube responder/)
 })
-confere('1  etiqueta do estado some só na passagem; reclamação, cobrança e estado sem motivo ficam', () => {
-  assert.equal(cartao.mostraEtiquetaDoEstado({ chave: 'passagem' }), false)
-  for (const chave of ['reclamacao', 'cobranca', 'esperando', 'pedido-atrasado', 'atraso-entrega', 'aguardando-abertura']) {
+// #1899: a função recebe o estado da linha (que herda a chave do motivo quando há motivo).
+confere('1  etiqueta do estado some na passagem, no Automático e no Com você; motivos, Bloqueado, Encerrada e Outro ficam', () => {
+  for (const chave of ['passagem', 'automatico', 'voce']) assert.equal(cartao.mostraEtiquetaDoEstado({ chave }), false, chave)
+  for (const chave of ['reclamacao', 'cobranca', 'esperando', 'pedido-atrasado', 'atraso-entrega', 'aguardando-abertura', 'bloqueado', 'encerrada', 'outro']) {
     assert.equal(cartao.mostraEtiquetaDoEstado({ chave }), true, chave)
   }
-  assert.equal(cartao.mostraEtiquetaDoEstado(null), true, 'Automático, Com você e Encerrada seguem escritos')
+  assert.equal(cartao.mostraEtiquetaDoEstado(null), true, 'sem estado conhecido, não esconde')
 })
 confere('1  a terceira linha só existe com etiqueta ou contexto', () => {
   assert.equal(cartao.temLinhaDeContexto({ etiqueta: false, contexto: [] }), false)
