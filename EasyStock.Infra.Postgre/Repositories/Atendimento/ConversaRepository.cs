@@ -68,12 +68,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
 
     public Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default)
     {
-        var contato = Conversa.NormalizarContato(canal, contatoIdExterno);
-        // #1290: no WhatsApp o mesmo celular aparece com e sem o nono dígito (wa_id da Meta x cadastro).
-        // string[] de propósito: o Npgsql manda array como parâmetro (= ANY), sem tipo gerado pelo compilador.
-        string[] grafias = canal == CanalConversa.WhatsApp
-            ? [.. NormalizadorTelefone.VariantesContatoWhatsApp(contato)]
-            : [contato];
+        var (contato, grafias) = GrafiasDoContato(canal, contatoIdExterno);
         return db.AtendimentoConversas
             .Where(c => c.EmpresaId == empresaId
                         && c.Canal == canal
@@ -81,6 +76,29 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                         && c.Situacao != SituacaoConversa.Encerrada)
             .OrderBy(c => c.ContatoIdExterno == contato ? 0 : 1)
             .FirstOrDefaultAsync(ct);
+    }
+
+    public Task<Conversa?> ObterUltimaEncerradaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default)
+    {
+        var (_, grafias) = GrafiasDoContato(canal, contatoIdExterno);
+        return db.AtendimentoConversas
+            .Where(c => c.EmpresaId == empresaId
+                        && c.Canal == canal
+                        && grafias.Contains(c.ContatoIdExterno)
+                        && c.Situacao == SituacaoConversa.Encerrada)
+            .OrderByDescending(c => c.EncerradaEm)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    private static (string Contato, string[] Grafias) GrafiasDoContato(CanalConversa canal, string contatoIdExterno)
+    {
+        var contato = Conversa.NormalizarContato(canal, contatoIdExterno);
+        // #1290: no WhatsApp o mesmo celular aparece com e sem o nono dígito (wa_id da Meta x cadastro).
+        // string[] de propósito: o Npgsql manda array como parâmetro (= ANY), sem tipo gerado pelo compilador.
+        string[] grafias = canal == CanalConversa.WhatsApp
+            ? [.. NormalizadorTelefone.VariantesContatoWhatsApp(contato)]
+            : [contato];
+        return (contato, grafias);
     }
 
     public async Task<ConversaComMensagens?> ObterComMensagensAsync(Guid empresaId, Guid id, int ultimasN, CancellationToken ct = default)

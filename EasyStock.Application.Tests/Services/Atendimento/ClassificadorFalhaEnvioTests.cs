@@ -27,4 +27,12 @@ public class ClassificadorFalhaEnvioTests
     [Fact]
     public void NotificacoesContinuamTratandoCodigoForaDaTabelaComoTransitorio() =>
         CodigosErroMeta.Classificar(999999).Should().Be(ClasseErroMeta.Transitorio);
+
+    /// <summary>#1765-1: sem resposta do canal a mensagem pode ter saído; não reenvia sozinho nem cai na reserva por SMS.</summary>
+    [Fact]
+    public void TimeoutDoCanalEIncerto()
+    {
+        ClassificadorFalhaEnvio.Classificar(new TimeoutException()).Should().Be(TipoFalhaEnvio.Incerta);
+        ClassificadorFalhaEnvio.Classificar(new TaskCanceledException()).Should().Be(TipoFalhaEnvio.Incerta);
+    }
 }

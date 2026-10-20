@@ -313,12 +313,21 @@ public sealed class WhatsAppCloudClient(
         var token = await remetente.ObterAccessTokenAsync(ct);
         var pipeline = pipelineProvider.GetPipeline(IntegrationCategories.WhatsAppEnvio);
         var url = $"{phoneNumberId}/messages";
-        return await pipeline.ExecuteAsync(async pollyCt =>
+        try
         {
-            using var request = ComTokenDaEmpresa(HttpMethod.Post, url, token);
-            request.Content = JsonContent.Create(payload);
-            return await httpClient.SendAsync(request, pollyCt);
-        }, ct);
+            return await pipeline.ExecuteAsync(async pollyCt =>
+            {
+                using var request = ComTokenDaEmpresa(HttpMethod.Post, url, token);
+                request.Content = JsonContent.Create(payload);
+                return await httpClient.SendAsync(request, pollyCt);
+            }, ct);
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            // #1765-1: o POST pode ter chegado à Meta. Como TimeoutException o atendimento registra falha incerta
+            // (sem reenvio automático nem reserva por SMS); a exceção do Polly caía em "permanente".
+            throw new TimeoutException("A Meta não respondeu ao envio a tempo; a mensagem pode ter saído.", ex);
+        }
     }
 
     /// <summary>
