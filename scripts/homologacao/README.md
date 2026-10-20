@@ -14,6 +14,10 @@ Simula clientes reais contra uma API local isolada e mede a aderência do atendi
 
 Pré-requisitos: Docker, Python 3.12, o segredo de teste do app da Meta em `~/.easystok/meta-appsecret-teste-local` e a chave do modelo em `FW_KEY`. Suba o Worker junto (sem ele o outbox não anda). O agente é estocástico: para aceite, repita 5 rodadas.
 
+## Jornada pedido a dinheiro (#1889)
+
+Com o `laboratorio.ps1` no ar numa pasta nova, `python -I scripts/homologacao/jornada_pedido_a_dinheiro.py` percorre a versão 1.11.0 por HTTP: agente desligado por padrão, loja e caixa abertos, três clientes pelo chat do site cadastrados pela conversa, prévia igual ao pedido, link pago pelo Mercado Pago falso e baixado pelo webhook, maquininha e dinheiro na entrega, Cozinha até entregue e fechamento com a gaveta só com dinheiro (`dinheiroNaGaveta` em `GET /api/caixa/fechamentos`). Cria uma janela à noite no dia corrente porque o prazo mínimo de 100 minutos tira as janelas próximas. Fecha o caixa do dia: uma execução por base.
+
 ## Onda 0: ciclo manual em API real local
 
 `onda0-http.ps1` exercita login, abertura da loja e caixa, pedido avulso fracionado, cozinha, pagamento manual, entrega, cancelamento de outro pedido pago e fechamento. Cada etapa relê a API. Só aceita URL loopback, uma loja chamada `Cozinha de Teste`, nenhum pedido anterior e caixa ainda não movimentado. Altera dados de teste e não é um roteiro para produção. Use uma base nova a cada execução; ele não apaga nem reseta bases.
