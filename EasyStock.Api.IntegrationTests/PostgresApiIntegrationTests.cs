@@ -104,6 +104,11 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
                 // (#1890); o ConfigureAppConfiguration abaixo chega tarde para isso.
                 b.UseSetting("Database:Provider", "PostgreSql");
                 b.UseSetting("ConnectionStrings:DefaultConnection", _connString);
+                // O AddJwtBearer le o segredo no registro dos servicos: sem UseSetting, o token que o
+                // proprio login emite e validado com o segredo do appsettings e responde 401 (#1890).
+                b.UseSetting("Jwt:SecretKey", JwtSecret);
+                b.UseSetting("Jwt:Issuer", JwtIssuer);
+                b.UseSetting("Jwt:Audience", JwtAudience);
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -138,8 +143,9 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         Skip.IfNot(loginResp.IsSuccessStatusCode,
             "Login admin indisponível (seed não rodou) — fluxo autenticado web→API pulado.");
 
+        // O login responde no envelope ApiResponse: { data: { token, ... }, meta } (#1890).
         var body = await loginResp.Content.ReadFromJsonAsync<JsonElement>();
-        var token = body.GetProperty("token").GetString();
+        var token = body.GetProperty("data").GetProperty("token").GetString();
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         return client;
@@ -219,7 +225,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync("/api/auth/login", payload);
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("token").GetString().Should().NotBeNullOrEmpty();
+        body.GetProperty("data").GetProperty("token").GetString().Should().NotBeNullOrEmpty();
     }
 
     [SkippableFact]
@@ -286,7 +292,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
     [InlineData("/api/produtos")]
     [InlineData("/api/estoque")]
     [InlineData("/api/lojas")]
-    [InlineData("/api/categorias")]
+    [InlineData("/api/categorias?empresaId={empresaId}")] // o Web manda empresaId (CategoriasService); sem ele, 400
     [InlineData("/api/fornecedores")]
     [InlineData("/api/notificacoes")]
     [InlineData("/api/contas-a-pagar")]
@@ -300,6 +306,13 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
         await using var factory = CriarFactory();
         using var client = await ClienteAutenticadoAdminAsync(factory);
+
+        if (path.Contains("{empresaId}"))
+        {
+            var jwt = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler()
+                .ReadJwtToken(client.DefaultRequestHeaders.Authorization!.Parameter);
+            path = path.Replace("{empresaId}", jwt.Claims.First(c => c.Type == "empresaId").Value);
+        }
 
         var response = await client.GetAsync(path);
 

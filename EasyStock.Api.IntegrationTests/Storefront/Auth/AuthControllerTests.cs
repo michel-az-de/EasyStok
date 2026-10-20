@@ -145,8 +145,11 @@ public sealed class AuthControllerTests : IAsyncLifetime
         var body = await resp.Content.ReadFromJsonAsync<SolicitarOtpResponseDto>();
         body!.ExpiresInSeconds.Should().Be(300);
 
-        // ClienteOtp persistido com hash do telefone
+        // ClienteOtp persistido com hash do telefone. O escopo do teste nao tem tenant: o filtro global
+        // por EmpresaId do DbContext esconde a linha ate fixar o tenant (#1890).
         using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<EasyStock.Application.Ports.Output.ITenantContextAccessor>()
+            .SetCurrentTenant(storefront.EmpresaId);
         var clienteOtpRepo = scope.ServiceProvider.GetRequiredService<IClienteOtpRepository>();
         var telefoneHash = ClienteOtp.CalcularTelefoneHash("+5511997573992");
         var otp = await clienteOtpRepo.GetAtivoPorTelefoneHashAsync(

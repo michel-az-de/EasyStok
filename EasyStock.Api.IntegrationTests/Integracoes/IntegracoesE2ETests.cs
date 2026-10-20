@@ -108,14 +108,16 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
         });
     }
 
-    private static string GerarJwt(Guid empresaId)
+    private static string GerarJwt(Guid empresaId, Guid usuarioId)
     {
         var creds = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSecret)), SecurityAlgorithms.HmacSha256);
+        // #1352: o JwtBearer valida a sessao no OnTokenValidated e exige `sub` de usuario real e ativo mais `iat`.
         var claims = new List<Claim>
         {
-            new("sub", Guid.NewGuid().ToString()),
+            new("sub", usuarioId.ToString()),
             new("nivel", "Admin"),
             new("empresaId", empresaId.ToString()),
+            new("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
         };
         var token = new JwtSecurityToken(JwtIssuer, JwtAudience, claims, expires: DateTime.UtcNow.AddMinutes(30), signingCredentials: creds);
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -123,16 +125,21 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
 
     private static async Task<HttpClient> ClienteDaEmpresaAsync(WebApplicationFactory<Program> factory, Guid empresaId)
     {
+        Guid usuarioId;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             using var _ = db.UseRowLevelSecurityBypass();
             db.Empresas.Add(new Empresa { Id = empresaId, Nome = "E2E Integrações", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            // Usuario real: a validacao de sessao (#1352) recusa `sub` que nao existe no banco (#1890).
+            var usuario = Usuario.Criar("E2E Integrações", $"e2e-integracoes-{empresaId:N}@example.test", "sem-login-por-senha");
+            db.Usuarios.Add(usuario);
             await db.SaveChangesAsync();
+            usuarioId = usuario.Id;
         }
 
         var http = factory.CreateClient();
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GerarJwt(empresaId));
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GerarJwt(empresaId, usuarioId));
         return http;
     }
 
