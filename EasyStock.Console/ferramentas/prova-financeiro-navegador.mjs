@@ -12,6 +12,7 @@ registerHooks({ resolve(spec, contexto, proximo) {
   return proximo(spec, contexto)
 } })
 const { MODULOS, hashDoModulo, telasDoMenu } = await import('../src/dominio/modulos.js')
+const { telaCongelada } = await import('../src/dominio/congelados.js')
 const { HASH_HALL } = await import('../src/dominio/rota.js')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const origem = process.env.CONSOLE_URL ?? 'http://127.0.0.1:5186'
@@ -179,6 +180,14 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 960 })
   await page.getByRole('radio', { name: 'Claro', exact: true }).click()
+  // #1891: o financeiro gerencial (contas, extrato, relatórios, categorias) está congelado em
+  // dominio/congelados.js. O percurso abaixo só vale quando as telas voltarem à lista viva.
+  if (telaCongelada('financeiro', 'pagar')) {
+    assert.deepEqual(erros, [], 'sem erros de página ou console nas rotas vivas')
+    console.log(`OK (parcial): ${telasVerificadas} rotas dos módulos vivos e navegação lateral conferidas; financeiro gerencial CONGELADO (#1891), percurso das contas, relatórios e categorias pulado.`)
+    await browser.close()
+    process.exit(0)
+  }
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
   await page.getByRole('main', { name: 'Contas a pagar', exact: true }).waitFor()

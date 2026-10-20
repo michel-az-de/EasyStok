@@ -9,6 +9,7 @@ import { itensDoDia } from '../../dominio/cardapioLink'
 import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao, tituloDaComanda } from '../../dominio/pedido'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { congelado } from '../../dominio/congelados'
 import { useComandasCliente, idDaJanela, janelaDoId } from '../../aplicacao/useComandasCliente'
 import { useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { ConsultaTransporte } from './BlocoFreteApi'
@@ -204,7 +205,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
         dataInicial={c.rascunho.dataEntrega ?? ''} aoLerJanelas={setJanelas}
         aoEscolher={valor => { const escolhida = janelaDoId(valor); editar({ ...rascunho, janelaId: escolhida?.janelaId ?? null, dataEntrega: escolhida?.data ?? null }) }} />
       <details className={css.transporteCompartilhado} open={c.entregaACombinar}>
-        <summary>Combinar entrega · consultar Lalamove</summary>
+        <summary>Combinar entrega{!congelado('lalamove') && ' · consultar Lalamove'}</summary>
         <ConsultaTransporte semPedido />
         {!c.entregaACombinar && c.freteCombinado == null && <>
           <Botao disabled={ocupado || Boolean(edicao) || !c.rascunho.endereco || !c.rascunho.itens.length}

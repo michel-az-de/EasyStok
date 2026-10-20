@@ -53,11 +53,11 @@ const renderizar = (extra = {}, edicao = null) => renderToStaticMarkup(createEle
 
 let total = 0
 const provar = (nome, fn) => { fn(); total++; console.log('ok ' + nome) }
-provar('ajuda e transporte estão disponíveis antes de existir pedido, na mesma seleção', () => {
+provar('ajuda e combinar entrega estão disponíveis antes de existir pedido, sem o link da Lalamove (#1891)', () => {
   const html = renderizar()
   assert.match(html, /Pedido de ajuda registrado/)
-  assert.match(html, /Consultar Lalamove/)
-  assert.match(html, /href="https:\/\/web.lalamove.com\/" target="_blank" rel="noopener noreferrer"/)
+  assert.doesNotMatch(html, /Lalamove|lalamove\.com/, 'a Lalamove está congelada: nem link nem menção na seleção')
+  assert.match(html, /<summary>Combinar entrega<\/summary>/)
   assert.match(html, /<button(?![^>]*disabled)[^>]*>Combinar entrega desta seleção<\/button>/)
   assert.equal((html.match(/Quantidade de Lasanha/g) ?? []).length, 1)
   assert.doesNotMatch(html, /Confirmar alteração|Gerar cobrança/)
@@ -100,11 +100,12 @@ provar('pedido persistido não oferece encaminhamento pré-confirmação', () =>
   const html = renderizar({ podeEditar: false, pedido: { total: 38, alocado: 38 } })
   assert.doesNotMatch(html, /Combinar entrega desta seleção|Confirmar frete combinado/)
 })
-provar('acesso a Entregas respeita permissão e orienta registro na viagem', () => {
+// #1891: a consulta à Lalamove está congelada (dominio/congelados.js); o bloco não renderiza nada,
+// com ou sem permissão em Entregas. Ao descongelar, volta a orientar o registro da corrida na viagem.
+provar('consulta de transporte congelada não renderiza, com ou sem acesso a Entregas', () => {
   const render = permite => renderToStaticMarkup(createElement(ContextoAcessoModulos.Provider, { value: { permite: () => permite } }, createElement(ConsultaTransporte)))
-  assert.match(render(true), /href="#\/m\/entregas"/)
-  assert.match(render(true), /Registrar corrida/)
-  assert.doesNotMatch(render(false), /href="#\/m\/entregas"/)
+  assert.equal(render(true), '')
+  assert.equal(render(false), '')
 })
 provar('seleção sem janela mostra a criação bloqueada com requisito explícito', () => {
   const html = renderizar({ freteCombinado: 0 })
