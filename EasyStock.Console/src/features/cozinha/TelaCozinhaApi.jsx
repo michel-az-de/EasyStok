@@ -130,7 +130,7 @@ export function TelaCozinhaApi({ linhas }) {
     if (movendo.has(pedido.id)) return
     const r = respostaAoSoltarKds(pedido.status, over.id)
     if (r.aceita) {
-      setFeedback({ id: pedido.id, numero: nomeDoPedido(pedido).principal, destino: over.id, porTeclado,
+      setFeedback({ id: pedido.id, numero: pedido.numeroCurto, destino: over.id, porTeclado,
         texto: `${nomeDoPedido(pedido).frase} solto em ${rotuloDaColuna(over.id)}. Aguardando confirmação da fila.` })
       avancar(pedido.id, over.id)
     } else {
