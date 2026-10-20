@@ -53,5 +53,6 @@ despachados.length = 0
 globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: 'Falha ao gravar' } }), { status: 500 })
 await acoes.confirmarPagamento('conversa', 25, 'dinheiro')
 assert.equal(despachados.length, 1)
-assert.match(despachados[0].mensagem, /Pagamento não registrado/)
+assert.match(despachados[0].mensagem, /Não foi possível confirmar o registro do pagamento/)
+assert.doesNotMatch(despachados[0].mensagem, /Pagamento não registrado/)
 console.log('Pagamento manual: saldo, conciliação, desfazer, duplo clique e erro de persistência verificados.')
