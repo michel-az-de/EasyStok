@@ -1,7 +1,7 @@
 import { itensDetalhados, totalDoPedido } from './pedido'
 import { dataIsoNoFuso, horaCurta, moeda } from './formato'
 import { faixaDepoisDeEntre } from './entrega'
-import { nomeDoMeio } from './cobranca'
+import { nomeDoMeio, sinalDeEncomenda } from './cobranca'
 
 // Texto do pedido que vai para o cliente. Fica no domínio porque é regra de
 // negócio, não formatação de tela: é o que a casa se compromete a entregar.
@@ -35,13 +35,42 @@ export const LINHA_COMANDA_VAI_JUNTO = 'A comanda vai ao cliente junto com a cob
 // diz só isso, sem prometer caminho que não existe.
 export const LINHA_COMANDA_TRAVADA = 'O pedido já está no EasyStok: os itens não mudam mais por aqui.'
 
-export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Date.now(), meio = pedido?.meio } = {}) {
-  if (!fonteApi || pedido?.pedidoId || pedido?.cobranca || pedido?.estado !== 'aguardando'
-    || !pedido.itens?.length || (meio && meio !== 'maquininha')) return null
+// Pedido ainda não criado, no modo API, com janela de um dia depois de hoje: é encomenda e tem sinal.
+function ehEncomendaDeOutroDia(pedido, { fonteApi, agora }) {
+  if (!fonteApi || pedido?.pedidoId || pedido?.cobranca || pedido?.estado !== 'aguardando' || !pedido.itens?.length) return false
   const [janelaId, data] = String(pedido.janela ?? '').split('|')
-  if (!janelaId || !/^\d{4}-\d{2}-\d{2}$/.test(data) || !Number.isFinite(Date.parse(data + 'T12:00:00Z'))
-    || data <= dataIsoNoFuso(agora)) return null
+  return Boolean(janelaId) && /^\d{4}-\d{2}-\d{2}$/.test(data) && Number.isFinite(Date.parse(data + 'T12:00:00Z'))
+    && data > dataIsoNoFuso(agora)
+}
+
+export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Date.now(), meio = pedido?.meio } = {}) {
+  if ((meio && meio !== 'maquininha') || !ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
   return 'Encomenda para outro dia: sinal de 50% antes da produção. Restante na entrega.'
+}
+
+// #1875 ("Quanto fica?"): o que o console já sabe antes de gerar a cobrança. O frete depende da zona do
+// endereço e só o servidor calcula, e o sinal da encomenda é metade do total COM o frete: aqui o sinal é o
+// dos itens, um piso, e a tela diz isso.
+// Vale para qualquer meio: o servidor cobra o sinal da encomenda também no Pix e no cartão por link.
+export function previaDoSinal(pedido, { fonteApi = false, agora = Date.now(), total = 0 } = {}) {
+  if (!ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
+  const sinal = sinalDeEncomenda(total)
+  return { sinal, restante: Math.round((total - sinal) * 100) / 100 }
+}
+
+// #1875: a barra só marca o meio; este resumo diz o que o botão de confirmação vai fazer.
+export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi = false, agora = Date.now(), simulacao = null }) {
+  // #1884: com a simulação do servidor os números são os que vão ser cobrados (frete, total e sinal sobre o total com o frete).
+  if (simulacao && !simulacao.freteACombinar) {
+    const base = `Pedido de ${moeda(simulacao.total)} com o frete de ${moeda(simulacao.frete)}`
+    if (simulacao.encomenda && simulacao.sinal != null)
+      return `${base}. Encomenda para outro dia: sinal de ${moeda(simulacao.sinal)} por ${rotuloMeio}; ${moeda(simulacao.restante)} ficam para a entrega.`
+    return `${base}, cobrança por ${rotuloMeio}.`
+  }
+  const itens = `Pedido de ${moeda(total)}${fonteApi && !pedido?.pedidoId ? ' nos itens (o frete entra ao gerar)' : ''}`
+  const previa = previaDoSinal(pedido, { fonteApi, agora, total })
+  if (!previa) return `${itens}, cobrança por ${rotuloMeio}.`
+  return `${itens}. Encomenda para outro dia: sinal de 50% do total com o frete por ${rotuloMeio} (nos itens, ${moeda(previa.sinal)}); o restante fica para a entrega.`
 }
 
 // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que a dona resolve, para o

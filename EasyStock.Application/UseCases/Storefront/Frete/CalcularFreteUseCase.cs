@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using EasyStock.Application.Ports.Output.Integrations;
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
@@ -38,7 +39,8 @@ public sealed class CalcularFreteUseCase(
     ICepLookupClient cepLookupClient,
     IGeocodingClient geocodingClient,
     IRotaClient rotaClient,
-    ILogger<CalcularFreteUseCase> logger)
+    ILogger<CalcularFreteUseCase> logger,
+    ICotacaoFreteExterna? cotacaoExterna = null)
 {
     private static readonly Regex CepDigitosRegex = new(@"^\d{8}$", RegexOptions.Compiled);
 
@@ -134,7 +136,8 @@ public sealed class CalcularFreteUseCase(
                 Cidade: endereco?.Cidade,
                 Uf: endereco?.Uf,
                 Cep: cepNormalizado),
-            geocodingClient, rotaClient, ct);
+            geocodingClient, rotaClient, ct,
+            cotacaoExterna is null ? null : new CotacaoExternaDaLoja(cotacaoExterna, storefront.EmpresaId, storefront.TituloPublico));
 
         // Geocode ausente ou impreciso → não cobra raio chutado; cai pra zona.
         if (cotacao is null)
@@ -145,7 +148,7 @@ public sealed class CalcularFreteUseCase(
             return null;
         }
 
-        var (r, rota) = cotacao;
+        var (r, rota, _) = cotacao;
 
         if (r.ForaDeCobertura)
         {
@@ -160,6 +163,24 @@ public sealed class CalcularFreteUseCase(
             ? rota.DuracaoSegundos / 60.0
             : r.DistanciaRotaMetros / 1000.0 * 4;
         var minutos = 20 + (int)Math.Round(deslocamento, MidpointRounding.AwayFromZero);
+
+        if (cotacao.Externa is { } externa)
+        {
+            var cobrado = cotacao.ValorCobradoCentavos;
+            logger.LogInformation(
+                "Frete pela cotação {Provedor}: {Cotado} centavos, cobrado {Cobrado}. storefrontId={StorefrontId}",
+                externa.Provedor, externa.ValorCentavos, cobrado, storefront.Id);
+            return new FreteCalculadoDto(
+                ZonaId: Guid.Empty,
+                Valor: cobrado,
+                ValorFormatado: FormatarValor(cobrado / 100m),
+                EtaLabel: FormatarEta(minutos),
+                ZonaLabel: "Entrega por moto",
+                TempoEstimadoMinutos: minutos,
+                GeocodeConfiavel: true,
+                DistanciaMetros: externa.DistanciaMetros ?? r.DistanciaRotaMetros,
+                FaixaId: externa.Provedor);
+        }
 
         return new FreteCalculadoDto(
             ZonaId: Guid.Empty,

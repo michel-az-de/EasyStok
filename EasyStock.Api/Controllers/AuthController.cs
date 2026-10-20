@@ -80,13 +80,12 @@ public class AuthController(
         return await EmitirSessaoAsync(resultado, "login");
     }
 
-    [SwaggerOperation(Summary = "Google sign-in settings", Description = "ClientId público do Google; 404 com o login Google desligado (#1324).")]
+    [SwaggerOperation(Summary = "Google sign-in settings", Description = "ClientId público do Google. Com o login Google desligado responde 200 com habilitado=false e clientId nulo (#1324, #1874).")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpGet("google/config")]
     [AllowAnonymous]
     public IActionResult ConfigGoogle([FromServices] IGoogleIdTokenValidator google) =>
-        google.ClientId is { } clientId ? DataOk(new { clientId }) : DataNotFound("Login com Google desligado.");
+        DataOk(new { habilitado = google.ClientId is not null, clientId = google.ClientId });
 
     [SwaggerOperation(Summary = "Sign in with a Google ID token",
         Description = "Só usuário que já existe (e-mail do Google, ou alias do Gmail com uma conta só). Sem empresaId, entra na empresa ativa do usuário (#1324).")]

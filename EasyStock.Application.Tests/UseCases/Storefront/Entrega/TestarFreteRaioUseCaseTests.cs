@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Integrations;
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Entrega;
@@ -67,6 +68,23 @@ public class TestarFreteRaioUseCaseTests
         teste.DistanciaMetros.Should().Be(2780);
         teste.DistanciaRotaMetros.Should().Be(rotaMedidaMetros ?? 3892);
         teste.ForaDeCobertura.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Com_cotacao_lalamove_mostra_o_mesmo_valor_que_o_checkout_cobra()
+    {
+        var cotador = Substitute.For<ICotacaoFreteExterna>();
+        cotador.CotarAsync(_empresaId, Arg.Any<PontoCotacaoFrete>(), Arg.Any<PontoCotacaoFrete>(), Arg.Any<CancellationToken>())
+            .Returns(new CotacaoFreteExterna("lalamove", 1740, 4100));
+
+        var teste = await new TestarFreteRaioUseCase(_lojas, _ceps, _geocoding, _rotas, cotador)
+            .ExecuteAsync(_empresaId, new TestarFreteRaioInput(Cep, "100"));
+        var checkout = await new CalcularFreteUseCase(_lojas, Substitute.For<IFreteZonaRepository>(), _ceps, _geocoding, _rotas,
+            NullLogger<CalcularFreteUseCase>.Instance, cotador).ExecuteAsync(new CalcularFreteInput(Slug, Cep, "100"));
+
+        teste.FaixaId.Should().Be("lalamove");
+        teste.ValorCentavos.Should().Be(1800);
+        teste.ValorCentavos.Should().Be(checkout.Valor);
     }
 
     [Fact]

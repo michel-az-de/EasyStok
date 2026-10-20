@@ -58,8 +58,11 @@ public sealed partial class PedidoConversaConcorrenciaTests
                 await db.SaveChangesAsync();
                 var resultado = await scope.ServiceProvider.GetRequiredService<ProcessarCobrancaVencidaUseCase>()
                     .ExecuteAsync(new CobrancaPedidoVencida(cobranca.Id, EmpresaId, envio.PedidoId, cobranca.ContaRecebedoraId));
-                resultado.Should().Be(tentativa == 1 ? ResultadoExpiracaoCobranca.Reemitida : ResultadoExpiracaoCobranca.PedidoCancelado);
+                // #1717-3 (decisão do Felipe, #1889): o segundo link vencido avisa e não cancela; a atendente cancela.
+                resultado.Should().Be(tentativa == 1 ? ResultadoExpiracaoCobranca.Reemitida : ResultadoExpiracaoCobranca.AguardandoAtendente);
             }
+            var cancelar = await client.PostAsJsonAsync($"/api/pedidos/{envio.PedidoId}/cancelar", new { EmpresaId, Id = envio.PedidoId, Motivo = "Segundo link vencido; a atendente cancelou" });
+            cancelar.StatusCode.Should().Be(HttpStatusCode.OK, await cancelar.Content.ReadAsStringAsync());
         }
         var resposta = await client.GetAsync($"/api/atendimento/conversas/{c.ConversaId}/pedido");
         resposta.StatusCode.Should().Be(HttpStatusCode.OK);

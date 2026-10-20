@@ -5,6 +5,7 @@ import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useSimulacaoDoPedido } from '../../aplicacao/useSimulacaoDoPedido'
 import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaPagar } from '../../dominio/cobranca'
 import { faixaDoPedido } from '../../dominio/entrega'
@@ -60,6 +61,10 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
     alterarMeioPagamento, desfazerPagamento, aprovarPedido,
   } = useAcoes()
   const { janelas, prefixosCepAtendidos, cardapio, canais } = useCatalogo()
+  // #1884 ("Quanto fica?"): uma simulação por comanda, para a comanda e a barra mostrarem os mesmos números.
+  const simulacao = useSimulacaoDoPedido({
+    conversaId: selecionada?.id, pedido: selecionada?.pedido, ativo: Boolean(fonteApi && selecionada && !conversaEncerrada(selecionada)),
+  })
   const [secao, setSecao] = useState(null)
   // #1683: conversa em que o cliente está escolhendo pelo link (quem sabe é a ComandaDoCliente).
   const [conversaEscolhendo, setConversaEscolhendo] = useState(null)
@@ -225,6 +230,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           conversaId={selecionada.id}
           numeroComanda={numero}
           clienteEscolhendo={clienteEscolhendo}
+          simulacao={simulacao}
         />
         {editavel && <>
             <BlocoEntrega conversa={selecionada} />
@@ -276,6 +282,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
         <BarraProximoPasso
           key={`${selecionada.id}:${avancoEm ?? 'sem-avanco'}`}
           emDesfazer={Boolean(avancoEm)}
+          simulacao={simulacao}
           pedido={pedido}
           conversaId={selecionada.id}
           agora={agora}

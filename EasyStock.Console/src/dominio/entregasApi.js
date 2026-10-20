@@ -40,8 +40,9 @@ export const DIAS_DA_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta
 
 const MOTIVOS_APROVACAO = { fora_de_area: 'Entrega fora da área' }
 // #1474 (R7): recusar cancela, estorna e avisa o cliente num toque só; a tela pergunta antes.
-export const confirmacaoDaRecusa = (numero, nome) =>
-  `Recusar o pedido ${numero} de ${nome}? O pedido é cancelado, o pagamento volta ao cliente e ele recebe aviso.`
+// #1899: `pedido` já vem nomeado ("Comanda 12" ou "Pedido 76A32A4D", `nomeDoPedido().frase`).
+export const confirmacaoDaRecusa = (pedido, nome) =>
+  `Recusar ${pedido} de ${nome}? O pedido é cancelado, o pagamento volta ao cliente e ele recebe aviso.`
 
 export const motivoDaAprovacao = (motivo) => (motivo ? MOTIVOS_APROVACAO[motivo] ?? motivo : 'Aprovação manual')
 
@@ -273,7 +274,9 @@ export function resumoDoTesteDeFrete(r) {
   if (r.modo !== 'raio') return { tom: 'atencao', titulo: 'Vale a tabela de zonas', detalhe: r.motivo ?? '' }
   const rota = `${emKm(r.distanciaRotaMetros)} de rota${r.distanciaEstimada ? ' (estimada, sem rota medida)' : ''}`
   if (r.foraDeCobertura) return { tom: 'atencao', titulo: 'Fora do raio de entrega', detalhe: rota }
-  return { tom: 'ok', titulo: r.gratis ? 'Frete grátis' : `Frete de ${moeda(r.valorCentavos / 100)}`, detalhe: rota }
+  // #1882: com a chave da Lalamove, o valor é a cotação de moto arredondada para cima no real.
+  const origem = r.faixaId === 'lalamove' ? ' · cotação Lalamove de moto' : ''
+  return { tom: 'ok', titulo: r.gratis ? 'Frete grátis' : `Frete de ${moeda(r.valorCentavos / 100)}`, detalhe: rota + origem }
 }
 // I9.2 (#1691): corrida pedida por fora (app da 99, da Lalamove, da Uber), anotada na viagem com o
 // custo (`CorridaExternaBody` da API). Entregador próprio não é corrida externa.

@@ -1,7 +1,8 @@
 import css from './Icone.module.css'
 
 // Casa da Baba V4 / Essencial (01/10/2026), geometria própria de icones.cjs.
-// Origem: marca/sistema-visual-pranchas-v4; SVGs íntegros em assets/icones-marca-v4.
+// Origem: marca/sistema-visual-pranchas-v4 (repositório da marca). Os SVGs de referência saíram
+// do console em #1891 (código morto: nada os importava); este arquivo é a cópia viva.
 // Mesmos nós e atributos, convertidos apenas para a grafia JSX; nenhuma entrada HTML.
 const DESENHOS = {
   'producao': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 11H26V23C26 28 6 28 6 23Z M3 11H29 M6 15H3V20H6 M26 15H29V20H26 M9 7C11 5 8 4 10 2 M16 7C18 5 15 4 17 2 M23 7C25 5 22 4 24 2"/></g>,

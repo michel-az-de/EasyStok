@@ -90,6 +90,7 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
             Observacoes: p.Observacoes,
             Endereco: p.Endereco,
             RequerAprovacao: p.RequerAprovacao,
-            MotivoRequerAprovacao: p.MotivoRequerAprovacao);
+            MotivoRequerAprovacao: p.MotivoRequerAprovacao,
+            NumeroComanda: p.NumeroComanda);
     }
 }

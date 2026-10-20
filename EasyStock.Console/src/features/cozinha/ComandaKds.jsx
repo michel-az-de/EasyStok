@@ -5,6 +5,7 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { Modal } from '../../componentes/Modal'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { ETAPAS_KDS, avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds } from '../../dominio/kds'
+import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
 
 // A comanda do cliente aberta da Cozinha (issue #1446): o que o canhoto de papel
@@ -31,7 +32,7 @@ export function ComandaKds({
 
   return (
     <Modal
-      titulo={`Comanda ${pedido.numeroCurto}`}
+      titulo={nomeDoPedido(pedido).frase}
       aoFechar={aoFechar}
       rodape={(
         <>

@@ -358,4 +358,38 @@ public class AuthControllerTests
 
         resposta!.StatusCode.Should().Be(429);
     }
+
+    [Fact]
+    public void ConfigGoogleSemClientIdResponde200DesabilitadoEmVezDe404()
+    {
+        // #1874: o console pergunta a cada carga; com o Google desligado o 404 virava erro no log do navegador.
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns((string?)null);
+
+        var resposta = _controller.ConfigGoogle(google);
+
+        var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
+        var dados = DadosDaResposta(ok);
+        dados.GetProperty("habilitado").GetBoolean().Should().BeFalse();
+        (dados.TryGetProperty("clientId", out var clientId) ? clientId.ValueKind : System.Text.Json.JsonValueKind.Null)
+            .Should().Be(System.Text.Json.JsonValueKind.Null);
+    }
+
+    [Fact]
+    public void ConfigGoogleComClientIdDevolveOClientIdHabilitado()
+    {
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns("cliente-123.apps.googleusercontent.com");
+
+        var resposta = _controller.ConfigGoogle(google);
+
+        var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
+        var dados = DadosDaResposta(ok);
+        dados.GetProperty("habilitado").GetBoolean().Should().BeTrue();
+        dados.GetProperty("clientId").GetString().Should().Be("cliente-123.apps.googleusercontent.com");
+    }
+
+    /// <summary>O <c>data</c> do envelope <c>{ data, meta }</c>, como o console o lê.</summary>
+    private static System.Text.Json.JsonElement DadosDaResposta(Microsoft.AspNetCore.Mvc.OkObjectResult ok) =>
+        System.Text.Json.JsonSerializer.SerializeToElement(ok.Value, System.Text.Json.JsonSerializerOptions.Web).GetProperty("data");
 }

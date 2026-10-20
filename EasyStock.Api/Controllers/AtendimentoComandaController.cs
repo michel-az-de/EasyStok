@@ -23,6 +23,7 @@ public class AtendimentoComandaController(
     ListarJanelasAtendimentoUseCase janelasUseCase,
     ObterPedidoConversaUseCase obterPedidoUseCase,
     GerarPedidoConversaUseCase gerarPedidoUseCase,
+    SimularPedidoConversaUseCase simularPedidoUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Menu of the logged company's storefront (same as the public menu)")]
@@ -74,6 +75,26 @@ public class AtendimentoComandaController(
             EnviarAoCliente: body.EnviarAoCliente), ct)));
     }
 
+    [SwaggerOperation(Summary = "Quote of the order before creating it: freight, total, deposit and rest (#1884)",
+        Description = "Só lê: não cria pedido, não ocupa vaga e não cobra. Mesmas validações e mesma conta do POST do pedido; "
+                      + "CEP fora da área devolve freteACombinar com total, sinal e restante nulos. Sinal e restante só na encomenda (entrega em outro dia).")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [HttpPost("conversas/{id:guid}/pedido/simulacao")]
+    public Task<IActionResult> SimularPedido(Guid id, [FromBody] SimularPedidoConversaBody body, CancellationToken ct = default)
+    {
+        // Só lê, como o GET do pedido: qualquer operador da empresa vê o que a comanda custaria; criar é que exige AtenderConversas.
+        if (body?.Itens is not { Count: > 0 })
+            return Task.FromResult(DataBadRequest("A comanda está vazia."));
+
+        return Tratar(async () => DataOk(await simularPedidoUseCase.ExecuteAsync(new SimularPedidoConversaInput(
+            currentUser.EmpresaId, id,
+            body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
+            body.JanelaId, body.DataEntrega, body.EnderecoId), ct)));
+    }
+
     private async Task<IActionResult> Tratar(Func<Task<IActionResult>> acao)
     {
         try
@@ -119,6 +140,13 @@ public sealed record GerarPedidoConversaBody(
     string? Forma = null,
     string? Observacoes = null,
     bool EnviarAoCliente = true);
+
+/// <summary>Comanda a simular (#1884): o mesmo corpo do pedido, sem forma de pagamento nem envio.</summary>
+public sealed record SimularPedidoConversaBody(
+    IReadOnlyList<ItemComandaBody> Itens,
+    Guid JanelaId,
+    DateOnly DataEntrega,
+    Guid? EnderecoId = null);
 
 /// <param name="VariacaoId">M1.4b (#1531): a porção escolhida; null em prato com porções usa a padrão.</param>
 public sealed record ItemComandaBody(Guid CardapioItemId, int Qtd, string? Observacao = null, Guid? VariacaoId = null);

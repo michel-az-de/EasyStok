@@ -13,6 +13,8 @@ public sealed class CobrancaPedidoConflitoException(string codigo, string mensag
     public const string PedidoFinalizado = "pedido_finalizado";
     public const string SemPagamento = "sem_pagamento";
     public const string FormaNaEntrega = "forma_na_entrega";
+    /// <summary>#1724-5: o pedido já tem valor recebido; itens mudam pela comanda (que confere a devolução), não pelo DELETE.</summary>
+    public const string ValorRecebido = "valor_recebido";
 
     public string Codigo { get; } = codigo;
 }

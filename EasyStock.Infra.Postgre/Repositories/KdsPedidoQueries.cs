@@ -7,6 +7,7 @@ using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Repositories.Atendimento;
 
 namespace EasyStock.Infra.Postgre.Repositories;
 
@@ -51,6 +52,7 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
         if (pedidos.Count == 0) return [];
 
         var ids = pedidos.Select(p => p.Id).ToList();
+        var comandas = await NumeroComandaDoPedido.PorPedidosAsync(db, empresaId, ids, ct);
         var janelas = (await (
                 from v in db.VagasOcupadas.AsNoTracking()
                 join j in db.JanelasEntrega.AsNoTracking() on v.JanelaEntregaId equals j.Id
@@ -117,7 +119,8 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                 Endereco: p.EnderecoEntrega ?? cliente?.Endereco,
                 RequerAprovacao: p.RequerAprovacao,
                 MotivoRequerAprovacao: p.MotivoRequerAprovacao,
-                AReceber: saldos[p.Id].AReceber(p.Total.Valor));
+                AReceber: saldos[p.Id].AReceber(p.Total.Valor),
+                NumeroComanda: comandas.TryGetValue(p.Id, out var comanda) ? comanda : null);
         }).ToList();
     }
 

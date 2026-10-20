@@ -124,7 +124,7 @@ export function AbaIntegracoesApi() {
             <Pilula tom="ok" fina>Ligado</Pilula>
           </div>
           <Pilula tom="ok" fina>Padrão do despacho</Pilula>
-          <p className={css.motivo}>Única forma de despacho até a Lalamove entrar no despacho (F17).</p>
+          <p className={css.motivo}>Entregador próprio é a forma de despacho desta versão.</p>
         </li>
       </ul>
     </div>

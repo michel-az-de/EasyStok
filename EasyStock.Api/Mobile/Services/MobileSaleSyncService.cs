@@ -84,7 +84,9 @@ public class MobileSaleSyncService(
                 dataEnvio: null,
                 numeroNotaFiscal: null,
                 observacoes: $"Mobile · pedido #{order.Id.Substring(Math.Max(0, order.Id.Length - 8))} · {order.ClientSnapshotName}",
-                criadoEm: DateTime.UtcNow);
+                criadoEm: DateTime.UtcNow,
+                // #1630-1: a mesma forma que o PedidoPagamento do pedido recebe (OrderLinker, #1493).
+                formaPagamentoPrincipal: FormaPagamentoMobile.ParaErp(order.Metodo));
             venda.LojaId = order.LojaId;
             _db.Add(venda);
 

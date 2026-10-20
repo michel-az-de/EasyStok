@@ -57,7 +57,10 @@ public class AgenteAtendimentoServiceTests
         _conversaRepository.ObterSituacaoAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>())
             .Returns(_ => _situacaoNoBanco ?? _conversa.Situacao);
 
-        _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns((ConfiguracaoAtendimento?)null);
+        // #1889: o padrão nasce desligado; estes cenários exercitam o agente ligado pela dona.
+        var ligada = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        ligada.Ativo = true;
+        _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns(ligada);
         _cloudClient.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new EnvioWhatsAppResult("wamid.out1"));
 

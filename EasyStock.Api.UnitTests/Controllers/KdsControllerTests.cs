@@ -10,6 +10,7 @@ using EasyStock.Application.UseCases.Financeiro.ContasReceber;
 using EasyStock.Application.UseCases.Financeiro.Integracao;
 using EasyStock.Application.UseCases.Operacao.Kds;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
@@ -199,6 +200,39 @@ public class KdsControllerTests : IDisposable
         var card = OkData<IReadOnlyList<KdsPedidoDto>>(result).Should().ContainSingle().Subject;
         card.Endereco.Should().BeNull();
         card.RequerAprovacao.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task NumeroComandaVemDaConversaDonaDoPedidoSoDaEmpresa()
+    {
+        // #1883 (#1902): "Comanda N" é o número da conversa dona do pedido, pela mesma regra de
+        // ConversaRepository.ObterIdPorPedidoAsync: pedido em andamento da conversa ou link do cardápio que
+        // o registrou. Sem conversa o campo é nulo; conversa de outra empresa apontando o pedido não conta.
+        var pelaConversa = PedidoPersistido(EmpresaA, StatusPedidoMapper.Aguardando, "paraServir");
+        var peloLink = PedidoPersistido(EmpresaA, StatusPedidoMapper.Aguardando, "paraServir");
+        var semConversa = PedidoPersistido(EmpresaA, StatusPedidoMapper.Aguardando, "paraServir");
+        var conversa = Conversa.Abrir(EmpresaA, "5511999998888", DateTime.UtcNow, "Maria");
+        conversa.DefinirPedidoEmAndamento(pelaConversa.Id);
+        var conversaDoLink = Conversa.Abrir(EmpresaA, "5511999997777", DateTime.UtcNow, "Joana");
+        var link = LinkCardapioConversa.Gerar(EmpresaA, conversaDoLink.Id, new string('a', LinkCardapioConversa.TokenHashTamanho), DateTime.UtcNow);
+        link.RegistrarResultado(peloLink.Id, "{}");
+        var alheia = Conversa.Abrir(EmpresaB, "5511999996666", DateTime.UtcNow, "Zé");
+        alheia.DefinirPedidoEmAndamento(semConversa.Id);
+        _db.AtendimentoConversas.AddRange(conversa, conversaDoLink, alheia);
+        // O InMemory não tem a identity do Postgres: o teste numera as comandas como o banco numeraria.
+        _db.Entry(conversa).Property(c => c.NumeroComanda).CurrentValue = 12L;
+        _db.Entry(conversaDoLink).Property(c => c.NumeroComanda).CurrentValue = 7L;
+        _db.Entry(alheia).Property(c => c.NumeroComanda).CurrentValue = 1L;
+        _db.LinksCardapioConversa.Add(link);
+        await _db.SaveChangesAsync();
+
+        var result = await _controller.GetPedidos(status: null, linha: null, data: null, empresaId: null, CancellationToken.None);
+
+        var cards = OkData<IReadOnlyList<KdsPedidoDto>>(result).ToDictionary(c => c.Id);
+        cards[pelaConversa.Id].NumeroComanda.Should().Be(12);
+        cards[peloLink.Id].NumeroComanda.Should().Be(7);
+        cards[semConversa.Id].NumeroComanda.Should().BeNull();
+        cards.Values.Should().OnlyContain(c => c.NumeroCurto == c.Id.ToString("N").Substring(0, 8).ToUpperInvariant());
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

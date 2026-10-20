@@ -41,7 +41,7 @@ public sealed class KdsSaldoLotePostgresTests(PostgreSqlDatabaseFixture fixture)
         var hoje = HorarioBrasil.Hoje();
         (await queries.ListarAsync(empresa, [StatusPedidoMapper.Aguardando], hoje, hoje)).Should().ContainSingle();
         var uma = contador.Total;
-        uma.Should().Be(9, "três leituras do agregado, uma de janelas e cinco totais financeiros em lote");
+        uma.Should().Be(10, "três leituras do agregado, uma de janelas, uma das comandas das conversas (#1883) e cinco totais financeiros em lote");
 
         for (var i = 1; i < 200; i++) seed.Pedidos.Add(NovoPedido(empresa, linha: "paraServir"));
         await seed.SaveChangesAsync();

@@ -356,4 +356,44 @@ public class ListarJanelasDisponiveisUseCaseTests
 
         result.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task JanelaEmCurso_SaiParaHojeMesmoSemPrazo()
+    {
+        // #1874: 11:30 em Brasilia; a janela 10-12h de hoje ja comecou e o site seguia oferecendo (o prazo
+        // nulo so cortava janela encerrada). Sem prazo informado vale 0: so sobra o que ainda nao comecou.
+        var f = BuildFakes();
+        var hoje = new DateOnly(2026, 6, 2);
+        var amanha = hoje.AddDays(1);
+        var relogio = new FakeTimeProvider(new DateTimeOffset(2026, 6, 2, 14, 30, 0, TimeSpan.Zero));
+        JanelaEntrega Janela(DateOnly dia, int inicio, int fim) => JanelaEntrega.Criar(
+            f.Storefront.Id, (int)dia.DayOfWeek, new TimeOnly(inicio, 0), new TimeOnly(fim, 0), 5, $"{inicio}h");
+        var emCurso = Janela(hoje, 10, 12);
+        var depois = Janela(hoje, 12, 13);
+        var deAmanha = Janela(amanha, 10, 12);
+        f.JanelaRepo.GetAtivasDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<JanelaEntrega> { emCurso, depois, deAmanha });
+
+        var result = await BuildUseCase(f, relogio).ExecuteAsync(new ListarJanelasDisponiveisInput(SlugValido, hoje, amanha, null));
+
+        result.Select(r => (r.Data, r.JanelaId)).Should().Equal(
+            (hoje, depois.Id),
+            (amanha, deAmanha.Id));
+    }
+
+    [Fact]
+    public async Task JanelaQueComecaAgora_Fica()
+    {
+        // O limite e inclusivo, o mesmo de AtendePrazo com prazo 0: 10:00 em Brasilia e a janela das 10h segue.
+        var f = BuildFakes();
+        var hoje = new DateOnly(2026, 6, 2);
+        var relogio = new FakeTimeProvider(new DateTimeOffset(2026, 6, 2, 13, 0, 0, TimeSpan.Zero));
+        var janela = JanelaEntrega.Criar(f.Storefront.Id, (int)hoje.DayOfWeek, new TimeOnly(10, 0), new TimeOnly(12, 0), 5, "10h");
+        f.JanelaRepo.GetAtivasDoStorefrontAsync(f.Storefront.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<JanelaEntrega> { janela });
+
+        var result = await BuildUseCase(f, relogio).ExecuteAsync(new ListarJanelasDisponiveisInput(SlugValido, hoje, hoje, null));
+
+        result.Should().ContainSingle(r => r.JanelaId == janela.Id);
+    }
 }

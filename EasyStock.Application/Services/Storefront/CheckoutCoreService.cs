@@ -39,9 +39,13 @@ public sealed record CheckoutCoreInput(
 
 /// <summary>
 /// Parâmetros do prazo mínimo (S16, RN-21): com eles o núcleo recusa a janela cujo início seja antes de
-/// agora + <c>CalculadoraPrazoPedido.PrazoMinimo</c> dos itens. Nulo (site) não corta.
+/// agora + <c>CalculadoraPrazoPedido.PrazoMinimo</c> dos itens. Nulo (site) vale 0: só corta a janela que já começou (#1874).
 /// </summary>
 public sealed record PrazoPreparoCheckout(int TempoPreparoPadraoMinutos, int RespiroMinutos);
+
+/// <summary>Resultado de <see cref="CheckoutCoreService.SimularAsync"/> (#1884): o que o pedido custaria, sem criá-lo.</summary>
+/// <param name="Frete">Em reais; nulo quando <paramref name="FreteACombinar"/>.</param>
+public sealed record SimulacaoCheckout(decimal Itens, decimal? Frete, bool FreteACombinar, DateTime AgendadoParaEm);
 
 /// <summary>
 /// Pedido em <c>AguardandoPagamento</c> com a vaga ocupada. <see cref="Itens"/> são os itens do
@@ -152,33 +156,11 @@ public sealed class CheckoutCoreService(
 
         // ── Cobertura e valor do frete: a mesma cotação do site (#1291) ───
         // Fora da área (zona ou raio), o CalcularFrete lança CepSemCoberturaException.
-        if (input.FreteCombinado is < 0 or > 100000 || input.FreteCombinado is { } combinado && decimal.Round(combinado, 2) != combinado)
-            throw new UseCaseValidationException("Informe um frete válido em reais e centavos.");
-        var frete = input.FreteCombinado is { } valorCombinado
-            ? new FreteCalculadoDto(Guid.Empty, checked((int)(valorCombinado * 100)), valorCombinado.ToString("C", Cultura.PtBr),
-                "Entrega combinada com a Casa", "Frete combinado pela equipe")
-            : await calcularFrete.ExecuteAsync(new CalcularFreteInput(storefront.Slug, cep, input.Numero), ct);
+        var frete = await CotarFreteAsync(input, storefront, cep, ct);
         var valorFrete = frete.Valor / 100m;
 
         // ── Validar janela ────────────────────────────────────────────────
-        var janela = await janelaEntregaRepository.GetByIdAsync(input.JanelaId, ct);
-        if (janela is null || !janela.Ativa || janela.StorefrontId != storefront.Id)
-            throw new RegraDeDominioVioladaException(
-                "A janela de entrega escolhida não está mais disponível. Escolha outro horário.");
-
-        if (janela.DiaDaSemana != (int)input.DataEntrega.DayOfWeek)
-            throw new RegraDeDominioVioladaException(
-                $"A janela {janela.Label} não atende o dia {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outro horário.");
-
-        var bloqueios = await bloqueioEntregaRepository.GetByStorefrontPeriodoAsync(
-            storefront.Id, input.DataEntrega, input.DataEntrega, ct);
-
-        var diaBloqueado = bloqueios.Any(b => b.JanelaEspecificaId == null);
-        var janelaEspecificaBloqueada = bloqueios.Any(b => b.JanelaEspecificaId == input.JanelaId);
-
-        if (diaBloqueado || janelaEspecificaBloqueada)
-            throw new RegraDeDominioVioladaException(
-                $"Não há entrega no dia {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outra data.");
+        var janela = await ValidarJanelaAsync(storefront, input.JanelaId, input.DataEntrega, ct);
 
         // ── Validar e carregar itens do cardápio ──────────────────────────
         var cardapioItens = await CarregarItensCardapioAsync(
@@ -186,23 +168,7 @@ public sealed class CheckoutCoreService(
         // M1.4b (#1531): porção de outro prato ou esgotada recusa antes de criar o pedido e ocupar a vaga.
         ValidarItens(input.Itens!, cardapioItens);
 
-        // #1506: janela já encerrada (ou data passada) nunca vale, com ou sem prazo mínimo.
-        if (CalculadoraPrazoPedido.JanelaJaPassou(input.DataEntrega, janela.HoraFim, timeProvider.GetUtcNow().UtcDateTime))
-            throw new RegraDeDominioVioladaException(
-                $"A janela {janela.Label} de {input.DataEntrega.ToString("dd/MM/yyyy", PtBr)} já passou. Escolha outro horário.");
-
-        // ── Prazo mínimo (S16, RN-21) ─────────────────────────────────────
-        // Revalida o corte da listagem: a janela pode ter ficado curta entre listar e criar.
-        if (input.Prazo is { } prazo)
-        {
-            var prazoMinimo = CalculadoraPrazoPedido.PrazoMinimo(
-                cardapioItens.Values.Select(ci => ci.TempoPreparoMinutos),
-                prazo.TempoPreparoPadraoMinutos,
-                prazo.RespiroMinutos);
-            if (!CalculadoraPrazoPedido.AtendePrazo(
-                    input.DataEntrega, janela.HoraInicio, timeProvider.GetUtcNow().UtcDateTime, prazoMinimo))
-                throw new RegraDeDominioVioladaException(JanelaAbaixoDoPrazo);
-        }
+        ValidarEncerramentoEPrazo(janela, input.DataEntrega, input.Prazo, cardapioItens);
 
         logger.LogInformation(
             "Checkout fase-validacao ok storefrontId={StorefrontId} clienteId={ClienteId} elapsed={Ms}ms",
@@ -337,6 +303,115 @@ public sealed class CheckoutCoreService(
         var expediente = await expedienteLojaRepository.GetPublicoAsync(empresaId, ct);
         if (expediente?.ControleManual == Domain.Enums.Storefront.ControleManualLoja.ForcarFechada)
             throw new LojaFechadaException(expediente.MensagemLojaFechada);
+    }
+
+    /// <summary>
+    /// Frete combinado pela equipe (validado em reais e centavos) ou a cotação do site (#1291). Fora da área,
+    /// a cotação lança <see cref="CepSemCoberturaException"/>. Compartilhada pela criação e pela simulação (#1884).
+    /// </summary>
+    private async Task<FreteCalculadoDto> CotarFreteAsync(
+        CheckoutCoreInput input, StorefrontEntity storefront, string cep, CancellationToken ct)
+    {
+        if (input.FreteCombinado is < 0 or > 100000 || input.FreteCombinado is { } combinado && decimal.Round(combinado, 2) != combinado)
+            throw new UseCaseValidationException("Informe um frete válido em reais e centavos.");
+        return input.FreteCombinado is { } valorCombinado
+            ? new FreteCalculadoDto(Guid.Empty, checked((int)(valorCombinado * 100)), valorCombinado.ToString("C", Cultura.PtBr),
+                "Entrega combinada com a Casa", "Frete combinado pela equipe")
+            : await calcularFrete.ExecuteAsync(new CalcularFreteInput(storefront.Slug, cep, input.Numero), ct);
+    }
+
+    /// <summary>Soma dos itens com o preço de cada linha (o da porção quando há), a conta que grava o pedido.</summary>
+    public static decimal SubtotalDosItens(IEnumerable<ItemPedidoCheckout> itens, IReadOnlyDictionary<Guid, CardapioItem> cardapioItens) =>
+        itens.Sum(i => i.Qtd * PorcaoEPreco(cardapioItens[i.CardapioItemId], i.VariacaoId).Preco);
+
+    /// <summary>
+    /// Simulação do pedido (#1884): as mesmas validações e a mesma conta de <see cref="CriarPedidoComReservaAsync"/>
+    /// (entrada, horizonte, frete, janela, itens, prazo), sem criar pedido, item, vaga nem cobrança. Fora da área o
+    /// frete vem "a combinar" em vez de recusar. Não confere a pausa manual da loja: quem cria o pedido confere.
+    /// </summary>
+    public async Task<SimulacaoCheckout> SimularAsync(CheckoutCoreInput input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var cep = ValidarEntrada(input.Cep, input.Itens?.Select(i => (i.CardapioItemId, i.Qtd)).ToList());
+        HorizonteAgendamento.Validar(input.DataEntrega, HorarioBrasil.DataOperacional(timeProvider.GetUtcNow().UtcDateTime));
+        var storefront = await ResolverStorefrontAsync(input, ct);
+
+        decimal? frete = null;
+        var freteACombinar = false;
+        try
+        {
+            frete = (await CotarFreteAsync(input, storefront, cep, ct)).Valor / 100m;
+        }
+        catch (CepSemCoberturaException)
+        {
+            freteACombinar = true;
+        }
+
+        var janela = await ValidarJanelaAsync(storefront, input.JanelaId, input.DataEntrega, ct);
+        var cardapioItens = await CarregarItensCardapioAsync(
+            storefront.Id, input.Itens!.Select(i => i.CardapioItemId), ct);
+        ValidarItens(input.Itens!, cardapioItens);
+        ValidarEncerramentoEPrazo(janela, input.DataEntrega, input.Prazo, cardapioItens);
+
+        return new SimulacaoCheckout(
+            SubtotalDosItens(input.Itens!, cardapioItens), frete, freteACombinar,
+            HorarioBrasil.InstanteUtc(input.DataEntrega, janela.HoraInicio));
+    }
+
+    /// <summary>
+    /// Janela existe, é da loja, atende o dia da semana e não está bloqueada (dia ou janela). Compartilhada pela
+    /// criação do pedido e pela simulação (#1884), para as duas recusarem igual.
+    /// </summary>
+    private async Task<JanelaEntrega> ValidarJanelaAsync(
+        StorefrontEntity storefront, Guid janelaId, DateOnly dataEntrega, CancellationToken ct)
+    {
+        var janela = await janelaEntregaRepository.GetByIdAsync(janelaId, ct);
+        if (janela is null || !janela.Ativa || janela.StorefrontId != storefront.Id)
+            throw new RegraDeDominioVioladaException(
+                "A janela de entrega escolhida não está mais disponível. Escolha outro horário.");
+
+        if (janela.DiaDaSemana != (int)dataEntrega.DayOfWeek)
+            throw new RegraDeDominioVioladaException(
+                $"A janela {janela.Label} não atende o dia {dataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outro horário.");
+
+        var bloqueios = await bloqueioEntregaRepository.GetByStorefrontPeriodoAsync(
+            storefront.Id, dataEntrega, dataEntrega, ct);
+
+        var diaBloqueado = bloqueios.Any(b => b.JanelaEspecificaId == null);
+        var janelaEspecificaBloqueada = bloqueios.Any(b => b.JanelaEspecificaId == janelaId);
+
+        if (diaBloqueado || janelaEspecificaBloqueada)
+            throw new RegraDeDominioVioladaException(
+                $"Não há entrega no dia {dataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outra data.");
+        return janela;
+    }
+
+    /// <summary>
+    /// Janela já encerrada nunca vale (#1506) e, com ou sem prazo mínimo, a janela que já começou também não
+    /// (site, #1874). Compartilhada pela criação do pedido e pela simulação (#1884).
+    /// </summary>
+    private void ValidarEncerramentoEPrazo(
+        JanelaEntrega janela, DateOnly dataEntrega, PrazoPreparoCheckout? prazoInput,
+        IReadOnlyDictionary<Guid, CardapioItem> cardapioItens)
+    {
+        // #1506: janela já encerrada (ou data passada) nunca vale, com ou sem prazo mínimo.
+        if (CalculadoraPrazoPedido.JanelaJaPassou(dataEntrega, janela.HoraFim, timeProvider.GetUtcNow().UtcDateTime))
+            throw new RegraDeDominioVioladaException(
+                $"A janela {janela.Label} de {dataEntrega.ToString("dd/MM/yyyy", PtBr)} já passou. Escolha outro horário.");
+
+        // ── Prazo mínimo (S16, RN-21) ─────────────────────────────────────
+        // Revalida o corte da listagem: a janela pode ter ficado curta entre listar e criar. Sem prazo
+        // (site) vale 0, como na listagem (#1874): a janela que já começou não é aceita.
+        var prazoMinimo = prazoInput is { } prazo
+            ? CalculadoraPrazoPedido.PrazoMinimo(
+                cardapioItens.Values.Select(ci => ci.TempoPreparoMinutos),
+                prazo.TempoPreparoPadraoMinutos,
+                prazo.RespiroMinutos)
+            : 0;
+        if (!CalculadoraPrazoPedido.AtendePrazo(
+                dataEntrega, janela.HoraInicio, timeProvider.GetUtcNow().UtcDateTime, prazoMinimo))
+            throw new RegraDeDominioVioladaException(JanelaAbaixoDoPrazo);
     }
 
     public async Task<IReadOnlyDictionary<Guid, CardapioItem>> CarregarItensCardapioAsync(

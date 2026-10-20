@@ -93,6 +93,9 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
 
         var card = (await LerFilaAsync(provider, cenario)).Should().ContainSingle().Subject;
         card.Id.Should().Be(pedidoId);
+        // #1883 (#1902): a cozinha vê a mesma "Comanda N" da conversa que gerou o pedido.
+        cenario.NumeroComanda.Should().BePositive();
+        card.NumeroComanda.Should().Be(cenario.NumeroComanda);
         card.Status.Should().Be("aguardando");
         card.InicioPrevistoEm.Should().NotBeNull();
         // #1474: a cozinha mostra o nome como no cardápio (o avulso é gravado minúsculo).
@@ -255,7 +258,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
             .ExecuteAsync(new ListarPedidosKdsQuery(cenario.EmpresaId, Data: cenario.Data));
     }
 
-    private sealed record Cenario(Guid EmpresaId, Guid ConversaId, Guid ItemId, Guid JanelaId, DateOnly Data);
+    private sealed record Cenario(Guid EmpresaId, Guid ConversaId, Guid ItemId, Guid JanelaId, DateOnly Data, long NumeroComanda);
 
     private async Task<Cenario> SemearAsync()
     {
@@ -280,7 +283,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         var conversa = Conversa.Abrir(empresaId, "5511999998888", agora, cliente.Nome, cliente.Id);
         db.AtendimentoConversas.Add(conversa);
         await db.SaveChangesAsync();
-        return new Cenario(empresaId, conversa.Id, item.Id, janela.Id, data);
+        return new Cenario(empresaId, conversa.Id, item.Id, janela.Id, data, conversa.NumeroComanda);
     }
 
     private ServiceProvider CriarProvider(Cenario cenario, IOperacaoEventPublisher eventos, IPublicadorEventoIntegracao? publicador = null)

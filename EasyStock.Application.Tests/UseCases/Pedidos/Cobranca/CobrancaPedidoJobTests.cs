@@ -1,3 +1,5 @@
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -8,8 +10,9 @@ namespace EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
 
 /// <summary>
 /// S11: regra do <c>CobrancaPedidoJob</c> (a cada 60 s), que vive em <see cref="ProcessarCobrancaVencidaUseCase"/>.
-/// Expirada na tentativa 1 com conversa: gera a tentativa 2 e manda o link. Tentativa 2, ou pedido sem
-/// conversa (site): cancela o pedido com motivo <c>pagamento_expirado</c> e libera a vaga.
+/// Expirada na tentativa 1 com conversa: gera a tentativa 2 e manda o link. Tentativa 2 com conversa: avisa e
+/// deixa o pedido aguardando a atendente (decisão do Felipe, #1889: avisa, não trava). Pedido sem conversa (site):
+/// cancela o pedido com motivo <c>pagamento_expirado</c> e libera a vaga.
 /// </summary>
 public class CobrancaPedidoJobTests
 {
@@ -56,20 +59,29 @@ public class CobrancaPedidoJobTests
         nova.Tentativa.Should().Be(2);
     }
 
+    /// <summary>
+    /// #1717-3, decisão do Felipe (20/10/2026): o link vencido pela segunda vez não cancela o pedido. Ele fica
+    /// aguardando pagamento, a conversa recebe o aviso e a atendente reemite (<c>POST /cobranca</c>) ou cancela.
+    /// </summary>
     [Fact]
-    public async Task SegundaExpiracaoCancela()
+    public async Task SegundaExpiracaoAvisaENaoCancela()
     {
         var f = new CobrancaPedidoFixture();
         f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
-        var vencida = f.AdicionarOnline(tentativa: 2, conversaId: Guid.NewGuid());
+        var conversa = Conversa.Abrir(f.EmpresaId, "5511999990001", f.Relogio.Agora.AddMinutes(-5));
+        conversa.RegistrarEntrada(f.Relogio.Agora.AddMinutes(-5));
+        f.ConversaRepo.ObterPorIdAsync(f.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var vencida = f.AdicionarOnline(tentativa: 2, conversaId: conversa.Id);
 
         var r = await f.ProcessarVencida().ExecuteAsync(Item(f, vencida.Id));
 
-        r.Should().Be(ResultadoExpiracaoCobranca.PedidoCancelado);
+        r.Should().Be(ResultadoExpiracaoCobranca.AguardandoAtendente);
         vencida.Status.Should().Be(StatusCobrancaPedido.Expirada);
-        f.Pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
-        f.Eventos.Should().Contain(e => e.Tipo == "cancelado" && e.Detalhes == "pagamento_expirado");
-        await f.VagaRepo.Received(1).LiberarPorPedidoAsync(f.Pedido.Id, Arg.Any<string>(), Arg.Any<CancellationToken>());
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento, "o pedido continua vivo para a atendente reemitir ou cancelar");
+        f.Eventos.Should().NotContain(e => e.Tipo == "cancelado");
+        await f.VagaRepo.DidNotReceiveWithAnyArgs().LiberarPorPedidoAsync(default, default!, default);
+        await f.ConversaRepo.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Texto == AvisoCobrancaConversa.TextoLinkVencidoAguardandoAtendente), Arg.Any<CancellationToken>());
         f.Preferencias.Should().BeEmpty();
     }
 

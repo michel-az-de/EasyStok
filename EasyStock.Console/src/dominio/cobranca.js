@@ -148,9 +148,13 @@ export function aguardaSinalManual(pedido) {
     && pedido.cobranca && !pedido.cobranca.link && !pedido.cobranca.pagaEm && !pedido.cobranca.canceladaEm)
 }
 
+// #1875: o sinal da encomenda é metade do total, em centavos e arredondando para cima, como o servidor
+// (`PlanoPagamentoEncomenda.Sinal`).
+export const sinalDeEncomenda = (total) => Math.ceil(Math.round(total * 100) / 2) / 100
+
 export function valorSugeridoParaBaixa(pedido) {
   const total = pedido.totalApi ?? pedido.cobranca?.valor ?? 0
-  const alvo = aguardaSinalManual(pedido) ? Math.ceil(Math.round(total * 100) / 2) / 100 : total
+  const alvo = aguardaSinalManual(pedido) ? sinalDeEncomenda(total) : total
   return Math.max(0, Math.round((alvo - (pedido.alocadoApi ?? pedido.totalPagoApi ?? 0)) * 100) / 100)
 }
 
@@ -416,8 +420,8 @@ export const baixaCancelaCobrancaOnline = (pedido) => Boolean(
 
 // --- Link vencido no modo API (#1586) ----------------------------------------
 // Quem trata é o job de expiração do EasyStok (`CobrancaPedidoJob`, a cada 60 s): na primeira
-// vez gera a segunda cobrança e manda o link novo na conversa; na segunda cancela o pedido,
-// libera a vaga e avisa o cliente. A Ficha não reenvia nada, então diz o que vai acontecer.
+// vez gera a segunda cobrança e manda o link novo na conversa; na segunda avisa o cliente e deixa o
+// pedido aguardando a atendente (#1717-3: avisa, não trava). A Ficha não reenvia nada, então diz o que vai acontecer.
 // #1683: o job só reemite e cancela pedido que ainda espera o pagamento. Com o pedido já na fila
 // (pagamento na entrega, complemento) ele só marca o link como vencido, e o texto diz isso.
 const ULTIMA_TENTATIVA_DE_COBRANCA = 2
@@ -427,8 +431,8 @@ export const avisoDeLinkVencidoApi = (cobranca, statusApi) => {
   if (statusApi === 'cancelado') return 'Pedido cancelado. O link venceu.'
   if (statusApi !== 'aguardando_pagamento') return LINK_VENCIDO_PEDIDO_SEGUE
   return (cobranca?.tentativa ?? 1) < ULTIMA_TENTATIVA_DE_COBRANCA
-    ? 'O EasyStok manda um link novo ao cliente sozinho. Se esse também vencer, o pedido é cancelado e o cliente é avisado.'
-    : 'Segundo link vencido: o EasyStok cancela o pedido sozinho e avisa o cliente.'
+    ? 'O EasyStok manda um link novo ao cliente sozinho. Se esse também vencer, o pedido continua guardado e espera você: gere outra cobrança ou cancele.'
+    : 'Segundo link vencido: o pedido continua guardado e o cliente foi avisado. Gere uma cobrança nova ou cancele o pedido.'
 }
 
 // --- "Alterar forma" no modo API (#1683) --------------------------------------

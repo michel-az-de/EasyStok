@@ -91,6 +91,8 @@
 
 .cabecaCartao { display: flex; align-items: center; gap: var(--e-2); }
 .numeroCartao { font-family: var(--f-corpo); font-size: var(--t-corpo); font-weight: 700; line-height: 1.35; }
+/* #1899: o código curto do EasyStok vira referência pequena ao lado de "Comanda N". */
+.referencia { margin-left: var(--e-1); font-size: var(--t-apoio); font-weight: 400; color: var(--tinta-2); }
 
 .rotuloSituacao { margin: 0; font-size: var(--t-apoio); font-weight: 700; }
 .cor-esperando .rotuloSituacao { color: var(--info); }
@@ -300,6 +302,8 @@ escritos e desliga as animações, inclusive a volta do overlay. */
   animation: dicaEntrar var(--dur-media) var(--ease-saida);
 }
 .cozinhaEmDia { margin: 0 var(--e-4); color: var(--tinta-2); font-size: var(--t-apoio); }
+/* #1899: texto de situação como <output> (role status nativo), em bloco como o <p> que substituiu. */
+.textoStatus { display: block; }
 
 /* Comanda aberta da Cozinha (Modal). */
 .comanda { display: grid; gap: var(--e-3); }

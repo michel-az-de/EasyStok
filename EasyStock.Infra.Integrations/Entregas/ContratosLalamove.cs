@@ -11,8 +11,9 @@ public sealed record LalamoveParada(
     [property: JsonPropertyName("coordinates")] LalamoveCoordenadas Coordinates,
     [property: JsonPropertyName("address")] string Address,
     [property: JsonPropertyName("stopId"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? StopId = null);
+/// <summary>Sem <c>scheduleAt</c> a cotação é para agora (#1882, preço do frete na hora do pedido).</summary>
 public sealed record LalamoveCotacaoRequest(
-    [property: JsonPropertyName("scheduleAt")] DateTimeOffset ScheduleAt,
+    [property: JsonPropertyName("scheduleAt"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? ScheduleAt,
     [property: JsonPropertyName("serviceType")] string ServiceType,
     [property: JsonPropertyName("language")] string Language,
     [property: JsonPropertyName("stops")] IReadOnlyList<LalamoveParada> Stops,
@@ -25,7 +26,19 @@ public sealed record LalamoveCotacaoResponse(
     [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt,
     [property: JsonPropertyName("stops")] IReadOnlyList<LalamoveParada> Stops,
     [property: JsonPropertyName("priceBreakdown")] LalamovePreco PriceBreakdown,
-    [property: JsonPropertyName("isRouteOptimized")] bool IsRouteOptimized);
+    [property: JsonPropertyName("isRouteOptimized")] bool IsRouteOptimized,
+    [property: JsonPropertyName("distance")] LalamoveDistancia? Distance = null);
+public sealed record LalamoveDistancia(
+    [property: JsonPropertyName("value")] string Value,
+    [property: JsonPropertyName("unit")] string Unit);
+/// <summary><c>GET /v3/cities</c>: os tipos de veículo do mercado vêm daqui, não de enum fixo.</summary>
+public sealed record LalamoveCidade(
+    [property: JsonPropertyName("locode")] string Locode,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("services")] IReadOnlyList<LalamoveServico>? Services);
+public sealed record LalamoveServico(
+    [property: JsonPropertyName("key")] string Key,
+    [property: JsonPropertyName("description")] string? Description);
 public sealed record LalamoveContato(
     [property: JsonPropertyName("stopId")] string StopId,
     [property: JsonPropertyName("name")] string Name,

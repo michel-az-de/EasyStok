@@ -106,11 +106,14 @@ await provar('hash/histórico usam rotas existentes; origem inválida volta ao c
   assert.deepEqual(destinos.map(hash => rotaDaHash(hash, { fonteApi: true }).tipo), ['hall', 'principal', 'cozinha', 'entregas', 'principal', 'hall'])
   assert.equal(contextoDaAjuda({ tipo: 'foo', modulo: 'https://invalido/?token=secreto' }, true).titulo, 'Módulos')
 })
-await provar('produção antiga da Cozinha orienta para cadastro real sem fingir escrita', () => {
+// #1891: a produção antiga da Cozinha (Em preparação) está congelada; a rota cai na Fila de preparo
+// e a ajuda é a da Fila, sem atalho para outro módulo.
+await provar('produção antiga da Cozinha congelada: a rota cai na Fila e a ajuda é a da Fila', () => {
   const caminho = rotaDaHash('#/m/cozinha/producao', { fonteApi: true })
+  assert.equal(caminho.tela, 'fila')
   const api = contextoDaAjuda(caminho, true)
-  assert.match(api.passos[0], /ainda não está disponível/)
-  assert.equal(hashDoModulo(api.atalho.modulo, api.atalho.tela), '#/m/producao/producao')
+  assert.equal(api.titulo, 'Cozinha · Fila de preparo')
+  assert.equal(api.atalho, null)
   assert.equal(contextoDaAjuda(caminho, false).atalho, null)
 })
 await provar('diagnóstico usa allowlist e nunca inclui sessão, URL ou erro arbitrário', () => {

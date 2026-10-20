@@ -29,7 +29,8 @@ namespace EasyStock.Application.UseCases.Storefront.Agendamento;
 ///
 /// <para>
 /// <strong>Prazo mínimo</strong> (S16, RN-21): com <c>PrazoMinimoMinutos</c>, janela cujo início seja antes
-/// de agora + prazo (fuso da loja) sai da lista. É o que o agente oferece ao cliente.
+/// de agora + prazo (fuso da loja) sai da lista. É o que o agente oferece ao cliente. Sem prazo (site) vale
+/// 0: a janela que já começou hoje não é oferecida (#1874).
 /// </para>
 /// </summary>
 public sealed class ListarJanelasDisponiveisUseCase(
@@ -128,8 +129,8 @@ public sealed class ListarJanelasDisponiveisUseCase(
                 if (CalculadoraPrazoPedido.JanelaJaPassou(data, janela.HoraFim, agoraUtc))
                     continue;
 
-                if (input.PrazoMinimoMinutos is { } prazo
-                    && !CalculadoraPrazoPedido.AtendePrazo(data, janela.HoraInicio, agoraUtc, prazo))
+                // #1874: sem prazo informado (site) vale 0, e janela cujo início já passou não é oferecida.
+                if (!CalculadoraPrazoPedido.AtendePrazo(data, janela.HoraInicio, agoraUtc, input.PrazoMinimoMinutos ?? 0))
                     continue;
 
                 var ocupadas = contagens.TryGetValue((janela.Id, data), out var c) ? c : 0;

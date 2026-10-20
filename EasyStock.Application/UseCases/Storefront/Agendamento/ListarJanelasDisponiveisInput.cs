@@ -4,7 +4,7 @@ namespace EasyStock.Application.UseCases.Storefront.Agendamento;
 /// Input para <see cref="ListarJanelasDisponiveisUseCase"/>.
 /// Datas nulas usam default (hoje..hoje+14d). CEP nulo desativa filtro por zona.
 /// <see cref="PrazoMinimoMinutos"/> (S16, RN-21) tira a janela cujo início, no fuso da loja, seja antes
-/// de agora + prazo; nulo não corta (site).
+/// de agora + prazo; nulo (site) vale 0: só fica a janela que ainda não começou (#1874).
 /// </summary>
 public record ListarJanelasDisponiveisInput(
     string Slug,

@@ -205,4 +205,15 @@ confere('#1474: início distante mostra a hora, não centenas de minutos', () =>
     /^Começar em 11\/10 às 09:30$/)
 })
 
+// #1899 (#1883, parte do console): um nome só para o pedido. Com numeroComanda, "Comanda N" e o curto
+// vira referência; sem ele, o curto sozinho (sem inventar número). O KDS e as Entregas usam esta função.
+const { nomeDoPedido } = await import('../src/dominio/pedido.js')
+confere('#1899: nome do pedido é "Comanda N" quando a API entrega o número; o curto vira referência', () => {
+  assert.deepEqual(nomeDoPedido({ numeroComanda: 12, numeroCurto: '76A32A4D' }),
+    { principal: 'Comanda 12', referencia: '76A32A4D', frase: 'Comanda 12', titulo: 'Comanda 12 · ref 76A32A4D' })
+  assert.deepEqual(nomeDoPedido({ numeroCurto: '76A32A4D' }), { principal: '76A32A4D', referencia: null, frase: 'Pedido 76A32A4D', titulo: '76A32A4D' })
+  assert.deepEqual(nomeDoPedido({ numeroComanda: null, numeroCurto: null }), { principal: '', referencia: null, frase: 'Pedido', titulo: '' })
+  assert.equal(nomeDoPedido(undefined).principal, '')
+  assert.equal(nomeDoPedido({ numeroComanda: 0, numeroCurto: 'A1B2' }).principal, 'A1B2', 'zero não é comanda')
+})
 console.log(`prova #1446 (cozinha viva no modo API): ${passou} conferências ok`)
