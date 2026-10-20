@@ -84,7 +84,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 
 # GIT_SHA do commit (passado via --build-arg). Declarado so no runtime para nao
 # invalidar o cache das camadas de build/publish a cada commit. Exposto em
-# /health/version (buildSha) para deploy-verify provar a versao da API no ar.
+# /health/version (buildSha) para o vps-deploy.sh provar a versao da API no ar.
 # Espelha Dockerfile.Web (#572).
 ARG GIT_SHA=unknown
 ENV GIT_SHA=$GIT_SHA

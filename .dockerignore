@@ -23,7 +23,6 @@ EasyStock.*.Tests/
 EasyStock.ArchitectureTests/
 EasyStock.Benchmarks/
 EasyStock.Infra.MongoDb.IntegrationTests/
-k8s/
 scripts/
 !scripts/docker/
 !scripts/docker/api-entrypoint.sh
@@ -35,5 +34,4 @@ git_*.err
 **/TestResults/
 EasyStok.Mobile/
 docker-compose*.yml
-azure-pipelines.yml*
 *.disabled

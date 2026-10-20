@@ -6,7 +6,7 @@ Regras comuns a qualquer agente (Claude Code, Codex, Kimi, Copilot). Claude Code
 
 - Stack: .NET 10 (`global.json`), PostgreSQL, EF Core, Clean Architecture. Solução `EasyStok.sln`.
 - Frentes: API `EasyStock.Api`, console React `EasyStock.Console/` (ADR-0054, destino dos módulos), PWA em `EasyStock.Api/wwwroot/pwa/` (backup offline, ADR-0059), API mobile em `EasyStock.Api/Mobile` (ADR-0019). `EasyStock.Web` (Razor) não recebe tela nova (ADR-0059).
-- Produção: VPS `/opt/stacks/easystok`, publicada por `scripts/deploy/vps-deploy.sh` (só o Felipe ou sessão autorizada). Fly.io, Render e Azure App Service estão desligados; `fly.toml` e workflows antigos são histórico.
+- Produção: VPS `/opt/stacks/easystok`, publicada por `scripts/deploy/vps-deploy.sh` (só o Felipe ou sessão autorizada). Fly.io, Render e Azure estão desligados e seus arquivos saíram do repositório (#1890); o histórico fica no git.
 - Multi-tenant é risco máximo: `EmpresaId` do JWT em toda leitura e escrita, filtro global + checagem no use case, 400 se divergir.
 
 ## Fonte da verdade

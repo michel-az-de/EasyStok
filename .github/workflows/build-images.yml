@@ -1,12 +1,9 @@
 # build-images — builda as imagens da VM (api/web/worker) no CI e pusha pro GHCR.
 # Poda P01 (#1169): a imagem do Admin saiu junto com o projeto.
-# Issue 605: o gargalo do deploy era o dotnet publish rodando NA VM (1,9 GB RAM,
-# swap thrashing → janela de ~2h). Com as imagens prontas no registry, a VM só
-# faz `docker compose pull` (vm-deploy.sh em modo pull, fatia 3).
+# Issue 605: as imagens prontas no registry servem de reserva e de prova de que o Dockerfile
+# builda no CI. A VPS hoje builda local pelo scripts/deploy/vps-deploy.sh (#1890).
 #
-# - Tags: :latest e :<sha do commit>. O vm-deploy.sh (modo pull) puxa :<sha> do
-#   HEAD — se este workflow ainda não terminou (ou falhou), o pull falha e o
-#   deploy aborta sem trocar nada: o CI vira gate natural do deploy.
+# - Tags: :latest e :<sha do commit>.
 # - GIT_SHA via build-arg, declarado só no estágio runtime dos Dockerfiles —
 #   não invalida o cache de camadas (issue 572).
 # - Cache buildx type=gha com escopo por imagem (restore/publish do NuGet ficam
@@ -18,8 +15,7 @@ on:
     branches: [master, main]
   workflow_dispatch:
 
-# Push novo em master cancela o build do commit anterior: o HEAD avançou, e o
-# vm-deploy pull-mode só procura a tag do HEAD atual.
+# Push novo em master cancela o build do commit anterior: so a tag do HEAD atual interessa.
 concurrency:
   group: build-images-${{ github.ref }}
   cancel-in-progress: true
@@ -41,7 +37,7 @@ jobs:
           - name: web
             dockerfile: Dockerfile.Web
           # #878: o Worker (outbox/notificacoes/SLA/jobs de cobranca) nao era buildado
-          # nem deployado na VM canonica. Sem esta imagem, o docker-compose.azure.yml nao
+          # nem deployado na VM canonica. Sem esta imagem, o compose da VPS nao
           # tem servico worker e nada de background roda em prod.
           - name: worker
             dockerfile: EasyStock.Worker/Dockerfile
@@ -73,27 +69,3 @@ jobs:
           cache-from: type=gha,scope=easystok-${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=easystok-${{ matrix.name }}
 
-  # Transicao da poda P01 (#1169). O vm-deploy.sh em modo pull roda ANTES do git pull,
-  # ou seja, com a versao antiga dele e do compose, que ainda pedem `pull ... admin` na
-  # tag do sha novo. Sem essa tag o deploy aborta (exit 4) em todo cron. Aqui a ultima
-  # imagem do Admin ganha a tag do sha novo, sem build. Sai na P06, depois que a VM
-  # tiver feito um deploy com este commit.
-  admin-tag-transicao:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Reaponta easystok-admin:latest para o sha
-        run: >
-          docker buildx imagetools create
-          -t ghcr.io/${{ github.repository_owner }}/easystok-admin:${{ github.sha }}
-          ghcr.io/${{ github.repository_owner }}/easystok-admin:latest

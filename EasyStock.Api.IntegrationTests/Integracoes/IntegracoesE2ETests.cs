@@ -32,6 +32,7 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
 {
     private PostgreSqlContainer? _pg;
     private bool _isAvailable;
+    private readonly VariaveisDeProcesso _variaveis = new();
 
     private const string JwtIssuer = "EasyStock";
     private const string JwtAudience = "EasyStock";
@@ -58,6 +59,7 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        _variaveis.Dispose();
         if (_pg is not null) await _pg.DisposeAsync();
     }
 
@@ -84,13 +86,19 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
         }
 
         // ConfigureAppConfiguration chega tarde para o Program.cs ler a connection string (mesmo
-        // contorno do SeedFlowIntegrationTests).
-        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _pg.GetConnectionString());
-        Environment.SetEnvironmentVariable("Database__Provider", "PostgreSql");
+        // contorno do SeedFlowIntegrationTests). Devolvido no DisposeAsync (#1890).
+        _variaveis
+            .Definir("ConnectionStrings__DefaultConnection", _pg.GetConnectionString())
+            .Definir("Database__Provider", "PostgreSql");
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseEnvironment("Development");
+            b.UseSetting("Database:Provider", "PostgreSql");
+            b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString()); // #1890: chega antes do Program.cs ler a conexao
+            b.UseSetting("Jwt:SecretKey", JwtSecret); // #1890: AddJwtBearer le o segredo no startup; sem isto a API valida com o segredo do appsettings e responde 401
+            b.UseSetting("Jwt:Issuer", JwtIssuer);
+            b.UseSetting("Jwt:Audience", JwtAudience);
             b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(config));
             b.ConfigureTestServices(s =>
             {
@@ -100,14 +108,16 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
         });
     }
 
-    private static string GerarJwt(Guid empresaId)
+    private static string GerarJwt(Guid empresaId, Guid usuarioId)
     {
         var creds = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSecret)), SecurityAlgorithms.HmacSha256);
+        // #1352: o JwtBearer valida a sessao no OnTokenValidated e exige `sub` de usuario real e ativo mais `iat`.
         var claims = new List<Claim>
         {
-            new("sub", Guid.NewGuid().ToString()),
+            new("sub", usuarioId.ToString()),
             new("nivel", "Admin"),
             new("empresaId", empresaId.ToString()),
+            new("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
         };
         var token = new JwtSecurityToken(JwtIssuer, JwtAudience, claims, expires: DateTime.UtcNow.AddMinutes(30), signingCredentials: creds);
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -115,16 +125,21 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
 
     private static async Task<HttpClient> ClienteDaEmpresaAsync(WebApplicationFactory<Program> factory, Guid empresaId)
     {
+        Guid usuarioId;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             using var _ = db.UseRowLevelSecurityBypass();
             db.Empresas.Add(new Empresa { Id = empresaId, Nome = "E2E Integrações", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            // Usuario real: a validacao de sessao (#1352) recusa `sub` que nao existe no banco (#1890).
+            var usuario = Usuario.Criar("E2E Integrações", $"e2e-integracoes-{empresaId:N}@example.test", "sem-login-por-senha");
+            db.Usuarios.Add(usuario);
             await db.SaveChangesAsync();
+            usuarioId = usuario.Id;
         }
 
         var http = factory.CreateClient();
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GerarJwt(empresaId));
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GerarJwt(empresaId, usuarioId));
         return http;
     }
 

@@ -108,3 +108,59 @@ jobs:
           name: test-results
           path: ./TestResults/**/*.trx
           retention-days: 14
+
+  # #1890: os 176 testes de EasyStock.Api.IntegrationTests (API inteira + Postgres real por
+  # Testcontainers) ficavam fora do EasyStok.CI.slnf desde #824 e vermelhos no coverage sem
+  # ninguem ver. Job proprio para nao estourar o teto do gate acima (#912). Cada classe sobe o
+  # proprio container e passa conexao e JWT por UseSetting, que chega antes de o Program.cs ler
+  # a configuracao (ConfigureAppConfiguration chega tarde). Sem EASYSTOCK_IT_PG de proposito:
+  # com ela as classes usariam o banco compartilhado do job acima, que sofre DROP SCHEMA dos
+  # fixtures de RLS.
+  api-integration:
+    name: Api.IntegrationTests (Postgres real)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Imagem do Postgres por espelho
+        run: bash scripts/ci/puxar-imagem.sh postgres:17-alpine
+
+      - name: Restore
+        run: dotnet restore EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj
+
+      - name: Build
+        run: dotnet build EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj -c Release --no-restore -warnaserror
+
+      - name: Test
+        env:
+          EASYSTOK_SCRIBAN_TIMEOUT_MS: '2000'
+          TESTCONTAINERS_RYUK_DISABLED: 'true'
+        run: >-
+          dotnet test EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj
+          -c Release --no-build --no-restore
+          --logger "trx;LogFileName=api-integration.trx"
+          --logger "console;verbosity=normal"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-integration-results
+          path: ./TestResults/**/*.trx
+          retention-days: 14
