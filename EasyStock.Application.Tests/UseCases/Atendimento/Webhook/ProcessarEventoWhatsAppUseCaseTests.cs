@@ -1,3 +1,4 @@
+using EasyStock.Domain.Sales;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Tests.Services.Atendimento;
 using EasyStock.Application.Events.Atendimento;
@@ -46,6 +47,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
     private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
     private readonly IPublicadorEventoIntegracao _publicadorEventos = Substitute.For<IPublicadorEventoIntegracao>();
     private readonly IExpedienteLojaRepository _expedientes = Substitute.For<IExpedienteLojaRepository>();
+    private readonly IPedidoRepository _pedidoRepository = Substitute.For<IPedidoRepository>();
     // 12:00 em São Paulo: dentro do expediente padrão (08–22 h); quem testa loja fechada muda o relógio.
     private readonly FakeTimeProvider _relogio = new(new DateTimeOffset(2026, 10, 8, 15, 0, 0, TimeSpan.Zero));
     private readonly Guid _empresaId = Guid.NewGuid();
@@ -80,7 +82,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
             _relogio,
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance,
             _publicadorEventos,
-            transcritor);
+            transcritor,
+            _pedidoRepository);
 
     private void ConfigurarCenario()
     {
@@ -200,6 +203,54 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
         await _publicadorEventos.DidNotReceiveWithAnyArgs().PublicarAsync<ConversaAbertaEvent>(
             default, default!, default!, default, default!, default, default, default, default);
+    }
+
+    /// <summary>
+    /// #1765-5: o cliente escreve depois do encerramento com o pedido ainda em andamento. A conversa anterior volta
+    /// (como em <c>ReabrirConversaUseCase</c>), em vez de nascer outra sem o pedido.
+    /// </summary>
+    [Fact]
+    public async Task EntradaDepoisDoEncerramentoComPedidoEmAndamentoReabreAConversa()
+    {
+        var pedido = Pedido.Criar(_empresaId, origem: "whatsapp");
+        pedido.Status = StatusPedidoMapper.Preparando;
+        var encerrada = ConversaEncerradaComPedido(pedido.Id);
+        _pedidoRepository.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.reabre1", "Mudou o horário?"));
+
+        await _conversaRepository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        encerrada.EstaAberta.Should().BeTrue();
+        encerrada.PedidoEmAndamentoId.Should().Be(pedido.Id);
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.ConversaId == encerrada.Id && m.Texto == "Mudou o horário?"), Arg.Any<CancellationToken>());
+        await _unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task EntradaDepoisDoEncerramentoComPedidoEntregueAbreOutraConversa()
+    {
+        var pedido = Pedido.Criar(_empresaId, origem: "whatsapp");
+        pedido.Status = StatusPedidoMapper.Entregue;
+        var encerrada = ConversaEncerradaComPedido(pedido.Id);
+        _pedidoRepository.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.reabre2", "Oi de novo"));
+
+        await _conversaRepository.Received(1).AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>());
+        encerrada.EstaAberta.Should().BeFalse();
+    }
+
+    private Conversa ConversaEncerradaComPedido(Guid pedidoId)
+    {
+        var encerrada = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddHours(-3), "Fulano");
+        encerrada.RegistrarEntrada(DateTime.UtcNow.AddHours(-3));
+        encerrada.DefinirPedidoEmAndamento(pedidoId);
+        encerrada.Encerrar(DateTime.UtcNow.AddHours(-1));
+        _conversaRepository.ObterUltimaEncerradaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
+            .Returns(encerrada);
+        _conversaRepository.ObterPorIdComLockAsync(_empresaId, encerrada.Id, Arg.Any<CancellationToken>()).Returns(encerrada);
+        return encerrada;
     }
 
     [Fact]

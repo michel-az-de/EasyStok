@@ -522,6 +522,7 @@ export function BarraProximoPasso({
       )}
 
       {confirmando === 'cancelar' && (
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape em qualquer campo fecha a confirmação; o form é o único ancestral comum.
         <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
           evento.preventDefault()
           if (!emVoo && !(fonteApi && motivoCancelar.trim().length < 3)) confirmarCancelamento()
@@ -545,6 +546,7 @@ export function BarraProximoPasso({
       )}
 
       {confirmando === 'estornar' && (
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- idem
         <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
           evento.preventDefault()
           if (emVoo || !estornoValido) return
@@ -585,6 +587,7 @@ export function BarraProximoPasso({
       )}
 
       {confirmando === 'desfazer' && (
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- idem
         <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
           evento.preventDefault()
           if (!emVoo && motivoDesfazer.trim().length >= 3) confirmarDesfazer()
@@ -618,6 +621,7 @@ export function BarraProximoPasso({
       )}
 
       {confirmando === 'voltar' && (
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- idem
         <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
           evento.preventDefault()
           if (!emVoo) confirmarCorrecao(() => aoVoltarEtapa(), 'Não foi possível voltar a etapa. Tente de novo.')

@@ -115,9 +115,10 @@ export const CartaoConversa = memo(function CartaoConversa({
   // aviso de esteira e nota não zeram a contagem.
   const pendentes = pendentesDaLinha(conversa)
   // #1868: o genérico "Visitante do site" cede o nome à comanda; a etiqueta da passagem vira o
-  // trilho lateral do cartão (`.precisa`) e o texto fica para o leitor de tela.
+  // trilho lateral do cartão (`.precisa`) e o texto fica para o leitor de tela. #1899: Automático e
+  // Com você também saem da etiqueta (quem conduz está na BarraModo).
   const nome = nomeDoCartao(conversa)
-  const etiqueta = mostraEtiquetaDoEstado(motivo)
+  const etiqueta = mostraEtiquetaDoEstado(estado)
 
   return (
     <button

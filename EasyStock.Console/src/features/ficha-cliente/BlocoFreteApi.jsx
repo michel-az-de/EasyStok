@@ -3,11 +3,14 @@ import { Botao } from '../../componentes/Botao'
 import { ModalFrete } from '../../componentes/ModalFrete'
 import { useFretesApi, useLogisticaDeDemonstracao } from '../../aplicacao/useFretesApi'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { congelado } from '../../dominio/congelados'
 import { hashDoModulo } from '../../dominio/modulos'
 import css from './comanda.module.css'
 
 export function ConsultaTransporte({ semPedido = false }) {
   const { permite } = useAcessoModulos()
+  // #1891: o link externo da Lalamove está congelado; a entrega é combinada com o entregador próprio.
+  if (congelado('lalamove')) return null
   return <div className={css.consultaTransporte}>
     <a href="https://web.lalamove.com/" target="_blank" rel="noopener noreferrer"
       aria-label="Consultar Lalamove (site externo, abre em nova aba)">Consultar Lalamove ↗</a>
@@ -25,7 +28,7 @@ export function BlocoFreteApi({ pedido, cliente, numero, endereco }) {
   // #1839: contratar o transporte é do módulo Entregas (viagem e corrida); o pedido do cliente não
   // repete o atalho do Lalamove. Na loja de verdade o bloco some; fica só a comparação da demonstração.
   const demonstracao = useLogisticaDeDemonstracao(pedido.pedidoId)
-  if (!demonstracao) return null
+  if (congelado('lalamove') || !demonstracao) return null
   return <Bloco titulo="Transporte e rastreio">
     <p>A comparação integrada abaixo é uma demonstração, sem chamada de entregador externo.</p>
     <Botao onClick={() => fretes.abrir({ titulo: `Entrega de ${cliente}`, pedidoId: pedido.pedidoId, pedidos: [{

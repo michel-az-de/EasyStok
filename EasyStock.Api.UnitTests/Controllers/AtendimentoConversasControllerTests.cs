@@ -1000,6 +1000,14 @@ public partial class AtendimentoConversasControllerTests
         public Task<SituacaoConversa?> ObterSituacaoAsync(Guid empresaId, Guid id, CancellationToken ct = default) =>
             Task.FromResult(Conversas.FirstOrDefault(c => c.EmpresaId == empresaId && c.Id == id)?.Situacao);
 
+        public Task<Conversa?> ObterUltimaEncerradaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default)
+        {
+            var contato = Conversa.NormalizarContato(canal, contatoIdExterno);
+            return Task.FromResult(Conversas.Where(c =>
+                    c.EmpresaId == empresaId && c.Canal == canal && c.ContatoIdExterno == contato && !c.EstaAberta)
+                .OrderByDescending(c => c.EncerradaEm).FirstOrDefault());
+        }
+
         public Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default)
         {
             var contato = Conversa.NormalizarContato(canal, contatoIdExterno);

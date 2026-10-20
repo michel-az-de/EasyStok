@@ -40,7 +40,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     TimeProvider relogio,
     ILogger<ProcessarEventoWhatsAppUseCase> logger,
     IPublicadorEventoIntegracao? publicadorEventos = null,
-    Ports.Output.Ai.ITranscritorAudio? transcritor = null)
+    Ports.Output.Ai.ITranscritorAudio? transcritor = null,
+    IPedidoRepository? pedidos = null)
 {
     private const string Provedor = "meta_whatsapp";
 
@@ -256,7 +257,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, DateTime enviadaEm, CancellationToken ct)
     {
         IdentificacaoCliente? identificacao = null;
-        var existenteConversa = await conversaRepository.ObterAbertaPorContatoComLockAsync(empresaId, CanalConversa.WhatsApp, msg.De, ct);
+        var existenteConversa = await conversaRepository.ObterAbertaPorContatoComLockAsync(empresaId, CanalConversa.WhatsApp, msg.De, ct)
+            ?? await ReabrirSePedidoEmAndamentoAsync(empresaId, msg.De, enviadaEm, ct);
         var nomePerfil = entrada.Contatos.FirstOrDefault(c => c.WaId == msg.De)?.Nome;
         var conversa = existenteConversa ?? Conversa.Abrir(empresaId, msg.De, enviadaEm, nomePerfil);
         // #1332: responder no wa_id que escreveu, não na grafia antiga com/sem o nono dígito.
@@ -303,6 +305,28 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
         await unitOfWork.CommitAsync();
         return (conversa, mensagemEntidade, configuracao, identificacao);
+    }
+
+    /// <summary>
+    /// #1765-5: o cliente escreveu depois do encerramento e o pedido daquele atendimento ainda está em andamento.
+    /// A conversa anterior volta (como em <see cref="Inbox.ReabrirConversaUseCase"/>: fila humana, sem renovar a
+    /// janela do canal) em vez de nascer outra sem o pedido. Relida sob trava: outro evento pode ter reaberto antes.
+    /// </summary>
+    private async Task<Conversa?> ReabrirSePedidoEmAndamentoAsync(Guid empresaId, string contato, DateTime agora, CancellationToken ct)
+    {
+        if (pedidos is null) return null;
+        var encerrada = await conversaRepository.ObterUltimaEncerradaPorContatoAsync(empresaId, CanalConversa.WhatsApp, contato, ct);
+        if (encerrada?.PedidoEmAndamentoId is not { } pedidoId) return null;
+        var pedido = await pedidos.GetByIdAsync(empresaId, pedidoId);
+        if (pedido is null || pedido.EmpresaId != empresaId || pedido.EstaFinalizado) return null;
+
+        var travada = await conversaRepository.ObterPorIdComLockAsync(empresaId, encerrada.Id, ct);
+        if (travada is null) return null;
+        if (travada.EstaAberta) return travada;
+        travada.Reabrir(agora);
+        logger.LogInformation("Webhook WhatsApp: conversa {ConversaId} reaberta pela entrada do cliente; pedido {PedidoId} em andamento.",
+            travada.Id, pedidoId);
+        return travada;
     }
 
     /// <summary>

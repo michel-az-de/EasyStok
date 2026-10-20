@@ -15,6 +15,8 @@ public static class MercadoPagoServiceCollectionExtensions
     /// simulador (<c>MercadoPago:UseStub=true</c>, nunca em Production), cliente real (há
     /// <c>MercadoPago:AccessToken</c>) ou não configurado. Em Production a subida falha com simulador,
     /// com token <c>TEST-</c> ou com <c>BaseUrl</c> que não seja <c>https://api.mercadopago.com</c>.
+    /// Com credencial real (não <c>TEST-</c>), em qualquer ambiente, <c>NotificationUrl</c> e <c>BackUrlSuccess</c>
+    /// são obrigatórias (#1724-8): sem elas nenhum webhook chega e o link nunca baixa sozinho.
     /// </summary>
     /// <param name="ambiente">Nome do ambiente do host; vazio vale Production (falha fechado).</param>
     public static IServiceCollection AddMercadoPagoClient(
@@ -44,6 +46,7 @@ public static class MercadoPagoServiceCollectionExtensions
         }
         else
         {
+            ExigirUrlsDaCredencialReal(configuration, token);
             services.Configure<MercadoPagoOptions>(configuration.GetSection(MercadoPagoOptions.Section));
 
             // S32: registra a PORTA como client tipado. O antigo AddHttpClient<MercadoPagoClient> +
@@ -59,6 +62,22 @@ public static class MercadoPagoServiceCollectionExtensions
         services.AddScoped<IEstornoPedidoGateway, MercadoPagoEstornoPedidoGateway>();
 
         return services;
+    }
+
+    /// <summary>
+    /// #1724-8: com credencial real o Mercado Pago precisa saber para onde mandar o webhook e para onde devolver o
+    /// cliente (<c>auto_return=approved</c>). Sem as URLs a API subia calada e o pagamento aprovado ficava pendente.
+    /// Credencial <c>TEST-</c> (sandbox local) não exige: o fluxo é conferido pela consulta ao provedor.
+    /// </summary>
+    private static void ExigirUrlsDaCredencialReal(IConfiguration configuration, string token)
+    {
+        if (token.TrimStart().StartsWith("TEST-", StringComparison.OrdinalIgnoreCase)) return;
+        if (string.IsNullOrWhiteSpace(configuration["MercadoPago:NotificationUrl"]))
+            throw new InvalidOperationException(
+                "MercadoPago:NotificationUrl é obrigatória com credencial de produção: sem ela nenhum webhook chega e o link nunca baixa sozinho. Defina MercadoPago__NotificationUrl (https://<host da API>/api/webhooks/mercadopago).");
+        if (string.IsNullOrWhiteSpace(configuration["MercadoPago:BackUrlSuccess"]))
+            throw new InvalidOperationException(
+                "MercadoPago:BackUrlSuccess é obrigatória com credencial de produção: o retorno automático do Checkout Pro precisa de uma página de destino. Defina MercadoPago__BackUrlSuccess.");
     }
 
     /// <summary>Mensagens sem o valor do token: a exceção de subida vai para o log.</summary>

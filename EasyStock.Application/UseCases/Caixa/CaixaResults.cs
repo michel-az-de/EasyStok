@@ -37,7 +37,12 @@ public sealed record FechamentoCaixaResult(
     Guid? FechadoPorUserId,
     string? FechadoPorNome,
     string? Observacoes,
-    DateTime FechadoEm
+    DateTime FechadoEm,
+    /// <summary>
+    /// #1776-11: dinheiro físico que ficou na gaveta ao fechar (abertura + entradas e vendas em dinheiro − saídas em
+    /// dinheiro), pela conta de <see cref="GavetaCaixa"/>. Nulo quando a listagem não recalculou o dia.
+    /// </summary>
+    decimal? DinheiroNaGaveta = null
 );
 
 /// <summary>

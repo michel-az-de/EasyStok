@@ -87,6 +87,19 @@ export const comandaTravada = (pedido, { fonteApi = false } = {}) => fonteApi &&
 // usam de relance (ex.: "2026-0186" vira "0186").
 export const numeroCurto = (numero) => String(numero).split('-').at(-1)
 
+// #1883 (parte do console, #1899): um nome só para o pedido nas três telas. "Comanda N" é o que a
+// atendente e o cliente dizem em voz alta; o código curto do EasyStok (8 letras do id) fica como
+// referência pequena para achar o pedido no suporte. Enquanto a API não entrega `numeroComanda`
+// em Entregas e KDS, vale o curto sozinho, sem inventar número.
+export function nomeDoPedido({ numeroComanda = null, numeroCurto = null } = {}) {
+  const curto = numeroCurto ? String(numeroCurto) : null
+  if (numeroComanda) {
+    const frase = `Comanda ${numeroComanda}`
+    return { principal: frase, referencia: curto, frase, titulo: curto ? `${frase} · ref ${curto}` : frase }
+  }
+  return { principal: curto ?? '', referencia: null, frase: curto ? `Pedido ${curto}` : 'Pedido', titulo: curto ?? '' }
+}
+
 // #1474 (R6): no modo API o número é o do EasyStok (8 letras, o mesmo da Cozinha e das
 // Entregas). Antes de o pedido existir não há número: o "0001" local seria inventado.
 export function numeroDaComanda(pedido, { fonteApi = false } = {}) {

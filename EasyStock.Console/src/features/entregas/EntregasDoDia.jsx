@@ -5,6 +5,7 @@ import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { Chip } from '../../componentes/Chip'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
+import { congelado } from '../../dominio/congelados'
 import { dataIsoNoFuso, listaEmPortugues, plural } from '../../dominio/formato'
 import { pdfDoRoteiro } from '../../dominio/impressao'
 import { resumoDoRoteiro, rotuloDaData, situacaoDoPagamento, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
@@ -62,7 +63,7 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens, aoReagend
   return (
     <li className={css.cartao}>
       <div className={css.linha}>
-        <span className={css.numero}>{pedido.numero}</span>
+        <span className={css.numero} title={pedido.identificacao?.titulo || undefined}>{pedido.identificacao?.principal ?? pedido.numero}{pedido.identificacao?.referencia && <small className={css.referencia}>ref {pedido.identificacao.referencia}</small>}</span>
         <span className={css.cresce}>{pedido.cliente}{pedido.apto ? ` · apto ${pedido.apto}` : ''}</span>
         <Pilula tom={tomDaEtapa(pedido)}>{pedido.rotulo}</Pilula>
       </div>
@@ -96,7 +97,7 @@ function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens, aoReagenda
       <div className={css.linha}>
         <h3 className={css.cresce}>{titulo}</h3>
         <span className={css.numero}>{grupo.capacidade ? `${n} de ${grupo.capacidade} vagas` : plural(n, 'entrega', 'entregas')}</span>
-        {n > 0 && <Botao variante="secundario" disabled={ocupado} onClick={() => aoCotar(grupo)}>Cotar esta janela</Botao>}
+        {n > 0 && !congelado('lalamove') && <Botao variante="secundario" disabled={ocupado} onClick={() => aoCotar(grupo)}>Cotar esta janela</Botao>}
       </div>
       {grupo.bloqueio && <p className={css.linha}><Pilula tom="aviso">Bloqueada</Pilula> <span className={css.apoio}>{grupo.bloqueio}</span></p>}
       {n > 0 && (
@@ -123,7 +124,8 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
     <>
       <section className={css.secao} aria-label="Dia das entregas">
         <EscolhaDoDia dia={dia} mudarDia={mudarDia} />
-        <Botao variante="texto" className={css.acaoDoDia} onClick={() => fretes.abrir({ titulo: 'Transportes do dia', dia, selecionarTodos: false, pedidos: roteiro?.grupos.flatMap((g) => g.pedidos) ?? [] })}>Organizar transportes</Botao>
+        {/* #1891: cotação e chamado da Lalamove estão congelados; o despacho é do entregador próprio. */}
+        {!congelado('lalamove') && <Botao variante="texto" className={css.acaoDoDia} onClick={() => fretes.abrir({ titulo: 'Transportes do dia', dia, selecionarTodos: false, pedidos: roteiro?.grupos.flatMap((g) => g.pedidos) ?? [] })}>Organizar transportes</Botao>}
         {roteiro && (
           <div className={css.cabecalhoDoDia}>
             <div className={css.cresce}>

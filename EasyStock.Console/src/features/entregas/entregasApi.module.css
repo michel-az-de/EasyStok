@@ -18,7 +18,11 @@
 .cartao > button { align-self: flex-start; }
 .linha { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .numero { font-family: var(--f-dado); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* #1899: o código curto do EasyStok vira referência pequena ao lado de "Comanda N". */
+.referencia { margin-left: var(--e-1); font-family: var(--f-corpo); font-size: var(--t-apoio); font-weight: 400; color: var(--tinta-2); }
 .apoio { color: var(--tinta-2); font-size: var(--t-apoio); }
+/* #1899: <output> de confirmação em bloco, como o <p> que substituiu. */
+.bloco { display: block; }
 .cresce { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .faixa {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); margin: 0;

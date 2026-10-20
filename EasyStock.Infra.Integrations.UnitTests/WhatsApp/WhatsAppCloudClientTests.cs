@@ -29,7 +29,7 @@ public class WhatsAppCloudClientTests
     }
 
     private static WhatsAppCloudClient BuildClient(
-        SequenceHandler handler, string? phoneNumberIdDoTenant = null, string phoneNumberIdGlobal = "1234567890",
+        HttpMessageHandler handler, string? phoneNumberIdDoTenant = null, string phoneNumberIdGlobal = "1234567890",
         bool? haTenant = null, ResiliencePipelineProvider<string>? pipelines = null, string? tokenDoTenant = null)
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://graph.test/v19.0/") };
@@ -461,6 +461,33 @@ public class WhatsAppCloudClientTests
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json")
             };
+        }
+    }
+
+    /// <summary>
+    /// #1765-1 / #1724-9: o timeout do pipeline depois do POST não prova que a Meta não recebeu. Sai como
+    /// <see cref="TimeoutException"/>, que o atendimento classifica como falha incerta (sem reenvio automático),
+    /// não como a exceção do Polly, que caía em "permanente" e acionava a reserva por SMS.
+    /// </summary>
+    [Fact]
+    public async Task TimeoutDoPipelineNoEnvioViraTimeoutException()
+    {
+        var pipeline = new ResiliencePipelineBuilder().AddTimeout(TimeSpan.FromMilliseconds(50)).Build();
+        var provider = Substitute.For<ResiliencePipelineProvider<string>>();
+        provider.GetPipeline(Arg.Any<string>()).Returns(pipeline);
+        var client = BuildClient(new HandlerQueNaoResponde(), pipelines: provider);
+
+        var act = () => client.EnviarTextoAsync("5511999998888", "Oi");
+
+        await act.Should().ThrowAsync<TimeoutException>();
+    }
+
+    private sealed class HandlerQueNaoResponde : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("nunca responde");
         }
     }
 }

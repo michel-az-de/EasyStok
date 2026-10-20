@@ -39,7 +39,8 @@ async function prepararImagem(titulo, arquivo, aprovar) {
   if (aprovar && !imagem.aprovadoEm) await post(`/api/acervo/imagens/${imagem.id}/aprovar`)
   return imagem
 }
-const foto = await prepararImagem('Foto aprovada da prova 1841', '../src/assets/hero.png', true)
+// #1891: hero.png saiu do repositório; as duas imagens de laboratório usam a mesma marca (títulos distintos).
+const foto = await prepararImagem('Foto aprovada da prova 1841', '../src/assets/casa-da-baba.png', true)
 await prepararImagem('Foto ainda não aprovada 1841', '../src/assets/casa-da-baba.png', false)
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' })

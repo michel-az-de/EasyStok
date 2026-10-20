@@ -134,7 +134,8 @@ public class PedidosControllerTests
         _controller = new PedidosController(
             criar, status, cancelar, agendamento,
             listar, obter, addItem, removeItem, addPag, removePag,
-            finalizarBalcao, _currentUser);
+            finalizarBalcao, _currentUser, Substitute.For<IIdempotencyKeyRepository>(),
+            Microsoft.Extensions.Options.Options.Create(new Microsoft.AspNetCore.Mvc.JsonOptions()));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

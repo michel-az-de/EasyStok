@@ -1,7 +1,8 @@
 // Módulos do ERP da Casa da Baba (ADR-0056, plano docs/plan/erp-casa-da-baba/), na
 // ordem e com a numeração do plano. O hall (#1447, homologação de 07/10) mostra
-// os oito; cada módulo tem o próprio menu (as `telas`) e o módulo ativo vem da
-// rota, nunca de estado guardado (ADR-0046 D1).
+// os oito, menos os congelados pela rodada de estabilização (`congelados.js`, #1891);
+// cada módulo tem o próprio menu (as `telas`) e o módulo ativo vem da rota, nunca de
+// estado guardado (ADR-0046 D1).
 //
 // Tela de `operacao` é a tela de trabalho de hoje (Balcão, fila da Cozinha,
 // painel de Entregas) e abre sem moldura, como sempre abriu. Tela de `ajuste`
@@ -12,6 +13,7 @@
 // perfil pode abrir o módulo é a API (M0.3): este catálogo descreve telas,
 // e o shell filtra a lista usando a matriz devolvida pelo servidor.
 
+import { moduloCongelado, telaCongelada } from './congelados'
 import { partesNoFuso } from './formato'
 
 export const TELA_OPERACAO = 'operacao'
@@ -69,7 +71,8 @@ export const MODULOS = [
   },
   {
     numero: 5, id: 'financeiro', nome: 'Financeiro', icone: 'dollar-sign',
-    resumo: 'Caixa, contas a pagar e receber, extrato e relatórios',
+    // #1891: enquanto o financeiro gerencial está congelado, o resumo fala só do que abre.
+    resumo: 'Caixa do dia',
     telas: [
       { id: 'caixa', rotulo: 'Caixa do dia', tipo: TELA_AJUSTE, aba: 'caixa' },
       { id: 'visao-geral', rotulo: 'Visão geral', tipo: TELA_AJUSTE, aba: 'financeiro-resumo', soApi: true },
@@ -116,13 +119,16 @@ export const moduloPorId = (id) => MODULOS.find((m) => m.id === id) ?? null
 
 export const hashDoModulo = (moduloId, telaId) => `#/m/${moduloId}${telaId ? '/' + telaId : ''}`
 
-// Menu do módulo no modo atual: tela só da API some no modo demonstração.
+// Menu do módulo no modo atual: tela só da API some no modo demonstração. Congelado (#1891)
+// some nos dois modos: módulo congelado não tem menu (sai do trilho e da Gestão) e tela
+// congelada sai do menu do módulo vivo.
 export const telasDoMenu = (modulo, { fonteApi = false } = {}) =>
-  (modulo?.telas ?? []).filter((t) => fonteApi || !t.soApi)
+  moduloCongelado(modulo?.id) ? [] : (modulo?.telas ?? []).filter((t) => (fonteApi || !t.soApi) && !telaCongelada(modulo.id, t.id))
 
-// Cartões do hall: disponível = tem pelo menos uma tela no modo atual.
+// Cartões do hall: disponível = tem pelo menos uma tela no modo atual. Módulo congelado
+// (#1891) não vira cartão; `MODULOS` segue inteiro para quem precisa do catálogo.
 export function modulosDoHall({ fonteApi = false } = {}) {
-  return MODULOS.map((modulo) => {
+  return MODULOS.filter((modulo) => !moduloCongelado(modulo.id)).map((modulo) => {
     const telas = telasDoMenu(modulo, { fonteApi })
     const disponivel = telas.length > 0
     return {

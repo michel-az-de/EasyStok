@@ -82,6 +82,12 @@ public interface IConversaRepository
     /// <summary>Conversa nao encerrada do contato no canal. O <paramref name="contatoIdExterno"/> e normalizado conforme o canal.</summary>
     Task<Conversa?> ObterAbertaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default);
 
+    /// <summary>
+    /// #1765-5: a conversa encerrada mais recente do contato no canal (mesmas grafias de <see cref="ObterAbertaPorContatoAsync"/>),
+    /// para a entrada depois do encerramento voltar ao atendimento que ainda tem pedido em andamento.
+    /// </summary>
+    Task<Conversa?> ObterUltimaEncerradaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default);
+
     Task<ConversaComMensagens?> ObterComMensagensAsync(Guid empresaId, Guid id, int ultimasN, CancellationToken ct = default);
 
     /// <summary>Mais recentes primeiro (por <c>UltimaMensagemEm</c>), paginado.</summary>

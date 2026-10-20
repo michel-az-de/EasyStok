@@ -35,15 +35,13 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     }
 
     [Fact]
-    public async Task OnlineParaNaEntrega_ColocaPedidoNaFilaSemLink()
+    public async Task SemLink_NaEntrega_ColocaPedidoNaFila()
     {
         var f = new CobrancaPedidoFixture();
-        var online = f.AdicionarOnline();
 
         var r = await f.Trocar().ExecuteAsync(
             new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
 
-        online.Status.Should().Be(StatusCobrancaPedido.Cancelada);
         r.Cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorNaEntrega);
         r.Cobranca.LinkPagamento.Should().BeNull();
         f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando, "pagamento na entrega libera o pedido para a fila");
@@ -51,12 +49,11 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     }
 
     [Fact]
-    public async Task OnlineParaNaEntrega_PedidoQueRequerAprovacao_EsperaABaba()
+    public async Task SemLink_NaEntrega_PedidoQueRequerAprovacao_EsperaABaba()
     {
         // #1291: lead liberado fora de área (S14) que paga na entrega passa pela aprovação, como no pago online.
         var f = new CobrancaPedidoFixture();
         f.Pedido.MarcarRequerAprovacao("fora_de_area");
-        f.AdicionarOnline();
 
         await f.Trocar().ExecuteAsync(
             new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
@@ -66,11 +63,10 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     }
 
     [Fact]
-    public async Task OnlineParaNaEntrega_GravaInicioPrevisto()
+    public async Task SemLink_NaEntrega_GravaInicioPrevisto()
     {
         // #1230: o pedido que vai pagar na entrega entra na fila; o início previsto vale como no Mercado Pago.
         var f = new CobrancaPedidoFixture();
-        f.AdicionarOnline();
         var entrega = new DateTime(2026, 9, 29, 18, 0, 0, DateTimeKind.Utc);
         f.Pedido.AgendadoParaEm = entrega;
         f.PrazoQueries.ObterAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>())
@@ -102,7 +98,6 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     public async Task NaEntrega_AvisaACozinhaUmaVezDepoisDeGravar()
     {
         var f = new CobrancaPedidoFixture();
-        f.AdicionarOnline();
         var gravou = false;
         f.Uow.When(u => u.CommitAsync()).Do(_ => gravou = true);
         f.OperacaoEventos.When(e => e.PublicarAsync(Arg.Any<string>(), Arg.Any<Guid>(),
@@ -125,7 +120,6 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     public async Task NaEntrega_GravacaoFalha_NaoAvisaACozinha()
     {
         var f = new CobrancaPedidoFixture();
-        f.AdicionarOnline();
         f.Uow.CommitAsync().Returns<Task>(_ => throw new InvalidOperationException("falha no banco"));
 
         var act = () => f.Trocar().ExecuteAsync(
@@ -152,9 +146,8 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     {
         var f = new CobrancaPedidoFixture();
         var antiga = f.AdicionarOnline(referencia: "pref-antiga");
-        await f.Trocar().ExecuteAsync(
-            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
-        var naEntrega = f.Cobrancas.Single(c => c.Provedor == CobrancaPedido.ProvedorNaEntrega);
+        antiga.Cancelar("troca_forma: na_entrega", CobrancaPedidoFixture.Agora);
+        var naEntrega = f.AdicionarNaEntrega();
 
         var r = await f.Confirmar().ExecuteAsync(new ConfirmarPagamentoPedidoInput(
             f.Pedido.Id, "pay-7", "approved", 25m, "visa", "credit_card", CobrancaPedidoFixture.Agora,
@@ -173,10 +166,10 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     public async Task TrocaExpiraAPreferenciaAnteriorNoMercadoPago()
     {
         var f = new CobrancaPedidoFixture();
-        f.AdicionarOnline(referencia: "pref-antiga");
+        f.AdicionarOnline(referencia: "pref-antiga", expiraEm: CobrancaPedidoFixture.Agora.AddSeconds(-30));
 
         await f.Trocar().ExecuteAsync(
-            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "online", Usuario, "Operadora"));
 
         await f.MpClient.Received(1).ExpirarPreferenciaAsync("pref-antiga", CobrancaPedidoFixture.Agora, Arg.Any<CancellationToken>());
     }
@@ -185,15 +178,15 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
     public async Task FalhaAoExpirarPreferencia_NaoDesfazATroca()
     {
         var f = new CobrancaPedidoFixture();
-        var antiga = f.AdicionarOnline(referencia: "pref-antiga");
+        var antiga = f.AdicionarOnline(referencia: "pref-antiga", expiraEm: CobrancaPedidoFixture.Agora.AddSeconds(-30));
         f.MpClient.ExpirarPreferenciaAsync(Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns<Task>(_ => throw new HttpRequestException("mp fora"));
 
         var r = await f.Trocar().ExecuteAsync(
-            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "online", Usuario, "Operadora"));
 
         antiga.Status.Should().Be(StatusCobrancaPedido.Cancelada);
-        r.Cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorNaEntrega);
+        r.Cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorMercadoPago);
     }
 
     [Fact]
@@ -206,5 +199,36 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
             new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "online", Usuario, "Operadora"));
 
         await f.MpClient.DidNotReceiveWithAnyArgs().ExpirarPreferenciaAsync(default!, default, default);
+    }
+
+    /// <summary>#1724-6: com o sinal pago online, trocar a forma do restante não é "pedido já pago".</summary>
+    [Fact]
+    public async Task SinalPagoOnline_TrocaDoRestanteParaNaEntregaCobraSoORestante()
+    {
+        var f = new CobrancaPedidoFixture();
+        var sinal = f.AdicionarOnline(referencia: "pref-sinal", valor: 12.5m);
+        sinal.MarcarPaga("pay-sinal", 12.5m, "pix", CobrancaPedidoFixture.Agora);
+        f.Pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = f.Pedido.Id, Valor = 12.5m, Metodo = "pix", PagoEm = CobrancaPedidoFixture.Agora });
+
+        var r = await f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+
+        r.Cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorNaEntrega);
+        r.Cobranca.Valor.Should().Be(12.5m, "o sinal de R$ 12,50 já entrou; só o restante fica para a entrega");
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+    }
+
+    [Fact]
+    public async Task PedidoQuitado_NaoTrocaAForma()
+    {
+        var f = new CobrancaPedidoFixture();
+        var online = f.AdicionarOnline(referencia: "pref-total");
+        online.MarcarPaga("pay-total", 25m, "pix", CobrancaPedidoFixture.Agora);
+        f.Pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = f.Pedido.Id, Valor = 25m, Metodo = "pix", PagoEm = CobrancaPedidoFixture.Agora });
+
+        var act = () => f.Trocar().ExecuteAsync(new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega"));
+
+        await act.Should().ThrowAsync<CobrancaPedidoConflitoException>()
+            .Where(e => e.Codigo == CobrancaPedidoConflitoException.PedidoJaPago);
     }
 }

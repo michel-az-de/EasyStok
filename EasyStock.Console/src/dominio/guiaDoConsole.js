@@ -45,12 +45,13 @@ export const GUIA_POR_MODULO = {
       'Em Janelas de entrega, ajuste horários e capacidade antes de combinar com o cliente.',
     ],
   },
+  // #1891: o financeiro gerencial está congelado (dominio/congelados.js); o guia fala só do Caixa do dia.
   financeiro: {
-    faz: 'Caixa do dia, contas a pagar e a receber, extrato, relatórios e categorias.',
+    faz: 'O Caixa do dia: saldo inicial, entradas e saídas, e o fechamento no fim do expediente.',
     passos: [
-      'Abra o Caixa do dia e confira os lançamentos antes de fechar.',
-      'Lance compromissos em Contas a pagar e Contas a receber.',
-      'Em Relatórios, escolha o período; Exportar CSV leva os dados para a planilha.',
+      'Abra o Caixa do dia e confira o saldo e os lançamentos.',
+      'Use Lançar entrada ou saída para registrar o que entrou e saiu fora dos pedidos.',
+      'No fim do expediente, use Fechar o caixa e confira o saldo do dia.',
     ],
   },
   campanhas: {

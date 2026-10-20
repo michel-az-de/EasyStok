@@ -47,8 +47,8 @@ confere('o hall lista os oito módulos do plano, numerados de 1 a 8 e na ordem',
 })
 
 // M1.1 (#1481) e M2.1 (#1490): Cardápio e Produção ganharam tela no modo API; na demonstração
-// seguem em breve (não navegam).
-confere('Cardápio e Produção abrem só no modo API', () => {
+// seguem em breve (não navegam). #1891: Campanhas está congelado e não vira cartão em modo nenhum.
+confere('Cardápio e Produção abrem só no modo API; Campanhas congelado não aparece', () => {
   const hall = modulosDoHall({ fonteApi: true })
   const porId = Object.fromEntries(hall.map((m) => [m.id, m]))
   const demonstracao = Object.fromEntries(modulosDoHall({ fonteApi: false }).map((m) => [m.id, m]))
@@ -56,10 +56,14 @@ confere('Cardápio e Produção abrem só no modo API', () => {
     assert.equal(demonstracao[id].disponivel, false, `${id}: sem API não há o que gerir`)
     assert.equal(demonstracao[id].href, null, `${id}: card em breve não navega`)
   }
-  for (const id of ['cardapio', 'producao', 'atendimento', 'cozinha', 'financeiro', 'campanhas', 'configuracoes', 'entregas']) {
+  for (const id of ['cardapio', 'producao', 'atendimento', 'cozinha', 'financeiro', 'configuracoes', 'entregas']) {
     assert.equal(porId[id].disponivel, true, `${id} abre`)
     assert.ok(porId[id].href.startsWith('#/m/' + id), `${id} aponta para a própria rota`)
   }
+  assert.equal(porId.campanhas, undefined, 'Campanhas congelado (#1891) não entra no hall')
+  assert.equal(demonstracao.campanhas, undefined, 'nem na demonstração')
+  assert.equal(hall.length, 7, 'o hall mostra os sete módulos vivos')
+  assert.deepEqual(telasDoMenu(moduloPorId('campanhas'), { fonteApi: true }), [], 'módulo congelado não tem menu (trilho e Gestão)')
 })
 
 confere('Atendimento, Cozinha e Entregas abrem a tela de operação de hoje', () => {
@@ -106,9 +110,12 @@ confere('sem hash (logo depois do login) é o hall, não o Balcão', () => {
   for (const hash of ['', '#', '#/', undefined, null]) assert.equal(rotaDaHash(hash).tipo, ROTA_HALL)
 })
 
-confere('hash desconhecida e módulo inexistente caem no hall', () => {
+confere('hash desconhecida, módulo inexistente e módulo congelado caem no hall', () => {
   assert.equal(rotaDaHash('#/nada-a-ver').tipo, ROTA_HALL)
   assert.equal(rotaDaHash('#/m/financeiro-que-nao-existe').tipo, ROTA_HALL)
+  // #1891: Campanhas existe no catálogo, mas está congelado: a rota não abre moldura nem tela.
+  assert.equal(rotaDaHash('#/m/campanhas', { fonteApi: true }).tipo, ROTA_HALL)
+  assert.equal(rotaDaHash('#/m/campanhas/fidelidade').tipo, ROTA_HALL)
 })
 
 confere('o módulo Atendimento abre o Balcão de hoje (cockpit, D5)', () => {
@@ -135,10 +142,14 @@ confere('os apelidos de hoje continuam: #/cozinha, #/entregas e o cardápio por 
 })
 
 confere('tela de ajuste abre dentro do módulo, com o módulo vindo da rota', () => {
-  const rota = rotaDaHash('#/m/cozinha/producao')
-  assert.deepEqual(rota, { tipo: ROTA_MODULO, modulo: 'cozinha', tela: 'producao', aba: 'producao' })
+  const rota = rotaDaHash('#/m/entregas/janelas')
+  assert.deepEqual(rota, { tipo: ROTA_MODULO, modulo: 'entregas', tela: 'janelas', aba: 'janelas' })
+  // #1891: Produção e cardápio do dia (Em preparação) está congelada; a rota cai na Fila de preparo.
+  assert.equal(rotaDaHash('#/m/cozinha/producao').tipo, ROTA_COZINHA)
   assert.equal(rotaDaHash('#/m/financeiro', { fonteApi: true }).aba, 'caixa', 'A entrada mantém o Caixa disponível ao Atendimento')
-  assert.equal(rotaDaHash('#/m/financeiro/visao-geral', { fonteApi: true }).aba, 'financeiro-resumo', 'A dona pode abrir a visão financeira completa')
+  // #1891: a visão financeira está congelada; a rota cai na primeira tela viva, o Caixa do dia.
+  assert.equal(rotaDaHash('#/m/financeiro/visao-geral', { fonteApi: true }).aba, 'caixa', 'Tela congelada cai no Caixa do dia')
+  assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true }).map((t) => t.id), ['caixa'], 'Financeiro só com Caixa do dia')
   assert.equal(rotaDaHash('#/m/financeiro').aba, 'caixa', 'A demonstração conserva o Caixa')
   assert.equal(rotaDaHash('#/m/configuracoes/canais', { fonteApi: true }).aba, 'canais')
 })

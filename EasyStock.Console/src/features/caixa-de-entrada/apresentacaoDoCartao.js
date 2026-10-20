@@ -27,12 +27,14 @@ export function origemNoCartao(passagem) {
   return origemDaPassagem(passagem)
 }
 
-// A etiqueta do estado ("Aguardando equipe", "Passou para você") sai quando o
-// motivo é a passagem: o cartão ganha o trilho lateral de atenção e o texto vai
-// para o leitor de tela. Os outros motivos (reclamação, cobrança venceu, pedido
-// atrasado) e os estados sem motivo continuam escritos.
-export function mostraEtiquetaDoEstado(motivo) {
-  return motivo?.chave !== 'passagem'
+// A etiqueta do estado sai quando não ajuda a escolher o cartão: na passagem ("Aguardando
+// equipe", "Passou para você") o cartão ganha o trilho lateral de atenção; em "Automático" e
+// "Com você" (#1899: eram 14 de 16 cartões) quem conduz já está na pílula da BarraModo. Nos
+// três casos o texto vai para o leitor de tela. Bloqueado, Encerrada, Outro atendente e os
+// motivos (reclamação, cobrança venceu, pedido atrasado) continuam escritos.
+const ESTADOS_SEM_ETIQUETA = ['passagem', 'automatico', 'voce']
+export function mostraEtiquetaDoEstado(estado) {
+  return !ESTADOS_SEM_ETIQUETA.includes(estado?.chave)
 }
 
 // A terceira linha só existe se sobrar o que dizer nela.

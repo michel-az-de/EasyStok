@@ -153,6 +153,10 @@ public sealed partial class PedidoConversaConcorrenciaTests
             combinado.FreteCombinado.Should().Be(13.5m, "trocar somente o horário no mesmo dia preserva o frete combinado");
             combinado.EntregaACombinar.Should().BeFalse();
             combinado.TotalPrevisto.Should().Be(33.5m);
+            await Salvar(client, token, combinado, combinado.Rascunho with { DataEntrega = combinado.Rascunho.DataEntrega!.Value.AddDays(7) });
+            combinado = await Estado(client, token);
+            combinado.FreteCombinado.Should().Be(13.5m, "trocar só a data preserva o frete combinado (#1717-6)");
+            combinado.TotalPrevisto.Should().Be(33.5m);
             await Salvar(client, token, combinado, combinado.Rascunho with { Observacoes = "Conferir transporte novamente" });
             var alterado = await Estado(client, token);
             alterado.FreteCombinado.Should().BeNull();

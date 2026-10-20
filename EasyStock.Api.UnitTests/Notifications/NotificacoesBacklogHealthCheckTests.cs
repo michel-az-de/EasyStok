@@ -166,4 +166,36 @@ public class NotificacoesBacklogHealthCheckTests
             .Should().Be(HealthStatus.Unhealthy);
         (await Rodar(NovoCheck(Backlog(falhado: 1), opcoes: opcoes))).Status.Should().Be(HealthStatus.Degraded);
     }
+
+    /// <summary>
+    /// Canal desligado de propósito por configuração (SMS stub, e-mail de console) não é defeito: o Worker mandava
+    /// <c>/fail</c> ao Healthchecks.io a cada minuto por um canal que ninguém pretende ligar.
+    /// </summary>
+    [Fact]
+    public async Task Canal_desligado_de_proposito_nao_deixa_Degraded_em_Production()
+    {
+        var resultado = await Rodar(NovoCheck(Backlog(), configuracao: new Dictionary<string, string?>
+        {
+            ["Notifications:WhatsApp:Provider"] = "meta",
+            ["Notifications:Sms:Provider"] = "stub",
+            ["Notifications:Sms:Desligado"] = "true",
+            ["Notifications:Email:Desligado"] = "true",
+        }, email: new ConsoleEmailService()));
+
+        resultado.Status.Should().Be(HealthStatus.Healthy, resultado.Description);
+    }
+
+    [Fact]
+    public async Task Canal_stub_sem_a_chave_de_desligado_continua_Degraded()
+    {
+        var resultado = await Rodar(NovoCheck(Backlog(), configuracao: new Dictionary<string, string?>
+        {
+            ["Notifications:WhatsApp:Provider"] = "meta",
+            ["Notifications:Sms:Provider"] = "stub",
+            ["Notifications:Sms:Desligado"] = "false",
+        }));
+
+        resultado.Status.Should().Be(HealthStatus.Degraded);
+        resultado.Description.Should().Contain("SMS");
+    }
 }

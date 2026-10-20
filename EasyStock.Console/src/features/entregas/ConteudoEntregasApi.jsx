@@ -8,6 +8,7 @@ import {
   rotuloSituacaoViagem, situacaoDaLista, viagensConcluidasNoDia,
 } from '../../dominio/entregasApi'
 import { moeda } from '../../dominio/formato'
+import { nomeDoPedido } from '../../dominio/pedido'
 import { aReceberDoCartao } from '../../dominio/pagamento'
 import { roteiroDoDia } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
@@ -57,7 +58,7 @@ export function ConteudoEntregasApi() {
             </Botao>
           ))}
         </div>
-        <span className={css.apoio} role="status">{aoVivo ? 'Ao vivo' : 'Atualizando a cada 15 s'}</span>
+        <output className={css.apoio}>{aoVivo ? 'Ao vivo' : 'Atualizando a cada 15 s'}</output>
       </div>
       {erro && (
         <p className={css.faixa} role="alert">
@@ -98,14 +99,14 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
             {p.aprovacao.map((x) => (
               <li key={x.id} className={css.cartao}>
                 <div className={css.linha}>
-                  <span className={css.numero}>{x.numeroCurto}</span>
+                  <span className={css.numero} title={nomeDoPedido(x).titulo || undefined}>{nomeDoPedido(x).principal}{nomeDoPedido(x).referencia && <small className={css.referencia}>ref {nomeDoPedido(x).referencia}</small>}</span>
                   <span className={css.cresce}>{x.clienteNome}</span>
                   <span className={css.apoio}>{motivoDaAprovacao(x.motivoRequerAprovacao)}</span>
                 </div>
                 <Endereco texto={x.endereco} />
                 {recusando === x.id ? (
-                  <div role="alertdialog" aria-label={`Recusar o pedido ${x.numeroCurto}`}>
-                    <p>{confirmacaoDaRecusa(x.numeroCurto, x.clienteNome)}</p>
+                  <div role="alertdialog" aria-label={`Recusar ${nomeDoPedido(x).frase}`}>
+                    <p>{confirmacaoDaRecusa(nomeDoPedido(x).frase, x.clienteNome)}</p>
                     <div className={css.linha}>
                       <Botao variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter</Botao>
                       <Botao variante="primario" disabled={ocupado} onClick={() => { setRecusando(null); acoes.recusar(x.id) }}>
@@ -135,7 +136,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
             {prontosFora.map((x) => (
               <li key={x.id} className={css.cartao}>
                 <div className={css.linha}>
-                  <span className={css.numero}>{x.numeroCurto}</span>
+                  <span className={css.numero} title={nomeDoPedido(x).titulo || undefined}>{nomeDoPedido(x).principal}{nomeDoPedido(x).referencia && <small className={css.referencia}>ref {nomeDoPedido(x).referencia}</small>}</span>
                   <span className={css.cresce}>{[x.clienteNome, x.clienteApt].filter(Boolean).join(' · ')}</span>
                   {x.janela && <span className={css.apoio}>{x.janela.label}</span>}
                 </div>
@@ -289,7 +290,7 @@ function Chamados({ chamados, ocupado, acoes }) {
         </div>
         <Botao tipo="submit" variante="secundario" disabled={ocupado || !texto.trim()}>Chamar</Botao>
       </form>
-      {confirmacao && <p className={css.apoio} role="status">{confirmacao}</p>}
+      {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
       <ul className={css.lista}>
         {chamados.map((c) => (
           <li key={c.id} className={`${css.cartao} ${css.linha}`}>
@@ -329,7 +330,7 @@ function Entregadores({ entregadores, ocupado, acoes }) {
         <CampoTexto rotulo="Placa" {...campo('placa')} />
         <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar</Botao>
       </form>
-      {confirmacao && <p className={css.apoio} role="status">{confirmacao}</p>}
+      {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
       <h3>Ativos</h3>
       {entregadores.length === 0 && <p className={css.vazio}>Nenhum entregador cadastrado.</p>}
       <ul className={css.lista}>

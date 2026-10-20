@@ -16,7 +16,7 @@ public class ConfiguracaoAtendimentoTests
         config.NivelSugestao.Should().Be(NivelSugestaoAtendimento.Discreto);
         config.RespiroMinutos.Should().Be(40);
         config.TempoPreparoPadraoMinutos.Should().Be(60);
-        config.Ativo.Should().BeTrue();
+        config.Ativo.Should().BeFalse("o agente automático nasce desligado (#1889); a loja liga em Atendimento > Horários");
         config.SlaRespostaMinutos.Should().Be(ConfiguracaoAtendimento.SlaRespostaPadraoMinutos).And.Be(5);
         config.Tom.Should().NotBeNullOrWhiteSpace();
         config.SaudacaoPrimeiroContato.Should().NotBeNullOrWhiteSpace();

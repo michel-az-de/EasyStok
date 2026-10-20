@@ -234,11 +234,12 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, t);
             dados = dados with { PedidoResumoHash = pedido is null ? null : ResumoHash(pedido) };
             link.SalvarRascunho(revisao, JsonSerializer.Serialize(dados, Json), relogio.GetUtcNow().UtcDateTime);
-            // O horário não altera a cotação manual; qualquer outra edição continua exigindo novo acordo.
+            // Data e horário não alteram a cotação manual (#1717-6); qualquer outra edição continua exigindo novo acordo.
             if (estado.Pedido is null && estado.FreteCombinado is decimal frete && dados.DataEntrega is not null &&
-                dados.JanelaId is not null && estado.Rascunho.JanelaId is not null && dados.JanelaId != estado.Rascunho.JanelaId &&
+                dados.JanelaId is not null && estado.Rascunho.JanelaId is not null &&
+                (dados.JanelaId != estado.Rascunho.JanelaId || dados.DataEntrega != estado.Rascunho.DataEntrega) &&
                 dados.Itens.SequenceEqual(estado.Rascunho.Itens) &&
-                (dados with { JanelaId = estado.Rascunho.JanelaId, Itens = estado.Rascunho.Itens }) == estado.Rascunho)
+                (dados with { JanelaId = estado.Rascunho.JanelaId, DataEntrega = estado.Rascunho.DataEntrega, Itens = estado.Rascunho.Itens }) == estado.Rascunho)
             {
                 var conversa = await conversas.ObterPorIdAsync(acesso.EmpresaId, acesso.ConversaId, t)
                     ?? throw new LinkCardapioConversaIndisponivelException();

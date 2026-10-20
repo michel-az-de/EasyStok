@@ -34,6 +34,7 @@ registerHooks({
 })
 
 const { MODULOS } = await import('../src/dominio/modulos.js')
+const { moduloCongelado } = await import('../src/dominio/congelados.js')
 const { normalizarPreferenciasHall, ordenarPaineisDoHall, moverPainelDoHall, aplicarFocoDoHall } = await import('../src/dominio/preferenciasHall.js')
 const { gravarPreferenciasHall, lerPreferenciasHall } = await import('../src/aplicacao/preferenciasHall.js')
 const { pendenciaDoModulo, indicadoresDoHall } = await import('../src/dominio/pulsoDoHall.js')
@@ -149,13 +150,15 @@ globalThis.document ??= { documentElement: { dataset: { theme: 'light' } } }
 const html = renderToStaticMarkup(h(ContextoAcessoModulos.Provider, { value: { permite: () => true, acoes: {}, aoSair: () => {} } },
   h(HallDeModulos, { fonteApi: true, sessao: null, agora: Date.parse('2026-10-15T18:00:00Z') })))
 
-provar('os oito módulos têm ilustração própria, decorativa e no tema', () => {
+// #1891: módulo congelado conserva a ilustração no catálogo, mas não tem cartão no hall.
+provar('os oito módulos têm ilustração própria, decorativa e no tema; só os vivos têm cartão', () => {
   for (const { id } of MODULOS) {
     const svg = renderToStaticMarkup(h(IlustracaoDoModulo, { id }))
     assert.match(svg, /aria-hidden="true"/, `${id} decorativa`)
     assert.match(svg, /var\(--il-tinta\)/, `${id} usa as cores do tema`)
     assert.doesNotMatch(svg, /#[0-9a-f]{6}/i, `${id} sem cor fixa`)
-    assert.match(html, new RegExp(`data-ilustracao="${id}"`), `${id} no cartão`)
+    if (moduloCongelado(id)) assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} congelado sem cartão`)
+    else assert.match(html, new RegExp(`data-ilustracao="${id}"`), `${id} no cartão`)
   }
   assert.equal(renderToStaticMarkup(h(IlustracaoDoModulo, { id: 'privado' })), '')
 })
