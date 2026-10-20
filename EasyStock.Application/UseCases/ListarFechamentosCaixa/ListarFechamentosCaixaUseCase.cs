@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.FecharCaixa;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 
 namespace EasyStock.Application.UseCases.ListarFechamentosCaixa;
 
@@ -16,7 +17,12 @@ public sealed record ListarFechamentosCaixaResult(
     int Page,
     int PageSize);
 
-public class ListarFechamentosCaixaUseCase(ICaixaRepository repo)
+/// <summary>
+/// Histórico de fechamentos. #1776-11: cada fechamento informa também o dinheiro que ficou na gaveta
+/// (<see cref="GavetaCaixa.DinheiroNaGaveta"/> sobre o dia do fechamento), porque o <c>SaldoFinal</c> soma Pix e cartão e a
+/// abertura seguinte sugeria esse total como dinheiro contado. Custa a leitura do dia por fechamento da página.
+/// </summary>
+public class ListarFechamentosCaixaUseCase(ICaixaRepository repo, ObterCaixaDiaUseCase? caixaDia = null)
 {
     public async Task<ListarFechamentosCaixaResult> ExecuteAsync(ListarFechamentosCaixaQuery q)
     {
@@ -26,8 +32,18 @@ public class ListarFechamentosCaixaUseCase(ICaixaRepository repo)
 
         var (items, total) = await repo.ListFechamentosAsync(q.EmpresaId, page, size, q.Desde, q.Ate);
 
-        return new ListarFechamentosCaixaResult(
-            items.Select(FecharCaixaUseCase.Map).ToList(),
-            total, page, size);
+        var resultados = new List<FechamentoCaixaResult>();
+        foreach (var fechamento in items)
+            resultados.Add(await ComDinheiroNaGavetaAsync(q.EmpresaId, fechamento));
+
+        return new ListarFechamentosCaixaResult(resultados, total, page, size);
+    }
+
+    private async Task<FechamentoCaixaResult> ComDinheiroNaGavetaAsync(Guid empresaId, FechamentoCaixa fechamento)
+    {
+        var resultado = FecharCaixaUseCase.Map(fechamento);
+        if (caixaDia is null) return resultado;
+        var dia = await caixaDia.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, fechamento.Data, fechamento.LojaId));
+        return resultado with { DinheiroNaGaveta = GavetaCaixa.DinheiroNaGaveta(dia) };
     }
 }

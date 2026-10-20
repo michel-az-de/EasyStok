@@ -33,8 +33,12 @@ export function situacaoDoCaixaParaAbrirLoja(dia, ultimoFechamento) {
   if (dia?.aberto) {
     return { tipo: 'aberto', saldoInicial: dia.saldoInicial, saldoEsperado: dia.saldoEsperado, naGaveta: gavetaDoDia(dia).naGaveta }
   }
-  return { tipo: 'novo', ultimo: ultimoFechamento ?? null, saldoSugerido: ultimoFechamento?.saldoFinal ?? 0 }
+  return { tipo: 'novo', ultimo: ultimoFechamento ?? null, saldoSugerido: gavetaDoFechamento(ultimoFechamento) }
 }
+
+// #1776-11: o que ficou na gaveta ao fechar é só dinheiro; `saldoFinal` soma Pix e cartão. Fechamento antigo
+// (sem o campo) continua sugerindo o saldo final, como antes.
+export const gavetaDoFechamento = (fechamento) => fechamento?.dinheiroNaGaveta ?? fechamento?.saldoFinal ?? 0
 
 const centavos = (valor) => Math.round((Number(valor) || 0) * 100)
 
@@ -42,7 +46,7 @@ const centavos = (valor) => Math.round((Number(valor) || 0) * 100)
 // anterior não há contra o que conferir: qualquer valor vale sem motivo.
 export function retificacaoDoSaldo(saldoInformado, situacao) {
   if (situacao?.tipo !== 'novo' || !situacao.ultimo) return { diferenca: 0, exigeMotivo: false }
-  const diferenca = (centavos(saldoInformado) - centavos(situacao.ultimo.saldoFinal)) / 100
+  const diferenca = (centavos(saldoInformado) - centavos(gavetaDoFechamento(situacao.ultimo))) / 100
   return { diferenca, exigeMotivo: diferenca !== 0 }
 }
 
@@ -52,7 +56,7 @@ const comSinal = (valor) => (valor > 0 ? `+${moeda(valor)}` : moeda(valor))
 export function observacaoDaAbertura({ saldoInformado, situacao, motivo }) {
   const ultimo = situacao?.ultimo
   if (!ultimo) return `Primeira abertura conferida: ${moeda(Number(saldoInformado) || 0)}.`
-  const base = `Conferido contra o fechamento de ${diaMes(ultimo.data)} (${moeda(ultimo.saldoFinal)}).`
+  const base = `Conferido contra o fechamento de ${diaMes(ultimo.data)} (${moeda(gavetaDoFechamento(ultimo))}).`
   const { diferenca } = retificacaoDoSaldo(saldoInformado, situacao)
   if (diferenca === 0) return base
   return `${base} Retificado em ${comSinal(diferenca)}: ${(motivo ?? '').trim()}`
