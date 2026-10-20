@@ -89,6 +89,8 @@ $env:Jwt__Issuer = 'EasyStock'; $env:Jwt__Audience = 'EasyStock'; $env:Jwt__Secr
 $env:Anthropic__Enabled = 'false'; $env:OpenAI__Enabled = 'false'; $env:FileStorage__Provider = 'Local'; $env:SEED_DEMO_DATA = 'true'
 $env:MercadoPago__UseStub = 'false'; $env:MercadoPago__AccessToken = 'token-mp-falso'
 $env:MercadoPago__BaseUrl = "http://127.0.0.1:$PortaMp/"; $env:MercadoPago__WebhookSecret = 'homol-mp-secret'
+# #1901 exige as duas URLs com credencial que nao e TEST-: o webhook volta para a propria API e o retorno vai ao site local.
+$env:MercadoPago__NotificationUrl = "$api/api/webhooks/mercadopago"; $env:MercadoPago__BackUrlSuccess = 'http://localhost:5732/pedido-status.html?resultado=sucesso'
 $env:ENABLE_VIACEP_LOOKUP = 'false'; $env:ENABLE_NOMINATIM_GEOCODING = 'false'
 $env:ASPNETCORE_ENVIRONMENT = 'Development'; $env:ASPNETCORE_URLS = $api
 $iniciados += (Start-Process dotnet -PassThru -WindowStyle Hidden -WorkingDirectory (Join-Path $raiz 'EasyStock.Api') `
