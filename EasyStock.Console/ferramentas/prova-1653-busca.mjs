@@ -15,7 +15,9 @@ assert.deepEqual(destinos(api, '  IMPRESSAO  '), ['#/m/configuracoes/impressao']
 assert.deepEqual(destinos(api, 'caixa'), ['#/m/financeiro/caixa'])
 assert.deepEqual(destinos(api, 'produção receitas'), ['#/m/producao/receitas'])
 assert.deepEqual(destinos(api, 'janelas entrega'), ['#/m/entregas/janelas'])
-assert.equal(destinos(api, 'financeiro').length, 8, 'o nome da área oferece suas telas')
+// #1891: o financeiro gerencial está congelado; a área oferece só o Caixa do dia.
+assert.deepEqual(destinos(api, 'financeiro'), ['#/m/financeiro/caixa'], 'o nome da área oferece suas telas vivas')
+assert.deepEqual(destinos(api, 'extrato'), [], 'tela congelada não aparece na busca')
 assert.deepEqual(destinos(api, 'pratos preços'), [
   '#/m/cardapio/itens', '#/m/cardapio/categorias', '#/m/cardapio/imagens',
 ], 'busca pelo resumo preserva a descoberta da área')
@@ -27,7 +29,7 @@ assert.deepEqual(destinos(api, 'fornecedores'), [], 'a busca não promete uma te
 for (const busca of ['', '   ', 'nenhum-destino-com-este-nome']) assert.deepEqual(destinos(api, busca), [])
 
 const antes = JSON.stringify(api)
-for (const busca of ['impressão', 'produção', 'fidelidade', 'integrações', 'financeiro']) {
+for (const busca of ['impressão', 'produção', 'integrações', 'financeiro']) {
   for (const destino of buscarDestinosDoConsole(api, busca)) {
     const rota = rotaDaHash(destino.href, { fonteApi: true })
     assert.equal(rota.modulo, destino.modulo.id)
@@ -35,8 +37,9 @@ for (const busca of ['impressão', 'produção', 'fidelidade', 'integrações', 
   }
 }
 assert.equal(JSON.stringify(api), antes, 'a busca não muda o catálogo nem a ordem escolhida')
-assert.deepEqual(api.flatMap((modulo) => modulo.telas.filter((tela) => tela.indisponivelNaApi).map((tela) => `${modulo.id}/${tela.id}`)), [
-  'cozinha/producao', 'campanhas/fidelidade',
-])
-assert.ok(buscarDestinosDoConsole(api, 'fidelidade')[0].href, 'tela em preparação conserva acesso à orientação')
+// #1891: as telas "Em preparação" (cozinha/producao e campanhas/fidelidade) estão congeladas e não
+// chegam ao hall nem à busca.
+assert.deepEqual(api.flatMap((modulo) => modulo.telas.filter((tela) => tela.indisponivelNaApi).map((tela) => `${modulo.id}/${tela.id}`)), [])
+assert.deepEqual(destinos(api, 'fidelidade'), [], 'Campanhas congelado não aparece na busca')
+assert.deepEqual(destinos(api, 'cupons'), [], 'nem pelo resumo do módulo')
 console.log('Busca #1653: destinos diretos, acentos, contexto, permissões, modo demonstração, rotas e catálogo preservados.')

@@ -14,6 +14,7 @@
 // `#/entregas` e `#/cardapio-link/<id>` abrem a mesma tela de sempre.
 
 import { PREFIXO_ROTA as PREFIXO_CARDAPIO_LINK } from './cardapioLink'
+import { moduloCongelado } from './congelados'
 import { TELA_OPERACAO, moduloPorId, telasDoMenu } from './modulos'
 
 export const ROTA_HALL = 'hall'
@@ -44,7 +45,8 @@ const ROTA_DA_OPERACAO = {
 function rotaDoModulo(caminho, fonteApi) {
   const [moduloId, telaId] = caminho.split('/')
   const modulo = moduloPorId(moduloId)
-  if (!modulo) return { tipo: ROTA_HALL }
+  // Módulo congelado (#1891) é tratado como inexistente: cai no hall, sem moldura vazia.
+  if (!modulo || moduloCongelado(modulo.id)) return { tipo: ROTA_HALL }
   const telas = telasDoMenu(modulo, { fonteApi })
   // Módulo "em breve" digitado à mão: a moldura do módulo diz que ainda não há tela.
   if (telas.length === 0) return { tipo: ROTA_MODULO, modulo: modulo.id, tela: null, aba: null }
