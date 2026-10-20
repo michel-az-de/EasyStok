@@ -23,6 +23,7 @@ import { encontrarCupom, validarCupom } from '../../dominio/fidelidade'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { RelogioPix } from './RelogioPix'
 import { cobrancaRepeteExtrato } from './apresentacaoDaFicha'
+import { ConferirPagamento } from './ConferirPagamento'
 import css from './ficha.module.css'
 
 // Campo "Cupom" da Cobrança (frente Fidelidade e cupons, rodada 13, issue
@@ -544,6 +545,10 @@ export function BlocoCobranca({
         aoAceitarDivergencia={aoAceitarDivergencia}
         aoCobrarDiferenca={() => reenvio.emitir(cobranca.valor - (cobranca.valorPago ?? 0))}
       />
+
+      {fonteApi && editavel && emAberto && pedido.pedidoId && pedido.estado !== 'cancelado' && (
+        <ConferirPagamento key={`${pedido.pedidoId}:${cobranca.id}`} conversaId={conversaId} />
+      )}
 
       <ListaDados itens={[
         { rotulo: pedido.pedidoId ? 'Recebido nesta cobrança' : 'Recebido', valor: cobranca.valorPago != null ? moeda(cobranca.valorPago) : null },

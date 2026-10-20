@@ -240,6 +240,9 @@ export const simularPedido = (conversaId, corpo, sinal = undefined) =>
 export const reemitirCobranca = (pedidoId) =>
   chamarApi(`/api/pedidos/${pedidoId}/cobranca`, { metodo: 'POST' })
 
+export const conferirPagamentoOnline = (pedidoId) =>
+  chamarApi(`/api/pedidos/${pedidoId}/cobranca/conferir`, { metodo: 'POST', sinal: AbortSignal.timeout(20000) })
+
 // Troca de forma da S11: com conversa aberta, o link novo sai ao cliente pelo EasyStok.
 export const trocarFormaPagamento = (pedidoId, forma) =>
   chamarApi(`/api/pedidos/${pedidoId}/cobranca/forma`, { metodo: 'POST', corpo: { forma } })

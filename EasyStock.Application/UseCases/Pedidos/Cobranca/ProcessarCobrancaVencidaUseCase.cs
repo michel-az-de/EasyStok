@@ -115,22 +115,7 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     /// </summary>
     private async Task<bool> CredencialNaoAlcancaAsync(CobrancaPedidoVencida item, CancellationToken ct)
     {
-        string contaAtual;
-        try
-        {
-            contaAtual = await mercadoPagoClient.ObterContaRecebedoraAsync(ct);
-        }
-        catch (MercadoPagoNaoConfiguradoException)
-        {
-            return true;
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
-        {
-            return true;
-        }
-
-        return item.ContaRecebedoraId is { } contaDaCobranca
-               && !string.Equals(contaDaCobranca, contaAtual, StringComparison.Ordinal);
+        return await ConferirPagamentoPedidoUseCase.CredencialNaoAlcancaAsync(mercadoPagoClient, item, ct);
     }
 
     private async Task MarcarAguardandoCredencialAsync(CobrancaPedidoVencida item, CancellationToken ct)
@@ -145,16 +130,7 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     /// <summary>Pagamento aprovado no Mercado Pago que o webhook não entregou, do mais novo para o mais antigo.</summary>
     private async Task<bool> ConfirmarPagamentoPerdidoAsync(CobrancaPedidoVencida item, CancellationToken ct)
     {
-        var pagamentos = await mercadoPagoClient.BuscarPagamentosPorReferenciaAsync(item.PedidoId.ToString(), ct);
-        foreach (var pagamento in pagamentos.Where(p => p.Aprovado))
-        {
-            var r = await confirmarPagamento.ExecuteAsync(new ConfirmarPagamentoPedidoInput(
-                item.PedidoId, pagamento.Id, pagamento.Status, pagamento.TransactionAmount,
-                pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved,
-                ContaRecebedoraId: pagamento.CollectorId), ct);
-            if (r.Confirmado) return true;
-        }
-        return false;
+        return (await ConferirPagamentoPedidoUseCase.ConsultarAsync(mercadoPagoClient, confirmarPagamento, item, ct)).Confirmado;
     }
 
     private async Task<(ResultadoExpiracaoCobranca, Guid?, string?)> ProcessarNoLockAsync(

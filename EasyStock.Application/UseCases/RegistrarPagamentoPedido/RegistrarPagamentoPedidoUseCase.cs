@@ -42,7 +42,9 @@ public class RegistrarPagamentoPedidoUseCase(
         "pix", "dinheiro", "credito", "debito", "transferencia", "outro"
     };
 
-    public async Task<PedidoResult?> ExecuteAsync(RegistrarPagamentoPedidoCommand cmd, CancellationToken ct = default)
+    public async Task<PedidoResult?> ExecuteAsync(RegistrarPagamentoPedidoCommand cmd, CancellationToken ct = default,
+        Func<PedidoResult, CancellationToken, Task>? antesDoCommit = null,
+        Func<CancellationToken, Task<PedidoResult?>>? recuperarRecibo = null)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
@@ -68,6 +70,10 @@ public class RegistrarPagamentoPedidoUseCase(
             if (!cmd.ConfirmadoPeloProvedor) await repo.TravarAsync(cmd.EmpresaId, cmd.PedidoId, token);
             var pedido = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
             if (pedido == null || pedido.EmpresaId != cmd.EmpresaId) return null;
+
+            // Um takeover pode ter ocorrido enquanto o primeiro recebimento segurava este lock.
+            // O recibo e o pagamento foram gravados juntos; releia antes de aplicar outro parcial.
+            if (recuperarRecibo is not null && await recuperarRecibo(token) is { } recibo) return recibo;
 
             // Pagamento manual so em pedido operacional: pre-operacional (montagem / pagamento
             // online pendente / aprovacao do cardapio guest) ainda nao e recebivel. Fecha o
@@ -150,7 +156,9 @@ public class RegistrarPagamentoPedidoUseCase(
 
             logger.LogInformation("Pedido {Id}: pagamento {Valor} {Metodo} (TotalPago={TotalPago}/{Total}).",
                 pedido.Id, pag.Valor, metodo, pedido.TotalPago, pedido.Total);
-            return CriarPedidoUseCase.Map(pedido);
+            var resposta = CriarPedidoUseCase.Map(pedido);
+            if (antesDoCommit is not null) await antesDoCommit(resposta, token);
+            return resposta;
         }, ct);
         await quitacao.PublicarAsync(cmd.EmpresaId, efeito, ct, mudanca);
         return resultado;
