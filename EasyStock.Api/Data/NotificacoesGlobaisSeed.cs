@@ -594,6 +594,16 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "Loja fechada no horário",
             corpoTemplate: "A loja foi fechada na mão às {{ hora }}, dentro do horário de funcionamento. Justificativa: {{ justificativa }}");
 
+        // ===== Link vencido na última tentativa (#1889, decisão do Felipe em 21/10): o pedido fica aguardando a equipe.
+        // Sino da equipe (In-App, audiência "gestores"); só primeiro nome e referência do pedido. Interno. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "cobranca_aguardando_equipe_inapp_v1",
+            nome: "Link Vencido Aguardando a Equipe — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.CobrancaAguardandoEquipe,
+            assuntoTemplate: "Pedido sem pagamento aguardando a equipe",
+            corpoTemplate: "O link de pagamento de {{ nome }} venceu de novo (pedido {{ referencia }}). Mande um link novo, combine o pagamento ou cancele o pedido.");
+
         // ===== Campanhas (S30): carregam a mensagem da onda e o lembrete do encerramento pelo WhatsApp. Sem
         // rotina: o EnfileiradorMensagensCampanha escreve direto no outbox (categoria Marketing) e monta os
         // metadados da Meta (campanha_generica / campanha_lembrete ou o template da propria campanha). =====
@@ -1056,6 +1066,11 @@ public static class NotificacoesGlobaisSeed
         yield return MakeRotina("loja_fechada_no_horario_global", "Loja Fechada no Horário",
             TipoEventoNotificacao.LojaFechadaNoHorario, "loja_fechada_no_horario_push_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"Push\",\"InApp\"]", ModoTodos("admins"));
+
+        // ===== Link vencido na última tentativa (#1889): sino da equipe. Rollback: Ativa=false. =====
+        yield return MakeRotina("cobranca_aguardando_equipe_global", "Link Vencido Aguardando a Equipe",
+            TipoEventoNotificacao.CobrancaAguardandoEquipe, "cobranca_aguardando_equipe_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]", ModoTodos("gestores"));
 
         // ===== Avisos de status do pedido ao cliente (S13): transacionais, so WhatsApp, sem janela de horario
         // (aviso de status nao espera). Rollback: desativar a rotina (Ativa=false). =====

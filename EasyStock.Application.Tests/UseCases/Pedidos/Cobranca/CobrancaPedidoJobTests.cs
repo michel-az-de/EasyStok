@@ -107,6 +107,49 @@ public class CobrancaPedidoJobTests
         f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
     }
 
+    /// <summary>
+    /// #1889, decisão do Felipe (21/10, caminho C): com a conversa já encerrada o aviso ao cliente se perdia e
+    /// ninguém da equipe era chamado; o pedido ficava aguardando para sempre. O vencimento na última tentativa vira
+    /// aviso no sino da equipe, na mesma transação, sem cancelar nem liberar a vaga. Com a conversa aberta também:
+    /// o texto ao cliente promete que alguém da equipe vai agir.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SegundaExpiracao_AvisaAEquipeNoSinoSemCancelar(bool conversaEncerrada)
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        var conversa = Conversa.Abrir(f.EmpresaId, "5511999990001", f.Relogio.Agora.AddMinutes(-5));
+        conversa.RegistrarEntrada(f.Relogio.Agora.AddMinutes(-5));
+        if (conversaEncerrada) conversa.Encerrar(f.Relogio.Agora.AddMinutes(-2));
+        f.ConversaRepo.ObterPorIdAsync(f.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var vencida = f.AdicionarOnline(tentativa: 2, conversaId: conversa.Id);
+
+        var referencia = f.Pedido.Id.ToString("N")[..8].ToUpperInvariant();
+        var r = await f.ProcessarVencida().ExecuteAsync(Item(f, vencida.Id));
+
+        r.Should().Be(ResultadoExpiracaoCobranca.AguardandoAtendente);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+        await f.VagaRepo.DidNotReceiveWithAnyArgs().LiberarPorPedidoAsync(default, default!, default);
+        await f.Notificador.Received(1).EnfileirarEventoAsync(
+            EasyStock.Domain.Enums.Notifications.TipoEventoNotificacao.CobrancaAguardandoEquipe, f.EmpresaId,
+            Arg.Is<string>(p => p.Contains(referencia) && !p.Contains("5511")),
+            f.Pedido.Id, Arg.Any<CancellationToken>(), $"cobranca-aguardando-equipe:{vencida.Id:N}");
+    }
+
+    [Fact]
+    public async Task PrimeiraExpiracao_NaoChamaAEquipe()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        var vencida = f.AdicionarOnline(tentativa: 1, conversaId: Guid.NewGuid());
+
+        (await f.ProcessarVencida().ExecuteAsync(Item(f, vencida.Id))).Should().Be(ResultadoExpiracaoCobranca.Reemitida);
+
+        await f.Notificador.DidNotReceiveWithAnyArgs().EnfileirarEventoAsync(default, default, default!, default, default, default);
+    }
+
     [Fact]
     public async Task SemConversaCancelaNaPrimeira()
     {
