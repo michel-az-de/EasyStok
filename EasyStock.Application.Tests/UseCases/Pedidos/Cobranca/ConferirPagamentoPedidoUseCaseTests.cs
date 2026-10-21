@@ -61,6 +61,41 @@ public class ConferirPagamentoPedidoUseCaseTests
         await f.MpClient.Received(1).ExpirarPreferenciaAsync("pref-1733", Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// #1889: cartão recusado (ou pagamento cancelado ou devolvido) não está "em processamento". Antes, a
+    /// tentativa recusada travava para sempre a troca para "na entrega" com "confira novamente em instantes".
+    /// </summary>
+    [Theory]
+    [InlineData("rejected")]
+    [InlineData("cancelled")]
+    [InlineData("refunded")]
+    [InlineData("charged_back")]
+    public async Task SoTentativaSemDinheiro_NaoEstaEmProcessamentoETrocaSegue(string status)
+    {
+        var f = new CobrancaPedidoFixture();
+        var online = f.AdicionarOnline(referencia: "pref-recusada");
+        f.PagamentosNoMercadoPago.Add(Pagamento(f, status));
+
+        (await f.Conferir().ExecuteAsync(f.EmpresaId, f.Pedido.Id))
+            .Should().Be(new ConferirPagamentoPedidoResult("nao_encontrado", false));
+        var r = await f.Trocar().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "na_entrega"));
+
+        online.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        r.Cobranca.Provedor.Should().Be(EasyStock.Domain.Entities.Pagamentos.CobrancaPedido.ProvedorNaEntrega);
+        f.Pedido.Pagamentos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RecusadoEDepoisPendente_ContinuaEmProcessamento()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        f.PagamentosNoMercadoPago.Add(Pagamento(f, "in_process") with { Id = "pagamento-2" });
+        f.PagamentosNoMercadoPago.Add(Pagamento(f, "rejected"));
+        (await f.Conferir().ExecuteAsync(f.EmpresaId, f.Pedido.Id))
+            .Should().Be(new ConferirPagamentoPedidoResult("em_processamento", false));
+    }
+
     [Theory]
     [InlineData("aguardando_credencial")]
     [InlineData("nao_conciliado")]
