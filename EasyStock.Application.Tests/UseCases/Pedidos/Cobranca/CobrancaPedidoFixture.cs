@@ -225,7 +225,8 @@ internal sealed class CobrancaPedidoFixture
             new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), VagaRepo, NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance), Uow,
             NullLogger<CancelarPedidoUseCase>.Instance, CobrancaRepo, Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(), Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>());
         return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, Gerar(), cancelar,
-            Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance, OperacaoEventos);
+            Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance, OperacaoEventos,
+            Notificador);
     }
 
     public void AdicionarPagamento(string? referencia, decimal valor = 25m)

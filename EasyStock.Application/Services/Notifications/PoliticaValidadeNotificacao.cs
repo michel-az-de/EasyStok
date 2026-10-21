@@ -59,6 +59,8 @@ public sealed class PoliticaValidadeNotificacao
             [TipoEventoNotificacao.PedidoMudouEtapaNoBalcao] = TimeSpan.FromMinutes(30),
             [TipoEventoNotificacao.LembreteVencido] = TimeSpan.FromHours(1),
             [TipoEventoNotificacao.LojaFechadaNoHorario] = TimeSpan.FromHours(2),
+            // #1889: o pedido continua parado até alguém agir; o aviso vale o turno.
+            [TipoEventoNotificacao.CobrancaAguardandoEquipe] = TimeSpan.FromHours(12),
 
             // Catalogo de plataforma (N13). ConviteAcesso fica no padrao de 24 h, como a N9 espera.
             [TipoEventoNotificacao.IncidenteSistema] = TimeSpan.FromHours(2),
