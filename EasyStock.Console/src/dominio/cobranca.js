@@ -425,6 +425,11 @@ export const baixaCancelaCobrancaOnline = (pedido) => Boolean(
 // #1683: o job só reemite e cancela pedido que ainda espera o pagamento. Com o pedido já na fila
 // (pagamento na entrega, complemento) ele só marca o link como vencido, e o texto diz isso.
 const ULTIMA_TENTATIVA_DE_COBRANCA = 2
+// #1924: depois do segundo link vencido o job não manda outro; quem manda é a atendente, pela Ficha
+// (`Mandar link novo`: troca a forma para o link do Mercado Pago, que gera e envia na conversa).
+export const esperaLinkNovoApi = (cobranca, statusApi) =>
+  statusApi === 'aguardando_pagamento' && (cobranca?.tentativa ?? 1) >= ULTIMA_TENTATIVA_DE_COBRANCA
+export const ROTULO_MANDAR_LINK_NOVO = 'Mandar link novo'
 export const LINK_VENCIDO_PEDIDO_SEGUE = 'O link venceu. O pedido continua valendo e o cliente não recebe outro link. '
   + 'Se o cliente pagou de outro jeito, clique em Marcar pago.'
 export const avisoDeLinkVencidoApi = (cobranca, statusApi) => {
@@ -432,7 +437,7 @@ export const avisoDeLinkVencidoApi = (cobranca, statusApi) => {
   if (statusApi !== 'aguardando_pagamento') return LINK_VENCIDO_PEDIDO_SEGUE
   return (cobranca?.tentativa ?? 1) < ULTIMA_TENTATIVA_DE_COBRANCA
     ? 'O EasyStok manda um link novo ao cliente sozinho. Se esse também vencer, o pedido continua guardado e espera você: gere outra cobrança ou cancele.'
-    : 'Segundo link vencido: o pedido continua guardado e o cliente foi avisado. Gere uma cobrança nova ou cancele o pedido.'
+    : `Segundo link vencido: o pedido continua guardado e o cliente foi avisado. Use ${ROTULO_MANDAR_LINK_NOVO} ou cancele o pedido.`
 }
 
 // --- "Alterar forma" no modo API (#1683) --------------------------------------
