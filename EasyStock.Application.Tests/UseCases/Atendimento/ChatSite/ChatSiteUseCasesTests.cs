@@ -8,6 +8,7 @@ using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Sales;
 using Microsoft.Extensions.Logging.Abstractions;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -27,6 +28,7 @@ public class ChatSiteUseCasesTests
     private readonly ISessaoChatSiteRepository _sessoes = Substitute.For<ISessaoChatSiteRepository>();
     private readonly IConversaRepository _conversas = Substitute.For<IConversaRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IPedidoRepository _pedidos = Substitute.For<IPedidoRepository>();
     private readonly AcessoChatSite _acesso;
 
     public ChatSiteUseCasesTests()
@@ -58,7 +60,53 @@ public class ChatSiteUseCasesTests
     }
 
     private EnviarMensagemVisitanteUseCase Enviar() => new(
-        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new ConversaChatSiteService(_conversas, _uow));
+        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new ConversaChatSiteService(_conversas, _uow, _pedidos));
+
+    /// <summary>
+    /// #1918: o visitante escreve depois do encerramento com o pedido feito pela página ainda em andamento. A conversa
+    /// da sessão volta à fila humana com o pedido (como no WhatsApp, #1765-5), em vez de nascer "Visitante do site" sem ele.
+    /// </summary>
+    [Fact]
+    public async Task MensagemDepoisDoEncerramentoComPedidoEmAndamento_ReabreAConversaDaSessao()
+    {
+        var pedido = Pedido.Criar(_loja.EmpresaId, origem: "site");
+        pedido.Status = StatusPedidoMapper.Preparando;
+        var (encerrada, token) = SessaoComConversaEncerrada(pedido);
+
+        await Enviar().ExecuteAsync(Slug, token, "Cadê meu pedido?");
+
+        await _conversas.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        encerrada.EstaAberta.Should().BeTrue();
+        encerrada.PedidoEmAndamentoId.Should().Be(pedido.Id);
+        await _conversas.Received().AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.ConversaId == encerrada.Id && m.Texto == "Cadê meu pedido?"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task MensagemDepoisDoEncerramentoComPedidoEntregue_AbreOutraConversa()
+    {
+        var pedido = Pedido.Criar(_loja.EmpresaId, origem: "site");
+        pedido.Status = StatusPedidoMapper.Entregue;
+        var (encerrada, token) = SessaoComConversaEncerrada(pedido);
+
+        await Enviar().ExecuteAsync(Slug, token, "Oi de novo");
+
+        await _conversas.Received(1).AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>());
+        encerrada.EstaAberta.Should().BeFalse();
+    }
+
+    private (Conversa Encerrada, string Token) SessaoComConversaEncerrada(Pedido pedido)
+    {
+        var (sessao, token) = SessaoValida();
+        var encerrada = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, DateTime.UtcNow.AddHours(-3),
+            ConversaChatSiteService.NomeSemFormulario, canal: CanalConversa.ChatSite);
+        encerrada.DefinirPedidoEmAndamento(pedido.Id);
+        encerrada.Encerrar(DateTime.UtcNow.AddHours(-1));
+        sessao.VincularConversa(encerrada.Id);
+        _conversas.ObterPorIdAsync(_loja.EmpresaId, encerrada.Id, Arg.Any<CancellationToken>()).Returns(encerrada);
+        _pedidos.GetByIdAsync(_loja.EmpresaId, pedido.Id).Returns(pedido);
+        return (encerrada, token);
+    }
 
     [Fact]
     public async Task AbrirSessao_DevolveTokenEGuardaSoOHash()
