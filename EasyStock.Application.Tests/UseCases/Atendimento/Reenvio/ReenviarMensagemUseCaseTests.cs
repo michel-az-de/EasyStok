@@ -152,7 +152,7 @@ public class ClassificadorFalhaEnvioTests
 
     [Fact]
     public void RedeFora() =>
-        ClassificadorFalhaEnvio.Classificar(new HttpRequestException("conexão recusada"))
+        ClassificadorFalhaEnvio.Classificar(new HttpRequestException(HttpRequestError.ConnectionError, "conexão recusada"))
             .Should().Be(TipoFalhaEnvio.Temporaria);
 
     [Fact]
