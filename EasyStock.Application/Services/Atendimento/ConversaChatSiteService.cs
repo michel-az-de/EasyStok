@@ -4,7 +4,7 @@ using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.Services.Atendimento;
 
-public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnitOfWork unitOfWork)
+public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnitOfWork unitOfWork, IPedidoRepository? pedidos = null)
 {
     /// <summary>Nome do contato quando o visitante não preencheu o formulário (#1430).</summary>
     public const string NomeSemFormulario = "Visitante do site";
@@ -26,6 +26,8 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
             || conversa.Canal != CanalConversa.ChatSite || (clienteVerificadoId.HasValue && conversa.ClienteId.HasValue && conversa.ClienteId != clienteVerificadoId)))
             conversa = null;
         conversa ??= await conversas.ObterAbertaPorContatoAsync(sessao.EmpresaId, CanalConversa.ChatSite, contato, token);
+        if (conversa is null && clienteVerificadoId is null && sessao.ConversaId is { } anterior)
+            conversa = await ReabrirSePedidoEmAndamentoAsync(sessao.EmpresaId, anterior, agora, token);
         if (conversa is not null && (conversa.EmpresaId != sessao.EmpresaId || conversa.Canal != CanalConversa.ChatSite
             || (clienteVerificadoId.HasValue && conversa.ClienteId.HasValue && conversa.ClienteId != clienteVerificadoId)))
             throw new RegraDeDominioVioladaException("Conversa não pertence a esta sessão.");
@@ -45,6 +47,23 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
         await unitOfWork.CommitAsync();
         return conversa;
     }, ct);
+
+    /// <summary>
+    /// #1918: a conversa da sessão foi encerrada com o pedido ainda em andamento. Ela volta à fila humana com o pedido
+    /// (como no WhatsApp, #1765-5) em vez de nascer outra sem ele. Relida sob trava: o console pode tê-la reaberto.
+    /// </summary>
+    private async Task<Conversa?> ReabrirSePedidoEmAndamentoAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct)
+    {
+        if (pedidos is null) return null;
+        var encerrada = await conversas.ObterPorIdComLockAsync(empresaId, conversaId, ct);
+        if (encerrada is null || encerrada.EmpresaId != empresaId || encerrada.Canal != CanalConversa.ChatSite
+            || encerrada.PedidoEmAndamentoId is not { } pedidoId)
+            return null;
+        var pedido = await pedidos.GetByIdAsync(empresaId, pedidoId);
+        if (pedido is null || pedido.EmpresaId != empresaId || pedido.EstaFinalizado) return null;
+        encerrada.Reabrir(agora);
+        return encerrada;
+    }
 
     /// <summary>
     /// Pedido feito pela página do chat: fica em andamento na conversa, conta como entrada do cliente e deixa a nota
