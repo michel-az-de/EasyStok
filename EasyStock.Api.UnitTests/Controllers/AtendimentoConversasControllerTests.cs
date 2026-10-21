@@ -231,6 +231,22 @@ public partial class AtendimentoConversasControllerTests
     }
 
     [Fact]
+    public async Task TimeoutDoCanalDevolveODetalheDeEnvioIncerto()
+    {
+        // #1912: o console reconhece "envio incerto" no detalhe; o texto do timeout da Meta (#1901) caía em "Não foi enviada".
+        var conversa = ConversaComClienteAgora();
+        _canal.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new TimeoutException("A Meta não respondeu ao envio a tempo; a mensagem pode ter saído."));
+
+        var result = await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("Temos nhoque!"), default);
+
+        var corpo = result.Should().BeOfType<ObjectResult>().Subject.Value.Should().BeOfType<ApiErrorResponse>().Subject;
+        var gravada = _repositorio.Mensagens.Should().ContainSingle(m => m.Direcao == DirecaoMensagem.Saida).Subject;
+        corpo.Error.Detail.Should().Contain("Envio incerto").And.Contain(gravada.Erro);
+        gravada.ProximoReenvioEm.Should().BeNull("incerta não reenvia sozinha");
+    }
+
+    [Fact]
     public async Task AbaFechadaDuranteOEnvioAindaGravaAMensagem()
     {
         // #1787: o POST à Meta já saiu quando a dona fecha a aba. Sem o registro, o agente seguiria respondendo.

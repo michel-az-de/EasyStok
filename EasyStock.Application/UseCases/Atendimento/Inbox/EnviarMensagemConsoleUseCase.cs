@@ -171,7 +171,8 @@ public sealed class EnviarMensagemConsoleUseCase(
             var falhou = criarMensagem(null);
             falhou.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora);
             var gravada = await RegistrarAsync(conversa, falhou, usuarioId, agora, ct);
-            throw new FalhaEnvioCanalException($"Falha ao enviar pelo canal: {ex.Message}", ex, gravada);
+            // #1912: o detalhe leva o erro gravado; na incerta ele diz "Envio incerto", que o console mostra como "pode ter chegado".
+            throw new FalhaEnvioCanalException($"Falha ao enviar pelo canal: {falhou.Erro}", ex, gravada);
         }
 
         return await RegistrarAsync(conversa, criarMensagem(externoId), usuarioId, agora, ct);
