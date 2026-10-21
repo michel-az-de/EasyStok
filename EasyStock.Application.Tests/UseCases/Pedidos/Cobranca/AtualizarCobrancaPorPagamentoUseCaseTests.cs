@@ -63,6 +63,29 @@ public class AtualizarCobrancaPorPagamentoUseCaseTests
         await f.ConversaRepo.Received(1).ObterPorIdAsync(f.EmpresaId, conversaId, Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// #1889: o cartão recusado antes do Pix aprovado chega por último. Sem link pendente, a recusa caía na
+    /// cobrança paga, sobrescrevia o motivo dela e gravava "pagamento_recusado" num pedido pago.
+    /// </summary>
+    [Theory]
+    [InlineData("rejected")]
+    [InlineData("cancelled")]
+    public async Task RecusaAtrasadaDepoisDoPagamento_NaoMarcaCobrancaPaga(string status)
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        var cobranca = f.AdicionarOnline(conversaId: Guid.NewGuid());
+        cobranca.MarcarPaga("pay-pix", 25m, "pix", CobrancaPedidoFixture.Agora);
+        var motivoAntes = cobranca.Motivo;
+
+        var r = await f.AtualizarPorPagamento().ExecuteAsync(Input(f.Pedido.Id, status, "pay-cartao"));
+
+        r.Should().Be(SituacaoAtualizacaoCobranca.Ignorada);
+        cobranca.Status.Should().Be(StatusCobrancaPedido.Paga);
+        cobranca.Motivo.Should().Be(motivoAntes);
+        f.Eventos.Should().NotContain(e => e.Tipo == "pagamento_recusado");
+        await f.ConversaRepo.DidNotReceiveWithAnyArgs().ObterPorIdAsync(default, default, default);
+    }
+
     [Fact]
     public async Task RecusadoRepetidoNaoAvisaDeNovo()
     {

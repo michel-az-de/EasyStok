@@ -109,6 +109,9 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
         var online = cobrancas.Where(c => c.Provedor == CobrancaPedido.ProvedorMercadoPago).ToList();
         var alvo = online.FirstOrDefault(c => c.EstaPendente) ?? online.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
         if (alvo is null) return (SituacaoAtualizacaoCobranca.SemCobranca, null, null);
+        // Recusa que chega depois do pagamento aprovado (outra tentativa, fora de ordem) não toca a cobrança paga.
+        if (alvo.Status is StatusCobrancaPedido.Paga or StatusCobrancaPedido.Estornada)
+            return (SituacaoAtualizacaoCobranca.Ignorada, null, null);
 
         var motivo = $"pagamento_recusado: pagamento {input.PagamentoExternoId} ({status})";
         if (alvo.Motivo == motivo) return (SituacaoAtualizacaoCobranca.JaRegistrado, null, null);
