@@ -12,7 +12,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../aplicacao/useCaixaDoDiaApi'
 import {
-  JUSTIFICATIVA_MINIMA, diaMes, justificativaValida, observacaoDaAbertura, retificacaoDoSaldo,
+  JUSTIFICATIVA_MINIMA, diaMes, gavetaDoFechamento, justificativaValida, observacaoDaAbertura, retificacaoDoSaldo,
   situacaoDoCaixaParaAbrirLoja,
 } from '../../dominio/aberturaDaLoja'
 import { conferenciaDaGaveta } from '../../dominio/caixa'
@@ -109,7 +109,8 @@ function UltimoFechamento({ ultimo }) {
   return (
     <div className={css.bloco}>
       <dl className={css.numeros}>
-        <div><dt>Fechamento de {diaMes(ultimo.data)}</dt><dd>{moeda(ultimo.saldoFinal)}</dd></div>
+        {/* #1920: o que ficou na gaveta, o mesmo valor que o saldo inicial sugere; `saldoFinal` soma Pix e cartão. */}
+        <div><dt>Na gaveta em {diaMes(ultimo.data)}</dt><dd>{moeda(gavetaDoFechamento(ultimo))}</dd></div>
         <div><dt>Entrou</dt><dd>{moeda(ultimo.totalPagamentosPedidos + ultimo.totalEntradasExtras)}</dd></div>
         <div><dt>Saiu</dt><dd>{moeda(ultimo.totalSaidasExtras)}</dd></div>
       </dl>

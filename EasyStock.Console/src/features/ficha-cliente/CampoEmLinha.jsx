@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icone } from '../../componentes/Icone'
-import { mascaraTelefone } from '../../dominio/formato'
+import { mascaraTelefone, telefoneDoE164 } from '../../dominio/formato'
 import css from './cliente.module.css'
 
 const SEGUNDOS_SALVOU = 2
@@ -27,6 +27,9 @@ export function CampoEmLinha({
   // Enter, sair do campo e o botão chamam o mesmo `confirmar`: a ref trava o segundo.
   const ocupado = useRef(false)
   const inputRef = useRef(null)
+  // #1920: a API guarda o telefone em E.164 ("+5511987654321"). Mostrado cru, e a máscara aplicada
+  // por cima dele ao editar virava "(55) 11987-6541". Mostra, edita e compara já na máscara da tela.
+  const exibido = tipo === 'telefone' && valor ? telefoneDoE164(valor) : (valor ?? '')
 
   useEffect(() => {
     if (!editando) return
@@ -41,7 +44,7 @@ export function CampoEmLinha({
   }, [salvou])
 
   function abrir() {
-    setRascunho(valor ?? '')
+    setRascunho(exibido)
     setErro(null)
     setEditando(true)
   }
@@ -65,7 +68,7 @@ export function CampoEmLinha({
     if (ocupado.current) return
     const mensagem = validar?.(rascunho) ?? null
     if (mensagem) { setErro(mensagem); return }
-    if (rascunho === (valor ?? '')) { setEditando(false); setErro(null); return }
+    if (rascunho === exibido) { setEditando(false); setErro(null); return }
     const ida = aoSalvar(rascunho)
     if (!ida?.then) { concluir(ida); return }
     ocupado.current = true
@@ -88,7 +91,7 @@ export function CampoEmLinha({
     return (
       <div className={css.campoEmLinha}>
         <button type="button" className={css.valorBotao} onClick={abrir} aria-label={`Editar ${rotulo}`}>
-          <span className={valor ? undefined : css.valorVazio}>{valor || vazio}</span>
+          <span className={valor ? undefined : css.valorVazio}>{exibido || vazio}</span>
           <Icone nome="lapis" tamanho={20} />
         </button>
         {salvou && (

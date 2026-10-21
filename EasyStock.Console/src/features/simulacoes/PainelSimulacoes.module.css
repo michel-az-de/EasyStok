@@ -18,12 +18,12 @@
 /* Rodada 10 (registro 79, notificações achado 8): a decisão 19 pede "sobre o
    Balcão", com o balcão (e o trilho ao lado dele) clicável. No desktop
    (>= 1024px, mesmo corte de `app/moldura.module.css`) o trilho de navegação
-   tem 84px fixos; sem este deslocamento a gaveta nascia em `left: 0` e
+   tem largura fixa (`--largura-trilho`, #1920); sem este deslocamento a gaveta nascia em `left: 0` e
    cobria o trilho inteiro, travando "Automáticas" e o sino atrás dela. */
 @media (min-width: 1024px) {
   .gaveta {
-    left: 84px;
-    width: min(420px, calc(100vw - 84px - 32px));
+    left: var(--largura-trilho);
+    width: min(420px, calc(100vw - var(--largura-trilho) - 32px));
   }
 }
 

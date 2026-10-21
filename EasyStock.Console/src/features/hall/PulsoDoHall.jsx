@@ -12,7 +12,7 @@ const frentes = {
   atendimento: { nome: 'Atendimento pendente', icone: 'mensagem', acao: 'Abrir Atendimento', tela: 'balcao' },
   cozinha: { nome: 'Em preparo ou na fila', icone: 'producao', acao: 'Ver fila de preparo', tela: 'fila' },
   entregas: { nome: 'Prontos para sair', icone: 'entrega', acao: 'Organizar entregas', tela: 'painel' },
-  financeiro: { nome: 'Saldo no caixa', icone: 'caixa', acao: 'Conferir caixa', tela: 'caixa' },
+  financeiro: { nome: 'Total do caixa', icone: 'caixa', acao: 'Conferir caixa', tela: 'caixa' },
 }
 const hora = (em) => new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(em)
 const dinheiro = (valor) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
