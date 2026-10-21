@@ -35,7 +35,7 @@ public sealed class AvisoCobrancaConversa(
 
     /// <summary>O pagamento chegou depois do cancelamento e foi devolvido automaticamente.</summary>
     public const string TextoPagamentoTardioEstornado =
-        "Recebemos seu pagamento, mas o pedido já tinha sido cancelado porque o prazo para pagar acabou. " +
+        "Recebemos seu pagamento, mas o pedido já tinha sido cancelado. " +
         "Já devolvemos o valor pelo Mercado Pago. Se ainda quiser, é só pedir de novo por aqui.";
 
     /// <summary>#1289: segundo pagamento do mesmo pedido, devolvido automaticamente.</summary>

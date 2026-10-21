@@ -85,6 +85,28 @@ public class CobrancaPedidoJobTests
         f.Preferencias.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// #1924: a reemissão da atendente (<c>POST /cobranca</c>) saía sem conversa. Quando esse link vencia, o job
+    /// tratava o pedido da conversa como pedido do site e o cancelava sem aviso, contra o #1717-3.
+    /// </summary>
+    [Fact]
+    public async Task ReemissaoManualDepoisDoSegundoVencimento_HerdaAConversaENaoCancela()
+    {
+        var f = new CobrancaPedidoFixture();
+        var conversaId = Guid.NewGuid();
+        var vencida = f.AdicionarOnline(tentativa: 2, conversaId: conversaId);
+        vencida.Expirar(CobrancaPedidoFixture.Agora.AddMinutes(31));
+
+        await f.Gerar().ExecuteComTravaAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+        var nova = f.Cobrancas.Single(c => c.EstaPendente);
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        var r = await f.ProcessarVencida().ExecuteAsync(Item(f, nova.Id));
+
+        nova.ConversaId.Should().Be(conversaId);
+        r.Should().NotBe(ResultadoExpiracaoCobranca.PedidoCancelado);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+    }
+
     [Fact]
     public async Task SemConversaCancelaNaPrimeira()
     {

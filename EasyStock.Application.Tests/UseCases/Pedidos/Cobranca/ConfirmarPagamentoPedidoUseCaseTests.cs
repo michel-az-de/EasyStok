@@ -247,6 +247,17 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         cobranca.Motivo.Should().Contain("pedido_cancelado");
     }
 
+    /// <summary>
+    /// #1889: desde o #1717-3 o job não cancela pedido com conversa, e só pedido com conversa recebe este aviso.
+    /// O cancelamento foi de uma pessoa; "o prazo para pagar acabou" dava ao cliente um motivo falso.
+    /// </summary>
+    [Fact]
+    public void AvisoDoPagamentoTardio_NaoAtribuiOCancelamentoAoPrazo()
+    {
+        EasyStock.Application.Services.Atendimento.AvisoCobrancaConversa.TextoPagamentoTardioEstornado.Should().NotContain("prazo")
+            .And.Contain("cancelado").And.Contain("devolvemos");
+    }
+
     [Fact]
     public async Task PagoDepoisDeCanceladoEstornaEAvisa()
     {

@@ -155,6 +155,9 @@ public sealed class GerarCobrancaPedidoUseCase(
             ? PlanoPagamentoEncomenda.Sinal(dados.Total)
             : dados.Total;
         var existentes = await cobrancaRepository.ListarDoPedidoAsync(dados.EmpresaId, dados.PedidoId, ct);
+        // #1924: reemissão sem conversa informada (POST /cobranca) herda a do pedido; sem ela, o job tratava o
+        // link vencido como pedido do site e cancelava o pedido da conversa sem aviso.
+        conversaId ??= existentes.Where(c => c.ConversaId is not null).OrderBy(c => c.CriadaEm).Select(c => c.ConversaId).LastOrDefault();
 
         if (!dados.CobrarSaldo && existentes.Any(c => c.Status == Domain.Enums.Pagamentos.StatusCobrancaPedido.Paga))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
