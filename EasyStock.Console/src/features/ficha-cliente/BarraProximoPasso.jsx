@@ -6,7 +6,7 @@ import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
 import {
-  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
+  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
 import { ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR, resumoDaCobrancaEscolhida } from '../../dominio/resumoPedido'
@@ -194,6 +194,8 @@ export function BarraProximoPasso({
       aoAbrirBaixa: () => setAbrindoBaixa(true),
       aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio), GERANDO_COBRANCA) : setPedindoMeio(true)),
       aoReenviarPix: () => executar(() => aoReenviarPix()),
+      aoMandarLinkNovo: fonteApi && pedido.pedidoId && esperaLinkNovoApi(pedido.cobranca, pedido.statusApi)
+        ? () => executar(() => aoReenviarPix()) : null,
     })
     rotuloEstado = fonteApi && aguardaSinalManual(pedido) ? 'Aguardando sinal' : info.rotuloEstado
     if (fonteApi && aguardaSinalManual(pedido)) depoisTexto = pedido.requerAprovacao ? 'Próximo: Aprovação da loja' : 'Próximo: Fila de preparo'

@@ -5,7 +5,7 @@ import { Icone } from '../../componentes/Icone'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAtendimento } from '../../aplicacao/contextos'
 import { useTiqueLocal } from '../../hooks/useTiqueLocal'
-import { avisoDeLinkVencidoApi, faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
+import { ROTULO_MANDAR_LINK_NOVO, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
 import { horaCurta, moeda } from '../../dominio/formato'
 import css from './RelogioPix.module.css'
 
@@ -194,6 +194,10 @@ export function RelogioPix({
           <div className={css.botoesZerado}>
             {!fonteApi && (
               <Botao largo variante="primario" icone="refresh-cw" onClick={aoReenviar}>Reenviar cobrança</Botao>
+            )}
+            {/* #1924: o texto acima manda usar este botão; antes ele não existia no modo API. */}
+            {fonteApi && esperaLinkNovoApi(cobranca, statusApi) && (
+              <Botao largo variante="primario" icone="refresh-cw" onClick={aoReenviar}>{ROTULO_MANDAR_LINK_NOVO}</Botao>
             )}
             {!fonteApi && disponivel('cancelarPedido') && (
               <Botao largo variante="secundario" icone="circle-x" onClick={() => setConfirmando('cancelar')}>

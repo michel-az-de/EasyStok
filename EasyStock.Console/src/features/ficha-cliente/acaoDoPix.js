@@ -3,7 +3,7 @@
 // muda com a situação da cobrança (secao 2, "Alerta do Pix"). Substitui a
 // antiga trava, que só mostrava texto e travava a barra inteira.
 
-export function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoApi, linkPendenteApi = false, aoAbrirBaixa, aoGerarPix, aoReenviarPix }) {
+export function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoApi, linkPendenteApi = false, aoAbrirBaixa, aoGerarPix, aoReenviarPix, aoMandarLinkNovo = null }) {
   switch (situacaoCob.chave) {
     case 'nenhuma':
       return {
@@ -19,6 +19,17 @@ export function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoA
       // #1586: no modo API quem reemite (ou cancela) é o job do EasyStok; o botão só avisava.
       // No lugar dele, o texto diz o que vai acontecer.
       // #1683: quem pagou por fora com o link vencido ainda precisa da baixa à mão.
+      // #1924: no segundo vencimento o job não manda outro link; a Ficha manda pelo botão (antes só
+      // dizia "gere uma cobrança nova" e não havia onde gerar).
+      if (linkVencidoApi && aoMandarLinkNovo) {
+        return {
+          rotuloEstado: 'Cobrança venceu', motivo: linkVencidoApi,
+          botoes: [
+            { rotulo: 'Mandar link novo', icone: 'refresh-cw', onClick: aoMandarLinkNovo },
+            { rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa, secundario: true },
+          ],
+        }
+      }
       if (linkVencidoApi) {
         return {
           rotuloEstado: 'Cobrança venceu', motivo: linkVencidoApi,
