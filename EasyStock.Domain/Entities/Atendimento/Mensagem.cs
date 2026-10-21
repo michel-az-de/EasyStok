@@ -227,15 +227,17 @@ public class Mensagem
     /// <summary>
     /// S57: falha de envio. Temporária agenda o reenvio pela próxima espera de <see cref="EsperasReenvio"/>,
     /// dentro do <see cref="PrazoReenvio"/>; permanente e incerta não agendam (a incerta avisa no erro).
+    /// Sem <paramref name="reenvioAutomatico"/> (#1933) nada é agendado: o texto pode vencer e só a atendente reenvia.
     /// </summary>
-    public void RegistrarFalhaEnvio(string? erro, TipoFalhaEnvio tipo, DateTime agora)
+    public void RegistrarFalhaEnvio(string? erro, TipoFalhaEnvio tipo, DateTime agora, bool reenvioAutomatico = true)
     {
         var motivo = tipo == TipoFalhaEnvio.Incerta ? $"Envio incerto (sem resposta do canal): {erro}" : erro;
         AtualizarStatusEntrega(StatusMensagem.Falhou, motivo);
         TentativasEnvio++;
         UltimaFalhaEnvio = tipo;
 
-        var podeAgendar = tipo == TipoFalhaEnvio.Temporaria
+        var podeAgendar = reenvioAutomatico
+            && tipo == TipoFalhaEnvio.Temporaria
             && PodeReenviar
             && TentativasEnvio <= EsperasReenvio.Length
             && agora - EnviadaEm <= PrazoReenvio;

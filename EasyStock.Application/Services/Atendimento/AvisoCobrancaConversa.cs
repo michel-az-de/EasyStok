@@ -103,7 +103,8 @@ public sealed class AvisoCobrancaConversa(
     private async Task RegistrarFalhaAsync(Conversa conversa, string texto, string erro, TipoFalhaEnvio tipo, DateTime agora, CancellationToken ct)
     {
         var falhou = Mensagem.Saida(conversa.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto, texto);
-        falhou.RegistrarFalhaEnvio(erro, tipo, agora);
+        // #1933: o reenvio automático repetiria o aviso sem conferir pedido nem cobrança (link vencido, pedido já pago).
+        falhou.RegistrarFalhaEnvio(erro, tipo, agora, reenvioAutomatico: false);
         await conversaRepository.AddMensagemAsync(falhou, ct);
         await unitOfWork.CommitAsync();
     }
