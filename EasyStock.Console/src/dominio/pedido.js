@@ -194,9 +194,12 @@ export function rotuloDoEstado(estado) {
 }
 
 // #1865: encomenda com só o sinal recebido entra como "aprovado baba"; com saldo em aberto não é "Pago".
-export function rotuloDoResumo(estado, saldo) {
+// #1920: pedido na entrega também entra aprovado, sem dinheiro nenhum. `pago` é o que entrou (modo API);
+// sem ele (demonstração) vale a regra de antes.
+export function rotuloDoResumo(estado, saldo, pago = null) {
   const rotulo = rotuloDoEstado(estado)
-  return rotulo === 'Pago' && saldo > 0 ? 'Sinal pago' : rotulo
+  if (rotulo !== 'Pago' || !(saldo > 0)) return rotulo
+  return pago === 0 ? 'A receber na entrega' : 'Sinal pago'
 }
 
 // #1709: CEP sem cobertura volta do EasyStok com a frase escrita para o cliente

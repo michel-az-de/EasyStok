@@ -122,12 +122,13 @@
   background: var(--papel); box-shadow: var(--sombra-alta);
   border-left: var(--b-1) solid var(--linha);
 }
-/* #1697: no computador o painel abre do lado do Balcão (depois do trilho de 84 px) e a conversa
+/* #1697: no computador o painel abre do lado do Balcão (depois do trilho) e a conversa
    fica à vista. Ancorado à Ficha ele cobria a conversa inteira em 1440, medido na tela. A alça de
-   largura passa para a borda de dentro, do lado da conversa. */
+   largura passa para a borda de dentro, do lado da conversa. #1920: o trilho cresceu para 100 px e o
+   `84px` fixo cobria 16 px dele; a medida vem do token (`TRILHO` em dominio/paineis.js). */
 .painel { right: 0; }
 .painelDoBalcao {
-  left: 84px; right: auto; flex-direction: row-reverse;
+  left: var(--largura-trilho); right: auto; flex-direction: row-reverse;
   border-left: 0; border-right: var(--b-1) solid var(--linha);
 }
 .corpoPainel { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }

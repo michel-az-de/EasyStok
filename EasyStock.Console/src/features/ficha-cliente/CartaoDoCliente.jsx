@@ -18,6 +18,9 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir }) {
       cliente.totalGasto > 0 ? `${moeda(cliente.totalGasto)} em compras` : null,
       cliente.favorito ? `costuma pedir ${cliente.favorito}` : null].filter(Boolean).join(' · ')
     : lead ? 'Lead: ainda sem cadastro' : dossieLido || !fonteApi ? 'Ainda não comprou com a casa' : null
+  // #1920: a IA devolve a frase com ponto final ("Ainda não comprou com a casa."); comparar sem a
+  // pontuação do fim para o cartão não repetir a mesma frase em duas linhas.
+  const mesmaFrase = (a, b) => Boolean(a && b) && a.trim().replace(/[.!]+$/, '') === b.trim().replace(/[.!]+$/, '')
   const nota = cliente.notas?.[0] ?? null
   const tags = (cliente.tags ?? []).slice(0, 4)
   // Lead sem tag nem nota: o Resumo já diz "primeiro o cadastro"; o cartão só repetiria.
@@ -25,7 +28,7 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir }) {
   return (
     <section className={css.cartaoCliente} aria-label={`Cliente ${conversa.nome}`}>
       <button type="button" className={css.cartaoClienteAbrir} onClick={aoAbrir} aria-label={`Abrir Cliente e histórico de ${conversa.nome}`}>
-        {resumo.texto && resumo.texto !== numeros && <span className={css.resumoIa}>{resumo.texto}</span>}
+        {resumo.texto && !mesmaFrase(resumo.texto, numeros) && <span className={css.resumoIa}>{resumo.texto}</span>}
         {resumo.carregando && <span className={css.resumoIaCarregando}>Lendo o histórico do cliente…</span>}
         {numeros && <span className={css.numerosCliente}>{numeros}</span>}
       </button>

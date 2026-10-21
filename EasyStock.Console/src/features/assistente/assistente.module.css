@@ -50,8 +50,8 @@
 }
 /* #1806: a alça de largura fica na borda de dentro; o conteúdo segue em coluna ao lado dela. */
 .colunaPainel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-/* Encaixado à esquerda: depois do trilho de 84 px no computador, na borda no tablet. */
-.painelEsquerda { right: auto; left: calc(84px + var(--e-4)); }
+/* Encaixado à esquerda: depois do trilho no computador (#1920: token, não 84 px), na borda no tablet. */
+.painelEsquerda { right: auto; left: calc(var(--largura-trilho) + var(--e-4)); }
 @media (max-width: 1179px) { .painelEsquerda { left: var(--e-4); } }
 /* Solto: left e top vêm do arrasto, já limitados à tela (`dominio/paineis.js`). */
 .painelSolto { animation: none; }

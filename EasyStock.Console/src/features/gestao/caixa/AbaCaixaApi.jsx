@@ -14,7 +14,7 @@ import { useCaixaDoDiaApi } from '../../../aplicacao/useCaixaDoDiaApi'
 import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import {
-  diaMes, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
+  diaMes, gavetaDoFechamento, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
   CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
@@ -82,7 +82,7 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
     <div className={css.painel}>
       <p className={css.corpoBloco}>
         O caixa de hoje ainda não foi aberto.
-        {ultimo ? ` O fechamento de ${diaMes(ultimo.data)} deixou ${moeda(ultimo.saldoFinal)} na gaveta.` : ''}
+        {ultimo ? ` O fechamento de ${diaMes(ultimo.data)} deixou ${moeda(gavetaDoFechamento(ultimo))} na gaveta.` : ''}
       </p>
       <CampoDinheiro
         rotulo="Saldo inicial"
@@ -243,7 +243,9 @@ function UltimosFechamentos({ fechamentos }) {
               <span className={css.dicaItem}>{f.fechadoPorNome ? `${f.fechadoPorNome} · ` : ''}{horaCurta(f.fechadoEm)}</span>
               {f.observacoes && <span className={css.dicaItem}>{f.observacoes}</span>}
             </span>
-            <span className={css.linhaValor}>{moeda(f.saldoFinal)}</span>
+            {/* #1920: o valor da linha é o dinheiro que ficou na gaveta, o mesmo que a abertura sugere;
+                `saldoFinal` soma Pix e cartão e desmentia o "Contado na gaveta" da observação. */}
+            <span className={css.linhaValor} title={`Total do dia: ${moeda(f.saldoFinal)}`}>{moeda(gavetaDoFechamento(f))}</span>
           </li>
         ))}
       </ul>
