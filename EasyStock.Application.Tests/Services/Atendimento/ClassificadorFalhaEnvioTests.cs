@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -35,4 +36,27 @@ public class ClassificadorFalhaEnvioTests
         ClassificadorFalhaEnvio.Classificar(new TimeoutException()).Should().Be(TipoFalhaEnvio.Incerta);
         ClassificadorFalhaEnvio.Classificar(new TaskCanceledException()).Should().Be(TipoFalhaEnvio.Incerta);
     }
+
+    /// <summary>#1915: só reenvia sozinho quando nada saiu; a conexão que cai depois do POST pode ter entregue.</summary>
+    [Theory]
+    [InlineData(HttpRequestError.NameResolutionError, TipoFalhaEnvio.Temporaria)]
+    [InlineData(HttpRequestError.ConnectionError, TipoFalhaEnvio.Temporaria)]
+    [InlineData(HttpRequestError.SecureConnectionError, TipoFalhaEnvio.Temporaria)]
+    [InlineData(HttpRequestError.ResponseEnded, TipoFalhaEnvio.Incerta)]
+    [InlineData(HttpRequestError.InvalidResponse, TipoFalhaEnvio.Incerta)]
+    [InlineData(HttpRequestError.Unknown, TipoFalhaEnvio.Incerta)]
+    public void RedeSoReenviaQuandoNadaSaiu(HttpRequestError erro, TipoFalhaEnvio esperado) =>
+        ClassificadorFalhaEnvio.Classificar(new HttpRequestException(erro, "rede")).Should().Be(esperado);
+
+    /// <summary>#1915: 5xx e 2xx sem message id podem ter saído (como no outbox e no envio de modelo); 4xx não saiu.</summary>
+    [Theory]
+    [InlineData(500, false, TipoFalhaEnvio.Incerta)]
+    [InlineData(503, false, TipoFalhaEnvio.Incerta)]
+    [InlineData(200, true, TipoFalhaEnvio.Incerta)]
+    [InlineData(429, false, TipoFalhaEnvio.Temporaria)]
+    [InlineData(400, true, TipoFalhaEnvio.Permanente)]
+    [InlineData(null, true, TipoFalhaEnvio.Permanente)]
+    [InlineData(null, false, TipoFalhaEnvio.Temporaria)]
+    public void MetaPeloStatusHttp(int? status, bool permanente, TipoFalhaEnvio esperado) =>
+        ClassificadorFalhaEnvio.Classificar(new WhatsAppCloudException(131000, "Meta", permanente, status)).Should().Be(esperado);
 }

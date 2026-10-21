@@ -7,14 +7,18 @@ namespace EasyStock.Application.Services.Atendimento;
 /// <summary>
 /// S57 (#1355): traduz a exceção do canal no <see cref="TipoFalhaEnvio"/> que decide o reenvio automático.
 /// Timeout é incerto (a mensagem pode ter saído; reenviar duplicaria, #1292). Erro desconhecido não insiste.
+/// #1915: também é incerto o que a Meta pode ter recebido: 5xx, 2xx sem message id e conexão que caiu depois do POST.
 /// </summary>
 public static class ClassificadorFalhaEnvio
 {
     public static TipoFalhaEnvio Classificar(Exception ex) => ex switch
     {
+        WhatsAppCloudException { StatusHttp: >= 200 and < 300 or >= 500 } => TipoFalhaEnvio.Incerta,
         WhatsAppCloudException meta => meta.EhPermanente ? TipoFalhaEnvio.Permanente : TipoFalhaEnvio.Temporaria,
         TimeoutException or TaskCanceledException => TipoFalhaEnvio.Incerta,
-        HttpRequestException => TipoFalhaEnvio.Temporaria,
+        HttpRequestException { HttpRequestError: HttpRequestError.NameResolutionError or HttpRequestError.ConnectionError
+            or HttpRequestError.SecureConnectionError } => TipoFalhaEnvio.Temporaria,
+        HttpRequestException => TipoFalhaEnvio.Incerta,
         _ => TipoFalhaEnvio.Permanente,
     };
 
