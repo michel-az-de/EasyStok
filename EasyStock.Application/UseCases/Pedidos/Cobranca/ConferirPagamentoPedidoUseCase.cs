@@ -92,7 +92,8 @@ public sealed class ConferirPagamentoPedidoUseCase(
                 ContaRecebedoraId: pagamento.CollectorId), ct);
             if (resultado.Confirmado) return new(SituacaoConfirmado, true);
         }
+        // Recusado, cancelado ou devolvido não está em processamento: só tentativa sem dinheiro equivale a nada pago.
         return new(pagamentos.Any(p => p.Aprovado) ? SituacaoNaoConciliado
-            : pagamentos.Count > 0 ? SituacaoEmProcessamento : SituacaoNaoEncontrado, false);
+            : pagamentos.Any(p => !p.Recusado && !p.Estornado) ? SituacaoEmProcessamento : SituacaoNaoEncontrado, false);
     }
 }
