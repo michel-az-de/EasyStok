@@ -118,6 +118,27 @@ public class RegistrarPagamentoPedidoUseCaseTests
         await _prazoQueries.DidNotReceiveWithAnyArgs().ObterAsync(default, default, default);
     }
 
+    /// <summary>
+    /// #1889: Pix do Mercado Pago confirmado de madrugada abria o caixa do dia com R$ 0. Às 8h o console
+    /// via o caixa "aberto" e a dona não conferia o troco inicial; no dia sem expediente, o caixa ficava
+    /// esquecido aberto. Dinheiro online não entra na gaveta: só a baixa manual abre o caixa.
+    /// </summary>
+    [Fact]
+    public async Task PagamentoConfirmadoPeloProvedor_NaoAbreCaixaComSaldoZero()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId);
+        _caixaRepo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), pedido.LojaId)
+            .Returns(Array.Empty<MovimentoCaixa>());
+        _caixaRepo.TryAddMovimentoAsync(Arg.Any<MovimentoCaixa>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await UC().ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 100m,
+            RegistradoPorNome: "Mercado Pago", Origem: "mercadopago", PermitirExcedente: true, ConfirmadoPeloProvedor: true));
+
+        pedido.Pagamentos.Should().ContainSingle(p => p.Valor == 100m);
+        await _caixaRepo.DidNotReceiveWithAnyArgs().TryAddMovimentoAsync(default!, default);
+    }
+
     [Fact]
     public async Task Pagamento_persiste_quando_abertura_colide_com_a_unica_ja_existente()
     {

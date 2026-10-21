@@ -175,6 +175,9 @@ public class RegistrarPagamentoPedidoUseCase(
         // como caso normal (retorna false); o catch abaixo é so para falhas inesperadas
         // (timeout, conexão, etc.) que não devem propagar como 500 pro operador.
         if (caixaRepo is null) return;
+        // #1889: pagamento do provedor não entra na gaveta e chega a qualquer hora. Abrir o caixa com R$ 0 de
+        // madrugada fazia o console pular a conferência do troco inicial; o pagamento entra no dia do mesmo jeito.
+        if (cmd.ConfirmadoPeloProvedor) return;
 
         try
         {
