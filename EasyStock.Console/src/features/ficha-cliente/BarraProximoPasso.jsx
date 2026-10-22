@@ -63,6 +63,7 @@ const GERANDO_COBRANCA = 'Gerando cobrança…'
 // listava os seis passos soltos) e da barra antiga somados.
 export function BarraProximoPasso({
   pedido, conversaId, nomeCliente, agora, emDesfazer, simulacao = null, bloqueado = false, prerequisito = null, gerarSemEnviar = false, aoAvancar, aoDesfazer,
+  alvoDoPrerequisito = null, aoIrParaMotivo = null, pedidoDeCancelar = 0,
   aoGerarPix, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
   aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento, aoAprovarPedido,
 }) {
@@ -71,6 +72,12 @@ export function BarraProximoPasso({
   const [motivoCancelar, setMotivoCancelar] = useState('')
   const [erroCancelar, setErroCancelar] = useState(null)
   const cancelando = useRef(false)
+  // #1686 (item 4): "Cancelar e refazer" da Seleção abre aqui a mesma confirmação do menu ⋯.
+  const [cancelarVisto, setCancelarVisto] = useState(pedidoDeCancelar)
+  if (pedidoDeCancelar !== cancelarVisto) {
+    setCancelarVisto(pedidoDeCancelar)
+    if (pedidoDeCancelar) { setMotivoCancelar(''); setErroCancelar(null); setConfirmando('cancelar') }
+  }
   const { acoes: capacidades } = useAcessoModulos()
   const [abrindoBaixa, setAbrindoBaixa] = useState(false)
   const [pedindoMeio, setPedindoMeio] = useState(false)
@@ -217,7 +224,11 @@ export function BarraProximoPasso({
       corpoAcao = (
         <div className={css.botoesPrimarios}>
           {gerarSemEnviar && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: gere sem enviar. Depois copie o link em Pagamento ou use um modelo aprovado.</p>}
-          {info.motivo && <p className={css.motivoDesabilitado}>{info.motivo}</p>}
+          {/* #1686 (item 9): o motivo que segura o botão leva ao campo que resolve. */}
+          {info.motivo && (info.motivo === prerequisito && alvoDoPrerequisito && aoIrParaMotivo
+            ? <p className={css.motivoDesabilitado}><button type="button" className={css.linkMotivo} data-alvo-motivo={alvoDoPrerequisito}
+              onClick={() => aoIrParaMotivo(alvoDoPrerequisito)}>{info.motivo}</button></p>
+            : <p className={css.motivoDesabilitado}>{info.motivo}</p>)}
           {info.nota && <p className={css.motivoDesabilitado}>{info.nota}</p>}
           {info.botoes.map((b) => (
             <Botao

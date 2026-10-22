@@ -55,7 +55,7 @@ function VazioEmLinha({ texto, acao, aoAgir }) {
 export function PainelConversas({ aoAbrir }) {
   const {
     visiveis, encerradasDoBalcao, bloqueadasDoBalcao, selecionadaId, filtros, agora,
-    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos,
+    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos, fonteApi,
   } = useAtendimento()
   const { mudarFiltro, selecionar } = useAcoes()
   const [gruposAbertos, setGruposAbertos] = useState({ encerradas: false, bloqueados: false })
@@ -159,6 +159,7 @@ export function PainelConversas({ aoAbrir }) {
             expediente={horarioDaLoja}
             busca={filtros.busca}
             aoAbrir={abrir}
+            fonteApi={fonteApi}
           />
         ))}
         {filtros.aba === 'todas' && (

@@ -5,8 +5,10 @@ import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { horaCurta } from '../../dominio/formato'
-import { falhaDeEnvio, textoDaFalhaDeEnvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
-import { useAcoes } from '../../aplicacao/contextos'
+import {
+  RECARGA_NAO_ENTREGUES_MS, assinaturaDeFalhas, falhaDeEnvio, falhaNovaNaTela, textoDaFalhaDeEnvio, TIPOS_DE_FALHA,
+} from '../../dominio/falhaDeEnvio'
+import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import css from './caixa.module.css'
 
 // S59 (#1391): mensagens que não chegaram ao cliente, de todas as conversas. Só aparece no modo API
@@ -70,19 +72,37 @@ export function NaoEntregues({ aoAbrir }) {
     }
   }, [aberto, itens, erro, carregando])
 
-  const carregar = useCallback(() => {
+  // `silencioso`: a releitura de fundo não acende "Conferindo mensagens…" nem troca a faixa por erro.
+  const carregar = useCallback(({ silencioso = false } = {}) => {
     if (!listarNaoEntregues) return Promise.resolve()
-    setCarregando(true)
+    if (!silencioso) setCarregando(true)
     return listarNaoEntregues()
       .then((lista) => {
         setItens(lista)
         setErro(null)
       })
-      .catch((e) => setErro(e.message))
-      .finally(() => setCarregando(false))
+      .catch((e) => { if (!silencioso) setErro(e.message) })
+      .finally(() => { if (!silencioso) setCarregando(false) })
   }, [listarNaoEntregues])
 
   useEffect(() => { carregar() }, [carregar])
+  // #1765 (item 10): a lista anda sozinha a cada minuto e quando uma falha nova aparece na tela.
+  // Com a lista aberta, quem atualiza é ela (botão "Atualizar lista"): nada muda debaixo do dedo.
+  const { conversas } = useAtendimento()
+  const falhas = assinaturaDeFalhas(conversas)
+  const falhasVistasRef = useRef(falhas)
+  useEffect(() => {
+    const antes = falhasVistasRef.current
+    falhasVistasRef.current = falhas
+    if (!aberto && falhaNovaNaTela(antes, falhas)) carregar({ silencioso: true })
+  }, [falhas, aberto, carregar])
+  useEffect(() => {
+    if (!listarNaoEntregues || aberto) return undefined
+    const id = setInterval(() => {
+      if (globalThis.document?.visibilityState !== 'hidden') carregar({ silencioso: true })
+    }, RECARGA_NAO_ENTREGUES_MS)
+    return () => clearInterval(id)
+  }, [listarNaoEntregues, aberto, carregar])
   useEffect(() => {
     if (!ocupado && !carregando && envioRef.current && !envioRef.current.isConnected) {
       atualizarRef.current?.focus()
@@ -135,7 +155,7 @@ export function NaoEntregues({ aoAbrir }) {
           largura="min(740px, calc(100vw - 24px))"
           descricao="Mensagens que o WhatsApp não entregou. Falha temporária tenta de novo sozinha por até 6 h."
           aoFechar={fechar}
-          rodape={<><Botao ref={atualizarRef} disabled={carregando || Boolean(ocupado)} onClick={carregar}>Atualizar lista</Botao><Botao onClick={fechar}>Fechar</Botao></>}
+          rodape={<><Botao ref={atualizarRef} disabled={carregando || Boolean(ocupado)} onClick={() => carregar()}>Atualizar lista</Botao><Botao onClick={fechar}>Fechar</Botao></>}
         >
           {erro && <p className={css.erroNaoEntregue} role="alert">A lista não carregou: {erro}</p>}
           {carregando && <output className={`${css.resumoNaoEntregues} ${css.bloco}`}>Atualizando mensagens…</output>}

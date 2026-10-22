@@ -19,7 +19,7 @@ import { indiceDoPasso } from '../../dominio/esteira'
 import { numeroCurto, pedidoEncerrado } from '../../dominio/pedido'
 import { SITUACOES, situacaoDoCep } from '../../dominio/areaEntrega'
 import {
-  chegouQuando, dicaDoCep, mesmoDomicilio, motivoParaNaoBloquear, recusaDoEndereco, resumoFinanceiro,
+  chegouQuando, dicaDoCep, mesmoDomicilio, motivoParaNaoBloquear, recusaDoEndereco, resumoDoContato, resumoFinanceiro,
 } from '../../dominio/cliente'
 import { SELO_CAPTADO, automaticoConduzindo } from '../../dominio/captura'
 import { historicoElegivelParaFidelidade, saldoDePontos } from '../../dominio/fidelidade'
@@ -260,8 +260,12 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
         )}
       </Bloco>
 
-      <Bloco titulo="Contato e endereço" chave="contato" recolhidoDePadrao={recolhidas.contato && !avisoEndereco} resumo={cliente.telefone ?? ''}>
+      {/* #1643 (item 6): o contato informado pelo visitante pede confirmação; a seção nasce aberta com
+          ele e, recolhida, o resumo diz que ele está ali. */}
+      <Bloco titulo="Contato e endereço" chave="contato" recolhidoDePadrao={recolhidas.contato && !avisoEndereco && !informado}
+        resumo={resumoDoContato(cliente, informado)}>
         {informado && (
+          <div data-campo-ficha="cadastro" className={css.contents}>
           <ContatoInformado
             key={conversa.id}
             contato={informado}
@@ -269,10 +273,11 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
               nome: informado.nome ?? conversa.nome, telefone: informado.telefone, email: informado.email, endereco: null, ...opcoes,
             }, agora)}
           />
+          </div>
         )}
 
         {precisaCadastro ? (
-          <div className={css.cadastroRapido}>
+          <div className={css.cadastroRapido} data-campo-ficha="cadastro">
             {!cliente.telefone && (
               <CampoMascarado
                 tipo="telefone" rotulo="Telefone"
@@ -282,7 +287,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
               />
             )}
             {!cliente.endereco && (
-              <>
+              <div data-campo-ficha="endereco" className={css.contents}>
                 <CampoTexto
                   rotulo="Endereço"
                   value={form.enderecoSemCep}
@@ -297,7 +302,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
                   placeholder="00000-000"
                   dica={dicaDoCep(cepForaDaArea, { fonteApi })}
                 />
-              </>
+              </div>
             )}
             {erroCadastro && <p className={css.erroEmLinha} role="alert">{erroCadastro}</p>}
             <Botao largo variante="primario" icone="user-plus" disabled={!podeSalvarCadastro || cadastro.salvando} onClick={aoSalvarCadastro}>
@@ -306,7 +311,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
           </div>
         ) : (
           <div className={css.dadosCliente}>
-            <div key={`tel-${captado.telefone ?? ''}`} className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
+            <div key={`tel-${captado.telefone ?? ''}`} data-campo-ficha="telefone cadastro" className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
               <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={15} /></span>
               <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
               <CampoEmLinha rotulo="Telefone" valor={cliente.telefone}
@@ -315,6 +320,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
             </div>
             <div
               key={`end-${captado.endereco ?? ''}`}
+              data-campo-ficha="endereco"
               className={`${css.linhaDado} ${enderecoPendente ? css.linhaDadoPendente : ''} ${captado.endereco ? css.captadoAgora : ''}`}
             >
               <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={15} /></span>

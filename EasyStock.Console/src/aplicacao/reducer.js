@@ -590,6 +590,13 @@ const CASOS = {
       texto: 'Cadastro criado a partir do endereço confirmado na conversa.',
     }, { id: mensagemId, agora })),
 
+  // #1686 (item 3): pedido entregue ou cancelado não recebe item (a trava do ADICIONAR_ITEM fica),
+  // mas a mesma conversa abre uma comanda nova, em rascunho. O pedido antigo segue no EasyStok e
+  // a leitura dele não apaga o rascunho (`pedidoMesclado`). Pedido em andamento não é trocado.
+  [acao.NOVA_COMANDA]: (estado, { id, numeroPedido }) => mapear(estado, id, (c) => (
+    c.pedido && !pedidoEncerrado(c.pedido) ? c : { ...c, pedido: novoPedido(numeroPedido) }
+  )),
+
   // Saldo zero avisa, nunca trava a venda.
   [acao.ADICIONAR_ITEM]: (estado, {
     id, item, numeroPedido, alertaId, agora,
