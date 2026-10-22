@@ -322,3 +322,6 @@ escritos e desliga as animações, inclusive a volta do overlay. */
 .etapa-atual .marcaEtapa { border-color: var(--marca); color: var(--marca); border-width: var(--b-2); }
 .etapa-futura { color: var(--tinta-3); }
 .itemComanda { font-size: var(--t-corpo); }
+
+/* #1686 (item 5): avanço esperando o "Desfazer", no lugar do botão de avançar. */
+.desfazerEtapa { display: grid; gap: var(--e-1); margin-top: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }

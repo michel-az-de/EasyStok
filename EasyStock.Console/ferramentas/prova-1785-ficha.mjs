@@ -63,7 +63,7 @@ for (const estado of ['aguardando', 'pago', 'entregue', 'cancelado']) {
     assert.match(html, /Atendimento encerrado/)
     assert.match(html, /Consultar pedido vinculado/)
     assert.match(html, /Cliente e histórico/)
-    assert.doesNotMatch(html, /Lasanha|4321|R\$|Comanda compartilhada|Pagamento completo|Gerar cobrança|Iniciar preparo|Revisar seleção/)
+    assert.doesNotMatch(html, /Lasanha|4321|R\$|Comanda compartilhada|Pagamento completo|Gerar cobrança|Começar preparo|Revisar seleção/)
     assert.doesNotMatch(html, /<dialog|<input|<textarea|<select/)
   })
 }
