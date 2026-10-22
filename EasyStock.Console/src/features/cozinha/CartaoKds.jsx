@@ -3,8 +3,11 @@ import { useDraggable } from '@dnd-kit/core'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
+import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
-import { avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoStatusKds, tempoAteInicio, urgenciaDoPedido } from '../../dominio/kds'
+import {
+  avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds, rotuloDoStatusKds, tempoAteInicio, urgenciaDoPedido,
+} from '../../dominio/kds'
 import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
 
@@ -21,14 +24,14 @@ const corDoCartao = (pedido, urgencia) => COR_DA_URGENCIA[urgencia]
 
 export function CartaoKds({
   pedido, agora, linhas, linhaFiltro, movendo = false, novo = false, mudou = false, saindo = false, recusa = null,
-  aoAvancar, aoAbrir, retomarFoco = false, aoConsumirFoco,
+  aoAvancar, aoAbrir, retomarFoco = false, aoConsumirFoco, adiado = null, aoDesfazer = null,
 }) {
   const proximo = saindo ? null : proximoStatusKds(pedido.status)
   const urgencia = urgenciaDoPedido(pedido, agora)
   const nome = nomeDoPedido(pedido)
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({
     id: pedido.id,
-    disabled: !proximo || movendo,
+    disabled: !proximo || movendo || Boolean(adiado),
     attributes: { roleDescription: 'pedido arrastável' },
     // Os anúncios do arrasto dizem "Pegou o pedido <numero>": fica o código curto, único e sem prefixo.
     data: { numero: pedido.numeroCurto, nome: nomeNaComanda(pedido), status: pedido.status },
@@ -66,7 +69,12 @@ export function CartaoKds({
       {recusa && (
         <p className={css.motivoRecusa}><Icone nome="circle-x" tamanho={16} />{recusa}</p>
       )}
-      {proximo && (
+      {/* #1686 (item 5): o toque espera alguns segundos com "Desfazer"; só depois o cliente é avisado. */}
+      {proximo && adiado && (
+        <DesfazerComPrazo largo className={css.desfazerEtapa} ate={adiado.ate}
+          texto={`Vai para ${rotuloDoDestinoKds(adiado.status)}`} aoDesfazer={() => aoDesfazer?.(pedido.id)} />
+      )}
+      {proximo && !adiado && (
         <Botao
           largo variante="primario" className={css.botaoAvancar} disabled={movendo}
           onClick={() => aoAvancar(pedido.id, proximo.status)}

@@ -33,7 +33,7 @@ import css from './ficha.module.css'
 // completo do passo continua no aria-label de cada item.
 const ROTULO_CURTO = {
   aguardando: 'Cobrança', pago: 'Pago', preparo: 'Preparo',
-  embalado: 'Embalado', entrega: 'Entrega', entregue: 'Entregue',
+  embalado: 'Pronto', entrega: 'Entrega', entregue: 'Entregue',
 }
 
 // Ícone de cada passo na trilha (secao 5 da direcao visual).
@@ -44,10 +44,11 @@ const ICONE_DA_TRILHA = {
 
 // Rótulo e ícone do botão primário de cada passo, exceto "aguardando": esse
 // depende da situação da cobrança (ver `acaoDoPix.js`).
+// #1686 (item 8): os mesmos toques da Cozinha (`COLUNAS_KDS`).
 const ACAO_DO_PASSO = {
-  pago: { rotulo: 'Iniciar preparo', icone: 'cooking-pot' },
-  preparo: { rotulo: 'Marcar embalado', icone: 'package' },
-  embalado: { rotulo: 'Despachar pedido', icone: 'moto' },
+  pago: { rotulo: 'Começar preparo', icone: 'cooking-pot' },
+  preparo: { rotulo: 'Marcar pronto', icone: 'package' },
+  embalado: { rotulo: 'Saiu para entrega', icone: 'moto' },
   entrega: { rotulo: 'Marcar entregue', icone: 'house' },
 }
 

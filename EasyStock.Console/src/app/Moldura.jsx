@@ -72,9 +72,9 @@ function grupoDoDia(emAndamento, naEsteira) {
 // próprio Balcão, e "Dois lugares para a mesma pergunta" era exatamente o
 // problema que a direção resolveu.
 function MenuMais({
-  refBotao, aoAbrirEntregas, aoAbrirGestao, aoAbrirAjuda, emAndamento, naEsteira,
+  refBotao, aoAbrirEntregas, aoAbrirGestao, aoAbrirAjuda, emAndamento, naEsteira, atendente = null,
 }) {
-  const { permite } = useAcessoModulos()
+  const { permite, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const [aberto, setAberto] = useState(false)
   const fechar = useCallback(() => setAberto(false), [])
 
@@ -105,6 +105,11 @@ function MenuMais({
     },
     { titulo: 'Ajuda', itens: [{ chave: '__ajuda', titulo: 'Ajuda e guia do Console', detalhe: 'O que cada módulo faz, primeiros passos e diagnóstico' }] },
     grupoDoDia(emAndamento, naEsteira),
+    // #1242 (D1): a faixa de baixo saiu do celular; quem está logado e o Sair vêm para cá.
+    ...(aoSair ? [{
+      titulo: 'Conta',
+      itens: [{ chave: '__sair', titulo: sessaoPersistente ? 'Sair deste aparelho' : 'Sair', detalhe: [atendente, conta?.casa].filter(Boolean).join(' · ') || 'Encerrar a sessão' }],
+    }] : []),
   ]
 
   function escolher(item) {
@@ -116,6 +121,7 @@ function MenuMais({
     if (item.chave === '__ajuda') aoAbrirAjuda()
     if (item.chave === '__claro') trocarTema('light')
     if (item.chave === '__escuro') trocarTema('dark')
+    if (item.chave === '__sair') aoSair?.()
   }
 
   return (
@@ -184,9 +190,9 @@ const MODULO_ATENDIMENTO = moduloPorId('atendimento')
 const rotuloAutomaticas = (regras) => (regras ? `Automáticas, ${contarAtivas(regras)} ligadas` : 'Automáticas')
 
 function Cabecalho({
-  conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, aoAbrirAjuda,
+  conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, aoAbrirAjuda, atendente = null,
 }) {
-  const { permite, notificacoes } = useAcessoModulos()
+  const { permite, notificacoes, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const compacto = useTopoCompacto()
   const botaoMaisRef = useRef(null)
   const emAndamento = contarAbertas(conversas)
@@ -239,12 +245,16 @@ function Cabecalho({
             aoAbrirAjuda={aoAbrirAjuda}
             emAndamento={emAndamento}
             naEsteira={naEsteira}
+            atendente={atendente}
           />
         ) : (
           // Rodada 2: a ocupação das janelas mora no topo, porque capacidade
           // estourada é a coisa que ela mais teme e não pode custar dois cliques.
           <>{permite('entregas') && <ResumoEntregas aoAbrir={aoAbrirEntregas} />}
-            <Botao variante="texto" icone="ajuda" aria-haspopup="dialog" onClick={aoAbrirAjuda}>Ajuda</Botao></>
+            <Botao variante="texto" icone="ajuda" aria-haspopup="dialog" onClick={aoAbrirAjuda}>Ajuda</Botao>
+            {/* #1242 (D1): no tablet largo o Sair mora no avatar, como no trilho do desktop. */}
+            {aoSair && <MenuDaConta nome={atendente} detalhe={conta?.casa} aoSair={aoSair} lado="abaixo"
+              rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'} />}</>
         )}
       </div>
     </header>
@@ -438,6 +448,7 @@ export function Moldura({
       aoAbrirGestao={aoAbrirGestao}
       aoAbrirEntregas={aoAbrirEntregas}
       aoAbrirAjuda={aoAbrirAjuda}
+      atendente={atendente}
     />
   )
 

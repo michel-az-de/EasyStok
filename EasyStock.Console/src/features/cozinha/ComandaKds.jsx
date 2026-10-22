@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
+import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { Modal } from '../../componentes/Modal'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
-import { ETAPAS_KDS, avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds } from '../../dominio/kds'
+import { ETAPAS_KDS, avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds } from '../../dominio/kds'
 import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
 
@@ -15,7 +16,7 @@ import css from './cozinha.module.css'
 // #1584: o erro da tela (`erro`) aparece aqui dentro; desenhado só na página, ficava inerte
 // atrás do modal e "Marcar pronto" parecia não ter feito nada.
 export function ComandaKds({
-  pedido, agora, linhas, movendo, erro, aoAvancar, aoReimprimir, aoLimparErro, aoFechar,
+  pedido, agora, linhas, movendo, erro, aoAvancar, aoReimprimir, aoLimparErro, aoFechar, adiado = null, aoDesfazer = null,
 }) {
   const proximo = proximoStatusKds(pedido.status)
   const aviso = avisoDeInicio(pedido, agora)
@@ -41,7 +42,11 @@ export function ComandaKds({
           </Botao>
           {/* #1839: um caminho só, o impresso da API com o papel na tela (o PDF próprio saiu). */}
           <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" rotulo="Imprimir canhoto" />
-          {proximo && (
+          {/* #1686 (item 5): o mesmo "Desfazer" do cartão. */}
+          {proximo && adiado && (
+            <DesfazerComPrazo ate={adiado.ate} texto={`Vai para ${rotuloDoDestinoKds(adiado.status)}`} aoDesfazer={() => aoDesfazer?.(pedido.id)} />
+          )}
+          {proximo && !adiado && (
             <Botao variante="primario" disabled={movendo} onClick={() => aoAvancar(pedido.id, proximo.status)}>
               {movendo ? 'Enviando…' : proximo.toque}
             </Botao>

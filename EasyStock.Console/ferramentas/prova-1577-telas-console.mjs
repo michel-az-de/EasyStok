@@ -4,6 +4,8 @@
 //   2. mídia da conversa: cache pequeno de endereços locais, liberados ao expulsar e ao sair;
 //   3. SSE calado por mais de 2,5 heartbeats cai sozinho;
 //   5. Pix sem contagem não tiquetaqueia; PDF aberto em aba nova tem o endereço liberado.
+// #1686 (item 5): o toque da Cozinha e das Entregas espera `PRAZO` com "Desfazer" antes de ir à API;
+// as conferências de recarga andam o prazo antes de olhar a rede.
 // Os hooks rodam de verdade num hospedeiro mínimo (o mesmo desenho da prova-ux-sistema); HTTP e SSE
 // são trocados na fronteira e o tempo é o de `mock.timers`.
 //
@@ -159,6 +161,9 @@ const evento = (nome) => conexoes.at(-1).aoEvento({ evento: nome })
 
 const { useEntregasApi } = await import('../src/aplicacao/useEntregasApi.js')
 const { useCozinhaApi } = await import('../src/aplicacao/useCozinhaApi.js')
+const { SEGUNDOS_PARA_DESFAZER_ETAPA, chaveDaEntrega, chaveDaSaida } = await import('../src/aplicacao/envioComDesfazer.js')
+const PRAZO = SEGUNDOS_PARA_DESFAZER_ETAPA * 1000
+const escritas = () => chamadas.filter((c) => c.metodo !== 'GET')
 
 await confere('1. Entregas: montagem e `ready` leem tudo, cadastro incluído', async () => {
   ligarRelogio()
@@ -200,6 +205,7 @@ await confere('1. Entregas: "Entregue" com o SSE vivo relê uma vez só, pelo ev
   const h = await montar(useEntregasApi)
   try {
     const feito = h.resultado.acoes.entregue('v-1', 'p-1')
+    andar(PRAZO)
     await h.estabilizar()
     assert.equal(leituras().length, 0, 'a resposta da ação não relê: o evento dela vem aí')
     assert.equal(h.resultado.ocupado, true, 'os botões seguem travados até a tela refletir a ação')
@@ -218,6 +224,7 @@ await confere('1. Entregas: SSE vivo e mudo não deixa a tela velha (relê em 2 
   const h = await montar(useEntregasApi)
   try {
     const feito = h.resultado.acoes.sair('v-1')
+    andar(PRAZO)
     await h.estabilizar()
     andar(1999)
     await h.estabilizar()
@@ -233,7 +240,9 @@ await confere('1. Entregas: SSE vivo e mudo não deixa a tela velha (relê em 2 
 await confere('1. Entregas: SSE caído, a ação relê na resposta como antes', async () => {
   const h = await montar(useEntregasApi, undefined, { aoVivo: false })
   try {
-    assert.equal(await h.resultado.acoes.entregue('v-1', 'p-1'), true)
+    const ida = h.resultado.acoes.entregue('v-1', 'p-1')
+    andar(PRAZO)
+    assert.equal(await ida, true)
     assert.equal(leituras().length, 4)
     conexoes.at(-1).aoCair()
     chamadas.length = 0
@@ -279,6 +288,7 @@ await confere('1. Cozinha: um toque com o SSE vivo lê a fila uma vez, pelo even
   const h = await montar(useCozinhaApi, { data: null })
   try {
     const feito = h.resultado.avancar('p-1', 'preparando')
+    andar(PRAZO)
     await h.estabilizar()
     assert.equal(h.resultado.movendo.has('p-1'), true)
     evento('pedido.mudou_status')
@@ -299,6 +309,7 @@ await confere('1. Cozinha: evento que chega antes da resposta lenta não prende 
     const lenta = pendente()
     responder('PATCH', '/api/kds/pedidos/p-1/status', () => lenta.promise)
     const feito = h.resultado.avancar('p-1', 'pronto')
+    andar(PRAZO)
     await h.estabilizar()
     evento('pedido.mudou_status')
     andar(300)
@@ -316,6 +327,7 @@ await confere('1. Cozinha: SSE mudo relê em 2 s; SSE caído relê na resposta',
   const vivo = await montar(useCozinhaApi, { data: null })
   try {
     const feito = vivo.resultado.avancar('p-1', 'pronto')
+    andar(PRAZO)
     await vivo.estabilizar()
     assert.equal(daFila().length, 0)
     andar(2000)
@@ -327,7 +339,9 @@ await confere('1. Cozinha: SSE mudo relê em 2 s; SSE caído relê na resposta',
   chamadas.length = 0
   const caido = await montar(useCozinhaApi, { data: null }, { aoVivo: false })
   try {
-    await caido.resultado.avancar('p-1', 'pronto')
+    const ida = caido.resultado.avancar('p-1', 'pronto')
+    andar(PRAZO)
+    await ida
     assert.equal(daFila().length, 1)
   } finally { caido.desmontar() }
 })
@@ -336,11 +350,72 @@ await confere('1. Cozinha: trocar o dia no meio da ação solta o cartão', asyn
   const h = await montar(useCozinhaApi, { data: null })
   try {
     const feito = h.resultado.avancar('p-1', 'pronto')
+    andar(PRAZO)
     await h.estabilizar()
     h.renderizar({ data: '2026-10-12' })
     await feito
     await h.estabilizar()
     assert.equal(h.resultado.movendo.has('p-1'), false)
+  } finally { h.desmontar() }
+})
+
+// --- #1686 (item 5): desfazer antes de avisar o cliente --------------------------------------------
+await confere('#1686-5 Cozinha: o toque espera o prazo; "Desfazer" cancela e nada vai à API', async () => {
+  const h = await montar(useCozinhaApi, { data: null })
+  try {
+    const ida = h.resultado.avancar('p-1', 'preparando')
+    await h.estabilizar()
+    assert.deepEqual(escritas(), [], 'nada sai antes do prazo')
+    assert.equal(h.resultado.adiados.get('p-1')?.status, 'preparando', 'o cartão sabe para onde vai')
+    andar(PRAZO - 1)
+    assert.equal(h.resultado.desfazerAvanco('p-1'), true)
+    await h.estabilizar()
+    assert.deepEqual(await ida, { desfeito: true })
+    andar(PRAZO)
+    await h.estabilizar()
+    assert.deepEqual(escritas(), [], 'desfeito não sai depois')
+    assert.equal(h.resultado.adiados.size, 0)
+  } finally { h.desmontar() }
+})
+await confere('#1686-5 Cozinha: sem desfazer, sai no fim do prazo; a confirmação do saldo vai na hora', async () => {
+  const h = await montar(useCozinhaApi, { data: null })
+  try {
+    h.resultado.avancar('p-1', 'preparando')
+    andar(PRAZO)
+    await h.estabilizar()
+    assert.deepEqual(escritas().map((c) => c.metodo + ' ' + c.caminho), ['PATCH /api/kds/pedidos/p-1/status'])
+    chamadas.length = 0
+    h.resultado.avancar('p-2', 'entregue', true)
+    await h.estabilizar()
+    assert.equal(escritas().length, 1, 'o segundo toque da pergunta do saldo não espera de novo')
+  } finally { h.desmontar() }
+})
+await confere('#1686-5 Cozinha: sair da tela com avanço pendente manda na hora (a decisão já foi tomada)', async () => {
+  const h = await montar(useCozinhaApi, { data: null })
+  h.resultado.avancar('p-1', 'pronto')
+  await h.estabilizar()
+  h.desmontar()
+  await Promise.resolve(); await Promise.resolve()
+  assert.equal(escritas().length, 1)
+})
+await confere('#1686-5 Entregas: "Saiu para entrega" e "Entregue" esperam com "Desfazer"', async () => {
+  const h = await montar(useEntregasApi)
+  try {
+    const saida = h.resultado.acoes.sair('v-1')
+    const entrega = h.resultado.acoes.entregue('v-2', 'p-9')
+    await h.estabilizar()
+    assert.ok(h.resultado.acoes.adiadoAte(chaveDaSaida('v-1')) > Date.now())
+    assert.ok(h.resultado.acoes.adiadoAte(chaveDaEntrega('v-2', 'p-9')) > Date.now())
+    assert.equal(h.resultado.acoes.desfazerEnvio(chaveDaSaida('v-1')), true)
+    andar(PRAZO)
+    await h.estabilizar()
+    assert.deepEqual(await saida, { desfeito: true })
+    evento('pedido.mudou_status')
+    andar(300)
+    await h.estabilizar()
+    assert.equal(await entrega, true)
+    assert.deepEqual(escritas().map((c) => c.metodo), ['POST'], 'só a entrega saiu; a saída desfeita não')
+    assert.equal(h.resultado.acoes.adiadoAte(chaveDaEntrega('v-2', 'p-9')), null)
   } finally { h.desmontar() }
 })
 

@@ -184,8 +184,8 @@ const ROTULO_FORA_DA_ESTEIRA = {
   'aguardando aprovacao baba': 'Aguardando aprovação',
   'aprovado baba': 'Pago',
   preparando: 'Em preparo',
-  pronto: 'Embalado',
-  'saiu para entrega': 'Em entrega',
+  pronto: 'Pronto',
+  'saiu para entrega': 'Saiu para entrega',
 }
 
 export function rotuloDoEstado(estado) {

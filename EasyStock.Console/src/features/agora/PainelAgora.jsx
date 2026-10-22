@@ -74,7 +74,7 @@ export function PainelAgora({ filas, podeVer, aoAbrirConversa, avisoResponder = 
         {podeVer.cozinha && <Fila titulo="Cozinhar" apoio="Pago e em preparo, o que sai antes primeiro"
           itens={filas.cozinhar} emDia="Nada na fila de preparo."
           href={hashDoModulo('cozinha', 'fila')} rotuloDoLink="Cozinha" renderizar={Pedido} />}
-        {podeVer.entregas && <Fila titulo="Despachar" apoio="Embalado e a caminho"
+        {podeVer.entregas && <Fila titulo="Despachar" apoio="Pronto e a caminho"
           itens={filas.despachar} emDia="Nada esperando sair."
           href={hashDoModulo('entregas', 'painel')} rotuloDoLink="Entregas" renderizar={Pedido} />}
       </div>
