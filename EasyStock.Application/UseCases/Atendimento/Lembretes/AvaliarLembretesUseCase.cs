@@ -21,7 +21,8 @@ public sealed record ResultadoAvaliacaoLembretes(int Criados, int Resolvidos, in
 ///   <item>Cria os automáticos a partir das consultas, uma vez por fato <c>(Tipo, Referencia)</c>
 ///   (o índice único no banco é a segunda trava).</item>
 ///   <item>Resolve sozinho o automático aberto cujo fato saiu da consulta: o pagamento baixou, a
-///   dona respondeu, a conversa foi encerrada ou devolvida ao agente.</item>
+///   dona (ou o agente) respondeu ou a conversa foi encerrada. Devolvida ao agente, a conversa só sai quando ele
+///   responde: o turno roda em memória e pode se perder (#1622-4).</item>
 ///   <item>Avisa os vencidos e ainda não avisados (o automático vence na hora; o manual, no horário
 ///   escolhido): evento <see cref="TipoEventoNotificacao.LembreteVencido"/> no outbox (Web Push,
 ///   ADR-0030) no mesmo commit do carimbo, e SSE <see cref="EventoSse"/> depois do commit.</item>

@@ -337,9 +337,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         Guid empresaId, Conversa conversa, Mensagem mensagem, MensagemRecebidaWhatsApp msg,
         ConfiguracaoAtendimento configuracao, IdentificacaoCliente? identificacao, CancellationToken ct)
     {
-        try { await cloudClient.MarcarComoLidaAsync(msg.Wamid, ct); }
-        catch (Exception ex) { logger.LogWarning(ex, "Falha ao marcar {Wamid} como lida (best-effort).", msg.Wamid); }
-
+        // #1765-6: o "lida" não sai daqui. Gravar não é ler; o console marca ao abrir a conversa (marcar-lida).
         try
         {
             if (msg.MidiaId is not null)

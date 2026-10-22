@@ -52,6 +52,8 @@ export const listarNaoEntregues = ({ limite = 50 } = {}) => chamarApi(`${BASE}/n
 
 export const assumir = (id) => chamarApi(`${BASE}/${id}/assumir`, { metodo: 'POST' })
 export const liberarAutomatico = (id) => chamarApi(`${BASE}/${id}/liberar-automatico`, { metodo: 'POST' })
+// #1239 (S41): passa a conversa para outro atendente da empresa.
+export const transferir = (id, paraUsuarioId) => chamarApi(`${BASE}/${id}/transferir`, { metodo: 'POST', corpo: { paraUsuarioId } })
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })
 export const reabrir = (id) => chamarApi(`${BASE}/${id}/reabrir`, { metodo: 'POST' })
 export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metodo: 'POST' })

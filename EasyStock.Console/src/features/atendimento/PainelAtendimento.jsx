@@ -16,6 +16,7 @@ import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
 import { Composer } from './Composer'
 import { CompartilharComanda } from './CompartilharComanda'
+import { PassarConversa } from './PassarConversa'
 import { Thread } from './Thread'
 import css from './atendimento.module.css'
 
@@ -129,6 +130,8 @@ export function PainelAtendimento({
           {/* Rodada 5, seção 5 (passo zero): "Encerrar" abre a modal do
               resumo (vazia até a F5 construir o conteúdo); com a conversa já
               encerrada, dá lugar ao "Reabrir conversa" que já existia. */}
+          {/* #1239: passar a conversa para outra atendente (só no modo API). */}
+          {fonteApi && !encerrada && !bloqueada && <PassarConversa key={selecionada.id} conversa={selecionada} />}
           {!encerrada && !bloqueada && (
             <Botao variante="secundario" icone="log-out" className={css.encerrar} title="Encerrar atendimento" onClick={() => abrirEncerramento(selecionada.id)}>
               Encerrar

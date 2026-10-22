@@ -5,7 +5,7 @@ import {
 import { clienteDoDossie, contatoInformadoDoDossie, enderecoParaApi } from '../../infra/api/traducaoCliente'
 import { deveCarregarDossie } from '../planoDeSincronizacao'
 import { textoNaoLigado } from './naoLigadas'
-import { recusaDoEndereco } from '../../dominio/cliente'
+import { nomeConhecidoDoLead, recusaDoEndereco } from '../../dominio/cliente'
 
 // Cadastro do cliente da conversa no modo API (#1276). Sem cliente vinculado o EasyStok não
 // gera pedido; aqui a dona cadastra nome, telefone e endereço pela Ficha. Nada muda na tela
@@ -103,7 +103,7 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
       const capturado = c?.cliente?.enderecoCapturado
       if (!capturado) return undefined
       const telefone = c.cliente.telefone || (c.canal === 'WhatsApp' ? c.cliente.telefoneCanal : null)
-      return cadastrar(id, { telefone, endereco: capturado })
+      return cadastrar(id, { nome: c.clienteId ? null : nomeConhecidoDoLead(c), telefone, endereco: capturado })
     },
 
     // Nome, telefone e endereço vão ao EasyStok; os avisos do cliente ainda não têm endpoint.
@@ -124,12 +124,13 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         const telefone = c?.contatoInformado?.telefone || (c?.canal === 'WhatsApp' ? c?.cliente?.telefoneCanal : null) || null
         if (telefone) {
           return cadastrar(id, {
-            nome: c?.nomeDaDona ? c.nome : (c?.contatoInformado?.nome ?? null),
+            nome: nomeConhecidoDoLead(c),
             telefone, email: c?.contatoInformado?.email ?? null, endereco: valor,
           })
         }
       }
-      return cadastrar(id, { [campo]: valor })
+      // #1643 (item 6): lead sem cadastro leva o nome conhecido; sem ele a API gravava "Cliente WhatsApp".
+      return cadastrar(id, { ...(c?.clienteId ? null : { nome: nomeConhecidoDoLead(c) }), [campo]: valor })
     },
 
     // #1436: nota interna vai ao cadastro do cliente; a Ficha relê o dossiê. Lead não tem cadastro.

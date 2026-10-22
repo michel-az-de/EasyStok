@@ -23,6 +23,9 @@ export const SO_DA_TELA = [
   'fecharGestoLoja',
   // Queda e volta da conexão (#1241): só a faixa e a foto dos pedidos abertos; o lote é ligado.
   'conexaoCaiu', 'conexaoVoltou',
+  // #1686 (item 3): comanda nova depois do pedido entregue ou cancelado. É rascunho da tela; o
+  // pedido nasce no EasyStok no "Gerar cobrança e enviar", como o primeiro.
+  'novaComanda',
 ]
 
 const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, rotulo]))

@@ -2,7 +2,7 @@
 // Funções puras: conversas, catálogo e relógio chegam por parâmetro, nada
 // aqui importa infra nem React (regra de ferramentas/verificar-camadas.mjs).
 // Extensão .js: `dominio/assistente.js` chega aqui pelo Node puro.
-import { diasDeCalendarioEntre, partesDoEndereco } from './formato.js'
+import { diasDeCalendarioEntre, partesDoEndereco, telefoneDoE164 } from './formato.js'
 
 // #1761: endereço que a Ficha não consegue separar (sem o CEP no fim, depois de vírgula) ia ao
 // EasyStok como nulo, voltava 200 e o campo esvaziava sem dizer nada. A recusa diz o formato.
@@ -130,4 +130,28 @@ export function sugestoesDeTag(texto, { conversas, cadastroIdAtual, tagsAtuais, 
     restricao: restricoes.filter(bate),
     gosto: gostosConhecidos(conversas, cadastroIdAtual, restricoes).filter(bate),
   }
+}
+
+// #1643 (item 6): o lead que ganha cadastro pela edição do telefone ou do endereço levava `nome`
+// nulo, e a API gravava "Cliente WhatsApp". Vale o nome que a dona escreveu, o do formulário do
+// chat do site ou o do contato, quando ele não é genérico (o do visitante, o padrão do lead ou
+// só o número).
+const NOMES_GENERICOS = new Set(['visitante do site', 'cliente whatsapp'])
+export const nomeGenerico = (nome) => {
+  const texto = String(nome ?? '').trim()
+  return !texto || NOMES_GENERICOS.has(texto.toLowerCase()) || /^[\d\s()+-]+$/.test(texto)
+}
+export function nomeConhecidoDoLead(conversa) {
+  if (!conversa) return null
+  if (conversa.nomeDaDona && !nomeGenerico(conversa.nome)) return conversa.nome.trim()
+  const informado = conversa.contatoInformado?.nome
+  if (!nomeGenerico(informado)) return informado.trim()
+  return nomeGenerico(conversa.nome) ? null : conversa.nome.trim()
+}
+
+// #1643 (item 7): resumo da seção "Contato e endereço" recolhida. Com o contato que o visitante
+// informou esperando confirmação, o resumo diz isso; senão, o telefone do cadastro.
+export function resumoDoContato(cliente, informado) {
+  if (informado) return 'Informado: ' + [informado.nome, telefoneDoE164(informado.telefone)].filter(Boolean).join(' · ')
+  return cliente?.telefone ?? ''
 }
