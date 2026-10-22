@@ -37,6 +37,7 @@ public class PedidosControllerTests
     private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
+    private readonly IIdempotencyKeyRepository _idempotencia = Substitute.For<IIdempotencyKeyRepository>();
     private readonly PedidosController _controller;
 
     private static readonly Guid _empresaId = Guid.NewGuid();
@@ -134,7 +135,7 @@ public class PedidosControllerTests
         _controller = new PedidosController(
             criar, status, cancelar, agendamento,
             listar, obter, addItem, removeItem, addPag, removePag,
-            finalizarBalcao, _currentUser, Substitute.For<IIdempotencyKeyRepository>(),
+            finalizarBalcao, _currentUser, _idempotencia,
             Microsoft.Extensions.Options.Options.Create(new Microsoft.AspNetCore.Mvc.JsonOptions()));
     }
 
@@ -231,6 +232,39 @@ public class PedidosControllerTests
             new RegistrarPagamentoPedidoCommand(_empresaId, pedido.Id, "pix", 100m, RegistradoPorNome: "Mercado Pago"));
 
         await _pedidoRepo.Received(1).AddPagamentoAsync(Arg.Is<PedidoPagamento>(p => p.RegistradoPorNome == "Ana"));
+    }
+
+    /// <summary>
+    /// #1940-5: o middleware grava a entrada de idempotência com a empresa do token; o SuperAdmin agindo em outra
+    /// empresa resolve a empresa do corpo. A repetição tem de achar o recibo pela empresa da gravação, senão o
+    /// recebimento é aplicado de novo.
+    /// </summary>
+    [Fact]
+    public async Task AddPagamento_SuperAdminEmOutraEmpresa_RepeticaoDevolveORecibo()
+    {
+        _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
+        var empresaDoToken = Guid.NewGuid();
+        _currentUser.EmpresaId.Returns(empresaDoToken);
+        var pedido = MakePedido(_empresaId);
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, pedido.Id).Returns(pedido);
+        var recibo = new EasyStock.Application.UseCases.Pedidos.PedidoResult(pedido.Id, _empresaId, null, null, null, null, null,
+            pedido.Status, 100m, 100m, null, "web", null, null, 0, pedido.CriadoEm, pedido.AlteradoEm, null, null);
+        var entradaId = Guid.NewGuid();
+        var entrada = IdempotencyKey.CriarPendente("chave", empresaDoToken, $"POST /api/pedidos/{pedido.Id}/pagamentos", null, TimeSpan.FromHours(1));
+        entrada.MarcarConcluido(200, System.Text.Json.JsonSerializer.Serialize(
+            new ApiResponse<EasyStock.Application.UseCases.Pedidos.PedidoResult>(recibo, null!),
+            new Microsoft.AspNetCore.Mvc.JsonOptions().JsonSerializerOptions), DateTime.UtcNow);
+        _idempotencia.ObterConcluidoAsync(entradaId, empresaDoToken, Arg.Any<CancellationToken>()).Returns(entrada);
+        var http = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        http.Items[EasyStock.Api.Middleware.IdempotencyMiddleware.EntradaDaRequisicao] = entradaId;
+        _controller.ControllerContext = new ControllerContext { HttpContext = http };
+
+        var resultado = await _controller.AddPagamento(pedido.Id,
+            new RegistrarPagamentoPedidoCommand(_empresaId, pedido.Id, "pix", 100m));
+
+        await _pedidoRepo.DidNotReceive().AddPagamentoAsync(Arg.Any<PedidoPagamento>());
+        OkData<EasyStock.Application.UseCases.Pedidos.PedidoResult>(resultado).TotalPago.Should().Be(100m);
+        http.Response.Headers["X-Idempotent-Replay"].ToString().Should().Be("true");
     }
 
     // #1547: a venda de balcão levava criadoPorNome do corpo para o autor do pagamento.
