@@ -3,6 +3,8 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { useEntregasApi } from '../../aplicacao/useEntregasApi'
+import { chaveDaEntrega, chaveDaSaida } from '../../aplicacao/envioComDesfazer'
+import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import {
   EMPRESAS_ENTREGADOR, TIPOS_ENTREGADOR, confirmacaoDaRecusa, motivoDaAprovacao, motivoDeSaida, paineisDeEntregas,
   rotuloSituacaoViagem, situacaoDaLista, viagensConcluidasNoDia,
@@ -228,7 +230,11 @@ function Viagem({ viagem, indice, pedidoPorId, opcoesEntregador, entregadores, o
               <p className={css.apoio}>{[parada.entregadorNome, parada.veiculo, parada.placa].filter(Boolean).join(' · ')}</p>
             )}
             {!parada.entregueEm && aReceber > 0 && <p className={css.linha}><strong>Receber {moeda(aReceber)} na entrega</strong></p>}
-            {confirmando?.pedidoId === parada.pedidoId ? (
+            {acoes.adiadoAte(chaveDaEntrega(viagem.id, parada.pedidoId)) ? (
+              <DesfazerComPrazo className={css.linha} ate={acoes.adiadoAte(chaveDaEntrega(viagem.id, parada.pedidoId))}
+                texto={`Marca entregue e avisa ${parada.clienteNome}`}
+                aoDesfazer={() => acoes.desfazerEnvio(chaveDaEntrega(viagem.id, parada.pedidoId))} />
+            ) : confirmando?.pedidoId === parada.pedidoId ? (
               <div className={css.linha} role="alertdialog" aria-label={`Confirmar a entrega do pedido ${parada.numeroPedido}`}>
                 <span className={`${css.apoio} ${css.cresce}`}>
                   Falta receber {moeda(confirmando.valor)}. Marque entregue se recebeu na porta ou combinou a cobrança; o valor segue em aberto até o pagamento ser lançado.
@@ -259,7 +265,11 @@ function Viagem({ viagem, indice, pedidoPorId, opcoesEntregador, entregadores, o
         })}
       </ul>
       <CorridasDaViagem viagem={viagem} entregadores={entregadores} ocupado={ocupado} />
-      {montando && (
+      {montando && acoes.adiadoAte(chaveDaSaida(viagem.id)) && (
+        <DesfazerComPrazo className={css.linha} ate={acoes.adiadoAte(chaveDaSaida(viagem.id))}
+          texto="A viagem sai e os clientes são avisados" aoDesfazer={() => acoes.desfazerEnvio(chaveDaSaida(viagem.id))} />
+      )}
+      {montando && !acoes.adiadoAte(chaveDaSaida(viagem.id)) && (
         <div className={css.linha}>
           <Botao variante="primario" icone="moto" disabled={ocupado || !!motivo} onClick={() => acoes.sair(viagem.id)}>
             Saiu para entrega

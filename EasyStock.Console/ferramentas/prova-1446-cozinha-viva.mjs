@@ -12,6 +12,7 @@
 // Roda com: node ferramentas/prova-1446-cozinha-viva.mjs
 
 import { registerHooks } from 'node:module'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 
 registerHooks({
@@ -216,4 +217,73 @@ confere('#1899: nome do pedido é "Comanda N" quando a API entrega o número; o 
   assert.equal(nomeDoPedido(undefined).principal, '')
   assert.equal(nomeDoPedido({ numeroComanda: 0, numeroCurto: 'A1B2' }).principal, 'A1B2', 'zero não é comanda')
 })
+// --- Frente C da #1889: #1686 itens 5 e 8 ------------------------------------------------------
+const fonte = (caminho) => readFileSync(new URL(`../src/${caminho}`, import.meta.url), 'utf8').replaceAll(String.fromCharCode(13), '')
+const esteira = await import('../src/dominio/esteira.js')
+const { rotuloDoEstado } = await import('../src/dominio/pedido.js')
+const envio = await import('../src/aplicacao/envioComDesfazer.js')
+
+confere('#1686-8 a Ficha fala a língua da Cozinha: "Pronto" e "Saiu para entrega", nos rótulos e nos toques', () => {
+  const coluna = (status) => kds.COLUNAS_KDS.find((c) => c.status === status)
+  assert.equal(esteira.passoPorId('embalado').rotulo, coluna('pronto').rotulo)
+  assert.equal(esteira.passoPorId('entrega').rotulo, coluna('saiu_para_entrega').rotulo)
+  assert.equal(esteira.passoPorId('preparo').rotulo, coluna('preparando').rotulo)
+  assert.equal(rotuloDoEstado('pronto'), 'Pronto')
+  assert.equal(rotuloDoEstado('saiu para entrega'), 'Saiu para entrega')
+  const barra = fonte('features/ficha-cliente/BarraProximoPasso.jsx')
+  assert.match(barra, /pago: \{ rotulo: 'Começar preparo'/)
+  assert.match(barra, /preparo: \{ rotulo: 'Marcar pronto'/)
+  assert.match(barra, /embalado: \{ rotulo: 'Saiu para entrega'/)
+  for (const [status, toque] of [['aguardando', 'Começar preparo'], ['preparando', 'Marcar pronto'], ['pronto', 'Saiu para entrega']]) {
+    assert.equal(coluna(status).toque, toque, status)
+  }
+  assert.doesNotMatch(fonte('dominio/respostas.js'), /"Embalado"|"Em entrega"/)
+})
+
+// O envio é assíncrono: esta conferência espera as promessas antes de contar.
+const confereEsperando = async (descricao, fn) => { await fn(); passou += 1; console.log('ok  ' + descricao) }
+await confereEsperando('#1686-5 envio com desfazer: agenda, desfaz antes de sair e descarrega ao sair da tela', async () => {
+  let agora = 0
+  const timers = new Map()
+  let seq = 0
+  const relogio = { agendar: (fn, ms) => { seq += 1; timers.set(seq, { fn, em: agora + ms }); return seq }, cancelar: (t) => timers.delete(t), agora: () => agora }
+  const andar = (ms) => { agora += ms; for (const [t, { fn, em }] of [...timers]) if (em <= agora) { timers.delete(t); fn() } }
+  const enviados = []
+  const mudancas = []
+  const e = envio.criarEnvioComDesfazer({ prazoMs: 5000, relogio, aoMudar: (l) => mudancas.push(l.map((x) => x.chave)) })
+  const a = e.agendar('a', () => { enviados.push('a'); return 'ok-a' }, { status: 'preparando' })
+  assert.equal(e.agendar('a', () => enviados.push('dobrado')), a, 'o segundo toque recebe a mesma promessa')
+  const b = e.agendar('b', () => { enviados.push('b'); return 'ok-b' })
+  assert.deepEqual(e.pendentes().map((x) => [x.chave, x.ate]), [['a', 5000], ['b', 5000]])
+  andar(4999)
+  assert.equal(e.desfazer('a'), true)
+  assert.deepEqual(await a, { desfeito: true })
+  andar(1)
+  assert.equal(await b, 'ok-b')
+  assert.deepEqual(enviados, ['b'])
+  const c = e.agendar('c', () => { enviados.push('c'); return 'ok-c' })
+  e.descarregar()
+  assert.equal(await c, 'ok-c')
+  assert.deepEqual(enviados, ['b', 'c'])
+  assert.equal(e.desfazer('c'), false, 'o que já saiu não se desfaz')
+  assert.deepEqual(mudancas.at(-1), [])
+  assert.equal(envio.segundosAte(5000, 1001), 4)
+})
+
+confere('#1686-5 o cartão, a comanda e as Entregas mostram "Desfazer" no lugar do toque enquanto esperam', () => {
+  assert.equal(kds.rotuloDoDestinoKds('preparando'), 'Em preparo')
+  assert.equal(kds.rotuloDoDestinoKds('entregue'), 'Entregue')
+  const cartao = fonte('features/cozinha/CartaoKds.jsx')
+  assert.match(cartao, /\{proximo && adiado && \(\s+<DesfazerComPrazo/)
+  assert.match(cartao, /\{proximo && !adiado && \(/)
+  assert.match(cartao, /disabled: !proximo \|\| movendo \|\| Boolean\(adiado\)/, 'não arrasta o cartão que espera')
+  assert.match(fonte('features/cozinha/ComandaKds.jsx'), /\{proximo && adiado && \(\s+<DesfazerComPrazo/)
+  const tela = fonte('features/cozinha/TelaCozinhaApi.jsx')
+  assert.match(tela, /adiado=\{adiados\.get\(p\.id\) \?\? null\} aoDesfazer=\{desfazerAvanco\}/)
+  const entregas = fonte('features/entregas/ConteudoEntregasApi.jsx')
+  assert.match(entregas, /acoes\.adiadoAte\(chaveDaEntrega\(viagem\.id, parada\.pedidoId\)\) \? \(\s+<DesfazerComPrazo/)
+  assert.match(entregas, /\{montando && acoes\.adiadoAte\(chaveDaSaida\(viagem\.id\)\) && \(\s+<DesfazerComPrazo/)
+  assert.match(fonte('componentes/DesfazerComPrazo.jsx'), /Desfazer · \{restam\}/)
+})
+
 console.log(`prova #1446 (cozinha viva no modo API): ${passou} conferências ok`)

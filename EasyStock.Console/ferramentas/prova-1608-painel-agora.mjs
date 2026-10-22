@@ -49,7 +49,7 @@ const CONVERSAS = [
   conversa('c4', 'Noite', { pedido: pedido('0191', 'pago', 'j-noite') }),
   conversa('c5', 'Almoço atrasado', { pedido: pedido('0184', 'pago', 'j-almoco') }),
   conversa('c6', 'No fogo', { pedido: pedido('0187', 'preparo', 'j-almoco') }),
-  conversa('c7', 'Embalado', { pedido: pedido('0188', 'embalado', 'j-almoco') }),
+  conversa('c7', 'Pronto', { pedido: pedido('0188', 'embalado', 'j-almoco') }),
   conversa('c8', 'Na rua', { pedido: pedido('0181', 'entrega', 'j-almoco') }),
   conversa('c9', 'Entregue', { pedido: pedido('0170', 'entregue', 'j-almoco') }),
   conversa('c10', 'Sem pagar', { pedido: pedido('0194', 'aguardando', 'j-noite') }),
@@ -111,7 +111,7 @@ confere('Cozinhar tem pago e em preparo, atrasado primeiro e escrito', () => {
 
 confere('Despachar tem embalado antes de quem já saiu', () => {
   assert.deepEqual(filas.despachar.map((i) => i.id), ['c7', 'c8'])
-  assert.equal(filas.despachar[0].situacao, 'Embalado')
+  assert.equal(filas.despachar[0].situacao, 'Pronto')
 })
 
 confere('entregue e aguardando pagamento ficam fora da cozinha e do despacho', () => {

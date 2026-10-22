@@ -102,7 +102,7 @@ await confere('R1 etapa do console vira o status do backend (PedidoStateMachine)
     preparo: 'preparando', embalado: 'pronto', entrega: 'saiu_para_entrega', entregue: 'entregue',
   })
 })
-await confere('R1 "Iniciar preparo" faz PATCH /api/kds/pedidos/{id}/status e relê o pedido', async () => {
+await confere('R1 "Começar preparo" faz PATCH /api/kds/pedidos/{id}/status e relê o pedido', async () => {
   chamadas.length = 0
   respostaFetch = (c) => ({ data: c.metodo === 'PATCH' ? {} : { ...PEDIDO_PAGO, status: 'preparando' } })
   const { api, despachos, locais } = montarComanda(PEDIDO_PAGO)

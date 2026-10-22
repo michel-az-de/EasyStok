@@ -6,6 +6,7 @@ import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 import { transicaoDaFila } from '../dominio/kds'
 import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { criarRecargaDeAcao } from './recargaDeAcao'
+import { criarEnvioComDesfazer } from './envioComDesfazer'
 
 // Cozinha no modo API (F05). A fila vem do KDS sobre Pedido (S19) e recarrega a
 // cada evento de pedido do SSE de operação (S18). Com o SSE caído, a tela não
@@ -59,6 +60,12 @@ export function useCozinhaApi({ data = null } = {}) {
   const anteriorRef = useRef(null)
   const timersRef = useRef(new Set())
   const recargaRef = useRef(null)
+  // #1686 (item 5): o toque agenda a mudança e o cartão mostra "Desfazer" antes de ela sair.
+  const [adiados, setAdiados] = useState(() => new Map())
+  const [envio] = useState(() => criarEnvioComDesfazer({
+    aoMudar: (lista) => setAdiados(new Map(lista.map((a) => [a.chave, { status: a.dados.status, ate: a.ate }]))),
+  }))
+  useEffect(() => () => envio.descarregar(), [envio])
 
   const depois = useCallback((ms, fazer) => {
     const t = setTimeout(() => {
@@ -160,7 +167,7 @@ export function useCozinhaApi({ data = null } = {}) {
   // Um toque (ou um soltar): a chamada vai e o cartão fica "movendo" até a fila nova chegar, pelo
   // `pedido.mudou_status` do SSE; sem ele (caído, ou mudo por 2 s), pela releitura da própria ação.
   // #1776 (item 19): "Marcar entregue" com saldo a receber não é erro: a tela pergunta e reenvia confirmado.
-  const avancar = useCallback((id, status, confirmarSaldoAReceber = false) => {
+  const enviarStatus = useCallback((id, status, confirmarSaldoAReceber = false) => {
     setMovendo((s) => comId(s, id, true))
     setSaldoPendente(null)
     const recarga = recargaRef.current
@@ -172,6 +179,14 @@ export function useCozinhaApi({ data = null } = {}) {
         : setErro(`O pedido não mudou: ${e.message}`)))
       .finally(() => setMovendo((s) => comId(s, id, false)))
   }, [])
+  // #1686 (item 5): o avanço espera alguns segundos com "Desfazer" à vista; a confirmação do saldo a
+  // receber já é o segundo toque de uma decisão e vai na hora.
+  const avancar = useCallback((id, status, confirmarSaldoAReceber = false) => {
+    if (confirmarSaldoAReceber) return enviarStatus(id, status, true)
+    setSaldoPendente(null)
+    return envio.agendar(id, () => enviarStatus(id, status, false), { status })
+  }, [envio, enviarStatus])
+  const desfazerAvanco = useCallback((id) => envio.desfazer(id), [envio])
 
   const reimprimir = useCallback((id) => reimprimirCanhoto(id)
     .then(() => recarregarImpressoes())
@@ -188,7 +203,7 @@ export function useCozinhaApi({ data = null } = {}) {
   const limparErro = useCallback(() => setErro(null), [])
 
   return {
-    pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes, saldoPendente,
+    pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes, saldoPendente, adiados, desfazerAvanco,
     descartarSaldoPendente: () => setSaldoPendente(null),
     avancar, recarregar, reimprimir, confirmarImpressao: confirmar, avisar: setErro, limparErro,
   }
