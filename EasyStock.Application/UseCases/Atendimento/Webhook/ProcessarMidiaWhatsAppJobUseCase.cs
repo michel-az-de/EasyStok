@@ -31,8 +31,8 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
             logger.LogWarning("Fila de mídia WhatsApp: mensagem não encontrada para wamid {Wamid}.", job.Wamid);
             return;
         }
-        if (mensagem.MidiaChave is not null)
-            return; // fila em memória e varredura podem entregar o mesmo anexo (#1397)
+        if (mensagem.MidiaChave is not null || mensagem.MidiaFalhou)
+            return; // fila em memória e varredura podem entregar o mesmo anexo (#1397); desistida não volta (#1622-5)
 
         try
         {
@@ -45,9 +45,11 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
             // #1622-5: acima do teto não adianta tentar de novo. A mensagem do cliente fica registrada sem o anexo.
             logger.LogWarning("Fila de mídia WhatsApp: anexo do wamid {Wamid} acima do teto ({Bytes} bytes), não guardado.",
                 job.Wamid, ex.Tamanho);
+            var primeiraFalha = mensagem.TentativasMidia == 0;
             mensagem.RegistrarFalhaMidia(ex.Message, relogio.GetUtcNow().UtcDateTime, definitiva: true);
             await unitOfWork.CommitAsync();
-            await DispararTurnoDoAudioAsync(job, mensagem);
+            // Como na falha comum: o turno do áudio sai uma vez, na primeira falha.
+            if (primeiraFalha) await DispararTurnoDoAudioAsync(job, mensagem);
             return;
         }
         catch (Exception ex) when (mensagem.MidiaChave is null)

@@ -28,17 +28,23 @@ public sealed class ArmazenadorMidiaWhatsApp(IWhatsAppCloudClient cloudClient, I
         "application/zip",
     };
 
+    /// <summary>Prazo para ler o corpo da mídia (até 16 MB); passou, a tentativa falha e a varredura tenta de novo.</summary>
+    public static readonly TimeSpan PrazoDaLeitura = TimeSpan.FromMinutes(2);
+
     public async Task<(string Chave, string Mime)> ArmazenarAsync(
         Guid empresaId, Guid conversaId, string wamid, string mediaId, CancellationToken ct = default)
     {
         var (conteudo, mime) = await cloudClient.BaixarMidiaAsync(mediaId, ct);
+        // O corpo vem em fluxo, depois do pipeline do cliente HTTP: o prazo dele não cobre esta leitura.
+        using var prazo = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        prazo.CancelAfter(PrazoDaLeitura);
 
         await using var _ = conteudo;
         using var memoria = new MemoryStream();
         // #1622-5: a cópia para no teto; o adaptador já recusa pelo tamanho informado, aqui fica a defesa sem ele.
         var buffer = new byte[81920];
         int lidos;
-        while ((lidos = await conteudo.ReadAsync(buffer, ct)) > 0)
+        while ((lidos = await conteudo.ReadAsync(buffer, prazo.Token)) > 0)
         {
             if (memoria.Length + lidos > MidiaGrandeDemaisException.TetoBytes)
                 throw new MidiaGrandeDemaisException(memoria.Length + lidos);

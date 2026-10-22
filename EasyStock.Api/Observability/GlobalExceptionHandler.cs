@@ -23,9 +23,9 @@ public class GlobalExceptionHandler(
 
         var correlationId = httpContext.Items["CorrelationId"] as string ?? "unknown";
         // I4.5 (#1698): webhook entra no log pelo molde da rota e sem query; #1725-3: comanda com o token mascarado.
-        var requestPath = CaminhoDoLog.TemSegredo(httpContext)
+        var requestPath = CaminhoDoLog.EhWebhook(httpContext)
             ? CaminhoDoLog.De(httpContext)
-            : httpContext.Request.Path + httpContext.Request.QueryString;
+            : CaminhoDoLog.De(httpContext) + httpContext.Request.QueryString;
         var requestMethod = httpContext.Request.Method;
 
         var (statusCode, code, title, detail, logAsError) = MapException(exception);

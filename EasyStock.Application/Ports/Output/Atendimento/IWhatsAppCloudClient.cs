@@ -47,10 +47,6 @@ public interface IWhatsAppCloudClient
 public sealed record EnvioWhatsAppResult(string Wamid);
 
 /// <summary>
-/// Erro tipado da Cloud API, com o código numérico da Meta (ex.: 131047 = fora da janela de 24h).
-/// <see cref="EhPermanente"/> = true nunca deve ser reenviado automaticamente.
-/// </summary>
-/// <summary>
 /// #1622-5: mídia recebida acima do teto. Não é baixada (ou a cópia para no teto) e não volta a ser tentada: a mensagem
 /// do cliente fica registrada sem o anexo.
 /// </summary>
@@ -64,6 +60,10 @@ public sealed class MidiaGrandeDemaisException(long? tamanho)
     public long? Tamanho { get; } = tamanho;
 }
 
+/// <summary>
+/// Erro tipado da Cloud API, com o código numérico da Meta (ex.: 131047 = fora da janela de 24h).
+/// <see cref="EhPermanente"/> = true nunca deve ser reenviado automaticamente.
+/// </summary>
 public sealed class WhatsAppCloudException(int codigo, string mensagem, bool ehPermanente, int? statusHttp = null)
     : Exception(mensagem)
 {

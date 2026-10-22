@@ -38,7 +38,7 @@ public static class ChatSiteRateLimit
     public static string ChaveMensagem(HttpContext context)
     {
         var token = context.Request.Headers[HeaderToken].FirstOrDefault()?.Trim();
-        return ComandaRateLimit.FormatoGerado(token)
+        return AcessoChatSite.TemFormatoDeToken(token)
             ? "sessao:" + AcessoChatSite.HashDoToken(token!)
             : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "anon");
     }

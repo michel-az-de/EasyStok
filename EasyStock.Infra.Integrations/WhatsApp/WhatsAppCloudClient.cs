@@ -281,10 +281,10 @@ public sealed class WhatsAppCloudClient(
         RecusarSeAcimaDoTeto(metadata.FileSize, mediaId);
         var binarioResponse = await pipeline.ExecuteAsync(
             async pollyCt => await GetComTokenAsync(metadata.Url, token, pollyCt, HttpCompletionOption.ResponseHeadersRead), ct);
-        if (!binarioResponse.IsSuccessStatusCode)
-            await LancarErroAsync(binarioResponse, ct);
         try
         {
+            if (!binarioResponse.IsSuccessStatusCode)
+                await LancarErroAsync(binarioResponse, ct);
             RecusarSeAcimaDoTeto(binarioResponse.Content.Headers.ContentLength, mediaId);
         }
         catch

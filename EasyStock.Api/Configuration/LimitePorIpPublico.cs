@@ -64,11 +64,8 @@ public static class ComandaRateLimit
     public static string Chave(HttpContext contexto, string? token)
     {
         var limpo = token?.Trim();
-        return FormatoGerado(limpo)
+        return AcessoChatSite.TemFormatoDeToken(limpo)
             ? "token:" + AcessoChatSite.HashDoToken(limpo!)
             : "ip:" + (contexto.Connection.RemoteIpAddress?.ToString() ?? "anon");
     }
-
-    public static bool FormatoGerado(string? token) =>
-        token is { Length: 43 } && token.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 }

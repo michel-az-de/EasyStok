@@ -148,18 +148,24 @@ public class ChatSiteControllerTests
         typeof(ChatSiteController).GetMethod(acao)!.GetCustomAttribute<EnableRateLimitingAttribute>()!
             .PolicyName.Should().Be(politica);
 
+    // Por sessão para o visitante não gastar a cota do vizinho no mesmo NAT, sem o token cru na chave. #1622-1: só o token
+    // no formato gerado vira sessão; o inventado (ou ausente) cai no IP, e o teto por IP (LimitePorIpPublicoTests) segura o resto.
     [Fact]
     public void LimiteDeMensagemEhPorSessaoENaoGuardaOToken()
     {
+        var token = AcessoChatSite.NovoToken();
         var comToken = new DefaultHttpContext();
-        comToken.Request.Headers[ChatSiteRateLimit.HeaderToken] = "tok-1";
+        comToken.Request.Headers[ChatSiteRateLimit.HeaderToken] = token;
         var outroToken = new DefaultHttpContext();
-        outroToken.Request.Headers[ChatSiteRateLimit.HeaderToken] = "tok-2";
+        outroToken.Request.Headers[ChatSiteRateLimit.HeaderToken] = AcessoChatSite.NovoToken();
+        var inventado = new DefaultHttpContext();
+        inventado.Request.Headers[ChatSiteRateLimit.HeaderToken] = "tok-1";
 
         var chave = ChatSiteRateLimit.ChaveMensagem(comToken);
 
-        chave.Should().NotContain("tok-1");
+        chave.Should().StartWith("sessao:").And.NotContain(token);
         chave.Should().NotBe(ChatSiteRateLimit.ChaveMensagem(outroToken));
+        ChatSiteRateLimit.ChaveMensagem(inventado).Should().StartWith("ip:").And.NotContain("tok-1");
         ChatSiteRateLimit.ChaveMensagem(new DefaultHttpContext()).Should().StartWith("ip:");
     }
 
