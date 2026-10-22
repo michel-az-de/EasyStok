@@ -127,6 +127,28 @@ function montar(conversa) {
   return { acoes, despachados }
 }
 
+await confere('#1936: endereço de lead do chat do site vai com o telefone e o nome informados', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(lead({ contatoInformado: INFORMADO }))
+  acoes.editarDadoCliente('conv-1', 'endereco', 'Rua dos Pinheiros, 200, Pinheiros, São Paulo, 05415-000', 0)
+  await esperar()
+  const post = chamadas.find((c) => c.metodo === 'POST')
+  assert.ok(post, 'sem POST')
+  assert.equal(post.corpo.telefone, '+5511987654321', 'cadastro sem o telefone do visitante')
+  assert.equal(post.corpo.nome, 'Maria Souza')
+  assert.deepEqual(post.corpo.endereco, { cep: '05415000', logradouro: 'Rua dos Pinheiros', numero: '200', complemento: null, bairro: 'Pinheiros' })
+})
+
+await confere('#1936: cidade e UF no fim do endereço não viram bairro', async () => {
+  const { partesDoEndereco } = await import('../src/dominio/formato.js')
+  for (const cidade of ['São Paulo', 'Sao Paulo - SP', 'São Paulo/SP', 'SP']) {
+    const p = partesDoEndereco(`Rua A, 10, apto 2, Pinheiros, ${cidade}, 05415-000`)
+    assert.equal(p.bairro, 'Pinheiros', cidade)
+    assert.equal(p.complemento, 'apto 2', cidade)
+  }
+  assert.equal(partesDoEndereco('Rua A, 10, Pinheiros, 05415-000').bairro, 'Pinheiros', 'formato antigo')
+})
+
 await confere('telefone E.164 da API aparece na máscara da tela', () => {
   assert.equal(telefoneDoE164('+5511987654321'), '(11) 98765-4321')
   assert.equal(telefoneDoE164('+551132654321'), '(11) 3265-4321')

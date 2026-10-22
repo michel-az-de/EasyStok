@@ -113,9 +113,21 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         avisar(textoNaoLigado('Avisos do cliente'))
         return undefined
       }
-      if (campo === 'nome' && !conversaDe(id)?.clienteId) {
+      const c = conversaDe(id)
+      if (campo === 'nome' && !c?.clienteId) {
         despachar({ tipo: acao.RENOMEAR_LEAD_API, id, nome: valor })
         return undefined
+      }
+      // #1936: lead sem cadastro cadastra junto o contato que já se tem (o do formulário do chat do
+      // site ou o telefone do WhatsApp). Sem isso a API recusava ("Informe o telefone") e o endereço sumia.
+      if (!c?.clienteId && campo === 'endereco') {
+        const telefone = c?.contatoInformado?.telefone || (c?.canal === 'WhatsApp' ? c?.cliente?.telefoneCanal : null) || null
+        if (telefone) {
+          return cadastrar(id, {
+            nome: c?.nomeDaDona ? c.nome : (c?.contatoInformado?.nome ?? null),
+            telefone, email: c?.contatoInformado?.email ?? null, endereco: valor,
+          })
+        }
       }
       return cadastrar(id, { [campo]: valor })
     },

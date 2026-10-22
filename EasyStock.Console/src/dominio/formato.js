@@ -178,10 +178,15 @@ export const faixaDeCep = (inicio, fim) => `${mascaraCep(inicio)} a ${mascaraCep
 // Endereço em string só, formato da massa: "Rua X, 412, apto 71, Bairro,
 // CEP" (seção 2). `partesDoEndereco` separa para o cadastro rápido editar
 // campo a campo; `enderecoDasPartes` junta de volta na mesma ordem.
+// #1936: cidade e UF no fim ("São Paulo", "São Paulo - SP", "SP") não são bairro. A loja entrega só
+// na própria cidade, então elas saem do texto antes de achar o bairro.
+const CIDADE_OU_UF = /^(s[aã]o paulo(\s*[-/]\s*sp)?|sp)$/i
+
 export function partesDoEndereco(texto) {
   if (!texto) return { rua: '', numero: '', complemento: '', bairro: '', cep: '' }
   const partes = texto.split(',').map((p) => p.trim())
   const cep = /^\d{5}-?\d{3}$/.test(partes.at(-1) ?? '') ? partes.pop() : ''
+  while (partes.length > 2 && CIDADE_OU_UF.test(partes.at(-1) ?? '')) partes.pop()
   const bairro = partes.pop() ?? ''
   const rua = partes.shift() ?? ''
   const numero = partes[0] && /^\d/.test(partes[0]) ? partes.shift() : ''
