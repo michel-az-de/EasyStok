@@ -4,14 +4,19 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Api.Http;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Storefront.Agendamento;
 using EasyStock.Application.UseCases.Storefront.Menu;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Exceptions;
+using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -157,6 +162,65 @@ public class AtendimentoComandaControllerTests
 
         resultado.Should().BeOfType<OkObjectResult>();
         await _storefronts.DidNotReceive().GetByEmpresaAsync(Arg.Is<Guid>(id => id != _empresaId), Arg.Any<CancellationToken>());
+    }
+
+    // #1942 (#1923): recusa definitiva sai com código próprio para o console não confundir com a corrida do
+    // clique duplo (PEDIDO_EM_ANDAMENTO), que relê. Loja fechada e cliente bloqueado falam com a equipe.
+    public static TheoryData<string, string, string> Recusas() => new()
+    {
+        { "loja", "LOJA_FECHADA", "A loja está fechada. Abra a loja para criar o pedido." },
+        { "janela", "JANELA_ESGOTADA", "Janela de entrega esgotada." },
+        { "cep", "CEP_SEM_COBERTURA", "Vamos combinar a entrega e o frete com a equipe." },
+        { "bloqueado", "CLIENTE_BLOQUEADO", "Cliente bloqueado: desbloqueie o cadastro para criar o pedido." },
+        { "andamento", "PEDIDO_EM_ANDAMENTO", "Esta conversa já tem um pedido em andamento." },
+        { "outra", "CONFLICT", "A conversa está encerrada." },
+    };
+
+    private static Exception Recusa(string caso) => caso switch
+    {
+        "loja" => new LojaFechadaException("Oi! Hoje não estamos atendendo."),
+        "janela" => new JanelaSemVagasException(),
+        "cep" => new CepSemCoberturaException(),
+        "bloqueado" => new ClienteBloqueadoException(Guid.NewGuid()),
+        "andamento" => new PedidoEmAndamentoException(),
+        _ => new RegraDeDominioVioladaException("A conversa está encerrada."),
+    };
+
+    private Guid ConversaQueRecusa(string caso)
+    {
+        var conversaId = Guid.NewGuid();
+        _conversas.ObterPorIdAsync(_empresaId, conversaId, Arg.Any<CancellationToken>())
+            .Returns<Conversa?>(_ => throw Recusa(caso));
+        return conversaId;
+    }
+
+    private static void DeveSerConflito(IActionResult resultado, string codigo, string mensagem)
+    {
+        var objeto = resultado.Should().BeAssignableTo<ObjectResult>().Subject;
+        objeto.StatusCode.Should().Be(StatusCodes.Status409Conflict);
+        var erro = objeto.Value.Should().BeOfType<ApiErrorResponse>().Subject.Error;
+        erro.Code.Should().Be(codigo);
+        erro.Message.Should().Be(mensagem);
+    }
+
+    [Theory]
+    [MemberData(nameof(Recusas))]
+    public async Task GerarPedidoRecusadoDevolveCodigoProprio(string caso, string codigo, string mensagem)
+    {
+        var resultado = await _controller.GerarPedido(ConversaQueRecusa(caso), Comanda());
+
+        DeveSerConflito(resultado, codigo, mensagem);
+    }
+
+    [Theory]
+    [MemberData(nameof(Recusas))]
+    public async Task SimularPedidoRecusadoDevolveCodigoProprio(string caso, string codigo, string mensagem)
+    {
+        var comanda = Comanda();
+        var resultado = await _controller.SimularPedido(ConversaQueRecusa(caso),
+            new SimularPedidoConversaBody(comanda.Itens, comanda.JanelaId, comanda.DataEntrega));
+
+        DeveSerConflito(resultado, codigo, mensagem);
     }
 
     [Fact]
