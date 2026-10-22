@@ -129,7 +129,7 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
           })
         }
       }
-      // #1643 (item 6): lead sem cadastro leva o nome conhecido; sem ele a API gravava "Cliente WhatsApp".
+      // #1643 (item 3): lead sem cadastro leva o nome conhecido; sem ele a API gravava "Cliente WhatsApp".
       return cadastrar(id, { ...(c?.clienteId ? null : { nome: nomeConhecidoDoLead(c) }), [campo]: valor })
     },
 
