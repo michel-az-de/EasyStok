@@ -173,13 +173,14 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
         var entradaEsperando = Mensagem.Entrada(empresa.Id, esperando.Id, agora.AddMinutes(-11), TipoConteudoMensagem.Texto, "oi?");
         var notaInterna = Mensagem.Saida(empresa.Id, esperando.Id, AutorMensagem.Sistema, agora.AddMinutes(-10.5), TipoConteudoMensagem.Texto, "escalado");
 
-        // Assumida e respondida pela dona; automática; e assumida com o cliente esperando há pouco.
+        // Assumida e respondida pela dona; automática respondida pelo agente; e assumida com o cliente esperando há pouco.
         var respondida = Conversa.Abrir(empresa.Id, "5511999990002", agora.AddMinutes(-20));
         respondida.Assumir(agora.AddMinutes(-19), atendente);
         var entradaRespondida = Mensagem.Entrada(empresa.Id, respondida.Id, agora.AddMinutes(-12), TipoConteudoMensagem.Texto, "oi");
         var respostaDona = Mensagem.Saida(empresa.Id, respondida.Id, AutorMensagem.Dona, agora.AddMinutes(-11), TipoConteudoMensagem.Texto, "já vou", "resposta-confirmada");
         var automatica = Conversa.Abrir(empresa.Id, "5511999990003", agora.AddMinutes(-30));
         var entradaAutomatica = Mensagem.Entrada(empresa.Id, automatica.Id, agora.AddMinutes(-20), TipoConteudoMensagem.Texto, "oi");
+        var respostaAutomatica = Mensagem.Saida(empresa.Id, automatica.Id, AutorMensagem.Agente, agora.AddMinutes(-19), TipoConteudoMensagem.Texto, "oi!", "resposta-agente");
         var poucoTempo = Conversa.Abrir(empresa.Id, "5511999990004", agora.AddMinutes(-5));
         poucoTempo.Assumir(agora.AddMinutes(-4), atendente);
         var entradaPoucoTempo = Mensagem.Entrada(empresa.Id, poucoTempo.Id, agora.AddMinutes(-3), TipoConteudoMensagem.Texto, "oi");
@@ -190,7 +191,7 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
             db.Empresas.Add(empresa);
             db.Pedidos.AddRange(parado, recente, pago);
             db.AtendimentoConversas.AddRange(esperando, respondida, automatica, poucoTempo);
-            db.AtendimentoMensagens.AddRange(entradaEsperando, notaInterna, entradaRespondida, respostaDona, entradaAutomatica, entradaPoucoTempo);
+            db.AtendimentoMensagens.AddRange(entradaEsperando, notaInterna, entradaRespondida, respostaDona, entradaAutomatica, respostaAutomatica, entradaPoucoTempo);
             await db.SaveChangesAsync();
         }
 
@@ -289,6 +290,49 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
             var vencido = lembretes.Should().ContainSingle().Subject;
             vencido.ConversaId.Should().Be(daLoja.Id);
             vencido.Texto.Should().Contain("há 2 min");
+        }
+    }
+
+    // #1622-4: com o agente desligado, quem escala é um job em memória. Perdido num deploy, a conversa fica Automatica com
+    // o cliente esperando. O lembrete cobre esse caso para toda a equipe; a que o agente respondeu e a esquecida há
+    // mais de uma semana não viram aviso.
+    [SkippableFact]
+    public async Task ConversaAutomaticaComClienteEsperandoViraLembreteDaEquipe()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var agora = new DateTime(2026, 10, 9, 15, 0, 0, DateTimeKind.Utc);
+        var casa = Empresa.Criar("Automatica sem resposta", null);
+
+        var esquecida = Conversa.Abrir(casa.Id, "5511999990201", agora.AddMinutes(-21), "Cliente esquecida");
+        var entradaEsquecida = Mensagem.Entrada(casa.Id, esquecida.Id, agora.AddMinutes(-20), TipoConteudoMensagem.Texto, "tem nhoque?");
+        var respondida = Conversa.Abrir(casa.Id, "5511999990202", agora.AddMinutes(-21), "Cliente respondida");
+        var entradaRespondida = Mensagem.Entrada(casa.Id, respondida.Id, agora.AddMinutes(-20), TipoConteudoMensagem.Texto, "oi");
+        var respostaAgente = Mensagem.Saida(casa.Id, respondida.Id, AutorMensagem.Agente, agora.AddMinutes(-19),
+            TipoConteudoMensagem.Texto, "Oi! Tem sim.", "resposta-agente-1622");
+        var velha = Conversa.Abrir(casa.Id, "5511999990203", agora.AddDays(-9), "Cliente velha");
+        var entradaVelha = Mensagem.Entrada(casa.Id, velha.Id, agora.AddDays(-8), TipoConteudoMensagem.Texto, "oi");
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var _ = db.UseRowLevelSecurityBypass();
+            db.Empresas.Add(casa);
+            db.AtendimentoConversas.AddRange(esquecida, respondida, velha);
+            db.AtendimentoMensagens.AddRange(entradaEsquecida, entradaRespondida, respostaAgente, entradaVelha);
+            await db.SaveChangesAsync();
+        }
+
+        await RodarAvaliadorAsync(agora);
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var _ = db.UseRowLevelSecurityBypass();
+            var aviso = await db.Lembretes.IgnoreQueryFilters().Where(l => l.EmpresaId == casa.Id).ToListAsync();
+            var lembrete = aviso.Should().ContainSingle().Subject;
+            lembrete.Tipo.Should().Be(TipoLembrete.ClienteSemResposta);
+            lembrete.ConversaId.Should().Be(esquecida.Id);
+            lembrete.Referencia.Should().Be(entradaEsquecida.Id.ToString());
+            lembrete.ParaUsuarioId.Should().BeNull("ninguém assumiu: o aviso é da equipe");
+            lembrete.AvisadoEm.Should().NotBeNull();
         }
     }
 

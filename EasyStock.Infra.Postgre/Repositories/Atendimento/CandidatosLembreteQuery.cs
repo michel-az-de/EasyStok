@@ -68,12 +68,20 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
                     .FirstOrDefault()))
             .ToListAsync(ct);
 
+    /// <summary>
+    /// #1622-4: até onde a conversa <see cref="SituacaoConversa.Automatica"/> com o cliente esperando ainda vira aviso. O turno
+    /// do agente (ou a escalada com ele desligado) roda em memória e se perde num deploy; uma semana cobre fim de semana e
+    /// feriado com a loja fechada sem acordar conversa esquecida há meses no dia em que esta regra entra.
+    /// </summary>
+    public static readonly TimeSpan AutomaticaEsperandoAte = TimeSpan.FromDays(7);
+
     // Quem falou por último segue UltimaPalavraConversa (#1550), o mesmo critério da inbox.
     public async Task<IReadOnlyList<ConversaSemResposta>> ListarConversasSemRespostaAsync(DateTime entradaAntesDe, CancellationToken ct = default)
     {
+        var automaticaDesde = entradaAntesDe - AutomaticaEsperandoAte;
         var linhas = await (
             from c in db.AtendimentoConversas.IgnoreQueryFilters()
-            where c.Situacao == SituacaoConversa.Assumida
+            where c.Situacao == SituacaoConversa.Assumida || c.Situacao == SituacaoConversa.Automatica
             let ultima = db.AtendimentoMensagens.IgnoreQueryFilters()
                 .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id)
                 .Where(UltimaPalavraConversa.Conta)
@@ -82,6 +90,7 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
                 .Select(m => new { m.Id, m.Direcao, m.EnviadaEm })
                 .FirstOrDefault()
             where ultima != null && ultima.Direcao == DirecaoMensagem.Entrada && ultima.EnviadaEm < entradaAntesDe
+            where c.Situacao == SituacaoConversa.Assumida || ultima.EnviadaEm >= automaticaDesde
             // #1427: o SLA da loja vai junto; nulo quando a loja não gravou configuração (o avaliador usa o padrão).
             let sla = db.ConfiguracoesAtendimento.IgnoreQueryFilters()
                 .Where(cfg => cfg.EmpresaId == c.EmpresaId)

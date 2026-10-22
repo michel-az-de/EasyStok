@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
@@ -44,7 +45,10 @@ public class ReabrirConversaUseCaseTests
         await _conversas.Received(1).AddMensagemAsync(Arg.Is<Mensagem>(m => m.EmpresaId == _empresa
             && m.ConversaId == conversa.Id && m.Autor == AutorMensagem.Sistema && m.ExternoId == null
             && m.Status == StatusMensagem.Pendente && m.EnviadaPorUsuarioId == _usuario
-            && m.Texto!.Contains("Atendente") && m.Texto.Contains($"{encerradaEm:dd/MM/yyyy HH:mm:ss} UTC")), Arg.Any<CancellationToken>());
+            && m.Texto!.Contains("Atendente") && !m.Texto.Contains("UTC")
+            // A nota é lida pela equipe na loja: hora de Brasília, como o resto do console.
+            && m.Texto.Contains($"Encerramento anterior: {HorarioBrasil.ConverterParaBrasilia(encerradaEm!.Value):dd/MM/yyyy 'às' HH:mm}.")),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

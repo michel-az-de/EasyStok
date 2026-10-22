@@ -60,7 +60,7 @@ public sealed class ReabrirConversaUseCase(
                     && pedido.EmpresaId == command.EmpresaId && pedido.EstaFinalizado)
                     conversa.DefinirPedidoEmAndamento(null);
                 var nota = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
-                    TipoConteudoMensagem.Texto, $"{PrefixoNotaReabertura}{command.QuemAgiu}. Encerramento anterior: {encerradaEm:dd/MM/yyyy HH:mm:ss} UTC.");
+                    TipoConteudoMensagem.Texto, $"{PrefixoNotaReabertura}{command.QuemAgiu}.{EncerramentoAnterior(encerradaEm)}");
                 nota.RegistrarAutorNotaInterna(command.UsuarioId);
                 await conversas.AddMensagemAsync(nota, token);
                 await unitOfWork.CommitAsync();
@@ -74,6 +74,12 @@ public sealed class ReabrirConversaUseCase(
             throw new RegraDeDominioVioladaException(ConflitoContato);
         }
     }
+
+    /// <summary>A equipe lê a nota na loja: o encerramento anterior vai em hora de Brasília.</summary>
+    private static string EncerramentoAnterior(DateTime? encerradaEm) =>
+        encerradaEm is { } utc
+            ? $" Encerramento anterior: {HorarioBrasil.ConverterParaBrasilia(DateTime.SpecifyKind(utc, DateTimeKind.Utc)):dd/MM/yyyy 'às' HH:mm}."
+            : string.Empty;
 
     private static Conversa Validar(Conversa? conversa, AcaoConversaCommand command) =>
         conversa is not null && conversa.EmpresaId == command.EmpresaId && conversa.Id == command.ConversaId
