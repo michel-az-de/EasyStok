@@ -55,7 +55,7 @@ export const NOME_DO_MEIO = {
   debito: 'cartão de débito',
   transferencia: 'transferência',
   outro: 'outro meio',
-  'cartao-link': 'link de cartão',
+  'cartao-link': 'link de pagamento',
   maquininha: 'maquininha',
   'vale-refeicao': 'vale',
 }
@@ -464,3 +464,7 @@ export function metodoDaCobranca(cobranca) {
   if (METODOS_DA_BAIXA.has(cobranca?.metodoRecebido)) return cobranca.metodoRecebido
   return METODOS_DA_BAIXA.has(cobranca?.meio) ? cobranca.meio : ''
 }
+
+// #1686 (item 10): devolução em dinheiro não tem comprovante; Pix, cartão e transferência têm.
+// A mesma regra do `RegistrarEstornoManualUseCase` da API.
+export const referenciaObrigatoriaNaDevolucao = (metodo) => metodo !== 'dinheiro'

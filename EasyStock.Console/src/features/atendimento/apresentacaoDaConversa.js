@@ -22,3 +22,8 @@ export function avisoDePedido(texto) {
   const t = String(texto ?? '').trim()
   return t.startsWith('Pedido do site #') || t.length > LIMITE_DO_AVISO_CURTO
 }
+
+// #1239: para quem a conversa pode ir. Quem está passando e quem já está com ela não entram.
+export function atendentesParaPassar(atendentes, { usuarioId = null, responsavelId = null } = {}) {
+  return (atendentes ?? []).filter((a) => a.usuarioId && a.usuarioId !== usuarioId && a.usuarioId !== responsavelId)
+}

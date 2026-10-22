@@ -273,15 +273,12 @@ export const ADICIONAIS_POR_SKU = {
 // AQUI ENTRA A API REAL DO MERCADO PAGO: quem lê `provedor === 'mercadopago'`
 // e decide a chamada é `infra/provedoresDeCobranca.js`. Nenhum componente
 // desta tabela para baixo sabe que existe Mercado Pago.
-// Rodada 12 (issue #13, sugestão da Thatiane): Pix e cartão em destaque, as
-// formas de pagar na entrega em segundo plano (`destaque`).
+// Rodada 12 (issue #13, sugestão da Thatiane): o link em destaque, as formas de pagar na
+// entrega em segundo plano (`destaque`). Decisão de 22/10: um botão só para o link. O link do
+// Mercado Pago aceita Pix e cartão, e dois chips que geravam o mesmo link confundiam quem atende.
 export const MEIOS_DE_PAGAMENTO = [
   {
-    id: 'pix', rotulo: 'Pix', situacao: 'ativo', provedor: 'mercadopago', liberaEsteiraSemPagar: false,
-    destaque: true,
-  },
-  {
-    id: 'cartao-link', rotulo: 'Cartão por link', situacao: 'ativo', provedor: 'mercadopago',
+    id: 'cartao-link', rotulo: 'Link de pagamento (Pix ou cartão)', situacao: 'ativo', provedor: 'mercadopago',
     liberaEsteiraSemPagar: false, destaque: true,
   },
   {

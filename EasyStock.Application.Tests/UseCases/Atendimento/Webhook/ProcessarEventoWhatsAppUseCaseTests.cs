@@ -156,6 +156,18 @@ public class ProcessarEventoWhatsAppUseCaseTests
         .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId)
         .Replace("__WAMID__", wamid).Replace("__TEXTO__", texto);
 
+    // #1765-6: gravar a entrada não é ler. O "lida" vai à Meta quando a atendente abre a conversa (marcar-lida do console).
+    [Fact]
+    public async Task EntradaDoClienteNaoMarcaLidaNaMeta()
+    {
+        var completo = await _useCase.ExecuteAsync(PayloadTexto("wamid.lida1", "tem nhoque?"));
+
+        completo.Should().BeTrue();
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Direcao == DirecaoMensagem.Entrada && m.ExternoId == "wamid.lida1"), Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceiveWithAnyArgs().MarcarComoLidaAsync(default!, default);
+    }
+
     [Fact]
     public async Task EcoDoAppViraSaidaDaDonaEAssumeSemDispararOAgente()
     {

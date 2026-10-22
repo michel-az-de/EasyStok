@@ -186,6 +186,14 @@
   .controles > button { font-size: 0; gap: 6px; padding: 0 10px; }
   .controles .conta { font-size: var(--t-micro); min-width: 22px; height: 22px; }
 }
+/* #1940 (item 3): a 375 px o "Mais" passava 16 px da borda (marca 66 + loja 32 + controles 277 +
+   recuos = 399 px). Abaixo de 400 px os vãos e o recuo lateral dos botões de ícone apertam
+   (30 px no total); a área de toque segue com 44 px. Medido a 375 e a 390 no laboratório. */
+@media (max-width: 399px) {
+  .topo { gap: 2px; padding-inline: 6px; }
+  .controles { gap: 2px; }
+  .controles > button { padding: 0 8px; }
+}
 @media (max-width: 374px) {
   .topo { flex-wrap: wrap; }
   .controleLoja { margin-left: auto; }
