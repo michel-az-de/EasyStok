@@ -195,6 +195,18 @@ public class AvaliarLembretesPrazoEstouradoTests
     }
 
     [Fact]
+    public async Task NomeDePerfilQueETelefoneNaoVaiNoAviso()
+    {
+        _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new ConversaSemResposta(_empresaId, Guid.NewGuid(), Guid.NewGuid(), "+55 11 98888-7777", null, Agora.AddMinutes(-20))]);
+        _repo.When(r => r.AddAsync(Arg.Any<Lembrete>(), Arg.Any<CancellationToken>())).Do(c => _vencidos.Add(c.Arg<Lembrete>()));
+
+        await Avaliador().ExecuteAsync();
+
+        Payload(Prazos().Single()).TryGetProperty("cliente", out _).Should().BeFalse("o e-mail leva o nome, nunca o telefone");
+    }
+
+    [Fact]
     public async Task DuasEsperasNaMesmaConversaDividemAChaveDoAviso()
     {
         var conversaId = Guid.NewGuid();

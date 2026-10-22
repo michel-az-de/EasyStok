@@ -92,8 +92,8 @@ public sealed class ResolvedorAudiencia(
                     candidatos = await usuarios.ListarDaEmpresaAsync(empresaId, [NivelAcesso.Admin, NivelAcesso.Gerente], ct);
                     break;
                 case AudienciaNotificacao.Equipe:
-                    candidatos = await usuarios.ListarDaEmpresaAsync(
-                        empresaId, [NivelAcesso.Admin, NivelAcesso.Gerente, NivelAcesso.Operador], ct);
+                    // Quem atende conversas, pela mesma regra do JWT: a cozinha (Operador sem atender) fica de fora.
+                    candidatos = await usuarios.ListarComPermissaoAsync(empresaId, Permissao.AtenderConversas, ct);
                     break;
                 default:
                     candidatos = await superAdmins.ListarAsync(ct);

@@ -19,7 +19,7 @@ public static class NotificacoesGlobaisSeed
     /// <summary>Avisos do Balcão (#1765-7): Push primeiro; falhou, o sino da mesma pessoa (fallback de canal).</summary>
     private const string ReservaNoSino = """["Push","InApp"]""";
 
-    /// <summary>Quem atende na loja (Admin, Gerente e Operador): uma mensagem por pessoa, sem modo "todos".</summary>
+    /// <summary>Quem atende conversas na loja (permissão AtenderConversas): uma mensagem por pessoa, sem modo "todos".</summary>
     private const string AudienciaEquipe = """{"audiencia":"equipe"}""";
 
     /// <param name="templates">Catálogo de templates; omitido, é o <see cref="BuildDefaultTemplates"/>. Existe para o teste subir a versão.</param>

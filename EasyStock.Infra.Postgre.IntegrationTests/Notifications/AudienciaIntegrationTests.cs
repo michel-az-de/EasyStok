@@ -100,7 +100,8 @@ public class AudienciaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICla
     }
 
     // #1765-7: aviso do Balcão com o Push falhando (sem inscrição, sem chave VAPID) caía no vazio. Com a audiência "equipe"
-    // e o In-App de reserva, cada pessoa da equipe ganha o aviso no sino; o visualizador e a outra empresa, não.
+    // e o In-App de reserva, cada pessoa que atende ganha o aviso no sino; o visualizador, a cozinha (sem atender conversas)
+    // e a outra empresa, não.
     [SkippableFact]
     public async Task PushSemInscricaoCaiNoSinoDeCadaPessoaDaEquipe()
     {
@@ -110,6 +111,7 @@ public class AudienciaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICla
         var dona = await SemearUsuarioComPerfilAsync(empresa, NivelAcesso.Admin, "dona");
         var atendente = await SemearUsuarioComPerfilAsync(empresa, NivelAcesso.Operador, "atendente");
         var visualizador = await SemearUsuarioComPerfilAsync(empresa, NivelAcesso.Visualizador, "visualizador");
+        var cozinha = await SemearUsuarioComPerfilAsync(empresa, NivelAcesso.Operador, "cozinha", [Permissao.AcessarModuloCozinha]);
         var deFora = await SemearUsuarioComPerfilAsync(outra, NivelAcesso.Operador, "defora");
         await SemearRotinaDoBalcaoAsync(empresa);
         var evento = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.ContatoNovoNoBalcao,
@@ -130,7 +132,8 @@ public class AudienciaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICla
         var noSino = mensagens.Where(m => m.Canal == CanalNotificacao.InApp).ToList();
         noSino.Select(m => m.Destinatario).Should().BeEquivalentTo([dona.Id.ToString(), atendente.Id.ToString()]);
         noSino.Should().OnlyContain(m => m.Status == StatusOutbox.Enviado && m.CorpoRenderizado == "Fulana entrou em contato");
-        mensagens.Select(m => m.Destinatario).Should().NotContain(d => d.Contains(visualizador.Id.ToString()) || d.Contains(deFora.Id.ToString()));
+        mensagens.Select(m => m.Destinatario).Should().NotContain(d => d.Contains(visualizador.Id.ToString())
+            || d.Contains(cozinha.Id.ToString()) || d.Contains(deFora.Id.ToString()));
         sino.ChamadasDaEmpresa(empresa).Should().Be(2);
     }
 
@@ -188,11 +191,17 @@ public class AudienciaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICla
         await db.SaveChangesAsync();
     }
 
-    private async Task<Usuario> SemearUsuarioComPerfilAsync(Guid empresaId, NivelAcesso nivel, string nome)
+    private async Task<Usuario> SemearUsuarioComPerfilAsync(Guid empresaId, NivelAcesso nivel, string nome, Permissao[]? explicitas = null)
     {
         var usuario = Usuario.Criar(nome, $"{nome}-{Guid.NewGuid():N}@casadababa.com", "hash");
         usuario.EmailConfirmado = true;
         var perfil = new Perfil { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = $"{nivel}-{nome}", Nivel = nivel, CriadoEm = DateTime.UtcNow };
+        if (explicitas is not null)
+        {
+            perfil.PermissoesExplicitas = true;
+            foreach (var permissao in explicitas)
+                perfil.Permissoes.Add(new PerfilPermissao { Id = Guid.NewGuid(), PerfilId = perfil.Id, Permissao = permissao });
+        }
 
         await using var db = fixture.CreateDbContext();
         using var _ = db.UseRowLevelSecurityBypass();

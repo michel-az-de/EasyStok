@@ -49,7 +49,10 @@ public static class ClassificadorFalhaEnvio
         WhatsAppCloudException propria => propria.Message,
         TimeoutException or TaskCanceledException => "O canal não respondeu a tempo (CANAL_SEM_RESPOSTA).",
         HttpRequestException => "Sem conexão com o canal (CANAL_SEM_CONEXAO).",
-        RegraDeDominioVioladaException or UseCaseValidationException => ex.Message,
+        // Recusas escritas pelos nossos adaptadores e regras (SMS sem imagem, título longo demais, canal sem adaptador):
+        // a frase diz o que fazer.
+        RegraDeDominioVioladaException or UseCaseValidationException or EnvioCanalFalhouException
+            or CanalNaoSuportadoException or NotSupportedException or ArgumentException => ex.Message,
         _ => "Falha no canal (CANAL_ERRO).",
     };
 

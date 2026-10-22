@@ -18,7 +18,7 @@ public enum AudienciaNotificacao
     Superadmins,
 
     /// <summary>
-    /// Quem atende na loja (#1765-7): usuários ativos com perfil Admin, Gerente ou Operador na empresa do evento. Os
+    /// Quem atende na loja (#1765-7): usuários ativos da empresa do evento com a permissão de atender conversas. Os
     /// avisos do Balcão vão a cada um, por Push e, se o Push falhar, pelo sino (In-App).
     /// </summary>
     Equipe,

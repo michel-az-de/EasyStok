@@ -87,7 +87,8 @@ public static class PrazoEstouradoEvento
             ["link"] = link ?? string.Empty,
             [NotificadorService.ChaveIdempotenciaPayload] = ChaveIdempotencia(tipo, fatoId ?? referenciaId),
         };
-        if (!string.IsNullOrWhiteSpace(cliente)) dados["cliente"] = cliente.Trim();
+        // Nome de perfil que é telefone não vai: o e-mail leva o nome, nunca o contato do cliente.
+        if (!string.IsNullOrWhiteSpace(cliente) && !cliente.Any(char.IsDigit)) dados["cliente"] = cliente.Trim();
         if (usuarioId is { } u) dados["usuarioId"] = u;
         return JsonSerializer.Serialize(dados);
     }

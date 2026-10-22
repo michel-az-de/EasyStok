@@ -69,6 +69,8 @@ public class ClassificadorFalhaEnvioTests
         { new TaskCanceledException("A task was canceled."), "O canal não respondeu a tempo (CANAL_SEM_RESPOSTA)." },
         { new HttpRequestException("No such host is known."), "Sem conexão com o canal (CANAL_SEM_CONEXAO)." },
         { new InvalidOperationException("Sequence contains no elements"), "Falha no canal (CANAL_ERRO)." },
+        { new NotSupportedException("SMS não envia imagem."), "SMS não envia imagem." },
+        { new EnvioCanalFalhouException("Falha no envio de e-mail pela caixa da loja.", true), "Falha no envio de e-mail pela caixa da loja." },
     };
 
     /// <summary>#1765-11: o erro gravado é frase estável em português; o texto do provedor fica só no log.</summary>

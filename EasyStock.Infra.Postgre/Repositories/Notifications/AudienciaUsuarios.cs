@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Domain.Services;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories.Notifications;
@@ -36,6 +37,36 @@ public sealed class AudienciaUsuarios(EasyStockDbContext db) : IAudienciaUsuario
             .ToListAsync(ct);
 
         return linhas
+            .Select(u => new UsuarioParaAudiencia(
+                u.Id, u.Nome, u.Email, u.EmailConfirmado, u.Ativo, u.Telefone?.Value, u.TelefoneVerificadoEm))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<UsuarioParaAudiencia>> ListarComPermissaoAsync(
+        Guid empresaId, Permissao permissao, CancellationToken ct = default)
+    {
+        var linhas = await db.Usuarios.AsNoTracking()
+            .Where(u => u.Ativo
+                        && u.Empresas.Any(ue => ue.EmpresaId == empresaId && ue.Ativo)
+                        && !u.Perfis.Any(up => up.Perfil != null && up.Perfil.Nivel == NivelAcesso.SuperAdmin))
+            .OrderBy(u => u.Nome)
+            .Select(u => new
+            {
+                u.Id, u.Nome, u.Email, u.EmailConfirmado, u.Ativo, u.Telefone, u.TelefoneVerificadoEm,
+                Perfis = u.Perfis.Where(up => up.EmpresaId == empresaId && up.Perfil != null)
+                    .Select(up => new
+                    {
+                        up.Perfil!.Nivel,
+                        up.Perfil.PermissoesExplicitas,
+                        Permissoes = up.Perfil.Permissoes.Select(p => p.Permissao).ToList(),
+                    })
+                    .ToList(),
+            })
+            .ToListAsync(ct);
+
+        // A regra de permissão é uma só (PoliticaPermissao), a mesma do JWT; por isso o filtro fino é aqui, em memória.
+        return linhas
+            .Where(u => u.Perfis.Any(p => PoliticaPermissao.Tem(p.Nivel, p.Permissoes, permissao, p.PermissoesExplicitas)))
             .Select(u => new UsuarioParaAudiencia(
                 u.Id, u.Nome, u.Email, u.EmailConfirmado, u.Ativo, u.Telefone?.Value, u.TelefoneVerificadoEm))
             .ToList();
