@@ -139,7 +139,8 @@ public class SensitivePatternsTests
     [Fact]
     public void Redact_DeveMascarar_TokenDaComandaNoCaminho()
     {
-        const string token = "Qk3x9_aB-7yTz0pLmN4vR2sW8eHcJ6uFdG1iK5oP9qA";
+        // Token gerado na hora, como a comanda gera: nada de segredo literal no repositório.
+        var token = EasyStock.Application.UseCases.Atendimento.ChatSite.AcessoChatSite.NovoToken();
         var output = SensitivePatterns.Redact($"{{\"RequestPath\":\"/api/storefront/cardapio-conversa/{token}/comanda\"}}");
 
         output.Should().NotContain(token);
