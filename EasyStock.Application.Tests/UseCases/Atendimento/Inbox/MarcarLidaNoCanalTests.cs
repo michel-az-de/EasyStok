@@ -59,6 +59,13 @@ public class MarcarLidaNoCanalTests
 
         conversa.NaoLidas.Should().Be(0);
         await _canal.Received(1).MarcarComoLidaAsync("wamid.2", Arg.Any<CancellationToken>());
+        // A última entrada é lida sob a trava, antes do commit: a que chegar depois segue não lida no canal também.
+        Received.InOrder(() =>
+        {
+            _repositorio.ListarMensagensAsync(_empresa, conversa.Id, null, Arg.Any<int>(), Arg.Any<CancellationToken>());
+            _uow.CommitAsync();
+            _canal.MarcarComoLidaAsync("wamid.2", Arg.Any<CancellationToken>());
+        });
     }
 
     [Fact]

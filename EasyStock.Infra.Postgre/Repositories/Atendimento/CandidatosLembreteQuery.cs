@@ -81,7 +81,13 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
         var automaticaDesde = entradaAntesDe - AutomaticaEsperandoAte;
         var linhas = await (
             from c in db.AtendimentoConversas.IgnoreQueryFilters()
-            where c.Situacao == SituacaoConversa.Assumida || c.Situacao == SituacaoConversa.Automatica
+            // A automática entra pela coluna da última entrada (barata) antes da subconsulta da última palavra. Passada
+            // a semana, só volta a que já tem aviso aberto: ele segue vigente até alguém responder, não se dá por resolvido.
+            where c.Situacao == SituacaoConversa.Assumida
+                || (c.Situacao == SituacaoConversa.Automatica
+                    && (c.UltimaMensagemEntradaEm >= automaticaDesde
+                        || db.Lembretes.IgnoreQueryFilters().Any(l => l.EmpresaId == c.EmpresaId && l.ConversaId == c.Id
+                            && l.Tipo == TipoLembrete.ClienteSemResposta && l.Situacao == SituacaoLembrete.Aberto)))
             let ultima = db.AtendimentoMensagens.IgnoreQueryFilters()
                 .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id)
                 .Where(UltimaPalavraConversa.Conta)
@@ -90,7 +96,6 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
                 .Select(m => new { m.Id, m.Direcao, m.EnviadaEm })
                 .FirstOrDefault()
             where ultima != null && ultima.Direcao == DirecaoMensagem.Entrada && ultima.EnviadaEm < entradaAntesDe
-            where c.Situacao == SituacaoConversa.Assumida || ultima.EnviadaEm >= automaticaDesde
             // #1427: o SLA da loja vai junto; nulo quando a loja não gravou configuração (o avaliador usa o padrão).
             let sla = db.ConfiguracoesAtendimento.IgnoreQueryFilters()
                 .Where(cfg => cfg.EmpresaId == c.EmpresaId)

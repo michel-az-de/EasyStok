@@ -304,12 +304,15 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
         var casa = Empresa.Criar("Automatica sem resposta", null);
 
         var esquecida = Conversa.Abrir(casa.Id, "5511999990201", agora.AddMinutes(-21), "Cliente esquecida");
+        esquecida.RegistrarEntrada(agora.AddMinutes(-20));
         var entradaEsquecida = Mensagem.Entrada(casa.Id, esquecida.Id, agora.AddMinutes(-20), TipoConteudoMensagem.Texto, "tem nhoque?");
         var respondida = Conversa.Abrir(casa.Id, "5511999990202", agora.AddMinutes(-21), "Cliente respondida");
+        respondida.RegistrarEntrada(agora.AddMinutes(-20));
         var entradaRespondida = Mensagem.Entrada(casa.Id, respondida.Id, agora.AddMinutes(-20), TipoConteudoMensagem.Texto, "oi");
         var respostaAgente = Mensagem.Saida(casa.Id, respondida.Id, AutorMensagem.Agente, agora.AddMinutes(-19),
             TipoConteudoMensagem.Texto, "Oi! Tem sim.", "resposta-agente-1622");
         var velha = Conversa.Abrir(casa.Id, "5511999990203", agora.AddDays(-9), "Cliente velha");
+        velha.RegistrarEntrada(agora.AddDays(-8));
         var entradaVelha = Mensagem.Entrada(casa.Id, velha.Id, agora.AddDays(-8), TipoConteudoMensagem.Texto, "oi");
 
         await using (var db = fixture.CreateDbContext())
@@ -333,6 +336,14 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
             lembrete.Referencia.Should().Be(entradaEsquecida.Id.ToString());
             lembrete.ParaUsuarioId.Should().BeNull("ninguém assumiu: o aviso é da equipe");
             lembrete.AvisadoEm.Should().NotBeNull();
+        }
+
+        // Passada a semana, o aviso aberto não se dá por resolvido: ninguém respondeu.
+        await RodarAvaliadorAsync(agora.AddDays(8));
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var _ = db.UseRowLevelSecurityBypass();
+            (await db.Lembretes.IgnoreQueryFilters().SingleAsync(l => l.EmpresaId == casa.Id)).EstaAberto.Should().BeTrue();
         }
     }
 

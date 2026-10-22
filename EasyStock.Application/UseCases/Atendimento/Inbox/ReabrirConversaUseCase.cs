@@ -75,10 +75,13 @@ public sealed class ReabrirConversaUseCase(
         }
     }
 
-    /// <summary>A equipe lê a nota na loja: o encerramento anterior vai em hora de Brasília.</summary>
+    /// <summary>
+    /// A equipe lê a nota na loja: o encerramento anterior vai em hora de Brasília, no mesmo formato em que o console
+    /// já mostrava as notas antigas em UTC (<c>notaDeReabertura</c>: "dd/MM/aaaa, HH:mm (horário da loja).").
+    /// </summary>
     private static string EncerramentoAnterior(DateTime? encerradaEm) =>
         encerradaEm is { } utc
-            ? $" Encerramento anterior: {HorarioBrasil.ConverterParaBrasilia(DateTime.SpecifyKind(utc, DateTimeKind.Utc)):dd/MM/yyyy 'às' HH:mm}."
+            ? $" Encerramento anterior: {HorarioBrasil.ConverterParaBrasilia(utc):dd/MM/yyyy', 'HH:mm} (horário da loja)."
             : string.Empty;
 
     private static Conversa Validar(Conversa? conversa, AcaoConversaCommand command) =>

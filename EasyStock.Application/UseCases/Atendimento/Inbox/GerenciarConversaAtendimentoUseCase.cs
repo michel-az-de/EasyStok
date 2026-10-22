@@ -101,30 +101,32 @@ public sealed class GerenciarConversaAtendimentoUseCase(
     /// </summary>
     public async Task<ConversaSituacaoResult> MarcarLidaAsync(AcaoConversaCommand command, CancellationToken ct = default)
     {
-        var tinhaNaoLidas = false;
+        string? ultimaEntrada = null;
         var canal = CanalConversa.WhatsApp;
-        var resultado = await ExecutarAsync(command, (conversa, _) =>
+        var resultado = await ExecutarAsync(command, async (conversa, _) =>
         {
-            tinhaNaoLidas = conversa.NaoLidas > 0;
-            canal = conversa.Canal;
+            // Lida sob a trava da conversa: entrada que chegar depois do commit segue não lida aqui e no canal.
+            if (conversa.NaoLidas > 0 && resolvedorCanal is not null)
+            {
+                canal = conversa.Canal;
+                var mensagens = await conversaRepository.ListarMensagensAsync(
+                    command.EmpresaId, command.ConversaId, null, MensagensParaLidaNoCanal, ct);
+                ultimaEntrada = mensagens.LastOrDefault(m => m.Direcao == DirecaoMensagem.Entrada
+                    && !string.IsNullOrEmpty(m.ExternoId))?.ExternoId;
+            }
             conversa.MarcarLida();
-            return Task.CompletedTask;
         }, ct);
 
-        if (tinhaNaoLidas && resolvedorCanal is not null)
-            await AvisarLidaNoCanalAsync(command, canal, ct);
+        if (ultimaEntrada is not null)
+            await AvisarLidaNoCanalAsync(command, canal, ultimaEntrada, ct);
         return resultado;
     }
 
-    private async Task AvisarLidaNoCanalAsync(AcaoConversaCommand command, CanalConversa canal, CancellationToken ct)
+    private async Task AvisarLidaNoCanalAsync(AcaoConversaCommand command, CanalConversa canal, string externoId, CancellationToken ct)
     {
         try
         {
-            var mensagens = await conversaRepository.ListarMensagensAsync(
-                command.EmpresaId, command.ConversaId, null, MensagensParaLidaNoCanal, ct);
-            var ultima = mensagens.LastOrDefault(m => m.Direcao == DirecaoMensagem.Entrada && !string.IsNullOrEmpty(m.ExternoId));
-            if (ultima is null) return;
-            await resolvedorCanal!.Obter(canal).MarcarComoLidaAsync(ultima.ExternoId!, ct);
+            await resolvedorCanal!.Obter(canal).MarcarComoLidaAsync(externoId, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {

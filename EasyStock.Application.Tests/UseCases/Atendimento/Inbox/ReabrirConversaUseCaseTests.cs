@@ -47,7 +47,7 @@ public class ReabrirConversaUseCaseTests
             && m.Status == StatusMensagem.Pendente && m.EnviadaPorUsuarioId == _usuario
             && m.Texto!.Contains("Atendente") && !m.Texto.Contains("UTC")
             // A nota é lida pela equipe na loja: hora de Brasília, como o resto do console.
-            && m.Texto.Contains($"Encerramento anterior: {HorarioBrasil.ConverterParaBrasilia(encerradaEm!.Value):dd/MM/yyyy 'às' HH:mm}.")),
+            && m.Texto.Contains($"Encerramento anterior: {HorarioBrasil.ConverterParaBrasilia(encerradaEm!.Value):dd/MM/yyyy', 'HH:mm} (horário da loja).")),
             Arg.Any<CancellationToken>());
     }
 
