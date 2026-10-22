@@ -435,8 +435,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             return;
 
         // #1396: falha temporária da Meta agenda o reenvio automático (S57); permanente ou sem código, não.
+        // #1765-11: grava o código; o título da Meta, em inglês, fica no log.
         if (novoStatus == StatusMensagem.Falhou)
-            mensagem.RegistrarFalhaEnvio(status.ErroMensagem, ClassificadorFalhaEnvio.ClassificarCodigoMeta(status.ErroCodigo), DateTime.UtcNow);
+        {
+            logger.LogWarning("Webhook WhatsApp: a Meta não entregou {Wamid} (código {Codigo}: {Titulo}).",
+                status.Wamid, status.ErroCodigo, status.ErroMensagem);
+            mensagem.RegistrarFalhaEnvio(ClassificadorFalhaEnvio.MotivoCodigoMeta(status.ErroCodigo),
+                ClassificadorFalhaEnvio.ClassificarCodigoMeta(status.ErroCodigo), DateTime.UtcNow);
+        }
         else
             mensagem.AtualizarStatusEntrega(novoStatus.Value);
         await unitOfWork.CommitAsync();
@@ -473,7 +479,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 logger.LogWarning(ex, "Webhook WhatsApp: falha ao enviar a saudação da conversa {ConversaId}.", conversa.Id);
                 saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
                     TipoConteudoMensagem.Texto, texto);
-                saida.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), saida.EnviadaEm);
+                saida.RegistrarFalhaEnvio(ClassificadorFalhaEnvio.Motivo(ex), ClassificadorFalhaEnvio.Classificar(ex), saida.EnviadaEm);
             }
 
             conversa.RegistrarSaida(saida.EnviadaEm);

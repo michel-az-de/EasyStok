@@ -18,6 +18,12 @@ public enum AudienciaNotificacao
     Superadmins,
 
     /// <summary>
+    /// Quem atende na loja (#1765-7): usuários ativos com perfil Admin, Gerente ou Operador na empresa do evento. Os
+    /// avisos do Balcão vão a cada um, por Push e, se o Push falhar, pelo sino (In-App).
+    /// </summary>
+    Equipe,
+
+    /// <summary>
     /// O convidado do <c>usuarioId</c> do payload (N9): o e-mail sempre, e o WhatsApp com o atestado da dona, sem exigir o
     /// telefone verificado, só até o aceite do convite.
     /// </summary>
@@ -49,6 +55,7 @@ public static class AudienciaDaRotina
                     "gestores" => AudienciaNotificacao.Gestores,
                     "superadmins" => AudienciaNotificacao.Superadmins,
                     "convidado" => AudienciaNotificacao.Convidado,
+                    "equipe" => AudienciaNotificacao.Equipe,
                     _ => null
                 };
             }

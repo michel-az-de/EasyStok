@@ -91,6 +91,10 @@ public sealed class ResolvedorAudiencia(
                 case AudienciaNotificacao.Gestores:
                     candidatos = await usuarios.ListarDaEmpresaAsync(empresaId, [NivelAcesso.Admin, NivelAcesso.Gerente], ct);
                     break;
+                case AudienciaNotificacao.Equipe:
+                    candidatos = await usuarios.ListarDaEmpresaAsync(
+                        empresaId, [NivelAcesso.Admin, NivelAcesso.Gerente, NivelAcesso.Operador], ct);
+                    break;
                 default:
                     candidatos = await superAdmins.ListarAsync(ct);
                     break;

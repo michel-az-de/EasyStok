@@ -53,6 +53,7 @@ public static class ExemplosDeEvento
                 ["referencia"] = "AB12CD34",
                 ["prazo_texto"] = "02/10/2026 14:00",
                 ["atraso_texto"] = "35 minutos",
+                ["link"] = "https://app.easystok.online/",
             },
             [TipoEventoNotificacao.ContatoAlterado] = new Dictionary<string, object?>
             {

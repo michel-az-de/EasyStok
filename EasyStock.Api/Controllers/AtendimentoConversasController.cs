@@ -391,6 +391,11 @@ public class AtendimentoConversasController(
             return StatusCode(StatusCodes.Status502BadGateway,
                 new ApiErrorResponse(new ApiError("CANAL_FALHOU", "Falha ao enviar pelo canal.", ex.Message, null) { Details = ex.Mensagem }));
         }
+        catch (CatalogoModelosException ex) when (ex.FaltaConexao)
+        {
+            // #1765-9: falta de conexão é da loja resolver em Integrações, não falha da Meta.
+            return Conflict(new ApiErrorResponse(new ApiError("WHATSAPP_NAO_CONECTADO", ex.Message, null, null)));
+        }
         catch (CatalogoModelosException ex)
         {
             return StatusCode(StatusCodes.Status502BadGateway,

@@ -27,7 +27,7 @@ public class ExemplosDeEventoTests
     [InlineData(TipoEventoNotificacao.SenhaAlterada, "nome,email,usuarioId,data")]
     [InlineData(TipoEventoNotificacao.ConviteAcesso, "nome,email,usuarioId,empresa,link_convite,expira_em_dias")]
     [InlineData(TipoEventoNotificacao.IncidenteSistema, "componente,estado_texto,gravidade,desde,duracao")]
-    [InlineData(TipoEventoNotificacao.PrazoEstourado, "tipo_legivel,referencia,prazo_texto,atraso_texto")]
+    [InlineData(TipoEventoNotificacao.PrazoEstourado, "tipo_legivel,referencia,prazo_texto,atraso_texto,link")]
     [InlineData(TipoEventoNotificacao.ContatoAlterado, "nome,email,usuarioId,contato,novo_mascarado,quando")]
     [InlineData(TipoEventoNotificacao.ResumoDiario, "data,entregues,faturamento,ticket_medio,pendentes,valor_pendentes,caixa_texto,pix_texto")]
     public void ExemploTemExatamenteAsChavesDoContrato(TipoEventoNotificacao tipo, string chaves) =>

@@ -26,7 +26,19 @@ public class AvisosDoBalcaoPushSeedTests
     public async Task AvisoDoBalcaoSaiPorPushSoComNomeEEvento(TipoEventoNotificacao tipo, string corpoEsperado)
     {
         var rotina = NotificacoesGlobaisSeed.BuildDefaultRotinas().Should().ContainSingle(r => r.TipoEvento == tipo).Subject;
-        rotina.CanaisOrdemFallbackJson.Should().Be("[\"Push\"]");
+        // #1765-7: os avisos do Balcão vão a cada pessoa da equipe, com o sino de reserva; a escalada segue só Push.
+        if (tipo == TipoEventoNotificacao.ConversaEscalada)
+            rotina.CanaisOrdemFallbackJson.Should().Be("[\"Push\"]");
+        else
+        {
+            rotina.CanaisOrdemFallbackJson.Should().Be("[\"Push\",\"InApp\"]");
+            rotina.ParametrosJson.Should().Contain("\"audiencia\":\"equipe\"");
+            var sino = NotificacoesGlobaisSeed.BuildDefaultTemplates()
+                .Single(t => t.TipoEvento == tipo && t.Canal == CanalNotificacao.InApp);
+            IRendererTemplate r = new ScribanRenderer(NullLogger<ScribanRenderer>.Instance);
+            (await r.RenderizarAsync(sino.CorpoTemplate, new Dictionary<string, object?> { ["nome"] = "Maria", ["etapa"] = "Em preparo" }))
+                .Should().Be(corpoEsperado);
+        }
         rotina.Categoria.Should().Be(CategoriaConteudoNotificacao.Operacional);
 
         var template = NotificacoesGlobaisSeed.BuildDefaultTemplates()

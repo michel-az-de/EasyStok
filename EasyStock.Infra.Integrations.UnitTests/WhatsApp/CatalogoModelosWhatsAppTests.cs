@@ -69,7 +69,7 @@ public class CatalogoModelosWhatsAppTests
     {
         if (outroNumero) Credencial("9999");
         var act = () => Catalogo.ListarAsync(outroNumero ? _empresa.Id : Guid.NewGuid());
-        await act.Should().ThrowAsync<CatalogoModelosException>();
+        (await act.Should().ThrowAsync<CatalogoModelosException>()).Which.FaltaConexao.Should().BeTrue("#1765-9: vira 409, não 502");
         _handler.Urls.Should().BeEmpty();
     }
 
@@ -82,7 +82,9 @@ public class CatalogoModelosWhatsAppTests
         _handler.Status = (HttpStatusCode)status;
         _handler.Respostas.Enqueue(corpo);
         var act = () => Catalogo.ListarAsync(_empresa.Id);
-        (await act.Should().ThrowAsync<CatalogoModelosException>()).Which.Message.Should().NotContain("token-secreto");
+        var erro = (await act.Should().ThrowAsync<CatalogoModelosException>()).Which;
+        erro.Message.Should().NotContain("token-secreto");
+        erro.FaltaConexao.Should().BeFalse("falha da Meta segue 502");
     }
 
     private sealed class Handler : HttpMessageHandler

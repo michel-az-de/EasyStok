@@ -35,4 +35,25 @@ public static class ClassificadorFalhaEnvio
     /// </summary>
     public static TipoFalhaEnvio ClassificarCodigoMeta(int? codigo) =>
         codigo is { } c && CodigosTemporarios.Contains(c) ? TipoFalhaEnvio.Temporaria : TipoFalhaEnvio.Permanente;
+
+    /// <summary>
+    /// #1765-11: o que fica em <c>Mensagem.Erro</c>. Frase estável em português com o código do canal (o console traduz pelo
+    /// código: 131026, 131047...); o texto do provedor, em inglês, vai só ao log de quem chama. Erro escrito por nós (sem
+    /// código e sem resposta da Meta) já está em português e segue como veio.
+    /// </summary>
+    public static string Motivo(Exception ex) => ex switch
+    {
+        WhatsAppCloudException { Codigo: > 0 } meta => MotivoCodigoMeta(meta.Codigo),
+        WhatsAppCloudException { StatusHttp: >= 200 and < 300 } => "O canal aceitou sem devolver o id da mensagem (CANAL_SEM_ID).",
+        WhatsAppCloudException { StatusHttp: { } status } => $"O canal respondeu com erro (HTTP {status}).",
+        WhatsAppCloudException propria => propria.Message,
+        TimeoutException or TaskCanceledException => "O canal não respondeu a tempo (CANAL_SEM_RESPOSTA).",
+        HttpRequestException => "Sem conexão com o canal (CANAL_SEM_CONEXAO).",
+        RegraDeDominioVioladaException or UseCaseValidationException => ex.Message,
+        _ => "Falha no canal (CANAL_ERRO).",
+    };
+
+    /// <summary>#1765-11: o callback <c>failed</c> da Meta traz o título em inglês; grava-se o código.</summary>
+    public static string MotivoCodigoMeta(int? codigo) =>
+        codigo is { } c and > 0 ? $"Falha no canal (código Meta {c})." : "Falha no canal (sem código da Meta).";
 }
