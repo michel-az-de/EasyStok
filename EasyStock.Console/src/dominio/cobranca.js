@@ -55,7 +55,7 @@ export const NOME_DO_MEIO = {
   debito: 'cartão de débito',
   transferencia: 'transferência',
   outro: 'outro meio',
-  'cartao-link': 'link de cartão',
+  'cartao-link': 'link de pagamento',
   maquininha: 'maquininha',
   'vale-refeicao': 'vale',
 }
