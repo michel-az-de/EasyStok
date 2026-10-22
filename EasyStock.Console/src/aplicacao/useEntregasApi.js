@@ -24,15 +24,19 @@ const RELE_PELO_EVENTO = 'evento'
 // aprovação) não saem no SSE e releem a operação na resposta.
 const RELE_TUDO = 'tudo'
 
-const lerCadastro = (data) => Promise.all([
+// #1921: janelas e bloqueios são da policy Admin; sem ela (`comVitrine` falso) não se pede: era 403 a
+// cada recarga do cadastro. O roteiro agrupa só pelo que vem no pedido, como já fazia na recusa.
+const lerCadastro = (data, comVitrine = true) => Promise.all([
   api.listarEntregadores(),
-  api.listarJanelas().catch(() => null),
-  api.listarBloqueios(data, data).catch(() => null),
+  comVitrine ? api.listarJanelas().catch(() => null) : null,
+  comVitrine ? api.listarBloqueios(data, data).catch(() => null) : null,
 ]).then(([entregadores, janelas, bloqueios]) => ({
   dia: data, lidoEm: Date.now(), entregadores: entregadores ?? [], janelas, bloqueios,
 }))
 
-export function useEntregasApi() {
+export function useEntregasApi({ comVitrine = true } = {}) {
+  const comVitrineRef = useRef(comVitrine)
+  useEffect(() => { comVitrineRef.current = comVitrine }, [comVitrine])
   const [pedidos, setPedidos] = useState(null)
   const [viagens, setViagens] = useState([])
   const [entregadores, setEntregadores] = useState([])
@@ -69,7 +73,7 @@ export function useEntregasApi() {
       api.listarViagens(),
       api.listarChamados(),
       api.listarPedidosEntrega(STATUS_KDS_DIA, data),
-      comCadastro ? lerCadastro(data) : null,
+      comCadastro ? lerCadastro(data, comVitrineRef.current) : null,
     ])
       .then(([p, v, c, pedidosDoDia, lido]) => {
         if (!vivoRef.current) return
