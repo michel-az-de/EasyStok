@@ -404,7 +404,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         var payload = """
             {"entry":[{"changes":[{"value":{
                 "metadata":{"phone_number_id":"__PHONE__"},
-                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"title":"Erro generico"}]}]
+                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"title":"Message undeliverable"}]}]
             }}]}]}
             """
             .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId).Replace("__WAMID__", wamid);
@@ -412,7 +412,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _useCase.ExecuteAsync(payload);
 
         mensagem.Status.Should().Be(StatusMensagem.Falhou);
-        mensagem.Erro.Should().Be("Erro generico");
+        mensagem.Erro.Should().Be("Falha no canal (sem código da Meta).", "#1765-11: o título em inglês fica só no log");
         mensagem.ProximoReenvioEm.Should().BeNull("sem código da Meta não há como saber se é temporária");
     }
 
@@ -434,7 +434,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         var payload = """
             {"entry":[{"changes":[{"value":{
                 "metadata":{"phone_number_id":"__PHONE__"},
-                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"code":__COD__,"title":"Falha da Meta"}]}]
+                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"code":__COD__,"title":"Re-engagement message"}]}]
             }}]}]}
             """
             .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId).Replace("__WAMID__", wamid)
@@ -443,7 +443,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _useCase.ExecuteAsync(payload);
 
         mensagem.Status.Should().Be(StatusMensagem.Falhou);
-        mensagem.Erro.Should().Be("Falha da Meta");
+        mensagem.Erro.Should().Be($"Falha no canal (código Meta {codigo}).");
         (mensagem.ProximoReenvioEm is not null).Should().Be(agenda);
     }
 

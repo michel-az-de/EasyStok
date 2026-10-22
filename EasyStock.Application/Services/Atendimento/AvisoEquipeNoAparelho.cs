@@ -9,9 +9,10 @@ namespace EasyStock.Application.Services.Atendimento;
 
 /// <summary>
 /// Avisos do Balcão no aparelho (#1807): com o console fechado, contato novo, pagamento confirmado e etapa do pedido
-/// viram Web Push para todos os aparelhos inscritos da empresa (rotina Push, destinatário <c>empresa:{id}</c>). O
-/// aparelho decide se recebe: desligar os avisos nele desfaz a inscrição, e o <c>WebPushCanal</c> só entrega para as
-/// ativas.
+/// viram Web Push para os aparelhos inscritos de cada pessoa da equipe (audiência <c>equipe</c>, destinatário
+/// <c>usuario:{id}</c>). O aparelho decide se recebe: desligar os avisos nele desfaz a inscrição, e o
+/// <c>WebPushCanal</c> só entrega para as ativas. #1765-7: Push que falha (sem inscrição, sem chave) cai no sino
+/// (In-App) da mesma pessoa.
 ///
 /// <para>
 /// A carga leva só o primeiro nome e o evento: nada de telefone, valor ou texto do cliente, porque o aviso aparece na

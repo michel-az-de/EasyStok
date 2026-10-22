@@ -27,6 +27,13 @@ public interface IAudienciaUsuarios
     /// </summary>
     Task<IReadOnlyList<UsuarioParaAudiencia>> ListarDaEmpresaAsync(
         Guid empresaId, IReadOnlyCollection<NivelAcesso> niveis, CancellationToken ct = default);
+
+    /// <summary>
+    /// #1765-7: usuários da empresa (vínculo ativo, sem SuperAdmin) cujo perfil na empresa dá a
+    /// <paramref name="permissao"/> pela <c>PoliticaPermissao</c> (permissões explícitas do perfil ou o padrão do nível).
+    /// </summary>
+    Task<IReadOnlyList<UsuarioParaAudiencia>> ListarComPermissaoAsync(
+        Guid empresaId, Permissao permissao, CancellationToken ct = default);
 }
 
 /// <summary>

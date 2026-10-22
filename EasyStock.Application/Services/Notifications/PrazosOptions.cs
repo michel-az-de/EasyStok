@@ -21,4 +21,14 @@ public sealed class PrazosOptions
     public TimeSpan ClienteSemResposta => TimeSpan.FromMinutes(ClienteSemRespostaMin > 0 ? ClienteSemRespostaMin : 10);
 
     public TimeSpan ImpressaoPendente => TimeSpan.FromMinutes(ImpressaoPendenteMin > 0 ? ImpressaoPendenteMin : 3);
+
+    /// <summary>Endereço do console da equipe, sem barra no fim. O aviso leva o link para resolver (#1765-8).</summary>
+    public string ConsoleUrl { get; set; } = "https://app.easystok.online";
+
+    /// <summary>Onde o aviso abre: o cliente sem resposta vai direto ao Balcão; o resto, ao console.</summary>
+    public string LinkPara(TipoPrazo tipo)
+    {
+        var console = (string.IsNullOrWhiteSpace(ConsoleUrl) ? "https://app.easystok.online" : ConsoleUrl.Trim()).TrimEnd('/');
+        return tipo == TipoPrazo.ClienteSemResposta ? $"{console}/#/m/atendimento/balcao" : $"{console}/";
+    }
 }

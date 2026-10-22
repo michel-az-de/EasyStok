@@ -66,7 +66,8 @@ public class AvaliarLembretesPrazoEstouradoTests
         var chamada = Prazos().Should().ContainSingle("rodar três vezes não gera o segundo").Subject;
         var payload = Payload(chamada);
         payload.GetProperty("tipo_legivel").GetString().Should().Be("Cliente sem resposta");
-        payload.GetProperty("chaveIdempotencia").GetString().Should().Be($"prazo:cliente_sem_resposta:{lembrete.Id}");
+        // #1765-8: a chave é a conversa (um e-mail por conversa); o CorrelationId segue o lembrete, único por empresa.
+        payload.GetProperty("chaveIdempotencia").GetString().Should().Be($"prazo:cliente_sem_resposta:{lembrete.ConversaId}");
         payload.TryGetProperty("usuarioId", out _).Should().BeFalse("sem atendente, a audiência gestores decide");
         chamada.GetArguments()[5].Should().Be($"prazo:cliente_sem_resposta:{lembrete.Id:N}");
         await _notificador.Received(1).EnfileirarEventoAsync(
@@ -174,14 +175,50 @@ public class AvaliarLembretesPrazoEstouradoTests
             TipoEventoNotificacao.LembreteVencido, _empresaId, Arg.Any<string>(), lembrete.Id, Arg.Any<CancellationToken>());
     }
 
+    // #1765-8: a equipe precisa saber de quem é e onde resolver. O nome vai; telefone e texto do cliente, não.
     [Fact]
-    public async Task PayloadNaoTemDadoDeCliente()
+    public async Task PayloadLevaONomeEOLinkDoBalcaoSemContatoDoCliente()
     {
-        Vencido(TipoLembrete.ClienteSemResposta);
+        var conversaId = Guid.NewGuid();
+        _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new ConversaSemResposta(_empresaId, conversaId, Guid.NewGuid(), "Mariana Souza", null, Agora.AddMinutes(-20))]);
+        _repo.When(r => r.AddAsync(Arg.Any<Lembrete>(), Arg.Any<CancellationToken>())).Do(c => _vencidos.Add(c.Arg<Lembrete>()));
 
         await Avaliador().ExecuteAsync();
 
-        var chaves = Payload(Prazos().Single()).EnumerateObject().Select(p => p.Name).ToList();
-        chaves.Should().BeEquivalentTo("tipo_legivel", "referencia", "prazo_texto", "atraso_texto", "chaveIdempotencia");
+        var payload = Payload(Prazos().Single());
+        payload.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(
+            "tipo_legivel", "referencia", "prazo_texto", "atraso_texto", "cliente", "link", "chaveIdempotencia");
+        payload.GetProperty("cliente").GetString().Should().Be("Mariana Souza");
+        payload.GetProperty("link").GetString().Should().Be("https://app.easystok.online/#/m/atendimento/balcao");
+        payload.GetProperty("chaveIdempotencia").GetString().Should().Be($"prazo:cliente_sem_resposta:{conversaId}");
+    }
+
+    [Fact]
+    public async Task NomeDePerfilQueETelefoneNaoVaiNoAviso()
+    {
+        _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new ConversaSemResposta(_empresaId, Guid.NewGuid(), Guid.NewGuid(), "+55 11 98888-7777", null, Agora.AddMinutes(-20))]);
+        _repo.When(r => r.AddAsync(Arg.Any<Lembrete>(), Arg.Any<CancellationToken>())).Do(c => _vencidos.Add(c.Arg<Lembrete>()));
+
+        await Avaliador().ExecuteAsync();
+
+        Payload(Prazos().Single()).TryGetProperty("cliente", out _).Should().BeFalse("o e-mail leva o nome, nunca o telefone");
+    }
+
+    [Fact]
+    public async Task DuasEsperasNaMesmaConversaDividemAChaveDoAviso()
+    {
+        var conversaId = Guid.NewGuid();
+        foreach (var _ in new[] { 1, 2 })
+            _vencidos.Add(Lembrete.Automatico(_empresaId, TipoLembrete.ClienteSemResposta, Guid.NewGuid().ToString(),
+                "Fulana está sem resposta.", Agora, conversaId: conversaId));
+
+        await Avaliador().ExecuteAsync();
+
+        var chamadas = Prazos();
+        chamadas.Should().HaveCount(2);
+        chamadas.Select(c => Payload(c).GetProperty("chaveIdempotencia").GetString()).Distinct().Should().ContainSingle();
+        chamadas.Select(c => c.GetArguments()[5]).Distinct().Should().HaveCount(2, "o CorrelationId é único por empresa");
     }
 }

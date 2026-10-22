@@ -1,3 +1,4 @@
+using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
@@ -60,5 +61,22 @@ public partial class AtendimentoConversasControllerTests
             .Should().BeOfType<NotFoundObjectResult>();
         (await _controller.EnviarModelo(Guid.NewGuid(), new(Guid.Empty, "modelo", "pt_BR", []), EnvioModelo(catalogo)))
             .Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    // #1765-9: sem a conexão do WhatsApp não há o que a Meta responder. É 409 com a frase para a dona, não 502.
+    [Fact]
+    public async Task Modelos_SemConexaoDoWhatsApp409ComFraseClara()
+    {
+        var catalogo = Substitute.For<ICatalogoModelosAtendimento>();
+        catalogo.ListarAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns<Task<IReadOnlyList<ModeloAtendimento>>>(
+            _ => throw CatalogoModelosException.SemConexao("Conecte o WhatsApp da empresa em Integrações."));
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+
+        var resposta = (await _controller.ListarModelos(new(catalogo), cache)).Should().BeAssignableTo<ObjectResult>().Subject;
+
+        resposta.StatusCode.Should().Be(409);
+        var erro = resposta.Value.Should().BeOfType<ApiErrorResponse>().Subject.Error;
+        erro.Code.Should().Be("WHATSAPP_NAO_CONECTADO");
+        erro.Message.Should().Contain("Conecte o WhatsApp");
     }
 }
