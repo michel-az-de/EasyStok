@@ -53,7 +53,9 @@ function EscolhaRascunho({ pedido, editavel, aoEscolher, dataInicial, aoLerJanel
     return () => { vivo = false }
   }, [skus, data, carregarJanelasComanda, aoLerJanelas, tentativa])
 
+  // #1686 (item 9): o motivo "Escolha a janela" da barra traz o foco para cá (a primeira vaga).
   return (
+    <div data-campo-ficha="janela" className={css.contents}>
     <Bloco titulo="Janela de entrega">
       <CampoTexto rotulo="Dia da entrega (opcional)" tipo="date" value={data} disabled={!editavel}
         min={hoje} max={somarDiasIso(hoje, 14)}
@@ -63,7 +65,7 @@ function EscolhaRascunho({ pedido, editavel, aoEscolher, dataInicial, aoLerJanel
         <p className={css.corpoBloco}>Nenhuma janela com vaga no prazo dos itens. Escolha outro dia.</p>
       )}
       {janelas?.length > 0 && (
-        <ul className={css.janelas}>
+        <ul className={css.janelas} data-foco-preferido>
           {janelas.map((janela) => {
             const escolhida = pedido.janela === janela.id
             return (
@@ -91,5 +93,6 @@ function EscolhaRascunho({ pedido, editavel, aoEscolher, dataInicial, aoLerJanel
       {erro && <output className={css.avisoErro} role="alert">{erro}</output>}
       {naoCarregou && <Botao onClick={() => setTentativa((t) => t + 1)}>Tentar de novo</Botao>}
     </Bloco>
+    </div>
   )
 }

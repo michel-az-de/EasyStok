@@ -1,6 +1,7 @@
 import * as acao from './acoes'
 import {
   assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
+  transferir,
 } from '../infra/api/conversasApi'
 import { mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
 import { lerSessao } from '../infra/api/sessao'
@@ -169,6 +170,13 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     },
     assumirAtendimento: (id) => confirmarResponsavel(id, assumir),
     devolverAutomatico: (id) => confirmarResponsavel(id, liberarAutomatico),
+    // #1239: "Passar para…" do cabeçalho da conversa. A resposta é a situação nova (outro dono);
+    // a recusa (destino que não atende, conversa mudou) volta como `{ erro }` para o modal.
+    transferirConversa: (id, paraUsuarioId) => transferir(id, paraUsuarioId)
+      .then((resumo) => {
+        despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) })
+        return { ok: true }
+      }, (erro) => ({ erro: erro.message })),
     encerrarAtendimento: (id) => {
       despachar({ tipo: acao.ENCERRAR_ATENDIMENTO, id })
       encerrar(id).catch(avisar)

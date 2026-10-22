@@ -7,6 +7,11 @@
 // "Precisa de você" no trilho lateral do cartão e no chip do filtro.
 
 import { origemDaPassagem } from '../../dominio/passagem'
+import { sinalVerde } from '../../dominio/cobranca'
+import { faltaPagar } from '../../dominio/pagamento'
+import { ehLead } from '../../dominio/conversa'
+import { passoPorId } from '../../dominio/esteira'
+import { moeda } from '../../dominio/formato'
 
 export const NOME_DO_VISITANTE = 'Visitante do site'
 
@@ -40,4 +45,33 @@ export function mostraEtiquetaDoEstado(estado) {
 // A terceira linha só existe se sobrar o que dizer nela.
 export function temLinhaDeContexto({ etiqueta, contexto }) {
   return Boolean(etiqueta) || (contexto?.length ?? 0) > 0
+}
+
+const ICONE_DO_PASSO = {
+  aguardando: 'dollar-sign', pago: 'circle-check', preparo: 'cooking-pot',
+  embalado: 'package', entrega: 'moto', entregue: 'house',
+}
+
+export const MARCA_EM_MONTAGEM = { texto: 'Em montagem', icone: 'shopping-cart', tom: 'neutro' }
+
+// Passo do pedido no contexto da linha (com o sinal verde do pagamento, RN-25,
+// dez minutos só) ou "Lead" quando ainda não há pedido nem cadastro.
+// #1940 (item 2): no modo API a comanda em montagem ainda não tem frete (só o servidor calcula, ao
+// gerar a cobrança): "Falta R$ 38,00" no cartão contra R$ 50,00 na Ficha. Sem pedido criado, o
+// cartão diz que está em montagem, sem valor.
+export function marcaDoPedido(conversa, cardapio, { fonteApi = false } = {}) {
+  const passo = conversa.pedido ? passoPorId(conversa.pedido.estado) : null
+  if (passo) {
+    if (fonteApi && !conversa.pedido.pedidoId) return MARCA_EM_MONTAGEM
+    const saldo = faltaPagar(conversa.pedido, cardapio)
+    if (saldo > 0 && conversa.pedido.sinalNaReserva && conversa.pedido.cobranca?.pagaEm
+      && Math.round(conversa.pedido.cobranca.valor * 100) === Math.round((conversa.pedido.totalApi - saldo) * 100)) {
+      return { texto: 'Sinal pago', icone: 'circle-check', tom: 'ok' }
+    }
+    if (saldo > 0) return { texto: `Falta ${moeda(saldo)}`, icone: 'dollar-sign', tom: 'neutro' }
+    if (sinalVerde(conversa.pedido)) return { texto: 'Pago', icone: 'circle-check', tom: 'ok' }
+    return { texto: passo.rotulo, icone: ICONE_DO_PASSO[passo.id], tom: 'neutro' }
+  }
+  if (ehLead(conversa)) return { texto: 'Lead', icone: 'user-plus', tom: 'marca' }
+  return null
 }

@@ -54,3 +54,18 @@ export const fraseDoReenvio = (erro) => (falhaDeEnvio(erro).tipo === TIPOS_DE_FA
 
 // Fora da janela o texto livre não sai: o caminho é o modelo aprovado.
 export const pedeModeloAprovado = (erro) => falhaDeEnvio(erro).tipo === TIPOS_DE_FALHA.FORA_DA_JANELA
+
+// #1765 (item 10): "Não entregues" lia a lista uma vez, ao montar o Balcão; quem já estava nele
+// quando a falha aconteceu não via a faixa. Duas réguas fazem a lista andar sem ninguém tocar:
+// a cada minuto (o mesmo passo da varredura da inbox) e quando uma mensagem carregada na tela
+// vira "falhou" (a falha que a atendente acabou de ver no fio entra na faixa na hora).
+export const RECARGA_NAO_ENTREGUES_MS = 60000
+export function assinaturaDeFalhas(conversas) {
+  const ids = []
+  for (const conversa of conversas ?? []) {
+    for (const m of conversa.mensagens ?? []) if (m.status === 'falhou') ids.push(m.id)
+  }
+  return ids.sort().join(',')
+}
+export const falhaNovaNaTela = (antes, depois) => Boolean(depois) && depois !== antes
+  && depois.split(',').some((id) => !(antes ?? '').split(',').includes(id))

@@ -18,6 +18,7 @@ import { ehJanelaAvulsa, origemForaDoBalcao } from '../../dominio/janelaAvulsa'
 import { IconeDoModulo } from './IconeDoModulo'
 import { MenuDosModulos } from './MenuDosModulos'
 import css from './moldura.module.css'
+import { LimiteDeErro } from '../../componentes/LimiteDeErro'
 
 const MODULO_DO_BALCAO = 'atendimento'
 const HASH_BALCAO = hashDoModulo(MODULO_DO_BALCAO, 'balcao')
@@ -98,7 +99,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
         </div>
       </header>
       {operacao
-        ? <main className={css.operacao} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={tela?.rotulo ?? modulo.nome}>{children}</main>
+        ? <main className={css.operacao} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={tela?.rotulo ?? modulo.nome}><LimiteDeErro parte={tela?.rotulo ?? modulo.nome}>{children}</LimiteDeErro></main>
         : (
           <main className={css.ajuste} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={tela?.rotulo ?? modulo.nome}>
             <div className={css.folha}>
@@ -108,7 +109,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
                     <IconeDoModulo modulo={modulo} telaId={tela.id} />
                     {tela.rotulo}
                   </h1>
-                  <div className={css.conteudo}>{children}</div>
+                  <div className={css.conteudo}><LimiteDeErro parte={tela.rotulo}>{children}</LimiteDeErro></div>
                 </>
               ) : (
                 <div className={css.conteudo}>

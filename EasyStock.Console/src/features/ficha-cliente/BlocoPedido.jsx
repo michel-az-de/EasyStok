@@ -14,7 +14,7 @@ import { diferencaAposPagamento, totalPago } from '../../dominio/pagamento'
 import { linhasDaSimulacao } from '../../dominio/simulacaoPedido'
 import { situacaoDoItem } from '../../dominio/cardapio'
 import {
-  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, avisoDoEnvio, previaDoSinal, rotuloDoTotal, situacaoDoEnvio,
+  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, caminhoParaTrocarItem, podeCancelarParaRefazer, avisoDoEnvio, previaDoSinal, rotuloDoTotal, situacaoDoEnvio,
 } from '../../dominio/resumoPedido'
 import { Cabecalho } from './Cabecalho'
 import { ModalCanhoto } from './Canhoto'
@@ -111,7 +111,7 @@ function ItemComanda({
 export function BlocoPedido({
   pedido, editavel, aoTrocarJanela, aoAbrirCardapio, aoAjustar, aoAjustarObservacao, aoGerarPedido, gerarSemEnviar = false,
   aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false, conversaId, numeroComanda,
-  clienteEscolhendo = false, simulacao = null,
+  clienteEscolhendo = false, simulacao = null, acaoAlterarPeloLink = null, aoCancelarParaRefazer = null,
 }) {
   const { cardapio, linhas } = useCatalogo()
   const { marcarCanhotoImpresso } = useAcoes()
@@ -287,6 +287,16 @@ export function BlocoPedido({
             {!clienteEscolhendo && (
               <>
                 {itensTravados && <p className={css.situacaoEnvio}>{LINHA_COMANDA_TRAVADA}</p>}
+                {/* #1686 (item 4): o motivo vem com o caminho e os botões que fazem a troca. */}
+                {itensTravados && fonteApi && pedido.pedidoId && (
+                  <div className={css.caminhoTroca} data-caminho-troca>
+                    <p className={css.situacaoEnvio}>{caminhoParaTrocarItem(pedido)}</p>
+                    {acaoAlterarPeloLink}
+                    {aoCancelarParaRefazer && podeCancelarParaRefazer(pedido, { fonteApi }) && (
+                      <Botao variante="secundario" icone="circle-x" onClick={aoCancelarParaRefazer}>Cancelar e refazer</Botao>
+                    )}
+                  </div>
+                )}
                 <Botao largo onClick={aoAbrirCardapio}>{itensTravados ? 'Ver cardápio' : 'Adicionar itens'}</Botao>
               </>
             )}
