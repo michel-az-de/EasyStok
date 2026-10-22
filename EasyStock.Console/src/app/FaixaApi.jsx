@@ -3,9 +3,10 @@ import { useIntegracoesApi } from '../aplicacao/useIntegracoesApi'
 import { textoDaFaixa } from '../dominio/chavesIntegracao'
 import { useEffect, useRef } from 'react'
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
-import { avisoDeVencimento, rotuloDaSessao } from '../dominio/sessao'
+import { useAcessoModulos } from '../aplicacao/acessoModulos'
+import { podeVerIntegracoes } from '../dominio/acessoModulos'
+import { avisoDeVencimento } from '../dominio/sessao'
 import { useHash } from '../hooks/useHash'
-import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
 import css from './faixaApi.module.css'
 
 // #1474: trocar de tela apaga o aviso da faixa, que era da tela de antes. Fica montado junto do
@@ -40,13 +41,17 @@ export function AvisoDaAcaoApi() {
 // Faixa fina do modo API (F01): quem está logado, em qual empresa, se a lista
 // está atualizando e o último aviso de ação recusada ou ainda não ligada. Some no
 // modo demonstração. O aviso fica até a dona fechar (F06): a sincronização não o apaga.
-// #1870: no desktop (e nos módulos, `somenteAvisos`) a faixa só aparece com aviso, falha,
+// #1870: no desktop (e nos módulos) a faixa só aparece com aviso, falha,
 // integração parada ou sessão vencendo. Quem está logado e o Sair moram no avatar do trilho.
-export function FaixaApi({ aoSair, somenteAvisos = false }) {
+// #1242 (D1): a mesma regra no celular e no tablet, onde a faixa ficava sempre à vista comendo
+// uma linha da tela ("Conversas ao vivo", quem está logado e Sair). Lá o Sair mora no menu Mais
+// (celular) e no avatar do topo (tablet largo).
+export function FaixaApi() {
   const { fonteApi, sincronizacao, sessao, agora } = useAtendimento()
   const { fecharAvisoApi } = useAcoes()
-  const enxuta = useTamanhoTela() === DESKTOP || somenteAvisos
-  const { lista: integracoes } = useIntegracoesApi({ ativo: fonteApi, intervaloMs: 60_000 })
+  // #1921: a lista de integrações é da policy Admin; sem a ação, nem a primeira leitura (era 403 a cada carga).
+  const { acoes: acoesDoPerfil } = useAcessoModulos()
+  const { lista: integracoes } = useIntegracoesApi({ ativo: fonteApi && podeVerIntegracoes(acoesDoPerfil), intervaloMs: 60_000 })
   const integracaoParada = textoDaFaixa(integracoes)
   if (!fonteApi) return null
   // F07, item 6: 10 min antes do JWT vencer. Sessão antiga, sem `venceEm`, usa o `expiraEm`.
@@ -56,15 +61,13 @@ export function FaixaApi({ aoSair, somenteAvisos = false }) {
   // O aviso de ação vem na frente; fechado ele, aparece o persistente, que só sai pelo botão.
   const avisoDeAcao = sincronizacao?.aviso ?? null
   const aviso = !carregando && !falhou ? avisoDeAcao ?? sincronizacao?.avisoFixo ?? null : null
-  if (enxuta && !falhou && !aviso && !integracaoParada && !vencimento) return null
-  const texto = carregando
-    ? 'Carregando conversas…'
-    : falhou
-      ? `Conversas sem atualização: ${sincronizacao.mensagem || 'a consulta não foi concluída.'} A próxima tentativa é automática.`
-      : aviso ?? 'Conversas ao vivo do EasyStok'
+  if (!falhou && !aviso && !integracaoParada && !vencimento) return null
+  const texto = falhou
+    ? `Conversas sem atualização: ${sincronizacao.mensagem || 'a consulta não foi concluída.'} A próxima tentativa é automática.`
+    : aviso
   return (
     <output className={`${css.faixa} ${falhou ? css.falha : aviso ? css.aviso : ''}`}>
-      {(!enxuta || falhou || aviso) && <span className={css.texto}>
+      {(falhou || aviso) && <span className={css.texto}>
         {texto}
         {aviso && (
           <button type="button" className={css.sair} onClick={() => fecharAvisoApi({ fixo: !avisoDeAcao })}>Fechar aviso</button>
@@ -73,8 +76,6 @@ export function FaixaApi({ aoSair, somenteAvisos = false }) {
       {integracaoParada && <span className={css.texto}>{integracaoParada} <a href={hashDoModulo('configuracoes', 'integracoes')}>Ver integrações</a></span>}
       <span className={css.quem}>
         {vencimento && <strong className={css.vence}>{vencimento}</strong>}
-        {!enxuta && rotuloDaSessao(sessao)}
-        {!enxuta && <button type="button" className={css.sair} onClick={aoSair}>Sair</button>}
       </span>
     </output>
   )

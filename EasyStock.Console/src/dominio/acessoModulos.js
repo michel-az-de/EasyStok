@@ -11,6 +11,15 @@ export const permiteRota = (acesso, rota) => !moduloDaRota(rota) || permiteModul
 // itens tirados do cardápio são da gerência do atendimento, a mesma regra de `controlarLoja`.
 export const podeVerAvisosDoCliente = (acoes) => acoes?.editarAtendimento === true
 export const podeVerItensFora = (acoes) => acoes?.controlarLoja === true
+// #1921 e #1940 (item 1): a atendente recebia 403 a cada carga e a cada minuto. Integrações e o cadastro
+// de entrega da vitrine (janelas, bloqueios, zonas, raio) são da policy Admin da API; a matriz manda
+// `verIntegracoes` e `ajustarEntrega`. Enquanto o servidor não manda a chave, vale a do administrador
+// (`editarAtendimento`, Admin com o atendimento liberado), a mesma de `podeVerAvisosDoCliente`.
+export const podeVerIntegracoes = (acoes) => (acoes?.verIntegracoes ?? acoes?.editarAtendimento) === true
+export const podeAjustarEntrega = (acoes) => (acoes?.ajustarEntrega ?? acoes?.editarAtendimento) === true
+// Os desacertos de estoque (produto vendido sem saldo) exigem a permissão de estoque, que a matriz só
+// passa a dizer com `verDesacertosEstoque`. Sem a chave, lê como antes: a recusa segue sem alerta.
+export const podeVerDesacertos = (acoes) => acoes?.verDesacertosEstoque !== false
 
 export const entradaDoPerfil = (acesso) => permiteModulo(acesso, acesso?.portaDeEntrada)
   ? `#/m/${acesso.portaDeEntrada}` : '#/'

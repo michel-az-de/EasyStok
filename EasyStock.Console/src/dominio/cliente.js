@@ -132,7 +132,7 @@ export function sugestoesDeTag(texto, { conversas, cadastroIdAtual, tagsAtuais, 
   }
 }
 
-// #1643 (item 6): o lead que ganha cadastro pela edição do telefone ou do endereço levava `nome`
+// #1643 (item 3): o lead que ganha cadastro pela edição do telefone ou do endereço levava `nome`
 // nulo, e a API gravava "Cliente WhatsApp". Vale o nome que a dona escreveu, o do formulário do
 // chat do site ou o do contato, quando ele não é genérico (o do visitante, o padrão do lead ou
 // só o número).
@@ -149,7 +149,7 @@ export function nomeConhecidoDoLead(conversa) {
   return nomeGenerico(conversa.nome) ? null : conversa.nome.trim()
 }
 
-// #1643 (item 7): resumo da seção "Contato e endereço" recolhida. Com o contato que o visitante
+// #1643 (item 6): resumo da seção "Contato e endereço" recolhida. Com o contato que o visitante
 // informou esperando confirmação, o resumo diz isso; senão, o telefone do cadastro.
 export function resumoDoContato(cliente, informado) {
   if (informado) return 'Informado: ' + [informado.nome, telefoneDoE164(informado.telefone)].filter(Boolean).join(' · ')

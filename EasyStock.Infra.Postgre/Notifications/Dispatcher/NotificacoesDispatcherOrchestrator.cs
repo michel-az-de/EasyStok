@@ -452,18 +452,21 @@ public sealed class NotificacoesDispatcherOrchestrator(
         if (rotina is null) return false;
 
         // N4: a mensagem de uma pessoa da audiência tem contato próprio, que o fallback (que lê o contato do payload)
-        // não conhece. Rotina com audiência entrega em modo "todos"; o fallback de canal não vale para ela.
-        if (AudienciaDaRotina.Ler(rotina.ParametrosJson) is not null)
+        // não conhece. #1765-7: o Push e o In-App dela saem só do usuário (o aviso do Balcão cai no sino quando o Push
+        // falha); e-mail e WhatsApp, que pedem o contato da pessoa, são pulados.
+        var comAudiencia = AudienciaDaRotina.Ler(rotina.ParametrosJson) is not null;
+        if (comAudiencia && mensagemOriginal.UsuarioDestinoId is null)
         {
             logger.LogWarning(
-                "Fallback de canal ignorado na rotina {Rotina}: com audiência, use o modo 'todos' (mensagem {MensagemId})",
+                "Fallback de canal ignorado na rotina {Rotina}: mensagem de audiência sem usuário (mensagem {MensagemId})",
                 rotina.Codigo, mensagemOriginal.Id);
             return false;
         }
 
         var construtor = new ConstrutorMensagemOutbox(templateRepo, renderer);
         var destinatario = new DestinatarioMensagem(
-            mensagemOriginal.UsuarioDestinoId, ConstrutorMensagemOutbox.LerVariaveis(evento.PayloadJson));
+            mensagemOriginal.UsuarioDestinoId, ConstrutorMensagemOutbox.LerVariaveis(evento.PayloadJson),
+            comAudiencia ? new ContatoAudiencia(Email: null, Whatsapp: null) : null);
 
         for (var i = 0; i < fallbacks.Count; i++)
         {

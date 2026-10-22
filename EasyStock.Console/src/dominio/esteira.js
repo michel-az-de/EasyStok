@@ -7,6 +7,8 @@
 // .js aqui, sem mudar comportamento nenhum.
 import { preencherFaixa } from './entrega.js'
 
+// #1686 (item 8): um vocabulário só, o da Cozinha (`kds.js`). A Ficha dizia "Embalado" e
+// "Em entrega" para o que a Cozinha chama de "Pronto" e "Saiu para entrega". Os ids não mudam.
 export const PASSOS = [
   { id: 'aguardando', rotulo: 'Aguardando pagamento', tom: 'aviso', mensagem: null },
   {
@@ -18,11 +20,11 @@ export const PASSOS = [
     mensagem: 'Seu pedido entrou em preparo. Previsão de entrega entre {faixa}.',
   },
   {
-    id: 'embalado', rotulo: 'Embalado', tom: 'ok',
+    id: 'embalado', rotulo: 'Pronto', tom: 'ok',
     mensagem: 'Seu pedido está embalado e aguardando o entregador.',
   },
   {
-    id: 'entrega', rotulo: 'Em entrega', tom: 'info',
+    id: 'entrega', rotulo: 'Saiu para entrega', tom: 'info',
     mensagem: 'Seu pedido saiu para entrega com o {entregador}.',
     // US-040: com motoboy nomeado ou entregador de plataforma o cliente lê o
     // nome (`{entregador}` acima); "eu mesma levo" é outra frase, primeira

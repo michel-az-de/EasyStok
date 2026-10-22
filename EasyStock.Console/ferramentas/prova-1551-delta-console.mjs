@@ -75,6 +75,20 @@ confere('o aviso continua calado na demonstração e sem aviso pendente', () => 
   assert.ok(corpoDe(faixa, 'AvisoDaAcaoApi').includes('if (!fonteApi || !sincronizacao?.aviso) return null'))
 })
 
+// #1242 (D1, frente C da #1889): no celular a faixa ficava sempre à vista ("Conversas ao vivo",
+// quem está logado e Sair). A regra do desktop vale em toda largura; o Sair foi para o menu Mais
+// (celular) e para o avatar do topo (tablet largo).
+confere('#1242-D1 a faixa só aparece com aviso, falha, integração parada ou sessão vencendo, em toda largura', () => {
+  const faixa = semComentarios(ler('app/FaixaApi.jsx'))
+  assert.doesNotMatch(faixa, /useTamanhoTela|DESKTOP/, 'a faixa não depende mais da largura')
+  assert.ok(corpoDe(faixa, 'FaixaApi').includes('if (!falhou && !aviso && !integracaoParada && !vencimento) return null'))
+  assert.doesNotMatch(corpoDe(faixa, 'FaixaApi'), />Sair</)
+  const moldura = semComentarios(ler('app/Moldura.jsx'))
+  assert.match(corpoDe(moldura, 'MenuMais'), /chave: '__sair', titulo: sessaoPersistente \? 'Sair deste aparelho' : 'Sair'/)
+  assert.match(corpoDe(moldura, 'MenuMais'), /if \(item\.chave === '__sair'\) aoSair\?\.\(\)/)
+  assert.match(corpoDe(moldura, 'Cabecalho'), /\{aoSair && <MenuDaConta nome=\{atendente\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\} lado="abaixo"/)
+})
+
 // --- 2. Dia da entrega por conversa -------------------------------------------------------
 const blocoPedido = semComentarios(ler('features/ficha-cliente/BlocoPedido.jsx'))
 const painelFicha = semComentarios(ler('features/ficha-cliente/PainelFicha.jsx'))

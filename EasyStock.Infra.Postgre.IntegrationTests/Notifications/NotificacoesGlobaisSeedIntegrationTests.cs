@@ -250,4 +250,44 @@ public class NotificacoesGlobaisSeedIntegrationTests(PostgreSqlDatabaseFixture f
         System.Text.Json.JsonSerializer.Deserialize<string[]>(incidenteDepois.CanaisOrdemFallbackJson).Should().Equal("Email");
         logger.Avisos.Should().ContainSingle().Which.Should().Contain(CodigoRotina);
     }
+    // #1765-7: base semeada com os avisos do Balcão só em Push. A rotina do sistema sobe para Push com In-App de reserva
+    // e audiência "equipe", e o template In-App de cada aviso nasce, sem esperar ninguém mexer.
+    [SkippableFact]
+    public async Task SeedDaReservaNoSinoAosAvisosDoBalcaoJaSemeados()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await NovaBaseAsync();
+        string[] codigos = ["contato_novo_balcao_global", "pedido_pago_balcao_global", "etapa_pedido_balcao_global"];
+
+        await using (var antigo = fixture.CreateDbContext())
+        {
+            using var bypass = antigo.UseRowLevelSecurityBypass();
+            foreach (var rotina in await antigo.NotifRotinas.IgnoreQueryFilters()
+                         .Where(r => r.EmpresaId == null && codigos.Contains(r.Codigo)).ToListAsync())
+            {
+                rotina.CanaisOrdemFallbackJson = "[\"Push\"]";
+                rotina.ParametrosJson = "{}";
+            }
+            antigo.NotifTemplates.RemoveRange(await antigo.NotifTemplates.IgnoreQueryFilters()
+                .Where(t => t.EmpresaId == null && t.Canal == CanalNotificacao.InApp && t.Codigo.Contains("_balcao_")).ToListAsync());
+            await antigo.SaveChangesAsync();
+        }
+
+        await using (var sobe = fixture.CreateDbContext())
+            await SemearAsync(sobe, new LoggerColetor());
+
+        await using var leitura = fixture.CreateDbContext();
+        using var _ = leitura.UseRowLevelSecurityBypass();
+        var rotinas = (await RotinasGlobaisAsync(leitura)).Where(r => codigos.Contains(r.Codigo)).ToList();
+        rotinas.Should().HaveCount(3);
+        foreach (var rotina in rotinas)
+        {
+            System.Text.Json.JsonSerializer.Deserialize<string[]>(rotina.CanaisOrdemFallbackJson).Should().Equal("Push", "InApp");
+            rotina.ParametrosJson.Should().Contain("equipe");
+            rotina.Ativa.Should().BeTrue();
+        }
+        var sino = (await TemplatesGlobaisAsync(leitura)).Where(t => t.Canal == CanalNotificacao.InApp && t.Ativo).Select(t => t.TipoEvento);
+        sino.Should().Contain([TipoEventoNotificacao.ContatoNovoNoBalcao, TipoEventoNotificacao.PedidoPagoNoBalcao,
+            TipoEventoNotificacao.PedidoMudouEtapaNoBalcao]);
+    }
 }

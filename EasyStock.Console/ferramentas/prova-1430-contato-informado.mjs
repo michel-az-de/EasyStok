@@ -320,13 +320,13 @@ await confere('conversa restaurada na carga: o efeito do Provider lê a Ficha pe
   assert.ok(!/deveCarregarDossie/.test(fonte), 'o Provider ainda decide só pelo cliente vinculado')
 })
 
-// ── #1643 (itens 6 e 7, frente C da #1889) ────────────────────────────────────────────────────
+// ── #1643 (itens 3 e 6, frente C da #1889) ────────────────────────────────────────────────────
 // Editar só o telefone ou o endereço de um lead mandava `nome` nulo e a API gravava "Cliente WhatsApp".
 const leadWhats = (extra = {}) => lead({
   canal: 'WhatsApp', nome: 'Joana Prado', contatoInformado: null,
   cliente: { telefone: null, endereco: null, enderecoCapturado: null, telefoneCanal: '5511955554444', tags: [], notas: [] }, ...extra,
 })
-await confere('#1643-6: lead do WhatsApp que ganha telefone leva o nome do contato, não nulo', async () => {
+await confere('#1643-3: lead do WhatsApp que ganha telefone leva o nome do contato, não nulo', async () => {
   const chamadas = rede()
   const { acoes } = montar(leadWhats())
   acoes.editarDadoCliente('conv-1', 'telefone', '(11) 95555-4444', 0)
@@ -335,14 +335,14 @@ await confere('#1643-6: lead do WhatsApp que ganha telefone leva o nome do conta
   assert.ok(post, 'sem POST')
   assert.equal(post.corpo.nome, 'Joana Prado', 'o cadastro virava "Cliente WhatsApp"')
 })
-await confere('#1643-6: endereço do lead do WhatsApp sem formulário também leva o nome do contato', async () => {
+await confere('#1643-3: endereço do lead do WhatsApp sem formulário também leva o nome do contato', async () => {
   const chamadas = rede()
   const { acoes } = montar(leadWhats())
   acoes.editarDadoCliente('conv-1', 'endereco', 'Rua dos Pinheiros, 200, Pinheiros, São Paulo, 05415-000', 0)
   await esperar()
   assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, 'Joana Prado')
 })
-await confere('#1643-6: endereço capturado confirmado no lead leva o nome; nome escrito pela dona vale primeiro', async () => {
+await confere('#1643-3: endereço capturado confirmado no lead leva o nome; nome escrito pela dona vale primeiro', async () => {
   const chamadas = rede()
   const { acoes } = montar(leadWhats({ nome: 'Joana P. (dona)', nomeDaDona: true,
     cliente: { telefone: null, endereco: null, enderecoCapturado: 'Rua X, 10, Centro, São Paulo, 01001-000', telefoneCanal: '5511955554444', tags: [], notas: [] } }))
@@ -350,21 +350,21 @@ await confere('#1643-6: endereço capturado confirmado no lead leva o nome; nome
   await esperar()
   assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, 'Joana P. (dona)')
 })
-await confere('#1643-6: nome genérico (visitante, "Cliente WhatsApp", só o número) não vira nome do cadastro', async () => {
+await confere('#1643-3: nome genérico (visitante, "Cliente WhatsApp", só o número) não vira nome do cadastro', async () => {
   const { nomeConhecidoDoLead, nomeGenerico } = await import('../src/dominio/cliente.js')
   for (const nome of ['Visitante do site', 'Cliente WhatsApp', '+55 11 95555-4444', '', null]) assert.equal(nomeGenerico(nome), true, String(nome))
   assert.equal(nomeConhecidoDoLead({ nome: 'Visitante do site', contatoInformado: { nome: 'Maria Souza' } }), 'Maria Souza')
   assert.equal(nomeConhecidoDoLead({ nome: '5511955554444' }), null)
   assert.equal(nomeConhecidoDoLead({ nome: 'Joana Prado' }), 'Joana Prado')
 })
-await confere('#1643-6: cliente já cadastrado não manda nome ao trocar o telefone (a API mantém o dele)', async () => {
+await confere('#1643-3: cliente já cadastrado não manda nome ao trocar o telefone (a API mantém o dele)', async () => {
   const chamadas = rede()
   const { acoes } = montar(leadWhats({ clienteId: CLIENTE, conta: 'cliente' }))
   acoes.editarDadoCliente('conv-1', 'telefone', '(11) 95555-4444', 0)
   await esperar()
   assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, null)
 })
-await confere('#1643-7: com o contato informado, "Contato e endereço" nasce aberta e o resumo recolhido mostra o contato', async () => {
+await confere('#1643-6: com o contato informado, "Contato e endereço" nasce aberta e o resumo recolhido mostra o contato', async () => {
   const { resumoDoContato } = await import('../src/dominio/cliente.js')
   assert.equal(resumoDoContato({ telefone: null }, INFORMADO), 'Informado: Maria Souza · ' + telefoneDoE164(INFORMADO.telefone))
   assert.equal(resumoDoContato({ telefone: '(11) 90000-0000' }, null), '(11) 90000-0000')

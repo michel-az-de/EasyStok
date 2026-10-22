@@ -248,9 +248,12 @@ public class NotificacoesGlobaisSeedTests
 
         // Variável ausente vira vazio no Scriban, então a checagem é por nome contra as chaves do exemplo.
         // token_convite_whatsapp e um segredo do envio real (N9): o exemplo nunca o carrega (ExemplosDeEventoTests).
+        // #1765-8: "cliente" é opcional no PrazoEstourado (só o aviso real de cliente sem resposta leva o nome) e o
+        // exemplo não carrega dado de cliente (ExemplosDeEventoTests). "end" e "else" são palavras do Scriban.
         var usadas = partes
             .SelectMany(p => Regex.Matches(p, @"\{\{\s*([A-Za-z_]\w*)\s*\}\}").Select(m => m.Groups[1].Value))
-            .Where(v => v != "token_convite_whatsapp")
+            .Where(v => v is not ("token_convite_whatsapp" or "end" or "else"))
+            .Where(v => !(template.TipoEvento == TipoEventoNotificacao.PrazoEstourado && v == "cliente"))
             .Distinct().ToList();
         usadas.Should().NotBeEmpty();
         usadas.Where(v => !variaveis.ContainsKey(v)).Should().BeEmpty($"o exemplo de {template.TipoEvento} precisa cobrir {codigo}");

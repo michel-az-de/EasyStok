@@ -31,7 +31,7 @@ import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom
 import { conectarPrincipal } from '../infra/canalEntreJanelas'
 import { FONTE_API } from '../infra/fonteDados'
 import { useAcessoModulos } from './acessoModulos'
-import { podeVerItensFora } from '../dominio/acessoModulos'
+import { podeVerDesacertos, podeVerItensFora } from '../dominio/acessoModulos'
 import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
@@ -82,7 +82,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   const comItensFora = podeVerItensFora(acoesDoPerfil)
   const comItensForaRef = useRef(comItensFora)
   useEffect(() => { comItensForaRef.current = comItensFora }, [comItensFora])
-  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, comItensFora, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco })
+  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, comItensFora, comDesacertos: podeVerDesacertos(acoesDoPerfil), usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a

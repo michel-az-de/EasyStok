@@ -15,7 +15,8 @@ public enum TipoPrazo
 }
 
 /// <summary>
-/// Construtor único do evento <c>PrazoEstourado</c> (N11): payload sem dado de cliente, chave de negócio
+/// Construtor único do evento <c>PrazoEstourado</c> (N11): payload sem contato do cliente (só o nome, no cliente sem
+/// resposta, #1765-8), link do console, chave de negócio
 /// <c>prazo:{tipo}:{id}</c> e <c>CorrelationId</c> determinístico <c>prazo:{tipo}:{id:N}</c> (no máximo 59
 /// caracteres, cabe no <c>varchar(64)</c>). Os quatro adaptadores enfileiram por aqui na unidade de trabalho do
 /// próprio fato (ADR-0030), respeitando o interruptor <c>Notifications:Prazos:Habilitado</c>.
@@ -69,8 +70,13 @@ public static class PrazoEstouradoEvento
         HorarioBrasil.ConverterParaBrasilia(DateTime.SpecifyKind(utc, DateTimeKind.Utc))
             .ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
 
+    /// <param name="cliente">#1765-8: nome do cliente que espera, para a equipe saber de quem é (só no cliente sem resposta).</param>
+    /// <param name="link">Onde resolver no console (<see cref="PrazosOptions.LinkPara"/>).</param>
+    /// <param name="fatoId">De quem é a chave de idempotência; sem ele, <paramref name="referenciaId"/>. O cliente sem resposta
+    /// usa a conversa: o aviso sai uma vez por conversa, não uma por mensagem do cliente.</param>
     public static string Payload(
-        TipoPrazo tipo, Guid referenciaId, string referenciaCurta, string prazoTexto, string atrasoTexto, Guid? usuarioId = null)
+        TipoPrazo tipo, Guid referenciaId, string referenciaCurta, string prazoTexto, string atrasoTexto, Guid? usuarioId = null,
+        string? cliente = null, string? link = null, Guid? fatoId = null)
     {
         var dados = new Dictionary<string, object?>
         {
@@ -78,25 +84,30 @@ public static class PrazoEstouradoEvento
             ["referencia"] = referenciaCurta,
             ["prazo_texto"] = prazoTexto,
             ["atraso_texto"] = atrasoTexto,
-            [NotificadorService.ChaveIdempotenciaPayload] = ChaveIdempotencia(tipo, referenciaId),
+            ["link"] = link ?? string.Empty,
+            [NotificadorService.ChaveIdempotenciaPayload] = ChaveIdempotencia(tipo, fatoId ?? referenciaId),
         };
+        // Nome de perfil que é telefone não vai: o e-mail leva o nome, nunca o contato do cliente.
+        if (!string.IsNullOrWhiteSpace(cliente) && !cliente.Any(char.IsDigit)) dados["cliente"] = cliente.Trim();
         if (usuarioId is { } u) dados["usuarioId"] = u;
         return JsonSerializer.Serialize(dados);
     }
 
     /// <summary>
     /// Enfileira o <c>PrazoEstourado</c> na unidade de trabalho atual (sem commit). Devolve false quando o
-    /// interruptor está desligado.
+    /// interruptor está desligado. O <c>CorrelationId</c> segue <paramref name="referenciaId"/> (único por empresa); a chave
+    /// de negócio, <paramref name="fatoId"/>, decide se a mensagem já saiu.
     /// </summary>
     public static async Task<bool> EnfileirarAsync(
         INotificadorService notificador, PrazosOptions opcoes,
         TipoPrazo tipo, Guid empresaId, Guid referenciaId, string referenciaCurta,
-        string prazoTexto, string atrasoTexto, Guid? usuarioId, CancellationToken ct)
+        string prazoTexto, string atrasoTexto, Guid? usuarioId, CancellationToken ct,
+        string? cliente = null, Guid? fatoId = null)
     {
         if (!opcoes.Habilitado) return false;
         await notificador.EnfileirarEventoAsync(
             TipoEventoNotificacao.PrazoEstourado, empresaId,
-            Payload(tipo, referenciaId, referenciaCurta, prazoTexto, atrasoTexto, usuarioId),
+            Payload(tipo, referenciaId, referenciaCurta, prazoTexto, atrasoTexto, usuarioId, cliente, opcoes.LinkPara(tipo), fatoId),
             referenciaId, ct, CorrelationId(tipo, referenciaId));
         return true;
     }

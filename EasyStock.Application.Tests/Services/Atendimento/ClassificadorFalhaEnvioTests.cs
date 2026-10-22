@@ -59,4 +59,29 @@ public class ClassificadorFalhaEnvioTests
     [InlineData(null, false, TipoFalhaEnvio.Temporaria)]
     public void MetaPeloStatusHttp(int? status, bool permanente, TipoFalhaEnvio esperado) =>
         ClassificadorFalhaEnvio.Classificar(new WhatsAppCloudException(131000, "Meta", permanente, status)).Should().Be(esperado);
+    public static TheoryData<Exception, string> Motivos => new()
+    {
+        { new WhatsAppCloudException(131026, "(#131026) Message undeliverable", true, 400), "Falha no canal (código Meta 131026)." },
+        { new WhatsAppCloudException(0, "Meta retornou 2xx sem message id.", true, 200), "O canal aceitou sem devolver o id da mensagem (CANAL_SEM_ID)." },
+        { new WhatsAppCloudException(0, "Internal Server Error", false, 503), "O canal respondeu com erro (HTTP 503)." },
+        { new WhatsAppCloudException(0, "Empresa sem número do WhatsApp.", true), "Empresa sem número do WhatsApp." },
+        { new TimeoutException("The operation has timed out."), "O canal não respondeu a tempo (CANAL_SEM_RESPOSTA)." },
+        { new TaskCanceledException("A task was canceled."), "O canal não respondeu a tempo (CANAL_SEM_RESPOSTA)." },
+        { new HttpRequestException("No such host is known."), "Sem conexão com o canal (CANAL_SEM_CONEXAO)." },
+        { new InvalidOperationException("Sequence contains no elements"), "Falha no canal (CANAL_ERRO)." },
+        { new NotSupportedException("SMS não envia imagem."), "SMS não envia imagem." },
+        { new EnvioCanalFalhouException("Falha no envio de e-mail pela caixa da loja.", true), "Falha no envio de e-mail pela caixa da loja." },
+    };
+
+    /// <summary>#1765-11: o erro gravado é frase estável em português; o texto do provedor fica só no log.</summary>
+    [Theory]
+    [MemberData(nameof(Motivos))]
+    public void MotivoGravadoSemOTextoDoProvedor(Exception ex, string esperado) =>
+        ClassificadorFalhaEnvio.Motivo(ex).Should().Be(esperado);
+
+    [Theory]
+    [InlineData(131047, "Falha no canal (código Meta 131047).")]
+    [InlineData(null, "Falha no canal (sem código da Meta).")]
+    public void MotivoDoCallbackFailedPeloCodigo(int? codigo, string esperado) =>
+        ClassificadorFalhaEnvio.MotivoCodigoMeta(codigo).Should().Be(esperado);
 }
