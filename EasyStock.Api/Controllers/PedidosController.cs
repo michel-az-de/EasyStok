@@ -229,7 +229,9 @@ public class PedidosController(
 
         async Task<PedidoResult?> RecuperarReciboAsync(CancellationToken token)
         {
-            var recibo = await idempotencia.ObterConcluidoAsync(entradaId!.Value, emp, token);
+            // #1940-5: a entrada é gravada pelo IdempotencyMiddleware com a empresa do token, não com a do corpo
+            // (diferem com o SuperAdmin agindo em outra empresa). A conferência abaixo continua com a do corpo.
+            var recibo = await idempotencia.ObterConcluidoAsync(entradaId!.Value, currentUser.EmpresaId, token);
             if (recibo is null) return null;
             if (string.IsNullOrEmpty(recibo.RespostaJson))
                 throw new UseCaseValidationException("Recebimento já registrado. Atualize o pedido antes de tentar novamente.");
