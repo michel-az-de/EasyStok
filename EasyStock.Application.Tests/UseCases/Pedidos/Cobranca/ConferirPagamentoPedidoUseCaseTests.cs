@@ -188,6 +188,33 @@ public class ConferirPagamentoPedidoUseCaseTests
             await f.MpClient.DidNotReceiveWithAnyArgs().BuscarPagamentosPorReferenciaAsync(default!, default);
     }
 
+    /// <summary>
+    /// #1938 (revisão da 1.11.0): o sinal já foi pago e conciliado pelo Mercado Pago e o restante está num link
+    /// complementar sem pagamento. A busca devolve só o sinal, já conhecido. Isso não é "aprovado sem conciliar":
+    /// não há pagamento novo, e a troca do restante para "na entrega" segue.
+    /// </summary>
+    [Fact]
+    public async Task SinalJaConciliadoERestanteSemPagamento_NaoTravaATrocaParaNaEntrega()
+    {
+        var f = new CobrancaPedidoFixture();
+        var sinal = f.AdicionarOnline(referencia: "pref-sinal", valor: 10m);
+        sinal.MarcarPaga("pagamento-sinal", 10m, "pix", CobrancaPedidoFixture.Agora.AddMinutes(-10));
+        f.AdicionarPagamento("pagamento-sinal", 10m);
+        var restante = f.AdicionarOnline(tentativa: 2, referencia: "pref-restante", valor: 15m);
+        restante.MarcarComplementar();
+        f.PagamentosNoMercadoPago.Add(new("pagamento-sinal", "approved", null, f.Pedido.Id.ToString(), 10m,
+            CobrancaPedidoFixture.Agora.AddMinutes(-10), "pix", "bank_transfer"));
+
+        (await f.Conferir().ExecuteAsync(f.EmpresaId, f.Pedido.Id))
+            .Should().Be(new ConferirPagamentoPedidoResult("nao_encontrado", false));
+        var r = await f.Trocar().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "na_entrega"));
+
+        r.Cobranca.Provedor.Should().Be(EasyStock.Domain.Entities.Pagamentos.CobrancaPedido.ProvedorNaEntrega);
+        restante.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        f.Pedido.Pagamentos.Should().ContainSingle("o sinal não entra de novo");
+        await f.MpClient.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
+    }
+
     private static PagamentoMercadoPago Pagamento(CobrancaPedidoFixture f, string status) =>
         new("pagamento-1733", status, null, f.Pedido.Id.ToString(), 25m, CobrancaPedidoFixture.Agora, "pix", "bank_transfer");
 

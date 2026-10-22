@@ -160,6 +160,12 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         }
         tenantContext.SetCurrentTenant(empresaId.Value);
 
+        // #1938: a decisão sob a trava do pedido precisa do estado do banco. Quem chama pela conferência ou pela
+        // troca de forma já leu pedido e cobranças neste mesmo contexto; o EF devolveria essas instâncias velhas
+        // e uma confirmação do webhook no meio pareceria "pagamento duplicado" (estorno do único pagamento).
+        // Nenhum chamador chega aqui com alteração pendente (webhook, job, conferência e troca só leram).
+        unitOfWork.DescartarAlteracoesPendentes();
+
         var (resultado, pago, impressao, conversaEstorno) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
             token => ConfirmarNoLockAsync(input, empresaId.Value, token), ct);
 
