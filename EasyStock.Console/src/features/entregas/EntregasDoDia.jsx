@@ -149,7 +149,7 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
       {roteiro?.grupos.length === 0 && (
         <div className={css.secao}>
           <p className={css.vazio}>Nenhuma janela neste dia e nenhum pedido marcado.</p>
-          <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>
+          {aoAbrirCadastro && <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>}
         </div>
       )}
       {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar}

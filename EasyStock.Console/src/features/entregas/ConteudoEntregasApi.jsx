@@ -3,6 +3,8 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { useEntregasApi } from '../../aplicacao/useEntregasApi'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { podeAjustarEntrega } from '../../dominio/acessoModulos'
 import { chaveDaEntrega, chaveDaSaida } from '../../aplicacao/envioComDesfazer'
 import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import {
@@ -29,9 +31,12 @@ export function ConteudoEntregasApi() {
   const [aba, setAba] = useState('hoje')
   const id = useId()
   const abasRef = useRef({})
+  // #1921: "Janelas e frete" é da policy Admin; a atendente não vê a aba nem faz as leituras dela.
+  const comVitrine = podeAjustarEntrega(useAcessoModulos().acoes)
+  const abas = comVitrine ? ABAS : ABAS.filter(([chave]) => chave !== 'cadastro')
   const {
     pedidos, viagens, entregadores, chamados, erro, aoVivo, ocupado, acoes, limparErro, dia, mudarDia, doDia,
-  } = useEntregasApi()
+  } = useEntregasApi({ comVitrine })
   const situacao = situacaoDaLista(pedidos, erro)
   const trocarAba = (proxima) => {
     // #1577: o roteiro não relê mais janelas e bloqueios a cada evento de pedido; o que ela
@@ -41,17 +46,17 @@ export function ConteudoEntregasApi() {
     abasRef.current[proxima]?.focus()
   }
   const navegarAbas = (evento, indice) => {
-    const destino = { ArrowRight: (indice + 1) % ABAS.length, ArrowLeft: (indice + ABAS.length - 1) % ABAS.length, Home: 0, End: ABAS.length - 1 }[evento.key]
+    const destino = { ArrowRight: (indice + 1) % abas.length, ArrowLeft: (indice + abas.length - 1) % abas.length, Home: 0, End: abas.length - 1 }[evento.key]
     if (destino === undefined) return
     evento.preventDefault()
-    trocarAba(ABAS[destino][0])
+    trocarAba(abas[destino][0])
   }
 
   return (
     <div className={css.conteudo}>
       <div className={css.navegacao}>
         <div className={css.abas} role="tablist" aria-label="Seções de entregas">
-          {ABAS.map(([chave, rotulo], indice) => (
+          {abas.map(([chave, rotulo], indice) => (
             <Botao key={chave} ref={(elemento) => { abasRef.current[chave] = elemento }}
               id={`${id}-${chave}`} role="tab" aria-selected={aba === chave} aria-controls={`${id}-painel`}
               tabIndex={aba === chave ? 0 : -1} variante="texto" className={css.abaInterna}
@@ -72,9 +77,9 @@ export function ConteudoEntregasApi() {
       <div id={`${id}-painel`} role="tabpanel" aria-labelledby={`${id}-${aba}`} tabIndex={0} className={css.painel}>
         {aba === 'hoje' && situacao === 'carregando' && <p className={css.vazio}>Carregando as entregas…</p>}
         {aba === 'hoje' && situacao === 'falhou' && <p className={css.vazio}>Não foi possível carregar as entregas.</p>}
-        {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }} aoAbrirCadastro={() => trocarAba('cadastro')} />}
+        {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }} aoAbrirCadastro={comVitrine ? () => trocarAba('cadastro') : null} />}
         {aba === 'entregadores' && <Entregadores entregadores={entregadores} ocupado={ocupado} acoes={acoes} />}
-        {aba === 'cadastro' && <CadastroEntregaApi />}
+        {aba === 'cadastro' && comVitrine && <CadastroEntregaApi />}
       </div>
     </div>
   )

@@ -14,6 +14,7 @@
 // e o shell filtra a lista usando a matriz devolvida pelo servidor.
 
 import { moduloCongelado, telaCongelada } from './congelados'
+import { podeAjustarEntrega } from './acessoModulos'
 import { partesNoFuso } from './formato'
 
 export const TELA_OPERACAO = 'operacao'
@@ -110,7 +111,8 @@ export const MODULOS = [
     telas: [
       { id: 'painel', rotulo: 'Painel de entregas', tipo: TELA_OPERACAO },
       { id: 'agenda', rotulo: 'Agenda de encomendas', tipo: TELA_OPERACAO, soApi: true },
-      { id: 'janelas', rotulo: 'Janelas de entrega', tipo: TELA_AJUSTE, aba: 'janelas' },
+      // #1921: o cadastro de janelas é da policy Admin da API; quem não pode não vê a tela.
+      { id: 'janelas', rotulo: 'Janelas de entrega', tipo: TELA_AJUSTE, aba: 'janelas', acao: 'ajustarEntrega' },
     ],
   },
 ]
@@ -122,14 +124,19 @@ export const hashDoModulo = (moduloId, telaId) => `#/m/${moduloId}${telaId ? '/'
 // Menu do módulo no modo atual: tela só da API some no modo demonstração. Congelado (#1891)
 // some nos dois modos: módulo congelado não tem menu (sai do trilho e da Gestão) e tela
 // congelada sai do menu do módulo vivo.
-export const telasDoMenu = (modulo, { fonteApi = false } = {}) =>
-  moduloCongelado(modulo?.id) ? [] : (modulo?.telas ?? []).filter((t) => (fonteApi || !t.soApi) && !telaCongelada(modulo.id, t.id))
+// #1921: tela com `acao` só aparece no modo API para quem a matriz libera (`podeNaTela`); sem a matriz
+// (`acoes` ausente: demonstração, catálogo do guia) a tela fica.
+const PODE_NA_TELA = { ajustarEntrega: podeAjustarEntrega }
+const podeNaTela = (tela, { fonteApi, acoes }) => !tela.acao || !fonteApi || !acoes || PODE_NA_TELA[tela.acao]?.(acoes) === true
+export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
+  moduloCongelado(modulo?.id) ? [] : (modulo?.telas ?? []).filter((t) => (fonteApi || !t.soApi) && !telaCongelada(modulo.id, t.id)
+    && podeNaTela(t, { fonteApi, acoes }))
 
 // Cartões do hall: disponível = tem pelo menos uma tela no modo atual. Módulo congelado
 // (#1891) não vira cartão; `MODULOS` segue inteiro para quem precisa do catálogo.
-export function modulosDoHall({ fonteApi = false } = {}) {
+export function modulosDoHall({ fonteApi = false, acoes = null } = {}) {
   return MODULOS.filter((modulo) => !moduloCongelado(modulo.id)).map((modulo) => {
-    const telas = telasDoMenu(modulo, { fonteApi })
+    const telas = telasDoMenu(modulo, { fonteApi, acoes })
     const disponivel = telas.length > 0
     return {
       ...modulo,

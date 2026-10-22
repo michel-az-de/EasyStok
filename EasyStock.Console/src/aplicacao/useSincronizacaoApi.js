@@ -22,7 +22,10 @@ const AGRUPAR_EVENTOS_MS = 300
 
 // `memoria` (#1576): os caches do laço, criados acima do Balcão para a volta do Hall, da Cozinha ou
 // das Entregas não reler tudo. Sem ela (demonstração, provas) o laço usa a sua, que morre com ele.
-export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora = true, usuario, despachar, selecionadaId = null, memoria = null }) {
+export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora = true, comDesacertos = true, usuario, despachar, selecionadaId = null, memoria = null }) {
+  // #1940 (item 1): os desacertos de estoque exigem a permissão de estoque; sem ela, não se pede.
+  const comDesacertosRef = useRef(comDesacertos)
+  useEffect(() => { comDesacertosRef.current = comDesacertos }, [comDesacertos])
   // #1761: quem não é da gerência não pede os itens tirados do cardápio (voltava 403 a cada minuto).
   // Num ref: a matriz de acesso relida não recomeça o laço.
   const comItensForaRef = useRef(comItensFora)
@@ -71,6 +74,7 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
         avisouCardapio = true
         despachar({ tipo: acao.AVISO_API, mensagem: avisoDoCardapio(erro), persistente: true })
       }
+      if (!comDesacertosRef.current) return
       const alertas = await lerAlertasDeEstoque()
       if (vivo) despachar({ tipo: acao.ALERTAS_DE_ESTOQUE_DA_API, alertas })
     }

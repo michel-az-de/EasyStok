@@ -3,6 +3,8 @@ import { useIntegracoesApi } from '../aplicacao/useIntegracoesApi'
 import { textoDaFaixa } from '../dominio/chavesIntegracao'
 import { useEffect, useRef } from 'react'
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
+import { useAcessoModulos } from '../aplicacao/acessoModulos'
+import { podeVerIntegracoes } from '../dominio/acessoModulos'
 import { avisoDeVencimento } from '../dominio/sessao'
 import { useHash } from '../hooks/useHash'
 import css from './faixaApi.module.css'
@@ -47,7 +49,9 @@ export function AvisoDaAcaoApi() {
 export function FaixaApi() {
   const { fonteApi, sincronizacao, sessao, agora } = useAtendimento()
   const { fecharAvisoApi } = useAcoes()
-  const { lista: integracoes } = useIntegracoesApi({ ativo: fonteApi, intervaloMs: 60_000 })
+  // #1921: a lista de integrações é da policy Admin; sem a ação, nem a primeira leitura (era 403 a cada carga).
+  const { acoes: acoesDoPerfil } = useAcessoModulos()
+  const { lista: integracoes } = useIntegracoesApi({ ativo: fonteApi && podeVerIntegracoes(acoesDoPerfil), intervaloMs: 60_000 })
   const integracaoParada = textoDaFaixa(integracoes)
   if (!fonteApi) return null
   // F07, item 6: 10 min antes do JWT vencer. Sessão antiga, sem `venceEm`, usa o `expiraEm`.
