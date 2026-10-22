@@ -134,4 +134,16 @@ public class SensitivePatternsTests
     {
         SensitivePatterns.Redact(entrada).Should().Be(entrada);
     }
+
+    // #1725-3: o escopo de log do ASP.NET leva o caminho cru (RequestPath) com o token da comanda.
+    [Fact]
+    public void Redact_DeveMascarar_TokenDaComandaNoCaminho()
+    {
+        const string token = "Qk3x9_aB-7yTz0pLmN4vR2sW8eHcJ6uFdG1iK5oP9qA";
+        var output = SensitivePatterns.Redact($"{{\"RequestPath\":\"/api/storefront/cardapio-conversa/{token}/comanda\"}}");
+
+        output.Should().NotContain(token);
+        output.Should().Contain("/api/storefront/cardapio-conversa/{token}/comanda");
+        SensitivePatterns.Redact("/api/storefront/cardapio-conversa/{token}/stream").Should().Be("/api/storefront/cardapio-conversa/{token}/stream");
+    }
 }

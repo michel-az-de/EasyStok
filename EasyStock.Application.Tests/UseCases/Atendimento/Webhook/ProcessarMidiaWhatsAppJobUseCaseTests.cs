@@ -55,6 +55,35 @@ public class ProcessarMidiaWhatsAppJobUseCaseTests
         await unitOfWork.Received(1).CommitAsync();
     }
 
+    // #1622-5: mídia acima do teto não vai ao storage nem volta a ser tentada; a mensagem do cliente fica registrada sem ela.
+    [Fact]
+    public async Task MidiaAcimaDoTetoFicaSemAnexoESemNovaTentativa()
+    {
+        var empresaId = Guid.NewGuid();
+        var mensagem = Domain.Entities.Atendimento.Mensagem.Entrada(
+            empresaId, Guid.NewGuid(), DateTime.UtcNow, TipoConteudoMensagem.Outro, externoId: "wamid.grande");
+        mensagem.AguardarMidia("media-grande", DateTime.UtcNow);
+        var conversaRepository = Substitute.For<IConversaRepository>();
+        conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, "wamid.grande", Arg.Any<CancellationToken>()).Returns(mensagem);
+        var cloudClient = Substitute.For<IWhatsAppCloudClient>();
+        cloudClient.BaixarMidiaAsync("media-grande", Arg.Any<CancellationToken>())
+            .Returns<(Stream, string)>(_ => throw new MidiaGrandeDemaisException(100L * 1024 * 1024));
+        var fileStorage = Substitute.For<IFileStorage>();
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var processador = new ProcessarMidiaWhatsAppJobUseCase(
+            conversaRepository, new ArmazenadorMidiaWhatsApp(cloudClient, fileStorage), Substitute.For<ITenantContextAccessor>(),
+            unitOfWork, TimeProvider.System, NullLogger<ProcessarMidiaWhatsAppJobUseCase>.Instance);
+
+        await processador.ExecuteAsync(new ArmazenarMidiaWhatsAppJob(empresaId, mensagem.ConversaId, "wamid.grande", "media-grande"));
+
+        mensagem.MidiaChave.Should().BeNull();
+        mensagem.MidiaFalhou.Should().BeTrue("acima do teto não adianta tentar de novo");
+        mensagem.ProximaTentativaMidiaEm.Should().BeNull();
+        mensagem.ErroMidia.Should().Contain("16 MB");
+        await fileStorage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default);
+        await unitOfWork.Received(1).CommitAsync();
+    }
+
     [Fact]
     public async Task DefineTenantAntesDeBuscarMensagem()
     {

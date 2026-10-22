@@ -35,7 +35,15 @@ public sealed class ArmazenadorMidiaWhatsApp(IWhatsAppCloudClient cloudClient, I
 
         await using var _ = conteudo;
         using var memoria = new MemoryStream();
-        await conteudo.CopyToAsync(memoria, ct);
+        // #1622-5: a cópia para no teto; o adaptador já recusa pelo tamanho informado, aqui fica a defesa sem ele.
+        var buffer = new byte[81920];
+        int lidos;
+        while ((lidos = await conteudo.ReadAsync(buffer, ct)) > 0)
+        {
+            if (memoria.Length + lidos > MidiaGrandeDemaisException.TetoBytes)
+                throw new MidiaGrandeDemaisException(memoria.Length + lidos);
+            memoria.Write(buffer, 0, lidos);
+        }
 
         var bucketPath = $"atendimento/{empresaId}/{conversaId}";
         var fileName = $"{wamid}{ExtensaoPara(mime)}";

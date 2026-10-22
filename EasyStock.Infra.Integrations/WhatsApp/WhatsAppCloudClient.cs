@@ -276,19 +276,85 @@ public sealed class WhatsAppCloudClient(
         var metadata = await metadataResponse.Content.ReadFromJsonAsync<MetaMediaMetadata>(cancellationToken: ct)
             ?? throw new WhatsAppCloudException(0, "Meta não devolveu metadados da mídia.", ehPermanente: true);
 
+        // #1622-5: acima do teto não se baixa. O tamanho vem dos metadados; sem ele, do Content-Length; sem os dois, a
+        // leitura para no teto (LimiteDeLeitura). Só os cabeçalhos são lidos antes: o corpo não é bufferizado inteiro.
+        RecusarSeAcimaDoTeto(metadata.FileSize, mediaId);
         var binarioResponse = await pipeline.ExecuteAsync(
-            async pollyCt => await GetComTokenAsync(metadata.Url, token, pollyCt), ct);
+            async pollyCt => await GetComTokenAsync(metadata.Url, token, pollyCt, HttpCompletionOption.ResponseHeadersRead), ct);
         if (!binarioResponse.IsSuccessStatusCode)
             await LancarErroAsync(binarioResponse, ct);
+        try
+        {
+            RecusarSeAcimaDoTeto(binarioResponse.Content.Headers.ContentLength, mediaId);
+        }
+        catch
+        {
+            binarioResponse.Dispose();
+            throw;
+        }
 
         var conteudo = await binarioResponse.Content.ReadAsStreamAsync(ct);
-        return (conteudo, metadata.MimeType);
+        return (new LimiteDeLeitura(conteudo, binarioResponse, MidiaGrandeDemaisException.TetoBytes), metadata.MimeType);
     }
 
-    private async Task<HttpResponseMessage> GetComTokenAsync(string url, string? token, CancellationToken ct)
+    private void RecusarSeAcimaDoTeto(long? tamanho, string mediaId)
+    {
+        if (tamanho is not { } bytes || bytes <= MidiaGrandeDemaisException.TetoBytes) return;
+        logger.LogWarning("Mídia {MediaId} recusada: {Bytes} bytes acima do teto de {Teto} bytes.",
+            mediaId, bytes, MidiaGrandeDemaisException.TetoBytes);
+        throw new MidiaGrandeDemaisException(bytes);
+    }
+
+    private async Task<HttpResponseMessage> GetComTokenAsync(
+        string url, string? token, CancellationToken ct, HttpCompletionOption leitura = HttpCompletionOption.ResponseContentRead)
     {
         using var request = ComTokenDaEmpresa(HttpMethod.Get, url, token);
-        return await httpClient.SendAsync(request, ct);
+        return await httpClient.SendAsync(request, leitura, ct);
+    }
+
+    /// <summary>
+    /// Corpo da mídia lido em fluxo, com teto: passou dele, <see cref="MidiaGrandeDemaisException"/>. Descartar o fluxo
+    /// descarta a resposta HTTP.
+    /// </summary>
+    private sealed class LimiteDeLeitura(Stream interno, HttpResponseMessage resposta, long teto) : Stream
+    {
+        private long _lidos;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => _lidos; set => throw new NotSupportedException(); }
+
+        public override int Read(byte[] buffer, int offset, int count) => Contar(interno.Read(buffer, offset, count));
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            Contar(await interno.ReadAsync(buffer, cancellationToken));
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+        private int Contar(int lidos)
+        {
+            _lidos += lidos;
+            if (_lidos > teto) throw new MidiaGrandeDemaisException(_lidos);
+            return lidos;
+        }
+
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                interno.Dispose();
+                resposta.Dispose();
+            }
+            base.Dispose(disposing);
+        }
     }
 
     private async Task<EnvioWhatsAppResult> EnviarEExtrairWamidAsync(object payload, CancellationToken ct)

@@ -70,4 +70,19 @@ public class ArmazenadorMidiaWhatsAppTests
                 r.IsPublic == false),
             Arg.Any<CancellationToken>());
     }
+
+    // #1622-5: sem tamanho conhecido, a cópia para no teto e a mídia é recusada sem ir ao storage.
+    [Fact]
+    public async Task MidiaAcimaDoTetoNaoVaiAoStorage()
+    {
+        var cloudClient = Substitute.For<IWhatsAppCloudClient>();
+        cloudClient.BaixarMidiaAsync("m", Arg.Any<CancellationToken>())
+            .Returns(((Stream)new MemoryStream(new byte[MidiaGrandeDemaisException.TetoBytes + 1]), "video/mp4"));
+        var fileStorage = Substitute.For<IFileStorage>();
+
+        var act = () => new ArmazenadorMidiaWhatsApp(cloudClient, fileStorage).ArmazenarAsync(Guid.NewGuid(), Guid.NewGuid(), "w", "m");
+
+        await act.Should().ThrowAsync<MidiaGrandeDemaisException>();
+        await fileStorage.DidNotReceiveWithAnyArgs().UploadAsync(default!, default);
+    }
 }

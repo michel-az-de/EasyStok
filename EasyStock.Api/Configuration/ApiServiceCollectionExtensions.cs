@@ -3,7 +3,6 @@ using EasyStock.Api.Observability;
 using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Storage;
-using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Infra.Async.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -264,24 +263,19 @@ public static class ApiServiceCollectionExtensions
                     });
             });
 
-            // Leitura, autosave e SSE usam a credencial individual; clientes no mesmo IP não dividem a cota.
-            options.AddPolicy("comanda-leitura", context =>
-            {
-                var token = context.Request.RouteValues["token"]?.ToString()?.Trim();
-                var formatoGerado = token is { Length: 43 } && token.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
-                var chave = formatoGerado ? "comanda:" + AcessoChatSite.HashDoToken(token!)
-                    : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "anon");
-                return RateLimitPartition.GetFixedWindowLimiter(chave,
-                    _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
-            });
-            options.AddPolicy("comanda-rascunho", context => RateLimitPartition.GetFixedWindowLimiter(
-                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+            // Leitura, autosave e SSE usam a credencial individual; clientes no mesmo IP não dividem a cota. #1725-1: só o
+            // token no formato gerado particiona (pelo hash); o resto cai no IP. O teto por IP é do LimitePorIpPublico.
+            options.AddPolicy(ComandaRateLimit.Leitura, context => RateLimitPartition.GetFixedWindowLimiter(
+                ComandaRateLimit.Chave(context, context.Request.RouteValues["token"]?.ToString()),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(ComandaRateLimit.Rascunho, context => RateLimitPartition.GetFixedWindowLimiter(
+                ComandaRateLimit.Chave(context, context.Request.RouteValues["token"]?.ToString()),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
-            options.AddPolicy("comanda-envio", context => RateLimitPartition.GetFixedWindowLimiter(
-                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+            options.AddPolicy(ComandaRateLimit.Envio, context => RateLimitPartition.GetFixedWindowLimiter(
+                ComandaRateLimit.Chave(context, context.Request.RouteValues["token"]?.ToString()),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
-            options.AddPolicy("comanda-stream", context => RateLimitPartition.GetConcurrencyLimiter(
-                context.Request.RouteValues["token"]?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+            options.AddPolicy(ComandaRateLimit.Stream, context => RateLimitPartition.GetConcurrencyLimiter(
+                ComandaRateLimit.Chave(context, context.Request.RouteValues["token"]?.ToString()),
                 _ => new ConcurrencyLimiterOptions { PermitLimit = 3, QueueLimit = 0 }));
 
             // Webhooks da Meta (WhatsApp, Instagram, Messenger). A Meta entrega em rajada a
@@ -381,6 +375,9 @@ public static class ApiServiceCollectionExtensions
                     IntegracaoTesteRateLimit.Chave(context),
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = IntegracaoTesteRateLimit.PorMinuto, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 
+            // #1622-1, #1643-2, #1725-1, #1725-2: teto por IP encadeado ao da sessão ou do token nas rotas públicas.
+            options.GlobalLimiter = LimitePorIpPublico.Criar();
+
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;            options.OnRejected = async (context, cancellationToken) =>
             {
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
@@ -439,7 +436,7 @@ public static class ApiServiceCollectionExtensions
                     // I4.5 (#1698): o span do webhook leva o molde da rota, não o caminho do provedor.
                     .AddAspNetCoreInstrumentation(aspnet => aspnet.EnrichWithHttpResponse = (atividade, resposta) =>
                     {
-                        if (CaminhoDoLog.EhWebhook(resposta.HttpContext))
+                        if (CaminhoDoLog.TemSegredo(resposta.HttpContext))
                             atividade.SetTag("url.path", CaminhoDoLog.De(resposta.HttpContext));
                     })
                     // I8.2 (#1661): CEP e endereço do cliente não vão para o span dos provedores de mapa.

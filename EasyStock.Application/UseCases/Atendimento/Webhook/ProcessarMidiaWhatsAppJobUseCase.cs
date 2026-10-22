@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 
@@ -38,6 +39,16 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
             var (chave, mime) = await armazenador.ArmazenarAsync(job.EmpresaId, job.ConversaId, job.Wamid, job.MediaId, ct);
             mensagem.AnexarMidia(chave, mime);
             await unitOfWork.CommitAsync();
+        }
+        catch (MidiaGrandeDemaisException ex) when (mensagem.MidiaChave is null)
+        {
+            // #1622-5: acima do teto não adianta tentar de novo. A mensagem do cliente fica registrada sem o anexo.
+            logger.LogWarning("Fila de mídia WhatsApp: anexo do wamid {Wamid} acima do teto ({Bytes} bytes), não guardado.",
+                job.Wamid, ex.Tamanho);
+            mensagem.RegistrarFalhaMidia(ex.Message, relogio.GetUtcNow().UtcDateTime, definitiva: true);
+            await unitOfWork.CommitAsync();
+            await DispararTurnoDoAudioAsync(job, mensagem);
+            return;
         }
         catch (Exception ex) when (mensagem.MidiaChave is null)
         {
