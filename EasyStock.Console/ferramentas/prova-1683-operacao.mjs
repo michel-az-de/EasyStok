@@ -96,17 +96,14 @@ confere('2  encerrar: cancelamento que falha vira erro e o atendimento não é e
   assert.match(encerramento.falhaAoCancelarNoEncerramento({}, 'P1'), /^Não deu para cancelar o pedido Nº P1\. O atendimento continua aberto\./)
 })
 
-confere('2  pedido sem link em aberto: nada o fecha sozinho, a caixa de cancelar nasce marcada', () => {
-  const comLink = { ...semPagamento, cobranca: { link: 'https://mp/x' } }
-  assert.equal(encerramento.cancelarNasceMarcado(comLink, { fonteApi: true }), false, 'com link, o EasyStok cancela no vencimento')
-  assert.equal(encerramento.cancelarNasceMarcado(semPagamento, { fonteApi: true }), true)
-  assert.equal(encerramento.cancelarNasceMarcado({ ...semPagamento, cobranca: { link: null } }, { fonteApi: true }), true)
-  assert.equal(encerramento.cancelarNasceMarcado(semPagamento, { fonteApi: false }), false, 'na demonstração segue desmarcada')
-  assert.equal(encerramento.cancelarNasceMarcado({ ...semPagamento, estado: 'pago' }, { fonteApi: true }), false)
-  assert.equal(encerramento.cancelarNasceMarcado(null, { fonteApi: true }), false)
+confere('2  a caixa de cancelar nasce sempre desmarcada, com ou sem link (decisão de 22/10)', () => {
+  assert.equal(encerramento.cancelarNasceMarcado, undefined, 'a regra que marcava a caixa sem link saiu')
   const modal = readFileSync(new URL('../src/features/encerramento/ModalEncerrar.jsx', import.meta.url), 'utf8')
-  assert.match(modal, /useState\(\(\) => cancelarNasceMarcado\(conversa\?\.pedido, \{ fonteApi \}\)\)/)
-  assert.match(modal, /setCancelarMarcado\(cancelarNasceMarcado\(conversa\?\.pedido, \{ fonteApi \}\)\)/)
+  assert.match(modal, /const \[cancelarMarcado, setCancelarMarcado\] = useState\(false\)/)
+  assert.match(modal, /setCancelarMarcado\(false\)/)
+  const fonte = readFileSync(new URL('../src/aplicacao/api/encerramentoEMidia.js', import.meta.url), 'utf8')
+  assert.match(fonte, /nasce desmarcada/)
+  assert.doesNotMatch(fonte, /nasce marcada/, 'o comentário contradizia o código')
 })
 
 // --- 3. Fechar o caixa -------------------------------------------------------------------------

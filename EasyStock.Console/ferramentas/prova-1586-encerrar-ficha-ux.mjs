@@ -365,12 +365,13 @@ await confere('A  modal: promessa rejeitada também vira erro dentro dele e solt
 const caixaDeCancelar = (tela) => nos(tela.arvore).find((n) => n.type === 'label' && texto(n).includes('Cancelar também o pedido'))
   ?.props.children.find?.((f) => f?.type === 'input')
 const marcarCancelar = (tela) => { caixaDeCancelar(tela).props.onChange({ target: { checked: true } }); tela.renderizar() }
-await confere('A  modal: pedido sem link em aberto nasce com a caixa de cancelar marcada, à vista', () => {
-  // Sem link, nenhum job do EasyStok fecha o pedido depois que a conversa encerra.
+await confere('A  modal: pedido sem link em aberto oferece a caixa de cancelar, desmarcada (decisão de 22/10)', () => {
+  // Decisão do Felipe (22/10): a caixa nasce sempre desmarcada, com ou sem link. Quem quiser cancelar marca.
   comoApi([conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: null } })])
   ctx.acoes = acoesDoModal({})
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
-  assert.equal(caixaDeCancelar(tela).props.checked, true)
+  assert.ok(caixaDeCancelar(tela), 'a caixa continua existindo')
+  assert.equal(caixaDeCancelar(tela).props.checked, false)
   tela.encerrar()
 })
 await confere('A  modal: com link em aberto a caixa de cancelar nasce desmarcada, e desmarcada não cancela', async () => {
