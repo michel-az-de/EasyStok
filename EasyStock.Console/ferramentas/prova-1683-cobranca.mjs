@@ -10,7 +10,9 @@
 //   7  estorno e "Voltar etapa" esperam a resposta e só fecham no sucesso;
 //   8  ação destrutiva usa a variante `perigo` do botão;
 //   9  confirmação em linha é formulário: Enter confirma, Esc volta, foco no motivo;
-//   10 "Marcar pago" no recebimento comum e "Registrar sinal" na entrada manual de encomenda.
+//   10 "Marcar pago" no recebimento comum e "Registrar sinal" na entrada manual de encomenda;
+//   11 um botão só para o link (decisão de 22/10): "Link de pagamento (Pix ou cartão)" no lugar
+//      dos chips "Pix" e "Cartão por link"; na entrega seguem Maquininha e Vale-refeição.
 //
 // Regras puras e ações reais (HTTP controlado no `fetch`); a composição que só existe no JSX é
 // conferida por leitura do fonte. Não prova pixels nem foco nativo.
@@ -339,6 +341,17 @@ await confere('10  receber distingue sinal manual de quitação, com ação secu
   const baixa = trecho(bloco, 'export function BaixaAMao(', '// "Alterar forma de pagamento"')
   assert.match(baixa, /enviando \? 'Registrando…' : aguardaSinalManual\(pedido\) \? 'Registrar sinal' : 'Marcar pago'/)
   assert.doesNotMatch(baixa, /'Confirmar'/)
+})
+
+await confere('11  um botão só para o link: "Link de pagamento (Pix ou cartão)"; na entrega, maquininha e vale', async () => {
+  const { MEIOS_DE_PAGAMENTO } = await import('../src/infra/catalogo.js')
+  const destaque = MEIOS_DE_PAGAMENTO.filter((m) => m.destaque)
+  assert.deepEqual(destaque.map((m) => [m.id, m.rotulo]), [['cartao-link', 'Link de pagamento (Pix ou cartão)']])
+  assert.deepEqual(MEIOS_DE_PAGAMENTO.filter((m) => !m.destaque).map((m) => m.id), ['maquininha', 'vale-refeicao'])
+  assert.ok(!MEIOS_DE_PAGAMENTO.some((m) => /^Pix$|Cartão por link/.test(m.rotulo)), 'os dois chips antigos saíram')
+  assert.equal(cobranca.nomeDoMeio('cartao-link'), 'link de pagamento')
+  assert.equal(pedidoDaApi({ pedidoId: 'p', status: 'aguardando_pagamento', itens: [], cobranca: { cobrancaId: 'c', provedor: 'mercadopago', valor: 10, linkPagamento: 'https://mp/x' } }).cobranca.meio, 'cartao-link')
+  assert.doesNotMatch(fonte('features/ficha-cliente/EscolhaDeMeio.jsx'), /quatro chips|Pix e cartão em destaque/)
 })
 
 if (falhas.length > 0) {

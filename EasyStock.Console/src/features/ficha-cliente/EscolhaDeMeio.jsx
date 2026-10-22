@@ -3,15 +3,15 @@ import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { avisoDeSinalAntesDeGerar } from '../../dominio/resumoPedido'
 import css from './ficha.module.css'
 
-// Os quatro chips de meio (F4, seção 4), num lugar só. Ponta (a) da
-// integração: o mesmo grupo aparece no bloco Cobrança e, quando ela aperta
-// "Enviar comanda" ou o "Gerar cobrança" da barra sem meio marcado, logo
-// abaixo do botão, com a pergunta. Nada sai por Pix sem ela escolher.
+// Os chips de meio (F4, seção 4), num lugar só. Ponta (a) da integração: o
+// mesmo grupo aparece no bloco Cobrança e, quando ela aperta "Enviar comanda"
+// ou o "Gerar cobrança" da barra sem meio marcado, logo abaixo do botão, com a
+// pergunta. Nada sai sem ela escolher.
 //
-// Rodada 12 (issue #13, sugestão da Thatiane): Pix e cartão em destaque, na
-// primeira linha; as formas de pagar na entrega numa segunda linha, menores
-// (`destaque` em `infra/catalogo.js`). `excluir` tira a forma atual quando a
-// pergunta é "mudar para qual?".
+// Decisão de 22/10: um botão só para o link, "Link de pagamento (Pix ou
+// cartão)", na primeira linha; as formas de pagar na entrega numa segunda
+// linha, menores (`destaque` em `infra/catalogo.js`). `excluir` tira a forma
+// atual quando a pergunta é "mudar para qual?".
 export function EscolhaDeMeio({ escolhido, aoEscolher, pergunta = null, excluir = null, pedido = null, geraAoEscolher = false }) {
   const { meiosDePagamento } = useCatalogo()
   const { fonteApi, agora } = useAtendimento()
