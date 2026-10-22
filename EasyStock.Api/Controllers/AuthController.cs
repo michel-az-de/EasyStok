@@ -354,7 +354,13 @@ public class AuthController(
                 estornarPagamentoOnline = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 gerenciarOcorrencias = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 reabrirConversa = usuario.TemPermissao(Permissao.AtenderConversas)
-                    && modulos.Any(m => m.id == "atendimento" && m.liberado)
+                    && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                // #1921 / #1940: leituras que o console só faz para quem a rota aceita (antes, 403 a cada
+                // carga). Mesma regra das rotas, sem mudar policy nem permissão: desacertos exigem a
+                // permissão de estoque; integrações e cadastro de entrega da vitrine, a policy Admin.
+                verDesacertosEstoque = usuario.TemPermissao(Permissao.GerenciarEstoque),
+                verIntegracoes = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin,
+                ajustarEntrega = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
             }
         });
     }

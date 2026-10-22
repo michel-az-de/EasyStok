@@ -250,6 +250,29 @@ public class AuthControllerTests
         acoes.GetProperty("reabrirConversa").GetBoolean().Should().Be(esperado);
     }
 
+    // #1921 / #1940 (frente C da #1889): o console da atendente pedia desacertos, integrações e o
+    // cadastro de entrega e recebia 403. A matriz diz quem pode, com a mesma regra das rotas.
+    [Theory]
+    [InlineData(NivelAcesso.SuperAdmin, true, true)]
+    [InlineData(NivelAcesso.Admin, false, true)]
+    [InlineData(NivelAcesso.Gerente, true, false)]
+    [InlineData(NivelAcesso.Operador, false, false)]
+    [InlineData(NivelAcesso.Operador, true, false)]
+    public void LeiturasDeEstoqueIntegracoesEEntregaSeguemAsRegrasDasRotas(NivelAcesso nivel, bool estoque, bool administrador)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(Guid.NewGuid());
+        usuario.Nivel.Returns(nivel);
+        usuario.TemPermissao(Permissao.GerenciarEstoque).Returns(estoque);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        acoes.GetProperty("verDesacertosEstoque").GetBoolean().Should().Be(estoque);
+        acoes.GetProperty("verIntegracoes").GetBoolean().Should().Be(administrador);
+        acoes.GetProperty("ajustarEntrega").GetBoolean().Should().Be(administrador);
+    }
+
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────
     [Theory]
     [InlineData(true, true, true)]
