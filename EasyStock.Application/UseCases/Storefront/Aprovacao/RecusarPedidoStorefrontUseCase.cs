@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Events.Storefront.Handlers;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
@@ -61,7 +62,8 @@ public sealed class RecusarPedidoStorefrontUseCase(
     AvisoCobrancaConversa aviso,
     IPublicadorEventoIntegracao publicadorEventos,
     IUnitOfWork unitOfWork,
-    ILogger<RecusarPedidoStorefrontUseCase> logger)
+    ILogger<RecusarPedidoStorefrontUseCase> logger,
+    IOperacaoEventPublisher? operacaoEventos = null)
 {
     private const int MensagemClienteMaxChars = 280;
     private const string Origem = "storefront";
@@ -105,7 +107,7 @@ public sealed class RecusarPedidoStorefrontUseCase(
             conversaAviso = null;
 
             // 1. SELECT FOR UPDATE.
-            var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, innerCt);
+            var pedido = await pedidoRepository.GetForUpdateAsync(input.EmpresaId, input.PedidoId, innerCt);
 
             // 2. Tenant isolation → 404.
             if (pedido is null || pedido.EmpresaId != input.EmpresaId)
@@ -182,6 +184,11 @@ public sealed class RecusarPedidoStorefrontUseCase(
                     estornadas.Count > 0 ? RefundEstornado : RefundSemPagamento),
                 NotificacaoCliente: new NotificacaoCliente(Enfileirada: false, Evento: nameof(AvisoCobrancaConversa)));
         }, ct);
+
+        // #1265-8: depois do commit, a operação (cozinha, Balcão) move o card sem recarregar.
+        if (operacaoEventos is not null)
+            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, input.EmpresaId,
+                new PedidoMudouStatusOperacao(resultado.PedidoId, StatusPedidoMapper.AguardandoAprovacaoBaba, resultado.Status), ct);
 
         // Aviso ao cliente só depois do commit; best-effort, não desfaz a recusa se falhar.
         if (conversaAviso is { } conversaId)

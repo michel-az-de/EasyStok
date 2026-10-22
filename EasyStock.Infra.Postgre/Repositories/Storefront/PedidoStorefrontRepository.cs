@@ -50,6 +50,24 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
         return pedido;
     }
 
+    public async Task<Pedido?> GetForUpdateAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
+    {
+        if (db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException(
+                "GetForUpdateAsync deve ser chamado dentro de IUnitOfWork.ExecuteInTransactionAsync: sem transação " +
+                "ativa, o FOR UPDATE é descartado pelo Postgres.");
+
+        // #1265-9: a empresa vai no WHERE; a linha de outra empresa não é travada (xmin explícito, como acima).
+        const string sql = "SELECT *, xmin FROM pedidos WHERE \"Id\" = {0} AND \"EmpresaId\" = {1} FOR UPDATE";
+        var pedido = await db.Pedidos
+            .FromSqlRaw(sql, pedidoId, empresaId)
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(ct);
+        if (pedido is not null)
+            await db.Entry(pedido).Collection(p => p.Pagamentos).LoadAsync(ct);
+        return pedido;
+    }
+
     public async Task AddAsync(Pedido pedido, CancellationToken ct = default)
     {
         await db.Pedidos.AddAsync(pedido, ct);
