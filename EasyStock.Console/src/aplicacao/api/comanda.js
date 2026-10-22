@@ -35,6 +35,10 @@ const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora e
 
 const MESMA_FORMA = 'A cobrança já está nessa forma de pagamento. Nada mudou.'
 
+// #1942 (#1923): 409 que o EasyStok recusou antes de criar o pedido. Mostra o motivo, sem reler. O resto dos
+// 409 (PEDIDO_EM_ANDAMENTO, a corrida do clique duplo, e código desconhecido) pode ter criado: relê.
+const RECUSA_DEFINITIVA = new Set(['LOJA_FECHADA', 'JANELA_ESGOTADA', 'CEP_SEM_COBERTURA', 'CLIENTE_BLOQUEADO'])
+
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'forcarEncaixe']
 
 export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
@@ -138,7 +142,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
       },
       (erro) => {
-        if (!erro.status || erro.status >= 500 || erro.status === 409) {
+        if (!erro.status || erro.status >= 500 || (erro.status === 409 && !RECUSA_DEFINITIVA.has(erro.codigo))) {
           const mensagem = 'Não foi possível confirmar se o pedido foi criado. Aguarde a atualização da conversa antes de reenviar.'
           const incerto = () => { avisar(mensagem); return { erro: mensagem } }
           return recarregar(id).then((atual) => {

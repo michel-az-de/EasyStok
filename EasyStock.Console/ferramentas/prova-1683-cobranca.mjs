@@ -3,7 +3,8 @@
 //
 //   1  link vencido mantém "Marcar pago" na barra;
 //   2  o aviso de "link novo / cancelamento" só vale com o pedido em `aguardando_pagamento`;
-//   3  "Gerar cobrança e enviar" devolve `{ erro }` para a barra mostrar ao lado do botão;
+//   3  "Gerar cobrança e enviar" devolve `{ erro }` para a barra mostrar ao lado do botão; a recusa
+//      definitiva (loja fechada, janela, CEP, bloqueio) não relê, a corrida e o 409 genérico relêem (#1942);
 //   4  cobrança criada sem a mensagem sair não diz "Enviada ao cliente";
 //   5  "Alterar forma" no modo API só troca entre link e na entrega, que é o que o back executa;
 //   6  "Desfazer pagamento" não aparece para o sinal pago no Mercado Pago;
@@ -87,10 +88,11 @@ function montar(pedido, responder) {
   const avisos = () => despachados.filter((d) => d.mensagem).map((d) => d.mensagem)
   const posts = () => chamadas.filter((c) => c.metodo === 'POST')
   const ultimoPedido = () => despachados.filter((d) => d.pedido).at(-1)?.pedido
-  return { acoes, avisos, posts, ultimoPedido, estadoRef }
+  return { acoes, avisos, posts, ultimoPedido, estadoRef, chamadas: () => chamadas }
 }
 const ok = (data) => new Response(JSON.stringify({ data }))
 const falha = (mensagem, status = 500) => new Response(JSON.stringify({ error: { message: mensagem } }), { status })
+const recusa = (code, message, status = 409) => new Response(JSON.stringify({ error: { code, message } }), { status })
 
 // ------------------------------------------------------------------ 1
 
@@ -146,6 +148,50 @@ await confere('3  POST recusado: devolve { erro } com o motivo e mantém o aviso
   const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
   assert.equal(resultado?.erro, 'Pedido não criado: Sem vaga na janela')
   assert.deepEqual(t.avisos(), ['Pedido não criado: Sem vaga na janela'])
+})
+
+// #1942 (#1923): a recusa definitiva do EasyStok tem código próprio e não passa pelo "não sei se criou".
+const leituras = (t) => t.chamadas().filter((c) => c.metodo === 'GET' && /\/pedido$/.test(c.url))
+const recusaPost = (codigo, mensagem, lido = null) => (url, metodo) => (metodo === 'POST' ? recusa(codigo, mensagem) : ok(lido))
+
+await confere('3  409 LOJA_FECHADA mostra o motivo e não relê a conversa', async () => {
+  const t = montar(rascunho(), recusaPost('LOJA_FECHADA', 'A loja está fechada. Abra a loja para criar o pedido.'))
+  const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+  assert.equal(resultado?.erro, 'Pedido não criado: A loja está fechada. Abra a loja para criar o pedido.')
+  assert.deepEqual(t.avisos(), [resultado.erro])
+  assert.equal(leituras(t).length, 0, 'releu a conversa numa recusa definitiva')
+})
+
+await confere('3  409 CEP_SEM_COBERTURA mostra a frase da área de entrega, sem reler', async () => {
+  const t = montar(rascunho(), recusaPost('CEP_SEM_COBERTURA', 'Vamos combinar a entrega e o frete com a equipe.'))
+  const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+  assert.match(resultado?.erro ?? '', /^Pedido não criado: o endereço do cliente está fora da área de entrega\./)
+  assert.equal(leituras(t).length, 0)
+})
+
+await confere('3  409 JANELA_ESGOTADA e CLIENTE_BLOQUEADO também não relêem', async () => {
+  for (const [codigo, mensagem] of [['JANELA_ESGOTADA', 'Janela de entrega esgotada.'],
+    ['CLIENTE_BLOQUEADO', 'Cliente bloqueado: desbloqueie o cadastro para criar o pedido.']]) {
+    const t = montar(rascunho(), recusaPost(codigo, mensagem))
+    const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+    assert.equal(resultado?.erro, `Pedido não criado: ${mensagem}`, codigo)
+    assert.equal(leituras(t).length, 0, codigo)
+  }
+})
+
+await confere('3  409 PEDIDO_EM_ANDAMENTO relê e acha o pedido criado pelo outro clique', async () => {
+  const t = montar(rascunho(), recusaPost('PEDIDO_EM_ANDAMENTO', 'Esta conversa já tem um pedido em andamento.', doServidor()))
+  const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+  assert.equal(leituras(t).length, 1)
+  assert.equal(resultado?.pedidoId, PEDIDO_ID)
+  assert.deepEqual(t.avisos(), ['Pedido encontrado. Confira a cobrança e o envio do resumo.'])
+})
+
+await confere('3  409 CONFLICT (código desconhecido) continua relendo', async () => {
+  const t = montar(rascunho(), recusaPost('CONFLICT', 'A conversa está encerrada.'))
+  const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+  assert.equal(leituras(t).length, 1)
+  assert.equal(resultado?.erro, 'Não foi possível confirmar se o pedido foi criado. Aguarde a atualização da conversa antes de reenviar.')
 })
 
 await confere('3  a ação seguinte na mesma conversa não fica presa depois do erro', async () => {

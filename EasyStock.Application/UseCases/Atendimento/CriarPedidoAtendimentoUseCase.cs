@@ -90,7 +90,7 @@ public sealed class CriarPedidoAtendimentoUseCase(
         if (pedidoEmAndamentoId is not { } pedidoId) return;
         var anterior = await pedidoRepository.GetByIdWithDetailsAsync(empresaId, pedidoId);
         if (anterior is not null && !PedidoStateMachine.EstaFinalizado(anterior.StatusEnum))
-            throw new RegraDeDominioVioladaException(PedidoEmAndamento);
+            throw new PedidoEmAndamentoException();
     }
 
     private async Task<PedidoReservado> ReservarAsync(
