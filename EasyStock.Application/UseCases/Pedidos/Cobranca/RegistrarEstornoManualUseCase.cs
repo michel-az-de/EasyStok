@@ -5,7 +5,7 @@ using EasyStock.Application.Services.Pedidos;
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
 public sealed record RegistrarEstornoManualInput(Guid EmpresaId, Guid PedidoId, Guid OperacaoId, Guid PagamentoId,
-    decimal Valor, string Metodo, string Motivo, string Referencia, bool ValorJaDevolvido,
+    decimal Valor, string Metodo, string Motivo, string? Referencia, bool ValorJaDevolvido,
     Guid UsuarioId, string? UsuarioNome, NivelAcesso NivelSolicitante);
 
 public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICobrancaPedidoRepository cobrancas,
@@ -28,7 +28,9 @@ public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICo
             throw new UseCaseValidationException("Informe o meio usado para devolver o valor.");
         if (string.IsNullOrWhiteSpace(input.Motivo) || input.Motivo.Length > 500)
             throw new UseCaseValidationException("Informe o motivo com até 500 caracteres.");
-        if (string.IsNullOrWhiteSpace(input.Referencia) || input.Referencia.Length > 120)
+        // #1686 (item 10): devolução em dinheiro não tem comprovante; nos outros meios a referência é obrigatória.
+        var referencia = input.Referencia?.Trim() ?? "";
+        if ((referencia.Length == 0 && input.Metodo != "dinheiro") || referencia.Length > 120)
             throw new UseCaseValidationException("Informe o comprovante ou referência com até 120 caracteres.");
         if (input.UsuarioNome?.Length > 120)
             throw new UseCaseValidationException("Nome do responsável excede 120 caracteres.");
@@ -45,7 +47,7 @@ public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICo
             if (anterior is not null)
             {
                 if (anterior.PagamentoId != input.PagamentoId || anterior.Valor != input.Valor
-                    || anterior.Metodo != input.Metodo || anterior.Motivo != input.Motivo.Trim() || anterior.Referencia != input.Referencia.Trim())
+                    || anterior.Metodo != input.Metodo || anterior.Motivo != input.Motivo.Trim() || anterior.Referencia != referencia)
                     throw new CobrancaPedidoConflitoException("operacao_reutilizada", "Esta confirmação já foi usada com outros dados.");
                 return anterior;
             }
@@ -71,7 +73,7 @@ public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICo
             var estorno = new PedidoEstornoManual
             {
                 Id = input.OperacaoId, EmpresaId = input.EmpresaId, PedidoId = pedido.Id, PagamentoId = pagamento.Id,
-                Valor = input.Valor, Metodo = input.Metodo, Motivo = input.Motivo.Trim(), Referencia = input.Referencia.Trim(),
+                Valor = input.Valor, Metodo = input.Metodo, Motivo = input.Motivo.Trim(), Referencia = referencia,
                 UsuarioId = input.UsuarioId, UsuarioNome = input.UsuarioNome, RegistradoEm = agora
             };
             var movimento = MovimentoCaixa.Criar(input.EmpresaId, "saida", estorno.Valor, agora, pedido.LojaId);
@@ -80,7 +82,7 @@ public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICo
             movimento.Metodo = estorno.Metodo;
             movimento.Categoria = "Devolução de pedido";
             movimento.Descricao = $"Devolução do pedido {pedido.Id.ToString("N")[..8].ToUpperInvariant()}: {estorno.Motivo}";
-            movimento.Referencia = estorno.Referencia;
+            movimento.Referencia = estorno.Referencia.Length > 0 ? estorno.Referencia : null;
             movimento.RegistradoPorUserId = estorno.UsuarioId;
             movimento.RegistradoPorNome = estorno.UsuarioNome;
             movimento.Origem = PedidoEstornoManual.OrigemCaixa;
@@ -90,7 +92,7 @@ public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICo
             {
                 Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "devolucao_manual", OcorridoEm = agora,
                 UsuarioId = estorno.UsuarioId, UsuarioNome = estorno.UsuarioNome, Origem = "web",
-                Detalhes = $"Devolução confirmada: {estorno.Valor.ToString("C", Cultura.PtBr)} ({estorno.Metodo}). Motivo: {estorno.Motivo}. Referência: {estorno.Referencia}. Operação: {estorno.Id}"
+                Detalhes = $"Devolução confirmada: {estorno.Valor.ToString("C", Cultura.PtBr)} ({estorno.Metodo}). Motivo: {estorno.Motivo}. Referência: {(estorno.Referencia.Length > 0 ? estorno.Referencia : "sem referência")}. Operação: {estorno.Id}"
             });
             await uow.CommitAsync();
             return estorno;

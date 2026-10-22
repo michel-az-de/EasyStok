@@ -7,6 +7,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { lerMoeda, mascaraMoeda, moeda } from '../../dominio/formato'
+import { referenciaObrigatoriaNaDevolucao } from '../../dominio/cobranca'
 import css from './ficha.module.css'
 import { EstornosOnline } from './EstornosOnline'
 
@@ -31,7 +32,9 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
   const pagamento = disponiveis.find((p) => p.id === pagamentoId)
   const valor = Number(centavos || 0) / 100
   const podeRegistrar = acoes.devolverPagamentoManual === true
-  const valido = pagamento && valor > 0 && valor <= pagamento.disponivel && motivo.trim() && referencia.trim() && confirmado
+  // #1686 (item 10): devolução em dinheiro não tem comprovante; nos outros meios a referência segue obrigatória.
+  const referenciaObrigatoria = referenciaObrigatoriaNaDevolucao(metodo)
+  const valido = pagamento && valor > 0 && valor <= pagamento.disponivel && motivo.trim() && (!referenciaObrigatoria || referencia.trim()) && confirmado
   const totalDevolvido = dados?.estornos.reduce((soma, e) => soma + e.valor, 0) ?? 0
   const conferirAcerto = cancelado && dados?.pagamentos.some((p) => p.valor > 0)
 
@@ -64,7 +67,7 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
           {dados.estornos.map((e) => <p key={e.id} className={css.corpoBloco}>
             <strong>{moeda(e.valor)} · {meios.find((m) => m.valor === e.metodo)?.rotulo ?? e.metodo}</strong><br />
             {data(e.registradoEm)}{e.usuarioNome ? ` · ${e.usuarioNome}` : ''}<br />
-            {e.motivo}<br />Referência: {e.referencia}
+            {e.motivo}{e.referencia && <><br />Referência: {e.referencia}</>}
           </p>)}
           {!podeRegistrar && <p className={css.corpoBloco}>Só a dona ou um gerente pode confirmar a devolução.</p>}
           {!pendente && podeRegistrar && disponiveis.length > 0 && !aberto && <Botao onClick={() => { escolher(disponiveis[0].id); setAberto(true) }}>Registrar devolução manual</Botao>}
@@ -79,7 +82,7 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
           <CampoMascarado rotulo="Valor devolvido" tipo="moeda" valor={mascaraMoeda(centavos)} aoMudarDigitos={setCentavos} aoColarTexto={(t) => setCentavos(String(lerMoeda(t)))} disabled={ocupado} dica={pagamento ? `Até ${moeda(pagamento.disponivel)} deste recebimento.` : 'Escolha um recebimento.'} />
           <CampoSelecao rotulo="Meio usado na devolução" value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={meios} disabled={ocupado} />
           <CampoTexto rotulo="Motivo da devolução" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500} required disabled={ocupado} />
-          <CampoTexto rotulo="Comprovante ou referência da devolução" value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} required disabled={ocupado} />
+          <CampoTexto rotulo={referenciaObrigatoria ? 'Comprovante ou referência da devolução' : 'Comprovante ou referência (opcional em dinheiro)'} value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} required={referenciaObrigatoria} disabled={ocupado} />
           <label className={css.corpoBloco}><input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} disabled={ocupado} /> Confirmo que já devolvi este valor ao cliente.</label>
           <p className={css.corpoBloco}>O registro gera uma saída no Caixa de hoje e preserva o recebimento original. O Caixa do dia precisa estar sem fechamento.</p>
           <Botao type="submit" variante="primario" disabled={!valido || ocupado}>{ocupado ? 'Registrando…' : 'Confirmar devolução já realizada'}</Botao>

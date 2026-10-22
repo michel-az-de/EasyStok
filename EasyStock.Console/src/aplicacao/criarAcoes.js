@@ -146,6 +146,8 @@ export function criarAcoes({
     // existe `c.pedido`), então continua a série real da massa em vez de
     // nascer com o próximo id solto de qualquer coisa (achado do gerente,
     // 24/09: "Nº 1" no canhoto).
+    // #1686 (item 3): segunda compra na mesma conversa, depois do pedido entregue ou cancelado.
+    novaComanda: (id) => despachar({ tipo: acao.NOVA_COMANDA, id, numeroPedido: proximoNumeroPedido() }),
     adicionarItem: (id, item) => despachar({
       tipo: acao.ADICIONAR_ITEM, id, item, numeroPedido: proximoNumeroPedido(), alertaId: proximoId('alerta'),
       agora: agoraRef.current,

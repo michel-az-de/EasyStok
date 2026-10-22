@@ -30,6 +30,7 @@ import { IconeDoModulo } from '../componentes/IconeDoModulo'
 import { JANELA_COZINHA } from '../dominio/janelaAvulsa'
 import { AvisoDaAcaoApi } from './FaixaApi'
 import css from './moldura.module.css'
+import { LimiteDeErro } from '../componentes/LimiteDeErro'
 
 // Título de coluna sem ícone: quando todo título tem ícone, ícone nenhum marca.
 // O ícone ficou para navegação, mídia e alerta.
@@ -420,13 +421,16 @@ export function Moldura({
   // a morar no balão flutuante (rodada 7, fala do dono 24/09/2026 04h12):
   // `app/App.jsx` monta `<PainelAgente>` e `<BalaoAssistente>` junto, porque
   // feature nenhuma importa outra feature (`ferramentas/verificar-camadas.mjs`).
+  // Frente C da #1889: cada coluna do Balcão dentro do seu limite de erro (LimiteDeErro).
   const atendimento = (
-    <PainelAtendimento
-      aoAbrirNota={aoAbrirNota}
-      aoAbrirGaleria={aoAbrirGaleria}
-      aoAbrirBiblioteca={aoAbrirBiblioteca}
-      focarAoTrocar={tamanho !== DESKTOP && tamanho !== TABLET}
-    />
+    <LimiteDeErro parte="Conversa">
+      <PainelAtendimento
+        aoAbrirNota={aoAbrirNota}
+        aoAbrirGaleria={aoAbrirGaleria}
+        aoAbrirBiblioteca={aoAbrirBiblioteca}
+        focarAoTrocar={tamanho !== DESKTOP && tamanho !== TABLET}
+      />
+    </LimiteDeErro>
   )
   const cabecalho = (
     <Cabecalho
@@ -467,7 +471,7 @@ export function Moldura({
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
           <Coluna variante="entrada" titulo="Balcão" semTitulo>
-            <PainelConversas />
+            <LimiteDeErro parte="Lista de conversas"><PainelConversas /></LimiteDeErro>
           </Coluna>
           <AlcaLargura
             rotulo="Redimensionar Balcão"
@@ -488,7 +492,7 @@ export function Moldura({
             aoMudar={(valor) => aoRedimensionar('ficha', valor)}
           />
           <Coluna variante="ficha" titulo="Resumo" semTitulo>
-            <div className={css.painelFicha}><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></div>
+            <div className={css.painelFicha}><LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro></div>
             {/* #1474: lugar da fila de canhotos (FilaCanhotos), no pé da Ficha e no fluxo da
                 coluna: a pílula não cobre mais o título nem o topo da coluna. Vazio, não ocupa. */}
             <div className={css.slotFila} data-fila-canhotos="" />
@@ -506,12 +510,12 @@ export function Moldura({
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
           <Coluna variante="entrada" titulo="Balcão">
-            <PainelConversas />
+            <LimiteDeErro parte="Lista de conversas"><PainelConversas /></LimiteDeErro>
           </Coluna>
           <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
           {gavetaAberta && (
             <Gaveta titulo="Resumo" aoFechar={fecharGaveta}>
-              <PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} acaoCompartilhar={acaoCompartilhar} />
+              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>
             </Gaveta>
           )}
         </main>
@@ -527,9 +531,9 @@ export function Moldura({
   }
 
   const painelDaAba = {
-    balcao: <PainelConversas aoAbrir={irParaAtendimento} />,
+    balcao: <LimiteDeErro parte="Lista de conversas"><PainelConversas aoAbrir={irParaAtendimento} /></LimiteDeErro>,
     atendimento,
-    ficha: <PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} />,
+    ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>,
   }
 
   return (

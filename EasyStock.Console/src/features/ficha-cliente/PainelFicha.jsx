@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { abrirSecao } from '../../hooks/useRecolhido'
 import { useDroppable } from '@dnd-kit/core'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -13,11 +14,12 @@ import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
 import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoResumo, totalDoPedido } from '../../dominio/pedido'
 import { faltaPagar as saldoDoPedido, totalPago } from '../../dominio/pagamento'
 import { moeda } from '../../dominio/formato'
-import { motivoAntesDeCobrar } from '../../dominio/resumoPedido'
+import { ALVOS_DO_MOTIVO, pendenciaAntesDeCobrar } from '../../dominio/resumoPedido'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import { canalDaConversa } from '../../dominio/canal'
 import { chavesDaFicha, primeiroPassoAntesDaVenda } from '../../dominio/ficha'
 import { BarraProximoPasso } from './BarraProximoPasso'
+import { focarCampoDaFicha } from './focarCampoDaFicha'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoDevolucoes } from './BlocoDevolucoes'
 import { BlocoCapturaAutomatica } from './BlocoCapturaAutomatica'
@@ -58,7 +60,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
     gerarCobranca, reenviarCobranca, confirmarPagamento,
     marcarComprovante, aceitarDivergencia, escolherJanela, forcarEncaixe,
     cancelarPedido, marcarEstorno, abrirEncerramento, decidirAreaEntrega, escolherMeioPagamento,
-    alterarMeioPagamento, desfazerPagamento, aprovarPedido,
+    alterarMeioPagamento, desfazerPagamento, aprovarPedido, novaComanda,
   } = useAcoes()
   const { janelas, prefixosCepAtendidos, cardapio, canais } = useCatalogo()
   // #1884 ("Quanto fica?"): uma simulação por comanda, para a comanda e a barra mostrarem os mesmos números.
@@ -66,6 +68,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
     conversaId: selecionada?.id, pedido: selecionada?.pedido, ativo: Boolean(fonteApi && selecionada && !conversaEncerrada(selecionada)),
   })
   const [secao, setSecao] = useState(null)
+  // #1686 (item 4): "Cancelar e refazer" na Seleção abre a confirmação de cancelar da barra.
+  const [pedidoDeCancelar, setPedidoDeCancelar] = useState(0)
   // #1683: conversa em que o cliente está escolhendo pelo link (quem sabe é a ComandaDoCliente).
   const [conversaEscolhendo, setConversaEscolhendo] = useState(null)
   const { setNodeRef: receberPrato, isOver: recebendoPrato } = useDroppable({
@@ -109,11 +113,12 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que se resolve. A barra
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
   const gerarSemEnviar = fonteApi && permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).motivo?.acao === 'janela'
-  const prerequisito = pedido
-    ? motivoAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, {
+  const pendencia = pedido
+    ? pendenciaAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, {
       fonteApi,
     })
     : null
+  const prerequisito = pendencia?.motivo ?? null
 
   // Texto pronto que o cliente lê ao cancelar (mesmo padrão de ENVIAR_MIDIA e
   // GERAR_PEDIDO: o domínio não escreve copy, quem monta é a tela). Reusado
@@ -127,6 +132,14 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   // Quem cancela pedido sem pagamento é a própria modal (faixa da seção 5).
   const aoEncerrarAtendimento = () => { setSecao(null); abrirEncerramento(selecionada.id) }
   const abrirCardapio = () => { setSecao(null); aoAbrirCardapio() }
+  // #1686 (item 9): o link do motivo abre onde ele se resolve e põe o foco no campo.
+  const irParaMotivo = (alvo) => {
+    if (alvo === ALVOS_DO_MOTIVO.CARDAPIO) { abrirCardapio(); return }
+    if (alvo === ALVOS_DO_MOTIVO.JANELA) { setSecao('pedido'); focarCampoDaFicha('janela'); return }
+    abrirSecao('contato')
+    setSecao('cliente')
+    focarCampoDaFicha(alvo)
+  }
   const chaves = chavesDaFicha({
     conversaId: selecionada.id, pedidoId: pedido?.pedidoId ?? null,
     pagamentos: (pedido?.pagamentosApi ?? []).map((p) => p.pagamentoId),
@@ -176,6 +189,12 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
         <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} aoAbrir={() => setSecao('cliente')} />
 
         {editavel && comandaCompartilhada}
+        {/* #1686 (item 3): pedido entregue ou cancelado, a mesma conversa começa outra compra. */}
+        {editavel && fonteApi && posVenda && novaComanda && (
+          <div className={css.acaoMontar}>
+            <Botao largo variante="secundario" icone="plus" onClick={() => novaComanda(selecionada.id)}>Nova comanda</Botao>
+          </div>
+        )}
         {editavel && !pedido && !fonteApi && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}
         <nav className={css.acessosFicha} aria-label="Detalhes do atendimento">
           {pedido && <AcessoDaFicha titulo={editavel ? tituloPedido : 'Consultar pedido vinculado'}
@@ -218,6 +237,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           editavel={editavel}
           aoTrocarJanela={(janela, avisar) => escolherJanela(selecionada.id, janela, avisar)}
           aoForcarEncaixe={(janela, faixa, motivo) => forcarEncaixe(selecionada.id, janela, faixa, motivo)}
+          acaoAlterarPeloLink={fonteApi ? acaoCompartilhar : null}
+          aoCancelarParaRefazer={() => { setSecao(null); setPedidoDeCancelar((n) => n + 1) }}
           aoAbrirCardapio={abrirCardapio}
           aoAjustar={(sku, delta) => ajustarQuantidade(selecionada.id, sku, delta)}
           aoAjustarObservacao={(sku, texto) => ajustarObservacao(selecionada.id, sku, texto)}
@@ -289,6 +310,9 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           nomeCliente={primeiroNome}
           bloqueado={estaBloqueada(selecionada)}
           prerequisito={prerequisito}
+          alvoDoPrerequisito={pendencia?.alvo ?? null}
+          aoIrParaMotivo={irParaMotivo}
+          pedidoDeCancelar={pedidoDeCancelar}
           aoAvancar={(passo, entregador, opcoes) => avancarEsteira(selecionada.id, passo, entregador, opcoes)}
           aoDesfazer={() => desfazerEsteira(selecionada.id, ultimoAvanco.mensagemId, ultimoAvanco.posEntregaId)}
           gerarSemEnviar={gerarSemEnviar}
