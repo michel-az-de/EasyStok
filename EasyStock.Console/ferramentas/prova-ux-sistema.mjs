@@ -74,7 +74,7 @@ registerHooks({
     if (spec === 'react' && /use(?:Entregas|Cozinha|CadastroEntrega)Api\.js$/.test(contexto.parentURL)) {
       return { url: moduloDados('const h=globalThis.__provaUxSistema.hooks; export const useState=h.useState,useRef=h.useRef,useCallback=h.useCallback,useEffect=h.useEffect;'), shortCircuit: true }
     }
-    if (spec === './cliente' && /\/infra\/api\/(?:entregasApi|kdsApi)\.js$/.test(contexto.parentURL)) {
+    if (spec === './cliente' && /\/infra\/api\/(?:entregasApi|kdsApi|pagamentosPedidoApi)\.js$/.test(contexto.parentURL)) {
       return { url: moduloDados('export const chamarApi=(...a)=>globalThis.__provaUxSistema.chamarApi(...a);'), shortCircuit: true }
     }
     if (spec.endsWith('/eventosOperacao')) {

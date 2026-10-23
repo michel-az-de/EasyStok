@@ -281,6 +281,12 @@ export const MEIOS_DE_PAGAMENTO = [
     id: 'cartao-link', rotulo: 'Link de pagamento (Pix ou cartão)', situacao: 'ativo', provedor: 'mercadopago',
     liberaEsteiraSemPagar: false, destaque: true,
   },
+  // J2 (#1990): "dinheiro, troco pra 100" saía registrado como maquininha. Mesma forma da API
+  // ("na entrega"); o troco vai nas observações do pedido (`dominio/cobranca.js`).
+  {
+    id: 'dinheiro-entrega', rotulo: 'Dinheiro na entrega', situacao: 'ativo', provedor: 'manual',
+    liberaEsteiraSemPagar: true, destaque: false, pedeTroco: true,
+  },
   {
     id: 'maquininha', rotulo: 'Maquininha na entrega', situacao: 'ativo', provedor: 'manual',
     liberaEsteiraSemPagar: true, destaque: false,

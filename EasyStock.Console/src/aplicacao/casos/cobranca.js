@@ -92,6 +92,15 @@ export const casosCobranca = {
     return mapear(estado, id, (c) => ({ ...c, pedido: { ...c.pedido, meio } }))
   },
 
+  // J2 (#1990): o troco mora no pedido, como o meio: vai no POST do pedido (observações) pela
+  // barra, pelo bloco Cobrança ou pela comanda, sem cada tela guardar o seu. Depois que o pedido
+  // existe no EasyStok, o que vale é o que ficou gravado nele.
+  [acao.DEFINIR_TROCO]: (estado, { id, trocoPara }) => {
+    const conversa = estado.conversas.find((c) => c.id === id)
+    if (!conversa?.pedido || conversa.pedido.pedidoId) return estado
+    return mapear(estado, id, (c) => ({ ...c, pedido: { ...c.pedido, trocoPara } }))
+  },
+
   // "Refazer cobrança": registro sem âncora direta em US/RN (fica anotado na
   // decisão 32 para o gerente revisar). Interpretação usada aqui: corrigir a
   // cobrança combinada de maquininha/vale sem trocar de meio nem contar como

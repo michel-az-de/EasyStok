@@ -13,7 +13,11 @@
 //   9  confirmação em linha é formulário: Enter confirma, Esc volta, foco no motivo;
 //   10 "Marcar pago" no recebimento comum e "Registrar sinal" na entrada manual de encomenda;
 //   11 um botão só para o link (decisão de 22/10): "Link de pagamento (Pix ou cartão)" no lugar
-//      dos chips "Pix" e "Cartão por link"; na entrega seguem Maquininha e Vale-refeição.
+//      dos chips "Pix" e "Cartão por link"; na entrega, Dinheiro, Maquininha e Vale-refeição;
+//   12 frente J2 (#1990), item 1: "Dinheiro na entrega" com troco, gravado nas observações do pedido;
+//   13 J2-4: pedido pago cancelado diz quanto falta devolver (extrato, acesso Pagamento e Resumo);
+//   14 J2-7: a alteração de pedido pago mostra a diferença ao vivo, antes de salvar;
+//   15 J2-9: "costuma pedir" só com o mesmo item em 2 pedidos ou mais.
 //
 // Regras puras e ações reais (HTTP controlado no `fetch`); a composição que só existe no JSX é
 // conferida por leitura do fonte. Não prova pixels nem foco nativo.
@@ -393,11 +397,99 @@ await confere('11  um botão só para o link: "Link de pagamento (Pix ou cartão
   const { MEIOS_DE_PAGAMENTO } = await import('../src/infra/catalogo.js')
   const destaque = MEIOS_DE_PAGAMENTO.filter((m) => m.destaque)
   assert.deepEqual(destaque.map((m) => [m.id, m.rotulo]), [['cartao-link', 'Link de pagamento (Pix ou cartão)']])
-  assert.deepEqual(MEIOS_DE_PAGAMENTO.filter((m) => !m.destaque).map((m) => m.id), ['maquininha', 'vale-refeicao'])
+  assert.deepEqual(MEIOS_DE_PAGAMENTO.filter((m) => !m.destaque).map((m) => m.id), ['dinheiro-entrega', 'maquininha', 'vale-refeicao'])
   assert.ok(!MEIOS_DE_PAGAMENTO.some((m) => /^Pix$|Cartão por link/.test(m.rotulo)), 'os dois chips antigos saíram')
   assert.equal(cobranca.nomeDoMeio('cartao-link'), 'link de pagamento')
   assert.equal(pedidoDaApi({ pedidoId: 'p', status: 'aguardando_pagamento', itens: [], cobranca: { cobrancaId: 'c', provedor: 'mercadopago', valor: 10, linkPagamento: 'https://mp/x' } }).cobranca.meio, 'cartao-link')
   assert.doesNotMatch(fonte('features/ficha-cliente/EscolhaDeMeio.jsx'), /quatro chips|Pix e cartão em destaque/)
+})
+
+// ------------------------------------------------------------------ J2 (#1990)
+const semEspacoDuro = (texto) => String(texto ?? '').replace(/ /g, ' ')
+
+await confere('12  J2-1 dinheiro na entrega com troco: chip, corpo do pedido, releitura e baixa em dinheiro', async () => {
+  const { MEIOS_DE_PAGAMENTO } = await import('../src/infra/catalogo.js')
+  const dinheiro = MEIOS_DE_PAGAMENTO.find((m) => m.id === 'dinheiro-entrega')
+  assert.ok(dinheiro, 'existe o chip "Dinheiro na entrega"')
+  assert.equal(dinheiro.rotulo, 'Dinheiro na entrega')
+  assert.equal(dinheiro.destaque, false)
+  assert.equal(dinheiro.liberaEsteiraSemPagar, true)
+  const { corpoDoPedido, formaDoMeio } = await import('../src/infra/api/comandaApi.js')
+  assert.equal(formaDoMeio('dinheiro-entrega'), 'na_entrega')
+  const corpo = corpoDoPedido({ itens: [], janela: null, meio: 'dinheiro-entrega', trocoPara: 100 })
+  assert.equal(corpo.forma, 'na_entrega')
+  assert.equal(semEspacoDuro(corpo.observacoes), 'Pagamento na entrega: dinheiro, troco para R$ 100,00.')
+  assert.equal(semEspacoDuro(corpoDoPedido({ itens: [], meio: 'dinheiro-entrega' }).observacoes), 'Pagamento na entrega: dinheiro, sem troco.')
+  assert.equal('observacoes' in corpoDoPedido({ itens: [], meio: 'maquininha' }), false, 'outro meio não manda observação')
+  const lido = pedidoDaApi({
+    pedidoId: 'p', status: 'aguardando', itens: [], observacoes: corpo.observacoes,
+    cobranca: { cobrancaId: 'c', provedor: 'na_entrega', valor: 57 },
+  })
+  assert.equal(lido.meio, 'dinheiro-entrega', 'recarregar a página não vira maquininha')
+  assert.equal(lido.trocoPara, 100)
+  assert.equal(pedidoDaApi({
+    pedidoId: 'p', status: 'aguardando', itens: [], observacoes: corpo.observacoes,
+    cobranca: { cobrancaId: 'c', provedor: 'na_entrega', valor: 57 },
+  }, { meio: 'maquininha' }).meio, 'maquininha', 'o meio que a tela já tem continua mandando')
+  assert.equal(pedidoDaApi({ pedidoId: 'p', status: 'aguardando', itens: [], cobranca: { cobrancaId: 'c', provedor: 'na_entrega', valor: 57 } }).meio, 'maquininha')
+  assert.equal(cobranca.metodoDaCobranca({ meio: 'dinheiro-entrega' }), 'dinheiro')
+  assert.equal(cobranca.nomeDoMeio('dinheiro-entrega'), 'dinheiro na entrega')
+  assert.equal(semEspacoDuro(cobranca.textoDoTroco({ trocoPara: 100, aReceber: 57 })), 'Dinheiro na entrega · troco para R$ 100,00 · levar R$ 43,00')
+  assert.equal(semEspacoDuro(cobranca.textoDoTroco({ trocoPara: null, aReceber: 57 })), 'Dinheiro na entrega · sem troco')
+  assert.equal(cobranca.textoDoTroco(null), null)
+  const escolha = fonte('features/ficha-cliente/EscolhaDeMeio.jsx')
+  assert.match(escolha, /rotulo="Troco para"/)
+  assert.match(escolha, /definirTroco\(/)
+})
+
+await confere('13  J2-4 pedido pago cancelado diz quanto falta devolver no extrato, no acesso Pagamento e no Resumo', async () => {
+  const base = {
+    pedidoId: 'p', estado: 'cancelado', totalApi: 216, totalPagoApi: 216,
+    pagamentosApi: [{ pagamentoId: 'x', valor: 216, meio: 'pix', em: 1 }],
+  }
+  assert.equal(pagamento.extratoDoPedido(base, { aDevolver: 216 }).aDevolver, 216)
+  assert.equal(pagamento.extratoDoPedido(base).aDevolver, 0)
+  const { resumoDoPagamento } = await import('../src/features/ficha-cliente/apresentacaoDaFicha.js')
+  assert.equal(semEspacoDuro(resumoDoPagamento({ cancelado: true, aDevolver: 216 })), 'R$ 216,00 a devolver')
+  assert.equal(resumoDoPagamento({ cancelado: true }), 'Confira recebimentos e devoluções')
+  const { consultaADevolver } = await import('../src/aplicacao/aDevolver.js')
+  assert.equal(consultaADevolver(base), true)
+  assert.equal(consultaADevolver({ ...base, estado: 'entregue' }), false, 'pedido ativo não tem devolução')
+  assert.equal(consultaADevolver({ ...base, totalPagoApi: 0 }), false, 'sem recebimento não consulta')
+  assert.equal(consultaADevolver({ ...base, pedidoId: null }), false)
+  assert.match(fonte('features/ficha-cliente/ExtratoDoPedido.jsx'), /<dt>Cancelado · a devolver<\/dt><dd>\{moeda\(extrato\.aDevolver\)\}<\/dd>/)
+  const painel = fonte('features/ficha-cliente/PainelFicha.jsx')
+  assert.match(painel, /useADevolver\(fonteApi \? selecionada\?\.pedido : null\)/)
+  assert.match(painel, /<ExtratoDoPedido pedido=\{pedido\} aDevolver=\{aDevolver\} \/>/)
+  assert.match(painel, /\{aDevolver > 0 && <p className=\{css\.saldoFicha\}>\{moeda\(aDevolver\)\} a devolver<\/p>\}/)
+  assert.match(painel, /resumoDoPagamento\(\{ cancelado: pedido\?\.estado === 'cancelado', saldo, destaque: destacaSaldo, aDevolver \}\)/)
+})
+
+await confere('14  J2-7 alteração de pedido pago mostra a diferença ao vivo, antes de salvar', async () => {
+  const { saldoDaAlteracao } = await import('../src/dominio/pedido.js')
+  const comanda = {
+    podeEditar: true, totalPrevisto: 100, pedido: { total: 100, alocado: 100 },
+    rascunho: { itens: [{ cardapioItemId: 'a', variacaoId: null, qtd: 1 }] },
+    selecao: [{ cardapioItemId: 'a', variacaoId: null, preco: 38, nome: 'A' }],
+  }
+  assert.equal(saldoDaAlteracao(comanda, null, []), 0, 'sem edição, o saldo do servidor')
+  assert.equal(saldoDaAlteracao(comanda, { itens: [{ cardapioItemId: 'a', qtd: 2 }] }, []), 38, '+1 unidade de R$ 38 aparece na hora')
+  assert.equal(saldoDaAlteracao(comanda, { itens: [] }, []), -38, 'tirar o prato vira valor a devolver')
+  assert.equal(saldoDaAlteracao(comanda, { itens: [{ cardapioItemId: 'a', qtd: 1 }, { cardapioItemId: 'b', variacaoId: 'v', qtd: 1 }] },
+    [{ sku: 'b~v', preco: 20 }]), 20, 'prato novo pelo preço do cardápio')
+  assert.equal(saldoDaAlteracao({ ...comanda, envio: { situacao: 'estorno_pendente', saldo: -10 } }, { itens: [] }, []), -10,
+    'devolução em acompanhamento segue o saldo do servidor')
+  const tela = fonte('features/ficha-cliente/ComandaDoCliente.jsx')
+  assert.match(tela, /saldoDaAlteracao\(c, edicao\?\.rascunho \?\? null, catalogo\)/)
+  assert.match(tela, /com os ajustes ainda não salvos/)
+})
+
+await confere('15  J2-9 "costuma pedir" só com o mesmo item em 2 pedidos ou mais', async () => {
+  const { clienteDoDossie } = await import('../src/infra/api/traducaoCliente.js')
+  const dossie = (pedidos) => ({ cliente: { id: 'c', nome: 'Ana' }, totalPedidos: 3, itemFavorito: { nome: 'Lasanha', pedidos, quantidade: 2 } })
+  assert.equal(clienteDoDossie(dossie(1)).cliente.favorito, null, 'um pedido só não é costume')
+  assert.equal(clienteDoDossie(dossie(2)).cliente.favorito, 'Lasanha')
+  assert.equal(clienteDoDossie({ cliente: { id: 'c' }, itemFavorito: { nome: 'X' } }).cliente.favorito, null, 'sem a contagem, não afirma hábito')
 })
 
 if (falhas.length > 0) {

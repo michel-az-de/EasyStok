@@ -116,7 +116,7 @@ function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
   return (
     <>
       <div className={css.cabecaCartao}>
-        <span className={css.numeroCartao} title={nome.titulo || undefined}>{nome.principal}{nome.referencia && <small className={css.referencia}>ref {nome.referencia}</small>} · {nomeNaComanda(pedido)}</span>
+        <span className={css.numeroCartao} title={nome.titulo || undefined}>{nome.principal}{nome.referencia && <small className={css.referencia}>{nome.referencia}</small>} · {nomeNaComanda(pedido)}</span>
         {alca}
       </div>
       <p className={css.rotuloSituacao}>{aviso ? aviso.texto : rotuloDoStatusKds(pedido)}</p>

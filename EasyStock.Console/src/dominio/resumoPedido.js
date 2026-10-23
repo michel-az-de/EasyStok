@@ -53,7 +53,8 @@ function ehEncomendaDeOutroDia(pedido, { fonteApi, agora }) {
 }
 
 export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Date.now(), meio = pedido?.meio } = {}) {
-  if ((meio && meio !== 'maquininha') || !ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
+  // J2 (#1990): dinheiro na entrega é a mesma forma da maquininha no EasyStok; a encomenda pede sinal igual.
+  if ((meio && meio !== 'maquininha' && meio !== 'dinheiro-entrega') || !ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
   return 'Encomenda para outro dia: sinal de 50% antes da produção. Restante na entrega.'
 }
 
