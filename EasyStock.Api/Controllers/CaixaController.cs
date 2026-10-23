@@ -1,5 +1,6 @@
 using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.AbrirCaixa;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.ListarFechamentosCaixa;
@@ -88,7 +89,7 @@ public class CaixaController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
         var (p, sz) = NormalisePage(page, pageSize);
         var result = await listarMovUseCase.ExecuteAsync(new ListarMovimentosCaixaQuery(
-            emp, p, sz, tipo, desde, ate, incluirEstornados, sort, NormaliseOrder(order)));
+            emp, p, sz, tipo, DataUtc.InicioDoPeriodoUtc(desde), DataUtc.FimDoPeriodoUtc(ate), incluirEstornados, sort, NormaliseOrder(order)));
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
     }
 
