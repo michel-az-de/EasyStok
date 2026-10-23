@@ -27,8 +27,8 @@ public interface IKdsPedidoQueries
 /// <param name="AReceber">Saldo financeiro calculado em lote para os pedidos desta leitura (#1859).</param>
 /// <param name="NumeroComanda">#1883: número da conversa dona do pedido ("Comanda N"), pela mesma regra de
 /// <c>IConversaRepository.ObterIdPorPedidoAsync</c>, resolvido em lote. Nulo quando nenhuma conversa é dona dele.</param>
-/// <param name="NumeroDoDia">#1641-1: número do dia (S53) quando atribuído para o <paramref name="DataProducao"/>; nulo sem número
-/// ou com número de outro dia.</param>
+/// <param name="NumeroDoDia">#1641-1: número do dia (S53); nulo até o pedido entrar na fila ou ser pago. Depois de atribuído não
+/// muda; só o reagendamento dá número novo (<c>NumeradorPedidoDoDia</c>).</param>
 public sealed record KdsPedidoLeitura(
     Guid Id,
     string Status,

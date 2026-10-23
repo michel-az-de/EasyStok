@@ -5,7 +5,7 @@ namespace EasyStock.Application.UseCases.Atendimento.Entregas;
 
 /// <param name="NumeroCurto">8 primeiros caracteres do id em maiúsculas: a referência que a equipe usa para achar o pedido.</param>
 /// <param name="NumeroComanda">#1883: "Comanda N", o número da conversa dona do pedido. Nulo quando nenhuma conversa é dona dele.</param>
-/// <param name="NumeroDoDia">#1641-1: número do dia (S53) do pedido na data da vaga; nulo sem número.</param>
+/// <param name="NumeroDoDia">#1641-1: número do dia (S53); nulo sem número.</param>
 public sealed record AgendaPedido(Guid PedidoId, string NumeroCurto, string? ClienteNome, string Status, long? NumeroComanda = null,
     int? NumeroDoDia = null);
 public sealed record AgendaJanela(Guid JanelaId, string Label, TimeOnly Inicio, TimeOnly Fim,

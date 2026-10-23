@@ -96,7 +96,6 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
         {
             var janela = janelas.GetValueOrDefault(p.Id);
             var cliente = p.ClienteId is { } cid ? clientes.GetValueOrDefault(cid) : null;
-            var dataProducao = janela?.DataEntrega ?? HorarioBrasil.DataOperacional(p.AgendadoParaEm ?? p.CriadoEm);
             return new KdsPedidoLeitura(
                 Id: p.Id,
                 Status: p.Status,
@@ -106,7 +105,7 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                 AgendadoParaEm: p.AgendadoParaEm,
                 CriadoEm: p.CriadoEm,
                 PagoEm: p.Pagamentos.Count == 0 ? null : p.Pagamentos.Max(g => g.PagoEm),
-                DataProducao: dataProducao,
+                DataProducao: janela?.DataEntrega ?? HorarioBrasil.DataOperacional(p.AgendadoParaEm ?? p.CriadoEm),
                 InicioPrevistoEm: p.InicioPrevistoEm,
                 Janela: janela is null ? null : new KdsJanelaLeitura(janela.Label, janela.DataEntrega, janela.HoraInicio, janela.HoraFim),
                 Itens: p.Itens
@@ -125,7 +124,7 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                 MotivoRequerAprovacao: p.MotivoRequerAprovacao,
                 AReceber: saldos[p.Id].AReceber(p.Total.Valor),
                 NumeroComanda: comandas.TryGetValue(p.Id, out var comanda) ? comanda : null,
-                NumeroDoDia: p.TemNumeroDoDia(dataProducao) ? p.NumeroDoDia : null);
+                NumeroDoDia: p.NumeroDoDia);
         }).ToList();
     }
 

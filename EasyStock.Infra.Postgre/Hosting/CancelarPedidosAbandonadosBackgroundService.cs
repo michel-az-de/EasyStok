@@ -113,7 +113,8 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
         var handler = new LiberarVagaOnPedidoCanceladoHandler(
             services.GetRequiredService<IVagaOcupadaRepository>(),
             services.GetRequiredService<ILogger<LiberarVagaOnPedidoCanceladoHandler>>());
-        await handler.HandleAsync(new PedidoCanceladoEvent(pedido.Id, Guid.Empty, "Timeout 30 min sem pagamento"), ct);
+        await handler.HandleAsync(new PedidoCanceladoEvent(pedido.Id, Guid.Empty, statusAntigo == StatusPedidoMapper.Rascunho
+            ? "Timeout 30 min com o checkout interrompido" : "Timeout 30 min sem pagamento"), ct);
         // #1726: o cancelamento automático deixa trilha no pedido. O evento grava junto com o pedido e a vaga.
         await pedidoRepo.AddEventoAsync(new Domain.Entities.PedidoEvento
         {

@@ -82,7 +82,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
 
     /// <summary>
     /// #1641-1: o número do dia (S53) existia no banco e nenhuma leitura do console o devolvia. KDS, agenda e o pedido
-    /// trazem <c>numeroDoDia</c> (aditivo); pedido sem número, ou numerado para outro dia de produção, vem nulo no card.
+    /// trazem <c>numeroDoDia</c> (aditivo); pedido sem número vem nulo.
     /// </summary>
     [SkippableFact]
     public async Task KdsAgendaEPedido_DevolvemNumeroDoDiaNoJson()
