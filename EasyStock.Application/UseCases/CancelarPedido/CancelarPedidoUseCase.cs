@@ -32,6 +32,9 @@ public class CancelarPedidoUseCase(
     IOperacaoEventPublisher operacaoEventos,
     SaldoFinanceiroPedido? saldos = null)
 {
+    /// <summary>#1717-5: tipo do evento da trilha com o valor recebido a devolver ao cliente.</summary>
+    public const string EventoDevolucaoAFazer = "devolucao_a_fazer";
+
     public async Task<PedidoResult?> ExecuteAsync(CancelarPedidoCommand cmd, bool publicarOperacao = true)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
@@ -68,14 +71,16 @@ public class CancelarPedidoUseCase(
             // equivale a devolver dinheiro pelo banco/provedor.
             foreach (var cobranca in cobrancas.Where(c => c.Status == StatusCobrancaPedido.Pendente))
                 cobranca.Cancelar(cmd.Motivo ?? "Pedido cancelado", agora);
+            var ocorridoEm = AtualizarStatusPedido.AtualizarStatusPedidoUseCase.OcorridoEmAuditoria(cmd.OcorridoEm);
             await pedidoRepo.AddEventoAsync(new PedidoEvento
             {
                 Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "cancelado",
                 StatusAntigo = statusAntigo, StatusNovo = StatusPedidoMapper.Cancelado,
                 Detalhes = cmd.Motivo, UsuarioId = cmd.UsuarioId, UsuarioNome = cmd.UsuarioNome,
                 Origem = cmd.Origem,
-                OcorridoEm = AtualizarStatusPedido.AtualizarStatusPedidoUseCase.OcorridoEmAuditoria(cmd.OcorridoEm)
+                OcorridoEm = ocorridoEm
             });
+            await RegistrarDevolucaoAFazerAsync(pedido, cmd, ocorridoEm, ct);
             await efeitosCancelamento.AplicarAsync(pedido, cmd.Motivo, cmd.UsuarioId, ct);
             await publicadorEventos.PublicarAsync(pedido.EmpresaId, "pedido.mudou_status", "pedido", pedido.Id,
                 new PedidoMudouStatusEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, statusAntigo,
@@ -94,5 +99,21 @@ public class CancelarPedidoUseCase(
             logger.LogInformation("Pedido {Id} cancelado por {UsuarioId}.", cmd.Id, cmd.UsuarioId);
         }
         return resultado;
+    }
+
+    /// <summary>
+    /// #1717-5: o dinheiro recebido e ainda não devolvido fica registrado na trilha como devolução a fazer. Não
+    /// estorna nada: a devolução é registrada depois em Devoluções (manual ou estorno online).
+    /// </summary>
+    private async Task RegistrarDevolucaoAFazerAsync(Domain.Entities.Pedido pedido, CancelarPedidoCommand cmd, DateTime ocorridoEm, CancellationToken ct)
+    {
+        var aDevolver = saldos is not null ? (await saldos.ConsultarAsync(pedido, ct)).DinheiroDisponivel : pedido.TotalPago;
+        if (aDevolver <= 0m) return;
+        await pedidoRepo.AddEventoAsync(new PedidoEvento
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = EventoDevolucaoAFazer,
+            Detalhes = $"Pedido cancelado com {aDevolver.ToString("C", Cultura.PtBr)} recebido. Devolva ao cliente e registre em Devoluções.",
+            UsuarioId = cmd.UsuarioId, UsuarioNome = cmd.UsuarioNome, Origem = cmd.Origem, OcorridoEm = ocorridoEm
+        });
     }
 }

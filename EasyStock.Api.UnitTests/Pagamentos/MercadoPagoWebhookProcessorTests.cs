@@ -83,7 +83,8 @@ public class MercadoPagoWebhookProcessorTests
 
         r.Sucesso.Should().BeTrue("o motivo fica na cobrança; o webhook foi processado");
         f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
-        f.Pedido.Pagamentos.Should().BeEmpty();
+        // #1724-7: o valor retido vira recebimento devolvível pelo estorno online, sem confirmar o pedido.
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Valor.Should().Be(20m);
         f.Cobranca.Status.Should().Be(StatusCobrancaPedido.Pendente);
         f.Cobranca.Motivo.Should().StartWith("valor_menor");
         f.Eventos.Should().ContainSingle(e => e.Tipo == "pagamento_divergente");

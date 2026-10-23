@@ -83,7 +83,9 @@ public sealed class ObterPedidoConversaUseCase(
         if (pedido is null || pedido.EmpresaId != empresaId) return null;
         var janela = (await vagas.GetByPedidoIdsAsync([pedido.Id], ct)).GetValueOrDefault(pedido.Id);
 
-        var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct);
+        // #1724-7: o registro do pagamento a menor não é a cobrança do pedido; o valor aparece no total pago.
+        var cobrancas = (await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct))
+            .Where(c => !c.RegistraPagamentoAMenor).ToList();
         var vigente = cobrancas.FirstOrDefault(c => c.EstaPendente)
             ?? cobrancas.FirstOrDefault(c => c.Status == StatusCobrancaPedido.Paga)
             ?? cobrancas.OrderByDescending(c => c.CriadaEm).FirstOrDefault();

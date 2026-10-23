@@ -75,7 +75,8 @@ public sealed record ConfirmarPagamentoPedidoResult(
 ///   <item>Descobre o tenant pelas cobranças do pedido (o webhook chega sem JWT) e liga o contexto.</item>
 ///   <item><c>SELECT FOR UPDATE</c> no pedido (padrão de <c>AprovarPedidoStorefrontUseCase</c>).</item>
 ///   <item>Mesmo <see cref="ConfirmarPagamentoPedidoInput.PagamentoExternoId"/> já pago → no-op.</item>
-///   <item>Valor menor que o da cobrança → não confirma, grava o motivo na cobrança e na trilha.</item>
+///   <item>Valor menor que o da cobrança → não confirma, grava o motivo na cobrança e na trilha e registra o valor
+///     como recebimento devolvível pelo estorno online (#1724-7).</item>
 ///   <item><c>AguardandoPagamento → Aguardando</c>, ou <c>AguardandoAprovacaoBaba</c> quando
 ///     <c>Pedido.RequerAprovacao</c> (S12); pedido já na fila só recebe o pagamento. Cobrança
 ///     <c>Paga</c>, demais pendentes canceladas, <c>PedidoPagoEvent</c> e <c>pedido.mudou_status</c> no
@@ -202,7 +203,9 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct);
         var jaPaga = cobrancas.FirstOrDefault(c => c.PagamentoExternoId == input.PagamentoExternoId);
         if (jaPaga is not null)
-            return (new(SituacaoConfirmacaoPagamento.JaConfirmado, jaPaga.Id, pedido.Status), null, null, null);
+            // #1724-7: o pagamento a menor já registrado continua sendo "a menor" na notificação repetida.
+            return (new(jaPaga.RegistraPagamentoAMenor ? SituacaoConfirmacaoPagamento.ValorMenor : SituacaoConfirmacaoPagamento.JaConfirmado,
+                jaPaga.Id, pedido.Status), null, null, null);
 
         var alvo = EscolherCobranca(cobrancas, input);
         if (alvo is null)
@@ -241,11 +244,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
                 SituacaoConfirmacaoPagamento.PagamentoDuplicado, ct);
 
         if (input.ValorPago < alvo.Valor)
-        {
-            var motivo = $"valor_menor: pagamento {input.PagamentoExternoId} de {input.ValorPago.ToString("F2", Cultura.PtBr)} " +
-                         $"para cobrança de {alvo.Valor.ToString("F2", Cultura.PtBr)}";
-            return (await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.ValorMenor, agora, ct), null, null, null);
-        }
+            return (await ReterPagamentoAMenorAsync(pedido, alvo, input, empresaId, agora, ct), null, null, null);
 
         var pagoEm = input.PagoEm ?? agora;
         var metodo = CobrancaPedido.MapearMetodo(input.MetodoPagamentoExterno, input.TipoPagamentoExterno);
@@ -308,6 +307,11 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             var saldo = comPagamentos.Total.Valor - comPagamentos.TotalPago;
             var naEntrega = CobrancaPedido.CriarNaEntrega(empresaId, pedido.Id, saldo, pagoEm, alvo.ConversaId);
             await cobrancaRepository.AddAsync(naEntrega, ct);
+            // Decisão do Felipe (22/10): o sinal da encomenda pago pelo link avisa o cliente pelo canal do pedido, uma
+            // vez por pagamento (a chave do outbox leva o id do pagamento). Pagamento que quita não passa aqui.
+            if (avisoCliente is not null && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm))
+                await avisoCliente.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+                    empresaId, pedido.Id, $"sinal:{input.PagamentoExternoId}", ct, mensagem: TextoSinalRecebido(input.ValorPago, saldo));
         }
 
         if (alvo.Complementar && comPagamentos.Pagamentos.Count > 1 && efeito is null && avisoCliente is not null)
@@ -372,6 +376,42 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         return (resultado, null, null, alvo.ConversaId);
     }
 
+    /// <summary>Aviso ao cliente do sinal da encomenda pago pelo link (decisão do Felipe, 22/10).</summary>
+    public static string TextoSinalRecebido(decimal sinal, decimal restante) =>
+        $"Recebemos o sinal de {sinal.ToString("C", Cultura.PtBr)}. O restante de {restante.ToString("C", Cultura.PtBr)} fica para a entrega.";
+
+    /// <summary>
+    /// #1724-7: pagamento aprovado abaixo do valor da cobrança. Antes só era recusado e o dinheiro ficava retido no
+    /// Mercado Pago sem recebimento nem caminho de devolução. Agora o valor entra como recebimento do Mercado Pago
+    /// (<see cref="CobrancaPedido.RegistrarPagamentoAMenor"/> + <c>PedidoPagamento</c> com o id do pagamento), que o
+    /// estorno online devolve, e conta no saldo: a próxima cobrança pede só o restante. O pedido não é confirmado
+    /// (não muda de status, sem <c>pedido.pago</c> nem canhoto) e a cobrança original segue pendente com o motivo.
+    /// A notificação repetida acha o registro pelo id do pagamento e não duplica.
+    /// </summary>
+    private async Task<ConfirmarPagamentoPedidoResult> ReterPagamentoAMenorAsync(PedidoEntity pedido, CobrancaPedido alvo,
+        ConfirmarPagamentoPedidoInput input, Guid empresaId, DateTime agora, CancellationToken ct)
+    {
+        var motivo = $"valor_menor: pagamento {input.PagamentoExternoId} de {input.ValorPago.ToString("F2", Cultura.PtBr)} " +
+                     $"para cobrança de {alvo.Valor.ToString("F2", Cultura.PtBr)}";
+        var pagoEm = input.PagoEm ?? agora;
+        var metodo = CobrancaPedido.MapearMetodo(input.MetodoPagamentoExterno, input.TipoPagamentoExterno);
+        await cobrancaRepository.AddAsync(
+            CobrancaPedido.RegistrarPagamentoAMenor(alvo, input.PagamentoExternoId, input.ValorPago, metodo, pagoEm, motivo), ct);
+        await registrarPagamento.ExecuteAsync(new RegistrarPagamentoPedidoCommand(
+            EmpresaId: empresaId,
+            PedidoId: pedido.Id,
+            Metodo: metodo,
+            Valor: input.ValorPago,
+            Referencia: input.PagamentoExternoId,
+            Observacao: $"Mercado Pago, pagamento a menor da cobrança {alvo.Id}",
+            RegistradoPorNome: "Mercado Pago",
+            Origem: Origem,
+            PermitirExcedente: true,
+            ConfirmadoPeloProvedor: true), ct);
+        return await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.ValorMenor, agora, ct,
+            $"{motivo}. Valor registrado como recebimento: devolva pelo estorno online ou use no restante do pedido.");
+    }
+
     /// <summary>
     /// #1289: o pedido já está pago por outro pagamento quando alguma cobrança está <c>Paga</c> com outro id ou
     /// quando os pagamentos registrados (console, maquininha) já cobrem o total. O <c>FOR UPDATE</c> não carrega
@@ -382,7 +422,9 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         Guid empresaId, CancellationToken ct)
     {
         var alvo = EscolherCobranca(cobrancas, input);
-        if (alvo?.Complementar != true && cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga && c.PagamentoExternoId != input.PagamentoExternoId))
+        // O pagamento a menor registrado (#1724-7) não quita o pedido: conta pelo saldo logo abaixo.
+        if (alvo?.Complementar != true && cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga
+                && c.PagamentoExternoId != input.PagamentoExternoId && !c.RegistraPagamentoAMenor))
             return true;
 
         var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
@@ -398,7 +440,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         if (!string.IsNullOrWhiteSpace(input.ReferenciaExterna))
             return cobrancas.FirstOrDefault(c => c.Provedor == input.Provedor && c.ReferenciaExterna == input.ReferenciaExterna);
 
-        var online = cobrancas.Where(c => c.Provedor == input.Provedor).ToList();
+        // O registro do pagamento a menor (#1724-7) não é link: nunca é a cobrança que um pagamento novo confirma.
+        var online = cobrancas.Where(c => c.Provedor == input.Provedor && !c.RegistraPagamentoAMenor).ToList();
         var atual = online.FirstOrDefault(c => c.EstaPendente) ?? online.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
         if (atual is null || input.ValorPago >= atual.Valor) return atual;
 
@@ -414,7 +457,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         c.Status is StatusCobrancaPedido.Cancelada or StatusCobrancaPedido.Expirada;
 
     private async Task<ConfirmarPagamentoPedidoResult> RecusarAsync(
-        PedidoEntity pedido, CobrancaPedido alvo, string motivo, SituacaoConfirmacaoPagamento situacao, DateTime agora, CancellationToken ct)
+        PedidoEntity pedido, CobrancaPedido alvo, string motivo, SituacaoConfirmacaoPagamento situacao, DateTime agora, CancellationToken ct,
+        string? detalhes = null)
     {
         alvo.RegistrarMotivo(motivo, agora);
         await pedidoRepository.AddEventoAsync(new PedidoEvento
@@ -422,7 +466,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             Id = Guid.NewGuid(),
             PedidoId = pedido.Id,
             Tipo = "pagamento_divergente",
-            Detalhes = motivo,
+            Detalhes = detalhes ?? motivo,
             UsuarioNome = "Mercado Pago",
             Origem = Origem,
             OcorridoEm = agora,

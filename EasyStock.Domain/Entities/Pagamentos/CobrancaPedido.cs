@@ -91,6 +91,13 @@ public class CobrancaPedido
     public bool EhOnline => Provedor == ProvedorMercadoPago;
     public bool EstaPendente => Status == StatusCobrancaPedido.Pendente;
 
+    /// <summary>
+    /// #1724-7: registro de um pagamento aprovado abaixo do valor da cobrança (<see cref="RegistrarPagamentoAMenor"/>).
+    /// Online sem preferência própria: não é link pagável nem quita o pedido; existe para o estorno online achar o
+    /// recebimento e devolvê-lo.
+    /// </summary>
+    public bool RegistraPagamentoAMenor => EhOnline && ReferenciaExterna is null;
+
     // EF Core
     private CobrancaPedido() { }
 
@@ -144,6 +151,29 @@ public class CobrancaPedido
             throw new RegraDeDominioVioladaException("Só cobrança online pendente aguarda credencial.");
         AguardandoCredencialDesde ??= Utc(agora);
         AtualizadaEm = Utc(agora);
+    }
+
+    /// <summary>
+    /// #1724-7: o cliente pagou menos que a <paramref name="cobrada"/> e o dinheiro ficou no Mercado Pago. O valor vira
+    /// um registro online já pago, sem preferência (o link continua sendo da cobrada, que segue pendente), com o id do
+    /// pagamento: é por ele que o estorno online devolve. Não confirma nem quita o pedido.
+    /// </summary>
+    public static CobrancaPedido RegistrarPagamentoAMenor(CobrancaPedido cobrada, string pagamentoExternoId, decimal valorPago,
+        string metodo, DateTime pagoEm, string motivo)
+    {
+        ArgumentNullException.ThrowIfNull(cobrada);
+        if (!cobrada.EhOnline)
+            throw new RegraDeDominioVioladaException("Pagamento a menor só vem de cobrança online.");
+        if (valorPago <= 0m || valorPago >= cobrada.Valor)
+            throw new RegraDeDominioVioladaException("Pagamento a menor deve ser positivo e abaixo do valor da cobrança.");
+
+        var c = Nova(cobrada.EmpresaId, cobrada.PedidoId, valorPago, ProvedorMercadoPago, pagoEm, cobrada.ConversaId);
+        c.Tentativa = cobrada.Tentativa;
+        c.ContaRecebedoraId = cobrada.ContaRecebedoraId;
+        c.OrigemCredencial = cobrada.OrigemCredencial;
+        c.MarcarPaga(pagamentoExternoId, valorPago, metodo, pagoEm);
+        c.RegistrarMotivo(motivo, pagoEm);
+        return c;
     }
 
     public static CobrancaPedido CriarNaEntrega(

@@ -11,7 +11,9 @@ using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.Services.Pedidos;
 
-public sealed record EfeitosQuitacao(PedidoPagoOperacao? Pago, ImpressaoPendenteOperacao? Impressao);
+/// <param name="PreferenciasSubstituidas">#1717-8: links online cancelados pela quitação; expiram no provedor depois do commit.</param>
+public sealed record EfeitosQuitacao(PedidoPagoOperacao? Pago, ImpressaoPendenteOperacao? Impressao,
+    IReadOnlyList<string>? PreferenciasSubstituidas = null);
 
 // O marco permanece na trilha mesmo quando a baixa é desfeita: uma correção não manda
 // outro "recebemos seu pagamento" nem imprime outra via automaticamente (#1255).
@@ -23,7 +25,8 @@ public sealed class QuitacaoPedido(
     IPublicadorEventoIntegracao publicador,
     IOperacaoEventPublisher eventos,
     CalculadoraInicioPrevistoPedido inicioPrevisto,
-    SaldoFinanceiroPedido? saldos = null)
+    SaldoFinanceiroPedido? saldos = null,
+    ExpiracaoPreferenciaMercadoPago? expiracao = null)
 {
     public const string Marco = "quitacao_confirmada";
 
@@ -69,9 +72,14 @@ public sealed class QuitacaoPedido(
             await cobrancas.AddAsync(manual, ct);
         }
         manual.MarcarPaga($"manual-{pagamento.Id:N}", pedido.TotalPago - pagoOnline, pagamento.Metodo, pagamento.PagoEm);
+        var substituidas = new List<string>();
         foreach (var outra in lista.Where(c => c.EstaPendente && c.Id != manual.Id))
+        {
             outra.Cancelar("quitacao_manual", pagamento.PagoEm);
-        return await PrepararAsync(pedido, manual, pagamento.PagoEm, ct);
+            if (outra is { EhOnline: true, ReferenciaExterna: { } preferencia }) substituidas.Add(preferencia);
+        }
+        var efeitos = await PrepararAsync(pedido, manual, pagamento.PagoEm, ct);
+        return substituidas.Count == 0 ? efeitos : (efeitos ?? new(null, null)) with { PreferenciasSubstituidas = substituidas };
     }
 
     public async Task<EfeitosQuitacao?> PrepararAsync(Pedido pedido, CobrancaPedido cobranca, DateTime agora, CancellationToken ct)
@@ -127,5 +135,7 @@ public sealed class QuitacaoPedido(
         if (mudanca is not null) await eventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, empresaId, mudanca, ct);
         if (efeito?.Pago is { } pago) await eventos.PublicarAsync(EventosOperacao.PedidoPago, empresaId, pago, ct);
         if (efeito?.Impressao is { } impressao) await eventos.PublicarAsync(EventosOperacao.ImpressaoPendente, empresaId, impressao, ct);
+        if (efeito?.PreferenciasSubstituidas is { Count: > 0 } preferencias && expiracao is not null)
+            await expiracao.ExpirarAsync(preferencias, ct);
     }
 }
