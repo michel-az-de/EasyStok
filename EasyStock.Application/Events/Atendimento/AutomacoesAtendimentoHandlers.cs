@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Automacoes;
 using EasyStock.Domain.Enums.Atendimento;
@@ -73,8 +74,8 @@ public sealed class AutomacaoConversaEncerradaHandler(ITenantContextAccessor ten
 /// <summary>
 /// <c>pedido.pago</c> (S11): o "recebemos seu pagamento" ao cliente, decidido num lugar só (#1991-2). Primeiro a
 /// automática "Pagamento confirmado" (nasce ligada; a dona troca o texto ou desliga); se ela não sai (desligada, fora
-/// da janela, sem conversa, variável sem valor, falha do canal), o aviso S13 de pedido pago, com modelo aprovado e
-/// idempotente por cobrança e pagamento externo. Assim o cliente recebe um aviso, nunca dois e nunca nenhum.
+/// da janela, sem conversa, variável sem valor, falha do canal que se sabe que nada saiu), o aviso S13 de pedido pago, com
+/// modelo aprovado e idempotente por cobrança e pagamento externo. Assim o cliente recebe um aviso, nunca dois e nunca nenhum.
 /// </summary>
 public sealed class AutomacaoPedidoPagoHandler(
     ITenantContextAccessor tenant, DispararAutomacaoUseCase disparo, AvisoStatusPedidoCliente aviso)
@@ -95,7 +96,9 @@ public sealed class AutomacaoPedidoPagoHandler(
 
         var automatica = await disparo.ExecuteAsync(new DisparoAutomacao(
             evento.EmpresaId, GatilhoAutomacao.PagamentoConfirmado, e.ConversaId, e.ClienteId, e.PedidoId), ct);
-        if (automatica == ResultadoAutomacao.Enviada) return;
+        // Envio incerto (o canal não respondeu): a automática pode ter chegado, e o S13 seria o segundo "recebemos seu pagamento".
+        // A falha fica na conversa (#2004) para a atendente conferir.
+        if (automatica is ResultadoAutomacao.Enviada or ResultadoAutomacao.EnvioIncerto) return;
 
         var marco = e.CobrancaPedidoId == Guid.Empty ? MarcoPago : $"pagamento:{e.CobrancaPedidoId:N}:{e.PagamentoExternoId}";
         await aviso.EnfileirarAsync(TipoEventoNotificacao.PedidoPagoConfirmado, evento.EmpresaId, e.PedidoId, marco, ct);
@@ -107,7 +110,8 @@ public sealed class AutomacaoPedidoPagoHandler(
 /// do S13 e não passam por aqui.
 /// </summary>
 public sealed class AutomacaoPedidoEntregueHandler(
-    ITenantContextAccessor tenant, DispararAutomacaoUseCase disparo, IPedidoRepository pedidos)
+    ITenantContextAccessor tenant, DispararAutomacaoUseCase disparo, IPedidoRepository pedidos,
+    IConversaRepository? conversas = null)
     : AutomacaoHandlerBase(tenant)
 {
     public const string Tipo = "pedido.mudou_status";
@@ -123,6 +127,9 @@ public sealed class AutomacaoPedidoEntregueHandler(
         var pedido = await pedidos.GetByIdAsync(evento.EmpresaId, e.PedidoId);
         if (pedido?.ClienteId is not { } clienteId) return;
 
-        await disparo.ExecuteAsync(new DisparoAutomacao(evento.EmpresaId, GatilhoAutomacao.PosEntrega, null, clienteId, pedido.Id), ct);
+        // #2004: o agradecimento vai pela conversa dona do pedido; a mais recente do cliente pode ser de outro canal.
+        // Sem conversa do pedido, o disparo cai na mais recente.
+        var conversaId = conversas is null ? null : await conversas.ObterIdPorPedidoAsync(evento.EmpresaId, pedido.Id, ct);
+        await disparo.ExecuteAsync(new DisparoAutomacao(evento.EmpresaId, GatilhoAutomacao.PosEntrega, conversaId, clienteId, pedido.Id), ct);
     }
 }

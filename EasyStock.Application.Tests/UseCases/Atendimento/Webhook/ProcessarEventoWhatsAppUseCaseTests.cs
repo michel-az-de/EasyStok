@@ -48,6 +48,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
     private readonly IPublicadorEventoIntegracao _publicadorEventos = Substitute.For<IPublicadorEventoIntegracao>();
     private readonly IExpedienteLojaRepository _expedientes = Substitute.For<IExpedienteLojaRepository>();
     private readonly IPedidoRepository _pedidoRepository = Substitute.For<IPedidoRepository>();
+    private readonly IRegraAutomaticaRepository _regrasAutomaticas = Substitute.For<IRegraAutomaticaRepository>();
     // 12:00 em São Paulo: dentro do expediente padrão (08–22 h); quem testa loja fechada muda o relógio.
     private readonly FakeTimeProvider _relogio = new(new DateTimeOffset(2026, 10, 8, 15, 0, 0, TimeSpan.Zero));
     private readonly Guid _empresaId = Guid.NewGuid();
@@ -83,7 +84,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
             NullLogger<ProcessarEventoWhatsAppUseCase>.Instance,
             _publicadorEventos,
             transcritor,
-            _pedidoRepository);
+            _pedidoRepository,
+            _regrasAutomaticas);
 
     private void ConfigurarCenario()
     {
@@ -593,6 +595,89 @@ public class ProcessarEventoWhatsAppUseCaseTests
         enviado.Should().StartWith(padrao.SaudacaoPrimeiroContato.Split('{')[0])
             .And.Contain("/cardapio")
             .And.EndWith(padrao.FraseEspera);
+    }
+
+    // ── #2004 atendimento-01: a automática de primeira entrada e a saudação direta não saem as duas ──────────
+
+    private void LigarAutomatica(GatilhoAutomacao gatilho) =>
+        _regrasAutomaticas.ObterPorGatilhoAsync(_empresaId, gatilho, Arg.Any<CancellationToken>())
+            .Returns(RegraAutomatica.Criar(_empresaId, gatilho, "Texto da dona.", ligada: true, DateTime.UtcNow));
+
+    [Fact]
+    public async Task ForaDoHorarioComAutomaticaLigada_OAvisoDoExpedienteNaoSaiDuasVezes()
+    {
+        // 00:00 em São Paulo: sem a correção o cliente lia o aviso do expediente aqui e, em até 30 s, o da automática.
+        _relogio.SetUtcNow(new DateTimeOffset(2026, 10, 9, 3, 0, 0, TimeSpan.Zero));
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        LigarAutomatica(GatilhoAutomacao.ForaDoHorario);
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.dupla-fora", "Oi"));
+
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _publicadorEventos.Received(1).PublicarAsync(_empresaId, ConversaAbertaEvent.TipoEvento, "Conversa",
+            Arg.Any<Guid>(), Arg.Any<ConversaAbertaEvent>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    [Fact]
+    public async Task LojaFechadaNaMaoComAutomaticaLigada_OAvisoDeLojaFechadaNaoSaiDuasVezes()
+    {
+        var expediente = ExpedienteLoja.CriarPadrao(_empresaId);
+        expediente.DefinirControle(EasyStock.Domain.Enums.Storefront.ControleManualLoja.ForcarFechada, null, DateTime.UtcNow);
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(expediente);
+        LigarAutomatica(GatilhoAutomacao.LojaFechada);
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.dupla-fechada", "Oi"));
+
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task LojaAbertaComPrimeiroContatoLigado_ASaudacaoNaoSaiDuasVezes()
+    {
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        LigarAutomatica(GatilhoAutomacao.PrimeiroContato);
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.dupla-aberta", "Oi"));
+
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task AutomaticaDeOutraSituacaoLigada_ASaudacaoSaiNormalmente()
+    {
+        // Só vale a regra da situação de agora: loja aberta usa o primeiro contato, não o fora do horário.
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        LigarAutomatica(GatilhoAutomacao.ForaDoHorario);
+        LigarAutomatica(GatilhoAutomacao.LojaFechada);
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.outra-regra", "Oi"));
+
+        await _cloudClient.Received(1).EnviarTextoAsync(ContatoWaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SemPublicadorDeEventos_ASaudacaoSaiMesmoComAutomaticaLigada()
+    {
+        // Sem o outbox a automática não dispara; a saudação não pode ceder a quem não vai falar.
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        LigarAutomatica(GatilhoAutomacao.PrimeiroContato);
+        var semOutbox = new ProcessarEventoWhatsAppUseCase(
+            _empresaRepository, _featureFlagRepository, _configuracaoRepository, _conversaRepository,
+            _webhookRecebidoRepository, _cloudClient, _queueService, _eventPublisher, _tenantContext, _unitOfWork,
+            new IdentificarClientePorTelefoneUseCase(_clienteRepository, _clienteStorefrontRepository,
+                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+            new SaudacaoAtendimento(_storefrontRepository, new ConfigurationBuilder().Build()),
+            new RoteadorAcoesBotao([], NullLogger<RoteadorAcoesBotao>.Instance),
+            new OptOutPorPalavra(_consentimentoRepository, _conversaRepository, new ResolvedorCanal([_canalWhatsApp]),
+                _unitOfWork, NullLogger<OptOutPorPalavra>.Instance),
+            new EscalarConversaUseCase(_conversaRepository, _notificador, _eventPublisher),
+            _expedientes, _relogio, NullLogger<ProcessarEventoWhatsAppUseCase>.Instance,
+            publicadorEventos: null, transcritor: null, pedidos: _pedidoRepository, regrasAutomaticas: _regrasAutomaticas);
+
+        await semOutbox.ExecuteAsync(PayloadTexto("wamid.sem-outbox", "Oi"));
+
+        await _cloudClient.Received(1).EnviarTextoAsync(ContatoWaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

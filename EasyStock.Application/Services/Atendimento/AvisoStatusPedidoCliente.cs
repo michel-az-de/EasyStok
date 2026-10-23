@@ -72,6 +72,11 @@ public sealed class AvisoStatusPedidoCliente(
         if (tipo == TipoEventoNotificacao.PedidoPagoConfirmado && pedido.StatusEnum == StatusPedido.Cancelado)
             return false;
 
+        // #2004: dinheiro recebido na porta é quitado depois de o pedido sair ou ser entregue; o "recebemos seu pagamento"
+        // chegaria depois do prato.
+        if (tipo == TipoEventoNotificacao.PedidoPagoConfirmado && pedido.StatusEnum is StatusPedido.SaiuParaEntrega or StatusPedido.Entregue)
+            return false;
+
         var cliente = pedido.ClienteId is { } clienteId
             ? await clienteRepository.GetByIdAsync(empresaId, clienteId)
             : null;
@@ -138,9 +143,8 @@ public sealed class AvisoStatusPedidoCliente(
         {
             ["pedidoId"] = pedido.Id.ToString(),
             ["clienteId"] = pedido.ClienteId?.ToString(),
-            ["nome"] = PrimeiroNome(cliente?.Nome ?? pedido.ClienteNome),
-            ["numero"] = conversa is { NumeroComanda: > 0 } ? conversa.NumeroComanda.ToString(CultureInfo.InvariantCulture)
-                : pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+            ["nome"] = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(pedido.ClienteNome, "cliente"),
+            ["numero"] = VariaveisAtendimento.NumeroDoPedido(pedido.Id, conversa),
             ["previsao"] = previsao ?? await PrevisaoAsync(pedido.Id, ct),
         };
         if (mensagem is not null) variaveis["mensagem"] = mensagem;
@@ -169,7 +173,4 @@ public sealed class AvisoStatusPedidoCliente(
             return null;
         }
     }
-
-    private static string PrimeiroNome(string? nome) =>
-        string.IsNullOrWhiteSpace(nome) ? "cliente" : nome.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
 }

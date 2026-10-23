@@ -24,7 +24,7 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
         ArgumentNullException.ThrowIfNull(identificacao);
 
         var link = await ResolverLinkCardapioAsync(empresaId, ct);
-        var primeiroNome = identificacao.EhNovo ? null : PrimeiroNome(identificacao.Cliente.Nome);
+        var primeiroNome = identificacao.EhNovo ? null : NomesDeContato.PrimeiroNome(identificacao.Cliente.Nome);
         return Montar(configuracao, primeiroNome, link);
     }
 
@@ -57,12 +57,5 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
             ? $"https://{storefront.DominioCustom.Trim().TrimEnd('/')}"
             : configuration["App:BaseUrl"]?.TrimEnd('/') ?? BaseUrlPadrao;
         return baseUrl + CaminhoCardapio;
-    }
-
-    private static string? PrimeiroNome(string? nome)
-    {
-        // Lead criado sem nome de perfil não é saudado como "Cliente".
-        if (string.IsNullOrWhiteSpace(nome) || nome == IdentificarClientePorTelefoneUseCase.NomePadraoLead) return null;
-        return nome.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
     }
 }

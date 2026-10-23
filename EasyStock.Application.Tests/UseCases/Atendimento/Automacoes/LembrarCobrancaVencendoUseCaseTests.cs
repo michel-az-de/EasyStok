@@ -234,7 +234,8 @@ public class LembrarCobrancaVencendoUseCaseTests
             .Returns<string>(_ => throw new HttpRequestException("Meta fora"), _ => "wamid.2");
 
         Minuto(21);
-        (await UseCase().ExecuteAsync(Item(link))).Automacao.Should().Be(ResultadoAutomacao.Falhou);
+        // #2004: HttpRequestException sem status é falha incerta (a Meta pode ter recebido).
+        (await UseCase().ExecuteAsync(Item(link))).Automacao.Should().Be(ResultadoAutomacao.EnvioIncerto);
         Minuto(22);
         (await UseCase().ExecuteAsync(Item(link))).Situacao.Should().Be(SituacaoLembreteCobranca.JaAvisada);
 

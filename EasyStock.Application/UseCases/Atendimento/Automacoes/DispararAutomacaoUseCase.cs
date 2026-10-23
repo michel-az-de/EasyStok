@@ -15,7 +15,10 @@ namespace EasyStock.Application.UseCases.Atendimento.Automacoes;
 /// </summary>
 public sealed record DisparoAutomacao(Guid EmpresaId, GatilhoAutomacao Gatilho, Guid? ConversaId, Guid? ClienteId, Guid? PedidoId);
 
-/// <summary>O que aconteceu com o disparo. Só <see cref="Enviada"/> sai para o cliente.</summary>
+/// <summary>
+/// O que aconteceu com o disparo. Só <see cref="Enviada"/> sai para o cliente; <see cref="EnvioIncerto"/> pode ter saído
+/// (o canal não respondeu), então quem decide um aviso de reserva não deve tratá-lo como "não saiu".
+/// </summary>
 public enum ResultadoAutomacao
 {
     Enviada = 1,
@@ -28,7 +31,9 @@ public enum ResultadoAutomacao
     Falhou = 8,
     ClienteBloqueado = 9,
     ConversaReaberta = 10,
-    PedidoCancelado = 11
+    PedidoCancelado = 11,
+    EnvioIncerto = 12,
+    PedidoJaAdiante = 13
 }
 
 /// <summary>
@@ -83,7 +88,9 @@ public sealed class DispararAutomacaoUseCase(
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Automática {Gatilho} falhou no canal da conversa {ConversaId}.", disparo.Gatilho, conversa.Id);
-            return ResultadoAutomacao.Falhou;
+            var tipo = ClassificadorFalhaEnvio.Classificar(ex);
+            await RegistrarFalhaAsync(conversa, texto, ex, tipo, agora);
+            return tipo == TipoFalhaEnvio.Incerta ? ResultadoAutomacao.EnvioIncerto : ResultadoAutomacao.Falhou;
         }
 
         var saida = Mensagem.Saida(disparo.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
@@ -93,6 +100,29 @@ public sealed class DispararAutomacaoUseCase(
         await conversas.AddMensagemAsync(saida, ct);
         await unitOfWork.CommitAsync();
         return ResultadoAutomacao.Enviada;
+    }
+
+    /// <summary>
+    /// #2004: a automática que não saiu fica no histórico como mensagem com falha, como a saudação e o aviso de cobrança
+    /// (#1724): a atendente vê no console que o cliente não recebeu. Sem reenvio automático (o texto pode estar vencido,
+    /// #1933) e só com a conversa aberta; a despedida de uma conversa encerrada não suja o histórico. Best-effort: quem
+    /// chama é um handler do outbox e este caminho nunca lança.
+    /// </summary>
+    private async Task RegistrarFalhaAsync(Conversa conversa, string texto, Exception ex, TipoFalhaEnvio tipo, DateTime agora)
+    {
+        if (!conversa.EstaAberta) return;
+        try
+        {
+            var falhou = Mensagem.Saida(conversa.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto, texto);
+            falhou.RegistrarFalhaEnvio(ClassificadorFalhaEnvio.Motivo(ex), tipo, agora, reenvioAutomatico: false);
+            await conversas.AddMensagemAsync(falhou);
+            await unitOfWork.CommitAsync();
+        }
+        catch (Exception erroAoGravar)
+        {
+            logger.LogWarning(erroAoGravar, "Automática falhou e o registro da falha também: conversa {ConversaId}.", conversa.Id);
+            unitOfWork.DescartarAlteracoesPendentes();
+        }
     }
 
     /// <summary>O que a automática vai mandar (<see cref="Pronta"/>; falta só o canal aceitar), ou por que não sai.</summary>
@@ -109,10 +139,16 @@ public sealed class DispararAutomacaoUseCase(
         if (regra is null) return new NaoSai(ResultadoAutomacao.SemRegra);
         if (!regra.Ligada) return new NaoSai(ResultadoAutomacao.Desligada);
 
-        // Pagamento que chegou depois do cancelamento é devolvido: não dizer que o pedido está garantido (como o S13).
-        if (disparo.Gatilho == GatilhoAutomacao.PagamentoConfirmado && disparo.PedidoId is { } pedidoId && pedidos is not null
-            && (await pedidos.GetByIdAsync(disparo.EmpresaId, pedidoId))?.StatusEnum == StatusPedido.Cancelado)
-            return new NaoSai(Registrar(disparo, ResultadoAutomacao.PedidoCancelado));
+        if (disparo.Gatilho == GatilhoAutomacao.PagamentoConfirmado && disparo.PedidoId is { } pedidoId && pedidos is not null)
+        {
+            var status = (await pedidos.GetByIdAsync(disparo.EmpresaId, pedidoId))?.StatusEnum;
+            // Pagamento que chegou depois do cancelamento é devolvido: não dizer que o pedido está garantido (como o S13).
+            if (status == StatusPedido.Cancelado) return new NaoSai(Registrar(disparo, ResultadoAutomacao.PedidoCancelado));
+            // #2004: dinheiro recebido na porta é quitado depois de o pedido sair ou ser entregue; "recebemos seu pagamento
+            // e seu pedido está confirmado" não faz mais sentido (como o S13).
+            if (status is StatusPedido.SaiuParaEntrega or StatusPedido.Entregue)
+                return new NaoSai(Registrar(disparo, ResultadoAutomacao.PedidoJaAdiante));
+        }
 
         var conversa = await ConversaAsync(disparo, ct);
         if (conversa is null) return new NaoSai(Registrar(disparo, ResultadoAutomacao.SemConversa));
