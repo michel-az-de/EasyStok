@@ -44,9 +44,9 @@ public sealed class ConfirmarEnderecoClienteUseCase(
             existente.Complemento = e.Complemento ?? existente.Complemento;
             existente.Referencia = e.Referencia ?? existente.Referencia;
             // #1991-3: o endereço salvo sem bairro, cidade ou UF fica com o que chegou agora.
-            existente.Bairro = e.Bairro ?? existente.Bairro;
-            existente.Cidade = e.Cidade ?? existente.Cidade;
-            existente.Estado = e.Uf ?? existente.Estado;
+            existente.Bairro ??= e.Bairro;
+            existente.Cidade ??= e.Cidade;
+            existente.Estado ??= e.Uf;
             existente.AlteradoEm = DateTime.UtcNow;
             await unitOfWork.CommitAsync();
             return existente.Id;

@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+using System.Text.Json;
+using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Events.Pedidos.Handlers;
 using EasyStock.Application.Ports.Output;
@@ -221,7 +222,7 @@ public class NotificarClienteStatusPedidoHandlerTests
     [Fact]
     public async Task PagamentoConfirmadoAvisaComPrevisao()
     {
-        var handler = new NotificarClientePedidoPagoHandler(Aviso());
+        var handler = HandlerDoPago(Aviso());
         var payload = new PedidoPagoEvent(_pedido.Id, _empresaId, null, _cliente.Id, null, Guid.NewGuid(), "mercadopago",
             "pay-1", "pix", 25m, StatusPedidoMapper.Aguardando, DateTime.UtcNow);
 
@@ -242,7 +243,7 @@ public class NotificarClienteStatusPedidoHandlerTests
         var payload = new PedidoPagoEvent(_pedido.Id, _empresaId, null, _cliente.Id, null, Guid.NewGuid(), "mercadopago",
             "pay-atrasado", "pix", 25m, StatusPedidoMapper.Aguardando, DateTime.UtcNow);
 
-        await new NotificarClientePedidoPagoHandler(Aviso()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, payload), CancellationToken.None);
+        await HandlerDoPago(Aviso()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, payload), CancellationToken.None);
         await AvaliarEventosAsync();
 
         _eventos.Should().BeEmpty();
@@ -396,28 +397,35 @@ public class NotificarClienteStatusPedidoHandlerTests
         _eventos.Where(e => e.Tipo != TipoEventoNotificacao.AvaliacaoSolicitada).Should().BeEmpty();
     }
 
-    // #1991-2: com a automática "Pagamento confirmado" ligada (padrão) e saindo na conversa, o aviso S13 cede a vez.
-    private NotificarClientePedidoPagoHandler HandlerDoPago(ICanalMensageria canal) => new(AvisoComChat(), _tenant,
-        new EasyStock.Application.UseCases.Atendimento.Automacoes.DispararAutomacaoUseCase(
+    // #1991-2: o "recebemos seu pagamento" é decidido num lugar só (AutomacaoPedidoPagoHandler): a automática
+    // "Pagamento confirmado" (nasce ligada) e, se ela não sai, o aviso S13. Um aviso, nunca dois e nunca nenhum.
+    private AutomacaoPedidoPagoHandler HandlerDoPago(AvisoStatusPedidoCliente aviso, ICanalMensageria? canal = null)
+    {
+        _conversas.ListarPorClienteAsync(_empresaId, Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Conversa>());
+        return new(_tenant, new EasyStock.Application.UseCases.Atendimento.Automacoes.DispararAutomacaoUseCase(
             Substitute.For<IRegraAutomaticaRepository>(), _conversas, _clientes, Substitute.For<IExpedienteLojaRepository>(),
             new VariaveisAtendimento(_clientes, _pedidos), new PoliticaEnvioCliente(_consentimentos),
-            new EasyStock.Application.Services.Atendimento.ResolvedorCanal([canal]), Substitute.For<IUnitOfWork>(), TimeProvider.System,
-            NullLogger<EasyStock.Application.UseCases.Atendimento.Automacoes.DispararAutomacaoUseCase>.Instance, _pedidos));
+            new EasyStock.Application.Services.Atendimento.ResolvedorCanal(canal is null ? [] : [canal]), Substitute.For<IUnitOfWork>(),
+            TimeProvider.System, NullLogger<EasyStock.Application.UseCases.Atendimento.Automacoes.DispararAutomacaoUseCase>.Instance,
+            _pedidos), aviso);
+    }
 
     private PedidoPagoEvent Pago(Guid? conversaId) => new(_pedido.Id, _empresaId, null, _cliente.Id, conversaId, Guid.NewGuid(),
         "mercadopago", "pay-1", "pix", 25m, StatusPedidoMapper.Aguardando, DateTime.UtcNow);
 
     [Fact]
-    public async Task PagamentoComAutomaticaSaindoNaConversa_AvisoS13CedeAVez()
+    public async Task PagamentoComAutomaticaSaindoNaConversa_SoAAutomaticaAvisa()
     {
         var conversa = ConversaDoChat();
         _pedido.AgendadoParaEm = DateTime.UtcNow.AddDays(2);
 
-        await HandlerDoPago(new CanalChatSite()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
+        var handler = HandlerDoPago(AvisoComChat(), new CanalChatSite());
+        await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
         await AvaliarEventosAsync();
 
-        _gravadas.Should().BeEmpty("quem fala do pagamento é a automática, que roda depois neste evento");
-        _eventos.Should().BeEmpty();
+        _gravadas.Should().ContainSingle().Which.Texto.Should().StartWith("Oi, Maria! Recebemos seu pagamento e seu pedido está confirmado");
+        _eventos.Should().BeEmpty("o aviso S13 só sai quando a automática não sai");
     }
 
     [Fact]
@@ -426,27 +434,50 @@ public class NotificarClienteStatusPedidoHandlerTests
         // O texto padrão da automática pede {faixa}; sem ela a automática não sai e o S13 avisa (com a previsão da vaga).
         var conversa = ConversaDoChat();
 
-        await HandlerDoPago(new CanalChatSite()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
+        await HandlerDoPago(AvisoComChat(), new CanalChatSite()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
 
         _gravadas.Should().ContainSingle().Which.Texto.Should().Contain("Recebemos seu pagamento").And.Contain("Tarde (14h às 18h), 01/10");
     }
 
     [Fact]
+    public async Task PagamentoComFalhaDoCanalNaAutomatica_AvisoS13Sai()
+    {
+        var conversa = ConversaDoWhatsApp(DateTime.UtcNow.AddMinutes(-1));
+        _pedido.AgendadoParaEm = DateTime.UtcNow.AddDays(2);
+        var whats = Substitute.For<ICanalMensageria>();
+        whats.Canal.Returns(CanalConversa.WhatsApp);
+        whats.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<string>(_ => throw new HttpRequestException("Meta fora"));
+
+        await HandlerDoPago(AvisoComChat(), whats).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
+        await AvaliarEventosAsync();
+
+        _outbox.Should().ContainSingle("a automática falhou no canal; o aviso S13 tem retentativa").Which.CorpoRenderizado
+            .Should().Contain("Recebemos seu pagamento");
+    }
+
+    [Fact]
     public async Task PagamentoForaDaJanelaDoWhatsApp_AvisoS13Sai()
     {
-        var conversa = Conversa.Abrir(_empresaId, "5511999990001", DateTime.UtcNow.AddDays(-3), "Maria", _cliente.Id);
-        conversa.RegistrarEntrada(DateTime.UtcNow.AddDays(-2));
-        _conversas.ObterIdPorPedidoAsync(_empresaId, _pedido.Id, Arg.Any<CancellationToken>()).Returns(conversa.Id);
-        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var conversa = ConversaDoWhatsApp(DateTime.UtcNow.AddDays(-2));
         var whats = Substitute.For<ICanalMensageria>();
         whats.Canal.Returns(CanalConversa.WhatsApp);
 
-        await HandlerDoPago(whats).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
+        await HandlerDoPago(AvisoComChat(), whats).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
         await AvaliarEventosAsync();
 
         _outbox.Should().ContainSingle().Which.CorpoRenderizado.Should().Contain("Recebemos seu pagamento");
+        await whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
 
+    private Conversa ConversaDoWhatsApp(DateTime ultimaEntrada)
+    {
+        var conversa = Conversa.Abrir(_empresaId, "5511999990001", ultimaEntrada.AddMinutes(-5), "Maria", _cliente.Id);
+        conversa.RegistrarEntrada(ultimaEntrada);
+        _conversas.ObterIdPorPedidoAsync(_empresaId, _pedido.Id, Arg.Any<CancellationToken>()).Returns(conversa.Id);
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        return conversa;
+    }
     private OutboxEventoIntegracao Evento<T>(string tipo, T payload) =>
         OutboxEventoIntegracao.Criar(_empresaId, tipo, "pedido", _pedido.Id, JsonSerializer.Serialize(payload, Camel));
 

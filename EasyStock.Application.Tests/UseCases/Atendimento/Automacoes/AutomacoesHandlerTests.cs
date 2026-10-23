@@ -284,26 +284,4 @@ public class AutomacoesHandlerTests
             .Should().Be(ResultadoAutomacao.PedidoCancelado);
         await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
-
-    // VaiSair responde o que o envio faria, sem enviar nem gravar: é por ele que o aviso S13 de pago cede a vez.
-    [Fact]
-    public async Task VaiSair_DizSeAAutomaticaSaiSemEnviar()
-    {
-        var velha = Conversa.Abrir(_empresaId, "5511977776666", Agora.AddDays(-3));
-        velha.RegistrarEntrada(Agora.AddDays(-2));
-        _conversas.ObterPorIdAsync(_empresaId, velha.Id, Arg.Any<CancellationToken>()).Returns(velha);
-
-        var pedidoId = PedidoAgendado();
-
-        (await UseCase().VaiSairAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, _conversa.Id, _cliente.Id, pedidoId)))
-            .Should().BeTrue();
-        (await UseCase().VaiSairAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, velha.Id, _cliente.Id, pedidoId)))
-            .Should().BeFalse("fora da janela quem avisa é o S13, com modelo");
-        (await UseCase().VaiSairAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, _conversa.Id, _cliente.Id, null)))
-            .Should().BeFalse("sem horário agendado o texto padrão não fecha e quem avisa é o S13");
-
-        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
-        await _conversas.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
-        _uow.CommitCount.Should().Be(0);
-    }
 }
