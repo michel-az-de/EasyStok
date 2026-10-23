@@ -48,6 +48,12 @@ function AcertoDaComanda({ comanda: c }) {
 }
 
 function etapaDaSelecao(c) {
+  // #1686-2: o link usado de pedido cancelado ou entregue não traz mais o pedido nem o saldo dele.
+  if (!c.pedido && c.pedidoEncerrado) return {
+    titulo: 'Histórico do link', acao: 'Consultar histórico',
+    estado: c.pedidoEncerrado === 'cancelado' ? 'Pedido cancelado' : 'Pedido entregue',
+    orientacao: 'O pedido deste link foi encerrado. Para uma nova compra, envie um link novo ao cliente.',
+  }
   if (!c.pedido) return {
     titulo: 'Seleção do cliente', estado: 'Não confirmada', acao: c.podeEditar ? 'Revisar seleção' : 'Consultar seleção',
     orientacao: 'Salvar a seleção atualiza os itens no link. Para virar pedido, é preciso revisar e confirmar.',
@@ -118,7 +124,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
     setPrato('')
   }
   const pendente = c.envio?.situacao === 'alteracao_aguardando_confirmacao'
-  const saldo = c.envio?.situacao === 'estorno_pendente' ? c.envio.saldo
+  const saldo = c.pedidoEncerrado ? 0 : c.envio?.situacao === 'estorno_pendente' ? c.envio.saldo
     : (c.podeEditar || pendente ? c.totalPrevisto ?? 0 : c.pedido?.total ?? c.totalPrevisto ?? 0) - (c.pedido?.alocado ?? c.pedido?.totalPago ?? 0)
   const resumoSaldo = saldo < 0 ? 'A devolver: ' + moeda(-saldo) + ' em ' + (c.rascunho.acerto === 'cupom' ? 'cupom' : 'estorno') + '.'
     : saldo > 0 ? 'Mais a pagar: ' + moeda(saldo) + '.' : 'Sem diferença de pagamento.'
@@ -310,7 +316,7 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
     {visiveis.map(c => {
       const pendente = ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
       const selecao = selecaoDe(c)
-      return c.pedido ? <details key={c.linkId} className={css.historicoCompartilhado} open={c.podeEditar || pendente}>
+      return c.pedido || c.pedidoEncerrado ? <details key={c.linkId} className={css.historicoCompartilhado} open={c.podeEditar || pendente}>
         <summary>{pendente ? 'Ajuste para conferir' : c.podeEditar ? 'Seleção em edição' : 'Histórico do link'}</summary>
         {selecao}
       </details> : selecao
