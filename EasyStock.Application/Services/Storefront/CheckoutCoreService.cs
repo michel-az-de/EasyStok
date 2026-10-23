@@ -111,6 +111,12 @@ public sealed class CheckoutCoreService(
     public const int QuantidadeMaximaPorItem = 99;
 
     /// <summary>
+    /// Teto de pratos distintos por pedido, o mesmo da comanda e das janelas (50). Os pratos são lidos numa consulta
+    /// só (#1725-8): sem o teto, uma lista enorme de ids inventados viraria uma consulta enorme.
+    /// </summary>
+    public const int MaximoPratosDistintos = 50;
+
+    /// <summary>
     /// Valida CEP e carrinho antes de qualquer consulta. Devolve o CEP só com dígitos.
     /// </summary>
     public static string ValidarEntrada(string? cep, IReadOnlyCollection<(Guid CardapioItemId, int Qtd)>? itens)
@@ -427,6 +433,8 @@ public sealed class CheckoutCoreService(
     {
         var cardapioItens = new Dictionary<Guid, CardapioItem>();
         var ids = cardapioItemIds.Distinct().ToList();
+        if (ids.Count > MaximoPratosDistintos)
+            throw new RegraDeDominioVioladaException($"O pedido aceita até {MaximoPratosDistintos} pratos diferentes.");
         // #1725-8: os pratos vêm numa consulta só; a checagem segue a ordem do pedido para recusar o mesmo item de antes.
         var lidos = (await cardapioItemRepository.ListarPorIdsAsync(storefrontId, ids, ct)).ToDictionary(c => c.Id);
 

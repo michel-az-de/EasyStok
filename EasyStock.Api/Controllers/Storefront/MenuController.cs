@@ -83,22 +83,16 @@ public sealed class MenuController(
     {
         try
         {
-            // Slug inexistente lança dentro da fábrica e não entra no cache.
-            var (json, etag) = (await cache.GetOrCreateAsync($"storefront:menu:{slug.Trim().ToLowerInvariant()}", async entrada =>
-            {
-                entrada.AbsoluteExpirationRelativeToNow = TempoNoServidor;
-                var result = await listarCardapioUseCase.ExecuteAsync(
-                    new ListarCardapioPublicoInput(slug), ct);
-
-                // Envelope { itens, tituloPublico, slug } — contrato canônico (menu-publico.contract.md)
-                // que a vitrine Casa da Babá consome (menu.js exige Array.isArray(data.itens)).
-                // Serialização MANUAL com PublicJsonOptions é load-bearing: o ETag tem que ser o hash
-                // dos BYTES EXATOS servidos. NÃO trocar por Ok(response) — Ok() delega a serialização ao
-                // framework (opções globais do MVC, não PublicJsonOptions) e o hash deixaria de bater.
-                var response = new MenuPublicoResponse(result.Itens, result.TituloPublico, result.Slug);
-                var bytes = JsonSerializer.SerializeToUtf8Bytes(response, PublicJsonOptions);
-                return new MenuSerializado(bytes, ComputarETag(bytes));
-            }))!;
+            // Só o anônimo passa pelo cache: ele lê com o tenant do slug (TenantDoStorefront). Quem está logado lê com o
+            // tenant do JWT, e o resultado dele não pode virar o cardápio de todos. Slug inexistente lança dentro da
+            // fábrica e não entra no cache; a montagem não usa o token da requisição porque serve às próximas.
+            var (json, etag) = User.Identity?.IsAuthenticated == true
+                ? await MontarAsync(slug, ct)
+                : (await cache.GetOrCreateAsync($"storefront:menu:{slug.Trim().ToLowerInvariant()}", entrada =>
+                {
+                    entrada.AbsoluteExpirationRelativeToNow = TempoNoServidor;
+                    return MontarAsync(slug, CancellationToken.None);
+                }))!;
 
             // Sempre seta cache-headers, mesmo no 304 (proxies precisam pra TTL).
             Response.Headers[HeaderNames.CacheControl] = CacheControlPublico;
@@ -267,6 +261,20 @@ public sealed class MenuController(
             }
         }
         return false;
+    }
+
+    private async Task<MenuSerializado> MontarAsync(string slug, CancellationToken ct)
+    {
+        var result = await listarCardapioUseCase.ExecuteAsync(new ListarCardapioPublicoInput(slug), ct);
+
+        // Envelope { itens, tituloPublico, slug } — contrato canônico (menu-publico.contract.md)
+        // que a vitrine Casa da Babá consome (menu.js exige Array.isArray(data.itens)).
+        // Serialização MANUAL com PublicJsonOptions é load-bearing: o ETag tem que ser o hash
+        // dos BYTES EXATOS servidos. NÃO trocar por Ok(response) — Ok() delega a serialização ao
+        // framework (opções globais do MVC, não PublicJsonOptions) e o hash deixaria de bater.
+        var response = new MenuPublicoResponse(result.Itens, result.TituloPublico, result.Slug);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(response, PublicJsonOptions);
+        return new MenuSerializado(bytes, ComputarETag(bytes));
     }
 
     private sealed record MenuSerializado(byte[] Json, string ETag);

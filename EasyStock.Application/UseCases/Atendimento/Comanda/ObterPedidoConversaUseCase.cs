@@ -87,15 +87,17 @@ public sealed class ObterPedidoConversaUseCase(
 
     /// <summary>
     /// O mesmo resultado com a conversa, o pedido e o saldo já lidos por quem chama (#1725-7): a comanda não relê o
-    /// pedido inteiro nem refaz a conta do saldo para montar o detalhe.
+    /// pedido inteiro nem refaz a conta do saldo para montar o detalhe. Pedido de outra empresa não monta.
     /// </summary>
     public async Task<PedidoConversaResult> MontarAsync(Conversa conversa, EasyStock.Domain.Entities.Pedido pedido, SaldoFinanceiroComanda? financeiro,
         CancellationToken ct = default)
     {
+        if (pedido.EmpresaId != conversa.EmpresaId)
+            throw new InvalidOperationException("Pedido e conversa de empresas diferentes.");
         var janela = (await vagas.GetByPedidoIdsAsync([pedido.Id], ct)).GetValueOrDefault(pedido.Id);
 
         // #1724-7: o registro do pagamento a menor não é a cobrança do pedido; o valor aparece no total pago.
-        var cobrancas = (await cobrancaRepository.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct))
+        var cobrancas = (await cobrancaRepository.ListarDoPedidoAsync(conversa.EmpresaId, pedido.Id, ct))
             .Where(c => !c.RegistraPagamentoAMenor).ToList();
         var vigente = cobrancas.FirstOrDefault(c => c.EstaPendente)
             ?? cobrancas.FirstOrDefault(c => c.Status == StatusCobrancaPedido.Paga)
