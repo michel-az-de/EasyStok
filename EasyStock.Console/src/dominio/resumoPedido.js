@@ -68,6 +68,10 @@ export function previaDoSinal(pedido, { fonteApi = false, agora = Date.now(), to
   return { sinal, restante: Math.round((total - sinal) * 100) / 100 }
 }
 
+// #1989 (#1765-3): a primeira linha do resumo antes de gerar, os itens que o cliente vai receber.
+export const itensDoResumo = (pedido, cardapio) => itensDetalhados(pedido, cardapio ?? [])
+  .map((l) => `${l.qtd}× ${l.produto?.nome ?? l.sku}`).join(', ')
+
 // #1875: a barra só marca o meio; este resumo diz o que o botão de confirmação vai fazer.
 export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi = false, agora = Date.now(), simulacao = null }) {
   // #1884: com a simulação do servidor os números são os que vão ser cobrados (frete, total e sinal sobre o total com o frete).

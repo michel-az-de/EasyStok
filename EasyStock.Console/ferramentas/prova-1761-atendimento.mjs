@@ -232,7 +232,8 @@ await confere('F  caixa da despedida marcada com o campo vazio não encerra', ()
 })
 
 // ── G  Endereço ──────────────────────────────────────────────────────────────
-const SEM_VIRGULA = 'Rua Cardeal Arcoverde, 500 - Pinheiros - 05400-000'
+// #1989: hífen entre espaços passou a separar como a vírgula; o que a Ficha não separa é o texto sem CEP no fim.
+const SEM_VIRGULA = 'Rua Cardeal Arcoverde 500 Pinheiros 05400-000'
 await confere('G  texto que a Ficha não separa é recusado com o formato e um exemplo', () => {
   assert.equal(recusaDoEndereco(SEM_VIRGULA), FORMATO_DO_ENDERECO)
   assert.ok(/Exemplo: Rua das Flores, 120, apto 12, Pinheiros, 05400-000/.test(FORMATO_DO_ENDERECO))

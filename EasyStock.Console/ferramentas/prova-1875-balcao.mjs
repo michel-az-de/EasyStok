@@ -86,7 +86,7 @@ await confere('1  tocar no meio na barra não cria o pedido: só o botão de con
   assert.match(barra, /aoEscolher=\{setMeioNaBarra\}/)
   assert.match(barra, /resumoDaCobrancaEscolhida\(/)
   assert.match(barra, /data-confirmar-cobranca/)
-  assert.match(barra, /const meio = meioNaBarra; setPedindoMeio\(false\); setMeioNaBarra\(null\); executar\(\(\) => aoGerarPix\(meio\), GERANDO_COBRANCA\)/)
+  assert.match(barra, /const meio = meioNaBarra; setPedindoMeio\(false\); setMeioNaBarra\(null\); return executar\(\(\) => aoGerarPix\(meio\), GERANDO_COBRANCA\)/)
 })
 
 // --- 2. Marcar pago com link pendente ----------------------------------------------------------
