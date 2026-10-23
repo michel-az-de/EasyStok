@@ -56,7 +56,7 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
             .Where(i => i.EmpresaId == empresaId &&
                 i.ValidadeEm != null &&
                 (DateTime?)i.ValidadeEm <= cutoff &&
-                (int)i.QuantidadeAtual > 0);
+                (decimal)i.QuantidadeAtual > 0);
         if (lojaId.HasValue)
             query = query.Where(i => i.LojaId == lojaId.Value);
 
@@ -107,7 +107,7 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
         var query = dbContext.ItensEstoque
             .AsNoTracking()
             .Where(i => i.EmpresaId == empresaId &&
-                (int)i.QuantidadeAtual > 0 &&
+                (decimal)i.QuantidadeAtual > 0 &&
                 (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
         if (lojaId.HasValue)
             query = query.Where(i => i.LojaId == lojaId.Value);
@@ -224,12 +224,12 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
 
         var taxas = await taxaQuery
             .GroupBy(m => m.ProdutoId)
-            .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => (int)m.Quantidade) })
-            .ToDictionaryAsync(x => x.ProdutoId, x => (decimal)x.Total / dias);
+            .Select(g => new { ProdutoId = g.Key, Total = g.Sum(m => (decimal)m.Quantidade) })
+            .ToDictionaryAsync(x => x.ProdutoId, x => x.Total / dias);
 
         var query = dbContext.ItensEstoque
             .AsNoTracking()
-            .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual > 0);
+            .Where(i => i.EmpresaId == empresaId && (decimal)i.QuantidadeAtual > 0);
         if (lojaId.HasValue)
             query = query.Where(i => i.LojaId == lojaId.Value);
 

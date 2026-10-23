@@ -195,9 +195,9 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (produtoId.HasValue)
                 query = query.Where(m => m.ProdutoId == produtoId.Value);
 
-            var totalSaidas = await query.Select(m => (int)m.Quantidade).SumAsync();
+            var totalSaidas = await query.Select(m => (decimal)m.Quantidade).SumAsync();
             var dias = Math.Max(1, (ate - de).Days);
-            return (decimal)totalSaidas / dias;
+            return totalSaidas / dias;
         }
 
         public async Task<IReadOnlyDictionary<Guid, decimal>> GetTaxaSaidaDiariaPorProdutoAsync(Guid empresaId, IEnumerable<Guid> produtoIds, DateTime de, DateTime ate)
@@ -215,7 +215,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                             m.Tipo == TipoMovimentacaoEstoque.Saida &&
                             m.DataMovimentacao >= de &&
                             m.DataMovimentacao <= ate)
-                .Select(m => new { m.ProdutoId, Quantidade = (int)m.Quantidade })
+                .Select(m => new { m.ProdutoId, Quantidade = (decimal)m.Quantidade })
                 .GroupBy(m => m.ProdutoId)
                 .Select(g => new
                 {
@@ -224,7 +224,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 })
                 .ToListAsync();
 
-            return totais.ToDictionary(x => x.ProdutoId, x => (decimal)x.TotalSaidas / dias);
+            return totais.ToDictionary(x => x.ProdutoId, x => x.TotalSaidas / dias);
         }
 
         public async Task<IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)>> GetAgregacaoMensalAsync(
@@ -275,7 +275,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<IReadOnlyList<MovimentacaoEstoque>> GetSaidasPorNaturezaAsync(
             Guid empresaId, IReadOnlyCollection<NaturezaMovimentacaoEstoque> naturezas, DateTime deUtc, DateTime ateUtc,
-            string? excetoDescricaoComPrefixo = null, CancellationToken ct = default)
+            string? excetoDescricaoComPrefixo = null, string? excetoDocumentoComPrefixo = null, CancellationToken ct = default)
         {
             var query = dbContext.MovimentacoesEstoque
                 .AsNoTracking()
@@ -285,6 +285,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                     && naturezas.Contains(m.Natureza) && m.DataMovimentacao >= deUtc && m.DataMovimentacao < ateUtc);
             if (!string.IsNullOrEmpty(excetoDescricaoComPrefixo))
                 query = query.Where(m => m.Descricao == null || !m.Descricao.StartsWith(excetoDescricaoComPrefixo));
+            if (!string.IsNullOrEmpty(excetoDocumentoComPrefixo))
+                query = query.Where(m => m.DocumentoReferencia == null || !m.DocumentoReferencia.StartsWith(excetoDocumentoComPrefixo));
             return await query.OrderByDescending(m => m.DataMovimentacao).ToListAsync(ct);
         }
     }

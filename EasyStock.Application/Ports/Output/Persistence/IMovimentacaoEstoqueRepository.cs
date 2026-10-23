@@ -63,11 +63,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// M2.6 (#1511): saídas das naturezas pedidas no período [de, ate), com o produto e o lote
         /// (para o relatório de perdas). Inclui as estornadas, que o relatório mostra como desfeitas.
         /// <paramref name="excetoDescricaoComPrefixo"/> (#1564) deixa no banco as saídas cuja descrição começa
-        /// pelo prefixo; descrição nula não é excluída.
+        /// pelo prefixo; descrição nula não é excluída. <paramref name="excetoDocumentoComPrefixo"/> (#2003) faz o mesmo
+        /// pelo <c>DocumentoReferencia</c>, a chave que não depende da redação da descrição.
         /// </summary>
         Task<IReadOnlyList<MovimentacaoEstoque>> GetSaidasPorNaturezaAsync(
             Guid empresaId, IReadOnlyCollection<NaturezaMovimentacaoEstoque> naturezas, DateTime deUtc, DateTime ateUtc,
-            string? excetoDescricaoComPrefixo = null, CancellationToken ct = default);
+            string? excetoDescricaoComPrefixo = null, string? excetoDocumentoComPrefixo = null, CancellationToken ct = default);
 
         /// <summary>
         /// Saídas da natureza pedida com este documento que ainda valem (não estornadas), de qualquer

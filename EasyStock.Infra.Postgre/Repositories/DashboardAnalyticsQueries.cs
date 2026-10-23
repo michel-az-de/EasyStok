@@ -65,8 +65,8 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         {
             TotalSkus = g.Select(i => i.ProdutoId).Distinct().Count(),
             Quantidade = g.Sum(i => (int)i.QuantidadeAtual),
-            ValorCusto = g.Sum(i => (decimal)i.CustoUnitario * (int)i.QuantidadeAtual),
-            ValorVenda = g.Sum(i => ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * OperacionalDefaults.FallbackMargemPrecoSugerido) * (int)i.QuantidadeAtual),
+            ValorCusto = g.Sum(i => (decimal)i.CustoUnitario * (decimal)i.QuantidadeAtual),
+            ValorVenda = g.Sum(i => ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * OperacionalDefaults.FallbackMargemPrecoSugerido) * (decimal)i.QuantidadeAtual),
             AlertasBaixo = g.Count(i => i.Status == StatusItemEstoque.Critical || i.Status == StatusItemEstoque.Esgotado)
         }).FirstOrDefaultAsync();
 
@@ -85,7 +85,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         var validadeQuery = dbContext.ItensEstoque.AsNoTracking()
             .Where(i => i.EmpresaId == empresaId && i.Status != StatusItemEstoque.Vencido
                 && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade
-                && (int)i.QuantidadeAtual > 0);
+                && (decimal)i.QuantidadeAtual > 0);
         if (lojaId.HasValue)
             validadeQuery = validadeQuery.Where(i => i.LojaId == lojaId.Value);
         var alertasValidade = await validadeQuery.CountAsync();
@@ -94,7 +94,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         var cutoffParado = DateTime.UtcNow.AddDays(-30);
         var paradosQuery = dbContext.ItensEstoque.AsNoTracking()
             .Where(i => i.EmpresaId == empresaId &&
-                        (int)i.QuantidadeAtual > 0 &&
+                        (decimal)i.QuantidadeAtual > 0 &&
                         (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado));
         if (lojaId.HasValue)
             paradosQuery = paradosQuery.Where(i => i.LojaId == lojaId.Value);
@@ -105,7 +105,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         // vencido. Nao afeta a valoracao (estoqueQuery ja exclui Vencido) — so vira alerta.
         var vencidosQuery = dbContext.ItensEstoque.AsNoTracking()
             .Where(i => i.EmpresaId == empresaId && i.Status == StatusItemEstoque.Vencido
-                && (int)i.QuantidadeAtual > 0);
+                && (decimal)i.QuantidadeAtual > 0);
         if (lojaId.HasValue)
             vencidosQuery = vencidosQuery.Where(i => i.LojaId == lojaId.Value);
         var alertasVencidos = await vencidosQuery.CountAsync();
@@ -125,7 +125,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         var movData = await movQuery.GroupBy(_ => 1)
             .Select(g => new
             {
-                Quantidade = g.Sum(m => (int)m.Quantidade),
+                Quantidade = g.Sum(m => (decimal)m.Quantidade),
                 ValorTotal = g.Sum(m => (decimal?)m.ValorTotal ?? 0m)
             })
             .FirstOrDefaultAsync();
@@ -184,7 +184,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
 
         var custoVendas = await custoQuery
             .Where(m => m.ItemEstoque != null)
-            .SumAsync(m => (decimal)m.ItemEstoque!.CustoUnitario * (int)m.Quantidade);
+            .SumAsync(m => (decimal)m.ItemEstoque!.CustoUnitario * (decimal)m.Quantidade);
 
         // null = "margem nao calculavel" (sem receita OU sem custo informado nas movimentacoes).
         // Antes: custoVendas == 0 produzia margem 100% confiante mas falsa.
@@ -212,17 +212,17 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             .Where(i => i.EmpresaId == empresaId
                 && i.Status != StatusItemEstoque.Vencido
                 && i.Status != StatusItemEstoque.Descartado
-                && (int)i.QuantidadeAtual > 0);
+                && (decimal)i.QuantidadeAtual > 0);
         if (lojaId.HasValue)
             estoqueQuery = estoqueQuery.Where(i => i.LojaId == lojaId.Value);
 
         var estoqueAgg = await estoqueQuery.GroupBy(_ => 1).Select(g => new
         {
             Total = g.Sum(i => (int)i.QuantidadeAtual),
-            Custo = g.Sum(i => (decimal)i.CustoUnitario * (int)i.QuantidadeAtual),
+            Custo = g.Sum(i => (decimal)i.CustoUnitario * (decimal)i.QuantidadeAtual),
             Critico = g.Count(i => i.Status == StatusItemEstoque.Critical
                                    || i.Status == StatusItemEstoque.Esgotado
-                                   || (int)i.QuantidadeAtual < i.QuantidadeMinima),
+                                   || (decimal)i.QuantidadeAtual < i.QuantidadeMinima),
             Count = g.Count()
         }).FirstOrDefaultAsync();
 
@@ -263,7 +263,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
     public async Task<EstoqueStatusDistribuicao> GetEstoqueStatusDistribuicaoAsync(Guid empresaId, Guid? lojaId = null)
     {
         var query = dbContext.ItensEstoque.AsNoTracking()
-            .Where(i => i.EmpresaId == empresaId && (int)i.QuantidadeAtual > 0);
+            .Where(i => i.EmpresaId == empresaId && (decimal)i.QuantidadeAtual > 0);
         if (lojaId.HasValue)
             query = query.Where(i => i.LojaId == lojaId.Value);
 
@@ -348,12 +348,12 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
             .Where(i => i.EmpresaId == empresaId &&
                 (i.Status == StatusItemEstoque.Critical ||
                  i.Status == StatusItemEstoque.Esgotado ||
-                 (int)i.QuantidadeAtual <= i.QuantidadeMinima));
+                 (decimal)i.QuantidadeAtual <= i.QuantidadeMinima));
         if (lojaId.HasValue)
             query = query.Where(i => i.LojaId == lojaId.Value);
 
         var itens = await query
-            .OrderBy(i => (int)i.QuantidadeAtual)
+            .OrderBy(i => (decimal)i.QuantidadeAtual)
             .Take(top)
             .Select(i => new
             {
@@ -517,7 +517,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
                 i.ValidadeEm != null &&
                 (DateTime?)i.ValidadeEm > now &&
                 (DateTime?)i.ValidadeEm <= limite &&
-                (int)i.QuantidadeAtual > 0);
+                (decimal)i.QuantidadeAtual > 0);
         if (lojaId.HasValue)
             query = query.Where(i => i.LojaId == lojaId.Value);
 

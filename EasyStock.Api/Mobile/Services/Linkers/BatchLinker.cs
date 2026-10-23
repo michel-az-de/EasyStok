@@ -1,7 +1,10 @@
 using EasyStock.Application.UseCases.Producao;
+using EasyStock.Domain.Defaults;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Services;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Repositories;
 
 namespace EasyStock.Api.Mobile.Services.Linkers;
 
@@ -150,9 +153,12 @@ public sealed class BatchLinker(
             .FirstOrDefaultAsync(l => l.Id == mobileB.ErpLoteId && l.EmpresaId == mobileB.EmpresaId);
         if (lote is null) return;
 
+        // #2003 (estoque-21): pelo documento do lote; a descricao cobre as saidas gravadas antes dele.
         var descricao = $"{BaixaDeInsumosDaProducao.PrefixoDaDescricao} {lote.Codigo}";
+        var documento = BaixaDeInsumosDaProducao.DocumentoDaProducao(lote.Codigo);
         var saidas = await db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AsNoTracking()
-            .Where(m => m.EmpresaId == lote.EmpresaId && m.Descricao == descricao && m.Tipo == TipoMovimentacaoEstoque.Saida)
+            .Where(m => m.EmpresaId == lote.EmpresaId && (m.DocumentoReferencia == documento || m.Descricao == descricao)
+                        && m.Tipo == TipoMovimentacaoEstoque.Saida)
             .Select(m => new { m.Id, m.CriadoEm, m.EstornadaEm })
             .ToListAsync();
         // Nunca baixou, ou a baixa esta valendo: nada a refazer.
@@ -215,6 +221,13 @@ public sealed class BatchLinker(
         }
     }
 
+    // O codigo que o PWA gerou pode ter caractere que o VO recusa; sem codigo e melhor que sem entrada.
+    private static CodigoLote? CodigoDoLote(string codigo)
+    {
+        try { return CodigoLote.From(codigo); }
+        catch (ArgumentException) { return null; }
+    }
+
     /// <summary>
     /// F8-A — Cria ItemEstoque + MovimentacaoEstoque (Entrada) para cada LoteItem.
     /// Idempotente: CodigoInterno="lote:loteId:produtoId".
@@ -248,6 +261,12 @@ public sealed class BatchLinker(
                 var precoVenda = produto.PrecoReferencia;
                 Validade? validade = item.ExpiraEm.HasValue ? Validade.From(item.ExpiraEm.Value) : null;
                 var qtd = Quantidade.From(item.Quantidade);
+                // #2003 (estoque-20): o item de estoque leva o codigo do lote, como na entrada do console
+                // (RegistrarEntradaEstoque). Sem ele aparecia como "sem lote" em "Vencidos com saldo" e no Estoque do dia.
+                var codigoDoLote = CodigoDoLote(lote.Codigo);
+                var categoria = await db.Set<Categoria>().IgnoreQueryFilters().AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.Id == produto.CategoriaId);
+                var configuracao = await ConfiguracaoLojaRepository.DaLojaAsync(db.Set<ConfiguracaoLoja>(), lote.EmpresaId, lote.LojaId);
 
                 var itemEstoque = ItemEstoque.CriarParaEntrada(
                     id: Guid.NewGuid(),
@@ -259,7 +278,7 @@ public sealed class BatchLinker(
                     precoVendaSugerido: precoVenda,
                     dataEntrada: lote.DataProducao,
                     codigoInterno: codigoInterno,
-                    codigoLote: null,
+                    codigoLote: codigoDoLote,
                     codigoMarketplace: null,
                     variacaoDescricao: null,
                     cor: null,
@@ -271,6 +290,11 @@ public sealed class BatchLinker(
                     observacoes: $"Auto-gerado pelo F8-A a partir do Lote {lote.Codigo}",
                     criadoEm: DateTime.UtcNow);
                 if (lote.LojaId.HasValue) itemEstoque.LojaId = lote.LojaId;
+
+                var limiares = LimiarEstoqueResolver.Resolver(produto, categoria, configuracao);
+                itemEstoque.QuantidadeMinima = limiares.QuantidadeMinima;
+                itemEstoque.QuantidadeCritica = limiares.QuantidadeCritica;
+                itemEstoque.RecalcularIndicadores(lote.DataProducao, configuracao?.DiasAlertaParado ?? OperacionalDefaults.DiasAlertaParado);
 
                 db.Add(itemEstoque);
 

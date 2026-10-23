@@ -28,17 +28,14 @@ public interface IVagaOcupadaRepository
     /// </summary>
     Task<bool> LiberarPorPedidoAsync(Guid pedidoId, string motivo, CancellationToken ct = default);
 
-    /// <summary>Conta vagas ativas para uma janela em uma data específica.</summary>
+    /// <summary>
+    /// Conta as vagas que ocupam a janela numa data: não liberadas e de pedido que ainda não foi entregue
+    /// (#2003: o pedido entregue mantém a vaga, para as telas acharem a janela dele, mas não ocupa mais).
+    /// </summary>
     Task<int> ContarAtivasPorJanelaDataAsync(Guid janelaEntregaId, DateOnly dataEntrega, CancellationToken ct = default);
 
     /// <summary>
-    /// Vagas órfãs: liberado_em IS NULL mas pedido inexistente ou cancelado/entregue
-    /// (cinto+suspensório — ADR-0014 §Solução 4).
-    /// </summary>
-    Task<IReadOnlyList<VagaOcupada>> GetOrfasAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Conta vagas ativas (LiberadoEm IS NULL) agrupadas por (janelaId, data) para
+    /// Conta as vagas que ocupam (mesma regra de <see cref="ContarAtivasPorJanelaDataAsync"/>) agrupadas por (janelaId, data) para
     /// um conjunto de janelas num período. Retorna apenas combinações com COUNT ≥ 1 —
     /// ausentes têm contagem implícita de zero. Anti-N+1: uma query para o período
     /// inteiro (TASK-EZ-AGEND-001).

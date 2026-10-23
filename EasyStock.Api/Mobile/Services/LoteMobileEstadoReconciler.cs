@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Producao;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Services;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 
@@ -122,13 +123,9 @@ public class LoteMobileEstadoReconciler(
             .ToDictionaryAsync(i => i.Id, ct);
         foreach (var saida in saidas)
         {
-            if (insumos.TryGetValue(saida.ItemEstoqueId, out var insumo))
-                insumo.RestaurarSaidaEstornada(saida.Quantidade, agora);
-            saida.MarcarComoEstornada(agora);
-            db.Add(MovimentacaoEstoque.CriarEstorno(
-                Guid.NewGuid(), saida, agora,
-                $"Estorno: lote {lote.Codigo} excluido (registrado por engano)", agora,
-                motivoEstorno: MotivoDoEstornoDeInsumo));
+            insumos.TryGetValue(saida.ItemEstoqueId, out var insumo);
+            db.Add(DevolucaoDeSaida.Aplicar(
+                saida, insumo, agora, $"Estorno: lote {lote.Codigo} excluido (registrado por engano)", MotivoDoEstornoDeInsumo));
         }
     }
 
@@ -142,9 +139,12 @@ public class LoteMobileEstadoReconciler(
     /// <summary>As saídas de insumo da produção do lote que ainda valem (não estornadas).</summary>
     public static IQueryable<MovimentacaoEstoque> SaidasDeInsumoAbertas(EasyStockDbContext db, Lote lote)
     {
+        // #2003 (estoque-21): a saida de insumo e achada pelo documento do lote. A descricao ainda vale para as
+        // saidas gravadas antes dele (leitura dupla, ate nao restar nenhuma).
         var descricao = $"{BaixaDeInsumosDaProducao.PrefixoDaDescricao} {lote.Codigo}";
+        var documento = BaixaDeInsumosDaProducao.DocumentoDaProducao(lote.Codigo);
         return db.Set<MovimentacaoEstoque>().IgnoreQueryFilters()
-            .Where(m => m.EmpresaId == lote.EmpresaId && m.Descricao == descricao
+            .Where(m => m.EmpresaId == lote.EmpresaId && (m.DocumentoReferencia == documento || m.Descricao == descricao)
                         && m.Tipo == TipoMovimentacaoEstoque.Saida && m.EstornadaEm == null);
     }
 

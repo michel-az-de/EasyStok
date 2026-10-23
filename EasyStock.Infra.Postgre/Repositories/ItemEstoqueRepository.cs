@@ -178,7 +178,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 query = query.Where(i => i.Produto != null && i.Produto.CategoriaId == categoriaId.Value);
 
             var cadastrados = await query.CountAsync();
-            var comSaldo = await query.CountAsync(i => (int)i.QuantidadeAtual > 0);
+            var comSaldo = await query.CountAsync(i => (decimal)i.QuantidadeAtual > 0);
             return (cadastrados, comSaldo);
         }
 
@@ -214,7 +214,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(i => new
                 {
                     Quantidade = (int)i.QuantidadeAtual,
-                    ValorTotal = ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * FallbackMargemPrecoSugerido) * (int)i.QuantidadeAtual,
+                    ValorTotal = ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * FallbackMargemPrecoSugerido) * (decimal)i.QuantidadeAtual,
                     PrecoReferencia = (decimal?)i.PrecoVendaSugerido
                         ?? (decimal)i.CustoUnitario * FallbackMargemPrecoSugerido
                 })
@@ -380,12 +380,12 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<bool> ExisteEstoqueDoProdutoAsync(Guid empresaId, Guid produtoId) =>
             dbContext.ItensEstoque
                 .AsNoTracking()
-                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && (int)i.QuantidadeAtual > 0);
+                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && (decimal)i.QuantidadeAtual > 0);
 
         public Task<bool> ExisteEstoqueDaVariacaoAsync(Guid empresaId, Guid produtoId, Guid variacaoId) =>
             dbContext.ItensEstoque
                 .AsNoTracking()
-                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && i.ProdutoVariacaoId == variacaoId && (int)i.QuantidadeAtual > 0);
+                .AnyAsync(i => i.EmpresaId == empresaId && i.ProdutoId == produtoId && i.ProdutoVariacaoId == variacaoId && (decimal)i.QuantidadeAtual > 0);
 
         public Task<ItemEstoque?> GetItemComProdutoAsync(Guid empresaId, Guid id) =>
             dbContext.ItensEstoque
@@ -434,7 +434,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             return query.Where(i => i.ValidadeEm != null
                 && (DateTime?)i.ValidadeEm <= cutoff
                 && i.Status != StatusItemEstoque.Vencido
-                && (int)i.QuantidadeAtual > 0);
+                && (decimal)i.QuantidadeAtual > 0);
         }
 
         // Mapeia o valor PT-BR do querystring (vindo do frontend / deep-links do

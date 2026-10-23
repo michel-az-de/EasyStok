@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
+using EasyStock.Domain.Specifications;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Producao;
@@ -20,8 +21,9 @@ public sealed record PratoParaBaixa(
 /// prato, a linha de embalagem (<see cref="Produto.EhEmbalagem"/>, D-M2-03). Consumo de cada insumo =
 /// quantidade da linha × produzido ÷ rendimento, convertido para a unidade-base do insumo.
 /// Falta de insumo AVISA e não trava: com algum saldo, a falta vira descoberto no lote (#540);
-/// sem saldo nenhum não há lote onde registrar, então só avisa. A saída é <c>UsoInterno</c>
-/// e cita o código do lote produzido.
+/// sem saldo nenhum não há lote onde registrar, então só avisa. Insumo inativo (inativar não zera o
+/// saldo) também só avisa e é pulado: a saída de produto inativo lançaria e desfaria a produção inteira
+/// (#2003). A saída é <c>UsoInterno</c> e cita o código do lote produzido.
 /// <para>
 /// A receita é do prato, não da porção (#1542). Para a conta acompanhar o tamanho (M1.4e, #1552): a
 /// comida segue o peso produzido quando a receita rende em peso, e a embalagem é da porção
@@ -38,6 +40,14 @@ public sealed class BaixaDeInsumosDaProducao(
 {
     /// <summary>Início da descrição da saída de insumo. O relatório de perdas (M2.6) a separa da degustação.</summary>
     public const string PrefixoDaDescricao = "Insumo da produção";
+
+    /// <summary>
+    /// #2003 (estoque-21): a chave que liga a saída de insumo ao lote produzido. A descrição é texto para
+    /// ler; quem acha a baixa de um lote (perdas, estorno e refazer do PWA) olha o documento.
+    /// </summary>
+    public const string PrefixoDoDocumento = "producao:";
+
+    public static string DocumentoDaProducao(string codigoLote) => $"{PrefixoDoDocumento}{codigoLote}";
 
     public async Task<IReadOnlyList<string>> BaixarAsync(
         Guid empresaId, IReadOnlyList<PratoParaBaixa> pratos, string codigoLote, DateTime data, CancellationToken ct = default)
@@ -92,6 +102,12 @@ public sealed class BaixaDeInsumosDaProducao(
             var quantidade = Math.Round(bruto, 3, MidpointRounding.AwayFromZero);
             if (quantidade <= 0) continue;
 
+            if (!new ProdutoAtivoSpecification().EhSatisfeitaPor(insumo))
+            {
+                avisos.Add($"{insumo.Nome} está inativo: a produção pedia {quantidade:0.###} {insumo.UnidadeMedidaBase} e nada foi baixado. Reative o insumo ou baixe à mão.");
+                continue;
+            }
+
             var lotes = await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, insumoId, null, true, false);
             var disponivel = lotes.Sum(l => l.QuantidadeAtual.Value);
             var unidade = insumo.UnidadeMedidaBase;
@@ -110,7 +126,8 @@ public sealed class BaixaDeInsumosDaProducao(
             await registrarSaida.ExecuteAsync(new RegistrarSaidaEstoqueCommand(
                 empresaId, itens, data, data, null, null,
                 NaturezaMovimentacaoEstoque.UsoInterno, CanalVenda.Outro,
-                $"Insumos da produção {codigoLote}", PermitirDescoberto: true));
+                $"Insumos da produção {codigoLote}", PermitirDescoberto: true,
+                DocumentoReferencia: DocumentoDaProducao(codigoLote)));
 
         return avisos;
     }

@@ -134,7 +134,7 @@ public class PerdasDaProducaoUseCaseTests
     {
         IReadOnlyCollection<NaturezaMovimentacaoEstoque>? pedidas = null;
         _movs.GetSaidasPorNaturezaAsync(_empresaId, Arg.Do<IReadOnlyCollection<NaturezaMovimentacaoEstoque>>(n => pedidas = n),
-                Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns([
                 Mov(NaturezaMovimentacaoEstoque.Perda, 2, 10m, "Perda · Perda no preparo"),
                 Mov(NaturezaMovimentacaoEstoque.UsoInterno, 1, 3m, "Perda · Degustação"),
@@ -152,6 +152,22 @@ public class PerdasDaProducaoUseCaseTests
         pedidas.Should().NotContain(NaturezaMovimentacaoEstoque.Ajuste).And.NotContain(NaturezaMovimentacaoEstoque.Venda);
     }
 
+    [Fact]
+    public async Task Resumo_BaixaDeInsumoSaiPeloDocumentoDoLote_MesmoComADescricaoReescrita()
+    {
+        // #2003 (estoque-21): a baixa de insumo era separada da degustação pelo texto da descrição.
+        var baixa = Mov(NaturezaMovimentacaoEstoque.UsoInterno, 600, 18m, "Baixa dos insumos da receita");
+        baixa.DocumentoReferencia = "producao:LOT-261009-001";
+        _movs.GetSaidasPorNaturezaAsync(_empresaId, Arg.Any<IReadOnlyCollection<NaturezaMovimentacaoEstoque>>(),
+                Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns([Mov(NaturezaMovimentacaoEstoque.UsoInterno, 1, 3m, "Perda · Degustação"), baixa]);
+
+        var r = await Sut().ResumoAsync(_empresaId);
+
+        r.Valor.Should().Be(3m);
+        r.Lancamentos.Should().ContainSingle();
+    }
+
     // #1564: a baixa de insumo da produção fica no banco; o período pedido vai inteiro, sem teto.
     [Fact]
     public async Task Resumo_PedeAoBancoOPeriodoSemABaixaDeInsumo()
@@ -161,7 +177,7 @@ public class PerdasDaProducaoUseCaseTests
         await _movs.Received(1).GetSaidasPorNaturezaAsync(_empresaId, Arg.Any<IReadOnlyCollection<NaturezaMovimentacaoEstoque>>(),
             EasyStock.Application.Common.HorarioBrasil.JanelaDiaUtc(new DateOnly(2025, 1, 1)).IniUtc,
             EasyStock.Application.Common.HorarioBrasil.JanelaDiaUtc(new DateOnly(2026, 10, 9)).FimUtc,
-            "Insumo da produção", Arg.Any<CancellationToken>());
+            "Insumo da produção", "producao:", Arg.Any<CancellationToken>());
     }
 
     [Fact]

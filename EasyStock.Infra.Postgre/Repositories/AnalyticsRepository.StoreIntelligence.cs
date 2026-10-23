@@ -41,14 +41,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                     LojaId = g.Key,
                     TotalSkus = g.Select(i => i.ProdutoId).Distinct().Count(),
                     QuantidadeTotal = g.Sum(i => (int)i.QuantidadeAtual),
-                    ValorEstoque = g.Sum(i => ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * Domain.Defaults.OperacionalDefaults.FallbackMargemPrecoSugerido) * (int)i.QuantidadeAtual),
-                    AlertasCriticos = g.Count(i => (int)i.QuantidadeAtual <= 2),
-                    ItensAbaixoMinimo = g.Count(i => (int)i.QuantidadeAtual < i.QuantidadeMinima),
+                    ValorEstoque = g.Sum(i => ((decimal?)i.PrecoVendaSugerido ?? (decimal)i.CustoUnitario * Domain.Defaults.OperacionalDefaults.FallbackMargemPrecoSugerido) * (decimal)i.QuantidadeAtual),
+                    AlertasCriticos = g.Count(i => (decimal)i.QuantidadeAtual <= 2),
+                    ItensAbaixoMinimo = g.Count(i => (decimal)i.QuantidadeAtual < i.QuantidadeMinima),
                     AlertasVencimento = g.Count(i => i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade),
                     ItensParados = g.Count(i => i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado),
                     TotalItens = g.Count(),
                     ValorVencendo = g.Where(i => i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade)
-                        .Sum(i => (decimal)i.CustoUnitario * (int)i.QuantidadeAtual)
+                        .Sum(i => (decimal)i.CustoUnitario * (decimal)i.QuantidadeAtual)
                 })
                 .ToDictionaryAsync(x => x.LojaId);
 
@@ -63,7 +63,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(g => new
                 {
                     LojaId = g.Key,
-                    TotalSaidas = g.Sum(m => (int)m.Quantidade),
+                    TotalSaidas = g.Sum(m => (decimal)m.Quantidade),
                     ReceitaTotal = g.Sum(m => (decimal?)m.ValorTotal ?? 0m)
                 })
                 .ToDictionaryAsync(x => x.LojaId);
@@ -142,11 +142,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(i => i.EmpresaId == empresaId && i.LojaId == lojaId)
                 .Select(i => new
                 {
-                    IsCritical = (int)i.QuantidadeAtual <= 2,
-                    IsBelowMin = (int)i.QuantidadeAtual < i.QuantidadeMinima,
+                    IsCritical = (decimal)i.QuantidadeAtual <= 2,
+                    IsBelowMin = (decimal)i.QuantidadeAtual < i.QuantidadeMinima,
                     IsIdle = i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoffParado,
                     ValorVencendo = i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoffValidade
-                        ? (decimal)i.CustoUnitario * (int)i.QuantidadeAtual : 0m
+                        ? (decimal)i.CustoUnitario * (decimal)i.QuantidadeAtual : 0m
                 })
                 .ToListAsync();
 
@@ -162,7 +162,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     m.Tipo == EasyStock.Domain.Enums.TipoMovimentacaoEstoque.Saida &&
                     m.Natureza == NaturezaMovimentacaoEstoque.Venda &&
                     m.DataMovimentacao >= de && m.DataMovimentacao <= ate)
-                .SumAsync(m => (int)m.Quantidade);
+                .SumAsync(m => (decimal)m.Quantidade);
             var lojasCount = await dbContext.Lojas.AsNoTracking()
                 .CountAsync(l => l.EmpresaId == empresaId && l.Ativa);
             var mediaEmpresaDiaria = lojasCount > 0 ? (decimal)empresaSaidas / dias / lojasCount : 0m;

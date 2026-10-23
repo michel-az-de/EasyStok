@@ -221,7 +221,7 @@ public sealed class ConsultasEmLoteIntegrationTests(PostgreSqlDatabaseFixture fi
         var (de, ate) = (Agora.AddDays(-7), Agora.AddDays(1));
         var emMemoria = (await repo.GetSaidasPorNaturezaAsync(casa.Id, naturezas, de, ate))
             .Where(m => !(m.Descricao ?? "").StartsWith(BaixaDeInsumosDaProducao.PrefixoDaDescricao, StringComparison.Ordinal)).ToList();
-        var noBanco = await repo.GetSaidasPorNaturezaAsync(casa.Id, naturezas, de, ate, BaixaDeInsumosDaProducao.PrefixoDaDescricao);
+        var noBanco = await repo.GetSaidasPorNaturezaAsync(casa.Id, naturezas, de, ate, BaixaDeInsumosDaProducao.PrefixoDaDescricao, BaixaDeInsumosDaProducao.PrefixoDoDocumento);
         noBanco.Select(m => (m.Id, m.Descricao, m.Produto!.Nome, Lote: m.ItemEstoque!.Id)).Should().Equal(
             emMemoria.Select(m => (m.Id, m.Descricao, m.Produto!.Nome, Lote: m.ItemEstoque!.Id)));
         noBanco.Select(m => m.Id).Should().Equal(movimentos[6].Id, movimentos[7].Id, movimentos[10].Id, movimentos[11].Id, movimentos[12].Id);

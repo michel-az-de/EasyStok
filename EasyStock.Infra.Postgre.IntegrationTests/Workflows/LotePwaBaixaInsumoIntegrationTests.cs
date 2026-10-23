@@ -111,6 +111,40 @@ public class LotePwaBaixaInsumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
         (await Saldos(s)).Should().Be((17m, 100m, 3m), "restaurado, o lote passa a valer: porções entram e insumo sai");
     }
 
+    [SkippableTheory]
+    [InlineData(true)]  // saída gravada antes do documento: só a descrição liga a baixa ao lote
+    [InlineData(false)] // saída com o documento do lote, descrição reescrita: só o documento liga
+    public async Task BaixaDeInsumo_AchadaPeloDocumentoDoLote_EPelaDescricaoNaBaixaAntiga(bool baixaAntiga)
+    {
+        // #2003 (estoque-21): a baixa de insumo do lote era achada pelo TEXTO da descrição ("Insumo da produção
+        // LOT-..."). Quem reescrevesse o texto escondia a saída da exclusão do lote, que deixava o insumo baixado.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        await using var provider = BuildProductionProvider();
+        await MarcarPratoEAbastecerAsync(provider, s);
+        await Sincronizar(provider, s, "b-1", 3);
+        (await Saldos(s)).Should().Be((17m, 100m, 3m));
+
+        await Escopo(provider, s.EmpresaId, async sp =>
+        {
+            var db = sp.GetRequiredService<EasyStockDbContext>();
+            var lote = await db.Set<Lote>().SingleAsync(l => l.MobileBatchId == "b-1");
+            foreach (var saida in await LoteMobileEstadoReconciler.SaidasDeInsumoAbertas(db, lote).ToListAsync())
+            {
+                if (baixaAntiga) saida.DocumentoReferencia = null;
+                else saida.Descricao = "Baixa dos insumos da receita";
+            }
+            await db.SaveChangesAsync();
+        });
+
+        await Marcar(provider, s, "b-1", b => { b.DeletedAt = DateTime.UtcNow; b.DeletedBy = "Thati"; });
+        (await Saldos(s)).Should().Be((20m, 1000m, 0m), "o lote excluído nunca consumiu insumo: bandeja e molho voltam");
+
+        await Marcar(provider, s, "b-1", b => { b.DeletedAt = null; b.DeletedBy = null; });
+        (await Saldos(s)).Should().Be((17m, 100m, 3m), "restaurado, a baixa é refeita uma vez");
+    }
+
     [SkippableFact]
     public async Task BaixaDeInsumoEstornadaAMaoNoErp_NaoVoltaComOReenvioDoLote()
     {
