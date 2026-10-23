@@ -181,14 +181,14 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
     <>
       <h3 className={css.tituloSecao}>Lançamentos</h3>
       <ul className={css.lista}>
-        {lancamentos.map((m) => (m.origemLinha === 'extra'
+        {lancamentos.map((m, indice) => (m.origemLinha === 'extra'
           ? (
-            <li key={`${m.origem}-${m.em}-${m.valor}`} className={css.linha}>
+            <li key={`${m.origem}-${m.tipo}-${m.em}-${m.valor}-${indice}`} className={css.linha}>
               <span className={css.linhaInfo}>
-                <strong>{m.origem === 'Pedido' ? 'Pagamento de pedido' : 'Venda'}</strong>
-                <span className={css.dicaItem}>{horaCurta(m.em)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.descricao && ` · ${m.descricao}`}</span>
+                <strong>{m.tipo === 'estorno' ? 'Estorno de venda' : m.origem === 'Pedido' ? 'Pagamento de pedido' : 'Venda'}</strong>
+                <span className={css.dicaItem}>{horaCurta(m.em)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.tipo !== 'estorno' && m.descricao && ` · ${m.descricao}`}</span>
               </span>
-              <span className={css.linhaValor}>+ {moeda(m.valor)}</span>
+              <span className={m.valor < 0 ? `${css.linhaValor} ${css.valorSaida}` : css.linhaValor}>{m.valor < 0 ? '−' : '+'} {moeda(Math.abs(m.valor))}</span>
             </li>
           )
           : estornando === m.id && podeEstornar(m)
@@ -336,7 +336,7 @@ function FluxoDaSemana({ hoje }) {
                 <td data-rotulo="Saldo do dia" className={l.saldo < 0 ? css.valorSaida : undefined}>{moeda(l.saldo)}</td>
                 <td data-rotulo="Caixa">
                   <Pilula tom={SITUACAO_DO_DIA[l.situacao].tom} fina>{SITUACAO_DO_DIA[l.situacao].rotulo}</Pilula>
-                  {/* A API recalcula o dia fechado; o retrato do fechamento (tabela de baixo) não muda. */}
+                  {/* O dia fechado vem com os números do fechamento; o que entrou depois vem à parte (#1630). */}
                   {l.depoisDoFechamento !== 0 && (
                     <span className={css.dicaItem}>{moeda(Math.abs(l.depoisDoFechamento))} {l.depoisDoFechamento > 0 ? 'depois de fechar' : 'a menos depois de fechar'}</span>
                   )}
@@ -452,6 +452,7 @@ export function AbaCaixaApi() {
             <p className={css.corpoBloco}>
               Fechado às {horaCurta(dia.fechamento.fechadoEm)}{dia.fechamento.fechadoPorNome ? ` por ${dia.fechamento.fechadoPorNome}` : ''}.
               {dia.fechamento.observacoes ? ` ${dia.fechamento.observacoes}` : ''}
+              {dia.posFechamento !== 0 && ` ${dia.posFechamento > 0 ? 'Entrou' : 'Saiu'} ${moeda(Math.abs(dia.posFechamento))} depois de fechar, fora do total do dia.`}
             </p>
           )}
 

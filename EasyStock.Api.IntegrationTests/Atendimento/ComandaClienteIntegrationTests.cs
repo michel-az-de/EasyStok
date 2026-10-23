@@ -666,4 +666,83 @@ public sealed partial class PedidoConversaConcorrenciaTests
         linha.Should().Contain("\"revisao\":1");
         (await Estado(client, token)).Rascunho.Observacoes.Should().Be("Anotação do atendimento");
     }
+
+    // #1686-6: com a alteração da comanda aguardando a aprovação, a atendente troca a janela do pedido. A troca grava
+    // AlteradoEm e mudava o resumo do pedido (a data entrava nele), e o aceite respondia 409 a uma alteração de itens
+    // que não conflita com a data.
+    [SkippableFact]
+    public async Task Comanda_ReagendarComAlteracaoPendenteNaoTravaAConfirmacao()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory(Provedor(new()));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var token = await Link(factory, c.ConversaId);
+        var estado = await Estado(client, token);
+        await Salvar(client, token, estado, estado.Rascunho with { Itens = [new(c.CardapioItemId, 1)], JanelaId = c.JanelaId, DataEntrega = c.DataEntrega });
+        var envio = await Enviar(client, token, 1);
+        var ajuste = await Link(factory, c.ConversaId);
+        estado = await Estado(client, ajuste);
+        await Salvar(client, ajuste, estado, estado.Rascunho with { Itens = [new(c.CardapioItemId, 1, "sem granulado")] });
+        (await Enviar(client, ajuste, 1)).Situacao.Should().Be("alteracao_aguardando_confirmacao");
+
+        var novaData = c.DataEntrega.AddDays(7);
+        var troca = await client.PatchAsJsonAsync($"/api/pedidos/{envio.PedidoId}/janela", new { c.JanelaId, Data = novaData });
+        troca.StatusCode.Should().Be(HttpStatusCode.OK, await troca.Content.ReadAsStringAsync());
+
+        var confirmar = await client.PostAsJsonAsync(
+            $"/api/atendimento/conversas/{c.ConversaId}/comandas-cliente/{estado.LinkId}/confirmar", new { Aceitar = true });
+
+        confirmar.StatusCode.Should().Be(HttpStatusCode.OK, await confirmar.Content.ReadAsStringAsync());
+        var final = await Estado(client, ajuste);
+        final.Pedido!.Itens.Should().ContainSingle().Which.Observacao.Should().Be("sem granulado");
+        final.Pedido.Janela!.Data.Should().Be(novaData, "a alteração confirmada mantém a data reagendada");
+    }
+
+    // #1686-2: o link já usado mostrava o pedido cancelado (ou entregue) como o pedido da comanda, com o saldo e o link de
+    // pagamento dele; a Ficha dizia "Mais a pagar" de pedido cancelado.
+    [SkippableTheory]
+    [InlineData("cancelado")]
+    [InlineData("entregue")]
+    public async Task Comanda_LinkUsadoNaoMostraPedidoEncerradoNemSaldoDele(string encerramento)
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory(Provedor(new()), NivelAcesso.Admin);
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var token = await Link(factory, c.ConversaId);
+        var estado = await Estado(client, token);
+        await Salvar(client, token, estado, estado.Rascunho with { Itens = [new(c.CardapioItemId, 1)], JanelaId = c.JanelaId, DataEntrega = c.DataEntrega });
+        var envio = await Enviar(client, token, 1);
+        envio.Saldo.Should().BePositive();
+        envio.LinkPagamento.Should().NotBeNull();
+        using (var scope = factory.Services.CreateScope())
+        {
+            if (encerramento == "cancelado")
+                await scope.ServiceProvider.GetRequiredService<EasyStock.Application.UseCases.CancelarPedido.CancelarPedidoUseCase>().ExecuteAsync(
+                    new(EmpresaId, envio.PedidoId, UsuarioId, "Teste", "Cliente desistiu", NivelSolicitante: NivelAcesso.Admin));
+            else
+            {
+                var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                db.SetMobileTenantContext(EmpresaId);
+                (await db.Pedidos.SingleAsync(p => p.Id == envio.PedidoId)).Status = encerramento;
+                await db.SaveChangesAsync();
+            }
+        }
+
+        var usado = await Estado(client, token);
+        using var listaJson = JsonDocument.Parse(await client.GetStringAsync($"/api/atendimento/conversas/{c.ConversaId}/comandas-cliente"));
+        var lista = listaJson.RootElement.GetProperty("data").Deserialize<List<ComandaClienteResult>>(ComandaClienteUseCase.Json)!;
+
+        foreach (var retrato in new[] { usado, lista.Single(l => l.LinkId == usado.LinkId) })
+        {
+            retrato.Pedido.Should().BeNull("o pedido encerrado não é mais o pedido da comanda");
+            retrato.PedidoEncerrado.Should().Be(encerramento);
+            retrato.Envio!.Saldo.Should().Be(0, "o saldo não vem do pedido encerrado");
+            retrato.Envio.LinkPagamento.Should().BeNull("o link de pagamento do pedido encerrado não é oferecido");
+        }
+        var reenvio = await Enviar(client, token, 1);
+        reenvio.Saldo.Should().Be(0, "o reenvio do link usado também não oferece cobrança do pedido encerrado");
+        reenvio.LinkPagamento.Should().BeNull();
+    }
 }

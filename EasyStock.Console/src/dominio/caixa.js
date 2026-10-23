@@ -350,23 +350,20 @@ export function gavetaDoDia(dia) {
 // lugar: ficam fora de entrou e de saiu, senão um dia de 300 em vendas com 100 de suprimento e 350
 // de sangria mostrava "saldo do dia 50". Vale para a categoria sugerida pela tela; categoria que a
 // dona escreveu de outro jeito continua contando.
-// `depoisDoFechamento`: a API recalcula o dia fechado ao vivo; Pix que entra depois de fechar muda
-// o dia e o retrato do fechamento não. A diferença vai na linha, para as duas tabelas não se
-// contradizerem em silêncio.
+// `depoisDoFechamento`: o dia fechado vem da API com os números do fechamento (#1630); o Pix que
+// entra depois de fechar chega à parte em `posFechamento` e vai na linha, sem mudar o dia.
 const TROCAS_DE_GAVETA = new Set(['suprimento', 'sangria'])
 const ehTrocaDeGaveta = (movimento) => TROCAS_DE_GAVETA.has(String(movimento.categoria ?? '').trim().toLocaleLowerCase('pt-BR'))
 const trocasDoDia = (dia, tipo) => (dia?.movimentos ?? [])
   .filter((m) => m.tipo === tipo && !m.estornadoEm && ehTrocaDeGaveta(m))
   .reduce((soma, m) => soma + centavos(m.valor), 0)
-const resultadoEmCentavos = (totais) =>
-  centavos(totais?.totalVendas) + centavos(totais?.totalPagamentosPedidos) + centavos(totais?.totalEntradasExtras) - centavos(totais?.totalSaidasExtras)
 
 export function linhaDoFluxo(dia) {
   const entrou = centavos(dia?.totalVendas) + centavos(dia?.totalPagamentosPedidos) + centavos(dia?.totalEntradasExtras) - trocasDoDia(dia, TIPOS_MOVIMENTO.ENTRADA)
   const saiu = centavos(dia?.totalSaidasExtras) - trocasDoDia(dia, TIPOS_MOVIMENTO.SAIDA)
   // A API manda `aberto` também no dia que já fechou: fechado vem primeiro.
   const situacao = dia?.fechado ? 'fechado' : dia?.aberto ? 'aberto' : entrou !== 0 || saiu !== 0 ? 'sem-abertura' : 'sem-movimento'
-  const depois = dia?.fechado && dia?.fechamento ? resultadoEmCentavos(dia) - resultadoEmCentavos(dia.fechamento) : 0
+  const depois = dia?.fechado ? centavos(dia?.posFechamento) : 0
   return { data: dia?.data ?? null, entrou: entrou / 100, saiu: saiu / 100, saldo: (entrou - saiu) / 100, situacao, depoisDoFechamento: depois / 100 }
 }
 

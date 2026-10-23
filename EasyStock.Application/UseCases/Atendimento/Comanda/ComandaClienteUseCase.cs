@@ -38,12 +38,14 @@ public sealed record DevolucaoComandaCliente(Guid OperacaoId, decimal Valor, str
     DateTime CriadoEm, DateTime? ConfirmadoEm, string? Referencia);
 public sealed record AcertoComandaCliente(string Tipo, decimal Valor, string Situacao, IReadOnlyList<DevolucaoComandaCliente> Devolucoes,
     string? CodigoCupom = null, DateTime? ConfirmadoEm = null, decimal? SaldoCupom = null);
+/// <param name="PedidoEncerrado">Status do pedido que o link usado registrou quando ele já foi encerrado (<c>cancelado</c>,
+/// <c>entregue</c>); aí <c>Pedido</c> e <c>Financeiro</c> vêm nulos e o envio sem saldo nem link (#1686-2).</param>
 public sealed record ComandaClienteResult(Guid LinkId, string Nome, DateOnly Dia, DateTime ExpiraEm, int Revisao, bool PodeEditar,
     RascunhoComandaCliente Rascunho, IReadOnlyList<ItemSelecionadoComanda> Selecao, PedidoConversaResult? Pedido,
     EnvioComandaCliente? Envio, IReadOnlyList<CupomComandaCliente> Cupons, decimal? TotalPrevisto = null,
     long NumeroComanda = 0, Guid ConversaId = default, SaldoFinanceiroComanda? Financeiro = null, AcertoComandaCliente? Acerto = null,
     bool PrecisaCadastro = false, bool EntregaACombinar = false, decimal? FreteCombinado = null,
-    bool AjudaSolicitada = false, DateTime? AjudaSolicitadaEm = null);
+    bool AjudaSolicitada = false, DateTime? AjudaSolicitadaEm = null, string? PedidoEncerrado = null);
 public sealed record FreteCombinadoComanda(Guid LinkId, int Revisao, decimal Valor);
 public sealed record EntregaACombinarComanda(Guid LinkId, int Revisao);
 public sealed class ComandaClienteConflitoException(string mensagem) : Exception(mensagem);
@@ -113,6 +115,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
             var link = await AcessoAsync(token, t);
             var estado = await EstadoAsync(link, t);
+            if (estado.PedidoEncerrado is not null) throw new LinkCardapioConversaIndisponivelException();
             if (link.UsadoEm is null || estado.Pedido is null || estado.Envio?.Situacao is "alteracao_aguardando_confirmacao" or "estorno_pendente")
                 throw new ComandaClienteConflitoException("Aguarde a confirmação deste envio antes de abrir outra edição.");
             var pedido = await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, estado.Pedido.PedidoId);
@@ -156,8 +159,14 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         // e não expõe o pedido. Só o pedido registrado pelo próprio link exige o mesmo cliente.
         if (pedido is not null && link.PedidoRegistradoId is null && pedido.ClienteId != cliente?.Id) pedido = null;
         if (pedido is not null && pedido.ClienteId != cliente?.Id) throw new LinkCardapioConversaIndisponivelException();
-        // Link novo depois da entrega começa outra comanda. O link usado conserva o acompanhamento.
-        if (link.UsadoEm is null && pedido is not null && pedido.EstaFinalizado) pedido = null;
+        // #1686-2: pedido encerrado (cancelado ou entregue) não é o pedido da comanda. O link novo começa outra comanda; o
+        // usado diz só o desfecho, sem o saldo nem o link de pagamento dele. O acerto do link (cupom, devolução) continua.
+        PedidoEntity? encerrado = null;
+        if (pedido is not null && pedido.EstaFinalizado)
+        {
+            if (link.UsadoEm is not null) encerrado = pedido;
+            pedido = null;
+        }
         var dados = Ler<RascunhoComandaCliente>(link.RascunhoJson);
         if (dados?.Itens is null)
         {
@@ -184,15 +193,14 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             dados = dados with { PedidoAtualizadoEm = pedido.AlteradoEm };
         var selecao = dados.Itens.Count == 0 ? [] : Selecionar(dados.Itens, pedido,
             await leitura.ObterAsync("cardapio", link.EmpresaId, () => CardapioCompletoAsync(link.EmpresaId, ct)), validar: false);
-        var lido = pedido is null ? null : await leitura.ObterAsync("detalhe", pedido.Id, async () =>
-        {
-            var saldo = await saldoFinanceiro.ConsultarAsync(pedido, ct);
-            return new DetalhePedidoComanda((await obterPedido.MontarAsync(conversa, pedido, saldo, ct)) with { TotalPago = saldo.Alocado }, saldo);
-        });
-        var detalhe = lido?.Detalhe;
-        var financeiro = lido?.Financeiro;
-        var acerto = pedido is null ? null : await AcertoAsync(link, pedido, leitura, ct);
-        var envio = Ler<EnvioComandaCliente>(link.ResultadoJson);
+        // O histórico do dinheiro (recebido, devolvido) do pedido encerrado continua: diz à equipe o que ainda está retido.
+        var comDinheiro = pedido ?? encerrado;
+        var financeiro = comDinheiro is null ? null
+            : await leitura.ObterAsync("saldo", comDinheiro.Id, () => saldoFinanceiro.ConsultarAsync(comDinheiro, ct));
+        var detalhe = pedido is null || financeiro is null ? null : await leitura.ObterAsync("detalhe", pedido.Id, async () =>
+            (await obterPedido.MontarAsync(conversa, pedido, financeiro, ct)) with { TotalPago = financeiro.Alocado });
+        var acerto = comDinheiro is null ? null : await AcertoAsync(link, comDinheiro, leitura, ct);
+        var envio = SemCobrancaSeEncerrado(Ler<EnvioComandaCliente>(link.ResultadoJson), encerrado);
         if (envio?.CupomAplicado is { } usado)
         {
             var cupom = cliente is null ? null : await creditos.ObterPorCodigoAsync(link.EmpresaId, cliente.Id, usado.Codigo, ct);
@@ -218,8 +226,13 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             envio, cupons,
             selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? valorCombinado ?? 0m), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
             cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado,
-            ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm);
+            ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm,
+            encerrado is null ? null : StatusPedidoMapper.Format(encerrado.StatusEnum));
     }
+
+    /// <summary>#1686-2: o envio de um pedido encerrado não oferece saldo nem link de pagamento.</summary>
+    private static EnvioComandaCliente? SemCobrancaSeEncerrado(EnvioComandaCliente? envio, PedidoEntity? pedido) =>
+        envio is not null && pedido is { EstaFinalizado: true } ? envio with { Saldo = 0, LinkPagamento = null, EmCobranca = false } : envio;
 
     private async Task<AcertoComandaCliente?> AcertoAsync(LinkCardapioConversa link, PedidoEntity pedido, LeituraComanda leitura,
         CancellationToken ct)
@@ -324,7 +337,12 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (peloAtendimento && Ler<RascunhoComandaCliente>(link.RascunhoJson)?.PedidoId is not null)
                 throw new ComandaClienteConflitoException("Esta seleção já é um ajuste. Confira a alteração no pedido existente.");
             if (link.UsadoEm is not null)
-                return Ler<EnvioComandaCliente>(link.ResultadoJson) ?? throw new ComandaClienteConflitoException("O envio está em confirmação. Atualize em instantes.");
+            {
+                var anterior = Ler<EnvioComandaCliente>(link.ResultadoJson)
+                    ?? throw new ComandaClienteConflitoException("O envio está em confirmação. Atualize em instantes.");
+                // Reenvio do link usado: o pedido pode ter sido encerrado depois (#1686-2).
+                return SemCobrancaSeEncerrado(anterior, await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, anterior.PedidoId))!;
+            }
             var estado = await EstadoAsync(link, t);
             if (!estado.PodeEditar) throw new LinkCardapioConversaIndisponivelException();
             if (peloAtendimento && estado.Pedido is not null)
@@ -815,13 +833,15 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             throw new UseCaseValidationException("Confira os itens, quantidades e observações da comanda.");
     }
 
+    /// <summary>
+    /// O que a alteração da comanda troca: itens e observação. A data fica fora (#1686-6): reagendar com a alteração
+    /// aguardando a aprovação não conflita com ela, e o aceite aplica os itens sobre o pedido como está.
+    /// </summary>
     public static string ResumoHash(PedidoEntity pedido) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
     {
-        pedido.Observacoes, pedido.AgendadoParaEm,
+        pedido.Observacoes,
         Itens = pedido.Itens.OrderBy(i => i.Id).Select(i => new { i.Id, i.CardapioItemId, i.CardapioItemVariacaoId, i.Quantidade, i.PrecoUnitario, i.Observacao })
     }, Json)));
-
-    private sealed record DetalhePedidoComanda(PedidoConversaResult Detalhe, SaldoFinanceiroComanda Financeiro);
 
     /// <summary>
     /// Leituras de uma montagem de estado (#1725-7). A lista do console monta vários links da mesma conversa, que

@@ -53,7 +53,8 @@ public class PedidosControllerTests
             new EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido(
                 Substitute.For<EasyStock.Application.Ports.Output.Lookup.ICepLookupClient>(),
                 Substitute.For<EasyStock.Application.Ports.Output.Lookup.IGeocodingClient>(), TimeProvider.System,
-                NullLogger<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>.Instance));
+                NullLogger<EasyStock.Application.Services.Pedidos.EnderecoEntregaPedido>.Instance),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.ILojaRepository>());
 
         var estoqueIntegration = new PedidoEstoqueIntegrationService(
             Substitute.For<IItemEstoqueRepository>(),

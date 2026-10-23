@@ -12,7 +12,7 @@ namespace EasyStock.Infra.Postgre.Hosting;
 
 /// <summary>
 /// Background service que cancela pedidos do checkout (site logado, site sem login e conversa) em
-/// <c>AguardandoPagamento</c> sem cobrança há mais de 30 minutos — prevenindo vagas órfãs (ADR-0014 §Solução 2, #1291).
+/// <c>AguardandoPagamento</c> ou <c>Rascunho</c> (fase 1 interrompida, #1623-a) sem cobrança há mais de 30 minutos — prevenindo vagas órfãs (ADR-0014 §Solução 2, #1291).
 ///
 /// <para>
 /// Intervalo: 5 min. Batch máximo: 50. Cada pedido cancelado invoca diretamente
@@ -60,7 +60,7 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
         {
             var pedidoRepo = scope.ServiceProvider.GetRequiredService<IPedidoStorefrontRepository>();
             var limite = DateTime.UtcNow - TimeoutAbandonado;
-            pedidosExpirados = await pedidoRepo.GetAguardandoPagamentoExpiradosAsync(limite, MaxBatch, ct);
+            pedidosExpirados = await pedidoRepo.GetAbandonadosNoCheckoutAsync(limite, MaxBatch, ct);
         }
 
         if (pedidosExpirados.Count == 0) return;
@@ -100,8 +100,9 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
         var pedidoRepo = services.GetRequiredService<IPedidoStorefrontRepository>();
 
         var pedido = await pedidoRepo.GetByIdAsync(pedidoId, ct);
-        if (pedido is null || pedido.Status != StatusPedidoMapper.AguardandoPagamento)
+        if (pedido is null || pedido.Status is not (StatusPedidoMapper.AguardandoPagamento or StatusPedidoMapper.Rascunho))
             return;
+        var statusAntigo = pedido.Status;
 
         pedido.Status = StatusPedidoMapper.Cancelado;
         pedido.CanceladoEm = DateTime.UtcNow;
@@ -112,14 +113,15 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
         var handler = new LiberarVagaOnPedidoCanceladoHandler(
             services.GetRequiredService<IVagaOcupadaRepository>(),
             services.GetRequiredService<ILogger<LiberarVagaOnPedidoCanceladoHandler>>());
-        await handler.HandleAsync(new PedidoCanceladoEvent(pedido.Id, Guid.Empty, "Timeout 30 min sem pagamento"), ct);
+        await handler.HandleAsync(new PedidoCanceladoEvent(pedido.Id, Guid.Empty, statusAntigo == StatusPedidoMapper.Rascunho
+            ? "Timeout 30 min com o checkout interrompido" : "Timeout 30 min sem pagamento"), ct);
         // #1726: o cancelamento automático deixa trilha no pedido. O evento grava junto com o pedido e a vaga.
         await pedidoRepo.AddEventoAsync(new Domain.Entities.PedidoEvento
         {
             Id = Guid.NewGuid(),
             PedidoId = pedido.Id,
             Tipo = "cancelado",
-            StatusAntigo = StatusPedidoMapper.AguardandoPagamento,
+            StatusAntigo = statusAntigo,
             StatusNovo = StatusPedidoMapper.Cancelado,
             Detalhes = MotivoAbandonado,
             UsuarioNome = "Sistema",

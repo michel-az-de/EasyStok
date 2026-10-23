@@ -56,6 +56,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             var conversa = await conversas.ObterPorIdAsync(input.EmpresaId, input.ConversaId, t);
             if (pedido.EmpresaId != input.EmpresaId || conversa is null || conversa.ClienteId != pedido.ClienteId || !conversa.EstaAberta)
                 throw new ComandaClienteConflitoException("Pedido não pertence à conversa.");
+            // #1686-2: alteração de pedido cancelado ou entregue não se aprova nem se recusa (a recusa avisava o cliente).
+            if (pedido.EstaFinalizado) throw new ComandaClienteConflitoException("O pedido foi encerrado. Não há alteração a conferir.");
             if (!input.Aceitar)
             {
                 var recusado = anterior with { Situacao = "alteracao_recusada" };

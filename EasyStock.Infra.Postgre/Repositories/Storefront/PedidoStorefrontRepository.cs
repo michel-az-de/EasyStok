@@ -97,7 +97,7 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
     private static readonly string[] OrigensDoCheckout =
         [OrigemPedido.Storefront, OrigemPedido.StorefrontGuest, OrigemPedido.WhatsApp];
 
-    public async Task<IReadOnlyList<Pedido>> GetAguardandoPagamentoExpiradosAsync(
+    public async Task<IReadOnlyList<Pedido>> GetAbandonadosNoCheckoutAsync(
         DateTime criadoAntesDe,
         int maxBatch = 50,
         CancellationToken ct = default)
@@ -107,7 +107,8 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
         return await db.Pedidos
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(p => p.Status == StatusPedidoMapper.AguardandoPagamento
+            // #1623-a: o rascunho da fase 1 do checkout interrompido também (sem cobrança, sem vaga ou com ela).
+            .Where(p => (p.Status == StatusPedidoMapper.AguardandoPagamento || p.Status == StatusPedidoMapper.Rascunho)
                      && OrigensDoCheckout.Contains(p.Origem)
                      && p.CriadoEm < criadoAntesDe
                      // S11: pedido com CobrancaPedido é do CobrancaPedidoJob (expira pelo link, não pela criação).

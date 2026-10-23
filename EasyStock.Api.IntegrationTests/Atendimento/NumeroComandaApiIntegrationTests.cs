@@ -79,4 +79,66 @@ public sealed partial class PedidoConversaConcorrenciaTests
         pedidos[pedidoId].GetProperty("numeroCurto").GetString().Should().Be(pedidoId.ToString("N")[..8].ToUpperInvariant());
         pedidos[semConversa.Id].GetProperty("numeroComanda").ValueKind.Should().Be(JsonValueKind.Null);
     }
+
+    /// <summary>
+    /// #1641-1: o número do dia (S53) existia no banco e nenhuma leitura do console o devolvia. KDS, agenda e o pedido
+    /// trazem <c>numeroDoDia</c> (aditivo); pedido sem número vem nulo.
+    /// </summary>
+    [SkippableFact]
+    public async Task KdsAgendaEPedido_DevolvemNumeroDoDiaNoJson()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var criado = await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/pedido", new
+        {
+            itens = new[] { new { cardapioItemId = c.CardapioItemId, qtd = 1 } },
+            janelaId = c.JanelaId, dataEntrega = c.DataEntrega.ToString("yyyy-MM-dd"), forma = "na_entrega",
+        });
+        criado.StatusCode.Should().Be(HttpStatusCode.OK, await criado.Content.ReadAsStringAsync());
+
+        Guid pedidoId;
+        var semNumero = new Pedido
+        {
+            Id = Guid.NewGuid(), EmpresaId = EmpresaId, Status = StatusPedidoMapper.Aguardando, ClienteNome = "Sem número",
+            Total = Dinheiro.FromDecimal(10m), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+        };
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(EmpresaId);
+            pedidoId = (await db.AtendimentoConversas.SingleAsync(x => x.Id == c.ConversaId)).PedidoEmAndamentoId!.Value;
+            (await db.Pedidos.SingleAsync(p => p.Id == pedidoId)).DefinirNumeroDoDia(c.DataEntrega, 42);
+            db.Pedidos.Add(semNumero);
+            db.VagasOcupadas.Add(VagaOcupada.Ocupar(c.JanelaId, c.DataEntrega, semNumero.Id));
+            await db.SaveChangesAsync();
+        }
+        var dia = c.DataEntrega.ToString("yyyy-MM-dd");
+
+        using var kds = await client.GetAsync($"/api/kds/pedidos?status=aguardando_pagamento,aguardando&data={dia}");
+        var kdsCorpo = await kds.Content.ReadAsStringAsync();
+        kds.StatusCode.Should().Be(HttpStatusCode.OK, kdsCorpo);
+        using var kdsJson = JsonDocument.Parse(kdsCorpo);
+        var cards = kdsJson.RootElement.GetProperty("data").EnumerateArray().ToDictionary(e => e.GetProperty("id").GetGuid());
+        cards[pedidoId].GetProperty("numeroDoDia").GetInt32().Should().Be(42, kdsCorpo);
+        cards[semNumero.Id].GetProperty("numeroDoDia").ValueKind.Should().Be(JsonValueKind.Null);
+
+        using var agenda = await client.GetAsync($"/api/atendimento/agenda?de={dia}&ate={dia}");
+        var agendaCorpo = await agenda.Content.ReadAsStringAsync();
+        agenda.StatusCode.Should().Be(HttpStatusCode.OK, agendaCorpo);
+        using var agendaJson = JsonDocument.Parse(agendaCorpo);
+        var pedidos = agendaJson.RootElement.GetProperty("data").GetProperty("dias").EnumerateArray()
+            .SelectMany(d => d.GetProperty("janelas").EnumerateArray())
+            .SelectMany(j => j.GetProperty("pedidos").EnumerateArray())
+            .ToDictionary(p => p.GetProperty("pedidoId").GetGuid());
+        pedidos[pedidoId].GetProperty("numeroDoDia").GetInt32().Should().Be(42, agendaCorpo);
+        pedidos[semNumero.Id].GetProperty("numeroDoDia").ValueKind.Should().Be(JsonValueKind.Null);
+
+        using var detalhe = await client.GetAsync($"/api/pedidos/{pedidoId}");
+        var detalheCorpo = await detalhe.Content.ReadAsStringAsync();
+        detalhe.StatusCode.Should().Be(HttpStatusCode.OK, detalheCorpo);
+        using var detalheJson = JsonDocument.Parse(detalheCorpo);
+        detalheJson.RootElement.GetProperty("data").GetProperty("pedido").GetProperty("numeroDoDia").GetInt32().Should().Be(42, detalheCorpo);
+    }
 }
