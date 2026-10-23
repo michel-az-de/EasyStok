@@ -49,6 +49,23 @@ public class AvisoCobrancaConversaFalhaTests
     }
 
     /// <summary>
+    /// #2004 atendimento-08: a mensagem com falha guarda o código estável (o console traduz), não o texto cru do
+    /// provedor nem a URL da exceção.
+    /// </summary>
+    [Fact]
+    public async Task Falha_do_canal_grava_o_codigo_estavel_e_nao_o_texto_cru_do_provedor()
+    {
+        var (aviso, conversa) = Montar(Agora.AddMinutes(-10));
+        _canal.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<string>(_ => throw new HttpRequestException("Connection refused (graph.facebook.com:443)"));
+
+        await aviso.EnviarAsync(_empresa, conversa.Id, AvisoCobrancaConversa.TextoNovoLink("https://mp.test/x"), Agora);
+
+        var falhou = _gravadas.Should().ContainSingle().Subject;
+        falhou.Erro.Should().Contain("CANAL_SEM_CONEXAO").And.NotContain("graph.facebook.com");
+    }
+
+    /// <summary>
     /// #1933 (decisão do Felipe, 21/10): o reenvio automático repetia o aviso sem conferir pedido nem cobrança, e o
     /// "novo link, válido por 30 minutos" saía já vencido. A falha fica em Não entregues para a atendente decidir.
     /// </summary>

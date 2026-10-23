@@ -255,4 +255,23 @@ public class MensagensProgramadasUseCasesTests
         mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
         _uow.CommitCount.Should().Be(1);
     }
+
+    [Fact]
+    public async Task Disparar_FalhaDoCanal_GravaOCodigoEstavelEmVezDoTextoCruDoProvedor()
+    {
+        // #2004 atendimento-08: o console traduz o código; o texto da exceção (inglês, com host) fica só no log.
+        var conversa = ConversaAberta(Agora.AddHours(-1));
+        var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, conversa.Id, CanalConversa.WhatsApp,
+            FinalidadeContato.Transacional, "Lembrete", null, Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddMinutes(-10));
+        mensagem.Reservar(Agora);
+        _repo.ObterAsync(_empresaId, mensagem.Id, Arg.Any<CancellationToken>()).Returns(mensagem);
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        _whats.EnviarTextoAsync("5511988887777", "Lembrete", Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new HttpRequestException("Connection refused (graph.facebook.com:443)"));
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
+        mensagem.Erro.Should().Contain("CANAL_SEM_CONEXAO").And.NotContain("graph.facebook.com");
+    }
 }

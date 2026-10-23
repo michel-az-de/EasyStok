@@ -78,7 +78,8 @@ public sealed class DispararMensagemProgramadaUseCase(
         {
             // #1787: o timeout do HttpClient também é OperationCanceledException; só o desligamento relança.
             logger.LogWarning(ex, "Mensagem programada {Id} não saiu.", id);
-            mensagem.RegistrarFalha(ex.Message, agora);
+            // #1765-11: o código estável (o console traduz); o texto do provedor, em inglês e com host, fica só no log.
+            mensagem.RegistrarFalha(ClassificadorFalhaEnvio.Motivo(ex), agora);
         }
 
         await unitOfWork.CommitAsync();
