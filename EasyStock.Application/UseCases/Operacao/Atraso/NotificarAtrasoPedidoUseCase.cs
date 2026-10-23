@@ -46,7 +46,7 @@ public sealed class NotificarAtrasoPedidoUseCase(
 
     private async Task<PedidoAtrasadoOperacao?> MarcarNoLockAsync(PedidoAtrasoCandidato candidato, CancellationToken ct)
     {
-        var pedido = await pedidoRepository.GetForUpdateAsync(candidato.PedidoId, ct);
+        var pedido = await pedidoRepository.GetForUpdateAsync(candidato.EmpresaId, candidato.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != candidato.EmpresaId) return null;
         if (!pedido.MarcarAtrasoNotificado(relogio.GetUtcNow().UtcDateTime)) return null;
 

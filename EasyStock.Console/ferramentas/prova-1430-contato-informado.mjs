@@ -149,6 +149,45 @@ await confere('#1936: cidade e UF no fim do endereço não viram bairro', async 
   assert.equal(partesDoEndereco('Rua A, 10, Pinheiros, 05415-000').bairro, 'Pinheiros', 'formato antigo')
 })
 
+// #1989 (item 5, laboratório de 23/10): endereço colado do WhatsApp era recusado com "escreva
+// separado por vírgulas". Prefixo "CEP" e hífen como separador são o jeito comum de escrever.
+await confere('#1989-5: endereço colado com "CEP" no fim ou separado por hífen é aceito', async () => {
+  const { partesDoEndereco } = await import('../src/dominio/formato.js')
+  const { recusaDoEndereco } = await import('../src/dominio/cliente.js')
+  const comPrefixo = 'Rua Cardeal Arcoverde, 500, apto 3, Pinheiros, Sao Paulo, CEP 05416-000'
+  assert.deepEqual(partesDoEndereco(comPrefixo),
+    { rua: 'Rua Cardeal Arcoverde', numero: '500', complemento: 'apto 3', bairro: 'Pinheiros', cep: '05416-000' })
+  const comHifen = 'Rua Harmonia, 300 - Vila Madalena - 05435-000'
+  assert.deepEqual(partesDoEndereco(comHifen),
+    { rua: 'Rua Harmonia', numero: '300', complemento: '', bairro: 'Vila Madalena', cep: '05435-000' })
+  for (const texto of [
+    'Rua Harmonia, 300 - Vila Madalena - São Paulo - SP - 05435-000',
+    'Rua Harmonia, 300 - Vila Madalena, São Paulo/SP, CEP: 05435000',
+    'Rua Harmonia, 300, Vila Madalena, cep 05435-000',
+  ]) {
+    const p = partesDoEndereco(texto)
+    assert.equal(p.bairro, 'Vila Madalena', texto)
+    assert.equal(p.numero, '300', texto)
+    assert.match(p.cep, /^05435-?000$/, texto)
+  }
+  assert.equal(recusaDoEndereco(comPrefixo), null)
+  assert.equal(recusaDoEndereco(comHifen), null)
+  // Hífen colado em nome próprio não separa nada.
+  assert.equal(partesDoEndereco('Rua Pedro-Álvares, 10, Pinheiros, 05415-000').rua, 'Rua Pedro-Álvares')
+  // Sem CEP no fim continua recusado, com o formato.
+  assert.ok(recusaDoEndereco('Rua Harmonia 300 Vila Madalena'))
+})
+
+await confere('#1989-5: o endereço colado com "CEP" chega ao EasyStok em partes', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(lead({ contatoInformado: INFORMADO }))
+  acoes.editarDadoCliente('conv-1', 'endereco', 'Rua Harmonia, 300 - Vila Madalena - São Paulo - SP - CEP 05435-000', 0)
+  await esperar()
+  const post = chamadas.find((c) => c.metodo === 'POST')
+  assert.ok(post, 'sem POST')
+  assert.deepEqual(post.corpo.endereco, { cep: '05435000', logradouro: 'Rua Harmonia', numero: '300', complemento: null, bairro: 'Vila Madalena' })
+})
+
 await confere('telefone E.164 da API aparece na máscara da tela', () => {
   assert.equal(telefoneDoE164('+5511987654321'), '(11) 98765-4321')
   assert.equal(telefoneDoE164('+551132654321'), '(11) 3265-4321')

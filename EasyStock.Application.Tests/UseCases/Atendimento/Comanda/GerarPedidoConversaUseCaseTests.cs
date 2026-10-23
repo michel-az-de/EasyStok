@@ -72,8 +72,8 @@ public class GerarPedidoConversaUseCaseTests
 
             // Troca de forma (na entrega) trava o pedido recém-criado numa transação.
             Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?, PedidoMudouStatusOperacao?, ImpressaoPendenteOperacao?)>();
-            Checkout.PedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-                .Returns(ci => Checkout.PedidosAdicionados.FirstOrDefault(p => p.Id == ci.Arg<Guid>()));
+            Checkout.PedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(ci => Checkout.PedidosAdicionados.FirstOrDefault(p => p.EmpresaId == ci.ArgAt<Guid>(0) && p.Id == ci.ArgAt<Guid>(1)));
 
             var aviso = new AvisoCobrancaConversa(ConversaRepo, new ResolvedorCanal([Canal]), Uow,
                 NullLogger<AvisoCobrancaConversa>.Instance);

@@ -120,4 +120,68 @@ confere('conversa comum segue fora de "Precisa de você"', () => {
   assert.equal(precisaDeVoce(c, AGORA, false), false)
 })
 
+// #1989 (item 3, laboratório de 23/10): atendimento normal virava "Cliente perguntou 2 vezes do
+// pedido". Contava toda mensagem sem resposta; só conta pergunta, e o assunto do pedido vem dela.
+confere('#1989-3 endereço e mais um pedido sem resposta não são "Cobrando o pedido"', () => {
+  const m = motivo(conversa([
+    casa('Oi! Anotei o ravióli de abóbora.', 8),
+    cliente('Rua Harmonia, 300, Vila Madalena, Sao Paulo, CEP 05416-000', 3),
+    cliente('Pode ser duas lasanhas para entrega às 19h', 1),
+  ], { pedido: { numero: '2026-0190', estado: 'aguardando', itens: [{ sku: 'X', qtd: 1 }] } }))
+  assert.notEqual(m?.chave, 'insistencia', m?.texto)
+})
+
+confere('#1989-3 uma pergunta do pedido e um recado não são insistência', () => {
+  const m = motivo(conversa([
+    cliente('Cadê meu pedido?', 3),
+    cliente('Vou estar no portão, é a casa azul', 1),
+  ], { pedido: { numero: '2026-0191', estado: 'em-preparo', cobranca: cobrancaPaga } }))
+  assert.notEqual(m?.chave, 'insistencia', m?.texto)
+})
+
+confere('#1989-3 pergunta respondida não conta: depois da resposta só vale a pergunta nova', () => {
+  const m = motivo(conversa([
+    cliente('Cadê meu pedido?', 20),
+    casa('Saiu agora, chega em 15 min!', 18),
+    cliente('Já saiu mesmo?', 1),
+  ], { pedido: { numero: '2026-0192', estado: 'em-entrega', cobranca: cobrancaPaga } }))
+  assert.notEqual(m?.chave, 'insistencia', m?.texto)
+})
+
+confere('#1989-3 duas perguntas do pedido sem resposta seguem subindo, com a contagem das perguntas', () => {
+  const m = motivo(conversa([
+    cliente('Cadê meu pedido?', 6),
+    cliente('Obrigada', 4),
+    cliente('Quanto tempo ainda demora?', 1),
+  ], { pedido: { numero: '2026-0193', estado: 'em-preparo', cobranca: cobrancaPaga } }))
+  assert.equal(m?.chave, 'insistencia')
+  assert.match(m.texto, /perguntou 2 vezes do pedido 2026-0193/)
+})
+
+// Achados da revisão da PR #1997: "demora" sem pergunta e pergunta de área no meio da venda não
+// cobram o pedido; pergunta de chegada sem "?" cobra.
+confere('#1989-3 "pode demorar, sem pressa" e pergunta de área não são insistência', () => {
+  const m = motivo(conversa([
+    cliente('Pode demorar, sem pressa', 3),
+    cliente('Vocês entregam no Butantã?', 1),
+  ], { pedido: { numero: '2026-0194', estado: 'em-preparo', cobranca: cobrancaPaga } }))
+  assert.notEqual(m?.chave, 'insistencia', m?.texto)
+})
+
+confere('#1989-3 duas perguntas de venda com a comanda em montagem não são insistência', () => {
+  const m = motivo(conversa([
+    cliente('Tem lasanha hoje?', 3),
+    cliente('Vocês entregam na Vila Madalena?', 1),
+  ], { pedido: { numero: '2026-0195', estado: 'aguardando', itens: [{ sku: 'X', qtd: 1 }] } }))
+  assert.notEqual(m?.chave, 'insistencia', m?.texto)
+})
+
+confere('#1989-3 "que horas chega" e "já saiu" sem "?" seguem sendo insistência', () => {
+  const m = motivo(conversa([
+    cliente('que horas chega', 3),
+    cliente('ja saiu', 1),
+  ], { pedido: { numero: '2026-0196', estado: 'em-preparo', cobranca: cobrancaPaga } }))
+  assert.equal(m?.chave, 'insistencia', m?.texto)
+})
+
 console.log(`\n${passou} verificações passaram`)

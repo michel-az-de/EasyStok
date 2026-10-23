@@ -30,7 +30,7 @@ public class CheckoutCoreServiceTests
     internal sealed class Cenario
     {
         public IStorefrontRepository StorefrontRepo { get; } = Substitute.For<IStorefrontRepository>();
-        public ICardapioItemRepository CardapioRepo { get; } = Substitute.For<ICardapioItemRepository>();
+        public ICardapioItemRepository CardapioRepo { get; } = Substitute.For<ICardapioItemRepository>().ListarPeloGetById();
         public IJanelaEntregaRepository JanelaRepo { get; } = Substitute.For<IJanelaEntregaRepository>();
         public IBloqueioEntregaRepository BloqueioRepo { get; } = Substitute.For<IBloqueioEntregaRepository>();
         public IFreteZonaRepository FreteZonaRepo { get; } = Substitute.For<IFreteZonaRepository>();
@@ -320,6 +320,7 @@ public class CheckoutCoreServiceTests
         var item = avulso ? CardapioItem.CriarAvulso(c.Storefront.Id, nome, 10m) : c.CardapioItem;
         if (!avulso) item.AtualizarMetadata(nomePublico: nome);
         item.TornarVisivel();
+        typeof(CardapioItem).GetProperty("Id")!.SetValue(item, CardapioItemId);
         c.CardapioRepo.GetByIdAsync(c.Storefront.Id, CardapioItemId, Arg.Any<CancellationToken>())
             .Returns(item);
 

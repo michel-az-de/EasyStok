@@ -121,6 +121,34 @@ public class SequenciaDiariaPedidoRepositoryTests(PostgreSqlDatabaseFixture fixt
     }
 
     /// <summary>
+    /// E12 (#1641-4, decisão do Felipe em 23/10): o upsert do contador que falha não pode abortar a transação do
+    /// pagamento. Sem o savepoint, o Postgres marca a transação como abortada e o SaveChanges seguinte cai junto.
+    /// </summary>
+    [SkippableFact]
+    public async Task ContadorQueFalhaNaoAbortaATransacaoDoPagamento()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = await NovaEmpresaAsync("Casa da Baba Contador Falho", "11222333001072");
+        var id = (await SemearPedidosAsync(empresa.Id, 1)).Single();
+
+        await using (var db = NovoDbComRls(empresa.Id))
+        {
+            await using var tx = await db.Database.BeginTransactionAsync();
+            await new PedidoRepository(db).TravarAsync(empresa.Id, id);
+            var pedido = await db.Pedidos.SingleAsync(p => p.Id == id);
+            // Empresa inexistente: a FK (e o RLS) recusam o upsert, como uma falha real do contador.
+            var falha = () => new SequenciaDiariaPedidoRepository(db).ProximoAsync(Guid.NewGuid(), Dia);
+            await falha.Should().ThrowAsync<Exception>();
+            pedido.Observacoes = "pagamento confirmado sem número";
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+
+        await using var leitura = NovoDbComRls(empresa.Id);
+        (await leitura.Pedidos.AsNoTracking().SingleAsync(p => p.Id == id)).Observacoes.Should().Be("pagamento confirmado sem número");
+    }
+
+    /// <summary>
     /// #1641-5: comportamento real do rollback. O upsert roda na transação aberta, então a confirmação desfeita
     /// devolve o número: o contador não avança e o próximo pagamento recebe o mesmo número, sem buraco.
     /// </summary>

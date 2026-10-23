@@ -23,6 +23,7 @@ public sealed record PagamentoMercadoPago(
     public const string Cancelled = "cancelled";
     public const string Refunded = "refunded";
     public const string ChargedBack = "charged_back";
+    public const string InMediation = "in_mediation";
 
     public bool Aprovado => string.Equals(Status, Approved, StringComparison.OrdinalIgnoreCase);
     public bool Estornado => EhEstorno(Status);
@@ -37,6 +38,10 @@ public sealed record PagamentoMercadoPago(
     public static bool EhRecusa(string? status) =>
         string.Equals(status, Rejected, StringComparison.OrdinalIgnoreCase)
         || string.Equals(status, Cancelled, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary><c>in_mediation</c>: o comprador abriu disputa; o dinheiro fica retido até o desfecho (#1724-12).</summary>
+    public static bool EhMediacao(string? status) =>
+        string.Equals(status?.Trim(), InMediation, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>Estorno criado pelo Mercado Pago (<c>POST v1/payments/{id}/refunds</c>).</summary>

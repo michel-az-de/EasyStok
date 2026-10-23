@@ -65,6 +65,79 @@ public class ConfirmarPagamentoPedidoUseCaseTests
             MetodoPagamentoExterno: "pix", TipoPagamentoExterno: "bank_transfer",
             PagoEm: CobrancaPedidoFixture.Agora);
 
+    /// <summary>#1724-12: o recebimento gravava a hora da baixa; a data da aprovação no provedor é a que vale.</summary>
+    [Fact]
+    public async Task PagamentoDoProvedor_GravaADataDaAprovacao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var aprovadoEm = CobrancaPedidoFixture.Agora.AddMinutes(-42);
+
+        (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagoEm = aprovadoEm })).Confirmado.Should().BeTrue();
+
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.PagoEm.Should().Be(aprovadoEm);
+    }
+
+    /// <summary>
+    /// Revisão da #1979: o recebimento não volta para um dia de Caixa já fechado (o fechamento não o retratou e o
+    /// desfazer recusaria por "dia fechado"); entra no instante do registro.
+    /// </summary>
+    [Fact]
+    public async Task PagamentoDoProvedor_AprovadoEmDiaDeCaixaFechado_FicaNoInstanteDoRegistro()
+    {
+        var f = new CobrancaPedidoFixture();
+        var aprovadoEm = CobrancaPedidoFixture.Agora.AddDays(-1);
+        var dia = EasyStock.Application.Common.HorarioBrasil.DataOperacional(aprovadoEm);
+        f.CaixaRepo.GetFechamentoDoDiaAsync(f.EmpresaId, dia, f.Pedido.LojaId)
+            .Returns(FechamentoCaixaFechado(f, dia));
+        var registrar = new RegistrarPagamentoPedidoUseCase(f.PedidoRepo, f.Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
+            new CalculadoraInicioPrevistoPedido(f.PrazoQueries), QuitacaoPedidoTeste.Criar(f.PedidoRepo), f.CaixaRepo);
+        var antes = DateTime.UtcNow;
+
+        await registrar.ExecuteAsync(new RegistrarPagamentoPedidoCommand(f.EmpresaId, f.Pedido.Id, "pix", 25m,
+            Referencia: "pay-9", ConfirmadoPeloProvedor: true, AprovadoNoProvedorEm: aprovadoEm));
+
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.PagoEm.Should().BeOnOrAfter(antes);
+    }
+
+    private static EasyStock.Domain.Entities.FechamentoCaixa FechamentoCaixaFechado(CobrancaPedidoFixture f, DateOnly dia) =>
+        EasyStock.Domain.Entities.FechamentoCaixa.Criar(f.EmpresaId, dia, 0, 0, 25, 0, 0, f.Pedido.LojaId);
+
+    /// <summary>
+    /// E12 (#1641-4, decisão do Felipe em 23/10): a falha do contador do número do dia não desfaz o pagamento; o pedido
+    /// fica sem número (buraco na sequência é aceitável).
+    /// </summary>
+    [Fact]
+    public async Task ContadorDoNumeroQueFalha_NaoDesfazAConfirmacao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var sequencia = Substitute.For<ISequenciaDiariaPedido>();
+        sequencia.ProximoAsync(default, default, default).ReturnsForAnyArgs<Task<int>>(_ => throw new InvalidOperationException("upsert do contador falhou"));
+        var calculadora = new CalculadoraInicioPrevistoPedido(f.PrazoQueries, new NumeradorPedidoDoDia(sequencia, f.Relogio));
+
+        var r = await f.Confirmar(calculadora: calculadora).ExecuteAsync(Aprovado(f.Pedido.Id));
+
+        r.Confirmado.Should().BeTrue();
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        f.Pedido.Pagamentos.Should().ContainSingle();
+        f.Pedido.NumeroDoDia.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ContadorDoNumero_NumeraNaConfirmacao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var sequencia = Substitute.For<ISequenciaDiariaPedido>();
+        sequencia.ProximoAsync(default, default, default).ReturnsForAnyArgs(7);
+        var calculadora = new CalculadoraInicioPrevistoPedido(f.PrazoQueries, new NumeradorPedidoDoDia(sequencia, f.Relogio));
+
+        (await f.Confirmar(calculadora: calculadora).ExecuteAsync(Aprovado(f.Pedido.Id))).Confirmado.Should().BeTrue();
+
+        f.Pedido.NumeroDoDia.Should().Be(7);
+    }
+
     [Fact]
     public async Task ConfirmaETransita()
     {

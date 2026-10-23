@@ -181,11 +181,17 @@ export const faixaDeCep = (inicio, fim) => `${mascaraCep(inicio)} a ${mascaraCep
 // #1936: cidade e UF no fim ("São Paulo", "São Paulo - SP", "SP") não são bairro. A loja entrega só
 // na própria cidade, então elas saem do texto antes de achar o bairro.
 const CIDADE_OU_UF = /^(s[aã]o paulo(\s*[-/]\s*sp)?|sp)$/i
+// #1989: endereço colado do WhatsApp. Hífen ou travessão entre espaços separa como a vírgula
+// ("Rua Harmonia, 300 - Vila Madalena - 05435-000"); o hífen do CEP e o de nome próprio não têm
+// espaço em volta. O CEP pode vir com o prefixo "CEP" ("CEP 05416-000", "CEP: 05416000").
+const SEPARADOR = /\s*,\s*|\s+[-–—]\s+/
+const CEP_NO_FIM = /^(?:cep[:.]?\s*)?(\d{5}-?\d{3})$/i
 
 export function partesDoEndereco(texto) {
   if (!texto) return { rua: '', numero: '', complemento: '', bairro: '', cep: '' }
-  const partes = texto.split(',').map((p) => p.trim())
-  const cep = /^\d{5}-?\d{3}$/.test(partes.at(-1) ?? '') ? partes.pop() : ''
+  const partes = texto.trim().split(SEPARADOR).filter(Boolean)
+  const cep = CEP_NO_FIM.exec(partes.at(-1) ?? '')?.[1] ?? ''
+  if (cep) partes.pop()
   while (partes.length > 2 && CIDADE_OU_UF.test(partes.at(-1) ?? '')) partes.pop()
   const bairro = partes.pop() ?? ''
   const rua = partes.shift() ?? ''

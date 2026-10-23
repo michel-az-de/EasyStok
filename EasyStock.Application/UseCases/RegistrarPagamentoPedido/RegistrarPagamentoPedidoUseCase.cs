@@ -26,7 +26,10 @@ public sealed record RegistrarPagamentoPedidoCommand(
     // S13: pagamento já confirmado na fonte pelo provedor (ConfirmarPagamentoPedidoUseCase). Dinheiro
     // recebido é registrado mesmo com o pedido aguardando a aprovação da dona (Pedido.RequerAprovacao,
     // S12); a guarda de pré-operacional continua valendo para todo registro manual.
-    bool ConfirmadoPeloProvedor = false);
+    bool ConfirmadoPeloProvedor = false,
+    // #1724-12: data da aprovação no provedor (date_approved). Só vale com ConfirmadoPeloProvedor; a baixa manual
+    // grava sempre o instante do registro.
+    DateTime? AprovadoNoProvedorEm = null);
 
 public class RegistrarPagamentoPedidoUseCase(
     IPedidoRepository repo,
@@ -110,7 +113,7 @@ public class RegistrarPagamentoPedidoUseCase(
                 Valor = cmd.Valor,
                 Referencia = cmd.Referencia,
                 Observacao = cmd.Observacao,
-                PagoEm = DateTime.UtcNow,
+                PagoEm = await PagoEmAsync(cmd, pedido.LojaId),
                 RegistradoPorUserId = cmd.RegistradoPorUserId,
                 RegistradoPorNome = cmd.RegistradoPorNome
             };
@@ -162,6 +165,20 @@ public class RegistrarPagamentoPedidoUseCase(
         }, ct);
         await quitacao.PublicarAsync(cmd.EmpresaId, efeito, ct, mudanca);
         return resultado;
+    }
+
+    /// <summary>
+    /// #1724-12: o recebimento do provedor vale na data da aprovação. Não volta para um dia de Caixa já fechado: o
+    /// fechamento não o retratou (CaixaFechadoGuard), e ele entra no dia em que foi registrado.
+    /// </summary>
+    private async Task<DateTime> PagoEmAsync(RegistrarPagamentoPedidoCommand cmd, Guid? lojaId)
+    {
+        var agora = DateTime.UtcNow;
+        if (!cmd.ConfirmadoPeloProvedor || DataUtc.ParaUtcOpcional(cmd.AprovadoNoProvedorEm) is not { } aprovado || aprovado >= agora)
+            return agora;
+        if (caixaRepo is not null && await CaixaFechadoGuard.DiaFechadoAsync(caixaRepo, cmd.EmpresaId, aprovado, lojaId))
+            return agora;
+        return aprovado;
     }
 
     private async Task TentarAbrirCaixaAsync(RegistrarPagamentoPedidoCommand cmd, EasyStock.Domain.Entities.Pedido pedido, DateTime pagoEm, CancellationToken ct)

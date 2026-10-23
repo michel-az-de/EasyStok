@@ -20,6 +20,18 @@ public class CheckoutEntradaLimitesTests
     }
 
     [Fact]
+    public async Task Pratos_distintos_acima_do_teto_sao_recusados_antes_de_consultar()
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var ids = Enumerable.Range(0, CheckoutCoreService.MaximoPratosDistintos + 1).Select(_ => Guid.NewGuid()).ToList();
+
+        var agir = () => c.Servico().CarregarItensCardapioAsync(c.Storefront.Id, ids);
+
+        await agir.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*50 pratos*");
+        await c.CardapioRepo.DidNotReceiveWithAnyArgs().ListarPorIdsAsync(default, default!, default);
+    }
+
+    [Fact]
     public void Quantidade_no_teto_passa()
     {
         CheckoutCoreService.ValidarEntrada("01310100", [(Guid.NewGuid(), CheckoutCoreService.QuantidadeMaximaPorItem)])
