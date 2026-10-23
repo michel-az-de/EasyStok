@@ -53,7 +53,7 @@ public sealed record FechamentoCaixaResult(
 /// </summary>
 public sealed record CaixaLinhaExtraResult(
     DateTime Hora,
-    string Tipo,        // "venda" | "pagamento"
+    string Tipo,        // "venda" | "pagamento" | "estorno" (venda estornada, valor negativo)
     decimal Valor,
     string? Descricao,
     string? Metodo,
@@ -66,6 +66,8 @@ public sealed record CaixaLinhaExtraResult(
 /// <param name="AbertoDesde">Data civil (BRT) da abertura quando a sessão é cross-day; null caso contrário.</param>
 /// <param name="LinhasExtras">Vendas e pagamentos de pedido do período como linhas, para a
 /// lista "Movimentos do dia" reconciliar com o saldo (BUG-5).</param>
+/// <param name="PosFechamento">#1630-2: no dia fechado, os totais e o saldo são os do fechamento; isto é
+/// o que mudou depois de fechar (recálculo ao vivo menos o saldo fechado). Zero no dia aberto.</param>
 public sealed record CaixaDiaResult(
     DateOnly Data,
     Guid EmpresaId,
@@ -82,5 +84,6 @@ public sealed record CaixaDiaResult(
     IReadOnlyList<MovimentoCaixaResult> Movimentos,
     bool AberturaPendenteCrossDay = false,
     DateOnly? AbertoDesde = null,
-    IReadOnlyList<CaixaLinhaExtraResult>? LinhasExtras = null
+    IReadOnlyList<CaixaLinhaExtraResult>? LinhasExtras = null,
+    decimal PosFechamento = 0m
 );

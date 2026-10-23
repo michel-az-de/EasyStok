@@ -120,7 +120,9 @@ public class CaixaController(
         {
             EmpresaId = emp,
             Id = id,
-            UsuarioId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null
+            UsuarioId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            // Origem server-side, nunca do body: "mobile" no corpo pularia a guarda da gaveta (#1623, #766).
+            Origem = "web"
         });
         return result == null ? DataNotFound("Movimento não encontrado.") : DataOk(result);
     }
