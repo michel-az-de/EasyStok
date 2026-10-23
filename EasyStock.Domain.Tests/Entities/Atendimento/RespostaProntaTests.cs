@@ -93,6 +93,25 @@ public class RegraAutomaticaTests
             .Should().Throw<RegraDeDominioVioladaException>();
     }
 
+    /// <summary>
+    /// #1610: o lembrete do link nasce ligado com texto padrão, sem regra gravada. Os gatilhos antigos continuam
+    /// desligados até a dona salvar.
+    /// </summary>
+    [Fact]
+    public void PadraoSoParaOLembreteDoLink()
+    {
+        var padrao = RegraAutomatica.Padrao(Empresa, GatilhoAutomacao.CobrancaVencendo, Agora);
+        padrao.Should().NotBeNull();
+        padrao!.Ligada.Should().BeTrue();
+        padrao.Gatilho.Should().Be(GatilhoAutomacao.CobrancaVencendo);
+        padrao.Texto.Should().Contain("{pedido}").And.NotContain("{nome}", "nome pode faltar, e variável sem valor não sai");
+
+        // "Pagamento confirmado" também nasce ligada (#1765-4); os demais seguem desligados.
+        foreach (var antigo in Enum.GetValues<GatilhoAutomacao>()
+                     .Where(g => g is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado)))
+            RegraAutomatica.Padrao(Empresa, antigo, Agora).Should().BeNull();
+    }
+
     [Theory]
     [InlineData(true, false, GatilhoAutomacao.PrimeiroContato)]
     [InlineData(false, false, GatilhoAutomacao.ForaDoHorario)]

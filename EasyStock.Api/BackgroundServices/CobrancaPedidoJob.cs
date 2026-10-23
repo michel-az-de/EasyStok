@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.UseCases.Atendimento.Automacoes;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Infra.Postgre.Data;
 
@@ -8,7 +9,8 @@ namespace EasyStock.Api.BackgroundServices;
 /// Expiração da cobrança do pedido (S11). A cada 60 s lista as cobranças online pendentes com o link
 /// vencido (cross-tenant) e processa cada uma no próprio escopo, com o tenant dela ligado, pelo
 /// <see cref="ProcessarCobrancaVencidaUseCase"/>: reemite uma vez para pedido da conversa; cancela o
-/// pedido (e libera a vaga) na segunda expiração ou quando o pedido é do site.
+/// pedido (e libera a vaga) na segunda expiração ou quando o pedido é do site. Na mesma rodada, lembra o cliente
+/// dos links da conversa a 10 min de vencer (#1610, <see cref="LembrarCobrancaVencendoUseCase"/>).
 ///
 /// <para>
 /// Advisory lock evita duas instâncias processando a mesma rodada (mesmo padrão do
@@ -86,6 +88,12 @@ public sealed class CobrancaPedidoJob(
 
     private async Task ProcessarRodadaAsync(CancellationToken ct)
     {
+        await ProcessarVencidasAsync(ct);
+        await LembrarVencendoAsync(ct);
+    }
+
+    private async Task ProcessarVencidasAsync(CancellationToken ct)
+    {
         IReadOnlyList<CobrancaPedidoVencida> vencidas;
         using (var scope = serviceProvider.CreateScope())
         {
@@ -107,5 +115,40 @@ public sealed class CobrancaPedidoJob(
 
         logger.LogInformation("CobrancaPedidoJob: vencidas={Total} falhas={Falhas} puladas={Puladas}",
             vencidas.Count, resumo.Falhas, resumo.Puladas);
+    }
+
+    /// <summary>
+    /// #1610: lembrete ao cliente nos últimos minutos do link (só avisa). Roda depois das vencidas, para não atrasá-las,
+    /// e com a própria proteção: falha da consulta ou de uma cobrança não derruba a rodada. Um escopo por cobrança.
+    /// </summary>
+    private async Task LembrarVencendoAsync(CancellationToken ct)
+    {
+        IReadOnlyList<CobrancaPedidoVencendo> vencendo;
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            vencendo = await scope.ServiceProvider.GetRequiredService<ICobrancaPedidoRepository>()
+                .ListarPendentesVencendoAsync(relogio.GetUtcNow().UtcDateTime, LembrarCobrancaVencendoUseCase.Antecedencia, MaximoPorRodada, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "CobrancaPedidoJob: consulta dos links perto de vencer falhou");
+            return;
+        }
+
+        foreach (var item in vencendo)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                using var scope = serviceProvider.CreateScope();
+                await scope.ServiceProvider.GetRequiredService<LembrarCobrancaVencendoUseCase>().ExecuteAsync(item, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "CobrancaPedidoJob: lembrete da cobranca {CobrancaId} pedido {PedidoId} falhou",
+                    item.CobrancaId, item.PedidoId);
+            }
+        }
     }
 }

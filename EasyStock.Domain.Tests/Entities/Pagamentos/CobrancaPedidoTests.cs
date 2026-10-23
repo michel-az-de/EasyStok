@@ -60,6 +60,33 @@ public class CobrancaPedidoTests
         c.Venceu(Agora.AddMinutes(30)).Should().BeTrue();
     }
 
+    /// <summary>#1610: o lembrete sai nos últimos minutos do link pendente, nunca antes nem depois do vencimento.</summary>
+    [Fact]
+    public void VenceEmBreve_SoNaAntecedenciaDoLinkPendente()
+    {
+        var c = Online(); // vence em Agora + 30 min
+        var dez = TimeSpan.FromMinutes(10);
+
+        c.VenceEmBreve(Agora.AddMinutes(19), dez).Should().BeFalse("faltam 11 minutos");
+        c.VenceEmBreve(Agora.AddMinutes(20), dez).Should().BeTrue("faltam 10 minutos");
+        c.VenceEmBreve(Agora.AddMinutes(29), dez).Should().BeTrue();
+        c.VenceEmBreve(Agora.AddMinutes(30), dez).Should().BeFalse("já venceu: é o job de vencidas que cuida");
+
+        var paga = Online();
+        paga.MarcarPaga("pay-1", 25m, "pix", Agora.AddMinutes(1));
+        paga.VenceEmBreve(Agora.AddMinutes(25), dez).Should().BeFalse("paga");
+
+        var substituida = Online();
+        substituida.Cancelar("troca_forma", Agora.AddMinutes(1));
+        substituida.VenceEmBreve(Agora.AddMinutes(25), dez).Should().BeFalse("cancelada ou substituída");
+
+        var semCredencial = Online();
+        semCredencial.AguardarCredencial(Agora.AddMinutes(1));
+        semCredencial.VenceEmBreve(Agora.AddMinutes(25), dez).Should().BeFalse("fora da varredura até a credencial voltar");
+
+        CobrancaPedido.CriarNaEntrega(Empresa, Pedido, 25m, Agora).VenceEmBreve(Agora, dez).Should().BeFalse("na entrega não tem link");
+    }
+
     [Fact]
     public void MarcarPaga_RegistraPagamentoEMetodo()
     {

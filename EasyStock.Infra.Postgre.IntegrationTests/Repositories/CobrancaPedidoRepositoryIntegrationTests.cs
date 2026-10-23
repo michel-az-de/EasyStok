@@ -1,6 +1,9 @@
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Repositories.Pagamentos;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -86,6 +89,53 @@ public class CobrancaPedidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture 
         var vencidas = await repo.ListarPendentesVencidasAsync(Agora.AddMinutes(31), 50);
         vencidas.Should().Contain(v => v.CobrancaId == vencidaId && v.EmpresaId == empresa && v.PedidoId == pedidoId);
         vencidas.Should().NotContain(v => v.PedidoId == pedidoId && v.CobrancaId != vencidaId, "a de 5 h ainda vale");
+    }
+
+    /// <summary>
+    /// #1610: a varredura do lembrete acha, sem tenant, o link online pendente da conversa nos últimos minutos. Fica de
+    /// fora o link do site (sem conversa), o que ainda tem tempo, o vencido, o que aguarda credencial, o já lembrado e
+    /// o do pedido que já saiu de AguardandoPagamento (pago no balcão com o link aberto).
+    /// </summary>
+    [SkippableFact]
+    public async Task VarreduraDoLembrete_AchaSoOLinkDaConversaPertoDeVencer()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        var conversa = Guid.NewGuid();
+        var agora = Agora.AddMinutes(22);
+        CobrancaPedido Link(Guid pedidoId, DateTime expiraEm, Guid? conversaId) =>
+            CobrancaPedido.CriarOnline(empresa, pedidoId, 25m, $"pref-{Guid.NewGuid():N}", "https://mp/l", expiraEm, 1, Agora, conversaId);
+
+        CobrancaPedido vencendo, doSite, comTempo, vencida, semCredencial, lembrada, pagoNoBalcao;
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            var pedido = await CriarPedidoAsync(db, empresa);
+            pedido.Status = StatusPedidoMapper.AguardandoPagamento;
+            var pago = Pedido.Criar(empresa, origem: "whatsapp");
+            pago.Status = StatusPedidoMapper.Aguardando;
+            db.Pedidos.Add(pago);
+            pagoNoBalcao = Link(pago.Id, Agora.AddMinutes(30), conversa);
+            vencendo = Link(pedido.Id, Agora.AddMinutes(30), conversa);
+            doSite = Link(pedido.Id, Agora.AddMinutes(30), null);
+            comTempo = Link(pedido.Id, Agora.AddMinutes(45), conversa);
+            vencida = Link(pedido.Id, Agora.AddMinutes(20), conversa);
+            semCredencial = Link(pedido.Id, Agora.AddMinutes(30), conversa);
+            semCredencial.AguardarCredencial(Agora.AddMinutes(1));
+            lembrada = Link(pedido.Id, Agora.AddMinutes(31), conversa);
+            db.CobrancasPedido.AddRange(vencendo, doSite, comTempo, vencida, semCredencial, lembrada, pagoNoBalcao);
+            await db.SaveChangesAsync();
+
+            var (_, reservado) = await new IdempotencyKeyRepository(db).TryBeginAsync(
+                lembrada.Id.ToString(), empresa, CobrancaPedidoVencendo.RecursoLembrete, null, TimeSpan.FromHours(1));
+            reservado.Should().BeTrue();
+        }
+
+        await using var semTenant = fixture.CreateDbContext();
+        var achadas = await new CobrancaPedidoRepository(semTenant)
+            .ListarPendentesVencendoAsync(agora, TimeSpan.FromMinutes(10), 50);
+
+        achadas.Where(a => a.EmpresaId == empresa).Select(a => a.CobrancaId).Should().Equal(vencendo.Id);
     }
 
     [SkippableFact]

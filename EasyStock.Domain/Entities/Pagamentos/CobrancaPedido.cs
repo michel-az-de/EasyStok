@@ -214,6 +214,17 @@ public class CobrancaPedido
         EstaPendente && EhOnline && ExpiraEm is { } expira && expira <= Utc(agora);
 
     /// <summary>
+    /// #1610: link online pendente, ainda válido, a até <paramref name="antecedencia"/> de vencer. Fora o que aguarda
+    /// credencial (não se sabe se foi pago) e o registro de pagamento a menor (não é link pagável).
+    /// </summary>
+    public bool VenceEmBreve(DateTime agora, TimeSpan antecedencia)
+    {
+        var instante = Utc(agora);
+        return EstaPendente && EhOnline && !RegistraPagamentoAMenor && !AguardandoCredencial
+            && ExpiraEm is { } expira && instante < expira && expira - antecedencia <= instante;
+    }
+
+    /// <summary>
     /// Pagamento confirmado pelo provedor. Aceita também cobrança já <c>Cancelada</c> ou <c>Expirada</c>:
     /// dinheiro recebido vence (S11, troca de forma). Mesmo pagamento de novo é no-op; outro pagamento
     /// numa cobrança já paga é recusado.

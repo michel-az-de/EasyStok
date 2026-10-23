@@ -36,7 +36,7 @@ public enum ResultadoAutomacao
 /// nunca lança por regra de negócio: devolve o <see cref="ResultadoAutomacao"/> e loga.
 ///
 /// <para>
-/// Regras: a regra do gatilho precisa existir e estar ligada; o texto é livre, então só sai dentro da
+/// Regras: a regra do gatilho precisa existir (ou ter padrão, <see cref="RegraAutomatica.Padrao"/>) e estar ligada; o texto é livre, então só sai dentro da
 /// janela do canal (S09/S34), sem modelo aprovado; o cliente não pode ter revogado o contato
 /// transacional no canal (S38); cliente bloqueado (S24) não recebe nenhuma; variável sem valor não sai.
 /// A saída entra no histórico como <see cref="AutorMensagem.Sistema"/>.
