@@ -196,7 +196,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         ConfirmarPagamentoPedidoInput input, Guid empresaId, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, ct);
+        var pedido = await pedidoRepository.GetForUpdateAsync(empresaId, input.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != empresaId)
             return (new(SituacaoConfirmacaoPagamento.PedidoNaoEncontrado), null, null, null);
 
@@ -295,7 +295,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             RegistradoPorNome: "Mercado Pago",
             Origem: Origem,
             PermitirExcedente: true,
-            ConfirmadoPeloProvedor: true), ct);
+            ConfirmadoPeloProvedor: true,
+            AprovadoNoProvedorEm: input.PagoEm), ct);
 
         var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
         EfeitosQuitacao? efeito = null;
@@ -426,7 +427,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             RegistradoPorNome: "Mercado Pago",
             Origem: Origem,
             PermitirExcedente: true,
-            ConfirmadoPeloProvedor: true), ct);
+            ConfirmadoPeloProvedor: true,
+            AprovadoNoProvedorEm: input.PagoEm), ct);
         return await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.ValorMenor, agora, ct,
             $"{motivo}. Valor registrado como recebimento: devolva pelo estorno online ou use no restante do pedido.");
     }

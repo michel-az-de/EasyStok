@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
 
@@ -140,6 +141,33 @@ public class AtualizarCobrancaPorPagamentoUseCaseTests
 
         r.Should().Be(SituacaoAtualizacaoCobranca.SemCobranca);
         await f.Uow.DidNotReceive().CommitAsync();
+    }
+
+    /// <summary>
+    /// #1724-12: <c>in_mediation</c> (cliente abriu disputa) era ignorado. O pedido não muda; a cobrança e a trilha
+    /// registram a mediação e a equipe é avisada pelo sino uma vez por pagamento.
+    /// </summary>
+    [Fact]
+    public async Task EmMediacao_RegistraNaTrilhaEAvisaAEquipeSemMudarOPedido()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        var cobranca = f.AdicionarOnline();
+        cobranca.MarcarPaga("pay-9", 25m, "credito", CobrancaPedidoFixture.Agora);
+        var uc = f.AtualizarPorPagamento();
+
+        var r = await uc.ExecuteAsync(Input(f.Pedido.Id, "in_mediation"));
+        var repetido = await uc.ExecuteAsync(Input(f.Pedido.Id, "in_mediation"));
+
+        r.Should().Be(SituacaoAtualizacaoCobranca.EmMediacao);
+        repetido.Should().Be(SituacaoAtualizacaoCobranca.JaRegistrado);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        cobranca.Status.Should().Be(StatusCobrancaPedido.Paga, "a disputa ainda não devolveu o dinheiro");
+        cobranca.Motivo.Should().Contain("pay-9").And.Contain("in_mediation");
+        f.Eventos.Should().ContainSingle(e => e.Tipo == "pagamento_em_mediacao");
+        var referencia = f.Pedido.Id.ToString("N")[..8].ToUpperInvariant();
+        await f.Notificador.Received(1).EnfileirarEventoAsync(TipoEventoNotificacao.PagamentoEmMediacao, f.EmpresaId,
+            Arg.Is<string>(p => p.Contains(referencia)), f.Pedido.Id,
+            Arg.Any<CancellationToken>(), Arg.Any<string?>());
     }
 
     [Theory]

@@ -29,12 +29,10 @@ public interface IPedidoStorefrontRepository
     /// simultaneamente. O segundo aguarda commit/rollback do primeiro antes
     /// de ler o registro — o use case então detecta o status novo e devolve 409.
     /// </para>
-    /// </summary>
-    Task<Pedido?> GetForUpdateAsync(Guid pedidoId, CancellationToken ct = default);
-
-    /// <summary>
-    /// #1265-9: o mesmo <c>FOR UPDATE</c>, só na linha da empresa: pedido de outra empresa não é travado nem lido. Os
-    /// chamadores migram para esta; a de cima fica até o último deles.
+    /// <para>
+    /// #1265-9: a empresa vai no <c>WHERE</c>: pedido de outra empresa não é travado nem lido. Não há sobrecarga só pelo
+    /// id: todo chamador trava pela empresa.
+    /// </para>
     /// </summary>
     Task<Pedido?> GetForUpdateAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
 

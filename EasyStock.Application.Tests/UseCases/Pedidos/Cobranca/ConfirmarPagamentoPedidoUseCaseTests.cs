@@ -65,6 +65,19 @@ public class ConfirmarPagamentoPedidoUseCaseTests
             MetodoPagamentoExterno: "pix", TipoPagamentoExterno: "bank_transfer",
             PagoEm: CobrancaPedidoFixture.Agora);
 
+    /// <summary>#1724-12: o recebimento gravava a hora da baixa; a data da aprovação no provedor é a que vale.</summary>
+    [Fact]
+    public async Task PagamentoDoProvedor_GravaADataDaAprovacao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var aprovadoEm = CobrancaPedidoFixture.Agora.AddMinutes(-42);
+
+        (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagoEm = aprovadoEm })).Confirmado.Should().BeTrue();
+
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.PagoEm.Should().Be(aprovadoEm);
+    }
+
     [Fact]
     public async Task ConfirmaETransita()
     {

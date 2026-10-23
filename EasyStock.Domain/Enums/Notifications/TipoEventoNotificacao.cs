@@ -98,5 +98,8 @@ public enum TipoEventoNotificacao
     PedidoMudouEtapaNoBalcao = 87,
 
     // #1889 (decisão do Felipe, 21/10): link vencido na última tentativa deixa o pedido aguardando a equipe; vira aviso no sino.
-    CobrancaAguardandoEquipe = 88
+    CobrancaAguardandoEquipe = 88,
+
+    // #1724-12: o cliente abriu disputa (in_mediation) de um pagamento do Mercado Pago; aviso no sino, pedido intacto.
+    PagamentoEmMediacao = 89
 }
