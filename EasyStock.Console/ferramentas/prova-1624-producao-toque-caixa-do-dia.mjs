@@ -859,15 +859,34 @@ await confere('J2-5 fechar o caixa avisa quanto há a devolver de pedidos cancel
     ],
     aDevolverDoPedido: async (id) => { consultados.push(id); return { a: 216, c: 0, d: 30 }[id] },
   }
-  assert.deepEqual(await somarDevolucoesPendentes(portas), { total: 246, pedidos: 2 })
+  assert.deepEqual(await somarDevolucoesPendentes(portas), { total: 246, pedidos: 2, falhas: 0 })
   assert.deepEqual(consultados, ['a', 'c', 'd'], 'sem recebimento não consulta')
-  assert.deepEqual(await somarDevolucoesPendentes({ ...portas, listarCancelados: async () => null }), { total: 0, pedidos: 0 })
+  assert.deepEqual(await somarDevolucoesPendentes({ ...portas, listarCancelados: async () => null }), { total: 0, pedidos: 0, falhas: 0 })
+  // Uma leitura que falha não apaga as outras; e nunca mais que algumas leituras ao mesmo tempo.
+  let emVoo = 0, pico = 0
+  const muitos = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, totalPago: 10 }))
+  const soma = await somarDevolucoesPendentes({
+    listarCancelados: async () => muitos,
+    aDevolverDoPedido: async (id) => {
+      emVoo += 1; pico = Math.max(pico, emVoo)
+      await new Promise((r) => setTimeout(r, 1))
+      emVoo -= 1
+      if (id === 'p3') throw new Error('404')
+      return 10
+    },
+  })
+  assert.deepEqual(soma, { total: 110, pedidos: 11, falhas: 1 })
+  assert.ok(pico <= 4, `no máximo 4 leituras por vez (foram ${pico})`)
   const semEspacoDuro = (t) => String(t ?? '').replace(/ /g, ' ')
   assert.equal(semEspacoDuro(avisoDeDevolucoesPendentes({ total: 246, pedidos: 2 })),
     'Há R$ 246,00 a devolver de 2 pedidos cancelados. O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
   assert.equal(semEspacoDuro(avisoDeDevolucoesPendentes({ total: 216, pedidos: 1 })),
     'Há R$ 216,00 a devolver de 1 pedido cancelado. O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
   assert.equal(avisoDeDevolucoesPendentes({ total: 0, pedidos: 0 }), null)
+  assert.match(semEspacoDuro(avisoDeDevolucoesPendentes({ total: 110, pedidos: 11, falhas: 1 })),
+    /^Há R\$ 110,00 a devolver de 11 pedidos cancelados\..* 1 pedido cancelado não foi conferido\.$/)
+  assert.equal(avisoDeDevolucoesPendentes({ total: 0, pedidos: 0, falhas: 2 }),
+    'Não deu para conferir tudo: 2 pedidos cancelados não foram conferidos.')
   const modal = readFileSync(new URL('../src/features/gestao/caixa/ModalFecharCaixa.jsx', import.meta.url), 'utf8')
   assert.match(modal, /useDevolucoesPendentes\(consultarDevolucoes\)/)
   assert.match(modal, /avisoDeDevolucoesPendentes\(devolucoes\)/)

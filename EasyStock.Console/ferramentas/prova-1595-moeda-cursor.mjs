@@ -143,8 +143,11 @@ confere('J2-6 abertura muito longe da sugestão pede confirmação', () => {
     'Abrir o caixa com R$ 1,00? Confira: o valor é em reais (100 é R$ 100,00).')
   for (const arquivo of ['features/gestao/caixa/AbaCaixaApi.jsx', 'features/loja/GestoLoja.jsx']) {
     const tela = readFileSync(new URL(`../src/${arquivo}`, import.meta.url), 'utf8')
-    assert.match(tela, /aberturaPedeConfirmacao\(saldoInicial, situacao\)/, arquivo)
+    assert.match(tela, /useConfirmacaoDaAbertura\(saldoInicial, situacao\)/, arquivo)
+    assert.match(tela, /if \(confirmacao\.segurar\(\)\) return/, arquivo)
   }
+  const gesto = readFileSync(new URL('../src/aplicacao/useConfirmacaoDaAbertura.js', import.meta.url), 'utf8')
+  assert.match(gesto, /aberturaPedeConfirmacao\(saldoInicial, situacao\)/)
 })
 
 console.log(`\n${passou} verificações passaram.`)

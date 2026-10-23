@@ -6,9 +6,9 @@ const chave = (pedidoId) => `easystok.devolucao:${identidadeDaSessao(lerSessao()
 export const listarEstornosManuais = (pedidoId) => chamarApi(rota(pedidoId))
 export const registrarEstornoManual = (pedidoId, corpo) => chamarApi(rota(pedidoId), { metodo: 'POST', corpo })
 
-// J2 (#1990): cancelados dos últimos 60 dias (pela criação; encomenda cancelada hoje pode ter
-// nascido semanas antes), para o fechamento do caixa somar o que falta devolver.
-export const DIAS_DE_CANCELADOS = 60
+// J2 (#1990): cancelados dos últimos 90 dias (pela criação; encomenda cancelada hoje pode ter
+// nascido semanas antes), os 200 mais novos, para o fechamento do caixa somar o que falta devolver.
+export const DIAS_DE_CANCELADOS = 90
 export function listarPedidosCanceladosRecentes(agora = Date.now()) {
   const desde = new Date(agora - DIAS_DE_CANCELADOS * 86400000).toISOString()
   const busca = new URLSearchParams({ status: 'cancelado', desde, pageSize: '200', sort: 'criadoem', order: 'desc' })

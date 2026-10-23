@@ -427,6 +427,10 @@ await confere('12  J2-1 dinheiro na entrega com troco: chip, corpo do pedido, re
   })
   assert.equal(lido.meio, 'dinheiro-entrega', 'recarregar a página não vira maquininha')
   assert.equal(lido.trocoPara, 100)
+  assert.equal(pedidoDaApi({
+    pedidoId: 'p', status: 'aguardando', itens: [], observacoes: corpo.observacoes,
+    cobranca: { cobrancaId: 'c', provedor: 'na_entrega', valor: 57 },
+  }, { meio: 'maquininha' }).meio, 'maquininha', 'o meio que a tela já tem continua mandando')
   assert.equal(pedidoDaApi({ pedidoId: 'p', status: 'aguardando', itens: [], cobranca: { cobrancaId: 'c', provedor: 'na_entrega', valor: 57 } }).meio, 'maquininha')
   assert.equal(cobranca.metodoDaCobranca({ meio: 'dinheiro-entrega' }), 'dinheiro')
   assert.equal(cobranca.nomeDoMeio('dinheiro-entrega'), 'dinheiro na entrega')

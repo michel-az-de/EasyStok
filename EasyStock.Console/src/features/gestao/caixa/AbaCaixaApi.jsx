@@ -11,11 +11,11 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Modal } from '../../../componentes/Modal'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../../aplicacao/useCaixaDoDiaApi'
+import { useConfirmacaoDaAbertura } from '../../../aplicacao/useConfirmacaoDaAbertura'
 import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import {
-  aberturaPedeConfirmacao, diaMes, gavetaDoFechamento, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
-  textoDaConfirmacaoDaAbertura,
+  diaMes, gavetaDoFechamento, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
   CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
@@ -76,13 +76,12 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
   const situacao = situacaoDoCaixaParaAbrirLoja(dia, ultimo)
   const [centavos, setCentavos] = useState(Math.round((situacao.saldoSugerido ?? 0) * 100))
   const [motivo, setMotivo] = useState('')
-  // J2 (#1990): valor muito longe da sugestão pede um segundo toque; mudar o valor desfaz o primeiro.
-  const [confirmando, setConfirmando] = useState(false)
   const saldoInicial = centavos / 100
   const retificacao = retificacaoDoSaldo(saldoInicial, situacao)
-  const pedeConfirmacao = aberturaPedeConfirmacao(saldoInicial, situacao)
+  // J2 (#1990): valor muito longe da sugestão pede um segundo toque; mudar o valor desfaz o primeiro.
+  const confirmacao = useConfirmacaoDaAbertura(saldoInicial, situacao)
   const abrir = () => {
-    if (pedeConfirmacao && !confirmando) { setConfirmando(true); return }
+    if (confirmacao.segurar()) return
     executar(() => abrirCaixa(agora, saldoInicial, observacaoDaAbertura({ saldoInformado: saldoInicial, situacao, motivo })), 'abertura')
   }
 
@@ -97,11 +96,9 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
         dica="O dinheiro que está na gaveta ao abrir o dia."
         centavos={centavos}
         disabled={enviando}
-        aoMudar={(valor) => { setCentavos(valor); setConfirmando(false) }}
+        aoMudar={(valor) => { setCentavos(valor); confirmacao.desfazer() }}
       />
-      {confirmando && pedeConfirmacao && (
-        <p className={css.avisoDevolucao} role="alert">{textoDaConfirmacaoDaAbertura(saldoInicial, situacao)}</p>
-      )}
+      {confirmacao.aviso && <p className={css.avisoAtencao} role="alert">{confirmacao.aviso}</p>}
       {retificacao.exigeMotivo && (
         <CampoArea
           rotulo={`Motivo da diferença de ${moeda(retificacao.diferenca)}`}
@@ -119,7 +116,7 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
         disabled={enviando || moedaAltaDemais(centavos) || (retificacao.exigeMotivo && motivo.trim().length < 3)}
         onClick={abrir}
       >
-        {abrindo ? 'Abrindo o caixa…' : confirmando && pedeConfirmacao ? `Sim, abrir com ${moeda(saldoInicial)}` : 'Abrir o caixa'}
+        {abrindo ? 'Abrindo o caixa…' : confirmacao.rotulo('Abrir o caixa')}
       </Botao>
     </div>
   )

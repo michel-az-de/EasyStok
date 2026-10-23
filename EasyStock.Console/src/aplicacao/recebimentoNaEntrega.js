@@ -17,18 +17,39 @@ export const METODOS_NA_PORTA = [
 export const metodoSugeridoNaPorta = (observacoes) => (pagamentoNaEntregaDasObservacoes(observacoes) ? 'dinheiro' : '')
 
 // Lança o recebido e só então marca entregue (confirmando o saldo, que acabou de ser pago). Se o
-// lançamento falhar, a entrega não é marcada e o erro volta para a tela.
-export async function receberEEntregar({ registrarPagamento, marcarEntregue }, { viagemId, pedidoId, valor, metodo, chave = null }) {
+// lançamento falhar, a entrega não é marcada. Se o lançamento entrou e a entrega falhou, `recebidos`
+// (um Set da tela) lembra: o próximo toque só marca a entrega, nunca lança o pagamento de novo, por
+// mais tempo que passe (a Idempotency-Key vale só 2 minutos).
+export async function receberEEntregar(
+  { registrarPagamento, marcarEntregue, recebidos = new Set() },
+  { viagemId, pedidoId, valor, metodo, chave = null },
+) {
   if (!metodo) throw new Error('Escolha como recebeu o pagamento.')
-  await registrarPagamento(pedidoId, valor, metodo, chave)
-  await marcarEntregue(viagemId, pedidoId, true)
+  const marca = `${pedidoId}|${valor}`
+  if (!recebidos.has(marca)) {
+    await registrarPagamento(pedidoId, valor, metodo, chave)
+    recebidos.add(marca)
+  }
+  try {
+    await marcarEntregue(viagemId, pedidoId, true)
+  } catch (erro) {
+    throw new Error(`O pagamento entrou, mas a entrega não foi marcada: ${erro.message} Toque de novo para marcar.`)
+  }
+  recebidos.delete(marca)
 }
 
 // Item 3: sem entregador cadastrado a viagem não saía. "Entrega própria (sem cadastro)" usa o
-// entregador "Entrega própria" da casa, cadastrando-o na primeira vez.
-export async function usarEntregaPropria({ criarEntregador, definirEntregador }, { viagemId, entregadores }) {
-  const existente = entregadorDaEntregaPropria(entregadores)
-  const entregador = existente ?? await criarEntregador({ ...CORPO_ENTREGA_PROPRIA })
+// entregador "Entrega própria" da casa: o ativo; senão o desativado, reativado; senão um novo.
+export async function usarEntregaPropria(
+  { listarComInativos, reativarEntregador, criarEntregador, definirEntregador },
+  { viagemId, entregadores },
+) {
+  let entregador = entregadorDaEntregaPropria(entregadores)
+  if (!entregador) {
+    const inativo = entregadorDaEntregaPropria(await listarComInativos())
+    if (inativo) await reativarEntregador(inativo.id)
+    entregador = inativo ?? await criarEntregador({ ...CORPO_ENTREGA_PROPRIA })
+  }
   if (!entregador?.id) throw new Error('O entregador "Entrega própria" não foi cadastrado.')
   await definirEntregador(viagemId, entregador.id)
 }

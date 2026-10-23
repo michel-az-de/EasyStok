@@ -97,11 +97,12 @@ function cobrancaDaApi(c, meioAnterior, naEntregaGravado = null) {
   const naEntrega = c.provedor === FORMA_NA_ENTREGA
   // Sem meio anterior (polling, recarga), o meio é o padrão da forma: link do Mercado Pago
   // online, maquininha na entrega. Antes caía em `undefined` e a tela mostrava "Pix" (F07).
-  // J2 (#1990): dinheiro na entrega gravado nas observações vale mais que o padrão.
-  const meio = naEntrega && naEntregaGravado
-    ? naEntregaGravado.meio
-    : meioAnterior && naEntrega === MEIOS_NA_ENTREGA.has(meioAnterior)
-      ? meioAnterior
+  // J2 (#1990): sem meio anterior (página recarregada), o dinheiro na entrega gravado nas observações
+  // vale mais que o padrão da forma. O meio que a tela já tem continua mandando.
+  const meio = meioAnterior && naEntrega === MEIOS_NA_ENTREGA.has(meioAnterior)
+    ? meioAnterior
+    : naEntrega && naEntregaGravado
+      ? naEntregaGravado.meio
       : (naEntrega ? 'maquininha' : 'cartao-link')
   const criadaEm = ms(c.criadaEm)
   return {
@@ -256,10 +257,8 @@ export const conferirPagamentoOnline = (pedidoId) =>
 export const trocarFormaPagamento = (pedidoId, forma) =>
   chamarApi(`/api/pedidos/${pedidoId}/cobranca/forma`, { metodo: 'POST', corpo: { forma } })
 
-export const registrarPagamentoManual = (pedidoId, valor, metodo, chave = null) =>
-  chamarApi(`/api/pedidos/${pedidoId}/pagamentos`, {
-    metodo: 'POST', chave, corpo: { empresaId: lerSessao()?.empresa?.id, pedidoId, valor, metodo },
-  })
+// J2 (#1990): a rota mora em `pagamentosPedidoApi.js`, que as Entregas também usam.
+export { registrarPagamentoManual } from './pagamentosPedidoApi'
 
 // Com o id, repetir o pedido depois de resposta perdida não desfaz o pagamento anterior.
 export const desfazerPagamentoManual = (pedidoId, motivo, pagamentoId = null) =>

@@ -7,7 +7,7 @@ import { somarDevolucoesPendentes } from './devolucoesPendentes'
 // leitura, a tela diz que não conferiu em vez de calar.
 // estado: inativo | carregando | ok | erro
 export function useDevolucoesPendentes(ativo) {
-  const [leitura, setLeitura] = useState({ estado: ativo ? 'carregando' : 'inativo', total: 0, pedidos: 0 })
+  const [leitura, setLeitura] = useState({ estado: ativo ? 'carregando' : 'inativo', total: 0, pedidos: 0, falhas: 0 })
   useEffect(() => {
     if (!ativo) return undefined
     let vivo = true
@@ -16,7 +16,7 @@ export function useDevolucoesPendentes(ativo) {
       aDevolverDoPedido: (id) => listarEstornosManuais(id).then(aDevolverDe),
     })
       .then((soma) => { if (vivo) setLeitura({ estado: 'ok', ...soma }) })
-      .catch(() => { if (vivo) setLeitura({ estado: 'erro', total: 0, pedidos: 0 }) })
+      .catch(() => { if (vivo) setLeitura({ estado: 'erro', total: 0, pedidos: 0, falhas: 0 }) })
     return () => { vivo = false }
   }, [ativo])
   return leitura

@@ -16,9 +16,10 @@ import css from './ficha.module.css'
 // atual quando a pergunta é "mudar para qual?".
 //
 // J2 (#1990): "Dinheiro na entrega" (`pedeTroco` no catálogo) abre o "Troco para" logo abaixo. O
-// valor mora no pedido (`definirTroco`) e vai nas observações quando o pedido nasce, então vale para
-// a barra, o bloco Cobrança e a comanda. Pedido já criado no EasyStok não regrava as observações:
-// a tela diz o que ficou gravado ou pede para combinar pela conversa.
+// valor mora no pedido (`definirTroco`) e vai nas observações quando a Ficha gera o pedido (barra
+// "Gerar cobrança e enviar" ou bloco Cobrança). O pedido que nasce pela seleção do link (comanda
+// compartilhada) não leva o troco: o meio ali é o que o cliente escolheu. Pedido já criado no
+// EasyStok não regrava as observações: a tela diz o que ficou gravado ou pede para combinar pela conversa.
 export function EscolhaDeMeio({ escolhido, aoEscolher, pergunta = null, excluir = null, pedido = null, geraAoEscolher = false }) {
   const { meiosDePagamento } = useCatalogo()
   const { fonteApi, agora, selecionada } = useAtendimento()

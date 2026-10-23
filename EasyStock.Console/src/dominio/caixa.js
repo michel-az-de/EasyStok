@@ -33,10 +33,12 @@ export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechar, o caixa de hoje não rea
 
 // J2 (#1990), item 5: devolução pendente não trava o fechamento (o dinheiro pode sair amanhã), mas o
 // modal diz quanto e onde se resolve. Sem nada a devolver, nada.
-export function avisoDeDevolucoesPendentes({ total = 0, pedidos = 0 } = {}) {
-  if (!(total > 0)) return null
+// Pedido que não deu para conferir (`falhas`) é dito, para "nada a devolver" não ser presumido.
+export function avisoDeDevolucoesPendentes({ total = 0, pedidos = 0, falhas = 0 } = {}) {
+  const semConferir = falhas > 0 ? ` ${plural(falhas, 'pedido cancelado não foi conferido', 'pedidos cancelados não foram conferidos')}.` : ''
+  if (!(total > 0)) return semConferir ? `Não deu para conferir tudo:${semConferir}` : null
   return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}. `
-    + 'O fechamento não espera: registre a devolução no Pós-venda de cada pedido.'
+    + `O fechamento não espera: registre a devolução no Pós-venda de cada pedido.${semConferir}`
 }
 
 // #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada

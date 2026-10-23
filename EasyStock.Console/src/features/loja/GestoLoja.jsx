@@ -11,9 +11,10 @@ import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../aplicacao/useCaixaDoDiaApi'
+import { useConfirmacaoDaAbertura } from '../../aplicacao/useConfirmacaoDaAbertura'
 import {
-  JUSTIFICATIVA_MINIMA, aberturaPedeConfirmacao, diaMes, gavetaDoFechamento, justificativaValida, observacaoDaAbertura,
-  retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja, textoDaConfirmacaoDaAbertura,
+  JUSTIFICATIVA_MINIMA, diaMes, gavetaDoFechamento, justificativaValida, observacaoDaAbertura,
+  retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../dominio/aberturaDaLoja'
 import { conferenciaDaGaveta } from '../../dominio/caixa'
 import {
@@ -134,12 +135,11 @@ export function ModalAbrirLoja({ aoFechar }) {
   const retificacao = retificacaoDoSaldo(saldoInicial, situacao)
   const motivoFalta = retificacao.exigeMotivo && motivo.trim().length < MOTIVO_MINIMO
   // J2 (#1990): valor muito longe da sugestão pede um segundo toque; mudar o valor desfaz o primeiro.
-  const [confirmando, setConfirmando] = useState(false)
-  const pedeConfirmacao = aberturaPedeConfirmacao(saldoInicial, situacao)
-  const mudarSaldo = (valor) => { setCentavos(valor); setConfirmando(false) }
+  const confirmacao = useConfirmacaoDaAbertura(saldoInicial, situacao)
+  const mudarSaldo = (valor) => { setCentavos(valor); confirmacao.desfazer() }
 
   const abrir = async () => {
-    if (pedeConfirmacao && !confirmando) { setConfirmando(true); return }
+    if (confirmacao.segurar()) return
     const caixaJaAberto = situacao.tipo === 'aberto'
     const observacoes = caixaJaAberto ? undefined : observacaoDaAbertura({ saldoInformado: saldoInicial, situacao, motivo })
     const ok = await enviar(() => abrirLojaComCaixa({ saldoInicial, observacoes, caixaJaAberto }))
@@ -165,7 +165,7 @@ export function ModalAbrirLoja({ aoFechar }) {
               disabled={envio.enviando || moedaAltaDemais(saldoCentavos) || motivoFalta}
               onClick={abrir}
             >
-              {envio.enviando ? 'Abrindo…' : confirmando && pedeConfirmacao ? `Sim, abrir com ${moeda(saldoInicial)}` : rotuloAbrir}
+              {envio.enviando ? 'Abrindo…' : confirmacao.rotulo(rotuloAbrir)}
             </Botao>
           )}
         </>
@@ -206,9 +206,7 @@ export function ModalAbrirLoja({ aoFechar }) {
               centavos={saldoCentavos}
               aoMudar={mudarSaldo}
             />
-            {confirmando && pedeConfirmacao && (
-              <p className={css.alerta} role="alert">{textoDaConfirmacaoDaAbertura(saldoInicial, situacao)}</p>
-            )}
+            {confirmacao.aviso && <p className={css.alerta} role="alert">{confirmacao.aviso}</p>}
             {retificacao.exigeMotivo && (
               <>
                 <p className={css.alerta}>

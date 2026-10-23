@@ -68,9 +68,9 @@ export function ModalFecharCaixa({
         {Boolean(gaveta?.semForma) && <div><dt>Sem forma de pagamento (confira se é dinheiro)</dt><dd>{moeda(gaveta.semForma)}</dd></div>}
       </dl>
 
-      {avisoDevolucoes && <output className={css.avisoDevolucao}>{avisoDevolucoes}</output>}
+      {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
       {devolucoes.estado === 'erro' && (
-        <output className={css.avisoDevolucao}>Não foi possível conferir se há devolução pendente de pedido cancelado.</output>
+        <output className={css.avisoAtencao}>Não foi possível conferir se há devolução pendente de pedido cancelado.</output>
       )}
 
       <CampoReais

@@ -319,6 +319,19 @@ await confereAsync('J2-2 "Recebi" lança o pagamento e só então marca entregue
   assert.deepEqual(chamadas, [], 'pagamento recusado não marca entregue')
   await assert.rejects(recebimento.receberEEntregar(portas, { ...pedido, metodo: '' }), /como recebeu/)
   assert.deepEqual(chamadas, [])
+  // Pagamento entrou e a entrega falhou: o toque seguinte (mesmo minutos depois) só marca a entrega.
+  const recebidos = new Set()
+  let entregaCai = true
+  const instavel = {
+    ...portas, recebidos,
+    marcarEntregue: async (...a) => { if (entregaCai) throw new Error('sem conexão.'); chamadas.push(['entregue', ...a]) },
+  }
+  await assert.rejects(recebimento.receberEEntregar(instavel, pedido), /O pagamento entrou, mas a entrega não foi marcada/)
+  entregaCai = false
+  await recebimento.receberEEntregar(instavel, pedido)
+  assert.deepEqual(chamadas, [['pagar', 'p', 57, 'dinheiro', 'k'], ['entregue', 'v', 'p', true]], 'um pagamento só')
+  assert.equal(recebidos.size, 0)
+  chamadas.length = 0
   assert.deepEqual(recebimento.METODOS_NA_PORTA.map((m) => m.valor), ['', 'dinheiro', 'debito', 'credito', 'pix'])
   assert.equal(recebimento.metodoSugeridoNaPorta('Pagamento na entrega: dinheiro, troco para R$ 100,00.'), 'dinheiro')
   assert.equal(recebimento.metodoSugeridoNaPorta(null), '')
@@ -338,7 +351,10 @@ await confereAsync('J2-3 sem entregador cadastrado, a viagem sai com "Entrega pr
   assert.equal(entregadorDaEntregaPropria(cadastrados)?.id, 'e1')
   assert.match(motivoDeSaida({ entregadorId: null, paradas: [{}] }), /Entrega própria/)
   const feitas = []
+  let todos = []
   const portas = {
+    listarComInativos: async () => todos,
+    reativarEntregador: async (id) => { feitas.push(['reativar', id]) },
     criarEntregador: async (corpo) => { feitas.push(['criar', corpo]); return { id: 'novo' } },
     definirEntregador: async (viagemId, entregadorId) => { feitas.push(['definir', viagemId, entregadorId]) },
   }
@@ -350,6 +366,10 @@ await confereAsync('J2-3 sem entregador cadastrado, a viagem sai com "Entrega pr
   feitas.length = 0
   await recebimento.usarEntregaPropria(portas, { viagemId: 'v', entregadores: cadastrados })
   assert.deepEqual(feitas, [['definir', 'v', 'e1']], 'não cadastra de novo')
+  feitas.length = 0
+  todos = [{ id: 'e9', nome: 'Entrega própria', ativo: false }]
+  await recebimento.usarEntregaPropria(portas, { viagemId: 'v', entregadores: [] })
+  assert.deepEqual(feitas, [['reativar', 'e9'], ['definir', 'v', 'e9']], 'a desativada volta, sem cadastro duplicado')
   const tela = fonte('features/entregas/ConteudoEntregasApi.jsx')
   assert.match(tela, /opcoesDeEntregador\(entregadores\)/)
   assert.match(tela, /e\.target\.value === ENTREGA_PROPRIA \? acoes\.usarEntregaPropria\(viagem\.id\)/)
