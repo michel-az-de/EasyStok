@@ -394,6 +394,13 @@ public sealed class WhatsAppCloudClient(
             // (sem reenvio automático nem reserva por SMS); a exceção do Polly caía em "permanente".
             throw new TimeoutException("A Meta não respondeu ao envio a tempo; a mensagem pode ter saído.", ex);
         }
+        catch (BrokenCircuitException)
+        {
+            // #2004: com o disjuntor aberto o POST nem sai. Falha temporária (nada saiu): o atendimento reagenda o reenvio e
+            // não aciona a reserva por SMS, como o caminho das notificações (EnviarPlataformaAsync).
+            throw new WhatsAppCloudException(0, "O canal está temporariamente indisponível; a mensagem não foi enviada.",
+                ehPermanente: false);
+        }
     }
 
     /// <summary>
