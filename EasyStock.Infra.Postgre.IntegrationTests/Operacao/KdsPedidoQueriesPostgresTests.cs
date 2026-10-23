@@ -206,6 +206,37 @@ public sealed class KdsPedidoQueriesPostgresTests(PostgreSqlDatabaseFixture fixt
         lido.Itens.Select(i => i.Nome).Should().Equal("Nhoque Artesanal 500 g");
     }
 
+    /// <summary>
+    /// #1709-1: o teto de 200 cards cortava pela ordem de criação crescente, então com 201 pedidos no filtro o
+    /// mais novo sumia da cozinha. O corte guarda os mais novos; a tela continua do mais antigo para o mais novo.
+    /// </summary>
+    [SkippableFact]
+    public async Task MaisDeDuzentosPedidos_OMaisNovoAparece()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var db = fixture.CreateDbContext();
+
+        var empresa = Guid.NewGuid();
+        db.SetMobileTenantContext(empresa);
+        db.Empresas.Add(NovaEmpresa(empresa));
+        var agora = DateTime.UtcNow;
+        var pedidos = Enumerable.Range(0, 201).Select(i =>
+        {
+            var pedido = NovoPedido(empresa, StatusPedidoMapper.Aguardando);
+            pedido.CriadoEm = agora.AddMinutes(-i);
+            return pedido;
+        }).ToList();
+        db.Pedidos.AddRange(pedidos);
+        await db.SaveChangesAsync();
+
+        var hoje = HorarioBrasil.Hoje();
+        var lidos = await new KdsPedidoQueries(db).ListarAsync(empresa, [StatusPedidoMapper.Aguardando], hoje.AddDays(-1), hoje);
+
+        lidos.Select(p => p.Id).Should().Contain(pedidos[0].Id, "o pedido mais novo não pode sumir no corte");
+        lidos.Should().HaveCount(200).And.BeInAscendingOrder(p => p.CriadoEm);
+        lidos.Select(p => p.Id).Should().NotContain(pedidos[^1].Id, "o corte deixa de fora o mais antigo");
+    }
+
     private static Empresa NovaEmpresa(Guid empresaId) => new()
     {
         Id = empresaId,
