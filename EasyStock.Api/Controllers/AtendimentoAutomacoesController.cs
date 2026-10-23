@@ -27,6 +27,9 @@ public class AtendimentoAutomacoesController(
     [SwaggerOperation(Summary = "Create or change the automatic message of a trigger")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    // #1265-11: a mensagem automática vai para todos os clientes; trocar ou desligar é de Admin ou Gerente.
+    [Authorize(Policy = "Gerente")]
     [HttpPut("{gatilho}")]
     public async Task<IActionResult> Salvar(GatilhoAutomacao gatilho, [FromBody] AutomacaoBody body, CancellationToken ct)
     {
