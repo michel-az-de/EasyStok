@@ -181,7 +181,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         }
         var dados = Ler<RascunhoComandaCliente>(link.RascunhoJson);
         var semRascunho = dados?.Itens is null;
-        if (semRascunho)
+        if (dados?.Itens is null)
         {
             var endereco = cliente?.Enderecos.FirstOrDefault(e => e.Id == CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente));
             dados = new(pedido?.Itens.Where(i => i.CardapioItemId is not null).Select(i =>
