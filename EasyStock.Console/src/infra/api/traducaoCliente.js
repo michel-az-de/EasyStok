@@ -7,10 +7,13 @@ import { instante } from './traducaoConversas'
 
 // String da Ficha -> corpo da API. Sem CEP não há endereço para gravar.
 export function enderecoParaApi(texto) {
-  const { rua, numero, complemento, bairro, cep } = partesDoEndereco(texto)
+  const { rua, numero, complemento, bairro, cep, cidade, uf } = partesDoEndereco(texto)
   const digitos = cep.replace(/\D/g, '')
   if (!digitos) return null
-  return { cep: digitos, logradouro: rua || null, numero: numero || null, complemento: complemento || null, bairro: bairro || null }
+  return {
+    cep: digitos, logradouro: rua || null, numero: numero || null, complemento: complemento || null, bairro: bairro || null,
+    ...(cidade ? { cidade } : {}), ...(uf ? { uf } : {}),
+  }
 }
 
 // Dossiê (S25) -> o que a Ficha mostra. Endereço: o padrão, ou o único.

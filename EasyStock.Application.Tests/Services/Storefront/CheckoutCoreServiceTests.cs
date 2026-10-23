@@ -312,9 +312,9 @@ public class CheckoutCoreServiceTests
         reservado.ItemFrete.ConservacaoSnapshot.Should().BeNull("frete não é produto");
     }
     [Theory]
-    [InlineData(true, "brigadeiro avulso")]
-    [InlineData(false, "brigadeiro da casa")]
-    public async Task PreservaNomePublicoDoCardapioNoPedido(bool avulso, string nome)
+    [InlineData(true, "brigadeiro avulso", "Brigadeiro Avulso")]
+    [InlineData(false, "brigadeiro da casa", "Brigadeiro da Casa")]
+    public async Task PreservaNomePublicoDoCardapioNoPedido(bool avulso, string nome, string noPedido)
     {
         var c = new Cenario();
         var item = avulso ? CardapioItem.CriarAvulso(c.Storefront.Id, nome, 10m) : c.CardapioItem;
@@ -326,7 +326,8 @@ public class CheckoutCoreServiceTests
 
         var reservado = await c.Servico().CriarPedidoComReservaAsync(Input(c));
 
-        reservado.Itens[0].Nome.Should().Be(nome);
+        // #1991-5: o pedido leva o nome como na vitrine (o cadastro guarda em minúsculas).
+        reservado.Itens[0].Nome.Should().Be(noPedido);
     }
 
     // ── S16: antecedência mínima ─────────────────────────────────────────

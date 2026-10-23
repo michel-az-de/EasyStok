@@ -60,6 +60,20 @@ public class ConfirmarEnderecoClienteUseCaseTests
         await _clientes.DidNotReceive().AddEnderecoAsync(Arg.Any<ClienteEndereco>());
     }
 
+    // #1991-3: o endereço salvo sem cidade e UF (ViaCEP fora do ar, console que não mandava) fica com o que chegou agora.
+    [Fact]
+    public async Task EnderecoJaSalvoGanhaCidadeEUfQueFaltavam()
+    {
+        var salvo = new ClienteEndereco { Id = Guid.NewGuid(), Cep = "05500000", Logradouro = "Rua Alvarenga", Numero = "120" };
+        var cliente = ClienteCom(salvo);
+
+        await UseCase().ExecuteAsync(new ConfirmarEnderecoClienteCommand(_empresaId, cliente.Id, Endereco()));
+
+        salvo.Cidade.Should().Be("São Paulo");
+        salvo.Estado.Should().Be("SP");
+        salvo.Bairro.Should().Be("Butantã");
+    }
+
     [Fact]
     public async Task ClienteInexistenteDevolveNulo()
     {

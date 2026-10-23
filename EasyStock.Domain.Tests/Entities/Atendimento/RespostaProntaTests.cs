@@ -99,4 +99,26 @@ public class RegraAutomaticaTests
     [InlineData(false, true, GatilhoAutomacao.LojaFechada)]
     public void GatilhoDaEntradaEscolheSoUm(bool aberta, bool fechadaNaMao, GatilhoAutomacao esperado) =>
         RegraAutomatica.GatilhoDaPrimeiraEntrada(aberta, fechadaNaMao).Should().Be(esperado);
+
+    // #1991-2 (#1765-4, decisão do Felipe de 23/10): "Pagamento confirmado" nasce ligada, com nome e entrega.
+    [Fact]
+    public void PagamentoConfirmadoNasceLigado()
+    {
+        var padrao = RegraAutomatica.Padrao(Empresa, GatilhoAutomacao.PagamentoConfirmado, Agora);
+
+        padrao.Should().NotBeNull();
+        padrao!.Ligada.Should().BeTrue();
+        padrao.Texto.Should().Be(RegraAutomatica.TextoPadraoPagamentoConfirmado);
+        padrao.Renderizar(new Dictionary<string, string?> { ["nome"] = "Ana", ["faixa"] = "01/10 às 14:00" })
+            .Should().Be("Oi, Ana! Recebemos seu pagamento e seu pedido está confirmado para 01/10 às 14:00. Obrigada pela preferência!");
+    }
+
+    [Theory]
+    [InlineData(GatilhoAutomacao.PrimeiroContato)]
+    [InlineData(GatilhoAutomacao.ForaDoHorario)]
+    [InlineData(GatilhoAutomacao.LojaFechada)]
+    [InlineData(GatilhoAutomacao.PosEntrega)]
+    [InlineData(GatilhoAutomacao.Encerramento)]
+    public void DemaisGatilhosNascemDesligados(GatilhoAutomacao gatilho) =>
+        RegraAutomatica.Padrao(Empresa, gatilho, Agora).Should().BeNull();
 }

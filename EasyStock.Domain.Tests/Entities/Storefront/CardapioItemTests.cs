@@ -533,6 +533,19 @@ public class CardapioItemTests
         item.FiltrosJson.Should().Be("[]");
     }
 
+    // #1991-5: o nome guardado em minúsculas chegava assim ao cliente, à comanda e ao Mercado Pago. O nome efetivo é o
+    // da vitrine; o que já tem maiúscula (nome de Produto) fica como está.
+    [Theory]
+    [InlineData("Lasanha Bolonhesa Clássica", "Lasanha Bolonhesa Clássica")]
+    [InlineData("talharim 500 g", "Talharim 500 g")]
+    [InlineData("pão de alho", "Pão de Alho")]
+    public void NomeEfetivo_ComoNaVitrine(string cadastrado, string esperado)
+    {
+        var item = CardapioItem.CriarAvulso(storefrontId: Guid.NewGuid(), nome: cadastrado, precoEmReais: 35.00m);
+
+        item.NomeEfetivo().Should().Be(esperado);
+    }
+
     [Fact]
     public void CriarAvulso_nome_nulo_throws()
     {

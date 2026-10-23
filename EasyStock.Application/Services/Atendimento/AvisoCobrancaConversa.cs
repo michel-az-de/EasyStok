@@ -55,7 +55,12 @@ public sealed class AvisoCobrancaConversa(
     public const string TextoLinkVencidoAguardandoAtendente =
         "O link de pagamento venceu de novo, mas seu pedido continua guardado. Em instantes alguém da equipe te manda um novo link ou combina o pagamento por aqui.";
 
-    public async Task<bool> EnviarAsync(Guid empresaId, Guid conversaId, string texto, DateTime agora, CancellationToken ct = default)
+    /// <param name="enviadaPorUsuarioId">
+    /// #1991-7: quem disparou pelo console (resumo do pedido, link trocado). A mensagem é dele (autor humano e
+    /// <c>EnviadaPorUsuarioId</c>), não automática; nulo para o que o sistema manda sozinho (expiração, webhook).
+    /// </param>
+    public async Task<bool> EnviarAsync(Guid empresaId, Guid conversaId, string texto, DateTime agora, CancellationToken ct = default,
+        Guid? enviadaPorUsuarioId = null)
     {
         try
         {
@@ -70,7 +75,7 @@ public sealed class AvisoCobrancaConversa(
             if (!conversa.DentroDaJanela(agora))
             {
                 await RegistrarFalhaAsync(conversa, texto, "Fora da janela de 24 h: o aviso não foi enviado.",
-                    TipoFalhaEnvio.Permanente, agora, ct);
+                    TipoFalhaEnvio.Permanente, agora, enviadaPorUsuarioId, ct);
                 return false;
             }
 
@@ -82,12 +87,12 @@ public sealed class AvisoCobrancaConversa(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogWarning(ex, "Falha ao enviar aviso de cobranca conversaId={ConversaId}", conversaId);
-                await RegistrarFalhaAsync(conversa, texto, ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora, ct);
+                await RegistrarFalhaAsync(conversa, texto, ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora, enviadaPorUsuarioId, ct);
                 return false;
             }
 
-            var mensagem = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora,
-                TipoConteudoMensagem.Texto, texto, externoId);
+            var mensagem = Assinada(Mensagem.Saida(empresaId, conversa.Id, AutorDe(enviadaPorUsuarioId), agora,
+                TipoConteudoMensagem.Texto, texto, externoId), enviadaPorUsuarioId);
             conversa.RegistrarSaida(agora);
             await conversaRepository.AddMensagemAsync(mensagem, ct);
             await unitOfWork.CommitAsync();
@@ -100,9 +105,19 @@ public sealed class AvisoCobrancaConversa(
         }
     }
 
-    private async Task RegistrarFalhaAsync(Conversa conversa, string texto, string erro, TipoFalhaEnvio tipo, DateTime agora, CancellationToken ct)
+    private static AutorMensagem AutorDe(Guid? usuarioId) => usuarioId is null ? AutorMensagem.Sistema : AutorMensagem.Dona;
+
+    private static Mensagem Assinada(Mensagem mensagem, Guid? usuarioId)
     {
-        var falhou = Mensagem.Saida(conversa.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto, texto);
+        if (usuarioId is { } quem) mensagem.RegistrarEnviadaPor(quem);
+        return mensagem;
+    }
+
+    private async Task RegistrarFalhaAsync(Conversa conversa, string texto, string erro, TipoFalhaEnvio tipo, DateTime agora,
+        Guid? enviadaPorUsuarioId, CancellationToken ct)
+    {
+        var falhou = Assinada(Mensagem.Saida(conversa.EmpresaId, conversa.Id, AutorDe(enviadaPorUsuarioId), agora,
+            TipoConteudoMensagem.Texto, texto), enviadaPorUsuarioId);
         // #1933: o reenvio automático repetiria o aviso sem conferir pedido nem cobrança (link vencido, pedido já pago).
         falhou.RegistrarFalhaEnvio(erro, tipo, agora, reenvioAutomatico: false);
         await conversaRepository.AddMensagemAsync(falhou, ct);

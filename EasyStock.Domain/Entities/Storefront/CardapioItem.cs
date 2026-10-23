@@ -337,8 +337,10 @@ public class CardapioItem
     /// <summary>
     /// Nome efetivo: <see cref="NomePublico"/> override OU <c>Produto.Nome</c>.
     /// Retorna null apenas se avulso sem NomePublico (estado inválido — CHECK no banco evita).
+    /// #1991-5: como na vitrine (<see cref="NomeDeExibicao"/>): o <see cref="NomePublico"/> guardado em minúsculas
+    /// chegava assim ao cliente, à comanda, ao pedido e ao Mercado Pago.
     /// </summary>
-    public string? NomeEfetivo() => NomePublico ?? Produto?.Nome;
+    public string? NomeEfetivo() => NomeDeExibicao.De(NomePublico ?? Produto?.Nome);
 
     /// <summary>
     /// Categoria efetiva (ADR-0035): <see cref="Secao"/>.Nome OU <see cref="CategoriaTexto"/> override

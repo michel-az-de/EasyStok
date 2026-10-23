@@ -13,15 +13,19 @@ public sealed record SalvarAutomacaoCommand(Guid EmpresaId, GatilhoAutomacao Gat
 
 /// <summary>
 /// S42: cadastro das mensagens automáticas. A lista traz todos os gatilhos do enum; o que ainda não tem
-/// regra aparece desligado e sem texto. Salvar cria ou altera a regra do gatilho.
+/// regra aparece com o padrão (<see cref="RegraAutomatica.Padrao"/>: "Pagamento confirmado" ligada, as demais
+/// desligadas e sem texto). Salvar cria ou altera a regra do gatilho.
 /// </summary>
 public sealed class AutomacoesUseCases(IRegraAutomaticaRepository repository, IUnitOfWork unitOfWork, TimeProvider relogio)
 {
     public async Task<IReadOnlyList<RegraAutomaticaResult>> ListarAsync(Guid empresaId, CancellationToken ct = default)
     {
         var porGatilho = (await repository.ListarAsync(empresaId, ct)).ToDictionary(r => r.Gatilho);
+        var agora = relogio.GetUtcNow().UtcDateTime;
         return Enum.GetValues<GatilhoAutomacao>()
-            .Select(g => porGatilho.TryGetValue(g, out var r) ? RegraAutomaticaResult.De(r) : new RegraAutomaticaResult(g, false, null, null))
+            .Select(g => porGatilho.TryGetValue(g, out var r) ? RegraAutomaticaResult.De(r)
+                : RegraAutomatica.Padrao(empresaId, g, agora) is { } padrao ? RegraAutomaticaResult.De(padrao) with { AlteradaEm = null }
+                : new RegraAutomaticaResult(g, false, null, null))
             .ToList();
     }
 

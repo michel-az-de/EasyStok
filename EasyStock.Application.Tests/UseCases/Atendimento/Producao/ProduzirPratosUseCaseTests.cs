@@ -149,7 +149,7 @@ public class ProduzirPratosUseCaseTests
             [new PratoProduzidoInput(ravioli.Id, 2, 500, 1144, 5)]));
 
         ravioli.ProdutoId.Should().NotBeNull("o que a casa produz é vinculado");
-        _produtos[ravioli.ProdutoId!.Value].Nome.Should().Be("Ravióli de queijo");
+        _produtos[ravioli.ProdutoId!.Value].Nome.Should().Be("Ravióli de Queijo", "o produto nasce com o nome do cardápio (#1991-5)");
         _categoriasGravadas.Should().ContainSingle(c => c.Nome == ProduzirPratosUseCase.CategoriaPratos);
         r.Pratos.Single().Should().Match<PratoProduzidoResult>(p => p.Porcoes == 2 && p.SobraG == 144 && p.CardapioItemId == ravioli.Id);
         r.TotalEtiquetas.Should().Be(2);
