@@ -513,6 +513,32 @@ public class CardapioItemTests
         act.Should().Throw<RegraDeDominioVioladaException>();
     }
 
+    // #2002 comanda-05: o cadastro recusa preço R$ 0 (CriarAvulso); a edição gravava R$ 0,00 e o site mostrava o prato de graça.
+    [Fact]
+    public void AtualizarMetadata_rejeita_preco_storefront_zero()
+    {
+        var item = NovoItemValido();
+
+        var act = () => item.AtualizarMetadata(precoStorefront: 0m);
+
+        act.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*maior que zero*");
+    }
+
+    // #2002 comanda-06: pedido_itens.Nome cabe 150 e o nome do prato aceitava 200; o INSERT do pedido estourava.
+    [Fact]
+    public void Nome_do_item_vai_ate_150_caracteres_o_teto_do_nome_no_pedido()
+    {
+        var noTeto = new string('a', 150);
+        var passou = CardapioItem.CriarAvulso(Guid.NewGuid(), noTeto, 10m);
+        passou.AtualizarMetadata(nomePublico: noTeto);
+
+        var criar = () => CardapioItem.CriarAvulso(Guid.NewGuid(), new string('a', 151), 10m);
+        var editar = () => passou.AtualizarMetadata(nomePublico: new string('a', 151));
+
+        criar.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*150*");
+        editar.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*150*");
+    }
+
     // ── CriarAvulso: item sem vínculo com ERP (ADR-0031) ──────────────
 
     [Fact]

@@ -480,6 +480,8 @@ public static class ApiServiceCollectionExtensions
     public static IServiceCollection AddEasyStockCache(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddMemoryCache();
+        // #2002: quem grava o cardápio esvazia o menu público guardado nesta memória (MenuController).
+        services.AddSingleton<EasyStock.Application.Ports.Output.ICardapioPublicoCache, EasyStock.Api.Services.Storefront.CardapioPublicoCache>();
 
         var redisConnectionString = configuration.GetConnectionString(ConfigurationKeys.ConnectionRedis);
         if (!string.IsNullOrWhiteSpace(redisConnectionString))

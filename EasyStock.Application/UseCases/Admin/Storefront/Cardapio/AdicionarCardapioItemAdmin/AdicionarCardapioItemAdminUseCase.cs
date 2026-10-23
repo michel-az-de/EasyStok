@@ -59,6 +59,18 @@ public class AdicionarCardapioItemAdminUseCase(
 {
     public async Task<AdicionarCardapioItemAdminResult> ExecuteAsync(AdicionarCardapioItemAdminCommand command)
     {
+        var item = await PrepararAsync(command);
+        await unitOfWork.CommitAsync();
+
+        return new AdicionarCardapioItemAdminResult(item.Id, command.StorefrontId, command.ProdutoId);
+    }
+
+    /// <summary>
+    /// Valida e põe o item no contexto, sem gravar (#2002): quem precisa acrescentar mais campos ao item recém-criado
+    /// (a comanda do console) faz o commit uma vez só, em vez de gravar o prato público e depois completá-lo.
+    /// </summary>
+    public async Task<CardapioItem> PrepararAsync(AdicionarCardapioItemAdminCommand command)
+    {
         // issue 658: estes campos viram PedidoItem.NomeSnapshot/metadata e fluem para
         // NF-e (xProd), PDF e etiqueta — sinks fora do escaping do Razor. A defesa é no
         // input. EnsureSemTagsHtml é no-op para null/vazio e libera '<'/'>' isolados.
@@ -187,8 +199,6 @@ public class AdicionarCardapioItemAdminUseCase(
             item.DefinirConservacao(conservacao);
 
         await cardapioRepository.AddAsync(item);
-        await unitOfWork.CommitAsync();
-
-        return new AdicionarCardapioItemAdminResult(item.Id, command.StorefrontId, command.ProdutoId);
+        return item;
     }
 }

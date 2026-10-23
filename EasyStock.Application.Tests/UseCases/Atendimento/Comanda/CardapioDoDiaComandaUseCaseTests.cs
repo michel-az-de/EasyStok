@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Campanhas;
@@ -24,6 +25,7 @@ public class CardapioDoDiaComandaUseCaseTests
     private readonly ICardapioItemRepository _cardapio = Substitute.For<ICardapioItemRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly IItemEstoqueRepository _itens = Substitute.For<IItemEstoqueRepository>();
+    private readonly ICardapioPublicoCache _publico = Substitute.For<ICardapioPublicoCache>();
 
     public CardapioDoDiaComandaUseCaseTests()
     {
@@ -37,7 +39,8 @@ public class CardapioDoDiaComandaUseCaseTests
         new ToggleDisponibilidadeCardapioItemAdminUseCase(_cardapio, _uow,
             new AvisoItemComInteresse(_storefronts, Substitute.For<IInteresseItemRepository>(), Substitute.For<IOperacaoEventPublisher>())),
         new AjustarSaldoRapidoUseCase(_itens, Substitute.For<IContagemRepository>(), Substitute.For<IMovimentacaoEstoqueRepository>(),
-            _uow, Substitute.For<IOperacaoEventPublisher>(), TimeProvider.System));
+            _uow, Substitute.For<IOperacaoEventPublisher>(), TimeProvider.System),
+        _publico);
 
     private CardapioItem ItemDeProduto(Guid produtoId, bool disponivel)
     {
@@ -59,6 +62,34 @@ public class CardapioDoDiaComandaUseCaseTests
         r.Disponivel.Should().BeFalse();
         item.Disponivel.Should().BeFalse();
         await _uow.Received(1).CommitAsync();
+    }
+
+    // #2002 comanda-01: esgotar o prato tem de chegar ao menu público na hora, não depois do prazo do cache.
+    [Fact]
+    public async Task DefinirDisponibilidade_InvalidaOMenuPublico_SoQuandoMuda()
+    {
+        var item = ItemDeProduto(Guid.NewGuid(), disponivel: true);
+
+        await Sut().DefinirDisponibilidadeAsync(new DefinirDisponibilidadeItemInput(EmpresaId, item.Id, false));
+        await Sut().DefinirDisponibilidadeAsync(new DefinirDisponibilidadeItemInput(EmpresaId, item.Id, false));
+
+        _publico.Received(1).Invalidar("casa-da-baba");
+    }
+
+    // #2002 comanda-08: duas atendentes esgotam o mesmo prato juntas. As duas viram "disponível"; o toggle relia o prato
+    // (já esgotado pela primeira) e invertia de volta. Pedir o valor, em vez de inverter, deixa o prato esgotado.
+    [Fact]
+    public async Task DefinirDisponibilidade_DuasAtendentesEsgotandoJuntas_NaoReligamOPrato()
+    {
+        var visto = ItemDeProduto(Guid.NewGuid(), disponivel: true);
+        var relido = CardapioItem.CriarAvulso(_vitrine.Id, "Lasanha", 20m);
+        relido.MarcarEsgotado();
+        _cardapio.GetByIdAndScopeAsync(_vitrine.Id, visto.Id, EmpresaId, Arg.Any<CancellationToken>()).Returns(visto, relido);
+
+        var r = await Sut().DefinirDisponibilidadeAsync(new DefinirDisponibilidadeItemInput(EmpresaId, visto.Id, false));
+
+        r.Disponivel.Should().BeFalse();
+        relido.Disponivel.Should().BeFalse("a segunda atendente pediu esgotado: o prato que a primeira esgotou não volta a ser vendido");
     }
 
     [Fact]

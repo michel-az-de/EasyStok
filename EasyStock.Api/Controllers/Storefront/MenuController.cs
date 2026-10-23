@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using EasyStock.Api.Services.Storefront;
 using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Storefront.Menu;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -22,15 +23,16 @@ namespace EasyStock.Api.Controllers.Storefront;
 /// </para>
 ///
 /// <para>
-/// <strong>Cache HTTP</strong>: <c>Cache-Control: public, max-age=300, s-maxage=300</c>
-/// (5 min em browser + edge). Cloudflare cacheia na borda. Invalidação cross-edge é
-/// eventual — aceitável pro MVP. ETag SHA-256 do payload permite <c>304 Not Modified</c>
-/// quando o cliente envia <c>If-None-Match</c>.
+/// <strong>Cache HTTP</strong>: <c>Cache-Control: public, no-cache</c> (#2002). O browser e a borda guardam a cópia
+/// e perguntam ao servidor a cada leitura; o ETag SHA-256 do payload responde <c>304 Not Modified</c> sem reenviar o
+/// corpo quando o cliente manda <c>If-None-Match</c>. Com <c>max-age</c>, o prato esgotado ou o preço novo demorava
+/// minutos para chegar a quem já tinha o cardápio.
 /// </para>
 ///
 /// <para>
 /// <strong>Cache no servidor</strong> (#1725-12): o cardápio serializado fica <see cref="TempoNoServidor"/> na memória,
-/// por slug. Não há evento de mudança do cardápio; a edição da dona aparece em até esse tempo.
+/// por slug. Quem grava o cardápio pelo console invalida (<see cref="ICardapioPublicoCache"/>, #2002); o prazo cobre o
+/// que muda fora dele (saldo do estoque, foto pelo acervo).
 /// </para>
 ///
 /// <para>
@@ -63,7 +65,7 @@ public sealed class MenuController(
         WriteIndented = false,
     };
 
-    private const string CacheControlPublico = "public, max-age=300, s-maxage=300";
+    private const string CacheControlPublico = "public, no-cache";
 
     /// <summary>
     /// Lista os items visíveis do cardápio do storefront identificado por
@@ -71,7 +73,7 @@ public sealed class MenuController(
     /// </summary>
     [SwaggerOperation(
         Summary = "Cardápio público do storefront",
-        Description = "Endpoint anônimo. Retorna apenas items com Visivel=true. Cache HTTP 5min (browser + edge). " +
+        Description = "Endpoint anônimo. Retorna apenas items com Visivel=true. Cache HTTP revalidado a cada leitura (browser + edge). " +
                       "Suporta ETag/If-None-Match para 304 Not Modified.")]
     [ProducesResponseType(typeof(MenuPublicoResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
@@ -89,7 +91,7 @@ public sealed class MenuController(
             // slug como veio: o filtro do tenant compara a caixa exata, e outra grafia não pode preencher o cardápio certo.
             var (json, etag) = User.Identity?.IsAuthenticated == true
                 ? await MontarAsync(slug, ct)
-                : (await cache.GetOrCreateAsync($"storefront:menu:{slug}", entrada =>
+                : (await cache.GetOrCreateAsync(CardapioPublicoCache.Chave(slug), entrada =>
                 {
                     entrada.AbsoluteExpirationRelativeToNow = TempoNoServidor;
                     return MontarAsync(slug, CancellationToken.None);

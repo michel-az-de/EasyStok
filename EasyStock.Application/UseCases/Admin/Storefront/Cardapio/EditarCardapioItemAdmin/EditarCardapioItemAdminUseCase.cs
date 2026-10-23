@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 
@@ -45,6 +46,15 @@ public class EditarCardapioItemAdminUseCase(
     : IUseCase<EditarCardapioItemAdminCommand, EditarCardapioItemAdminResult>
 {
     public async Task<EditarCardapioItemAdminResult> ExecuteAsync(EditarCardapioItemAdminCommand command)
+    {
+        var item = await AplicarAsync(command);
+        await unitOfWork.CommitAsync();
+
+        return new EditarCardapioItemAdminResult(item.Id);
+    }
+
+    /// <summary>Aplica a edição ao item rastreado, sem gravar (#2002): quem completa a edição faz o commit uma vez só.</summary>
+    public async Task<CardapioItem> AplicarAsync(EditarCardapioItemAdminCommand command)
     {
         // issue 658: mesmos guards do Adicionar — metadata flui para NF-e/PDF/etiqueta
         // (sinks sem escaping). No-op para null/vazio; '<'/'>' isolados passam.
@@ -97,8 +107,6 @@ public class EditarCardapioItemAdminUseCase(
             item.DefinirConservacao(conservacao);
 
         await cardapioRepository.UpdateAsync(item);
-        await unitOfWork.CommitAsync();
-
-        return new EditarCardapioItemAdminResult(item.Id);
+        return item;
     }
 }

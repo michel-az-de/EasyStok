@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
+using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
@@ -24,7 +25,8 @@ public sealed class SecoesDoCardapioComandaUseCase(
     IStorefrontRepository storefrontRepository,
     ICardapioSecaoRepository secaoRepository,
     ICardapioItemRepository cardapioRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ICardapioPublicoCache? cardapioPublico = null)
 {
     public async Task<IReadOnlyList<SecaoDoCardapio>> ListarAsync(Guid empresaId, CancellationToken ct = default)
     {
@@ -50,30 +52,32 @@ public sealed class SecoesDoCardapioComandaUseCase(
 
     public async Task RenomearAsync(Guid empresaId, Guid secaoId, string nome, CancellationToken ct = default)
     {
-        var storefrontId = await VitrineAsync(empresaId, ct);
-        var secoes = await secaoRepository.GetDoStorefrontAsync(storefrontId, ct);
+        var loja = await LojaAsync(empresaId, ct);
+        var secoes = await secaoRepository.GetDoStorefrontAsync(loja.Id, ct);
         var secao = SecaoDe(secoes, secaoId);
         GarantirNomeLivre(secoes, nome, ignorar: secao.Id);
         secao.Renomear(nome);
         await unitOfWork.CommitAsync();
+        cardapioPublico?.Invalidar(loja.Slug);
     }
 
     /// <summary>Esconde a categoria inteira do site e da comanda, sem apagar nem soltar os pratos.</summary>
     public async Task DefinirVisivelAsync(Guid empresaId, Guid secaoId, bool visivel, CancellationToken ct = default)
     {
-        var storefrontId = await VitrineAsync(empresaId, ct);
-        var secao = await secaoRepository.GetByIdAsync(storefrontId, secaoId, ct)
+        var loja = await LojaAsync(empresaId, ct);
+        var secao = await secaoRepository.GetByIdAsync(loja.Id, secaoId, ct)
             ?? throw new UseCaseValidationException("Categoria não encontrada.");
         if (secao.Visivel == visivel) return;
         secao.AlterarVisibilidade(visivel);
         await unitOfWork.CommitAsync();
+        cardapioPublico?.Invalidar(loja.Slug);
     }
 
     /// <summary>Sobe ou desce entre as irmãs e renumera de 1 a n (seção também nasce em ordem 0).</summary>
     public async Task MoverAsync(Guid empresaId, Guid secaoId, DirecaoMover direcao, CancellationToken ct = default)
     {
-        var storefrontId = await VitrineAsync(empresaId, ct);
-        var lista = Raizes(await secaoRepository.GetDoStorefrontAsync(storefrontId, ct)).ToList();
+        var loja = await LojaAsync(empresaId, ct);
+        var lista = Raizes(await secaoRepository.GetDoStorefrontAsync(loja.Id, ct)).ToList();
         var indice = lista.FindIndex(s => s.Id == secaoId);
         if (indice < 0) throw new UseCaseValidationException("Categoria não encontrada.");
         var alvo = indice + (direcao == DirecaoMover.Subir ? -1 : 1);
@@ -81,6 +85,7 @@ public sealed class SecoesDoCardapioComandaUseCase(
         (lista[indice], lista[alvo]) = (lista[alvo], lista[indice]);
         for (var posicao = 0; posicao < lista.Count; posicao++) lista[posicao].Reordenar(posicao + 1);
         await unitOfWork.CommitAsync();
+        cardapioPublico?.Invalidar(loja.Slug);
     }
 
     /// <summary>Só a categoria vazia sai: com prato dentro, ela precisa mover os pratos antes.</summary>
@@ -106,7 +111,8 @@ public sealed class SecoesDoCardapioComandaUseCase(
     /// </summary>
     public async Task<MigracaoDeCategoriasResult> MigrarCategoriasAsync(Guid empresaId, CancellationToken ct = default)
     {
-        var storefrontId = await VitrineAsync(empresaId, ct);
+        var loja = await LojaAsync(empresaId, ct);
+        var storefrontId = loja.Id;
         var secoes = (await secaoRepository.GetDoStorefrontAsync(storefrontId, ct)).ToList();
         var semSecao = SemSecaoComTexto(await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct));
 
@@ -131,7 +137,11 @@ public sealed class SecoesDoCardapioComandaUseCase(
             ligados++;
         }
 
-        if (criadas > 0 || ligados > 0) await unitOfWork.CommitAsync();
+        if (criadas > 0 || ligados > 0)
+        {
+            await unitOfWork.CommitAsync();
+            cardapioPublico?.Invalidar(loja.Slug);
+        }
         return new MigracaoDeCategoriasResult(criadas, ligados);
     }
 
@@ -176,12 +186,14 @@ public sealed class SecoesDoCardapioComandaUseCase(
     private static CardapioSecao SecaoDe(IEnumerable<CardapioSecao> secoes, Guid secaoId) =>
         secoes.FirstOrDefault(s => s.Id == secaoId) ?? throw new UseCaseValidationException("Categoria não encontrada.");
 
-    private async Task<Guid> VitrineAsync(Guid empresaId, CancellationToken ct)
+    private async Task<Guid> VitrineAsync(Guid empresaId, CancellationToken ct) => (await LojaAsync(empresaId, ct)).Id;
+
+    private async Task<StorefrontEntity> LojaAsync(Guid empresaId, CancellationToken ct)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
         var storefront = await storefrontRepository.GetByEmpresaAsync(empresaId, ct);
         if (storefront is null || !storefront.Ativo)
             throw new StorefrontNaoEncontradoException();
-        return storefront.Id;
+        return storefront;
     }
 }
