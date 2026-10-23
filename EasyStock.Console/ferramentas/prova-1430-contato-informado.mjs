@@ -136,17 +136,24 @@ await confere('#1936: endereço de lead do chat do site vai com o telefone e o n
   assert.ok(post, 'sem POST')
   assert.equal(post.corpo.telefone, '+5511987654321', 'cadastro sem o telefone do visitante')
   assert.equal(post.corpo.nome, 'Maria Souza')
-  assert.deepEqual(post.corpo.endereco, { cep: '05415000', logradouro: 'Rua dos Pinheiros', numero: '200', complemento: null, bairro: 'Pinheiros' })
+  // #1991-3: cidade e UF digitadas vão junto (antes o console descartava e o cadastro ficava sem elas).
+  assert.deepEqual(post.corpo.endereco, { cep: '05415000', logradouro: 'Rua dos Pinheiros', numero: '200', complemento: null, bairro: 'Pinheiros', cidade: 'São Paulo', uf: 'SP' })
 })
 
 await confere('#1936: cidade e UF no fim do endereço não viram bairro', async () => {
   const { partesDoEndereco } = await import('../src/dominio/formato.js')
-  for (const cidade of ['São Paulo', 'Sao Paulo - SP', 'São Paulo/SP', 'SP']) {
+  for (const cidade of ['São Paulo', 'Sao Paulo - SP', 'São Paulo/SP', 'SP', 'São Paulo, SP']) {
     const p = partesDoEndereco(`Rua A, 10, apto 2, Pinheiros, ${cidade}, 05415-000`)
     assert.equal(p.bairro, 'Pinheiros', cidade)
     assert.equal(p.complemento, 'apto 2', cidade)
+    // #1991-3: a cidade e a UF saem do texto, mas não somem: São Paulo é SP.
+    assert.equal(p.uf, 'SP', cidade)
+    assert.equal(p.cidade, cidade === 'SP' ? '' : 'São Paulo', cidade)
   }
-  assert.equal(partesDoEndereco('Rua A, 10, Pinheiros, 05415-000').bairro, 'Pinheiros', 'formato antigo')
+  const antigo = partesDoEndereco('Rua A, 10, Pinheiros, 05415-000')
+  assert.equal(antigo.bairro, 'Pinheiros', 'formato antigo')
+  assert.equal(antigo.cidade, '', 'formato antigo sem cidade')
+  assert.equal(antigo.uf, '', 'formato antigo sem UF')
 })
 
 await confere('telefone E.164 da API aparece na máscara da tela', () => {

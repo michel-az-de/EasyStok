@@ -169,6 +169,22 @@ public class ChatSiteUseCasesTests
         await _uow.Received(2).CommitAsync();
     }
 
+    // #1991-4: entrada e "Recebemos sua mensagem" saíam com o mesmo enviadaEm e a ordem do chat variava. A resposta
+    // fica ao menos 1 µs depois (a precisão do timestamp do Postgres), então nunca empata com a entrada.
+    [Fact]
+    public async Task PrimeiraMensagem_ConfirmacaoDeRecebimentoFicaDepoisDaEntrada()
+    {
+        var (_, token) = SessaoValida();
+        var gravadas = new List<Mensagem>();
+        await _conversas.AddMensagemAsync(Arg.Do<Mensagem>(gravadas.Add), Arg.Any<CancellationToken>());
+
+        await Enviar().ExecuteAsync(Slug, token, "Oi");
+
+        var entrada = gravadas.Single(m => m.Direcao == DirecaoMensagem.Entrada);
+        var confirmacao = gravadas.Single(m => m.Direcao == DirecaoMensagem.Saida);
+        (confirmacao.EnviadaEm - entrada.EnviadaEm).Should().BeGreaterThanOrEqualTo(TimeSpan.FromMicroseconds(1));
+    }
+
     [Fact]
     public async Task SegundaMensagem_ReaproveitaAConversa()
     {
