@@ -172,7 +172,8 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         r.Confirmado.Should().BeFalse();
         r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.ValorMenor);
         f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
-        f.Pedido.Pagamentos.Should().BeEmpty();
+        // #1724-7: o valor recebido fica registrado (devolvível pelo estorno online), sem confirmar o pedido.
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Valor.Should().Be(20m);
         cobranca.Status.Should().Be(StatusCobrancaPedido.Pendente);
         cobranca.Motivo.Should().Contain("valor_menor");
         f.Eventos.Should().Contain(e => e.Tipo == "pagamento_divergente");

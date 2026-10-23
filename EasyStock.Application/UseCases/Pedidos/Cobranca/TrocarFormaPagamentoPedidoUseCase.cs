@@ -65,10 +65,12 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         if (forma is not (FormaOnline or FormaNaEntrega))
             throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
 
+        Guid? linkConferido = null;
         if (forma == FormaNaEntrega)
         {
             var anteriores = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, input.PedidoId, ct);
-            if (anteriores.Any(c => c.EmpresaId == input.EmpresaId && c.PedidoId == input.PedidoId && c.EhOnline && c.EstaPendente))
+            var linkPendente = anteriores.FirstOrDefault(c => c.EmpresaId == input.EmpresaId && c.PedidoId == input.PedidoId && c.EhOnline && c.EstaPendente);
+            if (linkPendente is not null)
             {
                 // #1733: o link aberto é conferido no provedor antes de ser cancelado. Pago, o pedido já está
                 // quitado (409 e a tela atualiza). Sem pagamento no provedor, a troca segue e cancela o link
@@ -80,11 +82,12 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
                         "Pagamento online conferido. Atualize o pedido antes de receber outro valor.");
                 if (resultado.Situacao != ConferirPagamentoPedidoUseCase.SituacaoNaoEncontrado)
                     throw new UseCaseValidationException(MotivoLinkPendente(resultado.Situacao));
+                linkConferido = linkPendente.Id;
             }
         }
 
         var (cobranca, conversaId, preferenciaSubstituida, mudanca, impressao) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
-            async token => await TrocarNoLockAsync(input, forma, token), ct);
+            async token => await TrocarNoLockAsync(input, forma, linkConferido, token), ct);
 
         // A cozinha só relê depois que a transação terminou; na entrega ainda não é pagamento.
         if (mudanca is not null)
@@ -117,20 +120,15 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         _ => MensagemLinkPendente,
     };
 
-    private async Task ExpirarPreferenciaAsync(string preferenceId, CancellationToken ct)
-    {
-        try
-        {
-            await mercadoPagoClient.ExpirarPreferenciaAsync(preferenceId, relogio.GetUtcNow().UtcDateTime, ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogWarning(ex, "Troca de forma: falha ao expirar a preferencia anterior no Mercado Pago");
-        }
-    }
+    private Task ExpirarPreferenciaAsync(string preferenceId, CancellationToken ct) =>
+        ExpiracaoPreferenciaMercadoPago.ExpirarAsync(() => mercadoPagoClient, preferenceId, relogio.GetUtcNow().UtcDateTime, logger, ct);
 
+    /// <param name="linkConferido">
+    /// #1717-2: link online pendente que o provedor confirmou sem pagamento antes da trava. Só ele pode ser cancelado
+    /// pela troca para a entrega; outro link pendente nascido no meio não foi consultado e continua recusando.
+    /// </param>
     private async Task<(CobrancaPedidoResult, Guid?, string?, PedidoMudouStatusOperacao?, ImpressaoPendenteOperacao?)> TrocarNoLockAsync(
-        TrocarFormaPagamentoPedidoInput input, string forma, CancellationToken ct)
+        TrocarFormaPagamentoPedidoInput input, string forma, Guid? linkConferido, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
         var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, ct);
@@ -148,9 +146,9 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         var restante = pedido.Total.Valor - alocado;
         if (pedido.Total.Valor > 0m && restante <= 0m)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
-        // Encomenda com sinal: o link do sinal não vira pagamento na entrega (#1685); conferido acima.
-        if (forma == FormaNaEntrega && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
-            && cobrancas.Any(c => c.EstaPendente && c.EhOnline))
+        // #1717-2 (decisão do Felipe em 13/10): o sinal da encomenda pode ser baixado à mão, como o pedido comum. O
+        // link conferido sem pagamento é cancelado e a baixa manual segue; link pendente que não foi conferido recusa.
+        if (forma == FormaNaEntrega && cobrancas.Any(c => c.EstaPendente && c.EhOnline && c.Id != linkConferido))
             throw new UseCaseValidationException(MensagemLinkPendente);
 
         var pendente = cobrancas.FirstOrDefault(c => c.EstaPendente);
@@ -171,6 +169,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
             var tentativa = cobrancas.Where(c => c.EhOnline).Select(c => c.Tentativa).DefaultIfEmpty(1).Max();
             nova = await gerarCobranca.ExecuteAsync(
                 new GerarCobrancaPedidoInput(input.EmpresaId, pedido.Id, conversaId, tentativa), ct);
+            preferenciaSubstituida ??= nova.PreferenciaSubstituida;
         }
         else
         {

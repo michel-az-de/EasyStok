@@ -94,7 +94,9 @@ public sealed class ConferirPagamentoPedidoUseCase(
                 pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved,
                 ContaRecebedoraId: pagamento.CollectorId), ct);
             if (resultado.Confirmado) return new(SituacaoConfirmado, true);
-            if (resultado.Situacao == SituacaoConfirmacaoPagamento.JaConfirmado) jaConhecidos.Add(pagamento.Id);
+            // #1724-7: o pagamento a menor fica registrado como recebimento; já é conhecido, não "aprovado sem conciliar".
+            if (resultado.Situacao is SituacaoConfirmacaoPagamento.JaConfirmado or SituacaoConfirmacaoPagamento.ValorMenor)
+                jaConhecidos.Add(pagamento.Id);
         }
         var novos = pagamentos.Where(p => !jaConhecidos.Contains(p.Id)).ToList();
         // Recusado, cancelado ou devolvido não está em processamento: só tentativa sem dinheiro equivale a nada pago.

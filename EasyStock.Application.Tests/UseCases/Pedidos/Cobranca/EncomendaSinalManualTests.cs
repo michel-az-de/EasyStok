@@ -121,11 +121,14 @@ public class EncomendaSinalManualTests
         cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorMercadoPago);
     }
 
+    /// <summary>#1717-2: o sinal vira baixa manual só quando o provedor diz que o link não foi pago; em processamento, recusa.</summary>
     [Fact]
-    public async Task LinkPendente_NoDiaDaEntregaNaoPermiteTrocaParaManual()
+    public async Task LinkPendenteEmProcessamento_NoDiaDaEntregaNaoPermiteTrocaParaManual()
     {
         var f = ReservaNoDiaDaEntrega();
         f.AdicionarOnline();
+        f.PagamentosNoMercadoPago.Add(new PagamentoMercadoPago("pagamento-sinal", "in_process", null, f.Pedido.Id.ToString(),
+            12.5m, CobrancaPedidoFixture.Agora, "pix", "bank_transfer"));
 
         var trocar = () => f.Trocar().ExecuteAsync(new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega"));
 

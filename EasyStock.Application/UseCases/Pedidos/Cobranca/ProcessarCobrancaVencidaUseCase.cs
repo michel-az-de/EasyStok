@@ -7,6 +7,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Sales;
 
@@ -179,11 +180,13 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         // #1717-3: pedido da conversa não é cancelado pelo job ("avisa, não trava"). Fica aguardando a atendente.
         // #1889 (decisão do Felipe, 21/10): a equipe é chamada pelo sino na mesma transação; com a conversa encerrada
         // o aviso ao cliente não sai, e sem isso ninguém ficava sabendo.
-        if (cobranca.ConversaId is { } conversaDoPedido)
+        // #1724-7: o pedido do site com pagamento a menor registrado tem dinheiro recebido; o sistema não o cancela
+        // (exigiria a dona) e a equipe decide o acerto: cobrar o restante ou devolver.
+        if (cobranca.ConversaId is not null || cobrancas.Any(c => c.RegistraPagamentoAMenor && c.Status == StatusCobrancaPedido.Paga))
         {
             await AvisarEquipeAsync(pedido, cobranca, ct);
             await unitOfWork.CommitAsync();
-            return (ResultadoExpiracaoCobranca.AguardandoAtendente, conversaDoPedido, null);
+            return (ResultadoExpiracaoCobranca.AguardandoAtendente, cobranca.ConversaId, null);
         }
 
         await cancelarPedido.ExecuteAsync(new CancelarPedidoCommand(
