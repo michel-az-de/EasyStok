@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Storefront.Menu;
 using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -28,6 +29,11 @@ namespace EasyStock.Api.Controllers.Storefront;
 /// </para>
 ///
 /// <para>
+/// <strong>Cache no servidor</strong> (#1725-12): o cardápio serializado fica <see cref="TempoNoServidor"/> na memória,
+/// por slug. Não há evento de mudança do cardápio; a edição da dona aparece em até esse tempo.
+/// </para>
+///
+/// <para>
 /// <strong>Storefront inativo</strong> retorna 404 (não 403) para não vazar
 /// existência do tenant.
 /// </para>
@@ -39,8 +45,12 @@ namespace EasyStock.Api.Controllers.Storefront;
 [TenantDoStorefront]
 public sealed class MenuController(
     ListarCardapioPublicoUseCase listarCardapioUseCase,
+    IMemoryCache cache,
     ILogger<MenuController> logger) : EasyStockControllerBase
 {
+    /// <summary>Quanto o cardápio montado fica na memória do servidor, por slug (#1725-12).</summary>
+    public static readonly TimeSpan TempoNoServidor = TimeSpan.FromSeconds(30);
+
     /// <summary>
     /// JSON options dedicado ao endpoint público — camelCase + null skip. Estático
     /// pra garantir que o ETag (hash do payload) seja determinístico requisição
@@ -73,17 +83,22 @@ public sealed class MenuController(
     {
         try
         {
-            var result = await listarCardapioUseCase.ExecuteAsync(
-                new ListarCardapioPublicoInput(slug), ct);
+            // Slug inexistente lança dentro da fábrica e não entra no cache.
+            var (json, etag) = (await cache.GetOrCreateAsync($"storefront:menu:{slug.Trim().ToLowerInvariant()}", async entrada =>
+            {
+                entrada.AbsoluteExpirationRelativeToNow = TempoNoServidor;
+                var result = await listarCardapioUseCase.ExecuteAsync(
+                    new ListarCardapioPublicoInput(slug), ct);
 
-            // Envelope { itens, tituloPublico, slug } — contrato canônico (menu-publico.contract.md)
-            // que a vitrine Casa da Babá consome (menu.js exige Array.isArray(data.itens)).
-            // Serialização MANUAL com PublicJsonOptions é load-bearing: o ETag tem que ser o hash
-            // dos BYTES EXATOS servidos. NÃO trocar por Ok(response) — Ok() delega a serialização ao
-            // framework (opções globais do MVC, não PublicJsonOptions) e o hash deixaria de bater.
-            var response = new MenuPublicoResponse(result.Itens, result.TituloPublico, result.Slug);
-            var json = JsonSerializer.SerializeToUtf8Bytes(response, PublicJsonOptions);
-            var etag = ComputarETag(json);
+                // Envelope { itens, tituloPublico, slug } — contrato canônico (menu-publico.contract.md)
+                // que a vitrine Casa da Babá consome (menu.js exige Array.isArray(data.itens)).
+                // Serialização MANUAL com PublicJsonOptions é load-bearing: o ETag tem que ser o hash
+                // dos BYTES EXATOS servidos. NÃO trocar por Ok(response) — Ok() delega a serialização ao
+                // framework (opções globais do MVC, não PublicJsonOptions) e o hash deixaria de bater.
+                var response = new MenuPublicoResponse(result.Itens, result.TituloPublico, result.Slug);
+                var bytes = JsonSerializer.SerializeToUtf8Bytes(response, PublicJsonOptions);
+                return new MenuSerializado(bytes, ComputarETag(bytes));
+            }))!;
 
             // Sempre seta cache-headers, mesmo no 304 (proxies precisam pra TTL).
             Response.Headers[HeaderNames.CacheControl] = CacheControlPublico;
@@ -253,4 +268,6 @@ public sealed class MenuController(
         }
         return false;
     }
+
+    private sealed record MenuSerializado(byte[] Json, string ETag);
 }

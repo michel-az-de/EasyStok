@@ -14,6 +14,15 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .Include(c => c.Variacoes)
             .FirstOrDefaultAsync(c => c.StorefrontId == storefrontId && c.Id == id, ct);
 
+    public async Task<IReadOnlyList<CardapioItem>> ListarPorIdsAsync(Guid storefrontId, IReadOnlyCollection<Guid> ids,
+        CancellationToken ct = default) =>
+        ids.Count == 0 ? [] : await db.CardapioItens
+            .AsSplitQuery()
+            .Include(c => c.Produto)
+            .Include(c => c.Variacoes)
+            .Where(c => c.StorefrontId == storefrontId && ids.Contains(c.Id))
+            .ToListAsync(ct);
+
     public Task<CardapioItem?> GetByIdAndScopeAsync(Guid storefrontId, Guid itemId, Guid? empresaId, CancellationToken ct = default)
     {
         // ADR-0035: admin (Obter/Editar) precisa enxergar as opções e a seção do item.
