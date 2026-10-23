@@ -52,6 +52,34 @@ public sealed class CobrancaPedidoRepository(EasyStockDbContext db) : ICobrancaP
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<CobrancaPedidoVencendo>> ListarPendentesVencendoAsync(
+        DateTime agora, TimeSpan antecedencia, int maximo, CancellationToken ct = default)
+    {
+        var limite = agora + antecedencia;
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.CobrancasPedido
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Status == StatusCobrancaPedido.Pendente
+                        && c.Provedor == CobrancaPedido.ProvedorMercadoPago
+                        && c.ReferenciaExterna != null
+                        && c.ConversaId != null
+                        && c.AguardandoCredencialDesde == null
+                        && c.ExpiraEm > agora
+                        && c.ExpiraEm <= limite
+                        // Já lembrada (ou recusada pelas regras da automática): a reserva fica na tabela de idempotência.
+                        // A que falhou no canal volta para a próxima rodada.
+                        && !db.IdempotencyKeys.IgnoreQueryFilters().Any(k =>
+                            k.EmpresaId == c.EmpresaId
+                            && k.MetodoRecurso == CobrancaPedidoVencendo.RecursoLembrete
+                            && k.Key == c.Id.ToString()
+                            && k.Status != StatusIdempotencyKey.Falhou))
+            .OrderBy(c => c.ExpiraEm)
+            .Take(Math.Clamp(maximo, 1, 500))
+            .Select(c => new CobrancaPedidoVencendo(c.Id, c.EmpresaId, c.PedidoId))
+            .ToListAsync(ct);
+    }
+
     public async Task<bool> ExisteAguardandoCredencialAsync(CancellationToken ct = default)
     {
         using var _ = db.UseRowLevelSecurityBypass();

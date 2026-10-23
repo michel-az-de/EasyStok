@@ -89,6 +89,20 @@ public class RespostasProntasUseCasesTests
         texto.Texto.Should().Be("Bia, pedido 0A1B2C3D.");
     }
 
+    /// <summary>#1610: sem regra gravada, o lembrete do link aparece ligado e com o texto padrão; os demais, desligados.</summary>
+    [Fact]
+    public async Task ListaTrazOLembreteDoLinkLigadoSemRegraGravada()
+    {
+        _regras.ListarAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(new List<RegraAutomatica>());
+
+        var lista = await new AutomacoesUseCases(_regras, _uow, _relogio).ListarAsync(_empresaId);
+
+        var lembrete = lista.Should().ContainSingle(r => r.Gatilho == GatilhoAutomacao.CobrancaVencendo).Subject;
+        lembrete.Ligada.Should().BeTrue();
+        lembrete.Texto.Should().Contain("{pedido}");
+        lista.Where(r => r.Gatilho != GatilhoAutomacao.CobrancaVencendo).Should().OnlyContain(r => !r.Ligada && r.Texto == null);
+    }
+
     [Fact]
     public async Task SalvarAutomacaoCriaQuandoNaoExisteEAlteraQuandoExiste()
     {

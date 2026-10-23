@@ -36,6 +36,24 @@ public class RegraAutomatica
         AlteradaEm = agora;
     }
 
+    /// <summary>
+    /// #1610: texto do lembrete do link quando a dona ainda não gravou a regra. Só usa <c>{pedido}</c>, que o disparo
+    /// sempre preenche: <c>{nome}</c> pode faltar, e variável sem valor não sai.
+    /// </summary>
+    public const string TextoPadraoCobrancaVencendo =
+        "Oi! O link de pagamento do pedido {pedido} vence em 10 minutos. Se ainda quiser garantir, é só pagar por ele. "
+        + "Se precisar de outro link, me chama aqui.";
+
+    /// <summary>
+    /// Regra que vale quando a empresa ainda não gravou nenhuma para o gatilho (não é persistida). Só o lembrete do link
+    /// (<see cref="GatilhoAutomacao.CobrancaVencendo"/>) nasce ligado; os demais gatilhos ficam desligados até a dona
+    /// salvar, então devolvem null. Salvar grava uma regra de verdade, que passa a valer no lugar desta.
+    /// </summary>
+    public static RegraAutomatica? Padrao(Guid empresaId, GatilhoAutomacao gatilho, DateTime agora) =>
+        gatilho == GatilhoAutomacao.CobrancaVencendo
+            ? Criar(empresaId, gatilho, TextoPadraoCobrancaVencendo, ligada: true, agora)
+            : null;
+
     public string Renderizar(IReadOnlyDictionary<string, string?> valores) =>
         ModeloTextoAtendimento.Renderizar(Texto, valores);
 
