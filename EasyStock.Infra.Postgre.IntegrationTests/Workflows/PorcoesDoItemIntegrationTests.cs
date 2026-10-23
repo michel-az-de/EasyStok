@@ -80,8 +80,12 @@ public class PorcoesDoItemIntegrationTests(PostgreSqlDatabaseFixture fixture)
         {
             var db = sp.GetRequiredService<EasyStockDbContext>();
             var storefrontId = await db.Set<CardapioItem>().Where(i => i.Id == itemId).Select(i => i.StorefrontId).SingleAsync();
-            var item = await sp.GetRequiredService<EasyStock.Application.Ports.Output.Persistence.Storefront.ICardapioItemRepository>()
-                .GetByIdAsync(storefrontId, itemId);
+            var repositorio = sp.GetRequiredService<EasyStock.Application.Ports.Output.Persistence.Storefront.ICardapioItemRepository>();
+            var item = await repositorio.GetByIdAsync(storefrontId, itemId);
+            // #1725-8: o checkout lê em lote, com a mesma carga; id de fora do cardápio não volta.
+            (await repositorio.ListarPorIdsAsync(storefrontId, [itemId, Guid.NewGuid()])).Should().ContainSingle()
+                .Which.Variacoes.Should().HaveCount(2);
+            (await repositorio.ListarPorIdsAsync(Guid.NewGuid(), [itemId])).Should().BeEmpty("o item é de outra vitrine");
 
             item!.Variacoes.Should().HaveCount(2);
             var padrao = item.PorcaoParaVenda(null)!;
