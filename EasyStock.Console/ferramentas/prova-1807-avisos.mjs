@@ -258,5 +258,18 @@ await confere('G1. aba focada sem confirmação de toast não descarta o push', 
   assert.equal(fechadas, 0)
 })
 
+// #1989 (item 8, laboratório de 23/10, 390 px): os toasts "Contato novo" cobriam a barra de baixo
+// (Balcão, Atendimento, Resumo) e a faixa Imprimir. No celular a pilha fica no topo, abaixo do
+// recorte da tela, e não ancora mais no rodapé.
+await confere('#1989-8 no celular a pilha de avisos fica no topo, fora da barra inferior', () => {
+  const css = readFileSync(new URL('../src/componentes/Toast.module.css', import.meta.url), 'utf8')
+  const de = css.indexOf('@media (max-width: 759px)')
+  assert.ok(de >= 0, 'sem regra do celular')
+  const celular = css.slice(de)
+  assert.doesNotMatch(celular, /bottom:\s*calc\(/, 'a pilha ainda ancora no rodapé, sobre a barra inferior')
+  assert.match(celular, /top:\s*calc\([^;]*env\(safe-area-inset-top/, 'topo com a área segura do aparelho')
+  assert.match(celular, /left:\s*var\(--e-16\)/, 'largura da tela com o respiro de 16 px dos dois lados')
+})
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length) process.exit(1)

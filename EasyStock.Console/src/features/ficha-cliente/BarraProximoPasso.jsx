@@ -9,7 +9,7 @@ import {
   aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
 import { ultimoPagamentoApi } from '../../dominio/pagamento'
-import { ROTULO_GERAR_E_ENVIAR, resumoDaCobrancaEscolhida } from '../../dominio/resumoPedido'
+import { ROTULO_GERAR_E_ENVIAR, itensDoResumo, resumoDaCobrancaEscolhida } from '../../dominio/resumoPedido'
 import { totalDoPedido } from '../../dominio/pedido'
 import {
   PASSOS, motivoParaNaoAvancar, passoAnterior, passoPorId, proximoPasso, situacaoDoPasso,
@@ -200,7 +200,8 @@ export function BarraProximoPasso({
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
       linkPendenteApi: fonteApi && Boolean(pedido.cobranca?.link),
       aoAbrirBaixa: () => setAbrindoBaixa(true),
-      aoGerarPix: () => (pedido.meio ? executar(() => aoGerarPix(pedido.meio), GERANDO_COBRANCA) : setPedindoMeio(true)),
+      // #1989 (#1765-3): com a forma já escolhida também abre o resumo; quem gera é o "Confirmar".
+      aoGerarPix: () => { setMeioNaBarra(pedido.meio ?? null); setPedindoMeio(true) },
       aoReenviarPix: () => executar(() => aoReenviarPix()),
       aoMandarLinkNovo: fonteApi && pedido.pedidoId && esperaLinkNovoApi(pedido.cobranca, pedido.statusApi)
         ? () => executar(() => aoReenviarPix()) : null,
@@ -238,7 +239,7 @@ export function BarraProximoPasso({
               {fonteApi && aguardaSinalManual(pedido) && b.rotulo === 'Marcar pago' ? 'Registrar sinal' : b.rotulo}
             </Botao>
           ))}
-          {pedindoMeio && situacaoCob.chave === 'nenhuma' && !pedido.meio && (
+          {pedindoMeio && situacaoCob.chave === 'nenhuma' && (
             <>
               <EscolhaDeMeio
                 escolhido={meioNaBarra}
@@ -247,6 +248,9 @@ export function BarraProximoPasso({
                 aoEscolher={setMeioNaBarra}
                 pergunta="Como o cliente vai pagar?"
               />
+              {meioNaBarra && (
+                <p className={css.motivoDesabilitado} data-resumo-itens>{itensDoResumo(pedido, cardapio)}</p>
+              )}
               {meioNaBarra && (
                 <p className={css.motivoDesabilitado} data-resumo-cobranca>
                   {resumoDaCobrancaEscolhida(pedido, {
@@ -258,9 +262,12 @@ export function BarraProximoPasso({
               <Botao
                 largo variante="primario" icone="check" data-confirmar-cobranca
                 disabled={!meioNaBarra || emVoo}
-                onClick={() => { const meio = meioNaBarra; setPedindoMeio(false); setMeioNaBarra(null); executar(() => aoGerarPix(meio), GERANDO_COBRANCA) }}
+                onClick={() => { const meio = meioNaBarra; setPedindoMeio(false); setMeioNaBarra(null); return executar(() => aoGerarPix(meio), GERANDO_COBRANCA) }}
               >
                 {fonteApi && !pedido.pedidoId && !gerarSemEnviar ? 'Confirmar e enviar' : 'Confirmar e gerar'}
+              </Botao>
+              <Botao largo variante="secundario" disabled={emVoo} onClick={() => { setPedindoMeio(false); setMeioNaBarra(null) }}>
+                Voltar
               </Botao>
             </>
           )}

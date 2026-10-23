@@ -118,7 +118,9 @@ export function PainelAtendimento({
           </h2>
         </span>
         <div className={css.direita} data-ancora-assistente>
-          {!encerrada && !bloqueada && <CompartilharComanda key={selecionada.id} conversa={selecionada} canalNome={canal.nome} podeEnviar={pode} />}
+          {/* #1989: irmãos com a mesma chave (o id da conversa) faziam o React perder a conta e
+              deixar um "Link de compra" velho a cada troca de conversa. Cada um tem o seu prefixo. */}
+          {!encerrada && !bloqueada && <CompartilharComanda key={'compartilhar-' + selecionada.id} conversa={selecionada} canalNome={canal.nome} podeEnviar={pode} />}
           {/* Assumir e devolver ao automático moram na BarraModo, um lugar só.
               Aqui em cima fica o que é estado da conversa: bloqueio, encerrar
               e reabrir. */}
@@ -131,7 +133,7 @@ export function PainelAtendimento({
               resumo (vazia até a F5 construir o conteúdo); com a conversa já
               encerrada, dá lugar ao "Reabrir conversa" que já existia. */}
           {/* #1239: passar a conversa para outra atendente (só no modo API). */}
-          {fonteApi && !encerrada && !bloqueada && <PassarConversa key={selecionada.id} conversa={selecionada} />}
+          {fonteApi && !encerrada && !bloqueada && <PassarConversa key={'passar-' + selecionada.id} conversa={selecionada} />}
           {!encerrada && !bloqueada && (
             <Botao variante="secundario" icone="log-out" className={css.encerrar} title="Encerrar atendimento" onClick={() => abrirEncerramento(selecionada.id)}>
               Encerrar

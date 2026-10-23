@@ -212,7 +212,7 @@ try {
   const resultado = await Promise.race([tentativa, new Promise(resolve => setImmediate(() => resolve({ estado: 'preso' })))])
   assert.equal(resultado.estado, 'erro', 'o navegador sem resposta deve liberar uma nova tentativa')
   assert.equal(prazoDePermissao, 30000, 'o usuário dispõe de 30 segundos para responder')
-  assert.match(resultado.mensagem, /navegador demorou/)
+  assert.match(resultado.mensagem, /pedido de permissão/, 'a mensagem diz que é a permissão que ficou sem resposta')
   permitirDepois('granted')
   await Promise.resolve()
   await Promise.resolve()
@@ -222,3 +222,46 @@ try {
   globalThis.clearTimeout = limparOriginal
 }
 console.log('OK #1755: permissão sem resposta é recuperável e resposta tardia não ativa avisos.')
+
+// #1989 (item 9, laboratório de 23/10): ativar num navegador novo terminava em "O navegador
+// demorou…" fosse qual fosse a etapa. Cada etapa diz onde parou e o que fazer.
+{
+  const fechou = await ativarAvisosNoAparelho(contexto({ resposta: 'default' }))
+  assert.equal(fechou.estado, 'desligado')
+  assert.match(fechou.mensagem ?? '', /sem escolher.*Permitir/, 'fechou o pedido do navegador sem escolher')
+  assert.equal((await conferirAvisosNoAparelho(contexto({ permissao: 'default' }))).mensagem, null, 'abrir o Console não acusa nada')
+  const negou = await ativarAvisosNoAparelho(contexto({ resposta: 'denied' }))
+  assert.equal(negou.estado, 'bloqueado')
+  assert.match(negou.mensagem ?? '', /bloque.*configura/i, 'negada: diz onde liberar')
+
+  const mensagens = {}
+  const prazoImediato = globalThis.setTimeout
+  globalThis.setTimeout = (executar) => { queueMicrotask(executar); return 1 }
+  try {
+    // Permissão sem resposta.
+    globalThis.Notification = { requestPermission: () => new Promise(() => {}) }
+    mensagens.permissao = (await push.pedirPermissaoPush().catch((e) => e)).message
+    // Serviço de avisos que não fica pronto.
+    const pronto = { active: { scriptURL: 'https://console.example.test/sw-avisos.js' }, pushManager: { getSubscription: async () => null } }
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'teste', serviceWorker: {
+      getRegistration: async () => null, register: () => new Promise(() => {}), ready: Promise.resolve(pronto),
+    } } })
+    mensagens.preparo = (await push.inscreverPushNoNavegador('BAA', 'casa:ana').catch((e) => e)).message
+    // Inscrição recusada pelo serviço de push do navegador.
+    pronto.pushManager.subscribe = async () => { throw Object.assign(new Error('Registration failed - push service error'), { name: 'AbortError' }) }
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'teste', serviceWorker: {
+      getRegistration: async () => null, register: async () => pronto, ready: Promise.resolve(pronto),
+    } } })
+    mensagens.inscricao = (await push.inscreverPushNoNavegador('BAA', 'casa:ana').catch((e) => e)).message
+  } finally { globalThis.setTimeout = prazoImediato }
+  assert.match(mensagens.permissao, /permiss/i, mensagens.permissao)
+  assert.match(mensagens.preparo, /prepar/i, mensagens.preparo)
+  assert.match(mensagens.inscricao, /inscri/i, mensagens.inscricao)
+  assert.equal(new Set(Object.values(mensagens)).size, 3, 'cada etapa tem a própria mensagem')
+
+  // Aviso discreto no sino para quem ainda não ativou neste aparelho.
+  const sino = readFileSync(new URL('../src/features/notificacoes/SinoDaSessao.jsx', import.meta.url), 'utf8')
+  assert.match(sino, /const semAvisoNoAparelho = \['desligado', 'bloqueado'\]\.includes\(aparelho\?\.estado\)/)
+  assert.match(sino, /data-aparelho-desligado/)
+  console.log('OK #1989: ativação diz a etapa (permissão, preparo, inscrição) e o sino marca quem não ativou.')
+}

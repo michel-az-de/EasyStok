@@ -19,7 +19,7 @@ import { MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js
 import { pedidoEncerrado } from './pedido.js'
 import { ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
-import { sinalDoCliente } from './agente.js'
+import { INTENCOES, classificarIntencao, sinalDoCliente } from './agente.js'
 
 export const MODOS = {
   LIGADO: 'ligado',
@@ -175,6 +175,9 @@ export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida
 // última fala da conversa é dela. Nota interna e aviso do sistema não contam
 // como fala. Pedido em andamento nunca sugere encerrar: a conversa ainda vai
 // levar os avisos da esteira até a entrega.
+const INTENCOES_DE_VENDA = [INTENCOES.PEDIR_CARDAPIO, INTENCOES.FECHAR_PEDIDO, INTENCOES.PERGUNTA_ENTREGA, INTENCOES.PAGAMENTO]
+  .map((i) => i.chave)
+
 export function proximoPassoDepoisDeResponder(conversa, pausado) {
   if (!conversa || !pausado || conversa.estado === 'Encerrado') return null
   const fala = ultimaFala(conversa)
@@ -186,6 +189,15 @@ export function proximoPassoDepoisDeResponder(conversa, pausado) {
       chave: 'aguardar',
       texto: 'Você respondeu. Próximo passo sugerido: aguardar o cliente. O pedido ainda está em andamento, '
         + 'então não encerre; devolva ao automático se quiser que ele responda quando o cliente voltar.',
+    }
+  }
+  // #1989: a venda começa antes do primeiro item na comanda (o cliente pediu, mandou o endereço ou
+  // perguntou como pagar). Sugerir encerrar aí, logo na primeira resposta, é atrapalhar a venda.
+  if (!conversa.pedido && INTENCOES_DE_VENDA.includes(classificarIntencao(conversa).intencao.chave)) {
+    return {
+      chave: 'aguardar-venda',
+      texto: 'Você respondeu. Próximo passo sugerido: montar o pedido ou aguardar o cliente. A venda está em andamento, '
+        + 'então não encerre.',
     }
   }
   return {
@@ -387,16 +399,24 @@ function sinalUrgente(conversa, agora) {
   if (paraDona === 'pede-a-dona' && !(alegaPagamento && !semPagamento)) {
     return { chave: 'pede-a-dona', rotulo: 'Precisa de você', tom: 'aviso', texto: textoParaDona ?? MOTIVO_PADRAO }
   }
-  if (perguntaDoPedido && pendentes.length >= 2 && pedido && !pedidoEncerrado(pedido)) {
+  const perguntas = perguntaDoPedido ? pendentes.filter(ehPerguntaDoCliente) : []
+  // #1989: endereço e item novo não são pergunta. Conta só as perguntas ainda sem resposta, e ao
+  // menos uma delas, sozinha, é sobre o pedido.
+  if (perguntas.length >= 2 && perguntas.some(ehPerguntaDoPedido) && pedido && !pedidoEncerrado(pedido)) {
     return {
       chave: 'insistencia',
       rotulo: 'Cobrando o pedido',
       tom: 'perigo',
-      texto: `Cliente perguntou ${pendentes.length} vezes do pedido ${pedido.numero} e ninguém respondeu`,
+      texto: `Cliente perguntou ${perguntas.length} vezes do pedido ${pedido.numero} e ninguém respondeu`,
     }
   }
   return null
 }
+
+// Pergunta é a fala com "?" ou a que pergunta pelo andamento sem ele ("cadê", "já saiu").
+const sobreOPedido = (mensagem) => sinalDoCliente({ mensagens: [mensagem] })
+const ehPerguntaDoCliente = (mensagem) => mensagem.texto.includes('?') || sobreOPedido(mensagem).acompanhaPedido
+const ehPerguntaDoPedido = (mensagem) => sobreOPedido(mensagem).perguntaDoPedido && ehPerguntaDoCliente(mensagem)
 
 // `janelas` é novo na rodada 10 (achado 3): default `[]` para quem ainda não
 // passa o catálogo continuar funcionando exatamente como antes (pedido

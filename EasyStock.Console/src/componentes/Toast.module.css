@@ -39,6 +39,8 @@ button.texto:focus-visible, .fechar:focus-visible { outline: 2px solid var(--mar
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: none; }
 }
+/* #1989: no rodapé a pilha cobria a barra de abas (Balcão, Atendimento, Resumo) e a faixa Imprimir,
+   que mudam de altura. No celular ela fica no topo, abaixo do recorte da tela, de borda a borda. */
 @media (max-width: 759px) {
-  .pilha { top: auto; bottom: calc(var(--e-16) + env(safe-area-inset-bottom, 0px)); right: var(--e-16); }
+  .pilha { top: calc(var(--e-2) + env(safe-area-inset-top, 0px)); left: var(--e-16); right: var(--e-16); width: auto; }
 }

@@ -359,6 +359,8 @@ export function sinalDoCliente(conversa) {
     textoParaDona: paraDona === 'pede-a-dona' ? pedido.texto : null,
     alegaPagamento: PISTAS_DE_PAGAMENTO_FEITO.some((p) => texto.includes(p)),
     perguntaDoPedido: INTENCOES_SOBRE_O_PEDIDO.includes(intencao.chave),
+    // #1989: "cadê", "já saiu" e "quanto tempo" perguntam pelo andamento mesmo sem "?".
+    acompanhaPedido: intencao.chave === INTENCOES.ACOMPANHAR.chave,
   }
 }
 
