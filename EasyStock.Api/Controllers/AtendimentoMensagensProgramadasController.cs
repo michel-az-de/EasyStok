@@ -10,7 +10,7 @@ namespace EasyStock.Api.Controllers;
 /// Mensagem programada ao cliente pelo console (S39, ADR-0051): agendar, listar e cancelar. O
 /// disparo roda no processo da API (<c>MensagensProgramadasBackgroundService</c>).
 /// Agendar e cancelar falam com o cliente como enviar na conversa: exigem <see cref="Permissao.AtenderConversas"/>
-/// (#1781); ler basta a policy.
+/// (#1781) e a policy Gerente (#1992, decisão do Felipe: só Gerente e dona criam e cancelam); ler basta a policy Operador.
 /// </summary>
 [SwaggerTag("Scheduled messages to customers")]
 [ApiController]
@@ -26,6 +26,8 @@ public class AtendimentoMensagensProgramadasController(
         Description = "Recusa horário no passado, texto fora da janela do canal no horário do envio (use modelo no WhatsApp) e marketing sem consentimento no canal.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [Authorize(Policy = "Gerente")]
     [HttpPost]
     public async Task<IActionResult> Agendar([FromBody] AgendarMensagemProgramadaBody body, CancellationToken ct)
     {
@@ -53,7 +55,9 @@ public class AtendimentoMensagensProgramadasController(
     [SwaggerOperation(Summary = "Cancel a scheduled message", Description = "Só a agendada cancela; a que já está saindo não.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Gerente")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Cancelar(Guid id, CancellationToken ct)
     {

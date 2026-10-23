@@ -355,6 +355,9 @@ public class AuthController(
                 gerenciarOcorrencias = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 reabrirConversa = usuario.TemPermissao(Permissao.AtenderConversas)
                     && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                // #1992: respostas prontas e mensagens programadas, mesma regra das rotas (policy Gerente e AtenderConversas).
+                editarRespostas = gerente && usuario.TemPermissao(Permissao.AtenderConversas)
+                    && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 // #1921 / #1940: leituras que o console só faz para quem a rota aceita (antes, 403 a cada
                 // carga). Mesma regra das rotas, sem mudar policy nem permissão: desacertos exigem a
                 // permissão de estoque; integrações e cadastro de entrega da vitrine, a policy Admin.

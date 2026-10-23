@@ -273,6 +273,29 @@ public class AuthControllerTests
         acoes.GetProperty("ajustarEntrega").GetBoolean().Should().Be(administrador);
     }
 
+    // #1992 (#1265-11): respostas prontas e mensagens programadas só Gerente e dona editam. A matriz diz o
+    // mesmo que as rotas (policy Gerente e AtenderConversas) para o console esconder a edição da atendente.
+    [Theory]
+    [InlineData(NivelAcesso.SuperAdmin, true, true, true)]
+    [InlineData(NivelAcesso.Admin, true, true, true)]
+    [InlineData(NivelAcesso.Gerente, true, true, true)]
+    [InlineData(NivelAcesso.Operador, true, true, false)]
+    [InlineData(NivelAcesso.Gerente, false, true, false)]
+    [InlineData(NivelAcesso.Gerente, true, false, false)]
+    public void EditarRespostasExigeGerenteModuloEPermissaoDeAtender(NivelAcesso nivel, bool modulo, bool atender, bool esperado)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(Guid.NewGuid());
+        usuario.Nivel.Returns(nivel);
+        usuario.TemPermissao(EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Atendimento)).Returns(modulo);
+        usuario.TemPermissao(Permissao.AtenderConversas).Returns(atender);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        acoes.GetProperty("editarRespostas").GetBoolean().Should().Be(esperado);
+    }
+
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────
     [Theory]
     [InlineData(true, true, true)]
