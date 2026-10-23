@@ -13,7 +13,8 @@ namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 /// <summary>Pagamento consultado na fonte cujo desfecho não confirma o pedido (S32).</summary>
 /// <param name="PedidoId"><c>external_reference</c> do pagamento.</param>
 /// <param name="PagamentoExternoId"><c>id</c> do pagamento no Mercado Pago.</param>
-/// <param name="StatusPagamento"><c>status</c> do pagamento (<c>refunded</c>, <c>charged_back</c>, <c>rejected</c>, <c>cancelled</c>).</param>
+/// <param name="StatusPagamento"><c>status</c> do pagamento (<c>refunded</c>, <c>charged_back</c>, <c>rejected</c>, <c>cancelled</c>,
+/// <c>in_mediation</c>).</param>
 /// <param name="StatusDetalhe"><c>status_detail</c> do pagamento (ex.: <c>expired</c> no Pix vencido).</param>
 public sealed record AtualizarCobrancaPorPagamentoInput(
     Guid PedidoId, string PagamentoExternoId, string StatusPagamento, string? StatusDetalhe = null);
@@ -148,9 +149,10 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
         if (paga is null) return (SituacaoAtualizacaoCobranca.SemCobranca, null, null);
         if (paga.Status != StatusCobrancaPedido.Paga) return (SituacaoAtualizacaoCobranca.Ignorada, null, null);
         var motivo = $"em_mediacao: pagamento {pagamentoExternoId} ({status})";
-        if (paga.Motivo == motivo) return (SituacaoAtualizacaoCobranca.JaRegistrado, null, null);
+        if (paga.Motivo?.Contains(motivo, StringComparison.Ordinal) == true) return (SituacaoAtualizacaoCobranca.JaRegistrado, null, null);
 
-        paga.RegistrarMotivo(motivo, agora);
+        // Acrescenta ao motivo que já existe: as marcas do começo (valor menor, estorno automático) continuam valendo.
+        paga.RegistrarMotivo(paga.Motivo is null ? motivo : $"{paga.Motivo} | {motivo}", agora);
         await RegistrarNaTrilhaAsync(pedido.Id, "pagamento_em_mediacao", motivo, agora, ct);
         // Sem usuarioId: vale a audiência da rotina (gestores). Só primeiro nome e referência, como os avisos do Balcão.
         var correlacao = CorrelacaoAvisoMediacao(pagamentoExternoId);

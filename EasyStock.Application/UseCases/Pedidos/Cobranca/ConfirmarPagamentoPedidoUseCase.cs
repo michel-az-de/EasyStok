@@ -296,7 +296,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             Origem: Origem,
             PermitirExcedente: true,
             ConfirmadoPeloProvedor: true,
-            AprovadoNoProvedorEm: input.PagoEm), ct);
+            AprovadoNoProvedorEm: pagoEm), ct);
 
         var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
         EfeitosQuitacao? efeito = null;
@@ -428,7 +428,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             Origem: Origem,
             PermitirExcedente: true,
             ConfirmadoPeloProvedor: true,
-            AprovadoNoProvedorEm: input.PagoEm), ct);
+            AprovadoNoProvedorEm: pagoEm), ct);
         return await RecusarAsync(pedido, alvo, motivo, SituacaoConfirmacaoPagamento.ValorMenor, agora, ct,
             $"{motivo}. Valor registrado como recebimento: devolva pelo estorno online ou use no restante do pedido.");
     }

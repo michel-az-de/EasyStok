@@ -78,6 +78,31 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         f.Pedido.Pagamentos.Should().ContainSingle().Which.PagoEm.Should().Be(aprovadoEm);
     }
 
+    /// <summary>
+    /// Revisão da #1979: o recebimento não volta para um dia de Caixa já fechado (o fechamento não o retratou e o
+    /// desfazer recusaria por "dia fechado"); entra no instante do registro.
+    /// </summary>
+    [Fact]
+    public async Task PagamentoDoProvedor_AprovadoEmDiaDeCaixaFechado_FicaNoInstanteDoRegistro()
+    {
+        var f = new CobrancaPedidoFixture();
+        var aprovadoEm = CobrancaPedidoFixture.Agora.AddDays(-1);
+        var dia = EasyStock.Application.Common.HorarioBrasil.DataOperacional(aprovadoEm);
+        f.CaixaRepo.GetFechamentoDoDiaAsync(f.EmpresaId, dia, f.Pedido.LojaId)
+            .Returns(FechamentoCaixaFechado(f, dia));
+        var registrar = new RegistrarPagamentoPedidoUseCase(f.PedidoRepo, f.Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
+            new CalculadoraInicioPrevistoPedido(f.PrazoQueries), QuitacaoPedidoTeste.Criar(f.PedidoRepo), f.CaixaRepo);
+        var antes = DateTime.UtcNow;
+
+        await registrar.ExecuteAsync(new RegistrarPagamentoPedidoCommand(f.EmpresaId, f.Pedido.Id, "pix", 25m,
+            Referencia: "pay-9", ConfirmadoPeloProvedor: true, AprovadoNoProvedorEm: aprovadoEm));
+
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.PagoEm.Should().BeOnOrAfter(antes);
+    }
+
+    private static EasyStock.Domain.Entities.FechamentoCaixa FechamentoCaixaFechado(CobrancaPedidoFixture f, DateOnly dia) =>
+        EasyStock.Domain.Entities.FechamentoCaixa.Criar(f.EmpresaId, dia, 0, 0, 25, 0, 0, f.Pedido.LojaId);
+
     [Fact]
     public async Task ConfirmaETransita()
     {
