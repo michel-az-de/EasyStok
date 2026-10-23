@@ -120,7 +120,7 @@ async function montar({ memoria, dono = USUARIO.id, estado = estadoVazio(), sele
     despachar: (a) => { m.acoes.push(a); m.estado = reducer(m.estado, a) },
     lerSelecionada: () => m.selecionada,
     lerUsuario: () => USUARIO,
-    lerAbaVisivel: () => m.visivel,
+    lerConversaNaTela: () => m.visivel,
   })
   m.volta = volta
   m.rapida = () => volta({ cicloLento: false })
@@ -624,21 +624,33 @@ await confere('6. no laço: a conversa atualizada fora da página 1 é lida na v
   assert.deepEqual(s.paginas(), [1, 1], 'o evento prendeu a volta rápida nas páginas da conversa')
 })
 
-await confere('6. o hook relê a conversa no evento, sem passar pela releitura de pedidos', () => {
-  const hook = readFileSync(new URL('../src/aplicacao/useSincronizacaoApi.js', import.meta.url), 'utf8').replaceAll('\r', '')
+await confere('6. o hook marca a conversa para a volta seguinte e relê a Ficha da aberta, sem passar pela releitura de pedidos', () => {
+  const ler = (caminho) => readFileSync(new URL(`../src/${caminho}`, import.meta.url), 'utf8').replaceAll('\r', '')
+  const hook = ler('aplicacao/useSincronizacaoApi.js')
   assert.match(hook, /const alvo = alvoDoEvento\(evento, dados\)/)
-  assert.match(hook, /if \(alvo\.tipo === 'conversa'\) \{\s*sincronizar\.atualizarConversa\(alvo\.conversaId\)\s*ciclo\(\)\s*return\s*\}/)
+  assert.match(hook, /if \(alvo\.tipo === 'conversa'\) \{\s*sincronizar\.atualizarConversa\(alvo\.conversaId\)\s*if \(alvo\.conversaId === selecionadaRef\.current\) aoConversaAtualizadaRef\.current\?\.\(alvo\.conversaId\)\s*return\s*\}/)
+  assert.doesNotMatch(hook, /atualizarConversa\(alvo\.conversaId\)\s*ciclo\(\)/, 'o evento roda uma volta fora do ritmo e adianta o ciclo lento')
+  // O contato informado (cartão "Informado pelo visitante") só vem no dossiê: a conversa aberta relê a Ficha.
+  const provider = ler('aplicacao/AtendimentoProvider.jsx')
+  assert.match(provider, /useSincronizacaoApi\(\{[^}]*aoConversaAtualizada: relerFichaDaConversa/)
+  assert.match(provider, /const relerFichaDaConversa = useCallback\(\(id\) => acoesAtivasRef\.current\?\.carregarClienteDaConversa\?\.\(id\), \[\]\)/)
+  assert.match(provider, /useEffect\(\(\) => \{ acoesAtivasRef\.current = acoesAtivas \}, \[acoesAtivas\]\)/)
 })
 
-// --- 7. #1966: conversa aberta e aba visível marcam como lida a entrada nova ---------------------
+// --- 7. #1966: conversa aberta e na tela marca como lida a entrada nova --------------------------
 const entradaNova = (s, id, minutos) => {
   s.conversas = s.conversas.map((r) => (r.id === id ? { ...r, ultimaMensagemEm: hora(minutos), naoLidas: (r.naoLidas ?? 0) + 1 } : r))
 }
+// O que `selecionar` faz no servidor: marca como lida ao abrir.
+const lidaNaSelecao = (s, id) => {
+  s.conversas = s.conversas.map((r) => (r.id === id ? { ...r, naoLidas: 0 } : r))
+}
 await confere('7. entrada nova na conversa aberta marca como lida uma vez por lote, sem repetir a cada volta', async () => {
+  // O servidor deste caso não zera as não lidas (marca lenta ou que falhou): o laço não pode insistir.
   const s = servidor({ conversas: inbox(3) })
   const m = await montar({ selecionada: idDe(0) })
   await m.lenta()
-  assert.deepEqual(s.de('/marcar-lida'), [], 'abrir já marcou pela seleção; o laço não repete')
+  assert.deepEqual(s.de('/marcar-lida'), [], 'sem não lidas, nada a marcar')
   entradaNova(s, idDe(0), -1)
   await m.rapida()
   assert.deepEqual(s.de('/marcar-lida'), [`/api/atendimento/conversas/${idDe(0)}/marcar-lida`])
@@ -650,20 +662,30 @@ await confere('7. entrada nova na conversa aberta marca como lida uma vez por lo
   assert.equal(s.de('/marcar-lida').length, 2, 'o lote seguinte não foi marcado')
 })
 
-await confere('7. aba oculta não marca; ao voltar a ficar visível, marca o que chegou', async () => {
+await confere('7. conversa fora da tela (aba oculta, Hall, ajustes) não marca; ao voltar, marca o que chegou', async () => {
   const s = servidor({ conversas: inbox(3) })
   const m = await montar({ selecionada: idDe(0) })
   await m.lenta()
   m.visivel = false
   entradaNova(s, idDe(0), -1)
   await m.rapida()
-  assert.deepEqual(s.de('/marcar-lida'), [], 'marcou como lida com a aba oculta')
+  assert.deepEqual(s.de('/marcar-lida'), [], 'marcou como lida com a conversa fora da tela')
   m.visivel = true
   await m.rapida()
-  assert.equal(s.de('/marcar-lida').length, 1, 'o que chegou com a aba oculta ficou sem marcar')
+  assert.equal(s.de('/marcar-lida').length, 1, 'o que chegou fora da tela ficou sem marcar')
 })
 
-await confere('7. entrada em outra conversa e troca de conversa não chamam marcar-lida pelo laço', async () => {
+await confere('7. conversaNaTela: aba visível e o Balcão na rota; a seleção sobrevive ao Hall e às telas de ajuste', async () => {
+  const { conversaNaTela } = await plano()
+  const visivel = { visibilityState: 'visible' }
+  assert.equal(conversaNaTela(visivel, { hash: '#/m/atendimento/balcao' }), true)
+  assert.equal(conversaNaTela({ visibilityState: 'hidden' }, { hash: '#/m/atendimento/balcao' }), false, 'aba oculta')
+  assert.equal(conversaNaTela(visivel, { hash: '#/' }), false, 'Hall')
+  assert.equal(conversaNaTela(visivel, { hash: '#/m/configuracoes/integracoes' }), false, 'tela de ajuste')
+  assert.equal(conversaNaTela(visivel, { hash: '#/m/cozinha' }), false)
+})
+
+await confere('7. outra conversa não marca; a troca não repete a seleção; entrada logo depois de abrir é marcada', async () => {
   const s = servidor({ conversas: inbox(3) })
   const m = await montar({ selecionada: idDe(0) })
   await m.lenta()
@@ -671,12 +693,32 @@ await confere('7. entrada em outra conversa e troca de conversa não chamam marc
   await m.rapida()
   assert.deepEqual(s.de('/marcar-lida'), [], 'marcou a conversa que não está aberta')
   m.selecionada = idDe(1)
+  lidaNaSelecao(s, idDe(1))
   await m.rapida()
-  assert.deepEqual(s.de('/marcar-lida'), [], 'a seleção já marca; o laço repetiu')
+  assert.deepEqual(s.de('/marcar-lida'), [], 'a seleção já marcou; o laço repetiu')
+  // O cliente escreveu entre o clique (que marcou) e a primeira volta com a conversa aberta.
+  m.selecionada = idDe(2)
+  lidaNaSelecao(s, idDe(2))
+  entradaNova(s, idDe(2), -3)
+  await m.rapida()
+  assert.equal(s.de('/marcar-lida').length, 1, 'a mensagem que chegou logo depois de abrir ficou sem marcar')
   const sem = await montar({ selecionada: null })
   await sem.lenta()
   await sem.rapida()
-  assert.deepEqual(s.de('/marcar-lida'), [])
+  assert.equal(s.de('/marcar-lida').length, 1)
+})
+
+await confere('7. leitura das mensagens que falhou não marca o que a tela não mostra; a leitura seguinte marca', async () => {
+  const s = servidor({ conversas: inbox(3), mensagens: umaMensagemCada(inbox(3)) })
+  const m = await montar({ selecionada: idDe(0) })
+  await m.lenta()
+  entradaNova(s, idDe(0), -1)
+  s.falha = (url) => url.includes(`/conversas/${idDe(0)}/mensagens`)
+  await m.rapida()
+  assert.deepEqual(s.de('/marcar-lida'), [], 'marcou como lida a mensagem que não chegou à tela')
+  s.falha = () => false
+  await m.rapida()
+  assert.equal(s.de('/marcar-lida').length, 1)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

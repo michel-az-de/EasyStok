@@ -212,6 +212,8 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
   const { acoes } = useAcessoModulos()
   // #1966: `PUT automacoes/{gatilho}` exige Gerente; o Operador vê as regras sem ligar, desligar ou editar.
   const editavel = automacoesEditaveis({ fonteApi, acoes })
+  // Abrir e fechar a loja na mão é da gerência (`controlarLoja`), como em Horários e mensagens.
+  const podeControlarLoja = !fonteApi || acoes.controlarLoja === true
 
   const faixa = faixaDaJanela(janelas, selecionada?.pedido?.janela)
   // `abre` só a regra "Fora do horário" usa (VARIAVEIS, dominio/automacao.js);
@@ -256,15 +258,17 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
             ? 'Segue os horários da semana.'
             : `${lojaAberta ? 'Aberta' : 'Fechada'} manualmente, sem seguir os horários da semana.`}
         </p>
-        <div className={css.acoesLoja}>
-          <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
-            {aberta ? 'Fechar loja agora' : 'Abrir loja agora'}
-          </Botao>
-          {/* #1474: o mesmo "Voltar a seguir o horário" de Horários e mensagens (só no modo API). */}
-          {voltarAoHorario && lojaAberta != null && (
-            <Botao className={css.toque} onClick={voltarAoHorario}>Voltar a seguir o horário</Botao>
-          )}
-        </div>
+        {podeControlarLoja && (
+          <div className={css.acoesLoja}>
+            <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
+              {aberta ? 'Fechar loja agora' : 'Abrir loja agora'}
+            </Botao>
+            {/* #1474: o mesmo "Voltar a seguir o horário" de Horários e mensagens (só no modo API). */}
+            {voltarAoHorario && lojaAberta != null && (
+              <Botao className={css.toque} onClick={voltarAoHorario}>Voltar a seguir o horário</Botao>
+            )}
+          </div>
+        )}
         {fonteApi ? horariosApi : <ul className={css.diasFuncionamento}>
           {DIAS_DA_SEMANA.map((dia) => (
             <DiaDeFuncionamento

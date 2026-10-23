@@ -476,6 +476,11 @@ export const aDevolverDe = (dados) => {
   return Number.isFinite(valor) && valor > 0 ? valor : 0
 }
 
+// O caminho citado é o que a tela oferece: o estorno online só existe para pagamento online.
+export const textoADevolver = ({ comOnline }) => (comOnline
+  ? 'O pedido foi cancelado com valor recebido: devolva pelo estorno online abaixo ou registre a devolução manual.'
+  : 'O pedido foi cancelado com valor recebido: devolva ao cliente e registre a devolução manual.')
+
 // Resumo do bloco Devoluções recolhido: o que falta devolver vem antes do que já foi devolvido.
 export function resumoDasDevolucoes({ aDevolver, totalDevolvido, conferirAcerto }) {
   if (aDevolver > 0) return `${moeda(aDevolver)} a devolver`

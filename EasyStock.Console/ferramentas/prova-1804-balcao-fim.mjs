@@ -249,7 +249,7 @@ await confere('#1940-3 topo do Balcão abaixo de 400 px aperta vãos e recuos, s
 // #1966 (frente D da #1889): o GET de estornos manuais devolve `aDevolver` (pedido cancelado com dinheiro recebido e ainda
 // não devolvido, PR #1967). Devoluções mostra o valor onde a equipe decide o estorno, aberta ou recolhida.
 await confere('#1966 Devoluções mostra o valor a devolver do pedido cancelado', async () => {
-  const { aDevolverDe, resumoDasDevolucoes } = await import('../src/dominio/cobranca.js')
+  const { aDevolverDe, resumoDasDevolucoes, textoADevolver } = await import('../src/dominio/cobranca.js')
   const { moeda } = await import('../src/dominio/formato.js')
   assert.equal(aDevolverDe({ aDevolver: 25 }), 25)
   for (const sem of [{ aDevolver: 0 }, { aDevolver: -3 }, {}, null, { aDevolver: 'x' }]) assert.equal(aDevolverDe(sem), 0, JSON.stringify(sem))
@@ -260,7 +260,13 @@ await confere('#1966 Devoluções mostra o valor a devolver do pedido cancelado'
   const bloco = fonte('features/ficha-cliente/BlocoDevolucoes.jsx')
   assert.match(bloco, /const aDevolver = aDevolverDe\(dados\)/)
   assert.match(bloco, /resumo=\{erro \? RESUMO_COM_ERRO : resumoDasDevolucoes\(\{ aDevolver, totalDevolvido, conferirAcerto \}\)\}/)
-  assert.match(bloco, /\{aDevolver > 0 && <output className=\{css\.corpoBloco\}><strong>A devolver: \{moeda\(aDevolver\)\}<\/strong>/)
+  // O caminho citado é o que a tela oferece: o estorno online só aparece com pagamento online.
+  assert.match(textoADevolver({ comOnline: true }), /estorno online/)
+  assert.doesNotMatch(textoADevolver({ comOnline: false }), /online/, 'mandava ao estorno online que esta tela não mostra')
+  assert.match(textoADevolver({ comOnline: false }), /devolução manual/)
+  assert.match(bloco, /const comOnline = dados\?\.pagamentos\.some\(\(p\) => !p\.manual\) \?\? false/)
+  assert.match(bloco, /\{comOnline && <EstornosOnline pedidoId=\{pedidoId\} \/>\}/)
+  assert.match(bloco, /\{aDevolver > 0 && <output className=\{css\.corpoBloco\}><strong>A devolver: \{moeda\(aDevolver\)\}<\/strong>\. \{textoADevolver\(\{ comOnline \}\)\}<\/output>\}/)
   const caso = readFileSync(new URL('../../EasyStock.Application/UseCases/Pedidos/Cobranca/ConsultarEstornosManuaisUseCase.cs', import.meta.url), 'utf8')
   assert.match(caso, /IReadOnlyList<PedidoEstornoManual> Estornos, decimal ADevolver = 0m\)/, 'o contrato da API mudou')
 })

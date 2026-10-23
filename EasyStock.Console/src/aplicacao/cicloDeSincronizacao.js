@@ -2,7 +2,7 @@ import * as acao from './acoes'
 import { listarInbox, listarMensagens, marcarLida } from '../infra/api/conversasApi'
 import { conversaDaApi } from '../infra/api/traducaoConversas'
 import { obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
-import { abaVisivel, deveRelerMensagens, deveRelerPedido, emFila, fundirPagina, quedaDaSincronizacao } from './planoDeSincronizacao'
+import { conversaNaTela, deveRelerMensagens, deveRelerPedido, emFila, fundirPagina, quedaDaSincronizacao } from './planoDeSincronizacao'
 
 // Uma volta da polling da inbox (#1576), fora do React para ser provada sem tela: o hook
 // (`useSincronizacaoApi.js`) só dá o ritmo. O que relê e em que ordem: `planoDeSincronizacao.js`.
@@ -19,7 +19,7 @@ export const criarMemoriaDoLaco = () => ({ dono: null, resumos: new Map(), mensa
 
 export function criarCicloDeSincronizacao({
   despachar, memoria = criarMemoriaDoLaco(), dono = null, comConversas = true,
-  lerSelecionada = () => null, lerUsuario = () => null, estaVivo = () => true, lerAbaVisivel = abaVisivel,
+  lerSelecionada = () => null, lerUsuario = () => null, estaVivo = () => true, lerConversaNaTela = conversaNaTela,
 }) {
   // Memória de outro usuário não serve a este: começa do zero.
   if (memoria.dono !== dono) {
@@ -47,19 +47,17 @@ export function criarCicloDeSincronizacao({
   }
 
   // #1966: a API marca como lida na Meta só pelo `marcar-lida`, e a seleção chama ao abrir. Com a conversa
-  // já aberta e a aba visível, a entrada nova do cliente (não lidas e `ultimaMensagemEm` novos) é marcada
-  // uma vez por lote. Aba oculta não marca nem esquece: ao voltar, o lote que chegou é marcado.
-  let vista = { id: null, ultima: null }
+  // aberta e na tela (aba visível, Balcão na rota), a entrada que chega depois (não lidas e `ultimaMensagemEm`
+  // novos) é marcada uma vez por lote, e só com as mensagens desse lote já lidas para a tela. Fora da tela
+  // não marca nem esquece: ao voltar, o lote que chegou é marcado.
+  let marcada = { id: null, ultima: null }
   function marcarEntradaNaAberta() {
     const id = lerSelecionada()
+    if (marcada.id !== id) marcada = { id, ultima: null }
     const resumo = id ? memoria.resumos.get(id) : null
-    if (!resumo) return
-    if (vista.id !== id) {
-      vista = { id, ultima: resumo.ultimaMensagemEm }
-      return
-    }
-    if (!(resumo.naoLidas > 0) || resumo.ultimaMensagemEm === vista.ultima || !lerAbaVisivel()) return
-    vista = { id, ultima: resumo.ultimaMensagemEm }
+    if (!resumo || !(resumo.naoLidas > 0) || resumo.ultimaMensagemEm === marcada.ultima) return
+    if (memoria.mensagens.get(id)?.ultima !== resumo.ultimaMensagemEm || !lerConversaNaTela()) return
+    marcada = { id, ultima: resumo.ultimaMensagemEm }
     marcarLida(id).catch(() => {})
   }
 
@@ -123,7 +121,6 @@ export function criarCicloDeSincronizacao({
       // Quem saiu do Balcão no meio da volta não mexe na memória nem segue lendo conversa por conversa.
       if (!estaVivo()) return
       guardarInbox(inbox)
-      marcarEntradaNaAberta()
       const semMensagens = []
       const conversas = await emFila([...memoria.resumos.values()], CONVERSAS_POR_VEZ, async (resumo) => {
         const [mensagens, pedido] = await Promise.all([mensagensDe(resumo, cicloLento), pedidoDe(resumo, cicloLento)])
@@ -133,6 +130,7 @@ export function criarCicloDeSincronizacao({
       if (estaVivo()) {
         // `semMensagens`: quem a leitura não trouxe e não estava em cache; o reducer mantém o que está na tela.
         despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas, ...(semMensagens.length ? { semMensagens } : {}) })
+        marcarEntradaNaAberta()
         // #1241: a volta da rede abre o lançamento do papel (o reducer ignora se já estava online).
         despachar({ tipo: acao.CONEXAO_VOLTOU, agora: Date.now() })
       }

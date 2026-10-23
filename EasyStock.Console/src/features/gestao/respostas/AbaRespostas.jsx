@@ -145,11 +145,8 @@ function SecaoRespostas() {
   )
 }
 
-function LinhaAutomatica({ regra, fonteApi, emFoco }) {
+function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
   const { alternarRegra, editarRegra } = useAcoes()
-  const { acoes } = useAcessoModulos()
-  // #1966: ligar, desligar e editar é da gerência do atendimento (a API recusa o Operador).
-  const editavel = automacoesEditaveis({ fonteApi, acoes })
   const linhaRef = useRef(null)
   const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
@@ -233,6 +230,8 @@ function LinhaAutomatica({ regra, fonteApi, emFoco }) {
 function SecaoAutomaticas({ focoInicial }) {
   const { regras, fonteApi, cargaDasRegras } = useAtendimento()
   const { acoes } = useAcessoModulos()
+  // #1966: ligar, desligar e editar é da gerência do atendimento (a API recusa o Operador).
+  const editavel = automacoesEditaveis({ fonteApi, acoes })
   // #1474: lista vazia não é "carregando": separa a espera, o erro e o vazio de verdade.
   const vazio = cargaDasRegras?.estado === 'carregando'
     ? 'Carregando as automáticas do EasyStok…'
@@ -248,7 +247,7 @@ function SecaoAutomaticas({ focoInicial }) {
             Saem sozinhas, só até 24 h depois da última mensagem do cliente e nunca para cliente bloqueado.
             Na conversa aparecem com a etiqueta automática.
           </p>
-          {!automacoesEditaveis({ fonteApi, acoes }) && (
+          {!editavel && (
             <p className={css.descricao}>Só a dona ou um gerente liga, desliga e muda o texto das automáticas.</p>
           )}
         </div>
@@ -257,7 +256,7 @@ function SecaoAutomaticas({ focoInicial }) {
         <p className={css.vazio} role={cargaDasRegras?.estado === 'erro' ? 'alert' : undefined}>{vazio}</p>
       ) : (
         <ul className={css.lista}>
-          {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} emFoco={focoInicial === `regra-${r.id}`} />)}
+          {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} editavel={editavel} emFoco={focoInicial === `regra-${r.id}`} />)}
         </ul>
       )}
     </section>
