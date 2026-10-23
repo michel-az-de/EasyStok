@@ -3,6 +3,7 @@
 // aqui importa infra nem React (regra de ferramentas/verificar-camadas.mjs).
 // Extensão .js: `dominio/assistente.js` chega aqui pelo Node puro.
 import { diasDeCalendarioEntre, partesDoEndereco, telefoneDoE164 } from './formato.js'
+import { conversaEncerrada } from './conversa.js'
 
 // #1761: endereço que a Ficha não consegue separar (sem o CEP no fim, depois de vírgula) ia ao
 // EasyStok como nulo, voltava 200 e o campo esvaziava sem dizer nada. A recusa diz o formato.
@@ -147,6 +148,15 @@ export function nomeConhecidoDoLead(conversa) {
   const informado = conversa.contatoInformado?.nome
   if (!nomeGenerico(informado)) return informado.trim()
   return nomeGenerico(conversa.nome) ? null : conversa.nome.trim()
+}
+
+// #1408: quem a busca do Balcão oferece para "Chamar no WhatsApp": cliente cadastrado com telefone e sem
+// conversa aberta na tela. Com conversa aberta, ela já aparece na lista; encerrada não impede chamar de novo.
+export function clientesParaChamar(clientes, conversas, limite = 5) {
+  const comConversaAberta = new Set((conversas ?? [])
+    .filter((c) => c.clienteId && !conversaEncerrada(c))
+    .map((c) => c.clienteId))
+  return (clientes ?? []).filter((c) => String(c.telefone ?? '').trim() && !comConversaAberta.has(c.id)).slice(0, limite)
 }
 
 // #1643 (item 6): resumo da seção "Contato e endereço" recolhida. Com o contato que o visitante

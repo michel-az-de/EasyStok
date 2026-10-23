@@ -98,3 +98,58 @@ assert.match(modal, /erroDoModelo\(e, \{ envio: true \}\)/)
 assert.match(modal, /erroDoModelo\(e\)/)
 assert.match(modal, /semConexao && \(podeVerIntegracoes\(acoes\)\s*\? <a href=\{hashDoModulo\('configuracoes', 'integracoes'\)\}>/)
 console.log('ok 409 sem WhatsApp conectado: frase da API e caminho para Integrações, sem repetir a tentativa')
+
+// #1408: "Chamar no WhatsApp" para cliente cadastrado que nunca escreveu. Rota própria com o cliente; a mesma
+// proteção de tentativa (dupla ação e resposta perdida não duplicam) e o mesmo 409 sem a conexão do WhatsApp.
+const { clientesParaChamar } = await import('../src/dominio/cliente.js')
+const cadastrados = [
+  { id: 'k1', nome: 'Ana Souza', telefone: '(11) 98888-7777' },
+  { id: 'k2', nome: 'Bia Lima', telefone: '' },
+  { id: 'k3', nome: 'Caio Reis', telefone: '11977776666' },
+  { id: 'k4', nome: 'Duda Melo', telefone: '11966665555' },
+]
+const naTela = [
+  { id: 'c3', clienteId: 'k3', estado: 'Em atendimento' },
+  { id: 'c4', clienteId: 'k4', estado: 'Encerrado' },
+]
+assert.deepEqual(clientesParaChamar(cadastrados, naTela).map(c => c.id), ['k1', 'k4'],
+  'sem telefone e com conversa aberta ficam de fora; conversa encerrada não impede chamar de novo')
+const muitos = Array.from({ length: 8 }, (_, i) => ({ id: `m${i}`, nome: `Ana ${i}`, telefone: '11988887777' }))
+assert.equal(clientesParaChamar(muitos, []).length, 5, 'a lista da busca mostra até 5')
+const iniciadas = []
+let liberarInicio
+globalThis.fetch = async (url, options) => {
+  iniciadas.push({ url, corpo: JSON.parse(options.body) })
+  return new Promise(resolve => { liberarInicio = resolve })
+}
+const ana = cadastrados[0]
+const chamada = api.iniciarConversaComModelo(ana, { ...dados, parametros: ['Ana'] })
+const dupla = api.iniciarConversaComModelo(ana, { ...dados, parametros: ['Ana'] })
+await new Promise(r => setTimeout(r, 0))
+assert.equal(iniciadas.length, 1, 'dupla ação não chama duas vezes')
+assert.equal(iniciadas[0].url, '/api/atendimento/conversas/iniciar')
+assert.equal(iniciadas[0].corpo.clienteId, 'k1')
+assert.ok(iniciadas[0].corpo.tentativaId)
+liberarInicio(new Response(JSON.stringify({ data: { conversaId: 'nova', mensagem: {
+  id: iniciadas[0].corpo.tentativaId, direcao: 'Saida', autor: 'Dona', tipoConteudo: 'Modelo', status: 'Enviada',
+  texto: 'Olá Ana', modelo: dados, enviadaEm: '2026-10-23T12:00:00Z',
+} } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+const [iniciada] = await Promise.all([chamada, dupla])
+assert.equal(iniciada.conversaId, 'nova')
+globalThis.fetch = async (_url, options) => { iniciadas.push({ corpo: JSON.parse(options.body) }); throw new TypeError('resposta perdida') }
+await assert.rejects(api.iniciarConversaComModelo(ana, { ...dados, parametros: ['Ana'] }))
+const perdida = iniciadas.at(-1).corpo.tentativaId
+assert.notEqual(perdida, iniciadas[0].corpo.tentativaId, 'enviada com sucesso libera a próxima tentativa')
+await assert.rejects(api.iniciarConversaComModelo(ana, { ...dados, parametros: ['Ana'] }))
+assert.equal(iniciadas.at(-1).corpo.tentativaId, perdida, 'resposta perdida repete a mesma tentativa')
+globalThis.fetch = async () => new Response(JSON.stringify({ error: { code: 'WHATSAPP_NAO_CONECTADO', message: FRASE } }), { status: 409 })
+const semConexaoNoInicio = await api.iniciarConversaComModelo(cadastrados[3], { ...dados, parametros: ['Duda'] }).then(() => null, (e) => e)
+assert.deepEqual(erroDoModelo(semConexaoNoInicio, { envio: true }), { texto: FRASE, integracoes: true })
+assert.match(modal, /Chamar no WhatsApp/)
+assert.match(modal, /iniciarConversaComModelo\(cliente, /)
+// Envio sem confirmação: a conversa só é aberta ao fechar, para o aviso não sumir com a troca de aba no celular.
+assert.match(modal, /aoFechar\(\)\s+if \(iniciada\) aoIniciar\?\.\(iniciada\)/)
+const balcao = readFileSync(new URL('../src/features/atendimento/ChamarClientes.jsx', import.meta.url), 'utf8')
+assert.match(balcao, /clientesParaChamar\(/)
+assert.match(balcao, /<ModalEnviarModelo\s+cliente=\{/)
+console.log('ok chamar no WhatsApp: rota com o cliente, sem duplicar, 409 sem conexão e filtro dos cadastrados')

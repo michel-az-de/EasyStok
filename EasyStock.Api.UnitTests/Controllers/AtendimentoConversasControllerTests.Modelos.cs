@@ -1,3 +1,4 @@
+using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -61,6 +62,32 @@ public partial class AtendimentoConversasControllerTests
             .Should().BeOfType<NotFoundObjectResult>();
         (await _controller.EnviarModelo(Guid.NewGuid(), new(Guid.Empty, "modelo", "pt_BR", []), EnvioModelo(catalogo)))
             .Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    private IniciarConversaClienteUseCase Iniciar(ICatalogoModelosAtendimento catalogo, IClienteRepository clientes) =>
+        new(_repositorio, clientes, catalogo, new PoliticaEnvioCliente(Substitute.For<IConsentimentoContatoRepository>()),
+            EnvioModelo(catalogo), new FakeUnitOfWork(), TimeProvider.System);
+
+    /// <summary>#1408: chamar no WhatsApp exige a mesma permissão de atender e responde o 409 que o console já mostra.</summary>
+    [Fact]
+    public async Task IniciarConversa_PermissaoDeAtenderE409SemConexao()
+    {
+        var catalogo = Substitute.For<ICatalogoModelosAtendimento>();
+        catalogo.ListarAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns<Task<IReadOnlyList<ModeloAtendimento>>>(
+            _ => throw CatalogoModelosException.SemConexao("Conecte o WhatsApp da empresa em Integrações."));
+        var clientes = Substitute.For<IClienteRepository>();
+        var cliente = new EasyStock.Domain.Entities.Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Ana", Telefone = "11988887777", Ativo = true };
+        clientes.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        var body = new IniciarConversaClienteBody(cliente.Id, Guid.NewGuid(), "boas_vindas", "pt_BR", ["Ana"]);
+
+        _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
+        (await _controller.Iniciar(body, Iniciar(catalogo, clientes))).Should().BeOfType<ForbidResult>();
+        await catalogo.DidNotReceiveWithAnyArgs().ListarAsync(default, default);
+
+        _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(true);
+        var resposta = (await _controller.Iniciar(body, Iniciar(catalogo, clientes))).Should().BeAssignableTo<ObjectResult>().Subject;
+        resposta.StatusCode.Should().Be(409);
+        resposta.Value.Should().BeOfType<ApiErrorResponse>().Subject.Error.Code.Should().Be("WHATSAPP_NAO_CONECTADO");
     }
 
     // #1765-9: sem a conexão do WhatsApp não há o que a Meta responder. É 409 com a frase para a dona, não 502.
