@@ -265,10 +265,16 @@ public sealed class CheckoutCoreService(
     /// <c>AguardandoPagamento</c> sem <c>CobrancaPedido</c>, fora do alcance do <c>CobrancaPedidoJob</c>, e a vaga
     /// da janela presa.
     /// </summary>
-    public async Task DesfazerReservaAsync(PedidoReservado reservado, string motivo, CancellationToken ct = default)
+    public Task DesfazerReservaAsync(PedidoReservado reservado, string motivo, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(reservado);
-        var pedido = reservado.Pedido;
+        return DesfazerReservaDoPedidoAsync(reservado.Pedido, motivo, ct);
+    }
+
+    /// <summary>Mesma compensação para o pedido já relido (a comanda cobra depois do commit, #1961).</summary>
+    public async Task DesfazerReservaDoPedidoAsync(DomainPedido pedido, string motivo, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pedido);
         var statusAntigo = pedido.Status;
 
         // A liberação só marca a vaga; o SaveChanges do UpdateAsync grava vaga e pedido juntos.

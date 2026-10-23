@@ -140,11 +140,12 @@ public class CheckoutCoreServiceTests
             IConversaRepository conversas,
             IClienteRepository clientes,
             IUnitOfWork uow,
-            IPedidoRepository? pedidos = null)
+            IPedidoRepository? pedidos = null,
+            ILinkCardapioConversaRepository? links = null)
         {
             uow.SetupExecuteInTransactionSemRetry<PedidoReservado>();
             return new(Servico(), conversas, clientes, pedidos ?? Substitute.For<IPedidoRepository>(),
-                ConfiguracaoAtendimentoRepo, uow, Atribuicao());
+                ConfiguracaoAtendimentoRepo, uow, Atribuicao(), links ?? Substitute.For<ILinkCardapioConversaRepository>(), TimeProvider.System);
         }
     }
 

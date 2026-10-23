@@ -82,4 +82,44 @@ public sealed class CreditoComandaIntegrationTests(PostgreSqlDatabaseFixture fix
         (await rls.Set<CreditoClienteComanda>().IgnoreQueryFilters().CountAsync()).Should().Be(0);
         (await rls.Set<UsoCreditoClienteComanda>().IgnoreQueryFilters().CountAsync()).Should().Be(0);
     }
+
+    // #1961: a comanda que não conseguiu cobrar desfaz o pedido e devolve o MESMO cupom, para o cliente reenviar.
+    [SkippableFact]
+    public async Task UsoDoPedidoDesfeitoVoltaAoMesmoCupom()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid();
+        var cliente = Cliente.Criar(empresa, "Cliente do cupom devolvido");
+        var origem = Pedido.Criar(empresa); origem.ClienteId = cliente.Id;
+        var desfeito = Pedido.Criar(empresa); desfeito.ClienteId = cliente.Id;
+        var credito = CreditoClienteComanda.Criar(empresa, cliente.Id, origem.Id, Guid.NewGuid(), 10, DateTime.UtcNow);
+        var uso = credito.Usar(desfeito.Id, 6, DateTime.UtcNow);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa);
+            seed.Empresas.Add(new Empresa { Id = empresa, Nome = "Empresa do cupom devolvido", Documento = empresa.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            seed.Clientes.Add(cliente); seed.Pedidos.AddRange(origem, desfeito); seed.Set<CreditoClienteComanda>().Add(credito);
+            seed.Set<UsoCreditoClienteComanda>().Add(uso);
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            await using var tx = await db.Database.BeginTransactionAsync();
+            var repo = new CreditoClienteComandaRepository(db);
+            foreach (var usado in await repo.ListarUsosDoPedidoAsync(empresa, desfeito.Id, CancellationToken.None))
+            {
+                var atual = await repo.ObterComLockPorIdAsync(empresa, usado.CreditoId, CancellationToken.None);
+                atual!.Devolver(usado);
+                repo.RemoverUso(usado);
+            }
+            await db.SaveChangesAsync(); await tx.CommitAsync();
+        }
+
+        await using var relido = fixture.CreateDbContext();
+        relido.SetMobileTenantContext(empresa);
+        (await relido.Set<CreditoClienteComanda>().SingleAsync(c => c.Id == credito.Id)).Saldo.Should().Be(10);
+        (await relido.Set<UsoCreditoClienteComanda>().CountAsync(u => u.CreditoId == credito.Id)).Should().Be(0);
+    }
 }
