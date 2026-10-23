@@ -99,98 +99,9 @@ public sealed class CheckoutController(
             Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true };
             return StatusCode(StatusCodes.Status201Created, result);
         }
-        catch (IdempotencyMismatchException ex)
+        catch (Exception ex) when (TentarMapearErro(ex, out var resposta))
         {
-            return StatusCode(
-                StatusCodes.Status409Conflict,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status409Conflict,
-                    Title = "Carrinho alterado",
-                    Detail = ex.Message,
-                    Type = "https://httpstatuses.com/409",
-                });
-        }
-        catch (CheckoutEmAndamentoException ex)
-        {
-            Response.Headers["Retry-After"] = "2";
-            return StatusCode(409, new { error = new { code = "CHECKOUT_EM_ANDAMENTO", message = ex.Message } });
-        }
-        catch (SessaoChatSiteInvalidaException ex)
-        {
-            return StatusCode(403, new { error = new { code = "SESSAO_CHAT_INVALIDA", message = ex.Message } });
-        }
-        catch (ChatSiteIndisponivelException ex)
-        {
-            return DataNotFound(ex.Message);
-        }
-        catch (CepInvalidoException ex)
-        {
-            return DataBadRequest(ex.Message);
-        }
-        catch (UseCaseValidationException ex)
-        {
-            return DataBadRequest(ex.Message);
-        }
-        catch (StorefrontNaoEncontradoException ex)
-        {
-            return DataNotFound(ex.Message);
-        }
-        catch (LojaFechadaException ex)
-        {
-            // S40: a dona fechou a loja na mão; a mensagem é a de "loja fechada" configurada.
-            return StatusCode(
-                StatusCodes.Status409Conflict,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status409Conflict,
-                    Title = "Loja fechada",
-                    Detail = ex.Message,
-                });
-        }
-        catch (JanelaSemVagasException ex)
-        {
-            return StatusCode(
-                StatusCodes.Status409Conflict,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status409Conflict,
-                    Title = "Janela esgotada",
-                    Detail = ex.Message,
-                });
-        }
-        catch (CepSemCoberturaException ex)
-        {
-            return StatusCode(
-                StatusCodes.Status422UnprocessableEntity,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status422UnprocessableEntity,
-                    Title = "CEP sem cobertura",
-                    Detail = ex.Message,
-                });
-        }
-        catch (MercadoPagoIndisponivelException ex)
-        {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status503ServiceUnavailable,
-                    Title = "Gateway de pagamento indisponível",
-                    Detail = ex.Message,
-                });
-        }
-        catch (RegraDeDominioVioladaException ex)
-        {
-            return StatusCode(
-                StatusCodes.Status422UnprocessableEntity,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status422UnprocessableEntity,
-                    Title = "Dados inválidos",
-                    Detail = ex.Message,
-                });
+            return resposta;
         }
     }
 
@@ -246,85 +157,72 @@ public sealed class CheckoutController(
                 new CacheControlHeaderValue { NoStore = true, NoCache = true };
             return StatusCode(StatusCodes.Status201Created, result);
         }
-        catch (IdempotencyMismatchException ex)
+        catch (Exception ex) when (TentarMapearErro(ex, out var resposta))
         {
-            return StatusCode(409, new { error = new { code = "CARRINHO_ALTERADO", message = ex.Message } });
-        }
-        catch (TelefoneInvalidoException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Telefone invalido",
-                Detail = ex.Message,
-            });
-        }
-        catch (CheckoutEmAndamentoException ex)
-        {
-            Response.Headers["Retry-After"] = "2";
-            return StatusCode(409, new { error = new { code = "CHECKOUT_EM_ANDAMENTO", message = ex.Message } });
-        }
-        catch (SessaoChatSiteInvalidaException ex)
-        {
-            return StatusCode(403, new { error = new { code = "SESSAO_CHAT_INVALIDA", message = ex.Message } });
-        }
-        catch (ChatSiteIndisponivelException ex)
-        {
-            return DataNotFound(ex.Message);
-        }
-        catch (CepInvalidoException ex)
-        {
-            return DataBadRequest(ex.Message);
-        }
-        catch (UseCaseValidationException ex)
-        {
-            return DataBadRequest(ex.Message);
-        }
-        catch (StorefrontNaoEncontradoException ex)
-        {
-            return DataNotFound(ex.Message);
-        }
-        catch (LojaFechadaException ex)
-        {
-            return StatusCode(
-                StatusCodes.Status409Conflict,
-                new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Loja fechada", Detail = ex.Message });
-        }
-        catch (JanelaSemVagasException ex)
-        {
-            return StatusCode(
-                StatusCodes.Status409Conflict,
-                new ProblemDetails { Status = StatusCodes.Status409Conflict, Title = "Janela esgotada", Detail = ex.Message });
-        }
-        catch (CepSemCoberturaException ex)
-        {
-            return StatusCode(
-                StatusCodes.Status422UnprocessableEntity,
-                new ProblemDetails { Status = StatusCodes.Status422UnprocessableEntity, Title = "CEP sem cobertura", Detail = ex.Message });
-        }
-        catch (MercadoPagoIndisponivelException ex)
-        {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status503ServiceUnavailable,
-                    Title = "Gateway de pagamento indisponível",
-                    Detail = ex.Message,
-                });
-        }
-        catch (RegraDeDominioVioladaException ex)
-        {
-            return StatusCode(
-                StatusCodes.Status422UnprocessableEntity,
-                new ProblemDetails
-                {
-                    Status = StatusCodes.Status422UnprocessableEntity,
-                    Title = "Dados invalidos",
-                    Detail = ex.Message,
-                });
+            return resposta;
         }
     }
+
+    /// <summary>
+    /// Tradução única exceção -> resposta HTTP dos dois checkouts (logado e guest; estrutura-12). Antes cada um tinha
+    /// a sua cópia, e a mesma exceção saía em dois formatos. Devolve false para a exceção que não é daqui, que segue
+    /// para o handler global. Corpo e status de cada erro são os que o site já recebia; o que mudava era o
+    /// "carrinho alterado" (ProblemDetails no logado, envelope <c>error</c> no guest), que agora leva os dois.
+    /// </summary>
+    [NonAction]
+    public bool TentarMapearErro(Exception ex, out IActionResult resposta)
+    {
+        switch (ex)
+        {
+            case IdempotencyMismatchException:
+                var carrinho = Problema(StatusCodes.Status409Conflict, "Carrinho alterado", ex.Message);
+                carrinho.Type = "https://httpstatuses.com/409";
+                carrinho.Extensions["error"] = new { code = "CARRINHO_ALTERADO", message = ex.Message };
+                resposta = StatusCode(StatusCodes.Status409Conflict, carrinho);
+                return true;
+            case CheckoutEmAndamentoException:
+                Response.Headers["Retry-After"] = "2";
+                resposta = StatusCode(409, new { error = new { code = "CHECKOUT_EM_ANDAMENTO", message = ex.Message } });
+                return true;
+            case SessaoChatSiteInvalidaException:
+                resposta = StatusCode(403, new { error = new { code = "SESSAO_CHAT_INVALIDA", message = ex.Message } });
+                return true;
+            case ChatSiteIndisponivelException or StorefrontNaoEncontradoException:
+                resposta = DataNotFound(ex.Message);
+                return true;
+            case CepInvalidoException or UseCaseValidationException:
+                resposta = DataBadRequest(ex.Message);
+                return true;
+            case LojaFechadaException:
+                // S40: a dona fechou a loja na mão; a mensagem é a de "loja fechada" configurada.
+                resposta = Resposta(StatusCodes.Status409Conflict, "Loja fechada", ex.Message);
+                return true;
+            case JanelaSemVagasException:
+                resposta = Resposta(StatusCodes.Status409Conflict, "Janela esgotada", ex.Message);
+                return true;
+            case CepSemCoberturaException:
+                resposta = Resposta(StatusCodes.Status422UnprocessableEntity, "CEP sem cobertura", ex.Message);
+                return true;
+            case MercadoPagoIndisponivelException:
+                resposta = Resposta(StatusCodes.Status503ServiceUnavailable, "Gateway de pagamento indisponível", ex.Message);
+                return true;
+            case TelefoneInvalidoException:
+                resposta = Resposta(StatusCodes.Status400BadRequest, "Telefone invalido", ex.Message);
+                return true;
+            case RegraDeDominioVioladaException:
+                resposta = Resposta(StatusCodes.Status422UnprocessableEntity, "Dados inválidos", ex.Message);
+                return true;
+            default:
+                resposta = null!;
+                return false;
+        }
+    }
+
+    private static ProblemDetails Problema(int status, string titulo, string detalhe) =>
+        new() { Status = status, Title = titulo, Detail = detalhe };
+
+    private IActionResult Resposta(int status, string titulo, string detalhe) =>
+        StatusCode(status, Problema(status, titulo, detalhe));
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
