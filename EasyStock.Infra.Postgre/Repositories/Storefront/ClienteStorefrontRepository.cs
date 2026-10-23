@@ -18,6 +18,15 @@ public sealed class ClienteStorefrontRepository(EasyStockDbContext db) : IClient
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.TelefoneHash == telefoneHash, ct);
 
+    public Task<ClienteEntity?> GetBloqueadoPorTelefoneAsync(Guid empresaId, string telefoneE164, CancellationToken ct = default)
+    {
+        // O cadastro guarda o telefone como foi digitado: +55DDDN, 55DDDN ou DDDN.
+        var digitos = telefoneE164.TrimStart('+');
+        string[] formas = [telefoneE164, digitos, digitos.StartsWith("55", StringComparison.Ordinal) ? digitos[2..] : digitos];
+        return db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Bloqueado
+            && (formas.Contains(c.Telefone!) || c.Telefones.Any(t => formas.Contains(t.Numero))), ct);
+    }
+
     public Task<ClienteEntity?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         db.Clientes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct);
 

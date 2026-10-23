@@ -52,6 +52,42 @@ public sealed class CheckoutGuestSemJanelaIntegrationTests(PostgreSqlDatabaseFix
         pedido.Total.Valor.Should().Be(60m, "2 x R$ 30, cada item somado uma vez");
     }
 
+    [SkippableTheory]
+    [InlineData("+5511987654321", null)]
+    [InlineData("11987654321", null)]
+    [InlineData("5511987654321", null)]
+    [InlineData(null, "+5511987654321")]
+    public async Task ClienteBloqueadoPeloTelefoneEmOutroCadastro_NaoPassaPeloSiteSemLogin(string? telefoneDoCadastro, string? telefoneExtra)
+    {
+        // PEDIDO-06: o bloqueio feito no console/WhatsApp tem outro hash e nao pegava o guest.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await fixture.ResetDatabaseAsync();
+        var (empresaId, slug, itemId) = await SeedAsync();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresaId);
+            var bloqueado = Cliente.CriarParaStorefront(empresaId, $"hash-{Guid.NewGuid():N}", TimeProvider.System);
+            bloqueado.Nome = "Calote";
+            bloqueado.Telefone = telefoneDoCadastro;
+            if (telefoneExtra is not null)
+                bloqueado.Telefones.Add(new ClienteTelefone { Id = Guid.NewGuid(), Numero = telefoneExtra, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            bloqueado.Bloquear("calote", DateTime.UtcNow);
+            seed.Clientes.Add(bloqueado);
+            await seed.SaveChangesAsync();
+        }
+        await using var provider = BuildProvider();
+
+        await using var scope = provider.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+        var act = () => scope.ServiceProvider.GetRequiredService<IniciarCheckoutGuestUseCase>().ExecuteAsync(
+            Entrada(slug, itemId, qtd: 1, telefone: "5511987654321"));
+
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.ClienteBloqueadoException>();
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(empresaId);
+        (await leitura.Pedidos.CountAsync(p => p.EmpresaId == empresaId)).Should().Be(0);
+    }
+
     private static IniciarCheckoutGuestInput Entrada(string slug, Guid itemId, int qtd, string telefone = "(11) 98765-4321") => new(
         Slug: slug, Nome: "Maria Silva", Telefone: telefone, Cep: Cep, Numero: "120",
         Items: [new CheckoutItemInput(itemId, qtd)], JanelaId: null, DataEntrega: null);

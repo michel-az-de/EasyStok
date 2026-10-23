@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
@@ -8,6 +7,7 @@ using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 using DomainCliente = EasyStock.Domain.Entities.Cliente;
 using DomainPedido = EasyStock.Domain.Entities.Pedido;
 
@@ -58,10 +58,6 @@ public sealed class IniciarCheckoutGuestUseCase(
     /// <summary>Tamanho de <c>pedidos.ClienteNome</c>; acima disso o banco recusava com erro interno (#1719).</summary>
     private const int NomeMaximo = 150;
 
-    /// <summary>E.164 BR: <c>+55</c> + DDD (2) + numero (8 ou 9 digitos).</summary>
-    private static readonly Regex TelefoneE164BrRegex =
-        new(@"^\+55[1-9][0-9]\d{8,9}$", RegexOptions.Compiled);
-
     public async Task<IniciarCheckoutGuestResult> ExecuteAsync(
         IniciarCheckoutGuestInput input,
         CancellationToken ct = default,
@@ -78,7 +74,7 @@ public sealed class IniciarCheckoutGuestUseCase(
         if (nome.Length > NomeMaximo)
             throw new RegraDeDominioVioladaException($"O nome vai até {NomeMaximo} caracteres.");
 
-        var telefoneE164 = NormalizarTelefone(input.Telefone);
+        var telefoneE164 = TelefoneE164.From(input.Telefone).Value;
 
         var cep = CheckoutCoreService.ValidarEntrada(
             input.Cep, input.Items?.Select(i => (i.CardapioItemId, i.Qtd)).ToList());
@@ -203,6 +199,10 @@ public sealed class IniciarCheckoutGuestUseCase(
         // O bloqueio comercial continua valendo; consultar não concede identidade nem altera cadastro.
         var declarado = await clienteRepository.GetByTelefoneHashAsync(empresaId, ClienteOtp.CalcularTelefoneHash(telefoneE164), ct);
         if (declarado is { Bloqueado: true }) throw new ClienteBloqueadoException(declarado.Id);
+        // PEDIDO-06: o bloqueio feito pelo WhatsApp, pelo console ou num pedido guest anterior vive em outro
+        // cadastro (outro hash); o telefone é o que liga os canais.
+        var bloqueadoPorTelefone = await clienteRepository.GetBloqueadoPorTelefoneAsync(empresaId, telefoneE164, ct);
+        if (bloqueadoPorTelefone is not null) throw new ClienteBloqueadoException(bloqueadoPorTelefone.Id);
         // O telefone informado não prova posse: o pedido usa um cadastro guest separado.
         var cliente = DomainCliente.CriarParaStorefront(empresaId,
             ClienteOtp.CalcularTelefoneHash($"guest:{Guid.NewGuid():N}"), timeProvider);
@@ -222,33 +222,6 @@ public sealed class IniciarCheckoutGuestUseCase(
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
-
-    private static string NormalizarTelefone(string telefone)
-    {
-        if (string.IsNullOrWhiteSpace(telefone))
-            throw new TelefoneInvalidoException();
-
-        var span = telefone.Trim();
-        var sb = new System.Text.StringBuilder(span.Length);
-        var primeiro = true;
-        foreach (var c in span)
-        {
-            if (primeiro && c == '+') sb.Append('+');
-            else if (char.IsDigit(c)) sb.Append(c);
-            else if (c is ' ' or '(' or ')' or '-' or '.') { }
-            else throw new TelefoneInvalidoException();
-            primeiro = false;
-        }
-        var normalizado = sb.ToString();
-        if (!normalizado.StartsWith('+'))
-        {
-            if (normalizado.Length is 10 or 11) normalizado = "+55" + normalizado;
-            else throw new TelefoneInvalidoException();
-        }
-        if (!TelefoneE164BrRegex.IsMatch(normalizado))
-            throw new TelefoneInvalidoException();
-        return normalizado;
-    }
 
     private static string MontarObservacoes(string? obsCliente, string cepNormalizado, string? numero)
     {
