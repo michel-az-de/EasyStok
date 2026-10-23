@@ -1,7 +1,9 @@
 using EasyStock.Application.Services;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Services;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Repositories;
 
 namespace EasyStock.Api.Mobile.Services;
 
@@ -11,7 +13,8 @@ namespace EasyStock.Api.Mobile.Services;
 /// (<c>PedidoEstoqueIntegrationService</c>), sobre os lotes da loja do pedido (pedido sem loja: todos
 /// os lotes da empresa, como no ERP):
 /// <list type="bullet">
-/// <item>sai primeiro do lote que vence antes (FEFO) e atravessa os lotes; bloqueado e descartado não baixam;</item>
+/// <item>escolhe os lotes pela regra única <see cref="ConsumoDeLotes"/> (#2003): FEFO, vencido por último, empate pelo
+/// lote que entrou antes e <c>FifoAtivo</c> da loja; atravessa os lotes; bloqueado e descartado não baixam;</item>
 /// <item>falta de saldo não trava: o saldo vai a zero e a falta vira <c>QuantidadeDescoberta</c> no lote (#540);</item>
 /// <item>uma saída por lote, com o id do pedido em <c>DocumentoReferencia</c>; pedido e produto baixam uma vez só;</item>
 /// <item>o cancelamento devolve o que este pedido baixou, aos lotes de onde saiu. Sem saída, não devolve nada.</item>
@@ -57,7 +60,7 @@ public class MobileStockReconciler(
                 aBaixar -= (await SaidasAbertasAsync(alvo.EmpresaId, alvo.ProdutoId, null, doErp, ct)).Sum(s => s.Quantidade.Value);
             if (aBaixar <= 0m) return false;
 
-            var lotes = await LotesEmFefoAsync(alvo, lojaDoPedido, ct);
+            var lotes = await LotesDaLojaAsync(alvo, lojaDoPedido, ct);
             if (lotes.Count == 0)
             {
                 log.LogWarning(
@@ -68,34 +71,16 @@ public class MobileStockReconciler(
             var usuarioSistema = await systemUserResolver.GetOrCreateAsync(alvo.EmpresaId, ct);
 
             var agora = DateTime.UtcNow;
-            var restante = aBaixar;
-            var saidas = new List<(ItemEstoque Lote, decimal Quantidade)>();
-            foreach (var lote in lotes.Where(l => Saldo(l) > 0m))
-            {
-                if (restante <= 0m) break;
-                var consumir = Math.Min(restante, Saldo(lote));
-                lote.RegistrarSaida(Quantidade.From(consumir), agora, agora, permitirVencido: true);
-                saidas.Add((lote, consumir));
-                restante -= consumir;
-            }
-
-            var falta = restante;
-            if (falta > 0m)
-            {
-                // A falta fica no ultimo lote que baixou; sem nenhum com saldo, no que vence primeiro.
-                var comFalta = saidas.Count > 0 ? saidas[^1].Lote : lotes[0];
-                comFalta.RegistrarSaidaPermitindoDescoberto(Quantidade.From(falta), agora, agora, permitirVencido: true);
-                var indice = saidas.FindIndex(s => s.Lote.Id == comFalta.Id);
-                if (indice >= 0) saidas[indice] = (comFalta, saidas[indice].Quantidade + falta);
-                else saidas.Add((comFalta, falta));
+            var plano = ConsumoDeLotes.Planejar(lotes, aBaixar, agora, await RegraDeConsumoAsync(alvo.EmpresaId, lojaDoPedido, ct));
+            // A falta fica no ultimo lote que baixou; sem nenhum com saldo, no primeiro da ordem.
+            plano.Aplicar(agora, agora, permitirVencido: true);
+            if (plano.Falta > 0m)
                 log.LogWarning(
                     "Venda do PWA sem saldo: pedido {PedidoId} produto {ProdutoId} pediu {Quantidade} e faltaram {Falta}. Ficou a descoberto no lote {LoteId}.",
-                    pedidoId, alvo.ProdutoId, aBaixar, falta, comFalta.Id);
-            }
+                    pedidoId, alvo.ProdutoId, aBaixar, plano.Falta, plano.Consumos[^1].Lote.Id);
 
-            foreach (var (lote, quantidadeDoLote) in saidas)
+            foreach (var (lote, quantidadeDoLote, descoberto) in plano.Consumos)
             {
-                var temFalta = falta > 0m && lote.Id == saidas[^1].Lote.Id;
                 Registrar(new MovimentacaoEstoque
                 {
                     Id = Guid.NewGuid(),
@@ -111,7 +96,7 @@ public class MobileStockReconciler(
                         ? Dinheiro.FromDecimal(lote.CustoUnitario.Valor * quantidadeDoLote)
                         : null,
                     DataMovimentacao = agora,
-                    Descricao = temFalta ? $"{descricao} · {falta:0.###} a descoberto" : descricao,
+                    Descricao = descoberto > 0m ? $"{descricao} · {descoberto:0.###} a descoberto" : descricao,
                     DocumentoReferencia = pedidoId,
                     CriadoEm = agora
                 }, usuarioSistema, $"mobile_product={produtoDoAparelho.Id}", agora);
@@ -153,12 +138,10 @@ public class MobileStockReconciler(
             foreach (var saida in saidas)
             {
                 // A parte que ficou a descoberto nunca saiu do lote: e abatida antes de voltar ao saldo.
-                if (lotes.TryGetValue(saida.ItemEstoqueId, out var lote))
-                    lote.RestaurarSaidaEstornada(saida.Quantidade, agora);
-                saida.MarcarComoEstornada(agora);
+                lotes.TryGetValue(saida.ItemEstoqueId, out var lote);
                 Registrar(
-                    MovimentacaoEstoque.CriarEstorno(Guid.NewGuid(), saida, agora, descricao, agora,
-                        motivoEstorno: PedidoEstoqueIntegrationService.MotivoDoEstornoPorCancelamento),
+                    DevolucaoDeSaida.Aplicar(saida, lote, agora, descricao,
+                        PedidoEstoqueIntegrationService.MotivoDoEstornoPorCancelamento),
                     usuarioSistema, $"mobile_order={pedidoId}", agora);
             }
             return true;
@@ -186,25 +169,21 @@ public class MobileStockReconciler(
     private static AlvoNoErp? Alvo(Product p) =>
         p is { ErpProductId: { } produtoId, EmpresaId: { } empresaId } ? new AlvoNoErp(empresaId, produtoId) : null;
 
-    private static decimal Saldo(ItemEstoque lote) => lote.QuantidadeAtual?.Value ?? 0m;
-
     // Lotes da loja do pedido, para a venda de uma loja nao consumir o estoque de outra; pedido sem
     // loja enxerga todos os lotes da empresa (mesma regra de PedidoEstoqueIntegrationService, #1534).
     // A loja e a do pedido, nao a de quem cadastrou o produto. IgnoreQueryFilters: o sync do aparelho
-    // nao tem JWT; o isolamento e o filtro por empresa, que vem do proprio aparelho.
-    private async Task<List<ItemEstoque>> LotesEmFefoAsync(AlvoNoErp alvo, Guid? lojaDoPedido, CancellationToken ct)
-    {
-        var lotes = await db.Set<ItemEstoque>().IgnoreQueryFilters()
+    // nao tem JWT; o isolamento e o filtro por empresa, que vem do proprio aparelho. A ordem de consumo
+    // e de ConsumoDeLotes (#2003), nao daqui.
+    private async Task<List<ItemEstoque>> LotesDaLojaAsync(AlvoNoErp alvo, Guid? lojaDoPedido, CancellationToken ct) =>
+        await db.Set<ItemEstoque>().IgnoreQueryFilters()
             .Where(i => i.EmpresaId == alvo.EmpresaId && i.ProdutoId == alvo.ProdutoId
                         && (lojaDoPedido == null || i.LojaId == lojaDoPedido)
                         && i.Status != StatusItemEstoque.Bloqueado && i.Status != StatusItemEstoque.Descartado)
             .ToListAsync(ct);
-        return lotes
-            .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
-            .ThenBy(i => i.EntradaEm)
-            .ThenBy(i => i.CriadoEm)
-            .ToList();
-    }
+
+    // FifoAtivo da loja do pedido (ou da loja unica da empresa, pedido sem loja). Sem configuracao, FEFO.
+    private async Task<RegraDeConsumo> RegraDeConsumoAsync(Guid empresaId, Guid? lojaDoPedido, CancellationToken ct) =>
+        new(Fefo: (await ConfiguracaoLojaRepository.DaLojaAsync(db.Set<ConfiguracaoLoja>(), empresaId, lojaDoPedido, ct))?.FifoAtivo ?? true);
 
     // Saidas de venda ainda nao estornadas de um pedido: as do aparelho (documento = id do pedido de
     // la), as da esteira do ERP (documento = "{pedido do ERP}:{item}"), ou as duas. produtoId nulo =

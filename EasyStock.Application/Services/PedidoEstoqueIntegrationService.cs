@@ -1,5 +1,6 @@
 using EasyStock.Application.Events.Estoque;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Domain.Services;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
 namespace EasyStock.Application.Services;
@@ -33,9 +34,10 @@ public sealed class PedidoEstoqueOptions
 ///   - Se o item do pedido não tem ProdutoId, ignora (item ad-hoc).
 ///   - Se não há `ItemEstoque` ativo do produto na loja do pedido, ignora
 ///     com log de aviso (não quebra o status update).
-///   - Decrementa do primeiro lote (FIFO simples por validade), permitindo
-///     saldo negativo (a regra contábil rígida está em `RegistrarSaidaEstoqueUseCase`;
-///     aqui estamos no caminho rápido do pedido).
+///   - Decrementa os lotes pela regra única de consumo (`ConsumoDeLotes`: FEFO, vencido por
+///     último, desempate pelo lote que entrou antes, `FifoAtivo` da loja), permitindo saldo
+///     negativo (a regra contábil rígida está em `RegistrarSaidaEstoqueUseCase`; aqui estamos
+///     no caminho rápido do pedido).
 ///   - Cria `MovimentacaoEstoque` rastreável (referência = PedidoId, descrição
 ///     menciona origem = pedido).
 ///
@@ -49,7 +51,8 @@ public sealed class PedidoEstoqueIntegrationService(
     IMovimentacaoEstoqueRepository movRepo,
     IPublicadorEventoIntegracao publicadorEventos,
     Microsoft.Extensions.Options.IOptions<PedidoEstoqueOptions> options,
-    ILogger<PedidoEstoqueIntegrationService> logger)
+    ILogger<PedidoEstoqueIntegrationService> logger,
+    IConfiguracaoLojaRepository? configuracaoLoja = null)
 {
     private bool PermiteEstoqueNegativo => options.Value.PermiteEstoqueNegativo;
     private bool RequerEstoqueExistente => options.Value.RequerEstoqueExistente;
@@ -77,6 +80,7 @@ public sealed class PedidoEstoqueIntegrationService(
         // estoque da empresa; antes saía daqui sem descontar nada. Pedido com loja segue na loja dele.
         var lojaId = pedido.LojaId;
         var baixadoPeloAparelho = await BaixadoPeloAparelhoAsync(pedido, ct);
+        var regra = await RegraDeConsumoAsync(pedido, ct);
 
         foreach (var item in pedido.Itens)
         {
@@ -105,15 +109,14 @@ public sealed class PedidoEstoqueIntegrationService(
                 if (qtd <= 0m) continue;
             }
 
-            // Lotes elegiveis da loja em FEFO. Bloqueado/Descartado nunca baixam; vencido segue
-            // permitido (a cozinha ja produziu). Lotes com saldo vem primeiro: antes, um lote velho
-            // zerado era sempre o escolhido, gerava descoberto falso e o lote com saldo nunca baixava.
+            // Lotes elegiveis da loja. Bloqueado/Descartado nunca baixam; vencido segue permitido (a cozinha
+            // ja produziu), mas so depois dos que ainda valem. A ordem e a de ConsumoDeLotes, a mesma da venda
+            // e do PWA (#2003): lote zerado nao baixa, FEFO, empate pelo que entrou antes.
             var itens = await itemEstoqueRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value);
             var candidatos = (itens ?? [])
                 .Where(i => DaLojaDoPedido(i, lojaId)
                             && i.Status != StatusItemEstoque.Bloqueado
                             && i.Status != StatusItemEstoque.Descartado)
-                .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
                 .ToList();
             // M1.4c (#1537, D-M1-03): a linha de porção baixa do saldo da porção. Sem nenhum lote dela
             // (estoque antigo, lote do PWA), cai nos lotes sem porção do prato; nunca na porção errada.
@@ -149,62 +152,40 @@ public sealed class PedidoEstoqueIntegrationService(
             if (disponivelTotal < qtd && !PermiteEstoqueNegativo)
                 throw new EstoqueInsuficienteException(item.ProdutoId.Value, qtd, disponivelTotal);
 
-            var restante = qtd;
-            var falta = 0m;
-            var tocados = new List<(ItemEstoque Lote, decimal Quantidade)>();
-            ItemEstoque? ultimo = null;
+            // Trava os lotes (FOR UPDATE) antes de planejar: o saldo pode ter mudado desde a consulta.
+            var travados = new List<ItemEstoque>(candidatos.Count);
+            foreach (var candidato in candidatos)
+                travados.Add(await itemEstoqueRepo.GetByIdComLockAsync(pedido.EmpresaId, candidato.Id) ?? candidato);
 
-            foreach (var candidato in candidatos.Where(c => (c.QuantidadeAtual?.Value ?? 0m) > 0m))
-            {
-                if (restante <= 0m) break;
-
-                // Re-lê com FOR UPDATE para serializar atualizações concorrentes no mesmo lote.
-                var lote = await itemEstoqueRepo.GetByIdComLockAsync(pedido.EmpresaId, candidato.Id) ?? candidato;
-                var atualLote = lote.QuantidadeAtual?.Value ?? 0m;
-                if (atualLote <= 0m) continue;
-
-                var consumir = Math.Min(restante, atualLote);
-                lote.RegistrarSaida(EasyStock.Domain.ValueObjects.Quantidade.From(consumir), agora, agora, permitirVencido: true);
-                tocados.Add((lote, consumir));
-                restante -= consumir;
-                ultimo = lote;
-            }
-
-            if (restante > 0m)
+            var plano = ConsumoDeLotes.Planejar(travados, qtd, agora, regra);
+            var falta = plano.Falta;
+            if (falta > 0m)
             {
                 // O saldo pode diminuir entre a consulta inicial e a aquisição dos locks.
                 if (!PermiteEstoqueNegativo)
-                    throw new EstoqueInsuficienteException(item.ProdutoId.Value, qtd, qtd - restante);
+                    throw new EstoqueInsuficienteException(item.ProdutoId.Value, qtd, qtd - falta);
 
-                // Falta vira descoberto auditavel no ultimo lote tocado (ou no 1o lote operavel se todos zerados).
-                var alvoDescoberto = ultimo
-                    ?? await itemEstoqueRepo.GetByIdComLockAsync(pedido.EmpresaId, candidatos[0].Id)
-                    ?? candidatos[0];
-                falta = restante;
+                // Falta vira descoberto auditavel no ultimo lote tocado (ou no 1o lote da ordem se todos zerados).
                 logger.LogWarning(
                     "Pedido {Id}: produto {ProdId} estoque insuficiente (atual={Atual}, pedido={Qty}) — {Falta} un a descoberto.",
                     pedido.Id, item.ProdutoId, disponivelTotal, qtd, falta);
-                alvoDescoberto.RegistrarSaidaPermitindoDescoberto(EasyStock.Domain.ValueObjects.Quantidade.From(restante), agora, agora, permitirVencido: true);
-                var idx = tocados.FindIndex(t => t.Lote.Id == alvoDescoberto.Id);
-                if (idx >= 0) tocados[idx] = (tocados[idx].Lote, tocados[idx].Quantidade + restante);
-                else tocados.Add((alvoDescoberto, restante));
-                ultimo = alvoDescoberto;
             }
+            plano.Aplicar(agora, agora, permitirVencido: true);
+            var ultimo = plano.Consumos.Count > 0 ? plano.Consumos[^1].Lote : null;
 
             // Atualiza velocidade de saída (média 30 dias) para manter rotatividade
             // correta no estoque — o caminho RegistrarSaidaEstoqueUseCase faz o mesmo.
-            const int janelaDias = 30;
             var taxaAnterior = await movRepo.GetTaxaSaidaDiariaAsync(
                 pedido.EmpresaId, item.ProdutoId.Value,
-                agora.AddDays(-janelaDias), agora);
-            var velocidadeAtualizada = (taxaAnterior * janelaDias + qtd) / janelaDias;
+                agora.AddDays(-ItemEstoque.JanelaVelocidadeDias), agora);
+            var velocidadeAtualizada = ItemEstoque.VelocidadeAposSaida(taxaAnterior, qtd);
 
-            foreach (var (lote, quantidadeLote) in tocados)
+            foreach (var (lote, quantidadeLote, descoberto) in plano.Consumos)
             {
                 lote.AtualizarVelocidadeSaida(velocidadeAtualizada, agora);
                 await itemEstoqueRepo.UpdateAsync(lote);
 
-                var temFalta = falta > 0m && lote.Id == ultimo!.Id;
+                var temFalta = descoberto > 0m;
                 await movRepo.InsertAsync(new MovimentacaoEstoque
                 {
                     Id = Guid.NewGuid(),
@@ -238,6 +219,15 @@ public sealed class PedidoEstoqueIntegrationService(
                         pedido.Id, falta, agora),
                     ct: ct);
         }
+    }
+
+    // FifoAtivo da loja do pedido (ou da loja única da empresa, pedido sem loja, #1534). Sem configuração, FEFO.
+    private async Task<RegraDeConsumo> RegraDeConsumoAsync(PedidoEntity pedido, CancellationToken ct)
+    {
+        var configuracao = configuracaoLoja is null
+            ? null
+            : await configuracaoLoja.GetDaLojaAsync(pedido.EmpresaId, pedido.LojaId, ct);
+        return new RegraDeConsumo(Fefo: configuracao?.FifoAtivo ?? true);
     }
 
     // Pedido sem loja enxerga todos os lotes da empresa; com loja, só os dela.
@@ -284,16 +274,11 @@ public sealed class PedidoEstoqueIntegrationService(
             var saida = await movRepo.GetByIdComLockAsync(pedido.EmpresaId, lida.Id, ct);
             if (saida is null || saida.EstornadaEm is not null) continue;
 
-            if (lote is not null)
-            {
-                lote.RestaurarSaidaEstornada(saida.Quantidade, agora);
-                await itemEstoqueRepo.UpdateAsync(lote);
-            }
-            saida.MarcarComoEstornada(agora);
+            var estorno = DevolucaoDeSaida.Aplicar(
+                saida, lote, agora, $"Cancelamento pedido {pedido.Id}", MotivoDoEstornoPorCancelamento);
+            if (lote is not null) await itemEstoqueRepo.UpdateAsync(lote);
             await movRepo.UpdateAsync(saida);
-            await movRepo.InsertAsync(MovimentacaoEstoque.CriarEstorno(
-                Guid.NewGuid(), saida, agora, $"Cancelamento pedido {pedido.Id}", agora,
-                motivoEstorno: MotivoDoEstornoPorCancelamento));
+            await movRepo.InsertAsync(estorno);
         }
     }
 
@@ -343,10 +328,9 @@ public sealed class PedidoEstoqueIntegrationService(
         if (saidas.Count == 0)
         {
             // Saida registrada mas movimento nao localizavel (dado legado): devolve ao primeiro lote da loja.
-            var legado = (await itemEstoqueRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value))
-                ?.Where(i => DaLojaDoPedido(i, lojaId))
-                .OrderBy(i => i.ValidadeEm ?? DateTime.MaxValue)
-                .FirstOrDefault();
+            var daLoja = (await itemEstoqueRepo.GetByProdutoAsync(pedido.EmpresaId, item.ProdutoId.Value))
+                ?.Where(i => DaLojaDoPedido(i, lojaId));
+            var legado = daLoja is null ? null : ConsumoDeLotes.Ordenar(daLoja, agora, new RegraDeConsumo()).FirstOrDefault();
             if (legado is null) return;
             saidas.Add(new MovimentacaoEstoque
             {
@@ -363,14 +347,18 @@ public sealed class PedidoEstoqueIntegrationService(
             if (lote is null) continue;
             lotesDevolvidos[lote.Id] = lote;
 
-            lote.RestaurarSaidaEstornada(saida.Quantidade, agora);
-            await itemEstoqueRepo.UpdateAsync(lote);
             if (saida.Id != Guid.Empty)
             {
-                saida.MarcarComoEstornada(agora);
+                var estorno = DevolucaoDeSaida.Aplicar(saida, lote, agora, $"Cancelamento pedido {pedido.Id} item {item.Id}");
+                await itemEstoqueRepo.UpdateAsync(lote);
                 await movRepo.UpdateAsync(saida);
+                await movRepo.InsertAsync(estorno);
+                continue;
             }
 
+            // Dado legado: a saida nao tem movimento para marcar, so o saldo volta e o estorno nasce avulso.
+            lote.RestaurarSaidaEstornada(saida.Quantidade, agora);
+            await itemEstoqueRepo.UpdateAsync(lote);
             await movRepo.InsertAsync(new MovimentacaoEstoque
             {
                 Id = Guid.NewGuid(),
@@ -390,11 +378,10 @@ public sealed class PedidoEstoqueIntegrationService(
             });
         }
 
-        const int janelaDias = 30;
         var taxaAnterior = await movRepo.GetTaxaSaidaDiariaAsync(
             pedido.EmpresaId, item.ProdutoId.Value,
-            agora.AddDays(-janelaDias), agora);
-        var velocidadeAtualizada = Math.Max(0m, (taxaAnterior * janelaDias - qtd) / janelaDias);
+            agora.AddDays(-ItemEstoque.JanelaVelocidadeDias), agora);
+        var velocidadeAtualizada = ItemEstoque.VelocidadeAposDevolucao(taxaAnterior, qtd);
         foreach (var l in lotesDevolvidos.Values)
         {
             l.AtualizarVelocidadeSaida(velocidadeAtualizada, agora);

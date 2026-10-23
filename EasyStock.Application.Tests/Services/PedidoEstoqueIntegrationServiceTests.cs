@@ -780,4 +780,87 @@ public class PedidoEstoqueIntegrationServiceTests
         await movRepo.DidNotReceive().GetSaidasAbertasPorDocumentoAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<NaturezaMovimentacaoEstoque>(), Arg.Any<CancellationToken>());
     }
+
+    // ---- #2003 (estoque-01, 07, 17): a regra de escolha de lote é a mesma da venda e do PWA (ConsumoDeLotes) ----
+
+    private static ItemEstoque LoteDe(Guid empresaId, Guid? lojaId, Guid produtoId, decimal saldo, int? diasParaVencer, int diasDesdeAEntrada = 1)
+    {
+        var entrada = DateTime.UtcNow.AddDays(-diasDesdeAEntrada);
+        return new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(saldo), QuantidadeInicial = Quantidade.From(saldo), Status = StatusItemEstoque.Ok,
+            ValidadeEm = diasParaVencer is { } d ? Validade.From(DateTime.UtcNow.Date.AddDays(d)) : null,
+            EntradaEm = entrada, CriadoEm = entrada
+        };
+    }
+
+    [Fact]
+    public async Task DescontarAsync_lote_vencido_so_baixa_depois_do_que_ainda_vale()
+    {
+        var (svc, itemRepo, _) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var vencido = LoteDe(empresaId, lojaId, produtoId, saldo: 3, diasParaVencer: -1);
+        var vale = LoteDe(empresaId, lojaId, produtoId, saldo: 10, diasParaVencer: 20);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { vencido, vale });
+
+        await svc.DescontarAsync(PedidoComItem(empresaId, lojaId, produtoId, qty: 2));
+
+        vale.QuantidadeAtual.Value.Should().Be(8);
+        vencido.QuantidadeAtual.Value.Should().Be(3, "o cardápio e o Estoque do dia ignoram o vencido; baixar dele esconde a perda");
+    }
+
+    [Fact]
+    public async Task DescontarAsync_sem_outro_lote_o_vencido_ainda_baixa()
+    {
+        var (svc, itemRepo, _) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var vencido = LoteDe(empresaId, lojaId, produtoId, saldo: 3, diasParaVencer: -1);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { vencido });
+
+        await svc.DescontarAsync(PedidoComItem(empresaId, lojaId, produtoId, qty: 2));
+
+        vencido.QuantidadeAtual.Value.Should().Be(1);
+        vencido.QuantidadeDescoberta.Value.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DescontarAsync_validade_igual_baixa_o_lote_que_entrou_antes()
+    {
+        // A consulta devolve o lote mais novo primeiro (EntradaEm decrescente); o desempate era essa ordem (LIFO).
+        var (svc, itemRepo, _) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var novo = LoteDe(empresaId, lojaId, produtoId, saldo: 5, diasParaVencer: 10, diasDesdeAEntrada: 1);
+        var velho = LoteDe(empresaId, lojaId, produtoId, saldo: 5, diasParaVencer: 10, diasDesdeAEntrada: 6);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { novo, velho });
+
+        await svc.DescontarAsync(PedidoComItem(empresaId, lojaId, produtoId, qty: 2));
+
+        velho.QuantidadeAtual.Value.Should().Be(3);
+        novo.QuantidadeAtual.Value.Should().Be(5);
+    }
+
+    [Theory]
+    [InlineData(true, "VENCE_ANTES")]
+    [InlineData(false, "ENTROU_ANTES")]
+    public async Task DescontarAsync_respeita_o_FifoAtivo_da_loja_do_pedido(bool fifoAtivo, string saiPrimeiro)
+    {
+        var itemRepo = Substitute.For<IItemEstoqueRepository>();
+        var configuracoes = Substitute.For<IConfiguracaoLojaRepository>();
+        var svc = new PedidoEstoqueIntegrationService(itemRepo, Substitute.For<IMovimentacaoEstoqueRepository>(),
+            Substitute.For<IPublicadorEventoIntegracao>(), Options.Create(new PedidoEstoqueOptions()),
+            NullLogger<PedidoEstoqueIntegrationService>.Instance, configuracoes);
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var config = ConfiguracaoLoja.CriarPadrao(lojaId);
+        config.FifoAtivo = fifoAtivo;
+        configuracoes.GetDaLojaAsync(empresaId, lojaId, Arg.Any<CancellationToken>()).Returns(config);
+        var venceAntes = LoteDe(empresaId, lojaId, produtoId, saldo: 5, diasParaVencer: 3, diasDesdeAEntrada: 1);
+        var entrouAntes = LoteDe(empresaId, lojaId, produtoId, saldo: 5, diasParaVencer: 30, diasDesdeAEntrada: 9);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { venceAntes, entrouAntes });
+
+        await svc.DescontarAsync(PedidoComItem(empresaId, lojaId, produtoId, qty: 2));
+
+        (saiPrimeiro == "VENCE_ANTES" ? venceAntes : entrouAntes).QuantidadeAtual.Value.Should().Be(3);
+        (saiPrimeiro == "VENCE_ANTES" ? entrouAntes : venceAntes).QuantidadeAtual.Value.Should().Be(5);
+    }
 }

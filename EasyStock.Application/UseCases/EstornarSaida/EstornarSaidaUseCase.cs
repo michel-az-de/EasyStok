@@ -1,3 +1,5 @@
+using EasyStock.Domain.Services;
+
 namespace EasyStock.Application.UseCases.EstornarSaida
 {
     public sealed record EstornarSaidaCommand(
@@ -57,24 +59,15 @@ namespace EasyStock.Application.UseCases.EstornarSaida
                 if (itemEstoque.EmpresaId != command.EmpresaId)
                     throw new UseCaseValidationException("O item de estoque nao pertence a empresa informada.");
 
-                itemEstoque.RestaurarSaidaEstornada(original.Quantidade, agora);
-
                 var auditoria = currentUser is null ? null : new AuditoriaContexto(
                     UsuarioId: currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId,
                     Ip: currentUser.Ip,
                     UserAgent: currentUser.UserAgent,
                     DispositivoId: currentUser.DispositivoId);
 
-                var estorno = MovimentacaoEstoque.CriarEstorno(
-                    Guid.NewGuid(),
-                    original,
-                    agora,
-                    command.Motivo,
-                    agora,
-                    command.Motivo,
-                    auditoria);
-
-                original.MarcarComoEstornada(agora);
+                // #2003 (estoque-17): a devolução é a regra única de DevolucaoDeSaida (abate o descoberto, repõe o
+                // saldo, marca a saída e cria o estorno).
+                var estorno = DevolucaoDeSaida.Aplicar(original, itemEstoque, agora, command.Motivo, command.Motivo, auditoria);
 
                 await movimentacaoRepository.InsertAsync(estorno);
                 await movimentacaoRepository.UpdateAsync(original);

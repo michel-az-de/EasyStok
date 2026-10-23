@@ -138,7 +138,8 @@ public class VendaController(
             Canal: request.Canal,
             Observacoes: request.Observacoes,
             VendedorId: request.VendedorId,
-            FormaPagamentoPrincipal: request.FormaPagamentoPrincipal);
+            FormaPagamentoPrincipal: request.FormaPagamentoPrincipal,
+            LojaId: request.LojaId);
 
         var result = await registrarSaidaUseCase.ExecuteAsync(command);
 
