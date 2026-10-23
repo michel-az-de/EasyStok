@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as acao from './acoes'
 import { lerAlertasDeEstoque, lerCardapio } from './api/cardapio'
-import { abaVisivel, avisoDoCardapio, deveVarrerAoVoltar } from './planoDeSincronizacao'
+import { abaVisivel, alvoDoEvento, avisoDoCardapio, deveVarrerAoVoltar } from './planoDeSincronizacao'
 import { criarCicloDeSincronizacao, criarMemoriaDoLaco } from './cicloDeSincronizacao'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 
@@ -116,10 +116,15 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
     function conectar() {
       fecharEventos = conectarEventosOperacao({
         aoEvento: ({ evento, dados }) => {
-          const pedido = evento?.startsWith('pedido.') && dados?.pedidoId
-          const comanda = evento === 'conversa.comanda_atualizada' && dados?.conversaId
-          if (!vivo || (evento !== 'ready' && !pedido && !comanda)) return
-          if (!sincronizar.invalidarPedidos(pedido || null, comanda || null)) return
+          const alvo = alvoDoEvento(evento, dados)
+          if (!vivo || !alvo) return
+          // #1966: a volta seguinte lê até a página da conversa; com uma volta em andamento, vem logo depois dela.
+          if (alvo.tipo === 'conversa') {
+            sincronizar.atualizarConversa(alvo.conversaId)
+            ciclo()
+            return
+          }
+          if (!sincronizar.invalidarPedidos(alvo.pedidoId ?? null, alvo.tipo === 'comanda' ? alvo.conversaId : null)) return
           if (lendo) { pedidosPendentes = true; return }
           clearTimeout(esperaPedidos)
           esperaPedidos = setTimeout(() => ciclo(true), AGRUPAR_EVENTOS_MS)

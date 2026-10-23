@@ -114,3 +114,14 @@ export function avisoDoCardapio(erro) {
 // #1241: só falta de rede vira queda de conexão (faixa do papel). Erro do EasyStok (500,
 // 403...) é outro aviso: a internet está lá, o canhoto não precisa assumir.
 export const quedaDaSincronizacao = (erro) => erro?.codigo === 'SEM_CONEXAO'
+
+// Evento da operação (SSE) que o laço atende. Pedido e comanda (S18) releem o pedido; `ready` (conexão
+// nova) relê todos. #1966: `conversa.atualizada` (o visitante do chat do site se identificou) relê a
+// conversa, que traz o nome novo. O resto fica com a volta de 5 s.
+export function alvoDoEvento(evento, dados) {
+  if (evento === 'ready') return { tipo: 'pronto' }
+  if (evento?.startsWith('pedido.') && dados?.pedidoId) return { tipo: 'pedido', pedidoId: dados.pedidoId }
+  if (evento === 'conversa.comanda_atualizada' && dados?.conversaId) return { tipo: 'comanda', conversaId: dados.conversaId }
+  if (evento === 'conversa.atualizada' && dados?.conversaId) return { tipo: 'conversa', conversaId: dados.conversaId }
+  return null
+}

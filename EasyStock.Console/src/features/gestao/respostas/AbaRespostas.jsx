@@ -3,6 +3,8 @@ import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
+import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { automacoesEditaveis } from '../../../dominio/acessoModulos'
 import {
   VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, variaveisForaDaApi,
 } from '../../../dominio/automacao'
@@ -145,6 +147,9 @@ function SecaoRespostas() {
 
 function LinhaAutomatica({ regra, fonteApi, emFoco }) {
   const { alternarRegra, editarRegra } = useAcoes()
+  const { acoes } = useAcessoModulos()
+  // #1966: ligar, desligar e editar é da gerência do atendimento (a API recusa o Operador).
+  const editavel = automacoesEditaveis({ fonteApi, acoes })
   const linhaRef = useRef(null)
   const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
@@ -178,7 +183,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco }) {
             type="checkbox"
             aria-label={`${regra.nome}, ${regra.ativa ? 'ligada' : 'desligada'}`}
             checked={regra.ativa}
-            disabled={salvando}
+            disabled={salvando || !editavel}
             onChange={() => alternarRegra(regra.id)}
           />
           {regra.ativa ? 'Ligada' : 'Desligada'}
@@ -214,7 +219,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco }) {
             <Botao variante="texto" disabled={salvando} onClick={() => setRascunho(null)}>Cancelar</Botao>
           </div>
         </div>
-      ) : (
+      ) : editavel && (
         <div className={css.acoesLinha}>
           <Botao variante="texto" icone="lapis" onClick={() => setRascunho(regra.texto || regra.sugestao || '')}>
             {regra.texto ? 'Editar texto' : 'Escrever texto'}
@@ -227,6 +232,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco }) {
 
 function SecaoAutomaticas({ focoInicial }) {
   const { regras, fonteApi, cargaDasRegras } = useAtendimento()
+  const { acoes } = useAcessoModulos()
   // #1474: lista vazia não é "carregando": separa a espera, o erro e o vazio de verdade.
   const vazio = cargaDasRegras?.estado === 'carregando'
     ? 'Carregando as automáticas do EasyStok…'
@@ -242,6 +248,9 @@ function SecaoAutomaticas({ focoInicial }) {
             Saem sozinhas, só até 24 h depois da última mensagem do cliente e nunca para cliente bloqueado.
             Na conversa aparecem com a etiqueta automática.
           </p>
+          {!automacoesEditaveis({ fonteApi, acoes }) && (
+            <p className={css.descricao}>Só a dona ou um gerente liga, desliga e muda o texto das automáticas.</p>
+          )}
         </div>
       </header>
       {regras.length === 0 ? (

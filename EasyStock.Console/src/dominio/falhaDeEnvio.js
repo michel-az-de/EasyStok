@@ -52,6 +52,19 @@ export const fraseDoReenvio = (erro) => (falhaDeEnvio(erro).tipo === TIPOS_DE_FA
   ? 'Tentei de novo e o WhatsApp demorou outra vez. Pode ter chegado: confira com o cliente.'
   : 'Tentei de novo e não saiu.')
 
+// #1966: sem a conexão do WhatsApp, a lista e o envio de modelo voltam 409 WHATSAPP_NAO_CONECTADO (PR #1951). A frase
+// é a da API e o caminho é Integrações; nada saiu, então o envio não fala em "tentar novamente". Nas outras falhas
+// do envio a resposta pode ter se perdido: repetir consulta a mesma tentativa.
+export const WHATSAPP_NAO_CONECTADO = 'WHATSAPP_NAO_CONECTADO'
+export function erroDoModelo(erro, { envio = false } = {}) {
+  const texto = erro?.message || 'Não deu certo. Tente de novo.'
+  if (erro?.codigo === WHATSAPP_NAO_CONECTADO) return { texto, integracoes: true }
+  return {
+    texto: envio ? `${texto} Ao tentar novamente, esta mesma tentativa será consultada sem duplicar o envio.` : texto,
+    integracoes: false,
+  }
+}
+
 // Fora da janela o texto livre não sai: o caminho é o modelo aprovado.
 export const pedeModeloAprovado = (erro) => falhaDeEnvio(erro).tipo === TIPOS_DE_FALHA.FORA_DA_JANELA
 

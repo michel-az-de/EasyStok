@@ -71,3 +71,25 @@ assert.match(fonte('aplicacao/useSincronizacaoApi.js'), /if \(!comDesacertosRef\
 assert.match(fonte('aplicacao/AtendimentoProvider.jsx'), /comDesacertos: podeVerDesacertos\(acoesDoPerfil\)/)
 console.log('Perfis: a atendente não vê Janelas de entrega nem pede integrações, janelas e desacertos sem a ação.')
 
+
+// #1966 (frente D da #1889): `PUT api/atendimento/automacoes/{gatilho}` exige Gerente (PR #1965). Quem não é da gerência
+// do atendimento não liga, não desliga nem edita a automática (a API recusaria); na demonstração a matriz não decide.
+assert.equal(acesso.podeEditarAutomacoes(ATENDENTE), false)
+assert.equal(acesso.podeEditarAutomacoes(DONA), true)
+assert.equal(acesso.podeEditarAutomacoes({ ...ATENDENTE, controlarLoja: true }), true, 'gerente do atendimento edita')
+assert.equal(acesso.podeEditarAutomacoes({ ...DONA, editarAutomacoes: false }), false, 'a chave do servidor vale sobre a da gerência')
+assert.equal(acesso.podeEditarAutomacoes({ ...ATENDENTE, editarAutomacoes: true }), true)
+assert.equal(acesso.podeEditarAutomacoes(null), false)
+assert.equal(acesso.automacoesEditaveis({ fonteApi: true, acoes: ATENDENTE }), false)
+assert.equal(acesso.automacoesEditaveis({ fonteApi: true, acoes: DONA }), true)
+assert.equal(acesso.automacoesEditaveis({ fonteApi: false, acoes: {} }), true, 'na demonstração a matriz não decide')
+const modalAutomacoes = fonte('features/automacoes/ModalAutomacoes.jsx')
+assert.match(modalAutomacoes, /const editavel = automacoesEditaveis\(\{ fonteApi, acoes \}\)/)
+assert.match(modalAutomacoes, /checked=\{regra\.ativa\}\s+disabled=\{!editavel\}/, 'a chave da regra segue ativa para o Operador')
+assert.match(modalAutomacoes, /\{editavel && \(\s*<div className=\{css\.acoes\}>/, 'Salvar texto segue à vista para o Operador')
+assert.match(modalAutomacoes, /readOnly=\{!editavel\}/)
+const abaRespostas = fonte('features/gestao/respostas/AbaRespostas.jsx')
+assert.match(abaRespostas, /const editavel = automacoesEditaveis\(\{ fonteApi, acoes \}\)/)
+assert.match(abaRespostas, /disabled=\{salvando \|\| !editavel\}/, 'a chave da linha segue ativa para o Operador')
+assert.match(abaRespostas, /\) : editavel && \(\s*<div className=\{css\.acoesLinha\}>/, '"Editar texto" segue à vista para o Operador')
+console.log('Perfis: só a gerência do atendimento liga, desliga e edita as mensagens automáticas.')

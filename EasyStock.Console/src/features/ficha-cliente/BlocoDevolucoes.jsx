@@ -7,7 +7,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { lerMoeda, mascaraMoeda, moeda } from '../../dominio/formato'
-import { referenciaObrigatoriaNaDevolucao } from '../../dominio/cobranca'
+import { aDevolverDe, referenciaObrigatoriaNaDevolucao, resumoDasDevolucoes } from '../../dominio/cobranca'
 import css from './ficha.module.css'
 import { EstornosOnline } from './EstornosOnline'
 
@@ -37,6 +37,8 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
   const valido = pagamento && valor > 0 && valor <= pagamento.disponivel && motivo.trim() && (!referenciaObrigatoria || referencia.trim()) && confirmado
   const totalDevolvido = dados?.estornos.reduce((soma, e) => soma + e.valor, 0) ?? 0
   const conferirAcerto = cancelado && dados?.pagamentos.some((p) => p.valor > 0)
+  // #1966: valor recebido do pedido cancelado que ainda falta devolver (evento `devolucao_a_fazer`).
+  const aDevolver = aDevolverDe(dados)
 
   function escolher(id) {
     setPagamentoId(id)
@@ -56,12 +58,13 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
 
   return (
     <Bloco titulo={conferirAcerto ? 'Conferir acerto' : 'Devoluções'} chave="devolucoes" recolhidoDePadrao={!erro}
-      resumo={erro ? RESUMO_COM_ERRO : totalDevolvido ? `${moeda(totalDevolvido)} devolvidos` : conferirAcerto ? 'Recebimento registrado' : 'Recebimentos e estornos'}>
+      resumo={erro ? RESUMO_COM_ERRO : resumoDasDevolucoes({ aDevolver, totalDevolvido, conferirAcerto })}>
       <div className={css.acoesPedido}>
         {erro && <p role="alert" className={css.corpoBloco}>{erro}</p>}
         {aviso && <output className={css.corpoBloco}>{aviso}</output>}
         {!dados && <p className={css.corpoBloco}>{ocupado ? 'Consultando devoluções…' : 'Não foi possível consultar as devoluções.'}</p>}
         {dados && <>
+          {aDevolver > 0 && <output className={css.corpoBloco}><strong>A devolver: {moeda(aDevolver)}</strong>. O pedido foi cancelado com valor recebido: devolva pelo estorno online ou registre a devolução manual.</output>}
           <p className={css.corpoBloco}>Recebido: {moeda(dados.pagamentos.reduce((s, p) => s + p.valor, 0))}. Devolução manual confirmada: {moeda(totalDevolvido)}.</p>
           {dados.pagamentos.some((p) => !p.manual) && <EstornosOnline pedidoId={pedidoId} />}
           {dados.estornos.map((e) => <p key={e.id} className={css.corpoBloco}>

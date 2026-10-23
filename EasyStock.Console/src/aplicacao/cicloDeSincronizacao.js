@@ -1,14 +1,16 @@
 import * as acao from './acoes'
-import { listarInbox, listarMensagens } from '../infra/api/conversasApi'
+import { listarInbox, listarMensagens, marcarLida } from '../infra/api/conversasApi'
 import { conversaDaApi } from '../infra/api/traducaoConversas'
 import { obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
-import { deveRelerMensagens, deveRelerPedido, emFila, fundirPagina, quedaDaSincronizacao } from './planoDeSincronizacao'
+import { abaVisivel, deveRelerMensagens, deveRelerPedido, emFila, fundirPagina, quedaDaSincronizacao } from './planoDeSincronizacao'
 
 // Uma volta da polling da inbox (#1576), fora do React para ser provada sem tela: o hook
 // (`useSincronizacaoApi.js`) só dá o ritmo. O que relê e em que ordem: `planoDeSincronizacao.js`.
 const CONVERSAS_POR_VEZ = 4
 // Voltas (5 s cada, 1 min) em que a conversa que esteve aberta segue com o resumo lido de fresco.
 const VOLTAS_DE_FRESCOR = 12
+// #1966: `conversa.atualizada` vale para a volta seguinte só (a conta desconta uma volta antes de ler).
+const VOLTAS_DO_EVENTO = 2
 
 // O que o laço lembra entre as voltas: os resumos da inbox (id -> resumo, na ordem da tela) e a
 // última leitura de mensagens e de pedido de cada conversa. Criada acima do Balcão (App.jsx), não
@@ -17,7 +19,7 @@ export const criarMemoriaDoLaco = () => ({ dono: null, resumos: new Map(), mensa
 
 export function criarCicloDeSincronizacao({
   despachar, memoria = criarMemoriaDoLaco(), dono = null, comConversas = true,
-  lerSelecionada = () => null, lerUsuario = () => null, estaVivo = () => true,
+  lerSelecionada = () => null, lerUsuario = () => null, estaVivo = () => true, lerAbaVisivel = abaVisivel,
 }) {
   // Memória de outro usuário não serve a este: começa do zero.
   if (memoria.dono !== dono) {
@@ -42,6 +44,23 @@ export function criarCicloDeSincronizacao({
     const selecionada = lerSelecionada()
     if (selecionada) frescas.set(selecionada, VOLTAS_DE_FRESCOR)
     return [...frescas.keys()].filter((id) => memoria.resumos.has(id))
+  }
+
+  // #1966: a API marca como lida na Meta só pelo `marcar-lida`, e a seleção chama ao abrir. Com a conversa
+  // já aberta e a aba visível, a entrada nova do cliente (não lidas e `ultimaMensagemEm` novos) é marcada
+  // uma vez por lote. Aba oculta não marca nem esquece: ao voltar, o lote que chegou é marcado.
+  let vista = { id: null, ultima: null }
+  function marcarEntradaNaAberta() {
+    const id = lerSelecionada()
+    const resumo = id ? memoria.resumos.get(id) : null
+    if (!resumo) return
+    if (vista.id !== id) {
+      vista = { id, ultima: resumo.ultimaMensagemEm }
+      return
+    }
+    if (!(resumo.naoLidas > 0) || resumo.ultimaMensagemEm === vista.ultima || !lerAbaVisivel()) return
+    vista = { id, ultima: resumo.ultimaMensagemEm }
+    marcarLida(id).catch(() => {})
   }
 
   // `null` é "não li" (a leitura falhou e não há cache); lista vazia é "a conversa não tem mensagens".
@@ -104,6 +123,7 @@ export function criarCicloDeSincronizacao({
       // Quem saiu do Balcão no meio da volta não mexe na memória nem segue lendo conversa por conversa.
       if (!estaVivo()) return
       guardarInbox(inbox)
+      marcarEntradaNaAberta()
       const semMensagens = []
       const conversas = await emFila([...memoria.resumos.values()], CONVERSAS_POR_VEZ, async (resumo) => {
         const [mensagens, pedido] = await Promise.all([mensagensDe(resumo, cicloLento), pedidoDe(resumo, cicloLento)])
@@ -135,6 +155,11 @@ export function criarCicloDeSincronizacao({
       }
     }
     return afetou
+  }
+  // #1966: `conversa.atualizada` (nome ou contato mudou). A volta seguinte lê até a página dela, sem esperar a
+  // varredura do minuto; conversa que o laço ainda não conhece chega pela página 1.
+  volta.atualizarConversa = (conversaId) => {
+    if (conversaId) frescas.set(conversaId, Math.max(frescas.get(conversaId) ?? 0, VOLTAS_DO_EVENTO))
   }
   return volta
 }

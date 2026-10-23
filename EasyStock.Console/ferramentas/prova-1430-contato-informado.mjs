@@ -373,5 +373,29 @@ await confere('#1643-6: com o contato informado, "Contato e endereço" nasce abe
   assert.match(fonte, /resumo=\{resumoDoContato\(cliente, informado\)\}/)
 })
 
+// ── #1966 (frente D da #1889): cadastro pela conversa sem nome; a API usa o nome do contato (PR #1962) ──
+await confere('#1966: visitante que não informou o nome confirma sem o nome genérico do cartão (a API usa o do contato)', async () => {
+  const chamadas = rede()
+  const semNome = { ...INFORMADO, nome: null }
+  const { acoes } = montar(lead({ nome: 'Visitante do site', contatoInformado: semNome }))
+  // O que a Ficha manda no "Confirmar cadastro": `informado.nome ?? conversa.nome`.
+  await acoes.salvarCadastroRapido('conv-1', { nome: 'Visitante do site', telefone: semNome.telefone, email: semNome.email, endereco: null }, 0)
+  const post = chamadas.find((c) => c.metodo === 'POST')
+  assert.ok(post, 'sem POST')
+  assert.equal(post.corpo.nome, null, 'o cadastro virava "Visitante do site"')
+})
+await confere('#1966: nome genérico no cadastro rápido leva o nome do cartão "Informado pelo visitante"', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(lead({ nome: 'Visitante do site', contatoInformado: INFORMADO }))
+  await acoes.salvarCadastroRapido('conv-1', { nome: 'Visitante do site', telefone: INFORMADO.telefone, email: INFORMADO.email, endereco: null }, 0)
+  assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, 'Maria Souza')
+})
+await confere('#1966: nome escrito no cadastro rápido segue como veio', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(leadWhats({ nome: 'Cliente WhatsApp' }))
+  await acoes.salvarCadastroRapido('conv-1', { nome: 'Joana Prado', telefone: '11955554444', endereco: null }, 0)
+  assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, 'Joana Prado')
+})
+
 console.log(`\n${passou} verificações passaram, ${falhas.length} falharam.`)
 if (falhas.length > 0) process.exit(1)

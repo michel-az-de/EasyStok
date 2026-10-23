@@ -5,7 +5,7 @@ import {
 import { clienteDoDossie, contatoInformadoDoDossie, enderecoParaApi } from '../../infra/api/traducaoCliente'
 import { deveCarregarDossie } from '../planoDeSincronizacao'
 import { textoNaoLigado } from './naoLigadas'
-import { nomeConhecidoDoLead, recusaDoEndereco } from '../../dominio/cliente'
+import { nomeConhecidoDoLead, nomeGenerico, recusaDoEndereco } from '../../dominio/cliente'
 
 // Cadastro do cliente da conversa no modo API (#1276). Sem cliente vinculado o EasyStok não
 // gera pedido; aqui a dona cadastra nome, telefone e endereço pela Ficha. Nada muda na tela
@@ -94,7 +94,10 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         avisar(mensagem)
         return { erro: mensagem }
       }
-      return cadastrar(id, { ...dados, nome: c?.nomeDaDona ? c.nome : dados?.nome })
+      // #1966: nome genérico (o "Visitante do site" que a Ficha manda quando o visitante não disse o nome) não vira
+      // nome do cadastro: vai o do cartão "Informado pelo visitante" ou nulo, e a API usa o do contato (PR #1962).
+      const nome = c?.nomeDaDona ? c.nome : nomeGenerico(dados?.nome) ? nomeConhecidoDoLead(c) : dados.nome
+      return cadastrar(id, { ...dados, nome })
     },
 
     // Endereço que o automático capturou na conversa; no WhatsApp o telefone vem do canal.
