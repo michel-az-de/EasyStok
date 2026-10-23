@@ -184,7 +184,7 @@ public class CobrancaPedidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture 
         await db.SaveChangesAsync();
 
         var repo = new EasyStock.Infra.Postgre.Repositories.Storefront.PedidoStorefrontRepository(db);
-        var expirados = await repo.GetAguardandoPagamentoExpiradosAsync(Agora.AddHours(-1), 500);
+        var expirados = await repo.GetAbandonadosNoCheckoutAsync(Agora.AddHours(-1), 500);
 
         expirados.Select(p => p.Id).Should().Contain(semCobranca.Id).And.NotContain(comCobranca.Id);
     }
@@ -215,7 +215,7 @@ public class CobrancaPedidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture 
 
         await using var job = fixture.CreateDbContext();
         var repo = new EasyStock.Infra.Postgre.Repositories.Storefront.PedidoStorefrontRepository(job);
-        var expirados = await repo.GetAguardandoPagamentoExpiradosAsync(Agora.AddHours(-1), 500);
+        var expirados = await repo.GetAbandonadosNoCheckoutAsync(Agora.AddHours(-1), 500);
 
         expirados.Select(p => p.Id).Should().Contain(new[] { guestId, conversaId });
 

@@ -29,23 +29,13 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
     /// Falha rápido (InvalidOperationException) se chamado fora de transação ativa para evitar
     /// que o lock seja descartado silenciosamente — causando race condition que destrói a serialização.
     /// </summary>
-    public async Task<Pedido?> GetForUpdateAsync(Guid pedidoId, CancellationToken ct = default)
+    public async Task<Pedido?> GetForUpdateAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
     {
         if (db.Database.CurrentTransaction is null)
             throw new InvalidOperationException(
                 "GetForUpdateAsync deve ser chamado dentro de IUnitOfWork.ExecuteInTransactionAsync — " +
                 "sem transação ativa, o FOR UPDATE é descartado pelo Postgres e a serialização entre " +
                 "agentes Babá fica quebrada (race em aprovar/recusar concorrente).");
-
-        return await TravarAsync("SELECT *, xmin FROM pedidos WHERE \"Id\" = {0} FOR UPDATE", [pedidoId], ct);
-    }
-
-    public async Task<Pedido?> GetForUpdateAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
-    {
-        if (db.Database.CurrentTransaction is null)
-            throw new InvalidOperationException(
-                "GetForUpdateAsync deve ser chamado dentro de IUnitOfWork.ExecuteInTransactionAsync — " +
-                "sem transação ativa, o FOR UPDATE é descartado pelo Postgres.");
 
         // #1265-9: a empresa vai no WHERE; a linha de outra empresa não é travada.
         return await TravarAsync(
@@ -97,7 +87,7 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
     private static readonly string[] OrigensDoCheckout =
         [OrigemPedido.Storefront, OrigemPedido.StorefrontGuest, OrigemPedido.WhatsApp];
 
-    public async Task<IReadOnlyList<Pedido>> GetAguardandoPagamentoExpiradosAsync(
+    public async Task<IReadOnlyList<Pedido>> GetAbandonadosNoCheckoutAsync(
         DateTime criadoAntesDe,
         int maxBatch = 50,
         CancellationToken ct = default)
@@ -107,7 +97,8 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
         return await db.Pedidos
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(p => p.Status == StatusPedidoMapper.AguardandoPagamento
+            // #1623-a: o rascunho da fase 1 do checkout interrompido também (sem cobrança, sem vaga ou com ela).
+            .Where(p => (p.Status == StatusPedidoMapper.AguardandoPagamento || p.Status == StatusPedidoMapper.Rascunho)
                      && OrigensDoCheckout.Contains(p.Origem)
                      && p.CriadoEm < criadoAntesDe
                      // S11: pedido com CobrancaPedido é do CobrancaPedidoJob (expira pelo link, não pela criação).

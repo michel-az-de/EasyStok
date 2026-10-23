@@ -78,6 +78,47 @@ public sealed class CancelarPedidosAbandonadosIntegrationTests(PostgreSqlDatabas
         await ocupar.Should().NotThrowAsync();
     }
 
+    /// <summary>
+    /// #1623-a: checkout do site interrompido na fase 1 deixa o pedido em rascunho, sem cobrança, para sempre. A rodada
+    /// cancela o rascunho antigo do checkout com a trilha de sempre e deixa o recente (checkout em andamento).
+    /// </summary>
+    [SkippableFact]
+    public async Task RascunhoAntigoDoCheckout_ARodadaCancelaEDeixaORecente()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+
+        var empresaId = Guid.NewGuid();
+        Guid antigoId, recenteId;
+        await using (var setup = fixture.CreateDbContext())
+        {
+            await setup.Database.MigrateAsync();
+            setup.SetMobileTenantContext(empresaId);
+            var empresa = Empresa.Criar($"Empresa {empresaId:N}", null);
+            empresa.Id = empresaId;
+            setup.Empresas.Add(empresa);
+            var antigo = Pedido.Criar(empresaId, origem: "storefront");
+            antigo.Status = StatusPedidoMapper.Rascunho;
+            antigo.CriadoEm = DateTime.UtcNow.AddHours(-2);
+            var recente = Pedido.Criar(empresaId, origem: "storefront");
+            recente.Status = StatusPedidoMapper.Rascunho;
+            setup.Pedidos.AddRange(antigo, recente);
+            await setup.SaveChangesAsync();
+            (antigoId, recenteId) = (antigo.Id, recente.Id);
+        }
+
+        await using (var provider = BuildProvider())
+            await new CancelarPedidosAbandonadosBackgroundService(provider.GetRequiredService<IServiceScopeFactory>(),
+                NullLogger<CancelarPedidosAbandonadosBackgroundService>.Instance).RodadaAsync(CancellationToken.None);
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(empresaId);
+        (await leitura.Pedidos.AsNoTracking().SingleAsync(p => p.Id == antigoId)).Status.Should().Be(StatusPedidoMapper.Cancelado);
+        (await leitura.Pedidos.AsNoTracking().SingleAsync(p => p.Id == recenteId)).Status.Should().Be(StatusPedidoMapper.Rascunho);
+        (await leitura.Set<PedidoEvento>().IgnoreQueryFilters().AsNoTracking().SingleAsync(e => e.PedidoId == antigoId))
+            .Should().Match<PedidoEvento>(e => e.Tipo == "cancelado" && e.StatusAntigo == StatusPedidoMapper.Rascunho
+                && e.Detalhes == CancelarPedidosAbandonadosBackgroundService.MotivoAbandonado);
+    }
+
     private ServiceProvider BuildProvider()
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection([]).Build();

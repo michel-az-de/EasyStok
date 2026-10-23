@@ -101,8 +101,9 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
 
         var enviada = false;
         if (conversaId is { } conversa && cobranca.LinkPagamento is { } link)
+            // #1991-7: o link trocado pela atendente sai em nome dela, não como automática.
             enviada = await aviso.EnviarAsync(input.EmpresaId, conversa, AvisoCobrancaConversa.TextoLinkTrocado(link),
-                relogio.GetUtcNow().UtcDateTime, ct);
+                relogio.GetUtcNow().UtcDateTime, ct, input.UsuarioId);
 
         return new TrocarFormaPagamentoPedidoResult(cobranca, enviada);
     }
@@ -131,7 +132,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         TrocarFormaPagamentoPedidoInput input, string forma, Guid? linkConferido, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, ct);
+        var pedido = await pedidoRepository.GetForUpdateAsync(input.EmpresaId, input.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != input.EmpresaId)
             throw new CobrancaPedidoNaoEncontradoException(input.PedidoId);
         if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))

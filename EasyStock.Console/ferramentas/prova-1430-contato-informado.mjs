@@ -136,17 +136,63 @@ await confere('#1936: endereço de lead do chat do site vai com o telefone e o n
   assert.ok(post, 'sem POST')
   assert.equal(post.corpo.telefone, '+5511987654321', 'cadastro sem o telefone do visitante')
   assert.equal(post.corpo.nome, 'Maria Souza')
-  assert.deepEqual(post.corpo.endereco, { cep: '05415000', logradouro: 'Rua dos Pinheiros', numero: '200', complemento: null, bairro: 'Pinheiros' })
+  // #1991-3: cidade e UF digitadas vão junto (antes o console descartava e o cadastro ficava sem elas).
+  assert.deepEqual(post.corpo.endereco, { cep: '05415000', logradouro: 'Rua dos Pinheiros', numero: '200', complemento: null, bairro: 'Pinheiros', cidade: 'São Paulo', uf: 'SP' })
 })
 
 await confere('#1936: cidade e UF no fim do endereço não viram bairro', async () => {
   const { partesDoEndereco } = await import('../src/dominio/formato.js')
-  for (const cidade of ['São Paulo', 'Sao Paulo - SP', 'São Paulo/SP', 'SP']) {
+  for (const cidade of ['São Paulo', 'Sao Paulo - SP', 'São Paulo/SP', 'SP', 'São Paulo, SP']) {
     const p = partesDoEndereco(`Rua A, 10, apto 2, Pinheiros, ${cidade}, 05415-000`)
     assert.equal(p.bairro, 'Pinheiros', cidade)
     assert.equal(p.complemento, 'apto 2', cidade)
+    // #1991-3: a cidade e a UF saem do texto, mas não somem: São Paulo é SP.
+    assert.equal(p.uf, 'SP', cidade)
+    assert.equal(p.cidade, cidade === 'SP' ? '' : 'São Paulo', cidade)
   }
-  assert.equal(partesDoEndereco('Rua A, 10, Pinheiros, 05415-000').bairro, 'Pinheiros', 'formato antigo')
+  const antigo = partesDoEndereco('Rua A, 10, Pinheiros, 05415-000')
+  assert.equal(antigo.bairro, 'Pinheiros', 'formato antigo')
+  assert.equal(antigo.cidade, '', 'formato antigo sem cidade')
+  assert.equal(antigo.uf, '', 'formato antigo sem UF')
+})
+
+// #1989 (item 5, laboratório de 23/10): endereço colado do WhatsApp era recusado com "escreva
+// separado por vírgulas". Prefixo "CEP" e hífen como separador são o jeito comum de escrever.
+await confere('#1989-5: endereço colado com "CEP" no fim ou separado por hífen é aceito', async () => {
+  const { partesDoEndereco } = await import('../src/dominio/formato.js')
+  const { recusaDoEndereco } = await import('../src/dominio/cliente.js')
+  const comPrefixo = 'Rua Cardeal Arcoverde, 500, apto 3, Pinheiros, Sao Paulo, CEP 05416-000'
+  assert.deepEqual(partesDoEndereco(comPrefixo),
+    { rua: 'Rua Cardeal Arcoverde', numero: '500', complemento: 'apto 3', bairro: 'Pinheiros', cep: '05416-000', cidade: 'São Paulo', uf: 'SP' })
+  const comHifen = 'Rua Harmonia, 300 - Vila Madalena - 05435-000'
+  assert.deepEqual(partesDoEndereco(comHifen),
+    { rua: 'Rua Harmonia', numero: '300', complemento: '', bairro: 'Vila Madalena', cep: '05435-000', cidade: '', uf: '' })
+  for (const texto of [
+    'Rua Harmonia, 300 - Vila Madalena - São Paulo - SP - 05435-000',
+    'Rua Harmonia, 300 - Vila Madalena, São Paulo/SP, CEP: 05435000',
+    'Rua Harmonia, 300, Vila Madalena, cep 05435-000',
+  ]) {
+    const p = partesDoEndereco(texto)
+    assert.equal(p.bairro, 'Vila Madalena', texto)
+    assert.equal(p.numero, '300', texto)
+    assert.match(p.cep, /^05435-?000$/, texto)
+  }
+  assert.equal(recusaDoEndereco(comPrefixo), null)
+  assert.equal(recusaDoEndereco(comHifen), null)
+  // Hífen colado em nome próprio não separa nada.
+  assert.equal(partesDoEndereco('Rua Pedro-Álvares, 10, Pinheiros, 05415-000').rua, 'Rua Pedro-Álvares')
+  // Sem CEP no fim continua recusado, com o formato.
+  assert.ok(recusaDoEndereco('Rua Harmonia 300 Vila Madalena'))
+})
+
+await confere('#1989-5: o endereço colado com "CEP" chega ao EasyStok em partes', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(lead({ contatoInformado: INFORMADO }))
+  acoes.editarDadoCliente('conv-1', 'endereco', 'Rua Harmonia, 300 - Vila Madalena - São Paulo - SP - CEP 05435-000', 0)
+  await esperar()
+  const post = chamadas.find((c) => c.metodo === 'POST')
+  assert.ok(post, 'sem POST')
+  assert.deepEqual(post.corpo.endereco, { cep: '05435000', logradouro: 'Rua Harmonia', numero: '300', complemento: null, bairro: 'Vila Madalena', cidade: 'São Paulo', uf: 'SP' })
 })
 
 await confere('telefone E.164 da API aparece na máscara da tela', () => {

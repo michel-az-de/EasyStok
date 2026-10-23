@@ -110,5 +110,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// listar como linhas no caixa. Mesma seleção de
         /// <see cref="GetTotalPagamentosPedidosNoIntervaloAsync"/>.</summary>
         Task<IReadOnlyList<PedidoPagamento>> GetPagamentosPedidosListaNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
+
+        /// <summary>#1630-4: vendas estornadas no intervalo [iniUtc, fimUtc), pelo instante do estorno,
+        /// com a forma da venda. Mesma seleção que <see cref="GetTotalVendasNoIntervaloAsync"/> abate
+        /// do total, para as linhas por forma descontarem o estorno igual ao total.</summary>
+        Task<IReadOnlyList<VendaEstornadaCaixa>> GetVendasEstornadasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
     }
+
+    /// <summary>Uma venda estornada no caixa: quanto voltou, quando e em que forma a venda foi paga.</summary>
+    public sealed record VendaEstornadaCaixa(Guid VendaId, DateTime EstornadaEm, decimal Valor, string? FormaPagamento);
 }

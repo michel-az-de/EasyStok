@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Storefront.Agendamento;
 using EasyStock.Domain.Entities.Atendimento;
@@ -31,7 +32,7 @@ public class ListarJanelasFerramentaTests
     {
         public StorefrontEntity Storefront { get; }
         public IStorefrontRepository StorefrontRepo { get; } = Substitute.For<IStorefrontRepository>();
-        public ICardapioItemRepository CardapioRepo { get; } = Substitute.For<ICardapioItemRepository>();
+        public ICardapioItemRepository CardapioRepo { get; } = Substitute.For<ICardapioItemRepository>().ListarPeloGetById();
         public IConfiguracaoAtendimentoRepository ConfiguracaoRepo { get; } = Substitute.For<IConfiguracaoAtendimentoRepository>();
         public IJanelaEntregaRepository JanelaRepo { get; } = Substitute.For<IJanelaEntregaRepository>();
         public IVagaOcupadaRepository VagaRepo { get; } = Substitute.For<IVagaOcupadaRepository>();

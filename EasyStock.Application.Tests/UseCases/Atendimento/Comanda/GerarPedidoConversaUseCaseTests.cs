@@ -72,8 +72,8 @@ public class GerarPedidoConversaUseCaseTests
 
             // Troca de forma (na entrega) trava o pedido recém-criado numa transação.
             Uow.SetupExecuteInTransactionSemRetry<(CobrancaPedidoResult, Guid?, string?, PedidoMudouStatusOperacao?, ImpressaoPendenteOperacao?)>();
-            Checkout.PedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-                .Returns(ci => Checkout.PedidosAdicionados.FirstOrDefault(p => p.Id == ci.Arg<Guid>()));
+            Checkout.PedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(ci => Checkout.PedidosAdicionados.FirstOrDefault(p => p.EmpresaId == ci.ArgAt<Guid>(0) && p.Id == ci.ArgAt<Guid>(1)));
 
             var aviso = new AvisoCobrancaConversa(ConversaRepo, new ResolvedorCanal([Canal]), Uow,
                 NullLogger<AvisoCobrancaConversa>.Instance);
@@ -138,6 +138,32 @@ public class GerarPedidoConversaUseCaseTests
         var saida = c.Mensagens.Should().ContainSingle().Subject;
         saida.Direcao.Should().Be(DirecaoMensagem.Saida);
         saida.ExternoId.Should().Be("wamid.resumo");
+    }
+
+    // #1991-7 (#1989-6): o resumo que a atendente manda pelo console é dela, não "automática": autor humano e quem enviou.
+    [Fact]
+    public async Task ResumoEnviadoPeloConsole_GuardaQuemEnviou()
+    {
+        var c = new Cenario();
+        var atendente = Guid.NewGuid();
+
+        await c.UseCase.ExecuteAsync(c.Input() with { UsuarioId = atendente });
+
+        var saida = c.Mensagens.Should().ContainSingle().Subject;
+        saida.Autor.Should().Be(AutorMensagem.Dona);
+        saida.EnviadaPorUsuarioId.Should().Be(atendente);
+    }
+
+    [Fact]
+    public async Task ResumoSemUsuario_SegueDoSistema()
+    {
+        var c = new Cenario();
+
+        await c.UseCase.ExecuteAsync(c.Input());
+
+        var saida = c.Mensagens.Should().ContainSingle().Subject;
+        saida.Autor.Should().Be(AutorMensagem.Sistema);
+        saida.EnviadaPorUsuarioId.Should().BeNull();
     }
 
     [Fact]

@@ -370,7 +370,7 @@ public class ItensDoCardapioComandaUseCaseTests
         var lista = await Sut().ListarGestaoAsync(EmpresaId);
 
         lista.Select(i => (i.Nome, i.Visivel, i.Disponivel)).Should().Equal(
-            ("lasanha", true, false), ("nhoque", false, true));
+            ("Lasanha", true, false), ("Nhoque", false, true));
         lista.Should().OnlyContain(i => !i.ControlaSaldo, "itens avulsos não controlam saldo");
     }
 

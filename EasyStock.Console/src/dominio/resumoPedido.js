@@ -53,7 +53,8 @@ function ehEncomendaDeOutroDia(pedido, { fonteApi, agora }) {
 }
 
 export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Date.now(), meio = pedido?.meio } = {}) {
-  if ((meio && meio !== 'maquininha') || !ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
+  // J2 (#1990): dinheiro na entrega é a mesma forma da maquininha no EasyStok; a encomenda pede sinal igual.
+  if ((meio && meio !== 'maquininha' && meio !== 'dinheiro-entrega') || !ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
   return 'Encomenda para outro dia: sinal de 50% antes da produção. Restante na entrega.'
 }
 
@@ -66,6 +67,10 @@ export function previaDoSinal(pedido, { fonteApi = false, agora = Date.now(), to
   const sinal = sinalDeEncomenda(total)
   return { sinal, restante: Math.round((total - sinal) * 100) / 100 }
 }
+
+// #1989 (#1765-3): a primeira linha do resumo antes de gerar, os itens que o cliente vai receber.
+export const itensDoResumo = (pedido, cardapio) => itensDetalhados(pedido, cardapio ?? [])
+  .map((l) => `${l.qtd}× ${l.produto?.nome ?? l.sku}`).join(', ')
 
 // #1875: a barra só marca o meio; este resumo diz o que o botão de confirmação vai fazer.
 export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi = false, agora = Date.now(), simulacao = null }) {

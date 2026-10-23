@@ -146,9 +146,10 @@ public sealed class EnviarMensagemVisitanteUseCase(
             conversa.RegistrarEntrada(agora);
             await conversaRepository.AddMensagemAsync(entrada, tokenCt);
             var confirmacaoId = PrefixoConfirmacaoRecebimento + conversa.Id.ToString("N");
+            // #1991-4: 1 µs depois da entrada (a precisão do timestamp no banco): com o mesmo instante a ordem do chat variava.
             if (await conversaRepository.ObterMensagemPorExternoIdAsync(sessao.EmpresaId, confirmacaoId, tokenCt) is null)
                 await conversaRepository.AddMensagemAsync(Mensagem.Saida(sessao.EmpresaId, conversa.Id,
-                    AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+                    AutorMensagem.Sistema, agora.AddTicks(TimeSpan.TicksPerMicrosecond), TipoConteudoMensagem.Texto,
                     "Recebemos sua mensagem. A equipe da loja responde por aqui.", confirmacaoId), tokenCt);
             await unitOfWork.CommitAsync();
             return entrada;

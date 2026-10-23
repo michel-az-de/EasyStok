@@ -88,7 +88,7 @@ public class PlanejamentoDaProducaoUseCaseTests
 
         var r = await Sut().SugestaoAsync(EmpresaId);
 
-        r.Pratos.Select(p => (p.Nome, p.Sugestao)).Should().Equal(("nhoque", 0m), ("ravióli", 2m));
+        r.Pratos.Select(p => (p.Nome, p.Sugestao)).Should().Equal(("Nhoque", 0m), ("Ravióli", 2m));
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class PlanejamentoDaProducaoUseCaseTests
 
         var r = await Sut().SugestaoAsync(EmpresaId);
 
-        r.Pratos.Select(p => (p.Nome, p.Agendados)).Should().Equal(("lasanha", 3m), ("canelone", 4m));
+        r.Pratos.Select(p => (p.Nome, p.Agendados)).Should().Equal(("Lasanha", 3m), ("Canelone", 4m));
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class PlanejamentoDaProducaoUseCaseTests
 
         var r = await Sut().SugestaoAsync(EmpresaId);
 
-        r.Pratos.Select(p => p.Nome).Should().Equal("lasanha", "nhoque", "ravióli");
+        r.Pratos.Select(p => p.Nome).Should().Equal("Lasanha", "Nhoque", "Ravióli");
         await _produtos.Received(1).GetByIdsAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>());
         await _produtos.DidNotReceive().GetByIdAsync(EmpresaId, Arg.Any<Guid>());
     }
@@ -140,7 +140,7 @@ public class PlanejamentoDaProducaoUseCaseTests
 
         var r = await Sut().SugestaoAsync(EmpresaId);
 
-        r.Pratos.Select(p => p.Nome).Should().Equal("lasanha");
+        r.Pratos.Select(p => p.Nome).Should().Equal("Lasanha");
     }
 
     [Fact]

@@ -17,6 +17,8 @@ export const SO_DA_TELA = [
   'pedirNotificacaoDoNavegador',
   // Rascunho da comanda: o meio escolhido segue no corpo do pedido (F03).
   'escolherMeioPagamento',
+  // J2 (#1990): o troco do dinheiro na entrega também segue no corpo do pedido (observações).
+  'definirTroco',
   // Marca de canhoto já impresso nesta tela; a impressão em si não depende dela.
   'marcarCanhotoImpresso',
   // Fechar o modal do gesto da loja (#1443): abrir e fechar de verdade são ligadas.

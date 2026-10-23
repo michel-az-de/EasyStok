@@ -253,11 +253,13 @@ public sealed class GerarCobrancaPedidoUseCase(
     /// </summary>
     private static PreferenceItemCommand ItemDaPreferencia(PedidoItem item)
     {
+        // #1991-5: pedido antigo guardou o nome do prato em minúsculas; o cliente lê como no cardápio.
+        var titulo = NomeCardapio.Exibicao(item.Nome) ?? item.Nome;
         if (item.Quantidade == decimal.Truncate(item.Quantidade))
-            return new PreferenceItemCommand(item.Nome, (int)item.Quantidade, item.PrecoUnitario);
+            return new PreferenceItemCommand(titulo, (int)item.Quantidade, item.PrecoUnitario);
 
         var subtotal = Math.Round(item.Quantidade * item.PrecoUnitario, 2, MidpointRounding.AwayFromZero);
-        return new PreferenceItemCommand(item.Nome, 1, subtotal);
+        return new PreferenceItemCommand(titulo, 1, subtotal);
     }
 
     private async Task<PreferenceCriadaResult> CriarPreferenciaAsync(CriarPreferenceCommand command, CancellationToken ct)

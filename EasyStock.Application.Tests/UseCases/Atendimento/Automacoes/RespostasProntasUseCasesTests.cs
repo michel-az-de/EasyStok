@@ -100,7 +100,8 @@ public class RespostasProntasUseCasesTests
         var lembrete = lista.Should().ContainSingle(r => r.Gatilho == GatilhoAutomacao.CobrancaVencendo).Subject;
         lembrete.Ligada.Should().BeTrue();
         lembrete.Texto.Should().Contain("{pedido}");
-        lista.Where(r => r.Gatilho != GatilhoAutomacao.CobrancaVencendo).Should().OnlyContain(r => !r.Ligada && r.Texto == null);
+        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado))
+            .Should().OnlyContain(r => !r.Ligada && r.Texto == null);
     }
 
     [Fact]
@@ -119,5 +120,34 @@ public class RespostasProntasUseCasesTests
         desligada.Ligada.Should().BeFalse();
         existente.Ligada.Should().BeFalse();
         _uow.CommitCount.Should().Be(2);
+    }
+
+    // #1991-2: sem regra gravada a tela mostra "Pagamento confirmado" ligada com o texto padrão; a dona desliga salvando.
+    [Fact]
+    public async Task ListarSemRegraGravada_PagamentoConfirmadoVemLigado()
+    {
+        _regras.ListarAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(new List<RegraAutomatica>());
+
+        var lista = await new AutomacoesUseCases(_regras, _uow, _relogio).ListarAsync(_empresaId);
+
+        var pago = lista.Single(r => r.Gatilho == GatilhoAutomacao.PagamentoConfirmado);
+        pago.Ligada.Should().BeTrue();
+        pago.Texto.Should().Be(RegraAutomatica.TextoPadraoPagamentoConfirmado);
+        pago.AlteradaEm.Should().BeNull("o padrão não foi gravado por ninguém");
+        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.PagamentoConfirmado or GatilhoAutomacao.CobrancaVencendo))
+            .Should().OnlyContain(r => !r.Ligada && r.Texto == null);
+    }
+
+    [Fact]
+    public async Task ListarComRegraDesligadaPelaDona_PagamentoConfirmadoVemDesligado()
+    {
+        _regras.ListarAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(new List<RegraAutomatica>
+        {
+            RegraAutomatica.Criar(_empresaId, GatilhoAutomacao.PagamentoConfirmado, "Pago!", false, Agora),
+        });
+
+        var lista = await new AutomacoesUseCases(_regras, _uow, _relogio).ListarAsync(_empresaId);
+
+        lista.Single(r => r.Gatilho == GatilhoAutomacao.PagamentoConfirmado).Ligada.Should().BeFalse();
     }
 }

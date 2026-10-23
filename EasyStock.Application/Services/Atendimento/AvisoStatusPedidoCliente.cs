@@ -22,6 +22,10 @@ namespace EasyStock.Application.Services.Atendimento;
 /// enfileira. A chave <c>pedidoId|marco</c> vira a <c>IdempotencyKey</c> do outbox: reprocessar o evento de
 /// integração (at-least-once) não duplica a mensagem.
 /// </para>
+/// <para>
+/// #1991-1: pedido cuja conversa é do chat do site recebe o aviso nela (<see cref="AvisoPedidoNaConversa"/>), sem
+/// telefone e com o consentimento do canal do chat; o pedido de avaliação (agendado, com botões) segue pelo WhatsApp.
+/// </para>
 /// </summary>
 public sealed class AvisoStatusPedidoCliente(
     IPedidoRepository pedidoRepository,
@@ -32,7 +36,8 @@ public sealed class AvisoStatusPedidoCliente(
     INotificadorService notificador,
     ITenantContextAccessor tenantContext,
     ILogger<AvisoStatusPedidoCliente> logger, IConversaRepository? conversas = null,
-    EasyStock.Application.UseCases.Atendimento.Entregas.ConfiguracaoLogistica? logistica = null)
+    EasyStock.Application.UseCases.Atendimento.Entregas.ConfiguracaoLogistica? logistica = null,
+    AvisoPedidoNaConversa? naConversa = null)
 {
     /// <summary>Previsão quando o pedido não tem vaga de entrega (ex.: balcão).</summary>
     public const string PrevisaoSemJanela = "a confirmar";
@@ -79,6 +84,25 @@ public sealed class AvisoStatusPedidoCliente(
             return false;
         }
 
+        var conversaId = conversas is null ? null : await conversas.ObterIdPorPedidoAsync(empresaId, pedidoId, ct);
+        var conversa = conversaId is { } cid ? await conversas!.ObterPorIdAsync(empresaId, cid, ct) : null;
+        var chave = $"{pedido.Id:N}|{marco}";
+
+        // #1991-1: o cliente do chat do site recebe o aviso na conversa do pedido, sem telefone. O pedido de avaliação
+        // (agendado, com botões) segue o caminho do WhatsApp.
+        if (naConversa is not null && enviarApos is null && conversa is not null && AvisoPedidoNaConversa.Atende(conversa))
+        {
+            if (pedido.ClienteId is { } idChat
+                && !await politicaEnvio.PodeEnviarAsync(empresaId, idChat, conversa.Canal, FinalidadeContato.Transacional, ct))
+            {
+                logger.LogInformation("Aviso {Tipo} não gravado: cliente do pedido {PedidoId} revogou o chat do site", tipo, pedidoId);
+                return false;
+            }
+            var variaveis = await VariaveisAsync(tipo, empresaId, pedido, cliente, conversa, previsao, mensagem, ct);
+            return await naConversa.EntregarAsync(tipo, conversa,
+                variaveis.ToDictionary(v => v.Key, v => (object?)v.Value, StringComparer.OrdinalIgnoreCase), chave, ct);
+        }
+
         var telefone = TelefoneE164(cliente?.Telefone) ?? TelefoneE164(pedido.ClienteTelefone);
         if (telefone is null)
         {
@@ -93,30 +117,36 @@ public sealed class AvisoStatusPedidoCliente(
             return false;
         }
 
-        var nome = cliente?.Nome ?? pedido.ClienteNome;
-        var conversaId = conversas is null ? null : await conversas.ObterIdPorPedidoAsync(empresaId, pedidoId, ct);
-        var conversa = conversaId is { } cid ? await conversas!.ObterPorIdAsync(empresaId, cid, ct) : null;
-        var payload = new Dictionary<string, string?>
-        {
-            ["pedidoId"] = pedido.Id.ToString(),
-            ["clienteId"] = pedido.ClienteId?.ToString(),
-            ["telefone"] = telefone,
-            ["nome"] = PrimeiroNome(nome),
-            ["numero"] = conversa is { NumeroComanda: > 0 } ? conversa.NumeroComanda.ToString(CultureInfo.InvariantCulture)
-                : pedido.Id.ToString("N")[..8].ToUpperInvariant(),
-            ["previsao"] = previsao ?? await PrevisaoAsync(pedido.Id, ct),
-            [NotificadorService.ChaveIdempotenciaPayload] = $"{pedido.Id:N}|{marco}",
-        };
-        if (mensagem is not null) payload["mensagem"] = mensagem;
+        var payload = await VariaveisAsync(tipo, empresaId, pedido, cliente, conversa, previsao, mensagem, ct);
+        payload["telefone"] = telefone;
+        payload[NotificadorService.ChaveIdempotenciaPayload] = chave;
         if (enviarApos is { } instante)
             payload[NotificadorService.EnviarAposPayload] = DateTime.SpecifyKind(instante, DateTimeKind.Utc)
                 .ToString("O", CultureInfo.InvariantCulture);
-        if (tipo == TipoEventoNotificacao.PedidoEntregue)
-            payload["instagram"] = (await storefrontRepository.GetByEmpresaAsync(empresaId, ct))?.InstagramUrl ?? string.Empty;
 
         await notificador.EnfileirarEventoAsync(tipo, empresaId, JsonSerializer.Serialize(payload), pedido.Id, ct);
         logger.LogInformation("Aviso {Tipo} enfileirado para o pedido {PedidoId}", tipo, pedidoId);
         return true;
+    }
+
+    /// <summary>Variáveis dos modelos de aviso, as mesmas no WhatsApp e no chat do site.</summary>
+    private async Task<Dictionary<string, string?>> VariaveisAsync(
+        TipoEventoNotificacao tipo, Guid empresaId, Domain.Entities.Pedido pedido, Domain.Entities.Cliente? cliente,
+        Domain.Entities.Atendimento.Conversa? conversa, string? previsao, string? mensagem, CancellationToken ct)
+    {
+        var variaveis = new Dictionary<string, string?>
+        {
+            ["pedidoId"] = pedido.Id.ToString(),
+            ["clienteId"] = pedido.ClienteId?.ToString(),
+            ["nome"] = PrimeiroNome(cliente?.Nome ?? pedido.ClienteNome),
+            ["numero"] = conversa is { NumeroComanda: > 0 } ? conversa.NumeroComanda.ToString(CultureInfo.InvariantCulture)
+                : pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+            ["previsao"] = previsao ?? await PrevisaoAsync(pedido.Id, ct),
+        };
+        if (mensagem is not null) variaveis["mensagem"] = mensagem;
+        if (tipo == TipoEventoNotificacao.PedidoEntregue)
+            variaveis["instagram"] = (await storefrontRepository.GetByEmpresaAsync(empresaId, ct))?.InstagramUrl ?? string.Empty;
+        return variaveis;
     }
 
     private async Task<string> PrevisaoAsync(Guid pedidoId, CancellationToken ct)

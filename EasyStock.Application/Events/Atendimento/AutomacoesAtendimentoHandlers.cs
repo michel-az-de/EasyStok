@@ -1,8 +1,10 @@
 using System.Text.Json;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Automacoes;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Integration;
 using EasyStock.Domain.Sales;
 
@@ -68,20 +70,35 @@ public sealed class AutomacaoConversaEncerradaHandler(ITenantContextAccessor ten
     }
 }
 
-/// <summary><c>pedido.pago</c> (S11): pagamento confirmado.</summary>
-public sealed class AutomacaoPedidoPagoHandler(ITenantContextAccessor tenant, DispararAutomacaoUseCase disparo)
+/// <summary>
+/// <c>pedido.pago</c> (S11): o "recebemos seu pagamento" ao cliente, decidido num lugar só (#1991-2). Primeiro a
+/// automática "Pagamento confirmado" (nasce ligada; a dona troca o texto ou desliga); se ela não sai (desligada, fora
+/// da janela, sem conversa, variável sem valor, falha do canal), o aviso S13 de pedido pago, com modelo aprovado e
+/// idempotente por cobrança e pagamento externo. Assim o cliente recebe um aviso, nunca dois e nunca nenhum.
+/// </summary>
+public sealed class AutomacaoPedidoPagoHandler(
+    ITenantContextAccessor tenant, DispararAutomacaoUseCase disparo, AvisoStatusPedidoCliente aviso)
     : AutomacaoHandlerBase(tenant)
 {
+    /// <summary>Marco do aviso S13 quando o pagamento não tem cobrança (crédito do cliente).</summary>
+    public const string MarcoPago = "pago";
+
     public override string TipoEvento => PedidoPagoEvent.TipoEvento;
 
-    /// <summary>Só o que a automática usa do <see cref="PedidoPagoEvent"/>.</summary>
-    private sealed record PedidoPagoPayload(Guid PedidoId, Guid? ClienteId, Guid? ConversaId);
+    /// <summary>Só o que o aviso usa do <see cref="PedidoPagoEvent"/>.</summary>
+    private sealed record PedidoPagoPayload(
+        Guid PedidoId, Guid? ClienteId, Guid? ConversaId, Guid CobrancaPedidoId, string? PagamentoExternoId);
 
     protected override async Task TratarAsync(OutboxEventoIntegracao evento, CancellationToken ct)
     {
-        if (Ler<PedidoPagoPayload>(evento) is { } e)
-            await disparo.ExecuteAsync(new DisparoAutomacao(
-                evento.EmpresaId, GatilhoAutomacao.PagamentoConfirmado, e.ConversaId, e.ClienteId, e.PedidoId), ct);
+        if (Ler<PedidoPagoPayload>(evento) is not { } e) return;
+
+        var automatica = await disparo.ExecuteAsync(new DisparoAutomacao(
+            evento.EmpresaId, GatilhoAutomacao.PagamentoConfirmado, e.ConversaId, e.ClienteId, e.PedidoId), ct);
+        if (automatica == ResultadoAutomacao.Enviada) return;
+
+        var marco = e.CobrancaPedidoId == Guid.Empty ? MarcoPago : $"pagamento:{e.CobrancaPedidoId:N}:{e.PagamentoExternoId}";
+        await aviso.EnfileirarAsync(TipoEventoNotificacao.PedidoPagoConfirmado, evento.EmpresaId, e.PedidoId, marco, ct);
     }
 }
 

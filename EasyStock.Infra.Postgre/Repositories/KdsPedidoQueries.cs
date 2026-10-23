@@ -123,7 +123,8 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                 RequerAprovacao: p.RequerAprovacao,
                 MotivoRequerAprovacao: p.MotivoRequerAprovacao,
                 AReceber: saldos[p.Id].AReceber(p.Total.Valor),
-                NumeroComanda: comandas.TryGetValue(p.Id, out var comanda) ? comanda : null);
+                NumeroComanda: comandas.TryGetValue(p.Id, out var comanda) ? comanda : null,
+                NumeroDoDia: p.NumeroDoDia);
         }).ToList();
     }
 

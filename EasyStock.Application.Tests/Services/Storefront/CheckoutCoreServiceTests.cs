@@ -30,7 +30,7 @@ public class CheckoutCoreServiceTests
     internal sealed class Cenario
     {
         public IStorefrontRepository StorefrontRepo { get; } = Substitute.For<IStorefrontRepository>();
-        public ICardapioItemRepository CardapioRepo { get; } = Substitute.For<ICardapioItemRepository>();
+        public ICardapioItemRepository CardapioRepo { get; } = Substitute.For<ICardapioItemRepository>().ListarPeloGetById();
         public IJanelaEntregaRepository JanelaRepo { get; } = Substitute.For<IJanelaEntregaRepository>();
         public IBloqueioEntregaRepository BloqueioRepo { get; } = Substitute.For<IBloqueioEntregaRepository>();
         public IFreteZonaRepository FreteZonaRepo { get; } = Substitute.For<IFreteZonaRepository>();
@@ -312,20 +312,22 @@ public class CheckoutCoreServiceTests
         reservado.ItemFrete.ConservacaoSnapshot.Should().BeNull("frete não é produto");
     }
     [Theory]
-    [InlineData(true, "brigadeiro avulso")]
-    [InlineData(false, "brigadeiro da casa")]
-    public async Task PreservaNomePublicoDoCardapioNoPedido(bool avulso, string nome)
+    [InlineData(true, "brigadeiro avulso", "Brigadeiro Avulso")]
+    [InlineData(false, "brigadeiro da casa", "Brigadeiro da Casa")]
+    public async Task PreservaNomePublicoDoCardapioNoPedido(bool avulso, string nome, string noPedido)
     {
         var c = new Cenario();
         var item = avulso ? CardapioItem.CriarAvulso(c.Storefront.Id, nome, 10m) : c.CardapioItem;
         if (!avulso) item.AtualizarMetadata(nomePublico: nome);
         item.TornarVisivel();
+        typeof(CardapioItem).GetProperty("Id")!.SetValue(item, CardapioItemId);
         c.CardapioRepo.GetByIdAsync(c.Storefront.Id, CardapioItemId, Arg.Any<CancellationToken>())
             .Returns(item);
 
         var reservado = await c.Servico().CriarPedidoComReservaAsync(Input(c));
 
-        reservado.Itens[0].Nome.Should().Be(nome);
+        // #1991-5: o pedido leva o nome como na vitrine (o cadastro guarda em minúsculas).
+        reservado.Itens[0].Nome.Should().Be(noPedido);
     }
 
     // ── S16: antecedência mínima ─────────────────────────────────────────

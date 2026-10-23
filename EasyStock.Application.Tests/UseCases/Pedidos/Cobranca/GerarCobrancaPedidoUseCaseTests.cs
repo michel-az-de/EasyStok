@@ -175,6 +175,21 @@ public class GerarCobrancaPedidoUseCaseTests
         pref.ValorTotal.Should().Be(76m);
     }
 
+    // #1991-5: pedido feito antes da correção guardou o nome do prato em minúsculas ("1x talharim 500 g" no Mercado
+    // Pago). A descrição sai como no cardápio; o que já tem maiúscula não muda.
+    [Fact]
+    public async Task NomeDoItemEmMinusculas_SaiComoNoCardapio()
+    {
+        var f = new CobrancaPedidoFixture();
+        AdicionarItem(f, "talharim 500 g", 1m, 30m);
+
+        await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+
+        var pref = f.Preferencias.Should().ContainSingle().Subject;
+        pref.Items.Should().ContainEquivalentOf(new PreferenceItemCommand("Talharim 500 g", 1, 30m));
+        pref.Items.Should().ContainEquivalentOf(new PreferenceItemCommand("Brigadeiro", 2, 10m));
+    }
+
     [Fact]
     public async Task PendenteComValorDiferenteDoTotal_CancelaEGeraOutra()
     {

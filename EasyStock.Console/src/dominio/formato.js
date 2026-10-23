@@ -180,17 +180,30 @@ export const faixaDeCep = (inicio, fim) => `${mascaraCep(inicio)} a ${mascaraCep
 // campo a campo; `enderecoDasPartes` junta de volta na mesma ordem.
 // #1936: cidade e UF no fim ("São Paulo", "São Paulo - SP", "SP") não são bairro. A loja entrega só
 // na própria cidade, então elas saem do texto antes de achar o bairro.
+// #1991-3: e voltam em `cidade` e `uf` para o cadastro gravar (antes eram descartadas). São Paulo é SP.
 const CIDADE_OU_UF = /^(s[aã]o paulo(\s*[-/]\s*sp)?|sp)$/i
+const SO_UF = /^sp$/i
+// #1989: endereço colado do WhatsApp. Hífen ou travessão entre espaços separa como a vírgula
+// ("Rua Harmonia, 300 - Vila Madalena - 05435-000"); o hífen do CEP e o de nome próprio não têm
+// espaço em volta. O CEP pode vir com o prefixo "CEP" ("CEP 05416-000", "CEP: 05416000").
+const SEPARADOR = /\s*,\s*|\s+[-–—]\s+/
+const CEP_NO_FIM = /^(?:cep[:.]?\s*)?(\d{5}-?\d{3})$/i
 
 export function partesDoEndereco(texto) {
-  if (!texto) return { rua: '', numero: '', complemento: '', bairro: '', cep: '' }
-  const partes = texto.split(',').map((p) => p.trim())
-  const cep = /^\d{5}-?\d{3}$/.test(partes.at(-1) ?? '') ? partes.pop() : ''
-  while (partes.length > 2 && CIDADE_OU_UF.test(partes.at(-1) ?? '')) partes.pop()
+  if (!texto) return { rua: '', numero: '', complemento: '', bairro: '', cep: '', cidade: '', uf: '' }
+  const partes = texto.trim().split(SEPARADOR).filter(Boolean)
+  const cep = CEP_NO_FIM.exec(partes.at(-1) ?? '')?.[1] ?? ''
+  if (cep) partes.pop()
+  let cidade = ''
+  let uf = ''
+  while (partes.length > 2 && CIDADE_OU_UF.test(partes.at(-1) ?? '')) {
+    if (!SO_UF.test(partes.pop())) cidade = 'São Paulo'
+    uf = 'SP'
+  }
   const bairro = partes.pop() ?? ''
   const rua = partes.shift() ?? ''
   const numero = partes[0] && /^\d/.test(partes[0]) ? partes.shift() : ''
-  return { rua, numero, complemento: partes.join(', '), bairro, cep }
+  return { rua, numero, complemento: partes.join(', '), bairro, cep, cidade, uf }
 }
 
 export const enderecoDasPartes = ({ rua, numero, complemento, bairro, cep }) =>

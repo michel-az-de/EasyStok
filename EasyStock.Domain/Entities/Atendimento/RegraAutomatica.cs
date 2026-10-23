@@ -45,14 +45,24 @@ public class RegraAutomatica
         + "Se precisar de outro link, me chama aqui.";
 
     /// <summary>
-    /// Regra que vale quando a empresa ainda não gravou nenhuma para o gatilho (não é persistida). Só o lembrete do link
-    /// (<see cref="GatilhoAutomacao.CobrancaVencendo"/>) nasce ligado; os demais gatilhos ficam desligados até a dona
-    /// salvar, então devolvem null. Salvar grava uma regra de verdade, que passa a valer no lugar desta.
+    /// Texto de "Pagamento confirmado" enquanto a dona não grava o dela, com o que o aviso S13 de pago diz (nome e
+    /// entrega). Pedido sem horário agendado não tem <c>{faixa}</c>: a automática não sai e o aviso S13 avisa.
+    /// </summary>
+    public const string TextoPadraoPagamentoConfirmado =
+        "Oi, {nome}! Recebemos seu pagamento e seu pedido está confirmado para {faixa}. Obrigada pela preferência!";
+
+    /// <summary>
+    /// Regra que vale enquanto a empresa não gravou a do gatilho (não é persistida). Nascem ligadas "Pagamento
+    /// confirmado" (decisão do Felipe, 23/10, #1765-4) e o lembrete do link (#1610); as demais nascem desligadas
+    /// (nulo). Salvar a regra, ligada ou desligada, substitui o padrão.
     /// </summary>
     public static RegraAutomatica? Padrao(Guid empresaId, GatilhoAutomacao gatilho, DateTime agora) =>
-        gatilho == GatilhoAutomacao.CobrancaVencendo
-            ? Criar(empresaId, gatilho, TextoPadraoCobrancaVencendo, ligada: true, agora)
-            : null;
+        gatilho switch
+        {
+            GatilhoAutomacao.PagamentoConfirmado => Criar(empresaId, gatilho, TextoPadraoPagamentoConfirmado, ligada: true, agora),
+            GatilhoAutomacao.CobrancaVencendo => Criar(empresaId, gatilho, TextoPadraoCobrancaVencendo, ligada: true, agora),
+            _ => null
+        };
 
     public string Renderizar(IReadOnlyDictionary<string, string?> valores) =>
         ModeloTextoAtendimento.Renderizar(Texto, valores);
