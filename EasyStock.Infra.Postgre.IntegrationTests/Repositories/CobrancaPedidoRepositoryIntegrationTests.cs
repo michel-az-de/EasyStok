@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Repositories.Pagamentos;
@@ -92,7 +93,8 @@ public class CobrancaPedidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture 
 
     /// <summary>
     /// #1610: a varredura do lembrete acha, sem tenant, o link online pendente da conversa nos últimos minutos. Fica de
-    /// fora o link do site (sem conversa), o que ainda tem tempo, o vencido, o que aguarda credencial e o já lembrado.
+    /// fora o link do site (sem conversa), o que ainda tem tempo, o vencido, o que aguarda credencial, o já lembrado e
+    /// o do pedido que já saiu de AguardandoPagamento (pago no balcão com o link aberto).
     /// </summary>
     [SkippableFact]
     public async Task VarreduraDoLembrete_AchaSoOLinkDaConversaPertoDeVencer()
@@ -104,11 +106,16 @@ public class CobrancaPedidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture 
         CobrancaPedido Link(Guid pedidoId, DateTime expiraEm, Guid? conversaId) =>
             CobrancaPedido.CriarOnline(empresa, pedidoId, 25m, $"pref-{Guid.NewGuid():N}", "https://mp/l", expiraEm, 1, Agora, conversaId);
 
-        CobrancaPedido vencendo, doSite, comTempo, vencida, semCredencial, lembrada;
+        CobrancaPedido vencendo, doSite, comTempo, vencida, semCredencial, lembrada, pagoNoBalcao;
         await using (var db = fixture.CreateDbContext())
         {
             db.SetMobileTenantContext(empresa);
             var pedido = await CriarPedidoAsync(db, empresa);
+            pedido.Status = StatusPedidoMapper.AguardandoPagamento;
+            var pago = Pedido.Criar(empresa, origem: "whatsapp");
+            pago.Status = StatusPedidoMapper.Aguardando;
+            db.Pedidos.Add(pago);
+            pagoNoBalcao = Link(pago.Id, Agora.AddMinutes(30), conversa);
             vencendo = Link(pedido.Id, Agora.AddMinutes(30), conversa);
             doSite = Link(pedido.Id, Agora.AddMinutes(30), null);
             comTempo = Link(pedido.Id, Agora.AddMinutes(45), conversa);
@@ -116,7 +123,7 @@ public class CobrancaPedidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture 
             semCredencial = Link(pedido.Id, Agora.AddMinutes(30), conversa);
             semCredencial.AguardarCredencial(Agora.AddMinutes(1));
             lembrada = Link(pedido.Id, Agora.AddMinutes(31), conversa);
-            db.CobrancasPedido.AddRange(vencendo, doSite, comTempo, vencida, semCredencial, lembrada);
+            db.CobrancasPedido.AddRange(vencendo, doSite, comTempo, vencida, semCredencial, lembrada, pagoNoBalcao);
             await db.SaveChangesAsync();
 
             var (_, reservado) = await new IdempotencyKeyRepository(db).TryBeginAsync(

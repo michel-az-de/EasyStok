@@ -9,7 +9,7 @@ public enum SituacaoLembreteCobranca
     /// <summary>Não é hora (ainda falta, já venceu) ou não há o que lembrar: pago, cancelado, substituído, sem conversa.</summary>
     Ignorada = 1,
 
-    /// <summary>Esta cobrança já teve o lembrete (enviado ou recusado pelas regras da automática).</summary>
+    /// <summary>Esta cobrança já teve o lembrete (enviado, recusado pelas regras da automática ou falho no canal).</summary>
     JaAvisada = 2,
 
     /// <summary>A automática foi chamada; <see cref="LembreteCobrancaResult.Automacao"/> diz se saiu.</summary>
@@ -29,9 +29,9 @@ public sealed record LembreteCobrancaResult(SituacaoLembreteCobranca Situacao, R
 /// </para>
 ///
 /// <para>
-/// Uma vez por cobrança: a reserva é um INSERT na tabela de idempotência (<see cref="CobrancaPedidoVencendo.RecursoLembrete"/>,
-/// índice único) ANTES de enviar. Falha do canal libera a próxima rodada; os demais desfechos (janela, consentimento,
-/// regra desligada) encerram. Janela de 24 h, consentimento, bloqueio e texto são do <see cref="DispararAutomacaoUseCase"/>.
+/// No máximo uma vez por cobrança: a reserva é um INSERT na tabela de idempotência
+/// (<see cref="CobrancaPedidoVencendo.RecursoLembrete"/>, índice único) ANTES de enviar, e qualquer desfecho a encerra,
+/// inclusive falha do canal. Janela de 24 h, consentimento, bloqueio e texto são do <see cref="DispararAutomacaoUseCase"/>.
 /// </para>
 /// </summary>
 public sealed class LembrarCobrancaVencendoUseCase(
@@ -65,17 +65,20 @@ public sealed class LembrarCobrancaVencendoUseCase(
 
         var (reserva, reservada) = await idempotencia.TryBeginAsync(
             item.Chave, item.EmpresaId, CobrancaPedidoVencendo.RecursoLembrete, null, ValidadeReserva, ct);
-        if (!reservada
-            && !(reserva.Status == StatusIdempotencyKey.Falhou && await idempotencia.TryReabrirAsync(reserva.Id, null, DateTime.UtcNow, ct)))
-            return new(SituacaoLembreteCobranca.JaAvisada);
+        if (!reservada) return new(SituacaoLembreteCobranca.JaAvisada);
 
-        var resultado = await disparo.ExecuteAsync(
-            new DisparoAutomacao(item.EmpresaId, GatilhoAutomacao.CobrancaVencendo, conversaId, pedido.ClienteId, pedido.Id), ct);
-
-        if (resultado == ResultadoAutomacao.Falhou)
-            await idempotencia.MarcarFalhouAsync(reserva.Id, ct);
-        else
-            await idempotencia.MarcarConcluidoAsync(reserva.Id, 200, resultado.ToString(), ct);
+        // No máximo uma vez: falha do canal não é reenviada (o timeout pode ter entregado) e a reserva fica encerrada
+        // mesmo se o disparo lançar. Um lembrete perdido é melhor que o cliente receber o mesmo aviso a cada minuto.
+        ResultadoAutomacao? resultado = null;
+        try
+        {
+            resultado = await disparo.ExecuteAsync(
+                new DisparoAutomacao(item.EmpresaId, GatilhoAutomacao.CobrancaVencendo, conversaId, pedido.ClienteId, pedido.Id), ct);
+        }
+        finally
+        {
+            await idempotencia.MarcarConcluidoAsync(reserva.Id, 200, resultado?.ToString() ?? "Erro", CancellationToken.None);
+        }
 
         logger.LogInformation("Lembrete do link cobrancaId={CobrancaId} pedidoId={PedidoId} resultado={Resultado}",
             item.CobrancaId, item.PedidoId, resultado);

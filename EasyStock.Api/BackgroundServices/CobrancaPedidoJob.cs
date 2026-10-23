@@ -88,20 +88,21 @@ public sealed class CobrancaPedidoJob(
 
     private async Task ProcessarRodadaAsync(CancellationToken ct)
     {
+        await ProcessarVencidasAsync(ct);
+        await LembrarVencendoAsync(ct);
+    }
+
+    private async Task ProcessarVencidasAsync(CancellationToken ct)
+    {
         IReadOnlyList<CobrancaPedidoVencida> vencidas;
-        IReadOnlyList<CobrancaPedidoVencendo> vencendo;
         using (var scope = serviceProvider.CreateScope())
         {
             // I3.2: credencial de volta devolve à varredura as cobranças que esperavam por ela.
             await scope.ServiceProvider.GetRequiredService<RetomarCobrancasAguardandoCredencialUseCase>().ExecuteAsync(ct);
 
             var repo = scope.ServiceProvider.GetRequiredService<ICobrancaPedidoRepository>();
-            var agora = relogio.GetUtcNow().UtcDateTime;
-            vencidas = await repo.ListarPendentesVencidasAsync(agora, MaximoPorRodada, ct);
-            vencendo = await repo.ListarPendentesVencendoAsync(agora, LembrarCobrancaVencendoUseCase.Antecedencia, MaximoPorRodada, ct);
+            vencidas = await repo.ListarPendentesVencidasAsync(relogio.GetUtcNow().UtcDateTime, MaximoPorRodada, ct);
         }
-
-        await LembrarVencendoAsync(vencendo, ct);
         if (vencidas.Count == 0) return;
 
         // Um escopo por cobrança: DbContext limpo e o tenant da cobrança só nele. Falha conta por loja (I3.2).
@@ -117,11 +118,24 @@ public sealed class CobrancaPedidoJob(
     }
 
     /// <summary>
-    /// #1610: lembrete ao cliente nos últimos minutos do link (só avisa). Um escopo por cobrança, como as vencidas;
-    /// a falha de uma não segura as outras nem a expiração da rodada.
+    /// #1610: lembrete ao cliente nos últimos minutos do link (só avisa). Roda depois das vencidas, para não atrasá-las,
+    /// e com a própria proteção: falha da consulta ou de uma cobrança não derruba a rodada. Um escopo por cobrança.
     /// </summary>
-    private async Task LembrarVencendoAsync(IReadOnlyList<CobrancaPedidoVencendo> vencendo, CancellationToken ct)
+    private async Task LembrarVencendoAsync(CancellationToken ct)
     {
+        IReadOnlyList<CobrancaPedidoVencendo> vencendo;
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            vencendo = await scope.ServiceProvider.GetRequiredService<ICobrancaPedidoRepository>()
+                .ListarPendentesVencendoAsync(relogio.GetUtcNow().UtcDateTime, LembrarCobrancaVencendoUseCase.Antecedencia, MaximoPorRodada, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "CobrancaPedidoJob: consulta dos links perto de vencer falhou");
+            return;
+        }
+
         foreach (var item in vencendo)
         {
             ct.ThrowIfCancellationRequested();

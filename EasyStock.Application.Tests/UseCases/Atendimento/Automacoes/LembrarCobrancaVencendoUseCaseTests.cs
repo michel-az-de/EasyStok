@@ -222,8 +222,12 @@ public class LembrarCobrancaVencendoUseCaseTests
         Envios().Should().Be(0);
     }
 
+    /// <summary>
+    /// No máximo uma vez: o timeout do canal pode ter entregado, então a falha não volta na rodada seguinte. Exceção do
+    /// disparo (banco fora, desligamento) também encerra a reserva, em vez de deixá-la presa como pendente.
+    /// </summary>
     [Fact]
-    public async Task FalhaDoCanalTentaDeNovoNaProximaRodada()
+    public async Task FalhaDoCanalNaoReenvia()
     {
         var link = Link();
         _whats.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -232,10 +236,23 @@ public class LembrarCobrancaVencendoUseCaseTests
         Minuto(21);
         (await UseCase().ExecuteAsync(Item(link))).Automacao.Should().Be(ResultadoAutomacao.Falhou);
         Minuto(22);
-        (await UseCase().ExecuteAsync(Item(link))).Automacao.Should().Be(ResultadoAutomacao.Enviada);
-        Minuto(23);
         (await UseCase().ExecuteAsync(Item(link))).Situacao.Should().Be(SituacaoLembreteCobranca.JaAvisada);
 
-        Envios().Should().Be(2, "uma falhou, uma saiu, e depois nenhuma");
+        Envios().Should().Be(1);
+        _chaves.Values.Should().ContainSingle().Which.Status.Should().Be(StatusIdempotencyKey.Concluido);
+    }
+
+    [Fact]
+    public async Task ExcecaoNoDisparoEncerraAReserva()
+    {
+        var link = Link();
+        _regras.ObterPorGatilhoAsync(_empresaId, GatilhoAutomacao.CobrancaVencendo, Arg.Any<CancellationToken>())
+            .Returns<RegraAutomatica?>(_ => throw new TimeoutException("banco fora"));
+
+        Minuto(21);
+        await FluentActions.Awaiting(() => UseCase().ExecuteAsync(Item(link))).Should().ThrowAsync<TimeoutException>();
+
+        _chaves.Values.Should().ContainSingle().Which.Status.Should().Be(StatusIdempotencyKey.Concluido);
+        Envios().Should().Be(0);
     }
 }

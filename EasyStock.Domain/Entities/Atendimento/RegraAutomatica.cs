@@ -41,7 +41,7 @@ public class RegraAutomatica
     /// sempre preenche: <c>{nome}</c> pode faltar, e variável sem valor não sai.
     /// </summary>
     public const string TextoPadraoCobrancaVencendo =
-        "Oi! O link de pagamento do pedido {pedido} vence em 10 minutos. Se ainda quiser garantir, é só pagar por ele. "
+        "Oi! O link de pagamento do pedido {pedido} vence em poucos minutos. Se ainda quiser garantir, é só pagar por ele. "
         + "Se precisar de outro link, me chama aqui.";
 
     /// <summary>

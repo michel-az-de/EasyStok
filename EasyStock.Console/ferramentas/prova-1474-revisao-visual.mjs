@@ -448,7 +448,7 @@ await confere('pagamento e entrega: automática desligada não diz que nada sai 
 
 await confere('#1610 lembrete do link aparece nas automáticas com nome, descrição e o texto da API', async () => {
   const { regraDaApi } = await import('../src/infra/api/traducaoRespostas.js')
-  const texto = 'Oi! O link de pagamento do pedido {pedido} vence em 10 minutos.'
+  const texto = 'Oi! O link de pagamento do pedido {pedido} vence em poucos minutos.'
   const regra = regraDaApi({ gatilho: 'CobrancaVencendo', ligada: true, texto, alteradaEm: null })
   assert.equal(regra.gatilho, automacao.GATILHOS.COBRANCA_VENCENDO)
   assert.equal(regra.nome, 'Link de pagamento vencendo')
