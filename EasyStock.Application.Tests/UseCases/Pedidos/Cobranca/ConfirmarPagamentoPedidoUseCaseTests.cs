@@ -104,8 +104,8 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         EasyStock.Domain.Entities.FechamentoCaixa.Criar(f.EmpresaId, dia, 0, 0, 25, 0, 0, f.Pedido.LojaId);
 
     /// <summary>
-    /// E12 (#1641-4, decisão do Felipe em 23/10): o contador do número do dia sai da transação da confirmação. Contador
-    /// que falha não desfaz o pagamento; o pedido fica sem número (buraco na sequência é aceitável).
+    /// E12 (#1641-4, decisão do Felipe em 23/10): a falha do contador do número do dia não desfaz o pagamento; o pedido
+    /// fica sem número (buraco na sequência é aceitável).
     /// </summary>
     [Fact]
     public async Task ContadorDoNumeroQueFalha_NaoDesfazAConfirmacao()
@@ -125,11 +125,10 @@ public class ConfirmarPagamentoPedidoUseCaseTests
     }
 
     [Fact]
-    public async Task ContadorDoNumero_NumeraDepoisDaConfirmacao()
+    public async Task ContadorDoNumero_NumeraNaConfirmacao()
     {
         var f = new CobrancaPedidoFixture();
         f.AdicionarOnline();
-        f.PedidoStorefrontRepo.GetForUpdateAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns(f.Pedido);
         var sequencia = Substitute.For<ISequenciaDiariaPedido>();
         sequencia.ProximoAsync(default, default, default).ReturnsForAnyArgs(7);
         var calculadora = new CalculadoraInicioPrevistoPedido(f.PrazoQueries, new NumeradorPedidoDoDia(sequencia, f.Relogio));

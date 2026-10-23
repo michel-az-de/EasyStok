@@ -136,7 +136,6 @@ internal sealed class CobrancaPedidoFixture
         Uow.SetupExecuteInTransactionSemRetry<(ResultadoExpiracaoCobranca, Guid?, string?)>();
         Uow.SetupExecuteInTransactionSemRetry<PedidoResult?>();
         Uow.SetupExecuteInTransactionSemRetry<PedidoAtrasadoOperacao?>();
-        Uow.SetupExecuteInTransactionSemRetry<bool>();
     }
 
     private PedidoItem Item(string nome, decimal qtd, decimal preco)
