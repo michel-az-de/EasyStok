@@ -163,7 +163,7 @@ await confere('#1239 "Passar para…": a conversa vai ao atendente escolhido e a
   resposta = () => new Response(JSON.stringify({ error: { message: 'O usuário não atende conversas nesta empresa.' } }), { status: 422 })
   assert.deepEqual(await api.transferirConversa('c1', 'ze'), { erro: 'O usuário não atende conversas nesta empresa.' })
   assert.deepEqual(atendentesParaPassar([{ usuarioId: 'eu', nome: 'Eu' }, { usuarioId: 'ana', nome: 'Ana' }, { usuarioId: 'bia', nome: 'Bia' }], { usuarioId: 'eu', responsavelId: 'bia' }).map((a) => a.nome), ['Ana'])
-  assert.match(fonte('features/atendimento/PainelAtendimento.jsx'), /\{fonteApi && !encerrada && !bloqueada && <PassarConversa key=\{selecionada\.id\} conversa=\{selecionada\} \/>\}/)
+  assert.match(fonte('features/atendimento/PainelAtendimento.jsx'), /\{fonteApi && !encerrada && !bloqueada && <PassarConversa key=\{'passar-' \+ selecionada\.id\} conversa=\{selecionada\} \/>\}/)
   assert.match(fonte('features/atendimento/PassarConversa.jsx'), /Passar para…/)
 })
 
@@ -269,6 +269,67 @@ await confere('#1966 Devoluções mostra o valor a devolver do pedido cancelado'
   assert.match(bloco, /\{aDevolver > 0 && <output className=\{css\.corpoBloco\}><strong>A devolver: \{moeda\(aDevolver\)\}<\/strong>\. \{textoADevolver\(\{ comOnline \}\)\}<\/output>\}/)
   const caso = readFileSync(new URL('../../EasyStock.Application/UseCases/Pedidos/Cobranca/ConsultarEstornosManuaisUseCase.cs', import.meta.url), 'utf8')
   assert.match(caso, /IReadOnlyList<PedidoEstornoManual> Estornos, decimal ADevolver = 0m\)/, 'o contrato da API mudou')
+})
+
+// ── Frente J1 da #1889 (#1989, laboratório de 23/10) ─────────────────────────────────────────────
+
+await confere('#1989-7 respondeu no meio da venda: a faixa não sugere encerrar', async () => {
+  const { resumoDoModo } = await import('../src/dominio/resumoDoModo.js')
+  const { PAUSA_POR_ASSUMIR } = await import('../src/dominio/automatico.js')
+  const em = (min) => new Date(AGORA - min * 60000).toISOString()
+  const venda = (extra = {}) => ({ id: 'v1', nome: 'Rita', estado: 'Em atendimento', canal: 'WhatsApp', pedido: null, mensagens: [
+    { id: 'a', dir: 'in', texto: 'Oi, quero dois raviólis de abóbora para hoje', em: em(6) },
+    { id: 'b', dir: 'in', texto: 'Rua Harmonia, 300, Vila Madalena, CEP 05435-000', em: em(5) },
+    { id: 'c', dir: 'out', texto: 'Oi, Rita! Já anoto aqui.', status: 'entregue', em: em(1) },
+  ], ...extra })
+  for (const [caso, conversa] of [
+    ['sem itens na comanda ainda', venda()],
+    ['comanda em montagem', venda({ pedido: { numero: '7', estado: 'aguardando', itens: [] } })],
+  ]) {
+    const r = resumoDoModo(conversa, PAUSA_POR_ASSUMIR, false)
+    assert.equal(r.sugereEncerrar, false, caso)
+    assert.doesNotMatch(r.linha, /encerre/i, `${caso}: ${r.linha}`)
+  }
+  // Conversa que acabou (agradecimento, sem pedido) continua sugerindo encerrar.
+  const fim = venda({ mensagens: [
+    { id: 'a', dir: 'in', texto: 'Obrigada, estava uma delícia!', em: em(3) },
+    { id: 'b', dir: 'out', texto: 'Que bom, Rita!', status: 'entregue', em: em(1) },
+  ] })
+  assert.equal(resumoDoModo(fim, PAUSA_POR_ASSUMIR, false).sugereEncerrar, true)
+  // Revisão da PR #1997: agradecimento que cita "pedido" ou "marmita" é despedida, não venda.
+  for (const texto of ['Recebi o pedido, obrigada', 'Obrigada, adorei a marmita!', 'Valeu, chegou certinho o pedido']) {
+    const despedida = venda({ mensagens: [
+      { id: 'a', dir: 'in', texto, em: em(3) },
+      { id: 'b', dir: 'out', texto: 'Nós que agradecemos!', status: 'entregue', em: em(1) },
+    ] })
+    assert.equal(resumoDoModo(despedida, PAUSA_POR_ASSUMIR, false).sugereEncerrar, true, texto)
+  }
+})
+
+await confere('#1989-4 cabeçalho da conversa: um "Link de compra" e nenhuma chave repetida entre irmãos', () => {
+  const painel = fonte('features/atendimento/PainelAtendimento.jsx')
+  const de = painel.indexOf('<div className={css.direita} data-ancora-assistente>')
+  const direita = painel.slice(de, painel.indexOf('</header>', de))
+  assert.ok(de >= 0 && direita.length > 0, 'cabeçalho não encontrado')
+  const chaves = [...direita.matchAll(/key=\{([^}]+)\}/g)].map((m) => m[1].trim())
+  assert.equal(new Set(chaves).size, chaves.length, `chaves repetidas entre irmãos: ${chaves.join(' | ')}`)
+  assert.equal((direita.match(/<CompartilharComanda\b/g) ?? []).length, 1, 'um botão só no cabeçalho')
+  // O botão que a Moldura passa à Ficha também não usa o id puro como chave.
+  assert.doesNotMatch(fonte('app/Moldura.jsx'), /<CompartilharComanda key=\{selecionada\.id\}/)
+})
+
+await confere('#1989-1 (#1765-3) forma já escolhida: "Gerar cobrança e enviar" abre o resumo antes de gerar', async () => {
+  const barra = fonte('features/ficha-cliente/BarraProximoPasso.jsx')
+  assert.doesNotMatch(barra, /aoGerarPix: \(\) => \(pedido\.meio \? executar/, 'o clique ainda gera direto quando a forma já está escolhida')
+  assert.doesNotMatch(barra, /pedindoMeio && situacaoCob\.chave === 'nenhuma' && !pedido\.meio/, 'o resumo só aparecia sem forma escolhida')
+  assert.match(barra, /data-resumo-itens/)
+  assert.match(barra, /resumoDaCobrancaEscolhida\(/)
+  // Gerar só no botão de confirmação, com a forma que está marcada nele.
+  assert.equal((barra.match(/executar\(\(\) => aoGerarPix\(/g) ?? []).length, 1)
+  const { itensDoResumo } = await import('../src/dominio/resumoPedido.js')
+  const cardapio = [{ sku: 'R', nome: 'Ravióli de abóbora', porcao: '400 g', preco: 59 }, { sku: 'L', nome: 'Lasanha', porcao: '500 g', preco: 62 }]
+  assert.equal(itensDoResumo({ itens: [{ sku: 'R', qtd: 2 }, { sku: 'L', qtd: 1 }] }, cardapio), '2× Ravióli de abóbora, 1× Lasanha')
+  assert.equal(itensDoResumo({ itens: [{ sku: 'R', qtd: 1, nome: 'Ravióli' }] }, []), '1× Ravióli')
 })
 
 if (falhasC.length > 0) {

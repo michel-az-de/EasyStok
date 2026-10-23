@@ -402,7 +402,7 @@ export function Moldura({
   // própria renderização (padrão do React para "estado que segue uma prop"),
   // não em efeito.
   const selecionadaId = selecionada?.id ?? null
-  const acaoCompartilhar = selecionada && <CompartilharComanda key={selecionada.id} conversa={selecionada} />
+  const acaoCompartilhar = selecionada && <CompartilharComanda key={'compartilhar-' + selecionada.id} conversa={selecionada} />
   const [selecaoVista, setSelecaoVista] = useState(selecionadaId)
   if (selecionadaId !== selecaoVista) {
     setSelecaoVista(selecionadaId)

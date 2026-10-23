@@ -15,3 +15,5 @@
   .aviso { grid-template-columns: minmax(0, 1fr); gap: var(--e-2); justify-items: start; }
   .aparelho { padding: var(--e-3); }
 }
+/* #1989: ponto discreto no sino de quem ainda não ativou os avisos neste aparelho. */
+.pontoAparelho { display: inline-block; width: 8px; height: 8px; margin-left: var(--e-1); border-radius: var(--r-pilula); background: var(--alerta); vertical-align: middle; }

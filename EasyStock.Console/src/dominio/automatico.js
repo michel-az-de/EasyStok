@@ -19,7 +19,7 @@ import { MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js
 import { pedidoEncerrado } from './pedido.js'
 import { ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
-import { sinalDoCliente } from './agente.js'
+import { INTENCOES, classificarIntencao, sinalDoCliente } from './agente.js'
 
 export const MODOS = {
   LIGADO: 'ligado',
@@ -175,6 +175,10 @@ export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida
 // última fala da conversa é dela. Nota interna e aviso do sistema não contam
 // como fala. Pedido em andamento nunca sugere encerrar: a conversa ainda vai
 // levar os avisos da esteira até a entrega.
+const INTENCOES_DE_VENDA = [INTENCOES.PEDIR_CARDAPIO, INTENCOES.FECHAR_PEDIDO, INTENCOES.PERGUNTA_ENTREGA, INTENCOES.PAGAMENTO]
+  .map((i) => i.chave)
+const DESPEDIDA = /\b(obrigad|valeu|agradec|recebi|chegou|adorei|gostei|delicia)/
+
 export function proximoPassoDepoisDeResponder(conversa, pausado) {
   if (!conversa || !pausado || conversa.estado === 'Encerrado') return null
   const fala = ultimaFala(conversa)
@@ -186,6 +190,18 @@ export function proximoPassoDepoisDeResponder(conversa, pausado) {
       chave: 'aguardar',
       texto: 'Você respondeu. Próximo passo sugerido: aguardar o cliente. O pedido ainda está em andamento, '
         + 'então não encerre; devolva ao automático se quiser que ele responda quando o cliente voltar.',
+    }
+  }
+  // #1989: a venda começa antes do primeiro item na comanda (o cliente pediu, mandou o endereço ou
+  // perguntou como pagar). Sugerir encerrar aí, logo na primeira resposta, é atrapalhar a venda.
+  // Agradecimento que cita "pedido" ou "marmita" é despedida, não venda.
+  const ultimaDoCliente = [...conversa.mensagens ?? []].reverse().find((m) => m.dir === 'in')
+  const despedida = DESPEDIDA.test(semAcento(ultimaDoCliente?.texto ?? ''))
+  if (!conversa.pedido && !despedida && INTENCOES_DE_VENDA.includes(classificarIntencao(conversa).intencao.chave)) {
+    return {
+      chave: 'aguardar-venda',
+      texto: 'Você respondeu. Próximo passo sugerido: montar o pedido ou aguardar o cliente. A venda está em andamento, '
+        + 'então não encerre.',
     }
   }
   return {
@@ -361,7 +377,7 @@ function sinalUrgente(conversa, agora) {
   const pendentes = mensagensSemRespostaReal(conversa).filter((m) => m.texto)
   if (pendentes.length === 0) return null
   const pedido = conversa.pedido
-  const { paraDona, textoParaDona, alegaPagamento, perguntaDoPedido } = sinalDoCliente({ ...conversa, mensagens: pendentes })
+  const { paraDona, textoParaDona, alegaPagamento } = sinalDoCliente({ ...conversa, mensagens: pendentes })
   const semPagamento = Boolean(pedido?.cobranca)
     && COBRANCA_SEM_PAGAMENTO.includes(situacaoDaCobranca(pedido.cobranca, agora).chave)
   if (paraDona === 'devolucao') {
@@ -387,15 +403,33 @@ function sinalUrgente(conversa, agora) {
   if (paraDona === 'pede-a-dona' && !(alegaPagamento && !semPagamento)) {
     return { chave: 'pede-a-dona', rotulo: 'Precisa de você', tom: 'aviso', texto: textoParaDona ?? MOTIVO_PADRAO }
   }
-  if (perguntaDoPedido && pendentes.length >= 2 && pedido && !pedidoEncerrado(pedido)) {
+  // #1989: endereço, item novo e "entregam no meu bairro?" no meio da venda não são cobrança do
+  // pedido. Conta só as perguntas ainda sem resposta, e ao menos uma delas é pelo andamento.
+  const perguntas = pendentes.map(leituraDaPergunta).filter((l) => l.pergunta)
+  if (perguntas.length >= 2 && perguntas.some((l) => l.andamento) && pedido && !pedidoEncerrado(pedido)) {
     return {
       chave: 'insistencia',
       rotulo: 'Cobrando o pedido',
       tom: 'perigo',
-      texto: `Cliente perguntou ${pendentes.length} vezes do pedido ${pedido.numero} e ninguém respondeu`,
+      texto: `Cliente perguntou ${perguntas.length} vezes do pedido ${pedido.numero} e ninguém respondeu`,
     }
   }
   return null
+}
+
+// Pergunta é a fala com "?" ou a que começa perguntando sem ele ("cadê", "já saiu", "que horas
+// chega"); "pode demorar, sem pressa" não é. Andamento: "Quer saber do pedido" do classificador
+// do agente, ou saída e chegada ("saiu", "chega").
+const semAcento = (texto) => texto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+const PERGUNTA_SEM_INTERROGACAO = /^(e ai,?\s+)?(cade\b|ja saiu|saiu\b|quanto tempo|que horas|quando (chega|sai)|previsao)/
+const SAIDA_OU_CHEGADA = /\b(saiu|sai|chega|chegar|chegando)\b/
+function leituraDaPergunta(mensagem) {
+  const texto = semAcento(mensagem.texto).trim()
+  return {
+    pergunta: texto.includes('?') || PERGUNTA_SEM_INTERROGACAO.test(texto),
+    andamento: SAIDA_OU_CHEGADA.test(texto)
+      || classificarIntencao({ mensagens: [mensagem] }).intencao.chave === INTENCOES.ACOMPANHAR.chave,
+  }
 }
 
 // `janelas` é novo na rodada 10 (achado 3): default `[]` para quem ainda não

@@ -3,7 +3,8 @@ namespace EasyStock.Application.Ports.Output.Persistence;
 /// <summary>
 /// Contador do número do dia do pedido (S53), um por empresa e dia de produção. <see cref="ProximoAsync"/> é
 /// atômico no banco: dois pagamentos simultâneos nunca recebem o mesmo número e nenhum falha por isso. Roda na
-/// transação aberta, então um rollback devolve o número (sem buraco quando a confirmação desfaz).
+/// transação aberta, então um rollback devolve o número (sem buraco quando a confirmação desfaz). Dentro da transação,
+/// a falha do upsert desfaz só o savepoint dele e não aborta a transação do pagamento (E12, #1641-4).
 /// </summary>
 public interface ISequenciaDiariaPedido
 {
