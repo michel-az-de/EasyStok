@@ -25,7 +25,19 @@ namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 public sealed record RascunhoComandaCliente(IReadOnlyList<ItemPedidoCheckout> Itens, string? Observacoes = null,
     Guid? JanelaId = null, DateOnly? DataEntrega = null, EnderecoCheckout? Endereco = null,
     string Acerto = "estorno", string? CodigoCupom = null, Guid? PedidoId = null, DateTime? PedidoAtualizadoEm = null,
-    string? PedidoResumoHash = null, string? Nome = null, string? Telefone = null);
+    string? PedidoResumoHash = null, string? Nome = null, string? Telefone = null,
+    Guid? JanelaDoPedidoId = null, DateOnly? DataDoPedido = null)
+{
+    /// <summary>
+    /// E10: o cliente escolheu outra janela ou data no link de ajuste. Compara com a do pedido quando o rascunho foi
+    /// salvo (<see cref="JanelaDoPedidoId"/>, <see cref="DataDoPedido"/>): reagendar pela Ficha depois disso não
+    /// conta como pedido do cliente. Rascunho sem essa marca compara com a vaga atual.
+    /// </summary>
+    public (Guid JanelaId, DateOnly Data)? DataPedidaPeloCliente(Guid? janelaAtualId, DateOnly? dataAtual) =>
+        JanelaId is { } janela && DataEntrega is { } dia
+        && (DataDoPedido is not null ? (janela, dia) != (JanelaDoPedidoId, DataDoPedido) : (janela, dia) != (janelaAtualId, dataAtual))
+            ? (janela, dia) : null;
+}
 public sealed record ItemSelecionadoComanda(Guid CardapioItemId, Guid? VariacaoId, string Nome, int Qtd, decimal Preco, string? Observacao);
 public sealed record CupomAplicadoComandaCliente(Guid UsoId, string Codigo, decimal Valor, decimal SaldoCupom);
 /// <param name="EmCobranca">Resultado provisório (#1961): o pedido foi gravado e a cobrança ainda está saindo, fora do lock.</param>
@@ -166,11 +178,18 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             dados = dados with { PedidoAtualizadoEm = pedido.AlteradoEm };
         var selecao = await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, ct, validar: false);
         var detalhe = pedido is null ? null : await obterPedido.ExecuteAsync(link.EmpresaId, conversa.Id, ct, pedido.Id);
+        // E10: o link de ajuste começa com a janela e a data do pedido; trocar a data pelo link é uma alteração visível.
+        if (Ler<RascunhoComandaCliente>(link.RascunhoJson)?.Itens is null && dados.JanelaId is null && detalhe?.Janela is { } janelaAtual)
+            dados = dados with { JanelaId = janelaAtual.JanelaId, DataEntrega = janelaAtual.Data };
         // O histórico do dinheiro (recebido, devolvido) do pedido encerrado continua: diz à equipe o que ainda está retido.
         var financeiro = (pedido ?? encerrado) is { } comDinheiro ? await saldoFinanceiro.ConsultarAsync(comDinheiro, ct) : null;
         if (detalhe is not null && financeiro is not null) detalhe = detalhe with { TotalPago = financeiro.Alocado };
         var acerto = (pedido ?? encerrado) is { } doLink ? await AcertoAsync(link, doLink, ct) : null;
         var envio = SemCobrancaSeEncerrado(Ler<EnvioComandaCliente>(link.ResultadoJson), encerrado);
+        // E11: o complemento pago quita o pedido; o envio deixa de pedir pagamento e de oferecer o link antigo.
+        if (envio is { Situacao: "aguardando_pagamento" } && pedido is not null && financeiro is not null
+            && pedido.Total.Valor - financeiro.Alocado <= 0)
+            envio = envio with { Situacao = "pedido_confirmado", Saldo = 0, LinkPagamento = null, EmCobranca = false };
         if (envio?.CupomAplicado is { } usado)
         {
             var cupom = cliente is null ? null : await creditos.ObterPorCodigoAsync(link.EmpresaId, cliente.Id, usado.Codigo, ct);
@@ -252,7 +271,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (pedido is not null && pedido.AlteradoEm != dados.PedidoAtualizadoEm)
                 throw new ComandaClienteConflitoException("O atendimento atualizou o pedido. Recarregue antes de alterar.");
             await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, t);
-            dados = dados with { PedidoResumoHash = pedido is null ? null : ResumoHash(pedido) };
+            dados = dados with { PedidoResumoHash = pedido is null ? null : ResumoHash(pedido),
+                JanelaDoPedidoId = estado.Pedido?.Janela?.JanelaId, DataDoPedido = estado.Pedido?.Janela?.Data };
             link.SalvarRascunho(revisao, JsonSerializer.Serialize(dados, Json), relogio.GetUtcNow().UtcDateTime);
             // Data e horário não alteram a cotação manual (#1717-6); qualquer outra edição continua exigindo novo acordo.
             if (estado.Pedido is null && estado.FreteCombinado is decimal frete && dados.DataEntrega is not null &&
@@ -332,8 +352,11 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 link.Consumir(agora);
                 resultado = new(pedido.Id, "alteracao_aguardando_confirmacao", total,
                     total - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado);
+                // E10: a data nova pedida pelo link aparece para a equipe junto com o total.
+                var novaData = dados.DataPedidaPeloCliente(estado.Pedido.Janela?.JanelaId, estado.Pedido.Janela?.Data) is { } pedida
+                    ? $" Nova data de entrega: {pedida.Data:dd/MM}." : "";
                 await conversas.AddMensagemAsync(Mensagem.Saida(link.EmpresaId, link.ConversaId, AutorMensagem.Sistema, agora,
-                    TipoConteudoMensagem.Texto, $"Cliente enviou uma alteração de comanda. Total proposto: {total.ToString("C", Cultura.PtBr)}. Confira a seleção na Ficha."), t);
+                    TipoConteudoMensagem.Texto, $"Cliente enviou uma alteração de comanda. Total proposto: {total.ToString("C", Cultura.PtBr)}.{novaData} Confira a seleção na Ficha."), t);
             }
             else
             {

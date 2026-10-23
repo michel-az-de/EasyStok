@@ -8,6 +8,7 @@ using EasyStock.Application.Services;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -24,12 +25,14 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
     ComandaClienteUseCase comanda, SaldoFinanceiroPedido saldos, ICreditoClienteComandaRepository creditos,
     IEstornosOnlineService estornos, GerarCobrancaPedidoUseCase cobrar, ICobrancaPedidoRepository cobrancas,
     PedidoEstoqueIntegrationService estoque, AvisoStatusPedidoCliente aviso, IUnitOfWork uow, TimeProvider relogio,
-    ExpiracaoPreferenciaMercadoPago expiracao, ILogger<ConfirmarAlteracaoComandaUseCase> logger)
+    ExpiracaoPreferenciaMercadoPago expiracao, ILogger<ConfirmarAlteracaoComandaUseCase> logger,
+    IVagaOcupadaRepository vagas, TrocarJanelaPedidoUseCase trocarJanela)
 {
     public async Task<EnvioComandaCliente> ExecuteAsync(ConfirmarAlteracaoComandaInput input, CancellationToken ct)
     {
         var estornosParaRetomar = new List<Guid>();
         var substituidas = new List<string>();
+        (Guid JanelaId, DateOnly Data)? trocarPara = null;
         var result = await uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
             var link = await links.ObterComLockAsync(input.EmpresaId, input.LinkId, t);
@@ -77,11 +80,18 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             var saldoAnterior = await saldos.ConsultarAsync(pedido, t);
             if (saldoAnterior.Reservado > 0) throw new ComandaClienteConflitoException("Aguarde a devolução em andamento antes de alterar de novo.");
             var devolucao = Math.Max(0, saldoAnterior.Alocado - novoTotal);
-            if (input.Automatico && (devolucao > 0 || (dados.Observacoes ?? "") != (pedido.Observacoes ?? "")
+            // E10: data ou janela nova escolhida pelo link. Não se aprova sozinha: a equipe confere, e a troca segue a regra
+            // de vaga depois do commit (TrocarJanelaPedidoUseCase).
+            var vagaAtual = (await vagas.GetByPedidoIdsAsync([pedido.Id], t)).GetValueOrDefault(pedido.Id).Vaga;
+            var novaJanela = vagaAtual is { LiberadoEm: null }
+                ? dados.DataPedidaPeloCliente(vagaAtual.JanelaEntregaId, vagaAtual.DataEntrega)
+                : dados.DataPedidaPeloCliente(null, null);
+            if (input.Automatico && (devolucao > 0 || novaJanela is not null || (dados.Observacoes ?? "") != (pedido.Observacoes ?? "")
                 || !SomenteAcrescimos(antigos, selecao)))
                 return anterior;
             if (devolucao > 0 && input.Nivel is not (NivelAcesso.Gerente or NivelAcesso.Admin or NivelAcesso.SuperAdmin))
                 throw new UnauthorizedAccessException("Só a dona ou um gerente pode confirmar uma devolução ou cupom.");
+            trocarPara = novaJanela;
             var agora = relogio.GetUtcNow().UtcDateTime;
             var historico = JsonSerializer.Serialize(antigos.Select(i => new { i.Nome, i.Quantidade, i.PrecoUnitario, i.Observacao }), ComandaClienteUseCase.Json);
             // Retorna exclusivamente as saídas das linhas anteriores. Novas linhas recebem novos IDs.
@@ -164,6 +174,7 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             await uow.CommitAsync();
             return resposta;
         }, ct);
+        if (trocarPara is { } troca) await TrocarDataAsync(input, result.PedidoId, troca.JanelaId, troca.Data, ct);
         if (result.EmCobranca)
             result = await CobrarDepoisDoCommitAsync(input, result);
         // Depois da cobrança nova: expirar é chamada externa e não atrasa o link que o cliente vai receber.
@@ -259,6 +270,31 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
         if ((await saldos.ConsultarAsync(pedido, CancellationToken.None)).Alocado > 0) return true;
         return (await cobrancas.ListarDoPedidoAsync(empresaId, pedidoId, CancellationToken.None))
             .Any(c => c.Status == Domain.Enums.Pagamentos.StatusCobrancaPedido.Paga);
+    }
+
+    /// <summary>
+    /// E10: aplica a data ou a janela que o cliente escolheu na alteração, com a regra de vaga da troca de janela. Sem
+    /// vaga ou fora do prazo, a alteração dos itens fica e a equipe é avisada na conversa para combinar a data: a data
+    /// pedida nunca some em silêncio.
+    /// </summary>
+    private async Task TrocarDataAsync(ConfirmarAlteracaoComandaInput input, Guid pedidoId, Guid janelaId, DateOnly data, CancellationToken ct)
+    {
+        try
+        {
+            await trocarJanela.ExecuteAsync(new(input.EmpresaId, pedidoId, janelaId, data,
+                UsuarioId: input.UsuarioId == Guid.Empty ? null : input.UsuarioId, UsuarioNome: input.UsuarioNome), ct);
+        }
+        catch (Exception ex) when (ex is UseCaseValidationException or EasyStock.Domain.Exceptions.Storefront.JanelaSemVagasException)
+        {
+            logger.LogWarning(ex, "Alteracao da comanda: data pedida nao aplicada pedidoId={PedidoId}", pedidoId);
+            await uow.ExecuteInTransactionSemRetryAsync(async t =>
+            {
+                await AvisarEquipeAsync(input, $"O cliente pediu entrega em {data:dd/MM} na alteração da comanda, mas a data não pôde ser aplicada ({ex.Message}). Combine a data com ele e troque a janela na Ficha.",
+                    relogio.GetUtcNow().UtcDateTime, t);
+                await uow.CommitAsync();
+                return true;
+            }, ct);
+        }
     }
 
     private Task AvisarEquipeAsync(ConfirmarAlteracaoComandaInput input, string texto, DateTime agora, CancellationToken ct) =>
