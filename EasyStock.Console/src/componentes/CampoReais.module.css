@@ -1,0 +1,9 @@
+/* J2 (#1990): campo de dinheiro do caixa, digitado em reais. Mesmo acabamento do campo de moeda
+   (CampoMascarado.module.css); o "R$" fica fora do texto digitado, à esquerda. */
+.envelope { position: relative; }
+.prefixo {
+  position: absolute; left: var(--e-3); top: 50%; transform: translateY(-50%);
+  font-family: var(--f-dado); font-size: var(--t-corpo); font-weight: 600; color: var(--tinta-2);
+  pointer-events: none;
+}
+.controle { padding-left: calc(var(--e-3) + 3ch); }

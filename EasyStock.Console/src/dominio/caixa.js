@@ -11,7 +11,7 @@
 // `dominio/pagamento.js: pagamentosDoPedido` já devolve) e o resumo do caixa
 // SOMA os dois mundos sem misturar os dados de um dentro do outro.
 
-import { inicioDoDiaNoFuso, moeda } from './formato.js'
+import { inicioDoDiaNoFuso, moeda, plural } from './formato.js'
 import { pagamentosDoPedido } from './pagamento.js'
 import { itemPorSku } from './cardapio.js'
 
@@ -30,6 +30,14 @@ export const CATEGORIAS_ENTRADA_SUGERIDAS = ['Venda no balcão', 'Suprimento']
 // #1683: fechar o caixa também decide a loja. O caixa do dia não reabre e a loja só abre com ele
 // aberto (`aberturaDaLoja.js`, situação `fechadoHoje`).
 export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechar, o caixa de hoje não reabre. Sem caixa aberto, a loja não abre mais hoje. Os lançamentos de hoje não podem mais ser estornados.'
+
+// J2 (#1990), item 5: devolução pendente não trava o fechamento (o dinheiro pode sair amanhã), mas o
+// modal diz quanto e onde se resolve. Sem nada a devolver, nada.
+export function avisoDeDevolucoesPendentes({ total = 0, pedidos = 0 } = {}) {
+  if (!(total > 0)) return null
+  return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}. `
+    + 'O fechamento não espera: registre a devolução no Pós-venda de cada pedido.'
+}
 
 // #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada
 // rotulada Sangria. A sugerida do outro tipo sai; a que a dona digitou fica.
@@ -56,7 +64,7 @@ export const nomeDoMetodoCaixa = (metodo) => NOME_DO_METODO_CAIXA[metodo] ?? 'Ou
 // se a maquininha cai em crédito ou débito, nem se o vale vai para "outro".
 // Ajustável aqui, sem mexer em mais nada.
 const METODO_CAIXA_DA_COBRANCA = {
-  pix: 'pix', 'cartao-link': 'credito', maquininha: 'credito', 'vale-refeicao': 'outro',
+  pix: 'pix', 'cartao-link': 'credito', maquininha: 'credito', 'vale-refeicao': 'outro', 'dinheiro-entrega': 'dinheiro',
 }
 export const metodoCaixaDoMeio = (meio) => (
   METODOS_CAIXA.includes(meio) ? meio : (METODO_CAIXA_DA_COBRANCA[meio] ?? 'outro')

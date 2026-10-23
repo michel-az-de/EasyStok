@@ -50,6 +50,30 @@ export function retificacaoDoSaldo(saldoInformado, situacao) {
   return { diferenca, exigeMotivo: diferenca !== 0 }
 }
 
+// J2 (#1990), item 6: "100" digitado abriu o caixa com R$ 1,00 sem ninguém perceber. Valor muito longe
+// do que se espera pede um segundo toque: com fechamento anterior, menos da metade ou mais do dobro do
+// que ficou na gaveta (e ao menos R$ 20 de diferença, troco que mudou pouco não pergunta); na primeira
+// abertura, valor com cara de centavo (abaixo de R$ 10) ou de zero a mais (R$ 2.000 ou mais).
+const DIFERENCA_MINIMA_PARA_CONFIRMAR = 20
+const PRIMEIRA_ABERTURA_MINIMA = 10
+const PRIMEIRA_ABERTURA_MAXIMA = 2000
+export function aberturaPedeConfirmacao(saldoInformado, situacao) {
+  if (situacao?.tipo !== 'novo') return false
+  const saldo = Number(saldoInformado) || 0
+  if (!situacao.ultimo) return (saldo > 0 && saldo < PRIMEIRA_ABERTURA_MINIMA) || saldo >= PRIMEIRA_ABERTURA_MAXIMA
+  const sugerido = gavetaDoFechamento(situacao.ultimo)
+  if (Math.abs(saldo - sugerido) < DIFERENCA_MINIMA_PARA_CONFIRMAR) return false
+  return saldo < sugerido / 2 || saldo > sugerido * 2
+}
+
+export function textoDaConfirmacaoDaAbertura(saldoInformado, situacao) {
+  const pergunta = `Abrir o caixa com ${moeda(Number(saldoInformado) || 0)}?`
+  const ultimo = situacao?.ultimo
+  return ultimo
+    ? `${pergunta} O fechamento de ${diaMes(ultimo.data)} deixou ${moeda(gavetaDoFechamento(ultimo))} na gaveta.`
+    : `${pergunta} Confira: o valor é em reais (100 é R$ 100,00).`
+}
+
 const comSinal = (valor) => (valor > 0 ? `+${moeda(valor)}` : moeda(valor))
 
 // Vai para `Observacoes` do movimento de abertura: o rastro de contra o que ela conferiu.

@@ -91,12 +91,19 @@ export const numeroCurto = (numero) => String(numero).split('-').at(-1)
 // atendente e o cliente dizem em voz alta; o código curto do EasyStok (8 letras do id) fica como
 // referência pequena para achar o pedido no suporte. Enquanto a API não entrega `numeroComanda`
 // em Entregas e KDS, vale o curto sozinho, sem inventar número.
-export function nomeDoPedido({ numeroComanda = null, numeroCurto = null } = {}) {
+// J2 (#1990, #1641-1 parte console): o "ref DB72EC58" na tela era id técnico; o curto fica só no título
+// (dica do mouse, para o suporte). A referência pequena ao lado da comanda passa a ser o número do dia
+// (`numeroDoDia`, a sequência que a cozinha fala), quando a API manda; ausente ou nulo, nada.
+const numeroDoDiaNaTela = (n) => (Number.isInteger(n) && n > 0 ? String(n).padStart(3, '0') : null)
+export function nomeDoPedido({ numeroComanda = null, numeroCurto = null, numeroDoDia = null } = {}) {
   const curto = numeroCurto ? String(numeroCurto) : null
+  const dia = numeroDoDiaNaTela(numeroDoDia)
+  const titulo = (partes) => [...partes, curto ? `ref ${curto}` : null].filter(Boolean).join(' · ')
   if (numeroComanda) {
     const frase = `Comanda ${numeroComanda}`
-    return { principal: frase, referencia: curto, frase, titulo: curto ? `${frase} · ref ${curto}` : frase }
+    return { principal: frase, referencia: dia ? `nº ${dia}` : null, frase, titulo: titulo([frase, dia ? `nº ${dia}` : null]) }
   }
+  if (dia) return { principal: `Nº ${dia}`, referencia: null, frase: `Pedido nº ${dia}`, titulo: titulo([`Nº ${dia}`]) }
   return { principal: curto ?? '', referencia: null, frase: curto ? `Pedido ${curto}` : 'Pedido', titulo: curto ?? '' }
 }
 
@@ -132,6 +139,32 @@ export const rascunhoMantendoEdicao = (doServidor, daAtendente, baseDaEdicao = d
     || (daAtendente.dataEntrega ?? null) !== (baseDaEdicao.dataEntrega ?? null)
     ? { janelaId: daAtendente.janelaId, dataEntrega: daAtendente.dataEntrega } : {}),
 })
+
+// J2 (#1990), item 7: a diferença de pagamento da alteração de um pedido pago, ao vivo. O total do
+// servidor (`totalPrevisto`) só muda depois de salvar; enquanto ela edita, soma-se a diferença entre
+// os itens editados e os da seleção salva, pelo mesmo preço que a tela mostra em cada linha (o da
+// seleção, ou o do cardápio para prato novo). Positivo é mais a pagar; negativo, a devolver.
+// Devolução em acompanhamento segue o saldo do servidor.
+const chaveDoItem = (i) => (i.variacaoId ? `${i.cardapioItemId}~${i.variacaoId}` : i.cardapioItemId)
+function somaDosItens(itens, selecao, catalogo) {
+  return (itens ?? []).reduce((soma, i) => {
+    const atual = (selecao ?? []).find((s) => chaveDoItem(s) === chaveDoItem(i))
+    const preco = atual?.preco ?? (catalogo ?? []).find((p) => p.sku === chaveDoItem(i))?.preco ?? 0
+    return soma + i.qtd * preco
+  }, 0)
+}
+export function saldoDaAlteracao(c, rascunhoEditado = null, catalogo = []) {
+  // #1987: pedido entregue ou cancelado sai do link e não tem diferença a acertar por aqui.
+  if (c.pedidoEncerrado) return 0
+  if (c.envio?.situacao === 'estorno_pendente') return c.envio.saldo
+  const pendente = c.envio?.situacao === 'alteracao_aguardando_confirmacao'
+  const total = c.podeEditar || pendente ? c.totalPrevisto ?? 0 : c.pedido?.total ?? c.totalPrevisto ?? 0
+  const pago = c.pedido?.alocado ?? c.pedido?.totalPago ?? 0
+  const delta = c.podeEditar && rascunhoEditado
+    ? somaDosItens(rascunhoEditado.itens, c.selecao, catalogo) - somaDosItens(c.rascunho?.itens, c.selecao, catalogo)
+    : 0
+  return Math.round((total + delta - pago) * 100) / 100
+}
 
 // #1683: o cliente montando a escolha pelo link, sem pedido ainda. A comanda de baixo não soma
 // item por conta própria, senão a Ficha mostra duas listas e dois totais da mesma comanda.

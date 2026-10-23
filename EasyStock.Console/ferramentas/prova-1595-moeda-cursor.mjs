@@ -92,4 +92,59 @@ confere('a regra vale só para moeda: telefone e cep seguem com edição no meio
   assert.match(campo, /onSelect=\{tipo === 'moeda' \? manterCursorNoFim : undefined\}/)
 })
 
+// --- Frente J2 (#1990), item 6: no caixa o dinheiro se digita em reais -------------------------
+// No laboratório (23/10) "100" na abertura abriu o caixa com R$ 1,00 e "58" no fechamento virou
+// R$ 0,58: a máscara de centavos não é como se conta dinheiro na gaveta. O campo do caixa guarda o
+// texto que ela digitou ("100", "58,50") e lê em reais; a vírgula separa os centavos.
+const moedaNoCampo = await import('../src/componentes/moedaNoCampo.js')
+const { lerMoeda } = await import('../src/dominio/formato.js')
+const { aberturaPedeConfirmacao, textoDaConfirmacaoDaAbertura } = await import('../src/dominio/aberturaDaLoja.js')
+
+confere('J2-6 digitar em reais: 100 é R$ 100,00, 58 é R$ 58,00, vírgula para centavos', () => {
+  const { textoDigitadoEmReais, textoDosCentavos } = moedaNoCampo
+  const digitar = (teclas) => [...teclas].reduce((texto, tecla) => textoDigitadoEmReais(texto + tecla), '')
+  assert.equal(lerMoeda(digitar('100')), 10000)
+  assert.equal(lerMoeda(digitar('58')), 5800)
+  assert.equal(lerMoeda(digitar('58,5')), 5850)
+  assert.equal(lerMoeda(digitar('0,50')), 50)
+  assert.equal(lerMoeda(digitar('1.500')), 150000)
+  assert.equal(digitar('R$ 12a,3,4'), '12,34', 'só dígitos, uma vírgula e no máximo dois centavos')
+  assert.equal(semEspacoDuro(textoDosCentavos(10000)), '100,00')
+  assert.equal(semEspacoDuro(textoDosCentavos(150000)), '1.500,00')
+  assert.equal(lerMoeda(textoDosCentavos(150000)), 150000, 'o texto formatado relê igual')
+  assert.equal(textoDosCentavos(null), '')
+})
+
+confere('J2-6 todos os campos de dinheiro do caixa usam o campo em reais', () => {
+  for (const arquivo of ['features/gestao/caixa/AbaCaixaApi.jsx', 'features/gestao/caixa/AbaCaixa.jsx',
+    'features/gestao/caixa/ModalFecharCaixa.jsx', 'features/loja/GestoLoja.jsx']) {
+    const tela = readFileSync(new URL(`../src/${arquivo}`, import.meta.url), 'utf8')
+    assert.doesNotMatch(tela, /tipo="moeda"/, arquivo)
+    assert.match(tela, /<CampoReais/, arquivo)
+  }
+})
+
+confere('J2-6 abertura muito longe da sugestão pede confirmação', () => {
+  const primeira = { tipo: 'novo', ultimo: null, saldoSugerido: 0 }
+  assert.equal(aberturaPedeConfirmacao(1, primeira), true, 'R$ 1,00 parece centavo')
+  assert.equal(aberturaPedeConfirmacao(100, primeira), false)
+  assert.equal(aberturaPedeConfirmacao(0, primeira), false)
+  assert.equal(aberturaPedeConfirmacao(5000, primeira), true, 'zero a mais')
+  const comFechamento = { tipo: 'novo', ultimo: { data: '2026-10-22', dinheiroNaGaveta: 100 }, saldoSugerido: 100 }
+  assert.equal(aberturaPedeConfirmacao(1, comFechamento), true)
+  assert.equal(aberturaPedeConfirmacao(100, comFechamento), false)
+  assert.equal(aberturaPedeConfirmacao(80, comFechamento), false, 'troco que mudou pouco não pergunta')
+  assert.equal(aberturaPedeConfirmacao(30, comFechamento), true)
+  assert.equal(aberturaPedeConfirmacao(1000, comFechamento), true)
+  assert.equal(aberturaPedeConfirmacao(1, { tipo: 'aberto' }), false, 'caixa já aberto não confere saldo')
+  assert.equal(semEspacoDuro(textoDaConfirmacaoDaAbertura(1, comFechamento)),
+    'Abrir o caixa com R$ 1,00? O fechamento de 22/10 deixou R$ 100,00 na gaveta.')
+  assert.equal(semEspacoDuro(textoDaConfirmacaoDaAbertura(1, primeira)),
+    'Abrir o caixa com R$ 1,00? Confira: o valor é em reais (100 é R$ 100,00).')
+  for (const arquivo of ['features/gestao/caixa/AbaCaixaApi.jsx', 'features/loja/GestoLoja.jsx']) {
+    const tela = readFileSync(new URL(`../src/${arquivo}`, import.meta.url), 'utf8')
+    assert.match(tela, /aberturaPedeConfirmacao\(saldoInicial, situacao\)/, arquivo)
+  }
+})
+
 console.log(`\n${passou} verificações passaram.`)

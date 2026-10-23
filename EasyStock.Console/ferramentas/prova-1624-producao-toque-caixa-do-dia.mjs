@@ -847,5 +847,34 @@ await confere('Caixa do dia: a tabela dos 7 dias tem legenda, rótulo por célul
   assert.match(limpo(ontem), /Fechado.*R\$ 80,00 depois de fechar/)
 })
 
+// Frente J2 (#1990), item 5: no laboratório (23/10) o caixa fechou com devolução pendente e o
+// modal não disse nada. Agora soma o `aDevolver` dos cancelados com recebimento e avisa, sem travar.
+await confere('J2-5 fechar o caixa avisa quanto há a devolver de pedidos cancelados, sem bloquear', async () => {
+  const { somarDevolucoesPendentes } = await import('../src/aplicacao/devolucoesPendentes.js')
+  const { avisoDeDevolucoesPendentes } = await import('../src/dominio/caixa.js')
+  const consultados = []
+  const portas = {
+    listarCancelados: async () => [
+      { id: 'a', totalPago: 216 }, { id: 'b', totalPago: 0 }, { id: 'c', totalPago: 50 }, { id: 'd', totalPago: 30 },
+    ],
+    aDevolverDoPedido: async (id) => { consultados.push(id); return { a: 216, c: 0, d: 30 }[id] },
+  }
+  assert.deepEqual(await somarDevolucoesPendentes(portas), { total: 246, pedidos: 2 })
+  assert.deepEqual(consultados, ['a', 'c', 'd'], 'sem recebimento não consulta')
+  assert.deepEqual(await somarDevolucoesPendentes({ ...portas, listarCancelados: async () => null }), { total: 0, pedidos: 0 })
+  const semEspacoDuro = (t) => String(t ?? '').replace(/ /g, ' ')
+  assert.equal(semEspacoDuro(avisoDeDevolucoesPendentes({ total: 246, pedidos: 2 })),
+    'Há R$ 246,00 a devolver de 2 pedidos cancelados. O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
+  assert.equal(semEspacoDuro(avisoDeDevolucoesPendentes({ total: 216, pedidos: 1 })),
+    'Há R$ 216,00 a devolver de 1 pedido cancelado. O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
+  assert.equal(avisoDeDevolucoesPendentes({ total: 0, pedidos: 0 }), null)
+  const modal = readFileSync(new URL('../src/features/gestao/caixa/ModalFecharCaixa.jsx', import.meta.url), 'utf8')
+  assert.match(modal, /useDevolucoesPendentes\(consultarDevolucoes\)/)
+  assert.match(modal, /avisoDeDevolucoesPendentes\(devolucoes\)/)
+  assert.doesNotMatch(modal, /disabled=\{[^}]*devolucoes/, 'o aviso não trava o botão')
+  const aba = readFileSync(new URL('../src/features/gestao/caixa/AbaCaixaApi.jsx', import.meta.url), 'utf8')
+  assert.match(aba, /<ModalFecharCaixa\s+consultarDevolucoes/)
+})
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length > 0) process.exit(1)

@@ -6,18 +6,18 @@
 import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
-import { CampoMascarado } from '../../componentes/CampoMascarado'
+import { CampoReais } from '../../componentes/CampoReais'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../aplicacao/useCaixaDoDiaApi'
 import {
-  JUSTIFICATIVA_MINIMA, diaMes, gavetaDoFechamento, justificativaValida, observacaoDaAbertura, retificacaoDoSaldo,
-  situacaoDoCaixaParaAbrirLoja,
+  JUSTIFICATIVA_MINIMA, aberturaPedeConfirmacao, diaMes, gavetaDoFechamento, justificativaValida, observacaoDaAbertura,
+  retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja, textoDaConfirmacaoDaAbertura,
 } from '../../dominio/aberturaDaLoja'
 import { conferenciaDaGaveta } from '../../dominio/caixa'
 import {
-  horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
+  horaCurta, lerMoeda, moeda, moedaAltaDemais,
 } from '../../dominio/formato'
 import css from './loja.module.css'
 
@@ -39,16 +39,16 @@ function useEnvio() {
   return [envio, enviar]
 }
 
+// J2 (#1990): dinheiro do caixa se digita em reais ("100" é R$ 100,00); campo vazio vale zero.
 function CampoDinheiro({ rotulo, dica, centavos, aoMudar }) {
   return (
-    <CampoMascarado
-      tipo="moeda"
+    <CampoReais
       rotulo={rotulo}
       dica={dica}
-      valor={mascaraMoeda(centavos)}
+      centavos={centavos}
+      ler={lerMoeda}
       erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null}
-      aoMudarDigitos={(digitos) => aoMudar(Number(digitos || '0'))}
-      aoColarTexto={(texto) => aoMudar(lerMoeda(texto))}
+      aoMudar={(valor) => aoMudar(valor ?? 0)}
     />
   )
 }
@@ -75,15 +75,14 @@ function FecharEsquecido({ situacao, aoFechou }) {
       <dl className={css.numeros}>
         <div><dt>Na gaveta (dinheiro)</dt><dd>{moeda(situacao.naGaveta)}</dd></div>
       </dl>
-      <CampoMascarado
-        tipo="moeda"
+      <CampoReais
         rotulo="Quanto você contou na gaveta (só dinheiro)"
         dica="Conte o dinheiro. A diferença fica registrada no fechamento."
         placeholder="Digite o que contou"
-        valor={contado == null ? '' : mascaraMoeda(contado)}
+        centavos={contado}
+        ler={lerMoeda}
         erro={moedaAltaDemais(contado) ? 'Valor alto demais' : null}
-        aoMudarDigitos={(digitos) => setContado(digitos ? Number(digitos) : null)}
-        aoColarTexto={(texto) => setContado(lerMoeda(texto))}
+        aoMudar={setContado}
       />
       {conferencia.pronta && (
         <p className={css.apoio}>Diferença: <Pilula tom={conferencia.tom}>{conferencia.texto}</Pilula></p>
@@ -134,8 +133,13 @@ export function ModalAbrirLoja({ aoFechar }) {
   const saldoInicial = saldoCentavos / 100
   const retificacao = retificacaoDoSaldo(saldoInicial, situacao)
   const motivoFalta = retificacao.exigeMotivo && motivo.trim().length < MOTIVO_MINIMO
+  // J2 (#1990): valor muito longe da sugestão pede um segundo toque; mudar o valor desfaz o primeiro.
+  const [confirmando, setConfirmando] = useState(false)
+  const pedeConfirmacao = aberturaPedeConfirmacao(saldoInicial, situacao)
+  const mudarSaldo = (valor) => { setCentavos(valor); setConfirmando(false) }
 
   const abrir = async () => {
+    if (pedeConfirmacao && !confirmando) { setConfirmando(true); return }
     const caixaJaAberto = situacao.tipo === 'aberto'
     const observacoes = caixaJaAberto ? undefined : observacaoDaAbertura({ saldoInformado: saldoInicial, situacao, motivo })
     const ok = await enviar(() => abrirLojaComCaixa({ saldoInicial, observacoes, caixaJaAberto }))
@@ -161,7 +165,7 @@ export function ModalAbrirLoja({ aoFechar }) {
               disabled={envio.enviando || moedaAltaDemais(saldoCentavos) || motivoFalta}
               onClick={abrir}
             >
-              {envio.enviando ? 'Abrindo…' : rotuloAbrir}
+              {envio.enviando ? 'Abrindo…' : confirmando && pedeConfirmacao ? `Sim, abrir com ${moeda(saldoInicial)}` : rotuloAbrir}
             </Botao>
           )}
         </>
@@ -200,8 +204,11 @@ export function ModalAbrirLoja({ aoFechar }) {
               rotulo="Saldo inicial (o que está na gaveta agora)"
               dica={situacao.ultimo ? `Já vem com o saldo do fechamento de ${diaMes(situacao.ultimo.data)}.` : 'O dinheiro de troco que fica na gaveta.'}
               centavos={saldoCentavos}
-              aoMudar={setCentavos}
+              aoMudar={mudarSaldo}
             />
+            {confirmando && pedeConfirmacao && (
+              <p className={css.alerta} role="alert">{textoDaConfirmacaoDaAbertura(saldoInicial, situacao)}</p>
+            )}
             {retificacao.exigeMotivo && (
               <>
                 <p className={css.alerta}>

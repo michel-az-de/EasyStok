@@ -78,9 +78,25 @@ export function paineisDeEntregas(pedidos, viagens) {
   }
 }
 
+// J2 (#1990), item 3: sem entregador cadastrado a viagem ficava parada. A escolha "Entrega própria
+// (sem cadastro)" usa um entregador da casa com esse nome, cadastrado na primeira vez que se usa.
+export const ENTREGA_PROPRIA = 'entrega-propria'
+const NOME_ENTREGA_PROPRIA = 'Entrega própria'
+export const CORPO_ENTREGA_PROPRIA = {
+  nome: NOME_ENTREGA_PROPRIA, tipo: 'Proprio', empresa: 'Propria', telefone: null, veiculo: null, placa: null,
+}
+export const entregadorDaEntregaPropria = (entregadores) =>
+  (entregadores ?? []).find((e) => normalizarBusca(e.nome) === normalizarBusca(NOME_ENTREGA_PROPRIA)) ?? null
+
+export const opcoesDeEntregador = (entregadores) => [
+  { valor: '', rotulo: 'Sem entregador' },
+  ...(entregadores ?? []).map((e) => ({ valor: e.id, rotulo: e.nome })),
+  ...(entregadorDaEntregaPropria(entregadores) ? [] : [{ valor: ENTREGA_PROPRIA, rotulo: `${NOME_ENTREGA_PROPRIA} (sem cadastro)` }]),
+]
+
 // RN-32: sem entregador resolvido, nenhum aviso sai. A API recusa; a tela avisa antes.
 export function motivoDeSaida(viagem) {
-  if (!viagem.entregadorId) return 'Escolha o entregador antes de sair.'
+  if (!viagem.entregadorId) return 'Escolha o entregador (ou "Entrega própria") antes de sair.'
   if (viagem.paradas.length === 0) return 'Ponha ao menos um pedido na viagem.'
   return null
 }

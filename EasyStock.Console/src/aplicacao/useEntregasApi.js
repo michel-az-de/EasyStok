@@ -8,6 +8,8 @@ import { dataIsoNoFuso } from '../dominio/formato'
 import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { criarRecargaDeAcao } from './recargaDeAcao'
 import { chaveDaEntrega, chaveDaSaida, criarEnvioComDesfazer } from './envioComDesfazer'
+import { criarChaveDeEnvio } from './chaveDeEnvio'
+import { receberEEntregar, usarEntregaPropria } from './recebimentoNaEntrega'
 
 // Entregas no modo API (F04). Pedidos e viagens recarregam a cada evento de
 // pedido do SSE de operação (S18), o mesmo da cozinha (F05). Com o SSE caído,
@@ -64,6 +66,8 @@ export function useEntregasApi({ comVitrine = true } = {}) {
     aoMudar: (lista) => setAdiados(new Map(lista.map((a) => [a.chave, a.ate]))),
   }))
   useEffect(() => () => envio.descarregar(), [envio])
+  // J2 (#1990): repetir o "Recebi" logo depois de uma queda não lança o pagamento duas vezes.
+  const [envioDoPagamento] = useState(() => criarChaveDeEnvio())
 
   const recarregar = useCallback((alcance) => {
     const hoje = dataIsoNoFuso(Date.now())
@@ -188,6 +192,21 @@ export function useEntregasApi({ comVitrine = true } = {}) {
     entregue: (id, pedidoId, confirmarSaldo = false) => envio.agendar(chaveDaEntrega(id, pedidoId),
       () => executar(() => api.marcarParadaEntregue(id, pedidoId, confirmarSaldo),
         'A entrega não foi marcada', RELE_PELO_EVENTO, pedeConfirmacaoDoSaldo)),
+    // J2 (#1990), item 2: "Recebi R$ X" lança o pagamento (a mesma rota do "Marcar pago" do Balcão)
+    // e marca entregue. Espera com "Desfazer" como o "Entregue": desfazer não lança nada.
+    // A chave do pagamento só cai depois da entrega marcada: repetir após falha na entrega devolve o
+    // pagamento já gravado em vez de lançar outro.
+    receberEEntregar: (id, pedidoId, valor, metodo) => envio.agendar(chaveDaEntrega(id, pedidoId), () => {
+      const chave = envioDoPagamento.para({ pedidoId, valor, metodo })
+      return executar(() => receberEEntregar(
+        { registrarPagamento: api.registrarPagamentoNaEntrega, marcarEntregue: api.marcarParadaEntregue },
+        { viagemId: id, pedidoId, valor, metodo, chave },
+      ).then(() => envioDoPagamento.confirmar(chave)), 'O recebimento não foi lançado', RELE_PELO_EVENTO)
+    }),
+    // J2 (#1990), item 3: "Entrega própria (sem cadastro)" no lugar de um entregador cadastrado.
+    usarEntregaPropria: (id) => executar(() => usarEntregaPropria({
+      criarEntregador: api.criarEntregador, definirEntregador: api.definirEntregadorViagem,
+    }, { viagemId: id, entregadores }), 'O entregador não mudou', RELE_TUDO),
     adiadoAte: (chave) => adiados.get(chave) ?? null,
     desfazerEnvio: (chave) => envio.desfazer(chave),
     desfazer: (id) => executar(() => api.desfazerViagem(id), 'A viagem não foi desfeita'),

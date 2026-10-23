@@ -26,6 +26,12 @@ export function primeiroPassoAntesDaVenda({ conversa, pedido, fonteApi = false }
 // escolha de quem atende, o título diz que não carregou.
 export const RESUMO_COM_ERRO = 'Não carregou'
 
+// J2 (#1990), item 9: "costuma pedir" é hábito, e um pedido só não faz hábito. O dossiê manda o item
+// presente em mais pedidos com a contagem (`itemFavorito.pedidos`); sem ela, não se afirma nada.
+export const PEDIDOS_PARA_COSTUMA_PEDIR = 2
+export const favoritoDoCliente = (itemFavorito) =>
+  (Number(itemFavorito?.pedidos) >= PEDIDOS_PARA_COSTUMA_PEDIR ? itemFavorito.nome ?? null : null)
+
 // #1761 (L22): linha zerada da Ficha. "Tags · 0 tags" vira o convite da ação que mora ali; o
 // Histórico sem pedido e sem pontos para resgatar não tem o que abrir e sai da coluna.
 export const resumoDasTags = (quantas) => (quantas === 0 ? 'Adicionar tag' : quantas === 1 ? '1 tag' : `${quantas} tags`)

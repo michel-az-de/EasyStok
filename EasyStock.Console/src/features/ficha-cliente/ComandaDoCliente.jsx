@@ -6,7 +6,7 @@ import { Modal } from '../../componentes/Modal'
 import { moeda } from '../../dominio/formato'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
 import { itensDoDia } from '../../dominio/cardapioLink'
-import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao, tituloDaComanda } from '../../dominio/pedido'
+import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao, saldoDaAlteracao, tituloDaComanda } from '../../dominio/pedido'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { congelado } from '../../dominio/congelados'
@@ -124,10 +124,12 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
     setPrato('')
   }
   const pendente = !c.pedidoEncerrado && c.envio?.situacao === 'alteracao_aguardando_confirmacao'
-  const saldo = c.pedidoEncerrado ? 0 : c.envio?.situacao === 'estorno_pendente' ? c.envio.saldo
-    : (c.podeEditar || pendente ? c.totalPrevisto ?? 0 : c.pedido?.total ?? c.totalPrevisto ?? 0) - (c.pedido?.alocado ?? c.pedido?.totalPago ?? 0)
-  const resumoSaldo = saldo < 0 ? 'A devolver: ' + moeda(-saldo) + ' em ' + (c.rascunho.acerto === 'cupom' ? 'cupom' : 'estorno') + '.'
-    : saldo > 0 ? 'Mais a pagar: ' + moeda(saldo) + '.' : 'Sem diferença de pagamento.'
+  // J2 (#1990): a diferença acompanha a edição antes de salvar (antes dizia "Sem diferença" com +R$ 38 na tela).
+  const saldo = saldoDaAlteracao(c, edicao?.rascunho ?? null, catalogo)
+  const naoSalvo = Boolean(edicao) && c.podeEditar && !c.pedidoEncerrado
+  const resumoSaldo = (saldo < 0 ? 'A devolver: ' + moeda(-saldo) + ' em ' + (c.rascunho.acerto === 'cupom' ? 'cupom' : 'estorno') + '.'
+    : saldo > 0 ? 'Mais a pagar: ' + moeda(saldo) + '.' : 'Sem diferença de pagamento.')
+    + (naoSalvo ? ' Conta com os ajustes ainda não salvos.' : '')
   const exigeGerente = saldo < 0 || c.envio?.situacao === 'estorno_pendente'
   const janela = rascunho.janelaId && rascunho.dataEntrega ? idDaJanela(rascunho.janelaId, rascunho.dataEntrega) : null
   const rotuloJanela = janelas.find(j => j.id === janela)?.rotulo

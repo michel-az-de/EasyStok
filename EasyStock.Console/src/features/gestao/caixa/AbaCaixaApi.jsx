@@ -5,7 +5,7 @@ import { useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
-import { CampoMascarado } from '../../../componentes/CampoMascarado'
+import { CampoReais } from '../../../componentes/CampoReais'
 import { Chip } from '../../../componentes/Chip'
 import { Pilula } from '../../../componentes/Pilula'
 import { Modal } from '../../../componentes/Modal'
@@ -14,14 +14,15 @@ import { useCaixaDoDiaApi } from '../../../aplicacao/useCaixaDoDiaApi'
 import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import {
-  diaMes, gavetaDoFechamento, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
+  aberturaPedeConfirmacao, diaMes, gavetaDoFechamento, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
+  textoDaConfirmacaoDaAbertura,
 } from '../../../dominio/aberturaDaLoja'
 import {
   CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
   nomeDoMetodoCaixa, temMovimentoNoDia, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
-  horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais, plural,
+  horaCurta, lerMoeda, moeda, moedaAltaDemais, plural,
 } from '../../../dominio/formato'
 import { PromptEstorno } from './AbaCaixa'
 import { ModalFecharCaixa } from './ModalFecharCaixa'
@@ -54,17 +55,17 @@ function useAcaoComRecarga(recarregar) {
   return [situacao, executar, () => setSituacao((atual) => ({ ...atual, erro: null }))]
 }
 
+// J2 (#1990): dinheiro do caixa se digita em reais ("100" é R$ 100,00); campo vazio vale zero.
 function CampoDinheiro({ rotulo, dica, centavos, aoMudar, disabled = false }) {
   return (
-    <CampoMascarado
-      tipo="moeda"
+    <CampoReais
       disabled={disabled}
       rotulo={rotulo}
       dica={dica}
-      valor={mascaraMoeda(centavos)}
+      centavos={centavos}
+      ler={lerMoeda}
       erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null}
-      aoMudarDigitos={(digitos) => aoMudar(Number(digitos || '0'))}
-      aoColarTexto={(texto) => aoMudar(lerMoeda(texto))}
+      aoMudar={(valor) => aoMudar(valor ?? 0)}
     />
   )
 }
@@ -75,8 +76,15 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
   const situacao = situacaoDoCaixaParaAbrirLoja(dia, ultimo)
   const [centavos, setCentavos] = useState(Math.round((situacao.saldoSugerido ?? 0) * 100))
   const [motivo, setMotivo] = useState('')
+  // J2 (#1990): valor muito longe da sugestão pede um segundo toque; mudar o valor desfaz o primeiro.
+  const [confirmando, setConfirmando] = useState(false)
   const saldoInicial = centavos / 100
   const retificacao = retificacaoDoSaldo(saldoInicial, situacao)
+  const pedeConfirmacao = aberturaPedeConfirmacao(saldoInicial, situacao)
+  const abrir = () => {
+    if (pedeConfirmacao && !confirmando) { setConfirmando(true); return }
+    executar(() => abrirCaixa(agora, saldoInicial, observacaoDaAbertura({ saldoInformado: saldoInicial, situacao, motivo })), 'abertura')
+  }
 
   return (
     <div className={css.painel}>
@@ -89,8 +97,11 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
         dica="O dinheiro que está na gaveta ao abrir o dia."
         centavos={centavos}
         disabled={enviando}
-        aoMudar={setCentavos}
+        aoMudar={(valor) => { setCentavos(valor); setConfirmando(false) }}
       />
+      {confirmando && pedeConfirmacao && (
+        <p className={css.avisoDevolucao} role="alert">{textoDaConfirmacaoDaAbertura(saldoInicial, situacao)}</p>
+      )}
       {retificacao.exigeMotivo && (
         <CampoArea
           rotulo={`Motivo da diferença de ${moeda(retificacao.diferenca)}`}
@@ -106,9 +117,9 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
         icone="dollar-sign"
         largo
         disabled={enviando || moedaAltaDemais(centavos) || (retificacao.exigeMotivo && motivo.trim().length < 3)}
-        onClick={() => executar(() => abrirCaixa(agora, saldoInicial, observacaoDaAbertura({ saldoInformado: saldoInicial, situacao, motivo })), 'abertura')}
+        onClick={abrir}
       >
-        {abrindo ? 'Abrindo o caixa…' : 'Abrir o caixa'}
+        {abrindo ? 'Abrindo o caixa…' : confirmando && pedeConfirmacao ? `Sim, abrir com ${moeda(saldoInicial)}` : 'Abrir o caixa'}
       </Botao>
     </div>
   )
@@ -484,6 +495,7 @@ export function AbaCaixaApi() {
 
       {podeGerenciar && fecharAberto && (
         <ModalFecharCaixa
+          consultarDevolucoes
           resumo={dia}
           gaveta={gaveta}
           enviando={acao.enviando}

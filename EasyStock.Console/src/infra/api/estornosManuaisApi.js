@@ -6,6 +6,15 @@ const chave = (pedidoId) => `easystok.devolucao:${identidadeDaSessao(lerSessao()
 export const listarEstornosManuais = (pedidoId) => chamarApi(rota(pedidoId))
 export const registrarEstornoManual = (pedidoId, corpo) => chamarApi(rota(pedidoId), { metodo: 'POST', corpo })
 
+// J2 (#1990): cancelados dos últimos 60 dias (pela criação; encomenda cancelada hoje pode ter
+// nascido semanas antes), para o fechamento do caixa somar o que falta devolver.
+export const DIAS_DE_CANCELADOS = 60
+export function listarPedidosCanceladosRecentes(agora = Date.now()) {
+  const desde = new Date(agora - DIAS_DE_CANCELADOS * 86400000).toISOString()
+  const busca = new URLSearchParams({ status: 'cancelado', desde, pageSize: '200', sort: 'criadoem', order: 'desc' })
+  return chamarApi(`/api/pedidos?${busca}`)
+}
+
 // Só a solicitação ainda sem resposta fica no navegador. O saldo e o histórico vêm da API.
 export function lerDevolucaoPendente(pedidoId) {
   const texto = localStorage.getItem(chave(pedidoId))

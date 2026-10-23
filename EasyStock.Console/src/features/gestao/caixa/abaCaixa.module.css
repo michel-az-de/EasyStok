@@ -22,6 +22,11 @@
   margin: 0; padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta);
   background: var(--erro-pastel); border-radius: var(--r-1);
 }
+/* J2 (#1990): devolução pendente avisa no fechamento, sem travar. */
+.avisoDevolucao {
+  display: block; margin: 0; padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--tinta);
+  background: var(--alerta-pastel); border-radius: var(--r-1);
+}
 
 .resumoLista {
   margin: 0; display: grid; gap: var(--e-5) var(--e-4);

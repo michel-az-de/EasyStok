@@ -1,4 +1,5 @@
 import { chamarApi } from './cliente'
+import { lerSessao } from './sessao'
 
 // Entregas no modo API (F04). Pedidos pelo KDS (S19, com endereço e aprovação),
 // entregadores, viagens e chamados (S44, `api/atendimento`), aprovação manual
@@ -34,6 +35,12 @@ export const corrigirCorrida = (id, corridaId, corpo) => chamarApi(`${V}/${id}/c
 export const marcarParadaEntregue = (id, pedidoId, confirmarSaldoAReceber = false) =>
   chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST', corpo: { confirmarSaldoAReceber } })
 export const desfazerViagem = (id) => chamarApi(`${V}/${id}/desfazer`, { metodo: 'POST' })
+// J2 (#1990): o recebido na porta entra pela mesma rota do "Marcar pago" do Balcão
+// (`comandaApi.registrarPagamentoManual`), com o mesmo corpo. `chave` é a Idempotency-Key.
+export const registrarPagamentoNaEntrega = (pedidoId, valor, metodo, chave = null) =>
+  chamarApi(`/api/pedidos/${pedidoId}/pagamentos`, {
+    metodo: 'POST', chave, corpo: { empresaId: lerSessao()?.empresa?.id, pedidoId, valor, metodo },
+  })
 
 // Chamados de entregador (texto livre).
 const C = '/api/atendimento/chamados-entregador'
