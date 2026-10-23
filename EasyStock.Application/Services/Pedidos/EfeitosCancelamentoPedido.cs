@@ -19,7 +19,8 @@ public class EfeitosCancelamentoPedido(
     IContaReceberRepository contaReceberRepo,
     IVagaOcupadaRepository vagaOcupadaRepo,
     ILogger<EfeitosCancelamentoPedido> logger,
-    SaldoFinanceiroPedido? saldos = null, ICreditoClienteComandaRepository? creditos = null)
+    SaldoFinanceiroPedido? saldos = null, ICreditoClienteComandaRepository? creditos = null,
+    IViagemRepository? viagens = null)
 {
     public static void ExigirPermissao(bool temPagamento, NivelAcesso nivel)
     {
@@ -34,6 +35,10 @@ public class EfeitosCancelamentoPedido(
         var motivoTexto = string.IsNullOrWhiteSpace(motivo) ? "Pedido cancelado" : motivo;
 
         await vagaOcupadaRepo.LiberarPorPedidoAsync(pedido.Id, $"Pedido cancelado: {motivoTexto}", ct);
+        // estoque-03: o pedido cancelado sai da viagem; a da logística contratada tem o retorno próprio e não é mexida.
+        if (viagens is not null && await viagens.ObterAtivaDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct) is { } viagem
+            && !await viagens.VinculadaLogisticaAsync(pedido.EmpresaId, viagem.Id, ct))
+            viagem.RetirarParadaDePedidoCancelado(pedido.Id, DateTime.UtcNow);
         // Créditos usados voltam à carteira; recebimentos em dinheiro seguem a devolução existente.
         if (saldos is not null && creditos is not null && pedido.ClienteId is { } clienteId
             && await creditos.ObterPorOperacaoAsync(pedido.EmpresaId, pedido.Id, ct) is null)

@@ -39,6 +39,11 @@ public sealed class ViagemRepository(EasyStockDbContext db) : IViagemRepository
         return await query.OrderByDescending(v => v.CriadaEm).Take(Math.Clamp(limite, 1, 500)).ToListAsync(ct);
     }
 
+    public Task<Viagem?> ObterAtivaDoPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
+        db.Viagens.Include(v => v.Paradas).FirstOrDefaultAsync(v => v.EmpresaId == empresaId
+            && (v.Situacao == SituacaoViagem.Montando || v.Situacao == SituacaoViagem.EmRota)
+            && v.Paradas.Any(p => p.PedidoId == pedidoId), ct);
+
     public Task<bool> PedidoEmViagemAtivaAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
         db.Viagens.AnyAsync(v => v.EmpresaId == empresaId
             && (v.Situacao == SituacaoViagem.Montando || v.Situacao == SituacaoViagem.EmRota)

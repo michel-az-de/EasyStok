@@ -68,6 +68,28 @@ public class Viagem
         Renumerar(_paradas.OrderBy(p => p.Ordem).ToList());
     }
 
+    /// <summary>
+    /// Pedido cancelado dentro da viagem (estoque-03): a parada sai, montando ou em rota, porque <c>Cancelado</c> nunca
+    /// vira <c>Entregue</c> e a viagem ficaria "na rua" para sempre. Em rota, conclui quando as paradas que sobraram
+    /// já foram entregues; se não sobrou nenhuma, nada foi levado e ela se desfaz, como no retorno à loja. Parada já
+    /// entregue fica, e pedido que não está na viagem não faz nada.
+    /// </summary>
+    public void RetirarParadaDePedidoCancelado(Guid pedidoId, DateTime agora)
+    {
+        if (Situacao is not (SituacaoViagem.Montando or SituacaoViagem.EmRota)) return;
+        var parada = _paradas.FirstOrDefault(p => p.PedidoId == pedidoId);
+        if (parada is null || parada.Entregue) return;
+
+        _paradas.Remove(parada);
+        Renumerar(_paradas.OrderBy(p => p.Ordem).ToList());
+        if (Situacao != SituacaoViagem.EmRota) return;
+
+        if (_paradas.Count == 0) Situacao = SituacaoViagem.Desfeita;
+        else if (_paradas.All(p => p.Entregue)) Situacao = SituacaoViagem.Concluida;
+        else return;
+        ConcluidaEm = Datas.Utc(agora);
+    }
+
     /// <summary>Move a parada para <paramref name="novaOrdem"/> (começa em 1, limitada ao tamanho) e renumera.</summary>
     public void ReordenarParada(Guid pedidoId, int novaOrdem)
     {
