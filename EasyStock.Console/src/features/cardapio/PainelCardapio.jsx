@@ -22,8 +22,9 @@ import {
 } from '../../dominio/vitrineCardapio'
 import { moeda } from '../../dominio/formato'
 import {
-  agruparPorLinha, comandaTravada, itensDetalhados, numeroDaComanda, totalDoPedido,
+  agruparPorLinha, comandaTravada, itensDetalhados, numeroDaComanda,
 } from '../../dominio/pedido'
+import { totalDaVenda } from '../../dominio/resumoAtendimento'
 import { diferencaAposPagamento } from '../../dominio/pagamento'
 import { FOTO_NAO_ENVIADA } from '../../dominio/anexos'
 import { primeiroNome } from '../../dominio/mensagem'
@@ -460,7 +461,8 @@ function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
   const [somaEmDestaque, setSomaEmDestaque] = useState(null)
 
   const itens = itensDetalhados(pedido, cardapio)
-  const total = totalDoPedido(pedido, cardapio)
+  // #2002 comanda-20: no pedido do EasyStok o total é o do servidor (frete e preço gravado), não a soma pelo cardápio de hoje.
+  const total = totalDaVenda(pedido, cardapio)
   const qtdItens = itens.reduce((soma, linha) => soma + linha.qtd, 0)
   const grupos = agruparPorLinha(itens, linhas)
   // Mesmo cálculo de BlocoPedido.jsx (defeito c, decisão 23; a conta mora em
