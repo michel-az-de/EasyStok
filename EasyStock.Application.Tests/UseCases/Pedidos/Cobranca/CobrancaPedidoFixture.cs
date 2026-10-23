@@ -100,7 +100,7 @@ internal sealed class CobrancaPedidoFixture
             .Do(ci => Pedido.Pagamentos.Add(ci.Arg<PedidoPagamento>()));
         PedidoRepo.When(r => r.AddEventoAsync(Arg.Any<PedidoEvento>()))
             .Do(ci => Eventos.Add(ci.Arg<PedidoEvento>()));
-        PedidoStorefrontRepo.GetForUpdateAsync(Pedido.Id, Arg.Any<CancellationToken>()).Returns(Pedido);
+        PedidoStorefrontRepo.GetForUpdateAsync(EmpresaId, Pedido.Id, Arg.Any<CancellationToken>()).Returns(Pedido);
         PedidoStorefrontRepo.When(r => r.AddEventoAsync(Arg.Any<PedidoEvento>(), Arg.Any<CancellationToken>()))
             .Do(ci => Eventos.Add(ci.Arg<PedidoEvento>()));
 
@@ -230,7 +230,7 @@ internal sealed class CobrancaPedidoFixture
 
     public AtualizarCobrancaPorPagamentoUseCase AtualizarPorPagamento() =>
         new(CobrancaRepo, PedidoStorefrontRepo, Aviso(), Tenant, Uow, Relogio,
-            NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
+            NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance, Notificador);
 
     public DesfazerPagamentoManualUseCase Desfazer() =>
         new(PedidoStorefrontRepo, PedidoRepo, CobrancaRepo, Publicador, Uow, Relogio, Quitacao(), CaixaRepo);

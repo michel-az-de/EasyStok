@@ -151,7 +151,7 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         CobrancaPedidoVencida item, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var pedido = await pedidoRepository.GetForUpdateAsync(item.PedidoId, ct);
+        var pedido = await pedidoRepository.GetForUpdateAsync(item.EmpresaId, item.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != item.EmpresaId)
             return (ResultadoExpiracaoCobranca.Ignorada, null, null);
 

@@ -1,8 +1,11 @@
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Enums.Pagamentos;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -10,7 +13,8 @@ namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 /// <summary>Pagamento consultado na fonte cujo desfecho não confirma o pedido (S32).</summary>
 /// <param name="PedidoId"><c>external_reference</c> do pagamento.</param>
 /// <param name="PagamentoExternoId"><c>id</c> do pagamento no Mercado Pago.</param>
-/// <param name="StatusPagamento"><c>status</c> do pagamento (<c>refunded</c>, <c>charged_back</c>, <c>rejected</c>, <c>cancelled</c>).</param>
+/// <param name="StatusPagamento"><c>status</c> do pagamento (<c>refunded</c>, <c>charged_back</c>, <c>rejected</c>, <c>cancelled</c>,
+/// <c>in_mediation</c>).</param>
 /// <param name="StatusDetalhe"><c>status_detail</c> do pagamento (ex.: <c>expired</c> no Pix vencido).</param>
 public sealed record AtualizarCobrancaPorPagamentoInput(
     Guid PedidoId, string PagamentoExternoId, string StatusPagamento, string? StatusDetalhe = null);
@@ -25,6 +29,8 @@ public enum SituacaoAtualizacaoCobranca
     JaRegistrado = 4,
     SemCobranca = 5,
     PedidoNaoEncontrado = 6,
+    /// <summary><c>in_mediation</c>: o cliente abriu disputa no provedor. Registrado e a equipe avisada (#1724-12).</summary>
+    EmMediacao = 7,
 }
 
 /// <summary>
@@ -37,6 +43,9 @@ public enum SituacaoAtualizacaoCobranca
 ///   <item><c>rejected</c> ou <c>cancelled</c>: o motivo vai para a cobrança online (a pendente ou a mais recente)
 ///     e, com cobrança pendente vinda da conversa, o cliente recebe um aviso com o mesmo link. O mesmo pagamento
 ///     recusado de novo não avisa duas vezes.</item>
+///   <item><c>in_mediation</c> (#1724-12): o cliente abriu disputa. A cobrança paga por este pagamento guarda o motivo,
+///     a trilha ganha <c>pagamento_em_mediacao</c> e a equipe é avisada pelo sino, uma vez por pagamento. O pedido e o
+///     dinheiro ficam como estão até o desfecho da disputa (a devolução chega como <c>charged_back</c>).</item>
 /// </list>
 /// </summary>
 public sealed class AtualizarCobrancaPorPagamentoUseCase(
@@ -46,7 +55,8 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
     ITenantContextAccessor tenantContext,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<AtualizarCobrancaPorPagamentoUseCase> logger)
+    ILogger<AtualizarCobrancaPorPagamentoUseCase> logger,
+    INotificadorService notificador)
 {
     private const string Origem = "mercadopago";
 
@@ -61,7 +71,7 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
             throw new UseCaseValidationException("PagamentoExternoId é obrigatório.");
 
         var estorno = PagamentoMercadoPago.EhEstorno(input.StatusPagamento);
-        if (!estorno && !PagamentoMercadoPago.EhRecusa(input.StatusPagamento))
+        if (!estorno && !PagamentoMercadoPago.EhRecusa(input.StatusPagamento) && !PagamentoMercadoPago.EhMediacao(input.StatusPagamento))
             return SituacaoAtualizacaoCobranca.Ignorada;
 
         var empresaId = await cobrancaRepository.ObterEmpresaIdDoPedidoAsync(input.PedidoId, ct);
@@ -85,12 +95,15 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
         AtualizarCobrancaPorPagamentoInput input, bool estorno, Guid empresaId, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, ct);
+        var pedido = await pedidoRepository.GetForUpdateAsync(empresaId, input.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != empresaId)
             return (SituacaoAtualizacaoCobranca.PedidoNaoEncontrado, null, null);
 
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct);
         var status = input.StatusPagamento.Trim().ToLowerInvariant();
+
+        if (PagamentoMercadoPago.EhMediacao(status))
+            return await RegistrarMediacaoAsync(pedido, cobrancas, input.PagamentoExternoId, status, agora, ct);
 
         if (estorno)
         {
@@ -128,6 +141,34 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
             ? (SituacaoAtualizacaoCobranca.Recusada, alvo.ConversaId, alvo.LinkPagamento)
             : (SituacaoAtualizacaoCobranca.Recusada, null, null);
     }
+
+    private async Task<(SituacaoAtualizacaoCobranca, Guid?, string?)> RegistrarMediacaoAsync(EasyStock.Domain.Entities.Pedido pedido,
+        IReadOnlyList<CobrancaPedido> cobrancas, string pagamentoExternoId, string status, DateTime agora, CancellationToken ct)
+    {
+        var paga = cobrancas.FirstOrDefault(c => c.PagamentoExternoId == pagamentoExternoId);
+        if (paga is null) return (SituacaoAtualizacaoCobranca.SemCobranca, null, null);
+        if (paga.Status != StatusCobrancaPedido.Paga) return (SituacaoAtualizacaoCobranca.Ignorada, null, null);
+        var motivo = $"em_mediacao: pagamento {pagamentoExternoId} ({status})";
+        if (paga.Motivo?.Contains(motivo, StringComparison.Ordinal) == true) return (SituacaoAtualizacaoCobranca.JaRegistrado, null, null);
+
+        // Acrescenta ao motivo que já existe: as marcas do começo (valor menor, estorno automático) continuam valendo.
+        paga.RegistrarMotivo(paga.Motivo is null ? motivo : $"{paga.Motivo} | {motivo}", agora);
+        await RegistrarNaTrilhaAsync(pedido.Id, "pagamento_em_mediacao", motivo, agora, ct);
+        // Sem usuarioId: vale a audiência da rotina (gestores). Só primeiro nome e referência, como os avisos do Balcão.
+        var correlacao = CorrelacaoAvisoMediacao(pagamentoExternoId);
+        var payload = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["nome"] = AvisoEquipeNoAparelho.PrimeiroNome(pedido.ClienteNome),
+            ["referencia"] = PrazoEstouradoEvento.Referencia(pedido.Id),
+            [NotificadorService.ChaveIdempotenciaPayload] = correlacao,
+        });
+        await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.PagamentoEmMediacao, pedido.EmpresaId, payload,
+            pedido.Id, ct, correlacao);
+        await unitOfWork.CommitAsync();
+        return (SituacaoAtualizacaoCobranca.EmMediacao, null, null);
+    }
+
+    public static string CorrelacaoAvisoMediacao(string pagamentoExternoId) => $"pagamento-em-mediacao:{pagamentoExternoId}";
 
     private Task RegistrarNaTrilhaAsync(Guid pedidoId, string tipo, string detalhes, DateTime agora, CancellationToken ct) =>
         pedidoRepository.AddEventoAsync(new PedidoEvento
