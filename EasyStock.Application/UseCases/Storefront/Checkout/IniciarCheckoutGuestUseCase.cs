@@ -174,8 +174,11 @@ public sealed class IniciarCheckoutGuestUseCase(
         pedido.Observacoes = MontarObservacoes(input.Observacoes, cep, input.Numero);
         await pedidoRepository.AddAsync(pedido, ct);
 
+        // PEDIDO-03: o fixup do EF ja insere cada item em pedido.Itens (pedido rastreado); sem a guarda a
+        // mesma instancia entrava 2x e RecalcularTotal dobrava o Total (mesma classe do #595).
         foreach (var item in await checkoutCore.AdicionarItensAsync(pedido, itensPedidos, cardapioItens, ct))
-            pedido.Itens.Add(item);
+            if (!pedido.Itens.Contains(item))
+                pedido.Itens.Add(item);
         pedido.RecalcularTotal();
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido, ct);
