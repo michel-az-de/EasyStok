@@ -1,4 +1,5 @@
-import { estornarSaida, lancarPerda, obterPerdas, obterVencidos, resumoDePerdasDaApi, vencidoDaApi } from '../infra/api/producaoApi'
+import { corpoDaPerda, estornarSaida, lancarPerda, obterPerdas, obterVencidos, resumoDePerdasDaApi, vencidoDaApi } from '../infra/api/producaoApi'
+import { criarChaveDeEnvio } from './chaveDeEnvio'
 
 // Perdas no modo API (M2.6, #1511). D-M2-02: o motivo vem da lista e "Outro" pede texto; acima de
 // R$ 50 o EasyStok devolve 403 e a tela avisa que é do Gerente (D-M2-06). Desfazer é o estorno de
@@ -31,7 +32,17 @@ export function erroDaPerda({ produtoId, quantidade, motivo, texto, porcoes = []
   return null
 }
 
-export function criarGestaoPerdas({ recarregar, aoErro, aoFeito = () => {} }) {
+export function criarGestaoPerdas({ recarregar, aoErro, aoFeito = () => {}, gerarChave, agora }) {
+  // #2003 (estoque-09): a mesma perda reenviada depois de uma resposta perdida repete a chave e a API
+  // devolve o que já gravou; só uma resposta de sucesso a consome.
+  const envio = criarChaveDeEnvio(gerarChave, agora)
+  const enviar = async (perda) => {
+    const chave = envio.para(corpoDaPerda(perda))
+    const r = await lancarPerda(perda, chave)
+    envio.confirmar(chave)
+    return r
+  }
+
   const gravar = async (chamada, sucesso) => {
     try {
       const r = await chamada()
@@ -49,7 +60,7 @@ export function criarGestaoPerdas({ recarregar, aoErro, aoFeito = () => {} }) {
     lancar: async (rascunho) => {
       const erro = erroDaPerda(rascunho)
       if (erro) { aoErro(erro); return false }
-      return gravar(() => lancarPerda({
+      return gravar(() => enviar({
         produtoId: rascunho.produtoId,
         itemEstoqueId: rascunho.itemEstoqueId ?? null,
         produtoVariacaoId: (rascunho.porcoes ?? []).find((s) => s.chave === rascunho.porcao)?.produtoVariacaoId ?? null,
@@ -60,7 +71,7 @@ export function criarGestaoPerdas({ recarregar, aoErro, aoFeito = () => {} }) {
     },
     // Sugestão de lote vencido: lança o lote inteiro como Vencido, só quando ela confirma.
     lancarVencido: (v) => gravar(
-      () => lancarPerda({ produtoId: v.produtoId, itemEstoqueId: v.itemEstoqueId, quantidade: v.quantidade, motivo: 'Vencido' }),
+      () => enviar({ produtoId: v.produtoId, itemEstoqueId: v.itemEstoqueId, quantidade: v.quantidade, motivo: 'Vencido' }),
       () => `Lote ${v.lote ?? ''} lançado como vencido.`),
     desfazer: (lancamento) => gravar(
       () => estornarSaida(lancamento.id, 'Perda desfeita pelo console'),

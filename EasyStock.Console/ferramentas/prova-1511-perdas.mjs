@@ -47,8 +47,8 @@ const confere = async (descricao, fn) => {
 
 function montarFetch(rotas) {
   const chamadas = []
-  globalThis.fetch = async (url, { method = 'GET', body } = {}) => {
-    chamadas.push({ metodo: method, url, corpo: body ? JSON.parse(body) : null })
+  globalThis.fetch = async (url, { method = 'GET', body, headers = {} } = {}) => {
+    chamadas.push({ metodo: method, url, corpo: body ? JSON.parse(body) : null, chave: headers['Idempotency-Key'] ?? null })
     for (const [teste, resposta] of rotas) {
       if (teste(method, url)) {
         const { status = 200, data = null, error } = resposta
@@ -88,6 +88,31 @@ await confere('lançar manda produto, quantidade (vírgula vira ponto) e motivo,
     { produtoId: 'p-1', itemEstoqueId: null, quantidade: 1.5, motivo: 'Outro', texto: 'caiu' })
   assert.equal(m.relidas(), 1)
   assert.match(m.feitos[0], /Lasanha/)
+})
+
+await confere('#2003 (estoque-09): a perda leva Idempotency-Key; reenvio igual repete a chave, perda diferente ganha outra', async () => {
+  // A perda é uma saída por delta: se a resposta se perde e a tela reenvia sem chave, baixa o lote de novo.
+  const sequencia = ['k-1', 'k-2', 'k-3']
+  const chamadas = montarFetch([[(mt, u) => mt === 'POST' && u.endsWith(PERDAS), { status: 201, data: { quantidade: 1 } }]])
+  const gestao = criarGestaoPerdas({ recarregar: async () => {}, aoErro: () => {}, gerarChave: () => sequencia.shift() })
+  const perda = { produtoId: 'p-1', quantidade: '1', motivo: 'PerdaNoPreparo', nome: 'Lasanha' }
+
+  await gestao.lancar(perda)
+  assert.equal(chamadas[0].chave, 'k-1', 'a primeira perda manda a chave')
+  await gestao.lancar(perda)
+  assert.equal(chamadas[1].chave, 'k-2', 'gravou: a próxima perda igual é outra perda e ganha chave nova')
+})
+
+await confere('#2003 (estoque-09): resposta perdida não consome a chave; o reenvio da mesma perda repete', async () => {
+  const chamadas = montarFetch([[(mt, u) => mt === 'POST' && u.endsWith(PERDAS), { status: 500, error: { message: 'caiu' } }]])
+  const gestao = criarGestaoPerdas({ recarregar: async () => {}, aoErro: () => {}, gerarChave: (() => { let n = 0; return () => `k-${++n}` })() })
+  const perda = { produtoId: 'p-1', quantidade: '1', motivo: 'PerdaNoPreparo' }
+  await gestao.lancar(perda)
+  await gestao.lancar(perda)
+  assert.equal(chamadas[0].chave, 'k-1')
+  assert.equal(chamadas[1].chave, 'k-1', 'sem confirmação da API, a mesma perda vai com a mesma chave')
+  await gestao.lancar({ ...perda, quantidade: '2' })
+  assert.equal(chamadas[2].chave, 'k-2', 'perda diferente é outra chave')
 })
 
 await confere('acima de R$ 50 sem Gerente: o 403 do EasyStok vira o aviso dele', async () => {
