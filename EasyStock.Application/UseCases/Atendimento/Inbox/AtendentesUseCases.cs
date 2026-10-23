@@ -53,22 +53,25 @@ public sealed class TransferirConversaUseCase(
 {
     public const string PrefixoTransferencia = "conversa transferida por ";
 
-    public async Task<ConversaSituacaoResult> ExecuteAsync(TransferirConversaCommand command, CancellationToken ct = default)
-    {
-        var conversa = await conversaRepository.ObterPorIdAsync(command.EmpresaId, command.ConversaId, ct)
-            ?? throw new ConversaNaoEncontradaException(command.ConversaId);
+    // #2004: a conversa é lida sob trava, em transação, como assumir (#1792). Encerrada em outra aba no mesmo instante,
+    // a transferência é recusada pelo domínio em vez de gravar Assumida por cima do encerramento.
+    public Task<ConversaSituacaoResult> ExecuteAsync(TransferirConversaCommand command, CancellationToken ct = default) =>
+        unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            var conversa = await conversaRepository.ObterPorIdComLockAsync(command.EmpresaId, command.ConversaId, token)
+                ?? throw new ConversaNaoEncontradaException(command.ConversaId);
 
-        var destino = await atendenteRepository.ObterUsuarioAtivoAsync(command.EmpresaId, command.ParaUsuarioId, ct);
-        if (destino is null || !RegraAtendente.Atende(destino))
-            throw new DestinoNaoAtendenteException(command.ParaUsuarioId);
+            var destino = await atendenteRepository.ObterUsuarioAtivoAsync(command.EmpresaId, command.ParaUsuarioId, token);
+            if (destino is null || !RegraAtendente.Atende(destino))
+                throw new DestinoNaoAtendenteException(command.ParaUsuarioId);
 
-        var agora = DateTime.UtcNow;
-        conversa.Transferir(destino.UsuarioId, agora);
-        await conversaRepository.AddMensagemAsync(
-            Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
-                $"{PrefixoTransferencia}{(string.IsNullOrWhiteSpace(command.UsuarioNome) ? "a equipe" : command.UsuarioNome.Trim())} para {destino.Nome}"),
-            ct);
-        await unitOfWork.CommitAsync();
-        return ConversaSituacaoResult.De(conversa);
-    }
+            var agora = DateTime.UtcNow;
+            conversa.Transferir(destino.UsuarioId, agora);
+            await conversaRepository.AddMensagemAsync(
+                Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+                    $"{PrefixoTransferencia}{(string.IsNullOrWhiteSpace(command.UsuarioNome) ? "a equipe" : command.UsuarioNome.Trim())} para {destino.Nome}"),
+                token);
+            await unitOfWork.CommitAsync();
+            return ConversaSituacaoResult.De(conversa);
+        }, ct);
 }
