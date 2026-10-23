@@ -221,10 +221,10 @@ internal sealed class CobrancaPedidoFixture
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Notificador, Options.Create(Prazos), Relogio,
             NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
-    public TrocarFormaPagamentoPedidoUseCase Trocar(IConferenciaPagamentoPedido? conferencia = null) =>
+    public TrocarFormaPagamentoPedidoUseCase Trocar(IConferenciaPagamentoPedido? conferencia = null, SaldoFinanceiroPedido? saldos = null) =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
             NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries), OperacaoEventos, Quitacao(),
-            conferencia ?? Conferir());
+            conferencia ?? Conferir(), saldos);
 
     public ConferirPagamentoPedidoUseCase Conferir() => new(PedidoRepo, CobrancaRepo, MpClient, Confirmar());
 

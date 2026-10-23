@@ -54,7 +54,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     CalculadoraInicioPrevistoPedido inicioPrevisto, QuitacaoPedido quitacao, LinkCardapioConversaService gerarLink,
     IEstornoOnlineRepository estornos, AvisoStatusPedidoCliente avisoCliente, CadastrarClienteDaConversaUseCase cadastrarCliente,
     TrocarFormaPagamentoPedidoUseCase trocarForma, AvisoCobrancaConversa avisoCanal, ICobrancaPedidoRepository cobrancasPedido,
-    ILogger<ComandaClienteUseCase> logger)
+    ILogger<ComandaClienteUseCase> logger, ExpiracaoPreferenciaMercadoPago expiracao)
 {
     private const string RevisaoEntregaACombinar = "comandaEntregaACombinarRevisao";
     private const string FreteCombinadoChave = "comandaFreteCombinado";
@@ -328,7 +328,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
                 var pedido = await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, criado.PedidoId)
                     ?? throw new InvalidOperationException("Pedido criado sem persistência.");
-                var cupomAplicado = await AplicarCupomAsync(pedido, dados.CodigoCupom, t);
+                // #1971: o aviso do cupom só sai com o envio de pé; a cobrança depois do commit ainda pode desfazê-lo.
+                var cupomAplicado = await AplicarCupomAsync(pedido, dados.CodigoCupom, t, avisar: false);
                 var saldo = pedido.Total.Valor - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado;
                 if (saldo > 0)
                 {
@@ -345,6 +346,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                     await pedidos.UpdateAsync(pedido);
                     efeitos = await quitacao.PrepararCreditoAsync(pedido, link.ConversaId, agora, t);
                     resultado = new(pedido.Id, "pedido_confirmado", pedido.Total.Valor, saldo, CupomAplicado: cupomAplicado);
+                    if (cupomAplicado is not null) await AvisarCupomAsync(pedido.EmpresaId, pedido.Id, cupomAplicado, t);
                     confirmacaoNoCanal = await ConfirmarNaConversaAsync(link, $"pedido:{pedido.Id:N}",
                         TextoPedidoChatSite(pedido, resultado, null, agora), agora, t);
                 }
@@ -385,6 +387,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             // varredura de abandonados cancelava o pedido em silêncio 30 minutos depois.
             cobranca = await cobrar.ExecuteAsync(new(acesso.EmpresaId, provisorio.PedidoId, acesso.ConversaId,
                 NaEntregaSemProvedor: peloAtendimento), CancellationToken.None);
+            // #1717-8: sem transação aberta, a cobrança já commitou; o link substituído para de aceitar pagamento.
+            if (cobranca.PreferenciaSubstituida is { } substituida)
+                await expiracao.ExpirarAsync([substituida], CancellationToken.None);
         }
         catch (MercadoPagoIndisponivelException ex) when (ex.InnerException is MercadoPagoNaoConfiguradoException)
         {
@@ -434,7 +439,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (semProvedor)
                 await conversas.AddMensagemAsync(Mensagem.Saida(acesso.EmpresaId, acesso.ConversaId, AutorMensagem.Sistema, agora,
                     TipoConteudoMensagem.Texto, "Pagamento online indisponível (Mercado Pago não configurado). O pedido da comanda " +
-                    $"entrou na fila para pagar na entrega: receba {resultado.Saldo.ToString("C", Cultura.PtBr)} na entrega."), t);
+                    $"entrou na fila para pagar na entrega: receba {resultado.Saldo.ToString("C", Cultura.PtBr)} na entrega. " +
+                    "O resumo acima previa o link de pagamento; não vale mais."), t);
+            if (provisorio.CupomAplicado is { } cupom) await AvisarCupomAsync(acesso.EmpresaId, pedido.Id, cupom, t);
             var texto = await ConfirmarNaConversaAsync(link, $"pedido:{pedido.Id:N}", TextoPedidoChatSite(pedido, resultado, cobranca, agora), agora, t);
             link.RegistrarResultado(resultado.PedidoId, JsonSerializer.Serialize(resultado, Json));
             await uow.CommitAsync();
@@ -649,7 +656,10 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         return await ObterAsync(token, ct);
     }
 
-    public async Task<CupomAplicadoComandaCliente?> AplicarCupomAsync(PedidoEntity pedido, string? codigo, CancellationToken ct)
+    /// <param name="avisar">Falso quando o envio ainda pode ser desfeito (cobrança depois do commit, #1971): quem chama
+    /// avisa com <see cref="AvisarCupomAsync"/> depois que o envio fica de pé.</param>
+    public async Task<CupomAplicadoComandaCliente?> AplicarCupomAsync(PedidoEntity pedido, string? codigo, CancellationToken ct,
+        bool avisar = true)
     {
         if (string.IsNullOrWhiteSpace(codigo)) return null;
         if (pedido.ClienteId is not { } clienteId) throw new UseCaseValidationException("Cliente não identificado.");
@@ -662,12 +672,17 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         await creditos.AdicionarUsoAsync(uso, ct);
         await pedidos.AddEventoAsync(new() { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "cupom_cliente_aplicado",
             Origem = "comanda_cliente", OcorridoEm = relogio.GetUtcNow().UtcDateTime, Detalhes = $"{credito.Codigo}: {valor}" });
-        await avisoCliente.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
-            pedido.EmpresaId, pedido.Id, $"cupom-usado:{uso.Id:N}", ct,
-            mensagem: $"Cupom {credito.Codigo}: crédito de {valor.ToString("C", Cultura.PtBr)} aplicado neste pedido. Saldo do cupom: {credito.Saldo.ToString("C", Cultura.PtBr)}.");
+        var aplicado = new CupomAplicadoComandaCliente(uso.Id, credito.Codigo, uso.Valor, credito.Saldo);
+        if (avisar) await AvisarCupomAsync(pedido.EmpresaId, pedido.Id, aplicado, ct);
         await uow.CommitAsync();
-        return new(uso.Id, credito.Codigo, uso.Valor, credito.Saldo);
+        return aplicado;
     }
+
+    /// <summary>Aviso ao cliente do cupom usado no pedido; a chave do uso evita repetir.</summary>
+    public Task AvisarCupomAsync(Guid empresaId, Guid pedidoId, CupomAplicadoComandaCliente cupom, CancellationToken ct) =>
+        avisoCliente.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+            empresaId, pedidoId, $"cupom-usado:{cupom.UsoId:N}", ct,
+            mensagem: $"Cupom {cupom.Codigo}: crédito de {cupom.Valor.ToString("C", Cultura.PtBr)} aplicado neste pedido. Saldo do cupom: {cupom.SaldoCupom.ToString("C", Cultura.PtBr)}.");
 
     public async Task<IReadOnlyList<ItemSelecionadoComanda>> SelecionarAsync(Guid empresaId, IReadOnlyList<ItemPedidoCheckout> itens,
         PedidoEntity? pedido, CancellationToken ct, bool validar = true)

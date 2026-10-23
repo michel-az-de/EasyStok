@@ -140,9 +140,12 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, ct);
         // #1724-6: sinal pago online não é "pedido já pago"; a guarda vale só sem saldo a receber. O que as
         // cobranças pagas registram também conta: a confirmação do provedor pode ter gravado só a cobrança.
-        var alocado = Math.Max(
-            saldos is not null ? (await saldos.ConsultarAsync(pedido, ct)).Alocado : pedido.TotalPago,
-            cobrancas.Where(c => c.Status == Domain.Enums.Pagamentos.StatusCobrancaPedido.Paga).Sum(c => c.ValorPago ?? 0m));
+        // #1971: o pago pelas cobranças entra no lugar do recebido, não do alocado; devolução e cupom descontam dos dois.
+        var pagoPelasCobrancas = cobrancas.Where(c => c.Status == Domain.Enums.Pagamentos.StatusCobrancaPedido.Paga).Sum(c => c.ValorPago ?? 0m);
+        var saldo = saldos is null ? null : await saldos.ConsultarAsync(pedido, ct);
+        var alocado = saldo is null
+            ? Math.Max(pedido.TotalPago, pagoPelasCobrancas)
+            : (saldo with { Recebido = Math.Max(saldo.Recebido, pagoPelasCobrancas) }).Alocado;
         var restante = pedido.Total.Valor - alocado;
         if (pedido.Total.Valor > 0m && restante <= 0m)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
