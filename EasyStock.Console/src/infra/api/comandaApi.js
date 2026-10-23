@@ -1,6 +1,7 @@
 import { API_BASE } from '../fonteDados'
 import { urlDeExibicaoDaFoto } from '../../dominio/vitrineCardapio'
 import { partesDoSku, skuDaPorcao } from '../../dominio/cardapio'
+import { MEIOS_NA_ENTREGA, observacaoDoPagamentoNaEntrega, pagamentoNaEntregaDasObservacoes } from '../../dominio/cobranca'
 import { chamarApi } from './cliente'
 import { instante } from './traducaoConversas'
 import { lerSessao } from './sessao'
@@ -85,21 +86,24 @@ export const STATUS_DO_PASSO = {
 
 export const FORMA_NA_ENTREGA = 'na_entrega'
 export const FORMA_ONLINE = 'online'
-const MEIOS_NA_ENTREGA = new Set(['maquininha', 'vale-refeicao'])
 export const formaDoMeio = (meio) => (MEIOS_NA_ENTREGA.has(meio) ? FORMA_NA_ENTREGA : FORMA_ONLINE)
 
 const ms = (valor) => (valor ? new Date(instante(valor)).getTime() : null)
 
 // Cobrança da API → formato de `dominio/cobranca.js`, para `situacaoDaCobranca` e as telas
 // lerem igual ao modo demonstração. Expirada sai pelo próprio `expiraEm` vencido.
-function cobrancaDaApi(c, meioAnterior) {
+function cobrancaDaApi(c, meioAnterior, naEntregaGravado = null) {
   if (!c) return null
   const naEntrega = c.provedor === FORMA_NA_ENTREGA
   // Sem meio anterior (polling, recarga), o meio é o padrão da forma: link do Mercado Pago
   // online, maquininha na entrega. Antes caía em `undefined` e a tela mostrava "Pix" (F07).
+  // J2 (#1990): sem meio anterior (página recarregada), o dinheiro na entrega gravado nas observações
+  // vale mais que o padrão da forma. O meio que a tela já tem continua mandando.
   const meio = meioAnterior && naEntrega === MEIOS_NA_ENTREGA.has(meioAnterior)
     ? meioAnterior
-    : (naEntrega ? 'maquininha' : 'cartao-link')
+    : naEntrega && naEntregaGravado
+      ? naEntregaGravado.meio
+      : (naEntrega ? 'maquininha' : 'cartao-link')
   const criadaEm = ms(c.criadaEm)
   return {
     id: c.cobrancaId,
@@ -126,7 +130,8 @@ function cobrancaDaApi(c, meioAnterior) {
 // Pedido persistido: a janela vem da vaga no servidor, inclusive após recarregar a página.
 export function pedidoDaApi(p, anterior = null) {
   if (!p) return null
-  const cobranca = cobrancaDaApi(p.cobranca, anterior?.meio)
+  const naEntregaGravado = pagamentoNaEntregaDasObservacoes(p.observacoes)
+  const cobranca = cobrancaDaApi(p.cobranca, anterior?.meio, naEntregaGravado)
   const cobertura = p.alocado ?? p.totalPago ?? 0
   if (cobranca) cobranca.diferenca = cobertura > 0
     && ['Pendente', 'Expirada'].includes(cobranca.statusApi)
@@ -150,6 +155,7 @@ export function pedidoDaApi(p, anterior = null) {
       nome: i.nome, precoUnitario: i.precoUnitario, porcao: i.porcao ?? '',
     })),
     observacoes: p.observacoes ?? '',
+    trocoPara: naEntregaGravado?.trocoPara ?? null,
     agradecimentoEnviado: anterior?.agradecimentoEnviado ?? false,
     pagamentos: [],
     totalPagoApi: p.totalPago ?? 0,
@@ -212,7 +218,11 @@ export const trocarJanelaPedido = (pedidoId, janela, avisarCliente) =>
 // linhas próprias (RN-20); acréscimo só existe depois do pagamento, fora deste caminho.
 export function corpoDoPedido(pedido) {
   const janela = janelaDoId(pedido?.janela)
+  // J2 (#1990): dinheiro na entrega e o troco vão nas observações do pedido (a Cozinha e as
+  // Entregas leem). Outro meio não manda o campo: o corpo segue o de antes.
+  const observacoes = observacaoDoPagamentoNaEntrega({ meio: pedido?.meio, trocoPara: pedido?.trocoPara })
   return {
+    ...(observacoes ? { observacoes } : {}),
     itens: (pedido?.itens ?? []).map((l) => {
       const { itemSku, variacaoId } = partesDoSku(l.sku)
       return { cardapioItemId: itemSku, qtd: l.qtd, observacao: l.obs || null, ...(variacaoId ? { variacaoId } : {}) }
@@ -247,10 +257,8 @@ export const conferirPagamentoOnline = (pedidoId) =>
 export const trocarFormaPagamento = (pedidoId, forma) =>
   chamarApi(`/api/pedidos/${pedidoId}/cobranca/forma`, { metodo: 'POST', corpo: { forma } })
 
-export const registrarPagamentoManual = (pedidoId, valor, metodo, chave = null) =>
-  chamarApi(`/api/pedidos/${pedidoId}/pagamentos`, {
-    metodo: 'POST', chave, corpo: { empresaId: lerSessao()?.empresa?.id, pedidoId, valor, metodo },
-  })
+// J2 (#1990): a rota mora em `pagamentosPedidoApi.js`, que as Entregas também usam.
+export { registrarPagamentoManual } from './pagamentosPedidoApi'
 
 // Com o id, repetir o pedido depois de resposta perdida não desfaz o pagamento anterior.
 export const desfazerPagamentoManual = (pedidoId, motivo, pagamentoId = null) =>

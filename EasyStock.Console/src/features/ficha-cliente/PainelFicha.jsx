@@ -7,6 +7,7 @@ import { Modal } from '../../componentes/Modal'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useSimulacaoDoPedido } from '../../aplicacao/useSimulacaoDoPedido'
+import { useADevolver } from '../../aplicacao/useADevolver'
 import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaPagar } from '../../dominio/cobranca'
 import { faixaDoPedido } from '../../dominio/entrega'
@@ -67,6 +68,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   const simulacao = useSimulacaoDoPedido({
     conversaId: selecionada?.id, pedido: selecionada?.pedido, ativo: Boolean(fonteApi && selecionada && !conversaEncerrada(selecionada)),
   })
+  // J2 (#1990): pedido pago cancelado diz no Resumo e no Pagamento quanto falta devolver.
+  const aDevolver = useADevolver(fonteApi ? selecionada?.pedido : null)
   const [secao, setSecao] = useState(null)
   // #1686 (item 4): "Cancelar e refazer" na Seleção abre a confirmação de cancelar da barra.
   const [pedidoDeCancelar, setPedidoDeCancelar] = useState(0)
@@ -109,7 +112,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   const itens = pedido?.itens?.reduce((soma, item) => soma + item.qtd, 0) ?? 0
   // #1868: o saldo ganha linha própria no Resumo; o acesso Pagamento não repete o valor.
   const destacaSaldo = saldoEmDestaque({ editavel, pedidoCriado, saldo, cancelado: pedido?.estado === 'cancelado' })
-  const resumoPagamento = resumoDoPagamento({ cancelado: pedido?.estado === 'cancelado', saldo, destaque: destacaSaldo })
+  const resumoPagamento = resumoDoPagamento({ cancelado: pedido?.estado === 'cancelado', saldo, destaque: destacaSaldo, aDevolver })
   // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que se resolve. A barra
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
   const gerarSemEnviar = fonteApi && permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).motivo?.acao === 'janela'
@@ -183,6 +186,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
               : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. O que a conversa trouxe já vem preenchido.'
                 : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
           {destacaSaldo && <p className={css.saldoFicha}>{moeda(saldo)} a receber</p>}
+          {aDevolver > 0 && <p className={css.saldoFicha}>{moeda(aDevolver)} a devolver</p>}
         </section>
 
         {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
@@ -261,7 +265,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
       </Modal>}
 
       {secao === 'pagamento' && editavel && pedido && <Modal titulo={`Pagamento · ${selecionada.nome}`} largura="680px" aoFechar={() => setSecao(null)}>
-        {fonteApi && <ExtratoDoPedido pedido={pedido} />}
+        {fonteApi && <ExtratoDoPedido pedido={pedido} aDevolver={aDevolver} />}
         <BlocoCobranca
           key={chaves.cobranca}
           pedido={pedido}

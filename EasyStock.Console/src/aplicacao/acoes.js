@@ -106,6 +106,8 @@ export const DESPACHAR_MESMO_ASSIM = 'despachar-mesmo-assim'
 // Integração da onda seguinte, ponta (a): o meio escolhido nos chips vale
 // para "Enviar comanda" e para o atalho da barra, não só para o bloco.
 export const ESCOLHER_MEIO_PAGAMENTO = 'escolher-meio-pagamento'
+// J2 (#1990): "troco para R$" do dinheiro na entrega, antes de o pedido nascer.
+export const DEFINIR_TROCO = 'definir-troco'
 // Rodada 12 (issue #13): trocar a forma depois que a cobrança saiu (cancela a
 // pendente e emite outra) e desfazer a baixa marcada por engano.
 export const ALTERAR_MEIO_PAGAMENTO = 'alterar-meio-pagamento'

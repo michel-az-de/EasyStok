@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
-import { CampoMascarado } from '../../../componentes/CampoMascarado'
+import { CampoReais } from '../../../componentes/CampoReais'
 import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
-import { AVISO_AO_FECHAR_CAIXA, ROTULO_FORA_DA_GAVETA, conferenciaDaGaveta } from '../../../dominio/caixa'
+import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import {
-  lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
+  AVISO_AO_FECHAR_CAIXA, ROTULO_FORA_DA_GAVETA, avisoDeDevolucoesPendentes, conferenciaDaGaveta,
+} from '../../../dominio/caixa'
+import {
+  lerMoeda, moeda, moedaAltaDemais,
 } from '../../../dominio/formato'
 import css from './abaCaixa.module.css'
 
@@ -19,10 +22,16 @@ import css from './abaCaixa.module.css'
 // aparecem à parte e não entram na diferença do que ela contou. O campo nasce vazio (nascer
 // com o esperado mostrava "bate certo" sem ninguém contar) e o botão espera a contagem.
 // "Fechar o caixa", não "fechar o dia": fechar a loja é outro gesto.
-export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar, enviando = false, erro = null }) {
+// J2 (#1990): o valor contado se digita em reais ("58" é R$ 58,00) e, no modo API
+// (`consultarDevolucoes`), o modal avisa o que falta devolver de pedidos cancelados, sem travar.
+export function ModalFecharCaixa({
+  resumo, gaveta = null, aoFechar, aoConfirmar, enviando = false, erro = null, consultarDevolucoes = false,
+}) {
   const esperado = gaveta ? gaveta.naGaveta : resumo.saldoEsperado
   const [centavosContado, setCentavosContado] = useState(null)
   const conferencia = conferenciaDaGaveta(centavosContado, esperado)
+  const devolucoes = useDevolucoesPendentes(consultarDevolucoes)
+  const avisoDevolucoes = avisoDeDevolucoesPendentes(devolucoes)
 
   return (
     <Modal
@@ -59,15 +68,19 @@ export function ModalFecharCaixa({ resumo, gaveta = null, aoFechar, aoConfirmar,
         {Boolean(gaveta?.semForma) && <div><dt>Sem forma de pagamento (confira se é dinheiro)</dt><dd>{moeda(gaveta.semForma)}</dd></div>}
       </dl>
 
-      <CampoMascarado
-        tipo="moeda"
+      {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
+      {devolucoes.estado === 'erro' && (
+        <output className={css.avisoAtencao}>Não foi possível conferir se há devolução pendente de pedido cancelado.</output>
+      )}
+
+      <CampoReais
         disabled={enviando}
         rotulo={gaveta ? 'Quanto você contou na gaveta (só dinheiro)' : 'Quanto você contou no caixa'}
         placeholder="Digite o que contou"
-        valor={centavosContado == null ? '' : mascaraMoeda(centavosContado)}
+        centavos={centavosContado}
+        ler={lerMoeda}
         erro={moedaAltaDemais(centavosContado) ? 'Valor alto demais' : null}
-        aoMudarDigitos={(digitos) => setCentavosContado(digitos ? Number(digitos) : null)}
-        aoColarTexto={(texto) => setCentavosContado(lerMoeda(texto))}
+        aoMudar={setCentavosContado}
       />
 
       {erro && <p className={css.avisoFechado} role="alert">Não foi possível confirmar o fechamento. {erro} Confira o valor e tente novamente.</p>}
