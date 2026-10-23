@@ -111,11 +111,15 @@ public class CancelarPedidoUseCase(
     {
         var aDevolver = saldo?.DinheiroDisponivel ?? pedido.TotalPago;
         if (aDevolver <= 0m) return;
-        await pedidoRepo.AddEventoAsync(new PedidoEvento
-        {
-            Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = EventoDevolucaoAFazer,
-            Detalhes = $"Pedido cancelado com {aDevolver.ToString("C", Cultura.PtBr)} recebido. Devolva ao cliente e registre em Devoluções.",
-            UsuarioId = cmd.UsuarioId, UsuarioNome = cmd.UsuarioNome, Origem = cmd.Origem, OcorridoEm = ocorridoEm
-        });
+        await pedidoRepo.AddEventoAsync(EventoDevolucaoAFazerDe(pedido, aDevolver, cmd.UsuarioId, cmd.UsuarioNome, cmd.Origem, ocorridoEm));
     }
+
+    /// <summary>Evento da trilha com o valor a devolver; também usado pela recusa do pedido do site (PEDIDO-02).</summary>
+    public static PedidoEvento EventoDevolucaoAFazerDe(Domain.Entities.Pedido pedido, decimal aDevolver, Guid? usuarioId,
+        string? usuarioNome, string? origem, DateTime ocorridoEm) => new()
+    {
+        Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = EventoDevolucaoAFazer,
+        Detalhes = $"Pedido cancelado com {aDevolver.ToString("C", Cultura.PtBr)} recebido. Devolva ao cliente e registre em Devoluções.",
+        UsuarioId = usuarioId, UsuarioNome = usuarioNome, Origem = origem, OcorridoEm = ocorridoEm
+    };
 }

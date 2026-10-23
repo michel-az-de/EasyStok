@@ -1,5 +1,4 @@
 ﻿using EasyStock.Application.Events.Pedidos;
-using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
@@ -8,10 +7,13 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Financeiro;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -52,6 +54,8 @@ public class RecusarPedidoStorefrontUseCaseTests
         public required IConversaRepository ConversaRepo { get; init; }
         public required List<CobrancaPedido> Cobrancas { get; init; }
         public required IOperacaoEventPublisher Operacao { get; init; }
+        public required ICreditoClienteComandaRepository Creditos { get; init; }
+        public required IContaReceberRepository ContaReceber { get; init; }
 
         /// <summary>Cobrança do Mercado Pago já paga (pedido RequerAprovacao pago, aguardando a dona).</summary>
         public CobrancaPedido AdicionarCobrancaPaga(string pagamentoId, decimal valor = 120m, Guid? conversaId = null)
@@ -94,12 +98,14 @@ public class RecusarPedidoStorefrontUseCaseTests
 
         var aviso = new AvisoCobrancaConversa(conversaRepo, new ResolvedorCanal(Array.Empty<ICanalMensageria>()), uow,
             NullLogger<AvisoCobrancaConversa>.Instance);
-        var liberarVaga = new LiberarVagaOnPedidoCanceladoHandler(vagaRepo,
-            NullLogger<LiberarVagaOnPedidoCanceladoHandler>.Instance);
 
         var operacao = Substitute.For<IOperacaoEventPublisher>();
+        var creditos = Substitute.For<ICreditoClienteComandaRepository>();
+        var contaReceber = Substitute.For<IContaReceberRepository>();
+        var saldos = new SaldoFinanceiroPedido(Substitute.For<IPedidoRepository>(), Substitute.For<IEstornoOnlineRepository>(), creditos);
+        var efeitos = new EfeitosCancelamentoPedido(contaReceber, vagaRepo, NullLogger<EfeitosCancelamentoPedido>.Instance, saldos, creditos);
         var useCase = new RecusarPedidoStorefrontUseCase(
-            pedidoRepo, cobrancaRepo, estorno, liberarVaga, aviso, publicador, uow,
+            pedidoRepo, cobrancaRepo, estorno, efeitos, aviso, publicador, uow,
             NullLogger<RecusarPedidoStorefrontUseCase>.Instance, operacao);
         return new Sut
         {
@@ -112,6 +118,8 @@ public class RecusarPedidoStorefrontUseCaseTests
             ConversaRepo = conversaRepo,
             Cobrancas = cobrancas,
             Operacao = operacao,
+            Creditos = creditos,
+            ContaReceber = contaReceber,
         };
     }
 
@@ -344,6 +352,65 @@ public class RecusarPedidoStorefrontUseCaseTests
         await sut.Estorno.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
         await sut.PedidoRepo.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
         await sut.Publicador.DidNotReceiveWithAnyArgs().PublicarAsync(default, default!, default!, default, default(object)!, default, default, default, default);
+    }
+
+    // ── PEDIDO-02 (banca 23/10): a recusa aplica os mesmos efeitos do cancelamento ──────
+
+    [Fact]
+    public async Task Recusar_devolve_o_cupom_usado_e_cancela_a_conta_a_receber()
+    {
+        var pedido = PedidoAguardandoAprovacaoBaba();
+        pedido.Pagamentos.Add(new PedidoPagamento { Valor = 80m, Metodo = "dinheiro" });
+        var sut = BuildSut(pedido);
+        sut.Creditos.TotaisDoPedidoAsync(EmpresaId, PedidoId, Arg.Any<CancellationToken>()).Returns((0m, 20m));
+
+        await sut.UseCase.ExecuteAsync(InputValido(nivel: NivelAcesso.Gerente));
+
+        await sut.Creditos.Received(1).AddAsync(
+            Arg.Is<CreditoClienteComanda>(c => c.Valor == 20m && c.ClienteId == pedido.ClienteId && c.OperacaoId == PedidoId),
+            Arg.Any<CancellationToken>());
+        await sut.ContaReceber.Received(1).GetByOrigemAsync(EmpresaId, OrigemContaFinanceira.Pedido, PedidoId);
+    }
+
+    [Fact]
+    public async Task Recusar_cancela_a_cobranca_pendente_na_entrega()
+    {
+        var pedido = PedidoAguardandoAprovacaoBaba();
+        var sut = BuildSut(pedido);
+        var naEntrega = CobrancaPedido.CriarNaEntrega(EmpresaId, PedidoId, 100m, DateTime.UtcNow.AddMinutes(-3));
+        sut.Cobrancas.Add(naEntrega);
+
+        await sut.UseCase.ExecuteAsync(InputValido());
+
+        naEntrega.Status.Should().Be(StatusCobrancaPedido.Cancelada, "pedido recusado nao tem mais nada a cobrar na porta");
+    }
+
+    [Fact]
+    public async Task Recusar_registra_a_devolucao_a_fazer_do_dinheiro_recebido_por_fora_do_estorno_online()
+    {
+        var pedido = PedidoAguardandoAprovacaoBaba();
+        pedido.Pagamentos.Add(new PedidoPagamento { Valor = 30m, Metodo = "dinheiro" });
+        var sut = BuildSut(pedido);
+
+        await sut.UseCase.ExecuteAsync(InputValido(nivel: NivelAcesso.Gerente));
+
+        await sut.PedidoRepo.Received(1).AddEventoAsync(
+            Arg.Is<PedidoEvento>(e => e.Tipo == "devolucao_a_fazer" && e.Detalhes!.Contains(30m.ToString("C", Cultura.PtBr))),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Recusar_pago_so_online_e_estornado_nao_registra_devolucao_a_fazer()
+    {
+        var pedido = PedidoAguardandoAprovacaoBaba();
+        pedido.Pagamentos.Add(new PedidoPagamento { Valor = 120m, Metodo = "pix" });
+        var sut = BuildSut(pedido);
+        sut.AdicionarCobrancaPaga("pay-1");
+
+        await sut.UseCase.ExecuteAsync(InputValido(nivel: NivelAcesso.Gerente));
+
+        await sut.PedidoRepo.DidNotReceive().AddEventoAsync(
+            Arg.Is<PedidoEvento>(e => e.Tipo == "devolucao_a_fazer"), Arg.Any<CancellationToken>());
     }
 
     // ── Falhas ──────────────────────────────────────────────────────────────

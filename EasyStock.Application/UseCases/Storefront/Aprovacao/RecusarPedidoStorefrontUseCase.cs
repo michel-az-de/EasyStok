@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using EasyStock.Application.Events.Pedidos;
-using EasyStock.Application.Events.Storefront.Handlers;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
@@ -8,11 +7,11 @@ using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
-using EasyStock.Domain.Events.Storefront;
 using EasyStock.Domain.Sales;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
@@ -38,7 +37,12 @@ namespace EasyStock.Application.UseCases.Storefront.Aprovacao;
 ///     Atualiza Pedido: status = <see cref="StatusPedido.Cancelado"/>, <c>CanceladoEm</c>,
 ///     <c>RecusadoEm</c>, <c>RecusadoPorUsuarioId</c>, <c>MotivoRecusa</c>, <c>MensagemRecusaCliente</c>.
 ///   </item>
-///   <item>Libera a vaga pelo <see cref="LiberarVagaOnPedidoCanceladoHandler"/> (mesmo uso do job de cobrança).</item>
+///   <item>
+///     PEDIDO-02: cancela as cobranças ainda pendentes (a "na entrega" criada pelo sinal) e aplica os efeitos de
+///     todo cancelamento (<see cref="EfeitosCancelamentoPedido"/>): devolve o cupom usado, cancela a ContaReceber
+///     e libera a vaga (idempotente). O dinheiro recebido que o estorno online não devolveu vira
+///     <c>devolucao_a_fazer</c> na trilha, como no cancelamento comum.
+///   </item>
 ///   <item><c>pedido.mudou_status</c> no Outbox (MESMA TX) e trilha <c>recusado_storefront</c>.</item>
 ///   <item>Commit; depois dele, aviso best-effort na conversa da cobrança paga.</item>
 /// </list>
@@ -58,7 +62,7 @@ public sealed class RecusarPedidoStorefrontUseCase(
     IPedidoStorefrontRepository pedidoRepository,
     ICobrancaPedidoRepository cobrancaRepository,
     IEstornoPedidoGateway estorno,
-    LiberarVagaOnPedidoCanceladoHandler liberarVaga,
+    EfeitosCancelamentoPedido efeitos,
     AvisoCobrancaConversa aviso,
     IPublicadorEventoIntegracao publicadorEventos,
     IUnitOfWork unitOfWork,
@@ -139,7 +143,10 @@ public sealed class RecusarPedidoStorefrontUseCase(
             var estornadas = await EstornarCobrancasPagasAsync(pedido, motivoCanonical, agora, input.NivelSolicitante, innerCt);
             conversaAviso = estornadas.Select(c => c.ConversaId).FirstOrDefault(c => c is not null);
 
-            // 5. Aplicar transição + audit trail.
+            // 5. PEDIDO-02: cobrança pendente não fica viva num pedido cancelado.
+            await CancelarCobrancasPendentesAsync(pedido, motivoCanonical, agora, innerCt);
+
+            // 6. Aplicar transição + audit trail.
             var statusAntigo = pedido.Status;
             pedido.Status = StatusPedidoMapper.Cancelado;
             pedido.CanceladoEm = agora;
@@ -150,11 +157,11 @@ public sealed class RecusarPedidoStorefrontUseCase(
             pedido.AlteradoEm = agora;
             await pedidoRepository.UpdateAsync(pedido, innerCt);
 
-            // 6. Vaga liberada na mesma transação (idempotente).
-            await liberarVaga.HandleAsync(
-                new PedidoCanceladoEvent(pedido.Id, Guid.Empty, $"recusado_baba: {motivoCanonical}"), innerCt);
+            // 7. Cupom devolvido, ContaReceber cancelada e vaga liberada na mesma transação (idempotente).
+            await efeitos.AplicarAsync(pedido, $"recusado_baba: {motivoCanonical}", input.UsuarioId, innerCt);
+            await RegistrarDevolucaoAFazerAsync(pedido, estornadas, input, agora, innerCt);
 
-            // 7. Outbox: o evento de status que a esteira (log, automações, avisos) já consome.
+            // 8. Outbox: o evento de status que a esteira (log, automações, avisos) já consome.
             await publicadorEventos.PublicarAsync(
                 empresaId: pedido.EmpresaId,
                 tipoEvento: "pedido.mudou_status",
@@ -165,7 +172,7 @@ public sealed class RecusarPedidoStorefrontUseCase(
                 correlationId: pedido.Id.ToString(),
                 ct: innerCt);
 
-            // 8. Trilha por último: o flush dela grava cobrança, vaga e outbox juntos.
+            // 9. Trilha por último: o flush dela grava cobrança, vaga e outbox juntos.
             await PedidoEventoRecusado(pedido, input, motivoCanonical, agora, innerCt);
 
             logger.LogInformation(
@@ -233,6 +240,27 @@ public sealed class RecusarPedidoStorefrontUseCase(
         }
 
         return pagas;
+    }
+
+    /// <summary>PEDIDO-02: cancela o que ainda estava pendente; a cobrança paga já saiu como Estornada.</summary>
+    private async Task CancelarCobrancasPendentesAsync(PedidoEntity pedido, string motivoCanonical, DateTime agora, CancellationToken ct)
+    {
+        var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct);
+        foreach (var pendente in cobrancas.Where(c => c.Status == StatusCobrancaPedido.Pendente))
+            pendente.Cancelar($"recusado_baba: {motivoCanonical}", agora);
+    }
+
+    /// <summary>
+    /// PEDIDO-02: o estorno online já devolveu a parte paga pelo Mercado Pago; o resto do recebido (dinheiro, Pix
+    /// direto) fica registrado na trilha como devolução a fazer, igual ao cancelamento pelo console.
+    /// </summary>
+    private async Task RegistrarDevolucaoAFazerAsync(PedidoEntity pedido, IReadOnlyList<CobrancaPedido> estornadas,
+        RecusarPedidoStorefrontInput input, DateTime agora, CancellationToken ct)
+    {
+        var aDevolver = pedido.TotalPago - estornadas.Sum(c => c.ValorPago ?? c.Valor);
+        if (aDevolver <= 0m) return;
+        await pedidoRepository.AddEventoAsync(
+            CancelarPedidoUseCase.EventoDevolucaoAFazerDe(pedido, aDevolver, input.UsuarioId, input.UsuarioNome, Origem, agora), ct);
     }
 
     private async Task PedidoEventoRecusado(
