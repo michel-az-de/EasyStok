@@ -77,6 +77,16 @@ public sealed class AcessoChatSite(
     public static string NovoToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(TokenBytes))
         .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
+    /// <summary>Tamanho do token de <see cref="NovoToken"/>: base64url sem preenchimento de <see cref="TokenBytes"/> bytes.</summary>
+    public static readonly int TamanhoDoToken = (TokenBytes * 4 + 2) / 3;
+
+    /// <summary>
+    /// #1725-1: o texto tem o formato de <see cref="NovoToken"/>? Não diz se a sessão existe; serve ao limite de taxa, que
+    /// só particiona por token no formato gerado (o resto cai no IP).
+    /// </summary>
+    public static bool TemFormatoDeToken(string? token) =>
+        token is not null && token.Length == TamanhoDoToken && token.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+
     public static string HashDoToken(string token) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

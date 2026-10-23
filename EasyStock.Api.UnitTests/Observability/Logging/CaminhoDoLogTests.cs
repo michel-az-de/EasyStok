@@ -47,6 +47,19 @@ public class CaminhoDoLogTests
         CaminhoDoLog.EhWebhook(Contexto("/api/webhooksfalso/x", null)).Should().BeFalse();
     }
 
+    // #1725-3: o token da comanda vai no caminho; quem lesse o log abriria a comanda por 24 h.
+    [Theory]
+    [InlineData("/api/storefront/cardapio-conversa/" + Canario, "/api/storefront/cardapio-conversa/{token}")]
+    [InlineData("/api/storefront/cardapio-conversa/" + Canario + "/comanda", "/api/storefront/cardapio-conversa/{token}/comanda")]
+    [InlineData("/API/Storefront/Cardapio-Conversa/" + Canario + "/stream", "/api/storefront/cardapio-conversa/{token}/stream")]
+    public void Token_da_comanda_sai_mascarado(string caminho, string esperado)
+    {
+        var contexto = Contexto(caminho, molde: null);
+
+        CaminhoDoLog.TemSegredo(contexto).Should().BeTrue();
+        CaminhoDoLog.De(contexto).Should().Be(esperado).And.NotContain(Canario);
+    }
+
     [Theory]
     [InlineData("/oauth/token")]
     [InlineData("/v1/OAuth/access_token")]
