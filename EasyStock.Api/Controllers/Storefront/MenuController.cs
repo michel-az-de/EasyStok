@@ -85,10 +85,11 @@ public sealed class MenuController(
         {
             // Só o anônimo passa pelo cache: ele lê com o tenant do slug (TenantDoStorefront). Quem está logado lê com o
             // tenant do JWT, e o resultado dele não pode virar o cardápio de todos. Slug inexistente lança dentro da
-            // fábrica e não entra no cache; a montagem não usa o token da requisição porque serve às próximas.
+            // fábrica e não entra no cache; a montagem não usa o token da requisição porque serve às próximas. A chave é o
+            // slug como veio: o filtro do tenant compara a caixa exata, e outra grafia não pode preencher o cardápio certo.
             var (json, etag) = User.Identity?.IsAuthenticated == true
                 ? await MontarAsync(slug, ct)
-                : (await cache.GetOrCreateAsync($"storefront:menu:{slug.Trim().ToLowerInvariant()}", entrada =>
+                : (await cache.GetOrCreateAsync($"storefront:menu:{slug}", entrada =>
                 {
                     entrada.AbsoluteExpirationRelativeToNow = TempoNoServidor;
                     return MontarAsync(slug, CancellationToken.None);
