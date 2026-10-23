@@ -249,7 +249,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         var pagoEm = input.PagoEm ?? agora;
         var metodo = CobrancaPedido.MapearMetodo(input.MetodoPagamentoExterno, input.TipoPagamentoExterno);
         // #1615: a dona não escolheu receber o resto na entrega; o histórico do pedido diz por que ficou assim.
-        if (EhLinkSubstituido(alvo) && input.ValorPago < pedido.Total.Valor)
+        var linkAntigo = EhLinkSubstituido(alvo);
+        if (linkAntigo && input.ValorPago < pedido.Total.Valor)
             await pedidoRepository.AddEventoAsync(new PedidoEvento
             {
                 Id = Guid.NewGuid(),
@@ -309,9 +310,10 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             await cobrancaRepository.AddAsync(naEntrega, ct);
             // Decisão do Felipe (22/10): o sinal da encomenda pago pelo link avisa o cliente pelo canal do pedido, uma
             // vez por pagamento (a chave do outbox leva o id do pagamento). Pagamento que quita não passa aqui.
-            if (avisoCliente is not null && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm))
-                await avisoCliente.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
-                    empresaId, pedido.Id, $"sinal:{input.PagamentoExternoId}", ct, mensagem: TextoSinalRecebido(input.ValorPago, saldo));
+            // O link antigo pago depois de uma edição (#1615) não é o sinal. O restante segue a conta do saldo (cupom).
+            if (avisoCliente is not null && !linkAntigo && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm))
+                await AvisarSinalAsync(empresaId, pedido.Id, input, saldoFinanceiro is not null
+                    ? (await saldoFinanceiro.ConsultarAsync(comPagamentos, ct)).AReceber(comPagamentos.Total.Valor) : saldo, ct);
         }
 
         if (alvo.Complementar && comPagamentos.Pagamentos.Count > 1 && efeito is null && avisoCliente is not null)
@@ -374,6 +376,23 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         var motivo = $"{marca} de {input.ValorPago.ToString("F2", Cultura.PtBr)} {descricao}; estorno {r.IdSolicitacao}";
         var resultado = await RecusarAsync(pedido, alvo, motivo, situacao, agora, ct);
         return (resultado, null, null, alvo.ConversaId);
+    }
+
+    /// <summary>
+    /// O aviso do sinal é mensagem, não dinheiro: falha ao enfileirar só loga e não desfaz a confirmação do pagamento
+    /// (senão o webhook responderia 500 e o Mercado Pago reenviaria em laço).
+    /// </summary>
+    private async Task AvisarSinalAsync(Guid empresaId, Guid pedidoId, ConfirmarPagamentoPedidoInput input, decimal restante, CancellationToken ct)
+    {
+        try
+        {
+            await avisoCliente!.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+                empresaId, pedidoId, $"sinal:{input.PagamentoExternoId}", ct, mensagem: TextoSinalRecebido(input.ValorPago, restante));
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Aviso de sinal nao enfileirado pedidoId={PedidoId} pagamento={Pagamento}", pedidoId, input.PagamentoExternoId);
+        }
     }
 
     /// <summary>Aviso ao cliente do sinal da encomenda pago pelo link (decisão do Felipe, 22/10).</summary>

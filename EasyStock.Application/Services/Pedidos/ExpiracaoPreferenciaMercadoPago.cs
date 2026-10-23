@@ -27,7 +27,8 @@ public sealed class ExpiracaoPreferenciaMercadoPago(
         {
             await mercadoPago().ExpirarPreferenciaAsync(preferencia, agora, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        // Timeout do HttpClient chega como TaskCanceledException sem o ct cancelado: também é só log, o commit já houve.
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Falha ao expirar a preferencia substituida {Preferencia} no Mercado Pago", preferencia);
         }

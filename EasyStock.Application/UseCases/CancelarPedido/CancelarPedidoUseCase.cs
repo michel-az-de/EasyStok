@@ -54,9 +54,10 @@ public class CancelarPedidoUseCase(
             var cobrancas = await cobrancaRepo.ListarDoPedidoAsync(cmd.EmpresaId, cmd.Id, ct);
             if (cobrancas.Any(c => c.EmpresaId != cmd.EmpresaId || c.PedidoId != cmd.Id))
                 throw new UseCaseValidationException("Cobrança não pertence ao pedido.");
+            var saldo = saldos is null ? null : await saldos.ConsultarAsync(pedido, ct);
             EfeitosCancelamentoPedido.ExigirPermissao(
                 pedido.TotalPago > 0 || cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga)
-                    || saldos is not null && (await saldos.ConsultarAsync(pedido, ct)).Alocado > 0, cmd.NivelSolicitante);
+                    || saldo?.Alocado > 0, cmd.NivelSolicitante);
             if (pedido.StatusEnum == StatusPedido.Cancelado) return CriarPedidoUseCase.Map(pedido);
 
             statusAntigo = pedido.Status;
@@ -80,7 +81,7 @@ public class CancelarPedidoUseCase(
                 Origem = cmd.Origem,
                 OcorridoEm = ocorridoEm
             });
-            await RegistrarDevolucaoAFazerAsync(pedido, cmd, ocorridoEm, ct);
+            await RegistrarDevolucaoAFazerAsync(pedido, cmd, saldo, ocorridoEm);
             await efeitosCancelamento.AplicarAsync(pedido, cmd.Motivo, cmd.UsuarioId, ct);
             await publicadorEventos.PublicarAsync(pedido.EmpresaId, "pedido.mudou_status", "pedido", pedido.Id,
                 new PedidoMudouStatusEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, statusAntigo,
@@ -105,9 +106,10 @@ public class CancelarPedidoUseCase(
     /// #1717-5: o dinheiro recebido e ainda não devolvido fica registrado na trilha como devolução a fazer. Não
     /// estorna nada: a devolução é registrada depois em Devoluções (manual ou estorno online).
     /// </summary>
-    private async Task RegistrarDevolucaoAFazerAsync(Domain.Entities.Pedido pedido, CancelarPedidoCommand cmd, DateTime ocorridoEm, CancellationToken ct)
+    private async Task RegistrarDevolucaoAFazerAsync(Domain.Entities.Pedido pedido, CancelarPedidoCommand cmd,
+        SaldoFinanceiroComanda? saldo, DateTime ocorridoEm)
     {
-        var aDevolver = saldos is not null ? (await saldos.ConsultarAsync(pedido, ct)).DinheiroDisponivel : pedido.TotalPago;
+        var aDevolver = saldo?.DinheiroDisponivel ?? pedido.TotalPago;
         if (aDevolver <= 0m) return;
         await pedidoRepo.AddEventoAsync(new PedidoEvento
         {
