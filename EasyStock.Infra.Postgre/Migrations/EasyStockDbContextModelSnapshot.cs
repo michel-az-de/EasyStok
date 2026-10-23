@@ -7495,6 +7495,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasDatabaseName("ux_pedidos_empresa_numero_do_dia")
                         .HasFilter("numero_do_dia IS NOT NULL");
 
+                    b.HasIndex("EmpresaId", "Status", "CriadoEm")
+                        .HasDatabaseName("ix_pedidos_empresa_status_criado_em");
+
                     b.ToTable("pedidos", (string)null);
                 });
 
@@ -9523,6 +9526,8 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("JanelaEntregaId", "DataEntrega")
                         .HasDatabaseName("ix_vaga_ativa_por_janela_data")
                         .HasFilter("\"LiberadoEm\" IS NULL");
+
+                    b.HasIndex(new[] { "PedidoId" }, "ix_vaga_ocupada_pedido_id");
 
                     b.ToTable("vaga_ocupada", (string)null);
                 });
