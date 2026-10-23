@@ -63,7 +63,7 @@ public sealed class RecusarPedidoStorefrontUseCase(
     IPublicadorEventoIntegracao publicadorEventos,
     IUnitOfWork unitOfWork,
     ILogger<RecusarPedidoStorefrontUseCase> logger,
-    IOperacaoEventPublisher? operacaoEventos = null)
+    IOperacaoEventPublisher operacaoEventos)
 {
     private const int MensagemClienteMaxChars = 280;
     private const string Origem = "storefront";
@@ -186,8 +186,7 @@ public sealed class RecusarPedidoStorefrontUseCase(
         }, ct);
 
         // #1265-8: depois do commit, a operação (cozinha, Balcão) move o card sem recarregar.
-        if (operacaoEventos is not null)
-            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, input.EmpresaId,
+        await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, input.EmpresaId,
                 new PedidoMudouStatusOperacao(resultado.PedidoId, StatusPedidoMapper.AguardandoAprovacaoBaba, resultado.Status), ct);
 
         // Aviso ao cliente só depois do commit; best-effort, não desfaz a recusa se falhar.

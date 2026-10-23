@@ -174,7 +174,7 @@ public sealed record IdentificacaoVisitanteResult(string Nome, string Telefone, 
 /// </summary>
 public sealed class IdentificarVisitanteChatSiteUseCase(
     AcessoChatSite acesso, IConversaRepository conversaRepository, IUnitOfWork unitOfWork,
-    IOperacaoEventPublisher? operacaoEventos = null)
+    IOperacaoEventPublisher operacaoEventos)
 {
     public async Task<IdentificacaoVisitanteResult> ExecuteAsync(
         string slug, string? token, IdentificacaoVisitanteInput? input, CancellationToken ct = default)
@@ -211,7 +211,7 @@ public sealed class IdentificarVisitanteChatSiteUseCase(
 
         await unitOfWork.CommitAsync();
         // #1643-5: o console troca nome e contato na hora, sem esperar a próxima sincronização.
-        if (conversaAtualizada is { } atualizada && operacaoEventos is not null)
+        if (conversaAtualizada is { } atualizada)
             await operacaoEventos.PublicarAsync(EventosOperacao.ConversaAtualizada, sessao.EmpresaId,
                 new ConversaAtualizadaOperacao(atualizada), ct);
         return new IdentificacaoVisitanteResult(contato.Nome, contato.Telefone, contato.Email, contato.InformadoEm);

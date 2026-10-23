@@ -105,9 +105,8 @@ public sealed class CadastrarClienteDaConversaUseCase(
             if (telefone is null)
                 throw new UseCaseValidationException("Informe o telefone do cliente para cadastrar.");
             // #1643-3: sem nome no corpo, o cadastro novo leva o nome que a conversa já tem (perfil do canal ou o que o
-            // visitante informou), não "Cliente WhatsApp". Nome que é telefone e o genérico do chat sem formulário não servem.
-            var nomeDoCadastro = nome ?? (NomeLimpo(conversa.ContatoNome) is { } contato && !contato.Any(char.IsDigit)
-                && contato != ConversaChatSiteService.NomeSemFormulario ? contato : null);
+            // visitante informou), não "Cliente WhatsApp". Telefone, e-mail e o genérico do chat sem formulário não servem.
+            var nomeDoCadastro = nome ?? NomeDoContato(conversa.ContatoNome);
             var identificacao = await identificarCliente.ExecuteAsync(
                 new IdentificarClientePorTelefoneInput(command.EmpresaId, telefone.TrimStart('+'), nomeDoCadastro, command.ReutilizarCadastro), ct);
             cliente = identificacao.Cliente;
@@ -203,6 +202,12 @@ public sealed class CadastrarClienteDaConversaUseCase(
             throw new UseCaseValidationException("Telefone inválido: informe DDD e número.");
         }
     }
+
+    private static string? NomeDoContato(string? contatoNome) =>
+        NomeLimpo(contatoNome) is { } contato && !contato.Any(char.IsDigit) && !contato.Contains('@')
+            && contato != ConversaChatSiteService.NomeSemFormulario
+            ? contato
+            : null;
 
     private static string? NomeLimpo(string? nome)
     {

@@ -40,7 +40,7 @@ public sealed class AprovarPedidoStorefrontUseCase(
     IPublicadorEventoIntegracao publicadorEventos,
     IUnitOfWork unitOfWork,
     ILogger<AprovarPedidoStorefrontUseCase> logger,
-    IOperacaoEventPublisher? operacaoEventos = null)
+    IOperacaoEventPublisher operacaoEventos)
 {
     public async Task<AprovarPedidoStorefrontResult> ExecuteAsync(
         AprovarPedidoStorefrontInput input,
@@ -138,8 +138,7 @@ public sealed class AprovarPedidoStorefrontUseCase(
         }, ct);
 
         // #1265-8: depois do commit, a operação (cozinha, Balcão) move o card sem recarregar.
-        if (operacaoEventos is not null)
-            await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, input.EmpresaId,
+        await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, input.EmpresaId,
                 new PedidoMudouStatusOperacao(resultado.PedidoId, StatusPedidoMapper.AguardandoAprovacaoBaba, resultado.Status), ct);
         return resultado;
     }
