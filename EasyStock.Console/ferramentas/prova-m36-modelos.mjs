@@ -114,6 +114,8 @@ const naTela = [
 ]
 assert.deepEqual(clientesParaChamar(cadastrados, naTela).map(c => c.id), ['k1', 'k4'],
   'sem telefone e com conversa aberta ficam de fora; conversa encerrada não impede chamar de novo')
+const muitos = Array.from({ length: 8 }, (_, i) => ({ id: `m${i}`, nome: `Ana ${i}`, telefone: '11988887777' }))
+assert.equal(clientesParaChamar(muitos, []).length, 5, 'a lista da busca mostra até 5')
 const iniciadas = []
 let liberarInicio
 globalThis.fetch = async (url, options) => {
@@ -145,6 +147,8 @@ const semConexaoNoInicio = await api.iniciarConversaComModelo(cadastrados[3], { 
 assert.deepEqual(erroDoModelo(semConexaoNoInicio, { envio: true }), { texto: FRASE, integracoes: true })
 assert.match(modal, /Chamar no WhatsApp/)
 assert.match(modal, /iniciarConversaComModelo\(cliente, /)
+// Envio sem confirmação: a conversa só é aberta ao fechar, para o aviso não sumir com a troca de aba no celular.
+assert.match(modal, /aoFechar\(\)\s+if \(iniciada\) aoIniciar\?\.\(iniciada\)/)
 const balcao = readFileSync(new URL('../src/features/atendimento/ChamarClientes.jsx', import.meta.url), 'utf8')
 assert.match(balcao, /clientesParaChamar\(/)
 assert.match(balcao, /<ModalEnviarModelo\s+cliente=\{/)

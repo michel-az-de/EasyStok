@@ -29,6 +29,10 @@ public static class NormalizadorTelefone
     /// </summary>
     public static string NormalizarE164Br(string telefone) => TelefoneE164.From(telefone).Value;
 
+    /// <summary>#1408: celular BR com o nono dígito (dígitos ou E.164). Fixo não tem WhatsApp de cliente.</summary>
+    public static bool EhCelularBr(string telefone) =>
+        CelularBrComNonoDigitoRegex.IsMatch(new string((telefone ?? string.Empty).Where(char.IsDigit).ToArray()));
+
     /// <summary>
     /// Números E.164 a procurar para um <c>wa_id</c> da Meta (dígitos, sem <c>+</c>), o canônico
     /// primeiro. Celular BR sem o nono dígito gera também a forma com o nono, que é a canônica

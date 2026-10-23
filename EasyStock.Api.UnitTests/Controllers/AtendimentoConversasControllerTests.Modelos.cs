@@ -65,7 +65,8 @@ public partial class AtendimentoConversasControllerTests
     }
 
     private IniciarConversaClienteUseCase Iniciar(ICatalogoModelosAtendimento catalogo, IClienteRepository clientes) =>
-        new(_repositorio, clientes, catalogo, EnvioModelo(catalogo), new FakeUnitOfWork(), TimeProvider.System);
+        new(_repositorio, clientes, catalogo, new PoliticaEnvioCliente(Substitute.For<IConsentimentoContatoRepository>()),
+            EnvioModelo(catalogo), new FakeUnitOfWork(), TimeProvider.System);
 
     /// <summary>#1408: chamar no WhatsApp exige a mesma permissão de atender e responde o 409 que o console já mostra.</summary>
     [Fact]
@@ -75,7 +76,7 @@ public partial class AtendimentoConversasControllerTests
         catalogo.ListarAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns<Task<IReadOnlyList<ModeloAtendimento>>>(
             _ => throw CatalogoModelosException.SemConexao("Conecte o WhatsApp da empresa em Integrações."));
         var clientes = Substitute.For<IClienteRepository>();
-        var cliente = new EasyStock.Domain.Entities.Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Ana", Telefone = "11988887777" };
+        var cliente = new EasyStock.Domain.Entities.Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Ana", Telefone = "11988887777", Ativo = true };
         clientes.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
         var body = new IniciarConversaClienteBody(cliente.Id, Guid.NewGuid(), "boas_vindas", "pt_BR", ["Ana"]);
 

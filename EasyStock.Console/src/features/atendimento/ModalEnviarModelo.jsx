@@ -47,16 +47,27 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
   const falta = escolha === '' || !modelo || modelo.indisponivel || parametros.some(p => !p.trim() || p.includes('{{'))
   const previa = modelo ? [modelo.cabecalho, modelo.corpo.replace(/\{\{([1-9][0-9]?)\}\}/g,
     (original, n) => parametros[Number(n) - 1]?.trim() || original), modelo.rodape].filter(Boolean).join('\n') : ''
-  const fechar = () => { if (!ocupado.current) aoFechar() }
+  // #1408: a conversa aberta pelo "Chamar" só é levada ao Balcão ao fechar: no celular, abrir a conversa troca a aba e
+  // desmontaria a modal com o aviso de envio sem confirmação ainda na tela.
+  const [iniciada, setIniciada] = useState(null)
+  const fechar = () => {
+    if (ocupado.current) return
+    aoFechar()
+    if (iniciada) aoIniciar?.(iniciada)
+  }
   async function enviar() {
     if (ocupado.current || falta || bloqueado || resultado) return
     ocupado.current = true; setEnviando(true); setErro(null); setSemConexao(false)
     try {
       const dados = { nome: modelo.nome, idioma: modelo.idioma, parametros }
+      let conversaIniciada = null
       const m = cliente
-        ? await iniciarConversaComModelo(cliente, dados).then((r) => { aoIniciar?.(r.conversaId); return r.mensagem })
+        ? await iniciarConversaComModelo(cliente, dados).then((r) => { conversaIniciada = r.conversaId; setIniciada(r.conversaId); return r.mensagem })
         : await enviarModelo(conversa.id, dados)
-      if (['Enviada', 'Entregue', 'Lida'].includes(m.status)) aoFechar()
+      if (['Enviada', 'Entregue', 'Lida'].includes(m.status)) {
+        aoFechar()
+        if (conversaIniciada) aoIniciar?.(conversaIniciada)
+      }
       else {
         setResultado(m)
         setErro(m.erro || 'Envio sem confirmação. Confira a conversa no WhatsApp antes de iniciar outro envio.')

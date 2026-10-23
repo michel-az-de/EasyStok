@@ -29,7 +29,7 @@ public class IniciarConversaClienteUseCaseTests
 
     public IniciarConversaClienteUseCaseTests()
     {
-        _cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = _empresa, Nome = "Ana Souza", Telefone = "(11) 98888-7777" };
+        _cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = _empresa, Nome = "Ana Souza", Telefone = "(11) 98888-7777", Ativo = true };
         _clientes.GetByIdAsync(_empresa, _cliente.Id).Returns(_ => _cliente);
 
         // Banco em memória: a aberta do contato vale para as duas grafias do nono dígito, como no repositório (#1290).
@@ -59,7 +59,7 @@ public class IniciarConversaClienteUseCaseTests
     private IniciarConversaClienteUseCase UseCase()
     {
         var envio = new EnviarModeloConversaUseCase(_conversas, _clientes, _catalogo, new(_consentimentos), new([_canal]), _uow, TimeProvider.System);
-        return new(_conversas, _clientes, _catalogo, envio, _uow, TimeProvider.System);
+        return new(_conversas, _clientes, _catalogo, new(_consentimentos), envio, _uow, TimeProvider.System);
     }
 
     private IniciarConversaClienteCommand Command(Guid? tentativa = null, string modelo = "boas_vindas") =>
@@ -153,13 +153,69 @@ public class IniciarConversaClienteUseCaseTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("123")]
+    [InlineData("(11) 3333-4444")] // fixo: não tem WhatsApp de cliente
     public async Task ClienteSemTelefoneValido_Recusa(string? telefone)
     {
         _cliente.Telefone = telefone;
 
         await FluentActions.Awaiting(() => UseCase().ExecuteAsync(Command()))
-            .Should().ThrowAsync<UseCaseValidationException>().WithMessage("*telefone*");
+            .Should().ThrowAsync<UseCaseValidationException>().WithMessage("*celular*");
         _abertas.Should().BeEmpty();
+    }
+
+    /// <summary>Tudo o que o envio recusaria é conferido antes: recusa não deixa conversa vazia na inbox.</summary>
+    [Fact]
+    public async Task ModeloDeMarketingSemConsentimento_NaoAbreConversa()
+    {
+        _catalogo.ListarAsync(_empresa, Arg.Any<CancellationToken>()).Returns([
+            new ModeloAtendimento("promocao", "pt_BR", "MARKETING", "Oi {{1}}, temos novidade.", 1)]);
+
+        await FluentActions.Awaiting(() => UseCase().ExecuteAsync(Command(modelo: "promocao")))
+            .Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*não autorizou*");
+        _abertas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ParametrosAMenos_NaoAbreConversa()
+    {
+        await FluentActions.Awaiting(() => UseCase().ExecuteAsync(Command() with { Parametros = [] }))
+            .Should().ThrowAsync<UseCaseValidationException>();
+        await FluentActions.Awaiting(() => UseCase().ExecuteAsync(Command() with { Parametros = ["Ana", "sobra"] }))
+            .Should().ThrowAsync<UseCaseValidationException>().WithMessage("*exige 1 parâmetros*");
+        _abertas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ClienteDesativado_Recusa()
+    {
+        _cliente.Ativo = false;
+
+        await FluentActions.Awaiting(() => UseCase().ExecuteAsync(Command()))
+            .Should().ThrowAsync<UseCaseValidationException>().WithMessage("*desativado*");
+        _abertas.Should().BeEmpty();
+    }
+
+    /// <summary>A outra atendente (ou o próprio cliente escrevendo) abriu a conversa no mesmo instante: segue nela.</summary>
+    [Fact]
+    public async Task CorridaNaAberturaSegueNaConversaQueFicou()
+    {
+        var corrida = new InvalidOperationException("ux_conversas_contato_aberta");
+        _uow.EhViolacaoDeUnicidadePredicado = ex => ex == corrida;
+        var daOutra = Conversa.Abrir(_empresa, "5511988887777", DateTime.UtcNow, "Ana", _cliente.Id);
+        var primeira = true;
+        _conversas.AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            if (!primeira) throw new InvalidOperationException("não devia abrir de novo");
+            primeira = false;
+            _abertas.Add(daOutra);
+            throw corrida;
+        });
+
+        var r = await UseCase().ExecuteAsync(Command());
+
+        r.ConversaId.Should().Be(daOutra.Id);
+        _uow.DescartesCount.Should().Be(1);
+        r.Mensagem.Status.Should().Be(StatusMensagem.Enviada);
     }
 
     [Fact]
