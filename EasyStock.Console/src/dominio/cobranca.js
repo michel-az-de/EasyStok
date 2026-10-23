@@ -468,3 +468,22 @@ export function metodoDaCobranca(cobranca) {
 // #1686 (item 10): devolução em dinheiro não tem comprovante; Pix, cartão e transferência têm.
 // A mesma regra do `RegistrarEstornoManualUseCase` da API.
 export const referenciaObrigatoriaNaDevolucao = (metodo) => metodo !== 'dinheiro'
+
+// #1966: o GET de estornos manuais devolve `aDevolver` (PR #1967): pedido cancelado com dinheiro recebido e ainda
+// não devolvido, descontado o que virou cupom ou está em estorno pendente. API antiga (sem o campo) vale zero.
+export const aDevolverDe = (dados) => {
+  const valor = Number(dados?.aDevolver)
+  return Number.isFinite(valor) && valor > 0 ? valor : 0
+}
+
+// O caminho citado é o que a tela oferece: o estorno online só existe para pagamento online.
+export const textoADevolver = ({ comOnline }) => (comOnline
+  ? 'O pedido foi cancelado com valor recebido: devolva pelo estorno online abaixo ou registre a devolução manual.'
+  : 'O pedido foi cancelado com valor recebido: devolva ao cliente e registre a devolução manual.')
+
+// Resumo do bloco Devoluções recolhido: o que falta devolver vem antes do que já foi devolvido.
+export function resumoDasDevolucoes({ aDevolver, totalDevolvido, conferirAcerto }) {
+  if (aDevolver > 0) return `${moeda(aDevolver)} a devolver`
+  if (totalDevolvido) return `${moeda(totalDevolvido)} devolvidos`
+  return conferirAcerto ? 'Recebimento registrado' : 'Recebimentos e estornos'
+}

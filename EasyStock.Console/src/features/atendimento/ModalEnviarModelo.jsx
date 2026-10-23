@@ -3,14 +3,22 @@ import { Botao } from '../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
 import { useAcoes } from '../../aplicacao/contextos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { podeVerIntegracoes } from '../../dominio/acessoModulos'
+import { erroDoModelo } from '../../dominio/falhaDeEnvio'
+import { hashDoModulo } from '../../dominio/modulos'
 import css from './atendimento.module.css'
 
 export function ModalEnviarModelo({ conversa, aoFechar }) {
   const { listarModelos, enviarModelo, prepararOutroModelo } = useAcoes()
+  const { acoes } = useAcessoModulos()
   const [lista, setLista] = useState(null)
   const [escolha, setEscolha] = useState('')
   const [parametros, setParametros] = useState([])
   const [erro, setErro] = useState(null)
+  // #1966: 409 WHATSAPP_NAO_CONECTADO. A frase vem da API; aqui fica o caminho para Integrações.
+  const [semConexao, setSemConexao] = useState(false)
+  const falhar = (falha) => { setErro(falha.texto); setSemConexao(falha.integracoes) }
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState(null)
   const [conferido, setConferido] = useState(false)
@@ -18,11 +26,11 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
   const consulta = useRef(0)
   async function carregar(atualizar = false) {
     const versao = ++consulta.current
-    setLista(null); setErro(null); setEscolha(''); setParametros([])
+    setLista(null); setErro(null); setSemConexao(false); setEscolha(''); setParametros([])
     try {
       const modelos = await listarModelos(atualizar)
       if (versao === consulta.current) setLista(modelos)
-    } catch (e) { if (versao === consulta.current) { setLista([]); setErro(e.message) } }
+    } catch (e) { if (versao === consulta.current) { setLista([]); falhar(erroDoModelo(e)) } }
   }
   useEffect(() => {
     carregar()
@@ -38,7 +46,7 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
   const fechar = () => { if (!ocupado.current) aoFechar() }
   async function enviar() {
     if (ocupado.current || falta || bloqueado || resultado) return
-    ocupado.current = true; setEnviando(true); setErro(null)
+    ocupado.current = true; setEnviando(true); setErro(null); setSemConexao(false)
     try {
       const m = await enviarModelo(conversa.id, { nome: modelo.nome, idioma: modelo.idioma, parametros })
       if (['Enviada', 'Entregue', 'Lida'].includes(m.status)) aoFechar()
@@ -46,7 +54,7 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
         setResultado(m)
         setErro(m.erro || 'Envio sem confirmação. Confira a conversa no WhatsApp antes de iniciar outro envio.')
       }
-    } catch (e) { setErro(`${e.message} Ao tentar novamente, esta mesma tentativa será consultada sem duplicar o envio.`) }
+    } catch (e) { falhar(erroDoModelo(e, { envio: true })) }
     finally { ocupado.current = false; setEnviando(false) }
   }
   return (
@@ -81,6 +89,9 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
           </>}
         </fieldset>}
         {erro && <p className={css.programarErro} role="alert">{erro}</p>}
+        {erro && semConexao && (podeVerIntegracoes(acoes)
+          ? <a href={hashDoModulo('configuracoes', 'integracoes')}>Abrir Integrações</a>
+          : <p>Quem administra a loja conecta o WhatsApp em Configurações, Integrações.</p>)}
         {resultado && <>
           <label className={css.programarOpcao}><input type="checkbox" checked={conferido} onChange={e => setConferido(e.target.checked)} />
             Conferi no WhatsApp e preciso iniciar outro envio.
