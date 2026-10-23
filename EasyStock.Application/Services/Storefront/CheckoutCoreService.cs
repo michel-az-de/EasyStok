@@ -429,7 +429,8 @@ public sealed class CheckoutCoreService(
     public async Task<IReadOnlyDictionary<Guid, CardapioItem>> CarregarItensCardapioAsync(
         Guid storefrontId,
         IEnumerable<Guid> cardapioItemIds,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IReadOnlySet<Guid>? jaNoPedido = null)
     {
         var cardapioItens = new Dictionary<Guid, CardapioItem>();
         var ids = cardapioItemIds.Distinct().ToList();
@@ -441,8 +442,9 @@ public sealed class CheckoutCoreService(
         foreach (var itemId in ids)
         {
             var ci = lidos.GetValueOrDefault(itemId);
-            // M1.2 (#1482): item arquivado não se vende, nem por link antigo.
-            if (ci is null || !ci.Visivel || !ci.Disponivel || ci.EstaArquivado)
+            // M1.2 (#1482): item arquivado não se vende, nem por link antigo. M1.3 (#1483): nem o de categoria escondida.
+            // #2002: o prato que o pedido já reservou (alteração sem acrescentar nada dele) só precisa existir.
+            if (ci is null || jaNoPedido?.Contains(itemId) != true && (!ci.Visivel || !ci.Disponivel || ci.EstaArquivado || ci.EmSecaoOculta))
                 throw new RegraDeDominioVioladaException(ci?.NomeEfetivo() is { Length: > 0 } nome
                     ? $"{nome} está indisponível no cardápio agora."
                     : "Um item do pedido não está mais no cardápio.");
@@ -466,9 +468,9 @@ public sealed class CheckoutCoreService(
     /// M1.4b (#1531): com porção, o preço é o dela (absoluto, ADR-0035). PED-01 (#656): item a R$ 0 não
     /// vira pedido; a guarda existia só no pedido digitado e no balcão.
     /// </summary>
-    private static (CardapioItemVariacao? Porcao, decimal Preco) PorcaoEPreco(CardapioItem ci, Guid? variacaoId)
+    private static (CardapioItemVariacao? Porcao, decimal Preco) PorcaoEPreco(CardapioItem ci, Guid? variacaoId, bool mantida = false)
     {
-        var porcao = ci.PorcaoParaVenda(variacaoId);
+        var porcao = ci.PorcaoParaVenda(variacaoId, exigirDisponivel: !mantida);
         var preco = porcao?.PrecoStorefront ?? ci.PrecoEfetivo();
         if (preco <= 0m)
             throw new RegraDeDominioVioladaException(
@@ -484,13 +486,15 @@ public sealed class CheckoutCoreService(
         DomainPedido pedido,
         IEnumerable<ItemPedidoCheckout> itens,
         IReadOnlyDictionary<Guid, CardapioItem> cardapioItens,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IReadOnlySet<(Guid CardapioItemId, Guid? VariacaoId)>? mantidas = null)
     {
         var criados = new List<DomainPedidoItem>();
         foreach (var inputItem in itens)
         {
             var ci = cardapioItens[inputItem.CardapioItemId];
-            var (porcao, precoUnit) = PorcaoEPreco(ci, inputItem.VariacaoId);
+            var (porcao, precoUnit) = PorcaoEPreco(ci, inputItem.VariacaoId,
+                mantida: mantidas?.Contains((inputItem.CardapioItemId, inputItem.VariacaoId)) == true);
             var item = new DomainPedidoItem
             {
                 Id = Guid.NewGuid(),

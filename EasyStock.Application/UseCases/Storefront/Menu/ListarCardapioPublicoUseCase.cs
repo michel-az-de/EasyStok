@@ -72,7 +72,7 @@ public sealed class ListarCardapioPublicoUseCase(
 
         var dtos = itens
             // M1.3 (#1483): categoria escondida esconde os pratos dela (sem apagar nem soltar).
-            .Where(i => i.Secao is null || i.Secao.Visivel)
+            .Where(i => !i.EmSecaoOculta)
             // M1.3: pratos com seção vêm primeiro, na ordem das seções que a dona definiu.
             .OrderBy(i => i.Secao is null ? 1 : 0)
             .ThenBy(i => i.Secao?.OrdemExibicao ?? 0)
