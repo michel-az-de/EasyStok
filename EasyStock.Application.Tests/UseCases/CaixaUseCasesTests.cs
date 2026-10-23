@@ -619,8 +619,7 @@ public class CaixaUseCasesTests
         var movId = Guid.NewGuid();
         _repo.GetMovimentoAsync(empresaId, movId).Returns((MovimentoCaixa?)null);
 
-        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
-            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+        var useCase = NovoEstornar();
 
         var result = await useCase.ExecuteAsync(
             new EstornarMovimentoCaixaCommand(empresaId, movId));
@@ -637,8 +636,7 @@ public class CaixaUseCasesTests
         var empresaId = Guid.NewGuid();
         var mov = MovimentoCaixa.Criar(empresaId, tipo, 50m);
         _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
-        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
-            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+        var useCase = NovoEstornar();
 
         var act = () => useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id));
 
@@ -654,8 +652,7 @@ public class CaixaUseCasesTests
         mov.Estornar(Guid.NewGuid(), "Operador A", "duplicado");
         _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
 
-        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
-            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+        var useCase = NovoEstornar();
 
         var result = await useCase.ExecuteAsync(
             new EstornarMovimentoCaixaCommand(empresaId, mov.Id, Motivo: "tentativa nova"));
@@ -678,8 +675,7 @@ public class CaixaUseCasesTests
         _repo.GetFechamentoDoDiaAsync(empresaId, data, mov.LojaId)
             .Returns(FechamentoCaixa.Criar(empresaId, data, 0, 0, 0, 0, 0));
 
-        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
-            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+        var useCase = NovoEstornar();
 
         var act = () => useCase.ExecuteAsync(
             new EstornarMovimentoCaixaCommand(empresaId, mov.Id));
@@ -698,8 +694,7 @@ public class CaixaUseCasesTests
         _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, null)
             .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0));
 
-        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
-            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+        var useCase = NovoEstornar();
 
         var act = () => useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id));
 
@@ -718,9 +713,10 @@ public class CaixaUseCasesTests
         _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
         _repo.GetFechamentoDoDiaAsync(empresaId, DiaFixo, lojaId)
             .Returns(FechamentoCaixa.Criar(empresaId, DiaFixo, 0, 0, 0, 0, 0, lojaId));
+        // #1623: o estorno da entrada confere a gaveta do dia dela, onde a própria entrada está.
+        _repo.GetMovimentosDoDiaAsync(empresaId, DiaFixo, null).Returns(new[] { mov });
 
-        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
-            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+        var useCase = NovoEstornar();
 
         var result = await useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id));
 
@@ -738,8 +734,7 @@ public class CaixaUseCasesTests
         _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
         _repo.GetFechamentoDoDiaAsync(empresaId, data, mov.LojaId).Returns((FechamentoCaixa?)null);
 
-        var useCase = new EstornarMovimentoCaixaUseCase(_repo, _uow,
-            Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+        var useCase = NovoEstornar();
 
         var result = await useCase.ExecuteAsync(
             new EstornarMovimentoCaixaCommand(empresaId, mov.Id,
@@ -938,5 +933,166 @@ public class CaixaUseCasesTests
         linhas.Sum(l => l.Valor).Should().Be(100m); // 60 venda + 40 pagamento == total no saldo
         linhas.Single(l => l.Tipo == "venda").Metodo.Should().Be("dinheiro");
         linhas.Single(l => l.Tipo == "pagamento").Origem.Should().Be("Pedido");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // #1630 e #1623: dia fechado, caixa esquecido aberto e estorno de entrada
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task ObterCaixaDia_DiaFechado_MostraORetratoDoFechamento_EOQueEntrouDepoisFicaAParte()
+    {
+        // #1630-2: fechou com 500 (100 de abertura + 400 em Pix); um Pix de 80 entrou depois de fechar.
+        // O dia continua 500, o número do fechamento; os 80 aparecem como pós-fechamento.
+        var empresaId = Guid.NewGuid();
+        var dia = HorarioBrasil.Hoje().AddDays(-1);
+        _repo.GetFechamentoDoDiaAsync(empresaId, dia, null)
+            .Returns(FechamentoCaixa.Criar(empresaId, dia, 100m, 0m, 400m, 0m, 0m));
+        _repo.GetMovimentosDoDiaAsync(empresaId, dia, null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+        _repo.GetTotalVendasDoDiaAsync(empresaId, dia, null).Returns(0m);
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, dia, null).Returns(480m);
+
+        var result = await new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo))
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, dia));
+
+        result.Fechado.Should().BeTrue();
+        result.TotalPagamentosPedidos.Should().Be(400m);
+        result.SaldoEsperado.Should().Be(500m, "o dia fechado mostra o número do fechamento");
+        result.PosFechamento.Should().Be(80m, "o Pix que entrou depois de fechar fica à parte");
+    }
+
+    [Fact]
+    public async Task ObterCaixaDia_DiaAberto_NaoTemPosFechamento()
+    {
+        var empresaId = Guid.NewGuid();
+        var hoje = HorarioBrasil.Hoje();
+        _repo.GetFechamentoDoDiaAsync(empresaId, hoje, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, hoje, null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+        _repo.GetTotalPagamentosPedidosDoDiaAsync(empresaId, hoje, null).Returns(480m);
+
+        var result = await new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo))
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
+
+        result.SaldoEsperado.Should().Be(580m);
+        result.PosFechamento.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task ObterCaixaDia_CaixaEsquecidoAberto_ContaODiaDaAberturaDesdeAMeiaNoiteDeBrasilia()
+    {
+        // #1630-3: entrega de 80 às 9h, caixa aberto às 11h de ontem e nunca fechado. A sessão começa
+        // na meia-noite de Brasília do dia da abertura (ADR-0032), não às 11h: os 80 entram.
+        var empresaId = Guid.NewGuid();
+        var hoje = HorarioBrasil.Hoje();
+        var ontem = hoje.AddDays(-1);
+        var aberturaOntem = MovimentoCaixa.Criar(empresaId, "abertura", 100m,
+            HorarioBrasil.InstanteUtc(ontem, new TimeOnly(11, 0)));
+        var inicioDeOntem = HorarioBrasil.JanelaDiaUtc(ontem).IniUtc;
+        var fimDeHoje = HorarioBrasil.JanelaDiaUtc(hoje).FimUtc;
+        _repo.GetFechamentoDoDiaAsync(empresaId, hoje, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, hoje, null).Returns(Array.Empty<MovimentoCaixa>());
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(aberturaOntem);
+        _repo.GetMovimentosNoIntervaloAsync(empresaId, inicioDeOntem, fimDeHoje, null).Returns(new[] { aberturaOntem });
+        _repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, inicioDeOntem, fimDeHoje, null).Returns(80m);
+
+        var result = await new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo))
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
+
+        result.AberturaPendenteCrossDay.Should().BeTrue();
+        result.AbertoDesde.Should().Be(ontem);
+        result.TotalPagamentosPedidos.Should().Be(80m, "a entrega das 9h é do dia da abertura");
+        result.SaldoEsperado.Should().Be(180m);
+        await _repo.Received().GetPagamentosPedidosListaNoIntervaloAsync(empresaId, inicioDeOntem, fimDeHoje, null);
+    }
+
+    [Fact]
+    public async Task GetLinhasExtras_VendaEstornada_EntraComoLinhaNegativaNaFormaDaVenda()
+    {
+        // #1630-4: venda de 50 em dinheiro estornada no dia. O total desconta; as linhas também.
+        var empresaId = Guid.NewGuid();
+        var ini = DateTime.UtcNow.Date;
+        var fim = ini.AddDays(1);
+        var venda = new Venda { Id = Guid.NewGuid(), EmpresaId = empresaId, DataVenda = ini.AddHours(13),
+            ValorTotal = Dinheiro.FromDecimal(50m), FormaPagamentoPrincipal = "dinheiro" };
+        _repo.GetVendasNoIntervaloAsync(empresaId, ini, fim, null).Returns(new[] { venda });
+        _repo.GetVendasEstornadasNoIntervaloAsync(empresaId, ini, fim, null)
+            .Returns(new[] { new VendaEstornadaCaixa(venda.Id, ini.AddHours(14), 50m, "dinheiro") });
+
+        var linhas = await new CaixaSaldoCalculator(_repo).GetLinhasExtrasAsync(empresaId, ini, fim);
+
+        linhas.Sum(l => l.Valor).Should().Be(0m);
+        var estorno = linhas.Single(l => l.Tipo == "estorno");
+        estorno.Valor.Should().Be(-50m);
+        estorno.Metodo.Should().Be("dinheiro");
+        estorno.Hora.Should().Be(ini.AddHours(14));
+    }
+
+    private EstornarMovimentoCaixaUseCase NovoEstornar() => new(_repo, _uow,
+        new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+        Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+
+    private MovimentoCaixa GavetaComSuprimentoDe100ESangriaDe80(Guid empresaId)
+    {
+        var suprimento = MovimentoCaixa.Criar(empresaId, "entrada", 100m);
+        suprimento.Metodo = "dinheiro";
+        var sangria = MovimentoCaixa.Criar(empresaId, "saida", 80m);
+        sangria.Metodo = "dinheiro";
+        _repo.GetMovimentoAsync(empresaId, suprimento.Id).Returns(suprimento);
+        _repo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 0m), suprimento, sangria });
+        return suprimento;
+    }
+
+    [Fact]
+    public async Task EstornarMovimento_RecusaEstornarSuprimento_QuandoAGavetaFicariaNegativa()
+    {
+        // #1623-d: abertura 0, suprimento de 100 e sangria de 80, tudo em dinheiro. Estornar o
+        // suprimento deixaria a gaveta em −80: recusa como a sangria acima do saldo.
+        var empresaId = Guid.NewGuid();
+        var suprimento = GavetaComSuprimentoDe100ESangriaDe80(empresaId);
+
+        var act = () => NovoEstornar().ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, suprimento.Id));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("A gaveta ficaria negativa em R$*80,00*");
+        suprimento.EstornadoEm.Should().BeNull();
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task EstornarMovimento_Suprimento_TravaOCaixaAntesDeConferirAGaveta()
+    {
+        var empresaId = Guid.NewGuid();
+        var suprimento = MovimentoCaixa.Criar(empresaId, "entrada", 100m);
+        suprimento.Metodo = "dinheiro";
+        _repo.GetMovimentoAsync(empresaId, suprimento.Id).Returns(suprimento);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 0m), suprimento });
+
+        await NovoEstornar().ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, suprimento.Id));
+
+        Received.InOrder(() =>
+        {
+            _repo.TravarSaidasAsync(empresaId, null, Arg.Any<CancellationToken>());
+            _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null);
+            _repo.UpdateMovimentoAsync(suprimento);
+        });
+        suprimento.EstornadoEm.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task EstornarMovimento_SuprimentoVindoDoPwa_NaoPassaPelaGuardaDaGaveta()
+    {
+        // O PWA promove a exclusão já feita no aparelho, como a sangria mobile (FIN-003).
+        var empresaId = Guid.NewGuid();
+        var suprimento = GavetaComSuprimentoDe100ESangriaDe80(empresaId);
+
+        var result = await NovoEstornar().ExecuteAsync(
+            new EstornarMovimentoCaixaCommand(empresaId, suprimento.Id, Origem: "mobile"));
+
+        result!.EstornadoEm.Should().NotBeNull();
+        await _repo.DidNotReceive().TravarSaidasAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
     }
 }

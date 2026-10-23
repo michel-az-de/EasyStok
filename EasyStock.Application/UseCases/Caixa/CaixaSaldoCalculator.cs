@@ -12,7 +12,12 @@ namespace EasyStock.Application.UseCases.Caixa;
 ///
 /// Janela: dia civil BRT (<see cref="HorarioBrasil.JanelaDiaUtc(DateOnly)"/>). Resolução
 /// cross-day (issue #596): se o dia consultado é hoje e não teve abertura/fechamento próprios
-/// mas existe uma sessão aberta de um dia anterior, agrega [aberturaPendente, fim de hoje).
+/// mas existe uma sessão aberta de um dia anterior, agrega [meia-noite BRT do dia da abertura,
+/// fim de hoje) — o que entrou no dia da abertura antes de abrir também é da sessão (#1630-3).
+///
+/// Dia fechado (#1630-2): os totais e o saldo são os do <see cref="FechamentoCaixa"/>, o retrato
+/// gravado ao fechar. O que entrou depois não reescreve o dia: vai em
+/// <see cref="CaixaSaldoBreakdown.PosFechamento"/> (recálculo ao vivo menos o saldo fechado).
 /// </summary>
 public interface ICaixaSaldoCalculator
 {
@@ -32,6 +37,7 @@ public interface ICaixaSaldoCalculator
 /// Decomposição do saldo do caixa de um dia + a janela (instante UTC) e os movimentos da
 /// sessão. <see cref="JanelaInicioUtc"/>/<see cref="JanelaFimUtc"/> delimitam o intervalo
 /// usado para somar vendas/pagamentos (mesma base usada para listá-los no /caixa — BUG-5).
+/// <see cref="PosFechamento"/>: no dia fechado, o que mudou depois de fechar (#1630-2).
 /// </summary>
 public sealed record CaixaSaldoBreakdown(
     DateOnly Data,
@@ -48,7 +54,8 @@ public sealed record CaixaSaldoBreakdown(
     DateTime JanelaInicioUtc,
     DateTime JanelaFimUtc,
     IReadOnlyList<MovimentoCaixa> Movimentos,
-    FechamentoCaixa? Fechamento);
+    FechamentoCaixa? Fechamento,
+    decimal PosFechamento = 0m);
 
 public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCalculator
 {
@@ -75,10 +82,14 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
             if (aberturaPendente != null)
             {
                 aberturaPendenteCrossDay = true;
-                abertoDesde = HorarioBrasil.DataOperacional(aberturaPendente.DataMovimento);
-                // Re-agrega os movimentos da sessão: da abertura pendente até o fim de hoje.
+                var diaDaAbertura = HorarioBrasil.DataOperacional(aberturaPendente.DataMovimento);
+                abertoDesde = diaDaAbertura;
+                // #1630-3: a sessão é o dia operacional inteiro da abertura até o fim de hoje (ADR-0032:
+                // instante real pela janela de Brasília). Começar no instante da abertura deixava de
+                // fora a entrega das 9h de um caixa aberto às 11h.
+                janelaInicio = HorarioBrasil.JanelaDiaUtc(diaDaAbertura).IniUtc;
                 movList = (await repo.GetMovimentosNoIntervaloAsync(
-                    empresaId, aberturaPendente.DataMovimento, fimDia, lojaId)).ToList();
+                    empresaId, janelaInicio, fimDia, lojaId)).ToList();
             }
         }
 
@@ -90,10 +101,6 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
         decimal totalPagamentosPedidos;
         if (aberturaPendenteCrossDay)
         {
-            janelaInicio = movList.Where(m => m.Tipo == "abertura")
-                                  .Select(m => m.DataMovimento)
-                                  .DefaultIfEmpty(iniDia)
-                                  .Min();
             totalVendas = await repo.GetTotalVendasNoIntervaloAsync(empresaId, janelaInicio, fimDia, lojaId);
             totalPagamentosPedidos = await repo.GetTotalPagamentosPedidosNoIntervaloAsync(empresaId, janelaInicio, fimDia, lojaId);
         }
@@ -105,6 +112,17 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
 
         var saldoEsperado = saldoInicial + totalVendas + totalPagamentosPedidos + totalEntradas - totalSaidas;
         var aberto = aberturaNoDia || aberturaPendenteCrossDay;
+
+        if (fechamento != null)
+        {
+            // #1630-2: o dia fechado é o número do fechamento; Pix que entra depois de fechar
+            // aparece à parte, sem reescrever o fechado.
+            return new CaixaSaldoBreakdown(
+                data, fechamento.SaldoInicial, fechamento.TotalVendas, fechamento.TotalPagamentosPedidos,
+                fechamento.TotalEntradasExtras, fechamento.TotalSaidasExtras, fechamento.SaldoFinal,
+                aberto, fechado, aberturaPendenteCrossDay, abertoDesde, janelaInicio, fimDia, movList, fechamento,
+                PosFechamento: saldoEsperado - fechamento.SaldoFinal);
+        }
 
         return new CaixaSaldoBreakdown(
             data, saldoInicial, totalVendas, totalPagamentosPedidos, totalEntradas, totalSaidas,
@@ -119,13 +137,19 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
                      ?? (IReadOnlyList<Venda>)[];
         var pagamentos = await repo.GetPagamentosPedidosListaNoIntervaloAsync(empresaId, iniUtc, fimUtc, lojaId)
                          ?? (IReadOnlyList<PedidoPagamento>)[];
+        var estornos = await repo.GetVendasEstornadasNoIntervaloAsync(empresaId, iniUtc, fimUtc, lojaId)
+                       ?? (IReadOnlyList<VendaEstornadaCaixa>)[];
 
-        var linhas = new List<CaixaLinhaExtraResult>(vendas.Count + pagamentos.Count);
+        var linhas = new List<CaixaLinhaExtraResult>(vendas.Count + pagamentos.Count + estornos.Count);
         linhas.AddRange(vendas.Select(v => new CaixaLinhaExtraResult(
             v.DataVenda, "venda", v.ValorTotal == null ? 0m : v.ValorTotal.Valor,
             v.Observacoes, v.FormaPagamentoPrincipal, "Venda")));
         linhas.AddRange(pagamentos.Select(p => new CaixaLinhaExtraResult(
             p.PagoEm, "pagamento", p.Valor, "Pagamento de pedido", p.Metodo, "Pedido")));
+        // #1630-4: o total do dia desconta a venda estornada; a linha negativa na forma da venda faz
+        // a soma por forma bater com ele (e o dinheiro devolvido sair da gaveta).
+        linhas.AddRange(estornos.Select(e => new CaixaLinhaExtraResult(
+            e.EstornadaEm, "estorno", -e.Valor, "Estorno de venda", e.FormaPagamento, "Venda")));
 
         return linhas.OrderBy(l => l.Hora).ToList();
     }

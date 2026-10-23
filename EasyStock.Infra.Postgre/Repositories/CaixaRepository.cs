@@ -198,18 +198,25 @@ namespace EasyStock.Infra.Postgre.Repositories
             var valores = await q.Select(v => v.ValorTotal).ToListAsync();
             var bruto = valores.Sum(v => v == null ? 0m : v.Valor);
 
-            // Estorno de saida devolve o dinheiro no dia do estorno (fluxo de caixa): abate das vendas
-            // estornadas dentro da janela, independentemente do dia em que a venda foi feita.
+            var estornados = await SaidasDeVendaEstornadasNoIntervalo(empresaId, iniUtc, fimUtc, lojaId)
+                .Select(m => m.ValorTotal).ToListAsync();
+            var estornado = estornados.Sum(v => v == null ? 0m : v.Valor);
+
+            return bruto - estornado;
+        }
+
+        // Estorno de saida devolve o dinheiro no dia do estorno (fluxo de caixa): abate das vendas
+        // estornadas dentro da janela, independentemente do dia em que a venda foi feita. Base unica
+        // do total (GetTotalVendasNoIntervaloAsync) e das linhas (GetVendasEstornadasNoIntervaloAsync).
+        private IQueryable<MovimentacaoEstoque> SaidasDeVendaEstornadasNoIntervalo(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId)
+        {
             var qe = db.MovimentacoesEstoque.AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId && m.VendaId != null
                             && m.Tipo == TipoMovimentacaoEstoque.Saida && m.Natureza == NaturezaMovimentacaoEstoque.Venda
                             && m.EstornadaEm != null && m.EstornadaEm >= iniUtc && m.EstornadaEm < fimUtc);
             if (lojaId.HasValue)
                 qe = qe.Where(m => db.Vendas.Any(v => v.Id == m.VendaId && v.LojaId == lojaId));
-            var estornados = await qe.Select(m => m.ValorTotal).ToListAsync();
-            var estornado = estornados.Sum(v => v == null ? 0m : v.Valor);
-
-            return bruto - estornado;
+            return qe;
         }
 
         public Task<decimal> GetTotalPagamentosPedidosDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null)
@@ -278,6 +285,28 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .OrderBy(x => x.pg.PagoEm)
                 .Select(x => x.pg)
                 .ToListAsync();
+        }
+
+        // #1630-4: uma linha por venda estornada, na forma da venda, para a soma das linhas por forma
+        // bater com o total (que ja desconta o estorno).
+        public async Task<IReadOnlyList<VendaEstornadaCaixa>> GetVendasEstornadasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
+        {
+            var saidas = await SaidasDeVendaEstornadasNoIntervalo(empresaId, iniUtc, fimUtc, lojaId)
+                .Select(m => new
+                {
+                    VendaId = m.VendaId!.Value,
+                    EstornadaEm = m.EstornadaEm!.Value,
+                    m.ValorTotal,
+                    Forma = db.Vendas.Where(v => v.Id == m.VendaId).Select(v => v.FormaPagamentoPrincipal).FirstOrDefault(),
+                })
+                .ToListAsync();
+
+            return saidas
+                .GroupBy(s => s.VendaId)
+                .Select(g => new VendaEstornadaCaixa(
+                    g.Key, g.Min(s => s.EstornadaEm), g.Sum(s => s.ValorTotal == null ? 0m : s.ValorTotal.Valor), g.First().Forma))
+                .OrderBy(e => e.EstornadaEm)
+                .ToList();
         }
     }
 }

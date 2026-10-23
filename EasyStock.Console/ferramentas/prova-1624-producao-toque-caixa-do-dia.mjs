@@ -768,8 +768,11 @@ await confere('fluxo: suprimento e sangria só trocam o dinheiro de lugar e não
 await confere('fluxo: dia fechado que recebeu dinheiro depois do fechamento diz quanto mudou', async () => {
   const { linhaDoFluxo } = await import('../src/dominio/caixa.js')
   const retrato = { saldoInicial: 100, totalVendas: 0, totalPagamentosPedidos: 400, totalEntradasExtras: 0, totalSaidasExtras: 0, saldoFinal: 500 }
-  assert.equal(linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 480, fechamento: retrato })).depoisDoFechamento, 80)
-  assert.equal(linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 400, fechamento: retrato })).depoisDoFechamento, 0)
+  // #1630: a API devolve o dia fechado com os números do fechamento e o que entrou depois em `posFechamento`.
+  const fechadoComPix = linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 400, posFechamento: 80, fechamento: retrato }))
+  assert.equal(fechadoComPix.depoisDoFechamento, 80)
+  assert.equal(fechadoComPix.entrou, 400, 'o dia fechado não muda')
+  assert.equal(linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 400, posFechamento: 0, fechamento: retrato })).depoisDoFechamento, 0)
   assert.equal(linhaDoFluxo(dia({ aberto: true, totalPagamentosPedidos: 480 })).depoisDoFechamento, 0)
 })
 
@@ -833,7 +836,7 @@ await confere('Caixa do dia: erro ao estornar fica junto dos lançamentos, não 
 
 await confere('Caixa do dia: a tabela dos 7 dias tem legenda, rótulo por célula para tela estreita e avisa dia fechado que mudou', async () => {
   const retrato = { id: 'f', data: '2026-10-10', saldoInicial: 0, totalVendas: 0, totalPagamentosPedidos: 300, totalEntradasExtras: 0, totalSaidasExtras: 0, saldoFinal: 300, fechadoEm: '2026-10-10T23:00:00Z' }
-  montarFetch([[DIA_DA_API, (url) => { const data = new URL(url, 'http://x').searchParams.get('data'); return { data: data === '2026-10-10' ? dia({ data, fechado: true, totalPagamentosPedidos: 380, fechamento: retrato }) : dia({ data }) } }]])
+  montarFetch([[DIA_DA_API, (url) => { const data = new URL(url, 'http://x').searchParams.get('data'); return { data: data === '2026-10-10' ? dia({ data, fechado: true, totalPagamentosPedidos: 300, posFechamento: 80, fechamento: retrato }) : dia({ data }) } }]])
   g.caixa = caixaCom(dia({ aberto: true, totalEntradasExtras: 10, saldoEsperado: 10 }))
   const t = montar(AbaCaixaApi)
   await t.assentar()
