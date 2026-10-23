@@ -9,8 +9,10 @@ import { erroDoModelo } from '../../dominio/falhaDeEnvio'
 import { hashDoModulo } from '../../dominio/modulos'
 import css from './atendimento.module.css'
 
-export function ModalEnviarModelo({ conversa, aoFechar }) {
-  const { listarModelos, enviarModelo, prepararOutroModelo } = useAcoes()
+// #1408: com `cliente` no lugar de `conversa`, é o "Chamar no WhatsApp" de quem nunca escreveu: a API abre (ou
+// reaproveita) a conversa e `aoIniciar` recebe o id dela para o Balcão abrir.
+export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, aoIniciar = null }) {
+  const { listarModelos, enviarModelo, prepararOutroModelo, iniciarConversaComModelo, prepararOutroModeloDoCliente } = useAcoes()
   const { acoes } = useAcessoModulos()
   const [lista, setLista] = useState(null)
   const [escolha, setEscolha] = useState('')
@@ -39,7 +41,9 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const modelo = lista?.[Number(escolha)]
-  const bloqueado = Boolean(conversa.bloqueio) || conversa.estado === 'Encerrado' || !conversa.clienteId
+  const bloqueado = cliente
+    ? !String(cliente.telefone ?? '').trim()
+    : Boolean(conversa.bloqueio) || conversa.estado === 'Encerrado' || !conversa.clienteId
   const falta = escolha === '' || !modelo || modelo.indisponivel || parametros.some(p => !p.trim() || p.includes('{{'))
   const previa = modelo ? [modelo.cabecalho, modelo.corpo.replace(/\{\{([1-9][0-9]?)\}\}/g,
     (original, n) => parametros[Number(n) - 1]?.trim() || original), modelo.rodape].filter(Boolean).join('\n') : ''
@@ -48,7 +52,10 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
     if (ocupado.current || falta || bloqueado || resultado) return
     ocupado.current = true; setEnviando(true); setErro(null); setSemConexao(false)
     try {
-      const m = await enviarModelo(conversa.id, { nome: modelo.nome, idioma: modelo.idioma, parametros })
+      const dados = { nome: modelo.nome, idioma: modelo.idioma, parametros }
+      const m = cliente
+        ? await iniciarConversaComModelo(cliente, dados).then((r) => { aoIniciar?.(r.conversaId); return r.mensagem })
+        : await enviarModelo(conversa.id, dados)
       if (['Enviada', 'Entregue', 'Lida'].includes(m.status)) aoFechar()
       else {
         setResultado(m)
@@ -58,7 +65,9 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
     finally { ocupado.current = false; setEnviando(false) }
   }
   return (
-    <Modal titulo="Enviar modelo aprovado" descricao={`Confira a prévia antes de enviar para ${conversa.nome}. Este modelo é enviado diretamente pelo canal; não entra no rascunho de respostas rápidas.`}
+    <Modal titulo={cliente ? 'Chamar no WhatsApp' : 'Enviar modelo aprovado'} descricao={cliente
+      ? `Primeira mensagem para ${cliente.nome}: sem conversa recente, só sai modelo aprovado. Enviado, a conversa abre no Balcão.`
+      : `Confira a prévia antes de enviar para ${conversa.nome}. Este modelo é enviado diretamente pelo canal; não entra no rascunho de respostas rápidas.`}
       aoFechar={fechar} rodape={<>
         <Botao disabled={enviando} onClick={fechar}>Fechar</Botao>
         <Botao variante="primario" disabled={enviando || Boolean(falta) || bloqueado || Boolean(resultado)} onClick={enviar}>
@@ -66,7 +75,9 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
         </Botao>
       </>}>
       <div className={css.programar}>
-        {bloqueado && <p role="alert">Cadastre o cliente e confira se a conversa está aberta e desbloqueada na Ficha.</p>}
+        {bloqueado && <p role="alert">{cliente
+          ? 'Cadastre um celular válido na Ficha do cliente para chamar no WhatsApp.'
+          : 'Cadastre o cliente e confira se a conversa está aberta e desbloqueada na Ficha.'}</p>}
         <Botao onClick={() => carregar(true)} disabled={enviando || Boolean(resultado)}>Atualizar modelos</Botao>
         {lista === null && <output>Carregando modelos aprovados…</output>}
         {lista?.length === 0 && !erro && <p>Nenhum modelo aprovado nesta conta. Crie e aprove o modelo no Gerenciador da Meta.</p>}
@@ -97,7 +108,9 @@ export function ModalEnviarModelo({ conversa, aoFechar }) {
             Conferi no WhatsApp e preciso iniciar outro envio.
           </label>
           <Botao disabled={!conferido} onClick={() => {
-            prepararOutroModelo(conversa.id); setResultado(null); setErro(null); setConferido(false)
+            if (cliente) prepararOutroModeloDoCliente(cliente.id)
+            else prepararOutroModelo(conversa.id)
+            setResultado(null); setErro(null); setConferido(false)
           }}>Preparar outro envio</Botao>
         </>}
       </div>

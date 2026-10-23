@@ -149,6 +149,15 @@ export function nomeConhecidoDoLead(conversa) {
   return nomeGenerico(conversa.nome) ? null : conversa.nome.trim()
 }
 
+// #1408: quem a busca do Balcão oferece para "Chamar no WhatsApp": cliente cadastrado com telefone e sem
+// conversa aberta na tela. Com conversa aberta, ela já aparece na lista; encerrada não impede chamar de novo.
+export function clientesParaChamar(clientes, conversas) {
+  const comConversaAberta = new Set((conversas ?? [])
+    .filter((c) => c.clienteId && c.estado !== 'Encerrado')
+    .map((c) => c.clienteId))
+  return (clientes ?? []).filter((c) => String(c.telefone ?? '').trim() && !comConversaAberta.has(c.id))
+}
+
 // #1643 (item 6): resumo da seção "Contato e endereço" recolhida. Com o contato que o visitante
 // informou esperando confirmação, o resumo diz isso; senão, o telefone do cadastro.
 export function resumoDoContato(cliente, informado) {

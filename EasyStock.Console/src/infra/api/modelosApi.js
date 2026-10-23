@@ -6,6 +6,13 @@ export const enviarModelo = (id, corpo) => chamarApi(`/api/atendimento/conversas
   metodo: 'POST', corpo, sinal: AbortSignal.timeout(45000),
 })
 
+// #1408: abre (ou reaproveita) a conversa do cliente cadastrado e envia o modelo; devolve { conversaId, mensagem }.
+export const iniciarConversaComModelo = (corpo) => chamarApi('/api/atendimento/conversas/iniciar', {
+  metodo: 'POST', corpo, sinal: AbortSignal.timeout(45000),
+})
+export const buscarClientes = (termo) =>
+  chamarApi(`/api/clientes/buscar?termo=${encodeURIComponent(termo)}&max=5`, { sinal: AbortSignal.timeout(15000) })
+
 const prefixo = (id) => `easystok.modelo:${identidadeDaSessao(lerSessao())}:${id}`
 const memoria = new Map()
 export function tentativaModelo(id, dados) {

@@ -19,6 +19,7 @@ import { DESKTOP, TABLET, useTopoCompacto } from '../hooks/useTamanhoTela'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
 import { CompartilharComanda } from '../features/atendimento/CompartilharComanda'
+import { ChamarClientes } from '../features/atendimento/ChamarClientes'
 import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
@@ -482,7 +483,7 @@ export function Moldura({
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
           <Coluna variante="entrada" titulo="Balcão" semTitulo>
-            <LimiteDeErro parte="Lista de conversas"><PainelConversas /></LimiteDeErro>
+            <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
           </Coluna>
           <AlcaLargura
             rotulo="Redimensionar Balcão"
@@ -521,7 +522,7 @@ export function Moldura({
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
           <Coluna variante="entrada" titulo="Balcão">
-            <LimiteDeErro parte="Lista de conversas"><PainelConversas /></LimiteDeErro>
+            <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
           </Coluna>
           <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
           {gavetaAberta && (
@@ -542,7 +543,7 @@ export function Moldura({
   }
 
   const painelDaAba = {
-    balcao: <LimiteDeErro parte="Lista de conversas"><PainelConversas aoAbrir={irParaAtendimento} /></LimiteDeErro>,
+    balcao: <LimiteDeErro parte="Lista de conversas"><PainelConversas aoAbrir={irParaAtendimento} buscaDeClientes={ChamarClientes} /></LimiteDeErro>,
     atendimento,
     ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>,
   }
