@@ -37,7 +37,8 @@ globalThis.__premiumComanda = { hooks, atendimento: { fonteApi: true, conversas:
 const codigo = texto => 'data:text/javascript,' + encodeURIComponent(texto)
 const fronteiras = new Map([
   ['/aplicacao/acessoModulos', 'export const useAcessoModulos=()=>({acoes:{cancelarPedidoPago:true}})'],
-  ['/aplicacao/contextos', 'export const useAtendimento=()=>globalThis.__premiumComanda.atendimento; export const useCatalogo=()=>({entregadores:[]})'],
+  ['/aplicacao/contextos', 'export const useAtendimento=()=>globalThis.__premiumComanda.atendimento; export const useCatalogo=()=>({entregadores:[],'
+    + 'cardapio:[{sku:"massa",nome:"Massa fresca",preco:50}],meiosDePagamento:[{id:"pix",rotulo:"Link de pagamento (Pix ou cartão)"}]})'],
   ['/aplicacao/useAcaoDisponivel', 'export const useAcaoDisponivel=()=>()=>true'],
   ['/componentes/Botao', 'export function Botao(){}'],
   ['/componentes/Campo', 'export function CampoArea(){}'],
@@ -214,7 +215,10 @@ await provar('rascunho que ganha pedidoId conserva a espera e não libera outro 
     aoGerarPix: () => { chamadas++; return espera.promise },
     aoAvancar: () => { chamadas++; return Promise.resolve(undefined) },
   }))
-  const enviar = nos(tela.arvore).find(n => n.type?.name === 'Botao' && n.props.icone === 'dollar-sign')
+  // #1989 (#1765-3): o botão abre o resumo; quem gera é o "Confirmar e enviar".
+  nos(tela.arvore).find(n => n.type?.name === 'Botao' && n.props.icone === 'dollar-sign').props.onClick(); tela.renderizar()
+  assert.equal(chamadas, 0)
+  const enviar = nos(tela.arvore).find(n => n.type?.name === 'Botao' && n.props['data-confirmar-cobranca'])
   const ida = enviar.props.onClick()
   tela.renderizar({ ...tela.props, pedido: { ...tela.props.pedido, pedidoId: 'pedido-criado', numero: 'CRIADO01', estado: 'pago' } })
   const iniciar = botao(tela, 'Começar preparo')
@@ -223,6 +227,47 @@ await provar('rascunho que ganha pedidoId conserva a espera e não libera outro 
   espera.resolver(undefined); await ida; tela.renderizar()
   assert.equal(botao(tela, 'Começar preparo').props.disabled, false)
   assert.ok(!atualizou(tela)); tela.encerrar()
+})
+await provar('#1989-1 (#1765-3) forma já escolhida: um clique mostra itens, total e forma; só "Confirmar e enviar" gera', async () => {
+  const chamadas = []
+  const tela = new Tela(props({ estado: 'aguardando', pedidoId: null, meio: 'pix', itens: [{ sku: 'massa', qtd: 2 }] }, {
+    aoGerarPix: (meio) => { chamadas.push(meio); return Promise.resolve() },
+  }))
+  const gerar = nos(tela.arvore).find(n => n.type?.name === 'Botao' && n.props.icone === 'dollar-sign')
+  assert.equal(texto(gerar), 'Gerar cobrança e enviar')
+  gerar.props.onClick(); tela.renderizar()
+  assert.deepEqual(chamadas, [], 'um clique não cria o pedido nem manda o link')
+  const resumo = texto(tela.arvore)
+  assert.ok(resumo.includes('2× Massa fresca'), resumo)
+  assert.ok(resumo.includes('Pedido de R$ 100,00'), resumo)
+  assert.ok(resumo.includes('cobrança por Link de pagamento (Pix ou cartão)'), resumo)
+  // Voltar fecha o resumo sem gerar.
+  botao(tela, 'Voltar').props.onClick(); tela.renderizar()
+  assert.equal(nos(tela.arvore).find(n => n.props?.['data-confirmar-cobranca']), undefined)
+  assert.deepEqual(chamadas, [])
+  gerar.props.onClick(); tela.renderizar()
+  const confirmar = nos(tela.arvore).find(n => n.props?.['data-confirmar-cobranca'])
+  assert.equal(texto(confirmar), 'Confirmar e enviar')
+  await confirmar.props.onClick()
+  assert.deepEqual(chamadas, ['pix'])
+  tela.encerrar()
+  // Revisão da PR #1997: a forma trocada na Cobrança com o resumo aberto vale no confirmar.
+  const outra = new Tela(props({ estado: 'aguardando', pedidoId: null, meio: 'pix' }, {
+    aoGerarPix: (meio) => { chamadas.push(meio); return Promise.resolve() },
+  }))
+  const tocarGerar = () => { nos(outra.arvore).find(n => n.type?.name === 'Botao' && n.props.icone === 'dollar-sign').props.onClick(); outra.renderizar() }
+  const confirmarOutra = () => nos(outra.arvore).find(n => n.props?.['data-confirmar-cobranca']).props.onClick()
+  tocarGerar()
+  outra.renderizar({ ...outra.props, pedido: { ...outra.props.pedido, meio: 'maquininha' } })
+  await confirmarOutra()
+  assert.deepEqual(chamadas.slice(1), ['maquininha'], 'confirmou com a forma antiga')
+  // Tocar de novo no botão não desfaz a forma escolhida no resumo.
+  tocarGerar()
+  nos(outra.arvore).find(n => n.type?.name === 'EscolhaDeMeio').props.aoEscolher('cartao-link'); outra.renderizar()
+  tocarGerar()
+  await confirmarOutra()
+  assert.deepEqual(chamadas.slice(1), ['maquininha', 'cartao-link'], 'o segundo toque trocou a forma do resumo')
+  outra.encerrar()
 })
 await provar('pedido na fila sem quitação mantém rótulo financeiro honesto', () => {
   const tela = new Tela(props({ totalPagoApi: 20, totalApi: 100 }))

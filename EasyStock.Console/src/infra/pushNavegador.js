@@ -5,20 +5,30 @@ export const pushSuportado = () => typeof window !== 'undefined'
   && typeof navigator !== 'undefined' && window.isSecureContext !== false
   && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 export const permissaoPush = () => pushSuportado() ? Notification.permission : 'indisponivel'
-export const pedirPermissaoPush = () => comPrazo(Notification.requestPermission(), 30000)
+// #1989: "O navegador demorou…" servia para toda etapa e ninguém sabia onde tinha parado.
+const PERMISSAO_SEM_RESPOSTA = 'O navegador não recebeu sua resposta ao pedido de permissão. '
+  + 'Toque em "Ativar avisos neste aparelho" de novo e escolha Permitir.'
+const PREPARO_DEMOROU = 'O navegador demorou para preparar o serviço de avisos. Recarregue a página e tente de novo.'
+const INSCRICAO_FALHOU = 'O navegador não concluiu a inscrição nos avisos. Tente de novo; se repetir, '
+  + 'confira se este navegador permite notificações de sites.'
+const PERMISSAO_RETIRADA = 'O navegador recusou a inscrição: as notificações deste site estão bloqueadas. '
+  + 'Libere no cadeado ao lado do endereço e ative de novo.'
+const DESLIGAR_DEMOROU ='O navegador demorou para desligar os avisos. Tente de novo.'
+
+export const pedirPermissaoPush = () => comPrazo(Notification.requestPermission(), PERMISSAO_SEM_RESPOSTA, 30000)
 
 const dono = () => { try { return JSON.parse(localStorage.getItem(CHAVE_DONO)) } catch { return null } }
 export const associarInscricaoPush = (identidade, endpoint) => localStorage.setItem(CHAVE_DONO, JSON.stringify({ identidade, endpoint }))
-const comPrazo = (promessa, prazo = 10000) => {
+const comPrazo = (promessa, mensagem, prazo = 10000) => {
   let timer
   return Promise.race([promessa, new Promise((_, rejeitar) => {
-    timer = setTimeout(() => rejeitar(new Error('O navegador demorou para responder. Tente novamente.')), prazo)
+    timer = setTimeout(() => rejeitar(new Error(mensagem)), prazo)
   })]).finally(() => clearTimeout(timer))
 }
 const doConsole = (registro) => (registro?.active ?? registro?.waiting ?? registro?.installing)?.scriptURL === urlDoServiceWorker().href
 const registroAtual = async () => {
   if (!pushSuportado()) return null
-  const registro = await comPrazo(navigator.serviceWorker.getRegistration(urlDoServiceWorker().href))
+  const registro = await comPrazo(navigator.serviceWorker.getRegistration(urlDoServiceWorker().href), PREPARO_DEMOROU)
   return doConsole(registro) ? registro : null
 }
 
@@ -50,7 +60,7 @@ export async function desinscreverPushNoNavegador(identidade = null, endpoint = 
   const assinatura = await registro.pushManager.getSubscription()
   if (endpoint && assinatura?.endpoint !== endpoint) return
   for (const aviso of await registro.getNotifications()) aviso.close()
-  if (assinatura && !await comPrazo(assinatura.unsubscribe())) throw new Error('Não foi possível desligar os avisos neste aparelho.')
+  if (assinatura && !await comPrazo(assinatura.unsubscribe(), DESLIGAR_DEMOROU)) throw new Error('Não foi possível desligar os avisos neste aparelho.')
   localStorage.removeItem(CHAVE_DONO)
 }
 
@@ -58,8 +68,8 @@ export async function inscreverPushNoNavegador(chavePublica, identidade) {
   const url = urlDoServiceWorker()
   const anterior = await navigator.serviceWorker.getRegistration(url.href)
   if (anterior && !doConsole(anterior)) throw new Error('Outro aplicativo usa esta área do navegador. Abra o Console no endereço próprio.')
-  const registro = await comPrazo(navigator.serviceWorker.register(url.href, { scope: new URL('./', url).href }))
-  await comPrazo(navigator.serviceWorker.ready)
+  const registro = await comPrazo(navigator.serviceWorker.register(url.href, { scope: new URL('./', url).href }), PREPARO_DEMOROU)
+  await comPrazo(navigator.serviceWorker.ready, PREPARO_DEMOROU)
   if (!doConsole(registro)) throw new Error('O serviço de avisos ainda não está pronto. Tente novamente.')
   const chave = chaveDeBase64Url(chavePublica)
   let assinatura = await registro.pushManager.getSubscription()
@@ -67,9 +77,12 @@ export async function inscreverPushNoNavegador(chavePublica, identidade) {
   const mesmaChave = antiga && new Uint8Array(antiga).length === chave.length
     && new Uint8Array(antiga).every((byte, i) => byte === chave[i])
   if (assinatura && (!mesmaChave || dono()?.identidade !== identidade)) {
-    if (!await comPrazo(assinatura.unsubscribe())) throw new Error('Não foi possível renovar os avisos neste aparelho.')
+    if (!await comPrazo(assinatura.unsubscribe(), DESLIGAR_DEMOROU)) throw new Error('Não foi possível renovar os avisos neste aparelho.')
     assinatura = null
   }
-  assinatura ??= await comPrazo(registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chave }))
+  // A recusa do serviço de push do navegador ("push service error") vem em inglês e sem etapa. A
+  // permissão retirada no meio do caminho tem saída própria; o erro original fica em `cause`.
+  assinatura ??= await comPrazo(registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chave }), INSCRICAO_FALHOU)
+    .catch((erro) => { throw new Error(erro?.name === 'NotAllowedError' ? PERMISSAO_RETIRADA : INSCRICAO_FALHOU, { cause: erro }) })
   return comoInscricao(assinatura)
 }

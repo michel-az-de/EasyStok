@@ -26,6 +26,7 @@ const LINHA = {
 const LINHA_DO_PROXIMO = {
   'encerrar-ou-aguardar': 'Respondido: encerre se acabou, ou devolva ao automático.',
   aguardar: 'Respondido. Pedido em andamento: aguarde o cliente.',
+  'aguardar-venda': 'Respondido. Venda em andamento: monte o pedido ou aguarde o cliente.',
 }
 
 export function resumoDoModo(conversa, pausado = false, bloqueada = false) {
