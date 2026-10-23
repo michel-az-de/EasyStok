@@ -39,7 +39,7 @@ public class CalculadoraInicioPrevistoPedido(IPrazoPreparoPedidoQueries queries,
         ArgumentNullException.ThrowIfNull(pedido);
         var leitura = await queries.ObterAsync(pedido.EmpresaId, pedido.Id, ct);
         pedido.DefinirInicioPrevisto(Calcular(pedido, leitura));
-        if (numerador is not null) await numerador.AtribuirAsync(pedido, leitura?.DataJanela, somenteSeJaNumerado: true, ct);
+        if (numerador is not null) await numerador.AtribuirAsync(pedido, leitura?.DataJanela, reagendamento: true, ct);
     }
 
     /// <summary>
@@ -47,11 +47,15 @@ public class CalculadoraInicioPrevistoPedido(IPrazoPreparoPedidoQueries queries,
     /// previsto e o número do dia; em outro status, nada muda. Todo caminho que coloca o pedido na fila ou registra
     /// o pagamento dele passa por aqui (pagamento na entrega, troca genérica de status, criação no ERP, pagamento
     /// manual); o teste de arquitetura <c>InicioPrevistoNaFilaTests</c> barra caminho novo que esqueça.
+    /// Pedido que entra em <see cref="StatusPedido.Preparando"/> sem número (balcão para já sem pagamento, aprovado
+    /// pela dona) ganha o número ali: a S53 numera no pagamento ou no início do preparo, o que vier primeiro (#1641-2).
     /// </summary>
     public async Task AplicarNaFilaAsync(Pedido pedido, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pedido);
-        if (pedido.StatusEnum != StatusPedido.Aguardando) return;
+        var naFila = pedido.StatusEnum == StatusPedido.Aguardando;
+        var preparoSemNumero = pedido.StatusEnum == StatusPedido.Preparando && pedido.NumeroDoDia is null;
+        if (!naFila && !preparoSemNumero) return;
         await AplicarCompromissoAsync(pedido, ct);
     }
 
