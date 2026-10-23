@@ -52,6 +52,8 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         caixa.SaldoEsperado.Should().Be(100m, "o dia fechado mostra o número do fechamento");
         caixa.SaldoEsperado.Should().Be(caixa.Fechamento!.SaldoFinal);
         caixa.PosFechamento.Should().Be(80m, "a venda depois de fechar aparece à parte");
+        caixa.LinhasExtras.Should().BeEmpty("as linhas do dia fechado param no fechamento e batem com o retrato");
+        GavetaCaixa.DinheiroNaGaveta(caixa).Should().Be(100m, "a gaveta do fechamento não muda depois");
     }
 
     [SkippableFact]

@@ -181,9 +181,9 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
     <>
       <h3 className={css.tituloSecao}>Lançamentos</h3>
       <ul className={css.lista}>
-        {lancamentos.map((m) => (m.origemLinha === 'extra'
+        {lancamentos.map((m, indice) => (m.origemLinha === 'extra'
           ? (
-            <li key={`${m.origem}-${m.em}-${m.valor}`} className={css.linha}>
+            <li key={`${m.origem}-${m.tipo}-${m.em}-${m.valor}-${indice}`} className={css.linha}>
               <span className={css.linhaInfo}>
                 <strong>{m.tipo === 'estorno' ? 'Estorno de venda' : m.origem === 'Pedido' ? 'Pagamento de pedido' : 'Venda'}</strong>
                 <span className={css.dicaItem}>{horaCurta(m.em)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.tipo !== 'estorno' && m.descricao && ` · ${m.descricao}`}</span>

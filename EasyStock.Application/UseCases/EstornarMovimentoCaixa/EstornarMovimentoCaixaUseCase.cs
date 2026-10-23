@@ -69,6 +69,10 @@ public class EstornarMovimentoCaixaUseCase(
     private async Task ConferirCaixaParaEstornoAsync(MovimentoCaixa mov)
     {
         var dia = await CaixaDoMovimentoAsync(mov);
+        // O caixa só lista lançamento não estornado: ausente aqui, outra tela estornou entre a leitura
+        // e a trava (duplo clique). Não estorna de novo nem fala de gaveta.
+        if (dia.Movimentos.All(m => m.Id != mov.Id))
+            throw new UseCaseValidationException("Este lançamento já foi estornado. Atualize a tela.");
         var ptBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
         // Entrada sem método é do caixa físico (GavetaCaixa); em dinheiro, o teto é o mesmo da sangria.
         if (string.IsNullOrWhiteSpace(mov.Metodo) || GavetaCaixa.EhDinheiro(mov.Metodo))

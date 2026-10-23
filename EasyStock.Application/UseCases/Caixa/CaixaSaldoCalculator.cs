@@ -116,11 +116,13 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
         if (fechamento != null)
         {
             // #1630-2: o dia fechado é o número do fechamento; Pix que entra depois de fechar
-            // aparece à parte, sem reescrever o fechado.
+            // aparece à parte, sem reescrever o fechado. As linhas param no instante do fechamento
+            // para casar com o retrato (BUG-5) e a gaveta do fechamento não mudar depois.
+            var fimDasLinhas = fechamento.FechadoEm < fimDia ? fechamento.FechadoEm : fimDia;
             return new CaixaSaldoBreakdown(
                 data, fechamento.SaldoInicial, fechamento.TotalVendas, fechamento.TotalPagamentosPedidos,
                 fechamento.TotalEntradasExtras, fechamento.TotalSaidasExtras, fechamento.SaldoFinal,
-                aberto, fechado, aberturaPendenteCrossDay, abertoDesde, janelaInicio, fimDia, movList, fechamento,
+                aberto, fechado, aberturaPendenteCrossDay, abertoDesde, janelaInicio, fimDasLinhas, movList, fechamento,
                 PosFechamento: saldoEsperado - fechamento.SaldoFinal);
         }
 

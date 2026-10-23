@@ -292,12 +292,12 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<IReadOnlyList<VendaEstornadaCaixa>> GetVendasEstornadasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
             var saidas = await SaidasDeVendaEstornadasNoIntervalo(empresaId, iniUtc, fimUtc, lojaId)
-                .Select(m => new
+                .Join(db.Vendas.AsNoTracking(), m => m.VendaId, v => (Guid?)v.Id, (m, v) => new
                 {
-                    VendaId = m.VendaId!.Value,
+                    VendaId = v.Id,
                     EstornadaEm = m.EstornadaEm!.Value,
                     m.ValorTotal,
-                    Forma = db.Vendas.Where(v => v.Id == m.VendaId).Select(v => v.FormaPagamentoPrincipal).FirstOrDefault(),
+                    Forma = v.FormaPagamentoPrincipal,
                 })
                 .ToListAsync();
 

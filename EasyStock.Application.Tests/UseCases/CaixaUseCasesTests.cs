@@ -1083,6 +1083,24 @@ public class CaixaUseCasesTests
     }
 
     [Fact]
+    public async Task EstornarMovimento_Suprimento_EstornadoPorOutraTelaNoMeioDoCaminho_NaoFalaDeGavetaNemEstornaDeNovo()
+    {
+        // Dois cliques: o outro estorno gravou entre a leitura e a trava. O caixa já não tem a entrada.
+        var empresaId = Guid.NewGuid();
+        var suprimento = MovimentoCaixa.Criar(empresaId, "entrada", 100m);
+        suprimento.Metodo = "dinheiro";
+        _repo.GetMovimentoAsync(empresaId, suprimento.Id).Returns(suprimento);
+        _repo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 0m) });
+
+        var act = () => NovoEstornar().ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, suprimento.Id));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*já foi estornado*");
+        suprimento.EstornadoEm.Should().BeNull();
+        await _repo.DidNotReceive().UpdateMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
     public async Task EstornarMovimento_SuprimentoVindoDoPwa_NaoPassaPelaGuardaDaGaveta()
     {
         // O PWA promove a exclusão já feita no aparelho, como a sangria mobile (FIN-003).
