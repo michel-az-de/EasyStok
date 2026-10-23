@@ -51,11 +51,11 @@ public interface IPedidoStorefrontRepository
     Task AddEventoAsync(PedidoEvento evento, CancellationToken ct = default);
 
     /// <summary>
-    /// Retorna pedidos com status <c>aguardando_pagamento</c> E
+    /// Retorna pedidos do checkout com status <c>aguardando_pagamento</c> ou <c>rascunho</c> (#1623-a), sem cobrança, E
     /// <c>criado_em &lt; criadoAntesDe</c> (pedidos abandonados).
     /// Limite <paramref name="maxBatch"/> evita processar lote gigante num único sweep.
     /// </summary>
-    Task<IReadOnlyList<Pedido>> GetAguardandoPagamentoExpiradosAsync(
+    Task<IReadOnlyList<Pedido>> GetAbandonadosNoCheckoutAsync(
         DateTime criadoAntesDe,
         int maxBatch = 50,
         CancellationToken ct = default);
