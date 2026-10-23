@@ -548,7 +548,9 @@ public sealed class MenuControllerTests : IAsyncLifetime
                     QuantidadeInicial = Quantidade.From(qtd),
                     QuantidadeAtual = Quantidade.From(qtd),
                     CustoUnitario = Dinheiro.FromDecimal(10m),
-                    ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(validadeEmDias)),
+                    // Validade é data civil da loja: semente em UTC deixa o lote "de ontem" valendo hoje depois das 21h.
+                    ValidadeEm = Validade.From(EasyStock.Application.Common.HorarioBrasil.CivilComoInstanteUtc(
+                        EasyStock.Application.Common.HorarioBrasil.Hoje().AddDays(validadeEmDias))),
                     Status = StatusItemEstoque.Ok,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,
