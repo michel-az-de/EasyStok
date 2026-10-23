@@ -229,6 +229,8 @@ console.log('OK #1755: permissão sem resposta é recuperável e resposta tardia
   const fechou = await ativarAvisosNoAparelho(contexto({ resposta: 'default' }))
   assert.equal(fechou.estado, 'desligado')
   assert.match(fechou.mensagem ?? '', /sem escolher.*Permitir/, 'fechou o pedido do navegador sem escolher')
+  // Revisão da PR #1997: o Chrome responde "default" sem mostrar o pedido depois de alguns fechados.
+  assert.match(fechou.mensagem, /não aparecer.*cadeado/, 'pedido que nem aparece: diz onde liberar')
   assert.equal((await conferirAvisosNoAparelho(contexto({ permissao: 'default' }))).mensagem, null, 'abrir o Console não acusa nada')
   const negou = await ativarAvisosNoAparelho(contexto({ resposta: 'denied' }))
   assert.equal(negou.estado, 'bloqueado')
@@ -252,7 +254,12 @@ console.log('OK #1755: permissão sem resposta é recuperável e resposta tardia
     Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'teste', serviceWorker: {
       getRegistration: async () => null, register: async () => pronto, ready: Promise.resolve(pronto),
     } } })
-    mensagens.inscricao = (await push.inscreverPushNoNavegador('BAA', 'casa:ana').catch((e) => e)).message
+    const recusa = await push.inscreverPushNoNavegador('BAA', 'casa:ana').catch((e) => e)
+    mensagens.inscricao = recusa.message
+    assert.equal(recusa.cause?.name, 'AbortError', 'o erro original do navegador fica em cause')
+    // Permissão retirada entre o pedido e a inscrição tem saída própria.
+    pronto.pushManager.subscribe = async () => { throw Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' }) }
+    assert.match((await push.inscreverPushNoNavegador('BAA', 'casa:ana').catch((e) => e)).message, /bloqueadas.*cadeado/)
   } finally { globalThis.setTimeout = prazoImediato }
   assert.match(mensagens.permissao, /permiss/i, mensagens.permissao)
   assert.match(mensagens.preparo, /prepar/i, mensagens.preparo)

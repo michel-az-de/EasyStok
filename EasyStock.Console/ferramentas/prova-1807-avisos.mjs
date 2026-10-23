@@ -268,6 +268,11 @@ await confere('#1989-8 no celular a pilha de avisos fica no topo, fora da barra 
   const celular = css.slice(de)
   assert.doesNotMatch(celular, /bottom:\s*calc\(/, 'a pilha ainda ancora no rodapé, sobre a barra inferior')
   assert.match(celular, /top:\s*calc\([^;]*env\(safe-area-inset-top/, 'topo com a área segura do aparelho')
+  // Revisão da PR #1997: abaixo do topo da Moldura, para não cobrir o menu e o sino.
+  const topo = /min-height:\s*(\d+)px/.exec(readFileSync(new URL('../src/app/moldura.module.css', import.meta.url), 'utf8')
+    .split('.topo {')[1] ?? '')?.[1]
+  assert.ok(topo, 'altura do topo da Moldura não encontrada')
+  assert.match(celular, new RegExp(`top:\\s*calc\\(${topo}px`), `a pilha começa dentro do topo de ${topo} px`)
   assert.match(celular, /left:\s*var\(--e-16\)/, 'largura da tela com o respiro de 16 px dos dois lados')
 })
 

@@ -83,6 +83,12 @@ export function BarraProximoPasso({
   const [pedindoMeio, setPedindoMeio] = useState(false)
   // #1875: o meio tocado na pergunta só fica marcado; criar o pedido e cobrar é o botão de confirmação.
   const [meioNaBarra, setMeioNaBarra] = useState(null)
+  // #1989: a forma trocada na Cobrança com o resumo aberto passa para o resumo; nada sai com a antiga.
+  const [meioDoPedidoVisto, setMeioDoPedidoVisto] = useState(pedido.meio ?? null)
+  if ((pedido.meio ?? null) !== meioDoPedidoVisto) {
+    setMeioDoPedidoVisto(pedido.meio ?? null)
+    if (pedindoMeio) setMeioNaBarra(pedido.meio ?? null)
+  }
   const [pedindoEntregador, setPedindoEntregador] = useState(false)
   // Issue #17: entregador de um toque e os campos de veículo, placa e empresa.
   const { conversas, fonteApi } = useAtendimento()
@@ -201,7 +207,7 @@ export function BarraProximoPasso({
       linkPendenteApi: fonteApi && Boolean(pedido.cobranca?.link),
       aoAbrirBaixa: () => setAbrindoBaixa(true),
       // #1989 (#1765-3): com a forma já escolhida também abre o resumo; quem gera é o "Confirmar".
-      aoGerarPix: () => { setMeioNaBarra(pedido.meio ?? null); setPedindoMeio(true) },
+      aoGerarPix: () => { if (!pedindoMeio) setMeioNaBarra(pedido.meio ?? null); setPedindoMeio(true) },
       aoReenviarPix: () => executar(() => aoReenviarPix()),
       aoMandarLinkNovo: fonteApi && pedido.pedidoId && esperaLinkNovoApi(pedido.cobranca, pedido.statusApi)
         ? () => executar(() => aoReenviarPix()) : null,

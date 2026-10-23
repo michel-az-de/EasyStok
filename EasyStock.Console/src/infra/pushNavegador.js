@@ -11,7 +11,9 @@ const PERMISSAO_SEM_RESPOSTA = 'O navegador não recebeu sua resposta ao pedido 
 const PREPARO_DEMOROU = 'O navegador demorou para preparar o serviço de avisos. Recarregue a página e tente de novo.'
 const INSCRICAO_FALHOU = 'O navegador não concluiu a inscrição nos avisos. Tente de novo; se repetir, '
   + 'confira se este navegador permite notificações de sites.'
-const DESLIGAR_DEMOROU = 'O navegador demorou para desligar os avisos. Tente de novo.'
+const PERMISSAO_RETIRADA = 'O navegador recusou a inscrição: as notificações deste site estão bloqueadas. '
+  + 'Libere no cadeado ao lado do endereço e ative de novo.'
+const DESLIGAR_DEMOROU ='O navegador demorou para desligar os avisos. Tente de novo.'
 
 export const pedirPermissaoPush = () => comPrazo(Notification.requestPermission(), PERMISSAO_SEM_RESPOSTA, 30000)
 
@@ -78,8 +80,9 @@ export async function inscreverPushNoNavegador(chavePublica, identidade) {
     if (!await comPrazo(assinatura.unsubscribe(), DESLIGAR_DEMOROU)) throw new Error('Não foi possível renovar os avisos neste aparelho.')
     assinatura = null
   }
-  // A recusa do serviço de push do navegador ("push service error") vem em inglês e sem etapa.
+  // A recusa do serviço de push do navegador ("push service error") vem em inglês e sem etapa. A
+  // permissão retirada no meio do caminho tem saída própria; o erro original fica em `cause`.
   assinatura ??= await comPrazo(registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chave }), INSCRICAO_FALHOU)
-    .catch(() => { throw new Error(INSCRICAO_FALHOU) })
+    .catch((erro) => { throw new Error(erro?.name === 'NotAllowedError' ? PERMISSAO_RETIRADA : INSCRICAO_FALHOU, { cause: erro }) })
   return comoInscricao(assinatura)
 }

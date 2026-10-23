@@ -296,6 +296,14 @@ await confere('#1989-7 respondeu no meio da venda: a faixa não sugere encerrar'
     { id: 'b', dir: 'out', texto: 'Que bom, Rita!', status: 'entregue', em: em(1) },
   ] })
   assert.equal(resumoDoModo(fim, PAUSA_POR_ASSUMIR, false).sugereEncerrar, true)
+  // Revisão da PR #1997: agradecimento que cita "pedido" ou "marmita" é despedida, não venda.
+  for (const texto of ['Recebi o pedido, obrigada', 'Obrigada, adorei a marmita!', 'Valeu, chegou certinho o pedido']) {
+    const despedida = venda({ mensagens: [
+      { id: 'a', dir: 'in', texto, em: em(3) },
+      { id: 'b', dir: 'out', texto: 'Nós que agradecemos!', status: 'entregue', em: em(1) },
+    ] })
+    assert.equal(resumoDoModo(despedida, PAUSA_POR_ASSUMIR, false).sugereEncerrar, true, texto)
+  }
 })
 
 await confere('#1989-4 cabeçalho da conversa: um "Link de compra" e nenhuma chave repetida entre irmãos', () => {

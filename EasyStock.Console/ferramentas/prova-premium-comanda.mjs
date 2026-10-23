@@ -251,6 +251,23 @@ await provar('#1989-1 (#1765-3) forma já escolhida: um clique mostra itens, tot
   await confirmar.props.onClick()
   assert.deepEqual(chamadas, ['pix'])
   tela.encerrar()
+  // Revisão da PR #1997: a forma trocada na Cobrança com o resumo aberto vale no confirmar.
+  const outra = new Tela(props({ estado: 'aguardando', pedidoId: null, meio: 'pix' }, {
+    aoGerarPix: (meio) => { chamadas.push(meio); return Promise.resolve() },
+  }))
+  const tocarGerar = () => { nos(outra.arvore).find(n => n.type?.name === 'Botao' && n.props.icone === 'dollar-sign').props.onClick(); outra.renderizar() }
+  const confirmarOutra = () => nos(outra.arvore).find(n => n.props?.['data-confirmar-cobranca']).props.onClick()
+  tocarGerar()
+  outra.renderizar({ ...outra.props, pedido: { ...outra.props.pedido, meio: 'maquininha' } })
+  await confirmarOutra()
+  assert.deepEqual(chamadas.slice(1), ['maquininha'], 'confirmou com a forma antiga')
+  // Tocar de novo no botão não desfaz a forma escolhida no resumo.
+  tocarGerar()
+  nos(outra.arvore).find(n => n.type?.name === 'EscolhaDeMeio').props.aoEscolher('cartao-link'); outra.renderizar()
+  tocarGerar()
+  await confirmarOutra()
+  assert.deepEqual(chamadas.slice(1), ['maquininha', 'cartao-link'], 'o segundo toque trocou a forma do resumo')
+  outra.encerrar()
 })
 await provar('pedido na fila sem quitação mantém rótulo financeiro honesto', () => {
   const tela = new Tela(props({ totalPagoApi: 20, totalApi: 100 }))
