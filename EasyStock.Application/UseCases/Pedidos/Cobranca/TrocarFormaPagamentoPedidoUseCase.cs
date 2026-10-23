@@ -131,7 +131,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         TrocarFormaPagamentoPedidoInput input, string forma, Guid? linkConferido, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, ct);
+        var pedido = await pedidoRepository.GetForUpdateAsync(input.EmpresaId, input.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != input.EmpresaId)
             throw new CobrancaPedidoNaoEncontradoException(input.PedidoId);
         if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))

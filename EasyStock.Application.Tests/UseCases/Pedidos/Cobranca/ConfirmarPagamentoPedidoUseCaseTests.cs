@@ -65,6 +65,44 @@ public class ConfirmarPagamentoPedidoUseCaseTests
             MetodoPagamentoExterno: "pix", TipoPagamentoExterno: "bank_transfer",
             PagoEm: CobrancaPedidoFixture.Agora);
 
+    /// <summary>#1724-12: o recebimento gravava a hora da baixa; a data da aprovação no provedor é a que vale.</summary>
+    [Fact]
+    public async Task PagamentoDoProvedor_GravaADataDaAprovacao()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline();
+        var aprovadoEm = CobrancaPedidoFixture.Agora.AddMinutes(-42);
+
+        (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagoEm = aprovadoEm })).Confirmado.Should().BeTrue();
+
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.PagoEm.Should().Be(aprovadoEm);
+    }
+
+    /// <summary>
+    /// Revisão da #1979: o recebimento não volta para um dia de Caixa já fechado (o fechamento não o retratou e o
+    /// desfazer recusaria por "dia fechado"); entra no instante do registro.
+    /// </summary>
+    [Fact]
+    public async Task PagamentoDoProvedor_AprovadoEmDiaDeCaixaFechado_FicaNoInstanteDoRegistro()
+    {
+        var f = new CobrancaPedidoFixture();
+        var aprovadoEm = CobrancaPedidoFixture.Agora.AddDays(-1);
+        var dia = EasyStock.Application.Common.HorarioBrasil.DataOperacional(aprovadoEm);
+        f.CaixaRepo.GetFechamentoDoDiaAsync(f.EmpresaId, dia, f.Pedido.LojaId)
+            .Returns(FechamentoCaixaFechado(f, dia));
+        var registrar = new RegistrarPagamentoPedidoUseCase(f.PedidoRepo, f.Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
+            new CalculadoraInicioPrevistoPedido(f.PrazoQueries), QuitacaoPedidoTeste.Criar(f.PedidoRepo), f.CaixaRepo);
+        var antes = DateTime.UtcNow;
+
+        await registrar.ExecuteAsync(new RegistrarPagamentoPedidoCommand(f.EmpresaId, f.Pedido.Id, "pix", 25m,
+            Referencia: "pay-9", ConfirmadoPeloProvedor: true, AprovadoNoProvedorEm: aprovadoEm));
+
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.PagoEm.Should().BeOnOrAfter(antes);
+    }
+
+    private static EasyStock.Domain.Entities.FechamentoCaixa FechamentoCaixaFechado(CobrancaPedidoFixture f, DateOnly dia) =>
+        EasyStock.Domain.Entities.FechamentoCaixa.Criar(f.EmpresaId, dia, 0, 0, 25, 0, 0, f.Pedido.LojaId);
+
     [Fact]
     public async Task ConfirmaETransita()
     {
