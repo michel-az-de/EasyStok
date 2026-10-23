@@ -21,7 +21,9 @@ public sealed record PedidoResult(
     DateTime AlteradoEm,
     DateTime? EntreguEm,
     DateTime? CanceladoEm,
-    DateTime? AgendadoParaEm = null
+    DateTime? AgendadoParaEm = null,
+    // #1641-1: número do dia (S53); nulo até o pedido entrar na fila ou ser pago.
+    int? NumeroDoDia = null
 );
 
 public sealed record PedidoDetalheResult(

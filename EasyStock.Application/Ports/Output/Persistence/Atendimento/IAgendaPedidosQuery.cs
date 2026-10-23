@@ -2,8 +2,9 @@ namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
 
 /// <param name="NumeroComanda">#1883: número da conversa dona do pedido ("Comanda N"), pela mesma regra de
 /// <c>IConversaRepository.ObterIdPorPedidoAsync</c>, resolvido em lote. Nulo quando nenhuma conversa é dona dele.</param>
+/// <param name="NumeroDoDia">#1641-1: número do dia (S53) atribuído para a data da vaga; nulo sem número ou de outro dia.</param>
 public sealed record AgendaPedidoLeitura(Guid JanelaId, DateOnly Data, Guid PedidoId, string? ClienteNome, string Status,
-    long? NumeroComanda = null);
+    long? NumeroComanda = null, int? NumeroDoDia = null);
 
 public interface IAgendaPedidosQuery
 {

@@ -40,7 +40,7 @@ public sealed class RepositoryAsyncFailureTests
             "relatorios" => async () => await new ReportRunRepository(db)
                 .ListMineAsync(Guid.NewGuid(), Guid.NewGuid(), new ReportListFilter(), 0, 10, CancellationToken.None),
             "pedidos-storefront" => async () => await new PedidoStorefrontRepository(db)
-                .GetAguardandoPagamentoExpiradosAsync(DateTime.UtcNow),
+                .GetAbandonadosNoCheckoutAsync(DateTime.UtcNow),
             "etiquetas-sistema" => async () => await new EtiquetaTemplateRepository(db).ListSistemaAsync(),
             "etiquetas-empresa" => async () => await new EtiquetaTemplateRepository(db).ListEmpresaAsync(Guid.NewGuid()),
             _ => throw new ArgumentOutOfRangeException(nameof(consulta))

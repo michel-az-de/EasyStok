@@ -13,6 +13,7 @@ namespace EasyStock.Application.UseCases.Operacao.Kds;
 /// não "tem pagamento": o sinal deixa o resto para a porta. Nulo quando o host não calcula o saldo.</param>
 /// <param name="NumeroComanda">#1883: "Comanda N", o número da conversa dona do pedido (o mesmo de
 /// <c>/api/atendimento/conversas</c>). Nulo quando nenhuma conversa é dona dele; aí só o <c>NumeroCurto</c> identifica.</param>
+/// <param name="NumeroDoDia">#1641-1: número do dia (S53) do pedido no dia de produção do card; nulo sem número.</param>
 public sealed record KdsPedidoDto(
     Guid Id,
     string NumeroCurto,
@@ -33,7 +34,8 @@ public sealed record KdsPedidoDto(
     bool RequerAprovacao,
     string? MotivoRequerAprovacao,
     decimal? AReceber = null,
-    long? NumeroComanda = null);
+    long? NumeroComanda = null,
+    int? NumeroDoDia = null);
 
 public sealed record KdsJanelaDto(string Label, DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 

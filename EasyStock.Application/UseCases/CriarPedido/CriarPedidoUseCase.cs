@@ -45,7 +45,8 @@ public class CriarPedidoUseCase(
     IUnitOfWork uow,
     ILogger<CriarPedidoUseCase> logger,
     CalculadoraInicioPrevistoPedido inicioPrevisto,
-    EnderecoEntregaPedido enderecoEntrega)
+    EnderecoEntregaPedido enderecoEntrega,
+    ILojaRepository lojaRepo)
 {
     public async Task<PedidoResult> ExecuteAsync(CriarPedidoCommand cmd)
     {
@@ -89,7 +90,13 @@ public class CriarPedidoUseCase(
                 throw new UseCaseValidationException("Cliente não encontrado nesta empresa.");
         }
 
-        var pedido = PedidoEntity.Criar(cmd.EmpresaId, cliente, cmd.LojaId, cmd.Origem ?? "web");
+        // #1623-b: loja inexistente dava 500 pela FK; loja de outra empresa era gravada e o pedido seguia até Entregue sem
+        // baixar estoque. Como na entrada de estoque, a loja precisa ser da empresa.
+        var lojaId = cmd.LojaId == Guid.Empty ? null : cmd.LojaId;
+        if (lojaId is { } loja && await lojaRepo.GetByIdAsync(cmd.EmpresaId, loja) is null)
+            throw new UseCaseValidationException("Loja não encontrada nesta empresa.");
+
+        var pedido = PedidoEntity.Criar(cmd.EmpresaId, cliente, lojaId, cmd.Origem ?? "web");
         // Snapshot ad-hoc (sobrescreve quando cliente é null)
         if (cliente == null)
         {
@@ -205,5 +212,5 @@ public class CriarPedidoUseCase(
         p.Observacoes, p.Origem, p.MobileOrderId, p.VendaId,
         p.Itens.Count,
         p.CriadoEm, p.AlteradoEm, p.EntreguEm, p.CanceladoEm,
-        p.AgendadoParaEm);
+        p.AgendadoParaEm, p.NumeroDoDia);
 }
