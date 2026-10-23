@@ -210,12 +210,13 @@ internal sealed class CobrancaPedidoFixture
             NullLogger<AvisoStatusPedidoCliente>.Instance);
     }
 
-    public ConfirmarPagamentoPedidoUseCase Confirmar(AvisoStatusPedidoCliente? avisoCliente = null) =>
+    /// <param name="calculadora">Início previsto e número do dia; sem ela, a calculadora sem numerador.</param>
+    public ConfirmarPagamentoPedidoUseCase Confirmar(AvisoStatusPedidoCliente? avisoCliente = null, CalculadoraInicioPrevistoPedido? calculadora = null) =>
         new(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
                 new CalculadoraInicioPrevistoPedido(PrazoQueries), Quitacao()),
             Publicador, OperacaoEventos, Quitacao(), Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
-            new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo, avisoCliente: avisoCliente);
+            calculadora ?? new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo, avisoCliente: avisoCliente);
 
     public NotificarAtrasoPedidoUseCase NotificarAtraso() =>
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Notificador, Options.Create(Prazos), Relogio,

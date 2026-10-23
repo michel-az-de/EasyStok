@@ -10,7 +10,31 @@ namespace EasyStock.Infra.Postgre.Repositories;
 /// </summary>
 public sealed class SequenciaDiariaPedidoRepository(EasyStockDbContext db) : ISequenciaDiariaPedido
 {
+    /// <summary>
+    /// E12 (#1641-4): dentro da transação do pagamento, o upsert roda num savepoint. Se falhar, só ele é desfeito e a
+    /// exceção sobe para o numerador, que deixa o pedido sem número; a transação do pagamento segue utilizável.
+    /// </summary>
+    private const string Savepoint = "numero_do_dia";
+
     public async Task<int> ProximoAsync(Guid empresaId, DateOnly dia, CancellationToken ct = default)
+    {
+        var transacao = db.Database.CurrentTransaction;
+        if (transacao is null) return await UpsertAsync(empresaId, dia, ct);
+        await transacao.CreateSavepointAsync(Savepoint, ct);
+        try
+        {
+            var numero = await UpsertAsync(empresaId, dia, ct);
+            await transacao.ReleaseSavepointAsync(Savepoint, ct);
+            return numero;
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            await transacao.RollbackToSavepointAsync(Savepoint, CancellationToken.None);
+            throw;
+        }
+    }
+
+    private async Task<int> UpsertAsync(Guid empresaId, DateOnly dia, CancellationToken ct)
     {
         var numeros = await db.Database
             .SqlQuery<int>($"""

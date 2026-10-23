@@ -6,7 +6,10 @@ namespace EasyStock.Application.Services.Pedidos;
 /// de produção nunca dividem o número, mesmo pagos em dias diferentes. Depois de atribuído, o número não muda
 /// (#1641-3); só o reagendamento explícito (troca de janela ou de dia, #1293) dá número novo no dia novo.
 /// </summary>
-public sealed class NumeradorPedidoDoDia(ISequenciaDiariaPedido sequencia, TimeProvider relogio)
+/// <para>E12 (#1641-4, decisão do Felipe em 23/10): a falha do contador nunca desfaz o pagamento. O pedido fica sem
+/// número (buraco na sequência é aceitável) e a próxima entrada na fila ou no preparo tenta de novo.</para>
+public sealed class NumeradorPedidoDoDia(ISequenciaDiariaPedido sequencia, TimeProvider relogio,
+    ILogger<NumeradorPedidoDoDia>? logger = null)
 {
     /// <param name="dataJanela">Data da vaga ativa, quando houver (<see cref="PrazoPreparoPedidoLeitura.DataJanela"/>).</param>
     /// <param name="reagendamento">Troca de janela ou de dia: troca o número só de quem já tinha e mudou de dia de
@@ -19,7 +22,17 @@ public sealed class NumeradorPedidoDoDia(ISequenciaDiariaPedido sequencia, TimeP
         var dia = DiaDeProducao(pedido, dataJanela, relogio.GetUtcNow().UtcDateTime);
         if (pedido.TemNumeroDoDia(dia)) return;
 
-        pedido.DefinirNumeroDoDia(dia, await sequencia.ProximoAsync(pedido.EmpresaId, dia, ct));
+        int numero;
+        try
+        {
+            numero = await sequencia.ProximoAsync(pedido.EmpresaId, dia, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger?.LogWarning(ex, "Numero do dia nao atribuido pedidoId={PedidoId} dia={Dia}", pedido.Id, dia);
+            return;
+        }
+        pedido.DefinirNumeroDoDia(dia, numero);
     }
 
     public static DateOnly DiaDeProducao(Pedido pedido, DateOnly? dataJanela, DateTime agoraUtc) =>
