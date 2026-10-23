@@ -5,12 +5,13 @@ import { useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
-import { CampoMascarado } from '../../../componentes/CampoMascarado'
+import { CampoReais } from '../../../componentes/CampoReais'
 import { Chip } from '../../../componentes/Chip'
 import { Pilula } from '../../../componentes/Pilula'
 import { Modal } from '../../../componentes/Modal'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../../aplicacao/useCaixaDoDiaApi'
+import { useConfirmacaoDaAbertura } from '../../../aplicacao/useConfirmacaoDaAbertura'
 import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import {
@@ -21,7 +22,7 @@ import {
   nomeDoMetodoCaixa, temMovimentoNoDia, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
-  horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais, plural,
+  horaCurta, lerMoeda, moeda, moedaAltaDemais, plural,
 } from '../../../dominio/formato'
 import { PromptEstorno } from './AbaCaixa'
 import { ModalFecharCaixa } from './ModalFecharCaixa'
@@ -54,17 +55,17 @@ function useAcaoComRecarga(recarregar) {
   return [situacao, executar, () => setSituacao((atual) => ({ ...atual, erro: null }))]
 }
 
+// J2 (#1990): dinheiro do caixa se digita em reais ("100" é R$ 100,00); campo vazio vale zero.
 function CampoDinheiro({ rotulo, dica, centavos, aoMudar, disabled = false }) {
   return (
-    <CampoMascarado
-      tipo="moeda"
+    <CampoReais
       disabled={disabled}
       rotulo={rotulo}
       dica={dica}
-      valor={mascaraMoeda(centavos)}
+      centavos={centavos}
+      ler={lerMoeda}
       erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null}
-      aoMudarDigitos={(digitos) => aoMudar(Number(digitos || '0'))}
-      aoColarTexto={(texto) => aoMudar(lerMoeda(texto))}
+      aoMudar={(valor) => aoMudar(valor ?? 0)}
     />
   )
 }
@@ -77,6 +78,12 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
   const [motivo, setMotivo] = useState('')
   const saldoInicial = centavos / 100
   const retificacao = retificacaoDoSaldo(saldoInicial, situacao)
+  // J2 (#1990): valor muito longe da sugestão pede um segundo toque; mudar o valor desfaz o primeiro.
+  const confirmacao = useConfirmacaoDaAbertura(saldoInicial, situacao)
+  const abrir = () => {
+    if (confirmacao.segurar()) return
+    executar(() => abrirCaixa(agora, saldoInicial, observacaoDaAbertura({ saldoInformado: saldoInicial, situacao, motivo })), 'abertura')
+  }
 
   return (
     <div className={css.painel}>
@@ -89,8 +96,9 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
         dica="O dinheiro que está na gaveta ao abrir o dia."
         centavos={centavos}
         disabled={enviando}
-        aoMudar={setCentavos}
+        aoMudar={(valor) => { setCentavos(valor); confirmacao.desfazer() }}
       />
+      {confirmacao.aviso && <p className={css.avisoAtencao} role="alert">{confirmacao.aviso}</p>}
       {retificacao.exigeMotivo && (
         <CampoArea
           rotulo={`Motivo da diferença de ${moeda(retificacao.diferenca)}`}
@@ -106,9 +114,9 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
         icone="dollar-sign"
         largo
         disabled={enviando || moedaAltaDemais(centavos) || (retificacao.exigeMotivo && motivo.trim().length < 3)}
-        onClick={() => executar(() => abrirCaixa(agora, saldoInicial, observacaoDaAbertura({ saldoInformado: saldoInicial, situacao, motivo })), 'abertura')}
+        onClick={abrir}
       >
-        {abrindo ? 'Abrindo o caixa…' : 'Abrir o caixa'}
+        {abrindo ? 'Abrindo o caixa…' : confirmacao.rotulo('Abrir o caixa')}
       </Botao>
     </div>
   )
@@ -484,6 +492,7 @@ export function AbaCaixaApi() {
 
       {podeGerenciar && fecharAberto && (
         <ModalFecharCaixa
+          consultarDevolucoes
           resumo={dia}
           gaveta={gaveta}
           enviando={acao.enviando}

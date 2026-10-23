@@ -58,9 +58,44 @@ export const NOME_DO_MEIO = {
   'cartao-link': 'link de pagamento',
   maquininha: 'maquininha',
   'vale-refeicao': 'vale',
+  'dinheiro-entrega': 'dinheiro na entrega',
 }
 // Cobrança sem `meio` é da massa anterior à F4, quando só existia Pix.
 export const nomeDoMeio = (meio) => NOME_DO_MEIO[meio ?? 'pix'] ?? 'cobrança'
+
+// --- Dinheiro na entrega (frente J2, #1990) -----------------------------------
+// O EasyStok só conhece a forma "na entrega" (maquininha ou dinheiro). O que diz que é dinheiro e
+// quanto de troco levar vai nas observações do pedido, que a API grava no POST e devolve na
+// leitura e no KDS: a Cozinha e o entregador leem a mesma frase, e recarregar a página não
+// transforma o pedido em maquininha.
+export const DINHEIRO_NA_ENTREGA = 'dinheiro-entrega'
+export const MEIOS_NA_ENTREGA = new Set([DINHEIRO_NA_ENTREGA, 'maquininha', 'vale-refeicao'])
+const PREFIXO_DINHEIRO = 'Pagamento na entrega: dinheiro'
+
+// `trocoPara` em reais; vazio ou zero é "sem troco".
+export function observacaoDoPagamentoNaEntrega({ meio, trocoPara = null } = {}) {
+  if (meio !== DINHEIRO_NA_ENTREGA) return null
+  return trocoPara > 0 ? `${PREFIXO_DINHEIRO}, troco para ${moeda(trocoPara)}.` : `${PREFIXO_DINHEIRO}, sem troco.`
+}
+
+// O caminho de volta: a frase gravada no pedido diz o meio e o troco.
+export function pagamentoNaEntregaDasObservacoes(observacoes) {
+  const texto = String(observacoes ?? '')
+  if (!texto.includes(PREFIXO_DINHEIRO)) return null
+  const troco = texto.match(/troco para R\$\s*([\d.]+,\d{2})/)
+  const trocoPara = troco ? Number(troco[1].replace(/\./g, '').replace(',', '.')) : null
+  return { meio: DINHEIRO_NA_ENTREGA, trocoPara }
+}
+
+// O que o entregador lê na parada: quanto o cliente vai dar e quanto troco levar. Sem dinheiro na
+// entrega (`pagamento` nulo), nada.
+export function textoDoTroco(pagamento, aReceber = pagamento?.aReceber ?? 0) {
+  if (!pagamento) return null
+  const trocoPara = pagamento.trocoPara ?? null
+  if (!(trocoPara > 0)) return 'Dinheiro na entrega · sem troco'
+  const levar = Math.round((trocoPara - (aReceber ?? 0)) * 100) / 100
+  return `Dinheiro na entrega · troco para ${moeda(trocoPara)}${levar > 0 ? ` · levar ${moeda(levar)}` : ''}`
+}
 
 // `emissao` vem da infraestrutura: { identificador, copiaECola, link, meio }.
 export function criarCobranca(pedido, cardapio, agora, emissao, valorForcado = null) {
@@ -462,6 +497,8 @@ export function trocaDeFormaNoEasyStok(cobranca, nomeCliente) {
 const METODOS_DA_BAIXA = new Set(['pix', 'dinheiro', 'credito', 'debito', 'transferencia'])
 export function metodoDaCobranca(cobranca) {
   if (METODOS_DA_BAIXA.has(cobranca?.metodoRecebido)) return cobranca.metodoRecebido
+  // J2 (#1990): dinheiro na entrega se recebe em dinheiro.
+  if (cobranca?.meio === DINHEIRO_NA_ENTREGA) return 'dinheiro'
   return METODOS_DA_BAIXA.has(cobranca?.meio) ? cobranca.meio : ''
 }
 

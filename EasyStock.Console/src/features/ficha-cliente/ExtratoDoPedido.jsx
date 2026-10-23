@@ -9,8 +9,9 @@ const quando = (ms) => {
 }
 
 // #1839: extrato do pedido no topo da modal Pagamento: itens, frete, cada pagamento e o saldo.
-export function ExtratoDoPedido({ pedido }) {
-  const extrato = extratoDoPedido(pedido)
+// J2 (#1990): pedido cancelado com recebimento diz quanto falta devolver (`aDevolver` do EasyStok).
+export function ExtratoDoPedido({ pedido, aDevolver = 0 }) {
+  const extrato = extratoDoPedido(pedido, { aDevolver })
   if (!extrato) return null
   return (
     <section className={css.extrato} aria-label="Extrato do pedido">
@@ -24,7 +25,9 @@ export function ExtratoDoPedido({ pedido }) {
         ))}
         {extrato.ajuste !== 0 && <div><dt>Ajuste de saldo</dt><dd>{extrato.ajuste < 0 ? '+ ' : '− '}{moeda(Math.abs(extrato.ajuste))}</dd></div>}
         {extrato.cancelado && extrato.pago > 0 && <div><dt>Saldo em pagamentos e créditos</dt><dd>{moeda(extrato.pago)}</dd></div>}
-        <div className={css.extratoTotal}><dt>{extrato.cancelado ? 'Cancelado · nada a cobrar' : extrato.saldo > 0 ? 'A receber' : 'Quitado'}</dt><dd>{moeda(extrato.saldo)}</dd></div>
+        {extrato.aDevolver > 0
+          ? <div className={css.extratoTotal}><dt>Cancelado · a devolver</dt><dd>{moeda(extrato.aDevolver)}</dd></div>
+          : <div className={css.extratoTotal}><dt>{extrato.cancelado ? 'Cancelado · nada a cobrar' : extrato.saldo > 0 ? 'A receber' : 'Quitado'}</dt><dd>{moeda(extrato.saldo)}</dd></div>}
       </dl>
     </section>
   )

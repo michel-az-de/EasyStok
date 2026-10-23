@@ -14,11 +14,13 @@ using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
+using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
@@ -68,21 +70,41 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     public static bool PodeAlterar(PedidoEntity p) => p.StatusEnum is StatusPedido.AguardandoPagamento or StatusPedido.Aguardando
         or StatusPedido.AguardandoAprovacaoBaba or StatusPedido.AprovadoBaba or StatusPedido.Preparando or StatusPedido.Pronto;
 
-    public async Task<LinkCardapioConversa> AcessoAsync(string token, CancellationToken ct)
+    public async Task<LinkCardapioConversa> AcessoAsync(string token, CancellationToken ct) =>
+        await AcessoAsync(token, new LeituraComanda(), ct);
+
+    private async Task<LinkCardapioConversa> AcessoAsync(string token, LeituraComanda leitura, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(token) || token.Length > 512) throw new LinkCardapioConversaIndisponivelException();
         var link = await links.ObterPorTokenHashAsync(AcessoChatSite.HashDoToken(token.Trim()), ct);
         if (link is null || relogio.GetUtcNow().UtcDateTime >= link.ExpiraEm) throw new LinkCardapioConversaIndisponivelException();
         tenant.SetCurrentTenant(link.EmpresaId);
-        var conversa = await conversas.ObterPorIdAsync(link.EmpresaId, link.ConversaId, ct);
+        var conversa = await ConversaAsync(link.EmpresaId, link.ConversaId, leitura, ct);
         if (conversa is null || !conversa.EstaAberta) throw new LinkCardapioConversaIndisponivelException();
         return link;
     }
 
     public async Task<ComandaClienteResult> ObterAsync(string token, CancellationToken ct)
     {
-        var link = await AcessoAsync(token, ct);
-        return await EstadoAsync(link, ct);
+        var leitura = new LeituraComanda();
+        var link = await AcessoAsync(token, leitura, ct);
+        return await EstadoAsync(link, leitura, ct);
+    }
+
+    /// <summary>
+    /// Comandas da conversa para o console (#1725-7): os links do dia dividem a conversa, o cliente, o pedido, o
+    /// cardápio e os cupons, lidos uma vez para a lista inteira. Nulo quando a conversa não existe.
+    /// </summary>
+    public async Task<IReadOnlyList<ComandaClienteResult>?> ListarDoAtendimentoAsync(Guid empresaId, Guid conversaId, CancellationToken ct)
+    {
+        var leitura = new LeituraComanda();
+        if (await ConversaAsync(empresaId, conversaId, leitura, ct) is null) return null;
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        var resultado = new List<ComandaClienteResult>();
+        foreach (var link in (await links.ListarDaConversaAsync(empresaId, conversaId, agora.AddDays(-1), ct))
+            .Where(l => l.Revisao > 0 || l.EstaValido(agora)))
+            resultado.Add(await EstadoAsync(link, leitura, ct));
+        return resultado;
     }
 
     public async Task<LinkCardapioConversaGerado> NovaEdicaoAsync(string token, CancellationToken ct)
@@ -119,15 +141,20 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         return novo;
     }
 
-    public async Task<ComandaClienteResult> EstadoAsync(LinkCardapioConversa link, CancellationToken ct)
+    public Task<ComandaClienteResult> EstadoAsync(LinkCardapioConversa link, CancellationToken ct) =>
+        EstadoAsync(link, new LeituraComanda(), ct);
+
+    private async Task<ComandaClienteResult> EstadoAsync(LinkCardapioConversa link, LeituraComanda leitura, CancellationToken ct)
     {
-        var conversa = await conversas.ObterPorIdAsync(link.EmpresaId, link.ConversaId, ct)
+        var conversa = await ConversaAsync(link.EmpresaId, link.ConversaId, leitura, ct)
             ?? throw new LinkCardapioConversaIndisponivelException();
-        var cliente = conversa.ClienteId is { } clienteId ? await clientes.GetByIdWithDetailsAsync(link.EmpresaId, clienteId) : null;
+        var cliente = conversa.ClienteId is { } clienteId
+            ? await leitura.ObterAsync("cliente", clienteId, () => clientes.GetByIdWithDetailsAsync(link.EmpresaId, clienteId))
+            : null;
         if (conversa.ClienteId is not null && (cliente is null || cliente.EmpresaId != link.EmpresaId || cliente.Bloqueado))
             throw new UseCaseValidationException("Confirme seu cadastro no atendimento para abrir a comanda.");
         var pedidoId = link.PedidoRegistradoId ?? conversa.PedidoEmAndamentoId;
-        var pedido = pedidoId is { } id ? await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, id) : null;
+        var pedido = pedidoId is { } id ? await leitura.ObterAsync("pedido", id, () => pedidos.GetByIdWithDetailsAsync(link.EmpresaId, id)) : null;
         // Pedido do site ligado ao chat sem conceder identidade (#1865): de outro cadastro, o link começa comanda nova
         // e não expõe o pedido. Só o pedido registrado pelo próprio link exige o mesmo cliente.
         if (pedido is not null && link.PedidoRegistradoId is null && pedido.ClienteId != cliente?.Id) pedido = null;
@@ -164,12 +191,15 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         }
         if (link.UsadoEm is null && pedido is not null && dados.PedidoId == pedido.Id)
             dados = dados with { PedidoAtualizadoEm = pedido.AlteradoEm };
-        var selecao = await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, ct, validar: false);
-        var detalhe = pedido is null ? null : await obterPedido.ExecuteAsync(link.EmpresaId, conversa.Id, ct, pedido.Id);
+        var selecao = dados.Itens.Count == 0 ? [] : Selecionar(dados.Itens, pedido,
+            await leitura.ObterAsync("cardapio", link.EmpresaId, () => CardapioCompletoAsync(link.EmpresaId, ct)), validar: false);
         // O histórico do dinheiro (recebido, devolvido) do pedido encerrado continua: diz à equipe o que ainda está retido.
-        var financeiro = (pedido ?? encerrado) is { } comDinheiro ? await saldoFinanceiro.ConsultarAsync(comDinheiro, ct) : null;
-        if (detalhe is not null && financeiro is not null) detalhe = detalhe with { TotalPago = financeiro.Alocado };
-        var acerto = (pedido ?? encerrado) is { } doLink ? await AcertoAsync(link, doLink, ct) : null;
+        var comDinheiro = pedido ?? encerrado;
+        var financeiro = comDinheiro is null ? null
+            : await leitura.ObterAsync("saldo", comDinheiro.Id, () => saldoFinanceiro.ConsultarAsync(comDinheiro, ct));
+        var detalhe = pedido is null || financeiro is null ? null : await leitura.ObterAsync("detalhe", pedido.Id, async () =>
+            (await obterPedido.MontarAsync(conversa, pedido, financeiro, ct)) with { TotalPago = financeiro.Alocado });
+        var acerto = comDinheiro is null ? null : await AcertoAsync(link, comDinheiro, leitura, ct);
         var envio = SemCobrancaSeEncerrado(Ler<EnvioComandaCliente>(link.ResultadoJson), encerrado);
         if (envio?.CupomAplicado is { } usado)
         {
@@ -188,9 +218,12 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         var freteCombinado = ContextoConversaJson.Ler<FreteCombinadoComanda>(conversa, FreteCombinadoChave);
         var valorCombinado = freteCombinado?.LinkId == link.Id && freteCombinado.Revisao == link.Revisao ? freteCombinado.Valor : (decimal?)null;
         var ajudaEm = ContextoConversaJson.Ler<DateTime?>(conversa, AjudaSolicitadaChave);
+        var cupons = cliente is null ? [] : await leitura.ObterAsync("cupons", cliente.Id, async () =>
+            (IReadOnlyList<CupomComandaCliente>)(await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct))
+                .Select(c => new CupomComandaCliente(c.Codigo, c.Saldo, c.Valor, c.CriadoEm)).ToList());
         return new(link.Id, (cliente?.Nome ?? conversa.ContatoNome ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "",
             HorarioBrasil.DataOperacional(link.CriadoEm), link.ExpiraEm, link.Revisao, pode, dados, selecao, detalhe,
-            envio, cliente is null ? [] : (await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct)).Select(c => new CupomComandaCliente(c.Codigo, c.Saldo, c.Valor, c.CriadoEm)).ToList(),
+            envio, cupons,
             selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? valorCombinado ?? 0m), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
             cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado,
             ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm,
@@ -201,15 +234,16 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     private static EnvioComandaCliente? SemCobrancaSeEncerrado(EnvioComandaCliente? envio, PedidoEntity? pedido) =>
         envio is not null && pedido is { EstaFinalizado: true } ? envio with { Saldo = 0, LinkPagamento = null, EmCobranca = false } : envio;
 
-    private async Task<AcertoComandaCliente?> AcertoAsync(LinkCardapioConversa link, PedidoEntity pedido, CancellationToken ct)
+    private async Task<AcertoComandaCliente?> AcertoAsync(LinkCardapioConversa link, PedidoEntity pedido, LeituraComanda leitura,
+        CancellationToken ct)
     {
         var credito = await creditos.ObterPorOperacaoAsync(link.EmpresaId, link.Id, ct);
         if (credito is not null && credito.PedidoOrigemId == pedido.Id)
             return new("cupom", credito.Valor, "confirmado", [], credito.Codigo, credito.CriadoEm, credito.Saldo);
-        var proprios = (await estornos.ListarAsync(link.EmpresaId, pedido.Id, ct))
+        var proprios = (await leitura.ObterAsync("estornos", pedido.Id, () => estornos.ListarAsync(link.EmpresaId, pedido.Id, ct)))
             .Where(e => e.Id == ConfirmarAlteracaoComandaUseCase.IdEstorno(link.Id, e.PagamentoId)).ToList();
         if (proprios.Count == 0) return null;
-        var pagamentos = await estornos.RecebimentosAsync(link.EmpresaId, pedido.Id, ct);
+        var pagamentos = await leitura.ObterAsync("recebimentos", pedido.Id, () => estornos.RecebimentosAsync(link.EmpresaId, pedido.Id, ct));
         var situacao = proprios.Any(e => e.Situacao == PedidoEstornoOnline.Pendente) ? "pendente"
             : proprios.All(e => e.Situacao == PedidoEstornoOnline.Confirmado) ? "confirmado" : "recusado";
         return new("estorno", proprios.Sum(e => e.Valor), situacao, proprios.Select(e => new DevolucaoComandaCliente(
@@ -707,9 +741,24 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         PedidoEntity? pedido, CancellationToken ct, bool validar = true)
     {
         if (itens.Count == 0) return [];
-        var loja = await vitrines.GetByEmpresaAsync(empresaId, ct) ?? throw new UseCaseValidationException("Cardápio indisponível.");
-        var menu = validar ? await checkout.CarregarItensCardapioAsync(loja.Id, itens.Select(i => i.CardapioItemId), ct)
-            : (await pratos.GetTodosDoStorefrontAsync(loja.Id, ct)).ToDictionary(p => p.Id);
+        var menu = validar
+            ? await checkout.CarregarItensCardapioAsync((await LojaAsync(empresaId, ct)).Id, itens.Select(i => i.CardapioItemId), ct)
+            : await CardapioCompletoAsync(empresaId, ct);
+        return Selecionar(itens, pedido, menu, validar);
+    }
+
+    private async Task<StorefrontEntity> LojaAsync(Guid empresaId, CancellationToken ct) =>
+        await vitrines.GetByEmpresaAsync(empresaId, ct) ?? throw new UseCaseValidationException("Cardápio indisponível.");
+
+    private async Task<IReadOnlyDictionary<Guid, CardapioItem>> CardapioCompletoAsync(Guid empresaId, CancellationToken ct) =>
+        (await pratos.GetTodosDoStorefrontAsync((await LojaAsync(empresaId, ct)).Id, ct)).ToDictionary(p => p.Id);
+
+    private Task<Conversa?> ConversaAsync(Guid empresaId, Guid conversaId, LeituraComanda leitura, CancellationToken ct) =>
+        leitura.ObterAsync("conversa", conversaId, () => conversas.ObterPorIdAsync(empresaId, conversaId, ct));
+
+    private static IReadOnlyList<ItemSelecionadoComanda> Selecionar(IReadOnlyList<ItemPedidoCheckout> itens, PedidoEntity? pedido,
+        IReadOnlyDictionary<Guid, CardapioItem> menu, bool validar)
+    {
         return itens.Select(i =>
         {
             if (!menu.TryGetValue(i.CardapioItemId, out var prato))
@@ -793,4 +842,22 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         pedido.Observacoes,
         Itens = pedido.Itens.OrderBy(i => i.Id).Select(i => new { i.Id, i.CardapioItemId, i.CardapioItemVariacaoId, i.Quantidade, i.PrecoUnitario, i.Observacao })
     }, Json)));
+
+    /// <summary>
+    /// Leituras de uma montagem de estado (#1725-7). A lista do console monta vários links da mesma conversa, que
+    /// dividem conversa, cliente, pedido, cardápio, saldo e cupons: cada um vai ao banco uma vez. Vive só durante a
+    /// chamada que a criou; o que muda dentro de uma transação usa uma leitura nova.
+    /// </summary>
+    private sealed class LeituraComanda
+    {
+        private readonly Dictionary<(string Tipo, Guid Id), object?> _lidos = [];
+
+        public async Task<T> ObterAsync<T>(string tipo, Guid id, Func<Task<T>> carregar)
+        {
+            if (_lidos.TryGetValue((tipo, id), out var lido)) return (T)lido!;
+            var novo = await carregar();
+            _lidos[(tipo, id)] = novo;
+            return novo;
+        }
+    }
 }

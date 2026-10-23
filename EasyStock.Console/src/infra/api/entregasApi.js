@@ -34,6 +34,9 @@ export const corrigirCorrida = (id, corridaId, corpo) => chamarApi(`${V}/${id}/c
 export const marcarParadaEntregue = (id, pedidoId, confirmarSaldoAReceber = false) =>
   chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST', corpo: { confirmarSaldoAReceber } })
 export const desfazerViagem = (id) => chamarApi(`${V}/${id}/desfazer`, { metodo: 'POST' })
+// J2 (#1990): "Entrega própria" desativada volta em vez de virar cadastro duplicado.
+export const listarEntregadoresComInativos = () => chamarApi('/api/atendimento/entregadores?incluirInativos=true')
+export const reativarEntregador = (id) => chamarApi(`/api/atendimento/entregadores/${id}/reativar`, { metodo: 'POST' })
 
 // Chamados de entregador (texto livre).
 const C = '/api/atendimento/chamados-entregador'

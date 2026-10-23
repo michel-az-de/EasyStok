@@ -12,7 +12,9 @@ export function saldoEmDestaque({ editavel = true, pedidoCriado = false, saldo =
 
 // Subtítulo do acesso Pagamento. Com o saldo em destaque logo acima, repetir o valor
 // aqui era a terceira vez na mesma coluna: fica o que se faz lá dentro.
-export function resumoDoPagamento({ cancelado = false, saldo = 0, destaque = false } = {}) {
+// J2 (#1990): cancelado com dinheiro recebido diz quanto falta devolver (`aDevolver` do EasyStok).
+export function resumoDoPagamento({ cancelado = false, saldo = 0, destaque = false, aDevolver = 0 } = {}) {
+  if (cancelado && aDevolver > 0) return `${moeda(aDevolver)} a devolver`
   if (cancelado) return 'Confira recebimentos e devoluções'
   if (saldo <= 0) return 'Pagamento completo'
   return destaque ? 'Receber o saldo e ver o extrato' : `${moeda(saldo)} a receber`

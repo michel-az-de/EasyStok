@@ -634,6 +634,16 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "Pedido sem pagamento aguardando a equipe",
             corpoTemplate: "O link de pagamento de {{ nome }} venceu de novo (pedido {{ referencia }}). Mande um link novo, combine o pagamento ou cancele o pedido.");
 
+        // ===== Pagamento em disputa no Mercado Pago (#1724-12): o cliente abriu mediação; o pedido não muda.
+        // Sino da equipe (In-App, audiência "gestores"); só primeiro nome e referência do pedido. Interno. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "pagamento_em_mediacao_inapp_v1",
+            nome: "Pagamento em Disputa — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PagamentoEmMediacao,
+            assuntoTemplate: "Pagamento em disputa no Mercado Pago",
+            corpoTemplate: "{{ nome }} abriu uma disputa do pagamento do pedido {{ referencia }} no Mercado Pago. O pedido segue como está; responda a disputa no painel do Mercado Pago.");
+
         // ===== Campanhas (S30): carregam a mensagem da onda e o lembrete do encerramento pelo WhatsApp. Sem
         // rotina: o EnfileiradorMensagensCampanha escreve direto no outbox (categoria Marketing) e monta os
         // metadados da Meta (campanha_generica / campanha_lembrete ou o template da propria campanha). =====
@@ -1102,6 +1112,11 @@ public static class NotificacoesGlobaisSeed
         // ===== Link vencido na última tentativa (#1889): sino da equipe. Rollback: Ativa=false. =====
         yield return MakeRotina("cobranca_aguardando_equipe_global", "Link Vencido Aguardando a Equipe",
             TipoEventoNotificacao.CobrancaAguardandoEquipe, "cobranca_aguardando_equipe_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]", ModoTodos("gestores"));
+
+        // ===== Pagamento em disputa (#1724-12): sino da equipe. Rollback: Ativa=false. =====
+        yield return MakeRotina("pagamento_em_mediacao_global", "Pagamento em Disputa",
+            TipoEventoNotificacao.PagamentoEmMediacao, "pagamento_em_mediacao_inapp_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]", ModoTodos("gestores"));
 
         // ===== Avisos de status do pedido ao cliente (S13): transacionais, so WhatsApp, sem janela de horario

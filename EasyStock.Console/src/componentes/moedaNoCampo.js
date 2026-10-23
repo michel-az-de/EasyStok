@@ -26,3 +26,21 @@ export function digitosDeMoeda(anterior, novo) {
 export function cursorDeMoeda({ inicio, fim, tamanho }) {
   return inicio === fim && inicio !== tamanho ? tamanho : null
 }
+
+// J2 (#1990): no caixa o dinheiro se digita em reais, como se conta a gaveta: "100" é R$ 100,00 e a
+// vírgula separa os centavos. O campo guarda o que foi digitado; quem lê o valor é a tela (ela
+// injeta `lerMoeda`, do domínio). Aqui só a limpeza da digitação: dígitos e pontos de milhar, uma
+// vírgula e no máximo dois centavos.
+export function textoDigitadoEmReais(texto) {
+  const limpo = String(texto ?? '').replace(/[^\d.,]/g, '')
+  const virgula = limpo.indexOf(',')
+  if (virgula === -1) return limpo
+  const centavos = limpo.slice(virgula + 1).replace(/\D/g, '').slice(0, 2)
+  return `${limpo.slice(0, virgula)},${centavos}`
+}
+
+// Ao sair do campo, o valor volta escrito por inteiro ("100,00", "1.500,00"), sem o "R$" (que fica
+// fora do campo). Nulo é campo vazio.
+export const textoDosCentavos = (centavos) => (centavos == null
+  ? ''
+  : (centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
