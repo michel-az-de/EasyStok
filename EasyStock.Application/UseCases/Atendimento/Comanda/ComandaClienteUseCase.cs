@@ -329,7 +329,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 var pedido = await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, criado.PedidoId)
                     ?? throw new InvalidOperationException("Pedido criado sem persistência.");
                 // #1971: o aviso do cupom só sai com o envio de pé; a cobrança depois do commit ainda pode desfazê-lo.
-                var cupomAplicado = await AplicarCupomAsync(pedido, dados.CodigoCupom, t, avisar: false);
+                var cupomAplicado = await AplicarCupomAsync(pedido, dados.CodigoCupom, t);
                 var saldo = pedido.Total.Valor - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado;
                 if (saldo > 0)
                 {
@@ -656,10 +656,11 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         return await ObterAsync(token, ct);
     }
 
-    /// <param name="avisar">Falso quando o envio ainda pode ser desfeito (cobrança depois do commit, #1971): quem chama
-    /// avisa com <see cref="AvisarCupomAsync"/> depois que o envio fica de pé.</param>
-    public async Task<CupomAplicadoComandaCliente?> AplicarCupomAsync(PedidoEntity pedido, string? codigo, CancellationToken ct,
-        bool avisar = true)
+    /// <summary>
+    /// Usa o cupom no pedido, sem avisar o cliente: o envio ainda pode ser desfeito (cobrança depois do commit, #1971).
+    /// Quem chama avisa com <see cref="AvisarCupomAsync"/> quando o envio fica de pé.
+    /// </summary>
+    public async Task<CupomAplicadoComandaCliente?> AplicarCupomAsync(PedidoEntity pedido, string? codigo, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(codigo)) return null;
         if (pedido.ClienteId is not { } clienteId) throw new UseCaseValidationException("Cliente não identificado.");
@@ -672,10 +673,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         await creditos.AdicionarUsoAsync(uso, ct);
         await pedidos.AddEventoAsync(new() { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "cupom_cliente_aplicado",
             Origem = "comanda_cliente", OcorridoEm = relogio.GetUtcNow().UtcDateTime, Detalhes = $"{credito.Codigo}: {valor}" });
-        var aplicado = new CupomAplicadoComandaCliente(uso.Id, credito.Codigo, uso.Valor, credito.Saldo);
-        if (avisar) await AvisarCupomAsync(pedido.EmpresaId, pedido.Id, aplicado, ct);
         await uow.CommitAsync();
-        return aplicado;
+        return new(uso.Id, credito.Codigo, uso.Valor, credito.Saldo);
     }
 
     /// <summary>Aviso ao cliente do cupom usado no pedido; a chave do uso evita repetir.</summary>

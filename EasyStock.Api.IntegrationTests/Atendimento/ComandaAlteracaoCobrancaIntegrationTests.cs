@@ -136,7 +136,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         // jsonb: o filtro por texto fica em memória.
         var aviso = (await db.NotifEventos.AsNoTracking().Select(e => e.PayloadJson).ToListAsync())
             .Single(p => p.Contains(":aguardando_pagamento"));
-        aviso.Should().NotContain("Não há mais valor a pagar").And.Contain("Combine o pagamento");
+        aviso.Should().NotContain("Não há mais valor a pagar").And.Contain("na entrega");
     }
 
     // A comanda nova com cupom: o aviso "cupom aplicado" saía antes da cobrança e chegava ao cliente mesmo com o envio
@@ -186,6 +186,80 @@ public sealed partial class PedidoConversaConcorrenciaTests
         (await finalDb.Set<CreditoClienteComanda>().AsNoTracking().SingleAsync()).Saldo.Should().Be(5m, "o cupom voltou à carteira");
         (await finalDb.NotifEventos.AsNoTracking().Select(e => e.PayloadJson).ToListAsync())
             .Should().NotContain(p => p.Contains("cupom-usado"), "o envio foi desfeito: o cliente não pode ler que o cupom foi usado");
+    }
+
+    // Pedido combinado para pagar na entrega: a alteração cancelava a cobrança na entrega e mandava um link do Mercado
+    // Pago ao cliente pela diferença; o combinado se perdia.
+    [SkippableFact]
+    public async Task Alteracao_PedidoNaEntregaMantemADiferencaNaEntregaSemLink()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        var preferencias = new ConcurrentDictionary<string, CriarPreferenceCommand>();
+        await using var factory = CriarFactory(Provedor(preferencias));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var token = await Link(factory, c.ConversaId);
+        var estado = await Estado(client, token);
+        await Salvar(client, token, estado, estado.Rascunho with { Itens = [new(c.CardapioItemId, 1)], JanelaId = c.JanelaId, DataEntrega = c.DataEntrega });
+        var original = await Enviar(client, token, 1);
+        using (var scope = factory.Services.CreateScope())
+        {
+            // A atendente combinou receber tudo na entrega: o link do sinal saiu e a cobrança ficou na entrega.
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(EmpresaId);
+            var agora = DateTime.UtcNow;
+            foreach (var pendente in await db.CobrancasPedido.Where(x => x.PedidoId == original.PedidoId && x.Status == StatusCobrancaPedido.Pendente).ToListAsync())
+                pendente.Cancelar("troca_forma: na_entrega", agora);
+            db.CobrancasPedido.Add(CobrancaPedido.CriarNaEntrega(EmpresaId, original.PedidoId, 15m, agora, c.ConversaId));
+            (await db.Pedidos.SingleAsync(p => p.Id == original.PedidoId)).Status = EasyStock.Domain.Sales.StatusPedidoMapper.Aguardando;
+            await db.SaveChangesAsync();
+        }
+        var ajuste = await Link(factory, c.ConversaId);
+        estado = await Estado(client, ajuste);
+        await Salvar(client, ajuste, estado, estado.Rascunho with { Itens = [new(c.CardapioItemId, 2)] });
+
+        var envio = await Enviar(client, ajuste, 1);
+
+        envio.Situacao.Should().Be("aguardando_pagamento");
+        envio.LinkPagamento.Should().BeNull("o pedido continua combinado para pagar na entrega");
+        preferencias.Should().ContainSingle("só o link do sinal original foi criado");
+        using var final = factory.Services.CreateScope();
+        var finalDb = final.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        finalDb.SetMobileTenantContext(EmpresaId);
+        (await finalDb.CobrancasPedido.AsNoTracking().Where(x => x.PedidoId == original.PedidoId && x.Status == StatusCobrancaPedido.Pendente).ToListAsync())
+            .Should().ContainSingle().Which.Should().Match<CobrancaPedido>(x => x.Provedor == CobrancaPedido.ProvedorNaEntrega && x.Valor == 25m);
+    }
+
+    // Aceite que parou depois de gravar a alteração (processo caiu antes de cobrar): o resultado ficava provisório para
+    // sempre e cada aceite seguinte devolvia o provisório, sem link. Agora o aceite seguinte cobra.
+    [SkippableFact]
+    public async Task Alteracao_ProvisorioParadoCobraNoAceiteSeguinte()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        var preferencias = new ConcurrentDictionary<string, CriarPreferenceCommand>();
+        await using var factory = CriarFactory(Provedor(preferencias));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var (ajuste, linkId) = await AlteracaoComAcrescimoAsync(factory, client, c);
+        var envio = await Enviar(client, ajuste, 1);
+        envio.LinkPagamento.Should().NotBeNull();
+        using (var scope = factory.Services.CreateScope())
+        {
+            // Simula a parada: resultado de volta ao provisório e o link da diferença cancelado.
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(EmpresaId);
+            var link = await db.LinksCardapioConversa.SingleAsync(l => l.Id == linkId);
+            link.RegistrarResultado(envio.PedidoId, System.Text.Json.JsonSerializer.Serialize(
+                envio with { LinkPagamento = null, EmCobranca = true }, ComandaClienteUseCase.Json));
+            foreach (var pendente in await db.CobrancasPedido.Where(x => x.PedidoId == envio.PedidoId && x.Status == StatusCobrancaPedido.Pendente).ToListAsync())
+                pendente.Cancelar("teste", DateTime.UtcNow);
+            await db.SaveChangesAsync();
+        }
+
+        var resposta = await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/comandas-cliente/{linkId}/confirmar", new { Aceitar = true });
+
+        resposta.StatusCode.Should().Be(HttpStatusCode.OK, await resposta.Content.ReadAsStringAsync());
+        (await Estado(client, ajuste)).Envio.Should().Match<EnvioComandaCliente>(e => !e.EmCobranca && e.LinkPagamento != null);
     }
 
     /// <summary>
