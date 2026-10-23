@@ -13,9 +13,10 @@ internal static class QuitacaoPedidoTeste
     public static QuitacaoPedido Criar(IPedidoRepository pedidos,
         ICobrancaPedidoRepository? cobrancas = null, IConversaRepository? conversas = null,
         IImpressaoPendenteRepository? impressoes = null, IPublicadorEventoIntegracao? publicador = null,
-        IOperacaoEventPublisher? eventos = null, IPrazoPreparoPedidoQueries? prazos = null) => new(pedidos,
+        IOperacaoEventPublisher? eventos = null, IPrazoPreparoPedidoQueries? prazos = null,
+        ExpiracaoPreferenciaMercadoPago? expiracao = null) => new(pedidos,
             cobrancas ?? Substitute.For<ICobrancaPedidoRepository>(), conversas ?? Substitute.For<IConversaRepository>(),
             impressoes ?? Substitute.For<IImpressaoPendenteRepository>(), publicador ?? Substitute.For<IPublicadorEventoIntegracao>(),
             eventos ?? Substitute.For<IOperacaoEventPublisher>(),
-            new CalculadoraInicioPrevistoPedido(prazos ?? Substitute.For<IPrazoPreparoPedidoQueries>()));
+            new CalculadoraInicioPrevistoPedido(prazos ?? Substitute.For<IPrazoPreparoPedidoQueries>()), expiracao: expiracao);
 }

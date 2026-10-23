@@ -317,10 +317,13 @@ public class Mensagem
     /// <summary>#1397: a varredura assumiu o anexo; outro processo não o pega dentro do prazo.</summary>
     public void ReservarTentativaMidia(DateTime agora) => ProximaTentativaMidiaEm = Utc(agora) + PrazoFilaMidia;
 
-    /// <summary>#1397: falha ao baixar o anexo. Reagenda com espera crescente até <see cref="MaxTentativasMidia"/>.</summary>
-    public void RegistrarFalhaMidia(string? erro, DateTime agora)
+    /// <summary>
+    /// #1397: falha ao baixar o anexo. Reagenda com espera crescente até <see cref="MaxTentativasMidia"/>.
+    /// <paramref name="definitiva"/> (#1622-5, anexo acima do teto): nenhuma nova tentativa resolve, então encerra já.
+    /// </summary>
+    public void RegistrarFalhaMidia(string? erro, DateTime agora, bool definitiva = false)
     {
-        TentativasMidia++;
+        TentativasMidia = definitiva ? Math.Max(TentativasMidia + 1, MaxTentativasMidia) : TentativasMidia + 1;
         ErroMidia = Truncar(string.IsNullOrWhiteSpace(erro) ? "Falha ao baixar o anexo." : erro.Trim(), ErroMidiaTamanhoMaximo);
         ProximaTentativaMidiaEm = TentativasMidia < MaxTentativasMidia
             ? Utc(agora) + EsperasMidia[Math.Min(TentativasMidia, EsperasMidia.Length) - 1]

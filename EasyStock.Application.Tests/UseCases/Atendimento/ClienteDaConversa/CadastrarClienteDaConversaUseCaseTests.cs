@@ -81,6 +81,21 @@ public class CadastrarClienteDaConversaUseCaseTests
         string? telefone = "(11) 98765-4321", EnderecoDaConversaInput? endereco = null) =>
         new(_empresaId, conversa.Id, nome, telefone, endereco);
 
+    // #1643-3: a dona corrige só o telefone (o corpo vem sem nome) e o cadastro nascia "Cliente WhatsApp". Vale o nome
+    // que a conversa já tem (o do perfil ou o informado pelo visitante).
+    [Fact]
+    public async Task SemNomeNoCorpo_CadastroNovoUsaONomeDoContato()
+    {
+        var conversa = ConversaDoSite();
+        conversa.AtualizarContatoNome("Joana Prado");
+
+        var r = await UseCase().ExecuteAsync(Comando(conversa, nome: null));
+
+        r.Novo.Should().BeTrue();
+        r.Nome.Should().Be("Joana Prado");
+        await _clientes.Received(1).AddAsync(Arg.Is<Cliente>(c => c.Nome == "Joana Prado"));
+    }
+
     [Fact]
     public async Task ConversaSemCliente_CriaClientePeloTelefoneEVincula()
     {

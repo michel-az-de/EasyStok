@@ -185,22 +185,46 @@ internal sealed class CobrancaPedidoFixture
             VagaRepo, PedidoStorefrontRepo, Substitute.For<IExpedienteLojaRepository>(),
             NullLogger<CheckoutCoreService>.Instance, Relogio, EnderecoEntregaPedidoTeste.Criar());
 
-    private QuitacaoPedido Quitacao() => QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, ConversaRepo, ImpressaoRepo, Publicador, OperacaoEventos);
+    /// <summary>Expiração da preferência substituída sobre o Mercado Pago falso da fixture (#1717-8).</summary>
+    public ExpiracaoPreferenciaMercadoPago Expiracao() =>
+        new(new Lazy<IMercadoPagoClient>(() => MpClient), Relogio, NullLogger<ExpiracaoPreferenciaMercadoPago>.Instance);
 
-    public ConfirmarPagamentoPedidoUseCase Confirmar() =>
+    private QuitacaoPedido Quitacao() => QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, ConversaRepo, ImpressaoRepo, Publicador,
+        OperacaoEventos, PrazoQueries, Expiracao());
+
+    /// <summary>Baixa manual pelo console (Pix, dinheiro, maquininha) sobre o mesmo pedido.</summary>
+    public RegistrarPagamentoPedidoUseCase RegistrarManual() =>
+        new(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries),
+            Quitacao());
+
+    /// <summary>Clientes do aviso de status; o pedido da fixture tem telefone e não tem cliente cadastrado.</summary>
+    public IClienteRepository ClienteRepo { get; } = Substitute.For<IClienteRepository>();
+
+    /// <summary>Aviso ao cliente pelo canal do pedido, sobre o <see cref="Notificador"/> falso.</summary>
+    public AvisoStatusPedidoCliente AvisoCliente()
+    {
+        Pedido.ClienteTelefone ??= "11987654321";
+        PedidoRepo.GetByIdAsync(EmpresaId, Pedido.Id).Returns(Pedido);
+        return new(PedidoRepo, ClienteRepo, VagaRepo, StorefrontRepo,
+            new PoliticaEnvioCliente(Substitute.For<IConsentimentoContatoRepository>()), Notificador, Tenant,
+            NullLogger<AvisoStatusPedidoCliente>.Instance);
+    }
+
+    public ConfirmarPagamentoPedidoUseCase Confirmar(AvisoStatusPedidoCliente? avisoCliente = null) =>
         new(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
                 new CalculadoraInicioPrevistoPedido(PrazoQueries), Quitacao()),
             Publicador, OperacaoEventos, Quitacao(), Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
-            new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo);
+            new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo, avisoCliente: avisoCliente);
 
     public NotificarAtrasoPedidoUseCase NotificarAtraso() =>
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Notificador, Options.Create(Prazos), Relogio,
             NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
-    public TrocarFormaPagamentoPedidoUseCase Trocar() =>
+    public TrocarFormaPagamentoPedidoUseCase Trocar(IConferenciaPagamentoPedido? conferencia = null) =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
-            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries), OperacaoEventos, Quitacao(), Conferir());
+            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries), OperacaoEventos, Quitacao(),
+            conferencia ?? Conferir());
 
     public ConferirPagamentoPedidoUseCase Conferir() => new(PedidoRepo, CobrancaRepo, MpClient, Confirmar());
 

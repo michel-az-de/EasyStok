@@ -294,7 +294,9 @@ public class ChatSiteUseCasesTests
 
     // ── #1430: formulário antes do chat ──
 
-    private IdentificarVisitanteChatSiteUseCase Identificar() => new(_acesso, _conversas, _uow);
+    private readonly IOperacaoEventPublisher _operacao = Substitute.For<IOperacaoEventPublisher>();
+
+    private IdentificarVisitanteChatSiteUseCase Identificar() => new(_acesso, _conversas, _uow, _operacao);
 
     private static IdentificacaoVisitanteInput Formulario(string? email = "Maria@Exemplo.com", bool aceite = true) =>
         new("Maria Souza", "(11) 98765-4321", email, aceite);
@@ -355,6 +357,36 @@ public class ChatSiteUseCasesTests
         conversa.ContatoNome.Should().Be("Maria Souza");
         conversa.ContatoTelefoneInformado.Should().Be("+5511987654321");
         conversa.ContatoEmailInformado.Should().BeNull();
+        // #1643-5: o console troca o nome sem esperar a próxima sincronização; o aviso sai depois do commit.
+        await _operacao.Received(1).PublicarAsync(EventosOperacao.ConversaAtualizada, _loja.EmpresaId,
+            Arg.Is<ConversaAtualizadaOperacao>(e => e.ConversaId == conversa.Id), Arg.Any<CancellationToken>());
+        Received.InOrder(() =>
+        {
+            _uow.CommitAsync();
+            _operacao.PublicarAsync(EventosOperacao.ConversaAtualizada, _loja.EmpresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task Identificar_SemConversaAberta_NaoAvisaOConsole()
+    {
+        var (_, token) = SessaoValida();
+
+        await Identificar().ExecuteAsync(Slug, token, Formulario());
+
+        await _operacao.DidNotReceiveWithAnyArgs().PublicarAsync(default!, default, default!, default);
+    }
+
+    // #1643-4: sessão inválida é a primeira resposta, antes de olhar o corpo (o aceite da #1430 pedia 404/403, não 400).
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Identificar_CorpoInvalidoComTokenInventado_DizSessaoInvalida(bool semCorpo)
+    {
+        var act = () => Identificar().ExecuteAsync(Slug, "token-inventado",
+            semCorpo ? null : new IdentificacaoVisitanteInput("Maria", "123", null, true));
+
+        await act.Should().ThrowAsync<SessaoChatSiteInvalidaException>();
     }
 
     [Theory]

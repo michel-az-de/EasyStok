@@ -25,6 +25,13 @@ public sealed record CobrancaPedidoResult(
     int Tentativa,
     bool Reutilizada)
 {
+    /// <summary>
+    /// #1717-8: preferência do link pendente que esta cobrança substituiu. Quem fecha a transação a expira depois do
+    /// commit (<see cref="Services.Pedidos.ExpiracaoPreferenciaMercadoPago"/>). Não sai na resposta da API.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? PreferenciaSubstituida { get; init; }
+
     public static CobrancaPedidoResult De(CobrancaPedido c, bool reutilizada = false) =>
         new(c.Id, c.PedidoId, c.Provedor, c.Status.ToString(), c.LinkPagamento, c.Valor, c.ExpiraEm, c.Tentativa, reutilizada);
 }
@@ -108,15 +115,20 @@ public sealed class GerarCobrancaPedidoUseCase(
     /// <summary>
     /// Reemissão pedida por uma pessoa (console). Trava o pedido antes de olhar as cobranças (#1724): sem a
     /// trava, cliques simultâneos liam "sem pendente" e cada um criava um link pagável para o mesmo pedido.
+    /// #1717-8: o link substituído por valor expira no provedor depois que a transação fechou.
     /// </summary>
-    public Task<CobrancaPedidoResult> ExecuteComTravaAsync(GerarCobrancaPedidoInput input, CancellationToken ct = default)
+    public async Task<CobrancaPedidoResult> ExecuteComTravaAsync(GerarCobrancaPedidoInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
-        return unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        var resultado = await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
         {
             await pedidoRepository.TravarAsync(input.EmpresaId, input.PedidoId, token);
             return await ExecuteAsync(input, token);
         }, ct);
+        if (resultado.PreferenciaSubstituida is { } preferencia)
+            await ExpiracaoPreferenciaMercadoPago.ExpirarAsync(() => mercadoPagoClient, preferencia,
+                relogio.GetUtcNow().UtcDateTime, logger, ct);
+        return resultado;
     }
 
     /// <summary>Pedido já gravado: carrega itens e frete do banco.</summary>
@@ -179,11 +191,16 @@ public sealed class GerarCobrancaPedidoUseCase(
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.FormaNaEntrega,
                 "O pedido está combinado para pagar na entrega; troque a forma para gerar link.");
         }
+        string? preferenciaSubstituida = null;
         if (pendente is not null && pendente.Venceu(agora))
             pendente.Expirar(agora);
         else if (pendente is not null && pendente.Valor != valorCobrado)
+        {
             // #1291: item editado em AguardandoPagamento; o link antigo cobraria o valor velho.
             pendente.Cancelar(MotivoValorAlterado, agora);
+            // #1717-8: quem fecha a transação expira a preferência no provedor depois do commit.
+            preferenciaSubstituida = pendente.ReferenciaExterna;
+        }
         else if (pendente is not null)
             return CobrancaPedidoResult.De(pendente, reutilizada: true);
 
@@ -227,7 +244,7 @@ public sealed class GerarCobrancaPedidoUseCase(
         logger.LogInformation(
             "Cobranca pedido criada pedidoId={PedidoId} cobrancaId={CobrancaId} tentativa={Tentativa}",
             dados.PedidoId, cobranca.Id, tentativa);
-        return CobrancaPedidoResult.De(cobranca);
+        return CobrancaPedidoResult.De(cobranca) with { PreferenciaSubstituida = preferenciaSubstituida };
     }
 
     /// <summary>

@@ -3,3 +3,5 @@
 8786a4ac0872f77fd7fba9f3a6443a3d5b1114d6:EasyStock.Api.UnitTests/Controllers/ConsentimentosControllerTests.cs:generic-api-key:224
 # Falso positivo (canario de teste "CANARIO-...", ja trocado por montagem em execucao em commit seguinte da mesma PR #1703).
 033f2c4558037586c0f60c2bbdd643f9881b26d9:EasyStock.Api.UnitTests/Pagamentos/MercadoPagoClientTests.cs:generic-api-key:157
+# Falso positivo (token de teste da comanda, ja trocado por AcessoChatSite.NovoToken() no commit seguinte da mesma PR #1959).
+53be5663a0bb152cb4b21cb1b1d9efb2e041c752:EasyStock.Api.UnitTests/Observability/Logging/SensitivePatternsTests.cs:generic-api-key:142

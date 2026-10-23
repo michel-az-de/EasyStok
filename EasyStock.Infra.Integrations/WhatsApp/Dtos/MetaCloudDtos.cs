@@ -18,4 +18,5 @@ internal sealed record MetaError(
 internal sealed record MetaMediaMetadata(
     string Url,
     [property: JsonPropertyName("mime_type")] string MimeType,
-    string Id);
+    string Id,
+    [property: JsonPropertyName("file_size")] long? FileSize = null);

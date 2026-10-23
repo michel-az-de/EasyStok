@@ -32,6 +32,12 @@ public interface IPedidoStorefrontRepository
     /// </summary>
     Task<Pedido?> GetForUpdateAsync(Guid pedidoId, CancellationToken ct = default);
 
+    /// <summary>
+    /// #1265-9: o mesmo <c>FOR UPDATE</c>, só na linha da empresa: pedido de outra empresa não é travado nem lido. Os
+    /// chamadores migram para esta; a de cima fica até o último deles.
+    /// </summary>
+    Task<Pedido?> GetForUpdateAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
+
     Task AddAsync(Pedido pedido, CancellationToken ct = default);
 
     Task UpdateAsync(Pedido pedido, CancellationToken ct = default);

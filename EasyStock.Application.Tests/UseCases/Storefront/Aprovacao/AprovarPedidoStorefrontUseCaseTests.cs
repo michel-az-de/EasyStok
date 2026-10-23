@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Events.Storefront;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -38,12 +39,13 @@ public class AprovarPedidoStorefrontUseCaseTests
         AprovarPedidoStorefrontUseCase UseCase,
         IPedidoStorefrontRepository PedidoRepo,
         IPublicadorEventoIntegracao Publicador,
-        IUnitOfWork UnitOfWork);
+        IUnitOfWork UnitOfWork,
+        IOperacaoEventPublisher Operacao);
 
     private static Sut BuildSut(Pedido? pedidoStub = null)
     {
         var pedidoRepo = Substitute.For<IPedidoStorefrontRepository>();
-        pedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        pedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(pedidoStub);
 
         var publicador = Substitute.For<IPublicadorEventoIntegracao>();
@@ -58,10 +60,11 @@ public class AprovarPedidoStorefrontUseCaseTests
                 return action(callInfo.Arg<CancellationToken>());
             });
 
+        var operacao = Substitute.For<IOperacaoEventPublisher>();
         var useCase = new AprovarPedidoStorefrontUseCase(
-            pedidoRepo, publicador, uow, NullLogger<AprovarPedidoStorefrontUseCase>.Instance);
+            pedidoRepo, publicador, uow, NullLogger<AprovarPedidoStorefrontUseCase>.Instance, operacao);
 
-        return new Sut(useCase, pedidoRepo, publicador, uow);
+        return new Sut(useCase, pedidoRepo, publicador, uow, operacao);
     }
 
     private static Pedido PedidoNoStatus(string status, Guid empresaId)
@@ -127,7 +130,28 @@ public class AprovarPedidoStorefrontUseCaseTests
         await sut.UnitOfWork.Received(1).ExecuteInTransactionAsync(
             Arg.Any<Func<CancellationToken, Task<AprovarPedidoStorefrontResult>>>(),
             Arg.Any<CancellationToken>());
-        await sut.PedidoRepo.Received(1).GetForUpdateAsync(PedidoId, Arg.Any<CancellationToken>());
+        // #1265-9: a trava leva a empresa; pedido de outra empresa não é travado.
+        await sut.PedidoRepo.Received(1).GetForUpdateAsync(EmpresaId, PedidoId, Arg.Any<CancellationToken>());
+    }
+
+    // #1265-8: a cozinha e o Balcão movem o card sem recarregar; o evento sai depois do commit.
+    [Fact]
+    public async Task Aprovar_publica_pedido_mudou_status_na_operacao_depois_do_commit()
+    {
+        var sut = BuildSut(PedidoNoStatus(StatusPedidoMapper.AguardandoAprovacaoBaba, EmpresaId));
+
+        await sut.UseCase.ExecuteAsync(InputValido());
+
+        await sut.Operacao.Received(1).PublicarAsync(EventosOperacao.PedidoMudouStatus, EmpresaId,
+            Arg.Is<PedidoMudouStatusOperacao>(e => e.PedidoId == PedidoId
+                && e.StatusAntigo == StatusPedidoMapper.AguardandoAprovacaoBaba && e.StatusNovo == StatusPedidoMapper.AprovadoBaba),
+            Arg.Any<CancellationToken>());
+        Received.InOrder(() =>
+        {
+            sut.UnitOfWork.ExecuteInTransactionAsync(
+                Arg.Any<Func<CancellationToken, Task<AprovarPedidoStorefrontResult>>>(), Arg.Any<CancellationToken>());
+            sut.Operacao.PublicarAsync(EventosOperacao.PedidoMudouStatus, EmpresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+        });
     }
 
     [Fact]
