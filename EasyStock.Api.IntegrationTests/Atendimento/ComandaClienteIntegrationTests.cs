@@ -235,8 +235,10 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using (var mensagensScope = factory.Services.CreateScope())
         {
             var textos = await mensagensScope.ServiceProvider.GetRequiredService<EasyStockDbContext>().AtendimentoMensagens.Select(m => m.Texto).ToListAsync();
-            textos.Should().Contain(t => t!.Contains("saldo integral"));
-            textos.Should().NotContain(t => t!.Contains("Sinal agora") || t.Contains("Restante na entrega"));
+            // #1717-7 (#1961): a encomenda pela comanda cobra o sinal, como o console; antes cobrava o saldo integral.
+            textos.Should().Contain(t => t!.Contains("Sinal agora por link"));
+            textos.Should().ContainSingle(t => t!.Contains("Recebemos seu pedido") && t.Contains("Restante na entrega"));
+            textos.Should().NotContain(t => t!.Contains("saldo integral"));
         }
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -451,7 +453,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         acrescimo.Saldo.Should().Be(10);
         (await Estado(client, novo)).Pedido!.Status.Should().Be("preparando");
         (await SaldoEstoque()).Should().Be(5, "a alteração retorna o estoque antigo antes de refazer o preparo");
-        preferencias.Values.Select(p => p.ValorTotal).Should().BeEquivalentTo([15m, 10m]);
+        // #1717-7 (#1961): o primeiro link cobra o sinal da encomenda; o pagamento integral é aceito e o acréscimo cobra a diferença.
+        preferencias.Values.Select(p => p.ValorTotal).Should().BeEquivalentTo([7.5m, 10m]);
         using (var prazo = new CancellationTokenSource(TimeSpan.FromSeconds(6)))
         using (var stream = await client.GetAsync($"{Rota(novo)}/eventos", HttpCompletionOption.ResponseHeadersRead, prazo.Token))
         using (var leitor = new StreamReader(await stream.Content.ReadAsStreamAsync(prazo.Token)))

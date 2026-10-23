@@ -118,7 +118,9 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
         storefront.Ativar();
         db.Storefronts.Add(storefront);
 
-        var dia = dataEntrega ?? DateOnly.FromDateTime(agora).AddDays(7);
+        // Dia em Brasília: entre 21 h e meia-noite a data UTC já é amanhã, e a encomenda +7 empurrada mais 7 dias caía fora
+        // do limite de 14 dias do site (#1961, Comanda_LeadCadastraEnderecoEEntregaForaDaAreaVaiParaHumano).
+        var dia = dataEntrega ?? EasyStock.Application.Common.HorarioBrasil.Hoje().AddDays(7);
         var janela = JanelaEntrega.Criar(storefront.Id, (int)dia.DayOfWeek,
             new TimeOnly(9, 0), new TimeOnly(12, 0), 10, "Manhã");
         db.JanelasEntrega.Add(janela);

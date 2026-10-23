@@ -21,6 +21,19 @@ public sealed class CreditoClienteComandaRepository(EasyStockDbContext db) : ICr
         return credito;
     }
 
+    public async Task<IReadOnlyList<UsoCreditoClienteComanda>> ListarUsosDoPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct) =>
+        await db.Set<UsoCreditoClienteComanda>().Where(u => u.EmpresaId == empresaId && u.PedidoId == pedidoId).ToListAsync(ct);
+
+    public async Task<CreditoClienteComanda?> ObterComLockPorIdAsync(Guid empresaId, Guid creditoId, CancellationToken ct)
+    {
+        var credito = await db.Set<CreditoClienteComanda>().FromSqlInterpolated(
+            $"SELECT * FROM creditos_cliente_comanda WHERE \"EmpresaId\" = {empresaId} AND \"Id\" = {creditoId} FOR UPDATE").SingleOrDefaultAsync(ct);
+        if (credito is not null) await db.Entry(credito).ReloadAsync(ct);
+        return credito;
+    }
+
+    public void RemoverUso(UsoCreditoClienteComanda uso) => db.Set<UsoCreditoClienteComanda>().Remove(uso);
+
     public async Task<IReadOnlyList<CreditoClienteComanda>> ListarAsync(Guid empresaId, Guid clienteId, CancellationToken ct) =>
         await db.Set<CreditoClienteComanda>().AsNoTracking().Where(c => c.EmpresaId == empresaId && c.ClienteId == clienteId && c.Saldo > 0)
             .OrderBy(c => c.CriadoEm).Take(50).ToListAsync(ct);

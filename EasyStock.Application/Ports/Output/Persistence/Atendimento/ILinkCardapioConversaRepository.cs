@@ -22,6 +22,11 @@ public interface ILinkCardapioConversaRepository
 
     /// <summary>Desfaz o uso quando o pedido foi recusado, para o cliente corrigir o carrinho e reenviar.</summary>
     Task LiberarAsync(Guid empresaId, Guid linkId, CancellationToken ct = default);
+    /// <summary>
+    /// Vence, no banco, as comandas abertas (não usadas e ainda válidas) da conversa: o pedido nasceu por outro caminho
+    /// e elas ficariam órfãs (#1686-1). O link consumido pelo próprio envio já tem <c>UsadoEm</c> e fica de fora.
+    /// </summary>
+    Task<int> ExpirarPendentesAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default);
     Task<LinkCardapioConversa?> ObterComLockAsync(Guid empresaId, Guid linkId, CancellationToken ct = default);
     Task<IReadOnlyList<LinkCardapioConversa>> ListarDaConversaAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default);
 }

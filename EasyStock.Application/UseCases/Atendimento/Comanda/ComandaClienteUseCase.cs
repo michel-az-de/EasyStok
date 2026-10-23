@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -15,6 +16,7 @@ using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
@@ -26,8 +28,9 @@ public sealed record RascunhoComandaCliente(IReadOnlyList<ItemPedidoCheckout> It
     string? PedidoResumoHash = null, string? Nome = null, string? Telefone = null);
 public sealed record ItemSelecionadoComanda(Guid CardapioItemId, Guid? VariacaoId, string Nome, int Qtd, decimal Preco, string? Observacao);
 public sealed record CupomAplicadoComandaCliente(Guid UsoId, string Codigo, decimal Valor, decimal SaldoCupom);
+/// <param name="EmCobranca">Resultado provisório (#1961): o pedido foi gravado e a cobrança ainda está saindo, fora do lock.</param>
 public sealed record EnvioComandaCliente(Guid PedidoId, string Situacao, decimal Total, decimal Saldo, string? LinkPagamento = null,
-    string? CodigoCupom = null, CupomAplicadoComandaCliente? CupomAplicado = null);
+    string? CodigoCupom = null, CupomAplicadoComandaCliente? CupomAplicado = null, bool EmCobranca = false);
 public sealed record CupomComandaCliente(string Codigo, decimal Saldo, decimal? ValorEmitido = null, DateTime? CriadoEm = null);
 public sealed record DevolucaoComandaCliente(Guid OperacaoId, decimal Valor, string Situacao, string? Meio, string Provedor,
     DateTime CriadoEm, DateTime? ConfirmadoEm, string? Referencia);
@@ -49,7 +52,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     ICreditoClienteComandaRepository creditos, GerarCobrancaPedidoUseCase cobrar, IUnitOfWork uow,
     ITenantContextAccessor tenant, IOperacaoEventPublisher eventos, TimeProvider relogio,
     CalculadoraInicioPrevistoPedido inicioPrevisto, QuitacaoPedido quitacao, LinkCardapioConversaService gerarLink,
-    IEstornoOnlineRepository estornos, AvisoStatusPedidoCliente avisoCliente, CadastrarClienteDaConversaUseCase cadastrarCliente)
+    IEstornoOnlineRepository estornos, AvisoStatusPedidoCliente avisoCliente, CadastrarClienteDaConversaUseCase cadastrarCliente,
+    TrocarFormaPagamentoPedidoUseCase trocarForma, AvisoCobrancaConversa avisoCanal, ICobrancaPedidoRepository cobrancasPedido,
+    ILogger<ComandaClienteUseCase> logger)
 {
     private const string RevisaoEntregaACombinar = "comandaEntregaACombinarRevisao";
     private const string FreteCombinadoChave = "comandaFreteCombinado";
@@ -270,8 +275,13 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     {
         await ConfirmarCadastroAsync(acesso, revisao, ct);
         EfeitosQuitacao? efeitos = null;
+        string? confirmacaoNoCanal = null;
+        var cobrarDepoisDoCommit = false;
         var resposta = await uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
+            efeitos = null;
+            confirmacaoNoCanal = null;
+            cobrarDepoisDoCommit = false;
             await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
             var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
             if (link.Revisao != revisao) throw new ComandaClienteConflitoException("A seleção mudou. Confira a comanda antes de enviar.");
@@ -320,30 +330,191 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                     ?? throw new InvalidOperationException("Pedido criado sem persistência.");
                 var cupomAplicado = await AplicarCupomAsync(pedido, dados.CodigoCupom, t);
                 var saldo = pedido.Total.Valor - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado;
-                CobrancaPedidoResult? cobranca = null;
-                // #1726: confirmado pela atendente também nasce com cobrança; sem ela a varredura de abandonados
-                // cancelava o pedido em silêncio 30 minutos depois.
                 if (saldo > 0)
-                    cobranca = await cobrar.ExecuteAsync(new(link.EmpresaId, pedido.Id, link.ConversaId, CobrarSaldo: true,
-                        NaEntregaSemProvedor: peloAtendimento), t);
-                else if (saldo <= 0)
+                {
+                    // #1725-6: a cobrança sai depois do commit, como no console; a conversa não fica travada durante a
+                    // chamada ao provedor. Até lá, um reenvio concorrente recebe este resultado provisório, sem link.
+                    resultado = new(pedido.Id, "aguardando_pagamento", pedido.Total.Valor, saldo, CupomAplicado: cupomAplicado,
+                        EmCobranca: true);
+                    cobrarDepoisDoCommit = true;
+                }
+                else
                 {
                     pedido.MudarStatus(pedido.RequerAprovacao ? StatusPedido.AguardandoAprovacaoBaba : StatusPedido.Aguardando);
                     await inicioPrevisto.AplicarNaFilaAsync(pedido, t);
                     await pedidos.UpdateAsync(pedido);
                     efeitos = await quitacao.PrepararCreditoAsync(pedido, link.ConversaId, agora, t);
+                    resultado = new(pedido.Id, "pedido_confirmado", pedido.Total.Valor, saldo, CupomAplicado: cupomAplicado);
+                    confirmacaoNoCanal = await ConfirmarNaConversaAsync(link, $"pedido:{pedido.Id:N}",
+                        TextoPedidoChatSite(pedido, resultado, null, agora), agora, t);
                 }
-                resultado = new(pedido.Id, saldo > 0 ? "aguardando_pagamento" : "pedido_confirmado", pedido.Total.Valor, saldo,
-                    cobranca?.LinkPagamento, CupomAplicado: cupomAplicado);
-                await AvisarChatSiteAsync(link, $"pedido:{pedido.Id:N}", TextoPedidoChatSite(pedido, resultado, cobranca, agora), agora, t);
             }
             link.RegistrarResultado(resultado.PedidoId, JsonSerializer.Serialize(resultado, Json));
             await uow.CommitAsync();
             return resultado;
         }, ct);
+        if (cobrarDepoisDoCommit)
+            (resposta, confirmacaoNoCanal) = await CobrarDepoisDoCommitAsync(acesso, resposta, peloAtendimento);
+        else if (resposta.EmCobranca)
+            resposta = await AguardarCobrancaAsync(acesso, resposta, ct);
         await AvisarAsync(acesso.EmpresaId, acesso.ConversaId, ct);
         await quitacao.PublicarAsync(acesso.EmpresaId, efeitos, ct);
+        await EnviarNoCanalAsync(acesso, confirmacaoNoCanal, ct);
         return resposta;
+    }
+
+    /// <summary>
+    /// Cobrança do pedido já gravado e commitado pela comanda (#1725-6). Sem o token da requisição: com o pedido no
+    /// banco, a cobrança e a compensação terminam mesmo se o cliente fechar a página (o provedor tem limite de 5 s).
+    /// <list type="bullet">
+    ///   <item>#1717-7: nada alocado, a encomenda cobra o sinal, a mesma conta do console; com cupom, o restante (#1865).</item>
+    ///   <item>Sem Mercado Pago configurado (decisão do Felipe, 22/10): o pedido do dia paga na entrega, entra na fila como
+    ///     o pedido na entrega e a equipe é avisada na conversa. A encomenda já sai como sinal manual (#1736).</item>
+    ///   <item>Provedor fora do ar: desfaz o envio (<see cref="DesfazerEnvioAsync"/>) e relança para o 503.</item>
+    /// </list>
+    /// </summary>
+    private async Task<(EnvioComandaCliente, string?)> CobrarDepoisDoCommitAsync(LinkCardapioConversa acesso,
+        EnvioComandaCliente provisorio, bool peloAtendimento)
+    {
+        CobrancaPedidoResult cobranca;
+        var semProvedor = false;
+        try
+        {
+            // #1726: confirmado pela atendente também nasce com cobrança (na entrega, se o provedor falhar); sem ela a
+            // varredura de abandonados cancelava o pedido em silêncio 30 minutos depois.
+            cobranca = await cobrar.ExecuteAsync(new(acesso.EmpresaId, provisorio.PedidoId, acesso.ConversaId,
+                NaEntregaSemProvedor: peloAtendimento), CancellationToken.None);
+        }
+        catch (MercadoPagoIndisponivelException ex) when (ex.InnerException is MercadoPagoNaoConfiguradoException)
+        {
+            cobranca = (await trocarForma.ExecuteAsync(new(acesso.EmpresaId, provisorio.PedidoId,
+                TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, UsuarioNome: "comanda do cliente"), CancellationToken.None)).Cobranca;
+            semProvedor = true;
+        }
+        catch (MercadoPagoIndisponivelException)
+        {
+            await DesfazerEnvioAsync(acesso, provisorio.PedidoId, CheckoutCoreService.MotivoMercadoPagoIndisponivel);
+            await AvisarAsync(acesso.EmpresaId, acesso.ConversaId, CancellationToken.None);
+            throw;
+        }
+
+        try
+        {
+            return await RegistrarCobrancaAsync(acesso, provisorio, cobranca, semProvedor);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A confirmação ao cliente e o resultado não gravaram: o envio volta inteiro, como antes do #1961, para o
+            // cliente não ficar com um pedido que ele não viu confirmado.
+            await DesfazerEnvioAsync(acesso, provisorio.PedidoId, MotivoConfirmacaoNaoRegistrada);
+            await AvisarAsync(acesso.EmpresaId, acesso.ConversaId, CancellationToken.None);
+            throw;
+        }
+    }
+
+    /// <summary>Motivo do pedido desfeito porque a confirmação da comanda não gravou depois da cobrança (#1961).</summary>
+    public const string MotivoConfirmacaoNaoRegistrada = "confirmacao_da_comanda_nao_registrada";
+
+    private Task<(EnvioComandaCliente, string?)> RegistrarCobrancaAsync(LinkCardapioConversa acesso, EnvioComandaCliente provisorio,
+        CobrancaPedidoResult cobranca, bool semProvedor) =>
+        uow.ExecuteInTransactionSemRetryAsync(async t =>
+        {
+            await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
+            var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
+            var pedido = await pedidos.GetByIdWithDetailsAsync(acesso.EmpresaId, provisorio.PedidoId)
+                ?? throw new InvalidOperationException("Pedido criado sem persistência.");
+            var agora = relogio.GetUtcNow().UtcDateTime;
+            var resultado = provisorio with
+            {
+                Situacao = semProvedor ? "pedido_confirmado" : "aguardando_pagamento",
+                LinkPagamento = cobranca.LinkPagamento,
+                EmCobranca = false,
+            };
+            if (semProvedor)
+                await conversas.AddMensagemAsync(Mensagem.Saida(acesso.EmpresaId, acesso.ConversaId, AutorMensagem.Sistema, agora,
+                    TipoConteudoMensagem.Texto, "Pagamento online indisponível (Mercado Pago não configurado). O pedido da comanda " +
+                    $"entrou na fila para pagar na entrega: receba {resultado.Saldo.ToString("C", Cultura.PtBr)} na entrega."), t);
+            var texto = await ConfirmarNaConversaAsync(link, $"pedido:{pedido.Id:N}", TextoPedidoChatSite(pedido, resultado, cobranca, agora), agora, t);
+            link.RegistrarResultado(resultado.PedidoId, JsonSerializer.Serialize(resultado, Json));
+            await uow.CommitAsync();
+            return (resultado, texto);
+        }, CancellationToken.None);
+
+    /// <summary>
+    /// Reenvio concorrente (clique duplo; cliente e atendente juntos): o primeiro envio está cobrando fora do lock. Espera
+    /// o resultado final sem travar nada. Envio desfeito responde como o primeiro (provedor indisponível, tente de novo).
+    /// </summary>
+    private async Task<EnvioComandaCliente> AguardarCobrancaAsync(LinkCardapioConversa acesso, EnvioComandaCliente provisorio,
+        CancellationToken ct)
+    {
+        var espera = System.Diagnostics.Stopwatch.StartNew();
+        while (true)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(200), ct);
+            var link = await links.ObterPorTokenHashAsync(acesso.TokenHash, ct);
+            if (link?.UsadoEm is null)
+                throw new MercadoPagoIndisponivelException("O envio anterior não foi concluído. Tente novamente em instantes.");
+            var atual = Ler<EnvioComandaCliente>(link.ResultadoJson);
+            if (atual is { EmCobranca: false }) return atual;
+            if (espera.Elapsed > LimiteEsperaCobranca) return atual ?? provisorio;
+        }
+    }
+
+    /// <summary>O provedor responde em até 5 s (<see cref="GerarCobrancaPedidoUseCase"/>); a margem cobre a gravação.</summary>
+    private static readonly TimeSpan LimiteEsperaCobranca = TimeSpan.FromSeconds(15);
+
+    /// <summary>
+    /// A cobrança ou a confirmação não saiu depois do commit (#1725-6). Desfaz como o console (#1301): pedido cancelado com
+    /// o motivo, vaga liberada e cobrança pendente cancelada; devolve o cupom usado e o link, para o cliente reenviar a mesma
+    /// seleção. Se a compensação falhar, a resposta segue com o erro e a varredura de abandonados cancela o pedido sem
+    /// cobrança depois de 30 minutos.
+    /// </summary>
+    private async Task DesfazerEnvioAsync(LinkCardapioConversa acesso, Guid pedidoId, string motivo)
+    {
+        try
+        {
+            // O que falhou de gravar não pode voltar no commit da compensação.
+            uow.DescartarAlteracoesPendentes();
+            await uow.ExecuteInTransactionSemRetryAsync(async t =>
+            {
+                await conversas.TravarParaPedidoAsync(acesso.EmpresaId, acesso.ConversaId, t);
+                var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
+                await pedidos.TravarAsync(acesso.EmpresaId, pedidoId, t);
+                var pedido = await pedidos.GetByIdWithDetailsAsync(acesso.EmpresaId, pedidoId)
+                    ?? throw new InvalidOperationException("Pedido criado sem persistência.");
+                if (pedido.StatusEnum != StatusPedido.AguardandoPagamento) return false;
+                await checkout.DesfazerReservaDoPedidoAsync(pedido, motivo, t);
+                // Link já emitido fica sem efeito: pagamento que chegue por ele cai no pedido cancelado e é devolvido.
+                foreach (var pendente in (await cobrancasPedido.ListarDoPedidoAsync(acesso.EmpresaId, pedidoId, t)).Where(c => c.EstaPendente))
+                    pendente.Cancelar(motivo, relogio.GetUtcNow().UtcDateTime);
+                foreach (var uso in await creditos.ListarUsosDoPedidoAsync(acesso.EmpresaId, pedidoId, t))
+                {
+                    var credito = await creditos.ObterComLockPorIdAsync(acesso.EmpresaId, uso.CreditoId, t)
+                        ?? throw new InvalidOperationException("Cupom do uso não encontrado.");
+                    credito.Devolver(uso);
+                    creditos.RemoverUso(uso);
+                }
+                var conversa = await conversas.ObterPorIdAsync(acesso.EmpresaId, acesso.ConversaId, t);
+                if (conversa?.PedidoEmAndamentoId == pedidoId) conversa.DefinirPedidoEmAndamento(null);
+                if (link.PedidoRegistradoId == pedidoId) link.DesfazerEnvio();
+                await uow.CommitAsync();
+                return true;
+            }, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Comanda: envio nao desfeito pedidoId={PedidoId} linkId={LinkId}", pedidoId, acesso.Id);
+        }
+    }
+
+    /// <summary>
+    /// #1717-12: fora do ChatSite, a confirmação sai pela porta do canal (respeita a janela de 24 h) depois do commit, por
+    /// ser chamada externa. Best-effort: falha fica registrada na conversa e não desfaz o envio.
+    /// </summary>
+    private async Task EnviarNoCanalAsync(LinkCardapioConversa acesso, string? texto, CancellationToken ct)
+    {
+        if (texto is null) return;
+        await avisoCanal.EnviarAsync(acesso.EmpresaId, acesso.ConversaId, texto, relogio.GetUtcNow().UtcDateTime, ct);
     }
 
     /// <param name="exigirEndereco">Falso só na entrega a combinar (#1839): a atendente pede o endereço na conversa.</param>
@@ -374,8 +545,10 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     {
         if (valor < 0 || valor > 100000 || decimal.Round(valor, 2) != valor)
             throw new UseCaseValidationException("Informe um frete válido em reais e centavos.");
+        string? avisoNoCanal = null;
         var link = await uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
+            avisoNoCanal = null;
             await conversas.TravarParaPedidoAsync(empresaId, conversaId, t);
             var acesso = await links.ObterComLockAsync(empresaId, linkId, t) ?? throw new LinkCardapioConversaIndisponivelException();
             if (acesso.ConversaId != conversaId) throw new LinkCardapioConversaIndisponivelException();
@@ -389,13 +562,14 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             await conversas.AddMensagemAsync(Mensagem.Saida(empresaId, conversaId, AutorMensagem.Sistema,
                 relogio.GetUtcNow().UtcDateTime, TipoConteudoMensagem.Texto,
                 $"Frete de {valor.ToString("C", Cultura.PtBr)} combinado por {quem}. O cliente precisa conferir e confirmar o total na comanda."), t);
-            await AvisarChatSiteAsync(acesso, $"frete:{acesso.Id:N}:{revisao}",
+            avisoNoCanal = await ConfirmarNaConversaAsync(acesso, $"frete:{acesso.Id:N}:{revisao}",
                 $"O frete combinado é {valor.ToString("C", Cultura.PtBr)}. Confira e confirme o total na comanda para enviar o pedido.",
                 relogio.GetUtcNow().UtcDateTime, t);
             await uow.CommitAsync();
             return acesso;
         }, ct);
         await AvisarAsync(empresaId, conversaId, ct);
+        await EnviarNoCanalAsync(link, avisoNoCanal, ct);
         return await EstadoAsync(link, ct);
     }
 
@@ -515,16 +689,18 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
 
     // O ChatSite entrega a saída persistida pelo GET/SSE. O lock da conversa/link e a chave do marco
     // impedem repetição; gravar antes do commit preserva o aviso e a alteração na mesma transação.
-    private async Task AvisarChatSiteAsync(LinkCardapioConversa link, string marco, string texto, DateTime agora, CancellationToken ct)
+    // Nos outros canais (#1717-12) devolve o texto para quem chama mandar pela porta do canal depois do commit.
+    private async Task<string?> ConfirmarNaConversaAsync(LinkCardapioConversa link, string marco, string texto, DateTime agora, CancellationToken ct)
     {
         var conversa = await conversas.ObterPorIdAsync(link.EmpresaId, link.ConversaId, ct)
             ?? throw new LinkCardapioConversaIndisponivelException();
-        if (conversa.Canal != CanalConversa.ChatSite) return;
+        if (conversa.Canal != CanalConversa.ChatSite) return texto;
         var externoId = PrefixoAvisoChatSite + marco;
-        if (await conversas.ObterMensagemPorExternoIdAsync(link.EmpresaId, externoId, ct) is not null) return;
+        if (await conversas.ObterMensagemPorExternoIdAsync(link.EmpresaId, externoId, ct) is not null) return null;
         conversa.RegistrarSaida(agora);
         await conversas.AddMensagemAsync(Mensagem.Saida(link.EmpresaId, link.ConversaId, AutorMensagem.Sistema,
             agora, TipoConteudoMensagem.Texto, texto, externoId), ct);
+        return null;
     }
 
     private static string TextoPedidoChatSite(PedidoEntity pedido, EnvioComandaCliente envio, CobrancaPedidoResult? cobranca, DateTime agora)
@@ -534,13 +710,18 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         if (envio.Saldo <= 0) return texto + " Saldo a pagar: R$ 0,00.";
         if (cobranca is { Status: nameof(StatusCobrancaPedido.Pendente), LinkPagamento: { } link }
             && (cobranca.ExpiraEm is null || cobranca.ExpiraEm > agora))
-            return texto + $"\n\nPagamento de {cobranca.Valor.ToString("C", Cultura.PtBr)} pelo link: {link}";
+            // #1717-7: a encomenda cobra o sinal pelo link; o restante fica para a entrega.
+            return texto + (cobranca.Valor < envio.Saldo
+                ? $"\n\nSinal de {cobranca.Valor.ToString("C", Cultura.PtBr)} pelo link: {link}\nRestante na entrega: {(envio.Saldo - cobranca.Valor).ToString("C", Cultura.PtBr)}."
+                : $"\n\nPagamento de {cobranca.Valor.ToString("C", Cultura.PtBr)} pelo link: {link}");
         if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega }
             && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm))
         {
             var sinal = Math.Min(envio.Saldo, Math.Max(0, PlanoPagamentoEncomenda.Sinal(envio.Total) - (envio.Total - envio.Saldo)));
             return texto + $"\n\nSinal a receber: {sinal.ToString("C", Cultura.PtBr)} por Pix, dinheiro ou maquininha. Restante na entrega: {(envio.Saldo - sinal).ToString("C", Cultura.PtBr)}. Combine o pagamento com a equipe.";
         }
+        if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega })
+            return texto + $"\n\nPagamento na entrega: {envio.Saldo.ToString("C", Cultura.PtBr)}, por Pix, dinheiro ou maquininha.";
         return texto + $" Saldo a pagar: {envio.Saldo.ToString("C", Cultura.PtBr)}. Combine o pagamento com a equipe.";
     }
 
