@@ -85,6 +85,11 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ObterPedidoDetalhesUseCase>();
         services.AddScoped<AdicionarItemPedidoUseCase>();
         services.AddScoped<RemoverItemPedidoUseCase>();
+        // #1717-8: a quitação manual expira o link online que cancelou. O cliente do Mercado Pago só é resolvido
+        // quando há preferência a expirar: host sem pagamento (testes de banco, Worker) monta a quitação sem ele.
+        services.TryAddScoped(sp => new Lazy<EasyStock.Application.Ports.Output.Pagamentos.IMercadoPagoClient>(
+            () => sp.GetRequiredService<EasyStock.Application.Ports.Output.Pagamentos.IMercadoPagoClient>()));
+        services.AddScoped<EasyStock.Application.Services.Pedidos.ExpiracaoPreferenciaMercadoPago>();
         services.AddScoped<EasyStock.Application.Services.Pedidos.QuitacaoPedido>();
         services.AddScoped<RegistrarPagamentoPedidoUseCase>();
         services.AddScoped<RemoverPagamentoPedidoUseCase>();

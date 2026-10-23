@@ -114,8 +114,9 @@ public class IniciarCheckoutUseCaseTests
         var cardapioItem = CardapioItem.CriarAPartirDeProduto(storefront.Id, produto);
         cardapioItem.TornarVisivel();
         cardapioItem.Produto = produto; // nav p/ PrecoEfetivo() herdar PrecoReferencia (R$10)
+        typeof(CardapioItem).GetProperty("Id")!.SetValue(cardapioItem, CardapioItemId1);
 
-        var cardapioRepo = Substitute.For<ICardapioItemRepository>();
+        var cardapioRepo = Substitute.For<ICardapioItemRepository>().ListarPeloGetById();
         cardapioRepo.GetByIdAsync(storefront.Id, CardapioItemId1, Arg.Any<CancellationToken>())
             .Returns(cardapioItem);
 

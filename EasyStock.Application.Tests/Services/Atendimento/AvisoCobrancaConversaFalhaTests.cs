@@ -48,6 +48,25 @@ public class AvisoCobrancaConversaFalhaTests
         await _uow.Received(1).CommitAsync();
     }
 
+    /// <summary>
+    /// #1933 (decisão do Felipe, 21/10): o reenvio automático repetia o aviso sem conferir pedido nem cobrança, e o
+    /// "novo link, válido por 30 minutos" saía já vencido. A falha fica em Não entregues para a atendente decidir.
+    /// </summary>
+    [Fact]
+    public async Task Falha_temporaria_nao_agenda_reenvio_automatico()
+    {
+        var (aviso, conversa) = Montar(Agora.AddMinutes(-10));
+        _canal.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<string>(_ => throw new HttpRequestException(HttpRequestError.ConnectionError, "conexão recusada"));
+
+        await aviso.EnviarAsync(_empresa, conversa.Id, AvisoCobrancaConversa.TextoNovoLink("https://mp.test/x"), Agora);
+
+        var falhou = _gravadas.Should().ContainSingle().Subject;
+        falhou.UltimaFalhaEnvio.Should().Be(TipoFalhaEnvio.Temporaria);
+        falhou.ProximoReenvioEm.Should().BeNull();
+        falhou.PodeReenviar.Should().BeTrue("a atendente ainda reenvia pelo botão");
+    }
+
     [Fact]
     public async Task Fora_da_janela_de_24_horas_grava_a_falha_sem_chamar_o_canal()
     {

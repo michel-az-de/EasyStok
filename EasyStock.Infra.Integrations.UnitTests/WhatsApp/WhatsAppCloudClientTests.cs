@@ -303,6 +303,55 @@ public class WhatsAppCloudClientTests
         handler.TodosComBearer.Should().BeTrue();
     }
 
+    // #1622-5: documento de 100 MB custava ~300 MB de pico (resposta inteira em memória e duas cópias). Acima do teto, a
+    // mídia é recusada pelo tamanho que a Meta informa, sem baixar.
+    [Fact]
+    public async Task MidiaAcimaDoTetoPeloTamanhoDosMetadadosNaoEBaixada()
+    {
+        var handler = new HandlerDeMidia(
+            $$"""{"url":"https://graph.test/media-cdn/abc","mime_type":"video/mp4","id":"media-1","file_size":{{MidiaGrandeDemaisException.TetoBytes + 1}}}""",
+            () => new ByteArrayContent([1]));
+        var client = BuildClient(handler);
+
+        var act = () => client.BaixarMidiaAsync("media-1");
+
+        (await act.Should().ThrowAsync<MidiaGrandeDemaisException>()).Which.Tamanho.Should().Be(MidiaGrandeDemaisException.TetoBytes + 1);
+        handler.Chamadas.Should().Be(1, "o binário não é pedido");
+    }
+
+    [Fact]
+    public async Task MidiaAcimaDoTetoPeloContentLengthERecusadaAntesDeLerOCorpo()
+    {
+        var handler = new HandlerDeMidia(
+            """{"url":"https://graph.test/media-cdn/abc","mime_type":"application/pdf","id":"media-1"}""",
+            () =>
+            {
+                var conteudo = new ByteArrayContent([1, 2, 3]);
+                conteudo.Headers.ContentLength = MidiaGrandeDemaisException.TetoBytes + 1;
+                return conteudo;
+            });
+        var client = BuildClient(handler);
+
+        var act = () => client.BaixarMidiaAsync("media-1");
+
+        await act.Should().ThrowAsync<MidiaGrandeDemaisException>();
+        handler.Chamadas.Should().Be(2);
+    }
+
+    private sealed class HandlerDeMidia(string metadados, Func<HttpContent> binario) : HttpMessageHandler
+    {
+        public int Chamadas { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Chamadas++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = Chamadas == 1 ? new StringContent(metadados, Encoding.UTF8, "application/json") : binario(),
+            });
+        }
+    }
+
     [Fact]
     public async Task TemplateComImagemMandaOCabecalhoAntesDoCorpo()
     {

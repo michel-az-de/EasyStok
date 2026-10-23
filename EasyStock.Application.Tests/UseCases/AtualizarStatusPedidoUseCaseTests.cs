@@ -221,11 +221,13 @@ public class AtualizarStatusPedidoUseCaseTests
     [Fact]
     public async Task ForaDaFila_NaoConsultaInicioPrevisto()
     {
-        // #1230: só a entrada em "aguardando" calcula; avançar o preparo não gasta consulta.
+        // #1230: só a entrada em "aguardando" calcula; avançar o preparo de quem já tem o número do dia não gasta
+        // consulta (o preparo sem número numera, #1641-2).
         var prazo = Substitute.For<IPrazoPreparoPedidoQueries>();
         var (uc, repo, _, _, _, _) = Build(prazoQueries: prazo);
         var empresaId = Guid.NewGuid();
         var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 1);
+        pedido.DefinirNumeroDoDia(new DateOnly(2026, 10, 2), 5);
         repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
 
         await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "preparando"));

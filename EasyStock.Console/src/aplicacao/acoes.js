@@ -9,6 +9,8 @@ export const AVANCAR_ESTEIRA = 'avancar-esteira'
 export const TROCAR_JANELA = 'trocar-janela'
 export const CADASTRAR_ENDERECO = 'cadastrar-endereco'
 export const ADICIONAR_ITEM = 'adicionar-item'
+// #1686 (item 3): comanda nova na mesma conversa depois de o pedido anterior terminar.
+export const NOVA_COMANDA = 'nova-comanda'
 export const REMOVER_ITEM = 'remover-item'
 export const GERAR_PEDIDO = 'gerar-pedido'
 export const SALVAR_NOTA = 'salvar-nota'
@@ -104,6 +106,8 @@ export const DESPACHAR_MESMO_ASSIM = 'despachar-mesmo-assim'
 // Integração da onda seguinte, ponta (a): o meio escolhido nos chips vale
 // para "Enviar comanda" e para o atalho da barra, não só para o bloco.
 export const ESCOLHER_MEIO_PAGAMENTO = 'escolher-meio-pagamento'
+// J2 (#1990): "troco para R$" do dinheiro na entrega, antes de o pedido nascer.
+export const DEFINIR_TROCO = 'definir-troco'
 // Rodada 12 (issue #13): trocar a forma depois que a cobrança saiu (cancela a
 // pendente e emite outra) e desfazer a baixa marcada por engano.
 export const ALTERAR_MEIO_PAGAMENTO = 'alterar-meio-pagamento'

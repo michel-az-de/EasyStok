@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using EasyStock.Application.Events.Storefront;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
@@ -15,7 +16,7 @@ namespace EasyStock.Application.UseCases.Storefront.Aprovacao;
 /// Fluxo (single transaction via <see cref="IUnitOfWork.ExecuteInTransactionAsync"/>):
 /// </para>
 /// <list type="number">
-///   <item>SELECT FOR UPDATE no <c>Pedido</c> via <see cref="IPedidoStorefrontRepository.GetForUpdateAsync"/>.</item>
+///   <item>SELECT FOR UPDATE no <c>Pedido</c> via <see cref="IPedidoStorefrontRepository.GetForUpdateAsync(Guid, Guid, CancellationToken)"/>, com a empresa (#1265-9).</item>
 ///   <item>Valida tenant (<c>EmpresaId</c>) — mismatch → <c>PedidoNaoEncontradoException</c> (404, não vaza existência).</item>
 ///   <item>Valida status atual == <see cref="StatusPedido.AguardandoAprovacaoBaba"/> — mismatch → <see cref="PedidoJaResolvidoException"/> (409).</item>
 ///   <item>Atualiza Pedido: status = <see cref="StatusPedido.AprovadoBaba"/>, <c>AprovadoEm</c>, <c>AprovadoPorUsuarioId</c>.</item>
@@ -38,7 +39,8 @@ public sealed class AprovarPedidoStorefrontUseCase(
     IPedidoStorefrontRepository pedidoRepository,
     IPublicadorEventoIntegracao publicadorEventos,
     IUnitOfWork unitOfWork,
-    ILogger<AprovarPedidoStorefrontUseCase> logger)
+    ILogger<AprovarPedidoStorefrontUseCase> logger,
+    IOperacaoEventPublisher operacaoEventos)
 {
     public async Task<AprovarPedidoStorefrontResult> ExecuteAsync(
         AprovarPedidoStorefrontInput input,
@@ -55,10 +57,10 @@ public sealed class AprovarPedidoStorefrontUseCase(
 
         var sw = Stopwatch.StartNew();
 
-        return await unitOfWork.ExecuteInTransactionAsync(async innerCt =>
+        var resultado = await unitOfWork.ExecuteInTransactionAsync(async innerCt =>
         {
             // 1. SELECT FOR UPDATE no Pedido (lock pessimista — ADR-0014).
-            var pedido = await pedidoRepository.GetForUpdateAsync(input.PedidoId, innerCt);
+            var pedido = await pedidoRepository.GetForUpdateAsync(input.EmpresaId, input.PedidoId, innerCt);
 
             // 2. Tenant isolation: pedido inexistente OU de outro tenant → 404
             //    (mesma resposta evita oracle de existência cross-tenant).
@@ -134,6 +136,11 @@ public sealed class AprovarPedidoStorefrontUseCase(
                     Enfileirada: true,
                     Evento: nameof(NotificarClientePedidoAprovadoEvent)));
         }, ct);
+
+        // #1265-8: depois do commit, a operação (cozinha, Balcão) move o card sem recarregar.
+        await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, input.EmpresaId,
+                new PedidoMudouStatusOperacao(resultado.PedidoId, StatusPedidoMapper.AguardandoAprovacaoBaba, resultado.Status), ct);
+        return resultado;
     }
 
     private async Task PedidoEventoAprovado(

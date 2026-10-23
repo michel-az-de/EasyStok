@@ -317,7 +317,7 @@ public class ReenviarMensagemRetomadaTests
         var r = await Reenviar();
 
         r.Status.Should().Be(StatusMensagem.Falhou);
-        r.Erro.Should().Contain("modelo de retomada").And.Contain("modelo inexistente");
+        r.Erro.Should().Contain("modelo de retomada").And.Contain("código Meta 132001").And.NotContain("modelo inexistente");
         _falhou.AguardaClienteDesde.Should().BeNull();
     }
 

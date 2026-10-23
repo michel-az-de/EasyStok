@@ -14,7 +14,7 @@ namespace EasyStock.Application.Services.Atendimento;
 /// </summary>
 public static class ResumoPedidoConversa
 {
-    public static string Texto(PedidoReservado reservado, DateOnly dataEntrega, string forma, string cabecalho, bool cobrarTotal = false)
+    public static string Texto(PedidoReservado reservado, DateOnly dataEntrega, string forma, string cabecalho)
     {
         ArgumentNullException.ThrowIfNull(reservado);
         var reais = CultureInfo.GetCultureInfo("pt-BR");
@@ -29,9 +29,8 @@ public static class ResumoPedidoConversa
         sb.Append("\nFrete: ").Append(reservado.ItemFrete.PrecoUnitario.ToString("C", reais));
         sb.Append("\nTotal: ").Append(reservado.Total.ToString("C", reais));
         sb.Append("\nEntrega: ").Append(Entrega(dataEntrega, reservado.Janela));
-        if (cobrarTotal)
-            sb.Append("\nPagamento: este envio cobra o saldo integral; acréscimos posteriores cobram apenas a diferença.");
-        else if (PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
+        // #1717-7: a comanda cobra como o console; a encomenda pede o sinal e o restante fica para a entrega.
+        if (PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
         {
             var sinal = PlanoPagamentoEncomenda.Sinal(reservado.Total);
             sb.Append("\nSinal agora por link: ").Append(sinal.ToString("C", reais));

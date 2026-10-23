@@ -9,6 +9,7 @@ import {
 } from '../../dominio/kds'
 import { ORDEM_DAS_LINHAS, nomeDoPedido } from '../../dominio/pedido'
 import { useCozinhaApi } from '../../aplicacao/useCozinhaApi'
+import { SEGUNDOS_PARA_DESFAZER_ETAPA } from '../../aplicacao/envioComDesfazer'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { Botao } from '../../componentes/Botao'
@@ -20,6 +21,9 @@ import { ComandaKds } from './ComandaKds'
 import { FeedbackArrasto } from './FeedbackArrasto'
 import { colisaoPorColuna, coordenadasEntreColunas } from './arrastoEntreColunas'
 import css from './cozinha.module.css'
+
+// #1686 (item 5): avanços esperando o "Desfazer" (id do pedido -> { status, ate }).
+const SEM_ADIADOS = new Map()
 
 // Cozinha no modo API (F05, issue #1218): a fila real do KDS sobre Pedido (S19),
 // ao vivo pelo SSE de operação (S18), com início previsto e atraso (S21).
@@ -65,7 +69,7 @@ export function TelaCozinhaApi({ linhas }) {
   const { amanha, data: dataDaFila } = diaDaFilaDaCozinha(amanhaDesde, agora)
   const {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes, saldoPendente, descartarSaldoPendente,
-    avancar, recarregar, reimprimir, limparErro,
+    avancar, recarregar, reimprimir, limparErro, adiados = SEM_ADIADOS, desfazerAvanco,
   } = useCozinhaApi({ data: dataDaFila })
   const [linhaFiltro, setLinhaFiltro] = useState(null)
   const [abertoId, setAbertoId] = useState(null)
@@ -131,7 +135,7 @@ export function TelaCozinhaApi({ linhas }) {
     const r = respostaAoSoltarKds(pedido.status, over.id)
     if (r.aceita) {
       setFeedback({ id: pedido.id, numero: pedido.numeroCurto, destino: over.id, porTeclado,
-        texto: `${nomeDoPedido(pedido).frase} solto em ${rotuloDaColuna(over.id)}. Aguardando confirmação da fila.` })
+        texto: `${nomeDoPedido(pedido).frase} solto em ${rotuloDaColuna(over.id)}. Aguardando confirmação da fila; dá para desfazer no cartão por ${SEGUNDOS_PARA_DESFAZER_ETAPA} s.` })
       avancar(pedido.id, over.id)
     } else {
       if (r.motivo) setRecusa({ id: pedido.id, motivo: r.motivo })
@@ -252,6 +256,7 @@ export function TelaCozinhaApi({ linhas }) {
                             retomarFoco={feedback?.id === p.id && feedback.confirmado && feedback.porTeclado && !movendo.has(p.id)}
                             aoConsumirFoco={() => setFeedback((atual) => atual === feedback ? { ...atual, porTeclado: false } : atual)}
                             aoAvancar={avancar} aoAbrir={setAbertoId}
+                            adiado={adiados.get(p.id) ?? null} aoDesfazer={desfazerAvanco}
                           />
                         ))}
                         {saindoDaqui.map((p) => (
@@ -272,6 +277,7 @@ export function TelaCozinhaApi({ linhas }) {
         <ComandaKds
           pedido={aberto} agora={agora} linhas={linhas} movendo={movendo.has(aberto.id)} erro={erro}
           aoAvancar={avancar} aoReimprimir={reimprimir} aoLimparErro={limparErro}
+          adiado={adiados.get(aberto.id) ?? null} aoDesfazer={desfazerAvanco}
           aoFechar={() => setAbertoId(null)}
         />
       )}

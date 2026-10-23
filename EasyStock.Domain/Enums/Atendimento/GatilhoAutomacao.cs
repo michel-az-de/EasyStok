@@ -11,5 +11,11 @@ public enum GatilhoAutomacao
     LojaFechada = 3,
     PagamentoConfirmado = 4,
     PosEntrega = 5,
-    Encerramento = 6
+    Encerramento = 6,
+
+    /// <summary>
+    /// #1610: link de pagamento pendente da conversa perto de vencer. Só avisa: não reemite nem cancela. Único gatilho
+    /// que nasce ligado (<see cref="Entities.Atendimento.RegraAutomatica.Padrao"/>).
+    /// </summary>
+    CobrancaVencendo = 7
 }

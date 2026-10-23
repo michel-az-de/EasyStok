@@ -2,6 +2,7 @@
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Operacao;
 using EasyStock.Application.UseCases.Storefront.Aprovacao;
 using EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
 using EasyStock.Infra.Postgre.Repositories.Atendimento;
@@ -164,7 +165,7 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
         {
             var useCase = new AprovarPedidoStorefrontUseCase(
                 pedidoRepo, publicador, uow,
-                NullLogger<AprovarPedidoStorefrontUseCase>.Instance);
+                NullLogger<AprovarPedidoStorefrontUseCase>.Instance, new NoOpOperacaoEventPublisher());
 
             await useCase.ExecuteAsync(new AprovarPedidoStorefrontInput(
                 PedidoId: pedidoId,
@@ -187,7 +188,7 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
                     new ResolvedorCanal(Array.Empty<ICanalMensageria>()), uow,
                     NullLogger<AvisoCobrancaConversa>.Instance),
                 publicador, uow,
-                NullLogger<RecusarPedidoStorefrontUseCase>.Instance);
+                NullLogger<RecusarPedidoStorefrontUseCase>.Instance, new NoOpOperacaoEventPublisher());
 
             await useCase.ExecuteAsync(new RecusarPedidoStorefrontInput(
                 PedidoId: pedidoId,

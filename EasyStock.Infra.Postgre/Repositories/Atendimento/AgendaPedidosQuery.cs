@@ -16,11 +16,11 @@ public sealed class AgendaPedidosQuery(EasyStockDbContext db) : IAgendaPedidosQu
                 && vaga.LiberadoEm == null && vaga.DataEntrega >= de && vaga.DataEntrega <= ate
             orderby vaga.DataEntrega, janela.HoraInicio, pedido.CriadoEm
             select new { JanelaId = janela.Id, Data = vaga.DataEntrega, PedidoId = pedido.Id,
-                pedido.ClienteNome, pedido.Status })
+                pedido.ClienteNome, pedido.Status, pedido.NumeroDoDia })
             .ToListAsync(ct);
         var comandas = await NumeroComandaDoPedido.PorPedidosAsync(db, empresaId, linhas.Select(l => l.PedidoId).Distinct().ToList(), ct);
 
         return linhas.Select(l => new AgendaPedidoLeitura(l.JanelaId, l.Data, l.PedidoId, l.ClienteNome, l.Status,
-            comandas.TryGetValue(l.PedidoId, out var comanda) ? comanda : null)).ToList();
+            comandas.TryGetValue(l.PedidoId, out var comanda) ? comanda : null, l.NumeroDoDia)).ToList();
     }
 }

@@ -81,7 +81,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using var semToken = factory.CreateClient();
         (await semToken.GetAsync("/api/public/chat/chat-comanda/mensagens")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        // A falha da saída pública deve desfazer também pedido, cobrança e consumo do link.
+        // A falha da saída pública deve desfazer também pedido, cobrança e consumo do link. Desde o #1961 a cobrança sai
+        // depois do commit do pedido (a conversa não fica travada durante o provedor): desfazer é cancelar o pedido e a
+        // cobrança com o motivo e devolver o link; nenhum pedido ou cobrança ATIVO fica para trás.
         Guid outraConversa;
         using (var scope = factory.Services.CreateScope())
         {
@@ -102,8 +104,11 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-            (await db.Pedidos.CountAsync()).Should().Be(1);
-            (await db.CobrancasPedido.CountAsync()).Should().Be(1);
+            (await db.Pedidos.CountAsync(p => p.Status != "cancelado")).Should().Be(1);
+            (await db.CobrancasPedido.CountAsync(x => x.Status != EasyStock.Domain.Enums.Pagamentos.StatusCobrancaPedido.Cancelada)).Should().Be(1);
+            (await db.Pedidos.Where(p => p.Status == "cancelado").SelectMany(p => p.Eventos)
+                .AnyAsync(e => e.Detalhes == EasyStock.Application.UseCases.Atendimento.Comanda.ComandaClienteUseCase.MotivoConfirmacaoNaoRegistrada))
+                .Should().BeTrue("o pedido desfeito diz o motivo");
             (await db.LinksCardapioConversa.SingleAsync(l => l.Id == estado.LinkId)).UsadoEm.Should().BeNull();
         }
         await FalharAvisoChatComanda(factory, false);

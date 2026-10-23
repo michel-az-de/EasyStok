@@ -38,7 +38,8 @@ public class CriarPedidoUseCaseTests
     private readonly IPrazoPreparoPedidoQueries _prazoQueries = Substitute.For<IPrazoPreparoPedidoQueries>();
 
     private CriarPedidoUseCase Sut() => new(_pedidoRepo, _clienteRepo, _produtoRepo, _uow,
-        Substitute.For<ILogger<CriarPedidoUseCase>>(), new CalculadoraInicioPrevistoPedido(_prazoQueries), EnderecoEntregaPedidoTeste.Criar());
+        Substitute.For<ILogger<CriarPedidoUseCase>>(), new CalculadoraInicioPrevistoPedido(_prazoQueries), EnderecoEntregaPedidoTeste.Criar(),
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.ILojaRepository>());
 
     [Fact]
     public async Task DeveNormalizarAgendadoParaEm_ParaUtc_QuandoClienteEnviaDataSemFuso()

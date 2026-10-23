@@ -87,7 +87,7 @@ export function HallDeModulos(props) {
 }
 
 function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, painel = null, chavePreferencia }) {
-  const { permite, aoSair, notificacoes, conta } = useAcessoModulos()
+  const { permite, aoSair, notificacoes, conta, acoes } = useAcessoModulos()
   const [busca, setBusca] = useState('')
   const [organizar, setOrganizar] = useState(false)
   const [preferencia, setPreferencia] = useState(() => lerPreferenciasHall(chavePreferencia))
@@ -106,7 +106,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
     if (alvo === 'ajustar') ajustarRef.current?.focus()
     else if (alvo === 'organizar') document.querySelector('[data-alca-modulo]')?.focus()
   }, [organizar])
-  const modulosPermitidos = modulosDoHall({ fonteApi }).filter((modulo) => permite(modulo.id))
+  const modulosPermitidos = modulosDoHall({ fonteApi, acoes }).filter((modulo) => permite(modulo.id))
   const todos = ordenarModulosDoHall(modulosPermitidos, preferencia)
   const modulos = filtrarModulos(todos, busca)
   const moduloArrastando = modulos.find((modulo) => modulo.id === arrastando)

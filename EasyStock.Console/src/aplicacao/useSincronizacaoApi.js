@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as acao from './acoes'
 import { lerAlertasDeEstoque, lerCardapio } from './api/cardapio'
-import { abaVisivel, avisoDoCardapio, deveVarrerAoVoltar } from './planoDeSincronizacao'
+import { abaVisivel, alvoDoEvento, avisoDoCardapio, deveVarrerAoVoltar } from './planoDeSincronizacao'
 import { criarCicloDeSincronizacao, criarMemoriaDoLaco } from './cicloDeSincronizacao'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 
@@ -22,7 +22,16 @@ const AGRUPAR_EVENTOS_MS = 300
 
 // `memoria` (#1576): os caches do laço, criados acima do Balcão para a volta do Hall, da Cozinha ou
 // das Entregas não reler tudo. Sem ela (demonstração, provas) o laço usa a sua, que morre com ele.
-export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora = true, usuario, despachar, selecionadaId = null, memoria = null }) {
+export function useSincronizacaoApi({
+  ativo, comConversas = true, comItensFora = true, comDesacertos = true, usuario, despachar, selecionadaId = null, memoria = null,
+  aoConversaAtualizada = null,
+}) {
+  // #1966: num ref, como a seleção; quem passa a função não recomeça o laço.
+  const aoConversaAtualizadaRef = useRef(aoConversaAtualizada)
+  useEffect(() => { aoConversaAtualizadaRef.current = aoConversaAtualizada }, [aoConversaAtualizada])
+  // #1940 (item 1): os desacertos de estoque exigem a permissão de estoque; sem ela, não se pede.
+  const comDesacertosRef = useRef(comDesacertos)
+  useEffect(() => { comDesacertosRef.current = comDesacertos }, [comDesacertos])
   // #1761: quem não é da gerência não pede os itens tirados do cardápio (voltava 403 a cada minuto).
   // Num ref: a matriz de acesso relida não recomeça o laço.
   const comItensForaRef = useRef(comItensFora)
@@ -71,6 +80,7 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
         avisouCardapio = true
         despachar({ tipo: acao.AVISO_API, mensagem: avisoDoCardapio(erro), persistente: true })
       }
+      if (!comDesacertosRef.current) return
       const alertas = await lerAlertasDeEstoque()
       if (vivo) despachar({ tipo: acao.ALERTAS_DE_ESTOQUE_DA_API, alertas })
     }
@@ -112,10 +122,16 @@ export function useSincronizacaoApi({ ativo, comConversas = true, comItensFora =
     function conectar() {
       fecharEventos = conectarEventosOperacao({
         aoEvento: ({ evento, dados }) => {
-          const pedido = evento?.startsWith('pedido.') && dados?.pedidoId
-          const comanda = evento === 'conversa.comanda_atualizada' && dados?.conversaId
-          if (!vivo || (evento !== 'ready' && !pedido && !comanda)) return
-          if (!sincronizar.invalidarPedidos(pedido || null, comanda || null)) return
+          const alvo = alvoDoEvento(evento, dados)
+          if (!vivo || !alvo) return
+          // #1966: a volta seguinte (no ritmo de sempre) lê até a página da conversa e traz o nome. O contato
+          // informado pelo visitante só vem no dossiê: a conversa aberta relê a Ficha.
+          if (alvo.tipo === 'conversa') {
+            sincronizar.atualizarConversa(alvo.conversaId)
+            if (alvo.conversaId === selecionadaRef.current) aoConversaAtualizadaRef.current?.(alvo.conversaId)
+            return
+          }
+          if (!sincronizar.invalidarPedidos(alvo.pedidoId ?? null, alvo.tipo === 'comanda' ? alvo.conversaId : null)) return
           if (lendo) { pedidosPendentes = true; return }
           clearTimeout(esperaPedidos)
           esperaPedidos = setTimeout(() => ciclo(true), AGRUPAR_EVENTOS_MS)

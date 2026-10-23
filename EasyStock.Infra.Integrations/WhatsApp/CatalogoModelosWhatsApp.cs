@@ -19,7 +19,7 @@ public sealed partial class CatalogoModelosWhatsApp(
         if (empresaId == Guid.Empty || empresa?.Id != empresaId || string.IsNullOrWhiteSpace(empresa.WhatsAppPhoneNumberId)
             || string.IsNullOrWhiteSpace(credencial?.WabaId) || string.IsNullOrWhiteSpace(credencial.AccessToken)
             || credencial.PhoneNumberId != empresa.WhatsAppPhoneNumberId)
-            throw new CatalogoModelosException("Conecte o WhatsApp da empresa em Integrações para consultar seus modelos aprovados.");
+            throw CatalogoModelosException.SemConexao("Conecte o WhatsApp da empresa em Integrações para consultar seus modelos aprovados.");
 
         var modelos = new List<ModeloAtendimento>();
         var cursores = new HashSet<string>(StringComparer.Ordinal);
@@ -94,5 +94,5 @@ public sealed partial class CatalogoModelosWhatsApp(
 public sealed class CatalogoModelosIndisponivel : ICatalogoModelosAtendimento
 {
     public Task<IReadOnlyList<ModeloAtendimento>> ListarAsync(Guid empresaId, CancellationToken ct = default) =>
-        throw new CatalogoModelosException("O envio real do WhatsApp não está conectado. Configure a conexão em Integrações.");
+        throw CatalogoModelosException.SemConexao("O envio real do WhatsApp não está conectado. Configure a conexão em Integrações.");
 }

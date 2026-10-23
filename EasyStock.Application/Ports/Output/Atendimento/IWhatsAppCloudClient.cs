@@ -47,6 +47,20 @@ public interface IWhatsAppCloudClient
 public sealed record EnvioWhatsAppResult(string Wamid);
 
 /// <summary>
+/// #1622-5: mídia recebida acima do teto. Não é baixada (ou a cópia para no teto) e não volta a ser tentada: a mensagem
+/// do cliente fica registrada sem o anexo.
+/// </summary>
+/// <param name="tamanho">Bytes informados pela Meta ou contados até passar do teto; nulo quando desconhecido.</param>
+public sealed class MidiaGrandeDemaisException(long? tamanho)
+    : Exception($"Anexo acima de {TetoBytes / (1024 * 1024)} MB: não foi guardado.")
+{
+    /// <summary>Teto da mídia recebida: 16 MB, o limite de vídeo e áudio da Cloud API.</summary>
+    public const long TetoBytes = 16L * 1024 * 1024;
+
+    public long? Tamanho { get; } = tamanho;
+}
+
+/// <summary>
 /// Erro tipado da Cloud API, com o código numérico da Meta (ex.: 131047 = fora da janela de 24h).
 /// <see cref="EhPermanente"/> = true nunca deve ser reenviado automaticamente.
 /// </summary>

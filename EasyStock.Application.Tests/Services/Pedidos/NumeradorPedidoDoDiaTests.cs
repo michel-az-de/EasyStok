@@ -94,6 +94,48 @@ public class NumeradorPedidoDoDiaTests
         await _sequencia.DidNotReceiveWithAnyArgs().ProximoAsync(default, default, default);
     }
 
+    /// <summary>
+    /// #1641-3: pedido para já numerado ontem recebe o pagamento hoje, ainda em Aguardando. O número não muda
+    /// depois de atribuído; só o reagendamento explícito troca.
+    /// </summary>
+    [Fact]
+    public async Task CompromissoEmOutroDiaNaoTrocaONumeroDeQuemJaTem()
+    {
+        var pedido = NovoPedido();
+        pedido.DefinirNumeroDoDia(new DateOnly(2026, 10, 1), 42);
+        _sequencia.ProximoAsync(default, default, default).ReturnsForAnyArgs(1);
+
+        await Calculadora().AplicarCompromissoAsync(pedido);
+
+        pedido.NumeroDoDia.Should().Be(42);
+        pedido.DataNumero.Should().Be(new DateOnly(2026, 10, 1));
+        await _sequencia.DidNotReceiveWithAnyArgs().ProximoAsync(default, default, default);
+    }
+
+    /// <summary>
+    /// #1641-2: a spec numera "na confirmação do pagamento ou no início do preparo, o que vier primeiro". Pedido
+    /// para já do balcão (sem pagamento) ou aprovado pela dona entra em preparo sem número e ganha o número ali.
+    /// </summary>
+    [Fact]
+    public async Task EntradaEmPreparoNumeraSoQuemAindaNaoTem()
+    {
+        var semNumero = NovoPedido();
+        semNumero.Status = StatusPedidoMapper.Format(StatusPedido.Preparando);
+        _sequencia.ProximoAsync(default, default, default).ReturnsForAnyArgs(3);
+
+        await Calculadora().AplicarNaFilaAsync(semNumero);
+
+        semNumero.NumeroDoDia.Should().Be(3);
+        semNumero.DataNumero.Should().Be(new DateOnly(2026, 10, 2));
+
+        var comNumero = NovoPedido();
+        comNumero.DefinirNumeroDoDia(new DateOnly(2026, 10, 1), 7);
+        comNumero.Status = StatusPedidoMapper.Format(StatusPedido.Preparando);
+        await Calculadora().AplicarNaFilaAsync(comNumero);
+        comNumero.NumeroDoDia.Should().Be(7);
+        await _sequencia.ReceivedWithAnyArgs(1).ProximoAsync(default, default, default);
+    }
+
     [Fact]
     public async Task EntradaNaFilaNumeraSoQuemEstaAguardando()
     {

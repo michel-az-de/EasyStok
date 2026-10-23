@@ -52,10 +52,11 @@ function VazioEmLinha({ texto, acao, aoAgir }) {
   )
 }
 
-export function PainelConversas({ aoAbrir }) {
+// #1408: `buscaDeClientes` é o componente que a Moldura entrega para a busca achar cliente cadastrado sem conversa.
+export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = null }) {
   const {
-    visiveis, encerradasDoBalcao, bloqueadasDoBalcao, selecionadaId, filtros, agora,
-    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos,
+    conversas, visiveis, encerradasDoBalcao, bloqueadasDoBalcao, selecionadaId, filtros, agora,
+    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos, fonteApi,
   } = useAtendimento()
   const { mudarFiltro, selecionar } = useAcoes()
   const [gruposAbertos, setGruposAbertos] = useState({ encerradas: false, bloqueados: false })
@@ -159,6 +160,7 @@ export function PainelConversas({ aoAbrir }) {
             expediente={horarioDaLoja}
             busca={filtros.busca}
             aoAbrir={abrir}
+            fonteApi={fonteApi}
           />
         ))}
         {filtros.aba === 'todas' && (
@@ -189,6 +191,7 @@ export function PainelConversas({ aoAbrir }) {
             />
           </>
         )}
+        {fonteApi && BuscaDeClientes && <BuscaDeClientes busca={filtros.busca} conversas={conversas} aoAbrir={aoAbrir} />}
       </div>
     </>
   )

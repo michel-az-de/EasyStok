@@ -186,7 +186,10 @@ public sealed class EstornoManualPedidoIntegrationTests(PostgreSqlDatabaseFixtur
         await Executar(input);
         await using var db = fixture.CreateDbContext();
         db.SetMobileTenantContext(input.EmpresaId);
-        var uc = new EstornarMovimentoCaixaUseCase(new CaixaRepository(db), db, NullLogger<EstornarMovimentoCaixaUseCase>.Instance);
+        var repo = new CaixaRepository(db);
+        var uc = new EstornarMovimentoCaixaUseCase(repo, db,
+            new EasyStock.Application.UseCases.ObterCaixaDia.ObterCaixaDiaUseCase(new EasyStock.Application.UseCases.Caixa.CaixaSaldoCalculator(repo)),
+            NullLogger<EstornarMovimentoCaixaUseCase>.Instance);
         await FluentActions.Invoking(() => uc.ExecuteAsync(new(input.EmpresaId, input.OperacaoId, "Apagar")))
             .Should().ThrowAsync<UseCaseValidationException>();
         db.Set<PedidoPagamento>().Remove(await db.Set<PedidoPagamento>().SingleAsync(p => p.Id == input.PagamentoId));

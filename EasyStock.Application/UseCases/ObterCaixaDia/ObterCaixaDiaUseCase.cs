@@ -44,6 +44,6 @@ public class ObterCaixaDiaUseCase(ICaixaSaldoCalculator calc)
             b.SaldoInicial, b.TotalVendas, b.TotalPagamentosPedidos, b.TotalEntradas, b.TotalSaidas,
             b.SaldoEsperado, b.Aberto, b.Fechado, fechResult,
             b.Movimentos.Select(AbrirCaixaUseCase.Map).ToList(),
-            b.AberturaPendenteCrossDay, b.AbertoDesde, linhasExtras);
+            b.AberturaPendenteCrossDay, b.AbertoDesde, linhasExtras, b.PosFechamento);
     }
 }

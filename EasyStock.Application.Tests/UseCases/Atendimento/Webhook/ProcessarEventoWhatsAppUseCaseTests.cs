@@ -156,6 +156,18 @@ public class ProcessarEventoWhatsAppUseCaseTests
         .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId)
         .Replace("__WAMID__", wamid).Replace("__TEXTO__", texto);
 
+    // #1765-6: gravar a entrada não é ler. O "lida" vai à Meta quando a atendente abre a conversa (marcar-lida do console).
+    [Fact]
+    public async Task EntradaDoClienteNaoMarcaLidaNaMeta()
+    {
+        var completo = await _useCase.ExecuteAsync(PayloadTexto("wamid.lida1", "tem nhoque?"));
+
+        completo.Should().BeTrue();
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Direcao == DirecaoMensagem.Entrada && m.ExternoId == "wamid.lida1"), Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceiveWithAnyArgs().MarcarComoLidaAsync(default!, default);
+    }
+
     [Fact]
     public async Task EcoDoAppViraSaidaDaDonaEAssumeSemDispararOAgente()
     {
@@ -392,7 +404,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         var payload = """
             {"entry":[{"changes":[{"value":{
                 "metadata":{"phone_number_id":"__PHONE__"},
-                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"title":"Erro generico"}]}]
+                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"title":"Message undeliverable"}]}]
             }}]}]}
             """
             .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId).Replace("__WAMID__", wamid);
@@ -400,7 +412,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _useCase.ExecuteAsync(payload);
 
         mensagem.Status.Should().Be(StatusMensagem.Falhou);
-        mensagem.Erro.Should().Be("Erro generico");
+        mensagem.Erro.Should().Be("Falha no canal (sem código da Meta).", "#1765-11: o título em inglês fica só no log");
         mensagem.ProximoReenvioEm.Should().BeNull("sem código da Meta não há como saber se é temporária");
     }
 
@@ -422,7 +434,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         var payload = """
             {"entry":[{"changes":[{"value":{
                 "metadata":{"phone_number_id":"__PHONE__"},
-                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"code":__COD__,"title":"Falha da Meta"}]}]
+                "statuses":[{"id":"__WAMID__","status":"failed","recipient_id":"__WAID__","errors":[{"code":__COD__,"title":"Re-engagement message"}]}]
             }}]}]}
             """
             .Replace("__PHONE__", PhoneNumberId).Replace("__WAID__", ContatoWaId).Replace("__WAMID__", wamid)
@@ -431,7 +443,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _useCase.ExecuteAsync(payload);
 
         mensagem.Status.Should().Be(StatusMensagem.Falhou);
-        mensagem.Erro.Should().Be("Falha da Meta");
+        mensagem.Erro.Should().Be($"Falha no canal (código Meta {codigo}).");
         (mensagem.ProximoReenvioEm is not null).Should().Be(agenda);
     }
 
@@ -596,6 +608,33 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
         await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
         await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    /// <summary>
+    /// #1408: a loja chamou o cliente por modelo (conversa aberta pela loja, assumida, sem entrada). A resposta dele cai
+    /// nesta conversa, abre a janela de 24 h, não dispara saudação e a conversa segue com a atendente.
+    /// </summary>
+    [Fact]
+    public async Task RespostaAoModeloDaLojaCaiNaConversaIniciadaPelaLoja()
+    {
+        var iniciada = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddHours(-30), "Ana", Guid.NewGuid());
+        iniciada.Assumir(DateTime.UtcNow.AddHours(-30), Guid.NewGuid());
+        iniciada.RegistrarSaida(DateTime.UtcNow.AddHours(-30));
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
+            .Returns(iniciada);
+        _conversaRepository.DevolverAberta(iniciada);
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.resposta", "Oi, quero sim"));
+
+        await _conversaRepository.DidNotReceive().AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>());
+        await _conversaRepository.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.ConversaId == iniciada.Id && m.Direcao == DirecaoMensagem.Entrada), Arg.Any<CancellationToken>());
+        // A janela conta do instante da Meta no payload (UsaInstanteDaMetaNaMensagemENaJanela).
+        var resposta = DateTimeOffset.FromUnixTimeSeconds(1700000000).UtcDateTime;
+        iniciada.UltimaMensagemEntradaEm.Should().Be(resposta);
+        iniciada.DentroDaJanela(resposta.AddHours(1)).Should().BeTrue("a resposta abre a janela de 24 h para texto livre");
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        iniciada.Situacao.Should().Be(SituacaoConversa.Assumida, "segue com a atendente que chamou");
     }
 
     [Fact]

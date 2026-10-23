@@ -22,12 +22,24 @@ public static class ChatSiteRateLimit
     /// <summary>O formulário antes do chat (#1430) se manda uma vez; a folga cobre correção de digitação.</summary>
     public const int IdentificacoesPorMinuto = 5;
 
-    /// <summary>Partição por sessão (hash do token, nunca o token cru); sem token, pelo IP.</summary>
+    // #1622-1, #1643-2, #1725-1, #1725-2: teto por IP encadeado ao da sessão ou do token (LimitePorIpPublico). A folga
+    // cobre alguns visitantes atrás do mesmo NAT ou CGNAT; inventar token não passa daqui.
+    public const int MensagensPorIpPorMinuto = 60;
+    public const int IdentificacoesPorIpPorMinuto = 15;
+    public const int ComandaEnviosPorIpPorMinuto = 30;
+    public const int ComandaRascunhosPorIpPorMinuto = 240;
+    public const int ComandaLeiturasPorIpPorMinuto = 120;
+    public const int StreamsPorIp = 10;
+
+    /// <summary>
+    /// Partição por sessão (hash do token, nunca o token cru); sem token ou fora do formato gerado, pelo IP. O teto por IP
+    /// encadeado (<see cref="LimitePorIpPublico"/>) segura quem inventa token no formato certo.
+    /// </summary>
     public static string ChaveMensagem(HttpContext context)
     {
-        var token = context.Request.Headers[HeaderToken].FirstOrDefault();
-        return string.IsNullOrWhiteSpace(token)
-            ? "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "anon")
-            : "sessao:" + AcessoChatSite.HashDoToken(token.Trim());
+        var token = context.Request.Headers[HeaderToken].FirstOrDefault()?.Trim();
+        return AcessoChatSite.TemFormatoDeToken(token)
+            ? "sessao:" + AcessoChatSite.HashDoToken(token!)
+            : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "anon");
     }
 }

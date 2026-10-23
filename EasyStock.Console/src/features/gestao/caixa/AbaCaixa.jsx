@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
-import { CampoMascarado } from '../../../componentes/CampoMascarado'
+import { CampoReais } from '../../../componentes/CampoReais'
 import { Chip } from '../../../componentes/Chip'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
@@ -10,7 +10,7 @@ import {
   caixaFechamentoDoDia, movimentosDoDia, nomeDoMetodoCaixa, resumoCaixa, vendasDoDia,
 } from '../../../dominio/caixa'
 import {
-  horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
+  horaCurta, lerMoeda, moeda, moedaAltaDemais,
 } from '../../../dominio/formato'
 import { ModalFecharCaixa } from './ModalFecharCaixa'
 import { ModalVendaAvulsa } from './ModalVendaAvulsa'
@@ -132,14 +132,13 @@ export function AbaCaixa() {
     return (
       <div className={css.painel}>
         <p className={css.corpoBloco}>O caixa de hoje ainda não foi aberto.</p>
-        <CampoMascarado
-          tipo="moeda"
+        <CampoReais
           rotulo="Saldo inicial"
-          valor={mascaraMoeda(centavosAbertura)}
+          centavos={centavosAbertura}
+          ler={lerMoeda}
           erro={moedaAltaDemais(centavosAbertura) ? 'Valor alto demais' : null}
           dica="O dinheiro (ou nada) que já está na gaveta ao abrir o dia."
-          aoMudarDigitos={(digitos) => setCentavosAbertura(Number(digitos || '0'))}
-          aoColarTexto={(texto) => setCentavosAbertura(lerMoeda(texto))}
+          aoMudar={(valor) => setCentavosAbertura(valor ?? 0)}
         />
         <Botao
           variante="primario"
@@ -244,13 +243,12 @@ export function AbaCaixa() {
               onChange={(e) => setMetodoLancamento(e.target.value)}
             />
           </div>
-          <CampoMascarado
-            tipo="moeda"
+          <CampoReais
             rotulo="Valor"
-            valor={mascaraMoeda(centavosLancamento)}
+            centavos={centavosLancamento}
+            ler={lerMoeda}
             erro={moedaAltaDemais(centavosLancamento) ? 'Valor alto demais' : null}
-            aoMudarDigitos={(digitos) => setCentavosLancamento(Number(digitos || '0'))}
-            aoColarTexto={(texto) => setCentavosLancamento(lerMoeda(texto))}
+            aoMudar={(valor) => setCentavosLancamento(valor ?? 0)}
           />
           <CampoTexto
             rotulo="Descrição (opcional)"

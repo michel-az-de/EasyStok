@@ -37,7 +37,8 @@ globalThis.__premiumComanda = { hooks, atendimento: { fonteApi: true, conversas:
 const codigo = texto => 'data:text/javascript,' + encodeURIComponent(texto)
 const fronteiras = new Map([
   ['/aplicacao/acessoModulos', 'export const useAcessoModulos=()=>({acoes:{cancelarPedidoPago:true}})'],
-  ['/aplicacao/contextos', 'export const useAtendimento=()=>globalThis.__premiumComanda.atendimento; export const useCatalogo=()=>({entregadores:[]})'],
+  ['/aplicacao/contextos', 'export const useAtendimento=()=>globalThis.__premiumComanda.atendimento; export const useCatalogo=()=>({entregadores:[],'
+    + 'cardapio:[{sku:"massa",nome:"Massa fresca",preco:50}],meiosDePagamento:[{id:"pix",rotulo:"Link de pagamento (Pix ou cartão)"}]})'],
   ['/aplicacao/useAcaoDisponivel', 'export const useAcaoDisponivel=()=>()=>true'],
   ['/componentes/Botao', 'export function Botao(){}'],
   ['/componentes/Campo', 'export function CampoArea(){}'],
@@ -124,37 +125,37 @@ await provar('trilha recolhe e expande com alvo nativo e etapa atual identificad
 await provar('ação pendente mostra espera sem avançar ou recompensar e ignora clique repetido', async () => {
   const espera = pendente(); let chamadas = 0
   const tela = new Tela(props({}, { aoAvancar: () => { chamadas++; return espera.promise } }))
-  const clicado = botao(tela, 'Iniciar preparo'), ida = clicado.props.onClick()
+  const clicado = botao(tela, 'Começar preparo'), ida = clicado.props.onClick()
   clicado.props.onClick(); tela.renderizar()
-  assert.equal(chamadas, 1); assert.equal(botao(tela, 'Iniciar preparo').props.disabled, true)
+  assert.equal(chamadas, 1); assert.equal(botao(tela, 'Começar preparo').props.disabled, true)
   assert.ok(texto(tela.arvore).includes('Confirmando alteração…')); assert.ok(!atualizou(tela))
   assert.equal(tela.props.pedido.estado, 'pago')
   espera.resolver(undefined); await ida; tela.renderizar(); tela.encerrar()
 })
 await provar('falha HTTP conserva etapa e mostra erro, sem recompensa nem espera presa', async () => {
   const espera = pendente(), tela = new Tela(props({}, { aoAvancar: () => espera.promise }))
-  const ida = botao(tela, 'Iniciar preparo').props.onClick()
+  const ida = botao(tela, 'Começar preparo').props.onClick()
   espera.resolver({ erro: 'Alteração recusada (503)' }); await ida; tela.renderizar()
   assert.ok(nos(tela.arvore).some(n => n.props.role === 'alert' && texto(n).includes('(503)')))
   assert.equal(tela.props.pedido.estado, 'pago'); assert.ok(!atualizou(tela))
-  assert.equal(botao(tela, 'Iniciar preparo').props.disabled, false)
+  assert.equal(botao(tela, 'Começar preparo').props.disabled, false)
   assert.ok(!texto(tela.arvore).includes('Confirmando alteração…')); tela.encerrar()
 })
 await provar('Promise rejeitada vira erro contextual e libera o controle', async () => {
   const tela = new Tela(props({}, { aoAvancar: () => Promise.reject(new Error('Conexão interrompida')) }))
-  await botao(tela, 'Iniciar preparo').props.onClick(); tela.renderizar()
+  await botao(tela, 'Começar preparo').props.onClick(); tela.renderizar()
   assert.ok(texto(tela.arvore).includes('Conexão interrompida')); assert.ok(!atualizou(tela))
-  assert.equal(botao(tela, 'Iniciar preparo').props.disabled, false); tela.encerrar()
+  assert.equal(botao(tela, 'Começar preparo').props.disabled, false); tela.encerrar()
 })
 await provar('erro síncrono da ação também recebe feedback sem bloquear nova tentativa', () => {
   const tela = new Tela(props({}, { aoAvancar: () => { throw new Error('Não confirmado') } }))
-  botao(tela, 'Iniciar preparo').props.onClick(); tela.renderizar()
+  botao(tela, 'Começar preparo').props.onClick(); tela.renderizar()
   assert.ok(texto(tela.arvore).includes('Não confirmado'))
-  assert.equal(botao(tela, 'Iniciar preparo').props.disabled, false); assert.ok(!atualizou(tela)); tela.encerrar()
+  assert.equal(botao(tela, 'Começar preparo').props.disabled, false); assert.ok(!atualizou(tela)); tela.encerrar()
 })
 await provar('Promise aceita sem pedido atualizado não é apresentada como etapa confirmada', async () => {
   const tela = new Tela(props({}, { aoAvancar: () => Promise.resolve(undefined) }))
-  await botao(tela, 'Iniciar preparo').props.onClick(); tela.renderizar()
+  await botao(tela, 'Começar preparo').props.onClick(); tela.renderizar()
   assert.ok(!atualizou(tela)); assert.equal(tela.arvore.props['data-etapa-confirmada'], undefined)
   tela.encerrar()
 })
@@ -182,11 +183,11 @@ await provar('mudança de cliente ou de pedido nunca vira recompensa de outro co
 })
 await provar('resposta tardia do cliente anterior não altera o controle da nova ficha', async () => {
   const espera = pendente(), anterior = new Tela(props({}, { aoAvancar: () => espera.promise }))
-  const ida = botao(anterior, 'Iniciar preparo').props.onClick(); anterior.encerrar()
+  const ida = botao(anterior, 'Começar preparo').props.onClick(); anterior.encerrar()
   const atual = new Tela(props({ pedidoId: 'pedido-b' }, { conversaId: 'conversa-b' }))
   espera.resolver({ erro: 'Erro do pedido anterior' }); await ida; atual.renderizar()
   assert.ok(!texto(atual.arvore).includes('Erro do pedido anterior')); assert.ok(!atualizou(atual))
-  assert.equal(botao(atual, 'Iniciar preparo').props.disabled, false)
+  assert.equal(botao(atual, 'Começar preparo').props.disabled, false)
   const fonteFicha = readFileSync(new URL('../src/features/ficha-cliente/PainelFicha.jsx', import.meta.url), 'utf8')
   assert.match(fonteFicha, /<BarraProximoPasso[\s\S]*?key=\{`\$\{selecionada\.id\}:/)
   assert.match(fonteFicha, /<BarraProximoPasso[\s\S]*?conversaId=\{selecionada\.id\}/)
@@ -195,17 +196,17 @@ await provar('resposta tardia do cliente anterior não altera o controle da nova
 await provar('resposta tardia de outro pedido na mesma conversa não aparece na comanda atual', async () => {
   const espera = pendente(); let chamadas = 0
   const tela = new Tela(props({}, { aoAvancar: () => { chamadas++; return espera.promise } }))
-  const ida = botao(tela, 'Iniciar preparo').props.onClick()
+  const ida = botao(tela, 'Começar preparo').props.onClick()
   tela.renderizar({ ...tela.props, pedido: { ...tela.props.pedido, pedidoId: 'pedido-b', numero: 'PEDIDOB' } })
-  assert.equal(botao(tela, 'Iniciar preparo').props.disabled, true)
+  assert.equal(botao(tela, 'Começar preparo').props.disabled, true)
   const textoPendente = texto(tela.arvore)
-  botao(tela, 'Iniciar preparo').props.onClick(); assert.equal(chamadas, 1)
+  botao(tela, 'Começar preparo').props.onClick(); assert.equal(chamadas, 1)
   espera.resolver({ erro: 'Erro exclusivo do pedido A' }); await ida; tela.renderizar()
   assert.ok(!texto(tela.arvore).includes('Erro exclusivo do pedido A'))
   assert.ok(!textoPendente.includes('Confirmando alteração…'))
   assert.ok(textoPendente.includes('Concluindo a ação iniciada nesta conversa…'))
   assert.ok(!texto(tela.arvore).includes('Concluindo a ação iniciada nesta conversa…'))
-  assert.equal(botao(tela, 'Iniciar preparo').props.disabled, false)
+  assert.equal(botao(tela, 'Começar preparo').props.disabled, false)
   assert.ok(!atualizou(tela)); tela.encerrar()
 })
 await provar('rascunho que ganha pedidoId conserva a espera e não libera outro envio prematuro', async () => {
@@ -214,15 +215,59 @@ await provar('rascunho que ganha pedidoId conserva a espera e não libera outro 
     aoGerarPix: () => { chamadas++; return espera.promise },
     aoAvancar: () => { chamadas++; return Promise.resolve(undefined) },
   }))
-  const enviar = nos(tela.arvore).find(n => n.type?.name === 'Botao' && n.props.icone === 'dollar-sign')
+  // #1989 (#1765-3): o botão abre o resumo; quem gera é o "Confirmar e enviar".
+  nos(tela.arvore).find(n => n.type?.name === 'Botao' && n.props.icone === 'dollar-sign').props.onClick(); tela.renderizar()
+  assert.equal(chamadas, 0)
+  const enviar = nos(tela.arvore).find(n => n.type?.name === 'Botao' && n.props['data-confirmar-cobranca'])
   const ida = enviar.props.onClick()
   tela.renderizar({ ...tela.props, pedido: { ...tela.props.pedido, pedidoId: 'pedido-criado', numero: 'CRIADO01', estado: 'pago' } })
-  const iniciar = botao(tela, 'Iniciar preparo')
+  const iniciar = botao(tela, 'Começar preparo')
   assert.equal(iniciar.props.disabled, true); iniciar.props.onClick(); enviar.props.onClick()
   assert.equal(chamadas, 1); assert.ok(!atualizou(tela))
   espera.resolver(undefined); await ida; tela.renderizar()
-  assert.equal(botao(tela, 'Iniciar preparo').props.disabled, false)
+  assert.equal(botao(tela, 'Começar preparo').props.disabled, false)
   assert.ok(!atualizou(tela)); tela.encerrar()
+})
+await provar('#1989-1 (#1765-3) forma já escolhida: um clique mostra itens, total e forma; só "Confirmar e enviar" gera', async () => {
+  const chamadas = []
+  const tela = new Tela(props({ estado: 'aguardando', pedidoId: null, meio: 'pix', itens: [{ sku: 'massa', qtd: 2 }] }, {
+    aoGerarPix: (meio) => { chamadas.push(meio); return Promise.resolve() },
+  }))
+  const gerar = nos(tela.arvore).find(n => n.type?.name === 'Botao' && n.props.icone === 'dollar-sign')
+  assert.equal(texto(gerar), 'Gerar cobrança e enviar')
+  gerar.props.onClick(); tela.renderizar()
+  assert.deepEqual(chamadas, [], 'um clique não cria o pedido nem manda o link')
+  const resumo = texto(tela.arvore)
+  assert.ok(resumo.includes('2× Massa fresca'), resumo)
+  assert.ok(resumo.includes('Pedido de R$ 100,00'), resumo)
+  assert.ok(resumo.includes('cobrança por Link de pagamento (Pix ou cartão)'), resumo)
+  // Voltar fecha o resumo sem gerar.
+  botao(tela, 'Voltar').props.onClick(); tela.renderizar()
+  assert.equal(nos(tela.arvore).find(n => n.props?.['data-confirmar-cobranca']), undefined)
+  assert.deepEqual(chamadas, [])
+  gerar.props.onClick(); tela.renderizar()
+  const confirmar = nos(tela.arvore).find(n => n.props?.['data-confirmar-cobranca'])
+  assert.equal(texto(confirmar), 'Confirmar e enviar')
+  await confirmar.props.onClick()
+  assert.deepEqual(chamadas, ['pix'])
+  tela.encerrar()
+  // Revisão da PR #1997: a forma trocada na Cobrança com o resumo aberto vale no confirmar.
+  const outra = new Tela(props({ estado: 'aguardando', pedidoId: null, meio: 'pix' }, {
+    aoGerarPix: (meio) => { chamadas.push(meio); return Promise.resolve() },
+  }))
+  const tocarGerar = () => { nos(outra.arvore).find(n => n.type?.name === 'Botao' && n.props.icone === 'dollar-sign').props.onClick(); outra.renderizar() }
+  const confirmarOutra = () => nos(outra.arvore).find(n => n.props?.['data-confirmar-cobranca']).props.onClick()
+  tocarGerar()
+  outra.renderizar({ ...outra.props, pedido: { ...outra.props.pedido, meio: 'maquininha' } })
+  await confirmarOutra()
+  assert.deepEqual(chamadas.slice(1), ['maquininha'], 'confirmou com a forma antiga')
+  // Tocar de novo no botão não desfaz a forma escolhida no resumo.
+  tocarGerar()
+  nos(outra.arvore).find(n => n.type?.name === 'EscolhaDeMeio').props.aoEscolher('cartao-link'); outra.renderizar()
+  tocarGerar()
+  await confirmarOutra()
+  assert.deepEqual(chamadas.slice(1), ['maquininha', 'cartao-link'], 'o segundo toque trocou a forma do resumo')
+  outra.encerrar()
 })
 await provar('pedido na fila sem quitação mantém rótulo financeiro honesto', () => {
   const tela = new Tela(props({ totalPagoApi: 20, totalApi: 100 }))
@@ -231,7 +276,7 @@ await provar('pedido na fila sem quitação mantém rótulo financeiro honesto',
 })
 await provar('pré-requisito e bloqueio continuam claros, sem punição ou avanço falso', () => {
   const bloqueada = new Tela(props({}, { bloqueado: true }))
-  assert.equal(botao(bloqueada, 'Iniciar preparo').props.disabled, true)
+  assert.equal(botao(bloqueada, 'Começar preparo').props.disabled, true)
   assert.ok(texto(bloqueada.arvore).includes('Cliente bloqueado')); assert.ok(!atualizou(bloqueada)); bloqueada.encerrar()
   const rascunho = new Tela(props({ estado: 'aguardando', pedidoId: null }, { prerequisito: 'Falta escolher a janela' }))
   assert.ok(texto(rascunho.arvore).includes('Falta escolher a janela'))

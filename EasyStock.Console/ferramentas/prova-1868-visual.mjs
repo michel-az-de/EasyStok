@@ -124,7 +124,7 @@ confere('3  Cobrança repete Total e saldo só quando o Extrato não está acima
   assert.match(jsx, /cobrancaRepeteExtrato\(\{ extratoAcima: fonteApi && extratoDoPedido\(pedido\) != null \}\)/)
   // O valor a cobrar continua na linha da maquininha, fora da condição.
   assert.match(jsx, /\{sinalPendente \? 'Sinal a receber' : 'Receber na entrega'\} · \{nome\} <b>\{moeda\(faltaSinal\)\}<\/b>/)
-  assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /\{fonteApi && <ExtratoDoPedido pedido=\{pedido\} \/>\}\s*<BlocoCobranca/)
+  assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'), /\{fonteApi && <ExtratoDoPedido pedido=\{pedido\}( aDevolver=\{aDevolver\})? \/>\}\s*<BlocoCobranca/)
 })
 confere('3  papel da comanda sem a janela só quando a linha "Janela de entrega" está logo abaixo', () => {
   assert.equal(ficha.janelaNoCabecalhoDoPapel({ fonteApi: true, pedidoCriado: true, fechado: false }), false)

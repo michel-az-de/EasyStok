@@ -2,6 +2,7 @@ using System.Text.Json;
 using EasyStock.Api.Configuration;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.Common;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -70,7 +71,8 @@ public class ChatSiteController(
     [HttpPost("identificacao")]
     public Task<IActionResult> Identificar(
         string slug, [FromHeader(Name = ChatSiteRateLimit.HeaderToken)] string? token,
-        [FromBody] IdentificacaoVisitanteBody body,
+        // #1643-4: corpo vazio chega ao use case, que resolve a sessão antes de recusar o formulário.
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] IdentificacaoVisitanteBody? body,
         [FromServices] IdentificarVisitanteChatSiteUseCase identificar, CancellationToken ct) =>
         Tratar(async () => DataOk(await identificar.ExecuteAsync(slug, token,
             body is null ? null : new IdentificacaoVisitanteInput(body.Nome, body.Telefone, body.Email, body.AceitePrivacidade), ct)));

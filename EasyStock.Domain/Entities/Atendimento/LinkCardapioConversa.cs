@@ -77,6 +77,17 @@ public class LinkCardapioConversa
     /// <summary>Devolve o uso quando o pedido não chegou a ser criado (carrinho recusado).</summary>
     public void Liberar() => UsadoEm = null;
 
+    /// <summary>
+    /// Devolve o link quando o pedido gravado foi desfeito porque a cobrança não saiu (#1961): o cliente reenvia a
+    /// mesma seleção, sem resultado nem pedido do envio desfeito.
+    /// </summary>
+    public void DesfazerEnvio()
+    {
+        UsadoEm = null;
+        PedidoRegistradoId = null;
+        ResultadoJson = null;
+    }
+
     private static DateTime Utc(DateTime d) => d.Kind switch
     {
         DateTimeKind.Utc => d,

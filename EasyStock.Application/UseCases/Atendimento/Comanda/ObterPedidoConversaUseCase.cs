@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.AlterarAgendamentoPedido;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
 
@@ -81,9 +82,23 @@ public sealed class ObterPedidoConversaUseCase(
 
         var pedido = await pedidoRepository.GetByIdWithDetailsAsync(empresaId, pedidoId);
         if (pedido is null || pedido.EmpresaId != empresaId) return null;
+        return await MontarAsync(conversa, pedido, saldos is null ? null : await saldos.ConsultarAsync(pedido, ct), ct);
+    }
+
+    /// <summary>
+    /// O mesmo resultado com a conversa, o pedido e o saldo já lidos por quem chama (#1725-7): a comanda não relê o
+    /// pedido inteiro nem refaz a conta do saldo para montar o detalhe. Pedido de outra empresa não monta.
+    /// </summary>
+    public async Task<PedidoConversaResult> MontarAsync(Conversa conversa, EasyStock.Domain.Entities.Pedido pedido, SaldoFinanceiroComanda? financeiro,
+        CancellationToken ct = default)
+    {
+        if (pedido.EmpresaId != conversa.EmpresaId)
+            throw new InvalidOperationException("Pedido e conversa de empresas diferentes.");
         var janela = (await vagas.GetByPedidoIdsAsync([pedido.Id], ct)).GetValueOrDefault(pedido.Id);
 
-        var cobrancas = await cobrancaRepository.ListarDoPedidoAsync(empresaId, pedido.Id, ct);
+        // #1724-7: o registro do pagamento a menor não é a cobrança do pedido; o valor aparece no total pago.
+        var cobrancas = (await cobrancaRepository.ListarDoPedidoAsync(conversa.EmpresaId, pedido.Id, ct))
+            .Where(c => !c.RegistraPagamentoAMenor).ToList();
         var vigente = cobrancas.FirstOrDefault(c => c.EstaPendente)
             ?? cobrancas.FirstOrDefault(c => c.Status == StatusCobrancaPedido.Paga)
             ?? cobrancas.OrderByDescending(c => c.CriadaEm).FirstOrDefault();
@@ -102,6 +117,6 @@ public sealed class ObterPedidoConversaUseCase(
             pedido.RequerAprovacao && pedido.AprovadoEm is null,
             janela.Vaga is { LiberadoEm: null } ? JanelaPedidoResult.De(janela.Vaga, janela.Janela) : null,
             PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm),
-            saldos is null ? null : (await saldos.ConsultarAsync(pedido, ct)).Alocado, conversa.NumeroComanda, pedido.Observacoes);
+            financeiro?.Alocado, conversa.NumeroComanda, pedido.Observacoes);
     }
 }

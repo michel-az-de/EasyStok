@@ -108,6 +108,25 @@ public class ObterPedidoConversaUseCaseTests
         resultado.Cobranca.Tentativa.Should().Be(2);
     }
 
+    /// <summary>#1724-7: o pagamento a menor registrado não é "a cobrança paga" do pedido; vale o link original.</summary>
+    [Fact]
+    public async Task PagamentoAMenorRegistrado_NaoViraACobrancaDoPedido()
+    {
+        var conversa = NovaConversa();
+        var pedido = NovoPedido(conversa);
+        var link = CobrancaPedido.CriarOnline(_empresaId, pedido.Id, 33m, "pref-1", "https://mp/1",
+            Agora.AddMinutes(-1), 1, Agora.AddMinutes(-40), conversa.Id);
+        var aMenor = CobrancaPedido.RegistrarPagamentoAMenor(link, "pay-menor", 20m, "pix", Agora.AddMinutes(-20), "valor_menor");
+        link.Expirar(Agora);
+        _cobrancas.ListarDoPedidoAsync(_empresaId, pedido.Id, Arg.Any<CancellationToken>())
+            .Returns(new List<CobrancaPedido> { link, aMenor });
+
+        var resultado = await _useCase.ExecuteAsync(_empresaId, conversa.Id);
+
+        resultado!.Cobranca!.LinkPagamento.Should().Be("https://mp/1");
+        resultado.Cobranca.Status.Should().Be("Expirada");
+    }
+
     [Fact]
     public async Task CobrancaPagaVenceAsOutras()
     {

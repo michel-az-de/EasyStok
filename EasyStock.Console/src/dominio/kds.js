@@ -25,6 +25,9 @@ const PROXIMO = {
   saiu_para_entrega: 'entregue',
 }
 
+// #1686 (item 5): o que o cartão diz enquanto o avanço espera o "Desfazer" ("Vai para Em preparo").
+export const rotuloDoDestinoKds = (status) => (status === 'entregue' ? 'Entregue' : COLUNAS_KDS.find((c) => c.status === status)?.rotulo ?? status)
+
 // `{ status, toque }` do próximo passo, ou `null` quando o pedido não anda mais.
 export function proximoStatusKds(status) {
   const proximo = PROXIMO[status]

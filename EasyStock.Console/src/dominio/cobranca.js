@@ -55,12 +55,47 @@ export const NOME_DO_MEIO = {
   debito: 'cartão de débito',
   transferencia: 'transferência',
   outro: 'outro meio',
-  'cartao-link': 'link de cartão',
+  'cartao-link': 'link de pagamento',
   maquininha: 'maquininha',
   'vale-refeicao': 'vale',
+  'dinheiro-entrega': 'dinheiro na entrega',
 }
 // Cobrança sem `meio` é da massa anterior à F4, quando só existia Pix.
 export const nomeDoMeio = (meio) => NOME_DO_MEIO[meio ?? 'pix'] ?? 'cobrança'
+
+// --- Dinheiro na entrega (frente J2, #1990) -----------------------------------
+// O EasyStok só conhece a forma "na entrega" (maquininha ou dinheiro). O que diz que é dinheiro e
+// quanto de troco levar vai nas observações do pedido, que a API grava no POST e devolve na
+// leitura e no KDS: a Cozinha e o entregador leem a mesma frase, e recarregar a página não
+// transforma o pedido em maquininha.
+export const DINHEIRO_NA_ENTREGA = 'dinheiro-entrega'
+export const MEIOS_NA_ENTREGA = new Set([DINHEIRO_NA_ENTREGA, 'maquininha', 'vale-refeicao'])
+const PREFIXO_DINHEIRO = 'Pagamento na entrega: dinheiro'
+
+// `trocoPara` em reais; vazio ou zero é "sem troco".
+export function observacaoDoPagamentoNaEntrega({ meio, trocoPara = null } = {}) {
+  if (meio !== DINHEIRO_NA_ENTREGA) return null
+  return trocoPara > 0 ? `${PREFIXO_DINHEIRO}, troco para ${moeda(trocoPara)}.` : `${PREFIXO_DINHEIRO}, sem troco.`
+}
+
+// O caminho de volta: a frase gravada no pedido diz o meio e o troco.
+export function pagamentoNaEntregaDasObservacoes(observacoes) {
+  const texto = String(observacoes ?? '')
+  if (!texto.includes(PREFIXO_DINHEIRO)) return null
+  const troco = texto.match(/troco para R\$\s*([\d.]+,\d{2})/)
+  const trocoPara = troco ? Number(troco[1].replace(/\./g, '').replace(',', '.')) : null
+  return { meio: DINHEIRO_NA_ENTREGA, trocoPara }
+}
+
+// O que o entregador lê na parada: quanto o cliente vai dar e quanto troco levar. Sem dinheiro na
+// entrega (`pagamento` nulo), nada.
+export function textoDoTroco(pagamento, aReceber = pagamento?.aReceber ?? 0) {
+  if (!pagamento) return null
+  const trocoPara = pagamento.trocoPara ?? null
+  if (!(trocoPara > 0)) return 'Dinheiro na entrega · sem troco'
+  const levar = Math.round((trocoPara - (aReceber ?? 0)) * 100) / 100
+  return `Dinheiro na entrega · troco para ${moeda(trocoPara)}${levar > 0 ? ` · levar ${moeda(levar)}` : ''}`
+}
 
 // `emissao` vem da infraestrutura: { identificador, copiaECola, link, meio }.
 export function criarCobranca(pedido, cardapio, agora, emissao, valorForcado = null) {
@@ -425,6 +460,11 @@ export const baixaCancelaCobrancaOnline = (pedido) => Boolean(
 // #1683: o job só reemite e cancela pedido que ainda espera o pagamento. Com o pedido já na fila
 // (pagamento na entrega, complemento) ele só marca o link como vencido, e o texto diz isso.
 const ULTIMA_TENTATIVA_DE_COBRANCA = 2
+// #1924: depois do segundo link vencido o job não manda outro; quem manda é a atendente, pela Ficha
+// (`Mandar link novo`: troca a forma para o link do Mercado Pago, que gera e envia na conversa).
+export const esperaLinkNovoApi = (cobranca, statusApi) =>
+  statusApi === 'aguardando_pagamento' && (cobranca?.tentativa ?? 1) >= ULTIMA_TENTATIVA_DE_COBRANCA
+export const ROTULO_MANDAR_LINK_NOVO = 'Mandar link novo'
 export const LINK_VENCIDO_PEDIDO_SEGUE = 'O link venceu. O pedido continua valendo e o cliente não recebe outro link. '
   + 'Se o cliente pagou de outro jeito, clique em Marcar pago.'
 export const avisoDeLinkVencidoApi = (cobranca, statusApi) => {
@@ -432,7 +472,7 @@ export const avisoDeLinkVencidoApi = (cobranca, statusApi) => {
   if (statusApi !== 'aguardando_pagamento') return LINK_VENCIDO_PEDIDO_SEGUE
   return (cobranca?.tentativa ?? 1) < ULTIMA_TENTATIVA_DE_COBRANCA
     ? 'O EasyStok manda um link novo ao cliente sozinho. Se esse também vencer, o pedido continua guardado e espera você: gere outra cobrança ou cancele.'
-    : 'Segundo link vencido: o pedido continua guardado e o cliente foi avisado. Gere uma cobrança nova ou cancele o pedido.'
+    : `Segundo link vencido: o pedido continua guardado e o cliente foi avisado. Use ${ROTULO_MANDAR_LINK_NOVO} ou cancele o pedido.`
 }
 
 // --- "Alterar forma" no modo API (#1683) --------------------------------------
@@ -457,5 +497,30 @@ export function trocaDeFormaNoEasyStok(cobranca, nomeCliente) {
 const METODOS_DA_BAIXA = new Set(['pix', 'dinheiro', 'credito', 'debito', 'transferencia'])
 export function metodoDaCobranca(cobranca) {
   if (METODOS_DA_BAIXA.has(cobranca?.metodoRecebido)) return cobranca.metodoRecebido
+  // J2 (#1990): dinheiro na entrega se recebe em dinheiro.
+  if (cobranca?.meio === DINHEIRO_NA_ENTREGA) return 'dinheiro'
   return METODOS_DA_BAIXA.has(cobranca?.meio) ? cobranca.meio : ''
+}
+
+// #1686 (item 10): devolução em dinheiro não tem comprovante; Pix, cartão e transferência têm.
+// A mesma regra do `RegistrarEstornoManualUseCase` da API.
+export const referenciaObrigatoriaNaDevolucao = (metodo) => metodo !== 'dinheiro'
+
+// #1966: o GET de estornos manuais devolve `aDevolver` (PR #1967): pedido cancelado com dinheiro recebido e ainda
+// não devolvido, descontado o que virou cupom ou está em estorno pendente. API antiga (sem o campo) vale zero.
+export const aDevolverDe = (dados) => {
+  const valor = Number(dados?.aDevolver)
+  return Number.isFinite(valor) && valor > 0 ? valor : 0
+}
+
+// O caminho citado é o que a tela oferece: o estorno online só existe para pagamento online.
+export const textoADevolver = ({ comOnline }) => (comOnline
+  ? 'O pedido foi cancelado com valor recebido: devolva pelo estorno online abaixo ou registre a devolução manual.'
+  : 'O pedido foi cancelado com valor recebido: devolva ao cliente e registre a devolução manual.')
+
+// Resumo do bloco Devoluções recolhido: o que falta devolver vem antes do que já foi devolvido.
+export function resumoDasDevolucoes({ aDevolver, totalDevolvido, conferirAcerto }) {
+  if (aDevolver > 0) return `${moeda(aDevolver)} a devolver`
+  if (totalDevolvido) return `${moeda(totalDevolvido)} devolvidos`
+  return conferirAcerto ? 'Recebimento registrado' : 'Recebimentos e estornos'
 }

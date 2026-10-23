@@ -96,12 +96,19 @@ public sealed partial class PedidoConversaConcorrenciaTests
                 legado.AtualizarConteudo("", "Pagamento recebido", "operadora");
                 legado.Aprovar("operadora"); legado.Ativar();
             }
+            // #1991-2: "Pagamento confirmado" nasce ligada e, saindo na conversa, substitui este aviso. Aqui a dona a
+            // desligou: o teste guarda a revalidação do aviso S13 no despacho.
+            db.RegrasAutomaticas.Add(RegraAutomatica.Criar(EmpresaId, GatilhoAutomacao.PagamentoConfirmado, "Pago.", false, DateTime.UtcNow));
             await db.SaveChangesAsync();
         }
         await PrepararAvisos(factory, c.ConversaId);
         var token = await Link(factory, c.ConversaId); var estado = await Estado(client, token);
         await Salvar(client, token, estado, estado.Rascunho with { Itens = [new(c.CardapioItemId, 1)], JanelaId = c.JanelaId, DataEntrega = c.DataEntrega });
         var envio = await Enviar(client, token, 1);
+        // #1961 (#1717-12): a confirmação da comanda sai pelo WhatsApp no próprio envio. Este teste guarda o aviso do
+        // pagamento, enfileirado depois; só ele não pode sair após o bloqueio ou a revogação.
+        cloud.ReceivedCalls().Should().ContainSingle(x => x.GetArguments().OfType<string>().Any(a => a.Contains("Recebemos seu pedido")));
+        cloud.ClearReceivedCalls();
         await ConfirmarPagamento(factory, envio.PedidoId, "690001", 15);
         using (var scope = factory.Services.CreateScope())
         {

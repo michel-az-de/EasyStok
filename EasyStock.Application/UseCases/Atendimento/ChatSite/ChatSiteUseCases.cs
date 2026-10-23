@@ -77,6 +77,16 @@ public sealed class AcessoChatSite(
     public static string NovoToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(TokenBytes))
         .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
+    /// <summary>Tamanho do token de <see cref="NovoToken"/>: base64url sem preenchimento de <see cref="TokenBytes"/> bytes.</summary>
+    public static readonly int TamanhoDoToken = (TokenBytes * 4 + 2) / 3;
+
+    /// <summary>
+    /// #1725-1: o texto tem o formato de <see cref="NovoToken"/>? Não diz se a sessão existe; serve ao limite de taxa, que
+    /// só particiona por token no formato gerado (o resto cai no IP).
+    /// </summary>
+    public static bool TemFormatoDeToken(string? token) =>
+        token is not null && token.Length == TamanhoDoToken && token.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+
     public static string HashDoToken(string token) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }
@@ -136,9 +146,10 @@ public sealed class EnviarMensagemVisitanteUseCase(
             conversa.RegistrarEntrada(agora);
             await conversaRepository.AddMensagemAsync(entrada, tokenCt);
             var confirmacaoId = PrefixoConfirmacaoRecebimento + conversa.Id.ToString("N");
+            // #1991-4: 1 µs depois da entrada (a precisão do timestamp no banco): com o mesmo instante a ordem do chat variava.
             if (await conversaRepository.ObterMensagemPorExternoIdAsync(sessao.EmpresaId, confirmacaoId, tokenCt) is null)
                 await conversaRepository.AddMensagemAsync(Mensagem.Saida(sessao.EmpresaId, conversa.Id,
-                    AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+                    AutorMensagem.Sistema, agora.AddTicks(TimeSpan.TicksPerMicrosecond), TipoConteudoMensagem.Texto,
                     "Recebemos sua mensagem. A equipe da loja responde por aqui.", confirmacaoId), tokenCt);
             await unitOfWork.CommitAsync();
             return entrada;
@@ -173,15 +184,18 @@ public sealed record IdentificacaoVisitanteResult(string Nome, string Telefone, 
 /// cliente pelo telefone: o dado fica "informado pelo visitante" até a loja confirmar pela Ficha.
 /// </summary>
 public sealed class IdentificarVisitanteChatSiteUseCase(
-    AcessoChatSite acesso, IConversaRepository conversaRepository, IUnitOfWork unitOfWork)
+    AcessoChatSite acesso, IConversaRepository conversaRepository, IUnitOfWork unitOfWork,
+    IOperacaoEventPublisher operacaoEventos)
 {
     public async Task<IdentificacaoVisitanteResult> ExecuteAsync(
         string slug, string? token, IdentificacaoVisitanteInput? input, CancellationToken ct = default)
     {
+        // #1643-4: loja e sessão primeiro (404/403); o corpo só é validado para quem tem sessão.
+        var agora = DateTime.UtcNow;
+        var sessao = await acesso.ResolverSessaoAsync(slug, token, agora, ct);
         if (input is null)
             throw new UseCaseValidationException("Preencha nome e telefone.");
 
-        var agora = DateTime.UtcNow;
         ContatoInformadoVisitante contato;
         try
         {
@@ -192,18 +206,25 @@ public sealed class IdentificarVisitanteChatSiteUseCase(
             throw new UseCaseValidationException(ex.Message);
         }
 
-        var sessao = await acesso.ResolverSessaoAsync(slug, token, agora, ct);
         sessao.RegistrarUso(agora);
         sessao.Identificar(contato);
 
+        Guid? conversaAtualizada = null;
         if (sessao.ConversaId is { } conversaId)
         {
             var conversa = await conversaRepository.ObterPorIdAsync(sessao.EmpresaId, conversaId, ct);
             if (conversa is { EstaAberta: true, Canal: CanalConversa.ChatSite } && conversa.EmpresaId == sessao.EmpresaId)
+            {
                 conversa.RegistrarContatoInformado(contato);
+                conversaAtualizada = conversa.Id;
+            }
         }
 
         await unitOfWork.CommitAsync();
+        // #1643-5: o console troca nome e contato na hora, sem esperar a próxima sincronização.
+        if (conversaAtualizada is { } atualizada)
+            await operacaoEventos.PublicarAsync(EventosOperacao.ConversaAtualizada, sessao.EmpresaId,
+                new ConversaAtualizadaOperacao(atualizada), ct);
         return new IdentificacaoVisitanteResult(contato.Nome, contato.Telefone, contato.Email, contato.InformadoEm);
     }
 }

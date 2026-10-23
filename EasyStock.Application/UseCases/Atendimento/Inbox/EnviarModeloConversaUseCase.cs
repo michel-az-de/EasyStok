@@ -19,24 +19,16 @@ public sealed partial class EnviarModeloConversaUseCase(
 
     public async Task<MensagemAtendimentoResult> ExecuteAsync(EnviarModeloConversaCommand command, CancellationToken ct = default)
     {
-        if (command.EmpresaId == Guid.Empty || command.UsuarioId == Guid.Empty || command.ConversaId == Guid.Empty
-            || command.TentativaId == Guid.Empty || string.IsNullOrWhiteSpace(command.Nome) || string.IsNullOrWhiteSpace(command.Idioma)
-            || command.Parametros is null || command.Parametros.Count > 99
-            || command.Parametros.Any(p => string.IsNullOrWhiteSpace(p) || p.Length > 1024 || p.Contains("{{", StringComparison.Ordinal)))
-            throw new UseCaseValidationException("Informe a tentativa, o modelo, o idioma e os parâmetros preenchidos (até 1024 caracteres cada).");
-        var modelo = new ModeloMensagem(command.Nome.Trim(), command.Idioma.Trim(), command.Parametros.Select(p => p.Trim()).ToArray());
+        if (command.EmpresaId == Guid.Empty || command.UsuarioId == Guid.Empty || command.ConversaId == Guid.Empty)
+            throw new UseCaseValidationException(EntradaInvalida);
+        var modelo = ModeloDaTentativa(command.TentativaId, command.Nome, command.Idioma, command.Parametros);
         var conversa = ValidarConversa(await conversas.ObterPorIdAsync(command.EmpresaId, command.ConversaId, ct), command);
         var existente = await ObterTentativaAsync(command, modelo, ct);
         if (existente is not null) return MensagemAtendimentoResult.De(existente);
         GarantirAbertaComModelo(conversa);
 
         // Aprovação é conferida novamente no envio, sem o cache curto da listagem da tela.
-        var aprovado = (await catalogo.ListarAsync(command.EmpresaId, ct))
-            .FirstOrDefault(m => m.Nome == modelo.Nome && m.Idioma == modelo.Idioma)
-            ?? throw new UseCaseValidationException("Modelo não está aprovado nesta conta e idioma. Atualize a lista.");
-        if (aprovado.Indisponivel is not null) throw new UseCaseValidationException(aprovado.Indisponivel);
-        if (aprovado.QuantidadeParametros != modelo.Parametros.Count)
-            throw new UseCaseValidationException($"O modelo exige {aprovado.QuantidadeParametros} parâmetros.");
+        var aprovado = await ModeloAprovadoAsync(catalogo, command.EmpresaId, modelo, ct);
         var texto = string.Join("\n", new[] { aprovado.Cabecalho,
             Parametro().Replace(aprovado.Corpo, m => modelo.Parametros[int.Parse(m.Groups[1].Value) - 1]), aprovado.Rodape }
             .Where(p => !string.IsNullOrEmpty(p)));
@@ -121,6 +113,34 @@ public sealed partial class EnviarModeloConversaUseCase(
         }, CancellationToken.None);
     }
 
+    private const string EntradaInvalida = "Informe a tentativa, o modelo, o idioma e os parâmetros preenchidos (até 1024 caracteres cada).";
+
+    /// <summary>Entrada do envio de modelo, conferida também pelo <see cref="IniciarConversaClienteUseCase"/> antes de abrir conversa.</summary>
+    internal static ModeloMensagem ModeloDaTentativa(Guid tentativaId, string? nome, string? idioma, IReadOnlyList<string>? parametros)
+    {
+        if (tentativaId == Guid.Empty || string.IsNullOrWhiteSpace(nome) || string.IsNullOrWhiteSpace(idioma)
+            || parametros is null || parametros.Count > 99
+            || parametros.Any(p => string.IsNullOrWhiteSpace(p) || p.Length > 1024 || p.Contains("{{", StringComparison.Ordinal)))
+            throw new UseCaseValidationException(EntradaInvalida);
+        return new ModeloMensagem(nome.Trim(), idioma.Trim(), parametros.Select(p => p.Trim()).ToArray());
+    }
+
+    /// <summary>O modelo aprovado no catálogo, disponível e com a quantidade de parâmetros informada.</summary>
+    internal static async Task<ModeloAtendimento> ModeloAprovadoAsync(
+        ICatalogoModelosAtendimento catalogo, Guid empresaId, ModeloMensagem modelo, CancellationToken ct)
+    {
+        var aprovado = (await catalogo.ListarAsync(empresaId, ct))
+            .FirstOrDefault(m => m.Nome == modelo.Nome && m.Idioma == modelo.Idioma)
+            ?? throw new UseCaseValidationException("Modelo não está aprovado nesta conta e idioma. Atualize a lista.");
+        if (aprovado.Indisponivel is not null) throw new UseCaseValidationException(aprovado.Indisponivel);
+        if (aprovado.QuantidadeParametros != modelo.Parametros.Count)
+            throw new UseCaseValidationException($"O modelo exige {aprovado.QuantidadeParametros} parâmetros.");
+        return aprovado;
+    }
+
+    internal static FinalidadeContato FinalidadeDaCategoria(string categoria) =>
+        categoria == "MARKETING" ? FinalidadeContato.Marketing : FinalidadeContato.Transacional;
+
     private async Task<Mensagem?> ObterTentativaAsync(EnviarModeloConversaCommand command, ModeloMensagem modelo, CancellationToken ct)
     {
         var m = await conversas.ObterMensagemAsync(command.EmpresaId, command.ConversaId, command.TentativaId, ct);
@@ -140,7 +160,7 @@ public sealed partial class EnviarModeloConversaUseCase(
         if (cliente is null || cliente.EmpresaId != conversa.EmpresaId)
             throw new UseCaseValidationException("Cliente não encontrado nesta empresa.");
         if (cliente.Bloqueado) throw new RegraDeDominioVioladaException("Cliente bloqueado: modelo não enviado.");
-        var finalidade = categoria == "MARKETING" ? FinalidadeContato.Marketing : FinalidadeContato.Transacional;
+        var finalidade = FinalidadeDaCategoria(categoria);
         if (!await politica.PodeEnviarAsync(conversa.EmpresaId, clienteId, conversa.Canal, finalidade, ct))
             throw new RegraDeDominioVioladaException("O cliente não autorizou esta finalidade neste canal. Confira os consentimentos na Ficha.");
     }

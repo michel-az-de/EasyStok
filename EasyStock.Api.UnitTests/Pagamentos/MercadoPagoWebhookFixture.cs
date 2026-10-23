@@ -69,7 +69,7 @@ internal sealed class MercadoPagoWebhookFixture
         PedidoRepo.GetByIdWithDetailsAsync(EmpresaId, Pedido.Id).Returns(Pedido);
         PedidoRepo.When(r => r.AddPagamentoAsync(Arg.Any<PedidoPagamento>()))
             .Do(ci => Pedido.Pagamentos.Add(ci.Arg<PedidoPagamento>()));
-        PedidoStorefrontRepo.GetForUpdateAsync(Pedido.Id, Arg.Any<CancellationToken>()).Returns(Pedido);
+        PedidoStorefrontRepo.GetForUpdateAsync(EmpresaId, Pedido.Id, Arg.Any<CancellationToken>()).Returns(Pedido);
         PedidoStorefrontRepo.When(r => r.AddEventoAsync(Arg.Any<PedidoEvento>(), Arg.Any<CancellationToken>()))
             .Do(ci => Eventos.Add(ci.Arg<PedidoEvento>()));
         CobrancaRepo.ListarDoPedidoAsync(EmpresaId, Pedido.Id, Arg.Any<CancellationToken>()).Returns(_ => Cobrancas.ToList());
@@ -105,7 +105,8 @@ internal sealed class MercadoPagoWebhookFixture
             NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
             new CalculadoraInicioPrevistoPedido(Substitute.For<IPrazoPreparoPedidoQueries>()), Estorno, aviso, PedidoRepo);
         var atualizar = new AtualizarCobrancaPorPagamentoUseCase(CobrancaRepo, PedidoStorefrontRepo, aviso, tenant, Uow,
-            relogio, NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
+            relogio, NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance,
+            Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>());
         return new MercadoPagoWebhookProcessor(MpClient, confirmar, atualizar, NullLogger<MercadoPagoWebhookProcessor>.Instance, EstornosOnline, CobrancaRepo);
     }
 }

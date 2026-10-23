@@ -7,6 +7,12 @@ public interface ICardapioItemRepository
     Task<CardapioItem?> GetByIdAsync(Guid storefrontId, Guid id, CancellationToken ct = default);
 
     /// <summary>
+    /// Os itens pedidos do storefront numa ida ao banco, com a mesma carga de <see cref="GetByIdAsync"/> (#1725-8).
+    /// Id de outro storefront ou inexistente fica fora; a ordem não é garantida.
+    /// </summary>
+    Task<IReadOnlyList<CardapioItem>> ListarPorIdsAsync(Guid storefrontId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
+
+    /// <summary>
     /// Busca item por id COM escopo de empresa (ADR-0031 §3 — fecha IDOR cross-tenant).
     /// <paramref name="empresaId"/> null = SuperAdmin (sem filtro de empresa); com valor =
     /// só retorna o item se o Storefront pertencer àquela empresa, devolvendo null (→ 404,

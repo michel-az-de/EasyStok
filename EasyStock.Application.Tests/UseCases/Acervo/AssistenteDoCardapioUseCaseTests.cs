@@ -67,7 +67,7 @@ public class AssistenteDoCardapioUseCaseTests
         dica.PorIa.Should().BeTrue();
         dica.Texto.Should().Be("Fotografe a lasanha cortada e cite o ragu na descrição.");
         await _llm.Received(1).EnviarAsync(Arg.Is<RequisicaoLlm>(r =>
-            r.Mensagens.Single().Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Contains("lasanha à bolonhesa")), Arg.Any<CancellationToken>());
+            r.Mensagens.Single().Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Contains("Lasanha à Bolonhesa")), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public class AssistenteDoCardapioUseCaseTests
 
         resultado.PorIa.Should().BeTrue();
         resultado.Sugestoes.Should().ContainSingle().Which.Should().Match<SugestaoAssociacao>(s =>
-            s.ImagemId == _fotoLasanha.Id && s.ItemId == _lasanha.Id && s.Prato == "lasanha à bolonhesa" && s.Titulo == "Lasanha bolonhesa na travessa");
+            s.ImagemId == _fotoLasanha.Id && s.ItemId == _lasanha.Id && s.Prato == "Lasanha à Bolonhesa" && s.Titulo == "Lasanha bolonhesa na travessa");
         await _llm.Received(1).EnviarAsync(Arg.Is<RequisicaoLlm>(r =>
             !r.Mensagens.Single().Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Contains(_naoAprovada.Id.ToString())), Arg.Any<CancellationToken>());
     }

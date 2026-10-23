@@ -36,6 +36,34 @@ public class RegraAutomatica
         AlteradaEm = agora;
     }
 
+    /// <summary>
+    /// #1610: texto do lembrete do link quando a dona ainda não gravou a regra. Só usa <c>{pedido}</c>, que o disparo
+    /// sempre preenche: <c>{nome}</c> pode faltar, e variável sem valor não sai.
+    /// </summary>
+    public const string TextoPadraoCobrancaVencendo =
+        "Oi! O link de pagamento do pedido {pedido} vence em poucos minutos. Se ainda quiser garantir, é só pagar por ele. "
+        + "Se precisar de outro link, me chama aqui.";
+
+    /// <summary>
+    /// Texto de "Pagamento confirmado" enquanto a dona não grava o dela, com o que o aviso S13 de pago diz (nome e
+    /// entrega). Pedido sem horário agendado não tem <c>{faixa}</c>: a automática não sai e o aviso S13 avisa.
+    /// </summary>
+    public const string TextoPadraoPagamentoConfirmado =
+        "Oi, {nome}! Recebemos seu pagamento e seu pedido está confirmado para {faixa}. Obrigada pela preferência!";
+
+    /// <summary>
+    /// Regra que vale enquanto a empresa não gravou a do gatilho (não é persistida). Nascem ligadas "Pagamento
+    /// confirmado" (decisão do Felipe, 23/10, #1765-4) e o lembrete do link (#1610); as demais nascem desligadas
+    /// (nulo). Salvar a regra, ligada ou desligada, substitui o padrão.
+    /// </summary>
+    public static RegraAutomatica? Padrao(Guid empresaId, GatilhoAutomacao gatilho, DateTime agora) =>
+        gatilho switch
+        {
+            GatilhoAutomacao.PagamentoConfirmado => Criar(empresaId, gatilho, TextoPadraoPagamentoConfirmado, ligada: true, agora),
+            GatilhoAutomacao.CobrancaVencendo => Criar(empresaId, gatilho, TextoPadraoCobrancaVencendo, ligada: true, agora),
+            _ => null
+        };
+
     public string Renderizar(IReadOnlyDictionary<string, string?> valores) =>
         ModeloTextoAtendimento.Renderizar(Texto, valores);
 

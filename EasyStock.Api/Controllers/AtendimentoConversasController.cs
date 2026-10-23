@@ -148,6 +148,18 @@ public class AtendimentoConversasController(
         => Atendendo(async () => DataOk(await useCase.ExecuteAsync(new EnviarModeloConversaCommand(
             currentUser.EmpresaId, currentUser.UsuarioId, id, body.TentativaId, body.Nome, body.Idioma, body.Parametros), ct)));
 
+    [SwaggerOperation(Summary = "Start a WhatsApp conversation with a registered client (#1408)",
+        Description = "Abre (ou reaproveita) a conversa do telefone do cliente e envia um modelo aprovado. Sem a conexão do WhatsApp: 409 WHATSAPP_NAO_CONECTADO.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [HttpPost("iniciar")]
+    [ValidateEmpresaId]
+    public Task<IActionResult> Iniciar([FromBody] IniciarConversaClienteBody body,
+        [FromServices] IniciarConversaClienteUseCase useCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await useCase.ExecuteAsync(new IniciarConversaClienteCommand(
+            currentUser.EmpresaId, currentUser.UsuarioId, body.ClienteId, body.TentativaId, body.Nome, body.Idioma, body.Parametros), ct)));
+
     [SwaggerOperation(Summary = "Messages that did not reach the customer (S59)",
         Description = "Saída que falhou, mais recente primeiro: inclui a que espera o cliente responder ao modelo de retomada e a que saiu por SMS.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -391,6 +403,11 @@ public class AtendimentoConversasController(
             return StatusCode(StatusCodes.Status502BadGateway,
                 new ApiErrorResponse(new ApiError("CANAL_FALHOU", "Falha ao enviar pelo canal.", ex.Message, null) { Details = ex.Mensagem }));
         }
+        catch (CatalogoModelosException ex) when (ex.FaltaConexao)
+        {
+            // #1765-9: falta de conexão é da loja resolver em Integrações, não falha da Meta.
+            return Conflict(new ApiErrorResponse(new ApiError("WHATSAPP_NAO_CONECTADO", ex.Message, null, null)));
+        }
         catch (CatalogoModelosException ex)
         {
             return StatusCode(StatusCodes.Status502BadGateway,
@@ -402,6 +419,9 @@ public class AtendimentoConversasController(
 public sealed record EnviarMensagemConsoleBody(string Texto);
 
 public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null);
+
+public sealed record IniciarConversaClienteBody(
+    Guid ClienteId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null);
 
 public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda);
 

@@ -57,12 +57,9 @@ public sealed class ListarJanelasAtendimentoUseCase(
     {
         var configuracao = await configuracaoRepository.GetOrDefaultAsync(empresaId);
 
-        var tempos = new List<int?>();
-        foreach (var id in ItensParaPrazo(itens))
-        {
-            var item = await cardapioItemRepository.GetByIdAsync(storefrontId, id, ct);
-            if (item is not null) tempos.Add(item.TempoPreparoMinutos);
-        }
+        // #1725-8: os pratos do prazo vêm numa consulta só.
+        var tempos = (await cardapioItemRepository.ListarPorIdsAsync(storefrontId, ItensParaPrazo(itens), ct))
+            .Select(i => i.TempoPreparoMinutos).ToList();
         if (tempos.Count == 0) tempos.Add(null); // sem itens: vale o preparo padrão
 
         return CalculadoraPrazoPedido.PrazoMinimo(tempos, configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos);

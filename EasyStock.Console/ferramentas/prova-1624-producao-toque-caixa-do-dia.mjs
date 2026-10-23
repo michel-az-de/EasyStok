@@ -768,8 +768,11 @@ await confere('fluxo: suprimento e sangria só trocam o dinheiro de lugar e não
 await confere('fluxo: dia fechado que recebeu dinheiro depois do fechamento diz quanto mudou', async () => {
   const { linhaDoFluxo } = await import('../src/dominio/caixa.js')
   const retrato = { saldoInicial: 100, totalVendas: 0, totalPagamentosPedidos: 400, totalEntradasExtras: 0, totalSaidasExtras: 0, saldoFinal: 500 }
-  assert.equal(linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 480, fechamento: retrato })).depoisDoFechamento, 80)
-  assert.equal(linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 400, fechamento: retrato })).depoisDoFechamento, 0)
+  // #1630: a API devolve o dia fechado com os números do fechamento e o que entrou depois em `posFechamento`.
+  const fechadoComPix = linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 400, posFechamento: 80, fechamento: retrato }))
+  assert.equal(fechadoComPix.depoisDoFechamento, 80)
+  assert.equal(fechadoComPix.entrou, 400, 'o dia fechado não muda')
+  assert.equal(linhaDoFluxo(dia({ fechado: true, saldoInicial: 100, totalPagamentosPedidos: 400, posFechamento: 0, fechamento: retrato })).depoisDoFechamento, 0)
   assert.equal(linhaDoFluxo(dia({ aberto: true, totalPagamentosPedidos: 480 })).depoisDoFechamento, 0)
 })
 
@@ -833,7 +836,7 @@ await confere('Caixa do dia: erro ao estornar fica junto dos lançamentos, não 
 
 await confere('Caixa do dia: a tabela dos 7 dias tem legenda, rótulo por célula para tela estreita e avisa dia fechado que mudou', async () => {
   const retrato = { id: 'f', data: '2026-10-10', saldoInicial: 0, totalVendas: 0, totalPagamentosPedidos: 300, totalEntradasExtras: 0, totalSaidasExtras: 0, saldoFinal: 300, fechadoEm: '2026-10-10T23:00:00Z' }
-  montarFetch([[DIA_DA_API, (url) => { const data = new URL(url, 'http://x').searchParams.get('data'); return { data: data === '2026-10-10' ? dia({ data, fechado: true, totalPagamentosPedidos: 380, fechamento: retrato }) : dia({ data }) } }]])
+  montarFetch([[DIA_DA_API, (url) => { const data = new URL(url, 'http://x').searchParams.get('data'); return { data: data === '2026-10-10' ? dia({ data, fechado: true, totalPagamentosPedidos: 300, posFechamento: 80, fechamento: retrato }) : dia({ data }) } }]])
   g.caixa = caixaCom(dia({ aberto: true, totalEntradasExtras: 10, saldoEsperado: 10 }))
   const t = montar(AbaCaixaApi)
   await t.assentar()
@@ -842,6 +845,54 @@ await confere('Caixa do dia: a tabela dos 7 dias tem legenda, rótulo por célul
   const ontem = doTipo(fluxo, 'tr')[2]
   assert.deepEqual(doTipo(ontem, 'td').map((td) => td.props['data-rotulo']), ['Entrou', 'Saiu', 'Saldo do dia', 'Caixa'])
   assert.match(limpo(ontem), /Fechado.*R\$ 80,00 depois de fechar/)
+})
+
+// Frente J2 (#1990), item 5: no laboratório (23/10) o caixa fechou com devolução pendente e o
+// modal não disse nada. Agora soma o `aDevolver` dos cancelados com recebimento e avisa, sem travar.
+await confere('J2-5 fechar o caixa avisa quanto há a devolver de pedidos cancelados, sem bloquear', async () => {
+  const { somarDevolucoesPendentes } = await import('../src/aplicacao/devolucoesPendentes.js')
+  const { avisoDeDevolucoesPendentes } = await import('../src/dominio/caixa.js')
+  const consultados = []
+  const portas = {
+    listarCancelados: async () => [
+      { id: 'a', totalPago: 216 }, { id: 'b', totalPago: 0 }, { id: 'c', totalPago: 50 }, { id: 'd', totalPago: 30 },
+    ],
+    aDevolverDoPedido: async (id) => { consultados.push(id); return { a: 216, c: 0, d: 30 }[id] },
+  }
+  assert.deepEqual(await somarDevolucoesPendentes(portas), { total: 246, pedidos: 2, falhas: 0 })
+  assert.deepEqual(consultados, ['a', 'c', 'd'], 'sem recebimento não consulta')
+  assert.deepEqual(await somarDevolucoesPendentes({ ...portas, listarCancelados: async () => null }), { total: 0, pedidos: 0, falhas: 0 })
+  // Uma leitura que falha não apaga as outras; e nunca mais que algumas leituras ao mesmo tempo.
+  let emVoo = 0, pico = 0
+  const muitos = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, totalPago: 10 }))
+  const soma = await somarDevolucoesPendentes({
+    listarCancelados: async () => muitos,
+    aDevolverDoPedido: async (id) => {
+      emVoo += 1; pico = Math.max(pico, emVoo)
+      await new Promise((r) => setTimeout(r, 1))
+      emVoo -= 1
+      if (id === 'p3') throw new Error('404')
+      return 10
+    },
+  })
+  assert.deepEqual(soma, { total: 110, pedidos: 11, falhas: 1 })
+  assert.ok(pico <= 4, `no máximo 4 leituras por vez (foram ${pico})`)
+  const semEspacoDuro = (t) => String(t ?? '').replace(/ /g, ' ')
+  assert.equal(semEspacoDuro(avisoDeDevolucoesPendentes({ total: 246, pedidos: 2 })),
+    'Há R$ 246,00 a devolver de 2 pedidos cancelados. O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
+  assert.equal(semEspacoDuro(avisoDeDevolucoesPendentes({ total: 216, pedidos: 1 })),
+    'Há R$ 216,00 a devolver de 1 pedido cancelado. O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
+  assert.equal(avisoDeDevolucoesPendentes({ total: 0, pedidos: 0 }), null)
+  assert.match(semEspacoDuro(avisoDeDevolucoesPendentes({ total: 110, pedidos: 11, falhas: 1 })),
+    /^Há R\$ 110,00 a devolver de 11 pedidos cancelados\..* 1 pedido cancelado não foi conferido\.$/)
+  assert.equal(avisoDeDevolucoesPendentes({ total: 0, pedidos: 0, falhas: 2 }),
+    'Não deu para conferir tudo: 2 pedidos cancelados não foram conferidos.')
+  const modal = readFileSync(new URL('../src/features/gestao/caixa/ModalFecharCaixa.jsx', import.meta.url), 'utf8')
+  assert.match(modal, /useDevolucoesPendentes\(consultarDevolucoes\)/)
+  assert.match(modal, /avisoDeDevolucoesPendentes\(devolucoes\)/)
+  assert.doesNotMatch(modal, /disabled=\{[^}]*devolucoes/, 'o aviso não trava o botão')
+  const aba = readFileSync(new URL('../src/features/gestao/caixa/AbaCaixaApi.jsx', import.meta.url), 'utf8')
+  assert.match(aba, /<ModalFecharCaixa\s+consultarDevolucoes/)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

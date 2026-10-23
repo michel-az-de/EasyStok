@@ -608,7 +608,7 @@ public class SyncMutationDispatcher(
         if (movimento != null)
             await _estornarMovimentoCaixa.ExecuteAsync(new EstornarMovimentoCaixaCommand(
                 movimento.EmpresaId, movimento.Id,
-                Motivo: "Lançamento excluído no PWA", UsuarioNome: operatorName));
+                Motivo: "Lançamento excluído no PWA", UsuarioNome: operatorName, Origem: "mobile"));
 
         existing.DeletedAt = DateTime.UtcNow;
         existing.DeletedBy = operatorName;

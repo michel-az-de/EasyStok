@@ -19,6 +19,9 @@ export const GATILHOS = {
   // despedida oferecida na confirmação de encerrar. Nome fixo: a frente que
   // lê a biblioteca de respostas depois desta busca por este gatilho.
   ENCERRAMENTO: 'encerramento',
+  // #1610: lembrete do link de pagamento perto de vencer. Só existe no modo API
+  // (quem dispara é o job de cobranças do EasyStok); a demonstração não tem.
+  COBRANCA_VENCENDO: 'cobranca-vencendo',
 }
 
 export const REGRAS_PADRAO = [
@@ -129,7 +132,7 @@ export function contextoDePrevia(conversa, faixa, agora) {
 }
 
 // ---------------------------------------------------------------------------
-// Modo API (#1441): as seis automáticas do EasyStok (S42, `GatilhoAutomacao`)
+// Modo API (#1441): as automáticas do EasyStok (S42, `GatilhoAutomacao`)
 // casadas com as regras desta tela pelo gatilho. A descrição diz quando o
 // EasyStok dispara de verdade (AutomacoesAtendimentoHandlers), não o roteiro
 // da demonstração. Na primeira mensagem sai uma só: loja fechada na mão vence
@@ -159,6 +162,11 @@ export const GATILHOS_DA_API = {
   Encerramento: {
     id: 'encerramento', gatilho: GATILHOS.ENCERRAMENTO, nome: 'Encerramento',
     descricao: 'Quando o atendimento é encerrado pelo console.',
+  },
+  // #1610: nasce ligada no EasyStok, com texto padrão. Uma vez por link.
+  CobrancaVencendo: {
+    id: 'cobranca-vencendo', gatilho: GATILHOS.COBRANCA_VENCENDO, nome: 'Link de pagamento vencendo',
+    descricao: 'Uma vez por link, 10 minutos antes de vencer, se o pedido ainda não foi pago. Só avisa: não reemite nem cancela.',
   },
 }
 

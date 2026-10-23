@@ -15,6 +15,11 @@ public sealed class LinkCardapioConversaRepository(EasyStockDbContext db) : ILin
             == EasyStock.Application.Common.HorarioBrasil.DataOperacional(agora) ? ultimo.RascunhoJson : null;
     }
 
+    public Task<int> ExpirarPendentesAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default) =>
+        db.LinksCardapioConversa
+            .Where(l => l.EmpresaId == empresaId && l.ConversaId == conversaId && l.UsadoEm == null && l.ExpiraEm > agora)
+            .ExecuteUpdateAsync(s => s.SetProperty(l => l.ExpiraEm, agora), ct);
+
     public async Task<LinkCardapioConversa?> ObterComLockAsync(Guid empresaId, Guid linkId, CancellationToken ct = default)
     {
         var link = await db.LinksCardapioConversa.FromSqlInterpolated(

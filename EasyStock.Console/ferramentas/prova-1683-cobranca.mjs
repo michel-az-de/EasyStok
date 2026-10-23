@@ -3,14 +3,21 @@
 //
 //   1  link vencido mantém "Marcar pago" na barra;
 //   2  o aviso de "link novo / cancelamento" só vale com o pedido em `aguardando_pagamento`;
-//   3  "Gerar cobrança e enviar" devolve `{ erro }` para a barra mostrar ao lado do botão;
+//   3  "Gerar cobrança e enviar" devolve `{ erro }` para a barra mostrar ao lado do botão; a recusa
+//      definitiva (loja fechada, janela, CEP, bloqueio) não relê, a corrida e o 409 genérico relêem (#1942);
 //   4  cobrança criada sem a mensagem sair não diz "Enviada ao cliente";
 //   5  "Alterar forma" no modo API só troca entre link e na entrega, que é o que o back executa;
 //   6  "Desfazer pagamento" não aparece para o sinal pago no Mercado Pago;
 //   7  estorno e "Voltar etapa" esperam a resposta e só fecham no sucesso;
 //   8  ação destrutiva usa a variante `perigo` do botão;
 //   9  confirmação em linha é formulário: Enter confirma, Esc volta, foco no motivo;
-//   10 "Marcar pago" no recebimento comum e "Registrar sinal" na entrada manual de encomenda.
+//   10 "Marcar pago" no recebimento comum e "Registrar sinal" na entrada manual de encomenda;
+//   11 um botão só para o link (decisão de 22/10): "Link de pagamento (Pix ou cartão)" no lugar
+//      dos chips "Pix" e "Cartão por link"; na entrega, Dinheiro, Maquininha e Vale-refeição;
+//   12 frente J2 (#1990), item 1: "Dinheiro na entrega" com troco, gravado nas observações do pedido;
+//   13 J2-4: pedido pago cancelado diz quanto falta devolver (extrato, acesso Pagamento e Resumo);
+//   14 J2-7: a alteração de pedido pago mostra a diferença ao vivo, antes de salvar;
+//   15 J2-9: "costuma pedir" só com o mesmo item em 2 pedidos ou mais.
 //
 // Regras puras e ações reais (HTTP controlado no `fetch`); a composição que só existe no JSX é
 // conferida por leitura do fonte. Não prova pixels nem foco nativo.
@@ -87,10 +94,11 @@ function montar(pedido, responder) {
   const avisos = () => despachados.filter((d) => d.mensagem).map((d) => d.mensagem)
   const posts = () => chamadas.filter((c) => c.metodo === 'POST')
   const ultimoPedido = () => despachados.filter((d) => d.pedido).at(-1)?.pedido
-  return { acoes, avisos, posts, ultimoPedido, estadoRef }
+  return { acoes, avisos, posts, ultimoPedido, estadoRef, chamadas: () => chamadas }
 }
 const ok = (data) => new Response(JSON.stringify({ data }))
 const falha = (mensagem, status = 500) => new Response(JSON.stringify({ error: { message: mensagem } }), { status })
+const recusa = (code, message, status = 409) => new Response(JSON.stringify({ error: { code, message } }), { status })
 
 // ------------------------------------------------------------------ 1
 
@@ -146,6 +154,50 @@ await confere('3  POST recusado: devolve { erro } com o motivo e mantém o aviso
   const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
   assert.equal(resultado?.erro, 'Pedido não criado: Sem vaga na janela')
   assert.deepEqual(t.avisos(), ['Pedido não criado: Sem vaga na janela'])
+})
+
+// #1942 (#1923): a recusa definitiva do EasyStok tem código próprio e não passa pelo "não sei se criou".
+const leituras = (t) => t.chamadas().filter((c) => c.metodo === 'GET' && /\/pedido$/.test(c.url))
+const recusaPost = (codigo, mensagem, lido = null) => (url, metodo) => (metodo === 'POST' ? recusa(codigo, mensagem) : ok(lido))
+
+await confere('3  409 LOJA_FECHADA mostra o motivo e não relê a conversa', async () => {
+  const t = montar(rascunho(), recusaPost('LOJA_FECHADA', 'A loja está fechada. Abra a loja para criar o pedido.'))
+  const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+  assert.equal(resultado?.erro, 'Pedido não criado: A loja está fechada. Abra a loja para criar o pedido.')
+  assert.deepEqual(t.avisos(), [resultado.erro])
+  assert.equal(leituras(t).length, 0, 'releu a conversa numa recusa definitiva')
+})
+
+await confere('3  409 CEP_SEM_COBERTURA mostra a frase da área de entrega, sem reler', async () => {
+  const t = montar(rascunho(), recusaPost('CEP_SEM_COBERTURA', 'Vamos combinar a entrega e o frete com a equipe.'))
+  const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+  assert.match(resultado?.erro ?? '', /^Pedido não criado: o endereço do cliente está fora da área de entrega\./)
+  assert.equal(leituras(t).length, 0)
+})
+
+await confere('3  409 JANELA_ESGOTADA e CLIENTE_BLOQUEADO também não relêem', async () => {
+  for (const [codigo, mensagem] of [['JANELA_ESGOTADA', 'Janela de entrega esgotada.'],
+    ['CLIENTE_BLOQUEADO', 'Cliente bloqueado: desbloqueie o cadastro para criar o pedido.']]) {
+    const t = montar(rascunho(), recusaPost(codigo, mensagem))
+    const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+    assert.equal(resultado?.erro, `Pedido não criado: ${mensagem}`, codigo)
+    assert.equal(leituras(t).length, 0, codigo)
+  }
+})
+
+await confere('3  409 PEDIDO_EM_ANDAMENTO relê e acha o pedido criado pelo outro clique', async () => {
+  const t = montar(rascunho(), recusaPost('PEDIDO_EM_ANDAMENTO', 'Esta conversa já tem um pedido em andamento.', doServidor()))
+  const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+  assert.equal(leituras(t).length, 1)
+  assert.equal(resultado?.pedidoId, PEDIDO_ID)
+  assert.deepEqual(t.avisos(), ['Pedido encontrado. Confira a cobrança e o envio do resumo.'])
+})
+
+await confere('3  409 CONFLICT (código desconhecido) continua relendo', async () => {
+  const t = montar(rascunho(), recusaPost('CONFLICT', 'A conversa está encerrada.'))
+  const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
+  assert.equal(leituras(t).length, 1)
+  assert.equal(resultado?.erro, 'Não foi possível confirmar se o pedido foi criado. Aguarde a atualização da conversa antes de reenviar.')
 })
 
 await confere('3  a ação seguinte na mesma conversa não fica presa depois do erro', async () => {
@@ -339,6 +391,105 @@ await confere('10  receber distingue sinal manual de quitação, com ação secu
   const baixa = trecho(bloco, 'export function BaixaAMao(', '// "Alterar forma de pagamento"')
   assert.match(baixa, /enviando \? 'Registrando…' : aguardaSinalManual\(pedido\) \? 'Registrar sinal' : 'Marcar pago'/)
   assert.doesNotMatch(baixa, /'Confirmar'/)
+})
+
+await confere('11  um botão só para o link: "Link de pagamento (Pix ou cartão)"; na entrega, maquininha e vale', async () => {
+  const { MEIOS_DE_PAGAMENTO } = await import('../src/infra/catalogo.js')
+  const destaque = MEIOS_DE_PAGAMENTO.filter((m) => m.destaque)
+  assert.deepEqual(destaque.map((m) => [m.id, m.rotulo]), [['cartao-link', 'Link de pagamento (Pix ou cartão)']])
+  assert.deepEqual(MEIOS_DE_PAGAMENTO.filter((m) => !m.destaque).map((m) => m.id), ['dinheiro-entrega', 'maquininha', 'vale-refeicao'])
+  assert.ok(!MEIOS_DE_PAGAMENTO.some((m) => /^Pix$|Cartão por link/.test(m.rotulo)), 'os dois chips antigos saíram')
+  assert.equal(cobranca.nomeDoMeio('cartao-link'), 'link de pagamento')
+  assert.equal(pedidoDaApi({ pedidoId: 'p', status: 'aguardando_pagamento', itens: [], cobranca: { cobrancaId: 'c', provedor: 'mercadopago', valor: 10, linkPagamento: 'https://mp/x' } }).cobranca.meio, 'cartao-link')
+  assert.doesNotMatch(fonte('features/ficha-cliente/EscolhaDeMeio.jsx'), /quatro chips|Pix e cartão em destaque/)
+})
+
+// ------------------------------------------------------------------ J2 (#1990)
+const semEspacoDuro = (texto) => String(texto ?? '').replace(/ /g, ' ')
+
+await confere('12  J2-1 dinheiro na entrega com troco: chip, corpo do pedido, releitura e baixa em dinheiro', async () => {
+  const { MEIOS_DE_PAGAMENTO } = await import('../src/infra/catalogo.js')
+  const dinheiro = MEIOS_DE_PAGAMENTO.find((m) => m.id === 'dinheiro-entrega')
+  assert.ok(dinheiro, 'existe o chip "Dinheiro na entrega"')
+  assert.equal(dinheiro.rotulo, 'Dinheiro na entrega')
+  assert.equal(dinheiro.destaque, false)
+  assert.equal(dinheiro.liberaEsteiraSemPagar, true)
+  const { corpoDoPedido, formaDoMeio } = await import('../src/infra/api/comandaApi.js')
+  assert.equal(formaDoMeio('dinheiro-entrega'), 'na_entrega')
+  const corpo = corpoDoPedido({ itens: [], janela: null, meio: 'dinheiro-entrega', trocoPara: 100 })
+  assert.equal(corpo.forma, 'na_entrega')
+  assert.equal(semEspacoDuro(corpo.observacoes), 'Pagamento na entrega: dinheiro, troco para R$ 100,00.')
+  assert.equal(semEspacoDuro(corpoDoPedido({ itens: [], meio: 'dinheiro-entrega' }).observacoes), 'Pagamento na entrega: dinheiro, sem troco.')
+  assert.equal('observacoes' in corpoDoPedido({ itens: [], meio: 'maquininha' }), false, 'outro meio não manda observação')
+  const lido = pedidoDaApi({
+    pedidoId: 'p', status: 'aguardando', itens: [], observacoes: corpo.observacoes,
+    cobranca: { cobrancaId: 'c', provedor: 'na_entrega', valor: 57 },
+  })
+  assert.equal(lido.meio, 'dinheiro-entrega', 'recarregar a página não vira maquininha')
+  assert.equal(lido.trocoPara, 100)
+  assert.equal(pedidoDaApi({
+    pedidoId: 'p', status: 'aguardando', itens: [], observacoes: corpo.observacoes,
+    cobranca: { cobrancaId: 'c', provedor: 'na_entrega', valor: 57 },
+  }, { meio: 'maquininha' }).meio, 'maquininha', 'o meio que a tela já tem continua mandando')
+  assert.equal(pedidoDaApi({ pedidoId: 'p', status: 'aguardando', itens: [], cobranca: { cobrancaId: 'c', provedor: 'na_entrega', valor: 57 } }).meio, 'maquininha')
+  assert.equal(cobranca.metodoDaCobranca({ meio: 'dinheiro-entrega' }), 'dinheiro')
+  assert.equal(cobranca.nomeDoMeio('dinheiro-entrega'), 'dinheiro na entrega')
+  assert.equal(semEspacoDuro(cobranca.textoDoTroco({ trocoPara: 100, aReceber: 57 })), 'Dinheiro na entrega · troco para R$ 100,00 · levar R$ 43,00')
+  assert.equal(semEspacoDuro(cobranca.textoDoTroco({ trocoPara: null, aReceber: 57 })), 'Dinheiro na entrega · sem troco')
+  assert.equal(cobranca.textoDoTroco(null), null)
+  const escolha = fonte('features/ficha-cliente/EscolhaDeMeio.jsx')
+  assert.match(escolha, /rotulo="Troco para"/)
+  assert.match(escolha, /definirTroco\(/)
+})
+
+await confere('13  J2-4 pedido pago cancelado diz quanto falta devolver no extrato, no acesso Pagamento e no Resumo', async () => {
+  const base = {
+    pedidoId: 'p', estado: 'cancelado', totalApi: 216, totalPagoApi: 216,
+    pagamentosApi: [{ pagamentoId: 'x', valor: 216, meio: 'pix', em: 1 }],
+  }
+  assert.equal(pagamento.extratoDoPedido(base, { aDevolver: 216 }).aDevolver, 216)
+  assert.equal(pagamento.extratoDoPedido(base).aDevolver, 0)
+  const { resumoDoPagamento } = await import('../src/features/ficha-cliente/apresentacaoDaFicha.js')
+  assert.equal(semEspacoDuro(resumoDoPagamento({ cancelado: true, aDevolver: 216 })), 'R$ 216,00 a devolver')
+  assert.equal(resumoDoPagamento({ cancelado: true }), 'Confira recebimentos e devoluções')
+  const { consultaADevolver } = await import('../src/aplicacao/aDevolver.js')
+  assert.equal(consultaADevolver(base), true)
+  assert.equal(consultaADevolver({ ...base, estado: 'entregue' }), false, 'pedido ativo não tem devolução')
+  assert.equal(consultaADevolver({ ...base, totalPagoApi: 0 }), false, 'sem recebimento não consulta')
+  assert.equal(consultaADevolver({ ...base, pedidoId: null }), false)
+  assert.match(fonte('features/ficha-cliente/ExtratoDoPedido.jsx'), /<dt>Cancelado · a devolver<\/dt><dd>\{moeda\(extrato\.aDevolver\)\}<\/dd>/)
+  const painel = fonte('features/ficha-cliente/PainelFicha.jsx')
+  assert.match(painel, /useADevolver\(fonteApi \? selecionada\?\.pedido : null\)/)
+  assert.match(painel, /<ExtratoDoPedido pedido=\{pedido\} aDevolver=\{aDevolver\} \/>/)
+  assert.match(painel, /\{aDevolver > 0 && <p className=\{css\.saldoFicha\}>\{moeda\(aDevolver\)\} a devolver<\/p>\}/)
+  assert.match(painel, /resumoDoPagamento\(\{ cancelado: pedido\?\.estado === 'cancelado', saldo, destaque: destacaSaldo, aDevolver \}\)/)
+})
+
+await confere('14  J2-7 alteração de pedido pago mostra a diferença ao vivo, antes de salvar', async () => {
+  const { saldoDaAlteracao } = await import('../src/dominio/pedido.js')
+  const comanda = {
+    podeEditar: true, totalPrevisto: 100, pedido: { total: 100, alocado: 100 },
+    rascunho: { itens: [{ cardapioItemId: 'a', variacaoId: null, qtd: 1 }] },
+    selecao: [{ cardapioItemId: 'a', variacaoId: null, preco: 38, nome: 'A' }],
+  }
+  assert.equal(saldoDaAlteracao(comanda, null, []), 0, 'sem edição, o saldo do servidor')
+  assert.equal(saldoDaAlteracao(comanda, { itens: [{ cardapioItemId: 'a', qtd: 2 }] }, []), 38, '+1 unidade de R$ 38 aparece na hora')
+  assert.equal(saldoDaAlteracao(comanda, { itens: [] }, []), -38, 'tirar o prato vira valor a devolver')
+  assert.equal(saldoDaAlteracao(comanda, { itens: [{ cardapioItemId: 'a', qtd: 1 }, { cardapioItemId: 'b', variacaoId: 'v', qtd: 1 }] },
+    [{ sku: 'b~v', preco: 20 }]), 20, 'prato novo pelo preço do cardápio')
+  assert.equal(saldoDaAlteracao({ ...comanda, envio: { situacao: 'estorno_pendente', saldo: -10 } }, { itens: [] }, []), -10,
+    'devolução em acompanhamento segue o saldo do servidor')
+  const tela = fonte('features/ficha-cliente/ComandaDoCliente.jsx')
+  assert.match(tela, /saldoDaAlteracao\(c, edicao\?\.rascunho \?\? null, catalogo\)/)
+  assert.match(tela, /com os ajustes ainda não salvos/)
+})
+
+await confere('15  J2-9 "costuma pedir" só com o mesmo item em 2 pedidos ou mais', async () => {
+  const { clienteDoDossie } = await import('../src/infra/api/traducaoCliente.js')
+  const dossie = (pedidos) => ({ cliente: { id: 'c', nome: 'Ana' }, totalPedidos: 3, itemFavorito: { nome: 'Lasanha', pedidos, quantidade: 2 } })
+  assert.equal(clienteDoDossie(dossie(1)).cliente.favorito, null, 'um pedido só não é costume')
+  assert.equal(clienteDoDossie(dossie(2)).cliente.favorito, 'Lasanha')
+  assert.equal(clienteDoDossie({ cliente: { id: 'c' }, itemFavorito: { nome: 'X' } }).cliente.favorito, null, 'sem a contagem, não afirma hábito')
 })
 
 if (falhas.length > 0) {

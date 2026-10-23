@@ -1,14 +1,16 @@
 import * as acao from './acoes'
-import { listarInbox, listarMensagens } from '../infra/api/conversasApi'
+import { listarInbox, listarMensagens, marcarLida } from '../infra/api/conversasApi'
 import { conversaDaApi } from '../infra/api/traducaoConversas'
 import { obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
-import { deveRelerMensagens, deveRelerPedido, emFila, fundirPagina, quedaDaSincronizacao } from './planoDeSincronizacao'
+import { conversaNaTela, deveRelerMensagens, deveRelerPedido, emFila, fundirPagina, quedaDaSincronizacao } from './planoDeSincronizacao'
 
 // Uma volta da polling da inbox (#1576), fora do React para ser provada sem tela: o hook
 // (`useSincronizacaoApi.js`) só dá o ritmo. O que relê e em que ordem: `planoDeSincronizacao.js`.
 const CONVERSAS_POR_VEZ = 4
 // Voltas (5 s cada, 1 min) em que a conversa que esteve aberta segue com o resumo lido de fresco.
 const VOLTAS_DE_FRESCOR = 12
+// #1966: `conversa.atualizada` vale para a volta seguinte só (a conta desconta uma volta antes de ler).
+const VOLTAS_DO_EVENTO = 2
 
 // O que o laço lembra entre as voltas: os resumos da inbox (id -> resumo, na ordem da tela) e a
 // última leitura de mensagens e de pedido de cada conversa. Criada acima do Balcão (App.jsx), não
@@ -17,7 +19,7 @@ export const criarMemoriaDoLaco = () => ({ dono: null, resumos: new Map(), mensa
 
 export function criarCicloDeSincronizacao({
   despachar, memoria = criarMemoriaDoLaco(), dono = null, comConversas = true,
-  lerSelecionada = () => null, lerUsuario = () => null, estaVivo = () => true,
+  lerSelecionada = () => null, lerUsuario = () => null, estaVivo = () => true, lerConversaNaTela = conversaNaTela,
 }) {
   // Memória de outro usuário não serve a este: começa do zero.
   if (memoria.dono !== dono) {
@@ -42,6 +44,21 @@ export function criarCicloDeSincronizacao({
     const selecionada = lerSelecionada()
     if (selecionada) frescas.set(selecionada, VOLTAS_DE_FRESCOR)
     return [...frescas.keys()].filter((id) => memoria.resumos.has(id))
+  }
+
+  // #1966: a API marca como lida na Meta só pelo `marcar-lida`, e a seleção chama ao abrir. Com a conversa
+  // aberta e na tela (aba visível, Balcão na rota), a entrada que chega depois (não lidas e `ultimaMensagemEm`
+  // novos) é marcada uma vez por lote, e só com as mensagens desse lote já lidas para a tela. Fora da tela
+  // não marca nem esquece: ao voltar, o lote que chegou é marcado.
+  let marcada = { id: null, ultima: null }
+  function marcarEntradaNaAberta() {
+    const id = lerSelecionada()
+    if (marcada.id !== id) marcada = { id, ultima: null }
+    const resumo = id ? memoria.resumos.get(id) : null
+    if (!resumo || !(resumo.naoLidas > 0) || resumo.ultimaMensagemEm === marcada.ultima) return
+    if (memoria.mensagens.get(id)?.ultima !== resumo.ultimaMensagemEm || !lerConversaNaTela()) return
+    marcada = { id, ultima: resumo.ultimaMensagemEm }
+    marcarLida(id).catch(() => {})
   }
 
   // `null` é "não li" (a leitura falhou e não há cache); lista vazia é "a conversa não tem mensagens".
@@ -113,6 +130,7 @@ export function criarCicloDeSincronizacao({
       if (estaVivo()) {
         // `semMensagens`: quem a leitura não trouxe e não estava em cache; o reducer mantém o que está na tela.
         despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas, ...(semMensagens.length ? { semMensagens } : {}) })
+        marcarEntradaNaAberta()
         // #1241: a volta da rede abre o lançamento do papel (o reducer ignora se já estava online).
         despachar({ tipo: acao.CONEXAO_VOLTOU, agora: Date.now() })
       }
@@ -135,6 +153,11 @@ export function criarCicloDeSincronizacao({
       }
     }
     return afetou
+  }
+  // #1966: `conversa.atualizada` (nome ou contato mudou). A volta seguinte lê até a página dela, sem esperar a
+  // varredura do minuto; conversa que o laço ainda não conhece chega pela página 1.
+  volta.atualizarConversa = (conversaId) => {
+    if (conversaId) frescas.set(conversaId, Math.max(frescas.get(conversaId) ?? 0, VOLTAS_DO_EVENTO))
   }
   return volta
 }

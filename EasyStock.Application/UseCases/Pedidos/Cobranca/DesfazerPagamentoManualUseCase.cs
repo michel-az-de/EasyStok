@@ -51,7 +51,7 @@ public sealed class DesfazerPagamentoManualUseCase(
     private async Task<DesfazerPagamentoManualResult> DesfazerNoLockAsync(DesfazerPagamentoManualInput input, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var travado = await pedidoStorefrontRepository.GetForUpdateAsync(input.PedidoId, ct);
+        var travado = await pedidoStorefrontRepository.GetForUpdateAsync(input.EmpresaId, input.PedidoId, ct);
         if (travado is null || travado.EmpresaId != input.EmpresaId)
             throw new CobrancaPedidoNaoEncontradoException(input.PedidoId);
 

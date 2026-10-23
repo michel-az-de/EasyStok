@@ -54,11 +54,11 @@ function navegarAbas(evento, itens, indice, escolher, botoes, vertical = false) 
 // PainelDeAjuste. Trocar uma aba aqui mantém a conversa e o pedido montados.
 export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio, horariosAtendimento }) {
   const { fonteApi } = useAtendimento()
-  const { permite } = useAcessoModulos()
+  const { permite, acoes } = useAcessoModulos()
   const areas = useMemo(() => MODULOS
     .filter((modulo) => permite(modulo.id))
-    .map((modulo) => ({ ...modulo, telas: telasDoMenu(modulo, { fonteApi }).filter((tela) => tela.tipo === TELA_AJUSTE) }))
-    .filter((modulo) => modulo.telas.length > 0), [fonteApi, permite])
+    .map((modulo) => ({ ...modulo, telas: telasDoMenu(modulo, { fonteApi, acoes }).filter((tela) => tela.tipo === TELA_AJUSTE) }))
+    .filter((modulo) => modulo.telas.length > 0), [fonteApi, permite, acoes])
   const [abaAtiva, setAbaAtiva] = useState(abaInicial)
   const area = areas.find((modulo) => modulo.telas.some((tela) => tela.aba === abaAtiva)) ?? areas[0]
   const tela = area?.telas.find((item) => item.aba === abaAtiva) ?? area?.telas[0]

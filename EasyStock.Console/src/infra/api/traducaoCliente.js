@@ -1,4 +1,5 @@
 import { enderecoDasPartes, mascaraCep, partesDoEndereco } from '../../dominio/formato'
+import { favoritoDoCliente } from '../../dominio/ficha'
 import { instante } from './traducaoConversas'
 
 // Cliente da conversa entre o console e o EasyStok (#1276). A Ficha guarda o endereço numa
@@ -6,10 +7,13 @@ import { instante } from './traducaoConversas'
 
 // String da Ficha -> corpo da API. Sem CEP não há endereço para gravar.
 export function enderecoParaApi(texto) {
-  const { rua, numero, complemento, bairro, cep } = partesDoEndereco(texto)
+  const { rua, numero, complemento, bairro, cep, cidade, uf } = partesDoEndereco(texto)
   const digitos = cep.replace(/\D/g, '')
   if (!digitos) return null
-  return { cep: digitos, logradouro: rua || null, numero: numero || null, complemento: complemento || null, bairro: bairro || null }
+  return {
+    cep: digitos, logradouro: rua || null, numero: numero || null, complemento: complemento || null, bairro: bairro || null,
+    ...(cidade ? { cidade } : {}), ...(uf ? { uf } : {}),
+  }
 }
 
 // Dossiê (S25) -> o que a Ficha mostra. Endereço: o padrão, ou o único.
@@ -35,7 +39,8 @@ export function clienteDoDossie(dossie) {
       pedidos: dossie.totalPedidos ?? 0,
       // #1839: soma e favorito do servidor sobre todas as compras, não só as 10 da lista.
       totalGasto: dossie.totalGasto ?? null,
-      favorito: dossie.itemFavorito?.nome ?? null,
+      // J2 (#1990): só a partir de 2 pedidos com o mesmo item.
+      favorito: favoritoDoCliente(dossie.itemFavorito),
       notas: (dossie.notas ?? []).map(notaDaApi),
       // #1441: tags do cadastro (S24), já normalizadas pelo EasyStok.
       tags: (dossie.tags ?? []).map((t) => t.tag),

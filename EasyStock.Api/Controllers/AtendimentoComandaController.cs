@@ -1,4 +1,5 @@
 using EasyStock.Application.Services.Storefront;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -72,7 +73,8 @@ public class AtendimentoComandaController(
             currentUser.EmpresaId, id,
             body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
             body.JanelaId, body.DataEntrega, body.EnderecoId, body.Forma, body.Observacoes,
-            EnviarAoCliente: body.EnviarAoCliente), ct)));
+            EnviarAoCliente: body.EnviarAoCliente,
+            UsuarioId: currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null), ct)));
     }
 
     [SwaggerOperation(Summary = "Quote of the order before creating it: freight, total, deposit and rest (#1884)",
@@ -125,10 +127,28 @@ public class AtendimentoComandaController(
         }
         catch (RegraDeDominioVioladaException ex)
         {
-            // Janela esgotada, loja fechada, CEP sem cobertura, cliente bloqueado, pedido em andamento.
-            return DataConflict(ex.Message);
+            // #1942: recusa definitiva tem código próprio e o console não relê; PEDIDO_EM_ANDAMENTO (a corrida
+            // do clique duplo) e o CONFLICT genérico relêem, porque o pedido pode existir.
+            return Recusa(ex) is { } recusa
+                ? base.Conflict(new ApiErrorResponse(new ApiError(recusa.Codigo, recusa.Mensagem, null, null)))
+                : DataConflict(ex.Message);
         }
     }
+
+    private const string MensagemLojaFechada = "A loja está fechada. Abra a loja para criar o pedido.";
+    private const string MensagemClienteBloqueado = "Cliente bloqueado: desbloqueie o cadastro para criar o pedido.";
+
+    // A mensagem da loja fechada é a que a dona escreveu para o cliente, e a do bloqueio traz o id: a atendente
+    // lê o que fazer. As outras seguem iguais (o console troca a do CEP pela frase da área de entrega).
+    private static (string Codigo, string Mensagem)? Recusa(RegraDeDominioVioladaException ex) => ex switch
+    {
+        LojaFechadaException => ("LOJA_FECHADA", MensagemLojaFechada),
+        JanelaSemVagasException => ("JANELA_ESGOTADA", ex.Message),
+        CepSemCoberturaException => ("CEP_SEM_COBERTURA", ex.Message),
+        ClienteBloqueadoException => ("CLIENTE_BLOQUEADO", MensagemClienteBloqueado),
+        PedidoEmAndamentoException => ("PEDIDO_EM_ANDAMENTO", ex.Message),
+        _ => null,
+    };
 }
 
 /// <summary>Comanda fechada pela operadora. <c>Forma</c>: <c>online</c> (padrão) ou <c>na_entrega</c>.</summary>

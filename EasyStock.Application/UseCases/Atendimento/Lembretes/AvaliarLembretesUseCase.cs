@@ -21,7 +21,8 @@ public sealed record ResultadoAvaliacaoLembretes(int Criados, int Resolvidos, in
 ///   <item>Cria os automáticos a partir das consultas, uma vez por fato <c>(Tipo, Referencia)</c>
 ///   (o índice único no banco é a segunda trava).</item>
 ///   <item>Resolve sozinho o automático aberto cujo fato saiu da consulta: o pagamento baixou, a
-///   dona respondeu, a conversa foi encerrada ou devolvida ao agente.</item>
+///   dona (ou o agente) respondeu ou a conversa foi encerrada. Devolvida ao agente, a conversa só sai quando ele
+///   responde: o turno roda em memória e pode se perder (#1622-4).</item>
 ///   <item>Avisa os vencidos e ainda não avisados (o automático vence na hora; o manual, no horário
 ///   escolhido): evento <see cref="TipoEventoNotificacao.LembreteVencido"/> no outbox (Web Push,
 ///   ADR-0030) no mesmo commit do carimbo, e SSE <see cref="EventoSse"/> depois do commit.</item>
@@ -115,8 +116,10 @@ public sealed class AvaliarLembretesUseCase(
         var aguardandoPrazo = new HashSet<Guid>();
         var menorPrazo = TimeSpan.FromMinutes(Math.Min(ConfiguracaoAtendimento.SlaRespostaMinimoMinutos, padrao.TotalMinutes));
         var semResposta = new List<(ConversaSemResposta Conversa, string Referencia, TimeSpan Sla)>();
+        var nomePorConversa = new Dictionary<Guid, string?>();
         foreach (var conversa in await candidatos.ListarConversasSemRespostaAsync(agora - menorPrazo, ct))
         {
+            nomePorConversa[conversa.ConversaId] = conversa.ContatoNome;
             var semRespostaApos = SlaDa(conversa, padrao);
             var expediente = conversa.Expediente ?? ExpedienteLoja.CriarPadrao(conversa.EmpresaId);
             if (expediente.EmpresaId != conversa.EmpresaId) continue;
@@ -157,7 +160,7 @@ public sealed class AvaliarLembretesUseCase(
         if (criados + resolvidos > 0)
             await unitOfWork.CommitAsync();
 
-        var avisados = await AvisarVencidosAsync(agora, slaPorEmpresa, aguardandoPrazo, ct);
+        var avisados = await AvisarVencidosAsync(agora, slaPorEmpresa, aguardandoPrazo, nomePorConversa, ct);
         return new ResultadoAvaliacaoLembretes(criados, resolvidos, avisados);
     }
 
@@ -187,7 +190,7 @@ public sealed class AvaliarLembretesUseCase(
 
     // `slaPorEmpresa`: o SLA aplicado nesta rodada, para o PrazoEstourado dizer o mesmo prazo que criou o lembrete.
     private async Task<int> AvisarVencidosAsync(DateTime agora, IReadOnlyDictionary<Guid, TimeSpan> slaPorEmpresa,
-        IReadOnlySet<Guid> aguardandoPrazo, CancellationToken ct)
+        IReadOnlySet<Guid> aguardandoPrazo, IReadOnlyDictionary<Guid, string?> nomePorConversa, CancellationToken ct)
     {
         var vencidos = (await repository.ListarVencidosSemAvisoAsync(agora, AvisosPorRodada, ct))
             .Where(l => l.Tipo != TipoLembrete.ClienteSemResposta || l.ConversaId is not { } c || !aguardandoPrazo.Contains(c))
@@ -205,10 +208,14 @@ public sealed class AvaliarLembretesUseCase(
             // ficam só no Push. Sem atendente, o destino é a audiência da rotina (gestores).
             if (lembrete is { Tipo: TipoLembrete.ClienteSemResposta, CriadoPorUsuarioId: null })
             {
+                // #1765-8: o e-mail diz de quem é e sai uma vez por conversa (a chave é a conversa; o CorrelationId
+                // continua o lembrete, único por empresa).
                 var sla = slaPorEmpresa.GetValueOrDefault(lembrete.EmpresaId, prazos.Value.ClienteSemResposta);
+                var cliente = lembrete.ConversaId is { } conversaId ? nomePorConversa.GetValueOrDefault(conversaId) : null;
                 await PrazoEstouradoEvento.EnfileirarAsync(notificador, prazos.Value, TipoPrazo.ClienteSemResposta,
                     lembrete.EmpresaId, lembrete.Id, PrazoEstouradoEvento.Referencia(lembrete.ConversaId ?? lembrete.Id),
-                    PrazoEstouradoEvento.Duracao(sla), PrazoEstouradoEvento.Duracao(sla), lembrete.ParaUsuarioId, ct);
+                    PrazoEstouradoEvento.Duracao(sla), PrazoEstouradoEvento.Duracao(sla), lembrete.ParaUsuarioId, ct,
+                    cliente, fatoId: lembrete.ConversaId);
             }
             lembrete.MarcarAvisado(agora);
         }

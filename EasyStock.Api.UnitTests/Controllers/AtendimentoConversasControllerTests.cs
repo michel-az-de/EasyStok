@@ -208,7 +208,7 @@ public partial class AtendimentoConversasControllerTests
     {
         var conversa = ConversaComClienteAgora();
         _canal.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns<Task<string>>(_ => throw new WhatsAppCloudException(131000, "Meta instável", ehPermanente: false), _ => Task.FromResult("wamid.dona1"));
+            .Returns<Task<string>>(_ => throw new WhatsAppCloudException(131000, "(#131000) Something went wrong", ehPermanente: false), _ => Task.FromResult("wamid.dona1"));
 
         var result = await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("Temos nhoque!"), default);
 
@@ -216,7 +216,8 @@ public partial class AtendimentoConversasControllerTests
         erro.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
         var gravada = _repositorio.Mensagens.Should().ContainSingle(m => m.Direcao == DirecaoMensagem.Saida).Subject;
         gravada.Status.Should().Be(StatusMensagem.Falhou);
-        gravada.Erro.Should().Contain("Meta instável");
+        // #1765-11: grava o código estável em português; o texto em inglês da Meta fica só no log.
+        gravada.Erro.Should().Be("Falha no canal (código Meta 131000).");
         gravada.Autor.Should().Be(AutorMensagem.Dona);
         gravada.ProximoReenvioEm.Should().NotBeNull("131000 é temporária");
         var corpo = erro.Value.Should().BeOfType<ApiErrorResponse>().Subject;

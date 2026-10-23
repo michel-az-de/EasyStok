@@ -75,7 +75,7 @@ import { NavegacaoDoConsole } from './NavegacaoDoConsole'
 import css from './moldura.module.css'
 
 // Só o topo conhece todas as features. Feature nenhuma importa outra feature.
-function Composicao({ rota, aoSair }) {
+function Composicao({ rota }) {
   const {
     selecionada, regras, encerrando, encerrandoNumero, agente, modoAgente, agora, aberta, horarioDaLoja,
     conversas, automaticoPausado,
@@ -326,7 +326,7 @@ function Composicao({ rota, aoSair }) {
         {pratoArrastando && <CartaoArrasto item={pratoArrastando} />}
       </DragOverlay>
       </div>
-      <FaixaApi aoSair={aoSair} />
+      <FaixaApi />
     </DndContext>
   )
 }
@@ -352,9 +352,9 @@ const INICIO_DO_RELOGIO = FONTE_API ? Date.now() : INSTANTE_INICIAL
 // as telas de ajuste (as abas da antiga Gestão) abrem na moldura do módulo. As
 // telas de ajuste compartilham o `AtendimentoProvider`. Hall, Cozinha e Entregas usam
 // composição própria; a visita conserva a seleção e as comandas ainda locais ao voltar.
-function TelaDaRota({ rota, aoSair }) {
+function TelaDaRota({ rota }) {
   const { sessao, agora } = useAtendimento()
-  if (rota.tipo === ROTA_PRINCIPAL) return <Composicao rota={rota} aoSair={aoSair} />
+  if (rota.tipo === ROTA_PRINCIPAL) return <Composicao rota={rota} />
   // Na demonstração, navegar no mesmo tab mantém a origem do espelho viva.
   // Os apelidos avulsos continuam sem outro provider, como as janelas do tablet.
   if (!FONTE_API && rota.tipo === ROTA_COZINHA) return <NoModulo rota={rota}><TelaCozinha /></NoModulo>
@@ -375,7 +375,7 @@ function TelaDaRota({ rota, aoSair }) {
       {/* #1582: Horários e mensagens também abre e fecha a loja; sem isto o gesto só aparecia
           depois, sozinho, ao voltar para o Balcão. */}
       {FONTE_API && <GestoLoja />}
-      <FaixaApi aoSair={aoSair} somenteAvisos />
+      <FaixaApi />
     </>
   )
 }
@@ -417,7 +417,7 @@ function RestaurarConversa({ ultimaConversa, aoLembrarConversa }) {
   return null
 }
 
-function AppPrincipal({ rota, sessao, aoSair, ultimaConversa, aoLembrarConversa, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco }) {
+function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco }) {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
   const { permite } = useAcessoModulos()
   return (
@@ -425,7 +425,7 @@ function AppPrincipal({ rota, sessao, aoSair, ultimaConversa, aoLembrarConversa,
     <AtendimentoProvider key={identidadeDaSessao(sessao)} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={aoGuardarComandas} memoriaDoLaco={memoriaDoLaco}>
       {ultimaConversa && <RestaurarConversa ultimaConversa={ultimaConversa} aoLembrarConversa={aoLembrarConversa} />}
       <LimparAvisoAoNavegar />
-      <TelaDaRota rota={rota} aoSair={aoSair} />
+      <TelaDaRota rota={rota} />
       {permite('atendimento') && <PilhaDeAvisos />}
     </AtendimentoProvider>
   )
@@ -498,11 +498,11 @@ export function App() {
   }
   if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} avisoSaida={avisoSaida} />
   if (FONTE_API) return <><NavegacaoDoConsole hash={hash} /><AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} /></>
-  if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />
+  if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} />
   if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaEntregas /></NoModulo>
   if (rota.tipo === ROTA_COZINHA) return FONTE_API ? <CozinhaApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaCozinha /></NoModulo>
   if (rota.tipo === ROTA_CARDAPIO_LINK) return FONTE_API ? <AvisoCardapioDoSite /> : <TelaCardapioLink />
-  return <AppPrincipal rota={rota} sessao={sessao} aoSair={encerrarSessao} />
+  return <AppPrincipal rota={rota} sessao={sessao} />
 }
 
 function AppComAcesso({ rota, sessao, aoSair }) {
@@ -573,7 +573,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />
-  else tela = <AppPrincipal rota={rota} sessao={sessao} aoSair={sair} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} memoriaDoLaco={memoriaDoLaco} />
+  else tela = <AppPrincipal rota={rota} sessao={sessao} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} memoriaDoLaco={memoriaDoLaco} />
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
       {tela}{confirmacaoSaida}

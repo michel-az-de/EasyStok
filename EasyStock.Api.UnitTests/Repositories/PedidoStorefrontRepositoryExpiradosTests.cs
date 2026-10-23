@@ -46,10 +46,30 @@ public class PedidoStorefrontRepositoryExpiradosTests : IDisposable
             Agora.AddMinutes(30), 1, Agora.AddMinutes(-40)));
         await _db.SaveChangesAsync();
 
-        var ids = (await _repo.GetAguardandoPagamentoExpiradosAsync(Limite)).Select(p => p.Id).ToList();
+        var ids = (await _repo.GetAbandonadosNoCheckoutAsync(Limite)).Select(p => p.Id).ToList();
 
         ids.Should().BeEquivalentTo(new[] { site.Id, guest.Id, conversa.Id });
         ids.Should().NotContain(new[] { balcao.Id, comCobranca.Id, recente.Id, pago.Id });
+    }
+
+    /// <summary>
+    /// #1623-a: a fase 1 do checkout do site grava o pedido em rascunho sem transação; interrompida antes da vaga, o
+    /// rascunho ficava para sempre (e o produto não podia mais ser inativado). Rascunho antigo do checkout entra na
+    /// varredura; o recente (checkout em andamento) e o de outra origem não.
+    /// </summary>
+    [Fact]
+    public async Task PegaRascunhoAntigoDoCheckout()
+    {
+        var site = Seed(OrigemPedido.Storefront, status: StatusPedidoMapper.Rascunho);
+        var guest = Seed(OrigemPedido.StorefrontGuest, status: StatusPedidoMapper.Rascunho);
+        var recente = Seed(OrigemPedido.StorefrontGuest, status: StatusPedidoMapper.Rascunho, criadoEm: Agora.AddMinutes(-5));
+        var balcao = Seed("web", status: StatusPedidoMapper.Rascunho);
+        await _db.SaveChangesAsync();
+
+        var ids = (await _repo.GetAbandonadosNoCheckoutAsync(Limite)).Select(p => p.Id).ToList();
+
+        ids.Should().BeEquivalentTo(new[] { site.Id, guest.Id });
+        ids.Should().NotContain(new[] { recente.Id, balcao.Id });
     }
 
     private Pedido Seed(string origem, string status = StatusPedidoMapper.AguardandoPagamento, DateTime? criadoEm = null)

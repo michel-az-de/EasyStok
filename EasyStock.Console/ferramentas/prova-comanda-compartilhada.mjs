@@ -220,3 +220,35 @@ assert.equal(geracoes, 1, 'envio reutiliza o link já gerado, mesmo após falha 
 assert.equal(mensagemEnviada, gerado.texto)
 assert.equal(fechamentos, 1)
 console.log('Compartilhamento: abrir/cancelar sem geração, uma ação explícita, convite real e reutilização após falha de cópia aprovados.')
+
+// #1989 (item 2, laboratório de 23/10): "Confirmar alteração" com o pedido mudado volta 409 em
+// ProblemDetails (`detail`). A tela dizia "Confira os campos."; diz a frase da API, que traz o
+// próximo passo, e ao lado fica o "Atualizar comanda".
+{
+  const { confirmarComandaCliente } = await import('../src/infra/api/comandasClienteApi.js')
+  const sessaoAntes = globalThis.sessionStorage
+  const fetchAntes = globalThis.fetch
+  globalThis.sessionStorage = { getItem: () => JSON.stringify({ token: 't', expiraEm: Date.now() + 60000, empresa: { id: 'e' } }), setItem() {}, removeItem() {} }
+  const frase = 'O pedido mudou desde a solicitação. Gere um novo link para o cliente conferir.'
+  const problema = (status, corpo) => async () => new Response(JSON.stringify({ status, ...corpo }), { status, headers: { 'Content-Type': 'application/problem+json' } })
+  try {
+    globalThis.fetch = problema(409, { type: 'https://tools.ietf.org/html/rfc9110#section-15.5.10', title: 'Conflict', detail: frase })
+    await assert.rejects(confirmarComandaCliente('conversa', 'link', true), (e) => {
+      assert.equal(e.status, 409)
+      assert.equal(e.message, frase)
+      return true
+    })
+    // Validação sem frase própria segue no texto genérico.
+    globalThis.fetch = problema(400, { title: 'One or more validation errors occurred.', errors: { aceitar: ['inválido'] } })
+    await assert.rejects(confirmarComandaCliente('conversa', 'link', true), /Confira os campos\./)
+    // O envelope da casa continua mandando quando existe.
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: { code: 'X', message: 'Mensagem da casa.' }, detail: 'outra' }), { status: 409 })
+    await assert.rejects(confirmarComandaCliente('conversa', 'link', true), /Mensagem da casa\./)
+  } finally {
+    globalThis.sessionStorage = sessaoAntes
+    globalThis.fetch = fetchAntes
+  }
+  const fonteComanda = readFileSync(arquivo, 'utf8')
+  assert.match(fonteComanda, /\{erro && <><p role="alert">\{erro\}<\/p><Botao onClick=\{atualizar\}/, 'a recusa fica ao lado de "Atualizar comanda"')
+  console.log('#1989-2: 409 em ProblemDetails mostra a frase da API; validação sem frase segue genérica.')
+}

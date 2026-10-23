@@ -296,3 +296,6 @@
 .contatoInformado .rodapeBloco, .contatoInformado .erroEmLinha { margin: 0; }
 /* O telefone informado já é de um cadastro: a pergunta à dona, em texto de leitura (não de apoio). */
 .perguntaInformado { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
+
+/* #1686 (item 9): marca de destino do motivo da barra sem mexer no layout. */
+.contents { display: contents; }

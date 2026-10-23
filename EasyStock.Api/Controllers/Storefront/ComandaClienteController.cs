@@ -102,7 +102,8 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
                 try
                 {
                     var retrato = await escopo.ServiceProvider.GetRequiredService<ComandaClienteUseCase>().ObterAsync(token, ct);
-                    pedidoId = retrato.Pedido?.PedidoId;
+                    // Pedido encerrado sai do retrato (#1686-2); o envio do link ainda diz qual pedido acompanhar.
+                    pedidoId = retrato.Pedido?.PedidoId ?? retrato.Envio?.PedidoId;
                     estado = JsonSerializer.Serialize(retrato, ComandaClienteUseCase.Json);
                 }
                 catch (LinkCardapioConversaIndisponivelException) { break; }

@@ -22,7 +22,8 @@ public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid Co
 /// </summary>
 public sealed class GerenciarConversaAtendimentoUseCase(
     IConversaRepository conversaRepository, IUnitOfWork unitOfWork, IPublicadorEventoIntegracao? publicador = null,
-    IQueueService? fila = null)
+    IQueueService? fila = null, ResolvedorCanal? resolvedorCanal = null,
+    ILogger<GerenciarConversaAtendimentoUseCase>? logger = null)
 {
     public const string PrefixoLiberacao = "atendimento automático retomado por ";
 
@@ -91,12 +92,48 @@ public sealed class GerenciarConversaAtendimentoUseCase(
             return ConversaSituacaoResult.De(conversa);
         }, ct);
 
-    public Task<ConversaSituacaoResult> MarcarLidaAsync(AcaoConversaCommand command, CancellationToken ct = default) =>
-        ExecutarAsync(command, (conversa, _) =>
+    /// <summary>Quantas mensagens recentes procurar pela última entrada com id externo, para o "lida" no canal.</summary>
+    public const int MensagensParaLidaNoCanal = 20;
+
+    /// <summary>
+    /// #1765-6: é a atendente abrindo a conversa que lê. Havendo não lidas, o canal recebe o "lida" da última entrada
+    /// (a Meta dá como lidas as anteriores junto) depois do commit, em melhor esforço: falha do canal só vai ao log.
+    /// </summary>
+    public async Task<ConversaSituacaoResult> MarcarLidaAsync(AcaoConversaCommand command, CancellationToken ct = default)
+    {
+        string? ultimaEntrada = null;
+        var canal = CanalConversa.WhatsApp;
+        var resultado = await ExecutarAsync(command, async (conversa, _) =>
         {
+            // Lida sob a trava da conversa: entrada que chegar depois do commit segue não lida aqui e no canal.
+            if (conversa.NaoLidas > 0 && resolvedorCanal is not null)
+            {
+                canal = conversa.Canal;
+                var mensagens = await conversaRepository.ListarMensagensAsync(
+                    command.EmpresaId, command.ConversaId, null, MensagensParaLidaNoCanal, ct);
+                ultimaEntrada = mensagens.LastOrDefault(m => m.Direcao == DirecaoMensagem.Entrada
+                    && !string.IsNullOrEmpty(m.ExternoId))?.ExternoId;
+            }
             conversa.MarcarLida();
-            return Task.CompletedTask;
         }, ct);
+
+        if (ultimaEntrada is not null)
+            await AvisarLidaNoCanalAsync(command, canal, ultimaEntrada, ct);
+        return resultado;
+    }
+
+    private async Task AvisarLidaNoCanalAsync(AcaoConversaCommand command, CanalConversa canal, string externoId, CancellationToken ct)
+    {
+        try
+        {
+            await resolvedorCanal!.Obter(canal).MarcarComoLidaAsync(externoId, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger?.LogWarning(ex, "Atendimento: falha ao marcar como lida no canal a conversa {ConversaId} (melhor esforço).",
+                command.ConversaId);
+        }
+    }
 
     /// <summary>
     /// #1792: a ação parte da linha travada e relida. Sem a trava, uma entrada gravada sobre a leitura velha desfazia o

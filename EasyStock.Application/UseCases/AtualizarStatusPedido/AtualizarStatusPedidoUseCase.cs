@@ -136,7 +136,8 @@ public class AtualizarStatusPedidoUseCase(
         // acima, o re-check é apenas paranoia barata.
         pedido.MudarStatus(statusNovo);
         // #1230: AguardandoPagamento -> Aguardando pela troca genérica (a dona recebeu por fora) entra na
-        // fila com início previsto; nos demais status é no-op sem consulta.
+        // fila com início previsto; o início do preparo numera quem ainda não tem número (#1641-2); nos demais
+        // status é no-op sem consulta.
         await inicioPrevisto.AplicarNaFilaAsync(pedido);
 
         var statusNovoStr = StatusPedidoMapper.Format(statusNovo);

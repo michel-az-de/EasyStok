@@ -6,6 +6,16 @@ namespace EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 public sealed record CobrancaPedidoVencida(Guid CobrancaId, Guid EmpresaId, Guid PedidoId, string? ContaRecebedoraId = null);
 
 /// <summary>
+/// #1610: link online pendente da conversa perto de vencer, na varredura cross-tenant do lembrete. O lembrete enviado
+/// (ou tentado) fica reservado na tabela de idempotência com <see cref="RecursoLembrete"/> e a chave <c>CobrancaId</c>.
+/// </summary>
+public sealed record CobrancaPedidoVencendo(Guid CobrancaId, Guid EmpresaId, Guid PedidoId)
+{
+    public const string RecursoLembrete = "JOB cobranca.vencendo";
+    public string Chave => CobrancaId.ToString();
+}
+
+/// <summary>
 /// Persistência de <see cref="CobrancaPedido"/> (S11). Não faz SaveChanges: o commit é do
 /// <see cref="IUnitOfWork"/>. <c>empresaId</c> vai no WHERE de toda consulta de tenant (ADR-0010).
 /// </summary>
@@ -27,6 +37,13 @@ public interface ICobrancaPedidoRepository
     /// das que venceram antes primeiro.
     /// </summary>
     Task<IReadOnlyList<CobrancaPedidoVencida>> ListarPendentesVencidasAsync(DateTime limite, int maximo, CancellationToken ct = default);
+
+    /// <summary>
+    /// #1610: links online pendentes da conversa que vencem em até <paramref name="antecedencia"/> depois de
+    /// <paramref name="agora"/>, de todos os tenants, sem os que já têm lembrete reservado (exceto o que falhou no canal).
+    /// </summary>
+    Task<IReadOnlyList<CobrancaPedidoVencendo>> ListarPendentesVencendoAsync(
+        DateTime agora, TimeSpan antecedencia, int maximo, CancellationToken ct = default);
 
     /// <summary>
     /// Há alguma cobrança online pendente, em qualquer loja (I3.1)? O webhook que não consegue reconsultar o

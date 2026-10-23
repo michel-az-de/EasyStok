@@ -99,7 +99,75 @@ public class AudienciaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICla
         mensagens.Select(m => m.Destinatario).Should().NotContain("cliente@fora.com");
     }
 
+    // #1765-7: aviso do Balcão com o Push falhando (sem inscrição, sem chave VAPID) caía no vazio. Com a audiência "equipe"
+    // e o In-App de reserva, cada pessoa que atende ganha o aviso no sino; o visualizador, a cozinha (sem atender conversas)
+    // e a outra empresa, não.
+    [SkippableFact]
+    public async Task PushSemInscricaoCaiNoSinoDeCadaPessoaDaEquipe()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = await _s.SemearEmpresaAsync();
+        var outra = await _s.SemearEmpresaAsync();
+        var dona = await SemearUsuarioComPerfilAsync(empresa, NivelAcesso.Admin, "dona");
+        var atendente = await SemearUsuarioComPerfilAsync(empresa, NivelAcesso.Operador, "atendente");
+        var visualizador = await SemearUsuarioComPerfilAsync(empresa, NivelAcesso.Visualizador, "visualizador");
+        var cozinha = await SemearUsuarioComPerfilAsync(empresa, NivelAcesso.Operador, "cozinha", [Permissao.AcessarModuloCozinha]);
+        var deFora = await SemearUsuarioComPerfilAsync(outra, NivelAcesso.Operador, "defora");
+        await SemearRotinaDoBalcaoAsync(empresa);
+        var evento = await _s.SemearEventoPendenteAsync(empresa, TipoEventoNotificacao.ContatoNovoNoBalcao,
+            $$"""{"nome":"Fulana","tag":"casa-da-baba-contato-novo-x","chaveIdempotencia":"{{Guid.NewGuid():N}}|contato-novo"}""");
+        var push = new CanalFalso(CanalNotificacao.Push,
+            _ => new ResultadoEnvio(false, "webpush", "NENHUMA_SUBSCRIPTION_ATIVA", FalhaPermanente: true));
+        var sino = new CanalFalso(CanalNotificacao.InApp, _ => new ResultadoEnvio(true, "inapp"));
+        await using var provider = _s.ConstruirProviderDoWorker(papelRls: true, canais: [push, sino]);
+
+        await using (var escopo = provider.CreateAsyncScope())
+            await escopo.ServiceProvider.GetRequiredService<INotificacoesAvaliadorOrchestrator>().ExecutarRodadaAsync(TimeSpan.FromMinutes(2));
+        for (var rodada = 0; rodada < 2; rodada++)
+            await provider.GetRequiredService<INotificacoesDispatcherOrchestrator>().ExecutarRodadaAsync(shardCount: 4, batchSize: 50);
+
+        var mensagens = await _s.LerMensagensDoEventoAsync(evento.Id);
+        mensagens.Where(m => m.Canal == CanalNotificacao.Push).Select(m => m.Destinatario)
+            .Should().BeEquivalentTo([$"usuario:{dona.Id}", $"usuario:{atendente.Id}"]);
+        var noSino = mensagens.Where(m => m.Canal == CanalNotificacao.InApp).ToList();
+        noSino.Select(m => m.Destinatario).Should().BeEquivalentTo([dona.Id.ToString(), atendente.Id.ToString()]);
+        noSino.Should().OnlyContain(m => m.Status == StatusOutbox.Enviado && m.CorpoRenderizado == "Fulana entrou em contato");
+        mensagens.Select(m => m.Destinatario).Should().NotContain(d => d.Contains(visualizador.Id.ToString())
+            || d.Contains(cozinha.Id.ToString()) || d.Contains(deFora.Id.ToString()));
+        sino.ChamadasDaEmpresa(empresa).Should().Be(2);
+    }
+
     // ----- sementes -----
+
+    /// <summary>As rotinas do Balcão como o catálogo (#1765-7): Push com In-App de reserva e audiência "equipe".</summary>
+    private async Task SemearRotinaDoBalcaoAsync(Guid empresaId)
+    {
+        var codigo = $"balcao-{Guid.NewGuid():N}";
+        var rotina = RotinaNotificacao.Criar(
+            codigo, "Contato novo no Balcão", TipoEventoNotificacao.ContatoNovoNoBalcao, TriggerTipoRotina.Evento, codigo,
+            CategoriaConteudoNotificacao.Operacional, empresaId: empresaId);
+        rotina.CanaisOrdemFallbackJson = """["Push","InApp"]""";
+        rotina.DefinirParametros("""{"audiencia":"equipe"}""", "teste");
+        rotina.Ativar("teste");
+        var templatePush = TemplateNotificacao.Criar(codigo, "Push", CanalNotificacao.Push, TipoEventoNotificacao.ContatoNovoNoBalcao,
+            "Contato novo", "{{ nome }} entrou em contato", empresaId);
+        var templateSino = TemplateNotificacao.Criar($"{codigo}-inapp", "In-App", CanalNotificacao.InApp,
+            TipoEventoNotificacao.ContatoNovoNoBalcao, "Contato novo", "{{ nome }} entrou em contato", empresaId);
+        foreach (var t in new[] { templatePush, templateSino })
+        {
+            t.Aprovar("teste");
+            t.Ativar();
+        }
+
+        await using var db = fixture.CreateDbContext();
+        using var _ = db.UseRowLevelSecurityBypass();
+        db.NotifRotinas.Add(rotina);
+        db.NotifTemplates.AddRange(templatePush, templateSino);
+        foreach (var canal in new[] { CanalNotificacao.Push, CanalNotificacao.InApp })
+            if (!await db.NotifConfiguracoesCanal.IgnoreQueryFilters().AnyAsync(c => c.Canal == canal && c.EmpresaId == null))
+                db.NotifConfiguracoesCanal.Add(ConfiguracaoCanal.Criar(canal, "stub"));
+        await db.SaveChangesAsync();
+    }
 
     private async Task SemearRotinaDaEmpresaAsync(Guid empresaId, TipoEventoNotificacao tipo, string parametrosJson)
     {
@@ -123,11 +191,17 @@ public class AudienciaIntegrationTests(PostgreSqlDatabaseFixture fixture) : ICla
         await db.SaveChangesAsync();
     }
 
-    private async Task<Usuario> SemearUsuarioComPerfilAsync(Guid empresaId, NivelAcesso nivel, string nome)
+    private async Task<Usuario> SemearUsuarioComPerfilAsync(Guid empresaId, NivelAcesso nivel, string nome, Permissao[]? explicitas = null)
     {
         var usuario = Usuario.Criar(nome, $"{nome}-{Guid.NewGuid():N}@casadababa.com", "hash");
         usuario.EmailConfirmado = true;
         var perfil = new Perfil { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = $"{nivel}-{nome}", Nivel = nivel, CriadoEm = DateTime.UtcNow };
+        if (explicitas is not null)
+        {
+            perfil.PermissoesExplicitas = true;
+            foreach (var permissao in explicitas)
+                perfil.Permissoes.Add(new PerfilPermissao { Id = Guid.NewGuid(), PerfilId = perfil.Id, Permissao = permissao });
+        }
 
         await using var db = fixture.CreateDbContext();
         using var _ = db.UseRowLevelSecurityBypass();
