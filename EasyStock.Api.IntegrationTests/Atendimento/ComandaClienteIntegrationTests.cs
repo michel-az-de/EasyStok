@@ -738,9 +738,11 @@ public sealed partial class PedidoConversaConcorrenciaTests
         {
             retrato.Pedido.Should().BeNull("o pedido encerrado não é mais o pedido da comanda");
             retrato.PedidoEncerrado.Should().Be(encerramento);
-            retrato.Financeiro.Should().BeNull("o saldo não vem do pedido encerrado");
-            retrato.Envio!.Saldo.Should().Be(0);
+            retrato.Envio!.Saldo.Should().Be(0, "o saldo não vem do pedido encerrado");
             retrato.Envio.LinkPagamento.Should().BeNull("o link de pagamento do pedido encerrado não é oferecido");
         }
+        var reenvio = await Enviar(client, token, 1);
+        reenvio.Saldo.Should().Be(0, "o reenvio do link usado também não oferece cobrança do pedido encerrado");
+        reenvio.LinkPagamento.Should().BeNull();
     }
 }

@@ -123,7 +123,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
     else editar({ ...rascunho, itens: [...rascunho.itens, { cardapioItemId: itemSku, variacaoId, qtd: 1 }] })
     setPrato('')
   }
-  const pendente = c.envio?.situacao === 'alteracao_aguardando_confirmacao'
+  const pendente = !c.pedidoEncerrado && c.envio?.situacao === 'alteracao_aguardando_confirmacao'
   const saldo = c.pedidoEncerrado ? 0 : c.envio?.situacao === 'estorno_pendente' ? c.envio.saldo
     : (c.podeEditar || pendente ? c.totalPrevisto ?? 0 : c.pedido?.total ?? c.totalPrevisto ?? 0) - (c.pedido?.alocado ?? c.pedido?.totalPago ?? 0)
   const resumoSaldo = saldo < 0 ? 'A devolver: ' + moeda(-saldo) + ' em ' + (c.rascunho.acerto === 'cupom' ? 'cupom' : 'estorno') + '.'
@@ -273,7 +273,7 @@ function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompar
         return <div key={c.linkId} className={css.resumoCompartilhado}>
           <strong>{etapa.titulo}</strong>
           <span className={css.estadoDaSelecao}>{etapa.estado}</span>
-          {(!c.pedido || c.podeEditar || c.envio?.situacao === 'alteracao_aguardando_confirmacao') && <p>
+          {!c.pedidoEncerrado && (!c.pedido || c.podeEditar || c.envio?.situacao === 'alteracao_aguardando_confirmacao') && <p>
             {quantidade} {quantidade === 1 ? 'item' : 'itens'}{c.totalPrevisto != null && ` · ${c.pedido ? 'Proposta' : 'Seleção'}: ${moeda(c.totalPrevisto)}`}
           </p>}
           {c.ajudaSolicitada && <p>Cliente pediu ajuda</p>}
@@ -314,7 +314,8 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
     {acaoMontar}
     {!visiveis.length && !erro && !pedido?.pedidoId && <p>Compartilhe com o cliente pelo Link de compra ou adicione os itens por aqui.</p>}
     {visiveis.map(c => {
-      const pendente = ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
+      const pendente = (!c.pedidoEncerrado || c.envio?.situacao !== 'alteracao_aguardando_confirmacao')
+        && ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
       const selecao = selecaoDe(c)
       return c.pedido || c.pedidoEncerrado ? <details key={c.linkId} className={css.historicoCompartilhado} open={c.podeEditar || pendente}>
         <summary>{pendente ? 'Ajuste para conferir' : c.podeEditar ? 'Seleção em edição' : 'Histórico do link'}</summary>

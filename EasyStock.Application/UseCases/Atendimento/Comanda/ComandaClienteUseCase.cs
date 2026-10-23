@@ -166,12 +166,11 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             dados = dados with { PedidoAtualizadoEm = pedido.AlteradoEm };
         var selecao = await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, ct, validar: false);
         var detalhe = pedido is null ? null : await obterPedido.ExecuteAsync(link.EmpresaId, conversa.Id, ct, pedido.Id);
-        var financeiro = pedido is null ? null : await saldoFinanceiro.ConsultarAsync(pedido, ct);
+        // O histórico do dinheiro (recebido, devolvido) do pedido encerrado continua: diz à equipe o que ainda está retido.
+        var financeiro = (pedido ?? encerrado) is { } comDinheiro ? await saldoFinanceiro.ConsultarAsync(comDinheiro, ct) : null;
         if (detalhe is not null && financeiro is not null) detalhe = detalhe with { TotalPago = financeiro.Alocado };
         var acerto = (pedido ?? encerrado) is { } doLink ? await AcertoAsync(link, doLink, ct) : null;
-        var envio = Ler<EnvioComandaCliente>(link.ResultadoJson);
-        if (envio is not null && encerrado is not null)
-            envio = envio with { Saldo = 0, LinkPagamento = null, EmCobranca = false };
+        var envio = SemCobrancaSeEncerrado(Ler<EnvioComandaCliente>(link.ResultadoJson), encerrado);
         if (envio?.CupomAplicado is { } usado)
         {
             var cupom = cliente is null ? null : await creditos.ObterPorCodigoAsync(link.EmpresaId, cliente.Id, usado.Codigo, ct);
@@ -194,8 +193,13 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             envio, cliente is null ? [] : (await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct)).Select(c => new CupomComandaCliente(c.Codigo, c.Saldo, c.Valor, c.CriadoEm)).ToList(),
             selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? valorCombinado ?? 0m), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
             cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado,
-            ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm, encerrado?.Status);
+            ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm,
+            encerrado is null ? null : StatusPedidoMapper.Format(encerrado.StatusEnum));
     }
+
+    /// <summary>#1686-2: o envio de um pedido encerrado não oferece saldo nem link de pagamento.</summary>
+    private static EnvioComandaCliente? SemCobrancaSeEncerrado(EnvioComandaCliente? envio, PedidoEntity? pedido) =>
+        envio is not null && pedido is { EstaFinalizado: true } ? envio with { Saldo = 0, LinkPagamento = null, EmCobranca = false } : envio;
 
     private async Task<AcertoComandaCliente?> AcertoAsync(LinkCardapioConversa link, PedidoEntity pedido, CancellationToken ct)
     {
@@ -299,7 +303,12 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (peloAtendimento && Ler<RascunhoComandaCliente>(link.RascunhoJson)?.PedidoId is not null)
                 throw new ComandaClienteConflitoException("Esta seleção já é um ajuste. Confira a alteração no pedido existente.");
             if (link.UsadoEm is not null)
-                return Ler<EnvioComandaCliente>(link.ResultadoJson) ?? throw new ComandaClienteConflitoException("O envio está em confirmação. Atualize em instantes.");
+            {
+                var anterior = Ler<EnvioComandaCliente>(link.ResultadoJson)
+                    ?? throw new ComandaClienteConflitoException("O envio está em confirmação. Atualize em instantes.");
+                // Reenvio do link usado: o pedido pode ter sido encerrado depois (#1686-2).
+                return SemCobrancaSeEncerrado(anterior, await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, anterior.PedidoId))!;
+            }
             var estado = await EstadoAsync(link, t);
             if (!estado.PodeEditar) throw new LinkCardapioConversaIndisponivelException();
             if (peloAtendimento && estado.Pedido is not null)
