@@ -32,13 +32,10 @@ public sealed partial class PedidoConversaConcorrenciaTests
         estado.Rascunho.DataEntrega.Should().Be(c.DataEntrega, "o link novo mostra a data do pedido");
         var novaData = c.DataEntrega.AddDays(7);
         await Salvar(client, ajuste, estado, estado.Rascunho with { Itens = [new(c.CardapioItemId, 2)], DataEntrega = novaData });
-        var alteracao = await Enviar(client, ajuste, 1);
-        if (alteracao.Situacao == "alteracao_aguardando_confirmacao")
-        {
-            var aceite = await client.PostAsJsonAsync(
-                $"/api/atendimento/conversas/{c.ConversaId}/comandas-cliente/{estado.LinkId}/confirmar", new { Aceitar = true });
-            aceite.StatusCode.Should().Be(HttpStatusCode.OK, await aceite.Content.ReadAsStringAsync());
-        }
+        (await Enviar(client, ajuste, 1)).Situacao.Should().Be("alteracao_aguardando_confirmacao", "troca de data passa pela equipe");
+        var aceite = await client.PostAsJsonAsync(
+            $"/api/atendimento/conversas/{c.ConversaId}/comandas-cliente/{estado.LinkId}/confirmar", new { Aceitar = true });
+        aceite.StatusCode.Should().Be(HttpStatusCode.OK, await aceite.Content.ReadAsStringAsync());
 
         var final = await Estado(client, ajuste);
         final.Pedido!.PedidoId.Should().Be(envio.PedidoId);
@@ -107,5 +104,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         quitado.Envio!.Situacao.Should().Be("pedido_confirmado");
         quitado.Envio.Saldo.Should().Be(0);
         quitado.Envio.LinkPagamento.Should().BeNull("o link do complemento pago não é mais oferecido");
+        var reenvio = await Enviar(client, ajuste, 1);
+        reenvio.Situacao.Should().Be("pedido_confirmado", "o reenvio do link também vê o pedido quitado");
+        reenvio.LinkPagamento.Should().BeNull();
     }
 }

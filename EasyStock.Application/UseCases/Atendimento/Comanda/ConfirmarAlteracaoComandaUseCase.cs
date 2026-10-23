@@ -174,7 +174,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             await uow.CommitAsync();
             return resposta;
         }, ct);
-        if (trocarPara is { } troca) await TrocarDataAsync(input, result.PedidoId, troca.JanelaId, troca.Data, ct);
+        // Sem o token da requisição: com a alteração gravada, a data pedida precisa ser aplicada ou chegar à equipe.
+        if (trocarPara is { } troca) await TrocarDataAsync(input, result.PedidoId, troca.JanelaId, troca.Data);
         if (result.EmCobranca)
             result = await CobrarDepoisDoCommitAsync(input, result);
         // Depois da cobrança nova: expirar é chamada externa e não atrasa o link que o cliente vai receber.
@@ -277,23 +278,24 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
     /// vaga ou fora do prazo, a alteração dos itens fica e a equipe é avisada na conversa para combinar a data: a data
     /// pedida nunca some em silêncio.
     /// </summary>
-    private async Task TrocarDataAsync(ConfirmarAlteracaoComandaInput input, Guid pedidoId, Guid janelaId, DateOnly data, CancellationToken ct)
+    private async Task TrocarDataAsync(ConfirmarAlteracaoComandaInput input, Guid pedidoId, Guid janelaId, DateOnly data)
     {
         try
         {
             await trocarJanela.ExecuteAsync(new(input.EmpresaId, pedidoId, janelaId, data,
-                UsuarioId: input.UsuarioId == Guid.Empty ? null : input.UsuarioId, UsuarioNome: input.UsuarioNome), ct);
+                AvisarCliente: true, UsuarioId: input.UsuarioId == Guid.Empty ? null : input.UsuarioId, UsuarioNome: input.UsuarioNome),
+                CancellationToken.None);
         }
-        catch (Exception ex) when (ex is UseCaseValidationException or EasyStock.Domain.Exceptions.Storefront.JanelaSemVagasException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Alteracao da comanda: data pedida nao aplicada pedidoId={PedidoId}", pedidoId);
             await uow.ExecuteInTransactionSemRetryAsync(async t =>
             {
-                await AvisarEquipeAsync(input, $"O cliente pediu entrega em {data:dd/MM} na alteração da comanda, mas a data não pôde ser aplicada ({ex.Message}). Combine a data com ele e troque a janela na Ficha.",
+                await AvisarEquipeAsync(input, $"O cliente pediu entrega em {data:dd/MM} na alteração da comanda, mas a data não pôde ser aplicada ({(ex is UseCaseValidationException or EasyStock.Domain.Exceptions.Storefront.JanelaSemVagasException ? ex.Message : "erro ao trocar a janela")}). Combine a data com ele e troque a janela na Ficha.",
                     relogio.GetUtcNow().UtcDateTime, t);
                 await uow.CommitAsync();
                 return true;
-            }, ct);
+            }, CancellationToken.None);
         }
     }
 

@@ -153,7 +153,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             pedido = null;
         }
         var dados = Ler<RascunhoComandaCliente>(link.RascunhoJson);
-        if (dados?.Itens is null)
+        var semRascunho = dados?.Itens is null;
+        if (semRascunho)
         {
             var endereco = cliente?.Enderecos.FirstOrDefault(e => e.Id == CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente));
             dados = new(pedido?.Itens.Where(i => i.CardapioItemId is not null).Select(i =>
@@ -179,17 +180,14 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         var selecao = await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, ct, validar: false);
         var detalhe = pedido is null ? null : await obterPedido.ExecuteAsync(link.EmpresaId, conversa.Id, ct, pedido.Id);
         // E10: o link de ajuste começa com a janela e a data do pedido; trocar a data pelo link é uma alteração visível.
-        if (Ler<RascunhoComandaCliente>(link.RascunhoJson)?.Itens is null && dados.JanelaId is null && detalhe?.Janela is { } janelaAtual)
+        if (semRascunho && dados.JanelaId is null && detalhe?.Janela is { } janelaAtual)
             dados = dados with { JanelaId = janelaAtual.JanelaId, DataEntrega = janelaAtual.Data };
         // O histórico do dinheiro (recebido, devolvido) do pedido encerrado continua: diz à equipe o que ainda está retido.
         var financeiro = (pedido ?? encerrado) is { } comDinheiro ? await saldoFinanceiro.ConsultarAsync(comDinheiro, ct) : null;
         if (detalhe is not null && financeiro is not null) detalhe = detalhe with { TotalPago = financeiro.Alocado };
         var acerto = (pedido ?? encerrado) is { } doLink ? await AcertoAsync(link, doLink, ct) : null;
         var envio = SemCobrancaSeEncerrado(Ler<EnvioComandaCliente>(link.ResultadoJson), encerrado);
-        // E11: o complemento pago quita o pedido; o envio deixa de pedir pagamento e de oferecer o link antigo.
-        if (envio is { Situacao: "aguardando_pagamento" } && pedido is not null && financeiro is not null
-            && pedido.Total.Valor - financeiro.Alocado <= 0)
-            envio = envio with { Situacao = "pedido_confirmado", Saldo = 0, LinkPagamento = null, EmCobranca = false };
+        if (pedido is not null && financeiro is not null) envio = Quitado(envio, pedido, financeiro.Alocado);
         if (envio?.CupomAplicado is { } usado)
         {
             var cupom = cliente is null ? null : await creditos.ObterPorCodigoAsync(link.EmpresaId, cliente.Id, usado.Codigo, ct);
@@ -215,6 +213,11 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm,
             encerrado is null ? null : StatusPedidoMapper.Format(encerrado.StatusEnum));
     }
+
+    /// <summary>E11: o complemento pago quita o pedido; o envio deixa de pedir pagamento e de oferecer o link antigo.</summary>
+    private static EnvioComandaCliente? Quitado(EnvioComandaCliente? envio, PedidoEntity pedido, decimal alocado) =>
+        envio is { Situacao: "aguardando_pagamento" } && pedido.Total.Valor - alocado <= 0
+            ? envio with { Situacao = "pedido_confirmado", Saldo = 0, LinkPagamento = null, EmCobranca = false } : envio;
 
     /// <summary>#1686-2: o envio de um pedido encerrado não oferece saldo nem link de pagamento.</summary>
     private static EnvioComandaCliente? SemCobrancaSeEncerrado(EnvioComandaCliente? envio, PedidoEntity? pedido) =>
@@ -327,7 +330,10 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 var anterior = Ler<EnvioComandaCliente>(link.ResultadoJson)
                     ?? throw new ComandaClienteConflitoException("O envio está em confirmação. Atualize em instantes.");
                 // Reenvio do link usado: o pedido pode ter sido encerrado depois (#1686-2).
-                return SemCobrancaSeEncerrado(anterior, await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, anterior.PedidoId))!;
+                var doEnvio = await pedidos.GetByIdWithDetailsAsync(link.EmpresaId, anterior.PedidoId);
+                if (doEnvio is not null && !doEnvio.EstaFinalizado)
+                    return Quitado(anterior, doEnvio, (await saldoFinanceiro.ConsultarAsync(doEnvio, t)).Alocado)!;
+                return SemCobrancaSeEncerrado(anterior, doEnvio)!;
             }
             var estado = await EstadoAsync(link, t);
             if (!estado.PodeEditar) throw new LinkCardapioConversaIndisponivelException();
