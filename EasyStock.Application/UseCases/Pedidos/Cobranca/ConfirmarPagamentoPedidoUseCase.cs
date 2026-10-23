@@ -182,6 +182,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
                     : AvisoCobrancaConversa.TextoPagamentoTardioEstornado,
                 relogio.GetUtcNow().UtcDateTime, ct);
 
+        if (resultado.Confirmado) await NumerarDepoisDoCommitAsync(empresaId.Value, input.PedidoId, ct);
+
         // Evento de UI: só depois do commit da transação, nunca para uma confirmação desfeita.
         if (pago is not null)
             await operacaoEventos.PublicarAsync(EventosOperacao.PedidoPago, empresaId.Value, pago, ct);
@@ -190,6 +192,31 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         if (resultado.Confirmado)
             await operacaoEventos.PublicarAsync(EventosOperacao.PedidoPagamentoAtualizado, empresaId.Value, new { pedidoId = input.PedidoId }, ct);
         return resultado;
+    }
+
+    /// <summary>
+    /// E12 (#1641-4, decisão do Felipe em 23/10): o número do dia em transação própria, depois do pagamento gravado.
+    /// Contador que falha deixa o pedido sem número (buraco aceitável) e só registra; a próxima entrada na fila numera.
+    /// </summary>
+    private async Task NumerarDepoisDoCommitAsync(Guid empresaId, Guid pedidoId, CancellationToken ct)
+    {
+        try
+        {
+            await unitOfWork.ExecuteInTransactionSemRetryAsync(async t =>
+            {
+                var pedido = await pedidoRepository.GetForUpdateAsync(empresaId, pedidoId, t);
+                if (pedido is null || pedido.NumeroDoDia is not null) return false;
+                await inicioPrevisto.NumerarAsync(pedido, t);
+                if (pedido.NumeroDoDia is null) return false;
+                await pedidoRepository.UpdateAsync(pedido, t);
+                await unitOfWork.CommitAsync();
+                return true;
+            }, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Numero do dia nao atribuido depois do pagamento pedidoId={PedidoId}", pedidoId);
+        }
     }
 
     private async Task<(ConfirmarPagamentoPedidoResult, PedidoPagoOperacao?, ImpressaoPendenteOperacao?, Guid?)> ConfirmarNoLockAsync(
@@ -265,8 +292,9 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         foreach (var outra in cobrancas.Where(c => c.EstaPendente && c.Id != alvo.Id))
             outra.Cancelar($"pago_por_outra_cobranca: {alvo.Id}", agora);
 
-        // S21/S53: com o pagamento, a janela vira compromisso (o card do KDS atrasa a partir daqui) e o pedido ganha o número do dia.
-        await inicioPrevisto.AplicarCompromissoAsync(pedido, ct);
+        // S21: com o pagamento, a janela vira compromisso (o card do KDS atrasa a partir daqui). O número do dia (S53) sai
+        // depois do commit (E12, #1641-4): a falha do contador não desfaz o pagamento.
+        await inicioPrevisto.AplicarCompromissoAsync(pedido, numerar: false, ct);
 
         var statusAntigo = pedido.Status;
         var transitou = pedido.StatusEnum == StatusPedido.AguardandoPagamento;

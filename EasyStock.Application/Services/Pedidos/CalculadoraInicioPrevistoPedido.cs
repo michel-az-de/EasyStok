@@ -22,12 +22,25 @@ public class CalculadoraInicioPrevistoPedido(IPrazoPreparoPedidoQueries queries,
     /// O pedido virou compromisso (pagamento confirmado): grava o início previsto e o número do dia. O pedido
     /// precisa estar gravado: a leitura da janela e dos itens vai ao banco.
     /// </summary>
-    public async Task AplicarCompromissoAsync(Pedido pedido, CancellationToken ct = default)
+    public Task AplicarCompromissoAsync(Pedido pedido, CancellationToken ct = default) => AplicarCompromissoAsync(pedido, numerar: true, ct);
+
+    /// <param name="numerar">Falso na confirmação do pagamento (E12, #1641-4): o número sai depois do commit, por
+    /// <see cref="NumerarAsync"/>, e a falha do contador não desfaz o pagamento.</param>
+    public async Task AplicarCompromissoAsync(Pedido pedido, bool numerar, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(pedido);
         var leitura = await queries.ObterAsync(pedido.EmpresaId, pedido.Id, ct);
         pedido.DefinirInicioPrevisto(Calcular(pedido, leitura));
-        if (numerador is not null) await numerador.AtribuirAsync(pedido, leitura?.DataJanela, ct: ct);
+        if (numerar && numerador is not null) await numerador.AtribuirAsync(pedido, leitura?.DataJanela, ct: ct);
+    }
+
+    /// <summary>Só o número do dia (S53), para quem numera fora da transação do compromisso (E12). Sem número ainda.</summary>
+    public async Task NumerarAsync(Pedido pedido, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pedido);
+        if (numerador is null || pedido.NumeroDoDia is not null) return;
+        var leitura = await queries.ObterAsync(pedido.EmpresaId, pedido.Id, ct);
+        await numerador.AtribuirAsync(pedido, leitura?.DataJanela, ct: ct);
     }
 
     /// <summary>
