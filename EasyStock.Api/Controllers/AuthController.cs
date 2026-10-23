@@ -358,7 +358,11 @@ public class AuthController(
                 // #1921 / #1940: leituras que o console só faz para quem a rota aceita (antes, 403 a cada
                 // carga). Mesma regra das rotas, sem mudar policy nem permissão: desacertos exigem a
                 // permissão de estoque; integrações e cadastro de entrega da vitrine, a policy Admin.
-                verDesacertosEstoque = usuario.TemPermissao(Permissao.GerenciarEstoque),
+                // #1974: e os módulos da rota (ModulosConvention), como o filtro que responde 403.
+                verDesacertosEstoque = usuario.TemPermissao(Permissao.GerenciarEstoque)
+                    && (Authorization.ModulosConvention.ModulosDe(typeof(EstoqueDesacertosController),
+                            nameof(EstoqueDesacertosController.Listar)) is not { } modulosDaRota
+                        || modulosDaRota.Any(m => usuario.TemPermissao(Domain.Services.AcessoModulos.PermissaoDe(m)))),
                 verIntegracoes = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin,
                 ajustarEntrega = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
             }
