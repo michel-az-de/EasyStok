@@ -274,4 +274,31 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
         await act.Should().ThrowAsync<CobrancaPedidoConflitoException>()
             .Where(e => e.Codigo == CobrancaPedidoConflitoException.PedidoJaPago);
     }
+
+    /// <summary>
+    /// #1971 (#1724): depois de devolver parte do pagamento online, a troca contava o valor pago cheio da cobrança e
+    /// achava o pedido quitado; o que foi devolvido tem de voltar a ser cobrado na entrega.
+    /// </summary>
+    [Fact]
+    public async Task PagamentoOnlineComDevolucaoParcial_TrocaParaNaEntregaCobraODevolvido()
+    {
+        var f = new CobrancaPedidoFixture();
+        var online = f.AdicionarOnline(referencia: "pref-total");
+        online.MarcarPaga("pay-total", 25m, "pix", CobrancaPedidoFixture.Agora);
+        var pagamento = new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = f.Pedido.Id, Valor = 25m, Metodo = "pix", PagoEm = CobrancaPedidoFixture.Agora, Referencia = "pay-total" };
+        f.Pedido.Pagamentos.Add(pagamento);
+        var estornos = Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.IEstornoOnlineRepository>();
+        estornos.ListarAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns(new List<PedidoEstornoOnline>
+        {
+            new() { Id = Guid.NewGuid(), EmpresaId = f.EmpresaId, PedidoId = f.Pedido.Id, PagamentoId = pagamento.Id,
+                PagamentoExternoId = "pay-total", Valor = 10m, Situacao = PedidoEstornoOnline.Confirmado, CriadoEm = CobrancaPedidoFixture.Agora },
+        });
+        var saldos = new EasyStock.Application.Services.Pedidos.SaldoFinanceiroPedido(f.PedidoRepo, estornos, f.Creditos);
+
+        var r = await f.Trocar(saldos: saldos).ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+
+        r.Cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorNaEntrega);
+        r.Cobranca.Valor.Should().Be(10m, "R$ 10 dos R$ 25 voltaram ao cliente e ficam para a entrega");
+    }
 }
