@@ -359,7 +359,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             resposta = await AguardarCobrancaAsync(acesso, resposta, ct);
         await AvisarAsync(acesso.EmpresaId, acesso.ConversaId, ct);
         await quitacao.PublicarAsync(acesso.EmpresaId, efeitos, ct);
-        await EnviarNoCanalAsync(acesso, confirmacaoNoCanal, ct);
+        // Sem o token da requisição: o pedido já está gravado e a confirmação não pode se perder com a página fechada.
+        await EnviarNoCanalAsync(acesso, confirmacaoNoCanal, CancellationToken.None);
         return resposta;
     }
 
@@ -456,7 +457,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 throw new MercadoPagoIndisponivelException("O envio anterior não foi concluído. Tente novamente em instantes.");
             var atual = Ler<EnvioComandaCliente>(link.ResultadoJson);
             if (atual is { EmCobranca: false }) return atual;
-            if (espera.Elapsed > LimiteEsperaCobranca) return atual ?? provisorio;
+            // Provisório antigo (processo caiu no meio da cobrança) não segura cada reenvio pelo limite inteiro.
+            if (espera.Elapsed > LimiteEsperaCobranca || relogio.GetUtcNow().UtcDateTime - link.UsadoEm > LimiteEsperaCobranca)
+                return atual ?? provisorio;
         }
     }
 
@@ -482,7 +485,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 await pedidos.TravarAsync(acesso.EmpresaId, pedidoId, t);
                 var pedido = await pedidos.GetByIdWithDetailsAsync(acesso.EmpresaId, pedidoId)
                     ?? throw new InvalidOperationException("Pedido criado sem persistência.");
-                if (pedido.StatusEnum != StatusPedido.AguardandoPagamento) return false;
+                // Na fila só pelo pagamento na entrega sem provedor (nada recebido); com dinheiro ou preparo, não desfaz.
+                if (pedido.StatusEnum is not (StatusPedido.AguardandoPagamento or StatusPedido.Aguardando) || pedido.TotalPago > 0) return false;
                 await checkout.DesfazerReservaDoPedidoAsync(pedido, motivo, t);
                 // Link já emitido fica sem efeito: pagamento que chegue por ele cai no pedido cancelado e é devolvido.
                 foreach (var pendente in (await cobrancasPedido.ListarDoPedidoAsync(acesso.EmpresaId, pedidoId, t)).Where(c => c.EstaPendente))
@@ -569,7 +573,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             return acesso;
         }, ct);
         await AvisarAsync(empresaId, conversaId, ct);
-        await EnviarNoCanalAsync(link, avisoNoCanal, ct);
+        await EnviarNoCanalAsync(link, avisoNoCanal, CancellationToken.None);
         return await EstadoAsync(link, ct);
     }
 
