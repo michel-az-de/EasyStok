@@ -5,6 +5,7 @@ using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Storefront;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.Atendimento.Automacoes;
 
@@ -26,7 +27,8 @@ public enum ResultadoAutomacao
     VariavelSemValor = 7,
     Falhou = 8,
     ClienteBloqueado = 9,
-    ConversaReaberta = 10
+    ConversaReaberta = 10,
+    PedidoCancelado = 11
 }
 
 /// <summary>
@@ -50,7 +52,8 @@ public sealed class DispararAutomacaoUseCase(
     ResolvedorCanal canais,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    ILogger<DispararAutomacaoUseCase> logger)
+    ILogger<DispararAutomacaoUseCase> logger,
+    IPedidoRepository? pedidos = null)
 {
     /// <summary>
     /// Primeira mensagem de uma conversa: sai só uma automática. Loja fechada na mão vence fora do
@@ -66,41 +69,19 @@ public sealed class DispararAutomacaoUseCase(
         return await ExecuteAsync(new DisparoAutomacao(empresaId, gatilho, conversaId, null, null), ct);
     }
 
+    /// <summary>
+    /// #1991-2: a automática deste disparo vai sair (todas as regras passam; só falta o canal aceitar)? O aviso S13
+    /// de pedido pago cede a vez a ela para o cliente não receber dois "recebemos seu pagamento". Não envia nem grava.
+    /// </summary>
+    public async Task<bool> VaiSairAsync(DisparoAutomacao disparo, CancellationToken ct = default) =>
+        (await PrepararAsync(disparo, ct)).Resultado is null;
+
     public async Task<ResultadoAutomacao> ExecuteAsync(DisparoAutomacao disparo, CancellationToken ct = default)
     {
-        var regra = await regras.ObterPorGatilhoAsync(disparo.EmpresaId, disparo.Gatilho, ct);
-        if (regra is null) return ResultadoAutomacao.SemRegra;
-        if (!regra.Ligada) return ResultadoAutomacao.Desligada;
-
-        var conversa = await ConversaAsync(disparo, ct);
-        if (conversa is null) return Registrar(disparo, ResultadoAutomacao.SemConversa);
-
+        var (resultado, conversa, texto) = await PrepararAsync(disparo, ct);
+        if (resultado is { } naoSaiu) return naoSaiu;
+        if (conversa is null || texto is null) return ResultadoAutomacao.SemConversa;
         var agora = relogio.GetUtcNow().UtcDateTime;
-        if (!conversa.DentroDaJanela(agora)) return Registrar(disparo, ResultadoAutomacao.ForaDaJanela);
-
-        var clienteId = disparo.ClienteId ?? conversa.ClienteId;
-        if (clienteId is { } bloqueavel && (await clientes.GetByIdAsync(disparo.EmpresaId, bloqueavel))?.Bloqueado == true)
-            return Registrar(disparo, ResultadoAutomacao.ClienteBloqueado);
-
-        // O encerramento pode estar no outbox quando o operador reabre. Não despedir de uma conversa retomada.
-        if (disparo.Gatilho == GatilhoAutomacao.Encerramento && conversa.EstaAberta)
-            return Registrar(disparo, ResultadoAutomacao.ConversaReaberta);
-
-        if (clienteId is { } c
-            && !await politica.PodeEnviarAsync(disparo.EmpresaId, c, conversa.Canal, FinalidadeContato.Transacional, ct))
-            return Registrar(disparo, ResultadoAutomacao.SemConsentimento);
-
-        string texto;
-        try
-        {
-            var valores = await variaveis.ResolverAsync(disparo.EmpresaId, conversa, clienteId, disparo.PedidoId, ct);
-            texto = regra.Renderizar(valores);
-        }
-        catch (VariavelSemValorException ex)
-        {
-            logger.LogWarning("Automática {Gatilho} não saiu: {Motivo}", disparo.Gatilho, ex.Message);
-            return ResultadoAutomacao.VariavelSemValor;
-        }
 
         string idExterno;
         try
@@ -120,6 +101,52 @@ public sealed class DispararAutomacaoUseCase(
         await conversas.AddMensagemAsync(saida, ct);
         await unitOfWork.CommitAsync();
         return ResultadoAutomacao.Enviada;
+    }
+
+    /// <summary>O que a automática vai mandar, ou por que não sai. <c>Resultado</c> nulo: falta só o canal aceitar.</summary>
+    private sealed record Preparo(ResultadoAutomacao? Resultado, Conversa? Conversa = null, string? Texto = null);
+
+    private async Task<Preparo> PrepararAsync(DisparoAutomacao disparo, CancellationToken ct)
+    {
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        // #1991-2: sem regra gravada vale o padrão ("Pagamento confirmado" nasce ligada).
+        var regra = await regras.ObterPorGatilhoAsync(disparo.EmpresaId, disparo.Gatilho, ct)
+            ?? RegraAutomatica.Padrao(disparo.EmpresaId, disparo.Gatilho, agora);
+        if (regra is null) return new(ResultadoAutomacao.SemRegra);
+        if (!regra.Ligada) return new(ResultadoAutomacao.Desligada);
+
+        // Pagamento que chegou depois do cancelamento é devolvido: não dizer que o pedido está garantido (como o S13).
+        if (disparo.Gatilho == GatilhoAutomacao.PagamentoConfirmado && disparo.PedidoId is { } pedidoId && pedidos is not null
+            && (await pedidos.GetByIdAsync(disparo.EmpresaId, pedidoId))?.StatusEnum == StatusPedido.Cancelado)
+            return new(Registrar(disparo, ResultadoAutomacao.PedidoCancelado));
+
+        var conversa = await ConversaAsync(disparo, ct);
+        if (conversa is null) return new(Registrar(disparo, ResultadoAutomacao.SemConversa));
+
+        if (!conversa.DentroDaJanela(agora)) return new(Registrar(disparo, ResultadoAutomacao.ForaDaJanela));
+
+        var clienteId = disparo.ClienteId ?? conversa.ClienteId;
+        if (clienteId is { } bloqueavel && (await clientes.GetByIdAsync(disparo.EmpresaId, bloqueavel))?.Bloqueado == true)
+            return new(Registrar(disparo, ResultadoAutomacao.ClienteBloqueado));
+
+        // O encerramento pode estar no outbox quando o operador reabre. Não despedir de uma conversa retomada.
+        if (disparo.Gatilho == GatilhoAutomacao.Encerramento && conversa.EstaAberta)
+            return new(Registrar(disparo, ResultadoAutomacao.ConversaReaberta));
+
+        if (clienteId is { } c
+            && !await politica.PodeEnviarAsync(disparo.EmpresaId, c, conversa.Canal, FinalidadeContato.Transacional, ct))
+            return new(Registrar(disparo, ResultadoAutomacao.SemConsentimento));
+
+        try
+        {
+            var valores = await variaveis.ResolverAsync(disparo.EmpresaId, conversa, clienteId, disparo.PedidoId, ct);
+            return new(null, conversa, regra.Renderizar(valores));
+        }
+        catch (VariavelSemValorException ex)
+        {
+            logger.LogWarning("Automática {Gatilho} não saiu: {Motivo}", disparo.Gatilho, ex.Message);
+            return new(ResultadoAutomacao.VariavelSemValor);
+        }
     }
 
     private async Task<Conversa?> ConversaAsync(DisparoAutomacao disparo, CancellationToken ct)

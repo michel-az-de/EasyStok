@@ -140,6 +140,32 @@ public class GerarPedidoConversaUseCaseTests
         saida.ExternoId.Should().Be("wamid.resumo");
     }
 
+    // #1991-7 (#1989-6): o resumo que a atendente manda pelo console é dela, não "automática": autor humano e quem enviou.
+    [Fact]
+    public async Task ResumoEnviadoPeloConsole_GuardaQuemEnviou()
+    {
+        var c = new Cenario();
+        var atendente = Guid.NewGuid();
+
+        await c.UseCase.ExecuteAsync(c.Input() with { UsuarioId = atendente });
+
+        var saida = c.Mensagens.Should().ContainSingle().Subject;
+        saida.Autor.Should().Be(AutorMensagem.Dona);
+        saida.EnviadaPorUsuarioId.Should().Be(atendente);
+    }
+
+    [Fact]
+    public async Task ResumoSemUsuario_SegueDoSistema()
+    {
+        var c = new Cenario();
+
+        await c.UseCase.ExecuteAsync(c.Input());
+
+        var saida = c.Mensagens.Should().ContainSingle().Subject;
+        saida.Autor.Should().Be(AutorMensagem.Sistema);
+        saida.EnviadaPorUsuarioId.Should().BeNull();
+    }
+
     [Fact]
     public async Task NaEntrega_EnviaResumoSemLink()
     {

@@ -50,7 +50,7 @@ public class AutomacoesHandlerTests
     private DispararAutomacaoUseCase UseCase() =>
         new(_regras, _conversas, _clientes, _expedientes, new VariaveisAtendimento(_clientes, _pedidos),
             new PoliticaEnvioCliente(_consentimentos), new ResolvedorCanal([_whats]), _uow, _relogio,
-            NullLogger<DispararAutomacaoUseCase>.Instance);
+            NullLogger<DispararAutomacaoUseCase>.Instance, _pedidos);
 
     private void Regra(GatilhoAutomacao gatilho, string texto, bool ligada = true) =>
         _regras.ObterPorGatilhoAsync(_empresaId, gatilho, Arg.Any<CancellationToken>())
@@ -239,6 +239,71 @@ public class AutomacoesHandlerTests
             .Should().Be(ResultadoAutomacao.ConversaReaberta);
 
         await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        _uow.CommitCount.Should().Be(0);
+    }
+
+    private Guid PedidoAgendado()
+    {
+        var pedido = EasyStock.Domain.Entities.Pedido.Criar(_empresaId, _cliente);
+        pedido.AgendadoParaEm = new DateTime(2026, 10, 1, 17, 0, 0, DateTimeKind.Utc); // 14:00 em São Paulo
+        _pedidos.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+        return pedido.Id;
+    }
+
+    // #1991-2 (#1765-4, decisão do Felipe de 23/10): sem regra gravada, "Pagamento confirmado" sai com o texto padrão.
+    [Fact]
+    public async Task SemRegraGravada_PagamentoConfirmadoSaiComOTextoPadrao()
+    {
+        (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, _conversa.Id, _cliente.Id, PedidoAgendado())))
+            .Should().Be(ResultadoAutomacao.Enviada);
+
+        await _whats.Received(1).EnviarTextoAsync(_conversa.ContatoIdExterno,
+            "Oi, Ana! Recebemos seu pagamento e seu pedido está confirmado para 01/10 às 14:00. Obrigada pela preferência!",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DonaDesligou_PagamentoConfirmadoNaoSai()
+    {
+        Regra(GatilhoAutomacao.PagamentoConfirmado, "Pago!", ligada: false);
+
+        (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, _conversa.Id, _cliente.Id, null)))
+            .Should().Be(ResultadoAutomacao.Desligada);
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
+    // Pagamento que chega depois do cancelamento é devolvido: a automática não diz que o pedido está garantido.
+    [Fact]
+    public async Task PedidoCancelado_PagamentoConfirmadoNaoSai()
+    {
+        var pedido = EasyStock.Domain.Entities.Pedido.Criar(_empresaId, _cliente);
+        pedido.Cancelar();
+        _pedidos.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+
+        (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, _conversa.Id, _cliente.Id, pedido.Id)))
+            .Should().Be(ResultadoAutomacao.PedidoCancelado);
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
+    // VaiSair responde o que o envio faria, sem enviar nem gravar: é por ele que o aviso S13 de pago cede a vez.
+    [Fact]
+    public async Task VaiSair_DizSeAAutomaticaSaiSemEnviar()
+    {
+        var velha = Conversa.Abrir(_empresaId, "5511977776666", Agora.AddDays(-3));
+        velha.RegistrarEntrada(Agora.AddDays(-2));
+        _conversas.ObterPorIdAsync(_empresaId, velha.Id, Arg.Any<CancellationToken>()).Returns(velha);
+
+        var pedidoId = PedidoAgendado();
+
+        (await UseCase().VaiSairAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, _conversa.Id, _cliente.Id, pedidoId)))
+            .Should().BeTrue();
+        (await UseCase().VaiSairAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, velha.Id, _cliente.Id, pedidoId)))
+            .Should().BeFalse("fora da janela quem avisa é o S13, com modelo");
+        (await UseCase().VaiSairAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, _conversa.Id, _cliente.Id, null)))
+            .Should().BeFalse("sem horário agendado o texto padrão não fecha e quem avisa é o S13");
+
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+        await _conversas.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
         _uow.CommitCount.Should().Be(0);
     }
 }

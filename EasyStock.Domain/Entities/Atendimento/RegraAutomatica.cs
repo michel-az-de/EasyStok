@@ -36,6 +36,23 @@ public class RegraAutomatica
         AlteradaEm = agora;
     }
 
+    /// <summary>
+    /// Texto de "Pagamento confirmado" enquanto a dona não grava o dela, com o que o aviso S13 de pago diz (nome e
+    /// entrega). Pedido sem horário agendado não tem <c>{faixa}</c>: a automática não sai e o aviso S13 avisa.
+    /// </summary>
+    public const string TextoPadraoPagamentoConfirmado =
+        "Oi, {nome}! Recebemos seu pagamento e seu pedido está confirmado para {faixa}. Obrigada pela preferência!";
+
+    /// <summary>
+    /// Regra que vale enquanto a empresa não gravou a do gatilho (não é persistida). Decisão do Felipe (23/10,
+    /// #1765-4): "Pagamento confirmado" nasce ligada; as demais nascem desligadas (nulo). Salvar a regra, ligada ou
+    /// desligada, substitui o padrão.
+    /// </summary>
+    public static RegraAutomatica? Padrao(Guid empresaId, GatilhoAutomacao gatilho, DateTime agora) =>
+        gatilho == GatilhoAutomacao.PagamentoConfirmado
+            ? Criar(empresaId, gatilho, TextoPadraoPagamentoConfirmado, ligada: true, agora)
+            : null;
+
     public string Renderizar(IReadOnlyDictionary<string, string?> valores) =>
         ModeloTextoAtendimento.Renderizar(Texto, valores);
 

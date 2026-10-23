@@ -2,6 +2,7 @@
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Events.Pedidos.Handlers;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
@@ -302,6 +303,148 @@ public class NotificarClienteStatusPedidoHandlerTests
         (await Aviso().EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, _empresaId, _pedido.Id,
             "comanda:teste", CancellationToken.None, mensagem: "Ajuste confirmado")).Should().BeFalse();
         _eventos.Should().BeEmpty();
+    }
+
+    // ── #1991-1: cliente do chat do site recebe o aviso na conversa do pedido ─────────────────────────────
+
+    private readonly IConversaRepository _conversas = Substitute.For<IConversaRepository>();
+    private readonly List<Mensagem> _gravadas = [];
+
+    private Conversa ConversaDoChat(DateTime? ultimaEntrada = null)
+    {
+        var conversa = Conversa.Abrir(_empresaId, "visitante-1", DateTime.UtcNow.AddMinutes(-5), "Maria", _cliente.Id, CanalConversa.ChatSite);
+        conversa.RegistrarEntrada(ultimaEntrada ?? DateTime.UtcNow.AddMinutes(-1));
+        _conversas.ObterIdPorPedidoAsync(_empresaId, _pedido.Id, Arg.Any<CancellationToken>()).Returns(conversa.Id);
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        _conversas.When(c => c.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>()))
+            .Do(c => _gravadas.Add(c.Arg<Mensagem>()));
+        _conversas.ObterMensagemPorExternoIdAsync(_empresaId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(c => _gravadas.FirstOrDefault(m => m.ExternoId == c.ArgAt<string>(1)));
+        return conversa;
+    }
+
+    private AvisoStatusPedidoCliente AvisoComChat() => new(
+        _pedidos, _clientes, _vagas, _storefronts, new PoliticaEnvioCliente(_consentimentos), _notificador, _tenant,
+        NullLogger<AvisoStatusPedidoCliente>.Instance, _conversas, naConversa: new AvisoPedidoNaConversa(
+            _rotinaRepository, _templateRepository, new NotificadorServiceMetadadosTests.RendererTemplateSimples(), _conversas,
+            TimeProvider.System, NullLogger<AvisoPedidoNaConversa>.Instance));
+
+    private async Task MudarStatusNoChatAsync(string antigo, string novo)
+    {
+        var payload = new PedidoMudouStatusEvent(_pedido.Id, _empresaId, null, antigo, novo, "web", null, "Dona", DateTime.UtcNow);
+        await new NotificarClienteStatusPedidoHandler(AvisoComChat()).HandleAsync(Evento("pedido.mudou_status", payload), CancellationToken.None);
+        await AvaliarEventosAsync();
+    }
+
+    [Fact]
+    public async Task ChatDoSite_SaiuParaEntregaChegaNaConversaSemTelefoneEUmaVezSo()
+    {
+        _cliente.Telefone = null;
+        var conversa = ConversaDoChat();
+
+        await MudarStatusNoChatAsync(StatusPedidoMapper.Pronto, StatusPedidoMapper.SaiuParaEntrega);
+        await MudarStatusNoChatAsync(StatusPedidoMapper.Pronto, StatusPedidoMapper.SaiuParaEntrega);
+
+        var aviso = _gravadas.Should().ContainSingle("o evento reprocessado não repete o aviso").Subject;
+        aviso.ConversaId.Should().Be(conversa.Id);
+        aviso.Autor.Should().Be(AutorMensagem.Sistema);
+        aviso.Direcao.Should().Be(DirecaoMensagem.Saida);
+        aviso.Texto.Should().Be($"Maria, seu pedido nº {_pedido.Id.ToString("N")[..8].ToUpperInvariant()} saiu para entrega.");
+        aviso.ExternoId.Should().StartWith(AvisoPedidoNaConversa.PrefixoIdExterno);
+        _eventos.Should().BeEmpty("no chat do site o aviso não vai para o WhatsApp");
+    }
+
+    [Fact]
+    public async Task ChatDoSite_EntregueEPagamentoECancelamentoChegamNaConversa()
+    {
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ nome }}: {{ mensagem }}");
+        ConversaDoChat();
+
+        await MudarStatusNoChatAsync(StatusPedidoMapper.SaiuParaEntrega, StatusPedidoMapper.Entregue);
+        await AvisoComChat().EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, _empresaId, _pedido.Id, "sinal:pay-1",
+            CancellationToken.None, mensagem: "Recebemos o sinal de R$ 10,00.");
+        _pedido.Cancelar();
+        await MudarStatusNoChatAsync(StatusPedidoMapper.Aguardando, StatusPedidoMapper.Cancelado);
+
+        _gravadas.Select(m => m.Texto).Should().Equal(
+            "Obrigada, Maria! Siga a gente: https://instagram.com/casadababa",
+            "Maria: Recebemos o sinal de R$ 10,00.",
+            "Maria: Seu pedido foi cancelado. Fale com a loja se precisar de ajuda.");
+        _eventos.Should().ContainSingle(e => e.Tipo == TipoEventoNotificacao.AvaliacaoSolicitada,
+            "o pedido de avaliação (agendado, com botões) segue pelo WhatsApp");
+    }
+
+    [Fact]
+    public async Task ChatDoSite_RespeitaAvisosDesligadosRotinaDesativadaEConsentimento()
+    {
+        ConversaDoChat();
+        _cliente.DefinirAvisosStatus(false, DateTime.UtcNow);
+        await MudarStatusNoChatAsync(StatusPedidoMapper.Pronto, StatusPedidoMapper.SaiuParaEntrega);
+        _gravadas.Should().BeEmpty("o cliente desligou os avisos de andamento");
+
+        _cliente.DefinirAvisosStatus(true, DateTime.UtcNow);
+        _rotinaRepository.ListarAtivasAsync(TipoEventoNotificacao.PedidoSaiuParaEntrega, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        await MudarStatusNoChatAsync(StatusPedidoMapper.Pronto, StatusPedidoMapper.SaiuParaEntrega);
+        _gravadas.Should().BeEmpty("rotina desativada é o rollback do aviso");
+
+        _consentimentos.ListarDoClienteAsync(_empresaId, _cliente.Id, Arg.Any<CancellationToken>()).Returns([
+            ConsentimentoContato.Registrar(_empresaId, _cliente.Id, CanalConversa.ChatSite, FinalidadeContato.Transacional,
+                SituacaoConsentimento.Revogado, "teste", DateTime.UtcNow)]);
+        await MudarStatusNoChatAsync(StatusPedidoMapper.Aguardando, StatusPedidoMapper.Entregue);
+        _gravadas.Should().BeEmpty("o cliente revogou o contato no chat do site");
+        _eventos.Where(e => e.Tipo != TipoEventoNotificacao.AvaliacaoSolicitada).Should().BeEmpty();
+    }
+
+    // #1991-2: com a automática "Pagamento confirmado" ligada (padrão) e saindo na conversa, o aviso S13 cede a vez.
+    private NotificarClientePedidoPagoHandler HandlerDoPago(ICanalMensageria canal) => new(AvisoComChat(), _tenant,
+        new EasyStock.Application.UseCases.Atendimento.Automacoes.DispararAutomacaoUseCase(
+            Substitute.For<IRegraAutomaticaRepository>(), _conversas, _clientes, Substitute.For<IExpedienteLojaRepository>(),
+            new VariaveisAtendimento(_clientes, _pedidos), new PoliticaEnvioCliente(_consentimentos),
+            new EasyStock.Application.Services.Atendimento.ResolvedorCanal([canal]), Substitute.For<IUnitOfWork>(), TimeProvider.System,
+            NullLogger<EasyStock.Application.UseCases.Atendimento.Automacoes.DispararAutomacaoUseCase>.Instance, _pedidos));
+
+    private PedidoPagoEvent Pago(Guid? conversaId) => new(_pedido.Id, _empresaId, null, _cliente.Id, conversaId, Guid.NewGuid(),
+        "mercadopago", "pay-1", "pix", 25m, StatusPedidoMapper.Aguardando, DateTime.UtcNow);
+
+    [Fact]
+    public async Task PagamentoComAutomaticaSaindoNaConversa_AvisoS13CedeAVez()
+    {
+        var conversa = ConversaDoChat();
+        _pedido.AgendadoParaEm = DateTime.UtcNow.AddDays(2);
+
+        await HandlerDoPago(new CanalChatSite()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
+        await AvaliarEventosAsync();
+
+        _gravadas.Should().BeEmpty("quem fala do pagamento é a automática, que roda depois neste evento");
+        _eventos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PagamentoSemHorarioAgendado_AvisoS13SaiNoChat()
+    {
+        // O texto padrão da automática pede {faixa}; sem ela a automática não sai e o S13 avisa (com a previsão da vaga).
+        var conversa = ConversaDoChat();
+
+        await HandlerDoPago(new CanalChatSite()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
+
+        _gravadas.Should().ContainSingle().Which.Texto.Should().Contain("Recebemos seu pagamento").And.Contain("Tarde (14h às 18h), 01/10");
+    }
+
+    [Fact]
+    public async Task PagamentoForaDaJanelaDoWhatsApp_AvisoS13Sai()
+    {
+        var conversa = Conversa.Abrir(_empresaId, "5511999990001", DateTime.UtcNow.AddDays(-3), "Maria", _cliente.Id);
+        conversa.RegistrarEntrada(DateTime.UtcNow.AddDays(-2));
+        _conversas.ObterIdPorPedidoAsync(_empresaId, _pedido.Id, Arg.Any<CancellationToken>()).Returns(conversa.Id);
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var whats = Substitute.For<ICanalMensageria>();
+        whats.Canal.Returns(CanalConversa.WhatsApp);
+
+        await HandlerDoPago(whats).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
+        await AvaliarEventosAsync();
+
+        _outbox.Should().ContainSingle().Which.CorpoRenderizado.Should().Contain("Recebemos seu pagamento");
     }
 
     private OutboxEventoIntegracao Evento<T>(string tipo, T payload) =>

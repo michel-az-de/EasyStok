@@ -73,7 +73,8 @@ public class AtendimentoComandaController(
             currentUser.EmpresaId, id,
             body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
             body.JanelaId, body.DataEntrega, body.EnderecoId, body.Forma, body.Observacoes,
-            EnviarAoCliente: body.EnviarAoCliente), ct)));
+            EnviarAoCliente: body.EnviarAoCliente,
+            UsuarioId: currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null), ct)));
     }
 
     [SwaggerOperation(Summary = "Quote of the order before creating it: freight, total, deposit and rest (#1884)",

@@ -96,6 +96,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
                 legado.AtualizarConteudo("", "Pagamento recebido", "operadora");
                 legado.Aprovar("operadora"); legado.Ativar();
             }
+            // #1991-2: "Pagamento confirmado" nasce ligada e, saindo na conversa, substitui este aviso. Aqui a dona a
+            // desligou: o teste guarda a revalidação do aviso S13 no despacho.
+            db.RegrasAutomaticas.Add(RegraAutomatica.Criar(EmpresaId, GatilhoAutomacao.PagamentoConfirmado, "Pago.", false, DateTime.UtcNow));
             await db.SaveChangesAsync();
         }
         await PrepararAvisos(factory, c.ConversaId);
