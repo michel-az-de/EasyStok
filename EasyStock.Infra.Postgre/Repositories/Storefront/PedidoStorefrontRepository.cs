@@ -37,12 +37,28 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
                 "sem transação ativa, o FOR UPDATE é descartado pelo Postgres e a serialização entre " +
                 "agentes Babá fica quebrada (race em aprovar/recusar concorrente).");
 
-        // xmin explicito: Pedido usa xmin como concurrency token (80ce216f) e coluna de
-        // SISTEMA nao vem no SELECT * — sem ela o EF falha com "column e.xmin does not
-        // exist" e TODO aprovar/recusar de pedido storefront morre (pego via #822).
-        const string sql = "SELECT *, xmin FROM pedidos WHERE \"Id\" = {0} FOR UPDATE";
+        return await TravarAsync("SELECT *, xmin FROM pedidos WHERE \"Id\" = {0} FOR UPDATE", [pedidoId], ct);
+    }
+
+    public async Task<Pedido?> GetForUpdateAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
+    {
+        if (db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException(
+                "GetForUpdateAsync deve ser chamado dentro de IUnitOfWork.ExecuteInTransactionAsync — " +
+                "sem transação ativa, o FOR UPDATE é descartado pelo Postgres.");
+
+        // #1265-9: a empresa vai no WHERE; a linha de outra empresa não é travada.
+        return await TravarAsync(
+            "SELECT *, xmin FROM pedidos WHERE \"Id\" = {0} AND \"EmpresaId\" = {1} FOR UPDATE", [pedidoId, empresaId], ct);
+    }
+
+    // xmin explicito: Pedido usa xmin como concurrency token (80ce216f) e coluna de
+    // SISTEMA nao vem no SELECT * — sem ela o EF falha com "column e.xmin does not
+    // exist" e TODO aprovar/recusar de pedido storefront morre (pego via #822).
+    private async Task<Pedido?> TravarAsync(string sql, object[] parametros, CancellationToken ct)
+    {
         var pedido = await db.Pedidos
-            .FromSqlRaw(sql, pedidoId)
+            .FromSqlRaw(sql, parametros)
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(ct);
         if (pedido is not null)

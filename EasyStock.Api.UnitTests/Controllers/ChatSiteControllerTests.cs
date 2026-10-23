@@ -112,7 +112,8 @@ public class ChatSiteControllerTests
     }
 
     private IdentificarVisitanteChatSiteUseCase Identificacao() => new(
-        new AcessoChatSite(_lojas, _flags, Substitute.For<ITenantContextAccessor>(), _sessoes), _conversas, Substitute.For<IUnitOfWork>());
+        new AcessoChatSite(_lojas, _flags, Substitute.For<ITenantContextAccessor>(), _sessoes), _conversas, Substitute.For<IUnitOfWork>(),
+        Substitute.For<IOperacaoEventPublisher>());
 
     [Fact]
     public async Task IdentificacaoValida200SemAceite400TokenInvalido403()
@@ -128,6 +129,19 @@ public class ChatSiteControllerTests
             .Should().BeOfType<BadRequestObjectResult>();
         (await _controller.Identificar(Slug, "inventado", valido, Identificacao(), default))
             .Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    // #1643-4: corpo vazio com token inventado diz sessão inválida (403), não 400; o binder deixa o corpo vazio passar.
+    [Fact]
+    public async Task IdentificacaoSemCorpoComTokenInventado403()
+    {
+        Sessao();
+
+        (await _controller.Identificar(Slug, "inventado", null, Identificacao(), default))
+            .Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        typeof(ChatSiteController).GetMethod(nameof(ChatSiteController.Identificar))!.GetParameters()
+            .Single(p => p.Name == "body").GetCustomAttribute<FromBodyAttribute>()!.EmptyBodyBehavior
+            .Should().Be(Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow);
     }
 
     [Fact]
