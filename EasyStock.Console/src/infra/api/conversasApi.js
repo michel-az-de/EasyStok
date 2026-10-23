@@ -1,5 +1,6 @@
 import { chamarApi } from './cliente'
 import { nomeDoArquivoDeAudio } from '../../dominio/audio'
+import { MENSAGENS_POR_LEITURA } from './traducaoConversas'
 
 // Inbox do console (S07): `api/atendimento/conversas`. Devolve o formato da API;
 // a tradução para o formato do console mora em traducaoConversas.js.
@@ -31,8 +32,9 @@ export async function listarInbox({ completa = false, ate = [] } = {}) {
   return { itens: [...vistas.values()], completa: false }
 }
 
-export const listarMensagens = (id, { limite = 100 } = {}) =>
-  chamarApi(`${BASE}/${id}/mensagens?limite=${limite}`)
+// #2005 (console-09): a leitura traz as mais recentes; `antesDe` (instante) segue para trás, uma página por vez.
+export const listarMensagens = (id, { limite = MENSAGENS_POR_LEITURA, antesDe = null } = {}) =>
+  chamarApi(`${BASE}/${id}/mensagens?limite=${limite}${antesDe ? `&antesDe=${encodeURIComponent(antesDe)}` : ''}`)
 
 // Arquivo da mensagem (foto, áudio, documento) do storage privado, autenticado (#1287).
 export const baixarMidia = (conversaId, mensagemId) =>

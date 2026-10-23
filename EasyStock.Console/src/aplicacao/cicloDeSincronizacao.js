@@ -3,6 +3,7 @@ import { listarInbox, listarMensagens, marcarLida } from '../infra/api/conversas
 import { conversaDaApi } from '../infra/api/traducaoConversas'
 import { obterPedido, pedidoDaApi } from '../infra/api/comandaApi'
 import { conversaNaTela, deveRelerMensagens, deveRelerPedido, emFila, fundirPagina, quedaDaSincronizacao } from './planoDeSincronizacao'
+import { proximoInstante } from './relogioDeLeitura'
 
 // Uma volta da polling da inbox (#1576), fora do React para ser provada sem tela: o hook
 // (`useSincronizacaoApi.js`) só dá o ritmo. O que relê e em que ordem: `planoDeSincronizacao.js`.
@@ -15,17 +16,20 @@ const VOLTAS_DO_EVENTO = 2
 // O que o laço lembra entre as voltas: os resumos da inbox (id -> resumo, na ordem da tela) e a
 // última leitura de mensagens e de pedido de cada conversa. Criada acima do Balcão (App.jsx), não
 // morre quando a dona vai ao Hall, à Cozinha ou às Entregas, e a volta não relê a inbox inteira.
-export const criarMemoriaDoLaco = () => ({ dono: null, resumos: new Map(), mensagens: new Map(), pedidos: new Map() })
+// `lidaEm` (#2005, console-08): id da conversa -> instante em que saiu a leitura que trouxe o resumo dela.
+export const criarMemoriaDoLaco = () => ({ dono: null, resumos: new Map(), mensagens: new Map(), pedidos: new Map(), lidaEm: new Map() })
 
 export function criarCicloDeSincronizacao({
   despachar, memoria = criarMemoriaDoLaco(), dono = null, comConversas = true,
   lerSelecionada = () => null, lerUsuario = () => null, estaVivo = () => true, lerConversaNaTela = conversaNaTela,
 }) {
+  memoria.lidaEm ??= new Map()
   // Memória de outro usuário não serve a este: começa do zero.
   if (memoria.dono !== dono) {
     memoria.resumos = new Map()
     memoria.mensagens.clear()
     memoria.pedidos.clear()
+    memoria.lidaEm.clear()
     memoria.dono = dono
   }
   // A primeira volta de cada montagem varre a inbox inteira, e também a que vem depois de uma
@@ -95,12 +99,13 @@ export function criarCicloDeSincronizacao({
     }
   }
 
-  function guardarInbox({ itens, completa }) {
+  function guardarInbox({ itens, completa }, saiuEm) {
     memoria.resumos = fundirPagina(memoria.resumos, itens, { completa })
+    for (const item of itens) memoria.lidaEm.set(item.id, saiuEm)
     if (!completa) return
     devendoVarredura = false
     // Conversa que saiu da inbox sai dos caches: a memória agora dura o dia inteiro.
-    for (const guardados of [memoria.mensagens, memoria.pedidos, pedidosInvalidos]) {
+    for (const guardados of [memoria.mensagens, memoria.pedidos, pedidosInvalidos, memoria.lidaEm]) {
       for (const id of guardados.keys()) if (!memoria.resumos.has(id)) guardados.delete(id)
     }
   }
@@ -115,12 +120,15 @@ export function criarCicloDeSincronizacao({
         })
         return
       }
+      // #2005 (console-08): o instante em que a leitura SAIU. O reducer descarta a situação de um resumo que saiu
+      // antes de uma confirmação (assumir, encerrar) que a atendente já viu na tela.
+      const saiuEm = proximoInstante()
       const inbox = comConversas
         ? await listarInbox({ completa: devendoVarredura || cicloLento, ate: conversasFrescas() })
         : { itens: [], completa: true }
       // Quem saiu do Balcão no meio da volta não mexe na memória nem segue lendo conversa por conversa.
       if (!estaVivo()) return
-      guardarInbox(inbox)
+      guardarInbox(inbox, saiuEm)
       const semMensagens = []
       const conversas = await emFila([...memoria.resumos.values()], CONVERSAS_POR_VEZ, async (resumo) => {
         const [mensagens, pedido] = await Promise.all([mensagensDe(resumo, cicloLento), pedidoDe(resumo, cicloLento)])
@@ -129,7 +137,9 @@ export function criarCicloDeSincronizacao({
       })
       if (estaVivo()) {
         // `semMensagens`: quem a leitura não trouxe e não estava em cache; o reducer mantém o que está na tela.
-        despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas, ...(semMensagens.length ? { semMensagens } : {}) })
+        despachar({
+          tipo: acao.SINCRONIZAR_CONVERSAS, conversas, lidaEm: Object.fromEntries(memoria.lidaEm), ...(semMensagens.length ? { semMensagens } : {}),
+        })
         marcarEntradaNaAberta()
         // #1241: a volta da rede abre o lançamento do papel (o reducer ignora se já estava online).
         despachar({ tipo: acao.CONEXAO_VOLTOU, agora: Date.now() })

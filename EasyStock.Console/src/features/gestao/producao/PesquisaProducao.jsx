@@ -3,6 +3,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Modal } from '../../../componentes/Modal'
 import { pesquisarInsumosWeb, pesquisarReceitaIa } from '../../../aplicacao/calculosReceita'
+import { combinarSinais } from '../../../aplicacao/sinais'
 import css from './pesquisaProducao.module.css'
 
 function Fontes({ fontes }) {
@@ -18,7 +19,7 @@ export function NomeInsumoPesquisado({ value, onChange, disabled }) {
     if (disabled || value.trim().length < 3 || value.trim().length > 100) return undefined
     const controle = new AbortController()
     const tempo = setTimeout(() => {
-      pesquisarInsumosWeb(value.trim(), AbortSignal.any([controle.signal, AbortSignal.timeout(15000)]))
+      pesquisarInsumosWeb(value.trim(), combinarSinais([controle.signal, AbortSignal.timeout(15000)]))
         .then((dados) => { if (!controle.signal.aborted) setFontes(dados) })
         .catch(() => { if (!controle.signal.aborted) setErro('Pesquisa indisponível. Você pode continuar escrevendo o nome.') })
     }, 700)
@@ -54,7 +55,7 @@ function ModalPesquisaReceita({ nome, aoAplicar, aoFechar }) {
     controle.current = atual
     setOcupado(true); setResultado(null); setErro(null)
     try {
-      const dados = await pesquisarReceitaIa(termo.trim(), AbortSignal.any([atual.signal, AbortSignal.timeout(90000)]))
+      const dados = await pesquisarReceitaIa(termo.trim(), combinarSinais([atual.signal, AbortSignal.timeout(90000)]))
       if (!atual.signal.aborted) setResultado(dados)
     } catch (e) { if (!atual.signal.aborted) setErro(e.message) }
     finally { if (!atual.signal.aborted) { controle.current = null; setOcupado(false) } }

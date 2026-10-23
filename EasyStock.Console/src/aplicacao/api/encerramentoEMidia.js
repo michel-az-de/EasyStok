@@ -5,6 +5,7 @@ import {
 import { mensagemDaApi } from '../../infra/api/traducaoConversas'
 import { proximoId } from '../../infra/repositorioConversas'
 import { criarChavesDeMensagem } from '../chavesDeMensagem'
+import { proximoInstante } from '../relogioDeLeitura'
 
 // Encerrar pelo modal e mandar foto no modo API (F06, #1236).
 //
@@ -102,7 +103,7 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       return { erro: mensagem, despedidaSaiu: despedidaSaiu === true }
     }
     const pedido = conversaDe(id)?.pedido
-    despachar({ tipo: acao.ENCERRAR_ATENDIMENTO, id })
+    despachar({ tipo: acao.ENCERRAR_ATENDIMENTO, id, confirmadaEm: proximoInstante() })
     despachar({ tipo: acao.FECHAR_ENCERRAMENTO })
     // Só ressalva acende a faixa: encerrar que deu certo não sai em tom de alerta.
     const ressalvas = []

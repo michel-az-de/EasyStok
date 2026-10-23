@@ -276,7 +276,9 @@ await confere('1. Entregas: cadastro volta com ação de entregador, troca de di
     await h.estabilizar()
     assert.equal(doCadastro().length, 0)
     chamadas.length = 0
-    andar(5 * 60000)
+    // #2005 (console-20): a conferência de 30 s também corre nesses 5 min, um tique por vez (cada leitura termina
+    // antes do tique seguinte, como na rede de verdade); o cadastro vencido é relido uma vez só, por ela ou pelo evento.
+    for (let i = 0; i < 10; i += 1) { andar(30000); await h.estabilizar() }
     evento('pedido.pago')
     andar(300)
     await h.estabilizar()

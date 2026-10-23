@@ -5,8 +5,8 @@ import { Bloco } from '../../componentes/Bloco'
 import { RESUMO_COM_ERRO } from '../../dominio/ficha'
 import { Botao } from '../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
-import { CampoMascarado } from '../../componentes/CampoMascarado'
-import { lerMoeda, mascaraMoeda, moeda } from '../../dominio/formato'
+import { CampoReais } from '../../componentes/CampoReais'
+import { lerMoeda, moeda } from '../../dominio/formato'
 import { aDevolverDe, referenciaObrigatoriaNaDevolucao, resumoDasDevolucoes, textoADevolver } from '../../dominio/cobranca'
 import css from './ficha.module.css'
 import { EstornosOnline } from './EstornosOnline'
@@ -83,7 +83,7 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
         </>}
         {aberto && !pendente && podeRegistrar && <form className={css.acoesPedido} onSubmit={salvar}>
           <CampoSelecao rotulo="Recebimento a devolver" value={pagamentoId} disabled={ocupado} onChange={(e) => escolher(e.target.value)} opcoes={disponiveis.map((p) => ({ valor: p.id, rotulo: `${data(p.pagoEm)} · ${p.metodo} · disponível ${moeda(p.disponivel)}` }))} />
-          <CampoMascarado rotulo="Valor devolvido" tipo="moeda" valor={mascaraMoeda(centavos)} aoMudarDigitos={setCentavos} aoColarTexto={(t) => setCentavos(String(lerMoeda(t)))} disabled={ocupado} dica={pagamento ? `Até ${moeda(pagamento.disponivel)} deste recebimento.` : 'Escolha um recebimento.'} />
+          <CampoReais rotulo="Valor devolvido" centavos={centavos ? Number(centavos) : null} ler={lerMoeda} aoMudar={(valor) => setCentavos(valor == null ? '' : String(valor))} disabled={ocupado} dica={pagamento ? `Até ${moeda(pagamento.disponivel)} deste recebimento.` : 'Escolha um recebimento.'} />
           <CampoSelecao rotulo="Meio usado na devolução" value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={meios} disabled={ocupado} />
           <CampoTexto rotulo="Motivo da devolução" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500} required disabled={ocupado} />
           <CampoTexto rotulo={referenciaObrigatoria ? 'Comprovante ou referência da devolução' : 'Comprovante ou referência (opcional em dinheiro)'} value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} required={referenciaObrigatoria} disabled={ocupado} />

@@ -9,7 +9,7 @@ import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnlin
 import { pedeConfirmacaoDoSaldo, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
 import { criarChaveDeEnvio } from '../chaveDeEnvio'
-import { SO_NO_EASYSTOK } from './naoLigadas'
+import { SO_NO_EASYSTOK, textoNaoLigado } from './naoLigadas'
 
 // Comanda e cobrança no modo API (F03, S10/S11). Montar a comanda (itens, observação,
 // janela, meio) continua local até o envio; "Gerar cobrança e enviar" cria o pedido no
@@ -88,6 +88,15 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     }
     avisar('Comanda: o pedido já está no EasyStok e não muda por aqui.')
     return undefined
+  }
+
+  // #2005 (console-22): pedido em status que o console não conhece não recebe cobrança nem baixa daqui.
+  const recusaPorStatusDesconhecido = (id) => {
+    const pedido = pedidoDe(id)
+    if (!pedido?.statusDesconhecido) return null
+    const motivo = `O pedido está em "${pedido.statusApi}", um status que este console não conhece. Cobrança e baixa ficam bloqueadas: confira o pedido no EasyStok.`
+    avisar(motivo)
+    return motivo
   }
 
   const soNoEasyStok = (rotulo) => (id) => {
@@ -188,6 +197,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   // o link e com o link vencido manda um novo (#1924). Link ainda valendo não sai de novo sozinho.
   const cobrar = (id, meio, enviarAoCliente = true) => {
     if (!pedidoCriado(id)) return criarPedido(id, meio, enviarAoCliente)
+    if (recusaPorStatusDesconhecido(id)) return undefined
     const atual = pedidoDe(id)
     if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
     if (!atual?.cobranca && formaDoMeio(atual?.meio) === FORMA_ONLINE) return reemitir(id)
@@ -205,6 +215,8 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   const receber = (id, valor, metodo) => {
     const pedidoId = pedidoCriado(id)
     if (!pedidoId) return soNoEasyStok('Receber pagamento')(id)
+    const recusado = recusaPorStatusDesconhecido(id)
+    if (recusado) return Promise.resolve({ erro: recusado })
     if (!metodo) { avisar('Selecione como recebeu o pagamento.'); return undefined }
     // #1474 (R8): pedido que exige aprovação (fora da área liberado) é pré-operacional até a
     // dona aprovar; o EasyStok recusaria a baixa. Nada sai antes disso.
@@ -350,6 +362,14 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     },
 
     gerarCobranca: (id, pedido, meio = null, enviarAoCliente = true) => cobrar(id, meio, enviarAoCliente),
-    reenviarCobranca: (id, pedido, valorForcado = null, meio = null) => cobrar(id, meio),
+    // #2005 (console-01): o EasyStok não cobra só a diferença. Valor forçado avisa em vez de cair na cobrança
+    // comum (que trocava a forma, reemitia o link ou dizia que o link ainda vale).
+    reenviarCobranca: (id, pedido, valorForcado = null, meio = null) => {
+      if (valorForcado != null) {
+        avisar(textoNaoLigado(SO_NO_EASYSTOK.cobrarDiferenca))
+        return undefined
+      }
+      return cobrar(id, meio)
+    },
   }
 }

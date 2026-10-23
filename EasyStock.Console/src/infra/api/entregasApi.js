@@ -25,14 +25,15 @@ export const incluirParada = (id, pedidoId) => chamarApi(`${V}/${id}/paradas`, {
 export const retirarParada = (id, pedidoId) => chamarApi(`${V}/${id}/paradas/${pedidoId}`, { metodo: 'DELETE' })
 export const reordenarParada = (id, pedidoId, ordem) =>
   chamarApi(`${V}/${id}/paradas/${pedidoId}/ordem`, { metodo: 'PUT', corpo: { ordem } })
-export const sairParaEntrega = (id) => chamarApi(`${V}/${id}/sair`, { metodo: 'POST' })
+// `keepalive` (#2005, estoque-10): a saída e a entrega pendentes saem ao fechar ou esconder a aba.
+export const sairParaEntrega = (id) => chamarApi(`${V}/${id}/sair`, { metodo: 'POST', keepalive: true })
 // I9.2 (#1691): corrida externa da viagem, com custo.
 export const listarCorridas = (id) => chamarApi(`${V}/${id}/corridas`)
 export const registrarCorrida = (id, corpo) => chamarApi(`${V}/${id}/corridas`, { metodo: 'POST', corpo })
 export const corrigirCorrida = (id, corridaId, corpo) => chamarApi(`${V}/${id}/corridas/${corridaId}`, { metodo: 'PUT', corpo })
 // #1776 (item 19): com saldo a receber a API responde 409 SALDO_A_RECEBER até `confirmarSaldoAReceber`.
 export const marcarParadaEntregue = (id, pedidoId, confirmarSaldoAReceber = false) =>
-  chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST', corpo: { confirmarSaldoAReceber } })
+  chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST', corpo: { confirmarSaldoAReceber }, keepalive: true })
 export const desfazerViagem = (id) => chamarApi(`${V}/${id}/desfazer`, { metodo: 'POST' })
 // J2 (#1990): "Entrega própria" desativada volta em vez de virar cadastro duplicado.
 export const listarEntregadoresComInativos = () => chamarApi('/api/atendimento/entregadores?incluirInativos=true')

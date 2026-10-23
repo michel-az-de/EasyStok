@@ -173,7 +173,8 @@ export function estornarCobranca(cobranca, agora, { motivo, valor } = {}) {
   return { ...cobranca, estornadaEm: agora, motivoEstorno: motivoLimpo, valorEstornado }
 }
 
-export function faltaPagar(cobranca) {
+// Falta da divergência de UMA cobrança (pagou a menos). O saldo do pedido é `faltaPagar`, de pagamento.js.
+export function faltaDaCobranca(cobranca) {
   if (!cobranca?.pagaEm || cobranca.valorPago == null) return 0
   return Math.max(cobranca.valor - cobranca.valorPago, 0)
 }

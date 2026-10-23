@@ -1,11 +1,13 @@
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 
 const ESPERA_RECARGA_MS = 300
-const POLLING_SEM_SSE_MS = 15000
+// #2005 (console-20): as três constantes são de todas as telas que ouvem o SSE da operação (Agenda, Cozinha,
+// Entregas), para a regra não divergir de uma para outra.
+export const POLLING_SEM_SSE_MS = 15000
 // Com o SSE vivo a tela já recarrega a cada evento; a conferência lenta cobre o que não tem evento
 // (pedido criado no balcão) e a conexão viva e muda.
-const CONFERENCIA_AO_VIVO_MS = 30000
-const RECONECTAR_MS = 10000
+export const CONFERENCIA_AO_VIVO_MS = 30000
+export const RECONECTAR_MS = 10000
 
 // Recarga de uma tela que ouve o SSE da operação (#1565). Evento em rajada vira uma recarga só; o polling
 // de 15 s fica para o SSE caído e cede à conferência de 30 s quando ele volta. Devolve a função que desliga.

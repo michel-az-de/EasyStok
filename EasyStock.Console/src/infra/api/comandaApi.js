@@ -142,6 +142,9 @@ export function pedidoDaApi(p, anterior = null) {
     numero: p.numeroComanda || p.pedidoId.replace(/-/g, '').slice(0, 8).toUpperCase(),
     estado: ESTADO_DO_STATUS[p.status] ?? 'aguardando',
     statusApi: p.status,
+    // #2005 (console-22): status novo no servidor que o console não conhece. Cai em "aguardando" só para a
+    // tela não quebrar; a cobrança e a baixa ficam bloqueadas (a Ficha mostra o status cru).
+    statusDesconhecido: p.status != null && !Object.hasOwn(ESTADO_DO_STATUS, p.status),
     // #1474: pedido fora da área liberado espera aprovação; a baixa manual é barrada antes.
     requerAprovacao: Boolean(p.requerAprovacao),
     janela: p.janela ? idDaJanela(p.janela.janelaId, p.janela.data) : null,

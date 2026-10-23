@@ -53,6 +53,23 @@ export function criarEnvioComDesfazer({ prazoMs = SEGUNDOS_PARA_DESFAZER_ETAPA *
   }
 }
 
+// #2005 (estoque-10): o pendente vive na memória da aba. Com a aba fechada, recarregada, em crash ou
+// suspensa pelo tablet o cleanup do React não roda e o "Pronto"/"Saiu"/"Entregue" que a cozinheira tocou
+// nunca chegava ao EasyStok (sem baixa de estoque, sem aviso ao cliente). `pagehide` cobre fechar e
+// recarregar; `visibilitychange` para escondida cobre o tablet que suspende (no celular o `pagehide` nem sempre
+// vem). A requisição sai com `keepalive` (kdsApi, entregasApi), que sobrevive à aba. Devolve a função que desliga.
+export function enviarPendentesAoSair(envio, { janela = globalThis.window, documento = globalThis.document } = {}) {
+  if (!janela || !documento) return () => {}
+  const sair = () => envio.descarregar()
+  const aoMudarVisibilidade = () => { if (documento.visibilityState === 'hidden') sair() }
+  janela.addEventListener('pagehide', sair)
+  documento.addEventListener('visibilitychange', aoMudarVisibilidade)
+  return () => {
+    janela.removeEventListener('pagehide', sair)
+    documento.removeEventListener('visibilitychange', aoMudarVisibilidade)
+  }
+}
+
 // Entregas: a saída da viagem e a entrega de cada parada avisam o cliente.
 export const chaveDaSaida = (viagemId) => `sair:${viagemId}`
 export const chaveDaEntrega = (viagemId, pedidoId) => `entregue:${viagemId}:${pedidoId}`

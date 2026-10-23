@@ -9,9 +9,11 @@ import { listarFechamentos, obterCaixaDoDia } from '../infra/api/caixaApi'
 export function useCaixaDoDiaApi({ fechamentos: quantosFechamentos = 7 } = {}) {
   const [carga, setCarga] = useState({ estado: 'carregando', dia: null, fechamentos: [], erro: null })
 
+  // #2005 (console-02): devolve o dia lido, ou nulo quando a leitura falhou. Quem vai fechar o caixa precisa
+  // saber se o número que tem em mãos é de agora.
   const recarregar = useCallback(() => Promise.all([obterCaixaDoDia(), listarFechamentos(quantosFechamentos)])
-    .then(([dia, fechamentos]) => setCarga({ estado: 'ok', dia, fechamentos, erro: null }))
-    .catch((erro) => setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message }))), [quantosFechamentos])
+    .then(([dia, fechamentos]) => { setCarga({ estado: 'ok', dia, fechamentos, erro: null }); return dia })
+    .catch((erro) => { setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message })); return null }), [quantosFechamentos])
 
   useEffect(() => {
     let vivo = true

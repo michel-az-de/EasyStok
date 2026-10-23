@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { complementoDaResposta, podeAceitarComplemento, perguntaDeComplemento } from '../dominio/complementoDeTexto'
 import { perguntarAssistente } from '../infra/api/assistenteApi'
 import { EVENTO_SESSAO_ALTERADA, identidadeDaSessao, lerSessao } from '../infra/api/sessao'
+import { combinarSinais } from '../infra/api/sinais'
 
 let emVoo = null
 let proximaChamada = 0
@@ -44,7 +45,7 @@ export function useComplementoDeTexto({ texto = '', contexto, conversaId, ativo,
       try {
         // A cozinha pede só redação; sem conversa, a API não oferece ferramentas de ações no cliente.
         const resposta = await perguntarAssistente(perguntaDeComplemento(texto, contexto), contexto === 'cozinha' ? null : conversaId, {
-          sinal: AbortSignal.any([controle.signal, AbortSignal.timeout(15000)]), identidadeEsperada: identidade,
+          sinal: combinarSinais([controle.signal, AbortSignal.timeout(15000)]), identidadeEsperada: identidade,
         })
         // Ações da IA nunca são executadas por um complemento de escrita.
         const complemento = complementoDaResposta(texto, resposta, limite)

@@ -5,7 +5,7 @@ import { Icone } from '../../componentes/Icone'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAtendimento } from '../../aplicacao/contextos'
 import { useTiqueLocal } from '../../hooks/useTiqueLocal'
-import { ROTULO_MANDAR_LINK_NOVO, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaPagar, situacaoDaCobranca } from '../../dominio/cobranca'
+import { ROTULO_MANDAR_LINK_NOVO, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaDaCobranca, situacaoDaCobranca } from '../../dominio/cobranca'
 import { horaCurta, moeda } from '../../dominio/formato'
 import css from './RelogioPix.module.css'
 
@@ -153,7 +153,7 @@ export function RelogioPix({
   // Caiu valor diferente do cobrado. A decisão é dela, os dois botões já são
   // a escolha (nunca só um primário aqui).
   if (situacao.chave === 'divergente') {
-    const falta = faltaPagar(cobranca)
+    const falta = faltaDaCobranca(cobranca)
     return (
       <div className={css.relogio}>
         <Anel tamanho={DIAMETRO} traco={TRACO} fracao={1} tom="atencao">
@@ -166,7 +166,7 @@ export function RelogioPix({
             {disponivel('aceitarDivergencia') && (
               <Botao largo variante="primario" onClick={aoAceitarDivergencia}>Aceitar diferença</Botao>
             )}
-            {falta > 0 && (
+            {falta > 0 && disponivel('cobrarDiferenca') && (
               <Botao largo variante="secundario" onClick={aoCobrarDiferenca}>Cobrar diferença</Botao>
             )}
           </div>

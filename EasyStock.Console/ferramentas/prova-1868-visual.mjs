@@ -110,7 +110,7 @@ confere('2  o saldo aparece no Resumo com o peso do valor (24 px, negrito, tinta
 confere('2  "Já coberto/Falta" só sai quando o "Marcar pago (complemento)" já diz o saldo', () => {
   const barra = fonte('features/ficha-cliente/BarraProximoPasso.jsx')
   assert.match(barra, /saldoNoBotao = complementoEmAberto\s+const botaoComplemento = complementoEmAberto && \(/)
-  assert.match(barra, /\{!saldoNoBotao && alocadoApi > 0 && alocadoApi < pedido\.totalApi && \(/)
+  assert.match(barra, /\{!saldoNoBotao && alocadoApi > 0 && saldoApi\(pedido\) > 0 && \(/)
   assert.match(barra, /Marcar pago \(complemento \{moeda\(pedido\.cobranca\.valor\)\}\)/)
   // O caso sem botão (pedido na fila sem quitação) é conferido na tela por prova-premium-comanda.
 })

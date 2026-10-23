@@ -2,15 +2,16 @@ import { useId, useState } from 'react'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto, CampoSelecao, CampoArea } from '../../../componentes/Campo'
-import { CampoMascarado } from '../../../componentes/CampoMascarado'
-import { moeda, mascaraMoeda, lerMoeda, moedaAltaDemais } from '../../../dominio/formato'
+import { CampoReais } from '../../../componentes/CampoReais'
+import { moeda, lerMoeda, moedaAltaDemais } from '../../../dominio/formato'
 import { METODOS_CAIXA, nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { diaFinanceiro, instanteFinanceiro, parcelasFinanceiras } from '../../../dominio/financeiro'
 import { useOperacaoFinanceira, salvarContaFinanceira, registrarParcelaFinanceira, salvarCadastroFinanceiro, adicionarParcelaFinanceira } from '../../../aplicacao/useFinanceiroApi'
 import css from './financeiro.module.css'
 
 export function DinheiroFinanceiro({ rotulo, centavos, aoMudar, disabled, ...props }) {
-  return <CampoMascarado tipo="moeda" rotulo={rotulo} valor={mascaraMoeda(centavos)} disabled={disabled} erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null} aoMudarDigitos={(digitos) => aoMudar(Number(digitos || '0'))} aoColarTexto={(texto) => aoMudar(lerMoeda(texto))} {...props} />
+  // #2005 (console-04): em reais, como o caixa ("100" é R$ 100,00). Campo vazio vale zero.
+  return <CampoReais rotulo={rotulo} centavos={centavos} ler={lerMoeda} disabled={disabled} erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null} aoMudar={(valor) => aoMudar(valor ?? 0)} {...props} />
 }
 export function ErroFinanceiro({ erro }) { return erro ? <p role="alert" className={css.erro}>{erro}</p> : null }
 
