@@ -28,6 +28,13 @@ public class LinkCardapioConversaServiceTests
             return Task.FromResult(rascunho);
         }
 
+        public Task<int> ExpirarPendentesAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
+        {
+            var pendentes = Links.Where(l => l.EmpresaId == empresaId && l.ConversaId == conversaId && l.EstaValido(agora)).ToList();
+            foreach (var link in pendentes) link.Expirar(agora);
+            return Task.FromResult(pendentes.Count);
+        }
+
         public Task<LinkCardapioConversa?> ObterComLockAsync(Guid empresaId, Guid linkId, CancellationToken ct = default) =>
             Task.FromResult(Links.FirstOrDefault(l => l.EmpresaId == empresaId && l.Id == linkId));
         public Task<IReadOnlyList<LinkCardapioConversa>> ListarDaConversaAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default) =>

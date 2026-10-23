@@ -31,7 +31,7 @@ import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom
 import { conectarPrincipal } from '../infra/canalEntreJanelas'
 import { FONTE_API } from '../infra/fonteDados'
 import { useAcessoModulos } from './acessoModulos'
-import { podeVerItensFora } from '../dominio/acessoModulos'
+import { podeVerDesacertos, podeVerItensFora } from '../dominio/acessoModulos'
 import { comApi } from './acoesApi'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
@@ -82,7 +82,11 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   const comItensFora = podeVerItensFora(acoesDoPerfil)
   const comItensForaRef = useRef(comItensFora)
   useEffect(() => { comItensForaRef.current = comItensFora }, [comItensFora])
-  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, comItensFora, usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco })
+  // #1966: `conversa.atualizada` da conversa aberta relê a Ficha (o contato informado pelo visitante vem no dossiê).
+  // As ações nascem mais abaixo; o ref as alcança sem recomeçar o laço.
+  const acoesAtivasRef = useRef(null)
+  const relerFichaDaConversa = useCallback((id) => acoesAtivasRef.current?.carregarClienteDaConversa?.(id), [])
+  useSincronizacaoApi({ ativo: FONTE_API, comConversas: atendimentoAtivo, comItensFora, comDesacertos: podeVerDesacertos(acoesDoPerfil), usuario: sessao?.usuario ?? null, despachar, selecionadaId: estado.selecionadaId, memoria: memoriaDoLaco, aoConversaAtualizada: relerFichaDaConversa })
 
   // Relógio da tela mais o deslocamento do painel de simulações (seção 7,
   // "+10 min"/"+30 min"/"Agora"): as ações carimbam o mesmo instante que a
@@ -334,6 +338,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef }) : acoes),
     [acoes],
   )
+  useEffect(() => { acoesAtivasRef.current = acoesAtivas }, [acoesAtivas])
 
   // Modo API (F02): o expediente vem da API uma vez ao entrar; depois, a cada gravação.
   useEffect(() => {

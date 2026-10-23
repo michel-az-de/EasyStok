@@ -46,7 +46,7 @@ public class IniciarCheckoutGuestUseCaseTests
     {
         public StorefrontEntity Storefront { get; }
         public IStorefrontRepository StorefrontRepo { get; } = Substitute.For<IStorefrontRepository>();
-        public ICardapioItemRepository CardapioRepo { get; } = Substitute.For<ICardapioItemRepository>();
+        public ICardapioItemRepository CardapioRepo { get; } = Substitute.For<ICardapioItemRepository>().ListarPeloGetById();
         public IJanelaEntregaRepository JanelaRepo { get; } = Substitute.For<IJanelaEntregaRepository>();
         public IBloqueioEntregaRepository BloqueioRepo { get; } = Substitute.For<IBloqueioEntregaRepository>();
         public IFreteZonaRepository FreteZonaRepo { get; } = Substitute.For<IFreteZonaRepository>();
@@ -79,6 +79,7 @@ public class IniciarCheckoutGuestUseCaseTests
             var item = CardapioItem.CriarAPartirDeProduto(Storefront.Id, produto);
             item.TornarVisivel();
             item.Produto = produto;
+            typeof(CardapioItem).GetProperty("Id")!.SetValue(item, CardapioItemId);
             CardapioRepo.GetByIdAsync(Storefront.Id, CardapioItemId, Arg.Any<CancellationToken>()).Returns(item);
 
             var janela = JanelaEntrega.Criar(Storefront.Id, 2, new TimeOnly(9, 0), new TimeOnly(12, 0), 5, "Manhã 9-12h");

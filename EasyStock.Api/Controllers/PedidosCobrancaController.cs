@@ -11,7 +11,7 @@ public sealed record TrocarFormaPagamentoRequest(string Forma);
 public sealed record DesfazerPagamentoManualRequest(string Motivo, Guid? PagamentoId = null);
 
 public sealed record RegistrarEstornoManualRequest(Guid OperacaoId, Guid PagamentoId, decimal Valor,
-    string Metodo, string Motivo, string Referencia, bool ValorJaDevolvido, Guid? EmpresaId = null);
+    string Metodo, string Motivo, string? Referencia, bool ValorJaDevolvido, Guid? EmpresaId = null);
 
 /// <summary>
 /// Cobrança do pedido pela operadora (S11): reemitir o link, trocar a forma de pagamento e desfazer

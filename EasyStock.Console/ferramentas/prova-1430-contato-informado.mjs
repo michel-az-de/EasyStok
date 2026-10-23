@@ -127,6 +127,74 @@ function montar(conversa) {
   return { acoes, despachados }
 }
 
+await confere('#1936: endereço de lead do chat do site vai com o telefone e o nome informados', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(lead({ contatoInformado: INFORMADO }))
+  acoes.editarDadoCliente('conv-1', 'endereco', 'Rua dos Pinheiros, 200, Pinheiros, São Paulo, 05415-000', 0)
+  await esperar()
+  const post = chamadas.find((c) => c.metodo === 'POST')
+  assert.ok(post, 'sem POST')
+  assert.equal(post.corpo.telefone, '+5511987654321', 'cadastro sem o telefone do visitante')
+  assert.equal(post.corpo.nome, 'Maria Souza')
+  // #1991-3: cidade e UF digitadas vão junto (antes o console descartava e o cadastro ficava sem elas).
+  assert.deepEqual(post.corpo.endereco, { cep: '05415000', logradouro: 'Rua dos Pinheiros', numero: '200', complemento: null, bairro: 'Pinheiros', cidade: 'São Paulo', uf: 'SP' })
+})
+
+await confere('#1936: cidade e UF no fim do endereço não viram bairro', async () => {
+  const { partesDoEndereco } = await import('../src/dominio/formato.js')
+  for (const cidade of ['São Paulo', 'Sao Paulo - SP', 'São Paulo/SP', 'SP', 'São Paulo, SP']) {
+    const p = partesDoEndereco(`Rua A, 10, apto 2, Pinheiros, ${cidade}, 05415-000`)
+    assert.equal(p.bairro, 'Pinheiros', cidade)
+    assert.equal(p.complemento, 'apto 2', cidade)
+    // #1991-3: a cidade e a UF saem do texto, mas não somem: São Paulo é SP.
+    assert.equal(p.uf, 'SP', cidade)
+    assert.equal(p.cidade, cidade === 'SP' ? '' : 'São Paulo', cidade)
+  }
+  const antigo = partesDoEndereco('Rua A, 10, Pinheiros, 05415-000')
+  assert.equal(antigo.bairro, 'Pinheiros', 'formato antigo')
+  assert.equal(antigo.cidade, '', 'formato antigo sem cidade')
+  assert.equal(antigo.uf, '', 'formato antigo sem UF')
+})
+
+// #1989 (item 5, laboratório de 23/10): endereço colado do WhatsApp era recusado com "escreva
+// separado por vírgulas". Prefixo "CEP" e hífen como separador são o jeito comum de escrever.
+await confere('#1989-5: endereço colado com "CEP" no fim ou separado por hífen é aceito', async () => {
+  const { partesDoEndereco } = await import('../src/dominio/formato.js')
+  const { recusaDoEndereco } = await import('../src/dominio/cliente.js')
+  const comPrefixo = 'Rua Cardeal Arcoverde, 500, apto 3, Pinheiros, Sao Paulo, CEP 05416-000'
+  assert.deepEqual(partesDoEndereco(comPrefixo),
+    { rua: 'Rua Cardeal Arcoverde', numero: '500', complemento: 'apto 3', bairro: 'Pinheiros', cep: '05416-000', cidade: 'São Paulo', uf: 'SP' })
+  const comHifen = 'Rua Harmonia, 300 - Vila Madalena - 05435-000'
+  assert.deepEqual(partesDoEndereco(comHifen),
+    { rua: 'Rua Harmonia', numero: '300', complemento: '', bairro: 'Vila Madalena', cep: '05435-000', cidade: '', uf: '' })
+  for (const texto of [
+    'Rua Harmonia, 300 - Vila Madalena - São Paulo - SP - 05435-000',
+    'Rua Harmonia, 300 - Vila Madalena, São Paulo/SP, CEP: 05435000',
+    'Rua Harmonia, 300, Vila Madalena, cep 05435-000',
+  ]) {
+    const p = partesDoEndereco(texto)
+    assert.equal(p.bairro, 'Vila Madalena', texto)
+    assert.equal(p.numero, '300', texto)
+    assert.match(p.cep, /^05435-?000$/, texto)
+  }
+  assert.equal(recusaDoEndereco(comPrefixo), null)
+  assert.equal(recusaDoEndereco(comHifen), null)
+  // Hífen colado em nome próprio não separa nada.
+  assert.equal(partesDoEndereco('Rua Pedro-Álvares, 10, Pinheiros, 05415-000').rua, 'Rua Pedro-Álvares')
+  // Sem CEP no fim continua recusado, com o formato.
+  assert.ok(recusaDoEndereco('Rua Harmonia 300 Vila Madalena'))
+})
+
+await confere('#1989-5: o endereço colado com "CEP" chega ao EasyStok em partes', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(lead({ contatoInformado: INFORMADO }))
+  acoes.editarDadoCliente('conv-1', 'endereco', 'Rua Harmonia, 300 - Vila Madalena - São Paulo - SP - CEP 05435-000', 0)
+  await esperar()
+  const post = chamadas.find((c) => c.metodo === 'POST')
+  assert.ok(post, 'sem POST')
+  assert.deepEqual(post.corpo.endereco, { cep: '05435000', logradouro: 'Rua Harmonia', numero: '300', complemento: null, bairro: 'Vila Madalena', cidade: 'São Paulo', uf: 'SP' })
+})
+
 await confere('telefone E.164 da API aparece na máscara da tela', () => {
   assert.equal(telefoneDoE164('+5511987654321'), '(11) 98765-4321')
   assert.equal(telefoneDoE164('+551132654321'), '(11) 3265-4321')
@@ -296,6 +364,83 @@ await confere('conversa restaurada na carga: o efeito do Provider lê a Ficha pe
   // depender do booleano, não da conversa.
   assert.match(fonte, /if \(precisaDossie\) acoesAtivas\.carregarClienteDaConversa\(estado\.selecionadaId\)\s+\}, \[precisaDossie, estado\.selecionadaId, acoesAtivas\]\)/)
   assert.ok(!/deveCarregarDossie/.test(fonte), 'o Provider ainda decide só pelo cliente vinculado')
+})
+
+// ── #1643 (itens 3 e 6, frente C da #1889) ────────────────────────────────────────────────────
+// Editar só o telefone ou o endereço de um lead mandava `nome` nulo e a API gravava "Cliente WhatsApp".
+const leadWhats = (extra = {}) => lead({
+  canal: 'WhatsApp', nome: 'Joana Prado', contatoInformado: null,
+  cliente: { telefone: null, endereco: null, enderecoCapturado: null, telefoneCanal: '5511955554444', tags: [], notas: [] }, ...extra,
+})
+await confere('#1643-3: lead do WhatsApp que ganha telefone leva o nome do contato, não nulo', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(leadWhats())
+  acoes.editarDadoCliente('conv-1', 'telefone', '(11) 95555-4444', 0)
+  await esperar()
+  const post = chamadas.find((c) => c.metodo === 'POST')
+  assert.ok(post, 'sem POST')
+  assert.equal(post.corpo.nome, 'Joana Prado', 'o cadastro virava "Cliente WhatsApp"')
+})
+await confere('#1643-3: endereço do lead do WhatsApp sem formulário também leva o nome do contato', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(leadWhats())
+  acoes.editarDadoCliente('conv-1', 'endereco', 'Rua dos Pinheiros, 200, Pinheiros, São Paulo, 05415-000', 0)
+  await esperar()
+  assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, 'Joana Prado')
+})
+await confere('#1643-3: endereço capturado confirmado no lead leva o nome; nome escrito pela dona vale primeiro', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(leadWhats({ nome: 'Joana P. (dona)', nomeDaDona: true,
+    cliente: { telefone: null, endereco: null, enderecoCapturado: 'Rua X, 10, Centro, São Paulo, 01001-000', telefoneCanal: '5511955554444', tags: [], notas: [] } }))
+  acoes.cadastrarEndereco('conv-1')
+  await esperar()
+  assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, 'Joana P. (dona)')
+})
+await confere('#1643-3: nome genérico (visitante, "Cliente WhatsApp", só o número) não vira nome do cadastro', async () => {
+  const { nomeConhecidoDoLead, nomeGenerico } = await import('../src/dominio/cliente.js')
+  for (const nome of ['Visitante do site', 'Cliente WhatsApp', '+55 11 95555-4444', '', null]) assert.equal(nomeGenerico(nome), true, String(nome))
+  assert.equal(nomeConhecidoDoLead({ nome: 'Visitante do site', contatoInformado: { nome: 'Maria Souza' } }), 'Maria Souza')
+  assert.equal(nomeConhecidoDoLead({ nome: '5511955554444' }), null)
+  assert.equal(nomeConhecidoDoLead({ nome: 'Joana Prado' }), 'Joana Prado')
+})
+await confere('#1643-3: cliente já cadastrado não manda nome ao trocar o telefone (a API mantém o dele)', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(leadWhats({ clienteId: CLIENTE, conta: 'cliente' }))
+  acoes.editarDadoCliente('conv-1', 'telefone', '(11) 95555-4444', 0)
+  await esperar()
+  assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, null)
+})
+await confere('#1643-6: com o contato informado, "Contato e endereço" nasce aberta e o resumo recolhido mostra o contato', async () => {
+  const { resumoDoContato } = await import('../src/dominio/cliente.js')
+  assert.equal(resumoDoContato({ telefone: null }, INFORMADO), 'Informado: Maria Souza · ' + telefoneDoE164(INFORMADO.telefone))
+  assert.equal(resumoDoContato({ telefone: '(11) 90000-0000' }, null), '(11) 90000-0000')
+  const fonte = readFileSync(new URL('features/ficha-cliente/BlocoCliente.jsx', src), 'utf8')
+  assert.match(fonte, /chave="contato" recolhidoDePadrao=\{recolhidas\.contato && !avisoEndereco && !informado\}/)
+  assert.match(fonte, /resumo=\{resumoDoContato\(cliente, informado\)\}/)
+})
+
+// ── #1966 (frente D da #1889): cadastro pela conversa sem nome; a API usa o nome do contato (PR #1962) ──
+await confere('#1966: visitante que não informou o nome confirma sem o nome genérico do cartão (a API usa o do contato)', async () => {
+  const chamadas = rede()
+  const semNome = { ...INFORMADO, nome: null }
+  const { acoes } = montar(lead({ nome: 'Visitante do site', contatoInformado: semNome }))
+  // O que a Ficha manda no "Confirmar cadastro": `informado.nome ?? conversa.nome`.
+  await acoes.salvarCadastroRapido('conv-1', { nome: 'Visitante do site', telefone: semNome.telefone, email: semNome.email, endereco: null }, 0)
+  const post = chamadas.find((c) => c.metodo === 'POST')
+  assert.ok(post, 'sem POST')
+  assert.equal(post.corpo.nome, null, 'o cadastro virava "Visitante do site"')
+})
+await confere('#1966: nome genérico no cadastro rápido leva o nome do cartão "Informado pelo visitante"', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(lead({ nome: 'Visitante do site', contatoInformado: INFORMADO }))
+  await acoes.salvarCadastroRapido('conv-1', { nome: 'Visitante do site', telefone: INFORMADO.telefone, email: INFORMADO.email, endereco: null }, 0)
+  assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, 'Maria Souza')
+})
+await confere('#1966: nome escrito no cadastro rápido segue como veio', async () => {
+  const chamadas = rede()
+  const { acoes } = montar(leadWhats({ nome: 'Cliente WhatsApp' }))
+  await acoes.salvarCadastroRapido('conv-1', { nome: 'Joana Prado', telefone: '11955554444', endereco: null }, 0)
+  assert.equal(chamadas.find((c) => c.metodo === 'POST')?.corpo.nome, 'Joana Prado')
 })
 
 console.log(`\n${passou} verificações passaram, ${falhas.length} falharam.`)

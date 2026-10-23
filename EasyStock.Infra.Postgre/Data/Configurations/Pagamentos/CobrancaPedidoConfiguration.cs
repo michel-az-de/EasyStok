@@ -30,6 +30,7 @@ public class CobrancaPedidoConfiguration : IEntityTypeConfiguration<CobrancaPedi
         b.Ignore(c => c.AguardandoCredencial);
         b.Ignore(c => c.EhOnline);
         b.Ignore(c => c.EstaPendente);
+        b.Ignore(c => c.RegistraPagamentoAMenor);
 
         // A preferência do provedor aponta para uma cobrança só. Na entrega não tem referência (NULL não colide).
         b.HasIndex(c => new { c.Provedor, c.ReferenciaExterna })

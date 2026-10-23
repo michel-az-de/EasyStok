@@ -4,6 +4,16 @@ export const ESTADOS_AVISO = {
 }
 const situacao = (estado, mensagem = null) => ({ estado, mensagem })
 const semPermissao = (permissao) => situacao(permissao === 'denied' ? ESTADOS_AVISO.BLOQUEADO : ESTADOS_AVISO.DESLIGADO)
+// #1989: depois de pedir, a resposta do navegador diz o que fazer. Só abrir o Console não acusa nada.
+export const PERMISSAO_NEGADA = 'Avisos bloqueados neste navegador. Libere as notificações deste site nas configurações '
+  + 'do navegador (no cadeado ao lado do endereço) e toque em "Ativar avisos neste aparelho" de novo.'
+// O Chrome também responde "default" sem mostrar nada depois de alguns pedidos dispensados.
+export const PERMISSAO_SEM_ESCOLHA = 'O pedido do navegador foi fechado sem escolher ou nem apareceu. '
+  + 'Toque em "Ativar avisos neste aparelho" e escolha Permitir; se o pedido não aparecer, libere as notificações '
+  + 'deste site no cadeado ao lado do endereço.'
+const depoisDePedir = (permissao) => ({
+  ...semPermissao(permissao), mensagem: permissao === 'denied' ? PERMISSAO_NEGADA : PERMISSAO_SEM_ESCOLHA,
+})
 
 async function registrar(inscricao, { navegador, api, identidade, atual }, nova = false) {
   try {
@@ -37,7 +47,7 @@ export async function ativarAvisosNoAparelho(contexto) {
   try {
     // A permissão precisa ser pedida dentro do gesto, antes da primeira espera.
     const permissao = await navegador.pedirPermissao()
-    if (permissao !== 'granted') return semPermissao(permissao)
+    if (permissao !== 'granted') return depoisDePedir(permissao)
     if (!atual()) return situacao(ESTADOS_AVISO.DESLIGADO)
     let chave
     try { chave = (await api.obterChavePush())?.publicKey }

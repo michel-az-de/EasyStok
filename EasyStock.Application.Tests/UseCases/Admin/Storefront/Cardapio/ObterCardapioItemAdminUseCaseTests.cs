@@ -21,7 +21,7 @@ public class ObterCardapioItemAdminUseCaseTests
 
         var result = await Sut().ExecuteAsync(new ObterCardapioItemAdminCommand(storefrontId, item.Id, Guid.NewGuid()));
 
-        result.NomeEfetivo.Should().Be("lasanha");          // armazenado em lowercase
+        result.NomeEfetivo.Should().Be("Lasanha");          // armazenado em lowercase, efetivo como na vitrine (#1991-5)
         result.PrecoEfetivo.Should().Be(35m);
         result.DescricaoPublica.Should().Be("Massa fresca"); // detalhes vêm no GET-by-id (não na listagem)
         result.Ingredientes.Should().Be("Ovos, farinha");

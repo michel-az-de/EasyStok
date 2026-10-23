@@ -53,7 +53,7 @@ export function AgendaEncomendasApi() {
                 {janela.pedidos.length === 0 && <p className={css.vazioAgenda}>Sem reservas nesta janela.</p>}
                 {janela.pedidos.length > 0 && <ul className={css.pedidosAgenda}>
                   {janela.pedidos.map((pedido) => <li key={pedido.pedidoId}>
-                    <strong title={nomeDoPedido(pedido).titulo || undefined}>{nomeDoPedido(pedido).principal}{nomeDoPedido(pedido).referencia && <small className={css.referencia}>ref {nomeDoPedido(pedido).referencia}</small>}</strong>
+                    <strong title={nomeDoPedido(pedido).titulo || undefined}>{nomeDoPedido(pedido).principal}{nomeDoPedido(pedido).referencia && <small className={css.referencia}>{nomeDoPedido(pedido).referencia}</small>}</strong>
                     <span>{pedido.clienteNome || 'Cliente sem nome'}</span>
                     <span className={css.apoio}>{pedido.status.replaceAll('_', ' ')}</span>
                   </li>)}

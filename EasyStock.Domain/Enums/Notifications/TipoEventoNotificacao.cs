@@ -95,5 +95,11 @@ public enum TipoEventoNotificacao
     // Avisos do Balcão no aparelho (#1807): Web Push para a equipe com o console fechado. Internos: nada sai para o cliente.
     ContatoNovoNoBalcao = 85,
     PedidoPagoNoBalcao = 86,
-    PedidoMudouEtapaNoBalcao = 87
+    PedidoMudouEtapaNoBalcao = 87,
+
+    // #1889 (decisão do Felipe, 21/10): link vencido na última tentativa deixa o pedido aguardando a equipe; vira aviso no sino.
+    CobrancaAguardandoEquipe = 88,
+
+    // #1724-12: o cliente abriu disputa (in_mediation) de um pagamento do Mercado Pago; aviso no sino, pedido intacto.
+    PagamentoEmMediacao = 89
 }

@@ -5,7 +5,7 @@
 //
 // `operacao`: tela de trabalho (Cozinha, Entregas) ocupa a altura toda; tela de
 // ajuste ganha título e coluna de leitura. Módulo sem tela mostra "Em breve".
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
@@ -18,6 +18,7 @@ import { ehJanelaAvulsa, origemForaDoBalcao } from '../../dominio/janelaAvulsa'
 import { IconeDoModulo } from './IconeDoModulo'
 import { MenuDosModulos } from './MenuDosModulos'
 import css from './moldura.module.css'
+import { LimiteDeErro } from '../../componentes/LimiteDeErro'
 
 const MODULO_DO_BALCAO = 'atendimento'
 const HASH_BALCAO = hashDoModulo(MODULO_DO_BALCAO, 'balcao')
@@ -45,10 +46,16 @@ function voltarAoBalcao(fonteApi) {
 }
 
 export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, tituloVisivel = true, ajuda, children }) {
-  const { permite, aoSair, sessaoPersistente, notificacoes } = useAcessoModulos()
+  const { permite, aoSair, sessaoPersistente, notificacoes, acoes } = useAcessoModulos()
   const modulo = moduloPorId(moduloId)
-  const telas = telasDoMenu(modulo, { fonteApi })
+  const telas = telasDoMenu(modulo, { fonteApi, acoes })
   const tela = telas.find((t) => t.id === telaId) ?? null
+  const telaSemAcesso = !tela && Boolean(telaId) && telasDoMenu(modulo, { fonteApi }).some((t) => t.id === telaId)
+  // #1921: a rota direta para a tela que o perfil não abre cai na primeira tela viva do módulo.
+  const primeiraViva = telaSemAcesso ? telas[0]?.id ?? null : null
+  useEffect(() => {
+    if (primeiraViva) window.location.replace(hashDoModulo(moduloId, primeiraViva))
+  }, [primeiraViva, moduloId])
   const [menuAberto, setMenuAberto] = useState(false)
   // #1870: módulo de trabalho (Entregas, Cozinha, Atendimento) tem poucas telas e abas próprias;
   // o menu lateral de 216 px deixava ~650 px vazios. As telas vão para a barra, ao lado do nome.
@@ -98,7 +105,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
         </div>
       </header>
       {operacao
-        ? <main className={css.operacao} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={tela?.rotulo ?? modulo.nome}>{children}</main>
+        ? <main className={css.operacao} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={tela?.rotulo ?? modulo.nome}><LimiteDeErro parte={tela?.rotulo ?? modulo.nome}>{children}</LimiteDeErro></main>
         : (
           <main className={css.ajuste} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={tela?.rotulo ?? modulo.nome}>
             <div className={css.folha}>
@@ -108,13 +115,20 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
                     <IconeDoModulo modulo={modulo} telaId={tela.id} />
                     {tela.rotulo}
                   </h1>
-                  <div className={css.conteudo}>{children}</div>
+                  <div className={css.conteudo}><LimiteDeErro parte={tela.rotulo}>{children}</LimiteDeErro></div>
                 </>
               ) : (
                 <div className={css.conteudo}>
-                  <Vazio titulo={`${modulo.nome}: em breve`} acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
-                    Esta área ainda não está disponível.
-                  </Vazio>
+                  {/* #1921: a tela existe, mas a matriz do perfil não a libera (ex.: Janelas de entrega). */}
+                  {telaSemAcesso ? (
+                    <Vazio titulo="Seu perfil não abre esta tela" acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
+                      Se você precisa trabalhar aqui, peça à dona para mudar o seu perfil.
+                    </Vazio>
+                  ) : (
+                    <Vazio titulo={`${modulo.nome}: em breve`} acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
+                      Esta área ainda não está disponível.
+                    </Vazio>
+                  )}
                 </div>
               )}
             </div>

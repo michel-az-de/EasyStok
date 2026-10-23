@@ -227,15 +227,17 @@ public class Mensagem
     /// <summary>
     /// S57: falha de envio. Temporária agenda o reenvio pela próxima espera de <see cref="EsperasReenvio"/>,
     /// dentro do <see cref="PrazoReenvio"/>; permanente e incerta não agendam (a incerta avisa no erro).
+    /// Sem <paramref name="reenvioAutomatico"/> (#1933) nada é agendado: o texto pode vencer e só a atendente reenvia.
     /// </summary>
-    public void RegistrarFalhaEnvio(string? erro, TipoFalhaEnvio tipo, DateTime agora)
+    public void RegistrarFalhaEnvio(string? erro, TipoFalhaEnvio tipo, DateTime agora, bool reenvioAutomatico = true)
     {
         var motivo = tipo == TipoFalhaEnvio.Incerta ? $"Envio incerto (sem resposta do canal): {erro}" : erro;
         AtualizarStatusEntrega(StatusMensagem.Falhou, motivo);
         TentativasEnvio++;
         UltimaFalhaEnvio = tipo;
 
-        var podeAgendar = tipo == TipoFalhaEnvio.Temporaria
+        var podeAgendar = reenvioAutomatico
+            && tipo == TipoFalhaEnvio.Temporaria
             && PodeReenviar
             && TentativasEnvio <= EsperasReenvio.Length
             && agora - EnviadaEm <= PrazoReenvio;
@@ -315,10 +317,13 @@ public class Mensagem
     /// <summary>#1397: a varredura assumiu o anexo; outro processo não o pega dentro do prazo.</summary>
     public void ReservarTentativaMidia(DateTime agora) => ProximaTentativaMidiaEm = Utc(agora) + PrazoFilaMidia;
 
-    /// <summary>#1397: falha ao baixar o anexo. Reagenda com espera crescente até <see cref="MaxTentativasMidia"/>.</summary>
-    public void RegistrarFalhaMidia(string? erro, DateTime agora)
+    /// <summary>
+    /// #1397: falha ao baixar o anexo. Reagenda com espera crescente até <see cref="MaxTentativasMidia"/>.
+    /// <paramref name="definitiva"/> (#1622-5, anexo acima do teto): nenhuma nova tentativa resolve, então encerra já.
+    /// </summary>
+    public void RegistrarFalhaMidia(string? erro, DateTime agora, bool definitiva = false)
     {
-        TentativasMidia++;
+        TentativasMidia = definitiva ? Math.Max(TentativasMidia + 1, MaxTentativasMidia) : TentativasMidia + 1;
         ErroMidia = Truncar(string.IsNullOrWhiteSpace(erro) ? "Falha ao baixar o anexo." : erro.Trim(), ErroMidiaTamanhoMaximo);
         ProximaTentativaMidiaEm = TentativasMidia < MaxTentativasMidia
             ? Utc(agora) + EsperasMidia[Math.Min(TentativasMidia, EsperasMidia.Length) - 1]

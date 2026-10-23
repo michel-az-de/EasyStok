@@ -1,4 +1,10 @@
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Notifications;
+using EasyStock.Application.UseCases.Atendimento.Lembretes;
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Api.Data;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Notifications.Orchestrators;
@@ -90,6 +96,95 @@ public class PrazoEstouradoChegaNoMailpitIntegrationTests(MailpitFixture mailpit
         mensagem.Para.Should().Equal(gestorEmail);
         mensagem.Assunto.Should().Contain("Pedido sem início de preparo").And.Contain("35 minutos");
         mensagem.Html.Should().NotBeNullOrWhiteSpace().And.NotContain("{{");
+    }
+
+    // #1765-8: o e-mail "cliente sem resposta" saía como "Referência D887002D", sem nome nem link, com a marca EasyStok
+    // e um por mensagem do cliente. Agora: nome, link do Balcão, marca da casa e um e-mail por conversa.
+    [SkippableFact]
+    public async Task ClienteSemRespostaChegaUmaVezPorConversaComNomeLinkEMarca()
+    {
+        Skip.If(!postgres.IsAvailable, postgres.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        Skip.If(!mailpit.IsAvailable, mailpit.UnavailableReason ?? "Docker/Mailpit indisponivel");
+        await mailpit.LimparAsync();
+        await postgres.ResetDatabaseAsync();
+
+        await using (var db = postgres.CreateDbContext())
+        {
+            using var bypass = db.UseRowLevelSecurityBypass();
+            await NotificacoesGlobaisSeed.ExecutarAsync(db, NullLogger.Instance);
+            var rotina = await db.NotifRotinas.IgnoreQueryFilters().SingleAsync(r => r.Codigo == "prazo_estourado_global" && r.EmpresaId == null);
+            rotina.JanelaInicio = null;
+            rotina.JanelaFim = null;
+            await db.SaveChangesAsync();
+        }
+
+        var suporte = new MotorNotificacoesSuporte(postgres);
+        var empresaId = await suporte.SemearEmpresaAsync();
+        var gestorEmail = $"gestora-{Guid.NewGuid():N}@example.com";
+        await SemearGestorAsync(empresaId, gestorEmail);
+        // 12:00 em Brasília: dentro do expediente padrão, sem depender da hora em que o teste roda.
+        var t0 = new DateTime(2026, 10, 9, 15, 0, 0, DateTimeKind.Utc);
+        var conversa = Conversa.Abrir(empresaId, "5511999990301", t0.AddMinutes(-30), "Mariana Souza");
+        conversa.Assumir(t0.AddMinutes(-29));
+        await using (var db = postgres.CreateDbContext())
+        {
+            using var bypass = db.UseRowLevelSecurityBypass();
+            db.AtendimentoConversas.Add(conversa);
+            db.AtendimentoMensagens.Add(Mensagem.Entrada(empresaId, conversa.Id, t0.AddMinutes(-20), TipoConteudoMensagem.Texto, "tem nhoque?"));
+            await db.SaveChangesAsync();
+        }
+
+        await using var provider = suporte.ConstruirProviderDoWorker(
+            papelRls: true,
+            ajustar: services => services.AddSingleton<IRendererTemplate>(new ScribanRenderer(NullLogger<ScribanRenderer>.Instance)),
+            canais: CriarCanalSmtp());
+
+        await AvaliarLembretesENotificarAsync(provider, t0);
+
+        // A dona responde, o cliente escreve de novo e fica outra vez sem resposta: lembrete novo, e-mail não.
+        await using (var db = postgres.CreateDbContext())
+        {
+            using var bypass = db.UseRowLevelSecurityBypass();
+            db.AtendimentoMensagens.Add(Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Dona, t0.AddMinutes(1),
+                TipoConteudoMensagem.Texto, "Tem sim", "resposta-prazo-1765"));
+            db.AtendimentoMensagens.Add(Mensagem.Entrada(empresaId, conversa.Id, t0.AddMinutes(2), TipoConteudoMensagem.Texto, "e de abóbora?"));
+            await db.SaveChangesAsync();
+        }
+        await AvaliarLembretesENotificarAsync(provider, t0.AddMinutes(25));
+
+        var eventos = (await suporte.LerEventosDaEmpresaAsync(empresaId)).Where(e => e.Tipo == TipoEventoNotificacao.PrazoEstourado).ToList();
+        eventos.Should().HaveCount(2).And.OnlyContain(e => e.Status == StatusEventoNotificacao.Processado);
+        var mensagem = (await mailpit.AguardarAsync(1)).Should().ContainSingle("um e-mail por conversa").Subject;
+        mensagem.Para.Should().Equal(gestorEmail);
+        mensagem.Assunto.Should().Contain("Mariana Souza").And.Contain("Casa da Baba").And.NotContain("EasyStok");
+        mensagem.Html.Should().Contain("Mariana Souza")
+            .And.Contain("https://app.easystok.online/#/m/atendimento/balcao")
+            .And.Contain("Casa da Baba")
+            .And.NotContain("EasyStok").And.NotContain("Easy<span").And.NotContain("{{");
+    }
+
+    private static async Task AvaliarLembretesENotificarAsync(ServiceProvider provider, DateTime agora)
+    {
+        await using (var escopo = provider.CreateAsyncScope())
+        {
+            var sp = escopo.ServiceProvider;
+            var db = sp.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
+            using var bypass = db.UseRowLevelSecurityBypass();
+            await new AvaliarLembretesUseCase(
+                    sp.GetRequiredService<ILembreteRepository>(), sp.GetRequiredService<ICandidatosLembreteQuery>(),
+                    sp.GetRequiredService<INotificadorService>(), NSubstitute.Substitute.For<IOperacaoEventPublisher>(),
+                    sp.GetRequiredService<EasyStock.Application.Ports.Output.Persistence.IUnitOfWork>(), new RelogioFixo(agora),
+                    Microsoft.Extensions.Options.Options.Create(new PrazosOptions()))
+                .ExecuteAsync();
+        }
+        await using (var escopo = provider.CreateAsyncScope())
+            await escopo.ServiceProvider.GetRequiredService<INotificacoesAvaliadorOrchestrator>().ExecutarRodadaAsync(TimeSpan.FromMinutes(2));
+        await provider.GetRequiredService<INotificacoesDispatcherOrchestrator>().ExecutarRodadaAsync(shardCount: 4, batchSize: 50);
+    }
+
+    private sealed class RelogioFixo(DateTime agora) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(agora, TimeSpan.Zero);
     }
 
     private async Task SemearGestorAsync(Guid empresaId, string email)

@@ -2,6 +2,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using EasyStock.Api.IntegrationTests.Helpers;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums;
@@ -270,6 +271,31 @@ public sealed class MenuControllerTests : IAsyncLifetime
         avulso.GetProperty("imagemUrl").ValueKind.Should().Be(JsonValueKind.Null);
         avulso.GetProperty("estoqueAtual").ValueKind.Should().Be(JsonValueKind.Null, "avulso não tem snapshot de estoque");
         avulso.GetProperty("tag").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    // ── Cache no servidor (#1725-12) ───────────────────────────────────
+
+    [SkippableFact]
+    public async Task GetMenu_SegundaLeituraNoTempoDoCache_SoResolveOSlug()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = ContadorDeComandosSql.Instalar(CriarFactory());
+        using var client = factory.CreateClient();
+        var contador = factory.Services.GetRequiredService<ContadorDeComandosSql>();
+        var seed = await SeedCardapioAsync(factory, slug: "casa-da-baba-menu-cache");
+        var rota = $"/api/storefront/{seed.Storefront.Slug}/menu";
+        HttpResponseMessage? primeira = null, segunda = null;
+
+        var montando = await contador.ContarAsync(rota, async () => primeira = await client.GetAsync(rota));
+        var doCache = await contador.ContarAsync(rota, async () => segunda = await client.GetAsync(rota));
+
+        primeira!.StatusCode.Should().Be(HttpStatusCode.OK);
+        segunda!.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await segunda.Content.ReadAsByteArrayAsync()).Should().Equal(await primeira.Content.ReadAsByteArrayAsync());
+        segunda.Headers.ETag!.Tag.Should().Be(primeira.Headers.ETag!.Tag);
+        doCache.Should().Be(1, $"só o filtro do tenant resolve o slug; o cardápio vem da memória (montando: {montando})");
+        montando.Should().BeGreaterThan(doCache);
     }
 
     // ── ETag / 304 ─────────────────────────────────────────────────────
@@ -548,7 +574,9 @@ public sealed class MenuControllerTests : IAsyncLifetime
                     QuantidadeInicial = Quantidade.From(qtd),
                     QuantidadeAtual = Quantidade.From(qtd),
                     CustoUnitario = Dinheiro.FromDecimal(10m),
-                    ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(validadeEmDias)),
+                    // Validade é data civil da loja: semente em UTC deixa o lote "de ontem" valendo hoje depois das 21h.
+                    ValidadeEm = Validade.From(EasyStock.Application.Common.HorarioBrasil.CivilComoInstanteUtc(
+                        EasyStock.Application.Common.HorarioBrasil.Hoje().AddDays(validadeEmDias))),
                     Status = StatusItemEstoque.Ok,
                     EntradaEm = DateTime.UtcNow,
                     CriadoEm = DateTime.UtcNow,

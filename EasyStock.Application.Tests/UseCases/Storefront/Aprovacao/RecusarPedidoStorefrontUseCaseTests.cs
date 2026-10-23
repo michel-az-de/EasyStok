@@ -51,6 +51,7 @@ public class RecusarPedidoStorefrontUseCaseTests
         public required IVagaOcupadaRepository VagaRepo { get; init; }
         public required IConversaRepository ConversaRepo { get; init; }
         public required List<CobrancaPedido> Cobrancas { get; init; }
+        public required IOperacaoEventPublisher Operacao { get; init; }
 
         /// <summary>Cobrança do Mercado Pago já paga (pedido RequerAprovacao pago, aguardando a dona).</summary>
         public CobrancaPedido AdicionarCobrancaPaga(string pagamentoId, decimal valor = 120m, Guid? conversaId = null)
@@ -67,7 +68,7 @@ public class RecusarPedidoStorefrontUseCaseTests
     private static Sut BuildSut(Pedido? pedidoStub = null)
     {
         var pedidoRepo = Substitute.For<IPedidoStorefrontRepository>();
-        pedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        pedidoRepo.GetForUpdateAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(pedidoStub);
 
         var publicador = Substitute.For<IPublicadorEventoIntegracao>();
@@ -96,9 +97,10 @@ public class RecusarPedidoStorefrontUseCaseTests
         var liberarVaga = new LiberarVagaOnPedidoCanceladoHandler(vagaRepo,
             NullLogger<LiberarVagaOnPedidoCanceladoHandler>.Instance);
 
+        var operacao = Substitute.For<IOperacaoEventPublisher>();
         var useCase = new RecusarPedidoStorefrontUseCase(
             pedidoRepo, cobrancaRepo, estorno, liberarVaga, aviso, publicador, uow,
-            NullLogger<RecusarPedidoStorefrontUseCase>.Instance);
+            NullLogger<RecusarPedidoStorefrontUseCase>.Instance, operacao);
         return new Sut
         {
             UseCase = useCase,
@@ -109,6 +111,7 @@ public class RecusarPedidoStorefrontUseCaseTests
             VagaRepo = vagaRepo,
             ConversaRepo = conversaRepo,
             Cobrancas = cobrancas,
+            Operacao = operacao,
         };
     }
 
@@ -269,7 +272,27 @@ public class RecusarPedidoStorefrontUseCaseTests
 
         await sut.UseCase.ExecuteAsync(InputValido());
 
-        await sut.PedidoRepo.Received(1).GetForUpdateAsync(PedidoId, Arg.Any<CancellationToken>());
+        await sut.PedidoRepo.Received(1).GetForUpdateAsync(EmpresaId, PedidoId, Arg.Any<CancellationToken>());
+    }
+
+    // #1265-8: a recusa cancela o pedido; a operação move o card sem recarregar, depois do commit.
+    [Fact]
+    public async Task Recusar_publica_pedido_mudou_status_na_operacao_depois_do_commit()
+    {
+        var sut = BuildSut(PedidoAguardandoAprovacaoBaba());
+
+        await sut.UseCase.ExecuteAsync(InputValido());
+
+        await sut.Operacao.Received(1).PublicarAsync(EventosOperacao.PedidoMudouStatus, EmpresaId,
+            Arg.Is<PedidoMudouStatusOperacao>(e => e.PedidoId == PedidoId
+                && e.StatusAntigo == StatusPedidoMapper.AguardandoAprovacaoBaba && e.StatusNovo == StatusPedidoMapper.Cancelado),
+            Arg.Any<CancellationToken>());
+        Received.InOrder(() =>
+        {
+            sut.UnitOfWork.ExecuteInTransactionAsync(
+                Arg.Any<Func<CancellationToken, Task<RecusarPedidoStorefrontResult>>>(), Arg.Any<CancellationToken>());
+            sut.Operacao.PublicarAsync(EventosOperacao.PedidoMudouStatus, EmpresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+        });
     }
 
     [Fact]

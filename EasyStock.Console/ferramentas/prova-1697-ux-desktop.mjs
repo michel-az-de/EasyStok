@@ -99,7 +99,8 @@ confere('2  erro e o que pede ação não nascem escondidos', () => {
   assert.match(fonte('features/ficha-cliente/BlocoDevolucoes.jsx'), /resumo=\{erro \? RESUMO_COM_ERRO : /)
   assert.match(fonte('features/ficha-cliente/BlocoOcorrenciasApi.jsx'), /resumo=\{erro \? RESUMO_COM_ERRO : /)
   // Endereço salvo com pedido em andamento abre uma pergunta dentro do bloco: ele não recolhe por cima dela.
-  assert.match(fonte('features/ficha-cliente/BlocoCliente.jsx'), /chave="contato" recolhidoDePadrao=\{recolhidas\.contato && !avisoEndereco\}/)
+  // #1643 (item 6): o contato informado pelo visitante também abre a seção.
+  assert.match(fonte('features/ficha-cliente/BlocoCliente.jsx'), /chave="contato" recolhidoDePadrao=\{recolhidas\.contato && !avisoEndereco && !informado\}/)
 })
 confere('3  Enter na alça restaura o padrão da tela, não o padrão fixo antigo', () => {
   assert.match(fonte('app/Moldura.jsx'), /padrao=\{largurasPadrao\.balcao\}/)

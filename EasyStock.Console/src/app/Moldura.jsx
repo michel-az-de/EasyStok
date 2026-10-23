@@ -19,6 +19,7 @@ import { DESKTOP, TABLET, useTopoCompacto } from '../hooks/useTamanhoTela'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
 import { CompartilharComanda } from '../features/atendimento/CompartilharComanda'
+import { ChamarClientes } from '../features/atendimento/ChamarClientes'
 import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
@@ -30,6 +31,7 @@ import { IconeDoModulo } from '../componentes/IconeDoModulo'
 import { JANELA_COZINHA } from '../dominio/janelaAvulsa'
 import { AvisoDaAcaoApi } from './FaixaApi'
 import css from './moldura.module.css'
+import { LimiteDeErro } from '../componentes/LimiteDeErro'
 
 // Título de coluna sem ícone: quando todo título tem ícone, ícone nenhum marca.
 // O ícone ficou para navegação, mídia e alerta.
@@ -72,9 +74,9 @@ function grupoDoDia(emAndamento, naEsteira) {
 // próprio Balcão, e "Dois lugares para a mesma pergunta" era exatamente o
 // problema que a direção resolveu.
 function MenuMais({
-  refBotao, aoAbrirEntregas, aoAbrirGestao, aoAbrirAjuda, emAndamento, naEsteira,
+  refBotao, aoAbrirEntregas, aoAbrirGestao, aoAbrirAjuda, emAndamento, naEsteira, atendente = null,
 }) {
-  const { permite } = useAcessoModulos()
+  const { permite, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const [aberto, setAberto] = useState(false)
   const fechar = useCallback(() => setAberto(false), [])
 
@@ -105,6 +107,11 @@ function MenuMais({
     },
     { titulo: 'Ajuda', itens: [{ chave: '__ajuda', titulo: 'Ajuda e guia do Console', detalhe: 'O que cada módulo faz, primeiros passos e diagnóstico' }] },
     grupoDoDia(emAndamento, naEsteira),
+    // #1242 (D1): a faixa de baixo saiu do celular; quem está logado e o Sair vêm para cá.
+    ...(aoSair ? [{
+      titulo: 'Conta',
+      itens: [{ chave: '__sair', titulo: sessaoPersistente ? 'Sair deste aparelho' : 'Sair', detalhe: [atendente, conta?.casa].filter(Boolean).join(' · ') || 'Encerrar a sessão' }],
+    }] : []),
   ]
 
   function escolher(item) {
@@ -116,6 +123,7 @@ function MenuMais({
     if (item.chave === '__ajuda') aoAbrirAjuda()
     if (item.chave === '__claro') trocarTema('light')
     if (item.chave === '__escuro') trocarTema('dark')
+    if (item.chave === '__sair') aoSair?.()
   }
 
   return (
@@ -184,9 +192,9 @@ const MODULO_ATENDIMENTO = moduloPorId('atendimento')
 const rotuloAutomaticas = (regras) => (regras ? `Automáticas, ${contarAtivas(regras)} ligadas` : 'Automáticas')
 
 function Cabecalho({
-  conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, aoAbrirAjuda,
+  conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, aoAbrirAjuda, atendente = null,
 }) {
-  const { permite, notificacoes } = useAcessoModulos()
+  const { permite, notificacoes, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const compacto = useTopoCompacto()
   const botaoMaisRef = useRef(null)
   const emAndamento = contarAbertas(conversas)
@@ -239,12 +247,16 @@ function Cabecalho({
             aoAbrirAjuda={aoAbrirAjuda}
             emAndamento={emAndamento}
             naEsteira={naEsteira}
+            atendente={atendente}
           />
         ) : (
           // Rodada 2: a ocupação das janelas mora no topo, porque capacidade
           // estourada é a coisa que ela mais teme e não pode custar dois cliques.
           <>{permite('entregas') && <ResumoEntregas aoAbrir={aoAbrirEntregas} />}
-            <Botao variante="texto" icone="ajuda" aria-haspopup="dialog" onClick={aoAbrirAjuda}>Ajuda</Botao></>
+            <Botao variante="texto" icone="ajuda" aria-haspopup="dialog" onClick={aoAbrirAjuda}>Ajuda</Botao>
+            {/* #1242 (D1): no tablet largo o Sair mora no avatar, como no trilho do desktop. */}
+            {aoSair && <MenuDaConta nome={atendente} detalhe={conta?.casa} aoSair={aoSair} lado="abaixo"
+              rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'} />}</>
         )}
       </div>
     </header>
@@ -391,7 +403,7 @@ export function Moldura({
   // própria renderização (padrão do React para "estado que segue uma prop"),
   // não em efeito.
   const selecionadaId = selecionada?.id ?? null
-  const acaoCompartilhar = selecionada && <CompartilharComanda key={selecionada.id} conversa={selecionada} />
+  const acaoCompartilhar = selecionada && <CompartilharComanda key={'compartilhar-' + selecionada.id} conversa={selecionada} />
   const [selecaoVista, setSelecaoVista] = useState(selecionadaId)
   if (selecionadaId !== selecaoVista) {
     setSelecaoVista(selecionadaId)
@@ -420,13 +432,16 @@ export function Moldura({
   // a morar no balão flutuante (rodada 7, fala do dono 24/09/2026 04h12):
   // `app/App.jsx` monta `<PainelAgente>` e `<BalaoAssistente>` junto, porque
   // feature nenhuma importa outra feature (`ferramentas/verificar-camadas.mjs`).
+  // Frente C da #1889: cada coluna do Balcão dentro do seu limite de erro (LimiteDeErro).
   const atendimento = (
-    <PainelAtendimento
-      aoAbrirNota={aoAbrirNota}
-      aoAbrirGaleria={aoAbrirGaleria}
-      aoAbrirBiblioteca={aoAbrirBiblioteca}
-      focarAoTrocar={tamanho !== DESKTOP && tamanho !== TABLET}
-    />
+    <LimiteDeErro parte="Conversa">
+      <PainelAtendimento
+        aoAbrirNota={aoAbrirNota}
+        aoAbrirGaleria={aoAbrirGaleria}
+        aoAbrirBiblioteca={aoAbrirBiblioteca}
+        focarAoTrocar={tamanho !== DESKTOP && tamanho !== TABLET}
+      />
+    </LimiteDeErro>
   )
   const cabecalho = (
     <Cabecalho
@@ -438,6 +453,7 @@ export function Moldura({
       aoAbrirGestao={aoAbrirGestao}
       aoAbrirEntregas={aoAbrirEntregas}
       aoAbrirAjuda={aoAbrirAjuda}
+      atendente={atendente}
     />
   )
 
@@ -467,7 +483,7 @@ export function Moldura({
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
           <Coluna variante="entrada" titulo="Balcão" semTitulo>
-            <PainelConversas />
+            <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
           </Coluna>
           <AlcaLargura
             rotulo="Redimensionar Balcão"
@@ -488,7 +504,7 @@ export function Moldura({
             aoMudar={(valor) => aoRedimensionar('ficha', valor)}
           />
           <Coluna variante="ficha" titulo="Resumo" semTitulo>
-            <div className={css.painelFicha}><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></div>
+            <div className={css.painelFicha}><LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro></div>
             {/* #1474: lugar da fila de canhotos (FilaCanhotos), no pé da Ficha e no fluxo da
                 coluna: a pílula não cobre mais o título nem o topo da coluna. Vazio, não ocupa. */}
             <div className={css.slotFila} data-fila-canhotos="" />
@@ -506,12 +522,12 @@ export function Moldura({
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
           <Coluna variante="entrada" titulo="Balcão">
-            <PainelConversas />
+            <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
           </Coluna>
           <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
           {gavetaAberta && (
             <Gaveta titulo="Resumo" aoFechar={fecharGaveta}>
-              <PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} acaoCompartilhar={acaoCompartilhar} />
+              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>
             </Gaveta>
           )}
         </main>
@@ -527,9 +543,9 @@ export function Moldura({
   }
 
   const painelDaAba = {
-    balcao: <PainelConversas aoAbrir={irParaAtendimento} />,
+    balcao: <LimiteDeErro parte="Lista de conversas"><PainelConversas aoAbrir={irParaAtendimento} buscaDeClientes={ChamarClientes} /></LimiteDeErro>,
     atendimento,
-    ficha: <PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} />,
+    ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>,
   }
 
   return (

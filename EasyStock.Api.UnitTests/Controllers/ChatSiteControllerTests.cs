@@ -112,7 +112,8 @@ public class ChatSiteControllerTests
     }
 
     private IdentificarVisitanteChatSiteUseCase Identificacao() => new(
-        new AcessoChatSite(_lojas, _flags, Substitute.For<ITenantContextAccessor>(), _sessoes), _conversas, Substitute.For<IUnitOfWork>());
+        new AcessoChatSite(_lojas, _flags, Substitute.For<ITenantContextAccessor>(), _sessoes), _conversas, Substitute.For<IUnitOfWork>(),
+        Substitute.For<IOperacaoEventPublisher>());
 
     [Fact]
     public async Task IdentificacaoValida200SemAceite400TokenInvalido403()
@@ -128,6 +129,19 @@ public class ChatSiteControllerTests
             .Should().BeOfType<BadRequestObjectResult>();
         (await _controller.Identificar(Slug, "inventado", valido, Identificacao(), default))
             .Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    // #1643-4: corpo vazio com token inventado diz sessão inválida (403), não 400; o binder deixa o corpo vazio passar.
+    [Fact]
+    public async Task IdentificacaoSemCorpoComTokenInventado403()
+    {
+        Sessao();
+
+        (await _controller.Identificar(Slug, "inventado", null, Identificacao(), default))
+            .Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        typeof(ChatSiteController).GetMethod(nameof(ChatSiteController.Identificar))!.GetParameters()
+            .Single(p => p.Name == "body").GetCustomAttribute<FromBodyAttribute>()!.EmptyBodyBehavior
+            .Should().Be(Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow);
     }
 
     [Fact]
@@ -148,18 +162,24 @@ public class ChatSiteControllerTests
         typeof(ChatSiteController).GetMethod(acao)!.GetCustomAttribute<EnableRateLimitingAttribute>()!
             .PolicyName.Should().Be(politica);
 
+    // Por sessão para o visitante não gastar a cota do vizinho no mesmo NAT, sem o token cru na chave. #1622-1: só o token
+    // no formato gerado vira sessão; o inventado (ou ausente) cai no IP, e o teto por IP (LimitePorIpPublicoTests) segura o resto.
     [Fact]
     public void LimiteDeMensagemEhPorSessaoENaoGuardaOToken()
     {
+        var token = AcessoChatSite.NovoToken();
         var comToken = new DefaultHttpContext();
-        comToken.Request.Headers[ChatSiteRateLimit.HeaderToken] = "tok-1";
+        comToken.Request.Headers[ChatSiteRateLimit.HeaderToken] = token;
         var outroToken = new DefaultHttpContext();
-        outroToken.Request.Headers[ChatSiteRateLimit.HeaderToken] = "tok-2";
+        outroToken.Request.Headers[ChatSiteRateLimit.HeaderToken] = AcessoChatSite.NovoToken();
+        var inventado = new DefaultHttpContext();
+        inventado.Request.Headers[ChatSiteRateLimit.HeaderToken] = "tok-1";
 
         var chave = ChatSiteRateLimit.ChaveMensagem(comToken);
 
-        chave.Should().NotContain("tok-1");
+        chave.Should().StartWith("sessao:").And.NotContain(token);
         chave.Should().NotBe(ChatSiteRateLimit.ChaveMensagem(outroToken));
+        ChatSiteRateLimit.ChaveMensagem(inventado).Should().StartWith("ip:").And.NotContain("tok-1");
         ChatSiteRateLimit.ChaveMensagem(new DefaultHttpContext()).Should().StartWith("ip:");
     }
 

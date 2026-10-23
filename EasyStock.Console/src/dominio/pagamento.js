@@ -108,7 +108,9 @@ export function pagamentosDoTrecho(pedido, desde = null) {
 
 // #1839: extrato do pedido na modal Pagamento, com o que o EasyStok já devolve (itens, frete,
 // pagamentos e saldo): de onde veio cada real, sem abrir o Financeiro. Nulo fora do modo API.
-export function extratoDoPedido(pedido) {
+// J2 (#1990): `aDevolver` vem do EasyStok (pedido cancelado com recebimento); o extrato diz quanto
+// falta devolver em vez de "nada a cobrar".
+export function extratoDoPedido(pedido, { aDevolver = 0 } = {}) {
   if (!pedido?.pedidoId || typeof pedido.totalApi !== 'number') return null
   const frete = pedido.frete ?? 0
   const pagamentos = [...(pedido.pagamentosApi ?? [])].sort((a, b) => (a.em ?? 0) - (b.em ?? 0))
@@ -126,5 +128,6 @@ export function extratoDoPedido(pedido) {
     ajuste: Math.round((pago - recebido) * 100) / 100,
     pago,
     saldo: cancelado ? 0 : Math.max(pedido.totalApi - pago, 0),
+    aDevolver: cancelado && aDevolver > 0 ? aDevolver : 0,
   }
 }

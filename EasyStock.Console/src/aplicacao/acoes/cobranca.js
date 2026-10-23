@@ -17,6 +17,8 @@ export function criarAcoesCobranca(despachar) {
   return {
     // Chip de meio marcado (ponta a da integração): fica no pedido.
     escolherMeioPagamento: (id, meio) => despachar({ tipo: acao.ESCOLHER_MEIO_PAGAMENTO, id, meio }),
+    // J2 (#1990): troco do dinheiro na entrega, em reais (null = não informado).
+    definirTroco: (id, trocoPara) => despachar({ tipo: acao.DEFINIR_TROCO, id, trocoPara }),
 
     // "Recebi"/"Ainda não" da maquininha e do vale (decisão 19, seção 4: a
     // pergunta que hoje mora no "Marcar entregue"). `agora` chega da tela,

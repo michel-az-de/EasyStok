@@ -16,6 +16,12 @@ public static class NotificacoesGlobaisSeed
     /// <summary>Metadados dos avisos do Balcão no aparelho (#1807): a tag que o payload traz, a mesma do console.</summary>
     private const string TagDoBalcao = """{"tag":"{{ tag }}"}""";
 
+    /// <summary>Avisos do Balcão (#1765-7): Push primeiro; falhou, o sino da mesma pessoa (fallback de canal).</summary>
+    private const string ReservaNoSino = """["Push","InApp"]""";
+
+    /// <summary>Quem atende conversas na loja (permissão AtenderConversas): uma mensagem por pessoa, sem modo "todos".</summary>
+    private const string AudienciaEquipe = """{"audiencia":"equipe"}""";
+
     /// <param name="templates">Catálogo de templates; omitido, é o <see cref="BuildDefaultTemplates"/>. Existe para o teste subir a versão.</param>
     /// <param name="rotinas">Catálogo de rotinas; omitido, é o <see cref="BuildDefaultRotinas"/>.</param>
     public static async Task ExecutarAsync(
@@ -566,6 +572,30 @@ public static class NotificacoesGlobaisSeed
             corpoTemplate: "{{ nome }}: {{ etapa }}"),
             TagDoBalcao);
 
+        // #1765-7: reserva no sino. Push que falha (sem inscrição no aparelho, sem chave VAPID) cai no In-App de cada
+        // pessoa da equipe, com o mesmo texto curto.
+        yield return TemplateNotificacao.Criar(
+            codigo: "contato_novo_balcao_inapp_v1",
+            nome: "Contato Novo no Balcão — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.ContatoNovoNoBalcao,
+            assuntoTemplate: "Contato novo",
+            corpoTemplate: "{{ nome }} entrou em contato");
+        yield return TemplateNotificacao.Criar(
+            codigo: "pedido_pago_balcao_inapp_v1",
+            nome: "Pagamento Confirmado no Balcão — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PedidoPagoNoBalcao,
+            assuntoTemplate: "Pagamento confirmado",
+            corpoTemplate: "{{ nome }} pagou o pedido");
+        yield return TemplateNotificacao.Criar(
+            codigo: "etapa_pedido_balcao_inapp_v1",
+            nome: "Etapa do Pedido no Balcão — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PedidoMudouEtapaNoBalcao,
+            assuntoTemplate: "Pedido mudou de etapa",
+            corpoTemplate: "{{ nome }}: {{ etapa }}");
+
         // ===== Lembretes da dona (S43): Push para quem e o lembrete (payload com usuarioId) ou para a
         // empresa toda (sem usuarioId). Interno: nada sai para o cliente. =====
         yield return TemplateNotificacao.Criar(
@@ -593,6 +623,26 @@ public static class NotificacoesGlobaisSeed
             tipoEvento: TipoEventoNotificacao.LojaFechadaNoHorario,
             assuntoTemplate: "Loja fechada no horário",
             corpoTemplate: "A loja foi fechada na mão às {{ hora }}, dentro do horário de funcionamento. Justificativa: {{ justificativa }}");
+
+        // ===== Link vencido na última tentativa (#1889, decisão do Felipe em 21/10): o pedido fica aguardando a equipe.
+        // Sino da equipe (In-App, audiência "gestores"); só primeiro nome e referência do pedido. Interno. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "cobranca_aguardando_equipe_inapp_v1",
+            nome: "Link Vencido Aguardando a Equipe — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.CobrancaAguardandoEquipe,
+            assuntoTemplate: "Pedido sem pagamento aguardando a equipe",
+            corpoTemplate: "O link de pagamento de {{ nome }} venceu de novo (pedido {{ referencia }}). Mande um link novo, combine o pagamento ou cancele o pedido.");
+
+        // ===== Pagamento em disputa no Mercado Pago (#1724-12): o cliente abriu mediação; o pedido não muda.
+        // Sino da equipe (In-App, audiência "gestores"); só primeiro nome e referência do pedido. Interno. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "pagamento_em_mediacao_inapp_v1",
+            nome: "Pagamento em Disputa — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PagamentoEmMediacao,
+            assuntoTemplate: "Pagamento em disputa no Mercado Pago",
+            corpoTemplate: "{{ nome }} abriu uma disputa do pagamento do pedido {{ referencia }} no Mercado Pago. O pedido segue como está; responda a disputa no painel do Mercado Pago.");
 
         // ===== Campanhas (S30): carregam a mensagem da onda e o lembrete do encerramento pelo WhatsApp. Sem
         // rotina: o EnfileiradorMensagensCampanha escreve direto no outbox (categoria Marketing) e monta os
@@ -832,8 +882,9 @@ public static class NotificacoesGlobaisSeed
             nome: "Prazo Estourado · Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.PrazoEstourado,
-            assuntoTemplate: "EasyStok: {{ tipo_legivel }} há {{ atraso_texto }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("prazo_estourado_email_v1"));
+            assuntoTemplate: """Casa da Baba: {{ tipo_legivel }}{{ if cliente && cliente != "" }} ({{ cliente }}){{ end }} há {{ atraso_texto }}""",
+            corpoTemplate: EmailTemplateLoader.LoadBody("prazo_estourado_email_v2"))
+            .ComVersao(2); // #1765-8: nome do cliente, link do console e a marca da casa.
 
         yield return TemplateNotificacao.Criar(
             codigo: "prazo_estourado_whatsapp_v1",
@@ -1037,15 +1088,16 @@ public static class NotificacoesGlobaisSeed
             CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
 
         // ===== Avisos do Balcão no aparelho (#1807). Rollback: Ativa=false. =====
+        // #1765-7: cada pessoa da equipe (audiência "equipe") recebe o Push; se ele falhar, o sino (In-App) é a reserva.
         yield return MakeRotina("contato_novo_balcao_global", "Contato Novo no Balcão",
             TipoEventoNotificacao.ContatoNovoNoBalcao, "contato_novo_balcao_push_v1",
-            CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+            CategoriaConteudoNotificacao.Operacional, ReservaNoSino, AudienciaEquipe);
         yield return MakeRotina("pedido_pago_balcao_global", "Pagamento Confirmado no Balcão",
             TipoEventoNotificacao.PedidoPagoNoBalcao, "pedido_pago_balcao_push_v1",
-            CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+            CategoriaConteudoNotificacao.Operacional, ReservaNoSino, AudienciaEquipe);
         yield return MakeRotina("etapa_pedido_balcao_global", "Etapa do Pedido no Balcão",
             TipoEventoNotificacao.PedidoMudouEtapaNoBalcao, "etapa_pedido_balcao_push_v1",
-            CategoriaConteudoNotificacao.Operacional, "[\"Push\"]");
+            CategoriaConteudoNotificacao.Operacional, ReservaNoSino, AudienciaEquipe);
 
         // ===== Lembretes da dona (S43) =====
         yield return MakeRotina("lembrete_vencido_global", "Lembrete da Dona",
@@ -1056,6 +1108,16 @@ public static class NotificacoesGlobaisSeed
         yield return MakeRotina("loja_fechada_no_horario_global", "Loja Fechada no Horário",
             TipoEventoNotificacao.LojaFechadaNoHorario, "loja_fechada_no_horario_push_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"Push\",\"InApp\"]", ModoTodos("admins"));
+
+        // ===== Link vencido na última tentativa (#1889): sino da equipe. Rollback: Ativa=false. =====
+        yield return MakeRotina("cobranca_aguardando_equipe_global", "Link Vencido Aguardando a Equipe",
+            TipoEventoNotificacao.CobrancaAguardandoEquipe, "cobranca_aguardando_equipe_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]", ModoTodos("gestores"));
+
+        // ===== Pagamento em disputa (#1724-12): sino da equipe. Rollback: Ativa=false. =====
+        yield return MakeRotina("pagamento_em_mediacao_global", "Pagamento em Disputa",
+            TipoEventoNotificacao.PagamentoEmMediacao, "pagamento_em_mediacao_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]", ModoTodos("gestores"));
 
         // ===== Avisos de status do pedido ao cliente (S13): transacionais, so WhatsApp, sem janela de horario
         // (aviso de status nao espera). Rollback: desativar a rotina (Ativa=false). =====

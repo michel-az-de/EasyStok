@@ -100,7 +100,7 @@ internal sealed class CobrancaPedidoFixture
             .Do(ci => Pedido.Pagamentos.Add(ci.Arg<PedidoPagamento>()));
         PedidoRepo.When(r => r.AddEventoAsync(Arg.Any<PedidoEvento>()))
             .Do(ci => Eventos.Add(ci.Arg<PedidoEvento>()));
-        PedidoStorefrontRepo.GetForUpdateAsync(Pedido.Id, Arg.Any<CancellationToken>()).Returns(Pedido);
+        PedidoStorefrontRepo.GetForUpdateAsync(EmpresaId, Pedido.Id, Arg.Any<CancellationToken>()).Returns(Pedido);
         PedidoStorefrontRepo.When(r => r.AddEventoAsync(Arg.Any<PedidoEvento>(), Arg.Any<CancellationToken>()))
             .Do(ci => Eventos.Add(ci.Arg<PedidoEvento>()));
 
@@ -185,28 +185,53 @@ internal sealed class CobrancaPedidoFixture
             VagaRepo, PedidoStorefrontRepo, Substitute.For<IExpedienteLojaRepository>(),
             NullLogger<CheckoutCoreService>.Instance, Relogio, EnderecoEntregaPedidoTeste.Criar());
 
-    private QuitacaoPedido Quitacao() => QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, ConversaRepo, ImpressaoRepo, Publicador, OperacaoEventos);
+    /// <summary>Expiração da preferência substituída sobre o Mercado Pago falso da fixture (#1717-8).</summary>
+    public ExpiracaoPreferenciaMercadoPago Expiracao() =>
+        new(new Lazy<IMercadoPagoClient>(() => MpClient), Relogio, NullLogger<ExpiracaoPreferenciaMercadoPago>.Instance);
 
-    public ConfirmarPagamentoPedidoUseCase Confirmar() =>
+    private QuitacaoPedido Quitacao() => QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, ConversaRepo, ImpressaoRepo, Publicador,
+        OperacaoEventos, PrazoQueries, Expiracao());
+
+    /// <summary>Baixa manual pelo console (Pix, dinheiro, maquininha) sobre o mesmo pedido.</summary>
+    public RegistrarPagamentoPedidoUseCase RegistrarManual() =>
+        new(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries),
+            Quitacao());
+
+    /// <summary>Clientes do aviso de status; o pedido da fixture tem telefone e não tem cliente cadastrado.</summary>
+    public IClienteRepository ClienteRepo { get; } = Substitute.For<IClienteRepository>();
+
+    /// <summary>Aviso ao cliente pelo canal do pedido, sobre o <see cref="Notificador"/> falso.</summary>
+    public AvisoStatusPedidoCliente AvisoCliente()
+    {
+        Pedido.ClienteTelefone ??= "11987654321";
+        PedidoRepo.GetByIdAsync(EmpresaId, Pedido.Id).Returns(Pedido);
+        return new(PedidoRepo, ClienteRepo, VagaRepo, StorefrontRepo,
+            new PoliticaEnvioCliente(Substitute.For<IConsentimentoContatoRepository>()), Notificador, Tenant,
+            NullLogger<AvisoStatusPedidoCliente>.Instance);
+    }
+
+    /// <param name="calculadora">Início previsto e número do dia; sem ela, a calculadora sem numerador.</param>
+    public ConfirmarPagamentoPedidoUseCase Confirmar(AvisoStatusPedidoCliente? avisoCliente = null, CalculadoraInicioPrevistoPedido? calculadora = null) =>
         new(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
                 new CalculadoraInicioPrevistoPedido(PrazoQueries), Quitacao()),
             Publicador, OperacaoEventos, Quitacao(), Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
-            new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo);
+            calculadora ?? new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo, avisoCliente: avisoCliente);
 
     public NotificarAtrasoPedidoUseCase NotificarAtraso() =>
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Notificador, Options.Create(Prazos), Relogio,
             NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
-    public TrocarFormaPagamentoPedidoUseCase Trocar() =>
+    public TrocarFormaPagamentoPedidoUseCase Trocar(IConferenciaPagamentoPedido? conferencia = null, SaldoFinanceiroPedido? saldos = null) =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
-            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries), OperacaoEventos, Quitacao(), Conferir());
+            NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries), OperacaoEventos, Quitacao(),
+            conferencia ?? Conferir(), saldos);
 
     public ConferirPagamentoPedidoUseCase Conferir() => new(PedidoRepo, CobrancaRepo, MpClient, Confirmar());
 
     public AtualizarCobrancaPorPagamentoUseCase AtualizarPorPagamento() =>
         new(CobrancaRepo, PedidoStorefrontRepo, Aviso(), Tenant, Uow, Relogio,
-            NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance);
+            NullLogger<AtualizarCobrancaPorPagamentoUseCase>.Instance, Notificador);
 
     public DesfazerPagamentoManualUseCase Desfazer() =>
         new(PedidoStorefrontRepo, PedidoRepo, CobrancaRepo, Publicador, Uow, Relogio, Quitacao(), CaixaRepo);
@@ -225,7 +250,8 @@ internal sealed class CobrancaPedidoFixture
             new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), VagaRepo, NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance), Uow,
             NullLogger<CancelarPedidoUseCase>.Instance, CobrancaRepo, Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(), Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>());
         return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, Gerar(), cancelar,
-            Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance, OperacaoEventos);
+            Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance, OperacaoEventos,
+            Notificador);
     }
 
     public void AdicionarPagamento(string? referencia, decimal valor = 25m)

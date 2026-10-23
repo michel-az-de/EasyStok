@@ -68,6 +68,8 @@ export function caixaDiaDaApi(d) {
     aberto: Boolean(d.aberto),
     fechado: Boolean(d.fechado),
     fechamento: fechamentoDaApi(d.fechamento),
+    // #1630: no dia fechado, o que entrou depois de fechar (os totais acima são os do fechamento).
+    posFechamento: d.posFechamento ?? 0,
     esquecidoAberto: Boolean(d.aberturaPendenteCrossDay),
     abertoDesde: d.abertoDesde ?? null,
     movimentos: (d.movimentos ?? []).map(movimentoDaApi),

@@ -3,19 +3,16 @@ import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Avatar } from '../../componentes/Avatar'
 import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
-import { sinalVerde } from '../../dominio/cobranca'
-import { faltaPagar } from '../../dominio/pagamento'
-import { ehLead, previaDaConversa, tagCorrespondida } from '../../dominio/conversa'
+import { previaDaConversa, tagCorrespondida } from '../../dominio/conversa'
 import { motivoDePrecisar, respostaAtrasada } from '../../dominio/automatico'
 import { contextoDaLinha, estadoDaLinha, pendentesDaLinha } from '../../dominio/linhaDoBalcao'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { estadoDaJanela } from '../../dominio/janela'
-import { passoPorId } from '../../dominio/esteira'
 import { inicioDoPedidoAtivo } from '../../dominio/entrega'
-import { duracao, horaMono, moeda } from '../../dominio/formato'
+import { duracao, horaMono } from '../../dominio/formato'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
-import { mostraEtiquetaDoEstado, nomeDoCartao, origemNoCartao, temLinhaDeContexto } from './apresentacaoDoCartao'
+import { marcaDoPedido, mostraEtiquetaDoEstado, nomeDoCartao, origemNoCartao, temLinhaDeContexto } from './apresentacaoDoCartao'
 
 // Rótulo e ícone do motivo de precisar, por `chave` (dominio/automatico.js).
 // A direção 19 (seção 1) pede um texto de linha diferente do `rotulo` que o
@@ -33,29 +30,6 @@ const APRESENTACAO_DO_MOTIVO = {
   // atrasada (já em rota) ganham marca própria, mesmo padrão das outras.
   'pedido-atrasado': { texto: 'Pedido atrasado', icone: 'cooking-pot' },
   'atraso-entrega': { texto: 'Entrega atrasada', icone: 'moto' },
-}
-
-const ICONE_DO_PASSO = {
-  aguardando: 'dollar-sign', pago: 'circle-check', preparo: 'cooking-pot',
-  embalado: 'package', entrega: 'moto', entregue: 'house',
-}
-
-// Passo do pedido no contexto da linha (com o sinal verde do pagamento, RN-25,
-// dez minutos só) ou "Lead" quando ainda não há pedido nem cadastro.
-function marcaDoPedido(conversa, cardapio) {
-  const passo = conversa.pedido ? passoPorId(conversa.pedido.estado) : null
-  if (passo) {
-    const saldo = faltaPagar(conversa.pedido, cardapio)
-    if (saldo > 0 && conversa.pedido.sinalNaReserva && conversa.pedido.cobranca?.pagaEm
-      && Math.round(conversa.pedido.cobranca.valor * 100) === Math.round((conversa.pedido.totalApi - saldo) * 100)) {
-      return { texto: 'Sinal pago', icone: 'circle-check', tom: 'ok' }
-    }
-    if (saldo > 0) return { texto: `Falta ${moeda(saldo)}`, icone: 'dollar-sign', tom: 'neutro' }
-    if (sinalVerde(conversa.pedido)) return { texto: 'Pago', icone: 'circle-check', tom: 'ok' }
-    return { texto: passo.rotulo, icone: ICONE_DO_PASSO[passo.id], tom: 'neutro' }
-  }
-  if (ehLead(conversa)) return { texto: 'Lead', icone: 'user-plus', tom: 'marca' }
-  return null
 }
 
 // DEN-06: cobrança vencida repete o aviso do pedido e do lembrete de
@@ -82,7 +56,7 @@ function motivoDaLinha(motivo, origem) {
 // já resolvido, senão a mudança de UMA conversa re-renderizava a lista inteira.
 export const CartaoConversa = memo(function CartaoConversa({
   conversa, selecionada, agora, pausado = false, pagamentoNaoVisto = false, aberta = true, expediente = null,
-  grupo, busca, aoAbrir,
+  grupo, busca, aoAbrir, fonteApi = false,
 }) {
   const { canais, janelas, cardapio } = useCatalogo()
   const canal = canalDaConversa(canais, conversa)
@@ -105,7 +79,7 @@ export const CartaoConversa = memo(function CartaoConversa({
   const tagAchada = busca?.trim() && !nomeCombinaBusca ? tagCorrespondida(conversa, busca) : null
   const contexto = contextoDaLinha({
     origem: origem?.curto ?? null,
-    pedido: grupo ? null : marcaDoPedido(conversa, cardapio),
+    pedido: grupo ? null : marcaDoPedido(conversa, cardapio, { fonteApi }),
     entregaAte: inicioPedido != null ? horaMono(inicioPedido) : null,
     janelaFechada,
     tagAchada,

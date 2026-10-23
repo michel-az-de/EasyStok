@@ -17,12 +17,17 @@ export const SO_DA_TELA = [
   'pedirNotificacaoDoNavegador',
   // Rascunho da comanda: o meio escolhido segue no corpo do pedido (F03).
   'escolherMeioPagamento',
+  // J2 (#1990): o troco do dinheiro na entrega também segue no corpo do pedido (observações).
+  'definirTroco',
   // Marca de canhoto já impresso nesta tela; a impressão em si não depende dela.
   'marcarCanhotoImpresso',
   // Fechar o modal do gesto da loja (#1443): abrir e fechar de verdade são ligadas.
   'fecharGestoLoja',
   // Queda e volta da conexão (#1241): só a faixa e a foto dos pedidos abertos; o lote é ligado.
   'conexaoCaiu', 'conexaoVoltou',
+  // #1686 (item 3): comanda nova depois do pedido entregue ou cancelado. É rascunho da tela; o
+  // pedido nasce no EasyStok no "Gerar cobrança e enviar", como o primeiro.
+  'novaComanda',
 ]
 
 const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, rotulo]))

@@ -4,6 +4,8 @@ import { CampoArea, CampoTexto } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { automacoesEditaveis } from '../../dominio/acessoModulos'
 import {
   VARIAVEIS, VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, contextoDePrevia, textoDaRegra, variaveisForaDaApi,
 } from '../../dominio/automacao'
@@ -22,7 +24,7 @@ const CHAVES_DA_API = new Set(VARIAVEIS_DA_API.map((v) => v.chave))
 const soDaApi = (contexto) => Object.fromEntries(Object.entries(contexto).filter(([chave]) => CHAVES_DA_API.has(chave)))
 
 function Regra({
-  regra, contexto, aoAlternar, aoEditar, nomeConversa, podeEnviar, aoEnviar, fonteApi, avisoApi,
+  regra, contexto, aoAlternar, aoEditar, nomeConversa, podeEnviar, aoEnviar, fonteApi, avisoApi, editavel,
 }) {
   const [rascunho, setRascunho] = useState(null)
   // ocioso | salvando | salvo | erro: o resultado aparece aqui dentro, não atrás do modal.
@@ -69,6 +71,7 @@ function Regra({
             type="checkbox"
             aria-label={`Regra ${regra.nome}, ${regra.ativa ? 'ligada' : 'desligada'}`}
             checked={regra.ativa}
+            disabled={!editavel}
             onChange={() => aoAlternar(regra.id)}
           />
           {regra.ativa ? 'ligada' : 'desligada'}
@@ -79,6 +82,7 @@ function Regra({
       <CampoArea
         rotulo={`Texto de ${regra.nome}`}
         value={valor.texto}
+        readOnly={!editavel}
         onChange={(e) => mudar('texto', e.target.value)}
       />
       <p className={css.variaveis}>
@@ -110,6 +114,8 @@ function Regra({
         <output className={css.editando}><Pilula tom="ok" fina>Salvo</Pilula></output>
       )}
 
+      {/* #1966: salvar é da gerência do atendimento; para o Operador o texto fica só para ler. */}
+      {editavel && (
       <div className={css.acoes}>
         <Botao variante="primario" className={css.toque} disabled={!editando || gravacao === 'salvando'} onClick={salvar}>
           {gravacao === 'salvando' ? 'Salvando…' : 'Salvar texto'}
@@ -135,6 +141,7 @@ function Regra({
           </Botao>
         )}
       </div>
+      )}
     </li>
   )
 }
@@ -202,6 +209,11 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
     enviar, voltarAoHorario,
   } = useAcoes()
   const { janelas, canais } = useCatalogo()
+  const { acoes } = useAcessoModulos()
+  // #1966: `PUT automacoes/{gatilho}` exige Gerente; o Operador vê as regras sem ligar, desligar ou editar.
+  const editavel = automacoesEditaveis({ fonteApi, acoes })
+  // Abrir e fechar a loja na mão é da gerência (`controlarLoja`), como em Horários e mensagens.
+  const podeControlarLoja = !fonteApi || acoes.controlarLoja === true
 
   const faixa = faixaDaJanela(janelas, selecionada?.pedido?.janela)
   // `abre` só a regra "Fora do horário" usa (VARIAVEIS, dominio/automacao.js);
@@ -246,15 +258,17 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
             ? 'Segue os horários da semana.'
             : `${lojaAberta ? 'Aberta' : 'Fechada'} manualmente, sem seguir os horários da semana.`}
         </p>
-        <div className={css.acoesLoja}>
-          <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
-            {aberta ? 'Fechar loja agora' : 'Abrir loja agora'}
-          </Botao>
-          {/* #1474: o mesmo "Voltar a seguir o horário" de Horários e mensagens (só no modo API). */}
-          {voltarAoHorario && lojaAberta != null && (
-            <Botao className={css.toque} onClick={voltarAoHorario}>Voltar a seguir o horário</Botao>
-          )}
-        </div>
+        {podeControlarLoja && (
+          <div className={css.acoesLoja}>
+            <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
+              {aberta ? 'Fechar loja agora' : 'Abrir loja agora'}
+            </Botao>
+            {/* #1474: o mesmo "Voltar a seguir o horário" de Horários e mensagens (só no modo API). */}
+            {voltarAoHorario && lojaAberta != null && (
+              <Botao className={css.toque} onClick={voltarAoHorario}>Voltar a seguir o horário</Botao>
+            )}
+          </div>
+        )}
         {fonteApi ? horariosApi : <ul className={css.diasFuncionamento}>
           {DIAS_DA_SEMANA.map((dia) => (
             <DiaDeFuncionamento
@@ -331,6 +345,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
         )}
       </div>
 
+      {!editavel && <p className={css.descricao}>Só a dona ou um gerente liga, desliga e muda o texto das mensagens automáticas.</p>}
       <ul className={css.lista}>
         {regras.map((regra) => (
           <Regra
@@ -344,6 +359,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
             aoEnviar={enviarRegra}
             fonteApi={fonteApi}
             avisoApi={sincronizacao?.aviso ?? null}
+            editavel={editavel}
           />
         ))}
       </ul>

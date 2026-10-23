@@ -68,12 +68,26 @@ public sealed class CandidatosLembreteQuery(EasyStockDbContext db) : ICandidatos
                     .FirstOrDefault()))
             .ToListAsync(ct);
 
+    /// <summary>
+    /// #1622-4: até onde a conversa <see cref="SituacaoConversa.Automatica"/> com o cliente esperando ainda vira aviso. O turno
+    /// do agente (ou a escalada com ele desligado) roda em memória e se perde num deploy; uma semana cobre fim de semana e
+    /// feriado com a loja fechada sem acordar conversa esquecida há meses no dia em que esta regra entra.
+    /// </summary>
+    public static readonly TimeSpan AutomaticaEsperandoAte = TimeSpan.FromDays(7);
+
     // Quem falou por último segue UltimaPalavraConversa (#1550), o mesmo critério da inbox.
     public async Task<IReadOnlyList<ConversaSemResposta>> ListarConversasSemRespostaAsync(DateTime entradaAntesDe, CancellationToken ct = default)
     {
+        var automaticaDesde = entradaAntesDe - AutomaticaEsperandoAte;
         var linhas = await (
             from c in db.AtendimentoConversas.IgnoreQueryFilters()
+            // A automática entra pela coluna da última entrada (barata) antes da subconsulta da última palavra. Passada
+            // a semana, só volta a que já tem aviso aberto: ele segue vigente até alguém responder, não se dá por resolvido.
             where c.Situacao == SituacaoConversa.Assumida
+                || (c.Situacao == SituacaoConversa.Automatica
+                    && (c.UltimaMensagemEntradaEm >= automaticaDesde
+                        || db.Lembretes.IgnoreQueryFilters().Any(l => l.EmpresaId == c.EmpresaId && l.ConversaId == c.Id
+                            && l.Tipo == TipoLembrete.ClienteSemResposta && l.Situacao == SituacaoLembrete.Aberto)))
             let ultima = db.AtendimentoMensagens.IgnoreQueryFilters()
                 .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id)
                 .Where(UltimaPalavraConversa.Conta)

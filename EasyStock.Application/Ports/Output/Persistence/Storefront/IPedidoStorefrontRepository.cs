@@ -29,8 +29,12 @@ public interface IPedidoStorefrontRepository
     /// simultaneamente. O segundo aguarda commit/rollback do primeiro antes
     /// de ler o registro — o use case então detecta o status novo e devolve 409.
     /// </para>
+    /// <para>
+    /// #1265-9: a empresa vai no <c>WHERE</c>: pedido de outra empresa não é travado nem lido. Não há sobrecarga só pelo
+    /// id: todo chamador trava pela empresa.
+    /// </para>
     /// </summary>
-    Task<Pedido?> GetForUpdateAsync(Guid pedidoId, CancellationToken ct = default);
+    Task<Pedido?> GetForUpdateAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
 
     Task AddAsync(Pedido pedido, CancellationToken ct = default);
 
@@ -45,11 +49,11 @@ public interface IPedidoStorefrontRepository
     Task AddEventoAsync(PedidoEvento evento, CancellationToken ct = default);
 
     /// <summary>
-    /// Retorna pedidos com status <c>aguardando_pagamento</c> E
+    /// Retorna pedidos do checkout com status <c>aguardando_pagamento</c> ou <c>rascunho</c> (#1623-a), sem cobrança, E
     /// <c>criado_em &lt; criadoAntesDe</c> (pedidos abandonados).
     /// Limite <paramref name="maxBatch"/> evita processar lote gigante num único sweep.
     /// </summary>
-    Task<IReadOnlyList<Pedido>> GetAguardandoPagamentoExpiradosAsync(
+    Task<IReadOnlyList<Pedido>> GetAbandonadosNoCheckoutAsync(
         DateTime criadoAntesDe,
         int maxBatch = 50,
         CancellationToken ct = default);

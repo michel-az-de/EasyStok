@@ -104,9 +104,9 @@ confere('quantidade e subtotal do carrinho', () => {
   assert.equal(link.quantidadeNoCarrinho(carrinho), 3)
   assert.equal(link.subtotalDoCarrinho(carrinho, CARDAPIO), 85 * 2 + 62)
 })
-confere('pagamento: Pix e cartão em destaque, maquininha e vale "Na entrega" (PR #18)', () => {
+confere('pagamento: o link (Pix ou cartão) em destaque, maquininha e vale "Na entrega" (PR #18, decisão de 22/10)', () => {
   const { principais, naEntrega } = link.meiosDaPagina(MEIOS_DE_PAGAMENTO)
-  assert.deepEqual(principais.map((m) => m.id), ['pix', 'cartao-link'])
+  assert.deepEqual(principais.map((m) => m.id), ['cartao-link'])
   assert.deepEqual(naEntrega.map((m) => m.id), ['maquininha', 'vale-refeicao'])
   assert.deepEqual(link.meiosDaPagina([{ id: 'x', situacao: 'ativo', provedor: 'manual', destaque: true }]).principais.map((m) => m.id), ['x'])
 })

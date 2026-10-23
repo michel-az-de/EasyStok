@@ -5,7 +5,7 @@ import {
 } from '../../infra/api/comandaApi'
 import { mudarStatusKds } from '../../infra/api/kdsApi'
 import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
-import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao } from '../../dominio/cobranca'
+import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao, situacaoDaCobranca } from '../../dominio/cobranca'
 import { pedeConfirmacaoDoSaldo, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
 import { criarChaveDeEnvio } from '../chaveDeEnvio'
@@ -26,10 +26,18 @@ import { SO_NO_EASYSTOK } from './naoLigadas'
 // porque um rascunho "Pago" ou "Em preparo" nunca chega à cozinha.
 const NAO_LIGADO = 'esta ação ainda não está disponível nesta tela.'
 const SEM_PEDIDO = 'o pedido ainda não foi criado. Gere a cobrança ou envie ao cliente primeiro.'
+// #1924: textos do link novo pela Ficha.
+export const LINK_NOVO_SEM_ENVIO = 'Link novo gerado, mas não saiu na conversa (fora da janela de 24 h ou canal fora do ar). '
+  + 'Copie o link em Pagamento e mande ao cliente.'
+export const LINK_AINDA_VALE = 'O link desta cobrança ainda vale. Para mandar de novo, copie o link em Pagamento.'
 const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora espera aprovação. '
   + 'Use "Aprovar pedido" na Ficha e registre o pagamento de novo.'
 
 const MESMA_FORMA = 'A cobrança já está nessa forma de pagamento. Nada mudou.'
+
+// #1942 (#1923): 409 que o EasyStok recusou antes de criar o pedido. Mostra o motivo, sem reler. O resto dos
+// 409 (PEDIDO_EM_ANDAMENTO, a corrida do clique duplo, e código desconhecido) pode ter criado: relê.
+const RECUSA_DEFINITIVA = new Set(['LOJA_FECHADA', 'JANELA_ESGOTADA', 'CEP_SEM_COBERTURA', 'CLIENTE_BLOQUEADO'])
 
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'forcarEncaixe']
 
@@ -134,7 +142,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
       },
       (erro) => {
-        if (!erro.status || erro.status >= 500 || erro.status === 409) {
+        if (!erro.status || erro.status >= 500 || (erro.status === 409 && !RECUSA_DEFINITIVA.has(erro.codigo))) {
           const mensagem = 'Não foi possível confirmar se o pedido foi criado. Aguarde a atualização da conversa antes de reenviar.'
           const incerto = () => { avisar(mensagem); return { erro: mensagem } }
           return recarregar(id).then((atual) => {
@@ -157,14 +165,36 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     (erro) => avisar(`Cobrança: ${erro.message}`),
   ))
 
-  // Com pedido criado, gerar ou reenviar a cobrança troca a forma (S11) ou, sem cobrança
-  // online, emite o link; o link vencido é reemitido e enviado pelo EasyStok (job de expiração).
+  // #1924: link vencido que o job não reemite mais (segundo vencimento, pedido esperando a atendente).
+  // A troca para o link do Mercado Pago gera o link novo e o EasyStok manda na conversa
+  // (`TextoLinkTrocado`); o `POST /cobranca` só gerava, sem mandar.
+  const mandarLinkNovo = (id) => umaPorConversa(id, 'mandarLinkNovo', () => {
+    const pedidoId = pedidoCriado(id)
+    semResumo.delete(pedidoId)
+    return trocarFormaPagamento(pedidoId, FORMA_ONLINE).then(
+      (r) => {
+        limparAviso()
+        if (!r?.enviadaNaConversa) avisar(LINK_NOVO_SEM_ENVIO)
+        return recarregar(id).catch(() => {})
+      },
+      (erro) => {
+        avisar(`Link novo: ${erro.message}`)
+        return recarregar(id).catch(() => {})
+      },
+    )
+  })
+
+  // Com pedido criado, gerar ou reenviar a cobrança troca a forma (S11), sem cobrança online emite
+  // o link e com o link vencido manda um novo (#1924). Link ainda valendo não sai de novo sozinho.
   const cobrar = (id, meio, enviarAoCliente = true) => {
     if (!pedidoCriado(id)) return criarPedido(id, meio, enviarAoCliente)
     const atual = pedidoDe(id)
     if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
     if (!atual?.cobranca && formaDoMeio(atual?.meio) === FORMA_ONLINE) return reemitir(id)
-    avisar('A cobrança já está no EasyStok. Link vencido é reemitido e enviado sozinho.')
+    if (formaDoMeio(atual?.meio) === FORMA_ONLINE && situacaoDaCobranca(atual.cobranca, Date.now()).chave === 'expirada') {
+      return mandarLinkNovo(id)
+    }
+    avisar(LINK_AINDA_VALE)
     return undefined
   }
 

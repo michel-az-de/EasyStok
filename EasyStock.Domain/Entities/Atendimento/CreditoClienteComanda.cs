@@ -34,6 +34,16 @@ public sealed class CreditoClienteComanda
         Usos.Add(uso);
         return uso;
     }
+
+    /// <summary>Devolve ao cupom o valor de um uso cujo pedido foi desfeito sem cobrança (#1961).</summary>
+    public void Devolver(UsoCreditoClienteComanda uso)
+    {
+        ArgumentNullException.ThrowIfNull(uso);
+        if (uso.CreditoId != Id || Saldo + uso.Valor > Valor)
+            throw new RegraDeDominioVioladaException("Uso do cupom não pertence a este crédito.");
+        Saldo += uso.Valor;
+        Usos.Remove(uso);
+    }
 }
 
 public sealed class UsoCreditoClienteComanda

@@ -199,9 +199,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // S13: avisos de status ao cliente pelo WhatsApp (outbox de notificações).
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Pedidos.Handlers.NotificarClienteStatusPedidoHandler>("pedido.mudou_status");
-            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
-                EasyStock.Application.Events.Pedidos.Handlers.NotificarClientePedidoPagoHandler>(
-                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            // #1991-2: o aviso S13 de pedido pago saiu daqui; é o reserva da automática "Pagamento confirmado", no
+            // AutomacaoPedidoPagoHandler (um aviso só ao cliente).
 
             // #1807: avisos do Balcão no aparelho (Web Push para a equipe). Idempotentes pela chave do outbox; ficam
             // antes das automáticas, que precisam ser as últimas do tipo (#1506).
@@ -218,7 +217,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Campanhas.FecharInteressesPedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
-            // S42: mensagens automáticas por gatilho. #1506: a automática envia direto ao cliente, sem
+            // S42: mensagens automáticas por gatilho (a de pedido pago tem o aviso S13 de reserva). #1506: a automática envia direto ao cliente, sem
             // idempotência; fica por ÚLTIMO no tipo para que a falha de um handler seguinte não faça o
             // outbox repetir o evento e o cliente receber a mesma mensagem de novo.
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,

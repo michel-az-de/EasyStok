@@ -250,6 +250,33 @@ public class AuthControllerTests
         acoes.GetProperty("reabrirConversa").GetBoolean().Should().Be(esperado);
     }
 
+    // #1921 / #1940 (frente C da #1889): o console da atendente pedia desacertos, integrações e o
+    // cadastro de entrega e recebia 403. A matriz diz quem pode, com a mesma regra das rotas.
+    // #1974: a rota de desacertos também exige o módulo dela (ModulosConvention); o Operador tem a
+    // permissão de estoque pelo nível, mas não o módulo Produção, e recebia 403 com a chave em true.
+    [Theory]
+    [InlineData(NivelAcesso.SuperAdmin, true, true, true)]
+    [InlineData(NivelAcesso.Admin, false, true, true)]
+    [InlineData(NivelAcesso.Gerente, true, true, false)]
+    [InlineData(NivelAcesso.Operador, false, true, false)]
+    [InlineData(NivelAcesso.Operador, true, true, false)]
+    [InlineData(NivelAcesso.Operador, true, false, false)]
+    public void LeiturasDeEstoqueIntegracoesEEntregaSeguemAsRegrasDasRotas(NivelAcesso nivel, bool estoque, bool moduloDaRota, bool administrador)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(Guid.NewGuid());
+        usuario.Nivel.Returns(nivel);
+        usuario.TemPermissao(Permissao.GerenciarEstoque).Returns(estoque);
+        usuario.TemPermissao(EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Producao)).Returns(moduloDaRota);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        acoes.GetProperty("verDesacertosEstoque").GetBoolean().Should().Be(estoque && moduloDaRota);
+        acoes.GetProperty("verIntegracoes").GetBoolean().Should().Be(administrador);
+        acoes.GetProperty("ajustarEntrega").GetBoolean().Should().Be(administrador);
+    }
+
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────
     [Theory]
     [InlineData(true, true, true)]

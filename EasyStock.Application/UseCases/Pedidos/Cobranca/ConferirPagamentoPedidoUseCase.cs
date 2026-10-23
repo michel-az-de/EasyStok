@@ -84,6 +84,9 @@ public sealed class ConferirPagamentoPedidoUseCase(
         ConfirmarPagamentoPedidoUseCase confirmar, CobrancaPedidoVencida item, CancellationToken ct)
     {
         var pagamentos = await mercadoPago.BuscarPagamentosPorReferenciaAsync(item.PedidoId.ToString(), ct);
+        // #1938: pagamento que o pedido já conciliou (o sinal da encomenda, por exemplo) não é novidade nem
+        // "aprovado sem conciliar"; sem esta separação, o link complementar do restante nunca saía da trava.
+        var jaConhecidos = new HashSet<string>(StringComparer.Ordinal);
         foreach (var pagamento in pagamentos.Where(p => p.Aprovado))
         {
             var resultado = await confirmar.ExecuteAsync(new ConfirmarPagamentoPedidoInput(
@@ -91,9 +94,13 @@ public sealed class ConferirPagamentoPedidoUseCase(
                 pagamento.PaymentMethodId, pagamento.PaymentTypeId, pagamento.DateApproved,
                 ContaRecebedoraId: pagamento.CollectorId), ct);
             if (resultado.Confirmado) return new(SituacaoConfirmado, true);
+            // #1724-7: o pagamento a menor fica registrado como recebimento; já é conhecido, não "aprovado sem conciliar".
+            if (resultado.Situacao is SituacaoConfirmacaoPagamento.JaConfirmado or SituacaoConfirmacaoPagamento.ValorMenor)
+                jaConhecidos.Add(pagamento.Id);
         }
+        var novos = pagamentos.Where(p => !jaConhecidos.Contains(p.Id)).ToList();
         // Recusado, cancelado ou devolvido não está em processamento: só tentativa sem dinheiro equivale a nada pago.
-        return new(pagamentos.Any(p => p.Aprovado) ? SituacaoNaoConciliado
-            : pagamentos.Any(p => !p.Recusado && !p.Estornado) ? SituacaoEmProcessamento : SituacaoNaoEncontrado, false);
+        return new(novos.Any(p => p.Aprovado) ? SituacaoNaoConciliado
+            : novos.Any(p => !p.Recusado && !p.Estornado) ? SituacaoEmProcessamento : SituacaoNaoEncontrado, false);
     }
 }

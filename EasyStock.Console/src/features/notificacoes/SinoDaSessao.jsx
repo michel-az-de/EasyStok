@@ -12,7 +12,7 @@ const textoAparelho = {
   ativando: 'Aguarde a confirmação do navegador…',
   desativando: 'Desativando avisos neste aparelho…',
   ativo: 'Avisos desta conta ativados neste aparelho.',
-  bloqueado: 'Avisos bloqueados nas configurações deste navegador.',
+  bloqueado: 'Avisos bloqueados neste navegador. Libere as notificações deste site nas configurações do navegador e ative de novo.',
   'sem-chave': 'Os avisos no aparelho ainda não estão configurados neste ambiente.',
   indisponivel: 'Este navegador não oferece avisos com o Console fechado.',
 }
@@ -28,10 +28,14 @@ export function SinoDaSessao({ avisos, aparelho }) {
       leituraRef.current = null
     }
   }, [lendo, recentes])
+  // #1989: quem ainda não ativou neste aparelho vê um ponto discreto no sino; o caminho fica dentro.
+  const semAvisoNoAparelho = ['desligado', 'bloqueado'].includes(aparelho?.estado)
   return <>
-    <Botao variante="texto" icone="bell" aria-label={`Avisos${erro ? ', sem atualizar' : total === null ? '' : `, ${total} não lidas`}`}
+    <Botao variante="texto" icone="bell" aria-label={`Avisos${erro ? ', sem atualizar' : total === null ? '' : `, ${total} não lidas`}${semAvisoNoAparelho ? ', avisos neste aparelho desligados' : ''}`}
+      title={semAvisoNoAparelho ? 'Avisos neste aparelho desligados: abra para ativar' : undefined}
       aria-haspopup="dialog" onClick={() => { setAberto(true); carregar() }}>
       <span>Avisos{erro ? ' !' : total ? ` (${total})` : ''}</span>
+      {semAvisoNoAparelho && <span className={css.pontoAparelho} data-aparelho-desligado aria-hidden="true" />}
     </Botao>
     {aberto && <Modal titulo="Avisos" largura="min(760px, calc(100vw - 24px))" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."
       aoFechar={() => setAberto(false)} rodape={<><Botao ref={atualizarRef} onClick={() => carregar()} disabled={carregando || Boolean(lendo)}>Atualizar avisos</Botao><Botao onClick={() => setAberto(false)}>Fechar</Botao></>}>
@@ -62,7 +66,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
           <h3>Avisos no celular ou computador</h3>
           <p role={aparelho.estado === 'erro' ? 'alert' : 'status'}>{aparelho.mensagem ?? textoAparelho[aparelho.estado]}</p>
         </div>
-        {['desligado', 'erro', 'sem-chave', 'ativando'].includes(aparelho.estado) && <Botao onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar avisos neste aparelho</Botao>}
+        {['desligado', 'bloqueado', 'erro', 'sem-chave', 'ativando'].includes(aparelho.estado) && <Botao onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar avisos neste aparelho</Botao>}
         {['ativo', 'desativando'].includes(aparelho.estado) && <Botao onClick={aparelho.desligar} disabled={aparelho.estado === 'desativando'}>Desativar avisos neste aparelho</Botao>}
       </section>}
     </Modal>}

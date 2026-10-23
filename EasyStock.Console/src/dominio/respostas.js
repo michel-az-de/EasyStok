@@ -194,8 +194,8 @@ const ROTULO_PASSO_BIBLIOTECA = {
 const DESCRICAO_PASSO_BIBLIOTECA = {
   pago: 'Sai quando a dona marca o pedido como pago na esteira.',
   preparo: 'Sai quando a dona marca "Em preparo" na esteira.',
-  embalado: 'Sai quando a dona marca "Embalado" na esteira.',
-  entrega: 'Sai quando a dona marca "Em entrega" na esteira, com o nome de quem leva.',
+  embalado: 'Sai quando a dona marca "Pronto" na esteira.',
+  entrega: 'Sai quando a dona marca "Saiu para entrega" na esteira, com o nome de quem leva.',
   entregue: 'Sai quando a dona marca "Entregue" na esteira.',
 }
 

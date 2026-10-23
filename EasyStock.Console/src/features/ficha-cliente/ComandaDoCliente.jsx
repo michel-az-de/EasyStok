@@ -6,7 +6,7 @@ import { Modal } from '../../componentes/Modal'
 import { moeda } from '../../dominio/formato'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
 import { itensDoDia } from '../../dominio/cardapioLink'
-import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao, tituloDaComanda } from '../../dominio/pedido'
+import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao, saldoDaAlteracao, tituloDaComanda } from '../../dominio/pedido'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { congelado } from '../../dominio/congelados'
@@ -48,6 +48,12 @@ function AcertoDaComanda({ comanda: c }) {
 }
 
 function etapaDaSelecao(c) {
+  // #1686-2: o link usado de pedido cancelado ou entregue não traz mais o pedido nem o saldo dele.
+  if (!c.pedido && c.pedidoEncerrado) return {
+    titulo: 'Histórico do link', acao: 'Consultar histórico',
+    estado: c.pedidoEncerrado === 'cancelado' ? 'Pedido cancelado' : 'Pedido entregue',
+    orientacao: 'O pedido deste link foi encerrado. Para uma nova compra, envie um link novo ao cliente.',
+  }
   if (!c.pedido) return {
     titulo: 'Seleção do cliente', estado: 'Não confirmada', acao: c.podeEditar ? 'Revisar seleção' : 'Consultar seleção',
     orientacao: 'Salvar a seleção atualiza os itens no link. Para virar pedido, é preciso revisar e confirmar.',
@@ -117,11 +123,13 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
     else editar({ ...rascunho, itens: [...rascunho.itens, { cardapioItemId: itemSku, variacaoId, qtd: 1 }] })
     setPrato('')
   }
-  const pendente = c.envio?.situacao === 'alteracao_aguardando_confirmacao'
-  const saldo = c.envio?.situacao === 'estorno_pendente' ? c.envio.saldo
-    : (c.podeEditar || pendente ? c.totalPrevisto ?? 0 : c.pedido?.total ?? c.totalPrevisto ?? 0) - (c.pedido?.alocado ?? c.pedido?.totalPago ?? 0)
-  const resumoSaldo = saldo < 0 ? 'A devolver: ' + moeda(-saldo) + ' em ' + (c.rascunho.acerto === 'cupom' ? 'cupom' : 'estorno') + '.'
-    : saldo > 0 ? 'Mais a pagar: ' + moeda(saldo) + '.' : 'Sem diferença de pagamento.'
+  const pendente = !c.pedidoEncerrado && c.envio?.situacao === 'alteracao_aguardando_confirmacao'
+  // J2 (#1990): a diferença acompanha a edição antes de salvar (antes dizia "Sem diferença" com +R$ 38 na tela).
+  const saldo = saldoDaAlteracao(c, edicao?.rascunho ?? null, catalogo)
+  const naoSalvo = Boolean(edicao) && c.podeEditar && !c.pedidoEncerrado
+  const resumoSaldo = (saldo < 0 ? 'A devolver: ' + moeda(-saldo) + ' em ' + (c.rascunho.acerto === 'cupom' ? 'cupom' : 'estorno') + '.'
+    : saldo > 0 ? 'Mais a pagar: ' + moeda(saldo) + '.' : 'Sem diferença de pagamento.')
+    + (naoSalvo ? ' Conta com os ajustes ainda não salvos.' : '')
   const exigeGerente = saldo < 0 || c.envio?.situacao === 'estorno_pendente'
   const janela = rascunho.janelaId && rascunho.dataEntrega ? idDaJanela(rascunho.janelaId, rascunho.dataEntrega) : null
   const rotuloJanela = janelas.find(j => j.id === janela)?.rotulo
@@ -267,7 +275,7 @@ function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompar
         return <div key={c.linkId} className={css.resumoCompartilhado}>
           <strong>{etapa.titulo}</strong>
           <span className={css.estadoDaSelecao}>{etapa.estado}</span>
-          {(!c.pedido || c.podeEditar || c.envio?.situacao === 'alteracao_aguardando_confirmacao') && <p>
+          {!c.pedidoEncerrado && (!c.pedido || c.podeEditar || c.envio?.situacao === 'alteracao_aguardando_confirmacao') && <p>
             {quantidade} {quantidade === 1 ? 'item' : 'itens'}{c.totalPrevisto != null && ` · ${c.pedido ? 'Proposta' : 'Seleção'}: ${moeda(c.totalPrevisto)}`}
           </p>}
           {c.ajudaSolicitada && <p>Cliente pediu ajuda</p>}
@@ -308,9 +316,10 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
     {acaoMontar}
     {!visiveis.length && !erro && !pedido?.pedidoId && <p>Compartilhe com o cliente pelo Link de compra ou adicione os itens por aqui.</p>}
     {visiveis.map(c => {
-      const pendente = ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
+      const pendente = (!c.pedidoEncerrado || c.envio?.situacao !== 'alteracao_aguardando_confirmacao')
+        && ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)
       const selecao = selecaoDe(c)
-      return c.pedido ? <details key={c.linkId} className={css.historicoCompartilhado} open={c.podeEditar || pendente}>
+      return c.pedido || c.pedidoEncerrado ? <details key={c.linkId} className={css.historicoCompartilhado} open={c.podeEditar || pendente}>
         <summary>{pendente ? 'Ajuste para conferir' : c.podeEditar ? 'Seleção em edição' : 'Histórico do link'}</summary>
         {selecao}
       </details> : selecao

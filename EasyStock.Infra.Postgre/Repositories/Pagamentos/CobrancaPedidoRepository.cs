@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories.Pagamentos;
@@ -49,6 +50,35 @@ public sealed class CobrancaPedidoRepository(EasyStockDbContext db) : ICobrancaP
             .OrderBy(c => c.ExpiraEm)
             .Take(Math.Clamp(maximo, 1, 500))
             .Select(c => new CobrancaPedidoVencida(c.Id, c.EmpresaId, c.PedidoId, c.ContaRecebedoraId))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<CobrancaPedidoVencendo>> ListarPendentesVencendoAsync(
+        DateTime agora, TimeSpan antecedencia, int maximo, CancellationToken ct = default)
+    {
+        var limite = agora + antecedencia;
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.CobrancasPedido
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Status == StatusCobrancaPedido.Pendente
+                        && c.Provedor == CobrancaPedido.ProvedorMercadoPago
+                        && c.ReferenciaExterna != null
+                        && c.ConversaId != null
+                        && c.AguardandoCredencialDesde == null
+                        && c.ExpiraEm > agora
+                        && c.ExpiraEm <= limite
+                        // Pedido pago no balcão com o link ainda aberto não é lembrado: não volta para a rodada seguinte.
+                        && db.Pedidos.IgnoreQueryFilters().Any(p =>
+                            p.Id == c.PedidoId && p.EmpresaId == c.EmpresaId && p.Status == StatusPedidoMapper.AguardandoPagamento)
+                        // Já tentada, com qualquer desfecho: a reserva fica na tabela de idempotência (no máximo uma vez).
+                        && !db.IdempotencyKeys.IgnoreQueryFilters().Any(k =>
+                            k.EmpresaId == c.EmpresaId
+                            && k.MetodoRecurso == CobrancaPedidoVencendo.RecursoLembrete
+                            && k.Key == c.Id.ToString()))
+            .OrderBy(c => c.ExpiraEm)
+            .Take(Math.Clamp(maximo, 1, 500))
+            .Select(c => new CobrancaPedidoVencendo(c.Id, c.EmpresaId, c.PedidoId))
             .ToListAsync(ct);
     }
 

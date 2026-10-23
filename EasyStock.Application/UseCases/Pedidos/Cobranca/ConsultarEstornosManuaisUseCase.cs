@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Pagamentos;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -6,9 +7,10 @@ namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 public sealed record PagamentoParaDevolucao(Guid Id, string Metodo, decimal Valor, DateTime PagoEm,
     decimal Devolvido, decimal Disponivel, bool Manual);
 public sealed record EstornosManuaisResult(IReadOnlyList<PagamentoParaDevolucao> Pagamentos,
-    IReadOnlyList<PedidoEstornoManual> Estornos);
+    IReadOnlyList<PedidoEstornoManual> Estornos, decimal ADevolver = 0m);
 
-public sealed class ConsultarEstornosManuaisUseCase(IPedidoRepository pedidos, ICobrancaPedidoRepository cobrancas)
+public sealed class ConsultarEstornosManuaisUseCase(IPedidoRepository pedidos, ICobrancaPedidoRepository cobrancas,
+    SaldoFinanceiroPedido? saldos = null)
 {
     public async Task<EstornosManuaisResult> ExecuteAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default)
     {
@@ -23,7 +25,19 @@ public sealed class ConsultarEstornosManuaisUseCase(IPedidoRepository pedidos, I
             var manual = EhManual(p, lista);
             return new PagamentoParaDevolucao(p.Id, p.Metodo, p.Valor, p.PagoEm, devolvido,
                 manual ? Math.Max(0, p.Valor - devolvido) : 0, manual);
-        }).ToList(), estornos);
+        }).ToList(), estornos, await ADevolverAsync(pedido, estornos, ct));
+    }
+
+    /// <summary>
+    /// #1717-5: pedido cancelado com dinheiro recebido e ainda não devolvido (manual ou online), descontado o que virou
+    /// cupom ou está com estorno pendente. Pedido ativo não tem devolução a fazer.
+    /// </summary>
+    private async Task<decimal> ADevolverAsync(Domain.Entities.Pedido pedido, IReadOnlyList<PedidoEstornoManual> estornos, CancellationToken ct)
+    {
+        if (pedido.StatusEnum != Domain.Sales.StatusPedido.Cancelado) return 0m;
+        return saldos is not null
+            ? (await saldos.ConsultarAsync(pedido, ct)).DinheiroDisponivel
+            : Math.Max(0m, pedido.TotalPago - estornos.Sum(e => e.Valor));
     }
 
     internal static bool EhManual(PedidoPagamento pagamento, IReadOnlyList<CobrancaPedido> cobrancas) =>

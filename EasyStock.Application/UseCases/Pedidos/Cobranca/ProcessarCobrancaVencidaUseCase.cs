@@ -1,10 +1,14 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.CancelarPedido;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -70,7 +74,8 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
     ILogger<ProcessarCobrancaVencidaUseCase> logger,
-    IOperacaoEventPublisher operacaoEventos)
+    IOperacaoEventPublisher operacaoEventos,
+    INotificadorService notificador)
 {
     public const string MotivoCancelamento = "pagamento_expirado";
 
@@ -146,7 +151,7 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         CobrancaPedidoVencida item, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
-        var pedido = await pedidoRepository.GetForUpdateAsync(item.PedidoId, ct);
+        var pedido = await pedidoRepository.GetForUpdateAsync(item.EmpresaId, item.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != item.EmpresaId)
             return (ResultadoExpiracaoCobranca.Ignorada, null, null);
 
@@ -173,15 +178,35 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         }
 
         // #1717-3: pedido da conversa não é cancelado pelo job ("avisa, não trava"). Fica aguardando a atendente.
-        if (cobranca.ConversaId is { } conversaDoPedido)
+        // #1889 (decisão do Felipe, 21/10): a equipe é chamada pelo sino na mesma transação; com a conversa encerrada
+        // o aviso ao cliente não sai, e sem isso ninguém ficava sabendo.
+        // #1724-7: o pedido do site com pagamento a menor registrado tem dinheiro recebido; o sistema não o cancela
+        // (exigiria a dona) e a equipe decide o acerto: cobrar o restante ou devolver.
+        if (cobranca.ConversaId is not null || cobrancas.Any(c => c.RegistraPagamentoAMenor && c.Status == StatusCobrancaPedido.Paga))
         {
+            await AvisarEquipeAsync(pedido, cobranca, ct);
             await unitOfWork.CommitAsync();
-            return (ResultadoExpiracaoCobranca.AguardandoAtendente, conversaDoPedido, null);
+            return (ResultadoExpiracaoCobranca.AguardandoAtendente, cobranca.ConversaId, null);
         }
 
         await cancelarPedido.ExecuteAsync(new CancelarPedidoCommand(
             item.EmpresaId, item.PedidoId, UsuarioNome: "Sistema", Motivo: MotivoCancelamento, Origem: "sistema"),
             publicarOperacao: false); // O evento de UI espera o commit da transação externa.
         return (ResultadoExpiracaoCobranca.PedidoCancelado, cobranca.ConversaId, null);
+    }
+
+    public static string CorrelacaoAvisoEquipe(Guid cobrancaId) => $"cobranca-aguardando-equipe:{cobrancaId:N}";
+
+    // Sem usuarioId: vale a audiência da rotina. Só primeiro nome e referência, como os avisos do Balcão.
+    private Task AvisarEquipeAsync(EasyStock.Domain.Entities.Pedido pedido, CobrancaPedido cobranca, CancellationToken ct)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["nome"] = AvisoEquipeNoAparelho.PrimeiroNome(pedido.ClienteNome),
+            ["referencia"] = PrazoEstouradoEvento.Referencia(pedido.Id),
+            [NotificadorService.ChaveIdempotenciaPayload] = CorrelacaoAvisoEquipe(cobranca.Id),
+        });
+        return notificador.EnfileirarEventoAsync(TipoEventoNotificacao.CobrancaAguardandoEquipe, pedido.EmpresaId, payload,
+            pedido.Id, ct, CorrelacaoAvisoEquipe(cobranca.Id));
     }
 }

@@ -7,7 +7,7 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoResumo } from '../../aplicacao/impressos'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
-import { cancelarNasceMarcado, falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
+import { falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
 import { pedidoEncerrado } from '../../dominio/pedido'
@@ -54,12 +54,12 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const [textoMensagem, setTextoMensagem] = useState(() => (regraEncerramento
     ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora))
     : ''))
-  // #1683: cancelar o pedido sem pagamento é escolha de quem atende. Nasce desmarcada, menos
-  // quando o pedido não tem link em aberto e ficaria sem ninguém para fechá-lo.
-  const [cancelarMarcado, setCancelarMarcado] = useState(() => cancelarNasceMarcado(conversa?.pedido, { fonteApi }))
+  // #1683: cancelar o pedido sem pagamento é escolha de quem atende. A caixa nasce sempre
+  // desmarcada (decisão de 22/10); quem quiser cancelar marca.
+  const [cancelarMarcado, setCancelarMarcado] = useState(false)
   const pedidoJaCancelado = useRef(false)
   useEffect(() => {
-    setCancelarMarcado(cancelarNasceMarcado(conversa?.pedido, { fonteApi }))
+    setCancelarMarcado(false)
     pedidoJaCancelado.current = false
     setEnviarMensagem(Boolean(regraEncerramento))
     setTextoMensagem(regraEncerramento ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora)) : '')

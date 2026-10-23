@@ -446,6 +446,21 @@ await confere('pagamento e entrega: automática desligada não diz que nada sai 
   assert.equal(aviso({ gatilho: G.ENCERRAMENTO, ativa: false }), null)
 })
 
+await confere('#1610 lembrete do link aparece nas automáticas com nome, descrição e o texto da API', async () => {
+  const { regraDaApi } = await import('../src/infra/api/traducaoRespostas.js')
+  const texto = 'Oi! O link de pagamento do pedido {pedido} vence em poucos minutos.'
+  const regra = regraDaApi({ gatilho: 'CobrancaVencendo', ligada: true, texto, alteradaEm: null })
+  assert.equal(regra.gatilho, automacao.GATILHOS.COBRANCA_VENCENDO)
+  assert.equal(regra.nome, 'Link de pagamento vencendo')
+  assert.match(regra.descricao, /10 minutos antes/)
+  assert.match(regra.descricao, /não reemite nem cancela/)
+  assert.equal(regra.ativa, true, 'nasce ligada')
+  assert.equal(regra.texto, texto)
+  assert.equal(regra.sugestao, null)
+  assert.deepEqual(automacao.variaveisForaDaApi(regra.texto), [])
+  assert.equal(automacao.avisoDaAutomaticaDeEntrada(regra), null)
+})
+
 if (falhas.length > 0) {
   console.error(`\n${passou} ok, ${falhas.length} falha(s)`)
   process.exit(1)

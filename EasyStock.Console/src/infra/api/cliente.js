@@ -83,7 +83,10 @@ function mensagemDoErro(json, status) {
   const mensagem = json?.error?.message
   const detalhe = json?.error?.detail
   if (typeof detalhe === 'string' && detalhe.trim() && (!mensagem || MENSAGENS_GENERICAS.has(mensagem))) return detalhe
-  return mensagem ?? MENSAGEM_POR_STATUS[status] ?? (json?.title ? 'Confira os campos.' : 'Não deu certo. Tente de novo.')
+  // #1989: `Problem(motivo, 409)` do controller chega como ProblemDetails, com a frase em `detail`
+  // ("O pedido mudou desde a solicitação. Gere um novo link…"). Ela diz o próximo passo.
+  const problema = !mensagem && typeof json?.detail === 'string' && json.detail.trim() ? json.detail : null
+  return mensagem ?? problema ?? MENSAGEM_POR_STATUS[status] ?? (json?.title ? 'Confira os campos.' : 'Não deu certo. Tente de novo.')
 }
 
 const comoJson = (texto) => {

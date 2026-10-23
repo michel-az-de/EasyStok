@@ -8,9 +8,9 @@ import { IconeDoModulo } from './IconeDoModulo'
 import css from './moldura.module.css'
 
 export function MenuDosModulos({ moduloId, telaId, fonteApi, aoNavegar, semMenu = false }) {
-  const { permite, aoSair, sessaoPersistente, conta } = useAcessoModulos()
+  const { permite, aoSair, sessaoPersistente, conta, acoes } = useAcessoModulos()
   const modulo = MODULOS.find((item) => item.id === moduloId)
-  const areas = MODULOS.filter((item) => permite(item.id) && telasDoMenu(item, { fonteApi }).length)
+  const areas = MODULOS.filter((item) => permite(item.id) && telasDoMenu(item, { fonteApi, acoes }).length)
   return <>
     <nav className={css.trilho} aria-label="Módulos da loja">
       <a className={css.inicioTrilho} href={HASH_HALL} onClick={aoNavegar} aria-label="Ir para os módulos"><Marca compacta /><span>Módulos</span></a>
@@ -32,7 +32,7 @@ export function MenuDosModulos({ moduloId, telaId, fonteApi, aoNavegar, semMenu 
     </nav>
     {!semMenu && <nav className={css.menu} aria-label={`Telas de ${modulo.nome}`}>
       <h2 className={css.nomeMenu}><IconeDoModulo modulo={modulo} />{modulo.nome}</h2>
-      {telasDoMenu(modulo, { fonteApi }).map((item) => <a key={item.id} href={hashDoModulo(modulo.id, item.id)} onClick={aoNavegar} className={`${css.item} ${item.id === telaId ? css.itemAtivo : ''}`} aria-current={item.id === telaId ? 'page' : undefined}>
+      {telasDoMenu(modulo, { fonteApi, acoes }).map((item) => <a key={item.id} href={hashDoModulo(modulo.id, item.id)} onClick={aoNavegar} className={`${css.item} ${item.id === telaId ? css.itemAtivo : ''}`} aria-current={item.id === telaId ? 'page' : undefined}>
         <IconeDoModulo modulo={modulo} telaId={item.id} /><span>{item.rotulo}{fonteApi && item.indisponivelNaApi && <small className={css.preparacao}>Em preparação</small>}</span>
       </a>)}
     </nav>}

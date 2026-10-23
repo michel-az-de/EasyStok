@@ -44,7 +44,9 @@ public sealed class CriarPedidoAtendimentoUseCase(
     IPedidoRepository pedidoRepository,
     IConfiguracaoAtendimentoRepository configuracaoRepository,
     IUnitOfWork unitOfWork,
-    AtribuicaoPedidoCampanha atribuicaoCampanha)
+    AtribuicaoPedidoCampanha atribuicaoCampanha,
+    ILinkCardapioConversaRepository links,
+    TimeProvider relogio)
 {
     /// <summary>Motivo gravado em <c>Pedido.MotivoRequerAprovacao</c> quando a dona liberou o lead fora de área (S14).</summary>
     public const string MotivoForaDeArea = "fora_de_area";
@@ -90,7 +92,7 @@ public sealed class CriarPedidoAtendimentoUseCase(
         if (pedidoEmAndamentoId is not { } pedidoId) return;
         var anterior = await pedidoRepository.GetByIdWithDetailsAsync(empresaId, pedidoId);
         if (anterior is not null && !PedidoStateMachine.EstaFinalizado(anterior.StatusEnum))
-            throw new RegraDeDominioVioladaException(PedidoEmAndamento);
+            throw new PedidoEmAndamentoException();
     }
 
     private async Task<PedidoReservado> ReservarAsync(
@@ -127,6 +129,9 @@ public sealed class CriarPedidoAtendimentoUseCase(
             reservado.Pedido.MarcarRequerAprovacao(MotivoForaDeArea);
 
         conversa.DefinirPedidoEmAndamento(reservado.Pedido.Id);
+        // #1686-1: comanda aberta da conversa ficaria órfã (o cliente editaria e receberia 409 a cada salvar). Vence na
+        // mesma transação do pedido; a comanda que está criando este pedido já foi consumida e não entra.
+        await links.ExpirarPendentesAsync(input.EmpresaId, conversa.Id, relogio.GetUtcNow().UtcDateTime, ct);
         // S30: pedido de quem recebeu campanha na semana conta como conversão dela.
         await atribuicaoCampanha.AtribuirAsync(input.EmpresaId, cliente.Id, reservado.Pedido.Id, ct);
         await unitOfWork.CommitAsync();

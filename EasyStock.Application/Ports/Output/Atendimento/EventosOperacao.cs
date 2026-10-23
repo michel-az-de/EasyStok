@@ -19,6 +19,7 @@ public static class EventosOperacao
     public const string EstoqueDesacertoResolvido = "estoque.desacerto_resolvido";
     public const string ConversaMensagemRecebida = "conversa.mensagem_recebida";
     public const string ConversaPedidoPelaPagina = "conversa.pedido_pela_pagina";
+    public const string ConversaAtualizada = "conversa.atualizada";
 }
 
 /// <summary>Payload de <see cref="EventosOperacao.PedidoPago"/>: o console toca o som e acende o sinal verde.</summary>
@@ -57,3 +58,9 @@ public sealed record EstoqueDesacertoResolvidoOperacao(Guid ProdutoId, decimal Q
 /// </summary>
 /// <param name="Numero">Número curto do pedido, o mesmo de <see cref="PedidoPagoOperacao.Numero"/>.</param>
 public sealed record ConversaPedidoPelaPaginaOperacao(Guid ConversaId, Guid PedidoId, string Numero, decimal Total);
+
+/// <summary>
+/// Payload de <see cref="EventosOperacao.ConversaAtualizada"/> (#1643-5): nome ou contato da conversa mudou (o visitante do
+/// chat do site se identificou); o console relê a conversa. Sem o dado em si: ele vem pela leitura autenticada.
+/// </summary>
+public sealed record ConversaAtualizadaOperacao(Guid ConversaId);

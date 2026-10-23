@@ -64,6 +64,12 @@ public static class SensitivePatterns
         new Regex(
             @"(?i)([?&](?:key|access_token|token|api_key|apikey|client_secret|code)=)[^&\s""'<>]+",
             RegexOptions.Compiled),
+
+        // #1725-3: o token da comanda vai no caminho da URL. A propriedade RequestPath que o ASP.NET põe no escopo de
+        // todo log da requisição leva o caminho cru; aqui ele sai como {token}.
+        new Regex(
+            @"(?i)(/api/storefront/cardapio-conversa/)[^/\s?""'<>]+",
+            RegexOptions.Compiled),
     };
 
     /// <summary>
@@ -99,6 +105,9 @@ public static class SensitivePatterns
         result = Patterns[4].Replace(result, m => $"\"{m.Groups[1].Value}\":\"{RedactedToken}\"");
         // Padrao 6 (query de URL): preserva o nome do parametro, troca o valor.
         result = Patterns[5].Replace(result, m => $"{m.Groups[1].Value}{RedactedToken}");
+        // Padrao 7 (token da comanda no caminho): preserva a rota, troca o token pelo molde.
+        result = Patterns[6].Replace(result, m => m.Value.EndsWith("{token}", StringComparison.Ordinal)
+            ? m.Value : $"{m.Groups[1].Value}{{token}}");
         return result;
     }
 }

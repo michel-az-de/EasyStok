@@ -31,7 +31,8 @@ public sealed class EnviarMensagemConsoleUseCase(
     IConversaRepository conversaRepository,
     ResolvedorCanal resolvedorCanal,
     GerenciarUploadsUseCase uploads,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ILogger<EnviarMensagemConsoleUseCase>? logger = null)
 {
     /// <summary>Código da Cloud API para mensagem fora da janela de 24 h sem modelo.</summary>
     public const int CodigoMetaForaDaJanela = WhatsAppCloudException.CodigoForaDaJanela;
@@ -168,8 +169,10 @@ public sealed class EnviarMensagemConsoleUseCase(
         }
         catch (Exception ex)
         {
+            // #1765-11: a mensagem grava o código estável; o texto do provedor (em inglês) fica no log.
+            logger?.LogWarning(ex, "Console: o canal recusou o envio na conversa {ConversaId}.", conversa.Id);
             var falhou = criarMensagem(null);
-            falhou.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora);
+            falhou.RegistrarFalhaEnvio(ClassificadorFalhaEnvio.Motivo(ex), ClassificadorFalhaEnvio.Classificar(ex), agora);
             var gravada = await RegistrarAsync(conversa, falhou, usuarioId, agora, ct);
             // #1912: o detalhe leva o erro gravado; na incerta ele diz "Envio incerto", que o console mostra como "pode ter chegado".
             throw new FalhaEnvioCanalException($"Falha ao enviar pelo canal: {falhou.Erro}", ex, gravada);

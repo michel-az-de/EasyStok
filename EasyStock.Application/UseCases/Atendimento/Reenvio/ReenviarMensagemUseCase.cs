@@ -24,7 +24,8 @@ public sealed class ReenviarMensagemUseCase(
     ResolvedorCanal resolvedorCanal,
     ReservaSmsAtendimento reservaSms,
     IUnitOfWork unitOfWork,
-    TimeProvider relogio)
+    TimeProvider relogio,
+    ILogger<ReenviarMensagemUseCase>? logger = null)
 {
     public const string MotivoForaDaJanela = "Fora da janela de 24 h: só um modelo aprovado alcança o cliente.";
     public const string MotivoAguardandoCliente = "Fora da janela de 24 h: o modelo de retomada saiu; reenvia quando o cliente responder.";
@@ -81,7 +82,8 @@ public sealed class ReenviarMensagemUseCase(
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            mensagem.RegistrarFalhaEnvio(ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora);
+            logger?.LogWarning(ex, "Reenvio: o canal recusou a mensagem {MensagemId}.", mensagem.Id);
+            mensagem.RegistrarFalhaEnvio(ClassificadorFalhaEnvio.Motivo(ex), ClassificadorFalhaEnvio.Classificar(ex), agora);
         }
     }
 
@@ -109,7 +111,8 @@ public sealed class ReenviarMensagemUseCase(
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
-                mensagem.RegistrarFalhaEnvio($"Fora da janela de 24 h e o modelo de retomada falhou: {ex.Message}",
+                logger?.LogWarning(ex, "Reenvio: o modelo de retomada falhou na mensagem {MensagemId}.", mensagem.Id);
+                mensagem.RegistrarFalhaEnvio($"Fora da janela de 24 h e o modelo de retomada falhou: {ClassificadorFalhaEnvio.Motivo(ex)}",
                     TipoFalhaEnvio.Permanente, agora);
                 return;
             }

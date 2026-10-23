@@ -40,9 +40,9 @@ const EMISSAO = {
 }
 
 // --- Domínio -----------------------------------------------------------------
-confere('Pix e cartão em destaque; maquininha e vale em segundo plano', () => {
+confere('um botão só para o link em destaque (decisão de 22/10); maquininha e vale em segundo plano', () => {
   const destaque = catalogo.MEIOS_DE_PAGAMENTO.filter((m) => m.destaque).map((m) => m.id)
-  assert.deepEqual(destaque, ['pix', 'cartao-link'])
+  assert.deepEqual(destaque, ['cartao-link'])
 })
 
 const pedidoCom = (cobranca, estado = 'aguardando') => ({

@@ -63,7 +63,7 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens, aoReagend
   return (
     <li className={css.cartao}>
       <div className={css.linha}>
-        <span className={css.numero} title={pedido.identificacao?.titulo || undefined}>{pedido.identificacao?.principal ?? pedido.numero}{pedido.identificacao?.referencia && <small className={css.referencia}>ref {pedido.identificacao.referencia}</small>}</span>
+        <span className={css.numero} title={pedido.identificacao?.titulo || undefined}>{pedido.identificacao?.principal ?? pedido.numero}{pedido.identificacao?.referencia && <small className={css.referencia}>{pedido.identificacao.referencia}</small>}</span>
         <span className={css.cresce}>{pedido.cliente}{pedido.apto ? ` · apto ${pedido.apto}` : ''}</span>
         <Pilula tom={tomDaEtapa(pedido)}>{pedido.rotulo}</Pilula>
       </div>
@@ -149,7 +149,7 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
       {roteiro?.grupos.length === 0 && (
         <div className={css.secao}>
           <p className={css.vazio}>Nenhuma janela neste dia e nenhum pedido marcado.</p>
-          <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>
+          {aoAbrirCadastro && <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>}
         </div>
       )}
       {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar}

@@ -44,12 +44,15 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                 || (!db.VagasOcupadas.Any(v => v.PedidoId == p.Id && v.LiberadoEm == null)
                     && (p.AgendadoParaEm ?? p.CriadoEm) >= iniUtc
                     && (p.AgendadoParaEm ?? p.CriadoEm) < fimUtc))
-            .OrderBy(p => p.CriadoEm)
+            // #1709-1: o corte guarda os mais novos (o pedido que acabou de entrar não some); a tela segue do mais
+            // antigo para o mais novo.
+            .OrderByDescending(p => p.CriadoEm)
             .Take(Limite)
             .AsSplitQuery()
             .ToListAsync(ct);
 
         if (pedidos.Count == 0) return [];
+        pedidos = pedidos.OrderBy(p => p.CriadoEm).ToList();
 
         var ids = pedidos.Select(p => p.Id).ToList();
         var comandas = await NumeroComandaDoPedido.PorPedidosAsync(db, empresaId, ids, ct);
@@ -120,7 +123,8 @@ public sealed class KdsPedidoQueries(EasyStockDbContext db) : IKdsPedidoQueries
                 RequerAprovacao: p.RequerAprovacao,
                 MotivoRequerAprovacao: p.MotivoRequerAprovacao,
                 AReceber: saldos[p.Id].AReceber(p.Total.Valor),
-                NumeroComanda: comandas.TryGetValue(p.Id, out var comanda) ? comanda : null);
+                NumeroComanda: comandas.TryGetValue(p.Id, out var comanda) ? comanda : null,
+                NumeroDoDia: p.NumeroDoDia);
         }).ToList();
     }
 

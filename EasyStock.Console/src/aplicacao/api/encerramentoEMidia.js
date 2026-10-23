@@ -24,17 +24,12 @@ const ROTULO_DA_MIDIA = {
 }
 
 // #1683: encerrar não cancela pedido calado. O pedido sem pagamento só é cancelado quando a
-// atendente marca a caixa, que nasce desmarcada. No modo API só há o que cancelar quando o pedido
-// já existe no EasyStok (`pedidoId`); a comanda que ainda é rascunho não oferece a caixa.
+// atendente marca a caixa, que nasce desmarcada sempre, com ou sem link em aberto (decisão de
+// 22/10). No modo API só há o que cancelar quando o pedido já existe no EasyStok (`pedidoId`); a
+// comanda que ainda é rascunho não oferece a caixa.
 export function pedidoAoEncerrar(pedido, { fonteApi = false, cancelarMarcado = false } = {}) {
   const ofereceCancelar = Boolean(pedido) && pedido.estado === 'aguardando' && (!fonteApi || Boolean(pedido.pedidoId))
   return { ofereceCancelar, cancelar: ofereceCancelar && cancelarMarcado === true }
-}
-
-// Com link de pagamento em aberto, o EasyStok cancela o pedido sozinho quando o link vence. Sem
-// link, nada o fecha depois que a conversa encerra: a caixa nasce marcada, à vista de quem atende.
-export function cancelarNasceMarcado(pedido, { fonteApi = false } = {}) {
-  return fonteApi && pedidoAoEncerrar(pedido, { fonteApi }).ofereceCancelar && !pedido.cobranca?.link
 }
 
 export const rotuloCancelarAoEncerrar = (numero) => `Cancelar também o pedido Nº ${numero}, que ainda não foi pago`

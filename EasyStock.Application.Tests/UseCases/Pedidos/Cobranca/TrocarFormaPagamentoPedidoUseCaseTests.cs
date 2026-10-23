@@ -78,20 +78,63 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
         f.Pedido.InicioPrevistoEm.Should().Be(entrega.AddMinutes(-100));
     }
 
+    /// <summary>
+    /// #1717-2 (decisão do Felipe em 13/10: o sinal pode ser baixado à mão por Pix, dinheiro ou maquininha). Com o
+    /// provedor dizendo que o link do sinal não foi pago, a troca cancela o link, expira a preferência e o sinal
+    /// recebido por fora coloca o pedido na fila, como no pedido comum.
+    /// </summary>
     [Fact]
-    public async Task EncomendaFutura_NaoPermiteTrocarSinalPorPagamentoNaEntrega()
+    public async Task EncomendaFutura_SinalSemPagamentoNoProvedor_CancelaOLinkEAceitaOSinalManual()
     {
         var f = new CobrancaPedidoFixture();
         f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
-        f.AdicionarOnline();
         f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        var link = f.AdicionarOnline(referencia: "pref-sinal", valor: 12.5m);
 
-        var act = () => f.Trocar().ExecuteAsync(
+        var r = await f.Trocar().ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+
+        link.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        r.Cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorNaEntrega);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento, "sem o sinal a encomenda não entra na fila");
+        await f.MpClient.Received(1).ExpirarPreferenciaAsync("pref-sinal", CobrancaPedidoFixture.Agora, Arg.Any<CancellationToken>());
+
+        await f.RegistrarManual().ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", 12.5m));
+
+        f.Pedido.TotalPago.Should().Be(12.5m);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando, "o sinal recebido por fora coloca a encomenda na fila");
+    }
+
+    /// <summary>
+    /// #1717-2: só o link conferido no provedor pode ser cancelado. Outro link pendente que nasceu entre a
+    /// conferência e a trava não foi consultado e continua recusando a baixa manual.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task LinkNovoDepoisDaConferencia_ContinuaRecusado(bool encomenda)
+    {
+        var f = new CobrancaPedidoFixture();
+        if (encomenda)
+        {
+            f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
+            f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        }
+        var conferido = f.AdicionarOnline(referencia: "pref-conferida");
+        var conferencia = Substitute.For<IConferenciaPagamentoPedido>();
+        conferencia.ExecuteAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            conferido.Cancelar(GerarCobrancaPedidoUseCase.MotivoValorAlterado, CobrancaPedidoFixture.Agora);
+            f.AdicionarOnline(referencia: "pref-nova");
+            return new ConferirPagamentoPedidoResult(ConferirPagamentoPedidoUseCase.SituacaoNaoEncontrado, false);
+        });
+
+        var act = () => f.Trocar(conferencia).ExecuteAsync(
             new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega"));
 
-        await act.Should().ThrowAsync<UseCaseValidationException>()
-            .WithMessage("*cobrança online pendente*");
-        f.Cobrancas.Should().ContainSingle(c => c.EstaPendente && c.EhOnline);
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*cobrança online pendente*");
+        f.Cobrancas.Should().ContainSingle(c => c.EstaPendente).Which.ReferenciaExterna.Should().Be("pref-nova");
+        await f.MpClient.DidNotReceiveWithAnyArgs().ExpirarPreferenciaAsync(default!, default, default);
     }
 
     [Fact]
@@ -230,5 +273,32 @@ public class TrocarFormaPagamentoPedidoUseCaseTests
 
         await act.Should().ThrowAsync<CobrancaPedidoConflitoException>()
             .Where(e => e.Codigo == CobrancaPedidoConflitoException.PedidoJaPago);
+    }
+
+    /// <summary>
+    /// #1971 (#1724): depois de devolver parte do pagamento online, a troca contava o valor pago cheio da cobrança e
+    /// achava o pedido quitado; o que foi devolvido tem de voltar a ser cobrado na entrega.
+    /// </summary>
+    [Fact]
+    public async Task PagamentoOnlineComDevolucaoParcial_TrocaParaNaEntregaCobraODevolvido()
+    {
+        var f = new CobrancaPedidoFixture();
+        var online = f.AdicionarOnline(referencia: "pref-total");
+        online.MarcarPaga("pay-total", 25m, "pix", CobrancaPedidoFixture.Agora);
+        var pagamento = new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = f.Pedido.Id, Valor = 25m, Metodo = "pix", PagoEm = CobrancaPedidoFixture.Agora, Referencia = "pay-total" };
+        f.Pedido.Pagamentos.Add(pagamento);
+        var estornos = Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.IEstornoOnlineRepository>();
+        estornos.ListarAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns(new List<PedidoEstornoOnline>
+        {
+            new() { Id = Guid.NewGuid(), EmpresaId = f.EmpresaId, PedidoId = f.Pedido.Id, PagamentoId = pagamento.Id,
+                PagamentoExternoId = "pay-total", Valor = 10m, Situacao = PedidoEstornoOnline.Confirmado, CriadoEm = CobrancaPedidoFixture.Agora },
+        });
+        var saldos = new EasyStock.Application.Services.Pedidos.SaldoFinanceiroPedido(f.PedidoRepo, estornos, f.Creditos);
+
+        var r = await f.Trocar(saldos: saldos).ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, "na_entrega", Usuario, "Operadora"));
+
+        r.Cobranca.Provedor.Should().Be(CobrancaPedido.ProvedorNaEntrega);
+        r.Cobranca.Valor.Should().Be(10m, "R$ 10 dos R$ 25 voltaram ao cliente e ficam para a entrega");
     }
 }

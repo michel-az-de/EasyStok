@@ -12,6 +12,7 @@
 // Roda com: node ferramentas/prova-1446-cozinha-viva.mjs
 
 import { registerHooks } from 'node:module'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 
 registerHooks({
@@ -208,12 +209,176 @@ confere('#1474: início distante mostra a hora, não centenas de minutos', () =>
 // #1899 (#1883, parte do console): um nome só para o pedido. Com numeroComanda, "Comanda N" e o curto
 // vira referência; sem ele, o curto sozinho (sem inventar número). O KDS e as Entregas usam esta função.
 const { nomeDoPedido } = await import('../src/dominio/pedido.js')
-confere('#1899: nome do pedido é "Comanda N" quando a API entrega o número; o curto vira referência', () => {
+// J2 (#1990, #1641-1 parte console): o curto do id não aparece mais como "ref" na tela, só no título
+// (suporte); o número do dia, quando a API manda, vai ao lado da comanda.
+confere('#1899/#1641-1: nome do pedido é "Comanda N" com o número do dia; o curto só no título', () => {
   assert.deepEqual(nomeDoPedido({ numeroComanda: 12, numeroCurto: '76A32A4D' }),
-    { principal: 'Comanda 12', referencia: '76A32A4D', frase: 'Comanda 12', titulo: 'Comanda 12 · ref 76A32A4D' })
+    { principal: 'Comanda 12', referencia: null, frase: 'Comanda 12', titulo: 'Comanda 12 · ref 76A32A4D' })
+  assert.deepEqual(nomeDoPedido({ numeroComanda: 12, numeroCurto: '76A32A4D', numeroDoDia: 42 }),
+    { principal: 'Comanda 12', referencia: 'nº 042', frase: 'Comanda 12', titulo: 'Comanda 12 · nº 042 · ref 76A32A4D' })
+  assert.deepEqual(nomeDoPedido({ numeroCurto: '76A32A4D', numeroDoDia: 7 }),
+    { principal: 'Nº 007', referencia: null, frase: 'Pedido nº 007', titulo: 'Nº 007 · ref 76A32A4D' })
+  assert.equal(nomeDoPedido({ numeroComanda: 12, numeroDoDia: null }).referencia, null, 'campo ausente ou nulo não inventa número')
   assert.deepEqual(nomeDoPedido({ numeroCurto: '76A32A4D' }), { principal: '76A32A4D', referencia: null, frase: 'Pedido 76A32A4D', titulo: '76A32A4D' })
   assert.deepEqual(nomeDoPedido({ numeroComanda: null, numeroCurto: null }), { principal: '', referencia: null, frase: 'Pedido', titulo: '' })
   assert.equal(nomeDoPedido(undefined).principal, '')
   assert.equal(nomeDoPedido({ numeroComanda: 0, numeroCurto: 'A1B2' }).principal, 'A1B2', 'zero não é comanda')
 })
+// --- Frente C da #1889: #1686 itens 5 e 8 ------------------------------------------------------
+const fonte = (caminho) => readFileSync(new URL(`../src/${caminho}`, import.meta.url), 'utf8').replaceAll(String.fromCharCode(13), '')
+const esteira = await import('../src/dominio/esteira.js')
+const { rotuloDoEstado } = await import('../src/dominio/pedido.js')
+const envio = await import('../src/aplicacao/envioComDesfazer.js')
+
+confere('#1686-8 a Ficha fala a língua da Cozinha: "Pronto" e "Saiu para entrega", nos rótulos e nos toques', () => {
+  const coluna = (status) => kds.COLUNAS_KDS.find((c) => c.status === status)
+  assert.equal(esteira.passoPorId('embalado').rotulo, coluna('pronto').rotulo)
+  assert.equal(esteira.passoPorId('entrega').rotulo, coluna('saiu_para_entrega').rotulo)
+  assert.equal(esteira.passoPorId('preparo').rotulo, coluna('preparando').rotulo)
+  assert.equal(rotuloDoEstado('pronto'), 'Pronto')
+  assert.equal(rotuloDoEstado('saiu para entrega'), 'Saiu para entrega')
+  const barra = fonte('features/ficha-cliente/BarraProximoPasso.jsx')
+  assert.match(barra, /pago: \{ rotulo: 'Começar preparo'/)
+  assert.match(barra, /preparo: \{ rotulo: 'Marcar pronto'/)
+  assert.match(barra, /embalado: \{ rotulo: 'Saiu para entrega'/)
+  for (const [status, toque] of [['aguardando', 'Começar preparo'], ['preparando', 'Marcar pronto'], ['pronto', 'Saiu para entrega']]) {
+    assert.equal(coluna(status).toque, toque, status)
+  }
+  assert.doesNotMatch(fonte('dominio/respostas.js'), /"Embalado"|"Em entrega"/)
+})
+
+// O envio é assíncrono: esta conferência espera as promessas antes de contar.
+const confereEsperando = async (descricao, fn) => { await fn(); passou += 1; console.log('ok  ' + descricao) }
+await confereEsperando('#1686-5 envio com desfazer: agenda, desfaz antes de sair e descarrega ao sair da tela', async () => {
+  let agora = 0
+  const timers = new Map()
+  let seq = 0
+  const relogio = { agendar: (fn, ms) => { seq += 1; timers.set(seq, { fn, em: agora + ms }); return seq }, cancelar: (t) => timers.delete(t), agora: () => agora }
+  const andar = (ms) => { agora += ms; for (const [t, { fn, em }] of [...timers]) if (em <= agora) { timers.delete(t); fn() } }
+  const enviados = []
+  const mudancas = []
+  const e = envio.criarEnvioComDesfazer({ prazoMs: 5000, relogio, aoMudar: (l) => mudancas.push(l.map((x) => x.chave)) })
+  const a = e.agendar('a', () => { enviados.push('a'); return 'ok-a' }, { status: 'preparando' })
+  assert.equal(e.agendar('a', () => enviados.push('dobrado')), a, 'o segundo toque recebe a mesma promessa')
+  const b = e.agendar('b', () => { enviados.push('b'); return 'ok-b' })
+  assert.deepEqual(e.pendentes().map((x) => [x.chave, x.ate]), [['a', 5000], ['b', 5000]])
+  andar(4999)
+  assert.equal(e.desfazer('a'), true)
+  assert.deepEqual(await a, { desfeito: true })
+  andar(1)
+  assert.equal(await b, 'ok-b')
+  assert.deepEqual(enviados, ['b'])
+  const c = e.agendar('c', () => { enviados.push('c'); return 'ok-c' })
+  e.descarregar()
+  assert.equal(await c, 'ok-c')
+  assert.deepEqual(enviados, ['b', 'c'])
+  assert.equal(e.desfazer('c'), false, 'o que já saiu não se desfaz')
+  assert.deepEqual(mudancas.at(-1), [])
+  assert.equal(envio.segundosAte(5000, 1001), 4)
+})
+
+confere('#1686-5 o cartão, a comanda e as Entregas mostram "Desfazer" no lugar do toque enquanto esperam', () => {
+  assert.equal(kds.rotuloDoDestinoKds('preparando'), 'Em preparo')
+  assert.equal(kds.rotuloDoDestinoKds('entregue'), 'Entregue')
+  const cartao = fonte('features/cozinha/CartaoKds.jsx')
+  assert.match(cartao, /\{proximo && adiado && \(\s+<DesfazerComPrazo/)
+  assert.match(cartao, /\{proximo && !adiado && \(/)
+  assert.match(cartao, /disabled: !proximo \|\| movendo \|\| Boolean\(adiado\)/, 'não arrasta o cartão que espera')
+  assert.match(fonte('features/cozinha/ComandaKds.jsx'), /\{proximo && adiado && \(\s+<DesfazerComPrazo/)
+  const tela = fonte('features/cozinha/TelaCozinhaApi.jsx')
+  assert.match(tela, /adiado=\{adiados\.get\(p\.id\) \?\? null\} aoDesfazer=\{desfazerAvanco\}/)
+  const entregas = fonte('features/entregas/ConteudoEntregasApi.jsx')
+  assert.match(entregas, /acoes\.adiadoAte\(chaveDaEntrega\(viagem\.id, parada\.pedidoId\)\) \? \(\s+<DesfazerComPrazo/)
+  assert.match(entregas, /\{montando && acoes\.adiadoAte\(chaveDaSaida\(viagem\.id\)\) && \(\s+<DesfazerComPrazo/)
+  assert.match(fonte('componentes/DesfazerComPrazo.jsx'), /Desfazer · \{restam\}/)
+})
+
+// --- Frente J2 (#1990): entregas no modo API --------------------------------------------------
+confere('J2-8 Cozinha e Entregas não mostram mais "ref" com o id técnico', () => {
+  for (const arquivo of ['features/cozinha/CartaoKds.jsx', 'features/entregas/ConteudoEntregasApi.jsx',
+    'features/entregas/AgendaEncomendasApi.jsx', 'features/entregas/EntregasDoDia.jsx']) {
+    assert.doesNotMatch(fonte(arquivo), />ref \{/, arquivo)
+  }
+})
+
+const confereAsync = async (descricao, fn) => { await fn(); passou += 1; console.log('ok  ' + descricao) }
+const recebimento = await import('../src/aplicacao/recebimentoNaEntrega.js')
+const entregasApi = await import('../src/dominio/entregasApi.js')
+
+await confereAsync('J2-2 "Recebi" lança o pagamento e só então marca entregue; sem método não sai nada', async () => {
+  const chamadas = []
+  const portas = {
+    registrarPagamento: async (...a) => { chamadas.push(['pagar', ...a]) },
+    marcarEntregue: async (...a) => { chamadas.push(['entregue', ...a]) },
+  }
+  const pedido = { viagemId: 'v', pedidoId: 'p', valor: 57, metodo: 'dinheiro', chave: 'k' }
+  await recebimento.receberEEntregar(portas, pedido)
+  assert.deepEqual(chamadas, [['pagar', 'p', 57, 'dinheiro', 'k'], ['entregue', 'v', 'p', true]])
+  chamadas.length = 0
+  await assert.rejects(recebimento.receberEEntregar({ ...portas, registrarPagamento: async () => { throw new Error('recusado') } }, pedido), /recusado/)
+  assert.deepEqual(chamadas, [], 'pagamento recusado não marca entregue')
+  await assert.rejects(recebimento.receberEEntregar(portas, { ...pedido, metodo: '' }), /como recebeu/)
+  assert.deepEqual(chamadas, [])
+  // Pagamento entrou e a entrega falhou: o toque seguinte (mesmo minutos depois) só marca a entrega.
+  const recebidos = new Set()
+  let entregaCai = true
+  const instavel = {
+    ...portas, recebidos,
+    marcarEntregue: async (...a) => { if (entregaCai) throw new Error('sem conexão.'); chamadas.push(['entregue', ...a]) },
+  }
+  await assert.rejects(recebimento.receberEEntregar(instavel, pedido), /O pagamento entrou, mas a entrega não foi marcada/)
+  entregaCai = false
+  await recebimento.receberEEntregar(instavel, pedido)
+  assert.deepEqual(chamadas, [['pagar', 'p', 57, 'dinheiro', 'k'], ['entregue', 'v', 'p', true]], 'um pagamento só')
+  assert.equal(recebidos.size, 0)
+  chamadas.length = 0
+  assert.deepEqual(recebimento.METODOS_NA_PORTA.map((m) => m.valor), ['', 'dinheiro', 'debito', 'credito', 'pix'])
+  assert.equal(recebimento.metodoSugeridoNaPorta('Pagamento na entrega: dinheiro, troco para R$ 100,00.'), 'dinheiro')
+  assert.equal(recebimento.metodoSugeridoNaPorta(null), '')
+  const tela = fonte('features/entregas/ConteudoEntregasApi.jsx')
+  assert.match(tela, /acoes\.receberEEntregar\(viagem\.id, parada\.pedidoId, confirmando\.valor, metodoNaPorta\)/)
+  assert.match(tela, /Recebi \{moeda\(confirmando\.valor\)\}/)
+  assert.match(fonte('aplicacao/useEntregasApi.js'),
+    /receberEEntregar: \(id, pedidoId, valor, metodo\) => envio\.agendar\(chaveDaEntrega\(id, pedidoId\)/)
+})
+
+await confereAsync('J2-3 sem entregador cadastrado, a viagem sai com "Entrega própria (sem cadastro)"', async () => {
+  const { ENTREGA_PROPRIA, entregadorDaEntregaPropria, opcoesDeEntregador, motivoDeSaida } = entregasApi
+  assert.deepEqual(opcoesDeEntregador([]).map((o) => o.valor), ['', ENTREGA_PROPRIA])
+  assert.equal(opcoesDeEntregador([]).at(-1).rotulo, 'Entrega própria (sem cadastro)')
+  const cadastrados = [{ id: 'e1', nome: 'Entrega Própria' }, { id: 'e2', nome: 'João' }]
+  assert.deepEqual(opcoesDeEntregador(cadastrados).map((o) => o.valor), ['', 'e1', 'e2'], 'a já cadastrada não repete')
+  assert.equal(entregadorDaEntregaPropria(cadastrados)?.id, 'e1')
+  assert.match(motivoDeSaida({ entregadorId: null, paradas: [{}] }), /Entrega própria/)
+  const feitas = []
+  let todos = []
+  const portas = {
+    listarComInativos: async () => todos,
+    reativarEntregador: async (id) => { feitas.push(['reativar', id]) },
+    criarEntregador: async (corpo) => { feitas.push(['criar', corpo]); return { id: 'novo' } },
+    definirEntregador: async (viagemId, entregadorId) => { feitas.push(['definir', viagemId, entregadorId]) },
+  }
+  await recebimento.usarEntregaPropria(portas, { viagemId: 'v', entregadores: [] })
+  assert.deepEqual(feitas, [
+    ['criar', { nome: 'Entrega própria', tipo: 'Proprio', empresa: 'Propria', telefone: null, veiculo: null, placa: null }],
+    ['definir', 'v', 'novo'],
+  ])
+  feitas.length = 0
+  await recebimento.usarEntregaPropria(portas, { viagemId: 'v', entregadores: cadastrados })
+  assert.deepEqual(feitas, [['definir', 'v', 'e1']], 'não cadastra de novo')
+  feitas.length = 0
+  todos = [{ id: 'e9', nome: 'Entrega própria', ativo: false }]
+  await recebimento.usarEntregaPropria(portas, { viagemId: 'v', entregadores: [] })
+  assert.deepEqual(feitas, [['reativar', 'e9'], ['definir', 'v', 'e9']], 'a desativada volta, sem cadastro duplicado')
+  const tela = fonte('features/entregas/ConteudoEntregasApi.jsx')
+  assert.match(tela, /opcoesDeEntregador\(entregadores\)/)
+  assert.match(tela, /e\.target\.value === ENTREGA_PROPRIA \? acoes\.usarEntregaPropria\(viagem\.id\)/)
+  assert.match(fonte('aplicacao/useEntregasApi.js'), /usarEntregaPropria: \(id\) =>/)
+})
+
+confere('J2-1 o entregador vê "Dinheiro na entrega" e o troco na parada', () => {
+  const tela = fonte('features/entregas/ConteudoEntregasApi.jsx')
+  assert.match(tela, /textoDoTroco\(pagamentoNaEntregaDasObservacoes\(pedidoDaParada\?\.observacoes\)/)
+})
+
 console.log(`prova #1446 (cozinha viva no modo API): ${passou} conferências ok`)

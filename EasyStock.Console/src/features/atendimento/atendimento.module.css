@@ -378,6 +378,9 @@
 @container topo-conversa (max-width: 439px) {
   .direita > button.encerrar { font-size: 0; gap: 0; padding: 0 10px; }
   .direita > button.encerrar svg { width: 20px; height: 20px; }
+  /* #1239: "Passar para…" segue o Encerrar (o nome fica para o leitor de tela e o title). */
+  .direita > button.passar { font-size: 0; gap: 0; padding: 0 10px; }
+  .direita > button.passar svg { width: 20px; height: 20px; }
 }
 
 /* Rodada 9 (achado 5 da banca estética): no celular, canal + pedidos + janela
@@ -507,3 +510,18 @@
 @container composer (max-width: 439px) {
   .acoes > button.botaoRespostas { min-height: 36px; border-radius: var(--r-pilula); }
 }
+
+/* #1239: lista de quem pode receber a conversa, um botão largo por pessoa. */
+.listaPassar { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+
+/* #1408: na busca do Balcão, cliente cadastrado sem conversa aberta, com "Chamar no WhatsApp". */
+.chamarClientes { border-top: var(--b-1) solid var(--linha); }
+.chamarClientesTitulo {
+  margin: 0; padding: var(--e-2) var(--e-3); background: var(--elevado);
+  font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2);
+}
+.chamarCliente {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding: var(--e-2) var(--e-3); border-top: var(--b-1) solid var(--linha);
+}
+.chamarClienteNome { min-width: 0; overflow-wrap: anywhere; font-size: var(--t-apoio); color: var(--tinta-2); }
