@@ -143,14 +143,15 @@ public static class GeracaoAgenteAtendimento
 
     /// <summary>
     /// Cliente → <c>user</c>; agente e dona → <c>assistant</c>. Mensagens do sistema não entram na
-    /// conversa (vão para o dossiê). Mensagens seguidas do mesmo papel viram uma só. As
+    /// conversa (vão para o dossiê), nem as saídas que falharam ao enviar (#2004: o cliente nunca as recebeu, e o agente
+    /// responderia "já te mandei acima"). Mensagens seguidas do mesmo papel viram uma só. As
     /// <paramref name="pendentes"/> vão para o fim: o agente ainda não as viu (#1288).
     /// </summary>
     public static List<MensagemLlm> MontarConversacao(IReadOnlyList<Mensagem> historico, IReadOnlyList<Mensagem> pendentes)
     {
         var resultado = new List<MensagemLlm>();
         var ordenado = historico.Where(m => !pendentes.Contains(m)).Concat(pendentes);
-        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema))
+        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema && m.Status != StatusMensagem.Falhou))
         {
             var papel = msg.Autor == AutorMensagem.Cliente ? MensagemLlm.Usuario : MensagemLlm.Assistente;
             var texto = msg.Autor switch

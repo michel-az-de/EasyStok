@@ -551,6 +551,67 @@ public class AgenteAtendimentoServiceTests
         resultado.ChamouLlm.Should().BeFalse();
     }
 
+    // ── #2004 atendimento-03: mensagem que falhou ao enviar não é mensagem entregue ──────────────────────
+
+    private Mensagem SaidaQueFalhou(AutorMensagem autor, DateTime em, string texto, TipoFalhaEnvio tipo = TipoFalhaEnvio.Permanente)
+    {
+        var saida = Mensagem.Saida(_empresaId, _conversa.Id, autor, em, TipoConteudoMensagem.Texto, texto);
+        saida.RegistrarFalhaEnvio("Falha no canal (código Meta 131026).", tipo, em);
+        return saida;
+    }
+
+    [Fact]
+    public async Task EntradaCujaRespostaDaDonaFalhouAoEnviarAindaEPendente()
+    {
+        // A resposta da dona nunca chegou ao cliente: a entrada dele segue sem resposta e o agente precisa atender.
+        _historico[0].MarcarProcessada(Agora.AddSeconds(-50));
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddSeconds(-40), TipoConteudoMensagem.Texto,
+            "tem de chocolate?", "wamid.in2"));
+        _historico.Add(SaidaQueFalhou(AutorMensagem.Dona, Agora.AddSeconds(-30), "Tem sim!"));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(AutorMensagem.Agente, TipoFalhaEnvio.Permanente)]
+    [InlineData(AutorMensagem.Agente, TipoFalhaEnvio.Incerta)]
+    [InlineData(AutorMensagem.Dona, TipoFalhaEnvio.Permanente)]
+    public async Task SaidaQueFalhouNaoEntraNaConversaDoLlm(AutorMensagem autor, TipoFalhaEnvio tipo)
+    {
+        // Senão o agente responde "já te mandei o link acima" sobre algo que o cliente nunca recebeu.
+        _historico[0].MarcarProcessada(Agora.AddMinutes(-3));
+        _historico.Add(SaidaQueFalhou(autor, Agora.AddMinutes(-2), "Aqui está o link do cardápio: https://x.test/cardapio", tipo));
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddMinutes(-1), TipoConteudoMensagem.Texto,
+            "e o link?", "wamid.in2"));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+        var textos = _requisicoes.Should().ContainSingle().Subject.Mensagens
+            .SelectMany(m => m.Conteudo.OfType<BlocoTextoLlm>()).Select(b => b.Texto).ToList();
+        textos.Should().NotContain(t => t.Contains("link do cardápio"));
+        textos.Should().Contain(t => t.Contains("e o link?"));
+    }
+
+    [Fact]
+    public async Task SaidaReenviadaComSucessoVoltaParaAConversaDoLlm()
+    {
+        // Controle: a falha que o reenvio resolveu (Status Enviada) é mensagem entregue como as outras.
+        _historico[0].MarcarProcessada(Agora.AddMinutes(-3));
+        var reenviada = SaidaQueFalhou(AutorMensagem.Agente, Agora.AddMinutes(-2), "Seu pedido sai às 15h.", TipoFalhaEnvio.Temporaria);
+        reenviada.RegistrarReenviada("wamid.reenvio");
+        _historico.Add(reenviada);
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddMinutes(-1), TipoConteudoMensagem.Texto,
+            "obrigada!", "wamid.in2"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _requisicoes.Single().Mensagens.SelectMany(m => m.Conteudo.OfType<BlocoTextoLlm>()).Select(b => b.Texto)
+            .Should().Contain(t => t.Contains("Seu pedido sai às 15h."));
+    }
+
     [Fact]
     public async Task DonaAssumeDuranteOTurnoNaoEnvia()
     {
