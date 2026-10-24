@@ -25,6 +25,9 @@ public class VagaOcupadaConfiguration : IEntityTypeConfiguration<VagaOcupada>
             .HasFilter("\"LiberadoEm\" IS NULL")
             .HasDatabaseName("uq_vaga_ativa_por_pedido");
 
+        // #1725-10: a vaga do pedido (GetByPedidoIdsAsync) lê também as liberadas, que o índice filtrado acima não cobre.
+        builder.HasIndex(v => v.PedidoId, "ix_vaga_ocupada_pedido_id");
+
         // ADR-0014: lookup de capacidade efetiva (COUNT WHERE liberado_em IS NULL).
         builder.HasIndex(v => new { v.JanelaEntregaId, v.DataEntrega })
             .HasFilter("\"LiberadoEm\" IS NULL")
