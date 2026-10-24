@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Events.Estoque;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -790,7 +791,8 @@ public class PedidoEstoqueIntegrationServiceTests
         {
             Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
             QuantidadeAtual = Quantidade.From(saldo), QuantidadeInicial = Quantidade.From(saldo), Status = StatusItemEstoque.Ok,
-            ValidadeEm = diasParaVencer is { } d ? Validade.From(DateTime.UtcNow.Date.AddDays(d)) : null,
+            // O dia que decide o vencimento e o de Brasilia (entre 21h e meia-noite o dia UTC ja virou).
+            ValidadeEm = diasParaVencer is { } d ? Validade.From(HorarioBrasil.DataOperacional(DateTime.UtcNow).ToDateTime(TimeOnly.MinValue).AddDays(d)) : null,
             EntradaEm = entrada, CriadoEm = entrada
         };
     }

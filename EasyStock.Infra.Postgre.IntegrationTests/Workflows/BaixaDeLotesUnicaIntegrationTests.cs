@@ -1,4 +1,5 @@
 using EasyStock.Api.Mobile.Services;
+using EasyStock.Application.Common;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Lookup;
@@ -31,7 +32,8 @@ public sealed class BaixaDeLotesUnicaIntegrationTests(PostgreSqlDatabaseFixture 
     public enum Rota { Venda, Pedido, Pwa }
 
     private const string Lasanha = "Lasanha";
-    private static readonly DateTime Hoje = DateTime.UtcNow.Date;
+    // O dia que decide o vencimento e o de Brasilia: entre 21h e meia-noite o dia UTC ja virou e "ontem" nao venceu.
+    private static readonly DateTime Hoje = DateTime.SpecifyKind(HorarioBrasil.DataOperacional(DateTime.UtcNow).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
 
     private sealed record Semente(Guid EmpresaId, Guid ProdutoId, Guid? LojaId);
 
