@@ -121,6 +121,23 @@ public class RegraUnicaNoBackendTests
             + "nome volta a dar frete diferente na comanda, no aceite da alteração, na logística e no pedido do cliente");
     }
 
+    // ---- Política de senha ------------------------------------------------------------------------------------
+
+    [Fact]
+    public void PoliticaDeSenha_SoDefinidaPeloPasswordPolicy()
+    {
+        var root = RepoPaths.FindRepoRoot();
+        var fora = ArquivosDeProducao(root, "*.cs")
+            .Where(f => Regex.IsMatch(SemComentarios(File.ReadAllText(f)), @"Matches\(""\[A-Z\]""\)|\.Any\(char\.IsUpper\)"))
+            .Select(f => Relativo(root, f))
+            .Where(r => r != "EasyStock.Domain/ValueObjects/PasswordPolicy.cs")
+            .ToList();
+
+        fora.Should().BeEmpty(
+            "a política de senha (tamanho, maiúscula, minúscula, número, símbolo e teto) é PasswordPolicy.Falhas; os validators "
+            + "só põem a mensagem. Uma segunda regra volta a aceitar num fluxo o que o outro recusa");
+    }
+
     // ---- Apoio ------------------------------------------------------------------------------------------------
 
     private static string Relativo(string root, string arquivo) =>
