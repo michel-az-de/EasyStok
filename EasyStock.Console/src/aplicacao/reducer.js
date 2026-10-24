@@ -3,6 +3,7 @@ import {
   avisoDoPasso, indiceDoPasso, motivoParaNaoAvancar, passoAnterior,
 } from '../dominio/esteira'
 import { entregadorResolvido } from '../dominio/viagem'
+import { mensagemSoLocal } from '../dominio/mensagem'
 import {
   comItem, comObservacao, novoPedido, pedidoEncerrado, semItem,
 } from '../dominio/pedido'
@@ -201,8 +202,7 @@ function comMensagem(conversa, mensagem, { id, agora }) {
 // balões da dona ainda sem resposta da API (enviando) ou recusados (falhou), para
 // ela ver o que não saiu. O resto do estado local (rascunhos, filtros) fica.
 // #1287: a confirmada pela API (`aguardandoSync`) também fica até um sync que a contenha,
-// porque a leitura em voo pode ter saído antes de o servidor gravá-la.
-const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou' || Boolean(m.aguardandoSync)
+// porque a leitura em voo pode ter saído antes de o servidor gravá-la (`mensagemSoLocal`).
 
 // #1565: o pedido relido igual fica o mesmo objeto na tela, com a `leitura` de quando entrou. A ordem da
 // releitura mais nova que o confirmou fica aqui, para a regra da #1548 continuar valendo.
@@ -264,18 +264,21 @@ function mesclarDoServidor(local, lida, semMensagens = false, lidaEm = undefined
     ...(leituraAtrasada ? situacaoLocal(local) : null),
   }
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
-  const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id))
+  // #2005 (console-09): quem abriu as mensagens anteriores não as perde na volta de 5 s, que traz só a página mais
+  // recente: o que já estava na tela e é mais velho que essa página fica (inclusive o trecho que a janela deslizou).
+  // Vale para qualquer mensagem velha, também a saída que o servidor guarda como Falhou ou Pendente: ela já é do
+  // servidor e fica no topo, em vez de virar "só local" no fim do fio com o Reenviar.
+  const inicioDaPagina = semMensagens || !local.anterioresCarregadas ? null : Date.parse(doServidor.mensagens[0]?.em)
+  const retidas = inicioDaPagina
+    ? local.mensagens.filter((m) => !doServidorIds.has(m.id) && Date.parse(m.em) < inicioDaPagina)
+    : []
+  const idsRetidos = new Set(retidas.map((m) => m.id))
+  const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id) && !idsRetidos.has(m.id))
   const mantido = clienteDaApiMantido(local, doServidor)
   const rascunhoDoNome = local.nomeDaDona && !doServidor.clienteId
   const lido = pedidoMesclado(local.pedido, doServidor.pedido)
   const pedido = mesmoPedido(local.pedido, lido) ? local.pedido : lido
   if (pedido !== lido && lido.leitura > leituraDe(pedido)) confirmadoNaLeitura.set(pedido, lido.leitura)
-  // #2005 (console-09): quem abriu as mensagens anteriores não as perde na volta de 5 s, que traz só a página mais
-  // recente: o que já estava na tela e é mais velho que essa página fica (inclusive o trecho que a janela deslizou).
-  const inicioDaPagina = semMensagens || !local.anterioresCarregadas ? null : Date.parse(doServidor.mensagens[0]?.em)
-  const retidas = inicioDaPagina
-    ? local.mensagens.filter((m) => !mensagemSoLocal(m) && !doServidorIds.has(m.id) && Date.parse(m.em) < inicioDaPagina)
-    : []
   const mesclada = {
     ...base,
     ...doServidor,

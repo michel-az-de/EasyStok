@@ -9,6 +9,10 @@ export function preencherModelo(modelo, valores) {
 
 export const primeiroNome = (nomeCompleto) => nomeCompleto.split(' ')[0]
 
+// Balão que o EasyStok ainda não confirmou na leitura: enviando, recusado (falhou) ou já confirmado pela API mas
+// sem um sync que o contenha (`aguardandoSync`, #1287). Só ele sobrevive à volta da polling do lado de cá.
+export const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou' || Boolean(m.aguardandoSync)
+
 // Tique da mensagem que saiu (#1761). O EasyStok distingue entregue de lida; a bolha juntava as
 // duas em "✓✓ entregue" e a atendente nunca via que o cliente leu. Lida ganha a palavra na tela:
 // cor sozinha não informa. Enviando e falhou têm aviso próprio e não têm tique.

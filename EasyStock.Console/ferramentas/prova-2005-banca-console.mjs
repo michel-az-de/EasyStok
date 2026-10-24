@@ -424,6 +424,21 @@ await confere('03. sem a conversa aberta ou depois de algumas falhas, a tentativ
   assert.equal(leituras, 1, 'quem trocou de conversa não puxa o dossiê da anterior')
 })
 
+await confere('03. ficha já carregada (releitura pelo SSE) que falha fica quieta: sem aviso e sem nova tentativa', async () => {
+  ligarRelogio()
+  const { criarAcoesClienteApi } = await import('../src/aplicacao/api/cliente.js')
+  const conversa = { id: 'c1', clienteId: CLIENTE_DA_FICHA, canal: 'WhatsApp', cliente: { tags: [], notas: [], daApi: true } }
+  const despachados = []
+  let leituras = 0
+  globalThis.fetch = async () => { leituras += 1; return erroHttp(503, 'Fora do ar') }
+  const acoes = criarAcoesClienteApi({ estadoRef: { current: { conversas: [conversa], selecionadaId: 'c1' } }, despachar: (a) => despachados.push(a) })
+  await acoes.carregarClienteDaConversa('c1')
+  assert.deepEqual(despachados, [], 'a Ficha na tela segue valendo: nada a avisar')
+  andar(60000)
+  await umInstante()
+  assert.equal(leituras, 1, 'e não há o que tentar de novo')
+})
+
 // ================================================================================================
 // 05. Emissão de cobrança
 // ================================================================================================
@@ -638,6 +653,26 @@ await confere('09. a ação busca antes da mais antiga e funde no fio; a volta d
   assert.equal(estado.conversas[0].temAnteriores, true)
   estado = reducer(estado, { tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [conversaDaApi(resumo('a'), recentes, USUARIO)] })
   assert.equal(estado.conversas[0].mensagens.length, 130)
+})
+
+await confere('09. saída antiga que o servidor marca Falhou ou Pendente entra no topo e fica lá, sem ir para o fim do fio', async () => {
+  const { criarAcoesMensagensAnterioresApi } = await novo('../src/aplicacao/api/mensagensAnteriores.js')
+  existe({ criarAcoesMensagensAnterioresApi }, 'criarAcoesMensagensAnterioresApi')
+  const recentes = cem(100)
+  let estado = reducer(estadoCom(resumo('a')), { tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [conversaDaApi(resumo('a'), recentes, USUARIO)] })
+  const saida = (id, minutosAtras, status) => mensagem(id, minutosAtras, { direcao: 'Saida', autor: 'Atendente', status })
+  const antigas = [saida('velha-falhou', 5000, 'Falhou'), saida('velha-pendente', 4999, 'Pendente'), mensagem('velha-ok', 4998)]
+  globalThis.fetch = async () => corpo(antigas)
+  const acoes = criarAcoesMensagensAnterioresApi({ despachar: (a) => { estado = reducer(estado, a) }, estadoRef: { get current() { return estado } } })
+  assert.equal(await acoes.carregarMensagensAnteriores('a'), true)
+  const ordem = () => estado.conversas[0].mensagens.map((m) => m.id)
+  assert.deepEqual(ordem().slice(0, 3), ['velha-falhou', 'velha-pendente', 'velha-ok'])
+  for (let volta = 0; volta < 2; volta += 1) {
+    estado = reducer(estado, { tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [conversaDaApi(resumo('a'), recentes, USUARIO)] })
+    assert.deepEqual(ordem().slice(0, 3), ['velha-falhou', 'velha-pendente', 'velha-ok'], `volta ${volta + 1}: continuam no topo`)
+    assert.equal(ordem().length, 103, 'sem duplicar')
+    assert.equal(ordem().at(-1), 'm-199', 'nada de saída antiga no fim do fio, onde ganharia o Reenviar')
+  }
 })
 
 await confere('09. duas pedidas ao mesmo tempo viram uma, e a falha avisa sem apagar nada', async () => {

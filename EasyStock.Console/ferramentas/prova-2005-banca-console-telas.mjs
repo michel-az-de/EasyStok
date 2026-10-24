@@ -86,6 +86,13 @@ class Elemento extends No {
   blur() { documento.activeElement = documento.body }
   scrollIntoView() {}
   setSelectionRange() {}
+  get parentElement() { return this.parentNode?.nodeType === 1 ? this.parentNode : null }
+  get isConnected() { return documento.contains(this) }
+  closest() { return null }
+}
+class Dialogo extends Elemento {
+  showModal() { this.open = true }
+  close() { this.open = false }
 }
 // O textarea do navegador espelha `defaultValue` em `value` até alguém escrever nele; o react-dom conta com isso.
 class AreaDeTexto extends Elemento {
@@ -106,6 +113,7 @@ const criar = (tag, ns) => {
   if (tag === 'textarea') return new AreaDeTexto(tag)
   if (tag === 'select') return new Selecao(tag, ns)
   if (tag === 'option') return new Opcao(tag, ns)
+  if (tag === 'dialog') return new Dialogo(tag, ns)
   return new Elemento(tag, ns)
 }
 const ouvintes = new EventTarget()
@@ -160,6 +168,12 @@ registerHooks({
     return proximo(especificador, contexto)
   },
   load(url, contexto, proximo) {
+    if (url.endsWith('/features/ficha-cliente/MenuDoPedido.jsx')) {
+      return {
+        format: 'module', shortCircuit: true,
+        source: "import { createElement as h } from 'react'\nexport const MenuDoPedido = ({ podeEstornar, aoEscolher }) => (podeEstornar ? h('button', { type: 'button', onClick: () => aoEscolher('estornar') }, 'Marcar estorno') : null)\n",
+      }
+    }
     if (jsx.has(url)) return { format: 'module', shortCircuit: true, source: jsx.get(url) }
     if (url.endsWith('.css')) return { format: 'module', shortCircuit: true, source: 'export default new Proxy({}, { get: (_, p) => String(p) })' }
     if (url.endsWith('/infra/fonteDados.js')) {
@@ -216,6 +230,11 @@ const botaoDe = (tela, texto) => {
   assert.ok(botao, `botão "${texto}" não está na tela`)
   return botao
 }
+const clicarUltimo = (tela, texto) => {
+  const botoes = descendentes(tela.recipiente).filter((no) => no.localName === 'button' && no.textContent.trim() === texto)
+  assert.ok(botoes.length > 0, `botão "${texto}" não está na tela`)
+  flushSync(() => propsDe(botoes.at(-1)).onClick({ preventDefault() {} }))
+}
 const clicar = (tela, texto) => { flushSync(() => propsDe(botaoDe(tela, texto)).onClick({ preventDefault() {} })) }
 const textoDe = (tela) => tela.recipiente.textContent.replaceAll(' ', ' ')
 const comTela = async (elemento, fn) => {
@@ -232,6 +251,8 @@ const { ContextoAcoes, ContextoEstado, ContextoCatalogo } = await import('../src
 const { ContextoAcessoModulos } = await import('../src/aplicacao/acessoModulos.jsx')
 const { ESTADOS_OCORRENCIA } = await import('../src/dominio/ocorrencia.js')
 const { pedidoDaApi } = await import('../src/infra/api/comandaApi.js')
+const { AbaCaixaApi } = await import('../src/features/gestao/caixa/AbaCaixaApi.jsx')
+const { BarraProximoPasso } = await import('../src/features/ficha-cliente/BarraProximoPasso.jsx')
 const { CANAIS, LINHAS_PRODUTO } = await import('../src/infra/catalogo.js')
 
 // ================================================================================================
@@ -405,6 +426,95 @@ await confere('22. pedido em status desconhecido: a Ficha mostra o status cru e 
   assert.match(html, /em_analise_de_fraude/)
   assert.match(html, /Status desconhecido/)
   assert.doesNotMatch(html, /Gerar cobrança|Marcar pago|Registrar sinal|Confirmar e enviar/)
+})
+
+// ================================================================================================
+// 02 e 04, pelo comportamento: a aba Caixa e o estorno da Barra montados de verdade
+// ================================================================================================
+const corpo = (data) => new Response(JSON.stringify({ data }), { status: 200 })
+const DIA_DO_CAIXA = {
+  data: '2026-10-23', saldoInicial: 100, totalVendas: 0, totalPagamentosPedidos: 0, totalEntradasExtras: 0, totalSaidasExtras: 0,
+  saldoEsperado: 100, aberto: true, fechado: false, movimentos: [], linhasExtras: [],
+}
+function servidorDoCaixa(estado) {
+  const leituras = { dia: 0 }
+  globalThis.sessionStorage = { getItem: () => JSON.stringify({ token: 't', expiraEm: Date.now() + 600000, empresa: { id: 'e' }, usuario: { id: 'u' } }), setItem() {}, removeItem() {} }
+  globalThis.fetch = async (url) => {
+    if (/\/api\/caixa\/dia$/.test(url)) {
+      leituras.dia += 1
+      return estado.semRede ? new Response(JSON.stringify({ error: { message: 'Fora do ar' } }), { status: 503 }) : corpo(estado.dia)
+    }
+    if (url.includes('/api/caixa/dia?data=')) return corpo({ ...DIA_DO_CAIXA, aberto: false })
+    return corpo([])
+  }
+  return leituras
+}
+const aba = (acoes) => h(ContextoAcessoModulos.Provider, { value: { acoes: { gerenciarCaixa: true } } },
+  h(ContextoEstado.Provider, { value: { agora: AGORA, fonteApi: true } }, h(ContextoAcoes.Provider, { value: acoes }, h(AbaCaixaApi))))
+const CAMPO_CONTADO = 'Quanto você contou na gaveta (só dinheiro)'
+
+await confere('02. fechar o caixa relê o dia e, se entrou dinheiro enquanto ela contava, não fecha com o valor velho', async () => {
+  const estado = { dia: DIA_DO_CAIXA }
+  const leituras = servidorDoCaixa(estado)
+  const fechamentos = []
+  await comTela(aba({ fecharCaixa: (...a) => { fechamentos.push(a); return Promise.resolve() } }), async (tela) => {
+    await esperar()
+    const antes = leituras.dia
+    clicar(tela, 'Fechar o caixa')
+    await esperar()
+    assert.equal(leituras.dia, antes + 1, 'abrir o fechamento relê o dia')
+    digitar(tela, CAMPO_CONTADO, '100')
+    estado.dia = { ...DIA_DO_CAIXA, linhasExtras: [{ hora: '2026-10-23T15:00:00Z', tipo: 'entrada', valor: 50, metodo: 'dinheiro', origem: 'pedido' }] }
+    clicarUltimo(tela, 'Fechar o caixa')
+    await esperar()
+    assert.deepEqual(fechamentos, [], 'o esperado mudou: nada foi fechado com o de antes')
+    assert.match(textoDe(tela), /O esperado na gaveta agora é R\$ 150,00/)
+    clicarUltimo(tela, 'Fechar o caixa')
+    await esperar()
+    assert.equal(fechamentos.length, 1)
+    assert.deepEqual([fechamentos[0][1], fechamentos[0][2]], [100, 150], 'contado e o esperado relido, não o da carga da manhã')
+  })
+})
+
+await confere('02. leitura que falha ao abrir o fechamento não abre o modal nem fecha o caixa', async () => {
+  const estado = { dia: DIA_DO_CAIXA }
+  servidorDoCaixa(estado)
+  const fechamentos = []
+  await comTela(aba({ fecharCaixa: (...a) => { fechamentos.push(a); return Promise.resolve() } }), async (tela) => {
+    await esperar()
+    estado.semRede = true
+    clicar(tela, 'Fechar o caixa')
+    await esperar()
+    assert.match(textoDe(tela), /Não deu para conferir o caixa agora/)
+    assert.equal(descendentes(tela.recipiente).some((no) => no.localName === 'label' && no.textContent === CAMPO_CONTADO), false)
+    assert.deepEqual(fechamentos, [])
+  })
+})
+
+await confere('04. estorno da Barra do pedido: "Valor a devolver" nasce com o pago, lê "58" como R$ 58,00 e manda 58', async () => {
+  const estornos = []
+  const pedido = {
+    estado: 'pago', itens: [], pagamentos: [], meio: 'pix', numero: '1',
+    cobranca: { id: 'cb', meio: 'pix', pagaEm: 1, valor: 100, valorPago: 100, criadaEm: 1, expiraEm: 2 },
+  }
+  const barra = h(ContextoAcessoModulos.Provider, { value: { acoes: {} } },
+    h(ContextoEstado.Provider, { value: { agora: AGORA, fonteApi: false, conversas: [], selecionada: null } },
+      h(ContextoCatalogo.Provider, { value: { entregadores: [], cardapio: [], meiosDePagamento: [] } },
+        h(ContextoAcoes.Provider, { value: {} }, h(BarraProximoPasso, {
+          pedido, conversaId: 'c1', nomeCliente: 'Ana', agora: AGORA, emDesfazer: false, aoAvancar() {}, aoDesfazer() {},
+          aoMarcarEstorno: (...a) => estornos.push(a),
+        })))))
+  await comTela(barra, async (tela) => {
+    clicar(tela, 'Marcar estorno')
+    assert.equal(valorDe(tela, 'Valor a devolver'), '100,00')
+    digitar(tela, 'Valor a devolver', '58')
+    assert.equal(valorDe(tela, 'Valor a devolver'), '58')
+    digitar(tela, 'Motivo do estorno', 'Cliente desistiu')
+    const formulario = descendentes(tela.recipiente).find((no) => no.localName === 'form')
+    flushSync(() => propsDe(formulario).onSubmit({ preventDefault() {} }))
+    await esperar()
+    assert.deepEqual(estornos, [['Cliente desistiu', 58]])
+  })
 })
 
 console.log(`\n${passou} passaram, ${falhas.length} falharam.`)

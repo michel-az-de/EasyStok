@@ -40,8 +40,10 @@ try {
       await page.screenshot({ path: join(evidencias, id + '.png'), fullPage: true })
       assert.deepEqual(erros, [])
       if (ativo) {
-        if (nome === 'cancelado-sinal') assert.match(texto, /(Item novo depois do pagamento|Restante na entrega)[\s\S]*32,50/)
-        else assert.match(texto, /Segundo link vencido: o EasyStok cancela o pedido sozinho/)
+        if (nome === 'cancelado-sinal') {
+          assert.match(texto, /Restante na entrega[\s\S]*32,50/)
+          assert.doesNotMatch(texto, /Item novo depois do pagamento/)
+        } else assert.match(texto, /Segundo link vencido: o EasyStok cancela o pedido sozinho/)
       } else {
         assert.doesNotMatch(texto, /pedido continua valendo|Item novo depois do pagamento|a cobrar|clique em Marcar pago/i)
         assert.equal(await page.getByRole('button', { name: /Marcar pago|Cobrar diferença|Reenviar cobrança|Registrar sinal/ }).count(), 0)

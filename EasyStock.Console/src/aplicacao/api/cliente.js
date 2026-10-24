@@ -91,6 +91,8 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
   function carregarClienteDaConversa(id, retentativas = RETENTATIVAS_DO_DOSSIE) {
     if (!lendoDossie.has(id)) {
       lendoDossie.set(id, carregar(id).then(() => true, () => {
+        // Releitura de uma Ficha que já está na tela (SSE) que falha fica quieta, como antes: nada a avisar.
+        if (!precisaLerFicha(conversaDe(id))) return false
         const vaiTentar = retentativas > 0
         avisar(vaiTentar
           ? 'A ficha do cliente não carregou. O EasyStok tenta de novo em instantes.'
