@@ -12,6 +12,9 @@ public static class BackgroundJobServiceCollectionExtensions
         services.Configure<BackgroundJobOptions>(
             configuration.GetSection(BackgroundJobOptions.SectionName));
 
+        services.Configure<AlertasEstoqueOptions>(
+            configuration.GetSection(AlertasEstoqueOptions.SectionName));
+
         services.TryAddSingleton<IPedidoFornecedorRecebimentoProcessor, NoOpPedidoFornecedorRecebimentoProcessor>();
 
         var options = configuration.GetSection(BackgroundJobOptions.SectionName).Get<BackgroundJobOptions>()
@@ -33,9 +36,6 @@ public static class BackgroundJobServiceCollectionExtensions
         // Backup automático de logs no file storage (a cada 30 min)
         if (options.EnableLogStorage)
             services.AddHostedService<LogStorageBackgroundService>();
-
-        if (options.EnableAlertasEstoqueJob)
-            services.AddHostedService<AlertasEstoqueJob>();
 
         if (options.EnableProcessarRecebimentoJob)
             services.AddHostedService<ProcessarRecebimentoJob>();
