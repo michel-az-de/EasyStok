@@ -104,6 +104,8 @@ public class CancelarPedidoUseCase(
                 await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, cmd.EmpresaId,
                     new PedidoMudouStatusOperacao(cmd.Id, statusAntigo, StatusPedidoMapper.Cancelado));
             // PEDIDO-05: o link cancelado deixa de aceitar pagamento; depois do commit e best-effort (a falha so loga).
+            // Chamado pelo ProcessarCobrancaVencidaUseCase dentro da transacao externa dele: ali o commit deste use case
+            // ainda nao e o definitivo, e a expiracao roda antes do commit externo (best-effort, a falha so loga).
             if (expiracao is not null) await expiracao.ExpirarAsync(preferenciasCanceladas, CancellationToken.None);
             logger.LogInformation("Pedido {Id} cancelado por {UsuarioId}.", cmd.Id, cmd.UsuarioId);
         }
