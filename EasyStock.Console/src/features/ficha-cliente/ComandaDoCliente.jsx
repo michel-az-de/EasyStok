@@ -6,8 +6,11 @@ import { Modal } from '../../componentes/Modal'
 import { moeda } from '../../dominio/formato'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
 import { itensDoDia } from '../../dominio/cardapioLink'
-import { clienteEscolhendoPeloLink, rascunhoMantendoEdicao, rotuloDoTotalDaSelecao, saldoDaAlteracao, tituloDaComanda } from '../../dominio/pedido'
-import { useCatalogo } from '../../aplicacao/contextos'
+import {
+  clienteEscolhendoPeloLink, linhasDaMudancaDeData, mudancaDeDataDaAlteracao, rascunhoMantendoEdicao, rotuloDaJanelaDoPedido,
+  rotuloDoTotalDaSelecao, saldoDaAlteracao, tituloDaComanda,
+} from '../../dominio/pedido'
+import { useAcoes, useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { congelado } from '../../dominio/congelados'
 import { useComandasCliente, idDaJanela, janelaDoId } from '../../aplicacao/useComandasCliente'
@@ -15,6 +18,27 @@ import { useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { ConsultaTransporte } from './BlocoFreteApi'
 import { SeletorJanelaApi } from './SeletorJanelaApi'
 import css from './comanda.module.css'
+
+// #2007 (item 4): a data e a janela que o cliente pediu pelo link aparecem ao lado dos itens, para aprovar sabendo.
+function MudancaDeData({ comanda: c }) {
+  const { carregarJanelasComanda } = useAcoes()
+  const mudanca = mudancaDeDataDaAlteracao(c)
+  const [rotuloNovo, setRotuloNovo] = useState(null)
+  const dataNova = mudanca?.para.data ?? null
+  const alvo = mudanca && !mudanca.mesmaJanela ? idDaJanela(mudanca.para.janelaId, dataNova) : null
+  const skus = (c.rascunho?.itens ?? []).map(i => i.cardapioItemId).join(',')
+  useEffect(() => {
+    if (!alvo || !carregarJanelasComanda) return undefined
+    let vivo = true
+    carregarJanelasComanda(skus ? skus.split(',') : [], dataNova)
+      .then(lidas => { if (vivo) setRotuloNovo(lidas?.janelas?.find(j => j.id === alvo)?.rotulo ?? null) })
+      .catch(() => { if (vivo) setRotuloNovo(null) })
+    return () => { vivo = false }
+  }, [alvo, skus, dataNova, carregarJanelasComanda])
+  const linhas = linhasDaMudancaDeData(mudanca, { rotuloAtual: rotuloDaJanelaDoPedido(c.pedido?.janela), rotuloNovo: alvo ? rotuloNovo : null })
+  if (!linhas.length) return null
+  return <div className={css.comparativo}>{linhas.map(l => <p key={l}>{l}</p>)}</div>
+}
 
 function AcertoDaComanda({ comanda: c }) {
   const f = c.financeiro, a = c.acerto, uso = c.envio?.cupomAplicado
@@ -159,6 +183,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       <ul>{c.pedido.itens?.map((i, n) => <li key={n}>{i.quantidade}× {i.nome}{i.observacao && ' · ' + i.observacao}</li>)}</ul>
       <p>Pagamento já coberto: {moeda(c.pedido.alocado ?? c.pedido.totalPago ?? 0)}</p>
     </details>}
+    {c.pedido && (pendente || c.podeEditar) && <MudancaDeData comanda={c} />}
     {c.pedido && <h3>{c.podeEditar || pendente ? 'Alteração proposta' : 'Seleção enviada pelo link'}</h3>}
     {conflito && <p>Seleção atual: {c.selecao.map(i => i.qtd + '× ' + i.nome + (i.observacao ? ' (' + i.observacao + ')' : '')).join(', ')}. Observação: {c.rascunho.observacoes || 'nenhuma'}.</p>}
     <p className={css.totalCompartilhado}>{c.pedido && !edicao ? (c.podeEditar || pendente ? 'Total proposto' : 'Total enviado pelo link') : rotuloDoTotalDaSelecao(c, Boolean(edicao))}: <strong>{moeda(c.totalPrevisto ?? 0)}</strong></p>

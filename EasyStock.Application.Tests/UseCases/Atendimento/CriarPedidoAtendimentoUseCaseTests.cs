@@ -55,7 +55,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
         pedido.ClienteId.Should().Be(cliente.Id);
         pedido.Observacoes.Should().Be("tocar a campainha");
-        pedido.EnderecoEntrega.Should().Be("Rua escolhida, 42 - Centro, São Paulo - CEP 01310-100");
+        pedido.EnderecoEntrega.Should().Be("Rua escolhida, 42 - Centro, São Paulo/SP - CEP 01310-100");
         pedido.EntregaLat.Should().Be(-23.55);
         pedido.EntregaLng.Should().Be(-46.63);
         pedido.EnderecoConfirmadoEm.Should().Be(c.Relogio.GetUtcNow().UtcDateTime);
