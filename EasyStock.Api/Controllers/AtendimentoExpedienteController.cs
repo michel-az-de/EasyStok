@@ -48,7 +48,7 @@ public class AtendimentoExpedienteController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 
@@ -69,7 +69,7 @@ public class AtendimentoExpedienteController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
         catch (UnauthorizedAccessException ex)
         {

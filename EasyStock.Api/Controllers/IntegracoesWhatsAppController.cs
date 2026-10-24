@@ -87,7 +87,7 @@ public class IntegracoesWhatsAppController(
             r = await conectarUseCase.ExecuteAsync(new ConectarWhatsAppCoexistenciaCommand(
                 currentUser.EmpresaId, currentUser.UsuarioId, req?.Code ?? "", req?.WabaId ?? "", req?.PhoneNumberId ?? ""), ct);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (ConexaoWhatsAppRecusadaException ex) when (ex.Etapa == EtapaConexaoWhatsApp.TrocaDoCode && !ex.MetaIndisponivel)
         {
             return DataBadRequest(ex.Message);

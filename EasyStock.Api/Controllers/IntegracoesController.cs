@@ -52,7 +52,7 @@ public class IntegracoesController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
         catch (ChaveMestraAusenteException)
         {
@@ -87,7 +87,7 @@ public class IntegracoesController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 
@@ -110,7 +110,7 @@ public class IntegracoesController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 

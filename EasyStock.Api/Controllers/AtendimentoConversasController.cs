@@ -387,7 +387,7 @@ public class AtendimentoConversasController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
         catch (RegraDeDominioVioladaException ex)
         {

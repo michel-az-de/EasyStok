@@ -40,7 +40,7 @@ public class AtendimentoCorridasController(
     private async Task<IActionResult> Executar(Func<Task<IActionResult>> acao)
     {
         try { return await acao(); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (ViagemNaoEncontradaException ex) { return DataNotFound(ex.Message); }
         catch (CorridaExternaNaoEncontradaException ex) { return DataNotFound(ex.Message); }
     }
@@ -72,7 +72,7 @@ public class AtendimentoRelatorioCustoDeEntregaController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 }

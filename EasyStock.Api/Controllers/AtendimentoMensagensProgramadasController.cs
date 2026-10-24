@@ -40,7 +40,7 @@ public class AtendimentoMensagensProgramadasController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 
@@ -68,7 +68,7 @@ public class AtendimentoMensagensProgramadasController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 }

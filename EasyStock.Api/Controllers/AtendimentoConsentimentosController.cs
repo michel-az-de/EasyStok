@@ -54,7 +54,7 @@ public class AtendimentoConsentimentosController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 }

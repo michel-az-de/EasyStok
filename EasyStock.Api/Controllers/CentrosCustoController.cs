@@ -40,7 +40,7 @@ public class CentrosCustoController(
             var r = await criarUseCase.ExecuteAsync(cmd with { EmpresaId = eid }, ct);
             return DataCreated($"/api/financeiro/centros-custo/{r.Id}", r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPatch("{id:guid}")]
@@ -54,7 +54,7 @@ public class CentrosCustoController(
             var r = await atualizarUseCase.ExecuteAsync(cmd with { EmpresaId = eid, Id = id }, ct);
             return r is null ? DataNotFound() : DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPost("{id:guid}/inativar")]
@@ -67,7 +67,7 @@ public class CentrosCustoController(
             var ok = await inativarUseCase.ExecuteAsync(new InativarCentroCustoCommand(eid, id), ct);
             return ok ? NoContent() : DataNotFound();
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPost("{id:guid}/reativar")]

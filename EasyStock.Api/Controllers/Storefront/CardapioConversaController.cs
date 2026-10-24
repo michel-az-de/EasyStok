@@ -63,7 +63,7 @@ public sealed class CardapioConversaController(CriarPedidoPeloCardapioConversaUs
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
         catch (CepInvalidoException ex)
         {

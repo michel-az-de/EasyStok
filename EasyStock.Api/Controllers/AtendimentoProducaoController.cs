@@ -47,7 +47,7 @@ public class AtendimentoProducaoController(
         if (request.Quantidade is <= 0 or > 1000000 || !Enum.IsDefined(request.Unidade))
             return DataBadRequest("Informe uma quantidade maior que zero e até 1.000.000, com unidade válida.");
         try { return DataOk(await calculo.ExecuteAsync(new(currentUser.EmpresaId, request.ProdutoId, request.Quantidade, request.Unidade, null), ct)); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [SwaggerOperation(Summary = "Losses of the period by reason and product, in quantity and R$, with each entry (M2.6)",
@@ -65,7 +65,7 @@ public class AtendimentoProducaoController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 
@@ -124,7 +124,7 @@ public class AtendimentoProducaoController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 
@@ -143,7 +143,7 @@ public class AtendimentoProducaoController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 
@@ -178,7 +178,7 @@ public class AtendimentoProducaoController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 
@@ -196,7 +196,7 @@ public class AtendimentoProducaoController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 
@@ -243,7 +243,7 @@ public class AtendimentoProducaoController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 

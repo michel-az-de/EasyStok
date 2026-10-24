@@ -45,7 +45,7 @@ public class FinanceiroController(
                 eid, periodicidade, iniDef, fimDef, categoriaId, centroCustoId), ct);
             return DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (ArgumentException ex) { return DataBadRequest(ex.Message); }
     }
 
