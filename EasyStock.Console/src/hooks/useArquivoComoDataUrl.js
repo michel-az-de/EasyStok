@@ -11,8 +11,10 @@ export function useArquivoComoDataUrl() {
     setCarregando(true)
     const leitor = new FileReader()
     leitor.onload = () => { setCarregando(false); resolve(leitor.result) }
-    leitor.onerror = () => { setCarregando(false); reject(leitor.error) }
-    leitor.readAsDataURL(arquivo)
+    const falhar = (erro) => { setCarregando(false); reject(erro) }
+    leitor.onerror = () => falhar(leitor.error ?? new Error('Falha ao ler o arquivo.'))
+    leitor.onabort = () => falhar(new DOMException('Leitura do arquivo cancelada.', 'AbortError'))
+    try { leitor.readAsDataURL(arquivo) } catch (erro) { falhar(erro) }
   }), [])
 
   return { carregando, ler }

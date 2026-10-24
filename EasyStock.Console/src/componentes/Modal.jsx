@@ -23,7 +23,8 @@ import css from './Modal.module.css'
 export function Modal({ titulo, descricao, aoFechar, rodape, largura, className, children }) {
   const id = useId()
   const dialogoRef = useRef(null)
-  const focoAnterior = useRef(null)
+  // Capture antes do commit: um campo com autoFocus já terá foco quando o efeito rodar.
+  const focoAnterior = useRef(typeof document === 'undefined' ? null : document.activeElement)
   const aoFecharRef = useRef(aoFechar)
   // Grava a versão mais nova fora do corpo de render (linter: nada de ref
   // escrita durante o render), mas ainda síncrono, antes de qualquer clique.
@@ -32,7 +33,6 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, className,
   useEffect(() => {
     const dialogo = dialogoRef.current
     const dialogoPai = dialogo.parentElement?.closest('dialog[open]')
-    focoAnterior.current = document.activeElement
     if (!dialogo.open) dialogo.showModal()
 
     const aoCancelar = (evento) => { evento.preventDefault(); aoFecharRef.current?.() }

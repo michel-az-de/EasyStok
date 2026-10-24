@@ -147,6 +147,9 @@
   composes: trilho from '../componentes/Trilho.module.css';
   padding-top: calc(var(--e-3) + env(safe-area-inset-top, 0px));
   position: relative; z-index: 20;
+  overflow-y: auto; overflow-x: hidden;
+  /* Reserva espaço para a barra sem comprimir os alvos de toque. */
+  padding-inline: 0;
 }
 .inicioTrilho { composes: inicio from '../componentes/Trilho.module.css'; }
 .itemTrilho { composes: item from '../componentes/Trilho.module.css'; }
@@ -154,6 +157,7 @@
 .itemTrilho svg, .sinoTrilho > div > button svg { transition: transform var(--dur-media) var(--ease-mola); }
 .itemTrilho:hover svg, .sinoTrilho > div > button:hover svg { transform: translateY(-2px) scale(1.06); }
 .itemAtual { composes: ativo from '../componentes/Trilho.module.css'; cursor: default; }
+.itemAtual::before { left: 0; }
 .itemTrilho[aria-pressed='true'] { color: var(--tinta); background: var(--preenchimento-forte); }
 .contaTrilho, .seloTrilho {
   position: absolute; top: 3px; left: calc(50% + 6px);

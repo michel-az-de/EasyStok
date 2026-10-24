@@ -66,7 +66,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   const { janelas, prefixosCepAtendidos, cardapio, canais } = useCatalogo()
   // #1884 ("Quanto fica?"): uma simulação por comanda, para a comanda e a barra mostrarem os mesmos números.
   const simulacao = useSimulacaoDoPedido({
-    conversaId: selecionada?.id, pedido: selecionada?.pedido, ativo: Boolean(fonteApi && selecionada && !conversaEncerrada(selecionada)),
+    conversaId: selecionada?.id, clienteId: selecionada?.clienteId, endereco: selecionada?.cliente?.endereco,
+    pedido: selecionada?.pedido, ativo: Boolean(fonteApi && selecionada && !conversaEncerrada(selecionada)),
   })
   // J2 (#1990): pedido pago cancelado diz no Resumo e no Pagamento quanto falta devolver.
   const aDevolver = useADevolver(fonteApi ? selecionada?.pedido : null)
