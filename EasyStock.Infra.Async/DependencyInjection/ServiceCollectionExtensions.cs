@@ -26,8 +26,7 @@ public static class ServiceCollectionExtensions
         // Cache Service. <see cref="RedisCacheService"/> envelopa
         // <see cref="IDistributedCache"/> — quem registra o backend (Redis real
         // em prod ou MemoryDistributedCache em dev) e o host (ApiServiceCollectionExtensions
-        // .AddEasyStockCache). <see cref="InMemoryCacheService"/> existe como
-        // alternativa explicita pra fluxos in-process sem serializacao JSON.
+        // .AddEasyStockCache).
         services.AddSingleton<ICacheService, RedisCacheService>();
 
         // Queue Service
@@ -43,8 +42,6 @@ public static class ServiceCollectionExtensions
         // PDF Renderer (Modulo Financeiro F4) — QuestPDF stateless + threadsafe
         // PDF de etiqueta + Nota de Entrada (P5) — QuestPDF + QRCoder, stateless/threadsafe
         services.AddSingleton<IDocumentoEntradaPdfRenderer, DocumentoEntradaPdfRenderer>();
-        // PDF do extrato de fechamento de caixa (#642) — QuestPDF stateless/threadsafe
-        services.AddSingleton<IFechamentoCaixaExtratoRenderer, FechamentoCaixaExtratoRenderer>();
 
         // Webhook processors (scoped)
         services.AddScoped<IGatewayWebhookProcessor, EfiPixWebhookProcessor>();
@@ -87,27 +84,6 @@ public static class ServiceCollectionExtensions
         else
         {
             services.AddSingleton<IEfiPixService, NoopEfiPixService>();
-        }
-
-        // Efí Bank Boleto Gateway (reutiliza mesmo ClientId e chave Sandbox que Pix, só muda baseUrl e endpoint v1)
-        if (!string.IsNullOrWhiteSpace(efiClientId))
-        {
-            var isSandboxStr = configuration["Efi:Sandbox"];
-            var isSandbox = !bool.TryParse(isSandboxStr, out var sb2) || sb2;
-            var baseUrl = isSandbox ? "https://cobrancas-h.api.efipay.com.br" : "https://cobrancas.api.efipay.com.br";
-            services.AddTransient<IEfiBoletoService>(sp =>
-            {
-                var http = new HttpClient(EfiHandler, disposeHandler: false) { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
-                return new EfiBoletoService(
-                    http,
-                    sp.GetRequiredService<IMemoryCache>(),
-                    configuration,
-                    sp.GetRequiredService<ILogger<EfiBoletoService>>());
-            });
-        }
-        else
-        {
-            services.AddSingleton<IEfiBoletoService, NoopEfiBoletoService>();
         }
 
         // I3.1 (#1667): o webhook do Mercado Pago existe sempre, com ou sem token. Sem segredo configurado o
