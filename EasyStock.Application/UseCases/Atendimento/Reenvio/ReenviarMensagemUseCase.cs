@@ -103,7 +103,7 @@ public sealed class ReenviarMensagemUseCase(
             try
             {
                 var externoId = await resolvedorCanal.Obter(conversa.Canal).EnviarModeloAsync(
-                    conversa.ContatoIdExterno, modelo.Nome, modelo.Idioma, [PrimeiroNome(conversa.ContatoNome)], ct);
+                    conversa.ContatoIdExterno, modelo.Nome, modelo.Idioma, [NomesDeContato.PrimeiroNome(conversa.ContatoNome, "cliente")], ct);
                 var aviso = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora,
                     TipoConteudoMensagem.Texto, $"[modelo {modelo.Nome}]", externoId);
                 await conversaRepository.AddMensagemAsync(aviso, ct);
@@ -120,9 +120,6 @@ public sealed class ReenviarMensagemUseCase(
 
         mensagem.AguardarCliente(agora, MotivoAguardandoCliente);
     }
-
-    private static string PrimeiroNome(string? nome) =>
-        string.IsNullOrWhiteSpace(nome) ? "cliente" : nome.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
 }
 
 /// <summary>Mensagem inexistente, de outra conversa ou de outra empresa: 404.</summary>

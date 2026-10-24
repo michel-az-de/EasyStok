@@ -310,6 +310,8 @@ do S13: o S13 continua dono dos avisos de esteira.
 **Aceite.**
 - [ ] Atalho duplicado devolve 409. Render com `{pedido}` numa conversa sem pedido devolve erro de validação.
 - [ ] Primeiro contato fora do horário gera só uma automática (a de fora do horário, não as duas).
+- [x] (#2004) Com a automática da situação ligada, a saudação direta do webhook (ou o aviso do expediente) não sai: o
+  cliente lê uma mensagem só. Regra desligada: segue a saudação de sempre.
 - [ ] Regra desligada não dispara.
 **Testes (Red).** `RespostaProntaTests.RenderSemVariavelFalha`, `AutomacoesHandlerTests.ForaDoHorarioVencePrimeiroContato`, `...RegraDesligada`.
 **Rollback.** Desligar as regras.

@@ -66,6 +66,7 @@ public static class RemetentePorTipoEvento
             or TipoEventoNotificacao.LojaFechadaNoHorario
             or TipoEventoNotificacao.CobrancaAguardandoEquipe
             or TipoEventoNotificacao.PagamentoEmMediacao
+            or TipoEventoNotificacao.PagamentoSemAvisoAoCliente
             or TipoEventoNotificacao.ContatoNovoNoBalcao
             or TipoEventoNotificacao.PedidoPagoNoBalcao
             or TipoEventoNotificacao.PedidoMudouEtapaNoBalcao

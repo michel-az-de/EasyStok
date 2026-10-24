@@ -87,7 +87,8 @@ public sealed class AvisoCobrancaConversa(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogWarning(ex, "Falha ao enviar aviso de cobranca conversaId={ConversaId}", conversaId);
-                await RegistrarFalhaAsync(conversa, texto, ex.Message, ClassificadorFalhaEnvio.Classificar(ex), agora, enviadaPorUsuarioId, ct);
+                // #1765-11: grava o código estável (o console traduz); o texto do provedor fica no log acima.
+                await RegistrarFalhaAsync(conversa, texto, ClassificadorFalhaEnvio.Motivo(ex), ClassificadorFalhaEnvio.Classificar(ex), agora, enviadaPorUsuarioId, ct);
                 return false;
             }
 

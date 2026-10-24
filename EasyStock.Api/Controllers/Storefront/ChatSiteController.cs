@@ -35,6 +35,9 @@ public class ChatSiteController(
     public static readonly TimeSpan IntervaloStream = TimeSpan.FromSeconds(1);
     public static readonly TimeSpan IntervaloPing = TimeSpan.FromSeconds(15);
 
+    /// <summary>Quanto o stream relê antes do cursor para pegar a resposta gravada depois de uma mensagem mais nova (#2004).</summary>
+    public static readonly TimeSpan FolgaDoCursor = TimeSpan.FromSeconds(5);
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     [SwaggerOperation(Summary = "Open an anonymous chat session", Description = "Devolve o token uma vez só. 404 se a loja não tem o chat ligado.")]
@@ -115,6 +118,12 @@ public class ChatSiteController(
         Response.Headers["X-Accel-Buffering"] = "no";
 
         var cursor = depois;
+        // #2004: a resposta da loja leva o instante do início do envio mas só é gravada depois de esperar a trava da
+        // conversa, então pode aparecer no banco depois de uma mensagem do visitante mais nova que ela. Depois da
+        // primeira rodada o stream relê com folga e não repete o que já mandou (a primeira parte exatamente de
+        // "depois", para a reconexão do widget não reenviar o que ele já tem).
+        var enviados = new HashSet<Guid>();
+        var primeiraRodada = true;
         var fim = DateTime.UtcNow + DuracaoMaximaStream;
         var ultimoEnvio = DateTime.UtcNow;
         try
@@ -124,7 +133,9 @@ public class ChatSiteController(
                 IReadOnlyList<MensagemChatSiteResult> novas;
                 try
                 {
-                    novas = await listarMensagens.ListarParaStreamAsync(empresaId, tokenHash, cursor, ct);
+                    var desde = primeiraRodada || cursor is null ? cursor : cursor - FolgaDoCursor;
+                    novas = await listarMensagens.ListarParaStreamAsync(empresaId, tokenHash, desde, ct);
+                    primeiraRodada = false;
                 }
                 catch (SessaoChatSiteInvalidaException)
                 {
@@ -132,13 +143,16 @@ public class ChatSiteController(
                     break;
                 }
 
+                var enviouAgora = false;
                 foreach (var m in novas)
                 {
+                    if (m.EnviadaEm > cursor || cursor is null) cursor = m.EnviadaEm;
+                    if (!enviados.Add(m.Id)) continue;
                     await EscreverAsync($"id: {m.Id}\nevent: mensagem\ndata: {JsonSerializer.Serialize(m, Json)}\n\n", ct);
-                    cursor = m.EnviadaEm;
+                    enviouAgora = true;
                 }
 
-                if (novas.Count > 0) ultimoEnvio = DateTime.UtcNow;
+                if (enviouAgora) ultimoEnvio = DateTime.UtcNow;
                 else if (DateTime.UtcNow - ultimoEnvio >= IntervaloPing)
                 {
                     await EscreverAsync(": ping\n\n", ct);

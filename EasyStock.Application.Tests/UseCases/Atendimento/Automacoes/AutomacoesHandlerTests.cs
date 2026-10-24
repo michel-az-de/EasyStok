@@ -195,12 +195,13 @@ public class AutomacoesHandlerTests
     public async Task TimeoutDoCanalViraFalhaSemRelancar()
     {
         // #1787: relançar devolve o evento ao outbox, que tenta de novo e pode duplicar a mensagem.
+        // #2004: o timeout não prova que nada saiu; o resultado é EnvioIncerto, que o aviso de reserva não trata como "não saiu".
         Regra(GatilhoAutomacao.PosEntrega, "Chegou?");
         _whats.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns<Task<string>>(_ => throw new TaskCanceledException("HttpClient.Timeout"));
 
         (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PosEntrega, _conversa.Id, null, null)))
-            .Should().Be(ResultadoAutomacao.Falhou);
+            .Should().Be(ResultadoAutomacao.EnvioIncerto);
     }
 
     [Fact]
@@ -222,7 +223,10 @@ public class AutomacoesHandlerTests
 
         (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PosEntrega, _conversa.Id, null, null)))
             .Should().Be(ResultadoAutomacao.Falhou);
-        _uow.CommitCount.Should().Be(0);
+        // #2004: o único commit é o da mensagem com falha, para a atendente ver que o aviso não saiu.
+        _uow.CommitCount.Should().Be(1);
+        await _conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Status == StatusMensagem.Falhou && m.Autor == AutorMensagem.Sistema), Arg.Any<CancellationToken>());
     }
 
     [Theory]

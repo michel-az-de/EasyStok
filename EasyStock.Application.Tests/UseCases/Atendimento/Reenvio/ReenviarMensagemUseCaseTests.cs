@@ -295,6 +295,28 @@ public class ReenviarMensagemRetomadaTests
     }
 
     [Fact]
+    public async Task LeadSemNomeDePerfilRecebeOModeloComOPadraoCliente()
+    {
+        // #2004 atendimento-12: o lead sem nome de perfil é "Cliente WhatsApp"; o modelo dizia "Olá, Cliente".
+        _configuracao.DefinirModeloRetomada("retomar_conversa", "pt_BR");
+        var lead = Conversa.Abrir(_empresaId, WaId, Agora.AddDays(-2), EasyStock.Application.UseCases.Atendimento.IdentificarClientePorTelefoneUseCase.NomePadraoLead);
+        lead.RegistrarEntrada(Agora.AddDays(-2));
+        var falhou = Mensagem.Saida(_empresaId, lead.Id, AutorMensagem.Agente, Agora.AddDays(-2), TipoConteudoMensagem.Texto, "Temos ravioli!");
+        falhou.RegistrarFalhaEnvio("Meta fora", TipoFalhaEnvio.Permanente, Agora.AddDays(-2));
+        _conversas.ObterPorIdAsync(_empresaId, lead.Id, Arg.Any<CancellationToken>()).Returns(lead);
+        _conversas.ObterMensagemComLockAsync(_empresaId, lead.Id, falhou.Id, Arg.Any<CancellationToken>()).Returns(falhou);
+        var canais = new ResolvedorCanal([_whatsapp, _sms]);
+        var useCase = new ReenviarMensagemUseCase(_conversas, _configuracoes, canais,
+            new ReservaSmsAtendimento(canais, _opcoesSms, NullLogger<ReservaSmsAtendimento>.Instance),
+            _uow, new FakeTimeProvider(new DateTimeOffset(Agora)));
+
+        await useCase.ExecuteAsync(_empresaId, lead.Id, falhou.Id);
+
+        await _whatsapp.Received(1).EnviarModeloAsync(WaId, "retomar_conversa", "pt_BR",
+            Arg.Is<IReadOnlyList<string>>(p => p.SequenceEqual(new[] { "cliente" })), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ModeloJaEnviadoAoContatoNaoRepete()
     {
         _configuracao.DefinirModeloRetomada("retomar_conversa", "pt_BR");

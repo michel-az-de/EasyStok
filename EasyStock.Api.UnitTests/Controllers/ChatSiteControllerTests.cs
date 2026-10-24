@@ -94,6 +94,48 @@ public class ChatSiteControllerTests
         _corpo.Texto.Should().Contain("event: mensagem");
     }
 
+    /// <summary>
+    /// #2004 atendimento-04: a resposta da loja leva o instante do início do envio, mas só é gravada depois de esperar a
+    /// trava da conversa. Se a mensagem do visitante é gravada antes, o cursor do stream já passou do instante dela e a
+    /// resposta nunca chegava ao widget. O stream relê com folga e não repete o que já mandou.
+    /// </summary>
+    [Fact]
+    public async Task RespostaDaLojaGravadaDepoisComInstanteAnteriorAoCursorAindaChegaPeloStream()
+    {
+        var (sessao, token) = Sessao();
+        var conversaId = Guid.NewGuid();
+        sessao.VincularConversa(conversaId);
+        var t0 = DateTime.UtcNow;
+        var visitante = Mensagem.Entrada(_loja.EmpresaId, conversaId, t0.AddMilliseconds(20), TipoConteudoMensagem.Texto,
+            "Oi, ainda ai?", "chatsite:visitante-1");
+        var loja = Mensagem.Saida(_loja.EmpresaId, conversaId, AutorMensagem.Dona, t0, TipoConteudoMensagem.Texto,
+            "Entregamos sim!", "chatsite:loja-1");
+
+        // O que "está no banco" agora: a consulta devolve só o que é posterior ao cursor, como a do repositório.
+        var gravadas = new List<Mensagem> { visitante };
+        _conversas.ListarMensagensDepoisAsync(_loja.EmpresaId, conversaId, Arg.Any<DateTime?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                var cursor = ci.ArgAt<DateTime?>(2);
+                lock (gravadas) return (IReadOnlyList<Mensagem>)gravadas.Where(m => cursor is null || m.EnviadaEm > cursor)
+                    .OrderBy(m => m.EnviadaEm).ToList();
+            });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var stream = _controller.Stream(Slug, token, null, cts.Token);
+        (await _corpo.EsperarAsync("Oi, ainda ai?", TimeSpan.FromSeconds(5))).Should().BeTrue("o stream lê a do visitante e move o cursor");
+
+        lock (gravadas) gravadas.Add(loja); // a resposta da atendente só agora termina de gravar, com o instante antigo
+        var chegou = await _corpo.EsperarAsync("Entregamos sim!", TimeSpan.FromSeconds(6));
+        await Task.Delay(1500); // mais uma rodada: a mensagem do visitante, relida pela folga, não pode sair de novo
+        await cts.CancelAsync();
+        await stream;
+
+        chegou.Should().BeTrue();
+        System.Text.RegularExpressions.Regex.Matches(_corpo.Texto, "Oi, ainda ai").Should().HaveCount(1);
+        System.Text.RegularExpressions.Regex.Matches(_corpo.Texto, "Entregamos sim!").Should().HaveCount(1);
+    }
+
     [Fact]
     public async Task StreamComTokenInvalido403()
     {

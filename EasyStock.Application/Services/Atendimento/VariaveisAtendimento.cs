@@ -1,5 +1,4 @@
 using System.Globalization;
-using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 
 namespace EasyStock.Application.Services.Atendimento;
@@ -9,7 +8,8 @@ namespace EasyStock.Application.Services.Atendimento;
 /// não tem fica nulo, e o render recusa: nunca sai <c>{pedido}</c> literal para o cliente.
 /// <list type="bullet">
 /// <item><c>{nome}</c>: primeiro nome do cliente vinculado, senão o nome do perfil do contato.</item>
-/// <item><c>{pedido}</c>: os 8 primeiros caracteres do id do pedido (o mesmo código curto do resto do sistema).</item>
+/// <item><c>{pedido}</c>: o número que o cliente lê (<see cref="NumeroDoPedido"/>): a comanda da conversa, senão os 8
+/// primeiros caracteres do id do pedido (o mesmo código curto do resto do sistema).</item>
 /// <item><c>{faixa}</c>: horário agendado do pedido, no fuso de São Paulo.</item>
 /// </list>
 /// </summary>
@@ -25,7 +25,7 @@ public sealed class VariaveisAtendimento(IClienteRepository clientes, IPedidoRep
 
         var idCliente = clienteId ?? conversa.ClienteId;
         var cliente = idCliente is { } c ? await clientes.GetByIdAsync(empresaId, c) : null;
-        var nome = PrimeiroNome(cliente?.Nome) ?? PrimeiroNome(conversa.ContatoNome);
+        var nome = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome);
 
         var idPedido = pedidoId ?? conversa.PedidoEmAndamentoId;
         string? faixa = null;
@@ -40,16 +40,21 @@ public sealed class VariaveisAtendimento(IClienteRepository clientes, IPedidoRep
         return new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["nome"] = nome,
-            ["pedido"] = idPedido is { } id ? CodigoCurto(id) : null,
+            ["pedido"] = idPedido is { } id ? NumeroDoPedido(id, conversa) : null,
             ["faixa"] = faixa,
         };
     }
 
     public static string CodigoCurto(Guid pedidoId) => pedidoId.ToString("N")[..8].ToUpperInvariant();
 
-    private static string? PrimeiroNome(string? nome)
-    {
-        if (string.IsNullOrWhiteSpace(nome) || nome == IdentificarClientePorTelefoneUseCase.NomePadraoLead) return null;
-        return nome.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
-    }
+    /// <summary>
+    /// #2004: o número do pedido que o cliente lê, igual no aviso S13 ("pedido nº 12") e nas automáticas ("pedido {pedido}"):
+    /// a comanda da conversa quando ela é a do pedido, senão o <see cref="CodigoCurto"/>. A comanda é da conversa, não do
+    /// pedido: sem <paramref name="conversaEhDoPedido"/> (quem já achou a conversa pelo pedido), só vale se o pedido é o
+    /// que a conversa tem em andamento.
+    /// </summary>
+    public static string NumeroDoPedido(Guid pedidoId, Conversa? conversa, bool conversaEhDoPedido = false) =>
+        conversa is { NumeroComanda: > 0 } && (conversaEhDoPedido || conversa.PedidoEmAndamentoId == pedidoId)
+            ? conversa.NumeroComanda.ToString(CultureInfo.InvariantCulture)
+            : CodigoCurto(pedidoId);
 }

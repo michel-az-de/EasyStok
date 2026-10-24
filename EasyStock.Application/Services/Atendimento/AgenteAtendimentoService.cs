@@ -226,7 +226,8 @@ public sealed class AgenteAtendimentoService(
     /// turno, então uma mensagem que chegou durante o turno pode ficar antes da resposta. Vale
     /// <see cref="Mensagem.ProcessadaEm"/>: entrada não processada é pendente, salvo se a dona escreveu
     /// depois dela. Janela sem nenhuma entrada processada (histórico anterior ao #1288) segue a regra
-    /// antiga: qualquer resposta posterior, do agente ou da dona, conta.
+    /// antiga: qualquer resposta posterior, do agente ou da dona, conta. Resposta que falhou ao enviar (#2004) não conta:
+    /// o cliente não a recebeu.
     /// </summary>
     private static IReadOnlyList<Mensagem> EntradasPendentes(IReadOnlyList<Mensagem> historico)
     {
@@ -237,8 +238,8 @@ public sealed class AgenteAtendimentoService(
             var msg = historico[i];
             if (msg.Autor != AutorMensagem.Cliente || msg.ProcessadaEm is not null) continue;
 
-            var respondida = historico.Skip(i + 1).Any(m =>
-                m.Autor.EhHumanoDaEmpresa() || (legado && m.Autor == AutorMensagem.Agente));
+            var respondida = historico.Skip(i + 1).Any(m => m.Status != StatusMensagem.Falhou
+                && (m.Autor.EhHumanoDaEmpresa() || (legado && m.Autor == AutorMensagem.Agente)));
             if (!respondida) pendentes.Add(msg);
         }
 

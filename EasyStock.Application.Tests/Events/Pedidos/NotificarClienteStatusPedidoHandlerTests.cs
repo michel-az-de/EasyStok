@@ -468,11 +468,12 @@ public class NotificarClienteStatusPedidoHandlerTests
         var whats = Substitute.For<ICanalMensageria>();
         whats.Canal.Returns(CanalConversa.WhatsApp);
         whats.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns<string>(_ => throw new HttpRequestException("Meta fora"));
+            .Returns<string>(_ => throw new WhatsAppCloudException(131026, "Message undeliverable", ehPermanente: true, 400));
 
         await HandlerDoPago(AvisoComChat(), whats).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
         await AvaliarEventosAsync();
 
+        // #2004: recusa da Meta (nada saiu). Falha incerta (timeout, conexão que caiu) não cai no S13: seria o segundo aviso.
         _outbox.Should().ContainSingle("a automática falhou no canal; o aviso S13 tem retentativa").Which.CorpoRenderizado
             .Should().Contain("Recebemos seu pagamento");
     }

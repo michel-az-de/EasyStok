@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Polly;
+using Polly.CircuitBreaker;
 using Polly.Registry;
 
 namespace EasyStock.Infra.Integrations.UnitTests.WhatsApp;
@@ -529,6 +530,44 @@ public class WhatsAppCloudClientTests
         var act = () => client.EnviarTextoAsync("5511999998888", "Oi");
 
         await act.Should().ThrowAsync<TimeoutException>();
+    }
+
+    /// <summary>
+    /// #2004 atendimento-07: com o disjuntor aberto o POST nem sai. A exceção do Polly caía em "permanente" no
+    /// classificador: sem reenvio automático e com SMS de reserva para uma mensagem que nunca foi tentada. Agora é
+    /// falha temporária (nada saiu), como no caminho das notificações.
+    /// </summary>
+    [Fact]
+    public async Task DisjuntorAbertoNoEnvioViraFalhaTemporariaEOPostNaoSai()
+    {
+        var controle = new CircuitBreakerManualControl();
+        var pipeline = new ResiliencePipelineBuilder()
+            .AddCircuitBreaker(new CircuitBreakerStrategyOptions { ManualControl = controle })
+            .Build();
+        await controle.IsolateAsync();
+        var provider = Substitute.For<ResiliencePipelineProvider<string>>();
+        provider.GetPipeline(Arg.Any<string>()).Returns(pipeline);
+        var handler = new HandlerContador();
+        var client = BuildClient(handler, pipelines: provider);
+
+        var act = () => client.EnviarTextoAsync("5511999998888", "Oi");
+
+        var erro = (await act.Should().ThrowAsync<Exception>()).Which;
+        EasyStock.Application.Services.Atendimento.ClassificadorFalhaEnvio.Classificar(erro)
+            .Should().Be(EasyStock.Domain.Enums.Atendimento.TipoFalhaEnvio.Temporaria);
+        EasyStock.Application.Services.Atendimento.ClassificadorFalhaEnvio.Motivo(erro).Should().NotContain("CANAL_ERRO");
+        handler.Chamadas.Should().Be(0);
+    }
+
+    private sealed class HandlerContador : HttpMessageHandler
+    {
+        public int Chamadas { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Chamadas++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }
     }
 
     private sealed class HandlerQueNaoResponde : HttpMessageHandler

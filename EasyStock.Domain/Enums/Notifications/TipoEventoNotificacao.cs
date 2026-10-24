@@ -101,5 +101,9 @@ public enum TipoEventoNotificacao
     CobrancaAguardandoEquipe = 88,
 
     // #1724-12: o cliente abriu disputa (in_mediation) de um pagamento do Mercado Pago; aviso no sino, pedido intacto.
-    PagamentoEmMediacao = 89
+    PagamentoEmMediacao = 89,
+
+    // #2004: a automática de "pagamento confirmado" não teve resposta do canal e pode não ter chegado ao cliente; o aviso
+    // S13 não sai para não duplicar. Aviso no sino para a equipe conferir a conversa.
+    PagamentoSemAvisoAoCliente = 90
 }

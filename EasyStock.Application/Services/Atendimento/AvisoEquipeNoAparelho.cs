@@ -60,6 +60,30 @@ public sealed class AvisoEquipeNoAparelho(
             alvo.Nome, "pago", null, ct);
     }
 
+    /// <summary>
+    /// #2004: a automática de pagamento confirmado não teve resposta do canal e pode não ter chegado ao cliente. Sino da
+    /// equipe (audiência <c>gestores</c>) com o primeiro nome e a referência do pedido, uma vez por pedido.
+    /// </summary>
+    public async Task PagamentoSemAvisoAoClienteAsync(Guid empresaId, Guid pedidoId, CancellationToken ct)
+    {
+        tenantContext.SetCurrentTenant(empresaId);
+        var pedido = await pedidos.GetByIdAsync(empresaId, pedidoId);
+        if (pedido is null || pedido.EmpresaId != empresaId)
+        {
+            logger.LogWarning("Aviso de pagamento sem confirmação ao cliente sem pedido: pedidoId={PedidoId}", pedidoId);
+            return;
+        }
+
+        var chave = $"pagamento-sem-aviso:{pedido.Id:N}";
+        var payload = JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["nome"] = PrimeiroNome(pedido.ClienteNome),
+            ["referencia"] = pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+            [NotificadorService.ChaveIdempotenciaPayload] = chave,
+        });
+        await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.PagamentoSemAvisoAoCliente, empresaId, payload, pedido.Id, ct, chave);
+    }
+
     public async Task EtapaDoPedidoAsync(Guid empresaId, Guid pedidoId, string statusNovo, CancellationToken ct)
     {
         if (RotuloDaEtapa(statusNovo) is not { } rotulo) return;

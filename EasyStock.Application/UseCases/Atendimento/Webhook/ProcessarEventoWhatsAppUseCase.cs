@@ -11,6 +11,7 @@ using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Enums.Storefront;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 
@@ -41,7 +42,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     ILogger<ProcessarEventoWhatsAppUseCase> logger,
     IPublicadorEventoIntegracao? publicadorEventos = null,
     Ports.Output.Ai.ITranscritorAudio? transcritor = null,
-    IPedidoRepository? pedidos = null)
+    IPedidoRepository? pedidos = null,
+    IRegraAutomaticaRepository? regrasAutomaticas = null)
 {
     private const string Provedor = "meta_whatsapp";
 
@@ -355,8 +357,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             }
 
             // RN-01: a saudação sai antes do agente, sem LLM, para caber nos 5 s. Sem agente para cumprir
-            // o "já te respondo" (botão "acao:", reação), não há saudação (issue 1285).
-            if (identificacao is not null && !SemRespostaAutomatica(msg.Tipo, mensagem.BotaoId))
+            // o "já te respondo" (botão "acao:", reação), não há saudação (issue 1285). #2004: com a automática da
+            // situação ligada, é ela que fala (a saudação direta e a automática eram duas mensagens para a mesma entrada).
+            if (identificacao is not null && !SemRespostaAutomatica(msg.Tipo, mensagem.BotaoId)
+                && !await AutomaticaDeEntradaFalaNoLugarDaSaudacaoAsync(empresaId, ct))
                 await EnviarSaudacaoAsync(empresaId, conversa, configuracao, identificacao, ct);
 
             if (EhAcaoDeBotao(mensagem.BotaoId))
@@ -489,6 +493,33 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             logger.LogError(ex, "Webhook WhatsApp: falha registrando a saudação da conversa {ConversaId}.", conversa.Id);
             // Não deixa o insert pendente contaminar o commit da próxima mensagem do lote.
             unitOfWork.DescartarAlteracoesPendentes();
+        }
+    }
+
+    /// <summary>
+    /// #2004: a conversa nova já publicou <c>conversa.aberta</c>, que dispara a automática de primeira entrada (primeiro
+    /// contato, fora do horário ou loja fechada, a que vale agora) pelo outbox. Com essa regra ligada a dona escolheu o que
+    /// o cliente lê, e a saudação direta (ou o aviso do expediente) cairia como segunda mensagem. Sem outbox, sem regra ou
+    /// com falha ao consultar, a saudação sai aqui. Se a automática ligada não sair (variável sem valor, falha do canal, situação
+    /// que mudou), o <see cref="Automacoes.DispararAutomacaoUseCase.DispararPrimeiraEntradaAsync"/> manda a saudação no lugar.
+    /// </summary>
+    private async Task<bool> AutomaticaDeEntradaFalaNoLugarDaSaudacaoAsync(Guid empresaId, CancellationToken ct)
+    {
+        if (publicadorEventos is null || regrasAutomaticas is null) return false;
+        try
+        {
+            var expediente = await expedientes.GetByEmpresaIdAsync(empresaId, ct) ?? ExpedienteLoja.CriarPadrao(empresaId);
+            var agora = relogio.GetUtcNow().UtcDateTime;
+            var gatilho = RegraAutomatica.GatilhoDaPrimeiraEntrada(
+                expediente.EstaAberta(agora), expediente.ControleManual == ControleManualLoja.ForcarFechada);
+            var regra = await regrasAutomaticas.ObterPorGatilhoAsync(empresaId, gatilho, ct)
+                ?? RegraAutomatica.Padrao(empresaId, gatilho, agora);
+            return regra is { Ligada: true };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Webhook WhatsApp: não consegui ler a automática de primeira entrada; a saudação sai.");
+            return false;
         }
     }
 

@@ -13,9 +13,13 @@ namespace EasyStock.Application.UseCases.Atendimento.Automacoes;
 /// Um disparo de automática. A conversa vem pelo id quando o evento a conhece; senão é a mais recente do
 /// cliente. O pedido alimenta <c>{pedido}</c> e <c>{faixa}</c>.
 /// </summary>
-public sealed record DisparoAutomacao(Guid EmpresaId, GatilhoAutomacao Gatilho, Guid? ConversaId, Guid? ClienteId, Guid? PedidoId);
+public sealed record DisparoAutomacao(
+    Guid EmpresaId, GatilhoAutomacao Gatilho, Guid? ConversaId, Guid? ClienteId, Guid? PedidoId, bool PagamentoManual = false);
 
-/// <summary>O que aconteceu com o disparo. Só <see cref="Enviada"/> sai para o cliente.</summary>
+/// <summary>
+/// O que aconteceu com o disparo. Só <see cref="Enviada"/> sai para o cliente; <see cref="EnvioIncerto"/> pode ter saído
+/// (o canal não respondeu), então quem decide um aviso de reserva não deve tratá-lo como "não saiu".
+/// </summary>
 public enum ResultadoAutomacao
 {
     Enviada = 1,
@@ -28,7 +32,9 @@ public enum ResultadoAutomacao
     Falhou = 8,
     ClienteBloqueado = 9,
     ConversaReaberta = 10,
-    PedidoCancelado = 11
+    PedidoCancelado = 11,
+    EnvioIncerto = 12,
+    PedidoJaAdiante = 13
 }
 
 /// <summary>
@@ -53,12 +59,20 @@ public sealed class DispararAutomacaoUseCase(
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
     ILogger<DispararAutomacaoUseCase> logger,
-    IPedidoRepository? pedidos = null)
+    IPedidoRepository? pedidos = null,
+    SaudacaoAtendimento? saudacao = null,
+    IConfiguracaoAtendimentoRepository? configuracoes = null)
 {
     /// <summary>
     /// Primeira mensagem de uma conversa: sai só uma automática. Loja fechada na mão vence fora do
     /// horário, que vence o primeiro contato (<see cref="RegraAutomatica.GatilhoDaPrimeiraEntrada"/>).
     /// A regra escolhida desligada não cai para outra.
+    ///
+    /// <para>
+    /// #2004: o webhook cede a saudação direta à automática quando a regra da situação está ligada. Se a automática não
+    /// sai (variável sem valor, falha do canal, regra que mudou ou situação que virou outra até o outbox rodar), a
+    /// saudação sai aqui: o cliente novo nunca fica sem resposta por causa dessa cessão.
+    /// </para>
     /// </summary>
     public async Task<ResultadoAutomacao> DispararPrimeiraEntradaAsync(Guid empresaId, Guid conversaId, CancellationToken ct = default)
     {
@@ -66,7 +80,56 @@ public sealed class DispararAutomacaoUseCase(
         var agora = relogio.GetUtcNow().UtcDateTime;
         var gatilho = RegraAutomatica.GatilhoDaPrimeiraEntrada(
             expediente.EstaAberta(agora), expediente.ControleManual == ControleManualLoja.ForcarFechada);
-        return await ExecuteAsync(new DisparoAutomacao(empresaId, gatilho, conversaId, null, null), ct);
+        var resultado = await ExecuteAsync(new DisparoAutomacao(empresaId, gatilho, conversaId, null, null), ct);
+        // Enviada e EnvioIncerto já falaram (ou podem ter falado); bloqueio e falta de consentimento são decisão do cliente.
+        if (resultado is ResultadoAutomacao.SemRegra or ResultadoAutomacao.Desligada
+            or ResultadoAutomacao.VariavelSemValor or ResultadoAutomacao.Falhou)
+            await EnviarSaudacaoDeReservaAsync(empresaId, conversaId, expediente, ct);
+        return resultado;
+    }
+
+    /// <summary>
+    /// A saudação do webhook (RN-01) enviada pelo outbox: só em conversa aberta do WhatsApp (único canal com saudação
+    /// direta) em que ninguém falou com o cliente ainda (a saída mais nova que a última entrada é a saudação do webhook),
+    /// de cliente que pode receber. Fora do horário vale o aviso do expediente, como no webhook. Nunca lança.
+    /// </summary>
+    private async Task EnviarSaudacaoDeReservaAsync(Guid empresaId, Guid conversaId, ExpedienteLoja expediente, CancellationToken ct)
+    {
+        if (saudacao is null || configuracoes is null) return;
+        Conversa? conversa = null;
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        string texto = string.Empty;
+        try
+        {
+            conversa = await conversas.ObterPorIdAsync(empresaId, conversaId, ct);
+            if (conversa is null || conversa.Canal != CanalConversa.WhatsApp || !conversa.EstaAberta) return;
+            if (conversa.UltimaMensagemEm > (conversa.UltimaMensagemEntradaEm ?? conversa.IniciadaEm)) return;
+
+            var cliente = conversa.ClienteId is { } id ? await clientes.GetByIdAsync(empresaId, id) : null;
+            if (cliente?.Bloqueado == true) return;
+            if (conversa.ClienteId is { } c
+                && !await politica.PodeEnviarAsync(empresaId, c, conversa.Canal, FinalidadeContato.Transacional, ct))
+                return;
+
+            var primeiroNome = cliente is { OrderCount: > 0 } ? NomesDeContato.PrimeiroNome(cliente.Nome) : null;
+            texto = expediente.MensagemParaCliente(agora)
+                ?? SaudacaoAtendimento.Montar(await configuracoes.GetOrDefaultAsync(empresaId), primeiroNome,
+                    await saudacao.ResolverLinkCardapioAsync(empresaId, ct));
+
+            var idExterno = await canais.Obter(conversa.Canal).EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct);
+            conversa.RegistrarSaida(agora);
+            await conversas.AddMensagemAsync(
+                Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto, texto, idExterno), ct);
+            await unitOfWork.CommitAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Saudação de reserva da conversa {ConversaId} falhou.", conversaId);
+            if (conversa is not null && texto.Length > 0)
+                await RegistrarFalhaAsync(conversa, texto, ex, ClassificadorFalhaEnvio.Classificar(ex), agora, GatilhoAutomacao.PrimeiroContato);
+            else
+                unitOfWork.DescartarAlteracoesPendentes();
+        }
     }
 
     public async Task<ResultadoAutomacao> ExecuteAsync(DisparoAutomacao disparo, CancellationToken ct = default)
@@ -83,7 +146,9 @@ public sealed class DispararAutomacaoUseCase(
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Automática {Gatilho} falhou no canal da conversa {ConversaId}.", disparo.Gatilho, conversa.Id);
-            return ResultadoAutomacao.Falhou;
+            var tipo = ClassificadorFalhaEnvio.Classificar(ex);
+            await RegistrarFalhaAsync(conversa, texto, ex, tipo, agora, disparo.Gatilho);
+            return tipo == TipoFalhaEnvio.Incerta ? ResultadoAutomacao.EnvioIncerto : ResultadoAutomacao.Falhou;
         }
 
         var saida = Mensagem.Saida(disparo.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
@@ -93,6 +158,31 @@ public sealed class DispararAutomacaoUseCase(
         await conversas.AddMensagemAsync(saida, ct);
         await unitOfWork.CommitAsync();
         return ResultadoAutomacao.Enviada;
+    }
+
+    /// <summary>
+    /// #2004: a automática que não saiu fica no histórico como mensagem com falha, como a saudação e o aviso de cobrança
+    /// (#1724): a atendente vê no console que o cliente não recebeu. Sem reenvio automático (o texto pode estar vencido,
+    /// #1933). Vale também com a conversa encerrada antes de o outbox rodar (o pagamento confirmado que não chegou precisa
+    /// de rastro); só a despedida de uma conversa encerrada não suja o histórico. Best-effort: quem chama é um handler do
+    /// outbox e este caminho nunca lança.
+    /// </summary>
+    private async Task RegistrarFalhaAsync(
+        Conversa conversa, string texto, Exception ex, TipoFalhaEnvio tipo, DateTime agora, GatilhoAutomacao gatilho)
+    {
+        if (!conversa.EstaAberta && gatilho == GatilhoAutomacao.Encerramento) return;
+        try
+        {
+            var falhou = Mensagem.Saida(conversa.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto, texto);
+            falhou.RegistrarFalhaEnvio(ClassificadorFalhaEnvio.Motivo(ex), tipo, agora, reenvioAutomatico: false);
+            await conversas.AddMensagemAsync(falhou);
+            await unitOfWork.CommitAsync();
+        }
+        catch (Exception erroAoGravar)
+        {
+            logger.LogWarning(erroAoGravar, "Automática falhou e o registro da falha também: conversa {ConversaId}.", conversa.Id);
+            unitOfWork.DescartarAlteracoesPendentes();
+        }
     }
 
     /// <summary>O que a automática vai mandar (<see cref="Pronta"/>; falta só o canal aceitar), ou por que não sai.</summary>
@@ -109,10 +199,17 @@ public sealed class DispararAutomacaoUseCase(
         if (regra is null) return new NaoSai(ResultadoAutomacao.SemRegra);
         if (!regra.Ligada) return new NaoSai(ResultadoAutomacao.Desligada);
 
-        // Pagamento que chegou depois do cancelamento é devolvido: não dizer que o pedido está garantido (como o S13).
-        if (disparo.Gatilho == GatilhoAutomacao.PagamentoConfirmado && disparo.PedidoId is { } pedidoId && pedidos is not null
-            && (await pedidos.GetByIdAsync(disparo.EmpresaId, pedidoId))?.StatusEnum == StatusPedido.Cancelado)
-            return new NaoSai(Registrar(disparo, ResultadoAutomacao.PedidoCancelado));
+        if (disparo.Gatilho == GatilhoAutomacao.PagamentoConfirmado && disparo.PedidoId is { } pedidoId && pedidos is not null)
+        {
+            var status = (await pedidos.GetByIdAsync(disparo.EmpresaId, pedidoId))?.StatusEnum;
+            // Pagamento que chegou depois do cancelamento é devolvido: não dizer que o pedido está garantido (como o S13).
+            if (status == StatusPedido.Cancelado) return new NaoSai(Registrar(disparo, ResultadoAutomacao.PedidoCancelado));
+            // #2004: dinheiro recebido na porta é quitado depois de o pedido sair ou ser entregue; "recebemos seu pagamento
+            // e seu pedido está confirmado" não faz mais sentido. Pagamento online (Mercado Pago) segue: o cliente pagou
+            // o link e quer a confirmação, mesmo com o pedido na rua.
+            if (disparo.PagamentoManual && status is StatusPedido.SaiuParaEntrega or StatusPedido.Entregue)
+                return new NaoSai(Registrar(disparo, ResultadoAutomacao.PedidoJaAdiante));
+        }
 
         var conversa = await ConversaAsync(disparo, ct);
         if (conversa is null) return new NaoSai(Registrar(disparo, ResultadoAutomacao.SemConversa));

@@ -63,6 +63,8 @@ public sealed class PoliticaValidadeNotificacao
             [TipoEventoNotificacao.CobrancaAguardandoEquipe] = TimeSpan.FromHours(12),
             // #1724-12: a disputa tem prazo de resposta no Mercado Pago; o aviso vale o dia.
             [TipoEventoNotificacao.PagamentoEmMediacao] = TimeSpan.FromHours(24),
+            // #2004: o cliente pode estar sem a confirmação; o aviso vale o turno.
+            [TipoEventoNotificacao.PagamentoSemAvisoAoCliente] = TimeSpan.FromHours(12),
 
             // Catalogo de plataforma (N13). ConviteAcesso fica no padrao de 24 h, como a N9 espera.
             [TipoEventoNotificacao.IncidenteSistema] = TimeSpan.FromHours(2),

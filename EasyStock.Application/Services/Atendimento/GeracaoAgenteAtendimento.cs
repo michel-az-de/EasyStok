@@ -143,14 +143,16 @@ public static class GeracaoAgenteAtendimento
 
     /// <summary>
     /// Cliente → <c>user</c>; agente e dona → <c>assistant</c>. Mensagens do sistema não entram na
-    /// conversa (vão para o dossiê). Mensagens seguidas do mesmo papel viram uma só. As
+    /// conversa (vão para o dossiê), nem as saídas que falharam de vez ao enviar (#2004: o cliente nunca as recebeu, e o
+    /// agente responderia "já te mandei acima"). A falha incerta ou com reenvio agendado entra marcada
+    /// <see cref="MarcadorNaoConfirmada"/>. Mensagens seguidas do mesmo papel viram uma só. As
     /// <paramref name="pendentes"/> vão para o fim: o agente ainda não as viu (#1288).
     /// </summary>
     public static List<MensagemLlm> MontarConversacao(IReadOnlyList<Mensagem> historico, IReadOnlyList<Mensagem> pendentes)
     {
         var resultado = new List<MensagemLlm>();
         var ordenado = historico.Where(m => !pendentes.Contains(m)).Concat(pendentes);
-        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema))
+        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema && !FalhouDeVez(m)))
         {
             var papel = msg.Autor == AutorMensagem.Cliente ? MensagemLlm.Usuario : MensagemLlm.Assistente;
             var texto = msg.Autor switch
@@ -161,6 +163,7 @@ public static class GeracaoAgenteAtendimento
                 _ => msg.Texto ?? string.Empty
             };
             if (string.IsNullOrWhiteSpace(texto)) continue;
+            if (msg.Status == StatusMensagem.Falhou) texto = $"{MarcadorNaoConfirmada} {texto}";
 
             AcrescentarTexto(resultado, papel, texto);
         }
@@ -171,6 +174,18 @@ public static class GeracaoAgenteAtendimento
 
         return resultado;
     }
+
+    /// <summary>#2004: saída que pode ter chegado ao cliente (falha incerta) ou que o reenvio automático ainda vai entregar.</summary>
+    public const string MarcadorNaoConfirmada = "[não confirmada]";
+
+    /// <summary>
+    /// #2004: falha definitiva: o cliente nunca recebeu a saída e nada vai entregá-la. Falha incerta (pode ter chegado) e
+    /// temporária com reenvio agendado seguem no histórico, marcadas com <see cref="MarcadorNaoConfirmada"/>.
+    /// </summary>
+    private static bool FalhouDeVez(Mensagem m) =>
+        m.Status == StatusMensagem.Falhou
+        && m.UltimaFalhaEnvio != TipoFalhaEnvio.Incerta
+        && !(m.UltimaFalhaEnvio == TipoFalhaEnvio.Temporaria && m.ProximoReenvioEm is not null);
 
     /// <summary>Texto no fim da conversa: junta à última mensagem se o papel for o mesmo.</summary>
     public static void AcrescentarTexto(List<MensagemLlm> mensagens, string papel, string texto)
