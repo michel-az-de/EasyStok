@@ -64,6 +64,22 @@ public class ObterPedidoConversaUseCaseTests
         resultado!.RequerAprovacao.Should().BeTrue();
     }
 
+    // #2002 comanda-12: a alteração da comanda troca só os pratos do cardápio. O que o pedido tem além deles (frete e a linha
+    // que a casa lançou à mão pelo PWA) fica no total, então entra na conta do total proposto e na do aceite, a mesma.
+    [Fact]
+    public async Task ForaDoCardapio_SomaOFreteEALinhaLancadaPelaCasa_EAFichaSeparaSoOFrete()
+    {
+        var conversa = NovaConversa();
+        var pedido = NovoPedido(conversa);
+        pedido.Itens.Add(new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = Guid.NewGuid(),
+            Nome = "Embalagem térmica", Quantidade = 1, PrecoUnitario = 4m, Subtotal = 4m });
+
+        ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido).Should().Be(12m, "frete 8 + linha da casa 4");
+        var resultado = await _useCase.ExecuteAsync(_empresaId, conversa.Id);
+        resultado!.Frete.Should().Be(8m, "a tela separa só o frete; a linha da casa aparece entre os itens");
+        resultado.Itens.Should().Contain(i => i.Nome == "Embalagem térmica");
+    }
+
     [Fact]
     public async Task SemPedido_DevolveNulo()
     {

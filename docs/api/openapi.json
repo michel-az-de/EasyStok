@@ -29084,7 +29084,7 @@
           "Menu"
         ],
         "summary": "Lista os items visíveis do cardápio do storefront identificado por\r\nslug. Ordenação: categoria ASC → ordemExibicao ASC.",
-        "description": "Endpoint anônimo. Retorna apenas items com Visivel=true. Cache HTTP 5min (browser + edge). Suporta ETag/If-None-Match para 304 Not Modified.",
+        "description": "Endpoint anônimo. Retorna apenas items com Visivel=true. Cache HTTP revalidado a cada leitura (browser + edge). Suporta ETag/If-None-Match para 304 Not Modified.",
         "parameters": [
           {
             "name": "slug",
@@ -40080,7 +40080,7 @@
     },
     {
       "name": "Menu",
-      "description": "Endpoint público do cardápio do storefront (ADR-0012 / TASK-EZ-MENU-001).\r\n            \r\n<br><strong>Anônimo</strong>: cliente storefront NÃO está autenticado nesta fase.\r\nTenant vem do slug na rota. CORS permite a origem pública (configurado em\r\n`AddEasyStockCors`).\r\n<br><strong>Cache HTTP</strong>: `Cache-Control: public, max-age=300, s-maxage=300`\r\n(5 min em browser + edge). Cloudflare cacheia na borda. Invalidação cross-edge é\r\neventual — aceitável pro MVP. ETag SHA-256 do payload permite `304 Not Modified`\r\nquando o cliente envia `If-None-Match`.\r\n<br><strong>Storefront inativo</strong> retorna 404 (não 403) para não vazar\r\nexistência do tenant.\r\n"
+      "description": "Endpoint público do cardápio do storefront (ADR-0012 / TASK-EZ-MENU-001).\r\n            \r\n<br><strong>Anônimo</strong>: cliente storefront NÃO está autenticado nesta fase.\r\nTenant vem do slug na rota. CORS permite a origem pública (configurado em\r\n`AddEasyStockCors`).\r\n<br><strong>Cache HTTP</strong>: `Cache-Control: public, no-cache` (#2002). O browser e a borda guardam a cópia\r\ne perguntam ao servidor a cada leitura; o ETag SHA-256 do payload responde `304 Not Modified` sem reenviar o\r\ncorpo quando o cliente manda `If-None-Match`. Com `max-age`, o prato esgotado ou o preço novo demorava\r\nminutos para chegar a quem já tinha o cardápio.\r\n<br><strong>Storefront inativo</strong> retorna 404 (não 403) para não vazar\r\nexistência do tenant.\r\n"
     },
     {
       "name": "PedidosCliente",

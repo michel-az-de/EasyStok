@@ -74,9 +74,11 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
                 && (dados.PedidoResumoHash is null || dados.PedidoResumoHash != ComandaClienteUseCase.ResumoHash(pedido)))
                 throw new ComandaClienteConflitoException("O pedido mudou desde a solicitação. Gere um novo link para o cliente conferir.");
             var selecao = await comanda.SelecionarAsync(input.EmpresaId, dados.Itens, pedido, t);
+            // #2002 comanda-02: lidas antes de trocar as linhas do pedido.
+            var pratosMantidos = ComandaClienteUseCase.PratosMantidos(dados.Itens, pedido);
+            var linhasMantidas = ComandaClienteUseCase.LinhasMantidas(dados.Itens, pedido);
             var antigos = pedido.Itens.Where(i => i.CardapioItemId is not null).ToList();
-            var frete = pedido.Itens.Except(antigos).Sum(i => i.Subtotal);
-            var novoTotal = selecao.Sum(i => i.Qtd * i.Preco) + frete;
+            var novoTotal = selecao.Sum(i => i.Qtd * i.Preco) + ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido);
             var saldoAnterior = await saldos.ConsultarAsync(pedido, t);
             if (saldoAnterior.Reservado > 0) throw new ComandaClienteConflitoException("Aguarde a devolução em andamento antes de alterar de novo.");
             var devolucao = Math.Max(0, saldoAnterior.Alocado - novoTotal);
@@ -99,8 +101,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
                 foreach (var item in antigos) await estoque.DevolverItemAsync(pedido, item, t);
             foreach (var item in antigos) pedido.Itens.Remove(item);
             var loja = await vitrines.GetByEmpresaAsync(input.EmpresaId, t) ?? throw new UseCaseValidationException("Cardápio indisponível.");
-            var menu = await checkout.CarregarItensCardapioAsync(loja.Id, dados.Itens.Select(i => i.CardapioItemId), t);
-            var novos = await checkout.AdicionarItensAsync(pedido, dados.Itens, menu, t);
+            var menu = await checkout.CarregarItensCardapioAsync(loja.Id, dados.Itens.Select(i => i.CardapioItemId), t, pratosMantidos);
+            var novos = await checkout.AdicionarItensAsync(pedido, dados.Itens, menu, t, linhasMantidas);
             for (var i = 0; i < novos.Count; i++)
             {
                 novos[i].PrecoUnitario = selecao[i].Preco;

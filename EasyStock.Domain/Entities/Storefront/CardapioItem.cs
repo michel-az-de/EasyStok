@@ -101,6 +101,9 @@ public class CardapioItem
     public string? FotoUrl { get; private set; }
     public string FotosJson { get; private set; } = "[]";
 
+    /// <summary>#2002 comanda-06: o nome vira <c>pedido_itens.Nome</c> (150); com mais que isso o INSERT do pedido estourava.</summary>
+    public const int LimiteNome = 150;
+
     public const int LimiteFotosGaleria = 5;
     public const string MensagemLimiteFotos = "O item já possui o limite de 5 fotos.";
 
@@ -171,6 +174,12 @@ public class CardapioItem
     public DateOnly? NovidadeAte { get; private set; }
 
     public bool EstaArquivado => ArquivadoEm.HasValue;
+
+    /// <summary>
+    /// A categoria do prato está escondida (M1.3, #1483): esconde os pratos dela do site e da comanda. É regra de venda,
+    /// não só de listagem: o checkout também recusa (#2002). Precisa da <see cref="Secao"/> carregada.
+    /// </summary>
+    public bool EmSecaoOculta => Secao is { Visivel: false };
 
     /// <summary>
     /// Liga o prato avulso a um produto do estoque (M2.2, D-M1-01: o que a casa produz é vinculado).
@@ -268,7 +277,7 @@ public class CardapioItem
         if (string.IsNullOrWhiteSpace(nome))
             throw new RegraDeDominioVioladaException("Nome é obrigatório para item avulso.");
 
-        ValidarTamanho(nome, max: 200, nome: "Nome do item");
+        ValidarTamanho(nome, max: LimiteNome, nome: "Nome do item");
 
         if (precoEmReais <= 0m)
             throw new RegraDeDominioVioladaException(
@@ -446,7 +455,7 @@ public class CardapioItem
         {
             if (string.IsNullOrWhiteSpace(nomePublico))
                 throw new RegraDeDominioVioladaException("Nome não pode ser vazio.");
-            ValidarTamanho(nomePublico, max: 200, nome: "Nome do item");
+            ValidarTamanho(nomePublico, max: LimiteNome, nome: "Nome do item");
             NomePublico = nomePublico.Trim().ToLowerInvariant();
         }
 
@@ -500,6 +509,9 @@ public class CardapioItem
                 throw new RegraDeDominioVioladaException(
                     // BUG-011: evita '¤'/formato contábil EN do :C com cultura invariante.
                     $"Preço do storefront não pode ser negativo (recebido: R$ {precoStorefront.Value:0.00}).");
+            // #2002 comanda-05: como no cadastro (CriarAvulso), o preço gravado vale mais que zero.
+            if (precoStorefront.Value == 0m)
+                throw new RegraDeDominioVioladaException("Preço do storefront deve ser maior que zero.");
             if (precoStorefront.Value > 999_999.99m)
                 throw new RegraDeDominioVioladaException(
                     "Preço acima do limite permitido (máximo R$ 999.999,99).");
@@ -615,8 +627,9 @@ public class CardapioItem
     /// M1.4b (#1531): a porção que o pedido vai cobrar. Prato sem porções devolve null (vale o preço do
     /// item). Com porções, vale a pedida ou, sem nenhuma informada, a <see cref="VariacaoPadrao"/>
     /// (site e agente ainda não escolhem porção). Porção de outro prato ou esgotada recusa.
+    /// <paramref name="exigirDisponivel"/> false (#2002): a porção esgotada que o pedido já reservou segue na alteração.
     /// </summary>
-    public CardapioItemVariacao? PorcaoParaVenda(Guid? variacaoId)
+    public CardapioItemVariacao? PorcaoParaVenda(Guid? variacaoId, bool exigirDisponivel = true)
     {
         var nome = NomeEfetivo() is { Length: > 0 } n ? n : "O item";
         if (!TemVariacoes())
@@ -625,7 +638,7 @@ public class CardapioItem
         var porcao = variacaoId is { } id ? Variacoes.FirstOrDefault(v => v.Id == id) : VariacaoPadrao();
         if (porcao is null)
             throw new RegraDeDominioVioladaException($"{nome} não tem essa porção.");
-        if (!porcao.Disponivel)
+        if (exigirDisponivel && !porcao.Disponivel)
             throw new RegraDeDominioVioladaException($"{nome} {porcao.Rotulo} está esgotado agora.");
         return porcao;
     }

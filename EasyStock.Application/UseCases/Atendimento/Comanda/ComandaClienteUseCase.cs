@@ -247,7 +247,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         return new(link.Id, (cliente?.Nome ?? conversa.ContatoNome ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "",
             HorarioBrasil.DataOperacional(link.CriadoEm), link.ExpiraEm, link.Revisao, pode, dados, selecao, detalhe,
             envio, cupons,
-            selecao.Sum(i => i.Qtd * i.Preco) + (detalhe?.Frete ?? valorCombinado ?? 0m), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
+            selecao.Sum(i => i.Qtd * i.Preco) + (pedido is null ? valorCombinado ?? 0m : ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido)), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
             cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado,
             ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm,
             encerrado is null ? null : StatusPedidoMapper.Format(encerrado.StatusEnum));
@@ -394,12 +394,12 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 if (!PodeAlterar(pedido) || pedido.AlteradoEm != dados.PedidoAtualizadoEm)
                     throw new ComandaClienteConflitoException("O pedido mudou. Recarregue antes de enviar a alteração.");
                 var selecao = await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, t);
-                var total = selecao.Sum(i => i.Qtd * i.Preco) + estado.Pedido!.Frete;
+                var total = selecao.Sum(i => i.Qtd * i.Preco) + ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido);
                 link.Consumir(agora);
                 resultado = new(pedido.Id, "alteracao_aguardando_confirmacao", total,
                     total - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado);
                 // E10: a data nova pedida pelo link aparece para a equipe junto com o total.
-                var novaData = dados.DataPedidaPeloCliente(estado.Pedido.Janela?.JanelaId, estado.Pedido.Janela?.Data) is { } pedida
+                var novaData = dados.DataPedidaPeloCliente(estado.Pedido!.Janela?.JanelaId, estado.Pedido.Janela?.Data) is { } pedida
                     ? $" Nova data de entrega: {pedida.Data:dd/MM}." : "";
                 await conversas.AddMensagemAsync(Mensagem.Saida(link.EmpresaId, link.ConversaId, AutorMensagem.Sistema, agora,
                     TipoConteudoMensagem.Texto, $"Cliente enviou uma alteração de comanda. Total proposto: {total.ToString("C", Cultura.PtBr)}.{novaData} Confira a seleção na Ficha."), t);
@@ -777,7 +777,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     {
         if (itens.Count == 0) return [];
         var menu = validar
-            ? await checkout.CarregarItensCardapioAsync((await LojaAsync(empresaId, ct)).Id, itens.Select(i => i.CardapioItemId), ct)
+            ? await checkout.CarregarItensCardapioAsync((await LojaAsync(empresaId, ct)).Id, itens.Select(i => i.CardapioItemId), ct,
+                PratosMantidos(itens, pedido))
             : await CardapioCompletoAsync(empresaId, ct);
         return Selecionar(itens, pedido, menu, validar);
     }
@@ -791,9 +792,34 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     private Task<Conversa?> ConversaAsync(Guid empresaId, Guid conversaId, LeituraComanda leitura, CancellationToken ct) =>
         leitura.ObterAsync("conversa", conversaId, () => conversas.ObterPorIdAsync(empresaId, conversaId, ct));
 
+    /// <summary>
+    /// #2002 comanda-02: as linhas que o pedido já reservou, do mesmo prato e da mesma porção, na quantidade igual ou menor.
+    /// Prato que esgotou depois do pedido não trava a alteração dessas linhas; só acrescentar quantidade ou prato novo exige
+    /// que ele esteja à venda.
+    /// </summary>
+    public static IReadOnlySet<(Guid CardapioItemId, Guid? VariacaoId)> LinhasMantidas(IEnumerable<ItemPedidoCheckout> itens, PedidoEntity? pedido)
+    {
+        if (pedido is null) return new HashSet<(Guid, Guid?)>();
+        var reservado = pedido.Itens.Where(p => p.CardapioItemId is not null)
+            .GroupBy(p => (p.CardapioItemId!.Value, p.CardapioItemVariacaoId))
+            .ToDictionary(g => g.Key, g => g.Sum(p => p.Quantidade));
+        return itens.Where(i => reservado.TryGetValue((i.CardapioItemId, i.VariacaoId), out var qtd) && i.Qtd <= qtd)
+            .Select(i => (i.CardapioItemId, i.VariacaoId)).ToHashSet();
+    }
+
+    /// <summary>Os pratos cujas linhas, todas, o pedido já reserva (<see cref="LinhasMantidas"/>): só esses dispensam estar à venda.</summary>
+    public static IReadOnlySet<Guid> PratosMantidos(IReadOnlyList<ItemPedidoCheckout> itens, PedidoEntity? pedido)
+    {
+        var mantidas = LinhasMantidas(itens, pedido);
+        return itens.GroupBy(i => i.CardapioItemId)
+            .Where(g => g.All(i => mantidas.Contains((i.CardapioItemId, i.VariacaoId))))
+            .Select(g => g.Key).ToHashSet();
+    }
+
     private static IReadOnlyList<ItemSelecionadoComanda> Selecionar(IReadOnlyList<ItemPedidoCheckout> itens, PedidoEntity? pedido,
         IReadOnlyDictionary<Guid, CardapioItem> menu, bool validar)
     {
+        var mantidas = validar ? LinhasMantidas(itens, pedido) : new HashSet<(Guid, Guid?)>();
         return itens.Select(i =>
         {
             if (!menu.TryGetValue(i.CardapioItemId, out var prato))
@@ -801,7 +827,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 var salvo = pedido?.Itens.FirstOrDefault(p => p.CardapioItemId == i.CardapioItemId && p.CardapioItemVariacaoId == i.VariacaoId);
                 return new ItemSelecionadoComanda(i.CardapioItemId, i.VariacaoId, salvo?.Nome ?? "Item indisponível", i.Qtd, salvo?.PrecoUnitario ?? 0m, i.Observacao);
             }
-            var porcao = validar ? prato.PorcaoParaVenda(i.VariacaoId)
+            var porcao = validar ? prato.PorcaoParaVenda(i.VariacaoId, exigirDisponivel: !mantidas.Contains((i.CardapioItemId, i.VariacaoId)))
                 : prato.Variacoes.FirstOrDefault(v => i.VariacaoId is null ? v.EhPadrao : v.Id == i.VariacaoId);
             var anterior = pedido?.Itens.FirstOrDefault(p => p.CardapioItemId == i.CardapioItemId && p.CardapioItemVariacaoId == porcao?.Id);
             return new ItemSelecionadoComanda(i.CardapioItemId, porcao?.Id, prato.NomeEfetivo() ?? "", i.Qtd,
@@ -866,6 +892,12 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             || dados.Itens.GroupBy(i => (i.CardapioItemId, i.VariacaoId)).Any(g => g.Count() > 1)
             || dados.Observacoes?.Length > 2000 || dados.Acerto is not ("estorno" or "cupom") || dados.CodigoCupom?.Length > 35)
             throw new UseCaseValidationException("Confira os itens, quantidades e observações da comanda.");
+        // #2002 comanda-07: o rascunho inteiro volta em todo GET e no SSE; o teto é o do cadastro (Cliente.Nome 150,
+        // Telefone 32) e, no endereço, o do pedido (EnderecoCheckout.Validar), sem exigir o endereço completo: a atendente confere o parcial (#1839).
+        if (dados.Nome?.Length > 150 || dados.Telefone?.Length > 32 || dados.Endereco is { } e
+            && (e.Cep?.Length > 20 || e.Logradouro?.Length > 200 || e.Numero?.Length > 20 || e.Bairro?.Length > 100
+                || e.Cidade?.Length > 100 || e.Uf?.Length > 2 || e.Complemento?.Length > 100))
+            throw new UseCaseValidationException("Confira o nome, o telefone e o endereço: algum campo passou do tamanho permitido.");
     }
 
     /// <summary>

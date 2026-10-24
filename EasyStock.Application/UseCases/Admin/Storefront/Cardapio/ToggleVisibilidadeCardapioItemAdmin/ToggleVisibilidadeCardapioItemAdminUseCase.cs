@@ -5,10 +5,10 @@ using EasyStock.Domain.Exceptions.Storefront;
 namespace EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 
 /// <summary>
-/// Alterna Visivel do CardapioItem. Operação idempotente — chamar 2x volta ao
-/// estado original (toggle).
+/// Alterna Visivel do CardapioItem: chamar 2x volta ao estado original (toggle). Com <c>Alvo</c> (#2002), grava o valor
+/// pedido, e o clique repetido ou concorrente não inverte de volta.
 /// </summary>
-public sealed record ToggleVisibilidadeCardapioItemAdminCommand(Guid StorefrontId, Guid ItemId, Guid? EmpresaId = null) : ICommand;
+public sealed record ToggleVisibilidadeCardapioItemAdminCommand(Guid StorefrontId, Guid ItemId, Guid? EmpresaId = null, bool? Alvo = null) : ICommand;
 
 public sealed record ToggleVisibilidadeCardapioItemAdminResult(Guid ItemId, bool VisivelAgora);
 
@@ -25,8 +25,8 @@ public class ToggleVisibilidadeCardapioItemAdminUseCase(
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 
         var ofertadoAntes = AvisoItemComInteresse.Ofertado(item);
-        if (item.Visivel) item.Ocultar();
-        else item.TornarVisivel();
+        if (command.Alvo ?? !item.Visivel) item.TornarVisivel();
+        else item.Ocultar();
 
         await cardapioRepository.UpdateAsync(item);
         await unitOfWork.CommitAsync();

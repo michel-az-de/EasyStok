@@ -20,6 +20,8 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .AsSplitQuery()
             .Include(c => c.Produto)
             .Include(c => c.Variacoes)
+            // #2002: o checkout recusa o prato de categoria escondida, como a listagem.
+            .Include(c => c.Secao)
             .Where(c => c.StorefrontId == storefrontId && ids.Contains(c.Id))
             .ToListAsync(ct);
 

@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Campanhas;
@@ -28,6 +29,7 @@ public class ItensDoCardapioComandaUseCaseTests
     private readonly IProdutoVariacaoRepository _variacoes = Substitute.For<IProdutoVariacaoRepository>();
     private readonly List<ProdutoVariacao> _variacoesGravadas = [];
     private readonly IProdutoRepository _produtos = Substitute.For<IProdutoRepository>();
+    private readonly ICardapioPublicoCache _publico = Substitute.For<ICardapioPublicoCache>();
 
     public ItensDoCardapioComandaUseCaseTests()
     {
@@ -50,7 +52,8 @@ public class ItensDoCardapioComandaUseCaseTests
             _secoesRepo,
             _uow,
             new VincularPorcoesAoEstoqueUseCase(_variacoes),
-            _produtos);
+            _produtos,
+            _publico);
     }
 
     private CardapioItem ItemDoEstoque(string nome)
@@ -260,6 +263,21 @@ public class ItensDoCardapioComandaUseCaseTests
         await _cardapio.DidNotReceiveWithAnyArgs().RemoveAsync(default!);
     }
 
+    // #2002 comanda-08: mesma corrida na visibilidade; o valor pedido vale, não a inversão do que o toggle relê.
+    [Fact]
+    public async Task DefinirVisivel_DuasAtendentesEscondendoJuntas_NaoReexibemOPrato()
+    {
+        var visto = Item("Lasanha", visivel: true);
+        var relido = CardapioItem.CriarAvulso(_vitrine.Id, "Lasanha", 30m, "Massas");
+        relido.Ocultar();
+        _cardapio.GetByIdAndScopeAsync(_vitrine.Id, visto.Id, EmpresaId, Arg.Any<CancellationToken>()).Returns(visto, relido);
+
+        var r = await Sut().DefinirVisivelAsync(EmpresaId, visto.Id, false);
+
+        r.Visivel.Should().BeFalse();
+        relido.Visivel.Should().BeFalse("o prato que a primeira atendente escondeu não volta ao site");
+    }
+
     [Fact]
     public async Task TirarDeNovo_NaoRepoe()
     {
@@ -434,6 +452,127 @@ public class ItensDoCardapioComandaUseCaseTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Categoria*");
         item.SecaoId.Should().BeNull();
+    }
+
+    // #2002 comanda-01: o menu público fica guardado na memória do servidor; quem grava o cardápio esvazia essa cópia
+    // pelo slug da vitrine, em vez de a cliente ver o prato esgotado ou o preço antigo até o prazo vencer.
+    [Fact]
+    public async Task Gravar_InvalidaOMenuPublicoDaVitrine()
+    {
+        var item = Item("Lasanha", visivel: true);
+
+        await Sut().DefinirVisivelAsync(EmpresaId, item.Id, false);
+        await Sut().DefinirArquivadoAsync(EmpresaId, item.Id, true);
+        await Sut().EditarAsync(EmpresaId, item.Id, new DadosItemCardapio(null, null, null, 35m, null));
+        item.MarcarEmValidacao();
+        await Sut().ConfirmarValidacaoAsync(EmpresaId, item.Id);
+
+        _publico.Received(4).Invalidar("casa-da-baba");
+    }
+
+    [Fact]
+    public async Task Incluir_EMover_InvalidamOMenuPublico()
+    {
+        await _cardapio.AddAsync(Arg.Do<CardapioItem>(i =>
+            _cardapio.GetByIdAndScopeAsync(_vitrine.Id, i.Id, EmpresaId, Arg.Any<CancellationToken>()).Returns(i)), Arg.Any<CancellationToken>());
+        var a = Item("Lasanha", visivel: true);
+        var b = Item("Nhoque", visivel: true);
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([a, b]);
+
+        await Sut().IncluirAsync(EmpresaId, new DadosItemCardapio("Torta", LinhaProduto.ParaServir, "500 g", 40m, null));
+        await Sut().MoverAsync(EmpresaId, b.Id, DirecaoMover.Subir);
+
+        _publico.Received(2).Invalidar("casa-da-baba");
+    }
+
+    [Fact]
+    public async Task SemMudanca_NaoInvalidaOMenuPublico()
+    {
+        var item = Item("Lasanha", visivel: false);
+
+        await Sut().DefinirVisivelAsync(EmpresaId, item.Id, false);
+
+        _publico.DidNotReceiveWithAnyArgs().Invalidar(default!);
+    }
+
+    // #2002 comanda-04: incluir e editar gravavam em dois commits (a vitrine primeiro, categoria e porções depois). Categoria
+    // apagada em outra aba deixava o prato público, fora de validação e sem categoria, e a nova tentativa batia no nome único.
+    [Fact]
+    public async Task Incluir_ComCategoriaInexistente_NaoGravaNada()
+    {
+        var apagada = Guid.NewGuid();
+        _secoesRepo.GetByIdAsync(_vitrine.Id, apagada, Arg.Any<CancellationToken>()).Returns((CardapioSecao?)null);
+
+        var act = () => Sut().IncluirAsync(EmpresaId, new DadosItemCardapio(
+            "Torta de frango", LinhaProduto.ParaServir, "500 g", 40m, null, MexerSecao: true, SecaoId: apagada));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Categoria*");
+        await _cardapio.DidNotReceiveWithAnyArgs().AddAsync(default!);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Incluir_GravaOPratoComTudoNumCommitSo()
+    {
+        CardapioItem? criado = null;
+        await _cardapio.AddAsync(Arg.Do<CardapioItem>(i =>
+        {
+            criado = i;
+            _cardapio.GetByIdAndScopeAsync(_vitrine.Id, i.Id, EmpresaId, Arg.Any<CancellationToken>()).Returns(i);
+        }), Arg.Any<CancellationToken>());
+        var massas = CardapioSecao.CriarRaiz(_vitrine.Id, "Massas");
+        _secoesRepo.GetByIdAsync(_vitrine.Id, massas.Id, Arg.Any<CancellationToken>()).Returns(massas);
+
+        await Sut().IncluirAsync(EmpresaId, new DadosItemCardapio(
+            "Torta de frango", LinhaProduto.ParaServir, "500 g", 40m, null,
+            MexerNovidade: true, NovidadeAte: new DateOnly(2026, 11, 1), MexerSecao: true, SecaoId: massas.Id));
+
+        await _uow.Received(1).CommitAsync();
+        (criado!.EmValidacao, criado.SecaoId, criado.NovidadeAte).Should().Be((true, (Guid?)massas.Id, (DateOnly?)new DateOnly(2026, 11, 1)));
+        criado.Visivel.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Editar_ComCategoriaInexistente_NaoGravaNemOPreco()
+    {
+        var item = Item("Lasanha", visivel: true);
+        var apagada = Guid.NewGuid();
+        _secoesRepo.GetByIdAsync(_vitrine.Id, apagada, Arg.Any<CancellationToken>()).Returns((CardapioSecao?)null);
+
+        var act = () => Sut().EditarAsync(EmpresaId, item.Id, new DadosItemCardapio(null, null, null, 55m, null,
+            MexerSecao: true, SecaoId: apagada));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Categoria*");
+        await _uow.DidNotReceive().CommitAsync();
+        item.PrecoEfetivo().Should().Be(30m, "a recusa vem antes de qualquer gravação");
+    }
+
+    [Fact]
+    public async Task Editar_PrecoECategoria_GravamNumCommitSo()
+    {
+        var item = Item("Lasanha", visivel: true);
+        var massas = CardapioSecao.CriarRaiz(_vitrine.Id, "Massas");
+        _secoesRepo.GetByIdAsync(_vitrine.Id, massas.Id, Arg.Any<CancellationToken>()).Returns(massas);
+
+        await Sut().EditarAsync(EmpresaId, item.Id, new DadosItemCardapio(null, null, null, 55m, null, MexerSecao: true, SecaoId: massas.Id));
+
+        await _uow.Received(1).CommitAsync();
+        (item.PrecoEfetivo(), item.SecaoId).Should().Be((55m, (Guid?)massas.Id));
+    }
+
+    // #2002 comanda-05: incluir recusa preço R$ 0; editar gravava R$ 0,00 (campo mascarado vazio).
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public async Task Editar_ComPrecoZeroOuNegativo_400(int preco)
+    {
+        var item = Item("Lasanha", visivel: true);
+
+        var act = () => Sut().EditarAsync(EmpresaId, item.Id, new DadosItemCardapio(null, null, null, preco, null));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*preço*");
+        item.PrecoEfetivo().Should().Be(30m);
+        await _uow.DidNotReceive().CommitAsync();
     }
 
     [Fact]

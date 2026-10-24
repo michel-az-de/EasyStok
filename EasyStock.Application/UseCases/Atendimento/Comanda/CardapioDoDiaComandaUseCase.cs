@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Inventario.Desacertos;
 using EasyStock.Domain.Exceptions.Storefront;
+using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
@@ -28,31 +29,36 @@ public sealed class CardapioDoDiaComandaUseCase(
     IStorefrontRepository storefrontRepository,
     ICardapioItemRepository cardapioRepository,
     ToggleDisponibilidadeCardapioItemAdminUseCase toggleDisponivel,
-    AjustarSaldoRapidoUseCase ajustarSaldo)
+    AjustarSaldoRapidoUseCase ajustarSaldo,
+    ICardapioPublicoCache? cardapioPublico = null)
 {
     public async Task<DisponibilidadeItemResult> DefinirDisponibilidadeAsync(
         DefinirDisponibilidadeItemInput input, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
-        var (storefrontId, item) = await ItemDaVitrineAsync(input.EmpresaId, input.CardapioItemId, ct);
+        var (loja, item) = await ItemDaVitrineAsync(input.EmpresaId, input.CardapioItemId, ct);
         if (item.Disponivel == input.Disponivel)
             return new DisponibilidadeItemResult(item.Id, item.Disponivel);
 
+        // #2002: pede o valor, não a inversão: o toggle relê o prato e o que outra atendente acabou de gravar não se desfaz.
         var r = await toggleDisponivel.ExecuteAsync(
-            new ToggleDisponibilidadeCardapioItemAdminCommand(storefrontId, item.Id, input.EmpresaId));
+            new ToggleDisponibilidadeCardapioItemAdminCommand(loja.Id, item.Id, input.EmpresaId, input.Disponivel));
+        cardapioPublico?.Invalidar(loja.Slug);
         return new DisponibilidadeItemResult(r.ItemId, r.DisponivelAgora);
     }
 
     public async Task<AjustarSaldoRapidoResult> AjustarSaldoAsync(AjustarSaldoItemInput input, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
-        var (_, item) = await ItemDaVitrineAsync(input.EmpresaId, input.CardapioItemId, ct);
+        var (loja, item) = await ItemDaVitrineAsync(input.EmpresaId, input.CardapioItemId, ct);
         if (item.ProdutoId is not { } produtoId)
             throw new UseCaseValidationException("Este item não controla saldo: não está ligado a um produto do estoque.");
 
-        return await ajustarSaldo.ExecuteAsync(new AjustarSaldoRapidoInput(
+        var ajuste = await ajustarSaldo.ExecuteAsync(new AjustarSaldoRapidoInput(
             input.EmpresaId, input.UsuarioId, produtoId, input.LojaId, input.QuantidadeContada, input.Motivo,
             PorcaoDe(item, input)), ct);
+        cardapioPublico?.Invalidar(loja.Slug); // #2002: o menu público mostra o saldo (estoqueAtual)
+        return ajuste;
     }
 
     // Sem porção informada segue a contagem do prato inteiro: é o que uma aba antiga do console manda.
@@ -67,7 +73,7 @@ public sealed class CardapioDoDiaComandaUseCase(
         return new PorcaoDoAjuste(noEstoque);
     }
 
-    private async Task<(Guid StorefrontId, Domain.Entities.Storefront.CardapioItem Item)> ItemDaVitrineAsync(
+    private async Task<(StorefrontEntity Loja, Domain.Entities.Storefront.CardapioItem Item)> ItemDaVitrineAsync(
         Guid empresaId, Guid itemId, CancellationToken ct)
     {
         var storefront = await storefrontRepository.GetByEmpresaAsync(empresaId, ct);
@@ -75,6 +81,6 @@ public sealed class CardapioDoDiaComandaUseCase(
             throw new StorefrontNaoEncontradoException();
         var item = await cardapioRepository.GetByIdAndScopeAsync(storefront.Id, itemId, empresaId, ct)
             ?? throw new CardapioItemNaoEncontradoException(storefront.Id, itemId);
-        return (storefront.Id, item);
+        return (storefront, item);
     }
 }

@@ -6,9 +6,10 @@ namespace EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponi
 
 /// <summary>
 /// Alterna Disponivel (esgotado/disponível) do CardapioItem.
-/// Idempotente — chamar 2x volta ao estado original.
+/// Sem <c>Alvo</c>, inverte (chamar 2x volta ao estado original). Com <c>Alvo</c> (#2002), grava o valor pedido: duas
+/// atendentes esgotando o mesmo prato juntas não se desfazem.
 /// </summary>
-public sealed record ToggleDisponibilidadeCardapioItemAdminCommand(Guid StorefrontId, Guid ItemId, Guid? EmpresaId = null) : ICommand;
+public sealed record ToggleDisponibilidadeCardapioItemAdminCommand(Guid StorefrontId, Guid ItemId, Guid? EmpresaId = null, bool? Alvo = null) : ICommand;
 
 public sealed record ToggleDisponibilidadeCardapioItemAdminResult(Guid ItemId, bool DisponivelAgora);
 
@@ -25,8 +26,8 @@ public class ToggleDisponibilidadeCardapioItemAdminUseCase(
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 
         var ofertadoAntes = AvisoItemComInteresse.Ofertado(item);
-        if (item.Disponivel) item.MarcarEsgotado();
-        else item.MarcarDisponivel();
+        if (command.Alvo ?? !item.Disponivel) item.MarcarDisponivel();
+        else item.MarcarEsgotado();
 
         await cardapioRepository.UpdateAsync(item);
         await unitOfWork.CommitAsync();

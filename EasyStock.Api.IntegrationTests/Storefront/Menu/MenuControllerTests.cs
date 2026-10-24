@@ -197,8 +197,11 @@ public sealed class MenuControllerTests : IAsyncLifetime
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         resp.Headers.CacheControl!.Public.Should().BeTrue();
-        resp.Headers.CacheControl.MaxAge.Should().Be(TimeSpan.FromMinutes(5));
-        resp.Headers.CacheControl.SharedMaxAge.Should().Be(TimeSpan.FromMinutes(5));
+        // #2002: o browser e a borda revalidam a cada leitura (o ETag responde 304); com max-age, o prato esgotado e o
+        // preço novo demoravam minutos para chegar a quem já tinha o cardápio.
+        resp.Headers.CacheControl.NoCache.Should().BeTrue();
+        resp.Headers.CacheControl.MaxAge.Should().BeNull();
+        resp.Headers.CacheControl.SharedMaxAge.Should().BeNull();
         resp.Headers.ETag.Should().NotBeNull("ETag obrigatório para suportar If-None-Match");
         resp.Headers.ETag!.Tag.Should().StartWith("\"").And.EndWith("\"");
 
@@ -296,6 +299,36 @@ public sealed class MenuControllerTests : IAsyncLifetime
         segunda.Headers.ETag!.Tag.Should().Be(primeira.Headers.ETag!.Tag);
         doCache.Should().Be(1, $"só o filtro do tenant resolve o slug; o cardápio vem da memória (montando: {montando})");
         montando.Should().BeGreaterThan(doCache);
+    }
+
+    // #2002 comanda-01: o cardápio fica 30 s na memória do servidor. Quem grava o cardápio invalida pelo slug, e a próxima
+    // leitura já mostra o prato esgotado; antes, a dona esgotava a lasanha e o site seguia vendendo por minutos.
+    [SkippableFact]
+    public async Task GetMenu_DepoisDeInvalidar_MostraOQueMudouSemEsperarOPrazo()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+        var seed = await SeedCardapioAsync(factory, slug: "casa-da-baba-menu-invalida");
+        var rota = $"/api/storefront/{seed.Storefront.Slug}/menu";
+        var antes = JsonSerializer.Deserialize<MenuEnvelope>(await (await client.GetAsync(rota)).Content.ReadAsStringAsync(), JsonOpts)!;
+        antes.Itens.Single().Disponivel.Should().BeTrue();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var _ = db.UseRowLevelSecurityBypass();
+            (await db.CardapioItens.FindAsync(seed.ItemVisivel.Id))!.MarcarEsgotado();
+            await db.SaveChangesAsync();
+        }
+        var emCache = JsonSerializer.Deserialize<MenuEnvelope>(await (await client.GetAsync(rota)).Content.ReadAsStringAsync(), JsonOpts)!;
+        emCache.Itens.Single().Disponivel.Should().BeTrue("dentro do prazo, sem invalidar, a cópia da memória é a que vale");
+
+        factory.Services.GetRequiredService<EasyStock.Application.Ports.Output.ICardapioPublicoCache>().Invalidar(seed.Storefront.Slug);
+        var depois = JsonSerializer.Deserialize<MenuEnvelope>(await (await client.GetAsync(rota)).Content.ReadAsStringAsync(), JsonOpts)!;
+
+        depois.Itens.Single().Disponivel.Should().BeFalse();
     }
 
     // ── ETag / 304 ─────────────────────────────────────────────────────

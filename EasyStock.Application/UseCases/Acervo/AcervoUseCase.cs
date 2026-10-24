@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.GerenciarUploads;
 using EasyStock.Domain.Entities.Acervo;
@@ -12,7 +13,8 @@ public sealed record DadosImagem(string Titulo, string Origem, string Formato, G
 public sealed record PublicarImagem(Guid OperacaoId, Guid ItemId, bool Galeria, string? CapaEsperada);
 public sealed record SolicitarImagem(Guid OperacaoId, Guid ItemId, string Formato, string Brief, Guid[] Referencias);
 
-public sealed partial class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, IImageProcessor processor, IUnitOfWork uow)
+public sealed partial class AcervoUseCase(IAcervoRepository repo, IFileStorage storage, IImageProcessor processor, IUnitOfWork uow,
+    IStorefrontRepository? vitrines = null, ICardapioPublicoCache? cardapioPublico = null)
 {
     public const int LimiteArquivo = 6 * 1024 * 1024;
     public Task<IReadOnlyList<AcervoImagem>> ListarAsync(Guid empresa, int pagina, CancellationToken ct) =>
@@ -108,11 +110,12 @@ public sealed partial class AcervoUseCase(IAcervoRepository repo, IFileStorage s
         return imagem;
     }
 
-    public Task<AcervoPublicacao> PublicarAsync(Guid empresa, Guid autor, Guid id, PublicarImagem dados, CancellationToken ct)
+    public async Task<AcervoPublicacao> PublicarAsync(Guid empresa, Guid autor, Guid id, PublicarImagem dados, CancellationToken ct)
     {
         Empresa(empresa);
         if (dados.OperacaoId == Guid.Empty) throw new UseCaseValidationException("Operação não identificada.");
-        return uow.ExecuteInTransactionSemRetryAsync(async token =>
+        Guid? vitrineDoPrato = null;
+        var publicada = await uow.ExecuteInTransactionSemRetryAsync(async token =>
         {
             await repo.BloquearItemAsync(empresa, dados.ItemId, token);
             await repo.BloquearImagemAsync(empresa, id, token);
@@ -144,8 +147,14 @@ public sealed partial class AcervoUseCase(IAcervoRepository repo, IFileStorage s
             // Originais e arquivos anteriores permanecem para recuperação e rastreabilidade.
             repo.Adicionar(publicacao);
             await uow.CommitAsync();
+            vitrineDoPrato = item.StorefrontId;
             return publicacao;
         }, ct);
+        // #2002: a foto publicada aparece no menu público na hora, não depois do prazo do cache.
+        if (cardapioPublico is not null && vitrineDoPrato is { } vitrineId && vitrines is not null
+            && await vitrines.GetByIdAsync(vitrineId) is { } vitrine)
+            cardapioPublico.Invalidar(vitrine.Slug);
+        return publicada;
     }
 
     public async Task<AcervoSolicitacao> SolicitarAsync(Guid empresa, Guid autor, SolicitarImagem dados, CancellationToken ct)

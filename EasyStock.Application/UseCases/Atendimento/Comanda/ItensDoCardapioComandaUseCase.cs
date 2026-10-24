@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidad
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
+using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
@@ -74,7 +75,8 @@ public sealed class ItensDoCardapioComandaUseCase(
     ICardapioSecaoRepository secaoRepository,
     IUnitOfWork unitOfWork,
     VincularPorcoesAoEstoqueUseCase vincularPorcoes,
-    IProdutoRepository produtoRepository)
+    IProdutoRepository produtoRepository,
+    ICardapioPublicoCache? cardapioPublico = null)
 {
     public async Task<AdicionarCardapioItemAdminResult> IncluirAsync(Guid empresaId, DadosItemCardapio dados, CancellationToken ct = default)
     {
@@ -83,45 +85,53 @@ public sealed class ItensDoCardapioComandaUseCase(
         if (dados.Preco is not > 0)
             throw new UseCaseValidationException("Informe o preço do item.");
         var opcoes = OpcoesDe(dados.Porcoes);
-        var storefrontId = await VitrineAsync(empresaId, ct);
+        var loja = await LojaAsync(empresaId, ct);
+        var storefrontId = loja.Id;
         await ValidarEmbalagensAsync(empresaId, dados.Porcoes);
+        // #2002 comanda-04: a categoria é conferida antes de gravar qualquer coisa, e o prato sai de um commit só: categoria
+        // apagada em outra aba não deixa mais um prato público, fora de validação e sem categoria.
+        var secaoId = dados.MexerSecao ? await SecaoValidaAsync(storefrontId, dados.SecaoId, ct) : null;
 
         // Item avulso (sem produto do estoque), visível no balcão e no site. Ordem alta: fim da lista.
-        var r = await adicionar.ExecuteAsync(new AdicionarCardapioItemAdminCommand(
+        var item = await adicionar.PrepararAsync(new AdicionarCardapioItemAdminCommand(
             storefrontId, null, dados.Nome.Trim(), dados.Categoria, 10_000, true,
             dados.Descricao, dados.Ingredientes, dados.Alergenos, null, null, null, dados.Preco, null, dados.Porcao, null,
             empresaId, Linha: dados.Linha, TempoPreparoMinutos: dados.TempoPreparoMinutos,
-            InstrucaoFinalizacao: dados.InstrucaoFinalizacao, Opcoes: opcoes));
+            InstrucaoFinalizacao: dados.InstrucaoFinalizacao, Opcoes: opcoes, SecaoId: secaoId));
 
-        // RN-15: nasce em validação (o agente não oferece) e, se ela pediu, já como novidade e na categoria.
-        var item = await ItemAsync(storefrontId, r.ItemId, empresaId, ct);
+        // RN-15: nasce em validação (o agente não oferece) e, se ela pediu, já como novidade.
         item.MarcarEmValidacao();
         if (dados.MexerNovidade) item.DefinirNovidade(dados.NovidadeAte);
-        if (dados.MexerSecao) item.DefinirSecao(await SecaoValidaAsync(storefrontId, dados.SecaoId, ct));
         AplicarEmbalagens(item, dados.Porcoes);
         await unitOfWork.CommitAsync();
-        return r;
+        cardapioPublico?.Invalidar(loja.Slug);
+        return new AdicionarCardapioItemAdminResult(item.Id, storefrontId, item.ProdutoId);
     }
 
     public async Task EditarAsync(Guid empresaId, Guid itemId, DadosItemCardapio dados, CancellationToken ct = default)
     {
+        // #2002 comanda-05: como no incluir, o preço editado vale mais que zero (campo mascarado vazio gravava R$ 0,00).
+        if (dados.Preco is { } preco && preco <= 0)
+            throw new UseCaseValidationException("Informe o preço do item.");
         var opcoes = OpcoesDe(dados.Porcoes);
-        var storefrontId = await VitrineAsync(empresaId, ct);
+        var loja = await LojaAsync(empresaId, ct);
+        var storefrontId = loja.Id;
         if (dados.Porcoes?.Any(p => p.MexerEmbalagem) == true)
             await ValidarEmbalagensAsync(empresaId, dados.Porcoes, await ItemAsync(storefrontId, itemId, empresaId, ct));
-        await editar.ExecuteAsync(new EditarCardapioItemAdminCommand(
+        // #2002 comanda-04: a categoria é conferida antes de mexer no prato, e a edição sai de um commit só.
+        var secaoId = dados.MexerSecao ? await SecaoValidaAsync(storefrontId, dados.SecaoId, ct) : null;
+        var item = await editar.AplicarAsync(new EditarCardapioItemAdminCommand(
             storefrontId, itemId, dados.Nome?.Trim(), dados.Categoria,
             dados.Descricao, dados.Ingredientes, dados.Alergenos, null, null, null, dados.Preco, null, dados.Porcao, null,
             empresaId, Linha: dados.Linha, TempoPreparoMinutos: dados.TempoPreparoMinutos,
             InstrucaoFinalizacao: dados.InstrucaoFinalizacao, Opcoes: opcoes));
 
-        if (!dados.MexerNovidade && !dados.MexerSecao && opcoes is null) return;
-        var item = await ItemAsync(storefrontId, itemId, empresaId, ct);
         if (dados.MexerNovidade) item.DefinirNovidade(dados.NovidadeAte);
-        if (dados.MexerSecao) item.DefinirSecao(await SecaoValidaAsync(storefrontId, dados.SecaoId, ct));
+        if (dados.MexerSecao) item.DefinirSecao(secaoId);
         if (opcoes is not null) await vincularPorcoes.ExecuteAsync(empresaId, item);
         AplicarEmbalagens(item, dados.Porcoes);
         await unitOfWork.CommitAsync();
+        cardapioPublico?.Invalidar(loja.Slug);
     }
 
     // M1.4e (#1552): a embalagem escolhida tem de ser um produto da empresa que sirva de embalagem de porção
@@ -182,11 +192,13 @@ public sealed class ItensDoCardapioComandaUseCase(
 
     public async Task<VisibilidadeItemResult> DefinirVisivelAsync(Guid empresaId, Guid itemId, bool visivel, CancellationToken ct = default)
     {
-        var storefrontId = await VitrineAsync(empresaId, ct);
-        var item = await ItemAsync(storefrontId, itemId, empresaId, ct);
+        var loja = await LojaAsync(empresaId, ct);
+        var item = await ItemAsync(loja.Id, itemId, empresaId, ct);
         if (item.Visivel == visivel) return new VisibilidadeItemResult(item.Id, item.Visivel);
 
-        var r = await toggleVisivel.ExecuteAsync(new ToggleVisibilidadeCardapioItemAdminCommand(storefrontId, itemId, empresaId));
+        // #2002: pede o valor, não a inversão: o toggle relê o prato e o que outra atendente acabou de gravar não se desfaz.
+        var r = await toggleVisivel.ExecuteAsync(new ToggleVisibilidadeCardapioItemAdminCommand(loja.Id, itemId, empresaId, visivel));
+        cardapioPublico?.Invalidar(loja.Slug);
         return new VisibilidadeItemResult(r.ItemId, r.VisivelAgora);
     }
 
@@ -204,24 +216,26 @@ public sealed class ItensDoCardapioComandaUseCase(
     /// <summary>Tirar (arquivar) ou repor, por valor: o clique repetido não inverte de volta.</summary>
     public async Task<ArquivamentoItemResult> DefinirArquivadoAsync(Guid empresaId, Guid itemId, bool arquivado, CancellationToken ct = default)
     {
-        var storefrontId = await VitrineAsync(empresaId, ct);
-        var item = await ItemAsync(storefrontId, itemId, empresaId, ct);
+        var loja = await LojaAsync(empresaId, ct);
+        var item = await ItemAsync(loja.Id, itemId, empresaId, ct);
         if (item.EstaArquivado == arquivado) return new ArquivamentoItemResult(item.Id, arquivado);
 
         if (arquivado) item.Arquivar(DateTime.UtcNow);
         else item.Repor();
         await unitOfWork.CommitAsync();
+        cardapioPublico?.Invalidar(loja.Slug);
         return new ArquivamentoItemResult(item.Id, item.EstaArquivado);
     }
 
     /// <summary>RN-15: a dona confirma que o item novo vale ficar; o agente passa a oferecer.</summary>
     public async Task ConfirmarValidacaoAsync(Guid empresaId, Guid itemId, CancellationToken ct = default)
     {
-        var storefrontId = await VitrineAsync(empresaId, ct);
-        var item = await ItemAsync(storefrontId, itemId, empresaId, ct);
+        var loja = await LojaAsync(empresaId, ct);
+        var item = await ItemAsync(loja.Id, itemId, empresaId, ct);
         if (!item.EmValidacao) return;
         item.ConfirmarValidacao();
         await unitOfWork.CommitAsync();
+        cardapioPublico?.Invalidar(loja.Slug);
     }
 
     /// <summary>Itens tirados do cardápio (arquivados), para o console mostrar "Repor".</summary>
@@ -260,7 +274,8 @@ public sealed class ItensDoCardapioComandaUseCase(
     /// </summary>
     public async Task<OrdemItemResult> MoverAsync(Guid empresaId, Guid itemId, DirecaoMover direcao, CancellationToken ct = default)
     {
-        var storefrontId = await VitrineAsync(empresaId, ct);
+        var loja = await LojaAsync(empresaId, ct);
+        var storefrontId = loja.Id;
         var lista = NaOrdem(await cardapioRepository.GetTodosDoStorefrontAsync(storefrontId, ct)).ToList();
         var indice = lista.FindIndex(i => i.Id == itemId);
         if (indice < 0) throw new CardapioItemNaoEncontradoException(storefrontId, itemId);
@@ -279,6 +294,7 @@ public sealed class ItensDoCardapioComandaUseCase(
             rastreado?.DefinirOrdem(nova);
         }
         await unitOfWork.CommitAsync();
+        cardapioPublico?.Invalidar(loja.Slug);
         return new OrdemItemResult(itemId, ordemDoItem);
     }
 
@@ -299,12 +315,14 @@ public sealed class ItensDoCardapioComandaUseCase(
         await cardapioRepository.GetByIdAndScopeAsync(storefrontId, itemId, empresaId, ct)
         ?? throw new CardapioItemNaoEncontradoException(storefrontId, itemId);
 
-    private async Task<Guid> VitrineAsync(Guid empresaId, CancellationToken ct)
+    private async Task<Guid> VitrineAsync(Guid empresaId, CancellationToken ct) => (await LojaAsync(empresaId, ct)).Id;
+
+    private async Task<StorefrontEntity> LojaAsync(Guid empresaId, CancellationToken ct)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
         var storefront = await storefrontRepository.GetByEmpresaAsync(empresaId, ct);
         if (storefront is null || !storefront.Ativo)
             throw new StorefrontNaoEncontradoException();
-        return storefront.Id;
+        return storefront;
     }
 }

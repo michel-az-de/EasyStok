@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
@@ -18,6 +19,7 @@ public class SecoesDoCardapioComandaUseCaseTests
     private readonly ICardapioSecaoRepository _secoesRepo = Substitute.For<ICardapioSecaoRepository>();
     private readonly ICardapioItemRepository _cardapio = Substitute.For<ICardapioItemRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly ICardapioPublicoCache _publico = Substitute.For<ICardapioPublicoCache>();
     private readonly List<CardapioSecao> _secoes = [];
     private readonly List<CardapioItem> _itens = [];
 
@@ -32,7 +34,7 @@ public class SecoesDoCardapioComandaUseCaseTests
         _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns(_ => _itens.ToList());
     }
 
-    private SecoesDoCardapioComandaUseCase Sut() => new(_storefronts, _secoesRepo, _cardapio, _uow);
+    private SecoesDoCardapioComandaUseCase Sut() => new(_storefronts, _secoesRepo, _cardapio, _uow, _publico);
 
     private CardapioSecao Secao(string nome, double ordem = 0)
     {
@@ -69,6 +71,23 @@ public class SecoesDoCardapioComandaUseCaseTests
 
         nova.Ordem.Should().Be(3);
         (await Sut().ListarAsync(EmpresaId)).Select(s => s.Nome).Should().Equal("Massas", "Molhos", "Sobremesas");
+    }
+
+    // #2002 comanda-01: esconder, renomear, mover ou migrar categoria muda o menu público; ele não espera o prazo do cache.
+    [Fact]
+    public async Task MudarACategoria_InvalidaOMenuPublico()
+    {
+        var massas = Secao("Massas");
+        var molhos = Secao("Molhos");
+        Item("Lasanha", "Massas");
+        _secoesRepo.GetByIdAsync(_vitrine.Id, massas.Id, Arg.Any<CancellationToken>()).Returns(massas);
+
+        await Sut().RenomearAsync(EmpresaId, massas.Id, "Massas frescas");
+        await Sut().DefinirVisivelAsync(EmpresaId, massas.Id, false);
+        await Sut().MoverAsync(EmpresaId, molhos.Id, DirecaoMover.Subir);
+        await Sut().MigrarCategoriasAsync(EmpresaId);
+
+        _publico.Received(4).Invalidar("casa-da-baba");
     }
 
     [Fact]

@@ -89,6 +89,14 @@ public sealed class ObterPedidoConversaUseCase(
     /// O mesmo resultado com a conversa, o pedido e o saldo já lidos por quem chama (#1725-7): a comanda não relê o
     /// pedido inteiro nem refaz a conta do saldo para montar o detalhe. Pedido de outra empresa não monta.
     /// </summary>
+    /// <summary>
+    /// #2002 comanda-12: o que o pedido tem além dos pratos do cardápio: o frete e a linha que a casa lançou à mão (PWA, ERP).
+    /// A alteração da comanda troca só os pratos; o resto continua no pedido, então entra no total proposto ao cliente e no
+    /// total do aceite pela mesma conta. (<see cref="PedidoConversaResult.Frete"/> separa só o frete, para a tela.)
+    /// </summary>
+    public static decimal ValorForaDoCardapio(EasyStock.Domain.Entities.Pedido pedido) =>
+        pedido.Itens.Where(i => i.CardapioItemId is null).Sum(i => i.Subtotal);
+
     public async Task<PedidoConversaResult> MontarAsync(Conversa conversa, EasyStock.Domain.Entities.Pedido pedido, SaldoFinanceiroComanda? financeiro,
         CancellationToken ct = default)
     {

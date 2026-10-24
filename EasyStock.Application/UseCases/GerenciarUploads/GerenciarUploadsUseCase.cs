@@ -37,7 +37,8 @@ public sealed class GerenciarUploadsUseCase(
     IStorefrontRepository storefrontRepository,
     ICardapioItemRepository cardapioItemRepository,
     IUnitOfWork unitOfWork,
-    ICacheService? cacheService = null)
+    ICacheService? cacheService = null,
+    ICardapioPublicoCache? cardapioPublico = null)
 {
     private static readonly HashSet<string> AllowedImageTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -216,6 +217,7 @@ public sealed class GerenciarUploadsUseCase(
 
         await cardapioItemRepository.UpdateAsync(item, cancellationToken);
         await unitOfWork.CommitAsync();
+        cardapioPublico?.Invalidar(storefront.Slug); // #2002: a foto nova aparece no menu público na hora.
 
         // Best-effort: remove a foto anterior só depois de persistir a nova.
         // Adicionar ângulos preserva a capa anterior; substituir a capa também preserva
