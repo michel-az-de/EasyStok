@@ -152,9 +152,11 @@ public sealed class PedidoEstoqueIntegrationService(
             if (disponivelTotal < qtd && !PermiteEstoqueNegativo)
                 throw new EstoqueInsuficienteException(item.ProdutoId.Value, qtd, disponivelTotal);
 
-            // Trava os lotes (FOR UPDATE) antes de planejar: o saldo pode ter mudado desde a consulta.
+            // Trava os lotes (FOR UPDATE) antes de planejar: o saldo pode ter mudado desde a consulta. A ordem do
+            // lock e a do SQL da venda (validade, entrada, criacao; vencido no meio, nao por ultimo): pedido e venda
+            // do mesmo produto travam na mesma ordem e nao se derrubam com deadlock (40P01).
             var travados = new List<ItemEstoque>(candidatos.Count);
-            foreach (var candidato in candidatos)
+            foreach (var candidato in ConsumoDeLotes.Ordenar(candidatos, agora, regra with { VencidoPorUltimo = false }))
                 travados.Add(await itemEstoqueRepo.GetByIdComLockAsync(pedido.EmpresaId, candidato.Id) ?? candidato);
 
             var plano = ConsumoDeLotes.Planejar(travados, qtd, agora, regra);

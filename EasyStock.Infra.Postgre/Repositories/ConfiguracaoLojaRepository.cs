@@ -25,7 +25,8 @@ public sealed class ConfiguracaoLojaRepository(EasyStockDbContext dbContext) : I
     {
         var query = configuracoes.IgnoreQueryFilters().AsNoTracking()
             .Where(c => c.Loja != null && c.Loja.EmpresaId == empresaId);
-        if (lojaId.HasValue) query = query.Where(c => c.LojaId == lojaId.Value);
+        // Sem loja indicada vale a loja unica ATIVA: a desativada (historico) nao conta.
+        query = lojaId.HasValue ? query.Where(c => c.LojaId == lojaId.Value) : query.Where(c => c.Loja!.Ativa);
 
         var achadas = await query.Take(2).ToListAsync(ct);
         return achadas.Count == 1 ? achadas[0] : null;

@@ -865,4 +865,27 @@ public class PedidoEstoqueIntegrationServiceTests
         (saiPrimeiro == "VENCE_ANTES" ? venceAntes : entrouAntes).QuantidadeAtual.Value.Should().Be(3);
         (saiPrimeiro == "VENCE_ANTES" ? entrouAntes : venceAntes).QuantidadeAtual.Value.Should().Be(5);
     }
+
+    [Fact]
+    public async Task DescontarAsync_trava_os_lotes_na_mesma_ordem_do_SQL_da_venda()
+    {
+        // A venda trava os lotes de uma vez, na ordem validade (sem validade por ultimo), entrada, criacao. O pedido
+        // travava na ordem da consulta (EntradaEm decrescente): pedido e venda do mesmo produto, ao mesmo tempo,
+        // travavam em ordens opostas e o Postgres derrubava um dos dois com deadlock (40P01).
+        var (svc, itemRepo, _) = Build();
+        var (empresaId, lojaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var venceDepoisEntrouAntes = LoteDe(empresaId, lojaId, produtoId, saldo: 5, diasParaVencer: 30, diasDesdeAEntrada: 9);
+        var venceAntes = LoteDe(empresaId, lojaId, produtoId, saldo: 5, diasParaVencer: 3, diasDesdeAEntrada: 1);
+        var vencido = LoteDe(empresaId, lojaId, produtoId, saldo: 5, diasParaVencer: -2, diasDesdeAEntrada: 20);
+        var semValidade = LoteDe(empresaId, lojaId, produtoId, saldo: 5, diasParaVencer: null, diasDesdeAEntrada: 15);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { venceAntes, semValidade, venceDepoisEntrouAntes, vencido });
+
+        await svc.DescontarAsync(PedidoComItem(empresaId, lojaId, produtoId, qty: 2));
+
+        var travados = itemRepo.ReceivedCalls()
+            .Where(c => c.GetMethodInfo().Name == nameof(IItemEstoqueRepository.GetByIdComLockAsync))
+            .Select(c => (Guid)c.GetArguments()[1]!)
+            .ToArray();
+        travados.Should().Equal(vencido.Id, venceAntes.Id, venceDepoisEntrouAntes.Id, semValidade.Id);
+    }
 }
