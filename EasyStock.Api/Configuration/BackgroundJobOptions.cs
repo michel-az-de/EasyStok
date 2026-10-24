@@ -50,7 +50,6 @@ public sealed class BackgroundJobOptions
     /// </summary>
     public bool EnableRecalcularVelocidadesJob { get; set; }
     public bool EnableRelatorioMensalJob { get; set; }
-    public bool EnableDiagnosticoEmailReport { get; set; }
     /// <summary>
     /// Quando <c>true</c>, registra o <c>ContaFinanceiraVencimentoJob</c> (CAP/CAR)
     /// que roda 1x/dia (09:30 UTC) marcando parcelas de Contas a Pagar/Receber
