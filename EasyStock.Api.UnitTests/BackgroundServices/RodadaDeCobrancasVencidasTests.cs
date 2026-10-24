@@ -45,6 +45,44 @@ public class RodadaDeCobrancasVencidasTests
     }
 
     [Fact]
+    public async Task Timeout_de_uma_cobranca_conta_como_falha_e_a_rodada_segue()
+    {
+        // #2023: o HttpClient lança TaskCanceledException no timeout do Mercado Pago, com o token do job intacto.
+        var vencidas = new[] { Da(Guid.NewGuid()), Da(Guid.NewGuid()) };
+        var chamadas = 0;
+
+        var resumo = await RodadaDeCobrancasVencidas.ProcessarAsync(vencidas, (_, _) =>
+        {
+            chamadas++;
+            return chamadas == 1 ? throw new TaskCanceledException("timeout", new TimeoutException()) : Task.CompletedTask;
+        }, NullLogger.Instance, CancellationToken.None);
+
+        chamadas.Should().Be(2);
+        resumo.Should().Be(new RodadaDeCobrancasVencidas.Resumo(Processadas: 1, Falhas: 1, Puladas: 0));
+    }
+
+    [Fact]
+    public async Task Desligamento_no_meio_de_uma_cobranca_interrompe_a_rodada()
+    {
+        // #2023: o cancelamento do host que nasce dentro da cobrança não conta como falha dela. Na última cobrança não
+        // há próxima volta do laço para relançar: engolido, a rodada terminaria como se nada tivesse acontecido.
+        using var cts = new CancellationTokenSource();
+        var vencidas = new[] { Da(Guid.NewGuid()) };
+        var chamadas = 0;
+
+        var act = () => RodadaDeCobrancasVencidas.ProcessarAsync(vencidas, (_, token) =>
+        {
+            chamadas++;
+            cts.Cancel();
+            token.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }, NullLogger.Instance, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        chamadas.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Cancelamento_interrompe_a_rodada()
     {
         using var cts = new CancellationTokenSource();

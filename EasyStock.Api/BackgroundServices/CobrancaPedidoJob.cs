@@ -43,7 +43,7 @@ public sealed class CobrancaPedidoJob(
             {
                 await RunWithAdvisoryLockAsync(ProcessarRodadaAsync, stoppingToken);
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
                 logger.LogError(ex, "CobrancaPedidoJob: erro na rodada.");
@@ -130,7 +130,7 @@ public sealed class CobrancaPedidoJob(
             vencendo = await scope.ServiceProvider.GetRequiredService<ICobrancaPedidoRepository>()
                 .ListarPendentesVencendoAsync(relogio.GetUtcNow().UtcDateTime, LembrarCobrancaVencendoUseCase.Antecedencia, MaximoPorRodada, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "CobrancaPedidoJob: consulta dos links perto de vencer falhou");
             return;
@@ -144,7 +144,7 @@ public sealed class CobrancaPedidoJob(
                 using var scope = serviceProvider.CreateScope();
                 await scope.ServiceProvider.GetRequiredService<LembrarCobrancaVencendoUseCase>().ExecuteAsync(item, ct);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 logger.LogWarning(ex, "CobrancaPedidoJob: lembrete da cobranca {CobrancaId} pedido {PedidoId} falhou",
                     item.CobrancaId, item.PedidoId);

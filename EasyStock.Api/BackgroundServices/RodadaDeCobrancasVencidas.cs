@@ -37,7 +37,8 @@ public static class RodadaDeCobrancasVencidas
                 await processar(item, ct);
                 processadas++;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            // #2023: o timeout do HttpClient chega como OperationCanceledException com o ct intacto; é falha da cobrança.
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 falhas++;
                 var daLoja = falhasPorLoja[item.EmpresaId] = falhasPorLoja.GetValueOrDefault(item.EmpresaId) + 1;
