@@ -75,6 +75,10 @@ public class DevicePairingController(
         // Auditoria 2026-04-30 (CRITICAL fix): TODO antigo era brecha real.
         // Agora valida que o usuário logado pode parear devices nessa empresa.
         if (!RequestedEmpresaMatchesCurrentUser(req.EmpresaId)) return Forbid();
+        // #2033: a loja também precisa ser da empresa. Com a de outra, o aparelho assinava o SSE com ela e recebia
+        // os pedidos prontos de lá (o broker entrega por loja).
+        if (!await _db.Set<Loja>().IgnoreQueryFilters().AnyAsync(l => l.Id == req.LojaId && l.EmpresaId == req.EmpresaId, ct))
+            return BadRequest(new { error = "loja não pertence à empresa" });
         var userId = ResolveUserId();
 
         var code = GeneratePairingCode();

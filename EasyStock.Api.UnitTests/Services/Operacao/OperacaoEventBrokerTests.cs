@@ -66,6 +66,22 @@ public class OperacaoEventBrokerTests
             .StartWith("data: {\"type\":\"mutations-applied\"", "o PWA escuta onmessage, sem nome de evento");
     }
 
+    // #2033: o aparelho pareado com a loja de outra empresa assinava com a LojaId dela e recebia os eventos dela.
+    [Fact]
+    public async Task EventoMobileNaoChegaAoAparelhoDeOutraEmpresaComAMesmaLoja()
+    {
+        var empresaA = Guid.NewGuid();
+        var loja = Guid.NewGuid();
+        using var daLoja = _broker.Subscribe("device-a", empresaA, loja, "dev-a");
+        using var intruso = _broker.Subscribe("device-b", Guid.NewGuid(), loja, "dev-b");
+
+        await _broker.NotifyMutationsAppliedAsync(empresaA, loja, "dev-1", 3);
+        await _broker.NotifyOrderReadyAsync(empresaA, loja, "dev-1", "o-1", "Ana", 60m, 2);
+
+        daLoja.Slot.Queue.Should().HaveCount(2);
+        intruso.Slot.Queue.Should().BeEmpty("evento da loja da empresa A não vai a aparelho de outra empresa");
+    }
+
     [Fact]
     public void DisposeRemoveOuvinte()
     {
