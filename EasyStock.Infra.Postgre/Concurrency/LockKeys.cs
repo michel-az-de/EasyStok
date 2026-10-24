@@ -86,4 +86,16 @@ public static class LockKeys
     /// "PedAban" em hex ASCII.
     /// </summary>
     public const long PedidosAbandonados = 0x5065_6441_6261_6E00L;
+
+    /// <summary>
+    /// Alertas de estoque para o sino (AnalisadorEstoqueBackgroundService), de hora em hora. Serializa entre
+    /// réplicas para não gerar o mesmo alerta em dobro (#2016). "AlertEst" em hex ASCII.
+    /// </summary>
+    public const long AlertasEstoque = 0x416C_6572_7445_7374L;
+
+    /// <summary>
+    /// Recálculo da velocidade de saída dos lotes (RecalcularVelocidadesJob), a cada 6 h. Serializa entre réplicas
+    /// (#2016). "RecVelo" em hex ASCII.
+    /// </summary>
+    public const long RecalcularVelocidades = 0x5265_6356_656C_6F00L;
 }

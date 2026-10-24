@@ -5,6 +5,11 @@ public sealed class BackgroundJobOptions
     public const string SectionName = "BackgroundJobs";
 
     // Jobs fixos (default true para manter comportamento atual)
+
+    /// <summary>
+    /// #2016: alertas de estoque no sino (validade próxima e vencida, abaixo do mínimo, reposição), por empresa, de hora
+    /// em hora. Ligado por padrão e em produção; <c>false</c> é o rollback.
+    /// </summary>
     public bool EnableAnalisadorEstoque { get; set; } = true;
     public bool EnableCacheWarmup { get; set; } = true;
     public bool EnableHealthSnapshot { get; set; } = true;
@@ -37,8 +42,12 @@ public sealed class BackgroundJobOptions
     public bool EnableCampanhaJob { get; set; } = true;
 
     // Jobs opcionais (default false)
-    public bool EnableAlertasEstoqueJob { get; set; }
     public bool EnableProcessarRecebimentoJob { get; set; }
+
+    /// <summary>
+    /// #2016: recálculo da velocidade de saída dos lotes, por empresa, a cada 6 h. Padrão <c>false</c> no código; o
+    /// <c>appsettings.Production.json</c> liga (e o guard de arquitetura exige a chave lá). <c>false</c> é o rollback.
+    /// </summary>
     public bool EnableRecalcularVelocidadesJob { get; set; }
     public bool EnableRelatorioMensalJob { get; set; }
     public bool EnableDiagnosticoEmailReport { get; set; }

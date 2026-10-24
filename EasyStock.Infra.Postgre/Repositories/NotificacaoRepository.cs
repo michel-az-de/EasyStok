@@ -108,16 +108,16 @@ namespace EasyStock.Infra.Postgre.Repositories
                 n.ReferenciaId == referenciaId &&
                 !n.Lida);
 
-        public Task<bool> ExisteNotificacaoDoDiaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid? referenciaId, DateTime dataReferencia)
+        public async Task<HashSet<(TipoAlertaEstoque Tipo, Guid? ReferenciaId)>> GetAlertasDoPeriodoAsync(
+            Guid empresaId, DateTime inicioUtc, DateTime fimUtc, CancellationToken ct = default)
         {
-            var inicio = dataReferencia.Date;
-            var fim = inicio.AddDays(1);
-            return dbContext.Notificacoes.AnyAsync(n =>
-                n.EmpresaId == empresaId &&
-                n.TipoAlerta == tipo &&
-                n.ReferenciaId == referenciaId &&
-                n.CriadaEm >= inicio &&
-                n.CriadaEm < fim);
+            var chaves = await dbContext.Notificacoes
+                .AsNoTracking()
+                .Where(n => n.EmpresaId == empresaId && n.CriadaEm >= inicioUtc && n.CriadaEm < fimUtc)
+                .Select(n => new { n.TipoAlerta, n.ReferenciaId })
+                .Distinct()
+                .ToListAsync(ct);
+            return chaves.Select(c => (c.TipoAlerta, c.ReferenciaId)).ToHashSet();
         }
 
         public Task<int> CountNaoLidasAsync(Guid empresaId, Guid? usuarioId = null) =>
