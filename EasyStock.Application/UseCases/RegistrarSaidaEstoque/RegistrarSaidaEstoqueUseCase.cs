@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Domain.Events;
+using EasyStock.Domain.Services;
 using EasyStock.Domain.Specifications;
 using EasyStock.Domain.ValueObjects;
 
@@ -74,7 +75,13 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         // descoberto auditavel no lote (sem entrada-fantasma). Usado pelo QuickSaida do
         // Estoque (operacao nao trava). Fluxos de venda cliente (mobile/storefront) deixam
         // false e seguem bloqueando oversell.
-        bool PermitirDescoberto = false);
+        bool PermitirDescoberto = false,
+        // #2003 (estoque-07): a loja do movimento, que decide FEFO ou FIFO puro (ConfiguracaoLoja.FifoAtivo).
+        // Sem ela vale a loja única da empresa.
+        Guid? LojaId = null,
+        // #2003 (estoque-21): documento do movimento (ex.: "producao:{lote}"); sem ele vale a NotaFiscal.
+        // Fora do JSON: quem chama por HTTP não escolhe a origem da saída.
+        [property: System.Text.Json.Serialization.JsonIgnore] string? DocumentoReferencia = null);
 
     public sealed record RegistrarSaidaEstoqueItemResult(
         Guid ItemEstoqueId,
@@ -116,8 +123,10 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
             logger.LogInformation("Iniciando registro de sa�da de estoque. EmpresaId: {EmpresaId}, Itens: {QuantidadeItens}, Natureza: {Natureza}",
                 command.EmpresaId, command.Itens.Count, command.Natureza);
 
+            // #2003 (estoque-07): antes passava o id da EMPRESA onde o método espera o da LOJA, nunca achava a
+            // configuração e o FIFO puro não tinha efeito. Agora é a loja do movimento (ou a loja única da empresa).
             var configuracao = configuracaoLojaRepository is not null
-                ? await configuracaoLojaRepository.GetByLojaIdAsync(command.EmpresaId)
+                ? await configuracaoLojaRepository.GetDaLojaAsync(command.EmpresaId, command.LojaId)
                 : null;
             // FifoAtivo=true → FEFO (saída pelo lote mais próximo do vencimento).
             // FifoAtivo=false → FIFO puro (por data de entrada).
@@ -243,40 +252,21 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                 if (!command.PermitirDescoberto && disponivel < quantidadeSolicitada.Value)
                     throw new EstoqueInsuficienteException(produto.Id, quantidadeSolicitada.Value, disponivel);
 
-                var restante = quantidadeSolicitada.Value;
                 decimal totalSaidoNoComando = 0m;
                 var lotesTocados = new List<ItemEstoque>();
 
-                for (var idx = 0; idx < lotes.Length; idx++)
+                // #2003 (estoque-17): a escolha dos lotes é a regra única (ConsumoDeLotes), a mesma da esteira do
+                // pedido e do PWA. Lote que a linha anterior deste mesmo comando já esvaziou em memória sai da
+                // conta (estoque-06): antes entrava com saldo 0 e estourava "estoque insuficiente" havendo saldo
+                // em outro lote. Descoberto (#540) só na falta, no último lote que baixou.
+                var plano = ConsumoDeLotes.Planejar(
+                    lotes, quantidadeSolicitada.Value, command.DataSaida,
+                    new RegraDeConsumo(Fefo: fefo, VencidoPorUltimo: !permitirVencido));
+                plano.Aplicar(command.DataSaida, agora, permitirVencido);
+
+                foreach (var (lote, quantidadeConsumida, _) in plano.Consumos)
                 {
-                    if (restante <= 0)
-                        break;
-
-                    var lote = lotes[idx];
-                    // Descoberto so no ULTIMO lote: os anteriores sao consumidos normalmente
-                    // (FEFO) e a falta remanescente fica no ultimo, sem entrada-fantasma (#540).
-                    var permiteDescobertoNesteLote = command.PermitirDescoberto
-                        && idx == lotes.Length - 1
-                        && restante > lote.QuantidadeAtual.Value;
-
-                    decimal quantidadeConsumida;
-                    Quantidade quantidadeDoLote;
-                    if (permiteDescobertoNesteLote)
-                    {
-                        // A saida sai inteira (venda real); a falta vira descoberto auditavel.
-                        quantidadeConsumida = restante;
-                        quantidadeDoLote = Quantidade.From(quantidadeConsumida);
-                        lote.RegistrarSaidaPermitindoDescoberto(quantidadeDoLote, command.DataSaida, agora, permitirVencido);
-                    }
-                    else
-                    {
-                        lote.GarantirDisponivelParaSaida(command.DataSaida, permitirVencido);
-                        quantidadeConsumida = Math.Min(lote.QuantidadeAtual.Value, restante);
-                        if (quantidadeConsumida <= 0)
-                            continue;
-                        quantidadeDoLote = Quantidade.From(quantidadeConsumida);
-                        lote.RegistrarSaida(quantidadeDoLote, command.DataSaida, agora, permitirVencido);
-                    }
+                    var quantidadeDoLote = Quantidade.From(quantidadeConsumida);
 
                     var itemVenda = new ItemVenda
                     {
@@ -304,7 +294,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                         valorUnitario,
                         command.DataSaida,
                         itemVenda.DescricaoSnapshot,
-                        command.NotaFiscal,
+                        command.DocumentoReferencia ?? command.NotaFiscal,
                         agora,
                         auditoria);
 
@@ -322,7 +312,6 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                     venda.AdicionarItem(itemVenda);
                     lotesTocados.Add(lote);
 
-                    restante -= quantidadeConsumida;
                     totalSaidoNoComando += quantidadeConsumida;
                 }
 
@@ -371,11 +360,9 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
 
         private async Task AtualizarIndicadoresFifoAsync(Guid empresaId, Guid produtoId, IEnumerable<ItemEstoque> lotesTocados, decimal quantidadeSaidaAtual, DateTime dataSaida)
         {
-            const int janelaDias = 30;
-            var inicioJanela = dataSaida.AddDays(-janelaDias);
+            var inicioJanela = dataSaida.AddDays(-ItemEstoque.JanelaVelocidadeDias);
             var taxaAnterior = await movimentacaoEstoqueRepository.GetTaxaSaidaDiariaAsync(empresaId, produtoId, inicioJanela, dataSaida);
-            var totalAnterior = taxaAnterior * janelaDias;
-            var velocidadeAtualizada = (totalAnterior + quantidadeSaidaAtual) / janelaDias;
+            var velocidadeAtualizada = ItemEstoque.VelocidadeAposSaida(taxaAnterior, quantidadeSaidaAtual);
 
             // Atualiza velocidade em memória e persiste em batch (1 round-trip)
             // em vez de UpdateAsync individual por lote.

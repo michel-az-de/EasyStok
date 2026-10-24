@@ -21,6 +21,18 @@ namespace EasyStock.Infra.Postgre.Repositories.Storefront;
 /// </summary>
 public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaRepository
 {
+    /// <summary>
+    /// Vagas que ainda consomem a capacidade da janela: não liberadas E de pedido que ainda não foi entregue
+    /// (#2003, estoque-02). A vaga do pedido entregue fica, ativa, porque o KDS, a Agenda e a Logística a usam para
+    /// saber a janela dele; só deixa de contar na capacidade e nas "vagas ocupadas". O cancelamento segue
+    /// liberando de verdade (<see cref="LiberarPorPedidoAsync"/>).
+    /// </summary>
+    private IQueryable<VagaOcupada> VagasQueOcupam() =>
+        db.VagasOcupadas
+            .IgnoreQueryFilters()
+            .Where(v => v.LiberadoEm == null
+                && !db.Pedidos.IgnoreQueryFilters().Any(p => p.Id == v.PedidoId && p.Status == StatusPedidoMapper.Entregue));
+
     public Task<VagaOcupada?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         db.VagasOcupadas.IgnoreQueryFilters().FirstOrDefaultAsync(v => v.Id == id, ct);
 
@@ -75,12 +87,10 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
             throw new InvalidOperationException(
                 $"Janela {janelaEntregaId} não encontrada.");
 
-        var atual = await db.VagasOcupadas
-            .IgnoreQueryFilters()
+        var atual = await VagasQueOcupam()
             .CountAsync(v =>
                 v.JanelaEntregaId == janelaEntregaId
-                && v.DataEntrega == dataEntrega
-                && v.LiberadoEm == null, ct);
+                && v.DataEntrega == dataEntrega, ct);
 
         if (atual >= capacidade.Value)
             throw new JanelaSemVagasException(
@@ -122,30 +132,11 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
         Guid janelaEntregaId,
         DateOnly dataEntrega,
         CancellationToken ct = default) =>
-        db.VagasOcupadas
-            .IgnoreQueryFilters()
+        VagasQueOcupam()
             .AsNoTracking()
             .CountAsync(v =>
                 v.JanelaEntregaId == janelaEntregaId
-                && v.DataEntrega == dataEntrega
-                && v.LiberadoEm == null, ct);
-
-    public async Task<IReadOnlyList<VagaOcupada>> GetOrfasAsync(CancellationToken ct = default)
-    {
-        // Vagas ativas (LiberadoEm IS NULL) cujo pedido foi cancelado/entregue ou não existe.
-        // Cinto+suspensório ADR-0014 §Solução 4.
-        var orfas = await db.VagasOcupadas
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(v => v.LiberadoEm == null
-                && !db.Pedidos.IgnoreQueryFilters().Any(p =>
-                    p.Id == v.PedidoId
-                    && p.Status != StatusPedidoMapper.Cancelado
-                    && p.Status != StatusPedidoMapper.Entregue))
-            .ToListAsync(ct);
-
-        return orfas;
-    }
+                && v.DataEntrega == dataEntrega, ct);
 
     public async Task<IReadOnlyDictionary<(Guid JanelaId, DateOnly Data), int>> ContarPorJanelaPeriodoAsync(
         IReadOnlyList<Guid> janelaIds,
@@ -156,13 +147,11 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
         if (janelaIds.Count == 0)
             return new Dictionary<(Guid, DateOnly), int>();
 
-        var grupos = await db.VagasOcupadas
+        var grupos = await VagasQueOcupam()
             .AsNoTracking()
-            .IgnoreQueryFilters()
             .Where(v => janelaIds.Contains(v.JanelaEntregaId)
                      && v.DataEntrega >= dataInicio
-                     && v.DataEntrega <= dataFim
-                     && v.LiberadoEm == null)
+                     && v.DataEntrega <= dataFim)
             .GroupBy(v => new { v.JanelaEntregaId, v.DataEntrega })
             .Select(g => new { g.Key.JanelaEntregaId, g.Key.DataEntrega, Count = g.Count() })
             .ToListAsync(ct);

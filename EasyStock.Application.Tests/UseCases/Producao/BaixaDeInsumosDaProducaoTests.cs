@@ -396,4 +396,37 @@ public class BaixaDeInsumosDaProducaoTests
 
         PratoParaBaixa.Da(lasanha, item).EmbalagemDaPorcaoId.Should().Be(embalagemId);
     }
+
+    [Fact]
+    public async Task InsumoInativoComSaldo_AvisaENaoDerrubaAProducao_EOsOutrosInsumosBaixam()
+    {
+        // estoque-04 (#2003): inativar o insumo não zera o saldo. A saída de produto inativo lançava
+        // ProdutoInativoException dentro da transação da produção e desfazia o lote inteiro.
+        var lasanha = Prato(marcado: true);
+        var molho = Insumo("Molho base", UnidadeMedida.G, 400);
+        molho.Status = StatusProduto.Inativo;
+        var bandeja = Insumo("Bandeja", UnidadeMedida.Un, 20);
+        Receita(lasanha, (molho, 1.2m, UnidadeMedida.Kg), (bandeja, 6, UnidadeMedida.Un));
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 12, null)], "LOT-1", _data);
+
+        avisos.Should().ContainSingle().Which.Should().Contain("Molho base").And.Contain("inativo");
+        Baixado(molho).Should().Be(0m, "produto inativo não tem saída");
+        Baixado(bandeja).Should().Be(12m);
+    }
+
+    [Fact]
+    public async Task SaidaDeInsumo_LevaOLoteNoDocumentoReferencia()
+    {
+        // estoque-21 (#2003): a baixa de insumo da produção era achada pelo texto da descrição, em quatro lugares.
+        // O documento é a chave; a descrição fica para ler.
+        var lasanha = Prato(marcado: true);
+        var molho = Insumo("Molho", UnidadeMedida.G, 5000);
+        Receita(lasanha, (molho, 1.2m, UnidadeMedida.Kg));
+
+        await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 12, null)], "LOT-261009-AB", _data);
+
+        _movimentos.Should().ContainSingle().Which.DocumentoReferencia.Should().Be("producao:LOT-261009-AB");
+        BaixaDeInsumosDaProducao.DocumentoDaProducao("LOT-261009-AB").Should().Be("producao:LOT-261009-AB");
+    }
 }

@@ -199,8 +199,12 @@ const query = (pares) => {
 }
 export const obterPerdas = (de, ate) => chamarApi(`${PRODUCAO}/perdas${query({ de, ate })}`)
 export const obterVencidos = () => chamarApi(`${PRODUCAO}/perdas/vencidos`)
-export const lancarPerda = ({ produtoId, itemEstoqueId = null, quantidade, motivo, texto = null, produtoVariacaoId = null }) =>
-  chamarApi(`${PRODUCAO}/perdas`, { metodo: 'POST', corpo: { produtoId, itemEstoqueId, quantidade, motivo, texto, ...(produtoVariacaoId ? { produtoVariacaoId } : {}) } })
+// O corpo sai por aqui também para a chave (#2003, estoque-09): a perda é uma saída por delta, então o
+// reenvio de uma resposta perdida baixaria o lote de novo se não levasse a mesma Idempotency-Key.
+export const corpoDaPerda = ({ produtoId, itemEstoqueId = null, quantidade, motivo, texto = null, produtoVariacaoId = null }) =>
+  ({ produtoId, itemEstoqueId, quantidade, motivo, texto, ...(produtoVariacaoId ? { produtoVariacaoId } : {}) })
+export const lancarPerda = (perda, chave) =>
+  chamarApi(`${PRODUCAO}/perdas`, { metodo: 'POST', chave, corpo: corpoDaPerda(perda) })
 export const estornarSaida = (movimentacaoId, motivo) =>
   chamarApi(`/api/estoque/estorno/${movimentacaoId}`, { metodo: 'POST', corpo: { motivo } })
 

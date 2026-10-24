@@ -28,9 +28,11 @@ public class RegistrarSaidaEstoque_FefoTests
         produtoRepo.GetByIdAsync(produtoId).Returns(produto);
         movRepo.GetTaxaSaidaDiariaAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<DateTime>()).Returns(0m);
 
-        var config = ConfiguracaoLoja.CriarPadrao(empresaId);
+        // #2003 (estoque-07): a configuracao e a da LOJA do movimento (ou da loja unica da empresa). Este teste
+        // montava a configuracao pelo id da EMPRESA, o mesmo erro do use case, e por isso nunca pegou o bug.
+        var config = ConfiguracaoLoja.CriarPadrao(Guid.NewGuid());
         config.FifoAtivo = fifoAtivo;
-        configRepo.GetByLojaIdAsync(empresaId).Returns(config);
+        configRepo.GetDaLojaAsync(empresaId, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(config);
 
         // stub only the call with matching fefo value
         itemRepo.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, fifoAtivo).Returns([lote]);

@@ -291,6 +291,24 @@ namespace EasyStock.Domain.Entities
             return QuantidadeAtual;
         }
 
+        /// <summary>Janela, em dias, da média móvel de saída que alimenta <see cref="VelocidadeSaidaDiaria"/>.</summary>
+        public const int JanelaVelocidadeDias = 30;
+
+        /// <summary>
+        /// Velocidade diária depois de mais uma saída: soma a quantidade ao total da janela e volta à média.
+        /// Uma só fórmula para a venda, a esteira do pedido e o PWA.
+        /// </summary>
+        public static decimal VelocidadeAposSaida(decimal taxaDiariaAnterior, decimal quantidadeSaida) =>
+            (taxaDiariaAnterior * JanelaVelocidadeDias + quantidadeSaida) / JanelaVelocidadeDias;
+
+        /// <summary>Velocidade diária depois de devolver uma saída (nunca abaixo de zero).</summary>
+        public static decimal VelocidadeAposDevolucao(decimal taxaDiariaAnterior, decimal quantidadeDevolvida) =>
+            Math.Max(0m, (taxaDiariaAnterior * JanelaVelocidadeDias - quantidadeDevolvida) / JanelaVelocidadeDias);
+
+        /// <summary>True se o lote tem validade e ela já passou no dia operacional de <paramref name="referenciaUtc"/>.</summary>
+        public bool VenceuEm(DateTime referenciaUtc) =>
+            ValidadeEm?.EstaVencido(OperacionalFuso.DataOperacional(referenciaUtc)) == true;
+
         public void AtualizarVelocidadeSaida(decimal velocidadeSaidaDiaria, DateTime dataReferencia)
         {
             VelocidadeSaidaDiaria = Math.Max(0m, decimal.Round(velocidadeSaidaDiaria, 2));

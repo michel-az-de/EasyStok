@@ -133,6 +133,37 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
         EntradasDeProducao().Should().Be(2, "uma entrada de producao por lote");
     }
 
+    private ItemEstoque EntradaDoLote() => _db.Set<ItemEstoque>().IgnoreQueryFilters()
+        .Single(i => i.EmpresaId == _empresaId && i.ProdutoId == _produtoErpId && i.CodigoInterno!.StartsWith("lote:"));
+
+    [Fact]
+    public async Task EntradaDoLote_NasceComOCodigoDoLote()
+    {
+        // #2003 (estoque-20): o lote do PWA nascia sem CodigoLote, e aparecia como "sem lote" em "Vencidos com
+        // saldo" e no Estoque do dia; a cozinheira não sabia qual lote jogar fora. A chave de pesquisa leva o código.
+        await SincronizarLoteAsync("b-1", 5);
+
+        var codigoDoLote = _db.Set<Lote>().IgnoreQueryFilters().Single(l => l.MobileBatchId == "b-1").Codigo.ToUpperInvariant();
+        var entrada = EntradaDoLote();
+        entrada.CodigoLote!.Value.Should().Be(codigoDoLote).And.StartWith("LOT-261008");
+        entrada.ChavePesquisa.Should().Contain(codigoDoLote);
+    }
+
+    [Fact]
+    public async Task EntradaDoLote_LevaOsLimiaresDoProduto()
+    {
+        // #2003 (estoque-20): sem os limiares do produto, o lote do PWA ficava com o padrão global.
+        var produto = _db.Set<Produto>().IgnoreQueryFilters().Single(p => p.Id == _produtoErpId);
+        produto.QuantidadeMinima = 12;
+        produto.QuantidadeCritica = 4;
+        _db.SaveChanges();
+
+        await SincronizarLoteAsync("b-1", 5);
+
+        var entrada = EntradaDoLote();
+        (entrada.QuantidadeMinima, entrada.QuantidadeCritica).Should().Be((12, 4));
+    }
+
     private List<MovimentacaoEstoque> Saidas(NaturezaMovimentacaoEstoque natureza) =>
         _db.Set<MovimentacaoEstoque>().IgnoreQueryFilters()
             .Where(m => m.EmpresaId == _empresaId && m.ProdutoId == _produtoErpId
