@@ -25,7 +25,7 @@ public class ToggleDisponibilidadeCardapioItemAdminUseCase(
         var item = await cardapioRepository.GetByIdAndScopeAsync(command.StorefrontId, command.ItemId, command.EmpresaId)
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 
-        var ofertadoAntes = AvisoItemComInteresse.Ofertado(item);
+        var ofertadoAntes = item.EstaOfertado();
         if (command.Alvo ?? !item.Disponivel) item.MarcarDisponivel();
         else item.MarcarEsgotado();
 

@@ -67,6 +67,20 @@ public class CheckoutPratoVendavelTests
     }
 
     [Fact]
+    public async Task PratoComTodasAsPorcoesEsgotadas_NaoSeVende_ComAMesmaMensagemDosDemais()
+    {
+        // #2018: a listagem já escondia o prato sem porção à venda; o checkout só descobria na hora de escolher a porção.
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var porcao = CardapioItemVariacao.Criar(c.CardapioItem.Id, "300g", 28m);
+        c.CardapioItem.AdicionarVariacao(porcao);
+        porcao.MarcarEsgotado();
+
+        var agir = () => c.Servico().CarregarItensCardapioAsync(c.Storefront.Id, [c.CardapioItemId]);
+
+        await agir.Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("*indisponível no cardápio*");
+    }
+
+    [Fact]
     public async Task PratoQueSaiuDoCardapio_NaoSegueNemQuandoOPedidoJaTem()
     {
         var c = new CheckoutCoreServiceTests.Cenario();

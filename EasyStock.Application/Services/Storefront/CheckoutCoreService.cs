@@ -444,7 +444,7 @@ public sealed class CheckoutCoreService(
             var ci = lidos.GetValueOrDefault(itemId);
             // M1.2 (#1482): item arquivado não se vende, nem por link antigo. M1.3 (#1483): nem o de categoria escondida.
             // #2002: o prato que o pedido já reservou (alteração sem acrescentar nada dele) só precisa existir.
-            if (ci is null || jaNoPedido?.Contains(itemId) != true && (!ci.Visivel || !ci.Disponivel || ci.EstaArquivado || ci.EmSecaoOculta))
+            if (ci is null || jaNoPedido?.Contains(itemId) != true && !ci.EstaOfertado())
                 throw new RegraDeDominioVioladaException(ci?.NomeEfetivo() is { Length: > 0 } nome
                     ? $"{nome} está indisponível no cardápio agora."
                     : "Um item do pedido não está mais no cardápio.");
