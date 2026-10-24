@@ -164,10 +164,6 @@ public static class ImpressoHtml
     public static string QuantidadeComUnidade(decimal q, string unidade) =>
         unidade == MontarPedidoImpressoUseCase.UnidadePadrao ? Quantidade(q) : Quantidade(q) + " " + unidade;
 
-    /// <summary>Nulo sem nome: o Scriban trata string vazia como verdadeira e a saudação sairia ", vamos à mesa?".</summary>
-    public static string? PrimeiroNome(string? nome) =>
-        string.IsNullOrWhiteSpace(nome) ? null : nome.Trim().Split(' ', 2)[0];
-
     public static string Entrega(PedidoImpressoEntregaDto? e)
     {
         if (e is null) return "a definir";

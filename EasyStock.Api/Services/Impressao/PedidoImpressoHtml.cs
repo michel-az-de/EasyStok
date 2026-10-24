@@ -2,6 +2,7 @@ using System.Globalization;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.UseCases.Operacao.Impressao;
 using static EasyStock.Api.Services.Impressao.ImpressoHtml;
+using EasyStock.Application.Services.Atendimento;
 
 namespace EasyStock.Api.Services.Impressao;
 
@@ -79,7 +80,7 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
             ["cliente"] = new Dictionary<string, object?>
             {
                 ["nome"] = T(p.Cliente.Nome ?? "Cliente sem nome"),
-                ["primeiro"] = T(PrimeiroNome(p.Cliente.Nome)),
+                ["primeiro"] = T(NomesDeContato.PrimeiroNome(p.Cliente.Nome)),
                 ["telefone"] = p.Cliente.Telefone is { } tel ? T(Telefone(tel)) : null,
                 ["endereco"] = T(p.Cliente.Endereco),
             },

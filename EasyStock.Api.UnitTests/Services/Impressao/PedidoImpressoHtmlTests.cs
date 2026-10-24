@@ -124,6 +124,18 @@ public class PedidoImpressoHtmlTests
         corpo.Should().NotContainAny("Falta pagar", "CNPJ", "ID #");
     }
 
+    [Theory]
+    [InlineData("Cliente WhatsApp")]
+    [InlineData("+55 11 98765-4412")]
+    [InlineData(null)]
+    public async Task PedidoDeContatoSemNomeDePessoaNaoChamaAClienteDeCliente(string? nome)
+    {
+        // #2018: a mesma regra de primeiro nome dos avisos; o lead e o telefone no lugar do nome nao viram "Cliente, vamos...".
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(Exemplo(clienteNome: nome), PedidoImpressoHtml.Pedido, ImpressoHtml.A5));
+
+        corpo.Should().Contain("Vamos à mesa?").And.NotContain("Cliente, vamos").And.NotContain("98765-4412, vamos");
+    }
+
     [Fact]
     public async Task PedidoPagoAgradeceEmVezDeCobrar()
     {

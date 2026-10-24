@@ -244,7 +244,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         var cupons = cliente is null ? [] : await leitura.ObterAsync("cupons", cliente.Id, async () =>
             (IReadOnlyList<CupomComandaCliente>)(await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct))
                 .Select(c => new CupomComandaCliente(c.Codigo, c.Saldo, c.Valor, c.CriadoEm)).ToList());
-        return new(link.Id, (cliente?.Nome ?? conversa.ContatoNome ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "",
+        return new(link.Id, NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome) ?? "",
             HorarioBrasil.DataOperacional(link.CriadoEm), link.ExpiraEm, link.Revisao, pode, dados, selecao, detalhe,
             envio, cupons,
             selecao.Sum(i => i.Qtd * i.Preco) + (pedido is null ? valorCombinado ?? 0m : ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido)), conversa.NumeroComanda, conversa.Id, financeiro, acerto,

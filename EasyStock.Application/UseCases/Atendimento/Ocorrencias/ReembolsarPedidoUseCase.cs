@@ -124,7 +124,7 @@ public sealed class ReembolsarPedidoUseCase(
                 clienteId = ocorrencia.ClienteId.ToString(),
                 conversaId = ocorrencia.ConversaId?.ToString(),
                 telefone,
-                nome = PrimeiroNome(cliente!.Nome),
+                nome = NomesDeContato.PrimeiroNome(cliente!.Nome, "cliente"),
                 numero = VariaveisAtendimento.NumeroDoPedido(ocorrencia.PedidoId, conversa),
                 valor = Reais(valor),
             });
@@ -154,8 +154,6 @@ public sealed class ReembolsarPedidoUseCase(
         }
     }
 
-    private static string PrimeiroNome(string? nome) =>
-        string.IsNullOrWhiteSpace(nome) ? "cliente" : nome.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
 
     private static string Reais(decimal valor) => valor.ToString("C2", PtBr).Replace(' ', ' ');
 }

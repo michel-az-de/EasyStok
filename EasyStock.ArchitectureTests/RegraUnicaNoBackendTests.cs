@@ -84,6 +84,26 @@ public class RegraUnicaNoBackendTests
             + "deixar o frete, as janelas e o checkout comparando CEPs de formas diferentes");
     }
 
+    // ---- Primeiro nome do contato -----------------------------------------------------------------------------
+
+    private static readonly Regex PrimeiroNomeProprio = new(
+        @"static\s+string\??\s+PrimeiroNome\s*\(", RegexOptions.Compiled);
+
+    [Fact]
+    public void PrimeiroNomeDoContato_SoDefinidoPeloNomesDeContato()
+    {
+        var root = RepoPaths.FindRepoRoot();
+        var fora = ArquivosDeProducao(root, "*.cs")
+            .Where(f => PrimeiroNomeProprio.IsMatch(SemComentarios(File.ReadAllText(f))))
+            .Select(f => Relativo(root, f))
+            .Where(r => r != "EasyStock.Application/Services/Atendimento/NomesDeContato.cs")
+            .ToList();
+
+        fora.Should().BeEmpty(
+            "o primeiro nome do contato é NomesDeContato.PrimeiroNome; uma regra própria volta a chamar o lead de 'Cliente' "
+            + "numa tela e esconder o nome em outra");
+    }
+
     // ---- Apoio ------------------------------------------------------------------------------------------------
 
     private static string Relativo(string root, string arquivo) =>

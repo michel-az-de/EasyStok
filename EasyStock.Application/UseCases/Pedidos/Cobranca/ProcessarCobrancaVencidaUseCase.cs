@@ -203,7 +203,7 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     {
         var payload = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
         {
-            ["nome"] = AvisoEquipeNoAparelho.PrimeiroNome(pedido.ClienteNome),
+            ["nome"] = NomesDeContato.PrimeiroNome(pedido.ClienteNome, AvisoEquipeNoAparelho.NomeSemContato),
             ["referencia"] = CodigoCurto.De(pedido.Id),
             [NotificadorService.ChaveIdempotenciaPayload] = CorrelacaoAvisoEquipe(cobranca.Id),
         });

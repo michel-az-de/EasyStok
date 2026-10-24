@@ -49,7 +49,7 @@ public sealed class AvisoEquipeNoAparelho(
         }
 
         await EnfileirarAsync(TipoEventoNotificacao.ContatoNovoNoBalcao, empresaId, conversa.Id, conversa.Id, TagContatoNovo,
-            PrimeiroNome(conversa.ContatoNome), "contato-novo", null, ct);
+            NomesDeContato.PrimeiroNome(conversa.ContatoNome, NomeSemContato), "contato-novo", null, ct);
     }
 
     public async Task PedidoPagoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct)
@@ -78,7 +78,7 @@ public sealed class AvisoEquipeNoAparelho(
         var chave = $"pagamento-sem-aviso:{pedido.Id:N}";
         var payload = JsonSerializer.Serialize(new Dictionary<string, string>
         {
-            ["nome"] = PrimeiroNome(pedido.ClienteNome),
+            ["nome"] = NomesDeContato.PrimeiroNome(pedido.ClienteNome, NomeSemContato),
             ["referencia"] = CodigoCurto.De(pedido.Id),
             [NotificadorService.ChaveIdempotenciaPayload] = chave,
         });
@@ -109,12 +109,6 @@ public sealed class AvisoEquipeNoAparelho(
         _ => null,
     };
 
-    /// <summary>Primeiro nome do contato; sem nome, ou quando o nome é um telefone, <see cref="NomeSemContato"/>.</summary>
-    public static string PrimeiroNome(string? nome)
-    {
-        var primeiro = (nome ?? string.Empty).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        return primeiro is null || primeiro.Any(char.IsDigit) ? NomeSemContato : primeiro;
-    }
 
     /// <summary>Tag da notificação, igual à do console: <c>casa-da-baba-{tipo}-{referência}</c>.</summary>
     public static string Tag(string tipo, Guid referencia) => $"casa-da-baba-{tipo}-{referencia}";
@@ -131,7 +125,7 @@ public sealed class AvisoEquipeNoAparelho(
         // O Balcão lista conversas: com conversa, a tag é a dela, como no console.
         var conversaId = await conversas.ObterIdPorPedidoAsync(empresaId, pedidoId, ct);
         var conversa = conversaId is { } id ? await conversas.ObterPorIdAsync(empresaId, id, ct) : null;
-        return (conversa?.Id ?? pedido.Id, PrimeiroNome(conversa?.ContatoNome ?? pedido.ClienteNome));
+        return (conversa?.Id ?? pedido.Id, NomesDeContato.PrimeiroNome(conversa?.ContatoNome ?? pedido.ClienteNome, NomeSemContato));
     }
 
     /// <param name="referencia">De quem é a tag: a conversa (ou o pedido sem conversa), como no console.</param>
