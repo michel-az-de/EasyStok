@@ -38,8 +38,7 @@ builder.Configuration.AdicionarChaveMestraDoAmbiente();
     try { Directory.CreateDirectory(logDir); } catch { /* best-effort */ }
 }
 
-// LevelSwitch permite controlar o nível mínimo em tempo real via DiagnosticoModeService.
-// Criado aqui (antes do Serilog) para ser injetado no logger e nos serviços.
+// LevelSwitch do nível mínimo do Serilog, criado antes do logger.
 var diagLevelSwitch = new Serilog.Core.LoggingLevelSwitch(Serilog.Events.LogEventLevel.Information);
 
 // Configure Serilog — máximo de informações em cada log entry
@@ -149,10 +148,6 @@ builder.Services.AddEasyStockNotificationsModule(builder.Configuration);
 // ── Background + Mobile + Misc ────────────────────────────────────────────────
 builder.Services.AddEasyStockApiServices(builder.Configuration);
 
-// DiagnosticoModeService: Singleton que controla LoggingLevelSwitch em tempo real.
-builder.Services.AddSingleton(diagLevelSwitch);
-builder.Services.AddSingleton<EasyStock.Api.Observability.DiagnosticoModeService>();
-
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
@@ -208,20 +203,6 @@ await StartupMigrationsAndSeed.RunAsync(app, infraState, databaseProvider, resol
 // I4.2: em Production a API não sobe sem chave-mestra que leia todas as credenciais ativas.
 await ChaveMestraNaSubida.ExigirAsync(app.Services, app.Environment.EnvironmentName, "API");
 
-// Restaura modo de logging verbose salvo no DB (após migrations estarem aplicadas).
-if (resolvedProvider is "postgresql")
-{
-    try
-    {
-        var diagMode = app.Services.GetRequiredService<EasyStock.Api.Observability.DiagnosticoModeService>();
-        await diagMode.RestoreFromDbAsync();
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning(ex, "[DiagnosticoMode] Falha ao restaurar modo — usando Information.");
-    }
-}
-
 // ── Startup hardening: JWT, connection strings, Mobile API key ────────────────
 StartupHardening.Validate(builder, postgresConnectionString);
 // Fuso de Brasilia: em producao recusa subir se degradou (ex.: imagem sem tzdata).
@@ -239,7 +220,6 @@ Log.Information("""
       Banco:        {Provider} (configurado: {Configured})
       Raiz (/):     → redireciona para /swagger
       Swagger:      /swagger
-      Diagnostico:  /diagnostico
       Health:       /health, /health/live, /health/ready
     ======================================
     """,

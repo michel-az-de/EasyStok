@@ -56,26 +56,6 @@ public class DimensoesTests
     }
 
     [Fact]
-    public void Deve_estar_vazio_quando_todos_zero()
-    {
-        var dimensoes = Dimensoes.From(0, 0, 0, 0);
-
-        var vazio = dimensoes.EstaVazio();
-
-        vazio.Should().BeTrue();
-    }
-
-    [Fact]
-    public void Nao_deve_estar_vazio_quando_algum_nao_zero()
-    {
-        var dimensoes = Dimensoes.From(1, 0, 0, 0);
-
-        var vazio = dimensoes.EstaVazio();
-
-        vazio.Should().BeFalse();
-    }
-
-    [Fact]
     public void Deve_ser_igual_por_valores()
     {
         var d1 = Dimensoes.From(1, 10, 5, 20);

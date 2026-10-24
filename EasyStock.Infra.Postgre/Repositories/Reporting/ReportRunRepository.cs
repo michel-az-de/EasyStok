@@ -81,21 +81,6 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
             .ToListAsync(ct);
     }
 
-    public Task<int> CountRunningForOwnerAsync(
-        Guid?             empresaId,
-        Guid?             adminUsuarioId,
-        CancellationToken ct)
-    {
-        if (empresaId.HasValue)
-            return db.ReportRuns
-                .AsNoTracking()
-                .CountAsync(r => r.EmpresaId == empresaId && r.Status == ReportStatus.Running, ct);
-
-        return db.ReportRuns
-            .AsNoTracking()
-            .CountAsync(r => r.UsuarioSolicitanteId == adminUsuarioId && r.Status == ReportStatus.Running, ct);
-    }
-
     // ── Escrita ───────────────────────────────────────────────────────────────
 
     public async Task AddAsync(ReportRun run, CancellationToken ct)
@@ -286,18 +271,4 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         return storageKeys;
     }
 
-    public async Task<int> PurgeAllForTenantAsync(Guid empresaId, CancellationToken ct)
-    {
-        var runs = await db.ReportRuns
-            .Where(r => r.EmpresaId == empresaId && r.ArtifactStorageKey != null)
-            .ToListAsync(ct);
-
-        if (runs.Count == 0) return 0;
-
-        foreach (var run in runs)
-            run.MarkArtifactPurged();
-
-        await db.SaveChangesAsync(ct);
-        return runs.Count;
-    }
 }

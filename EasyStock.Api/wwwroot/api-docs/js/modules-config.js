@@ -55,7 +55,7 @@ export const MODULES = [
         name: 'Admin',
         icon: 'wrench',
         accent: 'danger',
-        tags: ['Diagnostico', 'DiagnosticoInfra', 'DiagnosticoLogs'],
+        tags: [],
         tagPrefix: ['Admin'],
         desc: 'Diagnóstico operacional e administração de tenants.'
     },

@@ -25,7 +25,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
             string? order = "asc");
 
         Task<IEnumerable<Cliente>> SearchAsync(Guid empresaId, string termo, int maxResults = 20);
-        Task<Cliente?> FindByDocumentoAsync(Guid empresaId, string documento);
         Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone);
 
         Task AddAsync(Cliente cliente);

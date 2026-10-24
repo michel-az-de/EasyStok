@@ -74,12 +74,6 @@ public class CpfTests
     }
 
     [Fact]
-    public void Formatado_retorna_cpf_com_mascara()
-    {
-        Cpf.From("11144477735").Formatado().Should().Be("111.444.777-35");
-    }
-
-    [Fact]
     public void Implicit_operator_converte_para_string()
     {
         var cpf = Cpf.From("11144477735");

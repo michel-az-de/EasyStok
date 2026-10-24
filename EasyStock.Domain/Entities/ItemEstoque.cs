@@ -315,9 +315,6 @@ namespace EasyStock.Domain.Entities
             RecalcularIndicadores(dataReferencia);
         }
 
-        public void RecalcularStatus(DateTime dataReferencia) =>
-            RecalcularIndicadores(dataReferencia);
-
         public void RecalcularIndicadores(DateTime dataReferencia, int diasAlertaParado = OperacionalDefaults.DiasAlertaParado)
         {
             // Converte o instante UTC para o dia operacional de Brasilia (ADR-0032).

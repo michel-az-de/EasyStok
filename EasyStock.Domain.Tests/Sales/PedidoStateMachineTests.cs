@@ -136,18 +136,6 @@ public class PedidoStateMachineTests
             .BeEquivalentTo(new[] { StatusPedido.Entregue, StatusPedido.Cancelado });
 
     [Theory]
-    [InlineData(StatusPedido.Aguardando, true)]
-    [InlineData(StatusPedido.Preparando, true)]
-    [InlineData(StatusPedido.Pronto, true)]
-    [InlineData(StatusPedido.SaiuParaEntrega, true)]
-    [InlineData(StatusPedido.Entregue, false)]
-    [InlineData(StatusPedido.Cancelado, false)]
-    public void EstaAberto_classifica_corretamente(StatusPedido status, bool esperado)
-    {
-        PedidoStateMachine.EstaAberto(status).Should().Be(esperado);
-    }
-
-    [Theory]
     [InlineData(StatusPedido.Aguardando, false)]
     [InlineData(StatusPedido.Preparando, false)]
     [InlineData(StatusPedido.Pronto, false)]

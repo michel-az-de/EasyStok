@@ -15,7 +15,7 @@ namespace EasyStock.Application.Ports.Output.Pagamentos;
 /// </summary>
 public interface IGatewayWebhookProcessor
 {
-    /// <summary>Identificador do provedor — bate com <see cref="IPagamentoGateway.Provedor"/>.</summary>
+    /// <summary>Identificador do provedor — e a chave da rota do webhook generico.</summary>
     string Provedor { get; }
 
     /// <summary>

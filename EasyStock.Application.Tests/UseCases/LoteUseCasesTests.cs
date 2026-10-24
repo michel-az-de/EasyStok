@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Persistence;
-using EasyStock.Application.UseCases.ConferirEtiqueta;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.FinalizarLote;
 using Microsoft.Extensions.Logging;
@@ -209,87 +208,6 @@ public class LoteUseCasesTests
         etiquetas.Where(e => e.LoteItemId == item1.Id).Should().HaveCount(3);
         etiquetas.Where(e => e.LoteItemId == item2.Id).Should().HaveCount(2);
         lote.Status.Should().Be("finalizado");
-        await _uow.Received(1).CommitAsync();
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // ConferirEtiqueta
-    // ════════════════════════════════════════════════════════════════════
-
-    [Fact]
-    public async Task ConferirEtiqueta_DeveLancarValidation_QuandoCodigoVazio()
-    {
-        var useCase = new ConferirEtiquetaUseCase(_repo, _uow,
-            Substitute.For<ILogger<ConferirEtiquetaUseCase>>());
-
-        var act = () => useCase.ExecuteAsync(
-            new ConferirEtiquetaCommand(Guid.NewGuid(), "  ", "conferida"));
-
-        await act.Should().ThrowAsync<UseCaseValidationException>()
-            .WithMessage("*Código*");
-    }
-
-    [Fact]
-    public async Task ConferirEtiqueta_DeveLancarValidation_QuandoStatusInvalido()
-    {
-        var useCase = new ConferirEtiquetaUseCase(_repo, _uow,
-            Substitute.For<ILogger<ConferirEtiquetaUseCase>>());
-
-        var act = () => useCase.ExecuteAsync(
-            new ConferirEtiquetaCommand(Guid.NewGuid(), "LOT-001-0001", "exotica"));
-
-        await act.Should().ThrowAsync<UseCaseValidationException>()
-            .WithMessage("*Status inválido*");
-    }
-
-    [Fact]
-    public async Task ConferirEtiqueta_DeveRetornarNull_QuandoEtiquetaNaoEncontrada()
-    {
-        var empresaId = Guid.NewGuid();
-        _repo.FindEtiquetaPorCodigoAsync(empresaId, "INEXISTENTE")
-            .Returns((LoteEtiqueta?)null);
-
-        var useCase = new ConferirEtiquetaUseCase(_repo, _uow,
-            Substitute.For<ILogger<ConferirEtiquetaUseCase>>());
-
-        var result = await useCase.ExecuteAsync(
-            new ConferirEtiquetaCommand(empresaId, "INEXISTENTE", "conferida"));
-
-        result.Should().BeNull();
-        await _uow.DidNotReceive().CommitAsync();
-    }
-
-    [Fact]
-    public async Task ConferirEtiqueta_DeveAtualizarStatusComMetadados_QuandoSucesso()
-    {
-        var empresaId = Guid.NewGuid();
-        var operadorId = Guid.NewGuid();
-        var etq = new LoteEtiqueta
-        {
-            Id = Guid.NewGuid(),
-            LoteId = Guid.NewGuid(),
-            LoteItemId = Guid.NewGuid(),
-            Sequencial = 1,
-            Codigo = "LOT-260501-005-0001",
-            Status = "pendente",
-            CriadoEm = DateTime.UtcNow.AddHours(-1)
-        };
-        _repo.FindEtiquetaPorCodigoAsync(empresaId, "LOT-260501-005-0001").Returns(etq);
-
-        var useCase = new ConferirEtiquetaUseCase(_repo, _uow,
-            Substitute.For<ILogger<ConferirEtiquetaUseCase>>());
-
-        var result = await useCase.ExecuteAsync(
-            new ConferirEtiquetaCommand(empresaId, "LOT-260501-005-0001", "DIVERGENTE",
-                Observacao: "peso fora", ConferidaPorUserId: operadorId, ConferidaPorNome: "Joao"));
-
-        result.Should().NotBeNull();
-        result!.Status.Should().Be("divergente"); // case-insensitive
-        result.ConferidaPorUserId.Should().Be(operadorId);
-        result.ConferidaPorNome.Should().Be("Joao");
-        result.ObservacaoConferencia.Should().Be("peso fora");
-        result.ConferidaEm.Should().NotBeNull();
-        await _repo.Received(1).UpdateEtiquetaAsync(etq);
         await _uow.Received(1).CommitAsync();
     }
 }

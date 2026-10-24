@@ -9,13 +9,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace EasyStock.Api.DependencyInjection;
 
 /// <summary>
-/// Agrupa registros que viviam soltos no Program.cs entre "Build" e "DiagnosticoMode":
+/// Agrupa registros que viviam soltos no Program.cs:
 /// Background Jobs da Application, HttpClient genérico, validators do FluentValidation,
 /// Mobile module services (Onda 2-9), ExpirarClienteSessions
 /// (Storefront sliding window).
-///
-/// DiagnosticoModeService NÃO entra aqui porque depende de <c>diagLevelSwitch</c>
-/// (variável local do <c>Program.cs</c> declarada antes do Serilog setup).
 ///
 /// Ordem relativa preservada exatamente como estava no Program.cs.
 /// </summary>
@@ -27,7 +24,7 @@ public static class ApiServicesExtensions
     {
         // ── Background Services + misc ────────────────────────────────────────────
         services.AddEasyStockBackgroundJobs(configuration);
-        services.AddHttpClient(); // for DiagnosticoInfraController self-testing
+        services.AddHttpClient();
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Entregas.LogisticaUseCases>();
         services.AddScoped<EasyStock.Api.Data.DemoStore.LogisticaDemoSeeder>();
         services.AddSingleton<RastreioLogisticaLink>();

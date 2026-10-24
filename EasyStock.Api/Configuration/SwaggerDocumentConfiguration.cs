@@ -488,7 +488,6 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["Uploads"]        = "Upload e gerenciamento de arquivos (fotos de produtos, documentos).",
         ["IaAutoPreenchimento"] = "Auto-preenchimento de produto novo via Inteligência Artificial (SSE).",
         ["Venda"]          = "Registro e consulta de vendas realizadas.",
-        ["Diagnostico"]    = "Diagnóstico operacional da API: status de banco, Redis, SMTP, storage e configurações.",
 
         // ── Admin (SuperAdmin painel global) ─────────────────────────────────
         ["AdminAdmins"]         = "Gerenciamento de SuperAdmins globais (admins da plataforma EasyStock, não dos tenants).",
@@ -536,8 +535,6 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["Reports"]             = "Relatórios gerenciais (estoque, vendas, financeiro).",
         ["Consentimentos"]      = "Registro de consentimentos LGPD por usuário/cliente.",
         ["EntityAudit"]         = "Consulta da trilha de auditoria de entidades específicas (quem alterou o quê).",
-        ["DiagnosticoInfra"]    = "Diagnóstico de infraestrutura (PostgreSQL, Redis, S3, SMTP) com self-test.",
-        ["DiagnosticoLogs"]     = "Live tail de logs estruturados (SSE) para diagnóstico em produção.",
         ["PwaPush"]             = "Subscription Web Push para o PWA (storefront e Casa da Babá).",
         ["WebhookGateway"]      = "Webhook do gateway de pagamento (MercadoPago).",
         ["WebhookPix"]          = "Webhook da Efi (PIX): retorno de cobrança recebida.",

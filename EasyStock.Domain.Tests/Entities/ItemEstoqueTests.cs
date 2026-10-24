@@ -161,7 +161,7 @@ public class ItemEstoqueTests
     {
         var item = CriarItem(status: StatusItemEstoque.Ok, validade: Validade.From(new DateTime(2026, 4, 1)));
 
-        item.RecalcularStatus(new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc));
+        item.RecalcularIndicadores(new DateTime(2026, 4, 3, 0, 0, 0, DateTimeKind.Utc));
 
         item.Status.Should().Be(StatusItemEstoque.Vencido);
     }
