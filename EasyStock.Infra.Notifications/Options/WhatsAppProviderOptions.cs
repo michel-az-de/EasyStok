@@ -2,13 +2,6 @@ using EasyStock.Application.Ports.Output.Notifications;
 
 namespace EasyStock.Infra.Notifications.Options;
 
-public sealed class TwilioWhatsAppOptions
-{
-    public string AccountSid { get; set; } = string.Empty;
-    public string AuthToken { get; set; } = string.Empty;
-    public string From { get; set; } = string.Empty; // whatsapp:+14155238886
-}
-
 /// <summary>
 /// WhatsApp de plataforma (N6), seção <c>Notifications:WhatsApp:Plataforma</c>: o 2º número da mesma WABA, só template.
 /// O token e o <c>AppSecret</c> são os do app (<see cref="MetaCloudWhatsAppOptions"/>).

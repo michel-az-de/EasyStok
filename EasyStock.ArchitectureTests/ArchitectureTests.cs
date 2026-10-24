@@ -155,7 +155,7 @@ public class ArchitectureTests
     public void Application_Nao_Deve_Depender_De_IMemoryCache()
     {
         // Arrange. Cache via ICacheService (port em Application), implementado por
-        // RedisCacheService/InMemoryCacheService em Infra.Async. IMemoryCache concreto
+        // RedisCacheService em Infra.Async. IMemoryCache concreto
         // acopla a aplicacao a um backend especifico.
         var assembly = typeof(EasyStock.Application.Ports.Output.Persistence.IProdutoRepository).Assembly;
 
