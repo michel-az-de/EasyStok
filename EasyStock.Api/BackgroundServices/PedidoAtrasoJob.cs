@@ -34,7 +34,7 @@ public sealed class PedidoAtrasoJob(
             {
                 await ProcessarRodadaAsync(stoppingToken);
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
                 logger.LogError(ex, "PedidoAtrasoJob: erro na rodada.");

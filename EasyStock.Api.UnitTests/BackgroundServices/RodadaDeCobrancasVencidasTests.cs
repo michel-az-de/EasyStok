@@ -45,6 +45,23 @@ public class RodadaDeCobrancasVencidasTests
     }
 
     [Fact]
+    public async Task Timeout_de_uma_cobranca_conta_como_falha_e_a_rodada_segue()
+    {
+        // #2023: o HttpClient lança TaskCanceledException no timeout do Mercado Pago, com o token do job intacto.
+        var vencidas = new[] { Da(Guid.NewGuid()), Da(Guid.NewGuid()) };
+        var chamadas = 0;
+
+        var resumo = await RodadaDeCobrancasVencidas.ProcessarAsync(vencidas, (_, _) =>
+        {
+            chamadas++;
+            return chamadas == 1 ? throw new TaskCanceledException("timeout", new TimeoutException()) : Task.CompletedTask;
+        }, NullLogger.Instance, CancellationToken.None);
+
+        chamadas.Should().Be(2);
+        resumo.Should().Be(new RodadaDeCobrancasVencidas.Resumo(Processadas: 1, Falhas: 1, Puladas: 0));
+    }
+
+    [Fact]
     public async Task Cancelamento_interrompe_a_rodada()
     {
         using var cts = new CancellationTokenSource();

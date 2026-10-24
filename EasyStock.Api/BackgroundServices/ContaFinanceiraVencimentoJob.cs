@@ -54,7 +54,7 @@ public sealed class ContaFinanceiraVencimentoJob(
 
                 await RunWithAdvisoryLockAsync(LockKeyJob, ProcessarAsync, stoppingToken);
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
                 logger.LogError(ex, "ContaFinanceiraVencimentoJob: erro — aguardando 1h.");
