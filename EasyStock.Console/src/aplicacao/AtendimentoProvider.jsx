@@ -2,9 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, u
 import { ATENDENTE, estadoInicial, reducer } from './reducer'
 import * as acao from './acoes'
 import { ContextoAcoes, ContextoCatalogo, ContextoEstado } from './contextos'
-import { carregarConversas, proximoId } from '../infra/repositorioConversas'
+import { carregarConversas } from '../infra/repositorioConversas'
+import { proximoId } from '../infra/numeracao'
 import { carregarCatalogo } from '../infra/repositorioCatalogo'
-import { carregarHistorico } from '../infra/historicoPedidos'
 import { pedirSugestao } from '../infra/conexaoAgente'
 import { REGRAS_PADRAO } from '../dominio/automacao'
 import { FUNCIONAMENTO_PADRAO, estaAberta } from '../dominio/funcionamento'
@@ -28,7 +28,7 @@ import { useAvisoSonoro } from './useAvisoSonoro'
 import { useFilaDeAvisos } from './useFilaDeAvisos'
 import { audioDestravado, destravarAudio } from '../infra/som'
 import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom'
-import { conectarPrincipal } from '../infra/canalEntreJanelas'
+import { demonstracao } from '../infra/demonstracao'
 import { FONTE_API } from '../infra/fonteDados'
 import { useAcessoModulos } from './acessoModulos'
 import { podeVerDesacertos, podeVerItensFora } from '../dominio/acessoModulos'
@@ -137,8 +137,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // publicaria o estado inteiro e aplicaria ação recebida sem passar por `comApi`.
   const canalPrincipalRef = useRef(null)
   useEffect(() => {
-    if (FONTE_API) return undefined
-    canalPrincipalRef.current = conectarPrincipal({
+    if (!demonstracao) return undefined
+    canalPrincipalRef.current = demonstracao.conectarPrincipal({
       estadoAtual: () => estadoRef.current,
       aplicarAcao: (acaoRecebida) => despachar(acaoRecebida),
     })
@@ -407,7 +407,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       // "Precisa de você".
       encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros, usuario),
       bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros, usuario),
-      historico: selecionada ? historicoComPedidoVivo(selecionada.cliente?.historico ?? carregarHistorico(selecionada.id), selecionada.pedido) : [],
+      historico: selecionada ? historicoComPedidoVivo(selecionada.cliente?.historico ?? (demonstracao ? demonstracao.carregarHistorico(selecionada.id) : []), selecionada.pedido) : [],
       ultimoAvanco: estado.ultimoAvanco,
       // Lote de papel (US-042): banner de queda e a modal de lançamento leem
       // só este campo, tirado de `estado.conexao` sem transformação nenhuma.

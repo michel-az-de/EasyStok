@@ -30,15 +30,4 @@ export const casosRespostas = {
       respostasProntas: alternarArquivamentoRespostaPronta(estado.catalogo.respostasProntas, id),
     },
   }),
-
-  // #1441: modo API. A lista lida do EasyStok substitui a da demonstração inteira.
-  [acao.RESPOSTAS_DA_API]: (estado, { respostas }) => ({
-    ...estado,
-    catalogo: { ...estado.catalogo, respostasProntas: respostas },
-  }),
-
-  [acao.REGRAS_DA_API]: (estado, { regras }) => ({ ...estado, regras, cargaDasRegras: { estado: 'ok', mensagem: null } }),
-
-  // #1474: a lista que não veio fica como erro, não como "carregando" para sempre.
-  [acao.REGRAS_FALHARAM]: (estado, { mensagem }) => ({ ...estado, cargaDasRegras: { estado: 'erro', mensagem } }),
 }

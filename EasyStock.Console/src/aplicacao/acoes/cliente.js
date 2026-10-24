@@ -5,7 +5,7 @@
 // `agora` chega por parâmetro de quem chama (mesmo molde de
 // `acoes/areaEntrega.js`): esta função não tem `agoraRef` próprio.
 import * as acao from '../acoes'
-import { proximoId } from '../../infra/repositorioConversas'
+import { proximoId } from '../../infra/numeracao'
 
 export function criarAcoesCliente(despachar) {
   return {

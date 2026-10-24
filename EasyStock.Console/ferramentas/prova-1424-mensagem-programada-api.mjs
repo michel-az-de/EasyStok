@@ -30,6 +30,8 @@ registerHooks({
 })
 
 const { criarAcoes } = await import('../src/aplicacao/criarAcoes.js')
+// O build de produção não leva a demonstração (#2017): aqui ela entra à mão, para provar que recusa.
+const { criarAcoesDaDemonstracao } = await import('../src/aplicacao/acoes/demonstracao.js')
 const { comApi } = await import('../src/aplicacao/acoesApi.js')
 const { mensagemDaApi, programadaDaApi } = await import('../src/infra/api/traducaoConversas.js')
 const { SEM_CLIENTE } = await import('../src/aplicacao/api/mensagensProgramadas.js')
@@ -62,10 +64,11 @@ const estadoRef = {
 }
 const despachos = []
 const montar = () => {
-  const locais = criarAcoes({
+  const argumentos = {
     despachar: (a) => despachos.push(a), agoraRef: { current: Date.now() }, estadoRef, pendentes: { current: [] },
     consultarAgente: async () => {}, perguntarAssistente: async () => '', pedirNotificacaoDoNavegador: async () => {},
-  })
+  }
+  const locais = { ...criarAcoes(argumentos), ...criarAcoesDaDemonstracao(argumentos) }
   return { locais, api: comApi(locais, { despachar: (a) => despachos.push(a), agoraRef: { current: Date.now() }, estadoRef }) }
 }
 const { locais, api } = montar()

@@ -6,8 +6,6 @@ import { AtendimentoProvider } from '../aplicacao/AtendimentoProvider'
 import { criarMemoriaDoLaco } from '../aplicacao/cicloDeSincronizacao'
 import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '../aplicacao/rascunhosDosAjustes'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
-import { useReacaoClienteSimulado } from '../aplicacao/useReacaoClienteSimulado'
-import { useDigitacaoAutomatica } from '../aplicacao/useDigitacaoAutomatica'
 import { CHAVE_CARDAPIO, usePreferenciaDePainel } from '../aplicacao/preferenciaDosPaineis'
 import { CARDAPIO, larguraDoCardapio, larguraMaxima, normalizarCardapio } from '../dominio/paineis'
 import { useHash } from '../hooks/useHash'
@@ -16,6 +14,8 @@ import { useRelogio } from '../hooks/useRelogio'
 import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
 import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
+import { demonstracao } from '../infra/demonstracao'
+import { telasDaDemonstracao } from './demonstracao'
 import { identidadeDaSessao } from '../infra/api/sessao'
 import { gravarVisita, lerVisita } from '../infra/api/visitaDaSessao'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
@@ -52,20 +52,15 @@ import { PainelAgora } from '../features/agora/PainelAgora'
 import { avisoDeResponder, filasDoAgora } from '../dominio/agora'
 import { hashDoModulo } from '../dominio/modulos'
 import { MolduraDoModulo } from '../features/hall/MolduraDoModulo'
-import { GavetaEntregas } from '../features/entregas/GavetaEntregas'
-import { TelaEntregas } from '../features/entregas/TelaEntregas'
 import { GavetaEntregasApi } from '../features/entregas/GavetaEntregasApi'
 import { TelaEntregasApi } from '../features/entregas/TelaEntregasApi'
 import { CadastroEntregaApi } from '../features/entregas/CadastroEntregaApi'
-import { TelaCozinha } from '../features/cozinha/TelaCozinha'
 import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
-import { AvisoCardapioDoSite, TelaCardapioLink } from '../features/cardapio-link/TelaCardapioLink'
+import { AvisoCardapioDoSite } from '../features/cardapio-link/AvisoCardapioDoSite'
 import { ModalEncerrar } from '../features/encerramento/ModalEncerrar'
 import { FilaCanhotos } from '../features/ficha-cliente/FilaCanhotos'
 import { GestoLoja } from '../features/loja/GestoLoja'
 import { ModalLoteDePapel } from '../features/lote-papel/ModalLoteDePapel'
-import { PainelSimulacoes } from '../features/simulacoes/PainelSimulacoes'
-import { useRoteiro } from '../features/simulacoes/useRoteiro'
 import { PainelAgente } from '../features/agente/PainelAgente'
 import { BalaoAssistente } from '../features/assistente/BalaoAssistente'
 import { Moldura } from './Moldura'
@@ -73,6 +68,18 @@ import { PilhaDeAvisos } from './PilhaDeAvisos'
 import { AjudaDoConsole } from '../features/ajuda/AjudaDoConsole'
 import { NavegacaoDoConsole } from './NavegacaoDoConsole'
 import css from './moldura.module.css'
+
+// Modo demonstração (laboratório local, issue #2017): as telas e os ganchos dele só existem fora do build de
+// produção (`VITE_FONTE_DADOS=api`). Com `demonstracao` nulo viram vazio, e os ramos `!FONTE_API` abaixo nem rodam.
+const semEfeito = () => {}
+const { useReacaoClienteSimulado = semEfeito, useDigitacaoAutomatica = semEfeito } = demonstracao ?? {}
+const {
+  TelaCardapioLink = null, TelaCozinha = null, GavetaEntregas = null, TelaEntregas = null,
+  PainelSimulacoes = null, useRoteiro = semEfeito,
+  AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao,
+} = telasDaDemonstracao ?? {}
+// As abas de Gestão que só a demonstração tem; o `PainelDeAjuste` as usa no lugar das abas da API.
+const abasDaDemonstracao = { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao }
 
 // Só o topo conhece todas as features. Feature nenhuma importa outra feature.
 function Composicao({ rota }) {
@@ -280,6 +287,7 @@ function Composicao({ rota }) {
           aoTrocarAba={setAbaGestao}
           janelasApi={FONTE_API ? <CadastroEntregaApi /> : null}
           avisosApi={<AvisoDaAcaoApi />}
+          abasDaDemonstracao={abasDaDemonstracao}
           aoFechar={fechar}
         />
       )}
@@ -368,7 +376,7 @@ function TelaDaRota({ rota }) {
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
                 Entregas › Janelas e frete). Feature não importa feature; quem compõe é o App. */}
             {rota.aba && (
-              <PainelDeAjuste renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />} horariosAtendimento={<AjustarHorariosAtendimento />} key={rota.aba} aba={rota.aba} janelasApi={FONTE_API ? <CadastroEntregaApi /> : null} />
+              <PainelDeAjuste renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />} horariosAtendimento={<AjustarHorariosAtendimento />} key={rota.aba} aba={rota.aba} janelasApi={FONTE_API ? <CadastroEntregaApi /> : null} abasDaDemonstracao={abasDaDemonstracao} />
             )}
           </MolduraDoModulo>
         )}
