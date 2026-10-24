@@ -40,6 +40,9 @@ export function avisosDoRetrato(antes, retrato) {
     } else if (mudanca.mensagemNova) {
       avisos.push(criar(TIPOS_DE_AVISO.MENSAGEM_NOVA, id, 'Mensagem nova', `${nome} mandou mensagem`, EVENTOS_DE_SOM.NOVO_ATENDIMENTO))
     }
+    if (mudanca.sinalAgora) {
+      avisos.push(criar(TIPOS_DE_AVISO.PAGAMENTO_CONFIRMADO, id, 'Sinal pago', `${nome} pagou o sinal`, EVENTOS_DE_SOM.PAGAMENTO_CONFIRMADO, true))
+    }
     if (mudanca.pagouAgora) {
       avisos.push(criar(TIPOS_DE_AVISO.PAGAMENTO_CONFIRMADO, id, 'Pagamento confirmado', `${nome} pagou o pedido`, EVENTOS_DE_SOM.PAGAMENTO_CONFIRMADO, true))
     }

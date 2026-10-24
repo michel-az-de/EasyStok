@@ -301,7 +301,10 @@ export function BarraProximoPasso({
     saldoNoBotao = complementoEmAberto
     const botaoComplemento = complementoEmAberto && (
       <Botao largo variante="secundario" icone="dollar-sign" onClick={() => setAbrindoBaixa(true)}>
-        Marcar pago (complemento {moeda(pedido.cobranca.valor)})
+        {/* #2007 (item 9): depois do sinal da encomenda, o que falta é o restante, não um complemento. */}
+        {pedido.sinalNaReserva
+          ? <>Marcar pago (restante {moeda(pedido.cobranca.valor)})</>
+          : <>Marcar pago (complemento {moeda(pedido.cobranca.valor)})</>}
       </Botao>
     )
 

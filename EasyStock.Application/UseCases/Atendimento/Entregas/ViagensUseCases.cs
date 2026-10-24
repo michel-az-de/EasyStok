@@ -15,7 +15,8 @@ namespace EasyStock.Application.UseCases.Atendimento.Entregas;
 /// </summary>
 public sealed record ParadaViagemResult(
     Guid PedidoId, string NumeroPedido, int Ordem, string? ClienteNome, string? Endereco, DateTime? EntregueEm,
-    string? EntregadorNome, string? Veiculo, string? Placa, EmpresaEntregador? EmpresaEntregador);
+    string? EntregadorNome, string? Veiculo, string? Placa, EmpresaEntregador? EmpresaEntregador,
+    string? Observacoes = null, int? NumeroDoDia = null);
 
 public sealed record ViagemResult(
     Guid Id, Guid? EntregadorId, SituacaoViagem Situacao, DateTime CriadaEm, DateTime? SaiuEm, DateTime? ConcluidaEm,
@@ -65,7 +66,10 @@ public sealed class ObterViagemUseCase(IViagemRepository viagens, IPedidoReposit
             paradas.Add(new ParadaViagemResult(
                 p.PedidoId, NumeroPedido(p.PedidoId), p.Ordem, cliente?.Nome ?? pedido?.ClienteNome,
                 pedido?.EnderecoEntrega ?? Endereco(cliente),
-                p.EntregueEm, p.EntregadorNome, p.Veiculo, p.Placa, p.EmpresaEntregador));
+                p.EntregueEm, p.EntregadorNome, p.Veiculo, p.Placa, p.EmpresaEntregador,
+                // #2007: o troco do dinheiro na entrega e o número do dia chegam à parada mesmo com o pedido fora
+                // da lista do dia que Entregas mostra.
+                pedido?.Observacoes, pedido?.NumeroDoDia));
         }
         return new ViagemResult(viagem.Id, viagem.EntregadorId, viagem.Situacao, viagem.CriadaEm, viagem.SaiuEm,
             viagem.ConcluidaEm, RotaMaps.Montar(paradas.Select(p => p.Endereco)), paradas);

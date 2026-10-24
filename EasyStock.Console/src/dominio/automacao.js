@@ -194,6 +194,8 @@ const AVISO_DO_PEDIDO = {
 export function avisoDaAutomaticaDeEntrada(regra) {
   const doPedido = AVISO_DO_PEDIDO[regra?.gatilho]
   if (doPedido) {
+    // #2007 (11d): a de pagamento sai no lugar do aviso do pedido (uma mensagem só); a pós-entrega sai além dele.
+    if (regra.ativa && regra.texto && regra.gatilho === GATILHOS.PAGAMENTO_CONFIRMADO) return `Ligada: este texto substitui ${doPedido}.`
     if (regra.ativa && regra.texto) return `Ligada: o cliente recebe duas mensagens, ${doPedido} e este texto.`
     return `Mesmo desligada, o cliente já recebe ${doPedido}.`
   }

@@ -14,6 +14,8 @@ import css from './atendimento.module.css'
 export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, aoIniciar = null }) {
   const { listarModelos, enviarModelo, prepararOutroModelo, iniciarConversaComModelo, prepararOutroModeloDoCliente } = useAcoes()
   const { acoes } = useAcessoModulos()
+  // #2007 (11c): sem acesso a Integrações, a frase manda pedir à gerência em vez de apontar a tela que ela não vê.
+  const podeIntegrar = podeVerIntegracoes(acoes)
   const [lista, setLista] = useState(null)
   const [escolha, setEscolha] = useState('')
   const [parametros, setParametros] = useState([])
@@ -32,7 +34,7 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
     try {
       const modelos = await listarModelos(atualizar)
       if (versao === consulta.current) setLista(modelos)
-    } catch (e) { if (versao === consulta.current) { setLista([]); falhar(erroDoModelo(e)) } }
+    } catch (e) { if (versao === consulta.current) { setLista([]); falhar(erroDoModelo(e, { podeIntegrar })) } }
   }
   useEffect(() => {
     carregar()
@@ -72,7 +74,7 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
         setResultado(m)
         setErro(m.erro || 'Envio sem confirmação. Confira a conversa no WhatsApp antes de iniciar outro envio.')
       }
-    } catch (e) { falhar(erroDoModelo(e, { envio: true })) }
+    } catch (e) { falhar(erroDoModelo(e, { envio: true, podeIntegrar })) }
     finally { ocupado.current = false; setEnviando(false) }
   }
   return (
@@ -111,9 +113,7 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
           </>}
         </fieldset>}
         {erro && <p className={css.programarErro} role="alert">{erro}</p>}
-        {erro && semConexao && (podeVerIntegracoes(acoes)
-          ? <a href={hashDoModulo('configuracoes', 'integracoes')}>Abrir Integrações</a>
-          : <p>Quem administra a loja conecta o WhatsApp em Configurações, Integrações.</p>)}
+        {erro && semConexao && podeIntegrar && <a href={hashDoModulo('configuracoes', 'integracoes')}>Abrir Integrações</a>}
         {resultado && <>
           <label className={css.programarOpcao}><input type="checkbox" checked={conferido} onChange={e => setConferido(e.target.checked)} />
             Conferi no WhatsApp e preciso iniciar outro envio.

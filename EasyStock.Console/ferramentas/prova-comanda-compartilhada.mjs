@@ -139,6 +139,29 @@ assert.equal(partesComLinkDoCardapio(link.replace('casadababa.com', 'malicioso.c
 assert.equal(partesComLinkDoCardapio(link, null)[0].tipo, 'texto')
 assert.equal(combinaBusca({ nome: 'Maria', numeroComanda: 72, mensagens: [] }, 'comanda 72'), true)
 console.log('Comanda: conflito preserva edição, falha API preserva dados, adição de prato, permissão de devolução, saldo líquido, link seguro e busca por número aprovados.')
+// #2007 (item 4): o cliente trocou a data pelo link; "Comparar e aprovar" mostra de onde para onde, não só itens e totais.
+{
+  const janelaAtual = { janelaId: 'j1', data: '2026-10-24', label: 'Manhã', horaInicio: '09:00:00', horaFim: '11:00:00' }
+  const pedidoAtual = { total: 60, alocado: 30, itens: [{ quantidade: 2, nome: 'Lasanha' }], janela: janelaAtual }
+  const alteracao = { ...comanda, podeEditar: false, pedido: pedidoAtual, envio: { situacao: 'alteracao_aguardando_confirmacao', saldo: 0 },
+    financeiro: undefined, acerto: undefined,
+    rascunho: { ...comanda.rascunho, janelaId: 'j1', dataEntrega: '2026-10-25', janelaDoPedidoId: 'j1', dataDoPedido: '2026-10-24' } }
+  contexto.estados = []; contexto.cursor = 0; contexto.dados = [alteracao]
+  const textos = elementos(ComandaDoCliente({ conversaId: 'conversa', ativo: true })).map(e => e.props.children).filter(t => typeof t === 'string')
+  assert.ok(textos.includes('Data: de sáb, 24/10 para dom, 25/10'), 'a data nova aparece na alteração para aprovar')
+  assert.ok(textos.includes('Janela: 9h00 às 11h00 · Manhã (mantida)'), 'a janela aparece junto')
+  const outraJanela = { ...alteracao, rascunho: { ...alteracao.rascunho, janelaId: 'j2', dataEntrega: '2026-10-24' } }
+  contexto.estados = []; contexto.cursor = 0; contexto.dados = [outraJanela]
+  const textos2 = elementos(ComandaDoCliente({ conversaId: 'conversa', ativo: true })).map(e => e.props.children).filter(t => typeof t === 'string')
+  assert.ok(!textos2.some(t => t.startsWith('Data:')), 'mesma data não vira linha de data')
+  assert.ok(textos2.includes('Janela: de 9h00 às 11h00 · Manhã para outra janela escolhida pelo cliente'), 'troca só de janela também aparece')
+  const semMudanca = { ...alteracao, rascunho: { ...alteracao.rascunho, dataEntrega: '2026-10-24' } }
+  contexto.estados = []; contexto.cursor = 0; contexto.dados = [semMudanca]
+  assert.ok(!elementos(ComandaDoCliente({ conversaId: 'conversa', ativo: true })).some(e => typeof e.props.children === 'string'
+    && /^(Data|Janela):/.test(e.props.children)), 'sem troca, nada a mais')
+  contexto.dados = [comanda]
+}
+console.log('Alteração para aprovar: data e janela novas aparecem ao lado dos itens.')
 for (const [podeEditar, pedido, situacao, estado, acao] of [
   [true, null, null, 'Não confirmada', 'Revisar seleção'],
   [true, { total: 60 }, null, 'Pedido atual mantido', 'Revisar alteração'],

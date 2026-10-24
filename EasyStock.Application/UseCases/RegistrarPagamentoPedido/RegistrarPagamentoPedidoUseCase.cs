@@ -38,7 +38,8 @@ public class RegistrarPagamentoPedidoUseCase(
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     QuitacaoPedido quitacao,
     ICaixaRepository? caixaRepo = null,
-    SaldoFinanceiroPedido? saldos = null)
+    SaldoFinanceiroPedido? saldos = null,
+    Lazy<EasyStock.Application.Services.Atendimento.AvisoStatusPedidoCliente>? avisoCliente = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -145,6 +146,7 @@ public class RegistrarPagamentoPedidoUseCase(
             {
                 mudanca = await quitacao.ConfirmarSinalManualAsync(pedido, pag, token);
                 if (mudanca is null) await inicioPrevisto.AplicarNaFilaAsync(pedido, token);
+                else await AvisarSinalManualAsync(pedido, pag, alocado + pag.Valor, token);
             }
 
             if (!cmd.ConfirmadoPeloProvedor && cmd.Origem != "balcao")
@@ -165,6 +167,27 @@ public class RegistrarPagamentoPedidoUseCase(
         }, ct);
         await quitacao.PublicarAsync(cmd.EmpresaId, efeito, ct, mudanca);
         return resultado;
+    }
+
+    /// <summary>
+    /// #2007 (item 6): o sinal da encomenda registrado à mão avisa o cliente como o pago pelo Mercado Pago, pelo mesmo
+    /// aviso do pedido (WhatsApp ou chat do site). Sai uma vez: só na passagem que completa o sinal, e a chave leva o
+    /// id do pagamento. Pagamento que já quita fica com o aviso de pedido pago. Mensagem não é dinheiro: falha só loga.
+    /// </summary>
+    private async Task AvisarSinalManualAsync(EasyStock.Domain.Entities.Pedido pedido, PedidoPagamento pag, decimal sinal, CancellationToken ct)
+    {
+        var restante = pedido.Total.Valor - sinal;
+        if (avisoCliente is null || restante <= 0) return;
+        try
+        {
+            await avisoCliente.Value.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+                pedido.EmpresaId, pedido.Id, $"sinal:manual-{pag.Id:N}", ct,
+                mensagem: EasyStock.Application.UseCases.Pedidos.Cobranca.ConfirmarPagamentoPedidoUseCase.TextoSinalRecebido(sinal, restante));
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Aviso de sinal manual nao enfileirado pedidoId={PedidoId} pagamento={Pagamento}", pedido.Id, pag.Id);
+        }
     }
 
     /// <summary>

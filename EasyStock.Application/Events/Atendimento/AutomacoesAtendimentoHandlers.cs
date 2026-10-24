@@ -87,11 +87,14 @@ public sealed class AutomacaoPedidoPagoHandler(
 
     /// <summary>Só o que o aviso usa do <see cref="PedidoPagoEvent"/>.</summary>
     private sealed record PedidoPagoPayload(
-        Guid PedidoId, Guid? ClienteId, Guid? ConversaId, Guid CobrancaPedidoId, string? PagamentoExternoId);
+        Guid PedidoId, Guid? ClienteId, Guid? ConversaId, Guid CobrancaPedidoId, string? PagamentoExternoId, string? StatusPedido);
 
     protected override async Task TratarAsync(OutboxEventoIntegracao evento, CancellationToken ct)
     {
         if (Ler<PedidoPagoPayload>(evento) is not { } e) return;
+        // #2007 (item 7): o saldo recebido na porta quita um pedido que já saiu ou foi entregue. "Pedido confirmado
+        // para o dia X" seria texto velho ao lado do "entregue": o aviso de entrega já fala com o cliente.
+        if (e.StatusPedido is StatusPedidoMapper.SaiuParaEntrega or StatusPedidoMapper.Entregue) return;
 
         var automatica = await disparo.ExecuteAsync(new DisparoAutomacao(
             evento.EmpresaId, GatilhoAutomacao.PagamentoConfirmado, e.ConversaId, e.ClienteId, e.PedidoId), ct);

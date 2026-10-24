@@ -24,16 +24,17 @@ public sealed class EnderecoEntregaPedido(ICepLookupClient ceps, IGeocodingClien
         var rua = Limpo(dados.Logradouro) ?? consulta?.Logradouro;
         var bairro = Limpo(dados.Bairro) ?? consulta?.Bairro;
         var cidade = Limpo(dados.Cidade) ?? consulta?.Cidade;
+        var uf = Limpo(dados.Uf) ?? consulta?.Uf;
         var logradouro = string.Join(", ", new[] { rua, dados.Numero }.Where(s => !string.IsNullOrWhiteSpace(s)));
         // Null identifica legado; vazio preserva a ausência de endereço na criação.
-        pedido.EnderecoEntrega = EnderecoImpresso.Montar(logradouro, dados.Complemento, null, bairro, cidade, dados.Cep) ?? string.Empty;
+        pedido.EnderecoEntrega = EnderecoImpresso.Montar(logradouro, dados.Complemento, null, bairro, cidade, dados.Cep, uf) ?? string.Empty;
         pedido.BairroEntrega = bairro;
         pedido.CepEntrega = cep.Length == 8 ? cep : null;
         pedido.EnderecoConfirmadoEm = string.IsNullOrWhiteSpace(rua) ? null : relogio.GetUtcNow().UtcDateTime;
         if (pedido.EnderecoEntrega.Length == 0) return;
 
         var geo = await geocoding.GeocodificarAsync(new GeocodeQuery(rua, dados.Numero,
-            bairro, cidade, dados.Uf ?? consulta?.Uf, pedido.CepEntrega), ct);
+            bairro, cidade, uf, pedido.CepEntrega), ct);
         pedido.EntregaLat = geo is { Confiavel: true } ? geo.Lat : null;
         pedido.EntregaLng = geo is { Confiavel: true } ? geo.Lng : null;
         if (pedido.EntregaLat is null)

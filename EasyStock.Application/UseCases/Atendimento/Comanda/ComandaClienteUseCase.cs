@@ -191,7 +191,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                     endereco.Bairro ?? "", endereco.Cidade ?? "", endereco.Estado ?? "", endereco.Complemento));
         }
         // Endereço em branco é endereço não informado (#1839): a cliente finaliza sem ele e a atendente registra pela Ficha.
-        dados = dados with { Endereco = Informado(dados.Endereco) };
+        // #2007 (item 11): o retrato "[Entrega] ..." das observações é da equipe; o rascunho mostra só o que o cliente escreveu.
+        dados = dados with { Endereco = Informado(dados.Endereco), Observacoes = EnderecoCheckout.SemRetratoDaEntrega(dados.Observacoes) };
         // Comanda entregue à atendente com endereço incompleto: vale o que ela registrar na Ficha (#1839).
         var comAtendente = ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar)?.LinkId == link.Id
             || ContextoConversaJson.Ler<FreteCombinadoComanda>(conversa, FreteCombinadoChave)?.LinkId == link.Id;
@@ -211,7 +212,12 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         var financeiro = comDinheiro is null ? null
             : await leitura.ObterAsync("saldo", comDinheiro.Id, () => saldoFinanceiro.ConsultarAsync(comDinheiro, ct));
         var detalhe = pedido is null || financeiro is null ? null : await leitura.ObterAsync("detalhe", pedido.Id, async () =>
-            (await obterPedido.MontarAsync(conversa, pedido, financeiro, ct)) with { TotalPago = financeiro.Alocado });
+            (await obterPedido.MontarAsync(conversa, pedido, financeiro, ct)) with
+            {
+                TotalPago = financeiro.Alocado,
+                // #2007 (item 11): o pedido do link fala como o rascunho, sem o retrato "[Entrega] ..." da equipe.
+                Observacoes = EnderecoCheckout.SemRetratoDaEntrega(pedido.Observacoes),
+            });
         // E10: o link de ajuste começa com a janela e a data do pedido; trocar a data pelo link é uma alteração visível.
         if (semRascunho && dados.JanelaId is null && detalhe?.Janela is { } janelaAtual)
             dados = dados with { JanelaId = janelaAtual.JanelaId, DataEntrega = janelaAtual.Data };
