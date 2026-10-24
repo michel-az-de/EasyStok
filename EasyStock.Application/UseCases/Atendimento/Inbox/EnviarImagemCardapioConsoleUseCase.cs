@@ -46,7 +46,8 @@ public sealed class EnviarImagemCardapioConsoleUseCase(
         if (command.Indice < 0 || command.Indice >= fotos.Count)
             throw new UseCaseValidationException("Foto do cardápio não encontrada para este item.");
 
-        var chave = StorageKeyExtractor.Extract(fotos[command.Indice]);
+        // #2027: só foto desta vitrine; a URL gravada pode apontar para o arquivo de outra empresa.
+        var chave = StorageKeyExtractor.ExtractDaVitrine(fotos[command.Indice], storefront.Id);
         if (chave is null || !await fileStorage.ExistsAsync(chave, ct))
             throw new FotoCardapioNaoEncontradaException("Arquivo da foto do cardápio não encontrado.");
 

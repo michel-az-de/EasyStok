@@ -77,4 +77,27 @@ public class UploadCapaCardapioItemTests
         _item.FotoUrl.Should().Be(CapaLegada);
         _item.ObterFotosGaleria().Should().Equal(angulos);
     }
+
+    // #2027: trocar a capa apagava a anterior pela FotoUrl, mesmo que ela apontasse para o arquivo de outra empresa.
+    [Fact]
+    public async Task TrocarCapa_NaoApagaArquivoDeOutraEmpresa()
+    {
+        var alheia = $"cardapios/{Guid.NewGuid()}/{Guid.NewGuid()}/{Guid.NewGuid()}/foto.webp";
+        _item.AtualizarMetadata(fotoUrl: $"/files/{alheia}");
+
+        await _useCase.UploadFotoCardapioItemAsync(_empresa, _item.Id, "capa.png", "image/png", Png);
+
+        await _storage.DidNotReceive().DeleteAsync(alheia, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TrocarCapa_ApagaACapaAnteriorDoProprioPrato()
+    {
+        var anterior = $"cardapios/{_empresa}/{_item.StorefrontId}/{_item.Id}/anterior.webp";
+        _item.AtualizarMetadata(fotoUrl: $"/files/{anterior}");
+
+        await _useCase.UploadFotoCardapioItemAsync(_empresa, _item.Id, "capa.png", "image/png", Png);
+
+        await _storage.Received(1).DeleteAsync(anterior, Arg.Any<CancellationToken>());
+    }
 }

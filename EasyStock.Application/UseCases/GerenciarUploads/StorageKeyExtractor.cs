@@ -37,4 +37,32 @@ public static class StorageKeyExtractor
 
         return null;
     }
+
+    /// <summary>
+    /// #2027: a chave da URL só sai se for do dono, ou seja, começar por <paramref name="prefixoDoDono"/> e não
+    /// tiver <c>..</c>. <c>FotoUrl</c>, logo e avatar são texto gravado pelo tenant e podem apontar para o arquivo
+    /// de outra empresa; apagar ou ler por eles sem conferir mexia no storage alheio.
+    /// </summary>
+    public static string? ExtractDoDono(string? url, string prefixoDoDono) => DoDono(Extract(url), prefixoDoDono);
+
+    /// <summary>A chave já gravada (ex.: <c>StorageKey</c> do <c>FotosJson</c> do produto, que vem do cliente) só sai se for do dono.</summary>
+    public static string? DoDono(string? chave, string prefixoDoDono)
+    {
+        if (chave is null || chave.Contains("..", System.StringComparison.Ordinal) || chave.Contains('\\')) return null;
+        return chave.StartsWith(prefixoDoDono, System.StringComparison.Ordinal) ? chave : null;
+    }
+
+    /// <summary>Foto deste prato: <c>cardapios/{empresa}/{vitrine}/{prato}/</c>, onde o upload e o acervo gravam.</summary>
+    public static string? ExtractDaFotoDoPrato(string? url, System.Guid storefrontId, System.Guid itemId) =>
+        ExtractDaVitrine(url, storefrontId) is { } chave
+        && chave.Split('/') is [_, _, _, var prato, _, ..] && prato == itemId.ToString()
+            ? chave
+            : null;
+
+    /// <summary>Foto de algum prato desta vitrine: <c>cardapios/{empresa}/{vitrine}/...</c>.</summary>
+    public static string? ExtractDaVitrine(string? url, System.Guid storefrontId) =>
+        ExtractDoDono(url, "cardapios/") is { } chave
+        && chave.Split('/') is [_, _, var vitrine, ..] && vitrine == storefrontId.ToString()
+            ? chave
+            : null;
 }
