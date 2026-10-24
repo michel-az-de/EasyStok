@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Automacoes;
+using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Integration;
@@ -75,10 +76,12 @@ public sealed class AutomacaoConversaEncerradaHandler(ITenantContextAccessor ten
 /// <c>pedido.pago</c> (S11): o "recebemos seu pagamento" ao cliente, decidido num lugar só (#1991-2). Primeiro a
 /// automática "Pagamento confirmado" (nasce ligada; a dona troca o texto ou desliga); se ela não sai (desligada, fora
 /// da janela, sem conversa, variável sem valor, falha do canal que se sabe que nada saiu), o aviso S13 de pedido pago, com
-/// modelo aprovado e idempotente por cobrança e pagamento externo. Assim o cliente recebe um aviso, nunca dois e nunca nenhum.
+/// modelo aprovado e idempotente por cobrança e pagamento externo. Assim o cliente recebe um aviso e quase nunca dois. O envio
+/// incerto (o canal não respondeu) não cai no S13, para não duplicar; a equipe é avisada no sino e a falha fica na conversa.
 /// </summary>
 public sealed class AutomacaoPedidoPagoHandler(
-    ITenantContextAccessor tenant, DispararAutomacaoUseCase disparo, AvisoStatusPedidoCliente aviso)
+    ITenantContextAccessor tenant, DispararAutomacaoUseCase disparo, AvisoStatusPedidoCliente aviso,
+    AvisoEquipeNoAparelho? equipe = null)
     : AutomacaoHandlerBase(tenant)
 {
     /// <summary>Marco do aviso S13 quando o pagamento não tem cobrança (crédito do cliente).</summary>
@@ -91,7 +94,8 @@ public sealed class AutomacaoPedidoPagoHandler(
 
     /// <summary>Só o que o aviso usa do <see cref="PedidoPagoEvent"/>.</summary>
     private sealed record PedidoPagoPayload(
-        Guid PedidoId, Guid? ClienteId, Guid? ConversaId, Guid CobrancaPedidoId, string? PagamentoExternoId, string? StatusPedido);
+        Guid PedidoId, Guid? ClienteId, Guid? ConversaId, Guid CobrancaPedidoId, string? PagamentoExternoId, string? StatusPedido,
+        string? Provedor);
 
     protected override async Task TratarAsync(OutboxEventoIntegracao evento, CancellationToken ct)
     {
@@ -105,14 +109,22 @@ public sealed class AutomacaoPedidoPagoHandler(
             return;
         }
 
+        var manual = e.Provedor != CobrancaPedido.ProvedorMercadoPago;
         var automatica = await disparo.ExecuteAsync(new DisparoAutomacao(
-            evento.EmpresaId, GatilhoAutomacao.PagamentoConfirmado, e.ConversaId, e.ClienteId, e.PedidoId), ct);
-        // Envio incerto (o canal não respondeu): a automática pode ter chegado, e o S13 seria o segundo "recebemos seu pagamento".
-        // A falha fica na conversa (#2004) para a atendente conferir.
-        if (automatica is ResultadoAutomacao.Enviada or ResultadoAutomacao.EnvioIncerto) return;
+            evento.EmpresaId, GatilhoAutomacao.PagamentoConfirmado, e.ConversaId, e.ClienteId, e.PedidoId,
+            PagamentoManual: manual), ct);
+        if (automatica is ResultadoAutomacao.Enviada or ResultadoAutomacao.PedidoJaAdiante) return;
+        if (automatica == ResultadoAutomacao.EnvioIncerto)
+        {
+            // O canal não respondeu: a automática pode ter chegado, e o S13 seria o segundo "recebemos seu pagamento".
+            // Mas também pode não ter chegado: a falha fica na conversa e a equipe é avisada no sino para conferir.
+            if (equipe is not null) await equipe.PagamentoSemAvisoAoClienteAsync(evento.EmpresaId, e.PedidoId, ct);
+            return;
+        }
 
         var marco = e.CobrancaPedidoId == Guid.Empty ? MarcoPago : $"pagamento:{e.CobrancaPedidoId:N}:{e.PagamentoExternoId}";
-        await aviso.EnfileirarAsync(TipoEventoNotificacao.PedidoPagoConfirmado, evento.EmpresaId, e.PedidoId, marco, ct);
+        await aviso.EnfileirarAsync(TipoEventoNotificacao.PedidoPagoConfirmado, evento.EmpresaId, e.PedidoId, marco, ct,
+            pagamentoManual: manual);
     }
 
     private static string MarcoDoPagamento(PedidoPagoPayload e) =>

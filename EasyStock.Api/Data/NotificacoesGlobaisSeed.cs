@@ -644,6 +644,16 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "Pagamento em disputa no Mercado Pago",
             corpoTemplate: "{{ nome }} abriu uma disputa do pagamento do pedido {{ referencia }} no Mercado Pago. O pedido segue como está; responda a disputa no painel do Mercado Pago.");
 
+        // ===== Pagamento confirmado sem resposta do canal (#2004): a automática pode não ter chegado ao cliente e o aviso
+        // S13 não sai para não duplicar. Sino da equipe (In-App, audiência "gestores"); só primeiro nome e referência. Interno. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "pagamento_sem_aviso_ao_cliente_inapp_v1",
+            nome: "Pagamento Sem Confirmação ao Cliente — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PagamentoSemAvisoAoCliente,
+            assuntoTemplate: "Confira se o cliente recebeu a confirmação do pagamento",
+            corpoTemplate: "O pagamento do pedido {{ referencia }} de {{ nome }} foi confirmado, mas o WhatsApp não respondeu ao enviar a confirmação e ela pode não ter chegado. Abra a conversa e confira.");
+
         // ===== Campanhas (S30): carregam a mensagem da onda e o lembrete do encerramento pelo WhatsApp. Sem
         // rotina: o EnfileiradorMensagensCampanha escreve direto no outbox (categoria Marketing) e monta os
         // metadados da Meta (campanha_generica / campanha_lembrete ou o template da propria campanha). =====
@@ -1117,6 +1127,11 @@ public static class NotificacoesGlobaisSeed
         // ===== Pagamento em disputa (#1724-12): sino da equipe. Rollback: Ativa=false. =====
         yield return MakeRotina("pagamento_em_mediacao_global", "Pagamento em Disputa",
             TipoEventoNotificacao.PagamentoEmMediacao, "pagamento_em_mediacao_inapp_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]", ModoTodos("gestores"));
+
+        // ===== Pagamento sem confirmação ao cliente (#2004): sino da equipe. Rollback: Ativa=false. =====
+        yield return MakeRotina("pagamento_sem_aviso_ao_cliente_global", "Pagamento Sem Confirmação ao Cliente",
+            TipoEventoNotificacao.PagamentoSemAvisoAoCliente, "pagamento_sem_aviso_ao_cliente_inapp_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]", ModoTodos("gestores"));
 
         // ===== Avisos de status do pedido ao cliente (S13): transacionais, so WhatsApp, sem janela de horario

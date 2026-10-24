@@ -49,13 +49,17 @@ public sealed class AvisoStatusPedidoCliente(
     /// (status novo, ou <c>pago</c>) e compõe a chave de idempotência. Retorna se enfileirou.
     /// </summary>
     /// <param name="enviarApos">Quando informado, a mensagem só sai a partir desse instante (S26).</param>
+    /// <param name="pagamentoManual">
+    /// #2004: pagamento recebido pela equipe (na porta). O "recebemos seu pagamento" não sai com o pedido já em entrega ou
+    /// entregue; no pagamento online (Mercado Pago) o cliente quer a confirmação mesmo com o pedido na rua.
+    /// </param>
     /// <param name="respeitaPreferenciaAvisos">
     /// Pós-venda (S26): não enfileira quando o cliente desligou os avisos (<c>Cliente.AvisosStatusAtivos</c>).
     /// </param>
     public async Task<bool> EnfileirarAsync(
         TipoEventoNotificacao tipo, Guid empresaId, Guid pedidoId, string marco, CancellationToken ct,
         DateTime? enviarApos = null, bool respeitaPreferenciaAvisos = false, string? previsao = null,
-        string? mensagem = null)
+        string? mensagem = null, bool pagamentoManual = false)
     {
         // O dispatcher de integração roda sem claim JWT: sem o tenant, o filtro global e a RLS zeram a busca.
         if (logistica is not null && logistica.EmpresaDemonstracaoId != Guid.Empty && empresaId == logistica.EmpresaDemonstracaoId)
@@ -72,9 +76,8 @@ public sealed class AvisoStatusPedidoCliente(
         if (tipo == TipoEventoNotificacao.PedidoPagoConfirmado && pedido.StatusEnum == StatusPedido.Cancelado)
             return false;
 
-        // #2004: dinheiro recebido na porta é quitado depois de o pedido sair ou ser entregue; o "recebemos seu pagamento"
-        // chegaria depois do prato.
-        if (tipo == TipoEventoNotificacao.PedidoPagoConfirmado && pedido.StatusEnum is StatusPedido.SaiuParaEntrega or StatusPedido.Entregue)
+        if (tipo == TipoEventoNotificacao.PedidoPagoConfirmado && pagamentoManual
+            && pedido.StatusEnum is StatusPedido.SaiuParaEntrega or StatusPedido.Entregue)
             return false;
 
         var cliente = pedido.ClienteId is { } clienteId
@@ -144,7 +147,7 @@ public sealed class AvisoStatusPedidoCliente(
             ["pedidoId"] = pedido.Id.ToString(),
             ["clienteId"] = pedido.ClienteId?.ToString(),
             ["nome"] = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(pedido.ClienteNome, "cliente"),
-            ["numero"] = VariaveisAtendimento.NumeroDoPedido(pedido.Id, conversa),
+            ["numero"] = VariaveisAtendimento.NumeroDoPedido(pedido.Id, conversa, conversaEhDoPedido: true),
             ["previsao"] = previsao ?? await PrevisaoAsync(pedido.Id, ct),
         };
         if (mensagem is not null) variaveis["mensagem"] = mensagem;

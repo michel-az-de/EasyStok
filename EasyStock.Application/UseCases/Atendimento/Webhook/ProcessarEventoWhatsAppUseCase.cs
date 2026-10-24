@@ -500,7 +500,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     /// #2004: a conversa nova já publicou <c>conversa.aberta</c>, que dispara a automática de primeira entrada (primeiro
     /// contato, fora do horário ou loja fechada, a que vale agora) pelo outbox. Com essa regra ligada a dona escolheu o que
     /// o cliente lê, e a saudação direta (ou o aviso do expediente) cairia como segunda mensagem. Sem outbox, sem regra ou
-    /// com falha ao consultar, a saudação sai: o cliente nunca fica sem resposta por causa desta decisão.
+    /// com falha ao consultar, a saudação sai aqui. Se a automática ligada não sair (variável sem valor, falha do canal, situação
+    /// que mudou), o <see cref="Automacoes.DispararAutomacaoUseCase.DispararPrimeiraEntradaAsync"/> manda a saudação no lugar.
     /// </summary>
     private async Task<bool> AutomaticaDeEntradaFalaNoLugarDaSaudacaoAsync(Guid empresaId, CancellationToken ct)
     {
