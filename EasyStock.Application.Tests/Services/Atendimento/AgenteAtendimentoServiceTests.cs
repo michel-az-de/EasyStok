@@ -576,9 +576,8 @@ public class AgenteAtendimentoServiceTests
 
     [Theory]
     [InlineData(AutorMensagem.Agente, TipoFalhaEnvio.Permanente)]
-    [InlineData(AutorMensagem.Agente, TipoFalhaEnvio.Incerta)]
     [InlineData(AutorMensagem.Dona, TipoFalhaEnvio.Permanente)]
-    public async Task SaidaQueFalhouNaoEntraNaConversaDoLlm(AutorMensagem autor, TipoFalhaEnvio tipo)
+    public async Task SaidaQueFalhouDeVezNaoEntraNaConversaDoLlm(AutorMensagem autor, TipoFalhaEnvio tipo)
     {
         // Senão o agente responde "já te mandei o link acima" sobre algo que o cliente nunca recebeu.
         _historico[0].MarcarProcessada(Agora.AddMinutes(-3));
@@ -593,6 +592,40 @@ public class AgenteAtendimentoServiceTests
             .SelectMany(m => m.Conteudo.OfType<BlocoTextoLlm>()).Select(b => b.Texto).ToList();
         textos.Should().NotContain(t => t.Contains("link do cardápio"));
         textos.Should().Contain(t => t.Contains("e o link?"));
+    }
+
+    [Theory]
+    [InlineData(TipoFalhaEnvio.Incerta, "(sem resposta do canal)")]
+    [InlineData(TipoFalhaEnvio.Temporaria, "reenvio agendado")]
+    public async Task SaidaIncertaOuComReenvioAgendadoEntraNoLlmMarcadaComoNaoConfirmada(TipoFalhaEnvio tipo, string _)
+    {
+        // Pode ter chegado (incerta) ou vai chegar sozinha (reenvio agendado): some do histórico só a falha definitiva.
+        _historico[0].MarcarProcessada(Agora.AddMinutes(-3));
+        _historico.Add(SaidaQueFalhou(AutorMensagem.Agente, Agora.AddMinutes(-2), "Seu pedido sai às 15h.", tipo));
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddMinutes(-1), TipoConteudoMensagem.Texto,
+            "e agora?", "wamid.in2"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _requisicoes.Single().Mensagens.SelectMany(m => m.Conteudo.OfType<BlocoTextoLlm>()).Select(b => b.Texto)
+            .Should().Contain(t => t.Contains("[não confirmada]") && t.Contains("Seu pedido sai às 15h."));
+    }
+
+    [Fact]
+    public async Task SaidaTemporariaSemReenvioAgendadoEFalhaDefinitivaNaoEntraNoLlm()
+    {
+        _historico[0].MarcarProcessada(Agora.AddMinutes(-3));
+        var semReenvio = Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, Agora.AddMinutes(-2),
+            TipoConteudoMensagem.Texto, "Seu pedido sai às 15h.");
+        semReenvio.RegistrarFalhaEnvio("Falha no canal.", TipoFalhaEnvio.Temporaria, Agora.AddMinutes(-2), reenvioAutomatico: false);
+        _historico.Add(semReenvio);
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddMinutes(-1), TipoConteudoMensagem.Texto,
+            "e agora?", "wamid.in2"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _requisicoes.Single().Mensagens.SelectMany(m => m.Conteudo.OfType<BlocoTextoLlm>()).Select(b => b.Texto)
+            .Should().NotContain(t => t.Contains("Seu pedido sai às 15h."));
     }
 
     [Fact]
