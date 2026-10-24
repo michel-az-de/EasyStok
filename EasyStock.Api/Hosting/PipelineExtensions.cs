@@ -417,16 +417,11 @@ public static class PipelineExtensions
 
     /// <summary>Whitelist de POSTs criticos cobertos pelo IdempotencyMiddleware (exposta para teste).</summary>
     public static IdempotencyOptions ConfigurarRotasIdempotentes(IdempotencyOptions opts) => opts
-        .Add("/api/itensestoque")
-        .Add("/api/itensestoque/estorno")
         .Add("/api/vendas")
         .Add("/api/mobile/vendas")
         .Add("/api/movimentacoes")
-        .Add("/api/itensestoque/repor")
         // #920: saida/entrada de estoque batem na rota REAL /api/estoque/* (ItemEstoqueController
-        // e [Route("api/estoque")]). As entradas /api/itensestoque* acima apontam para rota
-        // inexistente -> o middleware nunca cobria o double-submit desses fluxos, que debitava/
-        // creditava o saldo 2x. A limpeza ampla das rotas mortas fica no epico #917 (Fase A).
+        // e [Route("api/estoque")]); /api/estoque/reposicao ainda nao esta na lista (#2015).
         .Add("/api/estoque/saida")
         .Add("/api/estoque/entrada")
         .Add("/api/mobile/calculadora/criar-compra")

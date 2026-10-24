@@ -57,7 +57,6 @@ public class ProdutoControllerTests
             new RestaurarProdutoUseCase(_produtoRepository, _unitOfWork),
             new ReordenarFotosProdutoUseCase(_produtoRepository, _unitOfWork),
             new ObterHistoricoProdutoUseCase(_produtoRepository, _movimentacaoEstoqueRepository),
-            new ObterEstatisticasProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _movimentacaoEstoqueRepository),
             new ObterDetalheProdutoUseCase(_produtoRepository, _itemEstoqueRepository, _produtoVariacaoRepository),
             new AtualizarProdutoUseCase(
                 _produtoRepository,
