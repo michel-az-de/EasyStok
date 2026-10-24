@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Pedidos;
 using EasyStock.Domain.Entities.Storefront;
@@ -517,6 +518,49 @@ public class ListarPedidosClienteUseCaseTests
         var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
 
         result.Pedidos.Single().Itens.Single().Descricao.Should().BeNull();
+    }
+
+    /// <summary>
+    /// #1928: o "Pedir de novo" do site repõe o carrinho pelo <c>cardapioItemId</c> do JSON; casar pelo
+    /// nome perdia o prato renomeado. Com porção vale o id do item do cardápio, que é o que o checkout
+    /// recebe. Item avulso sai com null.
+    /// </summary>
+    [Fact]
+    public async Task Itens_trazem_cardapioItemId_no_json_inclusive_com_porcao()
+    {
+        var lasanha = Guid.NewGuid();
+        var torta = Guid.NewGuid();
+        var pedido = PedidoStub(itens: new[]
+        {
+            new PedidoItem
+            {
+                Id = Guid.NewGuid(), ProdutoId = Guid.NewGuid(), CardapioItemId = lasanha,
+                Nome = "Lasanha", Quantidade = 1, PrecoUnitario = 84m, Subtotal = 84m,
+            },
+            new PedidoItem
+            {
+                Id = Guid.NewGuid(), ProdutoId = Guid.NewGuid(), CardapioItemId = torta,
+                CardapioItemVariacaoId = Guid.NewGuid(), VariacaoRotuloSnapshot = "800 g",
+                Nome = "Torta", Quantidade = 2, PrecoUnitario = 60m, Subtotal = 120m,
+            },
+            new PedidoItem
+            {
+                Id = Guid.NewGuid(), ProdutoId = null,
+                Nome = "Vela de aniversário", Quantidade = 1, PrecoUnitario = 5m, Subtotal = 5m,
+            },
+        });
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        // Mesma política de nomes da API (camelCase).
+        var json = JsonSerializer.SerializeToElement(result.Pedidos.Single(), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var ids = json.GetProperty("itens").EnumerateArray()
+            .Select(i => !i.TryGetProperty("cardapioItemId", out var id) ? "ausente"
+                : id.ValueKind == JsonValueKind.Null ? null
+                : id.GetString())
+            .ToList();
+        ids.Should().Equal(lasanha.ToString(), torta.ToString(), null);
     }
 
     [Fact]
