@@ -48,8 +48,14 @@ public class GeradorNotificacoesAutomaticasTests
         _analytics.GetSnapshotReposicaoAsync(_empresaId, _lojaId,
                 Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<CancellationToken>())
             .Returns(new List<ProdutoReposicaoSnapshot>());
-        _estoque.GetProximoVencimentoAsync(_empresaId, Arg.Any<int>(), 1, 100, _lojaId, true).Returns((Array.Empty<ItemEstoque>(), 0));
-        _estoque.GetItensParadosAsync(_empresaId, Arg.Any<int>(), 1, 100, _lojaId, true).Returns((Array.Empty<ItemEstoque>(), 0));
+        _estoque.GetProximoVencimentoComSaldoAsync(_empresaId, Arg.Any<int>(), _lojaId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<ItemEstoque>());
+        _estoque.GetItensParadosComSaldoAsync(_empresaId, Arg.Any<int>(), _lojaId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<ItemEstoque>());
+        // A rodada roda dentro da transação do UnitOfWork: o duplo executa o bloco como o real faria.
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(
+                Arg.Any<Func<CancellationToken, Task<ResultadoAlertasEstoque>>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.ArgAt<Func<CancellationToken, Task<ResultadoAlertasEstoque>>>(0)(call.ArgAt<CancellationToken>(1)));
         _estoque.GetVencidosSemStatusAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<ItemEstoque>());
         _pedidos.GetPedidosAtrasadosAsync(_empresaId, Arg.Any<DateTime>()).Returns(Array.Empty<PedidoFornecedor>());
@@ -123,6 +129,8 @@ public class GeradorNotificacoesAutomaticasTests
         _gravadas.Should().Contain(n => n.TipoAlerta == TipoAlertaEstoque.ReposicaoSugerida && n.ReferenciaId == produtoId);
         _gravadas.Should().OnlyContain(n => n.EmpresaId == _empresaId && n.UsuarioId == null, "o alerta é da empresa, para toda a equipe");
         resultado.Criados.Should().Be(2);
+        await _unitOfWork.Received(1).ExecuteInTransactionSemRetryAsync(
+            Arg.Any<Func<CancellationToken, Task<ResultadoAlertasEstoque>>>(), Arg.Any<CancellationToken>());
         await _unitOfWork.Received(1).CommitAsync();
     }
 
@@ -244,14 +252,16 @@ public class GeradorNotificacoesAutomaticasTests
     public async Task Le_os_alertas_vigentes_numa_consulta_so_por_empresa_e_nao_uma_por_item()
     {
         var lotes = Enumerable.Range(0, 50).Select(i => Lote(diasParaVencer: 1 + i % 5)).ToArray();
-        _estoque.GetProximoVencimentoAsync(_empresaId, Arg.Any<int>(), 1, 100, _lojaId, true).Returns((lotes, lotes.Length));
+        _estoque.GetProximoVencimentoComSaldoAsync(_empresaId, Arg.Any<int>(), _lojaId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(lotes);
 
         var resultado = await CriarGerador().ExecutarAsync(_empresaId);
 
         resultado.Criados.Should().Be(50);
         await _sino.Received(1).GetAlertasAutomaticosAsync(
             _empresaId, Arg.Any<IReadOnlyCollection<TipoAlertaEstoque>>(), Agora.UtcDateTime.AddDays(-7), Arg.Any<CancellationToken>());
-        await _estoque.Received(1).GetProximoVencimentoAsync(_empresaId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), _lojaId, true);
+        await _estoque.Received(1).GetProximoVencimentoComSaldoAsync(
+            _empresaId, Arg.Any<int>(), _lojaId, Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -259,16 +269,18 @@ public class GeradorNotificacoesAutomaticasTests
     {
         var aVencer = Lote(diasParaVencer: 2);
         var vencido = Lote(diasParaVencer: -3);
-        _estoque.GetProximoVencimentoAsync(_empresaId, Arg.Any<int>(), 1, 100, _lojaId, true)
-            .Returns((new[] { vencido, aVencer }, 2));
+        _estoque.GetProximoVencimentoComSaldoAsync(_empresaId, Arg.Any<int>(), _lojaId, null, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new[] { vencido, aVencer });
 
         await CriarGerador().ExecutarAsync(_empresaId);
 
         _gravadas.Should().Contain(n => n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima && n.ReferenciaId == aVencer.Id && n.Severidade == SeveridadeNotificacao.Alta);
         _gravadas.Should().Contain(n => n.TipoAlerta == TipoAlertaEstoque.ProdutoVencido && n.ReferenciaId == vencido.Id && n.Severidade == SeveridadeNotificacao.Critica);
         // O filtro de saldo é do repositório: o gerador pede só lote com saldo (lote zerado não gera alerta).
-        await _estoque.Received().GetProximoVencimentoAsync(_empresaId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), _lojaId, true);
-        await _estoque.Received().GetItensParadosAsync(_empresaId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), _lojaId, true);
+        await _estoque.Received().GetProximoVencimentoComSaldoAsync(
+            _empresaId, Arg.Any<int>(), _lojaId, Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _estoque.Received().GetItensParadosComSaldoAsync(
+            _empresaId, Arg.Any<int>(), _lojaId, Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

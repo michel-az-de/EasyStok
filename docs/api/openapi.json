@@ -1417,94 +1417,6 @@
         }
       }
     },
-    "/api/admin/diagnostico/email/teste": {
-      "post": {
-        "tags": [
-          "AdminDiagnostico"
-        ],
-        "summary": "Envia email de teste pelo provedor ativo (smtp|sendgrid|console).\r\nPara validar config + deliverability sem precisar publicar evento real.",
-        "parameters": [
-          {
-            "name": "X-Correlation-Id",
-            "in": "header",
-            "description": "Optional correlation ID for distributed tracing.",
-            "style": "simple",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EasyStock.Api.Controllers.AdminDiagnosticoController.EnviarEmailTesteRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EasyStock.Api.Controllers.AdminDiagnosticoController.EnviarEmailTesteRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/EasyStock.Api.Controllers.AdminDiagnosticoController.EnviarEmailTesteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        }
-      }
-    },
-    "/api/admin/diagnostico/whatsapp/teste": {
-      "post": {
-        "tags": [
-          "AdminDiagnostico"
-        ],
-        "summary": "Onda 2.1 — envia mensagem WhatsApp de teste via Meta Cloud API.\r\nModo \"text\" usa corpo livre (so funciona dentro da janela de 24h pos-resposta).\r\nModo \"template\" usa template aprovado na Meta com vars posicionais (proativa, fora da janela 24h).",
-        "parameters": [
-          {
-            "name": "X-Correlation-Id",
-            "in": "header",
-            "description": "Optional correlation ID for distributed tracing.",
-            "style": "simple",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EasyStock.Api.Controllers.AdminDiagnosticoController.EnviarWhatsAppTesteRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EasyStock.Api.Controllers.AdminDiagnosticoController.EnviarWhatsAppTesteRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/EasyStock.Api.Controllers.AdminDiagnosticoController.EnviarWhatsAppTesteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        }
-      }
-    },
     "/api/admin/empresas/{id}/preview": {
       "get": {
         "tags": [
@@ -19933,50 +19845,6 @@
         }
       }
     },
-    "/api/lotes/etiquetas/conferir": {
-      "post": {
-        "tags": [
-          "Lotes"
-        ],
-        "summary": "Confirm a label by code (scanner)",
-        "parameters": [
-          {
-            "name": "X-Correlation-Id",
-            "in": "header",
-            "description": "Optional correlation ID for distributed tracing.",
-            "style": "simple",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EasyStock.Application.UseCases.ConferirEtiqueta.ConferirEtiquetaCommand"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EasyStock.Application.UseCases.ConferirEtiqueta.ConferirEtiquetaCommand"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/EasyStock.Application.UseCases.ConferirEtiqueta.ConferirEtiquetaCommand"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success"
-          }
-        }
-      }
-    },
     "/api/lotes/pendentes-peso": {
       "get": {
         "tags": [
@@ -31152,57 +31020,6 @@
         "additionalProperties": false,
         "description": "Body do POST /api/admin/reports/{key}/data"
       },
-      "EasyStock.Api.Controllers.AdminDiagnosticoController.EnviarEmailTesteRequest": {
-        "type": "object",
-        "properties": {
-          "destino": {
-            "type": "string",
-            "nullable": true
-          },
-          "assunto": {
-            "type": "string",
-            "nullable": true
-          },
-          "corpo": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "EasyStock.Api.Controllers.AdminDiagnosticoController.EnviarWhatsAppTesteRequest": {
-        "type": "object",
-        "properties": {
-          "destino": {
-            "type": "string",
-            "nullable": true
-          },
-          "modo": {
-            "type": "string",
-            "nullable": true
-          },
-          "corpo": {
-            "type": "string",
-            "nullable": true
-          },
-          "templateName": {
-            "type": "string",
-            "nullable": true
-          },
-          "vars": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          },
-          "languageCode": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "EasyStock.Api.Controllers.AdminEmpresaPreviewController.RevelarRequest": {
         "type": "object",
         "properties": {
@@ -36398,45 +36215,6 @@
         },
         "additionalProperties": false
       },
-      "EasyStock.Application.UseCases.ConferirEtiqueta.ConferirEtiquetaCommand": {
-        "required": [
-          "codigo",
-          "empresaId",
-          "status"
-        ],
-        "type": "object",
-        "properties": {
-          "empresaId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "codigo": {
-            "maxLength": 60,
-            "minLength": 1,
-            "type": "string"
-          },
-          "status": {
-            "maxLength": 20,
-            "minLength": 1,
-            "type": "string"
-          },
-          "observacao": {
-            "type": "string",
-            "nullable": true
-          },
-          "conferidaPorUserId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "conferidaPorNome": {
-            "maxLength": 120,
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "EasyStock.Application.UseCases.ConfiguracoesLoja.AtualizarConfiguracaoLojaCommand": {
         "type": "object",
         "properties": {
@@ -39975,10 +39753,6 @@
       "description": "Endpoints SuperAdmin de gestão de Cliente (tenant). Centraliza CRUD de Lojas\r\ne demais ações por tenant que não cabem em EasyStock.Api.Controllers.AdminUsuariosTenantController\r\n(ações por usuário) ou EasyStock.Api.Controllers.AdminTenantsController (assinatura/plano).\r\nToda mutação exige `motivo` (≥10 chars) auditado."
     },
     {
-      "name": "AdminDiagnostico",
-      "description": "Onda 1.3 — diagnostico operacional do SuperAdmin (SaaS-side). Endpoints\r\nusados para testar provedores externos (email, whatsapp, sms, push) sem\r\ndependencia de evento real do outbox. Util para validar SendGrid/Meta/Twilio\r\nem staging e producao."
-    },
-    {
       "name": "AdminFaturas",
       "description": "Endpoints administrativos do modulo Financeiro. SuperAdmin/Admin operacional\r\npode gerenciar todas as faturas (sujeito as permissoes finas\r\nEasyStock.Domain.Enums.Permissao.GerenciarFaturas, EasyStock.Domain.Enums.Permissao.EmitirFatura,\r\nEasyStock.Domain.Enums.Permissao.CancelarFatura)."
     },
@@ -40107,10 +39881,6 @@
       "description": "Catálogo de produtos com suporte a variações, embalagens, fotos e geração de anúncios via IA."
     },
     {
-      "name": "Diagnostico",
-      "description": "Diagnóstico operacional da API: status de banco, Redis, SMTP, storage e configurações."
-    },
-    {
       "name": "AdminAdmins",
       "description": "Gerenciamento de SuperAdmins globais (admins da plataforma EasyStock, não dos tenants)."
     },
@@ -40173,14 +39943,6 @@
     {
       "name": "Consentimentos",
       "description": "Registro de consentimentos LGPD por usuário/cliente."
-    },
-    {
-      "name": "DiagnosticoInfra",
-      "description": "Diagnóstico de infraestrutura (PostgreSQL, Redis, S3, SMTP) com self-test."
-    },
-    {
-      "name": "DiagnosticoLogs",
-      "description": "Live tail de logs estruturados (SSE) para diagnóstico em produção."
     },
     {
       "name": "WebhookPix",

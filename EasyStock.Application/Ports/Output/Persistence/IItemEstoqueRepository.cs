@@ -12,13 +12,21 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// </summary>
         Task<ItemEstoque?> GetByIdComLockAsync(Guid empresaId, Guid id);
         Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 100);
-        /// <param name="apenasComSaldo">
-        /// true (#2016) deixa de fora o lote zerado: quem alerta (sino) só quer o que ainda está na prateleira.
-        /// Os demais chamadores seguem no padrão (lista tudo).
-        /// </param>
-        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20, Guid? lojaId = null, bool apenasComSaldo = false);
-        /// <inheritdoc cref="GetProximoVencimentoAsync"/>
-        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20, Guid? lojaId = null, bool apenasComSaldo = false);
+        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20, Guid? lojaId = null);
+        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20, Guid? lojaId = null);
+
+        /// <summary>
+        /// Lotes COM SALDO que vencem em até <paramref name="dias"/> (ou já venceram), lidos por chave (#2031): em ordem de
+        /// <c>Id</c>, os <paramref name="limite"/> seguintes a <paramref name="depoisDoId"/> (<c>null</c> = do começo). Quem
+        /// percorre tudo (o gerador de alertas) não perde nem repete lote quando a fila muda entre duas leituras, o que o
+        /// <c>Skip</c> de <see cref="GetProximoVencimentoAsync"/> não garante.
+        /// </summary>
+        Task<IReadOnlyList<ItemEstoque>> GetProximoVencimentoComSaldoAsync(
+            Guid empresaId, int dias, Guid? lojaId, Guid? depoisDoId, int limite, CancellationToken ct = default);
+
+        /// <summary>Lotes COM SALDO parados há <paramref name="diasSemMovimento"/> dias ou mais, lidos por chave como em <see cref="GetProximoVencimentoComSaldoAsync"/>.</summary>
+        Task<IReadOnlyList<ItemEstoque>> GetItensParadosComSaldoAsync(
+            Guid empresaId, int diasSemMovimento, Guid? lojaId, Guid? depoisDoId, int limite, CancellationToken ct = default);
 
         /// <summary>
         /// Lotes RASTREADOS que já passaram da validade, ainda têm saldo e continuam com <c>Status</c> diferente de
