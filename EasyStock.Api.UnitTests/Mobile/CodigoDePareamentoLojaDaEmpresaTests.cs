@@ -41,9 +41,9 @@ public sealed class CodigoDePareamentoLojaDaEmpresaTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    private Guid Loja(Guid empresa)
+    private Guid Loja(Guid empresa, bool ativa = true)
     {
-        var loja = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa, Nome = "Loja" };
+        var loja = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa, Nome = "Loja", Ativa = ativa };
         _db.Add(loja);
         _db.SaveChanges();
         return loja.Id;
@@ -52,6 +52,7 @@ public sealed class CodigoDePareamentoLojaDaEmpresaTests : IDisposable
     [Fact]
     public async Task LojaDeOutraEmpresa_Recusa()
     {
+        Loja(_empresa); // a empresa tem loja: a conferência é desta loja, não de "alguma loja da empresa"
         var alheia = Loja(Guid.NewGuid());
 
         var resposta = await _controller.CreatePairCode(new CreatePairCodeRequest(_empresa, alheia, null, "Celular", null), default);
@@ -69,5 +70,15 @@ public sealed class CodigoDePareamentoLojaDaEmpresaTests : IDisposable
 
         resposta.Result.Should().BeOfType<OkObjectResult>();
         _db.Set<MobileDevice>().IgnoreQueryFilters().Should().ContainSingle().Which.LojaId.Should().Be(propria);
+    }
+
+    [Fact]
+    public async Task LojaDesativada_Recusa()
+    {
+        var desativada = Loja(_empresa, ativa: false);
+
+        var resposta = await _controller.CreatePairCode(new CreatePairCodeRequest(_empresa, desativada, null, "Celular", null), default);
+
+        resposta.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 }
