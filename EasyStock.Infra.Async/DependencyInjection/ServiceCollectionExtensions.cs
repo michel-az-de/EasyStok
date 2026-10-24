@@ -2,7 +2,6 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Pdf;
-using EasyStock.Infra.Async.Pagamentos;
 using EasyStock.Infra.Async.Pagamentos.Webhooks;
 using EasyStock.Infra.Async.Pdf;
 using Microsoft.Extensions.Caching.Memory;
@@ -46,26 +45,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDocumentoEntradaPdfRenderer, DocumentoEntradaPdfRenderer>();
         // PDF do extrato de fechamento de caixa (#642) — QuestPDF stateless/threadsafe
         services.AddSingleton<IFechamentoCaixaExtratoRenderer, FechamentoCaixaExtratoRenderer>();
-
-        // Modulo Financeiro F3 — abstracao multi-gateway de pagamento.
-        // Adapters base sao Scoped (consomem repos scoped via DI). Cada IPagamentoGateway
-        // resolvido pelo router e envolvido por MeasuredPagamentoGatewayDecorator que mede
-        // latencia, classifica excecoes e alimenta IGatewayHealthStore.
-
-        // Concretes (registrados por tipo, sem expor como IPagamentoGateway)
-        services.AddScoped<EfiPixGatewayAdapter>();
-        services.AddScoped<ManualGatewayAdapter>();
-
-        // IPagamentoGateway = decorator(adapter). Adicionamos um por adapter ativo.
-        services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<EfiPixGatewayAdapter>()));
-        services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<ManualGatewayAdapter>()));
-
-        services.AddScoped<IPagamentoGatewayRouter, PagamentoGatewayRouter>();
-
-        // Onda P0 Payment Orchestration
-        services.AddSingleton<IGatewayHealthStore, NoopGatewayHealthStore>();
-        services.AddSingleton<IGatewayErrorClassifier, GatewayErrorClassifier>();
-        services.AddScoped<IPagamentoOrchestrator, PagamentoOrchestrator>();
 
         // Webhook processors (scoped)
         services.AddScoped<IGatewayWebhookProcessor, EfiPixWebhookProcessor>();
@@ -131,24 +110,6 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IEfiBoletoService, NoopEfiBoletoService>();
         }
 
-        // F12 — Adapters de gateways internacionais (stubs).
-        // Registrados apenas quando ha credenciais OU quando AllowUnsigned=true
-        // (DEV/sandbox). Em prod sem credenciais, permanecem fora do router para
-        // nao oferecer metodos que vao falhar. Tambem envolvidos pelo decorator.
-        if (!string.IsNullOrWhiteSpace(configuration["Stripe:SecretKey"])
-            || string.Equals(configuration["Stripe:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddScoped<StripeGatewayAdapter>();
-            services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<StripeGatewayAdapter>()));
-            services.AddSingleton<IWebhookSignatureValidator, StripeSignatureValidator>();
-        }
-        if (!string.IsNullOrWhiteSpace(configuration["MercadoPago:AccessToken"])
-            || string.Equals(configuration["MercadoPago:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddScoped<MercadoPagoGatewayAdapter>();
-            services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<MercadoPagoGatewayAdapter>()));
-        }
-
         // I3.1 (#1667): o webhook do Mercado Pago existe sempre, com ou sem token. Sem segredo configurado o
         // validador recusa (401); antes a rota respondia 404 e a falta de configuração passava em silêncio.
         services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
@@ -156,13 +117,6 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
-
-    private static MeasuredPagamentoGatewayDecorator DecorateGateway(IServiceProvider sp, IPagamentoGateway inner)
-        => new(
-            inner,
-            sp.GetRequiredService<IGatewayHealthStore>(),
-            sp.GetRequiredService<IGatewayErrorClassifier>(),
-            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MeasuredPagamentoGatewayDecorator>>());
 }
 
 /// <summary>
