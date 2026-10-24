@@ -206,6 +206,13 @@ public sealed class CheckoutController(
             case MercadoPagoIndisponivelException:
                 resposta = Resposta(StatusCodes.Status503ServiceUnavailable, "Gateway de pagamento indisponível", ex.Message);
                 return true;
+            case ClienteBloqueadoException:
+                // Sem id e sem dizer que o cadastro esta bloqueado: o telefone pode ser de outra pessoa.
+                var bloqueado = Problema(StatusCodes.Status422UnprocessableEntity, "Não foi possível concluir o pedido",
+                    "Não foi possível concluir o pedido com este cadastro. Fale com a loja.");
+                bloqueado.Extensions["error"] = new { code = "CLIENTE_BLOQUEADO", message = bloqueado.Detail };
+                resposta = StatusCode(StatusCodes.Status422UnprocessableEntity, bloqueado);
+                return true;
             case TelefoneInvalidoException:
                 resposta = Resposta(StatusCodes.Status400BadRequest, "Telefone invalido", ex.Message);
                 return true;

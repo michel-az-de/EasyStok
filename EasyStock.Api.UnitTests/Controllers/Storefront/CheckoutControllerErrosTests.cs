@@ -51,6 +51,7 @@ public class CheckoutControllerErrosTests
         { new CepSemCoberturaException("sem cobertura"), 422 },
         { new MercadoPagoIndisponivelException("mp fora"), 503 },
         { new TelefoneInvalidoException(), 400 },
+        { new ClienteBloqueadoException(Guid.NewGuid()), 422 },
         { new RegraDeDominioVioladaException("x"), 422 },
     };
 
@@ -65,6 +66,23 @@ public class CheckoutControllerErrosTests
         doc.RootElement.GetProperty("status").GetInt32().Should().Be(409);
         doc.RootElement.GetProperty("error").GetProperty("code").GetString().Should().Be("CARRINHO_ALTERADO");
         doc.RootElement.GetProperty("error").GetProperty("message").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void ClienteBloqueado_NaoVazaOIdNemDizQueOCadastroEstaBloqueado()
+    {
+        // Revisao da PR: o bloqueio vale pelo telefone; quem digita o de outra pessoa nao pode descobrir o bloqueio.
+        var cliente = Guid.NewGuid();
+
+        var (status, json) = Mapear(new ClienteBloqueadoException(cliente));
+
+        status.Should().Be(422);
+        json.Should().NotContain(cliente.ToString());
+        using var doc = JsonDocument.Parse(json);
+        doc.RootElement.GetProperty("detail").GetString().Should().NotContainEquivalentOf("bloquead");
+        doc.RootElement.GetProperty("title").GetString().Should().NotContainEquivalentOf("bloquead");
+        doc.RootElement.GetProperty("error").GetProperty("code").GetString().Should().Be("CLIENTE_BLOQUEADO");
+        doc.RootElement.GetProperty("detail").GetString().Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
