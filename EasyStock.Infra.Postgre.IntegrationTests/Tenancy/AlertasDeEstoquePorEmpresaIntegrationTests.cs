@@ -230,10 +230,15 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
         var loja = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Loja", Ativa = true, CriadoEm = agora, AlteradoEm = agora };
         var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Massas", CriadoEm = agora, AlteradoEm = agora };
         var produto = NovoProduto(empresa, categoria, "Lasanha", agora);
-        // 105 lotes perto de vencer (2 páginas de 100), do que vence primeiro ao que vence por último.
-        var lotes = Enumerable.Range(0, 105)
-            .Select(i => NovoLote(empresa, loja, produto, saldo: 5, validade: agora.Date.AddDays(1 + i % 10), agora))
-            .ToList();
+        // 105 lotes perto de vencer (2 páginas de 100). A ordem é fixa nas duas leituras: o Id do lote i cresce com i e a
+        // validade não decresce com i, então "validade, Id" e "Id" põem os lotes na mesma sequência (0 a 104).
+        var prefixo = Guid.NewGuid().ToString("N")[..8]; // o mesmo em todos os lotes: a ordem é a do sufixo; muda a cada execução
+        var lotes = Enumerable.Range(0, 105).Select(i =>
+        {
+            var lote = NovoLote(empresa, loja, produto, saldo: 5, validade: agora.Date.AddDays(1 + i / 11), agora);
+            lote.Id = new Guid($"{prefixo}-0000-0000-0000-{i:D12}");
+            return lote;
+        }).ToList();
         var avisos = lotes.ToDictionary(l => l.Id, l => Notificacao.Criar(empresa.Id, TipoAlertaEstoque.ValidadeProxima, "Validade Próxima",
             "Vence em breve.", SeveridadeNotificacao.Media, l.Id));
         await using (var seed = fixture.CreateDbContext())
@@ -248,14 +253,17 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
             await seed.SaveChangesAsync();
         }
 
-        // Entre a primeira e a segunda página, o lote da frente da fila acaba (saldo zerado) e sai dela.
-        var saiu = Guid.Empty;
+        // Entre a primeira e a segunda página, dois lotes acabam (saldo zerado) e saem da condição:
+        //  - o 0, que a primeira página já leu (o aviso dele vale nesta rodada e só se resolve na próxima), e
+        //  - o 104, que ainda não foi lido (fica de fora dos candidatos: o aviso dele é resolvido e sai).
+        // Com o lote 0 fora da fila, o lote 100 sobe uma posição: com Skip ele caía no buraco entre as páginas.
+        var saiuJaLido = lotes[0].Id;
+        var saiuNaoLido = lotes[104].Id;
+        var mudouDePagina = lotes[100].Id;
         var saida = new AntesDaChamada("GetProximoVencimento", 2, async () =>
         {
-            await using var db = fixture.CreateDbContext();
-            db.SetMobileTenantContext(empresa.Id);
-            saiu = (await db.ItensEstoque.OrderBy(i => (DateTime?)i.ValidadeEm).ThenBy(i => i.Id).FirstAsync()).Id;
-            await DefinirSaldoAsync(empresa.Id, saiu, 0);
+            await DefinirSaldoAsync(empresa.Id, saiuJaLido, 0);
+            await DefinirSaldoAsync(empresa.Id, saiuNaoLido, 0);
         });
         await using var provider = BuildProvider(rls, aoInterceptar: (s, tipo, alvo) =>
             tipo == typeof(IItemEstoqueRepository) ? Proxy((IItemEstoqueRepository)alvo, saida) : alvo);
@@ -268,11 +276,16 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
 
         saida.Disparou.Should().BeTrue("o teste só vale se a fila mudou entre as duas páginas");
         var restantes = (await NotificacoesAsync(empresa.Id)).Where(n => n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima).ToList();
-        // O lote que acabou pode já ter sido lido na primeira página; o aviso dele é o único que pode ou não sobrar. Os outros
-        // 104 seguem com o mesmo id: nenhum foi apagado como "condição resolvida" nem recriado.
-        restantes.Where(n => n.ReferenciaId != saiu).Select(n => n.Id).Should().BeEquivalentTo(
-            avisos.Where(a => a.Key != saiu).Select(a => a.Value.Id),
-            "os outros 104 avisos seguem, sem apagar e recriar");
+
+        // Resultado exato: 104 avisos, os mesmos ids de antes (nenhum apagado e recriado), um por lote; só o do lote 104 sai.
+        restantes.Select(n => n.Id).Should().BeEquivalentTo(
+            avisos.Where(a => a.Key != saiuNaoLido).Select(a => a.Value.Id),
+            "só o aviso do lote que saiu da condição sem ser lido sai; os outros 104 seguem com o mesmo id");
+        restantes.GroupBy(n => n.ReferenciaId).Should().OnlyContain(g => g.Count() == 1, "um aviso por lote, sem duplicar");
+        restantes.Should().ContainSingle(n => n.ReferenciaId == mudouDePagina && n.Id == avisos[mudouDePagina].Id,
+            "o lote que mudou de página segue com o aviso de antes: nem apagado nem recriado");
+        restantes.Should().NotContain(n => n.ReferenciaId == saiuNaoLido);
+        restantes.Should().ContainSingle(n => n.ReferenciaId == saiuJaLido, "o lote 0 já tinha sido lido como condição ativa");
     }
 
     private async Task GravarAsync(Notificacao alerta)
