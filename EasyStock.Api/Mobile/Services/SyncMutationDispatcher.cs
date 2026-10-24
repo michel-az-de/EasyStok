@@ -625,12 +625,16 @@ public class SyncMutationDispatcher(
                 && (mv.Id == entry.ErpMovimentoCaixaId || mv.Referencia == referencia));
     }
 
-    /// <summary>Mesma regra do estorno no ERP: dia com caixa fechado não aceita mudança.</summary>
+    /// <summary>
+    /// Mesma regra do estorno no ERP: dia com caixa fechado não aceita mudança. O dia é o do movimento no caixa,
+    /// quando há: o lançamento que chegou depois do fechamento entrou no dia do registro (#2030), não no do aparelho.
+    /// </summary>
     private async Task RecusarSeCaixaFechadoAsync(CashEntry entry, string oQue)
     {
         if (entry.EmpresaId is not { } empresaId) return;
-        var dia = HorarioBrasil.DataOperacional(entry.CreatedAt);
-        if (await InstanteNoCaixa.DiaFechadoAsync(_db, empresaId, entry.CreatedAt, entry.LojaId))
+        var instante = (await MovimentoVinculadoAsync(entry))?.DataMovimento ?? entry.CreatedAt;
+        var dia = HorarioBrasil.DataOperacional(instante);
+        if (await InstanteNoCaixa.DiaFechadoAsync(_db, empresaId, instante, entry.LojaId))
             throw new UseCaseValidationException(
                 $"O caixa de {dia:dd/MM/yyyy} já foi fechado: {oQue} do lançamento '{entry.Description}' não foi aplicada.");
     }
