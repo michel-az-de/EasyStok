@@ -48,6 +48,7 @@ public sealed class GeradorNotificacoesAutomaticas(
     ILogger<GeradorNotificacoesAutomaticas> logger)
 {
     private const int LimiteDeLotesMarcadosPorRodada = 500;
+    private const int TamanhoDaPagina = 100;
 
     /// <summary>Tipos que este gerador cria. A retenção e a resolução só tocam nestes.</summary>
     public static readonly IReadOnlyList<TipoAlertaEstoque> TiposAutomaticos =
@@ -63,11 +64,19 @@ public sealed class GeradorNotificacoesAutomaticas(
 
     private readonly Dictionary<(TipoAlertaEstoque Tipo, Guid? ReferenciaId), Notificacao> candidatos = [];
 
-    public async Task<ResultadoAlertasEstoque> ExecutarAsync(Guid empresaId, CancellationToken ct = default)
+    public Task<ResultadoAlertasEstoque> ExecutarAsync(Guid empresaId, CancellationToken ct = default)
     {
         if (empresaId == Guid.Empty)
             throw new ArgumentException("A empresa é obrigatória: o gerador roda no escopo (tenant) de uma empresa.", nameof(empresaId));
 
+        // Uma transação só (#2031): a retenção e a resolução apagam por <c>ExecuteDelete</c>, que não espera o commit; sem a
+        // transação, um commit que cai (xmin de um lote mexido no meio da rodada) deixava os alertas já apagados. Sem retry:
+        // o estado da rodada vive na instância e a próxima rodada, em uma hora, refaz.
+        return unitOfWork.ExecuteInTransactionSemRetryAsync(token => ExecutarNaTransacaoAsync(empresaId, token), ct);
+    }
+
+    private async Task<ResultadoAlertasEstoque> ExecutarNaTransacaoAsync(Guid empresaId, CancellationToken ct)
+    {
         var agora = relogio.GetUtcNow().UtcDateTime;
         var hojeBrasilia = HorarioBrasil.DataOperacional(agora);
         var diasSemRepetir = Math.Max(1, opcoes.Value.DiasSemRepetir);
@@ -172,8 +181,9 @@ public sealed class GeradorNotificacoesAutomaticas(
             if (configuracaoLoja.NotificarValidade)
             {
                 // Itens proximos do vencimento e vencidos, só com saldo
-                await ProcessarPaginadoAsync(
-                    page => estoqueRepository.GetProximoVencimentoAsync(empresaId, configuracaoLoja.DiasAlertaValidade, page, 100, loja.Id, apenasComSaldo: true),
+                await ProcessarPorChaveAsync(
+                    depoisDoId => estoqueRepository.GetProximoVencimentoComSaldoAsync(
+                        empresaId, configuracaoLoja.DiasAlertaValidade, loja.Id, depoisDoId, TamanhoDaPagina, ct),
                     item =>
                     {
                         var diasRestantes = item.ValidadeEm?.DiasAteVencimento(hojeBrasilia) ?? 0;
@@ -213,8 +223,9 @@ public sealed class GeradorNotificacoesAutomaticas(
 
             if (configuracaoLoja.NotificarParado)
             {
-                await ProcessarPaginadoAsync(
-                    page => estoqueRepository.GetItensParadosAsync(empresaId, configuracaoLoja.DiasAlertaParado, page, 100, loja.Id, apenasComSaldo: true),
+                await ProcessarPorChaveAsync(
+                    depoisDoId => estoqueRepository.GetItensParadosComSaldoAsync(
+                        empresaId, configuracaoLoja.DiasAlertaParado, loja.Id, depoisDoId, TamanhoDaPagina, ct),
                     item =>
                     {
                         var dias = item.DiasSemMovimentacao > 0 ? item.DiasSemMovimentacao : configuracaoLoja.DiasAlertaParado;
@@ -289,20 +300,23 @@ public sealed class GeradorNotificacoesAutomaticas(
         Guid? referenciaId) =>
         candidatos.TryAdd((tipo, referenciaId), Notificacao.Criar(empresaId, tipo, titulo, mensagem, severidade, referenciaId));
 
-    private static async Task ProcessarPaginadoAsync(
-        Func<int, Task<(IEnumerable<ItemEstoque> Items, int TotalCount)>> carregarPagina,
+    /// <summary>
+    /// Percorre os lotes por chave (<c>Id</c>): cada leitura pede os seguintes ao último já visto, então um lote que sai
+    /// ou muda de posição na fila entre duas leituras não desloca os demais (a paginação por <c>Skip</c> deixava um para
+    /// trás, e o alerta dele era lido como condição resolvida e apagado).
+    /// </summary>
+    private static async Task ProcessarPorChaveAsync(
+        Func<Guid?, Task<IReadOnlyList<ItemEstoque>>> carregarPagina,
         Action<ItemEstoque> processarItem,
         CancellationToken ct)
     {
-        const int pageSize = 100;
-        var page = 1;
+        Guid? depoisDoId = null;
 
         while (!ct.IsCancellationRequested)
         {
-            var (items, totalCount) = await carregarPagina(page);
-            var paginaAtual = items.ToList();
+            var pagina = await carregarPagina(depoisDoId);
 
-            foreach (var item in paginaAtual)
+            foreach (var item in pagina)
             {
                 if (ct.IsCancellationRequested)
                     return;
@@ -310,10 +324,10 @@ public sealed class GeradorNotificacoesAutomaticas(
                 processarItem(item);
             }
 
-            if (paginaAtual.Count == 0 || page * pageSize >= totalCount)
+            if (pagina.Count < TamanhoDaPagina)
                 break;
 
-            page++;
+            depoisDoId = pagina[^1].Id;
         }
     }
 }
