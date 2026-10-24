@@ -33,6 +33,8 @@ public static partial class ServiceCollectionExtensions
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();
         services.AddScoped<AvisoStatusPedidoCliente>(); // S13: aviso de status ao cliente
+        // #2007: o registro de pagamento (muitos hosts) só materializa o aviso no ramo do sinal manual.
+        services.AddScoped(sp => new Lazy<AvisoStatusPedidoCliente>(() => sp.GetRequiredService<AvisoStatusPedidoCliente>()));
         services.AddScoped<AvisoPedidoNaConversa>(); // #1991-1: o mesmo aviso no chat do site
         services.AddScoped<AvisoEquipeNoAparelho>(); // #1807: avisos do Balcão no aparelho (Web Push)
         services.AddScoped<OptOutPorPalavra>();

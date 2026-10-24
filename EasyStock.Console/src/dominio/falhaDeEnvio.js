@@ -56,9 +56,11 @@ export const fraseDoReenvio = (erro) => (falhaDeEnvio(erro).tipo === TIPOS_DE_FA
 // é a da API e o caminho é Integrações; nada saiu, então o envio não fala em "tentar novamente". Nas outras falhas
 // do envio a resposta pode ter se perdido: repetir consulta a mesma tentativa.
 export const WHATSAPP_NAO_CONECTADO = 'WHATSAPP_NAO_CONECTADO'
-export function erroDoModelo(erro, { envio = false } = {}) {
+// #2007 (11c): quem não vê Integrações (`podeIntegrar` falso) lê o pedido à gerência, não o caminho da tela.
+export const PECA_A_GERENCIA = 'O WhatsApp da loja não está conectado. Peça à gerência para conectar o WhatsApp.'
+export function erroDoModelo(erro, { envio = false, podeIntegrar = true } = {}) {
   const texto = erro?.message || 'Não deu certo. Tente de novo.'
-  if (erro?.codigo === WHATSAPP_NAO_CONECTADO) return { texto, integracoes: true }
+  if (erro?.codigo === WHATSAPP_NAO_CONECTADO) return { texto: podeIntegrar ? texto : PECA_A_GERENCIA, integracoes: true }
   return {
     texto: envio ? `${texto} Ao tentar novamente, esta mesma tentativa será consultada sem duplicar o envio.` : texto,
     integracoes: false,

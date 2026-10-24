@@ -122,7 +122,11 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
 
         conversa.RegistrarSaida(agora);
         var resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
-            ResumoPedidoConversa.Texto(reservado, input.DataEntrega, forma,
+            // #2007: aqui a encomenda na entrega ainda cobra o sinal pelo link (CobrarAsync); o resumo diz o mesmo.
+            ResumoPedidoConversa.Texto(reservado, input.DataEntrega,
+                forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
+                && EasyStock.Application.Services.Pedidos.PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm)
+                    ? TrocarFormaPagamentoPedidoUseCase.FormaOnline : forma,
                 peloAtendimento ? "Pedido confirmado pelo atendimento a partir da seleção compartilhada:" : "Pedido montado pelo cliente no cardápio do site:"));
         await conversaRepository.AddMensagemAsync(resumo, ct);
         await unitOfWork.CommitAsync();

@@ -523,6 +523,24 @@ public partial class AtendimentoConversasControllerTests
         _repositorio.Mensagens.Should().ContainSingle(m => m.Autor == AutorMensagem.Dona && m.EnviadaPorUsuarioId == _usuarioId);
     }
 
+    // #2007 (item 10): a operadora não é a dona. O autor segue quem enviou; o id do usuário continua gravado.
+    [Theory]
+    [InlineData(NivelAcesso.Operador, AutorMensagem.Atendente)]
+    [InlineData(NivelAcesso.Gerente, AutorMensagem.Atendente)]
+    [InlineData(NivelAcesso.Admin, AutorMensagem.Dona)]
+    public async Task EnviarGravaAutorConformeQuemEnviou(NivelAcesso nivel, AutorMensagem autor)
+    {
+        var conversa = ConversaComClienteAgora();
+        _currentUser.Nivel.Returns(nivel);
+
+        var result = await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("Oi"), default);
+
+        var dados = Dados<MensagemAtendimentoResult>(result);
+        dados.Autor.Should().Be(autor);
+        dados.EnviadaPorUsuarioId.Should().Be(_usuarioId);
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+    }
+
     [Fact]
     public async Task TransferirParaAtendenteTrocaResponsavel()
     {

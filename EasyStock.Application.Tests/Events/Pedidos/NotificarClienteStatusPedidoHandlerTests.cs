@@ -428,6 +428,27 @@ public class NotificarClienteStatusPedidoHandlerTests
         _eventos.Should().BeEmpty("o aviso S13 só sai quando a automática não sai");
     }
 
+    // #2007 (item 7): o saldo recebido na porta quita um pedido que já saiu ou foi entregue. "Pagamento
+    // confirmado ... para 24/10" seria texto velho junto do "entregue"; sai só o obrigado, uma vez.
+    [Theory]
+    [InlineData(StatusPedidoMapper.SaiuParaEntrega)]
+    [InlineData(StatusPedidoMapper.Entregue)]
+    public async Task PagamentoQueQuitaPedidoNaRuaOuEntregue_NaoAvisaPagamentoConfirmado(string status)
+    {
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ mensagem }}");
+        var conversa = ConversaDoChat();
+        _pedido.AgendadoParaEm = DateTime.UtcNow.AddDays(2);
+        var pago = Pago(conversa.Id) with { StatusPedido = status };
+
+        var handler = HandlerDoPago(AvisoComChat(), new CanalChatSite());
+        await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, pago), CancellationToken.None);
+        await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, pago), CancellationToken.None);
+        await AvaliarEventosAsync();
+
+        _gravadas.Should().ContainSingle().Which.Texto.Should().Be(AutomacaoPedidoPagoHandler.TextoPagoNaEntrega)
+            .And.NotContain("confirmado");
+    }
+
     [Fact]
     public async Task PagamentoSemHorarioAgendado_AvisoS13SaiNoChat()
     {

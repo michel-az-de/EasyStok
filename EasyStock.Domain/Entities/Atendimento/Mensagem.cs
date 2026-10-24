@@ -354,7 +354,7 @@ public class Mensagem
 
     public void RegistrarEnviadaPor(Guid usuarioId)
     {
-        if (Autor != AutorMensagem.Dona)
+        if (!Autor.EhHumanoDaEmpresa())
             throw new RegraDeDominioVioladaException("So mensagem enviada por humano da empresa guarda quem enviou.");
         if (usuarioId == Guid.Empty)
             throw new RegraDeDominioVioladaException("Usuario que enviou e obrigatorio.");

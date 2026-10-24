@@ -1,5 +1,7 @@
 import { itemPorSku } from './cardapio.js'
 import { passoPorId } from './esteira.js'
+import { faixaDeHorarios } from './entrega.js'
+import { dataCurtaComSemana } from './formato.js'
 
 // #1683: prato que saiu do cardápio visível depois do pedido não some da Ficha. A linha da API
 // traz o retrato (nome, preço unitário, porção) e ele vira o produto quando o cardápio não tem.
@@ -244,4 +246,37 @@ const FORA_DA_AREA = 'o endereço do cliente está fora da área de entrega. Man
 export function motivoDoPedidoNaoCriado(erro) {
   const mensagem = String(erro?.message ?? '').trim()
   return `Pedido não criado: ${mensagem === CEP_SEM_COBERTURA ? FORA_DA_AREA : mensagem}`
+}
+
+// --- Alteração com data nova (#2007, item 4) ------------------------------------------------------
+// O cliente pode trocar a data ou a janela pelo link de ajuste. A base da comparação é a do pedido quando o rascunho foi
+// salvo (`dataDoPedido`, `janelaDoPedidoId`, como a API compara em `DataPedidaPeloCliente`); sem ela, a janela atual.
+export function mudancaDeDataDaAlteracao(comanda) {
+  const r = comanda?.rascunho
+  const atual = comanda?.pedido?.janela ?? null
+  if (!comanda?.pedido || !r?.dataEntrega || !r.janelaId) return null
+  const de = { data: r.dataDoPedido ?? atual?.data ?? null, janelaId: r.janelaDoPedidoId ?? atual?.janelaId ?? null }
+  if (de.data === r.dataEntrega && de.janelaId === r.janelaId) return null
+  return { de, para: { data: r.dataEntrega, janelaId: r.janelaId }, mesmaJanela: de.janelaId === r.janelaId }
+}
+
+const hhmm = (h) => String(h ?? '').slice(0, 5)
+// "9h00 às 11h00 · Manhã", da janela que a API devolve no pedido.
+export const rotuloDaJanelaDoPedido = (j) => (j
+  ? [faixaDeHorarios(hhmm(j.horaInicio), hhmm(j.horaFim)), j.label].filter(Boolean).join(' · ') || null
+  : null)
+
+// As linhas que "Comparar e aprovar" mostra. `rotuloNovo` só existe quando a tela já leu a janela escolhida.
+export function linhasDaMudancaDeData(mudanca, { rotuloAtual = null, rotuloNovo = null } = {}) {
+  if (!mudanca) return []
+  const linhas = []
+  if (mudanca.de.data !== mudanca.para.data) {
+    linhas.push(`Data: de ${mudanca.de.data ? dataCurtaComSemana(mudanca.de.data) : 'sem data'} para ${dataCurtaComSemana(mudanca.para.data)}`)
+  }
+  if (mudanca.mesmaJanela) {
+    if (rotuloAtual) linhas.push(`Janela: ${rotuloAtual} (mantida)`)
+  } else {
+    linhas.push(`Janela: ${rotuloAtual ? `de ${rotuloAtual} ` : ''}para ${rotuloNovo ?? 'outra janela escolhida pelo cliente'}`)
+  }
+  return linhas
 }

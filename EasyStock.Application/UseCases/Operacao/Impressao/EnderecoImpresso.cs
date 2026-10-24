@@ -2,19 +2,22 @@ namespace EasyStock.Application.UseCases.Operacao.Impressao;
 
 /// <summary>
 /// Endereço de entrega em uma linha, igual no canhoto (S20) e no impresso do pedido (S49):
-/// "rua, complemento - bairro, cidade - CEP 01001-000". O complemento do cadastro vence o apartamento do
+/// "rua, complemento - bairro, cidade/UF - CEP 01001-000". O complemento do cadastro vence o apartamento do
 /// pedido. Sem nenhuma parte, <c>null</c>.
 /// </summary>
 public static class EnderecoImpresso
 {
+    /// <param name="uf">#2007: a UF vai junto da cidade ("São Paulo/SP"); sem cidade, sozinha.</param>
     public static string? Montar(
-        string? endereco, string? complemento, string? apt, string? bairro, string? cidade, string? cep)
+        string? endereco, string? complemento, string? apt, string? bairro, string? cidade, string? cep, string? uf = null)
     {
         var partes = new List<string>();
         var rua = string.Join(", ", new[] { Limpo(endereco), Limpo(complemento) ?? Limpo(apt) }
             .Where(p => p is not null));
         if (rua.Length > 0) partes.Add(rua);
-        var local = string.Join(", ", new[] { Limpo(bairro), Limpo(cidade) }.Where(p => p is not null));
+        var estado = Limpo(uf)?.ToUpperInvariant();
+        var cidadeUf = Limpo(cidade) is { } c0 ? (estado is null ? c0 : $"{c0}/{estado}") : estado;
+        var local = string.Join(", ", new[] { Limpo(bairro), cidadeUf }.Where(p => p is not null));
         if (local.Length > 0) partes.Add(local);
         if (Limpo(cep) is { } c)
         {

@@ -378,7 +378,53 @@ await confereAsync('J2-3 sem entregador cadastrado, a viagem sai com "Entrega pr
 
 confere('J2-1 o entregador vê "Dinheiro na entrega" e o troco na parada', () => {
   const tela = fonte('features/entregas/ConteudoEntregasApi.jsx')
-  assert.match(tela, /textoDoTroco\(pagamentoNaEntregaDasObservacoes\(pedidoDaParada\?\.observacoes\)/)
+  assert.match(tela, /const \{ identificacao, aReceber, observacoes, troco, semSaldo \} = paradaDaViagem\(/)
+  assert.match(tela, /\(aReceber > 0 \|\| semSaldo\) && troco && <p className=\{css\.apoio\}>\{troco\}<\/p>/)
+})
+
+// --- Frente K (#2007): Entregas fala do pedido como a Cozinha ---------------------------------
+const roteiroMod = await import('../src/dominio/roteiroDoDia.js')
+const semNbsp = (s) => String(s ?? '').replace(/ /g, ' ')
+const OBS_TROCO = 'Pagamento na entrega: dinheiro, troco para R$ 100,00.'
+
+confere('K-1 o troco do dinheiro na entrega chega ao roteiro, à parada fora da lista e ao diálogo da porta', () => {
+  const r = roteiroMod.roteiroDoDia({
+    data: '2026-10-24', viagens: [], entregadores: [], janelas: [], bloqueios: [],
+    pedidos: [{ id: 'p1', numeroCurto: '57A22217', numeroComanda: 12, status: 'saiu_para_entrega', aReceber: 57,
+      observacoes: OBS_TROCO, janela: null, agendadoParaEm: '2026-10-24T12:00:00Z', criadoEm: '2026-10-23T12:00:00Z' }],
+  })
+  assert.equal(semNbsp(roteiroMod.situacaoDoPagamento(r.grupos[0].pedidos[0])),
+    'Receber R$ 57,00 na entrega · Dinheiro na entrega · troco para R$ 100,00 · levar R$ 43,00')
+  // O pedido de outro dia não está na lista que a tela leu: a parada traz as observações da API.
+  const parada = { pedidoId: 'p9', numeroPedido: '57A22217', numeroDoDia: 4, observacoes: OBS_TROCO }
+  const fora = roteiroMod.paradaDaViagem(parada, undefined)
+  // Sem o saldo lido, o cartão diz o troco sem inventar quanto levar.
+  assert.equal(fora.semSaldo, true)
+  assert.equal(semNbsp(fora.troco), 'Dinheiro na entrega · troco para R$ 100,00')
+  assert.equal(semNbsp(roteiroMod.trocoDaPorta(fora.observacoes, 57)), 'Dinheiro na entrega · troco para R$ 100,00 · levar R$ 43,00')
+  const dentro = roteiroMod.paradaDaViagem(parada, { numeroComanda: 12, numeroCurto: '57A22217', aReceber: 57, observacoes: OBS_TROCO })
+  assert.equal(dentro.aReceber, 57)
+  assert.match(semNbsp(dentro.troco), /troco para R\$ 100,00 · levar R\$ 43,00/)
+  const tela = fonte('features/entregas/ConteudoEntregasApi.jsx')
+  assert.match(tela, /paradaDaViagem\(parada, pedidoPorId\?\.get\(parada\.pedidoId\)\)/)
+  assert.match(tela, /trocoDaPorta\(/, 'o diálogo da porta mostra o troco')
+  assert.match(tela, /doDia\?\.pedidos/, 'a parada acha o pedido também na lista do dia escolhido')
+})
+
+confere('K-3 a parada diz "Comanda N" ou o nº do dia, como o roteiro, e não o código curto', () => {
+  const parada = { pedidoId: 'p9', numeroPedido: '57A22217', numeroDoDia: 4 }
+  assert.equal(roteiroMod.paradaDaViagem(parada, { numeroComanda: 12, numeroCurto: '57A22217', numeroDoDia: 4 }).identificacao.principal, 'Comanda 12')
+  assert.equal(roteiroMod.paradaDaViagem(parada, undefined).identificacao.principal, 'Nº 004')
+  const tela = fonte('features/entregas/ConteudoEntregasApi.jsx')
+  assert.doesNotMatch(tela, /\{parada\.ordem\}\. \{parada\.numeroPedido\}/)
+  assert.doesNotMatch(tela, /Confirmar a entrega do pedido \$\{parada\.numeroPedido\}/)
+})
+
+confere('K-11a "Entrega própria" não repete a empresa entre parênteses', () => {
+  assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'Entrega própria', empresa: 'Própria' }), 'Entrega própria')
+  assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'João', empresa: 'Própria' }), 'João (Própria)')
+  assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'Carlos', empresa: 'Lalamove' }), 'Carlos (Lalamove)')
+  assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'Lucas Uber', empresa: 'Uber' }), 'Lucas Uber (Uber)')
 })
 
 console.log(`prova #1446 (cozinha viva no modo API): ${passou} conferências ok`)

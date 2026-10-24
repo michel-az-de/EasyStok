@@ -81,7 +81,8 @@ public class ResumirClienteUseCaseTests
         resultado.PorIa.Should().BeTrue();
         resultado.Texto.Should().NotContain("—").And.Contain("lasanha bolonhesa");
         await _llm.Received(1).EnviarAsync(Arg.Is<RequisicaoLlm>(r => r.Ferramentas.Count == 0
-            && r.Mensagens.Single().Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Contains("Pedidos: 3")), Arg.Any<CancellationToken>());
+            && r.Mensagens.Single().Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Contains("Pedidos: 2")), Arg.Any<CancellationToken>());
+        // #2007 (item 12): a reserva ainda não paga fica fora da contagem, como já ficava do total gasto.
     }
 
     [Fact]
