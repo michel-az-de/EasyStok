@@ -105,9 +105,10 @@ public class DevicePairingController(
         _db.Set<MobileDevice>().Add(device);
         await _db.SaveChangesAsync(ct);
 
-        // O código vale 10 min e troca pela apiKey: não vai para o log em claro (#2033).
-        _log.LogInformation("Pair code criado por user={UserId} empresa={EmpresaId} loja={LojaId} registro={DeviceRecordId}",
-            userId, req.EmpresaId, req.LojaId, device.Id);
+        // O código vale 10 min e troca pela apiKey: não vai para o log em claro (#2033). O id do registro pode vir do
+        // corpo (DeviceId) e também fica de fora (CodeQL cs/log-forging); empresa e loja são Guids já conferidos.
+        _log.LogInformation("Pair code criado por user={UserId} empresa={EmpresaId} loja={LojaId}",
+            userId, req.EmpresaId, req.LojaId);
 
         return Ok(new PairCodeResponse(
             PairingCode: code,
