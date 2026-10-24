@@ -145,13 +145,14 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
         var ontem = DateTime.UtcNow.AddDays(-1);
         await PushAsync(a, Lancamento(lancamento, 40m, Ms(ontem)));
 
-        // O caixa de ontem e fechado (pelo proprio sync: closing.upsert).
-        (await PushAsync(a, Mutation("closing.upsert", new
+        // O caixa de ontem e fechado no console (#2030: o closing.upsert do aparelho e ignorado).
+        var empresaId = (await LancamentoAsync(lancamento)).EmpresaId!.Value;
+        await LerAsync(async db =>
         {
-            id = NovoId("close"), dateKey = HorarioBrasil.DataOperacional(ontem).ToString("yyyy-MM-dd"),
-            closedAt = Ms(DateTime.UtcNow), closedByName = "Thati",
-            totalPagamentosPedidos = 0m, totalSaidasExtras = 40m, saldoFinal = -40m, notes = (string?)null
-        }))).Rejeitadas.Should().BeEmpty();
+            db.SetMobileTenantContext(empresaId);
+            db.Add(FechamentoCaixa.Criar(empresaId, HorarioBrasil.DataOperacional(ontem), 0, 0, 0, 0, 40m, lojaId: null));
+            return await db.SaveChangesAsync();
+        });
 
         // Edicao e exclusao no dia fechado, no mesmo lote de um lancamento de hoje.
         var edicao = Lancamento(lancamento, 99m, Ms(ontem));
