@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { useAcoes } from '../../aplicacao/contextos'
 import { clientesParaChamar } from '../../dominio/cliente'
+import { telefoneDoE164 } from '../../dominio/formato'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
 import css from './atendimento.module.css'
 
@@ -40,7 +41,7 @@ export function ChamarClientes({ busca, conversas, aoAbrir }) {
       {lista.length > 0 && <p className={css.chamarClientesTitulo}>Clientes cadastrados sem conversa aberta</p>}
       {lista.map((cliente) => (
         <div key={cliente.id} className={css.chamarCliente}>
-          <span className={css.chamarClienteNome}>{cliente.nome} · {cliente.telefone}</span>
+          <span className={css.chamarClienteNome}>{cliente.nome} · {telefoneDoE164(cliente.telefone)}</span>
           <Botao onClick={() => setEscolhido(cliente)}>Chamar no WhatsApp</Botao>
         </div>
       ))}

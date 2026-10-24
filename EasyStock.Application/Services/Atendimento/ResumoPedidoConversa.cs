@@ -33,7 +33,11 @@ public static class ResumoPedidoConversa
         if (PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
         {
             var sinal = PlanoPagamentoEncomenda.Sinal(reservado.Total);
-            sb.Append("\nSinal agora por link: ").Append(sinal.ToString("C", reais));
+            // #2007 (item 5): na entrega não há link; o sinal entra antes da produção, pela forma combinada.
+            if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
+                sb.Append("\nSinal antes da produção: ").Append(sinal.ToString("C", reais)).Append(" (Pix, dinheiro ou maquininha)");
+            else
+                sb.Append("\nSinal agora por link: ").Append(sinal.ToString("C", reais));
             sb.Append("\nRestante na entrega: ").Append((reservado.Total - sinal).ToString("C", reais));
         }
         else
