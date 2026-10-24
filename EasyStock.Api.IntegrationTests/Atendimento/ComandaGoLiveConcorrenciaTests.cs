@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Storefront;
 using FluentAssertions;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -90,8 +91,10 @@ public sealed partial class PedidoConversaConcorrenciaTests
         nova.StatusCode.Should().Be(HttpStatusCode.OK);
         var link = (await nova.Content.ReadFromJsonAsync<LinkCardapioConversaGerado>())!;
         estado = await Estado(client, link.Token);
-        estado.Rascunho.Observacoes.Should().Be(observacaoOriginal, "o novo link conserva a observação já registrada");
-        estado.Pedido!.Observacoes.Should().Be(observacaoOriginal);
+        // #2007 (item 11): o cliente lê o que escreveu; o retrato "[Entrega] ..." fica só no pedido, para a equipe.
+        observacaoOriginal.Should().Contain("[Entrega]");
+        estado.Rascunho.Observacoes.Should().Be("Entregar na portaria", "o novo link conserva a observação já registrada");
+        estado.Pedido!.Observacoes.Should().Be("Entregar na portaria");
         await Salvar(client, link.Token, estado, estado.Rascunho with { Itens = [new(c.CardapioItemId, quantidade)],
             Observacoes = "Ligar antes, não deixar na portaria" });
         estado = await Estado(client, link.Token);
@@ -102,7 +105,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         (await Observacao()).Should().Be(observacaoOriginal);
         using var aprovado = await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/comandas-cliente/{estado.LinkId}/confirmar", new { aceitar = true });
         aprovado.StatusCode.Should().Be(HttpStatusCode.OK, await aprovado.Content.ReadAsStringAsync());
-        (await Observacao()).Should().Be("Ligar antes, não deixar na portaria");
+        (await Observacao()).Should().Be(EnderecoCheckout.ComRetratoDaEntregaDe(observacaoOriginal, "Ligar antes, não deixar na portaria"))
+            .And.StartWith("Ligar antes, não deixar na portaria | [Entrega] ", "aprovar a alteração não apaga o endereço gravado no checkout");
 
         async Task<string?> Observacao()
         {

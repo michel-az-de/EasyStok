@@ -88,7 +88,7 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             var novaJanela = vagaAtual is { LiberadoEm: null }
                 ? dados.DataPedidaPeloCliente(vagaAtual.JanelaEntregaId, vagaAtual.DataEntrega)
                 : dados.DataPedidaPeloCliente(null, null);
-            if (input.Automatico && (devolucao > 0 || novaJanela is not null || (dados.Observacoes ?? "") != (pedido.Observacoes ?? "")
+            if (input.Automatico && (devolucao > 0 || novaJanela is not null || (EnderecoCheckout.SemRetratoDaEntrega(dados.Observacoes) ?? "") != (EnderecoCheckout.SemRetratoDaEntrega(pedido.Observacoes) ?? "")
                 || !SomenteAcrescimos(antigos, selecao)))
                 return anterior;
             if (devolucao > 0 && input.Nivel is not (NivelAcesso.Gerente or NivelAcesso.Admin or NivelAcesso.SuperAdmin))
@@ -111,7 +111,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             }
             var statusAnterior = pedido.Status;
             if (pedido.StatusEnum == StatusPedido.Pronto) pedido.RetomarPreparoPorAlteracao();
-            pedido.Observacoes = dados.Observacoes;
+            // #2007 (item 11): o rascunho mostra ao cliente as observações sem o retrato da entrega; ele volta aqui.
+            pedido.Observacoes = EnderecoCheckout.ComRetratoDaEntregaDe(pedido.Observacoes, dados.Observacoes);
             pedido.RecalcularTotal();
             await pedidos.AddEventoAsync(new() { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "comanda_cliente_alterada",
                 UsuarioId = input.UsuarioId == Guid.Empty ? null : input.UsuarioId, UsuarioNome = input.UsuarioNome,

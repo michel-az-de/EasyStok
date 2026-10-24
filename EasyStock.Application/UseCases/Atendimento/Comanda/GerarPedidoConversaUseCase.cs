@@ -105,11 +105,14 @@ public sealed class GerarPedidoConversaUseCase(
 
     private static string TextoAoCliente(PedidoReservado reservado, DateOnly dataEntrega, string forma, CobrancaPedidoResult? cobranca)
     {
-        var resumo = ResumoPedidoConversa.Texto(reservado, dataEntrega, forma, CabecalhoResumo);
-        if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega }
-            && PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
-            return ResumoPedidoConversa.Limitar($"{resumo}\n\nSinal a receber: {PlanoPagamentoEncomenda.Sinal(reservado.Total).ToString("C", Cultura.PtBr)} por Pix, dinheiro ou maquininha. Restante na entrega.");
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
+        // #2007 (item 5): cobrança na entrega não tem link, nem quando o link online caiu para ela. O resumo diz o
+        // sinal antes da produção e o restante na entrega, sem prometer link.
+        var naEntrega = cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega };
+        var resumo = ResumoPedidoConversa.Texto(reservado, dataEntrega,
+            naEntrega ? TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega : forma, CabecalhoResumo);
+        if (naEntrega && PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
+            return ResumoPedidoConversa.Limitar($"{resumo}\n\nCombine com a equipe como pagar o sinal.");
+        if ((naEntrega || forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
             && !PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm)) return resumo;
         var pagamento = cobranca?.LinkPagamento is { } link
             ? $"Pague por este link, válido por 30 minutos: {link}"

@@ -50,7 +50,21 @@ public class ResumoPedidoConversaTests
         var texto = ResumoPedidoConversa.Texto(reservado, SextaFeira,
             TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, "Resumo:");
 
-        texto.Should().Contain("Sinal agora por link: R$ 22,50")
-            .And.Contain("Restante na entrega: R$ 22,50");
+        // #2007 (item 5): forma na entrega não tem link; o sinal é recebido antes da produção.
+        texto.Should().Contain("Sinal antes da produção: R$ 22,50 (Pix, dinheiro ou maquininha)")
+            .And.Contain("Restante na entrega: R$ 22,50")
+            .And.NotContain("link");
+    }
+
+    [Fact]
+    public void EncomendaFutura_ComFormaOnline_CobraOSinalPeloLink()
+    {
+        var reservado = Reservado("Bolo de Cenoura", null);
+        reservado.Pedido.AgendadoParaEm = reservado.Pedido.CriadoEm.AddDays(2);
+
+        var texto = ResumoPedidoConversa.Texto(reservado, SextaFeira,
+            TrocarFormaPagamentoPedidoUseCase.FormaOnline, "Resumo:");
+
+        texto.Should().Contain("Sinal agora por link: R$ 22,50").And.Contain("Restante na entrega: R$ 22,50");
     }
 }

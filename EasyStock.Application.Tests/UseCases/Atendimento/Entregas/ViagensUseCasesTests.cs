@@ -30,6 +30,25 @@ public class ViagensUseCasesTests
         dto.RotaUrl.Should().Contain(Uri.EscapeDataString(legado ? "Rua do cadastro, 99" : "Rua da encomenda, 42"));
     }
 
+    // #2007 (itens 1 e 3): a parada leva as observações (troco do dinheiro na entrega) e o número do dia,
+    // para Entregas não depender de o pedido estar na lista do dia que a tela mostra.
+    [Fact]
+    public async Task Parada_traz_observacoes_e_numero_do_dia_do_pedido()
+    {
+        var pedido = Pedido.Criar(_empresaId);
+        pedido.Observacoes = "Pagamento na entrega: dinheiro, troco para R$ 100,00.";
+        pedido.DefinirNumeroDoDia(new DateOnly(2026, 10, 24), 7);
+        _pedidos.ListarPorIdsAsync(_empresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([pedido]);
+        var viagem = Viagem.Criar(_empresaId, Agora);
+        viagem.IncluirParada(pedido.Id, false);
+        _viagens.ObterAsync(_empresaId, viagem.Id, Arg.Any<CancellationToken>()).Returns(viagem);
+
+        var parada = (await new ObterViagemUseCase(_viagens, _pedidos, _clientes).ExecuteAsync(_empresaId, viagem.Id)).Paradas.Single();
+
+        parada.Observacoes.Should().Be("Pagamento na entrega: dinheiro, troco para R$ 100,00.");
+        parada.NumeroDoDia.Should().Be(7);
+    }
+
     // #1564: a lista monta todas as paradas com uma consulta de pedidos e uma de clientes, e não uma por parada.
     [Fact]
     public async Task Lista_carrega_pedidos_e_clientes_em_lote()

@@ -90,7 +90,7 @@ public sealed class ObterDossieClienteUseCase(
             mesmoDomicilio,
             recentes.Select(Resumo).ToList(),
             pedidoEmAndamentoId is { } pedidoId ? historico.FirstOrDefault(p => p.Id == pedidoId) : null,
-            TotalGasto: compras.Where(p => p.Status != StatusPedidoMapper.AguardandoPagamento).Sum(p => p.Total));
+            TotalGasto: compras.Sum(p => p.Total));
     }
 
     /// <summary>Lead sem cadastro: só o que o canal informou.</summary>
@@ -105,9 +105,12 @@ public sealed class ObterDossieClienteUseCase(
                 : null);
     }
 
-    /// <summary>Cancelado e rascunho não são compra: ficam na lista, fora do favorito e da contagem.</summary>
+    /// <summary>
+    /// Cancelado, rascunho e reserva ainda sem pagamento não são compra: ficam na lista, fora do favorito, da contagem,
+    /// da última compra e do total gasto. #2007 (item 12): a mesma regra para todos os números do cartão.
+    /// </summary>
     private static bool EhCompra(PedidoResumoCliente pedido) =>
-        pedido.Status is not (StatusPedidoMapper.Cancelado or StatusPedidoMapper.Rascunho);
+        pedido.Status is not (StatusPedidoMapper.Cancelado or StatusPedidoMapper.Rascunho or StatusPedidoMapper.AguardandoPagamento);
 
     /// <summary>O item presente em mais pedidos; empate vai para a maior quantidade somada.</summary>
     private static ItemFavoritoDossie? ItemFavorito(IEnumerable<PedidoResumoCliente> compras) =>

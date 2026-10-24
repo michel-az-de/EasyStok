@@ -94,9 +94,15 @@ assert.match(doEnvio.texto, /^A Meta não respondeu\. Ao tentar novamente, esta 
 assert.deepEqual(erroDoModelo(outraFalha), { texto: 'A Meta não respondeu.', integracoes: false })
 const modal = readFileSync(new URL('../src/features/atendimento/ModalEnviarModelo.jsx', import.meta.url), 'utf8')
 assert.doesNotMatch(modal, /Ao tentar novamente/, 'a frase do envio mora no domínio, não no modal')
-assert.match(modal, /erroDoModelo\(e, \{ envio: true \}\)/)
-assert.match(modal, /erroDoModelo\(e\)/)
-assert.match(modal, /semConexao && \(podeVerIntegracoes\(acoes\)\s*\? <a href=\{hashDoModulo\('configuracoes', 'integracoes'\)\}>/)
+assert.match(modal, /erroDoModelo\(e, \{ envio: true, podeIntegrar \}\)/)
+assert.match(modal, /erroDoModelo\(e, \{ podeIntegrar \}\)/)
+// #2007 (11c): quem não tem acesso a Integrações não lê "Configure a conexão em Integrações".
+const semAcesso = erroDoModelo(semConexaoNoEnvio, { envio: true, podeIntegrar: false })
+assert.deepEqual(semAcesso, { texto: 'O WhatsApp da loja não está conectado. Peça à gerência para conectar o WhatsApp.', integracoes: true })
+assert.doesNotMatch(semAcesso.texto, /Integrações/)
+assert.doesNotMatch(modal, /Quem administra a loja conecta o WhatsApp/, 'a frase da gerência mora no domínio')
+assert.match(modal, /semConexao && podeIntegrar && <a href=\{hashDoModulo\('configuracoes', 'integracoes'\)\}>/)
+assert.match(modal, /const podeIntegrar = podeVerIntegracoes\(acoes\)/)
 console.log('ok 409 sem WhatsApp conectado: frase da API e caminho para Integrações, sem repetir a tentativa')
 
 // #1408: "Chamar no WhatsApp" para cliente cadastrado que nunca escreveu. Rota própria com o cliente; a mesma
@@ -152,4 +158,8 @@ assert.match(modal, /aoFechar\(\)\s+if \(iniciada\) aoIniciar\?\.\(iniciada\)/)
 const balcao = readFileSync(new URL('../src/features/atendimento/ChamarClientes.jsx', import.meta.url), 'utf8')
 assert.match(balcao, /clientesParaChamar\(/)
 assert.match(balcao, /<ModalEnviarModelo\s+cliente=\{/)
+// #2007 (11b): o telefone sai formatado na busca, não "+5511987650099".
+assert.match(balcao, /\{cliente\.nome\} · \{telefoneDoE164\(cliente\.telefone\)\}/)
+const { telefoneDoE164 } = await import('../src/dominio/formato.js')
+assert.doesNotMatch(telefoneDoE164('+5511987650099'), /^\+55119/)
 console.log('ok chamar no WhatsApp: rota com o cliente, sem duplicar, 409 sem conexão e filtro dos cadastrados')

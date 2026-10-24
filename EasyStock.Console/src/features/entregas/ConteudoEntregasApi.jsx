@@ -12,11 +12,9 @@ import {
   EMPRESAS_ENTREGADOR, ENTREGA_PROPRIA, TIPOS_ENTREGADOR, confirmacaoDaRecusa, motivoDaAprovacao, motivoDeSaida,
   opcoesDeEntregador, paineisDeEntregas, rotuloSituacaoViagem, situacaoDaLista, viagensConcluidasNoDia,
 } from '../../dominio/entregasApi'
-import { pagamentoNaEntregaDasObservacoes, textoDoTroco } from '../../dominio/cobranca'
 import { moeda } from '../../dominio/formato'
 import { nomeDoPedido } from '../../dominio/pedido'
-import { aReceberDoCartao } from '../../dominio/pagamento'
-import { roteiroDoDia } from '../../dominio/roteiroDoDia'
+import { paradaDaViagem, roteiroDoDia, trocoDaPorta } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
 import { CorridasDaViagem } from './CorridasDaViagem'
 import { Endereco, EntregasDoDia } from './EntregasDoDia'
@@ -93,7 +91,8 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
   const roteiro = useMemo(() => (doDia ? roteiroDoDia({ ...doDia, viagens, entregadores }) : null), [doDia, viagens, entregadores])
   // Prontos que o dia escolhido não mostra (de outro dia), para nenhum ficar sem viagem.
   const prontosFora = roteiro ? p.prontos.filter((x) => !roteiro.ids.has(x.id)) : []
-  const pedidoPorId = new Map(pedidos.map((x) => [x.id, x]))
+  // #2007: a viagem pode levar pedido do dia escolhido que não está entre os prontos e em rota de hoje.
+  const pedidoPorId = new Map([...(doDia?.pedidos ?? []), ...pedidos].map((x) => [x.id, x]))
   // #1474 (R7): recusar cancela, estorna e avisa o cliente; confirma em linha antes.
   const [recusando, setRecusando] = useState(null)
   const concluidas = viagensConcluidasNoDia(viagens, dia)
@@ -207,12 +206,12 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
   // J2 (#1990): ali mesmo ela lança o que recebeu ("Recebi R$ X") e a entrega sai marcada.
   const [confirmando, setConfirmando] = useState(null) // { pedidoId, valor }
   const [metodoNaPorta, setMetodoNaPorta] = useState('')
-  const perguntar = (pedidoId, valor) => {
-    setMetodoNaPorta(metodoSugeridoNaPorta(pedidoPorId?.get(pedidoId)?.observacoes))
-    setConfirmando({ pedidoId, valor })
+  const perguntar = (parada, valor) => {
+    setMetodoNaPorta(metodoSugeridoNaPorta(paradaDaViagem(parada, pedidoPorId?.get(parada.pedidoId)).observacoes))
+    setConfirmando({ pedidoId: parada.pedidoId, valor })
   }
-  const marcarEntregue = (pedidoId, confirmado = false) => acoes.entregue(viagem.id, pedidoId, confirmado)
-    .then((r) => (r?.confirmar ? perguntar(pedidoId, r.confirmar) : setConfirmando(null)))
+  const marcarEntregue = (parada, confirmado = false) => acoes.entregue(viagem.id, parada.pedidoId, confirmado)
+    .then((r) => (r?.confirmar ? perguntar(parada, r.confirmar) : setConfirmando(null)))
   const receberEEntregar = (parada) => acoes.receberEEntregar(viagem.id, parada.pedidoId, confirmando.valor, metodoNaPorta)
     .then((r) => { if (r) setConfirmando(null) })
 
@@ -232,14 +231,13 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
       {n === 0 && <p className={css.vazio}>Viagem vazia. Ponha um pedido pronto nela.</p>}
       <ul className={css.lista}>
         {viagem.paradas.map((parada) => {
-          const pedidoDaParada = pedidoPorId?.get(parada.pedidoId)
-          const aReceber = aReceberDoCartao(pedidoDaParada) ?? 0
-          // J2 (#1990): dinheiro na entrega diz ao entregador quanto receber e quanto troco levar.
-          const troco = textoDoTroco(pagamentoNaEntregaDasObservacoes(pedidoDaParada?.observacoes), aReceber)
+          // J2 (#1990): dinheiro na entrega diz ao entregador quanto receber e quanto troco levar. #2007: com o
+          // pedido fora da lista lida, valem as observações e o número do dia que a parada traz.
+          const { identificacao, aReceber, observacoes, troco, semSaldo } = paradaDaViagem(parada, pedidoPorId?.get(parada.pedidoId))
           return (
           <li key={parada.pedidoId} className={css.cartao}>
             <div className={css.linha}>
-              <span className={css.numero}>{parada.ordem}. {parada.numeroPedido}</span>
+              <span className={css.numero} title={identificacao.titulo || undefined}>{parada.ordem}. {identificacao.principal}{identificacao.referencia && <small className={css.referencia}>{identificacao.referencia}</small>}</span>
               <span className={css.cresce}>{parada.clienteNome}</span>
               {parada.entregueEm && <span className={css.apoio}><Icone nome="check" tamanho={16} /> Entregue</span>}
             </div>
@@ -248,22 +246,23 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
               <p className={css.apoio}>{[parada.entregadorNome, parada.veiculo, parada.placa].filter(Boolean).join(' · ')}</p>
             )}
             {!parada.entregueEm && aReceber > 0 && <p className={css.linha}><strong>Receber {moeda(aReceber)} na entrega</strong></p>}
-            {!parada.entregueEm && aReceber > 0 && troco && <p className={css.apoio}>{troco}</p>}
+            {!parada.entregueEm && (aReceber > 0 || semSaldo) && troco && <p className={css.apoio}>{troco}</p>}
             {acoes.adiadoAte(chaveDaEntrega(viagem.id, parada.pedidoId)) ? (
               <DesfazerComPrazo className={css.linha} ate={acoes.adiadoAte(chaveDaEntrega(viagem.id, parada.pedidoId))}
                 texto={`Marca entregue e avisa ${parada.clienteNome}`}
                 aoDesfazer={() => acoes.desfazerEnvio(chaveDaEntrega(viagem.id, parada.pedidoId))} />
             ) : confirmando?.pedidoId === parada.pedidoId ? (
-              <div className={css.linha} role="alertdialog" aria-label={`Confirmar a entrega do pedido ${parada.numeroPedido}`}>
+              <div className={css.linha} role="alertdialog" aria-label={`Confirmar a entrega: ${identificacao.frase}`}>
                 <span className={`${css.apoio} ${css.cresce}`}>
                   Falta receber {moeda(confirmando.valor)}. Recebeu na porta? Diga como e o pagamento entra junto com a entrega.
+                  {trocoDaPorta(observacoes, confirmando.valor) && <> {trocoDaPorta(observacoes, confirmando.valor)}.</>}
                 </span>
                 <CampoSelecao rotulo="Como recebeu" rotuloOculto opcoes={METODOS_NA_PORTA} value={metodoNaPorta}
                   disabled={ocupado} onChange={(e) => setMetodoNaPorta(e.target.value)} />
                 <Botao variante="primario" disabled={ocupado || !metodoNaPorta} onClick={() => receberEEntregar(parada)}>
                   Recebi {moeda(confirmando.valor)}
                 </Botao>
-                <Botao variante="secundario" disabled={ocupado} onClick={() => marcarEntregue(parada.pedidoId, true)}>Entregue sem receber</Botao>
+                <Botao variante="secundario" disabled={ocupado} onClick={() => marcarEntregue(parada, true)}>Entregue sem receber</Botao>
                 <Botao variante="texto" disabled={ocupado} onClick={() => setConfirmando(null)}>Voltar</Botao>
               </div>
             ) : (
@@ -279,8 +278,8 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
               )}
               {!montando && !parada.entregueEm && (
                 <Botao variante="primario" disabled={ocupado} onClick={() => (aReceber > 0
-                  ? perguntar(parada.pedidoId, aReceber)
-                  : marcarEntregue(parada.pedidoId))}>Entregue</Botao>
+                  ? perguntar(parada, aReceber)
+                  : marcarEntregue(parada))}>Entregue</Botao>
               )}
             </div>
             )}

@@ -6,7 +6,8 @@ using EasyStock.Domain.Entities.Storefront;
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 public sealed record EnviarImagemCardapioConsoleCommand(
-    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, Guid CardapioItemId, int Indice, string? Legenda);
+    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, Guid CardapioItemId, int Indice, string? Legenda,
+    EasyStock.Domain.Enums.NivelAcesso? Nivel = null);
 
 /// <summary>
 /// Foto da galeria do cardápio mandada pelo console (#1437). O navegador não baixa a foto: o item é
@@ -54,7 +55,7 @@ public sealed class EnviarImagemCardapioConsoleUseCase(
         var mime = MimePorExtensao.GetValueOrDefault(Path.GetExtension(nome), "application/octet-stream");
 
         return await enviarMensagem.EnviarImagemAsync(new EnviarImagemConsoleCommand(
-            command.EmpresaId, command.UsuarioId, command.ConversaId, nome, mime, conteudo, command.Legenda), ct);
+            command.EmpresaId, command.UsuarioId, command.ConversaId, nome, mime, conteudo, command.Legenda, command.Nivel), ct);
     }
 
     /// <summary>Mesma lista do console (comandaApi.js): galeria, ou a capa quando não há galeria.</summary>
