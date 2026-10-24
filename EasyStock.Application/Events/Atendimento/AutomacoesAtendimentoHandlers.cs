@@ -84,15 +84,26 @@ public sealed class AutomacaoPedidoPagoHandler(
     /// <summary>Marco do aviso S13 quando o pagamento não tem cobrança (crédito do cliente).</summary>
     public const string MarcoPago = "pago";
 
+    /// <summary>#2007: o obrigado do pagamento que quita o pedido em entrega ou entregue.</summary>
+    public const string TextoPagoNaEntrega = "Recebemos o pagamento. Obrigada!";
+
     public override string TipoEvento => PedidoPagoEvent.TipoEvento;
 
     /// <summary>Só o que o aviso usa do <see cref="PedidoPagoEvent"/>.</summary>
     private sealed record PedidoPagoPayload(
-        Guid PedidoId, Guid? ClienteId, Guid? ConversaId, Guid CobrancaPedidoId, string? PagamentoExternoId);
+        Guid PedidoId, Guid? ClienteId, Guid? ConversaId, Guid CobrancaPedidoId, string? PagamentoExternoId, string? StatusPedido);
 
     protected override async Task TratarAsync(OutboxEventoIntegracao evento, CancellationToken ct)
     {
         if (Ler<PedidoPagoPayload>(evento) is not { } e) return;
+        // #2007 (item 7): pagamento que quita um pedido que já saiu ou foi entregue (na porta, ou o link pago com o
+        // pedido na rua). "Pedido confirmado para o dia X" seria texto velho: sai só o obrigado, uma vez.
+        if (e.StatusPedido is StatusPedidoMapper.SaiuParaEntrega or StatusPedidoMapper.Entregue)
+        {
+            await aviso.EnfileirarAsync(TipoEventoNotificacao.ComandaAtualizada, evento.EmpresaId, e.PedidoId,
+                MarcoDoPagamento(e), ct, mensagem: TextoPagoNaEntrega);
+            return;
+        }
 
         var automatica = await disparo.ExecuteAsync(new DisparoAutomacao(
             evento.EmpresaId, GatilhoAutomacao.PagamentoConfirmado, e.ConversaId, e.ClienteId, e.PedidoId), ct);
@@ -103,6 +114,9 @@ public sealed class AutomacaoPedidoPagoHandler(
         var marco = e.CobrancaPedidoId == Guid.Empty ? MarcoPago : $"pagamento:{e.CobrancaPedidoId:N}:{e.PagamentoExternoId}";
         await aviso.EnfileirarAsync(TipoEventoNotificacao.PedidoPagoConfirmado, evento.EmpresaId, e.PedidoId, marco, ct);
     }
+
+    private static string MarcoDoPagamento(PedidoPagoPayload e) =>
+        e.CobrancaPedidoId == Guid.Empty ? MarcoPago : $"pagamento:{e.CobrancaPedidoId:N}:{e.PagamentoExternoId}";
 }
 
 /// <summary>

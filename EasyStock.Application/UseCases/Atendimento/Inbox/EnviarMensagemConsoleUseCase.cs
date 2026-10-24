@@ -8,17 +8,18 @@ using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
-public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string Texto);
+// #2007 (item 10): `Nivel` de quem envia decide o autor (Dona ou Atendente); sem ele, Dona, como antes.
+public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string Texto, NivelAcesso? Nivel = null);
 
 public sealed record EnviarImagemConsoleCommand(
-    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda);
+    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda, NivelAcesso? Nivel = null);
 
 /// <summary>Áudio gravado no console (#1444): os bytes como vieram do navegador; o formato sai dos bytes.</summary>
-public sealed record EnviarAudioConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, byte[] Conteudo);
+public sealed record EnviarAudioConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, byte[] Conteudo, NivelAcesso? Nivel = null);
 
 /// <summary>
 /// A dona responde pelo console (S07, RN-04, D4): envia pela porta do canal da conversa (S34), grava
-/// <c>Mensagem(Saida, Dona)</c> com o id externo e marca a conversa <see cref="SituacaoConversa.Assumida"/>,
+/// <c>Mensagem(Saida, Dona ou Atendente)</c> com o id externo e marca a conversa <see cref="SituacaoConversa.Assumida"/>,
 /// o que cala o agente até ela liberar o automático.
 ///
 /// <para>
@@ -58,7 +59,7 @@ public sealed class EnviarMensagemConsoleUseCase(
             token => tag is not null && canal is ICanalComTagHumana comTag
                 ? comTag.EnviarTextoComTagAsync(conversa.ContatoIdExterno, texto, tag, token)
                 : canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, token),
-            externoId => Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
+            externoId => Mensagem.Saida(command.EmpresaId, conversa.Id, AutorDe(command.Nivel), agora,
                 TipoConteudoMensagem.Texto, texto, externoId));
     }
 
@@ -81,7 +82,7 @@ public sealed class EnviarMensagemConsoleUseCase(
             token => canal.EnviarImagemAsync(conversa.ContatoIdExterno, imagem.Url, legenda, token),
             externoId =>
             {
-                var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
+                var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorDe(command.Nivel), agora,
                     TipoConteudoMensagem.Imagem, legenda, externoId);
                 mensagem.AnexarMidia(imagem.StorageKey, imagem.ContentType);
                 return mensagem;
@@ -105,12 +106,16 @@ public sealed class EnviarMensagemConsoleUseCase(
             token => canal.EnviarAudioAsync(conversa.ContatoIdExterno, audio.Url, audio.NotaDeVoz, token),
             externoId =>
             {
-                var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Dona, agora,
+                var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorDe(command.Nivel), agora,
                     TipoConteudoMensagem.Audio, null, externoId);
                 mensagem.AnexarMidia(audio.StorageKey, audio.ContentType);
                 return mensagem;
             });
     }
+
+    /// <summary>A dona é o perfil Admin; gerente e operadora são a equipe. Sem nível (chamada interna), a dona.</summary>
+    public static AutorMensagem AutorDe(NivelAcesso? nivel) =>
+        nivel is null or NivelAcesso.SuperAdmin or NivelAcesso.Admin ? AutorMensagem.Dona : AutorMensagem.Atendente;
 
     private async Task<Conversa> ObterParaEnvioAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct)
     {

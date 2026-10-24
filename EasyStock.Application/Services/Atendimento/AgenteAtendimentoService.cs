@@ -239,7 +239,7 @@ public sealed class AgenteAtendimentoService(
             if (msg.Autor != AutorMensagem.Cliente || msg.ProcessadaEm is not null) continue;
 
             var respondida = historico.Skip(i + 1).Any(m => m.Status != StatusMensagem.Falhou
-                && (m.Autor == AutorMensagem.Dona || (legado && m.Autor == AutorMensagem.Agente)));
+                && (m.Autor.EhHumanoDaEmpresa() || (legado && m.Autor == AutorMensagem.Agente)));
             if (!respondida) pendentes.Add(msg);
         }
 

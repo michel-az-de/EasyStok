@@ -492,6 +492,10 @@ await confere('15  J2-9 "costuma pedir" só com o mesmo item em 2 pedidos ou mai
   assert.equal(clienteDoDossie({ cliente: { id: 'c' }, itemFavorito: { nome: 'X' } }).cliente.favorito, null, 'sem a contagem, não afirma hábito')
 })
 
+await confere('K9  #2007: a cobrança do restante do sinal se chama "restante" no botão, não "complemento"', async () => {
+  assert.match(barra, /\{pedido\.sinalNaReserva && \(pedido\.alocadoApi \?\? pedido\.totalPagoApi \?\? 0\) \* 2 <= \(pedido\.totalApi \?\? 0\) \+ 0\.01\s+\? <>Marcar pago \(restante \{moeda\(pedido\.cobranca\.valor\)\}\)<\/>\s+: <>Marcar pago \(complemento \{moeda\(pedido\.cobranca\.valor\)\}\)<\/>\}/)
+})
+
 if (falhas.length > 0) {
   console.error(`\n${passou} ok, ${falhas.length} falha(s)`)
   process.exit(1)

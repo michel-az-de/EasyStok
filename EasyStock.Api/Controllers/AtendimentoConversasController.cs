@@ -122,7 +122,7 @@ public class AtendimentoConversasController(
     [HttpPost("{id:guid}/mensagens")]
     public Task<IActionResult> EnviarMensagem(Guid id, [FromBody] EnviarMensagemConsoleBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await enviarUseCase.EnviarTextoAsync(
-            new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty), ct)));
+            new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty, currentUser.Nivel), ct)));
 
     [HttpGet("~/api/atendimento/modelos")]
     [ValidateEmpresaId]
@@ -196,7 +196,7 @@ public class AtendimentoConversasController(
             await using var memoria = new MemoryStream();
             await file.CopyToAsync(memoria, ct);
             return DataOk(await enviarUseCase.EnviarImagemAsync(new EnviarImagemConsoleCommand(
-                currentUser.EmpresaId, currentUser.UsuarioId, id, file.FileName, file.ContentType, memoria.ToArray(), legenda), ct));
+                currentUser.EmpresaId, currentUser.UsuarioId, id, file.FileName, file.ContentType, memoria.ToArray(), legenda, currentUser.Nivel), ct));
         });
 
     [SwaggerOperation(Summary = "Send a recorded audio as the owner (multipart; takes over the conversation)",
@@ -221,7 +221,7 @@ public class AtendimentoConversasController(
             await using var memoria = new MemoryStream();
             await file.CopyToAsync(memoria, ct);
             return DataOk(await enviarUseCase.EnviarAudioAsync(new EnviarAudioConsoleCommand(
-                currentUser.EmpresaId, currentUser.UsuarioId, id, memoria.ToArray()), ct));
+                currentUser.EmpresaId, currentUser.UsuarioId, id, memoria.ToArray(), currentUser.Nivel), ct));
         });
 
     /// <remarks>Use case por <c>[FromServices]</c>: o construtor fica como está para os testes que o montam.</remarks>
@@ -240,7 +240,7 @@ public class AtendimentoConversasController(
         Guid id, [FromBody] EnviarImagemCardapioBody body,
         [FromServices] EnviarImagemCardapioConsoleUseCase imagemCardapioUseCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await imagemCardapioUseCase.ExecuteAsync(new EnviarImagemCardapioConsoleCommand(
-            currentUser.EmpresaId, currentUser.UsuarioId, id, body?.CardapioItemId ?? Guid.Empty, body?.Indice ?? 0, body?.Legenda), ct)));
+            currentUser.EmpresaId, currentUser.UsuarioId, id, body?.CardapioItemId ?? Guid.Empty, body?.Indice ?? 0, body?.Legenda, currentUser.Nivel), ct)));
 
     [SwaggerOperation(Summary = "Reopen a closed conversation in the human queue without renewing the channel window")]
     [ProducesResponseType(StatusCodes.Status200OK)]

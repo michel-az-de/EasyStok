@@ -5,6 +5,7 @@
 import { faixaDeHorarios } from './entrega'
 import { rotuloEmpresaEntregador } from './entregasApi'
 import { dataIsoNoFuso, listaEmPortugues, moeda, plural } from './formato'
+import { pagamentoNaEntregaDasObservacoes, textoDoTroco } from './cobranca'
 import { aReceberDoCartao, quitadoNoCartao } from './pagamento'
 import { nomeDoPedido } from './pedido'
 
@@ -61,7 +62,27 @@ function entregadorDe(achado, entregadores) {
   return quem ? { nome: quem.nome, empresa: rotuloEmpresaEntregador(quem.empresa) } : null
 }
 
-const textoDoEntregador = (e) => (e.empresa ? `${e.nome} (${e.empresa})` : e.nome)
+// #2007 (11a): "Entrega própria (Própria)" repetia a empresa que o nome já diz.
+const textoDoEntregador = (e) => (e.empresa && !(e.empresa === 'Própria' && /pr[oó]pria/i.test(e.nome)) ? `${e.nome} (${e.empresa})` : e.nome)
+
+// #2007 (itens 1 e 3): o troco do dinheiro na entrega, como a Cozinha lê nas observações.
+export const trocoDaPorta = (observacoes, aReceber) => textoDoTroco(pagamentoNaEntregaDasObservacoes(observacoes), aReceber)
+
+// A parada da viagem fala do pedido como o roteiro: "Comanda N" (ou o nº do dia), quanto receber e o troco. O pedido
+// vem da leitura do KDS; sem ele (pedido de outro dia), valem o número do dia e as observações que a parada traz, e o
+// troco sai sem o "levar R$ X", que depende do saldo que a tela não leu (`semSaldo`).
+export function paradaDaViagem(parada, pedido) {
+  const aReceber = aReceberDoCartao(pedido) ?? 0
+  const observacoes = pedido?.observacoes ?? parada.observacoes ?? null
+  const pagamento = pagamentoNaEntregaDasObservacoes(observacoes)
+  return {
+    identificacao: nomeDoPedido(pedido ?? { numeroCurto: parada.numeroPedido, numeroDoDia: parada.numeroDoDia }),
+    aReceber,
+    observacoes,
+    semSaldo: !pedido,
+    troco: pedido ? textoDoTroco(pagamento, aReceber) : textoDoTroco(pagamento, pagamento?.trocoPara ?? 0),
+  }
+}
 
 function linhaDoPedido(p, achado, entregadores) {
   const base = ETAPAS[p.status] ?? { etapa: 'outro', rotulo: p.statusRotulo ?? p.status, falta: null }
@@ -81,6 +102,7 @@ function linhaDoPedido(p, achado, entregadores) {
     rotulo,
     pago,
     aReceber: aReceberDoCartao(p) ?? 0,
+    troco: trocoDaPorta(p.observacoes, aReceberDoCartao(p) ?? 0),
     falta: p.status === 'pronto' ? faltaDoPronto(viagem) : base.falta,
     entregador: entregadorDe(achado, entregadores),
     viagem: viagem ? { id: viagem.id, situacao: viagem.situacao } : null,
@@ -101,7 +123,8 @@ function novoGrupo({ chave, label, inicio, fim, capacidade = null, janelaId = nu
 export const situacaoDoPagamento = (p) => {
   if (p.pago) return 'Pago'
   if (p.status === 'aguardando_pagamento') return 'Não pago'
-  return p.aReceber > 0 ? `Receber ${moeda(p.aReceber)} na entrega` : 'Não pago'
+  if (!(p.aReceber > 0)) return 'Não pago'
+  return [`Receber ${moeda(p.aReceber)} na entrega`, p.troco].filter(Boolean).join(' · ')
 }
 
 export function roteiroDoDia({ data, pedidos, viagens, entregadores, janelas, bloqueios }) {

@@ -158,6 +158,7 @@ public static class GeracaoAgenteAtendimento
             {
                 AutorMensagem.Cliente => TextoDoCliente(msg),
                 AutorMensagem.Dona => $"(dona) {msg.Texto}",
+                AutorMensagem.Atendente => $"(equipe) {msg.Texto}",
                 _ => msg.Texto ?? string.Empty
             };
             if (string.IsNullOrWhiteSpace(texto)) continue;

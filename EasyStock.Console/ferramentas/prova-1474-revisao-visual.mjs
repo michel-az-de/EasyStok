@@ -443,6 +443,10 @@ await confere('pagamento e entrega: automática desligada não diz que nada sai 
   const { avisoDaAutomaticaDeEntrada: aviso, GATILHOS: G } = await import('../src/dominio/automacao.js')
   assert.match(aviso({ gatilho: G.PAGAMENTO_CONFIRMADO, ativa: false }), /já recebe o aviso de pagamento confirmado/)
   assert.match(aviso({ gatilho: G.POS_ENTREGA, ativa: true, texto: 'Obrigada!' }), /duas mensagens/)
+  // #2007 (11d): ligada, a automática de pagamento sai no lugar do aviso do pedido; uma mensagem só.
+  const pago = aviso({ gatilho: G.PAGAMENTO_CONFIRMADO, ativa: true, texto: 'Recebemos!' })
+  assert.doesNotMatch(pago, /duas mensagens/)
+  assert.match(pago, /substitui o aviso de pagamento confirmado/)
   assert.equal(aviso({ gatilho: G.ENCERRAMENTO, ativa: false }), null)
 })
 

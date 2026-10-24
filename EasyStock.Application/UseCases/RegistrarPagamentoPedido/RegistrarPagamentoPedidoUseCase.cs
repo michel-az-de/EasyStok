@@ -38,7 +38,8 @@ public class RegistrarPagamentoPedidoUseCase(
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     QuitacaoPedido quitacao,
     ICaixaRepository? caixaRepo = null,
-    SaldoFinanceiroPedido? saldos = null)
+    SaldoFinanceiroPedido? saldos = null,
+    Lazy<EasyStock.Application.Services.Atendimento.AvisoStatusPedidoCliente>? avisoCliente = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -68,6 +69,7 @@ public class RegistrarPagamentoPedidoUseCase(
 
         EfeitosQuitacao? efeito = null;
         PedidoMudouStatusOperacao? mudanca = null;
+        (EasyStock.Domain.Entities.Pedido Pedido, PedidoPagamento Pagamento)? sinalManual = null;
         var resultado = await uow.ExecuteInTransactionSemRetryAsync(async token =>
         {
             if (!cmd.ConfirmadoPeloProvedor) await repo.TravarAsync(cmd.EmpresaId, cmd.PedidoId, token);
@@ -145,6 +147,7 @@ public class RegistrarPagamentoPedidoUseCase(
             {
                 mudanca = await quitacao.ConfirmarSinalManualAsync(pedido, pag, token);
                 if (mudanca is null) await inicioPrevisto.AplicarNaFilaAsync(pedido, token);
+                else sinalManual = (pedido, pag);
             }
 
             if (!cmd.ConfirmadoPeloProvedor && cmd.Origem != "balcao")
@@ -164,7 +167,35 @@ public class RegistrarPagamentoPedidoUseCase(
             return resposta;
         }, ct);
         await quitacao.PublicarAsync(cmd.EmpresaId, efeito, ct, mudanca);
+        if (sinalManual is { } sinal) await AvisarSinalManualAsync(sinal.Pedido, sinal.Pagamento, ct);
         return resultado;
+    }
+
+    /// <summary>
+    /// #2007 (item 6): o sinal da encomenda registrado à mão avisa o cliente como o pago pelo Mercado Pago, pelo mesmo
+    /// aviso do pedido (WhatsApp ou chat do site). Sai uma vez: só na passagem que completa o sinal, e a chave leva o
+    /// id do pagamento. Pagamento que já quita fica com o aviso de pedido pago. Mensagem não é dinheiro: sai depois do
+    /// commit do pagamento, numa gravação própria, e a falha só loga. Os valores seguem o do Mercado Pago: o dinheiro
+    /// recebido e o que falta pelo saldo financeiro (cupom e devolução contam).
+    /// </summary>
+    private async Task AvisarSinalManualAsync(EasyStock.Domain.Entities.Pedido pedido, PedidoPagamento pag, CancellationToken ct)
+    {
+        if (avisoCliente is null) return;
+        try
+        {
+            var restante = saldos is null
+                ? pedido.Total.Valor - pedido.TotalPago
+                : (await saldos.ConsultarAsync(pedido, ct)).AReceber(pedido.Total.Valor);
+            if (restante <= 0) return;
+            await avisoCliente.Value.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
+                pedido.EmpresaId, pedido.Id, $"sinal:manual-{pag.Id:N}", ct,
+                mensagem: EasyStock.Application.UseCases.Pedidos.Cobranca.ConfirmarPagamentoPedidoUseCase.TextoSinalRecebido(pedido.TotalPago, restante));
+            await uow.CommitAsync();
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Aviso de sinal manual nao enfileirado pedidoId={PedidoId} pagamento={Pagamento}", pedido.Id, pag.Id);
+        }
     }
 
     /// <summary>
