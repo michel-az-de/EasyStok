@@ -135,4 +135,24 @@ public class EditarCardapioItemAdminUseCaseTests
         item.SecaoId.Should().BeNull();
         await _uow.DidNotReceive().CommitAsync();
     }
+
+    [Fact]
+    public async Task SecaoDaPropriaVitrine_ODefine()
+    {
+        // A seção existe na vitrine do prato e em nenhuma outra: consultar outra vitrine (ou Guid.Empty) recusaria.
+        var storefrontId = Guid.NewGuid();
+        var item = CardapioItem.CriarAvulso(storefrontId, "Lasanha", 35m);
+        _repo.GetByIdAndScopeAsync(storefrontId, item.Id, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(item);
+        var secao = CardapioSecao.CriarRaiz(storefrontId, "Massas", 1);
+        _secoes.GetByIdAsync(storefrontId, secao.Id, Arg.Any<CancellationToken>()).Returns(secao);
+
+        await Sut().ExecuteAsync(new EditarCardapioItemAdminCommand(
+            storefrontId, item.Id,
+            NomePublico: null, CategoriaTexto: null, DescricaoPublica: null,
+            Ingredientes: null, Alergenos: null, SugestaoMolho: null, TempoPreparo: null,
+            FotoUrl: null, PrecoStorefront: null, Tag: null, PesoExibicao: null, FiltrosJson: null, SecaoId: secao.Id));
+
+        item.SecaoId.Should().Be(secao.Id);
+        await _uow.Received(1).CommitAsync();
+    }
 }
