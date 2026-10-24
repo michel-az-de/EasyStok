@@ -101,13 +101,6 @@ namespace EasyStock.Infra.Postgre.Repositories
             };
         }
 
-        public Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId) =>
-            dbContext.Notificacoes.AnyAsync(n =>
-                n.EmpresaId == empresaId &&
-                n.TipoAlerta == tipo &&
-                n.ReferenciaId == referenciaId &&
-                !n.Lida);
-
         public Task<bool> ExisteNotificacaoDoDiaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid? referenciaId, DateTime dataReferencia)
         {
             var inicio = dataReferencia.Date;

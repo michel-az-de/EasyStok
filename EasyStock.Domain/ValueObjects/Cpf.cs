@@ -64,9 +64,6 @@ public sealed record Cpf
     /// <summary>True quando o documento, só dígitos, tem 11 caracteres (forma de CPF).</summary>
     public static bool TemFormaDeCpf(string? documento) => SomenteDigitos(documento).Length == 11;
 
-    /// <summary>Formata para exibição: 000.000.000-00.</summary>
-    public string Formatado() => $"{Value[..3]}.{Value[3..6]}.{Value[6..9]}-{Value[9..]}";
-
     public static implicit operator string(Cpf c) => c.Value;
 
     public override string ToString() => Value;

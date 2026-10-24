@@ -34,12 +34,6 @@ namespace EasyStock.Domain.ValueObjects
             return new Dimensoes(peso, largura, altura, comprimento);
         }
 
-        public bool EstaVazio() =>
-            Peso == 0m &&
-            Largura == 0m &&
-            Altura == 0m &&
-            Comprimento == 0m;
-
         /// <summary>
         /// Valida coerência para PERSISTÊNCIA (write path). NÃO é chamado em <see cref="From"/>,
         /// que permanece leniente para não quebrar a desserialização de dados legados (#688/BUG-010a).
