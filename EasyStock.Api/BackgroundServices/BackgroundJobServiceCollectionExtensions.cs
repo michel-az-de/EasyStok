@@ -12,6 +12,9 @@ public static class BackgroundJobServiceCollectionExtensions
         services.Configure<BackgroundJobOptions>(
             configuration.GetSection(BackgroundJobOptions.SectionName));
 
+        services.Configure<AlertasEstoqueOptions>(
+            configuration.GetSection(AlertasEstoqueOptions.SectionName));
+
         services.TryAddSingleton<IPedidoFornecedorRecebimentoProcessor, NoOpPedidoFornecedorRecebimentoProcessor>();
 
         var options = configuration.GetSection(BackgroundJobOptions.SectionName).Get<BackgroundJobOptions>()

@@ -110,3 +110,25 @@ public sealed class BackgroundJobOptions
     /// <summary>Apaga, de hora em hora, as sessões do chat do site vencidas há mais de um dia (S36).</summary>
     public bool EnableLimpezaSessoesChatSite { get; set; } = true;
 }
+
+/// <summary>
+/// Deduplicação e retenção dos alertas automáticos de estoque (#2016), seção <c>BackgroundJobs:AlertasEstoque</c>.
+/// O alerta é por condição, não por dia: enquanto a condição de um item continua, o sino não recebe outro alerta do mesmo
+/// tipo e item se o anterior ainda não foi lido ou é recente.
+/// </summary>
+public sealed class AlertasEstoqueOptions
+{
+    public const string SectionName = "BackgroundJobs:AlertasEstoque";
+
+    /// <summary>
+    /// Janela, em dias, em que um alerta lido ainda segura o seguinte do mesmo tipo e item (não lido segura sempre, até a
+    /// retenção). Se a condição se resolve e volta, o alerta nasce de novo mesmo dentro da janela. Padrão 7.
+    /// </summary>
+    public int DiasSemRepetir { get; set; } = 7;
+
+    /// <summary>
+    /// Dias até o alerta sair do sino em qualquer estado. O alerta lido sai assim que passa da janela
+    /// <see cref="DiasSemRepetir"/> (antes disso ele ainda segura a repetição). Padrão 30.
+    /// </summary>
+    public int RetencaoDias { get; set; } = 30;
+}

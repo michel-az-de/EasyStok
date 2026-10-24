@@ -1,3 +1,4 @@
+using EasyStock.Api.Configuration;
 using EasyStock.Api.Services;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -9,13 +10,15 @@ using EasyStock.Domain.ValueObjects;
 using EasyStock.TestHelpers;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Services;
 
 /// <summary>
-/// Alertas de estoque de uma empresa (#2016): a rodada é de UMA empresa (o escopo e o tenant são do chamador), o alerta
-/// é um por (tipo, item) por dia de Brasília e o lote vencido parado ganha o status.
+/// Alertas de estoque de uma empresa (#2016): a rodada é de UMA empresa (o escopo e o tenant são do chamador), o alerta é
+/// por condição (não por dia), a condição resolvida sai do sino, a retenção roda na própria rodada e o lote vencido parado
+/// ganha o status.
 /// </summary>
 public class GeradorNotificacoesAutomaticasTests
 {
@@ -31,11 +34,11 @@ public class GeradorNotificacoesAutomaticasTests
     private readonly IPedidoFornecedorRepository _pedidos = Substitute.For<IPedidoFornecedorRepository>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly FakeTimeProvider _relogio = new(Agora);
+    private readonly AlertasEstoqueOptions _opcoes = new() { DiasSemRepetir = 7, RetencaoDias = 30 };
 
-    // O sino em memória: AddAsync grava, GetAlertasDoPeriodoAsync lê. Duas rodadas seguidas enxergam a mesma coisa.
+    // O sino em memória: as rodadas seguintes enxergam o que as anteriores gravaram, apagaram e expurgaram.
     private readonly INotificacaoRepository _sino = Substitute.For<INotificacaoRepository>();
     private readonly List<Notificacao> _gravadas = [];
-    private (DateTime Inicio, DateTime Fim)? _janelaConsultada;
 
     public GeradorNotificacoesAutomaticasTests()
     {
@@ -52,15 +55,17 @@ public class GeradorNotificacoesAutomaticasTests
         _pedidos.GetPedidosAtrasadosAsync(_empresaId, Arg.Any<DateTime>()).Returns(Array.Empty<PedidoFornecedor>());
         _pedidos.GetPedidosRecebidosNoPeriodoAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>()).Returns(Array.Empty<PedidoFornecedor>());
 
-        _sino.GetAlertasDoPeriodoAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                _janelaConsultada = (call.ArgAt<DateTime>(1), call.ArgAt<DateTime>(2));
-                return _gravadas
-                    .Where(n => n.CriadaEm >= call.ArgAt<DateTime>(1) && n.CriadaEm < call.ArgAt<DateTime>(2))
-                    .Select(n => (n.TipoAlerta, n.ReferenciaId))
-                    .ToHashSet();
-            });
+        _sino.GetAlertasAutomaticosAsync(_empresaId, Arg.Any<IReadOnlyCollection<TipoAlertaEstoque>>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(call => (IReadOnlyList<AlertaAutomatico>)_gravadas
+                .Where(n => call.ArgAt<IReadOnlyCollection<TipoAlertaEstoque>>(1).Contains(n.TipoAlerta)
+                    && (!n.Lida || n.CriadaEm >= call.ArgAt<DateTime>(2)))
+                .Select(n => new AlertaAutomatico(n.Id, n.TipoAlerta, n.ReferenciaId, n.Lida, n.CriadaEm))
+                .ToList());
+        _sino.RemoverAlertasAsync(_empresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(call => _gravadas.RemoveAll(n => call.ArgAt<IReadOnlyCollection<Guid>>(1).Contains(n.Id)));
+        _sino.ExpurgarAlertasAutomaticosAsync(_empresaId, Arg.Any<IReadOnlyCollection<TipoAlertaEstoque>>(), Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(call => _gravadas.RemoveAll(n =>
+                (n.Lida && n.CriadaEm < call.ArgAt<DateTime>(2)) || n.CriadaEm < call.ArgAt<DateTime>(3)));
         _sino.AddAsync(Arg.Do<Notificacao>(n => { n.CriadaEm = _relogio.GetUtcNow().UtcDateTime; _gravadas.Add(n); }))
             .Returns(Task.CompletedTask);
     }
@@ -75,6 +80,7 @@ public class GeradorNotificacoesAutomaticasTests
         _pedidos,
         _unitOfWork,
         _relogio,
+        Options.Create(_opcoes),
         Substitute.For<ILogger<GeradorNotificacoesAutomaticas>>());
 
     private void ProdutoCritico(Guid produtoId) =>
@@ -85,6 +91,11 @@ public class GeradorNotificacoesAutomaticasTests
             {
                 new(produtoId, null, "Cafe", 1m, 5, 2, null, null, null, null, 0m, 0, 7, 1, null, null)
             });
+
+    private void SemProdutoCritico() =>
+        _analytics.GetSnapshotReposicaoAsync(_empresaId, _lojaId,
+                Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<CancellationToken>())
+            .Returns(new List<ProdutoReposicaoSnapshot>());
 
     private ItemEstoque Lote(int diasParaVencer, decimal saldo = 10m, StatusItemEstoque status = StatusItemEstoque.Ok) => new()
     {
@@ -116,61 +127,131 @@ public class GeradorNotificacoesAutomaticasTests
     }
 
     [Fact]
-    public async Task Nao_repete_o_alerta_na_rodada_seguinte_do_mesmo_dia()
+    public async Task Condicao_que_continua_nao_gera_alerta_novo_nos_dias_seguintes()
     {
         ProdutoCritico(Guid.NewGuid());
         var gerador = CriarGerador();
 
         var primeira = await gerador.ExecutarAsync(_empresaId);
         _relogio.Advance(TimeSpan.FromHours(1));
-        var segunda = await gerador.ExecutarAsync(_empresaId);
+        var mesmaTarde = await gerador.ExecutarAsync(_empresaId);
+        _relogio.Advance(TimeSpan.FromDays(1));
+        var diaSeguinte = await gerador.ExecutarAsync(_empresaId);
+        _relogio.Advance(TimeSpan.FromDays(3));
+        var tresDiasDepois = await gerador.ExecutarAsync(_empresaId);
 
         primeira.Criados.Should().Be(2);
-        segunda.Criados.Should().Be(0);
+        mesmaTarde.Criados.Should().Be(0);
+        diaSeguinte.Criados.Should().Be(0, "a condição é a mesma: o sino não recebe o mesmo alerta todo dia");
+        tresDiasDepois.Criados.Should().Be(0);
         _gravadas.Should().HaveCount(2);
     }
 
     [Fact]
-    public async Task Repete_no_dia_seguinte_enquanto_a_situacao_continuar()
+    public async Task Alerta_nao_lido_segura_a_repeticao_mesmo_depois_da_janela()
     {
-        ProdutoCritico(Guid.NewGuid());
-        var gerador = CriarGerador();
-
-        await gerador.ExecutarAsync(_empresaId);
-        _relogio.Advance(TimeSpan.FromDays(1));
-        var segunda = await gerador.ExecutarAsync(_empresaId);
-
-        segunda.Criados.Should().Be(2);
-    }
-
-    [Fact]
-    public async Task O_dia_do_alerta_e_o_dia_de_Brasilia_e_nao_o_dia_UTC()
-    {
-        // 22:00 em Brasília (01:00Z do dia 25): ainda é dia 24 para a loja; um corte por UTC repetiria o alerta aqui.
         ProdutoCritico(Guid.NewGuid());
         var gerador = CriarGerador();
         await gerador.ExecutarAsync(_empresaId);
 
-        _relogio.SetUtcNow(new DateTimeOffset(2026, 10, 25, 1, 0, 0, TimeSpan.Zero));
-        var depoisDaMeiaNoiteUtc = await gerador.ExecutarAsync(_empresaId);
+        _relogio.Advance(TimeSpan.FromDays(20)); // além dos 7 dias, aquém dos 30 da retenção
+        var depois = await gerador.ExecutarAsync(_empresaId);
 
-        depoisDaMeiaNoiteUtc.Criados.Should().Be(0, "para a loja ainda é o mesmo dia");
-        _janelaConsultada.Should().Be((new DateTime(2026, 10, 24, 3, 0, 0, DateTimeKind.Utc), new DateTime(2026, 10, 25, 3, 0, 0, DateTimeKind.Utc)));
+        depois.Criados.Should().Be(0, "ninguém leu; o alerta segue valendo");
+        _gravadas.Should().HaveCount(2);
     }
 
     [Fact]
-    public async Task Alerta_ja_criado_hoje_nao_e_recriado_mas_os_demais_sim()
+    public async Task Alerta_lido_segura_a_repeticao_dentro_da_janela_e_volta_depois_dela()
+    {
+        ProdutoCritico(Guid.NewGuid());
+        var gerador = CriarGerador();
+        await gerador.ExecutarAsync(_empresaId);
+        _gravadas.ForEach(n => n.MarcarComoLida());
+
+        _relogio.Advance(TimeSpan.FromDays(3));
+        var dentroDaJanela = await gerador.ExecutarAsync(_empresaId);
+        _relogio.Advance(TimeSpan.FromDays(5)); // 8 dias depois do alerta lido
+        var depoisDaJanela = await gerador.ExecutarAsync(_empresaId);
+
+        dentroDaJanela.Criados.Should().Be(0, "lido há 3 dias, a condição é a mesma");
+        depoisDaJanela.Criados.Should().Be(2, "passou a janela e a condição segue: lembra a equipe de novo");
+        depoisDaJanela.Expurgados.Should().Be(2, "os lidos que passaram da janela saem na mesma rodada");
+        _gravadas.Should().HaveCount(2).And.OnlyContain(n => !n.Lida);
+    }
+
+    [Fact]
+    public async Task Condicao_resolvida_tira_o_alerta_do_sino_e_se_voltar_gera_um_novo()
     {
         var produtoId = Guid.NewGuid();
         ProdutoCritico(produtoId);
-        _gravadas.Add(Notificacao.Criar(_empresaId, TipoAlertaEstoque.EstoqueCritico, "Estoque Crítico", "ja avisado", SeveridadeNotificacao.Alta, produtoId));
-        _gravadas[0].CriadaEm = Agora.UtcDateTime.AddHours(-2);
+        var gerador = CriarGerador();
+        await gerador.ExecutarAsync(_empresaId);
+        var primeiroId = _gravadas.Single(n => n.TipoAlerta == TipoAlertaEstoque.EstoqueCritico).Id;
+
+        SemProdutoCritico(); // repuseram o produto
+        _relogio.Advance(TimeSpan.FromDays(1));
+        var resolvida = await gerador.ExecutarAsync(_empresaId);
+
+        resolvida.Resolvidos.Should().Be(2);
+        resolvida.Criados.Should().Be(0);
+        _gravadas.Should().BeEmpty("a condição acabou: o aviso não fica velho no sino");
+
+        ProdutoCritico(produtoId); // acabou de novo, dentro da janela de 7 dias
+        _relogio.Advance(TimeSpan.FromDays(1));
+        var voltou = await gerador.ExecutarAsync(_empresaId);
+
+        voltou.Criados.Should().Be(2, "condição nova, alerta novo");
+        _gravadas.Single(n => n.TipoAlerta == TipoAlertaEstoque.EstoqueCritico).Id.Should().NotBe(primeiroId);
+    }
+
+    [Fact]
+    public async Task Pedido_recebido_e_evento_nao_condicao_e_nao_some_quando_a_hora_passa()
+    {
+        var pedidoId = Guid.NewGuid();
+        _pedidos.GetPedidosRecebidosNoPeriodoAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>()).Returns(new[]
+        {
+            new PedidoFornecedor { Id = pedidoId, EmpresaId = _empresaId, DataRecebimento = Agora.UtcDateTime, Status = StatusPedidoFornecedor.Recebido }
+        });
+        var gerador = CriarGerador();
+        await gerador.ExecutarAsync(_empresaId);
+
+        _pedidos.GetPedidosRecebidosNoPeriodoAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>()).Returns(Array.Empty<PedidoFornecedor>());
+        _relogio.Advance(TimeSpan.FromHours(2));
+        var depois = await gerador.ExecutarAsync(_empresaId);
+
+        depois.Resolvidos.Should().Be(0);
+        _gravadas.Should().ContainSingle(n => n.TipoAlerta == TipoAlertaEstoque.PedidoRecebido && n.ReferenciaId == pedidoId);
+    }
+
+    [Fact]
+    public async Task Retencao_apaga_so_o_tipo_estoque_da_empresa_com_os_limites_configurados()
+    {
+        _opcoes.DiasSemRepetir = 5;
+        _opcoes.RetencaoDias = 20;
+
+        await CriarGerador().ExecutarAsync(_empresaId);
+
+        await _sino.Received(1).ExpurgarAlertasAutomaticosAsync(
+            _empresaId,
+            Arg.Is<IReadOnlyCollection<TipoAlertaEstoque>>(t => t.SequenceEqual(GeradorNotificacoesAutomaticas.TiposAutomaticos)),
+            Agora.UtcDateTime.AddDays(-5),
+            Agora.UtcDateTime.AddDays(-20),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Le_os_alertas_vigentes_numa_consulta_so_por_empresa_e_nao_uma_por_item()
+    {
+        var lotes = Enumerable.Range(0, 50).Select(i => Lote(diasParaVencer: 1 + i % 5)).ToArray();
+        _estoque.GetProximoVencimentoAsync(_empresaId, Arg.Any<int>(), 1, 100, _lojaId, true).Returns((lotes, lotes.Length));
 
         var resultado = await CriarGerador().ExecutarAsync(_empresaId);
 
-        resultado.Criados.Should().Be(1);
-        _gravadas.Where(n => n.TipoAlerta == TipoAlertaEstoque.EstoqueCritico).Should().HaveCount(1);
-        _gravadas.Should().Contain(n => n.TipoAlerta == TipoAlertaEstoque.ReposicaoSugerida);
+        resultado.Criados.Should().Be(50);
+        await _sino.Received(1).GetAlertasAutomaticosAsync(
+            _empresaId, Arg.Any<IReadOnlyCollection<TipoAlertaEstoque>>(), Agora.UtcDateTime.AddDays(-7), Arg.Any<CancellationToken>());
+        await _estoque.Received(1).GetProximoVencimentoAsync(_empresaId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), _lojaId, true);
     }
 
     [Fact]

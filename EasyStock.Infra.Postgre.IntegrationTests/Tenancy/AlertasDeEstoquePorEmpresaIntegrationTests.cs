@@ -10,6 +10,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -92,6 +93,120 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
         var depois = await LoteAsync(a.Empresa.Id, a.Lote.Id);
         depois.VelocidadeSaidaDiaria.Should().Be(2m);
         depois.AlteradoEm.Should().Be(alteradoEm, "velocidade igual não grava de novo");
+    }
+
+    /// <summary>
+    /// #2016, deduplicação por condição: dois ciclos em dias seguidos com a mesma condição geram UM alerta (o sino não
+    /// recebe o mesmo aviso todo dia). Resolvida a condição, o alerta sai; se ela voltar, nasce um novo, mesmo dentro dos 7
+    /// dias da janela.
+    /// </summary>
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Condicao_que_persiste_gera_um_alerta_em_dias_seguidos_e_resolvida_e_voltada_gera_outro(bool rls)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var c = await SemearAsync("Dedup por condição");
+        var relogio = new RelogioDeTeste(DateTimeOffset.UtcNow);
+        await using var provider = BuildProvider(rls, relogio);
+        var analisador = new AnalisadorEstoqueBackgroundService(
+            provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<AnalisadorEstoqueBackgroundService>.Instance);
+        async Task<List<Notificacao>> Criticos() => (await NotificacoesAsync(c.Empresa.Id))
+            .Where(n => n.TipoAlerta == TipoAlertaEstoque.EstoqueCritico && n.ReferenciaId == c.Critico.Id).ToList();
+
+        await analisador.RodadaAsync(CancellationToken.None);
+        var primeiro = (await Criticos()).Should().ContainSingle().Subject;
+
+        relogio.Avancar(TimeSpan.FromDays(1));
+        await analisador.RodadaAsync(CancellationToken.None);
+
+        (await Criticos()).Should().ContainSingle().Which.Id.Should().Be(primeiro.Id, "mesma condição no dia seguinte: o mesmo alerta, não outro");
+        (await NotificacoesAsync(c.Empresa.Id)).Count(n => n.TipoAlerta == TipoAlertaEstoque.ReposicaoSugerida && n.ReferenciaId == c.Critico.Id)
+            .Should().Be(1);
+
+        // Repuseram o produto: a condição acabou e o aviso sai do sino.
+        await DefinirSaldoAsync(c.Empresa.Id, c.AVencer.Id, 100);
+        relogio.Avancar(TimeSpan.FromDays(1));
+        await analisador.RodadaAsync(CancellationToken.None);
+
+        (await Criticos()).Should().BeEmpty("a condição foi resolvida");
+
+        // Acabou de novo, dois dias depois do primeiro alerta (dentro da janela de 7 dias): alerta novo.
+        await DefinirSaldoAsync(c.Empresa.Id, c.AVencer.Id, 1);
+        relogio.Avancar(TimeSpan.FromDays(1));
+        await analisador.RodadaAsync(CancellationToken.None);
+
+        (await Criticos()).Should().ContainSingle().Which.Id.Should().NotBe(primeiro.Id, "condição nova, alerta novo");
+    }
+
+    /// <summary>
+    /// #2016, retenção: na rodada da empresa saem os alertas automáticos de estoque lidos que passaram da janela de
+    /// repetição e os de qualquer estado com mais de 30 dias. Não saem os que ainda seguram a repetição, os que têm
+    /// destinatário nem os de outra empresa.
+    /// </summary>
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Retencao_expurga_so_o_alerta_automatico_vencido_da_empresa_da_rodada(bool rls)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var a = await SemearAsync("Retenção A");
+        var b = await SemearAsync("Retenção B");
+        var agora = DateTime.UtcNow;
+        var naoLidoMuitoAntigo = await GravarAlertaAsync(a.Empresa.Id, agora.AddDays(-40), lida: false);
+        var lidoForaDaJanela = await GravarAlertaAsync(a.Empresa.Id, agora.AddDays(-10), lida: true);
+        var lidoRecente = await GravarAlertaAsync(a.Empresa.Id, agora.AddDays(-2), lida: true);
+        var naoLidoComTempo = await GravarAlertaAsync(a.Empresa.Id, agora.AddDays(-10), lida: false);
+        var comDestinatario = await GravarAlertaAsync(a.Empresa.Id, agora.AddDays(-60), lida: true, usuarioId: Guid.NewGuid());
+        var deOutraEmpresa = await GravarAlertaAsync(b.Empresa.Id, agora.AddDays(-60), lida: true);
+        await using var provider = BuildProvider(rls);
+
+        // A rodada de UMA empresa, como o analisador a faz: escopo próprio com o tenant ligado.
+        await using (var escopo = provider.CreateAsyncScope())
+        {
+            escopo.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(a.Empresa.Id);
+            var resultado = await escopo.ServiceProvider.GetRequiredService<GeradorNotificacoesAutomaticas>().ExecutarAsync(a.Empresa.Id);
+            resultado.Expurgados.Should().Be(2);
+        }
+
+        var restantesA = (await NotificacoesAsync(a.Empresa.Id)).Select(n => n.Id).ToList();
+        restantesA.Should().NotContain([naoLidoMuitoAntigo, lidoForaDaJanela], "passaram da retenção");
+        restantesA.Should().Contain([lidoRecente, naoLidoComTempo, comDestinatario],
+            "ainda seguram a repetição ou não são alerta automático");
+        (await NotificacoesAsync(b.Empresa.Id)).Select(n => n.Id).Should().Contain(deOutraEmpresa, "a rodada de A não toca em B");
+    }
+
+    private sealed class RelogioDeTeste(DateTimeOffset inicio) : TimeProvider
+    {
+        private DateTimeOffset _agora = inicio;
+        public override DateTimeOffset GetUtcNow() => _agora;
+        public void Avancar(TimeSpan delta) => _agora += delta;
+    }
+
+    /// <summary>Alerta automático de pedido recebido (evento: a resolução não mexe nele), com a idade e o estado pedidos.</summary>
+    private async Task<Guid> GravarAlertaAsync(Guid empresaId, DateTime criadaEm, bool lida, Guid? usuarioId = null)
+    {
+        var alerta = Notificacao.Criar(empresaId, TipoAlertaEstoque.PedidoRecebido, "Pedido Recebido", "Pedido confirmado.",
+            SeveridadeNotificacao.Informativa, Guid.NewGuid());
+        alerta.CriadaEm = criadaEm;
+        alerta.UsuarioId = usuarioId;
+        if (lida)
+            alerta.MarcarComoLida();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresaId);
+        db.Notificacoes.Add(alerta);
+        await db.SaveChangesAsync();
+        return alerta.Id;
+    }
+
+    private async Task DefinirSaldoAsync(Guid empresaId, Guid loteId, decimal saldo)
+    {
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresaId);
+        var lote = await db.ItensEstoque.SingleAsync(i => i.Id == loteId);
+        lote.QuantidadeAtual = Quantidade.From(saldo);
+        await db.SaveChangesAsync();
     }
 
     private async Task<Cenario> SemearAsync(string nome)
@@ -179,7 +294,7 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
     private async Task<StatusItemEstoque> StatusAsync(Guid empresaId, Guid loteId) => (await LoteAsync(empresaId, loteId)).Status;
 
     /// <summary>DI de produção. Com <paramref name="rls"/>, o login do banco é sujeito a RLS, como o da aplicação.</summary>
-    private ServiceProvider BuildProvider(bool rls)
+    private ServiceProvider BuildProvider(bool rls, TimeProvider? relogio = null)
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection([]).Build();
         var services = new ServiceCollection();
@@ -191,6 +306,8 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
         services.AddSingleton(Substitute.For<ICacheService>());
         services.AddEasyStockPostgreInfrastructure(rls ? fixture.RlsClientConnectionString : fixture.ConnectionString, config);
         services.AddEasyStockApplication();
+        if (relogio is not null)
+            services.Replace(ServiceDescriptor.Singleton(relogio));
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         return services.BuildServiceProvider();
     }

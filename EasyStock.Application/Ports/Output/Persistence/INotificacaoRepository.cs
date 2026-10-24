@@ -16,18 +16,33 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId);
 
         /// <summary>
-        /// Os alertas já criados na janela UTC [<paramref name="inicioUtc"/>, <paramref name="fimUtc"/>) da empresa, lidos
-        /// ou não, como (tipo, referência). Uma consulta por rodada no lugar de uma por item (#2016): quem gera alerta
-        /// por dia consulta o conjunto e acrescenta o que criar.
+        /// Os alertas AUTOMÁTICOS de estoque da empresa (sem destinatário e sem mensagem do outbox: os avisos de caixa,
+        /// de convite etc. que reusam o enum ficam de fora) que ainda valem para a deduplicação: não lidos, de qualquer
+        /// idade, ou criados a partir de <paramref name="desdeUtc"/>. Uma consulta por rodada, não uma por item (#2016).
         /// </summary>
-        Task<HashSet<(TipoAlertaEstoque Tipo, Guid? ReferenciaId)>> GetAlertasDoPeriodoAsync(
-            Guid empresaId, DateTime inicioUtc, DateTime fimUtc, CancellationToken ct = default);
+        Task<IReadOnlyList<AlertaAutomatico>> GetAlertasAutomaticosAsync(
+            Guid empresaId, IReadOnlyCollection<TipoAlertaEstoque> tipos, DateTime desdeUtc, CancellationToken ct = default);
+
+        /// <summary>Apaga alertas automáticos da empresa por id (condição resolvida). Devolve quantos saíram.</summary>
+        Task<int> RemoverAlertasAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
+
+        /// <summary>
+        /// Retenção (#2016): apaga os alertas automáticos de estoque da empresa que já cumpriram o papel, só dos
+        /// <paramref name="tipos"/> dados: lidos e criados antes de <paramref name="lidosAntesDeUtc"/>, ou de qualquer
+        /// estado criados antes de <paramref name="qualquerAntesDeUtc"/>. Devolve quantos saíram.
+        /// </summary>
+        Task<int> ExpurgarAlertasAutomaticosAsync(
+            Guid empresaId, IReadOnlyCollection<TipoAlertaEstoque> tipos, DateTime lidosAntesDeUtc, DateTime qualquerAntesDeUtc,
+            CancellationToken ct = default);
         Task<int> CountNaoLidasAsync(Guid empresaId, Guid? usuarioId = null);
         Task AddAsync(Notificacao notificacao);
         Task UpdateAsync(Notificacao notificacao);
         Task MarcarTodasComoLidasAsync(Guid empresaId, Guid? usuarioId = null);
         Task DeleteAsync(Guid empresaId, Guid id);
     }
+
+    /// <summary>Alerta automático já gravado, no mínimo que a deduplicação precisa.</summary>
+    public sealed record AlertaAutomatico(Guid Id, TipoAlertaEstoque Tipo, Guid? ReferenciaId, bool Lida, DateTime CriadaEm);
 
     public record NotificacaoResumo
     {

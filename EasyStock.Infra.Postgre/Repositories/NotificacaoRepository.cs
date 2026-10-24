@@ -108,17 +108,30 @@ namespace EasyStock.Infra.Postgre.Repositories
                 n.ReferenciaId == referenciaId &&
                 !n.Lida);
 
-        public async Task<HashSet<(TipoAlertaEstoque Tipo, Guid? ReferenciaId)>> GetAlertasDoPeriodoAsync(
-            Guid empresaId, DateTime inicioUtc, DateTime fimUtc, CancellationToken ct = default)
-        {
-            var chaves = await dbContext.Notificacoes
+        public async Task<IReadOnlyList<AlertaAutomatico>> GetAlertasAutomaticosAsync(
+            Guid empresaId, IReadOnlyCollection<TipoAlertaEstoque> tipos, DateTime desdeUtc, CancellationToken ct = default) =>
+            await dbContext.Notificacoes
                 .AsNoTracking()
-                .Where(n => n.EmpresaId == empresaId && n.CriadaEm >= inicioUtc && n.CriadaEm < fimUtc)
-                .Select(n => new { n.TipoAlerta, n.ReferenciaId })
-                .Distinct()
+                .Where(n => n.EmpresaId == empresaId && n.UsuarioId == null && n.OutboxMensagemId == null
+                    && tipos.Contains(n.TipoAlerta) && (!n.Lida || n.CriadaEm >= desdeUtc))
+                .Select(n => new AlertaAutomatico(n.Id, n.TipoAlerta, n.ReferenciaId, n.Lida, n.CriadaEm))
                 .ToListAsync(ct);
-            return chaves.Select(c => (c.TipoAlerta, c.ReferenciaId)).ToHashSet();
-        }
+
+        public Task<int> RemoverAlertasAsync(Guid empresaId, IReadOnlyCollection<Guid> ids, CancellationToken ct = default) =>
+            ids.Count == 0
+                ? Task.FromResult(0)
+                : dbContext.Notificacoes
+                    .Where(n => n.EmpresaId == empresaId && n.UsuarioId == null && n.OutboxMensagemId == null && ids.Contains(n.Id))
+                    .ExecuteDeleteAsync(ct);
+
+        public Task<int> ExpurgarAlertasAutomaticosAsync(
+            Guid empresaId, IReadOnlyCollection<TipoAlertaEstoque> tipos, DateTime lidosAntesDeUtc, DateTime qualquerAntesDeUtc,
+            CancellationToken ct = default) =>
+            dbContext.Notificacoes
+                .Where(n => n.EmpresaId == empresaId && n.UsuarioId == null && n.OutboxMensagemId == null
+                    && tipos.Contains(n.TipoAlerta)
+                    && ((n.Lida && n.CriadaEm < lidosAntesDeUtc) || n.CriadaEm < qualquerAntesDeUtc))
+                .ExecuteDeleteAsync(ct);
 
         public Task<int> CountNaoLidasAsync(Guid empresaId, Guid? usuarioId = null) =>
             dbContext.Notificacoes.CountAsync(n => n.EmpresaId == empresaId && !n.Lida

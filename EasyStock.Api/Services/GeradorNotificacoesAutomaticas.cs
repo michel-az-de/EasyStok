@@ -1,11 +1,13 @@
+using EasyStock.Api.Configuration;
 using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Analytics.Reposicao;
 using EasyStock.Domain.Reposicao;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Api.Services;
 
 /// <summary>Quanto uma rodada de uma empresa produziu (#2016).</summary>
-public sealed record ResultadoAlertasEstoque(int Criados, int LotesMarcadosVencidos);
+public sealed record ResultadoAlertasEstoque(int Criados, int LotesMarcadosVencidos, int Resolvidos, int Expurgados);
 
 /// <summary>
 /// Alertas de estoque de UMA empresa para o sino da equipe (<c>Notificacao</c>, sem destinatário = toda a equipe):
@@ -20,8 +22,17 @@ public sealed record ResultadoAlertasEstoque(int Criados, int LotesMarcadosVenci
 /// </para>
 ///
 /// <para>
-/// Sem repetir: o alerta é um por (tipo, item) por dia de Brasília. As chaves do dia vêm numa consulta só e o que a
-/// rodada cria entra no conjunto; a rodada seguinte, no mesmo dia, não cria de novo. Um commit por empresa.
+/// <b>Alerta por condição, não por dia.</b> A rodada primeiro levanta as condições que valem agora (o conjunto de
+/// (tipo, item)); depois, numa só consulta, lê os alertas automáticos que ainda contam: os não lidos (qualquer idade) e os
+/// criados nos últimos <see cref="AlertasEstoqueOptions.DiasSemRepetir"/> dias. Só nasce alerta para condição sem alerta
+/// vigente. Alerta cuja condição deixou de valer (lote vendido, produto reposto) sai do sino; se a condição voltar, nasce
+/// um novo. <c>PedidoRecebido</c> é evento, não condição: só segue a janela.
+/// </para>
+///
+/// <para>
+/// <b>Retenção.</b> Na mesma rodada, e só entre os alertas automáticos de estoque da empresa (os avisos com destinatário ou
+/// com mensagem do outbox, como o de caixa, ficam de fora), saem os lidos que passaram da janela de repetição e os de
+/// qualquer estado com mais de <see cref="AlertasEstoqueOptions.RetencaoDias"/> dias. Um commit por empresa.
 /// </para>
 /// </summary>
 public sealed class GeradorNotificacoesAutomaticas(
@@ -33,12 +44,24 @@ public sealed class GeradorNotificacoesAutomaticas(
     IPedidoFornecedorRepository pedidoFornecedorRepository,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
+    IOptions<AlertasEstoqueOptions> opcoes,
     ILogger<GeradorNotificacoesAutomaticas> logger)
 {
     private const int LimiteDeLotesMarcadosPorRodada = 500;
 
-    private HashSet<(TipoAlertaEstoque Tipo, Guid? ReferenciaId)> alertasDoDia = [];
-    private int criados;
+    /// <summary>Tipos que este gerador cria. A retenção e a resolução só tocam nestes.</summary>
+    public static readonly IReadOnlyList<TipoAlertaEstoque> TiposAutomaticos =
+    [
+        TipoAlertaEstoque.EstoqueCritico,
+        TipoAlertaEstoque.ProdutoParado,
+        TipoAlertaEstoque.ValidadeProxima,
+        TipoAlertaEstoque.ReposicaoSugerida,
+        TipoAlertaEstoque.PedidoAtrasado,
+        TipoAlertaEstoque.PedidoRecebido,
+        TipoAlertaEstoque.ProdutoVencido,
+    ];
+
+    private readonly Dictionary<(TipoAlertaEstoque Tipo, Guid? ReferenciaId), Notificacao> candidatos = [];
 
     public async Task<ResultadoAlertasEstoque> ExecutarAsync(Guid empresaId, CancellationToken ct = default)
     {
@@ -47,18 +70,45 @@ public sealed class GeradorNotificacoesAutomaticas(
 
         var agora = relogio.GetUtcNow().UtcDateTime;
         var hojeBrasilia = HorarioBrasil.DataOperacional(agora);
-        var (inicioDoDia, fimDoDia) = HorarioBrasil.JanelaDiaUtc(hojeBrasilia);
-        alertasDoDia = await notificacaoRepository.GetAlertasDoPeriodoAsync(empresaId, inicioDoDia, fimDoDia, ct);
-        criados = 0;
+        var diasSemRepetir = Math.Max(1, opcoes.Value.DiasSemRepetir);
+        var retencaoDias = Math.Max(diasSemRepetir, opcoes.Value.RetencaoDias);
+        var inicioDaJanela = agora.AddDays(-diasSemRepetir);
+
+        var expurgados = await notificacaoRepository.ExpurgarAlertasAutomaticosAsync(
+            empresaId, TiposAutomaticos, lidosAntesDeUtc: inicioDaJanela, qualquerAntesDeUtc: agora.AddDays(-retencaoDias), ct);
 
         var marcados = await MarcarLotesVencidosAsync(empresaId, agora, hojeBrasilia, ct);
-        await ProcessarEmpresaAsync(empresaId, agora, hojeBrasilia, ct);
+
+        candidatos.Clear();
+        await LevantarCondicoesAsync(empresaId, agora, hojeBrasilia, ct);
+        // Cancelamento no meio do levantamento deixaria o conjunto incompleto e a resolução apagaria alerta vigente.
+        ct.ThrowIfCancellationRequested();
+
+        var existentes = await notificacaoRepository.GetAlertasAutomaticosAsync(empresaId, TiposAutomaticos, inicioDaJanela, ct);
+
+        // Condição que deixou de valer: o alerta sai (e, se voltar, nasce outro). PedidoRecebido é evento, não condição.
+        var resolvidos = existentes
+            .Where(e => e.Tipo != TipoAlertaEstoque.PedidoRecebido && !candidatos.ContainsKey((e.Tipo, e.ReferenciaId)))
+            .ToList();
+        var removidos = await notificacaoRepository.RemoverAlertasAsync(empresaId, resolvidos.Select(e => e.Id).ToList(), ct);
+
+        var vigentes = existentes.Except(resolvidos).Select(e => (e.Tipo, e.ReferenciaId)).ToHashSet();
+        var criados = 0;
+        foreach (var (chave, alerta) in candidatos)
+        {
+            if (vigentes.Contains(chave))
+                continue;
+
+            await notificacaoRepository.AddAsync(alerta);
+            criados++;
+        }
+
         await unitOfWork.CommitAsync();
 
         logger.LogInformation(
-            "Alertas de estoque da empresa {EmpresaId}: {Criados} novo(s), {Vencidos} lote(s) marcado(s) como vencido.",
-            empresaId, criados, marcados);
-        return new ResultadoAlertasEstoque(criados, marcados);
+            "Alertas de estoque da empresa {EmpresaId}: {Criados} novo(s), {Resolvidos} resolvido(s), {Expurgados} expurgado(s), {Vencidos} lote(s) marcado(s) como vencido.",
+            empresaId, criados, removidos, expurgados, marcados);
+        return new ResultadoAlertasEstoque(criados, marcados, removidos, expurgados);
     }
 
     /// <summary>
@@ -84,7 +134,7 @@ public sealed class GeradorNotificacoesAutomaticas(
         return marcados;
     }
 
-    private async Task ProcessarEmpresaAsync(Guid empresaId, DateTime hoje, DateOnly hojeBrasilia, CancellationToken ct)
+    private async Task LevantarCondicoesAsync(Guid empresaId, DateTime hoje, DateOnly hojeBrasilia, CancellationToken ct)
     {
         var lojas = (await lojaRepository.GetByEmpresaAsync(empresaId)).Where(x => x.Ativa).ToList();
 
@@ -109,7 +159,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                     var severidade = item.Estado == EstadoReposicao.Esgotado
                         ? SeveridadeNotificacao.Critica
                         : SeveridadeNotificacao.Alta;
-                    await CriarSeNaoExisteNoDiaAsync(
+                    Candidatar(
                         empresaId,
                         TipoAlertaEstoque.EstoqueCritico,
                         "Estoque Crítico",
@@ -121,7 +171,7 @@ public sealed class GeradorNotificacoesAutomaticas(
 
             if (configuracaoLoja.NotificarValidade)
             {
-                // Itens proximos do vencimento (ainda nao vencidos)
+                // Itens proximos do vencimento e vencidos, só com saldo
                 await ProcessarPaginadoAsync(
                     page => estoqueRepository.GetProximoVencimentoAsync(empresaId, configuracaoLoja.DiasAlertaValidade, page, 100, loja.Id, apenasComSaldo: true),
                     item =>
@@ -131,13 +181,14 @@ public sealed class GeradorNotificacoesAutomaticas(
                         {
                             // Ja vencido — gera ProdutoVencido
                             var codigoV = item.CodigoInterno ?? item.Id.ToString()[..8];
-                            return CriarSeNaoExisteNoDiaAsync(
+                            Candidatar(
                                 empresaId,
                                 TipoAlertaEstoque.ProdutoVencido,
                                 "Produto Vencido",
                                 $"{codigoV} venceu há {Math.Abs(diasRestantes)} dia(s). Retire do estoque ou descarte conforme procedimento.",
                                 SeveridadeNotificacao.Critica,
                                 item.Id);
+                            return;
                         }
 
                         var severidade = diasRestantes <= 3 ? SeveridadeNotificacao.Alta : SeveridadeNotificacao.Media;
@@ -149,7 +200,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                             1 => "vence amanhã",
                             _ => $"vence em {diasRestantes} dia(s)"
                         };
-                        return CriarSeNaoExisteNoDiaAsync(
+                        Candidatar(
                             empresaId,
                             TipoAlertaEstoque.ValidadeProxima,
                             "Validade Próxima",
@@ -168,7 +219,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                     {
                         var dias = item.DiasSemMovimentacao > 0 ? item.DiasSemMovimentacao : configuracaoLoja.DiasAlertaParado;
                         var codigo = item.CodigoInterno ?? item.Id.ToString()[..8];
-                        return CriarSeNaoExisteNoDiaAsync(
+                        Candidatar(
                             empresaId,
                             TipoAlertaEstoque.ProdutoParado,
                             "Produto Parado",
@@ -185,7 +236,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                 {
                     var previsao = item.DiasAteRuptura?.ToString() ?? "indefinida";
                     var sugestao = item.QuantidadeSugerida.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-                    await CriarSeNaoExisteNoDiaAsync(
+                    Candidatar(
                         empresaId,
                         TipoAlertaEstoque.ReposicaoSugerida,
                         "Reposição Sugerida",
@@ -200,7 +251,7 @@ public sealed class GeradorNotificacoesAutomaticas(
         foreach (var pedido in pedidosAtrasados)
         {
             var previsao = pedido.PrevisaoEntrega?.ToString("dd/MM/yyyy") ?? "não informada";
-            await CriarSeNaoExisteNoDiaAsync(
+            Candidatar(
                 empresaId,
                 TipoAlertaEstoque.PedidoAtrasado,
                 "Pedido Atrasado",
@@ -212,7 +263,7 @@ public sealed class GeradorNotificacoesAutomaticas(
         var pedidosRecebidos = await pedidoFornecedorRepository.GetPedidosRecebidosNoPeriodoAsync(empresaId, hoje.AddHours(-1), hoje);
         foreach (var pedido in pedidosRecebidos)
         {
-            await CriarSeNaoExisteNoDiaAsync(
+            Candidatar(
                 empresaId,
                 TipoAlertaEstoque.PedidoRecebido,
                 "Pedido Recebido",
@@ -228,26 +279,19 @@ public sealed class GeradorNotificacoesAutomaticas(
         return qty > 0 ? $"Estoque atual: {qty} un." : "Estoque zerado.";
     }
 
-    private async Task CriarSeNaoExisteNoDiaAsync(
+    /// <summary>Registra a condição que vale agora. Fica a primeira do (tipo, item) quando a mesma vem de duas lojas.</summary>
+    private void Candidatar(
         Guid empresaId,
         TipoAlertaEstoque tipo,
         string titulo,
         string mensagem,
         SeveridadeNotificacao severidade,
-        Guid? referenciaId)
-    {
-        // Add devolve false quando a chave do dia já está no conjunto (criada antes ou nesta rodada).
-        if (!alertasDoDia.Add((tipo, referenciaId)))
-            return;
-
-        await notificacaoRepository.AddAsync(
-            Notificacao.Criar(empresaId, tipo, titulo, mensagem, severidade, referenciaId));
-        criados++;
-    }
+        Guid? referenciaId) =>
+        candidatos.TryAdd((tipo, referenciaId), Notificacao.Criar(empresaId, tipo, titulo, mensagem, severidade, referenciaId));
 
     private static async Task ProcessarPaginadoAsync(
         Func<int, Task<(IEnumerable<ItemEstoque> Items, int TotalCount)>> carregarPagina,
-        Func<ItemEstoque, Task> processarItem,
+        Action<ItemEstoque> processarItem,
         CancellationToken ct)
     {
         const int pageSize = 100;
@@ -263,7 +307,7 @@ public sealed class GeradorNotificacoesAutomaticas(
                 if (ct.IsCancellationRequested)
                     return;
 
-                await processarItem(item);
+                processarItem(item);
             }
 
             if (paginaAtual.Count == 0 || page * pageSize >= totalCount)
