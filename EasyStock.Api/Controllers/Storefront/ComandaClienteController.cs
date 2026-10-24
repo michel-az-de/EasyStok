@@ -45,23 +45,10 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         EnvioComandaCliente resultado;
         try { resultado = await comanda.EnviarAsync(token, body.Revisao, ct); }
         catch (CepSemCoberturaException) { return await comanda.EncaminharEntregaAsync(token, body.Revisao, ct); }
-        if (resultado.Situacao == "alteracao_aguardando_confirmacao")
-        {
-            var estado = await comanda.ObterAsync(token, ct);
-            // Só acréscimos preservando pratos e observações passam direto. Trocas têm conferência humana.
-            if (estado.Pedido is { } pedido && resultado.Total >= pedido.Total
-                && (estado.Rascunho.Observacoes ?? "") == (pedido.Observacoes ?? "")
-                && pedido.Itens.GroupBy(a => (a.CardapioItemId, a.VariacaoId)).All(g => estado.Selecao.Any(n => n.CardapioItemId == g.Key.CardapioItemId
-                    && n.VariacaoId == g.Key.VariacaoId && n.Qtd >= g.Sum(a => a.Quantidade) && g.All(a => (n.Observacao ?? "") == (a.Observacao ?? "")))))
-            {
-                await using var escopo = escopos.CreateAsyncScope();
-                var acesso = await escopo.ServiceProvider.GetRequiredService<ComandaClienteUseCase>().AcessoAsync(token, ct);
-                resultado = await escopo.ServiceProvider.GetRequiredService<ConfirmarAlteracaoComandaUseCase>().ExecuteAsync(new(acesso.EmpresaId,
-                    acesso.ConversaId, estado.LinkId, true, Guid.Empty, "Cliente pelo link",
-                    NivelAcesso.Operador, Automatico: true), ct);
-            }
-        }
-        return resultado;
+        // A regra de "só acréscimo passa direto" é do use case (ConfirmarAlteracaoComandaUseCase), não deste controller.
+        if (resultado.Situacao != ConfirmarAlteracaoComandaUseCase.SituacaoAguardandoConfirmacao) return resultado;
+        await using var escopo = escopos.CreateAsyncScope();
+        return await escopo.ServiceProvider.GetRequiredService<ConfirmarAlteracaoComandaUseCase>().TentarAutomaticoAsync(token, resultado, ct);
     });
 
     [HttpPost("nova-edicao")]
