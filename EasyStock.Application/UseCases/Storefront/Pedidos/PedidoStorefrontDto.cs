@@ -22,7 +22,7 @@
 /// <param name="InitPointUrl">Link do Mercado Pago da cobrança online pendente e não vencida, para retomar o pagamento (#1865). Null sem cobrança a pagar e sempre null na listagem.</param>
 /// <param name="MotivoCancelamento">Mensagem ao cliente quando status == Cancelado/Recusado. Null caso contrário.</param>
 /// <param name="Pagamento">Pagamento confirmado (método + timestamp). Null se ainda sem pagamento.</param>
-/// <param name="Historico">Mapa stepKey → timestamp (pagamento/aprovacao/preparo/entrega/entregue) derivado dos PedidoEvento. Null se sem eventos relevantes.</param>
+/// <param name="Historico">Mapa stepKey → timestamp (pagamento/aprovacao/preparo/finalizando/entrega/entregue) derivado dos PedidoEvento; finalizando é o pronto e entrega é o saiu_para_entrega (#1927). Null se sem eventos relevantes.</param>
 /// <param name="PagoCentavos">Soma dos pagamentos do pedido (#1865): com o sinal da encomenda, o restante é <c>TotalCentavos - PagoCentavos</c>.</param>
 public sealed record PedidoStorefrontDto(
     Guid PedidoId,

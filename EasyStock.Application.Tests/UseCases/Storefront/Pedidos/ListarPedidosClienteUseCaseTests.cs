@@ -618,8 +618,37 @@ public class ListarPedidosClienteUseCaseTests
         hist.Should().NotBeNull();
         hist!["pagamento"].Should().Be(t1);
         hist["aprovacao"].Should().Be(t2);
-        hist["entrega"].Should().Be(t3);
+        hist["finalizando"].Should().Be(t3);
         hist.Should().NotContainKey("preparo");   // sem evento de preparo
+        hist.Should().NotContainKey("entrega");   // pronto ainda não saiu (#1927)
+    }
+
+    [Fact]
+    public async Task Historico_separa_finalizando_saida_e_entrega()
+    {
+        // #1927: pronto é o "Finalizando" do site; "Saiu para entrega" é o saiu_para_entrega.
+        var pedido = PedidoStub(status: StatusPedidoMapper.Entregue);
+        var preparando = new DateTime(2026, 10, 21, 10, 0, 0, DateTimeKind.Utc);
+        var pronto = new DateTime(2026, 10, 21, 11, 0, 0, DateTimeKind.Utc);
+        var saiu = new DateTime(2026, 10, 21, 11, 40, 0, DateTimeKind.Utc);
+        var entregue = new DateTime(2026, 10, 21, 12, 15, 0, DateTimeKind.Utc);
+        pedido.Eventos = new[]
+        {
+            new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "status_changed", StatusNovo = StatusPedidoMapper.Preparando, OcorridoEm = preparando },
+            new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "status_changed", StatusNovo = StatusPedidoMapper.Pronto, OcorridoEm = pronto },
+            new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "status_changed", StatusNovo = StatusPedidoMapper.SaiuParaEntrega, OcorridoEm = saiu },
+            new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "status_changed", StatusNovo = StatusPedidoMapper.Entregue, OcorridoEm = entregue },
+        };
+        var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        var hist = result.Pedidos.Single().Historico;
+        hist.Should().NotBeNull();
+        hist!["preparo"].Should().Be(preparando);
+        hist["finalizando"].Should().Be(pronto);
+        hist["entrega"].Should().Be(saiu);
+        hist["entregue"].Should().Be(entregue);
     }
 
     [Fact]

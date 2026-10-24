@@ -244,7 +244,8 @@ public sealed class ListarPedidosClienteUseCase(
         StatusPedidoMapper.AprovadoBaba => "aprovacao",             // a Babá confirmou
         StatusPedidoMapper.Aguardando => "preparo",
         StatusPedidoMapper.Preparando => "preparo",
-        StatusPedidoMapper.Pronto => "entrega",                     // saiu para entrega
+        StatusPedidoMapper.Pronto => "finalizando",                 // o "Finalizando" do site (#1927)
+        StatusPedidoMapper.SaiuParaEntrega => "entrega",            // saiu para entrega
         StatusPedidoMapper.Entregue => "entregue",
         _ => null,
     };
