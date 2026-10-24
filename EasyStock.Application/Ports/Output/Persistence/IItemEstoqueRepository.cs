@@ -12,8 +12,27 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// </summary>
         Task<ItemEstoque?> GetByIdComLockAsync(Guid empresaId, Guid id);
         Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 100);
-        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20, Guid? lojaId = null);
-        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20, Guid? lojaId = null);
+        /// <param name="apenasComSaldo">
+        /// true (#2016) deixa de fora o lote zerado: quem alerta (sino) só quer o que ainda está na prateleira.
+        /// Os demais chamadores seguem no padrão (lista tudo).
+        /// </param>
+        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20, Guid? lojaId = null, bool apenasComSaldo = false);
+        /// <inheritdoc cref="GetProximoVencimentoAsync"/>
+        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20, Guid? lojaId = null, bool apenasComSaldo = false);
+
+        /// <summary>
+        /// Lotes RASTREADOS que já passaram da validade, ainda têm saldo e continuam com <c>Status</c> diferente de
+        /// <c>Vencido</c> (a coluna só muda quando alguém toca no lote; #2016). Fora Bloqueado e Descartado, que
+        /// têm destino próprio. A validade é data civil: <paramref name="hojeInstanteUtc"/> é
+        /// <c>HorarioBrasil.HojeInstanteUtc()</c>.
+        /// </summary>
+        Task<IReadOnlyList<ItemEstoque>> GetVencidosSemStatusAsync(Guid empresaId, DateTime hojeInstanteUtc, int limite, CancellationToken ct = default);
+
+        /// <summary>
+        /// Lotes com saldo da empresa, RASTREADOS e sem <c>Include</c>, em ordem estável (<c>Id</c>), paginados. Para o job
+        /// que recalcula a velocidade de saída (#2016): o rastreador grava só o que mudou, sem reescrever o produto.
+        /// </summary>
+        Task<IReadOnlyList<ItemEstoque>> GetLotesComSaldoRastreadosAsync(Guid empresaId, int page, int pageSize, CancellationToken ct = default);
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null);
 
         /// <summary>
