@@ -6,7 +6,7 @@ namespace EasyStock.Domain.Tests.Entities.Storefront;
 
 /// <summary>
 /// Testes dos helpers de item guarda-chuva em <see cref="CardapioItem"/> (ADR-0035):
-/// <c>TemVariacoes</c>, <c>PrecoAPartirDe</c>, <c>VariacaoPadrao</c>, <c>TemDisponibilidade</c>,
+/// <c>TemVariacoes</c>, <c>PrecoAPartirDe</c>, <c>VariacaoPadrao</c>,
 /// <c>DefinirVariacaoPadrao</c> e a resolução de <c>CategoriaEfetiva</c> por seção.
 /// </summary>
 public class CardapioItemVariacoesHelpersTests
@@ -27,7 +27,6 @@ public class CardapioItemVariacoesHelpersTests
         item.TemVariacoes().Should().BeFalse();
         item.VariacaoPadrao().Should().BeNull();
         item.PrecoAPartirDe().Should().Be(35m, "sem opções, usa PrecoEfetivo (legado)");
-        item.TemDisponibilidade().Should().BeTrue();
     }
 
     // ── Preço "a partir de" = mais barata DISPONÍVEL ──────────────────
@@ -71,7 +70,6 @@ public class CardapioItemVariacoesHelpersTests
 
         item.VariacaoPadrao()!.Rotulo.Should().Be("300g", "nenhuma disponível → cai p/ a mais barata absoluta");
         item.PrecoAPartirDe().Should().Be(28m);
-        item.TemDisponibilidade().Should().BeFalse("todas as opções esgotadas");
     }
 
     [Fact]

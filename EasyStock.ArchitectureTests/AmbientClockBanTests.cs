@@ -47,7 +47,7 @@ public class AmbientClockBanTests
     /// Debito pre-existente tolerado — cada fase do plano de correcao remove sua entrada.
     /// Caminhos relativos a raiz do repo, forward slash.
     ///
-    /// Fase B (validade): remove EasyStock.Domain/Specifications/ItemEstoqueProximoDoVencimentoSpecification.cs
+    /// Fase B (validade): FEITA (#2015) — ItemEstoqueProximoDoVencimentoSpecification saiu por falta de chamador.
     /// Fase D (fiscal):   FEITA (#930) — NfeCertificadoA1Service normaliza ValidoAte para UTC.
     /// Baixa prio:        remove EasyStock.Infra.Async/Reporting/Handlers/EstoquePosicaoAtualHandler.cs
     /// </summary>
