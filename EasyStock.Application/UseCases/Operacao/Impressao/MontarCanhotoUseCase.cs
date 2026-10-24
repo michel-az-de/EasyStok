@@ -50,7 +50,7 @@ public sealed class MontarCanhotoUseCase(
             : null;
 
         var grupos = pedido.Itens
-            .Where(EhProducao)
+            .Where(i => i.EhProduto)
             .OrderBy(i => i.CriadoEm)
             .GroupBy(i => string.IsNullOrWhiteSpace(i.LinhaSnapshot) ? LinhaOutros : i.LinhaSnapshot!)
             .OrderBy(g => OrdemDaLinha(g.Key))
@@ -76,9 +76,6 @@ public sealed class MontarCanhotoUseCase(
 
         return new CanhotoDto(cabecalho, grupos, Limpo(pedido.Observacoes), Rodape);
     }
-
-    private static bool EhProducao(PedidoItem i) =>
-        !string.IsNullOrWhiteSpace(i.LinhaSnapshot) || i.CardapioItemId is not null || i.ProdutoId is not null;
 
     private static int OrdemDaLinha(string linha)
     {

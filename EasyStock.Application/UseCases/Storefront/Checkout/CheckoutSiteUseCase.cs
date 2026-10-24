@@ -72,7 +72,7 @@ public sealed class CheckoutSiteUseCase(
         {
             var pedido = await pedidos.GetByIdComItensAsync(anterior.PedidoId, ct);
             if (pedido is null || pedido.EmpresaId != sessao.EmpresaId) throw new IdempotencyMismatchException();
-            var frete = pedido.Itens.FirstOrDefault(i => i.Nome.StartsWith("Entrega ", StringComparison.Ordinal))?.PrecoUnitario;
+            var frete = pedido.Itens.FirstOrDefault(i => i.EhLinhaDeFrete)?.PrecoUnitario;
             return new IniciarCheckoutGuestResult(pedido.Id, CodigoCurto.De(pedido.Id),
                 acompanhamento.Gerar(pedido.Id), frete, anterior.InitPointUrl == "sem-cobranca" ? null : anterior.InitPointUrl,
                 anterior.InitPointUrl == "sem-cobranca" ? 0 : anterior.ExpiresIn);

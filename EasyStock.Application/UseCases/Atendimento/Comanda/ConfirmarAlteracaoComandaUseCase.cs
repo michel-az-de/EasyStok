@@ -78,7 +78,7 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             var pratosMantidos = ComandaClienteUseCase.PratosMantidos(dados.Itens, pedido);
             var linhasMantidas = ComandaClienteUseCase.LinhasMantidas(dados.Itens, pedido);
             var antigos = pedido.Itens.Where(i => i.CardapioItemId is not null).ToList();
-            var novoTotal = selecao.Sum(i => i.Qtd * i.Preco) + ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido);
+            var novoTotal = pedido.TotalComPratos(selecao.Sum(i => i.Qtd * i.Preco));
             var saldoAnterior = await saldos.ConsultarAsync(pedido, t);
             if (saldoAnterior.Reservado > 0) throw new ComandaClienteConflitoException("Aguarde a devolução em andamento antes de alterar de novo.");
             var devolucao = Math.Max(0, saldoAnterior.Alocado - novoTotal);

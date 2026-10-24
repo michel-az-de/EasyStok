@@ -104,6 +104,23 @@ public class RegraUnicaNoBackendTests
             + "numa tela e esconder o nome em outra");
     }
 
+    // ---- Linha de frete do pedido -----------------------------------------------------------------------------
+
+    [Fact]
+    public void LinhaDeFrete_SoDefinidaPeloPedidoItem()
+    {
+        var root = RepoPaths.FindRepoRoot();
+        var fora = ArquivosDeProducao(root, "*.cs")
+            .Where(f => Regex.IsMatch(SemComentarios(File.ReadAllText(f)), @"StartsWith\(\s*""Entrega"))
+            .Select(f => Relativo(root, f))
+            .Where(r => r != "EasyStock.Domain/Entities/Pedido.cs")
+            .ToList();
+
+        fora.Should().BeEmpty(
+            "a linha de frete é PedidoItem.EhLinhaDeFrete (ou PedidoItem.EhFrete para projeções); reescrever o predicado por "
+            + "nome volta a dar frete diferente na comanda, no aceite da alteração, na logística e no pedido do cliente");
+    }
+
     // ---- Apoio ------------------------------------------------------------------------------------------------
 
     private static string Relativo(string root, string arquivo) =>

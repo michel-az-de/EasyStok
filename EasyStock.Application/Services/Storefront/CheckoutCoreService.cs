@@ -208,8 +208,8 @@ public sealed class CheckoutCoreService(
         // 0 (coleção vazia); por isso atribuímos o Total diretamente. É o mesmo somatório
         // cobrado no MercadoPago (Fase 3), reutilizado aqui.
         // M1.4b (#1531): soma o que foi gravado em cada linha (preço da porção quando há).
-        decimal total = itens.Sum(i => i.Subtotal) + valorFrete;
-        pedido.Total = Dinheiro.FromDecimal(total);
+        pedido.Total = Pedido.TotalDe(itens.Select(i => i.Subtotal).Append(itemFrete.Subtotal));
+        var total = pedido.Total.Valor;
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido, ct);
 

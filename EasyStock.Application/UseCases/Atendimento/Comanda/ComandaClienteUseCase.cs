@@ -247,7 +247,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         return new(link.Id, NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome) ?? "",
             HorarioBrasil.DataOperacional(link.CriadoEm), link.ExpiraEm, link.Revisao, pode, dados, selecao, detalhe,
             envio, cupons,
-            selecao.Sum(i => i.Qtd * i.Preco) + (pedido is null ? valorCombinado ?? 0m : ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido)), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
+            pedido is null ? selecao.Sum(i => i.Qtd * i.Preco) + (valorCombinado ?? 0m) : pedido.TotalComPratos(selecao.Sum(i => i.Qtd * i.Preco)), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
             cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado,
             ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm,
             encerrado is null ? null : StatusPedidoMapper.Format(encerrado.StatusEnum));
@@ -394,7 +394,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 if (!PodeAlterar(pedido) || pedido.AlteradoEm != dados.PedidoAtualizadoEm)
                     throw new ComandaClienteConflitoException("O pedido mudou. Recarregue antes de enviar a alteração.");
                 var selecao = await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, t);
-                var total = selecao.Sum(i => i.Qtd * i.Preco) + ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido);
+                var total = pedido.TotalComPratos(selecao.Sum(i => i.Qtd * i.Preco));
                 link.Consumir(agora);
                 resultado = new(pedido.Id, "alteracao_aguardando_confirmacao", total,
                     total - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado);
