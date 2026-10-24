@@ -56,7 +56,7 @@ public class SyncMutationDispatcher(
                 await ApplyCashEntryDelete(m, deviceId, operatorName, empresaId);
                 break;
             case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
-            case "closing":   await ApplyClosing(m, deviceId, empresaId, lojaId);                 break;
+            case "closing":   await ApplyClosing(m, deviceId, empresaId);                         break;
             case "stock":     await ApplyStockDelta(m, deviceId, operatorName, empresaId);        break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
@@ -630,62 +630,20 @@ public class SyncMutationDispatcher(
     {
         if (entry.EmpresaId is not { } empresaId) return;
         var dia = HorarioBrasil.DataOperacional(entry.CreatedAt);
-        var fechado = await _db.Set<FechamentoCaixa>().IgnoreQueryFilters()
-            // Fechamento sem loja é o da empresa e retrata também o lançamento de loja (CaixaFechadoGuard, #1598).
-            .AnyAsync(f => f.EmpresaId == empresaId && f.Data == dia && (f.LojaId == entry.LojaId || f.LojaId == null));
-        if (fechado)
+        if (await InstanteNoCaixa.DiaFechadoAsync(_db, empresaId, entry.CreatedAt, entry.LojaId))
             throw new UseCaseValidationException(
                 $"O caixa de {dia:dd/MM/yyyy} já foi fechado: {oQue} do lançamento '{entry.Description}' não foi aplicada.");
     }
 
     /// <summary>
-    /// F7-C — aplica fechamento de caixa enviado pelo mobile (cashClosings.upsert).
-    /// Idempotente: (EmpresaId + Data) unique — segunda chamada do mesmo dia faz update.
+    /// #2030: o fechamento do caixa é do console (<c>FecharCaixaUseCase</c>, com o movimento marcador). O do
+    /// aparelho criava ou sobrescrevia o <c>FechamentoCaixa</c> com saldo inicial e vendas zerados e sem marcador,
+    /// e a abertura do dia seguinte recusava. O PWA não manda esta mutação; a de um cliente antigo é ignorada.
     /// </summary>
-    private async Task ApplyClosing(MutationDto m, string deviceId, Guid? empresaId, Guid? lojaId)
+    private Task ApplyClosing(MutationDto m, string deviceId, Guid? empresaId)
     {
-        if (!empresaId.HasValue) return;
-        CashClosingDto? dto;
-        try { dto = m.Payload.Deserialize<CashClosingDto>(SyncDtoConverters.JsonOpts); }
-        catch { return; }
-        if (dto == null) return;
-        if (!DateOnly.TryParse(dto.DateKey, out var data)) return;
-
-        // #1543 (#954): o fechamento e do escopo de quem fechou, loja com loja e empresa com empresa. O
-        // casamento frouxo sobrescrevia o fechamento da empresa com os numeros de uma loja e, no
-        // aparelho sem loja, o de uma loja qualquer. O indice unico ja e por (empresa, loja, dia).
-        var existing = await _db.Set<FechamentoCaixa>().IgnoreQueryFilters()
-            .FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Data == data && f.LojaId == lojaId);
-
-        var closedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.ClosedAt).UtcDateTime;
-        if (existing == null)
-        {
-            var f = FechamentoCaixa.Criar(
-                empresaId: empresaId.Value,
-                data: data,
-                saldoInicial: 0,
-                totalVendas: 0,
-                totalPagamentosPedidos: dto.TotalPagamentosPedidos,
-                totalEntradasExtras: 0,
-                totalSaidasExtras: dto.TotalSaidasExtras,
-                lojaId: lojaId);
-            f.SaldoFinal = dto.SaldoFinal;
-            f.FechadoEm = closedAt;
-            f.FechadoPorNome = dto.ClosedByName;
-            f.Observacoes = dto.Notes;
-            _db.Add(f);
-            _log.LogInformation("F7-C Fechamento CRIADO: empresa={EmpresaId} data={Data} saldo={Saldo}",
-                empresaId, data, dto.SaldoFinal);
-        }
-        else
-        {
-            existing.TotalPagamentosPedidos = dto.TotalPagamentosPedidos;
-            existing.TotalSaidasExtras = dto.TotalSaidasExtras;
-            existing.SaldoFinal = dto.SaldoFinal;
-            existing.FechadoEm = closedAt;
-            if (!string.IsNullOrWhiteSpace(dto.ClosedByName)) existing.FechadoPorNome = dto.ClosedByName;
-            if (!string.IsNullOrWhiteSpace(dto.Notes)) existing.Observacoes = dto.Notes;
-            _log.LogInformation("F7-C Fechamento ATUALIZADO: empresa={EmpresaId} data={Data}", empresaId, data);
-        }
+        _log.LogWarning("Fechamento de caixa vindo do aparelho ignorado: device={DeviceId} empresa={EmpresaId} mutation={MutationId}",
+            deviceId, empresaId, m.Id);
+        return Task.CompletedTask;
     }
 }

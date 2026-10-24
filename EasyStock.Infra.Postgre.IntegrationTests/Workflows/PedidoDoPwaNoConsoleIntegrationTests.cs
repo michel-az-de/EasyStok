@@ -3,6 +3,7 @@ using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Api.Services.Operacao;
+using EasyStock.Application.Common;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Lookup;
@@ -61,6 +62,33 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
 
         await AparelhoManda(provider, s, "cancelado");
         (await Saldo(s)).Should().Be(10m, "uma vez só");
+    }
+
+    [SkippableFact]
+    public async Task EntregueOfflineDepoisDoFechamento_RecebimentoEntraNoDiaDoRegistro()
+    {
+        // #2030: entregue no aparelho ontem, sem rede, e sincronizado hoje com o caixa de ontem fechado no console.
+        // Na hora do aparelho o recebimento cairia no dia fechado: o retrato não o contou e ele não poderia ser desfeito.
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var ontem = DateTime.UtcNow.AddDays(-1);
+        _relogioDoAparelho = new DateTimeOffset(ontem).ToUnixTimeMilliseconds();
+        await AparelhoManda(provider, s, "pronto");
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            db.Add(FechamentoCaixa.Criar(s.EmpresaId, HorarioBrasil.DataOperacional(ontem), 0, 0, 0, 0, 0, lojaId: null));
+            await db.SaveChangesAsync();
+        }
+        var antes = DateTime.UtcNow;
+
+        await AparelhoManda(provider, s, "entregue");
+
+        var pedidoId = await PedidoDoErp(s);
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var pagoEm = await leitura.Set<PedidoPagamento>().Where(p => p.PedidoId == pedidoId).Select(p => p.PagoEm).SingleAsync();
+        pagoEm.Should().BeOnOrAfter(antes);
     }
 
     [SkippableFact]

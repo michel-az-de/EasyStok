@@ -274,6 +274,34 @@ public sealed class LancamentoCaixaMobileEdicaoExclusaoTests : IDisposable
         return payload.TryGetProperty("estornado", out var e) && e.ValueKind == JsonValueKind.True;
     }
 
+    // ---------- dia fechado (#2030) ----------
+
+    [Fact]
+    public async Task LancamentoQueChegaDepoisDoFechamento_EntraNoDiaEmQueFoiRegistrado()
+    {
+        // Feito offline ontem e sincronizado hoje, com o caixa de ontem já fechado no console.
+        var ontem = DateTime.UtcNow.AddDays(-1);
+        var dia = HorarioBrasil.DataOperacional(ontem);
+        _db.Add(FechamentoCaixa.Criar(_empresaId, dia, 0, 0, 0, 0, 0, _lojaId));
+        _db.SaveChanges();
+        _db.ChangeTracker.Clear();
+        var antes = DateTime.UtcNow;
+
+        await SincronizarAsync(new CashEntryDto(Lancamento, "expense", 30m, "Gas", new DateTimeOffset(ontem).ToUnixTimeMilliseconds(), Metodo: "dinheiro"));
+
+        Movimentos().Should().ContainSingle().Which.DataMovimento.Should().BeOnOrAfter(antes,
+            "o dia fechado não retratou o lançamento; mexer nele mudaria a gaveta depois do fato");
+    }
+
+    [Fact]
+    public async Task LancamentoComODiaAberto_GuardaAHoraDoAparelho()
+    {
+        await SincronizarAsync(Dto("expense", 30m, "Gas", "dinheiro"));
+
+        Movimentos().Should().ContainSingle().Which.DataMovimento.Should()
+            .BeCloseTo(DateTimeOffset.FromUnixTimeMilliseconds(_criadoEm).UtcDateTime, TimeSpan.FromSeconds(1));
+    }
+
     // ---------- apoio ----------
 
     private CashEntryDto Dto(string tipo, decimal valor, string descricao, string? metodo) =>
