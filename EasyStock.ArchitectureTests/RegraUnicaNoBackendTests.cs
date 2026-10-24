@@ -64,7 +64,7 @@ public class RegraUnicaNoBackendTests
     // ---- CEP e bairro -----------------------------------------------------------------------------------------
 
     private static readonly Regex NormalizadorDeEnderecoProprio = new(
-        @"static\s+string\s+Normalizar(?:Cep|Bairro)\s*\(", RegexOptions.Compiled);
+        @"\bstatic\s+string\s+Normalizar(?:Cep|Bairro)\s*\(", RegexOptions.Compiled);
 
     /// <summary>O hash de idempotência do checkout multi-gateway sai na #2015 (código fantasma): não se mexe nele aqui.</summary>
     private static readonly string[] CepNoCodigoFantasma = ["EasyStock.Application/UseCases/Storefront/Checkout/Idempotency/CheckoutContentHasher.cs"];
