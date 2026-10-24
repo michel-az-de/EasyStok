@@ -67,7 +67,8 @@ public sealed class RecusarPedidoStorefrontUseCase(
     IPublicadorEventoIntegracao publicadorEventos,
     IUnitOfWork unitOfWork,
     ILogger<RecusarPedidoStorefrontUseCase> logger,
-    IOperacaoEventPublisher operacaoEventos)
+    IOperacaoEventPublisher operacaoEventos,
+    SaldoFinanceiroPedido? saldos = null)
 {
     private const int MensagemClienteMaxChars = 280;
     private const string Origem = "storefront";
@@ -257,7 +258,9 @@ public sealed class RecusarPedidoStorefrontUseCase(
     private async Task RegistrarDevolucaoAFazerAsync(PedidoEntity pedido, IReadOnlyList<CobrancaPedido> estornadas,
         RecusarPedidoStorefrontInput input, DateTime agora, CancellationToken ct)
     {
-        var aDevolver = pedido.TotalPago - estornadas.Sum(c => c.ValorPago ?? c.Valor);
+        // Mesma conta do Cancelar: o que já foi devolvido antes da recusa não volta a ser devido.
+        var disponivel = saldos is null ? pedido.TotalPago : (await saldos.ConsultarAsync(pedido, ct)).DinheiroDisponivel;
+        var aDevolver = disponivel - estornadas.Sum(c => c.ValorPago ?? c.Valor);
         if (aDevolver <= 0m) return;
         await pedidoRepository.AddEventoAsync(
             CancelarPedidoUseCase.EventoDevolucaoAFazerDe(pedido, aDevolver, input.UsuarioId, input.UsuarioNome, Origem, agora), ct);

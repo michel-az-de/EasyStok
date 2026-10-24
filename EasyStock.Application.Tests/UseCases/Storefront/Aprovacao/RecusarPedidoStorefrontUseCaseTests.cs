@@ -56,6 +56,7 @@ public class RecusarPedidoStorefrontUseCaseTests
         public required IOperacaoEventPublisher Operacao { get; init; }
         public required ICreditoClienteComandaRepository Creditos { get; init; }
         public required IContaReceberRepository ContaReceber { get; init; }
+        public required IPedidoRepository PedidoDominioRepo { get; init; }
 
         /// <summary>Cobrança do Mercado Pago já paga (pedido RequerAprovacao pago, aguardando a dona).</summary>
         public CobrancaPedido AdicionarCobrancaPaga(string pagamentoId, decimal valor = 120m, Guid? conversaId = null)
@@ -102,11 +103,12 @@ public class RecusarPedidoStorefrontUseCaseTests
         var operacao = Substitute.For<IOperacaoEventPublisher>();
         var creditos = Substitute.For<ICreditoClienteComandaRepository>();
         var contaReceber = Substitute.For<IContaReceberRepository>();
-        var saldos = new SaldoFinanceiroPedido(Substitute.For<IPedidoRepository>(), Substitute.For<IEstornoOnlineRepository>(), creditos);
+        var pedidoDominioRepo = Substitute.For<IPedidoRepository>();
+        var saldos = new SaldoFinanceiroPedido(pedidoDominioRepo, Substitute.For<IEstornoOnlineRepository>(), creditos);
         var efeitos = new EfeitosCancelamentoPedido(contaReceber, vagaRepo, NullLogger<EfeitosCancelamentoPedido>.Instance, saldos, creditos);
         var useCase = new RecusarPedidoStorefrontUseCase(
             pedidoRepo, cobrancaRepo, estorno, efeitos, aviso, publicador, uow,
-            NullLogger<RecusarPedidoStorefrontUseCase>.Instance, operacao);
+            NullLogger<RecusarPedidoStorefrontUseCase>.Instance, operacao, saldos);
         return new Sut
         {
             UseCase = useCase,
@@ -120,6 +122,7 @@ public class RecusarPedidoStorefrontUseCaseTests
             Operacao = operacao,
             Creditos = creditos,
             ContaReceber = contaReceber,
+            PedidoDominioRepo = pedidoDominioRepo,
         };
     }
 
@@ -396,6 +399,26 @@ public class RecusarPedidoStorefrontUseCaseTests
 
         await sut.PedidoRepo.Received(1).AddEventoAsync(
             Arg.Is<PedidoEvento>(e => e.Tipo == "devolucao_a_fazer" && e.Detalhes!.Contains(30m.ToString("C", Cultura.PtBr))),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Recusar_desconta_da_devolucao_a_fazer_o_que_ja_foi_devolvido_antes()
+    {
+        // Revisao da PR: R$ 30 em dinheiro (R$ 20 ja devolvidos antes) + R$ 120 online estornados agora: sobram R$ 10.
+        var pedido = PedidoAguardandoAprovacaoBaba();
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), Valor = 30m, Metodo = "dinheiro" });
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), Valor = 120m, Metodo = "pix" });
+        var sut = BuildSut(pedido);
+        sut.AdicionarCobrancaPaga("pay-1");
+        sut.PedidoDominioRepo.ListarEstornosManuaisAsync(EmpresaId, PedidoId, Arg.Any<CancellationToken>())
+            .Returns([new PedidoEstornoManual { Id = Guid.NewGuid(), EmpresaId = EmpresaId, PedidoId = PedidoId,
+                PagamentoId = pedido.Pagamentos.First().Id, Valor = 20m, Metodo = "dinheiro", Motivo = "parcial" }]);
+
+        await sut.UseCase.ExecuteAsync(InputValido(nivel: NivelAcesso.Gerente));
+
+        await sut.PedidoRepo.Received(1).AddEventoAsync(
+            Arg.Is<PedidoEvento>(e => e.Tipo == "devolucao_a_fazer" && e.Detalhes!.Contains(10m.ToString("C", Cultura.PtBr))),
             Arg.Any<CancellationToken>());
     }
 
