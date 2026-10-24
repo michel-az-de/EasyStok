@@ -892,9 +892,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             || dados.Itens.GroupBy(i => (i.CardapioItemId, i.VariacaoId)).Any(g => g.Count() > 1)
             || dados.Observacoes?.Length > 2000 || dados.Acerto is not ("estorno" or "cupom") || dados.CodigoCupom?.Length > 35)
             throw new UseCaseValidationException("Confira os itens, quantidades e observações da comanda.");
-        // #2002 comanda-07: o rascunho inteiro volta em todo GET e no SSE; o teto dos dados do cliente é o do pedido
-        // (EnderecoCheckout.Validar), sem exigir o endereço completo: a atendente confere o parcial (#1839).
-        if (dados.Nome?.Length > 120 || dados.Telefone?.Length > 20 || dados.Endereco is { } e
+        // #2002 comanda-07: o rascunho inteiro volta em todo GET e no SSE; o teto é o do cadastro (Cliente.Nome 150,
+        // Telefone 32) e, no endereço, o do pedido (EnderecoCheckout.Validar), sem exigir o endereço completo: a atendente confere o parcial (#1839).
+        if (dados.Nome?.Length > 150 || dados.Telefone?.Length > 32 || dados.Endereco is { } e
             && (e.Cep?.Length > 20 || e.Logradouro?.Length > 200 || e.Numero?.Length > 20 || e.Bairro?.Length > 100
                 || e.Cidade?.Length > 100 || e.Uf?.Length > 2 || e.Complemento?.Length > 100))
             throw new UseCaseValidationException("Confira o nome, o telefone e o endereço: algum campo passou do tamanho permitido.");

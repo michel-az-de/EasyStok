@@ -41,7 +41,8 @@ public class TenantVitrineCardapioController(
     ReordenarCardapioItemAdminUseCase reordenar,
     RemoverCardapioItemAdminUseCase remover,
     ICurrentUserAccessor currentUser,
-    ILogger<TenantVitrineCardapioController> logger) : EasyStockControllerBase, IActionFilter
+    ILogger<TenantVitrineCardapioController> logger,
+    ICardapioPublicoCache? cardapioPublico = null) : EasyStockControllerBase, IActionFilter
 {
     private const string SemVitrine = "Sua vitrine ainda não foi criada. Fale com o suporte.";
 
@@ -207,6 +208,7 @@ public class TenantVitrineCardapioController(
                 InstrucaoFinalizacao: req.InstrucaoFinalizacao,
                 Conservacao: req.Conservacao));
 
+            cardapioPublico?.Invalidar(sf.Slug); // #2002: o menu público não espera o prazo do cache
             return DataCreated($"/api/minha-vitrine/cardapio/{result.ItemId}", result);
         }
         catch (StorefrontNaoEncontradoException) { return DataNotFound(SemVitrine); }
@@ -251,6 +253,7 @@ public class TenantVitrineCardapioController(
                 InstrucaoFinalizacao: req.InstrucaoFinalizacao,
                 Conservacao: req.Conservacao));
 
+            cardapioPublico?.Invalidar(sf.Slug);
             return DataOk(result);
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
@@ -276,6 +279,7 @@ public class TenantVitrineCardapioController(
         {
             var result = await toggleVisivel.ExecuteAsync(
                 new ToggleVisibilidadeCardapioItemAdminCommand(sf.Id, itemId, EmpresaId));
+            cardapioPublico?.Invalidar(sf.Slug);
             return DataOk(result);
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
@@ -291,6 +295,7 @@ public class TenantVitrineCardapioController(
         {
             var result = await toggleDisponivel.ExecuteAsync(
                 new ToggleDisponibilidadeCardapioItemAdminCommand(sf.Id, itemId, EmpresaId));
+            cardapioPublico?.Invalidar(sf.Slug);
             return DataOk(result);
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
@@ -306,6 +311,7 @@ public class TenantVitrineCardapioController(
         {
             var result = await reordenar.ExecuteAsync(
                 new ReordenarCardapioItemAdminCommand(sf.Id, itemId, req.NovaOrdem, EmpresaId));
+            cardapioPublico?.Invalidar(sf.Slug);
             return DataOk(result);
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }

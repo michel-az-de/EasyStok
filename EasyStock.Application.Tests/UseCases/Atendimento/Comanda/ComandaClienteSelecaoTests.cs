@@ -130,7 +130,7 @@ public class ComandaClienteSelecaoTests
     [Fact]
     public void Rascunho_NoTeto_Passa()
     {
-        var agir = () => ComandaClienteUseCase.Validar(Rascunho(new string('n', 120), new string('9', 20),
+        var agir = () => ComandaClienteUseCase.Validar(Rascunho(new string('n', 150), new string('9', 32),
             Endereco(logradouro: new string('r', 200), numero: new string('1', 20), bairro: new string('b', 100),
                 cidade: new string('c', 100), complemento: new string('x', 100))));
 
@@ -147,8 +147,8 @@ public class ComandaClienteSelecaoTests
     }
 
     [Theory]
-    [InlineData("nome", 121)]
-    [InlineData("telefone", 21)]
+    [InlineData("nome", 151)]
+    [InlineData("telefone", 33)]
     [InlineData("cep", 21)]
     [InlineData("logradouro", 201)]
     [InlineData("numero", 21)]

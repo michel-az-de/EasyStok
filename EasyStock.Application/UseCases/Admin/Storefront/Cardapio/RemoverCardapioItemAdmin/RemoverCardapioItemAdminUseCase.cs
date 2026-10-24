@@ -19,7 +19,9 @@ public sealed record RemoverCardapioItemAdminResult(Guid ItemId);
 public class RemoverCardapioItemAdminUseCase(
     ICardapioItemRepository cardapioRepository,
     IFileStorage fileStorage,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IStorefrontRepository? storefrontRepository = null,
+    ICardapioPublicoCache? cardapioPublico = null)
     : IUseCase<RemoverCardapioItemAdminCommand, RemoverCardapioItemAdminResult>
 {
     public async Task<RemoverCardapioItemAdminResult> ExecuteAsync(RemoverCardapioItemAdminCommand command)
@@ -31,6 +33,10 @@ public class RemoverCardapioItemAdminUseCase(
 
         await cardapioRepository.RemoveAsync(item);
         await unitOfWork.CommitAsync();
+        // #2002: o prato excluído sai do menu público na hora, não depois do prazo do cache.
+        if (cardapioPublico is not null && storefrontRepository is not null
+            && await storefrontRepository.GetByIdAsync(command.StorefrontId) is { } vitrine)
+            cardapioPublico.Invalidar(vitrine.Slug);
 
         // Best-effort após o item sair do banco — falha de storage não desfaz a remoção.
         await TryDeleteFotoAsync(fotoUrl);

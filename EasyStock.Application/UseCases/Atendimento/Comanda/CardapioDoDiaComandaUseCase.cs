@@ -50,13 +50,15 @@ public sealed class CardapioDoDiaComandaUseCase(
     public async Task<AjustarSaldoRapidoResult> AjustarSaldoAsync(AjustarSaldoItemInput input, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
-        var (_, item) = await ItemDaVitrineAsync(input.EmpresaId, input.CardapioItemId, ct);
+        var (loja, item) = await ItemDaVitrineAsync(input.EmpresaId, input.CardapioItemId, ct);
         if (item.ProdutoId is not { } produtoId)
             throw new UseCaseValidationException("Este item não controla saldo: não está ligado a um produto do estoque.");
 
-        return await ajustarSaldo.ExecuteAsync(new AjustarSaldoRapidoInput(
+        var ajuste = await ajustarSaldo.ExecuteAsync(new AjustarSaldoRapidoInput(
             input.EmpresaId, input.UsuarioId, produtoId, input.LojaId, input.QuantidadeContada, input.Motivo,
             PorcaoDe(item, input)), ct);
+        cardapioPublico?.Invalidar(loja.Slug); // #2002: o menu público mostra o saldo (estoqueAtual)
+        return ajuste;
     }
 
     // Sem porção informada segue a contagem do prato inteiro: é o que uma aba antiga do console manda.

@@ -194,6 +194,17 @@ public class CardapioDoDiaComandaUseCaseTests
         (lote300.QuantidadeAtual.Value + lote800.QuantidadeAtual.Value).Should().Be(9m);
     }
 
+    // #2002: o menu público mostra o saldo (estoqueAtual); a contagem nova não espera o prazo do cache.
+    [Fact]
+    public async Task AjustarSaldo_InvalidaOMenuPublico()
+    {
+        var (item, _, _, _, _) = RavioliComPorcoes();
+
+        await Sut().AjustarSaldoAsync(new AjustarSaldoItemInput(EmpresaId, Guid.NewGuid(), item.Id, null, 9m, "contei"));
+
+        _publico.Received(1).Invalidar("casa-da-baba");
+    }
+
     [Fact]
     public async Task AjustarSaldo_ItemAvulsoNaoControlaSaldo()
     {

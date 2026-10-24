@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.UseCases.Acervo;
 using EasyStock.Domain.Entities.Acervo;
@@ -48,7 +50,10 @@ public class AcervoUsarEmPratoTests
             .Returns(c => c.Arg<Func<CancellationToken, Task<AcervoImagem>>>()(CancellationToken.None));
     }
 
-    private AcervoUseCase Sut() => new(_repo, _storage, _processor, _uow);
+    private readonly IStorefrontRepository _vitrines = Substitute.For<IStorefrontRepository>();
+    private readonly ICardapioPublicoCache _publico = Substitute.For<ICardapioPublicoCache>();
+
+    private AcervoUseCase Sut() => new(_repo, _storage, _processor, _uow, _vitrines, _publico);
 
     private Guid[] Vinculos() => JsonSerializer.Deserialize<Guid[]>(_imagem.ItensJson)!;
 
@@ -62,6 +67,18 @@ public class AcervoUsarEmPratoTests
         Vinculos().Should().BeEquivalentTo([_vinculado.Id, _outroPrato.Id]);
         await _repo.Received().BloquearImagemAsync(Empresa, _imagem.Id, Arg.Any<CancellationToken>());
         await _uow.Received(1).CommitAsync();
+    }
+
+    // #2002: a foto publicada aparece no menu público na hora.
+    [Fact]
+    public async Task Publicar_InvalidaOMenuPublicoDaVitrineDoPrato()
+    {
+        var vitrine = EasyStock.Domain.Entities.Storefront.Storefront.Criar(Empresa, "casa-da-baba", "Casa da Baba", 0m);
+        _vitrines.GetByIdAsync(_outroPrato.StorefrontId).Returns(vitrine);
+
+        await Sut().PublicarAsync(Empresa, Autor, _imagem.Id, new PublicarImagem(Guid.NewGuid(), _outroPrato.Id, false, null), default);
+
+        _publico.Received(1).Invalidar("casa-da-baba");
     }
 
     [Fact]
