@@ -378,8 +378,8 @@ await confereAsync('J2-3 sem entregador cadastrado, a viagem sai com "Entrega pr
 
 confere('J2-1 o entregador vê "Dinheiro na entrega" e o troco na parada', () => {
   const tela = fonte('features/entregas/ConteudoEntregasApi.jsx')
-  assert.match(tela, /const \{ identificacao, aReceber, observacoes, troco \} = paradaDaViagem\(/)
-  assert.match(tela, /aReceber > 0 && troco && <p className=\{css\.apoio\}>\{troco\}<\/p>/)
+  assert.match(tela, /const \{ identificacao, aReceber, observacoes, troco, semSaldo \} = paradaDaViagem\(/)
+  assert.match(tela, /\(aReceber > 0 \|\| semSaldo\) && troco && <p className=\{css\.apoio\}>\{troco\}<\/p>/)
 })
 
 // --- Frente K (#2007): Entregas fala do pedido como a Cozinha ---------------------------------
@@ -398,6 +398,9 @@ confere('K-1 o troco do dinheiro na entrega chega ao roteiro, à parada fora da 
   // O pedido de outro dia não está na lista que a tela leu: a parada traz as observações da API.
   const parada = { pedidoId: 'p9', numeroPedido: '57A22217', numeroDoDia: 4, observacoes: OBS_TROCO }
   const fora = roteiroMod.paradaDaViagem(parada, undefined)
+  // Sem o saldo lido, o cartão diz o troco sem inventar quanto levar.
+  assert.equal(fora.semSaldo, true)
+  assert.equal(semNbsp(fora.troco), 'Dinheiro na entrega · troco para R$ 100,00')
   assert.equal(semNbsp(roteiroMod.trocoDaPorta(fora.observacoes, 57)), 'Dinheiro na entrega · troco para R$ 100,00 · levar R$ 43,00')
   const dentro = roteiroMod.paradaDaViagem(parada, { numeroComanda: 12, numeroCurto: '57A22217', aReceber: 57, observacoes: OBS_TROCO })
   assert.equal(dentro.aReceber, 57)
@@ -421,6 +424,7 @@ confere('K-11a "Entrega própria" não repete a empresa entre parênteses', () =
   assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'Entrega própria', empresa: 'Própria' }), 'Entrega própria')
   assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'João', empresa: 'Própria' }), 'João (Própria)')
   assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'Carlos', empresa: 'Lalamove' }), 'Carlos (Lalamove)')
+  assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'Lucas Uber', empresa: 'Uber' }), 'Lucas Uber (Uber)')
 })
 
 console.log(`prova #1446 (cozinha viva no modo API): ${passou} conferências ok`)

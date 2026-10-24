@@ -159,6 +159,12 @@ console.log('Comanda: conflito preserva edição, falha API preserva dados, adi�
   contexto.estados = []; contexto.cursor = 0; contexto.dados = [semMudanca]
   assert.ok(!elementos(ComandaDoCliente({ conversaId: 'conversa', ativo: true })).some(e => typeof e.props.children === 'string'
     && /^(Data|Janela):/.test(e.props.children)), 'sem troca, nada a mais')
+  // Aprovada ou recusada, a seleção vira histórico: a troca não aparece como se ainda esperasse aprovação.
+  for (const situacao of ['pedido_confirmado', 'alteracao_recusada']) {
+    contexto.estados = []; contexto.cursor = 0; contexto.dados = [{ ...alteracao, envio: { situacao, saldo: 0 } }]
+    assert.ok(!elementos(ComandaDoCliente({ conversaId: 'conversa', ativo: true })).some(e => typeof e.props.children === 'string'
+      && /^(Data|Janela):/.test(e.props.children)), 'histórico sem a troca pendente: ' + situacao)
+  }
   contexto.dados = [comanda]
 }
 console.log('Alteração para aprovar: data e janela novas aparecem ao lado dos itens.')

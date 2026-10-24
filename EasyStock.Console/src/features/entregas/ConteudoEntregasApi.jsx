@@ -233,7 +233,7 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
         {viagem.paradas.map((parada) => {
           // J2 (#1990): dinheiro na entrega diz ao entregador quanto receber e quanto troco levar. #2007: com o
           // pedido fora da lista lida, valem as observações e o número do dia que a parada traz.
-          const { identificacao, aReceber, observacoes, troco } = paradaDaViagem(parada, pedidoPorId?.get(parada.pedidoId))
+          const { identificacao, aReceber, observacoes, troco, semSaldo } = paradaDaViagem(parada, pedidoPorId?.get(parada.pedidoId))
           return (
           <li key={parada.pedidoId} className={css.cartao}>
             <div className={css.linha}>
@@ -246,7 +246,7 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
               <p className={css.apoio}>{[parada.entregadorNome, parada.veiculo, parada.placa].filter(Boolean).join(' · ')}</p>
             )}
             {!parada.entregueEm && aReceber > 0 && <p className={css.linha}><strong>Receber {moeda(aReceber)} na entrega</strong></p>}
-            {!parada.entregueEm && aReceber > 0 && troco && <p className={css.apoio}>{troco}</p>}
+            {!parada.entregueEm && (aReceber > 0 || semSaldo) && troco && <p className={css.apoio}>{troco}</p>}
             {acoes.adiadoAte(chaveDaEntrega(viagem.id, parada.pedidoId)) ? (
               <DesfazerComPrazo className={css.linha} ate={acoes.adiadoAte(chaveDaEntrega(viagem.id, parada.pedidoId))}
                 texto={`Marca entregue e avisa ${parada.clienteNome}`}

@@ -183,7 +183,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       <ul>{c.pedido.itens?.map((i, n) => <li key={n}>{i.quantidade}× {i.nome}{i.observacao && ' · ' + i.observacao}</li>)}</ul>
       <p>Pagamento já coberto: {moeda(c.pedido.alocado ?? c.pedido.totalPago ?? 0)}</p>
     </details>}
-    {c.pedido && <MudancaDeData comanda={c} />}
+    {c.pedido && (pendente || c.podeEditar) && <MudancaDeData comanda={c} />}
     {c.pedido && <h3>{c.podeEditar || pendente ? 'Alteração proposta' : 'Seleção enviada pelo link'}</h3>}
     {conflito && <p>Seleção atual: {c.selecao.map(i => i.qtd + '× ' + i.nome + (i.observacao ? ' (' + i.observacao + ')' : '')).join(', ')}. Observação: {c.rascunho.observacoes || 'nenhuma'}.</p>}
     <p className={css.totalCompartilhado}>{c.pedido && !edicao ? (c.podeEditar || pendente ? 'Total proposto' : 'Total enviado pelo link') : rotuloDoTotalDaSelecao(c, Boolean(edicao))}: <strong>{moeda(c.totalPrevisto ?? 0)}</strong></p>

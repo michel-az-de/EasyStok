@@ -112,7 +112,7 @@ public sealed class GerarPedidoConversaUseCase(
             naEntrega ? TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega : forma, CabecalhoResumo);
         if (naEntrega && PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
             return ResumoPedidoConversa.Limitar($"{resumo}\n\nCombine com a equipe como pagar o sinal.");
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
+        if ((naEntrega || forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
             && !PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm)) return resumo;
         var pagamento = cobranca?.LinkPagamento is { } link
             ? $"Pague por este link, válido por 30 minutos: {link}"

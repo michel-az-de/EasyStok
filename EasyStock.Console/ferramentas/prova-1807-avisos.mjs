@@ -292,6 +292,9 @@ await confere('K8. só o sinal pago avisa "pagou o sinal"; a quitação depois a
   const depois = avisosDe(comSinal, quitado)
   assert.deepEqual(tipos(depois), [T.PAGAMENTO_CONFIRMADO])
   assert.equal(depois[0].corpo, 'Marina pagou o pedido')
+  // Quitado e depois com o total aumentado por uma alteração: nada foi pago, nada de "pagou o sinal".
+  const aumentou = retrato([['c1', linha({ etapa: 'pago', ...sonoro.pagamentoDoRetrato({ ...encomenda, totalApi: 80, alocadoApi: 50 }) })]])
+  assert.deepEqual(avisosDe(quitado, aumentou), [])
   assert.match(readFileSync(new URL('../src/aplicacao/useAvisoSonoro.js', import.meta.url), 'utf8'),
     /\.\.\.pagamentoDoRetrato\(c\.pedido\)/, 'o retrato do balcão usa a mesma regra')
 })

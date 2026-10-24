@@ -18,7 +18,8 @@ export function mudancasDoRetrato(antes, retrato) {
       && atual.ultimaMensagemClienteId !== velho.ultimaMensagemClienteId
     const pagouAgora = Boolean(velho) && Boolean(atual.pago) && !velho.pago
     // #2007 (item 8): o sinal da encomenda é aviso próprio; a quitação depois ainda avisa "pagou o pedido".
-    const sinalAgora = Boolean(velho) && Boolean(atual.sinal) && !velho.sinal && !atual.pago
+    // Pedido que estava quitado e teve o total aumentado (alteração aprovada) não "pagou o sinal".
+    const sinalAgora = Boolean(velho) && Boolean(atual.sinal) && !velho.sinal && !velho.pago && !atual.pago
     const passouAgora = Boolean(velho) && Boolean(atual.precisa) && !velho.precisa
     // Etapa só muda entre duas etapas de verdade: pedido que nasce ou some não é mudança, e o
     // que virou pago já é `pagouAgora`.
