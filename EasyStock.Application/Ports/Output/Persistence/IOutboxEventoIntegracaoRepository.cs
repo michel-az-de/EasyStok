@@ -47,12 +47,6 @@ public interface IOutboxEventoIntegracaoRepository
         CancellationToken ct = default);
 
     /// <summary>
-    /// Idade do mais antigo evento pendente — métrica de health do
-    /// dispatcher. Cross-tenant. Retorna 0 se nada pendente.
-    /// </summary>
-    Task<TimeSpan> LagDoMaisAntigoPendenteAsync(CancellationToken ct = default);
-
-    /// <summary>
     /// Watchdog (#928): reclama até <paramref name="max"/> eventos presos em
     /// <c>EmEnvio</c> além do lease (<c>ProximaTentativaEm &lt; now</c>) — worker caiu
     /// ou commit pós-handler falhou — voltando-os a <c>Pendente</c> (ou <c>Falhado</c>

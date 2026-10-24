@@ -136,7 +136,8 @@ public sealed class ListarPedidosClienteUseCase(
                 Nome: i.Nome,
                 Qtd: (int)Math.Round(i.Quantidade, MidpointRounding.AwayFromZero),
                 PrecoCentavos: ToCentavos(i.PrecoUnitario),
-                Descricao: i.VariacaoRotuloSnapshot))
+                Descricao: i.VariacaoRotuloSnapshot,
+                CardapioItemId: i.CardapioItemId))
             .ToList();
 
         var freteCentavos = itemFrete is null

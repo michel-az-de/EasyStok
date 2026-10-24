@@ -13,8 +13,6 @@ namespace EasyStock.Application.Ports.Output.Persistence
             Guid? usuarioId = null);
         Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5, Guid? usuarioId = null);
         Task<NotificacaoResumo> GetResumoAsync(Guid empresaId, Guid? usuarioId = null);
-        Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId);
-
         /// <summary>
         /// Os alertas AUTOMÁTICOS de estoque da empresa (sem destinatário e sem mensagem do outbox: os avisos de caixa,
         /// de convite etc. que reusam o enum ficam de fora) que ainda valem para a deduplicação: não lidos, de qualquer

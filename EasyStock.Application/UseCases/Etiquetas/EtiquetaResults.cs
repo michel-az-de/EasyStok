@@ -1,8 +1,5 @@
 namespace EasyStock.Application.UseCases.Etiquetas;
 
-public sealed record EtiquetaTemplateSistemaResult(
-    Guid Id, string Codigo, string Nome, string? Descricao, string LayoutJson, int Ordem);
-
 public sealed record EtiquetaTemplateResult(
     Guid Id, Guid EmpresaId, string Nome, Guid? BaseSistemaId,
     string LayoutJson, bool IsDefault,

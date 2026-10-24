@@ -46,11 +46,13 @@ public sealed record PedidoStorefrontDto(
 /// <param name="Qtd">Quantidade (arredondada pra inteiro).</param>
 /// <param name="PrecoCentavos">Preço unitário em centavos.</param>
 /// <param name="Descricao">Rótulo da variação/opção escolhida (ex: "tamanho família"). Null se item sem variação.</param>
+/// <param name="CardapioItemId">Item do cardápio (#1928), o mesmo id que o checkout recebe; com porção, o do item, não o da porção. O "Pedir de novo" do site repõe o carrinho por ele. Null em item avulso.</param>
 public sealed record PedidoStorefrontItemDto(
     string Nome,
     int Qtd,
     long PrecoCentavos,
-    string? Descricao);
+    string? Descricao,
+    Guid? CardapioItemId);
 
 /// <summary>Janela de entrega escolhida — copiada da <c>JanelaEntrega</c> referenciada via <c>VagaOcupada</c>.</summary>
 /// <param name="Data">Data da entrega (yyyy-MM-dd).</param>

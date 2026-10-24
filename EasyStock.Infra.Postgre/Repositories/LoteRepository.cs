@@ -82,13 +82,6 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task AddEtiquetaAsync(LoteEtiqueta e) { db.Set<LoteEtiqueta>().Add(e); return Task.CompletedTask; }
 
-        public Task<LoteEtiqueta?> FindEtiquetaPorCodigoAsync(Guid empresaId, string codigo) =>
-            db.Set<LoteEtiqueta>()
-                .Include(e => e.Lote)
-                .FirstOrDefaultAsync(e => e.Codigo == codigo && e.Lote!.EmpresaId == empresaId);
-
-        public Task UpdateEtiquetaAsync(LoteEtiqueta e) { db.Set<LoteEtiqueta>().Update(e); return Task.CompletedTask; }
-
         public async Task<IEnumerable<LoteEtiqueta>> GetEtiquetasForRenderAsync(Guid empresaId, Guid loteId)
         {
             return await db.Set<LoteEtiqueta>()

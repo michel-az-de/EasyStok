@@ -53,24 +53,6 @@ public sealed class BackgroundQueueService : IQueueService, IDisposable
         }
     }
 
-    public Task<int> GetQueueLengthAsync(string queueName)
-    {
-        if (_queues.TryGetValue(queueName, out var queue))
-        {
-            return Task.FromResult(queue.Count);
-        }
-        return Task.FromResult(0);
-    }
-
-    public Task ClearQueueAsync(string queueName)
-    {
-        if (_queues.TryGetValue(queueName, out var queue))
-        {
-            while (queue.TryDequeue(out _)) { }
-        }
-        return Task.CompletedTask;
-    }
-
     public void Dispose()
     {
         _queues.Clear();

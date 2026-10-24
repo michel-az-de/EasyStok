@@ -586,7 +586,7 @@ public class IniciarCheckoutUseCaseTests
                 idempotencyRepo, NullLogger<CheckoutIdempotencyService>.Instance),
         };
         var input = InputValido() with { IdempotencyKey = Guid.NewGuid() };
-        input = input with { ContentHash = CheckoutContentHasher.ComputarHash(input) };
+        input = input with { ContentHash = new string('a', 64) };
 
         var primeira = await BuildUseCase(f).ExecuteAsync(input);
         var segunda = await BuildUseCase(f).ExecuteAsync(input);
@@ -626,7 +626,7 @@ public class IniciarCheckoutUseCaseTests
         };
         f.Uow.When(u => u.CommitAsync()).Do(_ => banco.Commitar());
         var input = InputValido() with { IdempotencyKey = Guid.NewGuid() };
-        input = input with { ContentHash = CheckoutContentHasher.ComputarHash(input) };
+        input = input with { ContentHash = new string('a', 64) };
 
         var primeira = await BuildUseCase(f).ExecuteAsync(input);
         banco.FimDaRequisicao();

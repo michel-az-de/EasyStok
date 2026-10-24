@@ -196,8 +196,6 @@ public class CardapioItem
         AlteradoEm = DateTime.UtcNow;
     }
 
-    public bool EhNovidade(DateOnly hoje) => NovidadeAte is { } ate && ate >= hoje;
-
     public void Arquivar(DateTime agora)
     {
         if (EstaArquivado) return;
@@ -642,12 +640,6 @@ public class CardapioItem
             throw new RegraDeDominioVioladaException($"{nome} {porcao.Rotulo} está esgotado agora.");
         return porcao;
     }
-
-    /// <summary>
-    /// Há disponibilidade para venda: item sem opções segue <see cref="Disponivel"/>;
-    /// item guarda-chuva precisa de ao menos uma opção disponível.
-    /// </summary>
-    public bool TemDisponibilidade() => !TemVariacoes() || Variacoes.Any(v => v.Disponivel);
 
     /// <summary>Associa/desassocia a seção do item (null = sem seção).</summary>
     public void DefinirSecao(Guid? secaoId)

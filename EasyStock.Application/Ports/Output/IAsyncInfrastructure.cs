@@ -41,12 +41,6 @@ public interface IQueueService
 
     /// <summary>Processa mensagens de uma fila espec�fica.</summary>
     Task ProcessQueueAsync<T>(string queueName, Func<T, Task> processor, CancellationToken cancellationToken);
-
-    /// <summary>Obt�m o tamanho da fila.</summary>
-    Task<int> GetQueueLengthAsync(string queueName);
-
-    /// <summary>Limpa uma fila espec�fica.</summary>
-    Task ClearQueueAsync(string queueName);
 }
 
 /// <summary>

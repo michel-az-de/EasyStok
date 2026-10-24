@@ -2,12 +2,19 @@ import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 
-registerHooks({ resolve(spec, contexto, proximo) {
-  if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
-    try { return proximo(spec + '.js', contexto) } catch { /* resolução normal abaixo */ }
-  }
-  return proximo(spec, contexto)
-} })
+registerHooks({
+  resolve(spec, contexto, proximo) {
+    if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
+      try { return proximo(spec + '.js', contexto) } catch { /* resolução normal abaixo */ }
+    }
+    return proximo(spec, contexto)
+  },
+  // `fonteDados.js` lê `import.meta.env` do Vite; no node a fonte é fixa (a prova usa o modo API).
+  load(url, contexto, proximo) {
+    if (url.endsWith('/infra/fonteDados.js')) return { format: 'module', shortCircuit: true, source: "export const FONTE_API = true; export const API_BASE = ''" }
+    return proximo(url, contexto)
+  },
+})
 
 const { contextoDaAjuda, copiarDiagnostico, diagnosticoDoConsole } = await import('../src/features/ajuda/diagnosticoDoConsole.js')
 const { focarInicioDaTela } = await import('../src/app/focoDaNavegacao.js')

@@ -94,18 +94,4 @@ public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IO
         return presos.Count;
     }
 
-    public async Task<TimeSpan> LagDoMaisAntigoPendenteAsync(CancellationToken ct = default)
-    {
-        var maisAntigo = await db.Set<OutboxEventoIntegracao>()
-            .IgnoreQueryFilters()
-            .Where(e => e.Status == StatusOutboxIntegracao.Pendente)
-            .OrderBy(e => e.CriadoEm)
-            .Select(e => (DateTime?)e.CriadoEm)
-            .FirstOrDefaultAsync(ct);
-
-        if (maisAntigo is null) return TimeSpan.Zero;
-
-        var lag = DateTime.UtcNow - maisAntigo.Value;
-        return lag < TimeSpan.Zero ? TimeSpan.Zero : lag;
-    }
 }

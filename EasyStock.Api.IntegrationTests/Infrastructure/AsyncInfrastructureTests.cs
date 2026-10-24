@@ -2,8 +2,10 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Infra.Async;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Api.IntegrationTests.Infrastructure;
 
@@ -147,13 +149,12 @@ public sealed class AsyncInfrastructureFixture : IDisposable
 
     public AsyncInfrastructureFixture()
     {
-        // Cache: implementação REAL de produção (Infra.Async.InMemoryCacheService sobre
-        // IMemoryCache) — NÃO um shadow. Antes este arquivo redefinia uma classe
-        // InMemoryCacheService própria (Dictionary), sombrando a de produção: o "teste de
-        // integração" exercitava a reimplementação, não o código real (ver ADR-0023).
-        CacheService = new InMemoryCacheService(
-            new MemoryCache(new MemoryCacheOptions()),
-            NullLogger<InMemoryCacheService>.Instance);
+        // Cache: implementação REAL de produção (Infra.Async.RedisCacheService sobre o
+        // IDistributedCache em memória, o mesmo backend que o host usa em dev) — NÃO um shadow
+        // (ver ADR-0023).
+        CacheService = new RedisCacheService(
+            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
+            NullLogger<RedisCacheService>.Instance);
         QueueService = new BackgroundQueueService();
         // Email/Storage seguem como doubles em memória: não há implementação de produção
         // in-memory para esses ports, e os nomes não colidem com tipos de produção.

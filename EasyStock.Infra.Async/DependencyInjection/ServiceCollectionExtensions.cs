@@ -2,7 +2,6 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Pdf;
-using EasyStock.Infra.Async.Pagamentos;
 using EasyStock.Infra.Async.Pagamentos.Webhooks;
 using EasyStock.Infra.Async.Pdf;
 using Microsoft.Extensions.Caching.Memory;
@@ -27,8 +26,7 @@ public static class ServiceCollectionExtensions
         // Cache Service. <see cref="RedisCacheService"/> envelopa
         // <see cref="IDistributedCache"/> — quem registra o backend (Redis real
         // em prod ou MemoryDistributedCache em dev) e o host (ApiServiceCollectionExtensions
-        // .AddEasyStockCache). <see cref="InMemoryCacheService"/> existe como
-        // alternativa explicita pra fluxos in-process sem serializacao JSON.
+        // .AddEasyStockCache).
         services.AddSingleton<ICacheService, RedisCacheService>();
 
         // Queue Service
@@ -44,28 +42,6 @@ public static class ServiceCollectionExtensions
         // PDF Renderer (Modulo Financeiro F4) — QuestPDF stateless + threadsafe
         // PDF de etiqueta + Nota de Entrada (P5) — QuestPDF + QRCoder, stateless/threadsafe
         services.AddSingleton<IDocumentoEntradaPdfRenderer, DocumentoEntradaPdfRenderer>();
-        // PDF do extrato de fechamento de caixa (#642) — QuestPDF stateless/threadsafe
-        services.AddSingleton<IFechamentoCaixaExtratoRenderer, FechamentoCaixaExtratoRenderer>();
-
-        // Modulo Financeiro F3 — abstracao multi-gateway de pagamento.
-        // Adapters base sao Scoped (consomem repos scoped via DI). Cada IPagamentoGateway
-        // resolvido pelo router e envolvido por MeasuredPagamentoGatewayDecorator que mede
-        // latencia, classifica excecoes e alimenta IGatewayHealthStore.
-
-        // Concretes (registrados por tipo, sem expor como IPagamentoGateway)
-        services.AddScoped<EfiPixGatewayAdapter>();
-        services.AddScoped<ManualGatewayAdapter>();
-
-        // IPagamentoGateway = decorator(adapter). Adicionamos um por adapter ativo.
-        services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<EfiPixGatewayAdapter>()));
-        services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<ManualGatewayAdapter>()));
-
-        services.AddScoped<IPagamentoGatewayRouter, PagamentoGatewayRouter>();
-
-        // Onda P0 Payment Orchestration
-        services.AddSingleton<IGatewayHealthStore, NoopGatewayHealthStore>();
-        services.AddSingleton<IGatewayErrorClassifier, GatewayErrorClassifier>();
-        services.AddScoped<IPagamentoOrchestrator, PagamentoOrchestrator>();
 
         // Webhook processors (scoped)
         services.AddScoped<IGatewayWebhookProcessor, EfiPixWebhookProcessor>();
@@ -110,45 +86,6 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IEfiPixService, NoopEfiPixService>();
         }
 
-        // Efí Bank Boleto Gateway (reutiliza mesmo ClientId e chave Sandbox que Pix, só muda baseUrl e endpoint v1)
-        if (!string.IsNullOrWhiteSpace(efiClientId))
-        {
-            var isSandboxStr = configuration["Efi:Sandbox"];
-            var isSandbox = !bool.TryParse(isSandboxStr, out var sb2) || sb2;
-            var baseUrl = isSandbox ? "https://cobrancas-h.api.efipay.com.br" : "https://cobrancas.api.efipay.com.br";
-            services.AddTransient<IEfiBoletoService>(sp =>
-            {
-                var http = new HttpClient(EfiHandler, disposeHandler: false) { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };
-                return new EfiBoletoService(
-                    http,
-                    sp.GetRequiredService<IMemoryCache>(),
-                    configuration,
-                    sp.GetRequiredService<ILogger<EfiBoletoService>>());
-            });
-        }
-        else
-        {
-            services.AddSingleton<IEfiBoletoService, NoopEfiBoletoService>();
-        }
-
-        // F12 — Adapters de gateways internacionais (stubs).
-        // Registrados apenas quando ha credenciais OU quando AllowUnsigned=true
-        // (DEV/sandbox). Em prod sem credenciais, permanecem fora do router para
-        // nao oferecer metodos que vao falhar. Tambem envolvidos pelo decorator.
-        if (!string.IsNullOrWhiteSpace(configuration["Stripe:SecretKey"])
-            || string.Equals(configuration["Stripe:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddScoped<StripeGatewayAdapter>();
-            services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<StripeGatewayAdapter>()));
-            services.AddSingleton<IWebhookSignatureValidator, StripeSignatureValidator>();
-        }
-        if (!string.IsNullOrWhiteSpace(configuration["MercadoPago:AccessToken"])
-            || string.Equals(configuration["MercadoPago:WebhookAllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddScoped<MercadoPagoGatewayAdapter>();
-            services.AddScoped<IPagamentoGateway>(sp => DecorateGateway(sp, sp.GetRequiredService<MercadoPagoGatewayAdapter>()));
-        }
-
         // I3.1 (#1667): o webhook do Mercado Pago existe sempre, com ou sem token. Sem segredo configurado o
         // validador recusa (401); antes a rota respondia 404 e a falta de configuração passava em silêncio.
         services.AddSingleton<IWebhookSignatureValidator, MercadoPagoSignatureValidator>();
@@ -156,13 +93,6 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
-
-    private static MeasuredPagamentoGatewayDecorator DecorateGateway(IServiceProvider sp, IPagamentoGateway inner)
-        => new(
-            inner,
-            sp.GetRequiredService<IGatewayHealthStore>(),
-            sp.GetRequiredService<IGatewayErrorClassifier>(),
-            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MeasuredPagamentoGatewayDecorator>>());
 }
 
 /// <summary>

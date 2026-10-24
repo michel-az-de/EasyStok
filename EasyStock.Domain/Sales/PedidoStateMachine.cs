@@ -176,7 +176,6 @@ public static class PedidoStateMachine
         return passos;
     }
 
-    public static bool EstaAberto(StatusPedido status) => Abertos.Contains(status);
     public static bool EstaFinalizado(StatusPedido status) => Finais.Contains(status);
     public static bool DescontaEstoque(StatusPedido status) => ComEstoqueDescontado.Contains(status);
 }

@@ -1,5 +1,4 @@
 using EasyStock.Api.Data.Tenants;
-using EasyStock.Api.Data.Tenants.MassasVeneza;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Data;
@@ -7,17 +6,13 @@ namespace EasyStock.Api.Data;
 /// <summary>
 /// Orquestrador do seed multi-tenant. A definição de cada tenant vive em
 /// <c>Tenants/&lt;Nome&gt;Seed.cs</c>; helpers compartilhados em
-/// <c>SeedData.Helpers.cs</c> e <c>SeedData.NewHelpers.cs</c>.
+/// <c>SeedData.Helpers.cs</c>.
 ///
-/// Variáveis de ambiente:
+/// Variável de ambiente:
 /// - <c>SEED_DEMO_DATA=false</c> ativa <see cref="ExecutarMinimalAsync"/> (apenas 1 admin).
-/// - <c>SEED_DEMO_VOLUME=small|medium|large</c> seleciona quais tenants rodam.
-///   Default: <c>large</c> (4 tenants).
 /// </summary>
 public static partial class SeedData
 {
-    public enum Volume { Small, Medium, Large }
-
     public static async Task ExecutarAsync(IServiceProvider services, ILogger logger)
     {
         var seedDemoData = Environment.GetEnvironmentVariable("SEED_DEMO_DATA");
@@ -27,36 +22,15 @@ public static partial class SeedData
             return;
         }
 
-        var volume = ParseVolume(Environment.GetEnvironmentVariable("SEED_DEMO_VOLUME"));
-        logger.LogInformation("Seed demo iniciando — volume={Volume}", volume);
-
         var context = services.GetRequiredService<EasyStockDbContext>();
         var agora = ArredondarAoMinuto(DateTime.UtcNow);
 
-        // Cada tenant é idempotente (upsert). Rodar sem tx explícita elimina o conflito
+        // O tenant é idempotente (upsert). Rodar sem tx explícita elimina o conflito
         // com NpgsqlRetryingExecutionStrategy ("does not support user-initiated transactions").
-        // SaveChanges de cada tenant já é transacional internamente.
-        logger.LogInformation("Seed demo — T1: PastaBella");
-        await PastaBellaSpSeed.ExecutarAsync(context, agora, logger);
+        // SaveChanges do tenant já é transacional internamente.
+        logger.LogInformation("Seed demo — CasaDaBaba");
+        await CasaDaBabaSeed.ExecutarAsync(context, agora, logger);
         await context.SaveChangesAsync(); context.ChangeTracker.Clear();
-
-        logger.LogInformation("Seed demo — T2: CantinaMauricio");
-        await CantinaMauricioSeed.ExecutarAsync(context, agora, logger);
-        await context.SaveChangesAsync(); context.ChangeTracker.Clear();
-
-        if (volume >= Volume.Medium)
-        {
-            logger.LogInformation("Seed demo — T3: CasaDaBaba");
-            await CasaDaBabaSeed.ExecutarAsync(context, agora, logger);
-            await context.SaveChangesAsync(); context.ChangeTracker.Clear();
-        }
-
-        if (volume >= Volume.Large)
-        {
-            logger.LogInformation("Seed demo — T4: MassasVeneza");
-            await MassasVenezaSeed.ExecutarAsync(context, agora, logger);
-            await context.SaveChangesAsync(); context.ChangeTracker.Clear();
-        }
 
         logger.LogInformation("Seed demo concluído.");
     }
@@ -153,14 +127,6 @@ public static partial class SeedData
             "Seed minimal concluído. Empresa='{Empresa}' Loja='{Loja}' Admin='{Email}'",
             empresaNome, lojaNome, adminEmail);
     }
-
-    private static Volume ParseVolume(string? raw) => (raw ?? string.Empty).Trim().ToLowerInvariant() switch
-    {
-        "small" => Volume.Small,
-        "medium" => Volume.Medium,
-        "large" or "" => Volume.Large,
-        _ => Volume.Large
-    };
 
     /// <summary>
     /// Arredonda ao minuto para evitar drift de auditoria entre runs (importante

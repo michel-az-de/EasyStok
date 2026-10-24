@@ -3,7 +3,9 @@ import { Botao } from '../../componentes/Botao'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
-import { useAcoes } from '../../aplicacao/contextos'
+import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { respostasEditaveis } from '../../dominio/acessoModulos'
 import { dataHora } from '../../dominio/formato'
 import { primeiroNome } from '../../dominio/mensagem'
 import {
@@ -19,6 +21,10 @@ export function ModalProgramarMensagem({
   conversa, canal, rascunho, aoAgendar, aoFechar,
 }) {
   const { programarMensagem, listarProgramadas, cancelarProgramada } = useAcoes()
+  const { fonteApi } = useAtendimento()
+  const { acoes } = useAcessoModulos()
+  // #1992: agendar e cancelar é da gerência (a API recusa o Operador); a atendente consulta as programadas.
+  const editavel = respostasEditaveis({ fonteApi, acoes })
   const [quando, setQuando] = useState(() => horarioLocalPadrao(Date.now()))
   const [texto, setTexto] = useState(rascunho ?? '')
   const [finalidade, setFinalidade] = useState(FINALIDADES[0].valor)
@@ -58,7 +64,7 @@ export function ModalProgramarMensagem({
   const fechar = () => { if (!ocupado.current) aoFechar() }
 
   async function programar() {
-    if (ocupado.current || bloqueado) return
+    if (ocupado.current || bloqueado || !editavel) return
     const falta = faltaParaProgramar({ agendadaPara, agoraMs: Date.now(), usarModelo: comModelo, texto, nomeModelo })
     if (falta) { setErro(falta); return }
     setErro(null)
@@ -116,7 +122,7 @@ export function ModalProgramarMensagem({
       rodape={(
         <>
           <Botao onClick={fechar} disabled={salvando}>Fechar</Botao>
-          <Botao variante="primario" icone="relogio" disabled={salvando || bloqueado} onClick={programar}>
+          <Botao variante="primario" icone="relogio" disabled={salvando || bloqueado || !editavel} onClick={programar}>
             {salvando ? 'Aguarde…' : 'Programar'}
           </Botao>
         </>
@@ -124,7 +130,8 @@ export function ModalProgramarMensagem({
     >
       <div className={css.programar}>
         {bloqueado && <p className={css.programarErro}>Cliente bloqueado. Desbloqueie na ficha para programar. Você pode consultar e cancelar os agendamentos existentes.</p>}
-        <fieldset className={css.programarCampos} disabled={salvando || bloqueado}>
+        {!editavel && <p className={css.restricao}>Só a dona ou um gerente programa e cancela mensagens. Aqui você consulta as programadas desta conversa.</p>}
+        <fieldset className={css.programarCampos} disabled={salvando || bloqueado || !editavel}>
         <div className={css.programarQuando}>
         <CampoTexto
           rotulo="Quando enviar"
@@ -192,7 +199,7 @@ export function ModalProgramarMensagem({
                   <div className={css.programadaTopo}>
                     <strong>{p.agendadaPara ? dataHora(p.agendadaPara) : 'sem horário'}</strong>
                     <Pilula tom={situacao.tom}>{situacao.rotulo}</Pilula>
-                    {podeCancelar(p) && (
+                    {editavel && podeCancelar(p) && (
                       <Botao variante="texto" disabled={salvando} onClick={() => cancelar(p.id)}>Cancelar</Botao>
                     )}
                   </div>

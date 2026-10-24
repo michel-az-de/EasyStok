@@ -214,23 +214,6 @@ public class OutboxEventoIntegracaoTests
     }
 
     [Fact]
-    public void Reprocessar_reseta_tentativas_e_status()
-    {
-        var evt = OutboxEventoIntegracao.Criar(
-            Guid.NewGuid(), "evt", "Agg", Guid.NewGuid(), "{}",
-            maxTentativas: 1);
-        evt.MarcarFalhaTentativa("falha", TimeSpan.Zero);
-        evt.Status.Should().Be(StatusOutboxIntegracao.Falhado);
-
-        evt.Reprocessar();
-
-        evt.Status.Should().Be(StatusOutboxIntegracao.Pendente);
-        evt.Tentativas.Should().Be(0);
-        evt.ErroUltimaTentativa.Should().BeNull();
-        evt.ProximaTentativaEm.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
-    }
-
-    [Fact]
     public void Cancelar_seta_status_e_processadoEm()
     {
         var evt = CriarValido();

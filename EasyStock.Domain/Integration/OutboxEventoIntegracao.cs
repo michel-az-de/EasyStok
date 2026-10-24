@@ -197,18 +197,6 @@ public class OutboxEventoIntegracao
             : StatusOutboxIntegracao.Pendente;
     }
 
-    /// <summary>
-    /// Reseta pra Pendente com tentativas zeradas — admin reprocessa
-    /// item Falhado após corrigir causa raiz.
-    /// </summary>
-    public void Reprocessar()
-    {
-        Status = StatusOutboxIntegracao.Pendente;
-        Tentativas = 0;
-        ProximaTentativaEm = DateTime.UtcNow;
-        ErroUltimaTentativa = null;
-    }
-
     public void Cancelar()
     {
         Status = StatusOutboxIntegracao.Cancelado;

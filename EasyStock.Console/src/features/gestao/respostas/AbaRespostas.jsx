@@ -4,7 +4,7 @@ import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { automacoesEditaveis } from '../../../dominio/acessoModulos'
+import { automacoesEditaveis, respostasEditaveis } from '../../../dominio/acessoModulos'
 import {
   VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, variaveisForaDaApi,
 } from '../../../dominio/automacao'
@@ -60,6 +60,10 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
 function SecaoRespostas() {
   const { respostasProntas } = useCatalogo()
   const { incluirRespostaPronta, editarRespostaPronta, alternarArquivamentoRespostaPronta } = useAcoes()
+  const { fonteApi } = useAtendimento()
+  const { acoes } = useAcessoModulos()
+  // #1992: criar, editar e arquivar é da gerência (a API recusa o Operador); a atendente usa pelo / no campo.
+  const editavel = respostasEditaveis({ fonteApi, acoes })
   const [busca, setBusca] = useState('')
   const buscaRef = useRef(null)
   const [verArquivadas, setVerArquivadas] = useState(false)
@@ -81,8 +85,9 @@ function SecaoRespostas() {
         <div>
           <h3 id="gestao-respostas">Respostas prontas</h3>
           <p className={css.descricao}>{plural(ativas, 'ativa', 'ativas')}. No atendimento, digite / no campo ou toque em Respostas.</p>
+          {!editavel && <p className={css.descricao}>Só a dona ou um gerente cria, edita e arquiva respostas prontas.</p>}
         </div>
-        <Botao variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando !== null}>Nova resposta</Botao>
+        {editavel && <Botao variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando !== null}>Nova resposta</Botao>}
       </header>
 
       <div className={css.filtros}>
@@ -109,7 +114,7 @@ function SecaoRespostas() {
 
       {lista.length === 0 ? (
         <Vazio icone={busca ? 'search' : 'respostas'} titulo={busca ? 'Nada com essa busca.' : 'Nenhuma resposta pronta ainda.'}>
-          {busca ? 'Tente outro título, atalho ou trecho da resposta.' : 'Use Nova resposta para guardar as mensagens que você envia com frequência.'}
+          {busca ? 'Tente outro título, atalho ou trecho da resposta.' : editavel ? 'Use Nova resposta para guardar as mensagens que você envia com frequência.' : 'A dona ou um gerente cadastra as respostas prontas.'}
         </Vazio>
       ) : (
         <ul className={css.lista}>
@@ -129,12 +134,12 @@ function SecaoRespostas() {
                     {r.arquivada && <span className={css.marca}>arquivada</span>}
                     <span className={css.texto}>{r.texto}</span>
                   </div>
-                  <div className={css.acoesLinha}>
+                  {editavel && <div className={css.acoesLinha}>
                     {!r.arquivada && <Botao variante="texto" disabled={editando !== null} icone="lapis" aria-label={`Editar resposta ${r.titulo}`} onClick={() => setEditando(r.id)}>Editar</Botao>}
                     <Botao variante="texto" disabled={editando !== null} aria-label={`${r.arquivada ? 'Restaurar' : 'Arquivar'} resposta ${r.titulo}`} icone={r.arquivada ? 'undo-2' : 'archive'} onClick={() => alternarArquivamentoRespostaPronta(r.id)}>
                       {r.arquivada ? 'Restaurar' : 'Arquivar'}
                     </Botao>
-                  </div>
+                  </div>}
                 </>
               )}
             </li>

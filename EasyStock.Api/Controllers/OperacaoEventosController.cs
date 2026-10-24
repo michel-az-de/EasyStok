@@ -9,11 +9,12 @@ namespace EasyStock.Api.Controllers;
 /// Entrega os eventos nomeados da empresa da claim (<c>pedido.pago</c>, <c>pedido.mudou_status</c>,
 /// <c>conversa.mensagem_recebida</c>, ...) e um heartbeat a cada 25 s. <c>Last-Event-ID</c> é ignorado nesta
 /// versão: sem replay, o cliente recarrega a lista ao reconectar. O stream fecha no <c>exp</c> do JWT e quando a
-/// sessão do usuário é revogada (#1352), conferido a cada heartbeat.
+/// sessão do usuário é revogada (#1352), conferido a cada heartbeat. #1265-7: a mesma política de nível do KDS e das
+/// conversas (<c>Operador</c>); o módulo vem da <c>ModulosConvention</c> (Atendimento, Cozinha ou Entregas).
 /// </summary>
 [ApiController]
 [Route("api/operacao/eventos")]
-[Authorize]
+[Authorize(Policy = "Operador")]
 public class OperacaoEventosController(
     OperacaoEventBroker broker,
     ICurrentUserAccessor currentUser,

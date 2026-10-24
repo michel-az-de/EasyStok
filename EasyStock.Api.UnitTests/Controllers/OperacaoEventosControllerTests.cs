@@ -49,7 +49,8 @@ public class OperacaoEventosControllerTests
                 ValidAudience = "teste",
                 IssuerSigningKey = new SymmetricSecurityKey(new byte[32]),
             });
-        builder.Services.AddAuthorization();
+        // A política da rota (#1265-7), como no ApiServiceCollectionExtensions.
+        builder.Services.AddAuthorization(o => o.AddPolicy("Operador", p => p.RequireClaim("nivel", "SuperAdmin", "Admin", "Gerente", "Operador")));
         builder.Services.AddControllers()
             .ConfigureApplicationPartManager(m =>
             {
@@ -123,6 +124,15 @@ public class OperacaoEventosControllerTests
             .SelectMany(m => m.GetCustomAttributes<Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute>())
             .Should().BeEmpty();
     }
+
+    [Fact]
+    public void ExigeAPoliticaOperadorComoKdsEConversas() =>
+        // #1265-7: o SSE só tinha [Authorize]; Visualizador recebia os eventos que o KDS e as conversas negam a ele.
+        typeof(OperacaoEventosController).GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true)
+            .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>().Select(a => a.Policy)
+            .Should().Contain("Operador").And.BeEquivalentTo(typeof(KdsController)
+                .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true)
+                .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>().Select(a => a.Policy));
 
     [Fact]
     public void HeartbeatPadraoDe25Segundos() =>

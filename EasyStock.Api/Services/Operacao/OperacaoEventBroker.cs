@@ -145,20 +145,6 @@ public class OperacaoEventBroker(ILogger<OperacaoEventBroker> log)
         return Task.CompletedTask;
     }
 
-    /// <summary>Notifica device específico de comando pendente.</summary>
-    public Task NotifyCommandQueuedAsync(string deviceId, string commandType)
-    {
-        var data = JsonSerializer.Serialize(new
-        {
-            type = "command-queued",
-            deviceId,
-            commandType,
-            serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-        });
-        Broadcast(slot => slot.Canal == CanalSse.Mobile && slot.DeviceId == deviceId, new MensagemSse(null, data));
-        return Task.CompletedTask;
-    }
-
     /// <summary>
     /// C4 — Notifica todos devices da mesma loja (exceto o device origem) que
     /// um pedido transicionou pro status "pronto". PWA escuta e dispara

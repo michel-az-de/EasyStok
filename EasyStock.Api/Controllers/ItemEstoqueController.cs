@@ -205,20 +205,6 @@ public class ItemEstoqueController(
         return DataOk(items.Select(MapItemToDto));
     }
 
-    [SwaggerOperation(Summary = "Get stock item replenishment data")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [HttpGet("{id}/para-reposicao")]
-    public async Task<IActionResult> ParaReposicao(Guid id, [FromQuery] Guid empresaId)
-    {
-        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
-            return error!;
-
-        var item = await itemEstoqueRepository.GetItemComProdutoAsync(resolvedEmpresaId, id);
-        return item is null ? DataNotFound() : DataOk(item);
-    }
-
     [SwaggerOperation(Summary = "Replenish stock")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

@@ -113,7 +113,7 @@ public sealed class GeradorNotificacoesAutomaticas(
 
     /// <summary>
     /// <c>ItemEstoque.Status</c> é coluna materializada: lote que vence parado seguia Ok/Slow/Critical e as telas e
-    /// filtros por status o tratavam como vigente (estoque-08). O Domínio decide o status (<c>RecalcularStatus</c>).
+    /// filtros por status o tratavam como vigente (estoque-08). O Domínio decide o status (<c>RecalcularIndicadores</c>).
     /// </summary>
     private async Task<int> MarcarLotesVencidosAsync(Guid empresaId, DateTime agora, DateOnly hojeBrasilia, CancellationToken ct)
     {
@@ -123,7 +123,7 @@ public sealed class GeradorNotificacoesAutomaticas(
         var marcados = 0;
         foreach (var lote in lotes)
         {
-            lote.RecalcularStatus(agora);
+            lote.RecalcularIndicadores(agora);
             if (lote.Status != StatusItemEstoque.Vencido)
                 continue;
 

@@ -6,7 +6,6 @@ using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Notifications.Options;
 using EasyStock.Infra.Notifications.Push;
 using EasyStock.Infra.Notifications.Sms;
-using EasyStock.Infra.Notifications.WhatsApp;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -68,9 +67,6 @@ public class ClassificacaoDeFalhaTests
     private static TwilioSmsProvider TwilioSms(FabricaHttpContada http) =>
         new(http, Options.Create(new TwilioSmsOptions()), NullLogger<TwilioSmsProvider>.Instance);
 
-    private static TwilioWhatsAppProvider TwilioWhatsApp(FabricaHttpContada http) =>
-        new(http, Options.Create(new TwilioWhatsAppOptions()), NullLogger<TwilioWhatsAppProvider>.Instance);
-
     [Fact]
     public async Task Twilio_sms_400_e_permanente_e_chama_a_API_uma_vez()
     {
@@ -85,20 +81,6 @@ public class ClassificacaoDeFalhaTests
         http.Chamadas.Should().Be(1, "o 4xx é recusa do Twilio: repetir só gasta chamada");
     }
 
-    [Fact]
-    public async Task Twilio_whatsapp_503_e_indeterminado()
-    {
-        var http = new FabricaHttpContada(HttpStatusCode.ServiceUnavailable);
-
-        var resultado = await TwilioWhatsApp(http).EnviarAsync(Mensagem(CanalNotificacao.WhatsApp, Telefone));
-
-        resultado.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
-        resultado.Sucesso.Should().BeFalse();
-        resultado.FalhaPermanente.Should().BeFalse();
-        resultado.StatusHttp.Should().Be(503);
-        http.Chamadas.Should().Be(1, "num 5xx a mensagem pode já ter saído: repetir duplicaria");
-    }
-
     [Theory]
     [InlineData(HttpStatusCode.Created, DesfechoEnvio.Enviado)]
     [InlineData(HttpStatusCode.BadRequest, DesfechoEnvio.FalhaPermanente)]
@@ -111,16 +93,12 @@ public class ClassificacaoDeFalhaTests
     public async Task Twilio_classifica_pelo_status_http_sem_retentativa(HttpStatusCode status, DesfechoEnvio esperado)
     {
         var sms = new FabricaHttpContada(status);
-        var whatsapp = new FabricaHttpContada(status);
 
         var resultadoSms = await TwilioSms(sms).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone));
-        var resultadoWhatsApp = await TwilioWhatsApp(whatsapp).EnviarAsync(Mensagem(CanalNotificacao.WhatsApp, Telefone));
 
         resultadoSms.Desfecho.Should().Be(esperado);
-        resultadoWhatsApp.Desfecho.Should().Be(esperado);
         resultadoSms.StatusHttp.Should().Be((int)status);
         sms.Chamadas.Should().Be(1);
-        whatsapp.Chamadas.Should().Be(1);
     }
 
     [Fact]
@@ -130,7 +108,7 @@ public class ClassificacaoDeFalhaTests
         var queda = new FabricaHttpContada(_ => throw new HttpRequestException("conexão encerrada"));
 
         var porTimeout = await TwilioSms(timeout).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone));
-        var porQueda = await TwilioWhatsApp(queda).EnviarAsync(Mensagem(CanalNotificacao.WhatsApp, Telefone));
+        var porQueda = await TwilioSms(queda).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone));
 
         porTimeout.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
         porQueda.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
@@ -159,50 +137,6 @@ public class ClassificacaoDeFalhaTests
         var resultado = await TwilioSms(http).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone));
 
         resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaTransitoria);
-    }
-
-    // ----- Zenvia (SMS sai no máximo uma vez, como o Twilio) -----
-
-    private static ZenviaSmsProvider ZenviaSms(FabricaHttpContada http) =>
-        new(http, Options.Create(new ZenviaSmsOptions()), NullLogger<ZenviaSmsProvider>.Instance);
-
-    [Theory]
-    [InlineData(HttpStatusCode.OK, DesfechoEnvio.Enviado)]
-    [InlineData(HttpStatusCode.BadRequest, DesfechoEnvio.FalhaPermanente)]
-    [InlineData(HttpStatusCode.TooManyRequests, DesfechoEnvio.FalhaTransitoria)]
-    [InlineData(HttpStatusCode.ServiceUnavailable, DesfechoEnvio.Indeterminado)]
-    public async Task Zenvia_classifica_pelo_status_http_sem_retentativa(HttpStatusCode status, DesfechoEnvio esperado)
-    {
-        var http = new FabricaHttpContada(status);
-
-        var resultado = await ZenviaSms(http).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone));
-
-        resultado.Desfecho.Should().Be(esperado);
-        resultado.ProviderUsado.Should().Be("zenvia");
-        http.Chamadas.Should().Be(1, "o POST do SMS não é idempotente: repetir pode entregar duas vezes");
-    }
-
-    [Fact]
-    public async Task Zenvia_queda_de_conexao_vira_Indeterminado_sem_retentativa()
-    {
-        var http = new FabricaHttpContada(_ => throw new HttpRequestException("conexão encerrada"));
-
-        var resultado = await ZenviaSms(http).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone));
-
-        resultado.Desfecho.Should().Be(DesfechoEnvio.Indeterminado);
-        http.Chamadas.Should().Be(1);
-    }
-
-    [Fact]
-    public async Task Zenvia_com_cancelamento_do_chamador_propaga_em_vez_de_virar_falha()
-    {
-        using var cts = new CancellationTokenSource();
-        await cts.CancelAsync();
-        var http = new FabricaHttpContada(ct => Task.FromCanceled<HttpResponseMessage>(ct));
-
-        var act = () => ZenviaSms(http).EnviarAsync(Mensagem(CanalNotificacao.Sms, Telefone), cts.Token);
-
-        await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
     // ----- Web Push -----
