@@ -155,8 +155,6 @@ export function validarPeca({ nome, descricao, foto }) {
   return problemas
 }
 
-export const pecaPorId = (pecas, id) => pecas.find((p) => p.id === id) ?? null
-
 // Id gerado do nome (mesmo método de `dominio/cardapio.js:gerarSkuNovoItem`):
 // quem cadastra pensa em "Torta de limão", não digita id nenhum, e nenhuma
 // camada acima (features não importa infra) precisa gerar identificador.

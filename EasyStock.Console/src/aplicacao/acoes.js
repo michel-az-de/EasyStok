@@ -92,10 +92,6 @@ export const REMOVER_TAG = 'remover-tag'
 export const EDITAR_TAG = 'editar-tag'
 
 // Frente 3 · Comanda e cardápio.
-export const ADICIONAR_ACRESCIMO = 'adicionar-acrescimo'
-export const TIRAR_ACRESCIMO = 'tirar-acrescimo'
-export const TIRAR_ITEM_PAGO = 'tirar-item-pago'
-export const SEPARAR_ITEM_ANOTADO = 'separar-item-anotado'
 export const MARCAR_CANHOTO_IMPRESSO = 'marcar-canhoto-impresso'
 
 // Frente 4 · Cobrança.
@@ -145,7 +141,6 @@ export const SIMULAR_CONVERSA = 'simular-conversa'
 export const SIMULAR_MENSAGEM = 'simular-mensagem'
 export const SIMULAR_PAGAMENTO = 'simular-pagamento'
 export const DESLOCAR_RELOGIO = 'deslocar-relogio'
-export const PAUSAR_SIMULACOES = 'pausar-simulacoes'
 export const LIMPAR_SIMULACOES = 'limpar-simulacoes'
 
 // Área de entrega (rodada 5, RN-09/RN-10/RN-11, UC-02): as três ações de um

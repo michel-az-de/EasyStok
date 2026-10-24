@@ -269,16 +269,6 @@ export const liberaEsteira = (cobranca) => {
 // ficha lerem a MESMA regra, em vez de cada tela decidir o que é estar pago.
 export const sinalVerde = (pedido) => liberaEsteira(pedido?.cobranca)
 
-// Contagem regressiva em mm:ss. O relógio da tela anda de 30 em 30 segundos e a
-// contagem acompanha ele: o número na tela é sempre o mesmo instante que as ações
-// carimbam, nunca um relógio paralelo.
-export function contagemRegressiva(restamMs) {
-  const segundosTotais = Math.max(Math.ceil(restamMs / 1000), 0)
-  const minutos = Math.floor(segundosTotais / 60)
-  const segundos = segundosTotais % 60
-  return minutos + ':' + String(segundos).padStart(2, '0')
-}
-
 const resumirItens = (pedido, cardapio) => itensDetalhados(pedido, cardapio)
   .map((linha) => linha.qtd + '× ' + (linha.produto?.nome ?? linha.sku))
   .join(', ')
@@ -325,45 +315,6 @@ export function textoDaCobranca(cobranca, pedido, cardapio) {
 // esse silêncio que faz ele perguntar três vezes se caiu.
 export const TEXTO_DE_CONFERENCIA = 'Recebi seu comprovante, obrigada! '
   + 'Estou conferindo a baixa e já te confirmo por aqui.'
-
-// A esteira só abre depois que o dinheiro é reconhecido. Pedido que já passou de
-// aguardando veio de outro caminho (venda antiga, massa de teste) e não é travado
-// de novo: travar o passado deixaria pedido em preparo preso para sempre.
-export function travaDaEsteira(pedido, agora) {
-  if (!pedido || pedido.estado !== 'aguardando') return null
-  const situacao = situacaoDaCobranca(pedido.cobranca, agora)
-  const TRAVAS = {
-    nenhuma: {
-      titulo: 'A cobrança ainda não saiu.',
-      detalhe: 'Gere a cobrança na ficha. O pedido entra na fila de preparo quando o pagamento cair.',
-    },
-    expirada: {
-      titulo: 'A cobrança venceu sem pagamento.',
-      detalhe: 'Reenvie a cobrança. Enquanto não pagar, o pedido não ocupa o fogão.',
-    },
-    'em-conferencia': {
-      titulo: 'Comprovante em conferência.',
-      detalhe: 'A baixa do banco ainda não chegou. Print não libera pedido, comprovante se falsifica.',
-    },
-    divergente: {
-      titulo: 'O valor que caiu é diferente do cobrado.',
-      detalhe: 'Aceite a diferença ou cobre o que faltou. A decisão é sua, o sistema não escolhe.',
-    },
-    // Maquininha ou vale: não deveria durar, porque a esteira anda assim que a
-    // cobrança nasce (liberaEsteiraSemPagar). Fica de guarda para o caso de um
-    // item novo prender o pedido em "aguardando" antes de a esteira avançar.
-    combinada: {
-      titulo: 'Cobrando na entrega.',
-      detalhe: 'Sem prazo aqui: o entregador ou você confirma o recebido quando o dinheiro cair na mão.',
-    },
-    aguardando: {
-      titulo: 'Esperando a cobrança cair.',
-      detalhe: 'Faltam ' + contagemRegressiva(situacao.restamMs)
-        + '. Se ele mandar o comprovante, marque em conferência.',
-    },
-  }
-  return TRAVAS[situacao.chave] ? { chave: situacao.chave, ...TRAVAS[situacao.chave] } : null
-}
 
 // ---------------------------------------------------------------------------
 // Rodada 12 (issue #13, feedback da Thatiane no vídeo): trocar a forma depois

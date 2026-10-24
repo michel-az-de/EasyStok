@@ -117,8 +117,6 @@ export function ordemSugeridaDaViagem(paradas, janelas, agora) {
   })
 }
 
-export const viagemPorId = (conversas, id) => viagensDeHoje(conversas).find((v) => v.id === id) ?? null
-
 // Toda conversa com pedido é "entrega de hoje" (a janela default de um
 // pedido novo já é de hoje, `dominio/pedido.js:novoPedido`). Cancelada e
 // entregue continuam na lista: os chips do topo (seção 6) que escondem ou
