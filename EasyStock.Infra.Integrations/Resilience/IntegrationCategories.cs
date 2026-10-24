@@ -25,6 +25,12 @@ public static class IntegrationCategories
     /// </summary>
     public const string WhatsAppEnvio = "whatsapp-envio";
 
+    /// <summary>
+    /// Envio de Instagram e Messenger (<c>POST me/messages</c>): o mesmo pipeline sem retry do
+    /// <see cref="WhatsAppEnvio"/>, com disjuntor próprio, para a falha de um canal não fechar o outro (#2025).
+    /// </summary>
+    public const string MetaEnvio = "meta-envio";
+
     public static readonly IReadOnlyCollection<string> All = new[]
     {
         Payments, Fiscal, Marketplace, Logistics, WhatsApp,
