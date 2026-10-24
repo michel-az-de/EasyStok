@@ -56,7 +56,7 @@ public class SyncMutationDispatcher(
                 await ApplyCashEntryDelete(m, deviceId, operatorName, empresaId);
                 break;
             case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
-            case "closing":   await ApplyClosing(m, deviceId, empresaId);                         break;
+            case "closing":   await ApplyClosing(empresaId);                                      break;
             case "stock":     await ApplyStockDelta(m, deviceId, operatorName, empresaId);        break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
@@ -644,10 +644,10 @@ public class SyncMutationDispatcher(
     /// aparelho criava ou sobrescrevia o <c>FechamentoCaixa</c> com saldo inicial e vendas zerados e sem marcador,
     /// e a abertura do dia seguinte recusava. O PWA não manda esta mutação; a de um cliente antigo é ignorada.
     /// </summary>
-    private Task ApplyClosing(MutationDto m, string deviceId, Guid? empresaId)
+    private Task ApplyClosing(Guid? empresaId)
     {
-        _log.LogWarning("Fechamento de caixa vindo do aparelho ignorado: device={DeviceId} empresa={EmpresaId} mutation={MutationId}",
-            deviceId, empresaId, m.Id);
+        // Só a empresa (do servidor): id do aparelho e da mutação vêm do corpo do sync (CodeQL cs/log-forging).
+        _log.LogWarning("Fechamento de caixa vindo do aparelho ignorado: empresa={EmpresaId}", empresaId);
         return Task.CompletedTask;
     }
 }
