@@ -1,17 +1,6 @@
-namespace EasyStock.Application.Common;
+using EasyStock.Domain.Defaults;
 
-/// <summary>Origem da zona de fuso resolvida em <see cref="HorarioBrasil"/>.</summary>
-public enum FonteFuso
-{
-    /// <summary>Resolvida pelo id IANA "America/Sao_Paulo" (Linux/container, ideal).</summary>
-    Iana,
-    /// <summary>Resolvida pelo id Windows "E. South America Standard Time" (dev Windows).</summary>
-    Windows,
-    /// <summary>Nem IANA nem Windows disponiveis (ex.: container sem tzdata): caiu na
-    /// zona fixa -03:00. App sobe, mas opera em modo degradado — startup em producao
-    /// deve recusar subir nesse caso (ver StartupHardening.ValidateTimezone).</summary>
-    FallbackFixo,
-}
+namespace EasyStock.Application.Common;
 
 /// <summary>
 /// Dia operacional no fuso de Brasilia (America/Sao_Paulo). O servidor roda em UTC, entao
@@ -28,23 +17,17 @@ public enum FonteFuso
 ///    DataUtc.ParaUtc): comparar contra <see cref="HojeInstanteUtc"/> (meia-noite UTC = 00:00Z).
 ///    NAO use JanelaDiaUtc aqui: 03:00Z marcaria como vencido algo que vence hoje.
 ///
-/// Espelha EasyStock.Web.Helpers.BrazilTime; o valor canonico do TZ vive em
-/// EasyStock.Domain.Defaults.OperacionalDefaults.Timezone ("America/Sao_Paulo").
+/// A zona e resolvida uma vez so, em <see cref="OperacionalFuso"/> (Domain), e esta classe delega para ela.
 /// </summary>
 public static class HorarioBrasil
 {
-    private const string IanaId = "America/Sao_Paulo";
-    private const string WindowsId = "E. South America Standard Time";
-
-    private static readonly (TimeZoneInfo Tz, FonteFuso Fonte) Resolvido = Resolver(TimeZoneInfo.FindSystemTimeZoneById);
-
-    private static TimeZoneInfo Tz => Resolvido.Tz;
+    private static TimeZoneInfo Tz => OperacionalFuso.Zona;
 
     /// <summary>Como o fuso foi resolvido neste processo (diagnostico p/ /health e startup).</summary>
-    public static FonteFuso Fonte => Resolvido.Fonte;
+    public static FonteFuso Fonte => OperacionalFuso.Fonte;
 
     /// <summary>True quando nem IANA nem Windows resolveram e caiu na zona fixa -03:00.</summary>
-    public static bool Degradado => Resolvido.Fonte == FonteFuso.FallbackFixo;
+    public static bool Degradado => Fonte == FonteFuso.FallbackFixo;
 
     /// <summary>Id da zona resolvida (diagnostico p/ /health e startup).</summary>
     public static string ZonaId => Tz.Id;
@@ -52,36 +35,14 @@ public static class HorarioBrasil
     /// <summary>Offset atual de Brasilia em minutos (-180 normal; -120 so se o DST voltar).</summary>
     public static int OffsetMinutosAtual() => (int)Tz.GetUtcOffset(DateTime.UtcNow).TotalMinutes;
 
-    /// <summary>
-    /// Resolve a zona de Brasilia: IANA -> Windows -> zona fixa -03:00. NUNCA lanca (a versao
-    /// antiga lancava se faltasse tzdata no container, derrubando a 1a request). O `finder`
-    /// e injetavel para teste do caminho de fallback.
-    /// </summary>
-    public static (TimeZoneInfo Tz, FonteFuso Fonte) Resolver(Func<string, TimeZoneInfo> finder)
-    {
-        try { return (finder(IanaId), FonteFuso.Iana); }
-        catch (TimeZoneNotFoundException) { }
-        catch (InvalidTimeZoneException) { }
+    /// <summary>Resolve a zona de Brasilia (IANA, Windows, fixo -03:00); a regra vive em <see cref="OperacionalFuso"/>.</summary>
+    public static (TimeZoneInfo Tz, FonteFuso Fonte) Resolver(Func<string, TimeZoneInfo> finder) => OperacionalFuso.Resolver(finder);
 
-        try { return (finder(WindowsId), FonteFuso.Windows); }
-        catch (TimeZoneNotFoundException) { }
-        catch (InvalidTimeZoneException) { }
-
-        return (ZonaFixaBrasilia(), FonteFuso.FallbackFixo);
-    }
-
-    /// <summary>Zona fixa -03:00 sem DST. Brasil nao adota horario de verao desde a Lei
-    /// 13.650/2019, entao o offset fixo e correto p/ datas atuais; e a rede de seguranca
-    /// para o app subir em qualquer ambiente.</summary>
-    public static TimeZoneInfo ZonaFixaBrasilia() => TimeZoneInfo.CreateCustomTimeZone(
-        "America/Sao_Paulo (fixo -03:00)", TimeSpan.FromHours(-3), "Horario de Brasilia (fixo)", "BRT");
+    /// <summary>Zona fixa -03:00 sem DST (a rede de seguranca de <see cref="OperacionalFuso"/>).</summary>
+    public static TimeZoneInfo ZonaFixaBrasilia() => OperacionalFuso.ZonaFixaBrasilia();
 
     /// <summary>Instante UTC -> data do dia em Brasilia (robusto p/ Kind Utc/Unspecified).</summary>
-    public static DateOnly DataOperacional(DateTime utc)
-    {
-        var asUtc = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
-        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(asUtc, Tz));
-    }
+    public static DateOnly DataOperacional(DateTime utc) => OperacionalFuso.DataOperacional(utc);
 
     /// <summary>Dia operacional de "agora" em Brasilia (equivalente ao BrazilTime.Today() da Web).</summary>
     public static DateOnly Hoje() => DataOperacional(DateTime.UtcNow);
@@ -91,11 +52,11 @@ public static class HorarioBrasil
     /// data/hora local em telas/impressao. NAO usar para persistir nem comparar com
     /// colunas (use as variantes de instante/janela). Ex.: carimbo "impresso em 09/06 14:32".
     /// </summary>
-    public static DateTime ConverterParaBrasilia(DateTime utc)
-    {
-        var asUtc = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
-        return TimeZoneInfo.ConvertTimeFromUtc(asUtc, Tz);
-    }
+    public static DateTime ConverterParaBrasilia(DateTime utc) => OperacionalFuso.ParaBrasilia(utc);
+
+    /// <summary>"dd/MM/yyyy HH:mm" em Brasilia (pt-BR), o carimbo dos e-mails de seguranca da conta.</summary>
+    public static string Formatar(DateTime utc) =>
+        ConverterParaBrasilia(utc).ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
 
     /// <summary>"Agora" no horario de Brasilia (data + hora). Para exibicao apenas.</summary>
     public static DateTime Agora() => ConverterParaBrasilia(DateTime.UtcNow);

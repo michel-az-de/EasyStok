@@ -41,6 +41,26 @@ public class RegraUnicaNoBackendTests
             + "de novo traz de volta o financeiro em minúsculo e o canhoto em maiúsculo para o mesmo pedido");
     }
 
+    // ---- Fuso de Brasília -------------------------------------------------------------------------------------
+
+    /// <summary>O Web (Razor) está congelado (ADR-0059) e tem o espelho BrazilTime.</summary>
+    private static readonly string[] FusoNoWebCongelado = ["EasyStock.Web/Helpers/BrazilTime.cs"];
+
+    [Fact]
+    public void FusoDeBrasilia_SoResolvidoPeloOperacionalFuso()
+    {
+        var root = RepoPaths.FindRepoRoot();
+        var fora = ArquivosDeProducao(root, "*.cs")
+            .Where(f => SemComentarios(File.ReadAllText(f)).Contains("FindSystemTimeZoneById", StringComparison.Ordinal))
+            .Select(f => Relativo(root, f))
+            .Where(r => r != "EasyStock.Domain/Defaults/OperacionalFuso.cs" && !FusoNoWebCongelado.Contains(r))
+            .ToList();
+
+        fora.Should().BeEmpty(
+            "o fuso de Brasília é resolvido por OperacionalFuso (Domain); HorarioBrasil e os demais delegam. Uma segunda "
+            + "resolução volta a dar hora errada (UTC) em ambiente sem tzdata e escapa do StartupHardening.ValidateTimezone");
+    }
+
     // ---- Apoio ------------------------------------------------------------------------------------------------
 
     private static string Relativo(string root, string arquivo) =>
