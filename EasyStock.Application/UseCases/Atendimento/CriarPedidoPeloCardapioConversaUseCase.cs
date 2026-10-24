@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Endereco;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
@@ -79,11 +80,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         decimal? freteCombinado = null, bool peloAtendimento = false)
     {
         ArgumentNullException.ThrowIfNull(input);
-        var forma = string.IsNullOrWhiteSpace(input.Forma)
-            ? TrocarFormaPagamentoPedidoUseCase.FormaOnline
-            : input.Forma.Trim().ToLowerInvariant();
-        if (forma is not (TrocarFormaPagamentoPedidoUseCase.FormaOnline or TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega))
-            throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
+        var forma = CobrancaDoPedidoReservado.NormalizarForma(input.Forma);
 
         var agora = relogio.GetUtcNow().UtcDateTime;
         if (!link.EstaValido(agora)) throw new LinkCardapioConversaIndisponivelException();
@@ -123,11 +120,9 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
 
         conversa.RegistrarSaida(agora);
         var resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
-            // #2007: aqui a encomenda na entrega ainda cobra o sinal pelo link (CobrarAsync); o resumo diz o mesmo.
+            // #2007: aqui a encomenda na entrega ainda cobra o sinal pelo link (CobrancaDoPedidoReservado); o resumo diz o mesmo.
             ResumoPedidoConversa.Texto(reservado, input.DataEntrega,
-                forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
-                && EasyStock.Application.Services.Pedidos.PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm)
-                    ? TrocarFormaPagamentoPedidoUseCase.FormaOnline : forma,
+                CobrancaDoPedidoReservado.FormaEfetiva(forma, reservado.Pedido, QuemCobra.ClientePeloLink),
                 peloAtendimento ? "Pedido confirmado pelo atendimento a partir da seleção compartilhada:" : "Pedido montado pelo cliente no cardápio do site:"));
         await conversaRepository.AddMensagemAsync(resumo, ct);
         await unitOfWork.CommitAsync();
@@ -139,7 +134,8 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         CobrancaPedidoResult? cobranca;
         try
         {
-            cobranca = await CobrarAsync(reservado, conversa.Id, forma, ct);
+            cobranca = await CobrancaDoPedidoReservado.CobrarAsync(gerarCobranca, trocarForma, reservado, conversa.Id, forma,
+                QuemCobra.ClientePeloLink, "cardápio da conversa", ct);
         }
         catch (MercadoPagoIndisponivelException ex)
         {
@@ -168,16 +164,5 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         {
             logger.LogWarning(ex, "Cardapio da conversa: pedido {PedidoId} gravado, aviso ao console falhou.", pedido.Id);
         }
-    }
-
-    private async Task<CobrancaPedidoResult?> CobrarAsync(
-        PedidoReservado reservado, Guid conversaId, string forma, CancellationToken ct)
-    {
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
-            && !EasyStock.Application.Services.Pedidos.PlanoPagamentoEncomenda.TemSinal(
-                reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
-            return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
-                reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: "cardápio da conversa"), ct)).Cobranca;
-        return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
     }
 }

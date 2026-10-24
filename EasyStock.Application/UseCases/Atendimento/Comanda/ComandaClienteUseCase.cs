@@ -865,7 +865,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega }
             && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm))
         {
-            var sinal = Math.Min(envio.Saldo, Math.Max(0, PlanoPagamentoEncomenda.Sinal(envio.Total) - (envio.Total - envio.Saldo)));
+            var sinal = PlanoPagamentoEncomenda.SinalRestante(envio.Total, envio.Saldo);
             return texto + $"\n\nSinal a receber: {sinal.ToString("C", Cultura.PtBr)} por Pix, dinheiro ou maquininha. Restante na entrega: {(envio.Saldo - sinal).ToString("C", Cultura.PtBr)}. Combine o pagamento com a equipe.";
         }
         if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega })
@@ -888,7 +888,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
 
     public static void Validar(RascunhoComandaCliente dados)
     {
-        if (dados?.Itens is null || dados.Itens.Count > 50 || dados.Itens.Any(i => i.CardapioItemId == Guid.Empty || i.Qtd is < 1 or > 99 || i.Observacao?.Length > 500)
+        if (dados?.Itens is null || dados.Itens.Count > CheckoutCoreService.MaximoPratosDistintos || dados.Itens.Any(i => i.CardapioItemId == Guid.Empty || i.Qtd < 1 || i.Qtd > CheckoutCoreService.QuantidadeMaximaPorItem || i.Observacao?.Length > 500)
             || dados.Itens.GroupBy(i => (i.CardapioItemId, i.VariacaoId)).Any(g => g.Count() > 1)
             || dados.Observacoes?.Length > 2000 || dados.Acerto is not ("estorno" or "cupom") || dados.CodigoCupom?.Length > 35)
             throw new UseCaseValidationException("Confira os itens, quantidades e observações da comanda.");

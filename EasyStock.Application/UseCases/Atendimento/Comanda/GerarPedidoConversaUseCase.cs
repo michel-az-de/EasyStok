@@ -61,11 +61,7 @@ public sealed class GerarPedidoConversaUseCase(
     {
         ArgumentNullException.ThrowIfNull(input);
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
-        var forma = string.IsNullOrWhiteSpace(input.Forma)
-            ? TrocarFormaPagamentoPedidoUseCase.FormaOnline
-            : input.Forma.Trim().ToLowerInvariant();
-        if (forma is not (TrocarFormaPagamentoPedidoUseCase.FormaOnline or TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega))
-            throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
+        var forma = CobrancaDoPedidoReservado.NormalizarForma(input.Forma);
         if (input.Itens is null || input.Itens.Count == 0)
             throw new UseCaseValidationException("A comanda está vazia.");
 
@@ -85,22 +81,13 @@ public sealed class GerarPedidoConversaUseCase(
             input.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId,
             input.Observacoes), ct);
 
-        var cobranca = await CobrarAsync(reservado, conversa.Id, forma, input.UsuarioNome, ct);
+        var cobranca = await CobrancaDoPedidoReservado.CobrarAsync(gerarCobranca, trocarForma, reservado, conversa.Id, forma,
+            QuemCobra.Atendente, input.UsuarioNome ?? "console", ct);
         var texto = TextoAoCliente(reservado, input.DataEntrega, forma, cobranca);
         var enviado = input.EnviarAoCliente && await aviso.EnviarAsync(input.EmpresaId, conversa.Id, texto,
             relogio.GetUtcNow().UtcDateTime, ct, input.UsuarioId);
 
         return new PedidoConversaGeradoResult(reservado.Pedido.Id, reservado.Total, forma, cobranca, enviado);
-    }
-
-    /// <summary>Mercado Pago fora propaga: a cobrança já desfez o pedido e a vaga, e a operadora tenta de novo (#1301).</summary>
-    private async Task<CobrancaPedidoResult?> CobrarAsync(
-        PedidoReservado reservado, Guid conversaId, string forma, string? usuarioNome, CancellationToken ct)
-    {
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
-            return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
-                reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: usuarioNome ?? "console"), ct)).Cobranca;
-        return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
     }
 
     private static string TextoAoCliente(PedidoReservado reservado, DateOnly dataEntrega, string forma, CobrancaPedidoResult? cobranca)
