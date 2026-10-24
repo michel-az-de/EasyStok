@@ -88,9 +88,6 @@ public static class PipelineExtensions
 
                 var path = ctx.Request.Path.Value ?? "";
                 if (path.StartsWith("/health", StringComparison.OrdinalIgnoreCase) ||
-                    path.Equals("/diagnostico/ping", StringComparison.OrdinalIgnoreCase) ||
-                    path.StartsWith("/api/diagnostico/logs/live", StringComparison.OrdinalIgnoreCase) ||
-                    path.StartsWith("/api/diagnostico/historico", StringComparison.OrdinalIgnoreCase) ||
                     path.StartsWith("/api/notificacoes/resumo", StringComparison.OrdinalIgnoreCase) ||
                     path.Equals("/notificacoes/resumo", StringComparison.OrdinalIgnoreCase) ||
                     path.StartsWith("/swagger/", StringComparison.OrdinalIgnoreCase) ||
@@ -111,8 +108,7 @@ public static class PipelineExtensions
                 {
                     _ when reqPath.StartsWith("/health", StringComparison.OrdinalIgnoreCase)
                         || reqPath.Contains("/ping", StringComparison.OrdinalIgnoreCase) => "infra",
-                    _ when reqPath.Contains("/diagnostico", StringComparison.OrdinalIgnoreCase)
-                        || reqPath.Contains("/notificacoes/resumo", StringComparison.OrdinalIgnoreCase) => "polling",
+                    _ when reqPath.Contains("/notificacoes/resumo", StringComparison.OrdinalIgnoreCase) => "polling",
                     _ when reqPath.Contains("/logs/live", StringComparison.OrdinalIgnoreCase) => "sse",
                     _ => "business"
                 };
