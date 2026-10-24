@@ -521,7 +521,7 @@ public sealed class OrderLinker(
             PedidoId = pedido.Id,
             Metodo = metodo,
             Valor = pedido.Total.Valor,
-            PagoEm = mobileO.UpdatedAt,
+            PagoEm = await InstanteNoCaixa.DoRegistroAsync(db, pedido.EmpresaId, mobileO.UpdatedAt, pedido.LojaId),
             RegistradoPorNome = mobileO.LastOperatorName,
             Observacao = mobileO.Metodo is null
                 ? $"{MarcaDoRecebimentoAutomatico} (mobile→ERP). Aparelho sem forma de pagamento: assumido dinheiro."

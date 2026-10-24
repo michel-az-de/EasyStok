@@ -892,9 +892,17 @@ public partial class AtendimentoConversasControllerTests
     private EnviarImagemCardapioConsoleUseCase ImagemCardapio() =>
         new(_storefronts, _cardapioItens, _fileStorage, _enviarUseCase);
 
+    private EasyStock.Domain.Entities.Storefront.Storefront? _vitrine;
+
+    private EasyStock.Domain.Entities.Storefront.Storefront Vitrine =>
+        _vitrine ??= EasyStock.Domain.Entities.Storefront.Storefront.Criar(_empresaId, "casa-da-baba", "Casa da Baba", 0m);
+
+    /// <summary>Chave como o upload grava: <c>cardapios/{empresa}/{vitrine}/{prato}/</c> (#2027 só lê foto da vitrine).</summary>
+    private string ChaveDaVitrine(string arquivo) => $"cardapios/{_empresaId}/{Vitrine.Id}/i/{arquivo}";
+
     private EasyStock.Domain.Entities.Storefront.CardapioItem ItemComGaleria(params string[] chaves)
     {
-        var storefront = EasyStock.Domain.Entities.Storefront.Storefront.Criar(_empresaId, "casa-da-baba", "Casa da Baba", 0m);
+        var storefront = Vitrine;
         _storefronts.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(storefront);
         var item = EasyStock.Domain.Entities.Storefront.CardapioItem.CriarAvulso(storefront.Id, "Lasanha", 50m);
         foreach (var chave in chaves) item.AdicionarFotoGaleria(HostAntigo + chave);
@@ -906,9 +914,9 @@ public partial class AtendimentoConversasControllerTests
     public async Task ImagemCardapioEnviaAFotoDaGaleriaConvertidaSemONavegadorBaixar()
     {
         var conversa = ConversaComClienteAgora();
-        var item = ItemComGaleria("cardapios/e/s/i/capa.webp", "cardapios/e/s/i/angulo.webp");
-        _fileStorage.ExistsAsync("cardapios/e/s/i/angulo.webp", Arg.Any<CancellationToken>()).Returns(true);
-        _fileStorage.DownloadAsync("cardapios/e/s/i/angulo.webp", Arg.Any<CancellationToken>()).Returns(WebpDaGaleria);
+        var item = ItemComGaleria(ChaveDaVitrine("capa.webp"), ChaveDaVitrine("angulo.webp"));
+        _fileStorage.ExistsAsync(ChaveDaVitrine("angulo.webp"), Arg.Any<CancellationToken>()).Returns(true);
+        _fileStorage.DownloadAsync(ChaveDaVitrine("angulo.webp"), Arg.Any<CancellationToken>()).Returns(WebpDaGaleria);
         _imageProcessor.Optimize(WebpDaGaleria, "image/webp", 1920, 85, true).Returns((JpegConvertido, "image/jpeg", ".jpg"));
         _fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
             .Returns(new StoredFileResult("atendimento/x/foto.jpg", "https://app.easystok.online/files/atendimento/x/foto.jpg", "image/jpeg", 7));
@@ -935,9 +943,9 @@ public partial class AtendimentoConversasControllerTests
     {
         var conversa = ConversaComClienteAgora();
         var item = ItemComGaleria();
-        item.AtualizarMetadata(fotoUrl: HostAntigo + "cardapios/e/s/i/capa.webp");
-        _fileStorage.ExistsAsync("cardapios/e/s/i/capa.webp", Arg.Any<CancellationToken>()).Returns(true);
-        _fileStorage.DownloadAsync("cardapios/e/s/i/capa.webp", Arg.Any<CancellationToken>()).Returns(WebpDaGaleria);
+        item.AtualizarMetadata(fotoUrl: HostAntigo + ChaveDaVitrine("capa.webp"));
+        _fileStorage.ExistsAsync(ChaveDaVitrine("capa.webp"), Arg.Any<CancellationToken>()).Returns(true);
+        _fileStorage.DownloadAsync(ChaveDaVitrine("capa.webp"), Arg.Any<CancellationToken>()).Returns(WebpDaGaleria);
         _imageProcessor.Optimize(WebpDaGaleria, "image/webp", 1920, 85, true).Returns((JpegConvertido, "image/jpeg", ".jpg"));
         _fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
             .Returns(new StoredFileResult("atendimento/x/capa.jpg", "https://app.easystok.online/files/atendimento/x/capa.jpg", "image/jpeg", 7));
@@ -955,7 +963,7 @@ public partial class AtendimentoConversasControllerTests
     public async Task ImagemCardapioDeItemInexistenteOuDeOutraEmpresa404()
     {
         var conversa = ConversaComClienteAgora();
-        ItemComGaleria("cardapios/e/s/i/capa.webp");
+        ItemComGaleria(ChaveDaVitrine("capa.webp"));
 
         var result = await _controller.EnviarImagemCardapio(
             conversa.Id, new EnviarImagemCardapioBody(Guid.NewGuid(), 0, null), ImagemCardapio(), default);
@@ -971,7 +979,7 @@ public partial class AtendimentoConversasControllerTests
     public async Task ImagemCardapioComIndiceForaDaGaleria400(int indice)
     {
         var conversa = ConversaComClienteAgora();
-        var item = ItemComGaleria("cardapios/e/s/i/capa.webp");
+        var item = ItemComGaleria(ChaveDaVitrine("capa.webp"));
 
         var result = await _controller.EnviarImagemCardapio(
             conversa.Id, new EnviarImagemCardapioBody(item.Id, indice, null), ImagemCardapio(), default);
@@ -985,8 +993,8 @@ public partial class AtendimentoConversasControllerTests
     public async Task ImagemCardapioComArquivoFaltandoNoStorage404()
     {
         var conversa = ConversaComClienteAgora();
-        var item = ItemComGaleria("cardapios/e/s/i/sumiu.webp");
-        _fileStorage.ExistsAsync("cardapios/e/s/i/sumiu.webp", Arg.Any<CancellationToken>()).Returns(false);
+        var item = ItemComGaleria(ChaveDaVitrine("sumiu.webp"));
+        _fileStorage.ExistsAsync(ChaveDaVitrine("sumiu.webp"), Arg.Any<CancellationToken>()).Returns(false);
 
         var result = await _controller.EnviarImagemCardapio(
             conversa.Id, new EnviarImagemCardapioBody(item.Id, 0, null), ImagemCardapio(), default);
@@ -1000,7 +1008,7 @@ public partial class AtendimentoConversasControllerTests
     {
         _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
         var conversa = ConversaComClienteAgora();
-        var item = ItemComGaleria("cardapios/e/s/i/capa.webp");
+        var item = ItemComGaleria(ChaveDaVitrine("capa.webp"));
 
         var result = await _controller.EnviarImagemCardapio(
             conversa.Id, new EnviarImagemCardapioBody(item.Id, 0, null), ImagemCardapio(), default);

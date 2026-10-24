@@ -274,6 +274,61 @@ public sealed class LancamentoCaixaMobileEdicaoExclusaoTests : IDisposable
         return payload.TryGetProperty("estornado", out var e) && e.ValueKind == JsonValueKind.True;
     }
 
+    // ---------- dia fechado (#2030) ----------
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task LancamentoQueChegaDepoisDoFechamento_EntraNoDiaEmQueFoiRegistrado(bool fechamentoDaLoja)
+    {
+        // Feito offline ontem e sincronizado hoje, com o caixa de ontem já fechado no console. O fechamento sem loja é
+        // o da empresa e vale também para o lançamento da loja.
+        var ontem = FecharOntem(fechamentoDaLoja ? _lojaId : null);
+        var antes = DateTime.UtcNow;
+
+        await SincronizarAsync(DeOntem(ontem, 30m));
+
+        Movimentos().Should().ContainSingle().Which.DataMovimento.Should().BeOnOrAfter(antes,
+            "o dia fechado não retratou o lançamento; mexer nele mudaria a gaveta depois do fato");
+    }
+
+    [Fact]
+    public async Task LancamentoRedatado_PodeSerEditadoEExcluidoPeloAparelho()
+    {
+        // O movimento é de hoje, com o dia aberto: a edição e a exclusão olham o dia do movimento, não o do aparelho.
+        var ontem = FecharOntem(_lojaId);
+        await SincronizarAsync(DeOntem(ontem, 30m));
+
+        await SincronizarAsync(DeOntem(ontem, 45m));
+        Movimentos().Should().ContainSingle().Which.Valor.Should().Be(45m);
+
+        await AplicarAsync("cashEntry.delete", DeOntem(ontem, 45m));
+        _db.ChangeTracker.Clear();
+        LancamentoSalvo().DeletedAt.Should().NotBeNull();
+        Movimentos().Should().ContainSingle().Which.EstornadoEm.Should().NotBeNull();
+    }
+
+    private DateTime FecharOntem(Guid? lojaId)
+    {
+        var ontem = DateTime.UtcNow.AddDays(-1);
+        _db.Add(FechamentoCaixa.Criar(_empresaId, HorarioBrasil.DataOperacional(ontem), 0, 0, 0, 0, 0, lojaId));
+        _db.SaveChanges();
+        _db.ChangeTracker.Clear();
+        return ontem;
+    }
+
+    private static CashEntryDto DeOntem(DateTime ontem, decimal valor) =>
+        new(Lancamento, "expense", valor, "Gas", new DateTimeOffset(ontem).ToUnixTimeMilliseconds(), Metodo: "dinheiro");
+
+    [Fact]
+    public async Task LancamentoComODiaAberto_GuardaAHoraDoAparelho()
+    {
+        await SincronizarAsync(Dto("expense", 30m, "Gas", "dinheiro"));
+
+        Movimentos().Should().ContainSingle().Which.DataMovimento.Should()
+            .BeCloseTo(DateTimeOffset.FromUnixTimeMilliseconds(_criadoEm).UtcDateTime, TimeSpan.FromSeconds(1));
+    }
+
     // ---------- apoio ----------
 
     private CashEntryDto Dto(string tipo, decimal valor, string descricao, string? metodo) =>

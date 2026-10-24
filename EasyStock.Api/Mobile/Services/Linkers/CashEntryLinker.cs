@@ -68,7 +68,8 @@ public sealed class CashEntryLinker(
                 }
 
                 var tipo = TipoErp(mobileCE);
-                var mov = MovimentoCaixa.Criar(empresaId.Value, tipo, mobileCE.Amount, mobileCE.CreatedAt, mobileCE.LojaId);
+                var dataMovimento = await InstanteNoCaixa.DoRegistroAsync(db, empresaId.Value, mobileCE.CreatedAt, mobileCE.LojaId);
+                var mov = MovimentoCaixa.Criar(empresaId.Value, tipo, mobileCE.Amount, dataMovimento, mobileCE.LojaId);
                 Espelhar(mobileCE, mov);
                 mov.Origem = "mobile";
                 mov.RegistradoPorNome = mobileCE.LastOperatorName;

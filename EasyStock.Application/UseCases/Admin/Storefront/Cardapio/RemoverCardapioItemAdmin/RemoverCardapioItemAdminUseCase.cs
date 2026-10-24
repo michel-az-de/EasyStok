@@ -29,7 +29,8 @@ public class RemoverCardapioItemAdminUseCase(
         var item = await cardapioRepository.GetByIdAndScopeAsync(command.StorefrontId, command.ItemId, command.EmpresaId)
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 
-        var fotoUrl = item.FotoUrl;
+        // #2027: só a foto deste prato; a FotoUrl pode apontar para o arquivo de outra empresa.
+        var chaveDaFoto = StorageKeyExtractor.ExtractDaFotoDoPrato(item.FotoUrl, item.StorefrontId, item.Id);
 
         await cardapioRepository.RemoveAsync(item);
         await unitOfWork.CommitAsync();
@@ -39,14 +40,13 @@ public class RemoverCardapioItemAdminUseCase(
             cardapioPublico.Invalidar(vitrine.Slug);
 
         // Best-effort após o item sair do banco — falha de storage não desfaz a remoção.
-        await TryDeleteFotoAsync(fotoUrl);
+        await TryDeleteFotoAsync(chaveDaFoto);
 
         return new RemoverCardapioItemAdminResult(item.Id);
     }
 
-    private async Task TryDeleteFotoAsync(string? fotoUrl)
+    private async Task TryDeleteFotoAsync(string? storageKey)
     {
-        var storageKey = StorageKeyExtractor.Extract(fotoUrl);
         if (storageKey is null) return;
 
         try
