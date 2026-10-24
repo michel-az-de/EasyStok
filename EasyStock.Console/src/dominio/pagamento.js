@@ -35,7 +35,7 @@ export const pagamentosDoPedido = (pedido) => pedido?.pagamentosApi ?? [
 ]
 
 // O pagamento que "Desfazer o último" mostra e manda: a tela e a chamada leem daqui.
-export const ultimoPagamentoApi = (pedido) => pedido?.pagamentosApi?.toSorted((a, b) => b.em - a.em)[0] ?? null
+export const ultimoPagamentoApi = (pedido) => [...(pedido?.pagamentosApi ?? [])].sort((a, b) => b.em - a.em)[0] ?? null
 
 // Dinheiro que entrou no pedido.
 export const totalPago = (pedido) =>
@@ -46,7 +46,7 @@ const totalCoberto = (pedido) =>
   pedido?.alocadoApi ?? pagamentosDoPedido(pedido).reduce((soma, p) => soma + p.coberto, 0)
 
 // Falta pagar do PEDIDO inteiro (comanda menos o que as cobranças pagas
-// quitaram), diferente do `faltaPagar` de dominio/cobranca.js, que é só a
+// quitaram), diferente do `faltaDaCobranca` de dominio/cobranca.js, que é só a
 // divergência de uma cobrança.
 //
 // `pedido.valorDesconto` (frente Fidelidade e cupons, rodada 13, issue #45,
@@ -61,11 +61,25 @@ export function faltaPagar(pedido, cardapio) {
   return Math.max(totalLiquido - totalCoberto(pedido), 0)
 }
 
+// #2005 (console-19): o saldo do pedido criado no EasyStok, numa conta só: total menos o alocado (sem o
+// alocado, o recebido), em centavos exatos e nunca negativo. A Barra, a Cobrança e o Extrato liam
+// `totalApi - alocado` cada um por si, e só o Extrato arredondava.
+export const saldoApi = (pedido) =>
+  Math.max(Math.round(((pedido?.totalApi ?? 0) - (pedido?.alocadoApi ?? pedido?.totalPagoApi ?? 0)) * 100) / 100, 0)
+
+// #2005 (console-01): encomenda com o sinal pago e o resto combinado para a entrega. O que falta pagar é o
+// restante da entrega, não "item novo depois do pagamento": já estava no total quando o sinal foi cobrado.
+export function restanteDoSinal(pedido) {
+  if (!pedido?.sinalNaReserva || !pedido.cobranca?.pagaEm || pedido.estado === 'cancelado') return 0
+  return saldoApi(pedido)
+}
+
 // Item novo depois do pagamento (defeito c, seção 3.2): só acende quando a
 // cobrança ativa já foi paga e a comanda cresceu além do que foi quitado.
 // Vale para o segundo, terceiro acréscimo: o que já caiu está no arquivo.
 export function diferencaAposPagamento(pedido, cardapio) {
   if (!pedido?.cobranca?.pagaEm || pedido.estado === 'cancelado') return 0
+  if (restanteDoSinal(pedido) > 0) return 0
   return faltaPagar(pedido, cardapio)
 }
 
@@ -127,7 +141,7 @@ export function extratoDoPedido(pedido, { aDevolver = 0 } = {}) {
     pagamentos: pagamentos.map((p) => ({ id: p.pagamentoId, em: p.em, meio: p.meio, valor: p.valor })),
     ajuste: Math.round((pago - recebido) * 100) / 100,
     pago,
-    saldo: cancelado ? 0 : Math.max(pedido.totalApi - pago, 0),
+    saldo: cancelado ? 0 : saldoApi({ totalApi: pedido.totalApi, alocadoApi: pago }),
     aDevolver: cancelado && aDevolver > 0 ? aDevolver : 0,
   }
 }

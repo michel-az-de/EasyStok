@@ -2,13 +2,13 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
-import { CampoMascarado } from '../../componentes/CampoMascarado'
+import { CampoReais } from '../../componentes/CampoReais'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
 import {
-  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaPagar, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
+  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaDaCobranca, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
-import { ultimoPagamentoApi } from '../../dominio/pagamento'
+import { saldoApi, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR, itensDoResumo, resumoDaCobrancaEscolhida } from '../../dominio/resumoPedido'
 import { totalDoPedido } from '../../dominio/pedido'
 import {
@@ -16,7 +16,7 @@ import {
   SEGUNDOS_PARA_DESFAZER,
 } from '../../dominio/esteira'
 import {
-  lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
+  lerMoeda, moeda, moedaAltaDemais,
 } from '../../dominio/formato'
 import { entregadorResolvido } from '../../dominio/viagem'
 import { numeroParaEntregador, opcoesDoDespacho } from '../../dominio/despacho'
@@ -197,7 +197,17 @@ export function BarraProximoPasso({
   // #1868: o botão "Marcar pago (complemento R$ X)" já diz quanto falta.
   let saldoNoBotao = false
 
-  if (pedido.estado === 'aguardando') {
+  if (pedido.statusDesconhecido) {
+    // #2005 (console-22): sem cobrança nem baixa para um status que o console não conhece.
+    rotuloEstado = 'Status desconhecido'
+    depoisTexto = null
+    corpoAcao = (
+      <p className={css.motivoDesabilitado} role="note">
+        O pedido está em &quot;{pedido.statusApi}&quot;, um status que este console não conhece. Cobrança e baixa ficam
+        bloqueadas: confira o pedido no EasyStok.
+      </p>
+    )
+  } else if (pedido.estado === 'aguardando') {
     const situacaoCob = situacaoDaCobranca(pedido.cobranca, agora)
     const info = acaoDoPix(situacaoCob, {
       prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'A comanda está vazia.'),
@@ -216,13 +226,13 @@ export function BarraProximoPasso({
     if (fonteApi && aguardaSinalManual(pedido)) depoisTexto = pedido.requerAprovacao ? 'Próximo: Aprovação da loja' : 'Próximo: Fila de preparo'
 
     if (info.divergente) {
-      const falta = faltaPagar(pedido.cobranca)
+      const falta = faltaDaCobranca(pedido.cobranca)
       corpoAcao = (
         <div className={css.botoesPrimarios}>
           {disponivel('aceitarDivergencia') && (
             <Botao largo variante="primario" onClick={aoAceitarDivergencia}>Aceitar diferença</Botao>
           )}
-          {falta > 0 && (
+          {falta > 0 && disponivel('cobrarDiferenca') && (
             <Botao largo variante="secundario" onClick={aoCobrarDiferenca}>Cobrar diferença</Botao>
           )}
         </div>
@@ -374,7 +384,7 @@ export function BarraProximoPasso({
   }
 
   const alocadoApi = pedido.alocadoApi ?? pedido.totalPagoApi
-  const naFilaSemQuitar = Boolean(pedido.pedidoId) && alocadoApi < pedido.totalApi
+  const naFilaSemQuitar = Boolean(pedido.pedidoId) && saldoApi(pedido) > 0
   if (naFilaSemQuitar && pedido.estado === 'pago' && !aguardaAprovacao(pedido)) rotuloEstado = 'Na fila de preparo'
   const podeVoltarEtapa = Boolean(anterior) && disponivel('corrigirPasso')
   const temPagamento = alocadoApi > 0 || pedido.totalPagoApi > 0 || Boolean(pedido.cobranca?.pagaEm)
@@ -539,8 +549,8 @@ export function BarraProximoPasso({
       {/* #1868: com o "Marcar pago (complemento R$ X)" na barra, o "Já coberto/Falta" era a terceira
           vez do saldo na coluna (o Resumo o destaca no topo) e custava a barra em 720 px. Sem o
           botão, a linha fica: é o rótulo financeiro honesto do pedido na fila sem quitação. */}
-      {!saldoNoBotao && alocadoApi > 0 && alocadoApi < pedido.totalApi && (
-        <p className={css.corpoBloco}>Já coberto: {moeda(alocadoApi)}. Falta: {moeda(pedido.totalApi - alocadoApi)}.</p>
+      {!saldoNoBotao && alocadoApi > 0 && saldoApi(pedido) > 0 && (
+        <p className={css.corpoBloco}>Já coberto: {moeda(alocadoApi)}. Falta: {moeda(saldoApi(pedido))}.</p>
       )}
       {abrindoBaixa && (
         <BaixaAMao
@@ -587,16 +597,15 @@ export function BarraProximoPasso({
           <p className={css.corpoBloco}>
             Devolver para {nomeCliente}. Pago: {moeda(valorPago)}.
           </p>
-          <CampoMascarado
-            tipo="moeda"
+          <CampoReais
             rotulo="Valor a devolver"
-            valor={mascaraMoeda(centavosEstorno)}
+            centavos={centavosEstorno}
+            ler={lerMoeda}
             erro={moedaAltaDemais(centavosEstorno)
               ? 'Valor alto demais'
               : centavosEstorno > Math.round(valorPago * 100) ? 'Maior que o pago' : null}
             dica="Pode ser menor que o pago, para um estorno parcial."
-            aoMudarDigitos={(digitos) => setCentavosEstorno(Number(digitos || '0'))}
-            aoColarTexto={(texto) => setCentavosEstorno(lerMoeda(texto))}
+            aoMudar={(valor) => setCentavosEstorno(valor ?? 0)}
           />
           <CampoArea
             rotulo="Motivo do estorno"

@@ -13,6 +13,7 @@ import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../../aplicacao/useCaixaDoDiaApi'
 import { useConfirmacaoDaAbertura } from '../../../aplicacao/useConfirmacaoDaAbertura'
 import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
+import { relerParaFechar } from '../../../aplicacao/fechamentoDoCaixa'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import {
   diaMes, gavetaDoFechamento, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
@@ -378,6 +379,9 @@ export function AbaCaixaApi() {
   const [acao, executar, limparErro] = useAcaoComRecarga(caixa.recarregar)
   const [fecharAberto, setFecharAberto] = useState(false)
   const [lancamentoAberto, setLancamentoAberto] = useState(false)
+  // #2005 (console-02): o fechamento só abre, e só confirma, com o dia relido.
+  const [conferindo, setConferindo] = useState(false)
+  const [avisoDoFechamento, setAvisoDoFechamento] = useState(null)
 
   if (caixa.estado === 'carregando') return <output className={css.corpoBloco}>Carregando o caixa…</output>
   if (caixa.estado === 'erro' && !caixa.dia) {
@@ -409,6 +413,25 @@ export function AbaCaixaApi() {
   const titulo = dia.esquecidoAberto ? `Aberto desde ${diaMes(dia.abertoDesde)}` : 'Hoje'
   const podeLancar = dia.aberto && !dia.fechado && !dia.esquecidoAberto
   const fecharLancamento = () => { limparErro(); setLancamentoAberto(false) }
+  const abrirFechamento = async () => {
+    limparErro()
+    setAvisoDoFechamento(null)
+    setConferindo(true)
+    try {
+      const lido = await relerParaFechar(caixa.recarregar)
+      if (lido.erro) setAvisoDoFechamento(lido.erro)
+      else setFecharAberto(true)
+    } finally { setConferindo(false) }
+  }
+  const confirmarFechamento = async (contado) => {
+    setAvisoDoFechamento(null)
+    setConferindo(true)
+    try {
+      const lido = await relerParaFechar(caixa.recarregar, { esperadoVisto: gaveta.naGaveta })
+      if (lido.erro) { setAvisoDoFechamento(lido.erro); return }
+      if (await executar(() => fecharCaixa(agora, contado, lido.gaveta.naGaveta))) setFecharAberto(false)
+    } finally { setConferindo(false) }
+  }
 
   // #1627: um retorno só. Com dois, a tabela dos 7 dias mudava de lugar na árvore ao abrir o caixa,
   // desmontava e refazia as seis leituras, piscando "Carregando".
@@ -439,7 +462,7 @@ export function AbaCaixaApi() {
             </div>
             <div className={css.acoesTopo}>
               {podeGerenciar && dia.aberto && !dia.fechado && (
-                <Botao variante="texto" icone="log-out" disabled={acao.enviando} onClick={() => { limparErro(); setFecharAberto(true) }}>
+                <Botao variante="texto" icone="log-out" disabled={acao.enviando || conferindo} onClick={abrirFechamento}>
                   {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
                 </Botao>
               )}
@@ -465,6 +488,7 @@ export function AbaCaixaApi() {
           )}
 
           <ResumoDoDia dia={dia} gaveta={gaveta} />
+          {!fecharAberto && avisoDoFechamento && <p className={css.avisoFechado} role="alert">{avisoDoFechamento}</p>}
           {!(podeLancar && lancamentoAberto) && erro}
           {avisoDePermissao}
         </>
@@ -495,12 +519,10 @@ export function AbaCaixaApi() {
           consultarDevolucoes
           resumo={dia}
           gaveta={gaveta}
-          enviando={acao.enviando}
-          erro={acao.erro}
+          enviando={acao.enviando || conferindo}
+          erro={acao.erro ?? avisoDoFechamento}
           aoFechar={() => setFecharAberto(false)}
-          aoConfirmar={async (contado) => {
-            if (await executar(() => fecharCaixa(agora, contado, gaveta.naGaveta))) setFecharAberto(false)
-          }}
+          aoConfirmar={confirmarFechamento}
         />
       )}
     </div>

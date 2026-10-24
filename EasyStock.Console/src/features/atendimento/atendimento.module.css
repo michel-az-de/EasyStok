@@ -111,6 +111,9 @@
   content: ''; flex: 1 1 auto; height: var(--b-1); background: var(--linha);
 }
 
+/* #2005 (console-09): "Ver mensagens anteriores", no topo do fio. */
+.verAnteriores { display: flex; justify-content: center; margin: var(--e-2) 0 var(--e-3); }
+
 /* Separador de dia (achado 8, pendência 18 da banca 64): pílula centralizada
    antes da primeira mensagem de cada dia no fio. */
 .separadorDia { display: flex; justify-content: center; margin: var(--e-3) 0; }

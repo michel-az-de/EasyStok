@@ -3,8 +3,8 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useEstornosOnline } from '../../aplicacao/useEstornosOnline'
 import { Botao } from '../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
-import { CampoMascarado } from '../../componentes/CampoMascarado'
-import { lerMoeda, mascaraMoeda, moeda } from '../../dominio/formato'
+import { CampoReais } from '../../componentes/CampoReais'
+import { lerMoeda, moeda } from '../../dominio/formato'
 import css from './ficha.module.css'
 
 const data = (valor) => new Date(valor).toLocaleString('pt-BR')
@@ -74,7 +74,7 @@ export function EstornosOnline({ pedidoId }) {
     {podeSolicitar && !semResposta && !aberto && disponiveis.length > 0 && <Botao disabled={ocupado} onClick={() => { escolher(disponiveis[0].id); setAberto(true) }}>Solicitar estorno pelo Mercado Pago</Botao>}
     {podeSolicitar && !semResposta && aberto && <form className={css.acoesPedido} onSubmit={salvar}>
       <CampoSelecao rotulo="Recebimento do Mercado Pago" value={pagamentoId} disabled={ocupado} onChange={(e) => escolher(e.target.value)} opcoes={disponiveis.map((p) => ({ valor: p.id, rotulo: `${data(p.pagoEm)} · ${p.metodo} · disponível ${moeda(p.disponivel)}` }))} />
-      <CampoMascarado rotulo="Valor do estorno online" tipo="moeda" valor={mascaraMoeda(centavos)} aoMudarDigitos={setCentavos} aoColarTexto={(t) => setCentavos(String(lerMoeda(t)))} disabled={ocupado} dica={pagamento ? `Até ${moeda(pagamento.disponivel)} deste recebimento.` : 'Atualize para conferir o recebimento.'} />
+      <CampoReais rotulo="Valor do estorno online" centavos={centavos ? Number(centavos) : null} ler={lerMoeda} aoMudar={(valor) => setCentavos(valor == null ? '' : String(valor))} disabled={ocupado} dica={pagamento ? `Até ${moeda(pagamento.disponivel)} deste recebimento.` : 'Atualize para conferir o recebimento.'} />
       <CampoTexto rotulo="Motivo do estorno online" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500} required disabled={ocupado} />
       <label className={css.corpoBloco}><input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} disabled={ocupado} /> Confirmo a solicitação de devolução de {moeda(valor)} pelo Mercado Pago.</label>
       <p className={css.corpoBloco}>O Mercado Pago devolverá pelo meio original. A saída no Caixa será registrada quando o provedor confirmar. Não faça uma devolução manual para o mesmo valor.</p>

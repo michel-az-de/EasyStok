@@ -3,6 +3,7 @@ import {
   avisoDoPasso, indiceDoPasso, motivoParaNaoAvancar, passoAnterior,
 } from '../dominio/esteira'
 import { entregadorResolvido } from '../dominio/viagem'
+import { mensagemSoLocal } from '../dominio/mensagem'
 import {
   comItem, comObservacao, novoPedido, pedidoEncerrado, semItem,
 } from '../dominio/pedido'
@@ -201,8 +202,7 @@ function comMensagem(conversa, mensagem, { id, agora }) {
 // balões da dona ainda sem resposta da API (enviando) ou recusados (falhou), para
 // ela ver o que não saiu. O resto do estado local (rascunhos, filtros) fica.
 // #1287: a confirmada pela API (`aguardandoSync`) também fica até um sync que a contenha,
-// porque a leitura em voo pode ter saído antes de o servidor gravá-la.
-const mensagemSoLocal = (m) => m.status === 'enviando' || m.status === 'falhou' || Boolean(m.aguardandoSync)
+// porque a leitura em voo pode ter saído antes de o servidor gravá-la (`mensagemSoLocal`).
 
 // #1565: o pedido relido igual fica o mesmo objeto na tela, com a `leitura` de quando entrou. A ordem da
 // releitura mais nova que o confirmou fica aqui, para a regra da #1548 continuar valendo.
@@ -239,48 +239,81 @@ const clienteDaApiMantido = (local, doServidor) =>
 // #1565: `leitura` é só a ordem em que a consulta saiu; o mesmo pedido relido não é mudança.
 const mesmoPedido = (a, b) => Boolean(a) && Boolean(b) && mesmoConteudo({ ...a, leitura: null }, { ...b, leitura: null })
 
+// #2005 (console-08): o que a atendente acabou de mudar (assumir, devolver, encerrar, reabrir) e o servidor
+// confirmou. Uma leitura que saiu antes dessa confirmação (`lidaEm` <= `confirmadaEm`) traz a conversa como era
+// e não pode desfazê-la: ela não vale para estes campos. A primeira leitura que saiu depois solta a marca.
+const SITUACAO_CONFIRMADA = ['estado', 'situacaoApi', 'assumidaPorUsuarioId', 'responsavel', 'pausaApi', 'passagem']
+const situacaoLocal = (local) => Object.fromEntries(SITUACAO_CONFIRMADA.map((campo) => [campo, local[campo]]))
+const semConfirmacao = (local) => {
+  const { confirmadaEm: _confirmadaEm, ...resto } = local
+  return resto
+}
+
 // #1565: a polling relê a cada 5 s. Leitura igual à que já está na tela devolve a MESMA conversa, para a
 // tela parada não re-renderizar inteira.
 // #1576: `semMensagens` é a conversa cujas mensagens o laço não conseguiu ler e não tinha em cache. Não é
 // conversa vazia: ficam as mensagens da tela e o que se calcula delas (janela de 24 h, atraso).
-function mesclarDoServidor(local, lida, semMensagens = false) {
+function mesclarDoServidor(local, lida, semMensagens = false, lidaEm = undefined) {
   if (!local) return lida
-  const doServidor = semMensagens
-    ? { ...lida, mensagens: local.mensagens, janelaExpiraEm: local.janelaExpiraEm, atrasada: local.atrasada }
-    : lida
+  const leituraAtrasada = local.confirmadaEm != null && lidaEm != null && lidaEm <= local.confirmadaEm
+  const base = local.confirmadaEm != null && !leituraAtrasada ? semConfirmacao(local) : local
+  const doServidor = {
+    ...(semMensagens
+      ? { ...lida, mensagens: local.mensagens, janelaExpiraEm: local.janelaExpiraEm, atrasada: local.atrasada, temAnteriores: local.temAnteriores }
+      : lida),
+    ...(leituraAtrasada ? situacaoLocal(local) : null),
+  }
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
-  const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id))
+  // #2005 (console-09): quem abriu as mensagens anteriores não as perde na volta de 5 s, que traz só a página mais
+  // recente: o que já estava na tela e é mais velho que essa página fica (inclusive o trecho que a janela deslizou).
+  // Vale para qualquer mensagem velha, também a saída que o servidor guarda como Falhou ou Pendente: ela já é do
+  // servidor e fica no topo, em vez de virar "só local" no fim do fio com o Reenviar.
+  const inicioDaPagina = semMensagens || !local.anterioresCarregadas ? null : Date.parse(doServidor.mensagens[0]?.em)
+  const retidas = inicioDaPagina
+    ? local.mensagens.filter((m) => !doServidorIds.has(m.id) && Date.parse(m.em) < inicioDaPagina)
+    : []
+  const idsRetidos = new Set(retidas.map((m) => m.id))
+  const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id) && !idsRetidos.has(m.id))
   const mantido = clienteDaApiMantido(local, doServidor)
   const rascunhoDoNome = local.nomeDaDona && !doServidor.clienteId
   const lido = pedidoMesclado(local.pedido, doServidor.pedido)
   const pedido = mesmoPedido(local.pedido, lido) ? local.pedido : lido
   if (pedido !== lido && lido.leitura > leituraDe(pedido)) confirmadoNaLeitura.set(pedido, lido.leitura)
   const mesclada = {
-    ...local,
+    ...base,
     ...doServidor,
     ...(mantido ? { nome: local.nome, cliente: local.cliente } : {}),
     ...(rascunhoDoNome ? { nome: local.nome, nomeDaDona: true } : {}),
     pedido,
-    mensagens: [...doServidor.mensagens, ...soLocais],
+    mensagens: [...retidas, ...doServidor.mensagens, ...soLocais],
   }
   return mesmoConteudo(local, mesclada) ? local : mesclada
 }
 
+// Voltas da sincronização (5 s cada) em que a conversa recém-aberta pode demorar a aparecer na lista.
+const VOLTAS_DA_SELECAO_PENDENTE = 3
+
 const CASOS_API = {
-  [acao.CONFIRMAR_RESPONSAVEL_API]: (estado, { id, situacao }) => ({
-    ...mapear(estado, id, (c) => ({ ...c, ...situacao })),
+  [acao.CONFIRMAR_RESPONSAVEL_API]: (estado, { id, situacao, confirmadaEm }) => ({
+    ...mapear(estado, id, (c) => ({ ...c, ...situacao, ...(confirmadaEm != null ? { confirmadaEm } : null) })),
     automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },
   }),
-  [acao.CONFIRMAR_REABERTURA_API]: (estado, { id, situacao }) => ({
-    ...mapear(estado, id, (c) => ({ ...c, ...situacao })),
+  [acao.CONFIRMAR_REABERTURA_API]: (estado, { id, situacao, confirmadaEm }) => ({
+    ...mapear(estado, id, (c) => ({ ...c, ...situacao, ...(confirmadaEm != null ? { confirmadaEm } : null) })),
     automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },
   }),
-  [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas, semMensagens }) => {
+  // `lidaEm`: id da conversa -> instante em que saiu a leitura do resumo dela (console-08).
+  [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas, semMensagens, lidaEm }) => {
     const locais = new Map(estado.conversas.map((c) => [c.id, c]))
-    const lidas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c, semMensagens?.includes(c.id)))
+    const lidas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c, semMensagens?.includes(c.id), lidaEm?.[c.id]))
     const mescladas = mesmaLista(estado.conversas, lidas) ? estado.conversas : lidas
     const aindaExiste = mescladas.some((c) => c.id === estado.selecionadaId)
-    const selecionadaId = aindaExiste ? estado.selecionadaId : (mescladas[0]?.id ?? null)
+    // #2005 (console-07): "Chamar no WhatsApp" seleciona a conversa nova antes de a lista conhecê-la. A volta que
+    // saiu antes dela existir não pode devolver a seleção à primeira da lista: espera algumas voltas pela conversa.
+    const pendente = estado.selecaoPendente
+    const esperando = !aindaExiste && pendente?.id === estado.selecionadaId && pendente.voltas < VOLTAS_DA_SELECAO_PENDENTE
+    const selecionadaId = aindaExiste || esperando ? estado.selecionadaId : (mescladas[0]?.id ?? null)
+    const selecaoPendente = esperando ? { id: pendente.id, voltas: pendente.voltas + 1 } : null
     const pausas = Object.fromEntries(mescladas.map((c) => [c.id, c.pausaApi ?? false]))
     const automaticoPausado = mesmoConteudo(estado.automaticoPausado, pausas) ? estado.automaticoPausado : pausas
     // O aviso de ação recusada fica até a dona fechar (F06): o ciclo de 5 s não o apaga.
@@ -290,9 +323,9 @@ const CASOS_API = {
       aviso: estado.sincronizacao?.aviso ?? null, avisoFixo: estado.sincronizacao?.avisoFixo ?? null,
     }
     // #1565: volta sem novidade devolve o mesmo estado; o Provider não recalcula nem a tela re-renderiza.
-    if (mescladas === estado.conversas && selecionadaId === estado.selecionadaId
+    if (mescladas === estado.conversas && selecionadaId === estado.selecionadaId && selecaoPendente === (estado.selecaoPendente ?? null)
       && automaticoPausado === estado.automaticoPausado && sincronizacao === estado.sincronizacao) return estado
-    return { ...estado, conversas: mescladas, selecionadaId, automaticoPausado, sincronizacao }
+    return { ...estado, conversas: mescladas, selecionadaId, selecaoPendente, automaticoPausado, sincronizacao }
   },
 
   // #1276: cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
@@ -312,6 +345,18 @@ const CASOS_API = {
 
   [acao.RENOMEAR_LEAD_API]: (estado, { id, nome }) =>
     mapear(estado, id, (c) => ({ ...c, nome: nome?.trim() || c.nome, nomeDaDona: Boolean(nome?.trim()) })),
+
+  // #2005 (console-09): a página mais antiga entra no topo do fio. `esgotou`: veio menos que uma página.
+  [acao.ANTERIORES_CARREGADAS]: (estado, { id, mensagens, esgotou }) =>
+    mapear(estado, id, (c) => {
+      const jaTem = new Set(c.mensagens.map((m) => m.id))
+      return {
+        ...c,
+        mensagens: [...mensagens.filter((m) => !jaTem.has(m.id)), ...c.mensagens],
+        anterioresCarregadas: true,
+        anterioresEsgotadas: esgotou,
+      }
+    }),
 
   [acao.SINCRONIZACAO_FALHOU]: (estado, { mensagem }) => ({
     ...estado, sincronizacao: { ...estado.sincronizacao, estado: 'erro', mensagem },
@@ -391,6 +436,7 @@ const CASOS = {
   [acao.SELECIONAR_CONVERSA]: (estado, { id }) => ({
     ...estado,
     selecionadaId: id,
+    selecaoPendente: estado.conversas.some((c) => c.id === id) ? null : { id, voltas: 0 },
     agente: estado.agente.conversaId === id ? estado.agente : { estado: 'ocioso', sugestao: null, conversaId: null },
   }),
 
@@ -441,8 +487,8 @@ const CASOS = {
 
   // Fecha o ciclo depois de "Entregue" ou "Cancelado" (seção 2, ações de
   // pedido). Copy da confirmação em linha é da Frente A.
-  [acao.ENCERRAR_ATENDIMENTO]: (estado, { id }) =>
-    mapear(estado, id, (c) => ({ ...c, estado: 'Encerrado' })),
+  [acao.ENCERRAR_ATENDIMENTO]: (estado, { id, confirmadaEm }) =>
+    mapear(estado, id, (c) => ({ ...c, estado: 'Encerrado', ...(confirmadaEm != null ? { confirmadaEm } : null) })),
 
   // O cliente só é avisado quando a dona marca. O sistema não adivinha.
   [acao.AVANCAR_ESTEIRA]: (estado, {

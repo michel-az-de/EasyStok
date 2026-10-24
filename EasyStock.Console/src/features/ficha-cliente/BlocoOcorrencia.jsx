@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
-import { CampoMascarado } from '../../componentes/CampoMascarado'
+import { CampoReais } from '../../componentes/CampoReais'
 import { Pilula } from '../../componentes/Pilula'
 import { useAcoes } from '../../aplicacao/contextos'
 import {
-  dataHora, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
+  dataHora, lerMoeda, moeda, moedaAltaDemais,
 } from '../../dominio/formato'
 import { ESTADOS_OCORRENCIA } from '../../dominio/ocorrencia'
 import css from './ficha.module.css'
@@ -114,16 +114,15 @@ export function BlocoOcorrencia({
           <p className={css.corpoBloco}>
             Devolver para {nomeCliente}. Pago: {moeda(valorPago)}.
           </p>
-          <CampoMascarado
-            tipo="moeda"
+          <CampoReais
             rotulo="Valor a devolver"
-            valor={mascaraMoeda(centavosReembolso)}
+            centavos={centavosReembolso}
+            ler={lerMoeda}
             erro={moedaAltaDemais(centavosReembolso)
               ? 'Valor alto demais'
               : centavosReembolso > Math.round(valorPago * 100) ? 'Maior que o pago' : null}
             dica="Pode ser menor que o pago, para um estorno parcial."
-            aoMudarDigitos={(digitos) => setCentavosReembolso(Number(digitos || '0'))}
-            aoColarTexto={(texto) => setCentavosReembolso(lerMoeda(texto))}
+            aoMudar={(valor) => setCentavosReembolso(valor ?? 0)}
           />
           <CampoArea
             rotulo="Motivo do reembolso"

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { lerCaixaDoHub, lerCardapioDoHub, lerInboxDoHub, lerPedidosDoHub } from '../infra/api/hubApi'
+import { combinarSinais } from '../infra/api/sinais'
 
 export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro, cardapio = false }) {
   const [fontes, setFontes] = useState({})
@@ -14,7 +15,7 @@ export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro, cardap
       if (encerrado || lendo || document.visibilityState === 'hidden') return
       lendo = true
       controle = new AbortController()
-      const sinal = AbortSignal.any([controle.signal, AbortSignal.timeout(25000)])
+      const sinal = combinarSinais([controle.signal, AbortSignal.timeout(25000)])
       await Promise.allSettled(leitores.map(async ([id, ler]) => {
         setFontes((anterior) => ({ ...anterior, [id]: { ...anterior[id], estado: 'carregando' } }))
         try {

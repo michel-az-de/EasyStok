@@ -28,8 +28,10 @@ import { criarAcoesLoteApi } from './api/lote'
 import { criarAcoesCardapioApi } from './api/cardapio'
 import { criarAcoesMensagensProgramadasApi } from './api/mensagensProgramadas'
 import { criarAcoesModelosApi } from './api/modelos'
+import { criarAcoesMensagensAnterioresApi } from './api/mensagensAnteriores'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
 import { criarChavesDeMensagem } from './chavesDeMensagem'
+import { proximoInstante } from './relogioDeLeitura'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
@@ -79,7 +81,10 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
   const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
   const chaves = criarChavesDeMensagem()
   const confirmarResponsavel = (id, chamada) => chamada(id)
-    .then((resumo) => { despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) }); return true })
+    .then((resumo) => {
+      despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, confirmadaEm: proximoInstante(), situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) })
+      return true
+    })
     .catch((erro) => { avisar(erro); return false })
 
   return {
@@ -108,6 +113,8 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     ...criarAcoesCardapioApi({ despachar, estadoRef, comItensForaRef }),
     ...criarAcoesMensagensProgramadasApi({ estadoRef }),
     ...criarAcoesModelosApi({ despachar }),
+    // #2005 (console-09): "Ver mensagens anteriores" no topo do fio.
+    ...criarAcoesMensagensAnterioresApi({ despachar, estadoRef }),
     enviar: (id, texto, opcoes = {}) => {
       // #1287: texto vazio a API recusa (400); modelo e automática ainda não têm endpoint.
       if (!texto?.trim()) return false
@@ -174,17 +181,17 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     // a recusa (destino que não atende, conversa mudou) volta como `{ erro }` para o modal.
     transferirConversa: (id, paraUsuarioId) => transferir(id, paraUsuarioId)
       .then((resumo) => {
-        despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) })
+        despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, confirmadaEm: proximoInstante(), situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) })
         return { ok: true }
       }, (erro) => ({ erro: erro.message })),
     encerrarAtendimento: (id) => {
-      despachar({ tipo: acao.ENCERRAR_ATENDIMENTO, id })
+      despachar({ tipo: acao.ENCERRAR_ATENDIMENTO, id, confirmadaEm: proximoInstante() })
       encerrar(id).catch(avisar)
     },
     // A confirmação vem do servidor. Falha ou resposta perdida mantém a tela até a próxima leitura.
     reabrir: (id) => reabrir(id)
       .then((resumo) => despachar({
-        tipo: acao.CONFIRMAR_REABERTURA_API, id,
+        tipo: acao.CONFIRMAR_REABERTURA_API, id, confirmadaEm: proximoInstante(),
         situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario),
       }))
       .catch(avisar),

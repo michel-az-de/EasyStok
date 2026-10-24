@@ -12,6 +12,8 @@ export const listarPedidosKds = (data = null) =>
 export const mudarStatusKds = (id, status, { confirmarSaldoAReceber = false } = {}) =>
   chamarApi(`/api/kds/pedidos/${id}/status`, {
     metodo: 'PATCH', corpo: confirmarSaldoAReceber ? { status, confirmarSaldoAReceber } : { status },
+    // #2005 (estoque-10): o toque pendente sai ao fechar ou esconder a aba (`enviarPendentesAoSair`).
+    keepalive: true,
   })
 
 // Fila offline do tablet (S19, US-042): aplica em sequência e responde por item. #1863: item "entregue" com

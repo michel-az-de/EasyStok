@@ -73,6 +73,8 @@ export const textoNaoLigado = (rotulo) => `${rotulo}: indisponível nesta versã
 export const SO_NO_EASYSTOK = {
   marcarComprovante: 'Comprovante',
   aceitarDivergencia: 'Aceitar diferença',
+  // #2005 (console-01): o EasyStok não tem rota que cobre só a diferença; o botão não aparece.
+  cobrarDiferenca: 'Cobrar diferença',
   marcarEstorno: 'Estorno',
   corrigirPasso: 'Voltar a etapa',
   desfazerEsteira: 'Desfazer a etapa',

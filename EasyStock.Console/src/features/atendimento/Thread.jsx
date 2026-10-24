@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
+import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { marcarMudancasDeAssunto } from '../../dominio/email'
 import { Pilula } from '../../componentes/Pilula'
@@ -64,6 +65,7 @@ function PostIt({ nota }) {
 
 export function Thread({
   mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, digitando = false, notas = [],
+  temAnteriores = false, abrindoAnteriores = false, aoVerAnteriores,
 }) {
   const fim = useRef(null)
   // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
@@ -111,6 +113,14 @@ export function Thread({
 
   return (
     <div className={css.thread} role="log" aria-live="polite" aria-label="Mensagens da conversa">
+      {/* #2005 (console-09): o fio traz as 100 mais recentes; as de antes abrem sob demanda. */}
+      {temAnteriores && aoVerAnteriores && (
+        <div className={css.verAnteriores}>
+          <Botao variante="secundario" disabled={abrindoAnteriores} onClick={aoVerAnteriores}>
+            {abrindoAnteriores ? 'Abrindo…' : 'Ver mensagens anteriores'}
+          </Botao>
+        </div>
+      )}
       {linhas.map((l) => {
         if (l.tipo === 'divisoria') return <Divisoria key={l.chave} numero={l.numero} />
         if (l.tipo === 'dia') return <SeparadorDeDia key={l.chave} rotulo={l.rotulo} />

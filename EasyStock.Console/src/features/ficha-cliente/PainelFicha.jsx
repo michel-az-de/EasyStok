@@ -9,11 +9,11 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos
 import { useSimulacaoDoPedido } from '../../aplicacao/useSimulacaoDoPedido'
 import { useADevolver } from '../../aplicacao/useADevolver'
 import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
-import { faltaPagar } from '../../dominio/cobranca'
+import { faltaDaCobranca } from '../../dominio/cobranca'
 import { faixaDoPedido } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
 import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoResumo, totalDoPedido } from '../../dominio/pedido'
-import { faltaPagar as saldoDoPedido, totalPago } from '../../dominio/pagamento'
+import { faltaPagar, totalPago } from '../../dominio/pagamento'
 import { moeda } from '../../dominio/formato'
 import { ALVOS_DO_MOTIVO, pendenciaAntesDeCobrar } from '../../dominio/resumoPedido'
 import { permissaoDeEscrita } from '../../dominio/janela'
@@ -108,7 +108,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   const pedidoCriado = Boolean(pedido && (fonteApi ? pedido.pedidoId : pedido.cobranca || pedido.estado !== 'aguardando'))
   const tituloPedido = pedidoCriado ? 'Pedido e entrega' : 'Seleção do atendimento'
   const total = pedido?.totalApi ?? totalDoPedido(pedido, cardapio)
-  const saldo = saldoDoPedido(pedido, cardapio)
+  const saldo = faltaPagar(pedido, cardapio)
   const itens = pedido?.itens?.reduce((soma, item) => soma + item.qtd, 0) ?? 0
   // #1868: o saldo ganha linha própria no Resumo; o acesso Pagamento não repete o valor.
   const destacaSaldo = saldoEmDestaque({ editavel, pedidoCriado, saldo, cancelado: pedido?.estado === 'cancelado' })
@@ -270,7 +270,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           key={chaves.cobranca}
           pedido={pedido}
           agora={agora}
-          editavel={editavel}
+          editavel={editavel && !pedido.statusDesconhecido}
           nomeCliente={primeiroNome}
           conversaId={selecionada.id}
           aoGerar={(meio) => gerarCobranca(selecionada.id, pedido, meio)}
@@ -325,7 +325,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           aoAprovarPedido={aprovarPedido ? () => aprovarPedido(selecionada.id) : null}
           aoConfirmarPagamento={(valorPago, metodo) => confirmarPagamento(selecionada.id, valorPago ?? null, metodo)}
           aoAceitarDivergencia={() => aceitarDivergencia(selecionada.id)}
-          aoCobrarDiferenca={() => reenviarCobranca(selecionada.id, pedido, faltaPagar(pedido.cobranca))}
+          aoCobrarDiferenca={() => reenviarCobranca(selecionada.id, pedido, faltaDaCobranca(pedido.cobranca))}
           aoVoltarEtapa={() => corrigirPasso(selecionada.id)}
           aoCancelarPedido={aoCancelarPedido}
           aoMarcarEstorno={(motivo, valor) => marcarEstorno(selecionada.id, motivo, valor)}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
-import { CampoMascarado } from '../../componentes/CampoMascarado'
+import { CampoReais } from '../../componentes/CampoReais'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { ListaDados } from '../../componentes/ListaDados'
@@ -9,15 +9,16 @@ import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
+import { useEmissao } from '../../aplicacao/useEmissao'
 import {
   AVISO_BAIXA_COM_LINK, MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, aguardaSinalManual, baixaEsperaAprovacao, baixaCancelaCobrancaOnline, metodoDaCobranca,
   nomeDoMeio, podeAlterarMeio, situacaoDaCobranca, trocaDeFormaNoEasyStok, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
 import { rotuloDoTotal } from '../../dominio/resumoPedido'
 import {
-  horaCurta, lerMoeda, mascaraMoeda, moeda, moedaAltaDemais,
+  horaCurta, lerMoeda, moeda, moedaAltaDemais,
 } from '../../dominio/formato'
-import { diferencaAposPagamento, extratoDoPedido } from '../../dominio/pagamento'
+import { diferencaAposPagamento, extratoDoPedido, restanteDoSinal, saldoApi } from '../../dominio/pagamento'
 import { totalDoPedido } from '../../dominio/pedido'
 import { encontrarCupom, validarCupom } from '../../dominio/fidelidade'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
@@ -67,35 +68,6 @@ function CampoCupom({
       <Botao disabled={!codigo.trim()} onClick={aplicar}>Aplicar</Botao>
     </div>
   )
-}
-
-// Emitir uma cobrança é ida e volta a um provedor. No protótipo isso é instantâneo,
-// mas a tela mostra o estado de carregando mesmo assim: quem usa precisa aprender
-// que existe uma espera ali, senão estranha no dia em que o Pix real demorar.
-const MS_DE_EMISSAO = 700
-
-// #1287: no modo API a emissão devolve a promessa da ida ao EasyStok; o "emitindo" só
-// desliga quando ela volta, e o clique repetido no meio do caminho é ignorado.
-function useEmissao(aoEmitir) {
-  const [emitindo, setEmitindo] = useState(false)
-  const pendente = useRef(null)
-  const ocupado = useRef(false)
-
-  useEffect(() => () => clearTimeout(pendente.current), [])
-
-  const emitir = (...argumentos) => {
-    if (ocupado.current) return
-    ocupado.current = true
-    setEmitindo(true)
-    pendente.current = setTimeout(() => {
-      const liberar = () => { ocupado.current = false; setEmitindo(false) }
-      const ida = aoEmitir(...argumentos)
-      if (ida?.finally) ida.finally(liberar)
-      else liberar()
-    }, MS_DE_EMISSAO)
-  }
-
-  return { emitindo, emitir }
 }
 
 function CopiaECola({ codigo, rotulo = 'Copiar código' }) {
@@ -155,8 +127,8 @@ function CopiaECola({ codigo, rotulo = 'Copiar código' }) {
 // #1586: `aoConfirmar` devolve `{ erro }` na recusa. O erro aparece aqui, com o valor e o
 // método digitados; quem abriu o formulário só o fecha no sucesso.
 export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar, aoAprovar = null }) {
-  // Nasce preenchida com o total cobrado, em centavos por dentro (seção 4 da
-  // direção visual, passo zero): a tela só vê o texto já mascarado, "R$ X,XX".
+  // Nasce preenchida com o total cobrado, em centavos por dentro. #2005 (console-04): digitada em reais, como o
+  // caixa ("100" é R$ 100,00); a máscara de centavos fazia o mesmo "100" valer R$ 1,00.
   const [centavos, setCentavos] = useState(() => Math.round(valorCobrado * 100))
   const excedeu = moedaAltaDemais(centavos)
   const [metodo, setMetodo] = useState(() => metodoDaCobranca(pedido?.cobranca))
@@ -216,13 +188,12 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
           { valor: 'debito', rotulo: 'Cartão de débito' }, { valor: 'transferencia', rotulo: 'Transferência' },
           { valor: 'outro', rotulo: 'Outro' },
         ]} />
-      <CampoMascarado
-        tipo="moeda"
+      <CampoReais
         rotulo="Valor recebido"
-        valor={mascaraMoeda(centavos)}
+        centavos={centavos}
+        ler={lerMoeda}
         erro={excedeu ? 'Valor alto demais' : null}
-        aoMudarDigitos={(digitos) => setCentavos(Number(digitos || '0'))}
-        aoColarTexto={(texto) => setCentavos(lerMoeda(texto))}
+        aoMudar={(valor) => setCentavos(valor ?? 0)}
       />
       {recusa && <p className={css.motivoDesabilitado} role="alert">{recusa}</p>}
       <div className={css.acoesCobranca}>
@@ -314,9 +285,10 @@ export function BlocoCobranca({
   const cobranca = pedido.cobranca ?? null
   const situacao = situacaoDaCobranca(cobranca, agora)
   const total = totalDoPedido(pedido, cardapio)
-  const geracao = useEmissao(aoGerar)
-  const reenvio = useEmissao(aoReenviar)
-  const troca = useEmissao(aoAlterarMeio)
+  // #2005 (console-05): a espera de 700 ms é só da demonstração.
+  const geracao = useEmissao(aoGerar, { semEspera: fonteApi })
+  const reenvio = useEmissao(aoReenviar, { semEspera: fonteApi })
+  const troca = useEmissao(aoAlterarMeio, { semEspera: fonteApi })
   const alterar = editavel && !cancelado && podeAlterarMeio(pedido) && (
     <AlterarForma cobranca={cobranca} nomeCliente={nomeCliente} fonteApi={fonteApi} aoAlterar={troca.emitir} />
   )
@@ -440,10 +412,10 @@ export function BlocoCobranca({
           <Icone nome="credit-card" /> {sinalPendente ? 'Sinal a receber' : 'Receber na entrega'} · {nome} <b>{moeda(faltaSinal)}</b>
         </p>}
         {!cancelado && sinalPendente && (
-          <p className={css.corpoBloco}>{recebido > 0 ? `Recebido: ${moeda(recebido)}. ` : ''}O sinal confirma a reserva. Restante na entrega: {moeda(pedido.totalApi - alocado - faltaSinal)}.</p>
+          <p className={css.corpoBloco}>{recebido > 0 ? `Recebido: ${moeda(recebido)}. ` : ''}O sinal confirma a reserva. Restante na entrega: {moeda(Math.max(saldoApi(pedido) - faltaSinal, 0))}.</p>
         )}
-        {repete && !cancelado && !sinalPendente && fonteApi && pedido.sinalNaReserva && alocado > 0 && alocado < pedido.totalApi && (
-          <p className={css.corpoBloco}>Recebido: {moeda(recebido)}. Saldo na entrega: {moeda(pedido.totalApi - alocado)}.</p>
+        {repete && !cancelado && !sinalPendente && fonteApi && pedido.sinalNaReserva && alocado > 0 && saldoApi(pedido) > 0 && (
+          <p className={css.corpoBloco}>Recebido: {moeda(recebido)}. Saldo na entrega: {moeda(saldoApi(pedido))}.</p>
         )}
         {!cancelado && recebendo && (
           <BaixaAMao valorCobrado={valorSugeridoParaBaixa(pedido)}
@@ -508,19 +480,25 @@ export function BlocoCobranca({
         <p className={css.corpoBloco}>Sinal agora: {moeda(cobranca.valor)}. Restante na entrega: {moeda(pedido.totalApi - cobranca.valor)}.</p>
       )}
 
+      {restanteDoSinal(pedido) > 0 && (
+        <p className={css.corpoBloco}>Sinal pago: {moeda(cobranca.valor)}. Restante na entrega: {moeda(restanteDoSinal(pedido))}.</p>
+      )}
+
       {diferencaPosPagamento > 0 && (
         <div className={css.avisoDiferenca} role="alert">
           <p className={css.corpoBloco}>
             <Icone nome="alerta" /> Item novo depois do pagamento: <b>{moeda(diferencaPosPagamento)}</b> a cobrar.
           </p>
-          <Botao
-            largo
-            variante="secundario"
-            disabled={!editavel}
-            onClick={() => setMeioDaDiferenca(true)}
-          >
-            Cobrar diferença
-          </Botao>
+          {disponivel('cobrarDiferenca') && (
+            <Botao
+              largo
+              variante="secundario"
+              disabled={!editavel}
+              onClick={() => setMeioDaDiferenca(true)}
+            >
+              Cobrar diferença
+            </Botao>
+          )}
           {meioDaDiferenca && editavel && (
             <EscolhaDeMeio
               escolhido={null}

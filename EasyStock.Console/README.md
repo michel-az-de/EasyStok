@@ -20,6 +20,13 @@ Hoje roda com dados simulados. A ligação à API real é feita módulo a módul
 Para testar de um tablet na mesma rede: `HOST_AGENTE=0.0.0.0 npm run local` e abra o IP
 do computador na porta 5245. Sem essa variável o servidor só atende a própria máquina.
 
+## Navegador mínimo
+
+O build usa o alvo padrão do Vite 8 (`baseline-widely-available`): Chrome e Edge 111, Firefox 114 e Safari
+16.4. Recurso de navegador mais novo que isso entra com guarda: `infra/api/sinais.js` faz o papel de
+`AbortSignal.any` (Chrome 116, Safari 17.4) onde o nativo falta, e a `prova-2005-banca-console.mjs` remove o
+recurso para conferir que o console segue funcionando.
+
 ## Modos do agente
 
 | Modo | Onde roda | Precisa de |

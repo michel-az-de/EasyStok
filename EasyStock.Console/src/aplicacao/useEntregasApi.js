@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/entregasApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
+import { CONFERENCIA_AO_VIVO_MS, POLLING_SEM_SSE_MS, RECONECTAR_MS } from './recargaAoVivo'
 import {
   STATUS_KDS_DIA, STATUS_KDS_ENTREGAS, recarregaEntregasCom, releCadastroDeEntregas,
 } from '../dominio/entregasApi'
@@ -8,15 +9,13 @@ import { dataIsoNoFuso } from '../dominio/formato'
 import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { registrarPagamentoManual } from '../infra/api/pagamentosPedidoApi'
 import { criarRecargaDeAcao } from './recargaDeAcao'
-import { chaveDaEntrega, chaveDaSaida, criarEnvioComDesfazer } from './envioComDesfazer'
+import { chaveDaEntrega, chaveDaSaida, criarEnvioComDesfazer, enviarPendentesAoSair } from './envioComDesfazer'
 import { criarChaveDeEnvio } from './chaveDeEnvio'
 import { receberEEntregar, usarEntregaPropria } from './recebimentoNaEntrega'
 
 // Entregas no modo API (F04). Pedidos e viagens recarregam a cada evento de
 // pedido do SSE de operação (S18), o mesmo da cozinha (F05). Com o SSE caído,
-// busca a cada 15 s e tenta reconectar a cada 10 s.
-const POLLING_SEM_SSE_MS = 15000
-const RECONECTAR_MS = 10000
+// busca a cada 15 s e tenta reconectar a cada 10 s. Com ele vivo, confere a operação a cada 30 s.
 
 // #1577: a recarga por evento, por polling e por ação de viagem relê só a operação (4 GETs);
 // o cadastro (mais 3) volta quando `releCadastroDeEntregas` manda.
@@ -66,7 +65,10 @@ export function useEntregasApi({ comVitrine = true } = {}) {
   const [envio] = useState(() => criarEnvioComDesfazer({
     aoMudar: (lista) => setAdiados(new Map(lista.map((a) => [a.chave, a.ate]))),
   }))
-  useEffect(() => () => envio.descarregar(), [envio])
+  useEffect(() => {
+    const soltar = enviarPendentesAoSair(envio)
+    return () => { soltar(); envio.descarregar() }
+  }, [envio])
   // J2 (#1990): repetir o "Recebi" logo depois de uma queda não lança o pagamento duas vezes.
   const [envioDoPagamento] = useState(() => criarChaveDeEnvio())
   const [recebidosNaPorta] = useState(() => new Set())
@@ -134,8 +136,9 @@ export function useEntregasApi({ comVitrine = true } = {}) {
           if (evento === 'ready') {
             noAr = true
             setAoVivo(true)
+            // #2005 (console-20): SSE vivo e mudo não avisa o que não vira evento; a operação é conferida a cada 30 s.
             clearInterval(polling)
-            polling = null
+            polling = setInterval(() => recarregar(SO_OPERACAO), CONFERENCIA_AO_VIVO_MS)
           }
           if (recarregaEntregasCom(evento)) recarga.aoEvento(evento === 'ready')
         },
@@ -143,7 +146,8 @@ export function useEntregasApi({ comVitrine = true } = {}) {
           if (!vivoRef.current) return
           noAr = false
           setAoVivo(false)
-          if (!polling) polling = setInterval(() => recarregar(SO_OPERACAO), POLLING_SEM_SSE_MS)
+          clearInterval(polling)
+          polling = setInterval(() => recarregar(SO_OPERACAO), POLLING_SEM_SSE_MS)
           reconexao = setTimeout(conectar, RECONECTAR_MS)
         },
       })

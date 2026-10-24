@@ -1,5 +1,6 @@
 import { API_BASE } from '../fonteDados'
 import { atualizarTokens, empresaDoToken, gravarSessao, identidadeDaSessao, lerSessao, limparSessao } from './sessao'
+import { combinarSinais } from './sinais'
 
 // Erro de chamada à API com o que a tela precisa para falar com a dona:
 // status HTTP, código da API (`error.code` ou `erro`), mensagem legível e o detalhe
@@ -107,7 +108,7 @@ const PRAZO_DE_LEITURA_MS = 20000
 const semResposta = () => new ErroApi(0, 'SEM_RESPOSTA', 'O EasyStok demorou a responder.')
 
 export async function chamarApi(caminho, {
-  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null,
+  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null, keepalive = false,
 } = {}) {
   const sessao = autenticado ? await garantirSessao() : null
   // Uma operação em etapas pertence à conta que a iniciou, mesmo durante a renovação do token.
@@ -128,7 +129,9 @@ export async function chamarApi(caminho, {
       method: metodo,
       headers: cabecalhos,
       body: formulario ?? (corpo === undefined ? undefined : JSON.stringify(corpo)),
-      signal: sinal && prazo ? AbortSignal.any([sinal, prazo]) : sinal ?? prazo ?? undefined,
+      signal: sinal && prazo ? combinarSinais([sinal, prazo]) : sinal ?? prazo ?? undefined,
+      // Escrita pequena que precisa sobreviver à aba fechando (#2005, estoque-10).
+      keepalive: keepalive || undefined,
     })
   } catch {
     if (prazo?.aborted && !sinal?.aborted) throw semResposta()

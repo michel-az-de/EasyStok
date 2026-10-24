@@ -3,21 +3,20 @@ import {
   confirmarImpressao, listarImpressoesPendentes, listarPedidosKds, mudarStatusKds, reimprimirCanhoto,
 } from '../infra/api/kdsApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
+import { CONFERENCIA_AO_VIVO_MS, POLLING_SEM_SSE_MS, RECONECTAR_MS } from './recargaAoVivo'
 import { transicaoDaFila } from '../dominio/kds'
 import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { criarRecargaDeAcao } from './recargaDeAcao'
-import { criarEnvioComDesfazer } from './envioComDesfazer'
+import { criarEnvioComDesfazer, enviarPendentesAoSair } from './envioComDesfazer'
 
 // Cozinha no modo API (F05). A fila vem do KDS sobre Pedido (S19) e recarrega a
 // cada evento de pedido do SSE de operação (S18). Com o SSE caído, a tela não
-// para: busca a fila a cada 15 s e tenta reconectar a cada 10 s.
+// para: busca a fila a cada 15 s e tenta reconectar a cada 10 s. Com ele vivo, confere a fila a cada 30 s.
 //
 // Issue #1446: a cada leitura, compara com a anterior (`transicaoDaFila`) e marca
 // quem entrou, quem mudou de coluna e quem saiu, para a tela animar; e lê a fila de
 // impressão da API (S20), que a aba da Cozinha consome como a gaveta do protótipo.
 // O canhoto em si é o PDF de 80 mm do protótipo, montado na tela (`features/cozinha`).
-const POLLING_SEM_SSE_MS = 15000
-const RECONECTAR_MS = 10000
 const RECARREGA_COM = (evento) => evento === 'ready' || evento.startsWith('pedido.') || evento.startsWith('impressao.')
 
 // Quanto o destaque de "chegou" e "mudou de coluna" fica no cartão, e quanto o cartão que
@@ -65,7 +64,10 @@ export function useCozinhaApi({ data = null } = {}) {
   const [envio] = useState(() => criarEnvioComDesfazer({
     aoMudar: (lista) => setAdiados(new Map(lista.map((a) => [a.chave, { status: a.dados.status, ate: a.ate }]))),
   }))
-  useEffect(() => () => envio.descarregar(), [envio])
+  useEffect(() => {
+    const soltar = enviarPendentesAoSair(envio)
+    return () => { soltar(); envio.descarregar() }
+  }, [envio])
 
   const depois = useCallback((ms, fazer) => {
     const t = setTimeout(() => {
@@ -136,8 +138,9 @@ export function useCozinhaApi({ data = null } = {}) {
           if (evento === 'ready') {
             noAr = true
             setAoVivo(true)
+            // #2005 (console-20): SSE vivo e mudo não avisa o que não vira evento; a fila é conferida a cada 30 s.
             clearInterval(polling)
-            polling = null
+            polling = setInterval(recarregar, CONFERENCIA_AO_VIVO_MS)
           }
           if (RECARREGA_COM(evento)) recarga.aoEvento()
         },
@@ -145,7 +148,8 @@ export function useCozinhaApi({ data = null } = {}) {
           if (!vivoRef.current) return
           noAr = false
           setAoVivo(false)
-          if (!polling) polling = setInterval(recarregar, POLLING_SEM_SSE_MS)
+          clearInterval(polling)
+          polling = setInterval(recarregar, POLLING_SEM_SSE_MS)
           reconexao = setTimeout(conectar, RECONECTAR_MS)
         },
       })

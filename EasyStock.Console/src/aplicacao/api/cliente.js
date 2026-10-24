@@ -17,6 +17,11 @@ import { nomeConhecidoDoLead, nomeGenerico, recusaDoEndereco } from '../../domin
 export const precisaLerFicha = (c) => deveCarregarDossie(c)
   || Boolean(c && !c.clienteId && c.canal === 'Chat do site' && !c.contatoInformado)
 
+// #2005 (console-03): o dossiê que falha avisa e tenta de novo enquanto a conversa seguir aberta e sem ficha
+// (o efeito do Provider depende de um booleano e não rodaria outra vez). A primeira tentativa mais quatro.
+const ESPERA_DO_DOSSIE_MS = 8000
+const RETENTATIVAS_DO_DOSSIE = 4
+
 // Código do 409 de `POST .../cliente` quando o telefone informado pelo visitante já é de um cadastro (#1430).
 const TELEFONE_JA_CADASTRADO = 'TELEFONE_JA_CADASTRADO'
 
@@ -79,6 +84,30 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         avisar(`Cadastro do cliente: ${erro.message}`)
         return { erro: erro.message }
       })
+  }
+
+  // #1474: o clique em `selecionar` e o efeito da conversa restaurada podem pedir o mesmo
+  // dossiê juntos; com um em voo, o segundo recebe a mesma promessa.
+  function carregarClienteDaConversa(id, retentativas = RETENTATIVAS_DO_DOSSIE) {
+    if (!lendoDossie.has(id)) {
+      lendoDossie.set(id, carregar(id).then(() => true, () => {
+        // Releitura de uma Ficha que já está na tela (SSE) que falha fica quieta, como antes: nada a avisar.
+        if (!precisaLerFicha(conversaDe(id))) return false
+        const vaiTentar = retentativas > 0
+        avisar(vaiTentar
+          ? 'A ficha do cliente não carregou. O EasyStok tenta de novo em instantes.'
+          : 'A ficha do cliente não carregou. Abra a conversa de novo para tentar.')
+        if (vaiTentar) {
+          setTimeout(() => {
+            if (estadoRef.current.selecionadaId === id && precisaLerFicha(conversaDe(id))) {
+              carregarClienteDaConversa(id, retentativas - 1)
+            }
+          }, ESPERA_DO_DOSSIE_MS)
+        }
+        return false
+      }).finally(() => lendoDossie.delete(id)))
+    }
+    return lendoDossie.get(id)
   }
 
   return {
@@ -156,13 +185,6 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         })
     },
 
-    // #1474: o clique em `selecionar` e o efeito da conversa restaurada podem pedir o mesmo
-    // dossiê juntos; com um em voo, o segundo recebe a mesma promessa.
-    carregarClienteDaConversa: (id) => {
-      if (!lendoDossie.has(id)) {
-        lendoDossie.set(id, carregar(id).catch(() => {}).finally(() => lendoDossie.delete(id)))
-      }
-      return lendoDossie.get(id)
-    },
+    carregarClienteDaConversa,
   }
 }

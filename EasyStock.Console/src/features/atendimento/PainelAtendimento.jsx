@@ -29,7 +29,7 @@ export function PainelAtendimento({
   } = useAtendimento()
   const {
     enviar, reabrir, definirRascunho, assumirAtendimento, devolverAutomatico,
-    selecionar, abrirEncerramento, reenviar,
+    selecionar, abrirEncerramento, reenviar, carregarMensagensAnteriores,
   } = useAcoes()
   const { janelas, canais } = useCatalogo()
   const { acoes: capacidades } = useAcessoModulos()
@@ -41,6 +41,17 @@ export function PainelAtendimento({
   // #1761: "Modelos aprovados" abre do compositor e da bolha recusada fora da janela de 24 h.
   // Guardado pelo id da conversa: trocar de conversa fecha.
   const [modelosDe, setModelosDe] = useState(null)
+
+  // #2005 (console-09): só o modo API tem a ação; na demonstração o fio já é inteiro.
+  const anterioresEmCurso = useRef(false)
+  const [abrindoAnteriores, setAbrindoAnteriores] = useState(false)
+  async function aoVerAnteriores() {
+    if (anterioresEmCurso.current || !selecionada) return
+    anterioresEmCurso.current = true
+    setAbrindoAnteriores(true)
+    try { await carregarMensagensAnteriores(selecionada.id) }
+    finally { anterioresEmCurso.current = false; setAbrindoAnteriores(false) }
+  }
 
   async function aoReabrir() {
     if (reabrindoRef.current || !selecionada) return
@@ -164,6 +175,9 @@ export function PainelAtendimento({
           aoAbrirModelos={podeEnviarModelo ? () => setModelosDe(selecionada.id) : undefined}
           digitando={digitando}
           notas={selecionada.cliente?.notas ?? []}
+          temAnteriores={Boolean(selecionada.temAnteriores) && !selecionada.anterioresEsgotadas}
+          abrindoAnteriores={abrindoAnteriores}
+          aoVerAnteriores={carregarMensagensAnteriores ? aoVerAnteriores : undefined}
         />
       </div>
 

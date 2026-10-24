@@ -43,6 +43,7 @@ const fronteiras = new Map([
   ['/componentes/Botao', 'export function Botao(){}'],
   ['/componentes/Campo', 'export function CampoArea(){}'],
   ['/componentes/CampoMascarado', 'export function CampoMascarado(){}'],
+  ['/componentes/CampoReais', 'export function CampoReais(){}'],
   ['/componentes/EscolhaDeEntregador', 'export function EscolhaDeEntregador(){}'],
   ['/componentes/Icone', 'export function Icone(){}'],
   ['/features/ficha-cliente/BlocoCobranca', 'export function BaixaAMao(){}'],

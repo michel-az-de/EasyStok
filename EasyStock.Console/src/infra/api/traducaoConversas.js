@@ -7,6 +7,9 @@ import { pausaDaSituacao, respostaAtrasada } from '../../dominio/automatico'
 import { ACOES } from '../../dominio/agente'
 import { motivoDeEscalada, notaDeReabertura, notaDeSistema } from '../../dominio/motivoDeEscalada'
 
+// #2005 (console-09): a leitura da conversa traz até 100 mensagens (as mais recentes); página cheia sugere que há mais.
+export const MENSAGENS_POR_LEITURA = 100
+
 const NOME_DO_CANAL = {
   WhatsApp: 'WhatsApp', Instagram: 'Instagram', Messenger: 'Messenger',
   ChatSite: 'Chat do site', Email: 'E-mail', Sms: 'SMS',
@@ -151,6 +154,8 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     cliente: { desde: null, endereco: null, enderecoCapturado: null, pedidos: 0, tags: [], notas: [] },
     pedido: null,
     mensagens,
+    // #2005 (console-09): página cheia, pode haver mensagens mais antigas para abrir.
+    temAnteriores: (mensagensDaApi?.length ?? 0) >= MENSAGENS_POR_LEITURA,
   }
   return { ...conversa, atrasada: respostaAtrasada(conversa, agora, Boolean(conversa.pausaApi)) }
 }
