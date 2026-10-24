@@ -90,4 +90,18 @@ public class RemoverCardapioItemAdminUseCaseTests
 
         await _storage.Received(1).DeleteAsync(propria, Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task NaoApagaFotoDeOutroPratoDaMesmaVitrine()
+    {
+        // Prato duplicado aponta para a foto do original: remover a cópia não pode apagar a foto do original.
+        var storefrontId = Guid.NewGuid();
+        var item = CardapioItem.CriarAvulso(storefrontId, "Lasanha", 35m);
+        item.AtualizarMetadata(fotoUrl: $"/files/cardapios/{Guid.NewGuid()}/{storefrontId}/{Guid.NewGuid()}/foto.webp");
+        _repo.GetByIdAndScopeAsync(storefrontId, item.Id, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(item);
+
+        await Sut().ExecuteAsync(new RemoverCardapioItemAdminCommand(storefrontId, item.Id));
+
+        await _storage.DidNotReceiveWithAnyArgs().DeleteAsync(default!, default);
+    }
 }

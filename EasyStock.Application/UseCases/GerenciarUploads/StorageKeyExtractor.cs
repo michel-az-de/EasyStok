@@ -43,9 +43,11 @@ public static class StorageKeyExtractor
     /// tiver <c>..</c>. <c>FotoUrl</c>, logo e avatar são texto gravado pelo tenant e podem apontar para o arquivo
     /// de outra empresa; apagar ou ler por eles sem conferir mexia no storage alheio.
     /// </summary>
-    public static string? ExtractDoDono(string? url, string prefixoDoDono)
+    public static string? ExtractDoDono(string? url, string prefixoDoDono) => DoDono(Extract(url), prefixoDoDono);
+
+    /// <summary>A chave já gravada (ex.: <c>StorageKey</c> do <c>FotosJson</c> do produto, que vem do cliente) só sai se for do dono.</summary>
+    public static string? DoDono(string? chave, string prefixoDoDono)
     {
-        var chave = Extract(url);
         if (chave is null || chave.Contains("..", System.StringComparison.Ordinal) || chave.Contains('\\')) return null;
         return chave.StartsWith(prefixoDoDono, System.StringComparison.Ordinal) ? chave : null;
     }

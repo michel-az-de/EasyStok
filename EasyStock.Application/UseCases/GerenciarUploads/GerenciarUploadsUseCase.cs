@@ -87,8 +87,9 @@ public sealed class GerenciarUploadsUseCase(
         var foto = fotos.FirstOrDefault(f => f.FotoId == fotoId)
             ?? throw new UseCaseValidationException("Foto nao encontrada.");
 
-        if (!string.IsNullOrWhiteSpace(foto.StorageKey))
-            await fileStorage.DeleteAsync(foto.StorageKey, cancellationToken);
+        // #2027: o FotosJson vem do cadastro do produto; a chave pode ser de outra empresa.
+        if (StorageKeyExtractor.DoDono(foto.StorageKey, $"produtos/{empresaId}/{produtoId}/") is { } chave)
+            await fileStorage.DeleteAsync(chave, cancellationToken);
 
         fotos.Remove(foto);
         produto.FotosJson = EasyStock.Application.UseCases.GerenciarProduto.Helpers.ProdutoFotosSerializer.Serializar(fotos);
