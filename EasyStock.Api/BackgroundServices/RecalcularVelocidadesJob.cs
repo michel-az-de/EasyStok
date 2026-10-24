@@ -1,102 +1,127 @@
-using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Concurrency;
 
 namespace EasyStock.Api.BackgroundServices;
 
 /// <summary>
-/// Job para recalcular velocidades de saída dos itens de estoque.
-/// Executa periodicamente para manter as métricas de velocidade atualizadas.
+/// Recalcula a velocidade de saída (média diária dos últimos 30 dias) dos lotes com saldo, a cada 6 h (#2016). Roda
+/// <b>por empresa</b>, cada uma num escopo com o tenant ligado (<see cref="RodadaPorEmpresa"/>): sem isso o filtro global
+/// zerava a leitura e o job processava 0 lote (#1588). O advisory lock deixa uma réplica só na rodada.
+///
+/// <para>
+/// Lê os lotes RASTREADOS e deixa o rastreador gravar só o que mudou; o <c>Update</c> do grafo inteiro, que a versão
+/// anterior fazia sobre lotes lidos com <c>Include</c>, reescreveria produto e variação. Lote com a mesma velocidade não
+/// é gravado. Um lote mexido por uma venda no meio da página (token <c>xmin</c>) descarta a página e ela volta na rodada
+/// seguinte.
+/// </para>
+///
+/// <para>Desligado por <c>BackgroundJobs:EnableRecalcularVelocidadesJob=false</c>.</para>
 /// </summary>
 public sealed class RecalcularVelocidadesJob(
-    IServiceProvider serviceProvider,
+    IServiceScopeFactory scopeFactory,
     ILogger<RecalcularVelocidadesJob> logger) : BackgroundService
 {
-    private readonly TimeSpan _interval = TimeSpan.FromHours(6);
+    public static readonly TimeSpan Intervalo = TimeSpan.FromHours(6);
+    private static readonly TimeSpan EsperaInicial = TimeSpan.FromMinutes(2);
+    private const int TamanhoDaPagina = 500;
+    private const int JanelaEmDias = 30;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Job de recálculo de velocidades iniciado");
+        logger.LogInformation("Job de recálculo de velocidades iniciado — intervalo={Intervalo}.", Intervalo);
 
-        using var timer = new PeriodicTimer(_interval);
+        try { await Task.Delay(EsperaInicial, stoppingToken); }
+        catch (OperationCanceledException) { return; }
 
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await RecalcularVelocidadesAsync(stoppingToken);
+                await RodadaAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Erro no recálculo de velocidades");
+                logger.LogError(ex, "Erro no recálculo de velocidades — tenta de novo em {Intervalo}.", Intervalo);
             }
+
+            try { await Task.Delay(Intervalo, stoppingToken); }
+            catch (OperationCanceledException) { break; }
         }
     }
 
-    private async Task RecalcularVelocidadesAsync(CancellationToken cancellationToken)
-    {
-        using var scope = serviceProvider.CreateScope();
-        var itemEstoqueRepo = scope.ServiceProvider.GetRequiredService<IItemEstoqueRepository>();
-        var movimentacaoRepo = scope.ServiceProvider.GetRequiredService<IMovimentacaoEstoqueRepository>();
-        var empresaRepo = scope.ServiceProvider.GetRequiredService<IEmpresaRepository>();
-        var dbContext = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-
-        var empresas = await empresaRepo.GetAllAsync();
-        foreach (var empresa in empresas)
+    /// <summary>Uma rodada com a trava. Pública para os testes de integração; o laço de 6 em 6 h a chama.</summary>
+    public Task<bool> RodadaAsync(CancellationToken ct) => PostgresAdvisoryLock.TentarExecutarEmEscopoProprioAsync(
+        scopeFactory,
+        LockKeys.RecalcularVelocidades,
+        async token =>
         {
-            await ProcessarEmpresaAsync(empresa, itemEstoqueRepo, movimentacaoRepo, dbContext, cancellationToken);
-        }
-    }
+            var resultado = await RodadaPorEmpresa.ExecutarAsync(
+                scopeFactory,
+                logger,
+                nameof(RecalcularVelocidadesJob),
+                RecalcularEmpresaAsync,
+                token);
+            logger.LogInformation(
+                "Velocidades: {Empresas} empresa(s) percorrida(s), {Falhas} com falha.", resultado.Empresas, resultado.Falhas);
+        },
+        ct);
 
-    private async Task ProcessarEmpresaAsync(
-        Empresa empresa,
-        IItemEstoqueRepository itemEstoqueRepo,
-        IMovimentacaoEstoqueRepository movimentacaoRepo,
-        EasyStockDbContext dbContext,
-        CancellationToken cancellationToken)
+    private async Task RecalcularEmpresaAsync(IServiceProvider sp, Guid empresaId, CancellationToken ct)
     {
-        var de = DateTime.UtcNow.AddDays(-30);
-        var ate = DateTime.UtcNow;
+        var itemEstoqueRepo = sp.GetRequiredService<IItemEstoqueRepository>();
+        var movimentacaoRepo = sp.GetRequiredService<IMovimentacaoEstoqueRepository>();
+        var unitOfWork = sp.GetRequiredService<IUnitOfWork>();
 
-        const int pageSize = 500;
-        var page = 1;
-        var totalProcessados = 0;
-        List<ItemEstoque> itensList;
+        var ate = DateTime.UtcNow;
+        var de = ate.AddDays(-JanelaEmDias);
+        var pagina = 1;
+        var lidos = 0;
+        var atualizados = 0;
+        IReadOnlyList<ItemEstoque> lotes;
 
         do
         {
-            (var itens, _) = await itemEstoqueRepo.GetItensEstoquePaginadosAsync(empresa.Id, page, pageSize);
-            itensList = itens.ToList();
-            if (itensList.Count == 0) break;
+            lotes = await itemEstoqueRepo.GetLotesComSaldoRastreadosAsync(empresaId, pagina, TamanhoDaPagina, ct);
+            if (lotes.Count == 0)
+                break;
 
-            // Busca todas as taxas de saída em uma única query em vez de 1 por item
-            var produtoIds = itensList.Select(i => i.ProdutoId).Distinct();
-            var taxasPorProduto = await movimentacaoRepo.GetTaxaSaidaDiariaPorProdutoAsync(empresa.Id, produtoIds, de, ate);
+            // Uma consulta das taxas por página, no lugar de uma por lote.
+            var taxas = await movimentacaoRepo.GetTaxaSaidaDiariaPorProdutoAsync(empresaId, lotes.Select(l => l.ProdutoId), de, ate);
 
-            foreach (var item in itensList)
+            var mudados = 0;
+            foreach (var lote in lotes)
             {
-                try
-                {
-                    var velocidade = taxasPorProduto.GetValueOrDefault(item.ProdutoId, 0m);
-                    item.AtualizarVelocidadeSaida(velocidade, DateTime.UtcNow);
-                    await itemEstoqueRepo.UpdateAsync(item);
+                var velocidade = Math.Max(0m, decimal.Round(taxas.GetValueOrDefault(lote.ProdutoId, 0m), 2));
+                if (velocidade == lote.VelocidadeSaidaDiaria)
+                    continue;
 
-                    logger.LogDebug(
-                        "Velocidade atualizada para item {ItemId}: {Velocidade} unidades/dia",
-                        item.Id,
-                        velocidade);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Erro ao recalcular velocidade para item {ItemId}", item.Id);
-                }
+                lote.AtualizarVelocidadeSaida(velocidade, ate);
+                lote.AlteradoEm = ate;
+                mudados++;
             }
 
-            await dbContext.SaveChangesAsync(cancellationToken);
+            try
+            {
+                if (mudados > 0)
+                    await unitOfWork.CommitAsync();
+                atualizados += mudados;
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                logger.LogWarning(ex, "Velocidades da empresa {EmpresaId}: página {Pagina} mexida por outra operação; volta na próxima rodada.", empresaId, pagina);
+                unitOfWork.DescartarAlteracoesPendentes();
+            }
 
-            totalProcessados += itensList.Count;
-            page++;
+            // A página seguinte não precisa dos lotes desta no rastreador.
+            unitOfWork.DescartarAlteracoesPendentes();
+            lidos += lotes.Count;
+            pagina++;
         }
-        while (itensList.Count == pageSize);
+        while (lotes.Count == TamanhoDaPagina);
 
-        logger.LogInformation("Velocidades recalculadas para {Total} itens da empresa {EmpresaId}", totalProcessados, empresa.Id);
+        logger.LogInformation("Velocidades da empresa {EmpresaId}: {Lidos} lote(s) lido(s), {Atualizados} atualizado(s).", empresaId, lidos, atualizados);
     }
 }
