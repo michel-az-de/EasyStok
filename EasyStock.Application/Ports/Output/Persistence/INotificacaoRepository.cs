@@ -14,7 +14,14 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<IEnumerable<Notificacao>> GetRecentesNaoLidasAsync(Guid empresaId, int limit = 5, Guid? usuarioId = null);
         Task<NotificacaoResumo> GetResumoAsync(Guid empresaId, Guid? usuarioId = null);
         Task<bool> ExisteNotificacaoNaoLidaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid referenciaId);
-        Task<bool> ExisteNotificacaoDoDiaAsync(Guid empresaId, TipoAlertaEstoque tipo, Guid? referenciaId, DateTime dataReferencia);
+
+        /// <summary>
+        /// Os alertas já criados na janela UTC [<paramref name="inicioUtc"/>, <paramref name="fimUtc"/>) da empresa, lidos
+        /// ou não, como (tipo, referência). Uma consulta por rodada no lugar de uma por item (#2016): quem gera alerta
+        /// por dia consulta o conjunto e acrescenta o que criar.
+        /// </summary>
+        Task<HashSet<(TipoAlertaEstoque Tipo, Guid? ReferenciaId)>> GetAlertasDoPeriodoAsync(
+            Guid empresaId, DateTime inicioUtc, DateTime fimUtc, CancellationToken ct = default);
         Task<int> CountNaoLidasAsync(Guid empresaId, Guid? usuarioId = null);
         Task AddAsync(Notificacao notificacao);
         Task UpdateAsync(Notificacao notificacao);

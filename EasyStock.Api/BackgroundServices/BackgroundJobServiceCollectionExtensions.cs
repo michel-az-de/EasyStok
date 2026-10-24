@@ -34,9 +34,6 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableLogStorage)
             services.AddHostedService<LogStorageBackgroundService>();
 
-        if (options.EnableAlertasEstoqueJob)
-            services.AddHostedService<AlertasEstoqueJob>();
-
         if (options.EnableProcessarRecebimentoJob)
             services.AddHostedService<ProcessarRecebimentoJob>();
 
