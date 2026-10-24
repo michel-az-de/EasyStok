@@ -3,7 +3,7 @@
 // `AtendimentoProvider.jsx` na linha de import e na linha que espalha
 // `criarAcoesFidelidade(despachar)`.
 import * as acao from '../acoes'
-import { proximoId } from '../../infra/repositorioConversas'
+import { proximoId } from '../../infra/numeracao'
 
 export function criarAcoesFidelidade(despachar) {
   return {

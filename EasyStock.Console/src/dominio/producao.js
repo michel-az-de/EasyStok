@@ -84,10 +84,6 @@ const ordenarPorData = (lista) => [...lista].sort(
 export const saldoEmPorcoes = (lotes, sku) =>
   lotesDoSku(lotes, sku).reduce((soma, l) => soma + saldoLote(l), 0)
 
-// RN-50: baixa de estoque usa sempre o lote mais antigo com saldo.
-export const loteMaisAntigoComSaldo = (lotes, sku) =>
-  ordenarPorData(lotesDoSku(lotes, sku)).find((l) => saldoLote(l) > 0) ?? null
-
 // RN-51: lote perto do vencimento aparece destacado.
 export function situacaoDeVencimento(lote, agoraMs, diasAviso = PADRAO_DIAS_AVISO_VENCIMENTO) {
   if (!lote.validadeEm) return 'ok'

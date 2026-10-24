@@ -340,8 +340,6 @@ namespace EasyStock.Domain.Entities
             else if (novo == StatusPedido.Cancelado) CanceladoEm = agora;
         }
 
-        public void MarcarEntregue() => MudarStatus(StatusPedido.Entregue);
-
         /// <summary>Retorno físico confirmado, sem cancelar venda, estornar pagamento ou devolver estoque.</summary>
         public void RegistrarRetornoEntrega()
         {

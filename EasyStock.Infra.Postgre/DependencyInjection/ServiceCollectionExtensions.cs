@@ -137,11 +137,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<ILancamentoRepository, LancamentoRepository>();
             services.AddScoped<IWebhookRecebidoRepository, WebhookRecebidoRepository>();
 
-            // Onda P0 Payment Orchestration
-            services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IPaymentAttemptRepository,
-                Repositories.Pagamentos.PaymentAttemptRepository>();
-            services.AddScoped<EasyStock.Application.Ports.Output.Pagamentos.IGatewayRoutingRuleRepository,
-                Repositories.Pagamentos.GatewayRoutingRuleRepository>();
             // S11: cobrança do pedido
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.IEstornoOnlineRepository, Repositories.Pagamentos.EstornoOnlineRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Pagamentos.ICobrancaPedidoRepository,
@@ -256,8 +251,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Storefront.ClienteOtpRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IClienteSessionRepository,
                 Repositories.Storefront.ClienteSessionRepository>();
-            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IWebhookProcessadoRepository,
-                Repositories.Storefront.WebhookProcessadoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.ICheckoutIdempotencyRepository,
                 Repositories.Storefront.CheckoutIdempotencyRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IPedidoAvaliacaoRepository,
@@ -281,8 +274,6 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Services.Atendimento.CaixaEmailDoTenant>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IEmailAtendimentoQuery,
                 Repositories.Atendimento.EmailAtendimentoQuery>();
-            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IStorefrontFaleConoscoRepository,
-                Repositories.Storefront.StorefrontFaleConoscoRepository>();
             // Storefront — autenticação OTP cliente (AUTH-002)
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IClienteStorefrontRepository,
                 Repositories.Storefront.ClienteStorefrontRepository>();

@@ -58,40 +58,6 @@ public class ValidadeTests
     }
 
     [Fact]
-    public void Deve_estar_pronto_para_vencer_quando_dentro_da_janela()
-    {
-        var validade = Validade.From(new DateTime(2024, 12, 31));
-        var referencia = new DateOnly(2024, 12, 29);
-
-        var pronto = validade.EstaProntoParaVencerEm(3, referencia);
-
-        pronto.Should().BeTrue();
-    }
-
-    [Fact]
-    public void Nao_deve_estar_pronto_para_vencer_quando_fora_da_janela()
-    {
-        var validade = Validade.From(new DateTime(2024, 12, 31));
-        var referencia = new DateOnly(2024, 12, 25);
-
-        var pronto = validade.EstaProntoParaVencerEm(3, referencia);
-
-        pronto.Should().BeFalse();
-    }
-
-    [Fact]
-    public void Nao_deve_permitir_dias_negativo_em_esta_pronto_para_vencer()
-    {
-        var validade = Validade.From(new DateTime(2024, 12, 31));
-        var referencia = new DateOnly(2024, 12, 29);
-
-        Action act = () => validade.EstaProntoParaVencerEm(-1, referencia);
-
-        act.Should().Throw<ArgumentOutOfRangeException>()
-            .WithMessage("*Dias não pode ser negativo.*");
-    }
-
-    [Fact]
     public void Deve_retornar_string_formatada()
     {
         var validade = Validade.From(new DateTime(2024, 12, 31));

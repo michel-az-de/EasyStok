@@ -1,12 +1,6 @@
-import { caminhoDoImpresso } from '../../dominio/impressos'
 import { API_BASE } from '../fonteDados'
 import { chamarApi } from './cliente'
 import { lerSessao } from './sessao'
-
-// Impressos do pedido em HTML pronto (#1632): a API devolve a página autocontida, fora do
-// envelope, já com o `@page` do papel. O documento "cozinha" sai da rota `comanda`.
-export const obterHtmlDoImpresso = (pedidoId, opcoes) =>
-  chamarApi(caminhoDoImpresso(pedidoId, opcoes), { texto: true })
 
 export const prepararImpresso = (pedidoId, corpo, sinal) =>
   chamarApi(`/api/pedidos/${pedidoId}/impressoes`, { metodo: 'POST', corpo, sinal })

@@ -98,6 +98,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasDatabaseName("ux_pedidos_empresa_numero_do_dia")
                 .IsUnique()
                 .HasFilter("numero_do_dia IS NOT NULL");
+            // #1725-10: a lista do console (KdsPedidoQueries) e a de pedidos com status filtram por empresa e status e
+            // ordenam pela criação; sem este índice o Postgres lê todos os pedidos da empresa a cada atualização.
+            b.HasIndex(p => new { p.EmpresaId, p.Status, p.CriadoEm })
+                .HasDatabaseName("ix_pedidos_empresa_status_criado_em");
 
             b.HasOne(p => p.Empresa)
                 .WithMany()

@@ -193,19 +193,6 @@ public class ProdutoController(
         return DataOk(await gerenciarProdutoUseCase.ObterHistoricoAsync(resolvedEmpresaId, id));
     }
 
-    [SwaggerOperation(Summary = "Get product statistics", Description = "Returns sales velocity, average margin, days without movement.")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [HttpGet("{id}/estatisticas")]
-    public async Task<IActionResult> GetEstatisticas(Guid id, [FromQuery] Guid empresaId)
-    {
-        if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
-            return error!;
-
-        return DataOk(await gerenciarProdutoUseCase.ObterEstatisticasAsync(resolvedEmpresaId, id));
-    }
-
     [SwaggerOperation(Summary = "Create product variant (Gerente only)")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

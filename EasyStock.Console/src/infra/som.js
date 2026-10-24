@@ -25,8 +25,6 @@ import { EVENTOS_DE_SOM, ROTULO_DO_SOM } from '../dominio/automatico'
 // protótipo web não resolve isso; a fila já tem o app Android nativo, que
 // tem canal de notificação sonora fora da aba.
 
-export const EVENTOS = EVENTOS_DE_SOM
-
 let contexto = null
 
 function obterContexto() {

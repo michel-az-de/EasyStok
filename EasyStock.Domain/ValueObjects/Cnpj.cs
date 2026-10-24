@@ -62,11 +62,6 @@ public sealed record Cnpj
             && d[13] == DigitoVerificador(d, 13);
     }
 
-    /// <summary>Formata o documento para exibição (CPF: 000.000.000-00 / CNPJ: 00.000.000/0000-00).</summary>
-    public string Formatado() => Value.Length == 11
-        ? $"{Value[..3]}.{Value[3..6]}.{Value[6..9]}-{Value[9..]}"
-        : $"{Value[..2]}.{Value[2..5]}.{Value[5..8]}/{Value[8..12]}-{Value[12..]}";
-
     public static implicit operator string(Cnpj c) => c.Value;
 
     public override string ToString() => Value;

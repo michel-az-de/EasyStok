@@ -11,7 +11,7 @@
 // pronto, sem import de infra) e depois `executarPassoSimulado` a cada
 // `setTimeout`.
 import * as acao from '../acoes'
-import { proximoId, proximoNumeroPedido } from '../../infra/repositorioConversas'
+import { proximoId, proximoNumeroPedido } from '../../infra/numeracao'
 import { cenarioPorId, deslocamentoParaHora } from '../../dominio/simulacoes'
 import {
   ESQUELETOS, FALAS, FALA_VOLUME, FALA_VOLUME_RECLAMACAO, VARIACOES_VOLUME,

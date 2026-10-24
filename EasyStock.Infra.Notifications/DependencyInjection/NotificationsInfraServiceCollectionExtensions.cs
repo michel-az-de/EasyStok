@@ -35,11 +35,9 @@ public static class NotificationsInfraServiceCollectionExtensions
 
         // SMS providers (todos registrados, selecionado por chave "sms:active")
         services.Configure<TwilioSmsOptions>(configuration.GetSection("Notifications:Sms:Twilio"));
-        services.Configure<ZenviaSmsOptions>(configuration.GetSection("Notifications:Sms:Zenvia"));
 
         services.AddKeyedScoped<IProvedorSms, StubSmsProvider>("sms:stub");
         services.AddKeyedScoped<IProvedorSms, TwilioSmsProvider>("sms:twilio");
-        services.AddKeyedScoped<IProvedorSms, ZenviaSmsProvider>("sms:zenvia");
 
         var smsProvider = configuration["Notifications:Sms:Provider"] ?? "stub";
         services.AddKeyedScoped<IProvedorSms>(
@@ -51,12 +49,10 @@ public static class NotificationsInfraServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.Ports.Output.Atendimento.ICanalMensageria, EasyStock.Infra.Notifications.Atendimento.CanalEmail>();
 
         // WhatsApp providers
-        services.Configure<TwilioWhatsAppOptions>(configuration.GetSection("Notifications:WhatsApp:Twilio"));
         services.Configure<MetaCloudWhatsAppOptions>(configuration.GetSection("Notifications:WhatsApp:Meta"));
         services.Configure<WhatsAppPlataformaOptions>(configuration.GetSection("Notifications:WhatsApp:Plataforma"));
 
         services.AddKeyedScoped<IProvedorWhatsApp, StubWhatsAppProvider>("whatsapp:stub");
-        services.AddKeyedScoped<IProvedorWhatsApp, TwilioWhatsAppProvider>("whatsapp:twilio");
         // Onda 2.1 — Meta concrete tambem registrado direto pra acesso ao EnviarTemplateAsync
         // (templates aprovados Meta tem sintaxe propria, fora da interface IProvedorWhatsApp).
         services.AddScoped<MetaCloudWhatsAppProvider>();
@@ -83,8 +79,6 @@ public static class NotificationsInfraServiceCollectionExtensions
 
         // Named HttpClients para providers externos
         services.AddHttpClient("TwilioSms");
-        services.AddHttpClient("ZenviaSms");
-        services.AddHttpClient("TwilioWhatsApp");
         services.AddHttpClient("MetaWhatsApp");
         services.AddHttpClient(WebPushCanal.NomeHttpClient);
 

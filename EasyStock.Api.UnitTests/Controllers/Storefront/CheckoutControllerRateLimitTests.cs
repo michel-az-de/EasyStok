@@ -6,7 +6,8 @@ namespace EasyStock.Api.UnitTests.Controllers.Storefront;
 
 /// <summary>
 /// #1508: o checkout guest é anônimo e cria pedido; ganha o mesmo teto do outro POST público que cria
-/// pedido (cardápio da conversa). O checkout com sessão segue sem limitador próprio.
+/// pedido (cardápio da conversa). #1725-4: o checkout com sessão também cria pedido e chama o Mercado Pago a cada
+/// POST; ganha o mesmo teto (antes seguia sem limitador próprio). As janelas públicas seguem o teto do frete.
 /// </summary>
 public class CheckoutControllerRateLimitTests
 {
@@ -20,6 +21,12 @@ public class CheckoutControllerRateLimitTests
         Policies(nameof(CheckoutController.IniciarCheckoutGuest)).Should().Equal("public-post");
 
     [Fact]
-    public void CheckoutComSessao_NaoGanhaLimitadorProprio() =>
-        Policies(nameof(CheckoutController.IniciarCheckout)).Should().BeEmpty();
+    public void CheckoutComSessao_TemRateLimitPublico() =>
+        Policies(nameof(CheckoutController.IniciarCheckout)).Should().Equal("public-post");
+
+    [Fact]
+    public void JanelasPublicas_TemRateLimitPorIp() =>
+        typeof(AgendamentoController).GetMethod(nameof(AgendamentoController.ListarJanelas))!
+            .GetCustomAttributes(typeof(EnableRateLimitingAttribute), inherit: true)
+            .Cast<EnableRateLimitingAttribute>().Select(a => a.PolicyName!).Should().Equal("frete-publico");
 }

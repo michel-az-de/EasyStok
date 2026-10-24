@@ -22,6 +22,11 @@ export const podeAjustarEntrega = (acoes) => (acoes?.ajustarEntrega ?? acoes?.ed
 // não liga, não desliga nem edita. Na demonstração a matriz não decide.
 export const podeEditarAutomacoes = (acoes) => (acoes?.editarAutomacoes ?? acoes?.controlarLoja) === true
 export const automacoesEditaveis = ({ fonteApi, acoes }) => !fonteApi || podeEditarAutomacoes(acoes)
+// #1992 (decisão do Felipe, #1265-11): respostas prontas (criar, editar, arquivar) e mensagens programadas (agendar,
+// cancelar) são da gerência; a atendente usa. A matriz manda `editarRespostas`; sem a chave, vale `controlarLoja`
+// (mesmo nível Gerente). Na demonstração a matriz não decide.
+export const podeEditarRespostas = (acoes) => (acoes?.editarRespostas ?? acoes?.controlarLoja) === true
+export const respostasEditaveis = ({ fonteApi, acoes }) => !fonteApi || podeEditarRespostas(acoes)
 // Os desacertos de estoque (produto vendido sem saldo) exigem a permissão de estoque, que a matriz só
 // passa a dizer com `verDesacertosEstoque`. Sem a chave, lê como antes: a recusa segue sem alerta.
 export const podeVerDesacertos = (acoes) => acoes?.verDesacertosEstoque !== false

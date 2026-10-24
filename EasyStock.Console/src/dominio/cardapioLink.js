@@ -46,17 +46,6 @@ export const itensDoDia = (cardapio) => cardapio.filter(
   (item) => disponivelHoje(item) && !estaRemovido(item) && !estaEmValidacao(item),
 )
 
-// Mesmo agrupamento e mesma ordem da comanda (dominio/pedido.js,
-// ORDEM_DAS_LINHAS), só que sobre o catálogo cru em vez de itens já
-// lançados no pedido.
-export function itensDoDiaPorLinha(cardapio, linhas) {
-  return ORDEM_DAS_LINHAS
-    .map((chave) => ({
-      chave, rotulo: linhas?.[chave]?.rotulo ?? chave, itens: itensDoDia(cardapio).filter((i) => i.linha === chave),
-    }))
-    .filter((grupo) => grupo.itens.length > 0)
-}
-
 // RN-53: saldo zerado na venda AUTOMÁTICA (o agente, e o site é a mesma
 // coisa: ninguém do balcão do outro lado) não vende e não promete. É mais
 // estrito que RN-48 (venda manual da dona, que segue vendendo com alerta):
@@ -112,11 +101,6 @@ export function avisoDeEndereco(texto, prefixosCepAtendidos) {
 }
 
 export const enderecoValido = (texto, prefixosCepAtendidos) => avisoDeEndereco(texto, prefixosCepAtendidos) == null
-
-// Só os meios que o Mercado Pago emite online (Pix, cartão por link): a
-// maquininha e o vale só existem na entrega, não fazem sentido num
-// checkout sem ninguém do outro lado do balcão (infra/provedoresDeCobranca.js).
-export const meiosDePagamentoOnline = (meios) => meios.filter((m) => m.provedor === 'mercadopago')
 
 // ---------------------------------------------------------------------------
 // Pedido fechado no site: RN-23, o pedido nasce ANTES do pagamento. A cobrança

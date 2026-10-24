@@ -6,10 +6,6 @@
 .desligada { opacity: .68; }
 .topo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .topo strong { font-size: var(--t-corpo); }
-.espera {
-  margin-left: auto; display: flex; align-items: center; gap: var(--e-1);
-  font-size: var(--t-apoio); color: var(--tinta-3);
-}
 .descricao { margin: var(--e-1) 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 .texto {
   margin: 0 0 var(--e-3); padding: var(--e-2) var(--e-3);
@@ -103,10 +99,6 @@
   font-size: var(--t-corpo); white-space: pre-wrap;
 }
 
-.horario {
-  display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
-  margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta-2);
-}
 .editando { display: block; margin: var(--e-2) 0 0; }
 .alerta { margin: var(--e-1) 0; font-size: var(--t-apoio); color: var(--alerta); }
 .acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-3); }

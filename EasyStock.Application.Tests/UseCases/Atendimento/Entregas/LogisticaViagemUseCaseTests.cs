@@ -63,7 +63,7 @@ public sealed class LogisticaViagemUseCaseTests
         var viagem = Viagem.Criar(empresa, DateTime.UtcNow);
         var entregador = Entregador.Criar(empresa, "Demo", TipoEntregador.Proprio, EmpresaEntregador.Propria, null, null, null, DateTime.UtcNow);
         viagem.DefinirEntregador(entregador); viagem.IncluirParada(pedido.Id, false); viagem.Sair(entregador, DateTime.UtcNow);
-        if (jaEntregue) { viagem.MarcarParadaEntregue(pedido.Id, DateTime.UtcNow); pedido.MarcarEntregue(); }
+        if (jaEntregue) { viagem.MarcarParadaEntregue(pedido.Id, DateTime.UtcNow); pedido.MudarStatus(StatusPedido.Entregue); }
         var viagens = Substitute.For<IViagemRepository>(); var pedidos = Substitute.For<IPedidoRepository>();
         viagens.ObterAsync(empresa, viagem.Id, Arg.Any<CancellationToken>()).Returns(viagem);
         pedidos.GetByIdAsync(empresa, pedido.Id).Returns(pedido);

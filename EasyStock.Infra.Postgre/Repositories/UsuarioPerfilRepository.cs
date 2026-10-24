@@ -6,11 +6,6 @@ namespace EasyStock.Infra.Postgre.Repositories
     {
         public Task AddAsync(UsuarioPerfil usuarioPerfil) =>
             dbContext.UsuariosPerfis.AddAsync(usuarioPerfil).AsTask();
-        public Task<UsuarioPerfil?> GetByUsuarioEmpresaEPerfilAsync(Guid usuarioId, Guid empresaId, Guid perfilId) =>
-            dbContext.UsuariosPerfis.FirstOrDefaultAsync(x =>
-                x.UsuarioId == usuarioId &&
-                x.EmpresaId == empresaId &&
-                x.PerfilId == perfilId);
         public async Task<IReadOnlyList<UsuarioPerfil>> ListarPorUsuarioEEmpresaAsync(Guid usuarioId, Guid empresaId) =>
             await dbContext.UsuariosPerfis
                 .Include(x => x.Perfil)

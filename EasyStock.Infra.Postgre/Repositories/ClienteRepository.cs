@@ -79,9 +79,6 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToListAsync();
         }
 
-        public Task<Cliente?> FindByDocumentoAsync(Guid empresaId, string documento) =>
-            db.Clientes.FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Documento == documento);
-
         // #1290: o número pode estar só na lista de telefones do cadastro (ex.: WhatsApp como segundo número).
         public Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone) =>
             db.Clientes

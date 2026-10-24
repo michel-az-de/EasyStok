@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.Storefront.Agendamento;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Exceptions.Storefront;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Net.Http.Headers;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -42,6 +43,8 @@ public sealed class AgendamentoController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    // #1725-5: pública e sem limite; o mesmo teto por IP do frete público, que o checkout consulta junto.
+    [EnableRateLimiting("frete-publico")]
     [HttpGet]
     public async Task<IActionResult> ListarJanelas(
         [FromRoute] string slug,

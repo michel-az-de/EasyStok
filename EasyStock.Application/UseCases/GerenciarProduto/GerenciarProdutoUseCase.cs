@@ -113,22 +113,6 @@ public sealed record ProdutoHistoricoItemResult(
     string? DocumentoReferencia,
     string? Observacoes);
 
-public sealed record ProdutoEstatisticasResult(
-    Guid ProdutoId,
-    decimal QuantidadeEmEstoque,
-    decimal? MargemRealPercentual,
-    decimal Velocidade30Dias,
-    int? PrevisaoZeramentoDias,
-    decimal Velocidade60Dias,
-    decimal Velocidade90Dias,
-    IReadOnlyCollection<SazonalidadeMensalResult> SazonalidadeMensal);
-
-public sealed record SazonalidadeMensalResult(
-    int Ano,
-    int Mes,
-    int TotalSaidas,
-    decimal ValorTotal);
-
 public sealed record ProdutoFotoResult(
     Guid FotoId,
     string Url,
@@ -146,7 +130,6 @@ public sealed class GerenciarProdutoUseCase(
     Comandos.RestaurarProdutoUseCase restaurarUseCase,
     Comandos.ReordenarFotosProdutoUseCase reordenarFotosUseCase,
     Queries.ObterHistoricoProdutoUseCase obterHistoricoUseCase,
-    Queries.ObterEstatisticasProdutoUseCase obterEstatisticasUseCase,
     Queries.ObterDetalheProdutoUseCase obterDetalheUseCase,
     Comandos.AtualizarProdutoUseCase atualizarUseCase)
 {
@@ -171,10 +154,6 @@ public sealed class GerenciarProdutoUseCase(
     // F9b facade: delega para Queries.ObterHistoricoProdutoUseCase.
     public Task<IReadOnlyCollection<ProdutoHistoricoItemResult>> ObterHistoricoAsync(Guid empresaId, Guid produtoId)
         => obterHistoricoUseCase.ExecuteAsync(empresaId, produtoId);
-
-    // F9b facade: delega para Queries.ObterEstatisticasProdutoUseCase.
-    public Task<ProdutoEstatisticasResult> ObterEstatisticasAsync(Guid empresaId, Guid produtoId)
-        => obterEstatisticasUseCase.ExecuteAsync(empresaId, produtoId);
 
     // F9 facade: delega para Comandos.ReordenarFotosProdutoUseCase.
     public Task ReordenarFotosAsync(Guid empresaId, Guid produtoId, Guid[] novaOrdem)
