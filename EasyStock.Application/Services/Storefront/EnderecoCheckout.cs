@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Atendimento.Endereco;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.Services.Storefront;
 
@@ -8,8 +9,8 @@ public sealed record EnderecoCheckout(string Cep, string Logradouro, string Nume
 {
     public EnderecoCheckout Validar(string? cepEsperado = null, string? numeroEsperado = null)
     {
-        var cep = CheckoutCoreService.NormalizarCep(Cep);
-        if (cep.Length != 8 || (cepEsperado is not null && cep != CheckoutCoreService.NormalizarCep(cepEsperado)))
+        var cep = EnderecoBr.NormalizarCep(Cep);
+        if (cep.Length != 8 || (cepEsperado is not null && cep != EnderecoBr.NormalizarCep(cepEsperado)))
             throw new CepInvalidoException();
         var e = this with { Cep = cep, Logradouro = Limpar(Logradouro, 200), Numero = Limpar(Numero, 20),
             Bairro = Limpar(Bairro, 100), Cidade = Limpar(Cidade, 100), Uf = Limpar(Uf, 2).ToUpperInvariant(),

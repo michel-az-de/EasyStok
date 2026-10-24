@@ -1,8 +1,8 @@
-using System.Text;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Storefront.Agendamento;
 
@@ -54,7 +54,7 @@ public sealed class ListarJanelasDisponiveisUseCase(
         string? cepNormalizado = null;
         if (!string.IsNullOrWhiteSpace(input.Cep))
         {
-            cepNormalizado = NormalizarCep(input.Cep);
+            cepNormalizado = EnderecoBr.NormalizarCep(input.Cep);
             if (!CepDigitosRegex.IsMatch(cepNormalizado))
                 throw new CepInvalidoException();
         }
@@ -153,14 +153,4 @@ public sealed class ListarJanelasDisponiveisUseCase(
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
-    private static string NormalizarCep(string? cep)
-    {
-        if (string.IsNullOrWhiteSpace(cep)) return string.Empty;
-        var sb = new StringBuilder(cep.Length);
-        foreach (var c in cep)
-        {
-            if (char.IsDigit(c)) sb.Append(c);
-        }
-        return sb.ToString();
-    }
 }

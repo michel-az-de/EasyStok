@@ -1,3 +1,5 @@
+using EasyStock.Domain.ValueObjects;
+
 namespace EasyStock.Application.UseCases.Operacao.Impressao;
 
 /// <summary>
@@ -20,10 +22,7 @@ public static class EnderecoImpresso
         var local = string.Join(", ", new[] { Limpo(bairro), cidadeUf }.Where(p => p is not null));
         if (local.Length > 0) partes.Add(local);
         if (Limpo(cep) is { } c)
-        {
-            var digitos = new string(c.Where(char.IsDigit).ToArray());
-            partes.Add("CEP " + (digitos.Length == 8 ? $"{digitos[..5]}-{digitos[5..]}" : c));
-        }
+            partes.Add("CEP " + EnderecoBr.FormatarCep(c));
         return partes.Count == 0 ? null : string.Join(" - ", partes);
     }
 

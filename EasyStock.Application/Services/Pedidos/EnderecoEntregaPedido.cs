@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.UseCases.Operacao.Impressao;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.Services.Pedidos;
 
@@ -18,7 +19,7 @@ public sealed class EnderecoEntregaPedido(ICepLookupClient ceps, IGeocodingClien
 {
     public async Task RegistrarAsync(Pedido pedido, DadosEnderecoEntrega dados, CancellationToken ct = default)
     {
-        var cep = new string((dados.Cep ?? string.Empty).Where(char.IsDigit).ToArray());
+        var cep = EnderecoBr.NormalizarCep(dados.Cep);
         var consulta = string.IsNullOrWhiteSpace(dados.Logradouro) && cep.Length == 8
             ? await ceps.LookupAsync(cep, ct) : null;
         var rua = Limpo(dados.Logradouro) ?? consulta?.Logradouro;

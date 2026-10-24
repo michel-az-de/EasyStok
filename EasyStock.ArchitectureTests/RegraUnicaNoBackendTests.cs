@@ -61,6 +61,29 @@ public class RegraUnicaNoBackendTests
             + "resolução volta a dar hora errada (UTC) em ambiente sem tzdata e escapa do StartupHardening.ValidateTimezone");
     }
 
+    // ---- CEP e bairro -----------------------------------------------------------------------------------------
+
+    private static readonly Regex NormalizadorDeEnderecoProprio = new(
+        @"static\s+string\s+Normalizar(?:Cep|Bairro)\s*\(", RegexOptions.Compiled);
+
+    /// <summary>O hash de idempotência do checkout multi-gateway sai na #2015 (código fantasma): não se mexe nele aqui.</summary>
+    private static readonly string[] CepNoCodigoFantasma = ["EasyStock.Application/UseCases/Storefront/Checkout/Idempotency/CheckoutContentHasher.cs"];
+
+    [Fact]
+    public void CepEBairro_SoNormalizadosPeloEnderecoBr()
+    {
+        var root = RepoPaths.FindRepoRoot();
+        var fora = ArquivosDeProducao(root, "*.cs")
+            .Where(f => NormalizadorDeEnderecoProprio.IsMatch(SemComentarios(File.ReadAllText(f))))
+            .Select(f => Relativo(root, f))
+            .Where(r => r != "EasyStock.Domain/ValueObjects/EnderecoBr.cs" && !CepNoCodigoFantasma.Contains(r))
+            .ToList();
+
+        fora.Should().BeEmpty(
+            "CEP e bairro são normalizados por EnderecoBr.NormalizarCep/NormalizarBairro (Domain); uma cópia a mais volta a "
+            + "deixar o frete, as janelas e o checkout comparando CEPs de formas diferentes");
+    }
+
     // ---- Apoio ------------------------------------------------------------------------------------------------
 
     private static string Relativo(string root, string arquivo) =>

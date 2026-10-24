@@ -1,3 +1,5 @@
+using EasyStock.Domain.ValueObjects;
+
 ﻿namespace EasyStock.Domain.Entities
 {
     /// <summary>
@@ -349,11 +351,11 @@
         /// </summary>
         public static string? ChaveDomicilio(string? cep, string? numero, string? complemento)
         {
-            var cepNorm = Storefront.FreteZona.NormalizarCep(cep);
+            var cepNorm = EnderecoBr.NormalizarCep(cep);
             if (cepNorm.Length != 8) return null;
-            var numeroNorm = Storefront.FreteZona.NormalizarBairro(numero ?? string.Empty);
+            var numeroNorm = EnderecoBr.NormalizarBairro(numero ?? string.Empty);
             if (numeroNorm.Length == 0) return null;
-            var complementoNorm = Storefront.FreteZona.NormalizarBairro(complemento ?? string.Empty);
+            var complementoNorm = EnderecoBr.NormalizarBairro(complemento ?? string.Empty);
             return $"{cepNorm}|{numeroNorm}|{complementoNorm}";
         }
     }

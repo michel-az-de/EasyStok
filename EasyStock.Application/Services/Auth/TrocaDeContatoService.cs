@@ -2,6 +2,7 @@ using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.Configuration;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.Services.Auth;
 
@@ -144,7 +145,7 @@ public sealed class TrocaDeContatoService(
     /// <summary><c>+5511997573992</c> vira <c>+55 11 *****-3992</c>: só o final e o DDD aparecem.</summary>
     public static string MascararTelefone(string e164)
     {
-        var digitos = new string(e164.Where(char.IsDigit).ToArray());
+        var digitos = TelefoneE164.SoDigitos(e164);
         return digitos.Length < 6 ? "***" : $"+{digitos[..2]} {digitos[2..4]} *****-{digitos[^4..]}";
     }
 

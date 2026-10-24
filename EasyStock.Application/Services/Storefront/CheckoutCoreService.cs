@@ -121,7 +121,7 @@ public sealed class CheckoutCoreService(
     /// </summary>
     public static string ValidarEntrada(string? cep, IReadOnlyCollection<(Guid CardapioItemId, int Qtd)>? itens)
     {
-        var cepNormalizado = NormalizarCep(cep);
+        var cepNormalizado = EnderecoBr.NormalizarCep(cep);
         if (!CepDigitosRegex.IsMatch(cepNormalizado))
             throw new CepInvalidoException();
 
@@ -543,14 +543,6 @@ public sealed class CheckoutCoreService(
         return itemFrete;
     }
 
-    public static string NormalizarCep(string? cep)
-    {
-        if (string.IsNullOrWhiteSpace(cep)) return string.Empty;
-        var sb = new System.Text.StringBuilder(cep.Length);
-        foreach (var c in cep)
-            if (char.IsDigit(c)) sb.Append(c);
-        return sb.ToString();
-    }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 

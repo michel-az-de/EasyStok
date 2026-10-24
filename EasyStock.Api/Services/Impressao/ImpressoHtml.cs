@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using EasyStock.Application.UseCases.Operacao.Impressao;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Api.Services.Impressao;
 
@@ -184,7 +185,7 @@ public static class ImpressoHtml
     /// <summary>(11) 98765-4412; com DDI 55 ou fixo de 8 dígitos também. Fora do padrão, como veio.</summary>
     public static string Telefone(string telefone)
     {
-        var d = new string(telefone.Where(char.IsDigit).ToArray());
+        var d = TelefoneE164.SoDigitos(telefone);
         if (d.Length is 12 or 13 && d.StartsWith("55", StringComparison.Ordinal)) d = d[2..];
         return d.Length switch
         {
@@ -198,7 +199,7 @@ public static class ImpressoHtml
     public static string? LinkWhatsApp(string? whatsApp, string numeroPedido)
     {
         if (string.IsNullOrWhiteSpace(whatsApp)) return null;
-        var d = new string(whatsApp.Where(char.IsDigit).ToArray());
+        var d = TelefoneE164.SoDigitos(whatsApp);
         if (d.Length is 10 or 11) d = "55" + d;
         return d.Length is 12 or 13 ? $"https://wa.me/{d}?text=Pedido%20{Uri.EscapeDataString(numeroPedido)}" : null;
     }
