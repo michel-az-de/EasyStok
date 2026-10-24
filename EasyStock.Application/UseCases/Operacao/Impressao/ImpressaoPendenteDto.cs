@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities.Operacao;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Operacao.Impressao;
 
@@ -23,7 +24,7 @@ public sealed record ImpressaoPendenteDto(
     public static ImpressaoPendenteDto De(ImpressaoPendente i) => new(
         i.Id,
         i.PedidoId,
-        i.PedidoId.ToString("N")[..8].ToUpperInvariant(),
+        CodigoCurto.De(i.PedidoId),
         i.Tipo.ToString().ToLowerInvariant(),
         i.Status.ToString().ToLowerInvariant(),
         i.CriadaEm,

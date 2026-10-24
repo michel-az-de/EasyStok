@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Enums.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Operacao.Impressao;
 
@@ -66,7 +67,7 @@ public sealed class MontarCanhotoUseCase(
         var pagoEm = pedido.Pagamentos.Count == 0 ? (DateTime?)null : pedido.Pagamentos.Max(p => p.PagoEm);
         var cabecalho = new CanhotoCabecalhoDto(
             storefront?.TituloPublico ?? string.Empty,
-            pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+            CodigoCurto.De(pedido.Id),
             Limpo(pedido.ClienteNome) ?? Limpo(cliente?.Nome),
             Limpo(pedido.ClienteTelefone) ?? Limpo(cliente?.Telefone),
             pedido.EnderecoEntrega ?? MontarEndereco(cliente, pedido.ClienteApt),

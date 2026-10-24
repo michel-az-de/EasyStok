@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.Atendimento.Entregas;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Integration;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 
@@ -30,7 +31,7 @@ public sealed class LogisticaRepository(EasyStockDbContext db,
                 vaga.DataEntrega, janela.HoraInicio, janela.HoraFim,
                 Frete = pedido.Itens.Where(i => i.ProdutoId == null && i.CardapioItemId == null && i.Nome.StartsWith("Entrega ")).Sum(i => i.Quantidade * i.PrecoUnitario)
             }).ToListAsync(ct);
-        return linhas.Select(p => new LogisticaPedido(p.Id, p.Id.ToString("N")[..8].ToUpperInvariant(),
+        return linhas.Select(p => new LogisticaPedido(p.Id, CodigoCurto.De(p.Id),
             p.ClienteNome ?? "Cliente", p.EnderecoEntrega ?? "", p.BairroEntrega ?? "",
             DateTime.SpecifyKind(p.DataEntrega.ToDateTime(p.HoraInicio).AddHours(3), DateTimeKind.Utc),
             DateTime.SpecifyKind(p.DataEntrega.ToDateTime(p.HoraFim).AddHours(3), DateTimeKind.Utc),

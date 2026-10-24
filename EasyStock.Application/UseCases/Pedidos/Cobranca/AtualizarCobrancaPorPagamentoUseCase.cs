@@ -7,6 +7,7 @@ using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
@@ -159,7 +160,7 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
         var payload = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
         {
             ["nome"] = AvisoEquipeNoAparelho.PrimeiroNome(pedido.ClienteNome),
-            ["referencia"] = PrazoEstouradoEvento.Referencia(pedido.Id),
+            ["referencia"] = CodigoCurto.De(pedido.Id),
             [NotificadorService.ChaveIdempotenciaPayload] = correlacao,
         });
         await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.PagamentoEmMediacao, pedido.EmpresaId, payload,

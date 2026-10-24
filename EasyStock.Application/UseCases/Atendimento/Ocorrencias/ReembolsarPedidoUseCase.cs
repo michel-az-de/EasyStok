@@ -2,6 +2,7 @@ using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
@@ -37,7 +38,8 @@ public sealed class ReembolsarPedidoUseCase(
     ICobrancaPedidoRepository cobrancas,
     IEstornosOnlineService estornos,
     IClienteCrmRepository crm,
-    INotificadorService notificador)
+    INotificadorService notificador,
+    IConversaRepository conversas)
 {
     public const string CodigoReembolsoManual = "reembolso_manual_necessario";
     public const string CodigoReembolsoEfetuado = "reembolso_efetuado";
@@ -114,6 +116,7 @@ public sealed class ReembolsarPedidoUseCase(
         var cliente = await crm.ObterComTagsAsync(ocorrencia.EmpresaId, ocorrencia.ClienteId, ct);
         if (TelefoneE164(cliente?.Telefone) is { } telefone)
         {
+            var conversa = ocorrencia.ConversaId is { } conversaId ? await conversas.ObterPorIdAsync(ocorrencia.EmpresaId, conversaId, ct) : null;
             var payload = JsonSerializer.Serialize(new
             {
                 ocorrenciaId = ocorrencia.Id.ToString(),
@@ -122,7 +125,7 @@ public sealed class ReembolsarPedidoUseCase(
                 conversaId = ocorrencia.ConversaId?.ToString(),
                 telefone,
                 nome = PrimeiroNome(cliente!.Nome),
-                numero = ocorrencia.PedidoId.ToString("N")[..8].ToUpperInvariant(),
+                numero = VariaveisAtendimento.NumeroDoPedido(ocorrencia.PedidoId, conversa),
                 valor = Reais(valor),
             });
             await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, ocorrencia.EmpresaId, payload, ocorrencia.Id, ct);

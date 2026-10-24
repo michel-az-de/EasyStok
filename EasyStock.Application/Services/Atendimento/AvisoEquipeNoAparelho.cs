@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -78,7 +79,7 @@ public sealed class AvisoEquipeNoAparelho(
         var payload = JsonSerializer.Serialize(new Dictionary<string, string>
         {
             ["nome"] = PrimeiroNome(pedido.ClienteNome),
-            ["referencia"] = pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+            ["referencia"] = CodigoCurto.De(pedido.Id),
             [NotificadorService.ChaveIdempotenciaPayload] = chave,
         });
         await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.PagamentoSemAvisoAoCliente, empresaId, payload, pedido.Id, ct, chave);

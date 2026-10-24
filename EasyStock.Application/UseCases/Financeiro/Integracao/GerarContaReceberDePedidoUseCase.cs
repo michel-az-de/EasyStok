@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.Financeiro.Common;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;
 using EasyStock.Domain.Enums.Financeiro;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Financeiro.Integracao;
 
@@ -67,7 +68,7 @@ public class GerarContaReceberDePedidoUseCase(
             return null;
         }
 
-        var descricao = $"Pedido {pedido.Id.ToString("N")[..8]} — {pedido.ClienteNome ?? "Cliente"}";
+        var descricao = $"Pedido {CodigoCurto.De(pedido.Id)} — {pedido.ClienteNome ?? "Cliente"}";
         var hoje = DateTime.UtcNow;
 
         try

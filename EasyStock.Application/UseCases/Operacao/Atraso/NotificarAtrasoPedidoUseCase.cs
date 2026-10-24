@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Notifications;
 using Microsoft.Extensions.Options;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Operacao.Atraso;
 
@@ -54,11 +55,11 @@ public sealed class NotificarAtrasoPedidoUseCase(
         var agora = relogio.GetUtcNow().UtcDateTime;
         var inicio = pedido.InicioPrevistoEm!.Value;
         await PrazoEstouradoEvento.EnfileirarAsync(notificador, prazos.Value, TipoPrazo.PedidoAtrasado,
-            pedido.EmpresaId, pedido.Id, PrazoEstouradoEvento.Referencia(pedido.Id),
+            pedido.EmpresaId, pedido.Id, CodigoCurto.De(pedido.Id),
             PrazoEstouradoEvento.InstanteTexto(inicio), PrazoEstouradoEvento.Duracao(agora - inicio), usuarioId: null, ct);
         await unitOfWork.CommitAsync();
 
-        return new PedidoAtrasadoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+        return new PedidoAtrasadoOperacao(pedido.Id, CodigoCurto.De(pedido.Id),
             pedido.ClienteNome, pedido.InicioPrevistoEm!.Value);
     }
 }

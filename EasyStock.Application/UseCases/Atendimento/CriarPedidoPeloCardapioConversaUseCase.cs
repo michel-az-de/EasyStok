@@ -7,6 +7,7 @@ using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento;
 
@@ -159,7 +160,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         {
             await eventPublisher.PublicarAsync(EventosOperacao.ConversaPedidoPelaPagina, pedido.EmpresaId,
                 new ConversaPedidoPelaPaginaOperacao(resumo.ConversaId, pedido.Id,
-                    pedido.Id.ToString("N")[..8].ToUpperInvariant(), reservado.Total), ct);
+                    CodigoCurto.De(pedido.Id), reservado.Total), ct);
             await eventPublisher.PublicarAsync(EventosOperacao.ConversaMensagemRecebida, pedido.EmpresaId,
                 new { conversaId = resumo.ConversaId, mensagemId = resumo.Id }, ct);
         }

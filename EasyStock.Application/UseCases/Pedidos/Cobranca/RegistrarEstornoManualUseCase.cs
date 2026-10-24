@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
@@ -81,7 +82,7 @@ public sealed class RegistrarEstornoManualUseCase(IPedidoRepository pedidos, ICo
             movimento.CriadoEm = agora;
             movimento.Metodo = estorno.Metodo;
             movimento.Categoria = "Devolução de pedido";
-            movimento.Descricao = $"Devolução do pedido {pedido.Id.ToString("N")[..8].ToUpperInvariant()}: {estorno.Motivo}";
+            movimento.Descricao = $"Devolução do pedido {CodigoCurto.De(pedido.Id)}: {estorno.Motivo}";
             movimento.Referencia = estorno.Referencia.Length > 0 ? estorno.Referencia : null;
             movimento.RegistradoPorUserId = estorno.UsuarioId;
             movimento.RegistradoPorNome = estorno.UsuarioNome;
