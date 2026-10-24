@@ -66,7 +66,7 @@ public sealed class PedidoAtrasoJob(
                 var useCase = scope.ServiceProvider.GetRequiredService<NotificarAtrasoPedidoUseCase>();
                 if (await useCase.ExecuteAsync(candidato, ct)) avisados++;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 falhas++;
                 logger.LogWarning(ex, "PedidoAtrasoJob: falha no pedido {PedidoId}", candidato.PedidoId);

@@ -62,6 +62,27 @@ public class RodadaDeCobrancasVencidasTests
     }
 
     [Fact]
+    public async Task Desligamento_no_meio_de_uma_cobranca_interrompe_a_rodada()
+    {
+        // #2023: o cancelamento do host que nasce dentro da cobrança não conta como falha dela. Na última cobrança não
+        // há próxima volta do laço para relançar: engolido, a rodada terminaria como se nada tivesse acontecido.
+        using var cts = new CancellationTokenSource();
+        var vencidas = new[] { Da(Guid.NewGuid()) };
+        var chamadas = 0;
+
+        var act = () => RodadaDeCobrancasVencidas.ProcessarAsync(vencidas, (_, token) =>
+        {
+            chamadas++;
+            cts.Cancel();
+            token.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }, NullLogger.Instance, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        chamadas.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Cancelamento_interrompe_a_rodada()
     {
         using var cts = new CancellationTokenSource();
