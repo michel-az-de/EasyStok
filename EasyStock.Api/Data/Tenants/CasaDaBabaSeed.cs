@@ -263,11 +263,6 @@ internal static partial class CasaDaBabaSeed
 
         await context.SaveChangesAsync();
 
-        // Enriquecimento adicional (clientes, pedidos, caixa, lotes, audit) — implementado em CasaDaBabaSeed.Enrichment.cs
-        await EnriquecerAsync(context, empresa, lojaCentro, lojaMercadao,
-            usuarioAdmin, usuarioGerente, usuarioOperadorCentro, usuarioOperadorMercadao,
-            produtos, itens, fornFarinha, fornCarnes, fornLaticinios, fornHortifruti, agora, logger);
-
         logger.LogInformation("Seed tenant '{Empresa}' concluído.", EmpresaNome);
     }
 }
