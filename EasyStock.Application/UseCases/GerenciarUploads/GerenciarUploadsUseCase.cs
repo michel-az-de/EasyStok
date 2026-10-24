@@ -129,7 +129,7 @@ public sealed class GerenciarUploadsUseCase(
         await usuarioRepository.UpdateAsync(usuario);
         await unitOfWork.CommitAsync();
 
-        await TryDeletePreviousAsync(urlAntigo, cancellationToken);
+        await TryDeletePreviousAsync(StorageKeyExtractor.ExtractDoDono(urlAntigo, $"usuarios/{usuarioId}/avatar/"), cancellationToken);
 
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
     }
@@ -162,7 +162,7 @@ public sealed class GerenciarUploadsUseCase(
         await lojaRepository.UpdateAsync(loja);
         await unitOfWork.CommitAsync();
 
-        await TryDeletePreviousAsync(logoAntigo, cancellationToken);
+        await TryDeletePreviousAsync(StorageKeyExtractor.ExtractDoDono(logoAntigo, $"lojas/{empresaId}/{lojaId}/logo/"), cancellationToken);
 
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
     }
@@ -216,7 +216,7 @@ public sealed class GerenciarUploadsUseCase(
         // Adicionar ângulos preserva a capa anterior; substituir a capa também preserva
         // qualquer arquivo que continue referenciado pela galeria.
         if (!galeria && !item.ObterFotosGaleria().Contains(fotoAntiga))
-            await TryDeletePreviousAsync(fotoAntiga, cancellationToken);
+            await TryDeletePreviousAsync(StorageKeyExtractor.ExtractDaFotoDoPrato(fotoAntiga, storefront.Id, itemId), cancellationToken);
 
         return new UploadedFileResult(stored.Url, fileName, optContentType, stored.Size);
     }
@@ -297,15 +297,14 @@ public sealed class GerenciarUploadsUseCase(
     }
 
     /// <summary>
-    /// Tenta remover um arquivo anteriormente referenciado, a partir da URL
-    /// armazenada. Suporta URLs relativas locais (<c>/files/...</c>) e URLs
-    /// absolutas (<c>https://.../bucket/path</c>). Qualquer falha é silenciada
+    /// Tenta remover o arquivo anterior. A chave chega já conferida contra o dono
+    /// (<see cref="StorageKeyExtractor.ExtractDoDono"/>, #2027): a URL gravada pode apontar para o
+    /// arquivo de outra empresa, e então nada é apagado. Qualquer falha é silenciada
     /// para não bloquear o fluxo de upload — limpeza residual pode ser feita
     /// por um job de varredura de órfãos.
     /// </summary>
-    private async Task TryDeletePreviousAsync(string? urlAntigo, CancellationToken cancellationToken)
+    private async Task TryDeletePreviousAsync(string? storageKey, CancellationToken cancellationToken)
     {
-        var storageKey = StorageKeyExtractor.Extract(urlAntigo);
         if (storageKey is null) return;
         // Derivados do acervo são versões imutáveis referenciadas pelo histórico de publicação.
         if (storageKey.StartsWith("cardapios/", StringComparison.Ordinal) &&
