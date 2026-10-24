@@ -1,6 +1,5 @@
 using EasyStock.Application.UseCases.AdicionarItemLote;
 using EasyStock.Application.UseCases.AtualizarPesoLoteItem;
-using EasyStock.Application.UseCases.ConferirEtiqueta;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.FinalizarLote;
@@ -25,7 +24,6 @@ public class LotesController(
     AtualizarPesoLoteItemUseCase atualizarPesoUseCase,
     ListarLotesUseCase listarUseCase,
     ObterLoteDetalhesUseCase obterUseCase,
-    ConferirEtiquetaUseCase conferirUseCase,
     MontarPayloadRenderUseCase montarRenderUseCase,
     MarcarEtiquetasImpressasUseCase marcarImpressasUseCase,
     ILoteRepository loteRepo,
@@ -116,20 +114,6 @@ public class LotesController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
         var result = await finalizarUseCase.ExecuteAsync(new FinalizarLoteCommand(emp, id));
         return result == null ? DataNotFound("Lote não encontrado.") : DataOk(result);
-    }
-
-    [SwaggerOperation(Summary = "Confirm a label by code (scanner)")]
-    [HttpPost("etiquetas/conferir")]
-    [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> ConferirEtiqueta([FromBody] ConferirEtiquetaCommand command)
-    {
-        if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var emp, out var err)) return err!;
-        var result = await conferirUseCase.ExecuteAsync(command with
-        {
-            EmpresaId = emp,
-            ConferidaPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null
-        });
-        return result == null ? DataNotFound("Etiqueta não encontrada.") : DataOk(result);
     }
 
     [SwaggerOperation(Summary = "Get render payload (layout + labels + empresa) for printing")]

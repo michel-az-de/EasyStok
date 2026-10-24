@@ -5,15 +5,6 @@
   color: var(--marca); font-weight: 600; text-decoration: underline; border-radius: var(--r-1);
 }
 .saidaPreparacao:focus-visible { outline: 2px solid var(--marca); outline-offset: 3px; }
-.naoLigado {
-  margin: 0 0 var(--e-3); padding: var(--e-3);
-  border-radius: var(--r-2); background: var(--alerta-pastel); color: var(--alerta);
-  font-size: var(--t-apoio); font-weight: 600;
-}
-/* #1582: saída para a tela que já faz o trabalho. Mesma cor do aviso, sublinhado para ler como link. */
-.naoLigado a { color: inherit; font-weight: 700; text-decoration: underline; border-radius: var(--r-1); }
-.naoLigado a:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
-.desligado { min-width: 0; margin: 0; padding: 0; border: 0; }
 
 .janelaGestao {
   composes: densidade-compacta from global;

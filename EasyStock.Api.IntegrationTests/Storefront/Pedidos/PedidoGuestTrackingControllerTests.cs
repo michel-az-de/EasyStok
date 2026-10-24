@@ -98,7 +98,8 @@ public sealed class PedidoGuestTrackingControllerTests : IAsyncLifetime
     /// <summary>Semeia Empresa + Storefront ativo + Pedido, devolvendo o pedidoId.</summary>
     private static async Task<Guid> SeedPedidoAsync(
         WebApplicationFactory<Program> factory,
-        string origem = "storefront-guest")
+        string origem = "storefront-guest",
+        IEnumerable<PedidoItem>? itens = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStock.Infra.Postgre.Data.EasyStockDbContext>();
@@ -137,6 +138,11 @@ public sealed class PedidoGuestTrackingControllerTests : IAsyncLifetime
         pedido.ClienteNome = "Convidada Teste";
         pedido.ClienteTelefone = "11999990000";
         pedido.Total = Dinheiro.FromDecimal(89m);
+        foreach (var item in itens ?? [])
+        {
+            item.PedidoId = pedido.Id;
+            pedido.Itens.Add(item);
+        }
         await pedidoRepo.AddAsync(pedido);
         await uow.CommitAsync();
 
@@ -172,6 +178,46 @@ public sealed class PedidoGuestTrackingControllerTests : IAsyncLifetime
         body.GetProperty("pedido").GetProperty("pedidoId").GetGuid().Should().Be(pedidoId);
         body.GetProperty("pedido").GetProperty("status").GetString()
             .Should().Be("AguardandoAprovacaoBaba");
+    }
+
+    /// <summary>
+    /// #1928: o "Pedir de novo" do site repõe o carrinho pelo <c>cardapioItemId</c> de cada item. Com
+    /// porção vale o id do item do cardápio, que é o que o checkout recebe.
+    /// </summary>
+    [SkippableFact]
+    public async Task Get_TokenValido_ItensTrazemCardapioItemIdInclusiveComPorcao()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+
+        await using var factory = CriarFactory();
+        using var client = factory.CreateClient();
+
+        var lasanha = Guid.NewGuid();
+        var torta = Guid.NewGuid();
+        var pedidoId = await SeedPedidoAsync(factory, itens:
+        [
+            new PedidoItem
+            {
+                Id = Guid.NewGuid(), CardapioItemId = lasanha, Nome = "Lasanha",
+                Quantidade = 1, PrecoUnitario = 29m, Subtotal = 29m, CriadoEm = DateTime.UtcNow,
+            },
+            new PedidoItem
+            {
+                Id = Guid.NewGuid(), CardapioItemId = torta, CardapioItemVariacaoId = Guid.NewGuid(),
+                VariacaoRotuloSnapshot = "800 g", Nome = "Torta",
+                Quantidade = 1, PrecoUnitario = 60m, Subtotal = 60m, CriadoEm = DateTime.UtcNow,
+            },
+        ]);
+        var token = GerarToken(factory, pedidoId);
+
+        var resp = await client.GetAsync(
+            $"/api/storefront/{Slug}/pedidos/{pedidoId}?t={Uri.EscapeDataString(token)}");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("pedido").GetProperty("itens").EnumerateArray()
+            .Select(i => i.TryGetProperty("cardapioItemId", out var id) ? id.GetString() : "ausente")
+            .Should().BeEquivalentTo(lasanha.ToString(), torta.ToString());
     }
 
     [SkippableFact]

@@ -97,27 +97,6 @@ public class UnidadeMedidaConverterTests
     }
 
     [Fact]
-    public void UnidadesCompativeis_Un_retorna_apenas_Contagem()
-    {
-        var compativeis = UnidadeMedidaConverter.UnidadesCompativeis(UnidadeMedida.Un);
-        compativeis.Should().BeEquivalentTo(new[] { UnidadeMedida.Un, UnidadeMedida.Dz });
-    }
-
-    [Fact]
-    public void UnidadesCompativeis_Kg_retorna_apenas_Massa()
-    {
-        var compativeis = UnidadeMedidaConverter.UnidadesCompativeis(UnidadeMedida.Kg);
-        compativeis.Should().BeEquivalentTo(new[] { UnidadeMedida.Mg, UnidadeMedida.G, UnidadeMedida.Kg });
-    }
-
-    [Fact]
-    public void UnidadesCompativeis_Cx_retorna_apenas_Cx()
-    {
-        var compativeis = UnidadeMedidaConverter.UnidadesCompativeis(UnidadeMedida.Cx);
-        compativeis.Should().BeEquivalentTo(new[] { UnidadeMedida.Cx });
-    }
-
-    [Fact]
     public void GetGrupo_classifica_corretamente()
     {
         UnidadeMedidaConverter.GetGrupo(UnidadeMedida.Kg).Should().Be(UnidadeMedidaConverter.GrupoUnidade.Massa);

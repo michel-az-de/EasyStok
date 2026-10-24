@@ -66,10 +66,4 @@ public interface IReportRunRepository
     /// deletar exatamente esses arquivos do storage (#929 — evita divergência DB vs storage).
     /// </summary>
     Task<IReadOnlyList<string>> PurgeExpiredArtifactsAsync(int batchSize, CancellationToken ct);
-
-    /// <summary>Retorna quantas runs estão em Running para o owner informado.</summary>
-    Task<int> CountRunningForOwnerAsync(Guid? empresaId, Guid? adminUsuarioId, CancellationToken ct);
-
-    /// <summary>LGPD: purga todos os artefatos de um tenant.</summary>
-    Task<int> PurgeAllForTenantAsync(Guid empresaId, CancellationToken ct);
 }

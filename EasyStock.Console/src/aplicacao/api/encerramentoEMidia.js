@@ -3,7 +3,7 @@ import {
   encerrar, enviarAudio, enviarImagem, enviarImagemCardapio, enviarTexto,
 } from '../../infra/api/conversasApi'
 import { mensagemDaApi } from '../../infra/api/traducaoConversas'
-import { proximoId } from '../../infra/repositorioConversas'
+import { proximoId } from '../../infra/numeracao'
 import { criarChavesDeMensagem } from '../chavesDeMensagem'
 import { proximoInstante } from '../relogioDeLeitura'
 

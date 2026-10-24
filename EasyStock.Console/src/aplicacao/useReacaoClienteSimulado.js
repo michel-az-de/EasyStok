@@ -10,7 +10,7 @@
 // `SIMULAR_EVENTO_CLIENTE` (aplicacao/casos/simulacao.js), ao lado.
 import { useEffect, useRef } from 'react'
 import { useAcoes, useCatalogo } from './contextos'
-import { proximoId, proximoNumeroPedido } from '../infra/repositorioConversas'
+import { proximoId, proximoNumeroPedido } from '../infra/numeracao'
 import {
   ATRASO_ESCOLHA_RECORRENTE_MS, ATRASO_CONFIRMA_RECEBIMENTO_MS, ATRASO_PROMPT_AVALIACAO_MS,
   ATRASO_RESPOSTA_AVALIACAO_MS, MINUTOS_TRAJETO_ENTREGA, atrasoAleatorioMs,

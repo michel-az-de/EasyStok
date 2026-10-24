@@ -8,7 +8,8 @@ namespace EasyStock.Api.Controllers;
 /// <summary>
 /// Biblioteca de respostas prontas do console (S42, US-009): cadastro com atalho único e render das
 /// variáveis <c>{nome}</c>, <c>{pedido}</c> e <c>{faixa}</c> no servidor, para uma conversa.
-/// Criar, editar e arquivar exigem <see cref="Permissao.AtenderConversas"/> (#1781); listar e renderizar basta a policy.
+/// Criar, editar e arquivar exigem a policy Gerente (#1992, como as automáticas na #1965) e <see cref="Permissao.AtenderConversas"/>
+/// (#1781); listar e renderizar basta a policy Operador: a atendente usa.
 /// </summary>
 [SwaggerTag("Canned replies")]
 [ApiController]
@@ -27,7 +28,9 @@ public class AtendimentoRespostasProntasController(
     [SwaggerOperation(Summary = "Create a canned reply", Description = "Atalho duplicado devolve 409.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [Authorize(Policy = "Gerente")]
     [HttpPost]
     public Task<IActionResult> Criar([FromBody] RespostaProntaBody body, CancellationToken ct) =>
         Atendendo(async () => DataOk(await useCases.CriarAsync(Comando(body), ct)));
@@ -36,14 +39,18 @@ public class AtendimentoRespostasProntasController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [Authorize(Policy = "Gerente")]
     [HttpPut("{id:guid}")]
     public Task<IActionResult> Editar(Guid id, [FromBody] RespostaProntaBody body, CancellationToken ct) =>
         Atendendo(async () => DataOk(await useCases.EditarAsync(id, Comando(body), ct)));
 
     [SwaggerOperation(Summary = "Archive or restore a canned reply")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Gerente")]
     [HttpPost("{id:guid}/arquivar")]
     public Task<IActionResult> Arquivar(Guid id, [FromQuery] bool arquivada = true, CancellationToken ct = default) =>
         Atendendo(async () => DataOk(await useCases.ArquivarAsync(currentUser.EmpresaId, id, arquivada, ct)));

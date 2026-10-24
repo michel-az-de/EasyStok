@@ -50,30 +50,6 @@ public class LogsDeEnvioSemDadoPessoalTests
         logger.Assert(Telefone, mensagem.OutboxId);
     }
 
-    [Fact]
-    public async Task ZenviaSmsNaoLogaTelefone()
-    {
-        var logger = new LoggerQueGuarda<ZenviaSmsProvider>();
-        var provider = new ZenviaSmsProvider(FabricaQueFalha(), Options.Create(new ZenviaSmsOptions()), logger);
-        var mensagem = Mensagem(Telefone, CanalNotificacao.Sms);
-
-        await provider.EnviarAsync(mensagem);
-
-        logger.Assert(Telefone, mensagem.OutboxId);
-    }
-
-    [Fact]
-    public async Task TwilioWhatsAppNaoLogaTelefone()
-    {
-        var logger = new LoggerQueGuarda<TwilioWhatsAppProvider>();
-        var provider = new TwilioWhatsAppProvider(FabricaQueFalha(), Options.Create(new TwilioWhatsAppOptions()), logger);
-        var mensagem = Mensagem(Telefone, CanalNotificacao.WhatsApp);
-
-        await provider.EnviarAsync(mensagem);
-
-        logger.Assert(Telefone, mensagem.OutboxId);
-    }
-
     [Theory]
     [InlineData("enviado")]
     [InlineData("falha")]

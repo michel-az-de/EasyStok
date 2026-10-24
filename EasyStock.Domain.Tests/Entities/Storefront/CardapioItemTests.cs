@@ -699,17 +699,16 @@ public class CardapioItemTests
         act.Should().Throw<RegraDeDominioVioladaException>();
     }
 
-    // M1.2 (#1482, US-029): a novidade some sozinha depois do prazo (relógio fixo).
+    // M1.2 (#1482, US-029): a novidade guarda o prazo e limpa com null (o console calcula quando some).
     [Fact]
-    public void Novidade_ValeAteODiaInclusive_ESomeDepois()
+    public void Novidade_GuardaOPrazo_ELimpaComNull()
     {
         var item = CardapioItem.CriarAvulso(Guid.NewGuid(), "Torta", 60m);
         item.DefinirNovidade(new DateOnly(2026, 10, 20));
 
-        item.EhNovidade(new DateOnly(2026, 10, 20)).Should().BeTrue();
-        item.EhNovidade(new DateOnly(2026, 10, 21)).Should().BeFalse();
+        item.NovidadeAte.Should().Be(new DateOnly(2026, 10, 20));
         item.DefinirNovidade(null);
-        item.EhNovidade(new DateOnly(2026, 10, 1)).Should().BeFalse();
+        item.NovidadeAte.Should().BeNull();
     }
 
     // M1.2 (#1482, D-M1-07): arquivar não mexe no site nem no dia, e repor volta.

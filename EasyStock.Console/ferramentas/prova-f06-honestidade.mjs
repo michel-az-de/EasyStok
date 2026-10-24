@@ -45,6 +45,8 @@ globalThis.fetch = async (url, opcoes = {}) => {
 
 const acao = await import('../src/aplicacao/acoes.js')
 const { criarAcoes } = await import('../src/aplicacao/criarAcoes.js')
+// O build de produção não leva a demonstração (#2017): aqui ela entra à mão, para o conjunto ser o de sempre.
+const { criarAcoesDaDemonstracao } = await import('../src/aplicacao/acoes/demonstracao.js')
 const { comApi } = await import('../src/aplicacao/acoesApi.js')
 const { NAO_LIGADAS, SO_DA_TELA } = await import('../src/aplicacao/api/naoLigadas.js')
 const { reducer, estadoInicial } = await import('../src/aplicacao/reducer.js')
@@ -73,10 +75,11 @@ function montar() {
   const despachos = []
   const despachar = (a) => despachos.push(a)
   const agoraRef = { current: AGORA }
-  const locais = criarAcoes({
+  const argumentos = {
     despachar, agoraRef, estadoRef, pendentes: { current: [] },
     consultarAgente: async () => {}, perguntarAssistente: async () => '', pedirNotificacaoDoNavegador: async () => {},
-  })
+  }
+  const locais = { ...criarAcoes(argumentos), ...criarAcoesDaDemonstracao(argumentos) }
   const api = comApi(locais, { despachar, agoraRef, estadoRef })
   return { locais, api, despachos }
 }

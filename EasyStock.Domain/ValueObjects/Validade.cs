@@ -36,13 +36,6 @@ namespace EasyStock.Domain.ValueObjects
         public int DiasAteVencimento(DateOnly referencia)
             => DateOnly.FromDateTime(DataValidade).DayNumber - referencia.DayNumber;
 
-        /// <summary>True se o produto vence em ate <paramref name="dias"/> dias.</summary>
-        public bool EstaProntoParaVencerEm(int dias, DateOnly referencia)
-        {
-            if (dias < 0) throw new ArgumentOutOfRangeException(nameof(dias), "Dias não pode ser negativo.");
-            return DiasAteVencimento(referencia) <= dias;
-        }
-
         public static implicit operator DateTime(Validade v) => v.DataValidade;
         public static implicit operator DateTime?(Validade? v) => v?.DataValidade;
 

@@ -128,16 +128,6 @@ public sealed class VagaOcupadaRepository(EasyStockDbContext db) : IVagaOcupadaR
         return true;
     }
 
-    public Task<int> ContarAtivasPorJanelaDataAsync(
-        Guid janelaEntregaId,
-        DateOnly dataEntrega,
-        CancellationToken ct = default) =>
-        VagasQueOcupam()
-            .AsNoTracking()
-            .CountAsync(v =>
-                v.JanelaEntregaId == janelaEntregaId
-                && v.DataEntrega == dataEntrega, ct);
-
     public async Task<IReadOnlyDictionary<(Guid JanelaId, DateOnly Data), int>> ContarPorJanelaPeriodoAsync(
         IReadOnlyList<Guid> janelaIds,
         DateOnly dataInicio,

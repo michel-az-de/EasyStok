@@ -29,8 +29,6 @@ import { totalDoPedido } from './pedido'
 // Cupom de desconto.
 // ---------------------------------------------------------------------------
 
-export const TIPOS_DESCONTO = ['percentual', 'valor']
-
 export function novoCupom(id, {
   codigo, tipoDesconto = 'percentual', valor, validade = null, limiteUsos = null, minimoPedido = 0,
 }) {

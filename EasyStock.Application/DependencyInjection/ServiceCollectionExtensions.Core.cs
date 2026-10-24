@@ -29,7 +29,6 @@ using EasyStock.Application.UseCases.AtualizarPesoLoteItem;
 using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
-using EasyStock.Application.UseCases.ConferirEtiqueta;
 using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.ListasCompras;
 using EasyStock.Application.UseCases.CadastrarProduto;
@@ -120,7 +119,6 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AtualizarPesoLoteItemUseCase>(); // C2 backfill (R3 bloqueio)
         services.AddScoped<ListarLotesUseCase>();
         services.AddScoped<ObterLoteDetalhesUseCase>();
-        services.AddScoped<ConferirEtiquetaUseCase>();
         services.AddScoped<GerarDocumentoEntradaUseCase>(); // P5: PDF etiqueta + Nota de Entrada
 
         // Módulo Etiquetas (F2)
@@ -153,7 +151,6 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.RestaurarProdutoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.ReordenarFotosProdutoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterHistoricoProdutoUseCase>();
-        services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterEstatisticasProdutoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Queries.ObterDetalheProdutoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.GerenciarProduto.Comandos.AtualizarProdutoUseCase>();
         services.AddScoped<GerenciarProdutoUseCase>();

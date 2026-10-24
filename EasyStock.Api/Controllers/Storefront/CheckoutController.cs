@@ -44,6 +44,8 @@ public sealed class CheckoutController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    // #1725-4: cria pedido e chama o Mercado Pago a cada POST; o mesmo teto por IP do checkout guest.
+    [EnableRateLimiting("public-post")]
     [HttpPost]
     public async Task<IActionResult> IniciarCheckout(
         [FromRoute] string slug,

@@ -11,7 +11,7 @@ namespace EasyStock.Api.UnitTests.Controllers;
 /// internet: <c>POST register</c> criava conta sem empresa, mandava e-mail a qualquer endereço e
 /// enumerava contas, e foi removida na N0. A lista é fechada: rota anônima nova exige editar
 /// <see cref="RotasAnonimasConhecidas"/>, e a mudança aparece no diff da revisão
-/// (molde: <see cref="DiagnosticoAuthorizationTests"/>).
+/// (a lista fechada é a trava).
 /// </summary>
 public class AuthControllerRotasTests
 {

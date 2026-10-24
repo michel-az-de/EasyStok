@@ -27,9 +27,8 @@ public sealed class VagaDoPedidoEntregueIntegrationTests(PostgreSqlDatabaseFixtu
         await using var db = fixture.CreateDbContext();
         var vagas = new VagaOcupadaRepository(db);
 
-        (await vagas.ContarAtivasPorJanelaDataAsync(c.JanelaId, Segunda)).Should().Be(1, "só o pedido que ainda não foi entregue ocupa");
         var porPeriodo = await vagas.ContarPorJanelaPeriodoAsync([c.JanelaId], Segunda, Segunda);
-        porPeriodo.Should().Equal(new Dictionary<(Guid, DateOnly), int> { [(c.JanelaId, Segunda)] = 1 });
+        porPeriodo.Should().Equal(new Dictionary<(Guid, DateOnly), int> { [(c.JanelaId, Segunda)] = 1 }, "só o pedido que ainda não foi entregue ocupa");
     }
 
     [SkippableFact]

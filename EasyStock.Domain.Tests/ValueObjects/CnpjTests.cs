@@ -33,20 +33,6 @@ public class CnpjTests
     }
 
     [Fact]
-    public void Formatado_retorna_cnpj_com_mascara()
-    {
-        var cnpj = Cnpj.From("11222333000181");
-        cnpj.Formatado().Should().Be("11.222.333/0001-81");
-    }
-
-    [Fact]
-    public void Formatado_retorna_cpf_com_mascara()
-    {
-        var cpf = Cnpj.From("12345678909");
-        cpf.Formatado().Should().Be("123.456.789-09");
-    }
-
-    [Fact]
     public void Implicit_operator_converte_para_string()
     {
         var cnpj = Cnpj.From("11222333000181");

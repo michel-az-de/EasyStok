@@ -28,13 +28,6 @@ export function previaDaConversa(conversa) {
   return { prefixo, corpo: ROTULO_DO_FORMATO[ultima.formato] ?? ultima.texto }
 }
 
-// Aberto é o estado saudável de um painel de atendimento, não um alerta.
-// Âmbar fica reservado ao que espera ação da dona.
-export function tomDoEstado(estado) {
-  if (estado === 'Em atendimento') return 'ok'
-  return 'neutro'
-}
-
 export const conversaEncerrada = (conversa) => conversa?.estado === 'Encerrado'
 
 // Contagens do cabeçalho. Ficam aqui para o layout não conhecer estado nenhum.
@@ -183,17 +176,6 @@ function ordenarSemSla(lista, agora, { ordenacao, automaticoPausado, janelas, ab
 // cadastro, não cria histórico, e a ficha não pode dizer o contrário.
 export const jaComprou = (cliente) => cliente.pedidos > 0 && Boolean(cliente.desde)
 
-// UMA contagem de pedidos na ficha inteira, e ela sai de `cliente.pedidos`, que
-// é o dado da conversa. Antes o número aparecia aqui e no título do histórico,
-// vindo de duas fontes que podiam discordar. "Freguesa" saiu junto: o cadastro
-// não tem gênero e a casa atende homem, mulher e empresa.
-export function situacaoDoCliente(cliente) {
-  const quantos = cliente.pedidos === 1 ? '1 pedido' : `${cliente.pedidos} pedidos`
-  if (jaComprou(cliente)) return `Cliente desde ${cliente.desde} · ${quantos}`
-  if (cliente.endereco) return 'Cadastro criado, primeira compra ainda não saiu'
-  return 'Ainda não comprou'
-}
-
 // --- Bloqueio de cadastro (RN-14) -------------------------------------------
 // O bloqueio é do cadastro, nunca de uma conversa só: vale ao mesmo tempo em
 // WhatsApp, Instagram e chat do site. Tudo aqui é função pura, o reducer é
@@ -223,8 +205,6 @@ export const bloquearCadastro = (conversas, cadastroId, bloqueio) =>
 
 export const desbloquearCadastro = (conversas, cadastroId) =>
   conversas.map((c) => (mesmoCadastro(c, cadastroId) ? { ...c, bloqueio: null } : c))
-
-export const contarBloqueadas = (conversas) => conversas.filter(estaBloqueada).length
 
 export function resumoDoBloqueio(bloqueio) {
   if (!bloqueio) return ''

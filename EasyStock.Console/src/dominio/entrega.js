@@ -16,17 +16,6 @@ export const faixaDoPedido = (janelas, pedido) =>
 export const janelaLotada = (janela, atual) =>
   janela.ocupadas >= janela.capacidade && janela.id !== atual
 
-export function opcoesDeJanela(janelas, atual) {
-  return janelas.map((j) => {
-    const lotada = janelaLotada(j, atual)
-    return {
-      valor: j.id,
-      desabilitada: lotada,
-      rotulo: `${j.faixa} · ${lotada ? 'lotada' : `${j.capacidade - j.ocupadas} vaga(s)`}`,
-    }
-  })
-}
-
 // ---------------------------------------------------------------------------
 // Rodada 2 · janelas com capacidade. Acrescentado no fim do arquivo.
 //
@@ -268,8 +257,6 @@ export const resumoDeHoje = (ocupacoes) => ocupacoes
     chave: o.chave,
     estourou: o.estourou,
   }))
-
-export const totalDePorcoes = (ocupacoes) => ocupacoes.reduce((soma, o) => soma + o.porcoes, 0)
 
 // ---------------------------------------------------------------------------
 // Rodada 13 · configuração das janelas pela Thati (issue #42, D9, RN-21,

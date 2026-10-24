@@ -52,24 +52,4 @@ public static class UnidadeMedidaConverter
         var convertido = valorReferencia / info_para.FatorParaReferencia;
         return (convertido, null);
     }
-
-    /// <summary>
-    /// Lista as unidades compativeis com <paramref name="baseUnidade"/> (mesmo grupo).
-    /// Usado pela UI para filtrar chips de unidade desejada na calculadora (G7).
-    /// Cx aparece se a base for Cx — nao mistura com outras.
-    /// </summary>
-    public static IReadOnlyList<UnidadeMedida> UnidadesCompativeis(UnidadeMedida baseUnidade)
-    {
-        if (baseUnidade == UnidadeMedida.Cx)
-            return [UnidadeMedida.Cx];
-
-        var grupo = GetGrupo(baseUnidade);
-        if (grupo == null)
-            return [baseUnidade];
-
-        return _fatores
-            .Where(kv => kv.Value.Grupo == grupo)
-            .Select(kv => kv.Key)
-            .ToList();
-    }
 }

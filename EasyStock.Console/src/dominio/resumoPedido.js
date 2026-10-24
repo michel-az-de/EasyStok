@@ -17,9 +17,6 @@ export function resumoParaCliente(pedido, cardapio, janela) {
   ].filter(Boolean).join('\n')
 }
 
-export const pedidoPodeSerGerado = (pedido) =>
-  Boolean(pedido) && pedido.itens.length > 0 && pedido.estado === 'aguardando'
-
 // Rodada 12 (issue #14, feedback da Thatiane no vídeo): "Enviar comanda" não
 // reagia. O botão manda o resumo e a cobrança para o CLIENTE, na conversa; a
 // cozinha recebe o pedido sozinha quando o pagamento entra (US-035). O rótulo
