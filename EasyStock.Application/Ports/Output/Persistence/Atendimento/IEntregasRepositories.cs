@@ -26,6 +26,9 @@ public interface IViagemRepository
     /// <summary>Mais recentes primeiro. Sem <paramref name="situacao"/>, todas.</summary>
     Task<IReadOnlyList<Viagem>> ListarAsync(Guid empresaId, SituacaoViagem? situacao, int limite, CancellationToken ct = default);
 
+    /// <summary>Rastreada, com as paradas: a viagem montando ou em rota que leva o pedido (estoque-03).</summary>
+    Task<Viagem?> ObterAtivaDoPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
+
     /// <summary>O pedido já está numa viagem montando ou em rota?</summary>
     Task<bool> PedidoEmViagemAtivaAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default);
 

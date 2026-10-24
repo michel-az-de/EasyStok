@@ -132,6 +132,71 @@ public class ViagemTests
     }
 
     [Fact]
+    public void PedidoCanceladoEmRota_ConcluiAViagemQuandoAsRestantesJaForamEntregues()
+    {
+        var entregador = NovoEntregador();
+        var viagem = Viagem.Criar(Empresa, Agora);
+        viagem.DefinirEntregador(entregador);
+        var a = Guid.NewGuid(); var b = Guid.NewGuid();
+        viagem.IncluirParada(a, false);
+        viagem.IncluirParada(b, false);
+        viagem.Sair(entregador, Agora);
+        viagem.MarcarParadaEntregue(a, Agora.AddMinutes(10));
+
+        viagem.RetirarParadaDePedidoCancelado(b, Agora.AddMinutes(20));
+
+        viagem.Situacao.Should().Be(SituacaoViagem.Concluida);
+        viagem.ConcluidaEm.Should().Be(Agora.AddMinutes(20));
+        viagem.Paradas.Should().ContainSingle(p => p.PedidoId == a);
+    }
+
+    [Fact]
+    public void PedidoCanceladoEmRota_NaoRetiraParadaJaEntregue()
+    {
+        var entregador = NovoEntregador();
+        var viagem = Viagem.Criar(Empresa, Agora);
+        viagem.DefinirEntregador(entregador);
+        var a = Guid.NewGuid(); var b = Guid.NewGuid();
+        viagem.IncluirParada(a, false);
+        viagem.IncluirParada(b, false);
+        viagem.Sair(entregador, Agora);
+        viagem.MarcarParadaEntregue(a, Agora.AddMinutes(10));
+
+        viagem.RetirarParadaDePedidoCancelado(a, Agora.AddMinutes(20));
+
+        viagem.Paradas.Should().HaveCount(2);
+        viagem.Situacao.Should().Be(SituacaoViagem.EmRota);
+    }
+
+    [Fact]
+    public void PedidoCanceladoEmRota_SemSobraDesfazAViagem()
+    {
+        var entregador = NovoEntregador();
+        var viagem = Viagem.Criar(Empresa, Agora);
+        viagem.DefinirEntregador(entregador);
+        var a = Guid.NewGuid();
+        viagem.IncluirParada(a, false);
+        viagem.Sair(entregador, Agora);
+
+        viagem.RetirarParadaDePedidoCancelado(a, Agora.AddMinutes(5));
+
+        viagem.Situacao.Should().Be(SituacaoViagem.Desfeita);
+        viagem.Paradas.Should().BeEmpty();
+        viagem.ConcluidaEm.Should().Be(Agora.AddMinutes(5));
+    }
+
+    [Fact]
+    public void PedidoCanceladoDeOutraViagemNaoFazNada()
+    {
+        var viagem = Viagem.Criar(Empresa, Agora);
+        viagem.IncluirParada(Guid.NewGuid(), false);
+
+        viagem.RetirarParadaDePedidoCancelado(Guid.NewGuid(), Agora);
+
+        viagem.Paradas.Should().ContainSingle();
+    }
+
+    [Fact]
     public void MarcarEntregueAntesDeSairRecusa()
     {
         var viagem = Viagem.Criar(Empresa, Agora);

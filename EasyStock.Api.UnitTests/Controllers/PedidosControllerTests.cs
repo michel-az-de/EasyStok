@@ -195,6 +195,40 @@ public class PedidosControllerTests
     }
 
     [Fact]
+    public async Task GetAll_DataPuraNoFiltro_ViraDiaDeBrasiliaEmUtc_ComUltimoDiaIncluso()
+    {
+        // PEDIDO-01 (banca 23/10): desde/ate de data pura chegavam ao Npgsql com Kind=Unspecified (500 contra
+        // timestamptz) e `ate=2026-10-23` virava 23/10 00:00, escondendo o dia inteiro da data final.
+        DateTime? desdeRecebido = null, ateRecebido = null;
+        _pedidoRepo.GetByEmpresaAsync(_empresaId, 1, 20, null, null, Arg.Do<DateTime?>(d => desdeRecebido = d), Arg.Do<DateTime?>(d => ateRecebido = d), null, "criadoem", "desc")
+            .Returns(((IEnumerable<Pedido>)[], 0));
+
+        await _controller.GetAll(_empresaId,
+            desde: new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Unspecified),
+            ate: new DateTime(2026, 10, 23, 0, 0, 0, DateTimeKind.Unspecified));
+
+        desdeRecebido.Should().Be(new DateTime(2026, 10, 1, 3, 0, 0, DateTimeKind.Utc));
+        desdeRecebido!.Value.Kind.Should().Be(DateTimeKind.Utc);
+        ateRecebido.Should().Be(new DateTime(2026, 10, 24, 3, 0, 0, DateTimeKind.Utc).AddTicks(-10));
+        ateRecebido!.Value.Kind.Should().Be(DateTimeKind.Utc);
+    }
+
+    [Fact]
+    public async Task GetAll_InstanteComKindLocal_ChegaAoRepositorioComoUtcDoMesmoInstante()
+    {
+        // O extrato do console manda ISO com "Z": o binder entrega Kind=Local, que o Npgsql tambem recusa.
+        var instante = new DateTime(2026, 10, 23, 15, 30, 0, DateTimeKind.Utc);
+        DateTime? ateRecebido = null;
+        _pedidoRepo.GetByEmpresaAsync(_empresaId, 1, 20, null, null, Arg.Any<DateTime?>(), Arg.Do<DateTime?>(d => ateRecebido = d), null, "criadoem", "desc")
+            .Returns(((IEnumerable<Pedido>)[], 0));
+
+        await _controller.GetAll(_empresaId, ate: instante.ToLocalTime());
+
+        ateRecebido.Should().Be(instante);
+        ateRecebido!.Value.Kind.Should().Be(DateTimeKind.Utc);
+    }
+
+    [Fact]
     public async Task GetAll_DeveRetornarBadRequest_QuandoEmpresaIdVazioEhSuperAdmin()
     {
         var result = await _controller.GetAll(Guid.Empty);

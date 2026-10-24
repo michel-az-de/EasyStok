@@ -1,5 +1,4 @@
-﻿using EasyStock.Application.Events.Storefront.Handlers;
-using EasyStock.Application.Ports.Output.Atendimento;
+﻿using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Operacao;
@@ -182,8 +181,9 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
                 pedidoRepo,
                 new CobrancaPedidoRepository(uow),
                 NSubstitute.Substitute.For<IEstornoPedidoGateway>(),
-                new LiberarVagaOnPedidoCanceladoHandler(new VagaOcupadaRepository(uow),
-                    NullLogger<LiberarVagaOnPedidoCanceladoHandler>.Instance),
+                new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(new ContaReceberRepository(uow),
+                    new VagaOcupadaRepository(uow),
+                    NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance),
                 new AvisoCobrancaConversa(new ConversaRepository(uow),
                     new ResolvedorCanal(Array.Empty<ICanalMensageria>()), uow,
                     NullLogger<AvisoCobrancaConversa>.Instance),

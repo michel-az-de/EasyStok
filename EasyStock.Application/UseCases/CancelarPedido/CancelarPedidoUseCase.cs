@@ -30,7 +30,8 @@ public class CancelarPedidoUseCase(
     ICobrancaPedidoRepository cobrancaRepo,
     IPublicadorEventoIntegracao publicadorEventos,
     IOperacaoEventPublisher operacaoEventos,
-    SaldoFinanceiroPedido? saldos = null)
+    SaldoFinanceiroPedido? saldos = null,
+    ExpiracaoPreferenciaMercadoPago? expiracao = null)
 {
     /// <summary>#1717-5: tipo do evento da trilha com o valor recebido a devolver ao cliente.</summary>
     public const string EventoDevolucaoAFazer = "devolucao_a_fazer";
@@ -43,9 +44,11 @@ public class CancelarPedidoUseCase(
             throw new UseCaseValidationException("O motivo deve ter até 500 caracteres.");
 
         string? statusAntigo = null;
+        var preferenciasCanceladas = new List<string>();
         var resultado = await uow.ExecuteInTransactionSemRetryAsync(async ct =>
         {
             statusAntigo = null;
+            preferenciasCanceladas.Clear();
             // O recebimento usa o mesmo lock. A autorização precisa enxergar o pagamento
             // que acabou de ser confirmado, antes de decidir se o operador pode cancelar.
             await pedidoRepo.TravarAsync(cmd.EmpresaId, cmd.Id, ct);
@@ -71,7 +74,10 @@ public class CancelarPedidoUseCase(
             // Cobrança paga conserva a evidência do recebimento. Cancelar a operação não
             // equivale a devolver dinheiro pelo banco/provedor.
             foreach (var cobranca in cobrancas.Where(c => c.Status == StatusCobrancaPedido.Pendente))
+            {
                 cobranca.Cancelar(cmd.Motivo ?? "Pedido cancelado", agora);
+                if (cobranca is { EhOnline: true, ReferenciaExterna: { } preferencia }) preferenciasCanceladas.Add(preferencia);
+            }
             var ocorridoEm = AtualizarStatusPedido.AtualizarStatusPedidoUseCase.OcorridoEmAuditoria(cmd.OcorridoEm);
             await pedidoRepo.AddEventoAsync(new PedidoEvento
             {
@@ -97,6 +103,10 @@ public class CancelarPedidoUseCase(
             if (publicarOperacao)
                 await operacaoEventos.PublicarAsync(EventosOperacao.PedidoMudouStatus, cmd.EmpresaId,
                     new PedidoMudouStatusOperacao(cmd.Id, statusAntigo, StatusPedidoMapper.Cancelado));
+            // PEDIDO-05: o link cancelado deixa de aceitar pagamento; depois do commit e best-effort (a falha so loga).
+            // Chamado pelo ProcessarCobrancaVencidaUseCase dentro da transacao externa dele: ali o commit deste use case
+            // ainda nao e o definitivo, e a expiracao roda antes do commit externo (best-effort, a falha so loga).
+            if (expiracao is not null) await expiracao.ExpirarAsync(preferenciasCanceladas, CancellationToken.None);
             logger.LogInformation("Pedido {Id} cancelado por {UsuarioId}.", cmd.Id, cmd.UsuarioId);
         }
         return resultado;
@@ -111,11 +121,15 @@ public class CancelarPedidoUseCase(
     {
         var aDevolver = saldo?.DinheiroDisponivel ?? pedido.TotalPago;
         if (aDevolver <= 0m) return;
-        await pedidoRepo.AddEventoAsync(new PedidoEvento
-        {
-            Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = EventoDevolucaoAFazer,
-            Detalhes = $"Pedido cancelado com {aDevolver.ToString("C", Cultura.PtBr)} recebido. Devolva ao cliente e registre em Devoluções.",
-            UsuarioId = cmd.UsuarioId, UsuarioNome = cmd.UsuarioNome, Origem = cmd.Origem, OcorridoEm = ocorridoEm
-        });
+        await pedidoRepo.AddEventoAsync(EventoDevolucaoAFazerDe(pedido, aDevolver, cmd.UsuarioId, cmd.UsuarioNome, cmd.Origem, ocorridoEm));
     }
+
+    /// <summary>Evento da trilha com o valor a devolver; também usado pela recusa do pedido do site (PEDIDO-02).</summary>
+    public static PedidoEvento EventoDevolucaoAFazerDe(Domain.Entities.Pedido pedido, decimal aDevolver, Guid? usuarioId,
+        string? usuarioNome, string? origem, DateTime ocorridoEm) => new()
+    {
+        Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = EventoDevolucaoAFazer,
+        Detalhes = $"Pedido cancelado com {aDevolver.ToString("C", Cultura.PtBr)} recebido. Devolva ao cliente e registre em Devoluções.",
+        UsuarioId = usuarioId, UsuarioNome = usuarioNome, Origem = origem, OcorridoEm = ocorridoEm
+    };
 }

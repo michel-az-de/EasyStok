@@ -240,6 +240,38 @@ public class IniciarCheckoutGuestUseCaseTests
         await f.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
     }
 
+    [Theory]
+    [InlineData("5511987654321")]
+    [InlineData("+55 (11) 98765-4321")]
+    [InlineData("(11) 98765-4321")]
+    public async Task TelefoneComOuSemCodigoDoPaisViraE164Canonico(string digitado)
+    {
+        // estrutura-19: "55" + DDD + numero (o que o OTP e o cadastro aceitam) era recusado so no checkout guest.
+        var f = new Fixture();
+
+        await f.UseCase().ExecuteAsync(Input() with { Telefone = digitado });
+
+        f.Pedidos.Should().ContainSingle().Which.ClienteTelefone.Should().Be("+5511987654321");
+    }
+
+    [Fact]
+    public async Task ClienteBloqueadoPeloTelefoneEmOutroCadastroRecusa()
+    {
+        // PEDIDO-06: o bloqueio do WhatsApp/guest anterior tem outro hash; o guest novo nao pode passar por isso.
+        var f = new Fixture();
+        var bloqueado = DomainCliente.CriarParaStorefront(f.Storefront.EmpresaId, "outro-hash", TimeProvider.System);
+        bloqueado.Bloquear("calote", DateTime.UtcNow);
+        f.ClienteRepo.GetBloqueadoPorTelefoneAsync(f.Storefront.EmpresaId, "+5511987654321", Arg.Any<CancellationToken>())
+            .Returns(bloqueado);
+
+        var act = () => f.UseCase().ExecuteAsync(Input());
+
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.ClienteBloqueadoException>();
+        f.Pedidos.Should().BeEmpty();
+        f.Clientes.Should().BeEmpty("o cadastro guest nem chega a ser criado");
+        await f.VagaRepo.DidNotReceiveWithAnyArgs().OcuparAsync(default, default, default, default);
+    }
+
     [Fact]
     public async Task TelefoneAlegadoNaoAssociaPedidoACadastroOuCampanhaSemOtp()
     {
