@@ -7,14 +7,9 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { MODULOS, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 import { HASH_HALL, ROTA_PRINCIPAL, rotaDaHash } from '../../dominio/rota'
-import { AbaProducao } from './producao/AbaProducao'
-import { AbaCaixa } from './caixa/AbaCaixa'
 import { AbaCaixaApi } from './caixa/AbaCaixaApi'
 import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
-import { AbaJanelas } from './janelas/AbaJanelas'
-import { AbaFidelidade } from './fidelidade/AbaFidelidade'
 import { AbaIntegracoesApi } from './integracoes/AbaIntegracoesApi'
-import { AbaIntegracoes } from './integracoes/AbaIntegracoes'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { AbaImpressao } from './impressao/AbaImpressao'
 import { AbaRespostas } from './respostas/AbaRespostas'
@@ -52,7 +47,7 @@ function navegarAbas(evento, itens, indice, escolher, botoes, vertical = false) 
 
 // A janela e as rotas usam o mesmo catálogo, as mesmas permissões e o mesmo
 // PainelDeAjuste. Trocar uma aba aqui mantém a conversa e o pedido montados.
-export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio, horariosAtendimento }) {
+export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
   const { fonteApi } = useAtendimento()
   const { permite, acoes } = useAcessoModulos()
   const areas = useMemo(() => MODULOS
@@ -184,7 +179,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
               className={css.painelGestao}
               onClickCapture={seguirLink}
             >
-              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} renderizarEditorCardapio={renderizarEditorCardapio} horariosAtendimento={horariosAtendimento} />
+              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} renderizarEditorCardapio={renderizarEditorCardapio} horariosAtendimento={horariosAtendimento} abasDaDemonstracao={abasDaDemonstracao} />
             </div>
           </section>
         </div>
@@ -222,18 +217,21 @@ function AbaNaoLigada({ texto, saida = null }) {
 // Uma tela por aba: o objeto só decide qual elemento entra na árvore.
 // `janelasApi` (#1440): no modo API o App entrega aqui o cadastro de janelas, zonas e bloqueios
 // da S45 (o mesmo de Entregas › Janelas e frete), no lugar da aba de demonstração.
-export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, renderizarEditorCardapio, horariosAtendimento }) {
+// `abasDaDemonstracao` (#2017): as abas que só a demonstração tem (caixa, janelas, integrações, produção e
+// fidelidade com dados do navegador). O App as entrega; no build de produção não existem.
+export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
   const { fonteApi } = useAtendimento()
+  const { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao } = abasDaDemonstracao ?? {}
   const painelDaAba = useMemo(() => ({
     atendimento: <AbaAtendimento horariosAtendimento={horariosAtendimento} />,
     // #1441: respostas prontas e automáticas, fora do caminho do atendimento.
     respostas: <AbaRespostas focoInicial={focoInicial} />,
-    producao: <AbaProducao />,
+    producao: AbaProducao && <AbaProducao />,
     // #1443: no modo API o caixa é o do EasyStok; a demonstração segue com a massa local.
-    caixa: fonteApi ? <AbaCaixaApi /> : <AbaCaixa />,
-    janelas: fonteApi && janelasApi ? janelasApi : <AbaJanelas />,
-    fidelidade: <AbaFidelidade />,
-    integracoes: fonteApi ? <AbaIntegracoesApi /> : <AbaIntegracoes />,
+    caixa: fonteApi ? <AbaCaixaApi /> : AbaCaixa && <AbaCaixa />,
+    janelas: fonteApi && janelasApi ? janelasApi : AbaJanelas && <AbaJanelas />,
+    fidelidade: AbaFidelidade && <AbaFidelidade />,
+    integracoes: fonteApi ? <AbaIntegracoesApi /> : AbaIntegracoes && <AbaIntegracoes />,
     canais: <TelaCanais />,
     // #1753 (M7.2): usuários e histórico de acesso (só modo API).
     usuarios: <AbaUsuarios />,
@@ -258,7 +256,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     planejamento: <AbaPlanejamentoApi aoAbrirAba={aoAbrirAba} />,
     // M2.6 (#1511): controle de perdas (só modo API).
     perdas: <AbaPerdasApi />,
-  }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio, horariosAtendimento])
+  }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio, horariosAtendimento, AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao])
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />

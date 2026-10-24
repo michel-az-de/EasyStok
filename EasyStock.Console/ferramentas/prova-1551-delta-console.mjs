@@ -126,7 +126,7 @@ confere('botão e dica do campo dependem do mesmo sinal: sem o botão, a dica n�
   assert.match(composer, /onClick=\{podeEscrever \? barra\.abrir : aoAbrirModelos\}/)
 })
 confere('na demonstração a ação continua recusando, sem fingir envio', () => {
-  const acoes = ler('aplicacao/criarAcoes.js')
+  const acoes = ler('aplicacao/acoes/demonstracao.js')
   assert.equal(vezes(acoes, "throw new Error('Modelos aprovados exigem a conexão real com o EasyStok.')"), 2)
 })
 

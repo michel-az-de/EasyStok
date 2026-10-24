@@ -93,6 +93,3 @@ export function carregarMassa() {
 
   return numerarAtendimentosAntigos(comHistoricoEAtendimentos)
 }
-
-export const TOTAL_MASSA = massa.conversas.length + CONVERSAS_GERADAS.length
-export const VERSAO_MASSA = massa.versao

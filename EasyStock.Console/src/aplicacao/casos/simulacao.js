@@ -12,7 +12,7 @@
 // saldo que `dominio/agente.js` já tinha, e a conciliação quando a mensagem é
 // comprovante de Pix.
 //
-// `PAUSAR_SIMULACOES` fica de fora deste arquivo de propósito: pausar só
+// Pausar o cenário não é ação do reducer, de propósito: pausar só
 // precisa impedir o PRÓXIMO `setTimeout` da própria `useRoteiro.js`, e essa é
 // a única leitora. Colocar o estado no reducer pediria expor um campo novo em
 // `AtendimentoProvider.jsx` (não é arquivo da F7, nenhuma frente edita o

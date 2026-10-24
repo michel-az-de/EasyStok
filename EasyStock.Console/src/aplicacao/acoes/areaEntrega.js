@@ -5,7 +5,7 @@
 // que espalha `criarAcoesAreaEntrega(despachar)`. `despachar` já é o
 // `dispatch` do reducer.
 import * as acao from '../acoes'
-import { proximoId } from '../../infra/repositorioConversas'
+import { proximoId } from '../../infra/numeracao'
 
 export function criarAcoesAreaEntrega(despachar) {
   return {
