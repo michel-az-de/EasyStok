@@ -32,28 +32,38 @@ public static class DataUtc
 
     /// <summary>
     /// Início de filtro por período (<c>desde</c> da query string), pronto para comparar com coluna timestamptz.
-    /// Data pura (<c>2026-10-01</c>, Kind Unspecified à meia-noite) é o dia civil de Brasília: vira 03:00Z.
-    /// Instante (ISO com hora ou "Z") só é normalizado para UTC.
+    /// Sem offset (Kind Unspecified) é horário de Brasília: data pura vira 03:00Z e data com hora vira o instante
+    /// correspondente. Utc e Local (ISO com "Z") só são normalizados para UTC.
     /// </summary>
     public static DateTime? InicioDoPeriodoUtc(DateTime? desde)
     {
         if (!desde.HasValue) return null;
-        return DataPura(desde.Value)
-            ? HorarioBrasil.InicioRealDoDiaUtc(DateOnly.FromDateTime(desde.Value))
-            : ParaUtc(desde.Value);
+        return desde.Value.Kind == DateTimeKind.Unspecified ? DeBrasiliaParaUtc(desde.Value) : ParaUtc(desde.Value);
     }
 
     /// <summary>
     /// Fim de filtro por período (<c>ate</c>), inclusivo, para <c>coluna &lt;= valor</c>. Data pura inclui o dia
     /// inteiro de Brasília (até 23:59:59.999999, a precisão do timestamptz); sem isso <c>ate=2026-10-23</c> virava
-    /// 23/10 00:00 e escondia o último dia. Instante só é normalizado para UTC.
+    /// 23/10 00:00 e escondia o último dia. Data com hora sem offset é horário de Brasília; Utc e Local só normalizam.
     /// </summary>
     public static DateTime? FimDoPeriodoUtc(DateTime? ate)
     {
         if (!ate.HasValue) return null;
-        return DataPura(ate.Value)
-            ? HorarioBrasil.InicioRealDoDiaUtc(DateOnly.FromDateTime(ate.Value).AddDays(1)).AddTicks(-10)
-            : ParaUtc(ate.Value);
+        var d = ate.Value;
+        if (d.Kind != DateTimeKind.Unspecified) return ParaUtc(d);
+        if (!DataPura(d)) return DeBrasiliaParaUtc(d);
+        var dia = DateOnly.FromDateTime(d);
+        // Último dia representável: não há "dia seguinte" para somar.
+        return dia == DateOnly.MaxValue ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
+            : HorarioBrasil.InicioRealDoDiaUtc(dia.AddDays(1)).AddTicks(-10);
+    }
+
+    /// <summary>Instante UTC de uma data/hora de parede em Brasília; os extremos do <see cref="DateTime"/> saturam em vez de estourar.</summary>
+    private static DateTime DeBrasiliaParaUtc(DateTime d)
+    {
+        if (d <= DateTime.MinValue.AddDays(1)) return DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc);
+        if (d >= DateTime.MaxValue.AddDays(-1)) return DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc);
+        return HorarioBrasil.InstanteUtc(DateOnly.FromDateTime(d), TimeOnly.FromTimeSpan(d.TimeOfDay));
     }
 
     private static bool DataPura(DateTime d) => d.Kind == DateTimeKind.Unspecified && d.TimeOfDay == TimeSpan.Zero;
