@@ -54,9 +54,6 @@ export function dentroDoHorario(agora, funcionamento = FUNCIONAMENTO_PADRAO) {
   return dentroDaJanelaDoDia(hoje, minutos, false) || dentroDaJanelaDoDia(ontem, minutos, true)
 }
 
-export const foraDoHorario = (agora, funcionamento = FUNCIONAMENTO_PADRAO) =>
-  !dentroDoHorario(agora, funcionamento)
-
 // Estado da loja "vale por cima do horário" (pedido do dono): `lojaAberta`
 // chega em três valores. `null`/`undefined` é o padrão, ninguém tocou o
 // controle do topo, o horário sozinho decide. `true`/`false` é ela decidindo

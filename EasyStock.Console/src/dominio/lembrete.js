@@ -26,9 +26,6 @@ export const novoLembrete = ({
 
 export const vencido = (lembrete, agora) => lembrete.quando <= agora
 
-export const contarVencidos = (lembretes, agora) =>
-  (lembretes ?? []).filter((l) => vencido(l, agora)).length
-
 export const porHora = (lembretes) => [...lembretes].sort((a, b) => a.quando - b.quando)
 
 export function descreverPrazo(quando, agora) {

@@ -2,11 +2,6 @@
 export const ultimaFala = (conversa) =>
   [...(conversa?.mensagens ?? [])].reverse().find((m) => m.dir === 'in' || m.dir === 'out') ?? null
 
-// Substituição de variável de modelo aprovado. Sem React e sem catálogo fixo.
-export function preencherModelo(modelo, valores) {
-  return modelo.texto.replace(/\{\{(\d+)\}\}/g, (todo, indice) => valores[Number(indice) - 1] ?? todo)
-}
-
 export const primeiroNome = (nomeCompleto) => nomeCompleto.split(' ')[0]
 
 // Balão que o EasyStok ainda não confirmou na leitura: enviando, recusado (falhou) ou já confirmado pela API mas

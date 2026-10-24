@@ -45,8 +45,6 @@ export const indiceDoPasso = (id) => PASSOS.findIndex((p) => p.id === id)
 
 export const passoPorId = (id) => PASSOS.find((p) => p.id === id) ?? null
 
-export const ehProximoPasso = (id, atual) => indiceDoPasso(id) === indiceDoPasso(atual) + 1
-
 // Rótulo textual da situação do passo. Cor nunca informa sozinha.
 export function situacaoDoPasso(id, atual) {
   const i = indiceDoPasso(id)

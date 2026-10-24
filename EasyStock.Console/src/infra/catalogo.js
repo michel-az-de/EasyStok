@@ -311,10 +311,6 @@ export const MINUTOS_CONFERIR = 20
 // agente não responde sozinho (RN-52). Vêm sempre primeiro entre as tags.
 export const RESTRICOES = ['Lactose', 'Glúten', 'Celíaco', 'Vegano', 'Alergia']
 
-// Toques rápidos da anotação da comanda (seção 3.3). "Sem lactose" não mora
-// aqui: só aparece quando o cliente carrega a tag de restrição.
-export const ANOTACOES_RAPIDAS = ['Sem pimenta', 'Molho à parte', 'Sem queijo', 'Pouco sal', 'Sem tempero verde']
-
 // Prefixos de CEP atendidos (RN-10, RN-11): mesmo grão grosseiro que a massa
 // já usa para achar bairro por texto, o bastante para o protótipo aceitar ou
 // recusar um endereço.

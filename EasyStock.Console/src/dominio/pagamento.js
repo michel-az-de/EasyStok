@@ -105,21 +105,6 @@ export const quitadoNoCartao = (p) => {
 export const CODIGO_SALDO_A_RECEBER = 'SALDO_A_RECEBER'
 export const pedeConfirmacaoDoSaldo = (erro) => erro?.codigo === CODIGO_SALDO_A_RECEBER
 
-// #1863: no lote da fila offline (`status-lote`) a recusa vem por item, não em 409. Devolve os itens que
-// pararam no saldo a receber, para a tela perguntar e reenviar com `confirmarSaldoAReceber`.
-export const itensDoLoteComSaldoAReceber = (resultados = []) =>
-  resultados
-    .filter((r) => !r.sucesso && r.codigo === CODIGO_SALDO_A_RECEBER)
-    .map((r) => ({ id: r.id, valor: Number(r.valor) || 0, mensagem: r.erro }))
-
-// Pagamentos de um trecho de atendimento (seção 5, resumo): tudo que caiu
-// a partir de `desde` (instante numérico). Sem `desde`, devolve tudo.
-export function pagamentosDoTrecho(pedido, desde = null) {
-  const pagamentos = pagamentosDoPedido(pedido)
-  if (desde == null) return pagamentos
-  return pagamentos.filter((p) => p.em >= desde)
-}
-
 // #1839: extrato do pedido na modal Pagamento, com o que o EasyStok já devolve (itens, frete,
 // pagamentos e saldo): de onde veio cada real, sem abrir o Financeiro. Nulo fora do modo API.
 // J2 (#1990): `aDevolver` vem do EasyStok (pedido cancelado com recebimento); o extrato diz quanto

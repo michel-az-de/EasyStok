@@ -25,7 +25,7 @@ import {
 import {
   horaCurta, lerMoeda, moeda, moedaAltaDemais, plural,
 } from '../../../dominio/formato'
-import { PromptEstorno } from './AbaCaixa'
+import { PromptEstorno } from './PromptEstorno'
 import { ModalFecharCaixa } from './ModalFecharCaixa'
 import css from './abaCaixa.module.css'
 

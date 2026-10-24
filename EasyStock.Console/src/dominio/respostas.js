@@ -10,7 +10,6 @@
 // ALTERNAR_REGRA), então editar uma automática na biblioteca É editar a
 // mesma que a outra tela mostra.
 import { primeiroNome } from './mensagem.js'
-import { PASSOS } from './esteira.js'
 import { VARIAVEIS } from './automacao.js'
 
 const semAcento = (texto) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -109,10 +108,6 @@ export function resolverVariaveis(texto, conversa, extras = {}) {
   return { texto: textoResolvido, faltando }
 }
 
-export const avisoDeFaltando = (faltando) => (faltando.length === 0
-  ? null
-  : `Sem ${faltando.map((c) => ROTULO_VARIAVEL[c]).join(' e ')} nesta conversa.`)
-
 // #1474: variável do sistema que sobrou no texto do campo ("Pedido {pedido}.") sairia literal
 // para o cliente. Só as que o sistema conhece bloqueiam (as de `VARIAVEIS`, mais as de
 // ROTULO_VARIAVEL); texto da dona entre chaves, como {CUPOM10} ou {1}, segue. Reconhece a
@@ -149,94 +144,7 @@ export function avisoDeVariaveisNaoResolvidas(texto) {
 // ---------------------------------------------------------------------------
 export const CATEGORIA_AUTOMATICA = 'Automáticas do sistema'
 
-const itemDeRespostaPronta = (r) => ({
-  id: r.id, tipo: 'pronta', titulo: r.titulo, categoria: r.categoria,
-  atalho: r.atalho, texto: r.texto, arquivada: r.arquivada, ativa: true, regraId: null,
-  editavel: true, descricao: null,
-})
-
-// Achado 3, P1 (banca 10): a mesma regra perdia a `descricao` (o que dispara
-// ela) ao entrar na biblioteca, então editando por aqui ela via só nome e
-// texto, nunca a condição. `descricao` já existe em REGRAS_PADRAO
-// (dominio/automacao.js) e features/automacoes/ModalAutomacoes.jsx já
-// mostra; só faltava copiar para o item.
-const itemDeRegra = (regra) => ({
-  id: `regra-${regra.id}`, tipo: 'automatica', titulo: regra.nome, categoria: CATEGORIA_AUTOMATICA,
-  atalho: gerarAtalho(regra.nome), texto: regra.texto, arquivada: false, ativa: regra.ativa,
-  regraId: regra.id, editavel: true, descricao: regra.descricao,
-})
-
-// ---------------------------------------------------------------------------
-// Achado 2, P0 (banca 10): Pix e as cinco mensagens de mudança de status da
-// esteira (dominio/esteira.js#PASSOS) são geradas e marcadas "automática" na
-// conversa, mas não entravam neste catálogo — quem quisesse reenviar, rever
-// ou achar "o que a casa falou sozinha" nesses casos não achava onde. Os dois
-// grupos abaixo somam à mesma categoria, junto das seis regras de
-// dominio/automacao.js.
-//
-// Diferente das regras de automacao.js, o texto da esteira e da cobrança não
-// é um campo solto no estado (`estado.regras`): a esteira é um passo fixo do
-// pedido e a cobrança é gerada com valor, link e copia e cola de CADA pedido
-// (dominio/cobranca.js#textoDaCobranca). Editar isso pediria mover as duas
-// coisas para dentro do reducer, mudança grande demais para o achado que
-// pediu "aparecer na lista" — mesmo corte que "Modelos aprovados" já usa
-// nesta tela (`features/respostas/ModalBiblioteca.jsx`, texto fixo, sem
-// edição). `editavel: false` aqui é esse mesmo corte, não descuido.
-// ---------------------------------------------------------------------------
-const ROTULO_PASSO_BIBLIOTECA = {
-  pago: 'Esteira: pagamento confirmado',
-  preparo: 'Esteira: pedido em preparo',
-  embalado: 'Esteira: pedido pronto e embalado',
-  entrega: 'Esteira: pedido saiu para entrega',
-  entregue: 'Esteira: pedido entregue',
-}
-
-const DESCRICAO_PASSO_BIBLIOTECA = {
-  pago: 'Sai quando a dona marca o pedido como pago na esteira.',
-  preparo: 'Sai quando a dona marca "Em preparo" na esteira.',
-  embalado: 'Sai quando a dona marca "Pronto" na esteira.',
-  entrega: 'Sai quando a dona marca "Saiu para entrega" na esteira, com o nome de quem leva.',
-  entregue: 'Sai quando a dona marca "Entregue" na esteira.',
-}
-
-const itemDePassoEsteira = (passo) => {
-  const titulo = ROTULO_PASSO_BIBLIOTECA[passo.id] ?? passo.rotulo
-  return {
-    id: `passo-${passo.id}`, tipo: 'automatica', titulo, categoria: CATEGORIA_AUTOMATICA,
-    atalho: gerarAtalho(titulo), texto: passo.mensagem, arquivada: false, ativa: true,
-    regraId: `esteira-${passo.id}`, editavel: false, descricao: DESCRICAO_PASSO_BIBLIOTECA[passo.id] ?? null,
-  }
-}
-
 export const ID_ITEM_COBRANCA_PIX = 'cobranca-pix'
-
-// `texto: null` de propósito: quem exibe (ModalBiblioteca) resolve pelo
-// pedido e cobrança da conversa aberta (dominio/cobranca.js#textoDaCobranca),
-// porque o texto muda por pedido (valor, link, copia e cola). `normalizarBusca`
-// trata null como string vazia, então a busca por "pix" ainda acha este item
-// pelo título e pelo atalho.
-const ITEM_COBRANCA_PIX = {
-  id: ID_ITEM_COBRANCA_PIX,
-  tipo: 'automatica',
-  titulo: 'Cobrança gerada (Pix ou cartão por link)',
-  categoria: CATEGORIA_AUTOMATICA,
-  atalho: '/cobranca-pix',
-  texto: null,
-  arquivada: false,
-  ativa: true,
-  regraId: ID_ITEM_COBRANCA_PIX,
-  editavel: false,
-  descricao: 'Sai assim que a dona gera a cobrança do pedido, com valor, link e copia e cola.',
-}
-
-export function listarBiblioteca({ respostasProntas, regras, incluirArquivadas = false }) {
-  const prontas = respostasProntas
-    .filter((r) => incluirArquivadas || !r.arquivada)
-    .map(itemDeRespostaPronta)
-  const automaticas = regras.map(itemDeRegra)
-  const daEsteira = PASSOS.filter((p) => p.mensagem).map(itemDePassoEsteira)
-  return [...automaticas, ...daEsteira, ITEM_COBRANCA_PIX, ...prontas]
-}
 
 // ---------------------------------------------------------------------------
 // Item D (banca 10): a etiqueta "automática" do balão da conversa
@@ -259,13 +167,6 @@ export function itemDaBibliotecaPelaRegra(regra) {
   if (regra.startsWith(PREFIXO_ESTEIRA)) return `passo-${regra.slice(PREFIXO_ESTEIRA.length)}`
   if (SEM_DEFINICAO_NA_BIBLIOTECA.has(regra)) return null
   return `regra-${regra}`
-}
-
-export function filtrarBiblioteca(itens, termo) {
-  const alvo = normalizarBusca(termo)
-  if (!alvo) return itens
-  return itens.filter((item) => [item.titulo, item.atalho, item.categoria, item.texto]
-    .some((campo) => normalizarBusca(campo).includes(alvo)))
 }
 
 // Automáticas do sistema sempre primeiro (foi o pedido que trouxe a

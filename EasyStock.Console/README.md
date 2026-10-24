@@ -5,8 +5,19 @@ da Casa da Baba, a partir da entrevista de 21/09/2026 com a Thatiane, dona e coz
 repositório `michel-az-de/casa-da-baba-atendimento` (`prototipo-omni/`, commit a9831ab). Lá ficam
 o histórico, a transcrição, as estórias e a pasta `auditoria/` citada nos comentários.
 
-Hoje roda com dados simulados. A ligação à API real é feita módulo a módulo, na ordem da
-[matriz de paridade](../docs/plan/atendimento-whatsapp/10-console.md).
+Dois modos, escolhidos na hora do build por `VITE_FONTE_DADOS`:
+
+| Modo | Build | O que leva |
+|---|---|---|
+| API (produção) | `VITE_FONTE_DADOS=api npm run build` | Só o que fala com o EasyStok. Sem massa, sem esteira simulada, sem as telas da demonstração |
+| Demonstração (laboratório local) | `npm run build` ou `npm run dev` | Tudo do modo API mais a massa de conversas, a esteira, o Pix e as entregas simuladas |
+
+O código da demonstração mora em `src/demonstracao/` (e nos módulos que só ele importa) e entra por duas portas,
+`src/infra/demonstracao.js` (dados e casos do reducer) e `src/app/demonstracao.js` (telas). Cada porta é um
+`import()` atrás de `FONTE_API`: no build de produção o ramo morre e o bundle não leva nada dela. Quem muda a
+demonstração põe o módulo novo em `src/demonstracao/` e lê pela porta; a `ferramentas/prova-2017-demonstracao-fora-do-bundle.mjs`
+falha se um módulo da demonstração voltar para o bundle de produção. A ligação à API real é feita módulo a módulo,
+na ordem da [matriz de paridade](../docs/plan/atendimento-whatsapp/10-console.md).
 
 ## Rodar
 
@@ -46,7 +57,7 @@ automático.
 ## Massa de conversas
 
 `dados/massa-conversas.json` tem 30 conversas de teste com o resultado esperado do
-agente em cada uma. Ela é o padrão em qualquer build. Com `?massa=0` na URL a tela
+agente em cada uma. Ela é o padrão da demonstração; no build de produção (`VITE_FONTE_DADOS=api`) nem entra no bundle. Com `?massa=0` na URL a tela
 volta à semente curta de 5 conversas, útil para demonstração rápida.
 
 ## Provas de navegador com fixtures do servidor
@@ -83,4 +94,11 @@ as fixtures elas não rodam. Receita medida em 17/10/2026 (cerca de 4 min no tot
 
 Camadas com dependência só para baixo, verificada por `ferramentas/verificar-camadas.mjs`:
 `dominio` (puro) ← `infra` ← `aplicacao` ← `features` ← `app`. Feature não importa feature.
+`demonstracao` fica ao lado: pode importar de todas, e só as duas portas a carregam (por `import()`).
+
+O reducer (`aplicacao/reducer.js`) só compõe: o estado inicial está em `aplicacao/reducer/estadoInicial.js`, a
+mescla do que o servidor devolve em `aplicacao/reducer/mesclaDoServidor.js`, os casos do modo API em
+`aplicacao/casos/api.js` e os casos que os dois modos usam em `aplicacao/casos/` (atendimento, rascunho da
+comanda, lembretes, tags, meio de pagamento...). Os casos só da demonstração (esteira, Pix, entregas...) são
+somados por `src/demonstracao/casos.js`.
 Os geradores da primeira versão (`ferramentas/*.py`) ficaram no repositório de origem.
