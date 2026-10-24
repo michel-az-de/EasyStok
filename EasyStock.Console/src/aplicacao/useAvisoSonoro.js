@@ -3,6 +3,7 @@ import { tocarAviso } from '../infra/som'
 import { motivoVisivel, precisaDeVoce } from '../dominio/automatico'
 import { notificar } from '../infra/notificacaoNavegador'
 import { TIPOS_DE_AVISO, avisosDoRetrato } from '../dominio/aviso'
+import { pagamentoDoRetrato } from '../dominio/avisoSonoro'
 
 // Quando o som toca (D6, US-010, RN-25). O COMO mora em infra/som.js.
 //
@@ -58,7 +59,7 @@ export function useAvisoSonoro({
       const ultimaDoCliente = (c.mensagens ?? []).filter((m) => m.dir === 'in').at(-1)
       const precisa = precisaDeVoce(c, agora, true, aberta, janelas, expediente)
       return [c.id, {
-        pago: c.pedido?.estado === 'pago',
+        ...pagamentoDoRetrato(c.pedido),
         precisa,
         ultimaMensagemClienteId: ultimaDoCliente?.id ?? null,
         etapa: c.pedido?.estado ?? null,

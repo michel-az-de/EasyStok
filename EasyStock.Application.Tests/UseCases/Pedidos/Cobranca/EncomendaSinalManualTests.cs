@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -5,7 +6,9 @@ using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -268,8 +271,37 @@ public class EncomendaSinalManualTests
         return f;
     }
 
-    private static RegistrarPagamentoPedidoUseCase Manual(CobrancaPedidoFixture f) =>
+    private static RegistrarPagamentoPedidoUseCase Manual(CobrancaPedidoFixture f, AvisoStatusPedidoCliente? aviso = null) =>
         new(f.PedidoRepo, f.Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
             new CalculadoraInicioPrevistoPedido(f.PrazoQueries),
-            QuitacaoPedidoTeste.Criar(f.PedidoRepo, f.CobrancaRepo, f.ConversaRepo, f.ImpressaoRepo, f.Publicador, f.OperacaoEventos, f.PrazoQueries));
+            QuitacaoPedidoTeste.Criar(f.PedidoRepo, f.CobrancaRepo, f.ConversaRepo, f.ImpressaoRepo, f.Publicador, f.OperacaoEventos, f.PrazoQueries),
+            avisoCliente: aviso is null ? null : new Lazy<AvisoStatusPedidoCliente>(() => aviso));
+
+    // #2007 (item 6): o sinal registrado à mão avisa o cliente como o pago pelo Mercado Pago, uma vez: só quando
+    // o sinal se completa. Parcela abaixo do sinal e a quitação do restante não mandam o aviso do sinal.
+    [Fact]
+    public async Task SinalManual_AvisaOClienteUmaVezComOSinalEORestante()
+    {
+        var f = Futuro();
+        var total = f.Pedido.Total.Valor;
+        var sinal = PlanoPagamentoEncomenda.Sinal(total);
+        f.Cobrancas.Add(CobrancaPedido.CriarNaEntrega(f.EmpresaId, f.Pedido.Id, total, CobrancaPedidoFixture.Agora));
+        var uc = Manual(f, f.AvisoCliente());
+
+        await uc.ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", sinal - 0.01m));
+        MensagensDoSinal(f).Should().BeEmpty();
+        await uc.ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", 0.01m));
+        await uc.ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "dinheiro", total - sinal));
+
+        MensagensDoSinal(f).Should().ContainSingle().Which.Should().Be(
+            ConfirmarPagamentoPedidoUseCase.TextoSinalRecebido(sinal, total - sinal));
+    }
+
+    private static List<string?> MensagensDoSinal(CobrancaPedidoFixture f) => f.Notificador.ReceivedCalls()
+        .Where(c => c.GetMethodInfo().Name == "EnfileirarEventoAsync"
+            && (TipoEventoNotificacao)c.GetArguments()[0]! == TipoEventoNotificacao.ComandaAtualizada)
+        .Select(c => JsonSerializer.Deserialize<Dictionary<string, string?>>((string)c.GetArguments()[2]!)!
+            .GetValueOrDefault("mensagem"))
+        .Where(m => m?.StartsWith("Recebemos o sinal", StringComparison.Ordinal) == true)
+        .ToList();
 }

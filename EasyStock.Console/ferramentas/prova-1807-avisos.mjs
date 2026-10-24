@@ -276,5 +276,28 @@ await confere('#1989-8 no celular a pilha de avisos fica no topo, fora da barra 
   assert.match(celular, /left:\s*var\(--e-16\)/, 'largura da tela com o respiro de 16 px dos dois lados')
 })
 
+// --- K. Frente K (#2007, item 8): o sinal não é o pedido inteiro ------------------------------------
+const sonoro = await import('../src/dominio/avisoSonoro.js')
+await confere('K8. só o sinal pago avisa "pagou o sinal"; a quitação depois avisa "pagou o pedido"', () => {
+  const encomenda = { estado: 'pago', sinalNaReserva: true, totalApi: 50, alocadoApi: 25 }
+  assert.deepEqual(sonoro.pagamentoDoRetrato(encomenda), { pago: false, sinal: true })
+  assert.deepEqual(sonoro.pagamentoDoRetrato({ ...encomenda, alocadoApi: 50 }), { pago: true, sinal: false })
+  assert.deepEqual(sonoro.pagamentoDoRetrato({ estado: 'aguardando' }), { pago: false, sinal: false })
+  const antes = retrato([['c1', linha({ etapa: 'aguardando' })]])
+  const comSinal = retrato([['c1', linha({ etapa: 'pago', ...sonoro.pagamentoDoRetrato(encomenda) })]])
+  const lista = avisosDe(antes, comSinal)
+  assert.deepEqual(tipos(lista), [T.PAGAMENTO_CONFIRMADO])
+  assert.equal(lista[0].corpo, 'Marina pagou o sinal')
+  const quitado = retrato([['c1', linha({ etapa: 'pago', ...sonoro.pagamentoDoRetrato({ ...encomenda, alocadoApi: 50 }) })]])
+  const depois = avisosDe(comSinal, quitado)
+  assert.deepEqual(tipos(depois), [T.PAGAMENTO_CONFIRMADO])
+  assert.equal(depois[0].corpo, 'Marina pagou o pedido')
+  // Quitado e depois com o total aumentado por uma alteração: nada foi pago, nada de "pagou o sinal".
+  const aumentou = retrato([['c1', linha({ etapa: 'pago', ...sonoro.pagamentoDoRetrato({ ...encomenda, totalApi: 80, alocadoApi: 50 }) })]])
+  assert.deepEqual(avisosDe(quitado, aumentou), [])
+  assert.match(readFileSync(new URL('../src/aplicacao/useAvisoSonoro.js', import.meta.url), 'utf8'),
+    /\.\.\.pagamentoDoRetrato\(c\.pedido\)/, 'o retrato do balcão usa a mesma regra')
+})
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length) process.exit(1)

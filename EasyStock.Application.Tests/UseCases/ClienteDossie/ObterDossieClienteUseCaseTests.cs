@@ -73,6 +73,24 @@ public class ObterDossieClienteUseCaseTests
         dossie.Preferencias!.AvisosStatusAtivos.Should().BeTrue();
     }
 
+    // #2007 (item 12): uma regra só de compra para contagem, última compra e total gasto. Cancelado não é compra, e
+    // a reserva ainda sem pagamento também não: "1 pedido no total" sem nenhum real gasto contradizia o cartão.
+    [Fact]
+    public async Task CanceladoEReservaSemPagamentoNaoContamComoCompra()
+    {
+        _pedidos.ListarAsync(_empresaId, _cliente.Id, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([
+            Pedido(3, StatusPedidoMapper.Cancelado, ("Lasanha", 1m)),
+            Pedido(2, StatusPedidoMapper.AguardandoPagamento, ("Nhoque", 1m)),
+        ]);
+
+        var dossie = await CriarUseCase().ExecuteAsync(new ObterDossieClienteQuery(_empresaId, _cliente.Id));
+
+        dossie!.TotalPedidos.Should().Be(0);
+        dossie.TotalGasto.Should().Be(0m);
+        dossie.UltimaCompraEm.Should().BeNull();
+        dossie.UltimosPedidos.Should().HaveCount(2, "o histórico continua mostrando os dois");
+    }
+
     [Fact]
     public async Task ClienteDeOutraEmpresaDevolveNulo()
     {
