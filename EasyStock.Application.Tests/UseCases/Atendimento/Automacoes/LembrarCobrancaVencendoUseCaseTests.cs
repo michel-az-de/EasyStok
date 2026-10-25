@@ -12,6 +12,7 @@ using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
 using EasyStock.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento.Automacoes;
 
@@ -117,7 +118,7 @@ public class LembrarCobrancaVencendoUseCaseTests
         var aviso = await UseCase().ExecuteAsync(Item(link));
         aviso.Situacao.Should().Be(SituacaoLembreteCobranca.Disparada);
         aviso.Automacao.Should().Be(ResultadoAutomacao.Enviada);
-        var codigo = VariaveisAtendimento.CodigoCurto(_pedido.Id);
+        var codigo = CodigoCurto.De(_pedido.Id);
         await _whats.Received(1).EnviarTextoAsync(_conversa.ContatoIdExterno, Arg.Is<string>(t => t.Contains(codigo)), Arg.Any<CancellationToken>());
         _tenant.Received().SetCurrentTenant(_empresaId);
 
@@ -205,7 +206,7 @@ public class LembrarCobrancaVencendoUseCaseTests
         (await UseCase().ExecuteAsync(Item(link))).Automacao.Should().Be(ResultadoAutomacao.Enviada);
 
         await _whats.Received(1).EnviarTextoAsync(_conversa.ContatoIdExterno,
-            $"Seu Pix do {VariaveisAtendimento.CodigoCurto(_pedido.Id)} vence já!", Arg.Any<CancellationToken>());
+            $"Seu Pix do {CodigoCurto.De(_pedido.Id)} vence já!", Arg.Any<CancellationToken>());
     }
 
     [Fact]

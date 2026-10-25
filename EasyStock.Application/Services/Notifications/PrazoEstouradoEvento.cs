@@ -45,9 +45,6 @@ public static class PrazoEstouradoEvento
 
     public static string CorrelationId(TipoPrazo tipo, Guid referenciaId) => $"prazo:{Nome(tipo)}:{referenciaId:N}";
 
-    /// <summary>Código curto de 8 caracteres exibido ao operador.</summary>
-    public static string Referencia(Guid id) => id.ToString("N")[..8].ToUpperInvariant();
-
     /// <summary>Duração em pt-BR: "35 minutos", "1 hora e 5 minutos", "2 dias".</summary>
     public static string Duracao(TimeSpan d)
     {

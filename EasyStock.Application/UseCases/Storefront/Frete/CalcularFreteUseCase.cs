@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Integrations;
 using EasyStock.Application.Ports.Output.Lookup;
@@ -7,6 +6,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Storefront.Frete;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Storefront.Frete;
 
@@ -50,7 +50,7 @@ public sealed class CalcularFreteUseCase(
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var cepNormalizado = NormalizarCep(input.Cep);
+        var cepNormalizado = EnderecoBr.NormalizarCep(input.Cep);
         if (!CepDigitosRegex.IsMatch(cepNormalizado))
             throw new CepInvalidoException();
 
@@ -79,7 +79,7 @@ public sealed class CalcularFreteUseCase(
         }
 
         var bairroNormalizado = endereco is not null && !string.IsNullOrWhiteSpace(endereco.Bairro)
-            ? NormalizarBairro(endereco.Bairro)
+            ? EnderecoBr.NormalizarBairro(endereco.Bairro)
             : string.Empty;
 
         // ── Frete por raio (ADR-0017) — quando o storefront tem config E o
@@ -196,32 +196,6 @@ public sealed class CalcularFreteUseCase(
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
-
-    /// <summary>Remove tudo que não for dígito. Aceita "05500-000", "05500000", " 05500000 ".</summary>
-    private static string NormalizarCep(string? cep)
-    {
-        if (string.IsNullOrWhiteSpace(cep)) return string.Empty;
-        var sb = new StringBuilder(cep.Length);
-        foreach (var c in cep)
-        {
-            if (char.IsDigit(c)) sb.Append(c);
-        }
-        return sb.ToString();
-    }
-
-    /// <summary>Lowercase + remove acentos + trim. "Butantã" → "butanta".</summary>
-    private static string NormalizarBairro(string bairro)
-    {
-        var trimmed = bairro.Trim();
-        var formD = trimmed.Normalize(NormalizationForm.FormD);
-        var sb = new StringBuilder(formD.Length);
-        foreach (var ch in formD)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
-                sb.Append(ch);
-        }
-        return sb.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
-    }
 
     private static int ToCentavos(decimal valor) =>
         (int)Math.Round(valor * 100m, MidpointRounding.AwayFromZero);

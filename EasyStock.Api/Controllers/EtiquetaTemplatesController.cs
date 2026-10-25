@@ -46,7 +46,7 @@ public class EtiquetaTemplatesController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 
@@ -70,7 +70,7 @@ public class EtiquetaTemplatesController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
         catch (UseCaseConcurrencyException ex)
         {
@@ -110,7 +110,7 @@ public class EtiquetaTemplatesController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 }

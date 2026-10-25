@@ -1,4 +1,31 @@
+using EasyStock.Domain.Defaults;
+
 namespace EasyStock.Domain.Entities.Storefront;
+
+/// <summary>#2018: por que uma janela de entrega não atende uma data (<see cref="JanelaEntrega.AvaliarEm"/>).</summary>
+public enum DisponibilidadeDaJanela
+{
+    /// <summary>A janela atende a data.</summary>
+    Atende,
+
+    /// <summary>A janela está desativada no cadastro da loja.</summary>
+    Inativa,
+
+    /// <summary>A janela é de outro dia da semana.</summary>
+    OutroDiaDaSemana,
+
+    /// <summary>A data tem bloqueio do dia inteiro (feriado, férias).</summary>
+    DiaBloqueado,
+
+    /// <summary>A data tem bloqueio só desta janela.</summary>
+    JanelaBloqueada,
+
+    /// <summary>A janela já terminou (fuso da loja).</summary>
+    JaPassou,
+
+    /// <summary>A janela começa antes de agora mais o prazo mínimo de preparo.</summary>
+    AbaixoDoPrazo,
+}
 
 /// <summary>
 /// Template recorrente de janela de entrega por dia da semana (ADR-0011).
@@ -107,6 +134,45 @@ public class JanelaEntrega
 
         if (string.IsNullOrWhiteSpace(label))
             throw new RegraDeDominioVioladaException("Label é obrigatório.");
+    }
+
+    /// <summary>
+    /// #2018 (comanda-15): a ÚNICA regra de "a janela atende esta data". A listagem de janelas do site e da comanda e o
+    /// checkout chamam isto, então oferecer e aceitar nunca divergem. Ordem: ativa, dia da semana, bloqueios, janela já
+    /// terminada e prazo mínimo (<see cref="MotivoEstruturalEm"/>, depois <see cref="MotivoDeTempoEm"/>).
+    /// </summary>
+    /// <param name="bloqueios">Bloqueios da loja; só contam os da <paramref name="data"/> (do dia inteiro ou desta janela).</param>
+    /// <param name="prazoMinimoMinutos">Antecedência mínima em minutos; 0 quando o canal não informa (a janela que já começou não serve).</param>
+    public DisponibilidadeDaJanela AvaliarEm(
+        DateOnly data, IEnumerable<BloqueioEntrega> bloqueios, DateTime agoraUtc, int prazoMinimoMinutos)
+    {
+        var estrutural = MotivoEstruturalEm(data, bloqueios);
+        return estrutural != DisponibilidadeDaJanela.Atende ? estrutural : MotivoDeTempoEm(data, agoraUtc, prazoMinimoMinutos);
+    }
+
+    /// <summary>Ativa, no dia da semana certo e sem bloqueio na data (o que independe do relógio e dos pratos do pedido).</summary>
+    public DisponibilidadeDaJanela MotivoEstruturalEm(DateOnly data, IEnumerable<BloqueioEntrega> bloqueios)
+    {
+        ArgumentNullException.ThrowIfNull(bloqueios);
+        if (!Ativa) return DisponibilidadeDaJanela.Inativa;
+        if (DiaDaSemana != (int)data.DayOfWeek) return DisponibilidadeDaJanela.OutroDiaDaSemana;
+
+        var daData = bloqueios.Where(b => b.Data == data).ToList();
+        if (daData.Any(b => b.JanelaEspecificaId is null)) return DisponibilidadeDaJanela.DiaBloqueado;
+        if (daData.Any(b => b.JanelaEspecificaId == Id)) return DisponibilidadeDaJanela.JanelaBloqueada;
+        return DisponibilidadeDaJanela.Atende;
+    }
+
+    /// <summary>
+    /// Janela já terminada nunca vale (#1506), nem sem prazo mínimo (site); e só serve a que não começa antes de agora mais o
+    /// prazo (S16, RN-21; #1874: com prazo 0 a janela que já começou também sai). Fuso da loja (<see cref="OperacionalFuso"/>).
+    /// </summary>
+    public DisponibilidadeDaJanela MotivoDeTempoEm(DateOnly data, DateTime agoraUtc, int prazoMinimoMinutos)
+    {
+        var agoraLoja = OperacionalFuso.ParaBrasilia(agoraUtc);
+        if (data.ToDateTime(HoraFim) <= agoraLoja) return DisponibilidadeDaJanela.JaPassou;
+        if (data.ToDateTime(HoraInicio) < agoraLoja.AddMinutes(prazoMinimoMinutos)) return DisponibilidadeDaJanela.AbaixoDoPrazo;
+        return DisponibilidadeDaJanela.Atende;
     }
 
     public void Ativar()

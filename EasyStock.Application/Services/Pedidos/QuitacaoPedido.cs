@@ -8,6 +8,7 @@ using EasyStock.Domain.Entities.Operacao;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.Services.Pedidos;
 
@@ -97,7 +98,7 @@ public sealed class QuitacaoPedido(
             new PedidoPagoEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, pedido.ClienteId, conversaId, cobranca.Id,
                 cobranca.Provedor, cobranca.PagamentoExternoId!, cobranca.MetodoPagamento!, cobranca.ValorPago!.Value,
                 pedido.Status, agora), correlationId: pedido.Id.ToString(), ct: ct);
-        return new(new PedidoPagoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+        return new(new PedidoPagoOperacao(pedido.Id, CodigoCurto.De(pedido.Id),
             pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await PrepararCanhotoAsync(pedido, agora, ct));
     }
 
@@ -118,7 +119,7 @@ public sealed class QuitacaoPedido(
         await publicador.PublicarAsync(pedido.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", pedido.Id,
             new PedidoPagoEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, pedido.ClienteId, conversaId, Guid.Empty,
                 "credito_cliente", "cupom", "cupom", 0m, pedido.Status, agora), correlationId: pedido.Id.ToString(), ct: ct);
-        return new(new PedidoPagoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+        return new(new PedidoPagoOperacao(pedido.Id, CodigoCurto.De(pedido.Id),
             pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await PrepararCanhotoAsync(pedido, agora, ct));
     }
 

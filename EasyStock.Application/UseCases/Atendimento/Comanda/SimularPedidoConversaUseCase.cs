@@ -77,7 +77,7 @@ public sealed class SimularPedidoConversaUseCase(
         if (simulado.Frete is not { } frete)
             return new SimulacaoPedidoConversaResult(simulado.Itens, null, true, null, encomenda, null, null);
 
-        var total = simulado.Itens + frete;
+        var total = Domain.Entities.Pedido.TotalDe([simulado.Itens, frete]).Valor;
         var sinal = encomenda ? PlanoPagamentoEncomenda.Sinal(total) : (decimal?)null;
         return new SimulacaoPedidoConversaResult(
             simulado.Itens, frete, false, total, encomenda, sinal, sinal is { } metade ? total - metade : null);

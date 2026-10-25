@@ -3,6 +3,7 @@ using EasyStock.Application.UseCases.Atendimento.Entregas;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Integration;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 
@@ -28,13 +29,15 @@ public sealed class LogisticaRepository(EasyStockDbContext db,
                 pedido.ClienteTelefone, pedido.EntregaLat, pedido.EntregaLng,
                 Bloqueado = pedido.Cliente != null && pedido.Cliente.Bloqueado,
                 vaga.DataEntrega, janela.HoraInicio, janela.HoraFim,
-                Frete = pedido.Itens.Where(i => i.ProdutoId == null && i.CardapioItemId == null && i.Nome.StartsWith("Entrega ")).Sum(i => i.Quantidade * i.PrecoUnitario)
+                // A linha de frete é uma só (PedidoItem.EhFrete); o SQL só estreita para as linhas sem produto nem cardápio.
+                Avulsas = pedido.Itens.Where(i => i.ProdutoId == null && i.CardapioItemId == null)
+                    .Select(i => new { i.Nome, i.LinhaSnapshot, i.Subtotal }).ToList()
             }).ToListAsync(ct);
-        return linhas.Select(p => new LogisticaPedido(p.Id, p.Id.ToString("N")[..8].ToUpperInvariant(),
+        return linhas.Select(p => new LogisticaPedido(p.Id, CodigoCurto.De(p.Id),
             p.ClienteNome ?? "Cliente", p.EnderecoEntrega ?? "", p.BairroEntrega ?? "",
             DateTime.SpecifyKind(p.DataEntrega.ToDateTime(p.HoraInicio).AddHours(3), DateTimeKind.Utc),
             DateTime.SpecifyKind(p.DataEntrega.ToDateTime(p.HoraFim).AddHours(3), DateTimeKind.Utc),
-            p.Status, (int)Math.Round(p.Frete * 100, MidpointRounding.AwayFromZero), p.ClienteTelefone ?? "", p.EntregaLat, p.EntregaLng, p.Bloqueado)).ToList();
+            p.Status, (int)Math.Round(p.Avulsas.Where(i => PedidoItem.EhFrete(null, null, i.LinhaSnapshot, i.Nome)).Sum(i => i.Subtotal) * 100, MidpointRounding.AwayFromZero), p.ClienteTelefone ?? "", p.EntregaLat, p.EntregaLng, p.Bloqueado)).ToList();
     }
 
     public async Task<IReadOnlyList<DespachoLogistica>> DespachosAsync(Guid empresaId, CancellationToken ct) =>

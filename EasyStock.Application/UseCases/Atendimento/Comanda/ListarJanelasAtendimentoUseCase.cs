@@ -32,7 +32,7 @@ public sealed class ListarJanelasAtendimentoUseCase(
     public const int MaximoPadrao = 10;
 
     /// <summary>Teto de pratos consultados para o prazo: o mesmo número de itens que a comanda aceita.</summary>
-    public const int MaximoItens = 50;
+    public const int MaximoItens = EasyStock.Application.Services.Storefront.CheckoutCoreService.MaximoPratosDistintos;
 
     /// <summary>A lista vem da URL de um endpoint público: sem repetição e sem passar do teto (#1719).</summary>
     public static IReadOnlyList<Guid> ItensParaPrazo(IReadOnlyCollection<Guid> itens) => itens.Distinct().Take(MaximoItens).ToList();

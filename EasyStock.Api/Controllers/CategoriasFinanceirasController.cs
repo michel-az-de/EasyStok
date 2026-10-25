@@ -42,7 +42,7 @@ public class CategoriasFinanceirasController(
             var r = await criarUseCase.ExecuteAsync(cmd with { EmpresaId = eid }, ct);
             return DataCreated($"/api/financeiro/categorias/{r.Id}", r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPatch("{id:guid}")]
@@ -56,7 +56,7 @@ public class CategoriasFinanceirasController(
             var r = await atualizarUseCase.ExecuteAsync(cmd with { EmpresaId = eid, Id = id }, ct);
             return r is null ? DataNotFound() : DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPost("{id:guid}/inativar")]
@@ -69,7 +69,7 @@ public class CategoriasFinanceirasController(
             var ok = await inativarUseCase.ExecuteAsync(new InativarCategoriaFinanceiraCommand(eid, id), ct);
             return ok ? NoContent() : DataNotFound();
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPost("{id:guid}/reativar")]
@@ -92,7 +92,7 @@ public class CategoriasFinanceirasController(
             var r = await moverUseCase.ExecuteAsync(cmd with { EmpresaId = eid, Id = id }, ct);
             return r is null ? DataNotFound() : DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     private bool RequerVisualizar(out IActionResult? error)

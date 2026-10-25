@@ -7,6 +7,7 @@ using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
@@ -315,7 +316,7 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
         movimento.CriadoEm = Agora;
         movimento.Metodo = pagamento.Metodo;
         movimento.Categoria = "Devolução de pedido";
-        movimento.Descricao = $"Mercado Pago: devolução do pedido {estorno.PedidoId.ToString("N")[..8].ToUpperInvariant()}. {estorno.Motivo}";
+        movimento.Descricao = $"Mercado Pago: devolução do pedido {CodigoCurto.De(estorno.PedidoId)}. {estorno.Motivo}";
         movimento.Referencia = estorno.EstornoExternoId;
         movimento.RegistradoPorUserId = estorno.UsuarioId;
         movimento.RegistradoPorNome = estorno.UsuarioNome;

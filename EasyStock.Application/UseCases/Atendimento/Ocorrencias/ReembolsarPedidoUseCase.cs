@@ -2,6 +2,7 @@ using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
@@ -37,7 +38,8 @@ public sealed class ReembolsarPedidoUseCase(
     ICobrancaPedidoRepository cobrancas,
     IEstornosOnlineService estornos,
     IClienteCrmRepository crm,
-    INotificadorService notificador)
+    INotificadorService notificador,
+    IConversaRepository conversas)
 {
     public const string CodigoReembolsoManual = "reembolso_manual_necessario";
     public const string CodigoReembolsoEfetuado = "reembolso_efetuado";
@@ -114,6 +116,7 @@ public sealed class ReembolsarPedidoUseCase(
         var cliente = await crm.ObterComTagsAsync(ocorrencia.EmpresaId, ocorrencia.ClienteId, ct);
         if (TelefoneE164(cliente?.Telefone) is { } telefone)
         {
+            var conversa = ocorrencia.ConversaId is { } conversaId ? await conversas.ObterPorIdAsync(ocorrencia.EmpresaId, conversaId, ct) : null;
             var payload = JsonSerializer.Serialize(new
             {
                 ocorrenciaId = ocorrencia.Id.ToString(),
@@ -121,8 +124,8 @@ public sealed class ReembolsarPedidoUseCase(
                 clienteId = ocorrencia.ClienteId.ToString(),
                 conversaId = ocorrencia.ConversaId?.ToString(),
                 telefone,
-                nome = PrimeiroNome(cliente!.Nome),
-                numero = ocorrencia.PedidoId.ToString("N")[..8].ToUpperInvariant(),
+                nome = NomesDeContato.PrimeiroNome(cliente!.Nome, "cliente"),
+                numero = VariaveisAtendimento.NumeroDoPedido(ocorrencia.PedidoId, conversa),
                 valor = Reais(valor),
             });
             await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, ocorrencia.EmpresaId, payload, ocorrencia.Id, ct);
@@ -151,8 +154,6 @@ public sealed class ReembolsarPedidoUseCase(
         }
     }
 
-    private static string PrimeiroNome(string? nome) =>
-        string.IsNullOrWhiteSpace(nome) ? "cliente" : nome.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
 
     private static string Reais(decimal valor) => valor.ToString("C2", PtBr).Replace(' ', ' ');
 }

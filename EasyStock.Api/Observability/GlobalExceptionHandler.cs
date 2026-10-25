@@ -74,22 +74,13 @@ public class GlobalExceptionHandler(
                 : "Ocorreu um erro inesperado. Use o CorrelationId para rastreamento.";
         }
 
-        // UseCaseValidationException pode trazer Code + Details estruturados (ex: CYCLE_DETECTED).
-        // Quando setados, sobrescrevem o code generico "VALIDATION_ERROR".
-        var effectiveCode = code;
-        object? effectiveDetails = null;
-        if (exception is UseCaseValidationException ucvex)
-        {
-            if (!string.IsNullOrEmpty(ucvex.Code))
-                effectiveCode = ucvex.Code;
-            effectiveDetails = ucvex.Details;
-        }
-
-        var apiError = new ApiError(effectiveCode, title, errorDetail, correlationId);
+        // #2018: a UseCaseValidationException (com Code e Details estruturados, ex: CYCLE_DETECTED) responde igual aqui e no
+        // catch dos controllers: ApiErrors.Validacao.
+        var apiError = exception is UseCaseValidationException validacao
+            ? ApiErrors.Validacao(validacao, correlationId).Error
+            : new ApiError(code, title, errorDetail, correlationId);
         if (exception is EasyStock.Domain.Exceptions.PlanoLimiteAtingidoException planEx)
             apiError = apiError with { Recurso = planEx.Recurso };
-        if (effectiveDetails is not null)
-            apiError = apiError with { Details = effectiveDetails };
         var envelope = new ApiErrorResponse(apiError);
 
         httpContext.Response.StatusCode = statusCode;
@@ -105,8 +96,8 @@ public class GlobalExceptionHandler(
             // Exceções específicas que NÃO herdam de RegraDeDominioVioladaException
             UseCaseValidationException ex => (
                 StatusCodes.Status400BadRequest,
-                "VALIDATION_ERROR",
-                "Requisição inválida",
+                ApiErrors.CodigoPadraoDeValidacao,
+                ex.Message,
                 ex.Message,
                 false),
 

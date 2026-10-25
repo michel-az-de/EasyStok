@@ -71,7 +71,7 @@ public class AdminTenantsController(
                 trialFim = resultado.TrialFim
             });
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao cadastrar tenant manualmente");
@@ -171,7 +171,7 @@ public class AdminTenantsController(
             resultado = await vincularWhatsAppUseCase.ExecuteAsync(
                 new VincularWhatsAppDoTenantCommand(id, req?.PhoneNumberId), ct);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
 
         switch (resultado.Status)
         {

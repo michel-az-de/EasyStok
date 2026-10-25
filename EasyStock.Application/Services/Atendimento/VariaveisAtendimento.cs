@@ -1,5 +1,6 @@
 using System.Globalization;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -45,16 +46,14 @@ public sealed class VariaveisAtendimento(IClienteRepository clientes, IPedidoRep
         };
     }
 
-    public static string CodigoCurto(Guid pedidoId) => pedidoId.ToString("N")[..8].ToUpperInvariant();
-
     /// <summary>
     /// #2004: o número do pedido que o cliente lê, igual no aviso S13 ("pedido nº 12") e nas automáticas ("pedido {pedido}"):
-    /// a comanda da conversa quando ela é a do pedido, senão o <see cref="CodigoCurto"/>. A comanda é da conversa, não do
+    /// a comanda da conversa quando ela é a do pedido, senão o <see cref="CodigoCurto.De"/>. A comanda é da conversa, não do
     /// pedido: sem <paramref name="conversaEhDoPedido"/> (quem já achou a conversa pelo pedido), só vale se o pedido é o
     /// que a conversa tem em andamento.
     /// </summary>
     public static string NumeroDoPedido(Guid pedidoId, Conversa? conversa, bool conversaEhDoPedido = false) =>
         conversa is { NumeroComanda: > 0 } && (conversaEhDoPedido || conversa.PedidoEmAndamentoId == pedidoId)
             ? conversa.NumeroComanda.ToString(CultureInfo.InvariantCulture)
-            : CodigoCurto(pedidoId);
+            : CodigoCurto.De(pedidoId);
 }

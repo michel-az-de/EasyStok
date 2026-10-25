@@ -104,7 +104,7 @@ public sealed class EstornoOnlinePedidoIntegrationTests(PostgreSqlDatabaseFixtur
                 await db.NotifEventos.AddAsync(evento);
                 return evento.Id;
             });
-        var reembolsar = new ReembolsarPedidoUseCase(new CobrancaPedidoRepository(db), Service(db, mp), crm, notificacoes);
+        var reembolsar = new ReembolsarPedidoUseCase(new CobrancaPedidoRepository(db), Service(db, mp), crm, notificacoes, new ConversaRepository(db));
         return await new ResolverOcorrenciaUseCase(new OcorrenciaRepository(db), reembolsar, db, new Relogio()).ExecuteAsync(input);
     }
 

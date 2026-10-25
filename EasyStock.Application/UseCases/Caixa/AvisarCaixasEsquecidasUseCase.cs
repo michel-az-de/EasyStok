@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.Options;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Caixa;
 
@@ -106,7 +107,7 @@ public sealed class AvisarCaixasEsquecidasUseCase(
 
         var dias = Math.Max(1, hoje.DayNumber - diaAbertura.DayNumber);
         await PrazoEstouradoEvento.EnfileirarAsync(notificador, opcoes, TipoPrazo.CaixaEsquecido,
-            empresaId, aberturaId, PrazoEstouradoEvento.Referencia(aberturaId),
+            empresaId, aberturaId, CodigoCurto.De(aberturaId),
             diaAbertura.ToString("dd/MM/yyyy"), PrazoEstouradoEvento.Duracao(TimeSpan.FromDays(dias)), usuarioId: null, ct);
         await unitOfWork.CommitAsync();
     }

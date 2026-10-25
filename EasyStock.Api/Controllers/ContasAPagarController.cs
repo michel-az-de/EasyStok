@@ -68,7 +68,7 @@ public class ContasAPagarController(
             var r = await criarUseCase.ExecuteAsync(cmd with { EmpresaId = eid }, ct);
             return DataCreated($"/api/contas-a-pagar/{r.Id}", r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPatch("{id:guid}")]
@@ -82,7 +82,7 @@ public class ContasAPagarController(
             var r = await atualizarUseCase.ExecuteAsync(cmd with { EmpresaId = eid, Id = id }, ct);
             return r is null ? DataNotFound() : DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPost("{id:guid}/emitir")]
@@ -96,7 +96,7 @@ public class ContasAPagarController(
                 eid, id, currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId, null), ct);
             return r is null ? DataNotFound() : DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPost("{id:guid}/cancelar")]
@@ -111,7 +111,7 @@ public class ContasAPagarController(
                 currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId, null), ct);
             return r is null ? DataNotFound() : DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPost("{id:guid}/parcelas")]
@@ -125,7 +125,7 @@ public class ContasAPagarController(
             var r = await adicionarParcelaUseCase.ExecuteAsync(cmd with { EmpresaId = eid, ContaPagarId = id }, ct);
             return r is null ? DataNotFound() : DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpDelete("{id:guid}/parcelas/{parcelaId:guid}")]
@@ -138,7 +138,7 @@ public class ContasAPagarController(
             var r = await removerParcelaUseCase.ExecuteAsync(new RemoverParcelaContaPagarCommand(eid, id, parcelaId), ct);
             return r is null ? DataNotFound() : DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPost("{id:guid}/parcelas/{parcelaId:guid}/pagamentos")]
@@ -157,7 +157,7 @@ public class ContasAPagarController(
                 currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId, null), ct);
             return r is null ? DataNotFound() : DataOk(r);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpPost("parcelas/{parcelaId:guid}/pagamentos/{pagId:guid}/estornar")]
@@ -175,7 +175,7 @@ public class ContasAPagarController(
                 currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId, null), ct);
             return ok ? NoContent() : DataNotFound();
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
         {
             // 2 estornos concorrentes da mesma parcela: o xmin (Versao) da parcela faz o 2o commit falhar.

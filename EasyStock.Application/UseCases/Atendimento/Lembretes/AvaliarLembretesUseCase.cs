@@ -8,6 +8,7 @@ using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.Options;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Lembretes;
 
@@ -213,7 +214,7 @@ public sealed class AvaliarLembretesUseCase(
                 var sla = slaPorEmpresa.GetValueOrDefault(lembrete.EmpresaId, prazos.Value.ClienteSemResposta);
                 var cliente = lembrete.ConversaId is { } conversaId ? nomePorConversa.GetValueOrDefault(conversaId) : null;
                 await PrazoEstouradoEvento.EnfileirarAsync(notificador, prazos.Value, TipoPrazo.ClienteSemResposta,
-                    lembrete.EmpresaId, lembrete.Id, PrazoEstouradoEvento.Referencia(lembrete.ConversaId ?? lembrete.Id),
+                    lembrete.EmpresaId, lembrete.Id, CodigoCurto.De(lembrete.ConversaId ?? lembrete.Id),
                     PrazoEstouradoEvento.Duracao(sla), PrazoEstouradoEvento.Duracao(sla), lembrete.ParaUsuarioId, ct,
                     cliente, fatoId: lembrete.ConversaId);
             }

@@ -40,7 +40,7 @@ public class IntegracoesEmailController(ICurrentUserAccessor currentUser) : Easy
         {
             return DataOk(await salvar.ExecuteAsync(currentUser.EmpresaId, currentUser.UsuarioId, req, ct));
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Crypto", StringComparison.Ordinal) || ex.Message.Contains("KEK", StringComparison.OrdinalIgnoreCase))
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
@@ -65,6 +65,6 @@ public class IntegracoesEmailController(ICurrentUserAccessor currentUser) : Easy
             var r = await testar.ExecuteAsync(currentUser.EmpresaId, req, ct);
             return DataOk(new { ok = r.Ok, imapOk = r.ImapOk, imapErro = r.ImapErro, smtpOk = r.SmtpOk, smtpErro = r.SmtpErro });
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 }

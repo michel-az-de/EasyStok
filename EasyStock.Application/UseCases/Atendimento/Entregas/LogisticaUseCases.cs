@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Integrations;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Entregas;
 
@@ -181,7 +182,7 @@ public sealed class LogisticaUseCases(ILogisticaRepository repository, IUnitOfWo
                 throw new UseCaseValidationException(input.Meio == "dinheiro" ? "Não há dinheiro suficiente na gaveta para pagar este frete." : "O saldo do Caixa é insuficiente para registrar este pagamento.");
             var movimento = MovimentoCaixa.Criar(empresaId, "saida", despacho.ValorCentavos / 100m, Agora);
             movimento.Categoria = "frete";
-            movimento.Descricao = $"Frete {despacho.Provedor} · demonstração · {despacho.Id.ToString("N")[..8]}";
+            movimento.Descricao = $"Frete {despacho.Provedor} · demonstração · {CodigoCurto.De(despacho.Id)}";
             movimento.Metodo = input.Meio;
             movimento.Referencia = input.Referencia;
             movimento.RegistradoPorUserId = usuarioId;

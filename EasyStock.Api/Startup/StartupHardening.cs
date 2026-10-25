@@ -1,5 +1,6 @@
 using EasyStock.Api.Configuration;
 using EasyStock.Application.Common;
+using EasyStock.Domain.Defaults;
 using EasyStock.Infra.Integrations.DependencyInjection;
 
 namespace EasyStock.Api.Startup;

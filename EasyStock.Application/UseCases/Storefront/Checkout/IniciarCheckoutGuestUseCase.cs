@@ -136,7 +136,7 @@ public sealed class IniciarCheckoutGuestUseCase(
         var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: input.ConversaId, ct);
 
         var token = tokenService.Gerar(pedido.Id);
-        var numeroCurto = pedido.Id.ToString("N")[..8].ToUpperInvariant();
+        var numeroCurto = CodigoCurto.De(pedido.Id);
         var frete = reservado.ItemFrete.PrecoUnitario;
 
         logger.LogInformation(
@@ -183,7 +183,7 @@ public sealed class IniciarCheckoutGuestUseCase(
         await atribuicaoCampanha.AtribuirAsync(empresaId, cliente.Id, pedido.Id, ct);
         await unitOfWork.CommitAsync();
 
-        var numeroCurto = pedido.Id.ToString("N")[..8].ToUpperInvariant();
+        var numeroCurto = CodigoCurto.De(pedido.Id);
         logger.LogInformation(
             "Checkout guest sem janela (ponte #1306) pedidoId={PedidoId} numeroCurto={Numero} storefrontId={StorefrontId} clienteNovo={Novo} elapsedMs={Ms}",
             pedido.Id, numeroCurto, storefrontId, clienteNovo, sw.ElapsedMilliseconds);

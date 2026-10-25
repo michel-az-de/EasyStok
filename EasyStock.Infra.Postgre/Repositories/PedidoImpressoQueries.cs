@@ -117,7 +117,7 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                 .OrderBy(i => i.CriadoEm)
                 .Select(i => new PedidoImpressoItemLeitura(
                     i.Nome, i.VariacaoRotuloSnapshot, i.Quantidade, i.Unidade, i.PrecoUnitario, i.Subtotal, i.Observacao,
-                    EhProduto: !string.IsNullOrWhiteSpace(i.LinhaSnapshot) || i.CardapioItemId is not null || i.ProdutoId is not null,
+                    EhProduto: i.EhProduto,
                     Linha: i.LinhaSnapshot,
                     Molho: i.CardapioItemId is { } c ? molhos.GetValueOrDefault(c) : null,
                     Conservacao: i.ConservacaoSnapshot))

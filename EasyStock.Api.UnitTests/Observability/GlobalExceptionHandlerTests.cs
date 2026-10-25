@@ -29,8 +29,9 @@ public class GlobalExceptionHandlerTests
 
         var payload = await LerRespostaAsync(context);
         var error = payload.RootElement.GetProperty("error");
-        Assert.Equal("VALIDATION_ERROR", error.GetProperty("code").GetString());
-        Assert.Equal("Requisição inválida", error.GetProperty("message").GetString());
+        // #2018: o mesmo envelope do catch dos controllers (ApiErrors.Validacao): o texto vai em message.
+        Assert.Equal("BAD_REQUEST", error.GetProperty("code").GetString());
+        Assert.Equal("EmpresaId é obrigatório.", error.GetProperty("message").GetString());
         Assert.Equal("EmpresaId é obrigatório.", error.GetProperty("detail").GetString());
         Assert.Equal("corr-123", error.GetProperty("correlationId").GetString());
     }

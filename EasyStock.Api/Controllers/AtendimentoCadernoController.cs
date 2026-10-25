@@ -60,7 +60,7 @@ public class AtendimentoCadernoController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 }

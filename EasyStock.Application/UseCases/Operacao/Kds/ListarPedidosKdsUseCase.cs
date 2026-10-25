@@ -1,4 +1,5 @@
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Operacao.Kds;
 
@@ -77,7 +78,7 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
         var status = StatusPedidoMapper.Parse(p.Status);
         return new KdsPedidoDto(
             Id: p.Id,
-            NumeroCurto: p.Id.ToString("N")[..8].ToUpperInvariant(),
+            NumeroCurto: CodigoCurto.De(p.Id),
             ClienteNome: p.ClienteNome,
             ClienteApt: p.ClienteApt,
             Janela: p.Janela is { } j ? new KdsJanelaDto(j.Label, j.Data, j.Inicio, j.Fim) : null,

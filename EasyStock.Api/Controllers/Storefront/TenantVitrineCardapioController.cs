@@ -147,7 +147,7 @@ public class TenantVitrineCardapioController(
         catch (EmpresaJaTemStorefrontException) { return DataBadRequest("Você já tem uma vitrine."); }
         catch (StorefrontSlugDuplicadoException) { return DataBadRequest("Esse endereço já está em uso. Escolha outro."); }
         catch (RegraDeDominioVioladaException ex) { return DataBadRequest(ex.Message); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpGet("cardapio")]
@@ -212,7 +212,7 @@ public class TenantVitrineCardapioController(
             return DataCreated($"/api/minha-vitrine/cardapio/{result.ItemId}", result);
         }
         catch (StorefrontNaoEncontradoException) { return DataNotFound(SemVitrine); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
         catch (PostgresException ex) when (CardapioPostgresErrors.Traduzir(ex) is { } msg) { return DataBadRequest(msg); }
         catch (Exception ex)
@@ -257,7 +257,7 @@ public class TenantVitrineCardapioController(
             return DataOk(result);
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
         // Editar preserva o comportamento original: 23514 (nome obrigatório) NÃO é tratado aqui
         // e segue para o handler genérico (500) — mesmo padrão do Admin. As demais violações viram 400.
