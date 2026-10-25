@@ -87,9 +87,12 @@ public sealed class BatchLinker(
                     Guid? produtoIdResolved = null;
                     if (!string.IsNullOrWhiteSpace(item.ProductId))
                     {
-                        var mProd = await db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
-                            .FirstOrDefaultAsync(p => p.Id == item.ProductId);
-                        produtoIdResolved = mProd?.ErpProductId;
+                        // A referencia mobile e a ponte ERP precisam pertencer a mesma empresa do lote.
+                        produtoIdResolved = await db.Set<Product>().IgnoreQueryFilters()
+                            .Where(p => p.Id == item.ProductId && p.EmpresaId == empresaId)
+                            .Join(db.Set<Produto>().IgnoreQueryFilters().Where(p => p.EmpresaId == empresaId),
+                                p => p.ErpProductId, p => (Guid?)p.Id, (_, p) => (Guid?)p.Id)
+                            .FirstOrDefaultAsync();
                     }
                     lote.Itens.Add(new LoteItem
                     {
@@ -249,7 +252,7 @@ public sealed class BatchLinker(
                 }
 
                 var produto = await db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
-                    .FirstOrDefaultAsync(p => p.Id == item.ProdutoId);
+                    .FirstOrDefaultAsync(p => p.Id == item.ProdutoId && p.EmpresaId == lote.EmpresaId);
                 if (produto == null)
                 {
                     log.LogWarning("F8-A: produto {ProdutoId} nao existe; pulando entrada do lote {LoteId}",

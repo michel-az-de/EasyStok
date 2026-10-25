@@ -161,7 +161,7 @@ export function Sininho({ comRotulo = false }) {
     return undefined
   }, [lembretes])
 
-  useEscape(aberto, fecharPainel)
+  useEscape(aberto && !modalAberta, fecharPainel)
 
   useEffect(() => {
     if (!aberto) return undefined
@@ -184,9 +184,15 @@ export function Sininho({ comRotulo = false }) {
   useLayoutEffect(() => {
     const painel = painelRef.current
     if (!aberto || !painel) return undefined
-    const encaixar = () => {
+    const encaixar = (evento) => {
+      if (evento?.type === 'scroll' && painel.contains(evento.target)) return
       painel.style.top = ''
       painel.style.maxHeight = ''
+      // O trilho rola em telas baixas; a camada fixa escapa do recorte e segue o sino.
+      if (comRotulo) {
+        const ancora = sinoRef.current.getBoundingClientRect()
+        Object.assign(painel.style, { position: 'fixed', top: `${Math.max(12, ancora.top)}px`, left: `${ancora.right + 10}px`, right: 'auto' })
+      }
       const topoDaAncora = painel.offsetParent?.getBoundingClientRect().top ?? 0
       const encaixe = encaixeNaJanela({ topo: topoDaAncora + painel.offsetTop, altura: painel.offsetHeight, janela: window.innerHeight })
       if (!encaixe) return
@@ -195,8 +201,12 @@ export function Sininho({ comRotulo = false }) {
     }
     encaixar()
     window.addEventListener('resize', encaixar)
-    return () => window.removeEventListener('resize', encaixar)
-  }, [aberto, tamanhoDaLista])
+    document.addEventListener('scroll', encaixar, true)
+    return () => {
+      window.removeEventListener('resize', encaixar)
+      document.removeEventListener('scroll', encaixar, true)
+    }
+  }, [aberto, tamanhoDaLista, comRotulo])
 
   const alternarPainel = () => {
     if (aberto) { fecharPainel(); return }

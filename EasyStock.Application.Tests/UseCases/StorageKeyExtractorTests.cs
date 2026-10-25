@@ -61,4 +61,35 @@ public class StorageKeyExtractorTests
         StorageKeyExtractor.Extract("https://api.example.com/files/usuarios/42/avatar.png")
             .Should().Be("usuarios/42/avatar.png");
     }
+
+    // #2027: a chave só sai se for do dono.
+    private static readonly Guid Vitrine = Guid.NewGuid();
+    private static readonly Guid Prato = Guid.NewGuid();
+
+    [Theory]
+    [InlineData("/files/cardapios/E/{v}/{p}/foto.webp", true)]
+    [InlineData("https://cdn/files/cardapios/E/{v}/{p}/acervo-1.webp", true)]
+    [InlineData("/files/cardapios/E/{v}/outro-prato/foto.webp", false)]
+    [InlineData("/files/cardapios/E/outra-vitrine/{p}/foto.webp", false)]
+    [InlineData("/files/cardapios/E/{v}/{p}/../../outra/x/foto.webp", false)]
+    [InlineData("/files/lojas/E/L/logo/x.png", false)]
+    [InlineData("/files/cardapios/E/{v}/{p}", false)]
+    public void ExtractDaFotoDoPrato_so_aceita_o_proprio_prato(string modelo, bool aceita)
+    {
+        var url = modelo.Replace("{v}", Vitrine.ToString()).Replace("{p}", Prato.ToString());
+
+        var chave = StorageKeyExtractor.ExtractDaFotoDoPrato(url, Vitrine, Prato);
+
+        (chave is not null).Should().Be(aceita);
+    }
+
+    [Theory]
+    [InlineData("/files/usuarios/U/avatar/a.png", "usuarios/U/avatar/", true)]
+    [InlineData("/files/usuarios/OUTRO/avatar/a.png", "usuarios/U/avatar/", false)]
+    [InlineData("/files/usuarios/U/avatar/../../OUTRO/avatar/a.png", "usuarios/U/avatar/", false)]
+    [InlineData(@"/files/usuarios/U/avatar/x\y.png", "usuarios/U/avatar/", false)]
+    public void ExtractDoDono_confere_o_prefixo_e_recusa_subir_de_pasta(string url, string prefixo, bool aceita)
+    {
+        (StorageKeyExtractor.ExtractDoDono(url, prefixo) is not null).Should().Be(aceita);
+    }
 }

@@ -3,7 +3,8 @@ using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Operacao.Kds;
 
-/// <param name="Status">Lista separada por vírgula (<c>aguardando,preparando</c>). Vazio ou só inválidos = padrão.</param>
+/// <param name="Status">Lista separada por vírgula (<c>aguardando,preparando</c>). Vazio ou só inválidos = padrão:
+/// <c>aprovado_baba</c> (#2055), <c>aguardando</c>, <c>preparando</c>, <c>pronto</c> e <c>saiu_para_entrega</c>.</param>
 /// <param name="Linha">Filtro por linha de item; aceita <c>prepararEmCasa</c> ou <c>preparar_em_casa</c>.</param>
 /// <param name="Data">Dia de produção. Nulo = hoje e os abertos de ontem.</param>
 public sealed record ListarPedidosKdsQuery(
@@ -17,8 +18,10 @@ public sealed record ListarPedidosKdsQuery(
 /// </summary>
 public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider relogio)
 {
+    // #2055: aprovado_baba é o pedido fora da área pago e aprovado pela dona; espera o preparo como o aguardando.
     private static readonly string[] StatusPadrao =
     [
+        StatusPedidoMapper.AprovadoBaba,
         StatusPedidoMapper.Aguardando,
         StatusPedidoMapper.Preparando,
         StatusPedidoMapper.Pronto,
@@ -55,13 +58,13 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
     }
 
     /// <summary>
-    /// S21: com início previsto, atrasado = ainda aguardando e o início já passou (mesma regra de
-    /// <see cref="Pedido.EstaAtrasado"/>). Sem ele (pedido para já ou anterior à S21), vale a regra da S19:
-    /// aberto de dia de produção anterior a hoje.
+    /// S21: com início previsto, atrasado = ainda na fila (aguardando ou, #2055, aprovado pela dona) e o
+    /// início já passou (mesma regra de <see cref="Pedido.EstaAtrasado"/>). Sem ele (pedido para já ou
+    /// anterior à S21), vale a regra da S19: aberto de dia de produção anterior a hoje.
     /// </summary>
     private static bool Atrasado(KdsPedidoLeitura p, StatusPedido status, DateOnly hoje, DateTime agora) =>
         p.InicioPrevistoEm is { } inicio
-            ? status == StatusPedido.Aguardando && agora > inicio
+            ? status is StatusPedido.Aguardando or StatusPedido.AprovadoBaba && agora > inicio
             : p.DataProducao < hoje && !StatusPedidoVocabulario.EhTerminal(status);
 
     /// <summary>"preparar_em_casa", "prepararEmCasa" e "PREPARAR-EM-CASA" viram a mesma chave.</summary>

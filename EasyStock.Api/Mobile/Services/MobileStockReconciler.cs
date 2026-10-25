@@ -53,6 +53,8 @@ public class MobileStockReconciler(
         try
         {
             if (Alvo(produtoDoAparelho) is not { } alvo || quantidade <= 0) return false;
+            if (!await db.Set<Produto>().IgnoreQueryFilters()
+                    .AnyAsync(p => p.Id == alvo.ProdutoId && p.EmpresaId == alvo.EmpresaId, ct)) return false;
             if ((await SaidasAbertasAsync(alvo.EmpresaId, alvo.ProdutoId, pedidoId, null, ct)).Count > 0) return false;
 
             var aBaixar = (decimal)quantidade;

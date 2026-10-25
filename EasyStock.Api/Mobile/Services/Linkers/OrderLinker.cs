@@ -101,7 +101,7 @@ public sealed class OrderLinker(
                         if (!string.IsNullOrWhiteSpace(mobileO.ClientId))
                         {
                             mClient = await db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
-                                .FirstOrDefaultAsync(c => c.Id == mobileO.ClientId);
+                                .FirstOrDefaultAsync(c => c.Id == mobileO.ClientId && c.EmpresaId == empresaId);
                         }
 
                         var itens = mobileO.Items.Select(i => new CriarPedidoItemInput(
@@ -153,6 +153,8 @@ public sealed class OrderLinker(
                                 .Select(i => i.ProductId).Distinct().ToList();
                             var produtoMap = await db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
                                 .Where(p => productIds.Contains(p.Id) && p.EmpresaId == empresaId)
+                                .Join(db.Set<Produto>().IgnoreQueryFilters().Where(p => p.EmpresaId == empresaId),
+                                    p => p.ErpProductId, p => (Guid?)p.Id, (mobile, produto) => new { mobile.Id, ErpProductId = (Guid?)produto.Id })
                                 .ToDictionaryAsync(p => p.Id, p => p.ErpProductId);
 
                             // #1571: o id do item é sorteado, então casar por posição na ordem do id ligava
@@ -521,7 +523,7 @@ public sealed class OrderLinker(
             PedidoId = pedido.Id,
             Metodo = metodo,
             Valor = pedido.Total.Valor,
-            PagoEm = mobileO.UpdatedAt,
+            PagoEm = await InstanteNoCaixa.DoRegistroAsync(db, pedido.EmpresaId, mobileO.UpdatedAt, pedido.LojaId),
             RegistradoPorNome = mobileO.LastOperatorName,
             Observacao = mobileO.Metodo is null
                 ? $"{MarcaDoRecebimentoAutomatico} (mobile→ERP). Aparelho sem forma de pagamento: assumido dinheiro."

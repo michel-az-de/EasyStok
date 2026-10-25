@@ -30,10 +30,29 @@ public class BackgroundJobRegistrationTests
             .ToList();
 
         hostedServices.Should().Contain(typeof(AnalisadorEstoqueBackgroundService));
-        hostedServices.Should().NotContain(typeof(AlertasEstoqueJob));
         hostedServices.Should().NotContain(typeof(ProcessarRecebimentoJob));
         hostedServices.Should().NotContain(typeof(RecalcularVelocidadesJob));
         hostedServices.Should().NotContain(typeof(RelatorioMensalJob));
+    }
+
+    [Fact]
+    public void AddEasyStockBackgroundJobs_AlertasDeEstoque_LigamPorPadraoEDesligamPorChave()
+    {
+        // #2016: o analisador roda por empresa e vem ligado; a chave é o rollback. O job legado AlertasEstoqueJob
+        // (mesma chamada ao mesmo gerador, alerta em dobro) saiu: não existe mais tipo nem chave para ligá-lo.
+        var ligado = new ServiceCollection().AddLogging();
+        ligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder().Build());
+        var desligado = new ServiceCollection().AddLogging();
+        desligado.AddEasyStockBackgroundJobs(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{BackgroundJobOptions.SectionName}:EnableAnalisadorEstoque"] = "false" })
+            .Build());
+
+        ligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().Contain(typeof(AnalisadorEstoqueBackgroundService));
+        desligado.Where(d => d.ServiceType == typeof(IHostedService)).Select(d => d.ImplementationType)
+            .Should().NotContain(typeof(AnalisadorEstoqueBackgroundService), "desligar o analisador é o rollback do #2016");
+        typeof(BackgroundJobOptions).GetProperty("EnableAlertasEstoqueJob").Should().BeNull("o job legado duplicado saiu");
+        typeof(AnalisadorEstoqueBackgroundService).Assembly.GetType("EasyStock.Api.BackgroundServices.AlertasEstoqueJob").Should().BeNull();
     }
 
     [Fact]
@@ -139,7 +158,6 @@ public class BackgroundJobRegistrationTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [$"{BackgroundJobOptions.SectionName}:EnableAlertasEstoqueJob"] = "true",
                 [$"{BackgroundJobOptions.SectionName}:EnableProcessarRecebimentoJob"] = "true",
                 [$"{BackgroundJobOptions.SectionName}:EnableRecalcularVelocidadesJob"] = "true",
                 [$"{BackgroundJobOptions.SectionName}:EnableRelatorioMensalJob"] = "true"
@@ -156,7 +174,6 @@ public class BackgroundJobRegistrationTests
             .ToList();
 
         hostedServices.Should().Contain(typeof(AnalisadorEstoqueBackgroundService));
-        hostedServices.Should().Contain(typeof(AlertasEstoqueJob));
         hostedServices.Should().Contain(typeof(ProcessarRecebimentoJob));
         hostedServices.Should().Contain(typeof(RecalcularVelocidadesJob));
         hostedServices.Should().Contain(typeof(RelatorioMensalJob));

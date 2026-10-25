@@ -5,7 +5,8 @@ import {
 import { useRelogio } from '../../hooks/useRelogio'
 import { dataIsoNoFuso, horaCurta, moeda } from '../../dominio/formato'
 import {
-  COLUNAS_KDS, avisoDeFilaNoTeto, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
+  COLUNAS_KDS, avisoDeFilaNoTeto, colunaDoStatusKds, diaDaFilaDaCozinha, filtrarPorColunaKds, filtrarPorLinha, impressoesDaCozinha,
+  respostaAoSoltarKds, textoDaCozinhaVazia,
 } from '../../dominio/kds'
 import { ORDEM_DAS_LINHAS, nomeDoPedido } from '../../dominio/pedido'
 import { useCozinhaApi } from '../../aplicacao/useCozinhaApi'
@@ -40,7 +41,7 @@ const reduzMovimento = () => typeof window !== 'undefined'
   && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 const VOLTA_AO_LUGAR = { duration: 220, easing: 'cubic-bezier(.2, 0, 0, 1)' }
 
-const rotuloDaColuna = (status) => COLUNAS_KDS.find((c) => c.status === status)?.rotulo ?? status
+const rotuloDaColuna = (status) => COLUNAS_KDS.find((c) => c.status === colunaDoStatusKds(status))?.rotulo ?? status
 const ANUNCIOS = {
   onDragStart: ({ active }) => `Pegou o pedido ${active.data.current.numero} de ${active.data.current.nome}.`,
   onDragOver: ({ active, over }) => {
@@ -231,13 +232,13 @@ export function TelaCozinhaApi({ linhas }) {
               )}
               <div className={css.colunas}>
                 {COLUNAS_KDS.map((coluna) => {
-                  const cartoes = visiveis.filter((p) => p.status === coluna.status)
-                  const saindoDaqui = fantasmas.filter((p) => p.status === coluna.status)
+                  const cartoes = filtrarPorColunaKds(visiveis, coluna.status)
+                  const saindoDaqui = filtrarPorColunaKds(fantasmas, coluna.status)
                   return (
                     <ColunaKds
                       key={coluna.status} coluna={coluna} resposta={respostaPara(coluna.status)}
                       arrastando={Boolean(arrastado)}
-                      acao={arrastado && COLUNAS_KDS.find((c) => c.status === arrastado.status)?.toque}
+                      acao={arrastado && COLUNAS_KDS.find((c) => c.status === colunaDoStatusKds(arrastado.status))?.toque}
                     >
                       <h2>
                         {coluna.rotulo}{' '}

@@ -14,7 +14,7 @@ public class ReservaSmsConfiguracaoTests
     [InlineData("true", "Stub", false)]
     [InlineData("false", "twilio", false)]
     [InlineData("true", "twilio", true)]
-    [InlineData("true", "zenvia", true)]
+    [InlineData("true", "Twilio", true)]
     public void LigaSoComChaveEProvedorReal(string? ligada, string? provedor, bool ativa)
     {
         var configuracao = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

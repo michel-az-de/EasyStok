@@ -77,6 +77,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var totalCount = await query.CountAsync();
             var items = await query
                 .OrderBy(i => (DateTime?)i.ValidadeEm)
+                .ThenBy(i => i.Id)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -98,6 +99,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var totalCount = await query.CountAsync();
             var items = await query
                 .OrderByDescending(i => i.UltimaMovimentacaoEm ?? DateTime.MinValue)
+                .ThenBy(i => i.Id)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -461,6 +463,61 @@ namespace EasyStock.Infra.Postgre.Repositories
                 _ => null
             };
         }
+
+        public async Task<IReadOnlyList<ItemEstoque>> GetProximoVencimentoComSaldoAsync(
+            Guid empresaId, int dias, Guid? lojaId, Guid? depoisDoId, int limite, CancellationToken ct = default)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(dias);
+            var query = dbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && (decimal)i.QuantidadeAtual > 0
+                    && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoff);
+            return await PaginaPorChaveAsync(query, lojaId, depoisDoId, limite, ct);
+        }
+
+        public async Task<IReadOnlyList<ItemEstoque>> GetItensParadosComSaldoAsync(
+            Guid empresaId, int diasSemMovimento, Guid? lojaId, Guid? depoisDoId, int limite, CancellationToken ct = default)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-diasSemMovimento);
+            var query = dbContext.ItensEstoque
+                .AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && (decimal)i.QuantidadeAtual > 0
+                    && (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
+            return await PaginaPorChaveAsync(query, lojaId, depoisDoId, limite, ct);
+        }
+
+        // Keyset por Id: a posição de um lote na página não depende de quem entra ou sai da fila entre duas leituras.
+        // O lote sem loja (produção do console, #2054) é da empresa toda e entra na leitura de qualquer loja.
+        private static async Task<IReadOnlyList<ItemEstoque>> PaginaPorChaveAsync(
+            IQueryable<ItemEstoque> query, Guid? lojaId, Guid? depoisDoId, int limite, CancellationToken ct)
+        {
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value || i.LojaId == null);
+            if (depoisDoId.HasValue)
+                query = query.Where(i => i.Id.CompareTo(depoisDoId.Value) > 0);
+
+            return await query.OrderBy(i => i.Id).Take(limite).ToListAsync(ct);
+        }
+
+        public async Task<IReadOnlyList<ItemEstoque>> GetVencidosSemStatusAsync(Guid empresaId, DateTime hojeInstanteUtc, int limite, CancellationToken ct = default) =>
+            await dbContext.ItensEstoque
+                .Where(i => i.EmpresaId == empresaId && (decimal)i.QuantidadeAtual > 0
+                    && i.ValidadeEm != null && (DateTime?)i.ValidadeEm < hojeInstanteUtc
+                    && i.Status != StatusItemEstoque.Vencido
+                    && i.Status != StatusItemEstoque.Bloqueado
+                    && i.Status != StatusItemEstoque.Descartado)
+                .OrderBy(i => (DateTime?)i.ValidadeEm)
+                .ThenBy(i => i.Id)
+                .Take(limite)
+                .ToListAsync(ct);
+
+        public async Task<IReadOnlyList<ItemEstoque>> GetLotesComSaldoRastreadosAsync(Guid empresaId, int page, int pageSize, CancellationToken ct = default) =>
+            await dbContext.ItensEstoque
+                .Where(i => i.EmpresaId == empresaId && (decimal)i.QuantidadeAtual > 0)
+                .OrderBy(i => i.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(ct);
 
         public async Task<IReadOnlyList<ItemEstoque>> GetComSaldoEValidadeAteAsync(Guid empresaId, DateTime validadeAteUtc, CancellationToken ct = default) =>
             await dbContext.ItensEstoque

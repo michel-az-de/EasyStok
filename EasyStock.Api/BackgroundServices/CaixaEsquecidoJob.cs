@@ -49,7 +49,7 @@ public sealed class CaixaEsquecidoJob(
 
                 await ProcessarComLockAsync(stoppingToken);
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
                 logger.LogError(ex, "CaixaEsquecidoJob: erro — aguardando 1h.");

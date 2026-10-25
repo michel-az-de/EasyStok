@@ -61,4 +61,47 @@ public class RemoverCardapioItemAdminUseCaseTests
         await act.Should().ThrowAsync<CardapioItemNaoEncontradoException>();
         await _repo.DidNotReceive().RemoveAsync(Arg.Any<CardapioItem>(), Arg.Any<CancellationToken>());
     }
+
+    // #2027: a FotoUrl é texto gravado pelo tenant. Apontada para o arquivo de outra empresa, a remoção apagava o arquivo dela.
+    [Fact]
+    public async Task NaoApagaFotoDeOutraVitrine_QuandoFotoUrlApontaParaEla()
+    {
+        var storefrontId = Guid.NewGuid();
+        var item = CardapioItem.CriarAvulso(storefrontId, "Lasanha", 35m);
+        var alheia = $"cardapios/{Guid.NewGuid()}/{Guid.NewGuid()}/{Guid.NewGuid()}/foto.webp";
+        item.AtualizarMetadata(fotoUrl: $"/files/{alheia}");
+        _repo.GetByIdAndScopeAsync(storefrontId, item.Id, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(item);
+
+        await Sut().ExecuteAsync(new RemoverCardapioItemAdminCommand(storefrontId, item.Id));
+
+        await _storage.DidNotReceiveWithAnyArgs().DeleteAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task ApagaAFotoDoProprioPrato()
+    {
+        var storefrontId = Guid.NewGuid();
+        var item = CardapioItem.CriarAvulso(storefrontId, "Lasanha", 35m);
+        var propria = $"cardapios/{Guid.NewGuid()}/{storefrontId}/{item.Id}/foto.webp";
+        item.AtualizarMetadata(fotoUrl: $"https://api.exemplo/files/{propria}");
+        _repo.GetByIdAndScopeAsync(storefrontId, item.Id, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(item);
+
+        await Sut().ExecuteAsync(new RemoverCardapioItemAdminCommand(storefrontId, item.Id));
+
+        await _storage.Received(1).DeleteAsync(propria, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NaoApagaFotoDeOutroPratoDaMesmaVitrine()
+    {
+        // Prato duplicado aponta para a foto do original: remover a cópia não pode apagar a foto do original.
+        var storefrontId = Guid.NewGuid();
+        var item = CardapioItem.CriarAvulso(storefrontId, "Lasanha", 35m);
+        item.AtualizarMetadata(fotoUrl: $"/files/cardapios/{Guid.NewGuid()}/{storefrontId}/{Guid.NewGuid()}/foto.webp");
+        _repo.GetByIdAndScopeAsync(storefrontId, item.Id, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(item);
+
+        await Sut().ExecuteAsync(new RemoverCardapioItemAdminCommand(storefrontId, item.Id));
+
+        await _storage.DidNotReceiveWithAnyArgs().DeleteAsync(default!, default);
+    }
 }

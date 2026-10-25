@@ -3,19 +3,24 @@ using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Api.Services.Operacao;
+using EasyStock.Application.Common;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
+using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using FluentAssertions;
+using FluentAssertions.Execution;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,6 +66,33 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
 
         await AparelhoManda(provider, s, "cancelado");
         (await Saldo(s)).Should().Be(10m, "uma vez só");
+    }
+
+    [SkippableFact]
+    public async Task EntregueOfflineDepoisDoFechamento_RecebimentoEntraNoDiaDoRegistro()
+    {
+        // #2030: entregue no aparelho ontem, sem rede, e sincronizado hoje com o caixa de ontem fechado no console.
+        // Na hora do aparelho o recebimento cairia no dia fechado: o retrato não o contou e ele não poderia ser desfeito.
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var ontem = DateTime.UtcNow.AddDays(-1);
+        _relogioDoAparelho = new DateTimeOffset(ontem).ToUnixTimeMilliseconds();
+        await AparelhoManda(provider, s, "pronto");
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            db.Add(FechamentoCaixa.Criar(s.EmpresaId, HorarioBrasil.DataOperacional(ontem), 0, 0, 0, 0, 0, lojaId: null));
+            await db.SaveChangesAsync();
+        }
+        var antes = DateTime.UtcNow;
+
+        await AparelhoManda(provider, s, "entregue");
+
+        var pedidoId = await PedidoDoErp(s);
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var pagoEm = await leitura.Set<PedidoPagamento>().Where(p => p.PedidoId == pedidoId).Select(p => p.PagoEm).SingleAsync();
+        pagoEm.Should().BeOnOrAfter(antes);
     }
 
     [SkippableFact]
@@ -229,6 +261,198 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
             (await Saldo(s, nome)).Should().Be(10m - qtd, $"{nome} sai na quantidade dele");
     }
 
+    [SkippableTheory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public async Task PedidoSoCopiaCadastroMobileDaPropriaEmpresa(bool clienteDeOutraEmpresa, bool clienteErpDeOutraEmpresa)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var empresaCliente = clienteDeOutraEmpresa || clienteErpDeOutraEmpresa ? Guid.NewGuid() : s.EmpresaId;
+        var cliente = Cliente.Criar(empresaCliente, "Cliente do cadastro");
+        await using (var seed = fixture.CreateDbContext())
+        {
+            if (clienteDeOutraEmpresa || clienteErpDeOutraEmpresa)
+                seed.Add(new Empresa { Id = empresaCliente, Nome = "Outra empresa" });
+            seed.Add(cliente);
+            seed.Add(new Client
+            {
+                Id = "c-referencia", EmpresaId = clienteDeOutraEmpresa ? empresaCliente : s.EmpresaId, ErpClienteId = cliente.Id,
+                Name = cliente.Nome, Apt = "204", Phone = "5511988887777"
+            });
+            await seed.SaveChangesAsync();
+        }
+        await Escopo(provider, s.EmpresaId, async sp =>
+        {
+            var ts = ++_relogioDoAparelho;
+            var pedido = new OrderDto(PedidoNoAparelho, "c-referencia", new ClientSnapshotDto("", null),
+                [new OrderItemDto(NoAparelho(Lasanha), Lasanha, null, "un", 1, 30m)],
+                null, 30m, "aguardando", ts, ts);
+            var mutation = new MutationDto($"m-{Guid.NewGuid():N}", "dev-a", "order.upsert",
+                JsonSerializer.SerializeToElement(pedido, Json), ts);
+            await sp.GetRequiredService<SyncMutationDispatcher>().ApplyMutationAsync(mutation, "dev-a", "Thati", s.EmpresaId, null);
+            await sp.GetRequiredService<EasyStockDbContext>().SaveChangesAsync();
+            await sp.GetRequiredService<OrderLinker>().ExecuteAsync([PedidoNoAparelho], s.EmpresaId);
+        });
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var criado = await leitura.Set<Pedido>().SingleAsync(p => p.MobileOrderId == PedidoNoAparelho);
+        criado.ClienteNome.Should().Be(clienteDeOutraEmpresa ? "Avulso" : cliente.Nome);
+        criado.ClienteTelefone.Should().Be(clienteDeOutraEmpresa ? null : "5511988887777");
+        criado.ClienteApt.Should().Be(clienteDeOutraEmpresa ? null : "204");
+        criado.ClienteId.Should().Be(clienteDeOutraEmpresa || clienteErpDeOutraEmpresa ? null : cliente.Id);
+    }
+    [SkippableTheory]
+    [InlineData(true, "aguardando", false, false)]
+    [InlineData(false, "aguardando", false, false)]
+    [InlineData(true, "entregue", false, false)]
+    [InlineData(false, "entregue", false, false)]
+    [InlineData(false, "entregue", true, false)]
+    [InlineData(false, "entregue", true, true)]
+    public async Task PedidoNaoVinculaProdutoDeOutraEmpresa(bool produtoMobileDeOutraEmpresa, string status, bool entregarNoSegundoEnvio, bool estoqueLegado)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var outraEmpresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var outroProdutoId = Guid.NewGuid();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Add(new Empresa { Id = outraEmpresaId, Nome = "Outra empresa" });
+            seed.Add(new Categoria { Id = categoriaId, EmpresaId = outraEmpresaId, Nome = "Outra categoria" });
+            var produtoAlheio = new Produto
+            {
+                Id = outroProdutoId, EmpresaId = outraEmpresaId, CategoriaId = categoriaId,
+                Nome = "Produto alheio", Status = StatusProduto.Ativo
+            };
+            seed.Add(produtoAlheio);
+            if (estoqueLegado)
+                seed.Add(ItemEstoque.CriarParaEntrada(
+                    id: Guid.NewGuid(), empresaId: s.EmpresaId, produto: produtoAlheio, variacao: null,
+                    quantidade: Quantidade.From(5m), custoUnitario: Dinheiro.Zero, precoVendaSugerido: null,
+                    dataEntrada: DateTime.UtcNow, codigoInterno: "legado-cruzado", codigoLote: null,
+                    codigoMarketplace: null, variacaoDescricao: null, cor: null, tamanho: null,
+                    descricaoAnuncio: null, dimensoesReais: null, fornecedorNome: null, validade: null,
+                    observacoes: "Referencia cruzada legada do bug", criadoEm: DateTime.UtcNow));
+            seed.Add(new Product
+            {
+                Id = "p-outra-empresa", Name = "Produto alheio", Category = "massa",
+                EmpresaId = produtoMobileDeOutraEmpresa ? outraEmpresaId : s.EmpresaId,
+                ErpProductId = outroProdutoId
+            });
+            await seed.SaveChangesAsync();
+        }
+        List<OrderItemDto> itens = [new("p-outra-empresa", "Produto alheio", null, "un", 2, 30m)];
+        if (entregarNoSegundoEnvio)
+            await AparelhoManda(provider, s, "aguardando", itens);
+        await AparelhoManda(provider, s, status, itens);
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var criado = await leitura.Set<Pedido>().Include(p => p.Itens)
+            .SingleAsync(p => p.MobileOrderId == PedidoNoAparelho);
+        criado.Itens.Should().ContainSingle().Which.ProdutoId.Should().BeNull(
+            "a ponte do produto no pedido tambem precisa conferir as duas empresas");
+        var estoquesAlheios = await leitura.Set<ItemEstoque>().IgnoreQueryFilters()
+            .Where(i => i.ProdutoId == outroProdutoId).ToListAsync();
+        if (estoqueLegado)
+            estoquesAlheios.Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(5m,
+                "o sincronizador nao pode baixar estoque legado que aponta para produto de outra empresa");
+        else estoquesAlheios.Should().BeEmpty(
+            "a entrega tambem nao pode criar estoque da empresa A para produto da empresa B");
+        (await leitura.Set<ItemVenda>().IgnoreQueryFilters().AnyAsync(i => i.ProdutoId == outroProdutoId)).Should().BeFalse(
+            "a venda da entrega nao pode carregar produto de outra empresa");
+        (await leitura.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AnyAsync(m => m.ProdutoId == outroProdutoId)).Should().BeFalse();
+    }
+    [SkippableTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task EntregaDeProdutoProprioOuAvulsoContinuaOperavel(bool produtoVinculado)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var produtoMobileId = produtoVinculado ? NoAparelho(Lasanha) : "p-avulso";
+        await AparelhoManda(provider, s, "entregue",
+            [new OrderItemDto(produtoMobileId, Lasanha, null, "un", 2, 30m)]);
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var pedido = await leitura.Set<Pedido>().SingleAsync(p => p.MobileOrderId == PedidoNoAparelho);
+        pedido.Status.Should().Be("entregue");
+        var produtoId = s.Produtos[Lasanha];
+        var vendidos = await leitura.Set<ItemVenda>().IgnoreQueryFilters().CountAsync(i => i.ProdutoId == produtoId);
+        vendidos.Should().Be(produtoVinculado ? 1 : 0);
+        (await Saldo(s)).Should().Be(produtoVinculado ? 8m : 10m);
+    }
+
+    [SkippableTheory]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task PedidoEntregueComAvulso_ContaORecebimentoIntegralNoCaixaSemDuplicarNoReenvio(
+        bool primeiroVinculado, bool segundoVinculado)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var itens = new List<OrderItemDto>
+        {
+            new(primeiroVinculado ? NoAparelho(Lasanha) : "avulso-1",
+                primeiroVinculado ? Lasanha : "Avulso 1", null, "un", 1, 30m),
+            new(segundoVinculado ? NoAparelho(Lasanha) : "avulso-2",
+                segundoVinculado ? Lasanha : "Avulso 2", null, "un", 1, 20m)
+        };
+        await AparelhoManda(provider, s, "pronto", itens);
+        await AparelhoManda(provider, s, "entregue", itens);
+        var pedidoId = await PedidoDoErp(s);
+
+        using var assertions = new AssertionScope();
+        for (var tentativa = 0; tentativa < 2; tentativa++)
+        {
+            if (tentativa > 0) await AparelhoManda(provider, s, "entregue", itens);
+            await using var leitura = fixture.CreateDbContext();
+            leitura.SetMobileTenantContext(s.EmpresaId);
+            var pedido = await leitura.Set<Pedido>().Include(p => p.Pagamentos)
+                .SingleAsync(p => p.Id == pedidoId);
+            pedido.Status.Should().Be("entregue");
+            pedido.Total.Valor.Should().Be(50m);
+            pedido.Pagamentos.Should().ContainSingle("o reenvio da entrega não pode receber duas vezes");
+            pedido.Pagamentos.Sum(p => p.Valor).Should().Be(50m);
+            var todosVinculados = primeiroVinculado && segundoVinculado;
+            var vendas = await leitura.Set<Venda>().Include(v => v.ItensVenda).ToListAsync();
+            vendas.Should().HaveCount(todosVinculados ? 1 : 0,
+                "só uma Venda completa pode substituir o recebimento do pedido no Caixa");
+            if (todosVinculados)
+            {
+                pedido.VendaId.Should().NotBeNull();
+                vendas.Should().AllSatisfy(v =>
+                {
+                    v.ValorTotal.Valor.Should().Be(50m);
+                    v.ItensVenda.Sum(i => i.PrecoTotal.Valor).Should().Be(50m);
+                });
+            }
+            else pedido.VendaId.Should().BeNull("o pedido avulso ou misto mantém o recebimento integral");
+            (await Saldo(s)).Should().Be(10m - (primeiroVinculado ? 1m : 0m) - (segundoVinculado ? 1m : 0m),
+                "a parte vinculada baixa estoque uma vez, mesmo sem consolidar Venda parcial");
+            var diaDoRecebimento = HorarioBrasil.DataOperacional(pedido.Pagamentos.Single().PagoEm);
+
+            await Escopo(provider, s.EmpresaId, async sp =>
+            {
+                var caixa = await sp.GetRequiredService<ObterCaixaDiaUseCase>()
+                    .ExecuteAsync(new ObterCaixaDiaQuery(s.EmpresaId, diaDoRecebimento));
+                caixa.SaldoInicial.Should().Be(0m);
+                caixa.TotalVendas.Should().Be(todosVinculados ? 50m : 0m);
+                caixa.TotalPagamentosPedidos.Should().Be(todosVinculados ? 0m : 50m,
+                    "pedido avulso ou misto entra inteiro pelo recebimento, sem somar uma Venda parcial");
+                caixa.SaldoEsperado.Should().Be(50m,
+                    "a presença de uma Venda parcial não pode apagar o recebimento do avulso");
+                GavetaCaixa.DinheiroNaGaveta(caixa).Should().Be(50m,
+                    "a entrega deste aparelho antigo assume dinheiro e recebeu os R$ 50 integrais");
+                caixa.LinhasExtras!.Sum(l => l.Valor).Should().Be(50m);
+            });
+        }
+    }
     private sealed record Semente(Guid EmpresaId, Guid CategoriaId, Dictionary<string, Guid> Produtos);
 
     private static string NoAparelho(string prato) => $"p-{prato.ToLowerInvariant()}";

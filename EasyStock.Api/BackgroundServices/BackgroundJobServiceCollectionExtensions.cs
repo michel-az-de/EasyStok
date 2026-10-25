@@ -12,6 +12,9 @@ public static class BackgroundJobServiceCollectionExtensions
         services.Configure<BackgroundJobOptions>(
             configuration.GetSection(BackgroundJobOptions.SectionName));
 
+        services.Configure<AlertasEstoqueOptions>(
+            configuration.GetSection(AlertasEstoqueOptions.SectionName));
+
         services.TryAddSingleton<IPedidoFornecedorRecebimentoProcessor, NoOpPedidoFornecedorRecebimentoProcessor>();
 
         var options = configuration.GetSection(BackgroundJobOptions.SectionName).Get<BackgroundJobOptions>()
@@ -23,9 +26,8 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableCacheWarmup)
             services.AddHostedService<CacheWarmupService>();
 
-        // Health snapshot service (singleton para ser injetado no DiagnosticoController).
-        // O singleton sempre é registrado para o DiagnosticoController poder consumir o último snapshot,
-        // mas o HostedService (loop em background) só roda se a flag estiver habilitada.
+        // Health snapshot service (singleton, para quem quiser ler o último snapshot).
+        // O singleton sempre é registrado, mas o HostedService (loop em background) só roda se a flag estiver habilitada.
         services.AddSingleton<HealthSnapshotService>();
         if (options.EnableHealthSnapshot)
             services.AddHostedService(sp => sp.GetRequiredService<HealthSnapshotService>());
@@ -33,9 +35,6 @@ public static class BackgroundJobServiceCollectionExtensions
         // Backup automático de logs no file storage (a cada 30 min)
         if (options.EnableLogStorage)
             services.AddHostedService<LogStorageBackgroundService>();
-
-        if (options.EnableAlertasEstoqueJob)
-            services.AddHostedService<AlertasEstoqueJob>();
 
         if (options.EnableProcessarRecebimentoJob)
             services.AddHostedService<ProcessarRecebimentoJob>();
@@ -45,9 +44,6 @@ public static class BackgroundJobServiceCollectionExtensions
 
         if (options.EnableRelatorioMensalJob)
             services.AddHostedService<RelatorioMensalJob>();
-
-        if (options.EnableDiagnosticoEmailReport)
-            services.AddHostedService<DiagnosticoEmailReportJob>();
 
         // ContaFinanceiraVencimentoJob (CAP/CAR) — diario 09:30 UTC, marca
         // parcelas vencidas e atualiza status agregado das contas.

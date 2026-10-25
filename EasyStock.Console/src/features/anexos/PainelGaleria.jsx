@@ -26,27 +26,31 @@ import css from './anexos.module.css'
 // clique (só o <label> conta).
 function CampoFoto({ foto, aoEscolher, erro }) {
   const { ler } = useArquivoComoDataUrl()
+  const [erroLeitura, setErroLeitura] = useState(null)
+  const problema = erroLeitura ?? erro
   return (
     <div>
-      <label className={`${css.campoFoto} ${erro ? css.campoFotoInvalido : ''}`}>
+      <label className={`${css.campoFoto} ${problema ? css.campoFotoInvalido : ''}`}>
         {foto ? <img src={foto} alt="" /> : <span className={css.campoFotoVazio}><Icone nome="imagem" /> Escolher foto</span>}
         <input
           type="file"
           className="sr"
           data-campo="foto"
-          aria-invalid={Boolean(erro)}
+          aria-invalid={Boolean(problema)}
           accept="image/jpeg,image/png,image/webp,image/gif"
           onChange={async (evento) => {
             const arquivo = evento.target.files?.[0]
             evento.target.value = ''
             if (!arquivo) return
+            setErroLeitura(null)
             const { aceito } = validarArquivo({ tipo: arquivo.type, tamanho: arquivo.size })
             if (!aceito || tipoDeArquivo(arquivo.type) !== 'imagem') return
-            aoEscolher(await ler(arquivo))
+            try { aoEscolher(await ler(arquivo)) }
+            catch { setErroLeitura('Não consegui ler a foto. Escolha novamente ou tente outro arquivo.') }
           }}
         />
       </label>
-      {erro && <p className={css.dicaFoto}>{erro}</p>}
+      {problema && <p className={css.dicaFoto} role={erroLeitura ? 'alert' : undefined}>{problema}</p>}
     </div>
   )
 }

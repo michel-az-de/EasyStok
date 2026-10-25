@@ -14,6 +14,34 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<IEnumerable<ItemEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 100);
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetProximoVencimentoAsync(Guid empresaId, int dias, int page = 1, int pageSize = 20, Guid? lojaId = null);
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensParadosAsync(Guid empresaId, int diasSemMovimento, int page = 1, int pageSize = 20, Guid? lojaId = null);
+
+        /// <summary>
+        /// Lotes COM SALDO que vencem em até <paramref name="dias"/> (ou já venceram), lidos por chave (#2031): em ordem de
+        /// <c>Id</c>, os <paramref name="limite"/> seguintes a <paramref name="depoisDoId"/> (<c>null</c> = do começo). Quem
+        /// percorre tudo (o gerador de alertas) não perde nem repete lote quando a fila muda entre duas leituras, o que o
+        /// <c>Skip</c> de <see cref="GetProximoVencimentoAsync"/> não garante. Com <paramref name="lojaId"/>, entram os lotes
+        /// da loja e os sem loja (produção do console, #2054).
+        /// </summary>
+        Task<IReadOnlyList<ItemEstoque>> GetProximoVencimentoComSaldoAsync(
+            Guid empresaId, int dias, Guid? lojaId, Guid? depoisDoId, int limite, CancellationToken ct = default);
+
+        /// <summary>Lotes COM SALDO parados há <paramref name="diasSemMovimento"/> dias ou mais, lidos por chave como em <see cref="GetProximoVencimentoComSaldoAsync"/>.</summary>
+        Task<IReadOnlyList<ItemEstoque>> GetItensParadosComSaldoAsync(
+            Guid empresaId, int diasSemMovimento, Guid? lojaId, Guid? depoisDoId, int limite, CancellationToken ct = default);
+
+        /// <summary>
+        /// Lotes RASTREADOS que já passaram da validade, ainda têm saldo e continuam com <c>Status</c> diferente de
+        /// <c>Vencido</c> (a coluna só muda quando alguém toca no lote; #2016). Fora Bloqueado e Descartado, que
+        /// têm destino próprio. A validade é data civil: <paramref name="hojeInstanteUtc"/> é
+        /// <c>HorarioBrasil.HojeInstanteUtc()</c>.
+        /// </summary>
+        Task<IReadOnlyList<ItemEstoque>> GetVencidosSemStatusAsync(Guid empresaId, DateTime hojeInstanteUtc, int limite, CancellationToken ct = default);
+
+        /// <summary>
+        /// Lotes com saldo da empresa, RASTREADOS e sem <c>Include</c>, em ordem estável (<c>Id</c>), paginados. Para o job
+        /// que recalcula a velocidade de saída (#2016): o rastreador grava só o que mudou, sem reescrever o produto.
+        /// </summary>
+        Task<IReadOnlyList<ItemEstoque>> GetLotesComSaldoRastreadosAsync(Guid empresaId, int page, int pageSize, CancellationToken ct = default);
         Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null);
 
         /// <summary>

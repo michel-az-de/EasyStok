@@ -5,6 +5,11 @@ public sealed class BackgroundJobOptions
     public const string SectionName = "BackgroundJobs";
 
     // Jobs fixos (default true para manter comportamento atual)
+
+    /// <summary>
+    /// #2016: alertas de estoque no sino (validade próxima e vencida, abaixo do mínimo, reposição), por empresa, de hora
+    /// em hora. Ligado por padrão e em produção; <c>false</c> é o rollback.
+    /// </summary>
     public bool EnableAnalisadorEstoque { get; set; } = true;
     public bool EnableCacheWarmup { get; set; } = true;
     public bool EnableHealthSnapshot { get; set; } = true;
@@ -37,11 +42,14 @@ public sealed class BackgroundJobOptions
     public bool EnableCampanhaJob { get; set; } = true;
 
     // Jobs opcionais (default false)
-    public bool EnableAlertasEstoqueJob { get; set; }
     public bool EnableProcessarRecebimentoJob { get; set; }
+
+    /// <summary>
+    /// #2016: recálculo da velocidade de saída dos lotes, por empresa, a cada 6 h. Padrão <c>false</c> no código; o
+    /// <c>appsettings.Production.json</c> liga (e o guard de arquitetura exige a chave lá). <c>false</c> é o rollback.
+    /// </summary>
     public bool EnableRecalcularVelocidadesJob { get; set; }
     public bool EnableRelatorioMensalJob { get; set; }
-    public bool EnableDiagnosticoEmailReport { get; set; }
     /// <summary>
     /// Quando <c>true</c>, registra o <c>ContaFinanceiraVencimentoJob</c> (CAP/CAR)
     /// que roda 1x/dia (09:30 UTC) marcando parcelas de Contas a Pagar/Receber
@@ -100,4 +108,26 @@ public sealed class BackgroundJobOptions
 
     /// <summary>Apaga, de hora em hora, as sessões do chat do site vencidas há mais de um dia (S36).</summary>
     public bool EnableLimpezaSessoesChatSite { get; set; } = true;
+}
+
+/// <summary>
+/// Deduplicação e retenção dos alertas automáticos de estoque (#2016), seção <c>BackgroundJobs:AlertasEstoque</c>.
+/// O alerta é por condição, não por dia: enquanto a condição de um item continua, o sino não recebe outro alerta do mesmo
+/// tipo e item se o anterior ainda não foi lido ou é recente.
+/// </summary>
+public sealed class AlertasEstoqueOptions
+{
+    public const string SectionName = "BackgroundJobs:AlertasEstoque";
+
+    /// <summary>
+    /// Janela, em dias, em que um alerta lido ainda segura o seguinte do mesmo tipo e item (não lido segura sempre, até a
+    /// retenção). Se a condição se resolve e volta, o alerta nasce de novo mesmo dentro da janela. Padrão 7.
+    /// </summary>
+    public int DiasSemRepetir { get; set; } = 7;
+
+    /// <summary>
+    /// Dias até o alerta sair do sino em qualquer estado. O alerta lido sai assim que passa da janela
+    /// <see cref="DiasSemRepetir"/> (antes disso ele ainda segura a repetição). Padrão 30.
+    /// </summary>
+    public int RetencaoDias { get; set; } = 30;
 }

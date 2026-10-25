@@ -14,11 +14,12 @@ using NSubstitute;
 namespace EasyStock.Api.UnitTests.Mobile;
 
 /// <summary>
-/// #1543 (#954): o fechamento de caixa que o PWA manda é do escopo do aparelho, loja com loja e
-/// empresa com empresa. O casamento frouxo sobrescrevia o fechamento da empresa com os números de uma
-/// loja e, no aparelho sem loja, o de uma loja qualquer.
+/// #2030: o fechamento do caixa é do console. O <c>closing.upsert</c> do sync criava ou sobrescrevia o
+/// <c>FechamentoCaixa</c> com números do aparelho (saldo inicial e vendas zerados) e sem o movimento marcador;
+/// depois disso a abertura do dia seguinte recusava e o caixa travava. O PWA não manda essa mutação
+/// (<c>sync.js</c>), e o servidor a ignora. Antes, #1543 (#954) cuidava só do escopo loja x empresa.
 /// </summary>
-public sealed class FechamentoCaixaMobileLojaTests : IDisposable
+public sealed class FechamentoCaixaVindoDoAparelhoTests : IDisposable
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly DateOnly Dia = new(2026, 10, 10);
@@ -27,15 +28,14 @@ public sealed class FechamentoCaixaMobileLojaTests : IDisposable
     private readonly SyncMutationDispatcher _dispatcher;
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly Guid _lojaA = Guid.NewGuid();
-    private readonly Guid _lojaB = Guid.NewGuid();
 
-    public FechamentoCaixaMobileLojaTests()
+    public FechamentoCaixaVindoDoAparelhoTests()
     {
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.IsAuthenticated.Returns(true);
         currentUser.EmpresaId.Returns(_empresaId);
         _db = new EasyStockDbContext(
-            new DbContextOptionsBuilder<EasyStockDbContext>().UseInMemoryDatabase($"fechamento-loja-{Guid.NewGuid()}").Options,
+            new DbContextOptionsBuilder<EasyStockDbContext>().UseInMemoryDatabase($"fechamento-aparelho-{Guid.NewGuid()}").Options,
             currentUser);
         _dispatcher = new SyncMutationDispatcher(
             _db,
@@ -50,48 +50,27 @@ public sealed class FechamentoCaixaMobileLojaTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    [Fact]
-    public async Task AparelhoDaLoja_NaoSobrescreveOFechamentoDaEmpresa()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("loja")]
+    public async Task AparelhoNaoSobrescreveOFechamentoDoConsole(string? escopo)
     {
-        var daEmpresa = SemearFechamento(lojaId: null, saldoFinal: 900m);
+        var loja = escopo is null ? (Guid?)null : _lojaA;
+        var doConsole = SemearFechamento(loja, saldoFinal: 900m);
 
-        await FecharAsync(_lojaA, saldoFinal: 150m);
+        await FecharAsync(loja, saldoFinal: 150m);
 
-        Fechamento(daEmpresa).SaldoFinal.Should().Be(900m, "o consolidado da empresa nao e o caixa da loja A");
-        Fechamentos().Should().HaveCount(2);
-        Fechamentos().Single(f => f.LojaId == _lojaA).SaldoFinal.Should().Be(150m);
+        Fechamentos().Should().ContainSingle().Which.Id.Should().Be(doConsole);
+        Fechamento(doConsole).SaldoFinal.Should().Be(900m);
     }
 
     [Fact]
-    public async Task AparelhoSemLoja_NaoSobrescreveOFechamentoDeUmaLoja()
+    public async Task AparelhoNaoCriaFechamento()
     {
-        var daLojaB = SemearFechamento(_lojaB, saldoFinal: 320m);
-
+        await FecharAsync(_lojaA, saldoFinal: 150m);
         await FecharAsync(lojaId: null, saldoFinal: 70m);
 
-        Fechamento(daLojaB).SaldoFinal.Should().Be(320m);
-        Fechamentos().Single(f => f.LojaId == null).SaldoFinal.Should().Be(70m);
-    }
-
-    [Fact]
-    public async Task AparelhoDeUmaLoja_NaoSobrescreveOFechamentoDeOutra()
-    {
-        var daLojaB = SemearFechamento(_lojaB, saldoFinal: 320m);
-
-        await FecharAsync(_lojaA, saldoFinal: 150m);
-
-        Fechamento(daLojaB).SaldoFinal.Should().Be(320m);
-        Fechamentos().Should().HaveCount(2);
-    }
-
-    [Fact]
-    public async Task MesmoEscopoFechandoDeNovo_AtualizaOProprioFechamento()
-    {
-        await FecharAsync(_lojaA, saldoFinal: 150m);
-
-        await FecharAsync(_lojaA, saldoFinal: 180m);
-
-        Fechamentos().Should().ContainSingle().Which.SaldoFinal.Should().Be(180m);
+        Fechamentos().Should().BeEmpty("sem o movimento marcador o fechamento do aparelho travava a abertura do dia seguinte");
     }
 
     private async Task FecharAsync(Guid? lojaId, decimal saldoFinal)

@@ -29,6 +29,8 @@ public sealed class CobrancaPedidoJob(
 {
     private const long LockKeyJob = 0x436F6250656449L; // "CobPedI"
     private const int MaximoPorRodada = 50;
+    private int _pularVencidas;
+    private DateTime? _limiteVencidas;
     private static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(60);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -43,7 +45,7 @@ public sealed class CobrancaPedidoJob(
             {
                 await RunWithAdvisoryLockAsync(ProcessarRodadaAsync, stoppingToken);
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
                 logger.LogError(ex, "CobrancaPedidoJob: erro na rodada.");
@@ -101,17 +103,32 @@ public sealed class CobrancaPedidoJob(
             await scope.ServiceProvider.GetRequiredService<RetomarCobrancasAguardandoCredencialUseCase>().ExecuteAsync(ct);
 
             var repo = scope.ServiceProvider.GetRequiredService<ICobrancaPedidoRepository>();
-            vencidas = await repo.ListarPendentesVencidasAsync(relogio.GetUtcNow().UtcDateTime, MaximoPorRodada, ct);
+            // #2057: novos vencimentos não estendem a varredura sem fim. É um corte temporal,
+            // não uma fotografia das linhas: remoções continuam visíveis à paginação.
+            var limite = _limiteVencidas ?? relogio.GetUtcNow().UtcDateTime;
+            vencidas = await repo.ListarPendentesVencidasAsync(limite, MaximoPorRodada, _pularVencidas, ct);
+            _limiteVencidas = limite;
         }
-        if (vencidas.Count == 0) return;
+        if (vencidas.Count == 0)
+        {
+            _pularVencidas = 0;
+            _limiteVencidas = null;
+            return;
+        }
 
-        // Um escopo por cobrança: DbContext limpo e o tenant da cobrança só nele. Falha conta por loja (I3.2).
+        // Um escopo por cobrança: DbContext limpo e o tenant da cobrança só nele. Uma falha não pula a empresa.
         var resumo = await RodadaDeCobrancasVencidas.ProcessarAsync(vencidas, async (item, token) =>
         {
             using var scope = serviceProvider.CreateScope();
             var useCase = scope.ServiceProvider.GetRequiredService<ProcessarCobrancaVencidaUseCase>();
             await useCase.ExecuteAsync(item, token);
         }, logger, ct);
+
+        // #2048: a próxima rodada alcança outra página mesmo se as 50 antigas falharem. Itens que saem
+        // da consulta podem adiar outros até a volta ao início; reiniciar o job também volta ao início.
+        // O cursor só avança depois de concluir a rodada: cancelamento não pula uma página pela metade.
+        _pularVencidas = vencidas.Count == MaximoPorRodada ? _pularVencidas + vencidas.Count : 0;
+        if (_pularVencidas == 0) _limiteVencidas = null;
 
         logger.LogInformation("CobrancaPedidoJob: vencidas={Total} falhas={Falhas} puladas={Puladas}",
             vencidas.Count, resumo.Falhas, resumo.Puladas);
@@ -130,7 +147,7 @@ public sealed class CobrancaPedidoJob(
             vencendo = await scope.ServiceProvider.GetRequiredService<ICobrancaPedidoRepository>()
                 .ListarPendentesVencendoAsync(relogio.GetUtcNow().UtcDateTime, LembrarCobrancaVencendoUseCase.Antecedencia, MaximoPorRodada, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "CobrancaPedidoJob: consulta dos links perto de vencer falhou");
             return;
@@ -144,7 +161,7 @@ public sealed class CobrancaPedidoJob(
                 using var scope = serviceProvider.CreateScope();
                 await scope.ServiceProvider.GetRequiredService<LembrarCobrancaVencendoUseCase>().ExecuteAsync(item, ct);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 logger.LogWarning(ex, "CobrancaPedidoJob: lembrete da cobranca {CobrancaId} pedido {PedidoId} falhou",
                     item.CobrancaId, item.PedidoId);

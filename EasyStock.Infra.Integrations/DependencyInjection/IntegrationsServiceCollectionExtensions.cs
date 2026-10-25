@@ -51,6 +51,7 @@ public static class IntegrationsServiceCollectionExtensions
 
         // #1292: envio não idempotente (POST /messages da Meta) não repete; falha volta para quem chamou.
         services.AddResiliencePipeline(IntegrationCategories.WhatsAppEnvio, AdicionarDisjuntorETimeout);
+        services.AddResiliencePipeline(IntegrationCategories.MetaEnvio, AdicionarDisjuntorETimeout);
 
         return services;
     }
