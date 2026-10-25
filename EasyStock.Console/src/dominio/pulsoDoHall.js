@@ -1,6 +1,9 @@
+import { colunaDoStatusKds } from './kds'
+
 // Contagens da leitura atual. Não interpreta SLA sem o expediente da loja.
 const aguardandoResposta = (dados) => dados.itens.filter((c) => c.situacao === 'Assumida' && (c.aguardaResposta || !c.assumidaPorUsuarioId)).length
-const naFila = (dados) => dados.itens.filter((p) => ['aguardando', 'preparando'].includes(p.status)).length
+// #2055: `colunaDoStatusKds` põe o aprovado pela dona (`aprovado_baba`) em Na fila, como a Cozinha.
+const naFila = (dados) => dados.itens.filter((p) => ['aguardando', 'preparando'].includes(colunaDoStatusKds(p.status))).length
 const prontos = (dados) => dados.itens.filter((p) => p.status === 'pronto').length
 const plural = (n, um, varios, mais = '') => `${n}${mais} ${n === 1 ? um : varios}`
 

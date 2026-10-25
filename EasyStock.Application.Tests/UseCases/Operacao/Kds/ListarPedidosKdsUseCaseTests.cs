@@ -53,6 +53,31 @@ public sealed class ListarPedidosKdsUseCaseTests
         });
     }
 
+    [Fact]
+    public async Task AprovadoPelaDonaComInicioVencidoVemAtrasadoComoOAguardando()
+    {
+        // #2055: o aprovado_baba está em Na fila; com o início previsto vencido é atrasado, como o aguardando.
+        var empresaId = Guid.NewGuid();
+        var hoje = HorarioBrasil.DataOperacional(DateTime.UtcNow);
+        var vencido = Leitura(hoje, numeroComanda: null) with
+        {
+            Status = StatusPedidoMapper.AprovadoBaba, InicioPrevistoEm = DateTime.UtcNow.AddMinutes(-10),
+        };
+        var noPrazo = Leitura(hoje, numeroComanda: null) with
+        {
+            Status = StatusPedidoMapper.AprovadoBaba, InicioPrevistoEm = DateTime.UtcNow.AddMinutes(30),
+        };
+        var queries = Substitute.For<IKdsPedidoQueries>();
+        queries.ListarAsync(empresaId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>())
+            .Returns(new List<KdsPedidoLeitura> { vencido, noPrazo });
+
+        var cards = await new ListarPedidosKdsUseCase(queries, TimeProvider.System)
+            .ExecuteAsync(new ListarPedidosKdsQuery(empresaId));
+
+        cards.Single(c => c.Id == vencido.Id).Atrasado.Should().BeTrue();
+        cards.Single(c => c.Id == noPrazo.Id).Atrasado.Should().BeFalse();
+    }
+
     private static KdsPedidoLeitura Leitura(DateOnly dataProducao, long? numeroComanda) => new(
         Id: Guid.NewGuid(),
         Status: StatusPedidoMapper.Aguardando,

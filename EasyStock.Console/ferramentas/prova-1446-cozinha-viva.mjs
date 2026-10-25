@@ -436,7 +436,10 @@ confere('#2055 pedido aprovado pela dona fica em Na fila e o próximo toque é C
   assert.equal(kds.rotuloDoStatusKds(aprovado), 'Na fila')
   assert.deepEqual(respostaAoSoltarKds('aprovado_baba', 'preparando'), { aceita: true, motivo: null })
   assert.deepEqual(respostaAoSoltarKds('aprovado_baba', 'aguardando'), { aceita: false, motivo: null })
-  assert.equal(urgenciaDoPedido({ ...aprovado, atrasado: true }, Date.parse('2026-10-07T13:20:00Z')), 'atrasado')
+  // O que a API manda (ListarPedidosKdsUseCase.Atrasado): aprovado com o início vencido vem atrasado.
+  const vencido = pedido({ id: 'av', status: 'aprovado_baba', inicioPrevistoEm: '2026-10-07T13:00:00Z', atrasado: true })
+  assert.equal(urgenciaDoPedido(vencido, Date.parse('2026-10-07T13:20:00Z')), 'atrasado')
+  assert.equal(avisoDeInicio(vencido, Date.parse('2026-10-07T13:20:00Z')).texto, 'Atrasado 20 min: devia ter começado')
   assert.equal(tempoAteInicio(aprovado, Date.parse('2026-10-07T13:00:00Z')), 1)
   assert.match(avisoDeInicio(aprovado, Date.parse('2026-10-07T13:00:00Z')).texto, /Começar em 30 min/)
   const fila = [{ id: 'c1', pedidoId: 'ap', status: 'pendente', criadaEm: '2026-10-07T13:01:00Z' }]
