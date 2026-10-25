@@ -34,9 +34,9 @@ public interface ICobrancaPedidoRepository
 
     /// <summary>
     /// Cobranças online pendentes com <c>ExpiraEm &lt;= limite</c>, de todos os tenants (job S11),
-    /// das que venceram antes primeiro.
+    /// das que venceram antes primeiro, com desempate pelo id. O job avança páginas para uma falha antiga não prender a fila.
     /// </summary>
-    Task<IReadOnlyList<CobrancaPedidoVencida>> ListarPendentesVencidasAsync(DateTime limite, int maximo, CancellationToken ct = default);
+    Task<IReadOnlyList<CobrancaPedidoVencida>> ListarPendentesVencidasAsync(DateTime limite, int maximo, int pular = 0, CancellationToken ct = default);
 
     /// <summary>
     /// #1610: links online pendentes da conversa que vencem em até <paramref name="antecedencia"/> depois de
