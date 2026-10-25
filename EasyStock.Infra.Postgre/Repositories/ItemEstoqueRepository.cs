@@ -487,11 +487,12 @@ namespace EasyStock.Infra.Postgre.Repositories
         }
 
         // Keyset por Id: a posição de um lote na página não depende de quem entra ou sai da fila entre duas leituras.
+        // O lote sem loja (produção do console, #2054) é da empresa toda e entra na leitura de qualquer loja.
         private static async Task<IReadOnlyList<ItemEstoque>> PaginaPorChaveAsync(
             IQueryable<ItemEstoque> query, Guid? lojaId, Guid? depoisDoId, int limite, CancellationToken ct)
         {
             if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
+                query = query.Where(i => i.LojaId == lojaId.Value || i.LojaId == null);
             if (depoisDoId.HasValue)
                 query = query.Where(i => i.Id.CompareTo(depoisDoId.Value) > 0);
 

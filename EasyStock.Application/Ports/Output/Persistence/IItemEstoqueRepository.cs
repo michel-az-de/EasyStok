@@ -19,7 +19,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// Lotes COM SALDO que vencem em até <paramref name="dias"/> (ou já venceram), lidos por chave (#2031): em ordem de
         /// <c>Id</c>, os <paramref name="limite"/> seguintes a <paramref name="depoisDoId"/> (<c>null</c> = do começo). Quem
         /// percorre tudo (o gerador de alertas) não perde nem repete lote quando a fila muda entre duas leituras, o que o
-        /// <c>Skip</c> de <see cref="GetProximoVencimentoAsync"/> não garante.
+        /// <c>Skip</c> de <see cref="GetProximoVencimentoAsync"/> não garante. Com <paramref name="lojaId"/>, entram os lotes
+        /// da loja e os sem loja (produção do console, #2054).
         /// </summary>
         Task<IReadOnlyList<ItemEstoque>> GetProximoVencimentoComSaldoAsync(
             Guid empresaId, int dias, Guid? lojaId, Guid? depoisDoId, int limite, CancellationToken ct = default);
