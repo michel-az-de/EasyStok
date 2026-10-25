@@ -36,7 +36,7 @@ public sealed class CobrancaPedidoRepository(EasyStockDbContext db) : ICobrancaP
     }
 
     public async Task<IReadOnlyList<CobrancaPedidoVencida>> ListarPendentesVencidasAsync(
-        DateTime limite, int maximo, CancellationToken ct = default)
+        DateTime limite, int maximo, int pular = 0, CancellationToken ct = default)
     {
         using var _ = db.UseRowLevelSecurityBypass();
         return await db.CobrancasPedido
@@ -48,6 +48,8 @@ public sealed class CobrancaPedidoRepository(EasyStockDbContext db) : ICobrancaP
                         // I3.2: quem aguarda credencial fica fora, senão as mesmas presas ocupam a rodada.
                         && c.AguardandoCredencialDesde == null)
             .OrderBy(c => c.ExpiraEm)
+            .ThenBy(c => c.Id)
+            .Skip(Math.Max(0, pular))
             .Take(Math.Clamp(maximo, 1, 500))
             .Select(c => new CobrancaPedidoVencida(c.Id, c.EmpresaId, c.PedidoId, c.ContaRecebedoraId))
             .ToListAsync(ct);

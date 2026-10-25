@@ -75,6 +75,11 @@ public class DevicePairingController(
         // Auditoria 2026-04-30 (CRITICAL fix): TODO antigo era brecha real.
         // Agora valida que o usuário logado pode parear devices nessa empresa.
         if (!RequestedEmpresaMatchesCurrentUser(req.EmpresaId)) return Forbid();
+        // #2033: a loja também precisa ser da empresa. Com a de outra, o aparelho assinava o SSE com ela e recebia
+        // os pedidos prontos de lá (o broker entrega por loja).
+        // Loja desativada também não, como no pair-auto e no switch-loja.
+        if (!await _db.Set<Loja>().IgnoreQueryFilters().AnyAsync(l => l.Id == req.LojaId && l.EmpresaId == req.EmpresaId && l.Ativa, ct))
+            return BadRequest(new { error = "loja não pertence à empresa ou está desativada" });
         var userId = ResolveUserId();
 
         var code = GeneratePairingCode();
@@ -100,8 +105,10 @@ public class DevicePairingController(
         _db.Set<MobileDevice>().Add(device);
         await _db.SaveChangesAsync(ct);
 
-        _log.LogInformation("Pair code criado por user={UserId} empresa={EmpresaId} loja={LojaId} code={Code}",
-            userId, req.EmpresaId, req.LojaId, code);
+        // O código vale 10 min e troca pela apiKey: não vai para o log em claro (#2033). O id do registro pode vir do
+        // corpo (DeviceId) e também fica de fora (CodeQL cs/log-forging); empresa e loja são Guids já conferidos.
+        _log.LogInformation("Pair code criado por user={UserId} empresa={EmpresaId} loja={LojaId}",
+            userId, req.EmpresaId, req.LojaId);
 
         return Ok(new PairCodeResponse(
             PairingCode: code,

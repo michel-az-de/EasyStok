@@ -29,6 +29,7 @@ public sealed class CobrancaPedidoJob(
 {
     private const long LockKeyJob = 0x436F6250656449L; // "CobPedI"
     private const int MaximoPorRodada = 50;
+    private int _pularVencidas;
     private static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(60);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -101,17 +102,26 @@ public sealed class CobrancaPedidoJob(
             await scope.ServiceProvider.GetRequiredService<RetomarCobrancasAguardandoCredencialUseCase>().ExecuteAsync(ct);
 
             var repo = scope.ServiceProvider.GetRequiredService<ICobrancaPedidoRepository>();
-            vencidas = await repo.ListarPendentesVencidasAsync(relogio.GetUtcNow().UtcDateTime, MaximoPorRodada, ct);
+            vencidas = await repo.ListarPendentesVencidasAsync(relogio.GetUtcNow().UtcDateTime, MaximoPorRodada, _pularVencidas, ct);
         }
-        if (vencidas.Count == 0) return;
+        if (vencidas.Count == 0)
+        {
+            _pularVencidas = 0;
+            return;
+        }
 
-        // Um escopo por cobrança: DbContext limpo e o tenant da cobrança só nele. Falha conta por loja (I3.2).
+        // Um escopo por cobrança: DbContext limpo e o tenant da cobrança só nele. Uma falha não pula a empresa.
         var resumo = await RodadaDeCobrancasVencidas.ProcessarAsync(vencidas, async (item, token) =>
         {
             using var scope = serviceProvider.CreateScope();
             var useCase = scope.ServiceProvider.GetRequiredService<ProcessarCobrancaVencidaUseCase>();
             await useCase.ExecuteAsync(item, token);
         }, logger, ct);
+
+        // #2048: a próxima rodada alcança outra página mesmo se as 50 antigas falharem. Itens que saem
+        // da consulta podem adiar outros até a volta ao início; reiniciar o job também volta ao início.
+        // O cursor só avança depois de concluir a rodada: cancelamento não pula uma página pela metade.
+        _pularVencidas = vencidas.Count == MaximoPorRodada ? _pularVencidas + vencidas.Count : 0;
 
         logger.LogInformation("CobrancaPedidoJob: vencidas={Total} falhas={Falhas} puladas={Puladas}",
             vencidas.Count, resumo.Falhas, resumo.Puladas);

@@ -138,8 +138,10 @@ public class OperacaoEventBroker(ILogger<OperacaoEventBroker> log)
             serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         });
 
+        // #2033: a loja e a empresa; o Guid da loja sozinho não basta para isolar empresas.
         Broadcast(slot =>
             slot.Canal == CanalSse.Mobile &&
+            slot.EmpresaId == empresaId &&
             slot.LojaId == lojaId &&
             slot.DeviceId != originDeviceId, new MensagemSse(null, data));
         return Task.CompletedTask;
@@ -171,8 +173,10 @@ public class OperacaoEventBroker(ILogger<OperacaoEventBroker> log)
             originDeviceId,
             serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         });
+        // #2033: a loja e a empresa; o Guid da loja sozinho não basta para isolar empresas.
         Broadcast(slot =>
             slot.Canal == CanalSse.Mobile &&
+            slot.EmpresaId == empresaId &&
             slot.LojaId == lojaId &&
             slot.DeviceId != originDeviceId, new MensagemSse(null, data));
         return Task.CompletedTask;
