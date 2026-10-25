@@ -656,6 +656,8 @@ public class ConfirmarPagamentoPedidoUseCaseTests
     {
         // O TotalPago cru ainda contava o pagamento devolvido: o novo era tratado como duplicado e devolvido sozinho.
         var f = new CobrancaPedidoFixture();
+        f.PedidoRepo.ExisteEventoAsync(f.EmpresaId, f.Pedido.Id, QuitacaoPedido.Marco, Arg.Any<CancellationToken>())
+            .Returns(_ => f.Eventos.Any(e => e.Tipo == QuitacaoPedido.Marco));
         var primeira = f.AdicionarOnline(referencia: "pref-1");
         (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-1", ReferenciaExterna = "pref-1" }))
             .Confirmado.Should().BeTrue();
@@ -673,6 +675,11 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         f.Pedido.Pagamentos.Select(p => p.Referencia).Should().BeEquivalentTo("pay-1", "pay-2");
         f.Cobrancas.Single(c => c.Id == nova.CobrancaId).Status.Should().Be(StatusCobrancaPedido.Paga);
         primeira.Status.Should().Be(StatusCobrancaPedido.Estornada);
+        // A quitação (com o saldo, como na DI) quita de novo, mas o marco da primeira vale: um só "pedido pago".
+        f.Eventos.Should().ContainSingle(e => e.Tipo == QuitacaoPedido.Marco);
+        await f.Publicador.Received(1).PublicarAsync(
+            f.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", f.Pedido.Id,
+            Arg.Any<PedidoPagoEvent>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -700,6 +707,45 @@ public class ConfirmarPagamentoPedidoUseCaseTests
             Arg.Any<PedidoPagoEvent>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
         var saldo = f.Cobrancas.Should().ContainSingle(c => c.Provedor == "na_entrega" && c.EstaPendente).Subject;
         saldo.Valor.Should().Be(12.50m);
+    }
+
+    [Fact]
+    public async Task MesmaPreferencia_PagaDeNovoDepoisDaDevolucaoIntegral_EstornaComoDuplicado()
+    {
+        // Sem link novo, o webhook (sem preferência) cai na cobrança estornada. MarcarPaga recusaria e o webhook
+        // daria 500 em laço, sem estorno nem trilha: o pagamento volta ao cliente como duplicado.
+        var f = new CobrancaPedidoFixture();
+        var cobranca = f.AdicionarOnline(referencia: "pref-1");
+        (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-1" })).Confirmado.Should().BeTrue();
+        DevolverIntegral(f, cobranca, "pay-1");
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-3" });
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PagamentoDuplicado);
+        await f.Estorno.Received(1).EstornarAsync("pay-3", 25m, "estorno-duplicado-pay-3", Arg.Any<CancellationToken>());
+        f.Estorno.ReceivedCalls().Should().ContainSingle(c => c.GetMethodInfo().Name == nameof(IEstornoPedidoGateway.EstornarAsync));
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Referencia.Should().Be("pay-1");
+        cobranca.Status.Should().Be(StatusCobrancaPedido.Estornada);
+        f.Eventos.Should().Contain(e => e.Tipo == "pagamento_divergente" && e.Detalhes!.Contains("pay-3"));
+    }
+
+    [Fact]
+    public async Task SinalDevolvido_PagoDeNovoSemSinalNovo_EstornaComoDuplicado()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        var sinal = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+        (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, sinal.Valor) with { PagamentoExternoId = "pay-1" }))
+            .Confirmado.Should().BeTrue();
+        DevolverIntegral(f, f.Cobrancas.Single(c => c.Id == sinal.CobrancaId), "pay-1");
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, 12.50m) with { PagamentoExternoId = "pay-3" });
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PagamentoDuplicado);
+        await f.Estorno.Received(1).EstornarAsync("pay-3", 12.50m, "estorno-duplicado-pay-3", Arg.Any<CancellationToken>());
+        f.Estorno.ReceivedCalls().Should().ContainSingle(c => c.GetMethodInfo().Name == nameof(IEstornoPedidoGateway.EstornarAsync));
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Referencia.Should().Be("pay-1");
     }
 
     [Fact]

@@ -444,6 +444,11 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
         Guid empresaId, CancellationToken ct)
     {
         var alvo = EscolherCobranca(cobrancas, input);
+        // #2056: a cobrança que MarcarPaga recusa (estornada, ou paga por outro pagamento) não recebe este. Sem link
+        // novo depois da devolução integral, o webhook cai na estornada: devolver o novo, não 500 em laço.
+        if (alvo is not null && (alvo.Status == StatusCobrancaPedido.Estornada
+                || (alvo.Status == StatusCobrancaPedido.Paga && alvo.PagamentoExternoId != input.PagamentoExternoId)))
+            return true;
         // O pagamento a menor registrado (#1724-7) não quita o pedido: conta pelo saldo logo abaixo.
         if (alvo?.Complementar != true && cobrancas.Any(c => c.Status == StatusCobrancaPedido.Paga
                 && c.PagamentoExternoId != input.PagamentoExternoId && !c.RegistraPagamentoAMenor))
