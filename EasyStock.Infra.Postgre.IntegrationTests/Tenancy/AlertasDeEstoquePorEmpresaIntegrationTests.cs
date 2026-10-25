@@ -340,6 +340,61 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
             .Should().Be(0, "40 na prateleira com mínimo 10: o prato não está crítico nem esgotado");
     }
 
+    /// <summary>
+    /// #2054, fronteira entre lojas: a leitura da loja A traz o lote de A e o sem loja, nunca o da loja B. Vale para as
+    /// leituras por chave do gerador (validade e parado) e para o snapshot de reposição (saldo e velocidade de venda).
+    /// </summary>
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Leitura_da_loja_inclui_o_lote_sem_loja_e_deixa_de_fora_o_da_outra_loja(bool rls)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Fronteira entre lojas", null);
+        var lojaA = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Loja A", Ativa = true, CriadoEm = agora, AlteradoEm = agora };
+        var lojaB = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Loja B", Ativa = true, CriadoEm = agora, AlteradoEm = agora };
+        var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Pratos", CriadoEm = agora, AlteradoEm = agora };
+        var produto = NovoProduto(empresa, categoria, "Lasanha", agora);
+        var semLoja = NovoLote(empresa, null, produto, saldo: 10, validade: agora.Date.AddDays(1), agora);
+        var daA = NovoLote(empresa, lojaA, produto, saldo: 10, validade: agora.Date.AddDays(1), agora);
+        var daB = NovoLote(empresa, lojaB, produto, saldo: 10, validade: agora.Date.AddDays(1), agora);
+        MovimentacaoEstoque Venda(ItemEstoque lote, int quantidade) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresa.Id, ItemEstoqueId = lote.Id, ProdutoId = produto.Id,
+            Tipo = TipoMovimentacaoEstoque.Saida, Natureza = NaturezaMovimentacaoEstoque.Venda, Quantidade = Quantidade.From(quantidade),
+            DataMovimentacao = agora.AddDays(-5), CriadoEm = agora,
+        };
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa.Id);
+            seed.Empresas.Add(empresa);
+            seed.Lojas.AddRange(lojaA, lojaB);
+            seed.Categorias.Add(categoria);
+            seed.Produtos.Add(produto);
+            seed.ItensEstoque.AddRange(semLoja, daA, daB);
+            seed.MovimentacoesEstoque.AddRange(Venda(semLoja, 30), Venda(daA, 15), Venda(daB, 60));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProvider(rls);
+        await using var escopo = provider.CreateAsyncScope();
+        escopo.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(empresa.Id);
+        var lotes = escopo.ServiceProvider.GetRequiredService<IItemEstoqueRepository>();
+        var analytics = escopo.ServiceProvider.GetRequiredService<IAnalyticsRepository>();
+
+        var vencendoNaA = await lotes.GetProximoVencimentoComSaldoAsync(empresa.Id, 7, lojaA.Id, null, 100);
+        var paradosNaA = await lotes.GetItensParadosComSaldoAsync(empresa.Id, 30, lojaA.Id, null, 100);
+        var snapshotDaA = (await analytics.GetSnapshotReposicaoAsync(empresa.Id, lojaA.Id, 30, 7, null, null))
+            .Single(s => s.ProdutoId == produto.Id);
+
+        using var _ = new AssertionScope();
+        vencendoNaA.Select(l => l.Id).Should().BeEquivalentTo([semLoja.Id, daA.Id], "o lote da loja B não é da leitura da loja A");
+        paradosNaA.Select(l => l.Id).Should().BeEquivalentTo([semLoja.Id, daA.Id], "o lote da loja B não é da leitura da loja A");
+        snapshotDaA.QuantidadeVigente.Should().Be(20m, "10 da loja A + 10 sem loja; os 10 da loja B ficam de fora");
+        snapshotDaA.VelocidadeMediaDia.Should().Be(1.5m, "(15 da loja A + 30 sem loja) / 30 dias; as 60 da loja B ficam de fora");
+    }
+
     private async Task GravarAsync(Notificacao alerta)
     {
         await using var db = fixture.CreateDbContext();
