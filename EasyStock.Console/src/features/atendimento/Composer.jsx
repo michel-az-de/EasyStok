@@ -66,10 +66,12 @@ export function Composer({
     const tipo = tipoDeArquivo(arquivo.type)
     const bloqueioCanal = motivoDeAnexo(canal, tipo, { fonteApi })
     if (bloqueioCanal) { setErroAnexo(bloqueioCanal); return }
-    const dataUrl = await ler(arquivo)
-    setAnexo({
-      tipo, nome: arquivo.name, tamanho: arquivo.size, dataUrl,
-    })
+    try {
+      const dataUrl = await ler(arquivo)
+      setAnexo({ tipo, nome: arquivo.name, tamanho: arquivo.size, dataUrl })
+    } catch {
+      setErroAnexo('Não consegui ler o arquivo. Escolha novamente ou tente outro arquivo.')
+    }
   }
 
   // "Enviar" com anexo em espera manda o anexo (o texto digitado vira legenda
@@ -112,6 +114,8 @@ export function Composer({
       if (!resultado) return
       const saiu = await enviarMidia(conversa.id, mensagemDeAudio(resultado))
       if (saiu === false) setErroAnexo('O áudio não foi enviado. O motivo está no balão da conversa.')
+    } catch {
+      setErroAnexo('Não consegui enviar o áudio. Grave novamente e tente enviar.')
     } finally {
       setEnviandoAudio(false)
     }

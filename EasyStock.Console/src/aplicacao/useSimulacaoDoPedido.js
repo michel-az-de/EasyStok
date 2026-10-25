@@ -9,13 +9,14 @@ const ESPERA_MS = 350
 // abortada. Falhou ou a comanda ainda não dá para simular (sem endereço, janela esgotada, item fora do
 // cardápio): fica sem simulação e a tela segue com o texto de antes, sem alarme. O que impede de gerar a
 // cobrança já aparece na barra.
-export function useSimulacaoDoPedido({ conversaId, pedido, ativo }) {
+export function useSimulacaoDoPedido({ conversaId, clienteId, endereco, pedido, ativo }) {
   const corpo = useMemo(
     () => (ativo && conversaId && simulacaoVale(pedido) ? JSON.stringify(corpoDaSimulacao(pedido)) : null),
     [ativo, conversaId, pedido],
   )
   const [resultado, setResultado] = useState({ chave: null, simulacao: null })
-  const chave = corpo ? `${conversaId}|${corpo}` : null
+  // O frete usa o cadastro salvo, que pode mudar sem alterar os itens ou a janela.
+  const chave = corpo ? JSON.stringify([conversaId, clienteId ?? null, endereco ?? null, corpo]) : null
 
   useEffect(() => {
     if (!corpo) return undefined
