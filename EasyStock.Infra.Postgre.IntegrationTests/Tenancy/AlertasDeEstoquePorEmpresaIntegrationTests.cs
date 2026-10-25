@@ -10,6 +10,7 @@ using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
+using FluentAssertions.Execution;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -286,6 +287,112 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
             "o lote que mudou de página segue com o aviso de antes: nem apagado nem recriado");
         restantes.Should().NotContain(n => n.ReferenciaId == saiuNaoLido);
         restantes.Should().ContainSingle(n => n.ReferenciaId == saiuJaLido, "o lote 0 já tinha sido lido como condição ativa");
+    }
+
+    /// <summary>
+    /// #2054: a produção do console grava o lote sem loja (<c>LojaId = null</c>). A rodada percorre as lojas ativas e só lia
+    /// o lote da loja: o prato vencendo não ia para o sino e o prato com saldo aparecia como Esgotado. O lote sem loja conta
+    /// em toda loja ativa, e o aviso sai uma vez só por (tipo, item), com uma ou várias lojas.
+    /// </summary>
+    [SkippableTheory]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    public async Task Lote_sem_loja_da_producao_do_console_entra_nos_alertas_uma_vez_so(bool rls, int lojasAtivas)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Produção sem loja", null);
+        var lojas = Enumerable.Range(1, lojasAtivas)
+            .Select(i => new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = $"Loja {i}", Ativa = true, CriadoEm = agora, AlteradoEm = agora })
+            .ToList();
+        var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Pratos", CriadoEm = agora, AlteradoEm = agora };
+        var vencendo = NovoProduto(empresa, categoria, "Escondidinho", agora);
+        var comSaldo = NovoProduto(empresa, categoria, "Lasanha", agora, minima: 10, critica: 3);
+        var loteVencendo = NovoLote(empresa, null, vencendo, saldo: 5, validade: agora.Date.AddDays(1), agora);
+        var loteComSaldo = NovoLote(empresa, null, comSaldo, saldo: 40, validade: null, agora);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa.Id);
+            seed.Empresas.Add(empresa);
+            seed.Lojas.AddRange(lojas);
+            seed.Categorias.Add(categoria);
+            seed.Produtos.AddRange(vencendo, comSaldo);
+            seed.ItensEstoque.AddRange(loteVencendo, loteComSaldo);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProvider(rls);
+        await using (var escopo = provider.CreateAsyncScope())
+        {
+            escopo.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(empresa.Id);
+            await escopo.ServiceProvider.GetRequiredService<GeradorNotificacoesAutomaticas>().ExecutarAsync(empresa.Id);
+        }
+
+        var avisos = await NotificacoesAsync(empresa.Id);
+        using var _ = new AssertionScope(); // os três alertas falham ou passam juntos, cada um com o seu motivo
+        avisos.Count(n => n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima && n.ReferenciaId == loteVencendo.Id)
+            .Should().Be(1, "o lote sem loja vence amanhã: um aviso, mesmo com várias lojas ativas");
+        avisos.Count(n => n.TipoAlerta == TipoAlertaEstoque.ProdutoParado && n.ReferenciaId == loteComSaldo.Id)
+            .Should().Be(1, "o lote sem loja parado também entra, uma vez só");
+        avisos.Count(n => n.TipoAlerta == TipoAlertaEstoque.EstoqueCritico && n.ReferenciaId == comSaldo.Id)
+            .Should().Be(0, "40 na prateleira com mínimo 10: o prato não está crítico nem esgotado");
+    }
+
+    /// <summary>
+    /// #2054, fronteira entre lojas: a leitura da loja A traz o lote de A e o sem loja, nunca o da loja B. Vale para as
+    /// leituras por chave do gerador (validade e parado) e para o snapshot de reposição (saldo e velocidade de venda).
+    /// </summary>
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Leitura_da_loja_inclui_o_lote_sem_loja_e_deixa_de_fora_o_da_outra_loja(bool rls)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Fronteira entre lojas", null);
+        var lojaA = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Loja A", Ativa = true, CriadoEm = agora, AlteradoEm = agora };
+        var lojaB = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Loja B", Ativa = true, CriadoEm = agora, AlteradoEm = agora };
+        var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Pratos", CriadoEm = agora, AlteradoEm = agora };
+        var produto = NovoProduto(empresa, categoria, "Lasanha", agora);
+        var semLoja = NovoLote(empresa, null, produto, saldo: 10, validade: agora.Date.AddDays(1), agora);
+        var daA = NovoLote(empresa, lojaA, produto, saldo: 10, validade: agora.Date.AddDays(1), agora);
+        var daB = NovoLote(empresa, lojaB, produto, saldo: 10, validade: agora.Date.AddDays(1), agora);
+        MovimentacaoEstoque Venda(ItemEstoque lote, int quantidade) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresa.Id, ItemEstoqueId = lote.Id, ProdutoId = produto.Id,
+            Tipo = TipoMovimentacaoEstoque.Saida, Natureza = NaturezaMovimentacaoEstoque.Venda, Quantidade = Quantidade.From(quantidade),
+            DataMovimentacao = agora.AddDays(-5), CriadoEm = agora,
+        };
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa.Id);
+            seed.Empresas.Add(empresa);
+            seed.Lojas.AddRange(lojaA, lojaB);
+            seed.Categorias.Add(categoria);
+            seed.Produtos.Add(produto);
+            seed.ItensEstoque.AddRange(semLoja, daA, daB);
+            seed.MovimentacoesEstoque.AddRange(Venda(semLoja, 30), Venda(daA, 15), Venda(daB, 60));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProvider(rls);
+        await using var escopo = provider.CreateAsyncScope();
+        escopo.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(empresa.Id);
+        var lotes = escopo.ServiceProvider.GetRequiredService<IItemEstoqueRepository>();
+        var analytics = escopo.ServiceProvider.GetRequiredService<IAnalyticsRepository>();
+
+        var vencendoNaA = await lotes.GetProximoVencimentoComSaldoAsync(empresa.Id, 7, lojaA.Id, null, 100);
+        var paradosNaA = await lotes.GetItensParadosComSaldoAsync(empresa.Id, 30, lojaA.Id, null, 100);
+        var snapshotDaA = (await analytics.GetSnapshotReposicaoAsync(empresa.Id, lojaA.Id, 30, 7, null, null))
+            .Single(s => s.ProdutoId == produto.Id);
+
+        using var _ = new AssertionScope();
+        vencendoNaA.Select(l => l.Id).Should().BeEquivalentTo([semLoja.Id, daA.Id], "o lote da loja B não é da leitura da loja A");
+        paradosNaA.Select(l => l.Id).Should().BeEquivalentTo([semLoja.Id, daA.Id], "o lote da loja B não é da leitura da loja A");
+        snapshotDaA.QuantidadeVigente.Should().Be(20m, "10 da loja A + 10 sem loja; os 10 da loja B ficam de fora");
+        snapshotDaA.VelocidadeMediaDia.Should().Be(1.5m, "(15 da loja A + 30 sem loja) / 30 dias; as 60 da loja B ficam de fora");
     }
 
     private async Task GravarAsync(Notificacao alerta)
