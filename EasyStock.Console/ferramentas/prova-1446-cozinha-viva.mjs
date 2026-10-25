@@ -427,4 +427,22 @@ confere('K-11a "Entrega própria" não repete a empresa entre parênteses', () =
   assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'Lucas Uber', empresa: 'Uber' }), 'Lucas Uber (Uber)')
 })
 
+// #2055: o pedido fora da área pago e aprovado pela dona (`aprovado_baba`) espera o preparo como o pago
+// comum: fica em "Na fila", o toque é "Começar preparo" e vai a `preparando` (a API aceita a transição).
+confere('#2055 pedido aprovado pela dona fica em Na fila e o próximo toque é Começar preparo', () => {
+  const aprovado = pedido({ id: 'ap', status: 'aprovado_baba', statusRotulo: 'Aprovado' })
+  assert.deepEqual(kds.proximoStatusKds('aprovado_baba'), { status: 'preparando', toque: 'Começar preparo' })
+  assert.deepEqual(kds.filtrarPorColunaKds([aprovado, pedido({ id: 'pr', status: 'preparando' })], 'aguardando').map((p) => p.id), ['ap'])
+  assert.equal(kds.rotuloDoStatusKds(aprovado), 'Na fila')
+  assert.deepEqual(respostaAoSoltarKds('aprovado_baba', 'preparando'), { aceita: true, motivo: null })
+  assert.deepEqual(respostaAoSoltarKds('aprovado_baba', 'aguardando'), { aceita: false, motivo: null })
+  assert.equal(urgenciaDoPedido({ ...aprovado, atrasado: true }, Date.parse('2026-10-07T13:20:00Z')), 'atrasado')
+  assert.equal(tempoAteInicio(aprovado, Date.parse('2026-10-07T13:00:00Z')), 1)
+  assert.match(avisoDeInicio(aprovado, Date.parse('2026-10-07T13:00:00Z')).texto, /Começar em 30 min/)
+  const fila = [{ id: 'c1', pedidoId: 'ap', status: 'pendente', criadaEm: '2026-10-07T13:01:00Z' }]
+  assert.deepEqual(impressoesDaCozinha(fila, [aprovado]).map((i) => i.id), ['c1'], 'o canhoto do aprovado aparece')
+  const tela = fonte('features/cozinha/TelaCozinhaApi.jsx')
+  assert.match(tela, /filtrarPorColunaKds\(visiveis, coluna\.status\)/, 'a coluna junta os status dela')
+})
+
 console.log(`prova #1446 (cozinha viva no modo API): ${passou} conferências ok`)

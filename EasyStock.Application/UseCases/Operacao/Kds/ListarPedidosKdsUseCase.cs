@@ -16,8 +16,10 @@ public sealed record ListarPedidosKdsQuery(
 /// </summary>
 public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider relogio)
 {
+    // #2055: aprovado_baba é o pedido fora da área pago e aprovado pela dona; espera o preparo como o aguardando.
     private static readonly string[] StatusPadrao =
     [
+        StatusPedidoMapper.AprovadoBaba,
         StatusPedidoMapper.Aguardando,
         StatusPedidoMapper.Preparando,
         StatusPedidoMapper.Pronto,
