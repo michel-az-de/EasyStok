@@ -15,8 +15,8 @@ namespace EasyStock.Api.Mobile.Services;
 /// Estratégia:
 ///   - Idempotência via <see cref="Order.ErpVendaId"/>: se já tem Venda,
 ///     não cria de novo (re-envio de mutation é seguro).
-///   - Só cria itens pra produtos linkados ao ERP (<see cref="Product.ErpProductId"/>);
-///     itens não-linkados são ignorados (entram só na Venda como observação).
+///   - Só consolida a Venda quando todos os itens têm produto vinculado ao ERP.
+///     Até lá, o recebimento integral continua no PedidoPagamento; relatórios só de Venda aguardam os vínculos.
 ///   - ValorTotal vem da somatória dos PrecoTotal — agregação automática.
 ///   - Canal=<see cref="CanalVenda.Outro"/> + Observacoes="Mobile" pra
 ///     filtros futuros.
@@ -65,10 +65,12 @@ public class MobileSaleSyncService(
                 .Where(x => x.Product?.ErpProductId != null)
                 .ToList();
 
-            if (linkedItems.Count == 0)
+            // #2049: uma Venda parcial excluiria o pagamento integral do Caixa (Pedido.VendaId).
+            // O estoque dos itens vinculados continua pela esteira própria; não se fabrica item para o avulso.
+            if (linkedItems.Count != items.Count)
             {
                 _log.LogInformation(
-                    "Onda 3: pedido {OrderId} entregue mas nenhum produto está linkado ao ERP. Venda não criada (vai aparecer só nos analytics quando produtos forem aprovados).",
+                    "Onda 3: pedido {OrderId} entregue com item sem vínculo ERP. Venda não consolidada; recebimento permanece no pedido até todos os itens terem vínculo.",
                     order.Id);
                 return false;
             }

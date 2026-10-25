@@ -10,6 +10,8 @@ using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CancelarPedido;
+using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
@@ -17,6 +19,7 @@ using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using FluentAssertions;
+using FluentAssertions.Execution;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -257,6 +260,72 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
             (await Saldo(s, nome)).Should().Be(10m - qtd, $"{nome} sai na quantidade dele");
     }
 
+    [SkippableTheory]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task PedidoEntregueComAvulso_ContaORecebimentoIntegralNoCaixaSemDuplicarNoReenvio(
+        bool primeiroVinculado, bool segundoVinculado)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var itens = new List<OrderItemDto>
+        {
+            new(primeiroVinculado ? NoAparelho(Lasanha) : "avulso-1",
+                primeiroVinculado ? Lasanha : "Avulso 1", null, "un", 1, 30m),
+            new(segundoVinculado ? NoAparelho(Lasanha) : "avulso-2",
+                segundoVinculado ? Lasanha : "Avulso 2", null, "un", 1, 20m)
+        };
+        await AparelhoManda(provider, s, "pronto", itens);
+        await AparelhoManda(provider, s, "entregue", itens);
+        var pedidoId = await PedidoDoErp(s);
+
+        using var assertions = new AssertionScope();
+        for (var tentativa = 0; tentativa < 2; tentativa++)
+        {
+            if (tentativa > 0) await AparelhoManda(provider, s, "entregue", itens);
+            await using var leitura = fixture.CreateDbContext();
+            leitura.SetMobileTenantContext(s.EmpresaId);
+            var pedido = await leitura.Set<Pedido>().Include(p => p.Pagamentos)
+                .SingleAsync(p => p.Id == pedidoId);
+            pedido.Status.Should().Be("entregue");
+            pedido.Total.Valor.Should().Be(50m);
+            pedido.Pagamentos.Should().ContainSingle("o reenvio da entrega não pode receber duas vezes");
+            pedido.Pagamentos.Sum(p => p.Valor).Should().Be(50m);
+            var todosVinculados = primeiroVinculado && segundoVinculado;
+            var vendas = await leitura.Set<Venda>().Include(v => v.ItensVenda).ToListAsync();
+            vendas.Should().HaveCount(todosVinculados ? 1 : 0,
+                "só uma Venda completa pode substituir o recebimento do pedido no Caixa");
+            if (todosVinculados)
+            {
+                pedido.VendaId.Should().NotBeNull();
+                vendas.Should().AllSatisfy(v =>
+                {
+                    v.ValorTotal.Valor.Should().Be(50m);
+                    v.ItensVenda.Sum(i => i.PrecoTotal.Valor).Should().Be(50m);
+                });
+            }
+            else pedido.VendaId.Should().BeNull("o pedido avulso ou misto mantém o recebimento integral");
+            (await Saldo(s)).Should().Be(10m - (primeiroVinculado ? 1m : 0m) - (segundoVinculado ? 1m : 0m),
+                "a parte vinculada baixa estoque uma vez, mesmo sem consolidar Venda parcial");
+            var diaDoRecebimento = HorarioBrasil.DataOperacional(pedido.Pagamentos.Single().PagoEm);
+
+            await Escopo(provider, s.EmpresaId, async sp =>
+            {
+                var caixa = await sp.GetRequiredService<ObterCaixaDiaUseCase>()
+                    .ExecuteAsync(new ObterCaixaDiaQuery(s.EmpresaId, diaDoRecebimento));
+                caixa.SaldoInicial.Should().Be(0m);
+                caixa.TotalVendas.Should().Be(todosVinculados ? 50m : 0m);
+                caixa.TotalPagamentosPedidos.Should().Be(todosVinculados ? 0m : 50m,
+                    "pedido avulso ou misto entra inteiro pelo recebimento, sem somar uma Venda parcial");
+                caixa.SaldoEsperado.Should().Be(50m,
+                    "a presença de uma Venda parcial não pode apagar o recebimento do avulso");
+                GavetaCaixa.DinheiroNaGaveta(caixa).Should().Be(50m,
+                    "a entrega deste aparelho antigo assume dinheiro e recebeu os R$ 50 integrais");
+                caixa.LinhasExtras!.Sum(l => l.Valor).Should().Be(50m);
+            });
+        }
+    }
     private sealed record Semente(Guid EmpresaId, Guid CategoriaId, Dictionary<string, Guid> Produtos);
 
     private static string NoAparelho(string prato) => $"p-{prato.ToLowerInvariant()}";
