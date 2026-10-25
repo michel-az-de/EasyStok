@@ -54,6 +54,8 @@ public class MobileSaleSyncService(
             var mobileIds = items.Select(i => i.ProductId).Distinct().ToList();
             var products = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
                 .Where(p => p.EmpresaId == order.EmpresaId && mobileIds.Contains(p.Id))
+                .Join(_db.Set<Produto>().IgnoreQueryFilters().Where(p => p.EmpresaId == order.EmpresaId),
+                    p => p.ErpProductId, p => (Guid?)p.Id, (mobile, _) => mobile)
                 .ToListAsync(ct);
 
             var linkedItems = items
@@ -109,7 +111,7 @@ public class MobileSaleSyncService(
                     // e perde-se rastreabilidade. Saldo negativo é a verdade —
                     // produto vendido sem entrada registrada.
                     var produto = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
-                        .FirstOrDefaultAsync(p => p.Id == produtoId, ct);
+                        .FirstOrDefaultAsync(p => p.Id == produtoId && p.EmpresaId == order.EmpresaId, ct);
                     if (produto == null)
                     {
                         _log.LogWarning(

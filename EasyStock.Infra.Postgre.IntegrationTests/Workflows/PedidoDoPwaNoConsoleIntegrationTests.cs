@@ -14,6 +14,7 @@ using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
 using FluentAssertions;
@@ -257,6 +258,131 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
             (await Saldo(s, nome)).Should().Be(10m - qtd, $"{nome} sai na quantidade dele");
     }
 
+    [SkippableTheory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public async Task PedidoSoCopiaCadastroMobileDaPropriaEmpresa(bool clienteDeOutraEmpresa, bool clienteErpDeOutraEmpresa)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var empresaCliente = clienteDeOutraEmpresa || clienteErpDeOutraEmpresa ? Guid.NewGuid() : s.EmpresaId;
+        var cliente = Cliente.Criar(empresaCliente, "Cliente do cadastro");
+        await using (var seed = fixture.CreateDbContext())
+        {
+            if (clienteDeOutraEmpresa || clienteErpDeOutraEmpresa)
+                seed.Add(new Empresa { Id = empresaCliente, Nome = "Outra empresa" });
+            seed.Add(cliente);
+            seed.Add(new Client
+            {
+                Id = "c-referencia", EmpresaId = clienteDeOutraEmpresa ? empresaCliente : s.EmpresaId, ErpClienteId = cliente.Id,
+                Name = cliente.Nome, Apt = "204", Phone = "5511988887777"
+            });
+            await seed.SaveChangesAsync();
+        }
+        await Escopo(provider, s.EmpresaId, async sp =>
+        {
+            var ts = ++_relogioDoAparelho;
+            var pedido = new OrderDto(PedidoNoAparelho, "c-referencia", new ClientSnapshotDto("", null),
+                [new OrderItemDto(NoAparelho(Lasanha), Lasanha, null, "un", 1, 30m)],
+                null, 30m, "aguardando", ts, ts);
+            var mutation = new MutationDto($"m-{Guid.NewGuid():N}", "dev-a", "order.upsert",
+                JsonSerializer.SerializeToElement(pedido, Json), ts);
+            await sp.GetRequiredService<SyncMutationDispatcher>().ApplyMutationAsync(mutation, "dev-a", "Thati", s.EmpresaId, null);
+            await sp.GetRequiredService<EasyStockDbContext>().SaveChangesAsync();
+            await sp.GetRequiredService<OrderLinker>().ExecuteAsync([PedidoNoAparelho], s.EmpresaId);
+        });
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var criado = await leitura.Set<Pedido>().SingleAsync(p => p.MobileOrderId == PedidoNoAparelho);
+        criado.ClienteNome.Should().Be(clienteDeOutraEmpresa ? "Avulso" : cliente.Nome);
+        criado.ClienteTelefone.Should().Be(clienteDeOutraEmpresa ? null : "5511988887777");
+        criado.ClienteApt.Should().Be(clienteDeOutraEmpresa ? null : "204");
+        criado.ClienteId.Should().Be(clienteDeOutraEmpresa || clienteErpDeOutraEmpresa ? null : cliente.Id);
+    }
+    [SkippableTheory]
+    [InlineData(true, "aguardando", false, false)]
+    [InlineData(false, "aguardando", false, false)]
+    [InlineData(true, "entregue", false, false)]
+    [InlineData(false, "entregue", false, false)]
+    [InlineData(false, "entregue", true, false)]
+    [InlineData(false, "entregue", true, true)]
+    public async Task PedidoNaoVinculaProdutoDeOutraEmpresa(bool produtoMobileDeOutraEmpresa, string status, bool entregarNoSegundoEnvio, bool estoqueLegado)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var outraEmpresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var outroProdutoId = Guid.NewGuid();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Add(new Empresa { Id = outraEmpresaId, Nome = "Outra empresa" });
+            seed.Add(new Categoria { Id = categoriaId, EmpresaId = outraEmpresaId, Nome = "Outra categoria" });
+            var produtoAlheio = new Produto
+            {
+                Id = outroProdutoId, EmpresaId = outraEmpresaId, CategoriaId = categoriaId,
+                Nome = "Produto alheio", Status = StatusProduto.Ativo
+            };
+            seed.Add(produtoAlheio);
+            if (estoqueLegado)
+                seed.Add(ItemEstoque.CriarParaEntrada(
+                    id: Guid.NewGuid(), empresaId: s.EmpresaId, produto: produtoAlheio, variacao: null,
+                    quantidade: Quantidade.From(5m), custoUnitario: Dinheiro.Zero, precoVendaSugerido: null,
+                    dataEntrada: DateTime.UtcNow, codigoInterno: "legado-cruzado", codigoLote: null,
+                    codigoMarketplace: null, variacaoDescricao: null, cor: null, tamanho: null,
+                    descricaoAnuncio: null, dimensoesReais: null, fornecedorNome: null, validade: null,
+                    observacoes: "Referencia cruzada legada do bug", criadoEm: DateTime.UtcNow));
+            seed.Add(new Product
+            {
+                Id = "p-outra-empresa", Name = "Produto alheio", Category = "massa",
+                EmpresaId = produtoMobileDeOutraEmpresa ? outraEmpresaId : s.EmpresaId,
+                ErpProductId = outroProdutoId
+            });
+            await seed.SaveChangesAsync();
+        }
+        List<OrderItemDto> itens = [new("p-outra-empresa", "Produto alheio", null, "un", 2, 30m)];
+        if (entregarNoSegundoEnvio)
+            await AparelhoManda(provider, s, "aguardando", itens);
+        await AparelhoManda(provider, s, status, itens);
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var criado = await leitura.Set<Pedido>().Include(p => p.Itens)
+            .SingleAsync(p => p.MobileOrderId == PedidoNoAparelho);
+        criado.Itens.Should().ContainSingle().Which.ProdutoId.Should().BeNull(
+            "a ponte do produto no pedido tambem precisa conferir as duas empresas");
+        var estoquesAlheios = await leitura.Set<ItemEstoque>().IgnoreQueryFilters()
+            .Where(i => i.ProdutoId == outroProdutoId).ToListAsync();
+        if (estoqueLegado)
+            estoquesAlheios.Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(5m,
+                "o sincronizador nao pode baixar estoque legado que aponta para produto de outra empresa");
+        else estoquesAlheios.Should().BeEmpty(
+            "a entrega tambem nao pode criar estoque da empresa A para produto da empresa B");
+        (await leitura.Set<ItemVenda>().IgnoreQueryFilters().AnyAsync(i => i.ProdutoId == outroProdutoId)).Should().BeFalse(
+            "a venda da entrega nao pode carregar produto de outra empresa");
+        (await leitura.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AnyAsync(m => m.ProdutoId == outroProdutoId)).Should().BeFalse();
+    }
+    [SkippableTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task EntregaDeProdutoProprioOuAvulsoContinuaOperavel(bool produtoVinculado)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var produtoMobileId = produtoVinculado ? NoAparelho(Lasanha) : "p-avulso";
+        await AparelhoManda(provider, s, "entregue",
+            [new OrderItemDto(produtoMobileId, Lasanha, null, "un", 2, 30m)]);
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var pedido = await leitura.Set<Pedido>().SingleAsync(p => p.MobileOrderId == PedidoNoAparelho);
+        pedido.Status.Should().Be("entregue");
+        var produtoId = s.Produtos[Lasanha];
+        var vendidos = await leitura.Set<ItemVenda>().IgnoreQueryFilters().CountAsync(i => i.ProdutoId == produtoId);
+        vendidos.Should().Be(produtoVinculado ? 1 : 0);
+        (await Saldo(s)).Should().Be(produtoVinculado ? 8m : 10m);
+    }
     private sealed record Semente(Guid EmpresaId, Guid CategoriaId, Dictionary<string, Guid> Produtos);
 
     private static string NoAparelho(string prato) => $"p-{prato.ToLowerInvariant()}";
