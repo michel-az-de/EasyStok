@@ -189,6 +189,9 @@
 @media (max-width: 759px) {
   .controles > button { font-size: 0; gap: 6px; padding: 0 10px; }
   .controles .conta { font-size: var(--t-micro); min-width: 22px; height: 22px; }
+  /* O aviso do aparelho fica no sino sem alargar o cabeçalho e empurrar Mais para fora. */
+  .controles > button:has([data-aparelho-desligado]) { position: relative; }
+  .controles > button > [data-aparelho-desligado] { position: absolute; top: 6px; right: 6px; margin-left: 0; }
 }
 /* #1940 (item 3): a 375 px o "Mais" passava 16 px da borda (marca 66 + loja 32 + controles 277 +
    recuos = 399 px). Abaixo de 400 px os vãos e o recuo lateral dos botões de ícone apertam
