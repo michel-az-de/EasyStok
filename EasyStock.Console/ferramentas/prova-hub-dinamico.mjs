@@ -6,7 +6,7 @@ registerHooks({ resolve(spec, contexto, proximo) {
   }
   return proximo(spec, contexto)
 } })
-const { indicadoresDoHall } = await import('../src/dominio/pulsoDoHall.js')
+const { indicadoresDoHall, pendenciaDoModulo } = await import('../src/dominio/pulsoDoHall.js')
 const { normalizarPreferenciasHall, aplicarFocoDoHall, ordenarPaineisDoHall } = await import('../src/dominio/preferenciasHall.js')
 const ids = ['atendimento', 'cozinha', 'entregas', 'financeiro']
 const antes = { ordem: ['entregas', 'atendimento'], favoritos: ['cozinha'] }
@@ -42,6 +42,10 @@ const fontes = {
   financeiro: { estado: 'ok', dados: { saldoEsperado: 300.03, aberto: true } },
 }
 assert.deepEqual(indicadoresDoHall(fontes, ids).map((item) => item.valor), [2, 2, 1, 300.03])
+// #2055: o pedido fora da área pago e aprovado pela dona (aprovado_baba) está em Na fila na Cozinha; o Hall conta igual.
+const comAprovado = { pedidos: { estado: 'ok', dados: { itens: [{ status: 'aprovado_baba' }], parcial: false } } }
+assert.equal(indicadoresDoHall(comAprovado, ['cozinha'])[0].valor, 1)
+assert.deepEqual(pendenciaDoModulo('cozinha', comAprovado), { texto: '1 pedido no preparo', atencao: true })
 // #1810: no hall enxuto só o caixa de outro dia vira alerta escrito; o resto fica no título.
 assert.deepEqual(indicadoresDoHall(fontes, ids).map((item) => item.alerta), [null, null, null, null])
 assert.equal(indicadoresDoHall({ financeiro: { estado: 'ok', dados: { saldoEsperado: 10, aberturaPendenteCrossDay: true } } }, ['financeiro'])[0].alerta,
