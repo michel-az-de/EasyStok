@@ -94,8 +94,8 @@ public sealed record ConfirmarPagamentoPedidoResult(
 /// </para>
 ///
 /// <para>
-/// #1289: pedido já pago por outro pagamento (cobrança <c>Paga</c> com outro id, ou <c>TotalPago</c> que já
-/// cobre o total) não recebe o segundo: ele é estornado do mesmo jeito, com a chave
+/// #1289: pedido já pago por outro pagamento (cobrança <c>Paga</c> com outro id, ou saldo alocado que já
+/// cobre o total; pagamento devolvido não conta, #2056) não recebe o segundo: ele é estornado do mesmo jeito, com a chave
 /// <c>estorno-duplicado-{pagamento}</c>, sem novo <c>PedidoPagamento</c> nem canhoto
 /// (<see cref="SituacaoConfirmacaoPagamento.PagamentoDuplicado"/>). Antes, cobrança já paga fazia o
 /// <c>MarcarPaga</c> lançar (webhook 500 em loop) e cobrança cancelada aceitava o segundo pagamento.
@@ -300,13 +300,14 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
         var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
         EfeitosQuitacao? efeito = null;
-        var alocadoDepois = alvo.Complementar && saldoFinanceiro is not null
+        // #2056: o pagamento devolvido continua em Pagamentos; quitar e cobrar o resto seguem o saldo alocado.
+        var alocadoDepois = saldoFinanceiro is not null
             ? (await saldoFinanceiro.ConsultarAsync(comPagamentos, ct)).Alocado : comPagamentos.TotalPago;
         if (alocadoDepois >= comPagamentos.Total.Valor)
             efeito = await quitacao.PrepararAsync(comPagamentos, alvo, pagoEm, ct);
         else if (!alvo.Complementar && alvo.Valor < comPagamentos.Total.Valor)
         {
-            var saldo = comPagamentos.Total.Valor - comPagamentos.TotalPago;
+            var saldo = comPagamentos.Total.Valor - alocadoDepois;
             var naEntrega = CobrancaPedido.CriarNaEntrega(empresaId, pedido.Id, saldo, pagoEm, alvo.ConversaId);
             await cobrancaRepository.AddAsync(naEntrega, ct);
             // Decisão do Felipe (22/10): o sinal da encomenda pago pelo link avisa o cliente pelo canal do pedido, uma
@@ -435,7 +436,7 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
 
     /// <summary>
     /// #1289: o pedido já está pago por outro pagamento quando alguma cobrança está <c>Paga</c> com outro id ou
-    /// quando os pagamentos registrados (console, maquininha) já cobrem o total. O <c>FOR UPDATE</c> não carrega
+    /// quando o saldo alocado (pagamentos menos devoluções, com os cupons; #2056) já cobre o total. O <c>FOR UPDATE</c> não carrega
     /// <c>Pagamentos</c>; a leitura com detalhes devolve a mesma instância rastreada, já com eles.
     /// </summary>
     private async Task<bool> JaPagoPorOutroPagamentoAsync(
@@ -449,7 +450,9 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
             return true;
 
         var comPagamentos = await pedidos.GetByIdWithDetailsAsync(empresaId, pedido.Id) ?? pedido;
-        var alocado = saldoFinanceiro is not null && alvo?.Complementar == true
+        // #2056: mesma conta do GerarCobrancaPedidoUseCase. O TotalPago cru ainda conta o pagamento já devolvido
+        // e o link reemitido depois da devolução integral seria estornado como duplicado.
+        var alocado = saldoFinanceiro is not null
             ? (await saldoFinanceiro.ConsultarAsync(comPagamentos, ct)).Alocado : comPagamentos.TotalPago;
         // Preferência antiga paga depois de uma edição não vira complemento de valor diferente.
         return comPagamentos.Total.Valor > 0m && (alocado >= comPagamentos.Total.Valor

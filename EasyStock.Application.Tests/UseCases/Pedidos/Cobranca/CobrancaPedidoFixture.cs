@@ -71,6 +71,12 @@ internal sealed class CobrancaPedidoFixture
     /// <summary>Cupons do pedido, para a cobrança complementar (saldo depois do cupom).</summary>
     public ICreditoClienteComandaRepository Creditos { get; } = Substitute.For<ICreditoClienteComandaRepository>();
 
+    /// <summary>Devoluções online do pedido (#2056); sem configuração, nenhuma.</summary>
+    public IEstornoOnlineRepository Estornos { get; } = Substitute.For<IEstornoOnlineRepository>();
+
+    /// <summary>Saldo do pedido como na produção: pagamentos menos devoluções, com os cupons.</summary>
+    public SaldoFinanceiroPedido Saldos() => new(PedidoRepo, Estornos, Creditos);
+
     /// <summary>Estorno do pagamento que chega depois do cancelamento; aceita por padrão.</summary>
     public IEstornoPedidoGateway Estorno { get; } = Substitute.For<IEstornoPedidoGateway>();
 
@@ -173,8 +179,7 @@ internal sealed class CobrancaPedidoFixture
 
     public GerarCobrancaPedidoUseCase Gerar() =>
         new(PedidoRepo, StorefrontRepo, CobrancaRepo, MpClient, CheckoutCore(), Uow, Relogio,
-            NullLogger<GerarCobrancaPedidoUseCase>.Instance,
-            new SaldoFinanceiroPedido(PedidoRepo, Substitute.For<IEstornoOnlineRepository>(), Creditos));
+            NullLogger<GerarCobrancaPedidoUseCase>.Instance, Saldos());
 
     /// <summary>Núcleo do checkout sobre a vaga e o pedido da fixture: só a reserva desfeita (#1301) passa por ele aqui.</summary>
     public CheckoutCoreService CheckoutCore() =>
@@ -211,12 +216,13 @@ internal sealed class CobrancaPedidoFixture
     }
 
     /// <param name="calculadora">Início previsto e número do dia; sem ela, a calculadora sem numerador.</param>
+    /// <remarks>Com o <see cref="Saldos"/>, como a DI da produção monta o use case.</remarks>
     public ConfirmarPagamentoPedidoUseCase Confirmar(AvisoStatusPedidoCliente? avisoCliente = null, CalculadoraInicioPrevistoPedido? calculadora = null) =>
         new(CobrancaRepo, PedidoStorefrontRepo,
             new RegistrarPagamentoPedidoUseCase(PedidoRepo, Uow, NullLogger<RegistrarPagamentoPedidoUseCase>.Instance,
                 new CalculadoraInicioPrevistoPedido(PrazoQueries), Quitacao()),
             Publicador, OperacaoEventos, Quitacao(), Tenant, Uow, Relogio, NullLogger<ConfirmarPagamentoPedidoUseCase>.Instance,
-            calculadora ?? new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo, avisoCliente: avisoCliente);
+            calculadora ?? new CalculadoraInicioPrevistoPedido(PrazoQueries), Estorno, Aviso(), PedidoRepo, Saldos(), avisoCliente);
 
     public NotificarAtrasoPedidoUseCase NotificarAtraso() =>
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Notificador, Options.Create(Prazos), Relogio,
