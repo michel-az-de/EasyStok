@@ -91,6 +91,35 @@ public class CobrancaPedidoRepositoryIntegrationTests(PostgreSqlDatabaseFixture 
         vencidas.Should().NotContain(v => v.PedidoId == pedidoId && v.CobrancaId != vencidaId, "a de 5 h ainda vale");
     }
 
+    [SkippableFact]
+    public async Task Vencidas_paginam_com_desempate_estavel_quando_as_expiracoes_sao_iguais()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        var expiraEm = new DateTime(2001, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var ids = new List<Guid>();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa);
+            var pedido = await CriarPedidoAsync(seed, empresa);
+            for (var i = 51; i >= 1; i--)
+            {
+                var cobranca = CobrancaPedido.CriarOnline(empresa, pedido.Id, 25m,
+                    $"pref-{Guid.NewGuid():N}", "https://mp.test/fila", expiraEm, 1, expiraEm.AddHours(-1));
+                ids.Add(cobranca.Id);
+                seed.CobrancasPedido.Add(cobranca);
+            }
+            await seed.SaveChangesAsync();
+        }
+
+        await using var semTenant = fixture.CreateDbContext();
+        var repo = new CobrancaPedidoRepository(semTenant);
+        var primeira = await repo.ListarPendentesVencidasAsync(expiraEm, 50);
+        var segunda = await repo.ListarPendentesVencidasAsync(expiraEm, 50, pular: 50);
+        var esperados = ids.OrderBy(id => id.ToString("N"), StringComparer.Ordinal).ToArray();
+        primeira.Select(c => c.CobrancaId).Should().Equal(esperados.Take(50));
+        segunda.Select(c => c.CobrancaId).Should().Equal(esperados.Skip(50));
+    }
     /// <summary>
     /// #1610: a varredura do lembrete acha, sem tenant, o link online pendente da conversa nos últimos minutos. Fica de
     /// fora o link do site (sem conversa), o que ainda tem tempo, o vencido, o que aguarda credencial, o já lembrado e

@@ -6,8 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EasyStock.Api.UnitTests.BackgroundServices;
 
 /// <summary>
-/// I3.2 (#1688): a falha da rodada do <c>CobrancaPedidoJob</c> conta por loja. Antes, três falhas quaisquer
-/// interrompiam a rodada, e três cobranças presas de uma loja travavam a fila das demais.
+/// #2048: cada cobrança da página tem sua tentativa, mesmo quando outras da mesma empresa falham.
 /// </summary>
 public class RodadaDeCobrancasVencidasTests
 {
@@ -29,10 +28,36 @@ public class RodadaDeCobrancasVencidasTests
         }, NullLogger.Instance, CancellationToken.None);
 
         tentadas.Count(l => l == saudavel).Should().Be(2, "a loja saudável é processada inteira");
-        tentadas.Count(l => l == presa).Should().Be(RodadaDeCobrancasVencidas.FalhasParaPularALoja, "depois de três falhas o resto da loja fica para a próxima rodada");
-        resumo.Should().Be(new RodadaDeCobrancasVencidas.Resumo(Processadas: 2, Falhas: 3, Puladas: 2));
+        tentadas.Count(l => l == presa).Should().Be(5, "cada cobrança tem sua tentativa, mesmo na empresa com outras falhas");
+        resumo.Should().Be(new RodadaDeCobrancasVencidas.Resumo(Processadas: 2, Falhas: 5, Puladas: 0));
     }
 
+    [Fact]
+    public async Task Tres_falhas_da_mesma_loja_nao_impedem_a_conciliacao_do_pedido_seguinte()
+    {
+        var empresa = Guid.NewGuid();
+        var vencidas = new[] { Da(empresa), Da(empresa), Da(empresa), Da(empresa) };
+        var pedidoComPagamentoAConferir = vencidas[^1];
+        var tentadas = new List<Guid>();
+
+        // A consulta do job devolve de novo as três cobranças antigas que falharam.
+        // Sem avançar, um pagamento com webhook perdido nunca chega à consulta do provedor.
+        for (var rodada = 0; rodada < 2; rodada++)
+        {
+            tentadas.Clear();
+            var resumo = await RodadaDeCobrancasVencidas.ProcessarAsync(vencidas, (item, _) =>
+            {
+                tentadas.Add(item.CobrancaId);
+                return item.CobrancaId == pedidoComPagamentoAConferir.CobrancaId
+                    ? Task.CompletedTask
+                    : throw new HttpRequestException("Falha persistente desta cobrança");
+            }, NullLogger.Instance, CancellationToken.None);
+
+            tentadas.Should().Contain(pedidoComPagamentoAConferir.CobrancaId,
+                "três cobranças com falha não podem impedir a conciliação de outro pedido da mesma empresa");
+            resumo.Should().Be(new RodadaDeCobrancasVencidas.Resumo(1, 3, 0));
+        }
+    }
     [Fact]
     public async Task Falhas_espalhadas_por_lojas_diferentes_nao_interrompem_nada()
     {
