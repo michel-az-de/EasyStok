@@ -92,13 +92,78 @@ public sealed class CobrancaPedidoJobRotacaoTests
         await cenario.RodarAsync();
         var primeiraPagina = cenario.Tentadas.ToArray();
 
+        cenario.VencerNovas(2);
         cenario.ReiniciarJob();
         await cenario.RodarAsync();
         cenario.Tentadas.Should().Equal(primeiraPagina);
-        cenario.Pendentes().Should().Be(51);
+        cenario.Pendentes().Should().Be(53);
 
         await cenario.RodarAsync();
         cenario.Tentadas.Should().Equal(cenario.PedidosSaudaveis);
+    }
+
+    [Fact]
+    public async Task Novos_vencimentos_continuos_nao_abandonam_cobrancas_anteriores()
+    {
+        using var cenario = new Cenario(ruins: 0, saudaveis: 100);
+        var anteriores = cenario.PedidosSaudaveis.ToArray();
+        var tentadas = new HashSet<Guid>();
+        IReadOnlyList<Guid> primeirasNovas = [];
+
+        for (var rodada = 0; rodada < 6; rodada++)
+        {
+            await cenario.RodarAsync();
+            cenario.Tentadas.Should().HaveCountLessThanOrEqualTo(50);
+            tentadas.UnionWith(cenario.Tentadas);
+            var novas = cenario.VencerNovas(100);
+            if (rodada == 0) primeirasNovas = novas;
+        }
+
+        anteriores.Except(tentadas).Should().BeEmpty(
+            "novos vencimentos não podem impedir o retorno às cobranças puladas quando a página anterior saiu da fila");
+        primeirasNovas.Any(tentadas.Contains).Should().BeTrue(
+            "voltar ao início precisa renovar o corte para incluir as cobranças que venceram depois");
+    }
+
+    [Fact]
+    public async Task Novos_vencimentos_nao_impedem_a_retentativa_das_falhas_anteriores()
+    {
+        using var cenario = new Cenario(ruins: 50, saudaveis: 1);
+        await cenario.RodarAsync();
+        var primeiraPagina = cenario.Tentadas.ToArray();
+
+        cenario.VencerNovas(100);
+        await cenario.RodarAsync();
+        cenario.Tentadas.Should().Contain(cenario.PedidosSaudaveis[0]);
+
+        cenario.VencerNovas(100);
+        await cenario.RodarAsync();
+        cenario.Tentadas.Should().Equal(primeiraPagina,
+            "a varredura precisa terminar e tentar de novo as falhas mesmo com novas cobranças vencendo");
+    }
+
+    [Fact]
+    public async Task Cancelamento_conserva_o_corte_da_varredura_na_retomada()
+    {
+        using var cenario = new Cenario(ruins: 50, saudaveis: 1);
+        await cenario.RodarAsync();
+        var anterior = cenario.PedidosSaudaveis.Single();
+        cenario.VencerNovas(100);
+        using var cts = new CancellationTokenSource();
+        cenario.DuranteConsulta = (_, token) =>
+        {
+            cts.Cancel();
+            token.ThrowIfCancellationRequested();
+        };
+        var rodar = () => cenario.RodarAsync(cts.Token);
+        await rodar.Should().ThrowAsync<OperationCanceledException>();
+        cenario.Tentadas.Should().Equal(anterior);
+
+        cenario.DuranteConsulta = null;
+        cenario.VencerNovas(100);
+        await cenario.RodarAsync();
+        cenario.Tentadas.Should().Equal(new[] { anterior },
+            "cancelar não troca o corte nem inclui cobranças de uma varredura seguinte");
     }
 
     // Exercita seleção, tentativas e remoção da consulta pelo job e repositório reais. InMemory não
@@ -110,6 +175,7 @@ public sealed class CobrancaPedidoJobRotacaoTests
             "ProcessarVencidasAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
         private readonly DbContextOptions<EasyStockDbContext> _options;
         private readonly ServiceProvider _services;
+        private readonly RelogioControlado _relogio = new();
         private CobrancaPedidoJob _job;
         public List<Guid> Tentadas { get; } = [];
         public HashSet<Guid> PedidosComFalha { get; } = [];
@@ -167,7 +233,7 @@ public sealed class CobrancaPedidoJobRotacaoTests
                 var tenant = Substitute.For<ITenantContextAccessor>();
                 tenant.When(t => t.SetCurrentTenant(Arg.Any<Guid>())).Do(call => db.SetMobileTenantContext(call.Arg<Guid>()));
                 return new ProcessarCobrancaVencidaUseCase(pedidos, sp.GetRequiredService<ICobrancaPedidoRepository>(),
-                    null!, null!, null!, mercadoPago, null!, tenant, db, new RelogioFixo(),
+                    null!, null!, null!, mercadoPago, null!, tenant, db, _relogio,
                     NullLogger<ProcessarCobrancaVencidaUseCase>.Instance, null!, null!);
             });
             _services = services.BuildServiceProvider();
@@ -180,13 +246,35 @@ public sealed class CobrancaPedidoJobRotacaoTests
             return (Task)Rodada.Invoke(_job, [ct])!;
         }
 
+        public IReadOnlyList<Guid> VencerNovas(int quantidade)
+        {
+            // São criadas ainda válidas e vencem somente ao avançar o relógio da rodada.
+            var criadasEm = _relogio.GetUtcNow().UtcDateTime;
+            var novas = new List<Guid>();
+            using var db = new EasyStockDbContext(_options);
+            var empresaId = Guid.NewGuid();
+            for (var i = 0; i < quantidade; i++)
+            {
+                var pedido = Pedido.Criar(empresaId);
+                pedido.Status = StatusPedidoMapper.Preparando;
+                db.Pedidos.Add(pedido);
+                db.CobrancasPedido.Add(CobrancaPedido.CriarOnline(empresaId, pedido.Id, 25m,
+                    $"pref-{pedido.Id:N}", "https://mp.test/link", criadasEm.AddSeconds(30).AddMilliseconds(i), 1, criadasEm));
+                novas.Add(pedido.Id);
+                PedidosSaudaveis.Add(pedido.Id);
+            }
+            db.SaveChanges();
+            _relogio.Avancar(TimeSpan.FromMinutes(1));
+            return novas;
+        }
+
         public int Pendentes()
         {
             using var db = new EasyStockDbContext(_options);
             return db.CobrancasPedido.IgnoreQueryFilters().Count(c => c.Status == StatusCobrancaPedido.Pendente);
         }
 
-        private CobrancaPedidoJob CriarJob() => new(_services, new RelogioFixo(), NullLogger<CobrancaPedidoJob>.Instance);
+        private CobrancaPedidoJob CriarJob() => new(_services, _relogio, NullLogger<CobrancaPedidoJob>.Instance);
 
         public void ReiniciarJob()
         {
@@ -200,9 +288,11 @@ public sealed class CobrancaPedidoJobRotacaoTests
             _services.Dispose();
         }
 
-        private sealed class RelogioFixo : TimeProvider
+        private sealed class RelogioControlado : TimeProvider
         {
-            public override DateTimeOffset GetUtcNow() => new(Agora);
+            private DateTimeOffset _agora = new(Agora);
+            public override DateTimeOffset GetUtcNow() => _agora;
+            public void Avancar(TimeSpan intervalo) => _agora += intervalo;
         }
     }
 }

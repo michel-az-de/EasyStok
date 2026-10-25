@@ -30,6 +30,7 @@ public sealed class CobrancaPedidoJob(
     private const long LockKeyJob = 0x436F6250656449L; // "CobPedI"
     private const int MaximoPorRodada = 50;
     private int _pularVencidas;
+    private DateTime? _limiteVencidas;
     private static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(60);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -102,11 +103,16 @@ public sealed class CobrancaPedidoJob(
             await scope.ServiceProvider.GetRequiredService<RetomarCobrancasAguardandoCredencialUseCase>().ExecuteAsync(ct);
 
             var repo = scope.ServiceProvider.GetRequiredService<ICobrancaPedidoRepository>();
-            vencidas = await repo.ListarPendentesVencidasAsync(relogio.GetUtcNow().UtcDateTime, MaximoPorRodada, _pularVencidas, ct);
+            // #2057: novos vencimentos não estendem a varredura sem fim. É um corte temporal,
+            // não uma fotografia das linhas: remoções continuam visíveis à paginação.
+            var limite = _limiteVencidas ?? relogio.GetUtcNow().UtcDateTime;
+            vencidas = await repo.ListarPendentesVencidasAsync(limite, MaximoPorRodada, _pularVencidas, ct);
+            _limiteVencidas = limite;
         }
         if (vencidas.Count == 0)
         {
             _pularVencidas = 0;
+            _limiteVencidas = null;
             return;
         }
 
@@ -122,6 +128,7 @@ public sealed class CobrancaPedidoJob(
         // da consulta podem adiar outros até a volta ao início; reiniciar o job também volta ao início.
         // O cursor só avança depois de concluir a rodada: cancelamento não pula uma página pela metade.
         _pularVencidas = vencidas.Count == MaximoPorRodada ? _pularVencidas + vencidas.Count : 0;
+        if (_pularVencidas == 0) _limiteVencidas = null;
 
         logger.LogInformation("CobrancaPedidoJob: vencidas={Total} falhas={Falhas} puladas={Puladas}",
             vencidas.Count, resumo.Falhas, resumo.Puladas);
