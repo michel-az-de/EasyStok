@@ -201,8 +201,17 @@ public static class NotificacoesGlobaisSeed
             nome: "Produto Vencendo — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ProdutoVencendo,
-            assuntoTemplate: "EasyStock — Produto vencendo em {{ dias_restantes }} dia(s): {{ produto_nome }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("produto_vencendo_email_v1"));
+            assuntoTemplate: "Casa da Baba: {{ nomeProduto }} vence em {{ diasRestantes }} dia(s)",
+            corpoTemplate: EmailTemplateLoader.LoadBody("produto_vencendo_email_v2"))
+            .ComVersao(2); // #2074: as chaves que o ColetorProdutosVencendo envia (nomeProduto, expiraEm, diasRestantes).
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "produto_vencendo_inapp_v1",
+            nome: "Produto Vencendo — In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.ProdutoVencendo,
+            assuntoTemplate: "Produto perto do vencimento",
+            corpoTemplate: "{{ nomeProduto }} vence em {{ diasRestantes }} dia(s) ({{ expiraEm }}). Quantidade: {{ quantidade }}.");
 
         // ===== Templates do modulo Helpdesk =====
         yield return TemplateNotificacao.Criar(
@@ -358,8 +367,9 @@ public static class NotificacoesGlobaisSeed
             nome: "Relatorio Pronto — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.RelatorioPronto,
-            assuntoTemplate: "Seu relatorio esta pronto: {{ reportLabel }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("relatorio_pronto_email_v1"));
+            assuntoTemplate: "Seu relatório está pronto: {{ reportLabel }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("relatorio_pronto_email_v2"))
+            .ComVersao(2); // #2074: sem primeiroNome, que o Worker não envia.
 
         yield return TemplateNotificacao.Criar(
             codigo: "relatorio_falhou_inapp_v1",
@@ -375,7 +385,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.RelatorioFalhou,
             assuntoTemplate: "Nao conseguimos gerar: {{ reportLabel }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("relatorio_falhou_email_v1"));
+            corpoTemplate: EmailTemplateLoader.LoadBody("relatorio_falhou_email_v2"))
+            .ComVersao(2); // #2074: sem primeiroNome, que o Worker não envia.
 
         yield return TemplateNotificacao.Criar(
             codigo: "ticket_respondido_cliente_inapp_v1",
@@ -701,8 +712,11 @@ public static class NotificacoesGlobaisSeed
             tipoEvento: TipoEventoNotificacao.ComandaAtualizada,
             assuntoTemplate: "",
             corpoTemplate: "{{ nome }}, comanda nº {{ numero }}. {{ mensagem }}");
-        comandaAtualizada.DefinirMetadados("""{"clienteId":"{{ clienteId }}"}""");
-        yield return comandaAtualizada;
+        // #2074: fora da janela usa o modelo "pedido_atualizado" (corpo de submissão em docs/plan/notificacoes-sistema/
+        // 08-catalogo-mensagens.md). Os textos de "mensagem" são de uma linha, como a Meta exige no parâmetro.
+        comandaAtualizada.DefinirMetadados(
+            """{"template":"pedido_atualizado","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ mensagem }}","clienteId":"{{ clienteId }}"}""");
+        yield return comandaAtualizada.ComVersao(2);
 
         yield return TemplateNotificacao.Criar(
             codigo: "pedido_reagendado_whatsapp_v1",
@@ -710,7 +724,10 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.WhatsApp,
             tipoEvento: TipoEventoNotificacao.PedidoReagendado,
             assuntoTemplate: "",
-            corpoTemplate: "{{ nome }}, seu pedido nº {{ numero }} foi reagendado. Nova previsão de entrega: {{ previsao }}.");
+            corpoTemplate: "{{ nome }}, seu pedido nº {{ numero }} foi reagendado. Nova previsão de entrega: {{ previsao }}.")
+            .ComMetadados(
+                """{"template":"pedido_reagendado","idioma":"pt_BR","param1":"{{ nome }}","param2":"{{ numero }}","param3":"{{ previsao }}"}""")
+            .ComVersao(2); // #2074: modelo para fora da janela de 24 h.
 
         yield return ComMetadados(TemplateNotificacao.Criar(
             codigo: "pedido_saiu_whatsapp_v1",
@@ -844,8 +861,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ConviteAcesso,
             assuntoTemplate: "{{ empresa }}: seu convite para entrar no sistema",
-            corpoTemplate: EmailTemplateLoader.LoadBody("convite_acesso_email_v2"))
-            .ComVersao(2); // #1753: mesmo código, corpo novo com a marca da casa e sem supor gênero.
+            corpoTemplate: EmailTemplateLoader.LoadBody("convite_acesso_email_v3"))
+            .ComVersao(3); // #1753: marca da casa e sem supor gênero. #2074: entrar com Google ou criar senha.
 
         // O convite ja nasceu (N13) como o modelo "convite_acesso_link" (botao URL), para nao aprovar dois modelos na
         // Meta. N9: versao 2, que liga o botao ao token do WhatsApp (botaoUrl0 = token_convite_whatsapp, um token por
@@ -923,7 +940,55 @@ public static class NotificacoesGlobaisSeed
             corpoTemplate: "Resumo de {{ data }} no EasyStok: {{ entregues }} pedidos entregues, faturamento de {{ faturamento }} e caixa {{ caixa_texto }}. O resumo completo está no seu e-mail.")
             .ComMetadados(
                 """{"template":"resumo_diario","idioma":"pt_BR","param1":"{{ data }}","param2":"{{ entregues }}","param3":"{{ faturamento }}","param4":"{{ caixa_texto }}"}""");
+
+        // ===== #2074: o sino da dona e da equipe. A categoria Operacional acrescenta o InApp sozinha, mas só quando o tipo
+        // tem template InApp; sem ele, prazo estourado e resumo nunca apareciam no sino. O incidente fica de fora de
+        // propósito: vai ao superadmin por e-mail e WhatsApp (N10), e o sino cai junto com a API. Interno. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "prazo_estourado_inapp_v1",
+            nome: "Prazo Estourado · In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.PrazoEstourado,
+            assuntoTemplate: "{{ tipo_legivel }} há {{ atraso_texto }}",
+            corpoTemplate: """{{ if cliente && cliente != "" }}{{ cliente }} está esperando: {{ end }}{{ tipo_legivel }} há {{ atraso_texto }} (referência {{ referencia }}).""");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "resumo_diario_inapp_v1",
+            nome: "Resumo Diário · In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.ResumoDiario,
+            assuntoTemplate: "Resumo de {{ data }}",
+            corpoTemplate: "{{ entregues }} pedidos entregues, faturamento de {{ faturamento }} e caixa {{ caixa_texto }}.");
+
+        // ===== #2074: contas a pagar e a receber. O ContaFinanceiraVencimentoJob publicava e nenhuma rotina existia, então
+        // o evento fechava em silêncio. Sino e e-mail dos donos; o payload já leva os textos prontos. Interno. =====
+        foreach (var (tipo, codigo, nome) in ContasVencimento)
+        {
+            yield return TemplateNotificacao.Criar(
+                codigo: $"{codigo}_inapp_v1",
+                nome: $"{nome} · In-App",
+                canal: CanalNotificacao.InApp,
+                tipoEvento: tipo,
+                assuntoTemplate: "{{ titulo_texto }}: {{ descricao_texto }}",
+                corpoTemplate: "{{ descricao_texto }}, parcela {{ numero }}: {{ situacao_texto }}. Valor em aberto: {{ valor_texto }} (vencimento {{ vencimento_texto }}).");
+
+            yield return TemplateNotificacao.Criar(
+                codigo: $"{codigo}_email_v1",
+                nome: $"{nome} · Email",
+                canal: CanalNotificacao.Email,
+                tipoEvento: tipo,
+                assuntoTemplate: "Casa da Baba: {{ descricao_texto }} {{ situacao_texto }}",
+                corpoTemplate: EmailTemplateLoader.LoadBody("conta_vencimento_email_v1"));
+        }
     }
+
+    private static readonly (TipoEventoNotificacao Tipo, string Codigo, string Nome)[] ContasVencimento =
+    [
+        (TipoEventoNotificacao.ContaPagarVencendo, "conta_pagar_vencendo", "Conta a Pagar Vencendo"),
+        (TipoEventoNotificacao.ContaPagarVencida, "conta_pagar_vencida", "Conta a Pagar Vencida"),
+        (TipoEventoNotificacao.ContaReceberVencendo, "conta_receber_vencendo", "Conta a Receber Vencendo"),
+        (TipoEventoNotificacao.ContaReceberVencida, "conta_receber_vencida", "Conta a Receber Vencida"),
+    ];
 
     public static IEnumerable<RotinaNotificacao> BuildDefaultRotinas()
     {
@@ -968,6 +1033,8 @@ public static class NotificacoesGlobaisSeed
             templateCodigo: "produto_vencendo_email_v1",
             categoria: CategoriaConteudoNotificacao.Operacional);
         rotinaProdutoVencendo.DefinirFallback("[\"Email\"]", "system");
+        // #2074: o coletor publica sem destinatário; quem recebe são os gestores (sino e e-mail).
+        rotinaProdutoVencendo.DefinirParametros(ModoTodos("gestores"), "system");
         rotinaProdutoVencendo.Ativar("system");
         yield return rotinaProdutoVencendo;
 
@@ -1200,6 +1267,10 @@ public static class NotificacoesGlobaisSeed
             """{"modoCanais":"todos","audiencia":"admins","agenda":{"horario":"20:00"}}""");
         resumoDiario.Desativar("system");
         yield return resumoDiario;
+
+        foreach (var (tipo, codigo, nome) in ContasVencimento)
+            yield return MakeRotina($"{codigo}_global", nome, tipo, $"{codigo}_inapp_v1",
+                CategoriaConteudoNotificacao.Operacional, "[\"InApp\",\"Email\"]", ModoTodos("admins"));
     }
 
     private static TemplateNotificacao ComVersao(this TemplateNotificacao template, int versao)
