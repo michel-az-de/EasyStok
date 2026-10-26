@@ -78,6 +78,27 @@ module.exports = function ({ test, sandbox, assert }) {
     });
   }
 
+  test('#2066 OTA: aparelho que já operava sem IDB confirma a versão em modo degradado', async () => {
+    const f = fixture({
+      queueInit: store => { store.degraded = true; return { storage: 'localStorage', degraded: true }; },
+      photoInit: () => undefined
+    });
+    // Gravado pela queue-store na sessão anterior: a falha é do aparelho, não do pacote novo.
+    f.data.set('cdb-queue-storage', 'ls-fallback');
+    f.boot();
+    const result = await f.context.cdbSync.localReady;
+    assert.equal(result.ready, true);
+    assert.equal(result.degraded, true);
+    assert.ok(JSON.parse(f.data.get('cdb-sync-queue')).some(item => item.id === 'ls-pending'), 'fila do localStorage preservada');
+  });
+
+  test('#2066 OTA: aparelho que operava com IDB e degrada na versão nova não confirma', async () => {
+    const f = fixture({ queueInit: store => { store.degraded = true; return { storage: 'localStorage', degraded: true }; } });
+    f.data.set('cdb-queue-storage', 'idb');
+    f.boot();
+    assert.equal((await f.context.cdbSync.localReady).ready, false);
+  });
+
   test('#2065 OTA: falha antes das stores resolve confirmação negativa sem esconder o erro original', async () => {
     const f = fixture();
     f.context.cdbApp.getState = () => { throw new Error('fixture boot failure'); };

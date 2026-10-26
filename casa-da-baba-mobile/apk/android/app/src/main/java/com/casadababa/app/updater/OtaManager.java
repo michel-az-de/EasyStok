@@ -127,6 +127,15 @@ public final class OtaManager {
         } catch (Exception error) { return false; }
     }
 
+    /** Versão ativa gravada por outro APK. Campo ausente ou malformado continua sendo recuperação visível. */
+    private boolean installedOtherApk(JSONObject active) {
+        if (active == null) return false;
+        Object recorded = active.opt("nativeVersionCode");
+        if (!(recorded instanceof Integer || recorded instanceof Long)) return false;
+        if (((Number) recorded).longValue() != nativeCode) return true;
+        return active.optBoolean("builtin", false) && !builtinVersion.equals(active.optString("bundleVersion"));
+    }
+
     /** Called before Bridge.create(), never from a running web page. Null means APK assets. */
     public synchronized String beginBoot(boolean recreatedActivity) {
         boolean recreation = recreatedActivity && booted;
@@ -137,42 +146,51 @@ public final class OtaManager {
             return null;
         }
         try {
+            if (!recreation) {
+                // Aviso de retorno e erro valem para a abertura em que ocorreram.
+                put(state, "rolledBack", false);
+                lastError = "";
+            }
             JSONObject active = state.optJSONObject("active");
             boolean recovered = false;
-            if (!valid(active)) {
-                JSONObject previous = state.optJSONObject("previous");
-                put(state, "active", valid(previous) ? previous : builtin());
+            if (installedOtherApk(active)) {
+                // Instalar um APK novo é o caminho esperado: o conteúdo do APK anterior não serve mais.
+                put(state, "active", builtin());
                 state.remove("previous");
                 state.remove("pending");
                 state.remove("pendingRollback");
                 put(state, "trial", false);
-                put(state, "rolledBack", true);
-                lastError = "A versão ativa está ausente ou incompatível. Uma versão segura foi restaurada.";
+                put(state, "rolledBack", false);
+                lastError = "";
+                recovered = true;
+            } else if (!valid(active)) {
+                restorePrevious("A versão ativa está ausente ou incompatível. Uma versão segura foi restaurada.");
                 recovered = true;
             }
-            if (UpdatePolicy.mustFallback(state.optBoolean("trial"), recreation)) {
-                JSONObject previous = state.optJSONObject("previous");
-                put(state, "active", valid(previous) ? previous : builtin());
-                state.remove("previous");
-                state.remove("pending");
-                state.remove("pendingRollback");
-                put(state, "trial", false);
-                put(state, "rolledBack", true);
-                lastError = "A versão nova não confirmou a inicialização. A versão anterior foi restaurada.";
+            if (UpdatePolicy.mustFallback(state.optBoolean("trial"), recreation, state.optLong("trialBoots", 1))) {
+                restorePrevious("A versão nova não confirmou a inicialização. A versão anterior foi restaurada.");
             } else if (!recreation && !recovered) {
                 JSONObject pending = state.optJSONObject("pending");
+                boolean applied = false;
                 if (pending != null) {
                     if (valid(pending)) {
-                        put(state, "previous", state.optJSONObject("active"));
-                        put(state, "active", pending);
                         boolean rollback = state.optBoolean("pendingRollback");
-                        put(state, "trial", !rollback && !pending.optBoolean("builtin"));
+                        // A versão abandonada no retorno não vira "anterior": reaplicá-la pularia o teste de saúde.
+                        if (rollback) state.remove("previous");
+                        else put(state, "previous", state.optJSONObject("active"));
+                        put(state, "active", pending);
+                        boolean trial = !rollback && !pending.optBoolean("builtin");
+                        put(state, "trial", trial);
+                        if (trial) put(state, "trialBoots", 1L); else state.remove("trialBoots");
                         put(state, "rolledBack", rollback);
                         lastError = "";
+                        applied = true;
                     } else lastError = "Atualização preparada incompatível ou ausente. Versão atual preservada.";
                     state.remove("pending");
                     state.remove("pendingRollback");
                 }
+                if (!applied && state.optBoolean("trial"))
+                    put(state, "trialBoots", state.optLong("trialBoots", 1) + 1);
             }
             save(); // Persist the trial BEFORE the WebView can execute any new code.
             active = state.optJSONObject("active");
@@ -183,6 +201,18 @@ public final class OtaManager {
             put(state, "active", builtin());
             return null;
         }
+    }
+
+    private void restorePrevious(String message) {
+        JSONObject previous = state.optJSONObject("previous");
+        put(state, "active", valid(previous) ? previous : builtin());
+        state.remove("previous");
+        state.remove("pending");
+        state.remove("pendingRollback");
+        state.remove("trialBoots");
+        put(state, "trial", false);
+        put(state, "rolledBack", true);
+        lastError = message;
     }
 
     public synchronized JSObject status() {
@@ -211,6 +241,7 @@ public final class OtaManager {
             "Confirmação de inicialização pertence a outra versão.");
         if (state.optBoolean("trial")) {
             put(state, "trial", false);
+            state.remove("trialBoots");
             save();
         }
         return status();
@@ -270,7 +301,7 @@ public final class OtaManager {
         WORKER.execute(() -> {
             try {
                 download();
-                synchronized (this) { checkSucceeded = true; }
+                synchronized (this) { checkSucceeded = true; lastError = ""; }
             }
             catch (Exception error) {
                 synchronized (this) { lastError = safeError(error); }

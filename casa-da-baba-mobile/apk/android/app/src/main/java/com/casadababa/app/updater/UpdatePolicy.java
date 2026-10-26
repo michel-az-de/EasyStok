@@ -16,6 +16,8 @@ public final class UpdatePolicy {
     public static final long MAX_FILE = 32L * 1024 * 1024;
     public static final int MAX_ENTRIES = 4096;
     public static final int DATA_SCHEMA = 2;
+    /** Aberturas em teste sem ACK antes de voltar. Uma só confunde fechar o app com versão quebrada. */
+    public static final int MAX_TRIAL_BOOTS = 2;
     public static final String APP_ID = "com.casadababa.piloto";
     public static final String CHANNEL = "piloto";
     public static final String MANIFEST_URL = "https://easystok.online/downloads/casa-da-baba/ota/latest.json";
@@ -118,8 +120,9 @@ public final class UpdatePolicy {
             "Pacote sem tela inicial ou identificação de versão.");
     }
 
-    public static boolean mustFallback(boolean trial, boolean recreatedInSameProcess) {
-        return trial && !recreatedInSameProcess;
+    /** trialBoots conta as aberturas já feitas em teste; volta só quando a nova abertura excederia o limite. */
+    public static boolean mustFallback(boolean trial, boolean recreatedInSameProcess, long trialBoots) {
+        return trial && !recreatedInSameProcess && trialBoots >= MAX_TRIAL_BOOTS;
     }
 
     public static boolean isUpdateAnnouncement(String sender, String kind, String sequence) {

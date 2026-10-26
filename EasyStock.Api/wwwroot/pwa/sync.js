@@ -1226,14 +1226,21 @@
       // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
       // index.html escuta. Falha silenciosa nao bloqueia o app.
       maybeOfferRestoreOnReinstall();
+      // #2066: modo da fila na sessao anterior, gravado pela queue-store. Lido antes do
+      // init, que o sobrescreve. 'ls-fallback' indica aparelho que ja operava sem IDB.
+      let filaAnterior = null;
+      try { filaAnterior = localStorage.getItem('cdb-queue-storage'); } catch (_) {}
       // F10-C-2: inicializa queue-store IDB antes do primeiro flush.
       const queueReady = _initQueueStore().then(function (result) {
         updatePendingCount();
-        return result.storage === 'idb' && !result.degraded && _queueStoreReady
-          && Array.isArray(_queueCache) && window.cdbQueueStore.ready && !window.cdbQueueStore.degraded;
+        if (!_queueStoreReady || !Array.isArray(_queueCache)) return 'unavailable';
+        if (result.storage === 'idb' && !result.degraded
+          && window.cdbQueueStore.ready && !window.cdbQueueStore.degraded) return 'ready';
+        // Falha que ja existia antes desta versao e do aparelho, nao do pacote novo.
+        return filaAnterior === 'ls-fallback' ? 'degraded' : 'unavailable';
       }).catch(function (e) {
         _trace('boot', 'queue-store init error (continuing with localStorage)', { error: e && e.message });
-        return false;
+        return 'unavailable';
       });
       // init de fotos pode resolver mesmo em falha; confira o estado ao concluir.
       const photoReady = Promise.resolve().then(async function () {
@@ -1246,9 +1253,11 @@
         return false;
       });
       // Confirma apenas o bootstrap local. Rede, pareamento e fila vazia nao sao gates de OTA.
-      Promise.all([queueReady, photoReady]).then(function (results) {
-        resolveLocalReady(results.every(Boolean) ? { ready: true }
-          : { ready: false, reason: 'local-storage-unavailable' });
+      // Sem IDB no aparelho, as fotos tambem nao abrem: o modo degradado ja era o da versao anterior.
+      Promise.all([queueReady, photoReady]).then(function ([fila, fotos]) {
+        if (fila === 'ready' && fotos) resolveLocalReady({ ready: true });
+        else if (fila === 'degraded') resolveLocalReady({ ready: true, degraded: true });
+        else resolveLocalReady({ ready: false, reason: 'local-storage-unavailable' });
       });
       flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
       // Loop self-rescheduling com backoff exponencial em erro (substitui o

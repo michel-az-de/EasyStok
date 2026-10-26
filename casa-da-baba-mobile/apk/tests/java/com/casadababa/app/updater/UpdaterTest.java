@@ -81,7 +81,7 @@ public class UpdaterTest {
         check(disk(files).getLong("maxSequence") == 10, "Rollback preserves anti-replay sequence");
 
         Path unconfirmed = directory("trial");
-        seed(unconfirmed, state(next, builtin(), null, true), next);
+        seed(unconfirmed, state(next, builtin(), null, true).put("trialBoots", UpdatePolicy.MAX_TRIAL_BOOTS), next);
         OtaManager restarted = manager(unconfirmed);
         check(restarted.beginBoot(true) == null, "Process restart with saved Activity still rolls back unacked trial");
         check(restarted.status().getBoolean("rolledBack"), "Automatic rollback visible");
@@ -103,7 +103,7 @@ public class UpdaterTest {
         check(!recovery.status().getBoolean("trial"), "Recovery clears failed trial");
 
         Path writeFailed = directory("ack-failed");
-        seed(writeFailed, state(next, builtin(), null, true), next);
+        seed(writeFailed, state(next, builtin(), null, true).put("trialBoots", UpdatePolicy.MAX_TRIAL_BOOTS), next);
         OtaManager failing = manager(writeFailed);
         AtomicFile.failNextWrite = true;
         rejects(() -> failing.ready("0.3.1"), "Failed save cannot acknowledge readiness");
@@ -129,6 +129,70 @@ public class UpdaterTest {
         check(failActivation.beginBoot(false) == null, "Failed trial save runs embedded version only");
         check(!disk(activationFailed).getBoolean("trial"), "Failed activation never claims persisted trial");
         check(disk(activationFailed).getJSONObject("active").getBoolean("builtin"), "Old active survives failed trial save");
+    }
+
+    /** Revisão da PR #2066: achados 1, 2, 3 e 5. */
+    private static void reviewTests() throws Exception {
+        JSONObject next = release("0.3.1", HASH, 10);
+
+        // Achado 1: atualizar o APK é o caminho esperado, não uma recuperação.
+        Path upgraded = directory("apk-upgrade");
+        JSONObject oldBuiltin = builtin().put("nativeVersionCode", 2).put("bundleVersion", "0.2.0");
+        seed(upgraded, state(oldBuiltin, null, null, false));
+        OtaManager afterUpgrade = manager(upgraded);
+        check(afterUpgrade.beginBoot(false) == null, "APK upgrade serves the new embedded assets");
+        check(!afterUpgrade.status().getBoolean("rolledBack"), "APK upgrade from builtin is not reported as recovery");
+        check(afterUpgrade.status().getString("lastError").isEmpty(), "APK upgrade from builtin shows no error");
+        check(disk(upgraded).getJSONObject("active").getInt("nativeVersionCode") == 3, "New APK identity persisted");
+        Path upgradedOta = directory("apk-upgrade-ota");
+        JSONObject oldOta = release("0.2.5", "c".repeat(64), 9).put("nativeVersionCode", 2);
+        seed(upgradedOta, state(oldOta, oldBuiltin, null, false), oldOta);
+        OtaManager afterOtaUpgrade = manager(upgradedOta);
+        check(afterOtaUpgrade.beginBoot(false) == null, "APK upgrade over an OTA bundle serves the new embedded assets");
+        check(!afterOtaUpgrade.status().getBoolean("rolledBack"), "APK upgrade over OTA is not reported as recovery");
+        check(afterOtaUpgrade.status().getString("lastError").isEmpty(), "APK upgrade over OTA shows no error");
+        check(!afterOtaUpgrade.status().getBoolean("canRollback"), "Old APK content is never offered as rollback");
+        check(disk(upgradedOta).getLong("maxSequence") == 10, "APK upgrade preserves anti-replay sequence");
+        Path corrupt = directory("same-apk-missing");
+        seed(corrupt, state(release("0.3.2", "d".repeat(64), 11), null, null, false));
+        OtaManager missingActive = manager(corrupt);
+        missingActive.beginBoot(false);
+        check(missingActive.status().getBoolean("rolledBack"), "Missing bundle on the same APK is still a visible recovery");
+
+        // Achado 2: depois de voltar, a versão rejeitada não volta pelo mesmo botão.
+        Path toggle = directory("rollback-toggle");
+        seed(toggle, state(next, builtin(), null, false), next);
+        manager(toggle).rollback();
+        OtaManager back = manager(toggle);
+        check(back.beginBoot(false) == null, "Rollback applies the older version");
+        check(!back.status().getBoolean("canRollback"), "Rejected version is not offered as rollback target");
+        check(back.status().getString("previousVersion").isEmpty(), "Rejected version is not kept as previous");
+        rejects(back::rollback, "A second rollback cannot re-apply the rejected version without trial");
+
+        // Achado 3: fechar o app antes do ACK não descarta uma release boa.
+        Path closed = directory("closed-before-ready");
+        seed(closed, state(builtin(), null, next, false), next);
+        check(manager(closed).beginBoot(false).endsWith(HASH), "Prepared release applied in trial");
+        OtaManager reopened = manager(closed);
+        check(reopened.beginBoot(false).endsWith(HASH), "One close before ready keeps the new version in trial");
+        check(reopened.status().getBoolean("trial") && !reopened.status().getBoolean("rolledBack"), "Second trial boot is not a rollback");
+        reopened.ready("0.3.1");
+        check(!disk(closed).getBoolean("trial"), "Second trial boot can still acknowledge the release");
+        Path never = directory("never-ready");
+        seed(never, state(builtin(), null, next, false), next);
+        for (int boot = 0; boot < UpdatePolicy.MAX_TRIAL_BOOTS; boot++)
+            check(manager(never).beginBoot(false).endsWith(HASH), "Release keeps every allowed trial boot");
+        OtaManager exhausted = manager(never);
+        check(exhausted.beginBoot(false) == null, "Release that never acknowledges rolls back after the allowed trial boots");
+        check(exhausted.status().getBoolean("rolledBack"), "Exhausted trial rollback is visible");
+
+        // Achado 5: aviso de recuperação e erro valem para a abertura em que ocorreram.
+        Path sticky = directory("sticky-notice");
+        seed(sticky, state(next, builtin(), null, false).put("rolledBack", true).put("lastError", "falha antiga"), next);
+        OtaManager later = manager(sticky);
+        later.beginBoot(false);
+        check(!later.status().getBoolean("rolledBack"), "Recovery notice does not survive into a later boot");
+        check(later.status().getString("lastError").isEmpty(), "Old error does not survive into a later boot");
     }
 
     private static void policyTests() throws Exception {
@@ -206,11 +270,17 @@ public class UpdaterTest {
         int requests = NetworkFixture.packageRequests;
         checkUpdate(app);
         check(NetworkFixture.packageRequests == requests, "Same sequence never downloads again");
+        NetworkFixture.status = 500;
+        check(!checkUpdate(app).getString("lastError").isEmpty(), "Offline check reports its error");
+        NetworkFixture.status = 200;
+        JSONObject recovered = checkUpdate(app);
+        check(recovered.getBoolean("checkSucceeded") && recovered.getString("lastError").isEmpty(), "Successful check without news clears the old error");
         JSONObject older = new JSONObject(next.toString()).put("sequence", 9);
         signedManifest(older, key); checkUpdate(app);
         check(NetworkFixture.packageRequests == requests, "Older signed manifest rejected by anti-replay");
         signedManifest(next, key);
         app.beginBoot(false);
+        for (int boot = 1; boot < UpdatePolicy.MAX_TRIAL_BOOTS; boot++) manager(files).beginBoot(false);
         OtaManager failedTrial = manager(files);
         check(failedTrial.beginBoot(false) == null, "Unacknowledged downloaded bundle rolls back");
         checkUpdate(failedTrial);
@@ -283,7 +353,7 @@ public class UpdaterTest {
 
     public static void main(String[] args) throws Exception {
         temporary = Files.createTempDirectory("cdb-updater-test-");
-        try { policyTests(); zipTests(); stateTests(); networkTests(); System.out.println("PASS: " + assertions + " native updater assertions (host fixtures; Android device validation pending)"); }
+        try { policyTests(); zipTests(); stateTests(); reviewTests(); networkTests(); System.out.println("PASS: " + assertions + " native updater assertions (host fixtures; Android device validation pending)"); }
         finally {
             java.lang.reflect.Field worker = OtaManager.class.getDeclaredField("WORKER"); worker.setAccessible(true);
             ((java.util.concurrent.ExecutorService) worker.get(null)).shutdownNow();
