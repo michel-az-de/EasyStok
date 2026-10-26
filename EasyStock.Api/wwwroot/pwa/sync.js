@@ -1202,45 +1202,64 @@
     }
   } catch (_) {}
 
+  let resolveLocalReady;
+  const localReady = new Promise(resolve => { resolveLocalReady = resolve; });
   setTimeout(() => {
-    if (window.cdbApp) {
-      const s = window.cdbApp.getState();
-      lastSnapshot = JSON.parse(JSON.stringify({
-        products: s.products.map(({count, photo, ...r}) => r),
-        clients: s.clients,
-        orders: s.orders,
-        cashEntries: s.cashEntries,
-        // A6: snapshot inicial tambem stripado, senao o primeiro diff
-        // gerado por cdbOnPersist comparar inflated vs stripped e enfileirar
-        // batch inteira como "novidade".
-        batches: s.batches.map(stripBatchPhotoBytes)
-      }));
-    }
-    updatePendingCount();
-    // #1520: exclusao de lancamento que ficou no "Desfazer" quando o app fechou.
-    confirmarExclusoesPendentes();
-    // A5: detecta reinstalacao + oferece restore via backup local. Roda em
-    // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
-    // index.html escuta. Falha silenciosa nao bloqueia o app.
-    maybeOfferRestoreOnReinstall();
-    // F10-C-2: inicializa queue-store IDB antes do primeiro flush.
-    _initQueueStore().then(function () {
+    try {
+      if (window.cdbApp) {
+        const s = window.cdbApp.getState();
+        lastSnapshot = JSON.parse(JSON.stringify({
+          products: s.products.map(({count, photo, ...r}) => r),
+          clients: s.clients,
+          orders: s.orders,
+          cashEntries: s.cashEntries,
+          // A6: snapshot inicial tambem stripado, senao o primeiro diff
+          // gerado por cdbOnPersist comparar inflated vs stripped e enfileirar
+          // batch inteira como "novidade".
+          batches: s.batches.map(stripBatchPhotoBytes)
+        }));
+      }
       updatePendingCount();
-    }).catch(function (e) {
-      _trace('boot', 'queue-store init error (continuing with localStorage)', { error: e && e.message });
-    });
-    // F10-C-7: inicializa photo-store IDB (separado do queue-store).
-    if (window.cdbPhotoStore && typeof window.cdbPhotoStore.init === 'function') {
-      window.cdbPhotoStore.init().catch(function (e) {
-        _trace('boot', 'photo-store init error (fotos nao persistirao)', { error: e && e.message });
+      // #1520: exclusao de lancamento que ficou no "Desfazer" quando o app fechou.
+      confirmarExclusoesPendentes();
+      // A5: detecta reinstalacao + oferece restore via backup local. Roda em
+      // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
+      // index.html escuta. Falha silenciosa nao bloqueia o app.
+      maybeOfferRestoreOnReinstall();
+      // F10-C-2: inicializa queue-store IDB antes do primeiro flush.
+      const queueReady = _initQueueStore().then(function (result) {
+        updatePendingCount();
+        return result.storage === 'idb' && !result.degraded && _queueStoreReady
+          && Array.isArray(_queueCache) && window.cdbQueueStore.ready && !window.cdbQueueStore.degraded;
+      }).catch(function (e) {
+        _trace('boot', 'queue-store init error (continuing with localStorage)', { error: e && e.message });
+        return false;
       });
+      // init de fotos pode resolver mesmo em falha; confira o estado ao concluir.
+      const photoReady = Promise.resolve().then(async function () {
+        const store = window.cdbPhotoStore;
+        if (!store || typeof store.init !== 'function') return false;
+        await store.init();
+        return store.ready === true;
+      }).catch(function (e) {
+        _trace('boot', 'photo-store init error (fotos nao persistirao)', { error: e && e.message });
+        return false;
+      });
+      // Confirma apenas o bootstrap local. Rede, pareamento e fila vazia nao sao gates de OTA.
+      Promise.all([queueReady, photoReady]).then(function (results) {
+        resolveLocalReady(results.every(Boolean) ? { ready: true }
+          : { ready: false, reason: 'local-storage-unavailable' });
+      });
+      flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
+      // Loop self-rescheduling com backoff exponencial em erro (substitui o
+      // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
+      // longo do server escala ate 10min entre tentativas, economizando
+      // bateria/rede sem perder mutations (fila persiste).
+      scheduleNextFlush(FLUSH_DELAY_NORMAL_MS);
+    } catch (error) {
+      resolveLocalReady({ ready: false, reason: 'local-bootstrap-failed' });
+      throw error;
     }
-    flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
-    // Loop self-rescheduling com backoff exponencial em erro (substitui o
-    // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
-    // longo do server escala ate 10min entre tentativas, economizando
-    // bateria/rede sem perder mutations (fila persiste).
-    scheduleNextFlush(FLUSH_DELAY_NORMAL_MS);
   }, 500);
 
   // ---- Version ping (Onda 0): verifica compat + capabilities do servidor ----
@@ -1875,7 +1894,11 @@
       } else if (type === 'pwa_update') {
         // Onda 9 — gestor força atualizacao do bundle pelo painel web.
         // Drena fila antes; trigger com {force:true} limpa caches e reload.
-        flush().finally(() => triggerPwaUpdate({ reason: 'remote-command', force: true }));
+        if (window.CDB_CONFIG?.isPilot) {
+          triggerPwaUpdate({ reason: 'remote-command', force: true }).catch(() => {});
+        } else {
+          flush().finally(() => triggerPwaUpdate({ reason: 'remote-command', force: true }));
+        }
       } else if (type === 'clear_cache') {
         // Debug remoto: limpa caches do SW sem reload (operador continua trabalhando).
         try {
@@ -2140,6 +2163,10 @@
   // index.html cuida do reload. Se {force:true} (comando remoto pwa_update),
   // limpa caches antes pra garantir que ate index.html cacheado seja descartado.
   async function triggerPwaUpdate(opts) {
+    if (window.CDB_CONFIG?.isPilot) {
+      const updater = window.Capacitor?.Plugins?.PilotUpdater;
+      return updater?.check ? updater.check() : { prepared: false, reason: 'updater-unavailable' };
+    }
     opts = opts || {};
     if (_pwaUpdating) return;
 
@@ -2684,7 +2711,7 @@
 
   // Expõe utilitários pra debug + integração com Diagnóstico
   window.cdbSync = {
-    flush, pull, stop,
+    flush, pull, stop, localReady,
     pingVersion, uploadErrorLog,
     pairWithCode, pairAuto,
     openTicketAuto,

@@ -8,7 +8,8 @@ android/local.properties
 android/capacitor-cordova-android-plugins/
 android/capacitor.settings.gradle
 android/app/capacitor.build.gradle
-android/app/src/main/assets/
+android/app/src/main/assets/*
+!android/app/src/main/assets/ota-public-key.der
 android/app/src/main/res/xml/config.xml
 android/build/
 android/app/build/
@@ -16,3 +17,4 @@ android/app/build/
 !package-lock.json
 !android/app/src/main/java/com/casadababa/app/backup/
 !android/app/src/main/java/com/casadababa/app/backup/*.java
+/android/app/google-services.json

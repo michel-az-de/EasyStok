@@ -34,7 +34,7 @@
 .pilot-update button { color: #6b4a24; border: 0; background: transparent; text-decoration: underline; min-height: 44px; font: inherit; cursor: pointer; }
 .pilot-feedback { font-size: 13px; color: #686453; margin: 0; }
 .pilot-error:not(:empty) { color: #a13529; margin-top: 12px; border-left: 3px solid #a13529; padding-left: 10px; }
-#pilotDownload { min-height: 44px; margin-top: 10px; border: 0; background: #496b56; color: #fff; padding: 13px 17px; border-radius: 8px; cursor: pointer; }
+#pilotDownload, #pilotRollback { min-height: 44px; margin-top: 10px; border: 0; background: #496b56; color: #fff; padding: 13px 17px; border-radius: 8px; cursor: pointer; }
 .pilot-home button:focus-visible, .pilot-home summary:focus-visible, .pilot-rail button:focus-visible, .pilot-feedback:focus { outline: 3px solid #8b6322; outline-offset: 3px; }
 @media (max-width: 480px) { .pilot-home { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; } .pilot-sheet { padding: 20px 21px; } }
 @media (prefers-reduced-motion: reduce) { .pilot-home * { scroll-behavior: auto !important; } }
