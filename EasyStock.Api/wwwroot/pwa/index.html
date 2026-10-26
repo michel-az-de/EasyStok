@@ -7935,6 +7935,8 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
       <label class="modal-label">Medida</label>
       <div class="input-box"><input id="newProdUnit" placeholder="ex: 300g, 250ml, unidade"></div>
+      <label class="modal-label" for="newProdValidity">Validade padrão (dias)</label>
+      <div class="input-box"><input id="newProdValidity" type="number" inputmode="numeric" min="1" max="365" value="5" required></div>
       <label class="modal-label" id="emojiGridLabel">Ícone</label>
       <div class="emoji-grid" id="emojiGrid" role="radiogroup" aria-labelledby="emojiGridLabel">
         <button class="emoji-pick active" role="radio" aria-checked="true" aria-label="Massa">🍝</button>
@@ -8070,7 +8072,9 @@ body.ux-calm [data-screen="producao"] .section-label {
       <label class="modal-label">Itens</label>
       <div class="prod-summary" id="prodSummary"></div>
 
-      <label class="modal-label">Validade e peso de cada produto</label>
+      <label class="modal-label" for="prodManufacturedDate">Data de fabricação</label>
+      <div class="input-box"><input id="prodManufacturedDate" type="date" required></div>
+      <label class="modal-label">Quantidade, peso e validade de cada produto</label>
       <div class="prod-detail-list" id="prodDetailList"></div>
 
       <label class="modal-label">Foto (opcional)</label>
@@ -8084,7 +8088,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeProductionConfirm()">Cancelar</button>
-        <button class="cta-btn primary" onclick="confirmProduction()">Finalizar</button>
+        <button class="cta-btn primary" onclick="confirmProduction()">Registrar e imprimir</button>
       </div>
     </div>
   </div>
@@ -8632,6 +8636,10 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="np-icon">🖨️</div>
       <h3 class="np-title">Selecionar impressora</h3>
       <p class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</p>
+      <div id="savedPrinterProfiles" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+      <label for="printerProfile">Modelo do dispositivo que será selecionado</label>
+      <select id="printerProfile" class="np-btn np-secondary"><option value="escpos">Atual · Hipertech WTP05 (ESC/POS)</option><option value="oasis-pending">Oasis · driver pendente de validação</option></select>
+      <p class="np-text" style="font-size:12px">A Oasis pode ser cadastrada, mas a impressão será liberada depois de confirmar o modelo e o protocolo.</p>
       <div id="printerPickerList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:280px;overflow-y:auto"></div>
       <button class="np-btn np-secondary" onclick="loadPrinterDevices()">↻ Buscar de novo</button>
       <button class="np-btn np-tertiary"  onclick="closePrinterPicker()">Cancelar</button>
@@ -10002,7 +10010,7 @@ function buildBackupPayload() {
     'cdb-products','cdb-clients','cdb-orders','cdb-cash','cdb-cash-closings','cdb-batches',
     'cdb-operator-name','cdb-empresa-name','cdb-store-logo',
     'cdb-pix-key','cdb-pix-holder','cdb-pix-type',
-    'cdb-printer','cdb-theme','cdb-onboarding-done',
+    'cdb-printer','cdb-printers','cdb-theme','cdb-onboarding-done',
     'cdb-device-id','cdb-last-sync','cdb-sync-queue'
   ];
   const ls = {};
@@ -12426,10 +12434,25 @@ function openProductionConfirm() {
 
   // Lista de validade/peso por produto. Pré-preenche com defaults do cadastro.
   populateProdDetailList(items);
+  const manufactureInput = document.getElementById('prodManufacturedDate');
+  manufactureInput.value = localProductionDate(Date.now());
+  manufactureInput.max = manufactureInput.value;
 
   document.getElementById('batchDate').textContent = subtituloDoLote(new Date(), currentBatchId);
 
   document.getElementById('productionConfirmModal').classList.add('show');
+}
+
+function localProductionDate(ms) {
+  const date = new Date(ms);
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+}
+
+function productionTimestamp(value, nowMs) {
+  if (!value || value === localProductionDate(nowMs)) return nowMs;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value > localProductionDate(nowMs)) return null;
+  const ms = new Date(value + 'T12:00:00').getTime();
+  return Number.isFinite(ms) && localProductionDate(ms) === value ? ms : null;
 }
 
 const VALIDITY_OPTIONS = [3, 5, 7, 10, 15];
@@ -12450,7 +12473,7 @@ function populateProdDetailList(items) {
       <div class="pd-row" data-pid="${escapeHtml(p.id)}">
         <div class="pd-name">
           <span>${p.emoji || '📦'} ${escapeHtml(p.name)}</span>
-          <span class="pd-qty">×${p.count}</span>
+          <label class="pd-qty">Qtd. <input type="number" class="pd-quantity" aria-label="Quantidade de ${escapeHtml(p.name)}" min="1" max="9999" step="1" value="${p.count}" style="width:70px"></label>
         </div>
         <div class="pd-fields">
           <input type="number" class="pd-weight" placeholder="peso por unidade (g)" min="0" max="9999" value="${defWeight}" />
@@ -12495,14 +12518,17 @@ function readProdDetailValues() {
     row.querySelector('.pd-weight')?.removeAttribute('aria-invalid');
     const pid = row.dataset.pid;
     const weightRaw = row.querySelector('.pd-weight')?.value || '';
+    const quantityRaw = row.querySelector('.pd-quantity')?.value;
+    const qty = quantityRaw == null ? null : Number(quantityRaw);
+    if (qty !== null && (!Number.isInteger(qty) || qty < 1 || qty > 9999)) { valid = false; row.classList.add('invalid'); }
     const customRaw = row.querySelector('.pd-validity-custom')?.value || '';
     const activePill = row.querySelector('.pd-validity-pills button.active');
     let validityDays = null;
     if (customRaw && !isNaN(parseInt(customRaw))) validityDays = parseInt(customRaw);
     else if (activePill) validityDays = parseInt(activePill.dataset.d);
-    if (!validityDays || validityDays < 1) { valid = false; row.classList.add('invalid'); }
+    if (!Number.isInteger(validityDays) || validityDays < 1 || validityDays > 365) { valid = false; row.classList.add('invalid'); }
     const weightG = weightRaw && !isNaN(parseInt(weightRaw)) ? parseInt(weightRaw) : null;
-    perProduct.set(pid, { weightG, validityDays });
+    perProduct.set(pid, { weightG, validityDays, qty });
   });
   return { valid, perProduct };
 }
@@ -14913,8 +14939,35 @@ function ensureBluetoothPermission(cb) {
 }
 
 function getSavedPrinter() { return load('cdb-printer', null); }
+function getPrinterProfiles() {
+  const stored = load('cdb-printers', []);
+  const profiles = Array.isArray(stored) ? stored : [];
+  const saved = getSavedPrinter();
+  if (saved && saved.address && !profiles.some(p => p.address === saved.address)) profiles.push(saved);
+  return profiles;
+}
+function printerReady(printer) {
+  return !!printer && printer.profile !== 'oasis-pending' && !!printer.address;
+}
+function renderSavedPrinters() {
+  const host = document.getElementById('savedPrinterProfiles');
+  if (!host) return;
+  host.innerHTML = '';
+  getPrinterProfiles().forEach(p => {
+    const button = document.createElement('button');
+    button.className = 'np-btn np-secondary';
+    button.textContent = p.name + (p.profile === 'oasis-pending' ? ' · aguardando driver' : ' · salva');
+    button.onclick = () => selectPrinter(p);
+    host.appendChild(button);
+  });
+}
 function setSavedPrinter(p) {
-  if (p) save('cdb-printer', p);
+  if (p) {
+    const profiles = getPrinterProfiles().filter(item => item.address !== p.address);
+    profiles.push(p);
+    save('cdb-printers', profiles);
+    save('cdb-printer', p);
+  }
   else   { try { localStorage.removeItem('cdb-printer'); } catch (e) {} }
   renderPrinterStatus();
 }
@@ -14925,6 +14978,11 @@ function renderPrinterStatus() {
   if (!el || !lab) return;
 
   const bs = window.bluetoothSerial;
+  if (p && p.profile === 'oasis-pending') {
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.textContent = 'Oasis selecionada · modelo e driver pendentes de validação';
+    return;
+  }
   if (!bs) {
     // Plugin Cordova nao carregado: rodando no browser ou APK sem o plugin
     el.classList.add('none'); el.classList.remove('ok');
@@ -14954,6 +15012,7 @@ function pickPrinter() {
 function openPrinterPicker() {
   const modal = document.getElementById('printerPickerModal');
   modal.classList.add('show');
+  renderSavedPrinters();
   loadPrinterDevices();
 }
 
@@ -15021,7 +15080,7 @@ function loadPrinterDevices() {
           row.style.textAlign = 'left';
           row.innerHTML = (isSaved ? '✓ ' : '') + escapeHtml(name)
                         + '<br><span style="font-size:11px;opacity:.7">' + escapeHtml(addr) + '</span>';
-          row.onclick = () => selectPrinter({ address: addr, name });
+          row.onclick = () => selectPrinter({ address: addr, name, profile: document.getElementById('printerProfile').value });
           list.appendChild(row);
         });
       }, (err) => showError('list', err));
@@ -15054,7 +15113,7 @@ function loadPrinterDevices() {
 const DIAG_KNOWN_KEYS = [
   'cdb-products', 'cdb-orders', 'cdb-clients', 'cdb-cash', 'cdb-cash-closings',
   'cdb-batches', 'cdb-audit-log', 'cdb-audit-log-archive', 'cdb-sync-queue',
-  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-operator-name',
+  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-printers', 'cdb-operator-name',
   'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-device-id',
   'cdb-last-sync', 'cdb-theme', 'cdb-prod-scan-mode', 'cdb-demo-mode', 'cdb-schema-version',
   'cdb-pre-reset-backup'
@@ -16194,7 +16253,7 @@ function selectPrinter(printer) {
   try {
     setSavedPrinter(printer);
     btStep('select:saved');
-    showToast('Impressora salva: ' + printer.name + ' — toque Imprimir novamente');
+    showToast(printer.profile === 'oasis-pending' ? 'Oasis salva. Impressão aguarda validação do driver.' : 'Impressora selecionada: ' + printer.name + '. Toque Imprimir novamente.');
     logAction({
       action: 'settings.update',
       entityType: 'settings',
@@ -18889,10 +18948,14 @@ function releasePrinting() {
   isPrinting = false;
   if (printWatchdog) { clearTimeout(printWatchdog); printWatchdog = null; }
 }
-function printViaBluetooth(bytes, onFallback) {
+function printViaBluetooth(bytes, onFallback, printJob) {
   btStep('print:start');
   const bs = window.bluetoothSerial;
   const printer = getSavedPrinter();
+  if (printer && printer.profile === 'oasis-pending') {
+    showToast('Oasis: confirme o modelo e o driver antes de imprimir');
+    return;
+  }
   if (!bs || !printer || !printer.address) {
     btStep('print:no-printer-or-bs bs=' + !!bs + ' p=' + !!printer);
     if (typeof onFallback === 'function') onFallback();
@@ -18964,20 +19027,13 @@ function printViaBluetooth(bytes, onFallback) {
             btStep('print:write-ok');
             showToast('Enviado pra impressora');
             releasePrinting();
-            // #437 — registra impressao no audit log pra historico por lote.
-            try {
-              const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
-              const kind = currentEtiquetasKind;
-              const qtd = (currentEtiquetas && currentEtiquetas.length || 0) * copies;
-              const loteId = (currentEtiquetas && currentEtiquetas[0] && currentEtiquetas[0].id) || null;
-              const lote  = (currentEtiquetas && currentEtiquetas[0] && currentEtiquetas[0].lote) || null;
+            if (printJob && printJob.entityId) {
               logAction({
-                action: 'etiqueta.print',
-                entityType: kind === 'order' ? 'order' : 'batch',
-                entityId: loteId,
-                summary: qtd + ' etiqueta' + (qtd === 1 ? '' : 's') + (lote ? ' · ' + lote : '') + ' impressa' + (qtd === 1 ? '' : 's')
+                action: 'etiqueta.print', entityType: printJob.entityType, entityId: printJob.entityId,
+                summary: printJob.quantity + ' etiqueta(s), ' + printJob.copies + ' cópia(s) · enviada(s) para ' + printer.name,
+                diff: { copies: printJob.copies, quantity: printJob.quantity, printer: { name: printer.name, address: printer.address, profile: printer.profile || 'escpos' }, delivery: 'sent' }
               });
-            } catch (_) {}
+            }
           },
           (err) => {
             const msg = (err && err.message) || err;
@@ -18998,36 +19054,20 @@ function printViaBluetooth(bytes, onFallback) {
       }
     };
     const send = () => rawWrite(true);
-    btStep('print:isConnected-call addr=' + printer.address);
-    try {
-      bs.isConnected(
-        () => { btStep('print:already-connected'); send(); },
-        () => {
-          btStep('print:connect-call');
-          try {
-            bs.connect(printer.address,
-              () => { btStep('print:connected'); send(); },
-              (err) => {
-                btStep('print:connect-err ' + (err && err.message || err));
-                showError(err, 'print');
-                releasePrinting();
-                if (typeof onFallback === 'function') onFallback();
-              }
-            );
-          } catch (ex) {
-            btStep('print:connect-throw ' + (ex.message || ex));
-            showError(ex, 'print');
-            releasePrinting();
-            if (typeof onFallback === 'function') onFallback();
-          }
-        }
-      );
-    } catch (ex) {
-      btStep('print:isConnected-throw ' + (ex.message || ex));
-      showError(ex, 'bluetooth');
-      releasePrinting();
-      if (typeof onFallback === 'function') onFallback();
-    }
+    // Sempre abre a conexão escolhida; um socket existente pode ser da outra impressora.
+    const connectSelected = () => {
+      try {
+        bs.connect(printer.address, send, (err) => {
+          showError(err, 'print'); releasePrinting();
+          if (typeof onFallback === 'function') onFallback();
+        });
+      } catch (err) {
+        showError(err, 'print'); releasePrinting();
+        if (typeof onFallback === 'function') onFallback();
+      }
+    };
+    try { bs.disconnect(connectSelected, connectSelected); }
+    catch (_) { connectSelected(); }
   });
 }
 
@@ -19143,6 +19183,7 @@ function etiquetasFromBatch(batch) {
     for (let i = 0; i < it.qty; i++) {
       const idxStr = String(serial).padStart(3, '0');
       out.push({
+        batchId: batch.id,
         empresa,
         productName: it.name,
         emoji: it.emoji || '',
@@ -20106,6 +20147,15 @@ function closeEtiquetasPreview() {
 // #437 — guarda os ultimos bytes impressos para retry em caso de falha BT.
 let _etqLastPrintBytes = null;
 let _etqLastPrintKind  = null;
+let _etqLastPrintJob = null;
+function etiquetaPrintJob(etiquetas, kind, copies) {
+  const first = etiquetas[0];
+  return first ? {
+    entityType: kind === 'order' ? 'order' : 'batch',
+    entityId: kind === 'order' ? first.order?.id : first.batchId,
+    quantity: etiquetas.length * copies, copies
+  } : null;
+}
 
 function _etqShowRetry() {
   const btn = document.getElementById('etqRetryBtn');
@@ -20121,7 +20171,7 @@ function etqRetry() {
   printViaBluetooth(_etqLastPrintBytes, function () {
     showToast('Sem conexão BT — use Salvar ou Compartilhar');
     _etqShowRetry();
-  });
+  }, _etqLastPrintJob);
 }
 
 function getEtqCopies() {
@@ -20310,9 +20360,11 @@ async function etqAction(action) {
         openPrinterPicker();
         return;
       }
+      if (!printerReady(printer)) { showToast('Oasis: modelo e driver pendentes de validação'); return; }
       // #437: cópias (1/2/5/10) e retry
       const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
       _etqHideRetry();
+      _etqLastPrintJob = etiquetaPrintJob(currentEtiquetas, currentEtiquetasKind, copies);
       if (currentEtiquetasKind === 'order') {
         const et = currentEtiquetas[0];
         const printNota = getEtqNota() || null;
@@ -20324,7 +20376,7 @@ async function etqAction(action) {
         printViaBluetooth(totalBytes, function () {
           showToast('Sem conexão BT — use Salvar ou Compartilhar');
           _etqShowRetry();
-        });
+        }, _etqLastPrintJob);
       } else {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
@@ -20351,7 +20403,7 @@ async function etqAction(action) {
         printViaBluetooth(totalBytes, function () {
           showToast('Sem conexão BT — use Salvar ou Compartilhar');
           _etqShowRetry();
-        });
+        }, _etqLastPrintJob);
       }
       return;
     }
@@ -20731,7 +20783,7 @@ function confirmProduction() {
   // Validação: todo produto precisa de validade. Peso é opcional.
   const detail = readProdDetailValues();
   if (!detail.valid) {
-    showToast('Defina a validade de cada produto');
+    showToast('Confira a quantidade e a validade de cada produto');
     return;
   }
 
@@ -20750,6 +20802,10 @@ function confirmProduction() {
     marcarPesoFaltando(itemsRaw.filter(p => semPeso.includes(p.name)).map(p => p.id));
     showToast(`Falta o peso de: ${semPeso.join(', ')} (vai na etiqueta)`);
     return;
+  }
+  for (const p of itemsRaw) {
+    const qty = detail.perProduct.get(p.id)?.qty;
+    if (qty != null) p.count = qty;
   }
   // Sanitiza qty pra inteiro positivo (impede NaN/negativo escapando do prompt)
   for (const p of itemsRaw) {
@@ -20779,9 +20835,9 @@ function confirmProduction() {
       if (!proceed) return;
     }
   }
+  const nowMs = productionTimestamp(document.getElementById('prodManufacturedDate')?.value, Date.now());
+  if (nowMs === null) { showToast('Informe uma data de fabricação válida, até hoje'); return; }
   _isSavingProduction = true;
-
-  const nowMs = Date.now();
   const lote  = getLoteDoDia(new Date(nowMs));
 
   const items = itemsRaw.map(p => {
@@ -21550,6 +21606,7 @@ function saveOrder() {
     }}
   ];
   showActionToast(msg, actions);
+  if (!retroAtMs && window.CDB_CONFIG?.isPilot) openCobranca(order.id);
   lastAction = { type: 'pedido' };
 }
 
@@ -21574,6 +21631,8 @@ function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
   document.getElementById('newProdPrice').value = '';
   const costEl = document.getElementById('newProdCost');
   if (costEl) costEl.value = '';
+  document.getElementById('newProdMinStock').value = '';
+  document.getElementById('newProdValidity').value = '5';
   selectedCat = cat;
   selectedEmoji = '🍝';
   document.querySelectorAll('#catPills .cat-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
@@ -21661,6 +21720,12 @@ function saveNewProduct() {
   const minStockParsed = minStockStr ? parseInt(minStockStr, 10) : NaN;
   const minStock = (!isNaN(minStockParsed) && minStockParsed >= 0) ? minStockParsed : null;
 
+  const validityInput = document.getElementById('newProdValidity');
+  const defaultValidityDays = Number(validityInput.value);
+  if (!Number.isInteger(defaultValidityDays) || defaultValidityDays < 1 || defaultValidityDays > 365) {
+    showToast('Informe a validade do produto entre 1 e 365 dias'); validityInput.focus(); return;
+  }
+
   // Modo edit: editingProductId setado por openProductModalForEdit
   if (editingProductId) {
     const idx = products.findIndex(p => p.id === editingProductId);
@@ -21669,9 +21734,9 @@ function saveNewProduct() {
     products[idx] = {
       ...products[idx],
       name, emoji: selectedEmoji, category: selectedCat,
-      unit: unit || '', price, cost, minStock
+      unit: unit || '', price, cost, minStock, defaultValidityDays
     };
-    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost','minStock']);
+    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost','minStock','defaultValidityDays']);
     persistAll();
     renderProductGrid();
     if (typeof renderCatalogList === 'function') renderCatalogList();
@@ -21692,7 +21757,7 @@ function saveNewProduct() {
   const product = {
     id: 'custom-' + Date.now(),
     name, emoji: selectedEmoji, category: selectedCat,
-    unit: unit || '', price, cost, minStock, count: 0, photo: null, stock: 0, custom: true
+    unit: unit || '', price, cost, minStock, defaultValidityDays, count: 0, photo: null, stock: 0, custom: true
   };
   products.push(product);
   persistAll();
@@ -21705,7 +21770,8 @@ function saveNewProduct() {
     summary: 'Cadastrou produto ' + name
   });
 
-  if (productModalCallback) {
+  const fromOrder = !!productModalCallback;
+  if (fromOrder) {
     // Adiciona direto no pedido em construção
     addItemToOrder(product);
   } else {
@@ -21715,6 +21781,7 @@ function saveNewProduct() {
 
   closeProductModal();
   showToast(`${name} criado`);
+  if (!fromOrder) openProductionConfirm();
   haptic();
 }
 
@@ -21727,6 +21794,7 @@ function openProductModalForEdit(productId) {
   editingProductId = productId;
   document.getElementById('newProdName').value = p.name || '';
   document.getElementById('newProdUnit').value = p.unit || '';
+  document.getElementById('newProdValidity').value = p.defaultValidityDays ?? 5;
   document.getElementById('newProdPrice').value = p.price != null ? formatMoneyInput(p.price) : '';
   const costEl = document.getElementById('newProdCost');
   if (costEl) costEl.value = (p.cost != null ? formatMoneyInput(p.cost) : '');

@@ -1,0 +1,36 @@
+.pilot-app { padding-top: 48px !important; }
+.pilot-rail { position: fixed; top: 0; left: 0; right: 0; z-index: 9990; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 5px 14px; background: #fffaf2; border-bottom: 1px solid #e7dac6; color: #594530; font: 12px/1.3 system-ui, sans-serif; }
+.pilot-rail button { border: 0; background: none; color: #352c25; font-weight: 700; min-height: 36px; }
+.pilot-rail button span { margin-left: 4px; color: #936e35; font-size: 11px; font-weight: 500; }
+.pilot-rail [role=status] { max-width: 46%; text-align: right; }
+.pilot-rail[data-online=true] [role=status] { color: #326a50; }
+.pilot-home { width: min(100%, 600px); max-width: 100vw; max-height: 100dvh; margin: auto; padding: 0; border: 0; border-radius: 26px; background: #fbf6ec; color: #352d25; box-shadow: 0 18px 80px #241b1744; font: 15px/1.5 system-ui, sans-serif; }
+.pilot-home::backdrop { background: #291f1bbf; backdrop-filter: blur(3px); }
+.pilot-sheet { padding: 24px 26px 22px; }
+.pilot-topline { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: #94713d; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.pilot-topline button { width: 44px; height: 44px; border: 1px solid #e5d6c4; border-radius: 50%; background: #fffaf2; color: #7b6145; font-size: 25px; cursor: pointer; }
+.pilot-home h1 { margin: 23px 0 9px; font: 400 clamp(28px, 6vw, 38px)/1.12 Georgia, serif; letter-spacing: -.04em; }
+.pilot-intro { color: #7a6a58; margin: 0 0 20px; }
+.pilot-connection { border-top: 1px solid #e8ddcb; padding-top: 15px; color: #6c6856; font-size: 12px; }
+.pilot-actions { display: grid; gap: 12px; margin: 22px 0 13px; }
+.pilot-card { position: relative; display: grid; gap: 6px; width: 100%; padding: 22px 48px 22px 22px; text-align: left; border: 0; border-radius: 17px; cursor: pointer; font-family: inherit; }
+.pilot-card .pilot-step { font-size: 10px; letter-spacing: .13em; font-weight: 750; opacity: .84; }
+.pilot-card strong { font: 400 26px/1.15 Georgia, serif; margin: 2px 0; }
+.pilot-card > span:last-of-type { font-size: 12px; line-height: 1.5; }
+.pilot-card b { position: absolute; right: 22px; top: 47%; font-size: 23px; font-weight: 400; }
+.pilot-production { color: #fff9ee; background: #496b56; }
+.pilot-orders { color: #fff9ee; background: #ae573b; }
+.pilot-card:hover { filter: brightness(1.06); }
+.pilot-hint, .pilot-help p { color: #786854; font-size: 12px; }
+.pilot-shortcuts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 18px 0; }
+.pilot-shortcuts button { border: 1px solid #dfcfb9; border-radius: 10px; background: transparent; color: #604c36; min-height: 50px; padding: 7px; font: 600 11px/1.4 system-ui, sans-serif; cursor: pointer; }
+.pilot-help { border-top: 1px solid #e4d7c3; border-bottom: 1px solid #e4d7c3; padding: 15px 0; }
+.pilot-help summary { cursor: pointer; color: #6b5943; font-size: 12px; }
+.pilot-update { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 15px; color: #8c7961; font-size: 11px; }
+.pilot-update button { color: #6b4a24; border: 0; background: transparent; text-decoration: underline; min-height: 44px; font: inherit; cursor: pointer; }
+.pilot-feedback { font-size: 12px; color: #686453; margin: 0; }
+.pilot-error { color: #a13529; margin-top: 8px; }
+#pilotDownload { margin-top: 10px; border: 0; background: #496b56; color: #fff; padding: 13px 17px; border-radius: 8px; cursor: pointer; }
+.pilot-home button:focus-visible, .pilot-home summary:focus-visible, .pilot-rail button:focus-visible { outline: 3px solid #a77a2c; outline-offset: 3px; }
+@media (max-width: 480px) { .pilot-home { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; } .pilot-sheet { padding: 20px 21px; } }
+@media (prefers-reduced-motion: reduce) { .pilot-home * { scroll-behavior: auto !important; } }
