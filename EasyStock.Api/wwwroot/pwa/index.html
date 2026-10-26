@@ -8004,23 +8004,23 @@ body.ux-calm [data-screen="producao"] .section-label {
   </div>
 
   <!-- Modal novo cliente -->
-  <div class="modal-overlay" id="newClientModal">
+  <div class="modal-overlay" id="newClientModal" role="dialog" aria-modal="true" aria-labelledby="newClientModalTitle">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-title" id="newClientModalTitle">Novo <span class="accent">cliente</span></div>
       <div class="modal-sub">Nome é obrigatório. Resto é opcional.</div>
 
-      <label class="modal-label">Nome</label>
-      <div class="input-box"><input id="newClientName" placeholder="ex: Fernanda Silva" oninput="updateClientSaveState()"></div>
+      <label class="modal-label" for="newClientName">Nome</label>
+      <div class="input-box"><input id="newClientName" required autocomplete="name" placeholder="ex: Fernanda Silva" oninput="updateClientSaveState()"></div>
 
-      <label class="modal-label">Endereço (opcional)</label>
+      <label class="modal-label" for="newClientAddr">Endereço (opcional)</label>
       <div class="input-box"><input id="newClientAddr" placeholder="ex: Apto 506, Rua Tal 123, ou referência"></div>
 
-      <label class="modal-label">WhatsApp (opcional)</label>
-      <div class="input-box"><input id="newClientPhone" type="tel" placeholder="(11) 9xxxx xxxx"></div>
+      <label class="modal-label" for="newClientPhone">WhatsApp (opcional)</label>
+      <div class="input-box"><input id="newClientPhone" type="tel" autocomplete="tel" placeholder="(11) 9xxxx xxxx"></div>
 
-      <label class="modal-label">CPF ou CNPJ (opcional)</label>
-      <div class="input-box"><input id="newClientDoc" type="text" inputmode="numeric" placeholder="ex: 123.456.789-00 ou 12.345.678/0001-90" oninput="onClientDocInput(event)" maxlength="18"></div>
+      <label class="modal-label" for="newClientDoc">CPF ou CNPJ (opcional)</label>
+      <div class="input-box"><input id="newClientDoc" type="text" aria-describedby="newClientDocHint" inputmode="numeric" placeholder="ex: 123.456.789-00 ou 12.345.678/0001-90" oninput="onClientDocInput(event)" maxlength="18"></div>
       <div id="newClientDocHint" class="doc-hint"></div>
 
       <div class="modal-ctas">
@@ -8688,10 +8688,10 @@ body.ux-calm [data-screen="producao"] .section-label {
   <!-- Modal "Sem impressora" — aparece quando o operador toca em Imprimir
        sem ter pareado uma impressora termica. Substitui o confirm() do
        Android (cinza, fora do tema). Estilo igual ao modal de update. -->
-  <div class="np-overlay" id="noPrinterModal" role="dialog" aria-modal="true">
+  <div class="np-overlay" id="noPrinterModal" role="dialog" aria-modal="true" aria-labelledby="noPrinterTitle">
     <div class="np-sheet">
       <div class="np-icon">🖨️</div>
-      <h3 class="np-title">Impressora não configurada</h3>
+      <h3 class="np-title" id="noPrinterTitle">Impressora não configurada</h3>
       <p class="np-text">Você ainda não pareou uma impressora térmica. O que prefere fazer?</p>
       <button class="np-btn np-primary"   onclick="npModalAction('configure')">Configurar agora</button>
       <button class="np-btn np-secondary" onclick="npModalAction('share')">Compartilhar como imagem</button>
@@ -8773,7 +8773,7 @@ body.ux-calm [data-screen="producao"] .section-label {
   <div class="cobranca-overlay" id="cobrancaModal" role="dialog" aria-modal="true" aria-labelledby="cobrancaTitle">
     <div class="cobranca-sheet">
       <div class="cobranca-head">
-        <h3 id="cobrancaTitle">Cobrança</h3>
+        <h3 id="cobrancaTitle" tabindex="-1">Cobrança</h3>
         <button class="cobranca-close" onclick="closeCobranca()" aria-label="Fechar">×</button>
       </div>
       <div class="cobranca-preview" id="cobrancaPreview"></div>
@@ -9688,7 +9688,7 @@ async function maybeOfferLocalRestore() {
       if (!picked) return;
       if (picked.kind === 'export' && picked.payload && typeof applyBackupPayload === 'function') {
         // Formato do exportBackup manual: tem .state estruturado.
-        applyBackupPayload(picked.payload);
+        await applyBackupPayload(picked.payload);
         try {
           localStorage.setItem('cdb-restore-source', 'saf-export-' + (picked.filename || ''));
           localStorage.setItem('cdb-restore-at', String(Date.now()));
@@ -9728,13 +9728,7 @@ async function maybeOfferLocalRestore() {
             + 'Deseja RESTAURAR esses dados? (Recomendado se voce reinstalou o app)';
     if (!confirm(msg)) return;
 
-    // Aplica: escreve cada chave snap no localStorage e recarrega
-    Object.keys(snap).forEach(function (k) {
-      // Mantem device-id atual (se ja foi gerado neste install) pra nao
-      // confundir o servidor com "mesmo device" em duas instalacoes
-      if (k === 'cdb-device-id' && localStorage.getItem('cdb-device-id')) return;
-      try { localStorage.setItem(k, snap[k]); } catch (e) {}
-    });
+    await applyBackupPayload(backup);
     try {
       localStorage.setItem('cdb-restore-source', 'local-file');
       localStorage.setItem('cdb-restore-at', String(Date.now()));
@@ -10007,7 +10001,7 @@ async function restoreFromPublicStorage() {
     }
     if (picked.kind === 'export' && typeof applyBackupPayload === 'function') {
       if (!confirm('Restaurar dados do arquivo "' + (picked.filename || 'backup') + '"?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
-      applyBackupPayload(picked.payload);
+      await applyBackupPayload(picked.payload);
       try {
         localStorage.setItem('cdb-restore-source', 'manual-saf-export');
         localStorage.setItem('cdb-restore-at', String(Date.now()));
@@ -10018,11 +10012,7 @@ async function restoreFromPublicStorage() {
     }
     if (picked.kind === 'snapshot' && picked.payload && picked.payload.data) {
       if (!confirm('Restaurar a cópia automática de ' + new Date(picked.payload.capturedAt || Date.now()).toLocaleString('pt-BR') + '?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
-      var snap = picked.payload.data;
-      Object.keys(snap).forEach(function (k) {
-        if (k === 'cdb-device-id' && localStorage.getItem('cdb-device-id')) return;
-        try { localStorage.setItem(k, snap[k]); } catch (e) {}
-      });
+      await applyBackupPayload(picked.payload);
       try {
         localStorage.setItem('cdb-restore-source', 'manual-saf-snapshot');
         localStorage.setItem('cdb-restore-at', String(Date.now()));
@@ -10041,35 +10031,314 @@ async function restoreFromPublicStorage() {
 // =========================
 // BACKUP / RESTAURAÇÃO
 // =========================
-// Coleta TUDO que o app usa (state + chaves soltas em localStorage) num único
-// JSON. Versionado pra futuras migrações de schema.
+// Exporta coleções, preferências permitidas, fila e anexos operacionais.
+// Identidade do aparelho, credenciais e cursores não são transferidos.
+const BACKUP_COLLECTIONS = { products: 'cdb-products', clients: 'cdb-clients', orders: 'cdb-orders', cashEntries: 'cdb-cash', cashClosings: 'cdb-cash-closings', batches: 'cdb-batches' };
+const BACKUP_PREFERENCES = ['cdb-operator-name', 'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-pix-type', 'cdb-printer', 'cdb-printers', 'cdb-theme', 'cdb-onboarding-done'];
+const BACKUP_ARCHIVE_KEYS = ['cdb-shopping', 'cdb-audit-log', 'cdb-audit-log-archive'];
+function backupArchiveEntries(entries, legacyStorage = {}) {
+  if (!Array.isArray(entries)) throw new Error('Anexos do backup inválidos.');
+  const result = [], seen = new Set();
+  const append = entry => {
+    if (!entry || !BACKUP_ARCHIVE_KEYS.includes(entry.key) || typeof entry.value !== 'string') throw new Error('Anexo operacional inválido no backup.');
+    const identity = JSON.stringify([entry.key, entry.value]);
+    if (!seen.has(identity)) { seen.add(identity); result.push({ key: entry.key, value: entry.value }); }
+  };
+  entries.forEach(append);
+  BACKUP_ARCHIVE_KEYS.forEach(key => { if (typeof legacyStorage[key] === 'string' && legacyStorage[key] !== '[]') append({ key, value: legacyStorage[key] }); });
+  return result;
+}
 function buildBackupPayload() {
-  const lsKeys = [
-    'cdb-products','cdb-clients','cdb-orders','cdb-cash','cdb-cash-closings','cdb-batches',
-    'cdb-operator-name','cdb-empresa-name','cdb-store-logo',
-    'cdb-pix-key','cdb-pix-holder','cdb-pix-type',
-    'cdb-printer','cdb-printers','cdb-theme','cdb-onboarding-done',
-    'cdb-device-id','cdb-last-sync','cdb-sync-queue'
-  ];
   const ls = {};
-  lsKeys.forEach(k => {
-    try { const v = localStorage.getItem(k); if (v !== null) ls[k] = v; } catch (e) {}
-  });
+  BACKUP_PREFERENCES.forEach(k => { const value = localStorage.getItem(k); if (value !== null) ls[k] = value; });
+  const sync = window.cdbSync;
+  const pairing = sync && sync.getPairing ? sync.getPairing() : null;
   return {
-    version: 2,
-    exportedAt: new Date().toISOString(),
-    appId: 'casa-da-baba',
-    state: {
-      products: products.map(({count, photo, ...rest}) => rest),
-      clients, orders, cashEntries, cashClosings, batches
-    },
-    localStorage: ls
+    version: 3, exportedAt: new Date().toISOString(), appId: 'casa-da-baba',
+    state: { products: products.map(({count, ...rest}) => rest), clients, orders, cashEntries, cashClosings, batches },
+    localStorage: ls,
+    localArchive: backupArchiveEntries(JSON.parse(localStorage.getItem('cdb-import-archives') || '[]'), Object.fromEntries(BACKUP_ARCHIVE_KEYS.map(key => [key, localStorage.getItem(key)]))),
+    sync: { context: pairing && pairing.empresaId && pairing.lojaId ? { empresaId: pairing.empresaId, lojaId: pairing.lojaId } : null,
+      queue: sync && sync.getBackupQueue ? sync.getBackupQueue() : JSON.parse(localStorage.getItem('cdb-sync-queue') || '[]') }
   };
 }
 
-function exportBackup() {
+async function buildTransferBackupPayload() {
+  const sync = window.cdbSync;
+  if (!sync || !sync.localReady) throw new Error('A fila local ainda não está disponível.');
+  await sync.localReady;
+  const payload = buildBackupPayload();
+  const store = window.cdbQueueStore;
+  if (store && store.ready && !store.degraded) {
+    payload.sync.deadletter = await store.getDeadletter();
+    payload.sync.conflicts = await store.getConflicts();
+  }
+  const review = sync.importReview && sync.importReview();
+  payload.sync.queueComplete = !!payload.sync.context && !!store && store.ready && !store.degraded && !(review && (review.invalid || review.requiresReconciliation));
+  if (review) payload.sync.importReview = review;
+  const migrationSource = localStorage.getItem('cdb-import-source');
+  if (review && migrationSource) payload.sync.legacyImportSource = JSON.parse(migrationSource);
+  if (sync.getLegacyHistoryRules) payload.sync.legacyHistoryRules = sync.getLegacyHistoryRules();
+  const photos = window.cdbPhotoStore;
+  if (photos && photos.ready) payload.photos = (await photos.listPending()).concat(await photos.listUploaded());
+  else payload.photos = [];
+  return payload;
+}
+
+function backupComparable(value) {
+  if (Array.isArray(value)) return '[' + value.map(backupComparable).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).filter(k => k !== 'count').sort().map(k => JSON.stringify(k) + ':' + backupComparable(value[k])).join(',') + '}';
+  return JSON.stringify(value);
+}
+
+function prepareBackupImport(input) {
+  let payload = input;
+  if (input && input.schema === 'cdb-backup-v1' && input.data && typeof input.data === 'object') {
+    const state = {};
+    Object.entries(BACKUP_COLLECTIONS).forEach(([name, key]) => { state[name] = JSON.parse(input.data[key] || '[]'); });
+    payload = { appId: 'casa-da-baba', version: 2, exportedAt: input.capturedAtIso, state, localStorage: input.data };
+  }
+  if (!payload || payload.appId !== 'casa-da-baba' || ![1, 2, 3].includes(payload.version) || !payload.state || typeof payload.state !== 'object') throw new Error('Arquivo não reconhecido como backup da Casa da Baba.');
+  const current = { products, clients, orders, cashEntries, cashClosings, batches };
+  const merged = {}, conflicts = [], counts = {};
+  let added = 0, repeated = 0;
+  const incomingKeys = [];
+  function mergeRecords(existing, incoming, name) {
+    if (!Array.isArray(existing) || !Array.isArray(incoming) || incoming.length > 50000) throw new Error('Coleção inválida no backup: ' + name + '.');
+    const result = existing.slice();
+    const byId = new Map();
+    existing.forEach(row => { if (!row || !['string', 'number'].includes(typeof row.id) || !String(row.id).trim()) throw new Error('Registro atual sem identificação: ' + name + '.'); byId.set(String(row.id), row); });
+    incoming.forEach(row => {
+      if (!row || typeof row !== 'object' || Array.isArray(row) || !['string', 'number'].includes(typeof row.id) || !String(row.id).trim()) throw new Error('Registro sem identificação no backup: ' + name + '.');
+      const id = String(row.id), present = byId.get(id);
+      if (name !== 'fila') incomingKeys.push(name + ':' + id);
+      const comparable = item => name === 'fila' ? { type: item.type, payload: item.payload, schemaVersion: item.schemaVersion } : item;
+      if (present) {
+        if (backupComparable(comparable(present)) !== backupComparable(comparable(row))) conflicts.push(name + ': ' + id);
+        else repeated++;
+      } else { const copy = JSON.parse(JSON.stringify(row)); result.push(copy); byId.set(id, copy); added++; }
+    });
+    return result;
+  }
+  Object.keys(BACKUP_COLLECTIONS).forEach(name => {
+    const incoming = payload.state[name] === undefined ? [] : payload.state[name];
+    const before = added;
+    merged[name] = mergeRecords(current[name], incoming, name);
+    counts[name] = added - before;
+  });
+  const ls = payload.localStorage || {};
+  if (typeof ls !== 'object' || Array.isArray(ls)) throw new Error('Preferências do backup inválidas.');
+  const sourceArchive = backupArchiveEntries(payload.localArchive || [], ls);
+  const existingArchive = backupArchiveEntries(JSON.parse(localStorage.getItem('cdb-import-archives') || '[]'));
+  const localArchive = backupArchiveEntries(existingArchive.concat(sourceArchive));
+  const archiveChanged = JSON.stringify(localArchive) !== JSON.stringify(existingArchive);
+  const exportedSync = payload.sync || {};
+  if ((exportedSync.deadletter || []).length || (exportedSync.conflicts || []).length) throw new Error('Este backup tem alterações recusadas ou conflitos de sincronização. A equipe precisa revisá-los no PWA antigo antes da migração.');
+  const preparedOrigin = exportedSync.legacyImportSource && exportedSync.legacyImportSource.preparedRequest;
+  let sourceContext = exportedSync.context || (preparedOrigin && preparedOrigin.expectedEmpresaId && preparedOrigin.expectedLojaId ? { empresaId: preparedOrigin.expectedEmpresaId, lojaId: preparedOrigin.expectedLojaId } : null);
+  if (!sourceContext && ls['cdb-pairing']) {
+    const oldPairing = JSON.parse(ls['cdb-pairing']);
+    if (oldPairing && oldPairing.empresaId && oldPairing.lojaId) sourceContext = { empresaId: oldPairing.empresaId, lojaId: oldPairing.lojaId };
+  }
+  if (sourceContext && (!sourceContext.empresaId || !sourceContext.lojaId)) throw new Error('Empresa ou loja ausente no contexto do backup.');
+  const pairing = window.cdbSync && window.cdbSync.getPairing ? window.cdbSync.getPairing() : null;
+  const previousReview = window.cdbSync && window.cdbSync.importReview ? window.cdbSync.importReview() : null;
+  const bound = pairing || JSON.parse(localStorage.getItem('cdb-pilot-data-context') || 'null') || (previousReview && previousReview.sourceContext);
+  if (sourceContext && bound && (String(sourceContext.empresaId) !== String(bound.empresaId) || String(sourceContext.lojaId) !== String(bound.lojaId))) throw new Error('O backup pertence a outra empresa ou loja. Nenhum dado foi alterado.');
+  const sourceQueue = exportedSync.queue || JSON.parse(ls['cdb-sync-queue'] || '[]');
+  const currentQueue = window.cdbSync && window.cdbSync.getBackupQueue ? window.cdbSync.getBackupQueue() : JSON.parse(localStorage.getItem('cdb-sync-queue') || '[]');
+  if (!Array.isArray(sourceQueue)) throw new Error('Fila do backup inválida.');
+  sourceQueue.forEach(m => { if (!m || typeof m.id !== 'string' || !m.id.trim() || typeof m.type !== 'string' || !m.payload || typeof m.payload !== 'object') throw new Error('Alteração pendente inválida no backup.'); });
+  const queueBefore = added;
+  const queue = mergeRecords(currentQueue, sourceQueue, 'fila');
+  const queueAdded = added - queueBefore;
+  added -= queueAdded;
+  const preferences = {};
+  BACKUP_PREFERENCES.forEach(key => { if (typeof ls[key] === 'string' && localStorage.getItem(key) === null) preferences[key] = ls[key]; });
+  const photos = payload.photos || [];
+  if (!Array.isArray(photos) || photos.length > 10000) throw new Error('Fotos do backup inválidas.');
+  const photoBytes = new Map();
+  photos.forEach(p => {
+    if (!p || typeof p.hash !== 'string' || typeof p.dataUrl !== 'string' || !/^data:image\/(png|jpeg|webp);base64,/.test(p.dataUrl)) throw new Error('Foto inválida no backup.');
+    if (photoBytes.has(p.hash) && photoBytes.get(p.hash) !== p.dataUrl) throw new Error('Fotos diferentes usam o mesmo código no backup.');
+    photoBytes.set(p.hash, p.dataUrl);
+  });
+  const availablePhotos = new Set(photos.map(p => p.hash));
+  const missingPhotos = new Set();
+  (payload.state.batches || []).forEach(batch => {
+    if (batch.batchPhotoHash && !availablePhotos.has(batch.batchPhotoHash) && !batch.batchPhoto) missingPhotos.add(batch.batchPhotoHash);
+    (batch.items || []).forEach(item => { if (item.photoHash && !availablePhotos.has(item.photoHash) && !item.photo) missingPhotos.add(item.photoHash); });
+  });
+  if (previousReview && previousReview.invalid) throw new Error('A revisão da importação anterior está inválida. Preserve os backups e peça ajuda à equipe.');
+  const complete = !!sourceContext && payload.version >= 3 && exportedSync.queueComplete === true && !(exportedSync.importReview && (exportedSync.importReview.invalid || exportedSync.importReview.requiresReconciliation));
+  const unresolved = new Set((previousReview && previousReview.unreconciledRecords) || []);
+  incomingKeys.forEach(key => { if (!complete) unresolved.add(key); });
+  const requiresReconciliation = !complete || !!preparedOrigin || unresolved.size > 0 || !!(previousReview && previousReview.requiresReconciliation);
+  const reviewUpdated = !!previousReview && (previousReview.requiresReconciliation !== requiresReconciliation || backupComparable(previousReview.unreconciledRecords || []) !== backupComparable(Array.from(unresolved)));
+  return { merged, queue, preferences, photos, sourceArchive, localArchive, archiveChanged, sourceContext: sourceContext || (previousReview && previousReview.sourceContext) || null, conflicts, added, repeated, queueAdded, counts,
+    missingPhotos: missingPhotos.size, exportedAt: payload.exportedAt || null, legacy: payload.version < 3,
+    requiresReconciliation, unreconciledRecords: Array.from(unresolved), reviewUpdated, sourceState: payload.state, sourceQueue, sourceCapsule: exportedSync.legacyImportSource || null, historyRules: exportedSync.legacyHistoryRules || null };
+}
+
+async function backupRawDigest(text) {
+  if (!window.crypto || !window.crypto.subtle) throw new Error('Este navegador não permite validar a restauração com segurança. Atualize o aplicativo antes de importar.');
+  const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function backupDigest(value) { return backupRawDigest(backupComparable(value)); }
+
+function canonicalImportJson(value) {
+  if (Array.isArray(value)) return '[' + value.map(canonicalImportJson).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonicalImportJson(value[key])).join(',') + '}';
+  return JSON.stringify(value);
+}
+
+async function prepareLegacyImportSource(plan) {
+  const review = window.cdbSync.importReview();
+  if (!plan.added && !plan.queueAdded && !plan.archiveChanged && !review && !plan.sourceCapsule) return null;
+  const raw = localStorage.getItem('cdb-import-source');
+  const previous = review && raw ? JSON.parse(raw) : null;
+  if (plan.sourceCapsule) {
+    const source = JSON.parse(JSON.stringify(plan.sourceCapsule));
+    if (source.schema !== 1 || typeof source.importId !== 'string' || typeof source.snapshotJson !== 'string' || !Array.isArray(source.originMutationIds)
+      || source.originMutationIds.some(id => typeof id !== 'string' || !id) || await backupRawDigest(source.snapshotJson) !== source.snapshotSha256) throw new Error('A captura de migração do backup está inválida. Preserve o arquivo original.');
+    const captured = JSON.parse(source.snapshotJson);
+    if (Object.keys(BACKUP_COLLECTIONS).some(name => !Array.isArray(captured[name]))) throw new Error('A captura não contém todas as coleções do histórico.');
+    source.counts = Object.fromEntries(Object.keys(BACKUP_COLLECTIONS).map(name => [name, captured[name].length]));
+    source.archivedStorageKeys = Array.from(new Set(backupArchiveEntries(captured.localArchive || []).map(entry => entry.key)));
+    if (previous && (previous.importId !== source.importId || previous.snapshotSha256 !== source.snapshotSha256)) throw new Error('Este aparelho já tem outra captura de migração. Preserve os arquivos e peça revisão à equipe.');
+    const request = source.preparedRequest;
+    if (request && (request.importId !== source.importId || request.snapshotJson !== source.snapshotJson || request.snapshotSha256 !== source.snapshotSha256
+      || request.sourceNeverSynced !== true || JSON.stringify(request.originMutationIds) !== JSON.stringify(source.originMutationIds)
+      || !request.expectedEmpresaId || !request.expectedLojaId)) throw new Error('A solicitação guardada no backup difere da captura original.');
+    if (request && plan.sourceContext && (String(request.expectedEmpresaId) !== String(plan.sourceContext.empresaId) || String(request.expectedLojaId) !== String(plan.sourceContext.lojaId))) throw new Error('A solicitação guardada pertence a outra empresa ou loja.');
+    return { source, changed: !previous || JSON.stringify(previous) !== JSON.stringify(source) };
+  }
+  if (previous && previous.preparedRequest) throw new Error('A migração já foi preparada para o EasyStok. Retome essa mesma migração antes de importar outro arquivo.');
+  if (previous && (!previous.importId || typeof previous.snapshotJson !== 'string' || await backupRawDigest(previous.snapshotJson) !== previous.snapshotSha256)) throw new Error('A captura anterior está inválida. Preserve os arquivos e peça revisão à equipe.');
+  const state = previous ? JSON.parse(previous.snapshotJson) : {};
+  Object.keys(BACKUP_COLLECTIONS).forEach(name => {
+    const byId = new Map((state[name] || []).map(row => [String(row.id), row]));
+    (plan.sourceState[name] || []).forEach(row => {
+      const copy = JSON.parse(JSON.stringify(row)); if (name === 'products') delete copy.count;
+      const existing = byId.get(String(copy.id));
+      if (existing && canonicalImportJson(existing) !== canonicalImportJson(copy)) throw new Error('Um registro difere da captura original da migração. A equipe precisa conferir antes de prosseguir.');
+      byId.set(String(copy.id), copy);
+    });
+    state[name] = Array.from(byId.values());
+  });
+  if (plan.photos.length) {
+    const photos = new Map((state.photos || []).map(photo => [photo.hash, photo]));
+    plan.photos.forEach(photo => { const previousPhoto = photos.get(photo.hash); if (previousPhoto && previousPhoto.dataUrl !== photo.dataUrl) throw new Error('Uma foto difere da captura original da migração.'); if (!previousPhoto) photos.set(photo.hash, photo); });
+    state.photos = Array.from(photos.values());
+  }
+  if (plan.sourceArchive.length) state.localArchive = backupArchiveEntries((state.localArchive || []).concat(plan.sourceArchive));
+  const snapshotJson = canonicalImportJson(state);
+  const originMutationIds = Array.from(new Set((previous ? previous.originMutationIds : []).concat(plan.sourceQueue.map(m => m.id))));
+  const source = { schema: 1, importId: previous ? previous.importId : window.crypto.randomUUID(), snapshotJson,
+    snapshotSha256: await backupRawDigest(snapshotJson), originMutationIds, archivedStorageKeys: Array.from(new Set((state.localArchive || []).map(entry => entry.key))), historyRules: plan.historyRules || (previous && previous.historyRules) || window.cdbSync.getLegacyHistoryRules(),
+    counts: Object.fromEntries(Object.keys(BACKUP_COLLECTIONS).map(name => [name, state[name].length])) };
+  return { source, changed: !previous || source.snapshotSha256 !== previous.snapshotSha256 || JSON.stringify(originMutationIds) !== JSON.stringify(previous.originMutationIds) };
+}
+
+async function backupCheckpoint(payload, persistedState) {
+  const stored = persistedState || Object.fromEntries(Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [name, JSON.parse(localStorage.getItem(key) || '[]')]));
+  return backupDigest({ state: payload.state, persistedState: stored, preferences: payload.localStorage, localArchive: payload.localArchive, queue: payload.sync.queue, context: payload.sync.context });
+}
+
+function writeBackupImportEntries(entries) {
+  const previous = new Map(entries.map(([key]) => [key, localStorage.getItem(key)])), written = [];
+  try { entries.forEach(([key, value]) => { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); written.push(key); }); }
+  catch (error) { written.reverse().forEach(key => { const value = previous.get(key); if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); }); throw error; }
+}
+
+async function getBackupImportUndoState() {
+  const review = window.cdbSync && window.cdbSync.importReview();
+  if (!review) return { available: false, reason: 'Não há importação em revisão.' };
   try {
-    const payload = buildBackupPayload();
+    const saved = JSON.parse(localStorage.getItem('cdb-before-import-backup') || 'null');
+    if (review.migrationStartedAt) return { available: false, reason: 'A migração já foi iniciada e pode ter sido gravada no EasyStok. Retome a conferência antes de desfazer; os dados locais estão preservados.' };
+    if (review.undoBlocked) return { available: false, reason: 'Houve trabalho após o início desta importação. Exporte os dados atuais e peça revisão à equipe; nada será apagado.' };
+    if (!saved || !saved.rollback || !review.undoCheckpoint || !review.undoBackupHash) return { available: false, reason: 'A cópia necessária para desfazer não está disponível. Preserve os dados e peça revisão à equipe.' };
+    if (await backupDigest(saved) !== review.undoBackupHash) return { available: false, reason: 'A cópia anterior foi alterada. Preserve os dados e peça revisão à equipe; nada será apagado.' };
+    if (await backupCheckpoint(buildBackupPayload()) !== review.undoCheckpoint) return { available: false, reason: 'Há alterações ou conexão diferente após a importação. Exporte os dados atuais e peça revisão à equipe; nada será apagado.' };
+    return { available: true, reason: '' };
+  } catch (_) { return { available: false, reason: 'Não foi possível conferir a cópia anterior. Preserve os dados e peça revisão à equipe.' }; }
+}
+
+async function undoBackupImport() {
+  const sync = window.cdbSync;
+  await sync.beginBackupImport();
+  try {
+    const status = await getBackupImportUndoState();
+    if (!status.available) throw new Error(status.reason);
+    const saved = JSON.parse(localStorage.getItem('cdb-before-import-backup'));
+    if (!saved.state || !saved.sync || !Array.isArray(saved.sync.queue) || Object.keys(BACKUP_COLLECTIONS).some(key => !Array.isArray(saved.state[key]))) throw new Error('A cópia anterior está inválida. Nenhum dado foi alterado.');
+    const entries = Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [key, JSON.stringify(saved.state[name])]);
+    BACKUP_PREFERENCES.forEach(key => entries.push([key, saved.rollback.preferences[key] === undefined ? null : saved.rollback.preferences[key]]));
+    entries.push(['cdb-sync-queue', JSON.stringify(saved.sync.queue)], ['cdb-import-review', saved.rollback.review || null], ['cdb-import-source', saved.rollback.source || null], ['cdb-import-archives', saved.rollback.archives || null]);
+    writeBackupImportEntries(entries);
+    products = saved.state.products.map(p => ({ ...p, count: 0 })); clients = saved.state.clients; orders = saved.state.orders;
+    cashEntries = saved.state.cashEntries; cashClosings = saved.state.cashClosings; batches = saved.state.batches;
+    sync.finishBackupImport(saved.sync.queue, { products, clients, orders, cashEntries, batches });
+    return { restored: true };
+  } finally { sync.endBackupImport(); }
+}
+
+async function applyBackupPayload(payload, askConfirmation = false) {
+  const sync = window.cdbSync;
+  if (!sync || !sync.beginBackupImport || !sync.finishBackupImport) throw new Error('Sincronização ainda está iniciando. Aguarde e tente novamente.');
+  await sync.beginBackupImport();
+  try {
+    const plan = prepareBackupImport(payload);
+    if (plan.conflicts.length) throw new Error('Importação bloqueada: ' + plan.conflicts.length + ' registros têm o mesmo código e dados diferentes. A equipe precisa revisar. Exemplos: ' + plan.conflicts.slice(0, 3).join(', ') + '. Nenhum registro foi substituído.');
+    const captured = await prepareLegacyImportSource(plan);
+    const newPhotos = [];
+    if (plan.photos.length) {
+      const store = window.cdbPhotoStore;
+      if (!store || !store.ready) throw new Error('Armazenamento de fotos indisponível. Nenhum registro foi importado.');
+      for (const photo of plan.photos) {
+        const existing = await store.get(photo.hash);
+        if (existing && existing.dataUrl !== photo.dataUrl) throw new Error('Uma foto conflita com a já guardada neste aparelho.');
+        if (!existing) newPhotos.push(photo);
+      }
+    }
+    if (!plan.added && !plan.queueAdded && !newPhotos.length && !plan.reviewUpdated && !plan.archiveChanged && !(captured && captured.changed)) return { added: 0, repeated: plan.repeated, queueAdded: 0 };
+    const undoAllowed = !sync.importReview() || (await getBackupImportUndoState()).available;
+    // Uma cópia recuperável é exigida antes da confirmação e de qualquer troca.
+    if (!sync.importReview() || !localStorage.getItem('cdb-before-import-backup')) {
+      const original = buildBackupPayload();
+      original.rollback = { preferences: Object.fromEntries(BACKUP_PREFERENCES.map(key => [key, localStorage.getItem(key)])), review: localStorage.getItem('cdb-import-review'), source: localStorage.getItem('cdb-import-source'), archives: localStorage.getItem('cdb-import-archives') };
+      const safety = JSON.stringify(original);
+      localStorage.setItem('cdb-before-import-backup', safety);
+      if (localStorage.getItem('cdb-before-import-backup') !== safety) throw new Error('Não foi possível guardar a cópia de segurança.');
+    }
+    const expected = buildBackupPayload();
+    expected.state = plan.merged; expected.sync.queue = plan.queue;
+    expected.localArchive = backupArchiveEntries(plan.localArchive, Object.fromEntries(BACKUP_ARCHIVE_KEYS.map(key => [key, localStorage.getItem(key)])));
+    Object.assign(expected.localStorage, plan.preferences);
+    const undoCheckpoint = undoAllowed ? await backupCheckpoint(expected, plan.merged) : null;
+    const undoBackupHash = undoAllowed ? await backupDigest(JSON.parse(localStorage.getItem('cdb-before-import-backup'))) : null;
+    const warning = (plan.requiresReconciliation ? '\nEste arquivo não comprova a fila completa. Os registros serão preservados offline, mas o envio ficará bloqueado até a equipe conferir a origem e concluir a migração inicial segura para o EasyStok.' : '') + (plan.missingPhotos ? '\n' + plan.missingPhotos + ' fotos não estão neste arquivo. Preserve o PWA antigo.' : '') + (plan.sourceArchive.length ? '\nCompras e auditoria antigas serão preservadas como anexos no backup; não alteram as listas atuais deste app.' : '');
+    if (askConfirmation && !confirm('Importar ' + plan.added + ' registros e ' + plan.queueAdded + ' alterações pendentes?\n' + plan.repeated + ' registros repetidos serão ignorados.\nOs dados atuais serão mantidos. Uma cópia de segurança local já foi guardada.' + warning + '\n\nA sincronização ficará pausada para revisar esta importação.')) return null;
+    for (const photo of newPhotos) await window.cdbPhotoStore.save(photo.hash, photo.dataUrl, photo.batchId || '', photo.field || '');
+    const entries = Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [key, JSON.stringify(plan.merged[name])]);
+    Object.entries(plan.preferences).forEach(entry => entries.push(entry));
+    entries.push(['cdb-sync-queue', JSON.stringify(plan.queue)], ['cdb-import-archives', JSON.stringify(plan.localArchive)]);
+    if (captured) entries.push(['cdb-import-source', JSON.stringify(captured.source)]);
+    entries.push(['cdb-import-review', JSON.stringify({ sourceContext: plan.sourceContext, importedAt: Date.now(), importedRecords: plan.added, missingPhotos: plan.missingPhotos, legacy: plan.legacy, requiresReconciliation: plan.requiresReconciliation, unreconciledRecords: plan.unreconciledRecords, undoCheckpoint, undoBackupHash, undoBlocked: !undoAllowed || !!(captured && captured.source.preparedRequest), migrationStartedAt: captured && captured.source.preparedRequest ? Date.now() : undefined })]);
+    writeBackupImportEntries(entries);
+    products = plan.merged.products.map(p => ({ ...p, count: 0 })); clients = plan.merged.clients; orders = plan.merged.orders;
+    cashEntries = plan.merged.cashEntries; cashClosings = plan.merged.cashClosings; batches = plan.merged.batches;
+    sync.finishBackupImport(plan.queue, { products, clients, orders, cashEntries, batches });
+    return { added: plan.added, repeated: plan.repeated, queueAdded: plan.queueAdded, missingPhotos: plan.missingPhotos, updated: true, requiresReconciliation: plan.requiresReconciliation };
+  } finally { sync.endBackupImport(); }
+}
+
+async function exportBackup() {
+  try {
+    const payload = await buildTransferBackupPayload();
     const json = JSON.stringify(payload, null, 2);
     const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
     const filename = `casa-da-baba-backup-${stamp}.json`;
@@ -10189,74 +10458,20 @@ function showBackupTextForCopy(json, filename) {
 
 function importBackup(event) {
   const file = event.target.files && event.target.files[0];
-  event.target.value = ''; // permite re-importar o mesmo arquivo
+  event.target.value = '';
   if (!file) return;
+  if (file.size > 25 * 1024 * 1024) { showToast('Backup maior que 25 MB. Peça ajuda à equipe para migrar com segurança.'); return; }
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async e => {
     try {
-      const payload = JSON.parse(String(e.target.result || ''));
-      if (!payload || payload.appId !== 'casa-da-baba' || !payload.state) {
-        showToast('Arquivo inválido (não é backup do Easy Stock Mobile)');
-        return;
-      }
-      const itemCount = (payload.state.products?.length || 0)
-                      + (payload.state.clients?.length || 0)
-                      + (payload.state.orders?.length || 0)
-                      + (payload.state.batches?.length || 0)
-                      + (payload.state.cashEntries?.length || 0);
-      if (!confirm(`Restaurar ${itemCount} registros?\n\nIsso vai SUBSTITUIR os dados atuais do app por completo. Use só se tem certeza (recuperação de backup).`)) return;
-      applyBackupPayload(payload);
-      showToast('Backup restaurado · recarregando...');
-      setTimeout(() => location.reload(), 800);
-    } catch (e) {
-      console.error('Import falhou:', e);
-      showToast('Arquivo corrompido ou inválido');
-    }
+      const result = await applyBackupPayload(JSON.parse(String(e.target.result || '')), true);
+      if (!result) return;
+      showToast(result.updated ? (result.requiresReconciliation ? 'Dados preservados. A fila precisa ser conferida no PWA de origem.' : 'Dados importados. Confira a loja antes de sincronizar.') : 'Este backup já está no aparelho. Nenhum registro foi duplicado.');
+      if (result.updated) setTimeout(() => location.reload(), 800);
+    } catch (error) { console.error('Import falhou:', error); alert(error.message || 'Não foi possível importar. Os dados atuais foram mantidos.'); }
   };
+  reader.onerror = () => showToast('Não foi possível ler o arquivo de backup.');
   reader.readAsText(file);
-}
-
-function applyBackupPayload(payload) {
-  const s = payload.state || {};
-  // Sobrescreve estado em memória
-  if (Array.isArray(s.products))     products      = s.products.map(p => ({...p, count: 0}));
-  if (Array.isArray(s.clients))      clients       = s.clients;
-  if (Array.isArray(s.orders))       orders        = s.orders;
-  if (Array.isArray(s.cashEntries))  cashEntries   = s.cashEntries;
-  if (Array.isArray(s.cashClosings)) cashClosings  = s.cashClosings;
-  if (Array.isArray(s.batches))      batches       = s.batches;
-
-  // Restaura chaves soltas, exceto cdb-device-id (manter o ID atual evita
-  // conflito de "mesmo device" no servidor após restore em outro aparelho)
-  // E exceto cdb-audit-log: nao sobrescreve o log existente — ANEXA o log do
-  // backup pra preservar continuidade (e re-rotaciona pra max 1000 entradas).
-  const ls = payload.localStorage || {};
-  Object.keys(ls).forEach(k => {
-    if (k === 'cdb-device-id') return;
-    if (k === 'cdb-audit-log') return; // tratado abaixo
-    try { localStorage.setItem(k, ls[k]); } catch (e) {}
-  });
-  // Merge audit log: log atual + log do backup, ordena por ts desc, dedup, rotaciona
-  try {
-    const current = loadAuditLog();
-    let imported = [];
-    try { imported = JSON.parse(ls['cdb-audit-log'] || '[]') || []; } catch (e) {}
-    const seenIds = new Set(current.map(e => e.id));
-    imported.forEach(e => { if (!seenIds.has(e.id)) current.push(e); });
-    current.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    if (current.length > AUDIT_LOG_MAX) current.length = AUDIT_LOG_MAX;
-    localStorage.setItem('cdb-audit-log', JSON.stringify(current));
-  } catch (e) { console.warn('[restore] merge audit log falhou:', e); }
-
-  // Audit log: backup restaurado (depois do merge pra essa entrada aparecer)
-  logAction({
-    action: 'backup.restore',
-    entityType: 'backup',
-    summary: 'Backup restaurado · ' + (payload.exportedAt || 'sem data')
-            + ' · ' + ((s.products?.length||0) + (s.orders?.length||0) + (s.batches?.length||0)) + ' registro(s)'
-  });
-
-  persistAll();
 }
 
 // =========================
@@ -12068,7 +12283,28 @@ function advanceOrder(id) {
   applyAdvanceTransition(id, nextStatus);
 }
 
+function assertImportedBatchAction(batchId) {
+  const batch = getBatchById(batchId);
+  const rules = window.cdbSync && window.cdbSync.getLegacyHistoryRules ? window.cdbSync.getLegacyHistoryRules() : null;
+  if (batch && (batch.legacyImported === true || (rules && rules.batchIds.includes(batchId)))) {
+    showToast('Lote histórico preservado. Para alterar estoque, peça revisão à equipe. As etiquetas continuam disponíveis.');
+    return false;
+  }
+  return true;
+}
+
+function assertImportedOrderAction(orderId, action) {
+  const order = getOrderById(orderId);
+  const rules = window.cdbSync && window.cdbSync.getLegacyHistoryRules ? window.cdbSync.getLegacyHistoryRules() : null;
+  const status = order && (order.legacyHistoryStatus || (rules && rules.orderStates[orderId]));
+  if (!status) return true;
+  if (status === STATUS.PRONTO && order.status === STATUS.PRONTO && (action === STATUS.ENTREGUE || action === 'confer-ok')) return true;
+  showToast('Pedido histórico preservado. Alterações de estoque ou valores precisam de revisão da equipe.');
+  return false;
+}
+
 function cancelOrder(id) {
+  if (!assertImportedOrderAction(id, 'cancelar')) return;
   const o = getOrderById(id);
   if (!o) return;
   // Idempotencia: pedido ja cancelado nao re-executa devolucao de estoque.
@@ -12684,7 +12920,7 @@ function getOrderSalesMovement(order) {
     kind: 'sales',
     ts: order.updatedAt || order.factAt || order.createdAt || Date.now(),
     title: `${i.qty || 0}× ${i.name}`,
-    detail: `Pedido #${String(order.id || '').slice(-6)} · ${order.clientSnapshot?.name || 'Sem cliente'}`,
+    detail: `Pedido #${String(order.id || '').slice(-8)} · ${order.clientSnapshot?.name || 'Sem cliente'}`,
     productId: i.productId || '',
     productName: i.name || '',
     qty: -(Number(i.qty) || 0),
@@ -12870,7 +13106,7 @@ function buildMovimentos() {
       type: 'exit',
       at: o.updatedAt || o.createdAt,
       label: (o.clientSnapshot?.name || 'Pedido') + (safeRefDisplay(o.clientSnapshot?.ref) ? ' — ' + safeRefDisplay(o.clientSnapshot.ref) : ''),
-      ref: '#' + (o.id || '').slice(-6),
+      ref: '#' + (o.id || '').slice(-8),
       items: (o.items || []).map(i => ({ name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit })),
       status: o.status,
       opName: o.lastOperatorName || null
@@ -13478,6 +13714,7 @@ function renderFinalizadosScreen() {
 // Hard delete de pedido CANCELADO (apaga do array, audit registra).
 // Pra entregue, o operador deve cancelar primeiro.
 function purgeOrderRecord(id) {
+  if (!assertImportedOrderAction(id, 'excluir')) return;
   const o = (orders || []).find(x => x.id === id);
   if (!o) { showToast('Pedido não encontrado'); return; }
   if (o.status !== STATUS.CANCELADO) {
@@ -13729,6 +13966,7 @@ function ajustarSaldoDoLote(batch, contavaAntes) {
 // Recuperavel via restoreBatch. NAO bloqueia se estoque ja foi consumido em
 // vendas: usa Math.max(0, ...) pra evitar negativo (rastreado em audit log).
 function deleteBatch(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(b => b.id === batchId);
   if (!batch) { showToast('Lote não encontrado'); return; }
   if (batch.deleted) { showToast('Lote já está excluído'); return; }
@@ -13761,6 +13999,7 @@ function deleteBatch(batchId) {
 }
 // Restore silencioso pra ser chamado pelo undo (sem confirm modal).
 function _silentRestoreBatch(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(b => b.id === batchId);
   if (!batch || !batch.deleted) return;
   const contavaAntes = loteContaNoSaldo(batch);
@@ -13777,6 +14016,7 @@ function _silentRestoreBatch(batchId) {
   // Evita 2 toasts visualmente empilhados.
 }
 function restoreBatch(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(b => b.id === batchId);
   if (!batch) { showToast('Lote não encontrado'); return; }
   if (!batch.deleted) { showToast('Lote não está excluído'); return; }
@@ -14175,7 +14415,7 @@ function renderKanbanCard(o, col) {
       ${quickActions}
       <div class="k-meta">
         <span class="k-chip">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
-        <span class="k-chip">Pedido ${(o.id || '').slice(-6)}</span>
+        <span class="k-chip">Pedido ${(o.id || '').slice(-8)}</span>
         ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
       </div>
       <div class="k-items">${itemsLine}</div>
@@ -14487,7 +14727,7 @@ function buildEtiqueta(order) {
     `${itensLinhas}\n` +
     `Total: ${money(Number(order.total) || 0)}\n` +
     `Horário: ${horario}${obs}\n` +
-    `#${order.id.slice(-6)}`
+    `#${order.id.slice(-8)}`
   );
 }
 
@@ -14516,11 +14756,14 @@ function openCobranca(orderId) {
   if (labelEl) labelEl.textContent = '💳 PIX — ' + ((PIX_TYPES[getPixType()]?.short) || 'Chave');
   document.querySelectorAll('#cobrancaModal .msg-template-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.template === currentCobrancaTemplate));
+  rememberOperationalFocus('cobrancaModal');
   document.getElementById('cobrancaModal').classList.add('show');
+  document.getElementById('cobrancaTitle').focus();
 }
 function closeCobranca() {
   document.getElementById('cobrancaModal').classList.remove('show');
   currentCobrancaOrderId = null;
+  restoreOperationalFocus('cobrancaModal');
 }
 
 function setCobrancaTemplate(template) {
@@ -14587,7 +14830,10 @@ function fallbackCopy(text, successMsg) {
   ta.style.opacity = '0';
   document.body.appendChild(ta);
   ta.select();
-  try { document.execCommand('copy'); showToast(successMsg || 'Copiado'); }
+  try {
+    if (!document.execCommand('copy')) throw new Error('Cópia recusada');
+    showToast(successMsg || 'Copiado');
+  }
   catch (e) { showToast('Não consegui copiar — selecione manualmente'); }
   finally { document.body.removeChild(ta); }
 }
@@ -16581,6 +16827,7 @@ function closeConfer() {
 // operador mantém controle do kanban (assim divergência fica visível
 // até ele decidir entregar mesmo assim ou cancelar).
 function applyConfirmation(orderId, type, payload) {
+  if (!assertImportedOrderAction(orderId, type === 'ok' ? 'confer-ok' : 'confer-adjust')) return;
   const o = getOrderById(orderId);
   if (!o) return;
   const status = type === 'ok' ? CONFER_STATUS.CONFERIDO : CONFER_STATUS.DIVERGENCIA;
@@ -17467,6 +17714,7 @@ function isBatchClosed(batch) {
 }
 function assertBatchEditable(batch) {
   if (!batch) { showToast('Lote não encontrado'); return false; }
+  if (!assertImportedBatchAction(batch.id)) return false;
   if (batch.deleted) { showToast('Lote excluído'); return false; }
   if (isBatchClosed(batch)) { showToast('Lote fechado não pode ser alterado'); return false; }
   return true;
@@ -17478,6 +17726,7 @@ function rerenderBatchUx() {
   if (typeof renderHome === 'function') renderHome();
 }
 function toggleBatchStatus(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = getBatchById(batchId);
   if (!batch || batch.deleted) { showToast('Lote não encontrado'); return; }
   if (isBatchClosed(batch)) {
@@ -18146,7 +18395,7 @@ async function openCestaCalcFromOrder(orderId) {
   const order = ordersList.find(o => o.id === orderId);
   if (!order || !Array.isArray(order.items)) { showToast('Pedido não encontrado'); return; }
   await cestaCalcCarregarCacheReceitas();
-  const idShort = (order.id || '').slice(-6);
+  const idShort = (order.id || '').slice(-8);
   cestaCalcContexto = {
     tipo: 'order',
     orderId: order.id,
@@ -18470,6 +18719,7 @@ function mergeBatchesFlow() {
   const a = opens[parseInt(aRaw, 10) - 1];
   const d = opens[parseInt(bRaw, 10) - 1];
   if (!a || !d || a.id === d.id) { showToast('Escolha inválida'); return; }
+  if (!assertImportedBatchAction(a.id) || !assertImportedBatchAction(d.id)) return;
   d.items = (d.items || []).concat((a.items || []).map(x => ({ ...x })));
   a.status = 'closed';
   a.closedAt = Date.now();
@@ -18497,6 +18747,7 @@ function closeBatchDetails() { toggleModal('batchDetailsModal', false); }
 let _discardingBatchId = null;
 
 function openBatchDiscardModal(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(function (b) { return b.id === batchId; });
   if (!batch) return;
   _discardingBatchId = batchId;
@@ -18518,7 +18769,7 @@ function selectDiscardReason(el) {
 }
 
 function confirmBatchDiscard() {
-  if (!_discardingBatchId) return;
+  if (!_discardingBatchId || !assertImportedBatchAction(_discardingBatchId)) return;
   const batch = (batches || []).find(function (b) { return b.id === _discardingBatchId; });
   if (!batch) { closeBatchDiscardModal(); return; }
   const activeChip = document.querySelector('#batchDiscardChips .cash-type-pill.active');
@@ -18543,6 +18794,7 @@ function confirmBatchDiscard() {
 }
 
 function revertBatchDiscard(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(function (b) { return b.id === batchId; });
   if (!batch) return;
   const contavaAntes = loteContaNoSaldo(batch);
@@ -18656,6 +18908,7 @@ function doConferScreenSearch() {
 
 // 'entregue' exige passar por conferência antes; todos os outros vêm direto.
 function applyAdvanceTransition(id, nextStatus) {
+  if (!assertImportedOrderAction(id, nextStatus)) return;
   const o = getOrderById(id);
   if (!o) return;
   // #1493: entregar = receber. Sem a forma o servidor assumia dinheiro.
@@ -18698,6 +18951,7 @@ function applyAdvanceTransition(id, nextStatus) {
 // Separado de applyAdvanceTransition para permitir o dialog de bug 1
 // chamar diretamente quando o operador escolhe "continuar mesmo assim".
 function _proceedAdvance(id, nextStatus) {
+  if (!assertImportedOrderAction(id, nextStatus)) return;
   const o = getOrderById(id);
   if (!o) return;
   let negatives = [];
@@ -20680,7 +20934,7 @@ function cashClosingPlainText(dateKey) {
     lines.push('');
     lines.push(`--- Pedidos entregues (${dayOrders.length}) ---`);
     dayOrders.forEach(o => {
-      const ref = (o.id || '').slice(-6);
+      const ref = (o.id || '').slice(-8);
       const nm = (o.clientSnapshot && o.clientSnapshot.name) || 'Cliente';
       lines.push(`#${ref} ${nm}: ${money(o.total)}`);
     });
@@ -20729,7 +20983,7 @@ function cashClosingPrintHtml(dateKey) {
   const dayOrders = (orders || []).filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && dateKeyOf(o.updatedAt) === k);
   const dayEntries = (cashEntries || []).filter(e => dateKeyOf(e.createdAt) === k);
   const ordersHtml = dayOrders.length
-    ? dayOrders.map(o => `<div class="pa-item"><span class="pi-main"><span class="pi-name">#${escapeHtml((o.id||'').slice(-6))} ${escapeHtml(o.clientSnapshot?.name || 'Cliente')}</span></span><span class="pi-price">${money(o.total)}</span></div>`).join('')
+    ? dayOrders.map(o => `<div class="pa-item"><span class="pi-main"><span class="pi-name">#${escapeHtml((o.id||'').slice(-8))} ${escapeHtml(o.clientSnapshot?.name || 'Cliente')}</span></span><span class="pi-price">${money(o.total)}</span></div>`).join('')
     : '<div class="pa-item"><span class="pi-main"><span class="pi-unit">Sem vendas no dia</span></span></div>';
   const entriesHtml = dayEntries.length
     ? dayEntries.map(e => {
@@ -21264,12 +21518,14 @@ function openClientModal(prefillOrEditId) {
     }
   }
   updateClientSaveState();
+  rememberOperationalFocus('newClientModal');
   document.getElementById('newClientModal').classList.add('show');
-  setTimeout(() => document.getElementById((editId || prefill) ? 'newClientAddr' : 'newClientName').focus(), 300);
+  document.getElementById('newClientName').focus();
 }
 function closeClientModal() {
   editingClientId = null;
   document.getElementById('newClientModal').classList.remove('show');
+  restoreOperationalFocus('newClientModal');
 }
 function saveNewClient() {
   // Bug 9 (Onda 4): normalizeName em vez de so trim() — colapsa espacos
@@ -22103,6 +22359,7 @@ function renderFormaPills(hostId, selected, onPick) {
 // Entregar pedido pergunta a forma antes; escolherFormaEntrega retoma a entrega.
 let pendingPagamentoEntregaId = null;
 function openPagamentoEntrega(orderId) {
+  if (!assertImportedOrderAction(orderId, STATUS.ENTREGUE)) return;
   const o = getOrderById(orderId);
   if (!o) return;
   pendingPagamentoEntregaId = orderId;
@@ -22120,7 +22377,7 @@ function escolherFormaEntrega(key) {
   const metodo = normalizarFormaPagamento(key);
   closePagamentoEntrega();
   const o = id ? getOrderById(id) : null;
-  if (!o || !metodo) return;
+  if (!o || !metodo || !assertImportedOrderAction(id, STATUS.ENTREGUE)) return;
   o.metodo = metodo;
   applyAdvanceTransition(id, STATUS.ENTREGUE);
 }
@@ -22678,18 +22935,21 @@ function rememberOperationalFocus(id) { operationalFocus.set(id, document.active
 function restoreOperationalFocus(id) {
   const target = operationalFocus.get(id);
   operationalFocus.delete(id);
-  if (!document.querySelector('.modal-overlay.show, #etiquetasPreview.show, dialog[open]') && target?.isConnected && target.offsetParent !== null) target.focus();
+  if (!document.querySelector('.modal-overlay.show, .cobranca-overlay.show, #etiquetasPreview.show, dialog[open]') && target?.isConnected && target.offsetParent !== null) target.focus();
 }
 function operationalModalOpen() {
-  return !!document.querySelector('.modal-overlay.show, .historico-overlay.show, #etiquetasPreview.show, dialog[open], .welcome:not(.hidden), .tour:not(.hidden)');
+  return !!document.querySelector('.modal-overlay.show, .historico-overlay.show, .cobranca-overlay.show, #etiquetasPreview.show, dialog[open], .welcome:not(.hidden), .tour:not(.hidden)');
 }
-['newProductModal', 'productionConfirmModal', 'etiquetasPreview'].forEach(id => {
+['newProductModal', 'newClientModal', 'productionConfirmModal', 'etiquetasPreview', 'noPrinterModal', 'cobrancaModal'].forEach(id => {
   const modal = document.getElementById(id);
   modal.addEventListener('keydown', event => {
     if (!modal.classList.contains('show')) return;
     if (event.key === 'Escape') {
       event.preventDefault(); event.stopPropagation();
       if (id === 'newProductModal') closeProductModal();
+      else if (id === 'newClientModal') closeClientModal();
+      else if (id === 'noPrinterModal') closeNoPrinterModal();
+      else if (id === 'cobrancaModal') closeCobranca();
       else if (id === 'productionConfirmModal') closeProductionConfirm();
       else closeEtiquetasPreview();
       return;
@@ -23116,8 +23376,18 @@ function forceCheckUpdate() {
 
 // Modal "Sem impressora" — abre quando operador toca em Imprimir mas nao
 // tem impressora termica pareada. Substitui o confirm() cinza do Android.
-function openNoPrinterModal()  { document.getElementById('noPrinterModal').classList.add('show'); }
-function closeNoPrinterModal() { document.getElementById('noPrinterModal').classList.remove('show'); }
+function openNoPrinterModal() {
+  rememberOperationalFocus('noPrinterModal');
+  const modal = document.getElementById('noPrinterModal');
+  modal.classList.add('show');
+  modal.querySelector('button').focus();
+}
+function closeNoPrinterModal() {
+  document.getElementById('noPrinterModal').classList.remove('show');
+  const target = operationalFocus.get('noPrinterModal');
+  operationalFocus.delete('noPrinterModal');
+  if (target?.isConnected && target.offsetParent !== null) target.focus();
+}
 
 // Centraliza handlers dos botoes do noPrinterModal com try/catch + log
 // no btStep trail (visivel via Ajustes > Diagnostico). Se algum botao

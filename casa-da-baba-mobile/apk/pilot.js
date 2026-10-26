@@ -14,13 +14,15 @@
     return { ...data, available: data.versionCode > config.versionCode };
   }
 
-  function connectionStatus({ health, paired, invalid, pending }) {
+  function connectionStatus({ health, paired, invalid, pending, importPending }) {
     const status = health === 'online' ? 'EasyStok acessível' : health === 'checking' ? 'Conferindo conexão' : 'Sem conexão confirmada';
     const pairing = invalid ? 'Reconecte este aparelho: o pareamento está inválido.'
       : paired ? 'Produção pareada com o EasyStok.' : 'Produção só neste aparelho. Conecte com o código de pareamento para sincronizar.';
     const queue = pending > 0 ? pending + (pending === 1 ? ' alteração aguardando envio.' : ' alterações aguardando envio.')
       : 'Nenhuma alteração na fila de envio deste aparelho.';
-    return { status, pairing, queue, rail: status + (pending > 0 ? ' · ' + pending + ' pendente' + (pending === 1 ? '' : 's') : '') };
+    const syncState = invalid ? 'invalid' : importPending ? 'pending' : !paired ? 'local' : health === 'online' && pending > 0 ? 'pending' : health;
+    const railStatus = invalid ? 'Reconectar aparelho' : importPending ? 'Conferir dados importados' : !paired ? 'Só neste aparelho' : status;
+    return { status, pairing, queue: importPending ? 'Envio pausado até conferir os dados importados. ' + queue : queue, syncState, rail: railStatus + (pending > 0 ? ' · ' + pending + ' pendente' + (pending === 1 ? '' : 's') : '') };
   }
 
   function otaStatusText(state) {
@@ -70,6 +72,11 @@
   let lastFocus = null;
   let health = 'checking';
   let checkingUpdate = false;
+  let checkingConnection = false;
+  let confirmingImport = false;
+  let undoingImport = false;
+  let migratingImport = false;
+  let importUndoRequest = 0;
   const native = () => root.Capacitor?.Plugins?.PilotApp;
   const updater = () => root.Capacitor?.Plugins?.PilotUpdater;
   const rail = doc.createElement('div');
@@ -89,12 +96,15 @@
       <p class="pilot-intro">Escolha o que precisa fazer agora.</p>
       <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><button type="button" id="pilotReconnect" data-action="reconnect" hidden>Verificar conexão</button></div>
       <p id="pilotError" class="pilot-feedback pilot-error" role="alert" tabindex="-1"></p>
+      <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
+      <details id="pilotMigrationReceipt" class="pilot-help" hidden><summary>Última migração confirmada</summary><p id="pilotMigrationResult" class="pilot-feedback" role="status" tabindex="-1"></p></details>
       <div class="pilot-actions">
         <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-step">PRODUÇÃO NESTE APARELHO</span><strong>Produzir e etiquetar</strong><span>Cadastro, validade, lote e impressão.</span><b aria-hidden="true">↗</b></button>
         <button type="button" class="pilot-card pilot-orders" data-action="workspace"><span class="pilot-step">ATENDIMENTO ONLINE</span><strong>Pedidos e cobranças</strong><span>Abra o EasyStok para frete, mensagens e assistente.</span><b aria-hidden="true">↗</b></button>
       </div>
       <p class="pilot-hint">No Atendimento, entre com seu acesso da Casa da Baba. As alterações são feitas na operação real.</p>
       <button type="button" class="pilot-local" data-action="local-orders"><strong>Registrar pedido no aparelho</strong><span>Sem cálculo de frete nem envio automático. A sincronização exige pareamento.</span></button>
+      <details class="pilot-help pilot-migration"><summary>Já usava o PWA antigo?</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><p>Se está começando agora, basta conectar a produção.</p></details>
       <div class="pilot-shortcuts">
         <button type="button" data-action="printers">Impressoras</button>
         <button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button>
@@ -124,21 +134,144 @@
     if (message) { error.focus(); error.scrollIntoView({ block: 'nearest' }); }
   }
   function showConnection() {
-    const state = connectionStatus({ health, paired: !!root.cdbSync?.getPairing?.(), invalid: !!root.cdbSync?.isPairingInvalid?.(), pending: root.cdbSync?.queueSize?.() || 0 });
+    const pairing = root.cdbSync?.getPairing?.();
+    const review = root.cdbSync?.importReview?.();
+    const invalid = !!root.cdbSync?.isPairingInvalid?.();
+    const state = connectionStatus({ health, paired: !!pairing, invalid, pending: root.cdbSync?.queueSize?.() || 0, importPending: !!review });
     doc.getElementById('pilotRailStatus').textContent = state.rail;
     doc.getElementById('pilotConnection').textContent = state.status + '. ' + state.pairing + ' ' + state.queue;
-    doc.getElementById('pilotReconnect').hidden = health !== 'offline';
-    rail.dataset.online = String(health === 'online');
+    const reconnect = doc.getElementById('pilotReconnect');
+    reconnect.hidden = health !== 'offline' && !checkingConnection;
+    reconnect.disabled = checkingConnection;
+    reconnect.textContent = checkingConnection ? 'Conferindo…' : 'Verificar conexão';
+    doc.getElementById('pilotPairButton').textContent = state.syncState === 'invalid' ? 'Reconectar produção' : root.cdbSync?.getPairing?.() ? 'Alterar conexão' : 'Conectar produção';
+    rail.dataset.sync = state.syncState;
+    doc.getElementById('pilotImportReview').hidden = !review;
+    const confirm = doc.getElementById('pilotConfirmImport');
+    confirm.disabled = confirmingImport || undoingImport || migratingImport || !pairing || invalid || !!review?.invalid || !!review?.requiresReconciliation;
+    confirm.hidden = !!review?.requiresReconciliation;
+    showMigration(review);
+    confirm.textContent = confirmingImport ? 'Conferindo e sincronizando…' : 'Confirmar origem e sincronizar';
+    showImportUndo(review);
+    if (!migratingImport && !review) showMigrationReceipt(root.cdbSync?.getLastLegacyMigration?.());
+    if (review) {
+      const photos = Number(review.missingPhotos) > 0 ? ' Há ' + review.missingPhotos + ' foto(s) ausente(s) no arquivo; confira no PWA de origem.' : '';
+      doc.getElementById('pilotImportStatus').textContent = (review.invalid
+        ? 'A revisão deste backup não está disponível. Importe novamente o arquivo de origem. Os dados continuam neste aparelho.'
+        : review.requiresReconciliation
+          ? 'Dados importados aguardam conferência. Revise com a equipe os registros do PWA de origem e do EasyStok para identificar o que ainda precisa ser enviado. Não apague os dados de origem.'
+          : !pairing || invalid
+            ? 'Os dados estão neste aparelho, com envio pausado. Conecte a produção e confirme a empresa e a loja de origem para liberar a sincronização.'
+            : 'Os dados estão neste aparelho, com envio pausado. Confira se o backup pertence a ' + pairingDestination(pairing) + ' antes de liberar a sincronização.') + photos;
+    }
+  }
+  function migrationCounts(counts = {}) {
+    const labels = {products:['produto','produtos'],clients:['cliente','clientes'],orders:['pedido','pedidos'],cashEntries:['lançamento de caixa','lançamentos de caixa'],batches:['lote','lotes'],cashClosings:['fechamento de caixa','fechamentos de caixa']};
+    return Object.entries(labels).filter(([key]) => Number.isInteger(counts[key]) && counts[key] >= 0)
+      .map(([key,label]) => counts[key] + ' ' + label[counts[key] === 1 ? 0 : 1]).join(', ');
+  }
+  function migrationArchiveNote(state) {
+    return state.counts?.cashClosings > 0 || state.archiveOnlyCollections?.includes('cashClosings')
+      ? 'Fechamentos antigos serão preservados no backup; não reabrem nem recalculam caixa do EasyStok.' : '';
+  }
+  function migrationWarnings(state) {
+    return [...new Set([...(Array.isArray(state.warnings) ? state.warnings : []), migrationArchiveNote(state)].filter(Boolean))].join(' ');
+  }
+  function showMigration(review) {
+    const section = doc.getElementById('pilotMigration');
+    section.hidden = !review?.requiresReconciliation || typeof root.cdbSync?.getImportedMigrationState !== 'function';
+    if (section.hidden) return;
+    const state = root.cdbSync.getImportedMigrationState();
+    const button = doc.getElementById('pilotMigrateImport');
+    button.disabled = !state.available || migratingImport || undoingImport || confirmingImport;
+    button.textContent = migratingImport ? 'Enviando primeira migração…' : state.prepared ? 'Retomar migração' : 'Enviar primeira migração';
+    doc.getElementById('pilotMigrationStatus').textContent = (state.available
+      ? 'Somente para registros que nunca foram enviados ao EasyStok. Confira: ' + migrationCounts(state.counts) + '. '
+      : (state.reason || 'A primeira migração ainda não está disponível.') + ' ') + migrationWarnings(state);
+  }
+  function showMigrationReceipt(ack, focus = false) {
+    if (!ack) return;
+    const receipt = doc.getElementById('pilotMigrationReceipt'), result = doc.getElementById('pilotMigrationResult');
+    receipt.hidden = false;
+    result.textContent = 'Primeira migração confirmada pelo EasyStok. ' + migrationCounts(ack.counts) + '. ' + migrationWarnings(ack);
+    if (focus) { receipt.open = true; result.focus(); result.scrollIntoView({block:'nearest'}); }
+  }
+  async function migrateImport() {
+    if (migratingImport || undoingImport || confirmingImport) return;
+    const state = root.cdbSync.getImportedMigrationState(), pairing = root.cdbSync.getPairing();
+    if (!state.available || !pairing) throw new Error(state.reason || 'Conecte a produção e confira o backup antes de migrar.');
+    const question = (state.prepared
+      ? 'Retomar a mesma migração? O servidor pode já ter recebido a primeira tentativa. Confirme a origem dos registros, que estavam apenas no Android antes desta migração.'
+      : 'Confirma que estes registros do Android nunca foram enviados ao EasyStok?') + '\n\nDestino: ' + pairingDestination(pairing)
+      + '.\nRegistros: ' + migrationCounts(state.counts) + '.\n\n' + migrationWarnings(state)
+      + '\nDepois de exportar, registre novos pedidos e produção apenas neste app. Preserve o PWA antigo para consulta, sem reenviar sua fila.'
+      + '\nPedidos históricos prontos, entregues ou cancelados não geram novo movimento nem pagamento. ' + (state.prepared ? 'Retomar esta migração?' : 'Enviar esta primeira migração?');
+    if (!root.confirm(question)) return;
+    migratingImport = true;
+    doc.getElementById('pilotMigrationReceipt').hidden = true;
+    doc.getElementById('pilotMigrationResult').textContent = '';
+    const pairButton = doc.getElementById('pilotPairButton'); pairButton.disabled = true;
+    showConnection();
+    try {
+      const ack = await root.cdbSync.migrateImportedLegacyData({sourceNeverSynced:true,expectedEmpresaId:pairing.empresaId,expectedLojaId:pairing.lojaId});
+      showMigrationReceipt(ack, true);
+    } finally { migratingImport = false; pairButton.disabled = false; showConnection(); }
+  }
+  async function showImportUndo(review) {
+    const request = ++importUndoRequest;
+    const button = doc.getElementById('pilotUndoImport');
+    const message = doc.getElementById('pilotUndoImportStatus');
+    button.hidden = !review || typeof root.getBackupImportUndoState !== 'function';
+    button.disabled = true;
+    message.textContent = '';
+    if (button.hidden) return;
+    button.textContent = undoingImport ? 'Desfazendo importação…' : 'Desfazer importação';
+    try {
+      const state = await root.getBackupImportUndoState();
+      if (request !== importUndoRequest) return;
+      button.disabled = !state.available || confirmingImport || undoingImport || migratingImport;
+      message.textContent = state.available ? 'Desfazer restaura os dados e a fila anteriores à importação, desde que não haja trabalho novo.' : state.reason;
+    } catch {
+      if (request === importUndoRequest) message.textContent = 'Não foi possível conferir a restauração. Preserve os dados e tente novamente.';
+    }
+  }
+  async function undoImport() {
+    if (undoingImport || confirmingImport || migratingImport || !root.cdbSync?.importReview?.()) return;
+    const state = await root.getBackupImportUndoState();
+    if (!state.available) throw new Error(state.reason || 'Há alterações posteriores à importação. Preserve os dados antes de continuar.');
+    if (!root.confirm('Desfazer todos os arquivos importados nesta revisão? Os dados e a fila anteriores à importação serão restaurados. O app será recarregado.')) return;
+    undoingImport = true; showConnection();
+    try { await root.undoBackupImport(); root.location.reload(); }
+    finally { undoingImport = false; showConnection(); }
+  }
+  function pairingDestination(pairing) {
+    return 'empresa ' + (pairing.empresaNome || pairing.empresaId) + ', loja ' + (pairing.lojaNome || pairing.lojaId);
+  }
+  async function confirmImport() {
+    if (confirmingImport || undoingImport || migratingImport) return;
+    const review = root.cdbSync?.importReview?.(), pairing = root.cdbSync?.getPairing?.();
+    if (!review) return;
+    if (!pairing || root.cdbSync?.isPairingInvalid?.()) throw new Error('Conecte a produção antes de confirmar a origem do backup.');
+    if (review.invalid || review.requiresReconciliation) throw new Error('Revise com a equipe os dados do PWA de origem e do EasyStok antes de liberar a sincronização.');
+    const photos = Number(review.missingPhotos) > 0 ? '\nO arquivo não contém ' + review.missingPhotos + ' foto(s). Confira essas imagens no PWA de origem.' : '';
+    if (!root.confirm('Confirma que o backup importado pertence a ' + pairingDestination(pairing) + '? Ao confirmar, o app poderá enviar as alterações pendentes para essa operação.' + photos)) return;
+    confirmingImport = true; showConnection();
+    try { await root.cdbSync.confirmImportedDataContext(); }
+    finally { confirmingImport = false; showConnection(); }
+    const target = doc.getElementById('pilotConnection'); target.focus(); target.scrollIntoView({ block: 'nearest' });
   }
   async function refreshHealth() {
+    if (checkingConnection) return;
     health = root.navigator?.onLine === false ? 'offline' : 'checking'; showConnection();
     if (health === 'offline') return;
+    checkingConnection = true; showConnection();
     try {
       const response = await fetch(config.apiBaseUrl + '/api/mobile/version', { signal: AbortSignal.timeout(8000), cache: 'no-store' });
       if (!response.ok) throw new Error();
       const body = await response.json();
       health = body.databaseOk === true && root.navigator?.onLine !== false ? 'online' : 'offline';
     } catch { health = 'offline'; }
+    finally { checkingConnection = false; }
     showConnection();
   }
   async function openWorkspace() {
@@ -214,7 +347,7 @@
         data = await response.json();
       }
       latest = validateManifest(data, config);
-      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. O Android pedirá a confirmação para instalar.' : 'Você está na versão mais recente disponível.';
+      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. O Android pedirá a confirmação para instalar.' : 'O APK instalado está atualizado. A versão do conteúdo aparece em Atualizações e recuperação.';
       download.hidden = !latest.available;
     } catch {
       message.textContent = 'Não foi possível conferir a atualização. Tente novamente com conexão.';
@@ -238,7 +371,15 @@
       if (action === 'production') { closeHome(); root.go('producao'); }
       if (action === 'local-orders') { closeHome(); root.go('pedidos'); }
       if (action === 'printers') { closeHome(); root.openPrinterPicker(); }
+      if (action === 'import-pwa') {
+        const input = doc.getElementById('backupFileInput');
+        if (!input) throw new Error('Importação indisponível. Abra os Ajustes e tente novamente.');
+        closeHome(); input.click();
+      }
       if (action === 'pair') await connectProduction();
+      if (action === 'confirm-import') await confirmImport();
+      if (action === 'undo-import') await undoImport();
+      if (action === 'migrate-import') await migrateImport();
       if (action === 'workspace') await openWorkspace();
       if (action === 'reconnect') await refreshHealth();
       if (action === 'update') await checkUpdate();
@@ -257,6 +398,9 @@
   root.addEventListener('online', refreshHealth);
   root.addEventListener('offline', () => { health = 'offline'; showConnection(); });
   root.addEventListener('cdb-sync-success', showConnection);
+  root.addEventListener('cdb-sync-state-change', showConnection);
+  root.addEventListener('cdb-initial-pull-done', showConnection);
+  root.addEventListener('cdb-mutations-applied', showConnection);
   root.addEventListener('cdb-operator-ready', openHome);
   root.forceCheckUpdate = checkUpdate;
   startUpdater();

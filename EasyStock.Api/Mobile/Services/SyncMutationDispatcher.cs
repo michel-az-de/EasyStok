@@ -38,6 +38,16 @@ public class SyncMutationDispatcher(
     // inclui os movimentos que vieram no mesmo lote; soma-los de novo contaria em dobro.
     private readonly HashSet<string> _nascidosComSaldoDoAparelho = new(StringComparer.Ordinal);
 
+    private bool _snapshotImport;
+
+    // Usado apenas pela primeira carga transacional, depois da prova de que os IDs nao existem.
+    public async Task ApplySnapshotAsync(MutationDto mutation, string deviceId, string? operatorName, Guid empresaId, Guid lojaId)
+    {
+        _snapshotImport = true;
+        try { await ApplyMutationAsync(mutation, deviceId, operatorName, empresaId, lojaId); }
+        finally { _snapshotImport = false; }
+    }
+
     public async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
@@ -60,6 +70,70 @@ public class SyncMutationDispatcher(
             case "stock":     await ApplyStockDelta(m, deviceId, operatorName, empresaId);        break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
+    }
+
+    // Executada antes do push: uma entidade historica recusada nao pode deixar o stock.delta
+    // do mesmo envio ser aceito separadamente (cancelamento/descarte no PWA gera ambos).
+    public async Task ValidateLegacyHistoryAsync(MutationDto m, Guid? empresaId)
+    {
+        if (m.Type is not ("order.upsert" or "batch.upsert") || m.Payload.ValueKind != System.Text.Json.JsonValueKind.Object) return;
+        // O DTO aceita Id/id; a pre-validacao precisa usar a mesma identidade antes de qualquer delta.
+        var keys = m.Payload.EnumerateObject().Where(p => string.Equals(p.Name, "id", StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (keys.Length > 1) throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: identificacao ambigua; envio inteiro preservado sem aplicar.");
+        if (keys.Length == 0 || keys[0].Value.ValueKind != System.Text.Json.JsonValueKind.String) return;
+        var entityId = keys[0].Value.GetString();
+        if (m.Type == "order.upsert")
+        {
+            var order = await _db.Set<Order>().Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == entityId && x.EmpresaId == empresaId);
+            if (order?.ErpPedidoId is { } id && await _db.Set<Pedido>().AnyAsync(p => p.Id == id && p.Origem == LegacySnapshotImportService.HistoryOrigin))
+            {
+                OrderDto? dto;
+                try { dto = m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts); }
+                catch (System.Text.Json.JsonException) { throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: alteracao historica malformada; envio inteiro preservado sem aplicar."); }
+                if (dto is null) throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: pedido historico invalido.");
+                await AssertHistoricalOrderUpdateAsync(order, dto);
+            }
+        }
+        else if (m.Type == "batch.upsert")
+        {
+            var batch = await _db.Set<Batch>().FirstOrDefaultAsync(x => x.Id == entityId && x.EmpresaId == empresaId);
+            if (batch?.ErpLoteId is { } id && await _db.Set<Lote>().AnyAsync(l => l.Id == id && l.Origem == LegacySnapshotImportService.HistoryOrigin))
+            {
+                BatchDto? dto;
+                try { dto = m.Payload.Deserialize<BatchDto>(SyncDtoConverters.JsonOpts); }
+                catch (System.Text.Json.JsonException) { throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: alteracao historica malformada; envio inteiro preservado sem aplicar."); }
+                if (dto is null || batch.Excluido != (dto.Deleted == true) || batch.Descartado != (dto.Discarded == true))
+                    throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: lote historico importado exige reconciliacao para excluir ou descartar.");
+            }
+        }
+    }
+
+    private async Task AssertHistoricalOrderUpdateAsync(Order existing, OrderDto dto)
+    {
+        var erpStatus = await _db.Set<Pedido>().AsNoTracking()
+            .Where(p => p.Id == existing.ErpPedidoId && p.EmpresaId == existing.EmpresaId).Select(p => p.Status).SingleOrDefaultAsync();
+        if (erpStatus != existing.Status)
+            throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: o pedido mudou no ERP; confira a esteira antes de alterar o historico no aparelho.");
+        AssertHistoricalOrderUpdate(existing, dto);
+    }
+    private static void AssertHistoricalOrderUpdate(Order existing, OrderDto dto)
+    {
+        var sameItems = dto.Items is not null && existing.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).Order()
+            .SequenceEqual(dto.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).Order());
+        var sameBase = sameItems && existing.Total == dto.Total && existing.ClientId == dto.ClientId
+            && existing.ClientSnapshotName == dto.ClientSnapshot?.Name && existing.ClientSnapshotRef == dto.ClientSnapshot?.Ref
+            && CarimboMs(existing.CreatedAt) == dto.CreatedAt;
+        if (sameBase && existing.Status == "pronto"
+            && (dto.Status == "pronto" || dto.Status == "entregue" && FormaPagamentoMobile.Normalizar(dto.Metodo) is not null)) return;
+        // Um reenvio integral identico e inofensivo; nao confundir eco com reabertura do historico.
+        var historyEqual = System.Text.Json.Nodes.JsonNode.DeepEquals(
+            System.Text.Json.Nodes.JsonNode.Parse(existing.HistoryJson ?? "null"),
+            dto.History.HasValue ? System.Text.Json.Nodes.JsonNode.Parse(dto.History.Value.GetRawText()) : null);
+        if (sameBase && existing.Status == dto.Status && existing.Notes == dto.Notes && existing.Metodo == FormaPagamentoMobile.Normalizar(dto.Metodo)
+            && CarimboMs(existing.UpdatedAt) == dto.UpdatedAt && existing.ConfirmedBy == dto.ConfirmedBy
+            && existing.ConfirmedAt == MsParaUtc(dto.ConfirmedAt) && existing.FactAt == MsParaUtc(dto.FactAt)
+            && existing.ScheduledDeliveryAt == MsParaUtc(dto.ScheduledDeliveryAt) && historyEqual) return;
+        throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: pedido historico importado; apenas conferencia e entrega de um pedido pronto, sem alterar itens/cliente e com pagamento informado na entrega, podem continuar automaticamente.");
     }
 
     private async Task ApplyProduct(MutationDto m, string deviceId, string? operatorName,
@@ -195,6 +269,8 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Order>().Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == dto.Id && o.EmpresaId == empresaId);
+        if (existing?.ErpPedidoId is { } erpId && await _db.Set<Pedido>().AnyAsync(p => p.Id == erpId && p.Origem == LegacySnapshotImportService.HistoryOrigin))
+            await AssertHistoricalOrderUpdateAsync(existing, dto);
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         var updatedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.UpdatedAt).UtcDateTime;
 
@@ -257,10 +333,10 @@ public class SyncMutationDispatcher(
                 });
             _db.Add(order);
             // #1543: pedido que ja chega "pronto" (ou adiante) baixa aqui; antes so a troca de status baixava.
-            await ApplyStockRule(null, dto.Status, dto.Items, empresaId, dto.Id, lojaId);
+            if (!_snapshotImport) await ApplyStockRule(null, dto.Status, dto.Items, empresaId, dto.Id, lojaId);
             // Onda 3 — pedido criado direto como "entregue" (retroativo) cria Venda. #1543: a do pedido
             // que nasceu no ERP so nasce depois que a esteira aceita a entrega (OrderLinker).
-            if (order.Status == "entregue" && !await NasceuNoErpAsync(dto.Id, null, empresaId))
+            if (!_snapshotImport && order.Status == "entregue" && !await NasceuNoErpAsync(dto.Id, null, empresaId))
             {
                 await _saleSync.CreateVendaForDeliveredOrderAsync(order, dto.Items);
             }
@@ -402,6 +478,10 @@ public class SyncMutationDispatcher(
         if (existing != null)
         {
             // Itens sao imutaveis; o re-envio so traz as marcas de exclusao/descarte (#1464).
+            if (existing.ErpLoteId is { } loteId
+                && await _db.Set<Lote>().AnyAsync(l => l.Id == loteId && l.Origem == LegacySnapshotImportService.HistoryOrigin)
+                && (existing.Excluido != (dto.Deleted == true) || existing.Descartado != (dto.Discarded == true)))
+                throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: lote historico importado; o saldo inicial nao permite recalcular descarte ou exclusao automaticamente.");
             var marcasAntes = (existing.DeletedAt, existing.DeletedBy, existing.DiscardedAt, existing.DiscardedBy, existing.DiscardReason);
             AplicarMarcas(existing, dto);
             // #1520: a marca agora desce no pull (carimbo do servidor). Quem marcou passa a ser o

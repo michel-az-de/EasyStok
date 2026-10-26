@@ -24,7 +24,7 @@ def require(condition, message):
 def validate(payload):
     require(set(payload) == FIELDS, "Campos de manifesto invalidos.")
     require(payload["schemaVersion"] == 1 and payload["appId"] == APP and payload["channel"] == "piloto", "Identidade OTA invalida.")
-    require(payload["nativeVersionCode"] == 3 and payload["dataSchemaVersion"] == 2, "Versao nativa/esquema incompatível.")
+    require(type(payload["nativeVersionCode"]) is int and payload["nativeVersionCode"] in (3, 4) and payload["dataSchemaVersion"] == 2, "Versao nativa/esquema incompatível.")
     require(type(payload["sequence"]) is int and 0 < payload["sequence"] <= 2147483647, "Sequencia invalida.")
     require(isinstance(payload["bundleVersion"], str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", payload["bundleVersion"]), "bundleVersion invalida.")
     require(isinstance(payload["sha256"], str) and re.fullmatch(r"[a-f0-9]{64}", payload["sha256"]), "Hash invalido.")

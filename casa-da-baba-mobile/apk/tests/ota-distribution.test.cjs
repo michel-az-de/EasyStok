@@ -23,7 +23,7 @@ after(() => {
 function fixture(version = '0.3.0') {
   const dir = fs.mkdtempSync(path.join(temporary, 'web-'));
   fs.writeFileSync(path.join(dir, 'index.html'), '<html>' + version + '</html>');
-  fs.writeFileSync(path.join(dir, 'bundle.json'), JSON.stringify({ schemaVersion: 1, appId: ota.APP, channel: 'piloto', bundleVersion: version, nativeVersionCode: 3, dataSchemaVersion: 2 }));
+  fs.writeFileSync(path.join(dir, 'bundle.json'), JSON.stringify({ schemaVersion: 1, appId: ota.APP, channel: 'piloto', bundleVersion: version, nativeVersionCode: require('../package.json').versionCode, dataSchemaVersion: 2 }));
   return dir;
 }
 function build(version, sequence, content = '') {
@@ -66,7 +66,7 @@ test('ZIP determinístico, manifesto e integridade assinada', () => {
 });
 test('contrato rejeita URL, identidade, esquema e metadados incompatíveis', () => {
   const release = build('0.3.0', 1);
-  for (const change of [{ url: release.payload.url + '?x=1' }, { appId: 'outra.empresa' }, { dataSchemaVersion: 1 }, { nativeVersionCode: 4 }, { sequence: 0 }, { bundleVersion: '../escape' }]) {
+  for (const change of [{ url: release.payload.url + '?x=1' }, { appId: 'outra.empresa' }, { dataSchemaVersion: 1 }, { nativeVersionCode: 5 }, { sequence: 0 }, { bundleVersion: '../escape' }]) {
     assert.throws(() => ota.validate({ ...release.payload, ...change }));
   }
   const web = fixture();
@@ -74,6 +74,14 @@ test('contrato rejeita URL, identidade, esquema e metadados incompatíveis', () 
   fs.writeFileSync(path.join(web, 'bundle.json'), JSON.stringify(metadata));
   assert.throws(() => ota.zipWeb(web, '0.3.0'), /bundle.json/);
 });
+test('distribuidor gera a versao nativa atual e preserva verificacao de manifesto antigo', () => {
+  const release = build('0.4.0', 10);
+  assert.equal(release.payload.nativeVersionCode, require('../package.json').versionCode);
+  const legacy = { ...release.payload, nativeVersionCode: 3 };
+  const envelope = ota.sign(legacy, privateFile, key);
+  assert.equal(ota.verify(envelope, key).nativeVersionCode, 3);
+});
+
 test('rollback cria sequência nova preservando exatamente os bytes e hash anteriores', () => {
   const old = build('0.3.0', 1), output = fs.mkdtempSync(path.join(temporary, 'rollback-'));
   const rollback = ota.main(['rollback', '--release', old.release, '--bundle', old.bundle, '--sequence', '3', '--output', output, '--private-key', privateFile, '--public-key', publicFile]);
