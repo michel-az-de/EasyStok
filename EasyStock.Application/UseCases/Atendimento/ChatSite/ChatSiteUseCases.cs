@@ -121,7 +121,13 @@ public sealed class EnviarMensagemVisitanteUseCase(
     public const int TextoTamanhoMaximo = 1000;
     public const string PrefixoConfirmacaoRecebimento = "chatsite:recepcao:";
 
-    public async Task<MensagemChatSiteResult> ExecuteAsync(string slug, string? token, string? texto, CancellationToken ct = default)
+    public Task<MensagemChatSiteResult> ExecuteAsync(string slug, string? token, string? texto, CancellationToken ct = default) =>
+        EnviarAsync(slug, token, texto, null, ct);
+
+    public Task<MensagemChatSiteResult> ExecuteNaConversaAsync(string slug, string? token, string? texto, Guid conversaId, CancellationToken ct = default) =>
+        EnviarAsync(slug, token, texto, conversaId, ct);
+
+    private async Task<MensagemChatSiteResult> EnviarAsync(string slug, string? token, string? texto, Guid? conversaEsperada, CancellationToken ct)
     {
         var limpo = texto?.Trim();
         if (string.IsNullOrEmpty(limpo))
@@ -136,12 +142,24 @@ public sealed class EnviarMensagemVisitanteUseCase(
         // A trava de contato do serviço dura até entrada e confirmação estarem persistidas.
         var mensagem = await unitOfWork.ExecuteInTransactionSemRetryAsync(async tokenCt =>
         {
-            var conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
-            // #1797: a trava do contato não exclui o console. A linha travada e relida não grava não lidas velhas por cima
-            // do marcar-lida; encerrada enquanto esperava, a mensagem abre outra conversa (nova, ninguém mais a vê).
-            conversa = await conversaRepository.ObterPorIdComLockAsync(sessao.EmpresaId, conversa.Id, tokenCt)
-                ?? throw new ConversaNaoEncontradaException(conversa.Id);
-            if (!conversa.EstaAberta) conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
+            Conversa conversa;
+            if (conversaEsperada is { } esperada)
+            {
+                if (sessao.ConversaId != esperada) throw new SessaoChatSiteInvalidaException();
+                conversa = await conversaRepository.ObterPorIdComLockAsync(sessao.EmpresaId, esperada, tokenCt)
+                    ?? throw new SessaoChatSiteInvalidaException();
+                if (conversa.EmpresaId != sessao.EmpresaId || !conversa.EstaAberta || conversa.Canal != CanalConversa.ChatSite)
+                    throw new SessaoChatSiteInvalidaException();
+            }
+            else
+            {
+                conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
+                // #1797: a trava do contato não exclui o console. A linha travada e relida não grava não lidas velhas por cima
+                // do marcar-lida; encerrada enquanto esperava, a mensagem abre outra conversa (nova, ninguém mais a vê).
+                conversa = await conversaRepository.ObterPorIdComLockAsync(sessao.EmpresaId, conversa.Id, tokenCt)
+                    ?? throw new ConversaNaoEncontradaException(conversa.Id);
+                if (!conversa.EstaAberta) conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, tokenCt);
+            }
             var entrada = Mensagem.Entrada(sessao.EmpresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, limpo);
             conversa.RegistrarEntrada(agora);
             await conversaRepository.AddMensagemAsync(entrada, tokenCt);

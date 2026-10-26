@@ -59,7 +59,13 @@ public class ChatSiteController(
     public Task<IActionResult> EnviarMensagem(
         string slug, [FromHeader(Name = ChatSiteRateLimit.HeaderToken)] string? token,
         [FromBody] MensagemVisitanteBody body, CancellationToken ct) =>
-        Tratar(async () => DataOk(await enviarMensagem.ExecuteAsync(slug, token, body?.Texto, ct)));
+        Tratar(async () =>
+        {
+            var esperada = HttpContext?.Request.Headers["X-Chat-Conversa"].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(esperada)) return DataOk(await enviarMensagem.ExecuteAsync(slug, token, body?.Texto, ct));
+            if (!Guid.TryParse(esperada, out var conversaId)) throw new SessaoChatSiteInvalidaException();
+            return DataOk(await enviarMensagem.ExecuteNaConversaAsync(slug, token, body?.Texto, conversaId, ct));
+        });
 
     [SwaggerOperation(Summary = "Identify the visitor before the chat (name, phone, e-mail, privacy consent)",
         Description = "#1430. Grava na sessão o que o visitante informou, com o aceite da política de privacidade. " +
