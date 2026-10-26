@@ -1,24 +1,47 @@
 // Primeiro acesso (#1753, N9): quem recebeu o convite escolhe a senha aqui. Abrir o link não gasta o
 // convite; só o envio gasta. Depois de aceitar, a pessoa entra pelo login, como todo mundo.
-import { useEffect, useId, useRef, useState } from 'react'
+// #2070: ou entra direto com a conta Google do e-mail convidado; quem conclui o convite é o App (`google.entrar`).
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { aceitarConvite } from '../../aplicacao/usuarios'
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { Marca } from '../../componentes/Marca'
-import { regrasDaSenha, SAIDAS_DO_CONVITE, senhaValida } from '../../dominio/usuarios'
+import { fraseDaFalhaDoGoogleNoConvite, regrasDaSenha, SAIDAS_DO_CONVITE, senhaValida } from '../../dominio/usuarios'
+import { BotaoGoogle } from './BotaoGoogle'
 import css from './login.module.css'
 
-export function TelaConvite({ token, aoConcluir }) {
+export function TelaConvite({ token, google, aoConcluir }) {
   const id = useId()
   const [senha, setSenha] = useState('')
   const [visivel, setVisivel] = useState(false)
   const [estado, setEstado] = useState({ fase: token ? 'pedindo' : 'semToken', erro: null })
+  // O texto só fala do Google quando o botão existe (a API sem ClientId não tem o botão).
+  const [comGoogle, setComGoogle] = useState(false)
+  const [entrandoGoogle, setEntrandoGoogle] = useState(false)
   const regras = regrasDaSenha(senha)
   const enviando = estado.fase === 'enviando'
   const titulo = useRef(null)
   const saida = SAIDAS_DO_CONVITE[estado.fase] ?? null
   const tela = saida ? estado.fase : 'pedindo'
+
+  const buscarClientId = useCallback(async () => {
+    const clientId = await google.buscarClientId()
+    setComGoogle(Boolean(clientId))
+    return clientId
+  }, [google])
+  // Deu certo: o App limpa o convite e vai para o hall, então não há estado para mexer aqui.
+  const entrarComGoogle = useCallback(async (idToken) => {
+    setEstado((atual) => ({ ...atual, erro: null }))
+    setEntrandoGoogle(true)
+    try {
+      await google.entrar(idToken)
+    } catch (falha) {
+      setEstado((atual) => ({ ...atual, erro: fraseDaFalhaDoGoogleNoConvite(falha) }))
+      setEntrandoGoogle(false)
+    }
+  }, [google])
+  const falhaDoGoogle = useCallback((mensagem) => setEstado((atual) => ({ ...atual, erro: mensagem })), [])
 
   // A tela trocou inteira: o foco vai para o título novo, senão o teclado e o leitor de tela ficam no botão que sumiu.
   const telaAnterior = useRef(tela)
@@ -30,7 +53,7 @@ export function TelaConvite({ token, aoConcluir }) {
 
   async function enviar(evento) {
     evento.preventDefault()
-    if (enviando || !senhaValida(senha)) return
+    if (enviando || entrandoGoogle || !senhaValida(senha)) return
     setEstado({ fase: 'enviando', erro: null })
     try {
       await aceitarConvite(token, senha)
@@ -66,9 +89,19 @@ export function TelaConvite({ token, aoConcluir }) {
         <Marca />
         <div>
           <h1 id={`${id}-titulo`} ref={titulo} tabIndex={-1} className={css.titulo}>Boas-vindas à Casa da Baba</h1>
-          <p className={css.apoio}>Escolha a senha que você vai usar para entrar.</p>
+          <p className={css.apoio}>
+            {comGoogle
+              ? 'Entre com a conta Google do e-mail que recebeu o convite, ou crie uma senha.'
+              : 'Escolha a senha que você vai usar para entrar.'}
+          </p>
         </div>
         {estado.erro && <p className={css.erro} role="alert">{estado.erro}</p>}
+        {google && (
+          <div className={css.googleDoConvite} aria-busy={entrandoGoogle}>
+            <BotaoGoogle buscarClientId={buscarClientId} aoReceberToken={entrarComGoogle} aoFalhar={falhaDoGoogle} opcoes={google.opcoes} />
+            {comGoogle && <p className={css.ou}>ou crie uma senha</p>}
+          </div>
+        )}
         <form className={css.formulario} onSubmit={enviar} aria-busy={enviando}>
           <CampoTexto
             rotulo="Senha" tipo={visivel ? 'text' : 'password'} autoComplete="new-password" required
@@ -87,7 +120,7 @@ export function TelaConvite({ token, aoConcluir }) {
               </li>
             ))}
           </ul>
-          <Botao variante="primario" tipo="submit" largo disabled={enviando || !senhaValida(senha)}>
+          <Botao variante="primario" tipo="submit" largo disabled={enviando || entrandoGoogle || !senhaValida(senha)}>
             {enviando ? 'Salvando…' : 'Criar senha'}
           </Botao>
         </form>
