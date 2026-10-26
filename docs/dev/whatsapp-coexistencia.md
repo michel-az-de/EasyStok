@@ -77,3 +77,76 @@ valores no `.env` (nunca pelo chat):
 
 Admin › Tenants › WhatsApp desvincula o número (o webhook deixa de rotear para a empresa). Sem
 número vinculado o envio da empresa é recusado antes da Meta, com ou sem token gravado.
+
+## Ponte provisória WPPConnect (#2071)
+
+Alternativa por WhatsApp Web enquanto a habilitação da Meta está pendente. Não é uma conexão
+oficial e pode sofrer desconexão ou bloqueio. O aceite de envio, recebimento, mídia e reconexão
+exige teste com um número real; testes HTTP com respostas controladas não substituem esse aceite.
+
+O console oferece **Configurações › Canais › Conexão provisória por QR**. A sessão tem nome
+`ez-{EmpresaId:N}`; o token é cifrado no cofre existente, provider `wppconnect`. Nenhum token
+ou segredo do servidor é devolvido ao navegador. A conexão Meta e suas credenciais permanecem
+preservadas. Com o piloto habilitado, empresa sem sessão nem Meta real recebe erro ao enviar,
+em vez de sucesso do stub.
+
+### Configuração
+
+Use `docker-compose.wppconnect.yml` como sobreposição de `docker-compose.local.yml`, com
+`WPP_SECRET_KEY` e `WPP_WEBHOOK_TOKEN` aleatórios e `WPP_PUBLIC_FILES_URL` com a URL HTTP(S)
+dos arquivos (incluindo `/files`) no arquivo de ambiente fora do Git. O token
+do webhook deve ter pelo menos 16 caracteres. O cofre também exige a KEK já documentada acima.
+
+```powershell
+docker compose --env-file .env.local -f docker-compose.local.yml -f docker-compose.wppconnect.yml up -d --build
+```
+
+O servidor está fixado em `2.10.68`, com digest no compose. A porta 21465 não é publicada:
+somente a API acessa o gateway na rede Docker. Volumes de `tokens` e `userDataDir` preservam
+o vínculo no reinício. O pré-carregador `scripts/wppconnect/configurar.cjs` desliga a mídia
+inline, recupera mensagens não lidas na partida e mantém a sessão de QR disponível para leitura.
+O compose substitui o `entrypoint` da imagem: mudar apenas `command` não carrega essa configuração.
+Um `flock` exclusivo protege o volume; antes de iniciar o Chromium, são removidos somente os
+três links `Singleton*` dos perfis `ez-*` deixados pelo contêiner anterior. O perfil e as chaves
+não são apagados. Não compartilhar esse volume com processos fora desse entrypoint.
+Mensagens anteriores ao início da captura são ignoradas para não responder ao histórico da loja.
+
+Em outro ambiente, configure na API:
+
+- `Atendimento__WppConnect__Habilitado=true`;
+- `Atendimento__WppConnect__BaseUrl=http://wppconnect:21465/`;
+- `Atendimento__WppConnect__SecretKey` e `Atendimento__WppConnect__WebhookToken`;
+- no gateway, `WEBHOOK_URL=http://api:8080/api/webhooks/wppconnect?token=<mesmo-token>`;
+- `FileStorage__PublicBaseUrl` com URL HTTP(S) dos arquivos que o gateway consiga acessar,
+  incluindo `/files` para o storage local. Não usar somente a raiz do host.
+
+Não publicar o segredo no terminal, no log nem em URL acessível ao usuário. O cliente HTTP
+desliga seus loggers porque a geração de token do WPPConnect inclui o segredo no caminho.
+
+### Contratos e validação
+
+- `GET/POST/DELETE /api/integracoes/whatsapp/wppconnect`: estado, iniciar e desvincular;
+- `POST /api/integracoes/whatsapp/wppconnect/reconectar`: fecha sem logout e reinicia;
+- `POST /api/webhooks/wppconnect?token=...`: callback autenticado do gateway. A sessão é
+  conferida com a credencial cifrada antes de processar conteúdo.
+
+Envio retorna identificador real; resposta sem id ou falha do servidor não é sucesso. Não há
+retry automático de envio. Recebimento reutiliza idempotência, histórico, eventos do console
+e a fila de mídia do atendimento. A mídia é baixada pela sessão autenticada, com limite de
+resposta de 30 MB no transporte e os limites existentes do armazenamento. LID é resolvido
+pelo gateway antes de tratar o contato como telefone. Grupos e broadcasts são ignorados.
+
+Para liberar: parear pelo menu **Aparelhos conectados** do WhatsApp Business, conferir o
+número conectado, receber e responder texto, imagem e áudio pelo console, verificar o conteúdo
+no aparelho destinatário e repetir após reiniciar o gateway. Conferir que mensagens já gravadas
+não duplicam e que uma segunda empresa não acessa a sessão nem os anexos da primeira.
+
+### Limites do piloto
+
+- A interface e o domínio conservam a janela de atendimento existente. Modelos da Meta não
+  são enviados pelo WPPConnect; botões saem como opções em texto.
+- Respostas feitas diretamente no celular não são sincronizadas como ecos neste piloto:
+  `onSelfMessage=false` evita que a própria resposta do agente assuma a conversa como humana.
+- Não há importação do histórico anterior, grupos, campanhas ou garantia contra bloqueio.
+- Remover o vínculo pela tela faz logout e desativa somente a credencial WPPConnect da empresa;
+  o próximo envio usa Meta quando ela estiver configurada. Sem Meta real, o envio é recusado.

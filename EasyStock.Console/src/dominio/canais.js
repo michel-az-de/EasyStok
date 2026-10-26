@@ -31,6 +31,16 @@ export function resumoDoWhatsApp(status) {
     }
   }
 
+  if (status.provider === 'wppconnect') {
+    return {
+      tom: status.sessaoWeb?.conectado ? 'ok' : 'aviso',
+      titulo: status.sessaoWeb?.conectado ? 'WhatsApp conectado por QR' : 'Conexão por QR pendente ou interrompida',
+      linhas: [status.ultimaMensagemRecebidaEm
+        ? `Última mensagem recebida às ${horaEDia(status.ultimaMensagemRecebidaEm)}`
+        : 'Nenhuma mensagem recebida ainda', 'Conexão provisória por WhatsApp Web'],
+    }
+  }
+
   // #1474: mensagem que chegou prova que o webhook funciona, mesmo sem a data de verificação
   // gravada; dizer "ainda não verificado" com o Balcão cheio de conversas era mentira.
   const recebendo = Boolean(status.ultimaMensagemRecebidaEm)

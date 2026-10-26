@@ -4,6 +4,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { useConexaoWhatsAppApi } from '../../../aplicacao/useConexaoWhatsAppApi'
 import { textoDaSincronizacao } from '../../../dominio/embeddedSignup'
 import css from './SecaoWhatsApp.module.css'
+import { SecaoWppConnect } from './SecaoWppConnect'
 
 // WhatsApp da loja por coexistência (#1417): o número continua no app WhatsApp
 // Business do celular e passa a falar também pelo EasyStok. Só no modo API.
@@ -61,6 +62,7 @@ export function SecaoWhatsApp({ embutida = false, aoConectar, canalLigado = fals
       )}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {resultado && <Resultado resultado={resultado} />}
+      <SecaoWppConnect aoConectar={aoConectar} />
     </section>
   )
 }
