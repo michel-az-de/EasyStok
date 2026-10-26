@@ -57,7 +57,7 @@ public sealed record ComandaClienteResult(Guid LinkId, string Nome, DateOnly Dia
     EnvioComandaCliente? Envio, IReadOnlyList<CupomComandaCliente> Cupons, decimal? TotalPrevisto = null,
     long NumeroComanda = 0, Guid ConversaId = default, SaldoFinanceiroComanda? Financeiro = null, AcertoComandaCliente? Acerto = null,
     bool PrecisaCadastro = false, bool EntregaACombinar = false, decimal? FreteCombinado = null,
-    bool AjudaSolicitada = false, DateTime? AjudaSolicitadaEm = null, string? PedidoEncerrado = null);
+    bool AjudaSolicitada = false, DateTime? AjudaSolicitadaEm = null, string? PedidoEncerrado = null, bool ChatSite = false);
 public sealed record FreteCombinadoComanda(Guid LinkId, int Revisao, decimal Valor);
 public sealed record EntregaACombinarComanda(Guid LinkId, int Revisao);
 public sealed class ComandaClienteConflitoException(string mensagem) : Exception(mensagem);
@@ -250,7 +250,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             pedido is null ? selecao.Sum(i => i.Qtd * i.Preco) + (valorCombinado ?? 0m) : pedido.TotalComPratos(selecao.Sum(i => i.Qtd * i.Preco)), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
             cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado,
             ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm,
-            encerrado is null ? null : StatusPedidoMapper.Format(encerrado.StatusEnum));
+            encerrado is null ? null : StatusPedidoMapper.Format(encerrado.StatusEnum), conversa.Canal == CanalConversa.ChatSite);
     }
 
     /// <summary>E11: o complemento pago quita o pedido; o envio deixa de pedir pagamento e de oferecer o link antigo.</summary>
