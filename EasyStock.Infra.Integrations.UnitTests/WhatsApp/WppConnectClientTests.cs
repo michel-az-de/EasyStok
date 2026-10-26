@@ -98,6 +98,18 @@ public class WppConnectClientTests
     }
 
     [Fact]
+    public async Task Conexao_confirmada_retira_o_QR_residual_do_gateway()
+    {
+        _http.Quando(HttpMethod.Get, $"/api/{_sessao.Sessao}/status-session")
+            .Responde(HttpStatusCode.OK, """{"status":"CONNECTED","qrcode":"data:image/png;base64,cXI="}""");
+        _http.Quando(HttpMethod.Get, $"/api/{_sessao.Sessao}/check-connection-session")
+            .Responde(HttpStatusCode.OK, """{"status":true}""");
+        var estado = await Client.ObterEstadoAsync(_sessao);
+        estado.Conectado.Should().BeTrue();
+        estado.QrCode.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Piloto_sem_sessao_nao_cai_em_envio_simulado()
     {
         _remetente.ObterSessaoWebAsync(Arg.Any<CancellationToken>()).Returns((CredencialWppConnect?)null);

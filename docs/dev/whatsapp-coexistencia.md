@@ -132,6 +132,13 @@ desliga seus loggers porque a geração de token do WPPConnect inclui o segredo 
 - `POST /api/webhooks/wppconnect?token=...`: callback autenticado do gateway. A sessão é
   conferida com a credencial cifrada antes de processar conteúdo.
 
+O preload preserva os argumentos seguros da biblioteca para cache, origem e TLS. Callbacks
+HTTP 429/5xx são repetidos até cinco tentativas com espera exponencial limitada a 60 segundos;
+erros permanentes e endpoints de envio não recebem esse retry.
+
+O estado conectado exige confirmação do cliente WhatsApp; o QR residual do gateway é retirado
+da resposta e da tela após essa confirmação.
+
 Envio retorna identificador real; resposta sem id ou falha do servidor não é sucesso. Não há
 retry automático de envio. Recebimento reutiliza idempotência, histórico, eventos do console
 e a fila de mídia do atendimento. A mídia é baixada pela sessão autenticada, com limite de
@@ -142,6 +149,22 @@ Para liberar: parear pelo menu **Aparelhos conectados** do WhatsApp Business, co
 número conectado, receber e responder texto, imagem e áudio pelo console, verificar o conteúdo
 no aparelho destinatário e repetir após reiniciar o gateway. Conferir que mensagens já gravadas
 não duplicam e que uma segunda empresa não acessa a sessão nem os anexos da primeira.
+
+### VPS
+
+O compose local não é o compose de produção. A preparação específica fica em
+`scripts/deploy/wppconnect/compose.yaml`, para sobrepor os arquivos existentes em
+`/opt/stacks/easystok`. API e Worker entram também na rede `whatsapp`; o gateway fica apenas
+nessa rede, sem porta pública. Os volumes nomeados conservam perfil e tokens, e o Docker
+reinicia o processo. Isso não recupera um vínculo revogado pelo WhatsApp.
+
+Após homologar, copiar o fragmento para `compose.wppconnect.yaml` na stack e o preload para
+`wppconnect/configurar.cjs`. Definir `WPP_SECRET_KEY` e `WPP_WEBHOOK_TOKEN` no `.env` protegido
+da VPS. Preservar a URL pública de arquivos que API e Worker já usam. Configurar
+`COMPOSE_FILE=compose.yaml:compose.override.yaml:compose.wppconnect.yaml` nesse `.env` para
+o deploy canônico continuar carregando a integração. Conferir o compose mesclado antes de
+subir o serviço. A ativação depende de texto, imagem, áudio e reconexão reais aprovados;
+`/healthz` do gateway confirma o processo HTTP, não a sessão WhatsApp.
 
 ### Limites do piloto
 

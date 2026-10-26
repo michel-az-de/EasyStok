@@ -19,13 +19,13 @@ export function SecaoWppConnect({ aoConectar }) {
       {sessao && <Pilula tom={sessao.conectado ? 'ok' : 'aviso'}>
         {ocupado ? 'Atualizando a conexão…' : sessao.conectado ? 'WhatsApp conectado' : sessao.estado === 'INITIALIZING' ? 'Gerando QR…' : sessao.estado === 'INDISPONIVEL' ? 'Não foi possível confirmar a conexão' : sessao.qrCode ? 'Aguardando leitura do QR' : sessao.vinculado ? 'WhatsApp desconectado' : 'Número ainda não conectado'}
       </Pilula>}
-      {!ocupado && sessao?.qrCode && <>
+      {!ocupado && !conectado && sessao?.qrCode && <>
         <p className={css.texto}>No celular: WhatsApp Business → Aparelhos conectados → Conectar aparelho.</p>
         <img className={css.qr} src={sessao.qrCode} alt="QR para conectar o número de teste ao chat" />
       </>}
       <div className={css.acoes}>
         {!sessao?.vinculado && <Botao variante="primario" onClick={conectar} disabled={ocupado}>Conectar por QR</Botao>}
-        {sessao?.vinculado && <Botao onClick={sessao.qrCode ? atualizar : reconectar} disabled={ocupado || sessao.estado === 'INITIALIZING'}>{sessao.qrCode ? 'Atualizar QR' : 'Reconectar'}</Botao>}
+        {sessao?.vinculado && !conectado && <Botao onClick={sessao.qrCode ? atualizar : reconectar} disabled={ocupado || sessao.estado === 'INITIALIZING'}>{sessao.qrCode ? 'Atualizar QR' : 'Reconectar'}</Botao>}
         <Botao onClick={atualizar} disabled={ocupado}>Atualizar conexão</Botao>
         {sessao?.vinculado && <Botao onClick={desconectar} disabled={ocupado}>Desconectar número</Botao>}
       </div>

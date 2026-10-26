@@ -83,7 +83,7 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
             using var check = await ChamarAsync(HttpMethod.Get, Path(sessao, "check-connection-session"), sessao, null, ct);
             conectado = check.RootElement.TryGetProperty("status", out var ok) && ok.ValueKind == JsonValueKind.True;
         }
-        var qr = LerTexto(doc.RootElement, "qrcode");
+        var qr = conectado ? null : LerTexto(doc.RootElement, "qrcode");
         if (qr is not null && !qr.StartsWith("data:image/png;base64,", StringComparison.Ordinal)) qr = null;
         return new(Habilitado, true, conectado, estado, qr);
     }

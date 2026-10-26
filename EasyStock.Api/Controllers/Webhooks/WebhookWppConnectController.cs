@@ -11,7 +11,8 @@ namespace EasyStock.Api.Controllers.Webhooks;
 [Route("api/webhooks/wppconnect")]
 [AllowAnonymous]
 [IgnoreAntiforgeryToken]
-public sealed class WebhookWppConnectController(ProcessarWebhookWppConnectUseCase processar, IConfiguration configuration)
+public sealed class WebhookWppConnectController(ProcessarWebhookWppConnectUseCase processar, IConfiguration configuration,
+    ILogger<WebhookWppConnectController> logger)
     : ControllerBase
 {
     [HttpPost]
@@ -31,9 +32,16 @@ public sealed class WebhookWppConnectController(ProcessarWebhookWppConnectUseCas
             };
         }
         catch (Exception ex) when (ex is JsonException or FormatException or ArgumentOutOfRangeException)
-        { return BadRequest(new { error = new { message = "Evento WPPConnect inválido." } }); }
+        {
+            logger.LogWarning("Callback WPPConnect inválido: {Motivo}", ex.Message);
+            return BadRequest(new { error = new { message = "Evento WPPConnect inválido." } });
+        }
         catch (Exception ex) when (ex is WhatsAppCloudException or HttpRequestException or TaskCanceledException)
-        { return StatusCode(503); }
+        {
+            logger.LogWarning("Callback WPPConnect indisponível: {TipoErro}, HTTP {StatusHttp}, código {Codigo}",
+                ex.GetType().Name, (ex as WhatsAppCloudException)?.StatusHttp, (ex as WhatsAppCloudException)?.Codigo);
+            return StatusCode(503);
+        }
     }
 
     public static bool TokenValido(string? recebido, string? configurado) =>
