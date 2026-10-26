@@ -21,7 +21,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class WorkspaceActivity extends Activity {
-    private static final String HOME = "https://app.easystok.online/";
+    private static final String HOME = "https://app.easystok.online/#/m/atendimento/balcao";
     private static final int PICK_FILE = 2101;
     private static final int RECORD_AUDIO = 2102;
     private WebView web;

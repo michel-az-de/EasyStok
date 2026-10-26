@@ -163,6 +163,31 @@
   // Apos pareamento, server retorna { apiKey, empresaId, lojaId, ... }.
   // Persistimos tudo em cdb-pairing pra usar em todo request subsequente.
   const PAIRING_KEY = 'cdb-pairing';
+  const PILOT_CONTEXT_KEY = 'cdb-pilot-data-context';
+
+  function pilotDataContext() {
+    if (!window.CDB_CONFIG?.isPilot) return null;
+    const pairing = loadPairing();
+    if (pairing?.empresaId && pairing?.lojaId) return pairing;
+    try {
+      const stored = localStorage.getItem(PILOT_CONTEXT_KEY);
+      if (stored !== null) {
+        const context = JSON.parse(stored);
+        return context?.empresaId && context?.lojaId ? context : { invalid: true };
+      }
+      return localStorage.getItem(PAIRING_KEY) === null ? null : { invalid: true };
+    } catch (_) { return { invalid: true }; }
+  }
+
+  function guardPilotContextChange() {
+    if (!pilotDataContext()) return;
+    const hasData = loadQueue().length > 0 || ['cdb-products', 'cdb-clients', 'cdb-orders', 'cdb-batches', 'cdb-cash', 'cdb-cash-closings', 'cdb-shopping', 'cdb-audit-log']
+      .some(key => {
+        try { const data = JSON.parse(localStorage.getItem(key) || '[]'); return !Array.isArray(data) || data.length > 0; }
+        catch (_) { return true; }
+      });
+    if (hasData) throw new Error('Este aparelho já tem dados vinculados. A equipe precisa revisar a conexão antes de parear novamente ou trocar de loja. Seus dados foram mantidos; não desinstale o app.');
+  }
 
   // ---- Device ID (primeiro boot gera um UUID, persiste) ----
   function getDeviceId() {
@@ -180,9 +205,24 @@
     try { return JSON.parse(localStorage.getItem(PAIRING_KEY) || 'null'); } catch (e) { return null; }
   }
   function savePairing(p) {
+    if (window.CDB_CONFIG?.isPilot) {
+      try {
+        if (p?.empresaId && p?.lojaId) {
+          localStorage.setItem(PILOT_CONTEXT_KEY, JSON.stringify({ empresaId: p.empresaId, lojaId: p.lojaId }));
+        }
+        localStorage.setItem(PAIRING_KEY, JSON.stringify(p));
+      } catch (_) {
+        _pairingInvalid = true;
+        throw new Error('A conexão não pôde ser salva no aparelho. Seus dados foram mantidos. Procure a equipe para recuperar o vínculo; não desinstale o app.');
+      }
+      return;
+    }
     try { localStorage.setItem(PAIRING_KEY, JSON.stringify(p)); } catch (e) {}
   }
   function clearPairing() {
+    // O piloto conserva o contexto mesmo após desconectar, sem apagar dados ou fila.
+    const context = pilotDataContext();
+    if (context) localStorage.setItem(PILOT_CONTEXT_KEY, JSON.stringify({ empresaId: context.empresaId, lojaId: context.lojaId }));
     // INVARIANTE: clearPairing remove APENAS PAIRING_KEY (cdb-pairing).
     // NAO toca em cdb-sync-queue (fila offline), cdb-device-id (identidade
     // do device), cdb-products / cdb-orders / cdb-batches / cdb-cash etc
@@ -1594,6 +1634,7 @@
     if (!navigator.onLine) throw new Error('sem rede');
     if (!getApiKey()) throw new Error('nao pareado');
     if (!lojaId) throw new Error('lojaId obrigatorio');
+    if (lojaId !== loadPairing()?.lojaId) guardPilotContextChange();
 
     // Pre-drain: se fila tem mutations pendentes, drenar ANTES do switch.
     // Sem isto, mutations da loja antiga sobem APOS o POST switch-loja e
@@ -2239,6 +2280,7 @@
       _trace('pair-auto', 'abort: offline', null);
       throw new Error('sem rede');
     }
+    guardPilotContextChange();
     const url = API_BASE_URL + API_PREFIX + '/devices/pair-auto';
     _trace('pair-auto', 'fetch ' + url, { secretLen: (provisioningSecret || '').length, deviceId });
     const ctrl = new AbortController();
@@ -2321,6 +2363,7 @@
 
   async function pairWithCode(code, label) {
     if (!navigator.onLine) throw new Error('sem rede');
+    guardPilotContextChange();
     const url = API_BASE_URL + API_PREFIX + '/devices/pair';
     const ctrl = new AbortController();
     const timeoutId = setTimeout(() => ctrl.abort(), 12000);

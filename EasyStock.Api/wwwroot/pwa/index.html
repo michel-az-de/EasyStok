@@ -4535,8 +4535,8 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   border-radius: 13px;
 }
 [data-screen="producao"] .product-tile .qty-btn {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
 }
 [data-screen="producao"] .product-tile .prod-tile-actions {
   padding-top: 8px;
@@ -4545,7 +4545,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   grid-template-columns: 1fr 1fr;
 }
 [data-screen="producao"] .product-tile .prod-tile-action {
-  min-height: 32px;
+  min-height: 44px;
   border-radius: 10px;
 }
 [data-screen="producao"] .prod-screen-summary {
@@ -5141,6 +5141,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; gap: 6px; flex-wrap: wrap;
 }
 .pd-validity-pills button {
+  min-height: 44px; min-width: 44px;
   flex: 0 0 auto; padding: 8px 11px;
   background: transparent; color: var(--ink-dim);
   border: 1px solid var(--line); border-radius: 100px;
@@ -5429,7 +5430,8 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 .etq-card-wrap {
-  /* Wrapper que absorve o espaço de layout após scale */
+  /* Preserva a altura calculada após scale; o contêiner rola o lote inteiro. */
+  flex: 0 0 auto;
   overflow: hidden;
   display: block;
 }
@@ -6624,8 +6626,8 @@ select:focus-visible {
   flex-basis: 40px;
 }
 [data-screen="producao"] .product-tile .qty-btn {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
 }
 [data-screen="producao"] .prod-screen-summary {
   position: static !important;
@@ -7268,9 +7270,9 @@ body.ux-calm [data-screen="producao"] .section-label {
 <!-- Boas-vindas / login com nome do operador -->
 <div class="welcome hidden" id="welcomeScreen">
   <div class="emoji">👋</div>
-  <h1>Bem-vindo ao Easy Stock Mobile</h1>
+  <h1 id="welcomeTitle">Bem-vindo ao Easy Stock Mobile</h1>
   <p>Para começar, informe seu nome. Ele aparece nos lotes e pedidos registrados e ajuda a manter a operação rastreável.</p>
-  <input type="text" id="welcomeName" placeholder="Seu nome" maxlength="32" autocomplete="off" />
+  <input type="text" id="welcomeName" aria-label="Seu nome" placeholder="Seu nome" maxlength="32" autocomplete="off" />
   <button id="welcomeContinue" disabled>Começar</button>
   <div class="hint">Você pode trocar depois tocando no seu nome no topo.</div>
 </div>
@@ -7920,12 +7922,12 @@ body.ux-calm [data-screen="producao"] .section-label {
   </div>
 
   <!-- Modal novo produto -->
-  <div class="modal-overlay" id="newProductModal">
+  <div class="modal-overlay" id="newProductModal" role="dialog" aria-modal="true" aria-labelledby="newProductTitle">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
-      <div class="modal-title">Novo <span class="accent">produto</span></div>
+      <div class="modal-title" id="newProductTitle">Novo <span class="accent">produto</span></div>
       <div class="modal-sub">fica disponível na hora</div>
-      <label class="modal-label">Nome</label>
+      <label class="modal-label" for="newProdName">Nome</label>
       <div class="input-box"><input id="newProdName" placeholder="ex: Nhoque de batata" oninput="updateProductSaveState()"></div>
       <label class="modal-label">Categoria</label>
       <div class="cat-pills" id="catPills">
@@ -7933,10 +7935,21 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="cat-pill" data-cat="molho">Molho</button>
         <button class="cat-pill" data-cat="extra">Extra</button>
       </div>
-      <label class="modal-label">Medida</label>
+      <label class="modal-label" for="newProdUnit">Medida</label>
       <div class="input-box"><input id="newProdUnit" placeholder="ex: 300g, 250ml, unidade"></div>
       <label class="modal-label" for="newProdValidity">Validade padrão (dias)</label>
-      <div class="input-box"><input id="newProdValidity" type="number" inputmode="numeric" min="1" max="365" value="5" required></div>
+      <div class="input-box"><input id="newProdValidity" type="number" inputmode="numeric" min="1" max="365" value="5" required oninput="updateNewProductExpiry()"></div>
+      <div id="newProdBatchFields" hidden>
+        <label class="modal-label" for="newProdQuantity">Quantidade produzida</label>
+        <div class="input-box"><input id="newProdQuantity" type="number" inputmode="numeric" min="1" max="9999" step="1" value="1"></div>
+        <label class="modal-label" for="newProdManufacturedDate">Data de fabricação</label>
+        <div class="input-box"><input id="newProdManufacturedDate" type="date" oninput="updateNewProductExpiry()"></div>
+        <label class="modal-label" for="newProdWeight">Peso por unidade (g)</label>
+        <div class="input-box"><input id="newProdWeight" type="number" inputmode="numeric" min="1" max="9999" step="1" placeholder="Ex.: 500" aria-describedby="newProdWeightHelp"></div>
+        <p id="newProdWeightHelp" class="modal-sub">Se a medida estiver em g ou kg, usamos esse peso quando o campo estiver vazio.</p>
+        <p id="newProdExpiry" class="modal-sub" role="status"></p>
+        <p class="modal-sub">Criar e usar registra esta produção e abre as etiquetas para impressão.</p>
+      </div>
       <label class="modal-label" id="emojiGridLabel">Ícone</label>
       <div class="emoji-grid" id="emojiGrid" role="radiogroup" aria-labelledby="emojiGridLabel">
         <button class="emoji-pick active" role="radio" aria-checked="true" aria-label="Massa">🍝</button>
@@ -7952,12 +7965,12 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Carne">🥩</button>
         <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Cogumelo">🍄</button>
       </div>
-      <label class="modal-label">Preço de venda</label>
+      <label class="modal-label" for="newProdPrice">Preço de venda</label>
       <div class="price-row">
         <span class="currency">R$</span>
         <div class="input-box"><input id="newProdPrice" type="text" inputmode="decimal" placeholder="25,00" autocomplete="off" oninput="updateMarginPreview()"></div>
       </div>
-      <label class="modal-label">Custo (ingredientes + embalagem)
+      <label class="modal-label" for="newProdCost">Custo (ingredientes + embalagem)
         <span class="ml-hint">opcional, ajuda a calcular margem</span>
       </label>
       <div class="price-row">
@@ -7965,7 +7978,7 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="input-box"><input id="newProdCost" type="text" inputmode="decimal" placeholder="9,50" autocomplete="off" oninput="updateMarginPreview()"></div>
       </div>
       <!-- #425 — estoque minimo: threshold de alerta por produto (padrao: <=2) -->
-      <label class="modal-label">Estoque mínimo
+      <label class="modal-label" for="newProdMinStock">Estoque mínimo
         <span class="ml-hint">alerta quando stock ≤ este valor (padrão: 2)</span>
       </label>
       <div class="input-box"><input id="newProdMinStock" type="text" inputmode="numeric" placeholder="2" autocomplete="off" style="max-width:80px"></div>
@@ -8063,10 +8076,10 @@ body.ux-calm [data-screen="producao"] .section-label {
   </div>
 
   <!-- Modal confirmação de produção -->
-  <div class="modal-overlay" id="productionConfirmModal">
+  <div class="modal-overlay" id="productionConfirmModal" role="dialog" aria-modal="true" aria-labelledby="productionConfirmTitle">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
-      <div class="modal-title">Registrar <span class="accent">produção</span></div>
+      <div class="modal-title" id="productionConfirmTitle">Registrar <span class="accent">produção</span></div>
       <div class="modal-sub" id="batchDate">lote de hoje</div>
 
       <label class="modal-label">Itens</label>
@@ -8088,7 +8101,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeProductionConfirm()">Cancelar</button>
-        <button class="cta-btn primary" onclick="confirmProduction()">Registrar e imprimir</button>
+        <button class="cta-btn primary" onclick="confirmProduction()">Registrar e abrir etiquetas</button>
       </div>
     </div>
   </div>
@@ -8699,11 +8712,11 @@ body.ux-calm [data-screen="producao"] .section-label {
   </div>
 
   <!-- Tela cheia de preview de etiquetas: produção (N etiquetas) ou pedido (1) -->
-  <div class="etq-overlay" id="etiquetasPreview" role="dialog" aria-modal="true">
+  <div class="etq-overlay" id="etiquetasPreview" role="dialog" aria-modal="true" aria-labelledby="etqTitle" aria-describedby="etqSubtitle">
     <div class="etq-sheet">
       <div class="etq-head">
         <div>
-          <h3 id="etqTitle">Etiquetas geradas</h3>
+          <h3 id="etqTitle" tabindex="-1">Etiquetas geradas</h3>
           <div class="etq-sub" id="etqSubtitle">—</div>
         </div>
         <button class="cobranca-close" onclick="closeEtiquetasPreview()" aria-label="Fechar">×</button>
@@ -8764,6 +8777,7 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="cobranca-close" onclick="closeCobranca()" aria-label="Fechar">×</button>
       </div>
       <div class="cobranca-preview" id="cobrancaPreview"></div>
+      <p id="cobrancaPixWarning" role="status" hidden>Dados PIX não configurados. Você pode copiar o resumo. Configure o PIX em Ajustes ou use o Atendimento online para cobrar.</p>
       <div class="cobranca-pix">
         <div>
           <div class="pix-label">💳 PIX — celular</div>
@@ -8891,7 +8905,7 @@ function load(key, fallback) {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch(e) { return fallback; }
 }
 function save(key, data) {
-  try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+  try { localStorage.setItem(key, JSON.stringify(data)); return true; } catch(e) { return false; }
 }
 
 // ================================================================
@@ -9019,14 +9033,14 @@ function toggleUxDensity(ev) {
 applyUxDensity();
 
 let products = load('cdb-products', null);
-if (!products) products = defaultProducts.map(p => ({...p}));
+if (!products) products = window.CDB_CONFIG?.isPilot ? [] : defaultProducts.map(p => ({...p}));
 // Garante que o catálogo oficial sempre está presente mesmo após limpar custom
-defaultProducts.forEach(dp => {
+if (!window.CDB_CONFIG?.isPilot) defaultProducts.forEach(dp => {
   if (!products.find(p => p.id === dp.id)) products.unshift({...dp});
 });
 products = products.map(p => ({...p, count: 0, photo: null, stock: p.stock || 0}));
 
-let clients = load('cdb-clients', defaultClients);
+let clients = load('cdb-clients', window.CDB_CONFIG?.isPilot ? [] : defaultClients);
 // Migration silenciosa do legado "apt" -> "address". Clientes que tinham
 // apenas apartamento (do toggle "Aqui no predio" antigo) ganham endereco
 // formatado "Apto X". O campo apt fica preservado pra retrocompat com
@@ -9107,7 +9121,8 @@ function renderOperatorBadge() {
 
 function renderBrandName() {
   const el = document.getElementById('brandName');
-  if (el) el.textContent = (getEmpresaName() || 'Minha empresa').trim() || 'Minha empresa';
+  const name = (getEmpresaName() || '').trim();
+  if (el) el.textContent = window.CDB_CONFIG?.isPilot && (!name || name === 'Minha empresa') ? 'Casa da Baba' : name || 'Minha empresa';
   const logo = document.getElementById('brandLogo');
   if (logo) {
     const src = getStoreLogo();
@@ -9225,7 +9240,7 @@ function refreshAjustesThemeLabel() {
 }
 // Aplica tema salvo antes de renderizar (evita flash) — getItem direto
 // para não passar por JSON.parse do load().
-applyTheme((() => { try { return localStorage.getItem('cdb-theme') || 'dark'; } catch (e) { return 'dark'; } })());
+applyTheme((() => { const fallback = window.CDB_CONFIG?.isPilot ? 'light' : 'dark'; try { return localStorage.getItem('cdb-theme') || fallback; } catch (e) { return fallback; } })());
 
 // Mini-stats <details>: persiste estado collapsed/expanded em localStorage.
 // Default: collapsed (mostra so summary "N em aberto").
@@ -9315,19 +9330,32 @@ function endTour() {
 function persistAll() {
   // Salva catálogo sem contadores (são runtime)
   const toSaveProducts = products.map(({count, photo, ...rest}) => rest);
-  save('cdb-products', toSaveProducts);
-  save('cdb-clients', clients);
-  save('cdb-orders', orders);
-  save('cdb-cash', cashEntries);
-  save('cdb-cash-closings', cashClosings);
-  save('cdb-batches', batches);
-  save('cdb-shopping', shoppingItems);
+  const values = { 'cdb-products': toSaveProducts, 'cdb-clients': clients,
+    'cdb-orders': orders, 'cdb-cash': cashEntries, 'cdb-cash-closings': cashClosings,
+    'cdb-batches': batches, 'cdb-shopping': shoppingItems };
+  const previous = new Map();
+  const written = [];
+  try {
+    const entries = Object.entries(values).map(([key, value]) => [key, JSON.stringify(value)]);
+    entries.forEach(([key]) => previous.set(key, localStorage.getItem(key)));
+    entries.forEach(([key, value]) => { localStorage.setItem(key, value); written.push(key); });
+  } catch (error) {
+    written.reverse().forEach(key => {
+      try {
+        const value = previous.get(key);
+        if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+      } catch (rollbackError) { console.error('Falha ao restaurar dados locais', rollbackError); }
+    });
+    showToast('Não foi possível salvar neste aparelho. Confira o espaço disponível e tente novamente.');
+    return false;
+  }
   // Hook de sync: sync.js sobrescreve esse callback
   if (typeof window.cdbOnPersist === 'function') {
     try { window.cdbOnPersist({ products, clients, orders, cashEntries, batches }); } catch (e) { console.warn(e); }
   }
   // Conta acoes pra disparar backup automatico (a cada 50 ou 7 dias)
   try { incrementActionCounter(); } catch (e) {}
+  return true;
 }
 
 // =========================
@@ -9583,6 +9611,7 @@ function incrementActionCounter() {
 }
 
 function maybeTriggerAutoBackup() {
+  if (window.CDB_CONFIG?.isPilot && operationalModalOpen()) return;
   // Nao dispara se ja tem outro modal aberto — evita pilha de modais
   const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferProdModal','prodProblemaModal','cashCloseModal','etiquetasPreview','ajustesModal'];
   for (const id of overlays) {
@@ -9592,6 +9621,10 @@ function maybeTriggerAutoBackup() {
 
   const count = parseInt(localStorage.getItem('cdb-action-count') || '0', 10) || 0;
   const last  = parseInt(localStorage.getItem('cdb-last-backup-prompt') || '0', 10) || 0;
+  if (window.CDB_CONFIG?.isPilot && !last) {
+    try { localStorage.setItem('cdb-last-backup-prompt', String(Date.now())); } catch (_) {}
+    if (count < AUTO_BACKUP_ACTION_THRESHOLD) return;
+  }
   const daysSince = last ? (Date.now() - last) / (1000 * 60 * 60 * 24) : Infinity;
 
   const triggerByCount = count >= AUTO_BACKUP_ACTION_THRESHOLD;
@@ -9880,6 +9913,7 @@ var WEEKLY_SHARE_SKIP_PENALTY = 3 * 24 * 60 * 60 * 1000; // pular = volta em 3d
 
 function maybePromptWeeklyShare() {
   try {
+    if (window.CDB_CONFIG?.isPilot && operationalModalOpen()) return;
     // So roda em APK Capacitor (browser PWA usa share desktop, menos util)
     if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
 
@@ -9894,6 +9928,10 @@ function maybePromptWeeklyShare() {
 
     var last = 0;
     try { last = parseInt(localStorage.getItem('cdb-last-share-prompt') || '0', 10) || 0; } catch (e) {}
+    if (window.CDB_CONFIG?.isPilot && !last) {
+      try { localStorage.setItem('cdb-last-share-prompt', String(Date.now())); } catch (_) {}
+      return;
+    }
     if (Date.now() - last < WEEKLY_SHARE_INTERVAL_MS) return;
 
     // Pergunta: oferece abrir share. Mensagem amigavel — Felipe disse que
@@ -10404,6 +10442,13 @@ function updateSync() {
         bannerCount.hidden = true;
       }
     }
+  }
+  if (window.CDB_CONFIG?.isPilot && (!window.cdbSync?.getPairing?.() || window.cdbSync?.isPairingInvalid?.())) {
+    chip.classList.add('pending');
+    txt.textContent = 'Neste aparelho · não conectado';
+    if (typeof renderTrustBadges === 'function') renderTrustBadges();
+    if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
+    return;
   }
   if (offline) {
     chip.classList.add('pending');
@@ -12340,8 +12385,8 @@ function renderProductGrid() {
     : 'Registrar produção';
 }
 
-function clearProduction() {
-  products.forEach(p => { p.count = 0; p.photo = null; });
+function clearProduction(productIds = null) {
+  products.filter(p => !productIds || productIds.includes(p.id)).forEach(p => { p.count = 0; p.photo = null; });
   renderProductGrid();
 }
 
@@ -12403,9 +12448,11 @@ function buildBarcodePattern(seed) {
   return html;
 }
 
-function openProductionConfirm() {
-  const items = products.filter(p => p.count > 0);
+let productionSelectionIds = null;
+function openProductionConfirm(productIds = null) {
+  const items = products.filter(p => p.count > 0 && (!productIds || productIds.includes(p.id)));
   if (items.length === 0) return;
+  productionSelectionIds = productIds;
 
   currentPhotoDataUrl = null;
   renderBatchPhotoPreview();
@@ -12420,7 +12467,7 @@ function openProductionConfirm() {
     const stockAtual = Number(i.stock) || 0;
     const apos = stockAtual + (Number(i.count) || 0);
     return `
-    <div class="ps-item">
+    <div class="ps-item" data-pid="${escapeHtml(i.id)}">
       <div class="n">
         <span class="e">${escapeHtml(i.emoji || '📦')}</span>
         <span style="display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25">
@@ -12440,7 +12487,9 @@ function openProductionConfirm() {
 
   document.getElementById('batchDate').textContent = subtituloDoLote(new Date(), currentBatchId);
 
+  rememberOperationalFocus('productionConfirmModal');
   document.getElementById('productionConfirmModal').classList.add('show');
+  document.getElementById('prodManufacturedDate').focus();
 }
 
 function localProductionDate(ms) {
@@ -12449,7 +12498,8 @@ function localProductionDate(ms) {
 }
 
 function productionTimestamp(value, nowMs) {
-  if (!value || value === localProductionDate(nowMs)) return nowMs;
+  if (!value) return null;
+  if (value === localProductionDate(nowMs)) return nowMs;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value > localProductionDate(nowMs)) return null;
   const ms = new Date(value + 'T12:00:00').getTime();
   return Number.isFinite(ms) && localProductionDate(ms) === value ? ms : null;
@@ -12473,13 +12523,13 @@ function populateProdDetailList(items) {
       <div class="pd-row" data-pid="${escapeHtml(p.id)}">
         <div class="pd-name">
           <span>${p.emoji || '📦'} ${escapeHtml(p.name)}</span>
-          <label class="pd-qty">Qtd. <input type="number" class="pd-quantity" aria-label="Quantidade de ${escapeHtml(p.name)}" min="1" max="9999" step="1" value="${p.count}" style="width:70px"></label>
+          <label class="pd-qty">Qtd. <input type="number" class="pd-quantity" aria-label="Quantidade de ${escapeHtml(p.name)}" min="1" max="9999" step="1" value="${p.count}" style="width:70px" oninput="updateProductionQuantityPreview(this)"></label>
         </div>
         <div class="pd-fields">
-          <input type="number" class="pd-weight" placeholder="peso por unidade (g)" min="0" max="9999" value="${defWeight}" />
+          <input type="number" class="pd-weight" aria-label="Peso por unidade em gramas de ${escapeHtml(p.name)}" placeholder="Peso por unidade (g)" min="0" max="9999" value="${defWeight}" />
           <div class="pd-validity-pills">
             ${pills}
-            <input type="number" class="pd-validity-custom" placeholder="custom" min="1" max="365" value="${customVal}" />
+            <input type="number" class="pd-validity-custom" aria-label="Validade em dias de ${escapeHtml(p.name)}" placeholder="Dias" min="1" max="365" value="${customVal}" />
           </div>
         </div>
       </div>
@@ -12524,10 +12574,11 @@ function readProdDetailValues() {
     const customRaw = row.querySelector('.pd-validity-custom')?.value || '';
     const activePill = row.querySelector('.pd-validity-pills button.active');
     let validityDays = null;
-    if (customRaw && !isNaN(parseInt(customRaw))) validityDays = parseInt(customRaw);
-    else if (activePill) validityDays = parseInt(activePill.dataset.d);
+    if (customRaw) validityDays = Number(customRaw);
+    else if (activePill) validityDays = Number(activePill.dataset.d);
     if (!Number.isInteger(validityDays) || validityDays < 1 || validityDays > 365) { valid = false; row.classList.add('invalid'); }
-    const weightG = weightRaw && !isNaN(parseInt(weightRaw)) ? parseInt(weightRaw) : null;
+    const weightG = weightRaw ? Number(weightRaw) : null;
+    if (weightG !== null && (!Number.isInteger(weightG) || weightG < 0 || weightG > 9999)) { valid = false; row.classList.add('invalid'); }
     perProduct.set(pid, { weightG, validityDays, qty });
   });
   return { valid, perProduct };
@@ -12552,9 +12603,24 @@ function marcarPesoFaltando(productIds) {
   }
 }
 
+function updateProductionQuantityPreview(input) {
+  const id = input.closest('.pd-row')?.dataset.pid;
+  const product = products.find(p => p.id === id);
+  const row = Array.from(document.querySelectorAll('#prodSummary .ps-item')).find(item => item.dataset.pid === id);
+  if (!product || !row) return;
+  const quantity = Number(input.value);
+  const valid = Number.isInteger(quantity) && quantity > 0 && quantity <= 9999;
+  row.querySelector('.q').textContent = valid ? '×' + quantity : 'Confira a quantidade';
+  row.querySelector('.ps-after').textContent = valid
+    ? (Number(product.stock) || 0) + ' no estoque → ' + ((Number(product.stock) || 0) + quantity) + ' após'
+    : 'Quantidade entre 1 e 9999';
+}
+
 function closeProductionConfirm() {
   document.getElementById('productionConfirmModal').classList.remove('show');
   currentPhotoDataUrl = null;
+  productionSelectionIds = null;
+  restoreOperationalFocus('productionConfirmModal');
 }
 
 function renderBatchPhotoPreview() {
@@ -14207,7 +14273,11 @@ const PIX_TYPES = {
 function getPixKey()      { try { return localStorage.getItem('cdb-pix-key')      || DEFAULT_PIX_KEY;      } catch (e) { return DEFAULT_PIX_KEY; } }
 function getPixHolder()   { try { return localStorage.getItem('cdb-pix-holder')   || DEFAULT_PIX_HOLDER;   } catch (e) { return DEFAULT_PIX_HOLDER; } }
 function getPixType()     { try { return localStorage.getItem('cdb-pix-type')     || DEFAULT_PIX_TYPE;     } catch (e) { return DEFAULT_PIX_TYPE; } }
-function getEmpresaName() { try { return localStorage.getItem('cdb-empresa-name') || DEFAULT_EMPRESA_NAME; } catch (e) { return DEFAULT_EMPRESA_NAME; } }
+function getEmpresaName() {
+  const fallback = window.CDB_CONFIG?.isPilot ? 'Casa da Baba' : DEFAULT_EMPRESA_NAME;
+  try { const name = localStorage.getItem('cdb-empresa-name'); return !name || name === DEFAULT_EMPRESA_NAME ? fallback : name; }
+  catch (e) { return fallback; }
+}
 const DEFAULT_EMPRESA_CIDADE = 'São Paulo';
 function getEmpresaCidade() { try { return localStorage.getItem('cdb-empresa-cidade') || DEFAULT_EMPRESA_CIDADE; } catch (e) { return DEFAULT_EMPRESA_CIDADE; } }
 function getStoreLogo()   { try { return localStorage.getItem('cdb-store-logo') || ''; } catch (e) { return ''; } }
@@ -14341,6 +14411,7 @@ function getProductSku(product) {
  * Monta a mensagem de cobrança em texto puro (boa pra WhatsApp).
  * Shape: cabeçalho + itens + total + obs + chave PIX + assinatura.
  */
+function hasConfiguredPix() { return !!getPixHolder().trim() && validatePixKey(getPixKey(), getPixType()); }
 function buildCobrancaMessage(order, template) {
   template = template || currentCobrancaTemplate || 'cobranca';
   const nome = order.clientSnapshot?.name || 'Cliente';
@@ -14361,6 +14432,9 @@ function buildCobrancaMessage(order, template) {
   const pixHolder  = getPixHolder();
   const empresa    = getEmpresaName();
   const pedidoRef  = (order.id || '').slice(-8);
+  const pixBlock = hasConfiguredPix()
+    ? `\n💳 *Pagamento via PIX*\n${pixLabel}: *${pixDisplay}*\nTitular: ${pixHolder}\n\nPor favor, confirme o pagamento pra a gente finalizar seu pedido 💛\n\n`
+    : '\n\n';
 
   if (template === 'pronto') {
     return (
@@ -14387,10 +14461,7 @@ function buildCobrancaMessage(order, template) {
     `${itensLinhas}\n\n` +
     `💰 *Total: ${money(total)}*` +
     `${obsBloco}` +
-    `\n💳 *Pagamento via PIX*\n` +
-    `${pixLabel}: *${pixDisplay}*\n` +
-    `Titular: ${pixHolder}\n\n` +
-    `Por favor, confirme o pagamento pra a gente finalizar seu pedido 💛\n\n` +
+    pixBlock +
     `_Pedido ${pedidoRef}_`
   );
 }
@@ -14428,6 +14499,13 @@ function openCobranca(orderId) {
   if (!o) return;
   currentCobrancaOrderId = orderId;
   currentCobrancaTemplate = o.status === STATUS.PRONTO ? 'pronto' : 'cobranca';
+  const pixReady = hasConfiguredPix();
+  document.getElementById('cobrancaTitle').textContent = pixReady ? 'Cobrança' : 'Resumo do pedido';
+  document.getElementById('cobrancaPixWarning').hidden = pixReady;
+  const pixPanel = document.querySelector('#cobrancaModal .cobranca-pix');
+  if (pixPanel) pixPanel.style.display = pixReady ? '' : 'none';
+  const chargeTemplate = document.querySelector('#cobrancaModal [data-template="cobranca"]');
+  if (chargeTemplate) chargeTemplate.textContent = pixReady ? 'Cobrança' : 'Resumo';
 
   const msg = buildCobrancaMessage(o, currentCobrancaTemplate);
   document.getElementById('cobrancaPreview').textContent = msg;
@@ -14980,7 +15058,7 @@ function renderPrinterStatus() {
   const bs = window.bluetoothSerial;
   if (p && p.profile === 'oasis-pending') {
     el.classList.add('none'); el.classList.remove('ok');
-    lab.textContent = 'Oasis selecionada · modelo e driver pendentes de validação';
+    lab.textContent = 'Oasis OIA-8381-B selecionada · driver pendente de validação';
     return;
   }
   if (!bs) {
@@ -14991,8 +15069,8 @@ function renderPrinterStatus() {
   }
 
   if (p && p.address) {
-    el.classList.remove('none'); el.classList.add('ok');
-    lab.innerHTML = '✓ ' + escapeHtml(p.name || p.address) + '<br><span style="font-size:10px;opacity:.7">Bluetooth pronto</span>';
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.innerHTML = 'Selecionada: ' + escapeHtml(p.name || p.address) + '<br><span style="font-size:12px">A conexão será verificada ao imprimir.</span>';
   } else {
     el.classList.add('none'); el.classList.remove('ok');
     lab.innerHTML = 'Nenhuma impressora selecionada<br><span style="font-size:10px;opacity:.7">Bluetooth disponível — toque "Buscar impressora"</span>';
@@ -15340,19 +15418,27 @@ function textoPareadoCom(data) {
 }
 
 async function pairDevicePrompt() {
+  const pilot = !!window.CDB_CONFIG?.isPilot;
   const code = (window.prompt('Digite o código de pareamento (6 dígitos):') || '').trim();
-  if (!code) return;
+  if (!code) return { cancelled: true };
+  if (pilot && !/^\d{6}$/.test(code)) throw new Error('Informe o código de 6 dígitos fornecido pela equipe.');
   if (!window.cdbSync || typeof window.cdbSync.pairWithCode !== 'function') {
+    if (pilot) throw new Error('Sincronização indisponível. Tente novamente.');
     showToast('Sincronização indisponível'); return;
   }
-  showToast('Pareando…');
+  if (!pilot) showToast('Pareando…');
   try {
     const data = await window.cdbSync.pairWithCode(code, null);
-    showToast(textoPareadoCom(data));
-    if (typeof openDiagnostics === 'function') openDiagnostics();
+    if (!pilot) {
+      showToast(textoPareadoCom(data));
+      if (typeof openDiagnostics === 'function') openDiagnostics();
+    }
+    updateSync();
+    return { paired: true, data };
   } catch (e) {
-    showToast('Falha: ' + (e && e.message ? e.message : 'erro desconhecido'));
     try { logError(e, 'pairDevicePrompt'); } catch (_) {}
+    if (pilot) throw e;
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro desconhecido'));
   }
 }
 
@@ -18963,70 +19049,57 @@ function printViaBluetooth(bytes, onFallback, printJob) {
   }
   if (isPrinting) { showToast('Impressão em andamento, aguarda…'); return; }
 
+  // Reserva o envio antes do diálogo Android: dois toques não geram dois trabalhos.
+  const job = {};
+  printViaBluetooth.activeJob = job;
+  isPrinting = true;
+  const active = () => isPrinting && printViaBluetooth.activeJob === job;
+  const finish = () => {
+    if (!active()) return;
+    printViaBluetooth.activeJob = null;
+    releasePrinting();
+  };
+  const failed = (err, fallback) => {
+    if (!active()) return;
+    showError(err, 'print');
+    finish();
+    if (fallback && typeof onFallback === 'function') onFallback();
+  };
+  printWatchdog = setTimeout(() => {
+    if (!active()) return;
+    showToast('A autorização do Bluetooth não terminou. Confira a permissão e tente imprimir novamente.');
+    finish();
+  }, 60000);
   btStep('print:perm-check');
+  try {
   ensureBluetoothPermission((granted) => {
+    if (!active()) return;
     btStep('print:perm-result granted=' + granted);
     if (!granted) {
-      showToast('Permissao Bluetooth negada - Configuracoes > Apps > Easy Stock Mobile');
+      showToast('Permissão Bluetooth negada. Ative Dispositivos próximos nas permissões deste app.');
+      finish();
       if (typeof onFallback === 'function') onFallback();
       return;
     }
-    isPrinting = true;
+    if (printWatchdog) clearTimeout(printWatchdog);
     printWatchdog = setTimeout(() => {
-      showToast('Impressora não respondeu — liberando');
-      releasePrinting();
+      if (!active()) return;
+      showToast('A impressora não confirmou o envio. Confira as etiquetas antes de tentar novamente.');
+      finish();
       // Tenta fechar socket pra evitar leak — se o write travou, o socket
       // pode estar zumbi. Disconnect e silencioso (callbacks vazios).
       try { bs.disconnect(function () {}, function () {}); } catch (_) {}
     }, 15000);
-    // Erros de socket morto (printer saiu de range, entrou em idle, foi
-    // desligada): broken pipe, EPIPE, "not connected", "closed". Nesses
-    // casos a unica saida e fechar o socket e refazer o pareamento SPP.
-    const isStaleSocketErr = (msg) => {
-      const m = String(msg || '').toLowerCase();
-      return m.includes('broken pipe') || m.includes('epipe')
-          || m.includes('not connected') || m.includes('closed')
-          || m.includes('socket') || m.includes('connection reset');
-    };
-    const reconnectAndRetry = () => {
-      btStep('print:reconnect-retry');
-      try {
-        bs.disconnect(
-          () => {
-            bs.connect(printer.address,
-              () => { btStep('print:reconnected'); rawWrite(false); },
-              (err) => {
-                btStep('print:reconnect-err ' + (err && err.message || err));
-                showError(err, 'print');
-                releasePrinting();
-              }
-            );
-          },
-          () => {
-            bs.connect(printer.address,
-              () => { btStep('print:reconnected-nodc'); rawWrite(false); },
-              (err) => {
-                btStep('print:reconnect-err2 ' + (err && err.message || err));
-                showError(err, 'print');
-                releasePrinting();
-              }
-            );
-          }
-        );
-      } catch (ex) {
-        btStep('print:reconnect-throw ' + (ex.message || ex));
-        showError(ex, 'print');
-        releasePrinting();
-      }
-    };
-    const rawWrite = (canRetry) => {
-      btStep('print:send-write retry=' + !canRetry);
+    const send = () => {
+      if (!active()) return;
+      btStep('print:send-write');
       try {
         bs.write(bytes,
           () => {
+            if (!active()) return;
             btStep('print:write-ok');
             showToast('Enviado pra impressora');
-            releasePrinting();
+            finish();
             if (printJob && printJob.entityId) {
               logAction({
                 action: 'etiqueta.print', entityType: printJob.entityType, entityId: printJob.entityId,
@@ -19036,39 +19109,32 @@ function printViaBluetooth(bytes, onFallback, printJob) {
             }
           },
           (err) => {
+            if (!active()) return;
             const msg = (err && err.message) || err;
             btStep('print:write-err ' + msg);
-            if (canRetry && isStaleSocketErr(msg)) {
-              reconnectAndRetry();
-              return;
-            }
-            showError(err, 'print');
-            releasePrinting();
+            // Um write pode ter enviado parte do lote. Repetir automaticamente duplicaria etiquetas.
+            failed(err, false);
+            showToast('Confira as etiquetas na impressora antes de tentar novamente.');
           }
         );
       } catch (ex) {
         btStep('print:write-throw ' + (ex.message || ex));
-        showError(ex, 'print');
-        releasePrinting();
-        if (typeof onFallback === 'function') onFallback();
+        failed(ex, false);
       }
     };
-    const send = () => rawWrite(true);
     // Sempre abre a conexão escolhida; um socket existente pode ser da outra impressora.
     const connectSelected = () => {
+      if (!active()) return;
       try {
-        bs.connect(printer.address, send, (err) => {
-          showError(err, 'print'); releasePrinting();
-          if (typeof onFallback === 'function') onFallback();
-        });
+        bs.connect(printer.address, send, err => failed(err, true));
       } catch (err) {
-        showError(err, 'print'); releasePrinting();
-        if (typeof onFallback === 'function') onFallback();
+        failed(err, true);
       }
     };
     try { bs.disconnect(connectSelected, connectSelected); }
     catch (_) { connectSelected(); }
   });
+  } catch (err) { failed(err, true); }
 }
 
 let printAreaTimer = null;
@@ -19225,7 +19291,9 @@ function etiquetaProducaoHtml(et, nota) {
   const hasCodes = showQr || showBarcode;
   const horiz = currentEtqOrient === 'horizontal';
 
-  const brand = `<div class="et-brand">
+  const brand = window.CDB_CONFIG?.isPilot
+    ? `<div class="et-brand"><span class="et-brand-name">${escapeHtml(et.empresa || getEmpresaName())}</span></div>`
+    : `<div class="et-brand">
     <img src="etiqueta/assets/logo-easystok.svg" alt="">
     <span class="et-brand-name">Easy<b>Stok</b></span>
   </div>`;
@@ -19397,13 +19465,13 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
 
     // Logo EasyStok
     ctx.fillStyle = '#1A2E5A';
-    ctx.fillRect(lx, y, 22, 22);
+    if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx, y, 22, 22);
     ctx.fillStyle = '#E85814';
-    ctx.fillRect(lx + 4, y + 4, 14, 6);
+    if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx + 4, y + 4, 14, 6);
     ctx.fillStyle = '#1A2E5A';
     ctx.textAlign = 'left';
     ctx.font = '800 16px Inter, Arial, sans-serif';
-    ctx.fillText('EasyStok', lx + 30, y + 14);
+    ctx.fillText(window.CDB_CONFIG?.isPilot ? et.empresa || getEmpresaName() : 'EasyStok', lx + (window.CDB_CONFIG?.isPilot ? 0 : 30), y + 14, mainW - lx - 8);
     y += 34;
 
     // Nome do produto + emoji (#437)
@@ -19498,13 +19566,13 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
   let y = y0 + 16;
   // Logo EasyStok
   ctx.fillStyle = '#1A2E5A';
-  ctx.fillRect(lx, y, 22, 22);
+  if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx, y, 22, 22);
   ctx.fillStyle = '#E85814';
-  ctx.fillRect(lx + 4, y + 4, 14, 6);
+  if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx + 4, y + 4, 14, 6);
   ctx.fillStyle = '#1A2E5A';
   ctx.textAlign = 'left';
   ctx.font = '800 18px Inter, Arial, sans-serif';
-  ctx.fillText('EasyStok', lx + 30, y + 16);
+  ctx.fillText(window.CDB_CONFIG?.isPilot ? et.empresa || getEmpresaName() : 'EasyStok', lx + (window.CDB_CONFIG?.isPilot ? 0 : 30), y + 16, W - lx - 8);
   y += 36;
   // Product name + emoji (#437)
   ctx.fillStyle = '#000';
@@ -20131,7 +20199,9 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   }
 
   refreshEtqPreview();
+  rememberOperationalFocus('etiquetasPreview');
   document.getElementById('etiquetasPreview').classList.add('show');
+  document.getElementById('etqTitle').focus();
 }
 
 function closeEtiquetasPreview() {
@@ -20140,7 +20210,11 @@ function closeEtiquetasPreview() {
   try { document.getElementById('etqCopiesSelect').value = '1'; } catch (_) {}
   try { document.getElementById('etqRetryBtn').style.display = 'none'; } catch (_) {}
   // Se veio de produção, volta pra home (fluxo natural pós-finalizar).
-  if (currentEtiquetasKind === 'producao') go('home');
+  if (currentEtiquetasKind === 'producao') {
+    go(window.CDB_CONFIG?.isPilot ? 'producao' : 'home');
+    if (window.CDB_CONFIG?.isPilot) document.querySelector('[data-screen="producao"] button:not([disabled])')?.focus();
+  } else restoreOperationalFocus('etiquetasPreview');
+  operationalFocus.delete('etiquetasPreview');
   currentEtiquetas = [];
 }
 
@@ -20777,7 +20851,7 @@ function confirmProduction() {
   // Guard contra duplo-clique: bloqueia execucao concorrente que poderia
   // gerar 2 batches duplicados + dobrar estoque.
   if (_isSavingProduction) return;
-  const itemsRaw = products.filter(p => p.count > 0);
+  const itemsRaw = products.filter(p => p.count > 0 && (!productionSelectionIds || productionSelectionIds.includes(p.id)));
   if (itemsRaw.length === 0) return;
 
   // Validação: todo produto precisa de validade. Peso é opcional.
@@ -20854,7 +20928,6 @@ function confirmProduction() {
 
   const code = currentBatchCode || buildBatchCode(itemsRaw);
   const batchId = currentBatchId || ('b-' + nowMs);
-  currentBatchId = '';
   // #1474 W6: mesmo lote/codigo do batch e da etiqueta, mesmo virando o dia.
   try { document.getElementById('batchDate').textContent = subtituloDoLote(new Date(nowMs), batchId); } catch (_) {}
   const batch = {
@@ -20869,16 +20942,23 @@ function confirmProduction() {
   };
   // Persiste o batch ANTES de mexer no estoque pra cobrir crash entre
   // os dois passos: se persist falhar, estoque nem incrementa.
+  const previousStocks = new Map(items.map(it => [it.productId, products.find(p => p.id === it.productId)?.stock]));
   batches.push(batch);
   // Incrementa o estoque DEPOIS — mesma persistAll cobre os dois.
   items.forEach(it => {
     const p = products.find(x => x.id === it.productId);
     if (p) p.stock = (p.stock || 0) + it.qty;
   });
-  persistAll();
+  if (!persistAll()) {
+    batches.splice(batches.indexOf(batch), 1);
+    items.forEach(it => { const p = products.find(x => x.id === it.productId); if (p) p.stock = previousStocks.get(it.productId); });
+    _isSavingProduction = false;
+    return false;
+  }
+  currentBatchId = '';
   _isSavingProduction = false;
 
-  clearProduction();
+  clearProduction(productionSelectionIds);
   closeProductionConfirm();
   pendingSync += items.length;
   updateSync();
@@ -20910,6 +20990,7 @@ function confirmProduction() {
   } else {
     go('home');
   }
+  return true;
 }
 
 // =========================
@@ -21459,6 +21540,7 @@ function saveOrder() {
 
   const total = currentOrderItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
 
+  const previousClientLastOrder = selectedClient === 'avulso' ? null : selectedClient.lastOrder;
   let snapshot;
   if (selectedClient === 'avulso') {
     snapshot = { name: 'Avulso', ref: 'sem cadastro' };
@@ -21545,15 +21627,21 @@ function saveOrder() {
     ? 'pedido retroativo (' + new Date(retroAtMs).toLocaleString('pt-BR') + ') já entregue'
     : 'pedido criado');
 
+  const previousOrderStocks = new Map();
   if (retroAtMs) {
     order.items.forEach(it => {
       const p = products.find(x => x.id === it.productId);
-      if (p) p.stock = (p.stock || 0) - it.qty;
+      if (p) { previousOrderStocks.set(p.id, p.stock); p.stock = (p.stock || 0) - it.qty; }
     });
   }
 
   orders.unshift(order);
-  persistAll();
+  if (!persistAll()) {
+    orders.splice(orders.indexOf(order), 1);
+    previousOrderStocks.forEach((stock, id) => { const p = products.find(x => x.id === id); if (p) p.stock = stock; });
+    if (selectedClient !== 'avulso') selectedClient.lastOrder = previousClientLastOrder;
+    return;
+  }
   renderRecents();
 
   // Audit log: pedido criado
@@ -21617,6 +21705,16 @@ function saveOrder() {
 // MODAL NOVO PRODUTO
 // =========================
 let productModalCallback = null; // se presente, ao salvar adiciona direto no pedido
+let productSubmitCompleted = false;
+
+function updateNewProductExpiry() {
+  const value = document.getElementById('newProdManufacturedDate')?.value;
+  const days = Number(document.getElementById('newProdValidity')?.value);
+  const stamp = productionTimestamp(value, Date.now());
+  const label = document.getElementById('newProdExpiry');
+  if (label) label.textContent = value && stamp !== null && Number.isInteger(days) && days > 0 && days <= 365
+    ? 'Validade na etiqueta: ' + new Date(stamp + days * 86400000).toLocaleDateString('pt-BR') : '';
+}
 
 function updateProductSaveState() {
   const btn = document.getElementById('saveProductBtn');
@@ -21626,6 +21724,8 @@ function updateProductSaveState() {
 }
 
 function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
+  productSubmitCompleted = false;
+  editingProductId = null;
   document.getElementById('newProdName').value = prefillName;
   document.getElementById('newProdUnit').value = '';
   document.getElementById('newProdPrice').value = '';
@@ -21633,6 +21733,13 @@ function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
   if (costEl) costEl.value = '';
   document.getElementById('newProdMinStock').value = '';
   document.getElementById('newProdValidity').value = '5';
+  document.getElementById('newProdBatchFields').hidden = !window.CDB_CONFIG?.isPilot || fromOrder;
+  document.getElementById('newProdQuantity').value = '1';
+  document.getElementById('newProdWeight').value = '';
+  const manufacture = document.getElementById('newProdManufacturedDate');
+  manufacture.value = localProductionDate(Date.now());
+  manufacture.max = manufacture.value;
+  updateNewProductExpiry();
   selectedCat = cat;
   selectedEmoji = '🍝';
   document.querySelectorAll('#catPills .cat-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
@@ -21644,6 +21751,7 @@ function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
   productModalCallback = fromOrder;
   const saveBtn = document.getElementById('saveProductBtn');
   if (saveBtn) saveBtn.textContent = fromOrder ? 'Criar e adicionar' : 'Criar e usar';
+  rememberOperationalFocus('newProductModal');
   document.getElementById('newProductModal').classList.add('show');
   setTimeout(() => document.getElementById(prefillName ? 'newProdUnit' : 'newProdName').focus(), 300);
   updateMarginPreview();
@@ -21656,6 +21764,7 @@ function closeProductModal() {
   // Restaura titulo (caso tenha sido alterado pra "Editar")
   const titleEl = document.querySelector('#newProductModal .modal-title');
   if (titleEl) titleEl.innerHTML = 'Novo <span class="accent">produto</span>';
+  restoreOperationalFocus('newProductModal');
 }
 
 // Calcula e exibe lucro absoluto + margem % entre os campos preço e custo
@@ -21703,6 +21812,7 @@ function updateMarginPreview() {
   previewEl.style.display = '';
 }
 function saveNewProduct() {
+  if (productSubmitCompleted) return;
   // Bug 9 (Onda 4): normalizeName em vez de so trim() — mesma motivacao
   // do saveNewClient, evita "  Talharim  Fresco  " virar duplicata
   // de "Talharim Fresco" no catalogo de produtos.
@@ -21725,6 +21835,22 @@ function saveNewProduct() {
   if (!Number.isInteger(defaultValidityDays) || defaultValidityDays < 1 || defaultValidityDays > 365) {
     showToast('Informe a validade do produto entre 1 e 365 dias'); validityInput.focus(); return;
   }
+  const fastProduction = !!window.CDB_CONFIG?.isPilot && !editingProductId && !productModalCallback;
+  const quantity = Number(document.getElementById('newProdQuantity').value);
+  const manufactureDate = document.getElementById('newProdManufacturedDate').value;
+  const weightInput = document.getElementById('newProdWeight');
+  const weight = weightInput.value.trim() ? Number(weightInput.value) : pesoPadraoDoProduto({ unit });
+  if (fastProduction) {
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 9999) {
+      showToast('Informe a quantidade produzida entre 1 e 9999'); document.getElementById('newProdQuantity').focus(); return;
+    }
+    if (!manufactureDate || productionTimestamp(manufactureDate, Date.now()) === null) {
+      showToast('Informe uma data de fabricação válida, até hoje'); document.getElementById('newProdManufacturedDate').focus(); return;
+    }
+    if (!Number.isInteger(weight) || weight < 1 || weight > 9999) {
+      showToast('Informe o peso por unidade em gramas para a etiqueta'); weightInput.focus(); return;
+    }
+  }
 
   // Modo edit: editingProductId setado por openProductModalForEdit
   if (editingProductId) {
@@ -21737,7 +21863,8 @@ function saveNewProduct() {
       unit: unit || '', price, cost, minStock, defaultValidityDays
     };
     const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost','minStock','defaultValidityDays']);
-    persistAll();
+    if (!persistAll()) { products[idx] = before; return; }
+    productSubmitCompleted = true;
     renderProductGrid();
     if (typeof renderCatalogList === 'function') renderCatalogList();
     logAction({
@@ -21759,8 +21886,25 @@ function saveNewProduct() {
     name, emoji: selectedEmoji, category: selectedCat,
     unit: unit || '', price, cost, minStock, defaultValidityDays, count: 0, photo: null, stock: 0, custom: true
   };
+  if (fastProduction) { product.count = quantity; product.defaultWeightG = weight; }
   products.push(product);
-  persistAll();
+  if (fastProduction) {
+    openProductionConfirm([product.id]);
+    document.getElementById('prodManufacturedDate').value = manufactureDate;
+    if (confirmProduction() !== true) {
+      products.splice(products.indexOf(product), 1);
+      closeProductionConfirm();
+      return;
+    }
+    productSubmitCompleted = true;
+    logAction({ action: 'product.create', entityType: 'product', entityId: product.id, summary: 'Cadastrou produto ' + name });
+    closeProductModal();
+    renderProductGrid();
+    haptic();
+    return;
+  }
+  if (!persistAll()) { products.splice(products.indexOf(product), 1); return; }
+  productSubmitCompleted = true;
   renderProductGrid();
 
   logAction({
@@ -21791,6 +21935,8 @@ let editingProductId = null;
 function openProductModalForEdit(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
+  productSubmitCompleted = false;
+  document.getElementById('newProdBatchFields').hidden = true;
   editingProductId = productId;
   document.getElementById('newProdName').value = p.name || '';
   document.getElementById('newProdUnit').value = p.unit || '';
@@ -21815,7 +21961,9 @@ function openProductModalForEdit(productId) {
   if (titleEl) titleEl.innerHTML = 'Editar <span class="accent">produto</span>';
   const saveBtn = document.getElementById('saveProductBtn');
   if (saveBtn) saveBtn.textContent = 'Salvar alterações';
+  rememberOperationalFocus('newProductModal');
   document.getElementById('newProductModal').classList.add('show');
+  document.getElementById('newProdName').focus();
   updateMarginPreview();
   updateProductSaveState();
 }
@@ -22525,6 +22673,36 @@ function showUndoToast(msg, undoFn, opts) {
 // =========================
 // Fechar modais clicando fora
 // =========================
+const operationalFocus = new Map();
+function rememberOperationalFocus(id) { operationalFocus.set(id, document.activeElement); }
+function restoreOperationalFocus(id) {
+  const target = operationalFocus.get(id);
+  operationalFocus.delete(id);
+  if (!document.querySelector('.modal-overlay.show, #etiquetasPreview.show, dialog[open]') && target?.isConnected && target.offsetParent !== null) target.focus();
+}
+function operationalModalOpen() {
+  return !!document.querySelector('.modal-overlay.show, .historico-overlay.show, #etiquetasPreview.show, dialog[open], .welcome:not(.hidden), .tour:not(.hidden)');
+}
+['newProductModal', 'productionConfirmModal', 'etiquetasPreview'].forEach(id => {
+  const modal = document.getElementById(id);
+  modal.addEventListener('keydown', event => {
+    if (!modal.classList.contains('show')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault(); event.stopPropagation();
+      if (id === 'newProductModal') closeProductModal();
+      else if (id === 'productionConfirmModal') closeProductionConfirm();
+      else closeEtiquetasPreview();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'))
+      .filter(element => element.offsetParent !== null);
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (!focusable.includes(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); return; }
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  });
+});
 ['newProductModal','newClientModal','itemPickerModal','productionConfirmModal','cashEntryModal'].forEach(id => {
   document.getElementById(id).addEventListener('click', (e) => {
     if (e.target.id === id) {
@@ -22569,6 +22747,8 @@ try {
   const input   = document.getElementById('welcomeName');
   const btn     = document.getElementById('welcomeContinue');
   const hasName = operatorName && operatorName.trim().length > 0;
+  const pilot = !!window.CDB_CONFIG?.isPilot;
+  if (pilot) document.getElementById('welcomeTitle').textContent = 'Bem-vinda à Casa da Baba';
   const hasTour = (() => {
     try { return localStorage.getItem('cdb-onboarding-done') === '1'; }
     catch (e) { return false; }
@@ -22579,12 +22759,13 @@ try {
   btn.addEventListener('click', () => {
     saveOperatorName(input.value);
     hideWelcome();
-    if (!hasTour) startTour();
+    if (!pilot && !hasTour) startTour();
+    if (pilot) window.dispatchEvent(new Event('cdb-operator-ready'));
   });
 
   if (!hasName) {
     showWelcome();
-  } else if (!hasTour) {
+  } else if (!pilot && !hasTour) {
     // Já tem nome mas nunca viu tour (ex: atualizou o app) → mostra tour.
     startTour();
   }
@@ -22774,6 +22955,7 @@ window.cdbApp = {
     'updateModal','autoBackupModal','noPrinterModal','productActionsModal',
     'ajustarModal','problemaModal','conferProdModal','prodProblemaModal',
     'cashCloseModal','etiquetasPreview','ajustesModal','cashEntryModal',
+    'newProductModal','productionConfirmModal',
     'productModal','clientModal','batchModal','novoProdutoModal',
     'globalSearchModal','diagnosticsModal','supportModal'
   ];
@@ -22801,6 +22983,8 @@ window.cdbApp = {
     var closers = {
       ajustesModal: 'closeAjustes',
       etiquetasPreview: 'closeEtiquetasPreview',
+      newProductModal: 'closeProductModal',
+      productionConfirmModal: 'closeProductionConfirm',
       noPrinterModal: 'closeNoPrinterModal',
       updateModal: 'closeUpdateModal',
       autoBackupModal: function () { autoBackupAction && autoBackupAction('skip'); },

@@ -135,7 +135,7 @@ module.exports = function ({ test, sandbox, runInSandbox, assert }) {
   });
 
   // ── W6 ────────────────────────────────────────────────────────────────
-  test('#1474 W6: modal aberto antes da meia-noite e confirmado depois usa o lote do confirmar', async () => {
+  test('#1474 W6: atravessar meia-noite preserva fabricação escolhida e código da etiqueta', async () => {
     const RealDate = sandbox.Date;
     let agora = new RealDate(2026, 9, 8, 23, 59, 50).getTime();
     class FakeDate extends RealDate {
@@ -144,8 +144,9 @@ module.exports = function ({ test, sandbox, runInSandbox, assert }) {
     }
     const subtitulo = { textContent: '' };
     const getOriginal = sandbox.document.getElementById;
+    const manufacture = getOriginal('prodManufacturedDate');
     sandbox.Date = FakeDate;
-    sandbox.document.getElementById = (id) => (id === 'batchDate' ? subtitulo : getOriginal(id));
+    sandbox.document.getElementById = (id) => id === 'batchDate' ? subtitulo : id === 'prodManufacturedDate' ? manufacture : getOriginal(id);
     let r;
     try {
       runInSandbox(`products = [{ id: 'talharim', name: 'Talharim', emoji: '', category: 'massa', unit: 'un',
@@ -162,7 +163,7 @@ module.exports = function ({ test, sandbox, runInSandbox, assert }) {
       sandbox.document.getElementById = getOriginal;
     }
     assert.ok(/LOT-261008-/.test(r.naAbertura), 'abertura mostrou o lote do dia 8: ' + r.naAbertura);
-    assert.strictEqual(r.lote, 'LOT-261009', 'lote gravado e o do confirmar');
+    assert.strictEqual(r.lote, 'LOT-261008', 'lote preserva a data de fabricação escolhida');
     assert.ok(subtitulo.textContent.includes(r.codigo),
       'subtitulo mostra o mesmo codigo da etiqueta: ' + subtitulo.textContent + ' vs ' + r.codigo);
   });

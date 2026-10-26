@@ -50,17 +50,125 @@ module.exports = function ({ test, runInSandbox, assert }) {
     assert.strictEqual(result.count, 0);
   });
 
+  test('#2063 sprint: criar e usar no piloto registra uma vez e abre etiquetas, preservando outra seleção', () => {
+    const result = run(`
+      const old = {get:document.getElementById, products, batches, detail:readProdDetailValues, config:window.CDB_CONFIG, preview:showEtiquetasPreview};
+      const elements = {}; let previews = 0;
+      document.getElementById = id => elements[id] || (elements[id] = old.get.call(document,id));
+      showEtiquetasPreview = () => previews++;
+      try {
+        window.CDB_CONFIG={isPilot:true};
+        products=[{id:'outro',name:'Outro selecionado',count:3,stock:9,unit:'500g'}]; batches=[];
+        readProdDetailValues=()=>({valid:true,perProduct:new Map(products.map(p=>[p.id,{weightG:500,validityDays:p.defaultValidityDays||7,qty:p.count}]))});
+        openProductModal('massa');
+        document.getElementById('newProdName').value='Produto direto';
+        document.getElementById('newProdUnit').value='500g';
+        document.getElementById('newProdQuantity').value='2';
+        document.getElementById('newProdValidity').value='90';
+        saveNewProduct(); saveNewProduct();
+        const created=products.find(p=>p.id!=='outro');
+        return JSON.stringify({products:products.length,batches:batches.length,previews,stock:created.stock,
+          validity:created.defaultValidityDays,labels:etiquetasFromBatch(batches[0]).length,
+          otherStock:products[0].stock,otherCount:products[0].count,batchItems:batches[0].items.length});
+      } finally {document.getElementById=old.get;products=old.products;batches=old.batches;readProdDetailValues=old.detail;window.CDB_CONFIG=old.config;showEtiquetasPreview=old.preview;}
+    `);
+    assert.deepStrictEqual(result,{products:2,batches:1,previews:1,stock:2,validity:90,labels:2,otherStock:9,otherCount:3,batchItems:1});
+  });
+
+  test('#2063 sprint: falha ao salvar lote reverte armazenamento e permite repetir sem duplicar produção', () => {
+    const result = run(`
+      const old={get:document.getElementById,products,batches,detail:readProdDetailValues,config:window.CDB_CONFIG,
+        preview:showEtiquetasPreview,set:localStorage.setItem,hook:window.cdbOnPersist,toast:showToast};
+      const elements={}; let previews=0, syncs=0, errors=0;
+      document.getElementById=id=>elements[id]||(elements[id]=old.get.call(document,id));
+      const keys=['cdb-products','cdb-clients','cdb-orders','cdb-cash','cdb-cash-closings','cdb-batches','cdb-shopping'];
+      const before=keys.map(k=>localStorage.getItem(k));
+      try {
+        products=[];batches=[];window.CDB_CONFIG={isPilot:true};
+        window.cdbOnPersist=()=>syncs++;showEtiquetasPreview=()=>previews++;
+        showToast=message=>{if(message.includes('Não foi possível salvar'))errors++;};
+        readProdDetailValues=()=>({valid:true,perProduct:new Map(products.map(p=>[p.id,{weightG:500,validityDays:7,qty:p.count}]))});
+        openProductModal('massa');document.getElementById('newProdName').value='Produto com retry';
+        document.getElementById('newProdUnit').value='500g';document.getElementById('newProdQuantity').value='2';
+        localStorage.setItem=(key,value)=>{if(key==='cdb-batches')throw new Error('QuotaExceededError');return old.set.call(localStorage,key,value);};
+        saveNewProduct();
+        const failed={products:products.length,batches:batches.length,previews,syncs,errors,unchanged:keys.every((k,i)=>localStorage.getItem(k)===before[i])};
+        localStorage.setItem=old.set;saveNewProduct();
+        return JSON.stringify({failed,retry:{products:products.length,batches:batches.length,stock:products[0].stock,previews,syncs}});
+      } finally {
+        document.getElementById=old.get;products=old.products;batches=old.batches;readProdDetailValues=old.detail;window.CDB_CONFIG=old.config;
+        showEtiquetasPreview=old.preview;localStorage.setItem=old.set;window.cdbOnPersist=old.hook;showToast=old.toast;
+        keys.forEach((key,i)=>before[i]===null?localStorage.removeItem(key):localStorage.setItem(key,before[i]));
+      }
+    `);
+    assert.deepStrictEqual(result.failed,{products:0,batches:0,previews:0,syncs:0,errors:1,unchanged:true});
+    assert.deepStrictEqual(result.retry,{products:1,batches:1,stock:2,previews:1,syncs:1});
+  });
+
+  test('#2063 sprint: dados inválidos do cadastro não criam produto nem lote', () => {
+    const result=run(`
+      const old={get:document.getElementById,products,batches,config:window.CDB_CONFIG,toast:showToast};
+      const elements={};let errors=0;
+      document.getElementById=id=>elements[id]||(elements[id]=old.get.call(document,id));
+      try {
+        products=[];batches=[];window.CDB_CONFIG={isPilot:true};showToast=()=>errors++;
+        const cases=[['newProdQuantity','1.5'],['newProdManufacturedDate',''],['newProdWeight','0'],['newProdValidity','3.5']];
+        for(const [field,value] of cases){
+          openProductModal('massa');document.getElementById('newProdName').value='Não deve ser criado';
+          document.getElementById('newProdUnit').value='500g';document.getElementById(field).value=value;saveNewProduct();
+        }
+        return JSON.stringify({products:products.length,batches:batches.length,errors});
+      } finally {document.getElementById=old.get;products=old.products;batches=old.batches;window.CDB_CONFIG=old.config;showToast=old.toast;}
+    `);
+    assert.deepStrictEqual(result,{products:0,batches:0,errors:4});
+  });
+
+  test('#2063 sprint: pedido sem persistência não abre cobrança nem apaga o rascunho', () => {
+    const result=run(`
+      const old={config:window.CDB_CONFIG,cobranca:openCobranca,orders,client:selectedClient,items:currentOrderItems,set:localStorage.setItem,hook:window.cdbOnPersist};
+      let opened=0,syncs=0;openCobranca=()=>opened++;window.cdbOnPersist=()=>syncs++;
+      try {
+        orders=[];window.CDB_CONFIG={isPilot:true};selectedClient='avulso';
+        currentOrderItems=[{productId:'teste',name:'Pedido local',qty:1,unitPrice:10}];
+        localStorage.setItem=(key,value)=>{if(key==='cdb-orders')throw new Error('QuotaExceededError');return old.set.call(localStorage,key,value);};
+        saveOrder();return JSON.stringify({opened,syncs,orders:orders.length,draft:currentOrderItems.length});
+      } finally {window.CDB_CONFIG=old.config;openCobranca=old.cobranca;orders=old.orders;selectedClient=old.client;currentOrderItems=old.items;localStorage.setItem=old.set;window.cdbOnPersist=old.hook;}
+    `);
+    assert.deepStrictEqual(result,{opened:0,syncs:0,orders:0,draft:1});
+  });
+
+  test('#2063 sprint: resumo sem PIX não inventa cobrança e marca configurada prevalece no piloto', () => {
+    const result=run(`
+      const keys=['cdb-pix-key','cdb-pix-holder','cdb-pix-type','cdb-empresa-name'];
+      const old=keys.map(k=>localStorage.getItem(k)), config=window.CDB_CONFIG;
+      try {
+        keys.forEach(k=>localStorage.removeItem(k));window.CDB_CONFIG={isPilot:true};
+        const order={id:'pedido-local',clientSnapshot:{name:'Cliente local'},items:[],total:34};
+        const without=buildCobrancaMessage(order,'cobranca');
+        localStorage.setItem('cdb-pix-key','11999999999');localStorage.setItem('cdb-pix-holder','Titular configurado');
+        localStorage.setItem('cdb-empresa-name','Nome configurado');
+        const configured=buildCobrancaMessage(order,'cobranca');
+        const label=etiquetaProducaoHtml({empresa:getEmpresaName(),productName:'Item',productionDate:Date.now(),codigoBarras:'ABC',lote:'LOT-1'});
+        return JSON.stringify({fallback:without.includes('Casa da Baba'),hasEmptyPix:without.includes('Pagamento via PIX'),
+          asksPayment:without.includes('confirme o pagamento'),configured:configured.includes('Nome configurado')&&configured.includes('Pagamento via PIX'),
+          labelUsesCompany:label.includes('Nome configurado'),labelUsesErpLogo:label.includes('logo-easystok')});
+      } finally {window.CDB_CONFIG=config;keys.forEach((k,i)=>old[i]===null?localStorage.removeItem(k):localStorage.setItem(k,old[i]));}
+    `);
+    assert.deepStrictEqual(result,{fallback:true,hasEmptyPix:false,asksPayment:false,configured:true,labelUsesCompany:true,labelUsesErpLogo:false});
+  });
+
   test('#2063 fabricação: data local anterior preservada; futuro e data impossível rejeitados', () => {
     const result = run(`
       const now = new Date(2026,9,26,15,30).getTime();
       return JSON.stringify({ today:productionTimestamp('2026-10-26',now), now,
         before:localProductionDate(productionTimestamp('2026-10-25',now)),
-        future:productionTimestamp('2026-10-27',now), invalid:productionTimestamp('2026-02-31',now) });
+        future:productionTimestamp('2026-10-27',now), invalid:productionTimestamp('2026-02-31',now), blank:productionTimestamp('',now) });
     `);
     assert.strictEqual(result.today, result.now);
     assert.strictEqual(result.before, '2026-10-25');
     assert.strictEqual(result.future, null);
     assert.strictEqual(result.invalid, null);
+    assert.strictEqual(result.blank, null);
   });
 
   test('#2063 impressoras: seleção preserva as duas e Oasis permanece indisponível para envio', () => {

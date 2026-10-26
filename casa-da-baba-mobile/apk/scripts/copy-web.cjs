@@ -31,11 +31,19 @@ let html = fs.readFileSync(htmlPath, 'utf8');
 const syncScript = /<script\s+src=["']sync\.js[^"']*["']\s*><\/script>/i;
 if (!syncScript.test(html)) throw new Error('Ponto de carga sync.js não encontrado.');
 html = html.replace(/<script\s+src=["']config\.js[^"']*["']\s*><\/script>\s*/gi, '');
-html = html.replace(syncScript, '<script src="config.js"></script>\n$&');
+// A configuração precisa existir antes do onboarding inline do PWA.
+html = html.replace('<head>', '<head>\n<script src="config.js"></script>');
+html = html.replace('<title>Easy Stock Mobile</title>', '<title>Casa da Baba Piloto</title>');
+html = html.replace('O app costuma se atualizar sozinho ao reabrir. Se precisar, force a verificação manual.', 'Verifique a versão, baixe e confirme a atualização no Android. Não desinstale o app para preservar seus dados.');
 html = html.replace('</head>', '<link rel="stylesheet" href="pilot.css">\n</head>');
 html = html.replace('</body>', '<script src="pilot.js"></script>\n</body>');
 html = html.replaceAll('__APP_VERSION__', 'piloto-' + version.version)
   .replaceAll('"__APP_RELEASE_NOTES__"', JSON.stringify('Piloto integrado ao EasyStok'));
+// WebViews e previews podem conservar scripts da versão anterior após atualizar.
+html = html.replace(/((?:src|href)=['"])([^'"<>]+\.(?:js|css)(?:\?[^'"<>]*)?)(['"])/gi, (match, before, asset, after) => {
+  if (/^(?:https?:)?\/\//i.test(asset)) return match;
+  return before + asset + (asset.includes('?') ? '&' : '?') + 'pilot=' + version.versionCode + after;
+});
 fs.writeFileSync(htmlPath, html);
 fs.rmSync(path.join(target, 'sw.js'), { force: true });
 console.log('PWA empacotada: piloto ' + version.version);
