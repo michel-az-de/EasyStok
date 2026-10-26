@@ -14,11 +14,20 @@ export const listarUsuarios = (sinal) =>
 
 export const listarPerfis = (sinal) => chamarApi(comEmpresa('/api/usuarios/perfis'), { sinal, prazoComCancelamento: true })
 
-// Sem senha: a API cria o convite e manda o link por e-mail (N9).
-export const convidarUsuario = ({ nome, email, perfilId }) =>
+// Sem senha: a API cria o convite e manda o link por e-mail (N9). #2070: `dona` só com perfil de nível Admin.
+export const convidarUsuario = ({ nome, email, perfilId, dona = false }) =>
   chamarApi('/api/usuarios', {
-    metodo: 'POST', corpo: { empresaId: empresa(), nome: nome.trim(), email: email.trim(), senha: null, perfilId, lojaId: null },
+    metodo: 'POST',
+    corpo: { empresaId: empresa(), nome: nome.trim(), email: email.trim(), senha: null, perfilId, lojaId: null, dona: dona === true },
   })
+
+// #2070: marca e desmarca a dona. O motivo é do suporte (a API exige dele, com 10 caracteres ou mais).
+export const marcarDona = (usuarioId, { dona, motivo = null }) => {
+  const texto = motivo?.trim()
+  return chamarApi(comEmpresa(`/api/usuarios/${usuarioId}/dona`), {
+    metodo: 'PUT', corpo: { dona: dona === true, ...(texto ? { motivo: texto } : {}) },
+  })
+}
 
 export const reenviarConvite = (usuarioId) => chamarApi(`/api/usuarios/${usuarioId}/convite`, { metodo: 'POST' })
 

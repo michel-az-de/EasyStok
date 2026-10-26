@@ -1,5 +1,6 @@
 // Usuários e auditoria de acesso (#1753, M7.2). Regras puras: o que a tela mostra de cada pessoa,
-// o que a dona pode fazer com ela e como cada linha da auditoria vira frase.
+// o que quem está na tela pode fazer com ela e como cada linha da auditoria vira frase.
+// #2070: o que cada um pode fazer vem da política de hierarquia da API (`acoes` de cada linha); aqui só se lê.
 
 export const SITUACAO = {
   convite: { rotulo: 'Convite enviado', tom: 'aviso' },
@@ -11,44 +12,120 @@ export const SITUACAO = {
 export const situacaoDoUsuario = (usuario) =>
   !usuario.ativo ? SITUACAO.desativado : usuario.convite?.estado === 'pendente' ? SITUACAO.convite : SITUACAO.ativo
 
-// A API recusa mexer no próprio acesso (USUARIO_PROPRIO); a tela nem oferece.
-export function acoesDoUsuario(usuario, meuId) {
-  const eu = usuario.usuarioId === meuId
-  const pendente = usuario.convite?.estado === 'pendente'
-  return {
-    trocarPerfil: !eu && usuario.ativo,
-    reenviarConvite: !eu && usuario.ativo && pendente,
-    desativar: !eu && usuario.ativo,
-    reativar: !eu && !usuario.ativo,
-  }
+// As ações que a API devolve em cada linha (`GET api/usuarios`), calculadas pela política de hierarquia.
+export const ACOES_DA_LINHA = ['editarNome', 'trocarEmail', 'trocarPerfil', 'desativar', 'reativar', 'reenviarConvite', 'marcarDona', 'desmarcarDona']
+// Os controles que a linha tem, na ordem da tela. Editar nome e trocar e-mail ainda não têm formulário no console.
+export const CONTROLES_DA_LINHA = ['trocarPerfil', 'reenviarConvite', 'marcarDona', 'desmarcarDona', 'desativar', 'reativar']
+
+// Só `true` liga: resposta sem `acoes` (antiga ou incompleta) não oferece nada, e a API recusa o resto.
+export const acoesDoUsuario = (usuario) => Object.fromEntries(ACOES_DA_LINHA.map((acao) => [acao, usuario?.acoes?.[acao] === true]))
+export function controlesDaPessoa(usuario) {
+  const pode = acoesDoUsuario(usuario)
+  return CONTROLES_DA_LINHA.filter((controle) => pode[controle])
 }
 
+// "Dona" é a marca do vínculo, não um perfil; a sessão do suporte é a de nível SuperAdmin.
+export const ehDona = (usuario) => usuario?.dona === true
+export const ehSuporteDaSessao = (sessao) => sessao?.usuario?.nivel === 'SuperAdmin'
+const primeiroNome = (nome) => String(nome ?? '').trim().split(/\s+/)[0]
+
 // Os perfis da casa primeiro, na ordem em que a dona pensa neles; os demais (legado) depois, por nome.
-const ORDEM_DA_CASA = ['dona', 'atendimento', 'cozinha']
+const ORDEM_DA_CASA = ['administracao', 'gerencia', 'atendimento', 'cozinha']
 const chave = (nome) => String(nome ?? '').trim().toLocaleLowerCase('pt-BR')
+// O perfil escrito sem acento cai no mesmo lugar.
+const chaveDoPerfil = (nome) => chave(nome).normalize('NFD').replace(/\p{M}/gu, '')
 export function ordenarPerfis(perfis) {
-  const posicao = (p) => { const i = ORDEM_DA_CASA.indexOf(chave(p.nome)); return i === -1 ? ORDEM_DA_CASA.length : i }
+  const posicao = (p) => { const i = ORDEM_DA_CASA.indexOf(chaveDoPerfil(p.nome)); return i === -1 ? ORDEM_DA_CASA.length : i }
   return [...perfis].sort((a, b) => posicao(a) - posicao(b) || a.nome.localeCompare(b.nome, 'pt-BR'))
 }
 
 const RESUMO_DO_PERFIL = {
-  dona: 'Vê e altera tudo, inclusive usuários',
+  administracao: 'Vê e altera tudo, inclusive Configurações e a equipe',
+  gerencia: 'Toda a operação, com estoque e relatórios, menos Configurações',
   atendimento: 'Conversas, pedidos, cardápio, caixa e entregas',
   cozinha: 'Fila de preparo e produção',
 }
-export const resumoDoPerfil = (nome) => RESUMO_DO_PERFIL[chave(nome)] ?? null
+export const resumoDoPerfil = (nome) => RESUMO_DO_PERFIL[chaveDoPerfil(nome)] ?? null
+
+// A API diz quais perfis quem está na tela pode dar (Administração não dá perfil de nível Admin).
+export const perfisAtribuiveis = (perfis) => perfis.filter((p) => p.atribuivel === true)
+const opcaoDoPerfil = (p) => ({ valor: p.perfilId, rotulo: p.nome })
+// O perfil atual sempre aparece, mesmo que não esteja entre os que se pode dar.
+export function opcoesDoPerfilDaPessoa(usuario, perfis) {
+  const opcoes = perfisAtribuiveis(perfis).map(opcaoDoPerfil)
+  if (!usuario.perfilId) return [{ valor: '', rotulo: 'Sem perfil' }, ...opcoes]
+  return opcoes.some((o) => o.valor === usuario.perfilId) ? opcoes : [{ valor: usuario.perfilId, rotulo: usuario.perfil }, ...opcoes]
+}
+
+// A dona é convidada com perfil de nível Admin que quem convida pode dar; o resto a API confere (403 HIERARQUIA).
+export const podeConvidarComoDona = (perfil) => perfil?.atribuivel === true && perfil?.nivel === 'Admin'
+export const DICA_DO_EMAIL_DO_CONVITE = 'O convite chega neste e-mail. Pelo link, a pessoa entra com a conta Google deste e-mail ou cria uma senha.'
+export const CONVITE_VAZIO = { nome: '', email: '', emailDeNovo: '', perfilId: '', dona: false }
+
+// O que o formulário do convite mostra a partir do que está escrito. Trocar para perfil sem a opção tira a marca de dona.
+export function estadoDoConvite(campos, perfis) {
+  const atribuiveis = perfisAtribuiveis(perfis)
+  const perfil = atribuiveis.find((p) => p.perfilId === campos.perfilId) ?? null
+  const ofereceDona = podeConvidarComoDona(perfil)
+  const comoDona = ofereceDona && campos.dona === true
+  return {
+    opcoes: [{ valor: '', rotulo: 'Escolha o perfil' }, ...atribuiveis.map(opcaoDoPerfil)],
+    resumo: resumoDoPerfil(perfil?.nome),
+    ofereceDona,
+    comoDona,
+    pedeEmailDeNovo: comoDona,
+  }
+}
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-export function erroDoConvite({ nome, email, perfilId }) {
+const chaveDoEmail = (email) => String(email ?? '').trim().toLowerCase()
+// `dona` aqui já é a marca que vale (a de `estadoDoConvite`): só ela pede o e-mail duas vezes.
+export function erroDoConvite({ nome, email, perfilId, dona = false, emailDeNovo = '' }) {
   if (!nome.trim()) return 'Escreva o nome da pessoa.'
   if (!EMAIL.test(email.trim())) return 'Confira o e-mail: o convite vai para ele.'
   if (!perfilId) return 'Escolha o perfil.'
+  if (dona && !String(emailDeNovo ?? '').trim()) return 'Digite o e-mail mais uma vez para conferir.'
+  if (dona && chaveDoEmail(emailDeNovo) !== chaveDoEmail(email)) return 'Os dois e-mails não são iguais. Confira e digite o mesmo nas duas vezes.'
   return null
 }
 
+// Marcar e tirar a marca de dona pedem confirmação; o suporte explica o porquê (fica no histórico da API).
+export const MINIMO_DO_MOTIVO = 10
+export const erroDoMotivo = (motivo) => (String(motivo ?? '').trim().length >= MINIMO_DO_MOTIVO
+  ? null
+  : `Escreva o motivo com pelo menos ${MINIMO_DO_MOTIVO} caracteres. Ele fica no histórico.`)
+export function confirmacaoDaMarcaDeDona(acao, usuario, suporte) {
+  const nome = primeiroNome(usuario.nome)
+  if (acao === 'marcarDona') {
+    return {
+      texto: `Como dona, ${nome} pode tudo, inclusive marcar outras donas. Para trocar o perfil ou desativar uma dona, antes é preciso tirar a marca.`,
+      confirmar: `Marcar ${nome} como dona`,
+      pedeMotivo: suporte === true,
+    }
+  }
+  return {
+    texto: usuario.perfil ? `${nome} continua com o perfil ${usuario.perfil}, mas deixa de ser dona.` : `${nome} deixa de ser dona.`,
+    confirmar: `Tirar a marca de ${nome}`,
+    pedeMotivo: suporte === true,
+  }
+}
+
+// Recusas da política de hierarquia (#2070), na língua da casa. Código que a tela não conhece mostra a frase da API.
+export const MENSAGEM_DO_CODIGO = {
+  HIERARQUIA: 'O seu perfil não permite esta mudança. Peça à dona da casa.',
+  USUARIO_PROPRIO: 'Você não pode mudar o seu próprio acesso.',
+  DONA_PROTEGIDA: 'Ninguém da casa troca o perfil nem desativa uma dona. Antes é preciso tirar a marca de dona.',
+  DONA_EMAIL_EXISTENTE: 'Este e-mail já tem conta no sistema. Convide a dona com um e-mail que ainda não tenha conta.',
+  ULTIMA_DONA: 'A casa precisa de pelo menos uma dona. Marque outra pessoa como dona antes.',
+  DONA_NAO_ADMIN: 'Só quem tem o perfil Administração pode ser dona. Troque o perfil antes.',
+  DONA_CONTA_NAO_PROVADA: 'Esta pessoa ainda não confirmou a conta. Ela precisa aceitar o convite pelo e-mail ou entrar com a conta Google antes.',
+  DONA_SUPORTE: 'O acesso do suporte não pode ser marcado como dona.',
+}
+export const mensagemDaFalha = (falha) => MENSAGEM_DO_CODIGO[falha?.codigo] ?? falha?.message
+
 // O que a dona lê depois de cada ação. Quem nunca entrou não tem sessão para cair, então a frase não fala em entrar de novo.
 const FEITO = {
-  convite: (u) => `Convite enviado para ${u.email}. Chega em até um minuto.`,
+  convite: (u) => `${u.dona ? 'Convite de dona enviado' : 'Convite enviado'} para ${u.email}. Chega em até um minuto.`,
   reenviar: (u) => `Convite reenviado para ${u.email}. O link anterior deixou de valer.`,
   perfil: (u, perfil) => (u.ultimoAcessoEm
     ? `${u.nome} agora tem o perfil ${perfil}. A mudança vale na próxima vez que entrar.`
@@ -58,18 +135,23 @@ const FEITO = {
   reativar: (u) => (u.convite?.estado === 'pendente'
     ? `O acesso de ${u.nome} voltou. O convite antigo deixou de valer: use Reenviar convite.`
     : `${u.nome} pode entrar de novo.`),
+  marcarDona: (u) => `${u.nome} agora é dona.`,
+  desmarcarDona: (u) => `${u.nome} não é mais dona.`,
 }
 const FALHOU = {
+  convite: 'O convite não saiu',
   reenviar: 'O convite não foi reenviado',
   perfil: 'O perfil não mudou',
   desativar: 'O acesso continua ativo',
   reativar: 'O acesso continua desativado',
+  marcarDona: 'A marca de dona não foi posta',
+  desmarcarDona: 'A marca de dona continua',
 }
 export const fraseDeRetorno = (acao, usuario, perfil) => FEITO[acao](usuario, perfil)
 // 429 no reenvio é o limite por pessoa da API (ConvitesDeAcesso.EmissoesPorHora).
 export const fraseDeFalha = (acao, falha) => (acao === 'reenviar' && falha?.status === 429
   ? 'Limite de 3 envios por hora para a mesma pessoa. Tente de novo mais tarde.'
-  : `${FALHOU[acao]}: ${falha?.message}`)
+  : `${FALHOU[acao]}: ${mensagemDaFalha(falha)}`)
 
 // Filtro do histórico: duas pessoas com o mesmo nome se distinguem pelo e-mail.
 export function opcoesDePessoas(pessoas) {
@@ -117,6 +199,25 @@ export function tokenDoConvite(hash) {
   return token && token.trim() ? token.trim() : null
 }
 export const ehRotaDeConvite = (hash) => /^#\/convite(\?|$)/.test(hash ?? '')
+
+// #2070: o convite também se aceita entrando com a conta Google do e-mail convidado (a API só aceita com o
+// convite aberto). Mesmo formato do `google` da TelaLogin, mas nunca entra sozinho: o aparelho da casa pode ter
+// a conta Google de outra pessoa já escolhida. Entrou: `aoEntrar` conclui o convite.
+export function googleDoConvite(google, aoEntrar) {
+  if (!google) return null
+  return {
+    buscarClientId: google.buscarClientId,
+    opcoes: () => ({ auto_select: false, oferecer: false }),
+    entrar: async (idToken) => {
+      await google.entrar(idToken)
+      aoEntrar()
+    },
+  }
+}
+// 401 sem frase da API é a conta Google sem convite nem acesso; com frase (convite vencido), vale a da API.
+export const fraseDaFalhaDoGoogleNoConvite = (falha) => (falha?.status === 401 && falha?.codigo === 'HTTP_401'
+  ? 'Esta conta Google não tem convite. Use a conta Google do e-mail que recebeu o convite, ou crie uma senha.'
+  : falha?.message ?? 'Não deu para entrar com o Google. Tente de novo.')
 
 // Auditoria: a ação gravada pela API vira o que aconteceu, em palavras da casa.
 const ACOES = {
