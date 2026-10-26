@@ -127,6 +127,8 @@ desliga seus loggers porque a geração de token do WPPConnect inclui o segredo 
 
 - `GET/POST/DELETE /api/integracoes/whatsapp/wppconnect`: estado, iniciar e desvincular;
 - `POST /api/integracoes/whatsapp/wppconnect/reconectar`: fecha sem logout e reinicia;
+  durante a geração/leitura do QR, apenas atualiza o estado para não abandonar o navegador
+  ainda em inicialização;
 - `POST /api/webhooks/wppconnect?token=...`: callback autenticado do gateway. A sessão é
   conferida com a credencial cifrada antes de processar conteúdo.
 

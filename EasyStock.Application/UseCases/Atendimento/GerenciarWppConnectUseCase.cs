@@ -47,7 +47,14 @@ public sealed class GerenciarWppConnectUseCase(
     {
         await ConferirAsync(empresaId, ct);
         var sessao = await ObterCredencialAsync(empresaId, ct);
-        if (sessao is not null) await cliente.FecharAsync(sessao, sair: false, ct);
+        if (sessao is not null)
+        {
+            var estado = await cliente.ObterEstadoAsync(sessao, ct);
+            // Antes do login o WPPConnect ainda não expõe close() no cliente. Fechar nessa fase
+            // abandona um Chromium ativo e a próxima abertura falha com "browser already running".
+            if (estado.Estado is "QRCODE" or "INITIALIZING" or "PHONECODE") return estado;
+            await cliente.FecharAsync(sessao, sair: false, ct);
+        }
         return await ConectarAsync(empresaId, usuarioId, ct);
     }
 

@@ -65,6 +65,8 @@ public class GerenciarWppConnectUseCaseTests
     public async Task Reconectar_preserva_token_e_fecha_sem_logout()
     {
         var sessao = new CredencialWppConnect(CredencialWppConnect.NomeSessao(_empresa), "token-atual", DateTimeOffset.UtcNow);
+        _cliente.ObterEstadoAsync(sessao, Arg.Any<CancellationToken>())
+            .Returns(new EstadoWppConnect(true, true, true, "CONNECTED"));
         _credenciais.ObterAsync<CredencialWppConnect>(_empresa, CredencialWppConnect.ProviderKey,
             AmbienteIntegracao.Production, Arg.Any<CancellationToken>()).Returns(sessao);
         await UseCase.ReconectarAsync(_empresa, Guid.NewGuid());
@@ -75,6 +77,21 @@ public class GerenciarWppConnectUseCaseTests
         });
         await _cliente.DidNotReceiveWithAnyArgs().GerarTokenAsync(default!, default);
         await _credenciais.DidNotReceiveWithAnyArgs().DesativarAsync(default, default!, default);
+    }
+
+    [Theory]
+    [InlineData("QRCODE")]
+    [InlineData("INITIALIZING")]
+    public async Task Atualizar_qr_nao_abandona_browser_ainda_em_inicializacao(string estado)
+    {
+        var sessao = new CredencialWppConnect(CredencialWppConnect.NomeSessao(_empresa), "token-atual", DateTimeOffset.UtcNow);
+        _credenciais.ObterAsync<CredencialWppConnect>(_empresa, CredencialWppConnect.ProviderKey,
+            AmbienteIntegracao.Production, Arg.Any<CancellationToken>()).Returns(sessao);
+        _cliente.ObterEstadoAsync(sessao, Arg.Any<CancellationToken>())
+            .Returns(new EstadoWppConnect(true, true, false, estado));
+        (await UseCase.ReconectarAsync(_empresa, Guid.NewGuid())).Estado.Should().Be(estado);
+        await _cliente.DidNotReceiveWithAnyArgs().FecharAsync(default!, default, default);
+        await _cliente.DidNotReceiveWithAnyArgs().IniciarAsync(default!, default);
     }
 
     [Fact]
