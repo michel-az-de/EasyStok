@@ -52,3 +52,9 @@ export function useAvisosNoAparelho({ sessao }) {
   }, [contexto, identidade])
   return { ...situacao, ativar: () => operar(false), desligar: () => operar(true) }
 }
+
+// Para quem não recebe o `aparelho` do App (#2070): a sessão aberta quando a tela montou.
+export function useAvisosNoAparelhoDaSessao() {
+  const [sessao] = useState(lerSessao)
+  return useAvisosNoAparelho({ sessao })
+}

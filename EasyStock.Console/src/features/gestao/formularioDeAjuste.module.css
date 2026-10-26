@@ -1,0 +1,64 @@
+/* Formulários de ajuste (#2070): Dados da loja, Site e impressos, Alertas de estoque, Caderno do
+   agente e Avisos. Uma coluna no celular; do tablet para cima os campos curtos dividem a linha. */
+.aba { display: grid; gap: var(--e-5); min-width: 0; }
+
+.secao {
+  display: grid; gap: var(--e-3); min-width: 0;
+  border-top: var(--b-1) solid var(--linha);
+  padding: var(--e-4) 0; background: transparent;
+}
+.secao h3 { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
+
+.descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 72ch; }
+
+.campos { display: grid; gap: var(--e-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); min-width: 0; }
+.inteiro { grid-column: 1 / -1; }
+
+.cartao {
+  display: grid; gap: var(--e-3); min-width: 0; margin: 0;
+  padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+}
+.cartao h4 { margin: 0; font-size: var(--t-apoio); font-weight: 700; color: var(--tinta); }
+
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
+
+.acoes { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.toque { min-height: var(--toque); }
+
+.chave {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta);
+}
+.chave input { width: 20px; height: 20px; accent-color: var(--marca); }
+
+.pendencia {
+  margin: 0; padding: var(--e-2) var(--e-3); border-left: var(--b-3) solid var(--marca); border-radius: var(--r-1);
+  background: var(--marca-claro); color: var(--marca-forte); font-size: var(--t-apoio);
+}
+.aviso {
+  margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); max-width: 72ch;
+  background: var(--alerta-pastel); color: var(--tinta); font-size: var(--t-apoio);
+}
+.erros {
+  margin: 0; padding: var(--e-2) var(--e-3) var(--e-2) var(--e-5); border-radius: var(--r-1);
+  background: var(--erro-pastel); color: var(--tinta); font-size: var(--t-apoio);
+}
+.retorno { font-size: var(--t-apoio); color: var(--tinta-2); }
+.erro { margin: 0; color: var(--erro); font-size: var(--t-apoio); }
+
+/* Texto longo do caderno e endereço sem espaço não estouram a coluna de 360 px. */
+.texto { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tinta); font-size: var(--t-apoio); }
+
+.logo { display: flex; align-items: center; gap: var(--e-4); flex-wrap: wrap; }
+/* Fundo branco fixo: é o papel onde o logo vai sair, nos dois temas. */
+.previa {
+  width: 160px; height: 96px; object-fit: contain; padding: var(--e-2);
+  border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); background: var(--branco);
+}
+.semPrevia {
+  margin: 0; width: 160px; min-height: 96px; display: grid; place-items: center; text-align: center;
+  padding: var(--e-2); border: var(--b-1) dashed var(--linha-media); border-radius: var(--r-1);
+  font-size: var(--t-apoio); color: var(--tinta-2);
+}
+
+.canais { display: flex; flex-wrap: wrap; gap: var(--e-1); margin: 0; padding: 0; list-style: none; }
