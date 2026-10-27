@@ -84,7 +84,13 @@ public class PermissoesLegadasMigrationTests
         await using (var db = new EasyStockDbContext(options))
         {
             await db.GetService<IMigrator>().MigrateAsync("20261009170822_AddPerfilModuloInicial");
-            db.Empresas.AddRange(empresas);
+            // Empresa e vínculo entram por SQL com as colunas desta migração: o modelo atual tem colunas mais novas
+            // (#2070: configuração inicial em empresas, EhDona em usuarios_empresas) que o esquema antigo não tem.
+            foreach (var empresa in empresas)
+                await db.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO empresas ("Id", "Nome", "CriadoEm", "AlteradoEm", "FinanceiroHabilitado", "OnboardingCompleto")
+                    VALUES ({empresa.Id}, {empresa.Nome}, {empresa.CriadoEm}, {empresa.AlteradoEm}, false, false)
+                    """);
             db.Usuarios.AddRange(usuarios);
             await db.SaveChangesAsync();
             for (var i = 0; i < casos.Length; i++)

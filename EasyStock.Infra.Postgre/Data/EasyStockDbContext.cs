@@ -279,6 +279,9 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Operacao.ImpressaoPendente> ImpressoesPendentes { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Operacao.SequenciaDiariaPedido> SequenciasPedidoDia { get; set; } = null!; // S53
 
+        // #2070: marcas dos passos da configuração inicial da loja
+        public DbSet<PassoConfiguracaoInicial> ConfiguracaoInicialPassos { get; set; } = null!;
+
         // S27: ocorrência e reembolso
         public DbSet<EasyStock.Domain.Entities.Atendimento.Ocorrencia> Ocorrencias { get; set; } = null!;
         public DbSet<PaymentAttemptEvent> PaymentAttemptEvents { get; set; } = null!;

@@ -158,6 +158,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Operacao.IPedidoImpressoQueries, PedidoImpressoQueries>(); // S49: impresso do pedido
             services.AddScoped<IPrazoPreparoPedidoQueries, PrazoPreparoPedidoQueries>(); // S21: início previsto
             services.AddScoped<ISequenciaDiariaPedido, SequenciaDiariaPedidoRepository>(); // S53: número do dia
+            services.AddScoped<IConfiguracaoInicialRepository, ConfiguracaoInicialRepository>(); // #2070
+            services.AddScoped<IRetratoDaConfiguracaoInicialQuery, EasyStock.Infra.Postgre.Queries.RetratoDaConfiguracaoInicialQuery>(); // #2070
 
             services.AddScoped<IAdminTenantsQueries, AdminTenantsQueries>();
             services.AddScoped<ITenantFeatureFlagRepository, TenantFeatureFlagRepository>();
