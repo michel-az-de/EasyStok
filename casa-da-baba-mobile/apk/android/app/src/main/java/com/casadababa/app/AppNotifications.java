@@ -58,7 +58,7 @@ public final class AppNotifications {
         try {
             return NoticeManager.get(context).status().optBoolean("registered", false)
                 ? "Notificações permitidas. Consulte no sino o histórico e as confirmações deste aparelho."
-                : "Notificações permitidas. Abra o sino e toque em Atualizar avisos para concluir o registro.";
+                : "Notificações permitidas. Abra o sino e toque em Atualizar para registrar o aparelho.";
         } catch (Exception failure) { return "Notificações permitidas. Não foi possível ler o registro; confira o diagnóstico no sino."; }
     }
     public static void offerPermission(Activity activity, boolean explicit) {
@@ -75,7 +75,7 @@ public final class AppNotifications {
         // A decisão não interfere no banco, na produção nem no atualizador silencioso.
         prefs(activity).edit().putBoolean("explained", true).apply();
         new AlertDialog.Builder(activity).setTitle("Receber avisos da Casa da Baba?")
-            .setMessage("Ative para receber orientações e atualizações. Você também pode ativar depois pelo sino.")
+            .setMessage("Receba orientações e atualizações. Se escolher Depois, abra o sino de Avisos e toque em Ativar.")
             .setPositiveButton("Ativar", (d,w) -> {
                 if (NoticePolicy.shouldRequestPermission(Build.VERSION.SDK_INT,
                         Build.VERSION.SDK_INT < 33 || activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,

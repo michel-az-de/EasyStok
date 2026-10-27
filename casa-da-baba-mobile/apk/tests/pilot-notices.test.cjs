@@ -80,7 +80,7 @@ test('permissão negada tem ação clara e não é descrita como entrega pronta'
   const s = normal(); s.permission = 'denied'; s.registered = false;
   const { nodes, calls } = harness(s); await settle();
   assert.match(nodes.get('pilotNoticeHealthTitle').textContent, /Permita/);
-  assert.equal(nodes.get('pilotNoticePermission').textContent, 'Ativar avisos neste aparelho');
+  assert.equal(nodes.get('pilotNoticePermission').textContent, 'Ativar');
   await nodes.get('pilotNotices').click('permission'); assert.equal(calls.permission, 1);
   assert.equal(noticePresentation({ ...s, permission: 'blocked' }).tone, 'attention');
 });
@@ -109,7 +109,7 @@ test('histórico recuperado não vira prova de push e confirmações pendentes f
   assert.match(nodes.get('pilotNoticeDetailSource').textContent, /Recuperado pelo histórico/);
   assert.match(nodes.get('pilotNoticePush').textContent, /Ainda não confirmado/);
   assert.match(nodes.get('pilotNoticeReceipts').textContent, /2 confirmações aguardam envio/);
-  assert.match(nodes.get('pilotNoticeHealthBody').textContent, /ainda não confirma a entrega/);
+  assert.match(nodes.get('pilotNoticeHealthBody').textContent, /não confirma a entrega/);
 });
 
 test('falha de rede preserva histórico e permite nova tentativa sem alegar sucesso', async () => {
@@ -163,7 +163,7 @@ test('sino busca novos avisos online sem abrir registros e mantém cache offline
   const { nodes, calls, root } = harness(); await settle();
   await nodes.get('pilotNoticeBell').click(); await settle();
   assert.equal(calls.refresh, 1); assert.deepEqual(calls.open, []);
-  assert.equal(nodes.get('pilotNoticeRefresh').attributes['aria-label'], 'Atualizar avisos');
+  assert.equal(nodes.get('pilotNoticeRefresh').attributes['aria-label'], 'Atualizar');
   assert.equal(nodes.get('pilotNoticeRefresh').dataset.compact, 'true');
   await nodes.get('pilotNotices').click('close'); root.navigator.onLine = false;
   await nodes.get('pilotNoticeBell').click(); await settle();

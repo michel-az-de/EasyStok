@@ -68,12 +68,12 @@
 
   function noticePresentation(state, online = true) {
     if (!state?.supported) return { tone: 'neutral', title: state?.native ? 'Atualize o app para receber avisos' : 'Avisos no app Android', body: state?.native ? 'Esta instalação ainda não oferece a central de avisos. Use Atualizar APK na tela inicial.' : 'Esta é uma prévia no navegador. O recebimento e as confirmações funcionam no APK instalado.', action: '' };
-    if (state.permission === 'denied' || state.permission === 'blocked') return { tone: 'attention', title: 'Permita receber avisos', body: 'As notificações estão desativadas neste aparelho. Você ainda pode consultar o histórico aqui.', action: 'Ativar avisos neste aparelho' };
-    if (!online) return { tone: 'attention', title: 'Sem conexão agora', body: 'Os avisos salvos continuam disponíveis. As confirmações aguardam a volta da conexão.', action: 'Configurar notificações' };
-    if (state.checking) return { tone: 'neutral', title: 'Conferindo os avisos', body: 'Verificando o registro deste aparelho e as confirmações pendentes.', action: 'Configurar notificações' };
-    if (state.lastError) return { tone: 'attention', title: 'Não foi possível atualizar os avisos', body: 'O registro ou a atualização dos avisos não foi concluído. Toque em Atualizar avisos para tentar novamente.', action: 'Configurar notificações' };
-    if (!state.registered) return { tone: 'attention', title: 'Registro ainda não confirmado', body: 'A permissão está ativada. Toque em Atualizar avisos para registrar este aparelho com internet.', action: 'Configurar notificações' };
-    return { tone: 'ready', title: 'Aparelho registrado para avisos', body: 'A permissão está ativada. Isso ainda não confirma a entrega de uma nova notificação.', action: 'Configurar notificações' };
+    if (state.permission === 'denied' || state.permission === 'blocked') return { tone: 'attention', title: 'Permita receber avisos', body: 'Notificações desativadas. O histórico salvo continua disponível.', action: 'Ativar' };
+    if (!online) return { tone: 'attention', title: 'Sem conexão agora', body: 'Avisos salvos disponíveis. Os recibos aguardam conexão.', action: 'Configurar' };
+    if (state.checking) return { tone: 'neutral', title: 'Conferindo os avisos', body: 'Verificando o aparelho e os recibos pendentes.', action: 'Configurar' };
+    if (state.lastError) return { tone: 'attention', title: 'Não foi possível atualizar os avisos', body: 'Toque em Atualizar para tentar novamente.', action: 'Configurar' };
+    if (!state.registered) return { tone: 'attention', title: 'Registro ainda não confirmado', body: 'Permissão ativa. Atualize para registrar o aparelho.', action: 'Configurar' };
+    return { tone: 'ready', title: 'Aparelho registrado para avisos', body: 'O registro não confirma a entrega. Cada aviso precisa de recibo.', action: 'Configurar' };
   }
 
   // Subconjunto canônico do Console: MarcaIcone.jsx (Casa da Baba V4, grid32) e Icone.jsx (grid24).
@@ -419,7 +419,7 @@
     permission.textContent = presentation.action; permission.hidden = !noticeState.supported;
     const refresh = doc.getElementById('pilotNoticeRefresh');
     refresh.hidden = !noticeState.supported; refresh.disabled = noticeLoading || noticeState.checking === true;
-    const refreshLabel = noticeLoading || noticeState.checking ? 'Conferindo…' : 'Atualizar avisos';
+    const refreshLabel = noticeLoading || noticeState.checking ? 'Conferindo…' : 'Atualizar';
     refresh.innerHTML = pilotIcon('refresh-cw') + '<span>' + refreshLabel + '</span>';
     refresh.dataset.compact = String(contentFirst); refresh.setAttribute('aria-label', refreshLabel); refresh.setAttribute('title', refreshLabel);
     if (restorePermissionFocus || restoreRefreshFocus) (selectedNotice ? doc.getElementById('pilotNoticeDetailTitle') : !refresh.disabled && !refresh.hidden ? refresh : doc.getElementById('pilotNoticesTitle')).focus();
