@@ -380,7 +380,9 @@ await confere('Produção do dia: o filtro por categoria muda a grade; a linha d
   assert.equal(cartoesDaTela(t.renderizar()).length, 4)
   revisar(t)
   const item = () => itensDoLote(t.renderizar())[0]
-  assert.match(texto(doTipo(item(), 'summary')[0]), /Lasanha.*escolha a porção.*6 porções/)
+  // #2081 (A11): as porções saíram do resumo para o campo à vista ao lado do nome.
+  assert.match(texto(doTipo(item(), 'summary')[0]), /Lasanha.*escolha a porção/)
+  assert.equal(campos(item(), 'Porções')[0].props.value, '6')
   doTipo(item(), 'CampoSelecao').find((c) => c.props.rotulo === 'Porção').props.onChange(digitar('v-8'))
   assert.match(texto(doTipo(item(), 'summary')[0]), /Lasanha Família/)
   assert.doesNotMatch(texto(doTipo(item(), 'summary')[0]), /escolha a porção/)
@@ -563,7 +565,10 @@ await confere('Produção do dia: o lote mostra porções, validade e peso de ca
   tocar(t, 'Talharim 500 g')
   revisar(t)
   const item = itensDoLote(t.arvore)[0]
-  assert.match(texto(doTipo(item, 'summary')[0]), /Talharim 500 g.*2 porções.*validade 5 dias.*500 g cada/)
+  // #2081 (A11): as porções saíram do resumo para o campo à vista ao lado do nome.
+  assert.match(texto(doTipo(item, 'summary')[0]), /Talharim 500 g.*validade 5 dias.*500 g cada/)
+  assert.equal(campos(item, 'Porções')[0].props.value, '2')
+  assert.equal(doTipo(doTipo(item, 'details')[0], 'CampoTexto').some((c) => c.props.rotulo === 'Porções'), false, 'o campo de porções não fica escondido em Ajustar')
   assert.equal(campos(item, 'Porções')[0].props['aria-label'], 'Porções de Talharim 500 g')
   assert.equal(campos(item, 'Validade (dias)')[0].props['aria-label'], 'Validade em dias de Talharim 500 g')
   assert.ok(doTipo(t.arvore, 'Botao').some((b) => texto(b) === 'Conferir produção' && b.props.tipo !== 'submit'), 'a barra só abre a revisão')
