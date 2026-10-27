@@ -6,48 +6,31 @@
 // #2070: os botões de cada linha vêm das `acoes` que a API calcula pela política de hierarquia,
 // nunca de regra local; a linha da dona ganha o selo; o convite só oferece "como dona" com perfil
 // de nível Admin atribuível e pede o e-mail duas vezes; o suporte escreve o motivo ao mexer na marca.
-// A linha e o convite são montados de verdade (react-dom/server) para conferir que a tela segue as regras.
+// A aba é montada de verdade no react-dom (DOM mínimo de `tela-no-node.mjs`), com a API simulada no
+// envelope real: o que se confere é o que sai para a API depois de cada toque.
 //
 //   node ferramentas/prova-1753-usuarios.mjs
 
 import assert from 'node:assert/strict'
-import { registerHooks } from 'node:module'
-import { readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { transformWithOxc } from 'vite'
+import {
+  botoesDe, campoDe, clicar, comTela, digitar, documento, elementos, enviar, escolher, esperar, guardado, marcar, resposta,
+  temCampo, textoDe, caixaDe,
+} from './tela-no-node.mjs'
 
-// --- Montagem: o JSX passa pelo mesmo transformador do Vite; CSS de módulo vira o nome da classe.
-const raiz = fileURLToPath(new URL('../src', import.meta.url))
-const jsx = new Map(await Promise.all(readdirSync(raiz, { recursive: true }).filter((n) => n.endsWith('.jsx')).map(async (nome) => {
-  const arquivo = join(raiz, nome)
-  const codigo = readFileSync(arquivo, 'utf8').replaceAll('import.meta.env', '({ DEV: false })')
-  return [pathToFileURL(arquivo).href, (await transformWithOxc(codigo, arquivo, { jsx: { runtime: 'automatic' } })).code]
-})))
-registerHooks({
-  resolve(spec, contexto, proximo) {
-    if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
-      for (const ext of ['.js', '.jsx']) { try { return proximo(spec + ext, contexto) } catch { /* próximo formato */ } }
-    }
-    return proximo(spec, contexto)
-  },
-  load(url, contexto, proximo) {
-    if (jsx.has(url)) return { format: 'module', source: jsx.get(url), shortCircuit: true }
-    if (url.endsWith('.css')) return { format: 'module', source: 'export default new Proxy({}, { get: (_, p) => String(p) })', shortCircuit: true }
-    if (url.endsWith('/infra/fonteDados.js')) return { format: 'module', source: 'export const FONTE_API = true; export const API_BASE = ""', shortCircuit: true }
-    return proximo(url, contexto)
-  },
-})
-
-// Sessão de teste para a camada da API (a empresa sai dela) e um fetch que só anota.
-const guardado = new Map()
-const armazenamento = { getItem: (k) => (guardado.has(k) ? guardado.get(k) : null), setItem: (k, v) => guardado.set(k, String(v)), removeItem: (k) => guardado.delete(k) }
-globalThis.window = new EventTarget()
-globalThis.sessionStorage = armazenamento
-globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
-guardado.set('easystok.sessao', JSON.stringify({ token: 'jwt-de-teste', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa-1' }, usuario: { id: 'eu' } }))
-const chamadas = []
-globalThis.fetch = async (url, opcoes) => { chamadas.push({ url, ...opcoes }); return { ok: true, status: 204, text: async () => '' } }
+// --- A API simulada: anota cada chamada e responde no envelope da EasyStock.Api.
+const SESSAO = { token: 'jwt-de-teste', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa-1' }, usuario: { id: 'eu', nivel: 'Admin' } }
+const SUPORTE = { ...SESSAO, usuario: { id: 'suporte', nivel: 'SuperAdmin' } }
+guardado.set('easystok.sessao', JSON.stringify(SESSAO))
+const api = { usuarios: [], perfis: [], chamadas: [] }
+globalThis.fetch = async (url, opcoes = {}) => {
+  const metodo = opcoes.method ?? 'GET'
+  api.chamadas.push({ metodo, url, corpo: opcoes.body === undefined ? undefined : JSON.parse(opcoes.body) })
+  if (metodo === 'GET' && url.startsWith('/api/usuarios/perfis?')) return resposta(200, { data: api.perfis })
+  if (metodo === 'GET' && url.startsWith('/api/usuarios?')) return resposta(200, { data: api.usuarios })
+  if (metodo === 'POST' && url === '/api/usuarios') return resposta(201, { data: { id: 'nova' } })
+  return resposta(204)
+}
+const escritas = () => api.chamadas.filter((c) => c.metodo !== 'GET').map(({ metodo, url, corpo }) => ({ metodo, url, corpo }))
 
 const {
   ACOES_DA_LINHA, CONTROLES_DA_LINHA, acoesDoUsuario, agruparPorDia, condensarAuditoria, confirmacaoDaMarcaDeDona, controlesDaPessoa,
@@ -116,8 +99,9 @@ conferir('os perfis da casa vêm antes do legado, na ordem Administração, Ger�
   assert.deepEqual(ordenarPerfis([{ nome: 'Cozinha' }, { nome: 'Gerencia' }, { nome: 'ADMINISTRACAO' }]).map((p) => p.nome), ['ADMINISTRACAO', 'Gerencia', 'Cozinha'])
 })
 
-conferir('cada perfil da casa tem um resumo curto; "Dona" não é perfil e não tem resumo', () => {
-  assert.equal(resumoDoPerfil('Administração'), 'Vê e altera tudo, inclusive Configurações e a equipe')
+conferir('cada perfil da casa tem um resumo curto e fiel à hierarquia; "Dona" não é perfil e não tem resumo', () => {
+  // Administração não mexe na dona nem em outra Administração: o resumo não promete "a equipe" inteira.
+  assert.equal(resumoDoPerfil('Administração'), 'Tudo, até Configurações; na equipe, cuida de Gerência para baixo')
   assert.equal(resumoDoPerfil('Gerência'), 'Toda a operação, com estoque e relatórios, menos Configurações')
   assert.equal(resumoDoPerfil('Atendimento'), 'Conversas, pedidos, cardápio, caixa e entregas')
   assert.equal(resumoDoPerfil('Cozinha'), 'Fila de preparo e produção')
@@ -192,12 +176,12 @@ conferir('só a sessão de nível SuperAdmin é o suporte', () => {
 
 conferir('marcar e tirar a marca de dona confirmam antes, e o suporte escreve o motivo', () => {
   const ana = pessoa({ nome: 'Ana Souza', perfil: 'Administração' })
-  const marcar = confirmacaoDaMarcaDeDona('marcarDona', ana, false)
-  assert.equal(marcar.confirmar, 'Marcar Ana como dona')
-  assert.equal(marcar.pedeMotivo, false)
-  assert.match(marcar.texto, /^Como dona, Ana pode tudo/)
+  const marcarAna = confirmacaoDaMarcaDeDona('marcarDona', ana, false)
+  assert.equal(marcarAna.confirmar, 'Marcar Ana como dona')
+  assert.equal(marcarAna.pedeMotivo, false)
+  assert.match(marcarAna.texto, /^Como dona, Ana pode tudo/)
   const tirar = confirmacaoDaMarcaDeDona('desmarcarDona', ana, false)
-  assert.equal(tirar.confirmar, 'Tirar a marca de Ana')
+  assert.equal(tirar.confirmar, 'Tirar a marca de dona de Ana')
   assert.equal(tirar.texto, 'Ana continua com o perfil Administração, mas deixa de ser dona.')
   assert.equal(confirmacaoDaMarcaDeDona('marcarDona', ana, true).pedeMotivo, true)
   assert.equal(confirmacaoDaMarcaDeDona('desmarcarDona', ana, true).pedeMotivo, true)
@@ -217,7 +201,8 @@ conferir('cada código de recusa da hierarquia vira uma frase em português', ()
   assert.deepEqual(Object.keys(MENSAGEM_DO_CODIGO).sort(), [
     'DONA_CONTA_NAO_PROVADA', 'DONA_EMAIL_EXISTENTE', 'DONA_NAO_ADMIN', 'DONA_PROTEGIDA', 'DONA_SUPORTE', 'HIERARQUIA', 'ULTIMA_DONA', 'USUARIO_PROPRIO',
   ])
-  assert.equal(mensagemDaFalha({ status: 403, codigo: 'HIERARQUIA', message: 'Forbidden' }), 'O seu perfil não permite esta mudança. Peça à dona da casa.')
+  // Quem recebe HIERARQUIA pode ser a Administração mexendo na dona ou em outra Administração: a frase não manda pedir à dona.
+  assert.equal(mensagemDaFalha({ status: 403, codigo: 'HIERARQUIA', message: 'Forbidden' }), 'Esta mudança não cabe ao seu perfil.')
   assert.equal(mensagemDaFalha({ status: 409, codigo: 'DONA_EMAIL_EXISTENTE', message: 'x' }),
     'Este e-mail já tem conta no sistema. Convide a dona com um e-mail que ainda não tenha conta.')
   assert.equal(mensagemDaFalha({ status: 409, codigo: 'ULTIMA_DONA', message: 'x' }), 'A casa precisa de pelo menos uma dona. Marque outra pessoa como dona antes.')
@@ -236,14 +221,14 @@ conferir('cada código de recusa da hierarquia vira uma frase em português', ()
 
 conferir('a falha de cada ação diz o que não mudou e por quê, com a frase do código', () => {
   const hierarquia = { status: 403, codigo: 'HIERARQUIA', message: 'Forbidden' }
-  assert.equal(fraseDeFalha('perfil', hierarquia), 'O perfil não mudou: O seu perfil não permite esta mudança. Peça à dona da casa.')
+  assert.equal(fraseDeFalha('perfil', hierarquia), 'O perfil não mudou: Esta mudança não cabe ao seu perfil.')
   assert.equal(fraseDeFalha('convite', { status: 409, codigo: 'DONA_EMAIL_EXISTENTE' }),
     'O convite não saiu: Este e-mail já tem conta no sistema. Convide a dona com um e-mail que ainda não tenha conta.')
   assert.equal(fraseDeFalha('marcarDona', { status: 409, codigo: 'DONA_NAO_ADMIN' }),
-    'A marca de dona não foi posta: Só quem tem o perfil Administração pode ser dona. Troque o perfil antes.')
+    'Não deu para marcar como dona: Só quem tem o perfil Administração pode ser dona. Troque o perfil antes.')
   assert.equal(fraseDeFalha('desmarcarDona', { status: 409, codigo: 'ULTIMA_DONA' }),
     'A marca de dona continua: A casa precisa de pelo menos uma dona. Marque outra pessoa como dona antes.')
-  assert.equal(fraseDeFalha('desativar', hierarquia), 'O acesso continua ativo: O seu perfil não permite esta mudança. Peça à dona da casa.')
+  assert.equal(fraseDeFalha('desativar', hierarquia), 'O acesso continua ativo: Esta mudança não cabe ao seu perfil.')
 })
 
 conferir('a frase de retorno diz o que mudou, e só fala em entrar de novo para quem já entrou', () => {
@@ -270,15 +255,27 @@ conferir('reenvio no limite da hora explica o limite; as outras falhas dizem o q
 
 const { createElement: h } = await import('react')
 const { renderToStaticMarkup } = await import('react-dom/server')
-const { Pessoa, Convite } = await import('../src/features/gestao/usuarios/AbaUsuarios.jsx')
-const textoDe = (html) => html.replace(/<[^>]+>/g, '').trim()
-const botoesDe = (html) => [...html.matchAll(/<button\b[^>]*>(.*?)<\/button>/g)].map((m) => textoDe(m[1]))
+const { AbaUsuarios, Pessoa, Convite } = await import('../src/features/gestao/usuarios/AbaUsuarios.jsx')
+const { ContextoEstado } = await import('../src/aplicacao/contextos.js')
+const AGORA = Date.parse('2026-10-26T12:00:00Z')
+const textoDoHtml = (html) => html.replace(/<[^>]+>/g, '').trim()
+const botoesDoHtml = (html) => [...html.matchAll(/<button\b[^>]*>(.*?)<\/button>/g)].map((m) => textoDoHtml(m[1]))
 const linha = (usuario) => renderToStaticMarkup(h(Pessoa, {
-  usuario, perfis: PERFIS, meuId: 'eu', agora: Date.parse('2026-10-26T12:00:00Z'), ocupado: false, suporte: false, aoAgir() {}, aoAbrirConfirmacao() {},
+  usuario, perfis: PERFIS, meuId: 'eu', agora: AGORA, ocupado: false, suporte: false, aoAgir() {}, aoAbrirConfirmacao() {},
 }))
+// Oráculo próprio da prova: os rótulos que a dona lê em cada controle.
 const ROTULO = {
   reenviarConvite: 'Reenviar convite', marcarDona: 'Marcar como dona', desmarcarDona: 'Tirar a marca de dona', desativar: 'Desativar', reativar: 'Reativar',
 }
+// A aba inteira, com a sessão de quem está na tela e a lista que a API devolve.
+const aba = (sessao) => h(ContextoEstado.Provider, { value: { sessao, agora: AGORA } }, h(AbaUsuarios))
+const naAba = async (sessao, { usuarios, perfis = PERFIS }, fn) => {
+  api.usuarios = usuarios
+  api.perfis = perfis
+  api.chamadas.length = 0
+  await comTela(aba(sessao), async (tela) => { await esperar(); await fn(tela) })
+}
+const alertasDe = (tela) => elementos(tela, (no) => no.getAttribute('role') === 'alert').map((no) => no.textContent)
 
 conferir('linha montada: em cada combinação de `acoes`, os botões e o seletor de perfil batem com a API', () => {
   for (let i = 0; i < 2 ** ACOES_DA_LINHA.length; i += 1) {
@@ -286,7 +283,7 @@ conferir('linha montada: em cada combinação de `acoes`, os botões e o seletor
     // Estado local variado de propósito: ele não pode ligar nem desligar botão nenhum.
     const html = linha(pessoa({ acoes, usuarioId: i % 2 ? 'eu' : 'ana', ativo: i % 3 !== 0, convite: { estado: i % 5 ? 'aceito' : 'pendente' } }))
     const esperados = CONTROLES_DA_LINHA.filter((c) => acoes[c] && c !== 'trocarPerfil').map((c) => ROTULO[c])
-    assert.deepEqual(botoesDe(html), esperados, `combinação ${i}`)
+    assert.deepEqual(botoesDoHtml(html), esperados, `combinação ${i}`)
     assert.equal(html.includes('<select'), acoes.trocarPerfil, `combinação ${i}: seletor de perfil`)
   }
 })
@@ -305,30 +302,140 @@ conferir('convite montado: só perfis atribuíveis, sem "como dona" antes de esc
   assert.ok(html.includes(DICA_DO_EMAIL_DO_CONVITE), 'a dica do e-mail fala da conta Google')
 })
 
+await conferirAssincrono('convite de dona na aba: a caixa só com Administração, o e-mail conferido duas vezes e `dona: true` no POST', async () => {
+  await naAba(SESSAO, { usuarios: [] }, async (tela) => {
+    clicar(tela, 'Convidar pessoa')
+    digitar(tela, 'Nome', 'Bia Lima')
+    digitar(tela, 'E-mail', 'bia@exemplo.test')
+    escolher(tela, 'Perfil', 'p-ger')
+    assert.equal(caixaDe(tela, 'Convidar como dona'), null, 'Gerência não oferece a marca')
+    escolher(tela, 'Perfil', 'p-adm')
+    assert.equal(temCampo(tela, 'Confirme o e-mail'), false, 'sem a marca, o e-mail não é pedido de novo')
+    marcar(tela, 'Convidar como dona')
+    assert.equal(temCampo(tela, 'Confirme o e-mail'), true)
+
+    digitar(tela, 'Confirme o e-mail', 'bia@exemplo.tst')
+    enviar(tela)
+    await esperar()
+    assert.deepEqual(alertasDe(tela), ['Os dois e-mails não são iguais. Confira e digite o mesmo nas duas vezes.'])
+    assert.deepEqual(escritas(), [], 'e-mail diferente não sai para a API')
+
+    digitar(tela, 'Confirme o e-mail', ' BIA@exemplo.test ')
+    enviar(tela)
+    await esperar()
+    assert.deepEqual(escritas(), [{
+      metodo: 'POST', url: '/api/usuarios',
+      corpo: { empresaId: 'empresa-1', nome: 'Bia Lima', email: 'bia@exemplo.test', senha: null, perfilId: 'p-adm', lojaId: null, dona: true },
+    }])
+    assert.match(textoDe(tela), /Convite de dona enviado para bia@exemplo\.test\. Chega em até um minuto\./)
+  })
+})
+
+await conferirAssincrono('convite na aba: marcou "como dona" e trocou para Gerência, a caixa some e o POST vai com `dona: false`', async () => {
+  await naAba(SESSAO, { usuarios: [] }, async (tela) => {
+    clicar(tela, 'Convidar pessoa')
+    digitar(tela, 'Nome', 'Caio Reis')
+    digitar(tela, 'E-mail', 'caio@exemplo.test')
+    escolher(tela, 'Perfil', 'p-adm')
+    marcar(tela, 'Convidar como dona')
+    escolher(tela, 'Perfil', 'p-ger')
+    assert.equal(caixaDe(tela, 'Convidar como dona'), null)
+    assert.equal(temCampo(tela, 'Confirme o e-mail'), false)
+    enviar(tela)
+    await esperar()
+    assert.deepEqual(escritas().map((e) => [e.metodo, e.url, e.corpo.perfilId, e.corpo.dona]), [['POST', '/api/usuarios', 'p-ger', false]])
+  })
+})
+
+await conferirAssincrono('suporte marca a dona: o motivo é pedido, o erro fica ligado ao campo e o PUT leva o motivo', async () => {
+  const ana = pessoa({ perfil: 'Administração', perfilId: 'p-adm', acoes: { ...nenhuma, marcarDona: true } })
+  await naAba(SUPORTE, { usuarios: [ana] }, async (tela) => {
+    clicar(tela, 'Marcar como dona')
+    await esperar()
+    const motivo = campoDe(tela, 'Motivo do suporte')
+    assert.equal(documento.activeElement, motivo, 'o foco vai para o motivo')
+
+    clicar(tela, 'Marcar Ana como dona')
+    await esperar()
+    const [erro] = elementos(tela, (no) => no.getAttribute('role') === 'alert')
+    assert.equal(erro?.textContent, 'Escreva o motivo com pelo menos 10 caracteres. Ele fica no histórico.')
+    assert.equal(motivo.getAttribute('aria-invalid'), 'true', 'o campo diz que está errado')
+    assert.ok(erro.getAttribute('id'), 'o erro tem id')
+    assert.ok((motivo.getAttribute('aria-describedby') ?? '').split(' ').includes(erro.getAttribute('id')), 'o campo aponta para o erro')
+    assert.deepEqual(escritas(), [], 'sem motivo não sai nada')
+
+    digitar(tela, 'Motivo do suporte', '  pedido da dona por telefone  ')
+    assert.equal(campoDe(tela, 'Motivo do suporte').getAttribute('aria-invalid'), null, 'escrever tira o erro')
+    clicar(tela, 'Marcar Ana como dona')
+    await esperar()
+    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona?empresaId=empresa-1', corpo: { dona: true, motivo: 'pedido da dona por telefone' } }])
+    assert.match(textoDe(tela), /Ana Souza agora é dona\./)
+  })
+})
+
+await conferirAssincrono('a dona tira a marca de outra: confirmação em grupo rotulado, foco em Cancelar, PUT com `dona: false` e sem motivo', async () => {
+  const ana = pessoa({ perfil: 'Administração', perfilId: 'p-adm', dona: true, acoes: { ...nenhuma, desmarcarDona: true } })
+  await naAba(SESSAO, { usuarios: [ana] }, async (tela) => {
+    assert.deepEqual(botoesDe(tela).filter((b) => b !== 'Convidar pessoa'), ['Tirar a marca de dona'])
+    clicar(tela, 'Tirar a marca de dona')
+    await esperar()
+    assert.equal(temCampo(tela, 'Motivo do suporte'), false, 'fora do suporte não há motivo')
+    const [grupo] = elementos(tela, (no) => no.localName === 'fieldset')
+    assert.ok(grupo, 'a confirmação é um grupo (fieldset)')
+    const legendas = elementos(tela, (no) => no.localName === 'legend' && grupo.contains(no)).map((no) => no.textContent)
+    assert.deepEqual(legendas, ['Tirar a marca de dona de Ana'], 'o nome do grupo é o que se confirma')
+    const [descricao] = elementos(tela, (no) => no.getAttribute('id') === grupo.getAttribute('aria-describedby'))
+    assert.equal(descricao?.textContent, 'Ana continua com o perfil Administração, mas deixa de ser dona.', 'e a descrição é o efeito')
+    assert.equal(documento.activeElement?.textContent, 'Cancelar')
+    assert.ok(grupo.contains(documento.activeElement), 'o foco está dentro do grupo: o leitor anuncia nome e descrição')
+
+    clicar(tela, 'Tirar a marca de dona de Ana')
+    await esperar()
+    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona?empresaId=empresa-1', corpo: { dona: false } }])
+    assert.match(textoDe(tela), /Ana Souza não é mais dona\./)
+  })
+})
+
+await conferirAssincrono('recusa da API na marca: a frase do código aparece e nada fica marcado', async () => {
+  const ana = pessoa({ perfil: 'Atendimento', acoes: { ...nenhuma, marcarDona: true } })
+  const original = globalThis.fetch
+  globalThis.fetch = async (url, opcoes = {}) => (opcoes.method === 'PUT'
+    ? resposta(409, { error: { code: 'DONA_NAO_ADMIN', message: 'Alvo sem nível Admin.' } })
+    : original(url, opcoes))
+  try {
+    await naAba(SESSAO, { usuarios: [ana] }, async (tela) => {
+      clicar(tela, 'Marcar como dona')
+      clicar(tela, 'Marcar Ana como dona')
+      await esperar()
+      assert.deepEqual(alertasDe(tela), ['Não deu para marcar como dona: Só quem tem o perfil Administração pode ser dona. Troque o perfil antes.'])
+    })
+  } finally { globalThis.fetch = original }
+})
+
 // ---------------------------------------------------------------- o que vai para a API
 
 const { convidarUsuario, marcarDona } = await import('../src/infra/api/usuariosApi.js')
 
 await conferirAssincrono('convite leva `dona` só quando é de dona; o resto do corpo não muda', async () => {
-  chamadas.length = 0
+  api.chamadas.length = 0
   await convidarUsuario({ nome: ' Bia ', email: ' bia@exemplo.test ', perfilId: 'p-adm', dona: true })
   await convidarUsuario({ nome: 'Caio', email: 'caio@exemplo.test', perfilId: 'p-coz' })
-  assert.deepEqual(chamadas.map((c) => [c.method, c.url]), [['POST', '/api/usuarios'], ['POST', '/api/usuarios']])
-  assert.deepEqual(JSON.parse(chamadas[0].body),
-    { empresaId: 'empresa-1', nome: 'Bia', email: 'bia@exemplo.test', senha: null, perfilId: 'p-adm', lojaId: null, dona: true })
-  assert.deepEqual(JSON.parse(chamadas[1].body),
-    { empresaId: 'empresa-1', nome: 'Caio', email: 'caio@exemplo.test', senha: null, perfilId: 'p-coz', lojaId: null, dona: false })
+  assert.deepEqual(escritas(), [
+    { metodo: 'POST', url: '/api/usuarios', corpo: { empresaId: 'empresa-1', nome: 'Bia', email: 'bia@exemplo.test', senha: null, perfilId: 'p-adm', lojaId: null, dona: true } },
+    { metodo: 'POST', url: '/api/usuarios', corpo: { empresaId: 'empresa-1', nome: 'Caio', email: 'caio@exemplo.test', senha: null, perfilId: 'p-coz', lojaId: null, dona: false } },
+  ])
 })
 
 await conferirAssincrono('marcar e tirar a marca de dona: PUT na rota da dona, com o motivo só quando há', async () => {
-  chamadas.length = 0
+  api.chamadas.length = 0
   await marcarDona('u-1', { dona: true, motivo: '  pedido da dona por telefone  ' })
   await marcarDona('u-2', { dona: false })
   await marcarDona('u-3', { dona: false, motivo: '   ' })
-  assert.deepEqual(chamadas.map((c) => [c.method, c.url]), [
-    ['PUT', '/api/usuarios/u-1/dona?empresaId=empresa-1'], ['PUT', '/api/usuarios/u-2/dona?empresaId=empresa-1'], ['PUT', '/api/usuarios/u-3/dona?empresaId=empresa-1'],
+  assert.deepEqual(escritas(), [
+    { metodo: 'PUT', url: '/api/usuarios/u-1/dona?empresaId=empresa-1', corpo: { dona: true, motivo: 'pedido da dona por telefone' } },
+    { metodo: 'PUT', url: '/api/usuarios/u-2/dona?empresaId=empresa-1', corpo: { dona: false } },
+    { metodo: 'PUT', url: '/api/usuarios/u-3/dona?empresaId=empresa-1', corpo: { dona: false } },
   ])
-  assert.deepEqual(chamadas.map((c) => JSON.parse(c.body)), [{ dona: true, motivo: 'pedido da dona por telefone' }, { dona: false }, { dona: false }])
 })
 
 // ---------------------------------------------------------------- o que já valia (#1753)
@@ -442,4 +549,4 @@ conferir('toda saída do convite tem título e o que fazer, e a página sem link
 })
 
 console.log(`\n${passaram} verificações passaram${falharam.length ? `, ${falharam.length} falharam` : ''}.`)
-if (falharam.length) process.exit(1)
+process.exit(falharam.length ? 1 : 0)

@@ -39,8 +39,9 @@ export function ordenarPerfis(perfis) {
   return [...perfis].sort((a, b) => posicao(a) - posicao(b) || a.nome.localeCompare(b.nome, 'pt-BR'))
 }
 
+// Administração não mexe na dona nem em outra Administração (HIERARQUIA): o resumo não promete a equipe inteira.
 const RESUMO_DO_PERFIL = {
-  administracao: 'Vê e altera tudo, inclusive Configurações e a equipe',
+  administracao: 'Tudo, até Configurações; na equipe, cuida de Gerência para baixo',
   gerencia: 'Toda a operação, com estoque e relatórios, menos Configurações',
   atendimento: 'Conversas, pedidos, cardápio, caixa e entregas',
   cozinha: 'Fila de preparo e produção',
@@ -105,14 +106,15 @@ export function confirmacaoDaMarcaDeDona(acao, usuario, suporte) {
   }
   return {
     texto: usuario.perfil ? `${nome} continua com o perfil ${usuario.perfil}, mas deixa de ser dona.` : `${nome} deixa de ser dona.`,
-    confirmar: `Tirar a marca de ${nome}`,
+    confirmar: `Tirar a marca de dona de ${nome}`,
     pedeMotivo: suporte === true,
   }
 }
 
 // Recusas da política de hierarquia (#2070), na língua da casa. Código que a tela não conhece mostra a frase da API.
 export const MENSAGEM_DO_CODIGO = {
-  HIERARQUIA: 'O seu perfil não permite esta mudança. Peça à dona da casa.',
+  // Quem recebe é a Administração mexendo na dona ou em outra Administração; a frase não manda pedir a ninguém.
+  HIERARQUIA: 'Esta mudança não cabe ao seu perfil.',
   USUARIO_PROPRIO: 'Você não pode mudar o seu próprio acesso.',
   DONA_PROTEGIDA: 'Ninguém da casa troca o perfil nem desativa uma dona. Antes é preciso tirar a marca de dona.',
   DONA_EMAIL_EXISTENTE: 'Este e-mail já tem conta no sistema. Convide a dona com um e-mail que ainda não tenha conta.',
@@ -144,7 +146,7 @@ const FALHOU = {
   perfil: 'O perfil não mudou',
   desativar: 'O acesso continua ativo',
   reativar: 'O acesso continua desativado',
-  marcarDona: 'A marca de dona não foi posta',
+  marcarDona: 'Não deu para marcar como dona',
   desmarcarDona: 'A marca de dona continua',
 }
 export const fraseDeRetorno = (acao, usuario, perfil) => FEITO[acao](usuario, perfil)
@@ -214,9 +216,12 @@ export function googleDoConvite(google, aoEntrar) {
     },
   }
 }
-// 401 sem frase da API é a conta Google sem convite nem acesso; com frase (convite vencido), vale a da API.
-export const fraseDaFalhaDoGoogleNoConvite = (falha) => (falha?.status === 401 && falha?.codigo === 'HTTP_401'
-  ? 'Esta conta Google não tem convite. Use a conta Google do e-mail que recebeu o convite, ou crie uma senha.'
+// A API recusa o Google sempre com 401 `INVALID_CREDENTIALS` e a frase do caso (sem acesso, convite vencido,
+// conta não confirmada). No convite a causa mais comum é a conta errada: a frase da API ganha o que conferir.
+const CONFIRA_A_CONTA = 'Confira se escolheu a conta Google do e-mail que recebeu o convite.'
+const comPonto = (frase) => (/[.!?]$/.test(frase) ? frase : `${frase}.`)
+export const fraseDaFalhaDoGoogleNoConvite = (falha) => (falha?.codigo === 'INVALID_CREDENTIALS'
+  ? `${comPonto(falha.message)} ${CONFIRA_A_CONTA}`
   : falha?.message ?? 'Não deu para entrar com o Google. Tente de novo.')
 
 // Auditoria: a ação gravada pela API vira o que aconteceu, em palavras da casa.

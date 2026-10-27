@@ -2,7 +2,7 @@
 // e o que se faz com isso: convidar, trocar o perfil, desativar, reativar e (#2070) marcar a dona.
 // Convite é por link no e-mail: ninguém define a senha de ninguém (DM7-3).
 // #2070: os botões de cada linha são as `acoes` que a API calcula pela hierarquia; a tela não decide.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useAtendimento } from '../../../aplicacao/contextos'
 import {
   convidarUsuario, desativarUsuario, listarPerfis, listarUsuarios, marcarDona, reativarUsuario, reenviarConvite, trocarPerfil,
@@ -13,7 +13,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { haQuantoTempo } from '../../../dominio/formato'
 import {
-  CONVITE_VAZIO, DICA_DO_EMAIL_DO_CONVITE, MINIMO_DO_MOTIVO, SITUACAO, acoesDoUsuario, confirmacaoDaMarcaDeDona, ehDona,
+  CONVITE_VAZIO, DICA_DO_EMAIL_DO_CONVITE, MINIMO_DO_MOTIVO, SITUACAO, confirmacaoDaMarcaDeDona, controlesDaPessoa, ehDona,
   ehSuporteDaSessao, erroDoConvite, erroDoMotivo, estadoDoConvite, fraseDeFalha, fraseDeRetorno, instanteDaApi,
   opcoesDoPerfilDaPessoa, ordenarPerfis, situacaoDoUsuario,
 } from '../../../dominio/usuarios'
@@ -25,6 +25,10 @@ const ultimoAcesso = (ms, agora) => {
   return tempo === 'agora' ? 'Entrou agora há pouco' : `Último acesso há ${tempo}`
 }
 const primeiroControle = (elemento) => elemento?.querySelector('select:not(:disabled), button:not(:disabled)')
+// O que a dona lê em cada controle da linha; trocar o perfil é o seletor, não um botão.
+const ROTULO_DO_CONTROLE = {
+  reenviarConvite: 'Reenviar convite', marcarDona: 'Marcar como dona', desmarcarDona: 'Tirar a marca de dona', desativar: 'Desativar', reativar: 'Reativar',
+}
 
 export function Convite({ perfis, aoConvidar, aoCancelar }) {
   const formulario = useRef(null)
@@ -92,13 +96,14 @@ export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir
   const painel = useRef(null)
   const cancelar = useRef(null)
   const jaAbriu = useRef(false)
+  const id = useId()
   const [confirmando, setConfirmando] = useState(false)
   // Escolher no select não troca nada: seta do teclado num select fechado já mudava o perfil e derrubava a sessão da pessoa.
   const [perfilEscolhido, setPerfilEscolhido] = useState(null)
   // Marcar ou tirar a marca de dona: a confirmação ocupa a linha inteira, com o motivo quando é o suporte.
   const [marca, setMarca] = useState(null)
   const situacao = situacaoDoUsuario(usuario)
-  const pode = acoesDoUsuario(usuario)
+  const controles = controlesDaPessoa(usuario)
   const eu = usuario.usuarioId === meuId
   const ultimo = instanteDaApi(usuario.ultimoAcessoEm)
   const aberta = confirmando || perfilEscolhido !== null || marca !== null
@@ -138,6 +143,14 @@ export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir
     aoAgir(acao, usuario, confirmacao.pedeMotivo ? motivo : null)
   }
 
+  const tocar = {
+    reenviarConvite: () => aoAgir('reenviar', usuario),
+    marcarDona: () => abrirMarca('marcarDona'),
+    desmarcarDona: () => abrirMarca('desmarcarDona'),
+    desativar: () => { setConfirmando(true); aoAbrirConfirmacao() },
+    reativar: () => aoAgir('reativar', usuario),
+  }
+
   return (
     <li ref={linha} className={css.pessoa} data-usuario={usuario.usuarioId} data-desativado={!usuario.ativo || undefined}>
       <div className={css.quem}>
@@ -148,7 +161,7 @@ export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir
         <span className={css.email} title={usuario.email}>{usuario.email}</span>
       </div>
       <div className={css.perfil}>
-        {pode.trocarPerfil ? (
+        {controles.includes('trocarPerfil') ? (
           <CampoSelecao
             rotulo={`Perfil de ${usuario.nome}`} rotuloOculto className={css.seletor}
             opcoes={opcoesDoPerfilDaPessoa(usuario, perfis)}
@@ -162,18 +175,9 @@ export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir
         <span className={css.acesso}>{ultimoAcesso(ultimo, agora)}</span>
       </div>
       <div className={css.acoes}>
-        {pode.reenviarConvite && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('reenviar', usuario)}>Reenviar convite</Botao>
-        )}
-        {pode.marcarDona && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => abrirMarca('marcarDona')}>Marcar como dona</Botao>
-        )}
-        {pode.desmarcarDona && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => abrirMarca('desmarcarDona')}>Tirar a marca de dona</Botao>
-        )}
-        {pode.desativar && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => { setConfirmando(true); aoAbrirConfirmacao() }}>Desativar</Botao>
-        )}
+        {!aberta && controles.filter((controle) => controle !== 'trocarPerfil').map((controle) => (
+          <Botao key={controle} variante="texto" disabled={ocupado} onClick={tocar[controle]}>{ROTULO_DO_CONTROLE[controle]}</Botao>
+        ))}
         {confirmando && (
           <>
             <Botao variante="perigo" disabled={ocupado} onClick={() => { setConfirmando(false); aoAgir('desativar', usuario) }}>
@@ -190,24 +194,26 @@ export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir
             <Botao ref={cancelar} variante="texto" disabled={ocupado} onClick={() => setPerfilEscolhido(null)}>Cancelar</Botao>
           </>
         )}
-        {pode.reativar && !aberta && <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('reativar', usuario)}>Reativar</Botao>}
       </div>
+      {/* Ao entrar com o foco, o leitor de tela anuncia o que se confirma (a legenda) e o efeito (o texto). */}
       {confirmacao && (
-        <div ref={painel} className={css.confirmacao}>
-          <p className={css.textoDaConfirmacao}>{confirmacao.texto}</p>
+        <fieldset ref={painel} className={css.confirmacao} aria-describedby={`${id}-texto`}>
+          <legend className="sr">{confirmacao.confirmar}</legend>
+          <p id={`${id}-texto`} className={css.textoDaConfirmacao}>{confirmacao.texto}</p>
           {confirmacao.pedeMotivo && (
             <CampoTexto
               rotulo="Motivo do suporte" autoComplete="off" value={marca.motivo} readOnly={ocupado}
               onChange={(evento) => { const motivo = evento.target.value; setMarca((atual) => ({ ...atual, motivo, erro: null })) }}
               dica={`Fica no histórico da casa. Pelo menos ${MINIMO_DO_MOTIVO} caracteres.`}
+              aria-invalid={marca.erro ? true : undefined} aria-describedby={marca.erro ? `${id}-erro` : undefined}
             />
           )}
-          {marca.erro && <p className={css.erro} role="alert">{marca.erro}</p>}
+          {marca.erro && <p id={`${id}-erro`} className={css.erro} role="alert">{marca.erro}</p>}
           <div className={css.botoesDaConfirmacao}>
             <Botao variante="primario" disabled={ocupado} onClick={confirmarMarca}>{confirmacao.confirmar}</Botao>
             <Botao ref={cancelar} variante="texto" disabled={ocupado} onClick={() => setMarca(null)}>Cancelar</Botao>
           </div>
-        </div>
+        </fieldset>
       )}
     </li>
   )

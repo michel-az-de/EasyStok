@@ -31,7 +31,9 @@ export function TelaConvite({ token, google, aoConcluir }) {
     return clientId
   }, [google])
   // Deu certo: o App limpa o convite e vai para o hall, então não há estado para mexer aqui.
+  // Com a senha no ar, o toque no Google não abre uma segunda entrada.
   const entrarComGoogle = useCallback(async (idToken) => {
+    if (enviando) return
     setEstado((atual) => ({ ...atual, erro: null }))
     setEntrandoGoogle(true)
     try {
@@ -40,7 +42,7 @@ export function TelaConvite({ token, google, aoConcluir }) {
       setEstado((atual) => ({ ...atual, erro: fraseDaFalhaDoGoogleNoConvite(falha) }))
       setEntrandoGoogle(false)
     }
-  }, [google])
+  }, [google, enviando])
   const falhaDoGoogle = useCallback((mensagem) => setEstado((atual) => ({ ...atual, erro: mensagem })), [])
 
   // A tela trocou inteira: o foco vai para o título novo, senão o teclado e o leitor de tela ficam no botão que sumiu.
@@ -99,7 +101,7 @@ export function TelaConvite({ token, google, aoConcluir }) {
         {google && (
           <div className={css.googleDoConvite} aria-busy={entrandoGoogle}>
             <BotaoGoogle buscarClientId={buscarClientId} aoReceberToken={entrarComGoogle} aoFalhar={falhaDoGoogle} opcoes={google.opcoes} />
-            {comGoogle && <p className={css.ou}>ou crie uma senha</p>}
+            {comGoogle && <output className={css.ou}>{entrandoGoogle ? 'Entrando com o Google…' : 'ou crie uma senha'}</output>}
           </div>
         )}
         <form className={css.formulario} onSubmit={enviar} aria-busy={enviando}>

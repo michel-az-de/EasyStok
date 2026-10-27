@@ -52,8 +52,8 @@
 .acoes button { padding-inline: var(--e-2); }
 /* #2070: confirmação da marca de dona, na largura da linha (o motivo do suporte precisa de espaço). */
 .confirmacao {
-  grid-column: 1 / -1; display: grid; gap: var(--e-2); justify-items: start;
-  margin-top: var(--e-2); padding: var(--e-3); border-radius: var(--r-1); background: var(--preenchimento);
+  grid-column: 1 / -1; display: grid; gap: var(--e-2); justify-items: start; min-width: 0;
+  margin: var(--e-2) 0 0; padding: var(--e-3); border: 0; border-radius: var(--r-1); background: var(--preenchimento);
 }
 .confirmacao > div { width: min(100%, 480px); }
 .textoDaConfirmacao { margin: 0; font-size: var(--t-apoio); color: var(--tinta); max-width: 72ch; }

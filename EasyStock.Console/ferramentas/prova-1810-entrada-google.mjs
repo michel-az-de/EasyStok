@@ -2,24 +2,16 @@
 // Prova #1810 (revisão gravada de 14/10): com a conta Google já escolhida antes, o console entra
 // sozinho (One Tap com auto_select); depois de "Sair" nesta aba, não entra sozinho de novo até a
 // pessoa escolher a conta outra vez. #2070: a tela do convite também oferece o Google, sem entrar sozinha.
+// O convite é conferido com o App montado de verdade na rota do link (DOM mínimo de `tela-no-node.mjs`),
+// a API simulada no envelope real e o Google Identity Services falso: tocar no botão é chamar o callback dele.
 //
 //   node ferramentas/prova-1810-entrada-google.mjs
 
 import assert from 'node:assert/strict'
-import { registerHooks } from 'node:module'
-import { readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { transformWithOxc } from 'vite'
+import { botaoDe, digitar, elementos, enviar, esperar, google, guardado, janela, montar, resposta, textoDe } from './tela-no-node.mjs'
 
-const guardado = new Map()
-globalThis.sessionStorage = {
-  getItem: (k) => (guardado.has(k) ? guardado.get(k) : null),
-  setItem: (k, v) => guardado.set(k, String(v)),
-  removeItem: (k) => guardado.delete(k),
-}
 const chamadas = []
-globalThis.window = { google: { accounts: { id: { disableAutoSelect: () => chamadas.push('disableAutoSelect') } } } }
+google.accounts.id.disableAutoSelect = () => chamadas.push('disableAutoSelect')
 
 const { opcoesDaEntradaGoogle, travarEntradaSozinha, liberarEntradaSozinha } = await import('../src/infra/entradaGoogle.js')
 
@@ -40,15 +32,16 @@ liberarEntradaSozinha()
 assert.equal(opcoesDaEntradaGoogle().auto_select, true)
 ok('quem entra de novo pelo botão volta a entrar sozinho nas próximas visitas')
 
+const armazenamento = globalThis.sessionStorage
 globalThis.sessionStorage = { getItem: () => { throw new Error('bloqueado') }, setItem: () => { throw new Error('bloqueado') }, removeItem: () => {} }
 assert.doesNotThrow(() => travarEntradaSozinha())
 assert.equal(opcoesDaEntradaGoogle().auto_select, true)
+globalThis.sessionStorage = armazenamento
 ok('sem armazenamento do navegador, não quebra')
 
 // #2070: a tela do link do convite também oferece "Entrar com Google". Quem recebe o convite entra
 // com a conta Google do e-mail convidado; a API só aceita com o convite aberto e não vencido.
 const { googleDoConvite, fraseDaFalhaDoGoogleNoConvite } = await import('../src/dominio/usuarios.js')
-const fonte = (caminho) => readFileSync(new URL(`../src/${caminho}`, import.meta.url), 'utf8').replaceAll(String.fromCharCode(13), '')
 
 const buscarClientId = async () => 'client-id-de-teste'
 const entradas = []
@@ -63,71 +56,129 @@ ok('no convite o Google nunca entra sozinho: a conta já escolhida neste aparelh
 
 await noConvite.entrar('id-token-da-convidada')
 assert.deepEqual(entradas, ['id-token-da-convidada'], 'entra pela mesma sessão do login')
-assert.deepEqual(concluidos, ['convite concluído'], 'depois de entrar, o convite guardado é limpo e a tela vai para o hall')
-ok('entrar com Google no convite usa a entrada da sessão e só então conclui o convite')
-
-const vencido = Object.assign(new Error('Seu convite venceu: peça um novo'), { status: 401, codigo: 'CONVITE_VENCIDO' })
-const recusa = googleDoConvite({ ...googleDaSessao, entrar: async () => { throw vencido } }, () => concluidos.push('não devia'))
-await assert.rejects(() => recusa.entrar('id-token'), (erro) => erro === vencido)
-assert.deepEqual(concluidos, ['convite concluído'], 'recusado, o convite continua guardado e a tela fica')
-assert.equal(fraseDaFalhaDoGoogleNoConvite(vencido), 'Seu convite venceu: peça um novo')
-assert.equal(fraseDaFalhaDoGoogleNoConvite({ status: 401, codigo: 'HTTP_401', message: 'Sessão expirada. Entre de novo.' }),
-  'Esta conta Google não tem convite. Use a conta Google do e-mail que recebeu o convite, ou crie uma senha.')
-assert.equal(fraseDaFalhaDoGoogleNoConvite({ status: 0, codigo: 'SEM_CONEXAO', message: 'Sem conexão com o EasyStok.' }), 'Sem conexão com o EasyStok.')
-ok('recusa do Google no convite fica na tela, com a frase da API (convite vencido) ou o que fazer')
-
+assert.deepEqual(concluidos, ['convite concluído'], 'depois de entrar, o convite é concluído')
+const vencidoAMao = Object.assign(new Error('Seu convite venceu: peça um novo'), { status: 401, codigo: 'INVALID_CREDENTIALS' })
+const recusa = googleDoConvite({ ...googleDaSessao, entrar: async () => { throw vencidoAMao } }, () => concluidos.push('não devia'))
+await assert.rejects(() => recusa.entrar('id-token'), (erro) => erro === vencidoAMao)
+assert.deepEqual(concluidos, ['convite concluído'], 'recusado, o convite não é concluído')
 assert.equal(googleDoConvite(null, () => {}), null)
-ok('sem Google configurado na sessão, o convite fica só com a senha')
+ok('entrar com Google no convite usa a entrada da sessão e só conclui o convite se ela der certo; sem Google, nada')
 
-const telaConvite = fonte('features/login/TelaConvite.jsx')
-assert.match(telaConvite, /export function TelaConvite\(\{ token, google, aoConcluir \}\)/)
-assert.match(telaConvite, /<BotaoGoogle buscarClientId=\{buscarClientId\} aoReceberToken=\{entrarComGoogle\} aoFalhar=\{falhaDoGoogle\} opcoes=\{google\.opcoes\} \/>/)
-assert.match(telaConvite, /await google\.entrar\(idToken\)/)
-assert.match(telaConvite, /fraseDaFalhaDoGoogleNoConvite\(falha\)/)
-ok('a TelaConvite reaproveita o BotaoGoogle com o google da sessão e mostra a recusa')
+// A recusa passa pela camada da API de verdade (`chamarApi`), com a resposta no envelope que a
+// EasyStock.Api manda no `POST api/auth/google/login`: 401 `INVALID_CREDENTIALS` com a frase do caso.
+const { entrarComGoogle } = await import('../src/infra/api/autenticacao.js')
+const recusaDaApi = async (fetchFalso) => {
+  globalThis.fetch = fetchFalso
+  try { await entrarComGoogle('id-token') } catch (erro) { return erro }
+  throw new Error('a API devia ter recusado')
+}
+const invalida = (message) => async () => resposta(401, { error: { code: 'INVALID_CREDENTIALS', message } })
+const CONFIRA = 'Confira se escolheu a conta Google do e-mail que recebeu o convite.'
+assert.equal(fraseDaFalhaDoGoogleNoConvite(await recusaDaApi(invalida('Esta conta Google não tem acesso ao EasyStok.'))),
+  `Esta conta Google não tem acesso ao EasyStok. ${CONFIRA}`)
+assert.equal(fraseDaFalhaDoGoogleNoConvite(await recusaDaApi(invalida('Seu convite venceu: peça um novo'))),
+  `Seu convite venceu: peça um novo. ${CONFIRA}`)
+assert.equal(fraseDaFalhaDoGoogleNoConvite(await recusaDaApi(async () => { throw new TypeError('rede') })), 'Sem conexão com o EasyStok.')
+ok('recusa do Google no convite: a frase da API e o que conferir; sem rede, a frase da rede')
 
-const app = fonte('app/App.jsx')
-const blocoDoConvite = app.slice(app.indexOf('const CHAVE_DO_CONVITE'), app.indexOf('if (FONTE_API && !sessao) return <TelaLogin'))
-assert.match(blocoDoConvite, /const concluirConvitePeloGoogle = useCallback\(\(\) => \{\n\s+setTokenGuardado\(null\)\n\s+try \{ sessionStorage\.removeItem\(CHAVE_DO_CONVITE\) \} catch \{ \/\* nada a limpar \*\/ \}\n\s+window\.location\.hash = '#\/'\n\s+\}, \[\]\)/)
-assert.match(blocoDoConvite, /const googleNoConvite = useMemo\(\(\) => googleDoConvite\(google, concluirConvitePeloGoogle\), \[google, concluirConvitePeloGoogle\]\)/)
-assert.match(blocoDoConvite, /<TelaConvite key=\{token \?\? 'sem-token'\} token=\{token\} google=\{googleNoConvite\} aoConcluir=\{aoConcluir\} \/>/)
-// A sessão nova é a da convidada: o caminho do Google não encerra sessão nenhuma.
-const caminhoGoogle = blocoDoConvite.slice(blocoDoConvite.indexOf('const concluirConvitePeloGoogle'), blocoDoConvite.indexOf('const googleNoConvite'))
-assert.ok(caminhoGoogle.length > 0)
-assert.doesNotMatch(caminhoGoogle, /encerrarSessao/)
-ok('o App passa o google à TelaConvite e, ao entrar, limpa o convite guardado e vai para #/')
+// ---------------------------------------------------------------- o convite no App montado
 
-// A tela montada de verdade (react-dom/server, JSX pelo transformador do Vite), com e sem o google da sessão.
-const raiz = fileURLToPath(new URL('../src', import.meta.url))
-const jsx = new Map(await Promise.all(readdirSync(raiz, { recursive: true }).filter((n) => n.endsWith('.jsx')).map(async (nome) => {
-  const arquivo = join(raiz, nome)
-  return [pathToFileURL(arquivo).href, (await transformWithOxc(readFileSync(arquivo, 'utf8'), arquivo, { jsx: { runtime: 'automatic' } })).code]
-})))
-registerHooks({
-  resolve(spec, contexto, proximo) {
-    if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
-      for (const ext of ['.js', '.jsx']) { try { return proximo(spec + ext, contexto) } catch { /* próximo formato */ } }
-    }
-    return proximo(spec, contexto)
-  },
-  load(url, contexto, proximo) {
-    if (jsx.has(url)) return { format: 'module', source: jsx.get(url), shortCircuit: true }
-    if (url.endsWith('.css')) return { format: 'module', source: 'export default new Proxy({}, { get: (_, p) => String(p) })', shortCircuit: true }
-    if (url.endsWith('/infra/fonteDados.js')) return { format: 'module', source: 'export const FONTE_API = true; export const API_BASE = ""', shortCircuit: true }
-    return proximo(url, contexto)
-  },
-})
 const { createElement: h } = await import('react')
-const { renderToStaticMarkup } = await import('react-dom/server')
-const { TelaConvite } = await import('../src/features/login/TelaConvite.jsx')
-const comGoogle = renderToStaticMarkup(h(TelaConvite, { token: 'token-de-teste', google: noConvite, aoConcluir() {} }))
-assert.match(comGoogle, /<div class="googleDoConvite" aria-busy="false">/)
-assert.match(comGoogle, /Criar senha/)
-// Antes do ClientId chegar, o texto não promete o Google (sem ClientId o botão nem aparece).
-assert.match(comGoogle, /Escolha a senha que você vai usar para entrar\./)
-const semGoogle = renderToStaticMarkup(h(TelaConvite, { token: 'token-de-teste', google: null, aoConcluir() {} }))
-assert.doesNotMatch(semGoogle, /googleDoConvite/)
-assert.match(semGoogle, /Criar senha/)
-ok('a tela do convite monta com o google da sessão e sem ele')
+const { App } = await import('../src/app/App.jsx')
+const jwt = (carga) => `cabecalho.${Buffer.from(JSON.stringify(carga)).toString('base64url')}.assinatura`
+const SESSAO_DA_CONVIDADA = {
+  token: jwt({ empresaId: 'empresa-1', exp: Math.floor(Date.now() / 1000) + 3600 }), refreshToken: 'refresh-da-convidada', expiresIn: 3600,
+  usuario: { id: 'bia', nome: 'Bia Lima', email: 'bia@exemplo.test', nivel: 'Operador' },
+}
+// Resposta que a prova solta quando quer: mostra a tela no meio da espera.
+const adiada = () => { let soltar; const promessa = new Promise((r) => { soltar = r }); return { promessa, soltar } }
+const api = { clientId: 'client-id-de-teste', google: null, aceite: null, chamadas: [] }
+const fetchDoConvite = async (url, opcoes = {}) => {
+  api.chamadas.push(`${opcoes.method ?? 'GET'} ${url}`)
+  if (url === '/api/auth/google/config') return resposta(200, { data: { habilitado: Boolean(api.clientId), clientId: api.clientId } })
+  if (url === '/api/auth/google/login') return api.google()
+  if (url === '/api/auth/aceitar-convite') return api.aceite()
+  return resposta(404)
+}
+let prompts = 0
+google.accounts.id.prompt = () => { prompts += 1 }
+const abrirLink = async (token) => {
+  guardado.clear()
+  api.chamadas.length = 0
+  google.iniciados.length = 0
+  google.desenhados.length = 0
+  prompts = 0
+  globalThis.fetch = fetchDoConvite
+  janela.location.hash = `#/convite?t=${token}`
+  await esperar()
+  const tela = montar(h(App))
+  await esperar()
+  return tela
+}
+const alertas = (tela) => elementos(tela, (no) => no.getAttribute('role') === 'alert').map((no) => no.textContent)
+const desabilitado = (tela, texto) => botaoDe(tela, texto).hasAttribute('disabled')
+const SENHA_BOA = 'Casa-da-Baba1'
+
+api.clientId = null
+let tela = await abrirLink('token-sem-google')
+assert.equal(google.desenhados.length, 0, 'sem ClientId na API, o botão do Google não aparece')
+assert.match(textoDe(tela), /Escolha a senha que você vai usar para entrar\./)
+assert.doesNotMatch(textoDe(tela), /conta Google/)
+tela.desmontar()
+ok('sem o Google ligado na API, o convite fica só com a senha')
+
+api.clientId = 'client-id-de-teste'
+api.google = invalida('Esta conta Google não tem acesso ao EasyStok.')
+tela = await abrirLink('token-1')
+assert.equal(guardado.get('easystok.convite'), 'token-1', 'o token fica guardado nesta aba')
+assert.equal(janela.location.hash, '#/convite', 'e sai da barra de endereço')
+assert.equal(google.desenhados.length, 1, 'o botão do Google é desenhado')
+assert.equal(google.iniciados.at(-1).auto_select, false, 'no convite não entra sozinho')
+assert.equal(prompts, 0, 'nem oferece o One Tap')
+assert.match(textoDe(tela), /Entre com a conta Google do e-mail que recebeu o convite, ou crie uma senha\./)
+await google.escolherConta('id-token-de-outra-conta')
+await esperar()
+assert.deepEqual(alertas(tela), [`Esta conta Google não tem acesso ao EasyStok. ${CONFIRA}`])
+assert.equal(guardado.get('easystok.convite'), 'token-1', 'recusado, o convite continua guardado')
+assert.equal(janela.location.hash, '#/convite')
+digitar(tela, 'Senha', SENHA_BOA)
+assert.equal(desabilitado(tela, 'Criar senha'), false, 'depois da recusa, criar senha volta a valer')
+tela.desmontar()
+ok('recusa do Google no convite: a frase na tela, o convite guardado e a senha liberada')
+
+const entrada = adiada()
+api.google = () => entrada.promessa
+tela = await abrirLink('token-2')
+digitar(tela, 'Senha', SENHA_BOA)
+const tocou = google.escolherConta('id-token-da-convidada')
+await esperar()
+const [situacao] = elementos(tela, (no) => no.localName === 'output' && no.textContent === 'Entrando com o Google…')
+assert.ok(situacao, 'enquanto entra, a tela diz que está entrando (região ao vivo)')
+assert.equal(desabilitado(tela, 'Criar senha'), true, 'e criar senha espera')
+entrada.soltar(resposta(200, { data: SESSAO_DA_CONVIDADA }))
+await tocou
+await esperar()
+assert.equal(guardado.has('easystok.convite'), false, 'entrou: o convite guardado sai')
+assert.equal(janela.location.hash, '#/', 'e a tela vai para o hall')
+assert.equal(JSON.parse(guardado.get('easystok.sessao')).refreshToken, 'refresh-da-convidada', 'com a sessão da convidada')
+tela.desmontar()
+ok('entrar com Google no convite: "Entrando com o Google…", depois a sessão da convidada, sem o convite guardado, no hall')
+
+const aceite = adiada()
+api.aceite = () => aceite.promessa
+api.google = async () => resposta(200, { data: SESSAO_DA_CONVIDADA })
+tela = await abrirLink('token-3')
+digitar(tela, 'Senha', SENHA_BOA)
+enviar(tela)
+await esperar()
+await google.escolherConta('id-token-no-meio-da-senha')
+await esperar()
+assert.deepEqual(api.chamadas.filter((c) => c.startsWith('POST')), ['POST /api/auth/aceitar-convite'], 'com a senha no ar, o toque no Google não sai')
+aceite.soltar(resposta(200, { data: null }))
+await esperar()
+assert.match(textoDe(tela), /Senha criada/)
+tela.desmontar()
+ok('com a senha sendo criada, tocar no Google não abre uma segunda entrada')
 
 console.log(`\n${passos} passos verdes.`)
+process.exit(0)
