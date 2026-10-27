@@ -87,6 +87,29 @@ public class WahaRegistroTests
         scope.ServiceProvider.GetRequiredService<TradutorEventoWaha>().Should().NotBeNull("o webhook do WAHA resolve sempre e responde 404");
     }
 
+    [Fact]
+    public void WahaEWppConnectLigadosJuntosNaoSobem()
+    {
+        var valores = ComPonte();
+        valores["Atendimento:WppConnect:Habilitado"] = "true";
+
+        var acao = () => Construir(valores);
+
+        acao.Should().Throw<InvalidOperationException>().WithMessage("*only one WhatsApp bridge*");
+    }
+
+    [Fact]
+    public void WppConnectSozinhoNaoLigaOWaha()
+    {
+        using var provider = Construir(new Dictionary<string, string?>
+        {
+            ["Atendimento:WppConnect:Habilitado"] = "true",
+            ["Notifications:WhatsApp:Provider"] = "meta",
+        });
+
+        provider.GetRequiredService<IOptions<WahaOptions>>().Value.Ligada.Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("waha", true)]
     [InlineData(" WAHA ", true)]

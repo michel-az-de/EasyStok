@@ -3,6 +3,8 @@
 - Status: Aceito (2026-10-26, decisão do Felipe no chat da sessão da issue #2072)
 - Data: 2026-10-26
 - Decisor: Felipe
+- Emenda (26/10, Felipe): a ponte no ar é o WPPConnect (#2071). O WAHA fica no código, desligado e trocável por
+  configuração; a API e o Worker recusam as duas ligadas ao mesmo tempo.
 - Prazo: provisório. Sai quando o número da loja entrar na Cloud API por coexistência (ADR-0050, #1417).
 - Relacionados: ADR-0050 (WhatsApp direto na Meta), ADR-0051 (multicanal), issue #2072, pesquisa
   `docs/plan/atendimento-whatsapp/ponte-provisoria-whatsapp-2026-10-26.md`, guia `docs/dev/whatsapp-ponte-waha.md`

@@ -54,6 +54,7 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
         // #2072 (ADR-0062): ponte provisória pelo WAHA. As peças ficam registradas sempre, porque o webhook do WAHA
         // depende do tradutor; só valem com Atendimento:WhatsApp:Cliente=waha, que vence a Meta no atendimento.
         var ponteWaha = UsaPonteWaha(configuration[ChaveClienteAtendimento]);
+        GarantirUmaPonteSo(ponteWaha, configuration.GetValue<bool>(ChaveWppConnectHabilitado));
         services.Configure<WahaOptions>(configuration.GetSection(WahaOptions.Secao));
         services.PostConfigure<WahaOptions>(o => o.Ligada = ponteWaha);
         services.TryAddSingleton(TimeProvider.System);
@@ -100,6 +101,21 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
 
     /// <summary>Chave própria do cliente do atendimento: <c>meta</c>, <c>waha</c> (ponte provisória, #2072) ou <c>stub</c>.</summary>
     public const string ChaveClienteAtendimento = "Atendimento:WhatsApp:Cliente";
+
+    /// <summary>Chave que liga a conexão provisória pelo WPPConnect (#2071).</summary>
+    public const string ChaveWppConnectHabilitado = "Atendimento:WppConnect:Habilitado";
+
+    /// <summary>
+    /// WAHA e WPPConnect são pontes alternativas para o mesmo número: ligadas juntas, cada mensagem do cliente chegaria
+    /// duas vezes com ids diferentes e as respostas sairiam por uma só. A API e o Worker não sobem com as duas.
+    /// </summary>
+    public static void GarantirUmaPonteSo(bool waha, bool wppConnect)
+    {
+        if (waha && wppConnect)
+            throw new InvalidOperationException(
+                "Atendimento:WhatsApp:Cliente=waha and Atendimento:WppConnect:Habilitado=true cannot be on together: " +
+                "turn on only one WhatsApp bridge (docs/dev/whatsapp-ponte-waha.md).");
+    }
 
     /// <summary>Ponte provisória pelo WAHA (#2072): só com <c>Atendimento:WhatsApp:Cliente=waha</c>.</summary>
     public static bool UsaPonteWaha(string? cliente)

@@ -14,6 +14,28 @@ cliente ──WhatsApp──► celular da loja ◄──aparelho vinculado─�
                                       ez-api e ez-worker ──REST X-Api-Key──► ez-waha
 ```
 
+## Qual ponte está ligada
+
+Há duas pontes provisórias para o mesmo número: o WAHA (esta, #2072) e o WPPConnect (#2071). **SÓ UMA FICA LIGADA.**
+Com as duas, cada mensagem do cliente chegaria duas vezes com ids diferentes; por isso a API e o Worker não sobem com
+`Atendimento:WhatsApp:Cliente=waha` e `Atendimento:WppConnect:Habilitado=true` ao mesmo tempo.
+
+| Ponte no ar | `EZ_WHATSAPP_CLIENTE` (`Atendimento:WhatsApp:Cliente`) | `Atendimento:WppConnect:Habilitado` | Aparelho vinculado no celular |
+|---|---|---|---|
+| WPPConnect | vazio ou `meta` | `true` | só o do WPPConnect |
+| WAHA | `waha` | `false` | só o do WAHA |
+| Meta (coexistência) | `meta` | `false` | nenhum dos dois |
+
+**Trocar do WPPConnect para o WAHA:**
+
+1. No celular da loja, desconecte o aparelho do WPPConnect em Aparelhos conectados.
+2. Siga "Ligar, nesta ordem" abaixo (o `ligar-api` grava `EZ_WHATSAPP_CLIENTE=waha`).
+3. Ponha `Atendimento:WppConnect:Habilitado=false` no `.env` do easystok e publique com `scripts/deploy/vps-deploy.sh`.
+
+**Voltar para o WPPConnect:** desconecte o aparelho do WAHA, `EZ_WHATSAPP_CLIENTE=` (vazio) e
+`Atendimento:WppConnect:Habilitado=true`, publique e conecte o WPPConnect pelo console. O `ez-waha` pode ficar parado
+(`ssh hostinger "cd /opt/stacks/waha && docker compose stop"`); a sessão fica no volume para a próxima troca.
+
 ## Ligar, nesta ordem
 
 1. **Subir o WAHA** (gera os segredos na VPS, sobe o `ez-waha` e cria a sessão):
