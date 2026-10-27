@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usePendenciaDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
 import {
@@ -19,6 +20,8 @@ export function FreteRaioDaLoja({ config, acoes, ocupado }) {
   const [teste, setTeste] = useState(TESTE_VAZIO)
   const [testando, setTestando] = useState(false)
   const [resultado, setResultado] = useState(null)
+  // #2070: o raio editado e não salvo segura o passo do frete nos Primeiros passos.
+  usePendenciaDoAjuste('frete-por-distancia', edicao !== null)
 
   const configurado = Boolean(config?.configurado)
   const form = edicao ?? formularioDoFreteRaio(config)

@@ -2,6 +2,18 @@ export const ESTADOS_AVISO = {
   INDISPONIVEL: 'indisponivel', DESLIGADO: 'desligado', ATIVANDO: 'ativando', DESATIVANDO: 'desativando',
   ATIVO: 'ativo', BLOQUEADO: 'bloqueado', SEM_CHAVE: 'sem-chave', ERRO: 'erro',
 }
+// O que cada estado diz a quem vê, no sino e em Configurações › Avisos (#2070).
+export const TEXTO_DO_APARELHO = {
+  desligado: 'Receba avisos desta conta mesmo com o Console fechado.',
+  ativando: 'Aguarde a confirmação do navegador…',
+  desativando: 'Desativando avisos neste aparelho…',
+  ativo: 'Avisos desta conta ativados neste aparelho.',
+  bloqueado: 'Avisos bloqueados neste navegador. Libere as notificações deste site nas configurações do navegador e ative de novo.',
+  'sem-chave': 'Os avisos no aparelho ainda não estão configurados neste ambiente.',
+  indisponivel: 'Este navegador não oferece avisos com o Console fechado.',
+}
+export const podeAtivarNoAparelho = (estado) => ['desligado', 'bloqueado', 'erro', 'sem-chave', 'ativando'].includes(estado)
+export const podeDesligarNoAparelho = (estado) => ['ativo', 'desativando'].includes(estado)
 const situacao = (estado, mensagem = null) => ({ estado, mensagem })
 const semPermissao = (permissao) => situacao(permissao === 'denied' ? ESTADOS_AVISO.BLOQUEADO : ESTADOS_AVISO.DESLIGADO)
 // #1989: depois de pedir, a resposta do navegador diz o que fazer. Só abrir o Console não acusa nada.

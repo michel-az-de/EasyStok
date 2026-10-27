@@ -1,0 +1,72 @@
+/* Primeiros passos (#2070). Uma coluna até o computador; de 1100 px para cima a lista de passos fica ao lado.
+   Abaixo de 640 px o primário ocupa a linha toda, acima, e "Fazer depois" vira link. */
+.tela { display: grid; gap: var(--e-4); min-width: 0; }
+.tela > * { min-width: 0; }
+@media (min-width: 1100px) {
+  .tela { grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); column-gap: var(--e-5); align-items: start; }
+  .progresso { grid-column: 1; grid-row: 1 / span 5; position: sticky; top: 0; }
+  .tela > :not(.progresso) { grid-column: 2; }
+}
+
+.progresso { padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
+.lista > summary {
+  display: flex; align-items: center; min-height: var(--toque); cursor: pointer;
+  font-size: var(--t-apoio); font-weight: 700; color: var(--tinta);
+}
+.lista > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.parte { display: grid; gap: var(--e-1); margin-top: var(--e-3); }
+.tituloParte { margin: 0; font-size: var(--t-apoio); font-weight: 700; color: var(--tinta); }
+.passos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-1); }
+.itemPasso { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-width: 0; margin: 0; border-radius: var(--r-1); }
+.itemPasso:has(> [aria-current='step']) { background: var(--preenchimento-forte); }
+.linkPasso {
+  display: flex; align-items: center; min-height: var(--toque); min-width: 0; padding: 0 var(--e-2);
+  color: var(--tinta); font-size: var(--t-apoio); text-decoration: none; overflow-wrap: anywhere;
+}
+.linkPasso:hover { text-decoration: underline; }
+.linkPasso[aria-current='step'] { font-weight: 700; }
+.linkPasso:focus-visible { outline: 2px solid var(--marca); outline-offset: -2px; }
+.marca { flex: none; padding-right: var(--e-2); font-size: var(--t-minimo); color: var(--tinta-2); }
+
+.passo { display: grid; gap: var(--e-3); }
+.contagem { margin: 0; font-size: var(--t-apoio); font-weight: 700; color: var(--tinta-2); }
+.titulo { margin: 0; font-size: var(--t-titulo); font-weight: 700; line-height: var(--lh-compacto); color: var(--tinta); }
+.titulo:focus { outline: none; }
+.titulo:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.descricao, .apoio { margin: 0; max-width: 72ch; font-size: var(--t-apoio); color: var(--tinta-2); }
+.conteudo { display: grid; gap: var(--e-5); }
+.conteudo > *, .peca { min-width: 0; }
+.semAcesso { margin: 0; padding: var(--e-3); border-radius: var(--r-1); background: var(--alerta-pastel); color: var(--tinta); }
+
+.pendencia {
+  margin: 0; padding: var(--e-2) var(--e-3); border-left: var(--b-3) solid var(--marca); border-radius: var(--r-1);
+  background: var(--marca-claro); color: var(--marca-forte); font-size: var(--t-apoio);
+}
+.erro { margin: 0; color: var(--erro); font-size: var(--t-apoio); }
+
+.acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
+.primario { margin-left: auto; min-height: var(--toque); }
+.depois { text-decoration: underline; }
+.saida { display: flex; justify-content: flex-end; }
+
+/* Peças próprias: boas-vindas e revisão. */
+.bloco { display: grid; gap: var(--e-4); }
+.secao { display: grid; gap: var(--e-2); min-width: 0; }
+.secao h3 { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
+.itens { margin: 0; padding-left: var(--e-5); display: grid; gap: var(--e-1); font-size: var(--t-apoio); color: var(--tinta); overflow-wrap: anywhere; }
+.ligado { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.acoesDoBloco { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.destaque { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--alerta-pastel); color: var(--tinta); font-size: var(--t-apoio); max-width: 72ch; }
+
+/* Cartão do hall. */
+.cartaoHall { padding: var(--e-3) var(--e-4); border: var(--b-1) solid var(--linha); border-left: var(--b-3) solid var(--marca); border-radius: var(--r-2); background: var(--papel); }
+.textoDoCartao { margin: 0; font-size: var(--t-apoio); color: var(--tinta); overflow-wrap: anywhere; }
+.continuar { display: inline-flex; align-items: center; min-height: var(--toque); font-weight: 700; color: var(--marca); }
+.continuar:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .acoes { flex-direction: column; align-items: stretch; }
+  .primario { order: -1; width: 100%; margin-left: 0; }
+  .acoes > :not(.primario) { align-self: flex-start; }
+  .saida { justify-content: flex-start; }
+}

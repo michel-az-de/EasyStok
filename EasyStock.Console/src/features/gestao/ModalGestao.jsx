@@ -26,6 +26,11 @@ import { AbaReceitasApi } from './producao/AbaReceitasApi'
 import { AbaCalculadoraApi } from './producao/AbaCalculadoraApi'
 import { AbaPlanejamentoApi } from './producao/AbaPlanejamentoApi'
 import { AbaPerdasApi } from './producao/AbaPerdasApi'
+import { AbaDadosDaLoja } from './loja/AbaDadosDaLoja'
+import { AbaSiteEImpressos } from './vitrine/AbaSiteEImpressos'
+import { AbaAlertasDeEstoque } from './estoque/AbaAlertasDeEstoque'
+import { AbaCadernoDoAgente } from './caderno/AbaCadernoDoAgente'
+import { AbaAvisos } from './avisos/AbaAvisos'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -47,12 +52,14 @@ function navegarAbas(evento, itens, indice, escolher, botoes, vertical = false) 
 
 // A janela e as rotas usam o mesmo catálogo, as mesmas permissões e o mesmo
 // PainelDeAjuste. Trocar uma aba aqui mantém a conversa e o pedido montados.
-export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
+// `slots` (#2070): o que só o App compõe (editor do cardápio, horários, cadastro de entrega e de entregadores, abas
+// da demonstração), o mesmo objeto da tela de rota e dos Primeiros passos. Tela `foraDaGestao` não entra aqui.
+export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, avisosApi = null, ...slots }) {
   const { fonteApi } = useAtendimento()
   const { permite, acoes } = useAcessoModulos()
   const areas = useMemo(() => MODULOS
     .filter((modulo) => permite(modulo.id))
-    .map((modulo) => ({ ...modulo, telas: telasDoMenu(modulo, { fonteApi, acoes }).filter((tela) => tela.tipo === TELA_AJUSTE) }))
+    .map((modulo) => ({ ...modulo, telas: telasDoMenu(modulo, { fonteApi, acoes }).filter((tela) => tela.tipo === TELA_AJUSTE && !tela.foraDaGestao) }))
     .filter((modulo) => modulo.telas.length > 0), [fonteApi, permite, acoes])
   const [abaAtiva, setAbaAtiva] = useState(abaInicial)
   const area = areas.find((modulo) => modulo.telas.some((tela) => tela.aba === abaAtiva)) ?? areas[0]
@@ -179,7 +186,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
               className={css.painelGestao}
               onClickCapture={seguirLink}
             >
-              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} renderizarEditorCardapio={renderizarEditorCardapio} horariosAtendimento={horariosAtendimento} abasDaDemonstracao={abasDaDemonstracao} />
+              <PainelDeAjuste {...slots} aba={tela.aba} focoInicial={focoInicial} aoAbrirAba={abrirAba} />
             </div>
           </section>
         </div>
@@ -214,51 +221,68 @@ function AbaNaoLigada({ texto, saida = null }) {
   )
 }
 
-// Uma tela por aba: o objeto só decide qual elemento entra na árvore.
-// `janelasApi` (#1440): no modo API o App entrega aqui o cadastro de janelas, zonas e bloqueios
-// da S45 (o mesmo de Entregas › Janelas e frete), no lugar da aba de demonstração.
+// Uma tela por aba: cada entrada monta só o elemento da aba pedida.
+// `janelasApi` (#1440): no modo API o App entrega o cadastro de janelas, zonas e bloqueios da S45 (o mesmo de
+// Entregas › Janelas e frete), no lugar da aba de demonstração; `secao` (#2070) mostra só as janelas ou só o frete.
 // `abasDaDemonstracao` (#2017): as abas que só a demonstração tem (caixa, janelas, integrações, produção e
 // fidelidade com dados do navegador). O App as entrega; no build de produção não existem.
-export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
+// #2070: os formulários novos recebem `formulario` (`{ aoMudarPendencia, aoSalvo, compacto }`); `secoes` monta só
+// parte da AbaAtendimento; `horariosDaSemana` e `entregadoresApi` chegam do App (feature não importa feature).
+const PAINEIS = {
+  atendimento: ({ horariosAtendimento, secoes, horariosDaSemana, formulario }) => (
+    <AbaAtendimento horariosAtendimento={horariosAtendimento} secoes={secoes} aoMudarPendencia={formulario.aoMudarPendencia}
+      horariosDaSemana={secoes?.includes('horarios') ? horariosDaSemana?.(formulario) ?? null : null} />
+  ),
+  // #1441: respostas prontas e automáticas, fora do caminho do atendimento.
+  respostas: ({ focoInicial }) => <AbaRespostas focoInicial={focoInicial} />,
+  producao: ({ demonstracao: { AbaProducao } }) => AbaProducao && <AbaProducao />,
+  // #1443: no modo API o caixa é o do EasyStok; a demonstração segue com a massa local.
+  caixa: ({ fonteApi, demonstracao: { AbaCaixa } }) => (fonteApi ? <AbaCaixaApi /> : AbaCaixa && <AbaCaixa />),
+  janelas: ({ fonteApi, janelasApi, secao, demonstracao: { AbaJanelas } }) => (fonteApi && janelasApi ? janelasApi({ secao }) : AbaJanelas && <AbaJanelas />),
+  fidelidade: ({ demonstracao: { AbaFidelidade } }) => AbaFidelidade && <AbaFidelidade />,
+  integracoes: ({ fonteApi, demonstracao: { AbaIntegracoes } }) => (fonteApi ? <AbaIntegracoesApi /> : AbaIntegracoes && <AbaIntegracoes />),
+  canais: () => <TelaCanais />,
+  // #1753 (M7.2): usuários e histórico de acesso (só modo API).
+  usuarios: () => <AbaUsuarios />,
+  auditoria: () => <AbaAuditoria />,
+  // #1632: logo da loja e papel padrão dos impressos (só modo API).
+  impressao: () => <AbaImpressao />,
+  // M1.1 (#1481): gestão do cardápio (só modo API).
+  acervo: () => <AbaAcervo />,
+  cardapio: ({ renderizarEditorCardapio }) => <AbaCardapioApi renderizarEditor={renderizarEditorCardapio} />,
+  // M1.3 (#1483): categorias do cardápio (só modo API).
+  categorias: () => <AbaCategoriasApi />,
+  // M2.1 (#1490): estoque do dia em porções (só modo API).
+  'estoque-do-dia': () => <AbaEstoqueDoDiaApi />,
+  // M2.2 (#1491): produção do dia por prato (só modo API).
+  'producao-do-dia': () => <AbaProducaoDoDiaApi />,
+  // M2.3 (#1496): insumos (só modo API).
+  insumos: () => <AbaInsumosApi />,
+  // M2.4a (#1498): receitas (só modo API).
+  receitas: () => <AbaReceitasApi />,
+  'calculadora-producao': () => <AbaCalculadoraApi />,
+  // M2.5 (#1502): planejamento da produção (só modo API).
+  planejamento: ({ aoAbrirAba }) => <AbaPlanejamentoApi aoAbrirAba={aoAbrirAba} />,
+  // M2.6 (#1511): controle de perdas (só modo API).
+  perdas: () => <AbaPerdasApi />,
+  // #2070: os formulários da loja que só tinham API (só modo API).
+  'dados-da-loja': ({ formulario }) => <AbaDadosDaLoja {...formulario} />,
+  'site-e-impressos': ({ formulario }) => <AbaSiteEImpressos {...formulario} />,
+  'alertas-de-estoque': ({ formulario }) => <AbaAlertasDeEstoque {...formulario} />,
+  caderno: ({ formulario }) => <AbaCadernoDoAgente {...formulario} />,
+  avisos: ({ formulario }) => <AbaAvisos compacto={formulario.compacto} />,
+  entregadores: ({ entregadoresApi, formulario }) => entregadoresApi?.(formulario) ?? null,
+}
+
+export function PainelDeAjuste({
+  aba, focoInicial = null, aoAbrirAba = null, secoes = null, secao = null, aoMudarPendencia, aoSalvo, compacto = false,
+  renderizarEditorCardapio, horariosAtendimento, janelasApi = null, horariosDaSemana = null, entregadoresApi = null, abasDaDemonstracao = null,
+}) {
   const { fonteApi } = useAtendimento()
-  const { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao } = abasDaDemonstracao ?? {}
-  const painelDaAba = useMemo(() => ({
-    atendimento: <AbaAtendimento horariosAtendimento={horariosAtendimento} />,
-    // #1441: respostas prontas e automáticas, fora do caminho do atendimento.
-    respostas: <AbaRespostas focoInicial={focoInicial} />,
-    producao: AbaProducao && <AbaProducao />,
-    // #1443: no modo API o caixa é o do EasyStok; a demonstração segue com a massa local.
-    caixa: fonteApi ? <AbaCaixaApi /> : AbaCaixa && <AbaCaixa />,
-    janelas: fonteApi && janelasApi ? janelasApi : AbaJanelas && <AbaJanelas />,
-    fidelidade: AbaFidelidade && <AbaFidelidade />,
-    integracoes: fonteApi ? <AbaIntegracoesApi /> : AbaIntegracoes && <AbaIntegracoes />,
-    canais: <TelaCanais />,
-    // #1753 (M7.2): usuários e histórico de acesso (só modo API).
-    usuarios: <AbaUsuarios />,
-    auditoria: <AbaAuditoria />,
-    // #1632: logo da loja e papel padrão dos impressos (só modo API).
-    impressao: <AbaImpressao />,
-    // M1.1 (#1481): gestão do cardápio (só modo API).
-    acervo: <AbaAcervo />,
-    cardapio: <AbaCardapioApi renderizarEditor={renderizarEditorCardapio} />,
-    // M1.3 (#1483): categorias do cardápio (só modo API).
-    categorias: <AbaCategoriasApi />,
-    // M2.1 (#1490): estoque do dia em porções (só modo API).
-    'estoque-do-dia': <AbaEstoqueDoDiaApi />,
-    // M2.2 (#1491): produção do dia por prato (só modo API).
-    'producao-do-dia': <AbaProducaoDoDiaApi />,
-    // M2.3 (#1496): insumos (só modo API).
-    insumos: <AbaInsumosApi />,
-    // M2.4a (#1498): receitas (só modo API).
-    receitas: <AbaReceitasApi />,
-    'calculadora-producao': <AbaCalculadoraApi />,
-    // M2.5 (#1502): planejamento da produção (só modo API).
-    planejamento: <AbaPlanejamentoApi aoAbrirAba={aoAbrirAba} />,
-    // M2.6 (#1511): controle de perdas (só modo API).
-    perdas: <AbaPerdasApi />,
-  }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio, horariosAtendimento, AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao])
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
-  const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />
-  return painel
+  return PAINEIS[aba]?.({
+    fonteApi, focoInicial, aoAbrirAba, secoes, secao, renderizarEditorCardapio, horariosAtendimento, janelasApi, horariosDaSemana, entregadoresApi,
+    demonstracao: abasDaDemonstracao ?? {}, formulario: { aoMudarPendencia, aoSalvo, compacto },
+  }) ?? null
 }

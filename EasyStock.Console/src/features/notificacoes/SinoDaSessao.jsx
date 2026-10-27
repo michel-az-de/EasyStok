@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { TEXTO_DO_APARELHO, podeAtivarNoAparelho, podeDesligarNoAparelho } from '../../aplicacao/avisosNoAparelho'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
@@ -7,15 +8,6 @@ import css from './notificacoes.module.css'
 
 const gravidade = { Critica: 'Crítica', Alta: 'Alta', Media: 'Média', Informativa: 'Informativa' }
 const tom = { Critica: 'perigo', Alta: 'aviso', Media: 'aviso', Informativa: 'info' }
-const textoAparelho = {
-  desligado: 'Receba avisos desta conta mesmo com o Console fechado.',
-  ativando: 'Aguarde a confirmação do navegador…',
-  desativando: 'Desativando avisos neste aparelho…',
-  ativo: 'Avisos desta conta ativados neste aparelho.',
-  bloqueado: 'Avisos bloqueados neste navegador. Libere as notificações deste site nas configurações do navegador e ative de novo.',
-  'sem-chave': 'Os avisos no aparelho ainda não estão configurados neste ambiente.',
-  indisponivel: 'Este navegador não oferece avisos com o Console fechado.',
-}
 
 export function SinoDaSessao({ avisos, aparelho }) {
   const [aberto, setAberto] = useState(false)
@@ -64,10 +56,10 @@ export function SinoDaSessao({ avisos, aparelho }) {
       {aparelho && <section className={css.aparelho} aria-label="Avisos neste aparelho">
         <div>
           <h3>Avisos no celular ou computador</h3>
-          <p role={aparelho.estado === 'erro' ? 'alert' : 'status'}>{aparelho.mensagem ?? textoAparelho[aparelho.estado]}</p>
+          <p role={aparelho.estado === 'erro' ? 'alert' : 'status'}>{aparelho.mensagem ?? TEXTO_DO_APARELHO[aparelho.estado]}</p>
         </div>
-        {['desligado', 'bloqueado', 'erro', 'sem-chave', 'ativando'].includes(aparelho.estado) && <Botao onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar avisos neste aparelho</Botao>}
-        {['ativo', 'desativando'].includes(aparelho.estado) && <Botao onClick={aparelho.desligar} disabled={aparelho.estado === 'desativando'}>Desativar avisos neste aparelho</Botao>}
+        {podeAtivarNoAparelho(aparelho.estado) && <Botao onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar avisos neste aparelho</Botao>}
+        {podeDesligarNoAparelho(aparelho.estado) && <Botao onClick={aparelho.desligar} disabled={aparelho.estado === 'desativando'}>Desativar avisos neste aparelho</Botao>}
       </section>}
     </Modal>}
   </>

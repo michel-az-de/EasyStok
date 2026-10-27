@@ -67,6 +67,8 @@ registerHooks({
     if (url.endsWith('/aplicacao/useCozinhaApi.js')) return inline(`export const useCozinhaApi=(a)=>{${DE_FORA}.cozinha.args=a;return ${DE_FORA}.cozinha.api}`)
     if (url.endsWith('/aplicacao/usePerdasApi.js')) return inline(`export const usePerdasApi=()=>${DE_FORA}.perdas`)
     if (url.endsWith('/aplicacao/useCadastroEntregaApi.js')) return inline(`export const useCadastroEntregaApi=()=>${DE_FORA}.cadastro`)
+    // #2070: a pendência dos formulários de entrega vai ao contexto da visita, que esta prova não monta.
+    if (url.endsWith('/aplicacao/rascunhosDosAjustes.js')) return inline('export const usePendenciaDoAjuste=()=>{}')
     if (url.endsWith('/aplicacao/useCaixaDoDiaApi.js')) return inline(`export const useCaixaDoDiaApi=()=>${DE_FORA}.caixa`)
     if (url.endsWith('/aplicacao/acessoModulos.jsx')) return inline(`export const useAcessoModulos=()=>({permite:()=>true,...${DE_FORA}.acesso})`)
     if (url.endsWith('/aplicacao/contextos.js')) return inline(`export const useAcoes=()=>${DE_FORA}.acoes;export const useAtendimento=()=>({agora:${DE_FORA}.agora})`)
