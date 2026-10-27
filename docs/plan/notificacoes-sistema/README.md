@@ -29,7 +29,8 @@ no catálogo, e um disparo de teste por tipo prova o caminho inteiro (N13).
 5. [04-equipe-avisada.md](04-equipe-avisada.md): M3, com N4, N10, N11 e N12.
 6. [05-whatsapp-plataforma.md](05-whatsapp-plataforma.md): M4, com N6.
 7. [06-acesso.md](06-acesso.md): M5, com N7, N8 e N9.
-8. Decisões de arquitetura: [ADR-0057](../../adr/0057-notificacoes-de-plataforma.md).
+8. [08-catalogo-mensagens.md](08-catalogo-mensagens.md): inventário de 26/10, matriz tipo x canal e corpo dos modelos Meta.
+9. Decisões de arquitetura: [ADR-0057](../../adr/0057-notificacoes-de-plataforma.md).
 
 ## Ordem
 
@@ -95,5 +96,6 @@ RLS ou policy.
 
 | Spec | Planejado | Executado | Testado | PR | Mergeado | Deployado | Validado |
 |---|---|---|---|---|---|---|---|
-| S0 | sim | #1344 | gate | #1348 | Pendente | N/A | medido em 02/10 (#1344) |
-| N0 a N13 | sim | Pendente | Pendente | Pendente | Pendente | Pendente | Pendente |
+| S0 | sim | #1344 | gate | #1348 | sim | N/A | medido em 02/10 (#1344) |
+| N0 a N13 | sim | sim | sim | #1357 a #1390 | sim | sim | **e-mail ainda `console` em produção (26/10)** |
+| Catálogo (#2074) | [08](08-catalogo-mensagens.md) | sim | sim | Pendente | Pendente | Pendente | Pendente |
