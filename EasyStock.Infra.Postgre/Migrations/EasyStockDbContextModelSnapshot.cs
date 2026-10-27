@@ -2785,6 +2785,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("AlteradoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("ConfiguracaoInicialAdiadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ConfiguracaoInicialConcluidaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConfiguracaoInicialConcluidaPorId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
@@ -7328,6 +7337,34 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("pagamento_attempt_events", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.PassoConfiguracaoInicial", b =>
+                {
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Passo")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("Em")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PorUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Situacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("EmpresaId", "Passo");
+
+                    b.ToTable("configuracao_inicial_passos", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_configuracao_inicial_passos_situacao", "\"Situacao\" IN ('conferido', 'depois')");
+                        });
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Pedido", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9808,6 +9845,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("EhDona")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
@@ -12083,6 +12123,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired();
 
                     b.Navigation("PaymentAttempt");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.PassoConfiguracaoInicial", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Pedido", b =>
