@@ -54,7 +54,7 @@ function CartaoDaLoja({ loja: lida, aoMudarPendencia, aoSalvo }) {
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (!completa || !pendente || salvando) return
+    if (!pendente || salvando) return
     const encontrados = errosDaLoja(form)
     setErros(encontrados)
     if (Object.keys(encontrados).length > 0) return
@@ -71,17 +71,22 @@ function CartaoDaLoja({ loja: lida, aoMudarPendencia, aoSalvo }) {
     limpar()
   }
 
+  // A leitura sem os cinco campos não vira formulário: salvar apagaria o que já está gravado, e campo
+  // vazio pareceria dado que não existe.
+  if (!completa) {
+    return (
+      <section className={css.cartao} aria-labelledby={`${id}-titulo`}>
+        <h3 id={`${id}-titulo`}>{loja.nome || 'Loja'}</h3>
+        <p className={css.aviso}>Estes dados ainda não podem ser editados aqui; fale com o suporte.</p>
+      </section>
+    )
+  }
+
   return (
     <form className={css.cartao} aria-labelledby={`${id}-titulo`} onSubmit={salvar}>
       <h3 id={`${id}-titulo`}>{loja.nome || 'Loja'}</h3>
-      {!completa && (
-        <p className={css.aviso}>
-          Esta versão do EasyStok ainda não devolve a descrição, o documento, o endereço e o telefone da loja.
-          Salvar agora apagaria o que já está gravado, então o cartão fica só para leitura até a atualização.
-        </p>
-      )}
       <Pendencia visivel={pendente && !salvando} />
-      <fieldset className={css.campos} disabled={!completa || salvando}>
+      <fieldset className={css.campos} disabled={salvando}>
         <legend className="sr">Dados de {loja.nome || 'a loja'}</legend>
         <CampoTexto rotulo={ROTULOS.nome} required maxLength={LIMITES_DA_LOJA.nome} value={form.nome} onChange={mudar('nome')} />
         <CampoTexto rotulo={ROTULOS.documento} maxLength={LIMITES_DA_LOJA.documento} inputMode="numeric" value={form.documento} onChange={mudar('documento')} />
@@ -95,7 +100,7 @@ function CartaoDaLoja({ loja: lida, aoMudarPendencia, aoSalvo }) {
       </fieldset>
       <Erros erros={erros} rotulos={ROTULOS} />
       <div className={css.acoes}>
-        <Botao variante="primario" tipo="submit" className={css.toque} disabled={!completa || !pendente || salvando}>Salvar dados da loja</Botao>
+        <Botao variante="primario" tipo="submit" className={css.toque} disabled={!pendente || salvando}>Salvar dados da loja</Botao>
         <Botao variante="texto" className={css.toque} disabled={!pendente || salvando} onClick={desfazer}>Desfazer edição</Botao>
         <Retorno situacao={situacao} />
       </div>

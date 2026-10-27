@@ -23,6 +23,8 @@
 .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
 
 .acoes { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+/* Confirmação de remover: grupo com nome para o leitor de tela, sem a moldura do fieldset. */
+.confirmacao { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; min-width: 0; margin: 0; padding: 0; border: 0; }
 .toque { min-height: var(--toque); }
 
 .chave {

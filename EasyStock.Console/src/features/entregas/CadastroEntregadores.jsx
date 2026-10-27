@@ -57,14 +57,15 @@ export function CadastroEntregadores({ entregadores, ocupado, acoes, aoMudarPend
   )
 }
 
-// Fora das Entregas: a lista e as ações só dos entregadores, com o erro da API à vista.
+// Fora das Entregas: a lista e as ações só dos entregadores, com o erro da API à vista. "Tentar de
+// novo" só relê a lista; cadastro recusado deixa o formulário como estava para enviar outra vez.
 export function CadastroEntregadoresApi({ aoMudarPendencia, aoSalvo, compacto = false }) {
-  const { entregadores, erro, ocupado, acoes, tentarDeNovo } = useEntregadoresApi()
+  const { entregadores, erro, leituraFalhou, ocupado, acoes, tentarDeNovo } = useEntregadoresApi()
   return <>
     {erro && (
       <p className={css.faixa} role="alert">
         <span className={css.cresce}>{erro}</span>
-        <Botao variante="secundario" disabled={ocupado} onClick={tentarDeNovo}>Tentar de novo</Botao>
+        {leituraFalhou && <Botao variante="secundario" disabled={ocupado} onClick={tentarDeNovo}>Tentar de novo</Botao>}
       </p>
     )}
     {entregadores === null

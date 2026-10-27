@@ -4,15 +4,18 @@
 //   A  domínio puro: normalização e validação de cada formulário;
 //   B  montagem real dos componentes com a API simulada no fetch (o `chamarApi` é o de verdade):
 //      editar sem salvar chama aoMudarPendencia(true), salvar chama a rota certa com o corpo certo,
-//      o erro da API aparece em português e o site não mostra os campos proibidos.
+//      sair da tela com edição avisa false, o erro da API aparece em português, o site não mostra os
+//      campos proibidos e o foco do caderno vai e volta pelo `id` (document.getElementById simulado).
 //
-// Pixels, foco e 360 px continuam no navegador.
+// Pixels e as larguras de 360, 768 e 1280 px ficam para o laboratório no navegador.
 //
 //   node ferramentas/prova-2070-formularios.mjs
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { registerHooks } from 'node:module'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { transformWithOxc } from 'vite'
 
 const src = (caminho) => new URL(`../src/${caminho}`, import.meta.url)
@@ -71,6 +74,7 @@ const ehElemento = (valor) => Array.isArray(valor) ? valor.some(ehElemento) : Bo
 class Raiz {
   constructor(elemento) { this.elemento = elemento; this.instancias = new Map(); this.renderizar() }
   renderizar() {
+    g.raizAtual = this
     let voltas = 0
     do {
       assert.ok(voltas++ < 40, 'sem ciclo de renderização')
@@ -118,7 +122,15 @@ class Raiz {
 
 g.sessao = { token: 'token', persistente: false, expiraEm: Date.now() + 3_600_000, empresa: { id: 'emp-1', nome: 'Casa' }, usuario: { id: 'usu-1', nome: 'Ana' } }
 g.contexto = { acoes: {}, estado: {} }
+g.acesso = { acoes: {} }
 g.push = {}
+// Foco: o elemento com o `id` na árvore atual; quem recebeu o foco fica em `g.foco`.
+globalThis.document = {
+  getElementById(id) {
+    const no = g.raizAtual && andar(g.raizAtual.arvore).find((n) => n.props?.id === id)
+    return no ? { focus: () => { g.foco = no } } : null
+  },
+}
 const inline = (source) => ({ format: 'module', shortCircuit: true, source })
 registerHooks({
   resolve(spec, ctx, next) {
@@ -135,7 +147,7 @@ registerHooks({
     if (caminho.endsWith('/infra/api/sessao.js')) return inline('export const lerSessao=()=>globalThis.__prova2070.sessao;export const identidadeDaSessao=(s)=>`${s?.empresa?.id??"-"}:${s?.usuario?.id??"-"}`;export const gravarSessao=(s)=>s;export const limparSessao=()=>{};export const atualizarTokens=(s)=>s;export const empresaDoToken=()=>null')
     if (caminho.endsWith('/infra/pushNavegador.js')) return inline('const p=()=>globalThis.__prova2070.push;export const pushSuportado=()=>p().suportado();export const permissaoPush=()=>p().permissao();export const pedirPermissaoPush=()=>p().pedirPermissao();export const inscricaoPushAtual=(...a)=>p().inscricaoAtual(...a);export const inscreverPushNoNavegador=(...a)=>p().inscrever(...a);export const associarInscricaoPush=(...a)=>p().associar(...a);export const desinscreverPushNoNavegador=(...a)=>p().desinscrever(...a)')
     if (caminho.endsWith('/aplicacao/contextos.js')) return inline('export const useAcoes=()=>globalThis.__prova2070.contexto.acoes;export const useAtendimento=()=>globalThis.__prova2070.contexto.estado;export const useCatalogo=()=>({})')
-    if (caminho.endsWith('/aplicacao/acessoModulos.jsx')) return inline('export const useAcessoModulos=()=>({acoes:{}})')
+    if (caminho.endsWith('/aplicacao/acessoModulos.jsx')) return inline('export const useAcessoModulos=()=>globalThis.__prova2070.acesso')
     if (caminho.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>String(p)})')
     if (caminho.endsWith('.jsx')) return inline([...readFileSync(new URL(caminho), 'utf8').matchAll(/^export (?:function|const) (\w+)/gm)].map((m) => `export const ${m[1]}='${m[1]}'`).join('\n'))
     return next(caminho, ctx)
@@ -213,7 +225,7 @@ const montar = async (Componente, props = {}) => {
 let passou = 0
 const falhas = []
 async function provar(nome, fn) {
-  rede.chamadas = []; rede.rotas = []
+  rede.chamadas = []; rede.rotas = []; g.acesso = { acoes: {} }; g.foco = null
   try { await fn(); passou++; console.log('ok    ' + nome) }
   catch (erro) { falhas.push(nome); console.log('FALHA ' + nome + '\n      ' + String(erro?.message ?? erro).split('\n').join('\n      ')) }
 }
@@ -336,18 +348,96 @@ await provar('A4 caderno: palavras-chave como a API grava, limites e teto do nú
   })
 })
 
-await provar('A5 avisos: cada aviso diz por qual canal chega, sem canal inventado', async () => {
-  const d = await carregar('dominio/avisosDaDona.js')
-  const canais = new Set(Object.values(d.CANAIS_DE_AVISO))
-  assert.ok(d.AVISOS_DA_DONA.length >= 8)
-  assert.equal(new Set(d.AVISOS_DA_DONA.map((a) => a.titulo)).size, d.AVISOS_DA_DONA.length, 'títulos únicos')
-  for (const aviso of d.AVISOS_DA_DONA) {
-    assert.ok(aviso.canais.length > 0, aviso.titulo)
-    for (const canal of aviso.canais) assert.ok(canais.has(canal), `${aviso.titulo}: ${canal}`)
+// O catálogo de rotinas da API, lido do seed: código, evento e canais de cada rotina ativa.
+const raizDoRepo = new URL('../../', import.meta.url)
+function rotinasDoCatalogo() {
+  const seed = readFileSync(new URL('EasyStock.Api/Data/NotificacoesGlobaisSeed.cs', raizDoRepo), 'utf8')
+  const constantes = Object.fromEntries([...seed.matchAll(/const string (\w+) = """(.*?)""";/g)].map(([, nome, valor]) => [nome, valor]))
+  const canaisDe = (literal) => JSON.parse(literal.startsWith('"') ? JSON.parse(literal) : constantes[literal])
+  const corpo = seed.slice(seed.indexOf('BuildDefaultRotinas'))
+  const rotinas = new Map()
+  for (const [, codigo, evento, fallback] of corpo.matchAll(/codigo: "(\w+)",[^;]*?tipoEvento: TipoEventoNotificacao\.(\w+)[^;]*?;\s*\w+\.DefinirFallback\(("(?:[^"\\]|\\.)*")/g)) {
+    rotinas.set(codigo, { evento, canais: canaisDe(fallback) })
   }
-  const contato = d.AVISOS_DA_DONA.find((a) => a.titulo === 'Contato novo')
-  assert.deepEqual(contato.canais, [d.CANAIS_DE_AVISO.TELA, d.CANAIS_DE_AVISO.APARELHO, d.CANAIS_DE_AVISO.SINO])
-  assert.deepEqual(d.AVISOS_DA_DONA.find((a) => a.titulo === 'Mensagem nova de cliente').canais, [d.CANAIS_DE_AVISO.TELA])
+  for (const [, codigo, evento, fallback] of corpo.matchAll(/MakeRotina\("(\w+)",\s*"[^"]*",\s*TipoEventoNotificacao\.(\w+),\s*"\w+",\s*CategoriaConteudoNotificacao\.\w+,\s*("(?:[^"\\]|\\.)*"|\w+)/g)) {
+    rotinas.set(codigo, { evento, canais: canaisDe(fallback) })
+  }
+  for (const [, variavel, codigo] of corpo.matchAll(/var (\w+) = MakeRotina\("(\w+)"/g)) {
+    if (new RegExp(`${variavel}\\.Desativar\\(`).test(corpo)) rotinas.delete(codigo)
+  }
+  return rotinas
+}
+
+// Quem publica cada evento fora do catálogo, da política de validade e dos exemplos.
+function eventosPublicados() {
+  const ignorar = /[\\/](bin|obj|Migrations)[\\/]|NotificacoesGlobaisSeed|RemetentePorTipoEvento|PoliticaValidadeNotificacao|ExemplosDeEvento|TipoEventoNotificacao\.cs$/
+  const publicados = new Set()
+  const andarPasta = (pasta) => {
+    for (const entrada of readdirSync(pasta, { withFileTypes: true })) {
+      const caminho = join(pasta, entrada.name)
+      if (ignorar.test(caminho)) continue
+      if (entrada.isDirectory()) andarPasta(caminho)
+      else if (entrada.name.endsWith('.cs')) for (const [, evento] of readFileSync(caminho, 'utf8').matchAll(/TipoEventoNotificacao\.(\w+)/g)) publicados.add(evento)
+    }
+  }
+  const raiz = fileURLToPath(raizDoRepo)
+  for (const projeto of readdirSync(raiz)) {
+    if (/^EasyStock\.(Application|Domain|Api|Infra\.[A-Za-z]+)$/.test(projeto)) andarPasta(join(raiz, projeto))
+  }
+  return publicados
+}
+
+// Rotina ativa do catálogo que não chega à dona, com o motivo. Rotina nova no seed sem lugar aqui
+// nem em AVISOS_DA_DONA reprova a prova.
+const SEM_PUBLICADOR = 'nenhum código publica o evento'
+const FORA_DA_DONA = {
+  assinatura_expirando_global: SEM_PUBLICADOR, assinatura_expirada_dunning_global: SEM_PUBLICADOR,
+  alerta_estoque_critico_global: SEM_PUBLICADOR, produto_vencido_global: SEM_PUBLICADOR, tarefa_pendente_global: SEM_PUBLICADOR,
+  ticket_criado_global: SEM_PUBLICADOR, ticket_respondido_admin_global: SEM_PUBLICADOR, ticket_status_alterado_global: SEM_PUBLICADOR,
+  ticket_atribuido_global: SEM_PUBLICADOR, ticket_encaminhado_global: SEM_PUBLICADOR, sla_proximo_vencer_global: SEM_PUBLICADOR,
+  sla_violado_global: SEM_PUBLICADOR, bug_fix_criado_global: SEM_PUBLICADOR, ticket_respondido_cliente_global: SEM_PUBLICADOR,
+  convite_csat_global: SEM_PUBLICADOR, fatura_criada_global: SEM_PUBLICADOR, fatura_vencendo_global: SEM_PUBLICADOR,
+  fatura_paga_global: SEM_PUBLICADOR, fatura_vencida_global: SEM_PUBLICADOR, pagamento_confirmado_global: SEM_PUBLICADOR,
+  pagamento_falhou_global: SEM_PUBLICADOR, broadcast_super_admin_global: SEM_PUBLICADOR, relatorio_pronto_global: SEM_PUBLICADOR,
+  relatorio_falhou_global: SEM_PUBLICADOR, relatorio_expirado_global: SEM_PUBLICADOR,
+  produto_vencendo_global: 'o coletor publica sem destinatário e a rotina não tem audiência: o e-mail não tem para quem ir',
+  pedido_pago_confirmado_global: 'vai ao cliente', pedido_em_preparo_global: 'vai ao cliente', pedido_reagendado_global: 'vai ao cliente',
+  comanda_atualizada_global: 'vai ao cliente', pedido_saiu_para_entrega_global: 'vai ao cliente', pedido_entregue_global: 'vai ao cliente',
+  avaliacao_solicitada_global: 'vai ao cliente', reembolso_efetuado_global: 'vai ao cliente',
+  incidente_sistema_global: 'vai ao suporte da plataforma (superadmins)',
+}
+
+await provar('A5 avisos: cada aviso bate com o catálogo da API e com os avisos da tela; toda rotina ativa chega à dona ou tem motivo', async () => {
+  const d = await carregar('dominio/avisosDaDona.js')
+  const { TIPOS_DE_AVISO } = await carregar('dominio/aviso.js')
+  const { TELA, APARELHO, SINO, EMAIL, WHATSAPP } = d.CANAIS_DE_AVISO
+  const catalogo = rotinasDoCatalogo()
+  assert.equal(catalogo.has('resumo_diario_global'), false, 'o molde inativo do resumo diário não conta')
+  assert.deepEqual(catalogo.get('contato_novo_balcao_global'), { evento: 'ContatoNovoNoBalcao', canais: ['Push', 'InApp'] }, 'a leitura do seed resolve a constante')
+
+  const daDona = d.AVISOS_DA_DONA.flatMap((aviso) => aviso.rotinas)
+  assert.equal(new Set(daDona).size, daDona.length, 'cada rotina num aviso só')
+  assert.deepEqual(daDona.filter((codigo) => codigo in FORA_DA_DONA), [], 'rotina da dona não está na lista de fora')
+  assert.deepEqual([...new Set([...daDona, ...Object.keys(FORA_DA_DONA)])].sort(), [...catalogo.keys()].sort(),
+    'toda rotina ativa do catálogo está num aviso da dona ou tem motivo escrito, e nenhum aviso cita rotina que não existe')
+
+  const publicados = eventosPublicados()
+  const semPublicador = Object.keys(FORA_DA_DONA).filter((codigo) => FORA_DA_DONA[codigo] === SEM_PUBLICADOR)
+  assert.deepEqual(semPublicador.filter((codigo) => publicados.has(catalogo.get(codigo).evento)), [], 'quem é "sem publicador" não tem publicador')
+  assert.deepEqual(daDona.filter((codigo) => !publicados.has(catalogo.get(codigo).evento)), [], 'todo aviso da dona tem quem publique o evento')
+
+  const ORDEM = [TELA, APARELHO, SINO, EMAIL, WHATSAPP]
+  for (const aviso of d.AVISOS_DA_DONA) {
+    const esperado = new Set(aviso.rotinas.flatMap((codigo) => catalogo.get(codigo).canais.map((canal) => d.CANAL_DA_ROTINA[canal])))
+    if (aviso.tela) esperado.add(TELA)
+    if (aviso.rotinas.length === 0 && !aviso.tela) esperado.add(SINO) // alertas do analisador de estoque
+    assert.deepEqual(aviso.canais, ORDEM.filter((canal) => esperado.has(canal)), aviso.titulo)
+  }
+  assert.deepEqual(d.AVISOS_DA_DONA.map((a) => a.tela).filter(Boolean).sort(), Object.values(TIPOS_DE_AVISO).sort(), 'os cinco avisos da tela do Balcão')
+  assert.deepEqual(d.AVISOS_DA_DONA.filter((a) => a.rotinas.length === 0 && !a.tela).map((a) => a.titulo), ['Alertas de estoque'])
+  assert.match(readFileSync(new URL('EasyStock.Api/Services/GeradorNotificacoesAutomaticas.cs', raizDoRepo), 'utf8'), /sino da equipe/,
+    'os alertas de estoque vão ao sino pelo analisador, fora do catálogo')
+  assert.equal(new Set(d.AVISOS_DA_DONA.map((a) => a.titulo)).size, d.AVISOS_DA_DONA.length, 'títulos únicos')
 })
 
 // --- B. Montagem com a API simulada -------------------------------------------------------------------
@@ -390,11 +480,25 @@ await provar('B1 dados da loja: erro da API em português e a edição fica; sem
   rede.rotas = []; rede.chamadas = []
   responder('GET', LOJAS, { dados: [{ id: 'l1', empresaId: 'emp-1', nome: 'Casa da Baba', ativa: true, logoUrl: null }] })
   const curta = await montar(AbaDadosDaLoja)
-  mudar(curta.raiz, 'Nome da loja', 'Casa da Baba Massas')
-  assert.equal(botao(curta.raiz, 'Salvar dados da loja').props.disabled, true)
-  assert.match(texto(curta.raiz.arvore), /ainda não devolve/)
-  await enviar(curta.raiz)
-  assert.equal(escritas().length, 0, 'sem a leitura completa, salvar apagaria descrição, documento, endereço e telefone')
+  assert.deepEqual(rotulos(curta.raiz), [], 'sem a leitura completa nenhum campo aparece vazio, como se não existisse')
+  assert.equal(botao(curta.raiz, 'Salvar dados da loja'), undefined)
+  assert.equal(formularios(curta.raiz).length, 0, 'sem a leitura completa, salvar apagaria descrição, documento, endereço e telefone')
+  assert.match(texto(curta.raiz.arvore), /Casa da Baba/)
+  assert.match(texto(curta.raiz.arvore), /Estes dados ainda não podem ser editados aqui; fale com o suporte\./)
+  assert.doesNotMatch(texto(curta.raiz.arvore), /versão|devolve/, 'o texto fala com a dona, não da versão da API')
+  assert.deepEqual(curta.aoMudarPendencia.chamadas, [])
+  assert.equal(escritas().length, 0)
+})
+
+await provar('B1 dados da loja: sair da tela com a edição aberta avisa que a pendência acabou', async () => {
+  const { AbaDadosDaLoja } = await carregar('features/gestao/loja/AbaDadosDaLoja.jsx')
+  responder('GET', LOJAS, { dados: [LOJA] })
+  const { raiz, aoMudarPendencia } = await montar(AbaDadosDaLoja)
+  mudar(raiz, 'Telefone', '(11) 98765-4321')
+  assert.deepEqual(aoMudarPendencia.chamadas, [true])
+  raiz.desmontar()
+  assert.deepEqual(aoMudarPendencia.chamadas, [true, false], 'a edição local se perde ao sair: quem monta deixa de bloquear')
+  assert.equal(escritas().length, 0)
 })
 
 const CONFIG_SITE = {
@@ -412,6 +516,7 @@ await provar('B2 site: sem site oferece criar com nome e endereço; criar faz PO
   responder('POST', '/api/minha-vitrine', () => { criado = true; return { status: 201, dados: { storefrontId: 's1', slug: 'casa-da-baba' } } })
   const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaSiteEImpressos)
   assert.deepEqual(rotulos(raiz), ['Nome do site', 'Endereço do site'])
+  assert.match(texto(raiz.arvore), /O site nasce fora do ar: quem coloca no ar é o suporte\./, 'criar não promete site no ar')
   mudar(raiz, 'Nome do site', 'Casa da Babá')
   assert.equal(aoMudarPendencia.chamadas.at(-1), true)
   assert.equal(campo(raiz, 'Endereço do site').props.value, 'casa-da-baba', 'o endereço nasce do nome enquanto ela não mexe nele')
@@ -420,6 +525,8 @@ await provar('B2 site: sem site oferece criar com nome e endereço; criar faz PO
   assert.equal(aoSalvo.chamadas.length, 1)
   assert.equal(aoMudarPendencia.chamadas.at(-1), false)
   assert.ok(campo(raiz, 'Subtítulo'), 'depois de criar, a configuração aparece')
+  assert.match(texto(raiz.arvore), /Fora do ar: os clientes ainda não abrem o site\. Quem coloca o site no ar é o suporte\./)
+  assert.deepEqual(andar(raiz.arvore).filter((n) => n.type === 'Botao' && /no ar/i.test(texto(n))), [], 'a situação é só leitura')
 })
 
 await provar('B2 site: mostra só os campos do passo e o PUT reenvia o grupo de marca inteiro', async () => {
@@ -428,9 +535,19 @@ await provar('B2 site: mostra só os campos do passo e o PUT reenvia o grupo de 
   responder('GET', '/api/minha-vitrine/configuracao', { dados: CONFIG_SITE })
   responder('PUT', '/api/minha-vitrine/configuracao', ({ corpo }) => ({ dados: { ...CONFIG_SITE, ...corpo } }))
   const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaSiteEImpressos)
-  assert.deepEqual(rotulos(raiz), ['Subtítulo', 'Cor principal', 'WhatsApp de pedidos', 'Pedido mínimo para entrega', 'Frete grátis acima de'])
+  assert.deepEqual(rotulos(raiz), ['WhatsApp de pedidos', 'Subtítulo', 'Cor principal', 'Pedido mínimo para entrega', 'Frete grátis acima de'])
   assert.doesNotMatch(todoTexto(raiz), PROIBIDOS, 'nada de ativar o site, domínio, mensagem de fora da área, loja padrão ou fiscal')
   assert.doesNotMatch(todoTexto(raiz), /Ainda não chegamos aí|casadababa\.com/, 'o valor dos campos fora do passo não aparece')
+  assert.match(texto(raiz.arvore), /No ar: os clientes já abrem o site\./)
+  // Só o WhatsApp e o logo mudam algo hoje (impressos); o resto fica guardado e a tela diz isso.
+  assert.match(campo(raiz, 'WhatsApp de pedidos').props.dica, /Sai nos impressos dos pedidos\./)
+  const aviso = andar(raiz.arvore).find((n) => /ficam guardados/.test(texto(n)) && n.props?.id)
+  assert.ok(aviso, 'o aviso do que ainda não vale para os clientes')
+  assert.equal(texto(aviso), 'Subtítulo, cor, pedido mínimo e frete grátis ficam guardados, mas o site e o fechamento do pedido ainda não usam: por enquanto o cliente não vê nem é cobrado por eles.')
+  for (const rotulo of ['Subtítulo', 'Cor principal', 'Pedido mínimo para entrega', 'Frete grátis acima de']) {
+    assert.equal(campo(raiz, rotulo).props['aria-describedby'], aviso.props.id, `${rotulo} aponta para o aviso`)
+  }
+  assert.doesNotMatch(todoTexto(raiz), /sem mínimo|no topo do site|cor padrão do site/, 'nenhuma dica promete efeito que o site ainda não tem')
   mudar(raiz, 'Subtítulo', 'Massas frescas')
   mudar(raiz, 'Pedido mínimo para entrega', 4000)
   assert.equal(aoMudarPendencia.chamadas.at(-1), true)
@@ -476,6 +593,67 @@ await provar('B2 site: um envio de logo grava o da loja e depois o do site, sem 
   assert.equal(chamadasDe('POST', /uploads/).length, 1, 'arquivo recusado não sobe')
 })
 
+await provar('B2 site: logo e Salvar o site não correm juntos; o logo conta como pendência e avisa aoSalvo', async () => {
+  const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
+  let gravado = { ...CONFIG_SITE }
+  const espera = {}
+  const segurar = (nome, resposta) => new Promise((resolver) => { espera[nome] = () => resolver(resposta()) })
+  responder('GET', '/api/minha-vitrine', { dados: { storefrontId: 's1', slug: 'casa-da-baba', tituloPublico: 'Casa da Baba', ativo: true } })
+  responder('GET', '/api/minha-vitrine/configuracao', () => ({ dados: gravado }))
+  responder('GET', LOJAS, { dados: [LOJA] })
+  responder('POST', '/api/uploads/loja/logo?lojaId=l1', () => segurar('upload', () => ({ dados: { url: '/uploads/lojas/emp-1/l1/logo/novo.png' } })))
+  responder('PUT', '/api/minha-vitrine/configuracao', ({ corpo }) => { gravado = { ...gravado, ...corpo }; return { dados: gravado } })
+  const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaSiteEImpressos)
+  const formularioDoSite = () => formularios(raiz).find((f) => texto(f).includes('Salvar o site'))
+  const arquivo = () => andar(raiz.arvore).find((n) => n.type === 'input' && n.props?.type === 'file')
+
+  const escolha = arquivo().props.onChange({ target: { files: [new File([new Uint8Array(10)], 'logo.png', { type: 'image/png' })], value: 'x' } })
+  await raiz.atualizar()
+  assert.deepEqual(aoMudarPendencia.chamadas, [true], 'o logo subindo segura "Conferi, seguir"')
+  mudar(raiz, 'Subtítulo', 'Massas frescas')
+  assert.equal(botao(raiz, 'Salvar o site').props.disabled, true, 'Salvar espera o logo')
+  await enviar(raiz, formularioDoSite())
+  assert.equal(chamadasDe('PUT', '/api/minha-vitrine/configuracao').length, 0, 'nada do site vai enquanto o logo sobe')
+  espera.upload()
+  await escolha
+  await raiz.atualizar()
+  assert.deepEqual(chamadasDe('PUT', '/api/minha-vitrine/configuracao').map((c) => c.corpo), [{
+    subtituloPublico: 'Massas', logoUrl: '/uploads/lojas/emp-1/l1/logo/novo.png', corPrimaria: '#8b1e3f', whatsappPedidos: '(11) 99999-0000', mensagemForaArea: 'Ainda não chegamos aí',
+  }], 'o logo leva a marca gravada, não a edição aberta')
+  assert.equal(aoSalvo.chamadas.length, 1, 'logo gravado avisa aoSalvo')
+  assert.equal(aoMudarPendencia.chamadas.at(-1), true, 'o subtítulo editado continua pendente')
+
+  await enviar(raiz, formularioDoSite())
+  assert.deepEqual(chamadasDe('PUT', '/api/minha-vitrine/configuracao').map((c) => c.corpo).at(-1), {
+    subtituloPublico: 'Massas frescas', logoUrl: '/uploads/lojas/emp-1/l1/logo/novo.png', corPrimaria: '#8b1e3f', whatsappPedidos: '(11) 99999-0000', mensagemForaArea: 'Ainda não chegamos aí',
+  }, 'o Salvar seguinte parte do logo novo')
+  assert.equal(aoSalvo.chamadas.length, 2)
+  assert.equal(aoMudarPendencia.chamadas.at(-1), false)
+
+  rede.rotas = rede.rotas.filter((r) => r.metodo !== 'PUT')
+  responder('PUT', '/api/minha-vitrine/configuracao', ({ corpo }) => segurar('salvar', () => { gravado = { ...gravado, ...corpo }; return { dados: gravado } }))
+  mudar(raiz, 'Cor principal', '#000000')
+  const salvando = formularioDoSite().props.onSubmit({ preventDefault() {} })
+  await raiz.atualizar()
+  assert.equal(botao(raiz, 'Trocar logo').props.disabled, true, 'o logo espera o Salvar')
+  espera.salvar()
+  await salvando
+  await raiz.atualizar()
+  assert.equal(botao(raiz, 'Trocar logo').props.disabled, false)
+})
+
+await provar('B2 site: sair da tela com a edição aberta avisa que a pendência acabou', async () => {
+  const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
+  responder('GET', '/api/minha-vitrine', { dados: { storefrontId: 's1', slug: 'casa-da-baba', tituloPublico: 'Casa da Baba', ativo: true } })
+  responder('GET', '/api/minha-vitrine/configuracao', { dados: CONFIG_SITE })
+  const { raiz, aoMudarPendencia } = await montar(AbaSiteEImpressos)
+  mudar(raiz, 'Subtítulo', 'Massas frescas')
+  assert.deepEqual(aoMudarPendencia.chamadas, [true])
+  raiz.desmontar()
+  assert.deepEqual(aoMudarPendencia.chamadas, [true, false])
+  assert.equal(escritas().length, 0)
+})
+
 await provar('B3 alertas de estoque: a loja da empresa, sem moeda, fuso nem KDS, e PATCH só do que mudou', async () => {
   const { AbaAlertasDeEstoque } = await carregar('features/gestao/estoque/AbaAlertasDeEstoque.jsx')
   const config = { lojaId: 'l1', diasAlertaValidade: 7, diasAlertaParado: 30, quantidadeMinimaPadrao: 10, quantidadeCriticaPadrao: 3, notificarEstoqueCritico: true, notificarValidade: true, notificarParado: true, notificarReposicao: true, fifoAtivo: true, moeda: 'BRL', timezone: 'America/Sao_Paulo', kdsHabilitado: true }
@@ -512,7 +690,9 @@ await provar('B4 caderno: explica o uso, cria, edita e remove trechos pelas rota
   assert.match(texto(raiz.arvore), /agente/i)
   assert.match(texto(raiz.arvore), /núcleo/i)
   assert.match(texto(raiz.arvore), /Entregamos até 5 km\./)
+  const focado = () => [g.foco?.type, g.foco?.props?.['aria-label'] ?? texto(g.foco).trim()]
   await clicar(raiz, 'Novo trecho')
+  assert.deepEqual(focado(), ['h3', 'Novo trecho'], 'o foco vai ao título do formulário')
   mudar(raiz, 'Título', 'Alergias')
   mudar(raiz, 'Texto', 'Não temos opção sem glúten.')
   mudar(raiz, 'Palavras-chave', 'Glúten; alergia')
@@ -522,20 +702,55 @@ await provar('B4 caderno: explica o uso, cria, edita e remove trechos pelas rota
   assert.equal(aoSalvo.chamadas.length, 1)
   assert.equal(aoMudarPendencia.chamadas.at(-1), false)
   assert.match(texto(raiz.arvore), /Alergias/)
+  assert.deepEqual(focado(), ['Botao', 'Novo trecho'], 'salvo, o foco volta ao botão de origem')
 
   await clicar(raiz, 'Editar: Entrega')
+  assert.deepEqual(focado(), ['h3', 'Editar “Entrega”'])
   assert.equal(campo(raiz, 'Texto').props.value, 'Entregamos até 5 km.')
   mudar(raiz, 'Texto', 'Entregamos até 7 km.')
   assert.equal(aoMudarPendencia.chamadas.at(-1), true)
   await enviar(raiz)
   assert.deepEqual(chamadasDe('PUT', '/api/atendimento/caderno/t1').map((c) => c.corpo), [{ titulo: 'Entrega', texto: 'Entregamos até 7 km.', palavrasChave: 'entrega, frete', nucleo: true }])
   assert.equal(aoSalvo.chamadas.length, 2)
+  assert.deepEqual(focado(), ['Botao', 'Editar: Entrega'])
 
   await clicar(raiz, 'Remover: Alergias')
   assert.equal(chamadasDe('POST', /arquivar/).length, 0, 'remover pede confirmação antes')
+  assert.deepEqual(focado(), ['Botao', 'Remover do caderno'], 'o foco vai à confirmação')
+  assert.equal(andar(raiz.arvore).some((n) => n.props?.role === 'alertdialog'), false, 'não promete um diálogo modal')
+  const grupo = andar(raiz.arvore).find((n) => n.type === 'fieldset' && texto(n).includes('do caderno?'))
+  assert.ok(grupo, 'a confirmação é um grupo (fieldset)')
+  assert.equal(texto(andar(grupo).find((n) => n.type === 'legend')), 'Remover Alergias', 'com nome para o leitor de tela')
+  await clicar(raiz, 'Manter')
+  assert.deepEqual(focado(), ['Botao', 'Remover: Alergias'], 'manter devolve o foco ao botão de origem')
+  await clicar(raiz, 'Remover: Alergias')
   await clicar(raiz, 'Remover do caderno')
   assert.equal(chamadasDe('POST', '/api/atendimento/caderno/t2/arquivar?arquivado=true').length, 1)
   assert.doesNotMatch(texto(raiz.arvore), /Alergias/)
+  assert.deepEqual(focado(), ['h3', 'Caderno do agente'], 'o trecho saiu: o foco vai ao título do caderno')
+})
+
+await provar('B4 caderno: cancelar devolve o foco, remoção que falha fala da remoção e o compacto encurta a explicação', async () => {
+  const { AbaCadernoDoAgente } = await carregar('features/gestao/caderno/AbaCadernoDoAgente.jsx')
+  responder('GET', '/api/atendimento/caderno', { dados: [{ id: 't1', codigo: 't1', titulo: 'Entrega', texto: 'Até 5 km.', palavrasChave: '', nucleo: false, arquivado: false }] })
+  responder('POST', '/api/atendimento/caderno/t1/arquivar?arquivado=true', { status: 403 })
+  const { raiz, aoSalvo } = await montar(AbaCadernoDoAgente, { compacto: true })
+  assert.match(texto(raiz.arvore), /O agente do atendimento consulta este caderno para responder os clientes\./)
+  assert.doesNotMatch(texto(raiz.arvore), /índice/, 'no compacto fica só a explicação curta')
+  const completo = await montar(AbaCadernoDoAgente)
+  assert.match(texto(completo.raiz.arvore), /Os outros ficam num índice/)
+  completo.raiz.desmontar()
+  await raiz.atualizar()
+
+  await clicar(raiz, 'Editar: Entrega')
+  await clicar(raiz, 'Cancelar')
+  assert.deepEqual([g.foco?.type, g.foco?.props?.['aria-label']], ['Botao', 'Editar: Entrega'], 'cancelar devolve o foco ao botão de origem')
+
+  await clicar(raiz, 'Remover: Entrega')
+  await clicar(raiz, 'Remover do caderno')
+  assert.match(texto(raiz.arvore), /Não foi possível remover o trecho\. Seu usuário não tem permissão para isso\./)
+  assert.doesNotMatch(texto(raiz.arvore), /Sua edição continua na tela|Não foi possível salvar/, 'não houve edição, houve remoção')
+  assert.equal(aoSalvo.chamadas.length, 0)
 })
 
 await provar('B4 caderno: núcleo acima do teto não envia e o erro da API aparece', async () => {
@@ -567,18 +782,26 @@ await provar('B5 avisos: só leitura do que chega e por onde; ligar neste aparel
   assert.equal(ativou, 1)
   assert.equal(externo.aoMudarPendencia.chamadas.includes(true), false)
 
-  g.push = {
-    suportado: () => true, permissao: () => 'default', pedirPermissao: async () => 'granted', inscricaoAtual: async () => null,
-    inscrever: async () => ({ endpoint: 'https://push.exemplo.test/1', p256dh: 'p', auth: 'a' }), associar() {}, desinscrever: async () => {},
-  }
-  responder('GET', '/api/pwa/push/vapid-public', { dados: { publicKey: 'BAA' } })
-  responder('POST', '/api/pwa/push/subscribe', { dados: { ok: true } })
-  const proprio = await montar(AbaAvisos)
-  assert.match(texto(proprio.raiz.arvore), /Receba avisos desta conta mesmo com o Console fechado\./)
-  await clicar(proprio.raiz, 'Ativar avisos neste aparelho')
-  assert.deepEqual(chamadasDe('POST', '/api/pwa/push/subscribe').map((c) => c.corpo.endpoint), ['https://push.exemplo.test/1'])
-  assert.match(texto(proprio.raiz.arvore), /Avisos desta conta ativados neste aparelho\./)
-  assert.ok(botao(proprio.raiz, 'Desativar avisos neste aparelho'))
+
+  // A ativação do App (a mesma do sino) chega pelo contexto de acesso: uma instância só.
+  let desligou = 0
+  g.acesso = { acoes: {}, aparelho: { estado: 'ativo', mensagem: null, ativar() {}, desligar: () => { desligou++ } } }
+  const doApp = await montar(AbaAvisos)
+  assert.match(texto(doApp.raiz.arvore), /Avisos desta conta ativados neste aparelho\./)
+  await clicar(doApp.raiz, 'Desativar avisos neste aparelho')
+  assert.equal(desligou, 1)
+
+  // Sem a ativação do App, a aba não cria outra: aponta para o sino e não toca no navegador nem na API.
+  const tocou = []
+  g.push = new Proxy({}, { get: (_, nome) => () => { tocou.push(nome); throw new Error(`push.${String(nome)} não devia ser chamado`) } })
+  g.acesso = { acoes: {} }
+  const solta = await montar(AbaAvisos)
+  assert.equal(botao(solta.raiz, 'Ativar avisos neste aparelho'), undefined)
+  assert.match(texto(solta.raiz.arvore), /Para ligar os avisos neste aparelho, toque no sino de Avisos no topo da tela\./)
+  assert.deepEqual(tocou, [])
+  assert.deepEqual(rede.chamadas, [], 'nem conferir nem inscrever de novo')
+  for (const aviso of AVISOS_DA_DONA) assert.match(texto(solta.raiz.arvore), new RegExp(aviso.titulo))
+  assert.doesNotMatch(fonte('aplicacao/useAvisosNoAparelho.js'), /useAvisosNoAparelhoDaSessao/, 'a segunda instância não existe mais')
 })
 
 await provar('B6 entregadores: o cadastro extraído avisa pendência e chama a mesma ação de antes', async () => {
@@ -619,7 +842,24 @@ await provar('B6 entregadores: a versão autônoma lê e cadastra pela rota de e
   responder('POST', '/api/atendimento/entregadores', { status: 403 })
   mudar(raiz, 'Nome', 'Bia')
   await enviar(raiz)
-  assert.match(texto(raiz.arvore), /O entregador não foi cadastrado: Seu usuário não tem permissão para isso\./)
+  const alerta = andar(raiz.arvore).find((n) => n.props?.role === 'alert')
+  assert.equal(texto(alerta).trim(), 'O entregador não foi cadastrado: Seu usuário não tem permissão para isso.')
+  assert.equal(botao(raiz, 'Tentar de novo'), undefined, 'erro de cadastro não oferece reler a lista')
+  assert.equal(campo(raiz, 'Nome').props.value, 'Bia', 'o formulário fica para enviar de novo')
+  assert.equal(botao(raiz, 'Cadastrar').props.disabled, false)
+})
+
+await provar('B6 entregadores: a lista que não carregou oferece tentar de novo e relê', async () => {
+  const { CadastroEntregadoresApi } = await carregar('features/entregas/CadastroEntregadores.jsx')
+  let falhar = true
+  responder('GET', '/api/atendimento/entregadores', () => (falhar ? { status: 500, erro: { code: 'ERRO', message: 'Falha no servidor.' } } : { dados: [{ id: 'e1', nome: 'João' }] }))
+  const { raiz } = await montar(CadastroEntregadoresApi)
+  assert.match(texto(raiz.arvore), /Os entregadores não carregaram:/)
+  falhar = false
+  await clicar(raiz, 'Tentar de novo')
+  assert.equal(chamadasDe('GET', '/api/atendimento/entregadores').length, 2)
+  assert.match(texto(raiz.arvore), /João/)
+  assert.equal(botao(raiz, 'Tentar de novo'), undefined)
 })
 
 await provar('B7 horários: o formulário extraído grava a semana, avisa pendência e o modal segue como casca', async () => {
@@ -655,7 +895,8 @@ await provar('B7 horários: o formulário extraído grava a semana, avisa pendê
   assert.doesNotMatch(fonte('features/automacoes/ModalHorariosDaSemana.jsx'), /useState|useEffect|salvarHorariosExpediente/, 'o modal é só casca')
 })
 
-await provar('C  os formulários cabem em 360 px: uma coluna, sem largura fixa maior que a tela', async () => {
+// Só o CSS: 360, 768 e 1280 px na tela real ficam para o laboratório.
+await provar('C  CSS dos formulários: colunas que encolhem e nenhuma largura fixa acima de 328 px', async () => {
   const estilo = fonte('features/gestao/formularioDeAjuste.module.css')
   assert.match(estilo, /grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, \d+px\), 1fr\)\)/)
   for (const [, largura] of estilo.matchAll(/(?:^|[^-])width:\s*(\d+)px/g)) assert.ok(Number(largura) <= 328, `largura fixa ${largura}px`)

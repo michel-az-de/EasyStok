@@ -17,13 +17,14 @@ export const criarSite = (form) => criarVitrine(corpoDaCriacao(form))
 export const salvarSite = (configuracao, form) => salvarConfiguracaoDoSite(corpoDoSite(configuracao, form))
 
 // Um envio: o logo da loja (impressos) e, com a URL que a API devolveu, o logo do site. O envio
-// apaga o logo anterior da loja, então o site precisa da URL nova logo em seguida.
-export async function enviarLogoDoSite(configuracao, arquivo) {
+// apaga o logo anterior da loja, então o site precisa da URL nova logo em seguida. A configuração
+// é lida depois do upload (`lerConfiguracao`): o PUT leva a marca gravada mais recente.
+export async function enviarLogoDoSite(lerConfiguracao, arquivo) {
   const loja = await obterLojaDaEmpresa()
   const url = await enviarArquivoDoLogo(loja.id, arquivo)
   if (!url) throw new Error('O EasyStok não devolveu o endereço do logo. Tente de novo.')
   try {
-    return await salvarConfiguracaoDoSite(corpoDoLogoNoSite(configuracao, url))
+    return await salvarConfiguracaoDoSite(corpoDoLogoNoSite(lerConfiguracao(), url))
   } catch (erro) {
     throw new Error(`O logo já vale para os impressos, mas o site não foi atualizado: ${erro.message} Envie o logo de novo.`, { cause: erro })
   }

@@ -3,16 +3,22 @@ import { criarEntregador, desativarEntregador, listarEntregadores } from '../inf
 
 // Só o cadastro de entregadores (#2070), para quem mostra o cadastro fora das Entregas: sem pedidos,
 // viagens nem tempo real. As ações têm o contrato das de `useEntregasApi` (resolvem true ou false) e
-// relêem a lista depois de aceitas.
+// relêem a lista depois de aceitas. `leituraFalhou` separa a lista que não carregou (reler resolve)
+// da ação recusada (reler não reenvia nada).
 export function useEntregadoresApi() {
   const [entregadores, setEntregadores] = useState(null)
   const [erro, setErro] = useState(null)
+  const [leituraFalhou, setLeituraFalhou] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const vivo = useRef(true)
 
   const ler = useCallback(() => listarEntregadores()
-    .then((lista) => { if (vivo.current) setEntregadores(lista ?? []) })
-    .catch((e) => { if (vivo.current) setErro(`Os entregadores não carregaram: ${e.message}`) }), [])
+    .then((lista) => { if (vivo.current) { setEntregadores(lista ?? []); setLeituraFalhou(false) } })
+    .catch((e) => {
+      if (!vivo.current) return
+      setErro(`Os entregadores não carregaram: ${e.message}`)
+      setLeituraFalhou(true)
+    }), [])
 
   useEffect(() => {
     vivo.current = true
@@ -33,5 +39,5 @@ export function useEntregadoresApi() {
     criarEntregador: (corpo) => executar(() => criarEntregador(corpo), 'O entregador não foi cadastrado'),
     desativarEntregador: (id) => executar(() => desativarEntregador(id), 'O entregador não foi desativado'),
   }
-  return { entregadores, erro, ocupado, acoes, tentarDeNovo: () => { setErro(null); return ler() } }
+  return { entregadores, erro, leituraFalhou, ocupado, acoes, tentarDeNovo: () => { setErro(null); return ler() } }
 }
