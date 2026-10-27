@@ -105,5 +105,8 @@ public enum TipoEventoNotificacao
 
     // #2004: a automática de "pagamento confirmado" não teve resposta do canal e pode não ter chegado ao cliente; o aviso
     // S13 não sai para não duplicar. Aviso no sino para a equipe conferir a conversa.
-    PagamentoSemAvisoAoCliente = 90
+    PagamentoSemAvisoAoCliente = 90,
+
+    /// <summary>#2096: aviso da operação para dona e gerente (encomenda, estoque, IA do atendimento). Interno.</summary>
+    AlertaOperacao = 91
 }

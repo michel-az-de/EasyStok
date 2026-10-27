@@ -58,6 +58,8 @@ export const MODULOS = [
     telas: [
       { id: 'balcao', rotulo: 'Balcão', tipo: TELA_OPERACAO },
       { id: 'horarios', rotulo: 'Horários e mensagens', tipo: TELA_AJUSTE, aba: 'atendimento', soApi: true },
+      // #2096: o que chama a dona e o gerente (aparelho, e-mail e sino); mesma permissão do módulo.
+      { id: 'avisos', rotulo: 'Avisos', tipo: TELA_AJUSTE, aba: 'avisos', soApi: true },
       // #1441: criar, editar e arquivar respostas prontas; ligar e escrever as automáticas.
       { id: 'respostas', rotulo: 'Respostas e automáticas', tipo: TELA_AJUSTE, aba: 'respostas' },
     ],

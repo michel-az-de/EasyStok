@@ -39,10 +39,12 @@ public sealed class ImpressaoPendenteRepository(EasyStockDbContext db) : IImpres
                 i.Status == StatusImpressao.Impressa ? "impressa" : i.Status == StatusImpressao.Falhou ? "falhou" : "preparada",
                 i.CriadaEm, i.ImpressaEm)).ToListAsync(ct);
 
-    public async Task<IReadOnlyList<ImpressaoPendente>> ListarPendentesAsync(Guid empresaId, int limite, CancellationToken ct = default) =>
+    public async Task<IReadOnlyList<ImpressaoPendente>> ListarPendentesAsync(
+        Guid empresaId, int limite, CancellationToken ct = default, DateTime? criadasDesde = null) =>
         await db.ImpressoesPendentes
             .AsNoTracking()
             .Where(i => i.EmpresaId == empresaId && i.Tipo == TipoImpressao.Canhoto && i.Status == StatusImpressao.Pendente)
+            .Where(i => criadasDesde == null || i.CriadaEm >= criadasDesde)
             .OrderBy(i => i.CriadaEm)
             .ThenBy(i => i.Id)
             .Take(Math.Clamp(limite, 1, 500))

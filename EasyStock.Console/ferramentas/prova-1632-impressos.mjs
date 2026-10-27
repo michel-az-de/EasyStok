@@ -40,6 +40,9 @@ const PADRAO = {
   papeis: { pedido: 'cupom-80', agendamento: 'a5', entrega: 'etiqueta-10x15', cozinha: 'cupom-80' },
   perfis: { pedido: 'termica-80', agendamento: 'hp-a5', entrega: 'etiqueta-10x15', cozinha: 'termica-80' },
   logoTermica: false,
+  // #2096: canhoto sozinho neste aparelho, desligado por padrão.
+  canhotoAutomatico: false,
+  canhotoAutomaticoDesde: null,
 }
 
 function armazenamentoFalso(inicial = {}) {

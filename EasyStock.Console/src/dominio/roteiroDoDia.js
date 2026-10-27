@@ -107,7 +107,20 @@ function linhaDoPedido(p, achado, entregadores) {
     entregador: entregadorDe(achado, entregadores),
     viagem: viagem ? { id: viagem.id, situacao: viagem.situacao } : null,
     podePorNaViagem: p.status === 'pronto' && !viagem,
+    // #2096: encomenda que o cliente confirmou (ISO) e o horário agendado, para o selo e o botão.
+    agendadoParaEm: p.agendadoParaEm ?? null,
+    confirmadoPeloClienteEm: p.confirmadoPeloClienteEm ?? null,
   }
+}
+
+// #2096: confirmação do cliente numa encomenda. 'confirmada' mostra o selo; 'pendente' mostra o
+// botão "Cliente confirmou" (agendada para depois de agora, ainda não saiu nem acabou); null, nada.
+const SEM_CONFIRMACAO = new Set(['saiu_para_entrega', 'entregue', 'cancelado'])
+export function confirmacaoDoCliente(pedido, agora) {
+  if (!pedido || SEM_CONFIRMACAO.has(pedido.status)) return null
+  if (pedido.confirmadoPeloClienteEm) return 'confirmada'
+  const quando = Date.parse(pedido.agendadoParaEm ?? '')
+  return Number.isFinite(quando) && quando > agora ? 'pendente' : null
 }
 
 function novoGrupo({ chave, label, inicio, fim, capacidade = null, janelaId = null }) {

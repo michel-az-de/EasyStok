@@ -24,7 +24,9 @@ public interface IImpressaoPendenteRepository
     Task<ImpressaoPendente?> GetByIdComLockAsync(Guid empresaId, Guid id, CancellationToken ct = default);
 
     /// <summary>As pendentes da empresa, mais antigas primeiro (ordem de impressão).</summary>
-    Task<IReadOnlyList<ImpressaoPendente>> ListarPendentesAsync(Guid empresaId, int limite, CancellationToken ct = default);
+    /// <param name="criadasDesde">#2096: só as criadas a partir daqui (a impressão automática ignora o acumulado).</param>
+    Task<IReadOnlyList<ImpressaoPendente>> ListarPendentesAsync(
+        Guid empresaId, int limite, CancellationToken ct = default, DateTime? criadasDesde = null);
 
     /// <summary>Pendentes criadas entre <paramref name="criadasDepoisDe"/> e <paramref name="criadasAntesDe"/>, de todas as empresas.</summary>
     Task<IReadOnlyList<ImpressaoAtrasada>> ListarAtrasadasAsync(

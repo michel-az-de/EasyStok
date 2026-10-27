@@ -7,6 +7,12 @@ import { chamarApi } from './cliente'
 export const listarPedidosEntrega = (status, data) =>
   chamarApi(`/api/kds/pedidos?status=${encodeURIComponent(status)}${data ? `&data=${data}` : ''}`)
 
+// #2096: o cliente confirmou a encomenda (204); DELETE desfaz.
+export const marcarConfirmacaoDoCliente = (pedidoId) =>
+  chamarApi(`/api/pedidos/${encodeURIComponent(pedidoId)}/confirmacao-cliente`, { metodo: 'POST' })
+export const desfazerConfirmacaoDoCliente = (pedidoId) =>
+  chamarApi(`/api/pedidos/${encodeURIComponent(pedidoId)}/confirmacao-cliente`, { metodo: 'DELETE' })
+
 export const listarAgendaEncomendas = (de, ate) =>
   chamarApi(`/api/atendimento/agenda?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}`)
 

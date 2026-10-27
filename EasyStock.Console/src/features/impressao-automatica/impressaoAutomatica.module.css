@@ -1,0 +1,13 @@
+/* Indicador da impressão automática (#2096): pequeno, no canto, sem pegar clique. Só aparece no
+   aparelho em que ela foi ligada. */
+.indicador {
+  position: fixed; left: var(--e-3); bottom: var(--e-3); z-index: 25;
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  max-width: calc(100vw - 2 * var(--e-3)); padding: var(--e-1) var(--e-3);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-pilula);
+  background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-media);
+  font-size: var(--t-apoio); pointer-events: none;
+}
+.ponto { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--sucesso); }
+.espera { background: var(--tinta-2); }
+.falhou { color: var(--erro); font-weight: 600; }
