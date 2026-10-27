@@ -101,14 +101,14 @@ public final class AppNotifications {
         catch (Exception failure) { return false; }
     }
     public static void showGuide(Activity activity) {
-        new AlertDialog.Builder(activity).setTitle("Trazer dados do PWA antigo")
-            .setMessage("1. Pare novos registros durante a transferência. Não apague nem limpe o PWA antigo.\n\n"
-                + "2. No PWA antigo: Ajustes > Manut. > Backup e restauração > Exportar backup (JSON). Confirme que o arquivo foi salvo e guarde outra cópia.\n\n"
-                + "3. Neste app: Configurações > Backup do PWA > Importar. Selecione o JSON antes de conectar.\n\n"
+        new AlertDialog.Builder(activity).setTitle("Trazer dados do Sistema Antigo")
+            .setMessage("1. Pare novos registros durante a transferência. Não apague nem limpe o Sistema Antigo.\n\n"
+                + "2. No Sistema Antigo: Ajustes > Manut. > Backup e restauração > Exportar backup (JSON). Confirme que o arquivo foi salvo e guarde outra cópia.\n\n"
+                + "3. Neste app: Configurações > Backup do Sistema Antigo > Importar. Selecione o JSON antes de conectar.\n\n"
                 + "4. Confira produtos, estoque, pedidos, lotes e fotos. Se houver conflito ou foto ausente, preserve tudo e peça ajuda.\n\n"
                 + "5. No início, toque em Conectar e informe o código de 6 dígitos da empresa e loja corretas. Revise os dados importados e toque em Sincronizar para o primeiro envio.\n\n"
                 + "6. Aguarde a confirmação do EasyStok e compare as contagens no sistema. Se cair a conexão, retome pelo botão Sincronizar.\n\n"
-                + "Depois da conferência, registre somente no app novo. Preserve o PWA antigo para consulta e mantenha o backup. Históricos não geram novas vendas ou pagamentos.")
+                + "Depois da conferência, registre somente no app novo. Preserve o Sistema Antigo para consulta e mantenha o backup. Históricos não geram novas vendas ou pagamentos.")
             .setPositiveButton("Entendi", (d,w) -> offerPermission(activity, false)).show();
     }
     public static void receive(Context context, RemoteMessage message) {

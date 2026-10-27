@@ -164,6 +164,10 @@
       "size": 24,
       "body": "<path d=\"M12 15V3M7 10l5 5 5-5M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>"
     },
+    // Lucide (ISC): settings.svg e upload.svg, como os utilitários do Console.
+    "settings": { "grid": 24, "size": 24, "body": "<path d=\"M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>" },
+    "upload": { "grid": 24, "size": 24, "body": "<path d=\"M12 3v12m5-7-5-5-5 5M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>" },
+    "activity": { "grid": 24, "size": 24, "body": "<path d=\"M22 12h-4l-3 9-6-18-3 9H2\"/>" },
     "enviar": {
       "grid": 24,
       "size": 24,
@@ -204,7 +208,7 @@
       ['.nav-btn[data-nav="producao"] .nav-icon svg', 'producao'],
       ['.nav-btn[data-nav="pedidos"] .nav-icon svg', 'pedido-em-preparo'],
       ['.nav-btn[data-nav="more"] .nav-icon svg', 'ellipsis'],
-      ['#globalSearchBtn svg', 'search'], ['#ajustesBtn svg', 'configuracoes']
+      ['#globalSearchBtn svg', 'search'], ['#ajustesBtn svg', 'settings']
     ]) for (const element of document.querySelectorAll(selector)) element.outerHTML = pilotIcon(name);
     for (const element of document.querySelectorAll('#moreMenu .more-menu-search-icon')) element.innerHTML = pilotIcon('search');
     for (const [action, name] of [
@@ -282,7 +286,15 @@
     sheet.dataset.pilotLabels = 'true';
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation, pilotIcon, applyConsoleIcons, installAppChrome, refreshOperatorReview, installLabelWorkspace };
+  function menuContents(label, icon, hint = '') {
+    return pilotIcon(icon) + '<span>' + (hint ? '<strong>' + label + '</strong><small>' + hint + '</small>' : label) + '</span>' + pilotIcon('chevron-right');
+  }
+  function menuButton(action, label, icon, id = '') {
+    return '<button type="button" class="pilot-menu-button" data-action="' + action + '"' + (id ? ' id="' + id + '"' : '') + '>' + menuContents(label, icon) + '</button>';
+  }
+  root.cdbMenuButton = menuButton;
+  root.cdbMenuContents = menuContents;
+  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation, pilotIcon, menuButton, applyConsoleIcons, installAppChrome, refreshOperatorReview, installLabelWorkspace };
   if (!root.document || !root.CDB_CONFIG?.isPilot) return;
   const config = root.CDB_CONFIG;
   const doc = root.document;
@@ -322,7 +334,7 @@
   home.innerHTML = `
     <div class="pilot-sheet">
       <div class="pilot-topline"><span class="pilot-home-brand"><img class="pilot-brand-mark" src="casa-da-baba.png" alt="" width="60" height="44"><span>Casa da Baba<small id="pilotHomeVersion">PILOTO</small></span></span><div class="pilot-top-actions">${bell('pilotHomeNoticeBell', 'pilotHomeNoticeCount')}<button type="button" data-action="close" aria-label="Fechar início">${closeIcon}</button></div></div>
-      <h1 id="pilotTitle" tabindex="-1">Produção e pedidos.</h1>
+      <h1 id="pilotTitle" tabindex="-1">Início</h1>
       <p id="pilotError" class="pilot-feedback pilot-error" role="alert" tabindex="-1"></p>
       <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
       <details id="pilotMigrationReceipt" class="pilot-help" hidden><summary>Última migração confirmada</summary><p id="pilotMigrationResult" class="pilot-feedback" role="status" tabindex="-1"></p></details>
@@ -330,17 +342,23 @@
         <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${productionIcon}</span><span class="pilot-card-copy"><strong>Produção</strong></span></button>
         <button type="button" class="pilot-card pilot-orders" data-action="local-orders"><span class="pilot-action-icon">${pilotIcon('pedido-em-preparo')}</span><span class="pilot-card-copy"><strong>Pedidos</strong></span></button>
       </div>
-      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><div class="pilot-connection-controls"><button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button><button type="button" id="pilotReconnect" data-action="reconnect" hidden aria-label="Verificar conexão" title="Verificar conexão">${pilotIcon('refresh-cw')}</button><details class="pilot-connection-details"><summary>Detalhes</summary><p id="pilotConnectionDetail"></p><p id="pilotPairHint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p><div id="pilotSyncDetails"></div></details></div></div>
-      <div class="pilot-shortcuts">
-        <button type="button" data-action="printers">${pilotIcon('printer')}<span>Impressoras</span></button>
+      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p></div>
+      <div class="pilot-home-controls">
+        ${menuButton('pair', 'Conectar', 'link', 'pilotPairButton')}
+        ${menuButton('printers', 'Impressoras', 'printer')}
+        ${menuButton('settings', 'Configurações', 'settings')}
+        ${menuButton('migration-guide', 'Sistema Antigo', 'archive')}
+        ${menuButton('update', 'Atualizar', 'refresh-cw', 'pilotUpdateButton')}
       </div>
-      <details class="pilot-help pilot-support"><summary>Configurações</summary>
+      <div class="pilot-home-support" hidden>
+      <button type="button" id="pilotReconnect" data-action="reconnect" hidden>Reconectar</button>
+      <details class="pilot-connection-details"><summary>Conexão</summary><p id="pilotConnectionDetail"></p><p id="pilotPairHint">Solicite o código de conexão à equipe da Casa da Baba.</p><div id="pilotSyncDetails"></div></details>
       <div class="pilot-operator-row"><span>Registrando como</span><div id="pilotOperator"></div></div>
-      <details class="pilot-help pilot-migration"><summary>Backup do PWA</summary><p>Exporte o JSON nos Ajustes do PWA antigo e importe aqui. Mantenha o original até verificar os dados.</p><button type="button" data-action="import-pwa">Importar</button><button type="button" data-action="migration-guide">Guia</button></details>
+      <details class="pilot-help pilot-migration"><summary>Sistema Antigo</summary><p>Guarde o backup original até conferir a importação.</p><button type="button" data-action="import-pwa">Importar</button><button type="button" data-action="migration-guide">Guia</button></details>
       <details class="pilot-help"><summary>Offline</summary><p>Produtos, pedidos e lotes ficam salvos neste aparelho. Após conectar, o envio ao EasyStok é retomado com internet.</p></details>
       <details class="pilot-help"><summary>Atualizações</summary><p id="pilotOtaStatus" role="status">O conteúdo é atualizado ao reabrir.</p><p id="pilotPushStatus" role="status"></p><p>A versão anterior preserva seus dados e envios pendentes.</p><button type="button" id="pilotRollback" data-action="rollback" hidden>Recuperar</button></details>
-      </details>
-      <div class="pilot-update"><span id="pilotVersion" role="status"></span><button type="button" id="pilotUpdateButton" data-action="update">Verificar atualização</button></div>
+      </div>
+      <div class="pilot-update"><span id="pilotVersion" role="status"></span></div>
       <p id="pilotUpdateStatus" class="pilot-feedback" role="status" tabindex="-1"></p>
       <button type="button" id="pilotDownload" data-action="download" hidden>Atualizar APK</button>
     </div>`;
@@ -524,7 +542,7 @@
         case 'open': await showNotice(control.dataset.noticeId); break;
         case 'refresh': await loadNoticeState(true); break;
         case 'permission': await native().notifications({ configure: noticeState.permission === 'granted' }); await loadNoticeState(); break;
-        case 'guide': await native().migrationGuide(); break;
+        case 'guide': if (root.cdbOpenMigrationGuide) root.cdbOpenMigrationGuide(); else await native().migrationGuide(); break;
         case 'copy':
           if (!root.navigator?.clipboard?.writeText) throw new Error('copy');
           await root.navigator.clipboard.writeText('Casa da Baba · aparelho ' + noticeState.installationId + ' · APK ' + (noticeState.apkVersion || 'não identificado'));
@@ -599,7 +617,9 @@
     reconnect.innerHTML = pilotIcon('refresh-cw');
     reconnect.setAttribute('aria-label', checkingConnection ? 'Conferindo conexão' : 'Verificar conexão');
     reconnect.setAttribute('title', checkingConnection ? 'Conferindo conexão' : 'Verificar conexão');
-    doc.getElementById('pilotPairButton').textContent = state.syncState === 'invalid' ? 'Reconectar produção' : root.cdbSync?.getPairing?.() ? 'Alterar conexão' : 'Conectar produção';
+    const pairButton = doc.getElementById('pilotPairButton');
+    const pairLabel = pairButton.querySelector?.('span') || pairButton;
+    pairLabel.textContent = state.syncState === 'invalid' ? 'Reconectar' : root.cdbSync?.getPairing?.() ? 'Conexão' : 'Conectar';
     rail.dataset.sync = state.syncState;
     doc.getElementById('pilotImportReview').hidden = !review;
     const confirm = doc.getElementById('pilotConfirmImport');
@@ -610,11 +630,11 @@
     showImportUndo(review);
     if (!migratingImport && !review) showMigrationReceipt(root.cdbSync?.getLastLegacyMigration?.());
     if (review) {
-      const photos = Number(review.missingPhotos) > 0 ? ' Há ' + review.missingPhotos + ' foto(s) ausente(s) no arquivo; confira no PWA de origem.' : '';
+      const photos = Number(review.missingPhotos) > 0 ? ' Há ' + review.missingPhotos + ' foto(s) ausente(s) no arquivo; confira no Sistema Antigo.' : '';
       doc.getElementById('pilotImportStatus').textContent = (review.invalid
         ? 'A revisão deste backup não está disponível. Importe novamente o arquivo de origem. Os dados continuam neste aparelho.'
         : review.requiresReconciliation
-          ? 'Dados importados aguardam conferência. Revise com a equipe os registros do PWA de origem e do EasyStok para identificar o que ainda precisa ser enviado. Não apague os dados de origem.'
+          ? 'Dados importados aguardam conferência. Revise com a equipe os registros do Sistema Antigo e do EasyStok para identificar o que ainda precisa ser enviado. Não apague os dados de origem.'
           : !pairing || invalid
             ? 'Os dados estão neste aparelho, com envio pausado. Conecte a produção e confirme a empresa e a loja de origem para liberar a sincronização.'
             : 'Os dados estão neste aparelho, com envio pausado. Confira se o backup pertence a ' + pairingDestination(pairing) + ' antes de liberar a sincronização.') + photos;
@@ -659,7 +679,7 @@
       ? 'Retomar a mesma migração? O servidor pode já ter recebido a primeira tentativa. Confirme a origem dos registros, que estavam apenas no Android antes desta migração.'
       : 'Confirma que estes registros do Android nunca foram enviados ao EasyStok?') + '\n\nDestino: ' + pairingDestination(pairing)
       + '.\nRegistros: ' + migrationCounts(state.counts) + '.\n\n' + migrationWarnings(state)
-      + '\nDepois de exportar, registre novos pedidos e produção apenas neste app. Preserve o PWA antigo para consulta, sem reenviar sua fila.'
+      + '\nDepois de exportar, registre novos pedidos e produção apenas neste app. Preserve o Sistema Antigo para consulta, sem reenviar sua fila.'
       + '\nPedidos históricos prontos, entregues ou cancelados não geram novo movimento nem pagamento. ' + (state.prepared ? 'Retomar esta migração?' : 'Enviar esta primeira migração?');
     if (!root.confirm(question)) return;
     migratingImport = true;
@@ -707,8 +727,8 @@
     const review = root.cdbSync?.importReview?.(), pairing = root.cdbSync?.getPairing?.();
     if (!review) return;
     if (!pairing || root.cdbSync?.isPairingInvalid?.()) throw new Error('Conecte a produção antes de confirmar a origem do backup.');
-    if (review.invalid || review.requiresReconciliation) throw new Error('Revise com a equipe os dados do PWA de origem e do EasyStok antes de liberar a sincronização.');
-    const photos = Number(review.missingPhotos) > 0 ? '\nO arquivo não contém ' + review.missingPhotos + ' foto(s). Confira essas imagens no PWA de origem.' : '';
+    if (review.invalid || review.requiresReconciliation) throw new Error('Revise com a equipe os dados do Sistema Antigo e do EasyStok antes de liberar a sincronização.');
+    const photos = Number(review.missingPhotos) > 0 ? '\nO arquivo não contém ' + review.missingPhotos + ' foto(s). Confira essas imagens no Sistema Antigo.' : '';
     if (!root.confirm('Confirma que o backup importado pertence a ' + pairingDestination(pairing) + '? Ao confirmar, o app poderá enviar as alterações pendentes para essa operação.' + photos)) return;
     confirmingImport = true; showConnection();
     try { await root.cdbSync.confirmImportedDataContext(); }
@@ -834,11 +854,13 @@
       if (action === 'production') { closeHome(); root.go('producao'); }
       if (action === 'local-orders') { closeHome(); root.go('pedidos'); }
       if (action === 'printers') { closeHome(); root.openPrinterPicker(); }
+      if (action === 'settings') { closeHome(); root.openAjustes(); }
       if (action === 'import-pwa') {
         const input = doc.getElementById('backupFileInput');
-        if (!input) throw new Error('Importação indisponível. Abra os Ajustes e tente novamente.');
+        if (!input) throw new Error('Importação indisponível. Abra Configurações e tente novamente.');
         closeHome(); input.click();
       }
+      if (action === 'migration-guide' && root.cdbOpenMigrationGuide) { root.cdbOpenMigrationGuide(); return; }
       if (action === 'notifications' || action === 'migration-guide') {
         const app = root.Capacitor?.Plugins?.PilotApp;
         const method = action === 'notifications' ? 'notifications' : 'migrationGuide';

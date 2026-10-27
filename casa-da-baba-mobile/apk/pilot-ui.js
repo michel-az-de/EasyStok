@@ -13,12 +13,12 @@
     Cobrar: 'ficha', Preparar: 'producao', Produzir: 'producao',
     Finalizar: 'check', Entregar: 'check', Detalhes: 'ficha', Histórico: 'historico',
     Copiar: 'copy', Compartilhar: 'enviar', Enviar: 'enviar',
-    Exportar: 'download', Baixar: 'download', Importar: 'download',
-    Ajustar: 'configuracoes', Configurar: 'configuracoes', Ativar: 'bell',
+    Exportar: 'download', Baixar: 'download', Importar: 'upload',
+    Ajustar: 'configuracoes', Configurar: 'settings', Ativar: 'bell',
     Guia: 'ajuda', Buscar: 'search', Trocar: 'refresh-cw', Continuar: 'chevron-right',
     Reabrir: 'historico', Reverter: 'historico', Mesclar: 'producao',
     Agendar: 'relogio', Retroativo: 'historico', Carregar: 'chevron-right',
-    Opções: 'ellipsis', Pronto: 'check', Ajustes: 'configuracoes',
+    Opções: 'ellipsis', Pronto: 'check', Ajustes: 'settings', Diagnóstico: 'activity',
     Indicadores: 'ficha', Testar: 'printer', Pular: 'chevron-right',
     Escolher: 'plus', Repetir: 'refresh-cw', Ver: 'ficha', Abrir: 'ficha',
     Selecionar: 'check', Restaurar: 'historico', Registrar: 'check', Concluir: 'check',
@@ -43,7 +43,7 @@
     'Enviar primeira migração': 'Sincronizar', 'Voltar à versão anterior': 'Recuperar',
     'Ver passo a passo da migração': 'Guia', '← Voltar ao histórico': 'Voltar',
     'Pedido pronto': 'Pronto', 'Mais ações': 'Opções', 'Mais opções do produto': 'Opções',
-    'Ajustar etiqueta': 'Ajustes', 'Ver indicadores': 'Indicadores',
+    'Ajustar etiqueta': 'Configurar', 'Ver indicadores': 'Indicadores',
     'QR + barras': 'Ambos', 'Só barras': 'Barras', 'Só QR': 'QR',
     '+ Produção': 'Produzir', 'Carregar mais': 'Carregar',
     'Produzir agora': 'Produzir', 'Ajustar pedido': 'Ajustar',
@@ -56,7 +56,8 @@
     'Configurar impressora': 'Configurar', 'Pular tour': 'Pular', 'Criar pedido': 'Adicionar',
     'Buscar impressora': 'Buscar', 'Testar impressão': 'Testar',
     'Exportar backup (JSON)': 'Exportar', 'Restaurar de arquivo': 'Importar',
-    'Verificar atualizações agora': 'Atualizar', 'Abrir diagnóstico': 'Detalhes',
+    'Verificar atualizações agora': 'Atualizar', 'Abrir diagnóstico': 'Diagnóstico',
+    'Forçar flush': 'Sincronizar',
     '+ Novo produto': 'Cadastrar', 'Escolher imagem': 'Escolher', 'Ver detalhes': 'Detalhes',
     'Excluir do registro': 'Excluir',
     'Exportar histórico JSON': 'Exportar', 'Restaurar do celular (auto)': 'Recuperar',
@@ -79,6 +80,7 @@
     '[onclick*="resetAll"]', '[onclick*="cestaCalcAdicionar"]',
     '[onclick*="factoryReset"]', '[onclick*="purgeOldData"]', '[onclick*="clearTestData"]',
     '[onclick*="loadPresentationMode"]', '[onclick*="clearPresentationMode"]'
+    , '[onclick*="diagForcePull"]', '[onclick*="diagClearSyncQueue"]'
   ].join(',');
 
   function commandFor(text, handler = '') {
@@ -104,7 +106,7 @@
         if (!node.classList.contains('pilot-out-of-scope')) node.classList.add('pilot-out-of-scope');
       });
       doc.querySelectorAll('button, .k-more-actions > summary, .pilot-product-options > summary, .pilot-label-options > summary').forEach(button => {
-        if (button.matches('.nav-btn, .screen-tab:not(.pilot-new-order):not(.pilot-orders-back), .pilot-card, .pilot-bell, .pilot-topline button, #pilotHomeButton, .qty-btn, .emoji-btn, .etq-format-chip') || button.querySelector('input,select,[id]')) return;
+        if (button.matches('.nav-btn, .screen-tab:not(.pilot-new-order):not(.pilot-orders-back), .pilot-menu-button, .pilot-settings-back, [data-guide], .pilot-card, .pilot-bell, .pilot-topline button, #pilotHomeButton, .qty-btn, .emoji-btn, .etq-format-chip') || button.querySelector('input,select,[id]')) return;
         const command = commandFor(button.textContent, button.getAttribute('onclick') || '');
         if (!command) return;
         if (button.matches('.msg-template-btn')) command.icon = '';

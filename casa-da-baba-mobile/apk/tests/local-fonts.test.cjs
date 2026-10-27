@@ -65,10 +65,11 @@ test('empacotador real copia fontes/licenças sem rede e preserva PWA e estilos 
     const originalPwa = fs.readFileSync(path.resolve(root, '../../EasyStock.Api/wwwroot/pwa/index.html'));
     const originalCss = fs.readFileSync(path.join(root, 'pilot.css'));
     const copy = (from, to) => { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(from, to); };
-    for (const name of ['package.json', 'pilot.css', 'pilot.js', 'pilot-ui.js', 'scripts/copy-web.cjs', 'scripts/app-markup.cjs', 'scripts/ota-contract.cjs']) copy(path.join(root, name), path.join(fixtureRoot, name));
+    for (const name of ['package.json', 'pilot.css', 'pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'scripts/copy-web.cjs', 'scripts/app-markup.cjs', 'scripts/ota-contract.cjs']) copy(path.join(root, name), path.join(fixtureRoot, name));
     fs.mkdirSync(path.dirname(fixturePwa), { recursive: true }); fs.writeFileSync(fixturePwa, originalPwa);
     copy(path.resolve(root, '../../EasyStock.Console/src/assets/casa-da-baba.png'), path.join(tmp, 'EasyStock.Console/src/assets/casa-da-baba.png'));
     fs.cpSync(fonts, path.join(fixtureRoot, 'assets/fonts'), { recursive: true });
+    fs.cpSync(path.join(root, 'assets/guia'), path.join(fixtureRoot, 'assets/guia'), { recursive: true });
     execFileSync(process.execPath, [path.join(fixtureRoot, 'scripts/copy-web.cjs')], { encoding: 'utf8' });
     const web = path.join(fixtureRoot, 'web');
     const html = fs.readFileSync(path.join(web, 'index.html'), 'utf8');

@@ -15593,7 +15593,7 @@ function checkIntegrity() {
 }
 
 function collectDiagnostics() {
-  const ver = (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || '(desconhecida)';
+  const ver = (window.CDB_CONFIG?.isPilot && window.CDB_CONFIG.bundleVersion) || (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || '(desconhecida)';
   const platform = window.Capacitor
     ? (window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'capacitor')
     : 'web';
@@ -16359,6 +16359,7 @@ function closeDiagnostics() { toggleModal('diagnosticsModal', false); }
 
 // Acoes do diagnostico — todas chamam window.cdbSync (existente).
 function diagForceFlush() {
+  if (window.CDB_CONFIG?.isPilot) return syncNow().finally(() => openDiagnostics());
   if (window.cdbSync && typeof window.cdbSync.flush === 'function') {
     window.cdbSync.flush().then(() => { showToast('Sync forçado'); openDiagnostics(); });
   } else { showToast('Sincronização indisponível'); }
@@ -16629,7 +16630,7 @@ function openMapsPedidoRef(ref) {
 // Compat com botao existente em Ajustes > Equipamento.
 // Antes era alert(); agora abre o modal completo (operador encontra a
 // secao Impressora rolando, mas tambem ve o resto do estado do app).
-function printerDiagnostics() { openDiagnostics(); }
+function printerDiagnostics() { if (window.CDB_CONFIG?.isPilot) closeAjustes(); openDiagnostics(); }
 
 // Step logger persistente — sobrevive a native crash (JNI), permite ver
 // onde o app morreu reabrindo Ajustes > Diagnóstico apos restart.

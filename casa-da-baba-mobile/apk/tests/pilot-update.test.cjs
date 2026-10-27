@@ -335,7 +335,7 @@ test('fila e pareamento atualizam a barra mesmo sem envio bem-sucedido', () => {
   root.cdbSync.isPairingInvalid = () => true;
   events.get('cdb-sync-state-change')();
   assert.match(nodes.get('pilotRailStatus').textContent, /Reconectar aparelho/);
-  assert.equal(nodes.get('pilotPairButton').textContent, 'Reconectar produção');
+  assert.equal(nodes.get('pilotPairButton').textContent, 'Reconectar');
 });
 
 test('consulta de conexão em andamento bloqueia chamadas repetidas e libera o botão ao terminar', async () => {
@@ -443,7 +443,7 @@ test('backup sem proveniência exige revisão e nunca confirma envio só pelo pa
   root.cdbSync.confirmImportedDataContext=async()=>{confirmed++;};
   events.get('cdb-sync-state-change')();
   assert.equal(nodes.get('pilotConfirmImport').disabled,true);
-  assert.match(nodes.get('pilotImportStatus').textContent,/PWA de origem/);
+  assert.match(nodes.get('pilotImportStatus').textContent,/Sistema Antigo/);
   assert.match(nodes.get('pilotImportStatus').textContent,/Revise com a equipe/);
   assert.match(nodes.get('pilotImportStatus').textContent,/EasyStok/);
   await nodes.get('pilotHome').click('confirm-import');
