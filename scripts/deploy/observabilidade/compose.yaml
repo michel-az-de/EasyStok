@@ -1,0 +1,50 @@
+# Observabilidade da produção (#2107, F2): OpenObserve guarda logs, traces e métricas por 30 dias; o collector recebe
+# OTLP sem senha na rede "edge" e repassa ao OpenObserve com autenticação. As aplicações só conhecem http://ez-otel:4317.
+# Stack própria em /opt/stacks/observabilidade. UI só no loopback da VPS, pelo túnel SSH:
+#   ssh -L 5080:127.0.0.1:5080 hostinger   e abra http://localhost:5080
+# Segredos em /opt/stacks/observabilidade/.env (chmod 600), gerados por scripts/deploy/observabilidade-deploy.sh.
+name: observabilidade
+services:
+  openobserve:
+    image: openobserve/openobserve:v1.1.2
+    container_name: ez-openobserve
+    restart: unless-stopped
+    environment:
+      ZO_ROOT_USER_EMAIL: "${ZO_ROOT_USER_EMAIL:?gere com scripts/deploy/observabilidade-deploy.sh}"
+      ZO_ROOT_USER_PASSWORD: "${ZO_ROOT_USER_PASSWORD:?gere com scripts/deploy/observabilidade-deploy.sh}"
+      ZO_DATA_DIR: /data
+      ZO_COMPACT_DATA_RETENTION_DAYS: "30"
+      ZO_TELEMETRY: "false"
+      ZO_MEM_TABLE_MAX_SIZE: "128"
+      ZO_DISK_CACHE_MAX_SIZE: "1024"
+    volumes:
+      - dados:/data
+    ports:
+      - "127.0.0.1:5080:5080"
+    cpus: "1"
+    mem_limit: 1g
+    logging: &logs
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    networks: [edge]
+
+  otel:
+    image: otel/opentelemetry-collector:0.164.0
+    container_name: ez-otel
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      OO_AUTH: "${OO_AUTH:?gere com scripts/deploy/observabilidade-deploy.sh}"
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    depends_on: [openobserve]
+    cpus: "0.5"
+    mem_limit: 192m
+    logging: *logs
+    networks: [edge]
+
+volumes:
+  dados:
+networks:
+  edge:
+    external: true

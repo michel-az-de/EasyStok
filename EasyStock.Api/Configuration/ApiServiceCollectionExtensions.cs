@@ -422,11 +422,13 @@ public static class ApiServiceCollectionExtensions
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddEnderecoForaDoLogHttp();
 
-        // string.IsNullOrWhiteSpace (nao `??`): o compose da VM injeta a env como string
-        // vazia quando OTEL_COLLECTOR_ENDPOINT nao esta no .env, e new Uri("") lanca
-        // UriFormatException derrubando a API no startup (issue 1002).
+        // Opt-in, como no Web e no Worker (issue 1002): sem endpoint nao ha provider nem exporter.
+        // Antes caia em localhost:4317 e mandava traces e metricas para o vazio em producao (#2107).
+        // string.IsNullOrWhiteSpace: o compose injeta a env como string vazia.
         var otlpConfigured = configuration[ConfigurationKeys.OtlpEndpoint];
-        var otlpEndpoint = new Uri(string.IsNullOrWhiteSpace(otlpConfigured) ? "http://localhost:4317" : otlpConfigured);
+        if (string.IsNullOrWhiteSpace(otlpConfigured))
+            return services;
+        var otlpEndpoint = new Uri(otlpConfigured);
 
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService("EasyStock.Api"))
