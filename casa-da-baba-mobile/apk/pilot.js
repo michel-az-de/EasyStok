@@ -79,6 +79,34 @@
   // Subconjunto canônico do Console: MarcaIcone.jsx (Casa da Baba V4, grid32) e Icone.jsx (grid24).
   // Geometria sem redesenho; pilot-icons.test.cjs verifica paridade com essas fontes vivas.
   const CONSOLE_ICONS = {
+    "caixa": {
+      "grid": 32, "size": 24,
+      "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 5H25L27 20H5Z M3 20H29V28H3Z M8 24H12\"/><rect x=\"10\" y=\"8\" width=\"12\" height=\"5\" rx=\"1.5\"/><path d=\"M11 17H12 M16 17H17 M21 17H22\"/></g>"
+    },
+    "estoque": {
+      "grid": 32, "size": 24,
+      "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 4V28 M28 4V28 M4 16H28 M4 28H28\"/><rect x=\"7\" y=\"5\" width=\"8\" height=\"11\" rx=\"1.5\"/><rect x=\"18\" y=\"8\" width=\"7\" height=\"8\" rx=\"1.5\"/><rect x=\"8\" y=\"20\" width=\"16\" height=\"8\" rx=\"1.5\"/><path d=\"M11 5V9 M16 20V24\"/></g>"
+    },
+    "shopping-cart": {
+      "grid": 24, "size": 24,
+      "body": "<path d=\"M3 4h2.2l2.68 13.4a2 2 0 0 0 2 1.6h8.24a2 2 0 0 0 1.97-1.66L21.4 8H6M9 21a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6ZM18 21a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6Z\"/>"
+    },
+    "archive": {
+      "grid": 24, "size": 24,
+      "body": "<path d=\"M3 3h18a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4\"/>"
+    },
+    "ficha": {
+      "grid": 24, "size": 24,
+      "body": "<path d=\"M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1ZM9 8h6M9 11h4\"/>"
+    },
+    "historico": {
+      "grid": 24, "size": 24,
+      "body": "<path d=\"M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 8v4.5l3 1.8\"/>"
+    },
+    "ajuda": {
+      "grid": 24, "size": 24,
+      "body": "<path d=\"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM9.6 9.4a2.5 2.5 0 0 1 4.9.7c0 1.7-2.5 2.1-2.5 3.9M12 17h.01\"/>"
+    },
     "producao": {
       "grid": 32,
       "size": 32,
@@ -162,7 +190,7 @@
   }
   function applyConsoleIcons(document) {
     if (!document.querySelectorAll) return;
-    // Apenas SVGs de controles fixos. Não seleciona ícones de produtos nem etiquetas.
+    // Apenas controles fixos. Não seleciona ícones de produtos nem a prévia de etiquetas.
     for (const [selector, name] of [
       ['.nav-btn[data-nav="home"] .nav-icon svg', 'house'],
       ['.nav-btn[data-nav="producao"] .nav-icon svg', 'producao'],
@@ -170,6 +198,13 @@
       ['.nav-btn[data-nav="more"] .nav-icon svg', 'ellipsis'],
       ['#globalSearchBtn svg', 'search'], ['#ajustesBtn svg', 'configuracoes']
     ]) for (const element of document.querySelectorAll(selector)) element.outerHTML = pilotIcon(name);
+    for (const element of document.querySelectorAll('#moreMenu .more-menu-search-icon')) element.innerHTML = pilotIcon('search');
+    for (const [action, name] of [
+      ["go('caixa')", 'caixa'], ["go('compras')", 'shopping-cart'], ["go('finalizados')", 'archive'],
+      ["go('estoque')", 'estoque'], ["go('clientes')", 'ficha'], ["go('historico')", 'historico'],
+      ['closeMoreMenu(); if(window.etqAbrirModelos)etqAbrirModelos()', 'printer'],
+      ['closeMoreMenu(); openAjustes()', 'configuracoes'], ["go('suporte')", 'ajuda']
+    ]) for (const element of document.querySelectorAll('#moreMenu button[onclick="' + action + '"] .more-menu-icon')) element.innerHTML = pilotIcon(name);
   }
 
   function installAppChrome(environment, openHome) {

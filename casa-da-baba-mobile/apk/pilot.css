@@ -483,6 +483,55 @@ body.pilot-app #cobrancaModal .cobranca-actions button { min-height: 52px; font-
 body.pilot-app #cobrancaModal .btn-share { background: #1f7246; color: #fffaf2; }
 body.pilot-app #cobrancaModal .pilot-billing-whatsapp { flex-shrink: 0; width: 24px; height: 24px; }
 
+/* Alertas participam do layout: o banner offline não pode cobrir o cabeçalho. */
+body.pilot-app { flex-direction: column; align-items: stretch; justify-content: flex-start; }
+body.pilot-app > .phone { flex: 1 1 0; min-height: 0; height: auto; max-height: none; }
+body.pilot-app > #offlineBanner { position: static; flex: 0 0 auto; width: 100%; z-index: auto; padding: 8px 14px; background: #a34e35; color: #fffaf2; font-size: 14px; line-height: 1.5; box-shadow: none; animation: none; }
+body.pilot-app > #offlineBanner .ob-count[hidden] { display: none; }
+
+/* Quantidade na conferência mantém a aparência e o tamanho dos demais campos. */
+body.pilot-app #productionConfirmModal .pd-name { flex-wrap: wrap; gap: 8px 12px; }
+body.pilot-app #productionConfirmModal .pd-qty { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0; background: transparent; border-radius: 0; font-size: 14px; color: var(--ink-dim); }
+body.pilot-app #productionConfirmModal .pd-quantity { box-sizing: border-box; min-width: 76px; min-height: 48px; padding: 10px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg-elev); color: var(--ink); font: 400 16px/1.5 system-ui, sans-serif; }
+body.pilot-app #productionConfirmModal .pd-quantity:focus-visible { outline: 3px solid var(--basil); outline-offset: 2px; }
+
+/* Lotes: manutenção em duas colunas e identificação sem coluna estreita. */
+body.pilot-app .phone .batch-card .batch-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px 14px; }
+body.pilot-app .phone .batch-card .batch-action { min-width: 0; width: 100%; min-height: 48px; padding: 10px 8px; white-space: normal; font-size: 15px; line-height: 1.4; background: var(--bg-elev); color: var(--ink-dim); border: 1px solid var(--border); box-shadow: none; }
+body.pilot-app .phone .batch-card .batch-action.primary { background: #496b56; border-color: #496b56; color: #fffaf2; }
+body.pilot-app .phone .batch-unit-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 10px; padding: 12px 0; }
+body.pilot-app .phone .batch-unit-row > span:nth-child(2) { grid-column: 1 / -1; grid-row: 1; min-width: 0; font-size: 14px !important; line-height: 1.5; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+body.pilot-app .phone .batch-unit-row .u-idx { grid-column: 1; grid-row: 2; font-size: 14px; }
+body.pilot-app .phone .batch-unit-row .u-status { grid-column: 2; grid-row: 2; min-width: 0; max-width: none; white-space: normal; overflow: visible; text-overflow: clip; font-size: 12px; line-height: 1.4; letter-spacing: 0; text-transform: none; }
+body.pilot-app .phone .batch-unit-row .u-action { grid-column: 3; grid-row: 2; min-width: 44px; min-height: 44px; padding: 10px; background: #496b56; color: #fffaf2; font-size: 14px; }
+
+/* Pedidos: status integral e ações dentro de seus limites, sem cabeçalho sobreposto. */
+body.pilot-app .phone [data-screen=pedidos] > .screen-tabs { position: static; top: auto; z-index: auto; }
+body.pilot-app .phone .k-card { padding: 14px 12px; }
+body.pilot-app .phone .k-card .k-topline { flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+body.pilot-app .phone .k-card :is(.k-status, .k-confer-badge) { min-width: 0; max-width: 100%; margin-left: 0; white-space: normal; overflow: visible; text-overflow: clip; font-size: 13px; line-height: 1.4; letter-spacing: 0; }
+body.pilot-app .phone .k-card .k-time { margin-left: auto; font-size: 12px; }
+body.pilot-app .phone .k-card .k-head { flex-wrap: wrap; gap: 6px 10px; }
+body.pilot-app .phone .k-card .k-meta { gap: 4px 10px; margin-bottom: 8px; }
+body.pilot-app .phone .k-card .k-chip { padding: 0; border: 0; background: transparent; font-size: 13px; line-height: 1.5; letter-spacing: 0; text-transform: none; }
+body.pilot-app .phone .k-card .k-foot { gap: 8px; }
+body.pilot-app .phone .k-card .k-primary-actions .k-advance { min-height: 52px; padding: 12px; font-size: 16px; line-height: 1.4; white-space: normal; background: #a34e35; color: #fffaf2; box-shadow: none; }
+body.pilot-app .phone .k-card .k-support-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+body.pilot-app .phone .k-card .k-support-actions > .btn-cobrar { width: 100%; min-width: 0; min-height: 48px; margin: 0; padding: 10px 8px; white-space: normal; overflow-wrap: break-word; font-size: 14px; line-height: 1.4; color: var(--ink); background: var(--bg-elev-2); border: 1px solid var(--border-strong); box-shadow: none; }
+body.pilot-app .phone .k-card .k-more-actions { min-width: 0; }
+body.pilot-app .phone .k-card .k-more-actions > summary { min-height: 48px; padding: 10px 8px; white-space: normal; font-size: 14px; line-height: 1.4; }
+body.pilot-app .phone .k-card .k-secondary-actions button { min-width: 0; min-height: 48px; padding: 10px 8px; white-space: normal; overflow-wrap: break-word; font-size: 14px; line-height: 1.4; }
+
+/* Menu Mais acompanha a paleta do aplicativo e os ícones canônicos existentes. */
+body.pilot-app #moreMenu { background: var(--bg); border-color: var(--border); color: var(--ink); box-shadow: 0 8px 28px #00000020; }
+body.pilot-app #moreMenu::before { background: var(--border-strong); }
+body.pilot-app #moreMenu .more-menu-head { background: transparent; }
+body.pilot-app #moreMenu :is(.more-menu-search, .more-menu-item) { background: var(--bg-elev); border-color: var(--border); color: var(--ink); box-shadow: none; }
+body.pilot-app #moreMenu :is(.more-menu-search-icon, .more-menu-icon) { background: transparent; color: var(--basil); }
+body.pilot-app #moreMenu :is(.more-menu-search-icon, .more-menu-icon) svg { width: 24px; height: 24px; }
+body.pilot-app #moreMenu .more-menu-search strong { font-size: 16px; line-height: 1.4; }
+body.pilot-app #moreMenu .more-menu-item strong { font-size: 14px; line-height: 1.4; white-space: normal; }
+
 /* Pedido vazio: uma ação principal e resumo no fluxo, sem cobrir o teclado. */
 body.pilot-app .phone #orderDraftSummary { position: static; top: auto; z-index: auto; }
 body.pilot-app .phone #kanban .pilot-orders-empty { padding: 24px 16px; border: 1px solid var(--border); border-radius: 16px; font: 400 16px/1.5 system-ui, sans-serif; color: var(--ink-dim); }
@@ -521,3 +570,6 @@ body.pilot-app #etiquetasPreview .pilot-label-toolbar :is(.etq-save, .etq-share)
 body.pilot-app #etiquetasPreview .pilot-label-retry { flex-shrink: 0; padding-inline: 16px; }
 body.pilot-app #etiquetasPreview #etqRetryBtn { margin-bottom: 6px; min-height: 44px; }
 body.pilot-app #etiquetasPreview .pilot-label-options > summary:focus-visible { outline: 3px solid var(--basil); outline-offset: -3px; }
+/* O Code128 pode ser maior que os 160px pedidos. Conter só a prévia, sem alterar módulos/exportação. */
+body.pilot-app #etqBody .etq-card.etq-horiz .et-side { flex: 0 0 160px; width: 160px; min-width: 0; }
+body.pilot-app #etqBody .etq-card.etq-horiz .et-scan { width: 100%; min-width: 0; }

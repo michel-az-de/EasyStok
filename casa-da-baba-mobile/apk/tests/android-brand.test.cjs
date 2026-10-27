@@ -54,3 +54,36 @@ test('tema de abertura usa a marca e deixa de referenciar splash Capacitor', () 
   assert.match(launch, /name="windowSplashScreenBackground">@color\/ic_launcher_background</);
   assert.ok(!launch.includes('@drawable/splash<'));
 });
+
+test('feedback nativo reutiliza marca oficial e progresso indeterminado, sem janela sobre o Android', () => {
+  const layout = read('layout/startup_loading.xml');
+  assert.match(layout, /android:background="@drawable\/casa_da_baba_splash"/);
+  assert.match(layout, /<ProgressBar[\s\S]*?android:indeterminate="true"/);
+  assert.match(layout, /android:text="@string\/startup_loading"/);
+  assert.match(layout, /android:accessibilityLiveRegion="polite"/);
+  assert.match(read('values/startup.xml'), /Abrindo Casa da Baba/);
+  const activity = fs.readFileSync(path.join(root, 'android/app/src/main/java/com/casadababa/app/MainActivity.java'), 'utf8');
+  assert.match(activity, /content\.addView\(startupOverlay\)/);
+  assert.doesNotMatch(activity, /TYPE_APPLICATION_OVERLAY|SYSTEM_ALERT_WINDOW|setWebViewClient|evaluateJavascript/);
+});
+
+test('overlay acompanha API real do Capacitor, sai na primeira pintura, erro ou limite e limpa lifecycle', () => {
+  const activity = fs.readFileSync(path.join(root, 'android/app/src/main/java/com/casadababa/app/MainActivity.java'), 'utf8');
+  const capacitor = path.join(root, 'node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor');
+  const listener = fs.readFileSync(path.join(capacitor, 'WebViewListener.java'), 'utf8');
+  assert.match(fs.readFileSync(path.join(capacitor, 'Bridge.java'), 'utf8'), /public Builder addWebViewListener\(WebViewListener/);
+  for (const event of ['onPageLoaded', 'onReceivedError', 'onReceivedHttpError']) {
+    assert.ok(listener.includes('public void ' + event + '(WebView'));
+    assert.ok(activity.includes('public void ' + event + '(WebView'));
+  }
+  const load = activity.slice(activity.indexOf('protected void load()'), activity.indexOf('private void showStartupOverlay()'));
+  assert.ok(load.indexOf('showStartupOverlay();') < load.indexOf('OtaManager.get(this).beginBoot(recreatedActivity)'));
+  assert.ok(load.indexOf('bridgeBuilder.addWebViewListener(') < load.indexOf('super.load();'));
+  assert.match(load, /postVisualStateCallback\(0, new WebView\.VisualStateCallback/);
+  assert.match(load, /onComplete\(long requestId\) \{ hideStartupOverlay\(\); \}/);
+  assert.match(activity, /postDelayed\(startupDeadline, 15000\)/);
+  assert.match(activity, /startupDeadline = this::hideStartupOverlay/);
+  assert.match(activity, /removeCallbacks\(startupDeadline\)/);
+  assert.match(activity, /removeView\(startupOverlay\)/);
+  assert.match(activity, /onDestroy\(\) \{\s*hideStartupOverlay\(\);\s*super\.onDestroy\(\);/);
+});

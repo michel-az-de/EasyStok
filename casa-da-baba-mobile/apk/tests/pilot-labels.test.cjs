@@ -105,3 +105,27 @@ test('contrato de controles existe no HTML real e não renomeia ações de impre
   assert.match(modal, /oninput="onEtqNoteInput\(\)"/);
   assert.match(modal, /onclick="etqRetry\(\)"/);
 });
+
+test('prévia horizontal contém Code128 intrinsecamente largo sem mudar o gerador físico', () => {
+  const vm = require('node:vm');
+  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const start = html.indexOf('const CODE128_PATTERNS = [');
+  const end = html.indexOf('\n/**', html.indexOf('function generateCode128Svg(', start));
+  assert.ok(start >= 0 && end > start);
+  const context = { asciiNorm: value => value, ESCPOS_BARCODE_MAX: 32 };
+  vm.createContext(context); vm.runInContext(html.slice(start, end), context);
+  // Um código realista de lote/unidade já ultrapassa a largura solicitada:
+  // módulos de 1px são necessários e não devem ser removidos do SVG original.
+  const svg = context.generateCode128Svg('CDB-20261027-TALHARIM-001', 160, 50);
+  const width = Number(svg.match(/<svg[^>]* width="(\d+)"/)[1]);
+  assert.ok(width > 300, 'Reproduz o SVG que antes consumia a coluna do produto');
+  assert.match(svg, new RegExp('viewBox="0 0 ' + width + ' 50"'));
+  const css = fs.readFileSync(path.resolve(__dirname, '../pilot.css'), 'utf8');
+  assert.match(css, /body\.pilot-app #etqBody \.etq-card\.etq-horiz \.et-side\s*\{\s*flex:\s*0 0 160px;\s*width:\s*160px;\s*min-width:\s*0;\s*\}/);
+  assert.match(css, /body\.pilot-app #etqBody \.etq-card\.etq-horiz \.et-scan\s*\{\s*width:\s*100%;\s*min-width:\s*0;\s*\}/);
+  assert.match(html, /\.etq-card \.et-bars svg\s*\{[^}]*max-width:\s*100%/);
+  // PNG usa Canvas próprio: a contenção de prévia não pode alterar a exportação.
+  const png = html.slice(html.indexOf('function etiquetasToPng('), html.indexOf('\nfunction ', html.indexOf('function etiquetasToPng(') + 1));
+  assert.match(png, /drawProducaoEtiquetaCanvas\(ctx,/);
+  assert.doesNotMatch(png, /getElementById\(['"]etqBody|cloneNode|html2canvas/);
+});
