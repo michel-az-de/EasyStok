@@ -1,8 +1,8 @@
 {
   "name": "casa-da-baba-piloto",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
-  "versionCode": 8,
+  "versionCode": 9,
   "scripts": {
     "copy-web": "node scripts/copy-web.cjs",
     "sync": "cap sync android"

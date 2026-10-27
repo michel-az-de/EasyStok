@@ -718,7 +718,7 @@ body.pilot-app .phone [data-screen=historico] #histFilter button.active { backgr
 
 /* Escopo do aplicativo e comandos: ícone canônico à esquerda, rótulo curto. */
 body.pilot-app .phone .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-body.pilot-app .pilot-command { display: inline-flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px !important; min-height: 48px !important; font-size: 15px !important; line-height: 1.4; }
+body.pilot-app .pilot-command { display: inline-flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px !important; min-height: var(--pilot-control, 44px) !important; font-size: 14px !important; line-height: 1.4; }
 body.pilot-app .pilot-command > svg[data-pilot-icon] { flex: 0 0 20px; width: 20px !important; height: 20px !important; margin: 0; }
 body.pilot-app .pilot-command > .pilot-command-label { min-width: 0; white-space: normal; overflow-wrap: break-word; }
 body.pilot-app .phone .prod-tile-action.pilot-command::before { display: none; }
@@ -756,3 +756,64 @@ body.pilot-app .phone .screen-back { border: 0; background: transparent; box-sha
 body.pilot-app .pilot-notices .pilot-notice-health { border: 0; border-radius: 8px; box-shadow: none; }
 body.pilot-app .pilot-notices h1 { font: 750 24px/1.3 'Manrope', sans-serif; letter-spacing: -.025em; }
 body.pilot-app #pilotNoticeEmptyTitle { font: 700 20px/1.35 'Manrope', sans-serif; }
+
+/* Proporção e movimento do APK. As dimensões físicas das etiquetas ficam intactas. */
+body.pilot-app { --pilot-control: 44px; --pilot-ease: cubic-bezier(.2,.7,.2,1); --pilot-fast: 140ms; --pilot-enter: 220ms; --pilot-rail-height: 76px; }
+body.pilot-app .pilot-rail { min-height: 76px; gap: 0 8px; padding-block: 4px; }
+body.pilot-app .pilot-rail #pilotRailStatus { font-size: 12px; line-height: 1.4; }
+body.pilot-app .phone .content { padding-top: 16px; padding-bottom: 84px; }
+body.pilot-app .phone .nav { gap: 8px; padding: 8px 16px max(8px, env(safe-area-inset-bottom)); background: var(--bg-elev); }
+body.pilot-app .phone .nav-btn { flex-direction: row; justify-content: center; min-height: 48px; gap: 8px; padding: 8px 12px; border-radius: 12px; }
+body.pilot-app .phone .nav-btn .nav-icon { width: 22px; height: 22px; }
+body.pilot-app .phone .nav-btn .nav-icon svg { width: 22px; height: 22px; }
+body.pilot-app .phone :is(button, summary) { -webkit-tap-highlight-color: transparent; }
+body.pilot-app :is(button, .pilot-card, .k-more-actions > summary, .pilot-label-options > summary) { touch-action: manipulation; transition: background-color var(--pilot-fast) ease, color var(--pilot-fast) ease, box-shadow var(--pilot-fast) ease, scale var(--pilot-fast) var(--pilot-ease); }
+body.pilot-app :is(button, .pilot-card):not(:disabled):active { scale: .975; transform: none; }
+body.pilot-app :is(input, textarea, select) { transition: border-color var(--pilot-fast) ease, box-shadow var(--pilot-fast) ease; }
+body.pilot-app :is(input, textarea, select):focus-visible { outline: 2px solid var(--basil); outline-offset: 2px; }
+body.pilot-app .phone :is(.prod-hero h2, .pilot-orders-header h2, .screen-title) { letter-spacing: -.03em; font-weight: 700; }
+body.pilot-app .phone :is(.prod-create-btn, .pilot-new-order) { padding: 8px 12px; border-radius: 10px; }
+body.pilot-app .phone :is(.screen-tab, .prod-filter button, .batch-tools button, .mov-filter button) { min-height: 44px; font-size: 14px; font-weight: 600; }
+body.pilot-app .phone [data-screen=producao] #producaoTabs { margin-block: 12px; gap: 12px; }
+body.pilot-app .phone [data-screen=producao] #producaoTabs .screen-tab { border-radius: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-dim); padding: 8px 4px; }
+body.pilot-app .phone [data-screen=producao] #producaoTabs .screen-tab.active { color: var(--basil); border-bottom-color: var(--basil); }
+body.pilot-app .phone [data-screen=producao] .batch-tools { gap: 4px 8px; }
+body.pilot-app .phone [data-screen=producao] .batch-tools button { background: transparent; border-radius: 8px; }
+body.pilot-app .phone [data-screen=producao] .batch-tools button.active { background: var(--basil-soft); }
+body.pilot-app .phone [data-screen=producao] .batch-card-head { min-height: 56px; padding-block: 14px; }
+body.pilot-app .phone [data-screen=producao] .batch-card-head .bc-lote { font: 500 12px/1.5 'Manrope', sans-serif; letter-spacing: 0; }
+body.pilot-app .phone [data-screen=producao] .batch-actions { gap: 2px 8px; padding-bottom: 14px; }
+body.pilot-app .phone [data-screen=producao] .batch-actions .batch-action { padding: 8px 10px; border-radius: 10px; background: transparent; font-weight: 600; }
+body.pilot-app .phone [data-screen=producao] .batch-actions .batch-action.primary { background: var(--basil); }
+body.pilot-app .phone [data-screen=producao] .product-tile { padding-block: 14px; gap: 8px; }
+body.pilot-app .phone [data-screen=producao] .product-tile .qty-controls { gap: 0; padding: 0; border-radius: 10px; }
+body.pilot-app .phone [data-screen=producao] .product-tile .qty-btn { width: 44px; height: 44px; background: transparent; font-size: 22px; transform: none; }
+body.pilot-app .phone [data-screen=producao] .product-tile .qty-readout { min-width: 26px; font-size: 18px; }
+body.pilot-app .phone [data-screen=producao] .stock-badge { border: 0; border-radius: 4px; padding: 3px 6px; font: 600 11px/1.4 'Manrope', sans-serif; letter-spacing: 0; text-transform: none; }
+body.pilot-app .phone .prod-tile-action.pilot-command { padding: 8px 6px; font-weight: 600; }
+body.pilot-app .phone #kanban .pilot-order-filters button { min-height: 48px; border-radius: 8px; flex-direction: row; gap: 6px; padding: 8px 2px; font-size: 12px; }
+body.pilot-app .phone #kanban .pilot-order-filters button strong { font-size: 14px; }
+body.pilot-app .phone #kanban .k-card .k-secondary-actions button { background: transparent; }
+body.pilot-app :is(.pilot-home, .pilot-notices) .pilot-topline button { border-radius: 10px; }
+body.pilot-app .pilot-home .pilot-card { border-radius: 12px; min-height: 80px; }
+
+/* Movimento curto: nada aguarda a animação para aceitar o próximo toque. */
+@keyframes pilot-view-enter { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+body.pilot-app .phone :is(.screen.active, .producao-tab-section.active, .pedidos-tab-section) { animation: pilot-view-enter var(--pilot-enter) var(--pilot-ease); }
+body.pilot-app :is(.modal-overlay, .ajustes-overlay, .cobranca-overlay) { opacity: 0; transition: opacity 180ms ease, display 180ms allow-discrete; }
+body.pilot-app :is(.modal-overlay, .ajustes-overlay, .cobranca-overlay).show { opacity: 1; animation: none; }
+body.pilot-app :is(.modal-overlay, .ajustes-overlay, .cobranca-overlay) > :is(.modal-sheet, .ajustes-sheet, .cobranca-sheet) { opacity: 0; translate: 0 16px; animation: none; transition: opacity 180ms ease, translate var(--pilot-enter) var(--pilot-ease); }
+body.pilot-app :is(.modal-overlay, .ajustes-overlay, .cobranca-overlay).show > :is(.modal-sheet, .ajustes-sheet, .cobranca-sheet) { opacity: 1; translate: 0 0; }
+body.pilot-app dialog.pilot-home { opacity: 0; translate: 0 8px; transition: opacity 180ms ease, translate var(--pilot-enter) var(--pilot-ease), display 180ms allow-discrete, overlay 180ms allow-discrete; }
+body.pilot-app dialog.pilot-home[open] { opacity: 1; translate: 0 0; }
+body.pilot-app dialog.pilot-home::backdrop { opacity: 0; transition: opacity 180ms ease, display 180ms allow-discrete, overlay 180ms allow-discrete; }
+body.pilot-app dialog.pilot-home[open]::backdrop { opacity: 1; }
+@starting-style {
+  body.pilot-app :is(.modal-overlay, .ajustes-overlay, .cobranca-overlay).show, body.pilot-app :is(.modal-overlay, .ajustes-overlay, .cobranca-overlay).show > :is(.modal-sheet, .ajustes-sheet, .cobranca-sheet), body.pilot-app dialog.pilot-home[open], body.pilot-app dialog.pilot-home[open]::backdrop { opacity: 0; }
+  body.pilot-app :is(.modal-overlay, .ajustes-overlay, .cobranca-overlay).show > :is(.modal-sheet, .ajustes-sheet, .cobranca-sheet) { translate: 0 16px; }
+  body.pilot-app dialog.pilot-home[open] { translate: 0 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.pilot-app *, body.pilot-app *::before, body.pilot-app *::after, body.pilot-app dialog::backdrop { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  body.pilot-app :is(button, .pilot-card):active { scale: 1; }
+}
