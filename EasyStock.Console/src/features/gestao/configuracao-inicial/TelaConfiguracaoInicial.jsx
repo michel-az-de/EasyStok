@@ -1,15 +1,17 @@
 // Primeiros passos (#2070, só no modo API): o assistente que passa por todas as configurações da loja. O passo vem da
 // rota (`#/m/configuracoes/primeiros-passos/<passo>`); sem ele, a tela retoma do primeiro em aberto. Cada passo monta
 // a aba que já existe (`renderizarAba`, o PainelDeAjuste com os slots do App) ou uma peça própria, e grava pelas
-// rotas de sempre. "Conferi, seguir" só marca o passo e fica bloqueado enquanto houver alteração não salva.
+// rotas de sempre. "Conferi, seguir" só marca o passo e fica bloqueado enquanto houver alteração não salva; sair do
+// passo com ela (Voltar, Fazer depois, a lista, Continuar depois) pede confirmação.
 import { useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { ContextoRascunhosDosAjustes } from '../../../aplicacao/rascunhosDosAjustes'
 import { useConfiguracaoInicialApi } from '../../../aplicacao/useConfiguracaoInicialApi'
 import { Botao } from '../../../componentes/Botao'
+import { Modal } from '../../../componentes/Modal'
 import {
   AVISO_DA_PARTE_2, DESTINO_DESCONHECIDO, PARTE_AJUSTES, PARTE_ESSENCIAL, PASSO_FINAL, ROTULO_DA_PARTE, TEXTO_DESCONHECIDO,
-  passoDaRetomada, passoDoMapa, passoVizinho, passosDaParte, passosDesconhecidos, pendenciaDoPasso, textoDoProgresso,
+  passoDaRetomada, passoDoMapa, passoVizinho, passosDaParte, passosDesconhecidos, pendenciaDoPasso, rotuloDoDesconhecido, textoDoProgresso,
 } from '../../../dominio/configuracaoInicial'
 import { hashDoPasso } from '../../../dominio/rota'
 import { FalhaDeLeitura } from '../PartesDoAjuste'
@@ -21,8 +23,11 @@ const AVISO_PENDENCIA = 'Há alterações não salvas neste passo. Salve ou desf
 const MARCA_DA_SITUACAO = { conferido: 'conferido', depois: 'para depois' }
 const linhaDe = (estado, id) => estado?.passos?.find((p) => p?.passo === id) ?? null
 
-function Progresso({ estado, atual, aberta }) {
+function Progresso({ estado, atual, aberta, aoSairPeloLink }) {
   const id = useId()
+  const link = (href, rotulo, ehAtual = false) => (
+    <a className={css.linkPasso} href={href} aria-current={ehAtual ? 'step' : undefined} onClick={(evento) => aoSairPeloLink(evento, href)}>{rotulo}</a>
+  )
   const parte = (chave) => (
     <section className={css.parte} aria-labelledby={`${id}-${chave}`}>
       <h3 id={`${id}-${chave}`} className={css.tituloParte}>{ROTULO_DA_PARTE[chave]}</h3>
@@ -32,15 +37,15 @@ function Progresso({ estado, atual, aberta }) {
           const linha = linhaDe(estado, p.id)
           const marca = linha?.disponivel === false ? 'sem acesso' : MARCA_DA_SITUACAO[linha?.situacao] ?? null
           return (
-            <li key={p.id} className={css.itemPasso} aria-current={p.id === atual ? 'step' : undefined}>
-              <a className={css.linkPasso} href={hashDoPasso(p.id)}>{p.rotulo}</a>
+            <li key={p.id} className={css.itemPasso}>
+              {link(hashDoPasso(p.id), p.rotulo, p.id === atual)}
               {marca && <span className={css.marca}>{marca}</span>}
             </li>
           )
         })}
         {/* Passo que a API já tem e este console ainda não conhece. */}
         {chave === PARTE_AJUSTES && passosDesconhecidos(estado).map((passo) => (
-          <li key={passo} className={css.itemPasso}><a className={css.linkPasso} href={DESTINO_DESCONHECIDO}>{TEXTO_DESCONHECIDO}</a></li>
+          <li key={passo} className={css.itemPasso}>{link(DESTINO_DESCONHECIDO, `${rotuloDoDesconhecido(passo)}: ${TEXTO_DESCONHECIDO}`)}</li>
         ))}
       </ol>
     </section>
@@ -51,9 +56,7 @@ function Progresso({ estado, atual, aberta }) {
         <summary>Todos os passos</summary>
         {parte(PARTE_ESSENCIAL)}
         {parte(PARTE_AJUSTES)}
-        <p className={css.itemPasso} aria-current={atual === PASSO_FINAL ? 'step' : undefined}>
-          <a className={css.linkPasso} href={hashDoPasso(PASSO_FINAL)}>Revisão final</a>
-        </p>
+        <p className={css.itemPasso}>{link(hashDoPasso(PASSO_FINAL), 'Revisão final', atual === PASSO_FINAL)}</p>
       </details>
     </nav>
   )
@@ -68,11 +71,21 @@ export function TelaConfiguracaoInicial({ passo: passoDaRota = null, renderizarA
   const [falha, setFalha] = useState(null)
   // A lista de passos começa aberta onde cabe ao lado; no celular, recolhida acima do passo.
   const [listaAberta] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1100px)')?.matches === true)
+  // A saída (Voltar, Fazer depois, a lista, Continuar depois) que espera a confirmação, quando há pendência.
+  const [saida, setSaida] = useState(null)
   const tituloRef = useRef(null)
   const idTitulo = useId()
   const atual = passoDaRota ?? (estado ? passoDaRetomada(estado) : null)
   const pendente = pendenteLocal || pendenciaDoPasso(atual, rascunhos)
   const aoMudarPendencia = useCallback((valor) => setPendenteLocal(Boolean(valor)), [])
+  // Depois de esperar a API, só navega quem continua neste passo: a pessoa pode ter saído pela lista ou pela barra.
+  const montada = useRef(true)
+  const passoNaTela = useRef(null)
+  useEffect(() => {
+    montada.current = true
+    return () => { montada.current = false }
+  }, [])
+  useEffect(() => { passoNaTela.current = atual }, [atual])
 
   // Sem passo na rota, a hash passa a dizer o passo da retomada: o Voltar do navegador volta um passo.
   useEffect(() => {
@@ -109,23 +122,37 @@ export function TelaConfiguracaoInicial({ passo: passoDaRota = null, renderizarA
     window.location.hash = hashDoPasso(id)
   }
   const sair = () => { window.location.hash = entrada ?? '#/' }
+  const continuaNoPasso = (passo) => montada.current && passoNaTela.current === passo
+  // Com alteração não salva, sair do passo pergunta antes; sem ela, segue direto.
+  const comConfirmacao = (acao) => (pendente ? setSaida(() => acao) : acao())
+  const aoSairPeloLink = (evento, href) => {
+    if (!pendente) return
+    evento.preventDefault()
+    setSaida(() => () => { setPendenteLocal(false); window.location.hash = href })
+  }
 
   async function seguir(situacao) {
     if (situacao === 'conferido' && pendente) return
-    const resultado = await marcar(atual, situacao)
+    const passo = atual
+    const resultado = await marcar(passo, situacao)
+    if (!continuaNoPasso(passo)) return
     if (!resultado.ok) { avisar(`Não foi possível marcar o passo. ${resultado.erro.message}`); return }
     irPara(proximo)
   }
   // A dona (ou o suporte) adia: o assistente não abre mais sozinho. Quem não pode adiar só sai.
   async function continuarDepois() {
+    const passo = atual
     if (estado.podeConcluir === true) {
       const resultado = await adiar()
+      if (!continuaNoPasso(passo)) return
       if (!resultado.ok) { avisar(`Não foi possível deixar para depois. ${resultado.erro.message}`); return }
     }
     sair()
   }
   async function concluirTudo() {
+    const passo = atual
     const resultado = await concluir()
+    if (!continuaNoPasso(passo)) return
     if (!resultado.ok) {
       avisar(resultado.erro.status === 403
         ? 'Só a dona ou o suporte concluem os primeiros passos.'
@@ -137,7 +164,7 @@ export function TelaConfiguracaoInicial({ passo: passoDaRota = null, renderizarA
 
   return (
     <div className={css.tela}>
-      <Progresso estado={estado} atual={atual} aberta={listaAberta} />
+      <Progresso estado={estado} atual={atual} aberta={listaAberta} aoSairPeloLink={aoSairPeloLink} />
       <section className={css.passo} aria-labelledby={idTitulo}>
         <p className={css.contagem}>{textoDoProgresso(atual)}</p>
         <h2 id={idTitulo} ref={tituloRef} tabIndex={-1} className={css.titulo}>{definicao.rotulo}</h2>
@@ -160,24 +187,35 @@ export function TelaConfiguracaoInicial({ passo: passoDaRota = null, renderizarA
       {aviso && <p className={css.erro} role="alert">{aviso}</p>}
       <div className={css.acoes}>
         {final && <>
-          <Botao variante="texto" disabled={!anterior} onClick={() => irPara(anterior)}>Voltar</Botao>
+          <Botao variante="texto" disabled={!anterior} onClick={() => comConfirmacao(() => irPara(anterior))}>Voltar</Botao>
           {estado.podeConcluir === true
             ? <Botao variante="primario" className={css.primario} disabled={ocupada} onClick={concluirTudo}>Concluir</Botao>
             : <p className={css.apoio}>Só a dona conclui os primeiros passos.</p>}
         </>}
         {!final && semAcesso && <>
-          <Botao variante="texto" disabled={!anterior} onClick={() => irPara(anterior)}>Voltar</Botao>
-          <Botao variante="primario" className={css.primario} onClick={() => irPara(proximo)}>Seguir</Botao>
+          <Botao variante="texto" disabled={!anterior} onClick={() => comConfirmacao(() => irPara(anterior))}>Voltar</Botao>
+          <Botao variante="primario" className={css.primario} onClick={() => comConfirmacao(() => irPara(proximo))}>Seguir</Botao>
         </>}
         {!final && !semAcesso && <>
-          <Botao variante="texto" disabled={!anterior || ocupada} onClick={() => irPara(anterior)}>Voltar</Botao>
-          <Botao variante="texto" className={css.depois} disabled={ocupada} onClick={() => seguir('depois')}>Fazer depois</Botao>
+          <Botao variante="texto" disabled={!anterior || ocupada} onClick={() => comConfirmacao(() => irPara(anterior))}>Voltar</Botao>
+          <Botao variante="texto" className={css.depois} disabled={ocupada} onClick={() => comConfirmacao(() => seguir('depois'))}>Fazer depois</Botao>
           <Botao variante="primario" className={css.primario} disabled={pendente || ocupada} onClick={() => seguir('conferido')}>Conferi, seguir</Botao>
         </>}
       </div>
       <div className={css.saida}>
-        <Botao variante="texto" disabled={ocupada} onClick={continuarDepois}>Continuar depois</Botao>
+        <Botao variante="texto" disabled={ocupada} onClick={() => comConfirmacao(continuarDepois)}>Continuar depois</Botao>
       </div>
+      {saida && (
+        <Modal
+          titulo="Sair deste passo sem salvar?"
+          descricao="O que você mudou neste passo e não salvou não vale para os clientes."
+          aoFechar={() => setSaida(null)}
+          rodape={<>
+            <Botao variante="primario" onClick={() => setSaida(null)}>Continuar editando</Botao>
+            <Botao variante="texto" onClick={() => { const acao = saida; setSaida(null); return acao() }}>Sair sem salvar</Botao>
+          </>}
+        />
+      )}
     </div>
   )
 }

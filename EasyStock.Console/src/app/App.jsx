@@ -24,8 +24,9 @@ import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
 import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
 import { useConfiguracaoInicialApi } from '../aplicacao/useConfiguracaoInicialApi'
+import { useAberturaDosPrimeirosPassos } from '../aplicacao/useAberturaDosPrimeirosPassos'
 import { entradaDoPerfil, moduloDaRota, permiteModulo, permiteRota, podeConfigurarLoja } from '../dominio/acessoModulos'
-import { TELA_PRIMEIROS_PASSOS, deveAbrirSozinho, passoDaRetomada } from '../dominio/configuracaoInicial'
+import { TELA_PRIMEIROS_PASSOS } from '../dominio/configuracaoInicial'
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
 import { Modal } from '../componentes/Modal'
@@ -40,7 +41,7 @@ import { pedidoAcabouDeNascer } from '../dominio/pedido'
 import { canalDaConversa } from '../dominio/canal'
 import { envioBloqueado } from '../dominio/janela'
 import {
-  HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, hashDoPasso, rotaDaHash,
+  HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, rotaDaHash,
 } from '../dominio/rota'
 import { EditorItemCardapio } from '../features/cardapio/EditorItemCardapio'
 import { CartaoArrasto, PainelCardapio } from '../features/cardapio/PainelCardapio'
@@ -580,15 +581,12 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   const { dados, erro, tentarNovamente } = useModulosDaSessao(sessao)
   // #2070: sem `configurarLoja` (chave ausente = falso) nem lê; o estado serve à entrada e ao cartão do hall.
   const configuracaoInicial = useConfiguracaoInicialApi({ ativo: podeConfigurarLoja(dados?.acoes) })
-  const decidiuAbertura = useRef(false)
-  useEffect(() => {
-    if (decidiuAbertura.current || !dados || !configuracaoInicial.estado) return
-    decidiuAbertura.current = true
-    if (!deveAbrirSozinho(configuracaoInicial.estado, { hashAtual: window.location.hash, hashNaEntrada, hashDaPorta: entradaDoPerfil(dados), jaAbriuNaVisita: primeirosPassosAbertos.current })) return
+  const abriuNestaVisita = useCallback(() => primeirosPassosAbertos.current, [])
+  const marcarAberturaNaVisita = useCallback(() => {
     primeirosPassosAbertos.current = true
     gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: ultimaConversa.current, primeirosPassosAbertos: true })
-    window.location.hash = hashDoPasso(passoDaRetomada(configuracaoInicial.estado))
-  }, [dados, configuracaoInicial.estado, hashNaEntrada, sessao])
+  }, [sessao])
+  useAberturaDosPrimeirosPassos({ dados, estado: configuracaoInicial.estado, hashNaEntrada, abriuNestaVisita, aoAbrir: marcarAberturaNaVisita })
   // Voltar ao hall relê o estado: o cartão mostra o que foi feito nos Primeiros passos.
   const naHall = rota.tipo === ROTA_HALL
   const estavaNoHall = useRef(naHall)

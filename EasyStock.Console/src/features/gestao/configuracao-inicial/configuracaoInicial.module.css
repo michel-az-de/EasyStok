@@ -18,13 +18,13 @@
 .tituloParte { margin: 0; font-size: var(--t-apoio); font-weight: 700; color: var(--tinta); }
 .passos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-1); }
 .itemPasso { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-width: 0; margin: 0; border-radius: var(--r-1); }
-.itemPasso[aria-current='step'] { background: var(--preenchimento-forte); }
+.itemPasso:has(> [aria-current='step']) { background: var(--preenchimento-forte); }
 .linkPasso {
   display: flex; align-items: center; min-height: var(--toque); min-width: 0; padding: 0 var(--e-2);
   color: var(--tinta); font-size: var(--t-apoio); text-decoration: none; overflow-wrap: anywhere;
 }
 .linkPasso:hover { text-decoration: underline; }
-.itemPasso[aria-current='step'] .linkPasso { font-weight: 700; }
+.linkPasso[aria-current='step'] { font-weight: 700; }
 .linkPasso:focus-visible { outline: 2px solid var(--marca); outline-offset: -2px; }
 .marca { flex: none; padding-right: var(--e-2); font-size: var(--t-minimo); color: var(--tinta-2); }
 

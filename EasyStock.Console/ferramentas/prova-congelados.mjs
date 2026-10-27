@@ -201,7 +201,8 @@ confere('nenhum passo dos Primeiros passos aponta para tela congelada, e a próp
       abas += 1
     }
   }
-  assert.ok(abas >= 16, 'os passos montam as abas do catálogo')
+  // Exato: um passo novo que monte uma aba muda este número e passa por esta conferência.
+  assert.equal(abas, 18, 'os passos montam 18 abas do catálogo')
   assert.ok(!moduloCongelado('configuracoes') && !telaCongelada('configuracoes', 'primeiros-passos'))
   assert.ok(telasDoMenu(moduloPorId('configuracoes'), { fonteApi: true }).some((t) => t.id === 'primeiros-passos'))
 })

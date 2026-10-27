@@ -23,14 +23,19 @@ export function PassoPronto({ estado, podeAbrirLoja = false }) {
     <div className={css.bloco}>
       <Grupo titulo="Pronto" itens={resumo.pronto}>{(p) => <li key={p.passo}>{p.rotulo}</li>}</Grupo>
       <Grupo titulo="Falta" itens={resumo.falta}>
-        {(p) => <li key={p.passo}><a href={hashDoPasso(p.passo)}>{p.rotulo}</a>: {p.texto}</li>}
+        {(p) => (
+          <li key={p.passo}>
+            <a href={hashDoPasso(p.passo)}>{p.rotulo}</a>
+            <ul className={css.itens}>{p.itens.map((item) => <li key={item}>{item}</li>)}</ul>
+          </li>
+        )}
       </Grupo>
       <Grupo titulo="Deixado para depois" itens={resumo.depois}>
         {(p) => <li key={p.passo}><a href={hashDoPasso(p.passo)}>{p.rotulo}</a></li>}
       </Grupo>
       <Grupo titulo="Sem acesso" itens={resumo.semAcesso}>{(p) => <li key={p.passo}>{p.rotulo}: {p.texto}</li>}</Grupo>
       <Grupo titulo="Outros ajustes" itens={resumo.desconhecidos}>
-        {(p) => <li key={p.passo}><a href={p.href}>{p.texto}</a></li>}
+        {(p) => <li key={p.passo}><a href={p.href}>{`${p.rotulo}: ${p.texto}`}</a></li>}
       </Grupo>
       {podeAbrirLoja && (
         <p className={css.destaque}>

@@ -230,7 +230,7 @@ function AbaNaoLigada({ texto, saida = null }) {
 // parte da AbaAtendimento; `horariosDaSemana` e `entregadoresApi` chegam do App (feature não importa feature).
 const PAINEIS = {
   atendimento: ({ horariosAtendimento, secoes, horariosDaSemana, formulario }) => (
-    <AbaAtendimento horariosAtendimento={horariosAtendimento} secoes={secoes}
+    <AbaAtendimento horariosAtendimento={horariosAtendimento} secoes={secoes} aoMudarPendencia={formulario.aoMudarPendencia}
       horariosDaSemana={secoes?.includes('horarios') ? horariosDaSemana?.(formulario) ?? null : null} />
   ),
   // #1441: respostas prontas e automáticas, fora do caminho do atendimento.

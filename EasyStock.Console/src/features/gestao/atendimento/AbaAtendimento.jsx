@@ -3,6 +3,7 @@
 // composição do App, sem acoplar os editores de áreas diferentes.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { usePendenciaAvisada } from '../../../aplicacao/formularioDeAjuste'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { Botao } from '../../../componentes/Botao'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
@@ -24,6 +25,7 @@ const CAMPOS_CONFIGURACAO = [
   'fraseEspera', 'mensagemForaArea', 'modeloRetomadaNome', 'respiroMinutos',
   'tempoPreparoPadraoMinutos', 'slaRespostaMinutos',
 ]
+const CAMPOS_SEM_O_AGENTE = CAMPOS_CONFIGURACAO.filter((campo) => campo !== 'ativo')
 const valorComparavel = (valor) => String(valor ?? '')
 const camposMudaram = (atual, salvo, campos) => campos.some((campo) => valorComparavel(atual?.[campo]) !== valorComparavel(salvo?.[campo]))
 
@@ -173,9 +175,10 @@ function MensagensDoExpediente() {
   )
 }
 
-// `comLigaDesliga` (#2070): os Primeiros passos ajustam o atendimento sem ligar o agente; a gravação reenvia o
-// `ativo` como foi lido.
-function ConfiguracaoDoAtendimento({ comLigaDesliga = true }) {
+// `comLigaDesliga` falso (#2070): os Primeiros passos ajustam o atendimento sem ligar o agente. O rascunho da visita
+// pode trazer o liga e desliga marcado em outra tela: aqui ele não conta como pendência, a gravação reenvia o `ativo`
+// gravado e salvar ou desfazer deixa esse liga e desliga no rascunho, para a aba de Atendimento.
+function ConfiguracaoDoAtendimento({ comLigaDesliga = true, aoMudarPendencia }) {
   const { carregarConfiguracao, salvarConfiguracao } = useAcoes()
   const [carga, setCarga] = useState({ estado: 'carregando' })
   const [rascunho, setRascunho] = useRascunhoDoAjuste('configuracao-atendimento')
@@ -211,6 +214,11 @@ function ConfiguracaoDoAtendimento({ comLigaDesliga = true }) {
   }
 
   useAtualizarAposLimparRascunho(rascunho, situacao, buscar, gravando)
+  const camposAVista = comLigaDesliga ? CAMPOS_CONFIGURACAO : CAMPOS_SEM_O_AGENTE
+  const pendente = carga.estado === 'ok' && camposMudaram(form, gravado, camposAVista)
+  usePendenciaAvisada(pendente || gravando, aoMudarPendencia)
+  // O que fica no rascunho depois de salvar ou desfazer: nada, ou só o liga e desliga que veio de outra tela.
+  const soOLigaDesliga = (base) => (!comLigaDesliga && rascunho && rascunho.ativo !== base.ativo ? { ...base, ativo: rascunho.ativo } : null)
 
   if (carga.estado === 'carregando') return <p className={css.descricao}>Carregando a configuração…</p>
   if (carga.estado === 'erro') {
@@ -230,7 +238,6 @@ function ConfiguracaoDoAtendimento({ comLigaDesliga = true }) {
     const proximo = { ...form, [campo]: lerValor(e) }
     setRascunho(gravando || camposMudaram(proximo, gravado, CAMPOS_CONFIGURACAO) ? proximo : null)
   }
-  const pendente = camposMudaram(form, gravado, CAMPOS_CONFIGURACAO)
 
   async function aoSalvar(evento) {
     evento.preventDefault()
@@ -245,13 +252,13 @@ function ConfiguracaoDoAtendimento({ comLigaDesliga = true }) {
     // A resposta é o que ficou gravado: o formulário passa a mostrar isso.
     const { ok, resultado } = await salvar(async () => {
       atual = ++consulta.current
-      const confirmado = await salvarConfiguracao(form)
+      const confirmado = await salvarConfiguracao(comLigaDesliga ? form : { ...form, ativo: gravado.ativo })
       if (!confirmado || typeof confirmado.ativo !== 'boolean') throw new Error('O EasyStok não confirmou a configuração. Tente novamente; sua edição continua nesta tela.')
       return confirmado
     })
     if (ok) {
       if (atual === consulta.current) setGravado(resultado)
-      setRascunho((atual) => atual === rascunho ? null : atual)
+      setRascunho((atual) => atual === rascunho ? soOLigaDesliga(resultado) : atual)
     }
   }
 
@@ -351,7 +358,7 @@ function ConfiguracaoDoAtendimento({ comLigaDesliga = true }) {
           <Botao variante="primario" tipo="submit" className={css.toque} disabled={!pendente || gravando || situacao.estado === 'salvando'}>
             Salvar configuração
           </Botao>
-          <Botao variante="texto" disabled={!pendente || situacao.estado === 'salvando'} onClick={() => { setRascunho(null); limpar() }}>
+          <Botao variante="texto" disabled={!pendente || situacao.estado === 'salvando'} onClick={() => { setRascunho(soOLigaDesliga(gravado)); limpar() }}>
             Desfazer edição da configuração
           </Botao>
           <Retorno situacao={situacao} gravando={gravando} />
@@ -385,7 +392,7 @@ function SituacaoDoAgente() {
 // `secoes` (#2070): os Primeiros passos montam só uma parte. 'horarios': a semana (`horariosDaSemana`, do App) e as
 // mensagens de quando a loja não atende; 'configuracao': o atendimento sem o liga e desliga do agente; 'agente': a
 // situação do agente. Nenhuma delas mostra "Abrir loja agora". Sem `secoes`, a aba de sempre.
-export function AbaAtendimento({ horariosAtendimento = null, secoes = null, horariosDaSemana = null }) {
+export function AbaAtendimento({ horariosAtendimento = null, secoes = null, horariosDaSemana = null, aoMudarPendencia }) {
   const { recarregarExpediente } = useAcoes()
   const { acoes } = useAcessoModulos()
   // O expediente pode ter mudado em outro aparelho: abrir a aba traz o de agora.
@@ -395,7 +402,7 @@ export function AbaAtendimento({ horariosAtendimento = null, secoes = null, hora
     return (
       <div className={css.aba}>
         {secoes.includes('horarios') && <>{horariosDaSemana}{administra && <MensagensDoExpediente />}</>}
-        {secoes.includes('configuracao') && administra && <ConfiguracaoDoAtendimento comLigaDesliga={false} />}
+        {secoes.includes('configuracao') && administra && <ConfiguracaoDoAtendimento comLigaDesliga={false} aoMudarPendencia={aoMudarPendencia} />}
         {secoes.includes('agente') && <SituacaoDoAgente />}
         {!administra && !secoes.includes('agente') && <p className={css.descricao}>Horários, mensagens e prazo de resposta são configurados pela dona.</p>}
       </div>

@@ -4,19 +4,19 @@
 //   B  catálogo e acesso: a tela, as telas novas de Configurações e Entregas, a ação estrita e o ModalGestao sem ela;
 //   C  rota: o passo no terceiro segmento só para esta tela, validado contra o mapa, e hashDoPasso;
 //   D  montagem real da tela com a API simulada no fetch (o `chamarApi` é o de verdade): "Conferi, seguir"
-//      bloqueado com pendência (do formulário novo, do contexto e da zona de frete real), "Fazer depois" faz o PUT,
-//      recarregar retoma do primeiro passo em aberto, concluir, adiar, boas-vindas e o cartão do hall;
-//   E  o catálogo C# de passos (EasyStock.Domain), quando existe neste worktree, bate com o mapa nos dois sentidos;
-//   F  a entrada do App: só abre sozinho do hall, uma vez por visita e com a chave; nada disso na demonstração.
+//      bloqueado com pendência (do formulário novo, do contexto, da zona de frete, das respostas e do convite), o
+//      passo Atendimento sem ligar o agente, a confirmação ao sair com pendência, a navegação só no mesmo passo,
+//      "Fazer depois" faz o PUT, recarregar retoma do primeiro passo em aberto, concluir, adiar, boas-vindas e o hall;
+//   E  o catálogo C# de passos (EasyStock.Domain), quando existe neste worktree, bate com o mapa: ids, ordem e parte;
+//   F  a entrada do App (o efeito montado): só abre sozinho do hall, uma vez por visita e com a chave.
 //
 // Pixels e as larguras de 360, 768 e 1280 px ficam para o laboratório no navegador.
 //
 //   node ferramentas/prova-2070-primeiros-passos.mjs
 
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
-import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { transformWithOxc } from 'vite'
 
@@ -37,6 +37,7 @@ const COMPONENTES_REAIS = [
   'features/gestao/configuracao-inicial/PassoPronto', 'features/gestao/configuracao-inicial/CartaoPrimeirosPassos',
   'features/gestao/ModalGestao', 'features/gestao/PartesDoAjuste', 'features/gestao/atendimento/AbaAtendimento',
   'features/entregas/CadastroEntregaApi', 'features/entregas/JanelasDaLoja', 'features/entregas/FreteRaioDaLoja',
+  'features/gestao/respostas/AbaRespostas',
 ]
 const fontes = new Map()
 for (const caminho of COMPONENTES_REAIS) {
@@ -162,7 +163,7 @@ registerHooks({
     if (fontes.has(caminho)) return inline(fontes.get(caminho))
     if (caminho.endsWith('/infra/fonteDados.js')) return inline('export const API_BASE="";export const FONTE_API=true')
     if (caminho.endsWith('/infra/api/sessao.js')) return inline('const g=globalThis.__prova2070pp;export const lerSessao=()=>g.sessao;export const identidadeDaSessao=(s)=>`${s?.empresa?.id??"-"}:${s?.usuario?.id??"-"}`;export const gravarSessao=(s)=>{g.sessaoGravada=s;g.sessao=s;return s};export const limparSessao=()=>{};export const atualizarTokens=(s)=>s;export const empresaDoToken=()=>null;export const EVENTO_SESSAO_ALTERADA="x"')
-    if (caminho.endsWith('/aplicacao/contextos.js')) return inline('export const useAcoes=()=>globalThis.__prova2070pp.contexto.acoes;export const useAtendimento=()=>globalThis.__prova2070pp.contexto.estado;export const useCatalogo=()=>({})')
+    if (caminho.endsWith('/aplicacao/contextos.js')) return inline('export const useAcoes=()=>globalThis.__prova2070pp.contexto.acoes;export const useAtendimento=()=>globalThis.__prova2070pp.contexto.estado;export const useCatalogo=()=>globalThis.__prova2070pp.contexto.catalogo??{}')
     if (caminho.endsWith('/aplicacao/acessoModulos.jsx')) return inline('export const useAcessoModulos=()=>globalThis.__prova2070pp.acesso')
     if (caminho.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>String(p)})')
     if (caminho.endsWith('.jsx')) return inline([...readFileSync(new URL(caminho), 'utf8').matchAll(/^export (?:function|const) (\w+)/gm)].map((m) => `export const ${m[1]}='${m[1]}'`).join('\n'))
@@ -234,9 +235,10 @@ async function provar(nome, fn) {
 }
 const carregar = async (caminho) => import(src(caminho).href)
 
-// Estado como a API devolve: os passos do contrato, com as situações pedidas.
+// Estado como a API devolve: os passos do contrato, com as situações pedidas. A parte é a que o backend serializa
+// (`ParteDaConfiguracaoInicial` em minúsculas: essencial, ajustes, revisao).
 const passoDaApi = (passo, situacao = null, extra = {}) => ({
-  passo, parte: IDS_DO_CONTRATO.indexOf(passo) < 7 ? 'essencial' : passo === 'pronto' ? 'fim' : 'ajustes', ordem: IDS_DO_CONTRATO.indexOf(passo) + 1,
+  passo, parte: IDS_DO_CONTRATO.indexOf(passo) < 7 ? 'essencial' : passo === 'pronto' ? 'revisao' : 'ajustes', ordem: IDS_DO_CONTRATO.indexOf(passo) + 1,
   situacao, em: situacao ? '2026-10-26T12:00:00Z' : null, porNome: situacao ? 'Ana Teste' : null, disponivel: true, motivo: null, prontidao: null, ...extra,
 })
 const estadoDaApi = (situacoes = {}, extras = {}, topo = {}) => ({
@@ -245,11 +247,14 @@ const estadoDaApi = (situacoes = {}, extras = {}, topo = {}) => ({
 })
 
 const rascunhosDosAjustes = await carregar('aplicacao/rascunhosDosAjustes.js')
-// O contexto de rascunhos da visita (o do AppComAcesso): `definir` grava e pede outra volta de render.
+// O contexto de rascunhos da visita (o do AppComAcesso): `definir` grava e pede outra volta de render. Como o
+// `definirRascunho` do App, aceita a função que recebe o rascunho atual.
 const contextoDosRascunhos = () => {
   const valor = {
     rascunhos: {}, gravando: {},
-    definir(chave, novo) {
+    definir(chave, valorOuFuncao) {
+      const novo = typeof valorOuFuncao === 'function' ? valorOuFuncao(valor.rascunhos[chave] ?? null) : valorOuFuncao
+      if (novo === (valor.rascunhos[chave] ?? null)) return
       const proximos = { ...valor.rascunhos }
       if (novo === null) delete proximos[chave]
       else proximos[chave] = novo
@@ -271,7 +276,8 @@ await provar('A1 mapa: os 17 ids do contrato na mesma ordem, com rótulo, parte,
   assert.deepEqual(PASSOS.map((p) => p.id), IDS_DO_CONTRATO)
   assert.deepEqual(PASSOS.filter((p) => p.parte === 'essencial').map((p) => p.id), IDS_DO_CONTRATO.slice(0, 7))
   assert.deepEqual(PASSOS.filter((p) => p.parte === 'ajustes').map((p) => p.id), IDS_DO_CONTRATO.slice(7, 16))
-  assert.deepEqual(PASSOS.filter((p) => p.parte === 'fim').map((p) => p.id), ['pronto'])
+  assert.deepEqual(PASSOS.filter((p) => p.parte === 'revisao').map((p) => p.id), ['pronto'], 'a parte do passo final tem o nome do backend')
+  assert.deepEqual([...new Set(PASSOS.map((p) => p.parte))], ['essencial', 'ajustes', 'revisao'])
   for (const p of PASSOS) {
     assert.ok(p.rotulo && p.descricao, `${p.id} tem rótulo e descrição`)
     assert.ok(Array.isArray(p.monta) && p.monta.length > 0 && p.monta.every((m) => m.aba || m.componente), `${p.id} diz o que monta`)
@@ -285,7 +291,10 @@ await provar('A1 mapa: os 17 ids do contrato na mesma ordem, com rótulo, parte,
   assert.deepEqual(dominio.passoDoMapa('boas-vindas').monta, [{ componente: 'boas-vindas' }])
   assert.deepEqual(dominio.passoDoMapa('pronto').monta, [{ componente: 'pronto' }])
   assert.deepEqual(dominio.passoDoMapa('horarios').chavesDeRascunho, ['horarios-atendimento', 'mensagens-expediente', 'expediente-atendimento'])
-  assert.deepEqual(dominio.passoDoMapa('atendimento').chavesDeRascunho, ['configuracao-atendimento'])
+  // Atendimento avisa pelo `aoMudarPendencia` (o liga e desliga do rascunho não é deste passo; veja a D17).
+  assert.deepEqual(dominio.passoDoMapa('atendimento').chavesDeRascunho, [])
+  assert.deepEqual(dominio.passoDoMapa('respostas').chavesDeRascunho, ['resposta-pronta:', 'mensagem-automatica:'])
+  assert.deepEqual(dominio.passoDoMapa('equipe').chavesDeRascunho, ['convite-usuario'])
   assert.ok(dominio.passoDoMapa('frete').chavesDeRascunho.includes('zona-de-frete:'))
   assert.equal(dominio.passoDoMapa('nao-existe'), null)
   assert.equal(dominio.ehPassoConhecido('frete'), true)
@@ -309,31 +318,40 @@ await provar('A2 retomada: o primeiro passo em aberto, pulando o conferido, o "d
   assert.equal(passoDaRetomada(comDesconhecido), 'dados-da-loja', 'id desconhecido não vira rota')
 })
 
-await provar('A3 revisão: Pronto, Falta X, Deixado para depois, Sem acesso e o id desconhecido com "Abrir em Configurações"', async () => {
+// As frases de `ProntidaoDaConfiguracaoInicial` (EasyStock.Domain): começam com maiúscula e verbo.
+const FALTA_DO_BACKEND = {
+  horarios: ['Salvar os horários da semana', 'Abrir ao menos um dia na semana'],
+  cardapio: ['Publicar ao menos um item com preço'],
+}
+
+await provar('A3 revisão: Pronto, Falta (cada item como o backend manda), Deixado para depois, Sem acesso e o id desconhecido com nome', async () => {
   const estado = estadoDaApi(
     { 'boas-vindas': 'conferido', horarios: 'conferido', cardapio: 'conferido', frete: 'depois' },
-    { cardapio: { prontidao: { ok: false, falta: ['cadastrar um item', 'uma categoria'] } }, horarios: { prontidao: { ok: true, falta: [] } }, equipe: { disponivel: false, motivo: 'Só quem administra a loja convida.' } },
+    { horarios: { prontidao: { ok: false, falta: FALTA_DO_BACKEND.horarios } }, cardapio: { prontidao: { ok: true, falta: [] } }, equipe: { disponivel: false, motivo: 'Só quem administra a loja convida.' } },
   )
-  estado.passos.push(passoDaApi('passo-novo-da-api'))
+  estado.passos.push(passoDaApi('notas-fiscais'))
   const r = dominio.resumoDaRevisao(estado)
-  assert.deepEqual(r.pronto.map((p) => p.passo), ['boas-vindas', 'horarios'])
-  assert.deepEqual(r.falta.find((p) => p.passo === 'cardapio'), { passo: 'cardapio', rotulo: 'Cardápio', texto: 'Falta cadastrar um item, uma categoria' })
-  assert.equal(r.falta.find((p) => p.passo === 'site-e-impressos').texto, 'Falta conferir')
+  assert.deepEqual(r.pronto.map((p) => p.passo), ['boas-vindas', 'cardapio'])
+  assert.deepEqual(r.falta.find((p) => p.passo === 'horarios'), { passo: 'horarios', rotulo: 'Horários', itens: FALTA_DO_BACKEND.horarios }, 'uma lista, sem colar "Falta " na frase')
+  assert.deepEqual(r.falta.find((p) => p.passo === 'site-e-impressos'), { passo: 'site-e-impressos', rotulo: 'Site e impressos', itens: ['Conferir este passo'] })
+  assert.deepEqual(dominio.resumoDaRevisao(estadoDaApi({}, { janelas: { prontidao: { ok: false, falta: [] } } })).falta.find((p) => p.passo === 'janelas').itens, ['Conferir este passo'], 'prontidão sem frase cai no conferir')
   assert.ok(!r.falta.some((p) => p.passo === 'pronto'), 'o próprio passo final não entra na revisão')
   assert.deepEqual(r.depois.map((p) => p.passo), ['frete'])
   assert.deepEqual(r.semAcesso, [{ passo: 'equipe', rotulo: 'Equipe', texto: 'Só quem administra a loja convida.' }])
-  assert.deepEqual(r.desconhecidos, [{ passo: 'passo-novo-da-api', texto: 'Abrir em Configurações', href: '#/m/configuracoes' }])
+  assert.deepEqual(r.desconhecidos, [{ passo: 'notas-fiscais', rotulo: 'Notas fiscais', texto: 'Abrir em Configurações', href: '#/m/configuracoes' }])
   const todos = [...r.pronto, ...r.falta, ...r.depois, ...r.semAcesso].map((p) => p.passo).sort()
   assert.deepEqual(todos, IDS_DO_CONTRATO.slice(0, 16).sort(), 'cada passo cai em um grupo só')
 })
 
-await provar('A4 progresso: "Passo 2 de 7 · Horários", a Parte 2 conta 9, o fim é a revisão e o hall conta só a Parte 1', async () => {
-  assert.equal(dominio.textoDoProgresso('boas-vindas'), 'Passo 1 de 7 · Boas-vindas')
-  assert.equal(dominio.textoDoProgresso('horarios'), 'Passo 2 de 7 · Horários')
-  assert.equal(dominio.textoDoProgresso('equipe'), 'Passo 7 de 7 · Equipe')
-  assert.equal(dominio.textoDoProgresso('dados-da-loja'), 'Passo 1 de 9 · Dados da loja')
-  assert.equal(dominio.textoDoProgresso('respostas'), 'Passo 3 de 9 · Respostas')
+await provar('A4 progresso: "Parte 1 · Passo 2 de 7 · Horários", a Parte 2 conta 9 e diz que pode ser pulado, o fim é a revisão e o hall conta só a Parte 1', async () => {
+  // A parte e o "pode ser pulado" ficam no texto que está sempre à vista (a lista de passos recolhe no celular).
+  assert.equal(dominio.textoDoProgresso('boas-vindas'), 'Parte 1 · Passo 1 de 7 · Boas-vindas')
+  assert.equal(dominio.textoDoProgresso('horarios'), 'Parte 1 · Passo 2 de 7 · Horários')
+  assert.equal(dominio.textoDoProgresso('equipe'), 'Parte 1 · Passo 7 de 7 · Equipe')
+  assert.equal(dominio.textoDoProgresso('dados-da-loja'), 'Parte 2 · Passo 1 de 9 · Dados da loja · pode ser pulado')
+  assert.equal(dominio.textoDoProgresso('respostas'), 'Parte 2 · Passo 3 de 9 · Respostas · pode ser pulado')
   assert.equal(dominio.textoDoProgresso('pronto'), 'Revisão final')
+  assert.equal(dominio.textoDoProgresso('nao-existe'), '')
   assert.deepEqual(dominio.progressoDaParte(estadoDaApi({ 'boas-vindas': 'conferido', horarios: 'depois', cardapio: 'conferido', respostas: 'conferido' }), 'essencial'), { feitos: 3, total: 7 })
   assert.deepEqual(dominio.progressoDaParte(null, 'essencial'), { feitos: 0, total: 7 })
 })
@@ -565,26 +583,48 @@ const renderizador = () => {
   fn.chamadas = chamadas
   return fn
 }
+// O passo vem da hash, como no navegador.
 const montarTela = async (props = {}) => {
   const renderizarAba = props.renderizarAba ?? renderizador()
+  if (props.passo) janela.location.hash = rota.hashDoPasso(props.passo)
   const raiz = new Raiz({ type: TelaConfiguracaoInicial, props: { passo: null, renderizarAba, ...props } })
   await raiz.atualizar()
   return { raiz, renderizarAba }
 }
-const trocarPasso = async (raiz, passo) => { raiz.elemento = { ...raiz.elemento, props: { ...raiz.elemento.props, passo } }; return raiz.atualizar() }
+const trocarPasso = async (raiz, passo) => {
+  janela.location.hash = rota.hashDoPasso(passo)
+  raiz.elemento = { ...raiz.elemento, props: { ...raiz.elemento.props, passo } }
+  return raiz.atualizar()
+}
 const paineis = (raiz) => andar(raiz.arvore).filter((n) => n.type === 'PainelDeAjuste')
 const AVISO_PENDENCIA = 'Há alterações não salvas neste passo. Salve ou desfaça antes de seguir.'
+const CONFIGURACAO_DO_ATENDIMENTO = {
+  ativo: false, tom: 'acolhedor', nivelSugestao: 'Discreto', saudacaoPrimeiroContato: 'Oi', saudacaoRetorno: 'Oi de novo',
+  fraseEspera: 'Um instante', mensagemForaArea: 'Não atendemos aí', modeloRetomadaNome: null, respiroMinutos: 5, tempoPreparoPadraoMinutos: 30, slaRespostaMinutos: 5,
+}
+const TITULO_DA_CONFIRMACAO = 'Sair deste passo sem salvar?'
+const confirmacaoDeSaida = (raiz) => andar(raiz.arvore).find((n) => n.type === 'Modal')
+const clique = () => ({ prevenido: false, preventDefault() { this.prevenido = true } })
+const adiado = () => { let soltar; const promessa = new Promise((r) => { soltar = r }); return { promessa, soltar } }
+const esperar = (ms = 30) => new Promise((r) => setTimeout(r, ms))
 
-await provar('D1 sem passo na rota: retoma do primeiro em aberto, troca a hash e mostra "Passo 2 de 7 · Horários"', async () => {
+await provar('D1 sem passo na rota: retoma do primeiro em aberto, troca a hash e mostra "Parte 1 · Passo 2 de 7 · Horários" fora da lista recolhível', async () => {
   servidor(estadoDaApi({ 'boas-vindas': 'conferido' }))
   g.acesso = { acoes: ADMIN, entrada: '#/' }
   contextoDosRascunhos()
   const { raiz } = await montarTela()
   assert.deepEqual(janela.location.substituicoes, ['#/m/configuracoes/primeiros-passos/horarios'], 'a hash passa a dizer o passo')
-  assert.match(todoTexto(raiz), /Passo 2 de 7 · Horários/)
+  // O texto à vista mesmo com a lista recolhida (celular e tablet): fora do <details>.
+  const contagens = andar(raiz.arvore).filter((n) => n.props?.className === 'contagem')
+  assert.equal(contagens.length, 1, 'uma contagem')
+  assert.equal(texto(contagens[0]), 'Parte 1 · Passo 2 de 7 · Horários')
+  const lista = andar(raiz.arvore).find((n) => n.type === 'details')
+  assert.ok(!andar(lista).some((n) => n.props?.className === 'contagem'), 'a contagem não fica dentro da lista recolhível')
   const atuais = andar(raiz.arvore).filter((n) => n.props?.['aria-current'] === 'step')
   assert.equal(atuais.length, 1, 'um passo atual')
-  assert.match(texto(atuais[0]), /Horários/)
+  assert.equal(atuais[0].type, 'a', 'aria-current no link do passo atual')
+  assert.equal(atuais[0].props.href, '#/m/configuracoes/primeiros-passos/horarios')
+  assert.equal(texto(atuais[0]), 'Horários')
   assert.match(todoTexto(raiz), /Parte 1 · O essencial/)
   assert.match(todoTexto(raiz), /Parte 2 · Mais ajustes/)
   assert.match(todoTexto(raiz), /Cada passo desta parte pode ser pulado\./)
@@ -593,8 +633,18 @@ await provar('D1 sem passo na rota: retoma do primeiro em aberto, troca a hash e
   assert.equal(typeof painel.props.aoMudarPendencia, 'function')
   const titulo = andar(raiz.arvore).find((n) => n.type === 'h2' && texto(n) === 'Horários')
   assert.ok(titulo, 'o título do passo é um h2')
-  assert.equal(titulo.props.tabIndex, -1, 'o título recebe o foco ao trocar de passo')
+  assert.equal(titulo.props.tabIndex, -1, 'o título pode receber o foco')
   assert.doesNotMatch(todoTexto(raiz), /Abrir loja agora/)
+  // O foco de verdade: a ref do título recebe focus() a cada troca de passo, e só então.
+  const focos = []
+  titulo.props.ref.current = { focus: () => focos.push('foco') }
+  raiz.renderizar()
+  assert.deepEqual(focos, [], 'renderizar de novo no mesmo passo não rouba o foco')
+  await trocarPasso(raiz, 'site-e-impressos')
+  assert.deepEqual(focos, ['foco'], 'trocar de passo leva o foco ao título')
+  assert.equal(texto(andar(raiz.arvore).find((n) => n.props?.className === 'contagem')), 'Parte 1 · Passo 3 de 7 · Site e impressos')
+  await trocarPasso(raiz, 'dados-da-loja')
+  assert.equal(texto(andar(raiz.arvore).find((n) => n.props?.className === 'contagem')), 'Parte 2 · Passo 1 de 9 · Dados da loja · pode ser pulado')
 })
 
 await provar('D2 "Conferi, seguir" fica bloqueado com aviso enquanto o formulário novo avisa pendência', async () => {
@@ -718,13 +768,20 @@ await provar('D7 recarregar retoma do primeiro passo em aberto (o que já foi ma
 })
 
 await provar('D8 passo final: revisão, "Concluir" faz o POST e vai à porta de entrada; o atalho leva ao gesto de abrir loja e caixa', async () => {
-  servidor(estadoDaApi({ 'boas-vindas': 'conferido', horarios: 'depois' }, { cardapio: { prontidao: { ok: false, falta: ['cadastrar um item'] } } }))
+  servidor(estadoDaApi({ 'boas-vindas': 'conferido', horarios: 'conferido', 'site-e-impressos': 'depois' }, {
+    horarios: { prontidao: { ok: false, falta: FALTA_DO_BACKEND.horarios } }, cardapio: { prontidao: { ok: false, falta: FALTA_DO_BACKEND.cardapio } },
+  }))
   g.acesso = { acoes: ADMIN, entrada: '#/m/atendimento' }
   contextoDosRascunhos()
   const { raiz } = await montarTela({ passo: 'pronto' })
   const t = todoTexto(raiz)
-  for (const grupo of ['Pronto', 'Falta', 'Deixado para depois']) assert.match(t, new RegExp(grupo))
-  assert.match(t, /Falta cadastrar um item/)
+  for (const grupo of ['Pronto', 'Falta', 'Deixado para depois']) assert.ok(andar(raiz.arvore).some((n) => n.type === 'h3' && texto(n) === grupo), grupo)
+  // Cada frase do backend vira um item, como veio: nada de "Falta Salvar os horários…".
+  const grupoFalta = andar(raiz.arvore).filter((n) => n.type === 'section' && andar(n).some((h) => h.type === 'h3' && texto(h) === 'Falta')).at(-1)
+  const doPasso = (rotulo) => andar(grupoFalta).find((n) => n.type === 'li' && andar(n).some((a) => a.type === 'a' && texto(a) === rotulo))
+  assert.deepEqual(andar(doPasso('Horários')).filter((n) => n.type === 'li').slice(1).map(texto), FALTA_DO_BACKEND.horarios)
+  assert.deepEqual(andar(doPasso('Cardápio')).filter((n) => n.type === 'li').slice(1).map(texto), FALTA_DO_BACKEND.cardapio)
+  assert.doesNotMatch(t, /Falta [A-ZÁÉÍÓÚ]/, 'nenhuma frase colada depois de "Falta "')
   assert.match(t, /Revisão final/)
   assert.ok(!botao(raiz, 'Conferi, seguir'), 'o passo final não tem "Conferi, seguir"')
   const atalho = links(raiz).find((a) => a.props.href === '#/m/atendimento/horarios')
@@ -801,14 +858,17 @@ await provar('D11 boas-vindas: confere o nome com PATCH só do nome, mostra o qu
 
 await provar('D12 id desconhecido vindo da API: aparece com "Abrir em Configurações", sem quebrar a tela', async () => {
   const estado = estadoDaApi()
-  estado.passos.push(passoDaApi('passo-novo-da-api'))
+  estado.passos.push(passoDaApi('notas-fiscais'), passoDaApi('fidelidade'))
   servidor(estado)
   g.acesso = { acoes: ADMIN, entrada: '#/' }
   contextoDosRascunhos()
   const { raiz } = await montarTela({ passo: 'pronto' })
-  const link = links(raiz).find((a) => texto(a) === 'Abrir em Configurações')
-  assert.ok(link, 'o passo novo vira link para Configurações')
-  assert.equal(link.props.href, '#/m/configuracoes')
+  // Na revisão e na lista de passos, cada um com o nome tirado do id, para não virarem links iguais.
+  const paraConfiguracoes = links(raiz).filter((a) => a.props.href === '#/m/configuracoes').map(texto)
+  assert.deepEqual(paraConfiguracoes.sort(), [
+    'Fidelidade: Abrir em Configurações', 'Fidelidade: Abrir em Configurações',
+    'Notas fiscais: Abrir em Configurações', 'Notas fiscais: Abrir em Configurações',
+  ])
 })
 
 await provar('D13 passo sem acesso: diz o motivo, não monta o ajuste e só oferece seguir', async () => {
@@ -876,39 +936,299 @@ await provar('D16 AbaAtendimento: secoes monta só horários, só a configuraç�
   assert.ok(!andar(agente.arvore).some((n) => n.type === 'input' && n.props?.type === 'checkbox'))
 })
 
+// Atendimento real, montado pelo passo como o PainelDeAjuste monta.
+const passoComAtendimento = async () => {
+  const { AbaAtendimento } = await carregar('features/gestao/atendimento/AbaAtendimento.jsx')
+  return (props) => (props.aba === 'atendimento' ? { type: AbaAtendimento, props: { secoes: props.secoes, aoMudarPendencia: props.aoMudarPendencia } } : null)
+}
+
+await provar('D17 passo Atendimento nunca liga o agente: o liga e desliga não salvo em outra tela não segura o passo e o PUT leva o ativo gravado', async () => {
+  servidor(estadoDaApi())
+  const gravado = { ...CONFIGURACAO_DO_ATENDIMENTO, ativo: false }
+  const enviados = []
+  g.contexto = {
+    estado: { fonteApi: true, expediente: { carregado: true, mensagemForaDoHorario: '', mensagemLojaFechada: '' }, aberta: true, lojaAberta: null, agora: 0 },
+    acoes: { recarregarExpediente: () => {}, carregarConfiguracao: async () => structuredClone(gravado), salvarConfiguracao: async (c) => { enviados.push(c); return { ...c } } },
+  }
+  g.acesso = { acoes: ADMIN, entrada: '#/' }
+  const ctx = contextoDosRascunhos()
+  // Na mesma visita, "Atendimento automático" foi marcado em Atendimento › Horários e mensagens e não foi salvo.
+  ctx.rascunhos = { 'configuracao-atendimento': { ...gravado, ativo: true } }
+  const { raiz } = await montarTela({ passo: 'atendimento', renderizarAba: await passoComAtendimento() })
+  assert.equal(campo(raiz, 'Tom')?.props.value, 'acolhedor', 'o passo monta a configuração real')
+  assert.notEqual(botao(raiz, 'Conferi, seguir').props.disabled, true, 'nenhum campo à vista mudou: o passo não fica preso')
+  assert.doesNotMatch(todoTexto(raiz), /Alterações não salvas/)
+  assert.equal(botao(raiz, 'Salvar configuração').props.disabled, true, 'nada deste passo para salvar')
+  mudar(raiz, 'Tom', 'direto')
+  await raiz.atualizar(2)
+  assert.equal(botao(raiz, 'Conferi, seguir').props.disabled, true, 'o Tom editado segura o passo')
+  assert.match(avisoVivo(raiz), new RegExp(AVISO_PENDENCIA))
+  await enviar(raiz, andar(raiz.arvore).find((n) => n.type === 'form'))
+  assert.equal(enviados.length, 1)
+  assert.deepEqual(enviados[0], { ...gravado, tom: 'direto', ativo: false }, 'o PUT reenvia o ativo gravado, nunca o do rascunho')
+  assert.notEqual(botao(raiz, 'Conferi, seguir').props.disabled, true, 'salvo, o passo libera')
+  assert.deepEqual(ctx.rascunhos['configuracao-atendimento'], { ...gravado, tom: 'direto', ativo: true }, 'o liga e desliga não salvo continua com a aba de Atendimento')
+  // Desfazer no passo volta só os campos dele.
+  mudar(raiz, 'Tom', 'seco')
+  await clicar(raiz, 'Desfazer edição da configuração')
+  assert.deepEqual(ctx.rascunhos['configuracao-atendimento'], { ...gravado, tom: 'direto', ativo: true })
+  assert.notEqual(botao(raiz, 'Conferi, seguir').props.disabled, true)
+  assert.equal(enviados.length, 1)
+})
+
+await provar('D18 Respostas e Equipe: resposta pronta começada, texto automático em edição ou convite aberto seguram "Conferi, seguir"', async () => {
+  servidor(estadoDaApi())
+  const { AbaRespostas } = await carregar('features/gestao/respostas/AbaRespostas.jsx')
+  g.contexto = {
+    estado: { fonteApi: true, regras: [{ id: 'r1', nome: 'Boas-vindas', descricao: 'Na primeira mensagem', texto: 'Oi!', ativa: true }], cargaDasRegras: { estado: 'ok' } },
+    acoes: { incluirRespostaPronta: async () => true, editarRespostaPronta: async () => true, alternarArquivamentoRespostaPronta() {}, alternarRegra() {}, editarRegra: async () => true },
+    catalogo: { respostasProntas: [{ id: 'p1', titulo: 'Pix', atalho: '/pix', texto: 'Chave pix', arquivada: false }] },
+  }
+  g.acesso = { acoes: ADMIN, entrada: '#/' }
+  const ctx = contextoDosRascunhos()
+  const renderizarAba = (props) => (props.aba === 'respostas' ? { type: AbaRespostas, props: {} } : null)
+  const { raiz } = await montarTela({ passo: 'respostas', renderizarAba })
+  const bloqueado = () => botao(raiz, 'Conferi, seguir').props.disabled === true
+  assert.equal(bloqueado(), false)
+  await clicar(raiz, 'Nova resposta')
+  assert.equal(bloqueado(), false, 'formulário aberto e vazio não segura')
+  mudar(raiz, 'Título', 'Endereço')
+  await raiz.atualizar(2)
+  assert.equal(bloqueado(), true, 'resposta nova começada segura o passo')
+  assert.deepEqual(Object.keys(ctx.rascunhos), ['resposta-pronta:nova'])
+  await clicar(raiz, 'Cancelar')
+  assert.equal(bloqueado(), false, 'cancelar libera')
+  await clicar(raiz, 'Editar resposta Pix')
+  assert.equal(bloqueado(), false, 'abrir sem mudar não segura')
+  mudar(raiz, 'Texto', 'Chave pix: 123')
+  await raiz.atualizar(2)
+  assert.equal(bloqueado(), true, 'resposta em edição segura o passo')
+  assert.deepEqual(Object.keys(ctx.rascunhos), ['resposta-pronta:p1'])
+  await clicar(raiz, 'Cancelar')
+  assert.equal(bloqueado(), false)
+  await clicar(raiz, 'Editar texto')
+  assert.equal(bloqueado(), false, 'abrir o texto automático sem mudar não segura')
+  mudar(raiz, 'Texto de Boas-vindas', 'Olá!')
+  await raiz.atualizar(2)
+  assert.equal(bloqueado(), true, 'texto automático em edição segura o passo')
+  assert.deepEqual(Object.keys(ctx.rascunhos), ['mensagem-automatica:r1'])
+  raiz.desmontar()
+  assert.deepEqual(ctx.rascunhos, {}, 'sair do passo tira as chaves')
+  // Equipe: o convite (AbaUsuarios, do pacote de Usuários) avisa pela chave 'convite-usuario'.
+  const equipe = await montarTela({ passo: 'equipe' })
+  assert.equal(botao(equipe.raiz, 'Conferi, seguir').props.disabled, false)
+  ctx.definir('convite-usuario', true)
+  await equipe.raiz.atualizar(2)
+  assert.equal(botao(equipe.raiz, 'Conferi, seguir').props.disabled, true, 'convite começado segura o passo')
+})
+
+await provar('D19 com pendência, Voltar, Fazer depois, um passo da lista e Continuar depois pedem confirmação antes de sair', async () => {
+  const s = servidor(estadoDaApi({ 'boas-vindas': 'conferido' }))
+  g.acesso = { acoes: ADMIN, entrada: '#/m/atendimento' }
+  contextoDosRascunhos()
+  const { raiz } = await montarTela({ passo: 'site-e-impressos' })
+  const aqui = rota.hashDoPasso('site-e-impressos')
+  const pendurar = async () => { paineis(raiz)[0].props.aoMudarPendencia(true); await raiz.atualizar(2) }
+  const linkDoFrete = () => links(raiz).find((a) => a.props.href === rota.hashDoPasso('frete'))
+  // Sem pendência, a lista navega direto pelo href.
+  const semPendencia = clique()
+  linkDoFrete().props.onClick?.(semPendencia)
+  assert.equal(semPendencia.prevenido, false)
+  assert.equal(confirmacaoDeSaida(raiz), undefined)
+  await pendurar()
+  for (const nome of ['Fazer depois', 'Voltar', 'Continuar depois']) {
+    await clicar(raiz, nome)
+    assert.equal(confirmacaoDeSaida(raiz)?.props.titulo, TITULO_DA_CONFIRMACAO, `${nome} pergunta antes`)
+    await clicar(raiz, 'Continuar editando')
+    assert.equal(confirmacaoDeSaida(raiz), undefined)
+  }
+  const pelaLista = clique()
+  linkDoFrete().props.onClick(pelaLista)
+  await raiz.atualizar(2)
+  assert.equal(pelaLista.prevenido, true, 'o link da lista não sai sem confirmar')
+  assert.equal(confirmacaoDeSaida(raiz)?.props.titulo, TITULO_DA_CONFIRMACAO)
+  await clicar(raiz, 'Continuar editando')
+  assert.equal(escritas().length, 0, 'nada gravado sem confirmar')
+  assert.equal(janela.location.hash, aqui, 'nada trocado sem confirmar')
+  assert.equal(botao(raiz, 'Conferi, seguir').props.disabled, true, 'a pendência continua')
+  // Confirmar cada saída faz o que o botão faz.
+  await clicar(raiz, 'Fazer depois')
+  await clicar(raiz, 'Sair sem salvar')
+  assert.deepEqual(escritas(), [{ metodo: 'PUT', url: `${BASE}/passos/site-e-impressos`, corpo: { situacao: 'depois' } }])
+  assert.equal(janela.location.hash, rota.hashDoPasso('cardapio'))
+  assert.equal(s.estado.passos.find((p) => p.passo === 'site-e-impressos').situacao, 'depois')
+  await trocarPasso(raiz, 'site-e-impressos')
+  await pendurar()
+  await clicar(raiz, 'Voltar')
+  await clicar(raiz, 'Sair sem salvar')
+  assert.equal(janela.location.hash, rota.hashDoPasso('horarios'))
+  await trocarPasso(raiz, 'site-e-impressos')
+  await pendurar()
+  linkDoFrete().props.onClick(clique())
+  await raiz.atualizar(2)
+  await clicar(raiz, 'Sair sem salvar')
+  assert.equal(janela.location.hash, rota.hashDoPasso('frete'))
+  await trocarPasso(raiz, 'site-e-impressos')
+  await pendurar()
+  await clicar(raiz, 'Continuar depois')
+  await clicar(raiz, 'Sair sem salvar')
+  assert.deepEqual(escritas().at(-1), { metodo: 'POST', url: `${BASE}/adiar`, corpo: undefined })
+  assert.equal(janela.location.hash, '#/m/atendimento')
+  assert.equal(escritas().length, 2, 'Voltar e a lista só navegam')
+})
+
+await provar('D20 depois da espera, a tela só navega se a pessoa continua no mesmo passo', async () => {
+  servidor(estadoDaApi())
+  const put = adiado()
+  responder('PUT', `${BASE}/passos/horarios`, () => put.promessa)
+  g.acesso = { acoes: ADMIN, entrada: '#/m/atendimento' }
+  contextoDosRascunhos()
+  const { raiz } = await montarTela({ passo: 'horarios' })
+  const seguindo = botao(raiz, 'Conferi, seguir').props.onClick()
+  await raiz.atualizar(2)
+  // Ela abre outro passo pela lista enquanto o PUT não volta.
+  await trocarPasso(raiz, 'cardapio')
+  put.soltar({ status: 204 })
+  await seguindo
+  await raiz.atualizar()
+  assert.equal(janela.location.hash, rota.hashDoPasso('cardapio'), 'não é levada ao passo seguinte ao que deixou')
+  // Ela vai para Módulos enquanto "Continuar depois" espera: a tela sai de cena.
+  const adiar = adiado()
+  responder('POST', `${BASE}/adiar`, () => adiar.promessa)
+  const saindo = botao(raiz, 'Continuar depois').props.onClick()
+  await raiz.atualizar(2)
+  janela.location.hash = '#/'
+  raiz.desmontar()
+  adiar.soltar({ status: 204 })
+  await saindo
+  await esperar()
+  assert.equal(janela.location.hash, '#/', 'não vai à porta de entrada no meio de outra tela')
+  // Concluir, idem.
+  const outra = await montarTela({ passo: 'pronto' })
+  const conclusao = adiado()
+  responder('POST', `${BASE}/concluir`, () => conclusao.promessa)
+  const concluindo = botao(outra.raiz, 'Concluir').props.onClick()
+  janela.location.hash = '#/m/cardapio/itens'
+  outra.raiz.desmontar()
+  conclusao.soltar({ status: 204 })
+  await concluindo
+  await esperar()
+  assert.equal(janela.location.hash, '#/m/cardapio/itens')
+})
+
 // --- E. Catálogo C# de passos ----------------------------------------------------------------------------
 
-await provar('E1 os ids batem com o catálogo C# (EasyStock.Domain) nos dois sentidos, ou com a lista do contrato', async () => {
-  const raizDominio = fileURLToPath(new URL('../../EasyStock.Domain/', import.meta.url))
-  const arquivos = (dir) => readdirSync(dir).flatMap((nome) => {
-    const caminho = join(dir, nome)
-    if (['bin', 'obj'].includes(nome)) return []
-    return statSync(caminho).isDirectory() ? arquivos(caminho) : caminho.endsWith('.cs') ? [caminho] : []
-  })
-  const catalogo = arquivos(raizDominio).filter((c) => /ConfiguracaoInicial/.test(c)).map((c) => readFileSync(c, 'utf8')).find((c) => /"boas-vindas"/.test(c))
-  const ids = dominio.PASSOS.map((p) => p.id)
-  if (!catalogo) {
-    console.log('      (catálogo C# ConfiguracaoInicial ausente neste worktree: conferido contra a lista do contrato)')
-    assert.deepEqual(ids, IDS_DO_CONTRATO)
+// `ConfiguracaoInicial.cs`: as constantes `public const string X = "id"` e a ordem de `Numerar((X, Parte.Y), ...)`.
+// Devolve [{ id, parte }] na ordem do catálogo, com a parte como o backend serializa (minúsculas).
+function passosDoCatalogoCs(codigo) {
+  const valores = new Map([...codigo.matchAll(/public\s+const\s+string\s+(\w+)\s*=\s*"([^"]+)"\s*;/g)].map((m) => [m[1], m[2]]))
+  const ordem = [...codigo.matchAll(/\(\s*(\w+)\s*,\s*ParteDaConfiguracaoInicial\.(\w+)\s*\)/g)]
+  assert.ok(ordem.length > 0, 'o catálogo C# tem a lista de Numerar')
+  for (const [, nome] of ordem) assert.ok(valores.has(nome), `${nome} da lista tem constante`)
+  assert.equal(ordem.length, valores.size, 'toda constante de passo está na lista, e só uma vez')
+  return ordem.map(([, nome, parte]) => ({ id: valores.get(nome), parte: parte.toLowerCase() }))
+}
+
+await provar('E1 o mapa bate com o catálogo C# (EasyStock.Domain) como conjunto exato, ordem e parte, ou com a lista do contrato', async () => {
+  const doConsole = dominio.PASSOS.map((p) => ({ id: p.id, parte: p.parte }))
+  // O leitor do C# pega um passo novo de uma palavra só e uma constante fora da lista.
+  const amostra = (extra = '', lista = '') => `
+    public const string BoasVindas = "boas-vindas";
+    public const string Pronto = "pronto";${extra}
+    public const int TamanhoMaximoDoId = 40;
+    Numerar((BoasVindas, ParteDaConfiguracaoInicial.Essencial),${lista}
+      (Pronto, ParteDaConfiguracaoInicial.Revisao));`
+  assert.deepEqual(passosDoCatalogoCs(amostra()), [{ id: 'boas-vindas', parte: 'essencial' }, { id: 'pronto', parte: 'revisao' }])
+  assert.deepEqual(passosDoCatalogoCs(amostra('\n    public const string Fiscal = "fiscal";', '\n      (Fiscal, ParteDaConfiguracaoInicial.Ajustes),')).map((p) => p.id), ['boas-vindas', 'fiscal', 'pronto'])
+  assert.throws(() => passosDoCatalogoCs(amostra('\n    public const string Fiscal = "fiscal";')), /toda constante de passo está na lista/)
+  const arquivo = fileURLToPath(new URL('../../EasyStock.Domain/Services/ConfiguracaoInicial.cs', import.meta.url))
+  let codigo = null
+  try { codigo = readFileSync(arquivo, 'utf8') } catch { /* o catálogo é de outro pacote */ }
+  if (!codigo) {
+    console.log('      (EasyStock.Domain/Services/ConfiguracaoInicial.cs ausente neste worktree: conferido contra a lista do contrato)')
+    assert.deepEqual(doConsole.map((p) => p.id), IDS_DO_CONTRATO)
     return
   }
-  const doCs = [...new Set([...catalogo.matchAll(/"([a-z]+(?:-[a-z]+)*)"/g)].map((m) => m[1]).filter((id) => IDS_DO_CONTRATO.includes(id) || /-/.test(id)))]
-  for (const id of ids) assert.ok(doCs.includes(id), `${id} do console existe no C#`)
-  for (const id of doCs.filter((x) => !['essencial', 'ajustes', 'fim', 'conferido', 'depois'].includes(x))) assert.ok(ids.includes(id), `${id} do C# existe no console`)
+  assert.deepEqual(doConsole, passosDoCatalogoCs(codigo), 'os mesmos ids, na mesma ordem e na mesma parte')
 })
 
 // --- F. Entrada do App -----------------------------------------------------------------------------------
 
-await provar('F1 App: só abre sozinho do hall, uma vez por visita, com a chave, e o hall ganha o cartão; nada na demonstração', async () => {
+await provar('F1 entrada: o efeito real espera o acesso e o estado, decide uma vez, marca a visita e só abre do hall ou da porta', async () => {
+  const { useAberturaDosPrimeirosPassos } = await carregar('aplicacao/useAberturaDosPrimeirosPassos.js')
+  const DADOS = { modulos: [{ id: 'atendimento', liberado: true }, { id: 'configuracoes', liberado: true }], portaDeEntrada: 'atendimento', acoes: ADMIN }
+  const RETOMADA = rota.hashDoPasso('horarios')
+  const DONA = estadoDaApi({ 'boas-vindas': 'conferido' })
+  // O AppComAcesso: os dados e o estado chegam depois da primeira volta; a visita guarda se já abriu.
+  function Entrada({ dados, estado, hashNaEntrada, visita }) {
+    useAberturaDosPrimeirosPassos({ dados, estado, hashNaEntrada, abriuNestaVisita: () => visita.aberta, aoAbrir: () => { visita.aberta = true; visita.gravacoes++ } })
+    return null
+  }
+  const entrar = ({ hash = '', visita = { aberta: false, gravacoes: 0 } } = {}) => {
+    janela.location.hash = hash
+    const raiz = new Raiz({ type: Entrada, props: { dados: null, estado: null, hashNaEntrada: hash, visita } })
+    const chegar = (props) => { raiz.elemento = { ...raiz.elemento, props: { ...raiz.elemento.props, ...props } }; raiz.renderizar() }
+    return { raiz, chegar, visita }
+  }
+  // Dona, do hall: espera os dois, abre na retomada e marca a visita uma vez.
+  let e = entrar()
+  e.chegar({ estado: DONA })
+  assert.equal(janela.location.hash, '', 'sem o acesso ainda não decide')
+  e.chegar({ dados: DADOS })
+  assert.equal(janela.location.hash, RETOMADA, 'dona com abrirSozinho cai em Primeiros passos')
+  assert.deepEqual(e.visita, { aberta: true, gravacoes: 1 })
+  // O estado relido depois (marcar, voltar ao hall) não redireciona de novo.
+  janela.location.hash = '#/'
+  e.chegar({ estado: estadoDaApi({ 'boas-vindas': 'conferido', horarios: 'conferido' }) })
+  assert.equal(janela.location.hash, '#/')
+  assert.equal(e.visita.gravacoes, 1)
+  // O acesso chega antes do estado: decide quando o estado chega.
+  e = entrar()
+  e.chegar({ dados: DADOS })
+  assert.equal(janela.location.hash, '')
+  e.chegar({ estado: DONA })
+  assert.equal(janela.location.hash, RETOMADA)
+  // A entrada do perfil já trocou o hall pela porta antes do estado chegar: vale a hash da entrada.
+  e = entrar()
+  e.chegar({ dados: DADOS })
+  janela.location.hash = '#/m/atendimento'
+  e.chegar({ estado: DONA })
+  assert.equal(janela.location.hash, RETOMADA)
+  // Link direto não é sequestrado, e a decisão não volta quando o estado muda.
+  e = entrar({ hash: '#/m/cardapio/itens' })
+  e.chegar({ dados: DADOS, estado: DONA })
+  assert.equal(janela.location.hash, '#/m/cardapio/itens')
+  janela.location.hash = '#/'
+  e.chegar({ estado: estadoDaApi() })
+  assert.equal(janela.location.hash, '#/', 'decidido uma vez por entrada')
+  assert.equal(e.visita.gravacoes, 0)
+  // Já abriu nesta visita (recarregou a página): não abre de novo.
+  e = entrar({ visita: { aberta: true, gravacoes: 0 } })
+  e.chegar({ dados: DADOS, estado: DONA })
+  assert.equal(janela.location.hash, '')
+  // Depois de "Continuar depois" e para a Administração, o servidor manda abrirSozinho falso.
+  for (const topo of [{ abrirSozinho: false, adiadaEm: '2026-10-27T10:00:00Z' }, { abrirSozinho: false, ehDona: false, podeConcluir: false }]) {
+    e = entrar()
+    e.chegar({ dados: DADOS, estado: estadoDaApi({}, {}, topo) })
+    assert.equal(janela.location.hash, '', JSON.stringify(topo))
+    assert.equal(e.visita.gravacoes, 0)
+  }
+  // Chave ausente: o estado nunca é lido (fica nulo) e nada redireciona.
+  e = entrar()
+  e.chegar({ dados: { ...DADOS, acoes: {} } })
+  assert.equal(janela.location.hash, '')
+  e.raiz.desmontar()
+  // O App liga o efeito com o estado lido só com a chave; fora do AppComAcesso (modo API) nada disso existe.
   const app = fonte('app/App.jsx')
   const comAcesso = app.slice(app.indexOf('function AppComAcesso('))
   assert.match(comAcesso, /useConfiguracaoInicialApi\(\{ ativo: podeConfigurarLoja\(dados\?\.acoes\) \}\)/, 'chave ausente: nem lê')
-  assert.match(comAcesso, /deveAbrirSozinho\(configuracaoInicial\.estado, \{ hashAtual: window\.location\.hash, hashNaEntrada, hashDaPorta: entradaDoPerfil\(dados\), jaAbriuNaVisita: primeirosPassosAbertos\.current \}\)/)
-  assert.match(comAcesso, /primeirosPassosAbertos: true/)
+  assert.equal((comAcesso.match(/useAberturaDosPrimeirosPassos\(/g) ?? []).length, 1)
+  assert.match(comAcesso, /useAberturaDosPrimeirosPassos\(\{ dados, estado: configuracaoInicial\.estado, hashNaEntrada, abriuNestaVisita, aoAbrir: marcarAberturaNaVisita \}\)/)
   assert.match(comAcesso, /const \[hashNaEntrada\] = useState\(\(\) => window\.location\.hash\)/)
   assert.match(comAcesso, /<CartaoPrimeirosPassos estado=\{configuracaoInicial\.estado\} \/>/)
+  assert.doesNotMatch(comAcesso, /deveAbrirSozinho/, 'a decisão mora no efeito provado acima')
   const antes = app.slice(0, app.indexOf('function AppComAcesso(')).replace(/^import [\s\S]*?from '[^']+'$/gm, '')
-  assert.doesNotMatch(antes, /useConfiguracaoInicialApi|deveAbrirSozinho|CartaoPrimeirosPassos/, 'fora do AppComAcesso (modo API) nada disso existe')
+  assert.doesNotMatch(antes, /useConfiguracaoInicialApi|useAberturaDosPrimeirosPassos|CartaoPrimeirosPassos/, 'fora do AppComAcesso (modo API) nada disso existe')
   const visita = await carregar('infra/api/visitaDaSessao.js')
   const dados = new Map()
   globalThis.sessionStorage = { getItem: (k) => dados.get(k) ?? null, setItem: (k, v) => dados.set(k, v), removeItem: (k) => dados.delete(k), get length() { return dados.size }, key: (i) => [...dados.keys()][i] }
@@ -927,13 +1247,17 @@ await provar('F2 tela de rota: Primeiros passos monta a tela com os mesmos slots
   for (const slot of ['renderizarEditorCardapio', 'horariosAtendimento', 'janelasApi', 'horariosDaSemana', 'entregadoresApi', 'abasDaDemonstracao']) {
     assert.match(app.slice(app.indexOf('const SLOTS_DOS_AJUSTES = {')), new RegExp(`\\b${slot}\\b`), slot)
   }
-  assert.equal((app.match(/\{\.\.\.SLOTS_DOS_AJUSTES\}/g) ?? []).length >= 3, true, 'ModalGestao, Respostas e a tela de rota recebem o mesmo objeto')
+  // Exatamente quatro usos, um em cada lugar: ModalGestao, modal de Respostas, tela de rota e o passo.
+  assert.equal((app.match(/\{\.\.\.SLOTS_DOS_AJUSTES\}/g) ?? []).length, 4)
+  assert.match(app, /<ModalGestao\s+\{\.\.\.SLOTS_DOS_AJUSTES\}/)
+  assert.match(app, /<PainelDeAjuste \{\.\.\.SLOTS_DOS_AJUSTES\} aba="respostas"/)
+  assert.match(app, /<PainelDeAjuste \{\.\.\.SLOTS_DOS_AJUSTES\} key=\{rota\.aba\} aba=\{rota\.aba\} \/>/)
+  assert.match(app, /const renderizarAbaDoPasso = \(props\) => <PainelDeAjuste \{\.\.\.SLOTS_DOS_AJUSTES\} \{\.\.\.props\} \/>/)
   assert.match(app, /<TelaConfiguracaoInicial passo=\{rota\.passo\} renderizarAba=\{renderizarAbaDoPasso\} \/>/)
   const moldura = fonte('features/hall/MolduraDoModulo.jsx')
   assert.match(moldura, /tela\?\.telaCheia === true/)
   assert.match(fonte('features/hall/moldura.module.css'), /\.telaCheia/)
-  const tela = fonte('features/gestao/configuracao-inicial/TelaConfiguracaoInicial.jsx')
-  assert.match(tela, /tituloRef\.current\?\.focus\(/, 'foco no título ao trocar de passo')
+  // O foco no título é provado na D1 (a ref recebe focus() ao trocar de passo).
   assert.match(fonte('features/gestao/configuracao-inicial/configuracaoInicial.module.css'), /@media \(max-width: 640px\)/)
 })
 

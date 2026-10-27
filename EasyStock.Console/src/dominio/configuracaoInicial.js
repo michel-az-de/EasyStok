@@ -4,15 +4,16 @@
 //
 // `monta`: a aba do PainelDeAjuste (com `secoes` da AbaAtendimento ou a `secao` do cadastro de entrega) ou um
 // componente próprio do assistente. `chavesDeRascunho`: as chaves do `ContextoRascunhosDosAjustes` que seguram
-// o "Conferi, seguir" das abas reaproveitadas; terminada em ":" vale como prefixo. Os formulários novos avisam
-// pelo `aoMudarPendencia`.
+// o "Conferi, seguir" das abas reaproveitadas; terminada em ":" vale como prefixo. Os formulários novos e a
+// configuração do atendimento avisam pelo `aoMudarPendencia`.
 import { resumoDoWhatsApp } from './canais'
 
 export const MODULO_DOS_PRIMEIROS_PASSOS = 'configuracoes'
 export const TELA_PRIMEIROS_PASSOS = 'primeiros-passos'
+// As partes com os nomes que o backend serializa (`ParteDaConfiguracaoInicial`); a tela lê a parte deste mapa.
 export const PARTE_ESSENCIAL = 'essencial'
 export const PARTE_AJUSTES = 'ajustes'
-export const PARTE_FIM = 'fim'
+export const PARTE_REVISAO = 'revisao'
 export const PASSO_FINAL = 'pronto'
 // Passo que a API conhece e o console ainda não: a tela leva a Configurações, sem rota própria.
 export const DESTINO_DESCONHECIDO = `#/m/${MODULO_DOS_PRIMEIROS_PASSOS}`
@@ -33,14 +34,17 @@ export const PASSOS = Object.freeze([
     [{ aba: 'janelas', secao: 'janelas' }], ['janela-de-entrega:']),
   passo('frete', 'Frete', PARTE_ESSENCIAL, 'Quanto custa a entrega em cada bairro ou faixa de CEP.',
     [{ aba: 'janelas', secao: 'zonas' }], ['zona-de-frete:', 'frete-por-distancia']),
+  // 'convite-usuario': o convite aberto da AbaUsuarios (pacote de Usuários) avisa por `usePendenciaDoAjuste`.
   passo('equipe', 'Equipe', PARTE_ESSENCIAL, 'Convide quem trabalha com você como Gerência, Atendimento ou Cozinha. A pessoa entra com a conta Google deste e-mail.',
-    [{ aba: 'usuarios' }]),
+    [{ aba: 'usuarios' }], ['convite-usuario']),
   passo('dados-da-loja', 'Dados da loja', PARTE_AJUSTES, 'Nome, descrição, documento, endereço e telefone da loja.',
     [{ aba: 'dados-da-loja' }]),
+  // Sem chave: o rascunho 'configuracao-atendimento' pode trazer o liga e desliga de outra tela, que este passo não
+  // mostra; a configuração avisa só o que está à vista pelo `aoMudarPendencia`.
   passo('atendimento', 'Atendimento', PARTE_AJUSTES, 'O tom, as saudações e os tempos do atendimento. Ligar o atendimento automático fica em Atendimento.',
-    [{ aba: 'atendimento', secoes: ['configuracao'] }], ['configuracao-atendimento']),
+    [{ aba: 'atendimento', secoes: ['configuracao'] }]),
   passo('respostas', 'Respostas', PARTE_AJUSTES, 'As respostas prontas do Balcão e as mensagens automáticas.',
-    [{ aba: 'respostas' }]),
+    [{ aba: 'respostas' }], ['resposta-pronta:', 'mensagem-automatica:']),
   passo('agente', 'Agente', PARTE_AJUSTES, 'O que o atendimento automático sabe sobre a loja e se ele está ligado.',
     [{ aba: 'caderno' }, { aba: 'atendimento', secoes: ['agente'] }]),
   passo('producao', 'Produção', PARTE_AJUSTES, 'Os insumos e as receitas, de onde sai o custo de cada prato.',
@@ -53,12 +57,13 @@ export const PASSOS = Object.freeze([
     [{ aba: 'impressao' }]),
   passo('avisos', 'Avisos', PARTE_AJUSTES, 'O que você recebe e por onde. Ligar os avisos vale só neste aparelho.',
     [{ aba: 'avisos' }]),
-  passo(PASSO_FINAL, 'Revisão', PARTE_FIM, 'Confira o que ficou pronto e conclua. O que ficou para depois continua em Configurações.',
+  passo(PASSO_FINAL, 'Revisão', PARTE_REVISAO, 'Confira o que ficou pronto e conclua. O que ficou para depois continua em Configurações.',
     [{ componente: 'pronto' }]),
 ])
 
 export const ROTULO_DA_PARTE = { [PARTE_ESSENCIAL]: 'Parte 1 · O essencial', [PARTE_AJUSTES]: 'Parte 2 · Mais ajustes' }
 export const AVISO_DA_PARTE_2 = 'Cada passo desta parte pode ser pulado.'
+const PARTE_CURTA = { [PARTE_ESSENCIAL]: 'Parte 1', [PARTE_AJUSTES]: 'Parte 2' }
 
 const POR_ID = new Map(PASSOS.map((p) => [p.id, p]))
 export const passoDoMapa = (id) => POR_ID.get(id) ?? null
@@ -87,12 +92,15 @@ export function passoVizinho(id, direcao, estado) {
   return null
 }
 
+// O texto sempre à vista acima do título: a lista de passos recolhe no celular, então a parte e o "pode ser
+// pulado" da Parte 2 moram aqui também.
 export function textoDoProgresso(id) {
   const definicao = passoDoMapa(id)
   if (!definicao) return ''
-  if (definicao.parte === PARTE_FIM) return 'Revisão final'
+  if (definicao.parte === PARTE_REVISAO) return 'Revisão final'
   const parte = passosDaParte(definicao.parte)
-  return `Passo ${parte.indexOf(definicao) + 1} de ${parte.length} · ${definicao.rotulo}`
+  const texto = `${PARTE_CURTA[definicao.parte]} · Passo ${parte.indexOf(definicao) + 1} de ${parte.length} · ${definicao.rotulo}`
+  return definicao.parte === PARTE_AJUSTES ? `${texto} · pode ser pulado` : texto
 }
 
 // Para o cartão do hall: quantos passos da parte já têm situação (conferido ou deixado para depois).
@@ -102,23 +110,31 @@ export function progressoDaParte(estado, parte) {
 }
 
 // Revisão do passo final. Cada passo cai num grupo só: sem acesso, depois, falta (prontidão ou não conferido), pronto.
+// `itens` da falta são as frases da prontidão como o backend manda ("Salvar os horários da semana"), uma por linha.
+const FALTA_CONFERIR = 'Conferir este passo'
 export function resumoDaRevisao(estado) {
   const resumo = { pronto: [], falta: [], depois: [], semAcesso: [], desconhecidos: [] }
   for (const { id, rotulo } of PASSOS) {
     if (id === PASSO_FINAL) continue
     const linha = daApi(estado, id)
     const prontidao = linha?.prontidao
+    const frases = (prontidao?.falta ?? []).filter((f) => typeof f === 'string' && f.trim())
     if (linha?.disponivel === false) resumo.semAcesso.push({ passo: id, rotulo, texto: linha.motivo ?? 'Seu perfil não abre este ajuste.' })
     else if (linha?.situacao === 'depois') resumo.depois.push({ passo: id, rotulo })
-    else if (prontidao && prontidao.ok === false) resumo.falta.push({ passo: id, rotulo, texto: `Falta ${(prontidao.falta ?? []).join(', ') || 'conferir'}` })
+    else if (prontidao && prontidao.ok === false) resumo.falta.push({ passo: id, rotulo, itens: frases.length ? frases : [FALTA_CONFERIR] })
     else if (linha?.situacao === 'conferido') resumo.pronto.push({ passo: id, rotulo })
-    else resumo.falta.push({ passo: id, rotulo, texto: 'Falta conferir' })
+    else resumo.falta.push({ passo: id, rotulo, itens: [FALTA_CONFERIR] })
   }
-  resumo.desconhecidos = passosDesconhecidos(estado).map((id) => ({ passo: id, texto: TEXTO_DESCONHECIDO, href: DESTINO_DESCONHECIDO }))
+  resumo.desconhecidos = passosDesconhecidos(estado).map((id) => ({ passo: id, rotulo: rotuloDoDesconhecido(id), texto: TEXTO_DESCONHECIDO, href: DESTINO_DESCONHECIDO }))
   return resumo
 }
 
 export const passosDesconhecidos = (estado) => (estado?.passos ?? []).map((p) => p?.passo).filter((id) => typeof id === 'string' && !ehPassoConhecido(id))
+// A API não manda rótulo: o id kebab-case vira nome ("notas-fiscais" → "Notas fiscais"), para os links não ficarem iguais.
+export const rotuloDoDesconhecido = (id) => {
+  const nome = String(id).replaceAll('-', ' ').trim()
+  return nome.charAt(0).toUpperCase() + nome.slice(1)
+}
 
 // Rascunho ou gravação em curso numa das chaves do passo.
 export function pendenciaDoPasso(id, contexto) {
