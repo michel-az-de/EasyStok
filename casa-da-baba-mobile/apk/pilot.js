@@ -162,7 +162,30 @@
     ]) for (const element of document.querySelectorAll(selector)) element.outerHTML = pilotIcon(name);
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation, pilotIcon, applyConsoleIcons };
+  function installAppChrome(environment, openHome) {
+    const document = environment.document;
+    const header = document.querySelector?.('.phone > .header');
+    if (!header) return;
+    for (const [id, targetId] of [['globalSearchBtn', 'pilotRailActions'], ['ajustesBtn', 'pilotRailActions'], ['opBadge', 'pilotOperator'], ['syncChip', 'pilotSyncDetails']]) {
+      const control = document.getElementById(id), target = document.getElementById(targetId);
+      if (control && target) target.append(control);
+    }
+    header.hidden = true;
+    const homeLabel = document.querySelector('.nav-btn[data-nav="home"] .label');
+    if (homeLabel) homeLabel.textContent = 'Início';
+    const navigate = environment.go;
+    if (typeof navigate === 'function') environment.go = function (screen, options) {
+      const result = navigate.call(this, screen, options);
+      if (screen === 'home') openHome();
+      return result;
+    };
+  }
+
+  function refreshOperatorReview(document, name) {
+    for (const label of document.querySelectorAll('.pilot-current-operator')) label.textContent = name?.trim() || 'Não identificado';
+  }
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation, pilotIcon, applyConsoleIcons, installAppChrome, refreshOperatorReview };
   if (!root.document || !root.CDB_CONFIG?.isPilot) return;
   const config = root.CDB_CONFIG;
   const doc = root.document;
@@ -189,9 +212,12 @@
   const bell = (id, badge) => '<button type="button" id="' + id + '" class="pilot-bell" aria-label="Abrir avisos" title="Avisos" aria-haspopup="dialog" data-action="notices">' + bellIcon + '<span id="' + badge + '" class="pilot-bell-count" hidden aria-hidden="true"></span></button>';
   const rail = doc.createElement('div');
   rail.className = 'pilot-rail';
-  rail.innerHTML = '<button type="button" id="pilotHomeButton">Casa da Baba <span id="pilotRailVersion">Piloto</span></button><span id="pilotRailStatus" role="status">Conferindo conexão</span>' + bell('pilotNoticeBell', 'pilotNoticeCount');
+  rail.innerHTML = '<button type="button" id="pilotHomeButton" aria-label="Casa da Baba, início"><img class="pilot-brand-mark" src="casa-da-baba.png" alt="" width="48" height="40"><span class="pilot-wordmark">Casa da Baba<span id="pilotRailVersion">Piloto</span></span></button><div id="pilotRailActions">' + bell('pilotNoticeBell', 'pilotNoticeCount') + '</div><span id="pilotRailStatus" role="status">Conferindo conexão</span>';
   doc.body.prepend(rail);
   doc.body.classList.add('pilot-app');
+  if (root.ResizeObserver) new root.ResizeObserver(() => {
+    doc.body.style.setProperty('--pilot-rail-height', Math.ceil(rail.getBoundingClientRect().height) + 'px');
+  }).observe(rail);
 
   const home = doc.createElement('dialog');
   home.id = 'pilotHome';
@@ -199,7 +225,7 @@
   home.setAttribute('aria-labelledby', 'pilotTitle');
   home.innerHTML = `
     <div class="pilot-sheet">
-      <div class="pilot-topline"><span>CASA DA BABA <small id="pilotHomeVersion">PILOTO</small></span><div class="pilot-top-actions">${bell('pilotHomeNoticeBell', 'pilotHomeNoticeCount')}<button type="button" data-action="close" aria-label="Fechar início">${closeIcon}</button></div></div>
+      <div class="pilot-topline"><span class="pilot-home-brand"><img class="pilot-brand-mark" src="casa-da-baba.png" alt="" width="60" height="44"><span>Casa da Baba<small id="pilotHomeVersion">PILOTO</small></span></span><div class="pilot-top-actions">${bell('pilotHomeNoticeBell', 'pilotHomeNoticeCount')}<button type="button" data-action="close" aria-label="Fechar início">${closeIcon}</button></div></div>
       <h1 id="pilotTitle" tabindex="-1">Produção e pedidos.</h1>
       <p id="pilotError" class="pilot-feedback pilot-error" role="alert" tabindex="-1"></p>
       <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
@@ -208,19 +234,39 @@
         <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${productionIcon}</span><span class="pilot-card-copy"><span class="pilot-step">PRODUÇÃO NESTE APARELHO</span><strong>Produzir e etiquetar</strong><span class="pilot-card-description">Validade, lote e impressão.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
         <button type="button" class="pilot-card pilot-orders" data-action="workspace"><span class="pilot-action-icon">${atendimentoIcon}</span><span class="pilot-card-copy"><span class="pilot-step">ONLINE · OPERAÇÃO REAL</span><strong>Atendimento</strong><span class="pilot-card-description">Pedidos, frete e cobranças.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
       </div>
-      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><div class="pilot-connection-controls"><button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button><button type="button" id="pilotReconnect" data-action="reconnect" hidden aria-label="Verificar conexão" title="Verificar conexão">${pilotIcon('refresh-cw')}</button><details class="pilot-connection-details"><summary>Detalhes</summary><p id="pilotConnectionDetail"></p><p id="pilotPairHint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p></details></div></div>
+      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><div class="pilot-connection-controls"><button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button><button type="button" id="pilotReconnect" data-action="reconnect" hidden aria-label="Verificar conexão" title="Verificar conexão">${pilotIcon('refresh-cw')}</button><details class="pilot-connection-details"><summary>Detalhes</summary><p id="pilotConnectionDetail"></p><p id="pilotPairHint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p><div id="pilotSyncDetails"></div></details></div></div>
       <button type="button" class="pilot-local" data-action="local-orders"><strong class="pilot-local-title">${pilotIcon('pedido-em-preparo')}<span>Registrar pedido no aparelho</span></strong><span>Sem frete nem envio automático.</span></button>
-      <details class="pilot-help pilot-migration"><summary>Já usava o PWA antigo?</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><button type="button" data-action="migration-guide">Ver passo a passo</button><p>Se está começando agora, basta conectar a produção.</p></details>
       <div class="pilot-shortcuts">
         <button type="button" data-action="printers">${pilotIcon('printer')}<span>Impressoras</span></button>
       </div>
+      <details class="pilot-help pilot-support"><summary>Configurações e ajuda</summary>
+      <div class="pilot-operator-row"><span>Registrando como</span><div id="pilotOperator"></div></div>
+      <details class="pilot-help pilot-migration"><summary>Trazer dados do PWA antigo</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><button type="button" data-action="migration-guide">Ver passo a passo</button><p>Se está começando agora, basta conectar a produção.</p></details>
       <details class="pilot-help"><summary>Ajuda para usar o app</summary><p>No Atendimento, entre com seu acesso da Casa da Baba. As alterações são feitas na operação real.</p><p>O cadastro local de produtos e pedidos, a produção e o histórico ficam neste aparelho. Após o primeiro pareamento, as alterações aguardam a conexão para sincronizar. A impressão exige uma impressora compatível conectada.</p><p>Frete, cobrança online, envio pelo atendimento e IA precisam de conexão com o EasyStok. Uma mensagem preparada ou um pedido salvo no aparelho ainda não confirmam envio nem pagamento.</p></details>
       <details class="pilot-help"><summary>Atualizações e recuperação</summary><p id="pilotOtaStatus" role="status">A atualização automática de conteúdo está disponível no APK Android.</p><p id="pilotPushStatus" role="status"></p><p>O app guarda a versão anterior do conteúdo. Voltar a ela preserva os pedidos, a produção e a fila de envio. O Atendimento online segue a versão publicada no EasyStok.</p><button type="button" id="pilotRollback" data-action="rollback" hidden>Voltar à versão anterior</button></details>
+      </details>
       <div class="pilot-update"><span id="pilotVersion" role="status"></span><button type="button" id="pilotUpdateButton" data-action="update">Verificar atualização</button></div>
       <p id="pilotUpdateStatus" class="pilot-feedback" role="status" tabindex="-1"></p>
       <button type="button" id="pilotDownload" data-action="download" hidden>Atualizar APK</button>
     </div>`;
   doc.body.append(home);
+  installAppChrome(root, openHome);
+  if (doc.querySelector && root.MutationObserver) {
+    for (const id of ['newProductModal', 'productionConfirmModal']) {
+      const sheet = doc.querySelector('#' + id + ' .modal-sheet');
+      const subtitle = sheet?.querySelector('.modal-sub');
+      if (!subtitle) continue;
+      const context = doc.createElement('div');
+      context.className = 'pilot-operator-review';
+      context.innerHTML = '<span>Registrando como <strong class="pilot-current-operator"></strong></span><button type="button">Trocar</button>';
+      context.querySelector('button').addEventListener('click', () => root.changeOperator());
+      subtitle.after(context);
+    }
+    const refreshOperator = () => refreshOperatorReview(doc, root.cdbApp?.getOperator?.());
+    refreshOperator();
+    const operatorLabel = doc.getElementById('opName');
+    if (operatorLabel) new root.MutationObserver(refreshOperator).observe(operatorLabel, { childList: true, characterData: true, subtree: true });
+  }
   const notices = doc.createElement('dialog');
   notices.id = 'pilotNotices';
   notices.className = 'pilot-home pilot-notices';
@@ -711,6 +757,7 @@
     }
   });
   home.addEventListener('close', () => {
+    if (doc.querySelector?.('.screen.active')?.dataset.screen === 'home') root.go('producao', { preserveHistory: true });
     const target = lastFocus?.isConnected && lastFocus.getClientRects().length ? lastFocus : doc.getElementById('pilotHomeButton');
     target.focus();
   });

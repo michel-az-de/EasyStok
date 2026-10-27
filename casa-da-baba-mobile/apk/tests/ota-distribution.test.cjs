@@ -152,6 +152,18 @@ test('#2066 esquema de dados do empacotador é o mesmo do APK', () => {
   const java = fs.readFileSync(path.resolve(__dirname, '../android/app/src/main/java/com/casadababa/app/updater/UpdatePolicy.java'), 'utf8');
   assert.equal(Number(/DATA_SCHEMA\s*=\s*(\d+)/.exec(java)[1]), require('../scripts/ota-contract.cjs').DATA_SCHEMA);
 });
+
+test('versão e código do APK vêm do manifesto, com lockfile consistente', () => {
+  const manifest = require('../package.json');
+  const lock = require('../package-lock.json');
+  const contract = require('../scripts/ota-contract.cjs');
+  assert.equal(lock.version, manifest.version);
+  assert.equal(lock.packages[''].version, manifest.version);
+  assert.equal(contract.NATIVE_VERSION_CODE, manifest.versionCode);
+  const gradle = fs.readFileSync(path.resolve(__dirname, '../android/app/build.gradle'), 'utf8');
+  assert.match(gradle, /versionCode appVersion\.versionCode as int/);
+  assert.match(gradle, /versionName appVersion\.version/);
+});
 test('publicação recusa adulteração, troca de chave, sequência reutilizada e concorrência sem mudar latest', () => {
   const root = fs.mkdtempSync(path.join(temporary, 'server-')), first = build('0.3.0', 1);
   const initial = staging(root, first); run(root, initial, 'install'); run(root, initial, 'activate');
@@ -174,11 +186,22 @@ test('publicação recusa adulteração, troca de chave, sequência reutilizada 
 test('APK novo mantém manifesto e recuperação legados intactos', () => {
   const root = fs.mkdtempSync(path.join(temporary, 'legacy-channel-'));
   const old=Buffer.from('manifesto-legado-preservado'), previous=Buffer.from('anterior-legado-preservado');
-  fs.writeFileSync(path.join(root,'latest.json'),old);fs.writeFileSync(path.join(root,'previous.json'),previous);
+  const olderChannels = [root];
+  for (let code = 5; code < require('../package.json').versionCode; code++) {
+    const directory = path.join(root, 'native-' + code);
+    fs.mkdirSync(directory);
+    olderChannels.push(directory);
+  }
+  for (const directory of olderChannels) {
+    fs.writeFileSync(path.join(directory, 'latest.json'), old);
+    fs.writeFileSync(path.join(directory, 'previous.json'), previous);
+  }
   const release=build('0.5.0',6), next=build('0.5.1',7);
   for(const item of [release,next]) { const stage=staging(root,item);run(root,stage,'install');run(root,stage,'activate'); }
-  assert.deepEqual(fs.readFileSync(path.join(root,'latest.json')),old);
-  assert.deepEqual(fs.readFileSync(path.join(root,'previous.json')),previous);
+  for (const directory of olderChannels) {
+    assert.deepEqual(fs.readFileSync(path.join(directory, 'latest.json')), old);
+    assert.deepEqual(fs.readFileSync(path.join(directory, 'previous.json')), previous);
+  }
   assert.equal(current(root).sequence,7);
   assert.equal(ota.verify(read(path.join(channelRoot(root),'previous.json')),key).sequence,6);
 });
