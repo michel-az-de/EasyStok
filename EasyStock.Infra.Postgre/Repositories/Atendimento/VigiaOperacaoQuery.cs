@@ -12,12 +12,15 @@ public sealed class VigiaOperacaoQuery(EasyStockDbContext db) : IVigiaOperacaoQu
     private static readonly string[] Finalizados =
     [
         StatusPedidoMapper.Entregue, StatusPedidoMapper.Cancelado, StatusPedidoMapper.Rascunho,
+        // Pix não pago, carrinho abandonado e exceção que a dona ainda não aprovou não são compromisso da cozinha.
+        StatusPedidoMapper.AguardandoPagamento, StatusPedidoMapper.AguardandoAprovacaoBaba,
     ];
 
-    private static readonly string[] DespachoEncerrado = ["cancelado", "falha"];
+    // Corrida que não leva mais o pedido: cancelada, falhou, voltando ou já entregue.
+    private static readonly string[] DespachoEncerrado = ["cancelado", "falha", "devolvendo", "entregue"];
 
     public async Task<IReadOnlyList<PedidoProntoSemEntregador>> ListarProntosSemEntregadorAsync(
-        Guid empresaId, DateTime prontoAteUtc, int limite, CancellationToken ct = default)
+        Guid empresaId, DateTime prontoDesdeUtc, DateTime prontoAteUtc, int limite, CancellationToken ct = default)
     {
         var viagensAtivas = db.Viagens.Where(v => v.EmpresaId == empresaId
             && (v.Situacao == SituacaoViagem.Montando || v.Situacao == SituacaoViagem.EmRota));
@@ -39,8 +42,8 @@ public sealed class VigiaOperacaoQuery(EasyStockDbContext db) : IVigiaOperacaoQu
                     .Where(e => e.PedidoId == p.Id && e.StatusNovo == StatusPedidoMapper.Pronto)
                     .Max(e => (DateTime?)e.OcorridoEm) ?? p.AlteradoEm,
             })
-            .Where(x => x.ProntoDesde <= prontoAteUtc)
-            .OrderBy(x => x.ProntoDesde)
+            .Where(x => x.ProntoDesde <= prontoAteUtc && x.ProntoDesde >= prontoDesdeUtc)
+            .OrderByDescending(x => x.ProntoDesde)
             .Take(limite)
             .ToListAsync(ct);
 
@@ -56,10 +59,10 @@ public sealed class VigiaOperacaoQuery(EasyStockDbContext db) : IVigiaOperacaoQu
                 && !Finalizados.Contains(p.Status))
             .OrderBy(p => p.AgendadoParaEm)
             .Take(limite)
-            .Select(p => new { p.Id, p.ClienteNome, p.AgendadoParaEm, p.ConfirmadoPeloClienteEm })
+            .Select(p => new { p.Id, p.ClienteNome, p.AgendadoParaEm, p.ConfirmadoPeloClienteEm, p.CriadoEm })
             .ToListAsync(ct);
 
-        return linhas.Select(x => new EncomendaEmAberto(x.Id, x.ClienteNome, x.AgendadoParaEm!.Value, x.ConfirmadoPeloClienteEm))
+        return linhas.Select(x => new EncomendaEmAberto(x.Id, x.ClienteNome, x.AgendadoParaEm!.Value, x.ConfirmadoPeloClienteEm, x.CriadoEm))
             .ToList();
     }
 

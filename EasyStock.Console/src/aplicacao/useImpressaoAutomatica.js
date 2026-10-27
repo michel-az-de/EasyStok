@@ -23,6 +23,19 @@ const esperar = (ms, sinal) => new Promise((ok) => {
 
 const hoje = () => dataIsoNoFuso(Date.now())
 
+// Folha que saiu mas a API ainda não soube: fica guardada neste aparelho para não sair de novo ao recarregar
+// a página ou quando outra aba assumir, e a confirmação é repetida a cada volta da fila.
+const CHAVE_SEM_CONFIRMAR = 'easystok.impressao.semConfirmar'
+const lerSemConfirmar = () => {
+  try {
+    const lista = JSON.parse(globalThis.localStorage?.getItem(CHAVE_SEM_CONFIRMAR) ?? '[]')
+    return Array.isArray(lista) ? lista.filter((id) => typeof id === 'string') : []
+  } catch { return [] }
+}
+const gravarSemConfirmar = (ids) => {
+  try { globalThis.localStorage?.setItem(CHAVE_SEM_CONFIRMAR, JSON.stringify([...new Set(ids)].slice(-200))) } catch { /* sem armazenamento */ }
+}
+
 export function useImpressaoAutomatica({ imprimir }) {
   const [preferencias, setPreferencias] = useState(lerPreferenciasImpressao)
   const [contagem, setContagem] = useState(() => lerContagemAutomatica(hoje()))
@@ -61,18 +74,30 @@ export function useImpressaoAutomatica({ imprimir }) {
         await registrarFalhaImpressao(item.id, erro?.message).catch(() => {})
         return
       }
+      gravarSemConfirmar([...lerSemConfirmar(), item.id])
       const proxima = somarImpressa(lerContagemAutomatica(hoje()), hoje())
       gravarContagemAutomatica(proxima)
       setContagem(proxima)
-      // A folha já saiu: se a confirmação falhar, a cozinha vê na gaveta e a próxima leitura não reimprime.
-      await confirmarImpressao(item.id).catch(() => {})
+      await confirmarPendentes()
+    }
+
+    // A folha já saiu: repete a confirmação até a API aceitar, sem imprimir de novo.
+    const confirmarPendentes = async () => {
+      for (const id of lerSemConfirmar()) {
+        tentadas.current.add(id)
+        try {
+          await confirmarImpressao(id)
+          gravarSemConfirmar(lerSemConfirmar().filter((outro) => outro !== id))
+        } catch { /* rede fora: tenta na próxima volta */ }
+      }
     }
 
     const trabalhar = async () => {
       setNestaAba(true)
       while (!sinal.aborted) {
         try {
-          const lista = await listarImpressoesPendentes()
+          await confirmarPendentes()
+          const lista = await listarImpressoesPendentes(desde)
           for (const item of pendentesParaImprimir(lista, { tentadas: tentadas.current, desde })) {
             if (sinal.aborted) break
             await imprimirUma(item)

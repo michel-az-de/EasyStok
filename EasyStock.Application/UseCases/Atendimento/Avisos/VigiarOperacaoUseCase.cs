@@ -36,6 +36,9 @@ public sealed class VigiarOperacaoUseCase(
     public const int HoraResumoEstoque = 8;
 
     public const int MaximoPorLeitura = 50;
+
+    /// <summary>Pedido pronto há mais que isto não vira aviso: é resto parado, não entrega esperando agora.</summary>
+    public static readonly TimeSpan JanelaDoPronto = TimeSpan.FromHours(24);
     public const int ItensNoResumo = 8;
 
     private const string SemNome = "Cliente";
@@ -58,6 +61,8 @@ public sealed class VigiarOperacaoUseCase(
         if (resultado.Total > 0)
         {
             await unitOfWork.CommitAsync();
+            // Só depois do commit: uma falha ao gravar não perde o resumo do freezer do dia.
+            if (estoque > 0) FreezerOlhadoEm[empresaId] = DateOnly.FromDateTime(HorarioBrasil.ConverterParaBrasilia(agoraUtc));
             logger.LogInformation(
                 "Vigia da operação empresa={EmpresaId}: prontos={Prontos} encomendas={Proximas} semConfirmacao={SemConfirmacao} estoque={Estoque}",
                 empresaId, prontos, proximas, semConfirmacao, estoque);
@@ -72,7 +77,8 @@ public sealed class VigiarOperacaoUseCase(
         if (avisos.ProntoSemEntregadorMinutos <= 0) return 0;
 
         var limite = TimeSpan.FromMinutes(avisos.ProntoSemEntregadorMinutos);
-        var pedidos = await consultas.ListarProntosSemEntregadorAsync(empresaId, agora - limite, MaximoPorLeitura, ct);
+        var pedidos = await consultas.ListarProntosSemEntregadorAsync(
+            empresaId, agora - JanelaDoPronto, agora - limite, MaximoPorLeitura, ct);
         var enfileirados = 0;
         foreach (var pedido in pedidos)
         {
@@ -98,7 +104,7 @@ public sealed class VigiarOperacaoUseCase(
 
         var encomendas = await consultas.ListarEncomendasAsync(empresaId, agora, agora.AddHours(horas), MaximoPorLeitura, ct);
         int proximas = 0, semConfirmacao = 0;
-        foreach (var e in encomendas)
+        foreach (var e in encomendas.Where(EhEncomenda))
         {
             var nome = NomesDeContato.PrimeiroNome(e.ClienteNome, SemNome);
             var quando = Quando(e.AgendadoParaEm);
@@ -149,8 +155,11 @@ public sealed class VigiarOperacaoUseCase(
         DateTime? venceAte = avisos.EstoqueVencendoDias > 0 ? agora.AddDays(avisos.EstoqueVencendoDias) : null;
         DateTime? produzidoAte = avisos.EstoqueParadoDias > 0 ? agora.AddDays(-avisos.EstoqueParadoDias) : null;
         var itens = await consultas.ListarFreezerParaConferirAsync(empresaId, venceAte, produzidoAte, MaximoPorLeitura, ct);
-        FreezerOlhadoEm[empresaId] = dia;
-        if (itens.Count == 0) return 0;
+        if (itens.Count == 0)
+        {
+            FreezerOlhadoEm[empresaId] = dia;
+            return 0;
+        }
 
         var vencendo = itens.Count(i => venceAte is { } v && i.ExpiraEm is { } e && e <= v);
         var parados = itens.Count - vencendo;
@@ -168,6 +177,13 @@ public sealed class VigiarOperacaoUseCase(
             ? 1
             : 0;
     }
+
+    /// <summary>
+    /// Encomenda é pedido para outro dia (data de Brasília da entrega depois da data em que foi feito). O site grava a
+    /// data em todo pedido; o pedido para hoje já está na cozinha e tem os próprios avisos.
+    /// </summary>
+    public static bool EhEncomenda(EncomendaEmAberto e) =>
+        HorarioBrasil.DataOperacional(e.AgendadoParaEm) > HorarioBrasil.DataOperacional(e.CriadoEm);
 
     public static string TextoFreezer(IReadOnlyList<ItemFreezerParaConferir> itens, DateTime? venceAte, DateTime agora)
     {

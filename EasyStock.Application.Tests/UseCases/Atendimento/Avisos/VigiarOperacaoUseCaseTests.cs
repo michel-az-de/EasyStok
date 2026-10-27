@@ -27,7 +27,7 @@ public class VigiarOperacaoUseCaseTests
 
     public VigiarOperacaoUseCaseTests()
     {
-        _consultas.ListarProntosSemEntregadorAsync(default, default, default).ReturnsForAnyArgs([]);
+        _consultas.ListarProntosSemEntregadorAsync(default, default, default, default).ReturnsForAnyArgs([]);
         _consultas.ListarEncomendasAsync(default, default, default, default).ReturnsForAnyArgs([]);
         _consultas.ListarFreezerParaConferirAsync(default, default, default, default).ReturnsForAnyArgs([]);
         Avisos(AvisosOperacao.Padrao);
@@ -54,7 +54,7 @@ public class VigiarOperacaoUseCaseTests
     public async Task ProntoParadoSemEntregadorViraPrazoEstouradoComOTempo()
     {
         var pedido = Guid.NewGuid();
-        _consultas.ListarProntosSemEntregadorAsync(_empresaId, Agora.AddMinutes(-15), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        _consultas.ListarProntosSemEntregadorAsync(_empresaId, Agora.AddHours(-24), Agora.AddMinutes(-15), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([new PedidoProntoSemEntregador(pedido, "Maria Souza", Agora.AddMinutes(-20))]);
 
         var r = await Criar().ExecuteAsync(_empresaId, Agora);
@@ -73,7 +73,7 @@ public class VigiarOperacaoUseCaseTests
     public async Task ProntoJaAvisadoNaoRepete()
     {
         var pedido = Guid.NewGuid();
-        _consultas.ListarProntosSemEntregadorAsync(default, default, default).ReturnsForAnyArgs(
+        _consultas.ListarProntosSemEntregadorAsync(default, default, default, default).ReturnsForAnyArgs(
             [new PedidoProntoSemEntregador(pedido, "Maria", Agora.AddMinutes(-40))]);
         _eventos.ExisteCorrelacaoAsync(_empresaId, $"prazo:pronto_sem_entregador:{pedido:N}", Arg.Any<CancellationToken>()).Returns(true);
 
@@ -115,7 +115,7 @@ public class VigiarOperacaoUseCaseTests
         var pedido = Guid.NewGuid();
         var agendado = Agora.AddHours(1);
         _consultas.ListarEncomendasAsync(_empresaId, Agora, Agora.AddHours(24), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns([new EncomendaEmAberto(pedido, "João", agendado, null)]);
+            .Returns([new EncomendaEmAberto(pedido, "João", agendado, null, Agora.AddDays(-2))]);
 
         var r = await Criar().ExecuteAsync(_empresaId, Agora);
 
@@ -134,14 +134,52 @@ public class VigiarOperacaoUseCaseTests
     {
         _consultas.ListarEncomendasAsync(default, default, default, default).ReturnsForAnyArgs(
         [
-            new EncomendaEmAberto(Guid.NewGuid(), "Ana", Agora.AddHours(10), null),
-            new EncomendaEmAberto(Guid.NewGuid(), "Bia", Agora.AddHours(10), Agora.AddDays(-1)),
+            new EncomendaEmAberto(Guid.NewGuid(), "Ana", Agora.AddHours(10), null, Agora.AddDays(-3)),
+            new EncomendaEmAberto(Guid.NewGuid(), "Bia", Agora.AddHours(10), Agora.AddDays(-1), Agora.AddDays(-3)),
         ]);
 
         var r = await Criar().ExecuteAsync(_empresaId, Agora);
 
         r.EncomendasProximas.Should().Be(0, "10 h passa das 2 h do aviso de encomenda chegando");
         r.EncomendasSemConfirmacao.Should().Be(1, "só a Ana falta confirmar");
+    }
+
+    [Fact]
+    public async Task PedidoParaHojeNaoEhEncomenda()
+    {
+        // O site grava a data em todo pedido: o pedido de hoje para hoje já está na cozinha, não é encomenda.
+        _consultas.ListarEncomendasAsync(default, default, default, default).ReturnsForAnyArgs(
+            [new EncomendaEmAberto(Guid.NewGuid(), "Caio", Agora.AddHours(1), null, Agora.AddMinutes(-10))]);
+
+        var r = await Criar().ExecuteAsync(_empresaId, Agora);
+
+        r.Total.Should().Be(0);
+        Enfileirados().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(2026, 10, 27, 2, 59, false)] // 23:59 de 26/10 em Brasília para 27/10: véspera
+    [InlineData(2026, 10, 27, 3, 0, true)]   // 00:00 de 27/10 em Brasília: mesmo dia
+    public void EncomendaUsaODiaDeBrasilia(int ano, int mes, int dia, int hora, int minuto, bool mesmoDia)
+    {
+        var criado = new DateTime(ano, mes, dia, hora, minuto, 0, DateTimeKind.Utc);
+        var e = new EncomendaEmAberto(Guid.NewGuid(), null, new DateTime(2026, 10, 27, 15, 0, 0, DateTimeKind.Utc), null, criado);
+
+        VigiarOperacaoUseCase.EhEncomenda(e).Should().Be(!mesmoDia);
+    }
+
+    [Fact]
+    public async Task FalhaNoCommitNaoPerdeOFreezerDoDia()
+    {
+        _consultas.ListarFreezerParaConferirAsync(default, default, default, default).ReturnsForAnyArgs(
+            [new ItemFreezerParaConferir("Lasanha", "L-1", Agora.AddDays(-20), null, 1)]);
+        _uow.CommitAsync().Returns(_ => throw new InvalidOperationException("banco fora"), _ => Task.FromResult(1));
+        var uc = Criar();
+
+        await uc.Invoking(u => u.ExecuteAsync(_empresaId, Agora)).Should().ThrowAsync<InvalidOperationException>();
+        var segunda = await uc.ExecuteAsync(_empresaId, Agora.AddMinutes(1));
+
+        segunda.ResumosEstoque.Should().Be(1);
     }
 
     [Fact]

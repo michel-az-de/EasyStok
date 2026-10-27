@@ -1,14 +1,15 @@
 using System.Text.Json;
-using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.UseCases.Atendimento.Avisos;
 
 namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 
 /// <summary>
 /// <c>confirmar_encomenda(pedido_id?)</c> (#2096): o cliente confirmou na conversa a encomenda com data marcada. Só pedido
 /// do cliente da conversa (o id vem do LLM); sem id, o pedido em andamento. A confirmação tira a encomenda do aviso
-/// "sem confirmação". O commit é do turno do agente.
+/// "sem confirmação". Passa pelo <see cref="ConfirmarEncomendaPeloClienteUseCase"/>: o turno do agente não abre
+/// transação, e a leitura com trava do pedido exige uma.
 /// </summary>
-public sealed class ConfirmarEncomendaFerramenta(IPedidoStorefrontRepository pedidos) : IFerramentaAgente
+public sealed class ConfirmarEncomendaFerramenta(ConfirmarEncomendaPeloClienteUseCase confirmar) : IFerramentaAgente
 {
     public string Nome => "confirmar_encomenda";
 
@@ -30,13 +31,16 @@ public sealed class ConfirmarEncomendaFerramenta(IPedidoStorefrontRepository ped
             : conversa.PedidoEmAndamentoId;
         if (pedidoId is null) return FerramentaJson.Serializar(new { erro = "pedido_nao_informado" });
 
-        var pedido = await pedidos.GetForUpdateAsync(contexto.EmpresaId, pedidoId.Value, ct);
-        if (pedido is null || pedido.EmpresaId != contexto.EmpresaId || pedido.ClienteId != clienteId)
-            return FerramentaJson.Serializar(new { erro = "pedido_nao_encontrado" });
-        if (pedido.AgendadoParaEm is null || pedido.EstaFinalizado)
+        try
+        {
+            var resultado = await confirmar.ConfirmarAsync(contexto.EmpresaId, pedidoId.Value, ct, clienteId);
+            return resultado is null
+                ? FerramentaJson.Serializar(new { erro = "pedido_nao_encontrado" })
+                : FerramentaJson.Serializar(new { situacao = "confirmada" });
+        }
+        catch (UseCaseValidationException)
+        {
             return FerramentaJson.Serializar(new { erro = "pedido_sem_encomenda_aberta" });
-
-        if (pedido.ConfirmarPeloCliente(contexto.Agora)) await pedidos.UpdateAsync(pedido, ct);
-        return FerramentaJson.Serializar(new { situacao = "confirmada" });
+        }
     }
 }

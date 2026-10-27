@@ -15,19 +15,23 @@ public sealed class ConfirmarEncomendaPeloClienteUseCase(
     IUnitOfWork unitOfWork,
     TimeProvider relogio)
 {
-    public Task<ConfirmacaoEncomendaResult?> ConfirmarAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
-        AplicarAsync(empresaId, pedidoId, confirmar: true, ct);
+    /// <param name="clienteId">Quando vem do agente: só pedido deste cliente (o id do pedido vem do LLM).</param>
+    public Task<ConfirmacaoEncomendaResult?> ConfirmarAsync(
+        Guid empresaId, Guid pedidoId, CancellationToken ct = default, Guid? clienteId = null) =>
+        AplicarAsync(empresaId, pedidoId, confirmar: true, clienteId, ct);
 
     public Task<ConfirmacaoEncomendaResult?> DesfazerAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
-        AplicarAsync(empresaId, pedidoId, confirmar: false, ct);
+        AplicarAsync(empresaId, pedidoId, confirmar: false, clienteId: null, ct);
 
-    private async Task<ConfirmacaoEncomendaResult?> AplicarAsync(Guid empresaId, Guid pedidoId, bool confirmar, CancellationToken ct)
+    private async Task<ConfirmacaoEncomendaResult?> AplicarAsync(
+        Guid empresaId, Guid pedidoId, bool confirmar, Guid? clienteId, CancellationToken ct)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
         return await unitOfWork.ExecuteInTransactionSemRetryAsync<ConfirmacaoEncomendaResult?>(async token =>
         {
             var pedido = await pedidos.GetForUpdateAsync(empresaId, pedidoId, token);
             if (pedido is null || pedido.EmpresaId != empresaId) return null;
+            if (clienteId is { } cliente && pedido.ClienteId != cliente) return null;
 
             bool mudou;
             try

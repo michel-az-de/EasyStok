@@ -6,8 +6,11 @@ namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 
 public sealed class ConfiguracaoAtendimentoRepository(EasyStockDbContext dbContext) : IConfiguracaoAtendimentoRepository
 {
+    // #2096: jobs entre empresas (lembretes, caixa esquecido) rodam sem tenant; o filtro global zerava a leitura e o
+    // interruptor da tela Avisos caía no padrão. A empresa vai explícita no WHERE e a RLS do banco continua valendo.
     public Task<ConfiguracaoAtendimento?> GetByEmpresaIdAsync(Guid empresaId) =>
         dbContext.ConfiguracoesAtendimento
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.EmpresaId == empresaId);
 

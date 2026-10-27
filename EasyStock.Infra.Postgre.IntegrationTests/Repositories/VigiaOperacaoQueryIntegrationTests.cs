@@ -1,3 +1,6 @@
+using System.Text.Json;
+using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.UseCases.Atendimento.Avisos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -5,6 +8,7 @@ using EasyStock.Domain.Sales;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories.Atendimento;
+using EasyStock.Infra.Postgre.Repositories.Storefront;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 
@@ -53,6 +57,7 @@ public class VigiaOperacaoQueryIntegrationTests(PostgreSqlDatabaseFixture fixtur
         var retirada = NovoPedido(casa.Id, StatusPedidoMapper.Pronto, null);
         var recente = NovoPedido(casa.Id, StatusPedidoMapper.Pronto, "Rua D, 4");
         var preparando = NovoPedido(casa.Id, StatusPedidoMapper.Preparando, "Rua E, 5");
+        var esquecido = NovoPedido(casa.Id, StatusPedidoMapper.Pronto, "Rua G, 7");
         var deFora = NovoPedido(outra.Id, StatusPedidoMapper.Pronto, "Rua F, 6");
 
         var entregador = Entregador.Criar(casa.Id, "Zé", TipoEntregador.Motoboy, EmpresaEntregador.Propria, null, null, null, Agora);
@@ -65,22 +70,25 @@ public class VigiaOperacaoQueryIntegrationTests(PostgreSqlDatabaseFixture fixtur
         await using (var db = fixture.CreateDbContext())
         {
             db.Empresas.AddRange(casa, outra);
-            db.Pedidos.AddRange(parado, semEntregador, comEntregador, retirada, recente, preparando, deFora);
+            db.Pedidos.AddRange(parado, semEntregador, comEntregador, retirada, recente, preparando, deFora, esquecido);
             db.Set<PedidoEvento>().AddRange(
                 Pronto(parado, Agora.AddMinutes(-40)), Pronto(semEntregador, Agora.AddMinutes(-25)),
                 Pronto(comEntregador, Agora.AddMinutes(-40)), Pronto(retirada, Agora.AddMinutes(-40)),
-                Pronto(recente, Agora.AddMinutes(-5)), Pronto(deFora, Agora.AddMinutes(-40)));
+                Pronto(recente, Agora.AddMinutes(-5)), Pronto(deFora, Agora.AddMinutes(-40)),
+                Pronto(esquecido, Agora.AddDays(-3)));
             db.Entregadores.Add(entregador);
             db.Viagens.AddRange(viagemCom, viagemSem);
             await db.SaveChangesAsync();
         }
 
         await using var leitura = await ComTenantAsync(casa.Id);
-        var lista = await new VigiaOperacaoQuery(leitura).ListarProntosSemEntregadorAsync(casa.Id, Agora.AddMinutes(-15), 50);
+        var lista = await new VigiaOperacaoQuery(leitura)
+            .ListarProntosSemEntregadorAsync(casa.Id, Agora.AddHours(-24), Agora.AddMinutes(-15), 50);
 
-        lista.Select(p => p.PedidoId).Should().Equal(parado.Id, semEntregador.Id);
-        lista[0].ProntoDesde.Should().BeCloseTo(Agora.AddMinutes(-40), TimeSpan.FromSeconds(1));
-        lista[0].ClienteNome.Should().Be("Maria Souza");
+        // Mais novos primeiro; o pronto de 3 dias atrás fica fora da janela.
+        lista.Select(p => p.PedidoId).Should().Equal(semEntregador.Id, parado.Id);
+        lista[1].ProntoDesde.Should().BeCloseTo(Agora.AddMinutes(-40), TimeSpan.FromSeconds(1));
+        lista[1].ClienteNome.Should().Be("Maria Souza");
     }
 
     [SkippableFact]
@@ -94,19 +102,85 @@ public class VigiaOperacaoQueryIntegrationTests(PostgreSqlDatabaseFixture fixtur
         var cancelada = NovoPedido(casa.Id, StatusPedidoMapper.Cancelado, "Rua C", Agora.AddHours(4));
         var longe = NovoPedido(casa.Id, StatusPedidoMapper.Aguardando, "Rua D", Agora.AddDays(3));
         var passada = NovoPedido(casa.Id, StatusPedidoMapper.Aguardando, "Rua E", Agora.AddHours(-1));
+        var naoPaga = NovoPedido(casa.Id, StatusPedidoMapper.AguardandoPagamento, "Rua F", Agora.AddHours(2));
+        var naoAprovada = NovoPedido(casa.Id, StatusPedidoMapper.AguardandoAprovacaoBaba, "Rua G", Agora.AddHours(2));
         await using (var db = fixture.CreateDbContext())
         {
             db.Empresas.Add(casa);
-            db.Pedidos.AddRange(confirmada, semConfirmacao, cancelada, longe, passada);
+            db.Pedidos.AddRange(confirmada, semConfirmacao, cancelada, longe, passada, naoPaga, naoAprovada);
             await db.SaveChangesAsync();
         }
 
         await using var leitura = await ComTenantAsync(casa.Id);
         var lista = await new VigiaOperacaoQuery(leitura).ListarEncomendasAsync(casa.Id, Agora, Agora.AddHours(24), 50);
+        // Não paga e não aprovada ficam de fora.
 
         lista.Select(e => e.PedidoId).Should().Equal(confirmada.Id, semConfirmacao.Id);
         lista[0].ConfirmadoPeloClienteEm.Should().BeCloseTo(Agora.AddHours(-1), TimeSpan.FromSeconds(1));
         lista[1].ConfirmadoPeloClienteEm.Should().BeNull();
+        lista[1].CriadoEm.Should().BeCloseTo(Agora.AddHours(-2), TimeSpan.FromSeconds(1));
+    }
+
+    [SkippableFact]
+    public async Task InterruptorDaLojaLidoSemTenantNosJobsEntreEmpresas()
+    {
+        // AvaliadorLembretes e CaixaEsquecidoJob rodam sem tenant: o filtro global zerava a leitura e o aviso desligado saía.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var casa = Empresa.Criar("Avisos sem tenant", null);
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(casa.Id);
+        configuracao.DefinirAvisos(new AvisosOperacao { ClienteSemResposta = false, CaixaEsquecido = false });
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.Empresas.Add(casa);
+            db.ConfiguracoesAtendimento.Add(configuracao);
+            await db.SaveChangesAsync();
+        }
+
+        await using var semTenant = fixture.CreateDbContext();
+        using var _ = semTenant.UseRowLevelSecurityBypass();
+        var lida = await new ConfiguracaoAtendimentoRepository(semTenant).GetOrDefaultAsync(casa.Id);
+
+        lida.Avisos.Ligado(CodigosAviso.ClienteSemResposta).Should().BeFalse();
+        lida.Avisos.Ligado(CodigosAviso.CaixaEsquecido).Should().BeFalse();
+    }
+
+    [SkippableFact]
+    public async Task AgenteConfirmaEncomendaDoProprioClienteDentroDaTransacao()
+    {
+        // O turno do agente não abre transação; a leitura com trava do pedido exige uma (GetForUpdateAsync).
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var casa = Empresa.Criar("Agente confirma encomenda", null);
+        var cliente = Cliente.Criar(casa.Id, "Maria Souza");
+        var outro = Cliente.Criar(casa.Id, "Outra pessoa");
+        var minha = NovoPedido(casa.Id, StatusPedidoMapper.Aguardando, "Rua A", Agora.AddDays(1));
+        minha.ClienteId = cliente.Id;
+        var alheia = NovoPedido(casa.Id, StatusPedidoMapper.Aguardando, "Rua B", Agora.AddDays(1));
+        alheia.ClienteId = outro.Id;
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.Empresas.Add(casa);
+            db.Clientes.AddRange(cliente, outro);
+            db.Pedidos.AddRange(minha, alheia);
+            await db.SaveChangesAsync();
+        }
+
+        var conversa = Conversa.Abrir(casa.Id, "5511999990777", Agora, "Maria");
+        conversa.VincularCliente(cliente.Id);
+        await using var turno = await ComTenantAsync(casa.Id);
+        var ferramenta = new ConfirmarEncomendaFerramenta(new ConfirmarEncomendaPeloClienteUseCase(
+            new PedidoStorefrontRepository(turno), turno, TimeProvider.System));
+        var contexto = new ContextoTurnoAgente(casa.Id, conversa, Agora);
+
+        var minhaR = await ferramenta.ExecutarAsync(contexto, JsonDocument.Parse($$"""{"pedido_id":"{{minha.Id}}"}""").RootElement);
+        var alheiaR = await ferramenta.ExecutarAsync(contexto, JsonDocument.Parse($$"""{"pedido_id":"{{alheia.Id}}"}""").RootElement);
+
+        minhaR.Should().Contain("confirmada");
+        alheiaR.Should().Contain("pedido_nao_encontrado");
+        await using var leitura = fixture.CreateDbContext();
+        var gravados = await leitura.Pedidos.IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.Id == minha.Id || p.Id == alheia.Id).ToDictionaryAsync(p => p.Id);
+        gravados[minha.Id].ConfirmadoPeloClienteEm.Should().NotBeNull();
+        gravados[alheia.Id].ConfirmadoPeloClienteEm.Should().BeNull();
     }
 
     [SkippableFact]

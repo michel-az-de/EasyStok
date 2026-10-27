@@ -21,7 +21,9 @@ export const reimprimirCanhoto = (id) => chamarApi(`/api/pedidos/${id}/reimprimi
 
 // Fila de impressão (S20) consumida pela aba da Cozinha (issue #1446): o pedido pago entra
 // pendente; a aba imprime o canhoto e confirma. Confirmar é idempotente na API.
-export const listarImpressoesPendentes = () => chamarApi('/api/impressao/pendentes?limite=20')
+// #2096: `desde` filtra no servidor; o acumulado de antes de ligar a impressão automática não ocupa a fila.
+export const listarImpressoesPendentes = (desde) =>
+  chamarApi(`/api/impressao/pendentes?limite=20${desde ? `&desde=${encodeURIComponent(desde)}` : ''}`)
 
 export const confirmarImpressao = (id) => chamarApi(`/api/impressao/${id}/impressa`, { metodo: 'POST' })
 
