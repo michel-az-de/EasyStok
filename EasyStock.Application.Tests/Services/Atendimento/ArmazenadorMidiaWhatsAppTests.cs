@@ -71,6 +71,35 @@ public class ArmazenadorMidiaWhatsAppTests
             Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("image/jpeg", ".jpg")]
+    [InlineData("audio/ogg; codecs=opus", ".ogg")]
+    public async Task MidiaWppUsaNomeValidoEEstavelNoStorage(string mime, string extensao)
+    {
+        var empresaId = Guid.NewGuid();
+        var conversaId = Guid.NewGuid();
+        var wamid = $"wpp:ez-{empresaId:N}:false_11111111111111@lid_TESTE";
+        var cloud = Substitute.For<IWhatsAppCloudClient>();
+        cloud.BaixarMidiaAsync("wpp:media", Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(((Stream)new MemoryStream([1, 2, 3]), mime)));
+        var storage = Substitute.For<IFileStorage>();
+        storage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns(c =>
+            {
+                var req = c.Arg<FileUploadRequest>();
+                var nome = EasyStock.Application.UseCases.GerenciarUploads.UploadSecurityValidator.SanitizeFileName(req.FileName);
+                return Task.FromResult(new StoredFileResult($"{req.BucketPath}/{nome}", "u", mime, req.Content.Length));
+            });
+        var sut = new ArmazenadorMidiaWhatsApp(cloud, storage);
+
+        var (chave, _) = await sut.ArmazenarAsync(empresaId, conversaId, wamid, "wpp:media");
+        var (repetida, _) = await sut.ArmazenarAsync(empresaId, conversaId, wamid, "wpp:media");
+
+        chave.Should().StartWith($"atendimento/{empresaId}/{conversaId}/wpp-").And.EndWith(extensao);
+        chave.Should().NotContain(":").And.NotContain("@lid");
+        repetida.Should().Be(chave);
+        await storage.Received(2).UploadAsync(Arg.Is<FileUploadRequest>(r => !r.IsPublic), Arg.Any<CancellationToken>());
+    }
     // #1622-5: sem tamanho conhecido, a cópia para no teto e a mídia é recusada sem ir ao storage.
     [Fact]
     public async Task MidiaAcimaDoTetoNaoVaiAoStorage()
