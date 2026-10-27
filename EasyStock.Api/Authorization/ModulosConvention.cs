@@ -14,7 +14,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Consentimentos", "ContatoUsuario",
         "AdminTenants", "AdminNotificacoes", "WebhookGateway", "WebhookPix",
         "Internal.NotificacoesJobs", "Webhooks.WebhookMensageriaMeta", "Webhooks.WebhookWhatsApp",
-        "Webhooks.WebhookWhatsAppPlataforma",
+        "Webhooks.WebhookWhatsAppPlataforma", "Webhooks.WebhookWaha",
         "Storefront.Agendamento", "Storefront.Auth", "Storefront.Avaliacao", "Storefront.CardapioConversa",
         "Storefront.ChatSite", "Storefront.ChatSiteMidia", "Storefront.Checkout", "Storefront.ComandaCliente", "Storefront.FotosCardapioPublicas",
         "Storefront.Frete", "Storefront.Menu", "Storefront.PedidosCliente",

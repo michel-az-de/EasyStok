@@ -506,6 +506,32 @@ public class ProcessarEventoWhatsAppUseCaseTests
     }
 
     [Fact]
+    public async Task SaudacaoMarcaASaidaNaConversaAntesDeChamarOCanal()
+    {
+        // #2072: a saudação de reserva do outbox (#2004) só sai se a conversa não tem saída depois da entrada. O envio
+        // pode demorar (na ponte do WAHA há "digitando" antes); sem a marca gravada antes da rede, o cliente novo
+        // recebia duas saudações.
+        Conversa? conversaAberta = null;
+        await _conversaRepository.AddAsync(Arg.Do<Conversa>(c => conversaAberta = c), Arg.Any<CancellationToken>());
+        var commitsComSaida = 0;
+        _unitOfWork.When(u => u.CommitAsync()).Do(_ =>
+        {
+            if (conversaAberta is { } c && c.UltimaMensagemEm > c.UltimaMensagemEntradaEm) commitsComSaida++;
+        });
+        bool? saidaGravadaAntesDoEnvio = null;
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                saidaGravadaAntesDoEnvio ??= commitsComSaida > 0;
+                return new EnvioWhatsAppResult("wamid.saudacao");
+            });
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.primeira", "Oi"));
+
+        saidaGravadaAntesDoEnvio.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task PrimeiraMensagemDeClienteBloqueadoEscalaSemSaudacaoNemAgente()
     {
         var bloqueado = ClienteEntity.Criar(_empresaId, "Maria Silva");
