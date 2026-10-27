@@ -142,6 +142,32 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
     }
 
     [SkippableFact]
+    public async Task Lancamento_gravado_depois_do_fechamento_some_do_retrato_e_o_estorno_diz_o_motivo_certo()
+    {
+        // #2098 R1: o corte do retrato tira o lançamento posterior da lista do dia fechado. O estorno não pode
+        // concluir que ele "já foi estornado" por não achá-lo ali: o movimento é conferido pelo id, no banco.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var aberturaEm = DateTime.UtcNow.AddMinutes(-5);
+        var dia = HorarioBrasil.DataOperacional(aberturaEm);
+        await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 100m, aberturaEm)));
+        await using var provider = BuildProductionProvider();
+        await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<FecharCaixaUseCase>().ExecuteAsync(new FecharCaixaCommand(empresaId)));
+        var tardio = MovimentoCaixa.Criar(empresaId, "entrada", 30m, DateTime.UtcNow.AddSeconds(5));
+        tardio.Metodo = "dinheiro";
+        await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(tardio));
+
+        var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, dia)));
+        caixa.Movimentos.Should().NotContain(m => m.Id == tardio.Id);
+        caixa.PosFechamento.Should().Be(30m);
+
+        var estornar = () => NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<EstornarMovimentoCaixaUseCase>()
+            .ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, tardio.Id, "errado")));
+        (await estornar.Should().ThrowAsync<UseCaseValidationException>()).Which.Message.Should().NotContain("já foi estornado");
+    }
+
+    [SkippableFact]
     public async Task Linha_de_pagamento_de_pedido_traz_numero_do_dia_cliente_e_quem_registrou()
     {
         // #2082 B16/C10: "Pagamento de pedido · Pix · R$ 59" não dizia de quem era nem quem recebeu. A linha

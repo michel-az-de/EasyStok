@@ -35,6 +35,28 @@ public class CaixaLinhaDePagamentoTests
     }
 
     [Fact]
+    public async Task DiaFechado_CortaEntradaESaidaDepoisDoFechamento_ComBordaInclusiva()
+    {
+        // #2082 D9 / #2098 R1: DataMovimento == FechadoEm ainda é do retrato; um tick depois sai da lista e vai
+        // para PosFechamento. Abertura e marcador do fechamento (gravado logo depois) seguem na lista.
+        var repo = Substitute.For<ICaixaRepository>();
+        var dia = new DateOnly(2026, 10, 26);
+        var fechamento = FechamentoCaixa.Criar(EmpresaId, dia, 100m, 0m, 0m, 0m, 0m);
+        fechamento.FechadoEm = new DateTime(2026, 10, 26, 22, 0, 0, DateTimeKind.Utc);
+        var naBorda = MovimentoCaixa.Criar(EmpresaId, "saida", 10m, fechamento.FechadoEm);
+        var depois = MovimentoCaixa.Criar(EmpresaId, "saida", 40m, fechamento.FechadoEm.AddTicks(1));
+        var marcador = MovimentoCaixa.Criar(EmpresaId, "fechamento", 0m, fechamento.FechadoEm.AddSeconds(1));
+        repo.GetFechamentoDoDiaAsync(EmpresaId, dia, null).Returns(fechamento);
+        repo.GetMovimentosDoDiaAsync(EmpresaId, dia, null).Returns([MovimentoCaixa.Criar(EmpresaId, "abertura", 100m, fechamento.FechadoEm.AddHours(-8)), naBorda, depois, marcador]);
+
+        var b = await new CaixaSaldoCalculator(repo).CalcularAsync(EmpresaId, dia);
+
+        b.Movimentos.Should().Contain([naBorda, marcador]).And.NotContain(depois);
+        b.Movimentos.Should().HaveCount(3);
+        b.PosFechamento.Should().Be(-50m, "o saldo ao vivo (100 - 10 - 40) menos o fechado (100)");
+    }
+
+    [Fact]
     public void Json_TemOsTresCamposNovosEOsAntigosIntactos()
     {
         var linha = new CaixaLinhaExtraResult(Ini, "pagamento", 59m, "Pagamento de pedido", "pix", "Pedido", 12, "Maria", "Mercado Pago");
