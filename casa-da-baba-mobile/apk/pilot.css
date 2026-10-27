@@ -774,7 +774,9 @@ body.pilot-app :is(input, textarea, select):focus-visible { outline: 2px solid v
 body.pilot-app .phone :is(.prod-hero h2, .pilot-orders-header h2, .screen-title) { letter-spacing: -.03em; font-weight: 700; }
 body.pilot-app .phone :is(.prod-create-btn, .pilot-new-order) { padding: 8px 12px; border-radius: 10px; }
 body.pilot-app .phone :is(.screen-tab, .prod-filter button, .batch-tools button, .mov-filter button) { min-height: 44px; font-size: 14px; font-weight: 600; }
-body.pilot-app .phone [data-screen=producao] #producaoTabs { margin-block: 12px; gap: 12px; }
+body.pilot-app .phone [data-screen=producao] > .prod-hero { padding-bottom: 0; margin-bottom: 0; }
+body.pilot-app .pilot-production-metrics { margin-top: 4px; }
+body.pilot-app .phone [data-screen=producao] #producaoTabs { margin-block: 4px 12px; gap: 12px; }
 body.pilot-app .phone [data-screen=producao] #producaoTabs .screen-tab { border-radius: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-dim); padding: 8px 4px; }
 body.pilot-app .phone [data-screen=producao] #producaoTabs .screen-tab.active { color: var(--basil); border-bottom-color: var(--basil); }
 body.pilot-app .phone [data-screen=producao] .batch-tools { gap: 4px 8px; }
@@ -796,6 +798,12 @@ body.pilot-app .phone #kanban .pilot-order-filters button strong { font-size: 14
 body.pilot-app .phone #kanban .k-card .k-secondary-actions button { background: transparent; }
 body.pilot-app :is(.pilot-home, .pilot-notices) .pilot-topline button { border-radius: 10px; }
 body.pilot-app .pilot-home .pilot-card { border-radius: 12px; min-height: 80px; }
+body.pilot-app #ajustesModal .ajustes-head { background: var(--bg-elev); box-shadow: none; }
+body.pilot-app #ajustesModal .ajustes-tabs { gap: 12px; padding: 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+body.pilot-app #ajustesModal .ajustes-tabs button { min-height: 44px; padding: 8px 4px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ink-dim); font-size: 14px; font-weight: 600; }
+body.pilot-app #ajustesModal .ajustes-tabs button.active { color: var(--basil); border-bottom-color: var(--basil); }
+body.pilot-app #ajustesModal .logo-picker { padding: 12px 0; border: 0; border-radius: 0; background: transparent; }
+body.pilot-app #ajustesModal .logo-picker-actions button { border: 0; border-radius: 8px; background: transparent; font-weight: 600; }
 
 /* Movimento curto: nada aguarda a animação para aceitar o próximo toque. */
 @keyframes pilot-view-enter { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
