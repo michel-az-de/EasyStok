@@ -107,6 +107,8 @@
       <details class="pilot-help pilot-migration"><summary>Já usava o PWA antigo?</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><p>Se está começando agora, basta conectar a produção.</p></details>
       <div class="pilot-shortcuts">
         <button type="button" data-action="printers">Impressoras</button>
+        <button type="button" data-action="notifications">Notificações</button>
+        <button type="button" data-action="migration-guide">Como trazer meus dados</button>
         <button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button>
       </div>
       <p id="pilotPairHint" class="pilot-hint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p>
@@ -375,6 +377,12 @@
         const input = doc.getElementById('backupFileInput');
         if (!input) throw new Error('Importação indisponível. Abra os Ajustes e tente novamente.');
         closeHome(); input.click();
+      }
+      if (action === 'notifications' || action === 'migration-guide') {
+        const app = root.Capacitor?.Plugins?.PilotApp;
+        const method = action === 'notifications' ? 'notifications' : 'migrationGuide';
+        if (!app?.[method]) throw new Error('Atualize o APK para usar notificações e o guia no Android.');
+        await app[method]();
       }
       if (action === 'pair') await connectProduction();
       if (action === 'confirm-import') await confirmImport();
