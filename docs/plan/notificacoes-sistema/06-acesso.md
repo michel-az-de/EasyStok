@@ -383,7 +383,9 @@ Google com e-mail verificado ─► consome o convite e confirma o e-mail
 8. **Esqueci a senha de quem está pendente** reemite o convite e nunca gera token de reset: o reset só vale para quem já aceitou.
 9. **Google.** `IdentificarUsuarioGoogleUseCase`: identidade com e-mail verificado de usuário pendente consome o convite (revoga
    os demais), marca `EmailConfirmado` e grava `ConviteAceitoVia = "Google"`. A senha segue inutilizável até a pessoa definir uma
-   por "esqueci a senha", que depois do aceite passa a valer.
+   por "esqueci a senha", que depois do aceite passa a valer. **#2070:** só consome convite aberto (linha `Convite` não usada e
+   não vencida, `IResetTokenRepository.TemConviteAbertoAsync`); vencido ou revogado responde 401 "Seu convite venceu: peça um
+   novo". O bloqueio por senha errada é do login por senha e não barra o Google.
 10. **A dona vê.** `ListarUsuariosUseCase` devolve `convite { estado: pendente, aceito ou nenhum; aceitoEm; via }`, para a tela
     mostrar "pendente" ou "aceito via +55•••1234".
 11. **Web.** `Convidar` deixa de pedir senha (`UsuariosController.cs:47`) e ganha a tela `/auth/convite`. A tela do console é da
