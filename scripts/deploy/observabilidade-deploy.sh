@@ -14,7 +14,7 @@
 # saudáveis (ver scripts/deploy/observabilidade/ligar-remoto.sh).
 #
 # Saídas: 0 ok | 2 uso inválido | 3 deploy em andamento | 4 OpenObserve não respondeu ou compose inválido
-#         | 6 EasyStok não ficou saudável (restaurado)
+#         | 6 EasyStok não ficou saudável (estado anterior restaurado) | 7 nem o estado anterior ficou saudável
 # =============================================================================
 set -euo pipefail
 VPS_HOST="${VPS_HOST:-hostinger}"
@@ -64,7 +64,8 @@ REMOTO
     if [ "$ACAO" = ligar ]; then
       [ "$(remoto "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORTA/healthz" || true)" = 200 ] \
         || { echo "ERRO: OpenObserve fora do ar; rode 'subir' antes de ligar" >&2; exit 4; }
-      scp -q "$DIR/compose.easystok.yaml" "$VPS_HOST:$STACK_API/compose.observabilidade.yaml"
+      # Vai como .novo: o ligar-remoto.sh só o promove depois de pegar a trava e guarda o anterior para o rollback.
+      scp -q "$DIR/compose.easystok.yaml" "$VPS_HOST:$STACK_API/compose.observabilidade.yaml.novo"
     fi
     scp -q "$DIR/ligar-remoto.sh" "$VPS_HOST:/tmp/ez-obs-ligar.sh"
     remoto "bash /tmp/ez-obs-ligar.sh '$STACK_API' $ACAO"
@@ -77,7 +78,8 @@ set -euo pipefail
 . "$1/.env"
 agora=$(( $(date +%s) * 1000000 )); ini=$(( agora - 3600000000 ))
 for tipo in logs traces; do
-  n=$(curl -s -m 10 -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" -H 'Content-Type: application/json' \
+  # Credencial por stdin (-K -), fora da linha de comando que o `ps` mostra.
+  n=$(printf 'user = "%s:%s"\n' "$ZO_ROOT_USER_EMAIL" "$ZO_ROOT_USER_PASSWORD" | curl -s -m 10 -K - -H 'Content-Type: application/json' \
     "http://127.0.0.1:$2/api/default/_search?type=$tipo" \
     -d "{\"query\":{\"sql\":\"SELECT count(*) AS n FROM \\\"easystok\\\"\",\"start_time\":$ini,\"end_time\":$agora}}" \
     | sed -n 's/.*"n":\([0-9]*\).*/\1/p')

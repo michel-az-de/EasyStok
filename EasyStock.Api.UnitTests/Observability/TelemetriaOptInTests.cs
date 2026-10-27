@@ -46,6 +46,24 @@ public class TelemetriaOptInTests
     }
 
     [Fact]
+    public void Appsettings_reais_de_producao_nao_ligam_a_telemetria()
+    {
+        // Revisão da #2116: o localhost:4317 do appsettings.json base valia em todo ambiente e religava o exporter.
+        var raiz = new DirectoryInfo(AppContext.BaseDirectory);
+        while (raiz is not null && !File.Exists(Path.Combine(raiz.FullName, "EasyStok.CI.slnf")))
+            raiz = raiz.Parent;
+        raiz.Should().NotBeNull("o teste lê os appsettings da API a partir da raiz do repositório");
+        var api = Path.Combine(raiz!.FullName, "EasyStock.Api");
+        var config = new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(api, "appsettings.json"))
+            .AddJsonFile(Path.Combine(api, "appsettings.Production.json"))
+            .Build();
+
+        config["OpenTelemetry:OtlpEndpoint"].Should().BeNullOrWhiteSpace(
+            "em produção quem liga a telemetria é o override do compose, nunca um padrão do appsettings");
+    }
+
+    [Fact]
     public void Com_endpoint_registra_tracer_e_meter_provider()
     {
         using var sp = Montar("http://ez-otel:4317");
