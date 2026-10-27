@@ -114,6 +114,18 @@ confere('Financeiro descongelado: o gerencial volta no modo API e a demonstraç�
   assert.equal(rotaDaHash('#/m/financeiro/pagar', { fonteApi: true }).aba, 'financeiro-pagar')
 })
 
+confere('Financeiro por perfil (#2095, F17): o Operador vê só o Caixa; cada tela pede a ação que a API exige', () => {
+  const telas = (acoes) => telasDoMenu(moduloPorId('financeiro'), { fonteApi: true, acoes }).map((t) => t.id)
+  const operador = { visualizarContasPagar: false, visualizarContasReceber: false, gerenciarCategoriasFinanceiras: false, gerenciarCentrosCusto: false, gerenciarCaixa: true }
+  assert.deepEqual(telas(operador), ['caixa'])
+  assert.deepEqual(telas({}), ['caixa'], 'matriz sem as ações do financeiro não abre o gerencial')
+  assert.deepEqual(telas({ visualizarContasPagar: true }), ['caixa', 'visao-geral', 'pagar', 'extrato', 'relatorios', 'categorias', 'centros-custo'])
+  assert.deepEqual(telas({ visualizarContasReceber: true }), ['caixa', 'visao-geral', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo'])
+  assert.deepEqual(telas({ gerenciarCategoriasFinanceiras: true }), ['caixa', 'categorias'])
+  assert.deepEqual(telas({ gerenciarCentrosCusto: true }), ['caixa', 'centros-custo'])
+  assert.deepEqual(telas({ visualizarContasPagar: true, visualizarContasReceber: true }), ['caixa', 'visao-geral', 'pagar', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo'])
+})
+
 // ---------------------------------------------------------------- textos que mentiriam
 
 confere('o resumo do módulo e o guia da Ajuda não prometem o que está congelado', () => {

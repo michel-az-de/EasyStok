@@ -75,13 +75,15 @@ export const MODULOS = [
     resumo: 'Caixa, contas a pagar e receber, extrato e relatórios',
     telas: [
       { id: 'caixa', rotulo: 'Caixa do dia', tipo: TELA_AJUSTE, aba: 'caixa' },
-      { id: 'visao-geral', rotulo: 'Visão geral', tipo: TELA_AJUSTE, aba: 'financeiro-resumo', soApi: true },
-      { id: 'pagar', rotulo: 'Contas a pagar', tipo: TELA_AJUSTE, aba: 'financeiro-pagar', soApi: true },
-      { id: 'receber', rotulo: 'Contas a receber', tipo: TELA_AJUSTE, aba: 'financeiro-receber', soApi: true },
-      { id: 'extrato', rotulo: 'Extrato', tipo: TELA_AJUSTE, aba: 'financeiro-extrato', soApi: true },
-      { id: 'relatorios', rotulo: 'Relatórios', tipo: TELA_AJUSTE, aba: 'financeiro-relatorios', soApi: true },
-      { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true },
-      { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true },
+      // #2095 (F17): o Operador abre o Financeiro pelo Caixa do dia, mas a API recusa o gerencial;
+      // cada tela pede a ação que a API exige, e quem não tem vê só o Caixa.
+      { id: 'visao-geral', rotulo: 'Visão geral', tipo: TELA_AJUSTE, aba: 'financeiro-resumo', soApi: true, acao: 'verContas' },
+      { id: 'pagar', rotulo: 'Contas a pagar', tipo: TELA_AJUSTE, aba: 'financeiro-pagar', soApi: true, acao: 'verContasPagar' },
+      { id: 'receber', rotulo: 'Contas a receber', tipo: TELA_AJUSTE, aba: 'financeiro-receber', soApi: true, acao: 'verContasReceber' },
+      { id: 'extrato', rotulo: 'Extrato', tipo: TELA_AJUSTE, aba: 'financeiro-extrato', soApi: true, acao: 'verContas' },
+      { id: 'relatorios', rotulo: 'Relatórios', tipo: TELA_AJUSTE, aba: 'financeiro-relatorios', soApi: true, acao: 'verContas' },
+      { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true, acao: 'verCategoriasFinanceiras' },
+      { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true, acao: 'verCentrosCusto' },
     ],
   },
   {
@@ -125,7 +127,15 @@ export const hashDoModulo = (moduloId, telaId) => `#/m/${moduloId}${telaId ? '/'
 // congelada sai do menu do módulo vivo.
 // #1921: tela com `acao` só aparece no modo API para quem a matriz libera (`podeNaTela`); sem a matriz
 // (`acoes` ausente: demonstração, catálogo do guia) a tela fica.
-const PODE_NA_TELA = { ajustarEntrega: podeAjustarEntrega }
+const verContas = (acoes) => acoes?.visualizarContasPagar === true || acoes?.visualizarContasReceber === true
+const PODE_NA_TELA = {
+  ajustarEntrega: podeAjustarEntrega,
+  verContas,
+  verContasPagar: (acoes) => acoes?.visualizarContasPagar === true,
+  verContasReceber: (acoes) => acoes?.visualizarContasReceber === true,
+  verCategoriasFinanceiras: (acoes) => acoes?.gerenciarCategoriasFinanceiras === true || verContas(acoes),
+  verCentrosCusto: (acoes) => acoes?.gerenciarCentrosCusto === true || verContas(acoes),
+}
 const podeNaTela = (tela, { fonteApi, acoes }) => !tela.acao || !fonteApi || !acoes || PODE_NA_TELA[tela.acao]?.(acoes) === true
 export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
   moduloCongelado(modulo?.id) ? [] : (modulo?.telas ?? []).filter((t) => (fonteApi || !t.soApi) && !telaCongelada(modulo.id, t.id)
