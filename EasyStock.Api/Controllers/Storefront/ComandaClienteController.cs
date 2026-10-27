@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using System.Text.Json;
 using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Ports.Output.Pagamentos;
@@ -22,6 +23,12 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
     [HttpGet("comanda")]
     [EnableRateLimiting("comanda-leitura")]
     public Task<IActionResult> Obter(string token, CancellationToken ct) => Tratar(async () => await comanda.ObterAsync(token, ct));
+
+    [HttpPost("chat")]
+    [EnableRateLimiting("comanda-envio")]
+    public Task<IActionResult> RetomarChat(string token, [FromHeader(Name = "X-Chat-Token")] string? chatToken,
+        [FromServices] RetomarChatDaComandaUseCase chat, CancellationToken ct) =>
+        Tratar(async () => await chat.ExecuteAsync(token, chatToken, ct));
 
     [HttpGet("cardapio")]
     [EnableRateLimiting("comanda-leitura")]
@@ -137,6 +144,7 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         Response.Headers.CacheControl = "no-store";
         try { return Ok(await acao()); }
         catch (LinkCardapioConversaIndisponivelException e) { return Problem(e.Message, statusCode: 410); }
+        catch (ChatSiteIndisponivelException e) { return Problem(e.Message, statusCode: 404); }
         catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
         catch (TelefoneExigeVerificacaoException e) { return ExigirVerificacao(e.Message); }
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505", ConstraintName: "ix_clientes_empresa_telefone_hash" })
