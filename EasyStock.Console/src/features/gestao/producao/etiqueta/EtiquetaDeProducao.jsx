@@ -18,8 +18,8 @@ function Qr({ codigo }) {
   const lado = matriz.length + SILENCIO_QR * 2
   return (
     <svg className={css.qr} viewBox={`0 0 ${lado} ${lado}`} shapeRendering="crispEdges" aria-hidden="true">
-      <rect width={lado} height={lado} fill="#fff" />
-      <path d={caminhoDoQr(matriz, SILENCIO_QR)} fill="#000" />
+      <rect width={lado} height={lado} className={css.papel} />
+      <path d={caminhoDoQr(matriz, SILENCIO_QR)} className={css.tinta} />
     </svg>
   )
 }
@@ -28,8 +28,8 @@ function Barras({ codigo }) {
   const { barras, total } = barrasDoCode128(codigo)
   return (
     <svg className={css.barras} viewBox={`0 0 ${total} 1`} preserveAspectRatio="none" shapeRendering="crispEdges" aria-hidden="true">
-      <rect width={total} height={1} fill="#fff" />
-      {barras.map((b) => <rect key={b.x} x={b.x} width={b.largura} height={1} fill="#000" />)}
+      <rect width={total} height={1} className={css.papel} />
+      {barras.map((b) => <rect key={b.x} x={b.x} width={b.largura} height={1} className={css.tinta} />)}
     </svg>
   )
 }
