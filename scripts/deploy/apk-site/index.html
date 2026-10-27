@@ -12,13 +12,13 @@
 </head>
 <body>
 <main>
-  <div class="brand"><span class="seal" aria-hidden="true">B</span> Casa da Baba</div>
+  <div class="brand">Casa da Baba</div>
   <p class="eyebrow">Android · Piloto de validação</p>
-  <h1>A rotina da cozinha,<br>no seu celular.</h1>
-  <p class="intro">Instale o app para experimentar produção e etiquetas. Pedidos, frete, cobrança e IA usam o Atendimento online, acessível pelo próprio app.</p>
+  <h1>Produção e pedidos.</h1>
+  <p class="intro">Cadastre produtos, produza, imprima etiquetas e registre pedidos no Android.</p>
   <section class="download" aria-label="Download do aplicativo">
     <p id="version" class="version" role="status" aria-live="polite">Consultando a versão disponível…</p>
-    <a id="download" class="button" aria-disabled="true" tabindex="-1">Baixar app para Android</a>
+    <a id="download" class="button" aria-disabled="true" tabindex="-1">Baixar</a>
     <p class="small">Este link sempre apresenta a versão publicada mais recente. O app será instalado como <strong>Casa da Baba Piloto</strong>.</p>
     <p id="error" class="error" role="alert" hidden>Não foi possível consultar a versão. Confira sua conexão e recarregue esta página.</p>
   </section>
@@ -28,21 +28,21 @@
     <li>Se o Android pedir autorização para instalar por essa origem, autorize somente o navegador usado neste download. Mantenha o Play Protect ativo. Se houver alerta de risco, interrompa e avise o Felipe.</li>
     <li><strong>Atualize sem desinstalar.</strong> O Android preserva os dados ao instalar esta versão sobre o app existente.</li>
     <li><strong>Na primeira abertura, escolha Ativar para receber notificações.</strong> No Android 13 ou superior, confirme também o pedido do sistema. Depois, abra o sino no topo para conferir a permissão, o registro do aparelho e os avisos. O app continua funcionando se você escolher Agora não.</li>
-    <li><strong>Já usava o PWA antigo?</strong> Importe e confira o backup antes de conectar a produção. Use Como trazer meus dados para consultar o passo a passo, mesmo offline.</li>
-    <li>Use somente as operações reais combinadas com a equipe. O Atendimento e os registros sincronizados usam os dados da Casa da Baba. Para testes fictícios, use um ambiente separado.</li>
+    <li><strong>Já usava o PWA antigo?</strong> No início, abra Configurações → Backup do PWA → Importar. Confira os dados antes de sincronizar.</li>
+    <li>Ao conectar o aparelho, os registros sincronizados usam os dados reais da Casa da Baba. Faça testes fictícios somente em um ambiente separado.</li>
   </ol>
   <div class="notice">
     <p><strong>Se a conexão ou o EasyStok cair</strong></p>
-    <p>A produção pode continuar com os dados já carregados após o pareamento e a sincronização inicial. Os registros locais pendentes aguardam o EasyStok voltar. Nesta versão, pedidos, frete, cobrança e IA pelo Atendimento precisam de internet e do servidor disponível.</p>
+    <p>Produtos, produção e pedidos ficam salvos no aparelho. Após conectar, os envios pendentes aguardam a internet e o EasyStok voltarem.</p>
   </div>
   <h2>Avisos e confirmação de recebimento</h2>
   <p>No <strong>sino</strong>, consulte os avisos, o diagnóstico da conexão e a identificação do aparelho para suporte. O APK verifica a assinatura dos avisos e devolve recibos assinados de recebimento e abertura. Esses recibos não concedem acesso aos dados da produção e funcionam antes do pareamento.</p>
   <p><strong>Aceito pelo Firebase não significa entregue.</strong> O acompanhamento distingue recebimento por push, aviso recuperado ao atualizar o histórico e abertura do detalhe. Se não houver recibo, a entrega permanece sem confirmação. Uma abertura não comprova que a pessoa leu o conteúdo.</p>
   <h2>Trazer os dados do PWA antigo</h2>
-  <p>No Android da operação, exporte o backup em Ajustes do PWA antigo e preserve o arquivo. No APK, abra <strong>Já usava o PWA antigo?</strong>, importe o JSON e confira a prévia. Pareie o APK com o código da operação e confirme a empresa e a loja de destino. Use <strong>Enviar primeira migração</strong> somente para registros que nunca chegaram ao EasyStok. O app confere a cópia guardada no servidor e seu hash antes de liberar a sincronização. Em falha, use <strong>Retomar migração</strong>; colisões exigem reconciliação com a equipe.</p>
-  <p>Depois de exportar, registre novos pedidos e produção apenas no APK; preserve o PWA antigo para consulta, sem reenviar sua fila. Fechamentos antigos de caixa ficam arquivados e não reabrem nem recalculam o caixa do EasyStok. Compras e auditoria antigas também ficam no arquivo, sem alterar as listas atuais. Confira as contagens e ressalvas do recibo antes do uso diário.</p>
+  <p>Exporte o JSON nos Ajustes do PWA antigo e preserve o arquivo. No APK, abra <strong>Configurações → Backup do PWA → Importar</strong>. Confira a prévia, conecte com o código da operação e confirme a empresa e a loja antes de sincronizar. Registros que nunca chegaram ao EasyStok precisam da primeira migração; conflitos exigem revisão com a equipe.</p>
+  <p>Depois da migração, registre novas operações somente no APK e preserve o PWA para consulta. Dados antigos fora do escopo permanecem no backup. Confira as contagens e o recibo antes do uso diário.</p>
   <h2>Escopo deste piloto</h2>
-  <p>A produção permite cadastrar e etiquetar com armazenamento local. Pedidos com frete, cobrança, mensagens e IA abrem o Atendimento do EasyStok, com o acesso da operação. O registro de pedido no aparelho é uma alternativa de contingência e não calcula frete nem envia mensagens automaticamente.</p>
+  <p>Este aplicativo contém Produção e Pedidos, com etiquetas, histórico, backup e configurações de apoio. O atendimento será um aplicativo separado. O cadastro local de pedidos não calcula frete nem envia mensagens automaticamente.</p>
   <div class="notice">
     <p><strong>Validação com a equipe antes do uso diário</strong></p>
     <p>A instalação e a atualização no Android, a impressão física e a entrega de mensagens pelo canal ainda precisam de aceite no aparelho da operação. A Oasis OIA-8381-B está identificada, mas a impressão nesse modelo permanece bloqueada até confirmar o protocolo e testar o driver. A impressora atual continua selecionável.</p>
