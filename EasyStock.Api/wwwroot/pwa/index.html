@@ -7310,7 +7310,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="title"><span class="brand-name" id="brandName">Minha empresa</span><span class="suffix">Mobile</span></div>
       <button class="sync-chip pending" id="syncChip" type="button" onclick="syncNow()" aria-live="polite">
         <span class="dot"></span>
-        <span id="syncText">Tudo sincronizado</span>
+        <span id="syncText">Conferindo fila de envio</span>
       </button>
     </div>
     <div class="greeting">
@@ -8655,13 +8655,12 @@ body.ux-calm [data-screen="producao"] .section-label {
        Lista os dispositivos Bluetooth ja pareados pelo Android. -->
   <div class="np-overlay" id="printerPickerModal" role="dialog" aria-modal="true">
     <div class="np-sheet">
-      <div class="np-icon">🖨️</div>
       <h3 class="np-title">Selecionar impressora</h3>
-      <p class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</p>
+      <div class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</div>
       <div id="savedPrinterProfiles" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
-      <label for="printerProfile">Modelo do dispositivo que será selecionado</label>
-      <select id="printerProfile" class="np-btn np-secondary"><option value="escpos">Atual · Hipertech WTP05 (ESC/POS)</option><option value="oasis-pending">Oasis · driver pendente de validação</option></select>
-      <p class="np-text" style="font-size:12px">A Oasis pode ser cadastrada, mas a impressão será liberada depois de confirmar o modelo e o protocolo.</p>
+      <label for="printerProfile">Modelo da impressora</label>
+      <select id="printerProfile" class="np-btn np-secondary"><option value="escpos">Hipertech WTP05 · atual</option><option value="oasis-pending">Oasis OIA-8381-B · em validação</option></select>
+      <p class="np-text" style="font-size:12px">A Oasis OIA-8381-B pode ser salva. A impressão aguarda validação do protocolo e teste na impressora.</p>
       <div id="printerPickerList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:280px;overflow-y:auto"></div>
       <button class="np-btn np-secondary" onclick="loadPrinterDevices()">↻ Buscar de novo</button>
       <button class="np-btn np-tertiary"  onclick="closePrinterPicker()">Cancelar</button>
@@ -10662,7 +10661,7 @@ function updateSync() {
     txt.textContent = pendingSync + (pendingSync === 1 ? ' item pra sincronizar' : ' itens pra sincronizar');
   } else {
     chip.classList.remove('pending');
-    txt.textContent = 'Tudo sincronizado';
+    txt.textContent = 'Nenhuma alteração na fila de envio';
   }
   if (typeof renderTrustBadges === 'function') renderTrustBadges();
   if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
@@ -15346,29 +15345,27 @@ function closePrinterPicker() {
 function loadPrinterDevices() {
   const list = document.getElementById('printerPickerList');
   const hint = document.getElementById('printerPickerHint');
+  const appName = window.CDB_CONFIG?.isPilot ? 'Casa da Baba Piloto' : 'Easy Stock Mobile';
   list.innerHTML = '<div class="cat-empty">Buscando...</div>';
 
   const bs = window.bluetoothSerial;
   if (!bs || !bs.list) {
     list.innerHTML = '';
-    hint.innerHTML = '⚠️ <b>Plugin Bluetooth não carregou</b><br>'
-                   + '<span style="font-size:12px">Você precisa abrir pelo APK Android (não funciona no navegador). '
-                   + 'Se já está no APK, force fechar e reabrir.</span>';
+    hint.innerHTML = '<b>Impressão Bluetooth indisponível</b><br>'
+                   + 'Abra o ' + appName + ' no Android. Se já estiver no app, feche e abra novamente.';
     return;
   }
 
   const showError = (where, err) => {
     const detail = err && (err.message || err.toString && err.toString()) || JSON.stringify(err) || '(sem detalhe)';
     list.innerHTML = '';
-    hint.innerHTML = '⚠️ <b>Bluetooth bloqueado</b><br>'
-                   + '<span style="font-size:11px;opacity:.8">[' + where + '] ' + escapeHtml(String(detail)) + '</span><br><br>'
-                   + '<b>Como resolver:</b><br>'
-                   + '<span style="font-size:12px">'
-                   + '1. Configuracoes Android -> Apps -> <b>Easy Stock Mobile</b><br>'
-                   + '2. Permissões → ative <b>"Dispositivos próximos"</b> (ou "Nearby devices")<br>'
-                   + '3. Verifique também que Bluetooth está <b>ligado</b><br>'
-                   + '4. Volte aqui e toque "Buscar de novo"'
-                   + '</span>';
+    hint.innerHTML = '<b>' + (where === 'permission' ? 'Permita usar dispositivos próximos' : 'Não foi possível buscar as impressoras') + '</b>'
+                   + '<ol style="text-align:left;padding-left:20px">'
+                   + '<li>No Android, abra Configurações → Apps → <b>' + appName + '</b> → Permissões.</li>'
+                   + '<li>Permita <b>Dispositivos próximos</b> e confira se o Bluetooth está ligado.</li>'
+                   + '<li>Volte ao app e toque em <b>Buscar de novo</b>.</li></ol>'
+                   + '<details><summary>Detalhes técnicos</summary><p style="overflow-wrap:anywhere">['
+                   + escapeHtml(String(where)) + '] ' + escapeHtml(String(detail)) + '</p></details>';
   };
 
   const doList = () => {
@@ -19281,7 +19278,7 @@ function printViaBluetooth(bytes, onFallback, printJob) {
   const bs = window.bluetoothSerial;
   const printer = getSavedPrinter();
   if (printer && printer.profile === 'oasis-pending') {
-    showToast('Oasis: confirme o modelo e o driver antes de imprimir');
+    showToast('Oasis OIA-8381-B: impressão aguarda validação do protocolo e teste na impressora');
     return;
   }
   if (!bs || !printer || !printer.address) {
@@ -20676,7 +20673,7 @@ async function etqAction(action) {
         openPrinterPicker();
         return;
       }
-      if (!printerReady(printer)) { showToast('Oasis: modelo e driver pendentes de validação'); return; }
+      if (!printerReady(printer)) { showToast('Oasis OIA-8381-B: impressão aguarda validação do protocolo e teste na impressora'); return; }
       // #437: cópias (1/2/5/10) e retry
       const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
       _etqHideRetry();
@@ -21748,10 +21745,7 @@ function updateSaveOrderBtn() {
   const notes = document.getElementById('orderNotes').value.trim();
   // Pra salvar: precisa ter cliente + (pelo menos 1 item OU observação preenchida)
   btn.disabled = !selectedClient || (currentOrderItems.length === 0 && !notes);
-  const total = currentOrderItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
-  btn.textContent = btn.disabled
-    ? 'Salvar pedido'
-    : 'Salvar ' + (total > 0 ? money(total) : 'pedido');
+  btn.textContent = 'Salvar pedido';
   renderOrderDraftSummary();
 }
 document.getElementById('orderNotes').addEventListener('input', updateSaveOrderBtn);

@@ -85,6 +85,22 @@ test('permissão negada tem ação clara e não é descrita como entrega pronta'
   assert.equal(noticePresentation({ ...s, permission: 'blocked' }).tone, 'attention');
 });
 
+test('orientação nativa de permissão aponta para o mesmo rótulo disponível no sino', () => {
+  const native = fs.readFileSync(path.join(__dirname, '../android/app/src/main/java/com/casadababa/app/AppNotifications.java'), 'utf8');
+  const action = noticePresentation({ supported: true, permission: 'denied' }).action;
+  assert.ok(native.includes('Depois, abra o sino de Avisos e toque em ' + action + '.'));
+});
+
+test('histórico vazio com serviço indisponível não duplica erro nem atribui falha à internet', async () => {
+  const state = { ...normal(), items: [], unread: 0, registered: false, lastError: 'O serviço de avisos está indisponível. Tentaremos novamente.' };
+  const { nodes } = harness(state); await settle();
+  assert.match(nodes.get('pilotNoticeHealthTitle').textContent, /Não foi possível atualizar os avisos/);
+  assert.equal(nodes.get('pilotNoticeEmptyTitle').textContent, 'Nenhum aviso salvo neste aparelho');
+  assert.doesNotMatch(nodes.get('pilotNoticeEmptyTitle').textContent + nodes.get('pilotNoticeEmptyBody').textContent, /Não foi possível|quando houver conexão|Tente Atualizar/);
+  assert.match(nodes.get('pilotNoticeError').textContent, /serviço de avisos está indisponível/);
+  assert.equal(nodes.get('pilotNoticeRefresh').disabled, false);
+});
+
 test('histórico recuperado não vira prova de push e confirmações pendentes ficam explícitas', async () => {
   const s = normal(); s.items[0].source = 'sync'; s.pendingReceipts = 2; s.lastSyncAt = 1793051000000;
   const { nodes } = harness(s); await settle();
@@ -163,7 +179,7 @@ test('estado vazio diferencia consulta em curso e falha sem inventar badge', asy
   assert.match(nodes.get('pilotNoticeEmptyTitle').textContent, /Buscando/);
   assert.equal(nodes.get('pilotNoticeList').attributes['aria-busy'], 'true');
   finish({ ...s, lastError: 'Sem conexão' }); await request;
-  assert.match(nodes.get('pilotNoticeEmptyTitle').textContent, /Não foi possível/);
+  assert.equal(nodes.get('pilotNoticeEmptyTitle').textContent, 'Nenhum aviso salvo neste aparelho');
   assert.equal(nodes.get('pilotNoticeList').attributes['aria-busy'], 'false');
 });
 test('permissão desligada é independente de avisos não abertos', async () => {

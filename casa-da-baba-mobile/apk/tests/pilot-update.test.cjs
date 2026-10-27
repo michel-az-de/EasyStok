@@ -258,13 +258,37 @@ test('consulta de conexão em andamento bloqueia chamadas repetidas e libera o b
   assert.equal(nodes.get('pilotReconnect').hidden, true);
 });
 
-test('APK atualizado não esconde conteúdo OTA ainda aguardando abertura', async () => {
+test('ausência de APK mais novo não esconde conteúdo OTA ainda aguardando abertura', async () => {
   const { root, nodes } = pilotHarness();
   root.CDB_CONFIG.versionCode = manifest.versionCode;
   root.Capacitor = { Plugins: { PilotUpdater: { check: async () => ({ pendingVersion: '0.4.1' }) } } };
   await root.forceCheckUpdate();
-  assert.match(nodes.get('pilotUpdateStatus').textContent, /APK instalado está atualizado/);
+  assert.match(nodes.get('pilotUpdateStatus').textContent, /Não há APK mais novo publicado/);
   assert.match(nodes.get('pilotOtaStatus').textContent, /0.4.1 preparada/);
+});
+
+test('APK igual ou superior ao publicado informa a versão publicada sem afirmar atualização instalada', async () => {
+  for (const code of [manifest.versionCode, manifest.versionCode + 1]) {
+    const state = { builtinVersion: '0.7.0', nativeVersionCode: code, activeVersion: '0.7.0' };
+    const { root, nodes } = pilotHarness({ updater: { status: async () => state, check: async () => state } });
+    await new Promise(setImmediate);
+    await root.forceCheckUpdate();
+    const text = nodes.get('pilotUpdateStatus').textContent;
+    assert.match(text, /Não há APK mais novo publicado/);
+    assert.ok(text.includes('Versão publicada: ' + manifest.version + ' (' + manifest.versionCode + ')'));
+    assert.doesNotMatch(text, /instalado está atualizado/);
+    assert.equal(nodes.get('pilotDownload').hidden, true);
+  }
+});
+
+test('inscrição de push persistida não afirma conexão nem entrega quando o aparelho está offline', async () => {
+  const state = { builtinVersion: '0.7.0', nativeVersionCode: 7, activeVersion: '0.7.0', pushSubscribed: true };
+  const { nodes } = pilotHarness({ connected: false, updater: { status: async () => state } });
+  await new Promise(setImmediate);
+  const text = nodes.get('pilotPushStatus').textContent;
+  assert.match(text, /inscrito para receber atualizações/);
+  assert.match(text, /não confirma o recebimento/);
+  assert.doesNotMatch(text, /canal.*conectado|push recebido/i);
 });
 
 test('atalho do PWA fecha o modal antes de abrir o seletor de backup existente', async () => {

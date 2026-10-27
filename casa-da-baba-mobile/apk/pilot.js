@@ -124,6 +124,16 @@
       "size": 24,
       "body": "<path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6M6 14h12v8H6Z\"/>"
     },
+    "download": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M12 15V3M7 10l5 5 5-5M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>"
+    },
+    "enviar": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M4 12 20 5l-7 15-2-6-7-2Z\"/>"
+    },
     "refresh-cw": {
       "grid": 24,
       "size": 24,
@@ -185,7 +195,51 @@
     for (const label of document.querySelectorAll('.pilot-current-operator')) label.textContent = name?.trim() || 'Não identificado';
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation, pilotIcon, applyConsoleIcons, installAppChrome, refreshOperatorReview };
+  function installLabelWorkspace(environment) {
+    const document = environment.document;
+    const overlay = document.getElementById('etiquetasPreview');
+    const sheet = overlay?.querySelector?.('.etq-sheet');
+    if (!sheet || sheet.dataset.pilotLabels === 'true') return;
+    const config = document.getElementById('etqConfigBar');
+    const preview = document.getElementById('etqBody');
+    const note = sheet.querySelector('.etq-note-bar');
+    const actions = sheet.querySelector('.etq-actions');
+    const copies = document.getElementById('etqCopiesSelect');
+    const retry = document.getElementById('etqRetryBtn');
+    const copiesRow = copies?.parentElement;
+    const buttons = ['print', 'save', 'share'].map(name => actions?.querySelector('.etq-' + name));
+    if (!config || !preview || !note || !actions || !copiesRow || !retry || buttons.some(button => !button)) return;
+    if ([config, preview, note, actions, copiesRow].some(node => node.parentElement !== sheet) || retry.parentElement !== copiesRow) return;
+    const options = document.createElement('details');
+    options.className = 'pilot-label-options';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Ajustar etiqueta';
+    options.append(summary);
+    sheet.insertBefore(options, config);
+    options.append(config, note);
+    const retryRow = document.createElement('div');
+    retryRow.className = 'pilot-label-retry';
+    sheet.insertBefore(retryRow, actions);
+    retryRow.append(retry);
+    copiesRow.classList.add('pilot-label-copies');
+    copies.setAttribute('aria-label', 'Quantidade de cópias');
+    actions.classList.add('pilot-label-toolbar');
+    actions.insertBefore(copiesRow, buttons[0]);
+    for (const [index, icon, label] of [[0, 'printer', 'Imprimir'], [1, 'download', 'Salvar PNG'], [2, 'enviar', 'Enviar']]) {
+      const button = buttons[index];
+      button.innerHTML = pilotIcon(icon) + (index === 0 ? '<span>Imprimir</span>' : '');
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+    }
+    options.addEventListener('toggle', () => {
+      const resize = () => environment.scaleEtqCards?.();
+      if (environment.requestAnimationFrame) environment.requestAnimationFrame(resize);
+      else environment.setTimeout(resize, 0);
+    });
+    sheet.dataset.pilotLabels = 'true';
+  }
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation, pilotIcon, applyConsoleIcons, installAppChrome, refreshOperatorReview, installLabelWorkspace };
   if (!root.document || !root.CDB_CONFIG?.isPilot) return;
   const config = root.CDB_CONFIG;
   const doc = root.document;
@@ -251,6 +305,7 @@
     </div>`;
   doc.body.append(home);
   installAppChrome(root, openHome);
+  installLabelWorkspace(root);
   if (doc.querySelector && root.MutationObserver) {
     for (const id of ['newProductModal', 'productionConfirmModal']) {
       const sheet = doc.querySelector('#' + id + ' .modal-sheet');
@@ -342,8 +397,8 @@
     const items = Array.isArray(noticeState.items) ? noticeState.items : [];
     doc.getElementById('pilotNoticeEmpty').hidden = items.length > 0;
     const waiting = noticeLoading || noticeState.checking === true;
-    doc.getElementById('pilotNoticeEmptyTitle').textContent = waiting ? 'Buscando seus avisos…' : noticeState.lastError ? 'Não foi possível atualizar' : 'Seus avisos ficam aqui';
-    doc.getElementById('pilotNoticeEmptyBody').textContent = waiting ? 'Você pode continuar usando o app.' : noticeState.lastError ? 'Nenhum aviso salvo neste aparelho. Tente Atualizar avisos quando houver conexão.' : 'Orientações e novidades aparecerão aqui. O sino mostra quantos você ainda não abriu.';
+    doc.getElementById('pilotNoticeEmptyTitle').textContent = waiting ? 'Buscando seus avisos…' : noticeState.lastError ? 'Nenhum aviso salvo neste aparelho' : 'Seus avisos ficam aqui';
+    doc.getElementById('pilotNoticeEmptyBody').textContent = waiting ? 'Você pode continuar usando o app.' : 'Orientações e novidades aparecerão aqui. O sino mostra quantos você ainda não abriu.';
     if (!items.length) doc.getElementById('pilotNoticeUnread').textContent = '';
     for (const item of items) {
       if (!item || typeof item.id !== 'string') continue;
@@ -648,7 +703,7 @@
     doc.getElementById('pilotOtaStatus').textContent = otaStatusText(state);
     doc.getElementById('pilotRollback').hidden = !state.canRollback || !!state.pendingVersion;
     doc.getElementById('pilotPushStatus').textContent = state.pushSubscribed
-      ? 'Canal de atualização conectado. O Android pode adiar o recebimento em economia de bateria. A verificação ao abrir continua disponível.'
+      ? 'Aparelho inscrito para receber atualizações. A inscrição não confirma o recebimento de uma atualização. A verificação ao abrir continua disponível.'
       : state.pushError ? 'O canal de atualização ainda não conectou. A verificação ao abrir continua disponível.' : 'Conectando o canal de atualização…';
   }
   async function refreshOtaStatus() {
@@ -705,7 +760,7 @@
       }
       if (root.Capacitor?.isNativePlatform?.() && !nativeVersion) throw new Error('Versão nativa não confirmada.');
       latest = validateManifest(data, installedConfig());
-      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. Toque em Atualizar APK e confirme a instalação no Android, sem desinstalar.' : 'O APK instalado está atualizado. A versão do conteúdo aparece em Atualizações e recuperação.';
+      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. Toque em Atualizar APK e confirme a instalação no Android, sem desinstalar.' : 'Não há APK mais novo publicado. Versão publicada: ' + latest.version + ' (' + latest.versionCode + '). A versão do conteúdo aparece em Atualizações e recuperação.';
       download.hidden = !latest.available;
       showVersion();
     } catch {

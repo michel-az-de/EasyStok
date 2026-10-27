@@ -76,7 +76,7 @@ public final class AppNotifications {
         prefs(activity).edit().putBoolean("explained", true).apply();
         new AlertDialog.Builder(activity).setTitle("Receber avisos da Casa da Baba?")
             .setMessage("Ative notificações para receber orientações, como trazer seus dados do PWA. "
-                + "O app continua funcionando se você escolher Agora não. Depois, abra o sino de Avisos e toque em Ativar notificações.")
+                + "O app continua funcionando se você escolher Agora não. Depois, abra o sino de Avisos e toque em Ativar avisos neste aparelho.")
             .setPositiveButton("Ativar", (d,w) -> {
                 if (NoticePolicy.shouldRequestPermission(Build.VERSION.SDK_INT,
                         Build.VERSION.SDK_INT < 33 || activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,

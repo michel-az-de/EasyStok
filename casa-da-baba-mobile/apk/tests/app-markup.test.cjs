@@ -3,7 +3,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { adaptAppMarkup } = require('../scripts/app-markup.cjs');
+const { pilotIcon } = require('../pilot.js');
 
 const source = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
 const start = '<!-- Modal novo produto -->';
@@ -18,7 +20,14 @@ const welcomeStart = '<!-- Boas-vindas / login com nome do operador -->';
 const welcomeEnd = '<!-- Tutorial / onboarding (4 steps) -->';
 function welcome(html) { return html.slice(html.indexOf(welcomeStart), html.indexOf(welcomeEnd)); }
 function splash(html) { return html.slice(html.indexOf('<div id="cdbSplash"'), html.indexOf(welcomeStart)); }
-function restoreWelcomeTitle(html) { return html.replace("textContent = 'Quem vai usar o app?';", "textContent = 'Bem-vinda à Casa da Baba';"); }
+function restoreOrdersEmpty(html) {
+  const prefix = '<div class="empty pilot-orders-empty"><span class="big" aria-hidden="true">' + pilotIcon('pedido-em-preparo') + '</span>Nenhum pedido em aberto</div><button class="export-btn pilot-orders-create"';
+  return html.replace(prefix, '<div class="empty"><span class="big">📭</span>Nenhum pedido em aberto</div><button class="export-btn"');
+}
+function restoreWelcomeTitle(html) {
+  return restoreOrdersEmpty(html).replace("textContent = 'Quem vai usar o app?';", "textContent = 'Bem-vinda à Casa da Baba';")
+    .replace(/<svg class="pilot-billing-whatsapp"[\s\S]*?<\/svg> Compartilhar no WhatsApp/, '<span>📤</span> Compartilhar no WhatsApp');
+}
 function restoreProductionChrome(html) {
   const metrics = source.match(/<div class="prod-metrics">[\s\S]*?id="prodMetricLow">0<\/strong><span>críticos<\/span><\/div>\s*<\/div>/)[0];
   const actions = source.match(/<div class="cta-row">\s*<button class="cta-btn" onclick="clearProduction\(\)">[\s\S]*?id="saveProdBtn"[\s\S]*?<\/div>/)[0];
@@ -84,13 +93,35 @@ test('splash incompleto ou duplicado impede empacotar abertura inconsistente', (
 
 test('produção preserva IDs e botões completos, mantendo estoque baixo no resumo acessível', () => {
   assert.deepEqual(ids(result), ids(source));
-  assert.deepEqual(tags(result, /<(?:input|button|select|textarea)\b[^>]*>/g), tags(source, /<(?:input|button|select|textarea)\b[^>]*>/g));
+  assert.deepEqual(tags(restoreOrdersEmpty(result), /<(?:input|button|select|textarea)\b[^>]*>/g), tags(source, /<(?:input|button|select|textarea)\b[^>]*>/g));
   const metrics = result.match(/<details class="pilot-production-metrics">([\s\S]*?)<\/details>/)[1];
   const summary = metrics.match(/<summary>([\s\S]*?)<\/summary>/)[1];
   assert.match(summary, /Estoque baixo: <strong id="prodMetricLow">0<\/strong>/);
   assert.match(metrics, /id="prodMetricProducts"/);
   assert.match(metrics, /id="prodMetricStock"/);
   assert.match(result, /class="pilot-production-empty" role="status">Selecione a quantidade produzida\./);
+});
+
+test('estado vazio de pedidos gera SVG canônico e mantém ação Novo executável', () => {
+  const statement = result.match(/root\.innerHTML = '[^\n]*pilot-orders-empty[^\n]*;/)[0];
+  const context = { root: {} };
+  vm.runInNewContext(statement, context);
+  assert.ok(context.root.innerHTML.includes(pilotIcon('pedido-em-preparo')));
+  assert.match(context.root.innerHTML, /aria-hidden="true"/);
+  assert.match(context.root.innerHTML, /onclick="goPedidosTab\('novo'\)">Criar pedido<\/button>/);
+  assert.doesNotMatch(context.root.innerHTML, /📭/);
+  assert.throws(() => adaptAppMarkup(source.replace('<span class="big">📭</span>', '')), /incompatível/);
+});
+
+test('compartilhar cobrança preserva handler e usa geometria oficial do WhatsApp', () => {
+  const icon = result.match(/<svg class="pilot-billing-whatsapp"[\s\S]*?<\/svg>/)[0];
+  const canonical = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Console/src/componentes/Icone.jsx'), 'utf8').match(/whatsapp: '([^']+)'/)[1];
+  assert.equal(icon.match(/<path d="([^"]+)"/)[1], canonical);
+  assert.match(icon, /stroke-width="1.75"/);
+  assert.match(icon, /aria-hidden="true"/);
+  const before = source.match(/<button class="btn-share"[\s\S]*?<\/button>/)[0];
+  const after = result.match(/<button class="btn-share"[\s\S]*?<\/button>/)[0];
+  assert.equal(after.replace(icon, '<span>📤</span>'), before);
 });
 
 test('mudança inesperada nos indicadores ou na barra impede empacotar UI incompleta', () => {

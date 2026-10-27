@@ -1,4 +1,5 @@
 'use strict';
+const { pilotIcon } = require('../pilot.js');
 
 const START = '<!-- Modal novo produto -->';
 const END = '<!-- Modal novo cliente -->';
@@ -65,6 +66,23 @@ function adaptProduction(html) {
   return html.replace(actionMatches[0][0], '<div class="cta-row pilot-production-actions"><p class="pilot-production-empty" role="status">Selecione a quantidade produzida.</p>' + actionMatches[0][1] + '</div>');
 }
 
+function adaptOrders(html) {
+  const before = '<div class="empty"><span class="big">📭</span>Nenhum pedido em aberto</div><button class="export-btn"';
+  uniqueIndex(html, before);
+  // Este fragmento pertence ao literal JS do estado vazio. O SVG canônico usa
+  // aspas duplas; nenhuma ação ou condição do renderizador é substituída.
+  const icon = pilotIcon('pedido-em-preparo').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return html.replace(before, '<div class="empty pilot-orders-empty"><span class="big" aria-hidden="true">' + icon + '</span>Nenhum pedido em aberto</div><button class="export-btn pilot-orders-create"');
+}
+
+function adaptBilling(html) {
+  const before = '<span>📤</span> Compartilhar no WhatsApp';
+  uniqueIndex(html, before);
+  // Fonte: EasyStock.Console/src/componentes/Icone.jsx, whatsapp, grid24/traço1.75.
+  const icon = '<svg class="pilot-billing-whatsapp" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 21l1.7-4.9A9 9 0 1 1 8 19.6L3 21ZM9 8.5c0 3.3 3.2 6.5 6.5 6.5l1.5-1.5-2-1.2-1 1a4.5 4.5 0 0 1-2.8-2.8l1-1-1.2-2L9 8.5Z"/></svg>';
+  return html.replace(before, icon + ' Compartilhar no WhatsApp');
+}
+
 // Move somente os blocos originais do modal. IDs, controles e handlers continuam
 // pertencendo ao PWA; armazenamento, validação e impressão não são substituídos.
 function adaptAppMarkup(html) {
@@ -102,7 +120,7 @@ function adaptAppMarkup(html) {
     '<details class="pilot-product-options">' + newline +
     '<summary>Mais opções do produto</summary>' + newline + options + '</details>' + newline +
     modal.slice(actions);
-  return adaptSplash(adaptProduction(adaptWelcome(html.slice(0, start) + adapted + html.slice(end))));
+  return adaptBilling(adaptOrders(adaptSplash(adaptProduction(adaptWelcome(html.slice(0, start) + adapted + html.slice(end))))));
 }
 
 module.exports = { adaptAppMarkup };
