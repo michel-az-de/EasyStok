@@ -14,10 +14,12 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../aplicacao/useCaixaDoDiaApi'
 import { useConfirmacaoDaAbertura } from '../../aplicacao/useConfirmacaoDaAbertura'
 import {
-  JUSTIFICATIVA_MINIMA, caixaAoFecharLoja, diaMes, dicaDoSaldoInicial, gavetaDoFechamento, justificativaValida, observacaoDaAbertura,
-  retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
+  JUSTIFICATIVA_MINIMA, ROTULO_GAVETA_CONTADA_AGORA, avisoDaAberturaAConfirmar, caixaAoFecharLoja, diaMes, dicaDoSaldoInicial,
+  gavetaDoFechamento, justificativaValida, observacaoDaAbertura, observacaoDaConfirmacao, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../dominio/aberturaDaLoja'
-import { conferenciaDaGaveta } from '../../dominio/caixa'
+import {
+  ROTULO_CONTADO_DO_ESQUECIDO, ROTULO_ENTROU_DEPOIS, conferenciaDaGaveta, conferenciaDoFechamento,
+} from '../../dominio/caixa'
 import {
   horaCurta, lerMoeda, moeda, moedaAltaDemais,
 } from '../../dominio/formato'
@@ -67,7 +69,9 @@ function FecharEsquecido({ situacao, aoFechou }) {
   const { fecharCaixa } = useAcoes()
   const [contado, setContado] = useState(null)
   const [envio, enviar] = useEnvio()
-  const conferencia = conferenciaDaGaveta(contado, situacao.naGaveta)
+  // #2113 (D1 da #2084): o esperado do dia da abertura e, à parte, o que entrou depois e fica no caixa de hoje.
+  const { esquecido } = situacao
+  const conferencia = conferenciaDoFechamento(contado, situacao.naGaveta, esquecido)
 
   return (
     <div className={css.bloco}>
@@ -75,10 +79,15 @@ function FecharEsquecido({ situacao, aoFechou }) {
         O caixa de <strong>{diaMes(situacao.desde)}</strong> ficou aberto. Feche aquele dia antes de abrir o de hoje.
       </p>
       <dl className={css.numeros}>
-        <div><dt>Na gaveta (dinheiro)</dt><dd>{moeda(situacao.naGaveta)}</dd></div>
+        {esquecido ? (
+          <>
+            <div><dt>Esperado no fechamento de {diaMes(situacao.desde)}</dt><dd>{moeda(esquecido.esperado)}</dd></div>
+            <div><dt>{ROTULO_ENTROU_DEPOIS}</dt><dd>{moeda(esquecido.entrouDepois)}</dd></div>
+          </>
+        ) : <div><dt>Na gaveta (dinheiro)</dt><dd>{moeda(situacao.naGaveta)}</dd></div>}
       </dl>
       <CampoReais
-        rotulo="Quanto você contou na gaveta (só dinheiro)"
+        rotulo={esquecido ? ROTULO_CONTADO_DO_ESQUECIDO : 'Quanto você contou na gaveta (só dinheiro)'}
         dica="Conte o dinheiro. A diferença fica registrada no fechamento."
         placeholder="Digite o que contou"
         centavos={contado}
@@ -157,8 +166,18 @@ function AbrirLojaComCaixa({ aoFechar }) {
   const confirmacao = useConfirmacaoDaAbertura(saldoInicial, situacao)
   const mudarSaldo = (valor) => { setCentavos(valor); confirmacao.desfazer() }
 
+  // #2113 (B1 da #2084): o caixa abriu sozinho; abrir a loja confirma a abertura com a gaveta contada agora.
+  const aConfirmar = situacao?.tipo === 'aberto' && situacao.aConfirmar
+  const conferenciaDaConfirmacao = conferenciaDaGaveta(centavos, situacao?.naGaveta)
+
   const abrir = async () => {
     if (confirmacao.segurar()) return
+    if (aConfirmar) {
+      const contado = centavos / 100
+      const ok = await enviar(() => abrirLojaComCaixa({ saldoInicial: contado, observacoes: observacaoDaConfirmacao(contado, situacao.naGaveta), caixaJaAberto: false }))
+      if (!ok) caixa.recarregar()
+      return
+    }
     const caixaJaAberto = situacao.tipo === 'aberto'
     const observacoes = caixaJaAberto ? undefined : observacaoDaAbertura({ saldoInformado: saldoInicial, situacao, motivo })
     const ok = await enviar(() => abrirLojaComCaixa({ saldoInicial, observacoes, caixaJaAberto }))
@@ -167,7 +186,7 @@ function AbrirLojaComCaixa({ aoFechar }) {
   }
 
   const podeAbrir = situacao?.tipo === 'aberto' || situacao?.tipo === 'novo'
-  const rotuloAbrir = situacao?.tipo === 'aberto' ? 'Abrir a loja' : 'Abrir caixa e loja'
+  const rotuloAbrir = aConfirmar ? 'Confirmar abertura e abrir a loja' : situacao?.tipo === 'aberto' ? 'Abrir a loja' : 'Abrir caixa e loja'
 
   return (
     <Modal
@@ -181,7 +200,7 @@ function AbrirLojaComCaixa({ aoFechar }) {
             <Botao
               variante="primario"
               icone="dollar-sign"
-              disabled={envio.enviando || moedaAltaDemais(saldoCentavos) || motivoFalta}
+              disabled={envio.enviando || moedaAltaDemais(saldoCentavos) || motivoFalta || (aConfirmar && centavos == null)}
               onClick={abrir}
             >
               {envio.enviando ? 'Abrindo…' : confirmacao.rotulo(rotuloAbrir)}
@@ -211,7 +230,28 @@ function AbrirLojaComCaixa({ aoFechar }) {
           </p>
         )}
 
-        {situacao?.tipo === 'aberto' && (
+        {aConfirmar && (
+          <div className={css.bloco}>
+            <p className={css.alerta}>
+              {avisoDaAberturaAConfirmar(situacao.saldoInicial, situacao.ultimo)} Conte a gaveta inteira para confirmar a abertura.
+            </p>
+            <dl className={css.numeros}>
+              <div><dt>Na gaveta (dinheiro) agora</dt><dd>{moeda(situacao.naGaveta)}</dd></div>
+            </dl>
+            <CampoReais
+              rotulo={ROTULO_GAVETA_CONTADA_AGORA}
+              dica="O troco que veio do fechamento e o dinheiro que já entrou hoje."
+              placeholder="Digite o que contou"
+              centavos={centavos}
+              ler={lerMoeda}
+              erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null}
+              aoMudar={setCentavos}
+            />
+            <DiferencaDaGaveta conferencia={conferenciaDaConfirmacao} className={css.diferenca} />
+          </div>
+        )}
+
+        {situacao?.tipo === 'aberto' && !aConfirmar && (
           <dl className={css.numeros}>
             <div><dt>Caixa de hoje aberto com</dt><dd>{moeda(situacao.saldoInicial)}</dd></div>
             <div><dt>Na gaveta (dinheiro) agora</dt><dd>{moeda(situacao.naGaveta)}</dd></div>
