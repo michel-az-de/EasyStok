@@ -23352,6 +23352,13 @@ window.cdbApp = {
         closeMoreMenu();
         return true;
       }
+      // No APK, o formulário pertence à lista de Pedidos; mantém o rascunho.
+      if (window.CDB_CONFIG?.isPilot && typeof currentScreen !== 'undefined' && currentScreen === 'pedidos'
+          && document.querySelector('[data-screen="pedidos"] .pedidos-tab-section[data-tab="novo"]')?.style.display === ''
+          && typeof goPedidosTab === 'function') {
+        goPedidosTab('andamento');
+        return true;
+      }
       // 4. Não estamos em home — volta na história
       if (typeof currentScreen !== 'undefined' && currentScreen !== 'home'
           && typeof goBack === 'function') {

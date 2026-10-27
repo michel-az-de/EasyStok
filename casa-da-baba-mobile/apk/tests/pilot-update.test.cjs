@@ -132,6 +132,36 @@ test('Back nativo fecha formulário com o fechador PWA real e só minimiza no in
   assert.equal(nodes.get('pilotHome').open, true, 'Minimizar mantém a home nova pronta para voltar');
 });
 
+for (const pilot of [true, false]) {
+  test('Back do formulário de pedido ' + (pilot ? 'APK volta à lista sem perder rascunho' : 'PWA preserva histórico original'), () => {
+    const { root, doc, nodes } = pilotHarness(); nodes.get('pilotHome').close();
+    root.CDB_CONFIG.isPilot = pilot;
+    const sections = [{ dataset: { tab: 'novo' }, style: { display: '' } }, { dataset: { tab: 'andamento' }, style: { display: 'none' } }];
+    doc.querySelectorAll = selector => selector.includes('.pedidos-tab-section') ? sections : [];
+    doc.querySelector = selector => selector.includes('data-tab="novo"') ? sections[0] : selector === '.screen.active' ? { dataset: { screen: 'pedidos' } } : null;
+    const context = installPwaBack(root, doc); context.currentScreen = 'pedidos';
+    nodes.set('orderNotes', { value: 'Separar amanhã' }); let historyCalls = 0;
+    context.goBack = () => { historyCalls++; };
+    const source = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+    const bindings = ['selectedClient', 'currentOrderItems'].map(name => {
+      const declaration = source.match(new RegExp('^let ' + name + ' = [^;]+;', 'm'))?.[0];
+      assert.ok(declaration); return declaration;
+    }).join('\n');
+    vm.runInContext(bindings + '\nselectedClient = { id: "cliente" }; currentOrderItems = [{ productId: "produto", qty: 3 }];', context);
+    const draft = vm.runInContext('JSON.stringify({ selectedClient, currentOrderItems })', context);
+    const start = source.indexOf('function goPedidosTab('), end = source.indexOf('\nfunction ', start + 1);
+    assert.ok(start >= 0 && end > start);
+    vm.runInContext(source.slice(start, end), context);
+    assert.equal(root.cdbHandleNativeBack(), true);
+    assert.equal(historyCalls, pilot ? 0 : 1);
+    assert.equal(sections[0].style.display, pilot ? 'none' : '');
+    assert.equal(sections[1].style.display, pilot ? '' : 'none');
+    assert.equal(vm.runInContext('JSON.stringify({ selectedClient, currentOrderItems })', context), draft);
+    assert.equal(nodes.get('orderNotes').value, 'Separar amanhã');
+    assert.equal(nodes.get('pilotHome').open, false);
+  });
+}
+
 test('Back protege impressão lexical antes de avisos/home, e libera navegação quando termina', () => {
   const { root, doc, nodes } = pilotHarness();
   const notices = nodes.get('pilotNotices'); notices.showModal();
