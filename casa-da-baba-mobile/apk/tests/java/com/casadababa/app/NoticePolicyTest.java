@@ -16,7 +16,9 @@ public final class NoticePolicyTest {
   check(!NoticePolicy.shouldRequestPermission(32, false, false));
   check(!NoticePolicy.shouldRequestPermission(33, true, false));
   check(!NoticePolicy.shouldRequestPermission(33, false, true));
-  System.out.println("PASS: 14 notification policy assertions; Android permission and tray require device validation");
+  check(com.casadababa.app.updater.UpdatePolicy.manifestUrl(4).endsWith("/ota/latest.json"));
+  check(com.casadababa.app.updater.UpdatePolicy.manifestUrl(5).endsWith("/ota/native-5/latest.json"));
+  System.out.println("PASS: 16 notification policy assertions; Android permission and tray require device validation");
  }
  private static void check(boolean valid) { if(!valid) throw new AssertionError(); }
 }

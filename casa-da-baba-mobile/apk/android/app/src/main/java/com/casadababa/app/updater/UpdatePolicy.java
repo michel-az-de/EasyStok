@@ -21,6 +21,9 @@ public final class UpdatePolicy {
     public static final String APP_ID = "com.casadababa.piloto";
     public static final String CHANNEL = "piloto";
     public static final String MANIFEST_URL = "https://easystok.online/downloads/casa-da-baba/ota/latest.json";
+    public static String manifestUrl(int nativeCode) {
+        return nativeCode >= 5 ? MANIFEST_URL.replace("latest.json", "native-" + nativeCode + "/latest.json") : MANIFEST_URL;
+    }
     private UpdatePolicy() {}
 
     public static void require(boolean condition, String message) throws IOException {
