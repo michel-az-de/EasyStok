@@ -23,8 +23,10 @@ namespace EasyStock.Application.UseCases.ListarUsuarios
 
     /// <summary>
     /// O que quem está pedindo pode fazer com esta linha (#2070), pela <c>PoliticaDeHierarquia</c> e pelas pré-condições
-    /// que a rota confere: a API devolve 2xx se e somente se a ação está aqui. Desativar e reativar valem pela autoridade
-    /// (repetir é um 2xx que não muda nada); o console escolhe o botão pelo estado da linha.
+    /// que a rota confere: a API devolve 2xx se e somente se a ação está aqui. Desativar, reativar, marcar e tirar a marca
+    /// valem pela autoridade (repetir é um 2xx que não muda nada); o console escolhe o botão pelo estado da linha
+    /// (<c>ativo</c> e <c>dona</c>). Trocar perfil: existe ao menos um nível que quem pede pode dar a esta pessoa (o
+    /// <c>atribuivel</c> de cada perfil diz quais). Nome, e-mail e convite são da conta e olham todas as empresas dela.
     /// </summary>
     public sealed record AcoesSobreUsuario(
         bool EditarNome,
@@ -64,35 +66,49 @@ namespace EasyStock.Application.UseCases.ListarUsuarios
         public async Task<(IEnumerable<UsuarioResult> Usuarios, int Total)> ExecuteAsync(ListarUsuariosQuery query)
         {
             var (usuarios, total) = await usuarioRepository.GetByEmpresaAsync(query.EmpresaId, query.Page, query.PageSize);
+            var pagina = usuarios.ToList();
             var ator = await hierarquia.AtorAsync(query.EmpresaId);
             var donas = await hierarquia.DonasAtivasAsync(query.EmpresaId);
-            return (usuarios.Select(u => ToResult(u, query.EmpresaId, ator, donas)).ToList(), total);
+            // A conta inteira de cada linha, com todas as empresas (a lista vem no recorte desta).
+            var contas = (await usuarioRepository.GetByIdsAsync(pagina.Select(u => u.Id).ToList()) ?? [])
+                .ToDictionary(u => u.Id);
+            return (pagina.Select(u => ToResult(u, contas.GetValueOrDefault(u.Id, u), query.EmpresaId, ator, donas)).ToList(), total);
         }
 
-        private static UsuarioResult ToResult(Usuario u, Guid empresaId, ParticipanteDaHierarquia ator, int donas)
+        private static UsuarioResult ToResult(Usuario u, Usuario conta, Guid empresaId, ParticipanteDaHierarquia ator, int donas)
         {
             // O mesmo critério do login: o perfil de mais poder na empresa.
             var perfil = u.Perfis?.Where(p => p.Perfil is not null).Select(p => p.Perfil!).OrderBy(p => p.NivelNaEmpresa).FirstOrDefault();
             // Sem o vínculo carregado (lista antiga, teste) vale o cadastro; com ele, vale o acesso à empresa.
             var vinculo = u.Empresas?.FirstOrDefault(e => e.EmpresaId == empresaId);
-            var alvo = ParticipanteDaHierarquia.De(u, empresaId, u.EhSuperAdmin());
+            var alvo = ParticipanteDaHierarquia.De(u, empresaId, conta.EhSuperAdmin());
             return new(u.Id, u.Nome, u.Email, u.Ativo && (vinculo?.Ativo ?? true), u.UltimoAcessoEm, u.CriadoEm,
                 alvo.Nivel.ToString(), ConviteDoUsuario.De(u), perfil?.Id, perfil?.Nome,
-                vinculo?.EhDona ?? false, Acoes(ator, alvo, u, donas));
+                vinculo?.EhDona ?? false, Acoes(ator, alvo, u, conta, donas));
         }
 
-        private static AcoesSobreUsuario Acoes(ParticipanteDaHierarquia ator, ParticipanteDaHierarquia alvo, Usuario u, int donas)
+        /// <summary>Os níveis que um perfil de empresa dá; trocar perfil vale se ao menos um deles passa pela política.</summary>
+        private static readonly NivelAcesso[] NiveisDeEmpresa =
+            [NivelAcesso.Admin, NivelAcesso.Gerente, NivelAcesso.Operador, NivelAcesso.Visualizador];
+
+        private static AcoesSobreUsuario Acoes(
+            ParticipanteDaHierarquia ator, ParticipanteDaHierarquia alvo, Usuario u, Usuario conta, int donas)
         {
-            bool Pode(AcaoSobreUsuario acao) => PoliticaDeHierarquia.Avaliar(ator, alvo, acao, donas).Permitido;
+            var daConta = alvo.ComAContaInteira(conta);
+            bool Pode(AcaoSobreUsuario acao, NivelAcesso? nivelNovo = null) =>
+                PoliticaDeHierarquia.Avaliar(ator, PoliticaDeHierarquia.EhDaConta(acao) ? daConta : alvo, acao, donas, nivelNovo).Permitido;
             return new(
                 EditarNome: Pode(AcaoSobreUsuario.EditarNome),
-                TrocarEmail: Pode(AcaoSobreUsuario.TrocarEmail),
-                TrocarPerfil: alvo.VinculoAtivo && Pode(AcaoSobreUsuario.TrocarPerfil),
+                // As mesmas pré-condições da rota: conta só desta empresa (ou o suporte), vínculo ativo para trocar o perfil e
+                // para reenviar (a guarda de tenant do reenvio olha o vínculo ativo; o suporte passa sem ela).
+                TrocarEmail: (ator.EhSuporteGlobal || HierarquiaDeUsuarios.EmailTrocavelPelaEmpresa(conta)) && Pode(AcaoSobreUsuario.TrocarEmail),
+                TrocarPerfil: alvo.VinculoAtivo && NiveisDeEmpresa.Any(nivel => Pode(AcaoSobreUsuario.TrocarPerfil, nivel)),
                 Desativar: Pode(AcaoSobreUsuario.Desativar),
                 Reativar: Pode(AcaoSobreUsuario.Reativar),
-                ReenviarConvite: u.Ativo && u.ConvitePendente && !u.EhSuperAdmin() && Pode(AcaoSobreUsuario.ReenviarConvite),
-                MarcarDona: !alvo.EhDona && Pode(AcaoSobreUsuario.MarcarDona),
-                DesmarcarDona: alvo.EhDona && Pode(AcaoSobreUsuario.DesmarcarDona));
+                ReenviarConvite: (ator.EhSuporteGlobal || alvo.VinculoAtivo) && u.Ativo && u.ConvitePendente && !conta.EhSuperAdmin()
+                    && Pode(AcaoSobreUsuario.ReenviarConvite),
+                MarcarDona: Pode(AcaoSobreUsuario.MarcarDona),
+                DesmarcarDona: Pode(AcaoSobreUsuario.DesmarcarDona));
         }
     }
 

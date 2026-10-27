@@ -100,7 +100,8 @@ public class GestaoDeUsuariosUseCaseTests
         var recusa = _c.Auditorias.Should().ContainSingle().Subject;
         recusa.Acao.Should().Be("hierarquia-recusada");
         recusa.Sucesso.Should().BeFalse();
-        recusa.Detalhes.Should().Contain("USUARIO_PROPRIO").And.Contain("Baba");
+        // A dona lê este texto na auditoria: o motivo em português, sem o código técnico.
+        recusa.Detalhes.Should().Be("Pedido para desativar o acesso recusado: ninguém muda o próprio acesso por aqui; feito por Baba");
         _c.UnitOfWork.CommitCount.Should().Be(1);
     }
 

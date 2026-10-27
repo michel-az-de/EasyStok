@@ -7,7 +7,9 @@ namespace EasyStock.Domain.Services;
 ///   <item>o suporte só é alvo do próprio suporte e nunca recebe a marca (<c>DONA_SUPORTE</c>);</item>
 ///   <item>quem não é suporte precisa de acesso ativo de nível Admin na empresa (<c>HIERARQUIA</c>);</item>
 ///   <item>sobre si mesmo, só o nome (<c>USUARIO_PROPRIO</c>);</item>
-///   <item>a empresa nunca fica sem dona ativa (<c>ULTIMA_DONA</c>), qualquer que seja o ator;</item>
+///   <item>a Administração nunca alcança a dona (<c>HIERARQUIA</c>), nem quando ela é a última: a resposta não manda marcar
+///   outra dona, ação que a Administração não tem, e não conta quantas donas existem;</item>
+///   <item>a empresa nunca fica sem dona ativa (<c>ULTIMA_DONA</c>), para o suporte e para a dona;</item>
 ///   <item>a tabela do ator: suporte, dona ou Administração.</item>
 /// </list>
 /// </summary>
@@ -33,10 +35,12 @@ public static class PoliticaDeHierarquia
         if (!ator.EhSuporteGlobal && ator.UsuarioId == alvo.UsuarioId)
             return acao == AcaoSobreUsuario.EditarNome ? DecisaoDaHierarquia.Permite : Nega(CodigosDaHierarquia.UsuarioProprio);
 
+        if (!ator.EhSuporteGlobal && !ator.EhDonaAtiva && alvo.EhDona) return Nega(CodigosDaHierarquia.Hierarquia);
+
         if (alvo.EhDonaAtiva && TiraDona(acao, nivelNovo) && donasAtivas <= 1)
             return Nega(CodigosDaHierarquia.UltimaDona);
 
-        if (ator.EhSuporteGlobal) return DoSuporte(alvo, acao);
+        if (ator.EhSuporteGlobal) return DoSuporte(alvo, acao, nivelNovo);
         if (ator.EhDonaAtiva) return DaDona(alvo, acao);
         return DaAdministracao(alvo, acao, nivelNovo);
     }
@@ -51,6 +55,13 @@ public static class PoliticaDeHierarquia
         return propria.EhDonaAtiva && donasAtivas <= 1 ? Nega(CodigosDaHierarquia.UltimaDona) : DecisaoDaHierarquia.Permite;
     }
 
+    /// <summary>
+    /// Ações sobre a conta, que valem em toda empresa da pessoa: o nome, o e-mail e o convite (o link entra na conta).
+    /// O alvo delas é lido por <see cref="ParticipanteDaHierarquia.ComAContaInteira"/>.
+    /// </summary>
+    public static bool EhDaConta(AcaoSobreUsuario acao) =>
+        acao is AcaoSobreUsuario.EditarNome or AcaoSobreUsuario.TrocarEmail or AcaoSobreUsuario.ReenviarConvite;
+
     /// <summary>Quem pode dar um perfil de cada nível: suporte e dona dão todos; a Administração só abaixo de Admin.</summary>
     public static bool PodeDarNivel(ParticipanteDaHierarquia ator, NivelAcesso nivel)
     {
@@ -59,11 +70,17 @@ public static class PoliticaDeHierarquia
         return ator.AdministraAEmpresa && nivel > NivelAcesso.Admin;
     }
 
-    private static DecisaoDaHierarquia DoSuporte(ParticipanteDaHierarquia alvo, AcaoSobreUsuario acao)
+    /// <summary>
+    /// O suporte pode tudo, mas justifica o que tira a conta ou a marca da dona: trocar o e-mail, tirar a marca e
+    /// rebaixar (o rebaixamento tira a marca, o mesmo efeito de <see cref="AcaoSobreUsuario.DesmarcarDona"/>).
+    /// </summary>
+    private static DecisaoDaHierarquia DoSuporte(ParticipanteDaHierarquia alvo, AcaoSobreUsuario acao, NivelAcesso? nivelNovo)
     {
         if (acao == AcaoSobreUsuario.MarcarDona) return AlvoDaMarca(alvo);
         if (acao == AcaoSobreUsuario.Criar && alvo.EhDona) return NovaDona(alvo);
-        return alvo.EhDona && acao is AcaoSobreUsuario.TrocarEmail or AcaoSobreUsuario.DesmarcarDona
+        if (!alvo.EhDona) return DecisaoDaHierarquia.Permite;
+        return acao is AcaoSobreUsuario.TrocarEmail or AcaoSobreUsuario.DesmarcarDona
+            || (acao == AcaoSobreUsuario.TrocarPerfil && nivelNovo != NivelAcesso.Admin)
             ? DecisaoDaHierarquia.PermiteComMotivo
             : DecisaoDaHierarquia.Permite;
     }
@@ -77,7 +94,9 @@ public static class PoliticaDeHierarquia
         {
             AcaoSobreUsuario.Criar => NovaDona(alvo),
             AcaoSobreUsuario.TrocarEmail => Nega(CodigosDaHierarquia.Hierarquia),
-            AcaoSobreUsuario.TrocarPerfil or AcaoSobreUsuario.Desativar => Nega(CodigosDaHierarquia.DonaProtegida),
+            // Reativar desfaz a desativação, que sobre a dona só o suporte faz: a decisão volta para ele.
+            AcaoSobreUsuario.TrocarPerfil or AcaoSobreUsuario.Desativar or AcaoSobreUsuario.Reativar
+                => Nega(CodigosDaHierarquia.DonaProtegida),
             _ => DecisaoDaHierarquia.Permite,
         };
     }

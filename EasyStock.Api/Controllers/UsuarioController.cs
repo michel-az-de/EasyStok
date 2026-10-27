@@ -12,14 +12,15 @@ using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
 
-public sealed record AtribuirPerfilRequest(Guid EmpresaId, Guid PerfilId, Guid? LojaId);
+/// <param name="Motivo">#2070: 10+ caracteres, exigido do suporte ao rebaixar a dona (rebaixar tira a marca).</param>
+public sealed record AtribuirPerfilRequest(Guid EmpresaId, Guid PerfilId, Guid? LojaId, string? Motivo = null);
 public sealed record AlterarSenhaRequest(string SenhaAtual, string NovaSenha);
 
 /// <summary>
-/// Marca ou tira a marca de dona (#2070). <c>Motivo</c>: 10+ caracteres, exigido do suporte ao tirar a marca da dona.
-/// <c>EmpresaId</c>: a do token quando omitida.
+/// Marca ou tira a marca de dona (#2070). <c>Dona</c> é obrigatório: sem ele a resposta é 400, nunca "tirar a marca".
+/// <c>Motivo</c>: 10+ caracteres, exigido do suporte ao tirar a marca da dona. <c>EmpresaId</c>: a do token quando omitida.
 /// </summary>
-public sealed record MarcarDonaRequest(bool Dona, string? Motivo = null, Guid? EmpresaId = null);
+public sealed record MarcarDonaRequest(bool? Dona, string? Motivo = null, Guid? EmpresaId = null);
 
 [SwaggerTag("Users / Usuários")]
 [ApiController]
@@ -112,7 +113,10 @@ public class UsuarioController(
     [SwaggerOperation(
         Summary = "Update user (Admin only)",
         Description = "#2070: a Administração edita só da Gerência para baixo (403 HIERARQUIA); o e-mail da dona só o suporte troca, " +
-                      "com Motivo de 10+ caracteres (400 MOTIVO_OBRIGATORIO), que vai também para a auditoria da plataforma.")]
+                      "com Motivo de 10+ caracteres (400 MOTIVO_OBRIGATORIO), que vai também para a auditoria da plataforma. Nome e " +
+                      "e-mail são da conta: quem é dona ou Administração em qualquer empresa conta como tal. E-mail de quem é de mais " +
+                      "de uma empresa, convidado ou não, só a pessoa ou o suporte troca (403). O mesmo e-mail com outra caixa de " +
+                      "letra é só editar o nome.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -136,7 +140,8 @@ public class UsuarioController(
         Description = "#2070 (ADR-0038). Só a dona ou o suporte; com zero donas, só o suporte marca a primeira. Marcar exige " +
                       "acesso ativo de nível Admin (409 DONA_NAO_ADMIN) e conta provada por e-mail ou Google (409 DONA_CONTA_NAO_PROVADA); " +
                       "o suporte nunca é marcado (400 DONA_SUPORTE); a última dona ativa não perde a marca (409 ULTIMA_DONA). " +
-                      "O suporte tirando a marca escreve Motivo (10+). Repetir não muda nada. EmpresaId: a do token quando omitida.")]
+                      "A Administração recebe 403 HIERARQUIA. O suporte tirando a marca escreve Motivo (10+). Dona é obrigatório " +
+                      "(400 sem ele). Repetir não muda nada. EmpresaId: a do token quando omitida.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -146,15 +151,17 @@ public class UsuarioController(
     [Authorize(Policy = "Admin")]
     public async Task<IActionResult> MarcarDona(Guid id, [FromBody] MarcarDonaRequest request, CancellationToken ct)
     {
+        if (request.Dona is not { } dona)
+            return DataBadRequest("Informe dona: true para marcar ou false para tirar a marca.");
         var empresaId = request.EmpresaId ?? currentUser.EmpresaId;
         if (empresaId == Guid.Empty)
             return DataBadRequest("Informe a empresa.");
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != empresaId)
             return Forbid();
 
-        var resultado = await marcarDonaUseCase.ExecuteAsync(new MarcarDonaCommand(id, empresaId, request.Dona, request.Motivo), ct);
+        var resultado = await marcarDonaUseCase.ExecuteAsync(new MarcarDonaCommand(id, empresaId, dona, request.Motivo), ct);
         if (resultado.PeloSuporte && resultado.Mudou)
-            await adminAudit.LogAsync(request.Dona ? "SuporteMarcouDona" : "SuporteDesmarcouDona", $"UsuarioId={id}",
+            await adminAudit.LogAsync(dona ? "SuporteMarcouDona" : "SuporteDesmarcouDona", $"UsuarioId={id}",
                 tenantId: empresaId, motivo: resultado.Motivo, entidadeAfetadaId: id);
         return NoContent();
     }
@@ -162,7 +169,8 @@ public class UsuarioController(
     [SwaggerOperation(
         Summary = "Deactivate user (Admin only)",
         Description = "#2070: ninguém desativa a si mesmo (400 USUARIO_PROPRIO); a dona, só o suporte (409 DONA_PROTEGIDA para a dona, " +
-                      "403 HIERARQUIA para a Administração); a última dona ativa nunca (409 ULTIMA_DONA).")]
+                      "403 HIERARQUIA para a Administração, mesmo quando é a única dona); o suporte nunca desativa a última dona " +
+                      "ativa (409 ULTIMA_DONA).")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -182,7 +190,8 @@ public class UsuarioController(
     [SwaggerOperation(
         Summary = "Reactivate user (Admin only)",
         Description = "Desfaz a desativacao: religa o vinculo com a empresa e grava a auditoria. Repetir nao muda nada. " +
-                      "#2070: a Administração reativa só da Gerência para baixo (403 HIERARQUIA).")]
+                      "#2070: a Administração reativa só da Gerência para baixo (403 HIERARQUIA); a dona desativada, só o suporte " +
+                      "reativa (409 DONA_PROTEGIDA para a dona).")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -253,8 +262,9 @@ public class UsuarioController(
     [SwaggerOperation(
         Summary = "Assign role to user (Admin only)",
         Description = "#2070: o alvo precisa de acesso ativo na empresa (400 USUARIO_DESATIVADO); a Administração não dá perfil de " +
-                      "nível Admin nem mexe na dona ou em outra Administração (403 HIERARQUIA); a dona não rebaixa outra dona " +
-                      "(409 DONA_PROTEGIDA); a última dona ativa não é rebaixada (409 ULTIMA_DONA).")]
+                      "nível Admin nem mexe na dona ou em outra Administração (403 HIERARQUIA, também com uma dona só); a dona não " +
+                      "rebaixa outra dona (409 DONA_PROTEGIDA); o suporte rebaixa a dona com Motivo de 10+ caracteres " +
+                      "(400 MOTIVO_OBRIGATORIO), que vai para a auditoria da plataforma, e nunca a última dona ativa (409 ULTIMA_DONA).")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -267,7 +277,11 @@ public class UsuarioController(
         if (currentUser.Nivel != NivelAcesso.SuperAdmin && currentUser.EmpresaId != Guid.Empty && currentUser.EmpresaId != request.EmpresaId)
             return Forbid();
 
-        await atribuirPerfilUseCase.ExecuteAsync(new AtribuirPerfilUsuarioCommand(id, request.EmpresaId, request.PerfilId, request.LojaId));
+        var resultado = await atribuirPerfilUseCase.ExecuteAsync(
+            new AtribuirPerfilUsuarioCommand(id, request.EmpresaId, request.PerfilId, request.LojaId, request.Motivo));
+        if (resultado.SuporteRebaixouDona)
+            await adminAudit.LogAsync("SuporteRebaixouDona", $"UsuarioId={id}",
+                tenantId: request.EmpresaId, motivo: resultado.Motivo, entidadeAfetadaId: id);
         return NoContent();
     }
 

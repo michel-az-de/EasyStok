@@ -43,7 +43,8 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
                 throw new UseCaseValidationException("Usuario nao encontrado.");
             }
 
-            var trocaEmail = !string.IsNullOrWhiteSpace(command.Email) && command.Email.Trim() != usuario.Email;
+            // O e-mail é gravado normalizado (#1781): o mesmo endereço com outra caixa de letra é só editar o nome.
+            var trocaEmail = !string.IsNullOrWhiteSpace(command.Email) && Usuario.NormalizarEmail(command.Email) != usuario.Email;
 
             var empresaId = await EmpresaDaHierarquiaAsync(usuario, trocaEmail);
             if (trocaEmail && usuario.ConvitePendente) convites.ExigirBaseDeLink();
@@ -58,6 +59,14 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
                     var alvo = contexto.Alvo!;
                     if (trocaEmail)
                     {
+                        // N4: o vinculo com a empresa corrente nao basta para trocar o e-mail (achado 6). Usuario de duas empresas
+                        // ou com perfil SuperAdmin so troca o proprio contato, ou pelo suporte. Alterar so o nome segue permitido.
+                        // A leitura de antes da trava enxerga todas as empresas da pessoa; a de depois, so a desta. Vale tambem
+                        // para o convidado (#2070): o convite novo iria para o endereco trocado e valeria nas outras empresas.
+                        if (!contexto.Ator.EhSuporteGlobal && !HierarquiaDeUsuarios.EmailTrocavelPelaEmpresa(usuario))
+                            throw new UsuarioNaoAutorizadoException(
+                                "Não é possível trocar o e-mail deste usuário por aqui: peça ao próprio usuário ou ao suporte.");
+
                         // N9: quem nunca aceitou o convite nunca teve acesso. A troca e IMEDIATA e dispensa o EmailPendente da N4
                         // (a confirmacao em duas etapas protege conta que ja teve acesso), e o convite do contato antigo morre.
                         if (alvo.ConvitePendente)
@@ -68,13 +77,6 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
                             await unitOfWork.CommitAsync();
                             return Resultado(contexto);
                         }
-
-                        // N4: o vinculo com a empresa corrente nao basta para trocar o e-mail (achado 6). Usuario de duas empresas
-                        // ou com perfil SuperAdmin so troca o proprio contato, ou pelo suporte. Alterar so o nome segue permitido.
-                        // A leitura de antes da trava enxerga todas as empresas da pessoa; a de depois, so a desta.
-                        if (!contexto.Ator.EhSuporteGlobal && !PodeTrocarEmailPeloAdmin(usuario))
-                            throw new UsuarioNaoAutorizadoException(
-                                "Não é possível trocar o e-mail deste usuário por aqui: peça ao próprio usuário ou ao suporte.");
 
                         // Mesmo fluxo de duas etapas e mesmo aviso: o Email so muda no clique do link enviado ao endereco novo.
                         await trocaDeContato.SolicitarTrocaDeEmailAsync(alvo, command.Email!, command.BaseUrl, empresaId);
@@ -135,9 +137,5 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
             if (!trocaEmail && usuario.Empresas.FirstOrDefault(e => e.Ativo) is { } vinculo) return vinculo.EmpresaId;
             return await trocaDeContato.ResolverEmpresaDoEventoAsync();
         }
-
-        /// <summary>Exclusivo da empresa (um unico vinculo) e sem perfil de SuperAdmin.</summary>
-        private static bool PodeTrocarEmailPeloAdmin(Usuario usuario) =>
-            usuario.Empresas.Count == 1 && !usuario.EhSuperAdmin();
     }
 }

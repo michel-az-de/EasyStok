@@ -2,7 +2,11 @@ using EasyStock.Application.Services.Auth;
 
 namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
 {
-    public sealed record AtribuirPerfilUsuarioCommand(Guid UsuarioId, Guid EmpresaId, Guid PerfilId, Guid? LojaId);
+    /// <param name="Motivo">A justificativa do suporte ao rebaixar a dona (#2070, 10+ caracteres): rebaixar tira a marca.</param>
+    public sealed record AtribuirPerfilUsuarioCommand(Guid UsuarioId, Guid EmpresaId, Guid PerfilId, Guid? LojaId, string? Motivo = null);
+
+    /// <param name="SuporteRebaixouDona">O suporte rebaixou a dona e ela perdeu a marca: vai também para a auditoria da plataforma.</param>
+    public sealed record AtribuirPerfilUsuarioResult(bool SuporteRebaixouDona, string? Motivo);
 
     /// <summary>
     /// Define o perfil do usuário na empresa. #1753: um perfil por empresa, como o login já lê; antes a atribuição só
@@ -21,7 +25,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
         IUnitOfWork unitOfWork,
         ILogger<AtribuirPerfilUsuarioUseCase> logger)
     {
-        public async Task ExecuteAsync(AtribuirPerfilUsuarioCommand command)
+        public async Task<AtribuirPerfilUsuarioResult> ExecuteAsync(AtribuirPerfilUsuarioCommand command)
         {
             UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
 
@@ -41,18 +45,22 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
             if (!perfil.AtribuivelNaEmpresa(command.EmpresaId))
                 throw new UseCaseValidationException("Perfil invalido.");
 
-            await hierarquia.ExecutarAsync(
-                new PedidoDeHierarquia(command.EmpresaId, usuario.Id, AcaoSobreUsuario.TrocarPerfil, perfil.NivelNaEmpresa),
+            return await hierarquia.ExecutarAsync(
+                new PedidoDeHierarquia(command.EmpresaId, usuario.Id, AcaoSobreUsuario.TrocarPerfil, perfil.NivelNaEmpresa,
+                    Motivo: command.Motivo),
                 async (contexto, token) =>
                 {
                     // B3 relido depois da trava: a desativação concorrente vence a troca de perfil.
                     if (!contexto.ParticipanteAlvo.VinculoAtivo) throw VinculoInativo();
-                    await TrocarAsync(command, perfil, contexto, token);
-                    return true;
+                    var tirouAMarca = await TrocarAsync(command, perfil, contexto, token);
+                    return tirouAMarca && contexto.Ator.EhSuporteGlobal
+                        ? new AtribuirPerfilUsuarioResult(true, contexto.Motivo)
+                        : new AtribuirPerfilUsuarioResult(false, null);
                 });
         }
 
-        private async Task TrocarAsync(AtribuirPerfilUsuarioCommand command, Perfil perfil, ContextoDaHierarquia contexto, CancellationToken token)
+        /// <returns>A dona rebaixada perdeu a marca.</returns>
+        private async Task<bool> TrocarAsync(AtribuirPerfilUsuarioCommand command, Perfil perfil, ContextoDaHierarquia contexto, CancellationToken token)
         {
             var usuario = contexto.Alvo!;
             var atuais = await usuarioPerfilRepository.ListarPorUsuarioEEmpresaAsync(command.UsuarioId, command.EmpresaId);
@@ -62,13 +70,13 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
             if (mantido is not null && anteriores.Count == 0)
             {
                 // O perfil é o mesmo: não há troca a registrar. Só a loja muda o que o token carrega.
-                if (mantido.LojaId == command.LojaId) return;
+                if (mantido.LojaId == command.LojaId) return false;
                 mantido.LojaId = command.LojaId;
                 mantido.AtribuidoEm = DateTime.UtcNow;
                 await usuarioPerfilRepository.UpdateAsync(mantido);
                 await revogadorSessoes.RevogarAsync(usuario);
                 await unitOfWork.CommitAsync();
-                return;
+                return false;
             }
 
             foreach (var anterior in anteriores)
@@ -92,9 +100,11 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
 
             var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
 
-            // #2070: a dona rebaixada (só o suporte chega aqui, e nunca com a última) deixa de ser dona: toda dona tem nível Admin.
-            if (contexto.ParticipanteAlvo.EhDona && perfil.NivelNaEmpresa != NivelAcesso.Admin
-                && await usuarioEmpresaRepository.DefinirDonaAsync(usuario.Id, command.EmpresaId, dona: false, token) > 0)
+            // #2070: a dona rebaixada (só o suporte chega aqui, com motivo, e nunca com a última) deixa de ser dona: toda dona
+            // tem nível Admin.
+            var tirouAMarca = contexto.ParticipanteAlvo.EhDona && perfil.NivelNaEmpresa != NivelAcesso.Admin
+                && await usuarioEmpresaRepository.DefinirDonaAsync(usuario.Id, command.EmpresaId, dona: false, token) > 0;
+            if (tirouAMarca)
                 await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(usuario.Id, RastroDeUsuarios.DonaDesmarcada,
                     $"Marca de dona retirada com a troca para {perfil.Nome}, por {autor}", currentUser, command.EmpresaId));
 
@@ -106,6 +116,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
                 usuario.Id, RastroDeUsuarios.PerfilTrocado, $"Perfil trocado de {de} para {perfil.Nome} por {autor}", currentUser, command.EmpresaId));
 
             await unitOfWork.CommitAsync();
+            return tirouAMarca;
         }
 
         private static UseCaseValidationException VinculoInativo() =>

@@ -39,6 +39,27 @@ public sealed record ParticipanteDaHierarquia(
             usuario.ContaProvada, ehSuporteGlobal);
     }
 
+    /// <summary>
+    /// Nome, e-mail e convite são da conta, não do vínculo (#2070): valem em toda empresa da pessoa. Para essas ações
+    /// (<see cref="PoliticaDeHierarquia.EhDaConta"/>) o alvo é visto pelo recorte mais protegido das empresas dele: dona se
+    /// tem a marca em alguma, e o nível mais alto que tem em qualquer uma. <paramref name="contaInteira"/> é a leitura com
+    /// todas as empresas, a de antes da trava.
+    /// </summary>
+    public ParticipanteDaHierarquia ComAContaInteira(Usuario contaInteira)
+    {
+        ArgumentNullException.ThrowIfNull(contaInteira);
+        var donaEmAlguma = contaInteira.Empresas?.Any(e => e.EhDona) ?? false;
+        var nivelMaisAlto = contaInteira.Perfis?
+            .Where(up => up.Perfil is { EhSuporteGlobal: false })
+            .Select(up => (NivelAcesso?)up.Perfil!.NivelNaEmpresa)
+            .Min();
+        return this with
+        {
+            EhDona = EhDona || donaEmAlguma,
+            Nivel = nivelMaisAlto is { } nivel && nivel < Nivel ? nivel : Nivel,
+        };
+    }
+
     /// <summary>A pessoa que ainda vai nascer (<see cref="AcaoSobreUsuario.Criar"/>): o nível do perfil escolhido e a marca pedida.</summary>
     public static ParticipanteDaHierarquia Novo(NivelAcesso? nivel, bool dona) =>
         new(Guid.Empty, nivel ?? NivelAcesso.Visualizador, dona, VinculoAtivo: true, UsuarioAtivo: true, ContaProvada: false);

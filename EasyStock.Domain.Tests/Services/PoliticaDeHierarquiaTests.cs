@@ -6,8 +6,8 @@ namespace EasyStock.Domain.Tests.Services;
 
 /// <summary>
 /// #2070 (ADR-0038): a matriz inteira da hierarquia, ator {suporte, dona, Administração} × alvo {si, dona, Administração,
-/// Gerência, Operador, sem perfil} × as 9 ações, com o resultado esperado em cada célula. A empresa tem duas donas ativas
-/// na matriz, para a trava da última dona não se misturar; ela tem os seus próprios testes abaixo.
+/// Gerência, Operador, sem perfil} × as 9 ações, com o resultado esperado em cada célula, com duas donas ativas e com uma
+/// só (o caso real da Casa da Baba). Com uma dona só, a dona não é alvo de outra dona e a linha (dona, dona) sai.
 /// </summary>
 public class PoliticaDeHierarquiaTests
 {
@@ -18,6 +18,7 @@ public class PoliticaDeHierarquiaTests
     private const string DP = CodigosDaHierarquia.DonaProtegida;
     private const string NA = CodigosDaHierarquia.DonaNaoAdmin;
     private const string DS = CodigosDaHierarquia.DonaSuporte;
+    private const string UD = CodigosDaHierarquia.UltimaDona;
 
     private static readonly ParticipanteDaHierarquia Suporte =
         new(Guid.NewGuid(), NivelAcesso.Visualizador, false, VinculoAtivo: false, UsuarioAtivo: true, ContaProvada: true, EhSuporteGlobal: true);
@@ -50,14 +51,14 @@ public class PoliticaDeHierarquiaTests
     private static readonly Dictionary<(string Ator, string Alvo), string[]> Esperado = new()
     {
         [("suporte", "si")] = [P, P, P, P, P, P, P, DS, P],
-        [("suporte", "dona")] = [P, P, M, P, P, P, P, P, M],
+        [("suporte", "dona")] = [P, P, M, M, P, P, P, P, M],
         [("suporte", "administracao")] = [P, P, P, P, P, P, P, P, P],
         [("suporte", "gerencia")] = [P, P, P, P, P, P, P, NA, P],
         [("suporte", "operador")] = [P, P, P, P, P, P, P, NA, P],
         [("suporte", "sem perfil")] = [P, P, P, P, P, P, P, NA, P],
 
         [("dona", "si")] = [U, P, U, U, U, U, U, U, U],
-        [("dona", "dona")] = [P, P, H, DP, DP, P, P, P, P],
+        [("dona", "dona")] = [P, P, H, DP, DP, DP, P, P, P],
         [("dona", "administracao")] = [P, P, P, P, P, P, P, P, P],
         [("dona", "gerencia")] = [P, P, P, P, P, P, P, NA, P],
         [("dona", "operador")] = [P, P, P, P, P, P, P, NA, P],
@@ -71,17 +72,28 @@ public class PoliticaDeHierarquiaTests
         [("administracao", "sem perfil")] = [P, P, P, P, P, P, P, H, H],
     };
 
+    /// <summary>
+    /// Com uma dona ativa só, muda apenas o que tira a dona da contagem: o suporte recebe <c>ULTIMA_DONA</c>. A
+    /// Administração continua com <c>HIERARQUIA</c>: ela nunca alcança a dona, e a mensagem não manda marcar outra.
+    /// </summary>
+    private static readonly Dictionary<(string Ator, string Alvo), string[]> ComUmaDonaSo =
+        Esperado.Where(par => par.Key != ("dona", "dona")).ToDictionary(par => par.Key, par => par.Key == ("suporte", "dona")
+            ? new[] { P, P, M, UD, UD, P, P, P, UD }
+            : par.Value);
+
     public static IEnumerable<object[]> Celulas() =>
-        from par in Esperado
+        from donas in new[] { 2, 1 }
+        from par in donas == 2 ? Esperado : ComUmaDonaSo
         from i in Enumerable.Range(0, Acoes.Length)
-        select new object[] { par.Key.Ator, par.Key.Alvo, Acoes[i], par.Value[i] };
+        select new object[] { donas, par.Key.Ator, par.Key.Alvo, Acoes[i], par.Value[i] };
 
     [Fact]
-    public void A_matriz_tem_as_162_celulas() => Celulas().Should().HaveCount(3 * 6 * 9);
+    public void A_matriz_tem_as_162_celulas_com_duas_donas_e_153_com_uma() =>
+        Celulas().Should().HaveCount(3 * 6 * 9 + (3 * 6 - 1) * 9);
 
     [Theory]
     [MemberData(nameof(Celulas))]
-    public void Matriz(string ator, string alvo, AcaoSobreUsuario acao, string esperado)
+    public void Matriz(int donasAtivas, string ator, string alvo, AcaoSobreUsuario acao, string esperado)
     {
         var quem = Atores[ator];
         var (sobre, nivelAoNascer) = alvo == "si" ? (quem, quem.Nivel) : Alvos[alvo];
@@ -94,9 +106,9 @@ public class PoliticaDeHierarquiaTests
             _ => null,
         };
 
-        var decisao = PoliticaDeHierarquia.Avaliar(quem, sobre, acao, donasAtivas: 2, nivelNovo);
+        var decisao = PoliticaDeHierarquia.Avaliar(quem, sobre, acao, donasAtivas, nivelNovo);
 
-        Descrever(decisao).Should().Be(esperado, $"{ator} → {alvo}: {acao}");
+        Descrever(decisao).Should().Be(esperado, $"{ator} → {alvo}: {acao} com {donasAtivas} dona(s)");
     }
 
     [Theory]
@@ -115,12 +127,34 @@ public class PoliticaDeHierarquiaTests
             .Should().Be(P);
     }
 
-    [Fact]
-    public void Quem_perdeu_a_marca_na_corrida_recebe_ULTIMA_DONA_e_nao_HIERARQUIA()
+    [Theory]
+    [InlineData(AcaoSobreUsuario.DesmarcarDona)]
+    [InlineData(AcaoSobreUsuario.Desativar)]
+    [InlineData(AcaoSobreUsuario.TrocarPerfil)]
+    public void Administracao_sobre_a_unica_dona_recebe_HIERARQUIA_e_nao_ULTIMA_DONA(AcaoSobreUsuario acao)
     {
-        // Duas donas se desmarcando: a segunda, relida depois da trava, já é Administração e a outra é a última.
-        Descrever(PoliticaDeHierarquia.Avaliar(Administracao, Dona, AcaoSobreUsuario.DesmarcarDona, donasAtivas: 1))
-            .Should().Be(CodigosDaHierarquia.UltimaDona);
+        // A tabela do ator vem antes da última dona: "marque outra dona antes" é uma ação que a Administração não tem, e a
+        // resposta não pode contar quantas donas existem. Vale também para quem perdeu a marca numa corrida.
+        Descrever(PoliticaDeHierarquia.Avaliar(Administracao, Dona, acao, donasAtivas: 1, NivelAcesso.Gerente))
+            .Should().Be(H);
+    }
+
+    [Fact]
+    public void Suporte_rebaixando_a_dona_escreve_o_motivo_e_trocando_para_outro_perfil_de_Administracao_nao()
+    {
+        // Rebaixar tira a marca, o mesmo efeito de DesmarcarDona: pede a mesma justificativa.
+        Descrever(PoliticaDeHierarquia.Avaliar(Suporte, Dona, AcaoSobreUsuario.TrocarPerfil, 2, NivelAcesso.Gerente))
+            .Should().Be(M);
+        Descrever(PoliticaDeHierarquia.Avaliar(Suporte, Dona, AcaoSobreUsuario.TrocarPerfil, 2, NivelAcesso.Admin))
+            .Should().Be(P);
+    }
+
+    [Fact]
+    public void Dona_nao_reativa_outra_dona_que_o_suporte_desativou()
+    {
+        var desativada = Pessoa(NivelAcesso.Admin, dona: true) with { VinculoAtivo = false };
+        Descrever(PoliticaDeHierarquia.Avaliar(Dona, desativada, AcaoSobreUsuario.Reativar, 1)).Should().Be(DP);
+        Descrever(PoliticaDeHierarquia.Avaliar(Suporte, desativada, AcaoSobreUsuario.Reativar, 1)).Should().Be(P);
     }
 
     [Fact]

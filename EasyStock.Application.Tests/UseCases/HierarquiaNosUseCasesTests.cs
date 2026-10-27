@@ -45,13 +45,18 @@ public class HierarquiaNosUseCasesTests
             _ordem.Add("conta donas");
             return _donas;
         });
-        _c.Vinculos.DefinirDonaAsync(Arg.Any<Guid>(), _empresaId, Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(call =>
+        _c.Vinculos.DefinirDonaAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
-            var vinculo = _c.Usuarios.GetByIdAsync(call.ArgAt<Guid>(0)).Result!.Empresas.Single(e => e.EmpresaId == _empresaId);
+            _ordem.Add($"define dona em {(call.ArgAt<Guid>(1) == _empresaId ? "A" : "B")}");
+            var vinculo = _c.Usuarios.GetByIdAsync(call.ArgAt<Guid>(0)).Result!.Empresas.Single(e => e.EmpresaId == call.ArgAt<Guid>(1));
             if (vinculo.EhDona == call.ArgAt<bool>(2)) return 0;
             vinculo.EhDona = call.ArgAt<bool>(2);
             return 1;
         });
+        // A lista lê a conta inteira de cada linha em lote, com todas as empresas: aqui, o que o GetByIdAsync tem.
+        _c.Usuarios.GetByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>()).Returns(call =>
+            (IReadOnlyList<Usuario>)call.Arg<IReadOnlyCollection<Guid>>()
+                .Select(id => _c.Usuarios.GetByIdAsync(id).Result).OfType<Usuario>().ToList());
     }
 
     // ── pessoas da empresa ────────────────────────────────────────────────────────────────────
@@ -74,6 +79,14 @@ public class HierarquiaNosUseCasesTests
         _c.Usuarios.GetByEmailAsync(usuario.Email).Returns(usuario);
         _c.Vinculos.GetByUsuarioEEmpresaAsync(usuario.Id, _empresaId).Returns(vinculo);
         return usuario;
+    }
+
+    /// <summary>Dá à pessoa um vínculo, e um perfil, numa segunda empresa.</summary>
+    private static Guid NaOutraEmpresa(Usuario usuario, NivelAcesso nivel, bool dona = false, Guid? empresa = null)
+    {
+        var outra = empresa ?? Guid.NewGuid();
+        CenarioDeAcesso.DarPerfil(usuario, outra, nivel, dona);
+        return outra;
     }
 
     private Usuario Dona(string nome = "Baba") => Pessoa(nome, NivelAcesso.Admin, dona: true);
@@ -141,13 +154,14 @@ public class HierarquiaNosUseCasesTests
         return recusa;
     }
 
+    /// <summary>A recusa fica na auditoria que a dona lê: Sucesso=false e o motivo em português, nunca o código técnico.</summary>
     private void RecusaAuditada(Usuario? alvo, string codigo)
     {
         var linha = _c.Auditorias.Should().ContainSingle(a => a.Acao == RastroDeUsuarios.HierarquiaRecusada).Subject;
         linha.Sucesso.Should().BeFalse();
         linha.EmpresaId.Should().Be(_empresaId);
         if (alvo is not null) linha.UsuarioId.Should().Be(alvo.Id);
-        linha.Detalhes.Should().Contain(codigo);
+        linha.Detalhes.Should().StartWith("Pedido para ").And.NotContain(codigo);
     }
 
     // ── A1, A2: a Administração não alcança a dona nem outra Administração ───────────────────
@@ -276,15 +290,171 @@ public class HierarquiaNosUseCasesTests
     }
 
     [Fact]
-    public async Task Suporte_rebaixa_dona_que_nao_e_a_ultima_e_ela_perde_a_marca()
+    public async Task Suporte_rebaixa_dona_que_nao_e_a_ultima_so_com_motivo_e_ela_perde_a_marca()
     {
         var dona = Dona();
+        var gerencia = PerfilDaEmpresa(NivelAcesso.Gerente);
         Como(Suporte());
 
-        await Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(dona.Id, _empresaId, PerfilDaEmpresa(NivelAcesso.Gerente).Id, null));
+        // Rebaixar tira a marca, o mesmo efeito de tirar a marca: a mesma justificativa, que vai para a auditoria da plataforma.
+        var semMotivo = () => Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(dona.Id, _empresaId, gerencia.Id, null));
+        (await semMotivo.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("MOTIVO_OBRIGATORIO");
+        dona.Empresas.Single().EhDona.Should().BeTrue();
 
+        var resultado = await Atribuir().ExecuteAsync(
+            new AtribuirPerfilUsuarioCommand(dona.Id, _empresaId, gerencia.Id, null, Motivo: " pedido formal da titular "));
+
+        resultado.Should().Be(new AtribuirPerfilUsuarioResult(SuporteRebaixouDona: true, Motivo: "pedido formal da titular"));
         dona.Empresas.Single().EhDona.Should().BeFalse("toda dona tem nível Admin");
         _c.Auditorias.Select(a => a.Acao).Should().Equal(RastroDeUsuarios.DonaDesmarcada, RastroDeUsuarios.PerfilTrocado);
+    }
+
+    [Fact]
+    public async Task Dona_rebaixando_a_Administracao_nao_vai_para_a_auditoria_da_plataforma()
+    {
+        var gestora = Administracao();
+        Como(Dona());
+
+        var resultado = await Atribuir().ExecuteAsync(
+            new AtribuirPerfilUsuarioCommand(gestora.Id, _empresaId, PerfilDaEmpresa(NivelAcesso.Gerente).Id, null));
+
+        resultado.Should().Be(new AtribuirPerfilUsuarioResult(SuporteRebaixouDona: false, Motivo: null));
+    }
+
+    // ── a Administração e a dona única (o caso real) ─────────────────────────────────────────
+
+    [Fact]
+    public async Task Administracao_sobre_a_unica_dona_recebe_HIERARQUIA_e_o_texto_manda_falar_com_a_dona()
+    {
+        _donas = 1;
+        var dona = Dona();
+        Como(Administracao());
+
+        var desativar = await DeveRecusar(() => Desativar().ExecuteAsync(new DesativarUsuarioCommand(dona.Id, _empresaId)),
+            CodigosDominio.Hierarquia);
+        await DeveRecusar(() => Atribuir().ExecuteAsync(
+            new AtribuirPerfilUsuarioCommand(dona.Id, _empresaId, PerfilDaEmpresa(NivelAcesso.Gerente).Id, null)), CodigosDominio.Hierarquia);
+        await DeveRecusar(() => Marcar().ExecuteAsync(new MarcarDonaCommand(dona.Id, _empresaId, false)), CodigosDominio.Hierarquia);
+
+        desativar.Message.Should().Be("Você não pode mudar este acesso: fale com a dona.");
+        dona.Empresas.Single().Should().BeEquivalentTo(new { Ativo = true, EhDona = true });
+    }
+
+    [Fact]
+    public async Task O_texto_da_recusa_diz_com_quem_falar_conforme_quem_pediu()
+    {
+        var socia = Dona("Socia");
+        var baba = Dona();
+        var gestora = Administracao();
+        var rita = Administracao("Rita");
+
+        Como(baba);
+        var daDona = await DeveRecusar(() => Atualizar().ExecuteAsync(new AtualizarUsuarioCommand(socia.Id, "Socia", "nova@exemplo.test")),
+            CodigosDominio.Hierarquia);
+        var propriaDaDona = () => Desativar().ExecuteAsync(new DesativarUsuarioCommand(baba.Id, _empresaId));
+        (await propriaDaDona.Should().ThrowAsync<UseCaseValidationException>()).Which.Message
+            .Should().Be("Você não pode mudar o seu próprio acesso por aqui: fale com o suporte.");
+
+        Como(gestora);
+        var propriaDaAdministracao = () => Desativar().ExecuteAsync(new DesativarUsuarioCommand(gestora.Id, _empresaId));
+        (await propriaDaAdministracao.Should().ThrowAsync<UseCaseValidationException>()).Which.Message
+            .Should().Be("Você não pode mudar o seu próprio acesso por aqui: fale com a dona.");
+        _donas = 0;
+        var semDona = await DeveRecusar(() => Desativar().ExecuteAsync(new DesativarUsuarioCommand(rita.Id, _empresaId)),
+            CodigosDominio.Hierarquia);
+
+        daDona.Message.Should().Be("Você não pode mudar este acesso: fale com o suporte.");
+        semDona.Message.Should().Be("Você não pode mudar este acesso: fale com o suporte.", "sem dona, só o suporte resolve");
+    }
+
+    [Fact]
+    public async Task O_rastro_da_recusa_diz_o_motivo_em_portugues_sem_o_codigo()
+    {
+        var dona = Dona();
+        Como(Administracao());
+
+        await DeveRecusar(() => Desativar().ExecuteAsync(new DesativarUsuarioCommand(dona.Id, _empresaId)), CodigosDominio.Hierarquia);
+
+        _c.Auditorias.Should().ContainSingle().Which.Detalhes.Should()
+            .Be("Pedido para desativar o acesso recusado: sem autoridade sobre este acesso; feito por Gestora");
+    }
+
+    // ── nome, e-mail e convite são da conta: valem em toda empresa da pessoa ─────────────────
+
+    [Fact]
+    public async Task Suporte_com_sessao_noutra_empresa_troca_o_email_da_dona_so_com_motivo()
+    {
+        var dona = Pessoa("Titular", nivel: null);
+        dona.Empresas.Clear();
+        NaOutraEmpresa(dona, NivelAcesso.Admin, dona: true); // dona só da outra empresa; a sessão do suporte é desta
+        Como(Suporte());
+
+        var semMotivo = () => Atualizar().ExecuteAsync(new AtualizarUsuarioCommand(dona.Id, "Titular", "nova@exemplo.test"));
+        (await semMotivo.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("MOTIVO_OBRIGATORIO");
+        dona.EmailPendente.Should().BeNull();
+
+        var resultado = await Atualizar().ExecuteAsync(
+            new AtualizarUsuarioCommand(dona.Id, "Titular", "nova@exemplo.test", Motivo: "titular perdeu a caixa antiga"));
+
+        resultado.Should().Be(new AtualizarUsuarioResult(true, "titular perdeu a caixa antiga"));
+    }
+
+    [Fact]
+    public async Task Administracao_nao_edita_o_nome_de_quem_e_dona_ou_Administracao_noutra_empresa()
+    {
+        var donaLa = Operador("Ana");
+        NaOutraEmpresa(donaLa, NivelAcesso.Admin, dona: true);
+        var administracaoLa = Operador("Rui");
+        NaOutraEmpresa(administracaoLa, NivelAcesso.Admin);
+        Como(Administracao());
+
+        foreach (var alvo in new[] { donaLa, administracaoLa })
+        {
+            await DeveRecusar(() => Atualizar().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Outro nome", null)),
+                CodigosDominio.Hierarquia);
+            alvo.Nome.Should().NotBe("Outro nome");
+        }
+    }
+
+    [Fact]
+    public async Task Administracao_nao_troca_na_hora_o_email_de_convidado_que_tambem_e_de_outra_empresa()
+    {
+        var convidada = Pessoa("Lia", NivelAcesso.Operador, convidada: true);
+        NaOutraEmpresa(convidada, NivelAcesso.Operador);
+        Como(Administracao());
+
+        var acao = () => Atualizar().ExecuteAsync(new AtualizarUsuarioCommand(convidada.Id, "Lia", "invasor@exemplo.test"));
+
+        await acao.Should().ThrowAsync<UsuarioNaoAutorizadoException>().WithMessage("*próprio usuário ou ao suporte*");
+        convidada.Email.Should().Be("lia@exemplo.test", "o convite novo iria para o endereço trocado, valendo também na outra empresa");
+        _c.Tokens.Linhas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Convite_de_quem_e_dona_noutra_empresa_vai_so_por_email()
+    {
+        var convidada = Pessoa("Nova", NivelAcesso.Operador, convidada: true);
+        NaOutraEmpresa(convidada, NivelAcesso.Admin, dona: true);
+        convidada.DefinirTelefone(Domain.ValueObjects.TelefoneE164.From("+5511999991234"));
+        _c.DarOptInDeWhatsApp(convidada);
+        Como(Dona());
+
+        await Reenviar().ExecuteAsync(new ReenviarConviteCommand(convidada.Id));
+
+        _c.Tokens.Linhas.Should().ContainSingle().Which.Canal.Should().Be("Email");
+    }
+
+    [Fact]
+    public async Task O_mesmo_email_com_outra_caixa_de_letra_e_so_editar_o_nome()
+    {
+        var socia = Dona("Socia");
+        Como(Dona());
+
+        await Atualizar().ExecuteAsync(new AtualizarUsuarioCommand(socia.Id, "Socia Silva", "  Socia@Exemplo.TEST "));
+
+        socia.Nome.Should().Be("Socia Silva");
+        socia.EmailPendente.Should().BeNull();
+        _c.Auditorias.Should().BeEmpty("não houve recusa nem troca de e-mail");
     }
 
     // ── B3: atribuir exige vínculo ativo ──────────────────────────────────────────────────────
@@ -313,6 +483,17 @@ public class HierarquiaNosUseCasesTests
 
         await DeveRecusar(() => Reativar().ExecuteAsync(new ReativarUsuarioCommand(outra.Id, _empresaId)), CodigosDominio.Hierarquia);
         outra.Empresas.Single().Ativo.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Dona_nao_reativa_outra_dona_que_o_suporte_desativou()
+    {
+        var socia = Dona("Socia");
+        socia.Empresas.Single().Ativo = false;
+        Como(Dona());
+
+        await DeveRecusar(() => Reativar().ExecuteAsync(new ReativarUsuarioCommand(socia.Id, _empresaId)), CodigosDominio.DonaProtegida);
+        socia.Empresas.Single().Ativo.Should().BeFalse();
     }
 
     [Fact]
@@ -549,7 +730,36 @@ public class HierarquiaNosUseCasesTests
         dona.Empresas.Single().EhDona.Should().BeFalse();
         dona.Nome.Should().Be("[Anonimizado]");
         _c.Auditorias.Should().ContainSingle(a => a.Acao == RastroDeUsuarios.DonaDesmarcada);
-        _ordem.Should().Equal("trava na transação", "conta donas");
+        // A trava de novo, já da mesma transação, liga o tenant da empresa antes de escrever nela.
+        _ordem.Should().Equal("trava na transação", "conta donas", "trava na transação", "define dona em A");
+    }
+
+    [Fact]
+    public async Task Anonimizar_recusado_numa_empresa_nao_tira_a_marca_de_nenhuma()
+    {
+        // Dona em A (com outra dona) e em B (a única). A vem antes na ordem das travas: antes, A comitava a retirada da
+        // marca e só então B recusava, e a pessoa perdia a marca em A sem ter a conta anonimizada.
+        var dona = Dona();
+        var empresaB = Guid.NewGuid();
+        while (empresaB.CompareTo(_empresaId) <= 0) empresaB = Guid.NewGuid();
+        NaOutraEmpresa(dona, NivelAcesso.Admin, dona: true, empresaB);
+        _c.Vinculos.TravarHierarquiaAsync(empresaB, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            _ordem.Add(_c.UnitOfWork.EmTransacao ? "trava B na transação" : "trava B fora da transação");
+            return Task.CompletedTask;
+        });
+        _c.Vinculos.ContarDonasAtivasAsync(empresaB, Arg.Any<CancellationToken>()).Returns(1);
+        Como(dona);
+        var refresh = Substitute.For<IRefreshTokenRepository>();
+
+        var acao = () => Anonimizar(refresh).ExecuteAsync(new AnonimizarMeusDadosCommand("ANONIMIZAR"));
+
+        (await acao.Should().ThrowAsync<HierarquiaRecusadaException>()).Which.Codigo.Should().Be(CodigosDominio.UltimaDona);
+        dona.Empresas.Should().OnlyContain(e => e.EhDona, "nenhuma empresa perdeu a marca");
+        _ordem.Should().Equal("trava na transação", "conta donas", "trava B na transação");
+        _c.Auditorias.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new { Acao = RastroDeUsuarios.HierarquiaRecusada, Sucesso = false, EmpresaId = (Guid?)empresaB });
+        await refresh.DidNotReceiveWithAnyArgs().DeleteAllByUsuarioIdAsync(default);
     }
 
     // ── leituras: dona, ações por linha e perfis atribuíveis ──────────────────────────────────
@@ -587,10 +797,51 @@ public class HierarquiaNosUseCasesTests
         var (lista, _) = await new ListarUsuariosUseCase(_c.Usuarios, Hierarquia()).ExecuteAsync(new ListarUsuariosQuery(_empresaId));
         var linhas = lista.ToList();
 
-        linhas[0].Acoes!.Should().BeEquivalentTo(new { DesmarcarDona = true, MarcarDona = false, TrocarEmail = false, Desativar = false });
-        linhas[1].Acoes!.Should().BeEquivalentTo(new { MarcarDona = true, DesmarcarDona = false, TrocarPerfil = true });
+        // Marcar e tirar a marca valem pela autoridade, como desativar e reativar: repetir é um 2xx que não muda nada, e o
+        // console escolhe o botão pelo campo dona da linha.
+        linhas[0].Acoes!.Should().BeEquivalentTo(new { DesmarcarDona = true, MarcarDona = true, TrocarEmail = false, Desativar = false });
+        linhas[1].Acoes!.Should().BeEquivalentTo(new { MarcarDona = true, DesmarcarDona = true, TrocarPerfil = true });
         linhas[2].Acoes!.ReenviarConvite.Should().BeTrue();
         linhas[2].Acoes!.MarcarDona.Should().BeFalse("Operador não vira dona");
+    }
+
+    [Fact]
+    public async Task Acoes_da_lista_levam_as_mesmas_precondicoes_da_rota()
+    {
+        var deDuasEmpresas = Operador("Duas");
+        NaOutraEmpresa(deDuasEmpresas, NivelAcesso.Operador);
+        var convidadaDesligada = Pessoa("Desligada", NivelAcesso.Operador, convidada: true);
+        convidadaDesligada.Empresas.Single().Ativo = false;
+        var donaLa = Operador("DonaLa");
+        NaOutraEmpresa(donaLa, NivelAcesso.Admin, dona: true);
+        Como(Administracao());
+        _c.Usuarios.GetByEmpresaAsync(_empresaId, 1, 20)
+            .Returns((new[] { deDuasEmpresas, convidadaDesligada, donaLa }.AsEnumerable(), 3));
+
+        var linhas = (await new ListarUsuariosUseCase(_c.Usuarios, Hierarquia()).ExecuteAsync(new ListarUsuariosQuery(_empresaId)))
+            .Usuarios.ToList();
+
+        linhas[0].Acoes!.TrocarEmail.Should().BeFalse("o e-mail de quem também é de outra empresa, só a pessoa ou o suporte troca");
+        linhas[0].Acoes!.EditarNome.Should().BeTrue();
+        linhas[1].Acoes!.ReenviarConvite.Should().BeFalse("o reenvio exige o acesso ativo nesta empresa");
+        linhas[2].Acoes!.Should().BeEquivalentTo(new { EditarNome = false, TrocarEmail = false, ReenviarConvite = false, Desativar = true },
+            "nome e e-mail são da conta, e ela é dona na outra empresa");
+    }
+
+    [Fact]
+    public async Task Para_o_suporte_a_ultima_dona_ainda_troca_de_perfil_dentro_da_Administracao()
+    {
+        _donas = 1;
+        var dona = Dona();
+        Como(Suporte());
+        _c.Usuarios.GetByEmpresaAsync(_empresaId, 1, 20).Returns((new[] { dona }.AsEnumerable(), 1));
+
+        var linha = (await new ListarUsuariosUseCase(_c.Usuarios, Hierarquia()).ExecuteAsync(new ListarUsuariosQuery(_empresaId)))
+            .Usuarios.Single();
+
+        linha.Acoes!.TrocarPerfil.Should().BeTrue("para outro perfil de nível Admin a API aceita");
+        linha.Acoes!.Desativar.Should().BeFalse("a última dona não sai");
+        linha.Acoes!.DesmarcarDona.Should().BeFalse();
     }
 
     [Fact]

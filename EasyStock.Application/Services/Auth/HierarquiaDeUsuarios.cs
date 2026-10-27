@@ -37,7 +37,9 @@ public sealed record ContextoDaHierarquia(
 /// <para>
 /// O perfil de suporte é global (sem empresa) e a RLS o esconde dentro da transação, que corre no tenant da empresa. Por
 /// isso a marca de suporte do ator e do alvo é lida antes da trava, onde o repositório abre a conexão com o bypass. Ela
-/// não muda por nenhuma escrita de hierarquia.
+/// não muda por nenhuma escrita de hierarquia. A mesma leitura dá a conta inteira do alvo, com todas as empresas, para as
+/// ações sobre a conta (<see cref="PoliticaDeHierarquia.EhDaConta"/>): nome, e-mail e convite valem em toda empresa da
+/// pessoa, e a trava desta empresa não cobre a marca de dona das outras.
 /// </para>
 /// </summary>
 public sealed class HierarquiaDeUsuarios(
@@ -57,7 +59,8 @@ public sealed class HierarquiaDeUsuarios(
         ArgumentNullException.ThrowIfNull(pedido);
         ArgumentNullException.ThrowIfNull(escrita);
         var atorSuporte = await EhSuporteGlobalAsync(atual.UsuarioId);
-        var alvoSuporte = pedido.AlvoId is { } id && await EhSuporteGlobalAsync(id);
+        var contaDoAlvo = pedido.AlvoId is { } id ? await usuarios.GetByIdAsync(id) : null;
+        var alvoSuporte = contaDoAlvo?.EhSuperAdmin() == true;
         var motivo = string.IsNullOrWhiteSpace(pedido.Motivo) ? null : pedido.Motivo.Trim();
 
         var (contexto, valor) = await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
@@ -68,6 +71,8 @@ public sealed class HierarquiaDeUsuarios(
             var participanteAlvo = alvo is null
                 ? ParticipanteDaHierarquia.Novo(pedido.NivelNovo, pedido.DonaNova)
                 : ParticipanteDaHierarquia.De(alvo, pedido.EmpresaId, alvoSuporte);
+            if (alvo is not null && contaDoAlvo is not null && PoliticaDeHierarquia.EhDaConta(pedido.Acao))
+                participanteAlvo = participanteAlvo.ComAContaInteira(contaDoAlvo);
             var donas = await vinculos.ContarDonasAtivasAsync(pedido.EmpresaId, token);
             var decisao = PoliticaDeHierarquia.Avaliar(ator, participanteAlvo, pedido.Acao, donas, pedido.NivelNovo);
             var lido = new ContextoDaHierarquia(alvo, ator, participanteAlvo, decisao, donas, motivo);
@@ -85,46 +90,50 @@ public sealed class HierarquiaDeUsuarios(
             return (lido, await escrita(lido, token));
         }, ct);
 
-        if (!contexto.Decisao.Permitido) throw Recusa(contexto.Decisao.Codigo!);
+        if (!contexto.Decisao.Permitido) throw Recusa(contexto.Decisao.Codigo!, contexto.Ator, contexto.DonasAtivas);
         return valor;
     }
 
     /// <summary>
-    /// Antes de anonimizar a própria conta (LGPD): em cada empresa em que é dona, com a trava dela, a pessoa sai da
-    /// contagem e perde a marca; a última dona ativa é recusada (<c>ULTIMA_DONA</c>). Uma transação por empresa, em ordem
-    /// de Id; a anonimização em si vem depois, sem trava, porque já não mexe em dona nenhuma.
+    /// Antes de anonimizar a própria conta (LGPD): a pessoa sai da contagem de donas e perde a marca em cada empresa em
+    /// que é dona; a última dona ativa de qualquer uma delas é recusada (<c>ULTIMA_DONA</c>). Tudo numa transação: as
+    /// travas em ordem de Id e todas as avaliações antes de qualquer escrita, então recusada numa empresa, nenhuma perde a
+    /// marca. A anonimização em si vem depois, sem trava, porque já não mexe em dona nenhuma.
     /// </summary>
     public async Task SairComoDonaAsync(Usuario propria, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(propria);
         var empresas = propria.Empresas.Where(e => e.EhDona).Select(e => e.EmpresaId).Distinct().OrderBy(e => e).ToList();
+        if (empresas.Count == 0) return;
         var suporte = propria.EhSuperAdmin();
 
-        foreach (var empresaId in empresas)
+        var recusa = await unitOfWork.ExecuteInTransactionSemRetryAsync<Exception?>(async token =>
         {
-            var decisao = await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+            foreach (var empresaId in empresas)
             {
                 await vinculos.TravarHierarquiaAsync(empresaId, token);
                 var participante = await ParticipanteAsync(propria.Id, empresaId, suporte);
                 var donas = await vinculos.ContarDonasAtivasAsync(empresaId, token);
                 var resultado = PoliticaDeHierarquia.AvaliarAnonimizacao(participante, donas);
-                if (!resultado.Permitido)
-                {
-                    await RegistrarRecusaAsync(empresaId, propria.Id, "anonimizar a conta", resultado.Codigo!);
-                    return resultado;
-                }
+                if (resultado.Permitido) continue;
 
-                if (await vinculos.DefinirDonaAsync(propria.Id, empresaId, dona: false, token) > 0)
-                {
-                    await auditoria.AddAsync(RastroDeUsuarios.Linha(propria.Id, RastroDeUsuarios.DonaDesmarcada,
-                        "Marca de dona retirada: a própria conta foi anonimizada", atual, empresaId));
-                    await unitOfWork.CommitAsync();
-                }
-                return resultado;
-            }, ct);
+                await RegistrarRecusaAsync(empresaId, propria.Id, "anonimizar a conta", resultado.Codigo!);
+                return Recusa(resultado.Codigo!, participante, donas);
+            }
 
-            if (!decisao.Permitido) throw Recusa(decisao.Codigo!);
-        }
+            foreach (var empresaId in empresas)
+            {
+                // A trava de novo, já desta transação, só liga o tenant da empresa: a RLS da escrita é a dela.
+                await vinculos.TravarHierarquiaAsync(empresaId, token);
+                if (await vinculos.DefinirDonaAsync(propria.Id, empresaId, dona: false, token) == 0) continue;
+                await auditoria.AddAsync(RastroDeUsuarios.Linha(propria.Id, RastroDeUsuarios.DonaDesmarcada,
+                    "Marca de dona retirada: a própria conta foi anonimizada", atual, empresaId));
+                await unitOfWork.CommitAsync();
+            }
+            return null;
+        }, ct);
+
+        if (recusa is not null) throw recusa;
     }
 
     /// <summary>Quem está pedindo, no recorte da empresa, fora da trava: serve às leituras (as <c>acoes</c> de cada linha).</summary>
@@ -139,16 +148,28 @@ public sealed class HierarquiaDeUsuarios(
     public Task<int> DonasAtivasAsync(Guid empresaId, CancellationToken ct = default) =>
         vinculos.ContarDonasAtivasAsync(empresaId, ct);
 
-    /// <summary>Recusa da política na forma que a API conhece: 400 para os erros do próprio pedido, senão a de hierarquia.</summary>
-    public static Exception Recusa(string codigo) =>
-        codigo is CodigosDaHierarquia.UsuarioProprio or CodigosDaHierarquia.DonaSuporte
-            ? new UseCaseValidationException(codigo, Mensagem(codigo))
-            : new HierarquiaRecusadaException(codigo, Mensagem(codigo));
-
-    public static string Mensagem(string codigo) => codigo switch
+    /// <summary>
+    /// A conta é só desta empresa (um vínculo) e não é do suporte: só então quem administra a empresa troca o e-mail dela
+    /// (N4, achado 6). Vale também para o convidado pendente, cujo convite novo iria para o endereço trocado.
+    /// </summary>
+    public static bool EmailTrocavelPelaEmpresa(Usuario conta)
     {
-        CodigosDaHierarquia.Hierarquia => "Você não pode mudar este acesso: fale com a dona ou com o suporte.",
-        CodigosDaHierarquia.UsuarioProprio => "Você não pode mudar o seu próprio acesso por aqui. Peça a outra pessoa da administração.",
+        ArgumentNullException.ThrowIfNull(conta);
+        return conta.Empresas.Count == 1 && !conta.EhSuperAdmin();
+    }
+
+    /// <summary>Recusa da política na forma que a API conhece: 400 para os erros do próprio pedido, senão a de hierarquia.</summary>
+    /// <param name="ator">Quem pediu, para o texto dizer com quem falar.</param>
+    /// <param name="donas">As donas ativas da empresa: sem dona, só o suporte resolve.</param>
+    public static Exception Recusa(string codigo, ParticipanteDaHierarquia? ator = null, int? donas = null) =>
+        codigo is CodigosDaHierarquia.UsuarioProprio or CodigosDaHierarquia.DonaSuporte
+            ? new UseCaseValidationException(codigo, Mensagem(codigo, ator, donas))
+            : new HierarquiaRecusadaException(codigo, Mensagem(codigo, ator, donas));
+
+    public static string Mensagem(string codigo, ParticipanteDaHierarquia? ator = null, int? donas = null) => codigo switch
+    {
+        CodigosDaHierarquia.Hierarquia => $"Você não pode mudar este acesso: fale com {QuemResolve(ator, donas)}.",
+        CodigosDaHierarquia.UsuarioProprio => $"Você não pode mudar o seu próprio acesso por aqui: fale com {QuemResolve(ator, donas)}.",
         CodigosDaHierarquia.DonaProtegida => "A dona não pode ser rebaixada nem desativada por aqui: tire a marca de dona antes ou fale com o suporte.",
         CodigosDaHierarquia.UltimaDona => "A empresa precisa de pelo menos uma dona ativa: marque outra dona antes.",
         CodigosDaHierarquia.DonaNaoAdmin => "Só quem tem acesso ativo de Administração pode ser dona.",
@@ -156,6 +177,32 @@ public sealed class HierarquiaDeUsuarios(
         CodigosDaHierarquia.DonaSuporte => "O suporte não recebe a marca de dona.",
         CodigosDaHierarquia.DonaEmailExistente => "Este e-mail já tem cadastro. A dona nova precisa de um e-mail que ainda não esteja no EasyStok.",
         _ => "Ação recusada pela hierarquia de acesso.",
+    };
+
+    /// <summary>
+    /// Acima da dona só o suporte; acima da Administração, a dona (ou o suporte, quando a empresa ainda não tem dona).
+    /// Sem saber quem pediu, os dois.
+    /// </summary>
+    private static string QuemResolve(ParticipanteDaHierarquia? ator, int? donas) => ator switch
+    {
+        { EhDonaAtiva: true } => "o suporte",
+        { AdministraAEmpresa: true } when donas > 0 => "a dona",
+        { AdministraAEmpresa: true } when donas == 0 => "o suporte",
+        _ => "a dona ou o suporte",
+    };
+
+    /// <summary>O motivo da recusa como a dona lê na auditoria: em português, sem o código técnico (que vai para o log).</summary>
+    private static string Razao(string codigo) => codigo switch
+    {
+        CodigosDaHierarquia.Hierarquia => "sem autoridade sobre este acesso",
+        CodigosDaHierarquia.UsuarioProprio => "ninguém muda o próprio acesso por aqui",
+        CodigosDaHierarquia.DonaProtegida => "a dona só o suporte rebaixa, desativa ou reativa",
+        CodigosDaHierarquia.UltimaDona => "a empresa ficaria sem dona ativa",
+        CodigosDaHierarquia.DonaNaoAdmin => "só quem tem acesso ativo de Administração pode ser dona",
+        CodigosDaHierarquia.DonaContaNaoProvada => "a conta ainda não entrou pelo link do e-mail nem pela conta Google",
+        CodigosDaHierarquia.DonaSuporte => "o suporte não recebe a marca de dona",
+        CodigosDaHierarquia.DonaEmailExistente => "o e-mail já tem cadastro",
+        _ => "regra da hierarquia de acesso",
     };
 
     private static string Descrever(AcaoSobreUsuario acao) => acao switch
@@ -189,7 +236,7 @@ public sealed class HierarquiaDeUsuarios(
         var autor = await RastroDeUsuarios.AutorAsync(usuarios, atual);
         await auditoria.AddAsync(RastroDeUsuarios.Linha(
             alvoId ?? atual.UsuarioId, RastroDeUsuarios.HierarquiaRecusada,
-            $"Pedido para {acao} recusado ({codigo}); feito por {autor}", atual, empresaId, sucesso: false));
+            $"Pedido para {acao} recusado: {Razao(codigo)}; feito por {autor}", atual, empresaId, sucesso: false));
         await unitOfWork.CommitAsync();
         logger.LogWarning(
             "Hierarquia recusou {Codigo} na empresa {EmpresaId}: ator {AtorId}, alvo {AlvoId}",

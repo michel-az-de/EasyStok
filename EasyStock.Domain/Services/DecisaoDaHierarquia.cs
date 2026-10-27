@@ -15,7 +15,8 @@ public static class CodigosDaHierarquia
 
 /// <summary>
 /// Resposta da <see cref="PoliticaDeHierarquia"/>: permitido, ou negado com um dos <see cref="CodigosDaHierarquia"/>.
-/// <paramref name="ExigeMotivo"/>: o suporte trocando o e-mail da dona ou tirando a marca precisa justificar (10+ caracteres).
+/// <paramref name="ExigeMotivo"/>: o suporte trocando o e-mail da dona, tirando a marca ou rebaixando a dona precisa
+/// justificar (10+ caracteres).
 /// </summary>
 public sealed record DecisaoDaHierarquia(bool Permitido, string? Codigo = null, bool ExigeMotivo = false)
 {

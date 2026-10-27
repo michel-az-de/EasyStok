@@ -149,6 +149,22 @@ public class UsuarioControllerTests
     }
 
     [Fact]
+    public async Task MarcarDona_SemOCampoDona_DeveRetornarBadRequestSemTocarNaMarca()
+    {
+        // Antes: bool não anulável, e um corpo sem o campo (ou com o nome errado) virava dona=false, tirando a marca em silêncio.
+        var corpo = System.Text.Json.JsonSerializer.Deserialize<MarcarDonaRequest>(
+            """{"motivo":"pedido formal da titular"}""", new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        _currentUser.EmpresaId.Returns(Guid.NewGuid());
+
+        var result = await _controller.MarcarDona(Guid.NewGuid(), corpo, CancellationToken.None);
+
+        corpo.Dona.Should().BeNull();
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _usuarioRepository.DidNotReceiveWithAnyArgs().GetByIdAsync(default);
+        await _usuarioEmpresaRepository.DidNotReceiveWithAnyArgs().DefinirDonaAsync(default, default, default, default);
+    }
+
+    [Fact]
     public async Task MarcarDona_SemEmpresaNoTokenNemNoCorpo_DeveRetornarBadRequest()
     {
         _currentUser.EmpresaId.Returns(Guid.Empty);
