@@ -95,12 +95,14 @@ public class CriarTenantPorAdminUseCase(
         var usuario = Usuario.Criar(command.NomeAdmin.Trim(), emailNorm, senhaHash);
         await usuarioRepository.AddAsync(usuario);
 
+        // #2070: o primeiro Admin do tenant novo nasce dona, e a empresa já começa com a dona ativa que a hierarquia exige.
         await usuarioEmpresaRepository.AddAsync(new UsuarioEmpresa
         {
             Id = Guid.NewGuid(),
             UsuarioId = usuario.Id,
             EmpresaId = empresa.Id,
             Ativo = true,
+            EhDona = true,
             CriadoEm = agora
         });
 

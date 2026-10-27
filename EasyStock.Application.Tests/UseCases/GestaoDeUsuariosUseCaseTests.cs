@@ -28,8 +28,10 @@ public class GestaoDeUsuariosUseCaseTests
     public GestaoDeUsuariosUseCaseTests()
     {
         _dona = Usuario.Criar("Baba", "baba@casadababa.com", "$2a$11$hash");
-        _dona.Empresas.Add(new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = _dona.Id, EmpresaId = _empresaId, Ativo = true });
+        // #2070: a política lê o ator do banco: a dona tem perfil de nível Admin e a marca no vínculo.
+        CenarioDeAcesso.DarPerfil(_dona, _empresaId, NivelAcesso.Admin, dona: true);
         _c.Usuarios.GetByIdAsync(_dona.Id).Returns(_dona);
+        _vinculos.ContarDonasAtivasAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(1);
         _atual.EmpresaId.Returns(_empresaId);
         _atual.UsuarioId.Returns(_dona.Id);
         _atual.Nivel.Returns(NivelAcesso.Admin);
@@ -60,14 +62,16 @@ public class GestaoDeUsuariosUseCaseTests
     }
 
     private DesativarUsuarioUseCase Desativar() => new(
-        _c.Usuarios, _vinculos, _c.Revogador(), _c.Convites(), _atual, _c.Auditoria, _c.UnitOfWork, Substitute.For<ILogger<DesativarUsuarioUseCase>>());
+        _c.Usuarios, _vinculos, _c.Revogador(), _c.Convites(), _c.Hierarquia(_atual, _vinculos), _atual, _c.Auditoria, _c.UnitOfWork,
+        Substitute.For<ILogger<DesativarUsuarioUseCase>>());
 
     private ReativarUsuarioUseCase Reativar() => new(
-        _c.Usuarios, _vinculos, _assinaturas, _atual, _c.Auditoria, _c.UnitOfWork, Substitute.For<ILogger<ReativarUsuarioUseCase>>());
+        _c.Usuarios, _vinculos, _assinaturas, _c.Hierarquia(_atual, _vinculos), _atual, _c.Auditoria, _c.UnitOfWork,
+        Substitute.For<ILogger<ReativarUsuarioUseCase>>());
 
     private AtribuirPerfilUsuarioUseCase Atribuir() => new(
-        _c.Usuarios, _usuariosPerfis, _perfis, _c.Revogador(), _atual, _c.Auditoria, _c.UnitOfWork,
-        Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+        _c.Usuarios, _usuariosPerfis, _vinculos, _perfis, _c.Revogador(), _c.Hierarquia(_atual, _vinculos), _atual, _c.Auditoria,
+        _c.UnitOfWork, Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
     [Fact]
     public async Task DesativarDeixaRastroComQuemFez()
@@ -92,7 +96,12 @@ public class GestaoDeUsuariosUseCaseTests
 
         (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("USUARIO_PROPRIO");
         _dona.Empresas.Single().Ativo.Should().BeTrue();
-        _c.UnitOfWork.CommitCount.Should().Be(0);
+        // #2070: a recusa da hierarquia fica na auditoria (Sucesso=false); é a única escrita.
+        var recusa = _c.Auditorias.Should().ContainSingle().Subject;
+        recusa.Acao.Should().Be("hierarquia-recusada");
+        recusa.Sucesso.Should().BeFalse();
+        recusa.Detalhes.Should().Contain("USUARIO_PROPRIO").And.Contain("Baba");
+        _c.UnitOfWork.CommitCount.Should().Be(1);
     }
 
     [Fact]

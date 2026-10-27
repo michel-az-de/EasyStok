@@ -9,6 +9,7 @@ namespace EasyStock.Application.UseCases.ReativarUsuario
         IUsuarioRepository usuarioRepository,
         IUsuarioEmpresaRepository usuarioEmpresaRepository,
         IAssinaturaEmpresaRepository assinaturaRepository,
+        HierarquiaDeUsuarios hierarquia,
         ICurrentUserAccessor currentUser,
         IAuditLogRepository auditLogRepository,
         IUnitOfWork unitOfWork,
@@ -21,24 +22,34 @@ namespace EasyStock.Application.UseCases.ReativarUsuario
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
             // Mesma mensagem do não encontrado: não confirma a existência de usuário de outra empresa.
-            var linkEmpresa = await usuarioEmpresaRepository.GetByUsuarioEEmpresaAsync(command.UsuarioId, command.EmpresaId)
-                ?? throw new UseCaseValidationException("Usuario nao encontrado.");
+            if (!usuario.Empresas.Any(e => e.EmpresaId == command.EmpresaId))
+                throw new UseCaseValidationException("Usuario nao encontrado.");
 
-            if (linkEmpresa.Ativo) return;
+            // #2070: a Administração reativa só da Gerência para baixo; a dona, também a Administração e outra dona.
+            await hierarquia.ExecutarAsync(
+                new PedidoDeHierarquia(command.EmpresaId, usuario.Id, AcaoSobreUsuario.Reativar),
+                async (_, _) =>
+                {
+                    var linkEmpresa = await usuarioEmpresaRepository.GetByUsuarioEEmpresaAsync(command.UsuarioId, command.EmpresaId)
+                        ?? throw new UseCaseValidationException("Usuario nao encontrado.");
 
-            // Mesmo limite do convite (CriarUsuario): reativar não pode passar do que o plano permite.
-            var assinatura = await assinaturaRepository.GetAtivaAsync(command.EmpresaId);
-            var totalUsuarios = await usuarioRepository.CountByEmpresaAsync(command.EmpresaId);
-            if (assinatura?.Plano is not null && !assinatura.Plano.UsuariosSaoIlimitados && totalUsuarios >= assinatura.Plano.LimiteUsuarios)
-                throw new PlanoLimiteAtingidoException("usuarios");
+                    if (linkEmpresa.Ativo) return false;
 
-            linkEmpresa.Ativo = true;
-            await usuarioEmpresaRepository.UpdateAsync(linkEmpresa);
+                    // Mesmo limite do convite (CriarUsuario): reativar não pode passar do que o plano permite.
+                    var assinatura = await assinaturaRepository.GetAtivaAsync(command.EmpresaId);
+                    var totalUsuarios = await usuarioRepository.CountByEmpresaAsync(command.EmpresaId);
+                    if (assinatura?.Plano is not null && !assinatura.Plano.UsuariosSaoIlimitados && totalUsuarios >= assinatura.Plano.LimiteUsuarios)
+                        throw new PlanoLimiteAtingidoException("usuarios");
 
-            var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
-            await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
-                usuario.Id, RastroDeUsuarios.Reativado, $"Acesso reativado por {autor}", currentUser, command.EmpresaId));
-            await unitOfWork.CommitAsync();
+                    linkEmpresa.Ativo = true;
+                    await usuarioEmpresaRepository.UpdateAsync(linkEmpresa);
+
+                    var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
+                    await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
+                        usuario.Id, RastroDeUsuarios.Reativado, $"Acesso reativado por {autor}", currentUser, command.EmpresaId));
+                    await unitOfWork.CommitAsync();
+                    return true;
+                });
         }
     }
 }

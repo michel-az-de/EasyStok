@@ -6,13 +6,16 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
 
     /// <summary>
     /// Define o perfil do usuário na empresa. #1753: um perfil por empresa, como o login já lê; antes a atribuição só
-    /// acumulava, e quem virava Cozinha continuava com o Atendimento.
+    /// acumulava, e quem virava Cozinha continuava com o Atendimento. #2070: quem dá qual perfil a quem é da política de
+    /// hierarquia, e o alvo precisa de vínculo ativo com a empresa (B3).
     /// </summary>
     public class AtribuirPerfilUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
         IUsuarioPerfilRepository usuarioPerfilRepository,
+        IUsuarioEmpresaRepository usuarioEmpresaRepository,
         IPerfilRepository perfilRepository,
         RevogadorSessoes revogadorSessoes,
+        HierarquiaDeUsuarios hierarquia,
         ICurrentUserAccessor currentUser,
         IAuditLogRepository auditLogRepository,
         IUnitOfWork unitOfWork,
@@ -27,20 +30,31 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
 
-            // Perfil global SuperAdmin ou de outra empresa nao pode ser atribuido por um Admin de tenant
-            // (o login promove a SuperAdmin quem tiver QUALQUER perfil com esse nivel).
+            // Guarda de tenant antes da política, com a mesma resposta do não encontrado.
+            var vinculo = usuario.Empresas.FirstOrDefault(e => e.EmpresaId == command.EmpresaId)
+                ?? throw new UseCaseValidationException("Usuario nao encontrado.");
+            if (!vinculo.Ativo) throw VinculoInativo();
+
+            // Perfil global de suporte, de nível SuperAdmin ou de outra empresa nunca é atribuído por aqui.
             var perfil = await perfilRepository.GetByIdAsync(command.PerfilId)
                 ?? throw new UseCaseValidationException("Perfil invalido.");
-            if (perfil.Nivel == NivelAcesso.SuperAdmin || (perfil.EmpresaId is not null && perfil.EmpresaId != command.EmpresaId))
+            if (!perfil.AtribuivelNaEmpresa(command.EmpresaId))
                 throw new UseCaseValidationException("Perfil invalido.");
 
-            var vinculoAtivo = usuario.Empresas.Any(e => e.EmpresaId == command.EmpresaId && e.Ativo);
+            await hierarquia.ExecutarAsync(
+                new PedidoDeHierarquia(command.EmpresaId, usuario.Id, AcaoSobreUsuario.TrocarPerfil, perfil.NivelNaEmpresa),
+                async (contexto, token) =>
+                {
+                    // B3 relido depois da trava: a desativação concorrente vence a troca de perfil.
+                    if (!contexto.ParticipanteAlvo.VinculoAtivo) throw VinculoInativo();
+                    await TrocarAsync(command, perfil, contexto, token);
+                    return true;
+                });
+        }
 
-            // Quem se rebaixa perde a tela que desfaz o engano; a troca do próprio perfil é de outro administrador.
-            if (currentUser.Nivel != NivelAcesso.SuperAdmin && command.UsuarioId == currentUser.UsuarioId)
-                throw new UseCaseValidationException(
-                    "USUARIO_PROPRIO", "Você não pode trocar o seu próprio perfil. Peça a outro administrador.");
-
+        private async Task TrocarAsync(AtribuirPerfilUsuarioCommand command, Perfil perfil, ContextoDaHierarquia contexto, CancellationToken token)
+        {
+            var usuario = contexto.Alvo!;
             var atuais = await usuarioPerfilRepository.ListarPorUsuarioEEmpresaAsync(command.UsuarioId, command.EmpresaId);
             var mantido = atuais.FirstOrDefault(p => p.PerfilId == command.PerfilId);
             var anteriores = atuais.Where(p => p.PerfilId != command.PerfilId).ToList();
@@ -52,7 +66,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
                 mantido.LojaId = command.LojaId;
                 mantido.AtribuidoEm = DateTime.UtcNow;
                 await usuarioPerfilRepository.UpdateAsync(mantido);
-                if (vinculoAtivo) await revogadorSessoes.RevogarAsync(usuario);
+                await revogadorSessoes.RevogarAsync(usuario);
                 await unitOfWork.CommitAsync();
                 return;
             }
@@ -72,21 +86,29 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
                     AtribuidoPorId = currentUser.UsuarioId == Guid.Empty ? null : currentUser.UsuarioId
                 });
 
-            // #1352: nível e permissões viajam no JWT, então quem tinha token com o perfil antigo cai. O corte é do
-            // usuário todo e esta rota só confere a empresa de quem chama: sem vínculo ativo com a empresa da
-            // atribuição, o Admin de outra empresa deslogaria quem não é dele.
-            if (vinculoAtivo)
-                await revogadorSessoes.RevogarAsync(usuario);
+            // #1352: nível e permissões viajam no JWT, então quem tinha token com o perfil antigo cai. O vínculo ativo com a
+            // empresa da atribuição é exigido acima (B3): o corte, que é do usuário todo, nunca desloga quem não é da empresa.
+            await revogadorSessoes.RevogarAsync(usuario);
+
+            var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
+
+            // #2070: a dona rebaixada (só o suporte chega aqui, e nunca com a última) deixa de ser dona: toda dona tem nível Admin.
+            if (contexto.ParticipanteAlvo.EhDona && perfil.NivelNaEmpresa != NivelAcesso.Admin
+                && await usuarioEmpresaRepository.DefinirDonaAsync(usuario.Id, command.EmpresaId, dona: false, token) > 0)
+                await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(usuario.Id, RastroDeUsuarios.DonaDesmarcada,
+                    $"Marca de dona retirada com a troca para {perfil.Nome}, por {autor}", currentUser, command.EmpresaId));
 
             var nomesAnteriores = anteriores.Select(p => p.Perfil?.Nome).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
             var de = anteriores.Count == 0 ? "sem perfil"
                 : nomesAnteriores.Count == 0 ? "outro perfil"
                 : string.Join(" e ", nomesAnteriores);
-            var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
                 usuario.Id, RastroDeUsuarios.PerfilTrocado, $"Perfil trocado de {de} para {perfil.Nome} por {autor}", currentUser, command.EmpresaId));
 
             await unitOfWork.CommitAsync();
         }
+
+        private static UseCaseValidationException VinculoInativo() =>
+            new("USUARIO_DESATIVADO", "Este acesso está desativado: reative antes de trocar o perfil.");
     }
 }

@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using EasyStock.Application.Services.Auth;
+using EasyStock.Domain.Services;
 
 namespace EasyStock.Application.UseCases.ListarUsuarios
 {
@@ -19,8 +21,28 @@ namespace EasyStock.Application.UseCases.ListarUsuarios
             : new(Nenhum, null, null);
     }
 
+    /// <summary>
+    /// O que quem está pedindo pode fazer com esta linha (#2070), pela <c>PoliticaDeHierarquia</c> e pelas pré-condições
+    /// que a rota confere: a API devolve 2xx se e somente se a ação está aqui. Desativar e reativar valem pela autoridade
+    /// (repetir é um 2xx que não muda nada); o console escolhe o botão pelo estado da linha.
+    /// </summary>
+    public sealed record AcoesSobreUsuario(
+        bool EditarNome,
+        bool TrocarEmail,
+        bool TrocarPerfil,
+        bool Desativar,
+        bool Reativar,
+        bool ReenviarConvite,
+        bool MarcarDona,
+        bool DesmarcarDona)
+    {
+        public static AcoesSobreUsuario Nenhuma { get; } = new(false, false, false, false, false, false, false, false);
+    }
+
     /// <param name="Ativo">#1753: o acesso NESTA empresa (o vínculo), que é o que "desativar" desliga.</param>
+    /// <param name="Nivel">O nível na empresa; sem perfil é Visualizador, como o login entra (B2, #2070).</param>
     /// <param name="PerfilId">O perfil que o login usa nesta empresa; nulo para quem ficou sem perfil.</param>
+    /// <param name="Dona">A marca de dona do vínculo com esta empresa (#2070).</param>
     public sealed record UsuarioResult(
         Guid UsuarioId,
         string Nome,
@@ -31,40 +53,68 @@ namespace EasyStock.Application.UseCases.ListarUsuarios
         string Nivel,
         ConviteDoUsuario Convite,
         Guid? PerfilId = null,
-        string? Perfil = null);
+        string? Perfil = null,
+        bool Dona = false,
+        AcoesSobreUsuario? Acoes = null);
 
     public sealed record ListarUsuariosQuery(Guid EmpresaId, int Page = 1, int PageSize = 20);
 
-    public class ListarUsuariosUseCase(IUsuarioRepository usuarioRepository)
+    public class ListarUsuariosUseCase(IUsuarioRepository usuarioRepository, HierarquiaDeUsuarios hierarquia)
     {
         public async Task<(IEnumerable<UsuarioResult> Usuarios, int Total)> ExecuteAsync(ListarUsuariosQuery query)
         {
             var (usuarios, total) = await usuarioRepository.GetByEmpresaAsync(query.EmpresaId, query.Page, query.PageSize);
-            return (usuarios.Select(u => ToResult(u, query.EmpresaId)), total);
+            var ator = await hierarquia.AtorAsync(query.EmpresaId);
+            var donas = await hierarquia.DonasAtivasAsync(query.EmpresaId);
+            return (usuarios.Select(u => ToResult(u, query.EmpresaId, ator, donas)).ToList(), total);
         }
 
-        private static UsuarioResult ToResult(Usuario u, Guid empresaId)
+        private static UsuarioResult ToResult(Usuario u, Guid empresaId, ParticipanteDaHierarquia ator, int donas)
         {
-            // O mesmo critério do login: o perfil de menor nível (mais poder) na empresa.
-            var perfil = u.Perfis?.OrderBy(p => p.Perfil?.Nivel).FirstOrDefault()?.Perfil;
+            // O mesmo critério do login: o perfil de mais poder na empresa.
+            var perfil = u.Perfis?.Where(p => p.Perfil is not null).Select(p => p.Perfil!).OrderBy(p => p.NivelNaEmpresa).FirstOrDefault();
             // Sem o vínculo carregado (lista antiga, teste) vale o cadastro; com ele, vale o acesso à empresa.
             var vinculo = u.Empresas?.FirstOrDefault(e => e.EmpresaId == empresaId);
+            var alvo = ParticipanteDaHierarquia.De(u, empresaId, u.EhSuperAdmin());
             return new(u.Id, u.Nome, u.Email, u.Ativo && (vinculo?.Ativo ?? true), u.UltimoAcessoEm, u.CriadoEm,
-                perfil?.Nivel.ToString() ?? "Operador", ConviteDoUsuario.De(u), perfil?.Id, perfil?.Nome);
+                alvo.Nivel.ToString(), ConviteDoUsuario.De(u), perfil?.Id, perfil?.Nome,
+                vinculo?.EhDona ?? false, Acoes(ator, alvo, u, donas));
+        }
+
+        private static AcoesSobreUsuario Acoes(ParticipanteDaHierarquia ator, ParticipanteDaHierarquia alvo, Usuario u, int donas)
+        {
+            bool Pode(AcaoSobreUsuario acao) => PoliticaDeHierarquia.Avaliar(ator, alvo, acao, donas).Permitido;
+            return new(
+                EditarNome: Pode(AcaoSobreUsuario.EditarNome),
+                TrocarEmail: Pode(AcaoSobreUsuario.TrocarEmail),
+                TrocarPerfil: alvo.VinculoAtivo && Pode(AcaoSobreUsuario.TrocarPerfil),
+                Desativar: Pode(AcaoSobreUsuario.Desativar),
+                Reativar: Pode(AcaoSobreUsuario.Reativar),
+                ReenviarConvite: u.Ativo && u.ConvitePendente && !u.EhSuperAdmin() && Pode(AcaoSobreUsuario.ReenviarConvite),
+                MarcarDona: !alvo.EhDona && Pode(AcaoSobreUsuario.MarcarDona),
+                DesmarcarDona: alvo.EhDona && Pode(AcaoSobreUsuario.DesmarcarDona));
         }
     }
 
-    public sealed record PerfilAtribuivel(Guid PerfilId, string Nome, string Nivel, string? ModuloInicial);
+    /// <param name="Atribuivel">#2070: quem está pedindo pode dar este perfil (a Administração não dá perfil de nível Admin).</param>
+    public sealed record PerfilAtribuivel(Guid PerfilId, string Nome, string Nivel, string? ModuloInicial, bool Atribuivel = true);
 
-    /// <summary>#1753: os perfis que a dona pode dar a alguém da empresa. O perfil de suporte nunca aparece.</summary>
-    public class ListarPerfisAtribuiveisUseCase(IPerfilRepository perfilRepository)
+    /// <summary>
+    /// #1753: os perfis que a dona pode dar a alguém da empresa. O perfil de suporte nunca aparece. #2070: cada perfil diz
+    /// se quem está pedindo pode dá-lo (<see cref="PoliticaDeHierarquia.PodeDarNivel"/>).
+    /// </summary>
+    public class ListarPerfisAtribuiveisUseCase(IPerfilRepository perfilRepository, HierarquiaDeUsuarios hierarquia)
     {
-        public async Task<IReadOnlyList<PerfilAtribuivel>> ExecuteAsync(Guid empresaId) =>
-            (await perfilRepository.GetByEmpresaAsync(empresaId))
-                .Where(p => p.Nivel != NivelAcesso.SuperAdmin)
+        public async Task<IReadOnlyList<PerfilAtribuivel>> ExecuteAsync(Guid empresaId)
+        {
+            var ator = await hierarquia.AtorAsync(empresaId);
+            return (await perfilRepository.GetByEmpresaAsync(empresaId))
+                .Where(p => p.AtribuivelNaEmpresa(empresaId))
                 .OrderBy(p => p.Nivel).ThenBy(p => p.Nome, StringComparer.CurrentCultureIgnoreCase)
-                .Select(p => new PerfilAtribuivel(p.Id, p.Nome, p.Nivel.ToString(), p.ModuloInicial))
+                .Select(p => new PerfilAtribuivel(p.Id, p.Nome, p.Nivel.ToString(), p.ModuloInicial,
+                    PoliticaDeHierarquia.PodeDarNivel(ator, p.NivelNaEmpresa)))
                 .ToList();
+        }
     }
 
     public sealed record ListarAuditoriaDeAcessoQuery(Guid EmpresaId, Guid? UsuarioId = null, int Page = 1, int PageSize = 50);

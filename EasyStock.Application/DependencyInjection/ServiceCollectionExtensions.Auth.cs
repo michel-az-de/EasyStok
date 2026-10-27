@@ -55,6 +55,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AceitarConviteUseCase>();        // aceite do convite de primeiro acesso (N9)
         services.AddScoped<ReenviarConviteUseCase>();       // reenvio do convite pela dona (N9)
         services.AddScoped<ConvitesDeAcesso>();             // emissao e revogacao do convite de primeiro acesso (N9)
+        services.AddScoped<HierarquiaDeUsuarios>();         // trava, releitura e politica de toda escrita de hierarquia (#2070)
         services.AddScoped<ConfirmEmailUseCase>();
 
         // Perfil do usuário autenticado
