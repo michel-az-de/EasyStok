@@ -33,8 +33,22 @@ public class AtualizarUsuarioUseCaseTests
         new FakeTimeProvider(new DateTimeOffset(2026, 10, 2, 17, 30, 0, TimeSpan.Zero)),
         Substitute.For<ILogger<ConvitesDeAcesso>>());
 
+    private readonly IUsuarioEmpresaRepository _vinculos = Substitute.For<IUsuarioEmpresaRepository>();
+
     private AtualizarUsuarioUseCase CriarUseCase() =>
-        new(_repo, _currentUser, _f.UnitOfWork, _f.Servico, Convites(), _auditoria, Substitute.For<ILogger<AtualizarUsuarioUseCase>>());
+        new(_repo, _currentUser, _f.UnitOfWork, _f.Servico, Convites(),
+            new HierarquiaDeUsuarios(_repo, _vinculos, _currentUser, _auditoria, _f.UnitOfWork, Substitute.For<ILogger<HierarquiaDeUsuarios>>()),
+            _auditoria, Substitute.For<ILogger<AtualizarUsuarioUseCase>>());
+
+    /// <summary>#2070: a política lê o ator do banco. O suporte global, gravado no repositório.</summary>
+    private void ComoSuporte()
+    {
+        var suporte = Usuario.Criar("Suporte", "suporte@exemplo.test", "hash");
+        CenarioDeAcesso.TornarSuperAdmin(suporte);
+        _repo.GetByIdAsync(suporte.Id).Returns(suporte);
+        _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
+        _currentUser.UsuarioId.Returns(suporte.Id);
+    }
 
     private static Usuario UsuarioDaEmpresa(Guid usuarioId, Guid empresaId) => new()
     {
@@ -74,8 +88,7 @@ public class AtualizarUsuarioUseCaseTests
         var alvoId = Guid.NewGuid();
         var empresa = Guid.NewGuid();
         _repo.GetByIdAsync(alvoId).Returns(UsuarioDaEmpresa(alvoId, empresa));
-        _currentUser.Nivel.Returns(NivelAcesso.Admin);
-        _currentUser.EmpresaId.Returns(empresa); // MESMO tenant do alvo
+        ComoAdmin(empresa); // MESMO tenant do alvo
 
         var useCase = CriarUseCase();
         await useCase.ExecuteAsync(new AtualizarUsuarioCommand(alvoId, "Nome Atualizado", null));
@@ -88,7 +101,7 @@ public class AtualizarUsuarioUseCaseTests
     {
         var alvoId = Guid.NewGuid();
         _repo.GetByIdAsync(alvoId).Returns(UsuarioDaEmpresa(alvoId, Guid.NewGuid()));
-        _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
+        ComoSuporte();
         _currentUser.EmpresaId.Returns(Guid.NewGuid()); // irrelevante para SuperAdmin
 
         var useCase = CriarUseCase();
@@ -109,11 +122,15 @@ public class AtualizarUsuarioUseCaseTests
         return alvo;
     }
 
+    /// <summary>#2070: quem edita é alguém da Administração da empresa (perfil de nível Admin, sem a marca de dona).</summary>
     private void ComoAdmin(Guid empresaId)
     {
+        var administracao = Usuario.Criar("Gestora", "gestora@exemplo.test", "hash");
+        CenarioDeAcesso.DarPerfil(administracao, empresaId, NivelAcesso.Admin);
+        _repo.GetByIdAsync(administracao.Id).Returns(administracao);
         _currentUser.Nivel.Returns(NivelAcesso.Admin);
         _currentUser.EmpresaId.Returns(empresaId);
-        _currentUser.UsuarioId.Returns(Guid.NewGuid());
+        _currentUser.UsuarioId.Returns(administracao.Id);
     }
 
     [Fact]
@@ -146,7 +163,8 @@ public class AtualizarUsuarioUseCaseTests
 
         var acao = () => CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Alvo", "novo@empresa.com"));
 
-        await acao.Should().ThrowAsync<UsuarioNaoAutorizadoException>();
+        // #2070: o suporte só é alvo do próprio suporte; a recusa agora é da hierarquia (403 HIERARQUIA).
+        (await acao.Should().ThrowAsync<HierarquiaRecusadaException>()).Which.Codigo.Should().Be("HIERARQUIA");
         alvo.EmailPendente.Should().BeNull();
         _f.Eventos.Should().BeEmpty();
     }
@@ -190,8 +208,7 @@ public class AtualizarUsuarioUseCaseTests
     public async Task SuperAdminTrocaEmailCrossTenantPeloMesmoFluxoComAuditoria()
     {
         var alvo = AlvoDaEmpresa(Guid.NewGuid(), Guid.NewGuid());
-        _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
-        _currentUser.UsuarioId.Returns(Guid.NewGuid());
+        ComoSuporte();
 
         await CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Alvo", "novo@empresa.com"));
 

@@ -1,7 +1,6 @@
-using EasyStock.Application.UseCases.AutenticarUsuario;
+using EasyStock.Application.Services.Auth;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
 using RefreshTokenEntity = EasyStock.Domain.Entities.RefreshToken;
-using UsuarioEntity = EasyStock.Domain.Entities.Usuario;
 
 namespace EasyStock.Application.UseCases.RefreshToken;
 
@@ -32,6 +31,12 @@ public sealed class RefreshTokenUseCase(
             throw new CredenciaisInvalidasException("Usuario inativo.");
         }
 
+        // M3 (#2070): a regra do login, na empresa da sessão. Token antigo (sem a coluna) segue a regra de antes: a única
+        // empresa ativa. Sem vínculo ativo com a empresa da sessão, recusa antes de revogar ou emitir qualquer coisa.
+        var empresaDaSessao = refreshToken.EmpresaDaSessaoId;
+        var autenticarResult = ResolvedorDeSessao.Resolver(
+            usuario, empresaDaSessao ?? ResolvedorDeSessao.EmpresaPadrao(usuario), empresaDoSuporte: empresaDaSessao);
+
         refreshToken.Revogar();
         await refreshTokenRepository.UpdateAsync(refreshToken);
 
@@ -43,43 +48,10 @@ public sealed class RefreshTokenUseCase(
             novoTokenHash,
             expiraEm,
             null,
-            null);
+            null,
+            autenticarResult.EmpresaId);
         await refreshTokenRepository.AddAsync(novoRefreshToken);
 
-        var empresaId = ResolveEmpresaIdPadrao(usuario);
-
-        var nivel = NivelAcesso.Visualizador;
-        IReadOnlyCollection<Permissao> permissoes = [];
-        string? moduloInicial = null;
-        var permissoesExplicitas = false;
-        var sessaoPersistente = false;
-
-        if (empresaId.HasValue && usuario.Perfis is not null)
-        {
-            var perfil = usuario.Perfis
-                .Where(p => p.EmpresaId == empresaId.Value)
-                .OrderBy(p => p.Perfil != null ? (int)p.Perfil.Nivel : int.MaxValue)
-                .FirstOrDefault();
-            if (perfil?.Perfil is not null)
-            {
-                nivel = perfil.Perfil.Nivel;
-                moduloInicial = perfil.Perfil.ModuloInicial;
-                permissoesExplicitas = perfil.Perfil.PermissoesExplicitas;
-                sessaoPersistente = Domain.Services.PerfisCasaDaBaba.PermiteSessaoPersistente(perfil.Perfil, empresaId.Value);
-                permissoes = perfil.Perfil.Permissoes?.Select(p => p.Permissao).Distinct().ToArray() ?? [];
-            }
-        }
-
-        var autenticarResult = new AutenticarUsuarioResult(
-            usuario.Id,
-            empresaId,
-            usuario.Nome,
-            usuario.Email,
-            nivel,
-            permissoes,
-            moduloInicial,
-            permissoesExplicitas,
-            sessaoPersistente);
         var accessToken = jwtTokenService.GerarToken(autenticarResult);
 
         var auditLog = AuditLogEntity.Criar(
@@ -95,16 +67,5 @@ public sealed class RefreshTokenUseCase(
 
         logger.LogInformation("Refresh token executado com sucesso para usuario {UsuarioId}", usuario.Id);
         return new RefreshTokenResult(accessToken, novoRefreshTokenValue, jwtTokenService.ExpiresInSeconds);
-    }
-
-    private static Guid? ResolveEmpresaIdPadrao(UsuarioEntity usuario)
-    {
-        var empresasAtivas = usuario.Empresas?
-            .Where(e => e.Ativo)
-            .Select(e => e.EmpresaId)
-            .Distinct()
-            .ToArray() ?? [];
-
-        return empresasAtivas.Length == 1 ? empresasAtivas[0] : null;
     }
 }

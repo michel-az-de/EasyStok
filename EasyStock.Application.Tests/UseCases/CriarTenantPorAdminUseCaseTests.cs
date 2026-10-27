@@ -85,4 +85,13 @@ public class CriarTenantPorAdminUseCaseTests
         resultado.EmailEnviado.Should().BeFalse();
         await _emailService.DidNotReceive().EnviarAsync(Arg.Any<MensagemEmail>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task PrimeiroAdminDoTenantNovoNasceDona()
+    {
+        // #2070: a empresa nova já começa com a dona ativa que a hierarquia exige; o suporte não precisa marcar.
+        await CriarUseCase().ExecuteAsync(Comando());
+
+        await _usuarioEmpresaRepository.Received(1).AddAsync(Arg.Is<UsuarioEmpresa>(v => v.EhDona && v.Ativo));
+    }
 }

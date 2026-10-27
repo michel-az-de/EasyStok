@@ -88,7 +88,8 @@ public class AuthController(
         DataOk(new { habilitado = google.ClientId is not null, clientId = google.ClientId });
 
     [SwaggerOperation(Summary = "Sign in with a Google ID token",
-        Description = "Só usuário que já existe (e-mail do Google, ou alias do Gmail com uma conta só). Sem empresaId, entra na empresa ativa do usuário (#1324).")]
+        Description = "Só usuário que já existe (e-mail do Google, ou alias do Gmail com uma conta só). Sem empresaId, entra na empresa ativa do usuário (#1324). " +
+                      "#2070: convidado só entra com convite aberto (vencido ou revogado: 401 \"Seu convite venceu: peça um novo\"); o bloqueio por senha errada não barra o Google.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -132,12 +133,14 @@ public class AuthController(
         var refreshTokenHash = TokenHashHelper.ComputeSha256Hash(refreshTokenValue);
         var expiraEm = DateTime.UtcNow.AddDays(30);
 
+        // #2070 (M3): a empresa da sessão vai com o refresh token, e o refresh renova nela.
         var refreshToken = RefreshTokenEntity.Criar(
             resultado.UsuarioId,
             refreshTokenHash,
             expiraEm,
             ip,
-            userAgent);
+            userAgent,
+            resultado.EmpresaId);
 
         await refreshTokenRepository.AddAsync(refreshToken);
 
@@ -197,7 +200,10 @@ public class AuthController(
         }
     }
 
-    [SwaggerOperation(Summary = "Refresh JWT token", Description = "Exchange a valid refresh token for a new JWT access token.")]
+    [SwaggerOperation(Summary = "Refresh JWT token",
+        Description = "Exchange a valid refresh token for a new JWT access token. #2070: renova na empresa da sessão, pela mesma regra do " +
+                      "login: o suporte volta SuperAdmin na mesma empresa; os demais precisam de vínculo ativo com ela (401 sem ele). " +
+                      "Token antigo, sem a empresa gravada, segue a única empresa ativa.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [EnableRateLimiting("auth-refresh")]
@@ -367,7 +373,10 @@ public class AuthController(
                             nameof(EstoqueDesacertosController.Listar)) is not { } modulosDaRota
                         || modulosDaRota.Any(m => usuario.TemPermissao(Domain.Services.AcessoModulos.PermissaoDe(m)))),
                 verIntegracoes = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin,
-                ajustarEntrega = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
+                ajustarEntrega = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin,
+                // #2070: primeiros passos da loja (api/configuracao-inicial: policy Admin e módulo Configurações).
+                configurarLoja = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
+                    && modulos.Any(m => m.id == "configuracoes" && m.liberado)
             }
         });
     }

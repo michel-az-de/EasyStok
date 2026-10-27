@@ -9,13 +9,14 @@ import { chaveDaEntrega, chaveDaSaida } from '../../aplicacao/envioComDesfazer'
 import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { METODOS_NA_PORTA, metodoSugeridoNaPorta } from '../../aplicacao/recebimentoNaEntrega'
 import {
-  EMPRESAS_ENTREGADOR, ENTREGA_PROPRIA, TIPOS_ENTREGADOR, confirmacaoDaRecusa, motivoDaAprovacao, motivoDeSaida,
+  ENTREGA_PROPRIA, confirmacaoDaRecusa, motivoDaAprovacao, motivoDeSaida,
   opcoesDeEntregador, paineisDeEntregas, rotuloSituacaoViagem, situacaoDaLista, viagensConcluidasNoDia,
 } from '../../dominio/entregasApi'
 import { moeda } from '../../dominio/formato'
 import { nomeDoPedido } from '../../dominio/pedido'
 import { paradaDaViagem, roteiroDoDia, trocoDaPorta } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
+import { CadastroEntregadores } from './CadastroEntregadores'
 import { CorridasDaViagem } from './CorridasDaViagem'
 import { Endereco, EntregasDoDia } from './EntregasDoDia'
 import css from './entregasApi.module.css'
@@ -78,7 +79,7 @@ export function ConteudoEntregasApi() {
         {aba === 'hoje' && situacao === 'carregando' && <p className={css.vazio}>Carregando as entregas…</p>}
         {aba === 'hoje' && situacao === 'falhou' && <p className={css.vazio}>Não foi possível carregar as entregas.</p>}
         {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }} aoAbrirCadastro={comVitrine ? () => trocarAba('cadastro') : null} />}
-        {aba === 'entregadores' && <Entregadores entregadores={entregadores} ocupado={ocupado} acoes={acoes} />}
+        {aba === 'entregadores' && <CadastroEntregadores entregadores={entregadores} ocupado={ocupado} acoes={acoes} />}
         {aba === 'cadastro' && comVitrine && <CadastroEntregaApi />}
       </div>
     </div>
@@ -330,48 +331,6 @@ function Chamados({ chamados, ocupado, acoes }) {
             <span className={css.cresce}>{c.texto}</span>
             <Botao variante="texto" disabled={ocupado} onClick={() => acoes.atenderChamado(c.id)}>Atendido</Botao>
             <Botao variante="texto" disabled={ocupado} onClick={() => acoes.cancelarChamado(c.id)}>Cancelar</Botao>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
-const ENTREGADOR_VAZIO = { nome: '', tipo: 'Motoboy', empresa: 'Propria', telefone: '', veiculo: '', placa: '' }
-
-function Entregadores({ entregadores, ocupado, acoes }) {
-  const [form, setForm] = useState(ENTREGADOR_VAZIO)
-  const [confirmacao, setConfirmacao] = useState(null)
-  const campo = (k) => ({ value: form[k], disabled: ocupado, onChange: (e) => setForm({ ...form, [k]: e.target.value }) })
-  const salvar = (e) => {
-    e.preventDefault()
-    if (!form.nome.trim()) return
-    setConfirmacao(null)
-    acoes.criarEntregador({ ...form, nome: form.nome.trim() }).then((ok) => {
-      if (ok) { setForm(ENTREGADOR_VAZIO); setConfirmacao('Entregador cadastrado. Você já pode selecioná-lo nas viagens.') }
-    })
-  }
-  return (
-    <section className={css.secao} aria-label="Entregadores">
-      <h3>Novo entregador</h3>
-      <form className={css.formulario} onSubmit={salvar}>
-        <CampoTexto rotulo="Nome" {...campo('nome')} required />
-        <CampoSelecao rotulo="Tipo" opcoes={TIPOS_ENTREGADOR} {...campo('tipo')} />
-        <CampoSelecao rotulo="Empresa" opcoes={EMPRESAS_ENTREGADOR} {...campo('empresa')} />
-        <CampoTexto rotulo="Telefone" tipo="tel" {...campo('telefone')} />
-        <CampoTexto rotulo="Veículo" {...campo('veiculo')} />
-        <CampoTexto rotulo="Placa" {...campo('placa')} />
-        <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar</Botao>
-      </form>
-      {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
-      <h3>Ativos</h3>
-      {entregadores.length === 0 && <p className={css.vazio}>Nenhum entregador cadastrado.</p>}
-      <ul className={css.lista}>
-        {entregadores.map((e) => (
-          <li key={e.id} className={`${css.cartao} ${css.linha}`}>
-            <span className={css.cresce}>{e.nome}</span>
-            <span className={css.apoio}>{[e.veiculo, e.placa, e.telefone].filter(Boolean).join(' · ')}</span>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desativarEntregador(e.id)}>Desativar</Botao>
           </li>
         ))}
       </ul>

@@ -4,6 +4,7 @@ import { Icone } from '../../componentes/Icone'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { CampoReais } from '../../componentes/CampoReais'
 import { useCadastroEntregaApi } from '../../aplicacao/useCadastroEntregaApi'
+import { usePendenciaDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { faixaDeHorarios } from '../../dominio/entrega'
 import { DIAS_BLOQUEIO, DIAS_DA_SEMANA, avisoDeSobreposicao, camposDaZona, corpoBloqueio, corpoZona } from '../../dominio/entregasApi'
 import { centavosDoTexto, dataCurtaComSemana, dataIsoNoFuso, faixaDeCep, lerMoeda, moeda, textoDosCentavos } from '../../dominio/formato'
@@ -31,6 +32,8 @@ function useFormulario(inicial, ocupado) {
 // ativa já cobre vira aviso, sem bloquear: a ordem decide qual vale.
 function FormularioZona({ id, hidden, inicial, zonas, propria = null, rotuloSalvar, aoSalvar, aoCancelar, ocupado }) {
   const z = useFormulario(inicial, ocupado)
+  // #2070: zona começada e não salva segura o passo do frete nos Primeiros passos.
+  usePendenciaDoAjuste(`zona-de-frete:${propria ?? 'nova'}`, !hidden && JSON.stringify(z.form) !== JSON.stringify(inicial))
   const aviso = avisoDeSobreposicao(z.form, zonas, propria)
   const salvar = (e) => {
     e.preventDefault()
@@ -104,7 +107,8 @@ function LinhaZona({ zona, zonas, acoes, ocupado, focoAlternativo }) {
   )
 }
 
-export function CadastroEntregaApi() {
+// `secao` (#2070): os Primeiros passos mostram só as janelas ('janelas') ou só o frete ('zonas'), sem as abas.
+export function CadastroEntregaApi({ secao = null }) {
   const { janelas, zonas, bloqueios, freteRaio, erro, enviando, acoes, recarregar, limparErro } = useCadastroEntregaApi()
   const b = useFormulario(BLOQUEIO_VAZIO, enviando)
   // O dia de abertura basta para o calendário; a API confere o dia certo na gravação.
@@ -154,11 +158,14 @@ export function CadastroEntregaApi() {
   const hoje = dataIsoNoFuso(agora)
   const ultimoDia = dataIsoNoFuso(agora + DIAS_BLOQUEIO * 86400000)
   const fecharBloqueio = () => { setCriandoBloqueio(false); requestAnimationFrame(() => bloqueioRef.current?.focus()) }
+  // Com `secao`, um painel só, à vista e sem o papel de aba.
+  const mostra = (chave) => !secao || secao === chave
+  const painel = (chave) => (secao ? {} : { role: 'tabpanel', 'aria-labelledby': `${id}-${chave}`, hidden: aba !== chave, tabIndex: 0 })
 
   return (
     <div className={`${css.cadastro} ${layout.cadastro}`}>
       {aviso}
-      <div className={layout.abas} role="tablist" aria-label="Cadastro de entrega">
+      {!secao && <div className={layout.abas} role="tablist" aria-label="Cadastro de entrega">
         {abas.map(([chave, rotulo, quantidade], indice) => (
           <Botao key={chave} ref={(el) => { abasRef.current[chave] = el }} variante="texto"
             id={`${id}-${chave}`} role="tab" aria-selected={aba === chave} aria-controls={`${id}-painel-${chave}`}
@@ -166,12 +173,12 @@ export function CadastroEntregaApi() {
             {rotulo} <span className={layout.contagem}>{quantidade}</span>
           </Botao>
         ))}
-      </div>
-      <div id={`${id}-painel-janelas`} role="tabpanel" aria-labelledby={`${id}-janelas`} hidden={aba !== 'janelas'} tabIndex={0}>
+      </div>}
+      {mostra('janelas') && <div id={`${id}-painel-janelas`} {...painel('janelas')}>
         <JanelasDaLoja janelas={janelas} acoes={acoes} ocupado={enviando} />
-      </div>
+      </div>}
 
-      <section id={`${id}-painel-zonas`} className={css.secao} role="tabpanel" aria-labelledby={`${id}-zonas`} hidden={aba !== 'zonas'} tabIndex={0}>
+      {mostra('zonas') && <section id={`${id}-painel-zonas`} className={css.secao} {...painel('zonas')}>
         {freteRaio !== undefined && <FreteRaioDaLoja config={freteRaio} acoes={acoes} ocupado={enviando} />}
         <div className={layout.cabecalho}>
           <div><h2>Zonas de frete</h2><p className={css.apoio}>Valor e prazo por bairro ou faixa de CEP.</p></div>
@@ -183,9 +190,9 @@ export function CadastroEntregaApi() {
           {zonas.map((x) => <LinhaZona key={x.id} zona={x} zonas={zonas} acoes={acoes} ocupado={enviando} focoAlternativo={zonaRef} />)}
         </ul>
         {zonas.length === 0 && <p className={layout.vazio}>Nenhuma zona cadastrada. Crie uma zona para definir o frete.</p>}
-      </section>
+      </section>}
 
-      <section id={`${id}-painel-bloqueios`} className={css.secao} role="tabpanel" aria-labelledby={`${id}-bloqueios`} hidden={aba !== 'bloqueios'} tabIndex={0}>
+      {mostra('bloqueios') && <section id={`${id}-painel-bloqueios`} className={css.secao} {...painel('bloqueios')}>
         <div className={layout.cabecalho}>
           <div><h2>Bloqueios</h2><p className={css.apoio}>Fechamentos de dia ou horário, de hoje a um ano.</p></div>
           <Botao ref={bloqueioRef} variante="primario" icone="plus" disabled={enviando} aria-expanded={criandoBloqueio} aria-controls={`${id}-bloqueio-novo`} onClick={() => setCriandoBloqueio(true)}>Novo bloqueio</Botao>
@@ -220,7 +227,7 @@ export function CadastroEntregaApi() {
           ))}
         </ul>
         {bloqueios.length === 0 && <p className={layout.vazio}>Nenhum bloqueio marcado. Os horários seguem o cadastro semanal.</p>}
-      </section>
+      </section>}
     </div>
   )
 }

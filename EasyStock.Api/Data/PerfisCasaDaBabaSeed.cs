@@ -28,9 +28,15 @@ public static class PerfisCasaDaBabaSeed
             db.RemoveRange(legadas);
         }
 
-        // Startup não tem JWT. O bypass de RLS não desliga o filtro global do EF.
-        var existentes = await db.Perfis.IgnoreQueryFilters().Where(p => p.EmpresaId == empresaId)
-            .Select(p => p.Nome).ToListAsync(ct);
+        // #2070: a linha "Dona" de nível Admin vira "Administração" (mesmo Id e permissões; "Dona" na tela é a marca do
+        // vínculo). Idempotente: sem a linha antiga, ou com uma "Administração" já existente, nada muda.
+        if (!perfis.Any(p => string.Equals(p.Nome, PerfisCasaDaBaba.Administracao, StringComparison.OrdinalIgnoreCase))
+            && perfis.FirstOrDefault(p => p.Nivel == NivelAcesso.Admin
+                && string.Equals(p.Nome, PerfisCasaDaBaba.NomeAntigoDaAdministracao, StringComparison.OrdinalIgnoreCase)) is { } antigo)
+            antigo.Nome = PerfisCasaDaBaba.Administracao;
+
+        // Startup não tem JWT. O bypass de RLS não desliga o filtro global do EF. A lista já lida enxerga a renomeação.
+        var existentes = perfis.Select(p => p.Nome).ToList();
         foreach (var modelo in PerfisCasaDaBaba.Iniciais)
         {
             if (existentes.Contains(modelo.Nome, StringComparer.OrdinalIgnoreCase)) continue;

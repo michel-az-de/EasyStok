@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Auth;
 using EasyStock.TestHelpers;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
 using Microsoft.Extensions.Logging;
@@ -21,7 +22,10 @@ public class AnonimizarMeusDadosUseCaseTests
 
     private AnonimizarMeusDadosUseCase CriarUseCase() =>
         new(_usuarioRepository, _refreshTokenRepository, _resetTokenRepository,
-            _emailConfirmationTokenRepository, _consentimentos, _preferencias, _currentUser, _unitOfWork, _logger);
+            _emailConfirmationTokenRepository, _consentimentos, _preferencias,
+            new HierarquiaDeUsuarios(_usuarioRepository, Substitute.For<IUsuarioEmpresaRepository>(), _currentUser,
+                Substitute.For<IAuditLogRepository>(), _unitOfWork, Substitute.For<ILogger<HierarquiaDeUsuarios>>()),
+            _currentUser, _unitOfWork, _logger);
 
     private static Usuario CriarUsuario() =>
         new()

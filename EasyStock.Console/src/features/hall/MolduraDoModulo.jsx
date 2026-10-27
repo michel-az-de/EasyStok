@@ -61,12 +61,14 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
   // o menu lateral de 216 px deixava ~650 px vazios. As telas vão para a barra, ao lado do nome.
   const telasNaBarra = telas.length > 1 && telas.some((t) => t.tipo === TELA_OPERACAO)
   const avulsa = ehJanelaAvulsa({ nome: window.name, origemAberta: janelaDeOrigem() !== null })
+  // #2070: tela cheia (Primeiros passos) ocupa a largura toda, sem o trilho nem o menu lateral do módulo.
+  const telaCheia = tela?.telaCheia === true
 
   return (
-    <div className={css.moldura} data-conteudo-console>
-      <aside className={css.lateral}>
+    <div className={`${css.moldura}${telaCheia ? ` ${css.telaCheia}` : ''}`} data-conteudo-console>
+      {!telaCheia && <aside className={css.lateral}>
         <MenuDosModulos moduloId={moduloId} telaId={telaId} fonteApi={fonteApi} semMenu={telasNaBarra} />
-      </aside>
+      </aside>}
       <div className={css.areaTrabalho}>
       <header className={css.barra}>
         <div className={css.contexto}>

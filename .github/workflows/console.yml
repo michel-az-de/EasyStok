@@ -130,3 +130,6 @@ jobs:
       - run: node ferramentas/prova-1807-avisos.mjs
       - run: node ferramentas/prova-1810-entrada-google.mjs
       - run: node ferramentas/prova-r11-impressao.mjs
+      - run: node ferramentas/prova-2070-primeiros-passos.mjs
+      - run: node ferramentas/prova-2070-formularios.mjs
+      - run: node ferramentas/prova-1753-usuarios.mjs

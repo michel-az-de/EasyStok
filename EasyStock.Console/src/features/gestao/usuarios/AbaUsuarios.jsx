@@ -1,10 +1,11 @@
 // Configurações › Usuários (#1753, M7.2, só no modo API): quem tem acesso à casa, com que perfil,
-// e as quatro coisas que a dona faz com isso: convidar, trocar o perfil, desativar e reativar.
-// Convite é por link no e-mail: a dona nunca define a senha de ninguém (DM7-3).
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+// e o que se faz com isso: convidar, trocar o perfil, desativar, reativar e (#2070) marcar a dona.
+// Convite é por link no e-mail: ninguém define a senha de ninguém (DM7-3).
+// #2070: os botões de cada linha são as `acoes` que a API calcula pela hierarquia; a tela não decide.
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useAtendimento } from '../../../aplicacao/contextos'
 import {
-  convidarUsuario, desativarUsuario, listarPerfis, listarUsuarios, reativarUsuario, reenviarConvite, trocarPerfil,
+  convidarUsuario, desativarUsuario, listarPerfis, listarUsuarios, marcarDona, reativarUsuario, reenviarConvite, trocarPerfil,
 } from '../../../aplicacao/usuarios'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
@@ -12,82 +13,127 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { haQuantoTempo } from '../../../dominio/formato'
 import {
-  SITUACAO, acoesDoUsuario, erroDoConvite, fraseDeFalha, fraseDeRetorno, instanteDaApi, ordenarPerfis, resumoDoPerfil,
-  situacaoDoUsuario,
+  AVISO_DE_VERSAO_ANTIGA, CONVITE_VAZIO, DICA_DO_EMAIL_DO_CONVITE, MINIMO_DO_MOTIVO, SITUACAO, confirmacaoDaMarcaDeDona, controlesDaPessoa,
+  ehDona, ehSuporteDaSessao, erroDoMotivo, estadoDoConvite, falhaDoConvite, fraseDeFalha, fraseDeRetorno, instanteDaApi,
+  listaDeVersaoAntiga, opcoesDoPerfilDaPessoa, ordenarPerfis, situacaoDoUsuario,
 } from '../../../dominio/usuarios'
 import css from './usuarios.module.css'
 
-const VAZIO = { nome: '', email: '', perfilId: '' }
 const ultimoAcesso = (ms, agora) => {
   if (!ms) return 'Nunca entrou'
   const tempo = haQuantoTempo(ms, agora)
   return tempo === 'agora' ? 'Entrou agora há pouco' : `Último acesso há ${tempo}`
 }
 const primeiroControle = (elemento) => elemento?.querySelector('select:not(:disabled), button:not(:disabled)')
+// O que a dona lê em cada controle da linha; trocar o perfil é o seletor, não um botão.
+const ROTULO_DO_CONTROLE = {
+  reenviarConvite: 'Reenviar convite', marcarDona: 'Marcar como dona', desmarcarDona: 'Tirar a marca de dona', desativar: 'Desativar', reativar: 'Reativar',
+}
 
-function Convite({ perfis, aoConvidar, aoCancelar }) {
+export function Convite({ perfis, aoConvidar, aoCancelar }) {
+  const id = useId()
   const formulario = useRef(null)
-  const [campos, setCampos] = useState(VAZIO)
+  const [campos, setCampos] = useState(CONVITE_VAZIO)
+  // `{ campo, texto }`: o campo errado (null quando a recusa é da API) fica marcado e recebe o foco.
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
   // Digitar em qualquer campo tira o erro: ele falava do que estava escrito antes.
   const trocar = (campo) => (evento) => { setErro(null); setCampos((atual) => ({ ...atual, [campo]: evento.target.value })) }
-  const opcoes = [{ valor: '', rotulo: 'Escolha o perfil' }, ...perfis.map((p) => ({ valor: p.perfilId, rotulo: p.nome }))]
-  const resumo = resumoDoPerfil(perfis.find((p) => p.perfilId === campos.perfilId)?.nome)
+  const trocarDona = (evento) => { setErro(null); setCampos((atual) => ({ ...atual, dona: evento.target.checked })) }
+  const estado = estadoDoConvite(campos, perfis)
+  const idDoErro = `${id}-erro`
+  // O campo errado diz ao leitor de tela que está errado e por quê.
+  const marcaDoErro = (campo) => (erro?.campo === campo ? { 'aria-invalid': true, 'aria-describedby': idDoErro } : {})
 
   useEffect(() => { formulario.current?.querySelector('input')?.focus() }, [])
+  // Cada envio recusado leva o foco ao campo a corrigir (um objeto novo por envio: repete no mesmo campo).
+  useEffect(() => {
+    if (erro?.campo) formulario.current?.querySelector('input[aria-invalid="true"], select[aria-invalid="true"]')?.focus()
+  }, [erro])
 
   async function enviar(evento) {
     evento.preventDefault()
     if (enviando) return
-    const invalido = erroDoConvite(campos)
+    // Vale a marca que a tela mostra: trocar para um perfil sem a opção tira a marca de dona.
+    const pedido = { ...campos, dona: estado.comoDona }
+    const invalido = falhaDoConvite(pedido)
     if (invalido) { setErro(invalido); return }
     setErro(null)
     setEnviando(true)
     try {
       // Deu certo: quem chamou fecha o formulário, então não há mais estado para mexer aqui.
-      await aoConvidar(campos)
+      await aoConvidar(pedido)
     } catch (falha) {
-      setErro(`O convite não saiu: ${falha.message}`)
+      setErro({ campo: null, texto: fraseDeFalha('convite', falha) })
       setEnviando(false)
     }
   }
 
   return (
     <form ref={formulario} className={css.convite} onSubmit={enviar} aria-label="Convidar pessoa" aria-busy={enviando} noValidate>
-      <CampoTexto rotulo="Nome" autoComplete="off" value={campos.nome} onChange={trocar('nome')} readOnly={enviando} />
-      <CampoTexto rotulo="E-mail" tipo="email" autoComplete="off" value={campos.email} onChange={trocar('email')} readOnly={enviando} dica="O convite vai para este e-mail" />
-      <CampoSelecao rotulo="Perfil" opcoes={opcoes} value={campos.perfilId} onChange={trocar('perfilId')} disabled={enviando} dica={resumo} />
+      <CampoTexto rotulo="Nome" autoComplete="off" value={campos.nome} onChange={trocar('nome')} readOnly={enviando} {...marcaDoErro('nome')} />
+      <CampoTexto
+        rotulo="E-mail" tipo="email" autoComplete="off" value={campos.email} onChange={trocar('email')} readOnly={enviando}
+        dica={DICA_DO_EMAIL_DO_CONVITE} {...marcaDoErro('email')}
+      />
+      <CampoSelecao
+        rotulo="Perfil" opcoes={estado.opcoes} value={campos.perfilId} onChange={trocar('perfilId')} disabled={enviando}
+        dica={estado.resumo} {...marcaDoErro('perfilId')}
+      />
+      {estado.ofereceDona && (
+        <div className={css.dona}>
+          <div className={css.opcaoDona}>
+            <label className={css.marcarDona}>
+              <input type="checkbox" checked={estado.comoDona} onChange={trocarDona} disabled={enviando} aria-describedby={`${id}-dona`} />
+              Convidar como dona
+            </label>
+            <p id={`${id}-dona`} className={css.dicaDona}>A dona pode tudo, inclusive marcar outras donas. Use um e-mail que ainda não tenha conta.</p>
+          </div>
+          {estado.pedeEmailDeNovo && (
+            <CampoTexto
+              rotulo="Confirme o e-mail" tipo="email" autoComplete="off" value={campos.emailDeNovo} onChange={trocar('emailDeNovo')}
+              readOnly={enviando} dica="Digite o mesmo e-mail mais uma vez." {...marcaDoErro('emailDeNovo')}
+            />
+          )}
+        </div>
+      )}
       <div className={css.botoesDoConvite}>
         <Botao variante="primario" tipo="submit" disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar convite'}</Botao>
         <Botao variante="texto" disabled={enviando} onClick={aoCancelar}>Cancelar</Botao>
       </div>
-      {erro && <p className={css.erroDoConvite} role="alert">{erro}</p>}
+      {erro && <p id={idDoErro} className={css.erroDoConvite} role="alert">{erro.texto}</p>}
     </form>
   )
 }
 
-function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirmacao }) {
+export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir, aoAbrirConfirmacao }) {
   const linha = useRef(null)
+  const painel = useRef(null)
   const cancelar = useRef(null)
   const jaAbriu = useRef(false)
+  const id = useId()
   const [confirmando, setConfirmando] = useState(false)
   // Escolher no select não troca nada: seta do teclado num select fechado já mudava o perfil e derrubava a sessão da pessoa.
   const [perfilEscolhido, setPerfilEscolhido] = useState(null)
+  // Marcar ou tirar a marca de dona: a confirmação ocupa a linha inteira, com o motivo quando é o suporte.
+  const [marca, setMarca] = useState(null)
   const situacao = situacaoDoUsuario(usuario)
-  const pode = acoesDoUsuario(usuario, meuId)
+  const controles = controlesDaPessoa(usuario)
   const eu = usuario.usuarioId === meuId
   const ultimo = instanteDaApi(usuario.ultimoAcessoEm)
-  const aberta = confirmando || perfilEscolhido !== null
-  // O perfil atual sempre aparece, mesmo que não esteja mais entre os que se pode dar.
-  const opcoes = perfis.some((p) => p.perfilId === usuario.perfilId) || !usuario.perfilId
-    ? perfis.map((p) => ({ valor: p.perfilId, rotulo: p.nome }))
-    : [{ valor: usuario.perfilId, rotulo: usuario.perfil }, ...perfis.map((p) => ({ valor: p.perfilId, rotulo: p.nome }))]
+  const aberta = confirmando || perfilEscolhido !== null || marca !== null
+  const confirmacao = marca ? confirmacaoDaMarcaDeDona(marca.acao, usuario, suporte) : null
 
-  // Teclado: a confirmação abre com o foco em quem desiste; ao desistir, o foco volta para a linha.
+  // Teclado: a confirmação abre com o foco no motivo, quando há, ou em quem desiste; ao desistir, o foco volta para a linha.
   // Quando a ação segue, a linha está ocupada (nada habilitado) e quem devolve o foco é a lista.
   useEffect(() => {
-    if (aberta) { jaAbriu.current = true; cancelar.current?.focus(); return }
+    if (aberta) {
+      jaAbriu.current = true
+      const motivo = painel.current?.querySelector('input')
+      if (motivo) motivo.focus()
+      else cancelar.current?.focus()
+      return
+    }
     if (jaAbriu.current) primeiroControle(linha.current)?.focus()
   }, [aberta])
 
@@ -99,18 +145,45 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
     aoAbrirConfirmacao()
   }
 
+  function abrirMarca(acao) {
+    setMarca({ acao, motivo: '', erro: null })
+    aoAbrirConfirmacao()
+  }
+
+  async function confirmarMarca() {
+    const { pedeMotivo } = confirmacao
+    const invalido = pedeMotivo ? erroDoMotivo(marca.motivo) : null
+    if (invalido) { setMarca((atual) => ({ ...atual, erro: invalido })); return }
+    const { acao, motivo } = marca
+    // O motivo que o suporte escreveu não se perde: com ele, a confirmação só fecha quando a API aceita.
+    if (!pedeMotivo) setMarca(null)
+    const feito = await aoAgir(acao, usuario, pedeMotivo ? motivo : null)
+    if (feito) setMarca(null)
+  }
+
+  const tocar = {
+    reenviarConvite: () => aoAgir('reenviar', usuario),
+    marcarDona: () => abrirMarca('marcarDona'),
+    desmarcarDona: () => abrirMarca('desmarcarDona'),
+    desativar: () => { setConfirmando(true); aoAbrirConfirmacao() },
+    reativar: () => aoAgir('reativar', usuario),
+  }
+
   return (
     <li ref={linha} className={css.pessoa} data-usuario={usuario.usuarioId} data-desativado={!usuario.ativo || undefined}>
       <div className={css.quem}>
-        <strong className={css.nome}>{usuario.nome}{eu && <span className={css.voce}> (você)</span>}</strong>
+        <span className={css.identificacao}>
+          <strong className={css.nome}>{usuario.nome}{eu && <span className={css.voce}> (você)</span>}</strong>
+          {ehDona(usuario) && <Pilula tom="marca">Dona</Pilula>}
+        </span>
         <span className={css.email} title={usuario.email}>{usuario.email}</span>
       </div>
       <div className={css.perfil}>
-        {pode.trocarPerfil ? (
+        {controles.includes('trocarPerfil') ? (
           <CampoSelecao
             rotulo={`Perfil de ${usuario.nome}`} rotuloOculto className={css.seletor}
-            opcoes={usuario.perfilId ? opcoes : [{ valor: '', rotulo: 'Sem perfil' }, ...opcoes]}
-            value={perfilEscolhido ?? usuario.perfilId ?? ''} disabled={ocupado}
+            opcoes={opcoesDoPerfilDaPessoa(usuario, perfis)}
+            value={perfilEscolhido ?? usuario.perfilId ?? ''} disabled={ocupado || marca !== null}
             onChange={escolherPerfil}
           />
         ) : <span className={css.perfilFixo}>{usuario.perfil ?? 'Sem perfil'}</span>}
@@ -120,12 +193,9 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
         <span className={css.acesso}>{ultimoAcesso(ultimo, agora)}</span>
       </div>
       <div className={css.acoes}>
-        {pode.reenviarConvite && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('reenviar', usuario)}>Reenviar convite</Botao>
-        )}
-        {pode.desativar && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => { setConfirmando(true); aoAbrirConfirmacao() }}>Desativar</Botao>
-        )}
+        {!aberta && controles.filter((controle) => controle !== 'trocarPerfil').map((controle) => (
+          <Botao key={controle} variante="texto" disabled={ocupado} onClick={tocar[controle]}>{ROTULO_DO_CONTROLE[controle]}</Botao>
+        ))}
         {confirmando && (
           <>
             <Botao variante="perigo" disabled={ocupado} onClick={() => { setConfirmando(false); aoAgir('desativar', usuario) }}>
@@ -142,15 +212,44 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
             <Botao ref={cancelar} variante="texto" disabled={ocupado} onClick={() => setPerfilEscolhido(null)}>Cancelar</Botao>
           </>
         )}
-        {pode.reativar && <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('reativar', usuario)}>Reativar</Botao>}
       </div>
+      {/* Ao entrar com o foco, o leitor de tela anuncia o que se confirma (a legenda) e o efeito (o texto). */}
+      {confirmacao && (
+        <fieldset ref={painel} className={css.confirmacao} aria-describedby={`${id}-texto`}>
+          <legend className="sr">{confirmacao.confirmar}</legend>
+          <p id={`${id}-texto`} className={css.textoDaConfirmacao}>{confirmacao.texto}</p>
+          {confirmacao.pedeMotivo && (
+            <CampoTexto
+              rotulo="Motivo do suporte" autoComplete="off" value={marca.motivo} readOnly={ocupado}
+              onChange={(evento) => { const motivo = evento.target.value; setMarca((atual) => ({ ...atual, motivo, erro: null })) }}
+              dica={`Fica no histórico da casa. Pelo menos ${MINIMO_DO_MOTIVO} caracteres.`}
+              aria-invalid={marca.erro ? true : undefined} aria-describedby={marca.erro ? `${id}-erro` : undefined}
+            />
+          )}
+          {marca.erro && <p id={`${id}-erro`} className={css.erro} role="alert">{marca.erro}</p>}
+          <div className={css.botoesDaConfirmacao}>
+            <Botao variante="primario" disabled={ocupado} onClick={confirmarMarca}>{confirmacao.confirmar}</Botao>
+            <Botao ref={cancelar} variante="texto" disabled={ocupado} onClick={() => setMarca(null)}>Cancelar</Botao>
+          </div>
+        </fieldset>
+      )}
     </li>
   )
+}
+
+const CHAMADA = {
+  perfil: (usuario, perfilId) => trocarPerfil(usuario.usuarioId, perfilId),
+  reenviar: (usuario) => reenviarConvite(usuario.usuarioId),
+  desativar: (usuario) => desativarUsuario(usuario.usuarioId),
+  reativar: (usuario) => reativarUsuario(usuario.usuarioId),
+  marcarDona: (usuario, motivo) => marcarDona(usuario.usuarioId, { dona: true, motivo }),
+  desmarcarDona: (usuario, motivo) => marcarDona(usuario.usuarioId, { dona: false, motivo }),
 }
 
 export function AbaUsuarios() {
   const { sessao, agora } = useAtendimento()
   const meuId = sessao?.usuario?.id ?? null
+  const suporte = ehSuporteDaSessao(sessao)
   const titulo = useRef(null)
   const lista = useRef(null)
   const botaoConvidar = useRef(null)
@@ -198,21 +297,21 @@ export function AbaUsuarios() {
     await carregar()
   }, [carregar])
 
+  // `valor` é o perfil escolhido (trocar perfil) ou o motivo do suporte (marca de dona). Devolve se a API aceitou.
   const agir = useCallback(async (acao, usuario, valor) => {
     setOcupado(true)
     setRetorno(null)
     try {
-      if (acao === 'perfil') await trocarPerfil(usuario.usuarioId, valor)
-      else if (acao === 'reenviar') await reenviarConvite(usuario.usuarioId)
-      else if (acao === 'desativar') await desativarUsuario(usuario.usuarioId)
-      else await reativarUsuario(usuario.usuarioId)
+      await CHAMADA[acao](usuario, valor)
       const perfil = estado.perfis.find((p) => p.perfilId === valor)?.nome
       // A lista recarrega antes do aviso: "continua no fim desta lista" só é verdade depois disso.
       await carregar()
       setRetorno({ tom: 'ok', texto: fraseDeRetorno(acao, usuario, perfil) })
+      return true
     } catch (falha) {
       await carregar()
       setRetorno({ tom: 'erro', texto: fraseDeFalha(acao, falha) })
+      return false
     } finally {
       setOcupado(false)
       // Desativar e reativar mudam a linha de lugar: o foco vai para o título da lista.
@@ -228,6 +327,7 @@ export function AbaUsuarios() {
     () => [...estado.usuarios].sort((a, b) => Number(b.ativo) - Number(a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR')),
     [estado.usuarios],
   )
+  const versaoAntiga = listaDeVersaoAntiga(estado)
 
   if (estado.carregando) return <output className={css.descricao}>Carregando as pessoas…</output>
   if (estado.erro && !estado.carregada) {
@@ -258,11 +358,12 @@ export function AbaUsuarios() {
             <Botao variante="texto" onClick={recarregar}>Atualizar</Botao>
           </p>
         )}
+        {versaoAntiga && <output className={css.desatualizada}>{AVISO_DE_VERSAO_ANTIGA}</output>}
         <ul ref={lista} className={css.pessoas}>
           {pessoas.map((usuario) => (
             <Pessoa
               key={usuario.usuarioId} usuario={usuario} perfis={estado.perfis} meuId={meuId} agora={agora} ocupado={ocupado}
-              aoAgir={agir} aoAbrirConfirmacao={limparRetorno}
+              suporte={suporte} aoAgir={agir} aoAbrirConfirmacao={limparRetorno}
             />
           ))}
         </ul>

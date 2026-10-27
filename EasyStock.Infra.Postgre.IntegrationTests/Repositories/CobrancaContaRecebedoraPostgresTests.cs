@@ -109,6 +109,9 @@ public class CobrancaContaRecebedoraPostgresTests(PostgreSqlDatabaseFixture fixt
             .Where(c => c.PedidoId == pedidoId).ToDictionaryAsync(c => c.Id, c => c.OrigemCredencial);
         origens[online.Id].Should().Be(CobrancaPedido.OrigemCredencialGlobal, "cobrança online antiga nasceu da credencial global");
         origens[naEntrega.Id].Should().BeNull("na entrega não há credencial");
+
+        // Volta à última migração: os outros testes da classe semeiam pelo modelo atual (#2070 pôs colunas em empresas).
+        await migrator.MigrateAsync();
     }
 
     private static async Task<List<string>> ColunasAsync(DbContext db) =>

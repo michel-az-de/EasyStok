@@ -119,3 +119,8 @@
 .chave input[type='checkbox']:checked { background: var(--sucesso); }
 .chave input[type='checkbox']:checked::after { transform: translateX(18px); }
 .chave input[type='checkbox']:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
+
+/* #2070: os horários fora do modal (Primeiros passos), com os botões embaixo. */
+.formularioHorarios { display: grid; gap: var(--e-3); min-width: 0; }
+.formularioHorarios h3 { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
+.acoesHorarios { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
