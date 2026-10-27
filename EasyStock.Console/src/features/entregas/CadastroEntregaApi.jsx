@@ -2,10 +2,11 @@ import { useId, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
+import { CampoReais } from '../../componentes/CampoReais'
 import { useCadastroEntregaApi } from '../../aplicacao/useCadastroEntregaApi'
 import { faixaDeHorarios } from '../../dominio/entrega'
 import { DIAS_BLOQUEIO, DIAS_DA_SEMANA, avisoDeSobreposicao, camposDaZona, corpoBloqueio, corpoZona } from '../../dominio/entregasApi'
-import { dataCurtaComSemana, dataIsoNoFuso, faixaDeCep, moeda } from '../../dominio/formato'
+import { centavosDoTexto, dataCurtaComSemana, dataIsoNoFuso, faixaDeCep, lerMoeda, moeda, textoDosCentavos } from '../../dominio/formato'
 import { diaDaSemanaDaData } from '../../dominio/roteiroDoDia'
 import { JanelasDaLoja } from './JanelasDaLoja'
 import { FreteRaioDaLoja } from './FreteRaioDaLoja'
@@ -23,7 +24,7 @@ const BLOQUEIO_VAZIO = { data: '', motivo: '', janelaEspecificaId: '' }
 function useFormulario(inicial, ocupado) {
   const [form, setForm] = useState(inicial)
   const campo = (k) => ({ value: form[k], disabled: ocupado, onChange: (e) => setForm({ ...form, [k]: e.target.value }) })
-  return { form, campo, limpar: () => setForm(inicial) }
+  return { form, campo, mudar: (parte) => setForm((atual) => ({ ...atual, ...parte })), limpar: () => setForm(inicial) }
 }
 
 // #1776 (item 22): um formulário só para criar e editar a zona. A faixa ou o bairro que outra zona
@@ -38,7 +39,8 @@ function FormularioZona({ id, hidden, inicial, zonas, propria = null, rotuloSalv
   return (
     <form id={id} hidden={hidden} className={`${css.formulario} ${layout.formularioZona}`} onSubmit={salvar}>
       <CampoTexto rotulo="Nome" {...z.campo('label')} required />
-      <CampoTexto rotulo="Valor (R$)" inputMode="decimal" {...z.campo('valor')} required />
+      <CampoReais rotulo="Valor (R$)" centavos={centavosDoTexto(z.form.valor)} ler={lerMoeda} mostrarZero disabled={ocupado} required
+        aoMudar={(centavos) => z.mudar({ valor: textoDosCentavos(centavos) })} />
       <CampoTexto rotulo="Tempo (min)" tipo="number" min="1" {...z.campo('tempoEstimadoMinutos')} required />
       <CampoTexto rotulo="Ordem" tipo="number" min="0" {...z.campo('ordem')} />
       <CampoSelecao
