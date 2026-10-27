@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
+import { CampoReais } from '../../componentes/CampoReais'
 import { useCorridasDaViagem } from '../../aplicacao/useCorridasDaViagem'
 import {
   EMPRESAS_DE_CORRIDA, corpoCorrida, custoDasCorridas, empresaPadraoDaCorrida, erroDoFormularioCorrida,
   formularioDaCorrida, resumoDaCorrida,
 } from '../../dominio/entregasApi'
-import { moeda } from '../../dominio/formato'
+import { centavosDoTexto, lerMoeda, moeda, textoDosCentavos } from '../../dominio/formato'
 import css from './entregasApi.module.css'
 
 // Corrida pedida por fora (I9.2, #1691): a atendente chama a 99, a Lalamove ou a Uber pelo app e
@@ -52,7 +53,8 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado }) {
       {form ? (
         <form className={css.formulario} onSubmit={salvar} noValidate>
           <CampoSelecao rotulo="Empresa" opcoes={EMPRESAS_DE_CORRIDA} {...campo('empresa')} disabled={travado || Boolean(form.id)} />
-          <CampoTexto rotulo="Custo (R$)" inputMode="decimal" autoFocus {...campo('custo')} />
+          <CampoReais rotulo="Custo (R$)" autoFocus centavos={centavosDoTexto(form.custo)} ler={lerMoeda} mostrarZero disabled={travado}
+            aoMudar={(centavos) => { setForm({ ...form, custo: textoDosCentavos(centavos) }); setAviso(null) }} />
           <CampoTexto rotulo="Motorista (opcional)" maxLength={120} {...campo('motorista')} />
           <div className={css.linha}>
             <Botao tipo="submit" variante="primario" disabled={travado}>{form.id ? 'Salvar correção' : 'Salvar corrida'}</Botao>

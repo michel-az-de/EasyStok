@@ -7,7 +7,7 @@
         </shape>
     </item>
     <!-- PNG oficial 420x280, sem recorte ou distorção. A margem faz parte da marca. -->
-    <item android:width="102dp" android:height="68dp" android:gravity="center">
+    <item android:width="90dp" android:height="60dp" android:gravity="center">
         <bitmap android:src="@drawable/casa_da_baba_logo" android:gravity="fill" android:filter="true" />
     </item>
 </layer-list>

@@ -43,7 +43,7 @@ test('diferencia servidor acessível de aparelho pareado e envio pendente', () =
   assert.doesNotMatch(revoked.queue, /sincronizad|confirmad/);
 });
 
-function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch } = {}) {
+function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch, updater } = {}) {
   const nodes = new Map();
   const events = new Map();
   const doc = { activeElement: null, hidden: false, addEventListener: (name, callback) => events.set(name, callback), getElementById: id => nodes.get(id) };
@@ -72,6 +72,7 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
     addEventListener: (name, callback) => events.set(name, callback),
     open: url => calls.push(url), go: screen => calls.push(screen),
   };
+  if (updater) root.Capacitor = { isNativePlatform: () => true, Plugins: { PilotUpdater: updater } };
   const requests = [];
   const fetch = async url => {
     requests.push(url);
@@ -82,6 +83,52 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'pilot.js'), 'utf8'), { window: root, fetch, URL, AbortSignal });
   return { root, doc, nodes, events, calls, requests };
 }
+
+function realAndroidListener() {
+  const android = path.resolve(__dirname, '../node_modules/@capacitor/android/capacitor/src/main');
+  const bridge = fs.readFileSync(path.join(android, 'assets/native-bridge.js'), 'utf8');
+  const exporter = fs.readFileSync(path.join(android, 'java/com/getcapacitor/JSExport.java'), 'utf8');
+  assert.ok(exporter.includes('return w.Capacitor.addListener('), 'Plugins deve delegar ao bridge nativo instalado');
+  const begin = bridge.indexOf('cap.addListener = (');
+  const end = bridge.indexOf('cap.removeListener =', begin);
+  assert.ok(begin >= 0 && end > begin, 'Contrato addListener do bridge precisa ser identificável');
+  const callbacks = [];
+  const cap = { nativeCallback(plugin, method, options, callback) {
+    callbacks.push({ plugin, method, options, callback }); return 'callback-1';
+  } };
+  vm.runInNewContext(bridge.slice(begin, end), { cap, win: { console } });
+  return { callbacks, addListener: (event, callback) => cap.addListener('PilotUpdater', event, callback) };
+}
+
+test('bridge Android instalado retorna handle síncrono e startup abre início sem perder listener OTA', async () => {
+  const bridge = realAndroidListener();
+  const handle = bridge.addListener('probe', () => {});
+  assert.equal(typeof handle.remove, 'function');
+  assert.equal(handle.catch, undefined, 'Contrato legado real não é Promise');
+  bridge.callbacks.length = 0;
+  const { nodes } = pilotHarness({ updater: bridge });
+  assert.equal(nodes.get('pilotHome').open, true);
+  assert.equal(bridge.callbacks.length, 1);
+  assert.equal(bridge.callbacks[0].options.eventName, 'status');
+  bridge.callbacks[0].callback({ nativeVersionCode: 7, builtinVersion: '0.7.0' });
+  await new Promise(setImmediate);
+  assert.match(nodes.get('pilotRailVersion').textContent, /APK 0\.7\.0/);
+});
+
+test('bridge Android síncrono preserva boas-vindas até identificação do operador', () => {
+  const { nodes, events } = pilotHarness({ operator: '', updater: realAndroidListener() });
+  assert.equal(nodes.get('pilotHome').open, false);
+  events.get('cdb-operator-ready')();
+  assert.equal(nodes.get('pilotHome').open, true);
+});
+
+test('falha do listener OTA não interrompe início nem registro do operador', async () => {
+  for (const addListener of [() => { throw new Error('bridge unavailable'); }, () => Promise.reject(new Error('listener rejected'))]) {
+    const { nodes } = pilotHarness({ updater: { addListener } });
+    await new Promise(setImmediate);
+    assert.equal(nodes.get('pilotHome').open, true);
+  }
+});
 
 test('atualização acionada fora do início abre diálogo, informa resultado e restaura foco', async () => {
   const { root, nodes, doc } = pilotHarness();

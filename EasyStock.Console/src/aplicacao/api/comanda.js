@@ -341,6 +341,8 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
       })
     },
     desfazerPagamento: desfazer,
+    // #2079 (C4): devolução feita em Pós-venda muda o alocado; a Ficha relê o pedido em vez de esperar o ciclo.
+    recarregarPedido: (id) => recarregar(id).catch(() => null),
     avancarEsteira: avancar,
     aprovarPedido: aprovar,
     ...Object.fromEntries(EDITA_COMANDA.map((nome) => [nome, soSemPedidoCriado(nome)])),

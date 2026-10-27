@@ -6,6 +6,22 @@ const ADAPTED = '<!-- pilot-product-markup-v1 -->';
 const WELCOME_START = '<!-- Boas-vindas / login com nome do operador -->';
 const WELCOME_END = '<!-- Tutorial / onboarding (4 steps) -->';
 
+function adaptSplash(html) {
+  const start = uniqueIndex(html, '<div id="cdbSplash" aria-hidden="true">');
+  const end = uniqueIndex(html, WELCOME_START);
+  if (end <= start) throw new Error('Delimitadores da abertura fora de ordem.');
+  let splash = html.slice(start, end);
+  for (const [before, after] of [
+    ['<div id="cdbSplash" aria-hidden="true">', '<div id="cdbSplash" class="pilot-splash" aria-hidden="true">'],
+    ['<div class="cdb-splash-emoji">🍝</div>', '<img class="pilot-splash-logo" src="casa-da-baba.png" alt="" width="128" height="104">'],
+    ['<div class="cdb-splash-tagline">Massas frescas</div>', '<div class="cdb-splash-tagline">Produção e pedidos</div>']
+  ]) {
+    uniqueIndex(splash, before);
+    splash = splash.replace(before, after);
+  }
+  return html.slice(0, start) + splash + html.slice(end);
+}
+
 function adaptWelcome(html) {
   const start = uniqueIndex(html, WELCOME_START);
   const end = uniqueIndex(html, WELCOME_END);
@@ -86,7 +102,7 @@ function adaptAppMarkup(html) {
     '<details class="pilot-product-options">' + newline +
     '<summary>Mais opções do produto</summary>' + newline + options + '</details>' + newline +
     modal.slice(actions);
-  return adaptProduction(adaptWelcome(html.slice(0, start) + adapted + html.slice(end)));
+  return adaptSplash(adaptProduction(adaptWelcome(html.slice(0, start) + adapted + html.slice(end))));
 }
 
 module.exports = { adaptAppMarkup };

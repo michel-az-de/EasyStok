@@ -772,10 +772,16 @@
   root.addEventListener('cdb-mutations-applied', showConnection);
   root.addEventListener('cdb-operator-ready', openHome);
   root.forceCheckUpdate = checkUpdate;
-  if (updater()?.addListener) updater().addListener('status', state => {
-    showOtaStatus(state);
-    checkUpdate({ automatic: true });
-  }).catch(() => {});
+  if (updater()?.addListener) {
+    try {
+      // Plugins do bridge Android retornam um handle síncrono; o proxy moderno
+      // pode retornar Promise. Nenhuma falha deste listener deve impedir o início.
+      Promise.resolve(updater().addListener('status', state => {
+        showOtaStatus(state);
+        checkUpdate({ automatic: true });
+      })).catch(() => {});
+    } catch { /* A consulta automática ao abrir continua disponível. */ }
+  }
   startUpdater();
   Promise.resolve().then(() => checkUpdate({ automatic: true }));
   if (root.cdbApp?.getOperator?.()?.trim()) openHome();

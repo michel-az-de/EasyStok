@@ -17,6 +17,7 @@ const adapted = modal(result);
 const welcomeStart = '<!-- Boas-vindas / login com nome do operador -->';
 const welcomeEnd = '<!-- Tutorial / onboarding (4 steps) -->';
 function welcome(html) { return html.slice(html.indexOf(welcomeStart), html.indexOf(welcomeEnd)); }
+function splash(html) { return html.slice(html.indexOf('<div id="cdbSplash"'), html.indexOf(welcomeStart)); }
 function restoreWelcomeTitle(html) { return html.replace("textContent = 'Quem vai usar o app?';", "textContent = 'Bem-vinda à Casa da Baba';"); }
 function restoreProductionChrome(html) {
   const metrics = source.match(/<div class="prod-metrics">[\s\S]*?id="prodMetricLow">0<\/strong><span>críticos<\/span><\/div>\s*<\/div>/)[0];
@@ -58,9 +59,27 @@ test('essenciais e preço ficam fora de details, opções sem obrigatórios fica
 });
 
 test('preserva documento fora das áreas adaptadas, com única troca textual no bootstrap', () => {
-  assert.equal(result.slice(0, result.indexOf(welcomeStart)), source.slice(0, source.indexOf(welcomeStart)));
+  assert.equal(result.slice(0, result.indexOf(welcomeStart)).replace(splash(result), splash(source)), source.slice(0, source.indexOf(welcomeStart)));
   assert.equal(restoreProductionChrome(result.slice(result.indexOf(welcomeEnd), result.indexOf(start))), source.slice(source.indexOf(welcomeEnd), source.indexOf(start)));
   assert.equal(restoreWelcomeTitle(result.slice(result.indexOf(end))), source.slice(source.indexOf(end)));
+});
+
+test('splash HTML usa marca oficial sem alterar spinner, eventos ou tempos de saída', () => {
+  const after = splash(result);
+  assert.match(after, /id="cdbSplash" class="pilot-splash" aria-hidden="true"/);
+  assert.match(after, /<img class="pilot-splash-logo" src="casa-da-baba.png" alt="" width="128" height="104">/);
+  assert.match(after, /<div class="cdb-splash-name">Casa da Baba<\/div>/);
+  assert.match(after, /<div class="cdb-splash-tagline">Produção e pedidos<\/div>/);
+  assert.doesNotMatch(after, /🍝|Massas frescas/);
+  assert.equal(after.match(/<div class="cdb-splash-spinner"[^>]*><\/div>/)[0], splash(source).match(/<div class="cdb-splash-spinner"[^>]*><\/div>/)[0]);
+  assert.deepEqual(tags(restoreWelcomeTitle(result), /<script\b[^>]*>[\s\S]*?<\/script>/g), tags(source, /<script\b[^>]*>[\s\S]*?<\/script>/g));
+});
+
+test('splash incompleto ou duplicado impede empacotar abertura inconsistente', () => {
+  for (const marker of ['<div id="cdbSplash" aria-hidden="true">', '<div class="cdb-splash-emoji">🍝</div>', '<div class="cdb-splash-tagline">Massas frescas</div>']) {
+    assert.throws(() => adaptAppMarkup(source.replace(marker, '')), /incompatível/);
+    assert.throws(() => adaptAppMarkup(source.replace(marker, marker + marker)), /incompatível/);
+  }
 });
 
 test('produção preserva IDs e botões completos, mantendo estoque baixo no resumo acessível', () => {

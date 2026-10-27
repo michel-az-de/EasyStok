@@ -4,6 +4,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const source = path.resolve(root, '..', '..', 'EasyStock.Api', 'wwwroot', 'pwa');
 const target = path.join(root, 'web');
+const fonts = path.join(root, 'assets', 'fonts');
 const version = require('../package.json');
 const contract = require('./ota-contract.cjs');
 const { adaptAppMarkup } = require('./app-markup.cjs');
@@ -15,9 +16,13 @@ for (const name of ['pilot.js', 'pilot.css']) {
   if (!fs.existsSync(path.join(root, name))) throw new Error('Arquivo obrigatório ausente: ' + name);
 }
 if (!fs.existsSync(path.join(source, 'index.html'))) throw new Error('PWA fonte ausente.');
+for (const name of ['fonts.css', 'Manrope.ttf', 'Fraunces.ttf', 'Fraunces-Italic.ttf', 'Manrope-OFL.txt', 'Fraunces-OFL.txt']) {
+  if (!fs.existsSync(path.join(fonts, name))) throw new Error('Fonte local obrigatória ausente: ' + name);
+}
 if (path.dirname(target) !== root || path.basename(target) !== 'web') throw new Error('Destino inválido.');
 fs.rmSync(target, { recursive: true, force: true });
 fs.cpSync(source, target, { recursive: true });
+fs.cpSync(fonts, path.join(target, 'fonts'), { recursive: true });
 for (const name of ['pilot.js', 'pilot.css']) fs.copyFileSync(path.join(root, name), path.join(target, name));
 fs.copyFileSync(path.resolve(root, '../../EasyStock.Console/src/assets/casa-da-baba.png'), path.join(target, 'casa-da-baba.png'));
 const config = {
@@ -36,6 +41,14 @@ fs.writeFileSync(path.join(target, 'config.js'), 'window.CDB_CONFIG = ' + JSON.s
 fs.writeFileSync(path.join(target, 'bundle.json'), JSON.stringify({ schemaVersion: 1, appId: config.appId, channel: contract.CHANNEL, bundleVersion, nativeVersionCode: contract.NATIVE_VERSION_CODE, dataSchemaVersion: contract.DATA_SCHEMA }));
 const htmlPath = path.join(target, 'index.html');
 let html = adaptAppMarkup(fs.readFileSync(htmlPath, 'utf8'));
+// Mantém as mesmas famílias/eixos sem depender da rede para abrir o APK.
+let localFontsLinked = false;
+html = html.replace(/<link\b[^>]*href=["']https:\/\/fonts\.(?:googleapis\.com|gstatic\.com)[^"']*["'][^>]*>\s*/gi, () => {
+  if (localFontsLinked) return '';
+  localFontsLinked = true;
+  return '<link rel="stylesheet" href="fonts/fonts.css">\n';
+});
+if (!localFontsLinked) throw new Error('Ponto de carga das fontes não encontrado.');
 const syncScript = /<script\s+src=["']sync\.js[^"']*["']\s*><\/script>/i;
 if (!syncScript.test(html)) throw new Error('Ponto de carga sync.js não encontrado.');
 html = html.replace(/<script\s+src=["']config\.js[^"']*["']\s*><\/script>\s*/gi, '');

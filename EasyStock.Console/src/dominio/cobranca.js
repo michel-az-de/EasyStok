@@ -34,7 +34,7 @@
 //                  nunca do sistema: aceitar a diferença ou cobrar o que faltou.
 
 import { itensDetalhados, totalDoPedido } from './pedido.js'
-import { moeda } from './formato.js'
+import { lerMoeda, moeda } from './formato.js'
 
 const MS_POR_MINUTO = 60000
 
@@ -83,7 +83,7 @@ export function pagamentoNaEntregaDasObservacoes(observacoes) {
   const texto = String(observacoes ?? '')
   if (!texto.includes(PREFIXO_DINHEIRO)) return null
   const troco = texto.match(/troco para R\$\s*([\d.]+,\d{2})/)
-  const trocoPara = troco ? Number(troco[1].replace(/\./g, '').replace(',', '.')) : null
+  const trocoPara = troco ? lerMoeda(troco[1]) / 100 : null
   return { meio: DINHEIRO_NA_ENTREGA, trocoPara }
 }
 
@@ -179,9 +179,12 @@ export function faltaDaCobranca(cobranca) {
   return Math.max(cobranca.valor - cobranca.valorPago, 0)
 }
 
+// Encomenda esperando o sinal, com a cobrança dele aberta (link do Mercado Pago ou entrada à mão).
+const aguardaSinal = (pedido) => Boolean(pedido?.sinalNaReserva && pedido.statusApi === 'aguardando_pagamento'
+  && pedido.cobranca && !pedido.cobranca.pagaEm && !pedido.cobranca.canceladaEm)
+
 export function aguardaSinalManual(pedido) {
-  return Boolean(pedido?.sinalNaReserva && pedido.statusApi === 'aguardando_pagamento'
-    && pedido.cobranca && !pedido.cobranca.link && !pedido.cobranca.pagaEm && !pedido.cobranca.canceladaEm)
+  return aguardaSinal(pedido) && !pedido.cobranca.link
 }
 
 // #1875: o sinal da encomenda é metade do total, em centavos e arredondando para cima, como o servidor
@@ -190,7 +193,9 @@ export const sinalDeEncomenda = (total) => Math.ceil(Math.round(total * 100) / 2
 
 export function valorSugeridoParaBaixa(pedido) {
   const total = pedido.totalApi ?? pedido.cobranca?.valor ?? 0
-  const alvo = aguardaSinalManual(pedido) ? sinalDeEncomenda(total) : total
+  // #2079 (C3): com o link do sinal pendente, o alvo é o valor do link (o sinal); sugeria o total.
+  const alvo = aguardaSinalManual(pedido) ? sinalDeEncomenda(total)
+    : aguardaSinal(pedido) ? Math.min(pedido.cobranca.valor ?? total, total) : total
   return Math.max(0, Math.round((alvo - (pedido.alocadoApi ?? pedido.totalPagoApi ?? 0)) * 100) / 100)
 }
 

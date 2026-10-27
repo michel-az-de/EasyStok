@@ -305,6 +305,9 @@ const AbaProducaoDoDiaApi = await tela('AbaProducaoDoDiaApi')
 const cartoes = (no) => andar(no, (n) => n.type === 'li' && String(n.props.className).includes('itemDoLote'))
 const avisosDeLote = (no) => andar(no, (n) => n.type === 'output')
 const folha = (t) => andar(t.renderizar(), (n) => n.type === 'FolhaImpressao')
+// #2081 (A4): a folha leva a etiqueta 80x40 (componente próprio); conferimos lote e número de cada uma.
+const etiquetasDaFolha = (no) => andar(no, (n) => n.type === 'EtiquetaDeProducao')
+  .map((n) => `Lote ${n.props.etiqueta.lote} · ${n.props.etiqueta.sequencial}/${n.props.total}`).join(' ')
 const enviados = (chamadas) => chamadas.filter((c) => c.metodo === 'POST')
 const revisar = (t) => {
   if (!formulario(t.renderizar())) botoes(t.arvore, 'Conferir produção')[0].props.onClick()
@@ -388,7 +391,7 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   const t = montar(AbaProducaoDoDiaApi)
   await botoes(t.renderizar(), 'Imprimir 6 etiquetas')[0].props.onClick()
   await esperar(80)
-  assert.match(texto(folha(t)[0]), /Lote LOT-261011-002 · 6\/6/)
+  assert.match(etiquetasDaFolha(folha(t)[0]), /Lote LOT-261011-002 · 6\/6/)
   assert.equal(impressoes, 1)
   // Lote 1 com a rede fora: a folha do lote 2 sai, nada imprime e o erro aparece no aviso do lote 1.
   cair = true
@@ -403,7 +406,7 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   cair = false
   await botoes(t.arvore, 'Imprimir 2 etiquetas')[0].props.onClick()
   await esperar(80)
-  assert.match(texto(folha(t)[0]), /Lote LOT-261011-001 · 2\/2/)
+  assert.match(etiquetasDaFolha(folha(t)[0]), /Lote LOT-261011-001 · 2\/2/)
   assert.equal(impressoes, 2)
   assert.equal(chamadas.filter((c) => c.url.includes('/etiquetas/')).length, 3)
   // Dispensar o lote 1 leva a folha dele; o lote 2 continua.
