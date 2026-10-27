@@ -75,7 +75,8 @@ public record OrderDto(
     // F5 — agendamento de pedido (MVP). NULL = pedido pra agora (caso padrão).
     long? ScheduledDeliveryAt = null,
     // #1493 — forma de pagamento escolhida no PWA ao entregar. NULL = aparelho antigo.
-    string? Metodo = null
+    string? Metodo = null,
+    string? LegacyHistoryStatus = null
 );
 
 public record BatchItemDto(
@@ -106,7 +107,8 @@ public record BatchDto(
     bool? Discarded = null,
     long? DiscardedAt = null,
     string? DiscardedBy = null,
-    string? DiscardReason = null
+    string? DiscardReason = null,
+    bool? LegacyImported = null
 );
 
 public record CashEntryDto(

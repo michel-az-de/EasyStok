@@ -75,7 +75,7 @@
    * Chamado após cada sync flush bem-sucedido.
    */
   async function flushPhotos() {
-    if (_uploading) return;
+    if (_uploading || (window.cdbSync && window.cdbSync.isSyncHeldForImport && window.cdbSync.isSyncHeldForImport())) return;
     if (!window.cdbPhotoStore || !window.cdbPhotoStore.ready) return;
 
     var pending;
@@ -109,6 +109,7 @@
     try {
       // Upload em chunks de MAX_CONCURRENT
       for (var i = 0; i < pending.length; i += MAX_CONCURRENT) {
+        if (sync.isSyncHeldForImport && sync.isSyncHeldForImport()) return;
         var chunk = pending.slice(i, i + MAX_CONCURRENT);
         var promises = chunk.map(function (entry) {
           return uploadOne(entry, apiBase, headers);

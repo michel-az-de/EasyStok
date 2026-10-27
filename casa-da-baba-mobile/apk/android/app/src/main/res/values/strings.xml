@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Casa da Baba Piloto</string>
+    <string name="title_activity_main">Casa da Baba Piloto</string>
+    <string name="package_name">com.casadababa.piloto</string>
+    <string name="custom_url_scheme">cdb-piloto</string>
+</resources>
