@@ -367,7 +367,10 @@ public class AuthController(
                             nameof(EstoqueDesacertosController.Listar)) is not { } modulosDaRota
                         || modulosDaRota.Any(m => usuario.TemPermissao(Domain.Services.AcessoModulos.PermissaoDe(m)))),
                 verIntegracoes = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin,
-                ajustarEntrega = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
+                ajustarEntrega = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin,
+                // #2070: primeiros passos da loja (api/configuracao-inicial: policy Admin e módulo Configurações).
+                configurarLoja = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
+                    && modulos.Any(m => m.id == "configuracoes" && m.liberado)
             }
         });
     }
