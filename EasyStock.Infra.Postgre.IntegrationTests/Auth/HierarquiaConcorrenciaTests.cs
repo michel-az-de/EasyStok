@@ -4,8 +4,12 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
 using EasyStock.Application.UseCases.AtribuirPerfilUsuario;
+using EasyStock.Application.UseCases.AtualizarUsuario;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.CriarUsuario;
 using EasyStock.Application.UseCases.DesativarUsuario;
 using EasyStock.Application.UseCases.MarcarDona;
+using EasyStock.Application.UseCases.ReenviarConvite;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
@@ -25,8 +29,10 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Auth;
 /// #2070 (M1): a empresa nunca fica sem dona ativa, em Postgres real e com RLS (login NOSUPERUSER, o interceptor de
 /// tenant de produção). Cada corrida usa duas conexões e uma barreira logo depois da contagem de donas: sem nada que as
 /// serialize, as duas leem o mesmo estado antes de qualquer uma escrever. Com a trava da hierarquia
-/// (<c>pg_advisory_xact_lock</c>), a segunda espera a primeira comitar, relê e recusa. O teste de controle tira a trava
-/// e mostra a mesma corrida zerando a empresa: é a prova de que o verde vem da trava, não da sorte do agendador.
+/// (<c>pg_advisory_xact_lock</c>), a segunda espera a primeira comitar, relê e recusa. Cada corrida roda também sem a
+/// trava e mostra o invariante quebrando: é a prova de que o verde vem da trava, não da sorte do agendador. Os caminhos
+/// do suporte que escrevem dentro da transação (cadastrar a dona, trocar o e-mail dela, reenviar o convite) rodam aqui
+/// também, porque os testes HTTP usam o superuser e não passam pela RLS.
 /// </summary>
 [Collection("PostgreSqlTestCollection")]
 public sealed class HierarquiaConcorrenciaTests(PostgreSqlDatabaseFixture fixture)
@@ -34,67 +40,177 @@ public sealed class HierarquiaConcorrenciaTests(PostgreSqlDatabaseFixture fixtur
     /// <summary>Quanto a primeira corrida espera a outra na barreira. Com a trava, a outra não chega: espera inteira e segue.</summary>
     private static readonly TimeSpan EsperaNaBarreira = TimeSpan.FromSeconds(3);
 
-    [SkippableFact]
-    public async Task Duas_donas_se_desmarcando_uma_passa_e_a_outra_recebe_ULTIMA_DONA()
+    [SkippableTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Duas_donas_se_desmarcando(bool comTrava)
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
         var c = await SemearAsync();
         var barreira = new Barreira(2, EsperaNaBarreira);
 
         var resultados = await Task.WhenAll(
-            Task.Run(() => Capturar(() => MarcarAsync(c, c.DonaA, c.DonaB, dona: false, barreira, comTrava: true))),
-            Task.Run(() => Capturar(() => MarcarAsync(c, c.DonaB, c.DonaA, dona: false, barreira, comTrava: true))));
+            Task.Run(() => Capturar(() => MarcarAsync(c, c.DonaA, c.DonaB, dona: false, barreira, comTrava))),
+            Task.Run(() => Capturar(() => MarcarAsync(c, c.DonaB, c.DonaA, dona: false, barreira, comTrava))));
 
-        UmaPassaEAOutraRecebe(resultados, CodigosDaHierarquia.UltimaDona);
-        (await DonasAtivasAsync(c.EmpresaId)).Should().Be(1);
+        if (comTrava)
+        {
+            // Quem perdeu, relida depois da trava, já é Administração: a outra dona está fora do alcance dela (403), e a
+            // resposta não manda marcar outra dona nem conta quantas existem.
+            UmaPassaEAOutraRecebe(resultados, CodigosDaHierarquia.Hierarquia);
+            (await DonasAtivasAsync(c.EmpresaId)).Should().Be(1);
+        }
+        else
+        {
+            resultados.Should().OnlyContain(r => r == null, "sem a trava, as duas leem duas donas e as duas escrevem");
+            (await DonasAtivasAsync(c.EmpresaId)).Should().Be(0, "é exatamente o furo M1 que a trava fecha");
+        }
+    }
+
+    [SkippableTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Rebaixar_contra_marcar(bool comTrava)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var c = await SemearAsync();
+        var barreira = new Barreira(2, EsperaNaBarreira);
+
+        var resultados = await Task.WhenAll(
+            Task.Run(() => Capturar(() => RebaixarAsync(c, c.DonaA, c.Gestora, barreira, comTrava))),
+            Task.Run(() => Capturar(() => MarcarAsync(c, c.DonaA, c.Gestora, dona: true, barreira, comTrava))));
+
+        var estado = await EstadoAsync(c.EmpresaId, c.Gestora.Id);
+        var donas = await DonasAtivasAsync(c.EmpresaId);
+        if (comTrava)
+        {
+            // Rebaixar primeiro: marcar quem já é Gerência é DONA_NAO_ADMIN, e as donas seguem A e B. Marcar primeiro:
+            // rebaixar a dona é DONA_PROTEGIDA, e a gestora é a terceira dona, na Administração.
+            UmaPassaEAOutraRecebe(resultados, CodigosDaHierarquia.DonaNaoAdmin, CodigosDaHierarquia.DonaProtegida);
+            var rebaixarVenceu = ((HierarquiaRecusadaException)resultados.Single(r => r is not null)!).Codigo == CodigosDaHierarquia.DonaNaoAdmin;
+            estado.Should().Be(rebaixarVenceu ? (false, NivelAcesso.Gerente) : (true, NivelAcesso.Admin));
+            donas.Should().Be(rebaixarVenceu ? 2 : 3);
+        }
+        else
+        {
+            resultados.Should().OnlyContain(r => r == null, "sem a trava, as duas leem a gestora na Administração sem a marca");
+            estado.Should().Be((true, NivelAcesso.Gerente), "sem a trava fica uma dona de Gerência: o invariante quebra");
+            donas.Should().Be(2, "a marca na Gerência não conta como dona ativa");
+        }
+    }
+
+    [SkippableTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Desativar_uma_dona_e_anonimizar_a_outra(bool comTrava)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var c = await SemearAsync();
+        var barreira = new Barreira(2, EsperaNaBarreira);
+
+        var resultados = await Task.WhenAll(
+            Task.Run(() => Capturar(() => DesativarAsync(c, c.Suporte, c.DonaA, barreira, comTrava))),
+            Task.Run(() => Capturar(() => AnonimizarAsync(c, c.DonaB, barreira, comTrava))));
+
+        if (comTrava)
+        {
+            UmaPassaEAOutraRecebe(resultados, CodigosDaHierarquia.UltimaDona);
+            (await DonasAtivasAsync(c.EmpresaId)).Should().Be(1);
+        }
+        else
+        {
+            resultados.Should().OnlyContain(r => r == null, "sem a trava, as duas contam duas donas ativas");
+            (await DonasAtivasAsync(c.EmpresaId)).Should().Be(0, "uma desativada e a outra anonimizada: a empresa fica sem dona");
+        }
+    }
+
+    // ── os caminhos do suporte que escrevem na transação, sob RLS ─────────────────────────────
+
+    [SkippableFact]
+    public async Task Suporte_cadastra_a_dona_sob_RLS_com_convite_e_auditoria()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var c = await SemearAsync();
+        var email = $"titular-{Guid.NewGuid():N}@exemplo.test";
+
+        await using (var db = ContextoComRls(c.EmpresaId))
+        {
+            var (atual, vinculos, hierarquia) = Montar(db, c, c.Suporte, Sozinho(), comTrava: true);
+            await new CriarUsuarioUseCase(new UsuarioRepository(db), new AssinaturaEmpresaRepository(db), vinculos,
+                    new UsuarioPerfilRepository(db), new PerfilRepository(db), Substitute.For<IConsentimentoRepository>(), Convites(db),
+                    hierarquia, atual, new AuditLogRepository(db), db, Substitute.For<IPasswordHasher>(),
+                    NullLogger<CriarUsuarioUseCase>.Instance)
+                .ExecuteAsync(new CriarUsuarioCommand(c.EmpresaId, "Titular", email, null, c.PerfilAdministracao, null, Dona: true));
+        }
+
+        await using var conferencia = fixture.CreateDbContext();
+        var titular = await conferencia.Usuarios.IgnoreQueryFilters().SingleAsync(u => u.Email == email);
+        (await conferencia.UsuariosEmpresas.IgnoreQueryFilters().SingleAsync(v => v.UsuarioId == titular.Id))
+            .Should().BeEquivalentTo(new { EmpresaId = c.EmpresaId, Ativo = true, EhDona = true });
+        (await conferencia.ResetTokens.Where(t => t.UsuarioId == titular.Id).Select(t => new { t.Finalidade, t.Canal }).ToListAsync())
+            .Should().BeEquivalentTo([new { Finalidade = FinalidadeResetToken.Convite, Canal = (string?)"Email" }]);
+        (await conferencia.AuditLogs.IgnoreQueryFilters().Where(a => a.UsuarioId == titular.Id && a.EmpresaId == c.EmpresaId)
+                .Select(a => a.Acao).ToListAsync())
+            .Should().BeEquivalentTo([RastroDeUsuarios.Convidado, RastroDeUsuarios.DonaMarcada]);
+        (await DonasAtivasAsync(c.EmpresaId)).Should().Be(3, "a convidada pendente conta");
     }
 
     [SkippableFact]
-    public async Task Rebaixar_contra_marcar_uma_passa_e_a_dona_nunca_fica_abaixo_de_Admin()
+    public async Task Suporte_troca_sob_RLS_o_email_da_dona_so_com_motivo()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
         var c = await SemearAsync();
-        var barreira = new Barreira(2, EsperaNaBarreira);
+        var novo = $"nova-{Guid.NewGuid():N}@exemplo.test";
 
-        var resultados = await Task.WhenAll(
-            Task.Run(() => Capturar(() => RebaixarAsync(c, c.DonaA, c.Gestora, barreira, comTrava: true))),
-            Task.Run(() => Capturar(() => MarcarAsync(c, c.DonaA, c.Gestora, dona: true, barreira, comTrava: true))));
+        await using (var db = ContextoComRls(c.EmpresaId))
+        {
+            var semMotivo = () => Atualizar(db, c).ExecuteAsync(new AtualizarUsuarioCommand(c.DonaA.Id, "dona-a", novo));
+            (await semMotivo.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("MOTIVO_OBRIGATORIO");
+        }
 
-        // Rebaixar primeiro: marcar quem já é Gerência é DONA_NAO_ADMIN. Marcar primeiro: rebaixar a dona é DONA_PROTEGIDA.
-        UmaPassaEAOutraRecebe(resultados, CodigosDaHierarquia.DonaNaoAdmin, CodigosDaHierarquia.DonaProtegida);
-        var (ehDona, nivel) = await EstadoAsync(c.EmpresaId, c.Gestora.Id);
-        (ehDona && nivel != NivelAcesso.Admin).Should().BeFalse("toda dona tem nível Admin");
-        (await DonasAtivasAsync(c.EmpresaId)).Should().BeGreaterThanOrEqualTo(1);
+        AtualizarUsuarioResult resultado;
+        await using (var db = ContextoComRls(c.EmpresaId))
+            resultado = await Atualizar(db, c).ExecuteAsync(
+                new AtualizarUsuarioCommand(c.DonaA.Id, "dona-a", novo, Motivo: "titular perdeu a caixa antiga"));
+
+        resultado.Should().Be(new AtualizarUsuarioResult(true, "titular perdeu a caixa antiga"));
+        await using var conferencia = fixture.CreateDbContext();
+        (await conferencia.Usuarios.IgnoreQueryFilters().SingleAsync(u => u.Id == c.DonaA.Id))
+            .Should().BeEquivalentTo(new { Email = c.DonaA.Email, EmailPendente = novo });
+        (await conferencia.EmailConfirmationTokens.CountAsync(t => t.UsuarioId == c.DonaA.Id)).Should().Be(1);
+        (await conferencia.AuditLogs.IgnoreQueryFilters().CountAsync(a => a.UsuarioId == c.DonaA.Id && a.Acao == "admin-troca-email-solicitada"))
+            .Should().Be(1);
     }
 
     [SkippableFact]
-    public async Task Desativar_uma_dona_e_anonimizar_a_outra_uma_passa_e_a_outra_recebe_ULTIMA_DONA()
+    public async Task Suporte_troca_sob_RLS_o_email_da_dona_convidada_e_reenvia_o_convite()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
         var c = await SemearAsync();
-        var barreira = new Barreira(2, EsperaNaBarreira);
+        var convidada = await SemearConvidadaAsync(c, dona: true);
+        var novo = $"titular-{Guid.NewGuid():N}@exemplo.test";
 
-        var resultados = await Task.WhenAll(
-            Task.Run(() => Capturar(() => DesativarAsync(c, c.Suporte, c.DonaA, barreira, comTrava: true))),
-            Task.Run(() => Capturar(() => AnonimizarAsync(c, c.DonaB, barreira, comTrava: true))));
+        await using (var db = ContextoComRls(c.EmpresaId))
+            await Atualizar(db, c).ExecuteAsync(
+                new AtualizarUsuarioCommand(convidada, "Titular", novo, Motivo: "endereço digitado errado no cadastro"));
+        await using (var db = ContextoComRls(c.EmpresaId))
+        {
+            var (atual, _, hierarquia) = Montar(db, c, c.Suporte, Sozinho(), comTrava: true);
+            await new ReenviarConviteUseCase(new UsuarioRepository(db), atual, Convites(db), hierarquia, Substitute.For<ITenantContextAccessor>(),
+                    new AuditLogRepository(db), db, NullLogger<ReenviarConviteUseCase>.Instance)
+                .ExecuteAsync(new ReenviarConviteCommand(convidada));
+        }
 
-        UmaPassaEAOutraRecebe(resultados, CodigosDaHierarquia.UltimaDona);
-        (await DonasAtivasAsync(c.EmpresaId)).Should().Be(1);
-    }
-
-    [SkippableFact]
-    public async Task Controle_sem_a_trava_as_duas_donas_se_desmarcam_e_a_empresa_fica_sem_dona()
-    {
-        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
-        var c = await SemearAsync();
-        var barreira = new Barreira(2, EsperaNaBarreira);
-
-        var resultados = await Task.WhenAll(
-            Task.Run(() => Capturar(() => MarcarAsync(c, c.DonaA, c.DonaB, dona: false, barreira, comTrava: false))),
-            Task.Run(() => Capturar(() => MarcarAsync(c, c.DonaB, c.DonaA, dona: false, barreira, comTrava: false))));
-
-        resultados.Should().OnlyContain(r => r == null, "sem a trava, as duas leem duas donas e as duas escrevem");
-        (await DonasAtivasAsync(c.EmpresaId)).Should().Be(0, "é exatamente o furo M1 que a trava fecha");
+        await using var conferencia = fixture.CreateDbContext();
+        (await conferencia.Usuarios.IgnoreQueryFilters().SingleAsync(u => u.Id == convidada)).Email.Should().Be(novo,
+            "o convidado nunca teve acesso: a troca é imediata");
+        var convites = await conferencia.ResetTokens.Where(t => t.UsuarioId == convidada && t.Finalidade == FinalidadeResetToken.Convite)
+            .Select(t => new { t.Usado, t.Canal }).ToListAsync();
+        convites.Should().HaveCount(2).And.OnlyContain(t => t.Canal == "Email", "a dona só recebe por e-mail");
+        convites.Count(t => !t.Usado).Should().Be(1, "o reenvio revoga o convite aberto e emite outro");
+        (await conferencia.AuditLogs.IgnoreQueryFilters().Where(a => a.UsuarioId == convidada && a.EmpresaId == c.EmpresaId)
+                .Select(a => a.Acao).ToListAsync())
+            .Should().Contain("convite-reenviado");
     }
 
     [SkippableFact]
@@ -164,6 +280,30 @@ public sealed class HierarquiaConcorrenciaTests(PostgreSqlDatabaseFixture fixtur
     }
 
     // ── as operações, cada uma na sua conexão com RLS ─────────────────────────────────────────
+
+    private AtualizarUsuarioUseCase Atualizar(EasyStockDbContext db, Cenario c)
+    {
+        var (atual, _, hierarquia) = Montar(db, c, c.Suporte, Sozinho(), comTrava: true);
+        var usuarios = new UsuarioRepository(db);
+        var contato = new TrocaDeContatoService(usuarios, new EmailConfirmationTokenRepository(db), Substitute.For<INotificadorService>(),
+            Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(), atual, Substitute.For<IPasswordHasher>(),
+            db, new ConfigurationBuilder().Build(), TimeProvider.System, NullLogger<TrocaDeContatoService>.Instance);
+        return new AtualizarUsuarioUseCase(usuarios, atual, db, contato, Convites(db), hierarquia, new AuditLogRepository(db),
+            NullLogger<AtualizarUsuarioUseCase>.Instance);
+    }
+
+    /// <summary>Convites com o link configurado (o cadastro e o reenvio exigem a base do link) e o motor de notificação falso.</summary>
+    private static ConvitesDeAcesso Convites(EasyStockDbContext db) => new(
+        new ResetTokenRepository(db), Substitute.For<INotificadorService>(), Substitute.For<IConsentimentoRepository>(),
+        Substitute.For<IEmpresaRepository>(),
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Auth:LinkConvite"] = "https://app.exemplo.test/#/convite?t={0}",
+        }).Build(),
+        TimeProvider.System, NullLogger<ConvitesDeAcesso>.Instance);
+
+    /// <summary>Barreira de um participante só: quem não corre contra ninguém passa direto.</summary>
+    private static Barreira Sozinho() => new(1, TimeSpan.Zero);
 
     private async Task MarcarAsync(Cenario c, Usuario ator, Usuario alvo, bool dona, Barreira barreira, bool comTrava)
     {
@@ -237,7 +377,8 @@ public sealed class HierarquiaConcorrenciaTests(PostgreSqlDatabaseFixture fixtur
 
     // ── cenário e leituras de conferência (superuser, sem RLS) ────────────────────────────────
 
-    private sealed record Cenario(Guid EmpresaId, Usuario DonaA, Usuario DonaB, Usuario Gestora, Usuario Suporte, Guid PerfilGerente);
+    private sealed record Cenario(
+        Guid EmpresaId, Usuario DonaA, Usuario DonaB, Usuario Gestora, Usuario Suporte, Guid PerfilGerente, Guid PerfilAdministracao);
 
     private async Task<Cenario> SemearAsync()
     {
@@ -285,7 +426,26 @@ public sealed class HierarquiaConcorrenciaTests(PostgreSqlDatabaseFixture fixtur
             Id = Guid.NewGuid(), UsuarioId = suporte.Id, EmpresaId = Guid.Empty, PerfilId = perfilDoSuporte.Id, AtribuidoEm = agora,
         });
         await db.SaveChangesAsync();
-        return new Cenario(empresa.Id, donaA, donaB, gestora, suporte, gerencia.Id);
+        return new Cenario(empresa.Id, donaA, donaB, gestora, suporte, gerencia.Id, administracao.Id);
+    }
+
+    /// <summary>Convidada pendente da Administração, com um convite aberto por e-mail, como o cadastro a deixaria.</summary>
+    private async Task<Guid> SemearConvidadaAsync(Cenario c, bool dona)
+    {
+        await using var db = fixture.CreateDbContext();
+        var agora = DateTime.UtcNow;
+        var convidada = Usuario.CriarConvidado("Convidada", $"convidada-{Guid.NewGuid():N}@exemplo.test");
+        db.Usuarios.Add(convidada);
+        db.UsuariosEmpresas.Add(new UsuarioEmpresa
+        {
+            Id = Guid.NewGuid(), UsuarioId = convidada.Id, EmpresaId = c.EmpresaId, Ativo = true, EhDona = dona, CriadoEm = agora,
+        });
+        db.UsuariosPerfis.Add(new UsuarioPerfil
+        {
+            Id = Guid.NewGuid(), UsuarioId = convidada.Id, EmpresaId = c.EmpresaId, PerfilId = c.PerfilAdministracao, AtribuidoEm = agora,
+        });
+        await db.SaveChangesAsync();
+        return convidada.Id;
     }
 
     private async Task<int> DonasAtivasAsync(Guid empresaId)
