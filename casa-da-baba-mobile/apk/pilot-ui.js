@@ -20,7 +20,8 @@
     Agendar: 'relogio', Retroativo: 'historico', Carregar: 'chevron-right',
     Opções: 'ellipsis', Pronto: 'check', Ajustes: 'configuracoes',
     Indicadores: 'ficha', Testar: 'printer', Pular: 'chevron-right',
-    Escolher: 'plus', Repetir: 'refresh-cw',
+    Escolher: 'plus', Repetir: 'refresh-cw', Ver: 'ficha', Abrir: 'ficha',
+    Selecionar: 'check', Restaurar: 'historico', Registrar: 'check', Concluir: 'check',
     'Sincronizando…': 'refresh-cw', 'Enviando…': 'enviar'
   };
   const SHORT_LABELS = {
@@ -87,6 +88,10 @@
       || (/^SalvarR\$/.test(raw) ? 'Salvar' : '')
       || clean;
     if (/advanceOrder\(/.test(handler)) return { label: label === 'Entregar' ? 'Entregar' : label === 'Finalizar' ? 'Finalizar' : 'Preparar', icon: COMMANDS[label] || 'producao' };
+    const verb = label.split(' ')[0];
+    if (verb !== label && COMMANDS[verb] && /\b(?:go|open\w*|export\w*|reprint\w*|restore\w*|print\w*|save\w*|copy\w*|share\w*|delete\w*|archive\w*)\(/.test(handler)) {
+      return { label: verb, icon: COMMANDS[verb] };
+    }
     return COMMANDS[label] ? { label, icon: COMMANDS[label] } : SHORT_LABELS[clean] ? { label, icon: '' } : null;
   }
 

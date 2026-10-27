@@ -22,6 +22,8 @@ test('ações curtas conservam seu significado e sempre usam um ícone disponív
     assert.ok(pilotIcon(icon), label + ': ícone ausente');
   }
   assert.equal(commandFor('Nhoque de mandioquinha'), null);
+  assert.deepEqual(commandFor('Ver pedidos', "go('pedidos')"), { label: 'Ver', icon: 'ficha' });
+  assert.equal(commandFor('Ver Produto', "selectClient('cliente')"), null, 'nomes de registros não são comandos');
   assert.equal(commandFor('−'), null);
 });
 
