@@ -18,7 +18,7 @@
 // Texto novo (o dono corrigiu em 26/09: o nome dela é Thatiane, "Thati" no
 // dia a dia; "Thatiane" só existe no código antigo e não é tocado aqui).
 import { hashPara100 } from './avaliacaoSemente'
-import { duracao, horaCurta } from '../dominio/formato'
+import { duracao, horaCurta, moeda } from '../dominio/formato'
 
 const EM_ANDAMENTO = new Set(['pago', 'aguardando', 'preparo', 'entrega'])
 
@@ -111,7 +111,7 @@ function instanteBase(pedido) {
 function atendimentoDoPedido(conversaId, nomeCliente, pedido, indiceMensagemInicial) {
   const nome = primeiroNome(nomeCliente)
   const itens = itensNatural(pedido.itens)
-  const total = pedido.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const total = moeda(pedido.total)
   const inicio = instanteBase(pedido)
   const passo = 3 * 60000
 
