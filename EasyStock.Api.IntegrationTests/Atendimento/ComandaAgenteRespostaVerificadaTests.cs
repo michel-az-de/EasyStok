@@ -110,7 +110,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         else if (caso == "encerrar_sem_pedido")
         {
             conversa.Situacao.Should().Be(SituacaoConversa.Encerrada);
-            texto.Should().StartWith("Conversa encerrada.");
+            texto.Should().Be("Combinado. Até a próxima!");
         }
         else texto.Should().Contain("equipe").And.NotContain("Pedido registrado");
         if (caso is "escalar" or "encerrar_sem_pedido")

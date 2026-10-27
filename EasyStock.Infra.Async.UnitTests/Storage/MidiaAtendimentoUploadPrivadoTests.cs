@@ -13,7 +13,8 @@ namespace EasyStock.Infra.Async.UnitTests.Storage;
 /// <summary>
 /// Issue 1285: a mídia recebida do cliente (nota de voz, vídeo, documento) passava pela whitelist do
 /// upload público e era recusada; o job só logava e a mensagem ficava sem mídia. O atendimento tem
-/// allowlist própria para o upload privado, e o upload público continua tão restrito quanto antes.
+/// allowlist própria para o upload privado; vídeo e texto simples continuam restritos no público.
+/// Áudio também pode ser publicado após validação pelo Console.
 /// </summary>
 public class MidiaAtendimentoUploadPrivadoTests
 {
@@ -53,10 +54,9 @@ public class MidiaAtendimentoUploadPrivadoTests
     }
 
     [Theory]
-    [InlineData("audio/ogg")]
     [InlineData("video/mp4")]
     [InlineData("text/plain")]
-    public async Task UploadPublicoContinuaRecusandoMidiaDoAtendimento(string mime)
+    public async Task UploadPublicoContinuaRecusandoMidiaForaDaWhitelist(string mime)
     {
         // Mesmo com a allowlist do atendimento anexada, o upload público usa só a whitelist conservadora.
         var act = () => _storage.UploadAsync(new FileUploadRequest(
@@ -67,10 +67,24 @@ public class MidiaAtendimentoUploadPrivadoTests
     }
 
     [Fact]
-    public async Task UploadPrivadoSemAllowlistPropriaContinuaRecusandoAudio()
+    public async Task UploadPrivadoSemAllowlistPropriaContinuaRecusandoVideo()
     {
-        var act = () => _storage.UploadAsync(new FileUploadRequest("logs", "a.ogg", "audio/ogg", [1, 2, 3], IsPublic: false));
+        var act = () => _storage.UploadAsync(new FileUploadRequest("logs", "a.mp4", "video/mp4", [1, 2, 3], IsPublic: false));
 
         await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AudioPermitidoPelaWhitelistPreservaAPrivacidadeSolicitada(bool publico)
+    {
+        await _storage.UploadAsync(new FileUploadRequest(
+            "atendimento", "a.ogg", "audio/ogg", [1, 2, 3], IsPublic: publico));
+
+        await _s3.Received(1).PutObjectAsync(
+            Arg.Is<PutObjectRequest>(r => r.ContentType == "audio/ogg" &&
+                (publico ? r.CannedACL == S3CannedACL.PublicRead : r.CannedACL != S3CannedACL.PublicRead)),
+            Arg.Any<CancellationToken>());
     }
 }
