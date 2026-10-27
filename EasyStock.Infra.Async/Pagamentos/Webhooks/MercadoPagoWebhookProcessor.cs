@@ -13,9 +13,9 @@ namespace EasyStock.Infra.Async.Pagamentos.Webhooks;
 ///
 /// <para>Fluxo:</para>
 /// <list type="number">
-///   <item>Só o tópico <c>payment</c> interessa; os demais (ex.: <c>merchant_order</c>) são ignorados com log.</item>
-///   <item>O corpo só fornece <c>data.id</c>, que precisa ser numérico. <b>Nada mais do corpo é usado</b>: o
-///     estado do pagamento vem de <c>GET v1/payments/{id}</c> (a assinatura prova a origem, não o conteúdo atual).</item>
+///   <item>Reconhece <c>payment</c> e <c>order.processed</c>; os demais (ex.: <c>merchant_order</c>) são ignorados com log.</item>
+///   <item>Em <c>payment</c>, <c>data.id</c> deve ser numérico. Em <c>order.processed</c>, a referência
+///     e o E2E localizam os ids exatos pela busca. Estado, valor e conta vêm de <c>GET v1/payments/{id}</c>.</item>
 ///   <item><c>external_reference</c> = <c>PedidoId</c>. Outra referência (fatura SaaS, integração alheia) é ignorada.</item>
 ///   <item><c>approved</c> → <see cref="ConfirmarPagamentoPedidoUseCase"/> (S11): lock no pedido, valor contra a
 ///     cobrança, <c>AguardandoPagamento → Aguardando</c>, <c>PedidoPagamento</c> e <c>pedido.pago</c> no outbox.
@@ -54,10 +54,44 @@ public sealed class MercadoPagoWebhookProcessor(
 
     public async Task<ResultadoWebhookGateway> ProcessarAsync(string rawBody, IDictionary<string, string?> headers, CancellationToken ct = default)
     {
+        if (ReferenciaDaOrdem(rawBody) is { } ordem)
+            return await ProcessarOrdemAsync(ordem.Id, ordem.PedidoId, ct);
+
         var (pagamentoId, motivo) = ExtrairPagamentoId(rawBody);
         if (pagamentoId is null) return ResultadoWebhookGateway.Falha(motivo);
+        return await ProcessarPagamentoAsync(pagamentoId, ct);
+    }
 
+    private async Task<ResultadoWebhookGateway> ProcessarOrdemAsync(string ordemId, Guid pedidoId, CancellationToken ct)
+    {
+        if (await cobrancas.ObterEmpresaIdDoPedidoAsync(pedidoId, ct) is null)
+            return ResultadoWebhookGateway.Falha("pedido_sem_cobranca");
+
+        // #2093: o E2E identifica o Pix exato, inclusive em cobrancas complementares.
+        var encontrados = await mercadoPagoClient.BuscarPagamentosPixDaOrdemAsync(ordemId, ct);
+        if (encontrados.Count == 0 || encontrados.Any(p =>
+            !Guid.TryParse(p.ExternalReference, out var id) || id != pedidoId
+            || p.PaymentMethodId != "pix" || string.IsNullOrWhiteSpace(p.TransactionId)))
+            throw new InvalidOperationException("Mercado Pago ainda nao retornou os pagamentos Pix da ordem.");
+        var resultado = ResultadoWebhookGateway.Ok;
+        foreach (var pagamento in encontrados)
+        {
+            var atual = await ProcessarPagamentoAsync(pagamento.Id, ct, pagamento);
+            if (!atual.Sucesso) resultado = atual;
+        }
+        return resultado;
+    }
+
+    private async Task<ResultadoWebhookGateway> ProcessarPagamentoAsync(string pagamentoId, CancellationToken ct,
+        PagamentoMercadoPago? esperado = null)
+    {
         var pagamento = await mercadoPagoClient.ConsultarPagamentoAsync(pagamentoId, ct);
+        if (esperado is not null && (pagamento is null || !pagamento.Aprovado
+            || !Guid.TryParse(pagamento.ExternalReference, out var referencia)
+            || !Guid.TryParse(esperado.ExternalReference, out var referenciaEsperada) || referencia != referenciaEsperada
+            || pagamento.PaymentMethodId != "pix" || string.IsNullOrWhiteSpace(pagamento.TransactionId)
+            || !string.Equals(pagamento.TransactionId, esperado.TransactionId, StringComparison.Ordinal)))
+            throw new InvalidOperationException("Pagamento Pix da ordem ainda indisponivel ou divergente na reconsulta.");
         if (pagamento is null)
         {
             // I3.1 (invariante 7): 404 na reconsulta com cobrança online esperando pede reenvio (5xx).
@@ -110,10 +144,37 @@ public sealed class MercadoPagoWebhookProcessor(
             : ResultadoWebhookGateway.Ok;
     }
 
-    /// <summary>
-    /// <c>data.id</c> de uma notificação <c>payment</c>, normalizado a partir de um <see cref="long"/>: o texto que
-    /// segue para a URL da consulta e para o log nunca é o do corpo (evita injeção de caminho e log forging).
-    /// </summary>
+    /// <summary>Referencia de order.processed, usada apenas para pesquisar pagamentos na fonte.</summary>
+    private static (string Id, Guid PedidoId)? ReferenciaDaOrdem(string rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(rawBody);
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("type", out var tipo) && tipo.ValueKind == JsonValueKind.String
+                && tipo.GetString() == "order"
+                && root.TryGetProperty("action", out var acao) && acao.ValueKind == JsonValueKind.String
+                && acao.GetString() == "order.processed"
+                && root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object
+                && data.TryGetProperty("id", out var ordemId) && ordemId.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(ordemId.GetString())
+                && data.TryGetProperty("transactions", out var transacoes) && transacoes.ValueKind == JsonValueKind.Object
+                && transacoes.TryGetProperty("payments", out var pagamentos) && pagamentos.ValueKind == JsonValueKind.Array
+                && pagamentos.EnumerateArray().Any(p => p.ValueKind == JsonValueKind.Object
+                    && p.TryGetProperty("payment_method", out var m)
+                    && m.ValueKind == JsonValueKind.Object && m.TryGetProperty("id", out var nome)
+                    && nome.ValueKind == JsonValueKind.String && nome.GetString() == "pix")
+                && data.TryGetProperty("external_reference", out var referencia) && referencia.ValueKind == JsonValueKind.String
+                && Guid.TryParse(referencia.GetString(), out var id) && id != Guid.Empty)
+                return (ordemId.GetString()!, id);
+        }
+        catch (JsonException) { }
+        return null;
+    }
+
+    /// <summary>Id numerico de payment, fechado antes de compor a URL da consulta.</summary>
     private (string? Id, string Motivo) ExtrairPagamentoId(string rawBody)
     {
         if (string.IsNullOrWhiteSpace(rawBody)) return (null, "corpo_vazio");

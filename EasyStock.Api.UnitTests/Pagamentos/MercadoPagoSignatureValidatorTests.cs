@@ -92,6 +92,21 @@ public class MercadoPagoSignatureValidatorTests
         }).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Validar_OrdemAlfanumericaUsaIdMinusculoNaAssinatura(bool adulterar)
+    {
+        const string id = "ORDTST01M5XSQ1XGCKBRPVA95R5N6THZ";
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+        var sig = Hmac(Secret, $"id:{id.ToLowerInvariant()};request-id:{ReqId};ts:{ts};");
+        var corpo = $"{{\"type\":\"order\",\"data\":{{\"id\":\"{(adulterar ? id + "X" : id)}\"}}}}";
+        Build(environmentName: "Production").Validar(corpo, new Dictionary<string, string?>
+        {
+            ["x-signature"] = $"ts={ts},v1={sig}", ["x-request-id"] = ReqId
+        }).Should().Be(!adulterar);
+    }
+
     [Fact]
     public void Validar_SemSecretComAllowUnsigned_RetornaTrue()
     {

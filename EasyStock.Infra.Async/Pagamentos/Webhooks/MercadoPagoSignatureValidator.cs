@@ -100,7 +100,9 @@ public sealed class MercadoPagoSignatureValidator(
         }
         if (string.IsNullOrWhiteSpace(dataId)) return false;
 
-        var toSign = $"id:{dataId};request-id:{reqId};ts:{ts};";
+        // #2093: notificacoes naturais de Orders assinam o id alfanumerico em minusculas.
+        // Preservar o id original no corpo para reconsultar a ordem na fonte.
+        var toSign = $"id:{dataId.ToLowerInvariant()};request-id:{reqId};ts:{ts};";
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(toSign));
         var expected = Convert.ToHexString(hash).ToLowerInvariant();

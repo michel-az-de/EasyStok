@@ -30,6 +30,9 @@ public sealed class MercadoPagoNaoConfiguradoClient : IMercadoPagoClient
     public Task<IReadOnlyList<EstornoMercadoPagoResult>> ListarEstornosAsync(string pagamentoId, CancellationToken ct = default) =>
         throw new MercadoPagoNaoConfiguradoException();
 
+    public Task<IReadOnlyList<PagamentoMercadoPago>> BuscarPagamentosPixDaOrdemAsync(string ordemId, CancellationToken ct = default) =>
+        throw new MercadoPagoNaoConfiguradoException();
+
     public Task ExpirarPreferenciaAsync(string preferenceId, DateTime expiraEm, CancellationToken ct = default) =>
         throw new MercadoPagoNaoConfiguradoException();
 }
