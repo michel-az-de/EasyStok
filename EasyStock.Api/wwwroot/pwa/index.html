@@ -9682,34 +9682,8 @@ async function maybeOfferLocalRestore() {
     if (!window.cdbSync || typeof window.cdbSync.readLocalBackup !== 'function') return;
     var backup = await window.cdbSync.readLocalBackup();
 
-    // Auto-read falhou (Android 11+ pos-reinstall, app perdeu ownership do
-    // MediaStore). Oferece SAF picker pro user selecionar o arquivo.
-    if ((!backup || !backup.data) && typeof window.cdbSync.pickBackupViaSAF === 'function'
-        && window.cdbSync.hasPublicBackupPlugin && window.cdbSync.hasPublicBackupPlugin()) {
-      var ofereceuSAF = confirm(
-        'Bem-vindo de volta!\n\n'
-        + 'Parece que voce reinstalou o app. Tem um arquivo de backup salvo no '
-        + 'celular (em Documentos/casa-da-baba ou Downloads).\n\n'
-        + 'Quer selecionar o arquivo backup-latest.json pra restaurar seus dados?'
-      );
-      if (!ofereceuSAF) return;
-      var picked = await window.cdbSync.pickBackupViaSAF();
-      if (!picked) return;
-      if (picked.kind === 'export' && picked.payload && typeof applyBackupPayload === 'function') {
-        // Formato do exportBackup manual: tem .state estruturado.
-        await applyBackupPayload(picked.payload);
-        try {
-          localStorage.setItem('cdb-restore-source', 'saf-export-' + (picked.filename || ''));
-          localStorage.setItem('cdb-restore-at', String(Date.now()));
-        } catch (e) {}
-        alert('Dados restaurados de ' + (picked.filename || 'arquivo') + ' · recarregando...');
-        setTimeout(function () { location.reload(); }, 600);
-        return;
-      }
-      // kind === 'snapshot' (auto-backup-v1): cai no fluxo normal abaixo
-      backup = picked.payload;
-    }
-
+    // Plugin disponível não prova que existe backup nem que houve reinstalação.
+    // Sem arquivo lido, a seleção manual continua disponível em Ajustes.
     if (!backup || !backup.data) return;
 
     var capturedAt = backup.capturedAt ? new Date(backup.capturedAt).toLocaleString('pt-BR') : '?';
@@ -23550,22 +23524,26 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Pede permissao Bluetooth na 1a abertura do app — sem isso, qualquer
-// chamada bs.* no Android 12+ crasha. Roda apos deviceready (cordova) ou
-// logo que window.cordova existe (Capacitor injeta antes do load).
-document.addEventListener('deviceready', () => {
-  if (typeof ensureBluetoothPermission === 'function') {
-    ensureBluetoothPermission(() => {/* prompt mostrado, segue */});
-  }
-}, false);
-// Fallback: Capacitor nao dispara deviceready em todas as versoes.
-// Tenta de novo 2s apos load — se ja tiver permissao, no-op silencioso.
+// Oferta inicial única. Recusar não impede usar o app nem provoca novo prompt
+// pelo fallback. Impressoras/Imprimir continuam pedindo a permissão ao usar.
+let initialBluetoothOfferStarted = false;
+function offerInitialBluetoothPermission() {
+  if (initialBluetoothOfferStarted || typeof ensureBluetoothPermission !== 'function') return;
+  const nativePrinter = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter;
+  const legacyPermissions = window.cordova && window.cordova.plugins && window.cordova.plugins.permissions;
+  if (!(nativePrinter && typeof nativePrinter.requestPermissions === 'function')
+      && !(legacyPermissions && typeof legacyPermissions.requestPermissions === 'function')) return;
+  const offeredKey = 'cdb-bluetooth-initial-offer-v1';
+  try { if (localStorage.getItem(offeredKey) === '1') return; } catch (_) {}
+  initialBluetoothOfferStarted = true;
+  // A marca descreve a oferta, não o estado da permissão, e precede o diálogo.
+  try { localStorage.setItem(offeredKey, '1'); } catch (_) {}
+  try { ensureBluetoothPermission(() => {}); } catch (_) {}
+}
+document.addEventListener('deviceready', offerInitialBluetoothPermission, false);
+// Capacitor pode disponibilizar o bridge sem emitir deviceready.
 window.addEventListener('load', () => {
-  setTimeout(() => {
-    if (typeof ensureBluetoothPermission === 'function') {
-      try { ensureBluetoothPermission(() => {}); } catch (e) {}
-    }
-  }, 2000);
+  setTimeout(offerInitialBluetoothPermission, 2000);
 });
 
 // Hooks globais de erro — registram window.onerror e unhandledrejection

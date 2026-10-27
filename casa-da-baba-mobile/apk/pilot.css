@@ -357,7 +357,7 @@ body.pilot-app .phone .nav-btn.active::before { display: none; }
 body.pilot-app .phone .section-label, body.pilot-app .modal-label { font: 600 15px/1.4 system-ui, sans-serif; letter-spacing: 0; text-transform: none; color: var(--ink-dim); }
 body.pilot-app .modal-label { margin: 20px 0 8px; }
 body.pilot-app :is(.modal-sub, .modal-label .ml-hint) { font: 400 14px/1.5 system-ui, sans-serif; letter-spacing: 0; color: var(--ink-dim); }
-body.pilot-app .modal-sheet { padding: 20px 20px max(24px, env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; background: var(--bg); }
+body.pilot-app .modal-sheet { padding: 20px 20px max(24px, env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; background: var(--bg); scroll-padding-block: 16px; }
 body.pilot-app .modal-title { font: 600 28px/1.2 system-ui, sans-serif; letter-spacing: -.025em; }
 body.pilot-app .modal-title .accent { font: inherit; color: inherit; }
 body.pilot-app .input-box, body.pilot-app .search-box { padding: 0; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--bg-elev); box-shadow: none; }
@@ -369,7 +369,9 @@ body.pilot-app .search-box { display: flex; align-items: center; padding-left: 1
 body.pilot-app .search-box input { min-width: 0; flex: 1; }
 body.pilot-app :is(.cat-pill, .loc-tab, .screen-tab) { min-height: 48px; font-size: 15px; }
 body.pilot-app :is(.cta-btn, .prod-create-btn) { min-height: 52px; font-size: 16px; font-weight: 650; letter-spacing: 0; border-radius: 12px; }
-body.pilot-app .modal-ctas { position: sticky; bottom: -24px; z-index: 2; margin: 20px -20px -24px; padding: 14px 20px max(24px, env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--border); box-shadow: 0 -6px 18px #00000005; }
+/* No fluxo, o rodapé não cobre o campo focado quando o teclado reduz a tela. */
+body.pilot-app .modal-ctas { position: static; margin: 20px -20px -24px; padding: 14px 20px max(24px, env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--border); box-shadow: none; }
+body.pilot-app .modal-sheet :is(input, textarea, select) { scroll-margin-block: 16px; }
 body.pilot-app .pilot-product-options { margin-top: 24px; border-top: 1px solid var(--border); }
 body.pilot-app .pilot-product-options > summary { padding: 18px 0; font-size: 16px; font-weight: 650; cursor: pointer; }
 body.pilot-app #newProdBatchFields:not([hidden]) { margin-top: 24px; padding-top: 4px; border-top: 1px solid var(--border); }
@@ -405,3 +407,41 @@ body.pilot-app :is(.etq-chip, .etq-note-input, #etqCopiesSelect, #etqRetryBtn) {
 body.pilot-app .etq-config-lbl { font-size: 14px; letter-spacing: 0; }
 body.pilot-app .etq-actions .etq-btn { min-height: 52px; font-size: 16px; }
 @media (max-width: 380px) { .pilot-home .pilot-sheet { padding-left: 16px; padding-right: 16px; } .pilot-home .pilot-topline { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; } .pilot-top-actions { gap: 4px; } }
+
+/* Identificação do operador no APK, com rolagem disponível ao abrir o teclado. */
+body.pilot-app #welcomeScreen { box-sizing: border-box; justify-content: flex-start; padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 20px; }
+body.pilot-app #welcomeScreen > * { flex-shrink: 0; }
+body.pilot-app #welcomeScreen .pilot-welcome-brand { display: block; width: 96px; height: 72px; object-fit: contain; margin: 0 0 20px; }
+body.pilot-app #welcomeScreen h1 { width: 100%; max-width: 360px; margin: 0 0 12px; font: 650 28px/1.25 system-ui, sans-serif; letter-spacing: -.02em; }
+body.pilot-app #welcomeScreen p { max-width: 360px; margin: 0 0 28px; font: 400 16px/1.5 system-ui, sans-serif; color: var(--ink-dim); }
+body.pilot-app #welcomeScreen label { width: 100%; max-width: 360px; margin: 0 0 8px; font: 600 16px/1.4 system-ui, sans-serif; color: var(--ink); }
+body.pilot-app #welcomeScreen :is(input, button) { box-sizing: border-box; width: 100%; max-width: 360px; min-height: 52px; font-size: 16px; line-height: 1.5; border-radius: 12px; }
+body.pilot-app #welcomeScreen input { margin: 0 0 16px; padding: 13px 16px; background: var(--bg-elev); border: 1px solid var(--border-strong); color: var(--ink); }
+body.pilot-app #welcomeScreen button { padding: 14px 16px; background: #a34e35; color: #fffaf2; letter-spacing: 0; }
+body.pilot-app #welcomeScreen :is(input, button):focus-visible { outline: 3px solid var(--basil); outline-offset: 3px; }
+body.pilot-app #welcomeScreen .hint { max-width: 360px; margin-top: 16px; font: 400 14px/1.5 system-ui, sans-serif; color: var(--ink-dim); }
+/* O pseudo-elemento original já fornece a barra; evita duplicá-la com o HTML. */
+body.pilot-app .modal-sheet > .modal-handle { display: none; }
+
+/* Produção: alerta visível e indicadores secundários sob demanda. */
+body.pilot-app .pilot-production-metrics { margin-top: 12px; }
+body.pilot-app .pilot-production-metrics > summary { min-height: 44px; padding: 10px 0; color: var(--ink-dim); font: 400 14px/1.5 system-ui, sans-serif; cursor: pointer; }
+body.pilot-app .pilot-production-metrics > summary strong { color: var(--ink); font-weight: 700; }
+body.pilot-app .pilot-metrics-action { margin-left: 12px; text-decoration: underline; text-underline-offset: 3px; }
+body.pilot-app .phone .pilot-production-metrics .prod-metrics { display: grid; gap: 8px; margin: 0 0 8px; }
+body.pilot-app .phone .pilot-production-metrics .prod-metrics span { text-transform: none; font-size: 14px; }
+body.pilot-app .pilot-production-metrics > summary:focus-visible { outline: 3px solid var(--basil); outline-offset: 3px; border-radius: 6px; }
+.pilot-production-empty { display: none; }
+body.pilot-app .phone .pilot-production-actions > .cta-btn:not(.primary) { flex: 0 0 auto; min-width: 48px; padding-inline: 12px; border-color: transparent; background: transparent; box-shadow: none; }
+@supports selector(:has(*)) {
+  body.pilot-app .phone .pilot-production-actions:has(#saveProdBtn:disabled) { position: static; margin-top: 12px; padding: 12px 0; border: 0; box-shadow: none; }
+  body.pilot-app .phone .pilot-production-actions:has(#saveProdBtn:disabled) > button { display: none; }
+  body.pilot-app .phone .pilot-production-actions:has(#saveProdBtn:disabled) > .pilot-production-empty { display: block; margin: 0; color: var(--ink-dim); font: 400 16px/1.5 system-ui, sans-serif; }
+  body.pilot-app .phone .producao-tab-section[data-ptab=catalogo]:has(#saveProdBtn:disabled) { padding-bottom: 12px; }
+  body.pilot-app .phone .producao-tab-section[data-ptab=catalogo]:has(#saveProdBtn:disabled) > .product-grid { padding-bottom: 0; }
+}
+/* Contraste dos controles de tela; nenhuma regra alcança .etq-card/impressão. */
+body.pilot-app .etq-config-bar .etq-chip.active { background: #496b56; color: #fffaf2; border-color: #496b56; }
+body.pilot-app .etq-actions .etq-print { background: #a34e35; color: #fffaf2; box-shadow: none; }
+body.pilot-app :is(.etq-config-bar .etq-chip, .etq-actions .etq-print):focus-visible { outline: 3px solid var(--basil); outline-offset: 3px; }
+html[data-theme=light] body.pilot-app .pilot-rail .pilot-brand-mark { mix-blend-mode: multiply; }
