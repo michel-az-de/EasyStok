@@ -39,7 +39,8 @@ public class RegistrarPagamentoPedidoUseCase(
     QuitacaoPedido quitacao,
     ICaixaRepository? caixaRepo = null,
     SaldoFinanceiroPedido? saldos = null,
-    Lazy<EasyStock.Application.Services.Atendimento.AvisoStatusPedidoCliente>? avisoCliente = null)
+    Lazy<EasyStock.Application.Services.Atendimento.AvisoStatusPedidoCliente>? avisoCliente = null,
+    EasyStock.Application.UseCases.ListarFechamentosCaixa.ListarFechamentosCaixaUseCase? fechamentos = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -259,8 +260,15 @@ public class RegistrarPagamentoPedidoUseCase(
                 return;
             }
 
-            var abertura = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", 0m, pagoEm, pedido.LojaId);
-            abertura.Descricao = "Abertura automática no primeiro pagamento de pedido do dia.";
+            // #2084 (B1): a gaveta não começa vazia. Herda o dinheiro deixado no último fechamento, a mesma sugestão da
+            // abertura manual, e fica marcada para a gerente conferir depois (ConfirmacaoPendente). Não bloqueia o
+            // pagamento: sem fechamento anterior, abre com zero, também a confirmar.
+            var herdada = fechamentos is null ? null : await fechamentos.GavetaDoUltimoFechamentoAsync(cmd.EmpresaId, pedido.LojaId);
+            var abertura = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", Math.Max(0m, herdada?.Dinheiro ?? 0m), pagoEm, pedido.LojaId);
+            abertura.Descricao = herdada is { } h
+                ? $"Abertura automática no primeiro pagamento de pedido do dia, com {h.Dinheiro.ToString("C", Cultura.PtBr)} deixados no fechamento de {h.Data:dd/MM}. Falta a gerente conferir."
+                : "Abertura automática no primeiro pagamento de pedido do dia. Falta a gerente conferir.";
+            abertura.ConfirmacaoPendente = true;
             abertura.RegistradoPorUserId = cmd.RegistradoPorUserId;
             abertura.RegistradoPorNome = string.IsNullOrWhiteSpace(cmd.RegistradoPorNome) ? "Sistema" : cmd.RegistradoPorNome;
             abertura.Origem = "auto-pagamento";
