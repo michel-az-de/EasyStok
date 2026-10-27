@@ -133,7 +133,7 @@ O enriquecedor de telemetria também reduz essa chamada à origem, sem sessão n
 - `POST /api/webhooks/wppconnect?token=...`: callback autenticado do gateway. A sessão é
   conferida com a credencial cifrada antes de processar conteúdo.
 
-O preload preserva os argumentos seguros da biblioteca para cache, origem e TLS. Callbacks
+O preload fixa somente `--no-sandbox` e `--disable-dev-shm-usage`, sem desabilitar TLS ou isolamento de origem. Callbacks
 HTTP 429/5xx são repetidos até cinco tentativas com espera exponencial limitada a 60 segundos;
 erros permanentes e endpoints de envio não recebem esse retry.
 
@@ -183,6 +183,22 @@ real e a conexão, além de uma mensagem nova; a cópia do perfil sozinha não c
 - Não há importação do histórico anterior, grupos, campanhas ou garantia contra bloqueio.
 - Remover o vínculo pela tela faz logout e desativa somente a credencial WPPConnect da empresa;
   o próximo envio usa Meta quando ela estiver configurada. Sem Meta real, o envio é recusado.
+
+### Mídia e contexto do agente
+
+Os identificadores WPP são convertidos em nomes `wpp-<SHA256>` para o armazenamento aceitar
+os caracteres do identificador original. Anexos recebidos de WhatsApp e e-mail exigem o endpoint
+autenticado da conversa; o servidor público de arquivos só libera, no atendimento, os nomes
+GUID no formato D gerados para envio. Os áudios validados pelo chat podem ser publicados, e
+Ogg é servido como `audio/ogg` para o gateway reconhecer a nota de voz.
+
+O agente recebe cada entrada identificada como nova ou histórica, com data em Brasília. Um
+pedido vinculado é uma referência para consultar, não comprovação de que continua em andamento.
+As instruções usam legenda, transcrição e contexto antes de pedir detalhes sobre anexos;
+consultas de leitura são executadas pelas ferramentas existentes. A ausência de interpretação
+visual não deve provocar pedidos genéricos repetidos para reescrever a conversa. Não há visão
+computacional neste canal. Encerramento sem pendência envia uma despedida curta uma vez;
+perguntas pendentes e pedidos continuam sujeitos às guardas existentes.
 
 ### Risco da conta e atendimento automático
 

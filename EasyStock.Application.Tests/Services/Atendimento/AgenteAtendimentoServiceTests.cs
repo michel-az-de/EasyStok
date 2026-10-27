@@ -121,6 +121,32 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task FotoAntigaNaoViraPedidoNovoEDespedidaFechaUmaVez()
+    {
+        _situacaoNoBanco = SituacaoConversa.Automatica;
+        _historico.Clear();
+        var foto = Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddDays(-2), TipoConteudoMensagem.Imagem,
+            "foto do teste anterior", "wamid.foto-antiga");
+        foto.MarcarProcessada(Agora.AddDays(-2).AddSeconds(1));
+        _historico.Add(foto);
+        _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Agente, Agora.AddDays(-2).AddSeconds(2),
+            TipoConteudoMensagem.Texto, "Foto recebida.", "wamid.resposta-antiga"));
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddMinutes(-1), TipoConteudoMensagem.Texto,
+            "Obrigado, era só isso. Até mais!", "wamid.despedida"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(UsoFerramenta("encerrar_conversa"));
+        var servico = CriarServico(new EncerrarConversaFerramenta());
+
+        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeTrue();
+        _conversa.Situacao.Should().Be(SituacaoConversa.Encerrada);
+        var textos = _requisicoes.Single().Mensagens.SelectMany(m => m.Conteudo.OfType<BlocoTextoLlm>()).Select(b => b.Texto).ToList();
+        textos.Should().Contain(t => t.StartsWith("[histórico de ") && t.Contains("foto do teste anterior"));
+        textos[^1].Should().StartWith("[entrada nova de ").And.Contain("Obrigado, era só isso. Até mais!");
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Combinado. Até a próxima!", Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        (await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeFalse();
+    }
+    [Fact]
     public async Task AudioTranscritoChegaComoTextoAoAgente()
     {
         // #1398: com transcrição, o agente lê o que o cliente falou no lugar do marcador genérico.
@@ -293,7 +319,7 @@ public class AgenteAtendimentoServiceTests
         var servico = CriarServico(new EncerrarConversaFerramenta());
         var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
         resultado.Respondeu.Should().BeTrue(); resultado.Escalou.Should().BeFalse();
-        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Conversa encerrada. Quando precisar, mande uma nova mensagem por aqui.",
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Combinado. Até a próxima!",
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _consultarPedido.DidNotReceiveWithAnyArgs().ExecutarAsync(default!, default, default);
         (await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeFalse();
@@ -520,7 +546,7 @@ public class AgenteAtendimentoServiceTests
         resultado.ChamouLlm.Should().BeTrue();
         var mensagens = _requisicoes.Should().ContainSingle().Subject.Mensagens;
         mensagens[^1].Papel.Should().Be(MensagemLlm.Usuario);
-        mensagens[^1].Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Should().Be("quero um bolo de cenoura");
+        mensagens[^1].Conteudo.OfType<BlocoTextoLlm>().Single().Texto.Should().StartWith("[entrada nova de ").And.EndWith("quero um bolo de cenoura");
         segunda.ProcessadaEm.Should().Be(Agora);
     }
 
