@@ -38,8 +38,13 @@ const CODE128 = [
 const INICIO_B = 104
 const FIM = 106
 
+// O código que a etiqueta imprime nos três lugares (QR, barras e texto): sem acento e só ASCII
+// visível, que é o que o Code 128 B carrega. Assim o leitor lê o mesmo código em qualquer um deles.
+export const codigoDaEtiqueta = (texto) =>
+  String(texto ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '')
+
 export function valoresCode128(texto) {
-  const limpo = String(texto ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7E]/g, '')
+  const limpo = codigoDaEtiqueta(texto)
   const valores = [INICIO_B, ...[...limpo].map((c) => c.charCodeAt(0) - 32)]
   const soma = valores.reduce((total, v, i) => total + v * (i === 0 ? 1 : i), 0)
   return [...valores, soma % 103, FIM]

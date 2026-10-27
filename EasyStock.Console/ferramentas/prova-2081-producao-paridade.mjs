@@ -21,6 +21,9 @@ for (const nome of readdirSync(pastaDasTelas).filter((n) => n.endsWith('Api.jsx'
   const url = new URL(nome, pastaDasTelas)
   telasCompiladas.set(url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
+// A etiqueta roda de verdade só quando importada por esta URL com `?real` (as telas a recebem como nome).
+const urlDaEtiqueta = new URL('etiqueta/EtiquetaDeProducao.jsx', pastaDasTelas)
+const etiquetaCompilada = (await transformWithOxc(readFileSync(urlDaEtiqueta, 'utf8'), urlDaEtiqueta.pathname, { jsx: { runtime: 'automatic' } })).code
 
 // Hooks de mentira (como na prova da #1585): o estado mora no `host` do componente que renderiza.
 let host = null
@@ -58,6 +61,7 @@ registerHooks({
   },
   load(url, contexto, proximo) {
     if (telasCompiladas.has(url)) return inline(telasCompiladas.get(url))
+    if (url === `${urlDaEtiqueta.href}?real`) return inline(etiquetaCompilada)
     if (url.endsWith('/infra/fonteDados.js')) return inline("export const FONTE_API = true\nexport const API_BASE = ''\n")
     if (url.endsWith('/aplicacao/contextos.js')) return inline('export const useCatalogo=()=>globalThis.__prova2081.catalogo')
     if (url.includes('/aplicacao/acessoModulos.')) return inline('export const useAcessoModulos=()=>({acoes:{editarProducao:true},permite:()=>true})')
@@ -317,6 +321,40 @@ const botao = (no, rotulo) => doTipo(no, 'Botao').find((b) => texto(b) === rotul
 const evento = { preventDefault() {} }
 globalThis.window = { print: () => {} }
 const tela = async (nome) => (await import(new URL(`${nome}.jsx`, pastaDasTelas).href))[nome]
+
+// === R1/R2 da revisão: alérgenos na etiqueta e o mesmo código nos três lugares =============
+const renderizarEtiqueta = async (props) => {
+  const { EtiquetaDeProducao } = await import(`${urlDaEtiqueta.href}?real`)
+  const expandir = (el) => {
+    if (el == null || typeof el === 'boolean') return null
+    if (typeof el !== 'object') return String(el)
+    if (Array.isArray(el)) return el.map(expandir)
+    if (typeof el.type === 'function') return expandir(el.type(el.props))
+    const { children, ...resto } = el.props ?? {}
+    return { type: el.type, props: { ...resto, children: expandir(children) } }
+  }
+  return expandir({ type: EtiquetaDeProducao, props })
+}
+const etiquetaBase = { id: 'e-1', sequencial: 1, codigo: 'LOT-261026-001-0001', nome: 'Lasanha Bolonhesa Clássica 1 kg', pesoG: 1000, lote: 'LOT-261026-001',
+  produzidoEm: '2026-10-26T23:06:08Z', validadeEm: '2026-10-31T23:06:08Z', alergenos: [] }
+
+await confere('R1: a etiqueta declara os alérgenos que a ficha traz, em português e sem tirar QR nem barras', async () => {
+  const a = await renderizarEtiqueta({ etiqueta: { ...etiquetaBase, alergenos: ['gluten', 'lactose', 'ovo'] }, empresa: 'Casa da Baba', total: 12 })
+  assert.match(texto(a), /ALÉRGICOS: CONTÉM GLÚTEN, LACTOSE E OVO\./)
+  assert.equal(doTipo(a, 'svg').length, 2, 'QR e barras continuam')
+  const sem = await renderizarEtiqueta({ etiqueta: etiquetaBase, empresa: 'Casa da Baba', total: 12 })
+  assert.doesNotMatch(texto(sem), /ALÉRGICOS/)
+})
+
+await confere('R2: QR, barras e texto usam o mesmo código saneado', async () => {
+  const { codigoDaEtiqueta, valoresCode128 } = await import('../src/features/gestao/producao/etiqueta/codigos.js')
+  assert.equal(codigoDaEtiqueta('LOT-AÇÚCAR-0001'), 'LOT-ACUCAR-0001')
+  assert.equal(codigoDaEtiqueta('LOT-261026-001-0001'), 'LOT-261026-001-0001')
+  assert.deepEqual(valoresCode128('LOT-AÇÚCAR-0001'), valoresCode128('LOT-ACUCAR-0001'))
+  const e = await renderizarEtiqueta({ etiqueta: { ...etiquetaBase, codigo: 'LOT-AÇÚCAR-0001' }, empresa: '', total: 1 })
+  assert.match(texto(e), /LOT-ACUCAR-0001/)
+  assert.doesNotMatch(texto(e), /AÇÚCAR/)
+})
 
 await confere('A4: confirmar a produção abre a prévia da etiqueta de verdade, que imprime o lote todo', async () => {
   globalThis.__prova2081.catalogo = { cardapio: [{ sku: 'i-1', nome: 'Lasanha Bolonhesa Clássica 1 kg', porcao: '1 kg', porcoes: [] }] }

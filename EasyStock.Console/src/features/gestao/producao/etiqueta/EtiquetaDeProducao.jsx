@@ -1,5 +1,5 @@
 import { FUSO } from '../../../../dominio/formato'
-import { barrasDoCode128, caminhoDoQr, matrizDoQr } from './codigos'
+import { barrasDoCode128, caminhoDoQr, codigoDaEtiqueta, matrizDoQr } from './codigos'
 import css from './etiqueta.module.css'
 
 // #2081 (A4): a etiqueta de produção do console, a mesma do APK piloto: 80x40 mm, empresa, prato,
@@ -12,6 +12,20 @@ const peso = (g) => {
 }
 
 const SILENCIO_QR = 2
+
+// Revisão da #2081 (R1): a etiqueta antiga do console imprimia os alérgenos; a de comida tem de
+// declarar (RDC 26/2015). Os nomes são os do renderizador do PWA (pwa/etiqueta/render.js), em
+// maiúsculas como pede a norma: "ALÉRGICOS: CONTÉM GLÚTEN, LACTOSE E OVO."
+const ALERGENOS = {
+  gluten: 'glúten', lactose: 'lactose', ovo: 'ovo', soja: 'soja', amendoim: 'amendoim',
+  castanhas: 'castanhas', peixe: 'peixe', crustaceos: 'crustáceos', outros: 'outros',
+}
+function textoDosAlergenos(lista) {
+  const nomes = (lista ?? []).map((a) => ALERGENOS[a] ?? String(a)).filter(Boolean)
+  if (nomes.length === 0) return null
+  const juntos = nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`
+  return `ALÉRGICOS: CONTÉM ${juntos.toUpperCase()}.`
+}
 
 function Qr({ codigo }) {
   const matriz = matrizDoQr(codigo)
@@ -36,8 +50,11 @@ function Barras({ codigo }) {
 
 export function EtiquetaDeProducao({ etiqueta, empresa, total }) {
   const gramas = peso(etiqueta.pesoG)
+  const alergenos = textoDosAlergenos(etiqueta.alergenos)
+  // Revisão da #2081 (R2): QR, barras e texto com o mesmo código saneado.
+  const codigo = codigoDaEtiqueta(etiqueta.codigo)
   return (
-    <article className={css.etiqueta} aria-label={`Etiqueta ${etiqueta.sequencial} de ${total}, lote ${etiqueta.lote}`}>
+    <article className={`${css.etiqueta} ${alergenos ? css.comAlergenos : ''}`} aria-label={`Etiqueta ${etiqueta.sequencial} de ${total}, lote ${etiqueta.lote}`}>
       <div className={css.topo}>
         <div className={css.dados}>
           {empresa && <p className={css.empresa}>{empresa}</p>}
@@ -50,12 +67,13 @@ export function EtiquetaDeProducao({ etiqueta, empresa, total }) {
           </dl>
         </div>
         <div className={css.lado}>
-          <Qr codigo={etiqueta.codigo} />
+          <Qr codigo={codigo} />
           <span className={css.sequencial}>{etiqueta.sequencial}/{total}</span>
         </div>
       </div>
-      <Barras codigo={etiqueta.codigo} />
-      <p className={css.codigo}>{etiqueta.codigo}</p>
+      {alergenos && <p className={css.alergenos}>{alergenos}</p>}
+      <Barras codigo={codigo} />
+      <p className={css.codigo}>{codigo}</p>
     </article>
   )
 }
