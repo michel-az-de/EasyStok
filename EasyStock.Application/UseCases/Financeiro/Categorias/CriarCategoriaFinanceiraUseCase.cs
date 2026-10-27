@@ -24,6 +24,12 @@ public class CriarCategoriaFinanceiraUseCase(
         if (string.IsNullOrWhiteSpace(cmd.Nome))
             throw new UseCaseValidationException("Nome e obrigatorio.");
         UseCaseGuards.EnsureSemTagsHtml(cmd.Nome, "Nome da categoria");
+        // #2095 (F15/F7): tipo fora do enum e textos acima da coluna viravam categoria inválida ou 500.
+        if (!Enum.IsDefined(cmd.Tipo))
+            throw new UseCaseValidationException("Tipo da categoria inválido. Use Despesa, Receita ou Ambas.");
+        ValidacaoFinanceira.Texto(cmd.Nome, ValidacaoFinanceira.NomeCadastroMax, "Nome da categoria");
+        ValidacaoFinanceira.Texto(cmd.Cor, ValidacaoFinanceira.CorMax, "Cor");
+        ValidacaoFinanceira.Texto(cmd.Icone, ValidacaoFinanceira.IconeMax, "Ícone");
 
         CategoriaFinanceira? parent = null;
         if (cmd.ParentId.HasValue)

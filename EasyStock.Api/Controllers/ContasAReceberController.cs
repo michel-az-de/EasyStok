@@ -72,6 +72,7 @@ public class ContasAReceberController(
             return DataCreated($"/api/contas-a-receber/{r.Id}", r);
         }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
+        catch (EasyStock.Application.UseCases.Financeiro.Common.ContaFinanceiraDuplicadaException ex) { return DataConflict(ex.Message); }
     }
 
     [HttpPatch("{id:guid}")]

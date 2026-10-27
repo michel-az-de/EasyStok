@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Financeiro.Dashboard;
 using Swashbuckle.AspNetCore.Annotations;
@@ -36,8 +37,10 @@ public class FinanceiroController(
         if (!RequerVisualizar(out var permErr)) return permErr!;
         if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
 
-        var iniDef = inicio ?? new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var fimDef = fim ?? iniDef.AddMonths(6).AddSeconds(-1);
+        // #2095 (F13): o padrão é o mês corrente de Brasília e os 5 seguintes, em dias civis (data sem fuso).
+        var hoje = HorarioBrasil.Hoje();
+        var iniDef = inicio ?? new DateTime(hoje.Year, hoje.Month, 1);
+        var fimDef = fim ?? new DateTime(hoje.Year, hoje.Month, 1).AddMonths(6).AddDays(-1);
 
         try
         {
