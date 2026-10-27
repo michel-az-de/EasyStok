@@ -952,6 +952,41 @@ public static class NotificacoesGlobaisSeed
             assuntoTemplate: "{{ tipo_legivel }} há {{ atraso_texto }}",
             corpoTemplate: """{{ if cliente && cliente != "" }}{{ cliente }} está esperando: {{ end }}{{ tipo_legivel }} há {{ atraso_texto }} (referência {{ referencia }}).""");
 
+        // ===== #2096: prazo estourado e avisos da operação no aparelho da dona e do gerente. O Push aparece na tela de
+        // bloqueio: só o tipo, o primeiro nome e o tempo; o texto completo fica no e-mail e no sino. Interno. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: "prazo_estourado_push_v1",
+            nome: "Prazo Estourado · Push",
+            canal: CanalNotificacao.Push,
+            tipoEvento: TipoEventoNotificacao.PrazoEstourado,
+            assuntoTemplate: "{{ tipo_legivel }}",
+            corpoTemplate: """{{ if cliente && cliente != "" }}{{ cliente }}: {{ end }}há {{ atraso_texto }} ({{ referencia }})""");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "alerta_operacao_push_v1",
+            nome: "Aviso da Operação · Push",
+            canal: CanalNotificacao.Push,
+            tipoEvento: TipoEventoNotificacao.AlertaOperacao,
+            assuntoTemplate: "{{ titulo }}",
+            corpoTemplate: "{{ resumo_curto }}");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: "alerta_operacao_inapp_v1",
+            nome: "Aviso da Operação · In-App",
+            canal: CanalNotificacao.InApp,
+            tipoEvento: TipoEventoNotificacao.AlertaOperacao,
+            assuntoTemplate: "{{ titulo }}",
+            corpoTemplate: "{{ texto }}");
+
+        // O texto pode vir da IA do atendimento: o HTML do e-mail escapa tudo o que vem do payload.
+        yield return TemplateNotificacao.Criar(
+            codigo: "alerta_operacao_email_v1",
+            nome: "Aviso da Operação · Email",
+            canal: CanalNotificacao.Email,
+            tipoEvento: TipoEventoNotificacao.AlertaOperacao,
+            assuntoTemplate: "Casa da Baba: {{ titulo }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("alerta_operacao_email_v1"));
+
         yield return TemplateNotificacao.Criar(
             codigo: "resumo_diario_inapp_v1",
             nome: "Resumo Diário · In-App",
@@ -1254,9 +1289,15 @@ public static class NotificacoesGlobaisSeed
 
         var prazoEstourado = MakeRotina("prazo_estourado_global", "Prazo Estourado",
             TipoEventoNotificacao.PrazoEstourado, "prazo_estourado_email_v1",
-            CategoriaConteudoNotificacao.Operacional, "[\"Email\",\"WhatsApp\"]", ModoTodos("gestores"));
+            CategoriaConteudoNotificacao.Operacional, "[\"Push\",\"Email\",\"WhatsApp\"]", ModoTodos("gestores"));
         prazoEstourado.DefinirJanela(new TimeOnly(7, 0), new TimeOnly(22, 0));
         yield return prazoEstourado;
+
+        // #2096: avisos da operação (encomenda, freezer, IA do atendimento) para dona e gerente. O sino entra pela categoria
+        // Operacional. Sem janela: a vigia só gera o resumo do freezer depois das 8 h. Rollback: Ativa=false.
+        yield return MakeRotina("alerta_operacao_global", "Aviso da Operação",
+            TipoEventoNotificacao.AlertaOperacao, "alerta_operacao_email_v1",
+            CategoriaConteudoNotificacao.Operacional, "[\"Push\",\"Email\"]", ModoTodos("gestores"));
 
         // Molde: nasce inativa. A N12 liga por empresa (POST api/notificacoes/rotinas com a propria agenda e canais): o
         // coletor de rotinas agendadas ignora rotina global, entao ativar este molde nao dispara resumo para ninguem.

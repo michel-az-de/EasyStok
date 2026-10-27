@@ -79,6 +79,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(p => p.AtrasoNotificadoEm)
                 .HasColumnName("atraso_notificado_em")
                 .IsRequired(false);
+            // #2096: confirmação da encomenda pelo cliente.
+            b.Property(p => p.ConfirmadoPeloClienteEm)
+                .HasColumnName("confirmado_pelo_cliente_em")
+                .IsRequired(false);
             // Varredura do PedidoAtrasoJob a cada 60 s: só os aguardando ainda não avisados.
             b.HasIndex(p => p.InicioPrevistoEm)
                 .HasDatabaseName("ix_pedidos_atraso_pendente")

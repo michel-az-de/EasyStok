@@ -1,17 +1,21 @@
 using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Application.Services.Notifications;
 
-/// <summary>Os quatro prazos vivos do <see cref="TipoEventoNotificacao.PrazoEstourado"/> (N11).</summary>
+/// <summary>Os prazos vivos do <see cref="TipoEventoNotificacao.PrazoEstourado"/> (N11).</summary>
 public enum TipoPrazo
 {
     ClienteSemResposta,
     PedidoAtrasado,
     ImpressaoTravada,
     CaixaEsquecido,
+
+    /// <summary>#2096: pedido pronto, para entrega, sem viagem com entregador há mais que o tempo da loja.</summary>
+    ProntoSemEntregador,
 }
 
 /// <summary>
@@ -25,10 +29,11 @@ public static class PrazoEstouradoEvento
 {
     public static string Nome(TipoPrazo tipo) => tipo switch
     {
-        TipoPrazo.ClienteSemResposta => "cliente_sem_resposta",
-        TipoPrazo.PedidoAtrasado => "pedido_atrasado",
-        TipoPrazo.ImpressaoTravada => "impressao_travada",
-        TipoPrazo.CaixaEsquecido => "caixa_esquecido",
+        TipoPrazo.ClienteSemResposta => CodigosAviso.ClienteSemResposta,
+        TipoPrazo.PedidoAtrasado => CodigosAviso.PedidoAtrasado,
+        TipoPrazo.ImpressaoTravada => CodigosAviso.ImpressaoTravada,
+        TipoPrazo.CaixaEsquecido => CodigosAviso.CaixaEsquecido,
+        TipoPrazo.ProntoSemEntregador => CodigosAviso.ProntoSemEntregador,
         _ => throw new ArgumentOutOfRangeException(nameof(tipo), tipo, null),
     };
 
@@ -38,6 +43,7 @@ public static class PrazoEstouradoEvento
         TipoPrazo.PedidoAtrasado => "Pedido sem início de preparo",
         TipoPrazo.ImpressaoTravada => "Impressão travada",
         TipoPrazo.CaixaEsquecido => "Caixa aberto de ontem",
+        TipoPrazo.ProntoSemEntregador => "Pedido pronto sem entregador",
         _ => throw new ArgumentOutOfRangeException(nameof(tipo), tipo, null),
     };
 
@@ -77,6 +83,8 @@ public static class PrazoEstouradoEvento
     {
         var dados = new Dictionary<string, object?>
         {
+            // #2096: o interruptor da loja (NotificadorComAvisosDaLoja) lê este código.
+            [AlertaOperacaoEvento.ChaveAviso] = Nome(tipo),
             ["tipo_legivel"] = Legivel(tipo),
             ["referencia"] = referenciaCurta,
             ["prazo_texto"] = prazoTexto,

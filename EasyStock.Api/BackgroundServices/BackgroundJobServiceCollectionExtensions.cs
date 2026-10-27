@@ -70,6 +70,10 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnablePedidoAtraso)
             services.AddHostedService<PedidoAtrasoJob>();
 
+        // VigiaOperacaoJob (#2096): a cada 60 s, por empresa, pronto sem entregador, encomendas e freezer, uma vez cada.
+        if (options.EnableVigiaOperacao)
+            services.AddHostedService<VigiaOperacaoJob>();
+
         // CaixaEsquecidoJob (#641) — diario 10:00 UTC, detecta caixas abertos nao fechados de
         // dias anteriores e notifica in-app (so notifica, nao fecha).
         if (options.EnableCaixaEsquecidoJob)

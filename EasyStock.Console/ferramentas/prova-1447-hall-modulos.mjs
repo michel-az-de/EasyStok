@@ -87,7 +87,8 @@ confere('tela que só existe no modo API some do menu no modo demonstração', (
   const comApi = telasDoMenu(moduloPorId('atendimento'), { fonteApi: true }).map((t) => t.id)
   const semApi = telasDoMenu(moduloPorId('atendimento'), { fonteApi: false }).map((t) => t.id)
   // #1441: Respostas e automáticas existe nos dois modos (a demonstração grava no navegador).
-  assert.deepEqual(comApi, ['balcao', 'horarios', 'respostas'])
+  // #2096: Avisos da operação, só no modo API.
+  assert.deepEqual(comApi, ['balcao', 'horarios', 'avisos', 'respostas'])
   assert.deepEqual(semApi, ['balcao', 'respostas'])
   assert.ok(!telasDoMenu(moduloPorId('configuracoes'), { fonteApi: false }).some((t) => t.id === 'canais'))
 })
