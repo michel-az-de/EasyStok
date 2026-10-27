@@ -91,7 +91,7 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
     public async Task<string> ResolverTelefoneAsync(CredencialWppConnect sessao, string lid, CancellationToken ct = default)
     {
         using var doc = await ChamarAsync(HttpMethod.Get, Path(sessao, $"contact/pn-lid/{Uri.EscapeDataString(lid)}"), sessao, null, ct);
-        var pn = doc.RootElement.TryGetProperty("pn", out var valor) ? Identificador(valor) : null;
+        var pn = doc.RootElement.TryGetProperty("phoneNumber", out var valor) ? Identificador(valor) : null;
         if (pn is null || !pn.EndsWith("@c.us", StringComparison.Ordinal))
             throw Falha("O WhatsApp ainda não resolveu o telefone deste contato. O evento será tentado novamente.", 503);
         return pn[..^5];

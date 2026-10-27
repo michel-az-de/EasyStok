@@ -110,6 +110,14 @@ public class WppConnectClientTests
     }
 
     [Fact]
+    public async Task Resolve_LID_pelo_phoneNumber_retornado_pela_versao_instalada()
+    {
+        _http.Quando(HttpMethod.Get, $"/api/{_sessao.Sessao}/contact/pn-lid/123%40lid")
+            .Responde(HttpStatusCode.OK, """{"lid":{"_serialized":"123@lid"},"phoneNumber":{"id":"5511999999999","server":"c.us","_serialized":"5511999999999@c.us"},"contact":null}""");
+        (await Client.ResolverTelefoneAsync(_sessao, "123@lid")).Should().Be("5511999999999");
+    }
+
+    [Fact]
     public async Task Piloto_sem_sessao_nao_cai_em_envio_simulado()
     {
         _remetente.ObterSessaoWebAsync(Arg.Any<CancellationToken>()).Returns((CredencialWppConnect?)null);
