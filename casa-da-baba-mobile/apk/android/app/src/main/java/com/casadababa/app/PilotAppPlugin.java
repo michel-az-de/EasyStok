@@ -10,6 +10,16 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "PilotApp")
 public class PilotAppPlugin extends Plugin {
     @PluginMethod
+    public void notifications(PluginCall call) {
+        getActivity().runOnUiThread(() -> { AppNotifications.offerPermission(getActivity(), true); call.resolve(); });
+    }
+
+    @PluginMethod
+    public void migrationGuide(PluginCall call) {
+        getActivity().runOnUiThread(() -> { AppNotifications.showGuide(getActivity()); call.resolve(); });
+    }
+
+    @PluginMethod
     public void openWorkspace(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             try {

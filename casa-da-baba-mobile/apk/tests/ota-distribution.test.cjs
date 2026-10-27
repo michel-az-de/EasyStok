@@ -66,7 +66,7 @@ test('ZIP determinístico, manifesto e integridade assinada', () => {
 });
 test('contrato rejeita URL, identidade, esquema e metadados incompatíveis', () => {
   const release = build('0.3.0', 1);
-  for (const change of [{ url: release.payload.url + '?x=1' }, { appId: 'outra.empresa' }, { dataSchemaVersion: 1 }, { nativeVersionCode: 5 }, { sequence: 0 }, { bundleVersion: '../escape' }]) {
+  for (const change of [{ url: release.payload.url + '?x=1' }, { appId: 'outra.empresa' }, { dataSchemaVersion: 1 }, { nativeVersionCode: require('../package.json').versionCode + 1 }, { sequence: 0 }, { bundleVersion: '../escape' }]) {
     assert.throws(() => ota.validate({ ...release.payload, ...change }));
   }
   const web = fixture();

@@ -7,9 +7,11 @@ public class UpdateMessagingService extends FirebaseMessagingService {
     @Override public void onNewToken(String token) {
         // The Firebase SDK owns the token. Never put it in logs, the WebView or update manifests.
         UpdatePush.subscribe(this, true);
+        com.casadababa.app.AppNotifications.subscribe(this, true);
     }
 
     @Override public void onMessageReceived(RemoteMessage message) {
+        com.casadababa.app.AppNotifications.receive(this, message);
         if (!UpdatePolicy.isUpdateAnnouncement(message.getFrom(), message.getData().get("kind"),
                 message.getData().get("sequence"))) return;
         UpdatePush.received(this);
