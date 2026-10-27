@@ -18,7 +18,7 @@ public sealed class EncerrarConversaFerramenta : IFerramentaAgente
             return Task.FromResult(FerramentaJson.Serializar(new { erro = "pedido_vinculado_requer_atendimento" }));
 
         contexto.Conversa.Encerrar(contexto.Agora);
-        contexto.RegistrarRespostaVerificada("Conversa encerrada. Quando precisar, mande uma nova mensagem por aqui.");
+        contexto.RegistrarRespostaVerificada("Combinado. Até a próxima!");
         return Task.FromResult(FerramentaJson.Serializar(new { encerrada = true }));
     }
 }

@@ -4,6 +4,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { useConexaoWhatsAppApi } from '../../../aplicacao/useConexaoWhatsAppApi'
 import { textoDaSincronizacao } from '../../../dominio/embeddedSignup'
 import css from './SecaoWhatsApp.module.css'
+import { SecaoWppConnect } from './SecaoWppConnect'
 
 // WhatsApp da loja por coexistência (#1417): o número continua no app WhatsApp
 // Business do celular e passa a falar também pelo EasyStok. Só no modo API.
@@ -43,8 +44,8 @@ export function SecaoWhatsApp({ embutida = false, aoConectar, canalLigado = fals
     <section className={embutida ? css.embutida : css.secao} aria-labelledby={embutida ? undefined : 'secao-whatsapp-titulo'}>
       {!embutida && <h3 id="secao-whatsapp-titulo" className={css.titulo}>WhatsApp</h3>}
       {estado !== 'indisponivel' && <p className={css.texto}>
-        Conecte o número da loja sem tirá-lo do celular: o app WhatsApp Business continua funcionando, e o
-        que a loja responder por ele aparece aqui na conversa.
+        Na conexão pela Meta, o app WhatsApp Business continua funcionando e as respostas
+        feitas pelo celular aparecem aqui na conversa.
       </p>}
       {estado !== 'indisponivel' && <Botao variante="primario" className={css.botao} onClick={conectar} disabled={desabilitado} aria-busy={ocupado}>
         {ROTULO_BOTAO[estado] ?? 'Conectar WhatsApp Business'}
@@ -61,6 +62,7 @@ export function SecaoWhatsApp({ embutida = false, aoConectar, canalLigado = fals
       )}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {resultado && <Resultado resultado={resultado} />}
+      <SecaoWppConnect aoConectar={aoConectar} />
     </section>
   )
 }
