@@ -147,7 +147,7 @@ public class ContasAPagarController(
         [FromBody] RegistrarPagamentoBody body,
         CancellationToken ct = default)
     {
-        if (!RequerVisualizar(out var permErr)) return permErr!;
+        if (!RequerGerenciar(out var permErr)) return permErr!;
         if (!TryResolveEmpresaId(currentUser, body.EmpresaId, out var eid, out var err)) return err!;
         try
         {

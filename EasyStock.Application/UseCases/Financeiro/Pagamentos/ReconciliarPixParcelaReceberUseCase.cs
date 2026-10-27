@@ -16,7 +16,10 @@ public sealed record ReconciliarPixParcelaReceberCommand(
     string Txid,
     decimal? ValorPagoEfi = null,
     DateTime? PagoEm = null,
-    string? E2eId = null);
+    string? E2eId = null,
+    // #2095 (F3): a baixa manual informa a empresa de quem chama e a parcela da rota; o webhook e o job não.
+    Guid? EmpresaId = null,
+    Guid? ParcelaIdEsperada = null);
 
 public sealed record ReconciliarPixResult(
     Guid? PagamentoId,
@@ -42,6 +45,11 @@ public class ReconciliarPixParcelaReceberUseCase(
         var parcela = await contaRepo.GetParcelaByEfiTxidAsync(cmd.Txid, ct);
         if (parcela is null)
             return new ReconciliarPixResult(null, null, null, null, null, false, "parcela nao encontrada");
+        // A busca por txid ignora o filtro de empresa (o webhook não tem sessão): na baixa manual, txid de outra
+        // empresa ou de outra parcela é tratado como inexistente.
+        if ((cmd.EmpresaId.HasValue && parcela.EmpresaId != cmd.EmpresaId.Value)
+            || (cmd.ParcelaIdEsperada.HasValue && parcela.Id != cmd.ParcelaIdEsperada.Value))
+            return new ReconciliarPixResult(null, null, null, null, null, false, "txid nao pertence a esta parcela");
 
         var conta = parcela.ContaReceber;
         if (conta is null)
@@ -81,6 +89,9 @@ public class ReconciliarPixParcelaReceberUseCase(
         // Tolerancia: se valor pago for menor que saldo da parcela (cliente pagou parcial), aceitar
         // Se valor pago > saldo, cap no saldo (preserva invariante)
         var aplicado = Math.Min(valorPago, parcela.Saldo);
+        if (valorPago > parcela.Saldo)
+            logger.LogWarning("Pix acima do saldo: parcela={ParcId} txid={Txid} pago={Pago} saldo={Saldo}; excedente sem registro na conta",
+                parcela.Id, cmd.Txid, valorPago, parcela.Saldo);
         if (aplicado <= 0m)
             return new ReconciliarPixResult(null, parcela.Id, conta.Id,
                 parcela.Status.ToString(), conta.Status.ToString(), false, "saldo zero");
