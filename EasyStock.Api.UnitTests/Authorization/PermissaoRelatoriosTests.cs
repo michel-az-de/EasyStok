@@ -38,10 +38,11 @@ public class PermissaoRelatoriosTests
         Policies(typeof(EntityAuditController)).Should().Contain("Admin");
 
     [Theory]
-    [InlineData("Dona", true)]
+    [InlineData("Administração", true)]
+    [InlineData("Gerência", true)]
     [InlineData("Atendimento", false)]
     [InlineData("Cozinha", false)]
-    public async Task PerfisCasaDaBaba_SoADonaVeRelatorios(string nome, bool esperado)
+    public async Task PerfisCasaDaBaba_SoAdministracaoEGerenciaVeemRelatorios(string nome, bool esperado)
     {
         var perfil = PerfisCasaDaBaba.Iniciais.Single(p => p.Nome == nome);
         var claims = new List<Claim> { new("nivel", perfil.Nivel.ToString()), new("empresaId", Guid.NewGuid().ToString()) };

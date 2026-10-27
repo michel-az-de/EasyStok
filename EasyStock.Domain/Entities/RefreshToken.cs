@@ -12,9 +12,16 @@ namespace EasyStock.Domain.Entities
         public string? IpCriacao { get; set; }
         public string? UserAgent { get; set; }
 
+        /// <summary>
+        /// A empresa da sessão emitida (#2070, M3): o refresh renova nela. Nulo em token antigo ou sessão sem empresa, e aí
+        /// vale a regra de antes (a única empresa ativa do usuário).
+        /// </summary>
+        public Guid? EmpresaDaSessaoId { get; set; }
+
         public Usuario? Usuario { get; set; }
 
-        public static RefreshToken Criar(Guid usuarioId, string tokenHash, DateTime expiraEm, string? ip, string? userAgent)
+        public static RefreshToken Criar(
+            Guid usuarioId, string tokenHash, DateTime expiraEm, string? ip, string? userAgent, Guid? empresaDaSessaoId = null)
         {
             return new RefreshToken
             {
@@ -25,7 +32,8 @@ namespace EasyStock.Domain.Entities
                 ExpiraEm = expiraEm,
                 Revogado = false,
                 IpCriacao = ip,
-                UserAgent = userAgent
+                UserAgent = userAgent,
+                EmpresaDaSessaoId = empresaDaSessaoId
             };
         }
 
