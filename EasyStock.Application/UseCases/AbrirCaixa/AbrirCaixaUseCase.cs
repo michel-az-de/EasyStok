@@ -38,6 +38,19 @@ public class AbrirCaixaUseCase(
             throw new UseCaseValidationException(
                 $"O caixa de {diaPendente:dd/MM} ficou aberto. Feche-o antes de abrir o caixa de hoje.");
 
+        // #2084 (B1): o caixa já abriu sozinho no primeiro pagamento, com a gaveta herdada. A abertura de sempre é a
+        // conferência da gerente: confirma aquela abertura com o valor contado, em vez de tentar uma segunda.
+        var aConfirmar = (await repo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId))
+            .FirstOrDefault(m => m.Tipo == "abertura" && m.EstornadoEm == null && m.ConfirmacaoPendente);
+        if (aConfirmar != null)
+        {
+            aConfirmar.ConfirmarAbertura(cmd.SaldoInicial, cmd.RegistradoPorUserId, cmd.RegistradoPorNome, cmd.Observacoes);
+            await repo.UpdateMovimentoAsync(aConfirmar);
+            await uow.CommitAsync();
+            logger.LogInformation("Abertura automática de {Data} confirmada (saldo inicial={Saldo}).", data, cmd.SaldoInicial);
+            return Map(aConfirmar);
+        }
+
         var mov = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", cmd.SaldoInicial, dataMov, cmd.LojaId);
         mov.Descricao = cmd.Observacoes;
         mov.RegistradoPorUserId = cmd.RegistradoPorUserId;

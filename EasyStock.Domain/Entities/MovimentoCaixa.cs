@@ -54,6 +54,11 @@ namespace EasyStock.Domain.Entities
         /// notificado. Só faz sentido para Tipo=="abertura".</summary>
         public DateTime? NotificadoEsquecidoEm { get; set; }
 
+        /// <summary>#2084 (B1): abertura feita sozinha pelo primeiro pagamento em dinheiro, com a gaveta herdada do
+        /// último fechamento, que a gerente ainda não conferiu. A abertura manual do dia confirma (ver
+        /// <see cref="ConfirmarAbertura"/>). Só faz sentido para Tipo=="abertura".</summary>
+        public bool ConfirmacaoPendente { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
 
@@ -83,6 +88,17 @@ namespace EasyStock.Domain.Entities
             EstornadoPorUserId = userId;
             EstornadoPorNome = userNome;
             MotivoEstorno = motivo;
+        }
+
+        /// <summary>#2084 (B1): a gerente conferiu a gaveta da abertura automática. O valor passa a ser o que ela
+        /// informou; quem confirmou vira quem registrou.</summary>
+        public void ConfirmarAbertura(decimal saldoInicial, Guid? userId, string? userNome, string? observacao)
+        {
+            Valor = Math.Abs(saldoInicial);
+            RegistradoPorUserId = userId;
+            RegistradoPorNome = userNome ?? RegistradoPorNome;
+            if (!string.IsNullOrWhiteSpace(observacao)) Descricao = observacao;
+            ConfirmacaoPendente = false;
         }
 
         /// <summary>Carimba esta abertura como já notificada (caixa esquecido). Idempotente —
@@ -125,6 +141,19 @@ namespace EasyStock.Domain.Entities
         public string? FechadoPorNome { get; set; }
         public string? Observacoes { get; set; }
         public DateTime FechadoEm { get; set; }
+
+        /// <summary>#2084 (B3): dinheiro que a gerente contou na gaveta ao fechar. Nulo nos fechamentos antigos
+        /// e quando ninguém contou.</summary>
+        public decimal? ValorContado { get; set; }
+
+        /// <summary>#2084 (D1): dinheiro que o sistema esperava na gaveta no dia deste fechamento (o dia da
+        /// abertura, ADR-0034). Nulo nos fechamentos antigos.</summary>
+        public decimal? DinheiroEsperado { get; set; }
+
+        /// <summary>#2084 (D1): no fechamento de um caixa esquecido, o dinheiro que entrou HOJE sob a mesma sessão.
+        /// Já estava na gaveta contada, mas pertence ao caixa de hoje; a abertura seguinte não o herda.
+        /// Zero quando o fechamento é do próprio dia; nulo nos fechamentos antigos.</summary>
+        public decimal? DinheiroEntrouDepois { get; set; }
 
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }

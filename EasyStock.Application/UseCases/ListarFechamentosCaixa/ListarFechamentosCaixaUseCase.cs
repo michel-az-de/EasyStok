@@ -39,11 +39,36 @@ public class ListarFechamentosCaixaUseCase(ICaixaRepository repo, ObterCaixaDiaU
         return new ListarFechamentosCaixaResult(resultados, total, page, size);
     }
 
+    /// <summary>
+    /// #2084 (B1): o dinheiro que a abertura seguinte herda, pela mesma regra que a abertura manual sugere
+    /// (<c>gavetaDoFechamento</c> no console lê <see cref="FechamentoCaixaResult.DinheiroNaGaveta"/> do último
+    /// fechamento). Nulo sem fechamento anterior.
+    /// </summary>
+    public async Task<(DateOnly Data, decimal Dinheiro)?> GavetaDoUltimoFechamentoAsync(Guid empresaId)
+    {
+        var ultimo = (await ExecuteAsync(new ListarFechamentosCaixaQuery(empresaId, 1, 1))).Items.FirstOrDefault();
+        return ultimo is { DinheiroNaGaveta: { } dinheiro } ? (ultimo.Data, dinheiro) : null;
+    }
+
+    /// <summary>
+    /// A gaveta que fica para a abertura seguinte:
+    ///   B3, quem contou: o contado, menos o que entrou hoje num caixa esquecido (D1: fica no caixa de hoje);
+    ///   quem não contou: o calculado do dia até o fechamento;
+    ///   B4, mais o dinheiro que entrou no mesmo dia depois de fechar.
+    /// </summary>
     private async Task<FechamentoCaixaResult> ComDinheiroNaGavetaAsync(Guid empresaId, FechamentoCaixa fechamento)
     {
         var resultado = FecharCaixaUseCase.Map(fechamento);
         if (caixaDia is null) return resultado;
         var dia = await caixaDia.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, fechamento.Data, fechamento.LojaId));
-        return resultado with { DinheiroNaGaveta = GavetaCaixa.DinheiroNaGaveta(dia) };
+        var ateFechar = fechamento.ValorContado is { } contado
+            ? contado - (fechamento.DinheiroEntrouDepois ?? 0m)
+            // até o instante do fechamento, inclusive (o mesmo corte do retrato do dia fechado, #2082 D9)
+            : GavetaCaixa.DinheiroNaJanela(dia, null, fechamento.FechadoEm.AddTicks(1), comSaldoInicial: true);
+        return resultado with
+        {
+            DinheiroNaGaveta = ateFechar + dia.DinheiroPosFechamento,
+            DinheiroPosFechamento = dia.DinheiroPosFechamento
+        };
     }
 }
