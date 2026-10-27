@@ -78,7 +78,7 @@ public sealed class ColetorProdutosVencendo(
                 produtoId = item.ProdutoId,
                 nomeProduto = item.Nome,
                 quantidade = item.Quantidade,
-                expiraEm = item.ExpiraEm!.Value.ToString("yyyy-MM-dd"),
+                expiraEm = item.ExpiraEm!.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture), // #2074: data legível no e-mail e no sino
                 diasRestantes,
                 empresaId
             });
