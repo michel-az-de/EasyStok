@@ -43,7 +43,7 @@ jobs:
     name: Vigia da producao
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8  # pior caso: 5 alvos x (15 s + 20 s + 15 s) = 250 s
     permissions:
       contents: read
       issues: write
