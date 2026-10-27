@@ -70,7 +70,7 @@ de 24 h ela manda o `Corpo` do catálogo no lugar do modelo, e só para tipo que
 |---|---|---|---|
 | `codigo_redefinir_senha` | Autenticação | modelo de autenticação da Meta: "{{1}} é o seu código de verificação." | copiar código |
 | `senha_alterada` | Utilidade | EasyStok informa: a senha da sua conta foi alterada em {{1}}. Se não foi você, fale agora com a responsável da sua empresa. | |
-| `convite_acesso_link` | Utilidade | Olá, {{1}}! Você recebeu um convite para o sistema da {{2}}. Toque no botão para entrar com Google ou criar sua senha. O convite vale por 3 dias. | URL dinâmica: base do `Auth:LinkConvite`, sufixo = token |
+| `convite_acesso_link` | Utilidade | Olá, {{1}}! Você recebeu um convite para o sistema da {{2}}. Toque no botão para criar sua senha. O convite vale por 3 dias. | URL dinâmica: base do `Auth:LinkConvite`, sufixo = token |
 | `incidente_sistema` | Utilidade | EasyStok informa: o componente {{1}} está {{2}} desde {{3}}. Veja o resumo no e-mail enviado agora. | |
 | `prazo_estourado` | Utilidade | Atenção na loja: {{1}} há {{2}} (referência {{3}}). Abra o EasyStok para resolver. | |
 | `resumo_diario` | Utilidade | Resumo de {{1}} no EasyStok: {{2}} pedidos entregues, faturamento de {{3}} e caixa {{4}}. O resumo completo está no seu e-mail. | |

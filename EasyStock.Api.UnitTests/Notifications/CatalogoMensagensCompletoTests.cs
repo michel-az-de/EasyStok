@@ -142,11 +142,12 @@ public class CatalogoMensagensCompletoTests
     }
 
     [Fact]
-    public void Convite_oferece_entrar_com_google_e_diz_a_validade()
+    public void Convite_diz_a_validade_e_o_que_fazer_depois()
     {
         var convite = NotificacoesGlobaisSeed.BuildDefaultTemplates()
             .Single(t => t.TipoEvento == TipoEventoNotificacao.ConviteAcesso && t.Canal == CanalNotificacao.Email);
-        convite.CorpoTemplate.Should().Contain("Google").And.Contain("{{ expira_em_dias }} dias");
+        // O "entrar com Google" só entra junto com o botão na tela do convite (#2070).
+        convite.CorpoTemplate.Should().Contain("{{ expira_em_dias }} dias").And.Contain("convite novo").And.NotContain("Google");
         convite.Versao.Should().BeGreaterThan(2, "o seed só atualiza o banco existente quando a versão sobe");
     }
 

@@ -862,7 +862,7 @@ public static class NotificacoesGlobaisSeed
             tipoEvento: TipoEventoNotificacao.ConviteAcesso,
             assuntoTemplate: "{{ empresa }}: seu convite para entrar no sistema",
             corpoTemplate: EmailTemplateLoader.LoadBody("convite_acesso_email_v3"))
-            .ComVersao(3); // #1753: marca da casa e sem supor gênero. #2074: entrar com Google ou criar senha.
+            .ComVersao(3); // #1753: marca da casa e sem supor gênero. #2074: validade e o que fazer depois dela.
 
         // O convite ja nasceu (N13) como o modelo "convite_acesso_link" (botao URL), para nao aprovar dois modelos na
         // Meta. N9: versao 2, que liga o botao ao token do WhatsApp (botaoUrl0 = token_convite_whatsapp, um token por
