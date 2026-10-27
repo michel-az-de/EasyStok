@@ -72,8 +72,7 @@ export const MODULOS = [
   },
   {
     numero: 5, id: 'financeiro', nome: 'Financeiro', icone: 'dollar-sign',
-    // #1891: enquanto o financeiro gerencial está congelado, o resumo fala só do que abre.
-    resumo: 'Caixa do dia',
+    resumo: 'Caixa, contas a pagar e receber, extrato e relatórios',
     telas: [
       { id: 'caixa', rotulo: 'Caixa do dia', tipo: TELA_AJUSTE, aba: 'caixa' },
       { id: 'visao-geral', rotulo: 'Visão geral', tipo: TELA_AJUSTE, aba: 'financeiro-resumo', soApi: true },
