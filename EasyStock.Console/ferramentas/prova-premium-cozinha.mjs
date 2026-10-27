@@ -49,6 +49,8 @@ registerHooks({
     if (url.endsWith('/hooks/useRelogio.js')) return inline('export const useRelogio=()=>Date.parse("2026-10-11T12:00:00Z")')
     if (url.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>p})')
     if (url.endsWith('.json')) return inline('export default ' + readFileSync(new URL(url), 'utf8'))
+    // #2079 (C1): a pergunta do saldo usa o CampoSelecao, que mora em `Campo.jsx` com os outros campos.
+    if (url.endsWith('/componentes/Campo.jsx')) return inline("export const CampoSelecao='CampoSelecao',CampoTexto='CampoTexto'")
     if (url.endsWith('.jsx')) {
       const nome = url.split('/').at(-1).slice(0, -4)
       return inline(`export const ${nome}='${nome}'`)
