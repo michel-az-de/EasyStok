@@ -79,12 +79,40 @@ public static class StartupHardening
     /// obrigatorio: o numero de envio vem da empresa do tenant, e o global e so fallback.
     /// </summary>
     public static void ValidateWhatsAppMeta(WebApplicationBuilder builder)
-        => ValidateWhatsAppMeta(
+    {
+        ValidateWhatsAppMeta(
             builder.Configuration[WhatsAppCloudClientServiceCollectionExtensions.ChaveClienteAtendimento],
             builder.Configuration[WhatsAppCloudClientServiceCollectionExtensions.ChaveProviderNotificacoes],
             builder.Configuration["Notifications:WhatsApp:Meta:AccessToken"],
             builder.Configuration["Notifications:WhatsApp:Meta:AppSecret"],
             builder.Configuration["Notifications:WhatsApp:Meta:VerifyToken"]);
+        ValidateWhatsAppWaha(
+            builder.Configuration[WhatsAppCloudClientServiceCollectionExtensions.ChaveClienteAtendimento],
+            builder.Configuration["Atendimento:WhatsApp:Waha:BaseUrl"],
+            builder.Configuration["Atendimento:WhatsApp:Waha:ApiKey"],
+            builder.Configuration["Atendimento:WhatsApp:Waha:HmacKey"],
+            builder.Configuration["Atendimento:WhatsApp:Waha:PhoneNumberId"]);
+    }
+
+    /// <summary>
+    /// Ponte provisória do WhatsApp (#2072): com <c>Atendimento:WhatsApp:Cliente=waha</c>, o endereço e a chave do WAHA,
+    /// o segredo do HMAC do webhook e o número da loja são obrigatórios. Sem o segredo, o webhook recusaria tudo; sem o
+    /// número, nenhuma empresa receberia as mensagens.
+    /// </summary>
+    public static void ValidateWhatsAppWaha(string? cliente, string? baseUrl, string? apiKey, string? hmacKey, string? phoneNumberId)
+    {
+        if (!WhatsAppCloudClientServiceCollectionExtensions.UsaPonteWaha(cliente)) return;
+        const string quando = "when Atendimento:WhatsApp:Cliente=waha.";
+        if (!Uri.TryCreate(baseUrl?.Trim(), UriKind.Absolute, out var endereco) || endereco.Scheme is not ("http" or "https"))
+            throw new InvalidOperationException($"Atendimento:WhatsApp:Waha:BaseUrl (absolute http/https URL) is required {quando}");
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new InvalidOperationException($"Atendimento:WhatsApp:Waha:ApiKey is required {quando}");
+        if (string.IsNullOrWhiteSpace(hmacKey) || hmacKey.Trim().Length < 32)
+            throw new InvalidOperationException($"Atendimento:WhatsApp:Waha:HmacKey (min 32 chars) is required {quando}");
+        var digitos = phoneNumberId?.Count(char.IsAsciiDigit) ?? 0;
+        if (digitos is < 10 or > 15)
+            throw new InvalidOperationException($"Atendimento:WhatsApp:Waha:PhoneNumberId (store number, digits with country code) is required {quando}");
+    }
 
     /// <summary>
     /// Nucleo puro/testavel de <see cref="ValidateWhatsAppMeta(WebApplicationBuilder)"/>: mesma regra
