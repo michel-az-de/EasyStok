@@ -22,6 +22,15 @@ public sealed class RemetenteWhatsAppDoTenant(EasyStockDbContext dbContext, IInt
 
     public bool HaTenantCorrente => dbContext.CurrentTenantId != Guid.Empty;
 
+    public async Task<CredencialWppConnect?> ObterSessaoWebAsync(CancellationToken ct = default)
+    {
+        var empresa = dbContext.CurrentTenantId;
+        if (empresa == Guid.Empty) return null;
+        var sessao = await credenciais.ObterAsync<CredencialWppConnect>(
+            empresa, CredencialWppConnect.ProviderKey, AmbienteIntegracao.Production, ct);
+        return sessao?.Sessao == CredencialWppConnect.NomeSessao(empresa) ? sessao : null;
+    }
+
     public async Task<string?> ObterPhoneNumberIdAsync(CancellationToken ct = default)
     {
         var tenant = dbContext.CurrentTenantId;

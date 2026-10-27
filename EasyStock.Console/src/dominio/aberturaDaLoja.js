@@ -3,7 +3,7 @@
 // motivo da retificação. Fechar a loja dentro do horário pede justificativa (a API recusa sem).
 // Puro: o caixa chega já traduzido (`infra/api/caixaApi.js`) e "agora" chega por parâmetro.
 
-import { conferenciaDaGaveta, gavetaDoDia } from './caixa.js'
+import { conferenciaDaGaveta, esperadoDoEsquecido, gavetaDoDia } from './caixa.js'
 import { moeda } from './formato.js'
 import { dentroDoHorario } from './funcionamento.js'
 
@@ -27,11 +27,17 @@ export function situacaoDoCaixaParaAbrirLoja(dia, ultimoFechamento) {
     return {
       tipo: 'esquecido', desde: dia.abertoDesde, saldoEsperado: dia.saldoEsperado,
       naGaveta: gavetaDoDia(dia).naGaveta, ultimo: ultimoFechamento ?? null,
+      // #2113 (D1): o esperado do dia da abertura e, à parte, o que entrou depois (nulo na API antiga).
+      esquecido: esperadoDoEsquecido(dia),
     }
   }
   if (dia?.fechado) return { tipo: 'fechadoHoje', fechamento: dia.fechamento }
   if (dia?.aberto) {
-    return { tipo: 'aberto', saldoInicial: dia.saldoInicial, saldoEsperado: dia.saldoEsperado, naGaveta: gavetaDoDia(dia).naGaveta }
+    return {
+      tipo: 'aberto', saldoInicial: dia.saldoInicial, saldoEsperado: dia.saldoEsperado, naGaveta: gavetaDoDia(dia).naGaveta,
+      // #2113 (B1): abriu sozinho no primeiro pagamento; a gerente confirma com a gaveta contada.
+      aConfirmar: Boolean(dia.aberturaAConfirmar), ultimo: ultimoFechamento ?? null,
+    }
   }
   return { tipo: 'novo', ultimo: ultimoFechamento ?? null, saldoSugerido: gavetaDoFechamento(ultimoFechamento) }
 }
@@ -94,6 +100,21 @@ export function observacaoDoFechamento({ contado, saldoEsperado, nota }) {
   const texto = `Contado na gaveta: ${moeda(Number(contado) || 0)}. ${diferenca}.`
   const extra = (nota ?? '').trim()
   return extra ? `${texto} ${extra}` : texto
+}
+
+// #2113 (B1 da #2084): o caixa abriu sozinho no primeiro pagamento em dinheiro, com a gaveta do último
+// fechamento. Diz de onde veio o saldo inicial; a confirmação é da gerente ou da dona (a API dá 403 à operadora).
+export const ROTULO_GAVETA_CONTADA_AGORA = 'Quanto há na gaveta agora (todo o dinheiro)'
+export function avisoDaAberturaAConfirmar(saldoInicial, ultimoFechamento) {
+  const origem = ultimoFechamento ? ` que o fechamento de ${diaMes(ultimoFechamento.data)} deixou na gaveta` : ''
+  return `O caixa de hoje abriu sozinho no primeiro pagamento em dinheiro, com ${moeda(Number(saldoInicial) || 0)}${origem}.`
+}
+
+// Na confirmação ela conta a gaveta inteira (o troco herdado e o dinheiro que já entrou hoje): é o
+// `saldoInicial` que a API recebe, e ela desconta o dinheiro do dia. Vai nas observações da abertura.
+export function observacaoDaConfirmacao(contado, naGaveta) {
+  const { texto } = conferenciaDaGaveta(centavos(contado), naGaveta)
+  return `Abertura automática conferida: contado ${moeda(Number(contado) || 0)} na gaveta. ${texto}.`
 }
 
 // #2078 (D6/B18): sem abertura, o dinheiro que já entrou hoje está na conta do dia e na gaveta. Quem

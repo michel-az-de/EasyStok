@@ -4,8 +4,10 @@ import { CampoReais } from '../../../componentes/CampoReais'
 import { DiferencaDaGaveta } from '../../../componentes/DiferencaDaGaveta'
 import { Modal } from '../../../componentes/Modal'
 import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
+import { diaMes } from '../../../dominio/aberturaDaLoja'
 import {
-  AVISO_AO_FECHAR_CAIXA, ROTULO_FORA_DA_GAVETA, avisoDeDevolucoesPendentes, conferenciaDaGaveta,
+  AVISO_AO_FECHAR_CAIXA, ROTULO_CONTADO_DO_ESQUECIDO, ROTULO_ENTROU_DEPOIS, ROTULO_FORA_DA_GAVETA, avisoDeDevolucoesPendentes,
+  conferenciaDoFechamento, esperadoDoEsquecido,
 } from '../../../dominio/caixa'
 import {
   lerMoeda, moeda, moedaAltaDemais,
@@ -34,7 +36,9 @@ export function ModalFecharCaixa({
 }) {
   const esperado = gaveta ? gaveta.naGaveta : resumo.saldoEsperado
   const [centavosContado, setCentavosContado] = useState(null)
-  const conferencia = conferenciaDaGaveta(centavosContado, esperado)
+  // #2113 (D1 da #2084): no caixa esquecido, confere o esperado do dia da abertura; o que entrou depois fica à parte.
+  const esquecido = gaveta ? esperadoDoEsquecido(resumo) : null
+  const conferencia = conferenciaDoFechamento(centavosContado, esperado, esquecido)
   const devolucoes = useDevolucoesPendentes(consultarDevolucoes)
   const avisoDevolucoes = avisoDeDevolucoesPendentes(devolucoes)
   const falha = aviso ?? (erro && (erroSemResposta
@@ -65,7 +69,12 @@ export function ModalFecharCaixa({
       {/* #2078 (B12): em grade, para o aviso de devolução não colar no rótulo do campo. */}
       <div className={css.corpoModal}>
         <dl className={css.resumoLista}>
-          {gaveta ? (
+          {esquecido ? (
+            <>
+              <div className={css.resumoForte}><dt>Esperado no fechamento de {diaMes(resumo.abertoDesde)}</dt><dd>{moeda(esquecido.esperado)}</dd></div>
+              <div><dt>{ROTULO_ENTROU_DEPOIS}</dt><dd>{moeda(esquecido.entrouDepois)}</dd></div>
+            </>
+          ) : gaveta ? (
             <div className={css.resumoForte}><dt>Na gaveta (dinheiro)</dt><dd>{moeda(gaveta.naGaveta)}</dd></div>
           ) : (
             <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{moeda(resumo.saldoEsperado)}</dd></div>
@@ -87,7 +96,7 @@ export function ModalFecharCaixa({
 
         <CampoReais
           disabled={enviando}
-          rotulo={gaveta ? 'Quanto você contou na gaveta (só dinheiro)' : 'Quanto você contou no caixa'}
+          rotulo={esquecido ? ROTULO_CONTADO_DO_ESQUECIDO : gaveta ? 'Quanto você contou na gaveta (só dinheiro)' : 'Quanto você contou no caixa'}
           placeholder="Digite o que contou"
           centavos={centavosContado}
           ler={lerMoeda}
