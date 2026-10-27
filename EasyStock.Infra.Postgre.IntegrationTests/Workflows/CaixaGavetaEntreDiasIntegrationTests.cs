@@ -194,7 +194,7 @@ public sealed class CaixaGavetaEntreDiasIntegrationTests(PostgreSqlDatabaseFixtu
         // A gerente confere pela abertura de sempre, informando a gaveta contada agora (A1): a abertura automática é
         // confirmada, não duplicada, e volta a 130 (236 contados menos os 106 do dia).
         await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<AbrirCaixaUseCase>().ExecuteAsync(
-            new AbrirCaixaCommand(empresaId, 236m, lojaId, RegistradoPorNome: "Gerente", Observacoes: "Conferido")));
+            new AbrirCaixaCommand(empresaId, 236m, lojaId, RegistradoPorNome: "Gerente", Observacoes: "Conferido", PodeConfirmarAberturaAutomatica: true)));
         var depois = await NoEscopoAsync(provider, empresaId, sp =>
             sp.GetRequiredService<ObterCaixaDiaUseCase>().ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje, lojaId)));
         depois.AberturaAConfirmar.Should().BeFalse();
@@ -235,7 +235,7 @@ public sealed class CaixaGavetaEntreDiasIntegrationTests(PostgreSqlDatabaseFixtu
 
         // A gerente confere ao meio-dia contando a gaveta inteira: 280 (faltam 6 dos 286 esperados).
         var confirmada = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<AbrirCaixaUseCase>().ExecuteAsync(
-            new AbrirCaixaCommand(empresaId, 280m, lojaId, RegistradoPorNome: "Gerente")));
+            new AbrirCaixaCommand(empresaId, 280m, lojaId, RegistradoPorNome: "Gerente", PodeConfirmarAberturaAutomatica: true)));
         confirmada.Valor.Should().Be(124m, "a abertura é o contado menos o dinheiro que entrou no dia (280 - 156)");
         confirmada.Descricao.Should().Contain("130,00", "o valor herdado do fechamento fica registrado");
 

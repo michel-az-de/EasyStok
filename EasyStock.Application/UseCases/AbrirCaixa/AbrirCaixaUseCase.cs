@@ -14,7 +14,10 @@ public sealed record AbrirCaixaCommand(
     Guid? RegistradoPorUserId = null,
     [property: MaxLength(120)] string? RegistradoPorNome = null,
     [property: MaxLength(20)] string? Origem = "web",
-    string? Observacoes = null);
+    string? Observacoes = null,
+    // #2084 (A3): só gerente ou dona confirma a abertura automática. Definido pelo servidor a partir do usuário
+    // logado (CaixaController), nunca do corpo.
+    [property: System.Text.Json.Serialization.JsonIgnore] bool PodeConfirmarAberturaAutomatica = false);
 
 public class AbrirCaixaUseCase(
     ICaixaRepository repo,
@@ -49,6 +52,10 @@ public class AbrirCaixaUseCase(
             .FirstOrDefault(m => m.Tipo == "abertura" && m.EstornadoEm == null && m.ConfirmacaoPendente);
         if (aConfirmar != null)
         {
+            // A3 (decisão do Felipe): conferir a gaveta herdada é da gerente ou da dona. Vira 403.
+            if (!cmd.PodeConfirmarAberturaAutomatica)
+                throw new UnauthorizedAccessException(
+                    "O caixa de hoje abriu sozinho no primeiro pagamento e espera a conferência da gerente. Só gerente ou dona confirma a abertura.");
             // A1: ela conta a gaveta inteira; a abertura é o contado menos o dinheiro que entrou no dia, senão o
             // esperado soma esse dinheiro duas vezes.
             var entrouNoDia = 0m;

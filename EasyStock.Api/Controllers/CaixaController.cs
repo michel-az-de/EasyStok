@@ -55,6 +55,8 @@ public class CaixaController(
             // Origem server-side (trilha de auditoria), NUNCA do body — o caminho mobile
             // legitimo abre caixa via MobileCashController. #766
             Origem = "web",
+            // #2084 (A3): só gerente ou dona confirma a abertura automática; nunca do corpo.
+            PodeConfirmarAberturaAutomatica = currentUser.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin or NivelAcesso.Gerente,
             // #1615: a abertura e sempre de agora. Com data futura no body ela virava para sempre
             // o ultimo evento do caixa e nenhum dia fechava mais.
             DataMovimento = null
