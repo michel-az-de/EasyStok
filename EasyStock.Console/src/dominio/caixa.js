@@ -14,6 +14,7 @@
 import { inicioDoDiaNoFuso, moeda, plural } from './formato.js'
 import { pagamentosDoPedido } from './pagamento.js'
 import { itemPorSku } from './cardapio.js'
+import { numeroDoDiaNaTela } from './pedido.js'
 
 export const TIPOS_MOVIMENTO = {
   ABERTURA: 'abertura', ENTRADA: 'entrada', SAIDA: 'saida', FECHAMENTO: 'fechamento',
@@ -428,4 +429,29 @@ export function conferenciaDaGaveta(centavosContados, esperado) {
     pronta: true, texto, tom: pequena ? 'aviso' : 'perigo', diferenca,
     gravidade: pequena ? 'Diferença pequena.' : 'Diferença grande: conte de novo antes de fechar.',
   }
+}
+
+// #2113 (D1 da #2084): no caixa esquecido, a API diz o esperado do dia da abertura (o que o fechamento
+// retrata, ADR-0034) e o dinheiro de hoje que já está na gaveta e fica no caixa de hoje. Sem os campos
+// (API anterior à #2084), nulo, e a conferência é a de sempre.
+export const ROTULO_ENTROU_DEPOIS = 'Entrou depois, fica no caixa de hoje'
+export const ROTULO_CONTADO_DO_ESQUECIDO = 'Quanto você contou na gaveta (todo o dinheiro)'
+export function esperadoDoEsquecido(dia) {
+  if (!dia?.esquecidoAberto || dia.dinheiroEsperadoNoFechamento == null) return null
+  return { esperado: dia.dinheiroEsperadoNoFechamento, entrouDepois: dia.dinheiroEntrouDepois ?? 0 }
+}
+
+// Ela conta a gaveta inteira; no caixa esquecido, a conferência tira o que entrou depois e compara com o
+// esperado do dia da abertura. O contado continua indo inteiro para a API, que faz a mesma separação.
+export function conferenciaDoFechamento(centavosContados, naGaveta, esquecido = null) {
+  if (!esquecido) return conferenciaDaGaveta(centavosContados, naGaveta)
+  return conferenciaDaGaveta(centavosContados == null ? null : centavosContados - centavos(esquecido.entrouDepois), esquecido.esperado)
+}
+
+// #2113 (#2098): a linha do pagamento de pedido diz qual pedido, com o número que a cozinha fala.
+export function tituloDaLinhaExtra(linha) {
+  if (linha.tipo === 'estorno') return 'Estorno de venda'
+  if (linha.origem !== 'Pedido') return 'Venda'
+  const numero = numeroDoDiaNaTela(linha.pedidoNumeroDoDia)
+  return numero ? `Pagamento do pedido nº ${numero}` : 'Pagamento de pedido'
 }
