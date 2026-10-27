@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
@@ -50,6 +51,7 @@ public class SyncController(
     public async Task<ActionResult<SyncPushResponse>> Push([FromBody] SyncPushRequest req)
     {
         if (req == null || req.Mutations == null) return BadRequest("Payload invalido.");
+        if (req.Mutations.Any(m => m.Id?.StartsWith("legacy:", StringComparison.Ordinal) == true)) return BadRequest("Prefixo de id reservado a primeira migracao.");
 
         var device = HttpContext.GetMobileDevice();
         var empresaId = device?.EmpresaId;
@@ -80,6 +82,20 @@ public class SyncController(
                 .ToListAsync();
             foreach (var e in existing)
                 alreadyProcessed[e.MutationId] = e;
+        }
+
+        try
+        {
+            foreach (var mutation in req.Mutations.Where(m => !alreadyProcessed.ContainsKey(m.Id)))
+                await _dispatcher.ValidateLegacyHistoryAsync(mutation, empresaId);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("LEGACY_HISTORY_READ_ONLY:", StringComparison.Ordinal))
+        {
+            // Preserva ACKs antigos; nada novo deste envio foi aplicado, inclusive stock.delta.
+            return Ok(new SyncPushResponse(
+                req.Mutations.Where(m => alreadyProcessed.TryGetValue(m.Id, out var p) && p.Outcome == "accepted").Select(m => m.Id).ToList(),
+                req.Mutations.Where(m => !alreadyProcessed.TryGetValue(m.Id, out var p) || p.Outcome != "accepted")
+                    .Select(m => new SyncConflict(m.Id, ex.Message)).ToList()));
         }
 
         // #1520 (ADR-0060): movimento de estoque por ultimo no lote. A fila do aparelho reordena
@@ -325,6 +341,26 @@ public class SyncController(
             }
         }
 
+        // A protecao acompanha o historico tambem em reinstalacao/outro aparelho, apos o pull reverso.
+        if (mutations.Any(m => m.Type == "order.upsert"))
+        {
+            var history = await _db.Set<Order>().Where(o => o.EmpresaId == empresaId && (o.LojaId == lojaId || o.LojaId == null))
+                .Join(_db.Set<Pedido>().Where(p => p.EmpresaId == empresaId && p.Origem == LegacySnapshotImportService.HistoryOrigin),
+                    o => o.ErpPedidoId, p => (Guid?)p.Id, (o, p) => new { o.Id, ErpId = p.Id, o.Status }).ToListAsync();
+            var tags = new Dictionary<string, string>();
+            foreach (var row in history) { tags[row.Id] = row.Status; tags[row.ErpId.ToString()] = row.Status; }
+            mutations = mutations.Select(m => m.Type == "order.upsert" && m.Payload.TryGetProperty("id", out var id) && tags.TryGetValue(id.GetString()!, out var status)
+                ? m with { Payload = SyncDtoConverters.Serialize(m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)! with { LegacyHistoryStatus = status }) } : m).ToList();
+        }
+        if (mutations.Any(m => m.Type == "batch.upsert"))
+        {
+            var history = await _db.Set<Batch>().Where(b => b.EmpresaId == empresaId && (b.LojaId == lojaId || b.LojaId == null))
+                .Join(_db.Set<Lote>().Where(l => l.EmpresaId == empresaId && l.Origem == LegacySnapshotImportService.HistoryOrigin),
+                    b => b.ErpLoteId, l => (Guid?)l.Id, (b, l) => new { b.Id, ErpId = l.Id }).ToListAsync();
+            var tags = history.SelectMany(x => new[] { x.Id, x.ErpId.ToString() }).ToHashSet();
+            mutations = mutations.Select(m => m.Type == "batch.upsert" && m.Payload.TryGetProperty("id", out var id) && tags.Contains(id.GetString()!)
+                ? m with { Payload = SyncDtoConverters.Serialize(m.Payload.Deserialize<BatchDto>(SyncDtoConverters.JsonOpts)! with { LegacyImported = true }) } : m).ToList();
+        }
         return Ok(new SyncPullResponse(serverTime, mutations));
     }
 }

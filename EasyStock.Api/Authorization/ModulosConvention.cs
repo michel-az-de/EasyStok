@@ -22,7 +22,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Mobile.DeviceBackup", "Mobile.DevicePairing", "Mobile.MobileBatches", "Mobile.MobileCalculadora",
         "Mobile.MobileCash", "Mobile.MobileClients", "Mobile.MobileDiagnostics", "Mobile.MobileDiagTrace",
         "Mobile.MobileEstoque", "Mobile.MobileOrders", "Mobile.MobileProducts", "Mobile.MobileQuickReports",
-        "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync"
+        "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot"
     ];
     private static readonly HashSet<string> Bastidor =
     [
