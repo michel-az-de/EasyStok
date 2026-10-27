@@ -23,7 +23,9 @@ import { useNotificacoesDaSessao } from '../aplicacao/useNotificacoesDaSessao'
 import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
 import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
-import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
+import { useConfiguracaoInicialApi } from '../aplicacao/useConfiguracaoInicialApi'
+import { entradaDoPerfil, moduloDaRota, permiteModulo, permiteRota, podeConfigurarLoja } from '../dominio/acessoModulos'
+import { TELA_PRIMEIROS_PASSOS, deveAbrirSozinho, passoDaRetomada } from '../dominio/configuracaoInicial'
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
 import { Modal } from '../componentes/Modal'
@@ -38,7 +40,7 @@ import { pedidoAcabouDeNascer } from '../dominio/pedido'
 import { canalDaConversa } from '../dominio/canal'
 import { envioBloqueado } from '../dominio/janela'
 import {
-  HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, rotaDaHash,
+  HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, hashDoPasso, rotaDaHash,
 } from '../dominio/rota'
 import { EditorItemCardapio } from '../features/cardapio/EditorItemCardapio'
 import { CartaoArrasto, PainelCardapio } from '../features/cardapio/PainelCardapio'
@@ -46,7 +48,10 @@ import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
 import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
 import { ModalHorariosDaSemana } from '../features/automacoes/ModalHorariosDaSemana'
+import { FormularioHorariosDaSemana } from '../features/automacoes/FormularioHorariosDaSemana'
 import { ModalGestao, PainelDeAjuste } from '../features/gestao/ModalGestao'
+import { TelaConfiguracaoInicial } from '../features/gestao/configuracao-inicial/TelaConfiguracaoInicial'
+import { CartaoPrimeirosPassos } from '../features/gestao/configuracao-inicial/CartaoPrimeirosPassos'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
 import { PainelAgora } from '../features/agora/PainelAgora'
 import { avisoDeResponder, filasDoAgora } from '../dominio/agora'
@@ -55,6 +60,7 @@ import { MolduraDoModulo } from '../features/hall/MolduraDoModulo'
 import { GavetaEntregasApi } from '../features/entregas/GavetaEntregasApi'
 import { TelaEntregasApi } from '../features/entregas/TelaEntregasApi'
 import { CadastroEntregaApi } from '../features/entregas/CadastroEntregaApi'
+import { CadastroEntregadoresApi } from '../features/entregas/CadastroEntregadores'
 import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
 import { AvisoCardapioDoSite } from '../features/cardapio-link/AvisoCardapioDoSite'
 import { ModalEncerrar } from '../features/encerramento/ModalEncerrar'
@@ -281,13 +287,10 @@ function Composicao({ rota }) {
 
       {modal === 'gestao' && (
         <ModalGestao
-          renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />}
-          horariosAtendimento={<AjustarHorariosAtendimento />}
+          {...SLOTS_DOS_AJUSTES}
           abaInicial={abaGestao}
           aoTrocarAba={setAbaGestao}
-          janelasApi={FONTE_API ? <CadastroEntregaApi /> : null}
           avisosApi={<AvisoDaAcaoApi />}
-          abasDaDemonstracao={abasDaDemonstracao}
           aoFechar={fechar}
         />
       )}
@@ -299,7 +302,7 @@ function Composicao({ rota }) {
           aoFechar={fechar}
           rodape={<><AvisoDaAcaoApi /><Botao onClick={fechar}>Fechar</Botao></>}
         >
-          <PainelDeAjuste aba="respostas" focoInicial={focoBiblioteca} />
+          <PainelDeAjuste {...SLOTS_DOS_AJUSTES} aba="respostas" focoInicial={focoBiblioteca} />
         </Modal>
       )}
 
@@ -374,10 +377,11 @@ function TelaDaRota({ rota }) {
         : (
           <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} ajuda={<ControleAjuda rota={rota} />}>
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
-                Entregas › Janelas e frete). Feature não importa feature; quem compõe é o App. */}
-            {rota.aba && (
-              <PainelDeAjuste renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />} horariosAtendimento={<AjustarHorariosAtendimento />} key={rota.aba} aba={rota.aba} janelasApi={FONTE_API ? <CadastroEntregaApi /> : null} abasDaDemonstracao={abasDaDemonstracao} />
-            )}
+                Entregas › Janelas e frete). Feature não importa feature; quem compõe é o App.
+                #2070: Primeiros passos monta as mesmas abas, com os mesmos slots, um passo por vez. */}
+            {rota.aba === TELA_PRIMEIROS_PASSOS
+              ? <TelaConfiguracaoInicial passo={rota.passo} renderizarAba={renderizarAbaDoPasso} />
+              : rota.aba && <PainelDeAjuste {...SLOTS_DOS_AJUSTES} key={rota.aba} aba={rota.aba} />}
           </MolduraDoModulo>
         )}
       {/* #1582: Horários e mensagens também abre e fecha a loja; sem isto o gesto só aparecia
@@ -463,6 +467,19 @@ function AjustarHorariosAtendimento() {
   </>
 }
 
+// #2070: o que só o App compõe para as telas de ajuste (feature não importa feature). O mesmo objeto vai ao
+// ModalGestao, ao modal de Respostas, à tela de rota e aos Primeiros passos, que recebem os mesmos slots.
+const SLOTS_DOS_AJUSTES = {
+  renderizarEditorCardapio: (props) => <EditorItemCardapio {...props} />,
+  horariosAtendimento: <AjustarHorariosAtendimento />,
+  // #1440: no modo API, o cadastro de janelas, zonas e bloqueios da S45; `secao` mostra só uma parte.
+  janelasApi: FONTE_API ? (props) => <CadastroEntregaApi {...props} /> : null,
+  horariosDaSemana: (props) => <FormularioHorariosDaSemana {...props} />,
+  entregadoresApi: (props) => <CadastroEntregadoresApi {...props} />,
+  abasDaDemonstracao,
+}
+const renderizarAbaDoPasso = (props) => <PainelDeAjuste {...SLOTS_DOS_AJUSTES} {...props} />
+
 // Cozinha no modo API (F05): a fila vem do KDS, não do espelho do Balcão. Sem
 // sessão nesta aba, pede o login como a janela principal.
 function CozinhaApi({ rota, sessao }) {
@@ -517,6 +534,9 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   const [visitaInicial] = useState(() => lerVisita(sessao))
   const ultimaConversa = useRef(visitaInicial.ultimaConversa)
   const comandasDaVisita = useRef(visitaInicial.comandas)
+  // #2070: os Primeiros passos abrem sozinhos uma vez por visita, só a partir da hash com que o Console abriu.
+  const primeirosPassosAbertos = useRef(visitaInicial.primeirosPassosAbertos === true)
+  const [hashNaEntrada] = useState(() => window.location.hash)
   const [rascunhosDosAjustes, setRascunhosDosAjustes] = useState({})
   const gravacoesDosAjustes = useGravacoesDosAjustes()
   const [confirmandoSaida, setConfirmandoSaida] = useState(false)
@@ -539,7 +559,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   }, [temRascunhos])
   const sair = () => temRascunhos ? setConfirmandoSaida(true) : aoSair()
   const confirmacaoSaida = confirmandoSaida && <Modal titulo="Sair sem salvar os ajustes?"
-    descricao="Há ajustes não concluídos em Horários e mensagens. Você pode continuar trabalhando e voltar a eles. Sair descarta os rascunhos; uma gravação já enviada pode ser concluída. Confira os valores ao entrar novamente."
+    descricao="Há ajustes não concluídos (horários, mensagens, janelas ou frete). Você pode continuar trabalhando e voltar a eles. Sair descarta os rascunhos; uma gravação já enviada pode ser concluída. Confira os valores ao entrar novamente."
     aoFechar={() => setConfirmandoSaida(false)}
     rodape={<><Botao onClick={() => setConfirmandoSaida(false)}>Continuar trabalhando</Botao><Botao variante="texto" onClick={aoSair}>Sair e descartar ajustes</Botao></>} />
   // #1576: mensagens e pedidos já lidos ficam aqui enquanto a dona está no Hall, na Cozinha ou nas
@@ -548,16 +568,36 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   const lerComandasDaVisita = useCallback(() => comandasDaVisita.current, [])
   const guardarComandas = useCallback((comandas) => {
     comandasDaVisita.current = comandas
-    gravarVisita(sessao, { comandas, ultimaConversa: ultimaConversa.current })
+    gravarVisita(sessao, { comandas, ultimaConversa: ultimaConversa.current, primeirosPassosAbertos: primeirosPassosAbertos.current })
   }, [sessao])
   const lembrarConversa = useCallback((id) => {
     ultimaConversa.current = id
-    gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: id })
+    gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: id, primeirosPassosAbertos: primeirosPassosAbertos.current })
   }, [sessao])
   const avisos = useNotificacoesDaSessao()
   const avisosNoAparelho = useAvisosNoAparelho({ sessao })
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: true })
   const { dados, erro, tentarNovamente } = useModulosDaSessao(sessao)
+  // #2070: sem `configurarLoja` (chave ausente = falso) nem lê; o estado serve à entrada e ao cartão do hall.
+  const configuracaoInicial = useConfiguracaoInicialApi({ ativo: podeConfigurarLoja(dados?.acoes) })
+  const decidiuAbertura = useRef(false)
+  useEffect(() => {
+    if (decidiuAbertura.current || !dados || !configuracaoInicial.estado) return
+    decidiuAbertura.current = true
+    if (!deveAbrirSozinho(configuracaoInicial.estado, { hashAtual: window.location.hash, hashNaEntrada, hashDaPorta: entradaDoPerfil(dados), jaAbriuNaVisita: primeirosPassosAbertos.current })) return
+    primeirosPassosAbertos.current = true
+    gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: ultimaConversa.current, primeirosPassosAbertos: true })
+    window.location.hash = hashDoPasso(passoDaRetomada(configuracaoInicial.estado))
+  }, [dados, configuracaoInicial.estado, hashNaEntrada, sessao])
+  // Voltar ao hall relê o estado: o cartão mostra o que foi feito nos Primeiros passos.
+  const naHall = rota.tipo === ROTA_HALL
+  const estavaNoHall = useRef(naHall)
+  const { recarregar: relerConfiguracaoInicial } = configuracaoInicial
+  useEffect(() => {
+    const voltou = naHall && !estavaNoHall.current
+    estavaNoHall.current = naHall
+    if (voltou && podeConfigurarLoja(dados?.acoes)) relerConfiguracaoInicial()
+  }, [naHall, dados, relerConfiguracaoInicial])
   if (!dados) return (
     <><main className={css.estadoAcesso} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={erro ? 'Falha ao carregar acesso' : 'Carregando módulos'} aria-busy={!erro}>
     <Vazio titulo={erro ? 'Não foi possível carregar seu acesso' : 'Carregando seus módulos'}
@@ -566,8 +606,11 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     </Vazio>
     </main>{confirmacaoSaida}</>
   )
+  // #2070: `entrada` é a porta do perfil ("Continuar depois" dos Primeiros passos); `aparelho`, a ativação dos avisos
+  // deste aparelho, a mesma do sino, para Configurações › Avisos.
   const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair: sair, sessaoPersistente: sessao.persistente,
     conta: { nome: sessao.usuario?.nome ?? null, casa: sessao.empresa?.nome ?? null },
+    entrada: entradaDoPerfil(dados), aparelho: avisosNoAparelho,
     notificacoes: <SinoDaSessao avisos={avisos} aparelho={avisosNoAparelho} /> }
   let tela
   if (!permiteRota(dados, rota)) tela = (
@@ -577,7 +620,8 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     </Vazio>
     </main>
   )
-  else if (rota.tipo === ROTA_HALL) tela = <HallDeModulos fonteApi sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} />
+  else if (rota.tipo === ROTA_HALL) tela = <HallDeModulos fonteApi sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />}
+    painel={<CartaoPrimeirosPassos estado={configuracaoInicial.estado} />} />
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />

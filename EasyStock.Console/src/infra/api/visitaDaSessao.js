@@ -19,7 +19,9 @@ function comandaLocal(pedido) {
 function visitaDe(salva) {
   const comandas = salva?.comandas && typeof salva.comandas === 'object' && !Array.isArray(salva.comandas) ? salva.comandas : {}
   return { ultimaConversa: typeof salva?.ultimaConversa === 'string' ? salva.ultimaConversa : null,
-    comandas: Object.fromEntries(Object.entries(comandas).map(([id, p]) => [id, comandaLocal(p)]).filter(([, p]) => p)) }
+    comandas: Object.fromEntries(Object.entries(comandas).map(([id, p]) => [id, comandaLocal(p)]).filter(([, p]) => p)),
+    // #2070: os Primeiros passos já abriram sozinhos nesta visita; só a marca, nunca o estado deles.
+    ...(salva?.primeirosPassosAbertos === true ? { primeirosPassosAbertos: true } : {}) }
 }
 
 export function lerVisita(sessao) {

@@ -8,6 +8,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
+import { hashDoModulo } from '../../../dominio/modulos'
 import css from './abaAtendimento.module.css'
 
 const TAMANHO_MENSAGEM = 500
@@ -172,7 +173,9 @@ function MensagensDoExpediente() {
   )
 }
 
-function ConfiguracaoDoAtendimento() {
+// `comLigaDesliga` (#2070): os Primeiros passos ajustam o atendimento sem ligar o agente; a gravação reenvia o
+// `ativo` como foi lido.
+function ConfiguracaoDoAtendimento({ comLigaDesliga = true }) {
   const { carregarConfiguracao, salvarConfiguracao } = useAcoes()
   const [carga, setCarga] = useState({ estado: 'carregando' })
   const [rascunho, setRascunho] = useRascunhoDoAjuste('configuracao-atendimento')
@@ -257,7 +260,7 @@ function ConfiguracaoDoAtendimento() {
       <fieldset disabled={situacao.estado === 'salvando'} className={css.campos}>
         <div className={css.topo}>
           <h3 id="gestao-atend-config">Como o automático atende</h3>
-          <label className={css.chave}>
+          {comLigaDesliga && <label className={css.chave}>
             <input
               type="checkbox"
               checked={form.ativo}
@@ -265,15 +268,15 @@ function ConfiguracaoDoAtendimento() {
               onChange={mudar('ativo', (e) => e.target.checked)}
             />
             Atendimento automático
-          </label>
+          </label>}
         </div>
         <Pendencia visivel={pendente && situacao.estado !== 'salvando'} />
         {/* #1475: o backend lê este campo; desligado, o agente não responde e a conversa vai para a dona. */}
-        <p id="gestao-atend-config-efeito" className={css.descricao}>
+        {comLigaDesliga && <p id="gestao-atend-config-efeito" className={css.descricao}>
           {form.ativo
             ? 'Responde no WhatsApp e chama você quando precisa. A mudança só vale depois de salvar.'
             : 'As conversas vão para você; a saudação continua automática. A mudança só vale depois de salvar.'}
-        </p>
+        </p>}
         <CampoTexto
           rotulo="Tom"
           dica="Exemplos: acolhedor, direto, sem gírias."
@@ -358,11 +361,46 @@ function ConfiguracaoDoAtendimento() {
   )
 }
 
-export function AbaAtendimento({ horariosAtendimento = null }) {
+// #2070: a situação do agente, só leitura. Ligar e desligar fica em Atendimento › Horários e mensagens.
+function SituacaoDoAgente() {
+  const { carregarConfiguracao } = useAcoes()
+  const [carga, setCarga] = useState({ estado: 'carregando' })
+  const buscar = useCallback(() => carregarConfiguracao()
+    .then((c) => setCarga({ estado: 'ok', ativo: c?.ativo === true }))
+    .catch((erro) => setCarga({ estado: 'erro', mensagem: erro.message })), [carregarConfiguracao])
+  useEffect(() => { buscar() }, [buscar])
+  return (
+    <section className={css.secao} aria-labelledby="gestao-atend-agente">
+      <h3 id="gestao-atend-agente">Situação do agente</h3>
+      {carga.estado === 'carregando' && <output className={css.descricao}>Conferindo o atendimento automático…</output>}
+      {carga.estado === 'erro' && <p className={css.erro} role="alert">A situação do agente não carregou: {carga.mensagem}</p>}
+      {carga.estado === 'ok' && <p className={css.descricao}>Atendimento automático: {carga.ativo ? 'ligado' : 'desligado'}.</p>}
+      <p className={css.descricao}>
+        Para ligar ou desligar, abra <a href={hashDoModulo('atendimento', 'horarios')}>Atendimento › Horários e mensagens</a>.
+      </p>
+    </section>
+  )
+}
+
+// `secoes` (#2070): os Primeiros passos montam só uma parte. 'horarios': a semana (`horariosDaSemana`, do App) e as
+// mensagens de quando a loja não atende; 'configuracao': o atendimento sem o liga e desliga do agente; 'agente': a
+// situação do agente. Nenhuma delas mostra "Abrir loja agora". Sem `secoes`, a aba de sempre.
+export function AbaAtendimento({ horariosAtendimento = null, secoes = null, horariosDaSemana = null }) {
   const { recarregarExpediente } = useAcoes()
   const { acoes } = useAcessoModulos()
   // O expediente pode ter mudado em outro aparelho: abrir a aba traz o de agora.
   useEffect(() => { recarregarExpediente() }, [recarregarExpediente])
+  if (secoes) {
+    const administra = acoes.editarAtendimento === true
+    return (
+      <div className={css.aba}>
+        {secoes.includes('horarios') && <>{horariosDaSemana}{administra && <MensagensDoExpediente />}</>}
+        {secoes.includes('configuracao') && administra && <ConfiguracaoDoAtendimento comLigaDesliga={false} />}
+        {secoes.includes('agente') && <SituacaoDoAgente />}
+        {!administra && !secoes.includes('agente') && <p className={css.descricao}>Horários, mensagens e prazo de resposta são configurados pela dona.</p>}
+      </div>
+    )
+  }
   return (
     <div className={css.aba}>
       <LojaAgora horariosAtendimento={horariosAtendimento} />
