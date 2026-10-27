@@ -122,6 +122,7 @@ Em outro ambiente, configure na API:
 
 Não publicar o segredo no terminal, no log nem em URL acessível ao usuário. O cliente HTTP
 desliga seus loggers porque a geração de token do WPPConnect inclui o segredo no caminho.
+O enriquecedor de telemetria também reduz essa chamada à origem, sem sessão nem segredo.
 
 ### Contratos e validação
 
@@ -175,3 +176,22 @@ subir o serviço. A ativação depende de texto, imagem, áudio e reconexão rea
 - Não há importação do histórico anterior, grupos, campanhas ou garantia contra bloqueio.
 - Remover o vínculo pela tela faz logout e desativa somente a credencial WPPConnect da empresa;
   o próximo envio usa Meta quando ela estiver configurada. Sem Meta real, o envio é recusado.
+
+### Risco da conta e atendimento automático
+
+A avaliação é qualitativa: **risco elevado pelo impacto de perder acesso à conta e pelo uso de
+automação não oficial**. A probabilidade por número não é mensurável com os dados disponíveis;
+volume pequeno e um teste bem-sucedido não permitem estimar uma porcentagem de banimento.
+O WhatsApp informa que automação não autorizada pode causar bloqueio e que uma restrição pode
+afetar aparelhos vinculados ([uso responsável](https://faq.whatsapp.com/361005896189245/?eea=0&locale=en_US),
+[contas restritas](https://faq.whatsapp.com/717472490411581/?cms_platform=web)).
+
+Manter atendimento reativo às mensagens do cliente, opt-out, repasse humano e idempotência.
+O envio não recebe retry cego após resultado incerto; a retomada do webhook é limitada.
+Esses controles reduzem erros e mensagens indesejadas, mas não eliminam o risco da conexão.
+Migrar para a integração oficial quando liberada.
+
+O automático é configurado por empresa em **Atendimento → Horários e mensagens → Atendimento
+automático**, com tom, sugestões, saudações e SLA. A fila do agente roda na API; verificar o
+provedor de IA dessa API. Preservar o fechamento manual e os horários da loja. Conversas já
+assumidas pela equipe só voltam ao agente após liberação explícita no chat.

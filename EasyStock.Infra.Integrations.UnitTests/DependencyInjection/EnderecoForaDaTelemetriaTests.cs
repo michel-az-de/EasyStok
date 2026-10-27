@@ -41,6 +41,17 @@ public class EnderecoForaDaTelemetriaTests
     }
 
     [Fact]
+    public void Segredo_da_geracao_de_token_WppConnect_nao_vai_para_o_span()
+    {
+        var config = new Dictionary<string, string?> { ["Atendimento:WppConnect:BaseUrl"] = "http://wppconnect:21465/" };
+        Assert.Equal("http://wppconnect:21465/", UrlNoSpan("http://wppconnect:21465/api/ez-sessao/segredo-teste/generate-token", config));
+        var estado = "http://wppconnect:21465/api/ez-sessao/status-session";
+        Assert.Equal(estado, UrlNoSpan(estado, config));
+        var outro = "http://outro:21465/api/ez-sessao/segredo-teste/generate-token";
+        Assert.Equal(outro, UrlNoSpan(outro, config));
+    }
+
+    [Fact]
     public void Base_url_configurada_tambem_e_ocultada()
     {
         var config = new Dictionary<string, string?>
