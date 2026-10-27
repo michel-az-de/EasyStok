@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Notifications;
 using Microsoft.Extensions.Options;
@@ -280,16 +279,9 @@ public sealed class ContaFinanceiraVencimentoJob(
         {
             await notificador.PublicarEventoAsync(
                 tipo, parcela.EmpresaId, usuarioDestinoId: null,
-                payloadJson: JsonSerializer.Serialize(new
-                {
-                    parcelaId = parcela.Id,
-                    contaId = parcela.ContaPagarId,
-                    numero = parcela.Numero,
-                    valor = parcela.Saldo,
-                    vencimento = parcela.DataVencimento,
-                    descricao = parcela.ContaPagar?.Descricao,
-                    variante
-                }), ct: ct);
+                payloadJson: PayloadVencimentoConta.Montar(
+                    tipo, parcela.Id, parcela.ContaPagarId, parcela.Numero, parcela.Saldo, parcela.DataVencimento,
+                    parcela.ContaPagar?.Descricao, variante), ct: ct);
             return true;
         }
         catch (Exception ex)
@@ -315,16 +307,9 @@ public sealed class ContaFinanceiraVencimentoJob(
         {
             await notificador.PublicarEventoAsync(
                 tipo, parcela.EmpresaId, usuarioDestinoId: null,
-                payloadJson: JsonSerializer.Serialize(new
-                {
-                    parcelaId = parcela.Id,
-                    contaId = parcela.ContaReceberId,
-                    numero = parcela.Numero,
-                    valor = parcela.Saldo,
-                    vencimento = parcela.DataVencimento,
-                    descricao = parcela.ContaReceber?.Descricao,
-                    variante
-                }), ct: ct);
+                payloadJson: PayloadVencimentoConta.Montar(
+                    tipo, parcela.Id, parcela.ContaReceberId, parcela.Numero, parcela.Saldo, parcela.DataVencimento,
+                    parcela.ContaReceber?.Descricao, variante), ct: ct);
             return true;
         }
         catch (Exception ex)

@@ -74,9 +74,19 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         return completo;
     }
 
-    private async Task<bool> ProcessarEntradaAsync(EntradaWhatsApp entrada, CancellationToken ct)
+    public async Task<bool> ExecuteNormalizadoAsync(EventoWhatsApp evento, Guid empresaId, CancellationToken ct = default)
     {
-        var empresa = string.IsNullOrWhiteSpace(entrada.PhoneNumberId)
+        if (empresaId == Guid.Empty) throw new ArgumentException("Empresa obrigatória.", nameof(empresaId));
+        var completo = true;
+        foreach (var entrada in evento.Entradas)
+            completo &= await ProcessarEntradaAsync(entrada, ct, empresaId);
+        return completo;
+    }
+
+    private async Task<bool> ProcessarEntradaAsync(EntradaWhatsApp entrada, CancellationToken ct, Guid? empresaId = null)
+    {
+        var empresa = empresaId is { } id ? await empresaRepository.GetByIdAsync(id)
+            : string.IsNullOrWhiteSpace(entrada.PhoneNumberId)
             ? null
             : await empresaRepository.GetByWhatsAppPhoneNumberIdAsync(entrada.PhoneNumberId, ct);
 

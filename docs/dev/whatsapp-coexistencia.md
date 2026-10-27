@@ -77,3 +77,121 @@ valores no `.env` (nunca pelo chat):
 
 Admin › Tenants › WhatsApp desvincula o número (o webhook deixa de rotear para a empresa). Sem
 número vinculado o envio da empresa é recusado antes da Meta, com ou sem token gravado.
+
+## Ponte provisória WPPConnect (#2071)
+
+Alternativa por WhatsApp Web enquanto a habilitação da Meta está pendente. Não é uma conexão
+oficial e pode sofrer desconexão ou bloqueio. O aceite de envio, recebimento, mídia e reconexão
+exige teste com um número real; testes HTTP com respostas controladas não substituem esse aceite.
+
+O console oferece **Configurações › Canais › Conexão provisória por QR**. A sessão tem nome
+`ez-{EmpresaId:N}`; o token é cifrado no cofre existente, provider `wppconnect`. Nenhum token
+ou segredo do servidor é devolvido ao navegador. A conexão Meta e suas credenciais permanecem
+preservadas. Com o piloto habilitado, empresa sem sessão nem Meta real recebe erro ao enviar,
+em vez de sucesso do stub.
+
+### Configuração
+
+Use `docker-compose.wppconnect.yml` como sobreposição de `docker-compose.local.yml`, com
+`WPP_SECRET_KEY` e `WPP_WEBHOOK_TOKEN` aleatórios e `WPP_PUBLIC_FILES_URL` com a URL HTTP(S)
+dos arquivos (incluindo `/files`) no arquivo de ambiente fora do Git. O token
+do webhook deve ter pelo menos 16 caracteres. O cofre também exige a KEK já documentada acima.
+
+```powershell
+docker compose --env-file .env.local -f docker-compose.local.yml -f docker-compose.wppconnect.yml up -d --build
+```
+
+O servidor está fixado em `2.10.68`, com digest no compose. A porta 21465 não é publicada:
+somente a API acessa o gateway na rede Docker. Volumes de `tokens` e `userDataDir` preservam
+o vínculo no reinício. O pré-carregador `scripts/wppconnect/configurar.cjs` desliga a mídia
+inline, recupera mensagens não lidas na partida e mantém a sessão de QR disponível para leitura.
+O compose substitui o `entrypoint` da imagem: mudar apenas `command` não carrega essa configuração.
+Um `flock` exclusivo protege o volume; antes de iniciar o Chromium, são removidos somente os
+três links `Singleton*` dos perfis `ez-*` deixados pelo contêiner anterior. O perfil e as chaves
+não são apagados. Não compartilhar esse volume com processos fora desse entrypoint.
+Mensagens anteriores ao início da captura são ignoradas para não responder ao histórico da loja.
+
+Em outro ambiente, configure na API:
+
+- `Atendimento__WppConnect__Habilitado=true`;
+- `Atendimento__WppConnect__BaseUrl=http://wppconnect:21465/`;
+- `Atendimento__WppConnect__SecretKey` e `Atendimento__WppConnect__WebhookToken`;
+- no gateway, `WEBHOOK_URL=http://api:8080/api/webhooks/wppconnect?token=<mesmo-token>`;
+- `FileStorage__PublicBaseUrl` com URL HTTP(S) dos arquivos que o gateway consiga acessar,
+  incluindo `/files` para o storage local. Não usar somente a raiz do host.
+
+Não publicar o segredo no terminal, no log nem em URL acessível ao usuário. O cliente HTTP
+desliga seus loggers porque a geração de token do WPPConnect inclui o segredo no caminho.
+O enriquecedor de telemetria também reduz essa chamada à origem, sem sessão nem segredo.
+
+### Contratos e validação
+
+- `GET/POST/DELETE /api/integracoes/whatsapp/wppconnect`: estado, iniciar e desvincular;
+- `POST /api/integracoes/whatsapp/wppconnect/reconectar`: fecha sem logout e reinicia;
+  durante a geração/leitura do QR, apenas atualiza o estado para não abandonar o navegador
+  ainda em inicialização;
+- `POST /api/webhooks/wppconnect?token=...`: callback autenticado do gateway. A sessão é
+  conferida com a credencial cifrada antes de processar conteúdo.
+
+O preload preserva os argumentos seguros da biblioteca para cache, origem e TLS. Callbacks
+HTTP 429/5xx são repetidos até cinco tentativas com espera exponencial limitada a 60 segundos;
+erros permanentes e endpoints de envio não recebem esse retry.
+
+O estado conectado exige confirmação do cliente WhatsApp; o QR residual do gateway é retirado
+da resposta e da tela após essa confirmação.
+
+Envio retorna identificador real; resposta sem id ou falha do servidor não é sucesso. Não há
+retry automático de envio. Recebimento reutiliza idempotência, histórico, eventos do console
+e a fila de mídia do atendimento. A mídia é baixada pela sessão autenticada, com limite de
+resposta de 30 MB no transporte e os limites existentes do armazenamento. LID é resolvido
+pelo gateway antes de tratar o contato como telefone. Grupos e broadcasts são ignorados.
+
+Para liberar: parear pelo menu **Aparelhos conectados** do WhatsApp Business, conferir o
+número conectado, receber e responder texto, imagem e áudio pelo console, verificar o conteúdo
+no aparelho destinatário e repetir após reiniciar o gateway. Conferir que mensagens já gravadas
+não duplicam e que uma segunda empresa não acessa a sessão nem os anexos da primeira.
+
+### VPS
+
+O compose local não é o compose de produção. A preparação específica fica em
+`scripts/deploy/wppconnect/compose.yaml`, para sobrepor os arquivos existentes em
+`/opt/stacks/easystok`. API e Worker entram também na rede `whatsapp`; o gateway fica apenas
+nessa rede, sem porta pública. Os volumes nomeados conservam perfil e tokens, e o Docker
+reinicia o processo. Isso não recupera um vínculo revogado pelo WhatsApp.
+
+Após homologar, copiar o fragmento para `compose.wppconnect.yaml` na stack e o preload para
+`wppconnect/configurar.cjs`. Definir `WPP_SECRET_KEY` e `WPP_WEBHOOK_TOKEN` no `.env` protegido
+da VPS. Preservar a URL pública de arquivos que API e Worker já usam. Configurar
+`COMPOSE_FILE=compose.yaml:compose.override.yaml:compose.wppconnect.yaml` nesse `.env` para
+o deploy canônico continuar carregando a integração. Conferir o compose mesclado antes de
+subir o serviço. A ativação depende de texto, imagem, áudio e reconexão reais aprovados;
+`/healthz` do gateway confirma o processo HTTP, não a sessão WhatsApp.
+
+### Limites do piloto
+
+- A interface e o domínio conservam a janela de atendimento existente. Modelos da Meta não
+  são enviados pelo WPPConnect; botões saem como opções em texto.
+- Respostas feitas diretamente no celular não são sincronizadas como ecos neste piloto:
+  `onSelfMessage=false` evita que a própria resposta do agente assuma a conversa como humana.
+- Não há importação do histórico anterior, grupos, campanhas ou garantia contra bloqueio.
+- Remover o vínculo pela tela faz logout e desativa somente a credencial WPPConnect da empresa;
+  o próximo envio usa Meta quando ela estiver configurada. Sem Meta real, o envio é recusado.
+
+### Risco da conta e atendimento automático
+
+A avaliação é qualitativa: **risco elevado pelo impacto de perder acesso à conta e pelo uso de
+automação não oficial**. A probabilidade por número não é mensurável com os dados disponíveis;
+volume pequeno e um teste bem-sucedido não permitem estimar uma porcentagem de banimento.
+O WhatsApp informa que automação não autorizada pode causar bloqueio e que uma restrição pode
+afetar aparelhos vinculados ([uso responsável](https://faq.whatsapp.com/361005896189245/?eea=0&locale=en_US),
+[contas restritas](https://faq.whatsapp.com/717472490411581/?cms_platform=web)).
+
+Manter atendimento reativo às mensagens do cliente, opt-out, repasse humano e idempotência.
+O envio não recebe retry cego após resultado incerto; a retomada do webhook é limitada.
+Esses controles reduzem erros e mensagens indesejadas, mas não eliminam o risco da conexão.
+Migrar para a integração oficial quando liberada.
+
+O automático é configurado por empresa em **Atendimento → Horários e mensagens → Atendimento
+automático**, com tom, sugestões, saudações e SLA. A fila do agente roda na API; verificar o
+provedor de IA dessa API. Preservar o fechamento manual e os horários da loja. Conversas já
+assumidas pela equipe só voltam ao agente após liberação explícita no chat.

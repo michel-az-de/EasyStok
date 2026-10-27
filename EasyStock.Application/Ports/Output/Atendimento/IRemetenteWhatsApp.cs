@@ -7,6 +7,10 @@ namespace EasyStock.Application.Ports.Output.Atendimento;
 /// </summary>
 public interface IRemetenteWhatsApp
 {
+    /// <summary>Sessão provisória cifrada da empresa corrente; null conserva Meta/stub.</summary>
+    Task<CredencialWppConnect?> ObterSessaoWebAsync(CancellationToken ct = default) =>
+        Task.FromResult<CredencialWppConnect?>(null);
+
     /// <summary>
     /// <c>true</c> quando há empresa corrente. Com tenant e sem número vinculado o envio falha: o
     /// número global só serve a chamadas sem tenant (diagnóstico), nunca ao cliente de outra empresa.

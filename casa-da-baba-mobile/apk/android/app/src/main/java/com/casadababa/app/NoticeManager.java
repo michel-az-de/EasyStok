@@ -28,6 +28,7 @@ public final class NoticeManager {
     private final NoticeStore store;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean checking = new AtomicBoolean();
+    private final TokenRegistration tokenRegistration = new TokenRegistration();
     private final Handler main = new Handler(Looper.getMainLooper());
     private PrivateKey privateKey;
     private byte[] publicKey;
@@ -81,8 +82,14 @@ public final class NoticeManager {
         result.put("checking", checking.get());
         try {
             JSONObject snapshot = store.snapshot(); JSONArray items = snapshot.getJSONArray("items"), visible = new JSONArray(); int unread = 0;
-            for (int i = items.length() - 1; i >= 0; i--) {
-                JSONObject item = items.getJSONObject(i); if (item.optLong("openedAt", 0) == 0) unread++;
+            java.util.List<JSONObject> ordered = new java.util.ArrayList<>();
+            for (int i = 0; i < items.length(); i++) ordered.add(items.getJSONObject(i));
+            java.util.Collections.sort(ordered, (left, right) -> {
+                int byDate = Long.compare(right.optLong("createdAt", 0), left.optLong("createdAt", 0));
+                return byDate != 0 ? byDate : left.optString("id").compareTo(right.optString("id"));
+            });
+            for (JSONObject item : ordered) {
+                if (item.optLong("openedAt", 0) == 0) unread++;
                 visible.put(new JSONObject().put("id", item.getString("id")).put("title", item.getString("title"))
                     .put("body", item.getString("body")).put("screen", item.getString("screen"))
                     .put("receivedAt", item.getLong("receivedAt")).put("openedAt", item.optLong("openedAt", 0))
@@ -113,25 +120,30 @@ public final class NoticeManager {
             try {
                 identity();
                 JSONObject before = store.snapshot();
+                boolean registeredBefore = before.optLong("lastRegistrationAt", 0) > 0;
+                // Receipt authentication uses the existing installation key, not a fresh FCM token.
+                if (registeredBefore) flush(8);
+                String firebaseError = null;
                 if (!before.optBoolean("registered", false) || System.currentTimeMillis() - before.optLong("lastRegistrationAt", 0) > 21600000) {
-                    String token = Tasks.await(FirebaseMessaging.getInstance().getToken(), 20, TimeUnit.SECONDS);
-                    SignedNoticePolicy.require(token != null && !token.isEmpty() && token.length() <= 4096, "Token indisponível.");
-                    long issued = Math.max(System.currentTimeMillis(), before.optLong("lastRegistrationAt", 0) + 1);
-                    JSONObject registration = new JSONObject().put("kind", "cdb-installation-v1").put("installationId", installationId)
-                        .put("token", token).put("apkVersion", apkVersion).put("issuedAt", issued);
-                    JSONObject registered = post("installations", sign(registration));
-                    SignedNoticePolicy.require(registered.optBoolean("registered", false), "Registro não confirmado.");
-                    store.update("registered", true); store.update("lastRegistrationAt", issued);
-                }
-                // An upgraded APK may still belong to the old unsigned notification topic.
-                boolean legacyRemoved = store.snapshot().optBoolean("legacyTopicRemoved", false);
-                if (!legacyRemoved) {
                     try {
-                        Tasks.await(FirebaseMessaging.getInstance().unsubscribeFromTopic(NoticePolicy.TOPIC), 20, TimeUnit.SECONDS);
-                        store.update("legacyTopicRemoved", true); legacyRemoved = true;
-                    } catch (Exception failure) { /* Retry cleanup, but do not hold back signed receipts. */ }
+                        long generation = tokenRegistration.begin();
+                        String token = Tasks.await(FirebaseMessaging.getInstance().getToken(), 20, TimeUnit.SECONDS);
+                        SignedNoticePolicy.require(token != null && !token.isEmpty() && token.length() <= 4096, "Token indisponível.");
+                        long issued = Math.max(System.currentTimeMillis(), before.optLong("lastRegistrationIssuedAt", before.optLong("lastRegistrationAt", 0)) + 1);
+                        store.update("lastRegistrationIssuedAt", issued);
+                        JSONObject registration = new JSONObject().put("kind", "cdb-installation-v1").put("installationId", installationId)
+                            .put("token", token).put("apkVersion", apkVersion).put("issuedAt", issued);
+                        JSONObject registered = post("installations", sign(registration));
+                        SignedNoticePolicy.require(registered.optBoolean("registered", false), "Registro não confirmado.");
+                        tokenRegistration.complete(generation, () -> {
+                            store.update("registered", true); store.update("lastRegistrationAt", issued);
+                        });
+                    } catch (TimeoutException | ExecutionException failure) {
+                        if (!registeredBefore) throw failure;
+                        firebaseError = "A verificação do Firebase será repetida. Os recibos restantes permanecem na fila.";
+                    }
                 }
-                flush(8);
+                if (!registeredBefore) flush(8);
                 if (foreground || System.currentTimeMillis() - before.optLong("lastSyncAt", 0) > 900000) {
                     JSONObject query = new JSONObject().put("kind", "cdb-inbox-v1").put("installationId", installationId).put("issuedAt", System.currentTimeMillis());
                     JSONArray messages = post("inbox", sign(query)).getJSONArray("messages");
@@ -144,9 +156,21 @@ public final class NoticeManager {
                     store.update("lastSyncAt", System.currentTimeMillis());
                 }
                 flush(8);
-                if (legacyRemoved) { transientError = ""; store.update("lastError", ""); }
+                // An upgraded APK may still belong to the old unsigned notification topic.
+                boolean legacyRemoved = store.snapshot().optBoolean("legacyTopicRemoved", false);
+                if (!legacyRemoved) {
+                    try {
+                        Tasks.await(FirebaseMessaging.getInstance().unsubscribeFromTopic(NoticePolicy.TOPIC), 20, TimeUnit.SECONDS);
+                        store.update("legacyTopicRemoved", true); legacyRemoved = true;
+                    } catch (Exception failure) { /* Retry cleanup, but do not hold back signed receipts. */ }
+                }
+                JSONObject completed = store.snapshot();
+                boolean currentRegistration = completed.optBoolean("registered", false);
+                if (firebaseError != null) error(firebaseError);
+                else if (!currentRegistration) error("O registro das notificações mudou durante a verificação e será atualizado automaticamente.");
+                else if (legacyRemoved) { transientError = ""; store.update("lastError", ""); }
                 else error("Os avisos novos foram verificados. A retirada do registro antigo no Firebase ainda será repetida.");
-                success = legacyRemoved && store.snapshot().getJSONArray("pending").length() == 0;
+                success = firebaseError == null && currentRegistration && legacyRemoved && completed.getJSONArray("pending").length() == 0;
             } catch (TimeoutException timeout) { error("O registro no Firebase demorou. Confira a conexão e os serviços do Google Play; tentaremos novamente."); }
             catch (ApiException failure) { error(failure.safeMessage); }
             catch (ExecutionException failure) { error("O Firebase não concluiu o registro. Confira a conexão e os serviços do Google Play; tentaremos novamente."); }
@@ -159,7 +183,8 @@ public final class NoticeManager {
         });
     }
     public void tokenChanged() {
-        try { store.update("registered", false); store.update("legacyTopicRemoved", false); } catch (Exception ignored) {}
+        try { tokenRegistration.changed(() -> { store.update("registered", false); store.update("legacyTopicRemoved", false); }); }
+        catch (Exception failure) { error("Não foi possível salvar a renovação do registro. O histórico foi preservado."); }
         NoticeSyncJob.schedule(context); changed();
     }
     public void acceptPush(JSONObject envelope) {

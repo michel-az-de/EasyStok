@@ -2,11 +2,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 const notices = require('../scripts/signed-notice.cjs');
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 3072 });
 const target = 'a'.repeat(64);
 const input = { title: 'Aviso da Casa da Baba', body: 'Teste de confirmação, sem dados de clientes.', screen: 'home' };
 const decode = envelope => JSON.parse(Buffer.from(envelope.payloadBase64, 'base64'));
+test('API e Android confiam na mesma chave pública incluída no deploy', () => {
+  const android = fs.readFileSync(path.resolve(__dirname, '../android/app/src/main/assets/ota-public-key.der'));
+  const api = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/Mobile/Security/push-publisher.der'));
+  assert.deepEqual(api, android);
+});
 test('assinatura protege bytes, identidade, nonce e destino', () => {
   const payload = notices.notice(input, target);
   const other = notices.notice(input, target);

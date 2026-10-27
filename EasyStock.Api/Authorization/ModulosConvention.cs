@@ -14,7 +14,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Consentimentos", "ContatoUsuario",
         "AdminTenants", "AdminNotificacoes", "WebhookGateway", "WebhookPix",
         "Internal.NotificacoesJobs", "Webhooks.WebhookMensageriaMeta", "Webhooks.WebhookWhatsApp",
-        "Webhooks.WebhookWhatsAppPlataforma",
+        "Webhooks.WebhookWhatsAppPlataforma", "Webhooks.WebhookWppConnect",
         "Storefront.Agendamento", "Storefront.Auth", "Storefront.Avaliacao", "Storefront.CardapioConversa",
         "Storefront.ChatSite", "Storefront.ChatSiteMidia", "Storefront.Checkout", "Storefront.ComandaCliente", "Storefront.FotosCardapioPublicas",
         "Storefront.Frete", "Storefront.Menu", "Storefront.PedidosCliente",
@@ -91,7 +91,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Caixa, "Caixa", "Venda");
         Associar(Modulo.Campanhas, "Campanhas", "CampanhasSugestoes");
         Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "NotificacoesConfiguracao",
-            "Integracoes", "IntegracoesWhatsApp", "IntegracoesEmail", "Storefront.StorefrontConfiguracao");
+            "Integracoes", "IntegracoesWhatsApp", "IntegracoesWppConnect", "IntegracoesEmail", "Storefront.StorefrontConfiguracao");
         Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoAgenda", "AtendimentoRelatoriosEntrega", "AtendimentoCorridas", "AtendimentoRelatorioCustoDeEntrega",
             "Storefront.TenantVitrineEntrega");
         mapa.Add("Storefront.AprovacaoPedido", [Modulo.Atendimento, Modulo.Entregas]);

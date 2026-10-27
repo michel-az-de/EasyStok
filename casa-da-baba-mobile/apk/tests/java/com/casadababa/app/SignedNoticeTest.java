@@ -83,8 +83,61 @@ public final class SignedNoticeTest {
             fails(() -> captured.opened("missing", NOW, "0.6.0"));
             fails(() -> captured.accept(envelope, notice, "polling-as-push", NOW, "0.6.0"));
         } finally { Files.deleteIfExists(file.toPath()); Files.deleteIfExists(new File(file + ".new").toPath()); Files.deleteIfExists(folder.toPath()); }
+        testTokenRotation();
+        testEviction(id, publisher);
         System.out.println("PASS: " + assertions + " signed notice and durable receipt assertions; Android Keystore/FCM need device validation");
     }
+    private static void testTokenRotation() throws Exception {
+        TokenRegistration registration = new TokenRegistration();
+        java.util.concurrent.atomic.AtomicBoolean persisted = new java.util.concurrent.atomic.AtomicBoolean(true);
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.CountDownLatch waitingResponse = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch deliverResponse = new java.util.concurrent.CountDownLatch(1);
+        long tokenA = registration.begin();
+        Thread responseA = new Thread(() -> {
+            try {
+                waitingResponse.countDown();
+                if (!deliverResponse.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new AssertionError("Response not released");
+                if (registration.complete(tokenA, () -> persisted.set(true))) throw new AssertionError("Stale token accepted");
+            } catch (Throwable problem) { failure.set(problem); }
+        });
+        responseA.setDaemon(true); responseA.start();
+        check(waitingResponse.await(10, java.util.concurrent.TimeUnit.SECONDS));
+        registration.changed(() -> persisted.set(false));
+        deliverResponse.countDown(); responseA.join(10000);
+        check(!responseA.isAlive() && failure.get() == null);
+        check(!persisted.get());
+        long tokenB = registration.begin();
+        check(registration.complete(tokenB, () -> persisted.set(true)));
+        check(persisted.get());
+        // Rotation after a completed response must still invalidate that persisted success.
+        registration.changed(() -> persisted.set(false));
+        check(!persisted.get());
+        check(!registration.complete(tokenB, () -> persisted.set(true)));
+    }
+    private static void testEviction(String target, KeyPair publisher) throws Exception {
+        File folder = Files.createTempDirectory("cdb-notice-eviction").toFile(); File file = new File(folder, "notices.json");
+        try {
+            NoticeStore store = new NoticeStore(file);
+            // The inbox response is newest first. The oldest item intentionally has a pending receipt.
+            for (int i = 99; i >= 0; i--) {
+                JSONObject value = notice(target).put("id", historyId(i)).put("createdAt", NOW + i);
+                store.accept(sign(value, publisher), value, "sync", NOW + 200, "0.6.0");
+                if (i != 0) store.acknowledged(historyId(i) + ":received:sync");
+            }
+            JSONObject newest = notice(target).put("id", historyId(100)).put("createdAt", NOW + 100);
+            store.accept(sign(newest, publisher), newest, "push", NOW + 201, "0.6.0");
+            JSONArray items = store.snapshot().getJSONArray("items");
+            check(items.length() == 100);
+            check(NoticeStore.find(items, historyId(0)) != null);
+            check(NoticeStore.find(items, historyId(1)) == null);
+            check(NoticeStore.find(items, historyId(99)) != null);
+            check(NoticeStore.find(items, historyId(100)) != null);
+            check(store.snapshot().getJSONArray("pending").length() == 2);
+            check(new NoticeStore(file).snapshot().getJSONArray("items").length() == 100);
+        } finally { Files.deleteIfExists(file.toPath()); Files.deleteIfExists(new File(file + ".new").toPath()); Files.deleteIfExists(folder.toPath()); }
+    }
+    private static String historyId(int index) { return String.format(java.util.Locale.ROOT, "00000000-0000-4000-8000-%012d", index); }
     static JSONObject notice(String target) throws Exception {
         return new JSONObject().put("kind", "cdb-notice-v1").put("id", "11be2d87-d6ef-4274-894b-3d928fe0c95a")
             .put("createdAt", NOW).put("expiresAt", NOW + 86400000).put("target", target)

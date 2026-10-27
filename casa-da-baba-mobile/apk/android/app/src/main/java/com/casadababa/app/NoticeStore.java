@@ -32,7 +32,13 @@ public final class NoticeStore {
             // Never evict an item while its acknowledgement is awaiting upload.
             while (items.length() >= 100) {
                 int removable = -1;
-                for (int i = 0; i < items.length(); i++) if (!pendingFor(next, items.getJSONObject(i).getString("id"))) { removable = i; break; }
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject candidate = items.getJSONObject(i);
+                    if (pendingFor(next, candidate.getString("id"))) continue;
+                    if (removable < 0 || candidate.getLong("createdAt") < items.getJSONObject(removable).getLong("createdAt")
+                        || (candidate.getLong("createdAt") == items.getJSONObject(removable).getLong("createdAt")
+                            && candidate.getString("id").compareTo(items.getJSONObject(removable).getString("id")) < 0)) removable = i;
+                }
                 SignedNoticePolicy.require(removable >= 0, "Histórico aguardando confirmação. Conecte-se para continuar.");
                 items.remove(removable);
             }

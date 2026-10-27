@@ -17,3 +17,5 @@
 .resultado { display: flex; flex-direction: column; gap: var(--e-2); }
 .numero { margin: 0; font-size: var(--t-forte); color: var(--tinta); overflow-wrap: anywhere; }
 .syncs { margin: 0; padding-left: var(--e-4); font-size: var(--t-corpo); color: var(--tinta); }
+.qr { width: 280px; max-width: 100%; height: auto; }
+.acoes { display: flex; flex-wrap: wrap; gap: var(--e-2); }

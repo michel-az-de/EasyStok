@@ -42,14 +42,19 @@ public static class EnderecoForaDaTelemetria
 
     /// <summary>
     /// Enriquecedor para <c>AddHttpClientInstrumentation</c>: nas chamadas aos provedores de endereço,
-    /// <c>url.full</c> fica só com esquema, host e porta. As demais chamadas HTTP não mudam.
+    /// <c>url.full</c> fica só com esquema, host e porta. Também oculta a geração de token do WPPConnect.
     /// </summary>
     public static Action<Activity, HttpRequestMessage> OcultarUrlNoSpan(IConfiguration configuration)
     {
         var hosts = Hosts(configuration);
+        Uri.TryCreate(configuration["Atendimento:WppConnect:BaseUrl"] ?? "http://127.0.0.1:21465/",
+            UriKind.Absolute, out var wpp);
         return (activity, request) =>
         {
-            if (request.RequestUri is { } url && EhHostDeEndereco(hosts, url.Host))
+            // O WPPConnect também leva segredo no caminho ao gerar o token da sessão.
+            if (request.RequestUri is { } url && (EhHostDeEndereco(hosts, url.Host)
+                || wpp is not null && wpp.IsBaseOf(url)
+                && url.AbsolutePath.EndsWith("/generate-token", StringComparison.Ordinal)))
                 activity.SetTag("url.full", $"{url.Scheme}://{url.Authority}/");
         };
     }
