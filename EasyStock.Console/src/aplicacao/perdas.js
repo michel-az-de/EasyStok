@@ -13,6 +13,20 @@ export const MOTIVOS_PERDA = [
 ]
 
 export const lerResumoDePerdas = async (de, ate) => resumoDePerdasDaApi(await obterPerdas(de, ate))
+
+// #2081 (A5/E7): a API manda `valor: 0` quando o lote não tem custo. Mostrar "R$ 0,00" dizia que a
+// perda não custou nada; o certo é dizer que falta o custo e contar quantas perdas ficaram assim.
+export const semCusto = (l) => !l.desfeita && Number(l.valor ?? 0) === 0 && Number(l.quantidade ?? 0) > 0
+export const perdasSemCusto = (resumo) => (resumo?.lancamentos ?? []).filter(semCusto).length
+
+// #2081 (A16): a descrição que a API monta repete o motivo ("Perda · Perda no preparo"). A linha diz
+// o motivo uma vez e só acrescenta a descrição quando ela traz algo a mais.
+export function textoDaPerda(l) {
+  const rotulo = MOTIVOS_PERDA.find((m) => m.id === l.motivo)?.rotulo ?? l.motivo ?? ''
+  const resto = String(l.descricao ?? '').split(' · ').map((p) => p.trim())
+    .filter((p) => p && p.toLowerCase() !== 'perda' && p.toLowerCase() !== rotulo.toLowerCase() && p !== l.lote)
+  return [rotulo, ...resto].filter(Boolean).join(' · ')
+}
 export const lerVencidos = async () => ((await obterVencidos()) ?? []).map(vencidoDaApi)
 
 const numero = (texto) => (String(texto ?? '').trim() === '' ? NaN : Number(String(texto).replace(',', '.')))

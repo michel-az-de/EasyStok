@@ -4,8 +4,31 @@
 // fuso da máquina de quem abre o console.
 export const FUSO = 'America/Sao_Paulo'
 
-export const moeda = (v) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+// ---------------------------------------------------------------------------
+// Dinheiro (#2080): ESTE módulo é o único que formata e lê reais no console. O guard
+// `ferramentas/verificar-reais.mjs` reprova `currency`, `toFixed(2).replace` e leitor próprio fora
+// daqui. O campo (`componentes/moedaNoCampo.js`) espelha só o texto sem "R$", porque `componentes`
+// não importa `dominio`; `prova-2080-reais.mjs` garante que os dois escrevem igual.
+// ---------------------------------------------------------------------------
+const REAIS = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+const SINAL_NEGATIVO = '−'
+
+// "R$ 1.234,56". Negativo leva um sinal só, o menos de verdade colado ao "R$" ("−R$ 3,00"), e o que
+// arredonda para zero não leva sinal ("-R$ 0,00" não existe). Sem valor (nulo) mostra traço.
+export const moeda = (v) => {
+  if (v == null) return '—'
+  const texto = REAIS.format(Math.abs(v))
+  return v < 0 && /[1-9]/.test(texto) ? SINAL_NEGATIVO + texto : texto
+}
+
+// O mesmo valor quando ele chega em centavos (frete, corrida, fechamento).
+export const moedaDosCentavos = (centavos) => moeda(centavos == null ? null : centavos / 100)
+
+// "1.234,56" (sem o "R$"): o que o campo mostra quando o valor volta escrito por inteiro e o que
+// os formulários guardam no rascunho. Relê igual por `lerMoeda`/`lerReais`.
+export const textoDosCentavos = (centavos) => (centavos == null
+  ? ''
+  : (centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 
 export const horaCurta = (iso) =>
   new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: FUSO })
@@ -148,6 +171,24 @@ export function lerMoeda(texto) {
   const inteiro = semSimbolo.slice(0, posSeparador).replace(/[.,]/g, '')
   const decimal = (semSimbolo.slice(posSeparador + 1).replace(/[.,]/g, '') + '00').slice(0, 2)
   return Number(inteiro || '0') * 100 + Number(decimal || '0')
+}
+
+// #2080: a leitura que os formulários validam (zona, faixa de frete, corrida, porção). É o `lerMoeda`
+// acima, mais o que o campo já filtra antes: texto sem número ("", "abc") é NaN, para o formulário
+// avisar em vez de gravar zero, e o menos é respeitado, para a regra de "não pode ser negativo"
+// falar. Devolve centavos.
+export function lerReais(texto) {
+  const escrito = String(texto ?? '')
+  if (!/\d/.test(escrito)) return NaN
+  const centavos = lerMoeda(escrito)
+  return centavos > 0 && /^[^\d]*-/.test(escrito) ? -centavos : centavos
+}
+
+// O rascunho de um formulário guarda o reais como o texto que a tela escreve; o `CampoReais` quer
+// centavos (nulo = vazio). Esta é a ponte: `centavosDoTexto` lê, `textoDosCentavos` devolve.
+export const centavosDoTexto = (texto) => {
+  const centavos = lerReais(texto)
+  return Number.isNaN(centavos) ? null : centavos
 }
 
 // Telefone (seção 2, cadastro rápido): celular "(11) 98765-4321", fixo

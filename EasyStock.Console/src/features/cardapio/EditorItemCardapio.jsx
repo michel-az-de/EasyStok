@@ -3,14 +3,14 @@ import { Modal } from '../../componentes/Modal'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
-import { CampoMascarado } from '../../componentes/CampoMascarado'
+import { CampoReais } from '../../componentes/CampoReais'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { lerCategoriasDoPrato, lerEmbalagensDaPorcao, lerFichaDoPrato, salvarFichaDoPrato, salvarFotoDoPrato, salvarFotoDoAcervo } from '../../aplicacao/edicaoCardapio'
 import { useMiniaturaAcervo } from '../../aplicacao/useAcervo'
 import { catalogoDeAdicionais } from '../../dominio/cardapio'
 import { fotoDoItem } from '../../dominio/vitrineCardapio'
-import { lerMoeda, mascaraMoeda, moeda, moedaAltaDemais } from '../../dominio/formato'
+import { lerMoeda, moeda, moedaAltaDemais } from '../../dominio/formato'
 import { corpoDasPorcoes, erroDasPorcoes, porcoesMudaram, rascunhoDasPorcoes, resumoDoItem } from '../../dominio/porcoes'
 import { EditorPorcoes } from './EditorPorcoes'
 import { EscolherFotoDoAcervo } from './EscolherFotoDoAcervo'
@@ -263,7 +263,8 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
               <h3>Porções e valores</h3>
               {porcoes.length === 0 && <div className={css.dupla}>
                 <label className={css.campo}>Porção<input required value={porcao} onChange={(e) => setPorcao(e.target.value)} placeholder="Ex.: 800 g · serve 2 pessoas" /></label>
-                <CampoMascarado tipo="moeda" rotulo="Preço" valor={mascaraMoeda(centavos)} erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null} aoMudarDigitos={(d) => { setCentavos(Number(d || '0')); setAlterado(true) }} aoColarTexto={(t) => { setCentavos(lerMoeda(t)); setAlterado(true) }} />
+                {/* #2080: reais como em todo campo ("100" é R$ 100,00, igual à porção e ao caixa), não máscara de centavos. */}
+                <CampoReais rotulo="Preço" centavos={centavos} ler={lerMoeda} erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null} aoMudar={(c) => { setCentavos(c ?? 0); setAlterado(true) }} />
               </div>}
               {fonteApi && <EditorPorcoes linhas={porcoes} embalagens={embalagens} aoMudar={(p) => { setPorcoes(p); setAlterado(true) }} />}
             </section>

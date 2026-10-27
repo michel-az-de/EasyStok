@@ -118,7 +118,8 @@ await confere('saldo diferente do último fechamento pede motivo da retificaçã
 })
 
 await confere('fechamento do caixa leva o contado e a diferença nas observações', () => {
-  assert.match(observacaoDoFechamento({ contado: 195, saldoEsperado: 200 }), /Contado na gaveta: R\$\s?195,00.*Diferença: -R\$\s?5,00/)
+  // #2078 (B20): mesmas palavras do modal do fechamento.
+  assert.match(observacaoDoFechamento({ contado: 195, saldoEsperado: 200 }), /Contado na gaveta: R\$\s?195,00.*Faltam R\$\s?5,00/)
 })
 
 await confere('fechar a loja pede justificativa só dentro do horário', () => {

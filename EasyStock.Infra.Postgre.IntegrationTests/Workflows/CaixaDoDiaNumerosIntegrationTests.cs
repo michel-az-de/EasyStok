@@ -9,6 +9,7 @@ using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Sales;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
@@ -138,6 +139,71 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<EstornarMovimentoCaixaUseCase>()
             .ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, sangria.Id, "lançado errado")));
         (await estornarSuprimento())!.EstornadoEm.Should().NotBeNull();
+    }
+
+    [SkippableFact]
+    public async Task Lancamento_gravado_depois_do_fechamento_some_do_retrato_e_o_estorno_diz_o_motivo_certo()
+    {
+        // #2098 R1: o corte do retrato tira o lançamento posterior da lista do dia fechado. O estorno não pode
+        // concluir que ele "já foi estornado" por não achá-lo ali: o movimento é conferido pelo id, no banco.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var aberturaEm = DateTime.UtcNow.AddMinutes(-5);
+        var dia = HorarioBrasil.DataOperacional(aberturaEm);
+        await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 100m, aberturaEm)));
+        await using var provider = BuildProductionProvider();
+        await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<FecharCaixaUseCase>().ExecuteAsync(new FecharCaixaCommand(empresaId)));
+        var tardio = MovimentoCaixa.Criar(empresaId, "entrada", 30m, DateTime.UtcNow.AddSeconds(5));
+        tardio.Metodo = "dinheiro";
+        await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(tardio));
+
+        var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, dia)));
+        caixa.Movimentos.Should().NotContain(m => m.Id == tardio.Id);
+        caixa.PosFechamento.Should().Be(30m);
+
+        var estornar = () => NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<EstornarMovimentoCaixaUseCase>()
+            .ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, tardio.Id, "errado")));
+        (await estornar.Should().ThrowAsync<UseCaseValidationException>()).Which.Message.Should().NotContain("já foi estornado");
+    }
+
+    [SkippableFact]
+    public async Task Linha_de_pagamento_de_pedido_traz_numero_do_dia_cliente_e_quem_registrou()
+    {
+        // #2082 B16/C10: "Pagamento de pedido · Pix · R$ 59" não dizia de quem era nem quem recebeu. A linha
+        // passa a levar o número do pedido no dia, o cliente e o registrador, todos no mesmo SELECT do dia.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var agora = DateTime.UtcNow;
+        var dia = HorarioBrasil.DataOperacional(agora);
+        var doProvedor = NovoPedidoComPagamento(empresaId, 12, "Maria", 59m, "pix", "Mercado Pago", agora.AddMinutes(-3));
+        var baixaManual = NovoPedidoComPagamento(empresaId, 13, "João", 30m, "dinheiro", "Joana", agora.AddMinutes(-2));
+        var semDados = NovoPedidoComPagamento(empresaId, null, null, 10m, "pix", null, agora.AddMinutes(-1));
+        await SemearAsync(empresaId, db => db.Pedidos.AddRange(doProvedor, baixaManual, semDados));
+        await using var provider = BuildProductionProvider();
+
+        var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, dia)));
+
+        var linhas = caixa.LinhasExtras!.Where(l => l.Tipo == "pagamento").OrderBy(l => l.Hora).ToList();
+        linhas.Select(l => (l.Valor, l.Metodo, l.Descricao, l.PedidoNumeroDoDia, l.ClienteNome, l.RegistradoPorNome))
+            .Should().Equal(
+                (59m, "pix", "Pagamento de pedido", (int?)12, "Maria", "Mercado Pago"),
+                (30m, "dinheiro", "Pagamento de pedido", (int?)13, "João", "Joana"),
+                (10m, "pix", "Pagamento de pedido", (int?)null, null, null));
+        caixa.TotalPagamentosPedidos.Should().Be(linhas.Sum(l => l.Valor), "as linhas continuam somando o total do dia");
+    }
+
+    private static Pedido NovoPedidoComPagamento(Guid empresaId, int? numeroDoDia, string? cliente, decimal valor, string metodo,
+        string? registradoPor, DateTime pagoEm)
+    {
+        var pedido = Pedido.Criar(empresaId);
+        pedido.Status = StatusPedidoMapper.Aguardando;
+        pedido.ClienteNome = cliente;
+        if (numeroDoDia is { } n) pedido.DefinirNumeroDoDia(HorarioBrasil.DataOperacional(pagoEm), n);
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Valor = valor, Metodo = metodo,
+            PagoEm = pagoEm, RegistradoPorNome = registradoPor });
+        return pedido;
     }
 
     private async Task<Guid> NovaEmpresaAsync()

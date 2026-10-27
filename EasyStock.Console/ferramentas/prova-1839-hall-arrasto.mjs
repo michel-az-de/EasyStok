@@ -98,7 +98,7 @@ const cardapio = { estado: 'ok', dados: { itens: [
   { hoje: true, arquivado: false, pendencias: ['SemFoto'] }, { hoje: true, arquivado: false, pendencias: [] },
   { hoje: false, arquivado: true, pendencias: ['SemFoto'] },
 ] } }
-const fontes = { atendimento: conversas, pedidos, financeiro: { estado: 'ok', dados: { saldoEsperado: 10, aberto: true } }, cardapio }
+const fontes = { atendimento: conversas, pedidos, financeiro: { estado: 'ok', dados: { saldoEsperado: 10, saldoInicial: 10, aberto: true } }, cardapio }
 
 provar('cada módulo com fonte diz o que pede atenção, com o mesmo número de cima', () => {
   assert.deepEqual(pendenciaDoModulo('atendimento', fontes), { texto: '2 conversas sem resposta', atencao: true })
@@ -115,7 +115,7 @@ provar('sem pendência a linha acalma; caixa de outro dia aberto pede atenção'
   assert.deepEqual(pendenciaDoModulo('cozinha', { pedidos: vazio }), { texto: 'Fila de preparo vazia', atencao: false })
   assert.deepEqual(pendenciaDoModulo('entregas', { pedidos: vazio }), { texto: 'Nada pronto para sair', atencao: false })
   assert.deepEqual(pendenciaDoModulo('cardapio', { cardapio: { estado: 'ok', dados: { itens: [{ hoje: true, pendencias: [] }] } } }), { texto: '1 prato no cardápio de hoje', atencao: false })
-  assert.deepEqual(pendenciaDoModulo('financeiro', { financeiro: { estado: 'ok', dados: { aberturaPendenteCrossDay: true } } }), { texto: 'Caixa de outro dia aberto', atencao: true })
+  assert.deepEqual(pendenciaDoModulo('financeiro', { financeiro: { estado: 'ok', dados: { esquecidoAberto: true } } }), { texto: 'Caixa de outro dia aberto', atencao: true })
 })
 
 provar('zero numa leitura parcial não declara fila vazia', () => {

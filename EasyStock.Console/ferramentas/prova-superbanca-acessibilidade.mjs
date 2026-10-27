@@ -218,6 +218,87 @@ for (const protegido of [true, false]) {
   })
 }
 
+// #2078 (B11/E4): modal de dinheiro. Opt-in: sem as props, nenhum modal muda (o laço acima).
+const dialogoFalso = (eventos, campo = null) => ({ open: false, parentElement: { closest: () => null }, buscas: [],
+  showModal() { this.open = true }, close() { this.open = false },
+  addEventListener(nome, fn) { eventos.set(nome, fn) }, removeEventListener(nome) { eventos.delete(nome) },
+  querySelector(seletor) { this.buscas.push(seletor); return campo },
+})
+provar('Modal: segurarFechamento ignora Escape e fundo com valor digitado; o X e o Cancelar continuam fechando', () => {
+  let fechou = 0
+  const eventos = new Map(), m = montar(Modal, { titulo: 'Fechar o caixa', segurarFechamento: true, aoFechar: () => fechou++ })
+  const dialogo = dialogoFalso(eventos)
+  m.elemento.props.ref.current = dialogo
+  m.efeitos()
+  try {
+    const cancelamento = tecla('Escape', dialogo)
+    eventos.get('cancel')(cancelamento)
+    assert.equal(cancelamento.prevenido, true, 'o navegador não fecha o dialog sozinho')
+    eventos.get('click')({ target: dialogo })
+    assert.equal(fechou, 0, 'Escape e clique no fundo não perdem o valor digitado')
+    const fechar = andar(m.elemento, elemento => elemento.props['aria-label'] === 'Fechar janela')[0]
+    assert.equal(Boolean(fechar.props.disabled), false)
+    fechar.props.onClick()
+    assert.equal(fechou, 1, 'o X é um gesto explícito e fecha')
+  } finally { m.desmontar() }
+})
+// #2078 (revisão R2): no Chromium o 2º Esc seguido, sem ativação do usuário, não pode ser cancelado:
+// o dialog fecha sozinho e o React não sabia. O `close` nativo agora é ouvido.
+for (const caso of ['segurando', 'livre', 'protegido']) {
+  provar(`Modal: close nativo (Esc não cancelável) ${caso === 'livre' ? 'avisa o pai' : 'reabre a folha sem perder o valor'}`, () => {
+    let fechou = 0
+    const props = { titulo: 'Fechar o caixa', segurarFechamento: caso === 'segurando', aoFechar: caso === 'protegido' ? undefined : () => fechou++ }
+    const eventos = new Map(), m = montar(Modal, props)
+    const dialogo = dialogoFalso(eventos)
+    let reaberto = 0
+    dialogo.showModal = function () { this.open = true; reaberto++ }
+    m.elemento.props.ref.current = dialogo
+    m.efeitos()
+    try {
+      assert.ok(eventos.has('close'), 'o modal ouve o close nativo')
+      dialogo.open = false
+      eventos.get('close')({ target: dialogo })
+      if (caso === 'livre') { assert.equal(fechou, 1); assert.equal(reaberto, 1, 'só a abertura') }
+      else { assert.equal(fechou, 0); assert.equal(dialogo.open, true); assert.equal(reaberto, 2) }
+    } finally { m.desmontar() }
+    assert.equal(eventos.size, 0, 'desmontar tira o ouvinte antes do close() da limpeza')
+  })
+}
+provar('Modal: focarCampo põe o foco no campo marcado (ou no primeiro campo), sem rolar a página; sem a prop, o foco é o do navegador', () => {
+  const focos = []
+  const campo = { focus(opcoes) { focos.push(opcoes) } }
+  const eventos = new Map(), m = montar(Modal, { titulo: 'Lançar', focarCampo: true, aoFechar() {} })
+  const dialogo = dialogoFalso(eventos, campo)
+  m.elemento.props.ref.current = dialogo
+  m.efeitos()
+  try {
+    assert.deepEqual(focos, [{ preventScroll: true }])
+    assert.deepEqual(dialogo.buscas, ['[data-foco-inicial]:not(:disabled)'], 'o campo marcado vem antes de qualquer outro')
+  } finally { m.desmontar() }
+  // Sem campo marcado, o primeiro campo do modal.
+  const focosSemMarca = []
+  const eventosSemMarca = new Map(), semMarca = montar(Modal, { titulo: 'Lançar', focarCampo: true, aoFechar() {} })
+  const dialogoSemMarca = dialogoFalso(eventosSemMarca, null)
+  dialogoSemMarca.querySelector = function (seletor) { this.buscas.push(seletor); return seletor.startsWith('input') ? { focus: (o) => focosSemMarca.push(o) } : null }
+  semMarca.elemento.props.ref.current = dialogoSemMarca
+  semMarca.efeitos()
+  try {
+    assert.deepEqual(focosSemMarca, [{ preventScroll: true }])
+    assert.match(dialogoSemMarca.buscas[1], /^input:not\(:disabled\), select:not\(:disabled\), textarea:not\(:disabled\)$/)
+  } finally { m.desmontar() }
+  const semProp = new Map(), outro = montar(Modal, { titulo: 'Nota', aoFechar() {} })
+  const dialogoOutro = dialogoFalso(semProp, campo)
+  outro.elemento.props.ref.current = dialogoOutro
+  outro.efeitos()
+  try { assert.equal(dialogoOutro.buscas.length, 0, 'os outros modais seguem com o foco que o showModal dá') } finally { outro.desmontar() }
+})
+provar('Modal: a folha não é posicionada como relativa no top layer (vira absoluta e rola com a página em 390 px)', () => {
+  const cssModal = readFileSync(new URL('../src/componentes/Modal.module.css', import.meta.url), 'utf8')
+  const posicoes = [...cssModal.matchAll(/\.caixa\s*\{[^}]*?position:\s*([a-z]+)/g)].map(m => m[1])
+  assert.ok(posicoes.length > 0, 'a folha declara a posição')
+  assert.ok(posicoes.every(p => p === 'fixed'), `posições da .caixa: ${posicoes.join(', ')}`)
+})
+
 const propsAlca = aoMudar => ({ rotulo: 'Largura do Balcão', valor: 320, min: 280, max: 440, padrao: 360, aoMudar })
 const iniciar = montagem => montagem.elemento.props.onPointerDown({ button: 0, pointerId: 1, clientX: 100, preventDefault() {}, currentTarget: origem })
 provar('Alça: Enter restaura a largura e anuncia valor/unidade/instruções', () => {

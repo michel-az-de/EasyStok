@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/fretesApi'
 import { useAcessoModulos } from './acessoModulos'
+import { moedaDosCentavos } from '../dominio/formato'
 
 // #1761: a comparação integrada de fretes só funciona na empresa de demonstração (no servidor,
 // `LogisticaUseCases.ExigirDemonstracao`). Quem diz se a empresa é a de demonstração é o contexto.
@@ -86,6 +87,7 @@ export function useFretesApi({ aoAlterado } = {}) {
   }
   const mudarAgrupamento = (valor) => { setAgrupar(valor); setCotacoes(null); setEscolhida(null) }
   return {
+    moeda: moedaDosCentavos,
     entrada, contexto, selecionados, agrupar, incluirManual, valorManual, cotacoes, escolhida, erro, aviso, ocupado,
     podePagar: capacidades.gerenciarCaixa === true,
     podeConfigurar: capacidades.editarAtendimento === true,
