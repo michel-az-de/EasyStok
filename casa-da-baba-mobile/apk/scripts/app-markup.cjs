@@ -81,6 +81,7 @@ function adaptOrders(html) {
   html = html.replace(matches[0][0], `<div class="pilot-orders-header" data-view="andamento">
     <button type="button" class="screen-tab active pilot-orders-back" data-tab="andamento" onclick="goPedidosTab('andamento')" aria-label="Voltar aos pedidos">${pilotIcon('chevron-right')}<span>Voltar</span></button>
     <h2>Pedidos</h2>
+    <button type="button" class="pilot-orders-history" onclick="go('finalizados')">${pilotIcon('historico')}<span>Histórico</span></button>
     <button type="button" class="screen-tab pilot-new-order" data-tab="novo" onclick="goPedidosTab('novo')"><span aria-hidden="true">+</span> Novo pedido</button>
     <span id="pedidosTabBadge" hidden></span>
   </div>`);

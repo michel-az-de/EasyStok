@@ -41,6 +41,7 @@ test('destinos legados e links internos não abrem módulos excluídos do APK', 
   assert.ok(calls.every(([screen]) => screen === 'producao'));
   environment.go('pedidos', { preserveHistory: true });
   assert.deepEqual(calls.at(-1), ['pedidos', { preserveHistory: true }]);
+  environment.go('finalizados'); assert.equal(calls.at(-1)[0], 'finalizados');
   environment.goProducaoTab('calculadora'); environment.goProducaoTab('lotes');
   assert.deepEqual(tabs, ['catalogo', 'lotes']);
   assert.equal(JSON.stringify(state), original, 'retirar módulos não deve apagar registros antigos');

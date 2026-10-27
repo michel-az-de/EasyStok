@@ -5,7 +5,7 @@
   const COMMANDS = {
     Atualizar: 'refresh-cw', Sincronizar: 'refresh-cw', Conectar: 'link',
     Salvar: 'check', Confirmar: 'check', Etiquetar: 'printer', Imprimir: 'printer',
-    Reimprimir: 'printer', Cadastrar: 'plus', Criar: 'plus', Adicionar: 'plus',
+    Reimprimir: 'printer', Cadastrar: 'plus', Criar: 'plus', Adicionar: 'plus', Novo: 'plus',
     Editar: 'lapis', Excluir: 'lixeira', Descartar: 'lixeira',
     Arquivar: 'archive', Recuperar: 'historico', Desfazer: 'historico',
     Cancelar: 'fechar', Fechar: 'fechar', Remover: 'fechar',
@@ -25,7 +25,7 @@
     'Sincronizando…': 'refresh-cw', 'Enviando…': 'enviar'
   };
   const SHORT_LABELS = {
-    'Novo pedido': 'Adicionar', '+ Novo pedido': 'Adicionar',
+    'Novo pedido': 'Novo', '+ Novo pedido': 'Novo',
     'Cadastrar produto': 'Cadastrar', 'Cadastrar cliente': 'Cadastrar',
     'Criar e usar': 'Etiquetar', 'Criar e adicionar': 'Adicionar',
     'Salvar produto': 'Salvar', 'Salvar pedido': 'Salvar', 'Salvar PNG': 'Salvar',
@@ -57,7 +57,8 @@
     'Buscar impressora': 'Buscar', 'Testar impressão': 'Testar',
     'Exportar backup (JSON)': 'Exportar', 'Restaurar de arquivo': 'Importar',
     'Verificar atualizações agora': 'Atualizar', 'Abrir diagnóstico': 'Detalhes',
-    '+ Novo produto': 'Cadastrar', 'Escolher imagem': 'Escolher',
+    '+ Novo produto': 'Cadastrar', 'Escolher imagem': 'Escolher', 'Ver detalhes': 'Detalhes',
+    'Excluir do registro': 'Excluir',
     'Exportar histórico JSON': 'Exportar', 'Restaurar do celular (auto)': 'Recuperar',
     'Tentar de novo': 'Repetir', 'Sem código': 'Nenhum', '7 dias': '7d', '30 dias': '30d',
     'Retomar migração': 'Sincronizar', 'Enviando primeira migração…': 'Enviando…',
@@ -149,6 +150,8 @@
     }
     const productionTitle = doc.getElementById('productionConfirmTitle');
     if (productionTitle) productionTitle.textContent = 'Lote';
+    const orderHistoryTitle = doc.querySelector?.('[data-screen="finalizados"] .screen-title');
+    if (orderHistoryTitle) orderHistoryTitle.textContent = 'Histórico';
     doc.querySelectorAll('button.cobranca-close, button.modal-close, button.etq-close').forEach(button => {
       button.innerHTML = icon('fechar');
       button.setAttribute('aria-label', 'Fechar');

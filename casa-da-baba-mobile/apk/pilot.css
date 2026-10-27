@@ -742,3 +742,9 @@ body.pilot-app .pilot-icon-command { width: 44px; height: 44px; display: inline-
 body.pilot-app .pilot-icon-command > svg { width: 24px; height: 24px; }
 body.pilot-app [data-screen="historico"] .section-label,
 body.pilot-app #histList > .stock-ledger { display: none; }
+body.pilot-app .phone .pilot-orders-header { gap: 8px; flex-wrap: wrap; }
+body.pilot-app .phone .pilot-orders-history { min-height: 48px; padding: 8px 0; border: 0; background: transparent; color: var(--ink-dim); font-size: 14px; }
+body.pilot-app .phone .pilot-orders-history .pilot-command-label { font-size: 14px; }
+body.pilot-app .phone .pilot-orders-header[data-view=novo] .pilot-orders-history { display: none; }
+body.pilot-app [data-screen="finalizados"] .screen-title { font: 750 24px/1.3 'Manrope', sans-serif; }
+body.pilot-app [data-screen="finalizados"] .fin-card { border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; margin: 0; padding: 16px 0; box-shadow: none; }

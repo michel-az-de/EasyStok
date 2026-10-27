@@ -16,6 +16,11 @@ function tags(html, pattern) { return (html.match(pattern) || []).sort(); }
 const original = modal(source);
 const result = adaptAppMarkup(source);
 const adapted = modal(result);
+
+test('Pedidos mantém acesso aos finalizados dentro do próprio módulo', () => {
+  assert.match(result, /class="pilot-orders-history" onclick="go\('finalizados'\)"/);
+  assert.match(result, /data-pilot-icon="historico"[^]*?<span>Histórico<\/span>/);
+});
 const welcomeStart = '<!-- Boas-vindas / login com nome do operador -->';
 const welcomeEnd = '<!-- Tutorial / onboarding (4 steps) -->';
 function welcome(html) { return html.slice(html.indexOf(welcomeStart), html.indexOf(welcomeEnd)); }
