@@ -67,6 +67,15 @@ function adaptProduction(html) {
 }
 
 function adaptOrders(html) {
+  const tabs = /<div class="screen-tabs">\s*<button class="screen-tab" data-tab="novo" onclick="goPedidosTab\('novo'\)">\+ Novo<\/button>\s*<button class="screen-tab active" data-tab="andamento" onclick="goPedidosTab\('andamento'\)">\s*Andamento <span class="screen-tab-badge" id="pedidosTabBadge">0<\/span>\s*<\/button>\s*<\/div>/g;
+  const matches = [...html.matchAll(tabs)];
+  if (matches.length !== 1) throw new Error('Navegação de pedidos incompatível com o APK.');
+  html = html.replace(matches[0][0], `<div class="pilot-orders-header" data-view="andamento">
+    <button type="button" class="screen-tab active pilot-orders-back" data-tab="andamento" onclick="goPedidosTab('andamento')" aria-label="Voltar aos pedidos">${pilotIcon('chevron-right')}<span>Pedidos</span></button>
+    <h2>Pedidos</h2>
+    <button type="button" class="screen-tab pilot-new-order" data-tab="novo" onclick="goPedidosTab('novo')"><span aria-hidden="true">+</span> Novo pedido</button>
+    <span id="pedidosTabBadge" hidden></span>
+  </div>`);
   const before = '<div class="empty"><span class="big">📭</span>Nenhum pedido em aberto</div><button class="export-btn"';
   uniqueIndex(html, before);
   // Este fragmento pertence ao literal JS do estado vazio. O SVG canônico usa

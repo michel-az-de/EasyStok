@@ -7492,11 +7492,11 @@ body.ux-calm [data-screen="producao"] .section-label {
            quando outro device sincroniza. Tocar num produto pré-seleciona quantidade. -->
       <div class="prod-demand" id="prodDemand" hidden>
         <div class="pd-head">
-          <span class="pd-title">📋 Demanda dos pedidos abertos</span>
+          <span class="pd-title"><span data-op-icon="ficha" aria-hidden="true">📋</span> Demanda dos pedidos abertos</span>
           <span class="pd-count" id="prodDemandCount">0 pedidos</span>
         </div>
         <div class="pd-chips" id="prodDemandChips"></div>
-        <button type="button" class="cta-btn" onclick="openCestaCalcFromDemand()" style="margin-top:10px;font-size:13px;">🧮 Conferir insumos da demanda</button>
+        <button type="button" class="cta-btn" onclick="openCestaCalcFromDemand()" style="margin-top:10px;font-size:13px;"><span data-op-icon="produto" aria-hidden="true">🧮</span> Conferir insumos da demanda</button>
       </div>
       <div class="prod-screen-summary" id="prodScreenSummary" style="display:none">
         <div>
@@ -10473,6 +10473,9 @@ let _currentFabAction = null;
 function updateFab(screen) {
   const fab = document.getElementById('fab');
   if (!fab) return;
+  if (screen === 'pedidos' && window.CDB_CONFIG?.isPilot) {
+    fab.classList.remove('show'); _currentFabAction = null; return;
+  }
   let cfg = FAB_CONFIG[screen] || null;
   // Caso especial: na tela Pedidos, FAB so aparece na aba Andamento
   // (na aba Novo o operador ja esta no formulario).
@@ -10590,6 +10593,14 @@ function updateNavA11y() {
 
 // Tabs da tela Pedidos: alterna entre "novo" (form) e "andamento" (kanban)
 function goPedidosTab(tab) {
+  if (window.CDB_CONFIG?.isPilot) {
+    const header = document.querySelector('.pilot-orders-header');
+    if (header) {
+      header.dataset.view = tab;
+      const title = header.querySelector('h2');
+      if (title) title.textContent = tab === 'novo' ? 'Novo pedido' : 'Pedidos';
+    }
+  }
   document.querySelectorAll('#content [data-screen="pedidos"] .screen-tab').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('#content [data-screen="pedidos"] .pedidos-tab-section').forEach(s =>
@@ -10610,16 +10621,36 @@ function updatePedidosTabBadge() {
 // =========================
 // SYNC
 // =========================
-function syncNow() {
+async function syncNow() {
   if (navigator.onLine === false) {
     updateSync();
-    showToast('Sem internet. Suas ações ficam salvas e sincronizam quando voltar.');
-    return;
+    showToast('Sem internet. As alterações continuam neste aparelho. O envio depende de conexão e vínculo válido com o EasyStok.');
+    return 'offline';
   }
-  pendingSync = 0;
-  try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {}
-  updateSync();
-  showToast('Sincronizado com EasyStock');
+  const sync = window.cdbSync;
+  if (!sync || typeof sync.flush !== 'function') {
+    showToast('Sincronização indisponível. As alterações continuam neste aparelho.');
+    return 'unavailable';
+  }
+  try {
+    const result = await sync.flush();
+    updateSync();
+    const messages = {
+      auth: 'Vincule ou reconecte este aparelho ao EasyStok para enviar as alterações.',
+      review: 'Envio pausado. Confira a origem dos dados importados antes de sincronizar.',
+      empty: 'Nenhuma alteração na fila de envio deste aparelho.',
+      offline: 'Sem internet. As alterações continuam neste aparelho.',
+      retry: 'O envio não foi confirmado. As alterações continuam neste aparelho para nova tentativa.'
+    };
+    // HTTP 200 pode conter recusas. Só cdb-sync-success confirma os IDs aceitos.
+    if (messages[result]) showToast(messages[result]);
+    else if (result !== 'ok') showToast('O envio não foi confirmado. Confira a fila de envio.');
+    return result;
+  } catch (_) {
+    updateSync();
+    showToast('O envio não foi confirmado. As alterações continuam neste aparelho para nova tentativa.');
+    return 'retry';
+  }
 }
 function updateSync() {
   const chip = document.getElementById('syncChip');
@@ -12260,6 +12291,11 @@ function advanceOrder(id) {
   const idx = ORDER_FLOW.indexOf(o.status);
   if (idx < 0 || idx === ORDER_FLOW.length - 1) return;
   const nextStatus = ORDER_FLOW[idx + 1];
+  if (window.CDB_CONFIG?.isPilot
+      && document.querySelector('[data-screen="pedidos"].active .pedidos-tab-section[data-tab="andamento"]')?.style.display === ''
+      && document.querySelector('[data-screen="pedidos"].active')) {
+    pilotOrderAdvance = { id, from: o.status };
+  }
   // 'entregue' exige conferência manual primeiro — confirmConfer() retoma.
   if (nextStatus === STATUS.ENTREGUE) { openConfer(id); return; }
   applyAdvanceTransition(id, nextStatus);
@@ -13231,12 +13267,13 @@ function renderHistoricoScreen() {
       if (batch) {
         const btns = [];
         if (!batch.deleted) {
-          btns.push(`<button class="hist-action" onclick="reprintFromBatchId('${e.entityId}')">🖨️ Reimprimir</button>`);
-          btns.push(`<button class="hist-action danger" onclick="deleteBatch('${e.entityId}')">🗑️ Excluir lote</button>`);
+          btns.push(`<button class="hist-action" onclick="reprintFromBatchId('${e.entityId}')"><span data-op-icon="printer" aria-hidden="true">🖨️</span> Reimprimir</button>`);
+          btns.push(`<button class="hist-action" onclick="openBatchDetails('${e.entityId}')"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
+          btns.push(`<button class="hist-action danger" onclick="deleteBatch('${e.entityId}')"><span data-op-icon="lixeira" aria-hidden="true">🗑️</span> Excluir lote</button>`);
         } else {
-          btns.push(`<button class="hist-action" onclick="restoreBatch('${e.entityId}')">↩️ Recuperar lote</button>`);
+          btns.push(`<button class="hist-action" onclick="restoreBatch('${e.entityId}')"><span data-op-icon="undo-2" aria-hidden="true">↩️</span> Recuperar lote</button>`);
+          btns.push(`<button class="hist-action" onclick="openBatchDetails('${e.entityId}')"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
         }
-        btns.push(`<button class="hist-action" onclick="openBatchDetails('${e.entityId}')">Detalhes</button>`);
         actions = `<div class="mov-actions">${btns.join('')}</div>`;
       }
     }
@@ -13246,7 +13283,7 @@ function renderHistoricoScreen() {
     return `
       <div class="mov-item ${e.type}">
         <div class="mov-head">
-          <span class="mov-type">${e.icon} ${escapeHtml(e.label)}</span>
+          <span class="mov-type"><span data-op-icon="${e.type === 'batch' ? 'producao' : 'historico'}" aria-hidden="true">${e.icon}</span> ${escapeHtml(e.label)}</span>
           <span>${dateStr}</span>
         </div>
         <div class="mov-items">${escapeHtml(e.summary || '')}</div>
@@ -14294,6 +14331,17 @@ const KANBAN_COLS = [
 ];
 
 let highlightOrderId = null; // id do pedido que acabou de ser criado (pisca)
+let pilotOrderStatus = null;
+let pilotHighlightedOrder = null;
+let pilotOrderAdvance = null;
+
+function selectPilotOrderStatus(status) {
+  if (!window.CDB_CONFIG?.isPilot || !KANBAN_COLS.some(col => col.key === status)) return;
+  pilotOrderStatus = status;
+  pilotOrderAdvance = null;
+  renderKanban();
+  document.querySelector(`#kanban [data-order-status="${status}"]`)?.focus({ preventScroll: true });
+}
 
 function renderKanban() {
   const root = document.getElementById('kanban');
@@ -14306,7 +14354,7 @@ function renderKanban() {
     o.status === 'aguardando' || o.status === 'preparando' || o.status === 'pronto'
   );
 
-  if (openItems.length === 0) {
+  if (openItems.length === 0 && !window.CDB_CONFIG?.isPilot) {
     root.innerHTML = '<div class="empty"><span class="big">📭</span>Nenhum pedido em aberto</div><button class="export-btn" onclick="goPedidosTab(\'novo\')">Criar pedido</button>';
     return;
   }
@@ -14318,6 +14366,32 @@ function renderKanban() {
   Object.keys(byStatus).forEach(k => byStatus[k].sort((a, b) =>
     (a.scheduledDeliveryAt || a.createdAt) - (b.scheduledDeliveryAt || b.createdAt)
   ));
+
+  if (window.CDB_CONFIG?.isPilot) {
+    if (!pilotOrderStatus && openItems.length) pilotOrderStatus = KANBAN_COLS.find(col => byStatus[col.key].length).key;
+    if (highlightOrderId && highlightOrderId !== pilotHighlightedOrder) {
+      const highlighted = openItems.find(o => o.id === highlightOrderId);
+      if (highlighted) pilotOrderStatus = highlighted.status;
+    }
+    pilotHighlightedOrder = highlightOrderId;
+    if (pilotOrderAdvance) {
+      const moved = orders.find(o => o.id === pilotOrderAdvance.id);
+      if (!moved || moved.status !== pilotOrderAdvance.from) {
+        if (moved && byStatus[moved.status]
+            && document.querySelector('[data-screen="pedidos"].active .pedidos-tab-section[data-tab="andamento"]')?.style.display === ''
+            && document.querySelector('[data-screen="pedidos"].active')) pilotOrderStatus = moved.status;
+        pilotOrderAdvance = null;
+      }
+    }
+    const selected = KANBAN_COLS.find(col => col.key === pilotOrderStatus) || KANBAN_COLS[0];
+    const list = byStatus[selected.key];
+    root.innerHTML = `<div class="pilot-order-filters" role="group" aria-label="Etapas dos pedidos">${KANBAN_COLS.map(col =>
+      `<button type="button" data-order-status="${col.key}" aria-pressed="${col.key === selected.key}" onclick="selectPilotOrderStatus('${col.key}')"><span>${col.label}</span><strong>${byStatus[col.key].length}</strong></button>`).join('')}</div>`
+      + `<div class="pilot-order-list" aria-label="Pedidos: ${selected.label}">${list.length
+        ? list.map(o => renderKanbanCard(o, selected)).join('')
+        : `<div class="pilot-order-empty">${openItems.length ? 'Nenhum pedido nesta etapa.' : 'Nenhum pedido em aberto.'}</div>`}</div>`;
+    return;
+  }
 
   const overview = `
     <div class="kanban-overview" aria-label="Resumo da esteira">
@@ -14347,6 +14421,7 @@ function jumpKanban(status) {
 }
 
 function renderKanbanCard(o, col) {
+  const pilot = window.CDB_CONFIG?.isPilot === true;
   const isHighlight = highlightOrderId === o.id;
   // Bug 5 (Onda 4): filtra items com qty=0 (resultado de ajuste). Sem isso,
   // o card mostrava "0× Talharim Fresco" ate o pedido ser cancelado.
@@ -14363,7 +14438,7 @@ function renderKanbanCard(o, col) {
   const itemCount = visibleItems.reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
   // Selo de status de conferência ao lado do status do kanban
   const cs = getConferStatus(o);
-  const badgeLabel = cs === CONFER_STATUS.PENDENTE ? 'Conf. pendente' : conferStatusLabel(cs);
+  const badgeLabel = cs === CONFER_STATUS.PENDENTE ? (pilot ? 'Conferência pendente' : 'Conf. pendente') : conferStatusLabel(cs);
   const conferBadge = `<span class="k-confer-badge ${cs}">${badgeLabel}</span>`;
   const conferBtnLabel = cs === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Reconferir';
 
@@ -14387,19 +14462,19 @@ function renderKanbanCard(o, col) {
   return `
     <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
       <div class="k-topline">
-        <span class="k-status">${col.label}</span>${conferBadge}${o.channel ? `<span class="k-confer-badge" title="Canal">${escapeHtml(channelLabel(o.channel))}</span>` : ''}
-        <div class="k-time">${timeOf(o.createdAt)}</div>
+        ${pilot ? '' : `<span class="k-status">${col.label}</span>`}${conferBadge}${o.channel ? `<span class="k-confer-badge" title="Canal">${escapeHtml(channelLabel(o.channel))}</span>` : ''}
+        ${pilot ? '' : `<div class="k-time">${timeOf(o.createdAt)}</div>`}
       </div>
       <div class="k-head">
-        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref))}</span></div>
+        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}${!pilot || safeRefDisplay(o.clientSnapshot?.ref) ? `<span class="apt">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref))}</span>` : ''}</div>
         <span class="k-total">${money(o.total)}</span>
       </div>
       ${quickActions}
-      <div class="k-meta">
+      ${pilot ? `<div class="k-meta pilot-order-meta"><span>${itemCount} item${itemCount === 1 ? '' : 's'}</span>${o.id ? `<span>Pedido ${escapeHtml(o.id.slice(-8))}</span>` : ''}${o.createdAt ? `<span>${timeOf(o.createdAt)}</span>` : ''}${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}</div>` : `<div class="k-meta">
         <span class="k-chip">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
         <span class="k-chip">Pedido ${(o.id || '').slice(-8)}</span>
         ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
-      </div>
+      </div>`}
       <div class="k-items">${itemsLine}</div>
       ${negStockBanner}
       ${notes}
@@ -17643,7 +17718,7 @@ function batchCardHtml(batch) {
   // #441 — botao Descartar/Reverter em todas as acoes
   const discardBtn = isDiscarded
     ? `<button class="batch-action" onclick="event.stopPropagation();revertBatchDiscard('${batch.id}')">↩ Reverter</button>`
-    : `<button class="batch-action" style="color:var(--accent)" onclick="event.stopPropagation();openBatchDiscardModal('${batch.id}')">⛔ Descartar</button>`;
+    : `<button class="batch-action" style="color:var(--accent)" onclick="event.stopPropagation();openBatchDiscardModal('${batch.id}')"><span data-op-icon="lixeira" aria-hidden="true">⛔</span> Descartar</button>`;
   const actionsHtml = isDiscarded ? `
     <div class="batch-actions closed-actions">
       <span style="font-size:12px;color:var(--ink-mute);flex:1">${escapeHtml(batch.discardReason || 'descartado')}</span>
@@ -23197,7 +23272,7 @@ window.cdbApp = {
     'updateModal','autoBackupModal','noPrinterModal','productActionsModal',
     'ajustarModal','problemaModal','conferProdModal','prodProblemaModal',
     'cashCloseModal','etiquetasPreview','ajustesModal','cashEntryModal',
-    'newProductModal','productionConfirmModal',
+    'newProductModal','productionConfirmModal','cobrancaModal','newClientModal','itemPickerModal',
     'productModal','clientModal','batchModal','novoProdutoModal',
     'globalSearchModal','diagnosticsModal','supportModal'
   ];
@@ -23226,6 +23301,9 @@ window.cdbApp = {
       ajustesModal: 'closeAjustes',
       etiquetasPreview: 'closeEtiquetasPreview',
       newProductModal: 'closeProductModal',
+      cobrancaModal: 'closeCobranca',
+      newClientModal: 'closeClientModal',
+      itemPickerModal: 'closeItemPicker',
       productionConfirmModal: 'closeProductionConfirm',
       noPrinterModal: 'closeNoPrinterModal',
       updateModal: 'closeUpdateModal',
@@ -23259,26 +23337,26 @@ window.cdbApp = {
   function handleBack(event) {
     try {
       // 1. Imprimindo: protege o fluxo
-      if (window.isPrinting === true) {
+      if (isPrinting === true) {
         try { showToast && showToast('Aguarde a impressão terminar'); } catch (_) {}
-        return; // intercept silencioso
+        return true; // intercept silencioso
       }
       // 2. Modal aberto
       var modal = findOpenModal();
       if (modal) {
         tryCloseModal(modal);
-        return;
+        return true;
       }
       // 3. Mais menu aberto
       if (isMoreMenuOpen() && typeof closeMoreMenu === 'function') {
         closeMoreMenu();
-        return;
+        return true;
       }
       // 4. Não estamos em home — volta na história
       if (typeof currentScreen !== 'undefined' && currentScreen !== 'home'
           && typeof goBack === 'function') {
         goBack();
-        return;
+        return true;
       }
       // 5. Em home, sem modais — minimiza ao invés de fechar (preserva estado)
       try {
@@ -23290,7 +23368,12 @@ window.cdbApp = {
     } catch (e) {
       console.warn('[backbutton] handler erro:', e);
     }
+    return false;
   }
+
+  // O APK usa a ponte própria; não depende do plugin opcional @capacitor/app.
+  window.cdbHandleBack = handleBack;
+  window.cdbIsPrinting = function () { return isPrinting === true; };
 
   function attach() {
     try {

@@ -561,6 +561,19 @@
     refreshOtaStatus();
   }
   function closeHome() { home.close(); }
+  root.cdbHandleNativeBack = function () {
+    if (root.cdbIsPrinting?.()) return root.cdbHandleBack?.() === true;
+    if (notices.open) {
+      if (selectedNotice) backToNotices(); else notices.close();
+      return true;
+    }
+    // Início é a raiz da navegação: o Android pode minimizar sem fechar o dialog.
+    if (home.open) return false;
+    const handled = root.cdbHandleBack?.() === true;
+    if (handled && doc.querySelector?.('.screen.active')?.dataset.screen === 'home'
+        && root.cdbApp?.getOperator?.()?.trim()) openHome();
+    return handled;
+  };
   function showError(message) {
     const error = doc.getElementById('pilotError');
     error.textContent = message;

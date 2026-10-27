@@ -64,7 +64,9 @@ test('feedback nativo reutiliza marca oficial e progresso indeterminado, sem jan
   assert.match(read('values/startup.xml'), /Abrindo Casa da Baba/);
   const activity = fs.readFileSync(path.join(root, 'android/app/src/main/java/com/casadababa/app/MainActivity.java'), 'utf8');
   assert.match(activity, /content\.addView\(startupOverlay\)/);
-  assert.doesNotMatch(activity, /TYPE_APPLICATION_OVERLAY|SYSTEM_ALERT_WINDOW|setWebViewClient|evaluateJavascript/);
+  assert.doesNotMatch(activity, /TYPE_APPLICATION_OVERLAY|SYSTEM_ALERT_WINDOW|setWebViewClient/);
+  const overlay = activity.slice(activity.indexOf('private void showStartupOverlay()'), activity.indexOf('@Override\n    public void onDestroy()'));
+  assert.doesNotMatch(overlay, /evaluateJavascript/);
 });
 
 test('overlay acompanha API real do Capacitor, sai na primeira pintura, erro ou limite e limpa lifecycle', () => {
@@ -85,5 +87,24 @@ test('overlay acompanha API real do Capacitor, sai na primeira pintura, erro ou 
   assert.match(activity, /startupDeadline = this::hideStartupOverlay/);
   assert.match(activity, /removeCallbacks\(startupDeadline\)/);
   assert.match(activity, /removeView\(startupOverlay\)/);
-  assert.match(activity, /onDestroy\(\) \{\s*hideStartupOverlay\(\);\s*super\.onDestroy\(\);/);
+  assert.match(activity, /onDestroy\(\) \{[^}]*hideStartupOverlay\(\);\s*super\.onDestroy\(\);/);
+});
+
+test('Back usa dispatcher da Activity, consulta JS e minimiza no início ou falha sem destruir contexto', () => {
+  const activity = fs.readFileSync(path.join(root, 'android/app/src/main/java/com/casadababa/app/MainActivity.java'), 'utf8');
+  assert.match(activity, /getOnBackPressedDispatcher\(\)\.addCallback\(this, new OnBackPressedCallback\(true\)/);
+  assert.match(activity, /handleOnBackPressed\(\) \{ requestAppBack\(\); \}/);
+  assert.match(activity, /postDelayed\(backDeadline, 1500\)/);
+  assert.match(activity, /if \(!backPending \|\| request != backRequest\) return/);
+  assert.match(activity, /result -> finishBack\(request, "true"\.equals\(result\)\)/);
+  assert.match(activity, /if \(!handled && !isFinishing\(\) && !isDestroyed\(\)\) moveTaskToBack\(true\)/);
+  assert.match(activity, /onDestroy\(\) \{\s*backPending = false;\s*startupHandler.removeCallbacks\(backDeadline\)/);
+  assert.doesNotMatch(activity, /onKeyDown|dispatchKeyEvent|System\.exit|\.finish\(/);
+  const script = activity.match(/evaluateJavascript\("([^"\n]+)"/)[1];
+  const vm = require('node:vm');
+  for (const handler of [undefined, () => false, () => { throw new Error('renderer'); }]) {
+    assert.equal(vm.runInNewContext(script, { window: { cdbHandleNativeBack: handler } }), false);
+  }
+  assert.equal(vm.runInNewContext(script, { window: { cdbHandleNativeBack: () => true } }), true);
+  assert.equal(vm.runInNewContext(script, { window: { cdbHandleBack: () => true } }), true);
 });

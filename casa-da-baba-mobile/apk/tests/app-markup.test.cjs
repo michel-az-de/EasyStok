@@ -31,8 +31,15 @@ function restoreWelcomeTitle(html) {
 function restoreProductionChrome(html) {
   const metrics = source.match(/<div class="prod-metrics">[\s\S]*?id="prodMetricLow">0<\/strong><span>críticos<\/span><\/div>\s*<\/div>/)[0];
   const actions = source.match(/<div class="cta-row">\s*<button class="cta-btn" onclick="clearProduction\(\)">[\s\S]*?id="saveProdBtn"[\s\S]*?<\/div>/)[0];
-  return html.replace(/<details class="pilot-production-metrics">[\s\S]*?<\/details>/, metrics)
+  const orderHeader = source.match(/<div class="screen-tabs">\s*<button class="screen-tab" data-tab="novo"[\s\S]*?id="pedidosTabBadge"[\s\S]*?<\/div>/)[0];
+  return html.replace(/<div class="pilot-orders-header"[\s\S]*?<\/div>/, orderHeader)
+    .replace(/<details class="pilot-production-metrics">[\s\S]*?<\/details>/, metrics)
     .replace(/<div class="cta-row pilot-production-actions">[\s\S]*?<\/div>/, actions);
+}
+
+function restoreOrdersHeader(html) {
+  const before = source.match(/<div class="screen-tabs">\s*<button class="screen-tab" data-tab="novo"[\s\S]*?id="pedidosTabBadge"[\s\S]*?<\/div>/)[0];
+  return html.replace(/<div class="pilot-orders-header"[\s\S]*?<\/div>/, before);
 }
 
 test('adapta o formulário real preservando todos os IDs uma única vez', () => {
@@ -93,13 +100,24 @@ test('splash incompleto ou duplicado impede empacotar abertura inconsistente', (
 
 test('produção preserva IDs e botões completos, mantendo estoque baixo no resumo acessível', () => {
   assert.deepEqual(ids(result), ids(source));
-  assert.deepEqual(tags(restoreOrdersEmpty(result), /<(?:input|button|select|textarea)\b[^>]*>/g), tags(source, /<(?:input|button|select|textarea)\b[^>]*>/g));
+  assert.deepEqual(tags(restoreOrdersHeader(restoreOrdersEmpty(result)), /<(?:input|button|select|textarea)\b[^>]*>/g), tags(source, /<(?:input|button|select|textarea)\b[^>]*>/g));
   const metrics = result.match(/<details class="pilot-production-metrics">([\s\S]*?)<\/details>/)[1];
   const summary = metrics.match(/<summary>([\s\S]*?)<\/summary>/)[1];
   assert.match(summary, /Estoque baixo: <strong id="prodMetricLow">0<\/strong>/);
   assert.match(metrics, /id="prodMetricProducts"/);
   assert.match(metrics, /id="prodMetricStock"/);
   assert.match(result, /class="pilot-production-empty" role="status">Selecione a quantidade produzida\./);
+});
+
+test('cabeçalho de pedidos preserva navegação e rótulos sem duplicar o botão Novo', () => {
+  const header = result.match(/<div class="pilot-orders-header"[\s\S]*?<\/div>/)[0];
+  assert.equal((header.match(/class="screen-tab pilot-new-order"/g) || []).length, 1);
+  assert.match(header, /data-view="andamento"/);
+  assert.match(header, /onclick="goPedidosTab\('novo'\)"/);
+  assert.match(header, /onclick="goPedidosTab\('andamento'\)" aria-label="Voltar aos pedidos"/);
+  assert.match(header, /<h2>Pedidos<\/h2>/);
+  assert.match(header, /id="pedidosTabBadge" hidden/);
+  assert.doesNotMatch(header, /Andamento|\+ Novo<\/button>/);
 });
 
 test('estado vazio de pedidos gera SVG canônico e mantém ação Novo executável', () => {

@@ -7,6 +7,7 @@ import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
+import androidx.activity.OnBackPressedCallback;
 
 import com.casadababa.app.printer.ThermalPrinterPlugin;
 import com.casadababa.app.backup.PublicBackupPlugin;
@@ -23,6 +24,9 @@ public class MainActivity extends BridgeActivity {
     private final Handler startupHandler = new Handler(Looper.getMainLooper());
     private final Runnable startupDeadline = this::hideStartupOverlay;
     private View startupOverlay;
+    private boolean backPending;
+    private int backRequest;
+    private final Runnable backDeadline = () -> finishBack(backRequest, false);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -32,7 +36,32 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PublicBackupPlugin.class);
         registerPlugin(PilotUpdaterPlugin.class);
         super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() { requestAppBack(); }
+        });
         AppNotifications.initialize(this);
+    }
+
+    private void requestAppBack() {
+        // IME e dialogs nativos recebem Back antes do dispatcher da Activity.
+        if (backPending) return;
+        backPending = true;
+        final int request = ++backRequest;
+        startupHandler.postDelayed(backDeadline, 1500);
+        try {
+            WebView web = bridge == null ? null : bridge.getWebView();
+            if (web == null) { finishBack(request, false); return; }
+            web.evaluateJavascript("(function(){try{var back=window.cdbHandleNativeBack||window.cdbHandleBack;return typeof back==='function'&&back()===true;}catch(e){return false;}})()",
+                result -> finishBack(request, "true".equals(result)));
+        } catch (RuntimeException unavailable) { finishBack(request, false); }
+    }
+
+    private void finishBack(int request, boolean handled) {
+        if (!backPending || request != backRequest) return;
+        backPending = false;
+        startupHandler.removeCallbacks(backDeadline);
+        // Renderer indisponível não prende a pessoa nem destrói os dados/formulários.
+        if (!handled && !isFinishing() && !isDestroyed()) moveTaskToBack(true);
     }
 
     @Override
@@ -104,6 +133,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
+        backPending = false;
+        startupHandler.removeCallbacks(backDeadline);
         hideStartupOverlay();
         super.onDestroy();
     }

@@ -100,6 +100,70 @@ function realAndroidListener() {
   return { callbacks, addListener: (event, callback) => cap.addListener('PilotUpdater', event, callback) };
 }
 
+function installPwaBack(root, doc) {
+  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const start = html.indexOf('(function setupBackButton() {');
+  const end = html.indexOf('\n})();', start) + '\n})();'.length;
+  assert.ok(start >= 0 && end > start);
+  const context = { ...root, window: root, document: doc, console, setTimeout() {}, history: { pushState() {} }, location: { href: 'https://localhost' }, currentScreen: 'producao' };
+  const printingBinding = html.match(/^let isPrinting = false;$/m)?.[0];
+  assert.ok(printingBinding, 'Carrega o binding lexical real, que não é propriedade de window');
+  vm.createContext(context);
+  vm.runInContext(printingBinding + '\n' + html.slice(start, end), context);
+  return context;
+}
+
+test('Back nativo fecha formulário com o fechador PWA real e só minimiza no início', () => {
+  const { root, doc, nodes } = pilotHarness();
+  nodes.get('pilotHome').close();
+  const visible = new Set(['show']); let closed = 0;
+  const product = { id: 'newProductModal', classList: { contains: name => visible.has(name), remove: name => visible.delete(name) } };
+  nodes.set('newProductModal', product);
+  doc.querySelectorAll = () => [];
+  doc.querySelector = () => ({ dataset: { screen: 'producao' } });
+  root.closeProductModal = () => { closed++; visible.delete('show'); };
+  const context = installPwaBack(root, doc);
+  assert.equal(root.cdbHandleNativeBack(), true);
+  assert.equal(closed, 1); assert.equal(visible.size, 0);
+  context.goBack = () => { context.currentScreen = 'home'; doc.querySelector = () => ({ dataset: { screen: 'home' } }); };
+  assert.equal(root.cdbHandleNativeBack(), true);
+  assert.equal(nodes.get('pilotHome').open, true);
+  assert.equal(root.cdbHandleNativeBack(), false);
+  assert.equal(nodes.get('pilotHome').open, true, 'Minimizar mantém a home nova pronta para voltar');
+});
+
+test('Back protege impressão lexical antes de avisos/home, e libera navegação quando termina', () => {
+  const { root, doc, nodes } = pilotHarness();
+  const notices = nodes.get('pilotNotices'); notices.showModal();
+  doc.querySelectorAll = () => [];
+  const context = installPwaBack(root, doc); let navigated = 0;
+  context.showToast = () => {}; context.goBack = () => { navigated++; };
+  vm.runInContext('isPrinting = true', context);
+  assert.equal(root.isPrinting, undefined); assert.equal(context.isPrinting, undefined);
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(notices.open, true);
+  notices.close();
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(nodes.get('pilotHome').open, true);
+  nodes.get('pilotHome').close();
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(navigated, 0);
+  vm.runInContext('isPrinting = false', context);
+  notices.showModal();
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(notices.open, false);
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(navigated, 1);
+});
+
+for (const [id, closer] of [['cobrancaModal', 'closeCobranca'], ['newClientModal', 'closeClientModal'], ['itemPickerModal', 'closeItemPicker']]) {
+  test('Back fecha ' + id + ' pelo fechador próprio sem navegar por trás', () => {
+    const { root, doc, nodes } = pilotHarness(); nodes.get('pilotHome').close();
+    const visible = new Set(['show']); let closed = 0, navigated = 0;
+    nodes.set(id, { id, classList: { contains: name => visible.has(name), remove: name => visible.delete(name) } });
+    root[closer] = () => { closed++; visible.clear(); };
+    doc.querySelectorAll = () => []; doc.querySelector = () => ({ dataset: { screen: 'pedidos' } });
+    const context = installPwaBack(root, doc); context.goBack = () => { navigated++; };
+    assert.equal(root.cdbHandleNativeBack(), true);
+    assert.equal(closed, 1); assert.equal(navigated, 0); assert.equal(visible.size, 0);
+  });
+}
+
 test('bridge Android instalado retorna handle síncrono e startup abre início sem perder listener OTA', async () => {
   const bridge = realAndroidListener();
   const handle = bridge.addListener('probe', () => {});
