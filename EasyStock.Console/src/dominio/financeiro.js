@@ -34,12 +34,33 @@ export function diaMais(dia, dias) {
 const centavosDe = (valor) => Math.round((Number(valor) || 0) * 100)
 export const parcelaEmAberto = (parcela) => parcela.saldo > 0 && !['Paga', 'Cancelada'].includes(parcela.status)
 export const contaEmAberto = (conta) => !['Rascunho', 'Cancelada', 'Paga'].includes(conta.status) && (conta.parcelas ?? []).some(parcelaEmAberto)
-// A API só marca Vencida no job; a pílula já diz "Vencida" quando a próxima parcela passou do dia.
-export function statusDaConta(conta, hoje = diaFinanceiro()) {
-  if (!['Aberta', 'ParcialmentePaga'].includes(conta.status)) return conta.status
-  const parcela = proximaParcela(conta)
-  return parcela && diaFinanceiro(parcela.dataVencimento) < hoje ? 'Vencida' : conta.status
+export const STATUS_EM_ABERTO = ['Aberta', 'ParcialmentePaga', 'Vencida']
+// Uma regra só para pílula, chip e visão geral: a faixa da parcela pelo dia de Brasília. O servidor usa
+// o dia UTC (entre 21h e meia-noite já é amanhã) e só marca Vencida no job; aqui não se confia nisso.
+export function faixaDaParcela(parcela, hoje = diaFinanceiro()) {
+  if (!parcelaEmAberto(parcela)) return null
+  const dia = diaFinanceiro(parcela.dataVencimento)
+  if (dia < hoje) return 'vencida'
+  if (dia === hoje) return 'hoje'
+  return dia <= diaMais(hoje, 7) ? 'semana' : 'depois'
 }
+export function statusDaConta(conta, hoje = diaFinanceiro()) {
+  if (!STATUS_EM_ABERTO.includes(conta.status)) return conta.status
+  if ((conta.parcelas ?? []).some((parcela) => faixaDaParcela(parcela, hoje) === 'vencida')) return 'Vencida'
+  if (conta.status !== 'Vencida') return conta.status
+  return (conta.totalPago ?? conta.totalRecebido ?? 0) > 0 ? 'ParcialmentePaga' : 'Aberta'
+}
+// Visão geral: cada parcela em aberto na sua faixa, com o próprio saldo (#2105, achado 1).
+export function parcelasDoDia(contas, hoje = diaFinanceiro()) {
+  const faixas = { vencida: [], hoje: [], semana: [] }
+  for (const conta of contas) {
+    if (!contaEmAberto(conta)) continue
+    for (const parcela of conta.parcelas) { const faixa = faixaDaParcela(parcela, hoje); if (faixas[faixa]) faixas[faixa].push({ conta, parcela }) }
+  }
+  for (const lista of Object.values(faixas)) lista.sort((a, b) => Date.parse(a.parcela.dataVencimento) - Date.parse(b.parcela.dataVencimento))
+  return faixas
+}
+export const somaSaldos = (itens) => itens.reduce((soma, item) => soma + centavosDe(item.parcela.saldo), 0) / 100
 export const proximaParcela = (conta) => (conta.parcelas ?? []).filter(parcelaEmAberto).sort((a, b) => Date.parse(a.dataVencimento) - Date.parse(b.dataVencimento))[0] ?? null
 // Conta cancelada zera o total na API; o que foi lançado é a soma das parcelas.
 export const valorLancado = (conta) => (conta.parcelas ?? []).reduce((soma, parcela) => soma + centavosDe(parcela.valor), 0) / 100
@@ -63,20 +84,14 @@ export const CHIP_PADRAO = 'abertas'
 // O que pedir à API e o que conferir aqui. A API filtra por um status só e por qualquer
 // parcela no intervalo (inclusive a paga): o recorte fino é feito no cliente, sobre a lista
 // inteira daquele filtro, e só "Todas" pagina no servidor.
+// `emAberto`: pedir ao servidor só Aberta, Parcialmente paga e Vencida (nunca as pagas fora de "Todas").
 export function planoDoChip(chip, hoje = diaFinanceiro()) {
-  const venceEntre = (de, ate) => (conta) => contaEmAberto(conta) && conta.parcelas.some((parcela) => {
-    if (!parcelaEmAberto(parcela)) return false
-    const dia = diaFinanceiro(parcela.dataVencimento)
-    return dia >= de && dia <= ate
-  })
-  if (chip === 'vencidas') return { api: { status: 'Vencida' }, local: contaEmAberto }
-  if (chip === 'hoje') return { api: { vencimentoDe: instanteFinanceiro(hoje), vencimentoAte: instanteFinanceiro(hoje, true) }, local: venceEntre(hoje, hoje) }
-  if (chip === 'semana') {
-    const de = diaMais(hoje, 1), ate = diaMais(hoje, 7)
-    return { api: { vencimentoDe: instanteFinanceiro(de), vencimentoAte: instanteFinanceiro(ate, true) }, local: venceEntre(de, ate) }
-  }
-  if (chip === 'abertas') return { api: {}, local: contaEmAberto }
-  return { api: {}, local: null }
+  const naFaixa = (faixa) => (conta) => contaEmAberto(conta) && conta.parcelas.some((parcela) => faixaDaParcela(parcela, hoje) === faixa)
+  if (chip === 'vencidas') return { api: {}, emAberto: true, local: naFaixa('vencida') }
+  if (chip === 'hoje') return { api: { vencimentoDe: instanteFinanceiro(hoje), vencimentoAte: instanteFinanceiro(hoje, true) }, emAberto: true, local: naFaixa('hoje') }
+  if (chip === 'semana') return { api: { vencimentoDe: instanteFinanceiro(diaMais(hoje, 1)), vencimentoAte: instanteFinanceiro(diaMais(hoje, 7), true) }, emAberto: true, local: naFaixa('semana') }
+  if (chip === 'abertas') return { api: {}, emAberto: true, local: contaEmAberto }
+  return { api: {}, emAberto: false, local: null }
 }
 
 // Filtros escritos pela dona (situação e datas) vão como instante: data pura a API recusa (F4).

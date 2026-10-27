@@ -6,8 +6,8 @@ import { Pilula } from '../../../componentes/Pilula'
 import { MarcaIcone } from '../../../componentes/MarcaIcone'
 import { Vazio } from '../../../componentes/Vazio'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { useConsultaFinanceira, listarContasFinanceiras, listarTodasContasFinanceiras, obterContaFinanceira, obterResumoFinanceiro, obterExtratoFinanceiro, obterRelatorioFinanceiro, listarCategoriasFinanceiras, listarCentrosFinanceiros, emitirContaFinanceira, cancelarContaFinanceira, estornarParcelaFinanceira, removerParcelaFinanceira, inativarCadastroFinanceiro, reativarCadastroFinanceiro } from '../../../aplicacao/useFinanceiroApi'
-import { STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, diaFinanceiro, diaMais, instanteFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
+import { useConsultaFinanceira, listarContasFinanceiras, listarContasEmAberto, obterContaFinanceira, obterResumoFinanceiro, obterExtratoFinanceiro, obterRelatorioFinanceiro, listarCategoriasFinanceiras, listarCentrosFinanceiros, emitirContaFinanceira, cancelarContaFinanceira, estornarParcelaFinanceira, removerParcelaFinanceira, inativarCadastroFinanceiro, reativarCadastroFinanceiro } from '../../../aplicacao/useFinanceiroApi'
+import { STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
 import { moeda } from '../../../dominio/formato'
 import { nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { hashDoModulo } from '../../../dominio/modulos'
@@ -37,18 +37,16 @@ function Indicador({ nome, valor, detalhe }) { return <div className={css.indica
 function SituacaoConta({ status, lado }) { return <Pilula tom={tomDoStatusConta(status)}>{nomeStatusConta(status, lado)}</Pilula> }
 
 // ------------------------------------------------------------------ visão geral: o que vence
-function ListaDoDia({ titulo, lado, chip, contas, podeGerenciar, aoPagar, vazio }) {
+function ListaDoDia({ titulo, lado, chip, itens, podeGerenciar, aoPagar, vazio }) {
   const palavras = palavrasDoLado(lado)
+  // Cada item é uma parcela: o "Falta" e o total do bloco são o saldo dela, e o botão paga essa mesma parcela.
   return <section className={css.blocoDia} aria-label={`${titulo} a ${lado}`}>
-    <div className={css.barra}><h3>{titulo}{contas.length ? ` · ${moeda(contas.reduce((soma, conta) => soma + Math.round(conta.pendente * 100), 0) / 100)}` : ''}</h3><a className={css.verLista} href={hashDoChip(lado, chip)}>{contas.length ? `Ver ${contas.length} na lista` : 'Abrir a lista'}</a></div>
-    {contas.length ? <ul className={css.itensDia}>{contas.slice(0, 5).map((conta) => {
-      const parcela = proximaParcela(conta)
-      return <li key={conta.id} className={css.itemDia}>
-        <div><strong>{conta.descricao}</strong><small>{quandoVence(parcela)}</small></div>
-        <span className={css.valor}><small>Falta</small> {moeda(conta.pendente)}</span>
-        {podeGerenciar && parcela && <Botao variante="primario" aria-haspopup="dialog" aria-label={`${palavras.verbo} ${conta.descricao}`} onClick={() => aoPagar({ lado, conta, parcela })}>{palavras.verbo}</Botao>}
-      </li>
-    })}</ul> : <p className={css.apoio}>{vazio}</p>}
+    <div className={css.barra}><h3>{titulo}{itens.length ? ` · ${moeda(somaSaldos(itens))}` : ''}</h3><a className={css.verLista} href={hashDoChip(lado, chip)}>{itens.length ? 'Ver na lista' : 'Abrir a lista'}</a></div>
+    {itens.length ? <ul className={css.itensDia}>{itens.slice(0, 5).map(({ conta, parcela }) => <li key={parcela.id} className={css.itemDia}>
+      <div><strong>{conta.descricao}</strong><small>{quandoVence(parcela)}{conta.parcelas.length > 1 ? ` · parcela ${parcela.numero} de ${conta.parcelas.length}` : ''}</small></div>
+      <span className={css.valor}><small>Falta</small> {moeda(parcela.saldo)}</span>
+      {podeGerenciar && <Botao variante="primario" aria-haspopup="dialog" aria-label={`${palavras.verbo} ${conta.descricao}`} onClick={() => aoPagar({ lado, conta, parcela })}>{palavras.verbo}</Botao>}
+    </li>)}</ul> : <p className={css.apoio}>{vazio}</p>}
   </section>
 }
 
@@ -56,16 +54,11 @@ function ResumoFinanceiro() {
   const { acoes } = useAcessoModulos()
   const verPagar = podeVer(acoes, 'pagar'), verReceber = podeVer(acoes, 'receber')
   const carregar = useCallback(async () => {
-    const hoje = diaFinanceiro()
     const lados = [verPagar && 'pagar', verReceber && 'receber'].filter(Boolean)
-    // Uma consulta por lado cobre hoje e os próximos 7 dias; o recorte é o mesmo dos chips da lista.
-    const filtro = { vencimentoDe: instanteFinanceiro(hoje), vencimentoAte: instanteFinanceiro(diaMais(hoje, 7), true) }
-    const [resumo, ...listas] = await Promise.all([obterResumoFinanceiro(), ...lados.map((lado) => listarTodasContasFinanceiras(lado, filtro))])
-    const porLado = Object.fromEntries(lados.map((lado, indice) => {
-      const ordenadas = ordenarPorVencimento(listas[indice])
-      return [lado, { hoje: ordenadas.filter(planoDoChip('hoje', hoje).local), semana: ordenadas.filter(planoDoChip('semana', hoje).local) }]
-    }))
-    return { resumo, porLado }
+    // Só as contas em aberto; vencidas, hoje e semana saem da mesma regra dos chips e da pílula.
+    const [resumo, ...listas] = await Promise.all([obterResumoFinanceiro(), ...lados.map((lado) => listarContasEmAberto(lado))])
+    const hoje = diaFinanceiro()
+    return { resumo, porLado: Object.fromEntries(lados.map((lado, indice) => [lado, parcelasDoDia(listas[indice], hoje)])) }
   }, [verPagar, verReceber])
   const consulta = useConsultaFinanceira(carregar)
   const [pagamento, setPagamento] = useState(null)
@@ -73,19 +66,20 @@ function ResumoFinanceiro() {
   return <EstadoFinanceiro consulta={consulta}>{resumo && <div className={css.painel}>
     <div className={css.barra}><p className={css.aviso}>O que vence hoje e nos próximos 7 dias. Toque num bloco para ver a lista.</p><Botao icone="refresh-cw" onClick={consulta.recarregar}>Atualizar</Botao></div>
     <div className={css.dia}>{Object.entries(consulta.dados.porLado).map(([lado, listas]) => {
-      const vencido = lado === 'pagar' ? resumo.totalVencidoPagar : resumo.totalVencidoReceber
+      const vencido = somaSaldos(listas.vencida)
       return <section key={lado} className={css.ladoDia} aria-label={`Contas a ${lado}`}>
         <h2>{lado === 'pagar' ? 'A pagar' : 'A receber'}</h2>
         <a className={`${css.cartaoVencidas} ${vencido > 0 ? css.temVencida : ''}`} href={hashDoChip(lado, 'vencidas')}><span>Vencidas</span><strong>{moeda(vencido)}</strong><small>{vencido > 0 ? 'Ver as vencidas' : 'Nada vencido'}</small></a>
-        <ListaDoDia titulo="Vence hoje" lado={lado} chip="hoje" contas={listas.hoje} podeGerenciar={podeGerenciarLado(acoes, lado)} aoPagar={setPagamento} vazio={`Nada a ${lado} hoje.`} />
-        <ListaDoDia titulo="Próximos 7 dias" lado={lado} chip="semana" contas={listas.semana} podeGerenciar={podeGerenciarLado(acoes, lado)} aoPagar={setPagamento} vazio={`Nada a ${lado} nos próximos 7 dias.`} />
+        <ListaDoDia titulo="Vence hoje" lado={lado} chip="hoje" itens={listas.hoje} podeGerenciar={podeGerenciarLado(acoes, lado)} aoPagar={setPagamento} vazio={`Nada a ${lado} hoje.`} />
+        <ListaDoDia titulo="Próximos 7 dias" lado={lado} chip="semana" itens={listas.semana} podeGerenciar={podeGerenciarLado(acoes, lado)} aoPagar={setPagamento} vazio={`Nada a ${lado} nos próximos 7 dias.`} />
       </section>
     })}</div>
+    {/* Quem só vê um lado não vê os números do outro (#2105, achado 10). */}
     <div className={css.indicadores}>
-      <Indicador nome="A pagar nos próximos 30 dias" valor={resumo.totalAVencer30dPagar} detalhe={`${resumo.qtdContasPagarAVencer30d} ${resumo.qtdContasPagarAVencer30d === 1 ? 'conta' : 'contas'}`} />
-      <Indicador nome="A receber nos próximos 30 dias" valor={resumo.totalAVencer30dReceber} detalhe={`${resumo.qtdContasReceberAVencer30d} ${resumo.qtdContasReceberAVencer30d === 1 ? 'conta' : 'contas'}`} />
-      <Indicador nome="Pago no mês" valor={resumo.totalPagoMes} />
-      <Indicador nome="Recebido no mês" valor={resumo.totalRecebidoMes} />
+      {verPagar && <Indicador nome="A pagar nos próximos 30 dias" valor={resumo.totalAVencer30dPagar} detalhe={`${resumo.qtdContasPagarAVencer30d} ${resumo.qtdContasPagarAVencer30d === 1 ? 'conta' : 'contas'}`} />}
+      {verReceber && <Indicador nome="A receber nos próximos 30 dias" valor={resumo.totalAVencer30dReceber} detalhe={`${resumo.qtdContasReceberAVencer30d} ${resumo.qtdContasReceberAVencer30d === 1 ? 'conta' : 'contas'}`} />}
+      {verPagar && <Indicador nome="Pago no mês" valor={resumo.totalPagoMes} />}
+      {verReceber && <Indicador nome="Recebido no mês" valor={resumo.totalRecebidoMes} />}
     </div>
     <div className={css.atalhos}>{[['pagar', 'Contas a pagar', 'caixa'], ['receber', 'Contas a receber', 'financeiro'], ['caixa', 'Caixa do dia', 'caixa'], ['extrato', 'Extrato', 'receita'], ['relatorios', 'Relatórios', 'grade']].filter(([id]) => !['pagar', 'receber'].includes(id) || podeVer(acoes, id)).map(([id, nome, icone]) => <a key={id} className={css.atalho} href={hashDoModulo('financeiro', id)}><MarcaIcone nome={icone} tamanho={28} />{nome}</a>)}</div>
     {pagamento && <ModalPagamentoFinanceiro lado={pagamento.lado} conta={pagamento.conta} parcela={pagamento.parcela} aoFechar={() => setPagamento(null)} aoGravar={consulta.recarregar} />}
@@ -111,9 +105,22 @@ function ContasFinanceiras({ lado }) {
   const carregar = useCallback(async () => {
     const plano = planoDoChip(chip)
     const filtros = { ...plano.api, ...semVazios(filtrosDaApi({ busca: buscaAplicada, ...avancadoAplicado })) }
-    if (!plano.local) { const resposta = await listarContasFinanceiras(lado, { ...filtros, page: pagina, pageSize: TAMANHO_PAGINA }); return { itens: ordenarPorVencimento(resposta.itens), total: resposta.total } }
-    const todas = ordenarPorVencimento((await listarTodasContasFinanceiras(lado, filtros)).filter((conta) => plano.local(conta) || conta.id === manter.current))
-    return { itens: paginaDaLista(todas, pagina), total: todas.length }
+    if (!plano.emAberto) {
+      let resposta = await listarContasFinanceiras(lado, { ...filtros, page: pagina, pageSize: TAMANHO_PAGINA })
+      // Página que esvaziou (pagou com filtro ligado) volta para a primeira, sem efeito extra (C12).
+      const valida = paginaValida(pagina, resposta.total)
+      if (valida !== pagina) resposta = await listarContasFinanceiras(lado, { ...filtros, page: valida, pageSize: TAMANHO_PAGINA })
+      return { itens: ordenarPorVencimento(resposta.itens), total: resposta.total, pagina: valida }
+    }
+    const abertas = await listarContasEmAberto(lado, filtros)
+    const lista = abertas.filter(plano.local)
+    // A conta selecionada segue visível depois de paga, até trocar o chip ou a busca (#2105, achado 2).
+    if (manter.current && !lista.some((conta) => conta.id === manter.current)) {
+      const mantida = abertas.find((conta) => conta.id === manter.current) ?? await obterContaFinanceira(lado, manter.current).catch(() => null)
+      if (mantida) lista.push(mantida)
+    }
+    const ordenadas = ordenarPorVencimento(lista), valida = paginaValida(pagina, ordenadas.length)
+    return { itens: paginaDaLista(ordenadas, valida), total: ordenadas.length, pagina: valida }
   }, [lado, chip, buscaAplicada, avancadoAplicado, pagina])
   const consulta = useConsultaFinanceira(carregar)
   const cadastros = useConsultaFinanceira(carregarCadastros)
@@ -124,16 +131,24 @@ function ContasFinanceiras({ lado }) {
   const selecionada = consulta.dados?.itens.find((item) => item.id === selecionadaId)
   useEffect(() => { manter.current = selecionadaId }, [selecionadaId])
   const total = consulta.dados?.total
+  const paginaAtual = consulta.dados?.pagina ?? pagina
+  const esquecerSelecionada = () => { manter.current = null; setSelecionadaId(null) }
+  const ultimaBusca = useRef('')
+  const aplicarBusca = (texto) => {
+    if (texto !== ultimaBusca.current) { ultimaBusca.current = texto; esquecerSelecionada(); setPagina(1) }
+    setBuscaAplicada(texto)
+  }
   // Busca filtra enquanto digita (com um respiro curto); o Enter aplica na hora.
-  useEffect(() => { const espera = setTimeout(() => { setBuscaAplicada(busca); setPagina(1) }, 350); return () => clearTimeout(espera) }, [busca])
-  useEffect(() => { if (total !== undefined && paginaValida(pagina, total) !== pagina) setPagina(1) }, [pagina, total])
+  const espera = useRef(null)
+  useEffect(() => () => clearTimeout(espera.current), [])
+  const digitarBusca = (texto) => { setBusca(texto); clearTimeout(espera.current); espera.current = setTimeout(() => aplicarBusca(texto), 350) }
   useEffect(() => {
-    const aoMudarHash = () => { const doLink = chipDaHash(window.location.hash); if (doLink) { setChip(doLink); setAvancado(SEM_AVANCADO); setAvancadoAplicado(SEM_AVANCADO); setPagina(1) } }
+    const aoMudarHash = () => { const doLink = chipDaHash(window.location.hash); if (doLink) { manter.current = null; setSelecionadaId(null); setChip(doLink); setAvancado(SEM_AVANCADO); setAvancadoAplicado(SEM_AVANCADO); setPagina(1) } }
     window.addEventListener('hashchange', aoMudarHash)
     return () => window.removeEventListener('hashchange', aoMudarHash)
   }, [])
   const escolherChip = (id) => {
-    setChip(id); setAvancado(SEM_AVANCADO); setAvancadoAplicado(SEM_AVANCADO); setPagina(1)
+    esquecerSelecionada(); setChip(id); setAvancado(SEM_AVANCADO); setAvancadoAplicado(SEM_AVANCADO); setPagina(1)
     try { history.replaceState(null, '', hashDoChip(lado, id)) } catch { /* a rota segue a mesma */ }
   }
   const campo = (nome, valor) => setAvancado((atual) => ({ ...atual, [nome]: valor }))
@@ -146,12 +161,12 @@ function ContasFinanceiras({ lado }) {
       <div className={css.acoes}><Botao onClick={consulta.recarregar} icone="refresh-cw">Atualizar</Botao>{podeGerenciar && <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => setNova(true)}>Nova conta a {lado}</Botao>}</div>
     </div>
     <div className={css.ferramentas}>
-      <form className={css.busca} onSubmit={(evento) => { evento.preventDefault(); setBuscaAplicada(busca); setPagina(1) }}>
-        <CampoTexto rotulo="Buscar conta" rotuloOculto placeholder="Buscar conta" tipo="search" value={busca} onChange={(e) => setBusca(e.target.value)} />
+      <form className={css.busca} onSubmit={(evento) => { evento.preventDefault(); clearTimeout(espera.current); aplicarBusca(busca) }}>
+        <CampoTexto rotulo="Buscar conta" rotuloOculto placeholder="Buscar conta" tipo="search" value={busca} onChange={(e) => digitarBusca(e.target.value)} />
       </form>
       <details className={css.maisFiltros} open={comAvancado || undefined}>
         <summary>Mais filtros{comAvancado ? ' (ligados)' : ''}</summary>
-        <form className={css.filtros} onSubmit={(evento) => { evento.preventDefault(); setAvancadoAplicado(avancado); setChip('todas'); setPagina(1) }}>
+        <form className={css.filtros} onSubmit={(evento) => { evento.preventDefault(); esquecerSelecionada(); setAvancadoAplicado(avancado); setChip('todas'); setPagina(1) }}>
           <CampoSelecao rotulo="Situação" value={avancado.status} onChange={(e) => campo('status', e.target.value)} opcoes={[{ valor: '', rotulo: 'Todas' }, ...STATUS_CONTAS.map((valor) => ({ valor, rotulo: nomeStatusConta(valor, lado) }))]} />
           <CampoTexto rotulo="Vencimento de" tipo="date" value={avancado.vencimentoDe} onChange={(e) => campo('vencimentoDe', e.target.value)} />
           <CampoTexto rotulo="Vencimento até" tipo="date" min={avancado.vencimentoDe || undefined} value={avancado.vencimentoAte} onChange={(e) => campo('vencimentoAte', e.target.value)} />
@@ -178,7 +193,7 @@ function ContasFinanceiras({ lado }) {
               </div>
             </li>
           })}</ul>
-          {total > TAMANHO_PAGINA && <div className={css.paginacao}><Botao disabled={pagina === 1 || consulta.carregando} onClick={() => setPagina((atual) => atual - 1)}>Anterior</Botao><span>Página {pagina} de {Math.ceil(total / TAMANHO_PAGINA)}</span><Botao disabled={pagina * TAMANHO_PAGINA >= total || consulta.carregando} onClick={() => setPagina((atual) => atual + 1)}>Próxima</Botao></div>}
+          {total > TAMANHO_PAGINA && <div className={css.paginacao}><Botao disabled={paginaAtual === 1 || consulta.carregando} onClick={() => setPagina(paginaAtual - 1)}>Anterior</Botao><span>Página {paginaAtual} de {Math.ceil(total / TAMANHO_PAGINA)}</span><Botao disabled={paginaAtual * TAMANHO_PAGINA >= total || consulta.carregando} onClick={() => setPagina(paginaAtual + 1)}>Próxima</Botao></div>}
         </div>
         <aside className={css.contexto} aria-label="Resumo da conta selecionada">{selecionada ? <>
           <h2>{selecionada.descricao}</h2><SituacaoConta status={statusDaConta(selecionada)} lado={lado} />

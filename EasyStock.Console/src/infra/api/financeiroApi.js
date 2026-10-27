@@ -1,6 +1,6 @@
 import { chamarApi } from './cliente'
 import { lerSessao } from './sessao'
-import { instanteFinanceiro, extratoFinanceiro } from '../../dominio/financeiro'
+import { instanteFinanceiro, extratoFinanceiro, STATUS_EM_ABERTO } from '../../dominio/financeiro'
 
 const baseConta = (lado) => {
   if (!['pagar', 'receber'].includes(lado)) throw new Error('Tipo de conta inválido.')
@@ -39,8 +39,22 @@ async function todas(url, filtros = {}) {
 }
 
 export const listarContasFinanceiras = (lado, filtros) => pagina(baseConta(lado), { pageSize: 20, ...filtros })
-// #2095: lista inteira de um filtro, para o recorte e a ordem por vencimento feitos no console.
-export const listarTodasContasFinanceiras = (lado, filtros) => todas(baseConta(lado), filtros)
+// #2095: lista de um filtro para o recorte e a ordem feitos no console. Não depende da ordem do servidor
+// entre páginas: junta por id e, se uma conta mudar de página no meio, a próxima recarga acerta.
+async function semRepetir(url, filtros) {
+  const porId = new Map()
+  for (let numero = 1; numero <= 50; numero += 1) {
+    const atual = await pagina(url, { ...filtros, page: numero, pageSize: 100 })
+    for (const item of atual.itens) porId.set(item.id, item)
+    if (atual.itens.length < 100 || numero * 100 >= atual.total) break
+  }
+  return [...porId.values()]
+}
+// Só as em aberto, uma chamada por status em paralelo (as pagas ficam no servidor).
+export async function listarContasEmAberto(lado, filtros = {}) {
+  const listas = await Promise.all(STATUS_EM_ABERTO.map((status) => semRepetir(baseConta(lado), { ...filtros, status })))
+  return [...new Map(listas.flat().map((conta) => [conta.id, conta])).values()]
+}
 export const obterContaFinanceira = (lado, id) => chamarApi(`${baseConta(lado)}/${id}`)
 export const salvarContaFinanceira = (lado, corpo, id = null) => escrever(`${baseConta(lado)}${id ? '/' + id : ''}`, id ? { ...corpo, id } : corpo, id ? 'PATCH' : 'POST')
 export const emitirContaFinanceira = (lado, id) => chamarApi(`${baseConta(lado)}/${id}/emitir`, { metodo: 'POST' })
