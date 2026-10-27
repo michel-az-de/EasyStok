@@ -83,7 +83,11 @@
   to { transform: none; }
 }
 
-.caixa { position: relative; }
+/* #2078 (B5/E1): `relative` no dialog aberto com showModal() vira `absolute` no top layer, preso ao
+   documento: em 390 px, com a página mais alta que a tela, a folha abria com o topo em -199 px e
+   o foco rolava a página. `fixed` (o do navegador para o modal) prende a folha à tela e continua
+   sendo o bloco de referência do X absoluto. */
+.caixa { position: fixed; }
 .fecharCanto {
   position: absolute; top: calc(var(--e-5) + var(--t-titulo) * var(--lh-compacto) / 2 - var(--toque) / 2); right: var(--e-24); z-index: 2;
   width: var(--toque); height: var(--toque); padding: 0; border: 0; border-radius: var(--r-pilula);

@@ -89,6 +89,8 @@ class Elemento extends No {
   get parentElement() { return this.parentNode?.nodeType === 1 ? this.parentNode : null }
   get isConnected() { return documento.contains(this) }
   closest() { return null }
+  // #2078: o Modal de dinheiro procura o campo do foco inicial; este DOM não tem seletor, nem foco de verdade.
+  querySelector() { return null }
 }
 class Dialogo extends Elemento {
   showModal() { this.open = true }

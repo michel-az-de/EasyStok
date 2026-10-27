@@ -2,7 +2,8 @@ using EasyStock.Application.Ports.Output.Persistence.Operacao;
 
 namespace EasyStock.Application.UseCases.Operacao.Impressao;
 
-public sealed record ListarImpressoesPendentesInput(Guid EmpresaId, int Limite = ListarImpressoesPendentesUseCase.LimitePadrao);
+public sealed record ListarImpressoesPendentesInput(
+    Guid EmpresaId, int Limite = ListarImpressoesPendentesUseCase.LimitePadrao, DateTime? CriadasDesde = null);
 
 /// <summary>Polling do consumidor da fila (S20): as pendentes da empresa, mais antigas primeiro.</summary>
 public sealed class ListarImpressoesPendentesUseCase(IImpressaoPendenteRepository repo)
@@ -15,7 +16,7 @@ public sealed class ListarImpressoesPendentesUseCase(IImpressaoPendenteRepositor
         ArgumentNullException.ThrowIfNull(input);
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
 
-        var pendentes = await repo.ListarPendentesAsync(input.EmpresaId, Math.Clamp(input.Limite, 1, LimiteMaximo), ct);
+        var pendentes = await repo.ListarPendentesAsync(input.EmpresaId, Math.Clamp(input.Limite, 1, LimiteMaximo), ct, input.CriadasDesde);
         return pendentes.Select(ImpressaoPendenteDto.De).ToList();
     }
 }

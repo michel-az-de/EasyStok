@@ -3,7 +3,7 @@
 // motivo da retificação. Fechar a loja dentro do horário pede justificativa (a API recusa sem).
 // Puro: o caixa chega já traduzido (`infra/api/caixaApi.js`) e "agora" chega por parâmetro.
 
-import { gavetaDoDia } from './caixa.js'
+import { conferenciaDaGaveta, gavetaDoDia } from './caixa.js'
 import { moeda } from './formato.js'
 import { dentroDoHorario } from './funcionamento.js'
 
@@ -87,11 +87,32 @@ export function observacaoDaAbertura({ saldoInformado, situacao, motivo }) {
 }
 
 // A API não guarda o contado do fechamento; vai nas observações para a conferência ficar registrada.
+// #2078 (B20): com as palavras do modal (`conferenciaDaGaveta`): o modal dizia "Faltam R$ 2,60" e o
+// fechamento gravava "Diferença: -R$ 2,60".
 export function observacaoDoFechamento({ contado, saldoEsperado, nota }) {
-  const diferenca = (centavos(contado) - centavos(saldoEsperado)) / 100
-  const texto = `Contado na gaveta: ${moeda(Number(contado) || 0)}. Diferença: ${diferenca === 0 ? 'bateu certo' : comSinal(diferenca)}.`
+  const { texto: diferenca } = conferenciaDaGaveta(centavos(contado), saldoEsperado)
+  const texto = `Contado na gaveta: ${moeda(Number(contado) || 0)}. ${diferenca}.`
   const extra = (nota ?? '').trim()
   return extra ? `${texto} ${extra}` : texto
+}
+
+// #2078 (D6/B18): sem abertura, o dinheiro que já entrou hoje está na conta do dia e na gaveta. Quem
+// contasse a gaveta inteira como saldo inicial contaria esse dinheiro duas vezes.
+export function dicaDoSaldoInicial(dia) {
+  const deHoje = gavetaDoDia({ ...dia, saldoInicial: 0 }).naGaveta
+  return deHoje > 0
+    ? `Só o troco que ficou de ontem, sem os ${moeda(deHoje)} em dinheiro que já entraram hoje: eles já estão na conta.`
+    : 'O troco que está na gaveta ao abrir o dia.'
+}
+
+// #2078 (B9): fechar a loja não fecha o caixa, e o texto diz em que pé o caixa está. Sem a leitura do
+// caixa, só o que é sempre verdade.
+export function caixaAoFecharLoja(dia) {
+  if (!dia) return 'Fechar a loja não fecha o caixa.'
+  if (dia.esquecidoAberto) return `O caixa de ${diaMes(dia.abertoDesde)} continua aberto. Para fechar o caixa, use Financeiro › Caixa do dia.`
+  if (dia.fechado) return 'O caixa de hoje já está fechado.'
+  if (dia.aberto) return 'O caixa continua aberto. Para fechar o caixa, use Financeiro › Caixa do dia.'
+  return 'O caixa de hoje não foi aberto.'
 }
 
 // Fechar na mão dentro do horário de funcionamento pede gerente e justificativa; fora dele, não.

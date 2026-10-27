@@ -224,6 +224,9 @@ export function useEntregasApi({ comVitrine = true } = {}) {
     cancelarChamado: (id) => executar(() => api.cancelarChamado(id), 'O chamado não mudou'),
     aprovar: (id) => executar(() => api.aprovarPedido(id), 'O pedido não foi aprovado'),
     recusar: (id) => executar(() => api.recusarPedido(id, 'operacional'), 'O pedido não foi recusado'),
+    // #2096: confirmação da encomenda pelo cliente (marcar e desfazer). Relê a operação na resposta.
+    confirmarPeloCliente: (pedidoId) => executar(() => api.marcarConfirmacaoDoCliente(pedidoId), 'A confirmação não foi registrada'),
+    desfazerConfirmacaoDoCliente: (pedidoId) => executar(() => api.desfazerConfirmacaoDoCliente(pedidoId), 'A confirmação não foi desfeita'),
   }
 
   return {

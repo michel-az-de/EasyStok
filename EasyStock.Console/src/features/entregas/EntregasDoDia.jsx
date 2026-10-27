@@ -8,7 +8,7 @@ import { Pilula } from '../../componentes/Pilula'
 import { congelado } from '../../dominio/congelados'
 import { dataIsoNoFuso, listaEmPortugues, plural } from '../../dominio/formato'
 import { pdfDoRoteiro } from '../../dominio/impressao'
-import { resumoDoRoteiro, rotuloDaData, situacaoDoPagamento, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
+import { confirmacaoDoCliente, resumoDoRoteiro, rotuloDaData, situacaoDoPagamento, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
 import { useRelogio } from '../../hooks/useRelogio'
 import css from './entregasApi.module.css'
 import { ModalAlterarAgendamentoApi } from './ModalAlterarAgendamento'
@@ -54,7 +54,22 @@ function EscolhaDoDia({ dia, mudarDia }) {
   )
 }
 
-function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
+// #2096: o cliente confirmou a encomenda? Selo quando sim; botão enquanto ela ainda vai acontecer.
+function ConfirmacaoDoCliente({ pedido, agora, ocupado, acoes }) {
+  const situacao = confirmacaoDoCliente(pedido, agora)
+  if (situacao === 'confirmada') return (
+    <div className={css.linha}>
+      <Pilula tom="ok">Cliente confirmou</Pilula>
+      <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desfazerConfirmacaoDoCliente(pedido.id)}>Desfazer confirmação</Botao>
+    </div>
+  )
+  if (situacao === 'pendente') return (
+    <Botao variante="secundario" icone="check" disabled={ocupado} onClick={() => acoes.confirmarPeloCliente(pedido.id)}>Cliente confirmou</Botao>
+  )
+  return null
+}
+
+function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
   const detalhes = [
     situacaoDoPagamento(pedido),
     pedido.entregador ? `Leva ${textoDeQuemLeva(pedido.entregador)}` : null,
@@ -69,6 +84,7 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens, aoReagend
       </div>
       <Endereco texto={pedido.endereco} />
       <p className={css.apoio}>{detalhes}</p>
+      <ConfirmacaoDoCliente pedido={pedido} agora={agora} ocupado={ocupado} acoes={acoes} />
       {!['entregue', 'cancelado'].includes(pedido.status) && (
         <Botao variante="texto" disabled={ocupado} onClick={() => aoReagendar(pedido)}>Alterar agendamento</Botao>
       )}
@@ -89,7 +105,7 @@ function PedidoDoDia({ pedido, montando, ocupado, acoes, aoVerViagens, aoReagend
   )
 }
 
-function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens, aoReagendar, aoCotar }) {
+function JanelaDoDia({ grupo, agora, montando, ocupado, acoes, aoVerViagens, aoReagendar, aoCotar }) {
   const n = grupo.pedidos.length
   const titulo = grupo.chave === 'sem-janela' || grupo.label === grupo.faixa ? grupo.faixa : `${grupo.faixa} · ${grupo.label}`
   return (
@@ -105,7 +121,7 @@ function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens, aoReagenda
       )}
       {n === 0 && <p className={css.vazio}>Nenhum pedido nesta janela.</p>}
       <ul className={css.lista}>
-        {grupo.pedidos.map((p) => <PedidoDoDia key={p.id} pedido={p} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar} />)}
+        {grupo.pedidos.map((p) => <PedidoDoDia key={p.id} pedido={p} agora={agora} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar} />)}
       </ul>
     </section>
   )
@@ -114,6 +130,7 @@ function JanelaDoDia({ grupo, montando, ocupado, acoes, aoVerViagens, aoReagenda
 // `roteiro`: `roteiroDoDia` já montado por quem chama (nulo enquanto o dia carrega).
 export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes, aoAbrirCadastro, aoVerViagens }) {
   const fretes = useFretesApi({ aoAlterado: acoes.recarregar })
+  const agora = useRelogio(null, undefined, { real: true })
   const [papel, setPapel] = useState('a4')
   // #1584: o pedido em reagendamento mora aqui, fora da lista. Quando ele muda de janela (ou
   // de dia) o item dele desmonta; o modal ficava dentro do item e sumia com a frase de resultado.
@@ -152,7 +169,7 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
           {aoAbrirCadastro && <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>}
         </div>
       )}
-      {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar}
+      {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} agora={agora} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar}
         aoCotar={(grupo) => fretes.abrir({ titulo: `Entrega · ${grupo.faixa}`, dia, pedidos: grupo.pedidos })} />)}
       <ModalFrete controlador={fretes} />
       {reagendando && <ModalAlterarAgendamentoApi pedidoId={reagendando.id} nome={reagendando.nome}

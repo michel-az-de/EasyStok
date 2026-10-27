@@ -19,6 +19,9 @@
 
 .erro { margin: 0; font-size: var(--t-apoio); color: var(--erro); }
 
+/* #2078 (E5): a diferença do caixa esquecido, com a gravidade em palavra ao lado da pílula. */
+.diferenca { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
+
 .numeros {
   margin: 0; display: grid; gap: var(--e-3);
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
