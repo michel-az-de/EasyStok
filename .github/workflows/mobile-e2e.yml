@@ -43,7 +43,11 @@ jobs:
   # Atualizador OTA do APK piloto (#2065): assinatura, hash, replay, caminho do ZIP,
   # estado atômico e retorno de versão. Roda em host, sem Android SDK.
   apk-ota:
-    runs-on: ubuntu-latest
+    # A base APK publicada preservada nesta PR usa java.exe no harness.
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4
