@@ -90,8 +90,9 @@ public class ReconciliarPixParcelaReceberUseCase(
         // Se valor pago > saldo, cap no saldo (preserva invariante)
         var aplicado = Math.Min(valorPago, parcela.Saldo);
         if (valorPago > parcela.Saldo)
-            logger.LogWarning("Pix acima do saldo: parcela={ParcId} txid={Txid} pago={Pago} saldo={Saldo}; excedente sem registro na conta",
-                parcela.Id, cmd.Txid, valorPago, parcela.Saldo);
+            // Sem o txid: na baixa manual ele vem do corpo da requisição (CodeQL, log de entrada do usuário).
+            logger.LogWarning("Pix acima do saldo: parcela={ParcId} pago={Pago} saldo={Saldo}; excedente sem registro na conta",
+                parcela.Id, valorPago, parcela.Saldo);
         if (aplicado <= 0m)
             return new ReconciliarPixResult(null, parcela.Id, conta.Id,
                 parcela.Status.ToString(), conta.Status.ToString(), false, "saldo zero");
