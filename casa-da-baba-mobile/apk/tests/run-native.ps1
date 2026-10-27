@@ -19,6 +19,8 @@ $sourceRoot=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/upd
 $sources+=Join-Path $sourceRoot 'UpdatePolicy.java'
 $sources+=Join-Path $sourceRoot 'OtaManager.java'
 $sources+=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/NoticePolicy.java'
+$sources+=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/SignedNoticePolicy.java'
+$sources+=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/NoticeStore.java'
 # Sem extensão e com o separador do sistema: o mesmo script roda no Windows e no Linux do CI.
 & (Join-Path $JavaHome 'bin/javac') -encoding UTF-8 -cp $JsonJar -d $output $sources
 if ($LASTEXITCODE -ne 0) { throw 'Compilação do harness nativo falhou.' }
@@ -27,3 +29,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Teste do atualizador nativo falhou.' }
 
 & (Join-Path $JavaHome 'bin/java') -cp ($output + [IO.Path]::PathSeparator + $JsonJar) com.casadababa.app.NoticePolicyTest
 if ($LASTEXITCODE -ne 0) { throw 'Teste de política de notificações falhou.' }
+
+& (Join-Path $JavaHome 'bin/java') -cp ($output + [IO.Path]::PathSeparator + $JsonJar) com.casadababa.app.SignedNoticeTest
+if ($LASTEXITCODE -ne 0) { throw 'Teste dos recibos assinados falhou.' }

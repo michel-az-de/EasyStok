@@ -27,7 +27,7 @@
     <li><strong>Baixe o arquivo no Android</strong> e abra o download concluído.</li>
     <li>Se o Android pedir autorização para instalar por essa origem, autorize somente o navegador usado neste download. Mantenha o Play Protect ativo. Se houver alerta de risco, interrompa e avise o Felipe.</li>
     <li><strong>Atualize sem desinstalar.</strong> O Android preserva os dados ao instalar esta versão sobre o app existente.</li>
-    <li><strong>Na primeira abertura, escolha Ativar para receber notificações.</strong> No Android 13 ou superior, confirme também o pedido do sistema. Se escolher Agora não, o app continua funcionando; use Notificações na tela inicial para ativar depois.</li>
+    <li><strong>Na primeira abertura, escolha Ativar para receber notificações.</strong> No Android 13 ou superior, confirme também o pedido do sistema. Depois, abra o sino no topo para conferir a permissão, o registro do aparelho e os avisos. O app continua funcionando se você escolher Agora não.</li>
     <li><strong>Já usava o PWA antigo?</strong> Importe e confira o backup antes de conectar a produção. Use Como trazer meus dados para consultar o passo a passo, mesmo offline.</li>
     <li>Use somente as operações reais combinadas com a equipe. O Atendimento e os registros sincronizados usam os dados da Casa da Baba. Para testes fictícios, use um ambiente separado.</li>
   </ol>
@@ -35,6 +35,9 @@
     <p><strong>Se a conexão ou o EasyStok cair</strong></p>
     <p>A produção pode continuar com os dados já carregados após o pareamento e a sincronização inicial. Os registros locais pendentes aguardam o EasyStok voltar. Nesta versão, pedidos, frete, cobrança e IA pelo Atendimento precisam de internet e do servidor disponível.</p>
   </div>
+  <h2>Avisos e confirmação de recebimento</h2>
+  <p>No <strong>sino</strong>, consulte os avisos, o diagnóstico da conexão e a identificação do aparelho para suporte. O APK verifica a assinatura dos avisos e devolve recibos assinados de recebimento e abertura. Esses recibos não concedem acesso aos dados da produção e funcionam antes do pareamento.</p>
+  <p><strong>Aceito pelo Firebase não significa entregue.</strong> O acompanhamento distingue recebimento por push, aviso recuperado ao atualizar o histórico e abertura do detalhe. Se não houver recibo, a entrega permanece sem confirmação. Uma abertura não comprova que a pessoa leu o conteúdo.</p>
   <h2>Trazer os dados do PWA antigo</h2>
   <p>No Android da operação, exporte o backup em Ajustes do PWA antigo e preserve o arquivo. No APK, abra <strong>Já usava o PWA antigo?</strong>, importe o JSON e confira a prévia. Pareie o APK com o código da operação e confirme a empresa e a loja de destino. Use <strong>Enviar primeira migração</strong> somente para registros que nunca chegaram ao EasyStok. O app confere a cópia guardada no servidor e seu hash antes de liberar a sincronização. Em falha, use <strong>Retomar migração</strong>; colisões exigem reconciliação com a equipe.</p>
   <p>Depois de exportar, registre novos pedidos e produção apenas no APK; preserve o PWA antigo para consulta, sem reenviar sua fila. Fechamentos antigos de caixa ficam arquivados e não reabrem nem recalculam o caixa do EasyStok. Compras e auditoria antigas também ficam no arquivo, sem alterar as listas atuais. Confira as contagens e ressalvas do recibo antes do uso diário.</p>

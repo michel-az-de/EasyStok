@@ -14,12 +14,11 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.provider.Settings;
 import androidx.core.app.NotificationManagerCompat;
-import com.google.firebase.messaging.FirebaseMessaging;
+import org.json.JSONObject;
 import com.google.firebase.messaging.RemoteMessage;
 
 public final class AppNotifications {
     public static final int PERMISSION_REQUEST = 2087;
-    private static boolean subscribing;
     private AppNotifications() {}
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences("cdb-visible-notifications", Context.MODE_PRIVATE);
@@ -43,22 +42,24 @@ public final class AppNotifications {
         }
         return true;
     }
+    public static String permission(Context context) {
+        if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) return "denied";
+        return enabled(context) ? "granted" : "blocked";
+    }
     public static void subscribe(Context context, boolean newToken) {
-        Context app = context.getApplicationContext();
-        if (newToken) prefs(app).edit().putBoolean("subscribed", false).apply();
-        if (!enabled(app)) return;
-        synchronized (AppNotifications.class) {
-            if (subscribing || prefs(app).getBoolean("subscribed", false)) return;
-            subscribing = true;
-        }
+        // No topic acknowledgement can prove delivery. The new flow registers this installation.
         try {
-            FirebaseMessaging.getInstance().subscribeToTopic(NoticePolicy.TOPIC).addOnCompleteListener(task -> {
-                synchronized (AppNotifications.class) { subscribing = false; }
-                prefs(app).edit().putBoolean("subscribed", task.isSuccessful()).apply();
-            });
-        } catch (RuntimeException error) {
-            synchronized (AppNotifications.class) { subscribing = false; }
-        }
+            if (newToken) NoticeManager.get(context).tokenChanged();
+            else NoticeSyncJob.schedule(context);
+        } catch (Exception ignored) { /* The bell exposes storage/identity failures without touching production. */ }
+    }
+    private static String enabledMessage(Context context) {
+        try {
+            return NoticeManager.get(context).status().optBoolean("registered", false)
+                ? "Notificações permitidas. Consulte no sino o histórico e as confirmações deste aparelho."
+                : "Notificações permitidas. Abra o sino e toque em Atualizar avisos para concluir o registro.";
+        } catch (Exception failure) { return "Notificações permitidas. Não foi possível ler o registro; confira o diagnóstico no sino."; }
     }
     public static void offerPermission(Activity activity, boolean explicit) {
         if (activity.isFinishing()) return;
@@ -67,9 +68,7 @@ public final class AppNotifications {
         if (enabled(activity)) {
             prefs(activity).edit().putBoolean("explained", true).apply();
             if (explicit) new AlertDialog.Builder(activity).setTitle("Notificações")
-                .setMessage(prefs(activity).getBoolean("subscribed", false)
-                    ? "Avisos ativados. Você receberá orientações e poderá tocar para abrir o app."
-                    : "Permissão ativada. Conecte-se à internet para concluir o registro dos avisos.")
+                .setMessage(enabledMessage(activity))
                 .setPositiveButton("OK", null).setNeutralButton("Configurar", (d,w) -> openSettings(activity)).show();
             return;
         }
@@ -77,7 +76,7 @@ public final class AppNotifications {
         prefs(activity).edit().putBoolean("explained", true).apply();
         new AlertDialog.Builder(activity).setTitle("Receber avisos da Casa da Baba?")
             .setMessage("Ative notificações para receber orientações, como trazer seus dados do PWA. "
-                + "O app continua funcionando se você escolher Agora não. Depois, use Notificações na tela inicial.")
+                + "O app continua funcionando se você escolher Agora não. Depois, abra o sino de Avisos e toque em Ativar notificações.")
             .setPositiveButton("Ativar", (d,w) -> {
                 if (NoticePolicy.shouldRequestPermission(Build.VERSION.SDK_INT,
                         Build.VERSION.SDK_INT < 33 || activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
@@ -87,7 +86,7 @@ public final class AppNotifications {
                 } else openSettings(activity);
             }).setNegativeButton("Agora não", null).show();
     }
-    private static void openSettings(Activity activity) {
+    public static void openSettings(Activity activity) {
         Intent intent = new Intent(Build.VERSION.SDK_INT >= 26 ? Settings.ACTION_APP_NOTIFICATION_SETTINGS : Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
         if (Build.VERSION.SDK_INT >= 26) intent.putExtra(Settings.EXTRA_APP_PACKAGE, activity.getPackageName());
         else intent.setData(android.net.Uri.parse("package:" + activity.getPackageName()));
@@ -95,15 +94,12 @@ public final class AppNotifications {
     }
     public static boolean openNotice(Activity activity) {
         Intent intent = activity.getIntent();
-        if (intent == null || !"app-notice".equals(intent.getStringExtra("kind"))) return false;
-        String screen = intent.getStringExtra("screen");
-        intent.removeExtra("kind"); intent.removeExtra("screen");
-        if (!NoticePolicy.screenAllowed(screen)) return false;
-        if ("migration-guide".equals(screen)) {
-            showGuide(activity);
-            return true;
-        }
-        return false;
+        if (intent == null || !"signed-notice".equals(intent.getStringExtra("kind"))) return false;
+        String id = intent.getStringExtra("noticeId");
+        intent.removeExtra("kind"); intent.removeExtra("noticeId");
+        if (id == null) return false;
+        try { NoticeManager.get(activity).pendingOpen(id); return true; }
+        catch (Exception failure) { return false; }
     }
     public static void showGuide(Activity activity) {
         new AlertDialog.Builder(activity).setTitle("Trazer dados do PWA antigo")
@@ -117,24 +113,29 @@ public final class AppNotifications {
             .setPositiveButton("Entendi", (d,w) -> offerPermission(activity, false)).show();
     }
     public static void receive(Context context, RemoteMessage message) {
-        RemoteMessage.Notification notification = message.getNotification();
-        if (notification == null) return;
-        String id = message.getData().get("noticeId"), screen = message.getData().get("screen");
-        String title = notification.getTitle(), body = notification.getBody();
-        if (!NoticePolicy.accepts(message.getFrom(), message.getData().get("kind"), id, screen, title, body)) return;
+        if (!"signed-notice".equals(message.getData().get("kind"))) return;
+        try {
+            JSONObject envelope = new JSONObject().put("payloadBase64", message.getData().get("payloadBase64"))
+                .put("signatureBase64", message.getData().get("signatureBase64"));
+            NoticeManager.get(context).acceptPush(envelope);
+        } catch (Exception ignored) { /* Unverified data is never presented or acknowledged. */ }
+    }
+    static void display(Context context, JSONObject notice) throws Exception {
         initialize(context);
         if (!enabled(context)) return;
+        String id = notice.getString("id");
         Intent open = new Intent(context, MainActivity.class).setAction(NoticePolicy.ACTION)
+            .setData(android.net.Uri.parse("cdb-notice:" + id))
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            .putExtra("kind", "app-notice").putExtra("screen", screen);
-        PendingIntent tap = PendingIntent.getActivity(context, id.hashCode(), open,
+            .putExtra("kind", "signed-notice").putExtra("noticeId", id);
+        PendingIntent tap = PendingIntent.getActivity(context, 0, open,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification.Builder builder = Build.VERSION.SDK_INT >= 26
             ? new Notification.Builder(context, NoticePolicy.CHANNEL) : new Notification.Builder(context);
-        builder.setSmallIcon(R.drawable.ic_stat_notice).setContentTitle(title).setContentText(body)
-            .setStyle(new Notification.BigTextStyle().bigText(body)).setContentIntent(tap).setAutoCancel(true)
-            .setVisibility(Notification.VISIBILITY_PRIVATE);
-        try { context.getSystemService(NotificationManager.class).notify(id, 2087, builder.build()); }
-        catch (SecurityException ignored) { /* A permissão pode ser revogada durante o recebimento. */ }
+        builder.setSmallIcon(R.drawable.ic_stat_notice).setContentTitle(notice.getString("title")).setContentText(notice.getString("body"))
+            .setStyle(new Notification.BigTextStyle().bigText(notice.getString("body"))).setContentIntent(tap).setAutoCancel(true)
+            .setDefaults(Notification.DEFAULT_SOUND).setVisibility(Notification.VISIBILITY_PRIVATE);
+        try { context.getSystemService(NotificationManager.class).notify(id, 2091, builder.build()); }
+        catch (SecurityException ignored) { /* Received and presented are distinct. The signed inbox remains available. */ }
     }
 }

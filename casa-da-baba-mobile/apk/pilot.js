@@ -64,7 +64,17 @@
     await updater.ready({ bundleVersion: appConfig.bundleVersion });
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth };
+  function noticePresentation(state, online = true) {
+    if (!state?.supported) return { tone: 'neutral', title: state?.native ? 'Atualize o app para receber avisos' : 'Avisos no app Android', body: state?.native ? 'Esta instalação ainda não oferece a central de avisos. Use Atualizar APK na tela inicial.' : 'Esta é uma prévia no navegador. O recebimento e as confirmações funcionam no APK instalado.', action: '' };
+    if (state.permission === 'denied' || state.permission === 'blocked') return { tone: 'attention', title: 'Permita receber avisos', body: 'As notificações estão desativadas neste aparelho. Você ainda pode consultar o histórico aqui.', action: 'Ativar notificações' };
+    if (!online) return { tone: 'attention', title: 'Sem conexão agora', body: 'Os avisos salvos continuam disponíveis. As confirmações aguardam a volta da conexão.', action: 'Configurar notificações' };
+    if (state.checking) return { tone: 'neutral', title: 'Conferindo os avisos', body: 'Verificando o registro deste aparelho e as confirmações pendentes.', action: 'Configurar notificações' };
+    if (state.lastError) return { tone: 'attention', title: 'Precisamos conferir a conexão', body: 'O registro ou a atualização dos avisos não foi concluído. Toque em Atualizar avisos para tentar novamente.', action: 'Configurar notificações' };
+    if (!state.registered) return { tone: 'attention', title: 'Registro ainda não confirmado', body: 'A permissão está ativada. Toque em Atualizar avisos para registrar este aparelho com internet.', action: 'Configurar notificações' };
+    return { tone: 'ready', title: 'Aparelho registrado para avisos', body: 'A permissão está ativada. Isso ainda não confirma a entrega de uma nova notificação.', action: 'Configurar notificações' };
+  }
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation };
   if (!root.document || !root.CDB_CONFIG?.isPilot) return;
   const config = root.CDB_CONFIG;
   const doc = root.document;
@@ -82,9 +92,11 @@
   let importUndoRequest = 0;
   const native = () => root.Capacitor?.Plugins?.PilotApp;
   const updater = () => root.Capacitor?.Plugins?.PilotUpdater;
+  const bellIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M9 20a3 3 0 0 0 6 0"/></svg>';
+  const bell = (id, badge) => '<button type="button" id="' + id + '" class="pilot-bell" aria-label="Abrir avisos" data-action="notices">' + bellIcon + '<span class="pilot-bell-label">Avisos</span><span id="' + badge + '" class="pilot-bell-count" hidden aria-hidden="true"></span></button>';
   const rail = doc.createElement('div');
   rail.className = 'pilot-rail';
-  rail.innerHTML = '<button type="button" id="pilotHomeButton">Casa da Baba <span id="pilotRailVersion">Piloto</span></button><span id="pilotRailStatus" role="status">Conferindo conexão</span>';
+  rail.innerHTML = '<button type="button" id="pilotHomeButton">Casa da Baba <span id="pilotRailVersion">Piloto</span></button><span id="pilotRailStatus" role="status">Conferindo conexão</span>' + bell('pilotNoticeBell', 'pilotNoticeCount');
   doc.body.prepend(rail);
   doc.body.classList.add('pilot-app');
 
@@ -94,7 +106,7 @@
   home.setAttribute('aria-labelledby', 'pilotTitle');
   home.innerHTML = `
     <div class="pilot-sheet">
-      <div class="pilot-topline"><span>CASA DA BABA · PILOTO</span><button type="button" data-action="close" aria-label="Fechar início">×</button></div>
+      <div class="pilot-topline"><span>CASA DA BABA · PILOTO</span><div class="pilot-top-actions">${bell('pilotHomeNoticeBell', 'pilotHomeNoticeCount')}<button type="button" data-action="close" aria-label="Fechar início">×</button></div></div>
       <h1 id="pilotTitle" tabindex="-1">Produção e pedidos.</h1>
       <p class="pilot-intro">Escolha o que precisa fazer agora.</p>
       <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><button type="button" id="pilotReconnect" data-action="reconnect" hidden>Verificar conexão</button></div>
@@ -110,7 +122,7 @@
       <details class="pilot-help pilot-migration"><summary>Já usava o PWA antigo?</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><p>Se está começando agora, basta conectar a produção.</p></details>
       <div class="pilot-shortcuts">
         <button type="button" data-action="printers">Impressoras</button>
-        <button type="button" data-action="notifications">Notificações</button>
+        <button type="button" data-action="notices">Avisos e notificações</button>
         <button type="button" data-action="migration-guide">Como trazer meus dados</button>
         <button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button>
       </div>
@@ -122,6 +134,157 @@
       <button type="button" id="pilotDownload" data-action="download" hidden>Atualizar APK</button>
     </div>`;
   doc.body.append(home);
+  const notices = doc.createElement('dialog');
+  notices.id = 'pilotNotices';
+  notices.className = 'pilot-home pilot-notices';
+  notices.setAttribute('aria-labelledby', 'pilotNoticesTitle');
+  notices.innerHTML = `<div class="pilot-sheet">
+    <div class="pilot-topline"><span>CASA DA BABA · AVISOS</span><button type="button" data-notice-action="close" aria-label="Fechar avisos">×</button></div>
+    <h1 id="pilotNoticesTitle" tabindex="-1">Seus avisos.</h1>
+    <p id="pilotNoticeIntro" class="pilot-intro">Orientações e novidades, guardadas neste aparelho.</p>
+    <section id="pilotNoticeHealth" class="pilot-notice-health" aria-labelledby="pilotNoticeHealthTitle"><strong id="pilotNoticeHealthTitle"></strong><p id="pilotNoticeHealthBody"></p><div class="pilot-notice-controls"><button type="button" id="pilotNoticePermission" data-notice-action="permission"></button><button type="button" id="pilotNoticeRefresh" data-notice-action="refresh">Atualizar avisos</button></div></section>
+    <p id="pilotNoticeFeedback" class="pilot-feedback pilot-error" role="alert"></p>
+    <div id="pilotNoticeListView"><div class="pilot-notice-list-heading"><h2>Histórico</h2><span id="pilotNoticeUnread"></span></div><p id="pilotNoticeEmpty" class="pilot-notice-empty">Nenhum aviso salvo neste aparelho. Quando chegar um aviso, ele aparecerá aqui.</p><div id="pilotNoticeList" class="pilot-notice-list"></div></div>
+    <article id="pilotNoticeDetail" class="pilot-notice-detail" hidden><button type="button" data-notice-action="back" class="pilot-notice-back">← Voltar ao histórico</button><p id="pilotNoticeDetailSource" class="pilot-notice-source"></p><h2 id="pilotNoticeDetailTitle" tabindex="-1"></h2><p id="pilotNoticeDetailBody"></p><button type="button" id="pilotNoticeGuide" data-notice-action="guide" hidden>Ver passo a passo da migração</button></article>
+    <details class="pilot-help pilot-notice-diagnostics"><summary>Conexão e confirmações</summary><p id="pilotNoticePush"></p><p id="pilotNoticeSync"></p><p id="pilotNoticeReceipts" role="status"></p><p id="pilotNoticeError"></p><p>Um aviso recuperado pelo histórico não comprova que o push chegou. A abertura é registrada quando você entra no detalhe do aviso.</p></details>
+    <div class="pilot-notice-device"><span id="pilotNoticeDevice"></span><button type="button" id="pilotNoticeCopy" data-notice-action="copy">Copiar identificação</button></div>
+  </div>`;
+  doc.body.append(notices);
+  let noticeState = { supported: false, native: root.Capacitor?.isNativePlatform?.() === true, items: [] };
+  let noticeFocus = null;
+  let selectedNotice = null;
+  let noticeLoading = false;
+  let pendingOpenHandled = '';
+  const noticeTime = value => Number.isFinite(value) && value > 0 ? new Date(value).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Ainda não confirmado';
+  function noticeSource(item) { return item.source === 'push' ? 'Recebido por push' : item.source === 'sync' ? 'Recuperado pelo histórico' : 'Origem não identificada'; }
+  function renderNotices() {
+    const presentation = noticePresentation(noticeState, root.navigator?.onLine !== false);
+    doc.getElementById('pilotNoticeHealth').dataset.tone = presentation.tone;
+    doc.getElementById('pilotNoticeHealth').dataset.permission = noticeState.permission || '';
+    doc.getElementById('pilotNoticeHealth').hidden = !!selectedNotice;
+    doc.getElementById('pilotNoticeIntro').hidden = !!selectedNotice;
+    doc.getElementById('pilotNoticeHealthTitle').textContent = presentation.title;
+    doc.getElementById('pilotNoticeHealthBody').textContent = presentation.body;
+    const permission = doc.getElementById('pilotNoticePermission');
+    permission.textContent = presentation.action; permission.hidden = !noticeState.supported;
+    const refresh = doc.getElementById('pilotNoticeRefresh');
+    refresh.hidden = !noticeState.supported; refresh.disabled = noticeLoading || noticeState.checking === true;
+    refresh.textContent = noticeLoading || noticeState.checking ? 'Conferindo…' : 'Atualizar avisos';
+    const unread = Number.isSafeInteger(noticeState.unread) && noticeState.unread > 0 ? noticeState.unread : 0;
+    for (const [buttonId, badgeId] of [['pilotNoticeBell', 'pilotNoticeCount'], ['pilotHomeNoticeBell', 'pilotHomeNoticeCount']]) {
+      const button = doc.getElementById(buttonId), badge = doc.getElementById(badgeId);
+      button.setAttribute('aria-label', unread ? 'Abrir avisos: ' + unread + ' não aberto' + (unread > 1 ? 's' : '') : 'Abrir avisos');
+      badge.textContent = unread > 99 ? '99+' : String(unread); badge.hidden = unread === 0;
+    }
+    doc.getElementById('pilotNoticeUnread').textContent = unread ? unread + ' não aberto' + (unread > 1 ? 's' : '') : 'Todos abertos';
+    const list = doc.getElementById('pilotNoticeList');
+    const focusedId = doc.activeElement?.dataset?.noticeId;
+    list.textContent = '';
+    const items = Array.isArray(noticeState.items) ? noticeState.items : [];
+    doc.getElementById('pilotNoticeEmpty').hidden = items.length > 0;
+    if (!items.length) doc.getElementById('pilotNoticeUnread').textContent = '';
+    for (const item of items) {
+      if (!item || typeof item.id !== 'string') continue;
+      const button = doc.createElement('button'); button.type = 'button'; button.className = 'pilot-notice-item';
+      button.dataset.noticeAction = 'open'; button.dataset.noticeId = item.id;
+      button.dataset.unread = item.openedAt > 0 ? 'false' : 'true';
+      const title = doc.createElement('strong'); title.textContent = item.title || 'Aviso';
+      const description = doc.createElement('span'); description.textContent = (item.openedAt > 0 ? 'Aberto · ' : 'Novo · ') + noticeSource(item) + ' · ' + noticeTime(item.receivedAt);
+      button.append(title, description); list.append(button);
+      if (focusedId === item.id && !selectedNotice) button.focus();
+    }
+    doc.getElementById('pilotNoticePush').textContent = 'Último push recebido: ' + noticeTime(noticeState.lastPushAt);
+    doc.getElementById('pilotNoticeSync').textContent = 'Última consulta ao histórico: ' + noticeTime(noticeState.lastSyncAt);
+    const pending = Number.isSafeInteger(noticeState.pendingReceipts) ? Math.max(0, noticeState.pendingReceipts) : 0;
+    doc.getElementById('pilotNoticeReceipts').textContent = pending ? pending + (pending > 1 ? ' confirmações aguardam' : ' confirmação aguarda') + ' envio ao servidor. O app tentará novamente com conexão.' : 'Nenhuma confirmação aguardando envio neste aparelho.';
+    doc.getElementById('pilotNoticeError').textContent = noticeState.lastError ? 'Diagnóstico: ' + String(noticeState.lastError).slice(0, 300) : '';
+    const id = typeof noticeState.installationId === 'string' ? noticeState.installationId : '';
+    doc.getElementById('pilotNoticeDevice').textContent = noticeState.supported ? (id ? 'Aparelho ' + id.slice(0, 12) : 'Identificação ainda não disponível') + ' · APK ' + (noticeState.apkVersion || 'não identificado') : 'Prévia no navegador · sem registro de aparelho';
+    doc.getElementById('pilotNoticeCopy').hidden = !id;
+  }
+  function applyNoticeState(state) {
+    if (state && typeof state === 'object') noticeState = { ...state, supported: state.supported === true };
+    renderNotices();
+    const id = noticeState.pendingOpenId;
+    if (!id) pendingOpenHandled = '';
+    if (!doc.hidden && typeof id === 'string' && id && id !== pendingOpenHandled && noticeState.items?.some(item => item.id === id)) {
+      pendingOpenHandled = id; openNotices(false); showNotice(id);
+    }
+  }
+  async function loadNoticeState(refresh = false) {
+    if (noticeLoading) return;
+    if (!native()?.noticeStatus) { applyNoticeState({ supported: false, native: root.Capacitor?.isNativePlatform?.() === true, items: [] }); return; }
+    noticeLoading = true; renderNotices();
+    try {
+      const method = refresh ? 'noticeRefresh' : 'noticeStatus';
+      applyNoticeState(await native()[method]());
+    } catch {
+      noticeState = { ...noticeState, supported: true, lastError: 'Não foi possível consultar os avisos. Tente novamente.' };
+      renderNotices();
+    } finally { noticeLoading = false; renderNotices(); }
+  }
+  function openNotices(load = true) {
+    if (!notices.open) {
+      noticeFocus = doc.activeElement; selectedNotice = null;
+      doc.getElementById('pilotNoticeHealth').hidden = false; doc.getElementById('pilotNoticeIntro').hidden = false;
+      doc.getElementById('pilotNoticeListView').hidden = false; doc.getElementById('pilotNoticeDetail').hidden = true;
+      notices.showModal(); doc.getElementById('pilotNoticesTitle').focus();
+    }
+    if (load) loadNoticeState();
+  }
+  function backToNotices() {
+    selectedNotice = null; doc.getElementById('pilotNoticeHealth').hidden = false; doc.getElementById('pilotNoticeIntro').hidden = false; doc.getElementById('pilotNoticeListView').hidden = false; doc.getElementById('pilotNoticeDetail').hidden = true;
+    doc.getElementById('pilotNoticesTitle').focus();
+  }
+  async function showNotice(id) {
+    const item = noticeState.items?.find(entry => entry.id === id);
+    if (!item) return;
+    selectedNotice = id;
+    doc.getElementById('pilotNoticeHealth').hidden = true; doc.getElementById('pilotNoticeIntro').hidden = true;
+    doc.getElementById('pilotNoticeDetailTitle').textContent = item.title || 'Aviso';
+    doc.getElementById('pilotNoticeDetailBody').textContent = item.body || '';
+    doc.getElementById('pilotNoticeDetailSource').textContent = noticeSource(item) + ' · ' + noticeTime(item.receivedAt);
+    doc.getElementById('pilotNoticeGuide').hidden = item.screen !== 'migration-guide';
+    doc.getElementById('pilotNoticeListView').hidden = true; doc.getElementById('pilotNoticeDetail').hidden = false;
+    doc.getElementById('pilotNoticeDetailTitle').focus();
+    if (root.requestAnimationFrame) await new Promise(resolve => root.requestAnimationFrame(resolve));
+    if (!notices.open || doc.hidden || selectedNotice !== id) return;
+    try { applyNoticeState(await native().noticeOpen({ id })); }
+    catch { doc.getElementById('pilotNoticeFeedback').textContent = 'O aviso está aberto, mas não foi possível registrar a confirmação. Tente abrir o aviso novamente.'; }
+  }
+  notices.addEventListener('click', async event => {
+    const control = event.target.closest('[data-notice-action]');
+    if (!control) return;
+    doc.getElementById('pilotNoticeFeedback').textContent = '';
+    try {
+      switch (control.dataset.noticeAction) {
+        case 'close': notices.close(); break;
+        case 'back': backToNotices(); break;
+        case 'open': await showNotice(control.dataset.noticeId); break;
+        case 'refresh': await loadNoticeState(true); break;
+        case 'permission': await native().notifications({ configure: noticeState.permission === 'granted' }); await loadNoticeState(); break;
+        case 'guide': await native().migrationGuide(); break;
+        case 'copy':
+          if (!root.navigator?.clipboard?.writeText) throw new Error('copy');
+          await root.navigator.clipboard.writeText('Casa da Baba · aparelho ' + noticeState.installationId + ' · APK ' + (noticeState.apkVersion || 'não identificado'));
+          doc.getElementById('pilotNoticeFeedback').textContent = 'Identificação copiada. Compartilhe com o suporte para conferir este aparelho.'; break;
+      }
+    } catch { doc.getElementById('pilotNoticeFeedback').textContent = 'Não foi possível concluir. Tente novamente ou informe ao suporte a identificação abaixo.'; }
+  });
+  notices.addEventListener('cancel', event => { if (selectedNotice) { event.preventDefault(); backToNotices(); } });
+  notices.addEventListener('close', () => {
+    selectedNotice = null;
+    const target = noticeFocus?.isConnected && noticeFocus.getClientRects().length ? noticeFocus : doc.getElementById(home.open ? 'pilotHomeNoticeBell' : 'pilotNoticeBell');
+    target.focus();
+  });
+  doc.getElementById('pilotNoticeBell').addEventListener('click', () => openNotices());
+  renderNotices();
+  if (native()?.addListener) Promise.resolve(native().addListener('noticeStatus', applyNoticeState)).catch(() => {});
+  root.addEventListener('focus', () => loadNoticeState());
+  doc.addEventListener?.('visibilitychange', () => { if (!doc.hidden) loadNoticeState(); });
+  root.addEventListener('online', () => { renderNotices(); if (notices.open) loadNoticeState(true); });
+  root.addEventListener('offline', renderNotices);
+  Promise.resolve().then(() => loadNoticeState());
   function installedConfig() { return { ...config, versionCode: nativeVersion?.code || config.versionCode }; }
   function showVersion() {
     const installed = nativeVersion ? 'APK ' + nativeVersion.version + ' (' + nativeVersion.code + ')' : (root.Capacitor?.isNativePlatform?.() ? 'APK: aguardando confirmação do aparelho' : 'Prévia no navegador');
@@ -395,6 +558,7 @@
     showError('');
     try {
       if (action === 'close') closeHome();
+      if (action === 'notices') openNotices();
       if (action === 'production') { closeHome(); root.go('producao'); }
       if (action === 'local-orders') { closeHome(); root.go('pedidos'); }
       if (action === 'printers') { closeHome(); root.openPrinterPicker(); }

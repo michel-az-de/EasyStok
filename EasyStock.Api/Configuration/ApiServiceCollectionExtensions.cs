@@ -197,6 +197,12 @@ public static class ApiServiceCollectionExtensions
             // evitar abuso (tentativa de adivinhar pairing code, flood).
             // Limites generosos pra não atrapalhar uso legítimo (PWA pinga
             // version no boot a cada reload).
+            // Recibos em fila de aparelhos na mesma rede. O cadastro continua limitado separadamente.
+            options.AddPolicy("mobile-push-receipts", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    _ => new FixedWindowRateLimiterOptions
+                    { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             options.AddPolicy("mobile-anonymous", context =>
             {
                 var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";

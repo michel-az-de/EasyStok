@@ -68,3 +68,43 @@
 
 #pilotVersion { font-size:13px; font-weight:600; }
 .pilot-rail button span { display:block; margin-left:0; }
+
+/* Avisos: o sino permanece no trabalho e também no início modal. */
+.pilot-top-actions { display: flex; align-items: center; gap: 10px; }
+.pilot-rail #pilotHomeButton { flex: 1; text-align: left; min-width: 0; }
+.pilot-rail #pilotRailStatus { max-width: 35%; font-size: 11px; }
+.pilot-rail .pilot-bell, .pilot-topline .pilot-bell { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; width: auto; min-width: 44px; min-height: 44px; height: auto; padding: 9px 11px; border: 1px solid #d6c7b1; border-radius: 12px; background: #fffaf2; color: #594530; font: 650 12px/1.3 system-ui, sans-serif; letter-spacing: 0; cursor: pointer; }
+.pilot-rail .pilot-bell .pilot-bell-label { color: inherit; font: inherit; margin: 0; }
+.pilot-rail .pilot-bell-count, .pilot-topline .pilot-bell-count { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 20px; height: 20px; margin: 0; padding: 0 4px; border: 2px solid #fffaf2; border-radius: 12px; background: #a34e35; color: #fffaf2; font: 700 11px/1 system-ui, sans-serif; box-sizing: border-box; }
+.pilot-bell-count[hidden], .pilot-notices [hidden] { display: none !important; }
+.pilot-notices .pilot-sheet { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.pilot-notices h2 { font: 400 25px/1.2 Georgia, serif; letter-spacing: -.025em; color: #352d25; }
+.pilot-notices button { min-height: 44px; font: 600 13px/1.4 system-ui, sans-serif; cursor: pointer; }
+.pilot-notices .pilot-topline button { font-size: 25px; }
+.pilot-notice-health { margin: 20px 0 14px; padding: 17px; border: 1px solid #d7d4bc; border-radius: 14px; background: #efefe2; color: #384d3d; }
+.pilot-notice-health[data-tone=attention] { background: #f7ead7; border-color: #d9c29b; color: #63481d; }
+.pilot-notice-health[data-tone=neutral] { background: #f2eee5; border-color: #daceba; color: #5c503f; }
+.pilot-notice-health strong { font-size: 15px; }
+.pilot-notice-health p { margin: 7px 0 13px; font-size: 13px; line-height: 1.5; }
+.pilot-notice-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.pilot-notice-controls button, #pilotNoticeGuide { padding: 10px 13px; border: 1px solid #496b56; border-radius: 9px; background: #496b56; color: #fff9ee; }
+.pilot-notice-controls #pilotNoticeRefresh { background: #fffaf2; color: #435b49; }
+.pilot-notice-list-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 22px; }
+.pilot-notice-list-heading h2 { margin: 0 0 12px; }
+.pilot-notice-list-heading span { font-size: 12px; color: #6b5943; }
+.pilot-notice-empty { border: 1px dashed #d4c3aa; border-radius: 14px; margin: 0 0 20px; padding: 22px 18px; color: #6b5943; font-size: 14px; }
+.pilot-notice-list { display: grid; gap: 9px; margin-bottom: 22px; }
+.pilot-notice-item { display: grid; gap: 7px; width: 100%; padding: 16px 17px; border: 1px solid #dfcfb9; border-radius: 13px; background: #fffaf2; text-align: left; color: #352d25; }
+.pilot-notice-item[data-unread=true] { border-left: 4px solid #a34e35; padding-left: 14px; }
+.pilot-notice-item strong { font: 650 15px/1.4 system-ui, sans-serif; overflow-wrap: anywhere; }
+.pilot-notice-item span, .pilot-notice-source { color: #6b5943; font: 400 12px/1.5 system-ui, sans-serif; }
+.pilot-notice-back { border: 0; padding: 8px 0; background: transparent; color: #6b4a24; text-decoration: underline; }
+.pilot-notice-detail { margin: 14px 0 24px; }
+.pilot-notice-detail h2 { margin: 9px 0 16px; overflow-wrap: anywhere; }
+#pilotNoticeDetailBody { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; color: #493e31; }
+.pilot-notice-device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 5px 12px; padding-top: 14px; color: #6b5943; font-size: 12px; }
+.pilot-notice-device button { border: 0; padding: 7px 0; background: transparent; color: #6b4a24; text-decoration: underline; }
+#pilotNoticeError { overflow-wrap: anywhere; }
+@media (max-width: 380px) { .pilot-rail .pilot-bell-label { display: none; } .pilot-topline > span { font-size: 10px; letter-spacing: .08em; } .pilot-top-actions { gap: 7px; } }
+.pilot-notice-health[data-permission=granted] #pilotNoticePermission { background: transparent; border-color: #a7ad99; color: #435b49; }
+.pilot-notice-health[data-permission=granted] #pilotNoticeRefresh { background: #496b56; color: #fff9ee; }

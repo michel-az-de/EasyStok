@@ -66,6 +66,9 @@
     <None Update="Mobile\Schema\*.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <EmbeddedResource Include="..\casa-da-baba-mobile\apk\android\app\src\main\assets\ota-public-key.der">
+      <LogicalName>Mobile.PushPublisherKey</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
