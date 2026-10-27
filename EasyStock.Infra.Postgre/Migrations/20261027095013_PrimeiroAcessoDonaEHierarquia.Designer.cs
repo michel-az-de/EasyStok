@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    [Migration("20261027090222_PrimeiroAcessoDonaEHierarquia")]
+    [Migration("20261027095013_PrimeiroAcessoDonaEHierarquia")]
     partial class PrimeiroAcessoDonaEHierarquia
     {
         /// <inheritdoc />
@@ -3435,6 +3435,12 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateOnly>("Data")
                         .HasColumnType("date");
 
+                    b.Property<decimal?>("DinheiroEntrouDepois")
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<decimal?>("DinheiroEsperado")
+                        .HasColumnType("numeric(14,2)");
+
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
@@ -3470,6 +3476,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("numeric(14,2)");
 
                     b.Property<decimal>("TotalVendas")
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<decimal?>("ValorContado")
                         .HasColumnType("numeric(14,2)");
 
                     b.HasKey("Id");
@@ -6028,6 +6037,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("Categoria")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
+
+                    b.Property<bool>("ConfirmacaoPendente")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");

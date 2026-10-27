@@ -74,17 +74,18 @@ export const MODULOS = [
   },
   {
     numero: 5, id: 'financeiro', nome: 'Financeiro', icone: 'dollar-sign',
-    // #1891: enquanto o financeiro gerencial está congelado, o resumo fala só do que abre.
-    resumo: 'Caixa do dia',
+    resumo: 'Caixa, contas a pagar e receber, extrato e relatórios',
     telas: [
       { id: 'caixa', rotulo: 'Caixa do dia', tipo: TELA_AJUSTE, aba: 'caixa' },
-      { id: 'visao-geral', rotulo: 'Visão geral', tipo: TELA_AJUSTE, aba: 'financeiro-resumo', soApi: true },
-      { id: 'pagar', rotulo: 'Contas a pagar', tipo: TELA_AJUSTE, aba: 'financeiro-pagar', soApi: true },
-      { id: 'receber', rotulo: 'Contas a receber', tipo: TELA_AJUSTE, aba: 'financeiro-receber', soApi: true },
-      { id: 'extrato', rotulo: 'Extrato', tipo: TELA_AJUSTE, aba: 'financeiro-extrato', soApi: true },
-      { id: 'relatorios', rotulo: 'Relatórios', tipo: TELA_AJUSTE, aba: 'financeiro-relatorios', soApi: true },
-      { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true },
-      { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true },
+      // #2095 (F17): o Operador abre o Financeiro pelo Caixa do dia, mas a API recusa o gerencial;
+      // cada tela pede a ação que a API exige, e quem não tem vê só o Caixa.
+      { id: 'visao-geral', rotulo: 'Visão geral', tipo: TELA_AJUSTE, aba: 'financeiro-resumo', soApi: true, acao: 'verContas' },
+      { id: 'pagar', rotulo: 'Contas a pagar', tipo: TELA_AJUSTE, aba: 'financeiro-pagar', soApi: true, acao: 'verContasPagar' },
+      { id: 'receber', rotulo: 'Contas a receber', tipo: TELA_AJUSTE, aba: 'financeiro-receber', soApi: true, acao: 'verContasReceber' },
+      { id: 'extrato', rotulo: 'Extrato', tipo: TELA_AJUSTE, aba: 'financeiro-extrato', soApi: true, acao: 'verContas' },
+      { id: 'relatorios', rotulo: 'Relatórios', tipo: TELA_AJUSTE, aba: 'financeiro-relatorios', soApi: true, acao: 'verContas' },
+      { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true, acao: 'verCategoriasFinanceiras' },
+      { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true, acao: 'verCentrosCusto' },
     ],
   },
   {

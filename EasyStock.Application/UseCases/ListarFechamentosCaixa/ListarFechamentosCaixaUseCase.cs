@@ -39,11 +39,41 @@ public class ListarFechamentosCaixaUseCase(ICaixaRepository repo, ObterCaixaDiaU
         return new ListarFechamentosCaixaResult(resultados, total, page, size);
     }
 
+    /// <summary>
+    /// #2084 (B1): o dinheiro que a abertura seguinte herda, pela mesma regra que a abertura manual sugere
+    /// (<c>gavetaDoFechamento</c> no console lê <see cref="FechamentoCaixaResult.DinheiroNaGaveta"/> do último
+    /// fechamento). A2: da própria loja; sem fechamento dela, o do caixa da empresa sem loja (tenant de uma loja só
+    /// que fecha sem loja). Nulo sem fechamento anterior.
+    /// </summary>
+    public async Task<(DateOnly Data, decimal Dinheiro)?> GavetaDoUltimoFechamentoAsync(Guid empresaId, Guid? lojaId)
+    {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        var ultimo = await repo.GetUltimoFechamentoDaLojaAsync(empresaId, lojaId)
+                     ?? (lojaId is null ? null : await repo.GetUltimoFechamentoDaLojaAsync(empresaId, null));
+        if (ultimo is null) return null;
+        var resultado = await ComDinheiroNaGavetaAsync(empresaId, ultimo);
+        return resultado.DinheiroNaGaveta is { } dinheiro ? (resultado.Data, dinheiro) : null;
+    }
+
+    /// <summary>
+    /// A gaveta que fica para a abertura seguinte:
+    ///   B3, quem contou: o contado, menos o que entrou hoje num caixa esquecido (D1: fica no caixa de hoje);
+    ///   quem não contou: o calculado do dia até o fechamento;
+    ///   B4, mais o dinheiro que entrou no mesmo dia depois de fechar.
+    /// </summary>
     private async Task<FechamentoCaixaResult> ComDinheiroNaGavetaAsync(Guid empresaId, FechamentoCaixa fechamento)
     {
         var resultado = FecharCaixaUseCase.Map(fechamento);
         if (caixaDia is null) return resultado;
         var dia = await caixaDia.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, fechamento.Data, fechamento.LojaId));
-        return resultado with { DinheiroNaGaveta = GavetaCaixa.DinheiroNaGaveta(dia) };
+        var ateFechar = fechamento.ValorContado is { } contado
+            ? contado - (fechamento.DinheiroEntrouDepois ?? 0m)
+            // até o instante do fechamento, inclusive (o mesmo corte do retrato do dia fechado, #2082 D9)
+            : GavetaCaixa.DinheiroNaJanela(dia, null, fechamento.FechadoEm.AddTicks(1), comSaldoInicial: true);
+        return resultado with
+        {
+            DinheiroNaGaveta = ateFechar + dia.DinheiroPosFechamento,
+            DinheiroPosFechamento = dia.DinheiroPosFechamento
+        };
     }
 }

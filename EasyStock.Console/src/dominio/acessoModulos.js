@@ -35,10 +35,17 @@ export const podeVerDesacertos = (acoes) => acoes?.verDesacertosEstoque !== fals
 export const podeConfigurarLoja = (acoes) => acoes?.configurarLoja === true
 
 // #1921: a ação de cada tela do catálogo (`tela.acao` em dominio/modulos.js), pela mesma regra das rotas da API.
+const verContas = (acoes) => acoes?.visualizarContasPagar === true || acoes?.visualizarContasReceber === true
 export const PODE_NA_TELA = Object.freeze({
   ajustarEntrega: podeAjustarEntrega,
   configurarLoja: podeConfigurarLoja,
   editarAtendimento: (acoes) => acoes?.editarAtendimento === true,
+  verContas,
+  verContasPagar: (acoes) => acoes?.visualizarContasPagar === true,
+  verContasReceber: (acoes) => acoes?.visualizarContasReceber === true,
+  // O GET de categorias e de centros exige visualizar contas (a pagar ou a receber); só gerenciar não lista (#2105, achado 8).
+  verCategoriasFinanceiras: verContas,
+  verCentrosCusto: verContas,
 })
 
 export const entradaDoPerfil = (acesso) => permiteModulo(acesso, acesso?.portaDeEntrada)

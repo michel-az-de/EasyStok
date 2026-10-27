@@ -54,6 +54,11 @@ namespace EasyStock.Domain.Entities
         /// notificado. Só faz sentido para Tipo=="abertura".</summary>
         public DateTime? NotificadoEsquecidoEm { get; set; }
 
+        /// <summary>#2084 (B1): abertura feita sozinha pelo primeiro pagamento em dinheiro, com a gaveta herdada do
+        /// último fechamento, que a gerente ainda não conferiu. A abertura manual do dia confirma (ver
+        /// <see cref="ConfirmarAbertura"/>). Só faz sentido para Tipo=="abertura".</summary>
+        public bool ConfirmacaoPendente { get; set; }
+
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
 
@@ -84,6 +89,22 @@ namespace EasyStock.Domain.Entities
             EstornadoPorNome = userNome;
             MotivoEstorno = motivo;
         }
+
+        /// <summary>#2084 (B1, A1): a gerente conferiu a gaveta da abertura automática. <paramref name="saldoInicial"/> é
+        /// o troco que a gaveta tinha ao abrir, já descontado o dinheiro que entrou depois (quem chama calcula). A
+        /// descrição guarda o valor herdado e o confirmado; quem confirmou vira quem registrou.</summary>
+        public void ConfirmarAbertura(decimal saldoInicial, Guid? userId, string? userNome, string? observacao)
+        {
+            var herdado = Valor;
+            Valor = Math.Abs(saldoInicial);
+            RegistradoPorUserId = userId;
+            RegistradoPorNome = userNome ?? RegistradoPorNome;
+            var registro = $"Abertura automática conferida: herdado {herdado.ToString("N2", PtBr)}, confirmado {Valor.ToString("N2", PtBr)}.";
+            Descricao = string.IsNullOrWhiteSpace(observacao) ? registro : $"{registro} {observacao.Trim()}";
+            ConfirmacaoPendente = false;
+        }
+
+        private static readonly System.Globalization.CultureInfo PtBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
 
         /// <summary>Carimba esta abertura como já notificada (caixa esquecido). Idempotente —
         /// preserva o primeiro carimbo. Kind=Utc para a coluna timestamptz.</summary>
@@ -125,6 +146,19 @@ namespace EasyStock.Domain.Entities
         public string? FechadoPorNome { get; set; }
         public string? Observacoes { get; set; }
         public DateTime FechadoEm { get; set; }
+
+        /// <summary>#2084 (B3): dinheiro que a gerente contou na gaveta ao fechar. Nulo nos fechamentos antigos
+        /// e quando ninguém contou.</summary>
+        public decimal? ValorContado { get; set; }
+
+        /// <summary>#2084 (D1): dinheiro que o sistema esperava na gaveta no dia deste fechamento (o dia da
+        /// abertura, ADR-0034). Nulo nos fechamentos antigos.</summary>
+        public decimal? DinheiroEsperado { get; set; }
+
+        /// <summary>#2084 (D1): no fechamento de um caixa esquecido, o dinheiro que entrou HOJE sob a mesma sessão.
+        /// Já estava na gaveta contada, mas pertence ao caixa de hoje; a abertura seguinte não o herda.
+        /// Zero quando o fechamento é do próprio dia; nulo nos fechamentos antigos.</summary>
+        public decimal? DinheiroEntrouDepois { get; set; }
 
         public Empresa? Empresa { get; set; }
         public Loja? Loja { get; set; }
