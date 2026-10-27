@@ -165,6 +165,9 @@ public static class GeracaoAgenteAtendimento
             if (string.IsNullOrWhiteSpace(texto)) continue;
             if (msg.Status == StatusMensagem.Falhou) texto = $"{MarcadorNaoConfirmada} {texto}";
 
+            var origem = pendentes.Contains(msg) ? "entrada nova" : "histórico";
+            texto = $"[{origem} de {HorarioBrasil.ConverterParaBrasilia(msg.EnviadaEm):dd/MM/yyyy HH:mm}]\n{texto}";
+
             AcrescentarTexto(resultado, papel, texto);
         }
 
@@ -232,7 +235,7 @@ public static class GeracaoAgenteAtendimento
             ? "- Situação: lead (ainda não comprou)."
             : $"- Situação: cliente com {cliente.OrderCount} pedido(s).");
         sb.AppendLine(conversa.PedidoEmAndamentoId is { } pedidoId
-            ? $"- Pedido em andamento: {pedidoId}."
+            ? $"- Pedido vinculado à conversa: {pedidoId}. Consulte consultar_pedido para saber a situação atual; o vínculo não comprova pedido em andamento."
             : "- Pedido em andamento: nenhum registrado nesta conversa.");
         if (conversa.ContextoJson != "{}")
             sb.AppendLine($"- Contexto salvo: {conversa.ContextoJson}");
@@ -251,7 +254,7 @@ public static class GeracaoAgenteAtendimento
         if (automaticas.Count > 0)
         {
             sb.AppendLine("Mensagens automáticas já enviadas ao cliente:");
-            foreach (var auto in automaticas) sb.AppendLine($"- {auto.Texto}");
+            foreach (var auto in automaticas) sb.AppendLine($"- {HorarioBrasil.ConverterParaBrasilia(auto.EnviadaEm):dd/MM/yyyy HH:mm}: {auto.Texto}");
         }
 
         return sb.ToString().TrimEnd();

@@ -20,6 +20,8 @@ public static class UploadSecurityValidator
         "image/png",
         "image/webp",
         "image/gif",
+        // O atendimento publica o áudio já validado por bytes para o provedor buscar pela URL.
+        "audio/ogg", "audio/mpeg", "audio/mp4", "audio/aac", "audio/amr",
         "application/pdf",
         "text/csv",
         "application/vnd.ms-excel",

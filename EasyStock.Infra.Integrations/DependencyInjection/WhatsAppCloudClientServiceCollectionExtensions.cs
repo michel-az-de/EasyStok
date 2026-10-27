@@ -44,6 +44,14 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
         });
 
         services.AddScoped<StubWhatsAppCloudClient>();
+        services.Configure<WppConnectOptions>(configuration.GetSection("Atendimento:WppConnect"));
+        services.AddHttpClient<WppConnectClient>((sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<WppConnectOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        }).RemoveAllLoggers(); // generate-token carrega o segredo no caminho: nunca registrar a URL.
+        services.AddScoped<IWppConnectSessaoClient>(sp => sp.GetRequiredService<WppConnectClient>());
 
         services.AddHttpClient<CatalogoModelosWhatsApp>((sp, client) =>
         {
@@ -73,6 +81,9 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<WhatsAppCloudClient>());
         else
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<StubWhatsAppCloudClient>());
+
+        if (configuration.GetValue<bool>("Atendimento:WppConnect:Habilitado"))
+            services.AddScoped<IWhatsAppCloudClient, RoteadorWhatsAppClient>();
 
         // N6: WhatsApp de plataforma. Mesma classe (mesmo HttpClient, token e pipeline sem retry), métodos que não usam
         // o remetente do tenant. Registrado sempre: só o provider de plataforma o consome, e só com Provider=meta.
