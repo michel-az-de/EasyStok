@@ -50,7 +50,7 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
   const makeElement = tag => {
     const handlers = new Map();
     const el = { tag, dataset: {}, open: false, hidden: false, disabled: false, textContent: '', isConnected: true,
-      classList: { add() {} }, setAttribute() {}, getClientRects: () => [1], scrollIntoView() {},
+      classList: { add() {} }, children: [], append(...children) { this.children.push(...children); }, insertBefore(child, reference) { this.children = this.children.filter(item => item !== child); const index = this.children.indexOf(reference); this.children.splice(index < 0 ? this.children.length : index, 0, child); }, setAttribute() {}, getClientRects: () => [1], scrollIntoView() {},
       focus() { doc.activeElement = el; },
       showModal() { el.open = true; },
       close() { el.open = false; handlers.get('close')?.(); },
@@ -449,6 +449,7 @@ test('rodapé usa APK nativo mesmo com conteúdo antigo, sem oferecer reinstala�
  root.Capacitor={Plugins:{PilotUpdater:{status:async()=>({builtinVersion:'0.5.0',nativeVersionCode:5,pendingVersion:'0.5.2'})}}};
  await new Promise(setImmediate);
  assert.match(nodes.get('pilotVersion').textContent,/APK 0\.5\.0 \(5\)/);
+ assert.equal(nodes.get('pilotHomeVersion').textContent, 'APK 0.5.0');
  assert.match(nodes.get('pilotVersion').textContent,/Conteúdo 0\.3\.1/);
  assert.match(nodes.get('pilotVersion').textContent,/0\.5\.2 ao reabrir/);
  assert.equal(nodes.get('pilotDownload').hidden,true);
@@ -473,5 +474,6 @@ test('falha da consulta nativa não declara APK atualizado usando versão do con
  await new Promise(setImmediate);
  assert.doesNotMatch(nodes.get('pilotUpdateStatus').textContent,/está atualizado/);
  assert.match(nodes.get('pilotVersion').textContent,/aguardando confirmação/);
+ assert.equal(nodes.get('pilotHomeVersion').textContent, 'Confirmando versão do APK');
  assert.equal(nodes.get('pilotDownload').hidden,true);
 });

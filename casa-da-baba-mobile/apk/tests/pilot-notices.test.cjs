@@ -18,7 +18,7 @@ function harness(state = normal(), nativeEnabled = true) {
       classList: { add() {} }, setAttribute(name, value) { this.attributes[name] = value; },
       getClientRects: () => [1], scrollIntoView() {}, focus() { doc.activeElement = el; },
       showModal() { this.open = true; }, close() { this.open = false; handlers.get('close')?.({}); },
-      append(...children) { this.children.push(...children); },
+      append(...children) { for (const child of children) { child.parentElement = this; this.children.push(child); } }, insertBefore(child, reference) { child.parentElement = this; this.children = this.children.filter(item => item !== child); const index = this.children.indexOf(reference); this.children.splice(index < 0 ? this.children.length : index, 0, child); },
       addEventListener(name, cb) { handlers.set(name, cb); },
       async click(action, id) { await handlers.get('click')?.({ target: { closest: () => ({ dataset: { action, noticeAction: action, noticeId: id } }) } }); },
       cancel() { let prevented = false; handlers.get('cancel')?.({ preventDefault() { prevented = true; } }); if (!prevented) this.close(); return prevented; }
@@ -88,7 +88,9 @@ test('permissão negada tem ação clara e não é descrita como entrega pronta'
 test('histórico recuperado não vira prova de push e confirmações pendentes ficam explícitas', async () => {
   const s = normal(); s.items[0].source = 'sync'; s.pendingReceipts = 2; s.lastSyncAt = 1793051000000;
   const { nodes } = harness(s); await settle();
-  assert.match(nodes.get('pilotNoticeList').children[0].children[1].textContent, /Recuperado pelo histórico/);
+  assert.doesNotMatch(nodes.get('pilotNoticeList').children[0].children[1].textContent, /push|Recuperado/);
+  await nodes.get('pilotNoticeBell').click(); await settle(); await nodes.get('pilotNotices').click('open', 'notice-one');
+  assert.match(nodes.get('pilotNoticeDetailSource').textContent, /Recuperado pelo histórico/);
   assert.match(nodes.get('pilotNoticePush').textContent, /Ainda não confirmado/);
   assert.match(nodes.get('pilotNoticeReceipts').textContent, /2 confirmações aguardam envio/);
   assert.match(nodes.get('pilotNoticeHealthBody').textContent, /ainda não confirma a entrega/);
@@ -140,4 +142,53 @@ test('offline e registro pendente têm estados distintos e não afirmam entrega'
   assert.equal(noticePresentation(normal(), false).title, 'Sem conexão agora');
   assert.match(noticePresentation({ ...normal(), registered: false }).title, /ainda não confirmado/);
   assert.match(noticePresentation({ supported: false, native: true }).title, /Atualize o app/);
+});
+test('sino busca novos avisos online sem abrir registros e mantém cache offline', async () => {
+  const { nodes, calls, root } = harness(); await settle();
+  await nodes.get('pilotNoticeBell').click(); await settle();
+  assert.equal(calls.refresh, 1); assert.deepEqual(calls.open, []);
+  await nodes.get('pilotNotices').click('close'); root.navigator.onLine = false;
+  await nodes.get('pilotNoticeBell').click(); await settle();
+  assert.equal(calls.refresh, 1); assert.equal(nodes.get('pilotNoticeList').children.length, 1);
+});
+test('estado vazio diferencia consulta em curso e falha sem inventar badge', async () => {
+  const s = normal(); s.items = []; s.unread = 0;
+  const { nodes, plugin } = harness(s); await settle();
+  assert.equal(nodes.get('pilotNoticeEmptyTitle').textContent, 'Seus avisos ficam aqui');
+  assert.equal(nodes.get('pilotNoticeCount').hidden, true);
+  let finish; plugin.noticeRefresh = () => new Promise(resolve => { finish = resolve; });
+  const request = nodes.get('pilotNotices').click('refresh');
+  assert.match(nodes.get('pilotNoticeEmptyTitle').textContent, /Buscando/);
+  assert.equal(nodes.get('pilotNoticeList').attributes['aria-busy'], 'true');
+  finish({ ...s, lastError: 'Sem conexão' }); await request;
+  assert.match(nodes.get('pilotNoticeEmptyTitle').textContent, /Não foi possível/);
+  assert.equal(nodes.get('pilotNoticeList').attributes['aria-busy'], 'false');
+});
+test('permissão desligada é independente de avisos não abertos', async () => {
+  const s = normal(); s.permission = 'blocked'; s.unread = 0; s.items = [];
+  const { nodes } = harness(s); await settle();
+  assert.equal(nodes.get('pilotNoticeBell').dataset.permissionOff, 'true');
+  assert.match(nodes.get('pilotNoticeBell').attributes['aria-label'], /Notificações desativadas/);
+  assert.equal(nodes.get('pilotNoticeCount').hidden, true);
+});
+
+test('ativação aparece junto dos controles e precede atualizar; ao conceder recupera foco visível', async () => {
+  const s = normal(); s.permission = 'blocked';
+  const { nodes, doc, listeners } = harness(s); await settle();
+  const permission = nodes.get('pilotNoticePermission'), controls = nodes.get('pilotNoticeControls');
+  assert.equal(permission.parentElement, controls);
+  assert.equal(controls.children[0], permission);
+  permission.focus(); listeners.get('noticeStatus')({ ...s, permission: 'granted' });
+  assert.equal(permission.parentElement, nodes.get('pilotNoticeDiagnostics'));
+  assert.equal(doc.activeElement, nodes.get('pilotNoticeRefresh'));
+  const detail = nodes.get('pilotNoticeDetailTitle'); detail.focus();
+  listeners.get('noticeStatus')({ ...s, permission: 'granted' });
+  assert.equal(doc.activeElement, detail, 'atualização não pode roubar foco de leitura');
+});
+test('retorno da permissão durante consulta usa título quando atualizar está indisponível', async () => {
+  const s = normal(); s.permission = 'denied';
+  const { nodes, doc, listeners } = harness(s); await settle();
+  nodes.get('pilotNoticePermission').focus();
+  listeners.get('noticeStatus')({ ...s, permission: 'granted', checking: true });
+  assert.equal(doc.activeElement, nodes.get('pilotNoticesTitle'));
 });

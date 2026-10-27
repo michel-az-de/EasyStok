@@ -108,3 +108,42 @@
 @media (max-width: 380px) { .pilot-rail .pilot-bell-label { display: none; } .pilot-topline > span { font-size: 10px; letter-spacing: .08em; } .pilot-top-actions { gap: 7px; } }
 .pilot-notice-health[data-permission=granted] #pilotNoticePermission { background: transparent; border-color: #a7ad99; color: #435b49; }
 .pilot-notice-health[data-permission=granted] #pilotNoticeRefresh { background: #496b56; color: #fff9ee; }
+/* Cabeçalho de trabalho estável; o sino é sempre a entrada dos avisos. */
+.pilot-home .pilot-topline { position: sticky; top: 0; z-index: 2; margin: -24px -26px 0; padding: 12px 26px; min-height: 64px; box-sizing: border-box; background: #fbf6ec; border-bottom: 1px solid #e4d7c3; }
+.pilot-rail .pilot-bell, .pilot-topline .pilot-bell { width: 46px; height: 46px; padding: 10px; border-radius: 50%; }
+.pilot-bell svg { width: 24px; height: 24px; flex-shrink: 0; stroke-linecap: round; stroke-linejoin: round; }
+.pilot-bell[data-permission-off=true]::after { content: ''; position: absolute; bottom: 5px; right: 6px; width: 7px; height: 7px; border: 2px solid #fffaf2; border-radius: 50%; background: #97702c; }
+.pilot-notice-brand { display: inline-flex; align-items: center; gap: 10px; }
+.pilot-home h1 { margin-top: 22px; }
+.pilot-notices .pilot-sheet { display: flex; flex-direction: column; }
+.pilot-notices .pilot-topline { flex-shrink: 0; }
+.pilot-notice-list { gap: 0; border-top: 1px solid #dfcfb9; }
+.pilot-notice-item { position: relative; padding: 18px 14px 18px 20px; border: 0; border-bottom: 1px solid #dfcfb9; border-radius: 0; background: transparent; }
+.pilot-notice-item[data-unread=true] { border-left: 0; padding-left: 20px; background: #fffaf2; }
+.pilot-notice-item[data-unread=true]::before { content: ''; position: absolute; left: 5px; top: 25px; width: 6px; height: 6px; border-radius: 50%; background: #a34e35; }
+.pilot-notice-item:hover { background: #f2eadb; }
+.pilot-notice-preview { margin: 0; color: #645543; font: 400 13px/1.5 system-ui, sans-serif; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.pilot-notice-empty { display: grid; justify-items: center; gap: 10px; border: 0; padding: 34px 18px; text-align: center; }
+.pilot-notice-empty svg { color: #896b44; width: 30px; height: 30px; }
+.pilot-notice-empty strong { font: 400 22px/1.2 Georgia, serif; color: #493e31; }
+.pilot-notice-empty p { margin: 0; max-width: 30ch; font-size: 13px; line-height: 1.6; }
+
+.pilot-notices[data-tone=ready] .pilot-notice-health { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 12px 0; margin: 0; border: 0; border-top: 1px solid #e4d7c3; border-radius: 0; background: transparent; }
+.pilot-notices[data-tone=ready] .pilot-notice-health strong { font-size: 12px; flex: 1; }
+.pilot-notices[data-tone=ready] .pilot-notice-health p { display: none; }
+.pilot-notices[data-tone=ready] #pilotNoticeRefresh { background: transparent; border: 0; color: #435b49; padding: 8px 0; }
+.pilot-notice-diagnostics { margin-top: 16px; }
+.pilot-notice-diagnostics #pilotNoticePermission, .pilot-notice-health > #pilotNoticePermission { min-height: 44px; padding: 9px 12px; border: 1px solid #496b56; border-radius: 9px; background: #496b56; color: #fff9ee; }
+.pilot-notice-diagnostics #pilotNoticePermission { margin: 10px 0; background: transparent; color: #435b49; }
+.pilot-notice-device { border-top: 1px solid #e4d7c3; }
+@media (max-width: 480px) {
+  .pilot-home .pilot-topline { margin: -20px -21px 0; padding: 10px 21px; }
+  .pilot-home h1 { font-size: 31px; margin-top: 19px; }
+  .pilot-card { padding: 16px 42px 16px 18px; gap: 4px; }
+  .pilot-card strong { font-size: 24px; }
+  .pilot-actions { gap: 10px; margin-top: 16px; }
+}
+
+#pilotHomeVersion { display: block; margin-top: 3px; font: 500 10px/1.3 system-ui, sans-serif; letter-spacing: .03em; color: #786854; }
+
+#pilotTitle:focus, #pilotNoticesTitle:focus, #pilotNoticeDetailTitle:focus { outline: none; }
