@@ -133,8 +133,9 @@ const PODE_NA_TELA = {
   verContas,
   verContasPagar: (acoes) => acoes?.visualizarContasPagar === true,
   verContasReceber: (acoes) => acoes?.visualizarContasReceber === true,
-  verCategoriasFinanceiras: (acoes) => acoes?.gerenciarCategoriasFinanceiras === true || verContas(acoes),
-  verCentrosCusto: (acoes) => acoes?.gerenciarCentrosCusto === true || verContas(acoes),
+  // O GET de categorias e de centros exige visualizar contas (a pagar ou a receber); só gerenciar não lista (#2105, achado 8).
+  verCategoriasFinanceiras: verContas,
+  verCentrosCusto: verContas,
 }
 const podeNaTela = (tela, { fonteApi, acoes }) => !tela.acao || !fonteApi || !acoes || PODE_NA_TELA[tela.acao]?.(acoes) === true
 export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
