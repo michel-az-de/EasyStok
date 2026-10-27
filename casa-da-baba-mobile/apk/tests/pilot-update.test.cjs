@@ -46,7 +46,7 @@ test('diferencia servidor acessível de aparelho pareado e envio pendente', () =
 function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch } = {}) {
   const nodes = new Map();
   const events = new Map();
-  const doc = { activeElement: null, getElementById: id => nodes.get(id) };
+  const doc = { activeElement: null, hidden: false, addEventListener: (name, callback) => events.set(name, callback), getElementById: id => nodes.get(id) };
   const makeElement = tag => {
     const handlers = new Map();
     const el = { tag, dataset: {}, open: false, hidden: false, disabled: false, textContent: '', isConnected: true,
@@ -204,7 +204,7 @@ test('consulta de conexão em andamento bloqueia chamadas repetidas e libera o b
   assert.equal(nodes.get('pilotReconnect').disabled, true);
   await nodes.get('pilotHome').click('reconnect');
   await nodes.get('pilotHome').click('reconnect');
-  assert.equal(requests.length, 1);
+  assert.equal(requests.filter(url => url.endsWith('/api/mobile/version')).length, 1);
   complete({ ok: true, json: async () => ({ databaseOk: true }) });
   await new Promise(setImmediate);
   assert.equal(nodes.get('pilotReconnect').disabled, false);
@@ -430,4 +430,48 @@ test('recibo guardado restaura ressalvas após nova abertura sem tirar foco da n
   assert.match(nodes.get('pilotMigrationResult').textContent,/registro exige conferência/);
   assert.match(nodes.get('pilotMigrationResult').textContent,/Fechamentos antigos/);
   assert.equal(doc.activeElement,previousFocus);
+});
+
+
+test('consulta APK automaticamente sem abrir diálogo nem tirar foco da operação', async () => {
+ const {nodes,doc,requests}=pilotHarness({operator:''});
+ const field={};doc.activeElement=field;
+ await new Promise(setImmediate);
+ assert.equal(nodes.get('pilotHome').open,false);assert.equal(doc.activeElement,field);
+ assert.equal(requests.filter(url=>url.endsWith('/latest.json')).length,1);
+ assert.match(nodes.get('pilotUpdateStatus').textContent,/disponível/);
+ assert.equal(nodes.get('pilotDownload').hidden,false);
+ assert.match(nodes.get('pilotRailVersion').textContent,/atualização disponível/);
+});
+test('rodapé usa APK nativo mesmo com conteúdo antigo, sem oferecer reinstalação', async () => {
+ const {root,nodes}=pilotHarness({operator:''});
+ root.CDB_CONFIG.versionCode=3;root.CDB_CONFIG.version='0.3.0';root.CDB_CONFIG.bundleVersion='0.3.1';
+ root.Capacitor={Plugins:{PilotUpdater:{status:async()=>({builtinVersion:'0.5.0',nativeVersionCode:5,pendingVersion:'0.5.2'})}}};
+ await new Promise(setImmediate);
+ assert.match(nodes.get('pilotVersion').textContent,/APK 0\.5\.0 \(5\)/);
+ assert.match(nodes.get('pilotVersion').textContent,/Conteúdo 0\.3\.1/);
+ assert.match(nodes.get('pilotVersion').textContent,/0\.5\.2 ao reabrir/);
+ assert.equal(nodes.get('pilotDownload').hidden,true);
+});
+test('retomadas repetidas não duplicam consulta, e retorno da rede verifica sem interromper',async()=>{
+ const {root,nodes,events,requests}=pilotHarness({operator:'',connected:false});
+ await new Promise(setImmediate);assert.equal(requests.length,0);
+ root.navigator.onLine=true;events.get('online')();events.get('focus')();events.get('visibilitychange')();
+ await new Promise(setImmediate);
+ assert.equal(requests.filter(url=>url.endsWith('/latest.json')).length,1);assert.equal(nodes.get('pilotHome').open,false);
+});
+test('falha automática mantém a operação aberta e oferece nova verificação manual',async()=>{
+ const {root,nodes,doc}=pilotHarness({operator:'',manifestError:true});const field={};doc.activeElement=field;
+ await new Promise(setImmediate);assert.equal(doc.activeElement,field);assert.equal(nodes.get('pilotHome').open,false);
+ assert.equal(nodes.get('pilotUpdateButton').disabled,false);assert.match(nodes.get('pilotUpdateStatus').textContent,/Não foi possível/);
+ await root.forceCheckUpdate();assert.equal(nodes.get('pilotHome').open,true);
+});
+
+test('falha da consulta nativa não declara APK atualizado usando versão do conteúdo',async()=>{
+ const {root,nodes}=pilotHarness({operator:''});root.CDB_CONFIG.versionCode=99;
+ root.Capacitor={isNativePlatform:()=>true,Plugins:{PilotUpdater:{status:async()=>{throw new Error('bridge indisponível');}}}};
+ await new Promise(setImmediate);
+ assert.doesNotMatch(nodes.get('pilotUpdateStatus').textContent,/está atualizado/);
+ assert.match(nodes.get('pilotVersion').textContent,/aguardando confirmação/);
+ assert.equal(nodes.get('pilotDownload').hidden,true);
 });
