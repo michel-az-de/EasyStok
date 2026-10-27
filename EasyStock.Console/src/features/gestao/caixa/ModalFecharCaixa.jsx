@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoReais } from '../../../componentes/CampoReais'
+import { DiferencaDaGaveta } from '../../../componentes/DiferencaDaGaveta'
 import { Modal } from '../../../componentes/Modal'
-import { Pilula } from '../../../componentes/Pilula'
 import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import {
   AVISO_AO_FECHAR_CAIXA, ROTULO_FORA_DA_GAVETA, avisoDeDevolucoesPendentes, conferenciaDaGaveta,
@@ -24,19 +24,29 @@ import css from './abaCaixa.module.css'
 // "Fechar o caixa", não "fechar o dia": fechar a loja é outro gesto.
 // J2 (#1990): o valor contado se digita em reais ("58" é R$ 58,00) e, no modo API
 // (`consultarDevolucoes`), o modal avisa o que falta devolver de pedidos cancelados, sem travar.
+//
+// #2078: o foco abre no campo do contado e, com valor digitado, Esc e clique fora não fecham (B11/E4).
+// Três avisos diferentes (B12): `aviso` é da releitura antes de fechar e vai como veio; `erro` é a API
+// que recusou; `erroSemResposta` é a rede que caiu, quando ninguém sabe se o fechamento gravou. Nenhum
+// deles culpa o valor contado: a API nem recebe o contado como número.
 export function ModalFecharCaixa({
-  resumo, gaveta = null, aoFechar, aoConfirmar, enviando = false, erro = null, consultarDevolucoes = false,
+  resumo, gaveta = null, aoFechar, aoConfirmar, enviando = false, erro = null, erroSemResposta = false, aviso = null, consultarDevolucoes = false,
 }) {
   const esperado = gaveta ? gaveta.naGaveta : resumo.saldoEsperado
   const [centavosContado, setCentavosContado] = useState(null)
   const conferencia = conferenciaDaGaveta(centavosContado, esperado)
   const devolucoes = useDevolucoesPendentes(consultarDevolucoes)
   const avisoDevolucoes = avisoDeDevolucoesPendentes(devolucoes)
+  const falha = aviso ?? (erro && (erroSemResposta
+    ? `${erro} Não deu para saber se o fechamento foi gravado. Ao tentar de novo, o caixa é relido antes e não fecha duas vezes.`
+    : `O caixa não foi fechado. ${erro}`))
 
   return (
     <Modal
       titulo="Fechar o caixa"
       descricao={AVISO_AO_FECHAR_CAIXA}
+      focarCampo
+      segurarFechamento={centavosContado != null || enviando}
       aoFechar={() => { if (!enviando) aoFechar() }}
       rodape={(
         <>
@@ -52,44 +62,44 @@ export function ModalFecharCaixa({
         </>
       )}
     >
-      <dl className={css.resumoLista}>
-        {gaveta ? (
-          <div className={css.resumoForte}><dt>Na gaveta (dinheiro)</dt><dd>{moeda(gaveta.naGaveta)}</dd></div>
-        ) : (
-          <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{moeda(resumo.saldoEsperado)}</dd></div>
+      {/* #2078 (B12): em grade, para o aviso de devolução não colar no rótulo do campo. */}
+      <div className={css.corpoModal}>
+        <dl className={css.resumoLista}>
+          {gaveta ? (
+            <div className={css.resumoForte}><dt>Na gaveta (dinheiro)</dt><dd>{moeda(gaveta.naGaveta)}</dd></div>
+          ) : (
+            <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{moeda(resumo.saldoEsperado)}</dd></div>
+          )}
+          <div><dt>Saldo inicial</dt><dd>{moeda(resumo.saldoInicial)}</dd></div>
+          {Boolean(resumo.totalVendas) && <div><dt>Vendas</dt><dd>{moeda(resumo.totalVendas)}</dd></div>}
+          <div><dt>Outras entradas</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
+          <div><dt>Outras saídas</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
+          <div><dt>Pagamentos de pedidos</dt><dd>{moeda(resumo.totalPagamentosPedidos)}</dd></div>
+          {gaveta && <div><dt>{ROTULO_FORA_DA_GAVETA}</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>}
+          {/* #1627: pode ser dinheiro que já está na gaveta (venda do pedido entregue pelo PWA, #1630). */}
+          {Boolean(gaveta?.semForma) && <div><dt>Sem forma de pagamento (confira se é dinheiro)</dt><dd>{moeda(gaveta.semForma)}</dd></div>}
+        </dl>
+
+        {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
+        {devolucoes.estado === 'erro' && (
+          <output className={css.avisoAtencao}>Não foi possível conferir se há devolução pendente de pedido cancelado.</output>
         )}
-        <div><dt>Saldo inicial</dt><dd>{moeda(resumo.saldoInicial)}</dd></div>
-        {Boolean(resumo.totalVendas) && <div><dt>Vendas</dt><dd>{moeda(resumo.totalVendas)}</dd></div>}
-        <div><dt>Outras entradas</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
-        <div><dt>Outras saídas</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
-        <div><dt>Pagamentos de pedidos</dt><dd>{moeda(resumo.totalPagamentosPedidos)}</dd></div>
-        {gaveta && <div><dt>{ROTULO_FORA_DA_GAVETA}</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>}
-        {/* #1627: pode ser dinheiro que já está na gaveta (venda do pedido entregue pelo PWA, #1630). */}
-        {Boolean(gaveta?.semForma) && <div><dt>Sem forma de pagamento (confira se é dinheiro)</dt><dd>{moeda(gaveta.semForma)}</dd></div>}
-      </dl>
 
-      {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
-      {devolucoes.estado === 'erro' && (
-        <output className={css.avisoAtencao}>Não foi possível conferir se há devolução pendente de pedido cancelado.</output>
-      )}
+        <CampoReais
+          disabled={enviando}
+          rotulo={gaveta ? 'Quanto você contou na gaveta (só dinheiro)' : 'Quanto você contou no caixa'}
+          placeholder="Digite o que contou"
+          centavos={centavosContado}
+          ler={lerMoeda}
+          erro={moedaAltaDemais(centavosContado) ? 'Valor alto demais' : null}
+          aoMudar={setCentavosContado}
+          data-foco-inicial=""
+        />
 
-      <CampoReais
-        disabled={enviando}
-        rotulo={gaveta ? 'Quanto você contou na gaveta (só dinheiro)' : 'Quanto você contou no caixa'}
-        placeholder="Digite o que contou"
-        centavos={centavosContado}
-        ler={lerMoeda}
-        erro={moedaAltaDemais(centavosContado) ? 'Valor alto demais' : null}
-        aoMudar={setCentavosContado}
-      />
+        {falha && <p className={css.avisoFechado} role="alert">{falha}</p>}
 
-      {erro && <p className={css.avisoFechado} role="alert">Não foi possível confirmar o fechamento. {erro} Confira o valor e tente novamente.</p>}
-
-      {conferencia.pronta && (
-        <p className={css.corpoDiferenca}>
-          Diferença: <Pilula tom={conferencia.tom}>{conferencia.texto}</Pilula>
-        </p>
-      )}
+        <DiferencaDaGaveta conferencia={conferencia} className={css.corpoDiferenca} />
+      </div>
     </Modal>
   )
 }

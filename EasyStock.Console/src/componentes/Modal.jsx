@@ -20,24 +20,39 @@ import css from './Modal.module.css'
 // dentro fica por cima, sai com o foco que showModal() já dá de graça, e Esc
 // fecha só ele. A pilha de close-watcher nativa do navegador segue a mesma
 // ordem do top layer.
-export function Modal({ titulo, descricao, aoFechar, rodape, largura, className, children }) {
+//
+// #2078 (B11/E4), dois ajustes opt-in para os modais de dinheiro, sem mudar os outros:
+//   `focarCampo`: o foco vai para o campo marcado com `data-foco-inicial` (ou o primeiro campo), não
+//     para o X, que o showModal() escolhe por ser o primeiro botão. Sem rolar a página.
+//   `segurarFechamento`: com valor digitado, Esc e clique no fundo não fecham (perdiam o que ela
+//     contou). O X e o Cancelar do rodapé continuam fechando: são gestos de propósito.
+export function Modal({ titulo, descricao, aoFechar, rodape, largura, className, focarCampo = false, segurarFechamento = false, children }) {
   const id = useId()
   const dialogoRef = useRef(null)
   // Capture antes do commit: um campo com autoFocus já terá foco quando o efeito rodar.
   const focoAnterior = useRef(typeof document === 'undefined' ? null : document.activeElement)
   const aoFecharRef = useRef(aoFechar)
+  const segurarRef = useRef(segurarFechamento)
+  // Só vale na abertura, como o foco que o showModal() dá.
+  const focarCampoRef = useRef(focarCampo)
   // Grava a versão mais nova fora do corpo de render (linter: nada de ref
   // escrita durante o render), mas ainda síncrono, antes de qualquer clique.
-  useLayoutEffect(() => { aoFecharRef.current = aoFechar })
+  useLayoutEffect(() => { aoFecharRef.current = aoFechar; segurarRef.current = segurarFechamento })
 
   useEffect(() => {
     const dialogo = dialogoRef.current
     const dialogoPai = dialogo.parentElement?.closest('dialog[open]')
     if (!dialogo.open) dialogo.showModal()
+    if (focarCampoRef.current) {
+      const campo = dialogo.querySelector('[data-foco-inicial]:not(:disabled)')
+        ?? dialogo.querySelector('input:not(:disabled), select:not(:disabled), textarea:not(:disabled)')
+      campo?.focus({ preventScroll: true })
+    }
 
-    const aoCancelar = (evento) => { evento.preventDefault(); aoFecharRef.current?.() }
+    const fecharSeLivre = () => { if (!segurarRef.current) aoFecharRef.current?.() }
+    const aoCancelar = (evento) => { evento.preventDefault(); fecharSeLivre() }
     // Clique no ::backdrop chega no próprio <dialog>, nunca no conteúdo.
-    const aoClicar = (evento) => { if (evento.target === dialogo) aoFecharRef.current?.() }
+    const aoClicar = (evento) => { if (evento.target === dialogo) fecharSeLivre() }
     dialogo.addEventListener('cancel', aoCancelar)
     dialogo.addEventListener('click', aoClicar)
 
