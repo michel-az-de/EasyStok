@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using EasyStock.Application.Services.Auth;
 
 namespace EasyStock.Application.UseCases.AutenticarUsuario
 {
@@ -97,92 +98,18 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             ConcluirAsync(usuario, empresaId ?? ResolveEmpresaIdPadrao(usuario) ?? PrimeiraEmpresaAtiva(usuario),
                 empresaDoSuperAdmin: empresaId ?? empresaPadrao);
 
-        /// <summary>SuperAdmin, empresa, nível e permissões, e o último acesso. Credencial já conferida.</summary>
+        /// <summary>
+        /// Sessão pelo <see cref="ResolvedorDeSessao"/> (a regra do refresh também, #2070) e o último acesso.
+        /// Credencial já conferida.
+        /// </summary>
         private async Task<AutenticarUsuarioResult> ConcluirAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaDoSuperAdmin = null)
         {
-            // SuperAdmin: perfil global com Perfil.EmpresaId=null. Nao tem vinculo
-            // em UsuarioEmpresa, entao o fluxo padrao (que exige empresaId resolvido)
-            // deixava nivel=Visualizador como default e a tela /Auth/Login do
-            // EasyStock.Admin rejeitava o usuario com "Acesso restrito a administradores".
-            var perfilSuperAdmin = usuario.Perfis?
-                .Select(up => up.Perfil)
-                .FirstOrDefault(p => p != null && p.Nivel == NivelAcesso.SuperAdmin);
-
-            if (perfilSuperAdmin is not null)
-            {
-                var permissoesSuper = perfilSuperAdmin.Permissoes?
-                    .Select(pp => pp.Permissao)
-                    .Distinct()
-                    .ToArray() ?? [];
-
-                usuario.AtualizarUltimoAcesso();
-                await usuarioRepository.UpdateAsync(usuario);
-                await unitOfWork.CommitAsync();
-
-                return new AutenticarUsuarioResult(
-                    UsuarioId: usuario.Id,
-                    EmpresaId: empresaDoSuperAdmin,
-                    Nome: usuario.Nome,
-                    Email: usuario.Email,
-                    Nivel: NivelAcesso.SuperAdmin,
-                    Permissoes: permissoesSuper,
-                    ModuloInicial: perfilSuperAdmin.ModuloInicial,
-                    PermissoesExplicitas: perfilSuperAdmin.PermissoesExplicitas);
-            }
-
-            if (empresaId.HasValue)
-            {
-                var linkEmpresa = usuario.Empresas?.FirstOrDefault(
-                    e => e.EmpresaId == empresaId.Value && e.Ativo);
-
-                if (linkEmpresa is null)
-                    throw new CredenciaisInvalidasException();
-            }
-            // Desativar zera o vínculo, não o usuário: sem vínculo ativo não há sessão a abrir.
-            else if (usuario.Empresas?.Any(e => e.Ativo) != true)
-                throw new CredenciaisInvalidasException();
-
-            var nivel = NivelAcesso.Visualizador;
-            IReadOnlyCollection<Permissao> permissoes = [];
-            string? moduloInicial = null;
-            var permissoesExplicitas = false;
-            var sessaoPersistente = false;
-
-            if (empresaId.HasValue && usuario.Perfis is not null)
-            {
-                var perfilDaEmpresa = usuario.Perfis
-                    .Where(p => p.EmpresaId == empresaId.Value)
-                    .OrderBy(p => p.Perfil != null ? (int)p.Perfil.Nivel : int.MaxValue)
-                    .FirstOrDefault();
-
-                if (perfilDaEmpresa?.Perfil is not null)
-                {
-                    nivel = perfilDaEmpresa.Perfil.Nivel;
-                    moduloInicial = perfilDaEmpresa.Perfil.ModuloInicial;
-                    permissoesExplicitas = perfilDaEmpresa.Perfil.PermissoesExplicitas;
-                    sessaoPersistente = ResolveEmpresaIdPadrao(usuario) == empresaId
-                        && Domain.Services.PerfisCasaDaBaba.PermiteSessaoPersistente(perfilDaEmpresa.Perfil, empresaId.Value);
-                    permissoes = perfilDaEmpresa.Perfil.Permissoes?
-                        .Select(p => p.Permissao)
-                        .Distinct()
-                        .ToArray() ?? [];
-                }
-            }
+            var resultado = ResolvedorDeSessao.Resolver(usuario, empresaId, empresaDoSuperAdmin);
 
             usuario.AtualizarUltimoAcesso();
             await usuarioRepository.UpdateAsync(usuario);
             await unitOfWork.CommitAsync();
-
-            return new AutenticarUsuarioResult(
-                UsuarioId: usuario.Id,
-                EmpresaId: empresaId,
-                Nome: usuario.Nome,
-                Email: usuario.Email,
-                Nivel: nivel,
-                Permissoes: permissoes,
-                ModuloInicial: moduloInicial,
-                PermissoesExplicitas: permissoesExplicitas,
-                SessaoPersistente: sessaoPersistente);
+            return resultado;
         }
 
         /// <summary>#1781: mesmo custo e mesma resposta da senha errada, sem conferir senha real nenhuma.</summary>
@@ -193,21 +120,9 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         }
 
         private static Guid? PrimeiraEmpresaAtiva(Domain.Entities.Usuario usuario) =>
-            usuario.Empresas?
-                .Where(e => e.Ativo)
-                .OrderBy(e => e.Empresa?.Nome)
-                .Select(e => (Guid?)e.EmpresaId)
-                .FirstOrDefault();
+            ResolvedorDeSessao.PrimeiraEmpresaAtiva(usuario);
 
-        private static Guid? ResolveEmpresaIdPadrao(Domain.Entities.Usuario usuario)
-        {
-            var empresasAtivas = usuario.Empresas?
-                .Where(e => e.Ativo)
-                .Select(e => e.EmpresaId)
-                .Distinct()
-                .ToArray() ?? [];
-
-            return empresasAtivas.Length == 1 ? empresasAtivas[0] : null;
-        }
+        private static Guid? ResolveEmpresaIdPadrao(Domain.Entities.Usuario usuario) =>
+            ResolvedorDeSessao.EmpresaPadrao(usuario);
     }
 }
