@@ -1,3 +1,5 @@
+using EasyStock.Domain.Services;
+
 namespace EasyStock.Application.UseCases.PrimeirosPassos;
 
 /// <summary>Quem a pessoa é na configuração inicial da empresa do pedido (#2070).</summary>
@@ -8,8 +10,8 @@ public sealed record AutoridadeNaConfiguracao(bool EhDona, bool EhSuporteGlobal)
 }
 
 /// <summary>
-/// Lê do banco se a pessoa é dona ativa da empresa do JWT ou suporte global (#2070), nunca de claim. Regra provisória
-/// deste pacote, isolada aqui: a política de hierarquia da #2070 é dona dela e a substitui na integração.
+/// Lê do banco se a pessoa é dona ativa da empresa do JWT ou suporte global (#2070), nunca de claim, pela regra da
+/// política de hierarquia.
 /// </summary>
 public sealed class AutoridadeNaConfiguracaoInicial(IUsuarioRepository usuarios)
 {
@@ -30,14 +32,11 @@ public sealed class AutoridadeNaConfiguracaoInicial(IUsuarioRepository usuarios)
             throw new UseCaseValidationException(CodigoHierarquia, $"Só a dona da loja ou o suporte pode {acao} a configuração inicial.");
     }
 
-    /// <summary>Dona ativa: marca de dona, vínculo e conta ativos e perfil de nível Admin nesta empresa.</summary>
+    /// <summary>Dona ativa pela mesma regra da hierarquia (<see cref="ParticipanteDaHierarquia.EhDonaAtiva"/>).</summary>
     private static bool EhDonaAtiva(Usuario? usuario, Guid empresaId) =>
-        usuario is { Ativo: true }
-        && usuario.Empresas.Any(v => v.EmpresaId == empresaId && v.Ativo && v.EhDona)
-        && usuario.Perfis.Any(up => up.EmpresaId == empresaId && up.Perfil is { Nivel: NivelAcesso.Admin });
+        usuario is not null && ParticipanteDaHierarquia.De(usuario, empresaId, EhSuporteGlobal(usuario)).EhDonaAtiva;
 
-    /// <summary>Suporte global: perfil de nível SuperAdmin sem empresa (perfil da empresa com esse nível não conta).</summary>
+    /// <summary>Suporte global: perfil global de suporte (<see cref="Perfil.EhSuporteGlobal"/>) numa conta ativa.</summary>
     private static bool EhSuporteGlobal(Usuario? usuario) =>
-        usuario is { Ativo: true }
-        && usuario.Perfis.Any(up => up.Perfil is { Nivel: NivelAcesso.SuperAdmin, EmpresaId: null });
+        usuario is { Ativo: true } && usuario.EhSuperAdmin();
 }

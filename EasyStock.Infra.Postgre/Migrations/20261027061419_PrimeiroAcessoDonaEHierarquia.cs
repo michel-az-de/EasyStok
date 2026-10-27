@@ -5,7 +5,7 @@
 namespace EasyStock.Infra.Postgre.Migrations
 {
     /// <inheritdoc />
-    public partial class ConfiguracaoInicial : Migration
+    public partial class PrimeiroAcessoDonaEHierarquia : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -16,6 +16,12 @@ namespace EasyStock.Infra.Postgre.Migrations
                 type: "boolean",
                 nullable: false,
                 defaultValue: false);
+
+            migrationBuilder.AddColumn<Guid>(
+                name: "EmpresaDaSessaoId",
+                table: "refresh_tokens",
+                type: "uuid",
+                nullable: true);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "ConfiguracaoInicialAdiadaEm",
@@ -91,6 +97,10 @@ ALTER TABLE configuracao_inicial_passos DISABLE ROW LEVEL SECURITY;
             migrationBuilder.DropColumn(
                 name: "EhDona",
                 table: "usuarios_empresas");
+
+            migrationBuilder.DropColumn(
+                name: "EmpresaDaSessaoId",
+                table: "refresh_tokens");
 
             migrationBuilder.DropColumn(
                 name: "ConfiguracaoInicialAdiadaEm",
