@@ -265,7 +265,8 @@ await confere('#1966 Devoluções mostra o valor a devolver do pedido cancelado'
   assert.doesNotMatch(textoADevolver({ comOnline: false }), /online/, 'mandava ao estorno online que esta tela não mostra')
   assert.match(textoADevolver({ comOnline: false }), /devolução manual/)
   assert.match(bloco, /const comOnline = dados\?\.pagamentos\.some\(\(p\) => !p\.manual\) \?\? false/)
-  assert.match(bloco, /\{comOnline && <EstornosOnline pedidoId=\{pedidoId\} \/>\}/)
+  // #2079 (C4): o EstornosOnline ganhou o aviso de mudança (`aoAlterado`); continua só com pagamento online.
+  assert.match(bloco, /\{comOnline && <EstornosOnline pedidoId=\{pedidoId\} aoAlterado=\{mudou\} \/>\}/)
   assert.match(bloco, /\{aDevolver > 0 && <output className=\{css\.corpoBloco\}><strong>A devolver: \{moeda\(aDevolver\)\}<\/strong>\. \{textoADevolver\(\{ comOnline \}\)\}<\/output>\}/)
   const caso = readFileSync(new URL('../../EasyStock.Application/UseCases/Pedidos/Cobranca/ConsultarEstornosManuaisUseCase.cs', import.meta.url), 'utf8')
   assert.match(caso, /IReadOnlyList<PedidoEstornoManual> Estornos, decimal ADevolver = 0m\)/, 'o contrato da API mudou')

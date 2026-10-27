@@ -4,7 +4,8 @@ import { CampoSelecao, CampoTexto } from './Campo'
 import { Modal } from './Modal'
 import css from './ModalFrete.module.css'
 
-const moeda = (centavos) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100)
+// Dinheiro em centavos: quem formata é `dominio/formato.js` (#2080), que chega pelo controlador porque
+// `componentes` não importa `dominio`.
 const horario = (valor) => valor ? new Date(valor).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : ''
 const NOMES = { uber: 'Uber Direct', uber_direct: 'Uber Direct', lalamove: 'Lalamove', '99': '99 Entrega', '99entrega': '99 Entrega', manual: 'Entregador combinado', em_maos: 'Entrega em mãos' }
 const nome = (provedor) => NOMES[provedor] ?? provedor
@@ -92,7 +93,7 @@ function Conteudo({ controlador: c }) {
         dica="Valor combinado por telefone ou em outro aplicativo, inclusive 99, Uber ou Lalamove. Entrega em mãos tem custo zero."
         onChange={(e) => c.mudarValorManual(e.target.value)} />}
       <div className={css.linha}><Botao variante="primario" disabled={c.ocupado || !elegiveis || (c.incluirManual && c.valorManual !== '' && (!Number.isFinite(Number(c.valorManual)) || Number(c.valorManual) < 0 || Number(c.valorManual) > 1000))} onClick={c.cotar}>Comparar transportes</Botao>
-        {c.contexto.politica?.automatico && <Botao disabled={c.ocupado || !elegiveis} onClick={c.automatico}>Escolher e contratar até {moeda(c.contexto.politica.tetoCentavos)}</Botao>}
+        {c.contexto.politica?.automatico && <Botao disabled={c.ocupado || !elegiveis} onClick={c.automatico}>Escolher e contratar até {c.moeda(c.contexto.politica.tetoCentavos)}</Botao>}
         {!elegiveis && <span className={css.apoio}>Selecione de 1 a 15 pedidos sem transporte contratado e confira os requisitos indicados em cada pedido.</span>}</div>
       </section>
     </details>
@@ -104,7 +105,7 @@ function Conteudo({ controlador: c }) {
         <strong>{nome(q.provedor)}</strong>
         {q.simulado && <span className={css.apoio}>Cotação simulada</span>}
         {q.indisponibilidade ? <p>{q.indisponibilidade}</p> : <>
-          <span className={css.preco}>{moeda(q.valorCentavos)}</span>
+          <span className={css.preco}>{c.moeda(q.valorCentavos)}</span>
           <span>{['manual', 'em_maos'].includes(q.provedor) ? 'Horário combinado por você' : `${q.duracaoMinutos} min estimados`}</span>
           <span className={css.apoio}>Válida até {horario(q.expiraEm)}</span>
           {q.valorCentavos === menor && <span className={css.apoio}>Menor custo disponível</span>}
@@ -114,7 +115,7 @@ function Conteudo({ controlador: c }) {
     </section>}
     {c.escolhida && <section className={css.confirmacao} aria-label="Confirmar contratação">
       <h3>Confirmar {nome(c.escolhida.provedor)}</h3>
-      <p>{c.escolhida.pedidoIds.length} {c.escolhida.pedidoIds.length === 1 ? 'pedido' : 'pedidos'} · <strong>{moeda(c.escolhida.valorCentavos)}</strong></p>
+      <p>{c.escolhida.pedidoIds.length} {c.escolhida.pedidoIds.length === 1 ? 'pedido' : 'pedidos'} · <strong>{c.moeda(c.escolhida.valorCentavos)}</strong></p>
       <ol className={css.historico} aria-label="Ordem das entregas">{c.escolhida.pedidoIds.map((id) => {
         const p = todos.find((pedido) => pedido.id === id)
         return <li key={id}>{p ? `${p.numero} · ${p.cliente} · ${p.endereco}` : 'Pedido selecionado'}</li>
@@ -147,7 +148,7 @@ function Despacho({ despacho: d, controlador: c }) {
     else await c.evento(d.id, acao, motivo.trim() || null)
   }
   return <article className={css.viagem} data-despacho-id={d.id}>
-    <div className={css.linha}><strong className={css.cresce}>{nome(d.provedor)} · {SITUACOES[d.status] ?? d.status}</strong><strong>{moeda(d.valorCentavos)}</strong></div>
+    <div className={css.linha}><strong className={css.cresce}>{nome(d.provedor)} · {SITUACOES[d.status] ?? d.status}</strong><strong>{c.moeda(d.valorCentavos)}</strong></div>
     <div className={css.trilha} aria-hidden="true"><span style={{ width: d.status === 'entregue' ? '100%' : d.status === 'a_caminho' ? '60%' : '15%' }} /></div>
     <p className={css.apoio}>{d.pedidoIds.length} {d.pedidoIds.length === 1 ? 'pedido' : 'pedidos'} · {d.pago ? 'Pagamento registrado no caixa' : 'Pagamento ainda não registrado'}{d.simulado ? ' · Serviço simulado' : ''}</p>
     {d.status === 'entregue' && <p className={css.sucesso}>Entrega concluída.</p>}
@@ -166,7 +167,7 @@ function Despacho({ despacho: d, controlador: c }) {
     </div>
     {acao && !(acao === 'pagamento' && d.pago) && !(acao === d.status) && <form className={css.confirmacao} onSubmit={confirmar}>
       <h3>{acao === 'pagamento' ? 'Registrar valor já pago ao transportador' : SITUACOES[acao]}</h3>
-      {acao === 'pagamento' ? <><p>Será registrada uma saída de {moeda(d.valorCentavos)} no caixa. Confirme apenas depois de pagar.</p>
+      {acao === 'pagamento' ? <><p>Será registrada uma saída de {c.moeda(d.valorCentavos)} no caixa. Confirme apenas depois de pagar.</p>
         <div className={css.formulario}><CampoSelecao rotulo="Meio usado" value={meio} disabled={c.ocupado} onChange={(e) => setMeio(e.target.value)} opcoes={[{ valor: 'pix', rotulo: 'Pix' }, { valor: 'dinheiro', rotulo: 'Dinheiro' }, { valor: 'credito', rotulo: 'Cartão de crédito' }, { valor: 'debito', rotulo: 'Cartão de débito' }, { valor: 'transferencia', rotulo: 'Transferência' }, { valor: 'outro', rotulo: 'Outro' }]} />
           <CampoTexto rotulo="Referência do pagamento" value={referencia} maxLength={120} required disabled={c.ocupado} onChange={(e) => setReferencia(e.target.value)} /></div></>
         : <><CampoTexto rotulo="Motivo ou observação" value={motivo} maxLength={500} required={['falha', 'devolvendo', 'cancelado'].includes(acao)} disabled={c.ocupado} onChange={(e) => setMotivo(e.target.value)} />
