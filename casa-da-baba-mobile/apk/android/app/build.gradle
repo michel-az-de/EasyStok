@@ -1,6 +1,23 @@
 apply plugin: 'com.android.application'
 
 def appVersion = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+// FirebaseInitProvider consumes these documented resources; no extra Gradle plugin is needed.
+// https://firebase.google.com/docs/android/google-services-plugin-and-file
+def firebaseFile = file('google-services.json')
+if (!firebaseFile.isFile()) throw new GradleException('google-services.json do projeto Firebase dedicado está ausente.')
+def firebaseConfig = new groovy.json.JsonSlurper().parse(firebaseFile)
+def firebaseClient = firebaseConfig.client.find { it.client_info?.android_client_info?.package_name == 'com.casadababa.piloto' }
+if (!firebaseClient) throw new GradleException('google-services.json não contém o pacote com.casadababa.piloto.')
+def firebaseResources = [
+    google_app_id: firebaseClient.client_info.mobilesdk_app_id,
+    gcm_defaultSenderId: firebaseConfig.project_info.project_number,
+    google_api_key: firebaseClient.api_key?.find { it.current_key }?.current_key,
+    project_id: firebaseConfig.project_info.project_id
+]
+firebaseResources.each { name, value ->
+    if (!(value instanceof String) || !(value ==~ /[A-Za-z0-9:_-]+/))
+        throw new GradleException("Configuração pública Firebase inválida: ${name}")
+}
 android {
     namespace "com.casadababa.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -11,6 +28,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersion.versionCode as int
         versionName appVersion.version
+        firebaseResources.each { name, value -> resValue 'string', name, value }
     }
     signingConfigs {
         release {
@@ -38,5 +56,6 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
+    implementation 'com.google.firebase:firebase-messaging:25.0.2'
 }
 apply from: 'capacitor.build.gradle'

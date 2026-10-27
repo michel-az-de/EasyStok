@@ -23,7 +23,46 @@
     return { status, pairing, queue, rail: status + (pending > 0 ? ' · ' + pending + ' pendente' + (pending === 1 ? '' : 's') : '') };
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus };
+  function otaStatusText(state) {
+    if (state.pendingVersion) return 'Versão ' + state.pendingVersion + ' preparada. Será aplicada na próxima abertura do app. Seu trabalho atual continua aberto.';
+    if (state.rolledBack) return 'A versão anterior foi recuperada. Seus pedidos e sua produção foram preservados.';
+    if (state.lastError) return 'A atualização não foi concluída. A versão atual foi mantida; tente verificar novamente quando houver conexão.';
+    return 'Conteúdo ' + state.activeVersion + '. Novas versões são preparadas automaticamente ao abrir ou retomar o app.';
+  }
+
+  async function confirmOtaHealth(environment, appConfig, updater) {
+    if (!environment.cdbSync?.localReady) throw new Error('Inicialização local indisponível.');
+    if (environment.document && environment.document.readyState !== 'complete') {
+      await new Promise(resolve => environment.addEventListener('load', resolve, { once: true }));
+    }
+    const health = await environment.cdbSync.localReady;
+    for (const name of ['etqAbrirImprimir', 'etqImpImprimir', 'etqEditorAbrir', 'initEditor']) {
+      if (typeof environment[name] !== 'function') throw new Error('Módulos de etiquetas indisponíveis.');
+    }
+    if (health?.ready !== true) throw new Error('Armazenamento local não confirmado.');
+    const state = environment.cdbApp?.getState?.();
+    for (const key of ['products', 'clients', 'orders', 'cashEntries', 'batches', 'cashClosings']) {
+      if (!Array.isArray(state?.[key])) throw new Error('Dados locais indisponíveis.');
+    }
+    const storage = environment.localStorage;
+    if (storage.getItem('cdb-schema-version') !== String(appConfig.dataSchemaVersion)) throw new Error('Versão dos dados incompatível.');
+    for (const key of ['cdb-products', 'cdb-clients', 'cdb-orders', 'cdb-cash', 'cdb-batches', 'cdb-cash-closings']) {
+      const value = storage.getItem(key);
+      if (value !== null && !Array.isArray(JSON.parse(value))) throw new Error('Dados locais inválidos.');
+    }
+    // Testa escrita sem sobrescrever dados operacionais, inclusive com armazenamento cheio.
+    const key = 'cdb-ota-health-probe';
+    const previous = storage.getItem(key);
+    try {
+      storage.setItem(key, appConfig.bundleVersion);
+      if (storage.getItem(key) !== appConfig.bundleVersion) throw new Error('Escrita local não confirmada.');
+    } finally {
+      if (previous === null) storage.removeItem(key); else storage.setItem(key, previous);
+    }
+    await updater.ready({ bundleVersion: appConfig.bundleVersion });
+  }
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth };
   if (!root.document || !root.CDB_CONFIG?.isPilot) return;
   const config = root.CDB_CONFIG;
   const doc = root.document;
@@ -32,6 +71,7 @@
   let health = 'checking';
   let checkingUpdate = false;
   const native = () => root.Capacitor?.Plugins?.PilotApp;
+  const updater = () => root.Capacitor?.Plugins?.PilotUpdater;
   const rail = doc.createElement('div');
   rail.className = 'pilot-rail';
   rail.innerHTML = '<button type="button" id="pilotHomeButton">Casa da Baba <span>Piloto</span></button><span id="pilotRailStatus" role="status">Conferindo conexão</span>';
@@ -61,6 +101,7 @@
       </div>
       <p id="pilotPairHint" class="pilot-hint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p>
       <details class="pilot-help"><summary>O que funciona sem conexão?</summary><p>O cadastro local de produtos e pedidos, a produção e o histórico ficam neste aparelho. Após o primeiro pareamento, as alterações aguardam a conexão para sincronizar. A impressão exige uma impressora compatível conectada.</p><p>Frete, cobrança online, envio pelo atendimento e IA precisam de conexão com o EasyStok. Uma mensagem preparada ou um pedido salvo no aparelho ainda não confirmam envio nem pagamento.</p></details>
+      <details class="pilot-help"><summary>Atualizações e recuperação</summary><p id="pilotOtaStatus" role="status">A atualização automática de conteúdo está disponível no APK Android.</p><p id="pilotPushStatus" role="status"></p><p>O app guarda a versão anterior do conteúdo. Voltar a ela preserva os pedidos, a produção e a fila de envio. O Atendimento online segue a versão publicada no EasyStok.</p><button type="button" id="pilotRollback" data-action="rollback" hidden>Voltar à versão anterior</button></details>
       <div class="pilot-update"><span id="pilotVersion"></span><button type="button" id="pilotUpdateButton" data-action="update">Verificar atualização</button></div>
       <p id="pilotUpdateStatus" class="pilot-feedback" role="status" tabindex="-1"></p>
       <button type="button" id="pilotDownload" data-action="download" hidden>Baixar atualização</button>
@@ -74,6 +115,7 @@
     home.showModal();
     doc.getElementById('pilotTitle').focus();
     refreshHealth();
+    refreshOtaStatus();
   }
   function closeHome() { home.close(); }
   function showError(message) {
@@ -117,6 +159,33 @@
     const target = result?.paired ? doc.getElementById('pilotConnection') : button;
     target.focus(); target.scrollIntoView({ block: 'nearest' });
   }
+  function showOtaStatus(state) {
+    doc.getElementById('pilotOtaStatus').textContent = otaStatusText(state);
+    doc.getElementById('pilotRollback').hidden = !state.canRollback || !!state.pendingVersion;
+    doc.getElementById('pilotPushStatus').textContent = state.pushSubscribed
+      ? 'Canal de atualização conectado. O Android pode adiar o recebimento em economia de bateria. A verificação ao abrir continua disponível.'
+      : state.pushError ? 'O canal de atualização ainda não conectou. A verificação ao abrir continua disponível.' : 'Conectando o canal de atualização…';
+  }
+  async function refreshOtaStatus() {
+    if (!updater()) return;
+    try { showOtaStatus(await updater().status()); } catch { /* Uma falha de consulta não interrompe a operação. */ }
+  }
+  async function rollbackContent() {
+    if (!updater() || !root.confirm('Preparar a versão anterior para a próxima abertura? Os pedidos e a produção serão preservados.')) return;
+    const button = doc.getElementById('pilotRollback');
+    button.disabled = true;
+    try { showOtaStatus(await updater().rollback()); }
+    finally { button.disabled = false; }
+  }
+  async function startUpdater() {
+    if (!updater()) return;
+    try {
+      await confirmOtaHealth(root, config, updater());
+      showOtaStatus(await updater().check());
+    } catch {
+      doc.getElementById('pilotOtaStatus').textContent = 'Não foi possível confirmar a atualização. Se esta for uma versão nova, a anterior será recuperada na próxima abertura.';
+    }
+  }
   async function checkUpdate() {
     openHome();
     if (checkingUpdate) return;
@@ -129,6 +198,10 @@
     message.textContent = 'Conferindo a versão disponível…';
     message.focus(); message.scrollIntoView({ block: 'nearest' });
     try {
+      if (updater()) {
+        try { showOtaStatus(await updater().check()); }
+        catch { doc.getElementById('pilotOtaStatus').textContent = 'Não foi possível preparar a atualização de conteúdo. A versão atual foi mantida.'; }
+      }
       let data;
       const http = root.Capacitor?.Plugins?.CapacitorHttp;
       if (root.Capacitor?.isNativePlatform?.() && http) {
@@ -170,6 +243,7 @@
       if (action === 'reconnect') await refreshHealth();
       if (action === 'update') await checkUpdate();
       if (action === 'download') await downloadUpdate();
+      if (action === 'rollback') await rollbackContent();
     } catch (error) {
       openHome();
       showError(error.message || 'Não foi possível abrir. Tente novamente.');
@@ -185,5 +259,6 @@
   root.addEventListener('cdb-sync-success', showConnection);
   root.addEventListener('cdb-operator-ready', openHome);
   root.forceCheckUpdate = checkUpdate;
+  startUpdater();
   if (root.cdbApp?.getOperator?.()?.trim()) openHome();
 })(typeof window !== 'undefined' ? window : globalThis);

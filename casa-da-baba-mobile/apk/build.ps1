@@ -1,11 +1,22 @@
 [CmdletBinding()]
-param([string]$NodePath='', [string]$JavaHome=$env:JAVA_HOME, [string]$AndroidSdk=$env:ANDROID_HOME, [string]$ApiBaseUrl='https://api.easystok.online', [string]$SigningDirectory=$env:CDB_SIGNING_DIR, [switch]$InitializeSigning, [switch]$AllowDirty)
+param([string]$NodePath='', [string]$JavaHome=$env:JAVA_HOME, [string]$AndroidSdk=$env:ANDROID_HOME, [string]$ApiBaseUrl='https://api.easystok.online', [string]$SigningDirectory=$env:CDB_SIGNING_DIR, [switch]$InitializeSigning, [switch]$AllowDirty, [string]$FirebaseConfigPath='C:\rep\keystores\casa-da-baba-piloto\google-services.json')
 $ErrorActionPreference='Stop'
 $apkRoot=$PSScriptRoot
 $utf8=[Text.UTF8Encoding]::new($false)
 $sourceDirty = [bool](git -C $apkRoot status --porcelain)
 if ($sourceDirty -and -not $AllowDirty) { throw 'Worktree suja. Faça commit ou use -AllowDirty apenas para validação local.' }
 if (-not $SigningDirectory) { $SigningDirectory='C:\rep\keystores\casa-da-baba-piloto' }
+if (-not (Test-Path -LiteralPath $FirebaseConfigPath -PathType Leaf)) { throw 'Configuração Firebase ausente. Informe -FirebaseConfigPath com o arquivo oficial do projeto casa-da-baba-app.' }
+try { $firebaseConfig=Get-Content -LiteralPath $FirebaseConfigPath -Raw | ConvertFrom-Json } catch { throw 'Configuração Firebase JSON inválida.' }
+$firebaseClient=$firebaseConfig.client | Where-Object { $_.client_info.android_client_info.package_name -eq 'com.casadababa.piloto' } | Select-Object -First 1
+if ($firebaseConfig.project_info.project_id -ne 'casa-da-baba-app' -or -not $firebaseClient) { throw 'A configuração Firebase deve pertencer ao projeto casa-da-baba-app e ao pacote com.casadababa.piloto.' }
+$firebaseApiKey=($firebaseClient.api_key | Select-Object -First 1).current_key
+if ([string]::IsNullOrWhiteSpace($firebaseConfig.project_info.project_number) -or [string]::IsNullOrWhiteSpace($firebaseClient.client_info.mobilesdk_app_id) -or $firebaseApiKey -notmatch '^AIza[0-9A-Za-z_-]{35}$') { throw 'Configuração Firebase incompleta ou com valores de exemplo. Use o google-services.json oficial.' }
+$firebaseConfigSha256=(Get-FileHash -LiteralPath $FirebaseConfigPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$firebaseDestination=Join-Path $apkRoot 'android\app\google-services.json'
+if ([IO.Path]::GetFullPath($FirebaseConfigPath) -ne [IO.Path]::GetFullPath($firebaseDestination)) { Copy-Item -LiteralPath $FirebaseConfigPath -Destination $firebaseDestination -Force }
+if ((Get-FileHash -LiteralPath $firebaseDestination -Algorithm SHA256).Hash.ToLowerInvariant() -ne $firebaseConfigSha256) { throw 'A cópia da configuração Firebase divergiu da origem.' }
+
 if (-not $NodePath) { $command=Get-Command node -ErrorAction SilentlyContinue; if ($command) { $NodePath=$command.Source } }
 if (-not (Test-Path -LiteralPath $NodePath -PathType Leaf)) { throw 'Informe -NodePath para node.exe.' }
 if (-not $JavaHome) {
@@ -81,6 +92,8 @@ try {
         sourceDirty=$sourceDirty
         builtAt=[DateTime]::UtcNow.ToString('o')
         apiBaseUrl=$ApiBaseUrl
+        firebaseProjectId=$firebaseConfig.project_info.project_id
+        firebaseConfigSha256=$firebaseConfigSha256
     }
     [IO.File]::WriteAllText("$outputApk.json",($metadata|ConvertTo-Json),$utf8)
     Write-Output "APK assinado e verificado: $outputApk"
