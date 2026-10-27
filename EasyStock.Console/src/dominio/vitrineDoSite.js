@@ -2,8 +2,10 @@
 //
 // O PUT de `configuracao` trata nulo como "não muda", mas o grupo de marca (subtítulo, logo, cor,
 // WhatsApp de pedidos e mensagem de fora da área) é gravado inteiro quando qualquer um deles vem
-// (`Storefront.AtualizarBranding`): o que vier nulo é apagado. Por isso o corpo leva sempre os cinco,
-// e o que a tela não mostra (logo e mensagem de fora da área) vai exatamente como veio.
+// não nulo (`Storefront.AtualizarBranding`): o que vier nulo é apagado, e vazio limpa. Se os cinco
+// vierem nulos, a API pula a marca e responde 200 sem mudar nada. Por isso o corpo leva sempre os
+// cinco, o subtítulo vai sempre como texto (vazio quando não há) para o grupo nunca chegar todo
+// nulo, e o que a tela não mostra (logo e mensagem de fora da área) vai exatamente como veio.
 import { LIMITE_MOEDA_CENTAVOS, mascaraTelefone } from './formato.js'
 
 export const LIMITES_DO_SITE = { tituloPublico: 120, slug: 40, subtituloPublico: 240, corPrimaria: 7, whatsappPedidos: 20 }
@@ -74,7 +76,7 @@ export function errosDoSite(form, config) {
 }
 
 const marcaComoVeio = (config) => ({
-  subtituloPublico: config?.subtituloPublico ?? null,
+  subtituloPublico: config?.subtituloPublico ?? '',
   logoUrl: config?.logoUrl ?? null,
   corPrimaria: config?.corPrimaria ?? null,
   whatsappPedidos: config?.whatsappPedidos ?? null,
@@ -84,12 +86,13 @@ const marcaComoVeio = (config) => ({
 export function corpoDoSite(config, form) {
   const corpo = marcaComoVeio(config)
   const texto = (campo) => String(form[campo] ?? '').trim()
-  if (mudou(form, config, 'subtituloPublico')) corpo.subtituloPublico = texto('subtituloPublico') || null
-  // Cor vazia volta para a cor padrão do site; a API recusa texto vazio nela.
+  if (mudou(form, config, 'subtituloPublico')) corpo.subtituloPublico = texto('subtituloPublico')
+  // Cor vazia volta para a cor padrão do site; a API recusa texto vazio nela, mas aceita nulo.
   if (mudou(form, config, 'corPrimaria')) corpo.corPrimaria = texto('corPrimaria') || null
+  // WhatsApp apagado vai vazio: nulo seria "não muda" se fosse o único campo de marca preenchido.
   if (mudou(form, config, 'whatsappPedidos')) {
     const digitos = digitosDoWhatsApp(form.whatsappPedidos)
-    corpo.whatsappPedidos = digitos ? mascaraTelefone(digitos) : null
+    corpo.whatsappPedidos = digitos ? mascaraTelefone(digitos) : ''
   }
   if (mudou(form, config, 'pedidoMinimoCentavos')) corpo.pedidoMinimoEntrega = (form.pedidoMinimoCentavos ?? 0) / 100
   if (mudou(form, config, 'freteGratisCentavos') && form.freteGratisCentavos !== null) corpo.freteGratisAcima = form.freteGratisCentavos / 100
@@ -98,6 +101,13 @@ export function corpoDoSite(config, form) {
 
 // O logo novo vai com a marca como está gravada: uma edição ainda não salva não sai junto.
 export const corpoDoLogoNoSite = (config, logoUrl) => ({ ...marcaComoVeio(config), logoUrl })
+
+// O logo que sai nos impressos: o da loja e, sem ele, o do site (`PedidoImpressoQueries.ObterCasaAsync`).
+export const logoDosImpressos = (logoDaLoja, logoDoSite) => logoDaLoja || logoDoSite || null
+
+// A Impressão troca só o logo da loja (e o upload apaga o anterior): o site pode ficar apontando
+// para outro arquivo, ou para nenhum, enquanto os impressos já usam o da loja.
+export const siteComOutroLogo = (logoDaLoja, logoDoSite) => Boolean(logoDaLoja) && logoDaLoja !== (logoDoSite || null)
 
 export function motivoDoArquivoDeLogo(arquivo) {
   if (!TIPOS_DE_LOGO.includes(arquivo?.type)) return 'Escolha uma imagem PNG ou JPG.'

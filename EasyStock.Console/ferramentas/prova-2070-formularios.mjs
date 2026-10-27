@@ -280,11 +280,28 @@ await provar('A2 site: endereço válido, corpo do PUT reenvia o que a tela não
   }, 'o grupo de marca é gravado inteiro: o que a tela não mostra vai exatamente como veio')
   for (const proibido of ['ativo', 'dominioCustom', 'lojaPadraoId', 'modeloFiscal', 'habilitarNfeAutomatica', 'tituloPublico']) assert.equal(proibido in corpo, false, proibido)
   assert.deepEqual(d.corpoDoSite(config, { ...form, pedidoMinimoCentavos: 2550, freteGratisCentavos: 15000 }), {
-    subtituloPublico: null, logoUrl: '/uploads/logo-antigo.png', corPrimaria: '#8b1e3f', whatsappPedidos: '11999990000',
+    subtituloPublico: '', logoUrl: '/uploads/logo-antigo.png', corPrimaria: '#8b1e3f', whatsappPedidos: '11999990000',
     mensagemForaArea: 'Ainda não chegamos aí', pedidoMinimoEntrega: 25.5, freteGratisAcima: 150,
-  })
+  }, 'subtítulo sem valor vai vazio: o grupo de marca nunca chega todo nulo')
   assert.equal(d.corpoDoSite(config, { ...form, corPrimaria: '' }).corPrimaria, null, 'cor apagada volta à cor padrão do site')
   assert.equal(d.corpoDoSite(config, { ...form, whatsappPedidos: '11987654321' }).whatsappPedidos, '(11) 98765-4321')
+  // A API só grava a marca se um dos cinco vier não nulo (EditarStorefrontAdminUseCase); vazio limpa.
+  const soWhatsApp = { ...config, subtituloPublico: null, logoUrl: null, corPrimaria: null, whatsappPedidos: '(11) 99999-0000', mensagemForaArea: null }
+  assert.deepEqual(d.corpoDoSite(soWhatsApp, { ...d.formularioDoSite(soWhatsApp), whatsappPedidos: '' }), {
+    subtituloPublico: '', logoUrl: null, corPrimaria: null, whatsappPedidos: '', mensagemForaArea: null,
+  }, 'apagar o único WhatsApp manda vazio, e a marca é gravada')
+  const soCor = { ...soWhatsApp, whatsappPedidos: null, corPrimaria: '#8b1e3f' }
+  assert.deepEqual(d.corpoDoSite(soCor, { ...d.formularioDoSite(soCor), corPrimaria: '' }), {
+    subtituloPublico: '', logoUrl: null, corPrimaria: null, whatsappPedidos: null, mensagemForaArea: null,
+  }, 'voltar a única cor para a padrão: cor nula (a API recusa vazio) e o subtítulo vazio faz a marca ser gravada')
+  assert.equal(d.corpoDoSite({ ...config, subtituloPublico: 'Massas' }, { ...form, subtituloPublico: '  ' }).subtituloPublico, '', 'subtítulo apagado vai vazio')
+  assert.equal(d.logoDosImpressos('/uploads/loja.png', '/uploads/site.png'), '/uploads/loja.png', 'os impressos usam o logo da loja antes do do site')
+  assert.equal(d.logoDosImpressos(null, '/uploads/site.png'), '/uploads/site.png')
+  assert.equal(d.logoDosImpressos('', ''), null)
+  assert.equal(d.siteComOutroLogo('/uploads/loja.png', '/uploads/site.png'), true)
+  assert.equal(d.siteComOutroLogo('/uploads/loja.png', null), true)
+  assert.equal(d.siteComOutroLogo('/uploads/loja.png', '/uploads/loja.png'), false)
+  assert.equal(d.siteComOutroLogo(null, '/uploads/site.png'), false, 'sem logo na loja não há o que levar ao site')
   assert.deepEqual(d.errosDoSite({ ...form, corPrimaria: 'vermelho', whatsappPedidos: '123' }, config), {
     corPrimaria: 'Use o código da cor, como #8B1E3F.', whatsappPedidos: 'Informe o WhatsApp com DDD.',
   })
@@ -295,7 +312,7 @@ await provar('A2 site: endereço válido, corpo do PUT reenvia o que a tela não
   })
   assert.deepEqual(d.errosDoSite(form, config), {})
   assert.deepEqual(d.corpoDoLogoNoSite(config, '/uploads/novo.png'), {
-    subtituloPublico: null, logoUrl: '/uploads/novo.png', corPrimaria: '#8b1e3f', whatsappPedidos: '11999990000', mensagemForaArea: 'Ainda não chegamos aí',
+    subtituloPublico: '', logoUrl: '/uploads/novo.png', corPrimaria: '#8b1e3f', whatsappPedidos: '11999990000', mensagemForaArea: 'Ainda não chegamos aí',
   })
   assert.equal(d.motivoDoArquivoDeLogo({ type: 'image/gif', size: 10 }), 'Escolha uma imagem PNG ou JPG.')
   assert.equal(d.motivoDoArquivoDeLogo({ type: 'image/png', size: 5 * 1024 * 1024 + 1 }), 'A imagem não pode ser maior que 5 MB.')
@@ -442,12 +459,31 @@ await provar('A5 avisos: cada aviso bate com o catálogo da API e com os avisos 
 
 // --- B. Montagem com a API simulada -------------------------------------------------------------------
 
-const LOJA = { id: 'l1', empresaId: 'emp-1', nome: 'Casa da Baba', ativa: true, logoUrl: null, descricao: 'Massas', documento: null, endereco: 'Rua A, 10', telefone: '(11) 3456-7890' }
+// A loja como `GET api/lojas` devolve hoje (`LojaResult`). A prova abaixo confere os nomes contra o
+// record: quando o backend passar a devolver os 5 campos, esta fixture e o cartão só leitura mudam.
+const LOJA = { id: 'l1', empresaId: 'emp-1', nome: 'Casa da Baba', ativa: true, logoUrl: null }
+// Só para o caminho de edição, que depende de o `LojaResult` ganhar descrição, documento, endereço e telefone.
+const LOJA_COM_OS_CINCO = { ...LOJA, descricao: 'Massas', documento: null, endereco: 'Rua A, 10', telefone: '(11) 3456-7890' }
 const LOJAS = '/api/lojas?empresaId=emp-1'
 
-await provar('B1 dados da loja: um cartão por loja ativa; editar avisa pendência; salvar reenvia os 5 campos no PUT', async () => {
+await provar('B1 dados da loja: a fixture LOJA é a forma real do LojaResult, e com ela cada cartão é só leitura', async () => {
+  const record = readFileSync(new URL('EasyStock.Application/UseCases/Loja/LojaResult.cs', raizDoRepo), 'utf8')
+  const parametros = record.match(/record LojaResult\(([^)]*)\)/)[1].split(',')
+    .map((parte) => parte.trim().split('=')[0].trim().split(/\s+/).at(-1))
+    .map((nome) => nome[0].toLowerCase() + nome.slice(1))
+  assert.deepEqual(Object.keys(LOJA), parametros, 'LOJA tem exatamente os campos que a API devolve')
   const { AbaDadosDaLoja } = await carregar('features/gestao/loja/AbaDadosDaLoja.jsx')
-  responder('GET', LOJAS, { dados: [LOJA, { ...LOJA, id: 'l2', nome: 'Fechada', ativa: false }] })
+  responder('GET', LOJAS, { dados: [LOJA] })
+  const { raiz, aoMudarPendencia } = await montar(AbaDadosDaLoja)
+  assert.equal(formularios(raiz).length, 0, 'com a leitura de hoje não há o que salvar sem apagar')
+  assert.match(texto(raiz.arvore), /Estes dados ainda não podem ser editados aqui; fale com o suporte\./)
+  assert.deepEqual(aoMudarPendencia.chamadas, [])
+  assert.equal(escritas().length, 0)
+})
+
+await provar('B1 dados da loja (quando a leitura trouxer os 5 campos): um cartão por loja ativa; editar avisa pendência; salvar reenvia os 5 no PUT', async () => {
+  const { AbaDadosDaLoja } = await carregar('features/gestao/loja/AbaDadosDaLoja.jsx')
+  responder('GET', LOJAS, { dados: [LOJA_COM_OS_CINCO, { ...LOJA_COM_OS_CINCO, id: 'l2', nome: 'Fechada', ativa: false }] })
   responder('PUT', '/api/lojas/l1', { status: 204 })
   const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaDadosDaLoja)
   assert.equal(andar(raiz.arvore).filter((n) => n.props?.rotulo === 'Nome da loja').length, 1, 'só a loja ativa')
@@ -467,7 +503,7 @@ await provar('B1 dados da loja: um cartão por loja ativa; editar avisa pendênc
 
 await provar('B1 dados da loja: erro da API em português e a edição fica; sem os 5 campos na leitura não deixa apagar', async () => {
   const { AbaDadosDaLoja } = await carregar('features/gestao/loja/AbaDadosDaLoja.jsx')
-  responder('GET', LOJAS, { dados: [LOJA] })
+  responder('GET', LOJAS, { dados: [LOJA_COM_OS_CINCO] })
   responder('PUT', '/api/lojas/l1', { status: 400, erro: { code: 'VALIDACAO', message: 'Requisição inválida', detail: 'Nome da loja é obrigatório.' } })
   const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaDadosDaLoja)
   mudar(raiz, 'Endereço', 'Rua B, 20')
@@ -478,7 +514,7 @@ await provar('B1 dados da loja: erro da API em português e a edição fica; sem
   assert.equal(aoSalvo.chamadas.length, 0)
 
   rede.rotas = []; rede.chamadas = []
-  responder('GET', LOJAS, { dados: [{ id: 'l1', empresaId: 'emp-1', nome: 'Casa da Baba', ativa: true, logoUrl: null }] })
+  responder('GET', LOJAS, { dados: [LOJA] })
   const curta = await montar(AbaDadosDaLoja)
   assert.deepEqual(rotulos(curta.raiz), [], 'sem a leitura completa nenhum campo aparece vazio, como se não existisse')
   assert.equal(botao(curta.raiz, 'Salvar dados da loja'), undefined)
@@ -492,7 +528,7 @@ await provar('B1 dados da loja: erro da API em português e a edição fica; sem
 
 await provar('B1 dados da loja: sair da tela com a edição aberta avisa que a pendência acabou', async () => {
   const { AbaDadosDaLoja } = await carregar('features/gestao/loja/AbaDadosDaLoja.jsx')
-  responder('GET', LOJAS, { dados: [LOJA] })
+  responder('GET', LOJAS, { dados: [LOJA_COM_OS_CINCO] })
   const { raiz, aoMudarPendencia } = await montar(AbaDadosDaLoja)
   mudar(raiz, 'Telefone', '(11) 98765-4321')
   assert.deepEqual(aoMudarPendencia.chamadas, [true])
@@ -507,19 +543,36 @@ const CONFIG_SITE = {
   dominioCustom: 'casadababa.com', modeloFiscal: 'manual', nfeAutomaticaHabilitada: false, lojaPadraoId: 'l1', ativo: true,
 }
 const PROIBIDOS = /ativar|desativar|publicar|domínio|dominio|fora da área|loja padrão|fiscal|nota fiscal|nf-?e/i
+// O PUT de `configuracao` como a API faz (EditarStorefrontAdminUseCase e Storefront.AtualizarBranding):
+// nulo não muda; a marca só é gravada se um dos cinco vier não nulo, e aí os cinco ficam como vieram.
+const MARCA_DO_SITE = ['subtituloPublico', 'logoUrl', 'corPrimaria', 'whatsappPedidos', 'mensagemForaArea']
+const putDoSite = (gravado, corpo) => {
+  const novo = { ...gravado }
+  if (MARCA_DO_SITE.some((c) => corpo[c] != null)) for (const c of MARCA_DO_SITE) novo[c] = corpo[c] == null ? null : String(corpo[c]).trim()
+  if (corpo.pedidoMinimoEntrega != null) novo.pedidoMinimoEntrega = corpo.pedidoMinimoEntrega
+  if (corpo.freteGratisAcima != null) novo.freteGratisAcima = corpo.freteGratisAcima
+  return novo
+}
+const VITRINE = { dados: { storefrontId: 's1', slug: 'casa-da-baba', tituloPublico: 'Casa da Baba', ativo: true } }
+const PUT_DO_SITE = '/api/minha-vitrine/configuracao'
+const previaDoLogo = (raiz) => andar(raiz.arvore).find((n) => n.type === 'img')
 
-await provar('B2 site: sem site oferece criar com nome e endereço; criar faz POST e mostra a configuração', async () => {
+await provar('B2 site: sem site oferece criar com nome e código; criar faz POST e mostra a configuração', async () => {
   const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
   let criado = false
   responder('GET', '/api/minha-vitrine', () => (criado ? { dados: { storefrontId: 's1', slug: 'casa-da-baba', tituloPublico: 'Casa da Baba', ativo: false } } : { status: 404, erro: { code: 'NAO_ENCONTRADO', message: 'Sua vitrine ainda não foi criada.' } }))
   responder('GET', '/api/minha-vitrine/configuracao', { dados: { ...CONFIG_SITE, ativo: false } })
+  responder('GET', LOJAS, { dados: [LOJA] })
   responder('POST', '/api/minha-vitrine', () => { criado = true; return { status: 201, dados: { storefrontId: 's1', slug: 'casa-da-baba' } } })
   const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaSiteEImpressos)
-  assert.deepEqual(rotulos(raiz), ['Nome do site', 'Endereço do site'])
+  assert.deepEqual(rotulos(raiz), ['Nome do site', 'Código do site'])
+  assert.doesNotMatch(todoTexto(raiz), /endereço|link do site/i, 'o código não é o link que o cliente abre')
   assert.match(texto(raiz.arvore), /O site nasce fora do ar: quem coloca no ar é o suporte\./, 'criar não promete site no ar')
   mudar(raiz, 'Nome do site', 'Casa da Babá')
   assert.equal(aoMudarPendencia.chamadas.at(-1), true)
-  assert.equal(campo(raiz, 'Endereço do site').props.value, 'casa-da-baba', 'o endereço nasce do nome enquanto ela não mexe nele')
+  assert.match(texto(raiz.arvore), /Alterações não salvas\. Crie o site ou apague o que digitou antes de sair\./)
+  assert.doesNotMatch(texto(raiz.arvore), /desfaça/, 'a criação não tem botão de desfazer')
+  assert.equal(campo(raiz, 'Código do site').props.value, 'casa-da-baba', 'o código nasce do nome enquanto ela não mexe nele')
   await enviar(raiz)
   assert.deepEqual(chamadasDe('POST', '/api/minha-vitrine').map((c) => c.corpo), [{ tituloPublico: 'Casa da Babá', slug: 'casa-da-baba' }])
   assert.equal(aoSalvo.chamadas.length, 1)
@@ -531,14 +584,17 @@ await provar('B2 site: sem site oferece criar com nome e endereço; criar faz PO
 
 await provar('B2 site: mostra só os campos do passo e o PUT reenvia o grupo de marca inteiro', async () => {
   const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
-  responder('GET', '/api/minha-vitrine', { dados: { storefrontId: 's1', slug: 'casa-da-baba', tituloPublico: 'Casa da Baba', ativo: true } })
+  responder('GET', '/api/minha-vitrine', VITRINE)
   responder('GET', '/api/minha-vitrine/configuracao', { dados: CONFIG_SITE })
-  responder('PUT', '/api/minha-vitrine/configuracao', ({ corpo }) => ({ dados: { ...CONFIG_SITE, ...corpo } }))
+  responder('GET', LOJAS, { dados: [LOJA] })
+  responder('PUT', PUT_DO_SITE, ({ corpo }) => ({ dados: putDoSite(CONFIG_SITE, corpo) }))
   const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaSiteEImpressos)
   assert.deepEqual(rotulos(raiz), ['WhatsApp de pedidos', 'Subtítulo', 'Cor principal', 'Pedido mínimo para entrega', 'Frete grátis acima de'])
   assert.doesNotMatch(todoTexto(raiz), PROIBIDOS, 'nada de ativar o site, domínio, mensagem de fora da área, loja padrão ou fiscal')
   assert.doesNotMatch(todoTexto(raiz), /Ainda não chegamos aí|casadababa\.com/, 'o valor dos campos fora do passo não aparece')
   assert.match(texto(raiz.arvore), /No ar: os clientes já abrem o site\./)
+  const identificacao = andar(raiz.arvore).find((n) => n.type === 'p' && /casa-da-baba/.test(texto(n)))
+  assert.equal(texto(identificacao), 'Site “Casa da Baba”, código casa-da-baba. O nome e o código ficam como foram criados.')
   // Só o WhatsApp e o logo mudam algo hoje (impressos); o resto fica guardado e a tela diz isso.
   assert.match(campo(raiz, 'WhatsApp de pedidos').props.dica, /Sai nos impressos dos pedidos\./)
   const aviso = andar(raiz.arvore).find((n) => /ficam guardados/.test(texto(n)) && n.props?.id)
@@ -567,7 +623,7 @@ await provar('B2 site: um envio de logo grava o da loja e depois o do site, sem 
   responder('GET', '/api/minha-vitrine/configuracao', { dados: CONFIG_SITE })
   responder('GET', LOJAS, { dados: [LOJA] })
   responder('POST', '/api/uploads/loja/logo?lojaId=l1', { dados: { url: '/uploads/lojas/emp-1/l1/logo/novo.png' } })
-  responder('PUT', '/api/minha-vitrine/configuracao', ({ corpo }) => ({ dados: { ...CONFIG_SITE, ...corpo } }))
+  responder('PUT', PUT_DO_SITE, ({ corpo }) => ({ dados: putDoSite(CONFIG_SITE, corpo) }))
   const { raiz, aoMudarPendencia } = await montar(AbaSiteEImpressos)
   mudar(raiz, 'Subtítulo', 'Ainda pensando')
   const arquivo = andar(raiz.arvore).find((n) => n.type === 'input' && n.props?.type === 'file')
@@ -585,6 +641,8 @@ await provar('B2 site: um envio de logo grava o da loja e depois o do site, sem 
   assert.equal(campo(raiz, 'Subtítulo').props.value, 'Ainda pensando', 'a edição continua na tela')
   assert.equal(aoMudarPendencia.chamadas.at(-1), true)
   assert.match(texto(raiz.arvore), /Logo salvo/)
+  assert.equal(previaDoLogo(raiz).props.src, '/uploads/lojas/emp-1/l1/logo/novo.png', 'a prévia é o logo novo')
+  assert.doesNotMatch(texto(raiz.arvore), /O site ainda não usa este logo/, 'loja e site ficaram iguais')
 
   const gif = { target: { files: [new File([new Uint8Array(10)], 'logo.gif', { type: 'image/gif' })], value: 'x' } }
   await andar(raiz.arvore).find((n) => n.type === 'input' && n.props?.type === 'file').props.onChange(gif)
@@ -602,7 +660,7 @@ await provar('B2 site: logo e Salvar o site não correm juntos; o logo conta com
   responder('GET', '/api/minha-vitrine/configuracao', () => ({ dados: gravado }))
   responder('GET', LOJAS, { dados: [LOJA] })
   responder('POST', '/api/uploads/loja/logo?lojaId=l1', () => segurar('upload', () => ({ dados: { url: '/uploads/lojas/emp-1/l1/logo/novo.png' } })))
-  responder('PUT', '/api/minha-vitrine/configuracao', ({ corpo }) => { gravado = { ...gravado, ...corpo }; return { dados: gravado } })
+  responder('PUT', PUT_DO_SITE, ({ corpo }) => { gravado = putDoSite(gravado, corpo); return { dados: gravado } })
   const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaSiteEImpressos)
   const formularioDoSite = () => formularios(raiz).find((f) => texto(f).includes('Salvar o site'))
   const arquivo = () => andar(raiz.arvore).find((n) => n.type === 'input' && n.props?.type === 'file')
@@ -631,7 +689,7 @@ await provar('B2 site: logo e Salvar o site não correm juntos; o logo conta com
   assert.equal(aoMudarPendencia.chamadas.at(-1), false)
 
   rede.rotas = rede.rotas.filter((r) => r.metodo !== 'PUT')
-  responder('PUT', '/api/minha-vitrine/configuracao', ({ corpo }) => segurar('salvar', () => { gravado = { ...gravado, ...corpo }; return { dados: gravado } }))
+  responder('PUT', PUT_DO_SITE, ({ corpo }) => segurar('salvar', () => { gravado = putDoSite(gravado, corpo); return { dados: gravado } }))
   mudar(raiz, 'Cor principal', '#000000')
   const salvando = formularioDoSite().props.onSubmit({ preventDefault() {} })
   await raiz.atualizar()
@@ -644,14 +702,125 @@ await provar('B2 site: logo e Salvar o site não correm juntos; o logo conta com
 
 await provar('B2 site: sair da tela com a edição aberta avisa que a pendência acabou', async () => {
   const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
-  responder('GET', '/api/minha-vitrine', { dados: { storefrontId: 's1', slug: 'casa-da-baba', tituloPublico: 'Casa da Baba', ativo: true } })
+  responder('GET', '/api/minha-vitrine', VITRINE)
   responder('GET', '/api/minha-vitrine/configuracao', { dados: CONFIG_SITE })
+  responder('GET', LOJAS, { dados: [LOJA] })
   const { raiz, aoMudarPendencia } = await montar(AbaSiteEImpressos)
   mudar(raiz, 'Subtítulo', 'Massas frescas')
   assert.deepEqual(aoMudarPendencia.chamadas, [true])
   raiz.desmontar()
   assert.deepEqual(aoMudarPendencia.chamadas, [true, false])
   assert.equal(escritas().length, 0)
+})
+
+await provar('B2 site: apagar o único WhatsApp ou voltar a única cor para a padrão grava de verdade', async () => {
+  const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
+  const semMarca = { ...CONFIG_SITE, subtituloPublico: null, logoUrl: null, corPrimaria: null, whatsappPedidos: null, mensagemForaArea: null }
+  let gravado = { ...semMarca, whatsappPedidos: '(11) 99999-0000' }
+  responder('GET', '/api/minha-vitrine', VITRINE)
+  responder('GET', '/api/minha-vitrine/configuracao', () => ({ dados: gravado }))
+  responder('GET', LOJAS, { dados: [LOJA] })
+  responder('PUT', PUT_DO_SITE, ({ corpo }) => { gravado = putDoSite(gravado, corpo); return { dados: gravado } })
+  const doSite = (raiz) => formularios(raiz).find((f) => texto(f).includes('Salvar o site'))
+  const whats = await montar(AbaSiteEImpressos)
+  mudar(whats.raiz, 'WhatsApp de pedidos', '')
+  await enviar(whats.raiz, doSite(whats.raiz))
+  assert.equal(gravado.whatsappPedidos, '', 'o número saiu da vitrine e dos impressos')
+  assert.equal(campo(whats.raiz, 'WhatsApp de pedidos').props.value, '', 'o campo não volta preenchido')
+  assert.equal(whats.aoSalvo.chamadas.length, 1)
+  whats.raiz.desmontar()
+
+  gravado = { ...semMarca, corPrimaria: '#8b1e3f' }
+  const cor = await montar(AbaSiteEImpressos)
+  mudar(cor.raiz, 'Cor principal', '')
+  await enviar(cor.raiz, doSite(cor.raiz))
+  assert.equal(gravado.corPrimaria, null, 'a cor voltou para a padrão')
+  assert.equal(campo(cor.raiz, 'Cor principal').props.value, '')
+  assert.equal(cor.aoMudarPendencia.chamadas.at(-1), false)
+})
+
+await provar('B2 site: site sem nome começa a frase com maiúscula e não chama o código de endereço', async () => {
+  const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
+  responder('GET', '/api/minha-vitrine', VITRINE)
+  responder('GET', '/api/minha-vitrine/configuracao', { dados: { ...CONFIG_SITE, tituloPublico: null } })
+  responder('GET', LOJAS, { dados: [LOJA] })
+  const { raiz } = await montar(AbaSiteEImpressos)
+  const identificacao = andar(raiz.arvore).find((n) => n.type === 'p' && /casa-da-baba/.test(texto(n)))
+  assert.equal(texto(identificacao), 'Site sem nome, código casa-da-baba. O nome e o código ficam como foram criados.')
+  assert.doesNotMatch(todoTexto(raiz), /endereço/i)
+})
+
+const LOGO_A = '/uploads/lojas/emp-1/l1/logo/a.png'
+const LOGO_B = '/uploads/lojas/emp-1/l1/logo/b.png'
+
+await provar('B2 site: depois de trocar o logo pela Impressão, a prévia é o da loja e o site pode passar a usá-lo', async () => {
+  const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
+  // A Impressão gravou o B só na loja; o site ainda aponta para o A, que o upload apagou.
+  let gravado = { ...CONFIG_SITE, logoUrl: LOGO_A }
+  responder('GET', '/api/minha-vitrine', VITRINE)
+  responder('GET', '/api/minha-vitrine/configuracao', () => ({ dados: gravado }))
+  responder('GET', LOJAS, { dados: [{ ...LOJA, logoUrl: LOGO_B }] })
+  responder('PUT', PUT_DO_SITE, ({ corpo }) => { gravado = putDoSite(gravado, corpo); return { dados: gravado } })
+  const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaSiteEImpressos)
+  assert.equal(previaDoLogo(raiz).props.src, LOGO_B, 'a prévia é o logo que sai nos impressos')
+  assert.match(texto(raiz.arvore), /O site ainda não usa este logo\./)
+  mudar(raiz, 'Subtítulo', 'Ainda pensando')
+  await clicar(raiz, 'Usar este logo no site')
+  assert.deepEqual(chamadasDe('PUT', PUT_DO_SITE).map((c) => c.corpo), [{
+    subtituloPublico: 'Massas', logoUrl: LOGO_B, corPrimaria: '#8b1e3f', whatsappPedidos: '(11) 99999-0000', mensagemForaArea: 'Ainda não chegamos aí',
+  }], 'só o logo muda; a edição aberta não vai junto')
+  assert.equal(chamadasDe('POST', /uploads/).length, 0, 'nenhum arquivo sobe de novo')
+  assert.equal(gravado.logoUrl, LOGO_B)
+  assert.doesNotMatch(texto(raiz.arvore), /O site ainda não usa este logo/)
+  assert.equal(botao(raiz, 'Usar este logo no site'), undefined)
+  assert.match(texto(raiz.arvore), /O site agora usa o mesmo logo dos impressos\./)
+  assert.equal(aoSalvo.chamadas.length, 1)
+  assert.equal(campo(raiz, 'Subtítulo').props.value, 'Ainda pensando')
+  assert.equal(aoMudarPendencia.chamadas.at(-1), true)
+})
+
+await provar('B2 site: loja com logo e site sem logo mostra o da loja; sem logo nenhum pede o envio; iguais não avisam', async () => {
+  const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
+  const cenario = async (logoDaLoja, logoDoSite) => {
+    rede.rotas = []; rede.chamadas = []
+    responder('GET', '/api/minha-vitrine', VITRINE)
+    responder('GET', '/api/minha-vitrine/configuracao', { dados: { ...CONFIG_SITE, logoUrl: logoDoSite } })
+    responder('GET', LOJAS, { dados: [{ ...LOJA, logoUrl: logoDaLoja }] })
+    return (await montar(AbaSiteEImpressos)).raiz
+  }
+  const soNaLoja = await cenario(LOGO_B, null)
+  assert.equal(previaDoLogo(soNaLoja).props.src, LOGO_B, 'os impressos já saem com o logo da loja')
+  assert.doesNotMatch(texto(soNaLoja.arvore), /O logo aparece aqui depois do envio/)
+  assert.match(texto(soNaLoja.arvore), /O site ainda não usa este logo\./)
+  assert.ok(botao(soNaLoja, 'Usar este logo no site'))
+  soNaLoja.desmontar()
+
+  const nenhum = await cenario(null, null)
+  assert.equal(previaDoLogo(nenhum), undefined)
+  assert.match(texto(nenhum.arvore), /O logo aparece aqui depois do envio\./)
+  assert.equal(botao(nenhum, 'Usar este logo no site'), undefined)
+  nenhum.desmontar()
+
+  const iguais = await cenario(LOGO_B, LOGO_B)
+  assert.equal(previaDoLogo(iguais).props.src, LOGO_B)
+  assert.doesNotMatch(texto(iguais.arvore), /O site ainda não usa este logo/)
+  assert.equal(botao(iguais, 'Usar este logo no site'), undefined)
+  assert.equal(escritas().length, 0, 'ler não grava nada')
+})
+
+await provar('B2 site: com duas lojas ativas a tela diz para qual vai o logo', async () => {
+  const { AbaSiteEImpressos } = await carregar('features/gestao/vitrine/AbaSiteEImpressos.jsx')
+  responder('GET', '/api/minha-vitrine', VITRINE)
+  responder('GET', '/api/minha-vitrine/configuracao', { dados: CONFIG_SITE })
+  responder('GET', LOJAS, { dados: [LOJA, { ...LOJA, id: 'l2', nome: 'Quiosque' }] })
+  const { raiz } = await montar(AbaSiteEImpressos)
+  assert.match(texto(raiz.arvore), /Esta empresa tem 2 lojas ativas: o logo vai para Casa da Baba\./)
+  rede.rotas = []
+  responder('GET', '/api/minha-vitrine', VITRINE)
+  responder('GET', '/api/minha-vitrine/configuracao', { dados: CONFIG_SITE })
+  responder('GET', LOJAS, { dados: [LOJA] })
+  const uma = await montar(AbaSiteEImpressos)
+  assert.doesNotMatch(texto(uma.raiz.arvore), /lojas ativas/)
 })
 
 await provar('B3 alertas de estoque: a loja da empresa, sem moeda, fuso nem KDS, e PATCH só do que mudou', async () => {
@@ -661,6 +830,8 @@ await provar('B3 alertas de estoque: a loja da empresa, sem moeda, fuso nem KDS,
   responder('GET', '/api/configuracoes?empresaId=emp-1&lojaId=l1', { dados: config })
   responder('PATCH', '/api/configuracoes', ({ corpo }) => ({ dados: { ...config, ...corpo } }))
   const { raiz, aoMudarPendencia, aoSalvo } = await montar(AbaAlertasDeEstoque)
+  assert.equal(texto(andar(raiz.arvore).find((n) => n.type === 'h3')), 'Alertas de estoque · Casa da Baba', 'a tela diz de qual loja são os alertas')
+  assert.doesNotMatch(texto(raiz.arvore), /lojas ativas/, 'com uma loja só não há aviso')
   assert.deepEqual(rotulos(raiz), ['Validade próxima (dias)', 'Produto parado (dias sem saída)', 'Quantidade mínima padrão', 'Quantidade crítica padrão', 'Ordem de saída do estoque'])
   assert.doesNotMatch(todoTexto(raiz), /moeda|fuso|KDS|conta a receber|conta a pagar|restaurar|padrão de fábrica/i)
   mudar(raiz, 'Quantidade crítica padrão', '10')
@@ -675,6 +846,15 @@ await provar('B3 alertas de estoque: a loja da empresa, sem moeda, fuso nem KDS,
   assert.equal(aoSalvo.chamadas.length, 1)
   assert.equal(aoMudarPendencia.chamadas.at(-1), false)
   assert.equal(campo(raiz, 'Validade próxima (dias)').props.value, '15')
+})
+
+await provar('B3 alertas de estoque: com duas lojas ativas a tela avisa que valem só para uma', async () => {
+  const { AbaAlertasDeEstoque } = await carregar('features/gestao/estoque/AbaAlertasDeEstoque.jsx')
+  responder('GET', LOJAS, { dados: [LOJA, { ...LOJA, id: 'l2', nome: 'Quiosque' }, { ...LOJA, id: 'l3', nome: 'Fechada', ativa: false }] })
+  responder('GET', '/api/configuracoes?empresaId=emp-1&lojaId=l1', { dados: { lojaId: 'l1', diasAlertaValidade: 7, diasAlertaParado: 30, quantidadeMinimaPadrao: 10, quantidadeCriticaPadrao: 3, fifoAtivo: true } })
+  const { raiz } = await montar(AbaAlertasDeEstoque, { compacto: true })
+  assert.equal(texto(andar(raiz.arvore).find((n) => n.type === 'h3')), 'Alertas · Casa da Baba')
+  assert.match(texto(raiz.arvore), /Esta empresa tem 2 lojas ativas: estes alertas valem só para Casa da Baba\./)
 })
 
 await provar('B4 caderno: explica o uso, cria, edita e remove trechos pelas rotas do caderno', async () => {
@@ -709,6 +889,8 @@ await provar('B4 caderno: explica o uso, cria, edita e remove trechos pelas rota
   assert.equal(campo(raiz, 'Texto').props.value, 'Entregamos até 5 km.')
   mudar(raiz, 'Texto', 'Entregamos até 7 km.')
   assert.equal(aoMudarPendencia.chamadas.at(-1), true)
+  assert.match(texto(raiz.arvore), /Alterações não salvas\. Salve ou cancele antes de sair\./)
+  assert.doesNotMatch(texto(raiz.arvore), /desfaça/, 'a edição do trecho tem Cancelar, não Desfazer')
   await enviar(raiz)
   assert.deepEqual(chamadasDe('PUT', '/api/atendimento/caderno/t1').map((c) => c.corpo), [{ titulo: 'Entrega', texto: 'Entregamos até 7 km.', palavrasChave: 'entrega, frete', nucleo: true }])
   assert.equal(aoSalvo.chamadas.length, 2)
@@ -753,6 +935,23 @@ await provar('B4 caderno: cancelar devolve o foco, remoção que falha fala da r
   assert.equal(aoSalvo.chamadas.length, 0)
 })
 
+await provar('B4 caderno: enquanto remove, a tela diz "Removendo…", não "Salvando…"', async () => {
+  const { AbaCadernoDoAgente } = await carregar('features/gestao/caderno/AbaCadernoDoAgente.jsx')
+  responder('GET', '/api/atendimento/caderno', { dados: [{ id: 't1', codigo: 't1', titulo: 'Entrega', texto: 'Até 5 km.', palavrasChave: '', nucleo: false, arquivado: false }] })
+  let soltar
+  responder('POST', '/api/atendimento/caderno/t1/arquivar?arquivado=true', () => new Promise((resolver) => { soltar = () => resolver({ dados: {} }) }))
+  const { raiz } = await montar(AbaCadernoDoAgente)
+  await clicar(raiz, 'Remover: Entrega')
+  const remocao = botao(raiz, 'Remover do caderno').props.onClick()
+  await raiz.atualizar()
+  assert.match(texto(raiz.arvore), /Removendo…/)
+  assert.doesNotMatch(texto(raiz.arvore), /Salvando…/)
+  soltar()
+  await remocao
+  await raiz.atualizar()
+  assert.match(texto(raiz.arvore), /Trecho removido do caderno\./)
+})
+
 await provar('B4 caderno: núcleo acima do teto não envia e o erro da API aparece', async () => {
   const { AbaCadernoDoAgente } = await carregar('features/gestao/caderno/AbaCadernoDoAgente.jsx')
   responder('GET', '/api/atendimento/caderno', { dados: [{ id: 't1', codigo: 't1', titulo: 'Grande', texto: 'x'.repeat(5800), palavrasChave: '', nucleo: true, arquivado: false }] })
@@ -791,13 +990,15 @@ await provar('B5 avisos: só leitura do que chega e por onde; ligar neste aparel
   await clicar(doApp.raiz, 'Desativar avisos neste aparelho')
   assert.equal(desligou, 1)
 
-  // Sem a ativação do App, a aba não cria outra: aponta para o sino e não toca no navegador nem na API.
+  // Sem a ativação do App (hoje o App não põe `aparelho` no contexto de acesso: depende do pacote de
+  // registro), a aba não cria outra e não manda tocar num sino que pode estar atrás desta tela.
   const tocou = []
   g.push = new Proxy({}, { get: (_, nome) => () => { tocou.push(nome); throw new Error(`push.${String(nome)} não devia ser chamado`) } })
   g.acesso = { acoes: {} }
   const solta = await montar(AbaAvisos)
   assert.equal(botao(solta.raiz, 'Ativar avisos neste aparelho'), undefined)
-  assert.match(texto(solta.raiz.arvore), /Para ligar os avisos neste aparelho, toque no sino de Avisos no topo da tela\./)
+  assert.match(texto(solta.raiz.arvore), /Ligar os avisos neste aparelho não está disponível nesta tela\. Ao sair dela, use o sino de Avisos no topo do Console\./)
+  assert.doesNotMatch(texto(solta.raiz.arvore), /toque no sino/, 'não aponta para um sino que talvez não esteja à vista')
   assert.deepEqual(tocou, [])
   assert.deepEqual(rede.chamadas, [], 'nem conferir nem inscrever de novo')
   for (const aviso of AVISOS_DA_DONA) assert.match(texto(solta.raiz.arvore), new RegExp(aviso.titulo))
@@ -818,6 +1019,11 @@ await provar('B6 entregadores: o cadastro extraído avisa pendência e chama a m
   assert.equal(aoSalvo.chamadas.length, 1)
   assert.equal(aoMudarPendencia.chamadas.at(-1), false)
   assert.match(texto(raiz.arvore), /Entregador cadastrado/)
+  await clicar(raiz, 'Desativar')
+  assert.equal(aoSalvo.chamadas.length, 2, 'desativar grava na API: quem montou fica sabendo')
+  acoes.desativarEntregador = async () => false
+  await clicar(raiz, 'Desativar')
+  assert.equal(aoSalvo.chamadas.length, 2, 'desativação recusada não conta como salvo')
   const conteudo = fonte('features/entregas/ConteudoEntregasApi.jsx')
   assert.match(conteudo, /import \{ CadastroEntregadores \} from '\.\/CadastroEntregadores'/)
   assert.match(conteudo, /\{aba === 'entregadores' && <CadastroEntregadores entregadores=\{entregadores\} ocupado=\{ocupado\} acoes=\{acoes\} \/>\}/)

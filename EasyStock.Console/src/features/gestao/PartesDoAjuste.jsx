@@ -3,14 +3,15 @@
 import { Botao } from '../../componentes/Botao'
 import css from './formularioDeAjuste.module.css'
 
-export function Pendencia({ visivel }) {
-  return <output className={visivel ? css.pendencia : 'sr'}>{visivel ? 'Alterações não salvas. Salve ou desfaça antes de sair.' : ''}</output>
+// `acao` diz o que fazer com os botões que a tela tem (Desfazer, Cancelar ou só o de criar).
+export function Pendencia({ visivel, acao = 'Salve ou desfaça antes de sair.' }) {
+  return <output className={visivel ? css.pendencia : 'sr'}>{visivel ? `Alterações não salvas. ${acao}` : ''}</output>
 }
 
-// O erro da API nunca some calado: fica ao lado do botão até a próxima edição. `falhou` diz qual
-// ação não deu certo quando ela não foi um "Salvar" (remover um trecho, por exemplo).
-export function Retorno({ situacao, salvo = 'Salvo no EasyStok.', falhou = null }) {
-  if (situacao.estado === 'salvando') return <output className={css.retorno}>Salvando…</output>
+// O erro da API nunca some calado: fica ao lado do botão até a próxima edição. `falhou` e
+// `andamento` dizem qual ação está em curso ou não deu certo quando ela não é um "Salvar".
+export function Retorno({ situacao, salvo = 'Salvo no EasyStok.', falhou = null, andamento = 'Salvando…' }) {
+  if (situacao.estado === 'salvando') return <output className={css.retorno}>{andamento}</output>
   if (situacao.estado === 'salvo') return <output className={css.retorno}>{salvo}</output>
   if (situacao.estado === 'erro') {
     return (

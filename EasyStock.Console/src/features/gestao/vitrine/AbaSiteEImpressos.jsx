@@ -5,19 +5,23 @@
 // Hoje só o WhatsApp e o logo mudam algo (impressos): o resto fica guardado e a tela diz isso.
 import { useId, useRef, useState } from 'react'
 import { useEnvio, useLeitura, usePendenciaAvisada } from '../../../aplicacao/formularioDeAjuste'
-import { carregarSite, criarSite, enviarLogoDoSite, salvarSite, urlDoLogo } from '../../../aplicacao/siteEImpressos'
+import {
+  carregarSite, criarSite, enviarLogoDoSite, salvarSite, urlDoLogo, usarLogoDaLojaNoSite,
+} from '../../../aplicacao/siteEImpressos'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { CampoReais } from '../../../componentes/CampoReais'
 import { lerMoeda } from '../../../dominio/formato'
 import {
-  EXEMPLO_DE_COR, LIMITES_DO_SITE, TIPOS_DE_LOGO, errosDaCriacao, errosDoSite, formularioDoSite, motivoDoArquivoDeLogo, siteMudou,
-  sugerirEnderecoDoSite,
+  EXEMPLO_DE_COR, LIMITES_DO_SITE, TIPOS_DE_LOGO, errosDaCriacao, errosDoSite, formularioDoSite, logoDosImpressos, motivoDoArquivoDeLogo,
+  siteComOutroLogo, siteMudou, sugerirEnderecoDoSite,
 } from '../../../dominio/vitrineDoSite'
 import { Erros, FalhaDeLeitura, Pendencia, Retorno } from '../PartesDoAjuste'
 import css from '../formularioDeAjuste.module.css'
 
-const ROTULOS_DA_CRIACAO = { tituloPublico: 'Nome do site', slug: 'Endereço do site' }
+// O site dos clientes acha a vitrine por este código (o `slug`); o link que o cliente abre é o
+// domínio do site, que esta tela não mostra.
+const ROTULOS_DA_CRIACAO = { tituloPublico: 'Nome do site', slug: 'Código do site' }
 const ROTULOS_DO_SITE = {
   subtituloPublico: 'Subtítulo', corPrimaria: 'Cor principal', whatsappPedidos: 'WhatsApp de pedidos',
   pedidoMinimoCentavos: 'Pedido mínimo para entrega', freteGratisCentavos: 'Frete grátis acima de',
@@ -31,11 +35,12 @@ export function AbaSiteEImpressos({ aoMudarPendencia, aoSalvo, compacto = false 
 
   if (carga.estado === 'carregando') return <output className={css.descricao}>Carregando o site…</output>
   if (carga.estado === 'erro') return <FalhaDeLeitura mensagem={`O site não carregou: ${carga.mensagem}`} aoTentarDeNovo={recarregar} />
-  const { vitrine, configuracao } = carga.dados
+  const { vitrine, configuracao, loja, totalDeLojas } = carga.dados
   if (!vitrine) {
     return <CriarSite compacto={compacto} aoMudarPendencia={setCriacaoPendente} aoCriado={() => { aoSalvo?.(); return recarregar() }} />
   }
-  return <ConfigurarSite compacto={compacto} configuracao={configuracao} aoMudarPendencia={setSitePendente} aoSalvo={aoSalvo} />
+  return <ConfigurarSite compacto={compacto} configuracao={configuracao} loja={loja} totalDeLojas={totalDeLojas}
+    aoMudarPendencia={setSitePendente} aoSalvo={aoSalvo} />
 }
 
 const CRIACAO_VAZIA = { tituloPublico: '', slug: '' }
@@ -78,15 +83,15 @@ function CriarSite({ compacto, aoMudarPendencia, aoCriado }) {
   return (
     <form className={css.secao} aria-labelledby={`${id}-titulo`} onSubmit={criar}>
       <h3 id={`${id}-titulo`}>{compacto ? 'Criar o site' : 'A loja ainda não tem site'}</h3>
-      {!compacto && <p className={css.descricao}>Escolha o nome e o endereço. Os dois ficam assim depois de criados.</p>}
+      {!compacto && <p className={css.descricao}>Escolha o nome e o código. Os dois ficam assim depois de criados.</p>}
       <p className={css.descricao}>O site nasce fora do ar: quem coloca no ar é o suporte.</p>
-      <Pendencia visivel={pendente && !salvando} />
+      <Pendencia visivel={pendente && !salvando} acao="Crie o site ou apague o que digitou antes de sair." />
       <fieldset className={css.campos} disabled={salvando}>
         <legend className="sr">Novo site</legend>
         <CampoTexto rotulo={ROTULOS_DA_CRIACAO.tituloPublico} required maxLength={LIMITES_DO_SITE.tituloPublico}
           dica="Aparece no topo do site." value={form.tituloPublico} onChange={mudarNome} />
         <CampoTexto rotulo={ROTULOS_DA_CRIACAO.slug} required maxLength={LIMITES_DO_SITE.slug} autoCapitalize="none" spellCheck={false}
-          dica="Parte final do link do site: letras minúsculas, números e hífen." value={form.slug} onChange={mudarEndereco} />
+          dica="O site dos clientes acha a loja por este código: letras minúsculas, números e hífen." value={form.slug} onChange={mudarEndereco} />
       </fieldset>
       <Erros erros={erros} rotulos={ROTULOS_DA_CRIACAO} />
       <div className={css.acoes}>
@@ -97,9 +102,11 @@ function CriarSite({ compacto, aoMudarPendencia, aoCriado }) {
   )
 }
 
-function ConfigurarSite({ compacto, configuracao, aoMudarPendencia, aoSalvo }) {
+function ConfigurarSite({ compacto, configuracao, loja, totalDeLojas, aoMudarPendencia, aoSalvo }) {
   const id = useId()
   const [gravado, setGravado] = useState(configuracao)
+  // O logo da loja é o que os impressos usam; a aba Impressão pode trocá-lo sem passar pelo site.
+  const [logoDaLoja, setLogoDaLoja] = useState(loja?.logoUrl ?? null)
   // O logo lê a marca gravada depois do upload, não a da renderização em que o arquivo foi escolhido.
   const gravadoRef = useRef(configuracao)
   const gravar = (config) => { gravadoRef.current = config; setGravado(config) }
@@ -142,8 +149,9 @@ function ConfigurarSite({ compacto, configuracao, aoMudarPendencia, aoSalvo }) {
     limpar()
   }
 
-  function logoSalvo(config) {
+  function logoSalvo({ configuracao: config, logoDaLoja: logo }) {
     gravar(config)
+    setLogoDaLoja(logo)
     aoSalvo?.()
   }
 
@@ -152,14 +160,14 @@ function ConfigurarSite({ compacto, configuracao, aoMudarPendencia, aoSalvo }) {
     <div className={css.aba}>
       {!compacto && (
         <p className={css.descricao}>
-          {gravado.tituloPublico ? `${gravado.tituloPublico} · ` : ''}endereço {gravado.slug}. Nome e endereço ficam como foram criados.
+          {gravado.tituloPublico ? `Site “${gravado.tituloPublico}”` : 'Site sem nome'}, código {gravado.slug}. O nome e o código ficam como foram criados.
         </p>
       )}
       <p className={css.descricao}>
         {gravado.ativo ? 'No ar: os clientes já abrem o site.' : 'Fora do ar: os clientes ainda não abrem o site. Quem coloca o site no ar é o suporte.'}
       </p>
-      <LogoDoSite gravado={gravado} lerGravado={() => gravadoRef.current} bloqueado={salvando}
-        aoMudarEnvio={setEnviandoLogo} aoSalvar={logoSalvo} />
+      <LogoDoSite gravado={gravado} loja={loja} totalDeLojas={totalDeLojas} logoDaLoja={logoDaLoja}
+        lerGravado={() => gravadoRef.current} bloqueado={salvando} aoMudarEnvio={setEnviandoLogo} aoSalvar={logoSalvo} />
       <form className={css.secao} aria-labelledby={`${id}-titulo`} onSubmit={salvar}>
         <h3 id={`${id}-titulo`}>Site</h3>
         <Pendencia visivel={pendente && !salvando} />
@@ -195,24 +203,19 @@ function ConfigurarSite({ compacto, configuracao, aoMudarPendencia, aoSalvo }) {
   )
 }
 
-function LogoDoSite({ gravado, lerGravado, bloqueado, aoMudarEnvio, aoSalvar }) {
+function LogoDoSite({ gravado, loja, totalDeLojas, logoDaLoja, lerGravado, bloqueado, aoMudarEnvio, aoSalvar }) {
   const id = useId()
   const arquivoRef = useRef(null)
   const [situacao, setSituacao] = useState({ estado: 'ocioso', mensagem: null })
-  const enviando = situacao.estado === 'enviando'
+  const enviando = situacao.estado === 'enviando' || situacao.estado === 'alinhando'
 
-  async function escolher(evento) {
-    const arquivo = evento.target.files?.[0]
-    // O mesmo arquivo pode ser escolhido de novo depois de um erro.
-    evento.target.value = ''
-    if (!arquivo || enviando || bloqueado) return
-    const motivo = motivoDoArquivoDeLogo(arquivo)
-    if (motivo) { setSituacao({ estado: 'erro', mensagem: motivo }); return }
-    setSituacao({ estado: 'enviando', mensagem: null })
+  // Um envio ou alinhamento por vez, e nunca junto com o Salvar do site.
+  async function gravarLogo(estado, chamada, salvo) {
+    setSituacao({ estado, mensagem: null })
     aoMudarEnvio(true)
     try {
-      aoSalvar(await enviarLogoDoSite(lerGravado, arquivo))
-      setSituacao({ estado: 'salvo', mensagem: null })
+      aoSalvar(await chamada())
+      setSituacao({ estado: 'salvo', mensagem: salvo })
     } catch (erro) {
       setSituacao({ estado: 'erro', mensagem: erro.message })
     } finally {
@@ -220,23 +223,52 @@ function LogoDoSite({ gravado, lerGravado, bloqueado, aoMudarEnvio, aoSalvar }) 
     }
   }
 
-  const imagem = urlDoLogo(gravado.logoUrl)
+  function escolher(evento) {
+    const arquivo = evento.target.files?.[0]
+    // O mesmo arquivo pode ser escolhido de novo depois de um erro.
+    evento.target.value = ''
+    if (!arquivo || enviando || bloqueado) return undefined
+    const motivo = motivoDoArquivoDeLogo(arquivo)
+    if (motivo) { setSituacao({ estado: 'erro', mensagem: motivo }); return undefined }
+    return gravarLogo('enviando', () => enviarLogoDoSite(loja, lerGravado, arquivo), 'Logo salvo nos impressos e no site.')
+  }
+
+  function usarNoSite() {
+    if (enviando || bloqueado) return undefined
+    return gravarLogo('alinhando', async () => {
+      const configuracao = await usarLogoDaLojaNoSite(logoDaLoja, lerGravado)
+      if (!configuracao) throw new Error('O EasyStok não confirmou o site. Tente de novo.')
+      return { configuracao, logoDaLoja }
+    }, 'O site agora usa o mesmo logo dos impressos.')
+  }
+
+  const imagem = urlDoLogo(logoDosImpressos(logoDaLoja, gravado.logoUrl))
+  const outroNoSite = siteComOutroLogo(logoDaLoja, gravado.logoUrl)
   return (
     <section className={css.secao} aria-labelledby={`${id}-logo`}>
       <h3 id={`${id}-logo`}>Logo</h3>
       <p className={css.descricao}>PNG ou JPG até 5 MB. O mesmo logo vai para os impressos e para o site. Na térmica só sai em preto.</p>
+      {totalDeLojas > 1 && loja && (
+        <p className={css.aviso}>Esta empresa tem {totalDeLojas} lojas ativas: o logo vai para {loja.nome || 'a primeira'}.</p>
+      )}
       <div className={css.logo}>
         {imagem
-          ? <img className={css.previa} src={imagem} alt={`Logo de ${gravado.tituloPublico || 'a loja'}`} />
+          ? <img className={css.previa} src={imagem} alt={`Logo de ${gravado.tituloPublico || loja?.nome || 'a loja'}`} />
           : <p className={css.semPrevia}>O logo aparece aqui depois do envio.</p>}
         <div className={css.acoes}>
           <input ref={arquivoRef} type="file" accept={TIPOS_DE_LOGO.join(',')} className="sr" aria-label="Arquivo do logo" tabIndex={-1} onChange={escolher} />
           <Botao icone="imagem" className={css.toque} disabled={enviando || bloqueado} onClick={() => arquivoRef.current?.click()}>
-            {enviando ? 'Enviando…' : imagem ? 'Trocar logo' : 'Enviar logo'}
+            {situacao.estado === 'enviando' ? 'Enviando…' : imagem ? 'Trocar logo' : 'Enviar logo'}
           </Botao>
+          {outroNoSite && (
+            <Botao className={css.toque} disabled={enviando || bloqueado} onClick={usarNoSite}>
+              {situacao.estado === 'alinhando' ? 'Gravando no site…' : 'Usar este logo no site'}
+            </Botao>
+          )}
         </div>
       </div>
-      {situacao.estado === 'salvo' && <output className={css.retorno}>Logo salvo nos impressos e no site.</output>}
+      {outroNoSite && <p className={css.aviso}>O site ainda não usa este logo. Os impressos já saem com ele.</p>}
+      {situacao.estado === 'salvo' && <output className={css.retorno}>{situacao.mensagem}</output>}
       {situacao.estado === 'erro' && <p className={css.erro} role="alert">{situacao.mensagem}</p>}
     </section>
   )

@@ -41,7 +41,8 @@ function AvisosNesteAparelho({ aparelho }) {
   return (
     <section className={css.secao} aria-labelledby={`${id}-aparelho`}>
       <h3 id={`${id}-aparelho`}>Avisos neste aparelho</h3>
-      {!aparelho && <p className={css.descricao}>Para ligar os avisos neste aparelho, toque no sino de Avisos no topo da tela.</p>}
+      {/* Esta aba pode estar num modal ou em tela cheia, sem o sino à vista. */}
+      {!aparelho && <p className={css.descricao}>Ligar os avisos neste aparelho não está disponível nesta tela. Ao sair dela, use o sino de Avisos no topo do Console.</p>}
       {aparelho && (aparelho.estado === 'erro'
         ? <p className={css.erro} role="alert">{aparelho.mensagem ?? 'Não foi possível ligar os avisos neste aparelho.'}</p>
         : <output className={css.descricao}>{aparelho.mensagem ?? TEXTO_DO_APARELHO[aparelho.estado]}</output>)}

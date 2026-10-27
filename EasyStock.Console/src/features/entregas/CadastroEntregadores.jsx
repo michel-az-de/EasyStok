@@ -49,7 +49,7 @@ export function CadastroEntregadores({ entregadores, ocupado, acoes, aoMudarPend
           <li key={e.id} className={`${css.cartao} ${css.linha}`}>
             <span className={css.cresce}>{e.nome}</span>
             <span className={css.apoio}>{[e.veiculo, e.placa, e.telefone].filter(Boolean).join(' · ')}</span>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desativarEntregador(e.id)}>Desativar</Botao>
+            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desativarEntregador(e.id).then((ok) => { if (ok) aoSalvo?.() })}>Desativar</Botao>
           </li>
         ))}
       </ul>

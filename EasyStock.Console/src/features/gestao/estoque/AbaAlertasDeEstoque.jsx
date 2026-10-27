@@ -75,10 +75,14 @@ function FormularioDosAlertas({ lido, compacto, aoMudarPendencia, aoSalvo }) {
       required value={form[campo]} onChange={mudar(campo)} />
   }
 
+  const nomeDaLoja = lido.loja.nome
   return (
     <form className={css.secao} aria-labelledby={`${id}-titulo`} onSubmit={salvar}>
-      <h3 id={`${id}-titulo`}>{compacto ? 'Alertas' : 'Alertas de estoque'}</h3>
+      <h3 id={`${id}-titulo`}>{compacto ? 'Alertas' : 'Alertas de estoque'}{nomeDaLoja ? ` · ${nomeDaLoja}` : ''}</h3>
       {!compacto && <p className={css.descricao}>Quando o estoque avisa você e de qual lote a saída sai primeiro.</p>}
+      {lido.totalDeLojas > 1 && (
+        <p className={css.aviso}>Esta empresa tem {lido.totalDeLojas} lojas ativas: estes alertas valem só para {nomeDaLoja || 'a primeira'}.</p>
+      )}
       <Pendencia visivel={pendente && !salvando} />
       <fieldset className={css.campos} disabled={salvando}>
         <legend className="sr">Alertas de estoque</legend>

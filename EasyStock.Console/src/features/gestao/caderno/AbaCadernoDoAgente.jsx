@@ -101,7 +101,7 @@ export function AbaCadernoDoAgente({ aoMudarPendencia, aoSalvo, compacto = false
       {carga.estado === 'ok' && trechos.length === 0 && edicao === null && (
         <Vazio titulo="O caderno está vazio">Comece pelo que os clientes mais perguntam: entrega, pagamento, alergias.</Vazio>
       )}
-      <Retorno situacao={remocao} salvo="Trecho removido do caderno." falhou="Não foi possível remover o trecho." />
+      <Retorno situacao={remocao} andamento="Removendo…" salvo="Trecho removido do caderno." falhou="Não foi possível remover o trecho." />
       {carga.estado === 'ok' && trechos.length > 0 && (
         <ul className={css.lista} aria-label="Trechos do caderno">
           {trechos.map((trecho) => (
@@ -166,7 +166,7 @@ function EdicaoDoTrecho({ trecho, trechos, aoMudarPendencia, aoCancelar, aoSalvo
   return (
     <form className={css.secao} aria-labelledby={`${id}-titulo`} onSubmit={salvar}>
       <h3 id={`${id}-titulo`} tabIndex={-1}>{trecho ? `Editar “${trecho.titulo}”` : 'Novo trecho'}</h3>
-      <Pendencia visivel={pendente && !salvando} />
+      <Pendencia visivel={pendente && !salvando} acao="Salve ou cancele antes de sair." />
       <fieldset className={css.campos} disabled={salvando}>
         <legend className="sr">Trecho do caderno</legend>
         <div className={css.inteiro}>
