@@ -75,8 +75,7 @@ public final class AppNotifications {
         // A decisão não interfere no banco, na produção nem no atualizador silencioso.
         prefs(activity).edit().putBoolean("explained", true).apply();
         new AlertDialog.Builder(activity).setTitle("Receber avisos da Casa da Baba?")
-            .setMessage("Ative notificações para receber orientações, como trazer seus dados do PWA. "
-                + "O app continua funcionando se você escolher Agora não. Depois, abra o sino de Avisos e toque em Ativar avisos neste aparelho.")
+            .setMessage("Ative para receber orientações e atualizações. Você também pode ativar depois pelo sino.")
             .setPositiveButton("Ativar", (d,w) -> {
                 if (NoticePolicy.shouldRequestPermission(Build.VERSION.SDK_INT,
                         Build.VERSION.SDK_INT < 33 || activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
@@ -84,7 +83,7 @@ public final class AppNotifications {
                     prefs(activity).edit().putBoolean("requested", true).apply();
                     activity.requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, PERMISSION_REQUEST);
                 } else openSettings(activity);
-            }).setNegativeButton("Agora não", null).show();
+            }).setNegativeButton("Depois", null).show();
     }
     public static void openSettings(Activity activity) {
         Intent intent = new Intent(Build.VERSION.SDK_INT >= 26 ? Settings.ACTION_APP_NOTIFICATION_SETTINGS : Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
@@ -105,10 +104,10 @@ public final class AppNotifications {
         new AlertDialog.Builder(activity).setTitle("Trazer dados do PWA antigo")
             .setMessage("1. Pare novos registros durante a transferência. Não apague nem limpe o PWA antigo.\n\n"
                 + "2. No PWA antigo: Ajustes > Manut. > Backup e restauração > Exportar backup (JSON). Confirme que o arquivo foi salvo e guarde outra cópia.\n\n"
-                + "3. Neste app: Já usava o PWA antigo? > Trazer dados do PWA. Selecione o JSON antes de conectar a produção.\n\n"
+                + "3. Neste app: Configurações > Backup do PWA > Importar. Selecione o JSON antes de conectar.\n\n"
                 + "4. Confira produtos, estoque, pedidos, lotes e fotos. Se houver conflito ou foto ausente, preserve tudo e peça ajuda.\n\n"
-                + "5. Conecte a produção com o código de 6 dígitos da empresa e loja corretas. Como os dados estavam somente no Android, use Enviar primeira migração.\n\n"
-                + "6. Espere Primeira migração confirmada pelo EasyStok e confira os dados no sistema. Se cair a conexão, use Retomar migração.\n\n"
+                + "5. No início, toque em Conectar e informe o código de 6 dígitos da empresa e loja corretas. Revise os dados importados e toque em Sincronizar para o primeiro envio.\n\n"
+                + "6. Aguarde a confirmação do EasyStok e compare as contagens no sistema. Se cair a conexão, retome pelo botão Sincronizar.\n\n"
                 + "Depois da conferência, registre somente no app novo. Preserve o PWA antigo para consulta e mantenha o backup. Históricos não geram novas vendas ou pagamentos.")
             .setPositiveButton("Entendi", (d,w) -> offerPermission(activity, false)).show();
     }

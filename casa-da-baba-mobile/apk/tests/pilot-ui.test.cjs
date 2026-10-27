@@ -9,7 +9,9 @@ test('ações curtas conservam seu significado e sempre usam um ícone disponív
     ['🗑️ Excluir lote', 'Excluir'], ['Criar e usar', 'Etiquetar'],
     ['Conferir 12 unidades', 'Produzir'], ['Salvar R$ 34,00', 'Salvar'],
     ['Preparar cobrança', 'Cobrar'], ['Copiar mensagem toda', 'Copiar'],
-    ['Agendar para depois? (entrega futura)', 'Agendar']
+    ['Agendar para depois? (entrega futura)', 'Agendar'],
+    ['Escolher imagem', 'Escolher'], ['Restaurar do celular (auto)', 'Recuperar'],
+    ['↻ Tentar de novo', 'Repetir']
   ]) {
     const command = commandFor(text);
     assert.equal(command.label, label);

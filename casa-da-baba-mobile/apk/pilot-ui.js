@@ -19,7 +19,9 @@
     Reabrir: 'historico', Reverter: 'historico', Mesclar: 'producao',
     Agendar: 'relogio', Retroativo: 'historico', Carregar: 'chevron-right',
     Opções: 'ellipsis', Pronto: 'check', Ajustes: 'configuracoes',
-    Indicadores: 'ficha', Testar: 'printer', Pular: 'chevron-right'
+    Indicadores: 'ficha', Testar: 'printer', Pular: 'chevron-right',
+    Escolher: 'plus', Repetir: 'refresh-cw',
+    'Sincronizando…': 'refresh-cw', 'Enviando…': 'enviar'
   };
   const SHORT_LABELS = {
     'Novo pedido': 'Adicionar', '+ Novo pedido': 'Adicionar',
@@ -54,7 +56,11 @@
     'Buscar impressora': 'Buscar', 'Testar impressão': 'Testar',
     'Exportar backup (JSON)': 'Exportar', 'Restaurar de arquivo': 'Importar',
     'Verificar atualizações agora': 'Atualizar', 'Abrir diagnóstico': 'Detalhes',
-    '+ Novo produto': 'Cadastrar'
+    '+ Novo produto': 'Cadastrar', 'Escolher imagem': 'Escolher',
+    'Exportar histórico JSON': 'Exportar', 'Restaurar do celular (auto)': 'Recuperar',
+    'Tentar de novo': 'Repetir', 'Sem código': 'Nenhum', '7 dias': '7d', '30 dias': '30d',
+    'Retomar migração': 'Sincronizar', 'Enviando primeira migração…': 'Enviando…',
+    'Conferindo e sincronizando…': 'Sincronizando…'
   };
   const ALLOWED_SCREENS = new Set(['home', 'producao', 'pedidos', 'finalizados', 'historico', 'clientes']);
   const EXCLUDED = [
@@ -69,7 +75,8 @@
     '[onclick*="go(\'compras\')"]', '[onclick*="go(\'estoque\')"]',
     '[onclick*="go(\'conferencia\')"]', '[onclick*="openCash"]',
     '[onclick*="resetAll"]', '[onclick*="cestaCalcAdicionar"]',
-    '[onclick*="factoryReset"]', '[onclick*="purgeOldData"]', '[onclick*="clearTestData"]'
+    '[onclick*="factoryReset"]', '[onclick*="purgeOldData"]', '[onclick*="clearTestData"]',
+    '[onclick*="loadPresentationMode"]', '[onclick*="clearPresentationMode"]'
   ].join(',');
 
   function commandFor(text, handler = '') {
