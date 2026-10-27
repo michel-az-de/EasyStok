@@ -702,7 +702,7 @@ await provar('D4 frete: editar uma zona sem salvar (cadastro real) deixa "Confer
   await clicar(raiz, 'Editar zona Centro')
   // O formulário da zona nova fica montado (escondido) antes da lista: o campo da edição é o último.
   const valorDaEdicao = andar(raiz.arvore).filter((n) => n.props?.rotulo === 'Valor (R$)').at(-1)
-  valorDaEdicao.props.onChange({ target: { value: '9,50' } })
+  valorDaEdicao.props.aoMudar(950) // CampoReais (#2080) devolve centavos: R$ 9,50
   raiz.renderizar()
   await raiz.atualizar(2)
   assert.equal(botao(raiz, 'Conferi, seguir').props.disabled, true, 'zona editada e não salva segura o passo')
