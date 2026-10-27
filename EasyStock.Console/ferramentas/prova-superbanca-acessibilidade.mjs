@@ -242,6 +242,28 @@ provar('Modal: segurarFechamento ignora Escape e fundo com valor digitado; o X e
     assert.equal(fechou, 1, 'o X é um gesto explícito e fecha')
   } finally { m.desmontar() }
 })
+// #2078 (revisão R2): no Chromium o 2º Esc seguido, sem ativação do usuário, não pode ser cancelado:
+// o dialog fecha sozinho e o React não sabia. O `close` nativo agora é ouvido.
+for (const caso of ['segurando', 'livre', 'protegido']) {
+  provar(`Modal: close nativo (Esc não cancelável) ${caso === 'livre' ? 'avisa o pai' : 'reabre a folha sem perder o valor'}`, () => {
+    let fechou = 0
+    const props = { titulo: 'Fechar o caixa', segurarFechamento: caso === 'segurando', aoFechar: caso === 'protegido' ? undefined : () => fechou++ }
+    const eventos = new Map(), m = montar(Modal, props)
+    const dialogo = dialogoFalso(eventos)
+    let reaberto = 0
+    dialogo.showModal = function () { this.open = true; reaberto++ }
+    m.elemento.props.ref.current = dialogo
+    m.efeitos()
+    try {
+      assert.ok(eventos.has('close'), 'o modal ouve o close nativo')
+      dialogo.open = false
+      eventos.get('close')({ target: dialogo })
+      if (caso === 'livre') { assert.equal(fechou, 1); assert.equal(reaberto, 1, 'só a abertura') }
+      else { assert.equal(fechou, 0); assert.equal(dialogo.open, true); assert.equal(reaberto, 2) }
+    } finally { m.desmontar() }
+    assert.equal(eventos.size, 0, 'desmontar tira o ouvinte antes do close() da limpeza')
+  })
+}
 provar('Modal: focarCampo põe o foco no campo marcado (ou no primeiro campo), sem rolar a página; sem a prop, o foco é o do navegador', () => {
   const focos = []
   const campo = { focus(opcoes) { focos.push(opcoes) } }

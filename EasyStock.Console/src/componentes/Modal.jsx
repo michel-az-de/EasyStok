@@ -53,10 +53,21 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, className,
     const aoCancelar = (evento) => { evento.preventDefault(); fecharSeLivre() }
     // Clique no ::backdrop chega no próprio <dialog>, nunca no conteúdo.
     const aoClicar = (evento) => { if (evento.target === dialogo) fecharSeLivre() }
+    // #2078 (revisão R2): o Chromium só deixa cancelar o `cancel` com ativação do usuário desde o
+    // último; o 2º Esc seguido fecha o dialog sozinho e o React seguia achando que estava aberto (folha
+    // sumida, valor perdido). Se o fechamento estava segurado (ou indisponível), a folha reabre com o
+    // que foi digitado, que é o motivo de segurar; senão o pai fica sabendo e desmonta, como no Esc.
+    const aoFecharNativo = () => {
+      if (segurarRef.current || !aoFecharRef.current) { if (!dialogo.open) dialogo.showModal() }
+      else aoFecharRef.current()
+    }
     dialogo.addEventListener('cancel', aoCancelar)
     dialogo.addEventListener('click', aoClicar)
+    dialogo.addEventListener('close', aoFecharNativo)
 
     return () => {
+      // Antes do close() abaixo: fechar ao desmontar não é o navegador fechando sozinho.
+      dialogo.removeEventListener('close', aoFecharNativo)
       dialogo.removeEventListener('cancel', aoCancelar)
       dialogo.removeEventListener('click', aoClicar)
       if (dialogo.open) dialogo.close()

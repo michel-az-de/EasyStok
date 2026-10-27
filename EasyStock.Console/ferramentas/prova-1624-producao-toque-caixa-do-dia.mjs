@@ -52,7 +52,7 @@ const hooks = {
   },
 }
 const AGORA = Date.parse('2026-10-11T15:00:00-03:00')
-const gerente = () => ({ acoes: { gerenciarCaixa: true }, permite: () => true })
+const gerente = () => ({ acoes: { gerenciarCaixa: true, controlarLoja: true }, permite: () => true })
 const acoesDoCaixa = () => ({ abrirCaixa() {}, fecharCaixa() {}, lancarMovimentoCaixa() {}, estornarMovimentoCaixa() {} })
 const g = globalThis.__prova1624 = { hooks, catalogo: { cardapio: [] }, caixa: null, acoes: acoesDoCaixa(), acesso: gerente(), agora: AGORA }
 const DE_FORA = 'globalThis.__prova1624'
@@ -1071,6 +1071,21 @@ await confere('#2078 D5/B8 e D6: abrir a loja mostra só a gaveta do último fec
   const campo = andar(t.arvore, (n) => n.type === 'CampoReais')[0]
   assert.equal(campo.props.rotulo, 'Saldo inicial (o troco da gaveta)')
   assert.match(campo.props.dica.replace(/ /g, ' '), /^Só o troco que ficou de ontem, sem os R\$ 45,00 em dinheiro que já entraram hoje: eles já estão na conta\. Já vem com o que o fechamento de 10\/10 deixou\.$/)
+})
+
+// #2078 (revisão R1): a operadora abria a loja pelo topo: o caixa abria (política Operador) e o
+// controle da loja respondia 403. Sem `controlarLoja`, nada sai e a tela diz quem abre.
+await confere('#2078 R1: quem não controla a loja não abre caixa nem loja pelo gesto, e sabe quem abre', async () => {
+  const chamadas = []
+  g.acesso = { acoes: { gerenciarCaixa: false, controlarLoja: false }, permite: () => true }
+  g.acoes = { ...acoesDoCaixa(), abrirLojaComCaixa: async (...a) => { chamadas.push(a) } }
+  g.caixa = { ...caixaCom(dia()), fechamentos: [FECHAMENTO_DE_ONTEM] }
+  const t = montar(ModalAbrirLoja, { aoFechar() {} })
+  t.renderizar()
+  assert.match(t.arvore.props.descricao, /Só gerente ou dona abre a loja: peça a uma delas\./)
+  assert.deepEqual(doTipo(t.arvore.props.rodape, 'Botao').map(texto), ['Entendi'])
+  assert.equal(andar(t.arvore, (n) => n.type === 'CampoReais').length, 0, 'sem campo de saldo inicial')
+  assert.deepEqual(chamadas, [])
 })
 
 await confere('#2078 B9/B10: fechar a loja diz o estado do caixa e quem não pode fechar não escreve justificativa à toa', async () => {

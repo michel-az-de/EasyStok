@@ -122,7 +122,26 @@ function UltimoFechamento({ ultimo }) {
   )
 }
 
+// #2078 (revisão R1): simétrico ao Fechar. Sem `controlarLoja` o controle da loja responde 403 depois
+// que o caixa já abriu (a política do caixa deixa a operadora abrir): nada sai e a tela diz quem abre.
 export function ModalAbrirLoja({ aoFechar }) {
+  const { acoes } = useAcessoModulos()
+  if (acoes?.controlarLoja !== true) {
+    return (
+      <Modal
+        titulo="Abrir a loja"
+        descricao="Só gerente ou dona abre a loja: peça a uma delas."
+        aoFechar={aoFechar}
+        rodape={<Botao variante="primario" onClick={aoFechar}>Entendi</Botao>}
+      >
+        <p className={css.apoio}>Abrir a loja também abre o caixa do dia, com a conferência da gaveta.</p>
+      </Modal>
+    )
+  }
+  return <AbrirLojaComCaixa aoFechar={aoFechar} />
+}
+
+function AbrirLojaComCaixa({ aoFechar }) {
   const { abrirLojaComCaixa } = useAcoes()
   const caixa = useCaixaDoDiaApi({ fechamentos: 1 })
   const [centavos, setCentavos] = useState(null)
