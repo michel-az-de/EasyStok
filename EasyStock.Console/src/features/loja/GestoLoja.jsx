@@ -7,13 +7,14 @@ import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { CampoReais } from '../../componentes/CampoReais'
+import { DiferencaDaGaveta } from '../../componentes/DiferencaDaGaveta'
 import { Modal } from '../../componentes/Modal'
-import { Pilula } from '../../componentes/Pilula'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../aplicacao/useCaixaDoDiaApi'
 import { useConfirmacaoDaAbertura } from '../../aplicacao/useConfirmacaoDaAbertura'
 import {
-  JUSTIFICATIVA_MINIMA, diaMes, gavetaDoFechamento, justificativaValida, observacaoDaAbertura,
+  JUSTIFICATIVA_MINIMA, caixaAoFecharLoja, diaMes, dicaDoSaldoInicial, gavetaDoFechamento, justificativaValida, observacaoDaAbertura,
   retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../dominio/aberturaDaLoja'
 import { conferenciaDaGaveta } from '../../dominio/caixa'
@@ -85,9 +86,7 @@ function FecharEsquecido({ situacao, aoFechou }) {
         erro={moedaAltaDemais(contado) ? 'Valor alto demais' : null}
         aoMudar={setContado}
       />
-      {conferencia.pronta && (
-        <p className={css.apoio}>Diferença: <Pilula tom={conferencia.tom}>{conferencia.texto}</Pilula></p>
-      )}
+      <DiferencaDaGaveta conferencia={conferencia} className={css.diferenca} />
       <Erro texto={envio.erro} />
       <Botao
         variante="secundario"
@@ -110,9 +109,10 @@ function UltimoFechamento({ ultimo }) {
     <div className={css.bloco}>
       <dl className={css.numeros}>
         {/* #1920: o que ficou na gaveta, o mesmo valor que o saldo inicial sugere; `saldoFinal` soma Pix e cartão. */}
+        {/* #2078 (D5/B8): "Entrou" e "Saiu" do fechamento não fechavam com a gaveta (o Entrou levava
+            Pix e suprimento e deixava as vendas de fora; o Saiu, a sangria) nem com a tabela dos 7 dias.
+            O fechamento não traz a conta só do dinheiro: fica o número que ela confere. */}
         <div><dt>Na gaveta em {diaMes(ultimo.data)}</dt><dd>{moeda(gavetaDoFechamento(ultimo))}</dd></div>
-        <div><dt>Entrou</dt><dd>{moeda(ultimo.totalPagamentosPedidos + ultimo.totalEntradasExtras)}</dd></div>
-        <div><dt>Saiu</dt><dd>{moeda(ultimo.totalSaidasExtras)}</dd></div>
       </dl>
       <p className={css.apoio}>
         Fechado {ultimo.fechadoPorNome ? `por ${ultimo.fechadoPorNome} ` : ''}às {horaCurta(ultimo.fechadoEm)}.
@@ -122,7 +122,26 @@ function UltimoFechamento({ ultimo }) {
   )
 }
 
+// #2078 (revisão R1): simétrico ao Fechar. Sem `controlarLoja` o controle da loja responde 403 depois
+// que o caixa já abriu (a política do caixa deixa a operadora abrir): nada sai e a tela diz quem abre.
 export function ModalAbrirLoja({ aoFechar }) {
+  const { acoes } = useAcessoModulos()
+  if (acoes?.controlarLoja !== true) {
+    return (
+      <Modal
+        titulo="Abrir a loja"
+        descricao="Só gerente ou dona abre a loja: peça a uma delas."
+        aoFechar={aoFechar}
+        rodape={<Botao variante="primario" onClick={aoFechar}>Entendi</Botao>}
+      >
+        <p className={css.apoio}>Abrir a loja também abre o caixa do dia, com a conferência da gaveta.</p>
+      </Modal>
+    )
+  }
+  return <AbrirLojaComCaixa aoFechar={aoFechar} />
+}
+
+function AbrirLojaComCaixa({ aoFechar }) {
   const { abrirLojaComCaixa } = useAcoes()
   const caixa = useCaixaDoDiaApi({ fechamentos: 1 })
   const [centavos, setCentavos] = useState(null)
@@ -187,6 +206,8 @@ export function ModalAbrirLoja({ aoFechar }) {
             O caixa de hoje já foi fechado
             {situacao.fechamento?.fechadoEm ? ` às ${horaCurta(situacao.fechamento.fechadoEm)}` : ''} e não reabre.
             A loja só abre com o caixa aberto.
+            {/* #2078 (B6): o modal ficava sem caminho. Só a dona devolve a loja ao horário. */}
+            {' '}Para a loja voltar a seguir o horário da semana, a dona usa Atendimento › Horários e mensagens › Voltar a seguir o horário.
           </p>
         )}
 
@@ -200,9 +221,10 @@ export function ModalAbrirLoja({ aoFechar }) {
         {situacao?.tipo === 'novo' && (
           <>
             <UltimoFechamento ultimo={situacao.ultimo} />
+            {/* #2078 (D6/B18): "o que está na gaveta agora" contava duas vezes o dinheiro que já entrou hoje. */}
             <CampoDinheiro
-              rotulo="Saldo inicial (o que está na gaveta agora)"
-              dica={situacao.ultimo ? `Já vem com o saldo do fechamento de ${diaMes(situacao.ultimo.data)}.` : 'O dinheiro de troco que fica na gaveta.'}
+              rotulo="Saldo inicial (o troco da gaveta)"
+              dica={`${dicaDoSaldoInicial(caixa.dia)}${situacao.ultimo ? ` Já vem com o que o fechamento de ${diaMes(situacao.ultimo.data)} deixou.` : ''}`}
               centavos={saldoCentavos}
               aoMudar={mudarSaldo}
             />
@@ -230,17 +252,25 @@ export function ModalAbrirLoja({ aoFechar }) {
   )
 }
 
+// #2078: o texto do caixa segue o caixa de verdade (B9: dizia "continua aberto" com ele fechado ou sem
+// abrir). Quem não pode fechar a loja (B10: a operadora escrevia a justificativa e ouvia "sem
+// permissão") vê o porquê e quem fecha, sem campo nem botão. A permissão continua a da API.
 export function ModalFecharLoja({ aoFechar }) {
   const { fecharLojaComJustificativa } = useAcoes()
+  const { acoes } = useAcessoModulos()
+  const podeFechar = acoes?.controlarLoja === true
+  const caixa = useCaixaDoDiaApi({ fechamentos: 1 })
   const [justificativa, setJustificativa] = useState('')
   const [envio, enviar] = useEnvio()
 
   return (
     <Modal
       titulo="Fechar a loja no horário"
-      descricao="A loja está dentro do horário de funcionamento. Só gerente ou dona fecha agora, com justificativa."
+      descricao={podeFechar
+        ? 'A loja está dentro do horário de funcionamento. Fechar agora pede justificativa.'
+        : 'A loja está dentro do horário de funcionamento. Só gerente ou dona fecha a loja agora: peça a uma delas.'}
       aoFechar={aoFechar}
-      rodape={(
+      rodape={podeFechar ? (
         <>
           <Botao variante="texto" onClick={aoFechar}>Manter aberta</Botao>
           <Botao
@@ -252,17 +282,19 @@ export function ModalFecharLoja({ aoFechar }) {
             {envio.enviando ? 'Fechando…' : 'Fechar a loja'}
           </Botao>
         </>
-      )}
+      ) : <Botao variante="primario" onClick={aoFechar}>Entendi</Botao>}
     >
       <div className={css.corpo}>
-        <CampoArea
-          rotulo="Justificativa"
-          dica={`Pelo menos ${JUSTIFICATIVA_MINIMA} letras. Fica registrada com seu usuário e a hora, e os donos são avisados.`}
-          rows={3}
-          value={justificativa}
-          onChange={(e) => setJustificativa(e.target.value)}
-        />
-        <p className={css.apoio}>O caixa continua aberto. Para fechar o dia, use Financeiro › Caixa do dia.</p>
+        {podeFechar && (
+          <CampoArea
+            rotulo="Justificativa"
+            dica={`Pelo menos ${JUSTIFICATIVA_MINIMA} letras. Fica registrada com seu usuário e a hora, e os donos são avisados.`}
+            rows={3}
+            value={justificativa}
+            onChange={(e) => setJustificativa(e.target.value)}
+          />
+        )}
+        <p className={css.apoio}>{caixaAoFecharLoja(caixa.estado === 'ok' ? caixa.dia : null)}</p>
         <Erro texto={envio.erro} />
       </div>
     </Modal>

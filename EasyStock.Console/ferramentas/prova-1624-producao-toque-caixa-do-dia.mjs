@@ -22,7 +22,8 @@ import assert from 'node:assert/strict'
 import { transformWithOxc } from 'vite'
 
 const telasCompiladas = new Map()
-for (const caminho of ['features/gestao/producao/AbaProducaoDoDiaApi', 'features/gestao/caixa/AbaCaixaApi']) {
+// #2078: o modal do fechamento e o gesto da loja também rodam de verdade (avisos, foco, Esc, permissão).
+for (const caminho of ['features/gestao/producao/AbaProducaoDoDiaApi', 'features/gestao/caixa/AbaCaixaApi', 'features/gestao/caixa/ModalFecharCaixa', 'features/loja/GestoLoja']) {
   const url = new URL(`../src/${caminho}.jsx`, import.meta.url)
   telasCompiladas.set(url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
@@ -51,7 +52,7 @@ const hooks = {
   },
 }
 const AGORA = Date.parse('2026-10-11T15:00:00-03:00')
-const gerente = () => ({ acoes: { gerenciarCaixa: true }, permite: () => true })
+const gerente = () => ({ acoes: { gerenciarCaixa: true, controlarLoja: true }, permite: () => true })
 const acoesDoCaixa = () => ({ abrirCaixa() {}, fecharCaixa() {}, lancarMovimentoCaixa() {}, estornarMovimentoCaixa() {} })
 const g = globalThis.__prova1624 = { hooks, catalogo: { cardapio: [] }, caixa: null, acoes: acoesDoCaixa(), acesso: gerente(), agora: AGORA }
 const DE_FORA = 'globalThis.__prova1624'
@@ -72,6 +73,7 @@ registerHooks({
     if (url.endsWith('/aplicacao/contextos.js')) return inline(`export const useCatalogo=()=>${DE_FORA}.catalogo;export const useAcoes=()=>${DE_FORA}.acoes;export const useAtendimento=()=>({agora:${DE_FORA}.agora})`)
     if (url.includes('/aplicacao/acessoModulos.')) return inline(`export const useAcessoModulos=()=>${DE_FORA}.acesso`)
     if (url.endsWith('/aplicacao/useCaixaDoDiaApi.js')) return inline(`export const useCaixaDoDiaApi=()=>${DE_FORA}.caixa`)
+    if (url.endsWith('/aplicacao/useDevolucoesPendentes.js')) return inline("export const useDevolucoesPendentes=()=>({estado:'ok',total:0,pedidos:0,falhas:0})")
     if (url.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>String(p)})')
     if (url.endsWith('.json')) return inline('export default ' + readFileSync(new URL(url), 'utf8'))
     // Componente de fora das telas (Botao, Chip, CampoTexto) vira o próprio nome: aparece na árvore sem rodar.
@@ -682,7 +684,7 @@ await confere('Caixa do dia: o resumo tem a linha de vendas e as linhas somam o 
   const linhas = Object.fromEntries(doTipo(resumo, 'div').map((d) => [texto(doTipo(d, 'dt')[0]), limpo(doTipo(d, 'dd')[0])]))
   assert.equal(linhas.Vendas, moedaDe(80))
   const valor = (rotulo) => Number(linhas[rotulo].replace(/[^\d,]/g, '').replace(',', '.'))
-  assert.equal(valor('Saldo inicial') + valor('Vendas') + valor('Pagamentos de pedidos') + valor('Outras entradas') - valor('Outras saídas'), valor('Total esperado do dia'))
+  assert.equal(valor('Saldo inicial') + valor('Vendas') + valor('Pagamentos de pedidos') + valor('Outras entradas') - valor('Outras saídas'), valor('Total do caixa (com Pix e cartão)'))
 })
 
 await confere('Caixa do dia: fluxo dos últimos 7 dias lê os 6 dias anteriores e soma com o de hoje', async () => {
@@ -747,8 +749,9 @@ await confere('Caixa do dia: quem não é gerente não vê fechar nem estornar; 
   await fechado.assentar()
   assert.ok(doTipo(fechado.arvore, 'Pilula').some((pilula) => texto(pilula) === 'Fechado'))
   assert.ok(!botoes(fechado).some((b) => /Lançamento|Fechar o caixa|Estornar/.test(b)), 'dia fechado não lança, não fecha de novo e não estorna')
-  assert.match(limpo(fechado.arvore), /Total do dia/)
-  assert.doesNotMatch(limpo(fechado.arvore), /Total esperado do dia/)
+  // #2078 (D7): o mesmo nome para o total da API nos três estados do dia.
+  assert.match(limpo(fechado.arvore), /Total do caixa \(com Pix e cartão\)/)
+  assert.doesNotMatch(limpo(fechado.arvore), /Total esperado do dia|Total do dia/)
 })
 
 // --- Banca #1627: caixa -------------------------------------------------------------------
@@ -798,7 +801,7 @@ await confere('Caixa do dia: sem abertura o resumo não inventa gaveta nem saldo
   const linhas = Object.fromEntries(doTipo(resumo, 'div').map((d) => [texto(doTipo(d, 'dt')[0]), limpo(doTipo(d, 'dd')[0])]))
   assert.equal(linhas['Na gaveta (dinheiro)'], undefined, 'sem abrir o caixa ninguém disse quanto há na gaveta')
   assert.equal(linhas['Saldo inicial'], undefined)
-  assert.deepEqual([linhas['Em dinheiro'], linhas['Pix, cartão e outros'], linhas['Sem forma de pagamento'], linhas['Total do dia até agora']],
+  assert.deepEqual([linhas['Em dinheiro'], linhas['Pix, cartão e outros'], linhas['Sem forma de pagamento'], linhas['Total do caixa (com Pix e cartão)']],
     [moedaDe(30), moedaDe(40), moedaDe(250), moedaDe(320)])
 })
 
@@ -848,7 +851,7 @@ await confere('Caixa do dia: a tabela dos 7 dias tem legenda, rótulo por célul
   const fluxo = andar(t.arvore, (n) => n.props?.['aria-label'] === 'Fluxo de caixa dos últimos 7 dias')[0]
   assert.match(texto(doTipo(fluxo, 'caption')[0]), /suprimento e sangria/)
   const ontem = doTipo(fluxo, 'tr')[2]
-  assert.deepEqual(doTipo(ontem, 'td').map((td) => td.props['data-rotulo']), ['Entrou', 'Saiu', 'Saldo do dia', 'Caixa'])
+  assert.deepEqual(doTipo(ontem, 'td').map((td) => td.props['data-rotulo']), ['Entrou', 'Saiu', 'Resultado do dia', 'Caixa'])
   assert.match(limpo(ontem), /Fechado.*R\$ 80,00 depois de fechar/)
 })
 
@@ -898,6 +901,214 @@ await confere('J2-5 fechar o caixa avisa quanto há a devolver de pedidos cancel
   assert.doesNotMatch(modal, /disabled=\{[^}]*devolucoes/, 'o aviso não trava o botão')
   const aba = readFileSync(new URL('../src/features/gestao/caixa/AbaCaixaApi.jsx', import.meta.url), 'utf8')
   assert.match(aba, /<ModalFecharCaixa\s+consultarDevolucoes/)
+})
+
+// --- #2078 (banca #2073): leitura do caixa do dia ----------------------------------------
+const DIA_ABERTO_2078 = () => dia({
+  aberto: true, saldoInicial: 130, totalPagamentosPedidos: 136, totalEntradasExtras: 50, totalSaidasExtras: 23.9, saldoEsperado: 292.1,
+  movimentos: [
+    { id: 'm-1', tipo: 'entrada', valor: 50, categoria: 'Suprimento', meio: 'dinheiro', descricao: '', em: '2026-10-11T16:00:00Z' },
+    { id: 'm-2', tipo: 'saida', valor: 23.9, categoria: 'Despesa', meio: 'dinheiro', descricao: 'Gás', em: '2026-10-11T18:30:00Z' },
+  ],
+  linhasExtras: [
+    { em: '2026-10-11T17:00:00Z', tipo: 'pagamento', valor: 106, descricao: 'Pagamento de pedido', meio: 'dinheiro', origem: 'Pedido' },
+    { em: '2026-10-11T19:00:00Z', tipo: 'pagamento', valor: 30, descricao: 'Pagamento de pedido', meio: 'pix', origem: 'Pedido' },
+  ],
+})
+const caixaQueRele = (...dias) => {
+  const fila = [...dias]
+  const c = { estado: 'ok', erro: null, fechamentos: [], dia: fila[0] }
+  c.recarregar = async () => { const proximo = fila.length > 1 ? fila.shift() : fila[0]; if (proximo) c.dia = proximo; return proximo }
+  return c
+}
+
+await confere('#2078 B15: lançamentos do mais recente para o mais antigo', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  g.caixa = caixaCom(DIA_ABERTO_2078())
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  const movimentacao = andar(t.arvore, (n) => n.props?.['aria-label'] === 'Movimentação do caixa')[0]
+  const titulos = doTipo(doTipo(movimentacao, 'ul')[0], 'li').map((li) => texto(doTipo(li, 'strong')[0]))
+  assert.deepEqual(titulos, ['Pagamento de pedido', 'Despesa', 'Pagamento de pedido', 'Suprimento'])
+})
+
+await confere('#2078 E6: o número herói é a gaveta, à frente, com o total da API com um nome só', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  g.caixa = caixaCom(DIA_ABERTO_2078())
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  const resumo = andar(t.arvore, (n) => n.type === 'dl' && String(n.props.className).includes('resumoLista'))[0]
+  const itens = doTipo(resumo, 'div')
+  assert.equal(itens[0].props.className, 'resumoForte')
+  assert.deepEqual([texto(doTipo(itens[0], 'dt')[0]), limpo(doTipo(itens[0], 'dd')[0])], ['Na gaveta (dinheiro)', moedaDe(262.1)])
+  assert.equal(texto(doTipo(itens.at(-1), 'dt')[0]), 'Total do caixa (com Pix e cartão)')
+  const css = readFileSync(new URL('../src/features/gestao/caixa/abaCaixa.module.css', import.meta.url), 'utf8')
+  assert.match(css, /\.caixaApi > \.resumoLista \.resumoForte dd \{ font-size: var\(--t-valor\);/, 'o herói no tamanho de valor (28 px), não no de título')
+  assert.doesNotMatch(css, /\.caixaApi > \.resumoLista dt \{ min-height/, 'sem duas linhas reservadas entre o rótulo e o número')
+})
+
+await confere('#2078 D6: sem abertura, com dinheiro já no dia, o saldo inicial pede só o troco', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  g.caixa = caixaCom(dia({ totalPagamentosPedidos: 319, saldoEsperado: 319,
+    linhasExtras: [{ em: '2026-10-11T17:00:00Z', tipo: 'pagamento', valor: 319, descricao: '', meio: 'dinheiro', origem: 'Pedido' }] }))
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  const campo = andar(t.arvore, (n) => n.type === 'CampoReais' && n.props.rotulo === 'Saldo inicial')[0]
+  assert.match(campo.props.dica.replace(/ /g, ' '), /^Só o troco que ficou de ontem, sem os R\$ 319,00 em dinheiro que já entraram hoje/)
+  assert.match(limpo(t.arvore), /Ao abrir, informe só o troco: o que entrou hoje já está na conta\./)
+  assert.doesNotMatch(limpo(t.arvore), /só registra o que está na gaveta/)
+})
+
+await confere('#2078 B11/E4: Lançamento abre com foco no valor e não fecha por Esc ou fundo com algo digitado', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  g.caixa = caixaCom(DIA_ABERTO_2078())
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Lançamento').props.onClick()
+  const modal = () => doTipo(t.renderizar(), 'Modal')[0]
+  assert.equal(modal().props.titulo, 'Lançar entrada ou saída')
+  assert.equal(modal().props.focarCampo, true)
+  assert.equal(modal().props.segurarFechamento, false, 'vazio, Esc fecha como antes')
+  assert.equal(andar(modal(), (n) => n.type === 'CampoReais' && n.props.rotulo === 'Valor')[0].props['data-foco-inicial'], '')
+  andar(modal(), (n) => n.type === 'CampoReais' && n.props.rotulo === 'Valor')[0].props.aoMudar(1250)
+  assert.equal(modal().props.segurarFechamento, true, 'com valor digitado, Esc e fundo não perdem o que ela digitou')
+  assert.equal(typeof modal().props.aoFechar, 'function', 'o X continua fechando')
+})
+
+await confere('#2078 B11/E4/E5: Fechar o caixa abre no contado, segura o valor e anuncia a diferença com a gravidade em palavra', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  g.caixa = caixaQueRele(DIA_ABERTO_2078())
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  await doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Fechar o caixa').props.onClick()
+  const modal = () => doTipo(t.renderizar(), 'Modal')[0]
+  assert.equal(modal().props.titulo, 'Fechar o caixa')
+  assert.equal(modal().props.focarCampo, true)
+  assert.equal(modal().props.segurarFechamento, false)
+  const contado = () => andar(modal(), (n) => n.type === 'CampoReais')[0]
+  assert.equal(contado().props['data-foco-inicial'], '')
+  contado().props.aoMudar(22210)
+  assert.equal(modal().props.segurarFechamento, true)
+  const diferenca = doTipo(modal(), 'DiferencaDaGaveta')[0]
+  assert.equal(diferenca.props.conferencia.texto.replace(/ /g, ' '), 'Faltam R$ 40,00')
+  assert.equal(diferenca.props.conferencia.gravidade, 'Diferença grande: conte de novo antes de fechar.')
+  const componente = readFileSync(new URL('../src/componentes/DiferencaDaGaveta.jsx', import.meta.url), 'utf8')
+  assert.match(componente, /<output className=\{className\} aria-live="polite">/, 'a região existe antes do valor')
+})
+
+await confere('#2078 B12: sem conexão no fechamento não culpa o valor e a nova tentativa relê; erro velho não vence o aviso novo', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  const fechadoAgora = { ...DIA_ABERTO_2078(), fechado: true, fechamento: { id: 'f', data: '2026-10-11', saldoFinal: 292.1, fechadoEm: '2026-10-11T22:00:00Z' } }
+  // Abrir o modal e a 1ª confirmação leem o dia aberto; a 2ª confirmação não consegue ler; a 3ª já vê o dia fechado.
+  const c = caixaQueRele(DIA_ABERTO_2078(), DIA_ABERTO_2078(), DIA_ABERTO_2078())
+  g.caixa = c
+  let fechamentos = 0
+  g.acoes = { ...acoesDoCaixa(), fecharCaixa: async () => { fechamentos += 1; throw Object.assign(new Error('Sem conexão com o EasyStok.'), { status: 0 }) } }
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  await doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Fechar o caixa').props.onClick()
+  const modal = () => doTipo(t.renderizar(), 'Modal')[0]
+  const alerta = () => andar(modal(), (n) => n.props?.role === 'alert').map(limpo).join(' | ')
+  const confirmar = () => doTipo(modal().props.rodape, 'Botao').find((b) => texto(b) === 'Fechar o caixa').props.onClick()
+  andar(modal(), (n) => n.type === 'CampoReais')[0].props.aoMudar(26210)
+  await confirmar()
+  assert.equal(fechamentos, 1)
+  assert.match(alerta(), /^Sem conexão com o EasyStok\. Não deu para saber se o fechamento foi gravado\./)
+  assert.doesNotMatch(alerta(), /Confira o valor/)
+  // A releitura falha agora: o aviso dela aparece sozinho, sem o erro da tentativa anterior.
+  c.recarregar = async () => null
+  await confirmar()
+  assert.equal(alerta(), 'Não deu para conferir o caixa agora. Tente de novo antes de fechar.')
+  // Ela tenta de novo e o fechamento sem resposta tinha gravado: a releitura vê o dia fechado e o modal sai.
+  c.recarregar = async () => { c.dia = fechadoAgora; return fechadoAgora }
+  await confirmar()
+  assert.equal(fechamentos, 1, 'não manda fechar de novo')
+  assert.equal(doTipo(t.renderizar(), 'Modal').length, 0)
+})
+
+await confere('#2078 B12: recusa da API diz que o caixa não fechou, sem culpar o valor; esperado que mudou aparece uma vez', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  const entrou = { ...DIA_ABERTO_2078(), saldoInicial: 140 }
+  g.caixa = caixaQueRele(DIA_ABERTO_2078(), DIA_ABERTO_2078(), entrou)
+  g.acoes = { ...acoesDoCaixa(), fecharCaixa: async () => { throw Object.assign(new Error('O caixa de hoje já foi fechado.'), { status: 409 }) } }
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  await doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Fechar o caixa').props.onClick()
+  const modal = () => doTipo(t.renderizar(), 'Modal')[0]
+  const alerta = () => andar(modal(), (n) => n.props?.role === 'alert').map(limpo).join(' | ')
+  const confirmar = () => doTipo(modal().props.rodape, 'Botao').find((b) => texto(b) === 'Fechar o caixa').props.onClick()
+  andar(modal(), (n) => n.type === 'CampoReais')[0].props.aoMudar(26210)
+  await confirmar()
+  assert.equal(alerta(), 'O caixa não foi fechado. O caixa de hoje já foi fechado.')
+  await confirmar()
+  assert.match(alerta(), /^Entrou ou saiu dinheiro enquanto você contava\. O esperado na gaveta agora é R\$ 272,10\. Confira a contagem e feche de novo\.$/)
+})
+
+await confere('#2078 B20: dia fechado não manda conferir antes de fechar', async () => {
+  montarFetch([[DIA_DA_API, { data: dia() }]])
+  g.caixa = caixaCom(dia({ aberto: true, fechado: true, saldoInicial: 100, totalVendas: 38, saldoEsperado: 138,
+    linhasExtras: [{ em: '2026-10-11T17:00:00Z', tipo: 'venda', valor: 38, descricao: 'Mobile', meio: null, origem: 'Venda' }],
+    fechamento: { id: 'f', data: '2026-10-11', saldoFinal: 138, fechadoEm: '2026-10-11T23:00:00Z', observacoes: null } }))
+  const t = montar(AbaCaixaApi)
+  await t.assentar()
+  assert.match(limpo(t.arvore), /O que veio sem forma de pagamento pode ter sido dinheiro\./)
+  assert.doesNotMatch(limpo(t.arvore), /confira antes de fechar o caixa/)
+})
+
+const { ModalAbrirLoja, ModalFecharLoja } = await import('../src/features/loja/GestoLoja.jsx')
+const FECHAMENTO_DE_ONTEM = { id: 'f-0', data: '2026-10-10', saldoInicial: 100, totalVendas: 0, totalPagamentosPedidos: 140, totalEntradasExtras: 0, totalSaidasExtras: 50, saldoFinal: 190, dinheiroNaGaveta: 130, fechadoEm: '2026-10-10T23:00:00Z', fechadoPorNome: 'Thati', observacoes: null }
+
+await confere('#2078 B6: caixa e loja fechados dizem quem destrava e onde, sem mudar permissão', async () => {
+  g.caixa = caixaCom(dia({ aberto: true, fechado: true, fechamento: { id: 'f', data: '2026-10-11', fechadoEm: '2026-10-11T23:14:00Z' } }))
+  const t = montar(ModalAbrirLoja, { aoFechar() {} })
+  t.renderizar()
+  assert.match(limpo(t.arvore), /não reabre\. A loja só abre com o caixa aberto\. Para a loja voltar a seguir o horário da semana, a dona usa Atendimento › Horários e mensagens › Voltar a seguir o horário\./)
+  assert.ok(!doTipo(t.arvore.props.rodape, 'Botao').some((b) => /Abrir/.test(texto(b))), 'continua sem botão de abrir')
+})
+
+await confere('#2078 D5/B8 e D6: abrir a loja mostra só a gaveta do último fechamento e pede só o troco', async () => {
+  g.caixa = { ...caixaCom(dia({ totalPagamentosPedidos: 45, saldoEsperado: 45,
+    linhasExtras: [{ em: '2026-10-11T12:00:00Z', tipo: 'pagamento', valor: 45, descricao: '', meio: 'dinheiro', origem: 'Pedido' }] })), fechamentos: [FECHAMENTO_DE_ONTEM] }
+  const t = montar(ModalAbrirLoja, { aoFechar() {} })
+  t.renderizar()
+  const numeros = doTipo(doTipo(t.arvore, 'dl')[0], 'dt').map(texto)
+  assert.deepEqual(numeros, ['Na gaveta em 10/10'], 'sem "Entrou" e "Saiu" que não fechavam com a gaveta')
+  const campo = andar(t.arvore, (n) => n.type === 'CampoReais')[0]
+  assert.equal(campo.props.rotulo, 'Saldo inicial (o troco da gaveta)')
+  assert.match(campo.props.dica.replace(/ /g, ' '), /^Só o troco que ficou de ontem, sem os R\$ 45,00 em dinheiro que já entraram hoje: eles já estão na conta\. Já vem com o que o fechamento de 10\/10 deixou\.$/)
+})
+
+// #2078 (revisão R1): a operadora abria a loja pelo topo: o caixa abria (política Operador) e o
+// controle da loja respondia 403. Sem `controlarLoja`, nada sai e a tela diz quem abre.
+await confere('#2078 R1: quem não controla a loja não abre caixa nem loja pelo gesto, e sabe quem abre', async () => {
+  const chamadas = []
+  g.acesso = { acoes: { gerenciarCaixa: false, controlarLoja: false }, permite: () => true }
+  g.acoes = { ...acoesDoCaixa(), abrirLojaComCaixa: async (...a) => { chamadas.push(a) } }
+  g.caixa = { ...caixaCom(dia()), fechamentos: [FECHAMENTO_DE_ONTEM] }
+  const t = montar(ModalAbrirLoja, { aoFechar() {} })
+  t.renderizar()
+  assert.match(t.arvore.props.descricao, /Só gerente ou dona abre a loja: peça a uma delas\./)
+  assert.deepEqual(doTipo(t.arvore.props.rodape, 'Botao').map(texto), ['Entendi'])
+  assert.equal(andar(t.arvore, (n) => n.type === 'CampoReais').length, 0, 'sem campo de saldo inicial')
+  assert.deepEqual(chamadas, [])
+})
+
+await confere('#2078 B9/B10: fechar a loja diz o estado do caixa e quem não pode fechar não escreve justificativa à toa', async () => {
+  g.acesso = { acoes: { gerenciarCaixa: true, controlarLoja: true }, permite: () => true }
+  g.caixa = caixaCom(dia({ aberto: true, fechado: true }))
+  const gerenteVe = montar(ModalFecharLoja, { aoFechar() {} })
+  gerenteVe.renderizar()
+  assert.match(limpo(gerenteVe.arvore), /O caixa de hoje já está fechado\./)
+  assert.doesNotMatch(limpo(gerenteVe.arvore), /O caixa continua aberto/)
+  assert.equal(doTipo(gerenteVe.arvore, 'CampoArea').length, 1)
+  g.acesso = { acoes: { gerenciarCaixa: false, controlarLoja: false }, permite: () => true }
+  g.caixa = caixaCom(dia({ aberto: true }))
+  const operadora = montar(ModalFecharLoja, { aoFechar() {} })
+  operadora.renderizar()
+  assert.match(operadora.arvore.props.descricao, /Só gerente ou dona fecha a loja agora: peça a uma delas\./)
+  assert.equal(doTipo(operadora.arvore, 'CampoArea').length, 0, 'sem campo de justificativa')
+  assert.deepEqual(doTipo(operadora.arvore.props.rodape, 'Botao').map(texto), ['Entendi'])
+  assert.match(limpo(operadora.arvore), /O caixa continua aberto\. Para fechar o caixa, use Financeiro › Caixa do dia\./)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
