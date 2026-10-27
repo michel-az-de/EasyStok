@@ -16,7 +16,7 @@ import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
 import { relerParaFechar } from '../../../aplicacao/fechamentoDoCaixa'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import {
-  diaMes, gavetaDoFechamento, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
+  diaMes, dicaDoSaldoInicial, gavetaDoFechamento, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
   CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
@@ -34,32 +34,34 @@ const OPCOES_METODO = METODOS_CAIXA.map((id) => ({ valor: id, rotulo: nomeDoMeto
 // Uma ação por vez, com o erro da API ao lado do botão; depois de gravar, relê o dia.
 // #1627: `origem` diz quem pediu a ação ('abertura', 'estorno'). Sem ela, estornar um lançamento no
 // dia sem abertura fazia o botão dizer "Abrindo o caixa…" e punha o erro no bloco de abrir.
+// #2078 (B12): `semResposta` é a rede que caiu (status 0 do cliente da API): ninguém sabe se gravou.
 function useAcaoComRecarga(recarregar) {
-  const [situacao, setSituacao] = useState({ enviando: false, erro: null, origem: null })
+  const [situacao, setSituacao] = useState({ enviando: false, erro: null, origem: null, semResposta: false })
   const emCurso = useRef(false)
   const executar = async (fn, origem = null) => {
     if (emCurso.current) return false
     emCurso.current = true
-    setSituacao({ enviando: true, erro: null, origem })
+    setSituacao({ enviando: true, erro: null, origem, semResposta: false })
     try {
       await fn()
       await recarregar()
-      setSituacao({ enviando: false, erro: null, origem: null })
+      setSituacao({ enviando: false, erro: null, origem: null, semResposta: false })
       return true
     } catch (erro) {
-      setSituacao({ enviando: false, erro: erro.message, origem })
+      setSituacao({ enviando: false, erro: erro.message, origem, semResposta: erro?.status === 0 })
       return false
     } finally {
       emCurso.current = false
     }
   }
-  return [situacao, executar, () => setSituacao((atual) => ({ ...atual, erro: null }))]
+  return [situacao, executar, () => setSituacao((atual) => ({ ...atual, erro: null, semResposta: false }))]
 }
 
 // J2 (#1990): dinheiro do caixa se digita em reais ("100" é R$ 100,00); campo vazio vale zero.
-function CampoDinheiro({ rotulo, dica, centavos, aoMudar, disabled = false }) {
+function CampoDinheiro({ rotulo, dica, centavos, aoMudar, disabled = false, ...resto }) {
   return (
     <CampoReais
+      {...resto}
       disabled={disabled}
       rotulo={rotulo}
       dica={dica}
@@ -94,7 +96,7 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
       </p>
       <CampoDinheiro
         rotulo="Saldo inicial"
-        dica="O dinheiro que está na gaveta ao abrir o dia."
+        dica={dicaDoSaldoInicial(dia)}
         centavos={centavos}
         disabled={enviando}
         aoMudar={(valor) => { setCentavos(valor); confirmacao.desfazer() }}
@@ -123,7 +125,9 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
   )
 }
 
-function FormLancamento({ executar, enviando, aoRegistrar }) {
+// #2078 (B11/E4): o modal mora aqui, junto do que ela digitou. O foco abre no valor e, com algo
+// digitado, Esc e clique fora não fecham; o X fecha.
+function ModalLancamento({ executar, enviando, erro, aoFechar }) {
   const { agora } = useAtendimento()
   const { lancarMovimentoCaixa } = useAcoes()
   const [tipo, setTipo] = useState(TIPOS_MOVIMENTO.SAIDA)
@@ -136,44 +140,48 @@ function FormLancamento({ executar, enviando, aoRegistrar }) {
   const trocarTipo = (novo) => { setTipo(novo); setCategoria((atual) => categoriaAoTrocarTipo(atual, novo)) }
   // Saída pela web exige descrição (FIN-003): é o rastro da auditoria.
   const incompleto = !categoria.trim() || centavos <= 0 || moedaAltaDemais(centavos) || (saida && !descricao.trim())
+  const digitado = Boolean(categoria.trim() || centavos > 0 || descricao.trim())
 
   return (
-    <form
-      className={css.formLancamento}
-      onSubmit={async (e) => {
-        e.preventDefault()
-        if (enviando || incompleto) return
-        const ok = await executar(() => lancarMovimentoCaixa(agora, {
-          tipoMovimento: tipo, categoria, valor: centavos / 100, meio: metodo, descricao,
-        }))
-        if (ok) { setCategoria(''); setCentavos(0); setDescricao(''); aoRegistrar() }
-      }}
-    >
-      <div className={css.tiposLancamento} role="radiogroup" aria-label="Tipo de lançamento">
-        <Chip papel="escolha" disabled={enviando} ativo={!saida} onClick={() => trocarTipo(TIPOS_MOVIMENTO.ENTRADA)}>Entrada</Chip>
-        <Chip papel="escolha" disabled={enviando} ativo={saida} onClick={() => trocarTipo(TIPOS_MOVIMENTO.SAIDA)}>Saída</Chip>
-      </div>
-      {/* #1474: suprimento (reforço de troco) entra na gaveta; sangria e despesa saem. */}
-      <div className={css.categoriasSugeridas}>
-        {(saida ? CATEGORIAS_SAIDA_SUGERIDAS : CATEGORIAS_ENTRADA_SUGERIDAS).map((sugestao) => (
-          <Chip key={sugestao} papel="filtro" disabled={enviando} ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>{sugestao}</Chip>
-        ))}
-      </div>
-      <div className={css.formGrade}>
-        <CampoTexto disabled={enviando} rotulo="Categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} />
-        <CampoSelecao disabled={enviando} rotulo="Forma de pagamento" opcoes={OPCOES_METODO} value={metodo} onChange={(e) => setMetodo(e.target.value)} />
-      </div>
-      <CampoDinheiro disabled={enviando} rotulo="Valor" centavos={centavos} aoMudar={setCentavos} />
-      <CampoTexto
-        rotulo={saida ? 'Descrição (obrigatória na saída)' : 'Descrição (opcional)'}
-        value={descricao}
-        disabled={enviando}
-        onChange={(e) => setDescricao(e.target.value)}
-      />
-      <Botao tipo="submit" variante="primario" icone={saida ? 'menos' : 'mais'} disabled={enviando || incompleto}>
-        {enviando ? 'Registrando…' : `Lançar ${saida ? 'saída' : 'entrada'}`}
-      </Botao>
-    </form>
+    <Modal titulo="Lançar entrada ou saída" aoFechar={enviando ? undefined : aoFechar} focarCampo segurarFechamento={digitado || enviando}>
+      {erro}
+      <form
+        className={css.formLancamento}
+        onSubmit={async (e) => {
+          e.preventDefault()
+          if (enviando || incompleto) return
+          const ok = await executar(() => lancarMovimentoCaixa(agora, {
+            tipoMovimento: tipo, categoria, valor: centavos / 100, meio: metodo, descricao,
+          }))
+          if (ok) { setCategoria(''); setCentavos(0); setDescricao(''); aoFechar() }
+        }}
+      >
+        <div className={css.tiposLancamento} role="radiogroup" aria-label="Tipo de lançamento">
+          <Chip papel="escolha" disabled={enviando} ativo={!saida} onClick={() => trocarTipo(TIPOS_MOVIMENTO.ENTRADA)}>Entrada</Chip>
+          <Chip papel="escolha" disabled={enviando} ativo={saida} onClick={() => trocarTipo(TIPOS_MOVIMENTO.SAIDA)}>Saída</Chip>
+        </div>
+        {/* #1474: suprimento (reforço de troco) entra na gaveta; sangria e despesa saem. */}
+        <div className={css.categoriasSugeridas}>
+          {(saida ? CATEGORIAS_SAIDA_SUGERIDAS : CATEGORIAS_ENTRADA_SUGERIDAS).map((sugestao) => (
+            <Chip key={sugestao} papel="filtro" disabled={enviando} ativo={categoria === sugestao} onClick={() => setCategoria(sugestao)}>{sugestao}</Chip>
+          ))}
+        </div>
+        <div className={css.formGrade}>
+          <CampoTexto disabled={enviando} rotulo="Categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} />
+          <CampoSelecao disabled={enviando} rotulo="Forma de pagamento" opcoes={OPCOES_METODO} value={metodo} onChange={(e) => setMetodo(e.target.value)} />
+        </div>
+        <CampoDinheiro disabled={enviando} rotulo="Valor" centavos={centavos} aoMudar={setCentavos} data-foco-inicial="" />
+        <CampoTexto
+          rotulo={saida ? 'Descrição (obrigatória na saída)' : 'Descrição (opcional)'}
+          value={descricao}
+          disabled={enviando}
+          onChange={(e) => setDescricao(e.target.value)}
+        />
+        <Botao tipo="submit" variante="primario" icone={saida ? 'menos' : 'mais'} disabled={enviando || incompleto}>
+          {enviando ? 'Registrando…' : `Lançar ${saida ? 'saída' : 'entrada'}`}
+        </Botao>
+      </form>
+    </Modal>
   )
 }
 
@@ -254,13 +262,18 @@ function UltimosFechamentos({ fechamentos }) {
             </span>
             {/* #1920: o valor da linha é o dinheiro que ficou na gaveta, o mesmo que a abertura sugere;
                 `saldoFinal` soma Pix e cartão e desmentia o "Contado na gaveta" da observação. */}
-            <span className={css.linhaValor} title={`Total do dia: ${moeda(f.saldoFinal)}`}>{moeda(gavetaDoFechamento(f))}</span>
+            <span className={css.linhaValor} title={`${ROTULO_TOTAL_DO_CAIXA}: ${moeda(f.saldoFinal)}`}>{moeda(gavetaDoFechamento(f))}</span>
           </li>
         ))}
       </ul>
     </>
   )
 }
+
+// #2078 (D7/B17): um nome só para o total da API (troco, dinheiro, Pix e cartão). Eram quatro ("Total do
+// caixa" no Hall, "Total esperado do dia", "Total do dia", "Total do dia até agora"), e o "do dia" se
+// confundia com o resultado do dia da tabela dos 7 dias.
+const ROTULO_TOTAL_DO_CAIXA = 'Total do caixa (com Pix e cartão)'
 
 // #1474: a gaveta primeiro, porque é o número que ela confere na mão. #1624: a linha de vendas
 // entra quando há venda; sem ela as linhas não somavam o total.
@@ -279,7 +292,6 @@ function ResumoDoDia({ dia, gaveta, semAbertura = false }) {
     { rotulo: semAbertura ? ROTULO_FORA_DO_DINHEIRO : ROTULO_FORA_DA_GAVETA, valor: gaveta.pixECartao },
     gaveta.semForma !== 0 && { rotulo: 'Sem forma de pagamento', valor: gaveta.semForma },
   ].filter(Boolean)
-  const total = semAbertura ? 'Total do dia até agora' : dia.fechado ? 'Total do dia' : 'Total esperado do dia'
   return (
     <>
       {/* Sete itens cabem numa linha só; com outro número, quatro colunas não deixam o total sozinho. */}
@@ -287,13 +299,16 @@ function ResumoDoDia({ dia, gaveta, semAbertura = false }) {
         {linhas.map((l) => (
           <div key={l.rotulo} className={l.forte ? css.resumoForte : undefined}><dt>{l.rotulo}</dt><dd>{moeda(l.valor)}</dd></div>
         ))}
-        <div className={css.resumoTotal}><dt>{total}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
+        <div className={css.resumoTotal}><dt>{ROTULO_TOTAL_DO_CAIXA}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
       </dl>
       <p className={css.notaGaveta}>
         {semAbertura
           ? 'Sem abrir o caixa, o sistema não sabe quanto havia na gaveta: aqui está só o que entrou e saiu hoje.'
           : 'Pix e cartão não compõem o dinheiro da gaveta.'}
-        {gaveta.semForma !== 0 && ' O que veio sem forma de pagamento pode ser dinheiro: confira antes de fechar o caixa.'}
+        {/* #2078 (B20): com o caixa fechado não há mais o que conferir antes de fechar. */}
+        {gaveta.semForma !== 0 && (dia.fechado
+          ? ' O que veio sem forma de pagamento pode ter sido dinheiro.'
+          : ' O que veio sem forma de pagamento pode ser dinheiro: confira antes de fechar o caixa.')}
       </p>
     </>
   )
@@ -334,7 +349,7 @@ function FluxoDaSemana({ hoje }) {
         <table className={css.fluxo}>
           <caption>Entrou e saiu não contam suprimento e sangria, que só trocam o dinheiro de lugar.</caption>
           <thead>
-            <tr><th scope="col">Dia</th><th scope="col">Entrou</th><th scope="col">Saiu</th><th scope="col">Saldo do dia</th><th scope="col">Caixa</th></tr>
+            <tr><th scope="col">Dia</th><th scope="col">Entrou</th><th scope="col">Saiu</th><th scope="col">Resultado do dia</th><th scope="col">Caixa</th></tr>
           </thead>
           <tbody>
             {linhas.map((l, indice) => (
@@ -342,7 +357,7 @@ function FluxoDaSemana({ hoje }) {
                 <th scope="row">{l.desde ? `Desde ${diaMes(l.desde)}` : indice === 0 ? `Hoje, ${diaMes(l.data)}` : `${diaDaSemana(l.data)}, ${diaMes(l.data)}`}</th>
                 <td data-rotulo="Entrou">{moeda(l.entrou)}</td>
                 <td data-rotulo="Saiu">{moeda(l.saiu)}</td>
-                <td data-rotulo="Saldo do dia" className={l.saldo < 0 ? css.valorSaida : undefined}>{moeda(l.saldo)}</td>
+                <td data-rotulo="Resultado do dia" className={l.saldo < 0 ? css.valorSaida : undefined}>{moeda(l.saldo)}</td>
                 <td data-rotulo="Caixa">
                   <Pilula tom={SITUACAO_DO_DIA[l.situacao].tom} fina>{SITUACAO_DO_DIA[l.situacao].rotulo}</Pilula>
                   {/* O dia fechado vem com os números do fechamento; o que entrou depois vem à parte (#1630). */}
@@ -359,7 +374,7 @@ function FluxoDaSemana({ hoje }) {
                 <th scope="row">{desde ? 'Total' : '7 dias'}</th>
                 <td data-rotulo="Entrou">{moeda(total.entrou)}</td>
                 <td data-rotulo="Saiu">{moeda(total.saiu)}</td>
-                <td data-rotulo="Saldo" className={total.saldo < 0 ? css.valorSaida : undefined}>{moeda(total.saldo)}</td>
+                <td data-rotulo="Resultado" className={total.saldo < 0 ? css.valorSaida : undefined}>{moeda(total.saldo)}</td>
                 <td data-rotulo="Caixa">{plural(linhas.filter((l) => l.situacao !== 'sem-movimento').length, 'dia com movimento', 'dias com movimento')}</td>
               </tr>
             </tfoot>
@@ -423,11 +438,15 @@ export function AbaCaixaApi() {
       else setFecharAberto(true)
     } finally { setConferindo(false) }
   }
+  // #2078 (B12): cada tentativa começa sem o erro da anterior (o erro velho da API vencia o aviso
+  // novo da releitura). Se a tentativa anterior gravou sem resposta, a releitura já vem fechada.
   const confirmarFechamento = async (contado) => {
+    limparErro()
     setAvisoDoFechamento(null)
     setConferindo(true)
     try {
       const lido = await relerParaFechar(caixa.recarregar, { esperadoVisto: gaveta.naGaveta })
+      if (lido.dia?.fechado) { setFecharAberto(false); return }
       if (lido.erro) { setAvisoDoFechamento(lido.erro); return }
       if (await executar(() => fecharCaixa(agora, contado, lido.gaveta.naGaveta))) setFecharAberto(false)
     } finally { setConferindo(false) }
@@ -447,7 +466,7 @@ export function AbaCaixaApi() {
           </div>
           <h3 className={css.tituloSecao}>Movimento de hoje</h3>
           {comMovimento
-            ? <p className={css.corpoBloco}>Já tem dinheiro no dia, mesmo sem abrir o caixa. Abrir o caixa só registra o que está na gaveta.</p>
+            ? <p className={css.corpoBloco}>Já tem dinheiro no dia, mesmo sem abrir o caixa. Ao abrir, informe só o troco: o que entrou hoje já está na conta.</p>
             : <p className={css.corpoBloco}>Nada entrou nem saiu hoje ainda.</p>}
           {comMovimento && <ResumoDoDia dia={dia} gaveta={gaveta} semAbertura />}
         </>
@@ -508,10 +527,7 @@ export function AbaCaixaApi() {
       </section>
 
       {podeLancar && lancamentoAberto && (
-        <Modal titulo="Lançar entrada ou saída" aoFechar={acao.enviando ? undefined : fecharLancamento}>
-          {erro}
-          <FormLancamento executar={executar} enviando={acao.enviando} aoRegistrar={fecharLancamento} />
-        </Modal>
+        <ModalLancamento executar={executar} enviando={acao.enviando} erro={erro} aoFechar={fecharLancamento} />
       )}
 
       {podeGerenciar && fecharAberto && (
@@ -520,7 +536,9 @@ export function AbaCaixaApi() {
           resumo={dia}
           gaveta={gaveta}
           enviando={acao.enviando || conferindo}
-          erro={acao.erro ?? avisoDoFechamento}
+          erro={acao.erro}
+          erroSemResposta={acao.semResposta}
+          aviso={avisoDoFechamento}
           aoFechar={() => setFecharAberto(false)}
           aoConfirmar={confirmarFechamento}
         />
