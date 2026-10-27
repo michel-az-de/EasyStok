@@ -186,4 +186,24 @@ confere('os quatro chips de cobrança não entram no congelamento', () => {
   assert.doesNotMatch(fonte('features/ficha-cliente/EscolhaDeMeio.jsx'), /congelad/, 'EscolhaDeMeio sem gate')
 })
 
+// ---------------------------------------------------------------- Primeiros passos (#2070)
+
+const { PASSOS, abasDoPasso } = await import('../src/dominio/configuracaoInicial.js')
+confere('nenhum passo dos Primeiros passos aponta para tela congelada, e a própria tela não está congelada', () => {
+  const lugarDaAba = (aba) => MODULOS.flatMap((m) => m.telas.map((t) => ({ m, t }))).find(({ t }) => t.aba === aba)
+  let abas = 0
+  for (const passo of PASSOS) {
+    for (const aba of abasDoPasso(passo.id)) {
+      const lugar = lugarDaAba(aba)
+      assert.ok(lugar, `${passo.id}: a aba ${aba} existe no catálogo`)
+      assert.ok(!moduloCongelado(lugar.m.id), `${passo.id}: módulo ${lugar.m.id} congelado`)
+      assert.ok(!telaCongelada(lugar.m.id, lugar.t.id), `${passo.id}: tela ${lugar.m.id}/${lugar.t.id} congelada`)
+      abas += 1
+    }
+  }
+  assert.ok(abas >= 16, 'os passos montam as abas do catálogo')
+  assert.ok(!moduloCongelado('configuracoes') && !telaCongelada('configuracoes', 'primeiros-passos'))
+  assert.ok(telasDoMenu(moduloPorId('configuracoes'), { fonteApi: true }).some((t) => t.id === 'primeiros-passos'))
+})
+
 console.log(`\n${passou} verificações passaram.`)

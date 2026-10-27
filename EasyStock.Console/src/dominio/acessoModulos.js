@@ -30,6 +30,16 @@ export const respostasEditaveis = ({ fonteApi, acoes }) => !fonteApi || podeEdit
 // Os desacertos de estoque (produto vendido sem saldo) exigem a permissão de estoque, que a matriz só
 // passa a dizer com `verDesacertosEstoque`. Sem a chave, lê como antes: a recusa segue sem alerta.
 export const podeVerDesacertos = (acoes) => acoes?.verDesacertosEstoque !== false
+// #2070: Primeiros passos e os formulários da loja em Configurações (nível Admin ou suporte, empresa no token, módulo
+// Configurações). Estrita: sem a chave do servidor é falso, sem fallback de outra ação.
+export const podeConfigurarLoja = (acoes) => acoes?.configurarLoja === true
+
+// #1921: a ação de cada tela do catálogo (`tela.acao` em dominio/modulos.js), pela mesma regra das rotas da API.
+export const PODE_NA_TELA = Object.freeze({
+  ajustarEntrega: podeAjustarEntrega,
+  configurarLoja: podeConfigurarLoja,
+  editarAtendimento: (acoes) => acoes?.editarAtendimento === true,
+})
 
 export const entradaDoPerfil = (acesso) => permiteModulo(acesso, acesso?.portaDeEntrada)
   ? `#/m/${acesso.portaDeEntrada}` : '#/'
