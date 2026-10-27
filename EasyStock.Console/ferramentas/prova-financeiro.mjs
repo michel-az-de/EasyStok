@@ -27,6 +27,82 @@ pagamento.status = 'Estornado'
 assert.equal(extratoFinanceiro(contas, movimentos, '2026-10-11', '2026-10-11')[0].estornado, true)
 assert.equal(extratoFinanceiro(contas, movimentos, '2026-10-12', '2026-10-12').length, 0)
 
+// #2095: lista orientada a vencimento, rótulos honestos, formulário e período.
+const fin = await import('../src/dominio/financeiro.js')
+const hoje = '2026-10-27'
+const parcela = (dia, saldo, status = 'Pendente', valor = saldo) => ({ id: dia + status, numero: 1, valor, saldo, status, dataVencimento: fin.instanteFinanceiro(dia), pagamentos: [] })
+const conta = (id, status, parcelas, extra = {}) => ({ id, descricao: id, status, parcelas, pendente: parcelas.reduce((s, p) => s + p.saldo, 0), valorTotal: parcelas.reduce((s, p) => s + p.valor, 0), dataEmissao: fin.instanteFinanceiro('2026-10-01'), ...extra })
+const contasDoDia = [
+  conta('vencida', 'Vencida', [parcela('2026-10-20', 10)]),
+  conta('hoje', 'Aberta', [parcela(hoje, 20)]),
+  conta('amanha', 'Aberta', [parcela('2026-10-28', 30)]),
+  conta('semana-que-vem', 'Aberta', [parcela('2026-11-03', 40)]),
+  conta('longe', 'Aberta', [parcela('2026-11-20', 50)]),
+  conta('rascunho-hoje', 'Rascunho', [parcela(hoje, 60)]),
+  conta('cancelada-hoje', 'Cancelada', [parcela(hoje, 70, 'Cancelada')], { valorTotal: 0 }),
+  conta('paga-hoje', 'Paga', [parcela(hoje, 0, 'Paga', 80)], { pendente: 0 }),
+]
+const doChip = (chip) => contasDoDia.filter(fin.planoDoChip(chip, hoje).local ?? (() => true)).map((c) => c.id)
+const emAberto = ['vencida', 'hoje', 'amanha', 'semana-que-vem', 'longe']
+assert.deepEqual(doChip('hoje'), ['hoje'], 'vence hoje: só conta em aberto, sem rascunho, cancelada ou paga')
+assert.deepEqual(doChip('semana'), ['amanha', 'semana-que-vem'], 'próximos 7 dias: de amanhã a hoje + 7')
+assert.deepEqual(doChip('abertas'), emAberto, 'em aberto: sem rascunho, cancelada nem paga')
+assert.deepEqual(doChip('vencidas'), emAberto, 'vencidas: a API filtra o status e o cliente tira as fechadas')
+assert.equal(fin.planoDoChip('vencidas', hoje).api.status, 'Vencida')
+assert.equal(fin.planoDoChip('todas', hoje).local, null, 'Todas pagina no servidor')
+assert.equal(fin.CHIP_PADRAO, 'abertas')
+const planoHoje = fin.planoDoChip('hoje', hoje).api
+assert.equal(planoHoje.vencimentoDe, '2026-10-27T03:00:00.000Z', 'filtro de vencimento vai como instante (F4)')
+assert.equal(planoHoje.vencimentoAte, '2026-10-28T02:59:59.999Z')
+assert.deepEqual(fin.filtrosDaApi({ busca: ' gás ', status: '', vencimentoDe: hoje, vencimentoAte: hoje }), { busca: 'gás', status: '', vencimentoDe: '2026-10-27T03:00:00.000Z', vencimentoAte: '2026-10-28T02:59:59.999Z' })
+assert.deepEqual(fin.ordenarPorVencimento([contasDoDia[4], contasDoDia[7], contasDoDia[1], contasDoDia[0]]).map((c) => c.id), ['vencida', 'hoje', 'longe', 'paga-hoje'], 'ordem pela próxima parcela em aberto; quitada no fim')
+assert.equal(fin.tomDoStatusConta('Vencida'), 'perigo', 'C2: vencida com o tom que existe na Pilula')
+assert.equal(fin.tomDoStatusConta('Paga'), 'ok')
+assert.equal(fin.statusDaConta(conta('atrasada', 'Aberta', [parcela('2026-10-26', 5)]), hoje), 'Vencida', 'aberta com parcela de ontem já aparece vencida')
+assert.equal(fin.statusDaConta(contasDoDia[1], hoje), 'Aberta')
+assert.equal(fin.statusDaConta(contasDoDia[6], hoje), 'Cancelada')
+assert.deepEqual(fin.valorDaLinha(contasDoDia[1]), { rotulo: 'Falta', valor: 20 })
+assert.deepEqual(fin.valorDaLinha(contasDoDia[6]), { rotulo: 'Cancelada', valor: 70 }, 'C3: cancelada mostra o valor lançado, não R$ 0,00')
+assert.deepEqual(fin.valorDaLinha(contasDoDia[7], 'receber'), { rotulo: 'Recebido', valor: 80 })
+assert.equal(fin.valorLancado({ parcelas: [{ valor: 0.1 }, { valor: 0.2 }] }), 0.3, 'soma em centavos')
+assert.equal(fin.proximaParcela(conta('duas', 'Aberta', [parcela('2026-11-10', 5), parcela('2026-10-30', 5), parcela('2026-10-01', 0, 'Paga', 5)])).dataVencimento, fin.instanteFinanceiro('2026-10-30'))
+assert.equal(fin.nomeStatusConta('ParcialmentePaga', 'receber'), 'Parcialmente recebida', 'C10')
+assert.equal(fin.nomeStatusConta('Paga', 'receber'), 'Recebida')
+assert.equal(fin.nomeStatusConta('ParcialmentePaga'), 'Parcialmente paga')
+assert.equal(fin.nomeStatusPagamento('Confirmado'), 'Registrado')
+assert.equal(fin.palavrasDoLado('receber').data, 'Data do recebimento')
+assert.equal(fin.palavrasDoLado('pagar').forma, 'Forma de pagamento')
+assert.equal(fin.paginaValida(3, 20), 1, 'C12: página vazia volta para a primeira')
+assert.equal(fin.paginaValida(2, 21), 2)
+assert.equal(fin.paginaValida(1, 0), 1)
+assert.deepEqual(fin.paginaDaLista([1, 2, 3, 4, 5], 2, 2), [3, 4])
+assert.equal(fin.podeEditarConta({ status: 'Aberta' }, true), false, 'C5: a API só edita rascunho')
+assert.equal(fin.podeEditarConta({ status: 'Rascunho' }, true), true)
+assert.equal(fin.podeEditarConta({ status: 'Rascunho' }, false), false)
+assert.equal(fin.podeRegistrarNaConta(contasDoDia[1], true), true)
+assert.equal(fin.podeRegistrarNaConta(contasDoDia[1], false), false, '#476: só quem gerencia registra pagamento')
+assert.equal(fin.podeRegistrarNaConta(contasDoDia[5], true), false, 'rascunho não recebe pagamento (F1)')
+assert.equal(fin.podeRegistrarNaConta(contasDoDia[6], true), false, 'cancelada não recebe pagamento (F2)')
+assert.equal(fin.podeRegistrarNaConta(contasDoDia[7], true), false)
+assert.equal(fin.chipDaHash(fin.hashDoChip('pagar', 'vencidas')), 'vencidas')
+assert.equal(fin.chipDaHash('#/m/financeiro/pagar'), null)
+assert.equal(fin.chipDaHash('#/m/financeiro/pagar/inventado'), null)
+const formulario = { descricao: 'Gás', categoria: 'c', centavos: 1000, quantidade: 1, emissao: hoje, vencimento: hoje }
+assert.equal(fin.motivoContaInvalida(formulario), null)
+assert.equal(fin.motivoContaInvalida({ ...formulario, vencimento: '2026-10-26' }), 'O primeiro vencimento não pode ser antes da emissão.', 'C8')
+assert.equal(fin.motivoContaInvalida({ ...formulario, descricao: ' ' }), 'Escreva a descrição da conta.')
+assert.equal(fin.motivoContaInvalida({ ...formulario, categoria: '' }), 'Escolha a categoria financeira.')
+assert.equal(fin.motivoContaInvalida({ ...formulario, centavos: 0 }), 'Informe o valor total.')
+assert.equal(fin.motivoContaInvalida({ ...formulario, centavos: 2, quantidade: 3 }), 'Cada parcela precisa de pelo menos R$ 0,01.')
+assert.deepEqual(fin.mesFinanceiro('2026-10-27'), { inicio: '2026-10-01', fim: '2026-10-31' }, 'C4: relatório no mês inteiro')
+assert.deepEqual(fin.mesFinanceiro('2028-02-10'), { inicio: '2028-02-01', fim: '2028-02-29' })
+assert.equal(fin.diaMais('2026-12-31', 1), '2027-01-01')
+const tecnica = "Cannot write DateTime with Kind=Unspecified to PostgreSQL type 'timestamp with time zone', only UTC is supported."
+assert.doesNotMatch(fin.mensagemFinanceira(tecnica), /Cannot|Kind|PostgreSQL/, 'F4: texto do Npgsql não vai para a tela')
+assert.doesNotMatch(fin.mensagemFinanceira('System.InvalidOperationException: x'), /Exception/)
+assert.equal(fin.mensagemFinanceira('So e possivel atualizar conta em Rascunho'), 'Só dá para editar uma conta em rascunho.')
+assert.equal(fin.mensagemFinanceira('Categoria de teste indisponível'), 'Categoria de teste indisponível', 'mensagem humana passa como veio')
+
 const { gravarSessao } = await import('../src/infra/api/sessao.js')
 const armazenamento = new Map()
 globalThis.sessionStorage = { getItem: (chave) => armazenamento.get(chave) ?? null, setItem: (chave, valor) => armazenamento.set(chave, valor), removeItem: (chave) => armazenamento.delete(chave) }

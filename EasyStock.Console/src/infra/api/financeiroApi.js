@@ -39,6 +39,8 @@ async function todas(url, filtros = {}) {
 }
 
 export const listarContasFinanceiras = (lado, filtros) => pagina(baseConta(lado), { pageSize: 20, ...filtros })
+// #2095: lista inteira de um filtro, para o recorte e a ordem por vencimento feitos no console.
+export const listarTodasContasFinanceiras = (lado, filtros) => todas(baseConta(lado), filtros)
 export const obterContaFinanceira = (lado, id) => chamarApi(`${baseConta(lado)}/${id}`)
 export const salvarContaFinanceira = (lado, corpo, id = null) => escrever(`${baseConta(lado)}${id ? '/' + id : ''}`, id ? { ...corpo, id } : corpo, id ? 'PATCH' : 'POST')
 export const emitirContaFinanceira = (lado, id) => chamarApi(`${baseConta(lado)}/${id}/emitir`, { metodo: 'POST' })
@@ -53,6 +55,7 @@ export const listarCategoriasFinanceiras = () => chamarApi('/api/financeiro/cate
 export const listarCentrosFinanceiros = () => chamarApi('/api/financeiro/centros-custo')
 export const salvarCadastroFinanceiro = (tipo, corpo, id) => escrever(`/api/financeiro/${tipo}${id ? '/' + id : ''}`, id ? { ...corpo, id } : corpo, id ? 'PATCH' : 'POST')
 export const inativarCadastroFinanceiro = (tipo, id) => chamarApi(`/api/financeiro/${tipo}/${id}/inativar`, { metodo: 'POST' })
+export const reativarCadastroFinanceiro = (tipo, id) => chamarApi(`/api/financeiro/${tipo}/${id}/reativar`, { metodo: 'POST' })
 
 export async function obterExtratoFinanceiro({ inicio, fim }, acesso) {
   const [pagar, receber, movimentos] = await Promise.all([

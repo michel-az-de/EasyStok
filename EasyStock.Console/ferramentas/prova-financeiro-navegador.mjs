@@ -12,7 +12,7 @@ registerHooks({ resolve(spec, contexto, proximo) {
   return proximo(spec, contexto)
 } })
 const { MODULOS, hashDoModulo, telasDoMenu } = await import('../src/dominio/modulos.js')
-const { telaCongelada } = await import('../src/dominio/congelados.js')
+const { telaCongelada, moduloCongelado } = await import('../src/dominio/congelados.js')
 const { HASH_HALL } = await import('../src/dominio/rota.js')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const origem = process.env.CONSOLE_URL ?? 'http://127.0.0.1:5186'
@@ -37,6 +37,18 @@ async function capturarTela(page, modulo, tela, tema) {
   await page.screenshot({ path: join(evidencias, arquivo), fullPage: true })
   capturas.push({ modulo: modulo.id, tela: tela.id, rota: hashDoModulo(modulo.id, tela.id), arquivo, viewport, tema, tipoProva: 'HTTP controlado' })
   writeFileSync(join(evidencias, 'indice-telas.json'), JSON.stringify(capturas, null, 2))
+}
+// #1871: o Sair e quem está logado moram atrás do avatar; a prova abre o menu da conta e confere os dois.
+async function conferirSessao(page) {
+  // No celular o Sair fica no topo, fora da camada da conta.
+  if ((page.viewportSize()?.width ?? 1440) < 760) { assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 1); return }
+  await page.getByRole('button', { name: /^Conta de / }).first().click()
+  const camada = page.getByRole('group', { name: 'Conta', exact: true })
+  assert.equal(await camada.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
+  await camada.getByText('Dona de teste', { exact: true }).waitFor()
+  await camada.getByText('Empresa de teste', { exact: true }).waitFor()
+  await page.getByRole('button', { name: /^Conta de / }).first().click()
+  await camada.waitFor({ state: 'hidden' })
 }
 const empresaId = '11111111-1111-4111-8111-111111111111'
 const categoriaId = '33333333-3333-4333-8333-333333333333'
@@ -130,6 +142,8 @@ try {
   let telasVerificadas = 0
   for (const modulo of MODULOS) {
     const telas = telasDoMenu(modulo, { fonteApi: true })
+    // Módulo congelado (#1891) não tem menu nem rota; a prova-congelados cobre que ele cai no hall.
+    if (!telas.length) continue
     for (const telaId of [undefined, ...telas.map(tela => tela.id)]) {
       await page.goto(origem + '/' + hashDoModulo(modulo.id, telaId))
       // O Balcão é a referência aprovada e conserva seu próprio painel lateral.
@@ -191,22 +205,24 @@ try {
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
   await page.getByRole('main', { name: 'Contas a pagar', exact: true }).waitFor()
-  assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
+  await conferirSessao(page)
   await page.getByText('Conversas ao vivo do EasyStok', { exact: true }).waitFor({ state: 'hidden' })
-  await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
-  modulosPermitidos = new Set(['cozinha'])
-  await page.goto(origem + '/#/m/cozinha/producao')
-  await page.reload()
-  const preparacao = page.getByRole('main')
-  await preparacao.getByText('Em preparação', { exact: true }).waitFor()
-  assert.equal(await preparacao.locator('a[href="#/m/producao/producao"]').count(), 0)
-  assert.equal(await preparacao.getByRole('link', { name: 'Ver módulos', exact: true }).count(), 1)
-  const voltarAosModulos = preparacao.getByRole('link', { name: 'Ver módulos', exact: true })
-  assert.ok(await voltarAosModulos.evaluate(no => no.getBoundingClientRect().height >= 44))
-  await page.keyboard.press('Tab')
-  await voltarAosModulos.focus()
-  assert.equal(await voltarAosModulos.evaluate(no => document.activeElement === no && getComputedStyle(no).outlineStyle === 'solid'), true)
-  await page.screenshot({ path: join(evidencias, 'cozinha-preparacao-sem-acesso-producao.png') })
+  // Cozinha/Produção congelada (#1891): sem tela, sem o aviso "Em preparação"; a prova-congelados cobre a rota.
+  if (!telaCongelada('cozinha', 'producao')) {
+    modulosPermitidos = new Set(['cozinha'])
+    await page.goto(origem + '/#/m/cozinha/producao')
+    await page.reload()
+    const preparacao = page.getByRole('main')
+    await preparacao.getByText('Em preparação', { exact: true }).waitFor()
+    assert.equal(await preparacao.locator('a[href="#/m/producao/producao"]').count(), 0)
+    assert.equal(await preparacao.getByRole('link', { name: 'Ver módulos', exact: true }).count(), 1)
+    const voltarAosModulos = preparacao.getByRole('link', { name: 'Ver módulos', exact: true })
+    assert.ok(await voltarAosModulos.evaluate(no => no.getBoundingClientRect().height >= 44))
+    await page.keyboard.press('Tab')
+    await voltarAosModulos.focus()
+    assert.equal(await voltarAosModulos.evaluate(no => document.activeElement === no && getComputedStyle(no).outlineStyle === 'solid'), true)
+    await page.screenshot({ path: join(evidencias, 'cozinha-preparacao-sem-acesso-producao.png') })
+  }
   modulosPermitidos = new Set(MODULOS.map(modulo => modulo.id))
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.reload()
@@ -216,13 +232,17 @@ try {
   let modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
   await modal.getByLabel('Descrição', { exact: true }).fill('Conta criada pela prova')
   await modal.getByLabel('Categoria financeira', { exact: true }).selectOption(categoriaId)
-  await modal.getByLabel('Valor total', { exact: true }).fill('10000')
+  await modal.getByLabel('Valor total', { exact: true }).fill('100')
   await page.screenshot({ path: join(evidencias, 'financeiro-modal-nova-conta.png') })
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
   await modal.waitFor({ state: 'hidden' })
   assert.equal(escritas.find((item) => item.caminho === '/api/contas-a-pagar').corpo.parcelas[0].valor, 100)
-  await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).click()
+  // #2095 (C7): depois de salvar, a conta criada abre sozinha (o mock devolve a Compra de embalagens).
   modal = page.getByRole('dialog', { name: 'Compra de embalagens', exact: true })
+  await modal.waitFor()
+  await page.keyboard.press('Escape')
+  await modal.waitFor({ state: 'hidden' })
+  await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).click()
   await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).click()
   const pagamento = page.getByRole('dialog', { name: 'Registrar pagamento', exact: true })
   await pagamento.getByRole('button', { name: 'Confirmar registro', exact: true }).click()
@@ -238,6 +258,19 @@ try {
   await modal.waitFor({ state: 'hidden' })
   assert.equal(await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).evaluate((no) => no === document.activeElement), true)
   await page.screenshot({ path: join(evidencias, 'financeiro-contas-desktop.png') })
+  // #2095: "Pagar" na linha abre o registro da próxima parcela direto (2 cliques em vez de 3).
+  await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).click()
+  const pagamentoDireto = page.getByRole('dialog', { name: 'Registrar pagamento', exact: true })
+  await pagamentoDireto.getByRole('button', { name: 'Confirmar registro', exact: true }).click()
+  await pagamentoDireto.waitFor({ state: 'hidden' })
+  assert.equal(escritas.filter((item) => item.caminho === `/api/contas-a-pagar/${contaId}/parcelas/${parcelaId}/pagamentos`).length, 2)
+  Object.assign(conta, { status: 'Aberta', pendente: 100, totalPago: 0 }); Object.assign(conta.parcelas[0], { saldo: 100, valorPago: 0, pagamentos: [] })
+  // Chips de vencimento: o filtro vai como instante (a API recusa data pura, F4).
+  const pedidoHoje = page.waitForRequest((pedido) => new URL(pedido.url()).pathname === '/api/contas-a-pagar' && new URL(pedido.url()).searchParams.has('vencimentoDe'))
+  await page.getByRole('button', { name: 'Vencem hoje', exact: true }).click()
+  assert.match(new URL((await pedidoHoje).url()).searchParams.get('vencimentoDe'), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+  await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Vencem hoje', exact: true }).getAttribute('aria-pressed'), 'true')
   await page.goto(origem + '/#/m/financeiro/receber')
   await page.getByRole('button', { name: 'Abrir conta Venda de encomenda' }).click()
   modal = page.getByRole('dialog', { name: 'Venda de encomenda', exact: true })
@@ -281,7 +314,9 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
   // Duas modais abertas: Escape fecha a filha e o foco volta ao botão da conta.
   await page.setViewportSize({ width: 1440, height: 960 })
-  await page.goto(origem + '/#/m/financeiro/pagar')
+  // #2095 (C5): a API só edita rascunho; "Editar conta" aparece só nele.
+  conta.status = 'Rascunho'
+  await page.goto(origem + '/#/m/financeiro/pagar/todas')
   await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).click()
   modal = page.getByRole('dialog', { name: 'Compra de embalagens', exact: true })
   await modal.getByRole('button', { name: 'Editar conta', exact: true }).click()
@@ -290,12 +325,13 @@ try {
   assert.equal(await modal.isVisible(), true)
   assert.equal(await modal.getByRole('button', { name: 'Editar conta', exact: true }).evaluate((no) => no === document.activeElement), true)
   await page.keyboard.press('Escape')
+  conta.status = 'Aberta'
   falhaDeGravacao = true
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
   await modal.getByLabel('Descrição', { exact: true }).fill('Conta recusada')
   await modal.getByLabel('Categoria financeira', { exact: true }).selectOption(categoriaId)
-  await modal.getByLabel('Valor total', { exact: true }).fill('10000')
+  await modal.getByLabel('Valor total', { exact: true }).fill('100')
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
   await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).waitFor()
   assert.equal(await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).isVisible(), true)
@@ -323,6 +359,10 @@ try {
   }
   await page.goto(origem + '/#/m/financeiro/visao-geral')
   await page.getByText('Pago no mês', { exact: true }).waitFor()
+  // #2095 (C1): a visão geral responde o que vence hoje, com o atalho para a lista filtrada.
+  await page.getByRole('heading', { name: /^Vence hoje/ }).first().waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).isVisible(), true)
+  assert.equal(await page.locator('a[href="#/m/financeiro/pagar/hoje"]').count(), 1)
   await page.getByRole('radio', { name: 'Escuro', exact: true }).click()
   await page.screenshot({ path: join(evidencias, 'financeiro-visao-geral-escuro.png') })
   await page.goto(origem + '/#/m/atendimento/balcao')
@@ -341,12 +381,18 @@ try {
   await page.reload()
   await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).count(), 0)
+  assert.equal(await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).count(), 0, '#476: quem só consulta não registra pagamento')
   acoes.visualizarContasPagar = false
   await page.reload()
-  await page.getByText('Seu perfil não pode consultar estas contas', { exact: true }).waitFor()
+  // #2095 (F17): sem visualizar, a tela sai do menu do Financeiro e a rota digitada cai no Caixa do dia (#1921).
+  await page.waitForURL((url) => url.hash === '#/m/financeiro/caixa')
+  assert.equal(await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).locator('a[href="#/m/financeiro/pagar"]').count(), 0)
   acoes.visualizarContasPagar = true
   acoes.gerenciarContasPagar = true
+  // Recarrega a matriz antes de pedir a tela: com a matriz velha a moldura devolveria ao Caixa.
   await page.reload()
+  await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).locator('a[href="#/m/financeiro/pagar"]').waitFor()
+  await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).count(), 0)
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
@@ -381,14 +427,13 @@ try {
   falhaDeConversas = true
   await page.reload()
   await page.getByText(/Conversas sem atualização:.*Consulta de conversas indisponível na prova/).waitFor()
-  assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
-  await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
+  await conferirSessao(page)
   await page.screenshot({ path: join(evidencias, 'financeiro-aviso-global-preservado.png') })
   falhaDeConversas = false
   await page.reload()
   await page.getByText(/Conversas sem atualização:/).waitFor({ state: 'hidden' })
   await page.getByText('Conversas ao vivo do EasyStok', { exact: true }).waitFor({ state: 'hidden' })
-  await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
+  await conferirSessao(page)
   assert.deepEqual(erros, [])
   const demonstracao = await browser.newContext({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce' })
   await demonstracao.grantPermissions(['local-network-access'], { origin: origem })
@@ -401,7 +446,7 @@ try {
     ['cozinha', 'producao', 'Saldo por item, a partir dos lotes'],
     ['campanhas', 'fidelidade', 'BEMVINDA10'],
     ['configuracoes', 'integracoes', 'Entregador próprio'],
-  ]) {
+  ].filter(([modulo, tela]) => !moduloCongelado(modulo) && !telaCongelada(modulo, tela))) {
     await paginaDemo.goto(origem + '/' + hashDoModulo(modulo, tela))
     await paginaDemo.getByText(texto, { exact: true }).first().waitFor()
     assert.equal(await paginaDemo.getByRole('main').getByText('Em preparação', { exact: true }).count(), 0)
