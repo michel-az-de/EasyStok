@@ -61,7 +61,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
     gerarCobranca, reenviarCobranca, confirmarPagamento,
     marcarComprovante, aceitarDivergencia, escolherJanela, forcarEncaixe,
     cancelarPedido, marcarEstorno, abrirEncerramento, decidirAreaEntrega, escolherMeioPagamento,
-    alterarMeioPagamento, desfazerPagamento, aprovarPedido, novaComanda,
+    alterarMeioPagamento, desfazerPagamento, aprovarPedido, novaComanda, recarregarPedido,
   } = useAcoes()
   const { janelas, prefixosCepAtendidos, cardapio, canais } = useCatalogo()
   // #1884 ("Quanto fica?"): uma simulação por comanda, para a comanda e a barra mostrarem os mesmos números.
@@ -290,6 +290,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
               key={chaves.devolucoes}
               pedidoId={pedido.pedidoId}
               cancelado={pedido.estado === 'cancelado'}
+              aoAlterado={() => recarregarPedido?.(selecionada.id)}
             />}
             {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={chaves.ocorrenciasApi} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
             {!fonteApi && pedido.ocorrencia && (

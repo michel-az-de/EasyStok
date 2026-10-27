@@ -18,9 +18,12 @@ const meios = [
 ]
 const data = (valor) => new Date(valor).toLocaleString('pt-BR')
 
-export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
+// #2079 (C4): `aoAlterado` pede à Ficha que releia o pedido depois de uma devolução (o "a devolver" do Resumo).
+export function BlocoDevolucoes({ pedidoId, cancelado = false, aoAlterado = null }) {
   const { acoes } = useAcessoModulos()
   const { dados, erro, aviso, pendente, ocupado, atualizar, registrar } = useEstornosManuais(pedidoId)
+  // O estorno online só relia a si mesmo: "A devolver" daqui e a Ficha seguiam com o valor de antes.
+  const mudou = () => { atualizar(); aoAlterado?.() }
   const [aberto, setAberto] = useState(false)
   const [pagamentoId, setPagamentoId] = useState('')
   const [centavos, setCentavos] = useState('')
@@ -54,6 +57,7 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
     if (!valido || ocupado) return
     if (await registrar({ pagamentoId, valor, metodo, motivo: motivo.trim(), referencia: referencia.trim(), valorJaDevolvido: confirmado })) {
       setAberto(false); setConfirmado(false); setPagamentoId(''); setMotivo(''); setReferencia('')
+      aoAlterado?.()
     }
   }
 
@@ -66,8 +70,9 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false }) {
         {!dados && <p className={css.corpoBloco}>{ocupado ? 'Consultando devoluções…' : 'Não foi possível consultar as devoluções.'}</p>}
         {dados && <>
           {aDevolver > 0 && <output className={css.corpoBloco}><strong>A devolver: {moeda(aDevolver)}</strong>. {textoADevolver({ comOnline })}</output>}
-          <p className={css.corpoBloco}>Recebido: {moeda(dados.pagamentos.reduce((s, p) => s + p.valor, 0))}. Devolução manual confirmada: {moeda(totalDevolvido)}.</p>
-          {comOnline && <EstornosOnline pedidoId={pedidoId} />}
+          {/* #2079 (C11): o "manual R$ 0,00" ao lado do estorno online parecia dizer que nada foi devolvido. */}
+          <p className={css.corpoBloco}>Recebido: {moeda(dados.pagamentos.reduce((s, p) => s + p.valor, 0))}.{(totalDevolvido > 0 || !comOnline) && <> Devolução manual confirmada: {moeda(totalDevolvido)}.</>}</p>
+          {comOnline && <EstornosOnline pedidoId={pedidoId} aoAlterado={mudou} />}
           {dados.estornos.map((e) => <p key={e.id} className={css.corpoBloco}>
             <strong>{moeda(e.valor)} · {meios.find((m) => m.valor === e.metodo)?.rotulo ?? e.metodo}</strong><br />
             {data(e.registradoEm)}{e.usuarioNome ? ` · ${e.usuarioNome}` : ''}<br />
