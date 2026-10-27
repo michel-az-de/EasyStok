@@ -110,8 +110,11 @@ public class PermissoesLegadasMigrationTests
                         INSERT INTO perfis_permissoes ("Id", "PerfilId", "Permissao")
                         VALUES ({Guid.NewGuid()}, {perfilIds[i]}, 'AtenderConversas')
                         """);
-                db.UsuariosEmpresas.Add(new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = usuarios[i].Id,
-                    EmpresaId = empresaId, Ativo = true, CriadoEm = DateTime.UtcNow });
+                // SQL cru como em perfis: o modelo atual tem colunas que ainda não existem neste ponto (EhDona, #2070).
+                await db.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO usuarios_empresas ("Id", "UsuarioId", "EmpresaId", "Ativo", "CriadoEm")
+                    VALUES ({Guid.NewGuid()}, {usuarios[i].Id}, {empresaId}, true, {DateTime.UtcNow})
+                    """);
                 db.UsuariosPerfis.Add(new UsuarioPerfil { Id = Guid.NewGuid(), UsuarioId = usuarios[i].Id,
                     EmpresaId = empresaId, PerfilId = perfilIds[i], AtribuidoEm = DateTime.UtcNow });
             }
@@ -123,7 +126,8 @@ public class PermissoesLegadasMigrationTests
             await PerfisCasaDaBabaSeed.ExecutarAsync(db, empresas[0].Id);
             await db.Database.MigrateAsync();
             var perfis = await db.Perfis.IgnoreQueryFilters().Include(p => p.Permissoes).ToListAsync();
-            perfis.Should().HaveCount(8);
+            // Os 5 casos e os 4 perfis da casa (Administração, Gerência, Atendimento e Cozinha; Gerência nasce no #2070).
+            perfis.Should().HaveCount(9);
             for (var i = 0; i < casos.Length; i++)
             {
                 var perfil = perfis.Single(p => p.Id == perfilIds[i]);
