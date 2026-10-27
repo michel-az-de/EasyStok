@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f1e6">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Casa da Baba · App piloto</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#302820;background:#f7f1e6;line-height:1.6;font-synthesis:none}*{box-sizing:border-box}body{margin:0}main{max-width:760px;margin:auto;padding:48px 24px 36px}.brand{display:flex;align-items:center;gap:12px;font:600 25px Georgia,serif}.seal{display:grid;place-items:center;width:48px;height:48px;border:1px solid #b48a3b;border-radius:50%;color:#9b7027}.eyebrow{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:#846b47;margin-top:42px}h1{font:500 clamp(32px,6vw,46px)/1.13 Georgia,serif;letter-spacing:-.02em;margin:12px 0 20px;max-width:560px}.intro{font-size:18px;color:#675d51;max-width:560px}.download{background:#fffdf8;border:1px solid #e5dac7;border-radius:22px;padding:28px;margin:30px 0}.version{color:#786b57;font-size:14px;margin:0 0 18px}.button{display:block;background:#ae4e31;color:#fff;text-align:center;text-decoration:none;border-radius:12px;padding:16px 20px;font-size:17px;font-weight:650}.button:hover{background:#923f27}.button:focus-visible,summary:focus-visible{outline:3px solid #246658;outline-offset:4px}.button[aria-disabled=true]{background:#d1c6b5;color:#4e463b;pointer-events:none}.small{font-size:13px;color:#6c6256;margin:14px 0 0}h2{font:500 24px Georgia,serif;margin:34px 0 14px}ol{padding-left:23px}li{padding-left:4px;margin:12px 0}.notice{border-left:3px solid #b99551;padding:2px 0 2px 18px;margin:28px 0}.notice p{margin:8px 0}details{border-top:1px solid #dacdb7;margin-top:28px;padding-top:18px}summary{cursor:pointer;color:#6a5b43}dl{font-size:12px}dt{font-weight:650;margin-top:12px}dd{margin:3px 0;overflow-wrap:anywhere;font-family:ui-monospace,monospace}footer{font-size:12px;color:#8c7a61;border-top:1px solid #dacdb7;margin-top:38px;padding-top:18px}.error{color:#933a28}#changes{padding-left:20px}#changes li{margin:6px 0}[hidden]{display:none!important}@media(max-width:420px){main{padding:28px 20px}.download{padding:22px}.eyebrow{margin-top:30px}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand"><span class="seal" aria-hidden="true">B</span> Casa da Baba</div>
+  <p class="eyebrow">Android · Piloto de validação</p>
+  <h1>A rotina da cozinha,<br>no seu celular.</h1>
+  <p class="intro">Instale o app para experimentar produção e etiquetas. Pedidos, frete, cobrança e IA usam o Atendimento online, acessível pelo próprio app.</p>
+  <section class="download" aria-label="Download do aplicativo">
+    <p id="version" class="version" role="status" aria-live="polite">Consultando a versão disponível…</p>
+    <a id="download" class="button" aria-disabled="true" tabindex="-1">Baixar app para Android</a>
+    <p class="small">Este link sempre apresenta a versão publicada mais recente. O app será instalado como <strong>Casa da Baba Piloto</strong>.</p>
+    <p id="error" class="error" role="alert" hidden>Não foi possível consultar a versão. Confira sua conexão e recarregue esta página.</p>
+  </section>
+  <h2>Para começar</h2>
+  <ol>
+    <li><strong>Baixe o arquivo no Android</strong> e abra o download concluído.</li>
+    <li>Se o Android pedir autorização para instalar por essa origem, autorize somente o navegador usado neste download. Mantenha o Play Protect ativo. Se houver alerta de risco, interrompa e avise o Felipe.</li>
+    <li><strong>Abra o app com internet.</strong> Use o código de pareamento fornecido pela equipe e aguarde a primeira sincronização.</li>
+    <li>Use somente as operações reais combinadas com a equipe. O Atendimento e os registros sincronizados usam os dados da Casa da Baba. Para testes fictícios, use um ambiente separado.</li>
+  </ol>
+  <div class="notice">
+    <p><strong>Se a conexão ou o EasyStok cair</strong></p>
+    <p>A produção pode continuar com os dados já carregados após o pareamento e a sincronização inicial. Os registros locais pendentes aguardam o EasyStok voltar. Nesta versão, pedidos, frete, cobrança e IA pelo Atendimento precisam de internet e do servidor disponível.</p>
+  </div>
+  <h2>Escopo deste piloto</h2>
+  <p>A produção permite cadastrar e etiquetar com armazenamento local. Pedidos com frete, cobrança, mensagens e IA abrem o Atendimento do EasyStok, com o acesso da operação. O registro de pedido no aparelho é uma alternativa de contingência e não calcula frete nem envia mensagens automaticamente.</p>
+  <div class="notice">
+    <p><strong>Validação com a equipe antes do uso diário</strong></p>
+    <p>A instalação e a atualização no Android, a impressão física e a entrega de mensagens pelo canal ainda precisam de aceite no aparelho da operação. A Oasis OIA-8381-B está identificada, mas a impressão nesse modelo permanece bloqueada até confirmar o protocolo e testar o driver. A impressora atual continua selecionável.</p>
+    <p>Não substitua o fluxo diário até concluir essa validação. Se houver erro, pare a operação afetada, preserve os dados e procure a equipe. Não reinstale nem limpe os dados para tentar corrigir uma falha.</p>
+  </div>
+  <h2>Quando houver uma atualização</h2>
+  <p>Volte a este link, baixe a nova versão e confirme a atualização no Android. <strong>Não desinstale o app antes</strong>, para preservar os dados locais ainda não sincronizados.</p>
+  <section id="release" hidden>
+    <h2>Nesta versão</h2>
+    <ul id="changes"></ul>
+  </section>
+  <details id="verification" hidden>
+    <summary>Dados da versão e verificação do arquivo</summary>
+    <dl><dt>Publicação</dt><dd id="published"></dd><dt>Arquivo</dt><dd id="filename"></dd><dt>SHA-256 do APK</dt><dd id="hash"></dd><dt>Certificado de assinatura</dt><dd id="certificate"></dd><dt>Versão do código</dt><dd id="build"></dd></dl>
+  </details>
+  <footer>Casa da Baba · Distribuição do piloto pela equipe EasyStok</footer>
+</main>
+<script>
+(async function () {
+  try {
+    const response = await fetch('./latest.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!response.ok) throw new Error('Manifesto indisponível');
+    const release = await response.json();
+    const base = new URL('./', location.href);
+    const url = new URL(release.url, base);
+    if (release.schemaVersion !== 1 || release.appId !== 'com.casadababa.piloto' || url.origin !== base.origin || !url.pathname.startsWith(base.pathname) || !url.pathname.endsWith('.apk') || !/^[a-f0-9]{64}$/i.test(release.sha256) || !Number.isSafeInteger(release.versionCode) || release.versionCode < 1 || typeof release.version !== 'string') throw new Error('Manifesto inválido');
+    document.getElementById('version').textContent = 'Versão ' + release.version + ' · Android · ' + (release.sizeBytes / 1048576).toFixed(1).replace('.', ',') + ' MB';
+    const button = document.getElementById('download');
+    button.href = url.href;
+    button.download = release.fileName;
+    button.removeAttribute('aria-disabled');
+    button.removeAttribute('tabindex');
+    document.getElementById('published').textContent = new Date(release.publishedAt).toLocaleString('pt-BR');
+    document.getElementById('filename').textContent = release.fileName;
+    document.getElementById('hash').textContent = release.sha256;
+    document.getElementById('certificate').textContent = release.signingCertificateSha256;
+    document.getElementById('build').textContent = release.buildSha;
+    document.getElementById('verification').hidden = false;
+    const notes = Array.isArray(release.notes) ? release.notes : [];
+    notes.forEach(note => { const li = document.createElement('li'); li.textContent = String(note); document.getElementById('changes').appendChild(li); });
+    document.getElementById('release').hidden = !notes.length;
+  } catch (_) {
+    document.getElementById('version').textContent = 'Download temporariamente indisponível';
+    document.getElementById('error').hidden = false;
+  }
+})();
+</script>
+</body>
+</html>
