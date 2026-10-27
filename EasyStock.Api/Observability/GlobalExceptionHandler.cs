@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Domain.Services;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Diagnostics;
 
@@ -119,6 +120,14 @@ public class GlobalExceptionHandler(
                 StatusCodes.Status403Forbidden,
                 "FORBIDDEN",
                 "Acesso negado",
+                ex.Message,
+                false),
+
+            // #2070: a recusa da hierarquia leva o próprio código; HIERARQUIA (ator sem autoridade) é 403, o resto é 409.
+            HierarquiaRecusadaException ex => (
+                ex.Codigo == CodigosDaHierarquia.Hierarquia ? StatusCodes.Status403Forbidden : StatusCodes.Status409Conflict,
+                ex.Codigo,
+                ex.Message,
                 ex.Message,
                 false),
 

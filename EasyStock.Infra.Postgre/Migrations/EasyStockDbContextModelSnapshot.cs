@@ -8520,6 +8520,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("EmpresaDaSessaoId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("ExpiraEm")
                         .HasColumnType("timestamp with time zone");
 
@@ -9807,6 +9810,9 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EhDona")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");

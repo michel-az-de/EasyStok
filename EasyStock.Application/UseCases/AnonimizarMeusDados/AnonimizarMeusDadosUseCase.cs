@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Auth;
 
 namespace EasyStock.Application.UseCases.AnonimizarMeusDados;
 
@@ -17,7 +18,8 @@ public sealed record AnonimizarMeusDadosResult(
 /// desativa a conta. Hard-delete dos tokens de credenciais (Refresh/Reset/Confirm
 /// email). AuditLog, MovimentacoesEstoque e demais entidades com valor histórico
 /// mantêm UsuarioId — preserva trilha forense conforme orientação ANPD.
-/// Operação irreversível.
+/// Operação irreversível. #2070: a última dona ativa de uma empresa não se anonimiza (<c>ULTIMA_DONA</c>); a dona que não é
+/// a última perde a marca antes, com a trava da hierarquia de cada empresa.
 /// </summary>
 public sealed class AnonimizarMeusDadosUseCase(
     IUsuarioRepository usuarioRepository,
@@ -26,6 +28,7 @@ public sealed class AnonimizarMeusDadosUseCase(
     IEmailConfirmationTokenRepository emailConfirmationTokenRepository,
     IConsentimentoRepository consentimentoRepository,
     IPreferenciaNotificacaoRepository preferenciaRepository,
+    HierarquiaDeUsuarios hierarquia,
     ICurrentUserAccessor currentUserAccessor,
     IUnitOfWork unitOfWork,
     ILogger<AnonimizarMeusDadosUseCase> logger)
@@ -44,6 +47,9 @@ public sealed class AnonimizarMeusDadosUseCase(
 
         var usuario = await usuarioRepository.GetByIdAsync(usuarioId)
             ?? throw new RegraDeDominioVioladaException("Usuario nao encontrado.");
+
+        // #2070: antes de qualquer remoção. Recusada, nada da conta foi tocado.
+        await hierarquia.SairComoDonaAsync(usuario);
 
         // Hard-delete das credenciais — sem valor historico.
         var refreshRemovidos = await refreshTokenRepository.DeleteAllByUsuarioIdAsync(usuarioId);

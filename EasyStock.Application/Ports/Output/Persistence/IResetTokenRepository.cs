@@ -10,6 +10,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
 
         /// <summary>O segredo aberto (não usado, não expirado) mais recente do usuário para a finalidade.</summary>
         Task<ResetToken?> ObterAbertoAsync(Guid usuarioId, string finalidade, DateTime agora);
+
+        /// <summary>
+        /// O usuário tem convite aberto (#2070, A3): alguma linha <c>Convite</c> não usada e não vencida em
+        /// <paramref name="agora"/>. Sem ela o Google não consome o convite: vencido ou revogado não vale.
+        /// </summary>
+        Task<bool> TemConviteAbertoAsync(Guid usuarioId, DateTime agora);
         Task<IEnumerable<ResetToken>> GetByUsuarioIdAsync(Guid usuarioId);
         Task AddAsync(ResetToken resetToken);
         Task UpdateAsync(ResetToken resetToken);
