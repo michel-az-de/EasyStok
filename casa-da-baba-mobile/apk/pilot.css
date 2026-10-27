@@ -147,3 +147,112 @@
 #pilotHomeVersion { display: block; margin-top: 3px; font: 500 10px/1.3 system-ui, sans-serif; letter-spacing: .03em; color: #786854; }
 
 #pilotTitle:focus, #pilotNoticesTitle:focus, #pilotNoticeDetailTitle:focus { outline: none; }
+/* Operação em primeiro plano: ações claras e apoio contextual. */
+.pilot-home { --pilot-ink: #352d25; --pilot-muted: #75624c; }
+.pilot-home h1 { font-size: 34px; line-height: 1.12; margin: 24px 0 20px; letter-spacing: -.035em; }
+.pilot-home .pilot-topline { border-bottom-color: #e7ddcd; }
+.pilot-topline button { display: inline-flex; align-items: center; justify-content: center; }
+.pilot-topline > span:not(.pilot-notice-brand) { letter-spacing: .1em; }
+.pilot-topline button svg { flex-shrink: 0; }
+.pilot-actions { margin: 0 0 18px; gap: 12px; }
+.pilot-card { display: grid; grid-template-columns: 28px minmax(0, 1fr) 18px; align-items: center; column-gap: 12px; padding: 20px 18px; border-radius: 16px; box-shadow: 0 2px 4px #352d2508; }
+.pilot-action-icon { display: flex; align-items: center; justify-content: center; align-self: start; padding-top: 2px; color: #fff9ee; }
+.pilot-card-copy { display: grid; gap: 7px; min-width: 0; }
+.pilot-card .pilot-step { font-size: 10px; line-height: 1.4; letter-spacing: .06em; }
+.pilot-card strong { margin: 0; font: 400 26px/1.12 Georgia, serif; letter-spacing: -.025em; }
+.pilot-card-description { font: 400 13px/1.5 system-ui, sans-serif; }
+.pilot-card-arrow { display: flex; justify-content: center; color: #fff9ee; }
+.pilot-card-arrow svg { width: 18px; height: 18px; }
+.pilot-connection { padding: 14px 16px 7px; margin: 0 0 16px; border: 1px solid #ded4c1; border-radius: 12px; background: #f3ecdf; }
+.pilot-connection p { color: #605440; line-height: 1.55; }
+.pilot-connection button { font-weight: 650; padding: 8px 0; margin: 2px 16px 0 0; text-underline-offset: 3px; }
+.pilot-hint { line-height: 1.55; }
+.pilot-local { padding: 16px; border-radius: 12px; margin-top: 14px; }
+.pilot-shortcuts button { background: #fffaf2; border-radius: 12px; }
+.pilot-notices h1 { margin-bottom: 10px; }
+.pilot-notices .pilot-intro { font-size: 14px; line-height: 1.5; max-width: 32ch; margin: 0 0 16px; color: var(--pilot-muted); }
+.pilot-notice-list-heading { align-items: center; margin: 0 0 10px; min-height: 32px; }
+.pilot-notice-list-heading h2 { font: 650 11px/1.4 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .07em; margin: 0; color: var(--pilot-muted); }
+.pilot-notice-list-heading span:not(:empty) { padding: 4px 9px; border-radius: 20px; background: #eee2ce; color: #69492b; font-size: 11px; font-weight: 600; }
+.pilot-notice-list { margin-bottom: 8px; }
+.pilot-notice-item { padding: 17px 30px 17px 18px; gap: 6px; }
+.pilot-notice-item[data-unread=true] { padding-left: 18px; background: #fffaf2; }
+.pilot-notice-item strong { font-size: 16px; line-height: 1.4; letter-spacing: -.01em; }
+.pilot-notice-item[data-unread=true]::before { left: 4px; top: 26px; width: 5px; height: 5px; }
+.pilot-notice-item-arrow { position: absolute; right: 5px; top: 18px; display: flex; color: #826d52; }
+.pilot-notice-item-arrow svg { width: 17px; height: 17px; }
+.pilot-notice-preview { font-size: 13px; line-height: 1.6; }
+.pilot-notice-health { margin-top: 0; }
+.pilot-notice-diagnostics { margin-top: 8px; }
+.pilot-notice-back { text-underline-offset: 4px; }
+.pilot-home button { transition: background-color .14s ease, box-shadow .14s ease; -webkit-tap-highlight-color: transparent; }
+.pilot-home button:active, .pilot-rail .pilot-bell:active { box-shadow: inset 0 0 0 2px #352d2533; }
+.pilot-home button:focus-visible, .pilot-home summary:focus-visible, .pilot-rail button:focus-visible { outline: 3px solid #8b6322; outline-offset: 3px; }
+@media (max-width: 480px) {
+  .pilot-home h1 { font-size: 30px; margin-top: 22px; }
+  .pilot-card { padding: 18px 15px; grid-template-columns: 24px minmax(0, 1fr) 16px; gap: 10px; }
+  .pilot-card strong { font-size: 23px; }
+  .pilot-card .pilot-step { font-size: 9px; }
+  .pilot-card-copy { gap: 6px; }
+}
+@media (prefers-reduced-motion: reduce) { .pilot-home button { transition: none; } }
+.pilot-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.pilot-notice-list-heading { justify-content: space-between; }
+.pilot-notice-list-heading #pilotNoticeRefresh { min-height: 44px; margin-left: auto; padding: 8px 0 8px 12px; border: 0; background: transparent; color: #435b49; font-size: 12px; }
+.pilot-notices[data-tone=ready] .pilot-notice-health { border-top: 0; padding: 10px 0; }
+/* Conteúdo operacional do PWA dentro do APK: sem alterar o desenho das etiquetas. */
+body.pilot-app { align-items: flex-start; background: #24221d; --bg: #24221d; --bg-elev: #302d26; --bg-elev-2: #3a352c; --bg-card: #302d26; --ink: #faf3e7; --ink-dim: #d9cbb7; --ink-mute: #b8aa95; --accent: #e7a58b; --accent-soft: #51392e; --basil: #a5c3ad; --basil-soft: #344538; --gold: #dfc28d; --gold-soft: #514633; --border: #544b3c; --border-strong: #78694f; --shadow: 0 2px 8px #00000018; --glow: none; --surface: var(--bg-elev); --line: var(--border-strong); }
+[data-theme=light] body.pilot-app { background: #eee6d9; --bg: #fbf6ec; --bg-elev: #fffaf2; --bg-elev-2: #f2eadc; --bg-card: #fffaf2; --ink: #352d25; --ink-dim: #62533f; --ink-mute: #77644c; --accent: #a34e35; --accent-soft: #f1dfd5; --basil: #496b56; --basil-soft: #e8eee4; --gold: #7a5a28; --gold-soft: #eee2ca; --border: #e4d7c3; --border-strong: #cebc9f; --shadow: 0 2px 8px #352d2508; }
+body.pilot-app > .phone { height: calc(100dvh - 58px); max-height: none; max-width: 600px; margin: 0; border: 0; border-radius: 0; background: var(--bg); box-shadow: none; }
+body.pilot-app .phone > .header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 18px; border-bottom: 1px solid var(--border); background: var(--bg-elev); }
+body.pilot-app .header .header-row1 { grid-area: 1 / 2; display: flex; margin: 0; }
+body.pilot-app .header .title, body.pilot-app .header .brand-logo, body.pilot-app #greetingText { display: none; }
+body.pilot-app .header .greeting { grid-area: 1 / 1; min-width: 0; font-family: inherit; font-style: normal; }
+body.pilot-app .header .sync-chip { min-height: 44px; box-shadow: none; }
+body.pilot-app .header .op-badge { min-width: 0; min-height: 44px; border-color: var(--border); background: var(--bg-elev-2); color: var(--ink-dim); }
+body.pilot-app .header .icon-btn { width: 44px; min-width: 44px; height: 44px; background: transparent; color: var(--ink-dim); box-shadow: none; }
+body.pilot-app .phone .nav { background: var(--bg-elev); box-shadow: none; border-color: var(--border); }
+body.pilot-app .phone .nav-btn { color: var(--ink-mute); }
+body.pilot-app .phone .nav-btn.active { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+body.pilot-app .phone .nav-btn .label { font-size: 10px; }
+body.pilot-app .phone .prod-hero, body.pilot-app .phone .product-tile, body.pilot-app .phone .order-draft-summary, body.pilot-app .phone .order-card, body.pilot-app .phone .client-card, body.pilot-app .phone .input-box, body.pilot-app .phone .search-box { background: var(--bg-elev); border-color: var(--border); box-shadow: none; }
+body.pilot-app .phone .prod-hero { border-radius: 14px; padding: 16px; }
+body.pilot-app .phone .prod-hero::after { background: none; }
+body.pilot-app .phone .prod-hero h2 { font: 400 27px/1.15 Georgia, serif; letter-spacing: -.02em; }
+body.pilot-app .phone .prod-metrics div { background: var(--bg-elev-2); border-color: var(--border); box-shadow: none; }
+body.pilot-app .phone .prod-metrics span { color: var(--ink-dim); font-size: 10px; letter-spacing: .03em; }
+body.pilot-app .phone .prod-create-btn { background: #496b56; color: #fffaf2; box-shadow: none; min-height: 44px; font-weight: 700; border-radius: 10px; }
+body.pilot-app .phone .product-tile.counted { background: var(--basil-soft); border-color: var(--basil); box-shadow: none; }
+body.pilot-app .phone .cta-btn.primary { background: #a34e35; color: #fffaf2; box-shadow: none; }
+body.pilot-app .phone .cta-btn.primary:disabled { background: var(--bg-elev-2); color: var(--ink-mute); box-shadow: none; }
+body.pilot-app .phone .prod-filter button { min-height: 44px; background: var(--bg-elev); color: var(--ink-dim); box-shadow: none; }
+body.pilot-app .phone .prod-filter button.active { background: var(--basil-soft); border-color: var(--basil); color: var(--basil); }
+body.pilot-app .phone .input-box input, body.pilot-app .phone .input-box textarea, body.pilot-app .phone .search-box input { color: var(--ink); }
+body.pilot-app .phone :is(button, input, textarea, select):focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+body.pilot-app .phone .input-box:focus-within, body.pilot-app .phone .search-box:focus-within { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-soft); }
+@media (prefers-reduced-motion: reduce) { body.pilot-app .phone .screen.active { animation: none; } body.pilot-app .phone button { transition: none; } }
+/* Contexto em duas linhas: nomes e estado de sincronização não competem por largura. */
+body.pilot-app .phone > .header { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+body.pilot-app .header .greeting { order: 0; width: 100%; }
+body.pilot-app .header .op-badge { min-width: 110px; max-width: calc(100% - 110px); flex-shrink: 0; border-radius: 10px; }
+body.pilot-app .header #opName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.pilot-app .header .header-row1 { order: 1; width: 100%; justify-content: flex-start; }
+body.pilot-app .header .sync-chip { max-width: 100%; width: auto; min-height: 44px; border-radius: 8px; font-size: 11px; padding: 8px 10px; }
+body.pilot-app .header .sync-chip #syncText { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; }
+body.pilot-app .phone .screen-tabs { background: var(--bg-elev-2); box-shadow: none; mask-image: none; }
+body.pilot-app .phone .screen-tabs .screen-tab { min-height: 44px; color: var(--ink-dim); background: transparent; box-shadow: none; }
+body.pilot-app .phone .screen-tabs .screen-tab.active { background: #496b56; color: #fffaf2; }
+body.pilot-app .phone > .nav > .nav-btn.active { background: var(--accent-soft); background-image: none; box-shadow: none; }
+body.pilot-app .phone > .nav > .nav-btn.active::before { background: var(--accent); box-shadow: none; }
+body.pilot-app .phone .fab, body.pilot-app .phone [data-screen=pedidos] .export-btn { background: #a34e35; color: #fffaf2; box-shadow: 0 2px 6px #352d2515; min-height: 44px; }
+body.pilot-app .phone .product-tile.add-tile { background: var(--bg-elev-2); border-color: var(--border-strong); box-shadow: none; }
+body.pilot-app .phone .product-tile.add-tile .add-icon { background: var(--basil-soft); color: var(--basil); box-shadow: none; }
+body.pilot-app .phone .empty { background: var(--bg-elev); border-color: var(--border); }
+html:not([data-theme=light]) body.pilot-app .pilot-rail { background: var(--bg-elev); border-color: var(--border); color: var(--ink-dim); }
+html:not([data-theme=light]) body.pilot-app .pilot-rail button { color: var(--ink); }
+html:not([data-theme=light]) body.pilot-app .pilot-rail button span { color: var(--ink-dim); }
+html:not([data-theme=light]) body.pilot-app .pilot-rail .pilot-bell { background: var(--bg-elev-2); border-color: var(--border-strong); }
+html:not([data-theme=light]) body.pilot-app .pilot-rail .pilot-bell-count { background: #a34e35; border-color: var(--bg-elev-2); color: #fffaf2; }
+html:not([data-theme=light]) body.pilot-app .pilot-rail[data-sync=online] [role=status] { color: var(--basil); }
+html:not([data-theme=light]) body.pilot-app .pilot-rail[data-sync=pending] [role=status] { color: var(--gold); }
+html:not([data-theme=light]) body.pilot-app .pilot-rail[data-sync=invalid] [role=status] { color: #efb19e; }

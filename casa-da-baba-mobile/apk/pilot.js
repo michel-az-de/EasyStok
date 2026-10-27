@@ -93,6 +93,11 @@
   const native = () => root.Capacitor?.Plugins?.PilotApp;
   const updater = () => root.Capacitor?.Plugins?.PilotUpdater;
   const bellIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M9 20a3 3 0 0 0 6 0"/></svg>';
+  const lineIcon = paths => '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
+  const closeIcon = lineIcon('<path d="m7 7 10 10M17 7 7 17"/>');
+  const arrowIcon = lineIcon('<path d="M5 12h14m-5-5 5 5-5 5"/>');
+  const tagIcon = lineIcon('<path d="M20 13 11 4H4v7l9 9a2 2 0 0 0 3 0l4-4a2 2 0 0 0 0-3Z"/><circle cx="8" cy="8" r="1"/>');
+  const orderIcon = lineIcon('<path d="M7 3h10v18l-2-1-3 1-3-1-2 1V3Z"/><path d="M10 8h4m-4 4h4m-4 4h2"/>');
   const bell = (id, badge) => '<button type="button" id="' + id + '" class="pilot-bell" aria-label="Abrir avisos" title="Avisos" aria-haspopup="dialog" data-action="notices">' + bellIcon + '<span id="' + badge + '" class="pilot-bell-count" hidden aria-hidden="true"></span></button>';
   const rail = doc.createElement('div');
   rail.className = 'pilot-rail';
@@ -106,17 +111,16 @@
   home.setAttribute('aria-labelledby', 'pilotTitle');
   home.innerHTML = `
     <div class="pilot-sheet">
-      <div class="pilot-topline"><span>CASA DA BABA <small id="pilotHomeVersion">PILOTO</small></span><div class="pilot-top-actions">${bell('pilotHomeNoticeBell', 'pilotHomeNoticeCount')}<button type="button" data-action="close" aria-label="Fechar início">×</button></div></div>
+      <div class="pilot-topline"><span>CASA DA BABA <small id="pilotHomeVersion">PILOTO</small></span><div class="pilot-top-actions">${bell('pilotHomeNoticeBell', 'pilotHomeNoticeCount')}<button type="button" data-action="close" aria-label="Fechar início">${closeIcon}</button></div></div>
       <h1 id="pilotTitle" tabindex="-1">Produção e pedidos.</h1>
-      <p class="pilot-intro">Escolha o que precisa fazer agora.</p>
-      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button><button type="button" id="pilotReconnect" data-action="reconnect" hidden>Verificar conexão</button></div>
       <p id="pilotError" class="pilot-feedback pilot-error" role="alert" tabindex="-1"></p>
       <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
       <details id="pilotMigrationReceipt" class="pilot-help" hidden><summary>Última migração confirmada</summary><p id="pilotMigrationResult" class="pilot-feedback" role="status" tabindex="-1"></p></details>
       <div class="pilot-actions">
-        <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-step">PRODUÇÃO NESTE APARELHO</span><strong>Produzir e etiquetar</strong><span>Cadastro, validade, lote e impressão.</span><b aria-hidden="true">↗</b></button>
-        <button type="button" class="pilot-card pilot-orders" data-action="workspace"><span class="pilot-step">ATENDIMENTO ONLINE</span><strong>Pedidos e cobranças</strong><span>Abra o EasyStok para frete, mensagens e assistente.</span><b aria-hidden="true">↗</b></button>
+        <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${tagIcon}</span><span class="pilot-card-copy"><span class="pilot-step">PRODUÇÃO NESTE APARELHO</span><strong>Produzir e etiquetar</strong><span class="pilot-card-description">Cadastro, validade, lote e impressão.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
+        <button type="button" class="pilot-card pilot-orders" data-action="workspace"><span class="pilot-action-icon">${orderIcon}</span><span class="pilot-card-copy"><span class="pilot-step">ATENDIMENTO ONLINE</span><strong>Pedidos e cobranças</strong><span class="pilot-card-description">Frete, mensagens e assistente no EasyStok.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
       </div>
+      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button><button type="button" id="pilotReconnect" data-action="reconnect" hidden>Verificar conexão</button></div>
       <p class="pilot-hint">No Atendimento, entre com seu acesso da Casa da Baba. As alterações são feitas na operação real.</p>
       <button type="button" class="pilot-local" data-action="local-orders"><strong>Registrar pedido no aparelho</strong><span>Sem cálculo de frete nem envio automático. A sincronização exige pareamento.</span></button>
       <details class="pilot-help pilot-migration"><summary>Já usava o PWA antigo?</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><p>Se está começando agora, basta conectar a produção.</p></details>
@@ -137,12 +141,12 @@
   notices.className = 'pilot-home pilot-notices';
   notices.setAttribute('aria-labelledby', 'pilotNoticesTitle');
   notices.innerHTML = `<div id="pilotNoticeSheet" class="pilot-sheet">
-    <div class="pilot-topline"><span class="pilot-notice-brand">${bellIcon} AVISOS</span><button type="button" data-notice-action="close" aria-label="Fechar avisos">×</button></div>
-    <h1 id="pilotNoticesTitle" tabindex="-1">Seus avisos.</h1>
-    <p id="pilotNoticeIntro" class="pilot-intro">Orientações e novidades, guardadas neste aparelho.</p>
+    <div class="pilot-topline"><span class="pilot-notice-brand">${bellIcon} CASA DA BABA</span><button type="button" data-notice-action="close" aria-label="Fechar avisos">${closeIcon}</button></div>
+    <h1 id="pilotNoticesTitle" tabindex="-1">Avisos.</h1>
+    <p id="pilotNoticeIntro" class="pilot-intro">Orientações para sua operação.</p>
     <section id="pilotNoticeHealth" class="pilot-notice-health" aria-labelledby="pilotNoticeHealthTitle"><strong id="pilotNoticeHealthTitle"></strong><p id="pilotNoticeHealthBody"></p><div id="pilotNoticeControls" class="pilot-notice-controls"><button type="button" id="pilotNoticePermission" data-notice-action="permission"></button><button type="button" id="pilotNoticeRefresh" data-notice-action="refresh">Atualizar avisos</button></div></section>
     <p id="pilotNoticeFeedback" class="pilot-feedback pilot-error" role="alert"></p>
-    <div id="pilotNoticeListView"><div class="pilot-notice-list-heading"><h2>Histórico</h2><span id="pilotNoticeUnread"></span></div><div id="pilotNoticeEmpty" class="pilot-notice-empty" role="status">${bellIcon}<strong id="pilotNoticeEmptyTitle"></strong><p id="pilotNoticeEmptyBody"></p></div><div id="pilotNoticeList" class="pilot-notice-list"></div></div>
+    <div id="pilotNoticeListView"><div id="pilotNoticeListHeading" class="pilot-notice-list-heading"><h2 class="pilot-visually-hidden">Neste aparelho</h2><span id="pilotNoticeUnread"></span></div><div id="pilotNoticeEmpty" class="pilot-notice-empty" role="status">${bellIcon}<strong id="pilotNoticeEmptyTitle"></strong><p id="pilotNoticeEmptyBody"></p></div><div id="pilotNoticeList" class="pilot-notice-list"></div></div>
     <article id="pilotNoticeDetail" class="pilot-notice-detail" hidden><button type="button" data-notice-action="back" class="pilot-notice-back">← Voltar ao histórico</button><h2 id="pilotNoticeDetailTitle" tabindex="-1"></h2><p id="pilotNoticeDetailBody"></p><details class="pilot-help"><summary>Recebimento deste aviso</summary><p id="pilotNoticeDetailSource" class="pilot-notice-source"></p></details><button type="button" id="pilotNoticeGuide" data-notice-action="guide" hidden>Ver passo a passo da migração</button></article>
     <details id="pilotNoticeDiagnostics" class="pilot-help pilot-notice-diagnostics"><summary>Configurações e confirmações</summary><p id="pilotNoticePush"></p><p id="pilotNoticeSync"></p><p id="pilotNoticeReceipts" role="status"></p><p id="pilotNoticeError"></p><p>Um aviso recuperado pelo histórico não comprova que o push chegou. A abertura é registrada quando você entra no detalhe do aviso.</p>
     <div class="pilot-notice-device"><span id="pilotNoticeDevice"></span><button type="button" id="pilotNoticeCopy" data-notice-action="copy">Copiar identificação</button></div></details>
@@ -165,6 +169,10 @@
       notices.dataset.contentFirst = String(contentFirst);
     }
     doc.getElementById('pilotNoticeList').setAttribute('aria-busy', String(noticeLoading || noticeState.checking === true));
+    const refreshButton = doc.getElementById('pilotNoticeRefresh');
+    const refreshHost = doc.getElementById(contentFirst ? 'pilotNoticeListHeading' : 'pilotNoticeControls');
+    const restoreRefreshFocus = refreshButton.parentElement !== refreshHost && doc.activeElement === refreshButton;
+    if (refreshButton.parentElement !== refreshHost) refreshHost.append(refreshButton);
     const permissionOff = noticeState.permission === 'denied' || noticeState.permission === 'blocked';
     // Configuração fica secundária; falha de rede não exige mudar a permissão.
     const permissionHost = doc.getElementById(permissionOff ? 'pilotNoticeControls' : 'pilotNoticeDiagnostics');
@@ -185,7 +193,7 @@
     const refresh = doc.getElementById('pilotNoticeRefresh');
     refresh.hidden = !noticeState.supported; refresh.disabled = noticeLoading || noticeState.checking === true;
     refresh.textContent = noticeLoading || noticeState.checking ? 'Conferindo…' : 'Atualizar avisos';
-    if (restorePermissionFocus) (selectedNotice ? doc.getElementById('pilotNoticeDetailTitle') : !refresh.disabled && !refresh.hidden ? refresh : doc.getElementById('pilotNoticesTitle')).focus();
+    if (restorePermissionFocus || restoreRefreshFocus) (selectedNotice ? doc.getElementById('pilotNoticeDetailTitle') : !refresh.disabled && !refresh.hidden ? refresh : doc.getElementById('pilotNoticesTitle')).focus();
     const unread = Number.isSafeInteger(noticeState.unread) && noticeState.unread > 0 ? noticeState.unread : 0;
     for (const [buttonId, badgeId] of [['pilotNoticeBell', 'pilotNoticeCount'], ['pilotHomeNoticeBell', 'pilotHomeNoticeCount']]) {
       const button = doc.getElementById(buttonId), badge = doc.getElementById(badgeId);
@@ -210,9 +218,11 @@
       button.dataset.noticeAction = 'open'; button.dataset.noticeId = item.id;
       button.dataset.unread = item.openedAt > 0 ? 'false' : 'true';
       const title = doc.createElement('strong'); title.textContent = item.title || 'Aviso';
+      button.setAttribute('aria-label', 'Abrir aviso: ' + (item.title || 'Aviso') + (item.openedAt > 0 ? ', já aberto' : ', novo'));
       const description = doc.createElement('span'); description.textContent = (item.openedAt > 0 ? 'Aberto · ' : 'Novo · ') + noticeTime(item.receivedAt);
       const preview = doc.createElement('p'); preview.className = 'pilot-notice-preview'; preview.textContent = item.body || '';
-      button.append(title, description, preview); list.append(button);
+      const arrow = doc.createElement('span'); arrow.className = 'pilot-notice-item-arrow'; arrow.innerHTML = arrowIcon;
+      button.append(title, description, preview, arrow); list.append(button);
       if (focusedId === item.id && !selectedNotice) button.focus();
     }
     doc.getElementById('pilotNoticePush').textContent = 'Último push recebido: ' + noticeTime(noticeState.lastPushAt);

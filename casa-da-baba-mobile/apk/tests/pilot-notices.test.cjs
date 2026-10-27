@@ -192,3 +192,17 @@ test('retorno da permissão durante consulta usa título quando atualizar está 
   listeners.get('noticeStatus')({ ...s, permission: 'granted', checking: true });
   assert.equal(doc.activeElement, nodes.get('pilotNoticesTitle'));
 });
+
+test('atualizar acompanha a lista saudável e volta aos controles ao bloquear, preservando foco', async () => {
+  const s = normal(); const { nodes, doc, listeners } = harness(s); await settle();
+  const refresh = nodes.get('pilotNoticeRefresh');
+  assert.equal(refresh.parentElement, nodes.get('pilotNoticeListHeading'));
+  refresh.focus(); listeners.get('noticeStatus')({ ...s, permission: 'blocked' });
+  const controls = nodes.get('pilotNoticeControls');
+  assert.equal(refresh.parentElement, controls);
+  assert.ok(controls.children.indexOf(nodes.get('pilotNoticePermission')) < controls.children.indexOf(refresh));
+  assert.equal(doc.activeElement, refresh);
+  listeners.get('noticeStatus')(s);
+  assert.equal(refresh.parentElement, nodes.get('pilotNoticeListHeading'));
+  assert.equal(doc.activeElement, refresh);
+});
