@@ -257,20 +257,19 @@ test('início aguarda identificação do operador, sem sobrepor boas-vindas', ()
   assert.equal(nodes.get('pilotHome').open, true);
 });
 
-test('offline mantém registro local disponível e explica por que atendimento não abre', async () => {
-  const { nodes, doc, calls } = pilotHarness({ connected: false });
-  await nodes.get('pilotHome').click('workspace');
-  assert.equal(calls.length, 0);
-  assert.match(nodes.get('pilotError').textContent, /sem conexão/);
-  assert.equal(doc.activeElement, nodes.get('pilotError'));
+test('offline permite abrir Pedidos diretamente pelo início', async () => {
+  const { nodes, calls } = pilotHarness({ connected: false });
   await nodes.get('pilotHome').click('local-orders');
   assert.deepEqual(calls, ['pedidos']);
 });
 
-test('preview online abre o balcão real do atendimento', async () => {
+test('início limita as entradas principais a Produção e Pedidos', async () => {
   const { nodes, calls } = pilotHarness();
-  await nodes.get('pilotHome').click('workspace');
-  assert.deepEqual(calls, ['https://app.easystok.online/#/m/atendimento/balcao']);
+  const markup = fs.readFileSync(path.resolve(__dirname, '../pilot.js'), 'utf8');
+  assert.doesNotMatch(markup, /workspace|Atendimento|atendimento/);
+  await nodes.get('pilotHome').click('production');
+  await nodes.get('pilotHome').click('local-orders');
+  assert.deepEqual(calls, ['producao', 'pedidos']);
 });
 
 test('textos pequenos do início mantêm contraste mínimo de 4,5:1', () => {
@@ -311,7 +310,7 @@ test('sucesso e falha de pareamento ficam visíveis sem abrir diagnóstico', asy
   await nodes.get('pilotHome').click('pair');
   assert.equal(nodes.get('pilotHome').open, true);
   assert.equal(doc.activeElement, nodes.get('pilotConnection'));
-  assert.match(nodes.get('pilotConnection').textContent, /Aparelho vinculado/);
+  assert.match(nodes.get('pilotConnectionDetail').textContent, /Aparelho vinculado/);
   root.pairDevicePrompt = async () => { throw new Error('Código inválido'); };
   await nodes.get('pilotHome').click('pair');
   assert.equal(doc.activeElement, nodes.get('pilotError'));

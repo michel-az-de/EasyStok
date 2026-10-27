@@ -87,18 +87,20 @@ test('mudança por outra tela ou atualização externa não troca filtro escolhi
   assert.equal(selected(f), 'aguardando');
   f.ctx.orders[0].status = 'pronto'; f.ctx.renderKanban(); assert.equal(selected(f), 'aguardando');
 });
-test('pronto continua exigindo conferência sem marcar entregue automaticamente', () => {
+test('APK entrega pelo fluxo do pedido sem abrir conferência; PWA mantém seu fluxo', () => {
   const f = fixture([order('r', 'pronto')]); f.ctx.renderKanban(); f.ctx.advanceOrder('r');
-  assert.equal(f.confer(), 1); assert.equal(f.ctx.orders[0].status, 'pronto');
+  assert.equal(f.confer(), 0); assert.equal(f.ctx.orders[0].status, 'entregue');
+  const web = fixture([order('r', 'pronto')], false); web.ctx.advanceOrder('r');
+  assert.equal(web.confer(), 1); assert.equal(web.ctx.orders[0].status, 'pronto');
 });
 test('card APK preserva avisos, ações, segurança dos textos e filtro de quantidade zero', () => {
   const o = order('a', 'aguardando'); o.clientSnapshot.name = '<img>'; o.items.push({ name: 'invisivel', qty: 0 });
   o.notes = '<script>'; o.negativeStockNote = '<faltou>'; o.channel = '<canal>';
   const f = fixture([o]); f.ctx.renderKanban(); const card = f.list.innerHTML;
-  assert.match(card, /Conferência pendente/); assert.match(card, /pilot-order-meta/); assert.match(card, /10:30/);
+  assert.doesNotMatch(card, /Conferência|openConfer|openCestaCalc/); assert.match(card, /pilot-order-meta/); assert.match(card, /10:30/);
   assert.match(card, /&lt;img>/); assert.match(card, /&lt;script>/); assert.match(card, /&lt;faltou>/); assert.match(card, /&lt;canal>/);
   assert.doesNotMatch(card, /invisivel|class="apt"|class="k-time"/);
-  for (const handler of ['advanceOrder', 'openCobranca', 'openConfer', 'openCestaCalcFromOrder', 'printEtiqueta', 'openHistorico', 'cancelOrder']) assert.ok(card.includes(handler + "('a')"));
+  for (const handler of ['advanceOrder', 'openCobranca', 'printEtiqueta', 'openHistorico', 'cancelOrder']) assert.ok(card.includes(handler + "('a')"));
 });
 test('card de total zero não oferece cobrança e metadados ausentes não criam slots vazios', () => {
   const o = order('', 'pronto', 0); o.total = 0; const f = fixture([o]); f.ctx.renderKanban();

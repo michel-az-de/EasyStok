@@ -5,6 +5,25 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { installLabelWorkspace } = require('../pilot.js');
 
+test('tipo de código permanece selecionado quando o APK encurta os rótulos', () => {
+  const vm = require('node:vm');
+  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const start = html.indexOf('function setEtqCode('), end = html.indexOf('// Alias:', start);
+  const modes = ['both', 'barcode', 'qr'];
+  const chips = modes.map((mode, i) => ({
+    textContent: ['Ambos', 'Barras', 'QR'][i], active: false,
+    getAttribute: () => "setEtqCode('" + mode + "')",
+    classList: { toggle(name, active) { chips[i].active = active; } }
+  }));
+  const ctx = { document: { querySelectorAll: () => chips }, setScanModeChoice() {}, refreshEtqPreview() {},
+    prodScanModeLabel: mode => ({ both: 'QR + barras', barcode: 'Só barras', qr: 'Só QR' })[mode] };
+  vm.createContext(ctx); vm.runInContext(html.slice(start, end), ctx);
+  for (const mode of modes) {
+    ctx.setEtqCode(mode);
+    assert.deepEqual(chips.map(chip => chip.active), modes.map(value => value === mode));
+  }
+});
+
 function fixture() {
   const byId = new Map(), frames = [];
   function element(tag, className = '', id) {

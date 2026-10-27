@@ -12297,7 +12297,7 @@ function advanceOrder(id) {
     pilotOrderAdvance = { id, from: o.status };
   }
   // 'entregue' exige conferência manual primeiro — confirmConfer() retoma.
-  if (nextStatus === STATUS.ENTREGUE) { openConfer(id); return; }
+  if (nextStatus === STATUS.ENTREGUE && !window.CDB_CONFIG?.isPilot) { openConfer(id); return; }
   applyAdvanceTransition(id, nextStatus);
 }
 
@@ -12634,7 +12634,7 @@ function renderProductGrid() {
   if (prodMetricLow) prodMetricLow.textContent = lowStock;
   const saveBtn = document.getElementById('saveProdBtn');
   saveBtn.disabled = !anyCounted;
-  saveBtn.textContent = anyCounted
+  saveBtn.textContent = window.CDB_CONFIG?.isPilot ? 'Produzir' : anyCounted
     ? `Conferir ${totalUnits} unidade${totalUnits === 1 ? '' : 's'}`
     : 'Conferir produção';
 }
@@ -13152,6 +13152,7 @@ const HIST_ACTION_META = {
   'batch.unit_confirm_adjust': { icon: '✏️', label: 'Unidade ajustada',  type: 'batch' },
   'batch.delete':              { icon: '🗑️', label: 'Lote excluído',     type: 'batch' },
   'batch.restore':             { icon: '↩️', label: 'Lote recuperado',   type: 'batch' },
+  'etiqueta.print':             { icon: '🖨️', label: 'Etiqueta impressa', type: 'label' },
   'order.purge':               { icon: '⌫', label: 'Registro removido', type: 'order' },
   'cash.entry_delete':         { icon: '🗑️', label: 'Lançamento excluído', type: 'cash' },
   'cash.entry_edit':           { icon: '✏️', label: 'Lançamento editado', type: 'cash' },
@@ -13224,7 +13225,8 @@ function buildHistoryEvents() {
 function renderHistoricoScreen() {
   const list = document.getElementById('histList');
   if (!list) return;
-  const all = buildHistoryEvents();
+  const all = buildHistoryEvents().filter(e => !window.CDB_CONFIG?.isPilot
+    || (['product', 'batch', 'order', 'label'].includes(e.type) && !/^(order\.confirm|batch\.unit_confirm)/.test(e.action || '')));
   const filtered = histFilter === 'all' ? all : all.filter(e => e.type === histFilter);
   const batchCount = all.filter(e => e.type === 'batch').length;
   const orderCount = all.filter(e => e.type === 'order').length;
@@ -13243,8 +13245,8 @@ function renderHistoricoScreen() {
       <div class="stock-ledger-card">
         <div class="stock-ledger-top">
           <div>
-            <div class="stock-ledger-name">Auditoria operacional</div>
-            <div class="stock-ledger-meta">Eventos rastreáveis, lotes, pedidos e caixa</div>
+            <div class="stock-ledger-name">${window.CDB_CONFIG?.isPilot ? 'Histórico' : 'Auditoria operacional'}</div>
+            <div class="stock-ledger-meta">${window.CDB_CONFIG?.isPilot ? 'Produtos, lotes e pedidos' : 'Eventos rastreáveis, lotes, pedidos e caixa'}</div>
           </div>
           <span class="stock-ledger-badge ok">${all.length} eventos</span>
         </div>
@@ -14439,7 +14441,7 @@ function renderKanbanCard(o, col) {
   // Selo de status de conferência ao lado do status do kanban
   const cs = getConferStatus(o);
   const badgeLabel = cs === CONFER_STATUS.PENDENTE ? (pilot ? 'Conferência pendente' : 'Conf. pendente') : conferStatusLabel(cs);
-  const conferBadge = `<span class="k-confer-badge ${cs}">${badgeLabel}</span>`;
+  const conferBadge = pilot ? '' : `<span class="k-confer-badge ${cs}">${badgeLabel}</span>`;
   const conferBtnLabel = cs === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Reconferir';
 
   // Quick-actions WA + Mapa pro entregador. Phone vem do cliente cadastrado
@@ -14481,15 +14483,15 @@ function renderKanbanCard(o, col) {
       <div class="k-progress">${renderProgressDots(o.status, { small: true, showLabel: false })}</div>
       <div class="k-foot">
         <div class="k-primary-actions">
-          <button type="button" class="k-advance" onclick="advanceOrder('${o.id}')">${o.status === 'pronto' ? 'Conferir entrega' : col.next}</button>
+          <button type="button" class="k-advance" onclick="advanceOrder('${o.id}')">${pilot ? (o.status === 'pronto' ? 'Entregar' : o.status === 'preparando' ? 'Finalizar' : 'Preparar') : o.status === 'pronto' ? 'Conferir entrega' : col.next}</button>
         </div>
         <div class="k-support-actions">
           ${(Number(o.total) || 0) > 0 ? `<button type="button" class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>` : ''}
           <details class="k-more-actions">
             <summary aria-label="Mais ações do pedido ${escapeHtml((o.id || '').slice(-8))}">Mais ações</summary>
             <div class="k-secondary-actions">
-              <button type="button" class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
-              ${(o.status === 'aguardando' || o.status === 'preparando') ? `<button type="button" class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
+              ${!pilot ? `<button type="button" class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>` : ''}
+              ${!pilot && (o.status === 'aguardando' || o.status === 'preparando') ? `<button type="button" class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
               <button type="button" class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir etiqueta</button>
               <button type="button" class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Histórico</button>
               <button type="button" class="k-cancel" onclick="cancelOrder('${o.id}')">Cancelar pedido</button>
@@ -17679,6 +17681,7 @@ function renderConferProPanel() {
 }
 
 function batchCardHtml(batch) {
+  const pilot = window.CDB_CONFIG?.isPilot === true;
   const isClosed = getBatchStatus(batch) === 'closed';
   const ets = etiquetasFromBatch(batch);
   const total = ets.length;
@@ -17696,9 +17699,9 @@ function batchCardHtml(batch) {
   }).filter(Boolean).join(' · ');
   const dateStr = new Date(batch.createdAt).toLocaleDateString('pt-BR') + ' ' +
     new Date(batch.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
-  const progress = `Controle de etiquetas · ${conferidos}/${total} conferido${conferidos === 1 ? '' : 's'}` +
+  const progress = pilot ? '' : `Controle de etiquetas · ${conferidos}/${total} conferido${conferidos === 1 ? '' : 's'}` +
     (divergencias ? ` · ${divergencias} divergência${divergencias === 1 ? '' : 's'}` : '');
-  const unitsHtml = ets.map(et => {
+  const unitsHtml = pilot ? '' : ets.map(et => {
     const st = getUnitStatus(batch, et.idxStr);
     const statusBadge = `<span class="u-status ${st}">${conferStatusLabel(st)}</span>`;
     const actionLabel = st === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Ver';
@@ -17737,12 +17740,12 @@ function batchCardHtml(batch) {
       ${discardBtn}
     </div>`;
   return `<div class="batch-card${isClosed ? ' closed' : ''}" id="bc-${batch.id}">
-    <div class="batch-card-head" onclick="document.getElementById('bc-${batch.id}').classList.toggle('open')">
+    <div class="batch-card-head" ${pilot ? '' : `onclick="document.getElementById('bc-${batch.id}').classList.toggle('open')"`}>
       <div class="bc-info">
         <div class="bc-lote">${escapeHtml(batch.lote || batch.code || batch.id)} · ${escapeHtml(dateStr)} ${statusBadge}</div>
         <div class="bc-summary">${escapeHtml(items)}</div>
         ${validadeHtml ? '<div class="bc-progress">' + validadeHtml + '</div>' : ''}
-        <div class="bc-progress">${escapeHtml(progress)}</div>
+        ${progress ? `<div class="bc-progress">${escapeHtml(progress)}</div>` : ''}
         ${(function(){
           // #437 — historico de impressoes: le do audit log as entradas 'etiqueta.print' do lote.
           try {
@@ -17756,7 +17759,7 @@ function batchCardHtml(batch) {
           } catch(_) { return ''; }
         })()}
       </div>
-      <span class="bc-toggle">›</span>
+      ${pilot ? '' : '<span class="bc-toggle">›</span>'}
     </div>
     ${actionsHtml}
     <div class="batch-units">${unitsHtml}</div>
@@ -19045,7 +19048,7 @@ function _proceedAdvance(id, nextStatus) {
   renderHome();
   renderOrdersFeed();
   haptic();
-  if (nextStatus === STATUS.ENTREGUE) showToast('Pedido entregue, entrou no caixa');
+  if (nextStatus === STATUS.ENTREGUE) showToast(window.CDB_CONFIG?.isPilot ? 'Pedido entregue' : 'Pedido entregue, entrou no caixa');
   else if (nextStatus === STATUS.PRONTO && negatives.length > 0) showToast('Pronto. Estoque negativo: ' + negatives.join(', '));
   else if (nextStatus === STATUS.PRONTO) showToast('Marcado como pronto');
   else if (nextStatus === STATUS.PREPARANDO) showToast('Preparo iniciado');
@@ -20385,7 +20388,7 @@ let currentEtqOrient = 'vertical';     // 'vertical' | 'horizontal'
 
 function setEtqCode(mode) {
   setScanModeChoice(mode, true);
-  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => b.classList.toggle('active', b.textContent.trim() === prodScanModeLabel(mode)));
+  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => b.classList.toggle('active', b.getAttribute?.('onclick')?.includes("setEtqCode('" + mode + "')") || b.textContent.trim() === prodScanModeLabel(mode)));
   refreshEtqPreview();
 }
 // Alias: chama o setOrientChoice unificado que cuida de Ajustes + Preview + state + audit
@@ -20498,7 +20501,7 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   const curMode = getProdScanMode();
   document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => {
     const lbl = b.textContent.trim();
-    b.classList.toggle('active', lbl === prodScanModeLabel(curMode));
+    b.classList.toggle('active', b.getAttribute?.('onclick')?.includes("setEtqCode('" + curMode + "')") || lbl === prodScanModeLabel(curMode));
   });
   document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b => {
     b.classList.toggle('active', b.textContent.trim() === (currentEtqOrient === 'horizontal' ? 'Horizontal' : 'Vertical'));

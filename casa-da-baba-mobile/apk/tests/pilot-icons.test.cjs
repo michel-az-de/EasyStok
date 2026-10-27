@@ -20,7 +20,7 @@ for (const name of ['producao', 'mensagem', 'pedido-em-preparo', 'produto', 'con
     if (['producao', 'pedido-em-preparo'].includes(name)) assert.match(svg, /width="32" height="32"/);
   });
 }
-for (const name of ['bell', 'fechar', 'chevron-right', 'printer', 'download', 'enviar', 'refresh-cw', 'search', 'house', 'ellipsis', 'shopping-cart', 'archive', 'ficha', 'historico', 'ajuda']) {
+for (const name of ['bell', 'fechar', 'chevron-right', 'printer', 'download', 'enviar', 'refresh-cw', 'search', 'house', 'ellipsis', 'shopping-cart', 'archive', 'ficha', 'historico', 'ajuda', 'check', 'plus', 'copy', 'lapis', 'lixeira']) {
   test('traço utilitário canônico do Console: ' + name, () => {
     const source = utility.match(new RegExp('^\\s*(?:\'' + name + '\'|' + name + '):\\s*((?:\'[^\']*\'\\s*\\+\\s*)*\'[^\']*\')', 'm'));
     assert.ok(source);

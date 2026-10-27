@@ -79,6 +79,13 @@
   // Subconjunto canônico do Console: MarcaIcone.jsx (Casa da Baba V4, grid32) e Icone.jsx (grid24).
   // Geometria sem redesenho; pilot-icons.test.cjs verifica paridade com essas fontes vivas.
   const CONSOLE_ICONS = {
+    "link": { "grid": 24, "size": 24, "body": "<path d=\"M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7\"/>" },
+    "relogio": { "grid": 24, "size": 24, "body": "<path d=\"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7v5l3 2\"/>" },
+    "check": { "grid": 24, "size": 24, "body": "<path d=\"M4 12.5 9.5 18 20 6.5\"/>" },
+    "plus": { "grid": 24, "size": 24, "body": "<path d=\"M12 5v14M5 12h14\"/>" },
+    "copy": { "grid": 24, "size": 24, "body": "<path d=\"M9 9h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1ZM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1\"/>" },
+    "lapis": { "grid": 24, "size": 24, "body": "<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497zM15 5l4 4\"/>" },
+    "lixeira": { "grid": 24, "size": 24, "body": "<path d=\"M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6\"/>" },
     "caixa": {
       "grid": 32, "size": 24,
       "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 5H25L27 20H5Z M3 20H29V28H3Z M8 24H12\"/><rect x=\"10\" y=\"8\" width=\"12\" height=\"5\" rx=\"1.5\"/><path d=\"M11 17H12 M16 17H17 M21 17H22\"/></g>"
@@ -188,6 +195,7 @@
     if (!icon) return '';
     return '<svg data-pilot-icon="' + name + '" viewBox="0 0 ' + icon.grid + ' ' + icon.grid + '" width="' + icon.size + '" height="' + icon.size + '" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + icon.body + '</svg>';
   }
+  root.cdbPilotIcon = pilotIcon;
   function applyConsoleIcons(document) {
     if (!document.querySelectorAll) return;
     // Apenas controles fixos. Não seleciona ícones de produtos nem a prévia de etiquetas.
@@ -296,7 +304,6 @@
   const closeIcon = pilotIcon('fechar');
   const arrowIcon = pilotIcon('chevron-right');
   const productionIcon = pilotIcon('producao');
-  const atendimentoIcon = pilotIcon('mensagem');
   applyConsoleIcons(doc);
   const bell = (id, badge) => '<button type="button" id="' + id + '" class="pilot-bell" aria-label="Abrir avisos" title="Avisos" aria-haspopup="dialog" data-action="notices">' + bellIcon + '<span id="' + badge + '" class="pilot-bell-count" hidden aria-hidden="true"></span></button>';
   const rail = doc.createElement('div');
@@ -320,19 +327,18 @@
       <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
       <details id="pilotMigrationReceipt" class="pilot-help" hidden><summary>Última migração confirmada</summary><p id="pilotMigrationResult" class="pilot-feedback" role="status" tabindex="-1"></p></details>
       <div class="pilot-actions">
-        <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${productionIcon}</span><span class="pilot-card-copy"><span class="pilot-step">PRODUÇÃO NESTE APARELHO</span><strong>Produzir e etiquetar</strong><span class="pilot-card-description">Validade, lote e impressão.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
-        <button type="button" class="pilot-card pilot-orders" data-action="workspace"><span class="pilot-action-icon">${atendimentoIcon}</span><span class="pilot-card-copy"><span class="pilot-step">ONLINE · OPERAÇÃO REAL</span><strong>Atendimento</strong><span class="pilot-card-description">Pedidos, frete e cobranças.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
+        <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${productionIcon}</span><span class="pilot-card-copy"><strong>Produção</strong></span></button>
+        <button type="button" class="pilot-card pilot-orders" data-action="local-orders"><span class="pilot-action-icon">${pilotIcon('pedido-em-preparo')}</span><span class="pilot-card-copy"><strong>Pedidos</strong></span></button>
       </div>
       <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><div class="pilot-connection-controls"><button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button><button type="button" id="pilotReconnect" data-action="reconnect" hidden aria-label="Verificar conexão" title="Verificar conexão">${pilotIcon('refresh-cw')}</button><details class="pilot-connection-details"><summary>Detalhes</summary><p id="pilotConnectionDetail"></p><p id="pilotPairHint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p><div id="pilotSyncDetails"></div></details></div></div>
-      <button type="button" class="pilot-local" data-action="local-orders"><strong class="pilot-local-title">${pilotIcon('pedido-em-preparo')}<span>Registrar pedido no aparelho</span></strong><span>Sem frete nem envio automático.</span></button>
       <div class="pilot-shortcuts">
         <button type="button" data-action="printers">${pilotIcon('printer')}<span>Impressoras</span></button>
       </div>
-      <details class="pilot-help pilot-support"><summary>Configurações e ajuda</summary>
+      <details class="pilot-help pilot-support"><summary>Configurações</summary>
       <div class="pilot-operator-row"><span>Registrando como</span><div id="pilotOperator"></div></div>
-      <details class="pilot-help pilot-migration"><summary>Trazer dados do PWA antigo</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><button type="button" data-action="migration-guide">Ver passo a passo</button><p>Se está começando agora, basta conectar a produção.</p></details>
-      <details class="pilot-help"><summary>Ajuda para usar o app</summary><p>No Atendimento, entre com seu acesso da Casa da Baba. As alterações são feitas na operação real.</p><p>O cadastro local de produtos e pedidos, a produção e o histórico ficam neste aparelho. Após o primeiro pareamento, as alterações aguardam a conexão para sincronizar. A impressão exige uma impressora compatível conectada.</p><p>Frete, cobrança online, envio pelo atendimento e IA precisam de conexão com o EasyStok. Uma mensagem preparada ou um pedido salvo no aparelho ainda não confirmam envio nem pagamento.</p></details>
-      <details class="pilot-help"><summary>Atualizações e recuperação</summary><p id="pilotOtaStatus" role="status">A atualização automática de conteúdo está disponível no APK Android.</p><p id="pilotPushStatus" role="status"></p><p>O app guarda a versão anterior do conteúdo. Voltar a ela preserva os pedidos, a produção e a fila de envio. O Atendimento online segue a versão publicada no EasyStok.</p><button type="button" id="pilotRollback" data-action="rollback" hidden>Voltar à versão anterior</button></details>
+      <details class="pilot-help pilot-migration"><summary>Backup do PWA</summary><p>Exporte o JSON nos Ajustes do PWA antigo e importe aqui. Mantenha o original até verificar os dados.</p><button type="button" data-action="import-pwa">Importar</button><button type="button" data-action="migration-guide">Guia</button></details>
+      <details class="pilot-help"><summary>Offline</summary><p>Produtos, pedidos e lotes ficam salvos neste aparelho. Após conectar, o envio ao EasyStok é retomado com internet.</p></details>
+      <details class="pilot-help"><summary>Atualizações</summary><p id="pilotOtaStatus" role="status">O conteúdo é atualizado ao reabrir.</p><p id="pilotPushStatus" role="status"></p><p>A versão anterior preserva seus dados e envios pendentes.</p><button type="button" id="pilotRollback" data-action="rollback" hidden>Recuperar</button></details>
       </details>
       <div class="pilot-update"><span id="pilotVersion" role="status"></span><button type="button" id="pilotUpdateButton" data-action="update">Verificar atualização</button></div>
       <p id="pilotUpdateStatus" class="pilot-feedback" role="status" tabindex="-1"></p>
@@ -585,7 +591,7 @@
     const invalid = !!root.cdbSync?.isPairingInvalid?.();
     const state = connectionStatus({ health, paired: !!pairing, invalid, pending: root.cdbSync?.queueSize?.() || 0, importPending: !!review });
     doc.getElementById('pilotRailStatus').textContent = state.rail;
-    doc.getElementById('pilotConnection').textContent = state.summary;
+    doc.getElementById('pilotConnection').textContent = review ? 'Envio pausado · revise a importação' : state.rail;
     doc.getElementById('pilotConnectionDetail').textContent = state.status + '. ' + state.pairing + ' ' + state.queue;
     const reconnect = doc.getElementById('pilotReconnect');
     reconnect.hidden = health !== 'offline' && !checkingConnection;
@@ -723,14 +729,6 @@
     finally { checkingConnection = false; }
     showConnection();
   }
-  async function openWorkspace() {
-    if (root.navigator?.onLine === false) {
-      showError('O aparelho está sem conexão. Verifique a conexão ou use “Registrar pedido no aparelho” para continuar localmente.');
-      return;
-    }
-    if (native()?.openWorkspace) await native().openWorkspace();
-    else root.open('https://app.easystok.online/#/m/atendimento/balcao', '_blank', 'noopener,noreferrer');
-  }
   async function connectProduction() {
     const button = doc.getElementById('pilotPairButton');
     button.disabled = true;
@@ -849,7 +847,6 @@
       if (action === 'confirm-import') await confirmImport();
       if (action === 'undo-import') await undoImport();
       if (action === 'migrate-import') await migrateImport();
-      if (action === 'workspace') await openWorkspace();
       if (action === 'reconnect') await refreshHealth();
       if (action === 'update') await checkUpdate();
       if (action === 'download') await downloadUpdate();
