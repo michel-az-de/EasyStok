@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
+import { CampoReais } from '../../componentes/CampoReais'
 import {
   corpoFreteRaio, corpoTesteDeFrete, erroDoFormularioFreteRaio, formularioDoFreteRaio, resumoDoTesteDeFrete,
 } from '../../dominio/entregasApi'
+import { centavosDoTexto, lerMoeda, textoDosCentavos } from '../../dominio/formato'
 import css from './entregasApi.module.css'
 import layout from './cadastroEntrega.module.css'
 
@@ -80,8 +82,8 @@ export function FreteRaioDaLoja({ config, acoes, ocupado }) {
             <div key={indice} className={layout.faixaDeFrete}>
               <CampoTexto rotulo="Até (km)" inputMode="decimal" value={faixa.ateKm} disabled={ocupado}
                 onChange={(e) => mudarFaixa(indice, { ateKm: e.target.value })} />
-              <CampoTexto rotulo="Valor (R$)" inputMode="decimal" value={faixa.valor} disabled={ocupado}
-                onChange={(e) => mudarFaixa(indice, { valor: e.target.value })} />
+              <CampoReais rotulo="Valor (R$)" centavos={centavosDoTexto(faixa.valor)} ler={lerMoeda} disabled={ocupado}
+                aoMudar={(centavos) => mudarFaixa(indice, { valor: textoDosCentavos(centavos) })} />
               <Botao variante="texto" disabled={ocupado || form.faixas.length === 1} aria-label={`Remover faixa ${indice + 1}`}
                 onClick={() => mudar({ faixas: form.faixas.filter((_, i) => i !== indice) })}>Remover</Botao>
             </div>

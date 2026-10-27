@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { textoDigitadoEmReais, textoDosCentavos } from './moedaNoCampo'
+import { centavosCortados, textoDigitadoEmReais, textoDosCentavos } from './moedaNoCampo'
 import base from './CampoMascarado.module.css'
 import css from './CampoReais.module.css'
 
@@ -19,6 +19,8 @@ export function CampoReais({
   // dos centavos e não entrar.
   const mostrar = (valor) => (valor ? textoDosCentavos(valor) : '')
   const [texto, setTexto] = useState(() => mostrar(centavos))
+  // #2080: "1,500" não cabe (centavos têm 2 casas): o campo diz o que ficou em vez de calar.
+  const [cortou, setCortou] = useState(false)
   const lido = (valor) => (valor.trim() ? ler(valor) : null)
 
   // Valor trocado por fora (zerou depois de lançar, a sugestão chegou): o texto acompanha. O que
@@ -31,6 +33,7 @@ export function CampoReais({
 
   function aoDigitar(evento) {
     const novo = textoDigitadoEmReais(evento.target.value)
+    setCortou(centavosCortados(evento.target.value))
     setTexto(novo)
     aoMudar(lido(novo))
   }
@@ -60,6 +63,7 @@ export function CampoReais({
         />
       </div>
       {erro && <p id={`${id}-erro`} className={base.erroTexto} role="alert">{erro}</p>}
+      {!erro && cortou && <output className={base.dica}>Centavos têm 2 casas: ficou R$ {texto}.</output>}
       {!erro && dica && <p id={`${id}-dica`} className={base.dica}>{dica}</p>}
     </div>
   )

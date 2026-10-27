@@ -34,7 +34,7 @@
 //                  nunca do sistema: aceitar a diferença ou cobrar o que faltou.
 
 import { itensDetalhados, totalDoPedido } from './pedido.js'
-import { moeda } from './formato.js'
+import { lerMoeda, moeda } from './formato.js'
 
 const MS_POR_MINUTO = 60000
 
@@ -83,7 +83,7 @@ export function pagamentoNaEntregaDasObservacoes(observacoes) {
   const texto = String(observacoes ?? '')
   if (!texto.includes(PREFIXO_DINHEIRO)) return null
   const troco = texto.match(/troco para R\$\s*([\d.]+,\d{2})/)
-  const trocoPara = troco ? Number(troco[1].replace(/\./g, '').replace(',', '.')) : null
+  const trocoPara = troco ? lerMoeda(troco[1]) / 100 : null
   return { meio: DINHEIRO_NA_ENTREGA, trocoPara }
 }
 

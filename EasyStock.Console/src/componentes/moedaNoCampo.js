@@ -31,16 +31,34 @@ export function cursorDeMoeda({ inicio, fim, tamanho }) {
 // vírgula separa os centavos. O campo guarda o que foi digitado; quem lê o valor é a tela (ela
 // injeta `lerMoeda`, do domínio). Aqui só a limpeza da digitação: dígitos e pontos de milhar, uma
 // vírgula e no máximo dois centavos.
-export function textoDigitadoEmReais(texto) {
+//
+// #2080: colado no formato inglês ("1,234.56", "R$ 1,234,567.89": vírgula no milhar e ponto nos
+// centavos) o texto vira o nosso ("1234,56") antes de limpar. Antes a primeira vírgula valia como
+// decimal e o campo cortava para "1,23" sem aviso.
+const FORMATO_INGLES = /^\d{1,3}(,\d{3})+\.\d*$/
+const soNumero = (texto) => {
   const limpo = String(texto ?? '').replace(/[^\d.,]/g, '')
+  return FORMATO_INGLES.test(limpo) ? limpo.replaceAll(',', '').replace('.', ',') : limpo
+}
+
+export function textoDigitadoEmReais(texto) {
+  const limpo = soNumero(texto)
   const virgula = limpo.indexOf(',')
   if (virgula === -1) return limpo
   const centavos = limpo.slice(virgula + 1).replace(/\D/g, '').slice(0, 2)
   return `${limpo.slice(0, virgula)},${centavos}`
 }
 
+// A digitação perdeu casas decimais ("1,500" ficou "1,50")? O campo avisa em vez de calar.
+export function centavosCortados(texto) {
+  const limpo = soNumero(texto)
+  const virgula = limpo.indexOf(',')
+  return virgula !== -1 && limpo.slice(virgula + 1).replace(/\D/g, '').length > 2
+}
+
 // Ao sair do campo, o valor volta escrito por inteiro ("100,00", "1.500,00"), sem o "R$" (que fica
-// fora do campo). Nulo é campo vazio.
+// fora do campo). Nulo é campo vazio. Espelho de `textoDosCentavos` de `dominio/formato.js`
+// (`componentes` não importa `dominio`); `prova-2080-reais.mjs` garante que escrevem igual.
 export const textoDosCentavos = (centavos) => (centavos == null
   ? ''
   : (centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
