@@ -210,11 +210,11 @@ public class NotificacoesGlobaisSeedTests
     }
 
     [Fact]
-    public void ConviteAcessoEmailMantemOCodigoESobeParaAVersao2ComAMarcaDaCasa()
+    public void ConviteAcessoEmailMantemOCodigoESobeParaAVersao3ComAMarcaDaCasa()
     {
         var template = NotificacoesGlobaisSeed.BuildDefaultTemplates().Single(t => t.Codigo == "convite_acesso_email_v1");
 
-        template.Versao.Should().Be(2);
+        template.Versao.Should().Be(3); // #2074: validade e o que fazer depois dela.
         template.AssuntoTemplate.Should().Be("{{ empresa }}: seu convite para entrar no sistema");
         template.CorpoTemplate.Should().Contain("link_convite").And.Contain("Seu convite chegou");
         (template.AssuntoTemplate + template.CorpoTemplate).Should().NotContain("EasyStok").And.NotContain("convidado");

@@ -469,6 +469,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         {
             var texto = await MontarPrimeiraRespostaAsync(empresaId, configuracao, identificacao, ct);
 
+            // #2072: a saída fica marcada na conversa antes da rede. A saudação de reserva do outbox (#2004) só sai em
+            // conversa sem saída depois da entrada, e o envio pode demorar (a ponte do WAHA "digita" antes): sem a marca,
+            // o cliente novo recebia as duas saudações.
+            conversa.RegistrarSaida(DateTime.UtcNow);
+            await unitOfWork.CommitAsync();
+
             Mensagem saida;
             try
             {

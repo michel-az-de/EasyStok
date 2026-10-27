@@ -64,6 +64,8 @@ public class DeviceBackupController(
         if (req == null || string.IsNullOrWhiteSpace(req.SnapshotJson))
             return BadRequest(new { error = "snapshotJson obrigatório" });
 
+        if (req.Note?.Trim().StartsWith("legacy-import:", StringComparison.Ordinal) == true)
+            return BadRequest(new { error = "Prefixo reservado ao recibo imutavel de primeira migracao." });
         var size = System.Text.Encoding.UTF8.GetByteCount(req.SnapshotJson);
         if (size > MaxSnapshotBytes)
             return BadRequest(new { error = $"snapshot muito grande: {size} bytes (máx {MaxSnapshotBytes})" });
@@ -85,7 +87,7 @@ public class DeviceBackupController(
 
         // Rotaciona — mantém os RetainPerDevice mais novos do device.
         var oldIds = await _db.Set<DeviceBackup>().AsNoTracking()
-            .Where(b => b.DeviceId == device.Id)
+            .Where(b => b.DeviceId == device.Id && (b.Note == null || !b.Note.StartsWith("legacy-import:")))
             .OrderByDescending(b => b.CreatedAt)
             .Skip(RetainPerDevice)
             .Select(b => b.Id)
