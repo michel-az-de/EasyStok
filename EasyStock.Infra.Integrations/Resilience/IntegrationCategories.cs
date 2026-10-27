@@ -31,6 +31,12 @@ public static class IntegrationCategories
     /// </summary>
     public const string MetaEnvio = "meta-envio";
 
+    /// <summary>
+    /// Envio pela ponte do WAHA (#2072): o mesmo pipeline sem retry, com disjuntor próprio, para o WAHA fora do ar não
+    /// fechar o número de plataforma, que segue na Meta.
+    /// </summary>
+    public const string WahaEnvio = "waha-envio";
+
     public static readonly IReadOnlyCollection<string> All = new[]
     {
         Payments, Fiscal, Marketplace, Logistics, WhatsApp,

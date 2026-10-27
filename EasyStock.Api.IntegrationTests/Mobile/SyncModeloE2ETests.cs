@@ -224,6 +224,77 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
         (await SaldoAsync(produto)).Should().Be(4);
     }
 
+    [SkippableFact]
+    public async Task MigracaoPwaParaApk_ReenviaFilaOriginalSemDuplicarProducaoOuEstoque()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (pwa, apk, _) = await TresAparelhosAsync();
+        var produto = NovoId("p");
+        var lote = NovoId("b");
+        await PushAsync(pwa, Cadastro(produto, saldoNoAparelho: 10, porMovimento: true), Movimento(produto, 10));
+
+        // O PWA enviou a producao, mas perdeu a resposta antes de exportar o backup.
+        var filaOriginal = new[]
+        {
+            Cadastro(produto, saldoNoAparelho: 14, porMovimento: true),
+            Lote(lote, produto, qtd: 4, descartado: false), Movimento(produto, 4)
+        };
+        (await PushAsync(pwa, filaOriginal)).Rejeitadas.Should().BeEmpty();
+        (await SaldoAsync(produto)).Should().Be(14);
+
+        // O APK tem outra chave e DeviceId, conservando os MutationId da fila importada.
+        var resposta = await PushAsync(apk, filaOriginal);
+        resposta.Rejeitadas.Should().BeEmpty();
+        resposta.Aceitas.Should().BeEquivalentTo(filaOriginal.Select(m => m.Id));
+        (await SaldoAsync(produto)).Should().Be(14);
+        var recebido = await PullAsync(apk);
+        recebido.Should().ContainSingle(m => m.Tipo == "batch.upsert" && m.Id == lote);
+        recebido.Should().ContainSingle(m => m.Tipo == "product.upsert" && m.Id == produto)
+            .Which.Payload.GetProperty("stock").GetInt32().Should().Be(14);
+    }
+    [SkippableFact]
+    public async Task PedidoDoApk_ChegaNaEsteiraDoErpESegundoAparelho_SemDuplicarNoReenvio()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (apk, outro, _) = await TresAparelhosAsync();
+        var produto = NovoId("p");
+        var pedido = NovoId("o");
+        await PushAsync(apk, Cadastro(produto, saldoNoAparelho: 10, porMovimento: true));
+        var envio = Pedido(pedido, produto, "preparando", qtd: 2);
+        (await PushAsync(apk, envio)).Rejeitadas.Should().BeEmpty();
+        var registro = await PedidoAsync(pedido);
+        registro.ErpPedidoId.Should().NotBeNull("o pedido deve entrar na esteira do EasyStok, alem do espelho mobile");
+        (await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(p => p.Id == registro.ErpPedidoId))).MobileOrderId.Should().Be(pedido);
+        (await PullAsync(outro)).Should().ContainSingle(m => m.Tipo == "order.upsert" && m.Id == pedido);
+
+        (await PushAsync(outro, envio)).Rejeitadas.Should().BeEmpty();
+        (await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters()
+            .CountAsync(p => p.MobileOrderId == pedido))).Should().Be(1);
+    }
+    [SkippableFact]
+    public async Task Sincronizacao_ChaveDoAparelhoIsolaEmpresaMesmoComDeviceIdForjado()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (origem, _, _) = await TresAparelhosAsync();
+        var produto = NovoId("tenant");
+        (await PushAsync(origem, Cadastro(produto, 10, porMovimento: false))).Rejeitadas.Should().BeEmpty();
+
+        var (empresaB, lojaB) = await fixture.SeedEmpresaELojaAsync();
+        var credencialB = await fixture.SeedMobileDeviceAsync(empresaB, lojaB);
+        // A identidade escrita no corpo/query nao pode substituir o tenant da chave B.
+        var outroTenant = new Aparelho(origem.DeviceId, fixture.CreateMobileClient(credencialB.ApiKey));
+        (await PullAsync(outroTenant)).Should().NotContain(m => m.Id == produto);
+        var tentativa = await PushAsync(outroTenant, Movimento(produto, 100));
+        tentativa.Aceitas.Should().BeEmpty();
+        tentativa.Rejeitadas.Should().ContainSingle();
+        (await SaldoAsync(produto)).Should().Be(10);
+
+        var produtoB = NovoId("tenant-b");
+        (await PushAsync(outroTenant, Cadastro(produtoB, 3, porMovimento: false))).Rejeitadas.Should().BeEmpty();
+        (await PullAsync(origem)).Should().NotContain(m => m.Id == produtoB);
+    }
+
     // ---------- HTTP ----------
 
     private sealed record Aparelho(string DeviceId, HttpClient Http)

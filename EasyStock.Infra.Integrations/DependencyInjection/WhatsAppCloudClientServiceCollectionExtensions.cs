@@ -1,8 +1,10 @@
 using System.Net.Http.Headers;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Infra.Integrations.WhatsApp;
+using EasyStock.Infra.Integrations.WhatsApp.Waha;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace EasyStock.Infra.Integrations.DependencyInjection;
@@ -12,7 +14,8 @@ namespace EasyStock.Infra.Integrations.DependencyInjection;
 /// nomeado "whatsapp-cloud", bearer + base address da Meta) quando
 /// <c>Atendimento:WhatsApp:Cliente=meta</c> (#1102) ou <c>Notifications:WhatsApp:Provider=meta</c>
 /// (o switch antigo), senão <see cref="StubWhatsAppCloudClient"/>. A chave do atendimento liga o
-/// cliente real sem trocar o provider de notificações.
+/// cliente real sem trocar o provider de notificações. Com <c>Atendimento:WhatsApp:Cliente=waha</c> o atendimento
+/// sai pela ponte provisória do WAHA (#2072), e o número de plataforma continua na Meta.
 /// </summary>
 public static class WhatsAppCloudClientServiceCollectionExtensions
 {
@@ -48,11 +51,25 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
             client.BaseAddress = new Uri(opts.BaseUrlEfetiva.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(20);
         });
-        services.AddScoped<ICatalogoModelosAtendimento>(sp =>
-            UsaClienteMeta(configuration[ChaveClienteAtendimento], configuration[ChaveProviderNotificacoes])
-                ? sp.GetRequiredService<CatalogoModelosWhatsApp>() : new CatalogoModelosIndisponivel());
+        // #2072 (ADR-0062): ponte provisória pelo WAHA. As peças ficam registradas sempre, porque o webhook do WAHA
+        // depende do tradutor; só valem com Atendimento:WhatsApp:Cliente=waha, que vence a Meta no atendimento.
+        var ponteWaha = UsaPonteWaha(configuration[ChaveClienteAtendimento]);
+        GarantirUmaPonteSo(ponteWaha, configuration.GetValue<bool>(ChaveWppConnectHabilitado));
+        services.Configure<WahaOptions>(configuration.GetSection(WahaOptions.Secao));
+        services.PostConfigure<WahaOptions>(o => o.Ligada = ponteWaha);
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddHttpClient<WahaWhatsAppClient>(ConfigurarHttpWaha);
+        services.AddHttpClient<ResolvedorContatoWaha>(ConfigurarHttpWaha);
+        services.AddScoped<MenuNumeradoWaha>();
+        services.AddScoped<TradutorEventoWaha>();
 
-        if (UsaClienteMeta(configuration[ChaveClienteAtendimento], configuration[ChaveProviderNotificacoes]))
+        var clienteMeta = UsaClienteMeta(configuration[ChaveClienteAtendimento], configuration[ChaveProviderNotificacoes]);
+        services.AddScoped<ICatalogoModelosAtendimento>(sp =>
+            clienteMeta && !ponteWaha ? sp.GetRequiredService<CatalogoModelosWhatsApp>() : new CatalogoModelosIndisponivel());
+
+        if (ponteWaha)
+            services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<WahaWhatsAppClient>());
+        else if (clienteMeta)
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<WhatsAppCloudClient>());
         else
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<StubWhatsAppCloudClient>());
@@ -62,14 +79,47 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.Ports.Output.Notifications.IClienteWhatsAppPlataforma>(
             sp => sp.GetRequiredService<WhatsAppCloudClient>());
 
-        // Porta de canal (S34, ADR-0051): o WhatsApp e um dos adaptadores que o ResolvedorCanal escolhe.
-        services.AddScoped<ICanalMensageria, CanalWhatsApp>();
+        // Porta de canal (S34, ADR-0051): o WhatsApp e um dos adaptadores que o ResolvedorCanal escolhe. Na ponte, o
+        // adaptador avisa que não tem modelo aprovado (#2072).
+        if (ponteWaha)
+            services.AddScoped<ICanalMensageria, CanalWhatsAppPonte>();
+        else
+            services.AddScoped<ICanalMensageria, CanalWhatsApp>();
 
         return services;
     }
 
-    /// <summary>Chave própria do cliente da Cloud API do atendimento: <c>meta</c> ou <c>stub</c>.</summary>
+    private static void ConfigurarHttpWaha(IServiceProvider sp, HttpClient client)
+    {
+        var opts = sp.GetRequiredService<IOptions<WahaOptions>>().Value;
+        if (Uri.TryCreate(opts.BaseUrl.Trim().TrimEnd('/') + "/", UriKind.Absolute, out var endereco))
+            client.BaseAddress = endereco;
+        if (!string.IsNullOrWhiteSpace(opts.ApiKey))
+            client.DefaultRequestHeaders.Add("X-Api-Key", opts.ApiKey.Trim());
+        client.Timeout = TimeSpan.FromSeconds(Math.Max(5, opts.TimeoutSegundos));
+    }
+
+    /// <summary>Chave própria do cliente do atendimento: <c>meta</c>, <c>waha</c> (ponte provisória, #2072) ou <c>stub</c>.</summary>
     public const string ChaveClienteAtendimento = "Atendimento:WhatsApp:Cliente";
+
+    /// <summary>Chave que liga a conexão provisória pelo WPPConnect (#2071).</summary>
+    public const string ChaveWppConnectHabilitado = "Atendimento:WppConnect:Habilitado";
+
+    /// <summary>
+    /// WAHA e WPPConnect são pontes alternativas para o mesmo número: ligadas juntas, cada mensagem do cliente chegaria
+    /// duas vezes com ids diferentes e as respostas sairiam por uma só. A API e o Worker não sobem com as duas.
+    /// </summary>
+    public static void GarantirUmaPonteSo(bool waha, bool wppConnect)
+    {
+        if (waha && wppConnect)
+            throw new InvalidOperationException(
+                "Atendimento:WhatsApp:Cliente=waha and Atendimento:WppConnect:Habilitado=true cannot be on together: " +
+                "turn on only one WhatsApp bridge (docs/dev/whatsapp-ponte-waha.md).");
+    }
+
+    /// <summary>Ponte provisória pelo WAHA (#2072): só com <c>Atendimento:WhatsApp:Cliente=waha</c>.</summary>
+    public static bool UsaPonteWaha(string? cliente)
+        => string.Equals(cliente?.Trim(), "waha", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Chave antiga, do provider de notificações; com <c>meta</c> também leva o cliente real.</summary>
     public const string ChaveProviderNotificacoes = "Notifications:WhatsApp:Provider";

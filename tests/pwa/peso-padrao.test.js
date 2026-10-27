@@ -22,6 +22,10 @@ module.exports = function ({ test, runInSandbox, assert }) {
 
   test('#1474 lote: codigo mostrado ao abrir o modal e o mesmo do batch gravado', () => {
     const r = JSON.parse(runInSandbox(`(function(){
+      const getOriginal = document.getElementById;
+      const manufacture = getOriginal.call(document, 'prodManufacturedDate');
+      document.getElementById = id => id === 'prodManufacturedDate' ? manufacture : getOriginal.call(document, id);
+      try {
       products = [{ id: 'talharim', name: 'Talharim Fresco', emoji: '', category: 'massa', unit: '300g',
                     price: 12, stock: 0, count: 2, tipoEmbalagem: 'Avulso' }];
       batches = [];
@@ -30,6 +34,7 @@ module.exports = function ({ test, runInSandbox, assert }) {
       confirmProduction();
       const b = batches[batches.length - 1];
       return JSON.stringify({ previsto, gravado: b && codigoDoLote(b), resto: currentBatchId });
+      } finally { document.getElementById = getOriginal; }
     })()`));
     assert.match(r.gravado, /^LOT-\d{6}-\d{6}$/, 'codigo com sufixo do id');
     assert.strictEqual(r.previsto, r.gravado, 'modal mostra o codigo final');

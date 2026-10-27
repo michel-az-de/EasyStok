@@ -1,0 +1,64 @@
+.pilot-app { padding-top: 58px !important; }
+.pilot-rail { position: fixed; top: 0; left: 0; right: 0; z-index: 9990; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 54px; padding: 5px 14px; background: #fffaf2; border-bottom: 1px solid #e7dac6; color: #594530; font: 12px/1.3 system-ui, sans-serif; box-sizing: border-box; }
+.pilot-rail button { border: 0; background: none; color: #352c25; font-weight: 700; min-height: 44px; }
+.pilot-rail button span { margin-left: 4px; color: #7b5927; font-size: 11px; font-weight: 500; }
+.pilot-rail [role=status] { max-width: 46%; text-align: right; }
+.pilot-rail[data-sync=online] [role=status] { color: #326a50; }
+.pilot-home { width: min(100%, 600px); max-width: 100vw; max-height: 100dvh; margin: auto; padding: 0; border: 0; border-radius: 26px; background: #fbf6ec; color: #352d25; box-shadow: 0 18px 80px #241b1744; font: 15px/1.5 system-ui, sans-serif; }
+.pilot-home::backdrop { background: #291f1bbf; backdrop-filter: blur(3px); }
+.pilot-sheet { padding: 24px 26px 22px; }
+.pilot-topline { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: #76582f; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.pilot-topline button { width: 44px; height: 44px; flex-shrink: 0; border: 1px solid #e5d6c4; border-radius: 50%; background: #fffaf2; color: #7b6145; font-size: 25px; cursor: pointer; }
+.pilot-home h1 { margin: 18px 0 9px; font: 400 clamp(28px, 6vw, 38px)/1.12 Georgia, serif; letter-spacing: -.04em; }
+.pilot-intro { color: #7a6a58; margin: 0 0 18px; }
+.pilot-connection { border-top: 1px solid #e8ddcb; padding-top: 12px; color: #6c6856; font-size: 12px; }
+.pilot-connection p { margin: 0; }
+.pilot-connection button { margin-top: 4px; min-height: 44px; background: transparent; border: 0; color: #6b4a24; font: inherit; text-decoration: underline; cursor: pointer; }
+.pilot-actions { display: grid; gap: 12px; margin: 18px 0 13px; }
+.pilot-card { position: relative; display: grid; gap: 6px; width: 100%; min-height: 44px; padding: 20px 48px 20px 22px; text-align: left; border: 0; border-radius: 17px; cursor: pointer; font-family: inherit; }
+.pilot-card .pilot-step { font-size: 11px; letter-spacing: .1em; font-weight: 750; }
+.pilot-card strong { font: 400 26px/1.15 Georgia, serif; margin: 2px 0; }
+.pilot-card > span:last-of-type { font-size: 13px; line-height: 1.5; }
+.pilot-card b { position: absolute; right: 22px; top: 47%; font-size: 23px; font-weight: 400; }
+.pilot-production { color: #fff9ee; background: #496b56; }
+.pilot-orders { color: #fff9ee; background: #a34e35; }
+.pilot-card:hover { box-shadow: 0 0 0 3px #352d2526; }
+.pilot-hint, .pilot-help p { color: #786854; font-size: 12px; }
+.pilot-local { display: grid; gap: 5px; width: 100%; min-height: 44px; margin-top: 18px; padding: 15px 17px; border: 1px solid #dfcfb9; border-radius: 12px; background: #fffaf2; color: #604c36; font: 13px/1.5 system-ui, sans-serif; text-align: left; cursor: pointer; }
+.pilot-local strong { font-size: 14px; }
+.pilot-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 12px 0 18px; }
+.pilot-shortcuts button { border: 1px solid #dfcfb9; border-radius: 10px; background: transparent; color: #604c36; min-height: 50px; padding: 7px; font: 600 12px/1.4 system-ui, sans-serif; cursor: pointer; }
+.pilot-help { border-top: 1px solid #e4d7c3; border-bottom: 1px solid #e4d7c3; }
+.pilot-help summary { box-sizing: border-box; min-height: 44px; padding: 12px 0; cursor: pointer; color: #6b5943; font-size: 13px; }
+.pilot-update { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; color: #6f5d47; font-size: 12px; }
+.pilot-update button { color: #6b4a24; border: 0; background: transparent; text-decoration: underline; min-height: 44px; font: inherit; cursor: pointer; }
+.pilot-feedback { font-size: 13px; color: #686453; margin: 0; }
+.pilot-error:not(:empty) { color: #a13529; margin-top: 12px; border-left: 3px solid #a13529; padding-left: 10px; }
+#pilotDownload, #pilotRollback { min-height: 44px; margin-top: 10px; border: 0; background: #496b56; color: #fff; padding: 13px 17px; border-radius: 8px; cursor: pointer; }
+.pilot-home button:focus-visible, .pilot-home summary:focus-visible, .pilot-rail button:focus-visible, .pilot-feedback:focus { outline: 3px solid #8b6322; outline-offset: 3px; }
+@media (max-width: 480px) { .pilot-home { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; } .pilot-sheet { padding: 20px 21px; } }
+@media (prefers-reduced-motion: reduce) { .pilot-home * { scroll-behavior: auto !important; } }
+
+.pilot-rail[data-sync=invalid] [role=status] { color: #9c3a2e; }
+.pilot-rail[data-sync=pending] [role=status] { color: #765014; }
+.pilot-home button:disabled { cursor: progress; opacity: .7; }
+
+.pilot-migration { margin-top: 18px; }
+.pilot-migration button { min-height: 44px; border: 1px solid #dfcfb9; border-radius: 10px; padding: 10px 14px; background: #fffaf2; color: #604c36; font: 600 13px/1.4 system-ui, sans-serif; cursor: pointer; }
+
+/* Controles da prévia: preserva o desenho físico da etiqueta. */
+.pilot-app .etq-config-bar { flex-shrink: 0; gap: 6px; padding: 8px 16px; }
+.pilot-app .etq-config-row { gap: 6px; }
+.pilot-app .etq-config-chips { gap: 6px; }
+.pilot-app .etq-chip { min-height: 44px; padding: 8px 10px; color: #5b503f; font-size: 12px; }
+.pilot-app .etq-chip.active { color: #21190d; }
+.pilot-app .etq-config-lbl { color: #655945; }
+.pilot-app .etq-actions .etq-save { color: #24567a; background: #e2edf7; border-color: #b7cfe2; }
+.pilot-app .etq-actions .etq-share { color: #23613f; background: #e2f2e8; border-color: #b6d6c2; }
+.pilot-app .etq-note-input, .pilot-app #etqCopiesSelect, .pilot-app #etqRetryBtn { min-height: 44px; }
+.pilot-app .etq-note-input::placeholder { color: #655945; }
+.pilot-app .etq-chip:focus-visible, .pilot-app .etq-btn:focus-visible { outline: 3px solid #8b6322; outline-offset: 2px; }
+
+.pilot-import-review { margin-top: 14px; padding: 13px; border: 1px solid #d9c29b; border-radius: 12px; background: #fffaf2; color: #604c36; font-size: 13px; }
+.pilot-import-review p { margin: 7px 0; }
+.pilot-import-review button { margin: 4px 6px 4px 0; min-height: 44px; border: 1px solid #b49b74; border-radius: 8px; padding: 10px 12px; background: #fffaf2; color: #604c36; font: 600 13px/1.4 system-ui, sans-serif; cursor: pointer; }
