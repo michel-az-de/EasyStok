@@ -42,7 +42,7 @@ public class CardapioVariacaoAuthoringTests
                 new(Id: null, Rotulo: "800g", PrecoStorefront: 42m, OrdemExibicao: 2),
             });
 
-        await new AdicionarCardapioItemAdminUseCase(_storefrontRepo, _cardapioRepo, _produtoRepo, _uow)
+        await new AdicionarCardapioItemAdminUseCase(_storefrontRepo, _cardapioRepo, _produtoRepo, Substitute.For<ICardapioSecaoRepository>(), _uow)
             .ExecuteAsync(cmd);
 
         capturado.Should().NotBeNull();
@@ -69,7 +69,7 @@ public class CardapioVariacaoAuthoringTests
             new(Id: null, Rotulo: "M", PrecoStorefront: 33m, OrdemExibicao: 2),
         });
 
-        await new EditarCardapioItemAdminUseCase(_cardapioRepo, _uow).ExecuteAsync(cmd);
+        await new EditarCardapioItemAdminUseCase(_cardapioRepo, Substitute.For<ICardapioSecaoRepository>(), _uow).ExecuteAsync(cmd);
 
         item.Variacoes.Select(v => v.Rotulo).Should().BeEquivalentTo(new[] { "P", "M" });
         item.Variacoes.Single(v => v.Rotulo == "P").Id.Should().Be(pId, "update preserva o Id da opção");
@@ -87,7 +87,7 @@ public class CardapioVariacaoAuthoringTests
 
         var cmd = NewEdit(item, opcoes: null);   // Opcoes null = não tocar
 
-        await new EditarCardapioItemAdminUseCase(_cardapioRepo, _uow).ExecuteAsync(cmd);
+        await new EditarCardapioItemAdminUseCase(_cardapioRepo, Substitute.For<ICardapioSecaoRepository>(), _uow).ExecuteAsync(cmd);
 
         item.Variacoes.Should().HaveCount(2, "Opcoes null preserva as opções existentes");
     }
@@ -106,7 +106,7 @@ public class CardapioVariacaoAuthoringTests
             new(Id: gId, Rotulo: "G", PrecoStorefront: 42m, EhPadrao: true),
         });
 
-        await new EditarCardapioItemAdminUseCase(_cardapioRepo, _uow).ExecuteAsync(cmd);
+        await new EditarCardapioItemAdminUseCase(_cardapioRepo, Substitute.For<ICardapioSecaoRepository>(), _uow).ExecuteAsync(cmd);
 
         item.Variacoes.Count(v => v.EhPadrao).Should().Be(1);
         item.Variacoes.Single(v => v.Id == gId).EhPadrao.Should().BeTrue();
@@ -123,7 +123,7 @@ public class CardapioVariacaoAuthoringTests
         _cardapioRepo.GetByIdAndScopeAsync(item.StorefrontId, item.Id, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(item);
 
-        await new EditarCardapioItemAdminUseCase(_cardapioRepo, _uow).ExecuteAsync(
+        await new EditarCardapioItemAdminUseCase(_cardapioRepo, Substitute.For<ICardapioSecaoRepository>(), _uow).ExecuteAsync(
             NewEdit(item, [new(Id: p.Id, Rotulo: "300 g", PrecoStorefront: 32m)]));
 
         item.Variacoes.Single().Should().Match<CardapioItemVariacao>(v =>
