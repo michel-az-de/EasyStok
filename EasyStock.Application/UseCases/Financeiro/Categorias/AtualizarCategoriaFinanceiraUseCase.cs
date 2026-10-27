@@ -21,6 +21,9 @@ public class AtualizarCategoriaFinanceiraUseCase(
         if (string.IsNullOrWhiteSpace(cmd.Nome))
             throw new UseCaseValidationException("Nome e obrigatorio.");
         UseCaseGuards.EnsureSemTagsHtml(cmd.Nome, "Nome da categoria");
+        ValidacaoFinanceira.Texto(cmd.Nome, ValidacaoFinanceira.NomeCadastroMax, "Nome da categoria");
+        ValidacaoFinanceira.Texto(cmd.Cor, ValidacaoFinanceira.CorMax, "Cor");
+        ValidacaoFinanceira.Texto(cmd.Icone, ValidacaoFinanceira.IconeMax, "Ícone");
 
         var categoria = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id, ct);
         if (categoria is null) return null;

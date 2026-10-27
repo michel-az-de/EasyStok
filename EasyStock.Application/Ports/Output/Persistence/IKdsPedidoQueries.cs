@@ -47,7 +47,8 @@ public sealed record KdsPedidoLeitura(
     string? MotivoRequerAprovacao = null,
     decimal? AReceber = null,
     long? NumeroComanda = null,
-    int? NumeroDoDia = null);
+    int? NumeroDoDia = null,
+    DateTime? ConfirmadoPeloClienteEm = null);
 
 public sealed record KdsJanelaLeitura(string Label, DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 

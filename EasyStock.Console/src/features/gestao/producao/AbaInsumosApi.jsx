@@ -15,6 +15,8 @@ import css from '../cardapio/abaCardapio.module.css'
 // saldo, o mínimo e em quantas receitas entra. Abaixo do mínimo aparece em "Comprar". Farinha e ovo
 // ficam fora (US-067). A Cozinha consulta; cadastrar e ajustar exigem a capacidade da sessão.
 const formatar = (n) => (Number.isInteger(n) ? String(n) : n.toLocaleString('pt-BR', { maximumFractionDigits: 2 }))
+// #2081 (E9): o custo volta ao campo com vírgula, como ela digita; "2.125" seria lido como milhar.
+const custoNoCampo = (custo) => (custo == null ? '' : String(custo).replace('.', ','))
 
 // #1585: o aviso sai junto do formulário que o causou, como no Estoque do dia e nas Receitas.
 // `avisarEm(origem)` fecha o aviso anterior e diz onde sai o próximo: no cadastro, no ajuste do
@@ -24,7 +26,7 @@ const CADASTRO = 'cadastro'
 function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
   const [editando, setEditando] = useState(false)
   const [minimo, setMinimo] = useState(insumo.minimo ?? '')
-  const [custo, setCusto] = useState(insumo.custo ?? '')
+  const [custo, setCusto] = useState(() => custoNoCampo(insumo.custo))
   const [ocupado, setOcupado] = useState(false)
 
   const fazer = async (acao) => {
@@ -73,7 +75,7 @@ function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
       {podeEditar && (
         <div className={css.acoes}>
           <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Ajustar ${insumo.nome}`} aria-haspopup="dialog" onClick={() => {
-            setMinimo(insumo.minimo ?? ''); setCusto(insumo.custo ?? ''); setEditando(true)
+            setMinimo(insumo.minimo ?? ''); setCusto(custoNoCampo(insumo.custo)); setEditando(true)
           }}>Ajustar</Botao>
           <Botao variante="texto" disabled={ocupado} onClick={() => { avisarEm(null); fazer(() => gestao.marcarEmbalagem(insumo.id, !insumo.embalagem)) }}>
             {insumo.embalagem ? 'Não é embalagem' : 'É embalagem'}
@@ -131,6 +133,12 @@ export function AbaInsumosApi() {
         </p>
       )}
 
+      {/* #2081 (E11): a ação principal é um botão do tamanho do texto no topo, não uma barra da largura da tela. */}
+      <div className={css.topo}>
+        <p className={css.descricao}>Molho, recheio, massa e embalagem: o saldo, o mínimo e em quantas receitas entram.</p>
+        {podeEditar && <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setCadastroAberto(true) }}>Cadastrar insumo</Botao>}
+      </div>
+
       <section className={css.secao} aria-labelledby="insumos-comprar">
         <h3 id="insumos-comprar" className={css.tituloSecao}>Comprar</h3>
         {comprar.length === 0
@@ -150,7 +158,7 @@ export function AbaInsumosApi() {
         )}
       </section>
 
-      {podeEditar ? <><Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setCadastroAberto(true) }}>Cadastrar insumo</Botao>
+      {podeEditar ? <>
       {cadastroAberto && <Modal titulo="Cadastrar insumo" aoFechar={criando ? undefined : () => { avisarEm(null); setCadastroAberto(false) }} largura="min(720px, calc(100vw - 24px))"><form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
         <NomeInsumoPesquisado disabled={criando} value={novo.nome} onChange={mudarNovo('nome')} />
         <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: u }))} />

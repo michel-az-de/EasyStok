@@ -35,6 +35,8 @@ public class EmailTemplateRenderSmokeTests
         "convite_acesso_email_v3", "contato_alterado_email_v1", "incidente_sistema_email_v1", "prazo_estourado_email_v2", "resumo_diario_email_v1",
         // Contas a pagar e a receber (#2074)
         "conta_vencimento_email_v1",
+        // Avisos da operação (#2096)
+        "alerta_operacao_email_v1",
     };
 
     public static IEnumerable<object[]> TodosOsTemplates() => Templates.Select(t => new object[] { t });

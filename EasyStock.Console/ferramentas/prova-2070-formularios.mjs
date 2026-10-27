@@ -12,10 +12,8 @@
 //   node ferramentas/prova-2070-formularios.mjs
 
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { transformWithOxc } from 'vite'
 
 const src = (caminho) => new URL(`../src/${caminho}`, import.meta.url)
@@ -25,7 +23,7 @@ const fonte = (caminho) => readFileSync(src(caminho), 'utf8')
 
 const COMPONENTES_REAIS = [
   'features/gestao/PartesDoAjuste', 'features/gestao/loja/AbaDadosDaLoja', 'features/gestao/vitrine/AbaSiteEImpressos',
-  'features/gestao/estoque/AbaAlertasDeEstoque', 'features/gestao/caderno/AbaCadernoDoAgente', 'features/gestao/avisos/AbaAvisos',
+  'features/gestao/estoque/AbaAlertasDeEstoque', 'features/gestao/caderno/AbaCadernoDoAgente', 'features/gestao/avisos/AvisosNesteAparelho',
   'features/entregas/CadastroEntregadores', 'features/automacoes/FormularioHorariosDaSemana',
   'features/automacoes/ModalHorariosDaSemana', 'features/automacoes/ModalAutomacoes',
 ]
@@ -365,97 +363,8 @@ await provar('A4 caderno: palavras-chave como a API grava, limites e teto do nú
   })
 })
 
-// O catálogo de rotinas da API, lido do seed: código, evento e canais de cada rotina ativa.
+// Raiz do repositório, para ler os contratos do backend.
 const raizDoRepo = new URL('../../', import.meta.url)
-function rotinasDoCatalogo() {
-  const seed = readFileSync(new URL('EasyStock.Api/Data/NotificacoesGlobaisSeed.cs', raizDoRepo), 'utf8')
-  const constantes = Object.fromEntries([...seed.matchAll(/const string (\w+) = """(.*?)""";/g)].map(([, nome, valor]) => [nome, valor]))
-  const canaisDe = (literal) => JSON.parse(literal.startsWith('"') ? JSON.parse(literal) : constantes[literal])
-  const corpo = seed.slice(seed.indexOf('BuildDefaultRotinas'))
-  const rotinas = new Map()
-  for (const [, codigo, evento, fallback] of corpo.matchAll(/codigo: "(\w+)",[^;]*?tipoEvento: TipoEventoNotificacao\.(\w+)[^;]*?;\s*\w+\.DefinirFallback\(("(?:[^"\\]|\\.)*")/g)) {
-    rotinas.set(codigo, { evento, canais: canaisDe(fallback) })
-  }
-  for (const [, codigo, evento, fallback] of corpo.matchAll(/MakeRotina\("(\w+)",\s*"[^"]*",\s*TipoEventoNotificacao\.(\w+),\s*"\w+",\s*CategoriaConteudoNotificacao\.\w+,\s*("(?:[^"\\]|\\.)*"|\w+)/g)) {
-    rotinas.set(codigo, { evento, canais: canaisDe(fallback) })
-  }
-  for (const [, variavel, codigo] of corpo.matchAll(/var (\w+) = MakeRotina\("(\w+)"/g)) {
-    if (new RegExp(`${variavel}\\.Desativar\\(`).test(corpo)) rotinas.delete(codigo)
-  }
-  return rotinas
-}
-
-// Quem publica cada evento fora do catálogo, da política de validade e dos exemplos.
-function eventosPublicados() {
-  const ignorar = /[\\/](bin|obj|Migrations)[\\/]|NotificacoesGlobaisSeed|RemetentePorTipoEvento|PoliticaValidadeNotificacao|ExemplosDeEvento|TipoEventoNotificacao\.cs$/
-  const publicados = new Set()
-  const andarPasta = (pasta) => {
-    for (const entrada of readdirSync(pasta, { withFileTypes: true })) {
-      const caminho = join(pasta, entrada.name)
-      if (ignorar.test(caminho)) continue
-      if (entrada.isDirectory()) andarPasta(caminho)
-      else if (entrada.name.endsWith('.cs')) for (const [, evento] of readFileSync(caminho, 'utf8').matchAll(/TipoEventoNotificacao\.(\w+)/g)) publicados.add(evento)
-    }
-  }
-  const raiz = fileURLToPath(raizDoRepo)
-  for (const projeto of readdirSync(raiz)) {
-    if (/^EasyStock\.(Application|Domain|Api|Infra\.[A-Za-z]+)$/.test(projeto)) andarPasta(join(raiz, projeto))
-  }
-  return publicados
-}
-
-// Rotina ativa do catálogo que não chega à dona, com o motivo. Rotina nova no seed sem lugar aqui
-// nem em AVISOS_DA_DONA reprova a prova.
-const SEM_PUBLICADOR = 'nenhum código publica o evento'
-const FORA_DA_DONA = {
-  assinatura_expirando_global: SEM_PUBLICADOR, assinatura_expirada_dunning_global: SEM_PUBLICADOR,
-  alerta_estoque_critico_global: SEM_PUBLICADOR, produto_vencido_global: SEM_PUBLICADOR, tarefa_pendente_global: SEM_PUBLICADOR,
-  ticket_criado_global: SEM_PUBLICADOR, ticket_respondido_admin_global: SEM_PUBLICADOR, ticket_status_alterado_global: SEM_PUBLICADOR,
-  ticket_atribuido_global: SEM_PUBLICADOR, ticket_encaminhado_global: SEM_PUBLICADOR, sla_proximo_vencer_global: SEM_PUBLICADOR,
-  sla_violado_global: SEM_PUBLICADOR, bug_fix_criado_global: SEM_PUBLICADOR, ticket_respondido_cliente_global: SEM_PUBLICADOR,
-  convite_csat_global: SEM_PUBLICADOR, fatura_criada_global: SEM_PUBLICADOR, fatura_vencendo_global: SEM_PUBLICADOR,
-  fatura_paga_global: SEM_PUBLICADOR, fatura_vencida_global: SEM_PUBLICADOR, pagamento_confirmado_global: SEM_PUBLICADOR,
-  pagamento_falhou_global: SEM_PUBLICADOR, broadcast_super_admin_global: SEM_PUBLICADOR, relatorio_pronto_global: SEM_PUBLICADOR,
-  relatorio_falhou_global: SEM_PUBLICADOR, relatorio_expirado_global: SEM_PUBLICADOR,
-  produto_vencendo_global: 'o coletor publica sem destinatário e a rotina não tem audiência: o e-mail não tem para quem ir',
-  pedido_pago_confirmado_global: 'vai ao cliente', pedido_em_preparo_global: 'vai ao cliente', pedido_reagendado_global: 'vai ao cliente',
-  comanda_atualizada_global: 'vai ao cliente', pedido_saiu_para_entrega_global: 'vai ao cliente', pedido_entregue_global: 'vai ao cliente',
-  avaliacao_solicitada_global: 'vai ao cliente', reembolso_efetuado_global: 'vai ao cliente',
-  incidente_sistema_global: 'vai ao suporte da plataforma (superadmins)',
-}
-
-await provar('A5 avisos: cada aviso bate com o catálogo da API e com os avisos da tela; toda rotina ativa chega à dona ou tem motivo', async () => {
-  const d = await carregar('dominio/avisosDaDona.js')
-  const { TIPOS_DE_AVISO } = await carregar('dominio/aviso.js')
-  const { TELA, APARELHO, SINO, EMAIL, WHATSAPP } = d.CANAIS_DE_AVISO
-  const catalogo = rotinasDoCatalogo()
-  assert.equal(catalogo.has('resumo_diario_global'), false, 'o molde inativo do resumo diário não conta')
-  assert.deepEqual(catalogo.get('contato_novo_balcao_global'), { evento: 'ContatoNovoNoBalcao', canais: ['Push', 'InApp'] }, 'a leitura do seed resolve a constante')
-
-  const daDona = d.AVISOS_DA_DONA.flatMap((aviso) => aviso.rotinas)
-  assert.equal(new Set(daDona).size, daDona.length, 'cada rotina num aviso só')
-  assert.deepEqual(daDona.filter((codigo) => codigo in FORA_DA_DONA), [], 'rotina da dona não está na lista de fora')
-  assert.deepEqual([...new Set([...daDona, ...Object.keys(FORA_DA_DONA)])].sort(), [...catalogo.keys()].sort(),
-    'toda rotina ativa do catálogo está num aviso da dona ou tem motivo escrito, e nenhum aviso cita rotina que não existe')
-
-  const publicados = eventosPublicados()
-  const semPublicador = Object.keys(FORA_DA_DONA).filter((codigo) => FORA_DA_DONA[codigo] === SEM_PUBLICADOR)
-  assert.deepEqual(semPublicador.filter((codigo) => publicados.has(catalogo.get(codigo).evento)), [], 'quem é "sem publicador" não tem publicador')
-  assert.deepEqual(daDona.filter((codigo) => !publicados.has(catalogo.get(codigo).evento)), [], 'todo aviso da dona tem quem publique o evento')
-
-  const ORDEM = [TELA, APARELHO, SINO, EMAIL, WHATSAPP]
-  for (const aviso of d.AVISOS_DA_DONA) {
-    const esperado = new Set(aviso.rotinas.flatMap((codigo) => catalogo.get(codigo).canais.map((canal) => d.CANAL_DA_ROTINA[canal])))
-    if (aviso.tela) esperado.add(TELA)
-    if (aviso.rotinas.length === 0 && !aviso.tela) esperado.add(SINO) // alertas do analisador de estoque
-    assert.deepEqual(aviso.canais, ORDEM.filter((canal) => esperado.has(canal)), aviso.titulo)
-  }
-  assert.deepEqual(d.AVISOS_DA_DONA.map((a) => a.tela).filter(Boolean).sort(), Object.values(TIPOS_DE_AVISO).sort(), 'os cinco avisos da tela do Balcão')
-  assert.deepEqual(d.AVISOS_DA_DONA.filter((a) => a.rotinas.length === 0 && !a.tela).map((a) => a.titulo), ['Alertas de estoque'])
-  assert.match(readFileSync(new URL('EasyStock.Api/Services/GeradorNotificacoesAutomaticas.cs', raizDoRepo), 'utf8'), /sino da equipe/,
-    'os alertas de estoque vão ao sino pelo analisador, fora do catálogo')
-  assert.equal(new Set(d.AVISOS_DA_DONA.map((a) => a.titulo)).size, d.AVISOS_DA_DONA.length, 'títulos únicos')
-})
 
 // --- B. Montagem com a API simulada -------------------------------------------------------------------
 
@@ -970,13 +879,10 @@ await provar('B4 caderno: núcleo acima do teto não envia e o erro da API apare
   assert.match(texto(raiz.arvore), /Texto acima de 4000 caracteres\./)
 })
 
-await provar('B5 avisos: só leitura do que chega e por onde; ligar neste aparelho usa a ativação que já existe', async () => {
-  const { AbaAvisos } = await carregar('features/gestao/avisos/AbaAvisos.jsx')
-  const { AVISOS_DA_DONA } = await carregar('dominio/avisosDaDona.js')
+await provar('B5 avisos: ligar neste aparelho usa a ativação que já existe', async () => {
+  const { AvisosNesteAparelho } = await carregar('features/gestao/avisos/AvisosNesteAparelho.jsx')
   let ativou = 0
-  const externo = await montar(AbaAvisos, { aparelho: { estado: 'desligado', mensagem: null, ativar: () => { ativou++ }, desligar() {} } })
-  for (const aviso of AVISOS_DA_DONA) assert.match(texto(externo.raiz.arvore), new RegExp(aviso.titulo))
-  assert.equal(rotulos(externo.raiz).length, 0, 'nenhum campo para editar')
+  const externo = await montar(AvisosNesteAparelho, { aparelho: { estado: 'desligado', mensagem: null, ativar: () => { ativou++ }, desligar() {} } })
   await clicar(externo.raiz, 'Ativar avisos neste aparelho')
   assert.equal(ativou, 1)
   assert.equal(externo.aoMudarPendencia.chamadas.includes(true), false)
@@ -985,7 +891,7 @@ await provar('B5 avisos: só leitura do que chega e por onde; ligar neste aparel
   // A ativação do App (a mesma do sino) chega pelo contexto de acesso: uma instância só.
   let desligou = 0
   g.acesso = { acoes: {}, aparelho: { estado: 'ativo', mensagem: null, ativar() {}, desligar: () => { desligou++ } } }
-  const doApp = await montar(AbaAvisos)
+  const doApp = await montar(AvisosNesteAparelho)
   assert.match(texto(doApp.raiz.arvore), /Avisos desta conta ativados neste aparelho\./)
   await clicar(doApp.raiz, 'Desativar avisos neste aparelho')
   assert.equal(desligou, 1)
@@ -995,13 +901,12 @@ await provar('B5 avisos: só leitura do que chega e por onde; ligar neste aparel
   const tocou = []
   g.push = new Proxy({}, { get: (_, nome) => () => { tocou.push(nome); throw new Error(`push.${String(nome)} não devia ser chamado`) } })
   g.acesso = { acoes: {} }
-  const solta = await montar(AbaAvisos)
+  const solta = await montar(AvisosNesteAparelho)
   assert.equal(botao(solta.raiz, 'Ativar avisos neste aparelho'), undefined)
   assert.match(texto(solta.raiz.arvore), /Ligar os avisos neste aparelho não está disponível nesta tela\. Ao sair dela, use o sino de Avisos no topo do Console\./)
   assert.doesNotMatch(texto(solta.raiz.arvore), /toque no sino/, 'não aponta para um sino que talvez não esteja à vista')
   assert.deepEqual(tocou, [])
   assert.deepEqual(rede.chamadas, [], 'nem conferir nem inscrever de novo')
-  for (const aviso of AVISOS_DA_DONA) assert.match(texto(solta.raiz.arvore), new RegExp(aviso.titulo))
   assert.doesNotMatch(fonte('aplicacao/useAvisosNoAparelho.js'), /useAvisosNoAparelhoDaSessao/, 'a segunda instância não existe mais')
 })
 
@@ -1106,7 +1011,7 @@ await provar('C  CSS dos formulários: colunas que encolhem e nenhuma largura fi
   const estilo = fonte('features/gestao/formularioDeAjuste.module.css')
   assert.match(estilo, /grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, \d+px\), 1fr\)\)/)
   for (const [, largura] of estilo.matchAll(/(?:^|[^-])width:\s*(\d+)px/g)) assert.ok(Number(largura) <= 328, `largura fixa ${largura}px`)
-  for (const caminho of ['features/gestao/loja/AbaDadosDaLoja.jsx', 'features/gestao/vitrine/AbaSiteEImpressos.jsx', 'features/gestao/estoque/AbaAlertasDeEstoque.jsx', 'features/gestao/caderno/AbaCadernoDoAgente.jsx', 'features/gestao/avisos/AbaAvisos.jsx']) {
+  for (const caminho of ['features/gestao/loja/AbaDadosDaLoja.jsx', 'features/gestao/vitrine/AbaSiteEImpressos.jsx', 'features/gestao/estoque/AbaAlertasDeEstoque.jsx', 'features/gestao/caderno/AbaCadernoDoAgente.jsx', 'features/gestao/avisos/AvisosNesteAparelho.jsx']) {
     assert.match(fonte(caminho), /formularioDeAjuste\.module\.css/, caminho)
   }
 })

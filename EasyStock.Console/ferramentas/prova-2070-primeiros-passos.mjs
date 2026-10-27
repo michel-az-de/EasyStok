@@ -449,8 +449,10 @@ await provar('B2 catálogo: as telas dos formulários novos em Configurações e
     'site-e-impressos': { rotulo: 'Site e impressos', aba: 'site-e-impressos', acao: 'configurarLoja' },
     'alertas-de-estoque': { rotulo: 'Alertas de estoque', aba: 'alertas-de-estoque', acao: 'configurarLoja' },
     caderno: { rotulo: 'Caderno do agente', aba: 'caderno', acao: 'editarAtendimento' },
-    avisos: { rotulo: 'Avisos', aba: 'avisos' },
   }
+  // #2096: a tela Avisos é uma só, no Atendimento; o passo Avisos monta a mesma aba.
+  assert.equal(configuracoes.telas.some((t) => t.id === 'avisos'), false, 'avisos não se repete em Configurações')
+  assert.equal(modulos.moduloPorId('atendimento').telas.filter((t) => t.aba === 'avisos').length, 1)
   for (const [id, esperado] of Object.entries(esperadas)) {
     const tela = configuracoes.telas.find((t) => t.id === id)
     assert.ok(tela, `${id} no catálogo`)
@@ -462,8 +464,8 @@ await provar('B2 catálogo: as telas dos formulários novos em Configurações e
   for (const acao of new Set(Object.values(esperadas).map((e) => e.acao).filter(Boolean))) assert.equal(typeof acessoModulos.PODE_NA_TELA[acao], 'function', acao)
   const ids = (acoes) => modulos.telasDoMenu(configuracoes, { fonteApi: true, acoes }).map((t) => t.id)
   assert.deepEqual(ids(ADMIN).filter((id) => id in esperadas), Object.keys(esperadas))
-  assert.deepEqual(ids({ ...ADMIN, configurarLoja: false }).filter((id) => id in esperadas), ['caderno', 'avisos'])
-  assert.deepEqual(ids({ ...ADMIN, editarAtendimento: false }).filter((id) => id in esperadas), ['dados-da-loja', 'site-e-impressos', 'alertas-de-estoque', 'avisos'])
+  assert.deepEqual(ids({ ...ADMIN, configurarLoja: false }).filter((id) => id in esperadas), ['caderno'])
+  assert.deepEqual(ids({ ...ADMIN, editarAtendimento: false }).filter((id) => id in esperadas), ['dados-da-loja', 'site-e-impressos', 'alertas-de-estoque'])
   const entregas = modulos.moduloPorId('entregas')
   const entregadores = entregas.telas.find((t) => t.id === 'entregadores')
   assert.deepEqual(entregadores, { id: 'entregadores', rotulo: 'Entregadores', tipo: modulos.TELA_AJUSTE, aba: 'entregadores', soApi: true })

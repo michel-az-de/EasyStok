@@ -11,6 +11,7 @@ import { AbaCaixaApi } from './caixa/AbaCaixaApi'
 import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
 import { AbaIntegracoesApi } from './integracoes/AbaIntegracoesApi'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
+import { AbaAvisos } from './avisos/AbaAvisos'
 import { AbaImpressao } from './impressao/AbaImpressao'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
@@ -30,7 +31,7 @@ import { AbaDadosDaLoja } from './loja/AbaDadosDaLoja'
 import { AbaSiteEImpressos } from './vitrine/AbaSiteEImpressos'
 import { AbaAlertasDeEstoque } from './estoque/AbaAlertasDeEstoque'
 import { AbaCadernoDoAgente } from './caderno/AbaCadernoDoAgente'
-import { AbaAvisos } from './avisos/AbaAvisos'
+import { AvisosNesteAparelho } from './avisos/AvisosNesteAparelho'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -270,7 +271,8 @@ const PAINEIS = {
   'site-e-impressos': ({ formulario }) => <AbaSiteEImpressos {...formulario} />,
   'alertas-de-estoque': ({ formulario }) => <AbaAlertasDeEstoque {...formulario} />,
   caderno: ({ formulario }) => <AbaCadernoDoAgente {...formulario} />,
-  avisos: ({ formulario }) => <AbaAvisos compacto={formulario.compacto} />,
+  // #2096: o que avisa a dona e o gerente; #2070: acima, ligar os avisos neste aparelho.
+  avisos: () => <><AvisosNesteAparelho /><AbaAvisos /></>,
   entregadores: ({ entregadoresApi, formulario }) => entregadoresApi?.(formulario) ?? null,
 }
 

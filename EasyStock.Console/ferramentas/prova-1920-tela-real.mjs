@@ -125,9 +125,12 @@ confere('6  o campo em linha mostra, abre e compara o telefone já na máscara',
 
 // --- 7. Hall ---------------------------------------------------------------------------------------
 
-confere('7  o número do financeiro no hall se diz total, como no Caixa do dia', () => {
+// #2078 (banca #2073, B7/E3/D7): o hall passou a mostrar a gaveta, o número que o Caixa do dia
+// destaca, com o mesmo rótulo; o total com Pix e cartão ficou só no Caixa. A regra de não dizer
+// "Saldo no caixa" continua.
+confere('7  o número do financeiro no hall tem o rótulo do número que o Caixa do dia destaca', () => {
   const jsx = fonte('features/hall/PulsoDoHall.jsx')
-  assert.match(jsx, /financeiro: \{ nome: 'Total do caixa',/)
+  assert.match(jsx, /financeiro: \{ nome: 'Na gaveta \(dinheiro\)',/)
   assert.doesNotMatch(jsx, /Saldo no caixa/)
 })
 

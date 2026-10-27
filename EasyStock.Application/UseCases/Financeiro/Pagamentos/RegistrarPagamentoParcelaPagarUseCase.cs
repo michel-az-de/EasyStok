@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Financeiro.Common;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 
@@ -34,8 +35,13 @@ public class RegistrarPagamentoParcelaPagarUseCase(
     public async Task<RegistrarPagamentoResult?> ExecuteAsync(RegistrarPagamentoParcelaPagarCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
-        if (cmd.Valor <= 0m) throw new UseCaseValidationException("Valor deve ser positivo.");
-        if (string.IsNullOrWhiteSpace(cmd.Metodo)) throw new UseCaseValidationException("Metodo e obrigatorio.");
+        // #2095 (F7 a F9): arredonda antes de validar, método do caixa, textos no tamanho da coluna, data no dia de Brasília.
+        var valor = ValidacaoFinanceira.Valor(cmd.Valor, "Valor");
+        var metodo = ValidacaoFinanceira.MetodoPagamento(cmd.Metodo);
+        ValidacaoFinanceira.Texto(cmd.Observacao, ValidacaoFinanceira.ObservacaoPagamentoMax, "Observação");
+        ValidacaoFinanceira.Texto(cmd.GatewayProvedor, ValidacaoFinanceira.GatewayProvedorMax, "Gateway");
+        ValidacaoFinanceira.Texto(cmd.GatewayTransactionId, ValidacaoFinanceira.GatewayTransacaoMax, "Referência do pagamento");
+        var dataPagamento = ValidacaoFinanceira.DataPagamentoUtc(cmd.DataPagamento);
 
         var parcela = await contaRepo.GetParcelaWithContaAsync(cmd.EmpresaId, cmd.ParcelaId, ct);
         if (parcela is null) return null;
@@ -56,12 +62,12 @@ public class RegistrarPagamentoParcelaPagarUseCase(
                     parcela.ValorPago, parcela.Saldo, existente.MovimentoCaixaId);
         }
 
-        var dataPagamento = DataUtc.ParaUtcOpcional(cmd.DataPagamento) ?? DateTime.UtcNow;
         try
         {
+            conta.GarantirAceitaPagamento();
             var pagamento = PagamentoParcela.CriarConfirmado(
                 cmd.EmpresaId, TipoLadoFinanceiro.Pagar,
-                cmd.Valor, cmd.Metodo, dataPagamento,
+                valor, metodo, dataPagamento,
                 cmd.GatewayProvedor, cmd.GatewayTransactionId,
                 cmd.Observacao, cmd.RegistradoPorUserId, cmd.RegistradoPorNome);
 
@@ -69,11 +75,11 @@ public class RegistrarPagamentoParcelaPagarUseCase(
 
             // MovimentoCaixa na MESMA transacao — sai pelo caixa do dia atual
             var mov = MovimentoCaixa.Criar(
-                cmd.EmpresaId, "saida", cmd.Valor,
+                cmd.EmpresaId, "saida", valor,
                 dataMovimento: DateTime.UtcNow,
                 lojaId: conta.LojaId);
             mov.Descricao = $"Pag. parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
-            mov.Metodo = cmd.Metodo.ToLowerInvariant();
+            mov.Metodo = metodo;
             mov.Categoria = "contas-a-pagar";
             mov.Referencia = ReferenciaDeParcela.DoPagamento("cp", conta.Id, parcela.Id, pagamento.Id);
             mov.RegistradoPorUserId = cmd.RegistradoPorUserId;
@@ -87,8 +93,8 @@ public class RegistrarPagamentoParcelaPagarUseCase(
 
             await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaPagar(
                 conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PagamentoConfirmado,
-                descricao: $"Pagamento de R$ {cmd.Valor:F2} via {cmd.Metodo} na parcela {parcela.Numero}.",
-                valorDepois: $"+R$ {cmd.Valor:F2}",
+                descricao: $"Pagamento de R$ {valor:F2} via {metodo} na parcela {parcela.Numero}.",
+                valorDepois: $"+R$ {valor:F2}",
                 usuarioId: cmd.RegistradoPorUserId, usuarioNome: cmd.RegistradoPorNome,
                 origem: "api"), ct);
 

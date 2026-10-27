@@ -96,6 +96,7 @@ public class ListarPedidosKdsUseCase(IKdsPedidoQueries queries, TimeProvider rel
             RequerAprovacao: p.RequerAprovacao,
             MotivoRequerAprovacao: p.MotivoRequerAprovacao,
             NumeroComanda: p.NumeroComanda,
-            NumeroDoDia: p.NumeroDoDia);
+            NumeroDoDia: p.NumeroDoDia,
+            ConfirmadoPeloClienteEm: p.ConfirmadoPeloClienteEm);
     }
 }

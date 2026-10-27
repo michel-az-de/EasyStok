@@ -17,11 +17,15 @@ public class AtualizarContaReceberUseCase(
     IContaReceberRepository repo,
     ICategoriaFinanceiraRepository categoriaRepo,
     ICentroCustoRepository centroRepo,
-    IUnitOfWork uow)
+    IUnitOfWork uow,
+    IClienteRepository? clientes = null)
 {
     public async Task<ContaReceberResult?> ExecuteAsync(AtualizarContaReceberCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        // #2095 (F7): tamanho antes do banco (estourar a coluna respondia 500).
+        ValidacaoFinanceira.TextosDaConta(cmd.Descricao, cmd.Observacoes);
+
         var conta = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id, ct);
         if (conta is null) return null;
 
@@ -47,6 +51,7 @@ public class AtualizarContaReceberUseCase(
             if (centro is null || !centro.Ativo) throw new UseCaseValidationException("Centro de custo invalido ou inativo.");
             conta.CentroCustoId = centro.Id;
         }
+        await ValidacaoFinanceira.GarantirReferenciasAsync(cmd.EmpresaId, clienteId: cmd.ClienteId, clientes: clientes);
         if (cmd.ClienteId.HasValue) conta.ClienteId = cmd.ClienteId.Value == Guid.Empty ? null : cmd.ClienteId;
 
         conta.AlteradoEm = DateTime.UtcNow;

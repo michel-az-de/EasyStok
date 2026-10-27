@@ -525,6 +525,13 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<string>("Avisos")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("avisos_operacao")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
@@ -7418,6 +7425,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("ClienteTelefone")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("ConfirmadoPeloClienteEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmado_pelo_cliente_em");
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");

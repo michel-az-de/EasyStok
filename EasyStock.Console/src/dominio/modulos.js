@@ -58,6 +58,8 @@ export const MODULOS = [
     telas: [
       { id: 'balcao', rotulo: 'Balcão', tipo: TELA_OPERACAO },
       { id: 'horarios', rotulo: 'Horários e mensagens', tipo: TELA_AJUSTE, aba: 'atendimento', soApi: true },
+      // #2096: o que chama a dona e o gerente (aparelho, e-mail e sino); mesma permissão do módulo.
+      { id: 'avisos', rotulo: 'Avisos', tipo: TELA_AJUSTE, aba: 'avisos', soApi: true },
       // #1441: criar, editar e arquivar respostas prontas; ligar e escrever as automáticas.
       { id: 'respostas', rotulo: 'Respostas e automáticas', tipo: TELA_AJUSTE, aba: 'respostas' },
     ],
@@ -109,8 +111,6 @@ export const MODULOS = [
       { id: 'alertas-de-estoque', rotulo: 'Alertas de estoque', tipo: TELA_AJUSTE, aba: 'alertas-de-estoque', soApi: true, acao: 'configurarLoja' },
       // O caderno é rota do Atendimento (`AtendimentoCaderno`): o administrador com o atendimento liberado.
       { id: 'caderno', rotulo: 'Caderno do agente', tipo: TELA_AJUSTE, aba: 'caderno', soApi: true, acao: 'editarAtendimento' },
-      // Só leitura do que chega e o liga e desliga deste aparelho: nenhuma rota da loja.
-      { id: 'avisos', rotulo: 'Avisos', tipo: TELA_AJUSTE, aba: 'avisos', soApi: true },
       // #2070: o assistente da dona. Fora da janela de Gestão e em tela cheia, sem o menu lateral.
       { id: 'primeiros-passos', rotulo: 'Primeiros passos', tipo: TELA_AJUSTE, aba: 'primeiros-passos', soApi: true, acao: 'configurarLoja', foraDaGestao: true, telaCheia: true },
     ],

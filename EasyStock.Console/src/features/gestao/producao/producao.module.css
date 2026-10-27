@@ -93,3 +93,15 @@
 @media (prefers-reduced-motion: reduce) {
   .linha, .cartao { transition: none; }
 }
+
+/* #2081 (E7): o total perdido em destaque, com a contagem do que ficou sem custo ao lado. */
+.resumoDasPerdas { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), max-content)); padding-top: 0; }
+
+/* #2081 (A6): o código de pareamento em dígitos grandes, para ditar ou digitar no celular. */
+.pareamento { display: grid; gap: var(--e-3); justify-items: center; text-align: center; min-height: 96px; align-content: center; }
+.codigoDoAparelho {
+  margin: 0; color: var(--tinta); font-size: clamp(2.5rem, 8vw, 3.5rem); font-weight: 750; line-height: 1;
+  letter-spacing: .08em; font-variant-numeric: tabular-nums; user-select: all;
+}
+.detalheDoCodigo { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); font-variant-numeric: tabular-nums; }
+.avisoDoCodigo { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-2); background: var(--alerta-pastel); color: var(--alerta); font-size: var(--t-apoio); }

@@ -55,7 +55,7 @@ export const PASSOS = Object.freeze([
     [{ aba: 'entregadores' }]),
   passo('impressora', 'Impressora', PARTE_AJUSTES, 'O papel de cada documento. Vale só neste aparelho.',
     [{ aba: 'impressao' }]),
-  passo('avisos', 'Avisos', PARTE_AJUSTES, 'O que você recebe e por onde. Ligar os avisos vale só neste aparelho.',
+  passo('avisos', 'Avisos', PARTE_AJUSTES, 'O que chama você e o gerente, e quando. Ligar os avisos vale só neste aparelho.',
     [{ aba: 'avisos' }]),
   passo(PASSO_FINAL, 'Revisão', PARTE_REVISAO, 'Confira o que ficou pronto e conclua. O que ficou para depois continua em Configurações.',
     [{ componente: 'pronto' }]),

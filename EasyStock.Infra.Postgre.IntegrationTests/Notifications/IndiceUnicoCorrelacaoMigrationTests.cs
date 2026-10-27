@@ -88,9 +88,7 @@ public class IndiceUnicoCorrelacaoMigrationTests(PostgreSqlDatabaseFixture fixtu
         await migrator.MigrateAsync(anterior);
         (await IndiceExisteAsync(db)).Should().BeFalse();
         (await _s.LerEventosDaEmpresaAsync(empresa)).Should().HaveCount(2);
-        await migrator.MigrateAsync(alvo);
-
-        // Volta à última migração: os outros testes da classe semeiam pelo modelo atual.
+        // O banco é da classe inteira: volta ao topo, não só até esta migração (#2096).
         await migrator.MigrateAsync();
     }
 

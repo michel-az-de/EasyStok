@@ -123,12 +123,12 @@ console.log('Perfis: só a gerência cria, edita e arquiva respostas prontas e a
 const configuracoes = moduloPorId('configuracoes')
 const ADMINISTRACAO = { ...DONA, configurarLoja: true }
 const GERENCIA = { editarAtendimento: false, controlarLoja: true, configurarLoja: false }
-const DA_LOJA = ['dados-da-loja', 'site-e-impressos', 'alertas-de-estoque', 'caderno', 'avisos', 'primeiros-passos']
+const DA_LOJA = ['dados-da-loja', 'site-e-impressos', 'alertas-de-estoque', 'caderno', 'primeiros-passos']
 const telasDaLoja = (opcoes) => ids(telasDoMenu(configuracoes, opcoes)).filter((id) => DA_LOJA.includes(id))
 assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: ADMINISTRACAO }), DA_LOJA)
-assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: DONA }), ['caderno', 'avisos'], 'API sem a chave configurarLoja: só o que não depende dela')
-assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: GERENCIA }), ['avisos'])
-assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: ATENDENTE }), ['avisos'])
+assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: DONA }), ['caderno'], 'API sem a chave configurarLoja: só o que não depende dela')
+assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: GERENCIA }), [])
+assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: ATENDENTE }), [])
 assert.deepEqual(telasDaLoja({ fonteApi: true }), DA_LOJA, 'sem a matriz (guia, rota), as telas ficam')
 assert.deepEqual(telasDaLoja({ fonteApi: false, acoes: ADMINISTRACAO }), [], 'na demonstração não existem')
 assert.equal(acesso.podeConfigurarLoja(ADMINISTRACAO), true)

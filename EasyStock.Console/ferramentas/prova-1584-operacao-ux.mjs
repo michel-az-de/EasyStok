@@ -242,7 +242,8 @@ await confere('Lançamento: Sangria e depois Entrada não grava entrada rotulada
   }
   const aba = montar(AbaCaixaApi)
   botao(aba.renderizar(), 'Lançamento').props.onClick()
-  const elForm = doTipo(aba.renderizar(), 'FormLancamento')[0]
+  // #2078: o formulário passou a morar junto do seu modal (`ModalLancamento`), para segurar o Esc.
+  const elForm = doTipo(aba.renderizar(), 'ModalLancamento')[0]
   const form = montar(elForm.type, elForm.props)
   const categoria = (el) => doTipo(el, 'CampoTexto').find((c) => c.props.rotulo === 'Categoria')
   const enviar = (el) => doTipo(el, 'Botao').find((b) => b.props.tipo === 'submit')

@@ -1,3 +1,4 @@
+using EasyStock.Api.Authentication;
 using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Common;
@@ -70,7 +71,10 @@ public class CaixaController(
         var result = await fecharUseCase.ExecuteAsync(command with
         {
             EmpresaId = emp,
-            FechadoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null
+            FechadoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            // #2082 B13: o nome sai do token, nunca do corpo (o corpo atribuiria o fechamento a outra pessoa).
+            // A coluna tem 120 caracteres.
+            FechadoPorNome = User.NomeExibicao() is { } nome ? nome[..Math.Min(nome.Length, 120)] : null
         });
         return DataOk(result);
     }

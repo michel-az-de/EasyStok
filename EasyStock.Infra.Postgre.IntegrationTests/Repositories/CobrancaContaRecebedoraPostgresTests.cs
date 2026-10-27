@@ -100,6 +100,8 @@ public class CobrancaContaRecebedoraPostgresTests(PostgreSqlDatabaseFixture fixt
 
         await migrator.MigrateAsync(alvo);
         (await ColunasAsync(admin)).Should().BeEquivalentTo(["AguardandoCredencialDesde", "ContaRecebedoraId", "OrigemCredencial"]);
+        // O banco é da classe inteira: volta ao topo para os outros testes verem as migrações posteriores (#2096).
+        await migrator.MigrateAsync();
 
         await using var leitura = fixture.CreateDbContext();
         using var _ = leitura.UseRowLevelSecurityBypass();
