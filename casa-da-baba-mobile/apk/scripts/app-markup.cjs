@@ -67,7 +67,7 @@ function adaptProduction(html) {
   const metrics = /<div class="prod-metrics">\s*<div><strong id="prodMetricProducts">0<\/strong><span>ativos<\/span><\/div>\s*<div><strong id="prodMetricStock">0<\/strong><span>estoque<\/span><\/div>\s*<div><strong id="prodMetricLow">0<\/strong><span>críticos<\/span><\/div>\s*<\/div>/g;
   const matches = [...html.matchAll(metrics)];
   if (matches.length !== 1) throw new Error('Indicadores de produção incompatíveis com o APK.');
-  html = html.replace(matches[0][0], '<details class="pilot-production-metrics"><summary><span>Estoque baixo: <strong id="prodMetricLow">0</strong></span><span class="pilot-metrics-action">Ver indicadores</span></summary><div class="prod-metrics"><div><span>Produtos ativos:</span><strong id="prodMetricProducts">0</strong></div><div><span>Unidades em estoque:</span><strong id="prodMetricStock">0</strong></div></div></details>');
+  html = html.replace(matches[0][0], '<details class="pilot-production-metrics"><summary><span>Estoque baixo: <strong id="prodMetricLow">0</strong></span><span class="pilot-metrics-action">Indicadores</span></summary><div class="prod-metrics"><div><span>Produtos ativos:</span><strong id="prodMetricProducts">0</strong></div><div><span>Unidades em estoque:</span><strong id="prodMetricStock">0</strong></div></div></details>');
   const actions = /<div class="cta-row">\s*(<button class="cta-btn" onclick="clearProduction\(\)">Limpar<\/button>\s*<button class="cta-btn primary" id="saveProdBtn" onclick="openProductionConfirm\(\)" disabled>Conferir produção<\/button>)\s*<\/div>/g;
   const actionMatches = [...html.matchAll(actions)];
   if (actionMatches.length !== 1) throw new Error('Ações de produção incompatíveis com o APK.');

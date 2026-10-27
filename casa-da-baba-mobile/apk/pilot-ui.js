@@ -137,6 +137,11 @@
     }
     const productionTitle = doc.getElementById('productionConfirmTitle');
     if (productionTitle) productionTitle.textContent = 'Lote';
+    doc.querySelectorAll('button.cobranca-close, button.modal-close, button.etq-close').forEach(button => {
+      button.innerHTML = icon('fechar');
+      button.setAttribute('aria-label', 'Fechar');
+      button.classList.add('pilot-icon-command');
+    });
     doc.querySelectorAll('#scanModeOptions .scan-mode-card').forEach(button => {
       const label = button.querySelector('strong');
       if (label) label.textContent = { both: 'Ambos', barcode: 'Barras', qr: 'QR', none: 'Nenhum' }[button.dataset.mode];
@@ -144,7 +149,7 @@
     doc.querySelectorAll('#ajustesModal .ajustes-tabs button').forEach(button => {
       button.textContent = { loja: 'Geral', eq: 'Etiquetas', manut: 'Backup' }[button.dataset.group];
     });
-    doc.querySelectorAll('[onclick*="factoryReset"]').forEach(button => button.closest('.ajustes-section')?.classList.add('pilot-out-of-scope'));
+    doc.querySelectorAll('[onclick*="factoryReset"], #themeToggleAjustes').forEach(button => button.closest('.ajustes-section')?.classList.add('pilot-out-of-scope'));
     refresh();
     if (environment.MutationObserver) {
       let scheduled = false;

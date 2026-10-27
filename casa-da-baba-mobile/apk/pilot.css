@@ -718,7 +718,7 @@ body.pilot-app .phone [data-screen=historico] #histFilter button.active { backgr
 
 /* Escopo do aplicativo e comandos: ícone canônico à esquerda, rótulo curto. */
 body.pilot-app .phone .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-body.pilot-app .pilot-command { display: inline-flex !important; flex-direction: row; align-items: center; justify-content: center; gap: 8px !important; min-height: 48px !important; font-size: 15px !important; line-height: 1.4; }
+body.pilot-app .pilot-command { display: inline-flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px !important; min-height: 48px !important; font-size: 15px !important; line-height: 1.4; }
 body.pilot-app .pilot-command > svg[data-pilot-icon] { flex: 0 0 20px; width: 20px !important; height: 20px !important; margin: 0; }
 body.pilot-app .pilot-command > .pilot-command-label { min-width: 0; white-space: normal; overflow-wrap: break-word; }
 body.pilot-app .phone .prod-tile-action.pilot-command::before { display: none; }
@@ -730,3 +730,13 @@ body.pilot-app .pilot-out-of-scope { display: none !important; }
 body.pilot-app .pilot-command[data-command="Voltar"] > svg { transform: rotate(180deg); }
 body.pilot-app #ajustesModal .scan-mode-card { grid-template-columns: minmax(0, 1fr) auto; min-height: 48px; }
 body.pilot-app #ajustesModal .scan-mode-icon, body.pilot-app #ajustesModal .scan-mode-text > span { display: none; }
+body.pilot-app .pilot-command[hidden] { display: none !important; }
+body.pilot-app .phone .k-topline { display: none; }
+body.pilot-app .ajustes-section { border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; padding: 16px 0; margin: 0; box-shadow: none; }
+body.pilot-app .ajustes-head h3, body.pilot-app .modal-title, body.pilot-app .cobranca-head h3 { font: 750 24px/1.3 'Manrope', sans-serif; letter-spacing: -.025em; }
+body.pilot-app .ajustes-section h4 { font: 700 18px/1.35 'Manrope', sans-serif; letter-spacing: -.01em; }
+body.pilot-app .ajustes-head .sub { display: none; }
+body.pilot-app .ajustes-section .input-box, body.pilot-app .ajustes-section input, body.pilot-app .ajustes-section select { border-radius: 8px; font-size: 16px; }
+body.pilot-app .pilot-command[data-command="Excluir"], body.pilot-app .pilot-command[data-command="Descartar"] { color: #a34e35; }
+body.pilot-app .pilot-icon-command { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+body.pilot-app .pilot-icon-command > svg { width: 24px; height: 24px; }

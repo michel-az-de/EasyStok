@@ -784,6 +784,7 @@
     const message = doc.getElementById('pilotUpdateStatus');
     const download = doc.getElementById('pilotDownload');
     const button = doc.getElementById('pilotUpdateButton');
+    message.hidden = automatic;
     button.disabled = true;
     download.hidden = true; latest = null; showVersion();
     message.textContent = 'Conferindo a versão disponível…';
@@ -806,7 +807,8 @@
       }
       if (root.Capacitor?.isNativePlatform?.() && !nativeVersion) throw new Error('Versão nativa não confirmada.');
       latest = validateManifest(data, installedConfig());
-      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. Toque em Atualizar APK e confirme a instalação no Android, sem desinstalar.' : 'Não há APK mais novo publicado. Versão publicada: ' + latest.version + ' (' + latest.versionCode + '). A versão do conteúdo aparece em Atualizações e recuperação.';
+      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. Atualize sem desinstalar.' : 'Versão publicada: ' + latest.version + ' (' + latest.versionCode + ').';
+      message.hidden = automatic && !latest.available;
       download.hidden = !latest.available;
       showVersion();
     } catch {

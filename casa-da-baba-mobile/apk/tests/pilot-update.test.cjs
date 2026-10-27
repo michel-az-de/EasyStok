@@ -356,7 +356,7 @@ test('ausência de APK mais novo não esconde conteúdo OTA ainda aguardando abe
   root.CDB_CONFIG.versionCode = manifest.versionCode;
   root.Capacitor = { Plugins: { PilotUpdater: { check: async () => ({ pendingVersion: '0.4.1' }) } } };
   await root.forceCheckUpdate();
-  assert.match(nodes.get('pilotUpdateStatus').textContent, /Não há APK mais novo publicado/);
+  assert.match(nodes.get('pilotUpdateStatus').textContent, /Versão publicada:/);
   assert.match(nodes.get('pilotOtaStatus').textContent, /0.4.1 preparada/);
 });
 
@@ -367,7 +367,6 @@ test('APK igual ou superior ao publicado informa a versão publicada sem afirmar
     await new Promise(setImmediate);
     await root.forceCheckUpdate();
     const text = nodes.get('pilotUpdateStatus').textContent;
-    assert.match(text, /Não há APK mais novo publicado/);
     assert.ok(text.includes('Versão publicada: ' + manifest.version + ' (' + manifest.versionCode + ')'));
     assert.doesNotMatch(text, /instalado está atualizado/);
     assert.equal(nodes.get('pilotDownload').hidden, true);
@@ -628,8 +627,10 @@ test('retomadas repetidas não duplicam consulta, e retorno da rede verifica sem
 test('falha automática mantém a operação aberta e oferece nova verificação manual',async()=>{
  const {root,nodes,doc}=pilotHarness({operator:'',manifestError:true});const field={};doc.activeElement=field;
  await new Promise(setImmediate);assert.equal(doc.activeElement,field);assert.equal(nodes.get('pilotHome').open,false);
+ assert.equal(nodes.get('pilotUpdateStatus').hidden,true);
  assert.equal(nodes.get('pilotUpdateButton').disabled,false);assert.match(nodes.get('pilotUpdateStatus').textContent,/Não foi possível/);
  await root.forceCheckUpdate();assert.equal(nodes.get('pilotHome').open,true);
+ assert.equal(nodes.get('pilotUpdateStatus').hidden,false);
 });
 
 test('falha da consulta nativa não declara APK atualizado usando versão do conteúdo',async()=>{
