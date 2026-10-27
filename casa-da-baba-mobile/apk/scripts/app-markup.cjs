@@ -34,7 +34,7 @@ function adaptWelcome(html) {
     ['Bem-vindo ao Easy Stock Mobile', 'Quem vai usar o app?'],
     ['Para começar, informe seu nome. Ele aparece nos lotes e pedidos registrados e ajuda a manter a operação rastreável.', 'Seu nome identifica os lotes e pedidos que você registrar.'],
     ['<input type="text" id="welcomeName"', '<label for="welcomeName">Seu nome</label>' + newline + '  <input type="text" id="welcomeName"'],
-    ['Você pode trocar depois tocando no seu nome no topo.', 'Para trocar depois, abra Configurações e ajuda no início.']
+    ['Você pode trocar depois tocando no seu nome no topo.', 'Você pode trocar em Configurações.']
   ]) {
     uniqueIndex(welcome, before);
     welcome = welcome.replace(before, after);

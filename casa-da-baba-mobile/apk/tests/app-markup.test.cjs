@@ -175,7 +175,7 @@ test('identificação usa marca oficial e rótulo visível preservando controles
   assert.match(after, /<label for="welcomeName">Seu nome<\/label>/);
   assert.match(after, /Quem vai usar o app\?/);
   assert.match(after, /Seu nome identifica os lotes e pedidos que você registrar\./);
-  assert.match(after, /Para trocar depois, abra Configurações e ajuda no início\./);
+  assert.match(after, /Você pode trocar em Configurações\./);
   assert.doesNotMatch(after, /👋|nome no topo/);
 });
 

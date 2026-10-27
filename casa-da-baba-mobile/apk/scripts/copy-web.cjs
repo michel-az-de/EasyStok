@@ -57,6 +57,7 @@ html = html.replace('<head>', '<head>\n<script src="config.js"></script>');
 html = html.replace('<title>Easy Stock Mobile</title>', '<title>Casa da Baba Piloto</title>');
 html = html.replace('<h2>Registrar lote</h2>', '<h2>Produção</h2>');
 html = html.replace('Selecione os itens produzidos, revise validade e gere etiquetas em seguida.', 'Informe a quantidade produzida. Depois, confira o lote e imprima as etiquetas.');
+html = html.replaceAll('Cadastre o primeiro produto para liberar produção, pedidos e estoque.', 'Cadastre um produto para começar.');
 html = html.replace('O app costuma se atualizar sozinho ao reabrir. Se precisar, force a verificação manual.', 'O conteúdo é preparado automaticamente e aplicado na próxima abertura. Mudanças nativas exigem confirmar a instalação no Android. Não desinstale o app.');
 html = html.replace('</head>', '<link rel="stylesheet" href="pilot.css">\n</head>');
 html = html.replace('</body>', '<script src="pilot.js"></script>\n<script src="pilot-ui.js"></script>\n</body>');
