@@ -30,7 +30,8 @@ public class GerarContaReceberDePedidoUseCase(
     ICategoriaFinanceiraRepository categoriaRepo,
     IConfiguracaoLojaRepository configRepo,
     CriarContaReceberUseCase criarContaUseCase,
-    ILogger<GerarContaReceberDePedidoUseCase> logger)
+    ILogger<GerarContaReceberDePedidoUseCase> logger,
+    EasyStock.Application.Services.Pedidos.SaldoFinanceiroPedido? saldos = null)
 {
     public async Task<ContaReceberResult?> ExecuteAsync(GerarContaReceberDePedidoCommand cmd, CancellationToken ct = default)
     {
@@ -61,15 +62,21 @@ public class GerarContaReceberDePedidoUseCase(
             return null;
         }
 
-        var valor = pedido.Total.Valor;
+        // #2095 (F10): cobra o que falta receber (total menos o alocado: pagamentos, estornos e cupons), não o total.
+        // Pedido pago no site não vira conta aberta e depois "vencida". Sem o serviço (teste antigo), só os pagamentos.
+        var valor = saldos is not null
+            ? await saldos.AReceberAsync(pedido, ct)
+            : Math.Max(0m, pedido.Total.Valor - pedido.TotalPago);
         if (valor <= 0m)
         {
-            logger.LogDebug("Pedido {PedidoId} com total zero — sem CR.", pedido.Id);
+            logger.LogDebug("Pedido {PedidoId} sem saldo a receber — sem CR.", pedido.Id);
             return null;
         }
 
         var descricao = $"Pedido {CodigoCurto.De(pedido.Id)} — {pedido.ClienteNome ?? "Cliente"}";
         var hoje = DateTime.UtcNow;
+        // Vencimento é data civil de Brasília (meia-noite UTC do dia), como as demais colunas de vencimento.
+        var vencimento = HorarioBrasil.CivilComoInstanteUtc(HorarioBrasil.Hoje().AddDays(7));
 
         try
         {
@@ -81,7 +88,7 @@ public class GerarContaReceberDePedidoUseCase(
                 DataEmissao: hoje,
                 Parcelas: new[]
                 {
-                    new ParcelaSpec(1, valor, hoje.AddDays(7), MetodoPlanejado: null)
+                    new ParcelaSpec(1, valor, vencimento, MetodoPlanejado: null)
                 },
                 CentroCustoId: null,
                 LojaId: pedido.LojaId,
