@@ -477,3 +477,16 @@ test('falha da consulta nativa não declara APK atualizado usando versão do con
  assert.equal(nodes.get('pilotHomeVersion').textContent, 'Confirmando versão do APK');
  assert.equal(nodes.get('pilotDownload').hidden,true);
 });
+
+test('resumo compacto mantém rede, vínculo, fila pendente e bloqueio de importação explícitos', () => {
+  const empty = connectionStatus({ health: 'online', paired: false, invalid: false, pending: 0 });
+  assert.match(empty.summary, /EasyStok acessível.*só neste aparelho/);
+  assert.doesNotMatch(empty.summary, /Nenhuma alteração/);
+  assert.match(empty.queue, /Nenhuma alteração/, 'detalhes preservam o estado de fila vazia');
+  const pending = connectionStatus({ health: 'offline', paired: true, invalid: false, pending: 9 });
+  assert.match(pending.summary, /Sem conexão confirmada.*Aparelho vinculado.*9 alterações aguardando envio/);
+  const invalid = connectionStatus({ health: 'online', paired: true, invalid: true, pending: 1 });
+  assert.match(invalid.summary, /inválida.*1 alteração aguardando envio/);
+  const importing = connectionStatus({ health: 'online', paired: true, invalid: false, pending: 2, importPending: true });
+  assert.match(importing.summary, /Envio pausado.*2 alterações aguardando envio/);
+});

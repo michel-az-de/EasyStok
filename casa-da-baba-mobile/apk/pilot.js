@@ -22,7 +22,9 @@
       : 'Nenhuma alteração na fila de envio deste aparelho.';
     const syncState = invalid ? 'invalid' : importPending ? 'pending' : !paired ? 'local' : health === 'online' && pending > 0 ? 'pending' : health;
     const railStatus = invalid ? 'Reconectar aparelho' : importPending ? 'Conferir dados importados' : !paired ? 'Só neste aparelho' : status;
-    return { status, pairing, queue: importPending ? 'Envio pausado até conferir os dados importados. ' + queue : queue, syncState, rail: railStatus + (pending > 0 ? ' · ' + pending + ' pendente' + (pending === 1 ? '' : 's') : '') };
+    const visibleQueue = importPending ? 'Envio pausado até conferir os dados importados. ' + queue : queue;
+    const summary = status + '. ' + (invalid ? 'Conexão do aparelho inválida.' : paired ? 'Aparelho vinculado ao EasyStok.' : 'Produção só neste aparelho.') + (pending > 0 || importPending ? ' ' + visibleQueue : '');
+    return { status, pairing, summary, queue: visibleQueue, syncState, rail: railStatus + (pending > 0 ? ' · ' + pending + ' pendente' + (pending === 1 ? '' : 's') : '') };
   }
 
   function otaStatusText(state) {
@@ -203,19 +205,16 @@
       <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
       <details id="pilotMigrationReceipt" class="pilot-help" hidden><summary>Última migração confirmada</summary><p id="pilotMigrationResult" class="pilot-feedback" role="status" tabindex="-1"></p></details>
       <div class="pilot-actions">
-        <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${productionIcon}</span><span class="pilot-card-copy"><span class="pilot-step">PRODUÇÃO NESTE APARELHO</span><strong>Produzir e etiquetar</strong><span class="pilot-card-description">Cadastro, validade, lote e impressão.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
-        <button type="button" class="pilot-card pilot-orders" data-action="workspace"><span class="pilot-action-icon">${atendimentoIcon}</span><span class="pilot-card-copy"><span class="pilot-step">ONLINE</span><strong>Atendimento</strong><span class="pilot-card-description">Pedidos, frete e cobranças no EasyStok.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
+        <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${productionIcon}</span><span class="pilot-card-copy"><span class="pilot-step">PRODUÇÃO NESTE APARELHO</span><strong>Produzir e etiquetar</strong><span class="pilot-card-description">Validade, lote e impressão.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
+        <button type="button" class="pilot-card pilot-orders" data-action="workspace"><span class="pilot-action-icon">${atendimentoIcon}</span><span class="pilot-card-copy"><span class="pilot-step">ONLINE · OPERAÇÃO REAL</span><strong>Atendimento</strong><span class="pilot-card-description">Pedidos, frete e cobranças.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
       </div>
-      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button><button type="button" id="pilotReconnect" data-action="reconnect" hidden>Verificar conexão</button></div>
-      <p class="pilot-hint">No Atendimento, entre com seu acesso da Casa da Baba. As alterações são feitas na operação real.</p>
-      <button type="button" class="pilot-local" data-action="local-orders"><strong class="pilot-local-title">${pilotIcon('pedido-em-preparo')}<span>Registrar pedido no aparelho</span></strong><span>Sem frete nem envio automático. Conecte o aparelho para sincronizar.</span></button>
-      <details class="pilot-help pilot-migration"><summary>Já usava o PWA antigo?</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><p>Se está começando agora, basta conectar a produção.</p></details>
+      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><div class="pilot-connection-controls"><button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button><button type="button" id="pilotReconnect" data-action="reconnect" hidden aria-label="Verificar conexão" title="Verificar conexão">${pilotIcon('refresh-cw')}</button><details class="pilot-connection-details"><summary>Detalhes</summary><p id="pilotConnectionDetail"></p><p id="pilotPairHint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p></details></div></div>
+      <button type="button" class="pilot-local" data-action="local-orders"><strong class="pilot-local-title">${pilotIcon('pedido-em-preparo')}<span>Registrar pedido no aparelho</span></strong><span>Sem frete nem envio automático.</span></button>
+      <details class="pilot-help pilot-migration"><summary>Já usava o PWA antigo?</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><button type="button" data-action="migration-guide">Ver passo a passo</button><p>Se está começando agora, basta conectar a produção.</p></details>
       <div class="pilot-shortcuts">
         <button type="button" data-action="printers">${pilotIcon('printer')}<span>Impressoras</span></button>
-        <button type="button" data-action="migration-guide">Como trazer meus dados</button>
       </div>
-      <p id="pilotPairHint" class="pilot-hint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p>
-      <details class="pilot-help"><summary>O que funciona sem conexão?</summary><p>O cadastro local de produtos e pedidos, a produção e o histórico ficam neste aparelho. Após o primeiro pareamento, as alterações aguardam a conexão para sincronizar. A impressão exige uma impressora compatível conectada.</p><p>Frete, cobrança online, envio pelo atendimento e IA precisam de conexão com o EasyStok. Uma mensagem preparada ou um pedido salvo no aparelho ainda não confirmam envio nem pagamento.</p></details>
+      <details class="pilot-help"><summary>Ajuda para usar o app</summary><p>No Atendimento, entre com seu acesso da Casa da Baba. As alterações são feitas na operação real.</p><p>O cadastro local de produtos e pedidos, a produção e o histórico ficam neste aparelho. Após o primeiro pareamento, as alterações aguardam a conexão para sincronizar. A impressão exige uma impressora compatível conectada.</p><p>Frete, cobrança online, envio pelo atendimento e IA precisam de conexão com o EasyStok. Uma mensagem preparada ou um pedido salvo no aparelho ainda não confirmam envio nem pagamento.</p></details>
       <details class="pilot-help"><summary>Atualizações e recuperação</summary><p id="pilotOtaStatus" role="status">A atualização automática de conteúdo está disponível no APK Android.</p><p id="pilotPushStatus" role="status"></p><p>O app guarda a versão anterior do conteúdo. Voltar a ela preserva os pedidos, a produção e a fila de envio. O Atendimento online segue a versão publicada no EasyStok.</p><button type="button" id="pilotRollback" data-action="rollback" hidden>Voltar à versão anterior</button></details>
       <div class="pilot-update"><span id="pilotVersion" role="status"></span><button type="button" id="pilotUpdateButton" data-action="update">Verificar atualização</button></div>
       <p id="pilotUpdateStatus" class="pilot-feedback" role="status" tabindex="-1"></p>
@@ -228,11 +227,11 @@
   notices.setAttribute('aria-labelledby', 'pilotNoticesTitle');
   notices.innerHTML = `<div id="pilotNoticeSheet" class="pilot-sheet">
     <div class="pilot-topline"><span class="pilot-notice-brand">${bellIcon} CASA DA BABA</span><button type="button" data-notice-action="close" aria-label="Fechar avisos">${closeIcon}</button></div>
-    <h1 id="pilotNoticesTitle" tabindex="-1">Avisos.</h1>
-    <p id="pilotNoticeIntro" class="pilot-intro">Orientações para sua operação.</p>
+    <div class="pilot-notice-heading"><h1 id="pilotNoticesTitle" tabindex="-1">Avisos.</h1><div id="pilotNoticeListHeading" class="pilot-notice-list-heading"><h2 class="pilot-visually-hidden">Neste aparelho</h2><span id="pilotNoticeUnread"></span></div></div>
+    <p id="pilotNoticeIntro" class="pilot-visually-hidden">Orientações para sua operação.</p>
     <section id="pilotNoticeHealth" class="pilot-notice-health" aria-labelledby="pilotNoticeHealthTitle"><strong id="pilotNoticeHealthTitle"></strong><p id="pilotNoticeHealthBody"></p><div id="pilotNoticeControls" class="pilot-notice-controls"><button type="button" id="pilotNoticePermission" data-notice-action="permission"></button><button type="button" id="pilotNoticeRefresh" data-notice-action="refresh">Atualizar avisos</button></div></section>
     <p id="pilotNoticeFeedback" class="pilot-feedback pilot-error" role="alert"></p>
-    <div id="pilotNoticeListView"><div id="pilotNoticeListHeading" class="pilot-notice-list-heading"><h2 class="pilot-visually-hidden">Neste aparelho</h2><span id="pilotNoticeUnread"></span></div><div id="pilotNoticeEmpty" class="pilot-notice-empty" role="status">${bellIcon}<strong id="pilotNoticeEmptyTitle"></strong><p id="pilotNoticeEmptyBody"></p></div><div id="pilotNoticeList" class="pilot-notice-list"></div></div>
+    <div id="pilotNoticeListView"><div id="pilotNoticeEmpty" class="pilot-notice-empty" role="status">${bellIcon}<strong id="pilotNoticeEmptyTitle"></strong><p id="pilotNoticeEmptyBody"></p></div><div id="pilotNoticeList" class="pilot-notice-list"></div></div>
     <article id="pilotNoticeDetail" class="pilot-notice-detail" hidden><button type="button" data-notice-action="back" class="pilot-notice-back">← Voltar ao histórico</button><h2 id="pilotNoticeDetailTitle" tabindex="-1"></h2><p id="pilotNoticeDetailBody"></p><details class="pilot-help"><summary>Recebimento deste aviso</summary><p id="pilotNoticeDetailSource" class="pilot-notice-source"></p></details><button type="button" id="pilotNoticeGuide" data-notice-action="guide" hidden>Ver passo a passo da migração</button></article>
     <details id="pilotNoticeDiagnostics" class="pilot-help pilot-notice-diagnostics"><summary>Configurações e confirmações</summary><p id="pilotNoticePush"></p><p id="pilotNoticeSync"></p><p id="pilotNoticeReceipts" role="status"></p><p id="pilotNoticeError"></p><p>Um aviso recuperado pelo histórico não comprova que o push chegou. A abertura é registrada quando você entra no detalhe do aviso.</p>
     <div class="pilot-notice-device"><span id="pilotNoticeDevice"></span><button type="button" id="pilotNoticeCopy" data-notice-action="copy">Copiar identificação</button></div></details>
@@ -280,6 +279,7 @@
     refresh.hidden = !noticeState.supported; refresh.disabled = noticeLoading || noticeState.checking === true;
     const refreshLabel = noticeLoading || noticeState.checking ? 'Conferindo…' : 'Atualizar avisos';
     refresh.innerHTML = pilotIcon('refresh-cw') + '<span>' + refreshLabel + '</span>';
+    refresh.dataset.compact = String(contentFirst); refresh.setAttribute('aria-label', refreshLabel); refresh.setAttribute('title', refreshLabel);
     if (restorePermissionFocus || restoreRefreshFocus) (selectedNotice ? doc.getElementById('pilotNoticeDetailTitle') : !refresh.disabled && !refresh.hidden ? refresh : doc.getElementById('pilotNoticesTitle')).focus();
     const unread = Number.isSafeInteger(noticeState.unread) && noticeState.unread > 0 ? noticeState.unread : 0;
     for (const [buttonId, badgeId] of [['pilotNoticeBell', 'pilotNoticeCount'], ['pilotHomeNoticeBell', 'pilotHomeNoticeCount']]) {
@@ -436,11 +436,14 @@
     const invalid = !!root.cdbSync?.isPairingInvalid?.();
     const state = connectionStatus({ health, paired: !!pairing, invalid, pending: root.cdbSync?.queueSize?.() || 0, importPending: !!review });
     doc.getElementById('pilotRailStatus').textContent = state.rail;
-    doc.getElementById('pilotConnection').textContent = state.status + '. ' + state.pairing + ' ' + state.queue;
+    doc.getElementById('pilotConnection').textContent = state.summary;
+    doc.getElementById('pilotConnectionDetail').textContent = state.status + '. ' + state.pairing + ' ' + state.queue;
     const reconnect = doc.getElementById('pilotReconnect');
     reconnect.hidden = health !== 'offline' && !checkingConnection;
     reconnect.disabled = checkingConnection;
-    reconnect.textContent = checkingConnection ? 'Conferindo…' : 'Verificar conexão';
+    reconnect.innerHTML = pilotIcon('refresh-cw');
+    reconnect.setAttribute('aria-label', checkingConnection ? 'Conferindo conexão' : 'Verificar conexão');
+    reconnect.setAttribute('title', checkingConnection ? 'Conferindo conexão' : 'Verificar conexão');
     doc.getElementById('pilotPairButton').textContent = state.syncState === 'invalid' ? 'Reconectar produção' : root.cdbSync?.getPairing?.() ? 'Alterar conexão' : 'Conectar produção';
     rail.dataset.sync = state.syncState;
     doc.getElementById('pilotImportReview').hidden = !review;

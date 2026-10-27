@@ -6100,6 +6100,15 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   font-family: inherit;
 }
 .k-card .k-cancel:hover { color: #ef6b6b; background: rgba(239,107,107,0.14); }
+.k-card .k-primary-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+.k-card .k-support-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.k-card .k-primary-actions button, .k-card .k-support-actions button { min-height: 44px; min-width: 0; margin: 0; }
+.k-card .k-more-actions { min-width: 0; }
+.k-card .k-more-actions[open], .k-card .k-more-actions:only-child { grid-column: 1 / -1; }
+.k-card .k-more-actions summary { box-sizing: border-box; min-height: 44px; padding: 12px 10px; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 20px; cursor: pointer; }
+.k-card .k-more-actions summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.k-card .k-secondary-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-top: 8px; }
+.k-card .k-more-actions .k-cancel { grid-column: 1 / -1; width: auto; height: auto; padding: 10px; font-size: 12px; }
 .k-card.blink {
   animation: blinkHighlight 1.5s ease-in-out 0s 2;
 }
@@ -14423,16 +14432,21 @@ function renderKanbanCard(o, col) {
       ${notes}
       <div class="k-progress">${renderProgressDots(o.status, { small: true, showLabel: false })}</div>
       <div class="k-foot">
-        <div class="k-actions">
-          <button class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
-          ${(o.status === 'aguardando' || o.status === 'preparando') ? `<button class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
-          ${(Number(o.total) || 0) > 0 ? `<button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>` : ''}
-          <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir</button>
-          <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Histórico</button>
+        <div class="k-primary-actions">
+          <button type="button" class="k-advance" onclick="advanceOrder('${o.id}')">${o.status === 'pronto' ? 'Conferir entrega' : col.next}</button>
         </div>
-        <div class="k-actions">
-          <button class="k-advance" onclick="advanceOrder('${o.id}')">${col.next}</button>
-          <button class="k-cancel" onclick="cancelOrder('${o.id}')" aria-label="Cancelar" title="Cancelar">×</button>
+        <div class="k-support-actions">
+          ${(Number(o.total) || 0) > 0 ? `<button type="button" class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>` : ''}
+          <details class="k-more-actions">
+            <summary aria-label="Mais ações do pedido ${escapeHtml((o.id || '').slice(-8))}">Mais ações</summary>
+            <div class="k-secondary-actions">
+              <button type="button" class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
+              ${(o.status === 'aguardando' || o.status === 'preparando') ? `<button type="button" class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
+              <button type="button" class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir etiqueta</button>
+              <button type="button" class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Histórico</button>
+              <button type="button" class="k-cancel" onclick="cancelOrder('${o.id}')">Cancelar pedido</button>
+            </div>
+          </details>
         </div>
       </div>
     </div>

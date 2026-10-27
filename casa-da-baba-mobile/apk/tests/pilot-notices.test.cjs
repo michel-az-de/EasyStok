@@ -147,6 +147,8 @@ test('sino busca novos avisos online sem abrir registros e mantém cache offline
   const { nodes, calls, root } = harness(); await settle();
   await nodes.get('pilotNoticeBell').click(); await settle();
   assert.equal(calls.refresh, 1); assert.deepEqual(calls.open, []);
+  assert.equal(nodes.get('pilotNoticeRefresh').attributes['aria-label'], 'Atualizar avisos');
+  assert.equal(nodes.get('pilotNoticeRefresh').dataset.compact, 'true');
   await nodes.get('pilotNotices').click('close'); root.navigator.onLine = false;
   await nodes.get('pilotNoticeBell').click(); await settle();
   assert.equal(calls.refresh, 1); assert.equal(nodes.get('pilotNoticeList').children.length, 1);

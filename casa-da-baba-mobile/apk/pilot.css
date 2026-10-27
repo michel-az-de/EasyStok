@@ -271,3 +271,37 @@ body.pilot-app .phone .nav-icon svg[data-pilot-icon=producao], body.pilot-app .p
 body.pilot-app .header .icon-btn svg[data-pilot-icon], body.pilot-app .phone .nav-icon svg[data-pilot-icon] { width: 24px; height: 24px; }
 body.pilot-app .phone .nav-icon svg[data-pilot-icon=producao], body.pilot-app .phone .nav-icon svg[data-pilot-icon=pedido-em-preparo] { width: 32px; height: 32px; }
 body.pilot-app .phone .k-actions button { min-height: 44px; }
+/* Densidade operacional: ações explícitas, utilitários compactos e detalhes sob demanda. */
+.pilot-home h1 { margin-top: 18px; margin-bottom: 16px; }
+.pilot-actions { gap: 10px; margin-bottom: 12px; }
+.pilot-card { padding-top: 13px; padding-bottom: 13px; }
+.pilot-card-copy { gap: 4px; }
+.pilot-card-description { font-size: 12px; line-height: 1.45; }
+.pilot-connection { padding: 10px 12px 6px; margin-bottom: 12px; }
+.pilot-connection-controls { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0 10px; }
+.pilot-connection-controls button { margin: 0; }
+.pilot-connection-controls #pilotReconnect { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; width: 44px; height: 44px; padding: 10px; }
+.pilot-connection-controls #pilotReconnect[hidden] { display: none; }
+.pilot-connection-details { margin-left: auto; }
+.pilot-connection-details summary { display: list-item; min-height: 44px; padding: 12px 0; color: #6b5943; cursor: pointer; }
+.pilot-connection-details[open] { flex-basis: 100%; margin-left: 0; }
+.pilot-connection-details p { margin: 0 0 9px; font-size: 12px; }
+.pilot-local { margin-top: 0; padding: 12px 14px; }
+.pilot-local-title { gap: 8px; }
+.pilot-shortcuts { display: flex; margin: 10px 0; }
+.pilot-shortcuts button { min-height: 44px; padding: 8px 12px; }
+.pilot-migration { margin-top: 12px; }
+.pilot-migration button { margin-right: 8px; }
+.pilot-notice-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 16px 0; }
+.pilot-notice-heading h1 { margin: 0; }
+.pilot-notice-heading .pilot-notice-list-heading { margin: 0; gap: 8px; min-height: 44px; }
+#pilotNoticeRefresh[data-compact=true] { width: 44px; height: 44px; min-width: 44px; padding: 10px; }
+#pilotNoticeRefresh[data-compact=true] span { display: none; }
+.pilot-notice-item { padding-top: 14px; padding-bottom: 14px; }
+.pilot-notice-empty { padding-top: 24px; padding-bottom: 24px; }
+body.pilot-app .health-banner { top: 58px; }
+body.pilot-app .health-banner .hb-action, body.pilot-app .health-banner .hb-close { min-width: 44px; min-height: 44px; }
+body.pilot-app .phone .prod-hero { padding: 12px 14px; margin: 0 0 10px; }
+body.pilot-app .phone .prod-hero h2 { font-size: 25px; }
+body.pilot-app .phone .prod-hero-actions { margin-bottom: 0; }
+body.pilot-app .phone [data-screen=producao] > .section-label { margin-top: 10px; margin-bottom: 6px; }
