@@ -134,7 +134,9 @@ public class DisparoTestePorTipoIntegrationTests(MailpitFixture mailpit, Postgre
 
         var evento = await suporte.LerEventoAsync(eventoId);
         evento.Status.Should().Be(StatusEventoNotificacao.Processado, evento.ErroProcessamento);
-        var outbox = (await suporte.LerMensagensDoEventoAsync(eventoId)).Should().ContainSingle().Subject;
+        // #2074: prazo e resumo também vão ao sino (InApp); a prova aqui é o e-mail real.
+        var outbox = (await suporte.LerMensagensDoEventoAsync(eventoId))
+            .Where(m => m.Canal == CanalNotificacao.Email).Should().ContainSingle().Subject;
         outbox.Status.Should().Be(StatusOutbox.Enviado);
         outbox.Canal.Should().Be(CanalNotificacao.Email);
         var mensagem = (await mailpit.AguardarAsync(1)).Should().ContainSingle().Subject;
