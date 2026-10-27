@@ -6,7 +6,7 @@ if (-not $JavaHome) {
         Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
 }
 if (-not $JsonJar) {
-    $jsonCache=Join-Path $env:USERPROFILE '.gradle\caches\modules-2\files-2.1\org.json\json'
+    $jsonCache=Join-Path $HOME '.gradle/caches/modules-2/files-2.1/org.json/json'
     $JsonJar=Get-ChildItem -LiteralPath $jsonCache -Recurse -Filter '*.jar' |
         Sort-Object FullName | Select-Object -First 1 -ExpandProperty FullName
 }
@@ -18,7 +18,8 @@ $sources=@(Get-ChildItem (Join-Path $PSScriptRoot 'java') -Recurse -Filter '*.ja
 $sourceRoot=Join-Path $apkRoot 'android/app/src/main/java/com/casadababa/app/updater'
 $sources+=Join-Path $sourceRoot 'UpdatePolicy.java'
 $sources+=Join-Path $sourceRoot 'OtaManager.java'
-& (Join-Path $JavaHome 'bin/javac.exe') -encoding UTF-8 -cp $JsonJar -d $output $sources
+# Sem extensão e com o separador do sistema: o mesmo script roda no Windows e no Linux do CI.
+& (Join-Path $JavaHome 'bin/javac') -encoding UTF-8 -cp $JsonJar -d $output $sources
 if ($LASTEXITCODE -ne 0) { throw 'Compilação do harness nativo falhou.' }
-& (Join-Path $JavaHome 'bin/java.exe') -cp "$output;$JsonJar" com.casadababa.app.updater.UpdaterTest
+& (Join-Path $JavaHome 'bin/java') -cp ($output + [IO.Path]::PathSeparator + $JsonJar) com.casadababa.app.updater.UpdaterTest
 if ($LASTEXITCODE -ne 0) { throw 'Teste do atualizador nativo falhou.' }

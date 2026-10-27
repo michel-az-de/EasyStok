@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, '..');
 const source = path.resolve(root, '..', '..', 'EasyStock.Api', 'wwwroot', 'pwa');
 const target = path.join(root, 'web');
 const version = require('../package.json');
+const contract = require('./ota-contract.cjs');
 const bundleVersion = process.env.CDB_BUNDLE_VERSION || version.version;
 if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(bundleVersion)) throw new Error('Versão do conteúdo inválida.');
 const apiBaseUrl = process.env.CDB_API_BASE_URL || 'https://api.easystok.online';
@@ -20,17 +21,17 @@ for (const name of ['pilot.js', 'pilot.css']) fs.copyFileSync(path.join(root, na
 const config = {
   apiBaseUrl: apiBaseUrl.replace(/\/+$/, ''),
   isPilot: true,
-  appId: 'com.casadababa.piloto',
+  appId: contract.APP,
   version: version.version,
   pilotVersion: version.version,
   versionCode: version.versionCode,
   bundleVersion,
-  dataSchemaVersion: 2,
+  dataSchemaVersion: contract.DATA_SCHEMA,
   updateManifestUrl: 'https://easystok.online/downloads/casa-da-baba/latest.json',
   updatePageUrl: 'https://easystok.online/downloads/casa-da-baba/'
 };
 fs.writeFileSync(path.join(target, 'config.js'), 'window.CDB_CONFIG = ' + JSON.stringify(config) + ';\n');
-fs.writeFileSync(path.join(target, 'bundle.json'), JSON.stringify({ schemaVersion: 1, appId: config.appId, channel: 'piloto', bundleVersion, nativeVersionCode: version.versionCode, dataSchemaVersion: 2 }));
+fs.writeFileSync(path.join(target, 'bundle.json'), JSON.stringify({ schemaVersion: 1, appId: config.appId, channel: contract.CHANNEL, bundleVersion, nativeVersionCode: contract.NATIVE_VERSION_CODE, dataSchemaVersion: contract.DATA_SCHEMA }));
 const htmlPath = path.join(target, 'index.html');
 let html = fs.readFileSync(htmlPath, 'utf8');
 const syncScript = /<script\s+src=["']sync\.js[^"']*["']\s*><\/script>/i;
