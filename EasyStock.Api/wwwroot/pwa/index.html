@@ -4535,8 +4535,8 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   border-radius: 13px;
 }
 [data-screen="producao"] .product-tile .qty-btn {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
 }
 [data-screen="producao"] .product-tile .prod-tile-actions {
   padding-top: 8px;
@@ -4545,7 +4545,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   grid-template-columns: 1fr 1fr;
 }
 [data-screen="producao"] .product-tile .prod-tile-action {
-  min-height: 32px;
+  min-height: 44px;
   border-radius: 10px;
 }
 [data-screen="producao"] .prod-screen-summary {
@@ -5141,6 +5141,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; gap: 6px; flex-wrap: wrap;
 }
 .pd-validity-pills button {
+  min-height: 44px; min-width: 44px;
   flex: 0 0 auto; padding: 8px 11px;
   background: transparent; color: var(--ink-dim);
   border: 1px solid var(--line); border-radius: 100px;
@@ -5429,7 +5430,8 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 .etq-card-wrap {
-  /* Wrapper que absorve o espaço de layout após scale */
+  /* Preserva a altura calculada após scale; o contêiner rola o lote inteiro. */
+  flex: 0 0 auto;
   overflow: hidden;
   display: block;
 }
@@ -6624,8 +6626,8 @@ select:focus-visible {
   flex-basis: 40px;
 }
 [data-screen="producao"] .product-tile .qty-btn {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
 }
 [data-screen="producao"] .prod-screen-summary {
   position: static !important;
@@ -7268,9 +7270,9 @@ body.ux-calm [data-screen="producao"] .section-label {
 <!-- Boas-vindas / login com nome do operador -->
 <div class="welcome hidden" id="welcomeScreen">
   <div class="emoji">👋</div>
-  <h1>Bem-vindo ao Easy Stock Mobile</h1>
+  <h1 id="welcomeTitle">Bem-vindo ao Easy Stock Mobile</h1>
   <p>Para começar, informe seu nome. Ele aparece nos lotes e pedidos registrados e ajuda a manter a operação rastreável.</p>
-  <input type="text" id="welcomeName" placeholder="Seu nome" maxlength="32" autocomplete="off" />
+  <input type="text" id="welcomeName" aria-label="Seu nome" placeholder="Seu nome" maxlength="32" autocomplete="off" />
   <button id="welcomeContinue" disabled>Começar</button>
   <div class="hint">Você pode trocar depois tocando no seu nome no topo.</div>
 </div>
@@ -7920,12 +7922,12 @@ body.ux-calm [data-screen="producao"] .section-label {
   </div>
 
   <!-- Modal novo produto -->
-  <div class="modal-overlay" id="newProductModal">
+  <div class="modal-overlay" id="newProductModal" role="dialog" aria-modal="true" aria-labelledby="newProductTitle">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
-      <div class="modal-title">Novo <span class="accent">produto</span></div>
+      <div class="modal-title" id="newProductTitle">Novo <span class="accent">produto</span></div>
       <div class="modal-sub">fica disponível na hora</div>
-      <label class="modal-label">Nome</label>
+      <label class="modal-label" for="newProdName">Nome</label>
       <div class="input-box"><input id="newProdName" placeholder="ex: Nhoque de batata" oninput="updateProductSaveState()"></div>
       <label class="modal-label">Categoria</label>
       <div class="cat-pills" id="catPills">
@@ -7933,8 +7935,21 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="cat-pill" data-cat="molho">Molho</button>
         <button class="cat-pill" data-cat="extra">Extra</button>
       </div>
-      <label class="modal-label">Medida</label>
+      <label class="modal-label" for="newProdUnit">Medida</label>
       <div class="input-box"><input id="newProdUnit" placeholder="ex: 300g, 250ml, unidade"></div>
+      <label class="modal-label" for="newProdValidity">Validade padrão (dias)</label>
+      <div class="input-box"><input id="newProdValidity" type="number" inputmode="numeric" min="1" max="365" value="5" required oninput="updateNewProductExpiry()"></div>
+      <div id="newProdBatchFields" hidden>
+        <label class="modal-label" for="newProdQuantity">Quantidade produzida</label>
+        <div class="input-box"><input id="newProdQuantity" type="number" inputmode="numeric" min="1" max="9999" step="1" value="1"></div>
+        <label class="modal-label" for="newProdManufacturedDate">Data de fabricação</label>
+        <div class="input-box"><input id="newProdManufacturedDate" type="date" oninput="updateNewProductExpiry()"></div>
+        <label class="modal-label" for="newProdWeight">Peso por unidade (g)</label>
+        <div class="input-box"><input id="newProdWeight" type="number" inputmode="numeric" min="1" max="9999" step="1" placeholder="Ex.: 500" aria-describedby="newProdWeightHelp"></div>
+        <p id="newProdWeightHelp" class="modal-sub">Se a medida estiver em g ou kg, usamos esse peso quando o campo estiver vazio.</p>
+        <p id="newProdExpiry" class="modal-sub" role="status"></p>
+        <p class="modal-sub">Criar e usar registra esta produção e abre as etiquetas para impressão.</p>
+      </div>
       <label class="modal-label" id="emojiGridLabel">Ícone</label>
       <div class="emoji-grid" id="emojiGrid" role="radiogroup" aria-labelledby="emojiGridLabel">
         <button class="emoji-pick active" role="radio" aria-checked="true" aria-label="Massa">🍝</button>
@@ -7950,12 +7965,12 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Carne">🥩</button>
         <button class="emoji-pick" role="radio" aria-checked="false" aria-label="Cogumelo">🍄</button>
       </div>
-      <label class="modal-label">Preço de venda</label>
+      <label class="modal-label" for="newProdPrice">Preço de venda</label>
       <div class="price-row">
         <span class="currency">R$</span>
         <div class="input-box"><input id="newProdPrice" type="text" inputmode="decimal" placeholder="25,00" autocomplete="off" oninput="updateMarginPreview()"></div>
       </div>
-      <label class="modal-label">Custo (ingredientes + embalagem)
+      <label class="modal-label" for="newProdCost">Custo (ingredientes + embalagem)
         <span class="ml-hint">opcional, ajuda a calcular margem</span>
       </label>
       <div class="price-row">
@@ -7963,7 +7978,7 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="input-box"><input id="newProdCost" type="text" inputmode="decimal" placeholder="9,50" autocomplete="off" oninput="updateMarginPreview()"></div>
       </div>
       <!-- #425 — estoque minimo: threshold de alerta por produto (padrao: <=2) -->
-      <label class="modal-label">Estoque mínimo
+      <label class="modal-label" for="newProdMinStock">Estoque mínimo
         <span class="ml-hint">alerta quando stock ≤ este valor (padrão: 2)</span>
       </label>
       <div class="input-box"><input id="newProdMinStock" type="text" inputmode="numeric" placeholder="2" autocomplete="off" style="max-width:80px"></div>
@@ -7989,23 +8004,23 @@ body.ux-calm [data-screen="producao"] .section-label {
   </div>
 
   <!-- Modal novo cliente -->
-  <div class="modal-overlay" id="newClientModal">
+  <div class="modal-overlay" id="newClientModal" role="dialog" aria-modal="true" aria-labelledby="newClientModalTitle">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-title" id="newClientModalTitle">Novo <span class="accent">cliente</span></div>
       <div class="modal-sub">Nome é obrigatório. Resto é opcional.</div>
 
-      <label class="modal-label">Nome</label>
-      <div class="input-box"><input id="newClientName" placeholder="ex: Fernanda Silva" oninput="updateClientSaveState()"></div>
+      <label class="modal-label" for="newClientName">Nome</label>
+      <div class="input-box"><input id="newClientName" required autocomplete="name" placeholder="ex: Fernanda Silva" oninput="updateClientSaveState()"></div>
 
-      <label class="modal-label">Endereço (opcional)</label>
+      <label class="modal-label" for="newClientAddr">Endereço (opcional)</label>
       <div class="input-box"><input id="newClientAddr" placeholder="ex: Apto 506, Rua Tal 123, ou referência"></div>
 
-      <label class="modal-label">WhatsApp (opcional)</label>
-      <div class="input-box"><input id="newClientPhone" type="tel" placeholder="(11) 9xxxx xxxx"></div>
+      <label class="modal-label" for="newClientPhone">WhatsApp (opcional)</label>
+      <div class="input-box"><input id="newClientPhone" type="tel" autocomplete="tel" placeholder="(11) 9xxxx xxxx"></div>
 
-      <label class="modal-label">CPF ou CNPJ (opcional)</label>
-      <div class="input-box"><input id="newClientDoc" type="text" inputmode="numeric" placeholder="ex: 123.456.789-00 ou 12.345.678/0001-90" oninput="onClientDocInput(event)" maxlength="18"></div>
+      <label class="modal-label" for="newClientDoc">CPF ou CNPJ (opcional)</label>
+      <div class="input-box"><input id="newClientDoc" type="text" aria-describedby="newClientDocHint" inputmode="numeric" placeholder="ex: 123.456.789-00 ou 12.345.678/0001-90" oninput="onClientDocInput(event)" maxlength="18"></div>
       <div id="newClientDocHint" class="doc-hint"></div>
 
       <div class="modal-ctas">
@@ -8061,16 +8076,18 @@ body.ux-calm [data-screen="producao"] .section-label {
   </div>
 
   <!-- Modal confirmação de produção -->
-  <div class="modal-overlay" id="productionConfirmModal">
+  <div class="modal-overlay" id="productionConfirmModal" role="dialog" aria-modal="true" aria-labelledby="productionConfirmTitle">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
-      <div class="modal-title">Registrar <span class="accent">produção</span></div>
+      <div class="modal-title" id="productionConfirmTitle">Registrar <span class="accent">produção</span></div>
       <div class="modal-sub" id="batchDate">lote de hoje</div>
 
       <label class="modal-label">Itens</label>
       <div class="prod-summary" id="prodSummary"></div>
 
-      <label class="modal-label">Validade e peso de cada produto</label>
+      <label class="modal-label" for="prodManufacturedDate">Data de fabricação</label>
+      <div class="input-box"><input id="prodManufacturedDate" type="date" required></div>
+      <label class="modal-label">Quantidade, peso e validade de cada produto</label>
       <div class="prod-detail-list" id="prodDetailList"></div>
 
       <label class="modal-label">Foto (opcional)</label>
@@ -8084,7 +8101,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeProductionConfirm()">Cancelar</button>
-        <button class="cta-btn primary" onclick="confirmProduction()">Finalizar</button>
+        <button class="cta-btn primary" onclick="confirmProduction()">Registrar e abrir etiquetas</button>
       </div>
     </div>
   </div>
@@ -8632,6 +8649,10 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="np-icon">🖨️</div>
       <h3 class="np-title">Selecionar impressora</h3>
       <p class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</p>
+      <div id="savedPrinterProfiles" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+      <label for="printerProfile">Modelo do dispositivo que será selecionado</label>
+      <select id="printerProfile" class="np-btn np-secondary"><option value="escpos">Atual · Hipertech WTP05 (ESC/POS)</option><option value="oasis-pending">Oasis · driver pendente de validação</option></select>
+      <p class="np-text" style="font-size:12px">A Oasis pode ser cadastrada, mas a impressão será liberada depois de confirmar o modelo e o protocolo.</p>
       <div id="printerPickerList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:280px;overflow-y:auto"></div>
       <button class="np-btn np-secondary" onclick="loadPrinterDevices()">↻ Buscar de novo</button>
       <button class="np-btn np-tertiary"  onclick="closePrinterPicker()">Cancelar</button>
@@ -8667,10 +8688,10 @@ body.ux-calm [data-screen="producao"] .section-label {
   <!-- Modal "Sem impressora" — aparece quando o operador toca em Imprimir
        sem ter pareado uma impressora termica. Substitui o confirm() do
        Android (cinza, fora do tema). Estilo igual ao modal de update. -->
-  <div class="np-overlay" id="noPrinterModal" role="dialog" aria-modal="true">
+  <div class="np-overlay" id="noPrinterModal" role="dialog" aria-modal="true" aria-labelledby="noPrinterTitle">
     <div class="np-sheet">
       <div class="np-icon">🖨️</div>
-      <h3 class="np-title">Impressora não configurada</h3>
+      <h3 class="np-title" id="noPrinterTitle">Impressora não configurada</h3>
       <p class="np-text">Você ainda não pareou uma impressora térmica. O que prefere fazer?</p>
       <button class="np-btn np-primary"   onclick="npModalAction('configure')">Configurar agora</button>
       <button class="np-btn np-secondary" onclick="npModalAction('share')">Compartilhar como imagem</button>
@@ -8691,11 +8712,11 @@ body.ux-calm [data-screen="producao"] .section-label {
   </div>
 
   <!-- Tela cheia de preview de etiquetas: produção (N etiquetas) ou pedido (1) -->
-  <div class="etq-overlay" id="etiquetasPreview" role="dialog" aria-modal="true">
+  <div class="etq-overlay" id="etiquetasPreview" role="dialog" aria-modal="true" aria-labelledby="etqTitle" aria-describedby="etqSubtitle">
     <div class="etq-sheet">
       <div class="etq-head">
         <div>
-          <h3 id="etqTitle">Etiquetas geradas</h3>
+          <h3 id="etqTitle" tabindex="-1">Etiquetas geradas</h3>
           <div class="etq-sub" id="etqSubtitle">—</div>
         </div>
         <button class="cobranca-close" onclick="closeEtiquetasPreview()" aria-label="Fechar">×</button>
@@ -8752,10 +8773,11 @@ body.ux-calm [data-screen="producao"] .section-label {
   <div class="cobranca-overlay" id="cobrancaModal" role="dialog" aria-modal="true" aria-labelledby="cobrancaTitle">
     <div class="cobranca-sheet">
       <div class="cobranca-head">
-        <h3 id="cobrancaTitle">Cobrança</h3>
+        <h3 id="cobrancaTitle" tabindex="-1">Cobrança</h3>
         <button class="cobranca-close" onclick="closeCobranca()" aria-label="Fechar">×</button>
       </div>
       <div class="cobranca-preview" id="cobrancaPreview"></div>
+      <p id="cobrancaPixWarning" role="status" hidden>Dados PIX não configurados. Você pode copiar o resumo. Configure o PIX em Ajustes ou use o Atendimento online para cobrar.</p>
       <div class="cobranca-pix">
         <div>
           <div class="pix-label">💳 PIX — celular</div>
@@ -8883,7 +8905,7 @@ function load(key, fallback) {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch(e) { return fallback; }
 }
 function save(key, data) {
-  try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+  try { localStorage.setItem(key, JSON.stringify(data)); return true; } catch(e) { return false; }
 }
 
 // ================================================================
@@ -9011,14 +9033,14 @@ function toggleUxDensity(ev) {
 applyUxDensity();
 
 let products = load('cdb-products', null);
-if (!products) products = defaultProducts.map(p => ({...p}));
+if (!products) products = window.CDB_CONFIG?.isPilot ? [] : defaultProducts.map(p => ({...p}));
 // Garante que o catálogo oficial sempre está presente mesmo após limpar custom
-defaultProducts.forEach(dp => {
+if (!window.CDB_CONFIG?.isPilot) defaultProducts.forEach(dp => {
   if (!products.find(p => p.id === dp.id)) products.unshift({...dp});
 });
 products = products.map(p => ({...p, count: 0, photo: null, stock: p.stock || 0}));
 
-let clients = load('cdb-clients', defaultClients);
+let clients = load('cdb-clients', window.CDB_CONFIG?.isPilot ? [] : defaultClients);
 // Migration silenciosa do legado "apt" -> "address". Clientes que tinham
 // apenas apartamento (do toggle "Aqui no predio" antigo) ganham endereco
 // formatado "Apto X". O campo apt fica preservado pra retrocompat com
@@ -9099,7 +9121,8 @@ function renderOperatorBadge() {
 
 function renderBrandName() {
   const el = document.getElementById('brandName');
-  if (el) el.textContent = (getEmpresaName() || 'Minha empresa').trim() || 'Minha empresa';
+  const name = (getEmpresaName() || '').trim();
+  if (el) el.textContent = window.CDB_CONFIG?.isPilot && (!name || name === 'Minha empresa') ? 'Casa da Baba' : name || 'Minha empresa';
   const logo = document.getElementById('brandLogo');
   if (logo) {
     const src = getStoreLogo();
@@ -9217,7 +9240,7 @@ function refreshAjustesThemeLabel() {
 }
 // Aplica tema salvo antes de renderizar (evita flash) — getItem direto
 // para não passar por JSON.parse do load().
-applyTheme((() => { try { return localStorage.getItem('cdb-theme') || 'dark'; } catch (e) { return 'dark'; } })());
+applyTheme((() => { const fallback = window.CDB_CONFIG?.isPilot ? 'light' : 'dark'; try { return localStorage.getItem('cdb-theme') || fallback; } catch (e) { return fallback; } })());
 
 // Mini-stats <details>: persiste estado collapsed/expanded em localStorage.
 // Default: collapsed (mostra so summary "N em aberto").
@@ -9307,19 +9330,32 @@ function endTour() {
 function persistAll() {
   // Salva catálogo sem contadores (são runtime)
   const toSaveProducts = products.map(({count, photo, ...rest}) => rest);
-  save('cdb-products', toSaveProducts);
-  save('cdb-clients', clients);
-  save('cdb-orders', orders);
-  save('cdb-cash', cashEntries);
-  save('cdb-cash-closings', cashClosings);
-  save('cdb-batches', batches);
-  save('cdb-shopping', shoppingItems);
+  const values = { 'cdb-products': toSaveProducts, 'cdb-clients': clients,
+    'cdb-orders': orders, 'cdb-cash': cashEntries, 'cdb-cash-closings': cashClosings,
+    'cdb-batches': batches, 'cdb-shopping': shoppingItems };
+  const previous = new Map();
+  const written = [];
+  try {
+    const entries = Object.entries(values).map(([key, value]) => [key, JSON.stringify(value)]);
+    entries.forEach(([key]) => previous.set(key, localStorage.getItem(key)));
+    entries.forEach(([key, value]) => { localStorage.setItem(key, value); written.push(key); });
+  } catch (error) {
+    written.reverse().forEach(key => {
+      try {
+        const value = previous.get(key);
+        if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+      } catch (rollbackError) { console.error('Falha ao restaurar dados locais', rollbackError); }
+    });
+    showToast('Não foi possível salvar neste aparelho. Confira o espaço disponível e tente novamente.');
+    return false;
+  }
   // Hook de sync: sync.js sobrescreve esse callback
   if (typeof window.cdbOnPersist === 'function') {
     try { window.cdbOnPersist({ products, clients, orders, cashEntries, batches }); } catch (e) { console.warn(e); }
   }
   // Conta acoes pra disparar backup automatico (a cada 50 ou 7 dias)
   try { incrementActionCounter(); } catch (e) {}
+  return true;
 }
 
 // =========================
@@ -9575,6 +9611,7 @@ function incrementActionCounter() {
 }
 
 function maybeTriggerAutoBackup() {
+  if (window.CDB_CONFIG?.isPilot && operationalModalOpen()) return;
   // Nao dispara se ja tem outro modal aberto — evita pilha de modais
   const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferProdModal','prodProblemaModal','cashCloseModal','etiquetasPreview','ajustesModal'];
   for (const id of overlays) {
@@ -9584,6 +9621,10 @@ function maybeTriggerAutoBackup() {
 
   const count = parseInt(localStorage.getItem('cdb-action-count') || '0', 10) || 0;
   const last  = parseInt(localStorage.getItem('cdb-last-backup-prompt') || '0', 10) || 0;
+  if (window.CDB_CONFIG?.isPilot && !last) {
+    try { localStorage.setItem('cdb-last-backup-prompt', String(Date.now())); } catch (_) {}
+    if (count < AUTO_BACKUP_ACTION_THRESHOLD) return;
+  }
   const daysSince = last ? (Date.now() - last) / (1000 * 60 * 60 * 24) : Infinity;
 
   const triggerByCount = count >= AUTO_BACKUP_ACTION_THRESHOLD;
@@ -9647,7 +9688,7 @@ async function maybeOfferLocalRestore() {
       if (!picked) return;
       if (picked.kind === 'export' && picked.payload && typeof applyBackupPayload === 'function') {
         // Formato do exportBackup manual: tem .state estruturado.
-        applyBackupPayload(picked.payload);
+        await applyBackupPayload(picked.payload);
         try {
           localStorage.setItem('cdb-restore-source', 'saf-export-' + (picked.filename || ''));
           localStorage.setItem('cdb-restore-at', String(Date.now()));
@@ -9687,13 +9728,7 @@ async function maybeOfferLocalRestore() {
             + 'Deseja RESTAURAR esses dados? (Recomendado se voce reinstalou o app)';
     if (!confirm(msg)) return;
 
-    // Aplica: escreve cada chave snap no localStorage e recarrega
-    Object.keys(snap).forEach(function (k) {
-      // Mantem device-id atual (se ja foi gerado neste install) pra nao
-      // confundir o servidor com "mesmo device" em duas instalacoes
-      if (k === 'cdb-device-id' && localStorage.getItem('cdb-device-id')) return;
-      try { localStorage.setItem(k, snap[k]); } catch (e) {}
-    });
+    await applyBackupPayload(backup);
     try {
       localStorage.setItem('cdb-restore-source', 'local-file');
       localStorage.setItem('cdb-restore-at', String(Date.now()));
@@ -9872,6 +9907,7 @@ var WEEKLY_SHARE_SKIP_PENALTY = 3 * 24 * 60 * 60 * 1000; // pular = volta em 3d
 
 function maybePromptWeeklyShare() {
   try {
+    if (window.CDB_CONFIG?.isPilot && operationalModalOpen()) return;
     // So roda em APK Capacitor (browser PWA usa share desktop, menos util)
     if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
 
@@ -9886,6 +9922,10 @@ function maybePromptWeeklyShare() {
 
     var last = 0;
     try { last = parseInt(localStorage.getItem('cdb-last-share-prompt') || '0', 10) || 0; } catch (e) {}
+    if (window.CDB_CONFIG?.isPilot && !last) {
+      try { localStorage.setItem('cdb-last-share-prompt', String(Date.now())); } catch (_) {}
+      return;
+    }
     if (Date.now() - last < WEEKLY_SHARE_INTERVAL_MS) return;
 
     // Pergunta: oferece abrir share. Mensagem amigavel — Felipe disse que
@@ -9961,7 +10001,7 @@ async function restoreFromPublicStorage() {
     }
     if (picked.kind === 'export' && typeof applyBackupPayload === 'function') {
       if (!confirm('Restaurar dados do arquivo "' + (picked.filename || 'backup') + '"?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
-      applyBackupPayload(picked.payload);
+      await applyBackupPayload(picked.payload);
       try {
         localStorage.setItem('cdb-restore-source', 'manual-saf-export');
         localStorage.setItem('cdb-restore-at', String(Date.now()));
@@ -9972,11 +10012,7 @@ async function restoreFromPublicStorage() {
     }
     if (picked.kind === 'snapshot' && picked.payload && picked.payload.data) {
       if (!confirm('Restaurar a cópia automática de ' + new Date(picked.payload.capturedAt || Date.now()).toLocaleString('pt-BR') + '?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
-      var snap = picked.payload.data;
-      Object.keys(snap).forEach(function (k) {
-        if (k === 'cdb-device-id' && localStorage.getItem('cdb-device-id')) return;
-        try { localStorage.setItem(k, snap[k]); } catch (e) {}
-      });
+      await applyBackupPayload(picked.payload);
       try {
         localStorage.setItem('cdb-restore-source', 'manual-saf-snapshot');
         localStorage.setItem('cdb-restore-at', String(Date.now()));
@@ -9995,35 +10031,314 @@ async function restoreFromPublicStorage() {
 // =========================
 // BACKUP / RESTAURAÇÃO
 // =========================
-// Coleta TUDO que o app usa (state + chaves soltas em localStorage) num único
-// JSON. Versionado pra futuras migrações de schema.
+// Exporta coleções, preferências permitidas, fila e anexos operacionais.
+// Identidade do aparelho, credenciais e cursores não são transferidos.
+const BACKUP_COLLECTIONS = { products: 'cdb-products', clients: 'cdb-clients', orders: 'cdb-orders', cashEntries: 'cdb-cash', cashClosings: 'cdb-cash-closings', batches: 'cdb-batches' };
+const BACKUP_PREFERENCES = ['cdb-operator-name', 'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-pix-type', 'cdb-printer', 'cdb-printers', 'cdb-theme', 'cdb-onboarding-done'];
+const BACKUP_ARCHIVE_KEYS = ['cdb-shopping', 'cdb-audit-log', 'cdb-audit-log-archive'];
+function backupArchiveEntries(entries, legacyStorage = {}) {
+  if (!Array.isArray(entries)) throw new Error('Anexos do backup inválidos.');
+  const result = [], seen = new Set();
+  const append = entry => {
+    if (!entry || !BACKUP_ARCHIVE_KEYS.includes(entry.key) || typeof entry.value !== 'string') throw new Error('Anexo operacional inválido no backup.');
+    const identity = JSON.stringify([entry.key, entry.value]);
+    if (!seen.has(identity)) { seen.add(identity); result.push({ key: entry.key, value: entry.value }); }
+  };
+  entries.forEach(append);
+  BACKUP_ARCHIVE_KEYS.forEach(key => { if (typeof legacyStorage[key] === 'string' && legacyStorage[key] !== '[]') append({ key, value: legacyStorage[key] }); });
+  return result;
+}
 function buildBackupPayload() {
-  const lsKeys = [
-    'cdb-products','cdb-clients','cdb-orders','cdb-cash','cdb-cash-closings','cdb-batches',
-    'cdb-operator-name','cdb-empresa-name','cdb-store-logo',
-    'cdb-pix-key','cdb-pix-holder','cdb-pix-type',
-    'cdb-printer','cdb-theme','cdb-onboarding-done',
-    'cdb-device-id','cdb-last-sync','cdb-sync-queue'
-  ];
   const ls = {};
-  lsKeys.forEach(k => {
-    try { const v = localStorage.getItem(k); if (v !== null) ls[k] = v; } catch (e) {}
-  });
+  BACKUP_PREFERENCES.forEach(k => { const value = localStorage.getItem(k); if (value !== null) ls[k] = value; });
+  const sync = window.cdbSync;
+  const pairing = sync && sync.getPairing ? sync.getPairing() : null;
   return {
-    version: 2,
-    exportedAt: new Date().toISOString(),
-    appId: 'casa-da-baba',
-    state: {
-      products: products.map(({count, photo, ...rest}) => rest),
-      clients, orders, cashEntries, cashClosings, batches
-    },
-    localStorage: ls
+    version: 3, exportedAt: new Date().toISOString(), appId: 'casa-da-baba',
+    state: { products: products.map(({count, ...rest}) => rest), clients, orders, cashEntries, cashClosings, batches },
+    localStorage: ls,
+    localArchive: backupArchiveEntries(JSON.parse(localStorage.getItem('cdb-import-archives') || '[]'), Object.fromEntries(BACKUP_ARCHIVE_KEYS.map(key => [key, localStorage.getItem(key)]))),
+    sync: { context: pairing && pairing.empresaId && pairing.lojaId ? { empresaId: pairing.empresaId, lojaId: pairing.lojaId } : null,
+      queue: sync && sync.getBackupQueue ? sync.getBackupQueue() : JSON.parse(localStorage.getItem('cdb-sync-queue') || '[]') }
   };
 }
 
-function exportBackup() {
+async function buildTransferBackupPayload() {
+  const sync = window.cdbSync;
+  if (!sync || !sync.localReady) throw new Error('A fila local ainda não está disponível.');
+  await sync.localReady;
+  const payload = buildBackupPayload();
+  const store = window.cdbQueueStore;
+  if (store && store.ready && !store.degraded) {
+    payload.sync.deadletter = await store.getDeadletter();
+    payload.sync.conflicts = await store.getConflicts();
+  }
+  const review = sync.importReview && sync.importReview();
+  payload.sync.queueComplete = !!payload.sync.context && !!store && store.ready && !store.degraded && !(review && (review.invalid || review.requiresReconciliation));
+  if (review) payload.sync.importReview = review;
+  const migrationSource = localStorage.getItem('cdb-import-source');
+  if (review && migrationSource) payload.sync.legacyImportSource = JSON.parse(migrationSource);
+  if (sync.getLegacyHistoryRules) payload.sync.legacyHistoryRules = sync.getLegacyHistoryRules();
+  const photos = window.cdbPhotoStore;
+  if (photos && photos.ready) payload.photos = (await photos.listPending()).concat(await photos.listUploaded());
+  else payload.photos = [];
+  return payload;
+}
+
+function backupComparable(value) {
+  if (Array.isArray(value)) return '[' + value.map(backupComparable).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).filter(k => k !== 'count').sort().map(k => JSON.stringify(k) + ':' + backupComparable(value[k])).join(',') + '}';
+  return JSON.stringify(value);
+}
+
+function prepareBackupImport(input) {
+  let payload = input;
+  if (input && input.schema === 'cdb-backup-v1' && input.data && typeof input.data === 'object') {
+    const state = {};
+    Object.entries(BACKUP_COLLECTIONS).forEach(([name, key]) => { state[name] = JSON.parse(input.data[key] || '[]'); });
+    payload = { appId: 'casa-da-baba', version: 2, exportedAt: input.capturedAtIso, state, localStorage: input.data };
+  }
+  if (!payload || payload.appId !== 'casa-da-baba' || ![1, 2, 3].includes(payload.version) || !payload.state || typeof payload.state !== 'object') throw new Error('Arquivo não reconhecido como backup da Casa da Baba.');
+  const current = { products, clients, orders, cashEntries, cashClosings, batches };
+  const merged = {}, conflicts = [], counts = {};
+  let added = 0, repeated = 0;
+  const incomingKeys = [];
+  function mergeRecords(existing, incoming, name) {
+    if (!Array.isArray(existing) || !Array.isArray(incoming) || incoming.length > 50000) throw new Error('Coleção inválida no backup: ' + name + '.');
+    const result = existing.slice();
+    const byId = new Map();
+    existing.forEach(row => { if (!row || !['string', 'number'].includes(typeof row.id) || !String(row.id).trim()) throw new Error('Registro atual sem identificação: ' + name + '.'); byId.set(String(row.id), row); });
+    incoming.forEach(row => {
+      if (!row || typeof row !== 'object' || Array.isArray(row) || !['string', 'number'].includes(typeof row.id) || !String(row.id).trim()) throw new Error('Registro sem identificação no backup: ' + name + '.');
+      const id = String(row.id), present = byId.get(id);
+      if (name !== 'fila') incomingKeys.push(name + ':' + id);
+      const comparable = item => name === 'fila' ? { type: item.type, payload: item.payload, schemaVersion: item.schemaVersion } : item;
+      if (present) {
+        if (backupComparable(comparable(present)) !== backupComparable(comparable(row))) conflicts.push(name + ': ' + id);
+        else repeated++;
+      } else { const copy = JSON.parse(JSON.stringify(row)); result.push(copy); byId.set(id, copy); added++; }
+    });
+    return result;
+  }
+  Object.keys(BACKUP_COLLECTIONS).forEach(name => {
+    const incoming = payload.state[name] === undefined ? [] : payload.state[name];
+    const before = added;
+    merged[name] = mergeRecords(current[name], incoming, name);
+    counts[name] = added - before;
+  });
+  const ls = payload.localStorage || {};
+  if (typeof ls !== 'object' || Array.isArray(ls)) throw new Error('Preferências do backup inválidas.');
+  const sourceArchive = backupArchiveEntries(payload.localArchive || [], ls);
+  const existingArchive = backupArchiveEntries(JSON.parse(localStorage.getItem('cdb-import-archives') || '[]'));
+  const localArchive = backupArchiveEntries(existingArchive.concat(sourceArchive));
+  const archiveChanged = JSON.stringify(localArchive) !== JSON.stringify(existingArchive);
+  const exportedSync = payload.sync || {};
+  if ((exportedSync.deadletter || []).length || (exportedSync.conflicts || []).length) throw new Error('Este backup tem alterações recusadas ou conflitos de sincronização. A equipe precisa revisá-los no PWA antigo antes da migração.');
+  const preparedOrigin = exportedSync.legacyImportSource && exportedSync.legacyImportSource.preparedRequest;
+  let sourceContext = exportedSync.context || (preparedOrigin && preparedOrigin.expectedEmpresaId && preparedOrigin.expectedLojaId ? { empresaId: preparedOrigin.expectedEmpresaId, lojaId: preparedOrigin.expectedLojaId } : null);
+  if (!sourceContext && ls['cdb-pairing']) {
+    const oldPairing = JSON.parse(ls['cdb-pairing']);
+    if (oldPairing && oldPairing.empresaId && oldPairing.lojaId) sourceContext = { empresaId: oldPairing.empresaId, lojaId: oldPairing.lojaId };
+  }
+  if (sourceContext && (!sourceContext.empresaId || !sourceContext.lojaId)) throw new Error('Empresa ou loja ausente no contexto do backup.');
+  const pairing = window.cdbSync && window.cdbSync.getPairing ? window.cdbSync.getPairing() : null;
+  const previousReview = window.cdbSync && window.cdbSync.importReview ? window.cdbSync.importReview() : null;
+  const bound = pairing || JSON.parse(localStorage.getItem('cdb-pilot-data-context') || 'null') || (previousReview && previousReview.sourceContext);
+  if (sourceContext && bound && (String(sourceContext.empresaId) !== String(bound.empresaId) || String(sourceContext.lojaId) !== String(bound.lojaId))) throw new Error('O backup pertence a outra empresa ou loja. Nenhum dado foi alterado.');
+  const sourceQueue = exportedSync.queue || JSON.parse(ls['cdb-sync-queue'] || '[]');
+  const currentQueue = window.cdbSync && window.cdbSync.getBackupQueue ? window.cdbSync.getBackupQueue() : JSON.parse(localStorage.getItem('cdb-sync-queue') || '[]');
+  if (!Array.isArray(sourceQueue)) throw new Error('Fila do backup inválida.');
+  sourceQueue.forEach(m => { if (!m || typeof m.id !== 'string' || !m.id.trim() || typeof m.type !== 'string' || !m.payload || typeof m.payload !== 'object') throw new Error('Alteração pendente inválida no backup.'); });
+  const queueBefore = added;
+  const queue = mergeRecords(currentQueue, sourceQueue, 'fila');
+  const queueAdded = added - queueBefore;
+  added -= queueAdded;
+  const preferences = {};
+  BACKUP_PREFERENCES.forEach(key => { if (typeof ls[key] === 'string' && localStorage.getItem(key) === null) preferences[key] = ls[key]; });
+  const photos = payload.photos || [];
+  if (!Array.isArray(photos) || photos.length > 10000) throw new Error('Fotos do backup inválidas.');
+  const photoBytes = new Map();
+  photos.forEach(p => {
+    if (!p || typeof p.hash !== 'string' || typeof p.dataUrl !== 'string' || !/^data:image\/(png|jpeg|webp);base64,/.test(p.dataUrl)) throw new Error('Foto inválida no backup.');
+    if (photoBytes.has(p.hash) && photoBytes.get(p.hash) !== p.dataUrl) throw new Error('Fotos diferentes usam o mesmo código no backup.');
+    photoBytes.set(p.hash, p.dataUrl);
+  });
+  const availablePhotos = new Set(photos.map(p => p.hash));
+  const missingPhotos = new Set();
+  (payload.state.batches || []).forEach(batch => {
+    if (batch.batchPhotoHash && !availablePhotos.has(batch.batchPhotoHash) && !batch.batchPhoto) missingPhotos.add(batch.batchPhotoHash);
+    (batch.items || []).forEach(item => { if (item.photoHash && !availablePhotos.has(item.photoHash) && !item.photo) missingPhotos.add(item.photoHash); });
+  });
+  if (previousReview && previousReview.invalid) throw new Error('A revisão da importação anterior está inválida. Preserve os backups e peça ajuda à equipe.');
+  const complete = !!sourceContext && payload.version >= 3 && exportedSync.queueComplete === true && !(exportedSync.importReview && (exportedSync.importReview.invalid || exportedSync.importReview.requiresReconciliation));
+  const unresolved = new Set((previousReview && previousReview.unreconciledRecords) || []);
+  incomingKeys.forEach(key => { if (!complete) unresolved.add(key); });
+  const requiresReconciliation = !complete || !!preparedOrigin || unresolved.size > 0 || !!(previousReview && previousReview.requiresReconciliation);
+  const reviewUpdated = !!previousReview && (previousReview.requiresReconciliation !== requiresReconciliation || backupComparable(previousReview.unreconciledRecords || []) !== backupComparable(Array.from(unresolved)));
+  return { merged, queue, preferences, photos, sourceArchive, localArchive, archiveChanged, sourceContext: sourceContext || (previousReview && previousReview.sourceContext) || null, conflicts, added, repeated, queueAdded, counts,
+    missingPhotos: missingPhotos.size, exportedAt: payload.exportedAt || null, legacy: payload.version < 3,
+    requiresReconciliation, unreconciledRecords: Array.from(unresolved), reviewUpdated, sourceState: payload.state, sourceQueue, sourceCapsule: exportedSync.legacyImportSource || null, historyRules: exportedSync.legacyHistoryRules || null };
+}
+
+async function backupRawDigest(text) {
+  if (!window.crypto || !window.crypto.subtle) throw new Error('Este navegador não permite validar a restauração com segurança. Atualize o aplicativo antes de importar.');
+  const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function backupDigest(value) { return backupRawDigest(backupComparable(value)); }
+
+function canonicalImportJson(value) {
+  if (Array.isArray(value)) return '[' + value.map(canonicalImportJson).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonicalImportJson(value[key])).join(',') + '}';
+  return JSON.stringify(value);
+}
+
+async function prepareLegacyImportSource(plan) {
+  const review = window.cdbSync.importReview();
+  if (!plan.added && !plan.queueAdded && !plan.archiveChanged && !review && !plan.sourceCapsule) return null;
+  const raw = localStorage.getItem('cdb-import-source');
+  const previous = review && raw ? JSON.parse(raw) : null;
+  if (plan.sourceCapsule) {
+    const source = JSON.parse(JSON.stringify(plan.sourceCapsule));
+    if (source.schema !== 1 || typeof source.importId !== 'string' || typeof source.snapshotJson !== 'string' || !Array.isArray(source.originMutationIds)
+      || source.originMutationIds.some(id => typeof id !== 'string' || !id) || await backupRawDigest(source.snapshotJson) !== source.snapshotSha256) throw new Error('A captura de migração do backup está inválida. Preserve o arquivo original.');
+    const captured = JSON.parse(source.snapshotJson);
+    if (Object.keys(BACKUP_COLLECTIONS).some(name => !Array.isArray(captured[name]))) throw new Error('A captura não contém todas as coleções do histórico.');
+    source.counts = Object.fromEntries(Object.keys(BACKUP_COLLECTIONS).map(name => [name, captured[name].length]));
+    source.archivedStorageKeys = Array.from(new Set(backupArchiveEntries(captured.localArchive || []).map(entry => entry.key)));
+    if (previous && (previous.importId !== source.importId || previous.snapshotSha256 !== source.snapshotSha256)) throw new Error('Este aparelho já tem outra captura de migração. Preserve os arquivos e peça revisão à equipe.');
+    const request = source.preparedRequest;
+    if (request && (request.importId !== source.importId || request.snapshotJson !== source.snapshotJson || request.snapshotSha256 !== source.snapshotSha256
+      || request.sourceNeverSynced !== true || JSON.stringify(request.originMutationIds) !== JSON.stringify(source.originMutationIds)
+      || !request.expectedEmpresaId || !request.expectedLojaId)) throw new Error('A solicitação guardada no backup difere da captura original.');
+    if (request && plan.sourceContext && (String(request.expectedEmpresaId) !== String(plan.sourceContext.empresaId) || String(request.expectedLojaId) !== String(plan.sourceContext.lojaId))) throw new Error('A solicitação guardada pertence a outra empresa ou loja.');
+    return { source, changed: !previous || JSON.stringify(previous) !== JSON.stringify(source) };
+  }
+  if (previous && previous.preparedRequest) throw new Error('A migração já foi preparada para o EasyStok. Retome essa mesma migração antes de importar outro arquivo.');
+  if (previous && (!previous.importId || typeof previous.snapshotJson !== 'string' || await backupRawDigest(previous.snapshotJson) !== previous.snapshotSha256)) throw new Error('A captura anterior está inválida. Preserve os arquivos e peça revisão à equipe.');
+  const state = previous ? JSON.parse(previous.snapshotJson) : {};
+  Object.keys(BACKUP_COLLECTIONS).forEach(name => {
+    const byId = new Map((state[name] || []).map(row => [String(row.id), row]));
+    (plan.sourceState[name] || []).forEach(row => {
+      const copy = JSON.parse(JSON.stringify(row)); if (name === 'products') delete copy.count;
+      const existing = byId.get(String(copy.id));
+      if (existing && canonicalImportJson(existing) !== canonicalImportJson(copy)) throw new Error('Um registro difere da captura original da migração. A equipe precisa conferir antes de prosseguir.');
+      byId.set(String(copy.id), copy);
+    });
+    state[name] = Array.from(byId.values());
+  });
+  if (plan.photos.length) {
+    const photos = new Map((state.photos || []).map(photo => [photo.hash, photo]));
+    plan.photos.forEach(photo => { const previousPhoto = photos.get(photo.hash); if (previousPhoto && previousPhoto.dataUrl !== photo.dataUrl) throw new Error('Uma foto difere da captura original da migração.'); if (!previousPhoto) photos.set(photo.hash, photo); });
+    state.photos = Array.from(photos.values());
+  }
+  if (plan.sourceArchive.length) state.localArchive = backupArchiveEntries((state.localArchive || []).concat(plan.sourceArchive));
+  const snapshotJson = canonicalImportJson(state);
+  const originMutationIds = Array.from(new Set((previous ? previous.originMutationIds : []).concat(plan.sourceQueue.map(m => m.id))));
+  const source = { schema: 1, importId: previous ? previous.importId : window.crypto.randomUUID(), snapshotJson,
+    snapshotSha256: await backupRawDigest(snapshotJson), originMutationIds, archivedStorageKeys: Array.from(new Set((state.localArchive || []).map(entry => entry.key))), historyRules: plan.historyRules || (previous && previous.historyRules) || window.cdbSync.getLegacyHistoryRules(),
+    counts: Object.fromEntries(Object.keys(BACKUP_COLLECTIONS).map(name => [name, state[name].length])) };
+  return { source, changed: !previous || source.snapshotSha256 !== previous.snapshotSha256 || JSON.stringify(originMutationIds) !== JSON.stringify(previous.originMutationIds) };
+}
+
+async function backupCheckpoint(payload, persistedState) {
+  const stored = persistedState || Object.fromEntries(Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [name, JSON.parse(localStorage.getItem(key) || '[]')]));
+  return backupDigest({ state: payload.state, persistedState: stored, preferences: payload.localStorage, localArchive: payload.localArchive, queue: payload.sync.queue, context: payload.sync.context });
+}
+
+function writeBackupImportEntries(entries) {
+  const previous = new Map(entries.map(([key]) => [key, localStorage.getItem(key)])), written = [];
+  try { entries.forEach(([key, value]) => { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); written.push(key); }); }
+  catch (error) { written.reverse().forEach(key => { const value = previous.get(key); if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); }); throw error; }
+}
+
+async function getBackupImportUndoState() {
+  const review = window.cdbSync && window.cdbSync.importReview();
+  if (!review) return { available: false, reason: 'Não há importação em revisão.' };
   try {
-    const payload = buildBackupPayload();
+    const saved = JSON.parse(localStorage.getItem('cdb-before-import-backup') || 'null');
+    if (review.migrationStartedAt) return { available: false, reason: 'A migração já foi iniciada e pode ter sido gravada no EasyStok. Retome a conferência antes de desfazer; os dados locais estão preservados.' };
+    if (review.undoBlocked) return { available: false, reason: 'Houve trabalho após o início desta importação. Exporte os dados atuais e peça revisão à equipe; nada será apagado.' };
+    if (!saved || !saved.rollback || !review.undoCheckpoint || !review.undoBackupHash) return { available: false, reason: 'A cópia necessária para desfazer não está disponível. Preserve os dados e peça revisão à equipe.' };
+    if (await backupDigest(saved) !== review.undoBackupHash) return { available: false, reason: 'A cópia anterior foi alterada. Preserve os dados e peça revisão à equipe; nada será apagado.' };
+    if (await backupCheckpoint(buildBackupPayload()) !== review.undoCheckpoint) return { available: false, reason: 'Há alterações ou conexão diferente após a importação. Exporte os dados atuais e peça revisão à equipe; nada será apagado.' };
+    return { available: true, reason: '' };
+  } catch (_) { return { available: false, reason: 'Não foi possível conferir a cópia anterior. Preserve os dados e peça revisão à equipe.' }; }
+}
+
+async function undoBackupImport() {
+  const sync = window.cdbSync;
+  await sync.beginBackupImport();
+  try {
+    const status = await getBackupImportUndoState();
+    if (!status.available) throw new Error(status.reason);
+    const saved = JSON.parse(localStorage.getItem('cdb-before-import-backup'));
+    if (!saved.state || !saved.sync || !Array.isArray(saved.sync.queue) || Object.keys(BACKUP_COLLECTIONS).some(key => !Array.isArray(saved.state[key]))) throw new Error('A cópia anterior está inválida. Nenhum dado foi alterado.');
+    const entries = Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [key, JSON.stringify(saved.state[name])]);
+    BACKUP_PREFERENCES.forEach(key => entries.push([key, saved.rollback.preferences[key] === undefined ? null : saved.rollback.preferences[key]]));
+    entries.push(['cdb-sync-queue', JSON.stringify(saved.sync.queue)], ['cdb-import-review', saved.rollback.review || null], ['cdb-import-source', saved.rollback.source || null], ['cdb-import-archives', saved.rollback.archives || null]);
+    writeBackupImportEntries(entries);
+    products = saved.state.products.map(p => ({ ...p, count: 0 })); clients = saved.state.clients; orders = saved.state.orders;
+    cashEntries = saved.state.cashEntries; cashClosings = saved.state.cashClosings; batches = saved.state.batches;
+    sync.finishBackupImport(saved.sync.queue, { products, clients, orders, cashEntries, batches });
+    return { restored: true };
+  } finally { sync.endBackupImport(); }
+}
+
+async function applyBackupPayload(payload, askConfirmation = false) {
+  const sync = window.cdbSync;
+  if (!sync || !sync.beginBackupImport || !sync.finishBackupImport) throw new Error('Sincronização ainda está iniciando. Aguarde e tente novamente.');
+  await sync.beginBackupImport();
+  try {
+    const plan = prepareBackupImport(payload);
+    if (plan.conflicts.length) throw new Error('Importação bloqueada: ' + plan.conflicts.length + ' registros têm o mesmo código e dados diferentes. A equipe precisa revisar. Exemplos: ' + plan.conflicts.slice(0, 3).join(', ') + '. Nenhum registro foi substituído.');
+    const captured = await prepareLegacyImportSource(plan);
+    const newPhotos = [];
+    if (plan.photos.length) {
+      const store = window.cdbPhotoStore;
+      if (!store || !store.ready) throw new Error('Armazenamento de fotos indisponível. Nenhum registro foi importado.');
+      for (const photo of plan.photos) {
+        const existing = await store.get(photo.hash);
+        if (existing && existing.dataUrl !== photo.dataUrl) throw new Error('Uma foto conflita com a já guardada neste aparelho.');
+        if (!existing) newPhotos.push(photo);
+      }
+    }
+    if (!plan.added && !plan.queueAdded && !newPhotos.length && !plan.reviewUpdated && !plan.archiveChanged && !(captured && captured.changed)) return { added: 0, repeated: plan.repeated, queueAdded: 0 };
+    const undoAllowed = !sync.importReview() || (await getBackupImportUndoState()).available;
+    // Uma cópia recuperável é exigida antes da confirmação e de qualquer troca.
+    if (!sync.importReview() || !localStorage.getItem('cdb-before-import-backup')) {
+      const original = buildBackupPayload();
+      original.rollback = { preferences: Object.fromEntries(BACKUP_PREFERENCES.map(key => [key, localStorage.getItem(key)])), review: localStorage.getItem('cdb-import-review'), source: localStorage.getItem('cdb-import-source'), archives: localStorage.getItem('cdb-import-archives') };
+      const safety = JSON.stringify(original);
+      localStorage.setItem('cdb-before-import-backup', safety);
+      if (localStorage.getItem('cdb-before-import-backup') !== safety) throw new Error('Não foi possível guardar a cópia de segurança.');
+    }
+    const expected = buildBackupPayload();
+    expected.state = plan.merged; expected.sync.queue = plan.queue;
+    expected.localArchive = backupArchiveEntries(plan.localArchive, Object.fromEntries(BACKUP_ARCHIVE_KEYS.map(key => [key, localStorage.getItem(key)])));
+    Object.assign(expected.localStorage, plan.preferences);
+    const undoCheckpoint = undoAllowed ? await backupCheckpoint(expected, plan.merged) : null;
+    const undoBackupHash = undoAllowed ? await backupDigest(JSON.parse(localStorage.getItem('cdb-before-import-backup'))) : null;
+    const warning = (plan.requiresReconciliation ? '\nEste arquivo não comprova a fila completa. Os registros serão preservados offline, mas o envio ficará bloqueado até a equipe conferir a origem e concluir a migração inicial segura para o EasyStok.' : '') + (plan.missingPhotos ? '\n' + plan.missingPhotos + ' fotos não estão neste arquivo. Preserve o PWA antigo.' : '') + (plan.sourceArchive.length ? '\nCompras e auditoria antigas serão preservadas como anexos no backup; não alteram as listas atuais deste app.' : '');
+    if (askConfirmation && !confirm('Importar ' + plan.added + ' registros e ' + plan.queueAdded + ' alterações pendentes?\n' + plan.repeated + ' registros repetidos serão ignorados.\nOs dados atuais serão mantidos. Uma cópia de segurança local já foi guardada.' + warning + '\n\nA sincronização ficará pausada para revisar esta importação.')) return null;
+    for (const photo of newPhotos) await window.cdbPhotoStore.save(photo.hash, photo.dataUrl, photo.batchId || '', photo.field || '');
+    const entries = Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [key, JSON.stringify(plan.merged[name])]);
+    Object.entries(plan.preferences).forEach(entry => entries.push(entry));
+    entries.push(['cdb-sync-queue', JSON.stringify(plan.queue)], ['cdb-import-archives', JSON.stringify(plan.localArchive)]);
+    if (captured) entries.push(['cdb-import-source', JSON.stringify(captured.source)]);
+    entries.push(['cdb-import-review', JSON.stringify({ sourceContext: plan.sourceContext, importedAt: Date.now(), importedRecords: plan.added, missingPhotos: plan.missingPhotos, legacy: plan.legacy, requiresReconciliation: plan.requiresReconciliation, unreconciledRecords: plan.unreconciledRecords, undoCheckpoint, undoBackupHash, undoBlocked: !undoAllowed || !!(captured && captured.source.preparedRequest), migrationStartedAt: captured && captured.source.preparedRequest ? Date.now() : undefined })]);
+    writeBackupImportEntries(entries);
+    products = plan.merged.products.map(p => ({ ...p, count: 0 })); clients = plan.merged.clients; orders = plan.merged.orders;
+    cashEntries = plan.merged.cashEntries; cashClosings = plan.merged.cashClosings; batches = plan.merged.batches;
+    sync.finishBackupImport(plan.queue, { products, clients, orders, cashEntries, batches });
+    return { added: plan.added, repeated: plan.repeated, queueAdded: plan.queueAdded, missingPhotos: plan.missingPhotos, updated: true, requiresReconciliation: plan.requiresReconciliation };
+  } finally { sync.endBackupImport(); }
+}
+
+async function exportBackup() {
+  try {
+    const payload = await buildTransferBackupPayload();
     const json = JSON.stringify(payload, null, 2);
     const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
     const filename = `casa-da-baba-backup-${stamp}.json`;
@@ -10143,74 +10458,20 @@ function showBackupTextForCopy(json, filename) {
 
 function importBackup(event) {
   const file = event.target.files && event.target.files[0];
-  event.target.value = ''; // permite re-importar o mesmo arquivo
+  event.target.value = '';
   if (!file) return;
+  if (file.size > 25 * 1024 * 1024) { showToast('Backup maior que 25 MB. Peça ajuda à equipe para migrar com segurança.'); return; }
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async e => {
     try {
-      const payload = JSON.parse(String(e.target.result || ''));
-      if (!payload || payload.appId !== 'casa-da-baba' || !payload.state) {
-        showToast('Arquivo inválido (não é backup do Easy Stock Mobile)');
-        return;
-      }
-      const itemCount = (payload.state.products?.length || 0)
-                      + (payload.state.clients?.length || 0)
-                      + (payload.state.orders?.length || 0)
-                      + (payload.state.batches?.length || 0)
-                      + (payload.state.cashEntries?.length || 0);
-      if (!confirm(`Restaurar ${itemCount} registros?\n\nIsso vai SUBSTITUIR os dados atuais do app por completo. Use só se tem certeza (recuperação de backup).`)) return;
-      applyBackupPayload(payload);
-      showToast('Backup restaurado · recarregando...');
-      setTimeout(() => location.reload(), 800);
-    } catch (e) {
-      console.error('Import falhou:', e);
-      showToast('Arquivo corrompido ou inválido');
-    }
+      const result = await applyBackupPayload(JSON.parse(String(e.target.result || '')), true);
+      if (!result) return;
+      showToast(result.updated ? (result.requiresReconciliation ? 'Dados preservados. A fila precisa ser conferida no PWA de origem.' : 'Dados importados. Confira a loja antes de sincronizar.') : 'Este backup já está no aparelho. Nenhum registro foi duplicado.');
+      if (result.updated) setTimeout(() => location.reload(), 800);
+    } catch (error) { console.error('Import falhou:', error); alert(error.message || 'Não foi possível importar. Os dados atuais foram mantidos.'); }
   };
+  reader.onerror = () => showToast('Não foi possível ler o arquivo de backup.');
   reader.readAsText(file);
-}
-
-function applyBackupPayload(payload) {
-  const s = payload.state || {};
-  // Sobrescreve estado em memória
-  if (Array.isArray(s.products))     products      = s.products.map(p => ({...p, count: 0}));
-  if (Array.isArray(s.clients))      clients       = s.clients;
-  if (Array.isArray(s.orders))       orders        = s.orders;
-  if (Array.isArray(s.cashEntries))  cashEntries   = s.cashEntries;
-  if (Array.isArray(s.cashClosings)) cashClosings  = s.cashClosings;
-  if (Array.isArray(s.batches))      batches       = s.batches;
-
-  // Restaura chaves soltas, exceto cdb-device-id (manter o ID atual evita
-  // conflito de "mesmo device" no servidor após restore em outro aparelho)
-  // E exceto cdb-audit-log: nao sobrescreve o log existente — ANEXA o log do
-  // backup pra preservar continuidade (e re-rotaciona pra max 1000 entradas).
-  const ls = payload.localStorage || {};
-  Object.keys(ls).forEach(k => {
-    if (k === 'cdb-device-id') return;
-    if (k === 'cdb-audit-log') return; // tratado abaixo
-    try { localStorage.setItem(k, ls[k]); } catch (e) {}
-  });
-  // Merge audit log: log atual + log do backup, ordena por ts desc, dedup, rotaciona
-  try {
-    const current = loadAuditLog();
-    let imported = [];
-    try { imported = JSON.parse(ls['cdb-audit-log'] || '[]') || []; } catch (e) {}
-    const seenIds = new Set(current.map(e => e.id));
-    imported.forEach(e => { if (!seenIds.has(e.id)) current.push(e); });
-    current.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    if (current.length > AUDIT_LOG_MAX) current.length = AUDIT_LOG_MAX;
-    localStorage.setItem('cdb-audit-log', JSON.stringify(current));
-  } catch (e) { console.warn('[restore] merge audit log falhou:', e); }
-
-  // Audit log: backup restaurado (depois do merge pra essa entrada aparecer)
-  logAction({
-    action: 'backup.restore',
-    entityType: 'backup',
-    summary: 'Backup restaurado · ' + (payload.exportedAt || 'sem data')
-            + ' · ' + ((s.products?.length||0) + (s.orders?.length||0) + (s.batches?.length||0)) + ' registro(s)'
-  });
-
-  persistAll();
 }
 
 // =========================
@@ -10396,6 +10657,13 @@ function updateSync() {
         bannerCount.hidden = true;
       }
     }
+  }
+  if (window.CDB_CONFIG?.isPilot && (!window.cdbSync?.getPairing?.() || window.cdbSync?.isPairingInvalid?.())) {
+    chip.classList.add('pending');
+    txt.textContent = 'Neste aparelho · não conectado';
+    if (typeof renderTrustBadges === 'function') renderTrustBadges();
+    if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
+    return;
   }
   if (offline) {
     chip.classList.add('pending');
@@ -12015,7 +12283,28 @@ function advanceOrder(id) {
   applyAdvanceTransition(id, nextStatus);
 }
 
+function assertImportedBatchAction(batchId) {
+  const batch = getBatchById(batchId);
+  const rules = window.cdbSync && window.cdbSync.getLegacyHistoryRules ? window.cdbSync.getLegacyHistoryRules() : null;
+  if (batch && (batch.legacyImported === true || (rules && rules.batchIds.includes(batchId)))) {
+    showToast('Lote histórico preservado. Para alterar estoque, peça revisão à equipe. As etiquetas continuam disponíveis.');
+    return false;
+  }
+  return true;
+}
+
+function assertImportedOrderAction(orderId, action) {
+  const order = getOrderById(orderId);
+  const rules = window.cdbSync && window.cdbSync.getLegacyHistoryRules ? window.cdbSync.getLegacyHistoryRules() : null;
+  const status = order && (order.legacyHistoryStatus || (rules && rules.orderStates[orderId]));
+  if (!status) return true;
+  if (status === STATUS.PRONTO && order.status === STATUS.PRONTO && (action === STATUS.ENTREGUE || action === 'confer-ok')) return true;
+  showToast('Pedido histórico preservado. Alterações de estoque ou valores precisam de revisão da equipe.');
+  return false;
+}
+
 function cancelOrder(id) {
+  if (!assertImportedOrderAction(id, 'cancelar')) return;
   const o = getOrderById(id);
   if (!o) return;
   // Idempotencia: pedido ja cancelado nao re-executa devolucao de estoque.
@@ -12332,8 +12621,8 @@ function renderProductGrid() {
     : 'Registrar produção';
 }
 
-function clearProduction() {
-  products.forEach(p => { p.count = 0; p.photo = null; });
+function clearProduction(productIds = null) {
+  products.filter(p => !productIds || productIds.includes(p.id)).forEach(p => { p.count = 0; p.photo = null; });
   renderProductGrid();
 }
 
@@ -12395,9 +12684,11 @@ function buildBarcodePattern(seed) {
   return html;
 }
 
-function openProductionConfirm() {
-  const items = products.filter(p => p.count > 0);
+let productionSelectionIds = null;
+function openProductionConfirm(productIds = null) {
+  const items = products.filter(p => p.count > 0 && (!productIds || productIds.includes(p.id)));
   if (items.length === 0) return;
+  productionSelectionIds = productIds;
 
   currentPhotoDataUrl = null;
   renderBatchPhotoPreview();
@@ -12412,7 +12703,7 @@ function openProductionConfirm() {
     const stockAtual = Number(i.stock) || 0;
     const apos = stockAtual + (Number(i.count) || 0);
     return `
-    <div class="ps-item">
+    <div class="ps-item" data-pid="${escapeHtml(i.id)}">
       <div class="n">
         <span class="e">${escapeHtml(i.emoji || '📦')}</span>
         <span style="display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25">
@@ -12426,10 +12717,28 @@ function openProductionConfirm() {
 
   // Lista de validade/peso por produto. Pré-preenche com defaults do cadastro.
   populateProdDetailList(items);
+  const manufactureInput = document.getElementById('prodManufacturedDate');
+  manufactureInput.value = localProductionDate(Date.now());
+  manufactureInput.max = manufactureInput.value;
 
   document.getElementById('batchDate').textContent = subtituloDoLote(new Date(), currentBatchId);
 
+  rememberOperationalFocus('productionConfirmModal');
   document.getElementById('productionConfirmModal').classList.add('show');
+  document.getElementById('prodManufacturedDate').focus();
+}
+
+function localProductionDate(ms) {
+  const date = new Date(ms);
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+}
+
+function productionTimestamp(value, nowMs) {
+  if (!value) return null;
+  if (value === localProductionDate(nowMs)) return nowMs;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value > localProductionDate(nowMs)) return null;
+  const ms = new Date(value + 'T12:00:00').getTime();
+  return Number.isFinite(ms) && localProductionDate(ms) === value ? ms : null;
 }
 
 const VALIDITY_OPTIONS = [3, 5, 7, 10, 15];
@@ -12450,13 +12759,13 @@ function populateProdDetailList(items) {
       <div class="pd-row" data-pid="${escapeHtml(p.id)}">
         <div class="pd-name">
           <span>${p.emoji || '📦'} ${escapeHtml(p.name)}</span>
-          <span class="pd-qty">×${p.count}</span>
+          <label class="pd-qty">Qtd. <input type="number" class="pd-quantity" aria-label="Quantidade de ${escapeHtml(p.name)}" min="1" max="9999" step="1" value="${p.count}" style="width:70px" oninput="updateProductionQuantityPreview(this)"></label>
         </div>
         <div class="pd-fields">
-          <input type="number" class="pd-weight" placeholder="peso por unidade (g)" min="0" max="9999" value="${defWeight}" />
+          <input type="number" class="pd-weight" aria-label="Peso por unidade em gramas de ${escapeHtml(p.name)}" placeholder="Peso por unidade (g)" min="0" max="9999" value="${defWeight}" />
           <div class="pd-validity-pills">
             ${pills}
-            <input type="number" class="pd-validity-custom" placeholder="custom" min="1" max="365" value="${customVal}" />
+            <input type="number" class="pd-validity-custom" aria-label="Validade em dias de ${escapeHtml(p.name)}" placeholder="Dias" min="1" max="365" value="${customVal}" />
           </div>
         </div>
       </div>
@@ -12495,14 +12804,18 @@ function readProdDetailValues() {
     row.querySelector('.pd-weight')?.removeAttribute('aria-invalid');
     const pid = row.dataset.pid;
     const weightRaw = row.querySelector('.pd-weight')?.value || '';
+    const quantityRaw = row.querySelector('.pd-quantity')?.value;
+    const qty = quantityRaw == null ? null : Number(quantityRaw);
+    if (qty !== null && (!Number.isInteger(qty) || qty < 1 || qty > 9999)) { valid = false; row.classList.add('invalid'); }
     const customRaw = row.querySelector('.pd-validity-custom')?.value || '';
     const activePill = row.querySelector('.pd-validity-pills button.active');
     let validityDays = null;
-    if (customRaw && !isNaN(parseInt(customRaw))) validityDays = parseInt(customRaw);
-    else if (activePill) validityDays = parseInt(activePill.dataset.d);
-    if (!validityDays || validityDays < 1) { valid = false; row.classList.add('invalid'); }
-    const weightG = weightRaw && !isNaN(parseInt(weightRaw)) ? parseInt(weightRaw) : null;
-    perProduct.set(pid, { weightG, validityDays });
+    if (customRaw) validityDays = Number(customRaw);
+    else if (activePill) validityDays = Number(activePill.dataset.d);
+    if (!Number.isInteger(validityDays) || validityDays < 1 || validityDays > 365) { valid = false; row.classList.add('invalid'); }
+    const weightG = weightRaw ? Number(weightRaw) : null;
+    if (weightG !== null && (!Number.isInteger(weightG) || weightG < 0 || weightG > 9999)) { valid = false; row.classList.add('invalid'); }
+    perProduct.set(pid, { weightG, validityDays, qty });
   });
   return { valid, perProduct };
 }
@@ -12526,9 +12839,24 @@ function marcarPesoFaltando(productIds) {
   }
 }
 
+function updateProductionQuantityPreview(input) {
+  const id = input.closest('.pd-row')?.dataset.pid;
+  const product = products.find(p => p.id === id);
+  const row = Array.from(document.querySelectorAll('#prodSummary .ps-item')).find(item => item.dataset.pid === id);
+  if (!product || !row) return;
+  const quantity = Number(input.value);
+  const valid = Number.isInteger(quantity) && quantity > 0 && quantity <= 9999;
+  row.querySelector('.q').textContent = valid ? '×' + quantity : 'Confira a quantidade';
+  row.querySelector('.ps-after').textContent = valid
+    ? (Number(product.stock) || 0) + ' no estoque → ' + ((Number(product.stock) || 0) + quantity) + ' após'
+    : 'Quantidade entre 1 e 9999';
+}
+
 function closeProductionConfirm() {
   document.getElementById('productionConfirmModal').classList.remove('show');
   currentPhotoDataUrl = null;
+  productionSelectionIds = null;
+  restoreOperationalFocus('productionConfirmModal');
 }
 
 function renderBatchPhotoPreview() {
@@ -12592,7 +12920,7 @@ function getOrderSalesMovement(order) {
     kind: 'sales',
     ts: order.updatedAt || order.factAt || order.createdAt || Date.now(),
     title: `${i.qty || 0}× ${i.name}`,
-    detail: `Pedido #${String(order.id || '').slice(-6)} · ${order.clientSnapshot?.name || 'Sem cliente'}`,
+    detail: `Pedido #${String(order.id || '').slice(-8)} · ${order.clientSnapshot?.name || 'Sem cliente'}`,
     productId: i.productId || '',
     productName: i.name || '',
     qty: -(Number(i.qty) || 0),
@@ -12778,7 +13106,7 @@ function buildMovimentos() {
       type: 'exit',
       at: o.updatedAt || o.createdAt,
       label: (o.clientSnapshot?.name || 'Pedido') + (safeRefDisplay(o.clientSnapshot?.ref) ? ' — ' + safeRefDisplay(o.clientSnapshot.ref) : ''),
-      ref: '#' + (o.id || '').slice(-6),
+      ref: '#' + (o.id || '').slice(-8),
       items: (o.items || []).map(i => ({ name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit })),
       status: o.status,
       opName: o.lastOperatorName || null
@@ -13386,6 +13714,7 @@ function renderFinalizadosScreen() {
 // Hard delete de pedido CANCELADO (apaga do array, audit registra).
 // Pra entregue, o operador deve cancelar primeiro.
 function purgeOrderRecord(id) {
+  if (!assertImportedOrderAction(id, 'excluir')) return;
   const o = (orders || []).find(x => x.id === id);
   if (!o) { showToast('Pedido não encontrado'); return; }
   if (o.status !== STATUS.CANCELADO) {
@@ -13637,6 +13966,7 @@ function ajustarSaldoDoLote(batch, contavaAntes) {
 // Recuperavel via restoreBatch. NAO bloqueia se estoque ja foi consumido em
 // vendas: usa Math.max(0, ...) pra evitar negativo (rastreado em audit log).
 function deleteBatch(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(b => b.id === batchId);
   if (!batch) { showToast('Lote não encontrado'); return; }
   if (batch.deleted) { showToast('Lote já está excluído'); return; }
@@ -13669,6 +13999,7 @@ function deleteBatch(batchId) {
 }
 // Restore silencioso pra ser chamado pelo undo (sem confirm modal).
 function _silentRestoreBatch(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(b => b.id === batchId);
   if (!batch || !batch.deleted) return;
   const contavaAntes = loteContaNoSaldo(batch);
@@ -13685,6 +14016,7 @@ function _silentRestoreBatch(batchId) {
   // Evita 2 toasts visualmente empilhados.
 }
 function restoreBatch(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(b => b.id === batchId);
   if (!batch) { showToast('Lote não encontrado'); return; }
   if (!batch.deleted) { showToast('Lote não está excluído'); return; }
@@ -14083,7 +14415,7 @@ function renderKanbanCard(o, col) {
       ${quickActions}
       <div class="k-meta">
         <span class="k-chip">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
-        <span class="k-chip">Pedido ${(o.id || '').slice(-6)}</span>
+        <span class="k-chip">Pedido ${(o.id || '').slice(-8)}</span>
         ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
       </div>
       <div class="k-items">${itemsLine}</div>
@@ -14181,7 +14513,11 @@ const PIX_TYPES = {
 function getPixKey()      { try { return localStorage.getItem('cdb-pix-key')      || DEFAULT_PIX_KEY;      } catch (e) { return DEFAULT_PIX_KEY; } }
 function getPixHolder()   { try { return localStorage.getItem('cdb-pix-holder')   || DEFAULT_PIX_HOLDER;   } catch (e) { return DEFAULT_PIX_HOLDER; } }
 function getPixType()     { try { return localStorage.getItem('cdb-pix-type')     || DEFAULT_PIX_TYPE;     } catch (e) { return DEFAULT_PIX_TYPE; } }
-function getEmpresaName() { try { return localStorage.getItem('cdb-empresa-name') || DEFAULT_EMPRESA_NAME; } catch (e) { return DEFAULT_EMPRESA_NAME; } }
+function getEmpresaName() {
+  const fallback = window.CDB_CONFIG?.isPilot ? 'Casa da Baba' : DEFAULT_EMPRESA_NAME;
+  try { const name = localStorage.getItem('cdb-empresa-name'); return !name || name === DEFAULT_EMPRESA_NAME ? fallback : name; }
+  catch (e) { return fallback; }
+}
 const DEFAULT_EMPRESA_CIDADE = 'São Paulo';
 function getEmpresaCidade() { try { return localStorage.getItem('cdb-empresa-cidade') || DEFAULT_EMPRESA_CIDADE; } catch (e) { return DEFAULT_EMPRESA_CIDADE; } }
 function getStoreLogo()   { try { return localStorage.getItem('cdb-store-logo') || ''; } catch (e) { return ''; } }
@@ -14315,6 +14651,7 @@ function getProductSku(product) {
  * Monta a mensagem de cobrança em texto puro (boa pra WhatsApp).
  * Shape: cabeçalho + itens + total + obs + chave PIX + assinatura.
  */
+function hasConfiguredPix() { return !!getPixHolder().trim() && validatePixKey(getPixKey(), getPixType()); }
 function buildCobrancaMessage(order, template) {
   template = template || currentCobrancaTemplate || 'cobranca';
   const nome = order.clientSnapshot?.name || 'Cliente';
@@ -14335,6 +14672,9 @@ function buildCobrancaMessage(order, template) {
   const pixHolder  = getPixHolder();
   const empresa    = getEmpresaName();
   const pedidoRef  = (order.id || '').slice(-8);
+  const pixBlock = hasConfiguredPix()
+    ? `\n💳 *Pagamento via PIX*\n${pixLabel}: *${pixDisplay}*\nTitular: ${pixHolder}\n\nPor favor, confirme o pagamento pra a gente finalizar seu pedido 💛\n\n`
+    : '\n\n';
 
   if (template === 'pronto') {
     return (
@@ -14361,10 +14701,7 @@ function buildCobrancaMessage(order, template) {
     `${itensLinhas}\n\n` +
     `💰 *Total: ${money(total)}*` +
     `${obsBloco}` +
-    `\n💳 *Pagamento via PIX*\n` +
-    `${pixLabel}: *${pixDisplay}*\n` +
-    `Titular: ${pixHolder}\n\n` +
-    `Por favor, confirme o pagamento pra a gente finalizar seu pedido 💛\n\n` +
+    pixBlock +
     `_Pedido ${pedidoRef}_`
   );
 }
@@ -14390,7 +14727,7 @@ function buildEtiqueta(order) {
     `${itensLinhas}\n` +
     `Total: ${money(Number(order.total) || 0)}\n` +
     `Horário: ${horario}${obs}\n` +
-    `#${order.id.slice(-6)}`
+    `#${order.id.slice(-8)}`
   );
 }
 
@@ -14402,6 +14739,13 @@ function openCobranca(orderId) {
   if (!o) return;
   currentCobrancaOrderId = orderId;
   currentCobrancaTemplate = o.status === STATUS.PRONTO ? 'pronto' : 'cobranca';
+  const pixReady = hasConfiguredPix();
+  document.getElementById('cobrancaTitle').textContent = pixReady ? 'Cobrança' : 'Resumo do pedido';
+  document.getElementById('cobrancaPixWarning').hidden = pixReady;
+  const pixPanel = document.querySelector('#cobrancaModal .cobranca-pix');
+  if (pixPanel) pixPanel.style.display = pixReady ? '' : 'none';
+  const chargeTemplate = document.querySelector('#cobrancaModal [data-template="cobranca"]');
+  if (chargeTemplate) chargeTemplate.textContent = pixReady ? 'Cobrança' : 'Resumo';
 
   const msg = buildCobrancaMessage(o, currentCobrancaTemplate);
   document.getElementById('cobrancaPreview').textContent = msg;
@@ -14412,11 +14756,14 @@ function openCobranca(orderId) {
   if (labelEl) labelEl.textContent = '💳 PIX — ' + ((PIX_TYPES[getPixType()]?.short) || 'Chave');
   document.querySelectorAll('#cobrancaModal .msg-template-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.template === currentCobrancaTemplate));
+  rememberOperationalFocus('cobrancaModal');
   document.getElementById('cobrancaModal').classList.add('show');
+  document.getElementById('cobrancaTitle').focus();
 }
 function closeCobranca() {
   document.getElementById('cobrancaModal').classList.remove('show');
   currentCobrancaOrderId = null;
+  restoreOperationalFocus('cobrancaModal');
 }
 
 function setCobrancaTemplate(template) {
@@ -14483,7 +14830,10 @@ function fallbackCopy(text, successMsg) {
   ta.style.opacity = '0';
   document.body.appendChild(ta);
   ta.select();
-  try { document.execCommand('copy'); showToast(successMsg || 'Copiado'); }
+  try {
+    if (!document.execCommand('copy')) throw new Error('Cópia recusada');
+    showToast(successMsg || 'Copiado');
+  }
   catch (e) { showToast('Não consegui copiar — selecione manualmente'); }
   finally { document.body.removeChild(ta); }
 }
@@ -14913,8 +15263,35 @@ function ensureBluetoothPermission(cb) {
 }
 
 function getSavedPrinter() { return load('cdb-printer', null); }
+function getPrinterProfiles() {
+  const stored = load('cdb-printers', []);
+  const profiles = Array.isArray(stored) ? stored : [];
+  const saved = getSavedPrinter();
+  if (saved && saved.address && !profiles.some(p => p.address === saved.address)) profiles.push(saved);
+  return profiles;
+}
+function printerReady(printer) {
+  return !!printer && printer.profile !== 'oasis-pending' && !!printer.address;
+}
+function renderSavedPrinters() {
+  const host = document.getElementById('savedPrinterProfiles');
+  if (!host) return;
+  host.innerHTML = '';
+  getPrinterProfiles().forEach(p => {
+    const button = document.createElement('button');
+    button.className = 'np-btn np-secondary';
+    button.textContent = p.name + (p.profile === 'oasis-pending' ? ' · aguardando driver' : ' · salva');
+    button.onclick = () => selectPrinter(p);
+    host.appendChild(button);
+  });
+}
 function setSavedPrinter(p) {
-  if (p) save('cdb-printer', p);
+  if (p) {
+    const profiles = getPrinterProfiles().filter(item => item.address !== p.address);
+    profiles.push(p);
+    save('cdb-printers', profiles);
+    save('cdb-printer', p);
+  }
   else   { try { localStorage.removeItem('cdb-printer'); } catch (e) {} }
   renderPrinterStatus();
 }
@@ -14925,6 +15302,11 @@ function renderPrinterStatus() {
   if (!el || !lab) return;
 
   const bs = window.bluetoothSerial;
+  if (p && p.profile === 'oasis-pending') {
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.textContent = 'Oasis OIA-8381-B selecionada · driver pendente de validação';
+    return;
+  }
   if (!bs) {
     // Plugin Cordova nao carregado: rodando no browser ou APK sem o plugin
     el.classList.add('none'); el.classList.remove('ok');
@@ -14933,8 +15315,8 @@ function renderPrinterStatus() {
   }
 
   if (p && p.address) {
-    el.classList.remove('none'); el.classList.add('ok');
-    lab.innerHTML = '✓ ' + escapeHtml(p.name || p.address) + '<br><span style="font-size:10px;opacity:.7">Bluetooth pronto</span>';
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.innerHTML = 'Selecionada: ' + escapeHtml(p.name || p.address) + '<br><span style="font-size:12px">A conexão será verificada ao imprimir.</span>';
   } else {
     el.classList.add('none'); el.classList.remove('ok');
     lab.innerHTML = 'Nenhuma impressora selecionada<br><span style="font-size:10px;opacity:.7">Bluetooth disponível — toque "Buscar impressora"</span>';
@@ -14954,6 +15336,7 @@ function pickPrinter() {
 function openPrinterPicker() {
   const modal = document.getElementById('printerPickerModal');
   modal.classList.add('show');
+  renderSavedPrinters();
   loadPrinterDevices();
 }
 
@@ -15021,7 +15404,7 @@ function loadPrinterDevices() {
           row.style.textAlign = 'left';
           row.innerHTML = (isSaved ? '✓ ' : '') + escapeHtml(name)
                         + '<br><span style="font-size:11px;opacity:.7">' + escapeHtml(addr) + '</span>';
-          row.onclick = () => selectPrinter({ address: addr, name });
+          row.onclick = () => selectPrinter({ address: addr, name, profile: document.getElementById('printerProfile').value });
           list.appendChild(row);
         });
       }, (err) => showError('list', err));
@@ -15054,7 +15437,7 @@ function loadPrinterDevices() {
 const DIAG_KNOWN_KEYS = [
   'cdb-products', 'cdb-orders', 'cdb-clients', 'cdb-cash', 'cdb-cash-closings',
   'cdb-batches', 'cdb-audit-log', 'cdb-audit-log-archive', 'cdb-sync-queue',
-  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-operator-name',
+  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-printers', 'cdb-operator-name',
   'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-device-id',
   'cdb-last-sync', 'cdb-theme', 'cdb-prod-scan-mode', 'cdb-demo-mode', 'cdb-schema-version',
   'cdb-pre-reset-backup'
@@ -15281,19 +15664,27 @@ function textoPareadoCom(data) {
 }
 
 async function pairDevicePrompt() {
+  const pilot = !!window.CDB_CONFIG?.isPilot;
   const code = (window.prompt('Digite o código de pareamento (6 dígitos):') || '').trim();
-  if (!code) return;
+  if (!code) return { cancelled: true };
+  if (pilot && !/^\d{6}$/.test(code)) throw new Error('Informe o código de 6 dígitos fornecido pela equipe.');
   if (!window.cdbSync || typeof window.cdbSync.pairWithCode !== 'function') {
+    if (pilot) throw new Error('Sincronização indisponível. Tente novamente.');
     showToast('Sincronização indisponível'); return;
   }
-  showToast('Pareando…');
+  if (!pilot) showToast('Pareando…');
   try {
     const data = await window.cdbSync.pairWithCode(code, null);
-    showToast(textoPareadoCom(data));
-    if (typeof openDiagnostics === 'function') openDiagnostics();
+    if (!pilot) {
+      showToast(textoPareadoCom(data));
+      if (typeof openDiagnostics === 'function') openDiagnostics();
+    }
+    updateSync();
+    return { paired: true, data };
   } catch (e) {
-    showToast('Falha: ' + (e && e.message ? e.message : 'erro desconhecido'));
     try { logError(e, 'pairDevicePrompt'); } catch (_) {}
+    if (pilot) throw e;
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro desconhecido'));
   }
 }
 
@@ -16194,7 +16585,7 @@ function selectPrinter(printer) {
   try {
     setSavedPrinter(printer);
     btStep('select:saved');
-    showToast('Impressora salva: ' + printer.name + ' — toque Imprimir novamente');
+    showToast(printer.profile === 'oasis-pending' ? 'Oasis salva. Impressão aguarda validação do driver.' : 'Impressora selecionada: ' + printer.name + '. Toque Imprimir novamente.');
     logAction({
       action: 'settings.update',
       entityType: 'settings',
@@ -16436,6 +16827,7 @@ function closeConfer() {
 // operador mantém controle do kanban (assim divergência fica visível
 // até ele decidir entregar mesmo assim ou cancelar).
 function applyConfirmation(orderId, type, payload) {
+  if (!assertImportedOrderAction(orderId, type === 'ok' ? 'confer-ok' : 'confer-adjust')) return;
   const o = getOrderById(orderId);
   if (!o) return;
   const status = type === 'ok' ? CONFER_STATUS.CONFERIDO : CONFER_STATUS.DIVERGENCIA;
@@ -17322,6 +17714,7 @@ function isBatchClosed(batch) {
 }
 function assertBatchEditable(batch) {
   if (!batch) { showToast('Lote não encontrado'); return false; }
+  if (!assertImportedBatchAction(batch.id)) return false;
   if (batch.deleted) { showToast('Lote excluído'); return false; }
   if (isBatchClosed(batch)) { showToast('Lote fechado não pode ser alterado'); return false; }
   return true;
@@ -17333,6 +17726,7 @@ function rerenderBatchUx() {
   if (typeof renderHome === 'function') renderHome();
 }
 function toggleBatchStatus(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = getBatchById(batchId);
   if (!batch || batch.deleted) { showToast('Lote não encontrado'); return; }
   if (isBatchClosed(batch)) {
@@ -18001,7 +18395,7 @@ async function openCestaCalcFromOrder(orderId) {
   const order = ordersList.find(o => o.id === orderId);
   if (!order || !Array.isArray(order.items)) { showToast('Pedido não encontrado'); return; }
   await cestaCalcCarregarCacheReceitas();
-  const idShort = (order.id || '').slice(-6);
+  const idShort = (order.id || '').slice(-8);
   cestaCalcContexto = {
     tipo: 'order',
     orderId: order.id,
@@ -18325,6 +18719,7 @@ function mergeBatchesFlow() {
   const a = opens[parseInt(aRaw, 10) - 1];
   const d = opens[parseInt(bRaw, 10) - 1];
   if (!a || !d || a.id === d.id) { showToast('Escolha inválida'); return; }
+  if (!assertImportedBatchAction(a.id) || !assertImportedBatchAction(d.id)) return;
   d.items = (d.items || []).concat((a.items || []).map(x => ({ ...x })));
   a.status = 'closed';
   a.closedAt = Date.now();
@@ -18352,6 +18747,7 @@ function closeBatchDetails() { toggleModal('batchDetailsModal', false); }
 let _discardingBatchId = null;
 
 function openBatchDiscardModal(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(function (b) { return b.id === batchId; });
   if (!batch) return;
   _discardingBatchId = batchId;
@@ -18373,7 +18769,7 @@ function selectDiscardReason(el) {
 }
 
 function confirmBatchDiscard() {
-  if (!_discardingBatchId) return;
+  if (!_discardingBatchId || !assertImportedBatchAction(_discardingBatchId)) return;
   const batch = (batches || []).find(function (b) { return b.id === _discardingBatchId; });
   if (!batch) { closeBatchDiscardModal(); return; }
   const activeChip = document.querySelector('#batchDiscardChips .cash-type-pill.active');
@@ -18398,6 +18794,7 @@ function confirmBatchDiscard() {
 }
 
 function revertBatchDiscard(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
   const batch = (batches || []).find(function (b) { return b.id === batchId; });
   if (!batch) return;
   const contavaAntes = loteContaNoSaldo(batch);
@@ -18511,6 +18908,7 @@ function doConferScreenSearch() {
 
 // 'entregue' exige passar por conferência antes; todos os outros vêm direto.
 function applyAdvanceTransition(id, nextStatus) {
+  if (!assertImportedOrderAction(id, nextStatus)) return;
   const o = getOrderById(id);
   if (!o) return;
   // #1493: entregar = receber. Sem a forma o servidor assumia dinheiro.
@@ -18553,6 +18951,7 @@ function applyAdvanceTransition(id, nextStatus) {
 // Separado de applyAdvanceTransition para permitir o dialog de bug 1
 // chamar diretamente quando o operador escolhe "continuar mesmo assim".
 function _proceedAdvance(id, nextStatus) {
+  if (!assertImportedOrderAction(id, nextStatus)) return;
   const o = getOrderById(id);
   if (!o) return;
   let negatives = [];
@@ -18889,10 +19288,14 @@ function releasePrinting() {
   isPrinting = false;
   if (printWatchdog) { clearTimeout(printWatchdog); printWatchdog = null; }
 }
-function printViaBluetooth(bytes, onFallback) {
+function printViaBluetooth(bytes, onFallback, printJob) {
   btStep('print:start');
   const bs = window.bluetoothSerial;
   const printer = getSavedPrinter();
+  if (printer && printer.profile === 'oasis-pending') {
+    showToast('Oasis: confirme o modelo e o driver antes de imprimir');
+    return;
+  }
   if (!bs || !printer || !printer.address) {
     btStep('print:no-printer-or-bs bs=' + !!bs + ' p=' + !!printer);
     if (typeof onFallback === 'function') onFallback();
@@ -18900,135 +19303,92 @@ function printViaBluetooth(bytes, onFallback) {
   }
   if (isPrinting) { showToast('Impressão em andamento, aguarda…'); return; }
 
+  // Reserva o envio antes do diálogo Android: dois toques não geram dois trabalhos.
+  const job = {};
+  printViaBluetooth.activeJob = job;
+  isPrinting = true;
+  const active = () => isPrinting && printViaBluetooth.activeJob === job;
+  const finish = () => {
+    if (!active()) return;
+    printViaBluetooth.activeJob = null;
+    releasePrinting();
+  };
+  const failed = (err, fallback) => {
+    if (!active()) return;
+    showError(err, 'print');
+    finish();
+    if (fallback && typeof onFallback === 'function') onFallback();
+  };
+  printWatchdog = setTimeout(() => {
+    if (!active()) return;
+    showToast('A autorização do Bluetooth não terminou. Confira a permissão e tente imprimir novamente.');
+    finish();
+  }, 60000);
   btStep('print:perm-check');
+  try {
   ensureBluetoothPermission((granted) => {
+    if (!active()) return;
     btStep('print:perm-result granted=' + granted);
     if (!granted) {
-      showToast('Permissao Bluetooth negada - Configuracoes > Apps > Easy Stock Mobile');
+      showToast('Permissão Bluetooth negada. Ative Dispositivos próximos nas permissões deste app.');
+      finish();
       if (typeof onFallback === 'function') onFallback();
       return;
     }
-    isPrinting = true;
+    if (printWatchdog) clearTimeout(printWatchdog);
     printWatchdog = setTimeout(() => {
-      showToast('Impressora não respondeu — liberando');
-      releasePrinting();
+      if (!active()) return;
+      showToast('A impressora não confirmou o envio. Confira as etiquetas antes de tentar novamente.');
+      finish();
       // Tenta fechar socket pra evitar leak — se o write travou, o socket
       // pode estar zumbi. Disconnect e silencioso (callbacks vazios).
       try { bs.disconnect(function () {}, function () {}); } catch (_) {}
     }, 15000);
-    // Erros de socket morto (printer saiu de range, entrou em idle, foi
-    // desligada): broken pipe, EPIPE, "not connected", "closed". Nesses
-    // casos a unica saida e fechar o socket e refazer o pareamento SPP.
-    const isStaleSocketErr = (msg) => {
-      const m = String(msg || '').toLowerCase();
-      return m.includes('broken pipe') || m.includes('epipe')
-          || m.includes('not connected') || m.includes('closed')
-          || m.includes('socket') || m.includes('connection reset');
-    };
-    const reconnectAndRetry = () => {
-      btStep('print:reconnect-retry');
-      try {
-        bs.disconnect(
-          () => {
-            bs.connect(printer.address,
-              () => { btStep('print:reconnected'); rawWrite(false); },
-              (err) => {
-                btStep('print:reconnect-err ' + (err && err.message || err));
-                showError(err, 'print');
-                releasePrinting();
-              }
-            );
-          },
-          () => {
-            bs.connect(printer.address,
-              () => { btStep('print:reconnected-nodc'); rawWrite(false); },
-              (err) => {
-                btStep('print:reconnect-err2 ' + (err && err.message || err));
-                showError(err, 'print');
-                releasePrinting();
-              }
-            );
-          }
-        );
-      } catch (ex) {
-        btStep('print:reconnect-throw ' + (ex.message || ex));
-        showError(ex, 'print');
-        releasePrinting();
-      }
-    };
-    const rawWrite = (canRetry) => {
-      btStep('print:send-write retry=' + !canRetry);
+    const send = () => {
+      if (!active()) return;
+      btStep('print:send-write');
       try {
         bs.write(bytes,
           () => {
+            if (!active()) return;
             btStep('print:write-ok');
             showToast('Enviado pra impressora');
-            releasePrinting();
-            // #437 — registra impressao no audit log pra historico por lote.
-            try {
-              const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
-              const kind = currentEtiquetasKind;
-              const qtd = (currentEtiquetas && currentEtiquetas.length || 0) * copies;
-              const loteId = (currentEtiquetas && currentEtiquetas[0] && currentEtiquetas[0].id) || null;
-              const lote  = (currentEtiquetas && currentEtiquetas[0] && currentEtiquetas[0].lote) || null;
+            finish();
+            if (printJob && printJob.entityId) {
               logAction({
-                action: 'etiqueta.print',
-                entityType: kind === 'order' ? 'order' : 'batch',
-                entityId: loteId,
-                summary: qtd + ' etiqueta' + (qtd === 1 ? '' : 's') + (lote ? ' · ' + lote : '') + ' impressa' + (qtd === 1 ? '' : 's')
+                action: 'etiqueta.print', entityType: printJob.entityType, entityId: printJob.entityId,
+                summary: printJob.quantity + ' etiqueta(s), ' + printJob.copies + ' cópia(s) · enviada(s) para ' + printer.name,
+                diff: { copies: printJob.copies, quantity: printJob.quantity, printer: { name: printer.name, address: printer.address, profile: printer.profile || 'escpos' }, delivery: 'sent' }
               });
-            } catch (_) {}
+            }
           },
           (err) => {
+            if (!active()) return;
             const msg = (err && err.message) || err;
             btStep('print:write-err ' + msg);
-            if (canRetry && isStaleSocketErr(msg)) {
-              reconnectAndRetry();
-              return;
-            }
-            showError(err, 'print');
-            releasePrinting();
+            // Um write pode ter enviado parte do lote. Repetir automaticamente duplicaria etiquetas.
+            failed(err, false);
+            showToast('Confira as etiquetas na impressora antes de tentar novamente.');
           }
         );
       } catch (ex) {
         btStep('print:write-throw ' + (ex.message || ex));
-        showError(ex, 'print');
-        releasePrinting();
-        if (typeof onFallback === 'function') onFallback();
+        failed(ex, false);
       }
     };
-    const send = () => rawWrite(true);
-    btStep('print:isConnected-call addr=' + printer.address);
-    try {
-      bs.isConnected(
-        () => { btStep('print:already-connected'); send(); },
-        () => {
-          btStep('print:connect-call');
-          try {
-            bs.connect(printer.address,
-              () => { btStep('print:connected'); send(); },
-              (err) => {
-                btStep('print:connect-err ' + (err && err.message || err));
-                showError(err, 'print');
-                releasePrinting();
-                if (typeof onFallback === 'function') onFallback();
-              }
-            );
-          } catch (ex) {
-            btStep('print:connect-throw ' + (ex.message || ex));
-            showError(ex, 'print');
-            releasePrinting();
-            if (typeof onFallback === 'function') onFallback();
-          }
-        }
-      );
-    } catch (ex) {
-      btStep('print:isConnected-throw ' + (ex.message || ex));
-      showError(ex, 'bluetooth');
-      releasePrinting();
-      if (typeof onFallback === 'function') onFallback();
-    }
+    // Sempre abre a conexão escolhida; um socket existente pode ser da outra impressora.
+    const connectSelected = () => {
+      if (!active()) return;
+      try {
+        bs.connect(printer.address, send, err => failed(err, true));
+      } catch (err) {
+        failed(err, true);
+      }
+    };
+    try { bs.disconnect(connectSelected, connectSelected); }
+    catch (_) { connectSelected(); }
   });
+  } catch (err) { failed(err, true); }
 }
 
 let printAreaTimer = null;
@@ -19143,6 +19503,7 @@ function etiquetasFromBatch(batch) {
     for (let i = 0; i < it.qty; i++) {
       const idxStr = String(serial).padStart(3, '0');
       out.push({
+        batchId: batch.id,
         empresa,
         productName: it.name,
         emoji: it.emoji || '',
@@ -19184,7 +19545,9 @@ function etiquetaProducaoHtml(et, nota) {
   const hasCodes = showQr || showBarcode;
   const horiz = currentEtqOrient === 'horizontal';
 
-  const brand = `<div class="et-brand">
+  const brand = window.CDB_CONFIG?.isPilot
+    ? `<div class="et-brand"><span class="et-brand-name">${escapeHtml(et.empresa || getEmpresaName())}</span></div>`
+    : `<div class="et-brand">
     <img src="etiqueta/assets/logo-easystok.svg" alt="">
     <span class="et-brand-name">Easy<b>Stok</b></span>
   </div>`;
@@ -19356,13 +19719,13 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
 
     // Logo EasyStok
     ctx.fillStyle = '#1A2E5A';
-    ctx.fillRect(lx, y, 22, 22);
+    if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx, y, 22, 22);
     ctx.fillStyle = '#E85814';
-    ctx.fillRect(lx + 4, y + 4, 14, 6);
+    if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx + 4, y + 4, 14, 6);
     ctx.fillStyle = '#1A2E5A';
     ctx.textAlign = 'left';
     ctx.font = '800 16px Inter, Arial, sans-serif';
-    ctx.fillText('EasyStok', lx + 30, y + 14);
+    ctx.fillText(window.CDB_CONFIG?.isPilot ? et.empresa || getEmpresaName() : 'EasyStok', lx + (window.CDB_CONFIG?.isPilot ? 0 : 30), y + 14, mainW - lx - 8);
     y += 34;
 
     // Nome do produto + emoji (#437)
@@ -19457,13 +19820,13 @@ function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
   let y = y0 + 16;
   // Logo EasyStok
   ctx.fillStyle = '#1A2E5A';
-  ctx.fillRect(lx, y, 22, 22);
+  if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx, y, 22, 22);
   ctx.fillStyle = '#E85814';
-  ctx.fillRect(lx + 4, y + 4, 14, 6);
+  if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx + 4, y + 4, 14, 6);
   ctx.fillStyle = '#1A2E5A';
   ctx.textAlign = 'left';
   ctx.font = '800 18px Inter, Arial, sans-serif';
-  ctx.fillText('EasyStok', lx + 30, y + 16);
+  ctx.fillText(window.CDB_CONFIG?.isPilot ? et.empresa || getEmpresaName() : 'EasyStok', lx + (window.CDB_CONFIG?.isPilot ? 0 : 30), y + 16, W - lx - 8);
   y += 36;
   // Product name + emoji (#437)
   ctx.fillStyle = '#000';
@@ -20090,7 +20453,9 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   }
 
   refreshEtqPreview();
+  rememberOperationalFocus('etiquetasPreview');
   document.getElementById('etiquetasPreview').classList.add('show');
+  document.getElementById('etqTitle').focus();
 }
 
 function closeEtiquetasPreview() {
@@ -20099,13 +20464,26 @@ function closeEtiquetasPreview() {
   try { document.getElementById('etqCopiesSelect').value = '1'; } catch (_) {}
   try { document.getElementById('etqRetryBtn').style.display = 'none'; } catch (_) {}
   // Se veio de produção, volta pra home (fluxo natural pós-finalizar).
-  if (currentEtiquetasKind === 'producao') go('home');
+  if (currentEtiquetasKind === 'producao') {
+    go(window.CDB_CONFIG?.isPilot ? 'producao' : 'home');
+    if (window.CDB_CONFIG?.isPilot) document.querySelector('[data-screen="producao"] button:not([disabled])')?.focus();
+  } else restoreOperationalFocus('etiquetasPreview');
+  operationalFocus.delete('etiquetasPreview');
   currentEtiquetas = [];
 }
 
 // #437 — guarda os ultimos bytes impressos para retry em caso de falha BT.
 let _etqLastPrintBytes = null;
 let _etqLastPrintKind  = null;
+let _etqLastPrintJob = null;
+function etiquetaPrintJob(etiquetas, kind, copies) {
+  const first = etiquetas[0];
+  return first ? {
+    entityType: kind === 'order' ? 'order' : 'batch',
+    entityId: kind === 'order' ? first.order?.id : first.batchId,
+    quantity: etiquetas.length * copies, copies
+  } : null;
+}
 
 function _etqShowRetry() {
   const btn = document.getElementById('etqRetryBtn');
@@ -20121,7 +20499,7 @@ function etqRetry() {
   printViaBluetooth(_etqLastPrintBytes, function () {
     showToast('Sem conexão BT — use Salvar ou Compartilhar');
     _etqShowRetry();
-  });
+  }, _etqLastPrintJob);
 }
 
 function getEtqCopies() {
@@ -20310,9 +20688,11 @@ async function etqAction(action) {
         openPrinterPicker();
         return;
       }
+      if (!printerReady(printer)) { showToast('Oasis: modelo e driver pendentes de validação'); return; }
       // #437: cópias (1/2/5/10) e retry
       const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
       _etqHideRetry();
+      _etqLastPrintJob = etiquetaPrintJob(currentEtiquetas, currentEtiquetasKind, copies);
       if (currentEtiquetasKind === 'order') {
         const et = currentEtiquetas[0];
         const printNota = getEtqNota() || null;
@@ -20324,7 +20704,7 @@ async function etqAction(action) {
         printViaBluetooth(totalBytes, function () {
           showToast('Sem conexão BT — use Salvar ou Compartilhar');
           _etqShowRetry();
-        });
+        }, _etqLastPrintJob);
       } else {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
@@ -20351,7 +20731,7 @@ async function etqAction(action) {
         printViaBluetooth(totalBytes, function () {
           showToast('Sem conexão BT — use Salvar ou Compartilhar');
           _etqShowRetry();
-        });
+        }, _etqLastPrintJob);
       }
       return;
     }
@@ -20554,7 +20934,7 @@ function cashClosingPlainText(dateKey) {
     lines.push('');
     lines.push(`--- Pedidos entregues (${dayOrders.length}) ---`);
     dayOrders.forEach(o => {
-      const ref = (o.id || '').slice(-6);
+      const ref = (o.id || '').slice(-8);
       const nm = (o.clientSnapshot && o.clientSnapshot.name) || 'Cliente';
       lines.push(`#${ref} ${nm}: ${money(o.total)}`);
     });
@@ -20603,7 +20983,7 @@ function cashClosingPrintHtml(dateKey) {
   const dayOrders = (orders || []).filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && dateKeyOf(o.updatedAt) === k);
   const dayEntries = (cashEntries || []).filter(e => dateKeyOf(e.createdAt) === k);
   const ordersHtml = dayOrders.length
-    ? dayOrders.map(o => `<div class="pa-item"><span class="pi-main"><span class="pi-name">#${escapeHtml((o.id||'').slice(-6))} ${escapeHtml(o.clientSnapshot?.name || 'Cliente')}</span></span><span class="pi-price">${money(o.total)}</span></div>`).join('')
+    ? dayOrders.map(o => `<div class="pa-item"><span class="pi-main"><span class="pi-name">#${escapeHtml((o.id||'').slice(-8))} ${escapeHtml(o.clientSnapshot?.name || 'Cliente')}</span></span><span class="pi-price">${money(o.total)}</span></div>`).join('')
     : '<div class="pa-item"><span class="pi-main"><span class="pi-unit">Sem vendas no dia</span></span></div>';
   const entriesHtml = dayEntries.length
     ? dayEntries.map(e => {
@@ -20725,13 +21105,13 @@ function confirmProduction() {
   // Guard contra duplo-clique: bloqueia execucao concorrente que poderia
   // gerar 2 batches duplicados + dobrar estoque.
   if (_isSavingProduction) return;
-  const itemsRaw = products.filter(p => p.count > 0);
+  const itemsRaw = products.filter(p => p.count > 0 && (!productionSelectionIds || productionSelectionIds.includes(p.id)));
   if (itemsRaw.length === 0) return;
 
   // Validação: todo produto precisa de validade. Peso é opcional.
   const detail = readProdDetailValues();
   if (!detail.valid) {
-    showToast('Defina a validade de cada produto');
+    showToast('Confira a quantidade e a validade de cada produto');
     return;
   }
 
@@ -20750,6 +21130,10 @@ function confirmProduction() {
     marcarPesoFaltando(itemsRaw.filter(p => semPeso.includes(p.name)).map(p => p.id));
     showToast(`Falta o peso de: ${semPeso.join(', ')} (vai na etiqueta)`);
     return;
+  }
+  for (const p of itemsRaw) {
+    const qty = detail.perProduct.get(p.id)?.qty;
+    if (qty != null) p.count = qty;
   }
   // Sanitiza qty pra inteiro positivo (impede NaN/negativo escapando do prompt)
   for (const p of itemsRaw) {
@@ -20779,9 +21163,9 @@ function confirmProduction() {
       if (!proceed) return;
     }
   }
+  const nowMs = productionTimestamp(document.getElementById('prodManufacturedDate')?.value, Date.now());
+  if (nowMs === null) { showToast('Informe uma data de fabricação válida, até hoje'); return; }
   _isSavingProduction = true;
-
-  const nowMs = Date.now();
   const lote  = getLoteDoDia(new Date(nowMs));
 
   const items = itemsRaw.map(p => {
@@ -20798,7 +21182,6 @@ function confirmProduction() {
 
   const code = currentBatchCode || buildBatchCode(itemsRaw);
   const batchId = currentBatchId || ('b-' + nowMs);
-  currentBatchId = '';
   // #1474 W6: mesmo lote/codigo do batch e da etiqueta, mesmo virando o dia.
   try { document.getElementById('batchDate').textContent = subtituloDoLote(new Date(nowMs), batchId); } catch (_) {}
   const batch = {
@@ -20813,16 +21196,23 @@ function confirmProduction() {
   };
   // Persiste o batch ANTES de mexer no estoque pra cobrir crash entre
   // os dois passos: se persist falhar, estoque nem incrementa.
+  const previousStocks = new Map(items.map(it => [it.productId, products.find(p => p.id === it.productId)?.stock]));
   batches.push(batch);
   // Incrementa o estoque DEPOIS — mesma persistAll cobre os dois.
   items.forEach(it => {
     const p = products.find(x => x.id === it.productId);
     if (p) p.stock = (p.stock || 0) + it.qty;
   });
-  persistAll();
+  if (!persistAll()) {
+    batches.splice(batches.indexOf(batch), 1);
+    items.forEach(it => { const p = products.find(x => x.id === it.productId); if (p) p.stock = previousStocks.get(it.productId); });
+    _isSavingProduction = false;
+    return false;
+  }
+  currentBatchId = '';
   _isSavingProduction = false;
 
-  clearProduction();
+  clearProduction(productionSelectionIds);
   closeProductionConfirm();
   pendingSync += items.length;
   updateSync();
@@ -20854,6 +21244,7 @@ function confirmProduction() {
   } else {
     go('home');
   }
+  return true;
 }
 
 // =========================
@@ -21127,12 +21518,14 @@ function openClientModal(prefillOrEditId) {
     }
   }
   updateClientSaveState();
+  rememberOperationalFocus('newClientModal');
   document.getElementById('newClientModal').classList.add('show');
-  setTimeout(() => document.getElementById((editId || prefill) ? 'newClientAddr' : 'newClientName').focus(), 300);
+  document.getElementById('newClientName').focus();
 }
 function closeClientModal() {
   editingClientId = null;
   document.getElementById('newClientModal').classList.remove('show');
+  restoreOperationalFocus('newClientModal');
 }
 function saveNewClient() {
   // Bug 9 (Onda 4): normalizeName em vez de so trim() — colapsa espacos
@@ -21403,6 +21796,7 @@ function saveOrder() {
 
   const total = currentOrderItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
 
+  const previousClientLastOrder = selectedClient === 'avulso' ? null : selectedClient.lastOrder;
   let snapshot;
   if (selectedClient === 'avulso') {
     snapshot = { name: 'Avulso', ref: 'sem cadastro' };
@@ -21489,15 +21883,21 @@ function saveOrder() {
     ? 'pedido retroativo (' + new Date(retroAtMs).toLocaleString('pt-BR') + ') já entregue'
     : 'pedido criado');
 
+  const previousOrderStocks = new Map();
   if (retroAtMs) {
     order.items.forEach(it => {
       const p = products.find(x => x.id === it.productId);
-      if (p) p.stock = (p.stock || 0) - it.qty;
+      if (p) { previousOrderStocks.set(p.id, p.stock); p.stock = (p.stock || 0) - it.qty; }
     });
   }
 
   orders.unshift(order);
-  persistAll();
+  if (!persistAll()) {
+    orders.splice(orders.indexOf(order), 1);
+    previousOrderStocks.forEach((stock, id) => { const p = products.find(x => x.id === id); if (p) p.stock = stock; });
+    if (selectedClient !== 'avulso') selectedClient.lastOrder = previousClientLastOrder;
+    return;
+  }
   renderRecents();
 
   // Audit log: pedido criado
@@ -21550,6 +21950,7 @@ function saveOrder() {
     }}
   ];
   showActionToast(msg, actions);
+  if (!retroAtMs && window.CDB_CONFIG?.isPilot) openCobranca(order.id);
   lastAction = { type: 'pedido' };
 }
 
@@ -21560,6 +21961,16 @@ function saveOrder() {
 // MODAL NOVO PRODUTO
 // =========================
 let productModalCallback = null; // se presente, ao salvar adiciona direto no pedido
+let productSubmitCompleted = false;
+
+function updateNewProductExpiry() {
+  const value = document.getElementById('newProdManufacturedDate')?.value;
+  const days = Number(document.getElementById('newProdValidity')?.value);
+  const stamp = productionTimestamp(value, Date.now());
+  const label = document.getElementById('newProdExpiry');
+  if (label) label.textContent = value && stamp !== null && Number.isInteger(days) && days > 0 && days <= 365
+    ? 'Validade na etiqueta: ' + new Date(stamp + days * 86400000).toLocaleDateString('pt-BR') : '';
+}
 
 function updateProductSaveState() {
   const btn = document.getElementById('saveProductBtn');
@@ -21569,11 +21980,22 @@ function updateProductSaveState() {
 }
 
 function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
+  productSubmitCompleted = false;
+  editingProductId = null;
   document.getElementById('newProdName').value = prefillName;
   document.getElementById('newProdUnit').value = '';
   document.getElementById('newProdPrice').value = '';
   const costEl = document.getElementById('newProdCost');
   if (costEl) costEl.value = '';
+  document.getElementById('newProdMinStock').value = '';
+  document.getElementById('newProdValidity').value = '5';
+  document.getElementById('newProdBatchFields').hidden = !window.CDB_CONFIG?.isPilot || fromOrder;
+  document.getElementById('newProdQuantity').value = '1';
+  document.getElementById('newProdWeight').value = '';
+  const manufacture = document.getElementById('newProdManufacturedDate');
+  manufacture.value = localProductionDate(Date.now());
+  manufacture.max = manufacture.value;
+  updateNewProductExpiry();
   selectedCat = cat;
   selectedEmoji = '🍝';
   document.querySelectorAll('#catPills .cat-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
@@ -21585,6 +22007,7 @@ function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
   productModalCallback = fromOrder;
   const saveBtn = document.getElementById('saveProductBtn');
   if (saveBtn) saveBtn.textContent = fromOrder ? 'Criar e adicionar' : 'Criar e usar';
+  rememberOperationalFocus('newProductModal');
   document.getElementById('newProductModal').classList.add('show');
   setTimeout(() => document.getElementById(prefillName ? 'newProdUnit' : 'newProdName').focus(), 300);
   updateMarginPreview();
@@ -21597,6 +22020,7 @@ function closeProductModal() {
   // Restaura titulo (caso tenha sido alterado pra "Editar")
   const titleEl = document.querySelector('#newProductModal .modal-title');
   if (titleEl) titleEl.innerHTML = 'Novo <span class="accent">produto</span>';
+  restoreOperationalFocus('newProductModal');
 }
 
 // Calcula e exibe lucro absoluto + margem % entre os campos preço e custo
@@ -21644,6 +22068,7 @@ function updateMarginPreview() {
   previewEl.style.display = '';
 }
 function saveNewProduct() {
+  if (productSubmitCompleted) return;
   // Bug 9 (Onda 4): normalizeName em vez de so trim() — mesma motivacao
   // do saveNewClient, evita "  Talharim  Fresco  " virar duplicata
   // de "Talharim Fresco" no catalogo de produtos.
@@ -21661,6 +22086,28 @@ function saveNewProduct() {
   const minStockParsed = minStockStr ? parseInt(minStockStr, 10) : NaN;
   const minStock = (!isNaN(minStockParsed) && minStockParsed >= 0) ? minStockParsed : null;
 
+  const validityInput = document.getElementById('newProdValidity');
+  const defaultValidityDays = Number(validityInput.value);
+  if (!Number.isInteger(defaultValidityDays) || defaultValidityDays < 1 || defaultValidityDays > 365) {
+    showToast('Informe a validade do produto entre 1 e 365 dias'); validityInput.focus(); return;
+  }
+  const fastProduction = !!window.CDB_CONFIG?.isPilot && !editingProductId && !productModalCallback;
+  const quantity = Number(document.getElementById('newProdQuantity').value);
+  const manufactureDate = document.getElementById('newProdManufacturedDate').value;
+  const weightInput = document.getElementById('newProdWeight');
+  const weight = weightInput.value.trim() ? Number(weightInput.value) : pesoPadraoDoProduto({ unit });
+  if (fastProduction) {
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 9999) {
+      showToast('Informe a quantidade produzida entre 1 e 9999'); document.getElementById('newProdQuantity').focus(); return;
+    }
+    if (!manufactureDate || productionTimestamp(manufactureDate, Date.now()) === null) {
+      showToast('Informe uma data de fabricação válida, até hoje'); document.getElementById('newProdManufacturedDate').focus(); return;
+    }
+    if (!Number.isInteger(weight) || weight < 1 || weight > 9999) {
+      showToast('Informe o peso por unidade em gramas para a etiqueta'); weightInput.focus(); return;
+    }
+  }
+
   // Modo edit: editingProductId setado por openProductModalForEdit
   if (editingProductId) {
     const idx = products.findIndex(p => p.id === editingProductId);
@@ -21669,10 +22116,11 @@ function saveNewProduct() {
     products[idx] = {
       ...products[idx],
       name, emoji: selectedEmoji, category: selectedCat,
-      unit: unit || '', price, cost, minStock
+      unit: unit || '', price, cost, minStock, defaultValidityDays
     };
-    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost','minStock']);
-    persistAll();
+    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost','minStock','defaultValidityDays']);
+    if (!persistAll()) { products[idx] = before; return; }
+    productSubmitCompleted = true;
     renderProductGrid();
     if (typeof renderCatalogList === 'function') renderCatalogList();
     logAction({
@@ -21692,10 +22140,27 @@ function saveNewProduct() {
   const product = {
     id: 'custom-' + Date.now(),
     name, emoji: selectedEmoji, category: selectedCat,
-    unit: unit || '', price, cost, minStock, count: 0, photo: null, stock: 0, custom: true
+    unit: unit || '', price, cost, minStock, defaultValidityDays, count: 0, photo: null, stock: 0, custom: true
   };
+  if (fastProduction) { product.count = quantity; product.defaultWeightG = weight; }
   products.push(product);
-  persistAll();
+  if (fastProduction) {
+    openProductionConfirm([product.id]);
+    document.getElementById('prodManufacturedDate').value = manufactureDate;
+    if (confirmProduction() !== true) {
+      products.splice(products.indexOf(product), 1);
+      closeProductionConfirm();
+      return;
+    }
+    productSubmitCompleted = true;
+    logAction({ action: 'product.create', entityType: 'product', entityId: product.id, summary: 'Cadastrou produto ' + name });
+    closeProductModal();
+    renderProductGrid();
+    haptic();
+    return;
+  }
+  if (!persistAll()) { products.splice(products.indexOf(product), 1); return; }
+  productSubmitCompleted = true;
   renderProductGrid();
 
   logAction({
@@ -21705,7 +22170,8 @@ function saveNewProduct() {
     summary: 'Cadastrou produto ' + name
   });
 
-  if (productModalCallback) {
+  const fromOrder = !!productModalCallback;
+  if (fromOrder) {
     // Adiciona direto no pedido em construção
     addItemToOrder(product);
   } else {
@@ -21715,6 +22181,7 @@ function saveNewProduct() {
 
   closeProductModal();
   showToast(`${name} criado`);
+  if (!fromOrder) openProductionConfirm();
   haptic();
 }
 
@@ -21724,9 +22191,12 @@ let editingProductId = null;
 function openProductModalForEdit(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
+  productSubmitCompleted = false;
+  document.getElementById('newProdBatchFields').hidden = true;
   editingProductId = productId;
   document.getElementById('newProdName').value = p.name || '';
   document.getElementById('newProdUnit').value = p.unit || '';
+  document.getElementById('newProdValidity').value = p.defaultValidityDays ?? 5;
   document.getElementById('newProdPrice').value = p.price != null ? formatMoneyInput(p.price) : '';
   const costEl = document.getElementById('newProdCost');
   if (costEl) costEl.value = (p.cost != null ? formatMoneyInput(p.cost) : '');
@@ -21747,7 +22217,9 @@ function openProductModalForEdit(productId) {
   if (titleEl) titleEl.innerHTML = 'Editar <span class="accent">produto</span>';
   const saveBtn = document.getElementById('saveProductBtn');
   if (saveBtn) saveBtn.textContent = 'Salvar alterações';
+  rememberOperationalFocus('newProductModal');
   document.getElementById('newProductModal').classList.add('show');
+  document.getElementById('newProdName').focus();
   updateMarginPreview();
   updateProductSaveState();
 }
@@ -21887,6 +22359,7 @@ function renderFormaPills(hostId, selected, onPick) {
 // Entregar pedido pergunta a forma antes; escolherFormaEntrega retoma a entrega.
 let pendingPagamentoEntregaId = null;
 function openPagamentoEntrega(orderId) {
+  if (!assertImportedOrderAction(orderId, STATUS.ENTREGUE)) return;
   const o = getOrderById(orderId);
   if (!o) return;
   pendingPagamentoEntregaId = orderId;
@@ -21904,7 +22377,7 @@ function escolherFormaEntrega(key) {
   const metodo = normalizarFormaPagamento(key);
   closePagamentoEntrega();
   const o = id ? getOrderById(id) : null;
-  if (!o || !metodo) return;
+  if (!o || !metodo || !assertImportedOrderAction(id, STATUS.ENTREGUE)) return;
   o.metodo = metodo;
   applyAdvanceTransition(id, STATUS.ENTREGUE);
 }
@@ -22457,6 +22930,39 @@ function showUndoToast(msg, undoFn, opts) {
 // =========================
 // Fechar modais clicando fora
 // =========================
+const operationalFocus = new Map();
+function rememberOperationalFocus(id) { operationalFocus.set(id, document.activeElement); }
+function restoreOperationalFocus(id) {
+  const target = operationalFocus.get(id);
+  operationalFocus.delete(id);
+  if (!document.querySelector('.modal-overlay.show, .cobranca-overlay.show, #etiquetasPreview.show, dialog[open]') && target?.isConnected && target.offsetParent !== null) target.focus();
+}
+function operationalModalOpen() {
+  return !!document.querySelector('.modal-overlay.show, .historico-overlay.show, .cobranca-overlay.show, #etiquetasPreview.show, dialog[open], .welcome:not(.hidden), .tour:not(.hidden)');
+}
+['newProductModal', 'newClientModal', 'productionConfirmModal', 'etiquetasPreview', 'noPrinterModal', 'cobrancaModal'].forEach(id => {
+  const modal = document.getElementById(id);
+  modal.addEventListener('keydown', event => {
+    if (!modal.classList.contains('show')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault(); event.stopPropagation();
+      if (id === 'newProductModal') closeProductModal();
+      else if (id === 'newClientModal') closeClientModal();
+      else if (id === 'noPrinterModal') closeNoPrinterModal();
+      else if (id === 'cobrancaModal') closeCobranca();
+      else if (id === 'productionConfirmModal') closeProductionConfirm();
+      else closeEtiquetasPreview();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'))
+      .filter(element => element.offsetParent !== null);
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (!focusable.includes(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); return; }
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  });
+});
 ['newProductModal','newClientModal','itemPickerModal','productionConfirmModal','cashEntryModal'].forEach(id => {
   document.getElementById(id).addEventListener('click', (e) => {
     if (e.target.id === id) {
@@ -22501,6 +23007,8 @@ try {
   const input   = document.getElementById('welcomeName');
   const btn     = document.getElementById('welcomeContinue');
   const hasName = operatorName && operatorName.trim().length > 0;
+  const pilot = !!window.CDB_CONFIG?.isPilot;
+  if (pilot) document.getElementById('welcomeTitle').textContent = 'Bem-vinda à Casa da Baba';
   const hasTour = (() => {
     try { return localStorage.getItem('cdb-onboarding-done') === '1'; }
     catch (e) { return false; }
@@ -22511,12 +23019,13 @@ try {
   btn.addEventListener('click', () => {
     saveOperatorName(input.value);
     hideWelcome();
-    if (!hasTour) startTour();
+    if (!pilot && !hasTour) startTour();
+    if (pilot) window.dispatchEvent(new Event('cdb-operator-ready'));
   });
 
   if (!hasName) {
     showWelcome();
-  } else if (!hasTour) {
+  } else if (!pilot && !hasTour) {
     // Já tem nome mas nunca viu tour (ex: atualizou o app) → mostra tour.
     startTour();
   }
@@ -22706,6 +23215,7 @@ window.cdbApp = {
     'updateModal','autoBackupModal','noPrinterModal','productActionsModal',
     'ajustarModal','problemaModal','conferProdModal','prodProblemaModal',
     'cashCloseModal','etiquetasPreview','ajustesModal','cashEntryModal',
+    'newProductModal','productionConfirmModal',
     'productModal','clientModal','batchModal','novoProdutoModal',
     'globalSearchModal','diagnosticsModal','supportModal'
   ];
@@ -22733,6 +23243,8 @@ window.cdbApp = {
     var closers = {
       ajustesModal: 'closeAjustes',
       etiquetasPreview: 'closeEtiquetasPreview',
+      newProductModal: 'closeProductModal',
+      productionConfirmModal: 'closeProductionConfirm',
       noPrinterModal: 'closeNoPrinterModal',
       updateModal: 'closeUpdateModal',
       autoBackupModal: function () { autoBackupAction && autoBackupAction('skip'); },
@@ -22864,8 +23376,18 @@ function forceCheckUpdate() {
 
 // Modal "Sem impressora" — abre quando operador toca em Imprimir mas nao
 // tem impressora termica pareada. Substitui o confirm() cinza do Android.
-function openNoPrinterModal()  { document.getElementById('noPrinterModal').classList.add('show'); }
-function closeNoPrinterModal() { document.getElementById('noPrinterModal').classList.remove('show'); }
+function openNoPrinterModal() {
+  rememberOperationalFocus('noPrinterModal');
+  const modal = document.getElementById('noPrinterModal');
+  modal.classList.add('show');
+  modal.querySelector('button').focus();
+}
+function closeNoPrinterModal() {
+  document.getElementById('noPrinterModal').classList.remove('show');
+  const target = operationalFocus.get('noPrinterModal');
+  operationalFocus.delete('noPrinterModal');
+  if (target?.isConnected && target.offsetParent !== null) target.focus();
+}
 
 // Centraliza handlers dos botoes do noPrinterModal com try/catch + log
 // no btStep trail (visivel via Ajustes > Diagnostico). Se algum botao

@@ -1,0 +1,13 @@
+{
+  "appId": "com.casadababa.piloto",
+  "appName": "Casa da Baba Piloto",
+  "webDir": "web",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#fbf8f2"
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}
