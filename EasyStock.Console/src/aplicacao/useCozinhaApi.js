@@ -8,6 +8,9 @@ import { transicaoDaFila } from '../dominio/kds'
 import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { criarRecargaDeAcao } from './recargaDeAcao'
 import { criarEnvioComDesfazer, enviarPendentesAoSair } from './envioComDesfazer'
+import { criarChaveDeEnvio } from './chaveDeEnvio'
+import { receberEEntregar as receberNaPortaEEntregar } from './recebimentoNaEntrega'
+import { registrarPagamentoManual } from '../infra/api/pagamentosPedidoApi'
 
 // Cozinha no modo API (F05). A fila vem do KDS sobre Pedido (S19) e recarrega a
 // cada evento de pedido do SSE de operação (S18). Com o SSE caído, a tela não
@@ -64,6 +67,11 @@ export function useCozinhaApi({ data = null } = {}) {
   const [envio] = useState(() => criarEnvioComDesfazer({
     aoMudar: (lista) => setAdiados(new Map(lista.map((a) => [a.chave, { status: a.dados.status, ate: a.ate }]))),
   }))
+  // #2079 (C1): o "Recebi R$ X" da Cozinha é o mesmo das Entregas (J2): chave idempotente do pagamento,
+  // `recebidos` lembra o que já entrou e `emVoo` segura o clique duplo antes da primeira resposta.
+  const [envioDoPagamento] = useState(() => criarChaveDeEnvio())
+  const [recebidosNaPorta] = useState(() => new Set())
+  const emVooRef = useRef(new Map())
   useEffect(() => {
     const soltar = enviarPendentesAoSair(envio)
     return () => { soltar(); envio.descarregar() }
@@ -192,6 +200,42 @@ export function useCozinhaApi({ data = null } = {}) {
   }, [envio, enviarStatus])
   const desfazerAvanco = useCallback((id) => envio.desfazer(id), [envio])
 
+  // #2079 (C1): "Marcar entregue" com saldo só confirmava o saldo e o Caixa nunca via o dinheiro. Agora a
+  // pergunta lança o recebido (a rota do "Marcar pago" do Balcão) e só então marca entregue; se o
+  // pagamento falha, a entrega não sai e a pergunta continua. Vai na hora: é o segundo toque da decisão.
+  const receberEEntregar = useCallback((id, status, valor, metodo) => {
+    const emVoo = emVooRef.current
+    if (emVoo.has(id)) return emVoo.get(id)
+    setMovendo((s) => comId(s, id, true))
+    const recarga = recargaRef.current
+    const marca = recarga.marcar()
+    const chave = envioDoPagamento.para({ pedidoId: id, valor, metodo })
+    let pagou = false
+    const ida = receberNaPortaEEntregar(
+      {
+        registrarPagamento: (...args) => registrarPagamentoManual(...args).then((r) => { pagou = true; return r }),
+        marcarEntregue: (_viagem, pedidoId) => mudarStatusKds(pedidoId, status, { confirmarSaldoAReceber: true }),
+        recebidos: recebidosNaPorta,
+      },
+      { viagemId: null, pedidoId: id, valor, metodo, chave },
+    )
+      .then(() => {
+        envioDoPagamento.confirmar(chave)
+        setSaldoPendente(null)
+        return recarga.depoisDaAcao(marca)
+      })
+      .catch((e) => {
+        if (pagou || recebidosNaPorta.has(`${id}|${valor}`)) setErro(e.message)
+        else setErro(`O pagamento não entrou: ${e.message} A entrega não foi marcada.`)
+      })
+      .finally(() => {
+        emVoo.delete(id)
+        setMovendo((s) => comId(s, id, false))
+      })
+    emVoo.set(id, ida)
+    return ida
+  }, [envioDoPagamento, recebidosNaPorta])
+
   const reimprimir = useCallback((id) => reimprimirCanhoto(id)
     .then(() => recarregarImpressoes())
     .catch((e) => setErro(`Não voltou para a fila de impressão: ${e.message}`)), [recarregarImpressoes])
@@ -209,6 +253,6 @@ export function useCozinhaApi({ data = null } = {}) {
   return {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes, saldoPendente, adiados, desfazerAvanco,
     descartarSaldoPendente: () => setSaldoPendente(null),
-    avancar, recarregar, reimprimir, confirmarImpressao: confirmar, avisar: setErro, limparErro,
+    avancar, receberEEntregar, recarregar, reimprimir, confirmarImpressao: confirmar, avisar: setErro, limparErro,
   }
 }

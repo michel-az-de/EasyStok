@@ -131,6 +131,27 @@ await confere('o gancho não deixa duas ações de dinheiro em voo, mostra o err
   assert.ok(corpo.includes('finally { emVoo.current = false; if (ativo.current) setOcupado(false) }'))
 })
 
+// #2079 (C4): depois do estorno online, "A devolver" da modal e o "a devolver" da Ficha ficavam com o valor antigo:
+// o EstornosOnline só relia a si mesmo. Agora ele avisa o bloco Devoluções, que relê o seu `aDevolver` e pede à
+// Ficha a releitura do pedido (o alocado muda e o `useADevolver` relê).
+const devolucoes = semComentarios(ler('features/ficha-cliente/BlocoDevolucoes.jsx'))
+const painel = semComentarios(ler('features/ficha-cliente/PainelFicha.jsx'))
+const acoesComanda = semComentarios(ler('aplicacao/api/comanda.js'))
+await confere('#2079-C4 estorno online feito relê o "A devolver" da modal e o pedido da Ficha', () => {
+  assert.ok(tela.includes('export function EstornosOnline({ pedidoId, aoAlterado = null })'), 'EstornosOnline sem aviso de mudança')
+  assert.ok(tela.includes('const ok = await fazer(...args)\n    if (ok) aoAlterado?.()'), 'o aviso só sai quando a API respondeu')
+  for (const nome of ['solicitar', 'retomar', 'descartar']) {
+    assert.ok(tela.includes(`const ${nome} = depoisAvisar(${nome}NoGancho)`), `${nome} não avisa o bloco`)
+  }
+  assert.ok(devolucoes.includes('export function BlocoDevolucoes({ pedidoId, cancelado = false, aoAlterado = null })'))
+  assert.ok(devolucoes.includes('<EstornosOnline pedidoId={pedidoId} aoAlterado={mudou} />'), 'o bloco não ouve o estorno online')
+  assert.ok(devolucoes.includes('const mudou = () => { atualizar(); aoAlterado?.() }'))
+  assert.ok(devolucoes.includes('if (await registrar('), 'devolução manual')
+  assert.match(devolucoes, /setAberto\(false\); setConfirmado\(false\); setPagamentoId\(''\); setMotivo\(''\); setReferencia\(''\)\s+aoAlterado\?\.\(\)/)
+  assert.ok(painel.includes('aoAlterado={() => recarregarPedido?.(selecionada.id)}'), 'a Ficha não relê o pedido')
+  assert.ok(acoesComanda.includes('recarregarPedido: (id) => recarregar(id).catch(() => null),'))
+})
+
 // --- 2. Hora digitada é hora da loja ------------------------------------------------------
 // O `process.env.TZ` troca o fuso do processo na hora. A primeira verificação prova que a troca
 // vale: sem ela, as seguintes passariam sem olhar nada.
