@@ -56,6 +56,14 @@ function uniqueIndex(text, marker) {
 }
 
 function adaptProduction(html) {
+  const demandStart = uniqueIndex(html, '<div class="prod-demand" id="prodDemand" hidden>');
+  const demandEnd = uniqueIndex(html, '<div class="prod-screen-summary" id="prodScreenSummary"');
+  const demand = html.slice(demandStart, demandEnd);
+  const demandHeader = /<div class="pd-head">([\s\S]*?)<\/div>/;
+  if (!demandHeader.test(demand)) throw new Error('Resumo da demanda incompatível com o APK.');
+  const compactDemand = demand.replace(demandHeader, '<details class="pilot-demand-details"><summary class="pd-head">$1</summary>')
+    .replace(/<\/div>(\s*)$/, '</details></div>$1');
+  html = html.slice(0, demandStart) + compactDemand + html.slice(demandEnd);
   const metrics = /<div class="prod-metrics">\s*<div><strong id="prodMetricProducts">0<\/strong><span>ativos<\/span><\/div>\s*<div><strong id="prodMetricStock">0<\/strong><span>estoque<\/span><\/div>\s*<div><strong id="prodMetricLow">0<\/strong><span>críticos<\/span><\/div>\s*<\/div>/g;
   const matches = [...html.matchAll(metrics)];
   if (matches.length !== 1) throw new Error('Indicadores de produção incompatíveis com o APK.');

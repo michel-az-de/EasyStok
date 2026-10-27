@@ -33,6 +33,7 @@ function restoreProductionChrome(html) {
   const actions = source.match(/<div class="cta-row">\s*<button class="cta-btn" onclick="clearProduction\(\)">[\s\S]*?id="saveProdBtn"[\s\S]*?<\/div>/)[0];
   const orderHeader = source.match(/<div class="screen-tabs">\s*<button class="screen-tab" data-tab="novo"[\s\S]*?id="pedidosTabBadge"[\s\S]*?<\/div>/)[0];
   return html.replace(/<div class="pilot-orders-header"[\s\S]*?<\/div>/, orderHeader)
+    .replace(/<details class="pilot-demand-details"><summary class="pd-head">([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/, '<div class="pd-head">$1</div>$2')
     .replace(/<details class="pilot-production-metrics">[\s\S]*?<\/details>/, metrics)
     .replace(/<div class="cta-row pilot-production-actions">[\s\S]*?<\/div>/, actions);
 }
@@ -47,6 +48,18 @@ test('adapta o formulário real preservando todos os IDs uma única vez', () => 
   assert.equal(new Set(ids(adapted)).size, ids(adapted).length);
   assert.match(adapted, /Dados do produto e validade\./);
   assert.match(adapted, /<summary>Mais opções do produto<\/summary>/);
+});
+
+test('demanda recolhida preserva todos os dados e a ação para conferir insumos', () => {
+  const start = '<div class="prod-demand" id="prodDemand" hidden>';
+  const end = '<div class="prod-screen-summary" id="prodScreenSummary"';
+  const before = source.slice(source.indexOf(start), source.indexOf(end));
+  const after = result.slice(result.indexOf(start), result.indexOf(end));
+  assert.match(after, /<details class="pilot-demand-details"><summary class="pd-head">/);
+  assert.doesNotMatch(after, /<details[^>]*\bopen\b/);
+  assert.deepEqual(ids(after), ids(before));
+  assert.deepEqual(tags(after, /<(?:input|button)\b[^>]*>/g), tags(before, /<(?:input|button)\b[^>]*>/g));
+  assert.equal(after.replace('<details class="pilot-demand-details"><summary class="pd-head">', '<div class="pd-head">').replace('</summary>', '</div>').replace('</details>', ''), before);
 });
 
 test('preserva controles completos, handlers, validação, acessibilidade e estado inicial', () => {
