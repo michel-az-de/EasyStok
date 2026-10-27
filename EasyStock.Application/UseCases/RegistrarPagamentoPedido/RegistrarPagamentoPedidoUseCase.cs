@@ -263,7 +263,7 @@ public class RegistrarPagamentoPedidoUseCase(
             // #2084 (B1): a gaveta não começa vazia. Herda o dinheiro deixado no último fechamento, a mesma sugestão da
             // abertura manual, e fica marcada para a gerente conferir depois (ConfirmacaoPendente). Não bloqueia o
             // pagamento: sem fechamento anterior, abre com zero, também a confirmar.
-            var herdada = fechamentos is null ? null : await fechamentos.GavetaDoUltimoFechamentoAsync(cmd.EmpresaId);
+            var herdada = fechamentos is null ? null : await fechamentos.GavetaDoUltimoFechamentoAsync(cmd.EmpresaId, pedido.LojaId);
             var abertura = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", Math.Max(0m, herdada?.Dinheiro ?? 0m), pagoEm, pedido.LojaId);
             abertura.Descricao = herdada is { } h
                 ? $"Abertura automática no primeiro pagamento de pedido do dia, com {h.Dinheiro.ToString("C", Cultura.PtBr)} deixados no fechamento de {h.Data:dd/MM}. Falta a gerente conferir."

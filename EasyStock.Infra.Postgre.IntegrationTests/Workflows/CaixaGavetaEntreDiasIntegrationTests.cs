@@ -191,14 +191,88 @@ public sealed class CaixaGavetaEntreDiasIntegrationTests(PostgreSqlDatabaseFixtu
         dia.AberturaAConfirmar.Should().BeTrue("a gerente confere a gaveta depois");
         GavetaCaixa.DinheiroNaGaveta(dia).Should().Be(236m);
 
-        // A gerente confere pela abertura de sempre: a abertura automática é confirmada, não duplicada.
+        // A gerente confere pela abertura de sempre, informando a gaveta contada agora (A1): a abertura automática é
+        // confirmada, não duplicada, e volta a 130 (236 contados menos os 106 do dia).
         await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<AbrirCaixaUseCase>().ExecuteAsync(
-            new AbrirCaixaCommand(empresaId, 130m, lojaId, RegistradoPorNome: "Gerente", Observacoes: "Conferido")));
+            new AbrirCaixaCommand(empresaId, 236m, lojaId, RegistradoPorNome: "Gerente", Observacoes: "Conferido")));
         var depois = await NoEscopoAsync(provider, empresaId, sp =>
             sp.GetRequiredService<ObterCaixaDiaUseCase>().ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje, lojaId)));
         depois.AberturaAConfirmar.Should().BeFalse();
         depois.SaldoInicial.Should().Be(130m);
         depois.Movimentos.Count(m => m.Tipo == "abertura").Should().Be(1);
+    }
+
+    [SkippableFact]
+    public async Task A1_confirmar_abertura_automatica_com_a_gaveta_contada_agora_nao_conta_em_dobro()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var (empresaId, lojaId) = await SemearEmpresaAsync();
+        var pedido = NovoPedidoOperacional(empresaId, lojaId, 106m);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 130m, DateTime.UtcNow.AddDays(-1), lojaId));
+            seed.Pedidos.Add(pedido);
+            await seed.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await NoEscopoAsync(provider, empresaId, sp =>
+            sp.GetRequiredService<FecharCaixaUseCase>().ExecuteAsync(new FecharCaixaCommand(empresaId, LojaId: lojaId)));
+
+        // Abre sozinho herdando 130 com o pagamento de 106; depois entram 30 e 20 em dinheiro.
+        await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<RegistrarPagamentoPedidoUseCase>().ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "dinheiro", 106m)));
+        await using (var seed = fixture.CreateDbContext())
+        {
+            foreach (var valor in new[] { 30m, 20m })
+            {
+                var entrada = MovimentoCaixa.Criar(empresaId, "entrada", valor, DateTime.UtcNow, lojaId);
+                entrada.Metodo = "dinheiro";
+                seed.MovimentosCaixa.Add(entrada);
+            }
+            await seed.SaveChangesAsync();
+        }
+
+        // A gerente confere ao meio-dia contando a gaveta inteira: 280 (faltam 6 dos 286 esperados).
+        var confirmada = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<AbrirCaixaUseCase>().ExecuteAsync(
+            new AbrirCaixaCommand(empresaId, 280m, lojaId, RegistradoPorNome: "Gerente")));
+        confirmada.Valor.Should().Be(124m, "a abertura é o contado menos o dinheiro que entrou no dia (280 - 156)");
+        confirmada.Descricao.Should().Contain("130,00", "o valor herdado do fechamento fica registrado");
+
+        var dia = await NoEscopoAsync(provider, empresaId, sp =>
+            sp.GetRequiredService<ObterCaixaDiaUseCase>().ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.Hoje(), lojaId)));
+        GavetaCaixa.DinheiroNaGaveta(dia).Should().Be(280m, "o esperado bate com a gaveta contada, sem dobrar os 156");
+        dia.AberturaAConfirmar.Should().BeFalse();
+    }
+
+    [SkippableFact]
+    public async Task A2_abertura_automatica_herda_a_gaveta_da_propria_loja()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var (empresaId, centroId) = await SemearEmpresaAsync();
+        var mercadao = Loja.Criar(empresaId, "Mercadão");
+        var pedido = NovoPedidoOperacional(empresaId, mercadao.Id, 25m);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Lojas.Add(mercadao);
+            // Mercadão fechou anteontem com 40; o Centro fechou ontem com 150 (o fechamento mais recente da empresa).
+            seed.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 40m, DateTime.UtcNow.AddDays(-2), mercadao.Id));
+            seed.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 150m, DateTime.UtcNow.AddDays(-1), centroId));
+            seed.Pedidos.Add(pedido);
+            await seed.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        foreach (var loja in new[] { mercadao.Id, centroId })
+            await NoEscopoAsync(provider, empresaId, sp =>
+                sp.GetRequiredService<FecharCaixaUseCase>().ExecuteAsync(new FecharCaixaCommand(empresaId, LojaId: loja)));
+
+        await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<RegistrarPagamentoPedidoUseCase>().ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "dinheiro", 25m)));
+
+        var dia = await NoEscopoAsync(provider, empresaId, sp =>
+            sp.GetRequiredService<ObterCaixaDiaUseCase>().ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.Hoje(), mercadao.Id)));
+        dia.SaldoInicial.Should().Be(40m, "o Mercadão herda a própria gaveta, não a do Centro");
     }
 
     private async Task<(Guid EmpresaId, Guid LojaId)> SemearEmpresaAsync()

@@ -163,6 +163,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             db.FechamentosCaixa.FirstOrDefaultAsync(f =>
                 f.EmpresaId == empresaId && f.Data == data && f.LojaId == lojaId);
 
+        public Task<FechamentoCaixa?> GetUltimoFechamentoDaLojaAsync(Guid empresaId, Guid? lojaId) =>
+            db.FechamentosCaixa.AsNoTracking()
+                .Where(f => f.EmpresaId == empresaId && (lojaId == null ? f.LojaId == null : f.LojaId == lojaId))
+                .OrderByDescending(f => f.Data).ThenByDescending(f => f.FechadoEm)
+                .FirstOrDefaultAsync();
+
         public async Task<(IEnumerable<FechamentoCaixa> items, int total)> ListFechamentosAsync(
             Guid empresaId, int page, int pageSize, DateOnly? desde = null, DateOnly? ate = null)
         {

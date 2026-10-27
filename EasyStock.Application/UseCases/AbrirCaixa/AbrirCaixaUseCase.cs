@@ -1,7 +1,11 @@
 using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 
 namespace EasyStock.Application.UseCases.AbrirCaixa;
 
+/// <param name="SaldoInicial">O troco na gaveta ao abrir. #2084 (A1): quando o caixa do dia já abriu sozinho e
+/// espera conferência (<c>aberturaAConfirmar</c>), é a gaveta CONTADA AGORA; o servidor desconta o dinheiro que entrou
+/// no dia e grava o resto como abertura.</param>
 public sealed record AbrirCaixaCommand(
     [property: Required] Guid EmpresaId,
     decimal SaldoInicial = 0m,
@@ -15,7 +19,8 @@ public sealed record AbrirCaixaCommand(
 public class AbrirCaixaUseCase(
     ICaixaRepository repo,
     IUnitOfWork uow,
-    ILogger<AbrirCaixaUseCase> logger)
+    ILogger<AbrirCaixaUseCase> logger,
+    ObterCaixaDiaUseCase? caixaDia = null)
 {
     public async Task<MovimentoCaixaResult> ExecuteAsync(AbrirCaixaCommand cmd)
     {
@@ -44,10 +49,22 @@ public class AbrirCaixaUseCase(
             .FirstOrDefault(m => m.Tipo == "abertura" && m.EstornadoEm == null && m.ConfirmacaoPendente);
         if (aConfirmar != null)
         {
-            aConfirmar.ConfirmarAbertura(cmd.SaldoInicial, cmd.RegistradoPorUserId, cmd.RegistradoPorNome, cmd.Observacoes);
+            // A1: ela conta a gaveta inteira; a abertura é o contado menos o dinheiro que entrou no dia, senão o
+            // esperado soma esse dinheiro duas vezes.
+            var entrouNoDia = 0m;
+            if (caixaDia is not null)
+            {
+                var dia = await caixaDia.ExecuteAsync(new ObterCaixaDiaQuery(cmd.EmpresaId, data, cmd.LojaId));
+                entrouNoDia = GavetaCaixa.DinheiroNaGaveta(dia) - dia.SaldoInicial;
+            }
+            var abertura = cmd.SaldoInicial - entrouNoDia;
+            if (abertura < 0)
+                throw new UseCaseValidationException(
+                    $"A gaveta contada ({cmd.SaldoInicial.ToString("C", Cultura.PtBr)}) é menor que o dinheiro recebido hoje ({entrouNoDia.ToString("C", Cultura.PtBr)}). Confira a contagem.");
+            aConfirmar.ConfirmarAbertura(abertura, cmd.RegistradoPorUserId, cmd.RegistradoPorNome, cmd.Observacoes);
             await repo.UpdateMovimentoAsync(aConfirmar);
             await uow.CommitAsync();
-            logger.LogInformation("Abertura automática de {Data} confirmada (saldo inicial={Saldo}).", data, cmd.SaldoInicial);
+            logger.LogInformation("Abertura automática de {Data} confirmada (contado={Contado}, abertura={Saldo}).", data, cmd.SaldoInicial, abertura);
             return Map(aConfirmar);
         }
 

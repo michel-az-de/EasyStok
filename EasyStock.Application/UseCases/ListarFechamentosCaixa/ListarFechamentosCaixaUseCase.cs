@@ -42,12 +42,17 @@ public class ListarFechamentosCaixaUseCase(ICaixaRepository repo, ObterCaixaDiaU
     /// <summary>
     /// #2084 (B1): o dinheiro que a abertura seguinte herda, pela mesma regra que a abertura manual sugere
     /// (<c>gavetaDoFechamento</c> no console lê <see cref="FechamentoCaixaResult.DinheiroNaGaveta"/> do último
-    /// fechamento). Nulo sem fechamento anterior.
+    /// fechamento). A2: da própria loja; sem fechamento dela, o do caixa da empresa sem loja (tenant de uma loja só
+    /// que fecha sem loja). Nulo sem fechamento anterior.
     /// </summary>
-    public async Task<(DateOnly Data, decimal Dinheiro)?> GavetaDoUltimoFechamentoAsync(Guid empresaId)
+    public async Task<(DateOnly Data, decimal Dinheiro)?> GavetaDoUltimoFechamentoAsync(Guid empresaId, Guid? lojaId)
     {
-        var ultimo = (await ExecuteAsync(new ListarFechamentosCaixaQuery(empresaId, 1, 1))).Items.FirstOrDefault();
-        return ultimo is { DinheiroNaGaveta: { } dinheiro } ? (ultimo.Data, dinheiro) : null;
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        var ultimo = await repo.GetUltimoFechamentoDaLojaAsync(empresaId, lojaId)
+                     ?? (lojaId is null ? null : await repo.GetUltimoFechamentoDaLojaAsync(empresaId, null));
+        if (ultimo is null) return null;
+        var resultado = await ComDinheiroNaGavetaAsync(empresaId, ultimo);
+        return resultado.DinheiroNaGaveta is { } dinheiro ? (resultado.Data, dinheiro) : null;
     }
 
     /// <summary>
