@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { centavosCortados, textoDigitadoEmReais, textoDosCentavos } from './moedaNoCampo'
+import { centavosCortados, textoDigitadoEmReais, textoDoCampo, textoDosCentavos } from './moedaNoCampo'
 import base from './CampoMascarado.module.css'
 import css from './CampoReais.module.css'
 
@@ -11,13 +11,13 @@ import css from './CampoReais.module.css'
 //
 // `centavos` nulo é campo vazio; `aoMudar` recebe nulo quando ela apaga tudo.
 export function CampoReais({
-  rotulo, rotuloOculto, dica, erro, centavos, aoMudar, ler, id: idInformado, className, onBlur, placeholder = '0,00', ...resto
+  rotulo, rotuloOculto, dica, erro, centavos, aoMudar, ler, mostrarZero = false, id: idInformado, className, onBlur, placeholder = '0,00', ...resto
 }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
   // Zero aparece vazio (com "0,00" de exemplo): o campo que nascia "0,00" fazia a tecla cair depois
   // dos centavos e não entrar.
-  const mostrar = (valor) => (valor ? textoDosCentavos(valor) : '')
+  const mostrar = (valor) => textoDoCampo(valor, mostrarZero)
   const [texto, setTexto] = useState(() => mostrar(centavos))
   // #2080: "1,500" não cabe (centavos têm 2 casas): o campo diz o que ficou em vez de calar.
   const [cortou, setCortou] = useState(false)
@@ -28,7 +28,7 @@ export function CampoReais({
   const [anterior, setAnterior] = useState(centavos)
   if (centavos !== anterior) {
     setAnterior(centavos)
-    if ((lido(texto) ?? 0) !== (centavos ?? 0)) setTexto(mostrar(centavos))
+    if ((lido(texto) ?? 0) !== (centavos ?? 0)) { setTexto(mostrar(centavos)); setCortou(false) }
   }
 
   function aoDigitar(evento) {

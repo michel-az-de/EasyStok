@@ -53,7 +53,7 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado }) {
       {form ? (
         <form className={css.formulario} onSubmit={salvar} noValidate>
           <CampoSelecao rotulo="Empresa" opcoes={EMPRESAS_DE_CORRIDA} {...campo('empresa')} disabled={travado || Boolean(form.id)} />
-          <CampoReais rotulo="Custo (R$)" autoFocus centavos={centavosDoTexto(form.custo)} ler={lerMoeda} disabled={travado}
+          <CampoReais rotulo="Custo (R$)" autoFocus centavos={centavosDoTexto(form.custo)} ler={lerMoeda} mostrarZero disabled={travado}
             aoMudar={(centavos) => { setForm({ ...form, custo: textoDosCentavos(centavos) }); setAviso(null) }} />
           <CampoTexto rotulo="Motorista (opcional)" maxLength={120} {...campo('motorista')} />
           <div className={css.linha}>

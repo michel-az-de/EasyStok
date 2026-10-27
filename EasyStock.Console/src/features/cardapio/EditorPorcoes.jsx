@@ -26,7 +26,7 @@ export function EditorPorcoes({ linhas, aoMudar, desabilitado = false, embalagen
         <div key={l.chave} className={css.porcao}>
           <label className={css.campo}>Nome da porção<input placeholder="Ex.: Individual" maxLength={60} value={l.rotulo} onChange={(e) => mudar(l.chave, 'rotulo', e.target.value)} /></label>
           <label className={css.campo}>Peso para mostrar<input placeholder="Ex.: 300 g" maxLength={40} value={l.peso} onChange={(e) => mudar(l.chave, 'peso', e.target.value)} /></label>
-          <CampoReais rotulo="Preço" aria-label={`Preço de ${l.rotulo || 'porção'}`} centavos={centavosDoTexto(l.preco)} ler={lerMoeda}
+          <CampoReais rotulo="Preço" aria-label={`Preço de ${l.rotulo || 'porção'}`} centavos={centavosDoTexto(l.preco)} ler={lerMoeda} mostrarZero
             aoMudar={(centavos) => mudar(l.chave, 'preco', textoDosCentavos(centavos))} />
           {opcoesDeEmbalagem(l).length > 0 && (
             <label className={`${css.campo} ${css.embalagemDaPorcao}`}>Embalagem

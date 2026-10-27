@@ -162,5 +162,16 @@ confere('D10: quando os centavos são cortados o campo sabe, para avisar', () =>
   assert.equal(campo.centavosCortados('100'), false)
 })
 
+confere('R1: zero que veio preenchido (frete grátis) aparece "0,00"; campo novo continua vazio', () => {
+  const zona = entregas.camposDaZona({ label: 'Centro', valor: 0, tempoEstimadoMinutos: 40, ordem: 1, bairros: ['Centro'] }).valor
+  assert.equal(zona, '0,00')
+  assert.equal(formato.centavosDoTexto(zona), 0, 'a ponte devolve 0, não nulo')
+  assert.equal(formato.centavosDoTexto(''), null)
+  assert.equal(campo.textoDoCampo(formato.centavosDoTexto(zona), true), '0,00')
+  assert.equal(campo.textoDoCampo(formato.centavosDoTexto(''), true), '')
+  assert.equal(campo.textoDoCampo(0, false), '', 'o caixa segue com zero vazio')
+  assert.equal(campo.textoDoCampo(150000, false), '1.500,00')
+})
+
 console.log(`${String.fromCharCode(10)}${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length > 0) process.exit(1)

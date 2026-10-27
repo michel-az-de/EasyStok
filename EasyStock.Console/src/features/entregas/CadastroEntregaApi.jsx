@@ -39,7 +39,7 @@ function FormularioZona({ id, hidden, inicial, zonas, propria = null, rotuloSalv
   return (
     <form id={id} hidden={hidden} className={`${css.formulario} ${layout.formularioZona}`} onSubmit={salvar}>
       <CampoTexto rotulo="Nome" {...z.campo('label')} required />
-      <CampoReais rotulo="Valor (R$)" centavos={centavosDoTexto(z.form.valor)} ler={lerMoeda} disabled={ocupado} required
+      <CampoReais rotulo="Valor (R$)" centavos={centavosDoTexto(z.form.valor)} ler={lerMoeda} mostrarZero disabled={ocupado} required
         aoMudar={(centavos) => z.mudar({ valor: textoDosCentavos(centavos) })} />
       <CampoTexto rotulo="Tempo (min)" tipo="number" min="1" {...z.campo('tempoEstimadoMinutos')} required />
       <CampoTexto rotulo="Ordem" tipo="number" min="0" {...z.campo('ordem')} />

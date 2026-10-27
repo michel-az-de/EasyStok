@@ -82,7 +82,7 @@ export function FreteRaioDaLoja({ config, acoes, ocupado }) {
             <div key={indice} className={layout.faixaDeFrete}>
               <CampoTexto rotulo="Até (km)" inputMode="decimal" value={faixa.ateKm} disabled={ocupado}
                 onChange={(e) => mudarFaixa(indice, { ateKm: e.target.value })} />
-              <CampoReais rotulo="Valor (R$)" centavos={centavosDoTexto(faixa.valor)} ler={lerMoeda} disabled={ocupado}
+              <CampoReais rotulo="Valor (R$)" centavos={centavosDoTexto(faixa.valor)} ler={lerMoeda} mostrarZero disabled={ocupado}
                 aoMudar={(centavos) => mudarFaixa(indice, { valor: textoDosCentavos(centavos) })} />
               <Botao variante="texto" disabled={ocupado || form.faixas.length === 1} aria-label={`Remover faixa ${indice + 1}`}
                 onClick={() => mudar({ faixas: form.faixas.filter((_, i) => i !== indice) })}>Remover</Botao>

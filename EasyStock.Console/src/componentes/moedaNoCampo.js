@@ -56,6 +56,12 @@ export function centavosCortados(texto) {
   return virgula !== -1 && limpo.slice(virgula + 1).replace(/\D/g, '').length > 2
 }
 
+// O texto com que o campo nasce ou acompanha o valor de fora. Zero é vazio (o campo que nascia
+// "0,00" fazia a tecla cair depois dos centavos), salvo `mostrarZero`: valor que veio preenchido,
+// como o frete grátis de uma zona, tem de aparecer "0,00" (#2080). Nulo é sempre vazio.
+export const textoDoCampo = (centavos, mostrarZero = false) => (
+  centavos == null || (centavos === 0 && !mostrarZero) ? '' : textoDosCentavos(centavos))
+
 // Ao sair do campo, o valor volta escrito por inteiro ("100,00", "1.500,00"), sem o "R$" (que fica
 // fora do campo). Nulo é campo vazio. Espelho de `textoDosCentavos` de `dominio/formato.js`
 // (`componentes` não importa `dominio`); `prova-2080-reais.mjs` garante que escrevem igual.
