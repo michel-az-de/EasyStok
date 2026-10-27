@@ -8,7 +8,7 @@ import { Modal } from '../../../componentes/Modal'
 import { Vazio } from '../../../componentes/Vazio'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
-import { aoLancarLote, dispensarLote, guardarRascunho, linhasDoRascunho, lotesLancados, producaoDoDia } from '../../../aplicacao/producaoDoDia'
+import { aoLancarLote, dispensarLote, guardarRascunho, linhasDoRascunho, lotesLancados, marcarPassosVistos, passosRecolhidos, producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { lerSugestao, retirarProducaoPlanejada } from '../../../aplicacao/planejamento'
 import { estaRemovido } from '../../../dominio/cardapio'
 import { plural } from '../../../dominio/formato'
@@ -21,6 +21,9 @@ import { erroDaLinha, sobraDaLinha } from '../../../dominio/producao'
 import { linhaComPorcao } from '../../../dominio/porcoes'
 import css from '../cardapio/abaCardapio.module.css'
 import grade from './producaoDoDia.module.css'
+import { ConectarAparelho } from './ConectarAparelho'
+import { EtiquetaDeProducao } from './etiqueta/EtiquetaDeProducao'
+import etq from './etiqueta/etiqueta.module.css'
 
 // M2 › Produção do dia (M2.2, #1491). #1624: a dona produz como no PWA. Toca no prato para somar uma
 // porção, vê o saldo no cartão e o que falta para os pedidos, confere validade e peso no lote e
@@ -31,7 +34,6 @@ const ID_DO_LOTE = 'lote-da-producao'
 const ID_DOS_AVISOS = 'lotes-lancados'
 const novaLinha = () => ({ id: crypto.randomUUID(), sku: '', variacaoId: '', porcoes: '', pesoPorPorcaoG: '', pesoRealG: '', validadeDias: String(VALIDADE_PADRAO) })
 const inteiro = (texto) => (String(texto).trim() === '' ? null : Number(texto))
-const dataCurta = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '')
 const diaCurto = (iso) => (iso ? iso.split('-').reverse().slice(0, 2).join('/') : 'amanhã')
 const CAMPO_DO_ERRO = {
   'Escolha a porção produzida.': 'variacaoId',
@@ -59,13 +61,12 @@ function paraEnviar(linha, pratos = []) {
   }
 }
 
-// #1627: o que ela confere de cada prato cabe numa linha (porções, validade, peso); os campos
-// ficam em "Ajustar". Antes cada prato ocupava a altura da coluna inteira.
+// #1627: o que ela confere de cada prato cabe numa linha; validade e peso ficam em "Ajustar".
+// #2081 (A11): as porções saíram do resumo e viraram o campo ao lado do nome, à vista como no APK.
 function resumoDaLinha(linha, faltaPorcao) {
   const enviada = paraEnviar(linha)
   return [
     faltaPorcao ? 'escolha a porção' : null,
-    enviada.porcoes > 0 ? plural(enviada.porcoes, 'porção', 'porções') : 'sem porções',
     enviada.validadeDias > 0 ? `validade ${plural(enviada.validadeDias, 'dia', 'dias')}` : 'sem validade',
     enviada.pesoPorPorcaoG > 0 ? `${enviada.pesoPorPorcaoG} g cada` : 'sem peso',
   ].filter(Boolean).join(' · ')
@@ -73,6 +74,8 @@ function resumoDaLinha(linha, faltaPorcao) {
 
 // #1809: a foto do prato no cartão, a mesma do cardápio. Sem foto, ou se ela não carregar, o
 // lugar fica reservado com o desenho de imagem: o cartão não muda de altura e a grade não pula.
+// #2081 (A14): quando nenhum prato da grade tem foto, a reserva some e o cartão fica compacto; no
+// tablet eram 43 cartões de 250 px com o mesmo desenho vazio.
 function FotoDoCartao({ foto }) {
   const [falhou, setFalhou] = useState(null)
   return (
@@ -81,6 +84,33 @@ function FotoDoCartao({ foto }) {
         ? <img src={foto} alt="" loading="lazy" decoding="async" onError={() => setFalhou(foto)} />
         : <Icone nome="imagem" tamanho={24} />}
     </span>
+  )
+}
+
+// #2081 (A4): a prévia abre sozinha depois do lote, como no APK: a etiqueta de verdade (80x40, QR e
+// barras) e um botão para imprimir todas. Fechar não perde nada: o aviso do lote continua imprimindo.
+function PreviaDasEtiquetas({ lote, impressao, aoImprimir, aoFechar }) {
+  const folha = impressao?.loteId === lote.loteId ? impressao.folha : null
+  const erro = impressao?.loteId === lote.loteId ? impressao.erro : null
+  const quantas = folha?.etiquetas.length ?? lote.etiquetas
+  const rotulo = `Imprimir ${quantas} ${quantas === 1 ? 'etiqueta' : 'etiquetas'}`
+  return (
+    <Modal titulo={`Etiquetas do lote ${lote.codigo}`} largura="min(520px, calc(100vw - 24px))" aoFechar={aoFechar}
+      descricao="Uma etiqueta por porção, no papel de 80 x 40 mm."
+      rodape={<>
+        <Botao variante="texto" onClick={aoFechar}>Fechar</Botao>
+        <Botao variante="primario" icone="printer" disabled={!folha || folha.etiquetas.length === 0} onClick={aoImprimir}>{rotulo}</Botao>
+      </>}>
+      {erro ? <p className={css.aviso} role="alert">Não consegui buscar as etiquetas deste lote. {erro}</p>
+        : !folha ? <p className={css.descricao}>Buscando as etiquetas…</p>
+          : folha.etiquetas.length === 0 ? <p className={css.descricao}>Este lote não tem etiquetas para imprimir.</p>
+            : (
+              <div className={etq.previa}>
+                <div className={etq.moldura}><EtiquetaDeProducao etiqueta={folha.etiquetas[0]} empresa={folha.empresa} total={folha.etiquetas.length} /></div>
+                {folha.etiquetas.length > 1 && <p className={css.descricao}>E mais {folha.etiquetas.length - 1}, numeradas até {folha.etiquetas.length}/{folha.etiquetas.length}.</p>}
+              </div>
+            )}
+    </Modal>
   )
 }
 
@@ -98,8 +128,12 @@ export function AbaProducaoDoDiaApi() {
   const [enviando, setEnviando] = useState(() => producaoDoDia.enviando())
   const [erro, setErro] = useState(null)
   const [lotes, setLotes] = useState(lotesLancados)
-  // O que está na folha, de qual lote: { loteId } buscando, com `etiquetas` pronta, com `erro` falhou.
+  // O que está na folha, de qual lote: { loteId } buscando, com `folha` pronta, com `erro` falhou.
   const [impressao, setImpressao] = useState(null)
+  // #2081 (A4): o lote cuja prévia de etiquetas está aberta.
+  const [previa, setPrevia] = useState(null)
+  // #2081 (A14): os passos começam abertos e recolhem depois do primeiro lote.
+  const [passosAbertos, setPassosAbertos] = useState(() => !passosRecolhidos())
   // "Falta produzir": a sugestão do planejamento. Sem permissão ou sem rede, o bloco não aparece.
   const [sugestao, setSugestao] = useState(null)
   const [leitura, setLeitura] = useState(0)
@@ -113,19 +147,37 @@ export function AbaProducaoDoDiaApi() {
     montada.current = true
     return () => { montada.current = false }
   }, [])
+  // #1585: cada lote imprime as próprias etiquetas. A folha esvazia antes de buscar: se a busca
+  // falhar, não sobra a do lote anterior, e o erro aparece junto do botão do lote.
+  // #1627: se ela saiu da tela antes de as etiquetas chegarem, a impressão não abre sobre outra tela.
+  // #2081 (A4): a folha traz a empresa e as etiquetas, que saem no papel de 80x40 com QR e barras.
+  async function buscarEtiquetas(loteId, imprimirAoChegar) {
+    setImpressao({ loteId })
+    try {
+      const folha = await producaoDoDia.folhaDeEtiquetas(loteId)
+      setImpressao({ loteId, folha })
+      if (imprimirAoChegar) setTimeout(() => { if (montada.current) window.print() }, 50)
+    } catch (e) {
+      setImpressao({ loteId, erro: e.message })
+    }
+  }
+  const imprimir = (loteId) => buscarEtiquetas(loteId, true)
   useEffect(() => producaoDoDia.aoMudarEnvio(setEnviando), [])
   useEffect(() => { guardarRascunho(linhas) }, [linhas])
   // O lote gravado entra na lista e as linhas dele saem, mesmo quando o envio partiu antes de ela
   // sair da tela e voltar. A folha do lote anterior sai junto: não imprime etiqueta de outro lote.
   // O saldo dos cartões e o que falta produzir mudaram: os dois são relidos.
-  useEffect(() => aoLancarLote(() => {
+  // #2081 (A4): a prévia das etiquetas do lote novo abre sozinha, como no APK.
+  useEffect(() => aoLancarLote((lote) => {
     setLotes(lotesLancados())
     setLinhas([])
     setErro(null)
-    setImpressao(null)
     setRevisando(false)
     setLeitura((n) => n + 1)
     recarregarEstoque()
+    marcarPassosVistos()
+    setPrevia(lote.loteId)
+    buscarEtiquetas(lote.loteId, false)
   }), [recarregarEstoque])
   // O campo inválido ganha foco dentro da revisão; falha da API anuncia o erro sem perder o lote.
   useEffect(() => {
@@ -193,37 +245,35 @@ export function AbaProducaoDoDiaApi() {
     if (!r.ok) setErro(r.erro)
   }
 
-  // #1585: cada lote imprime as próprias etiquetas. A folha esvazia antes de buscar: se a busca
-  // falhar, não sobra a do lote anterior, e o erro aparece junto do botão do lote.
-  // #1627: se ela saiu da tela antes de as etiquetas chegarem, a impressão não abre sobre outra tela.
-  async function imprimir(loteId) {
-    setImpressao({ loteId })
-    try {
-      const etiquetas = await producaoDoDia.etiquetas(loteId)
-      setImpressao({ loteId, etiquetas })
-      setTimeout(() => { if (montada.current) window.print() }, 50)
-    } catch (e) {
-      setImpressao({ loteId, erro: e.message })
-    }
-  }
 
   function dispensar(loteId) {
     setLotes(dispensarLote(loteId))
     if (impressao?.loteId === loteId) setImpressao(null)
+    if (previa === loteId) setPrevia(null)
   }
 
-  const buscandoEtiquetas = impressao !== null && !impressao.etiquetas && !impressao.erro
+  const buscandoEtiquetas = impressao !== null && !impressao.folha && !impressao.erro
+  const loteDaPrevia = previa ? lotes.find((l) => l.loteId === previa) ?? null : null
+  // #2081 (A14): sem nenhuma foto na grade, o cartão não reserva o lugar da foto.
+  const gradeComFoto = cartoes.some((c) => c.foto)
   const semLote = linhas.length === 0
   const rotuloDoConfirmar = enviando ? 'Confirmando…' : 'Confirmar produção'
 
   return (
     <div className={css.aba}>
-      {/* #1809: o caminho em três passos, à vista, para quem abre a tela pela primeira vez. */}
-      <ol className={grade.passos} aria-label="Como registrar a produção">
-        <li><span className={grade.numeroDoPasso} aria-hidden="true">1</span><span><strong>Toque nos pratos que ficaram prontos.</strong> Cada toque soma uma porção; o − tira.</span></li>
-        <li><span className={grade.numeroDoPasso} aria-hidden="true">2</span><span><strong>Confira</strong> porções, validade e peso em Conferir produção.</span></li>
-        <li><span className={grade.numeroDoPasso} aria-hidden="true">3</span><span><strong>Registre a produção</strong> em Confirmar produção. O estoque só muda nessa hora.</span></li>
-      </ol>
+      {/* #1809: o caminho em três passos, à vista, para quem abre a tela pela primeira vez.
+          #2081 (A14): depois do primeiro lote eles recolhem; ao lado, o pareamento do aparelho (A6). */}
+      <div className={grade.topoDaProducao}>
+        <details className={grade.ajudaDosPassos} open={passosAbertos} onToggle={(e) => setPassosAbertos(e.currentTarget.open)}>
+          <summary>Como registrar a produção</summary>
+          <ol className={grade.passos} aria-label="Como registrar a produção">
+            <li><span className={grade.numeroDoPasso} aria-hidden="true">1</span><span><strong>Toque nos pratos que ficaram prontos.</strong> Cada toque soma uma porção; o − tira.</span></li>
+            <li><span className={grade.numeroDoPasso} aria-hidden="true">2</span><span><strong>Confira</strong> porções, validade e peso em Conferir produção.</span></li>
+            <li><span className={grade.numeroDoPasso} aria-hidden="true">3</span><span><strong>Registre a produção</strong> em Confirmar produção. O estoque só muda nessa hora.</span></li>
+          </ol>
+        </details>
+        <div className={grade.acoesDoTopo}><ConectarAparelho /></div>
+      </div>
 
       {falta.length > 0 && (
         <section className={grade.falta} aria-label="Falta produzir">
@@ -294,7 +344,7 @@ export function AbaProducaoDoDiaApi() {
                       <button type="button" className={grade.tocar} disabled={enviando} aria-label={`Somar 1 porção de ${nome}`}
                         title={`Adicionar 1 porção de ${nome} à seleção. O estoque só muda ao confirmar.`}
                         aria-describedby={[idDoSaldo, idDaContagem].filter(Boolean).join(' ') || undefined} onClick={() => somar(cartao, 1)}>
-                        <FotoDoCartao foto={cartao.foto} />
+                        {gradeComFoto && <FotoDoCartao foto={cartao.foto} />}
                         <span className={grade.nomeDoPrato}>{nomeVisual}</span>
                         {tamanho && <span className={grade.tamanho}>{tamanho}</span>}
                         {cartao.saldo != null && (
@@ -363,6 +413,10 @@ export function AbaProducaoDoDiaApi() {
                     const validacao = (campo) => campoComErro === campo ? { 'aria-invalid': true, 'aria-describedby': 'erro-da-producao' } : {}
                     return (
                       <li key={l.id} className={grade.itemDoLote}>
+                        {/* #2081 (A11): as porções à vista, ao lado do nome; validade e peso ficam em "Ajustar". */}
+                        <div className={grade.porcoesDoItem}>
+                          <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" aria-label={`Porções de ${nome}`} value={l.porcoes} onChange={mudarContagem(l.id, 'porcoes')} {...validacao('porcoes')} />
+                        </div>
                         {/* Abre sozinho quando o prato pede decisão dela ou quando o envio foi recusado. */}
                         <details open={faltaPorcao || !prato || Boolean(erro) || undefined}>
                           <summary className={grade.resumoDoItem}>
@@ -379,7 +433,6 @@ export function AbaProducaoDoDiaApi() {
                                 opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...porcoesDoPrato.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
                             )}
                             <div className={grade.camposDoItem}>
-                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" aria-label={`Porções de ${nome}`} value={l.porcoes} onChange={mudarContagem(l.id, 'porcoes')} {...validacao('porcoes')} />
                               <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Validade (dias)" aria-label={`Validade em dias de ${nome}`} value={l.validadeDias} onChange={mudarContagem(l.id, 'validadeDias')} {...validacao('validadeDias')} />
                             </div>
                             <div className={grade.chips} role="radiogroup" aria-label={`Validade de ${nome}`}>
@@ -433,17 +486,15 @@ export function AbaProducaoDoDiaApi() {
         </div>
       </div>
 
-      {impressao?.etiquetas && (
+      {loteDaPrevia && <PreviaDasEtiquetas lote={loteDaPrevia} impressao={impressao}
+        aoImprimir={() => window.print()} aoFechar={() => setPrevia(null)} />}
+
+      {/* #2081 (A4): a etiqueta do APK, 80x40 mm com QR e barras, uma por página. */}
+      {impressao?.folha && impressao.folha.etiquetas.length > 0 && (
         <FolhaImpressao>
-          {impressao.etiquetas.map((e) => (
-            <div key={e.id} style={{ breakInside: 'avoid', border: '1px solid var(--impressao-tinta)', padding: '4mm', marginBottom: '3mm', color: 'var(--impressao-tinta)' }}>
-              <strong>{e.nome}</strong>{e.pesoG ? ` · ${e.pesoG} g` : ''}
-              <div>Lote {e.lote} · {e.sequencial}/{impressao.etiquetas.length}</div>
-              <div>Produzido {dataCurta(e.produzidoEm)} · Validade {dataCurta(e.validadeEm)}</div>
-              {e.alergenos.length > 0 && <div>Alérgenos: {e.alergenos.join(', ')}</div>}
-              <div>{e.codigo}</div>
-            </div>
-          ))}
+          <div className={etq.folha}>
+            {impressao.folha.etiquetas.map((e) => <EtiquetaDeProducao key={e.id} etiqueta={e} empresa={impressao.folha.empresa} total={impressao.folha.etiquetas.length} />)}
+          </div>
         </FolhaImpressao>
       )}
     </div>

@@ -80,7 +80,7 @@ globalThis.__prova1577 = {
   hooks,
   chamarApi(caminho, opcoes = {}) {
     const metodo = opcoes.metodo ?? 'GET'
-    chamadas.push({ metodo, caminho })
+    chamadas.push({ metodo, caminho, opcoes })
     const indice = respostas.findIndex((r) => r.metodo === metodo && caminho.startsWith(r.caminho))
     return indice < 0 ? Promise.resolve([]) : Promise.resolve().then(respostas.splice(indice, 1)[0].executar)
   },
@@ -97,7 +97,7 @@ registerHooks({
     if (especificador === 'react' && /\/(?:aplicacao\/use(?:EntregasApi|CozinhaApi|MidiaDaMensagem)|hooks\/useTiqueLocal)\.js$/.test(pai)) {
       return moduloDados('const h=globalThis.__prova1577.hooks; export const useState=h.useState,useRef=h.useRef,useCallback=h.useCallback,useEffect=h.useEffect;')
     }
-    if (especificador === './cliente' && /\/infra\/api\/(?:entregasApi|kdsApi)\.js$/.test(pai)) {
+    if (especificador === './cliente' && /\/infra\/api\/(?:entregasApi|kdsApi|pagamentosPedidoApi)\.js$/.test(pai)) {
       return moduloDados('export const chamarApi=(...a)=>globalThis.__prova1577.chamarApi(...a);')
     }
     if (especificador.endsWith('/conversasApi') && pai.endsWith('/aplicacao/useMidiaDaMensagem.js')) {
@@ -399,6 +399,61 @@ await confere('#1686-5 Cozinha: sair da tela com avanço pendente manda na hora 
   h.desmontar()
   await Promise.resolve(); await Promise.resolve()
   assert.equal(escritas().length, 1)
+})
+// --- #2079 (C1): "Recebi R$ X" na Cozinha lança o pagamento e marca entregue ----------------------
+const PAGAR_P1 = 'POST /api/pedidos/p-1/pagamentos'
+const ENTREGAR_P1 = 'PATCH /api/kds/pedidos/p-1/status'
+const rotas = () => escritas().map((c) => c.metodo + ' ' + c.caminho)
+// Com o SSE vivo e mudo, a ação relê a fila em 2 s; o relógio anda até lá antes de esperar a promessa.
+const concluir = async (h, ...promessas) => {
+  for (let i = 0; i < 3; i += 1) { await h.estabilizar(); andar(2000) }
+  await Promise.all(promessas)
+  await h.estabilizar()
+}
+await confere('#2079-C1 Cozinha: "Recebi R$ 88,00" grava UM pagamento em dinheiro e só então marca entregue', async () => {
+  const h = await montar(useCozinhaApi, { data: null })
+  try {
+    const ida = h.resultado.receberEEntregar('p-1', 'entregue', 88, 'dinheiro')
+    // Clique duplo: o segundo toque com o primeiro em voo não lança outro pagamento.
+    const dupla = h.resultado.receberEEntregar('p-1', 'entregue', 88, 'dinheiro')
+    await concluir(h, ida, dupla)
+    assert.deepEqual(rotas(), [PAGAR_P1, ENTREGAR_P1], 'pagamento, depois a entrega; nada em dobro')
+    const [pagar, entregar] = escritas()
+    assert.equal(pagar.opcoes.corpo.valor, 88)
+    assert.equal(pagar.opcoes.corpo.metodo, 'dinheiro')
+    assert.ok(pagar.opcoes.chave, 'o pagamento leva a Idempotency-Key')
+    assert.deepEqual(entregar.opcoes.corpo, { status: 'entregue', confirmarSaldoAReceber: true })
+    assert.equal(h.resultado.movendo.has('p-1'), false)
+    assert.equal(h.resultado.saldoPendente, null)
+  } finally { h.desmontar() }
+})
+await confere('#2079-C1 Cozinha: pagamento recusado não marca entregue e diz o motivo', async () => {
+  const h = await montar(useCozinhaApi, { data: null })
+  try {
+    responder('PATCH', '/api/kds/pedidos/p-1/status', () => {
+      throw Object.assign(new Error('Há saldo a receber.'), { codigo: 'SALDO_A_RECEBER', dados: { valor: 88 } })
+    })
+    h.resultado.avancar('p-1', 'entregue')
+    andar(PRAZO)
+    await h.estabilizar()
+    assert.equal(h.resultado.saldoPendente?.valor, 88, 'a pergunta do saldo aparece')
+    chamadas.length = 0
+    responder('POST', '/api/pedidos/p-1/pagamentos', () => { throw new Error('Caixa do dia já foi fechado.') })
+    await concluir(h, h.resultado.receberEEntregar('p-1', 'entregue', 88, 'dinheiro'))
+    assert.deepEqual(rotas(), [PAGAR_P1], 'sem pagamento, a entrega não sai')
+    assert.match(h.resultado.erro, /O pagamento não entrou: Caixa do dia já foi fechado\./)
+    assert.equal(h.resultado.saldoPendente?.valor, 88, 'a pergunta continua para tentar de novo ou escolher outra saída')
+  } finally { h.desmontar() }
+})
+await confere('#2079-C1 Cozinha: pagamento entrou e a entrega falhou: o toque seguinte só marca a entrega', async () => {
+  const h = await montar(useCozinhaApi, { data: null })
+  try {
+    responder('PATCH', '/api/kds/pedidos/p-1/status', () => { throw new Error('sem conexão.') })
+    await concluir(h, h.resultado.receberEEntregar('p-1', 'entregue', 88, 'dinheiro'))
+    assert.match(h.resultado.erro, /O pagamento entrou, mas a entrega não foi marcada/)
+    await concluir(h, h.resultado.receberEEntregar('p-1', 'entregue', 88, 'dinheiro'))
+    assert.deepEqual(rotas(), [PAGAR_P1, ENTREGAR_P1, ENTREGAR_P1], 'um pagamento só')
+  } finally { h.desmontar() }
 })
 await confere('#1686-5 Entregas: "Saiu para entrega" e "Entregue" esperam com "Desfazer"', async () => {
   const h = await montar(useEntregasApi)

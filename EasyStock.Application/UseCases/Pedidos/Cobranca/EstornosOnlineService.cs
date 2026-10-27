@@ -309,6 +309,9 @@ public sealed class EstornosOnlineService(IPedidoRepository pedidos, IEstornoOnl
         estorno.Situacao = PedidoEstornoOnline.Confirmado;
         estorno.ConfirmadoEm = Agora;
         estorno.Detalhe = "Devolução confirmada pelo Mercado Pago e registrada no Caixa.";
+        // #2082 D9: sem CaixaFechadoGuard de propósito. A trava está em ReservarAsync (antes de pedir ao provedor); aqui o
+        // dinheiro já saiu no Mercado Pago, e recusar apagaria o registro. Confirmada depois de fechar, a saída fica
+        // no instante da confirmação e o caixa a mostra como "depois de fechar" (CaixaSaldoCalculator), sem mexer no retrato.
         var movimento = MovimentoCaixa.Criar(estorno.EmpresaId, "saida", estorno.Valor, Agora, pagamento.LojaId);
         // IDs enviados pelo cliente não podem colidir com um lançamento de outra origem no Caixa.
         movimento.Id = Guid.NewGuid();

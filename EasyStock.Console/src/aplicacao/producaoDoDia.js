@@ -1,5 +1,5 @@
 import { erroDaLinha } from '../dominio/producao'
-import { corpoDaProducao, etiquetasDaApi, obterEtiquetasDoLote, registrarProducao } from '../infra/api/producaoApi'
+import { corpoDaProducao, etiquetasDaApi, folhaDeEtiquetasDaApi, obterEtiquetasDoLote, registrarProducao } from '../infra/api/producaoApi'
 import { criarChaveDeEnvio } from './chaveDeEnvio'
 
 // #1585: a tela desmonta a cada troca de rota. O que ela digitou e os lotes lançados na visita
@@ -9,6 +9,16 @@ let lancados = []
 const ouvintes = new Set()
 
 export const guardarRascunho = (linhas) => { rascunho = linhas }
+
+// #2081 (A14): os três passos ajudam na primeira vez; depois do primeiro lote eles recolhem e a grade
+// sobe. A marca fica no navegador; sem armazenamento (aba anônima, prova) os passos ficam abertos.
+const PASSOS_VISTOS = 'easystok.producao.passosVistos'
+export function passosRecolhidos() {
+  try { return globalThis.localStorage?.getItem(PASSOS_VISTOS) === '1' } catch { return false }
+}
+export function marcarPassosVistos() {
+  try { globalThis.localStorage?.setItem(PASSOS_VISTOS, '1') } catch { /* sem armazenamento: continuam abertos */ }
+}
 
 // As linhas com que a tela abre, ou null quando não há nada guardado. Vindo do Planejamento
 // ("Revisar na produção"), o prato planejado entra com as porções do plano e o rascunho de outro
@@ -97,6 +107,8 @@ export function criarProducaoDoDia({ gerarChave, agora } = {}) {
       return lote
     },
     etiquetas: async (loteId) => etiquetasDaApi(await obterEtiquetasDoLote(loteId)),
+    // #2081 (A4, A8): a folha inteira (empresa e etiquetas), para a etiqueta 80x40 com QR e barras.
+    folhaDeEtiquetas: async (loteId) => folhaDeEtiquetasDaApi(await obterEtiquetasDoLote(loteId)),
   }
 }
 

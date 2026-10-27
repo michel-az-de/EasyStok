@@ -1,15 +1,16 @@
 // Porções do prato (M1.4a, #1529). O preço da porção é absoluto, não um acréscimo (ADR-0035), e
 // cada porção de prato ligado ao estoque tem saldo próprio (D-M1-03). Regras puras do editor: o
 // que a tela mostra, valida e manda. O rascunho guarda o preço como texto, do jeito que ela digita.
-import { lerMoeda } from './formato'
+import { lerReais, textoDosCentavos } from './formato'
 
 let serie = 0
 const chaveNova = () => `nova-${serie += 1}`
 
-// Mesma leitura do campo Preço: "34.90" e "34,90" são trinta e quatro e noventa. Tirar todo ponto
-// antes da vírgula fazia "34.90" virar R$ 3.490,00 no cardápio.
-export const precoDoTexto = (texto) => (String(texto ?? '').trim() === '' ? NaN : lerMoeda(texto) / 100)
-const textoDoPreco = (preco) => (preco == null ? '' : Number(preco).toFixed(2).replace('.', ','))
+// Mesma leitura de todo campo de reais (#2080, `lerReais`): "100" é R$ 100,00, "34.90" e "34,90" são
+// trinta e quatro e noventa. Tirar todo ponto antes da vírgula fazia "34.90" virar R$ 3.490,00.
+// Sem número é NaN. O texto que a tela escreve ("1.500,00") é o que ela relê.
+export const precoDoTexto = (texto) => lerReais(texto) / 100
+const textoDoPreco = (preco) => (preco == null ? '' : textoDosCentavos(Math.round(Number(preco) * 100)))
 
 export const porcaoNova = () => ({ chave: chaveNova(), id: null, rotulo: '', peso: '', preco: '', disponivel: true, padrao: false, sku: null })
 

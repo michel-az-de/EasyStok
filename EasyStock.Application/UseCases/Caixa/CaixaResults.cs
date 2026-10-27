@@ -59,13 +59,21 @@ public sealed record FechamentoCaixaResult(
 /// PedidoPagamento). Exibida na lista "Movimentos do dia" para reconciliar (BUG-5):
 /// soma das linhas visíveis (movimentos + estas) == saldo esperado.
 /// </summary>
+/// <param name="PedidoNumeroDoDia">#2082 B16: só no pagamento de pedido. Número do pedido no dia de produção (o que a
+/// cozinha fala); nulo enquanto o pedido não foi numerado.</param>
+/// <param name="ClienteNome">#2082 B16: só no pagamento de pedido. Nome do cliente no pedido.</param>
+/// <param name="RegistradoPorNome">#2082 B16: só no pagamento de pedido. Quem registrou o recebimento: "Mercado Pago"
+/// no que o provedor confirmou, o nome da pessoa na baixa manual.</param>
 public sealed record CaixaLinhaExtraResult(
     DateTime Hora,
     string Tipo,        // "venda" | "pagamento" | "estorno" (venda estornada, valor negativo)
     decimal Valor,
     string? Descricao,
     string? Metodo,
-    string Origem);     // "Venda" | "Pedido"
+    string Origem,      // "Venda" | "Pedido"
+    int? PedidoNumeroDoDia = null,
+    string? ClienteNome = null,
+    string? RegistradoPorNome = null);
 
 /// <summary>Resumo consolidado do caixa de um dia (mesmo se ainda não fechado).</summary>
 /// <param name="AberturaPendenteCrossDay">True quando o dia consultado é hoje, não teve

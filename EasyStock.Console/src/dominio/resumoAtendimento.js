@@ -10,7 +10,7 @@
 import { nomeDoMeio } from './cobranca'
 import { faltaPagar, pagamentosDoPedido, totalPago } from './pagamento'
 import { atendimentoDesde, ehLead, indiceInicioDoAtendimento } from './conversa'
-import { duracao, horaCurta } from './formato'
+import { duracao, horaCurta, partesNoFuso } from './formato'
 import { itensDetalhados, totalDoPedido } from './pedido'
 import { passoPorId } from './esteira'
 
@@ -61,6 +61,17 @@ const semCobrancaMasAvancado = (pedido) =>
 // valer sozinho assim que a F4 integrar), cai para a cobrança quando ela
 // existe, e só então para o total da comanda. Decisão registrada em
 // auditoria/decisoes/36-f5-encerrar.md.
+// #2079 (D3/E2): no EasyStok a devolução (estorno online ou manual) não mexe no `totalPago`: sai do
+// `alocado` (`SaldoFinanceiroPedido`). A cobrança da API não traz valor nem data do estorno, então o
+// devolvido é o recebido que deixou de estar alocado, até o que entrou neste trecho (o resumo não
+// desconta devolução de dinheiro recebido em outro atendimento). Cupom usado põe o alocado acima do
+// pago e não vira estorno.
+function devolvidoDaApi(pedido, bruto) {
+  if (pedido.alocadoApi == null) return 0
+  const devolvido = Math.round(((pedido.totalPagoApi ?? 0) - pedido.alocadoApi) * 100) / 100
+  return Math.max(0, Math.min(devolvido, bruto))
+}
+
 export function receitaDoTrecho(pedido, cardapio, desde) {
   const desdeMs = emMs(desde)
   // Integração (registro 38): lê a fonte única de pagamentos, a cobrança
@@ -71,9 +82,11 @@ export function receitaDoTrecho(pedido, cardapio, desde) {
   if (doTrecho.length === 0 && semCobrancaMasAvancado(pedido)) {
     bruto = totalDoPedido(pedido, cardapio)
   }
-  const estorno = cobranca?.estornadaEm && emMs(cobranca.estornadaEm) >= desdeMs
-    ? (cobranca.valorEstornado ?? 0)
-    : 0
+  const estorno = Array.isArray(pedido?.pagamentosApi)
+    ? devolvidoDaApi(pedido, bruto)
+    : cobranca?.estornadaEm && emMs(cobranca.estornadaEm) >= desdeMs
+      ? (cobranca.valorEstornado ?? 0)
+      : 0
   return { bruto, estorno, liquido: bruto - estorno }
 }
 
@@ -250,7 +263,8 @@ export function montarResumoAtendimento(conversa, cardapio, agora, draft = {}) {
     mensagens,
     receita: { ...receita, faltaReceber },
     vendas: venda ? [venda] : [],
-    vendasTotal: venda?.valor ?? 0,
+    // #2079 (E2): venda cancelada fica na tabela com a palavra "Cancelado", mas fora do Total.
+    vendasTotal: venda && conversa.pedido.estado !== 'cancelado' ? venda.valor : 0,
     marcos,
     converteu,
     avaliacaoCliente: draft.avaliacaoCliente ?? null,
@@ -263,10 +277,11 @@ export function montarResumoAtendimento(conversa, cardapio, agora, draft = {}) {
 const ROTULO_AVALIACAO_CLIENTE = { positiva: 'Positiva', negativa: 'Negativa' }
 const ROTULO_AUTOAVALIACAO = { bom: 'Bom', regular: 'Regular', ruim: 'Ruim' }
 const doisDigitos = (n) => String(n).padStart(2, '0')
-// Hora da loja como o papel mostra: data e hora locais, sem fuso, para a API não converter.
+// Hora da loja como o papel mostra: data e hora de parede, sem fuso, para a API não converter.
+// #2079 (D11): do fuso da loja, não do aparelho (fora de Brasília, 21:30 saía 00:30 do dia seguinte).
 const dataLocal = (iso) => {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${doisDigitos(d.getMonth() + 1)}-${doisDigitos(d.getDate())}T${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}:00`
+  const d = partesNoFuso(new Date(iso).getTime())
+  return `${d.ano}-${doisDigitos(d.mes)}-${doisDigitos(d.dia)}T${doisDigitos(d.horas)}:${doisDigitos(d.minutos)}:00`
 }
 
 // #1839: o corpo que a API desenha no layout dos impressos. A conta continua aqui
@@ -291,8 +306,8 @@ export function resumoParaImpresso({ nomeCliente, canalNome, telefone, resumo, c
     vendas: resumo.vendas.map((v) => ({ numero: String(v.numero), itens: v.itensTexto, meio: v.meio ?? null, valor: v.valor, situacao: v.situacao })),
     vendasTotal: resumo.vendasTotal,
     marcos: resumo.marcos.map((m) => {
-      const d = new Date(m.em)
-      return { hora: `${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`, rotulo: m.rotulo }
+      const d = partesNoFuso(new Date(m.em).getTime())
+      return { hora: `${doisDigitos(d.horas)}:${doisDigitos(d.minutos)}`, rotulo: m.rotulo }
     }),
     avaliacaoCliente: comAvaliacaoEAnotacao ? ROTULO_AVALIACAO_CLIENTE[resumo.avaliacaoCliente] ?? null : null,
     autoavaliacao: comAvaliacaoEAnotacao ? ROTULO_AUTOAVALIACAO[resumo.autoavaliacao] ?? null : null,

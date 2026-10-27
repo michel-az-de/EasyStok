@@ -119,10 +119,18 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
             // aparece à parte, sem reescrever o fechado. As linhas param no instante do fechamento
             // para casar com o retrato (BUG-5) e a gaveta do fechamento não mudar depois.
             var fimDasLinhas = fechamento.FechadoEm < fimDia ? fechamento.FechadoEm : fimDia;
+            // #2082 D9: o mesmo corte vale para os movimentos. Devolução do provedor confirmada depois de fechar (o dinheiro
+            // já saiu, não dá para recusar) e lançamento que o aparelho sincroniza depois (#2030) ficam gravados, mas o
+            // retrato não os mostra: entram em PosFechamento (o saldo ao vivo acima já os conta). Sem o corte, a gaveta
+            // e as linhas por forma mudavam depois do fechamento e deixavam de somar o total fechado. O marcador
+            // "fechamento" e a abertura não movem saldo e seguem na lista.
+            var movimentosDoRetrato = movList
+                .Where(m => m.Tipo is not ("entrada" or "saida") || m.DataMovimento <= fechamento.FechadoEm)
+                .ToList();
             return new CaixaSaldoBreakdown(
                 data, fechamento.SaldoInicial, fechamento.TotalVendas, fechamento.TotalPagamentosPedidos,
                 fechamento.TotalEntradasExtras, fechamento.TotalSaidasExtras, fechamento.SaldoFinal,
-                aberto, fechado, aberturaPendenteCrossDay, abertoDesde, janelaInicio, fimDasLinhas, movList, fechamento,
+                aberto, fechado, aberturaPendenteCrossDay, abertoDesde, janelaInicio, fimDasLinhas, movimentosDoRetrato, fechamento,
                 PosFechamento: saldoEsperado - fechamento.SaldoFinal);
         }
 
@@ -146,8 +154,10 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
         linhas.AddRange(vendas.Select(v => new CaixaLinhaExtraResult(
             v.DataVenda, "venda", v.ValorTotal == null ? 0m : v.ValorTotal.Valor,
             v.Observacoes, v.FormaPagamentoPrincipal, "Venda")));
+        // #2082 B16/C10: de quem é o recebimento (pedido no dia e cliente) e quem o registrou.
         linhas.AddRange(pagamentos.Select(p => new CaixaLinhaExtraResult(
-            p.PagoEm, "pagamento", p.Valor, "Pagamento de pedido", p.Metodo, "Pedido")));
+            p.PagoEm, "pagamento", p.Valor, "Pagamento de pedido", p.Metodo, "Pedido",
+            p.Pedido?.NumeroDoDia, p.Pedido?.ClienteNome, p.RegistradoPorNome)));
         // #1630-4: o total do dia desconta a venda estornada; a linha negativa na forma da venda faz
         // a soma por forma bater com ele (e o dinheiro devolvido sair da gaveta).
         linhas.AddRange(estornos.Select(e => new CaixaLinhaExtraResult(
