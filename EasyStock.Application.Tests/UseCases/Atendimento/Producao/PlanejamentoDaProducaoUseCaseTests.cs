@@ -116,6 +116,88 @@ public class PlanejamentoDaProducaoUseCaseTests
         r.Pratos.Select(p => (p.Nome, p.Agendados)).Should().Equal(("Lasanha", 3m), ("Canelone", 4m));
     }
 
+    private CardapioItem PratoSemProduto(string nome)
+    {
+        var item = CardapioItem.CriarAvulso(_vitrine.Id, nome, 40m);
+        _pratos.Add(item);
+        return item;
+    }
+
+    [Fact]
+    public async Task PratoSemProdutoComPedidoAgendado_EntraNaSugestaoPeloCardapioItem()
+    {
+        // #2082 A1: prato do cardápio nunca produzido (sem Produto, saldo 0) com 4 porções agendadas. Antes o filtro
+        // ProdutoId.HasValue o deixava de fora e "Falta produzir" não aparecia.
+        var talharim = PratoSemProduto("Talharim 500 g");
+        Prato("Nhoque", 2, 10);
+        _pedidos.GetDemandaAgendadaAsync(EmpresaId, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new DemandaDePedido(talharim.Id, null, 3), new DemandaDePedido(talharim.Id, null, 1)]);
+
+        var r = await Sut().SugestaoAsync(EmpresaId);
+
+        var s = r.Pratos.Single(p => p.CardapioItemId == talharim.Id);
+        (s.ProdutoId, s.Agendados, s.Saldo, s.Minimo, s.Descoberto, s.Sugestao).Should().Be((null, 4m, 0m, 0m, 0m, 4m));
+        s.Nome.Should().Be("Talharim 500 g");
+        r.Pratos.Select(p => p.Nome).Should().Equal("Talharim 500 g", "Nhoque");
+    }
+
+    [Fact]
+    public async Task PratoSemProdutoSemPedido_FicaForaDaSugestao()
+    {
+        // O cardápio tem prato avulso e pratos nunca produzidos aos montes: sem pedido não há o que sugerir.
+        PratoSemProduto("Refrigerante");
+        Prato("Lasanha", 5, 4);
+
+        var r = await Sut().SugestaoAsync(EmpresaId);
+
+        r.Pratos.Select(p => p.Nome).Should().Equal("Lasanha");
+    }
+
+    [Fact]
+    public async Task PratoSemProduto_SoCasaPeloCardapioItem_NaoPeloProduto()
+    {
+        var talharim = PratoSemProduto("Talharim");
+        PratoSemProduto("Panqueca");
+        _pedidos.GetDemandaAgendadaAsync(EmpresaId, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new DemandaDePedido(talharim.Id, null, 2), new DemandaDePedido(null, Guid.NewGuid(), 9)]);
+
+        var r = await Sut().SugestaoAsync(EmpresaId);
+
+        r.Pratos.Should().ContainSingle().Which.Agendados.Should().Be(2m);
+    }
+
+    [Fact]
+    public async Task Sugestao_SoPratosSemProduto_NaoConsultaLotesNemProdutos()
+    {
+        var talharim = PratoSemProduto("Talharim");
+        _pedidos.GetDemandaAgendadaAsync(EmpresaId, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns([new DemandaDePedido(talharim.Id, null, 2)]);
+
+        var r = await Sut().SugestaoAsync(EmpresaId);
+
+        r.Pratos.Should().ContainSingle();
+        await _itens.DidNotReceiveWithAnyArgs().GetByProdutosAsync(default, default!, default, default, default);
+    }
+
+    [Fact]
+    public async Task Planejar_PratoSemProdutoNaoTemReceita_FicaDeForaSemDerrubarOPlano()
+    {
+        // O console manda o produtoId nulo do prato que ainda não foi produzido; o plano dos outros segue.
+        var lasanha = LasanhaComMolho(6, UnidadeMedida.Un);
+
+        var plano = await Sut().PlanejarAsync(EmpresaId, [new PratoPlanejado(null, 4), new PratoPlanejado(lasanha.Id, 12)]);
+
+        plano.Consolidado.Should().ContainSingle().Which.Precisa.Should().Be(2.4m);
+    }
+
+    [Fact]
+    public async Task Planejar_SoPratosSemProduto_ExplicaPorQueNaoHaInsumos()
+    {
+        var act = () => Sut().PlanejarAsync(EmpresaId, [new PratoPlanejado(null, 4)]);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*receita*");
+    }
+
     [Fact]
     public async Task Sugestao_BuscaOsProdutosDosPratosNumaConsultaSo()
     {
