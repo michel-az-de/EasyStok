@@ -138,10 +138,14 @@ public class VigiaOperacaoQueryIntegrationTests(PostgreSqlDatabaseFixture fixtur
 
         await using var semTenant = fixture.CreateDbContext();
         using var _ = semTenant.UseRowLevelSecurityBypass();
-        var lida = await new ConfiguracaoAtendimentoRepository(semTenant).GetOrDefaultAsync(casa.Id);
+        var repositorio = new ConfiguracaoAtendimentoRepository(semTenant);
+        var avisos = await repositorio.ObterAvisosAsync(casa.Id);
 
-        lida.Avisos.Ligado(CodigosAviso.ClienteSemResposta).Should().BeFalse();
-        lida.Avisos.Ligado(CodigosAviso.CaixaEsquecido).Should().BeFalse();
+        avisos.Ligado(CodigosAviso.ClienteSemResposta).Should().BeFalse();
+        avisos.Ligado(CodigosAviso.CaixaEsquecido).Should().BeFalse();
+        (await repositorio.ObterAvisosAsync(Guid.NewGuid())).Should().Be(AvisosOperacao.Padrao, "sem registro, o padrão");
+        // A leitura completa continua presa ao tenant do contexto.
+        (await repositorio.GetByEmpresaIdAsync(casa.Id)).Should().BeNull();
     }
 
     [SkippableFact]

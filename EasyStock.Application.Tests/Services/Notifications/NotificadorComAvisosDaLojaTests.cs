@@ -17,9 +17,7 @@ public class NotificadorComAvisosDaLojaTests
 
     private NotificadorComAvisosDaLoja Criar(AvisosOperacao avisos, bool comRepositorio = true)
     {
-        var configuracao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
-        configuracao.DefinirAvisos(avisos);
-        _configuracoes.GetOrDefaultAsync(_empresaId).Returns(configuracao);
+        _configuracoes.ObterAvisosAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(avisos.Validado());
         var servicos = new ServiceCollection();
         if (comRepositorio) servicos.AddSingleton(_configuracoes);
         return new NotificadorComAvisosDaLoja(_interno, servicos.BuildServiceProvider(), NullLogger<NotificadorComAvisosDaLoja>.Instance);
@@ -85,7 +83,7 @@ public class NotificadorComAvisosDaLojaTests
 
         await _interno.Received(1).EnfileirarEventoAsync(TipoEventoNotificacao.PrazoEstourado, _empresaId, payload,
             null, Arg.Any<CancellationToken>(), null);
-        await _configuracoes.DidNotReceiveWithAnyArgs().GetOrDefaultAsync(default);
+        await _configuracoes.DidNotReceiveWithAnyArgs().ObterAvisosAsync(default);
     }
 
     [Fact]
@@ -96,7 +94,7 @@ public class NotificadorComAvisosDaLojaTests
         await sut.EnfileirarEventoAsync(TipoEventoNotificacao.ConversaEscalada, _empresaId, Prazo(TipoPrazo.PedidoAtrasado));
 
         await _interno.ReceivedWithAnyArgs(1).EnfileirarEventoAsync(default, default, default!);
-        await _configuracoes.DidNotReceiveWithAnyArgs().GetOrDefaultAsync(default);
+        await _configuracoes.DidNotReceiveWithAnyArgs().ObterAvisosAsync(default);
     }
 
     [Fact]

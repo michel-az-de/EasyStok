@@ -50,8 +50,7 @@ public sealed class NotificadorComAvisosDaLoja(
     {
         var repositorio = servicos.GetService<IConfiguracaoAtendimentoRepository>();
         if (repositorio is null) return true;
-        var configuracao = await repositorio.GetOrDefaultAsync(empresaId);
-        return configuracao.Avisos.Ligado(aviso);
+        return (await repositorio.ObterAvisosAsync(empresaId)).Ligado(aviso);
     }
 
     internal static string? LerAviso(string payloadJson)
