@@ -1,0 +1,59 @@
+/* Aba Avisos da Gestão (#2096): mesma casca da aba Atendimento, com letra um degrau acima
+   e o texto em tinta cheia para ler de longe no balcão. */
+.aba { display: grid; gap: var(--e-4); }
+
+.introducao {
+  margin: 0; padding: var(--e-3); max-width: 72ch;
+  border-left: var(--b-3) solid var(--marca); border-radius: var(--r-1);
+  background: var(--marca-claro); color: var(--tinta); font-size: var(--t-corpo);
+}
+
+.formulario { display: grid; gap: var(--e-4); }
+
+.grupo {
+  margin: 0; padding: var(--e-3) 0 0; min-width: 0;
+  border: 0; border-top: var(--b-1) solid var(--linha);
+}
+.tituloGrupo { padding: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
+
+.lista { list-style: none; margin: var(--e-2) 0 0; padding: 0; display: grid; gap: var(--e-2); }
+.linha {
+  display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-1);
+}
+
+.interruptor {
+  display: flex; align-items: center; gap: var(--e-3);
+  min-height: var(--toque); cursor: pointer;
+}
+.interruptor input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--marca); }
+.rotulo { font-size: var(--t-corpo); font-weight: 600; color: var(--tinta); }
+
+.dica { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 72ch; }
+
+.prazo { display: grid; gap: var(--e-1); padding-left: calc(24px + var(--e-3)); }
+.rotuloPrazo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); }
+.numeroComUnidade { display: inline-flex; align-items: center; gap: var(--e-2); }
+.numero {
+  width: 7ch; min-height: var(--toque); padding: 0 var(--e-2);
+  font: inherit; font-size: var(--t-corpo); color: var(--tinta);
+  border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); background: var(--papel);
+}
+.numero[aria-invalid='true'] { border-color: var(--erro); }
+.unidade { font-size: var(--t-corpo); color: var(--tinta); }
+
+.descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 72ch; }
+.pendencia {
+  margin: 0; padding: var(--e-2) var(--e-3); border-left: var(--b-3) solid var(--marca); border-radius: var(--r-1);
+  background: var(--marca-claro); color: var(--marca-forte); font-size: var(--t-apoio);
+}
+.acoes { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.toque { min-height: var(--toque); }
+.retorno { font-size: var(--t-apoio); color: var(--tinta-2); }
+.erro { color: var(--erro); font-size: var(--t-apoio); margin: 0; }
+.secao { display: grid; gap: var(--e-3); }
+
+@media (max-width: 420px) {
+  .prazo { padding-left: 0; }
+  .linha { padding: var(--e-2); }
+}

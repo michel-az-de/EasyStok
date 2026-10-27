@@ -69,6 +69,8 @@ public sealed class PoliticaValidadeNotificacao
             // Catalogo de plataforma (N13). ConviteAcesso fica no padrao de 24 h, como a N9 espera.
             [TipoEventoNotificacao.IncidenteSistema] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.PrazoEstourado] = TimeSpan.FromHours(6),
+            // #2096: encomenda chegando ou cliente reclamando não serve horas depois.
+            [TipoEventoNotificacao.AlertaOperacao] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.ResumoDiario] = TimeSpan.FromHours(4),
         };
 

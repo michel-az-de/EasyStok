@@ -11,6 +11,7 @@ import { AbaCaixaApi } from './caixa/AbaCaixaApi'
 import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
 import { AbaIntegracoesApi } from './integracoes/AbaIntegracoesApi'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
+import { AbaAvisos } from './avisos/AbaAvisos'
 import { AbaImpressao } from './impressao/AbaImpressao'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
@@ -224,6 +225,8 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
   const { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao } = abasDaDemonstracao ?? {}
   const painelDaAba = useMemo(() => ({
     atendimento: <AbaAtendimento horariosAtendimento={horariosAtendimento} />,
+    // #2096: avisos da operação para a dona e o gerente (só modo API).
+    avisos: <AbaAvisos />,
     // #1441: respostas prontas e automáticas, fora do caminho do atendimento.
     respostas: <AbaRespostas focoInicial={focoInicial} />,
     producao: AbaProducao && <AbaProducao />,
