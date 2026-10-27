@@ -72,6 +72,9 @@
   let lastFocus = null;
   let health = 'checking';
   let checkingUpdate = false;
+  let nativeVersion = null;
+  let lastAutomaticCheck = 0;
+  let pendingContent = '';
   let checkingConnection = false;
   let confirmingImport = false;
   let undoingImport = false;
@@ -81,7 +84,7 @@
   const updater = () => root.Capacitor?.Plugins?.PilotUpdater;
   const rail = doc.createElement('div');
   rail.className = 'pilot-rail';
-  rail.innerHTML = '<button type="button" id="pilotHomeButton">Casa da Baba <span>Piloto</span></button><span id="pilotRailStatus" role="status">Conferindo conexão</span>';
+  rail.innerHTML = '<button type="button" id="pilotHomeButton">Casa da Baba <span id="pilotRailVersion">Piloto</span></button><span id="pilotRailStatus" role="status">Conferindo conexão</span>';
   doc.body.prepend(rail);
   doc.body.classList.add('pilot-app');
 
@@ -114,12 +117,21 @@
       <p id="pilotPairHint" class="pilot-hint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p>
       <details class="pilot-help"><summary>O que funciona sem conexão?</summary><p>O cadastro local de produtos e pedidos, a produção e o histórico ficam neste aparelho. Após o primeiro pareamento, as alterações aguardam a conexão para sincronizar. A impressão exige uma impressora compatível conectada.</p><p>Frete, cobrança online, envio pelo atendimento e IA precisam de conexão com o EasyStok. Uma mensagem preparada ou um pedido salvo no aparelho ainda não confirmam envio nem pagamento.</p></details>
       <details class="pilot-help"><summary>Atualizações e recuperação</summary><p id="pilotOtaStatus" role="status">A atualização automática de conteúdo está disponível no APK Android.</p><p id="pilotPushStatus" role="status"></p><p>O app guarda a versão anterior do conteúdo. Voltar a ela preserva os pedidos, a produção e a fila de envio. O Atendimento online segue a versão publicada no EasyStok.</p><button type="button" id="pilotRollback" data-action="rollback" hidden>Voltar à versão anterior</button></details>
-      <div class="pilot-update"><span id="pilotVersion"></span><button type="button" id="pilotUpdateButton" data-action="update">Verificar atualização</button></div>
+      <div class="pilot-update"><span id="pilotVersion" role="status"></span><button type="button" id="pilotUpdateButton" data-action="update">Verificar atualização</button></div>
       <p id="pilotUpdateStatus" class="pilot-feedback" role="status" tabindex="-1"></p>
-      <button type="button" id="pilotDownload" data-action="download" hidden>Baixar atualização</button>
+      <button type="button" id="pilotDownload" data-action="download" hidden>Atualizar APK</button>
     </div>`;
   doc.body.append(home);
-  doc.getElementById('pilotVersion').textContent = 'Versão ' + config.version;
+  function installedConfig() { return { ...config, versionCode: nativeVersion?.code || config.versionCode }; }
+  function showVersion() {
+    const installed = nativeVersion ? 'APK ' + nativeVersion.version + ' (' + nativeVersion.code + ')' : (root.Capacitor?.isNativePlatform?.() ? 'APK: aguardando confirmação do aparelho' : 'Prévia no navegador');
+    const content = config.bundleVersion || config.version || 'não identificado';
+    doc.getElementById('pilotVersion').textContent = installed + ' · Conteúdo ' + content
+      + (pendingContent ? ' · Próximo conteúdo: ' + pendingContent + ' ao reabrir' : '');
+    doc.getElementById('pilotRailVersion').textContent = (nativeVersion ? 'APK ' + nativeVersion.version : 'Piloto')
+      + (latest?.available ? ' · atualização disponível' : pendingContent ? ' · conteúdo pronto' : '');
+  }
+  showVersion();
 
   function openHome() {
     if (home.open) return;
@@ -295,6 +307,12 @@
     target.focus(); target.scrollIntoView({ block: 'nearest' });
   }
   function showOtaStatus(state) {
+    if (Number.isSafeInteger(state.nativeVersionCode) && state.nativeVersionCode > 0
+        && typeof state.builtinVersion === 'string' && state.builtinVersion) {
+      nativeVersion = { code: state.nativeVersionCode, version: state.builtinVersion };
+    }
+    pendingContent = state.pendingVersion || '';
+    showVersion();
     doc.getElementById('pilotOtaStatus').textContent = otaStatusText(state);
     doc.getElementById('pilotRollback').hidden = !state.canRollback || !!state.pendingVersion;
     doc.getElementById('pilotPushStatus').textContent = state.pushSubscribed
@@ -321,20 +339,25 @@
       doc.getElementById('pilotOtaStatus').textContent = 'Não foi possível confirmar a atualização. Se esta for uma versão nova, a anterior será recuperada na próxima abertura.';
     }
   }
-  async function checkUpdate() {
-    openHome();
+  async function checkUpdate(options = {}) {
+    const automatic = options.automatic === true;
+    if (!automatic) openHome();
     if (checkingUpdate) return;
+    if (automatic) {
+      if (root.navigator?.onLine === false || doc.hidden || (lastAutomaticCheck && Date.now() - lastAutomaticCheck < 60000)) return;
+      lastAutomaticCheck = Date.now();
+    }
     checkingUpdate = true;
     const message = doc.getElementById('pilotUpdateStatus');
     const download = doc.getElementById('pilotDownload');
     const button = doc.getElementById('pilotUpdateButton');
     button.disabled = true;
-    download.hidden = true; latest = null;
+    download.hidden = true; latest = null; showVersion();
     message.textContent = 'Conferindo a versão disponível…';
-    message.focus(); message.scrollIntoView({ block: 'nearest' });
+    if (!automatic) { message.focus(); message.scrollIntoView({ block: 'nearest' }); }
     try {
       if (updater()) {
-        try { showOtaStatus(await updater().check()); }
+        try { showOtaStatus(await (automatic ? updater().status() : updater().check())); }
         catch { doc.getElementById('pilotOtaStatus').textContent = 'Não foi possível preparar a atualização de conteúdo. A versão atual foi mantida.'; }
       }
       let data;
@@ -348,9 +371,11 @@
         if (!response.ok) throw new Error('Não foi possível consultar a atualização. Tente novamente com conexão.');
         data = await response.json();
       }
-      latest = validateManifest(data, config);
-      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. O Android pedirá a confirmação para instalar.' : 'O APK instalado está atualizado. A versão do conteúdo aparece em Atualizações e recuperação.';
+      if (root.Capacitor?.isNativePlatform?.() && !nativeVersion) throw new Error('Versão nativa não confirmada.');
+      latest = validateManifest(data, installedConfig());
+      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. Toque em Atualizar APK e confirme a instalação no Android, sem desinstalar.' : 'O APK instalado está atualizado. A versão do conteúdo aparece em Atualizações e recuperação.';
       download.hidden = !latest.available;
+      showVersion();
     } catch {
       message.textContent = 'Não foi possível conferir a atualização. Tente novamente com conexão.';
     } finally {
@@ -360,7 +385,7 @@
   }
   async function downloadUpdate() {
     if (!latest?.available) return;
-    const checked = validateManifest(latest, config);
+    const checked = validateManifest(latest, installedConfig());
     if (native()?.openDownload) await native().openDownload({ url: checked.url });
     else root.open(checked.url, '_blank', 'noopener,noreferrer');
   }
@@ -403,7 +428,9 @@
     target.focus();
   });
   doc.getElementById('pilotHomeButton').addEventListener('click', openHome);
-  root.addEventListener('online', refreshHealth);
+  root.addEventListener('online', () => { refreshHealth(); checkUpdate({ automatic: true }); });
+  root.addEventListener('focus', () => checkUpdate({ automatic: true }));
+  doc.addEventListener?.('visibilitychange', () => { if (!doc.hidden) checkUpdate({ automatic: true }); });
   root.addEventListener('offline', () => { health = 'offline'; showConnection(); });
   root.addEventListener('cdb-sync-success', showConnection);
   root.addEventListener('cdb-sync-state-change', showConnection);
@@ -411,6 +438,11 @@
   root.addEventListener('cdb-mutations-applied', showConnection);
   root.addEventListener('cdb-operator-ready', openHome);
   root.forceCheckUpdate = checkUpdate;
+  if (updater()?.addListener) updater().addListener('status', state => {
+    showOtaStatus(state);
+    checkUpdate({ automatic: true });
+  }).catch(() => {});
   startUpdater();
+  Promise.resolve().then(() => checkUpdate({ automatic: true }));
   if (root.cdbApp?.getOperator?.()?.trim()) openHome();
 })(typeof window !== 'undefined' ? window : globalThis);

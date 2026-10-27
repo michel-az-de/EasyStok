@@ -62,3 +62,9 @@
 .pilot-import-review { margin-top: 14px; padding: 13px; border: 1px solid #d9c29b; border-radius: 12px; background: #fffaf2; color: #604c36; font-size: 13px; }
 .pilot-import-review p { margin: 7px 0; }
 .pilot-import-review button { margin: 4px 6px 4px 0; min-height: 44px; border: 1px solid #b49b74; border-radius: 8px; padding: 10px 12px; background: #fffaf2; color: #604c36; font: 600 13px/1.4 system-ui, sans-serif; cursor: pointer; }
+
+#pilotVersion { display:block; line-height:1.5; flex:1; overflow-wrap:anywhere; }
+.pilot-update { align-items:flex-start; flex-wrap:wrap; }
+
+#pilotVersion { font-size:13px; font-weight:600; }
+.pilot-rail button span { display:block; margin-left:0; }
