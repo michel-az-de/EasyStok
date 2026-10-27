@@ -27,6 +27,13 @@ public sealed class BatchLinker(
     ILogger<BatchLinker> log,
     BaixaDeInsumosDaProducao? baixaDeInsumos = null)
 {
+    internal static string CodigoDoLote(Batch batch)
+    {
+        var codigoBase = !string.IsNullOrWhiteSpace(batch.Lote) ? batch.Lote
+            : !string.IsNullOrWhiteSpace(batch.Code) ? batch.Code : $"LOT-{batch.CreatedAt:yyMMdd}";
+        var sufixo = new string(batch.Id.TakeLast(6).Where(char.IsLetterOrDigit).ToArray());
+        return string.IsNullOrEmpty(sufixo) ? codigoBase : codigoBase + "-" + sufixo;
+    }
     public async Task ExecuteAsync(IEnumerable<string> mobileBatchIds, Guid? empresaId)
     {
         var idsList = mobileBatchIds as ICollection<string> ?? mobileBatchIds.ToList();
@@ -66,16 +73,7 @@ public sealed class BatchLinker(
                     continue;
                 }
 
-                var codigoBase = !string.IsNullOrWhiteSpace(mobileB.Lote)
-                    ? mobileB.Lote!
-                    : !string.IsNullOrWhiteSpace(mobileB.Code)
-                        ? mobileB.Code!
-                        : $"LOT-{mobileB.CreatedAt:yyMMdd}";
-                var sufixo = mobileB.Id.Length >= 6
-                    ? mobileB.Id.Substring(mobileB.Id.Length - 6)
-                    : mobileB.Id;
-                sufixo = new string(sufixo.Where(c => char.IsLetterOrDigit(c)).ToArray());
-                var codigo = string.IsNullOrEmpty(sufixo) ? codigoBase : (codigoBase + "-" + sufixo);
+                var codigo = CodigoDoLote(mobileB);
 
                 var lote = Lote.Criar(empresaId.Value, codigo, mobileB.CreatedAt, mobileB.LojaId);
                 lote.MobileBatchId = mobileB.Id;

@@ -12,11 +12,15 @@ on:
       - 'tests/pwa/**'
       - 'EasyStock.Api/wwwroot/pwa/**'
       - '.github/workflows/mobile-e2e.yml'
+      - 'casa-da-baba-mobile/**'
+      - 'scripts/deploy/ota-*'
   pull_request:
     paths:
       - 'tests/pwa/**'
       - 'EasyStock.Api/wwwroot/pwa/**'
       - '.github/workflows/mobile-e2e.yml'
+      - 'casa-da-baba-mobile/**'
+      - 'scripts/deploy/ota-*'
   workflow_dispatch:
 
 jobs:
@@ -35,3 +39,34 @@ jobs:
         run: node tests/pwa/run.js
         env:
           PWA_HTML: ${{ github.workspace }}/EasyStock.Api/wwwroot/pwa/index.html
+
+  # Atualizador OTA do APK piloto (#2065): assinatura, hash, replay, caminho do ZIP,
+  # estado atômico e retorno de versão. Roda em host, sem Android SDK.
+  apk-ota:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Baixar org.json do harness nativo
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/json-20231013.jar" https://repo1.maven.org/maven2/org/json/json/20231013/json-20231013.jar
+          echo "0f18192df289114e17aa1a0d0a7f8372cc9f5c7e4f7e39adcf8906fe714fa7d3  $RUNNER_TEMP/json-20231013.jar" | sha256sum -c -
+
+      - name: Testes nativos do atualizador
+        shell: pwsh
+        run: ./casa-da-baba-mobile/apk/tests/run-native.ps1 -JsonJar "$env:RUNNER_TEMP/json-20231013.jar"
+
+      - name: Testes de empacotamento, publicação e push
+        run: node --test casa-da-baba-mobile/apk/tests/*.test.cjs
