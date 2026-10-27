@@ -167,6 +167,13 @@ o deploy canônico continuar carregando a integração. Conferir o compose mescl
 subir o serviço. A ativação depende de texto, imagem, áudio e reconexão reais aprovados;
 `/healthz` do gateway confirma o processo HTTP, não a sessão WhatsApp.
 
+Para mover um vínculo já autenticado para a VPS, criar primeiro a credencial da empresa pelo
+console. Fechar a sessão de origem sem logout e parar o gateway antes de copiar o perfil do
+Chromium para o nome de sessão do destino, com ambos parados e backup preservado. Não copiar
+o token de acesso do servidor antigo. Proteger o arquivo de transferência como credencial,
+nunca versioná-lo e manter só uma instância ativa desse perfil. Após iniciar, conferir o número
+real e a conexão, além de uma mensagem nova; a cópia do perfil sozinha não comprova operação.
+
 ### Limites do piloto
 
 - A interface e o domínio conservam a janela de atendimento existente. Modelos da Meta não

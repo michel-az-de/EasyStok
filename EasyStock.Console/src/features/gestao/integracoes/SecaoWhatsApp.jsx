@@ -44,8 +44,8 @@ export function SecaoWhatsApp({ embutida = false, aoConectar, canalLigado = fals
     <section className={embutida ? css.embutida : css.secao} aria-labelledby={embutida ? undefined : 'secao-whatsapp-titulo'}>
       {!embutida && <h3 id="secao-whatsapp-titulo" className={css.titulo}>WhatsApp</h3>}
       {estado !== 'indisponivel' && <p className={css.texto}>
-        Conecte o número da loja sem tirá-lo do celular: o app WhatsApp Business continua funcionando, e o
-        que a loja responder por ele aparece aqui na conversa.
+        Na conexão pela Meta, o app WhatsApp Business continua funcionando e as respostas
+        feitas pelo celular aparecem aqui na conversa.
       </p>}
       {estado !== 'indisponivel' && <Botao variante="primario" className={css.botao} onClick={conectar} disabled={desabilitado} aria-busy={ocupado}>
         {ROTULO_BOTAO[estado] ?? 'Conectar WhatsApp Business'}

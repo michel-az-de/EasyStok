@@ -32,7 +32,7 @@ export function SecaoWppConnect({ aoConectar }) {
       {ocupado && <p className={css.texto} role="status">Atualizando a conexão…</p>}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       <p className={css.explicacao}>O piloto recebe texto, imagem e áudio e permite responder pelo chat.
-        Modelos aprovados pela Meta não estão disponíveis nesta conexão.</p>
+        Responda pelo chat: respostas feitas no celular não são sincronizadas por esta conexão. Modelos aprovados pela Meta não estão disponíveis.</p>
     </div>
   )
 }
