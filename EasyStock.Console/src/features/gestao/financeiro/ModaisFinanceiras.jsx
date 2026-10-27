@@ -42,13 +42,15 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
   const [dataFeito, setDataFeito] = useState(diaFinanceiro())
   const [referencia] = useState(() => crypto.randomUUID())
   const criada = useRef(null)
+  // Revisão #2105 (3): criada a conta, os campos dela travam; a nova tentativa só registra o pagamento.
+  const [travada, setTravada] = useState(false)
   const palavras = palavrasDoLado(lado)
   const operacao = useOperacaoFinanceira(aoGravar)
   const tipo = lado === 'pagar' ? 'Despesa' : 'Receita'
   const categorias = cadastros.categorias.filter((item) => (item.ativa && [tipo, 'Ambas'].includes(item.tipo)) || item.id === categoria)
   const parcelas = parcelasFinanceiras(centavos, quantidade, vencimento)
   const registrarJunto = !conta && jaFeito && quantidade === 1 && emitir
-  const motivo = conta
+  const motivo = travada ? (!dataFeito ? `Informe a ${palavras.data.toLowerCase()}.` : null) : conta
     ? (!descricao.trim() ? 'Escreva a descrição da conta.' : !categoria ? 'Escolha a categoria financeira.' : null)
     : motivoContaInvalida({ descricao, categoria, centavos, quantidade, emissao, vencimento })
       ?? (moedaAltaDemais(centavos) ? 'Valor alto demais.' : registrarJunto && !dataFeito ? `Informe a ${palavras.data.toLowerCase()}.` : null)
@@ -59,17 +61,24 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
     if (!conta || centro !== (conta.centroCustoId ?? '')) corpo.centroCustoId = centro || null
     if (!conta) Object.assign(corpo, { dataEmissao: instanteFinanceiro(emissao), parcelas, emitirAposCriar: emitir, origem: 'Manual' })
     const ok = await operacao.executar(async () => {
-      // Se o registro falhar, a conta já existe: a nova tentativa só registra, sem duplicar a conta.
-      if (!criada.current) criada.current = await salvarContaFinanceira(lado, corpo, conta?.id)
+      // Se o registro falhar, a conta já existe: a lista recarrega já e a nova tentativa só registra.
+      if (!criada.current) {
+        criada.current = await salvarContaFinanceira(lado, corpo, conta?.id)
+        if (registrarJunto) { setTravada(true); await aoGravar?.() }
+      }
       const parcela = criada.current?.parcelas?.[0]
       if (registrarJunto && parcela) {
         try { await registrarParcelaFinanceira(lado, criada.current.id, parcela.id, { valor: parcela.saldo ?? parcela.valor, metodo, dataPagamento: instanteFinanceiro(dataFeito), observacao: '', gatewayProvedor: 'Manual', gatewayTransactionId: referencia }) }
         catch (erro) { throw new Error(`A conta foi salva, mas o ${palavras.registro} não foi registrado: ${mensagemFinanceira(erro.message)} Tente de novo.`) }
       }
     })
-    if (ok) { aoFechar(); if (!conta && criada.current?.id) aoCriar?.(criada.current) }
+    if (ok) fechar()
   }
-  return <FormularioFinanceiro titulo={conta ? 'Editar conta' : `Nova conta a ${lado}`} aoFechar={aoFechar} operacao={operacao} aoEnviar={salvar} valido={valido} motivo={motivo}>
+  // Fechar depois de criar (mesmo se o registro falhou) abre a conta criada para terminar ali.
+  const fechar = () => { aoFechar(); if (!conta && criada.current?.id) aoCriar?.(criada.current) }
+  return <FormularioFinanceiro titulo={conta ? 'Editar conta' : `Nova conta a ${lado}`} aoFechar={fechar} operacao={operacao} aoEnviar={salvar} valido={valido} motivo={motivo} salvar={travada ? `Registrar ${palavras.registro}` : 'Salvar'}>
+    {travada && <output className={css.aviso}>A conta já foi criada e aparece na lista. Falta só registrar o {palavras.registro}; para mudar a conta, feche e abra o detalhe.</output>}
+    <fieldset disabled={travada} className={css.campos}>
     <CampoTexto rotulo="Descrição" required maxLength={300} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
     <div className={css.grade}>
       <CampoSelecao rotulo="Categoria financeira" required value={categoria} onChange={(e) => setCategoria(e.target.value)} opcoes={[{ valor: '', rotulo: 'Escolha a categoria' }, ...categorias.map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
@@ -83,9 +92,12 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
       <ol className={css.parcelas}>{parcelas.map((item) => <li key={item.numero}>Parcela {item.numero}: {moeda(item.valor)} · {diaFinanceiro(item.dataVencimento).split('-').reverse().join('/')}</li>)}</ol>
       <label className={css.escolha}><input type="checkbox" checked={emitir} onChange={(e) => { setEmitir(e.target.checked); if (!e.target.checked) setJaFeito(false) }} /> Emitir a conta ao salvar</label>
       {quantidade === 1 && emitir && <label className={css.escolha}><input type="checkbox" checked={jaFeito} onChange={(e) => setJaFeito(e.target.checked)} /> {palavras.jaFeito}</label>}
-      {registrarJunto && <div className={css.grade}><CampoSelecao rotulo={palavras.forma} value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={METODOS_CAIXA.map((item) => ({ valor: item, rotulo: nomeDoMetodoCaixa(item) }))} /><CampoTexto rotulo={palavras.data} tipo="date" required max={diaFinanceiro()} value={dataFeito} onChange={(e) => setDataFeito(e.target.value)} /></div>}
     </>}
     <CampoArea rotulo="Observações" rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
+    </fieldset>
+    {!conta && <>
+      {registrarJunto && <div className={css.grade}><CampoSelecao rotulo={palavras.forma} value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={METODOS_CAIXA.map((item) => ({ valor: item, rotulo: nomeDoMetodoCaixa(item) }))} /><CampoTexto rotulo={palavras.data} tipo="date" required max={diaFinanceiro()} value={dataFeito} onChange={(e) => setDataFeito(e.target.value)} /></div>}
+    </>}
   </FormularioFinanceiro>
 }
 
