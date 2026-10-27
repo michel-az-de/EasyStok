@@ -740,3 +740,5 @@ body.pilot-app .ajustes-section .input-box, body.pilot-app .ajustes-section inpu
 body.pilot-app .pilot-command[data-command="Excluir"], body.pilot-app .pilot-command[data-command="Descartar"] { color: #a34e35; }
 body.pilot-app .pilot-icon-command { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 body.pilot-app .pilot-icon-command > svg { width: 24px; height: 24px; }
+body.pilot-app [data-screen="historico"] .section-label,
+body.pilot-app #histList > .stock-ledger { display: none; }
