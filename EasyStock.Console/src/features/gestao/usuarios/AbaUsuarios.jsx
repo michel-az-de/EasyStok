@@ -13,9 +13,9 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { haQuantoTempo } from '../../../dominio/formato'
 import {
-  CONVITE_VAZIO, DICA_DO_EMAIL_DO_CONVITE, MINIMO_DO_MOTIVO, SITUACAO, confirmacaoDaMarcaDeDona, controlesDaPessoa, ehDona,
-  ehSuporteDaSessao, erroDoConvite, erroDoMotivo, estadoDoConvite, fraseDeFalha, fraseDeRetorno, instanteDaApi,
-  opcoesDoPerfilDaPessoa, ordenarPerfis, situacaoDoUsuario,
+  AVISO_DE_VERSAO_ANTIGA, CONVITE_VAZIO, DICA_DO_EMAIL_DO_CONVITE, MINIMO_DO_MOTIVO, SITUACAO, confirmacaoDaMarcaDeDona, controlesDaPessoa,
+  ehDona, ehSuporteDaSessao, erroDoMotivo, estadoDoConvite, falhaDoConvite, fraseDeFalha, fraseDeRetorno, instanteDaApi,
+  listaDeVersaoAntiga, opcoesDoPerfilDaPessoa, ordenarPerfis, situacaoDoUsuario,
 } from '../../../dominio/usuarios'
 import css from './usuarios.module.css'
 
@@ -31,23 +31,32 @@ const ROTULO_DO_CONTROLE = {
 }
 
 export function Convite({ perfis, aoConvidar, aoCancelar }) {
+  const id = useId()
   const formulario = useRef(null)
   const [campos, setCampos] = useState(CONVITE_VAZIO)
+  // `{ campo, texto }`: o campo errado (null quando a recusa é da API) fica marcado e recebe o foco.
   const [erro, setErro] = useState(null)
   const [enviando, setEnviando] = useState(false)
   // Digitar em qualquer campo tira o erro: ele falava do que estava escrito antes.
   const trocar = (campo) => (evento) => { setErro(null); setCampos((atual) => ({ ...atual, [campo]: evento.target.value })) }
   const trocarDona = (evento) => { setErro(null); setCampos((atual) => ({ ...atual, dona: evento.target.checked })) }
   const estado = estadoDoConvite(campos, perfis)
+  const idDoErro = `${id}-erro`
+  // O campo errado diz ao leitor de tela que está errado e por quê.
+  const marcaDoErro = (campo) => (erro?.campo === campo ? { 'aria-invalid': true, 'aria-describedby': idDoErro } : {})
 
   useEffect(() => { formulario.current?.querySelector('input')?.focus() }, [])
+  // Cada envio recusado leva o foco ao campo a corrigir (um objeto novo por envio: repete no mesmo campo).
+  useEffect(() => {
+    if (erro?.campo) formulario.current?.querySelector('input[aria-invalid="true"], select[aria-invalid="true"]')?.focus()
+  }, [erro])
 
   async function enviar(evento) {
     evento.preventDefault()
     if (enviando) return
     // Vale a marca que a tela mostra: trocar para um perfil sem a opção tira a marca de dona.
     const pedido = { ...campos, dona: estado.comoDona }
-    const invalido = erroDoConvite(pedido)
+    const invalido = falhaDoConvite(pedido)
     if (invalido) { setErro(invalido); return }
     setErro(null)
     setEnviando(true)
@@ -55,29 +64,35 @@ export function Convite({ perfis, aoConvidar, aoCancelar }) {
       // Deu certo: quem chamou fecha o formulário, então não há mais estado para mexer aqui.
       await aoConvidar(pedido)
     } catch (falha) {
-      setErro(fraseDeFalha('convite', falha))
+      setErro({ campo: null, texto: fraseDeFalha('convite', falha) })
       setEnviando(false)
     }
   }
 
   return (
     <form ref={formulario} className={css.convite} onSubmit={enviar} aria-label="Convidar pessoa" aria-busy={enviando} noValidate>
-      <CampoTexto rotulo="Nome" autoComplete="off" value={campos.nome} onChange={trocar('nome')} readOnly={enviando} />
-      <CampoTexto rotulo="E-mail" tipo="email" autoComplete="off" value={campos.email} onChange={trocar('email')} readOnly={enviando} dica={DICA_DO_EMAIL_DO_CONVITE} />
-      <CampoSelecao rotulo="Perfil" opcoes={estado.opcoes} value={campos.perfilId} onChange={trocar('perfilId')} disabled={enviando} dica={estado.resumo} />
+      <CampoTexto rotulo="Nome" autoComplete="off" value={campos.nome} onChange={trocar('nome')} readOnly={enviando} {...marcaDoErro('nome')} />
+      <CampoTexto
+        rotulo="E-mail" tipo="email" autoComplete="off" value={campos.email} onChange={trocar('email')} readOnly={enviando}
+        dica={DICA_DO_EMAIL_DO_CONVITE} {...marcaDoErro('email')}
+      />
+      <CampoSelecao
+        rotulo="Perfil" opcoes={estado.opcoes} value={campos.perfilId} onChange={trocar('perfilId')} disabled={enviando}
+        dica={estado.resumo} {...marcaDoErro('perfilId')}
+      />
       {estado.ofereceDona && (
         <div className={css.dona}>
           <div className={css.opcaoDona}>
             <label className={css.marcarDona}>
-              <input type="checkbox" checked={estado.comoDona} onChange={trocarDona} disabled={enviando} />
+              <input type="checkbox" checked={estado.comoDona} onChange={trocarDona} disabled={enviando} aria-describedby={`${id}-dona`} />
               Convidar como dona
             </label>
-            <p className={css.dicaDona}>A dona pode tudo, inclusive marcar outras donas. Use um e-mail que ainda não tenha conta.</p>
+            <p id={`${id}-dona`} className={css.dicaDona}>A dona pode tudo, inclusive marcar outras donas. Use um e-mail que ainda não tenha conta.</p>
           </div>
           {estado.pedeEmailDeNovo && (
             <CampoTexto
               rotulo="Confirme o e-mail" tipo="email" autoComplete="off" value={campos.emailDeNovo} onChange={trocar('emailDeNovo')}
-              readOnly={enviando} dica="Digite o mesmo e-mail mais uma vez."
+              readOnly={enviando} dica="Digite o mesmo e-mail mais uma vez." {...marcaDoErro('emailDeNovo')}
             />
           )}
         </div>
@@ -86,7 +101,7 @@ export function Convite({ perfis, aoConvidar, aoCancelar }) {
         <Botao variante="primario" tipo="submit" disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar convite'}</Botao>
         <Botao variante="texto" disabled={enviando} onClick={aoCancelar}>Cancelar</Botao>
       </div>
-      {erro && <p className={css.erroDoConvite} role="alert">{erro}</p>}
+      {erro && <p id={idDoErro} className={css.erroDoConvite} role="alert">{erro.texto}</p>}
     </form>
   )
 }
@@ -135,12 +150,15 @@ export function Pessoa({ usuario, perfis, meuId, agora, ocupado, suporte, aoAgir
     aoAbrirConfirmacao()
   }
 
-  function confirmarMarca() {
-    const invalido = confirmacao.pedeMotivo ? erroDoMotivo(marca.motivo) : null
+  async function confirmarMarca() {
+    const { pedeMotivo } = confirmacao
+    const invalido = pedeMotivo ? erroDoMotivo(marca.motivo) : null
     if (invalido) { setMarca((atual) => ({ ...atual, erro: invalido })); return }
     const { acao, motivo } = marca
-    setMarca(null)
-    aoAgir(acao, usuario, confirmacao.pedeMotivo ? motivo : null)
+    // O motivo que o suporte escreveu não se perde: com ele, a confirmação só fecha quando a API aceita.
+    if (!pedeMotivo) setMarca(null)
+    const feito = await aoAgir(acao, usuario, pedeMotivo ? motivo : null)
+    if (feito) setMarca(null)
   }
 
   const tocar = {
@@ -279,7 +297,7 @@ export function AbaUsuarios() {
     await carregar()
   }, [carregar])
 
-  // `valor` é o perfil escolhido (trocar perfil) ou o motivo do suporte (marca de dona).
+  // `valor` é o perfil escolhido (trocar perfil) ou o motivo do suporte (marca de dona). Devolve se a API aceitou.
   const agir = useCallback(async (acao, usuario, valor) => {
     setOcupado(true)
     setRetorno(null)
@@ -289,9 +307,11 @@ export function AbaUsuarios() {
       // A lista recarrega antes do aviso: "continua no fim desta lista" só é verdade depois disso.
       await carregar()
       setRetorno({ tom: 'ok', texto: fraseDeRetorno(acao, usuario, perfil) })
+      return true
     } catch (falha) {
       await carregar()
       setRetorno({ tom: 'erro', texto: fraseDeFalha(acao, falha) })
+      return false
     } finally {
       setOcupado(false)
       // Desativar e reativar mudam a linha de lugar: o foco vai para o título da lista.
@@ -307,6 +327,7 @@ export function AbaUsuarios() {
     () => [...estado.usuarios].sort((a, b) => Number(b.ativo) - Number(a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR')),
     [estado.usuarios],
   )
+  const versaoAntiga = listaDeVersaoAntiga(estado)
 
   if (estado.carregando) return <output className={css.descricao}>Carregando as pessoas…</output>
   if (estado.erro && !estado.carregada) {
@@ -337,6 +358,7 @@ export function AbaUsuarios() {
             <Botao variante="texto" onClick={recarregar}>Atualizar</Botao>
           </p>
         )}
+        {versaoAntiga && <output className={css.desatualizada}>{AVISO_DE_VERSAO_ANTIGA}</output>}
         <ul ref={lista} className={css.pessoas}>
           {pessoas.map((usuario) => (
             <Pessoa

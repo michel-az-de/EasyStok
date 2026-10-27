@@ -29,7 +29,8 @@ import { Botao } from '../componentes/Botao'
 import { Modal } from '../componentes/Modal'
 import { TelaLogin } from '../features/login/TelaLogin'
 import { TelaConvite } from '../features/login/TelaConvite'
-import { ehRotaDeConvite, googleDoConvite, tokenDoConvite } from '../dominio/usuarios'
+import { ehRotaDeConvite, tokenDoConvite } from '../dominio/usuarios'
+import { googleDoConvite } from '../aplicacao/convite'
 import { AvisoDaAcaoApi, FaixaApi, LimparAvisoAoNavegar } from './FaixaApi'
 import { contarPrecisaDeVoce, precisaDeVoce } from '../dominio/automatico'
 import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
@@ -492,14 +493,15 @@ export function App() {
     try { sessionStorage.setItem(CHAVE_DO_CONVITE, tokenNaBarra) } catch { /* sem armazenamento, vale a memória */ }
     window.history.replaceState(window.history.state, '', '#/convite')
   }, [tokenNaBarra])
-  // #2070: entrar com Google no convite já é a sessão da convidada (troca a de quem estava no aparelho):
-  // o convite guardado sai e a tela vai para o hall. Identidade estável para o botão não ser desenhado de novo.
+  // #2070: entrar com Google no convite já é a sessão de quem entrou (troca a de quem estava no aparelho). Quando a
+  // pessoa confirma que é ela ("Continuar"), o convite guardado sai e a tela vai para o hall.
+  // Identidade estável para o botão não ser desenhado de novo.
   const concluirConvitePeloGoogle = useCallback(() => {
     setTokenGuardado(null)
     try { sessionStorage.removeItem(CHAVE_DO_CONVITE) } catch { /* nada a limpar */ }
     window.location.hash = '#/'
   }, [])
-  const googleNoConvite = useMemo(() => googleDoConvite(google, concluirConvitePeloGoogle), [google, concluirConvitePeloGoogle])
+  const googleNoConvite = useMemo(() => googleDoConvite(google), [google])
   // O link do convite abre antes do login e vale mesmo com outra pessoa logada neste aparelho. Ao concluir, a sessão
   // dessa outra pessoa é encerrada: senão quem acabou de criar a senha clicava "Entrar" e caía no Console dela.
   if (FONTE_API && ehRotaDeConvite(hash)) {
@@ -510,7 +512,11 @@ export function App() {
       try { sessionStorage.removeItem(CHAVE_DO_CONVITE) } catch { /* nada a limpar */ }
       window.location.hash = ''
     }
-    return <TelaConvite key={token ?? 'sem-token'} token={token} google={googleNoConvite} aoConcluir={aoConcluir} />
+    return (
+      <TelaConvite
+        key={token ?? 'sem-token'} token={token} google={googleNoConvite} aoConcluir={aoConcluir} aoEntrarPeloGoogle={concluirConvitePeloGoogle}
+      />
+    )
   }
   if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} avisoSaida={avisoSaida} />
   if (FONTE_API) return <><NavegacaoDoConsole hash={hash} /><AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} /></>

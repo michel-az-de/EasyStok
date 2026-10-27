@@ -5,7 +5,7 @@
 //
 // #2070: os botões de cada linha vêm das `acoes` que a API calcula pela política de hierarquia,
 // nunca de regra local; a linha da dona ganha o selo; o convite só oferece "como dona" com perfil
-// de nível Admin atribuível e pede o e-mail duas vezes; o suporte escreve o motivo ao mexer na marca.
+// de nível Admin atribuível e pede o e-mail duas vezes; o suporte escreve o motivo ao tirar a marca.
 // A aba é montada de verdade no react-dom (DOM mínimo de `tela-no-node.mjs`), com a API simulada no
 // envelope real: o que se confere é o que sai para a API depois de cada toque.
 //
@@ -33,11 +33,11 @@ globalThis.fetch = async (url, opcoes = {}) => {
 const escritas = () => api.chamadas.filter((c) => c.metodo !== 'GET').map(({ metodo, url, corpo }) => ({ metodo, url, corpo }))
 
 const {
-  ACOES_DA_LINHA, CONTROLES_DA_LINHA, acoesDoUsuario, agruparPorDia, condensarAuditoria, confirmacaoDaMarcaDeDona, controlesDaPessoa,
-  ehRotaDeConvite, ehSuporteDaSessao, erroDoConvite, erroDoMotivo, estadoDoConvite, fraseDeFalha, fraseDeRetorno, instanteDaApi,
-  juntarPaginas, linhaDeAuditoria, mensagemDaFalha, MENSAGEM_DO_CODIGO, opcoesDePessoas, opcoesDoPerfilDaPessoa, ordenarPerfis,
-  perfisAtribuiveis, podeConvidarComoDona, regrasDaSenha, resumoDoPerfil, senhaValida, SAIDAS_DO_CONVITE, situacaoDoUsuario,
-  tokenDoConvite, DICA_DO_EMAIL_DO_CONVITE,
+  ACOES_DA_LINHA, AVISO_DE_VERSAO_ANTIGA, CONTROLES_DA_LINHA, acoesDoUsuario, agruparPorDia, condensarAuditoria, confirmacaoDaMarcaDeDona,
+  controlesDaPessoa, ehRotaDeConvite, ehSuporteDaSessao, erroDoConvite, erroDoMotivo, estadoDoConvite, falhaDoConvite, fraseDeFalha,
+  fraseDeRetorno, instanteDaApi, juntarPaginas, linhaDeAuditoria, listaDeVersaoAntiga, mensagemDaFalha, MENSAGEM_DO_CODIGO, opcoesDePessoas,
+  opcoesDoPerfilDaPessoa, ordenarPerfis, perfisAtribuiveis, podeConvidarComoDona, regrasDaSenha, resumoDoPerfil, senhaValida,
+  SAIDAS_DO_CONVITE, situacaoDoUsuario, tokenDoConvite, DICA_DO_EMAIL_DO_CONVITE,
 } = await import('../src/dominio/usuarios.js')
 
 let passaram = 0
@@ -83,6 +83,17 @@ conferir('a regra local não decide: a própria pessoa, desativada ou com convit
   }
 })
 
+conferir('resposta da API de antes da hierarquia (linha sem `acoes` ou perfil sem `atribuivel`) é reconhecida', () => {
+  // O console pode subir antes da API nova (ou a API voltar atrás): sem isto a aba ficava sem botões e sem dizer por quê.
+  assert.equal(listaDeVersaoAntiga({ usuarios: [pessoa()], perfis: PERFIS }), false)
+  assert.equal(listaDeVersaoAntiga({ usuarios: [pessoa({ acoes: { ...nenhuma } })], perfis: PERFIS }), false, 'tudo falso ainda é a API nova')
+  assert.equal(listaDeVersaoAntiga({ usuarios: [{ usuarioId: 'ana', ativo: true }], perfis: PERFIS }), true)
+  assert.equal(listaDeVersaoAntiga({ usuarios: [pessoa({ acoes: null })], perfis: PERFIS }), true)
+  assert.equal(listaDeVersaoAntiga({ usuarios: [pessoa()], perfis: [{ perfilId: 'p-adm', nome: 'Administração', nivel: 'Admin' }] }), true)
+  assert.equal(listaDeVersaoAntiga({ usuarios: [], perfis: [] }), false)
+  assert.equal(AVISO_DE_VERSAO_ANTIGA, 'A lista veio de uma versão antiga do sistema. As ações e o convite voltam quando a atualização terminar.')
+})
+
 conferir('em cada uma das 256 combinações de `acoes`, os controles são exatamente os ligados', () => {
   for (let i = 0; i < 2 ** ACOES_DA_LINHA.length; i += 1) {
     const acoes = Object.fromEntries(ACOES_DA_LINHA.map((a, j) => [a, Boolean(i & (1 << j))]))
@@ -100,14 +111,15 @@ conferir('os perfis da casa vêm antes do legado, na ordem Administração, Ger�
 })
 
 conferir('cada perfil da casa tem um resumo curto e fiel à hierarquia; "Dona" não é perfil e não tem resumo', () => {
-  // Administração não mexe na dona nem em outra Administração: o resumo não promete "a equipe" inteira.
-  assert.equal(resumoDoPerfil('Administração'), 'Tudo, até Configurações; na equipe, cuida de Gerência para baixo')
+  // Administração não mexe na dona nem em outra Administração: o resumo diz de quem cuida, sem "para baixo".
+  assert.equal(resumoDoPerfil('Administração'), 'Tudo; na equipe, cuida de Gerência, Atendimento e Cozinha')
   assert.equal(resumoDoPerfil('Gerência'), 'Toda a operação, com estoque e relatórios, menos Configurações')
   assert.equal(resumoDoPerfil('Atendimento'), 'Conversas, pedidos, cardápio, caixa e entregas')
   assert.equal(resumoDoPerfil('Cozinha'), 'Fila de preparo e produção')
   assert.equal(resumoDoPerfil('Dona'), null)
   assert.equal(resumoDoPerfil(null), null)
   for (const p of PERFIS) assert.ok(resumoDoPerfil(p.nome).length <= 64, `${p.nome}: resumo curto`)
+  for (const p of PERFIS) assert.doesNotMatch(resumoDoPerfil(p.nome), /para baixo|abaixo|acima/, `${p.nome}: sem jargão de hierarquia`)
 })
 
 conferir('só os perfis com `atribuivel` entram nas opções; o perfil atual da pessoa sempre aparece', () => {
@@ -155,6 +167,17 @@ conferir('convidar como dona pede o e-mail duas vezes e confere, sem diferença 
   assert.equal(erroDoConvite({ ...base, dona: false, emailDeNovo: '' }), null)
 })
 
+conferir('cada erro do convite diz em qual campo está, para o campo ser marcado e receber o foco', () => {
+  const base = { nome: 'Bia', email: 'bia@exemplo.test', perfilId: 'p-adm', dona: true, emailDeNovo: 'bia@exemplo.test' }
+  assert.deepEqual(falhaDoConvite({ ...base, nome: ' ' }), { campo: 'nome', texto: 'Escreva o nome da pessoa.' })
+  assert.deepEqual(falhaDoConvite({ ...base, email: 'bia@casa' }), { campo: 'email', texto: 'Confira o e-mail: o convite vai para ele.' })
+  assert.deepEqual(falhaDoConvite({ ...base, perfilId: '' }), { campo: 'perfilId', texto: 'Escolha o perfil.' })
+  assert.deepEqual(falhaDoConvite({ ...base, emailDeNovo: '' }), { campo: 'emailDeNovo', texto: 'Digite o e-mail mais uma vez para conferir.' })
+  assert.deepEqual(falhaDoConvite({ ...base, emailDeNovo: 'bia@exemplo.tst' }),
+    { campo: 'emailDeNovo', texto: 'Os dois e-mails não são iguais. Confira e digite o mesmo nas duas vezes.' })
+  assert.equal(falhaDoConvite(base), null)
+})
+
 conferir('convite sem nome, com e-mail torto ou sem perfil não sai', () => {
   assert.equal(erroDoConvite({ nome: ' ', email: 'a@b.co', perfilId: 'p' }), 'Escreva o nome da pessoa.')
   assert.equal(erroDoConvite({ nome: 'Ana', email: 'ana@casa', perfilId: 'p' }), 'Confira o e-mail: o convite vai para ele.')
@@ -174,7 +197,7 @@ conferir('só a sessão de nível SuperAdmin é o suporte', () => {
   assert.equal(ehSuporteDaSessao(null), false)
 })
 
-conferir('marcar e tirar a marca de dona confirmam antes, e o suporte escreve o motivo', () => {
+conferir('marcar e tirar a marca de dona confirmam antes; o suporte escreve o motivo só ao tirar a marca', () => {
   const ana = pessoa({ nome: 'Ana Souza', perfil: 'Administração' })
   const marcarAna = confirmacaoDaMarcaDeDona('marcarDona', ana, false)
   assert.equal(marcarAna.confirmar, 'Marcar Ana como dona')
@@ -183,7 +206,8 @@ conferir('marcar e tirar a marca de dona confirmam antes, e o suporte escreve o 
   const tirar = confirmacaoDaMarcaDeDona('desmarcarDona', ana, false)
   assert.equal(tirar.confirmar, 'Tirar a marca de dona de Ana')
   assert.equal(tirar.texto, 'Ana continua com o perfil Administração, mas deixa de ser dona.')
-  assert.equal(confirmacaoDaMarcaDeDona('marcarDona', ana, true).pedeMotivo, true)
+  // A especificação (tabela do suporte) e a política da API só exigem motivo do suporte ao tirar a marca de uma dona.
+  assert.equal(confirmacaoDaMarcaDeDona('marcarDona', ana, true).pedeMotivo, false)
   assert.equal(confirmacaoDaMarcaDeDona('desmarcarDona', ana, true).pedeMotivo, true)
 })
 
@@ -199,10 +223,14 @@ conferir('o motivo do suporte tem 10 caracteres ou mais, sem contar os espaços 
 
 conferir('cada código de recusa da hierarquia vira uma frase em português', () => {
   assert.deepEqual(Object.keys(MENSAGEM_DO_CODIGO).sort(), [
-    'DONA_CONTA_NAO_PROVADA', 'DONA_EMAIL_EXISTENTE', 'DONA_NAO_ADMIN', 'DONA_PROTEGIDA', 'DONA_SUPORTE', 'HIERARQUIA', 'ULTIMA_DONA', 'USUARIO_PROPRIO',
+    'DONA_CONTA_NAO_PROVADA', 'DONA_EMAIL_EXISTENTE', 'DONA_NAO_ADMIN', 'DONA_PROTEGIDA', 'DONA_SUPORTE', 'HIERARQUIA', 'MOTIVO_OBRIGATORIO',
+    'ULTIMA_DONA', 'USUARIO_PROPRIO',
   ])
   // Quem recebe HIERARQUIA pode ser a Administração mexendo na dona ou em outra Administração: a frase não manda pedir à dona.
-  assert.equal(mensagemDaFalha({ status: 403, codigo: 'HIERARQUIA', message: 'Forbidden' }), 'Esta mudança não cabe ao seu perfil.')
+  assert.equal(mensagemDaFalha({ status: 403, codigo: 'HIERARQUIA', message: 'Forbidden' }), 'Seu perfil não permite fazer isso com esta pessoa.')
+  // 400 da API quando o suporte não manda o motivo (HierarquiaDeUsuarios): a tela não deixa sair sem ele, mas a frase existe.
+  assert.equal(mensagemDaFalha({ status: 400, codigo: 'MOTIVO_OBRIGATORIO', message: 'x' }),
+    'O suporte precisa escrever o motivo, com pelo menos 10 caracteres. Ele fica no histórico.')
   assert.equal(mensagemDaFalha({ status: 409, codigo: 'DONA_EMAIL_EXISTENTE', message: 'x' }),
     'Este e-mail já tem conta no sistema. Convide a dona com um e-mail que ainda não tenha conta.')
   assert.equal(mensagemDaFalha({ status: 409, codigo: 'ULTIMA_DONA', message: 'x' }), 'A casa precisa de pelo menos uma dona. Marque outra pessoa como dona antes.')
@@ -221,14 +249,15 @@ conferir('cada código de recusa da hierarquia vira uma frase em português', ()
 
 conferir('a falha de cada ação diz o que não mudou e por quê, com a frase do código', () => {
   const hierarquia = { status: 403, codigo: 'HIERARQUIA', message: 'Forbidden' }
-  assert.equal(fraseDeFalha('perfil', hierarquia), 'O perfil não mudou: Esta mudança não cabe ao seu perfil.')
+  assert.equal(fraseDeFalha('perfil', hierarquia), 'O perfil não mudou: Seu perfil não permite fazer isso com esta pessoa.')
+  assert.equal(fraseDeFalha('convite', hierarquia), 'O convite não saiu: Seu perfil não permite fazer isso com esta pessoa.')
   assert.equal(fraseDeFalha('convite', { status: 409, codigo: 'DONA_EMAIL_EXISTENTE' }),
     'O convite não saiu: Este e-mail já tem conta no sistema. Convide a dona com um e-mail que ainda não tenha conta.')
   assert.equal(fraseDeFalha('marcarDona', { status: 409, codigo: 'DONA_NAO_ADMIN' }),
     'Não deu para marcar como dona: Só quem tem o perfil Administração pode ser dona. Troque o perfil antes.')
   assert.equal(fraseDeFalha('desmarcarDona', { status: 409, codigo: 'ULTIMA_DONA' }),
     'A marca de dona continua: A casa precisa de pelo menos uma dona. Marque outra pessoa como dona antes.')
-  assert.equal(fraseDeFalha('desativar', hierarquia), 'O acesso continua ativo: Esta mudança não cabe ao seu perfil.')
+  assert.equal(fraseDeFalha('desativar', hierarquia), 'O acesso continua ativo: Seu perfil não permite fazer isso com esta pessoa.')
 })
 
 conferir('a frase de retorno diz o que mudou, e só fala em entrar de novo para quem já entrou', () => {
@@ -347,15 +376,29 @@ await conferirAssincrono('convite na aba: marcou "como dona" e trocou para Gerê
   })
 })
 
-await conferirAssincrono('suporte marca a dona: o motivo é pedido, o erro fica ligado ao campo e o PUT leva o motivo', async () => {
+await conferirAssincrono('suporte marca a primeira dona: confirma sem motivo (a política não pede) e o PUT vai sem ele', async () => {
   const ana = pessoa({ perfil: 'Administração', perfilId: 'p-adm', acoes: { ...nenhuma, marcarDona: true } })
   await naAba(SUPORTE, { usuarios: [ana] }, async (tela) => {
     clicar(tela, 'Marcar como dona')
     await esperar()
+    assert.equal(temCampo(tela, 'Motivo do suporte'), false, 'marcar não pede motivo, nem ao suporte')
+    assert.equal(documento.activeElement?.textContent, 'Cancelar')
+    clicar(tela, 'Marcar Ana como dona')
+    await esperar()
+    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona?empresaId=empresa-1', corpo: { dona: true } }])
+    assert.match(textoDe(tela), /Ana Souza agora é dona\./)
+  })
+})
+
+await conferirAssincrono('suporte tira a marca de dona: o motivo é pedido, o erro fica ligado ao campo e o PUT leva o motivo', async () => {
+  const ana = pessoa({ perfil: 'Administração', perfilId: 'p-adm', dona: true, acoes: { ...nenhuma, desmarcarDona: true } })
+  await naAba(SUPORTE, { usuarios: [ana] }, async (tela) => {
+    clicar(tela, 'Tirar a marca de dona')
+    await esperar()
     const motivo = campoDe(tela, 'Motivo do suporte')
     assert.equal(documento.activeElement, motivo, 'o foco vai para o motivo')
 
-    clicar(tela, 'Marcar Ana como dona')
+    clicar(tela, 'Tirar a marca de dona de Ana')
     await esperar()
     const [erro] = elementos(tela, (no) => no.getAttribute('role') === 'alert')
     assert.equal(erro?.textContent, 'Escreva o motivo com pelo menos 10 caracteres. Ele fica no histórico.')
@@ -366,10 +409,11 @@ await conferirAssincrono('suporte marca a dona: o motivo é pedido, o erro fica 
 
     digitar(tela, 'Motivo do suporte', '  pedido da dona por telefone  ')
     assert.equal(campoDe(tela, 'Motivo do suporte').getAttribute('aria-invalid'), null, 'escrever tira o erro')
-    clicar(tela, 'Marcar Ana como dona')
+    clicar(tela, 'Tirar a marca de dona de Ana')
     await esperar()
-    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona?empresaId=empresa-1', corpo: { dona: true, motivo: 'pedido da dona por telefone' } }])
-    assert.match(textoDe(tela), /Ana Souza agora é dona\./)
+    assert.deepEqual(escritas(), [{ metodo: 'PUT', url: '/api/usuarios/ana/dona?empresaId=empresa-1', corpo: { dona: false, motivo: 'pedido da dona por telefone' } }])
+    assert.match(textoDe(tela), /Ana Souza não é mais dona\./)
+    assert.equal(temCampo(tela, 'Motivo do suporte'), false, 'deu certo: a confirmação fecha')
   })
 })
 
@@ -396,20 +440,92 @@ await conferirAssincrono('a dona tira a marca de outra: confirmação em grupo r
   })
 })
 
+// O PUT da marca recusado pela API com o código dado; o resto segue a API simulada (e fica anotado).
+const comMarcaRecusada = async (codigo, fn) => {
+  const original = globalThis.fetch
+  globalThis.fetch = async (url, opcoes = {}) => {
+    if (opcoes.method !== 'PUT') return original(url, opcoes)
+    api.chamadas.push({ metodo: 'PUT', url, corpo: JSON.parse(opcoes.body) })
+    return resposta(409, { error: { code: codigo, message: 'Recusado pela política.' } })
+  }
+  try { await fn() } finally { globalThis.fetch = original }
+}
+const caminhos = () => api.chamadas.map((c) => `${c.metodo} ${c.url.split('?')[0]}`)
+const selosDona = (tela) => elementos(tela, (no) => no.localName === 'span' && no.textContent === 'Dona')
+
 await conferirAssincrono('recusa da API na marca: a frase do código aparece e nada fica marcado', async () => {
   const ana = pessoa({ perfil: 'Atendimento', acoes: { ...nenhuma, marcarDona: true } })
-  const original = globalThis.fetch
-  globalThis.fetch = async (url, opcoes = {}) => (opcoes.method === 'PUT'
-    ? resposta(409, { error: { code: 'DONA_NAO_ADMIN', message: 'Alvo sem nível Admin.' } })
-    : original(url, opcoes))
-  try {
-    await naAba(SESSAO, { usuarios: [ana] }, async (tela) => {
-      clicar(tela, 'Marcar como dona')
-      clicar(tela, 'Marcar Ana como dona')
-      await esperar()
-      assert.deepEqual(alertasDe(tela), ['Não deu para marcar como dona: Só quem tem o perfil Administração pode ser dona. Troque o perfil antes.'])
-    })
-  } finally { globalThis.fetch = original }
+  await comMarcaRecusada('DONA_NAO_ADMIN', () => naAba(SESSAO, { usuarios: [ana] }, async (tela) => {
+    clicar(tela, 'Marcar como dona')
+    clicar(tela, 'Marcar Ana como dona')
+    await esperar()
+    assert.deepEqual(alertasDe(tela), ['Não deu para marcar como dona: Só quem tem o perfil Administração pode ser dona. Troque o perfil antes.'])
+    const ordem = caminhos()
+    assert.ok(ordem.lastIndexOf('GET /api/usuarios') > ordem.indexOf('PUT /api/usuarios/ana/dona'), 'a lista é lida de novo depois da recusa')
+    assert.deepEqual(selosDona(tela), [], 'sem selo de dona: nada ligado antes da resposta')
+    assert.deepEqual(botoesDe(tela).filter((b) => b !== 'Convidar pessoa'), ['Marcar como dona'], 'a linha volta ao que era')
+  }))
+})
+
+await conferirAssincrono('recusa da API ao tirar a marca pelo suporte: a confirmação fica aberta com o motivo escrito', async () => {
+  const ana = pessoa({ perfil: 'Administração', perfilId: 'p-adm', dona: true, acoes: { ...nenhuma, desmarcarDona: true } })
+  await comMarcaRecusada('ULTIMA_DONA', () => naAba(SUPORTE, { usuarios: [ana] }, async (tela) => {
+    clicar(tela, 'Tirar a marca de dona')
+    await esperar()
+    digitar(tela, 'Motivo do suporte', 'pedido da dona por telefone')
+    clicar(tela, 'Tirar a marca de dona de Ana')
+    await esperar()
+    assert.deepEqual(alertasDe(tela), ['A marca de dona continua: A casa precisa de pelo menos uma dona. Marque outra pessoa como dona antes.'])
+    assert.equal(campoDe(tela, 'Motivo do suporte').value, 'pedido da dona por telefone', 'o motivo não se perde')
+    assert.equal(selosDona(tela).length, 1, 'continua dona')
+    clicar(tela, 'Cancelar')
+    await esperar()
+    assert.equal(temCampo(tela, 'Motivo do suporte'), false)
+    assert.deepEqual(botoesDe(tela).filter((b) => b !== 'Convidar pessoa'), ['Tirar a marca de dona'])
+  }))
+})
+
+await conferirAssincrono('convite de dona acessível: a caixa lê a explicação e o e-mail diferente marca o campo e leva o foco a ele', async () => {
+  await naAba(SESSAO, { usuarios: [] }, async (tela) => {
+    clicar(tela, 'Convidar pessoa')
+    digitar(tela, 'Nome', 'Bia Lima')
+    digitar(tela, 'E-mail', 'bia@exemplo.test')
+    escolher(tela, 'Perfil', 'p-adm')
+    const caixa = caixaDe(tela, 'Convidar como dona')
+    const [dica] = elementos(tela, (no) => no.localName === 'p' && no.textContent.startsWith('A dona pode tudo'))
+    assert.ok(dica?.getAttribute('id'), 'a explicação tem id')
+    assert.equal(caixa.getAttribute('aria-describedby'), dica.getAttribute('id'), 'a caixa aponta para a explicação')
+
+    marcar(tela, 'Convidar como dona')
+    digitar(tela, 'Confirme o e-mail', 'bia@exemplo.tst')
+    enviar(tela)
+    await esperar()
+    const confirme = campoDe(tela, 'Confirme o e-mail')
+    const [erro] = elementos(tela, (no) => no.getAttribute('role') === 'alert')
+    assert.equal(erro?.textContent, 'Os dois e-mails não são iguais. Confira e digite o mesmo nas duas vezes.')
+    assert.equal(confirme.getAttribute('aria-invalid'), 'true', 'o campo diz que está errado')
+    assert.ok(erro.getAttribute('id'), 'o erro tem id')
+    assert.ok((confirme.getAttribute('aria-describedby') ?? '').split(' ').includes(erro.getAttribute('id')), 'o campo aponta para o erro')
+    assert.equal(documento.activeElement, confirme, 'o foco vai para o campo a corrigir')
+    assert.equal(campoDe(tela, 'E-mail').getAttribute('aria-invalid'), null, 'só o campo errado fica marcado')
+
+    digitar(tela, 'Confirme o e-mail', 'bia@exemplo.test')
+    assert.equal(campoDe(tela, 'Confirme o e-mail').getAttribute('aria-invalid'), null, 'escrever tira o erro')
+  })
+})
+
+await conferirAssincrono('API de antes da hierarquia: a aba diz por que não há ações, em vez de ficar sem botões calada', async () => {
+  const semAcoes = { usuarioId: 'ana', nome: 'Ana Souza', email: 'ana@exemplo.test', ativo: true, convite: { estado: 'aceito' }, perfilId: 'p-ate', perfil: 'Atendimento', ultimoAcessoEm: null }
+  const perfisAntigos = PERFIS.map(({ perfilId, nome, nivel }) => ({ perfilId, nome, nivel }))
+  // Região ao vivo (`output`, papel status): o leitor de tela lê o aviso quando a lista chega.
+  const avisos = (tela) => elementos(tela, (no) => no.localName === 'output' && no.textContent.includes('versão antiga')).map((no) => no.textContent)
+  await naAba(SESSAO, { usuarios: [semAcoes], perfis: perfisAntigos }, async (tela) => {
+    assert.deepEqual(avisos(tela), [AVISO_DE_VERSAO_ANTIGA])
+    assert.deepEqual(botoesDe(tela), ['Convidar pessoa'], 'o bloqueio continua: nenhuma ação pela regra local')
+  })
+  await naAba(SESSAO, { usuarios: [pessoa()] }, async (tela) => {
+    assert.deepEqual(avisos(tela), [], 'com a API nova, nenhum aviso')
+  })
 })
 
 // ---------------------------------------------------------------- o que vai para a API
@@ -546,6 +662,16 @@ conferir('toda saída do convite tem título e o que fazer, e a página sem link
   }
   assert.doesNotMatch(SAIDAS_DO_CONVITE.semToken.titulo + SAIDAS_DO_CONVITE.semToken.texto, /não vale|reenviar/)
   assert.equal(SAIDAS_DO_CONVITE.pedindo, undefined)
+})
+
+conferir('as saídas do convite servem a quem entra pelo Google e à própria dona: sem "criou a senha" nem "peça à dona"', () => {
+  assert.deepEqual(SAIDAS_DO_CONVITE.vencido, {
+    titulo: 'Este convite já não vale',
+    texto: 'Se você já entrou antes, use Entrar, com o Google ou com a senha. Se ainda não entrou, peça um convite novo a quem convidou você.',
+  })
+  assert.equal(SAIDAS_DO_CONVITE.semToken.texto, 'Use o botão do e-mail que você recebeu. Se você já entrou antes, é só usar Entrar.')
+  assert.equal(SAIDAS_DO_CONVITE.limitado.texto, 'Espere uns minutos e abra o link do e-mail de novo. Se você já entrou antes, é só usar Entrar.')
+  for (const fase of ['vencido', 'semToken', 'limitado']) assert.doesNotMatch(SAIDAS_DO_CONVITE[fase].texto, /dona|criou a sua senha/, fase)
 })
 
 console.log(`\n${passaram} verificações passaram${falharam.length ? `, ${falharam.length} falharam` : ''}.`)

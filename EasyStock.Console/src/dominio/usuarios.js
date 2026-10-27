@@ -24,6 +24,13 @@ export function controlesDaPessoa(usuario) {
   return CONTROLES_DA_LINHA.filter((controle) => pode[controle])
 }
 
+// O console pode subir antes da API da hierarquia (ou a API voltar atrás): a lista chega sem `acoes` e os perfis sem
+// `atribuivel`. O bloqueio continua (nada pela regra local), mas a aba diz por quê.
+const semAcoes = (usuario) => !usuario?.acoes || typeof usuario.acoes !== 'object'
+const semAtribuivel = (perfil) => typeof perfil?.atribuivel !== 'boolean'
+export const listaDeVersaoAntiga = ({ usuarios = [], perfis = [] }) => usuarios.some(semAcoes) || perfis.some(semAtribuivel)
+export const AVISO_DE_VERSAO_ANTIGA = 'A lista veio de uma versão antiga do sistema. As ações e o convite voltam quando a atualização terminar.'
+
 // "Dona" é a marca do vínculo, não um perfil; a sessão do suporte é a de nível SuperAdmin.
 export const ehDona = (usuario) => usuario?.dona === true
 export const ehSuporteDaSessao = (sessao) => sessao?.usuario?.nivel === 'SuperAdmin'
@@ -39,9 +46,9 @@ export function ordenarPerfis(perfis) {
   return [...perfis].sort((a, b) => posicao(a) - posicao(b) || a.nome.localeCompare(b.nome, 'pt-BR'))
 }
 
-// Administração não mexe na dona nem em outra Administração (HIERARQUIA): o resumo não promete a equipe inteira.
+// Administração não mexe na dona nem em outra Administração (HIERARQUIA): o resumo diz de quem ela cuida.
 const RESUMO_DO_PERFIL = {
-  administracao: 'Tudo, até Configurações; na equipe, cuida de Gerência para baixo',
+  administracao: 'Tudo; na equipe, cuida de Gerência, Atendimento e Cozinha',
   gerencia: 'Toda a operação, com estoque e relatórios, menos Configurações',
   atendimento: 'Conversas, pedidos, cardápio, caixa e entregas',
   cozinha: 'Fila de preparo e produção',
@@ -81,16 +88,22 @@ export function estadoDoConvite(campos, perfis) {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const chaveDoEmail = (email) => String(email ?? '').trim().toLowerCase()
 // `dona` aqui já é a marca que vale (a de `estadoDoConvite`): só ela pede o e-mail duas vezes.
-export function erroDoConvite({ nome, email, perfilId, dona = false, emailDeNovo = '' }) {
-  if (!nome.trim()) return 'Escreva o nome da pessoa.'
-  if (!EMAIL.test(email.trim())) return 'Confira o e-mail: o convite vai para ele.'
-  if (!perfilId) return 'Escolha o perfil.'
-  if (dona && !String(emailDeNovo ?? '').trim()) return 'Digite o e-mail mais uma vez para conferir.'
-  if (dona && chaveDoEmail(emailDeNovo) !== chaveDoEmail(email)) return 'Os dois e-mails não são iguais. Confira e digite o mesmo nas duas vezes.'
+// O campo vem junto: a tela marca o campo errado e leva o foco até ele.
+export function falhaDoConvite({ nome, email, perfilId, dona = false, emailDeNovo = '' }) {
+  const falha = (campo, texto) => ({ campo, texto })
+  if (!nome.trim()) return falha('nome', 'Escreva o nome da pessoa.')
+  if (!EMAIL.test(email.trim())) return falha('email', 'Confira o e-mail: o convite vai para ele.')
+  if (!perfilId) return falha('perfilId', 'Escolha o perfil.')
+  if (dona && !String(emailDeNovo ?? '').trim()) return falha('emailDeNovo', 'Digite o e-mail mais uma vez para conferir.')
+  if (dona && chaveDoEmail(emailDeNovo) !== chaveDoEmail(email)) {
+    return falha('emailDeNovo', 'Os dois e-mails não são iguais. Confira e digite o mesmo nas duas vezes.')
+  }
   return null
 }
+export const erroDoConvite = (campos) => falhaDoConvite(campos)?.texto ?? null
 
-// Marcar e tirar a marca de dona pedem confirmação; o suporte explica o porquê (fica no histórico da API).
+// Marcar e tirar a marca de dona pedem confirmação. Pela especificação (tabela do suporte) e pela política da API, só
+// tirar a marca de uma dona pede o motivo do suporte (fica no histórico); marcar, nem do suporte.
 export const MINIMO_DO_MOTIVO = 10
 export const erroDoMotivo = (motivo) => (String(motivo ?? '').trim().length >= MINIMO_DO_MOTIVO
   ? null
@@ -101,7 +114,7 @@ export function confirmacaoDaMarcaDeDona(acao, usuario, suporte) {
     return {
       texto: `Como dona, ${nome} pode tudo, inclusive marcar outras donas. Para trocar o perfil ou desativar uma dona, antes é preciso tirar a marca.`,
       confirmar: `Marcar ${nome} como dona`,
-      pedeMotivo: suporte === true,
+      pedeMotivo: false,
     }
   }
   return {
@@ -114,7 +127,7 @@ export function confirmacaoDaMarcaDeDona(acao, usuario, suporte) {
 // Recusas da política de hierarquia (#2070), na língua da casa. Código que a tela não conhece mostra a frase da API.
 export const MENSAGEM_DO_CODIGO = {
   // Quem recebe é a Administração mexendo na dona ou em outra Administração; a frase não manda pedir a ninguém.
-  HIERARQUIA: 'Esta mudança não cabe ao seu perfil.',
+  HIERARQUIA: 'Seu perfil não permite fazer isso com esta pessoa.',
   USUARIO_PROPRIO: 'Você não pode mudar o seu próprio acesso.',
   DONA_PROTEGIDA: 'Ninguém da casa troca o perfil nem desativa uma dona. Antes é preciso tirar a marca de dona.',
   DONA_EMAIL_EXISTENTE: 'Este e-mail já tem conta no sistema. Convide a dona com um e-mail que ainda não tenha conta.',
@@ -122,6 +135,7 @@ export const MENSAGEM_DO_CODIGO = {
   DONA_NAO_ADMIN: 'Só quem tem o perfil Administração pode ser dona. Troque o perfil antes.',
   DONA_CONTA_NAO_PROVADA: 'Esta pessoa ainda não confirmou a conta. Ela precisa aceitar o convite pelo e-mail ou entrar com a conta Google antes.',
   DONA_SUPORTE: 'O acesso do suporte não pode ser marcado como dona.',
+  MOTIVO_OBRIGATORIO: `O suporte precisa escrever o motivo, com pelo menos ${MINIMO_DO_MOTIVO} caracteres. Ele fica no histórico.`,
 }
 export const mensagemDaFalha = (falha) => MENSAGEM_DO_CODIGO[falha?.codigo] ?? falha?.message
 
@@ -178,18 +192,19 @@ export const senhaValida = (senha) => REGRAS_DE_SENHA.every((r) => r.vale(senha)
 // O que a tela do convite diz quando não há mais o que preencher. Um botão só, "Entrar", em todas.
 export const SAIDAS_DO_CONVITE = {
   pronto: { titulo: 'Senha criada', texto: 'Agora é só entrar com o seu e-mail e a senha que você escolheu.' },
+  // #2070: quem lê pode ser a própria dona e pode entrar pelo Google, sem senha: nada de "peça à dona" nem "criou a senha".
   vencido: {
     titulo: 'Este convite já não vale',
-    texto: 'Se você já criou a sua senha, é só entrar. Se ainda não criou, peça à dona para reenviar o convite.',
+    texto: 'Se você já entrou antes, use Entrar, com o Google ou com a senha. Se ainda não entrou, peça um convite novo a quem convidou você.',
   },
   // A página foi aberta sem o link (recarregada em outra aba, por exemplo): o convite pode estar valendo.
   semToken: {
     titulo: 'Abra o link do convite de novo',
-    texto: 'Use o botão do e-mail que você recebeu. Se já criou a sua senha, é só entrar.',
+    texto: 'Use o botão do e-mail que você recebeu. Se você já entrou antes, é só usar Entrar.',
   },
   limitado: {
     titulo: 'Muitas tentativas seguidas',
-    texto: 'Espere uns minutos e abra o link do e-mail de novo. Se já criou a sua senha, é só entrar.',
+    texto: 'Espere uns minutos e abra o link do e-mail de novo. Se você já entrou antes, é só usar Entrar.',
   },
 }
 
@@ -202,27 +217,27 @@ export function tokenDoConvite(hash) {
 }
 export const ehRotaDeConvite = (hash) => /^#\/convite(\?|$)/.test(hash ?? '')
 
-// #2070: o convite também se aceita entrando com a conta Google do e-mail convidado (a API só aceita com o
-// convite aberto). Mesmo formato do `google` da TelaLogin, mas nunca entra sozinho: o aparelho da casa pode ter
-// a conta Google de outra pessoa já escolhida. Entrou: `aoEntrar` conclui o convite.
-export function googleDoConvite(google, aoEntrar) {
-  if (!google) return null
+// #2070: o convite também se aceita entrando com a conta Google do e-mail convidado (o caso de uso fica em
+// `aplicacao/convite`). A API ainda não confere se a conta que entrou é a do convite: quem tiver conta entra. Antes de
+// largar o convite, a tela diz quem entrou; quem não é a pessoa convidada sai e volta ao convite.
+const SAIA_SE_NAO_E_VOCE = 'Se não é você, saia e entre com a conta Google do e-mail que recebeu o convite.'
+export function saidaDoGoogleNoConvite(quem) {
+  const nome = String(quem?.nome ?? '').trim()
   return {
-    buscarClientId: google.buscarClientId,
-    opcoes: () => ({ auto_select: false, oferecer: false }),
-    entrar: async (idToken) => {
-      await google.entrar(idToken)
-      aoEntrar()
-    },
+    titulo: nome ? `Você entrou como ${nome}` : 'Você entrou',
+    texto: quem?.email ? `Conta ${quem.email}. ${SAIA_SE_NAO_E_VOCE}` : SAIA_SE_NAO_E_VOCE,
   }
 }
 // A API recusa o Google sempre com 401 `INVALID_CREDENTIALS` e a frase do caso (sem acesso, convite vencido,
-// conta não confirmada). No convite a causa mais comum é a conta errada: a frase da API ganha o que conferir.
+// conta não confirmada). No convite a causa mais comum é a conta errada: a frase da API ganha o que conferir, menos
+// quando ela já fala do convite (vencido: trocar de conta não adianta).
 const CONFIRA_A_CONTA = 'Confira se escolheu a conta Google do e-mail que recebeu o convite.'
 const comPonto = (frase) => (/[.!?]$/.test(frase) ? frase : `${frase}.`)
-export const fraseDaFalhaDoGoogleNoConvite = (falha) => (falha?.codigo === 'INVALID_CREDENTIALS'
-  ? `${comPonto(falha.message)} ${CONFIRA_A_CONTA}`
-  : falha?.message ?? 'Não deu para entrar com o Google. Tente de novo.')
+export function fraseDaFalhaDoGoogleNoConvite(falha) {
+  if (falha?.codigo !== 'INVALID_CREDENTIALS') return falha?.message ?? 'Não deu para entrar com o Google. Tente de novo.'
+  const frase = comPonto(falha.message)
+  return /convite/i.test(frase) ? frase : `${frase} ${CONFIRA_A_CONTA}`
+}
 
 // Auditoria: a ação gravada pela API vira o que aconteceu, em palavras da casa.
 const ACOES = {

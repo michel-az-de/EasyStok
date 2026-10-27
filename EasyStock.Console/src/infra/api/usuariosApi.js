@@ -46,3 +46,8 @@ export const listarAuditoria = ({ usuarioId = null, pagina = 1, tamanho = 50 } =
 // Anônimo: quem aceita o convite ainda não tem sessão.
 export const aceitarConvite = (token, novaSenha) =>
   chamarApi('/api/auth/aceitar-convite', { metodo: 'POST', corpo: { token, novaSenha }, autenticado: false })
+
+// #2070: entrar pelo Google no convite troca a sessão de quem estava no aparelho; esta encerra a anterior no servidor
+// (o `sair` da autenticação só encerra a sessão atual).
+export const encerrarSessaoAnterior = (refreshToken) =>
+  chamarApi('/api/auth/logout', { metodo: 'POST', corpo: { refreshToken }, autenticado: false, sinal: AbortSignal.timeout(15000) })
