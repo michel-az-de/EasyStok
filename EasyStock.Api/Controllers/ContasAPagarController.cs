@@ -69,6 +69,7 @@ public class ContasAPagarController(
             return DataCreated($"/api/contas-a-pagar/{r.Id}", r);
         }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
+        catch (EasyStock.Application.UseCases.Financeiro.Common.ContaFinanceiraDuplicadaException ex) { return DataConflict(ex.Message); }
     }
 
     [HttpPatch("{id:guid}")]

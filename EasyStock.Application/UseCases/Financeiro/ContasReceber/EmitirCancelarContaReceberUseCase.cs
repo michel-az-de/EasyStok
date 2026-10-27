@@ -13,6 +13,8 @@ public class EmitirContaReceberUseCase(IContaReceberRepository repo, IUnitOfWork
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         var c = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id, ct);
         if (c is null) return null;
+        // #2095 (F15): emitir de novo é idempotente e não grava um segundo evento "Emitida".
+        if (c.Status == StatusContaFinanceira.Aberta) return ContaReceberResult.De(c);
 
         try { c.Emitir(); }
         catch (RegraDeDominioVioladaException ex) { throw new UseCaseValidationException(ex.Message); }
@@ -38,6 +40,7 @@ public class CancelarContaReceberUseCase(IContaReceberRepository repo, IUnitOfWo
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (string.IsNullOrWhiteSpace(cmd.Motivo))
             throw new UseCaseValidationException("Motivo do cancelamento e obrigatorio.");
+        ValidacaoFinanceira.Texto(cmd.Motivo, ValidacaoFinanceira.MotivoMax, "Motivo do cancelamento");
 
         var c = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id, ct);
         if (c is null) return null;

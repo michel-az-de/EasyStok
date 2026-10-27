@@ -19,6 +19,8 @@ public class EmitirContaPagarUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         var c = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id, ct);
         if (c is null) return null;
+        // #2095 (F15): emitir de novo é idempotente e não grava um segundo evento "Emitida".
+        if (c.Status == StatusContaFinanceira.Aberta) return ContaPagarResult.De(c);
 
         try { c.Emitir(); }
         catch (RegraDeDominioVioladaException ex) { throw new UseCaseValidationException(ex.Message); }
