@@ -7501,7 +7501,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="cta-row">
         <button class="cta-btn" onclick="clearProduction()">Limpar</button>
-        <button class="cta-btn primary" id="saveProdBtn" onclick="openProductionConfirm()" disabled>Registrar produção</button>
+        <button class="cta-btn primary" id="saveProdBtn" onclick="openProductionConfirm()" disabled>Conferir produção</button>
       </div>
       </section>
 
@@ -8079,7 +8079,7 @@ body.ux-calm [data-screen="producao"] .section-label {
   <div class="modal-overlay" id="productionConfirmModal" role="dialog" aria-modal="true" aria-labelledby="productionConfirmTitle">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
-      <div class="modal-title" id="productionConfirmTitle">Registrar <span class="accent">produção</span></div>
+      <div class="modal-title" id="productionConfirmTitle">Conferir <span class="accent">produção</span></div>
       <div class="modal-sub" id="batchDate">lote de hoje</div>
 
       <label class="modal-label">Itens</label>
@@ -8101,7 +8101,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeProductionConfirm()">Cancelar</button>
-        <button class="cta-btn primary" onclick="confirmProduction()">Registrar e abrir etiquetas</button>
+        <button class="cta-btn primary" onclick="confirmProduction()">Confirmar e abrir etiquetas</button>
       </div>
     </div>
   </div>
@@ -10816,14 +10816,14 @@ function getOrderPrimaryActions(o) {
         return [
           { key: 'confer', label: 'Conferir', icon: '✅', primary: true,
             handler: 'openConfer', args: [id] },
-          { key: 'charge', label: 'Cobrar', icon: '💰', primary: false,
+          { key: 'charge', label: 'Preparar cobrança', icon: '💰', primary: false,
             handler: 'openCobranca', args: [id] }
         ];
       }
       return [
         { key: 'deliver', label: 'Marcar entregue', icon: '✓', primary: true,
           handler: 'applyAdvanceTransition', args: [id, 'entregue'] },
-        { key: 'charge', label: 'Cobrar', icon: '💰', primary: false,
+        { key: 'charge', label: 'Preparar cobrança', icon: '💰', primary: false,
           handler: 'openCobranca', args: [id] }
       ];
     }
@@ -11390,7 +11390,7 @@ function _normalizeSearch(s) {
 const GS_SHORTCUTS = [
   { key: 'novo-pedido', label: 'Novo pedido', icon: '➕', kind: 'shortcut',
     keywords: 'novo pedido criar adicionar', action: function () { go('pedidos'); if (typeof goPedidosTab === 'function') goPedidosTab('novo'); } },
-  { key: 'producao', label: 'Registrar produção', icon: '🏭', kind: 'shortcut',
+  { key: 'producao', label: 'Produção', icon: '🏭', kind: 'shortcut',
     keywords: 'producao lote registrar', action: function () { go('producao'); } },
   { key: 'conferencia', label: 'Abrir conferência', icon: '✅', kind: 'shortcut',
     keywords: 'conferencia conferir scanner qr', action: function () { go('conferencia'); } },
@@ -12166,7 +12166,7 @@ function renderOpenOrders() {
         : `advanceOrder('${o.id}')`;
       const secondaryActions = calm
         ? `<button class="open-full" onclick="go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)">Abrir</button>`
-        : `<button onclick="openCobranca('${o.id}')" title="Gerar cobranca">Cobrar</button>
+        : `<button onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>
           <button onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Etiqueta</button>`;
       card.innerHTML = `
         <div class="home-order-top">
@@ -12617,8 +12617,8 @@ function renderProductGrid() {
   const saveBtn = document.getElementById('saveProdBtn');
   saveBtn.disabled = !anyCounted;
   saveBtn.textContent = anyCounted
-    ? `Registrar ${totalUnits} unidade${totalUnits === 1 ? '' : 's'}`
-    : 'Registrar produção';
+    ? `Conferir ${totalUnits} unidade${totalUnits === 1 ? '' : 's'}`
+    : 'Conferir produção';
 }
 
 function clearProduction(productIds = null) {
@@ -14426,9 +14426,9 @@ function renderKanbanCard(o, col) {
         <div class="k-actions">
           <button class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
           ${(o.status === 'aguardando' || o.status === 'preparando') ? `<button class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
-          ${(Number(o.total) || 0) > 0 ? `<button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>` : ''}
+          ${(Number(o.total) || 0) > 0 ? `<button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>` : ''}
           <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir</button>
-          <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
+          <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Histórico</button>
         </div>
         <div class="k-actions">
           <button class="k-advance" onclick="advanceOrder('${o.id}')">${col.next}</button>
@@ -21936,10 +21936,10 @@ function saveOrder() {
     : `<span class="hi">✓ Pedido criado</span> pra ${escapeHtml(nomeCli)} · ${money(total)}`;
   const actions = retroAtMs ? [
     { label: '🖨️ Imprimir',     fn: () => printEtiqueta(order.id) },
-    { label: '💳 Cobrar',       fn: () => openCobranca(order.id) },
+    { label: '💳 Preparar cobrança',       fn: () => openCobranca(order.id) },
     { label: 'Ver caixa',       fn: () => go('movimento') }
   ] : [
-    { label: '💳 Cobrar',       fn: () => openCobranca(order.id) },
+    { label: '💳 Preparar cobrança',       fn: () => openCobranca(order.id) },
     { label: 'Iniciar preparo', fn: () => { advanceOrder(order.id); go('pedidos'); } },
     { label: 'Ver esteira',     fn: () => {
         go('pedidos');

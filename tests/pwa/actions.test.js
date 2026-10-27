@@ -22,7 +22,7 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.deepStrictEqual(r[0].args, ['o1', 'pronto']);
   });
 
-  test('actions: pronto sem conferencia -> primary "Conferir" + secondary "Cobrar"', () => {
+  test('actions: pronto sem conferencia -> primary "Conferir" + secondary "Preparar cobrança"', () => {
     const r = JSON.parse(runInSandbox(`
       JSON.stringify(getOrderPrimaryActions({
         id: 'o1', status: 'pronto', confirmedAt: null
@@ -35,6 +35,7 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.strictEqual(r[1].key, 'charge');
     assert.strictEqual(r[1].primary, false);
     assert.strictEqual(r[1].handler, 'openCobranca');
+    assert.strictEqual(r[1].label, 'Preparar cobrança');
   });
 
   test('actions: pronto JA conferido -> primary "Marcar entregue"', () => {

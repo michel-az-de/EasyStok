@@ -256,3 +256,18 @@ html:not([data-theme=light]) body.pilot-app .pilot-rail .pilot-bell-count { back
 html:not([data-theme=light]) body.pilot-app .pilot-rail[data-sync=online] [role=status] { color: var(--basil); }
 html:not([data-theme=light]) body.pilot-app .pilot-rail[data-sync=pending] [role=status] { color: var(--gold); }
 html:not([data-theme=light]) body.pilot-app .pilot-rail[data-sync=invalid] [role=status] { color: #efb19e; }
+/* Mesma geometria e tamanhos mínimos do Console, sem substituir ícones dos produtos. */
+.pilot-card { grid-template-columns: 32px minmax(0, 1fr) 18px; }
+.pilot-action-icon svg { width: 24px; height: 24px; }
+.pilot-action-icon svg[data-pilot-icon=producao], .pilot-local-title svg[data-pilot-icon=pedido-em-preparo] { width: 32px; height: 32px; flex-shrink: 0; }
+.pilot-local-title { display: flex; align-items: center; gap: 10px; }
+.pilot-shortcuts button[data-action=printers], #pilotNoticeRefresh { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.pilot-shortcuts svg, #pilotNoticeRefresh svg { width: 24px; height: 24px; flex-shrink: 0; }
+body.pilot-app .phone .nav-icon { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; }
+body.pilot-app .phone .nav-icon svg[data-pilot-icon=producao], body.pilot-app .phone .nav-icon svg[data-pilot-icon=pedido-em-preparo] { width: 32px; height: 32px; }
+@media (max-width: 480px) { .pilot-card { grid-template-columns: 32px minmax(0, 1fr) 16px; } }
+.pilot-card-arrow svg, .pilot-notice-item-arrow svg { width: 24px; height: 24px; }
+.pilot-card { grid-template-columns: 32px minmax(0, 1fr) 24px; }
+body.pilot-app .header .icon-btn svg[data-pilot-icon], body.pilot-app .phone .nav-icon svg[data-pilot-icon] { width: 24px; height: 24px; }
+body.pilot-app .phone .nav-icon svg[data-pilot-icon=producao], body.pilot-app .phone .nav-icon svg[data-pilot-icon=pedido-em-preparo] { width: 32px; height: 32px; }
+body.pilot-app .phone .k-actions button { min-height: 44px; }

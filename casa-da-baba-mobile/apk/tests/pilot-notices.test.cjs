@@ -80,7 +80,7 @@ test('permissão negada tem ação clara e não é descrita como entrega pronta'
   const s = normal(); s.permission = 'denied'; s.registered = false;
   const { nodes, calls } = harness(s); await settle();
   assert.match(nodes.get('pilotNoticeHealthTitle').textContent, /Permita/);
-  assert.equal(nodes.get('pilotNoticePermission').textContent, 'Ativar notificações');
+  assert.equal(nodes.get('pilotNoticePermission').textContent, 'Ativar avisos neste aparelho');
   await nodes.get('pilotNotices').click('permission'); assert.equal(calls.permission, 1);
   assert.equal(noticePresentation({ ...s, permission: 'blocked' }).tone, 'attention');
 });
@@ -100,7 +100,7 @@ test('falha de rede preserva histórico e permite nova tentativa sem alegar suce
   const { nodes, plugin, state } = harness(); await settle();
   plugin.noticeRefresh = async () => { throw new Error('segredo que não deve ir para a UI'); };
   await nodes.get('pilotNotices').click('refresh');
-  assert.match(nodes.get('pilotNoticeHealthTitle').textContent, /conferir a conexão/);
+  assert.match(nodes.get('pilotNoticeHealthTitle').textContent, /Não foi possível atualizar os avisos/);
   assert.doesNotMatch(nodes.get('pilotNoticeError').textContent, /segredo/);
   assert.equal(nodes.get('pilotNoticeRefresh').disabled, false); assert.equal(nodes.get('pilotNoticeList').children.length, 1);
   plugin.noticeRefresh = async () => structuredClone(state); await nodes.get('pilotNotices').click('refresh');

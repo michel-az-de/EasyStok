@@ -36,10 +36,10 @@ test('diferencia servidor acessível de aparelho pareado e envio pendente', () =
   assert.equal(local.queue, '2 alterações aguardando envio.');
   const offline = connectionStatus({ health: 'offline', paired: true, invalid: false, pending: 1 });
   assert.match(offline.status, /Sem conexão confirmada/);
-  assert.match(offline.pairing, /pareada/);
+  assert.match(offline.pairing, /vinculado/);
   assert.equal(offline.queue, '1 alteração aguardando envio.');
   const revoked = connectionStatus({ health: 'online', paired: true, invalid: true, pending: 0 });
-  assert.match(revoked.pairing, /inválido/);
+  assert.match(revoked.pairing, /inválida/);
   assert.doesNotMatch(revoked.queue, /sincronizad|confirmad/);
 });
 
@@ -170,7 +170,7 @@ test('sucesso e falha de pareamento ficam visíveis sem abrir diagnóstico', asy
   await nodes.get('pilotHome').click('pair');
   assert.equal(nodes.get('pilotHome').open, true);
   assert.equal(doc.activeElement, nodes.get('pilotConnection'));
-  assert.match(nodes.get('pilotConnection').textContent, /Produção pareada/);
+  assert.match(nodes.get('pilotConnection').textContent, /Aparelho vinculado/);
   root.pairDevicePrompt = async () => { throw new Error('Código inválido'); };
   await nodes.get('pilotHome').click('pair');
   assert.equal(doc.activeElement, nodes.get('pilotError'));

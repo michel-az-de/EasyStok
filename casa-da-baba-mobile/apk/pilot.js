@@ -16,8 +16,8 @@
 
   function connectionStatus({ health, paired, invalid, pending, importPending }) {
     const status = health === 'online' ? 'EasyStok acessível' : health === 'checking' ? 'Conferindo conexão' : 'Sem conexão confirmada';
-    const pairing = invalid ? 'Reconecte este aparelho: o pareamento está inválido.'
-      : paired ? 'Produção pareada com o EasyStok.' : 'Produção só neste aparelho. Conecte com o código de pareamento para sincronizar.';
+    const pairing = invalid ? 'Conexão do aparelho inválida. Conecte novamente.'
+      : paired ? 'Aparelho vinculado ao EasyStok.' : 'Produção só neste aparelho. Conecte com o código de pareamento para sincronizar.';
     const queue = pending > 0 ? pending + (pending === 1 ? ' alteração aguardando envio.' : ' alterações aguardando envio.')
       : 'Nenhuma alteração na fila de envio deste aparelho.';
     const syncState = invalid ? 'invalid' : importPending ? 'pending' : !paired ? 'local' : health === 'online' && pending > 0 ? 'pending' : health;
@@ -66,15 +66,101 @@
 
   function noticePresentation(state, online = true) {
     if (!state?.supported) return { tone: 'neutral', title: state?.native ? 'Atualize o app para receber avisos' : 'Avisos no app Android', body: state?.native ? 'Esta instalação ainda não oferece a central de avisos. Use Atualizar APK na tela inicial.' : 'Esta é uma prévia no navegador. O recebimento e as confirmações funcionam no APK instalado.', action: '' };
-    if (state.permission === 'denied' || state.permission === 'blocked') return { tone: 'attention', title: 'Permita receber avisos', body: 'As notificações estão desativadas neste aparelho. Você ainda pode consultar o histórico aqui.', action: 'Ativar notificações' };
+    if (state.permission === 'denied' || state.permission === 'blocked') return { tone: 'attention', title: 'Permita receber avisos', body: 'As notificações estão desativadas neste aparelho. Você ainda pode consultar o histórico aqui.', action: 'Ativar avisos neste aparelho' };
     if (!online) return { tone: 'attention', title: 'Sem conexão agora', body: 'Os avisos salvos continuam disponíveis. As confirmações aguardam a volta da conexão.', action: 'Configurar notificações' };
     if (state.checking) return { tone: 'neutral', title: 'Conferindo os avisos', body: 'Verificando o registro deste aparelho e as confirmações pendentes.', action: 'Configurar notificações' };
-    if (state.lastError) return { tone: 'attention', title: 'Precisamos conferir a conexão', body: 'O registro ou a atualização dos avisos não foi concluído. Toque em Atualizar avisos para tentar novamente.', action: 'Configurar notificações' };
+    if (state.lastError) return { tone: 'attention', title: 'Não foi possível atualizar os avisos', body: 'O registro ou a atualização dos avisos não foi concluído. Toque em Atualizar avisos para tentar novamente.', action: 'Configurar notificações' };
     if (!state.registered) return { tone: 'attention', title: 'Registro ainda não confirmado', body: 'A permissão está ativada. Toque em Atualizar avisos para registrar este aparelho com internet.', action: 'Configurar notificações' };
     return { tone: 'ready', title: 'Aparelho registrado para avisos', body: 'A permissão está ativada. Isso ainda não confirma a entrega de uma nova notificação.', action: 'Configurar notificações' };
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation };
+  // Subconjunto canônico do Console: MarcaIcone.jsx (Casa da Baba V4, grid32) e Icone.jsx (grid24).
+  // Geometria sem redesenho; pilot-icons.test.cjs verifica paridade com essas fontes vivas.
+  const CONSOLE_ICONS = {
+    "producao": {
+      "grid": 32,
+      "size": 32,
+      "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 11H26V23C26 28 6 28 6 23Z M3 11H29 M6 15H3V20H6 M26 15H29V20H26 M9 7C11 5 8 4 10 2 M16 7C18 5 15 4 17 2 M23 7C25 5 22 4 24 2\"/></g>"
+    },
+    "mensagem": {
+      "grid": 32,
+      "size": 24,
+      "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 5H28V22H14L6 29V22H4Z M9 11H23 M9 16H19\"/></g>"
+    },
+    "pedido-em-preparo": {
+      "grid": 32,
+      "size": 32,
+      "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 28V4H24V14 M8 28L11 26 14 28 17 26\"/><path d=\"M11 8H20 M11 12H16 M18 22H29V27H18Z M17 22H30 M21 19V17 M26 19V17\"/></g>"
+    },
+    "produto": {
+      "grid": 32,
+      "size": 24,
+      "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 4H24L27 9V28H5V9Z M5 9H27 M8 4 10 9 M24 4 22 9\"/><rect x=\"10\" y=\"15\" width=\"12\" height=\"8\" rx=\"2\"/></g>"
+    },
+    "configuracoes": {
+      "grid": 32,
+      "size": 24,
+      "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 8H12 M20 8H28 M4 24H19 M27 24H28 M16 4V12 M23 20V28 M4 16H5 M13 16H28\"/><circle cx=\"16\" cy=\"8\" r=\"4\"/><circle cx=\"9\" cy=\"16\" r=\"4\"/><circle cx=\"23\" cy=\"24\" r=\"4\"/></g>"
+    },
+    "bell": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M10.268 21a2 2 0 0 0 3.464 0M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"/>"
+    },
+    "fechar": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M6 6l12 12M18 6 6 18\"/>"
+    },
+    "chevron-right": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M9 18l6-6-6-6\"/>"
+    },
+    "printer": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6M6 14h12v8H6Z\"/>"
+    },
+    "refresh-cw": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5\"/>"
+    },
+    "search": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14ZM16.5 16.5 21 21\"/>"
+    },
+    "house": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>"
+    },
+    "ellipsis": {
+      "grid": 24,
+      "size": 24,
+      "body": "<path d=\"M12 11a1 1 0 1 0 0 2a1 1 0 0 0 0-2ZM19 11a1 1 0 1 0 0 2a1 1 0 0 0 0-2ZM5 11a1 1 0 1 0 0 2a1 1 0 0 0 0-2Z\"/>"
+    }
+  };
+  function pilotIcon(name) {
+    const icon = CONSOLE_ICONS[name];
+    if (!icon) return '';
+    return '<svg data-pilot-icon="' + name + '" viewBox="0 0 ' + icon.grid + ' ' + icon.grid + '" width="' + icon.size + '" height="' + icon.size + '" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + icon.body + '</svg>';
+  }
+  function applyConsoleIcons(document) {
+    if (!document.querySelectorAll) return;
+    // Apenas SVGs de controles fixos. Não seleciona ícones de produtos nem etiquetas.
+    for (const [selector, name] of [
+      ['.nav-btn[data-nav="home"] .nav-icon svg', 'house'],
+      ['.nav-btn[data-nav="producao"] .nav-icon svg', 'producao'],
+      ['.nav-btn[data-nav="pedidos"] .nav-icon svg', 'pedido-em-preparo'],
+      ['.nav-btn[data-nav="more"] .nav-icon svg', 'ellipsis'],
+      ['#globalSearchBtn svg', 'search'], ['#ajustesBtn svg', 'configuracoes']
+    ]) for (const element of document.querySelectorAll(selector)) element.outerHTML = pilotIcon(name);
+  }
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation, pilotIcon, applyConsoleIcons };
   if (!root.document || !root.CDB_CONFIG?.isPilot) return;
   const config = root.CDB_CONFIG;
   const doc = root.document;
@@ -92,12 +178,12 @@
   let importUndoRequest = 0;
   const native = () => root.Capacitor?.Plugins?.PilotApp;
   const updater = () => root.Capacitor?.Plugins?.PilotUpdater;
-  const bellIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M9 20a3 3 0 0 0 6 0"/></svg>';
-  const lineIcon = paths => '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
-  const closeIcon = lineIcon('<path d="m7 7 10 10M17 7 7 17"/>');
-  const arrowIcon = lineIcon('<path d="M5 12h14m-5-5 5 5-5 5"/>');
-  const tagIcon = lineIcon('<path d="M20 13 11 4H4v7l9 9a2 2 0 0 0 3 0l4-4a2 2 0 0 0 0-3Z"/><circle cx="8" cy="8" r="1"/>');
-  const orderIcon = lineIcon('<path d="M7 3h10v18l-2-1-3 1-3-1-2 1V3Z"/><path d="M10 8h4m-4 4h4m-4 4h2"/>');
+  const bellIcon = pilotIcon('bell');
+  const closeIcon = pilotIcon('fechar');
+  const arrowIcon = pilotIcon('chevron-right');
+  const productionIcon = pilotIcon('producao');
+  const atendimentoIcon = pilotIcon('mensagem');
+  applyConsoleIcons(doc);
   const bell = (id, badge) => '<button type="button" id="' + id + '" class="pilot-bell" aria-label="Abrir avisos" title="Avisos" aria-haspopup="dialog" data-action="notices">' + bellIcon + '<span id="' + badge + '" class="pilot-bell-count" hidden aria-hidden="true"></span></button>';
   const rail = doc.createElement('div');
   rail.className = 'pilot-rail';
@@ -117,15 +203,15 @@
       <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
       <details id="pilotMigrationReceipt" class="pilot-help" hidden><summary>Última migração confirmada</summary><p id="pilotMigrationResult" class="pilot-feedback" role="status" tabindex="-1"></p></details>
       <div class="pilot-actions">
-        <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${tagIcon}</span><span class="pilot-card-copy"><span class="pilot-step">PRODUÇÃO NESTE APARELHO</span><strong>Produzir e etiquetar</strong><span class="pilot-card-description">Cadastro, validade, lote e impressão.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
-        <button type="button" class="pilot-card pilot-orders" data-action="workspace"><span class="pilot-action-icon">${orderIcon}</span><span class="pilot-card-copy"><span class="pilot-step">ATENDIMENTO ONLINE</span><strong>Pedidos e cobranças</strong><span class="pilot-card-description">Frete, mensagens e assistente no EasyStok.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
+        <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${productionIcon}</span><span class="pilot-card-copy"><span class="pilot-step">PRODUÇÃO NESTE APARELHO</span><strong>Produzir e etiquetar</strong><span class="pilot-card-description">Cadastro, validade, lote e impressão.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
+        <button type="button" class="pilot-card pilot-orders" data-action="workspace"><span class="pilot-action-icon">${atendimentoIcon}</span><span class="pilot-card-copy"><span class="pilot-step">ONLINE</span><strong>Atendimento</strong><span class="pilot-card-description">Pedidos, frete e cobranças no EasyStok.</span></span><span class="pilot-card-arrow">${arrowIcon}</span></button>
       </div>
       <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><button type="button" id="pilotPairButton" data-action="pair" aria-describedby="pilotPairHint">Conectar produção</button><button type="button" id="pilotReconnect" data-action="reconnect" hidden>Verificar conexão</button></div>
       <p class="pilot-hint">No Atendimento, entre com seu acesso da Casa da Baba. As alterações são feitas na operação real.</p>
-      <button type="button" class="pilot-local" data-action="local-orders"><strong>Registrar pedido no aparelho</strong><span>Sem cálculo de frete nem envio automático. A sincronização exige pareamento.</span></button>
+      <button type="button" class="pilot-local" data-action="local-orders"><strong class="pilot-local-title">${pilotIcon('pedido-em-preparo')}<span>Registrar pedido no aparelho</span></strong><span>Sem frete nem envio automático. Conecte o aparelho para sincronizar.</span></button>
       <details class="pilot-help pilot-migration"><summary>Já usava o PWA antigo?</summary><p>No Android da operação, abra os Ajustes do PWA antigo e exporte o backup em JSON. Importe esse arquivo aqui antes de conectar este app. Não apague o PWA antigo até conferir os dados.</p><button type="button" data-action="import-pwa">Trazer dados do PWA</button><p>Se está começando agora, basta conectar a produção.</p></details>
       <div class="pilot-shortcuts">
-        <button type="button" data-action="printers">Impressoras</button>
+        <button type="button" data-action="printers">${pilotIcon('printer')}<span>Impressoras</span></button>
         <button type="button" data-action="migration-guide">Como trazer meus dados</button>
       </div>
       <p id="pilotPairHint" class="pilot-hint">Solicite o código de pareamento à equipe da Casa da Baba para conectar este aparelho.</p>
@@ -192,7 +278,8 @@
     permission.textContent = presentation.action; permission.hidden = !noticeState.supported;
     const refresh = doc.getElementById('pilotNoticeRefresh');
     refresh.hidden = !noticeState.supported; refresh.disabled = noticeLoading || noticeState.checking === true;
-    refresh.textContent = noticeLoading || noticeState.checking ? 'Conferindo…' : 'Atualizar avisos';
+    const refreshLabel = noticeLoading || noticeState.checking ? 'Conferindo…' : 'Atualizar avisos';
+    refresh.innerHTML = pilotIcon('refresh-cw') + '<span>' + refreshLabel + '</span>';
     if (restorePermissionFocus || restoreRefreshFocus) (selectedNotice ? doc.getElementById('pilotNoticeDetailTitle') : !refresh.disabled && !refresh.hidden ? refresh : doc.getElementById('pilotNoticesTitle')).focus();
     const unread = Number.isSafeInteger(noticeState.unread) && noticeState.unread > 0 ? noticeState.unread : 0;
     for (const [buttonId, badgeId] of [['pilotNoticeBell', 'pilotNoticeCount'], ['pilotHomeNoticeBell', 'pilotHomeNoticeCount']]) {
