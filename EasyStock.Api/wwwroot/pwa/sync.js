@@ -2137,6 +2137,8 @@
   }
 
   async function maybeApplyPwaUpdate(versionPayload) {
+    // No piloto o conteúdo segue o canal OTA do APK, que já checa sozinho; PwaCacheVersion é do Console.
+    if (window.CDB_CONFIG?.isPilot) return;
     if (_pwaUpdating) return;
     if (!navigator.serviceWorker || !navigator.serviceWorker.getRegistration) return;
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publicação OTA em duas fases. Nenhum modo remove releases ou pacotes anteriores."""
+"""Publicação OTA em duas fases. Nenhum modo remove releases ou pacotes anteriores; só o staging da própria publicação."""
 import base64
 import contextlib
 import hashlib
@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -24,7 +25,8 @@ def require(condition, message):
 def validate(payload):
     require(set(payload) == FIELDS, "Campos de manifesto invalidos.")
     require(payload["schemaVersion"] == 1 and payload["appId"] == APP and payload["channel"] == "piloto", "Identidade OTA invalida.")
-    require(payload["nativeVersionCode"] == 3 and payload["dataSchemaVersion"] == 2, "Versao nativa/esquema incompatível.")
+    # A VPS só confere a forma: o aparelho recusa APK ou esquema diferente do seu, e o manifesto é assinado.
+    require(all(type(payload[f]) is int and 0 < payload[f] <= 2147483647 for f in ("nativeVersionCode", "dataSchemaVersion")), "Versao nativa/esquema invalida.")
     require(type(payload["sequence"]) is int and 0 < payload["sequence"] <= 2147483647, "Sequencia invalida.")
     require(isinstance(payload["bundleVersion"], str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", payload["bundleVersion"]), "bundleVersion invalida.")
     require(isinstance(payload["sha256"], str) and re.fullmatch(r"[a-f0-9]{64}", payload["sha256"]), "Hash invalido.")
@@ -111,8 +113,11 @@ def publish(root, staging, mode):
         root.mkdir(parents=True, exist_ok=True)
         staging.mkdir(mode=0o700)
         return {"phase": mode}
-    require(mode in ("install", "activate") and staging.is_dir(), "Fase/diretorio invalido.")
+    require(mode in ("install", "activate", "discard") and staging.is_dir(), "Fase/diretorio invalido.")
     with publication_lock(root):
+        if mode == "discard":
+            shutil.rmtree(staging)
+            return {"phase": mode}
         releases = list(staging.glob("release-*.json"))
         require(len(releases) == 1, "Staging deve conter uma release.")
         staged_key, trusted_key = staging / "ota-public-key.der", root / "ota-public-key.der"
@@ -146,11 +151,12 @@ def publish(root, staging, mode):
             if latest.exists() and latest.read_bytes() != data:
                 replace(root / "previous.json", latest.read_bytes())
             replace(latest, data)
+            shutil.rmtree(staging)  # Tudo já está nos caminhos imutáveis; o staging não fica servido.
         return {"phase": mode, "sequence": payload["sequence"], "sha256": payload["sha256"]}
 
 if __name__ == "__main__":
     try:
-        require(len(sys.argv) == 4, "Uso: ota-publish.py destino staging stage|install|activate")
+        require(len(sys.argv) == 4, "Uso: ota-publish.py destino staging stage|install|activate|discard")
         print(json.dumps(publish(*sys.argv[1:])))
     except Exception as error:
         print(str(error), file=sys.stderr)

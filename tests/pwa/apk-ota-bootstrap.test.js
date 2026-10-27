@@ -134,6 +134,17 @@ module.exports = function ({ test, sandbox, assert }) {
     assert.equal(JSON.parse(f.data.get('cdb-sync-queue')).length, 1);
   });
 
+  test('#2066 OTA: PwaCacheVersion do servidor não força checagem do canal OTA do piloto', async () => {
+    const f = fixture();
+    f.context.navigator.onLine = true;
+    f.context.navigator.serviceWorker = { async getRegistration() { return null; } };
+    f.data.set('cdb-pwa-installed-version', 'W');
+    f.context.fetch = async () => ({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({ MobileSchemaVersion: 99, Ota: { PwaCacheVersion: 'X' } }) });
+    await f.context.cdbSync.pingVersion();
+    await f.context.cdbSync.pingVersion();
+    assert.equal(f.calls.filter(call => call[0] === 'check').length, 0, 'o APK checa sozinho, com o limite de 5 minutos');
+  });
+
   test('#2065 OTA: ausência do plugin no piloto não usa fallback destrutivo de PWA', async () => {
     const f = fixture(); delete f.context.Capacitor;
     assert.equal((await f.context.cdbSync.forceUpdate()).reason, 'updater-unavailable');

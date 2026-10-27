@@ -43,7 +43,7 @@ function scenario(name) {
     'function ssh { $global:events.Add("ssh:" + $args[-1]); $global:LASTEXITCODE = 0 }',
     'function scp { $global:events.Add("scp"); $global:LASTEXITCODE = 0 }',
     'function Invoke-WebRequest { param([switch]$UseBasicParsing, [int]$MaximumRedirection, [string]$Uri, [string]$OutFile, [int]$TimeoutSec)',
-    '  $global:events.Add("download"); Copy-Item -LiteralPath (Join-Path $global:directory "bundle.zip") -Destination $OutFile',
+    '  $global:events.Add("download"); if ($global:scenario -eq "download-failure") { throw "download simulado falhou" }; Copy-Item -LiteralPath (Join-Path $global:directory "bundle.zip") -Destination $OutFile',
     '}',
     'function Invoke-RestMethod { param([int]$MaximumRedirection, [string]$Uri, [int]$TimeoutSec)',
     '  $global:events.Add("latest"); Get-Content -LiteralPath (Join-Path $global:directory "release-1.json") -Raw | ConvertFrom-Json',
@@ -87,4 +87,15 @@ test('falha de push após latest retorna erro explícito sem executar rollback',
   assert.ok(result.events.indexOf('latest') < result.events.indexOf('push:send'));
   assert.match(result.stdout, /Versão publicada; push pendente/);
   assert.match(result.stdout, /sem rollback automático/);
+});
+test('#2066 falha antes de ativar descarta o staging e mantém latest', () => {
+  const result = scenario('download-failure');
+  assert.notEqual(result.status, 0);
+  assert.deepEqual(result.events.filter(event => event.startsWith('ssh:')), ['ssh:stage', 'ssh:install', 'ssh:discard']);
+  assert.match(result.stdout, /download simulado falhou/);
+});
+test('#2066 publicação ativada não chama descarte, o activate já remove o staging', () => {
+  const result = scenario('skip');
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.equal(result.events.includes('ssh:discard'), false);
 });

@@ -55,26 +55,32 @@ function Invoke-OtaRemote([string]$Mode) {
     if ($LASTEXITCODE -ne 0) { throw "Falha na fase OTA '$Mode'. A fase install nunca altera latest." }
 }
 Invoke-OtaRemote 'stage'
-foreach ($item in @(
-    @{ Source = $bundle; Name = 'bundle.zip' },
-    @{ Source = $release.FullName; Name = $release.Name },
-    @{ Source = $publicKey; Name = 'ota-public-key.der' }
-)) {
-    & scp -q $item.Source "$($SshHost):$stage/$($item.Name)"
-    if ($LASTEXITCODE -ne 0) { throw 'Transferência OTA falhou. latest permanece anterior.' }
-}
-Invoke-OtaRemote 'install'
-# Um pacote só se torna latest após conferir os bytes servidos pela URL pública.
-$download = Join-Path $output ('verification-' + [Guid]::NewGuid().ToString('N') + '.zip')
 try {
-    Invoke-WebRequest -UseBasicParsing -MaximumRedirection 0 -Uri $payload.url -OutFile $download -TimeoutSec 180
-    if ((Get-Item -LiteralPath $download).Length -ne $payload.sizeBytes -or (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash.ToLowerInvariant() -ne $payload.sha256) {
-        throw 'ZIP público divergente. latest não será promovido.'
+    foreach ($item in @(
+        @{ Source = $bundle; Name = 'bundle.zip' },
+        @{ Source = $release.FullName; Name = $release.Name },
+        @{ Source = $publicKey; Name = 'ota-public-key.der' }
+    )) {
+        & scp -q $item.Source "$($SshHost):$stage/$($item.Name)"
+        if ($LASTEXITCODE -ne 0) { throw 'Transferência OTA falhou. latest permanece anterior.' }
     }
-} finally {
-    if (Test-Path -LiteralPath $download) { Remove-Item -LiteralPath $download -Force }
+    Invoke-OtaRemote 'install'
+    # Um pacote só se torna latest após conferir os bytes servidos pela URL pública.
+    $download = Join-Path $output ('verification-' + [Guid]::NewGuid().ToString('N') + '.zip')
+    try {
+        Invoke-WebRequest -UseBasicParsing -MaximumRedirection 0 -Uri $payload.url -OutFile $download -TimeoutSec 180
+        if ((Get-Item -LiteralPath $download).Length -ne $payload.sizeBytes -or (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash.ToLowerInvariant() -ne $payload.sha256) {
+            throw 'ZIP público divergente. latest não será promovido.'
+        }
+    } finally {
+        if (Test-Path -LiteralPath $download) { Remove-Item -LiteralPath $download -Force }
+    }
+    Invoke-OtaRemote 'activate'
+} catch {
+    # Sem ativação, o staging só ocuparia disco no diretório público. latest não muda.
+    try { Invoke-OtaRemote 'discard' } catch { Write-Warning ('Staging não descartado: ' + $stage) }
+    throw
 }
-Invoke-OtaRemote 'activate'
 $published = Invoke-RestMethod -MaximumRedirection 0 -Uri ($publicBase + 'latest.json?verify=' + [Guid]::NewGuid().ToString('N')) -TimeoutSec 30
 $expected = Get-Content -LiteralPath $release.FullName -Raw | ConvertFrom-Json
 if ($published.payloadBase64 -ne $expected.payloadBase64 -or $published.signatureBase64 -ne $expected.signatureBase64) {
