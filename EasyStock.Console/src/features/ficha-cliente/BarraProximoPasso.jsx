@@ -333,15 +333,30 @@ export function BarraProximoPasso({
         </div>
       )
     } else if (!proximo) {
+      // #2079 (C2): entregue com o dinheiro da porta não lançado não está "concluído, nada pendente": a barra
+      // diz quanto falta e oferece a baixa à frente do encerrar.
+      const aReceberDoEntregue = fonteApi && Boolean(pedido.pedidoId) && pedido.estado === 'entregue' && !complementoEmAberto
+        ? saldoApi(pedido) : 0
+      if (aReceberDoEntregue > 0) saldoNoBotao = true
       corpoAcao = (
         <div className={css.botoesPrimarios}>
           {/* #1804: pedido concluído sem nada a cobrar: o atendimento acabou e só falta mandar ao histórico. */}
-          {pedido.estado === 'entregue' && !complementoEmAberto && (
+          {pedido.estado === 'entregue' && !complementoEmAberto && aReceberDoEntregue === 0 && (
             <p className={css.motivoDesabilitado}>
               Pedido concluído, nada pendente. Encerre para a conversa ir ao histórico do cliente.
             </p>
           )}
-          <Botao largo variante="primario" icone="log-out" onClick={aoEncerrarAtendimento}>
+          {aReceberDoEntregue > 0 && (
+            <>
+              <p className={css.motivoDesabilitado}>
+                Entregue com {moeda(aReceberDoEntregue)} a receber. Marque pago quando o dinheiro entrar.
+              </p>
+              <Botao largo variante="primario" icone="dollar-sign" onClick={() => setAbrindoBaixa(true)}>
+                Marcar pago ({moeda(aReceberDoEntregue)})
+              </Botao>
+            </>
+          )}
+          <Botao largo variante={aReceberDoEntregue > 0 ? 'secundario' : 'primario'} icone="log-out" onClick={aoEncerrarAtendimento}>
             Encerrar atendimento
           </Botao>
           {botaoComplemento}
