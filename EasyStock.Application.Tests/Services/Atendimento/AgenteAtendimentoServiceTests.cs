@@ -367,8 +367,7 @@ public class AgenteAtendimentoServiceTests
             pedido.MudarStatus(StatusPedido.Entregue);
         }
         else pedido.Cancelar();
-        _pedidos.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
-        _conversa.DefinirPedidoEmAndamento(pedido.Id);
+        VincularFinalizado(pedido, noBanco: pedido.Id);
         _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddSeconds(-30), TipoConteudoMensagem.Texto,
             "Eu quero uma lasanha", "wamid.in2"));
 
@@ -377,6 +376,44 @@ public class AgenteAtendimentoServiceTests
         _conversa.PedidoEmAndamentoId.Should().BeNull();
         _requisicoes[0].System.Should().Contain("Pedido em andamento: nenhum")
             .And.NotContain(pedido.Id.ToString());
+        await _conversaRepository.Received(1).TravarParaPedidoAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PedidoNovoVinculadoDuranteASolturaNaoEApagado()
+    {
+        var cancelado = Pedido.Criar(_empresaId, origem: "whatsapp");
+        cancelado.Cancelar();
+        var novo = Guid.NewGuid();
+        VincularFinalizado(cancelado, noBanco: novo);
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _conversa.PedidoEmAndamentoId.Should().Be(novo);
+    }
+
+    [Fact]
+    public async Task ConversaPresaAPedidoCanceladoVoltaAEncerrar()
+    {
+        _situacaoNoBanco = SituacaoConversa.Encerrada;
+        var cancelado = Pedido.Criar(_empresaId, origem: "whatsapp");
+        cancelado.Cancelar();
+        VincularFinalizado(cancelado, noBanco: cancelado.Id);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("encerrar_conversa"), Texto("Até mais!"));
+
+        await CriarServico(new EncerrarConversaFerramenta()).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _conversa.Situacao.Should().Be(SituacaoConversa.Encerrada);
+    }
+
+    private void VincularFinalizado(Pedido pedido, Guid? noBanco)
+    {
+        _pedidos.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+        _conversa.DefinirPedidoEmAndamento(pedido.Id);
+        _conversaRepository.TravarParaPedidoAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>()).Returns(noBanco);
+        _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
     }
 
     [Fact]

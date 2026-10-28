@@ -101,11 +101,18 @@ public sealed class AgenteAtendimentoService(
 
         // #2126: o vínculo só é limpo em parte dos caminhos de cancelamento e entrega. Pedido já finalizado
         // não é atendimento em andamento: preso, a IA respondia "quero uma lasanha" com a comanda antiga e
-        // não conseguia encerrar a conversa. Mesmo critério da reabertura (#1839).
+        // não conseguia encerrar a conversa. Mesmo critério da reabertura (#1839). Solta sob a trava da
+        // geração de pedido e grava já: o turno dura a chamada ao LLM e não pode apagar um pedido novo
+        // vinculado pela página do cardápio nesse meio-tempo (#1238).
         if (pedidos is not null && conversa.PedidoEmAndamentoId is { } pedidoId
             && await pedidos.GetByIdAsync(empresaId, pedidoId) is { } pedido
             && pedido.EmpresaId == empresaId && pedido.EstaFinalizado)
-            conversa.DefinirPedidoEmAndamento(null);
+            await unitOfWork.ExecuteInTransactionAsync(async token =>
+            {
+                var noBanco = await conversaRepository.TravarParaPedidoAsync(empresaId, conversaId, token);
+                conversa.DefinirPedidoEmAndamento(noBanco == pedidoId ? null : noBanco);
+                await unitOfWork.CommitAsync();
+            }, ct);
 
         var system = await GeracaoAgenteAtendimento.MontarSystemAsync(
             empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossieUseCase, ct);
