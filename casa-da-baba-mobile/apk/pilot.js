@@ -43,6 +43,9 @@
     for (const name of ['etqAbrirImprimir', 'etqImpImprimir', 'etqEditorAbrir', 'initEditor']) {
       if (typeof environment[name] !== 'function') throw new Error('Módulos de etiquetas indisponíveis.');
     }
+    // pilot-ui.js e pilot-settings.js escondem ações perigosas e montam os ajustes.
+    // Se um deles falhar, o trial não é confirmado e o atualizador nativo recupera a versão anterior.
+    if (environment.cdbPilotUiReady !== true || environment.cdbPilotSettingsReady !== true) throw new Error('Telas do piloto não inicializadas.');
     if (health?.ready !== true) throw new Error('Armazenamento local não confirmado.');
     const state = environment.cdbApp?.getState?.();
     for (const key of ['products', 'clients', 'orders', 'cashEntries', 'batches', 'cashClosings']) {
@@ -168,6 +171,9 @@
     "settings": { "grid": 24, "size": 24, "body": "<path d=\"M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>" },
     "upload": { "grid": 24, "size": 24, "body": "<path d=\"M12 3v12m5-7-5-5-5 5M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>" },
     "activity": { "grid": 24, "size": 24, "body": "<path d=\"M22 12h-4l-3 9-6-18-3 9H2\"/>" },
+    // Lucide (ISC): circle-x para cancelar um registro e undo-2 para desfazer, distintos de fechar e histórico.
+    "circle-x": { "grid": 24, "size": 24, "body": "<path d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20ZM15 9l-6 6M9 9l6 6\"/>" },
+    "undo-2": { "grid": 24, "size": 24, "body": "<path d=\"M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11\"/>" },
     "enviar": {
       "grid": 24,
       "size": 24,
@@ -353,7 +359,7 @@
         ${tileButton('pair', 'Conectar', 'link', 'support', 'pilotPairButton')}
         ${tileButton('printers', 'Impressoras', 'printer')}
         ${tileButton('settings', 'Configurações', 'settings')}
-        ${tileButton('migration-guide', 'Sistema Antigo', 'archive')}
+        ${tileButton('migration-guide', 'Sistema Antigo', 'ajuda')}
         ${tileButton('update', 'Atualizar', 'refresh-cw', 'support', 'pilotUpdateButton')}
       </div>
       <div class="pilot-home-support" hidden>
@@ -824,11 +830,11 @@
       const http = root.Capacitor?.Plugins?.CapacitorHttp;
       if (root.Capacitor?.isNativePlatform?.() && http) {
         const response = await http.get({ url: config.updateManifestUrl, connectTimeout: 10000, readTimeout: 10000, headers: { 'Cache-Control': 'no-cache' } });
-        if (response.status !== 200) throw new Error('Não foi possível consultar a atualização. Tente novamente com conexão.');
+        if (response.status !== 200) throw new Error('Não foi possível conferir a atualização. Tente novamente com conexão.');
         data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
       } else {
         const response = await fetch(config.updateManifestUrl, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        if (!response.ok) throw new Error('Não foi possível consultar a atualização. Tente novamente com conexão.');
+        if (!response.ok) throw new Error('Não foi possível conferir a atualização. Tente novamente com conexão.');
         data = await response.json();
       }
       if (root.Capacitor?.isNativePlatform?.() && !nativeVersion) throw new Error('Versão nativa não confirmada.');

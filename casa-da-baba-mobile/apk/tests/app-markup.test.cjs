@@ -19,7 +19,7 @@ const adapted = modal(result);
 
 test('Pedidos mantém acesso aos finalizados dentro do próprio módulo', () => {
   assert.match(result, /class="pilot-orders-history" onclick="go\('finalizados'\)"/);
-  assert.match(result, /data-pilot-icon="historico"[^]*?<span>Histórico<\/span>/);
+  assert.match(result, /data-pilot-icon="archive"[^]*?<span>Finalizados<\/span>/, 'o atalho de pedidos não repete o nome Histórico');
 });
 const welcomeStart = '<!-- Boas-vindas / login com nome do operador -->';
 const welcomeEnd = '<!-- Tutorial / onboarding (4 steps) -->';

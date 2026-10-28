@@ -7,6 +7,7 @@ function fixture() {
   const calls = [];
   const appConfig = { bundleVersion: '0.3.1', dataSchemaVersion: 2 };
   const environment = { etqAbrirImprimir() {}, etqImpImprimir() {}, etqEditorAbrir() {}, initEditor() {},
+    cdbPilotUiReady: true, cdbPilotSettingsReady: true,
     cdbSync: { localReady: Promise.resolve({ ready: true }) },
     cdbApp: { getState: () => ({ products: [], clients: [], orders: [{ id: 'pedido-preservado' }], cashEntries: [], batches: [], cashClosings: [] }) },
     localStorage: { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value), removeItem: key => data.delete(key) },
@@ -69,6 +70,13 @@ test('falha de módulo de etiquetas impede ACK mesmo com armazenamento saudável
   const f = fixture(); delete f.environment.etqImpImprimir;
   await assert.rejects(confirmOtaHealth(f.environment, f.appConfig, f.updater), /Módulos/);
   assert.equal(f.calls.length, 0);
+});
+test('script do piloto que falhou ao instalar impede ACK e deixa o rollback nativo agir', async () => {
+  for (const flag of ['cdbPilotUiReady', 'cdbPilotSettingsReady']) {
+    const f = fixture(); delete f.environment[flag];
+    await assert.rejects(confirmOtaHealth(f.environment, f.appConfig, f.updater), /piloto/);
+    assert.equal(f.calls.length, 0, flag);
+  }
 });
 test('aguarda load para confirmar módulos defer, sem recarregar ou interromper o app', async () => {
   const f = fixture(); let loaded;

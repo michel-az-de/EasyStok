@@ -7,7 +7,7 @@ const { pilotIcon } = require('../pilot.js');
 test('ações curtas conservam seu significado e sempre usam um ícone disponível', () => {
   for (const [text, label] of [
     ['🗑️ Excluir lote', 'Excluir'], ['Criar e usar', 'Etiquetar'],
-    ['Conferir 12 unidades', 'Produzir'], ['Salvar R$ 34,00', 'Salvar'],
+    ['Conferir 12 unidades', 'Produzir 12'], ['Conferir 1 unidade', 'Produzir 1'], ['Salvar R$ 34,00', 'Salvar'],
     ['Preparar cobrança', 'Cobrar'], ['Copiar mensagem toda', 'Copiar'],
     ['Agendar para depois? (entrega futura)', 'Agendar'],
     ['Escolher imagem', 'Escolher'], ['Restaurar do celular (auto)', 'Recuperar'],
@@ -25,6 +25,30 @@ test('ações curtas conservam seu significado e sempre usam um ícone disponív
   assert.deepEqual(commandFor('Ver pedidos', "go('pedidos')"), { label: 'Ver', icon: 'ficha' });
   assert.equal(commandFor('Ver Produto', "selectClient('cliente')"), null, 'nomes de registros não são comandos');
   assert.equal(commandFor('−'), null);
+});
+
+test('ação destrutiva e criação de pedido dizem o objeto e não se confundem com fechar', () => {
+  assert.deepEqual(commandFor('Cancelar pedido', "cancelOrder('p1')"), { label: 'Cancelar pedido', icon: 'circle-x' });
+  assert.deepEqual(commandFor('Cancelar', "cancelOrder('p1')"), { label: 'Cancelar pedido', icon: 'circle-x' });
+  assert.equal(commandFor('Cancelar').icon, 'fechar', 'cancelar um formulário continua sendo fechar');
+  for (const text of ['Novo pedido', '+ Novo pedido', 'Criar pedido']) assert.deepEqual(commandFor(text), { label: 'Novo pedido', icon: 'plus' });
+  assert.deepEqual(commandFor('Marcar pronto', "advanceOrder('p1')"), { label: 'Pronto', icon: 'check' });
+  // O kanban do piloto escreve Finalizar para o pedido em preparo: não pode voltar a parecer Preparar.
+  assert.deepEqual(commandFor('Finalizar', "advanceOrder('p1')"), { label: 'Pronto', icon: 'check' });
+  for (const verb of ['Desfazer', 'Reverter', 'Recuperar']) assert.equal(COMMANDS[verb], 'undo-2');
+  assert.ok(pilotIcon('circle-x') && pilotIcon('undo-2'));
+});
+
+test('cada histórico tem nome próprio: movimentos da produção e pedidos finalizados', () => {
+  const tab = { append(node) { this.node = node; } }, title = { textContent: 'Finalizados' };
+  const created = { addEventListener() {}, set textContent(v) { this.text = v; } };
+  installProductionOrdersUI({
+    document: { querySelectorAll: () => [], getElementById: id => id === 'producaoTabs' ? tab : null,
+      createElement: () => created, querySelector: selector => selector.includes('finalizados') ? title : null },
+    cdbPilotIcon: pilotIcon, go() {}, goProducaoTab() {}
+  });
+  assert.equal(created.text, 'Movimentos');
+  assert.equal(title.textContent, 'Pedidos finalizados');
 });
 
 test('destinos legados e links internos não abrem módulos excluídos do APK', () => {

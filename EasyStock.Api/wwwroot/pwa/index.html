@@ -8673,7 +8673,7 @@ body.ux-calm [data-screen="producao"] .section-label {
     <div class="np-sheet">
       <div class="np-icon">💾</div>
       <h3 class="np-title">Hora do backup</h3>
-      <p class="np-text">Já fazem alguns dias ou várias mudanças desde o último backup. Salvar agora protege seus dados em caso de problema com o celular.</p>
+      <p class="np-text">Já faz alguns dias ou houve várias mudanças desde o último backup. Salvar agora protege seus dados em caso de problema com o celular.</p>
       <button class="np-btn np-primary"   onclick="autoBackupAction('save')">Salvar agora</button>
       <button class="np-btn np-tertiary"  onclick="autoBackupAction('skip')">Pular dessa vez</button>
     </div>
@@ -12344,8 +12344,8 @@ function cancelOrder(id) {
   const stockAlreadyTaken = (prev === STATUS.PRONTO || prev === STATUS.ENTREGUE);
   if (stockAlreadyTaken) {
     const promptMsg = wasDelivered
-      ? `Cancelar pedido JA ENTREGUE de ${money(o.total)}?\n\nEstoque sera devolvido e o valor sai do caixa de hoje.`
-      : 'Cancelar pedido pronto? Estoque sera devolvido.';
+      ? `Cancelar pedido JÁ ENTREGUE de ${money(o.total)}?\n\nEstoque será devolvido e o valor sai do caixa de hoje.`
+      : 'Cancelar pedido pronto? Estoque será devolvido.';
     if (!confirm(promptMsg)) return;
     o.items.forEach(it => {
       const p = products.find(x => x.id === it.productId);
@@ -16068,6 +16068,8 @@ function openDiagnostics() {
   const friendlyLevel = (!d.sync.online || d.sync.queueSize > 0 || d.server.status !== 'ok') ? 'warn' : 'ok';
   const friendlyText = !d.sync.online
     ? 'Sem internet agora. O app continua funcionando e guarda as alterações para sincronizar depois.'
+    : d.sync.queueSize > 0 && !d.server.pairing
+      ? `Existem ${d.sync.queueSize} item(ns) só neste aparelho. Conecte o aparelho à loja para enviar.`
     : d.sync.queueSize > 0
       ? `Existem ${d.sync.queueSize} item(ns) aguardando envio. Toque em Forçar flush se quiser tentar agora.`
       : `Tudo em dia. Última sincronização ${_fmtRelTime(d.sync.lastSync)}.`;
