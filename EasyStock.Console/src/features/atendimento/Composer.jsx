@@ -3,6 +3,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { SugestaoDeTexto } from '../../componentes/SugestaoDeTexto'
 import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
+import { useComplementoLigado } from '../../aplicacao/preferenciaDoComplemento'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
@@ -25,7 +26,7 @@ import css from './atendimento.module.css'
 export function Composer({
   conversa, canal, podeEscrever, motivo, rascunho: rascunhoGlobal, escritaDeFora,
   aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
-  aoReabrir, reabrindo = false, podeEnviarModelo = false,
+  aoReabrir, reabrindo = false, podeEnviarModelo = false, aoAssumirAntes = null,
   modeloAberto = false, aoAbrirModelos, aoFecharModelos, modelosFixos = true,
 }) {
   const { enviarMidia } = useAcoes()
@@ -74,13 +75,38 @@ export function Composer({
     }
   }
 
+  // #2134: responder com o Assistente atendendo é assumir. `aoAssumirAntes` só vem preenchido nesse
+  // caso e assume pelo mesmo caminho do botão Assumir. Se falhar, nada sai e o erro fica aqui,
+  // junto do campo (o aviso da barra de modo pode estar fora da tela).
+  const assumindoRef = useRef(false)
+  const [assumindo, setAssumindo] = useState(false)
+  const [assumiu, setAssumiu] = useState(false)
+  const [erroAssumir, setErroAssumir] = useState(null)
+  async function assumirSePreciso() {
+    if (!aoAssumirAntes) return true
+    assumindoRef.current = true
+    setAssumindo(true)
+    setErroAssumir(null)
+    let assumida = false
+    try { assumida = (await aoAssumirAntes()) !== false } catch { assumida = false } finally {
+      assumindoRef.current = false
+      setAssumindo(false)
+    }
+    if (assumida) setAssumiu(true)
+    else setErroAssumir('Não consegui assumir a conversa, então a mensagem não saiu. Tente enviar de novo.')
+    return assumida
+  }
+
   // "Enviar" com anexo em espera manda o anexo (o texto digitado vira legenda
   // de imagem, se houver); sem anexo, segue o fluxo de sempre. Um só botão,
   // uma só tecla Enter, sem o composer perguntar qual dos dois você quis.
-  function enviarComposer() {
+  async function enviarComposer() {
     // #1474: {pedido} sem valor sairia literal para o cliente (texto ou legenda); o aviso está
     // acima do campo e o Enviar fica desligado até ela trocar.
-    if (variavelSobrando) return
+    if (variavelSobrando || assumindoRef.current) return
+    // Enter com o campo vazio não manda balão vazio (#1287).
+    if (!anexo && !rascunho.trim()) return
+    if (!(await assumirSePreciso())) return
     if (anexo) {
       const molde = anexo.tipo === 'imagem'
         ? mensagemDeImagemAnexada({ nomeArquivo: anexo.nome, dataUrl: anexo.dataUrl, legenda: rascunho })
@@ -90,8 +116,6 @@ export function Composer({
       aoMudarRascunho('')
       return
     }
-    // Enter com o campo vazio não manda balão vazio (#1287).
-    if (!rascunho.trim()) return
     // O campo é quem tem o texto de agora; o rascunho global pode estar uma pausa atrás.
     descarregar()
     aoEnviar(rascunho)
@@ -101,6 +125,7 @@ export function Composer({
   // envio até o EasyStok responder; o balão na conversa nasce "enviando". Se não sair, o motivo
   // fica no balão e aqui só o aviso curto.
   const [enviandoAudio, setEnviandoAudio] = useState(false)
+  const [complementoLigado, alternarComplemento] = useComplementoLigado()
   const sugestao = useComplementoDeTexto({
     texto: rascunho, contexto: 'cliente', conversaId: conversa.id,
     ativo: fonteApi && podeEscrever && !barra.aberto && !anexo && !gravando && !enviandoAudio,
@@ -110,6 +135,7 @@ export function Composer({
     setErroAnexo(null)
     setEnviandoAudio(true)
     try {
+      if (!(await assumirSePreciso())) return
       const resultado = await gravador.finalizar()
       if (!resultado) return
       const saiu = await enviarMidia(conversa.id, mensagemDeAudio(resultado))
@@ -171,6 +197,10 @@ export function Composer({
       </Botao>}
       {modelosFixos && podeEnviarModelo && podeEscrever && <p className={css.restricao}>Mensagens prontas aprovadas pelo WhatsApp para retomar a conversa fora da janela de resposta.</p>}
 
+      {/* #2134: junto do campo, onde a atendente olha ao enviar. */}
+      {assumiu && <p className={css.avisoAssumiu} role="status"><Icone nome="check" /> Você assumiu a conversa</p>}
+      {erroAssumir && <p className={css.erroAssumir} role="alert">{erroAssumir}</p>}
+
       {/* Gravando substitui o campo de texto e as ações: gravar e escrever ao
           mesmo tempo não é o gesto que o dono pediu ("gravar... cancelar ou
           enviar"), e um estado só por vez é mais fácil de entender. */}
@@ -207,7 +237,7 @@ export function Composer({
                     // Respostas, com rótulo, já mostra o caminho, e a frase longa
                     // quebrava em três linhas no campo (rodada 10, integração).
                     : `Escreva para ${conversa.nome.split(' ')[0]}`}
-                onChange={(e) => digitar(e.target.value)}
+                onChange={(e) => { digitar(e.target.value); setAssumiu(false); setErroAssumir(null) }}
                 onFocus={sugestao.aoFocar}
                 onBlur={() => { sugestao.aoSair(); descarregar() }}
                 onKeyDown={(e) => {
@@ -284,11 +314,23 @@ export function Composer({
               <Botao title="Nota interna: fica na ficha, o cliente nunca vê" aria-label="Nota interna" className={css.acaoComRotulo} onClick={aoAbrirNota}>
                 <Icone nome="nota" /><span className={css.rotuloAcao}>Nota</span>
               </Botao>
+              {/* #2134: chave do completar com Tab. Só existe no modo API (é lá que a sugestão chama o
+                  provedor). Desligada, nenhuma chamada sai; vale por usuário, neste navegador. */}
+              {fonteApi && <Botao
+                aria-pressed={complementoLigado}
+                title={complementoLigado
+                  ? 'Completar com Tab: ligado. O que você digita é enviado à IA para sugerir a continuação. Toque para desligar.'
+                  : 'Completar com Tab: desligado. Nada do que você digita é enviado à IA. Toque para ligar.'}
+                className={`${css.acaoComRotulo} ${complementoLigado ? css.chaveLigada : ''}`}
+                onClick={alternarComplemento}
+              >
+                <Icone nome="sparkles" /><span className={css.rotuloAcao}>Completar com Tab</span>
+              </Botao>}
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
               {temTexto || anexo || !acoes.audio ? (
-                <Botao variante="primario" className={css.enviar} aria-label="Enviar" title={variavelSobrando ?? (temTexto || anexo ? 'Enviar (Enter)' : restricao ?? 'Escreva a mensagem para enviar')} disabled={!podeEscrever || Boolean(variavelSobrando) || !(temTexto || anexo)} onClick={enviarComposer}>
+                <Botao variante="primario" className={css.enviar} aria-label="Enviar" title={variavelSobrando ?? (temTexto || anexo ? 'Enviar (Enter)' : restricao ?? 'Escreva a mensagem para enviar')} disabled={!podeEscrever || assumindo || Boolean(variavelSobrando) || !(temTexto || anexo)} onClick={enviarComposer}>
                   <Icone nome="arrow-up" tamanho={20} />
                 </Botao>
               ) : (

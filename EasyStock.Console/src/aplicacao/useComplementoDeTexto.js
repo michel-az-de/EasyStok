@@ -3,11 +3,15 @@ import { complementoDaResposta, podeAceitarComplemento, perguntaDeComplemento } 
 import { perguntarAssistente } from '../infra/api/assistenteApi'
 import { EVENTO_SESSAO_ALTERADA, identidadeDaSessao, lerSessao } from '../infra/api/sessao'
 import { combinarSinais } from '../infra/api/sinais'
+import { useComplementoLigado } from './preferenciaDoComplemento'
 
 let emVoo = null
 let proximaChamada = 0
 
-export function useComplementoDeTexto({ texto = '', contexto, conversaId, ativo, aoCompletar, limite = 2000 }) {
+export function useComplementoDeTexto({ texto = '', contexto, conversaId, ativo: ativoPelaTela, aoCompletar, limite = 2000 }) {
+  // #2134: a chave da pessoa vence a tela. Desligado, nenhuma chamada ao provedor sai.
+  const [ligadoPelaPessoa] = useComplementoLigado()
+  const ativo = ativoPelaTela && ligadoPelaPessoa
   const [focado, setFocado] = useState(false)
   const [identidade, setIdentidade] = useState(() => identidadeDaSessao(lerSessao()))
   const [resposta, setResposta] = useState(null)

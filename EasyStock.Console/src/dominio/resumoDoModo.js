@@ -7,6 +7,7 @@
 
 import { MODOS, PAUSA_POR_OUTRO, modoDoAtendimento, proximoPassoDepoisDeResponder } from './automatico'
 import { origemDaPassagem } from './passagem'
+import { automaticoDesligadoNaConversa } from './motivoDeEscalada'
 
 const ROTULO = {
   [MODOS.LIGADO]: 'Automático',
@@ -53,4 +54,12 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false) {
     proximo,
     sugereEncerrar: proximo?.chave === 'encerrar-ou-aguardar',
   }
+}
+
+// #2134: o Assistente está de fato respondendo esta conversa. Responder por cima dele são duas
+// vozes falando com o cliente, então quem escreve assume antes (convenção do Intercom e do Front).
+// Automático desligado na loja não responde ninguém: não há o que assumir.
+export function assistenteAtendendo(conversa, pausado = false, bloqueada = false) {
+  return modoDoAtendimento(conversa, pausado, bloqueada).chave === MODOS.LIGADO
+    && !automaticoDesligadoNaConversa(conversa)
 }

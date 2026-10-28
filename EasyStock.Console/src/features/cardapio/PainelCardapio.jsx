@@ -690,8 +690,8 @@ export function PainelCardapio({
                 <Icone nome={amplo ? 'reduzir' : 'ampliar'} />
               </button>
             )}
-            <button type="button" ref={fecharRef} className={css.fechar} onClick={aoFechar}>
-              <Icone nome="fechar" rotulo="Fechar cardápio" />
+            <button type="button" ref={fecharRef} className={css.fechar} aria-label="Fechar cardápio" title="Fechar cardápio" onClick={aoFechar}>
+              <Icone nome="fechar" />
             </button>
           </div>
         </header>

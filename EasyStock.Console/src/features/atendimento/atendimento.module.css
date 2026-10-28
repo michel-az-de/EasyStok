@@ -250,6 +250,16 @@
   margin: var(--e-2) 0 0; font-size: var(--t-apoio); color: var(--tinta-3);
 }
 
+/* #2134: o que acabou de acontecer com o "responder é assumir", junto do campo. */
+.avisoAssumiu, .erroAssumir {
+  display: flex; align-items: center; gap: var(--e-1); margin: 0;
+  font-size: var(--t-apoio); font-weight: 600;
+}
+.avisoAssumiu { color: var(--sucesso); }
+.erroAssumir { color: var(--erro); }
+/* Chave do completar com Tab: ligada fica com o fundo marcado, como um botão apertado. */
+.acoes > button.chaveLigada { background: var(--preenchimento-forte); }
+
 /* Cor por canal, pelo nome do ícone do catálogo (conversa, camera, globo). */
 .canal_conversa { color: var(--c-whatsapp); }
 .canal_camera { color: var(--c-instagram); }

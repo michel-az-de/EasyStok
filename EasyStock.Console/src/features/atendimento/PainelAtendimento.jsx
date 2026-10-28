@@ -11,6 +11,7 @@ import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { primeiroNome } from '../../dominio/mensagem'
+import { assistenteAtendendo } from '../../dominio/resumoDoModo'
 import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
@@ -153,18 +154,21 @@ export function PainelAtendimento({
         </div>
       </header>
 
-      {/* Uma área rolável só: barra de modo, conversa e painel do agente rolam
-          juntos, e o composer fica preso no pé da coluna em qualquer largura. */}
-      <div className={css.rolagemCentro}>
-        <BarraModo
-          conversa={selecionada}
-          pausado={pausado}
-          bloqueada={bloqueada}
-          aoAssumir={() => assumirAtendimento(selecionada.id)}
-          aoDevolver={() => devolverAutomatico(selecionada.id)}
-          aoEncerrar={() => abrirEncerramento(selecionada.id)}
-        />
+      {/* #2134: quem responde a conversa e o Assumir ficam fixos entre o cabeçalho e a conversa.
+          Dentro da área que rola, o aviso saía da tela (y=-228 px em 1280x720) e o campo seguia
+          enviando como pessoa por cima do Assistente. */}
+      <BarraModo
+        conversa={selecionada}
+        pausado={pausado}
+        bloqueada={bloqueada}
+        aoAssumir={() => assumirAtendimento(selecionada.id)}
+        aoDevolver={() => devolverAutomatico(selecionada.id)}
+        aoEncerrar={() => abrirEncerramento(selecionada.id)}
+      />
 
+      {/* Uma área rolável só: conversa e painel do agente rolam juntos, e o composer fica
+          preso no pé da coluna em qualquer largura. */}
+      <div className={css.rolagemCentro}>
         <Thread
           mensagens={selecionada.mensagens}
           chaveRolagem={selecionada.id}
@@ -194,6 +198,8 @@ export function PainelAtendimento({
         rascunho={rascunho}
         escritaDeFora={escritaDeFora}
         aoEnviar={(texto) => enviar(selecionada.id, texto.trim())}
+        // #2134: responder com o Assistente atendendo é assumir, pelo mesmo caminho do botão Assumir.
+        aoAssumirAntes={assistenteAtendendo(selecionada, pausado, bloqueada) ? () => assumirAtendimento(selecionada.id) : null}
         podeEnviarModelo={podeEnviarModelo}
         modelosFixos={modelosAVista(janela)}
         modeloAberto={modelosDe === selecionada.id}

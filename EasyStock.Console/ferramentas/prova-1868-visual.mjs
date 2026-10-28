@@ -147,7 +147,7 @@ confere('4  canal sem mídia: sem Anexar, Fotos e microfone; a barra fica enxuta
 confere('4  sem áudio o lugar do microfone fica com o Enviar, desligado até haver texto', () => {
   const jsx = fonte('features/atendimento/Composer.jsx')
   assert.match(jsx, /\{temTexto \|\| anexo \|\| !acoes\.audio \? \(/)
-  assert.match(jsx, /disabled=\{!podeEscrever \|\| Boolean\(variavelSobrando\) \|\| !\(temTexto \|\| anexo\)\}/)
+  assert.match(jsx, /disabled=\{!podeEscrever \|\| assumindo \|\| Boolean\(variavelSobrando\) \|\| !\(temTexto \|\| anexo\)\}/)
 })
 confere('4  o pedido do site no fio se lê como documento; aviso curto segue miúdo', () => {
   assert.equal(conversa.avisoDePedido('Pedido do site #13EF98F7: 1 × lasanha. Total R$ 65,00.'), true)
