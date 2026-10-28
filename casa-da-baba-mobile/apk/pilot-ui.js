@@ -11,7 +11,7 @@
     Cancelar: 'fechar', Fechar: 'fechar', Remover: 'fechar',
     Voltar: 'chevron-right', Limpar: 'fechar',
     Cobrar: 'ficha', Preparar: 'producao', Produzir: 'producao',
-    Finalizar: 'check', Entregar: 'check', Detalhes: 'ficha', Histórico: 'historico',
+    Finalizar: 'check', Entregar: 'check', Detalhes: 'ficha', Histórico: 'historico', Finalizados: 'archive',
     Copiar: 'copy', Compartilhar: 'enviar', Enviar: 'enviar',
     Exportar: 'download', Baixar: 'download', Importar: 'upload',
     Ajustar: 'configuracoes', Configurar: 'settings', Ativar: 'bell',

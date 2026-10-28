@@ -744,7 +744,9 @@ body.pilot-app .pilot-icon-command { width: 48px; height: 48px; display: inline-
 body.pilot-app .pilot-icon-command > svg { width: 24px; height: 24px; }
 body.pilot-app [data-screen="historico"] .section-label,
 body.pilot-app #histList > .stock-ledger { display: none; }
+/* "Novo pedido" não cabe ao lado do título em 360dp: vai para a linha de baixo, na largura toda. */
 body.pilot-app .phone .pilot-orders-header { gap: 8px; flex-wrap: wrap; }
+body.pilot-app .phone .pilot-orders-header .pilot-new-order { order: 3; flex: 1 0 100%; }
 body.pilot-app .phone .pilot-orders-history { min-height: 48px; padding: 8px 0; border: 0; background: transparent; color: var(--ink-dim); font-size: 14px; }
 body.pilot-app .phone .pilot-orders-history .pilot-command-label { font-size: 14px; }
 body.pilot-app .phone .pilot-orders-header[data-view=novo] .pilot-orders-history { display: none; }
@@ -752,6 +754,8 @@ body.pilot-app [data-screen="finalizados"] .screen-title { font: 750 24px/1.3 'M
 body.pilot-app [data-screen="finalizados"] .fin-card { border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; margin: 0; padding: 16px 0; box-shadow: none; }
 body.pilot-app .phone .prod-empty-state { border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 16px 0; }
 body.pilot-app #productGrid:has(.prod-empty-state) + .pilot-production-actions { display: none; }
+/* Os filtros cabem em 360dp: sem a máscara de rolagem, o chip ativo não desbota na borda. */
+body.pilot-app .phone .mov-filter { mask-image: none; -webkit-mask-image: none; }
 body.pilot-app .phone .mov-filter button { border: 0; border-radius: 8px; background: transparent; box-shadow: none; text-transform: none; letter-spacing: 0; min-height: 48px; }
 body.pilot-app .phone .mov-filter button.active { background: var(--basil-soft); color: var(--basil); box-shadow: none; }
 body.pilot-app .phone .screen-back { border: 0; background: transparent; box-shadow: none; min-width: 48px; min-height: 48px; }
@@ -859,8 +863,7 @@ body.pilot-app #pilotHome .pilot-tile:nth-child(5) { animation-delay: 120ms; }
 body.pilot-app #pilotHome .pilot-tile:nth-child(6) { animation-delay: 150ms; }
 @keyframes pilot-tile-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (hover: hover) and (pointer: fine) { body.pilot-app #pilotHome .pilot-tile:hover { translate: 0 -2px; box-shadow: 0 6px 18px #352d2510; } }
-/* Até 379px, três colunas cortam "Configurações" com fonte ampliada. */
-@media (max-width: 379px) { body.pilot-app #pilotHome .pilot-home-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 359px) { body.pilot-app #pilotHome .pilot-home-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { body.pilot-app #pilotHome .pilot-tile:active { scale: 1; } body.pilot-app #pilotHome .pilot-tile:hover { translate: 0; } }
 body.pilot-app .pilot-home .pilot-connection { margin: 0 0 12px; padding: 0; border: 0; }
 body.pilot-app .pilot-home-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
