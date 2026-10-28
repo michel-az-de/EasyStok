@@ -3,6 +3,10 @@
 #
 #   powershell -File scripts/homologacao/laboratorio.ps1            sobe tudo e prepara a loja
 #   powershell -File scripts/homologacao/laboratorio.ps1 -Parar     derruba o que este script subiu
+#   ... -Dump C:\caminho\easystock.dump -Pasta <pasta nova>          banco restaurado de um pg_dump -Fc, sem seed (#2132)
+#
+# Com -Dump o login e o dos usuarios do dump e a loja nao e preparada. Campos cifrados com a KEK de producao
+# (credenciais de canal) nao abrem aqui; o resto funciona. A Meta e o Mercado Pago seguem falsos.
 #
 # Depois de subir, abra em dois terminais (ou pelo preview do Claude Code):
 #   console:  set VITE_FONTE_DADOS=api& set API_ALVO=http://127.0.0.1:18716& npm --prefix EasyStock.Console run dev -- --port 5731
@@ -16,7 +20,8 @@ param(
     [int]$PortaMp = 18736,
     [int]$PortaPg = 55716,
     [string]$Pasta = (Join-Path $env:LOCALAPPDATA 'easystok-laboratorio'),
-    [string]$PgBin = 'C:\Program Files\PostgreSQL\17\bin'
+    [string]$PgBin = 'C:\Program Files\PostgreSQL\17\bin',
+    [string]$Dump
 )
 $ErrorActionPreference = 'Stop'
 $raiz = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -66,7 +71,15 @@ if (Get-NetTCPConnection -LocalPort $PortaPg -State Listen -ErrorAction Silently
 $env:PGPASSWORD = $senhaPg
 $psql = Join-Path $PgBin 'psql.exe'
 $existe = & $psql -h 127.0.0.1 -p $PortaPg -U postgres -tAc "select 1 from pg_database where datname='easystock'"
-if ($existe -ne '1') { & $psql -h 127.0.0.1 -p $PortaPg -U postgres -tAc 'create database easystock' | Out-Null }
+if ($existe -ne '1') {
+    & $psql -h 127.0.0.1 -p $PortaPg -U postgres -tAc 'create database easystock' | Out-Null
+    if ($Dump) {
+        Write-Host "Restaurando $Dump..."
+        # Sem dono e sem grants: os papeis de producao nao existem aqui e o superusuario local le tudo.
+        & (Join-Path $PgBin 'pg_restore.exe') -h 127.0.0.1 -p $PortaPg -U postgres -d easystock --no-owner --no-acl --exit-on-error $Dump
+        if ($LASTEXITCODE -ne 0) { throw "pg_restore falhou para $Dump." }
+    }
+} elseif ($Dump) { Write-Host "Banco ja existe em $Pasta; o dump nao foi restaurado de novo. Use outra -Pasta para recomecar." }
 
 # 2. Build Release da API e do Worker deste checkout.
 Write-Host 'Compilando API e Worker (Release)...'
@@ -86,7 +99,13 @@ $env:Database__Provider = 'PostgreSql'
 $env:ConnectionStrings__DefaultConnection = "Host=127.0.0.1;Port=$PortaPg;Database=easystock;Username=postgres;Password=$senhaPg;SSL Mode=Disable"
 $env:ConnectionStrings__Redis = ''
 $env:Jwt__Issuer = 'EasyStock'; $env:Jwt__Audience = 'EasyStock'; $env:Jwt__SecretKey = 'EasyStock-Local-Dev-SuperSecretKey-32+'; $env:Jwt__ExpirationMinutes = '480'
-$env:Anthropic__Enabled = 'false'; $env:OpenAI__Enabled = 'false'; $env:FileStorage__Provider = 'Local'; $env:SEED_DEMO_DATA = 'true'
+# Com dados reais a API pode ir para a internet pelo tunel: a chave versionada deixaria qualquer um forjar token.
+if ($Dump) {
+    $bytes = New-Object byte[] 48
+    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $env:Jwt__SecretKey = [Convert]::ToBase64String($bytes)
+}
+$env:Anthropic__Enabled = 'false'; $env:OpenAI__Enabled = 'false'; $env:FileStorage__Provider = 'Local'; $env:SEED_DEMO_DATA = $(if ($Dump) { 'false' } else { 'true' })
 $env:MercadoPago__UseStub = 'false'; $env:MercadoPago__AccessToken = 'token-mp-falso'
 $env:MercadoPago__BaseUrl = "http://127.0.0.1:$PortaMp/"; $env:MercadoPago__WebhookSecret = 'homol-mp-secret'
 # #1901 exige as duas URLs com credencial que nao e TEST-: o webhook volta para a propria API e o retorno vai ao site local.
@@ -106,6 +125,14 @@ foreach ($i in 1..40) {
     try { Invoke-RestMethod "$api/health/version" -TimeoutSec 3 | Out-Null; $no_ar = $true; break } catch { }
 }
 if (-not $no_ar) { throw "A API nao respondeu. Veja $(Join-Path $Pasta 'api.err')." }
+if ($Dump) {
+    Write-Host ''
+    Write-Host "API            $api   (dados de $Dump; login com os usuarios do dump)"
+    Write-Host "Banco          127.0.0.1:$PortaPg / easystock"
+    Write-Host "Logs           $Pasta"
+    Write-Host "Tunel          powershell -File scripts/contingencia/tunel.ps1 -Porta $PortaApi"
+    exit 0
+}
 
 # 5. Loja pronta para pedir: vitrine, cardapio, janelas, zona de frete e chat do site.
 $login = Invoke-RestMethod -Method Post "$api/api/auth/login" -ContentType 'application/json' -Body '{"email":"admin@casadababa.demo","senha":"admin123"}'
