@@ -22,7 +22,7 @@ function fixture() {
   const account = { type: 'service_account', project_id: 'cdb-test-project', client_email: 'ota@cdb-test-project.iam.gserviceaccount.com', private_key: pair.privateKey, private_key_id: 'test-key', token_uri: push.TOKEN_URL };
   const app = { project_info: { project_id: account.project_id }, client: [{ client_info: { android_client_info: { package_name: ota.APP } } }] };
   const hash = 'a'.repeat(64);
-  const payload = { schemaVersion: 1, appId: ota.APP, channel: 'piloto', sequence: 1, bundleVersion: '0.3.1', nativeVersionCode: 3, dataSchemaVersion: 2, url: ota.BASE + hash + '/bundle.zip', sizeBytes: 123, sha256: hash };
+  const payload = { schemaVersion: 1, appId: ota.APP, channel: 'piloto', sequence: 1, bundleVersion: '0.3.1', nativeVersionCode: require('../scripts/ota-contract.cjs').NATIVE_VERSION_CODE, dataSchemaVersion: require('../scripts/ota-contract.cjs').DATA_SCHEMA, url: ota.BASE + hash + '/bundle.zip', sizeBytes: 123, sha256: hash };
   const options = { credentials: path.join(directory, 'service.json'), appConfig: path.join(directory, 'google-services.json'), release: path.join(directory, 'release-1.json'), publicKey: publicFile };
   fs.writeFileSync(options.credentials, JSON.stringify(account));
   fs.writeFileSync(options.appConfig, JSON.stringify(app));

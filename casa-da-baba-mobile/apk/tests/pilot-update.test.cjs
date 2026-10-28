@@ -36,21 +36,21 @@ test('diferencia servidor acessível de aparelho pareado e envio pendente', () =
   assert.equal(local.queue, '2 alterações aguardando envio.');
   const offline = connectionStatus({ health: 'offline', paired: true, invalid: false, pending: 1 });
   assert.match(offline.status, /Sem conexão confirmada/);
-  assert.match(offline.pairing, /pareada/);
+  assert.match(offline.pairing, /vinculado/);
   assert.equal(offline.queue, '1 alteração aguardando envio.');
   const revoked = connectionStatus({ health: 'online', paired: true, invalid: true, pending: 0 });
-  assert.match(revoked.pairing, /inválido/);
+  assert.match(revoked.pairing, /inválida/);
   assert.doesNotMatch(revoked.queue, /sincronizad|confirmad/);
 });
 
-function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch } = {}) {
+function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch, updater } = {}) {
   const nodes = new Map();
   const events = new Map();
-  const doc = { activeElement: null, getElementById: id => nodes.get(id) };
+  const doc = { activeElement: null, hidden: false, addEventListener: (name, callback) => events.set(name, callback), getElementById: id => nodes.get(id) };
   const makeElement = tag => {
     const handlers = new Map();
     const el = { tag, dataset: {}, open: false, hidden: false, disabled: false, textContent: '', isConnected: true,
-      classList: { add() {} }, setAttribute() {}, getClientRects: () => [1], scrollIntoView() {},
+      classList: { add() {} }, children: [], append(...children) { this.children.push(...children); }, insertBefore(child, reference) { this.children = this.children.filter(item => item !== child); const index = this.children.indexOf(reference); this.children.splice(index < 0 ? this.children.length : index, 0, child); }, setAttribute() {}, getClientRects: () => [1], scrollIntoView() {},
       focus() { doc.activeElement = el; },
       showModal() { el.open = true; },
       close() { el.open = false; handlers.get('close')?.(); },
@@ -72,6 +72,7 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
     addEventListener: (name, callback) => events.set(name, callback),
     open: url => calls.push(url), go: screen => calls.push(screen),
   };
+  if (updater) root.Capacitor = { isNativePlatform: () => true, Plugins: { PilotUpdater: updater } };
   const requests = [];
   const fetch = async url => {
     requests.push(url);
@@ -82,6 +83,146 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'pilot.js'), 'utf8'), { window: root, fetch, URL, AbortSignal });
   return { root, doc, nodes, events, calls, requests };
 }
+
+function realAndroidListener() {
+  const android = path.resolve(__dirname, '../node_modules/@capacitor/android/capacitor/src/main');
+  const bridge = fs.readFileSync(path.join(android, 'assets/native-bridge.js'), 'utf8');
+  const exporter = fs.readFileSync(path.join(android, 'java/com/getcapacitor/JSExport.java'), 'utf8');
+  assert.ok(exporter.includes('return w.Capacitor.addListener('), 'Plugins deve delegar ao bridge nativo instalado');
+  const begin = bridge.indexOf('cap.addListener = (');
+  const end = bridge.indexOf('cap.removeListener =', begin);
+  assert.ok(begin >= 0 && end > begin, 'Contrato addListener do bridge precisa ser identificável');
+  const callbacks = [];
+  const cap = { nativeCallback(plugin, method, options, callback) {
+    callbacks.push({ plugin, method, options, callback }); return 'callback-1';
+  } };
+  vm.runInNewContext(bridge.slice(begin, end), { cap, win: { console } });
+  return { callbacks, addListener: (event, callback) => cap.addListener('PilotUpdater', event, callback) };
+}
+
+function installPwaBack(root, doc) {
+  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const start = html.indexOf('(function setupBackButton() {');
+  const end = html.indexOf('\n})();', start) + '\n})();'.length;
+  assert.ok(start >= 0 && end > start);
+  const context = { ...root, window: root, document: doc, console, setTimeout() {}, history: { pushState() {} }, location: { href: 'https://localhost' }, currentScreen: 'producao' };
+  const printingBinding = html.match(/^let isPrinting = false;$/m)?.[0];
+  assert.ok(printingBinding, 'Carrega o binding lexical real, que não é propriedade de window');
+  vm.createContext(context);
+  vm.runInContext(printingBinding + '\n' + html.slice(start, end), context);
+  return context;
+}
+
+test('Back nativo fecha formulário com o fechador PWA real e só minimiza no início', () => {
+  const { root, doc, nodes } = pilotHarness();
+  nodes.get('pilotHome').close();
+  const visible = new Set(['show']); let closed = 0;
+  const product = { id: 'newProductModal', classList: { contains: name => visible.has(name), remove: name => visible.delete(name) } };
+  nodes.set('newProductModal', product);
+  doc.querySelectorAll = () => [];
+  doc.querySelector = () => ({ dataset: { screen: 'producao' } });
+  root.closeProductModal = () => { closed++; visible.delete('show'); };
+  const context = installPwaBack(root, doc);
+  assert.equal(root.cdbHandleNativeBack(), true);
+  assert.equal(closed, 1); assert.equal(visible.size, 0);
+  context.goBack = () => { context.currentScreen = 'home'; doc.querySelector = () => ({ dataset: { screen: 'home' } }); };
+  assert.equal(root.cdbHandleNativeBack(), true);
+  assert.equal(nodes.get('pilotHome').open, true);
+  assert.equal(root.cdbHandleNativeBack(), false);
+  assert.equal(nodes.get('pilotHome').open, true, 'Minimizar mantém a home nova pronta para voltar');
+});
+
+for (const pilot of [true, false]) {
+  test('Back do formulário de pedido ' + (pilot ? 'APK volta à lista sem perder rascunho' : 'PWA preserva histórico original'), () => {
+    const { root, doc, nodes } = pilotHarness(); nodes.get('pilotHome').close();
+    root.CDB_CONFIG.isPilot = pilot;
+    const sections = [{ dataset: { tab: 'novo' }, style: { display: '' } }, { dataset: { tab: 'andamento' }, style: { display: 'none' } }];
+    doc.querySelectorAll = selector => selector.includes('.pedidos-tab-section') ? sections : [];
+    doc.querySelector = selector => selector.includes('data-tab="novo"') ? sections[0] : selector === '.screen.active' ? { dataset: { screen: 'pedidos' } } : null;
+    const context = installPwaBack(root, doc); context.currentScreen = 'pedidos';
+    nodes.set('orderNotes', { value: 'Separar amanhã' }); let historyCalls = 0;
+    context.goBack = () => { historyCalls++; };
+    const source = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+    const bindings = ['selectedClient', 'currentOrderItems'].map(name => {
+      const declaration = source.match(new RegExp('^let ' + name + ' = [^;]+;', 'm'))?.[0];
+      assert.ok(declaration); return declaration;
+    }).join('\n');
+    vm.runInContext(bindings + '\nselectedClient = { id: "cliente" }; currentOrderItems = [{ productId: "produto", qty: 3 }];', context);
+    const draft = vm.runInContext('JSON.stringify({ selectedClient, currentOrderItems })', context);
+    const start = source.indexOf('function goPedidosTab('), end = source.indexOf('\nfunction ', start + 1);
+    assert.ok(start >= 0 && end > start);
+    vm.runInContext(source.slice(start, end), context);
+    assert.equal(root.cdbHandleNativeBack(), true);
+    assert.equal(historyCalls, pilot ? 0 : 1);
+    assert.equal(sections[0].style.display, pilot ? 'none' : '');
+    assert.equal(sections[1].style.display, pilot ? '' : 'none');
+    assert.equal(vm.runInContext('JSON.stringify({ selectedClient, currentOrderItems })', context), draft);
+    assert.equal(nodes.get('orderNotes').value, 'Separar amanhã');
+    assert.equal(nodes.get('pilotHome').open, false);
+  });
+}
+
+test('Back protege impressão lexical antes de avisos/home, e libera navegação quando termina', () => {
+  const { root, doc, nodes } = pilotHarness();
+  const notices = nodes.get('pilotNotices'); notices.showModal();
+  doc.querySelectorAll = () => [];
+  const context = installPwaBack(root, doc); let navigated = 0;
+  context.showToast = () => {}; context.goBack = () => { navigated++; };
+  vm.runInContext('isPrinting = true', context);
+  assert.equal(root.isPrinting, undefined); assert.equal(context.isPrinting, undefined);
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(notices.open, true);
+  notices.close();
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(nodes.get('pilotHome').open, true);
+  nodes.get('pilotHome').close();
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(navigated, 0);
+  vm.runInContext('isPrinting = false', context);
+  notices.showModal();
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(notices.open, false);
+  assert.equal(root.cdbHandleNativeBack(), true); assert.equal(navigated, 1);
+});
+
+for (const [id, closer] of [['cobrancaModal', 'closeCobranca'], ['newClientModal', 'closeClientModal'], ['itemPickerModal', 'closeItemPicker']]) {
+  test('Back fecha ' + id + ' pelo fechador próprio sem navegar por trás', () => {
+    const { root, doc, nodes } = pilotHarness(); nodes.get('pilotHome').close();
+    const visible = new Set(['show']); let closed = 0, navigated = 0;
+    nodes.set(id, { id, classList: { contains: name => visible.has(name), remove: name => visible.delete(name) } });
+    root[closer] = () => { closed++; visible.clear(); };
+    doc.querySelectorAll = () => []; doc.querySelector = () => ({ dataset: { screen: 'pedidos' } });
+    const context = installPwaBack(root, doc); context.goBack = () => { navigated++; };
+    assert.equal(root.cdbHandleNativeBack(), true);
+    assert.equal(closed, 1); assert.equal(navigated, 0); assert.equal(visible.size, 0);
+  });
+}
+
+test('bridge Android instalado retorna handle síncrono e startup abre início sem perder listener OTA', async () => {
+  const bridge = realAndroidListener();
+  const handle = bridge.addListener('probe', () => {});
+  assert.equal(typeof handle.remove, 'function');
+  assert.equal(handle.catch, undefined, 'Contrato legado real não é Promise');
+  bridge.callbacks.length = 0;
+  const { nodes } = pilotHarness({ updater: bridge });
+  assert.equal(nodes.get('pilotHome').open, true);
+  assert.equal(bridge.callbacks.length, 1);
+  assert.equal(bridge.callbacks[0].options.eventName, 'status');
+  bridge.callbacks[0].callback({ nativeVersionCode: 7, builtinVersion: '0.7.0' });
+  await new Promise(setImmediate);
+  assert.match(nodes.get('pilotRailVersion').textContent, /APK 0\.7\.0/);
+});
+
+test('bridge Android síncrono preserva boas-vindas até identificação do operador', () => {
+  const { nodes, events } = pilotHarness({ operator: '', updater: realAndroidListener() });
+  assert.equal(nodes.get('pilotHome').open, false);
+  events.get('cdb-operator-ready')();
+  assert.equal(nodes.get('pilotHome').open, true);
+});
+
+test('falha do listener OTA não interrompe início nem registro do operador', async () => {
+  for (const addListener of [() => { throw new Error('bridge unavailable'); }, () => Promise.reject(new Error('listener rejected'))]) {
+    const { nodes } = pilotHarness({ updater: { addListener } });
+    await new Promise(setImmediate);
+    assert.equal(nodes.get('pilotHome').open, true);
+  }
+});
 
 test('atualização acionada fora do início abre diálogo, informa resultado e restaura foco', async () => {
   const { root, nodes, doc } = pilotHarness();
@@ -116,20 +257,19 @@ test('início aguarda identificação do operador, sem sobrepor boas-vindas', ()
   assert.equal(nodes.get('pilotHome').open, true);
 });
 
-test('offline mantém registro local disponível e explica por que atendimento não abre', async () => {
-  const { nodes, doc, calls } = pilotHarness({ connected: false });
-  await nodes.get('pilotHome').click('workspace');
-  assert.equal(calls.length, 0);
-  assert.match(nodes.get('pilotError').textContent, /sem conexão/);
-  assert.equal(doc.activeElement, nodes.get('pilotError'));
+test('offline permite abrir Pedidos diretamente pelo início', async () => {
+  const { nodes, calls } = pilotHarness({ connected: false });
   await nodes.get('pilotHome').click('local-orders');
   assert.deepEqual(calls, ['pedidos']);
 });
 
-test('preview online abre o balcão real do atendimento', async () => {
+test('início limita as entradas principais a Produção e Pedidos', async () => {
   const { nodes, calls } = pilotHarness();
-  await nodes.get('pilotHome').click('workspace');
-  assert.deepEqual(calls, ['https://app.easystok.online/#/m/atendimento/balcao']);
+  const markup = fs.readFileSync(path.resolve(__dirname, '../pilot.js'), 'utf8');
+  assert.doesNotMatch(markup, /workspace|Atendimento|atendimento/);
+  await nodes.get('pilotHome').click('production');
+  await nodes.get('pilotHome').click('local-orders');
+  assert.deepEqual(calls, ['producao', 'pedidos']);
 });
 
 test('textos pequenos do início mantêm contraste mínimo de 4,5:1', () => {
@@ -170,7 +310,7 @@ test('sucesso e falha de pareamento ficam visíveis sem abrir diagnóstico', asy
   await nodes.get('pilotHome').click('pair');
   assert.equal(nodes.get('pilotHome').open, true);
   assert.equal(doc.activeElement, nodes.get('pilotConnection'));
-  assert.match(nodes.get('pilotConnection').textContent, /Produção pareada/);
+  assert.match(nodes.get('pilotConnectionDetail').textContent, /Aparelho vinculado/);
   root.pairDevicePrompt = async () => { throw new Error('Código inválido'); };
   await nodes.get('pilotHome').click('pair');
   assert.equal(doc.activeElement, nodes.get('pilotError'));
@@ -195,7 +335,7 @@ test('fila e pareamento atualizam a barra mesmo sem envio bem-sucedido', () => {
   root.cdbSync.isPairingInvalid = () => true;
   events.get('cdb-sync-state-change')();
   assert.match(nodes.get('pilotRailStatus').textContent, /Reconectar aparelho/);
-  assert.equal(nodes.get('pilotPairButton').textContent, 'Reconectar produção');
+  assert.equal(nodes.get('pilotPairButton').textContent, 'Reconectar');
 });
 
 test('consulta de conexão em andamento bloqueia chamadas repetidas e libera o botão ao terminar', async () => {
@@ -204,20 +344,43 @@ test('consulta de conexão em andamento bloqueia chamadas repetidas e libera o b
   assert.equal(nodes.get('pilotReconnect').disabled, true);
   await nodes.get('pilotHome').click('reconnect');
   await nodes.get('pilotHome').click('reconnect');
-  assert.equal(requests.length, 1);
+  assert.equal(requests.filter(url => url.endsWith('/api/mobile/version')).length, 1);
   complete({ ok: true, json: async () => ({ databaseOk: true }) });
   await new Promise(setImmediate);
   assert.equal(nodes.get('pilotReconnect').disabled, false);
   assert.equal(nodes.get('pilotReconnect').hidden, true);
 });
 
-test('APK atualizado não esconde conteúdo OTA ainda aguardando abertura', async () => {
+test('ausência de APK mais novo não esconde conteúdo OTA ainda aguardando abertura', async () => {
   const { root, nodes } = pilotHarness();
   root.CDB_CONFIG.versionCode = manifest.versionCode;
   root.Capacitor = { Plugins: { PilotUpdater: { check: async () => ({ pendingVersion: '0.4.1' }) } } };
   await root.forceCheckUpdate();
-  assert.match(nodes.get('pilotUpdateStatus').textContent, /APK instalado está atualizado/);
+  assert.match(nodes.get('pilotUpdateStatus').textContent, /Versão publicada:/);
   assert.match(nodes.get('pilotOtaStatus').textContent, /0.4.1 preparada/);
+});
+
+test('APK igual ou superior ao publicado informa a versão publicada sem afirmar atualização instalada', async () => {
+  for (const code of [manifest.versionCode, manifest.versionCode + 1]) {
+    const state = { builtinVersion: '0.7.0', nativeVersionCode: code, activeVersion: '0.7.0' };
+    const { root, nodes } = pilotHarness({ updater: { status: async () => state, check: async () => state } });
+    await new Promise(setImmediate);
+    await root.forceCheckUpdate();
+    const text = nodes.get('pilotUpdateStatus').textContent;
+    assert.ok(text.includes('Versão publicada: ' + manifest.version + ' (' + manifest.versionCode + ')'));
+    assert.doesNotMatch(text, /instalado está atualizado/);
+    assert.equal(nodes.get('pilotDownload').hidden, true);
+  }
+});
+
+test('inscrição de push persistida não afirma conexão nem entrega quando o aparelho está offline', async () => {
+  const state = { builtinVersion: '0.7.0', nativeVersionCode: 7, activeVersion: '0.7.0', pushSubscribed: true };
+  const { nodes } = pilotHarness({ connected: false, updater: { status: async () => state } });
+  await new Promise(setImmediate);
+  const text = nodes.get('pilotPushStatus').textContent;
+  assert.match(text, /inscrito para receber atualizações/);
+  assert.match(text, /não confirma o recebimento/);
+  assert.doesNotMatch(text, /canal.*conectado|push recebido/i);
 });
 
 test('atalho do PWA fecha o modal antes de abrir o seletor de backup existente', async () => {
@@ -280,7 +443,7 @@ test('backup sem proveniência exige revisão e nunca confirma envio só pelo pa
   root.cdbSync.confirmImportedDataContext=async()=>{confirmed++;};
   events.get('cdb-sync-state-change')();
   assert.equal(nodes.get('pilotConfirmImport').disabled,true);
-  assert.match(nodes.get('pilotImportStatus').textContent,/PWA de origem/);
+  assert.match(nodes.get('pilotImportStatus').textContent,/Sistema Antigo/);
   assert.match(nodes.get('pilotImportStatus').textContent,/Revise com a equipe/);
   assert.match(nodes.get('pilotImportStatus').textContent,/EasyStok/);
   await nodes.get('pilotHome').click('confirm-import');
@@ -430,4 +593,65 @@ test('recibo guardado restaura ressalvas após nova abertura sem tirar foco da n
   assert.match(nodes.get('pilotMigrationResult').textContent,/registro exige conferência/);
   assert.match(nodes.get('pilotMigrationResult').textContent,/Fechamentos antigos/);
   assert.equal(doc.activeElement,previousFocus);
+});
+
+
+test('consulta APK automaticamente sem abrir diálogo nem tirar foco da operação', async () => {
+ const {nodes,doc,requests}=pilotHarness({operator:''});
+ const field={};doc.activeElement=field;
+ await new Promise(setImmediate);
+ assert.equal(nodes.get('pilotHome').open,false);assert.equal(doc.activeElement,field);
+ assert.equal(requests.filter(url=>url.endsWith('/latest.json')).length,1);
+ assert.match(nodes.get('pilotUpdateStatus').textContent,/disponível/);
+ assert.equal(nodes.get('pilotDownload').hidden,false);
+ assert.match(nodes.get('pilotRailVersion').textContent,/atualização disponível/);
+});
+test('rodapé usa APK nativo mesmo com conteúdo antigo, sem oferecer reinstalação', async () => {
+ const {root,nodes}=pilotHarness({operator:''});
+ root.CDB_CONFIG.versionCode=3;root.CDB_CONFIG.version='0.3.0';root.CDB_CONFIG.bundleVersion='0.3.1';
+ root.Capacitor={Plugins:{PilotUpdater:{status:async()=>({builtinVersion:'0.5.0',nativeVersionCode:5,pendingVersion:'0.5.2'})}}};
+ await new Promise(setImmediate);
+ assert.match(nodes.get('pilotVersion').textContent,/APK 0\.5\.0 \(5\)/);
+ assert.equal(nodes.get('pilotHomeVersion').textContent, 'APK 0.5.0');
+ assert.match(nodes.get('pilotVersion').textContent,/Conteúdo 0\.3\.1/);
+ assert.match(nodes.get('pilotVersion').textContent,/0\.5\.2 ao reabrir/);
+ assert.equal(nodes.get('pilotDownload').hidden,true);
+});
+test('retomadas repetidas não duplicam consulta, e retorno da rede verifica sem interromper',async()=>{
+ const {root,nodes,events,requests}=pilotHarness({operator:'',connected:false});
+ await new Promise(setImmediate);assert.equal(requests.length,0);
+ root.navigator.onLine=true;events.get('online')();events.get('focus')();events.get('visibilitychange')();
+ await new Promise(setImmediate);
+ assert.equal(requests.filter(url=>url.endsWith('/latest.json')).length,1);assert.equal(nodes.get('pilotHome').open,false);
+});
+test('falha automática mantém a operação aberta e oferece nova verificação manual',async()=>{
+ const {root,nodes,doc}=pilotHarness({operator:'',manifestError:true});const field={};doc.activeElement=field;
+ await new Promise(setImmediate);assert.equal(doc.activeElement,field);assert.equal(nodes.get('pilotHome').open,false);
+ assert.equal(nodes.get('pilotUpdateStatus').hidden,true);
+ assert.equal(nodes.get('pilotUpdateButton').disabled,false);assert.match(nodes.get('pilotUpdateStatus').textContent,/Não foi possível/);
+ await root.forceCheckUpdate();assert.equal(nodes.get('pilotHome').open,true);
+ assert.equal(nodes.get('pilotUpdateStatus').hidden,false);
+});
+
+test('falha da consulta nativa não declara APK atualizado usando versão do conteúdo',async()=>{
+ const {root,nodes}=pilotHarness({operator:''});root.CDB_CONFIG.versionCode=99;
+ root.Capacitor={isNativePlatform:()=>true,Plugins:{PilotUpdater:{status:async()=>{throw new Error('bridge indisponível');}}}};
+ await new Promise(setImmediate);
+ assert.doesNotMatch(nodes.get('pilotUpdateStatus').textContent,/está atualizado/);
+ assert.match(nodes.get('pilotVersion').textContent,/aguardando confirmação/);
+ assert.equal(nodes.get('pilotHomeVersion').textContent, 'Confirmando versão do APK');
+ assert.equal(nodes.get('pilotDownload').hidden,true);
+});
+
+test('resumo compacto mantém rede, vínculo, fila pendente e bloqueio de importação explícitos', () => {
+  const empty = connectionStatus({ health: 'online', paired: false, invalid: false, pending: 0 });
+  assert.match(empty.summary, /EasyStok acessível.*só neste aparelho/);
+  assert.doesNotMatch(empty.summary, /Nenhuma alteração/);
+  assert.match(empty.queue, /Nenhuma alteração/, 'detalhes preservam o estado de fila vazia');
+  const pending = connectionStatus({ health: 'offline', paired: true, invalid: false, pending: 9 });
+  assert.match(pending.summary, /Sem conexão confirmada.*Aparelho vinculado.*9 alterações aguardando envio/);
+  const invalid = connectionStatus({ health: 'online', paired: true, invalid: true, pending: 1 });
+  assert.match(invalid.summary, /inválida.*1 alteração aguardando envio/);
+  const importing = connectionStatus({ health: 'online', paired: true, invalid: false, pending: 2, importPending: true });
+  assert.match(importing.summary, /Envio pausado.*2 alterações aguardando envio/);
 });

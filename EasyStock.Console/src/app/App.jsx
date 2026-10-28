@@ -59,6 +59,7 @@ import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
 import { AvisoCardapioDoSite } from '../features/cardapio-link/AvisoCardapioDoSite'
 import { ModalEncerrar } from '../features/encerramento/ModalEncerrar'
 import { FilaCanhotos } from '../features/ficha-cliente/FilaCanhotos'
+import { ImpressaoAutomatica } from '../features/impressao-automatica/ImpressaoAutomatica'
 import { GestoLoja } from '../features/loja/GestoLoja'
 import { ModalLoteDePapel } from '../features/lote-papel/ModalLoteDePapel'
 import { PainelAgente } from '../features/agente/PainelAgente'
@@ -585,6 +586,8 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
       {tela}{confirmacaoSaida}
+      {/* #2096: o canhoto sai sozinho no aparelho em que a dona ligou, em qualquer tela. */}
+      <ImpressaoAutomatica />
     </ContextoRascunhosDosAjustes.Provider>
   </ContextoAcessoModulos.Provider>
 }

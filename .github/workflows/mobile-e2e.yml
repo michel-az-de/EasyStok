@@ -43,11 +43,7 @@ jobs:
   # Atualizador OTA do APK piloto (#2065): assinatura, hash, replay, caminho do ZIP,
   # estado atômico e retorno de versão. Roda em host, sem Android SDK.
   apk-ota:
-    # A base APK publicada preservada nesta PR usa java.exe no harness.
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -72,5 +68,8 @@ jobs:
         shell: pwsh
         run: ./casa-da-baba-mobile/apk/tests/run-native.ps1 -JsonJar "$env:RUNNER_TEMP/json-20231013.jar"
 
-      - name: Testes de empacotamento, publicação e push
+      - name: Instalar dependências do bridge Android
+        run: npm ci --prefix casa-da-baba-mobile/apk --ignore-scripts --no-audit --no-fund
+
+      - name: Validar contratos do APK e do bridge Android
         run: node --test casa-da-baba-mobile/apk/tests/*.test.cjs

@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
@@ -5,7 +6,8 @@ using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories;
 
-public sealed class ContaReceberRepository(EasyStockDbContext db) : IContaReceberRepository
+/// <param name="relogio">Relógio do "hoje" do filtro de status (#2095, F12); nulo é o do sistema.</param>
+public sealed class ContaReceberRepository(EasyStockDbContext db, TimeProvider? relogio = null) : IContaReceberRepository
 {
     public Task AddAsync(ContaReceber conta, CancellationToken ct = default)
     {
@@ -91,7 +93,10 @@ public sealed class ContaReceberRepository(EasyStockDbContext db) : IContaRecebe
             // Filtro consistente com o badge derivado (BUG-022): Vencida = armazenada
             // Vencida OU Aberta/Parcial com parcela vencida por data; Aberta/Parcial
             // excluem as ja vencidas. Demais status: match direto no armazenado.
-            var hojeFiltro = DateTime.UtcNow.Date;
+            // #2095 (F12): o "hoje" é o dia de Brasília, igual ao StatusEfetivo da pílula; com UtcNow.Date a lista e a
+            // pílula discordavam entre 21h e 24h. DataVencimento é data civil (00:00Z ou 03:00Z do dia).
+            var hojeFiltro = HorarioBrasil.CivilComoInstanteUtc(
+                HorarioBrasil.DataOperacional((relogio ?? TimeProvider.System).GetUtcNow().UtcDateTime));
             query = status.Value switch
             {
                 StatusContaFinanceira.Vencida => query.Where(c =>
@@ -123,11 +128,11 @@ public sealed class ContaReceberRepository(EasyStockDbContext db) : IContaRecebe
 
         if (!string.IsNullOrWhiteSpace(busca))
         {
-            var termo = busca.Trim();
+            var padrao = PadraoILike.Contendo(busca);
             query = query.Where(c =>
-                EF.Functions.ILike(c.Descricao, $"%{termo}%") ||
-                (c.DocumentoReferencia != null && EF.Functions.ILike(c.DocumentoReferencia, $"%{termo}%")) ||
-                (c.Observacoes != null && EF.Functions.ILike(c.Observacoes, $"%{termo}%")));
+                EF.Functions.ILike(c.Descricao, padrao, PadraoILike.Escape) ||
+                (c.DocumentoReferencia != null && EF.Functions.ILike(c.DocumentoReferencia, padrao, PadraoILike.Escape)) ||
+                (c.Observacoes != null && EF.Functions.ILike(c.Observacoes, padrao, PadraoILike.Escape)));
         }
 
         var total = await query.CountAsync(ct);
@@ -135,10 +140,13 @@ public sealed class ContaReceberRepository(EasyStockDbContext db) : IContaRecebe
 
         query = (sort?.ToLowerInvariant()) switch
         {
-            "valor" => desc ? query.OrderByDescending(c => c.ValorTotal) : query.OrderBy(c => c.ValorTotal),
-            "criadoem" => desc ? query.OrderByDescending(c => c.CriadoEm) : query.OrderBy(c => c.CriadoEm),
-            "status" => desc ? query.OrderByDescending(c => c.Status) : query.OrderBy(c => c.Status),
-            _ => desc ? query.OrderByDescending(c => c.DataEmissao) : query.OrderBy(c => c.DataEmissao),
+            "valor" => (desc ? query.OrderByDescending(c => c.ValorTotal) : query.OrderBy(c => c.ValorTotal)).ThenBy(c => c.Id),
+            "criadoem" => (desc ? query.OrderByDescending(c => c.CriadoEm) : query.OrderBy(c => c.CriadoEm)).ThenBy(c => c.Id),
+            "status" => (desc ? query.OrderByDescending(c => c.Status) : query.OrderBy(c => c.Status)).ThenBy(c => c.Id),
+            "dataemissao" => (desc ? query.OrderByDescending(c => c.DataEmissao) : query.OrderBy(c => c.DataEmissao)).ThenBy(c => c.Id),
+            // #2095 (F11): "datavencimento" (padrao) e o proximo vencimento em aberto: menor vencimento das parcelas nao
+            // pagas e nao canceladas. Conta sem parcela aberta vai para o fim nos dois sentidos; Id desempata a pagina.
+            _ => OrdenarPorProximoVencimento(query, desc),
         };
 
         var itens = await query
@@ -148,6 +156,19 @@ public sealed class ContaReceberRepository(EasyStockDbContext db) : IContaRecebe
             .ToListAsync(ct);
 
         return (itens, total);
+    }
+
+    private static IOrderedQueryable<ContaReceber> OrdenarPorProximoVencimento(IQueryable<ContaReceber> query, bool desc)
+    {
+        var semAberta = query.OrderBy(c => !c.Parcelas.Any(p => p.Status != StatusParcela.Paga && p.Status != StatusParcela.Cancelada));
+        var porVencimento = desc
+            ? semAberta.ThenByDescending(c => c.Parcelas
+                .Where(p => p.Status != StatusParcela.Paga && p.Status != StatusParcela.Cancelada)
+                .Min(p => (DateTime?)p.DataVencimento))
+            : semAberta.ThenBy(c => c.Parcelas
+                .Where(p => p.Status != StatusParcela.Paga && p.Status != StatusParcela.Cancelada)
+                .Min(p => (DateTime?)p.DataVencimento));
+        return porVencimento.ThenBy(c => c.Id);
     }
 
     public Task<ParcelaReceber?> GetParcelaAsync(Guid empresaId, Guid parcelaId, CancellationToken ct = default)

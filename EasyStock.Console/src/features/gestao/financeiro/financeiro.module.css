@@ -1,4 +1,5 @@
 .painel, .formulario, .campos { display: grid; align-content: start; gap: var(--e-4); min-width: 0; }
+.painel { grid-template-columns: minmax(0, 1fr); }
 .campos { border: 0; padding: 0; margin: 0; }
 .barra, .acoes { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .barra { justify-content: space-between; }
@@ -19,6 +20,40 @@
 .contexto p { margin: 0; color: var(--tinta-2); }
 .lista { display: grid; align-content: start; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
 .linha { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-3); padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); min-width: 0; }
+/* #2095: a linha da conta é grade (descrição | valor com rótulo | ações); no celular as ações descem para baixo do valor. */
+.lista > .linha:has(> .valorLinha) { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; padding: var(--e-2) var(--e-3); }
+.valorLinha { display: grid; justify-items: end; gap: 2px; }
+.valorLinha > small { color: var(--tinta-2); font-size: var(--t-apoio); }
+.acoesLinha { display: flex; gap: var(--e-2); justify-content: flex-end; }
+.selecionar small { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e-1); }
+.chips { border: 0; margin: 0; min-width: 0; display: flex; gap: var(--e-2); overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.chip { flex: none; min-height: var(--toque); padding: 0 var(--e-4); border-radius: var(--r-pilula); border: var(--b-1) solid var(--linha); background: var(--elevado); color: var(--tinta); font: inherit; font-weight: 600; cursor: pointer; }
+.chip:hover { background: var(--preenchimento); }
+.chipAtivo, .chipAtivo:hover { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
+.chip:focus-visible, .verLista:focus-visible, .cartaoVencidas:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.barra > .chips { flex: 1 1 360px; }
+.ferramentas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-4); }
+.ferramentas > .aviso { margin-left: auto; }
+.busca { flex: 1 1 260px; max-width: 420px; }
+.maisFiltros[open] { flex-basis: 100%; order: 3; }
+.maisFiltros > summary { cursor: pointer; min-height: var(--toque); display: flex; align-items: center; color: var(--tinta-2); font-weight: 600; }
+.maisFiltros[open] > summary { margin-bottom: var(--e-3); }
+.motivo { margin-right: auto; color: var(--tinta-2); font-size: var(--t-apoio); }
+.dia { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--e-4); }
+.ladoDia { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); }
+.ladoDia h2 { margin: 0; font-size: var(--t-forte); }
+.ladoDia h3 { margin: 0; font-size: var(--t-corpo); }
+.cartaoVencidas { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0 var(--e-3); padding: var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); text-decoration: none; }
+.cartaoVencidas > strong { font-family: var(--f-dado); font-size: var(--t-forte); }
+.cartaoVencidas > small { grid-column: 1 / -1; color: var(--tinta-2); }
+.temVencida { background: var(--erro-pastel); }
+.temVencida > strong, .temVencida > span { color: var(--erro); }
+.verLista { color: var(--marca); font-weight: 600; font-size: var(--t-apoio); }
+.itensDia { display: grid; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
+.itemDia { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--e-3); padding: var(--e-2) 0; border-top: var(--b-1) solid var(--linha); }
+.itemDia > div { display: grid; min-width: 0; }
+.itemDia strong { overflow-wrap: anywhere; }
+.itemDia small, .valor > small { color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 400; }
 .linhaSelecionada { border-color: var(--marca); background: var(--preenchimento); }
 .selecionar { display: grid; gap: var(--e-1); flex: 1; min-width: 130px; text-align: left; background: none; border: 0; padding: var(--e-2); color: var(--tinta); }
 .selecionar small, .apoio { color: var(--tinta-2); font-size: var(--t-apoio); }
@@ -44,4 +79,14 @@
 .tabela td { white-space: nowrap; }
 .tabela td:first-child { white-space: normal; }
 @media (max-width: 1199px) { .comContexto { grid-template-columns: minmax(0, 1fr); } .contexto { grid-template-columns: repeat(2, minmax(0, 1fr)); } .contexto .acoes { justify-content: start; } }
-@media (max-width: 759px) { .grade, .detalhes, .contexto { grid-template-columns: minmax(0, 1fr); } .linha { gap: var(--e-2); } .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 759px) {
+  .grade, .detalhes, .contexto { grid-template-columns: minmax(0, 1fr); } .linha { gap: var(--e-2); } .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* No celular o toque na conta abre o detalhe; o resumo ao lado iria para depois da lista. */
+  .comContexto > .contexto { display: none; }
+  .lista > .linha:has(> .valorLinha) { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "sel sel" "valor acoes"; row-gap: 0; align-items: center; }
+  .lista > .linha > .valorLinha { display: flex; align-items: baseline; gap: var(--e-2); padding-left: var(--e-2); }
+  .ferramentas > .aviso { display: none; }
+  .lista > .linha > .selecionar { grid-area: sel; } .lista > .linha > .valorLinha { grid-area: valor; } .lista > .linha > .acoesLinha { grid-area: acoes; }
+  .busca { flex-basis: 160px; max-width: none; }
+  .dia { grid-template-columns: minmax(0, 1fr); }
+}

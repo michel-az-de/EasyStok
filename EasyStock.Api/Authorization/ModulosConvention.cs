@@ -22,7 +22,8 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Mobile.DeviceBackup", "Mobile.DevicePairing", "Mobile.MobileBatches", "Mobile.MobileCalculadora",
         "Mobile.MobileCash", "Mobile.MobileClients", "Mobile.MobileDiagnostics", "Mobile.MobileDiagTrace",
         "Mobile.MobileEstoque", "Mobile.MobileOrders", "Mobile.MobileProducts", "Mobile.MobileQuickReports",
-        "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot"
+        "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot",
+        "Mobile.PushReceipts"
     ];
     private static readonly HashSet<string> Bastidor =
     [
@@ -82,7 +83,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Producao, "Producao", "ProdutoComposicao", "Lotes", "ItemEstoque", "Movimentacao",
             "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "AtendimentoProducao", "AtendimentoProducaoPesquisa");
         Associar(Modulo.Atendimento, "AtendimentoAtendentes", "AtendimentoCaderno", "AtendimentoAssistente",
-            "AtendimentoComanda", "AtendimentoComandasCliente", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
+            "AtendimentoAvisos", "AtendimentoComanda", "AtendimentoComandasCliente", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
             "AtendimentoAutomacoes", "AtendimentoEsteira", "AtendimentoExpediente", "AtendimentoMensagensProgramadas",
             "AtendimentoLembretes", "AtendimentoRespostasProntas", "Clientes", "ClientesCrm", "ClienteInteresses",
             "Ocorrencias", "Pedidos", "PedidosCobranca");
@@ -95,6 +96,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
             "Storefront.TenantVitrineEntrega");
         mapa.Add("Storefront.AprovacaoPedido", [Modulo.Atendimento, Modulo.Entregas]);
         mapa.Add("PedidoJanela", [Modulo.Atendimento, Modulo.Entregas]);
+        mapa.Add("PedidoConfirmacaoCliente", [Modulo.Atendimento, Modulo.Entregas]); // #2096
         mapa.Add("AtendimentoLogistica", [Modulo.Atendimento, Modulo.Entregas]);
         mapa.Add("AtendimentoCardapioDoDia", [Modulo.Cardapio, Modulo.Producao, Modulo.Atendimento]);
         mapa.Add("OperacaoEventos", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);

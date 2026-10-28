@@ -49,6 +49,16 @@ public class WppConnectClientTests
         _http.Chamadas.Should().HaveCount(1);
     }
 
+    // Risco conhecido #2071 (caracterização, não correção): fora da janela de 24 h o domínio pede modelo, e a
+    // conexão provisória recusa de forma permanente em vez de enviar texto. Quem corrigir inverte esta asserção.
+    [Fact]
+    public async Task Risco_modelo_fora_da_janela_falha_permanente_sem_sair_como_texto()
+    {
+        var act = () => Client.EnviarTemplateAsync("5511999999999", "aviso_pedido", "pt_BR", ["1"]);
+        await act.Should().ThrowAsync<WhatsAppCloudException>().Where(e => e.EhPermanente);
+        _http.Chamadas.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task Sem_sessao_do_tenant_nao_chama_o_servidor()
     {

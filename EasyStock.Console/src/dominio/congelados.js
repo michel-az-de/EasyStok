@@ -9,9 +9,9 @@
 // Quem consome: `telasDoMenu` e `modulosDoHall` (dominio/modulos.js), `rotaDaHash`
 // (dominio/rota.js) e os pontos avulsos das features, pelo gate `congelado('<chave>')`.
 //
-// Para DESCONGELAR um item: tire-o da lista abaixo e desfaça os dois textos que foram ajustados
-// para não mentir enquanto o item está fora: o `resumo` do Financeiro em dominio/modulos.js e o
-// `faz` do Financeiro em dominio/guiaDoConsole.js (ambos dizem só "Caixa do dia").
+// Para DESCONGELAR um item: tire-o da lista abaixo e confira se algum texto foi ajustado para não
+// mentir enquanto o item estava fora (resumo do módulo em dominio/modulos.js, guia em
+// dominio/guiaDoConsole.js). O financeiro gerencial voltou em 27/10/2026 (decisão do Felipe, #2095).
 // `ferramentas/prova-congelados.mjs` confere que cada item da lista existe no catálogo e está
 // fora da tela.
 
@@ -21,13 +21,6 @@ export const CONGELADOS = Object.freeze({
   // Tela de um módulo que continua vivo (`modulo/tela`): sai do menu; a rota cai na primeira
   // tela viva do módulo.
   telas: Object.freeze([
-    'financeiro/visao-geral',
-    'financeiro/pagar',
-    'financeiro/receber',
-    'financeiro/extrato',
-    'financeiro/relatorios',
-    'financeiro/categorias',
-    'financeiro/centros-custo',
     'cozinha/producao',
   ]),
   // Pontos avulsos das features (botão, link, chip), por chave.

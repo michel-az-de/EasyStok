@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Financeiro.Common;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
@@ -21,6 +22,7 @@ public class EstornarPagamentoParcelaPagarUseCase(
     public async Task<bool> ExecuteAsync(EstornarPagamentoParcelaPagarCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        ValidacaoFinanceira.Texto(cmd.Motivo, ValidacaoFinanceira.MotivoMax, "Motivo do estorno");
         var parcela = await contaRepo.GetParcelaWithContaAsync(cmd.EmpresaId, cmd.ParcelaId, ct);
         if (parcela is null) return false;
         var conta = parcela.ContaPagar
@@ -52,8 +54,8 @@ public class EstornarPagamentoParcelaPagarUseCase(
                 }
             }
 
-            parcela.AtualizarStatusPorPagamentos(HorarioBrasil.HojeInstanteUtc());
-            conta.AtualizarStatusPorParcelas();
+            // #2095 (F2): em conta cancelada a parcela estornada fica cancelada e a conta não reabre.
+            conta.ReavaliarParcelaAposEstorno(parcela, HorarioBrasil.HojeInstanteUtc());
 
             await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaPagar(
                 conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PagamentoEstornado,
@@ -93,6 +95,7 @@ public class EstornarPagamentoParcelaReceberUseCase(
     public async Task<bool> ExecuteAsync(EstornarPagamentoParcelaReceberCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        ValidacaoFinanceira.Texto(cmd.Motivo, ValidacaoFinanceira.MotivoMax, "Motivo do estorno");
         var parcela = await contaRepo.GetParcelaWithContaAsync(cmd.EmpresaId, cmd.ParcelaId, ct);
         if (parcela is null) return false;
         var conta = parcela.ContaReceber
@@ -123,8 +126,8 @@ public class EstornarPagamentoParcelaReceberUseCase(
                 }
             }
 
-            parcela.AtualizarStatusPorPagamentos(HorarioBrasil.HojeInstanteUtc());
-            conta.AtualizarStatusPorParcelas();
+            // #2095 (F2): em conta cancelada a parcela estornada fica cancelada e a conta não reabre.
+            conta.ReavaliarParcelaAposEstorno(parcela, HorarioBrasil.HojeInstanteUtc());
 
             await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
                 conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PagamentoEstornado,

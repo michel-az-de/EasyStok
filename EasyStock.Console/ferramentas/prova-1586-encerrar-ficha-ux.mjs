@@ -671,6 +671,84 @@ await confere('F  link vencido: no modo API o texto substitui "Reenviar cobranç
   demo.encerrar()
 })
 
+// #2079 (C2): entregue com dinheiro na entrega não lançado dizia "Pedido concluído, nada pendente".
+const entregueComSaldo = (extra = {}) => pedidoComLink({
+  estado: 'entregue', statusApi: 'entregue', meio: 'dinheiro', totalApi: 88, totalPagoApi: 0, alocadoApi: 0,
+  cobranca: { id: 'cb', meio: 'dinheiro', manual: true, valor: 88, link: null, criadaEm: AGORA - 60000, expiraEm: null, tentativa: 1, diferenca: false, statusApi: 'Pendente' },
+  ...extra,
+})
+await confere('#2079-C2 entregue com saldo: sem "nada pendente", com "Marcar pago (R$ 88,00)" à frente', async () => {
+  comoApi()
+  const idas = []
+  const tela = new Tela(BarraProximoPasso, propsDaBarra(entregueComSaldo(), { aoConfirmarPagamento: async (...a) => { idas.push(a) }, aoEncerrarAtendimento: nada }))
+  const tudo = texto(tela.arvore).replace(/ /g, ' ')
+  assert.ok(!tudo.includes('nada pendente'), 'dizia "nada pendente" com R$ 88,00 a receber')
+  assert.match(tudo, /R\$ 88,00 a receber/)
+  const marcar = botao(tela, 'Marcar pago (R$')
+  assert.ok(marcar, 'falta o "Marcar pago" com o saldo')
+  assert.match(texto(marcar).replace(/ /g, ' '), /Marcar pago \(R\$ 88,00\)/)
+  assert.equal(marcar.props.variante, 'primario', 'receber vem antes de encerrar')
+  assert.equal(botao(tela, 'Encerrar atendimento').props.variante, 'secundario')
+  marcar.props.onClick()
+  tela.renderizar()
+  assert.equal(doTipo(tela, 'BaixaAMao')[0].props.valorCobrado, 88)
+  tela.encerrar()
+  // Quitado, a barra volta a dizer que nada falta.
+  const quitado = new Tela(BarraProximoPasso, propsDaBarra(entregueComSaldo({ totalPagoApi: 88, alocadoApi: 88 }), { aoEncerrarAtendimento: nada }))
+  assert.ok(texto(quitado.arvore).includes('nada pendente'))
+  assert.equal(botao(quitado, 'Marcar pago (R$'), undefined)
+  assert.equal(botao(quitado, 'Encerrar atendimento').props.variante, 'primario')
+  quitado.encerrar()
+})
+
+// #2079 (D3/E2): pedido pago R$ 69 no Pix, cancelado e devolvido pelo Mercado Pago. O servidor mantém o
+// `totalPago` e tira a devolução do `alocado`; a folha dizia "Receita R$ 69,00" e o impresso, estorno 0.
+const { resumoParaImpresso } = await import('../src/dominio/resumoAtendimento.js')
+const PAGO_E_DEVOLVIDO = (extra = {}) => ({
+  pedidoId: '22222222-2222-2222-2222-222222222222', status: 'cancelado', total: 69, frete: 12, itens: [{ cardapioItemId: 'massa', nome: 'Lasanha', quantidade: 1, precoUnitario: 57 }],
+  totalPago: 69, alocado: 0, pagamentos: [{ id: 'pg5', valor: 69, metodo: 'pix', pagoEm: '2026-10-11T14:50:00Z' }],
+  cobranca: { cobrancaId: 'cb5', provedor: 'mercadopago', status: 'Paga', valor: 69, valorPago: 69, tentativa: 1, criadaEm: '2026-10-11T14:40:00Z', pagaEm: '2026-10-11T14:50:00Z' },
+  ...extra,
+})
+await confere('#2079-D3 resumo e impresso: pedido estornado não conta como receita', () => {
+  const total = montarResumoAtendimento(conversaBase({ pedido: pedidoDaApi(PAGO_E_DEVOLVIDO()) }), [], AGORA, {})
+  assert.equal(total.receita.liquido, 0, 'receita de pedido devolvido inteiro')
+  assert.equal(total.receita.estorno, 69)
+  assert.equal(total.vendas[0].situacao, 'Cancelado')
+  assert.equal(total.vendasTotal, 0, 'venda cancelada somava no Total')
+  const papel = resumoParaImpresso({ nomeCliente: 'Ana', canalNome: 'WhatsApp', resumo: total })
+  assert.equal(papel.receita, 0)
+  assert.equal(papel.estorno, 69)
+  assert.equal(papel.vendasTotal, 0)
+  // Parcial: R$ 80 recebidos, R$ 30 devolvidos e R$ 50 ainda a devolver.
+  const parcial = montarResumoAtendimento(conversaBase({ pedido: pedidoDaApi(PAGO_E_DEVOLVIDO({ total: 80, totalPago: 80, alocado: 50,
+    pagamentos: [{ id: 'pg6', valor: 80, metodo: 'credito', pagoEm: '2026-10-11T14:50:00Z' }] })) }), [], AGORA, {})
+  assert.deepEqual([parcial.receita.bruto, parcial.receita.estorno, parcial.receita.liquido], [80, 30, 50])
+  // Sem devolução nada muda; cupom usado (alocado acima do pago) não vira estorno negativo.
+  const pago = montarResumoAtendimento(conversaBase({ pedido: pedidoDaApi(PAGO_E_DEVOLVIDO({ status: 'entregue', alocado: 69 })) }), [], AGORA, {})
+  assert.deepEqual([pago.receita.estorno, pago.receita.liquido, pago.vendasTotal], [0, 69, 69])
+  const comCupom = montarResumoAtendimento(conversaBase({ pedido: pedidoDaApi(PAGO_E_DEVOLVIDO({ status: 'entregue', totalPago: 59, alocado: 69,
+    pagamentos: [{ id: 'pg7', valor: 59, metodo: 'pix', pagoEm: '2026-10-11T14:50:00Z' }] })) }), [], AGORA, {})
+  assert.deepEqual([comCupom.receita.estorno, comCupom.receita.liquido], [0, 59])
+})
+await confere('#2079-D11 impresso: data e hora do encerramento são as da loja, em qualquer fuso do aparelho', () => {
+  const fusoOriginal = process.env.TZ
+  try {
+    for (const fuso of ['UTC', 'Asia/Tokyo', 'America/Sao_Paulo']) {
+      process.env.TZ = fuso
+      // 21:30 em Brasília é 00:30Z do dia seguinte.
+      const resumo = { ...montarResumoAtendimento(conversaBase(), [], AGORA, {}), encerradoEm: '2026-10-27T00:30:00Z',
+        marcos: [{ em: '2026-10-27T00:30:00Z', rotulo: 'pagamento confirmado' }] }
+      const papel = resumoParaImpresso({ nomeCliente: 'Ana', resumo })
+      assert.equal(papel.data, '2026-10-26T21:30:00', fuso)
+      assert.equal(papel.marcos[0].hora, '21:30', fuso)
+    }
+  } finally { process.env.TZ = fusoOriginal }
+  const folha = readFileSync(new URL('features/encerramento/FolhaResumo.jsx', src), 'utf8')
+  assert.match(folha, /const dataCurta = \(iso\) => new Date\(iso\)\.toLocaleDateString\('pt-BR', \{ timeZone: FUSO \}\)/)
+  assert.match(folha, /const dataHumana = \(iso\) => new Date\(iso\)\.toLocaleDateString\('pt-BR', \{ day: '2-digit', month: 'short', timeZone: FUSO \}\)/)
+})
+
 if (falhas.length > 0) {
   console.error(`\n${passou} ok, ${falhas.length} falha(s)`)
   process.exit(1)

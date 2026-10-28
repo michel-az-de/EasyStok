@@ -101,7 +101,8 @@ React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cli
   assert.match(await extrato.innerText(), /Quitado\s+R\$\s*0,00/)
   console.log('ok extrato real: cancelados sem dívida, ajustes neutros e ativos preservados')
   const cobranca = componente.getByRole('region', { name: 'Cobrança em teste' })
-  assert.match(await cobranca.innerText(), /Sinal agora: R\$\s*15,50/)
+  // #2079 (C5): o valor do link do sinal ganhou o rótulo "Sinal agora" (era "Total"); a linha abaixo diz o total.
+  assert.match(await cobranca.innerText(), /Sinal agora\s*R\$\s*15,50/)
   for (const cena of [1, 2, 3]) {
     await componente.getByRole('button', { name: 'Próxima cobrança' }).click()
     const texto = await cobranca.innerText()

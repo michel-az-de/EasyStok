@@ -46,7 +46,8 @@ function staging(root, release) {
   for (const [source, name] of [[release.bundle, 'bundle.zip'], [release.release, path.basename(release.release)], [publicFile, 'ota-public-key.der']]) fs.copyFileSync(source, path.join(stage, name));
   return stage;
 }
-function current(root) { return ota.verify(read(path.join(root, 'latest.json')), key); }
+function channelRoot(root) { const code=require('../package.json').versionCode; return code >= 5 ? path.join(root, 'native-' + code) : root; }
+function current(root) { return ota.verify(read(path.join(channelRoot(root), 'latest.json')), key); }
 
 test('ZIP determinístico, manifesto e integridade assinada', () => {
   const repository = fs.mkdtempSync(path.join(temporary, 'git-fixture-'));
@@ -66,7 +67,7 @@ test('ZIP determinístico, manifesto e integridade assinada', () => {
 });
 test('contrato rejeita URL, identidade, esquema e metadados incompatíveis', () => {
   const release = build('0.3.0', 1);
-  for (const change of [{ url: release.payload.url + '?x=1' }, { appId: 'outra.empresa' }, { dataSchemaVersion: 1 }, { nativeVersionCode: 5 }, { sequence: 0 }, { bundleVersion: '../escape' }]) {
+  for (const change of [{ url: release.payload.url + '?x=1' }, { appId: 'outra.empresa' }, { dataSchemaVersion: 1 }, { nativeVersionCode: require('../package.json').versionCode + 1 }, { sequence: 0 }, { bundleVersion: '../escape' }]) {
     assert.throws(() => ota.validate({ ...release.payload, ...change }));
   }
   const web = fixture();
@@ -74,12 +75,11 @@ test('contrato rejeita URL, identidade, esquema e metadados incompatíveis', () 
   fs.writeFileSync(path.join(web, 'bundle.json'), JSON.stringify(metadata));
   assert.throws(() => ota.zipWeb(web, '0.3.0'), /bundle.json/);
 });
-test('distribuidor gera a versao nativa atual e preserva verificacao de manifesto antigo', () => {
+test('distribuidor gera a versao nativa atual e recusa conteúdo para APK anterior', () => {
   const release = build('0.4.0', 10);
   assert.equal(release.payload.nativeVersionCode, require('../package.json').versionCode);
   const legacy = { ...release.payload, nativeVersionCode: 3 };
-  const envelope = ota.sign(legacy, privateFile, key);
-  assert.equal(ota.verify(envelope, key).nativeVersionCode, 3);
+  assert.throws(() => ota.sign(legacy, privateFile, key), /incompatível/);
 });
 
 test('rollback cria sequência nova preservando exatamente os bytes e hash anteriores', () => {
@@ -93,12 +93,12 @@ test('publicação local preserva versões, separa instalação/ativação e per
   const root = fs.mkdtempSync(path.join(temporary, 'server-'));
   const first = build('0.3.0', 1), next = build('0.3.1', 2);
   const stage1 = staging(root, first); run(root, stage1, 'install');
-  assert.equal(fs.existsSync(path.join(root, 'latest.json')), false);
+  assert.equal(fs.existsSync(path.join(channelRoot(root), 'latest.json')), false);
   run(root, stage1, 'activate'); assert.equal(current(root).sequence, 1);
   const stage2 = staging(root, next); run(root, stage2, 'install');
   assert.equal(current(root).sequence, 1);
   run(root, stage2, 'activate'); assert.equal(current(root).sequence, 2);
-  assert.equal(ota.verify(read(path.join(root, 'previous.json')), key).sequence, 1);
+  assert.equal(ota.verify(read(path.join(channelRoot(root), 'previous.json')), key).sequence, 1);
   const output = fs.mkdtempSync(path.join(temporary, 'rollback-'));
   const payload = ota.main(['rollback', '--release', first.release, '--bundle', first.bundle, '--sequence', '3', '--output', output, '--private-key', privateFile, '--public-key', publicFile]);
   const stage3 = staging(root, { output, payload, bundle: path.join(output, 'bundle.zip'), release: path.join(output, 'release-3.json') });
@@ -106,8 +106,63 @@ test('publicação local preserva versões, separa instalação/ativação e per
   assert.equal(current(root).sequence, 3); assert.equal(current(root).sha256, first.payload.sha256);
   for (const sequence of [1, 2, 3]) assert.ok(fs.existsSync(path.join(root, 'release-' + sequence + '.json')));
   for (const release of [first, next]) assert.deepEqual(fs.readFileSync(path.join(root, release.payload.sha256, 'bundle.zip')), fs.readFileSync(release.bundle));
-  run(root, stage2, 'activate', false); run(root, stage1, 'install', false);
+  // Staging novo: o usado já foi removido pela ativação, e a recusa tem de vir do replay.
+  run(root, staging(root, next), 'activate', false); run(root, staging(root, first), 'install', false);
   assert.equal(current(root).sequence, 3);
+});
+test('#2066 staging sai do diretório público depois da ativação ou do descarte', () => {
+  const root = fs.mkdtempSync(path.join(temporary, 'server-'));
+  const stage = staging(root, build('0.3.0', 1));
+  run(root, stage, 'install');
+  assert.ok(fs.existsSync(stage), 'activate ainda precisa da release em staging');
+  run(root, stage, 'activate');
+  assert.equal(fs.existsSync(stage), false, 'activate remove o staging');
+  assert.equal(current(root).sequence, 1);
+  const abandoned = staging(root, build('0.3.1', 2));
+  run(root, abandoned, 'discard');
+  assert.equal(fs.existsSync(abandoned), false, 'discard remove staging de publicação falha');
+  assert.equal(current(root).sequence, 1, 'discard não mexe em latest');
+  run(root, path.join(channelRoot(root), 'latest.json'), 'discard', false);
+  assert.ok(fs.existsSync(path.join(channelRoot(root), 'latest.json')));
+});
+test('#2066 versão nativa vem do package.json, sem número fixo no empacotador', () => {
+  const manifest = require.resolve('../package.json'), packager = require.resolve('../scripts/ota-package.cjs');
+  const contract = path.resolve(__dirname, '../scripts/ota-contract.cjs');
+  const saved = require.cache[manifest];
+  try {
+    require.cache[manifest] = { id: manifest, filename: manifest, loaded: true, exports: { ...require(manifest), versionCode: 4 } };
+    delete require.cache[packager]; delete require.cache[contract];
+    const next = require(packager);
+    const web = fixture();
+    const metadata = read(path.join(web, 'bundle.json')); metadata.nativeVersionCode = 4;
+    fs.writeFileSync(path.join(web, 'bundle.json'), JSON.stringify(metadata));
+    const output = fs.mkdtempSync(path.join(temporary, 'native-'));
+    const payload = next.main(['build', '--web-dir', web, '--version', '0.3.0', '--sequence', '1', '--output', output, '--private-key', privateFile, '--public-key', publicFile]);
+    assert.equal(payload.nativeVersionCode, 4);
+    assert.throws(() => next.validate({ ...payload, nativeVersionCode: 3 }), /nativa/);
+    const root = fs.mkdtempSync(path.join(temporary, 'server-'));
+    const stage = staging(root, { bundle: path.join(output, 'bundle.zip'), release: path.join(output, 'release-1.json') });
+    run(root, stage, 'install'); run(root, stage, 'activate');
+  } finally {
+    require.cache[manifest] = saved;
+    delete require.cache[packager]; delete require.cache[contract];
+  }
+});
+test('#2066 esquema de dados do empacotador é o mesmo do APK', () => {
+  const java = fs.readFileSync(path.resolve(__dirname, '../android/app/src/main/java/com/casadababa/app/updater/UpdatePolicy.java'), 'utf8');
+  assert.equal(Number(/DATA_SCHEMA\s*=\s*(\d+)/.exec(java)[1]), require('../scripts/ota-contract.cjs').DATA_SCHEMA);
+});
+
+test('versão e código do APK vêm do manifesto, com lockfile consistente', () => {
+  const manifest = require('../package.json');
+  const lock = require('../package-lock.json');
+  const contract = require('../scripts/ota-contract.cjs');
+  assert.equal(lock.version, manifest.version);
+  assert.equal(lock.packages[''].version, manifest.version);
+  assert.equal(contract.NATIVE_VERSION_CODE, manifest.versionCode);
+  const gradle = fs.readFileSync(path.resolve(__dirname, '../android/app/build.gradle'), 'utf8');
+  assert.match(gradle, /versionCode appVersion\.versionCode as int/);
+  assert.match(gradle, /versionName appVersion\.version/);
 });
 test('publicação recusa adulteração, troca de chave, sequência reutilizada e concorrência sem mudar latest', () => {
   const root = fs.mkdtempSync(path.join(temporary, 'server-')), first = build('0.3.0', 1);
@@ -126,4 +181,27 @@ test('publicação recusa adulteração, troca de chave, sequência reutilizada 
   run(root, concurrent, 'install', false); fs.rmdirSync(path.join(root, '.publish-lock'));
   assert.equal(current(root).sequence, 1);
   assert.equal(fs.existsSync(path.join(root, 'release-2.json')), false);
+});
+
+test('APK novo mantém manifesto e recuperação legados intactos', () => {
+  const root = fs.mkdtempSync(path.join(temporary, 'legacy-channel-'));
+  const old=Buffer.from('manifesto-legado-preservado'), previous=Buffer.from('anterior-legado-preservado');
+  const olderChannels = [root];
+  for (let code = 5; code < require('../package.json').versionCode; code++) {
+    const directory = path.join(root, 'native-' + code);
+    fs.mkdirSync(directory);
+    olderChannels.push(directory);
+  }
+  for (const directory of olderChannels) {
+    fs.writeFileSync(path.join(directory, 'latest.json'), old);
+    fs.writeFileSync(path.join(directory, 'previous.json'), previous);
+  }
+  const release=build('0.5.0',6), next=build('0.5.1',7);
+  for(const item of [release,next]) { const stage=staging(root,item);run(root,stage,'install');run(root,stage,'activate'); }
+  for (const directory of olderChannels) {
+    assert.deepEqual(fs.readFileSync(path.join(directory, 'latest.json')), old);
+    assert.deepEqual(fs.readFileSync(path.join(directory, 'previous.json')), previous);
+  }
+  assert.equal(current(root).sequence,7);
+  assert.equal(ota.verify(read(path.join(channelRoot(root),'previous.json')),key).sequence,6);
 });

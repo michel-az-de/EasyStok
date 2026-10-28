@@ -5,6 +5,7 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -448,6 +449,42 @@ public sealed class EstornoOnlinePedidoIntegrationTests(PostgreSqlDatabaseFixtur
         await db.SaveChangesAsync();
         await FluentActions.Invoking(() => Executar(input with { OperacaoId = Guid.NewGuid() }, mp)).Should().ThrowAsync<UseCaseValidationException>();
         mp.Chaves.Should().ContainSingle();
+    }
+
+    [SkippableFact]
+    public async Task Estorno_confirmado_depois_do_fechamento_registra_a_saida_e_o_dia_fechado_segue_o_retrato()
+    {
+        // #2082 D9: a devolução já foi enviada ao Mercado Pago (resposta perdida), o dia fecha, e só então a retomada
+        // a confirma. Recusar perderia o registro de um dinheiro que já saiu. A saída fica gravada no instante da
+        // confirmação (como o recebimento do provedor depois do fechamento) e entra em "depois de fechar"; o dia
+        // fechado não a mostra, para linhas, gaveta e total serem do mesmo retrato.
+        var input = await Preparar();
+        using var mp = new ProvedorHttp(input.PedidoId) { PerderResposta = true };
+        (await Executar(input, mp)).Situacao.Should().Be(PedidoEstornoOnline.Pendente);
+        var dia = new DateOnly(2026, 10, 10);
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(input.EmpresaId);
+        db.MovimentosCaixa.Add(MovimentoCaixa.Criar(input.EmpresaId, "abertura", 100m, Agora.AddHours(-5)));
+        var fechamento = FechamentoCaixa.Criar(input.EmpresaId, dia, 100m, 0m, 0m, 0m, 0m);
+        fechamento.FechadoEm = Agora.AddMinutes(-30);
+        db.FechamentosCaixa.Add(fechamento);
+        // O marcador do fechamento é gravado logo depois do retrato e não move saldo: segue na lista.
+        db.MovimentosCaixa.Add(MovimentoCaixa.Criar(input.EmpresaId, "fechamento", 0m, fechamento.FechadoEm.AddSeconds(1)));
+        await db.SaveChangesAsync();
+
+        (await Service(db, mp).RetomarAsync(input.EmpresaId, input.PedidoId, input.OperacaoId, NivelAcesso.Admin))
+            .Situacao.Should().Be(PedidoEstornoOnline.Confirmado);
+
+        var saida = await db.MovimentosCaixa.SingleAsync(m => m.Tipo == "saida");
+        saida.Valor.Should().Be(40m, "o dinheiro já saiu no provedor: o registro não se perde");
+        saida.DataMovimento.Should().Be(Agora);
+        var caixa = await new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(new CaixaRepository(db)))
+            .ExecuteAsync(new ObterCaixaDiaQuery(input.EmpresaId, dia));
+        caixa.Fechado.Should().BeTrue();
+        caixa.SaldoEsperado.Should().Be(100m, "o total é o do fechamento");
+        caixa.Movimentos.Should().NotContain(m => m.Tipo == "saida", "o retrato do dia fechado não ganha lançamento de depois");
+        caixa.Movimentos.Select(m => m.Tipo).Should().BeEquivalentTo("abertura", "fechamento");
+        caixa.PosFechamento.Should().Be(-40m, "a devolução aparece à parte, como o Pix que entra depois de fechar");
     }
 
     [SkippableFact]

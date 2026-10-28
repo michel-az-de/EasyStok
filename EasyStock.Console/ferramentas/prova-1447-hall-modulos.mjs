@@ -87,7 +87,8 @@ confere('tela que só existe no modo API some do menu no modo demonstração', (
   const comApi = telasDoMenu(moduloPorId('atendimento'), { fonteApi: true }).map((t) => t.id)
   const semApi = telasDoMenu(moduloPorId('atendimento'), { fonteApi: false }).map((t) => t.id)
   // #1441: Respostas e automáticas existe nos dois modos (a demonstração grava no navegador).
-  assert.deepEqual(comApi, ['balcao', 'horarios', 'respostas'])
+  // #2096: Avisos da operação, só no modo API.
+  assert.deepEqual(comApi, ['balcao', 'horarios', 'avisos', 'respostas'])
   assert.deepEqual(semApi, ['balcao', 'respostas'])
   assert.ok(!telasDoMenu(moduloPorId('configuracoes'), { fonteApi: false }).some((t) => t.id === 'canais'))
 })
@@ -147,9 +148,10 @@ confere('tela de ajuste abre dentro do módulo, com o módulo vindo da rota', ()
   // #1891: Produção e cardápio do dia (Em preparação) está congelada; a rota cai na Fila de preparo.
   assert.equal(rotaDaHash('#/m/cozinha/producao').tipo, ROTA_COZINHA)
   assert.equal(rotaDaHash('#/m/financeiro', { fonteApi: true }).aba, 'caixa', 'A entrada mantém o Caixa disponível ao Atendimento')
-  // #1891: a visão financeira está congelada; a rota cai na primeira tela viva, o Caixa do dia.
-  assert.equal(rotaDaHash('#/m/financeiro/visao-geral', { fonteApi: true }).aba, 'caixa', 'Tela congelada cai no Caixa do dia')
-  assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true }).map((t) => t.id), ['caixa'], 'Financeiro só com Caixa do dia')
+  // #2095: o financeiro gerencial foi descongelado (revoga a #1891 nessas telas); a visão geral abre a própria aba.
+  assert.equal(rotaDaHash('#/m/financeiro/visao-geral', { fonteApi: true }).aba, 'financeiro-resumo', 'Visão geral descongelada abre a própria tela')
+  assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true, acoes: { gerenciarCaixa: true } }).map((t) => t.id), ['caixa'], 'Operador: Financeiro só com Caixa do dia (#2095, F17)')
+  assert.equal(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true }).length, 8, 'sem a matriz (catálogo), as oito telas do Financeiro')
   assert.equal(rotaDaHash('#/m/financeiro').aba, 'caixa', 'A demonstração conserva o Caixa')
   assert.equal(rotaDaHash('#/m/configuracoes/canais', { fonteApi: true }).aba, 'canais')
 })

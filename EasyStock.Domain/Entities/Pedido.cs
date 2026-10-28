@@ -220,6 +220,38 @@ namespace EasyStock.Domain.Entities
             return true;
         }
 
+        // ── Confirmação da encomenda pelo cliente (#2096) ───────────────
+
+        /// <summary>Quando o cliente confirmou a encomenda (pela equipe ou pelo agente). Nulo = ainda não.</summary>
+        public DateTime? ConfirmadoPeloClienteEm { get; private set; }
+
+        /// <summary>
+        /// Marca a encomenda como confirmada pelo cliente. Só pedido com data marcada e em aberto; confirmar de novo é
+        /// no-op (devolve <c>false</c>) para guardar o primeiro instante.
+        /// </summary>
+        public bool ConfirmarPeloCliente(DateTime agoraUtc)
+        {
+            if (AgendadoParaEm is null)
+                throw new RegraDeDominioVioladaException("Só encomenda com data marcada pode ser confirmada pelo cliente.");
+            if (EstaFinalizado)
+                throw new RegraDeDominioVioladaException("Pedido finalizado não muda a confirmação do cliente.");
+            if (ConfirmadoPeloClienteEm is not null) return false;
+            ConfirmadoPeloClienteEm = agoraUtc;
+            AlteradoEm = DateTime.UtcNow;
+            return true;
+        }
+
+        /// <summary>Desfaz a confirmação marcada por engano. Sem confirmação é no-op.</summary>
+        public bool DesfazerConfirmacaoDoCliente()
+        {
+            if (ConfirmadoPeloClienteEm is null) return false;
+            if (EstaFinalizado)
+                throw new RegraDeDominioVioladaException("Pedido finalizado não muda a confirmação do cliente.");
+            ConfirmadoPeloClienteEm = null;
+            AlteradoEm = DateTime.UtcNow;
+            return true;
+        }
+
         // ── Número do dia (S53) ─────────────────────────────────────────
 
         /// <summary>

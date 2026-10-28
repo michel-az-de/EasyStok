@@ -16,21 +16,29 @@ public static class GavetaCaixa
     public static bool EhDinheiro(string? metodo) =>
         string.Equals(metodo?.Trim(), Dinheiro, StringComparison.OrdinalIgnoreCase);
 
-    public static decimal DinheiroNaGaveta(CaixaDiaResult dia)
+    public static decimal DinheiroNaGaveta(CaixaDiaResult dia) => DinheiroNaJanela(dia, null, null, comSaldoInicial: true);
+
+    /// <summary>
+    /// #2084: a mesma conta, só com o que aconteceu em [<paramref name="desdeUtc"/>, <paramref name="ateUtc"/>).
+    /// Separa, numa sessão esquecida, o dia da abertura do que entrou hoje (D1), e no dia fechado o que entrou
+    /// depois de fechar (B4). O saldo inicial é da abertura e entra só quando pedido.
+    /// </summary>
+    public static decimal DinheiroNaJanela(CaixaDiaResult dia, DateTime? desdeUtc, DateTime? ateUtc, bool comSaldoInicial)
     {
         ArgumentNullException.ThrowIfNull(dia);
-        var gaveta = dia.SaldoInicial;
+        bool NaJanela(DateTime t) => (desdeUtc is null || t >= desdeUtc) && (ateUtc is null || t < ateUtc);
+        var gaveta = comSaldoInicial ? dia.SaldoInicial : 0m;
 
         foreach (var m in dia.Movimentos)
         {
-            if (m.EstornadoEm is not null) continue;
+            if (m.EstornadoEm is not null || !NaJanela(m.DataMovimento)) continue;
             if (!string.IsNullOrWhiteSpace(m.Metodo) && !EhDinheiro(m.Metodo)) continue;
             if (m.Tipo == "entrada") gaveta += m.Valor;
             else if (m.Tipo == "saida") gaveta -= m.Valor;
         }
 
         foreach (var linha in dia.LinhasExtras ?? [])
-            if (EhDinheiro(linha.Metodo)) gaveta += linha.Valor;
+            if (EhDinheiro(linha.Metodo) && NaJanela(linha.Hora)) gaveta += linha.Valor;
 
         return gaveta;
     }

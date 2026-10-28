@@ -110,5 +110,5 @@ async function main(argv) {
   return sendUpdate({ credentials: args['--credentials'], appConfig: args['--app-config'], release: args['--release'],
     publicKey: args['--public-key'] || path.resolve(__dirname, '../android/app/src/main/assets/ota-public-key.der'), validateOnly: args.mode !== '--send' });
 }
-module.exports = { TOKEN_URL, SCOPE, TOPIC, configuration, assertion, message, sendUpdate, main };
+module.exports = { TOKEN_URL, SCOPE, TOPIC, configuration, assertion, message, requestJson, sendUpdate, main };
 if (require.main === module) main(process.argv.slice(2)).then(result => console.log(JSON.stringify(result))).catch(error => { console.error(error.message); process.exitCode = 1; });

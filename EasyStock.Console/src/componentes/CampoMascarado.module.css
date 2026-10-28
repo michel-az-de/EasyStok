@@ -26,3 +26,4 @@
 .controle.erro { border-width: var(--b-2); border-color: var(--erro); }
 .erroTexto { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--erro); }
 .dica { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
+output.dica { display: block; }

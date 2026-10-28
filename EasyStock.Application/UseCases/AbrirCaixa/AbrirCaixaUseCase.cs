@@ -1,7 +1,11 @@
 using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 
 namespace EasyStock.Application.UseCases.AbrirCaixa;
 
+/// <param name="SaldoInicial">O troco na gaveta ao abrir. #2084 (A1): quando o caixa do dia já abriu sozinho e
+/// espera conferência (<c>aberturaAConfirmar</c>), é a gaveta CONTADA AGORA; o servidor desconta o dinheiro que entrou
+/// no dia e grava o resto como abertura.</param>
 public sealed record AbrirCaixaCommand(
     [property: Required] Guid EmpresaId,
     decimal SaldoInicial = 0m,
@@ -10,12 +14,16 @@ public sealed record AbrirCaixaCommand(
     Guid? RegistradoPorUserId = null,
     [property: MaxLength(120)] string? RegistradoPorNome = null,
     [property: MaxLength(20)] string? Origem = "web",
-    string? Observacoes = null);
+    string? Observacoes = null,
+    // #2084 (A3): só gerente ou dona confirma a abertura automática. Definido pelo servidor a partir do usuário
+    // logado (CaixaController), nunca do corpo.
+    [property: System.Text.Json.Serialization.JsonIgnore] bool PodeConfirmarAberturaAutomatica = false);
 
 public class AbrirCaixaUseCase(
     ICaixaRepository repo,
     IUnitOfWork uow,
-    ILogger<AbrirCaixaUseCase> logger)
+    ILogger<AbrirCaixaUseCase> logger,
+    ObterCaixaDiaUseCase? caixaDia = null)
 {
     public async Task<MovimentoCaixaResult> ExecuteAsync(AbrirCaixaCommand cmd)
     {
@@ -37,6 +45,35 @@ public class AbrirCaixaUseCase(
         if (pendente != null && HorarioBrasil.DataOperacional(pendente.DataMovimento) is var diaPendente && diaPendente < data)
             throw new UseCaseValidationException(
                 $"O caixa de {diaPendente:dd/MM} ficou aberto. Feche-o antes de abrir o caixa de hoje.");
+
+        // #2084 (B1): o caixa já abriu sozinho no primeiro pagamento, com a gaveta herdada. A abertura de sempre é a
+        // conferência da gerente: confirma aquela abertura com o valor contado, em vez de tentar uma segunda.
+        var aConfirmar = (await repo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, cmd.LojaId))
+            .FirstOrDefault(m => m.Tipo == "abertura" && m.EstornadoEm == null && m.ConfirmacaoPendente);
+        if (aConfirmar != null)
+        {
+            // A3 (decisão do Felipe): conferir a gaveta herdada é da gerente ou da dona. Vira 403.
+            if (!cmd.PodeConfirmarAberturaAutomatica)
+                throw new UnauthorizedAccessException(
+                    "O caixa de hoje abriu sozinho no primeiro pagamento e espera a conferência da gerente. Só gerente ou dona confirma a abertura.");
+            // A1: ela conta a gaveta inteira; a abertura é o contado menos o dinheiro que entrou no dia, senão o
+            // esperado soma esse dinheiro duas vezes.
+            var entrouNoDia = 0m;
+            if (caixaDia is not null)
+            {
+                var dia = await caixaDia.ExecuteAsync(new ObterCaixaDiaQuery(cmd.EmpresaId, data, cmd.LojaId));
+                entrouNoDia = GavetaCaixa.DinheiroNaGaveta(dia) - dia.SaldoInicial;
+            }
+            var abertura = cmd.SaldoInicial - entrouNoDia;
+            if (abertura < 0)
+                throw new UseCaseValidationException(
+                    $"A gaveta contada ({cmd.SaldoInicial.ToString("C", Cultura.PtBr)}) é menor que o dinheiro recebido hoje ({entrouNoDia.ToString("C", Cultura.PtBr)}). Confira a contagem.");
+            aConfirmar.ConfirmarAbertura(abertura, cmd.RegistradoPorUserId, cmd.RegistradoPorNome, cmd.Observacoes);
+            await repo.UpdateMovimentoAsync(aConfirmar);
+            await uow.CommitAsync();
+            logger.LogInformation("Abertura automática de {Data} confirmada (contado={Contado}, abertura={Saldo}).", data, cmd.SaldoInicial, abertura);
+            return Map(aConfirmar);
+        }
 
         var mov = MovimentoCaixa.Criar(cmd.EmpresaId, "abertura", cmd.SaldoInicial, dataMov, cmd.LojaId);
         mov.Descricao = cmd.Observacoes;

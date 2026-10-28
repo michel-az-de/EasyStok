@@ -42,7 +42,15 @@ public sealed record FechamentoCaixaResult(
     /// #1776-11: dinheiro físico que ficou na gaveta ao fechar (abertura + entradas e vendas em dinheiro − saídas em
     /// dinheiro), pela conta de <see cref="GavetaCaixa"/>. Nulo quando a listagem não recalculou o dia.
     /// </summary>
-    decimal? DinheiroNaGaveta = null
+    decimal? DinheiroNaGaveta = null,
+    /// <summary>#2084 (B3): o que a gerente contou ao fechar. Nulo nos fechamentos antigos.</summary>
+    decimal? ValorContado = null,
+    /// <summary>#2084 (D1): o dinheiro que o sistema esperava na gaveta no dia do fechamento (dia da abertura).</summary>
+    decimal? DinheiroEsperado = null,
+    /// <summary>#2084 (D1): caixa esquecido; o dinheiro de hoje que já estava na gaveta contada e fica no caixa de hoje.</summary>
+    decimal? DinheiroEntrouDepois = null,
+    /// <summary>#2084 (B4): dinheiro recebido no mesmo dia depois de fechar. Já somado em <see cref="DinheiroNaGaveta"/>.</summary>
+    decimal DinheiroPosFechamento = 0m
 );
 
 /// <summary>
@@ -51,13 +59,21 @@ public sealed record FechamentoCaixaResult(
 /// PedidoPagamento). Exibida na lista "Movimentos do dia" para reconciliar (BUG-5):
 /// soma das linhas visíveis (movimentos + estas) == saldo esperado.
 /// </summary>
+/// <param name="PedidoNumeroDoDia">#2082 B16: só no pagamento de pedido. Número do pedido no dia de produção (o que a
+/// cozinha fala); nulo enquanto o pedido não foi numerado.</param>
+/// <param name="ClienteNome">#2082 B16: só no pagamento de pedido. Nome do cliente no pedido.</param>
+/// <param name="RegistradoPorNome">#2082 B16: só no pagamento de pedido. Quem registrou o recebimento: "Mercado Pago"
+/// no que o provedor confirmou, o nome da pessoa na baixa manual.</param>
 public sealed record CaixaLinhaExtraResult(
     DateTime Hora,
     string Tipo,        // "venda" | "pagamento" | "estorno" (venda estornada, valor negativo)
     decimal Valor,
     string? Descricao,
     string? Metodo,
-    string Origem);     // "Venda" | "Pedido"
+    string Origem,      // "Venda" | "Pedido"
+    int? PedidoNumeroDoDia = null,
+    string? ClienteNome = null,
+    string? RegistradoPorNome = null);
 
 /// <summary>Resumo consolidado do caixa de um dia (mesmo se ainda não fechado).</summary>
 /// <param name="AberturaPendenteCrossDay">True quando o dia consultado é hoje, não teve
@@ -68,6 +84,15 @@ public sealed record CaixaLinhaExtraResult(
 /// lista "Movimentos do dia" reconciliar com o saldo (BUG-5).</param>
 /// <param name="PosFechamento">#1630-2: no dia fechado, os totais e o saldo são os do fechamento; isto é
 /// o que mudou depois de fechar (recálculo ao vivo menos o saldo fechado). Zero no dia aberto.</param>
+/// <param name="AberturaAConfirmar">#2084 (B1): o caixa abriu sozinho no primeiro pagamento em dinheiro, com a
+/// gaveta herdada do último fechamento, e a gerente ainda não conferiu. A abertura manual (POST /api/caixa/abrir)
+/// confirma com o valor contado.</param>
+/// <param name="DinheiroEsperadoNoFechamento">#2084 (D1): só no caixa esquecido (<paramref name="AberturaPendenteCrossDay"/>).
+/// O dinheiro esperado na gaveta no dia da abertura, que é o que o fechamento retrata (ADR-0034).</param>
+/// <param name="DinheiroEntrouDepois">#2084 (D1): só no caixa esquecido. O dinheiro que entrou hoje sob a sessão:
+/// está na gaveta, mas fica no caixa de hoje e não é diferença a justificar.</param>
+/// <param name="DinheiroPosFechamento">#2084 (B4): no dia fechado, o dinheiro que entrou depois de fechar. Vai
+/// para a gaveta sugerida na abertura seguinte.</param>
 public sealed record CaixaDiaResult(
     DateOnly Data,
     Guid EmpresaId,
@@ -85,5 +110,9 @@ public sealed record CaixaDiaResult(
     bool AberturaPendenteCrossDay = false,
     DateOnly? AbertoDesde = null,
     IReadOnlyList<CaixaLinhaExtraResult>? LinhasExtras = null,
-    decimal PosFechamento = 0m
+    decimal PosFechamento = 0m,
+    bool AberturaAConfirmar = false,
+    decimal? DinheiroEsperadoNoFechamento = null,
+    decimal? DinheiroEntrouDepois = null,
+    decimal DinheiroPosFechamento = 0m
 );

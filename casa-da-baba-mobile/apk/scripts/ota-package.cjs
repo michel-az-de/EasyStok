@@ -5,8 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const { spawnSync } = require('node:child_process');
-const APP = 'com.casadababa.piloto';
-const NATIVE_VERSION = require('../package.json').versionCode;
+const { APP, NATIVE_VERSION_CODE, DATA_SCHEMA } = require('./ota-contract.cjs');
 const BASE = 'https://easystok.online/downloads/casa-da-baba/ota/';
 const MAX_ZIP = 64 * 1024 * 1024;
 const MAX_FILE = 32 * 1024 * 1024;
@@ -20,7 +19,7 @@ function validate(payload, minimumSequence = 0) {
   assert(Number.isSafeInteger(minimumSequence) && minimumSequence >= 0, 'Sequência mínima inválida.');
   assert(payload && Object.keys(payload).sort().join(',') === fields, 'Campos do manifesto inválidos.');
   assert(payload.schemaVersion === 1 && payload.appId === APP && payload.channel === 'piloto', 'Identidade OTA inválida.');
-  assert([3, 4].includes(payload.nativeVersionCode) && payload.dataSchemaVersion === 2, 'Versão nativa ou esquema incompatível.');
+  assert(payload.nativeVersionCode === NATIVE_VERSION_CODE && payload.dataSchemaVersion === DATA_SCHEMA,'Versão nativa ou esquema incompatível.');
   assert(Number.isSafeInteger(payload.sequence) && payload.sequence > minimumSequence && payload.sequence <= 2147483647, 'Sequência inválida ou replay.');
   assert(typeof payload.bundleVersion === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(payload.bundleVersion), 'bundleVersion inválida.');
   assert(typeof payload.sha256 === 'string' && /^[a-f0-9]{64}$/.test(payload.sha256), 'SHA256 inválido.');
@@ -78,7 +77,7 @@ function crc32(bytes) {
 }
 function zipWeb(directory, version) {
   const metadata = JSON.parse(fs.readFileSync(path.join(directory, 'bundle.json'), 'utf8'));
-  assert(metadata.schemaVersion === 1 && metadata.appId === APP && metadata.channel === 'piloto' && metadata.bundleVersion === version && metadata.nativeVersionCode === NATIVE_VERSION && metadata.dataSchemaVersion === 2, 'bundle.json incompatível; gere web novamente.');
+  assert(metadata.schemaVersion === 1 && metadata.appId === APP && metadata.channel === 'piloto' && metadata.bundleVersion === version && metadata.nativeVersionCode === NATIVE_VERSION_CODE && metadata.dataSchemaVersion === DATA_SCHEMA,'bundle.json incompatível; gere web novamente.');
   assert(fs.statSync(path.join(directory, 'index.html')).isFile(), 'index.html ausente.');
   const files = [];
   function walk(relative) {
@@ -173,7 +172,7 @@ function main(argv) {
     assert(args['web-dir'] && args.version, 'Informe --web-dir e --version.');
     bytes = zipWeb(path.resolve(args['web-dir']), args.version);
     const hash = sha256(bytes);
-    payload = { schemaVersion: 1, appId: APP, channel: 'piloto', sequence, bundleVersion: args.version, nativeVersionCode: NATIVE_VERSION, dataSchemaVersion: 2, url: BASE + hash + '/bundle.zip', sizeBytes: bytes.length, sha256: hash };
+    payload = { schemaVersion: 1, appId: APP, channel: 'piloto', sequence, bundleVersion: args.version, nativeVersionCode: NATIVE_VERSION_CODE, dataSchemaVersion: DATA_SCHEMA, url: BASE + hash + '/bundle.zip', sizeBytes: bytes.length, sha256: hash };
   } else if (command === 'rollback') {
     assert(args.release && args.bundle, 'Informe --release e --bundle da versão preservada.');
     const previous = verify(JSON.parse(fs.readFileSync(args.release, 'utf8')), key);

@@ -52,8 +52,10 @@ public class MidiaAtendimentoUploadPrivadoTests
             Arg.Is<PutObjectRequest>(r => r.CannedACL != S3CannedACL.PublicRead), Arg.Any<CancellationToken>());
     }
 
+    // #2071: o áudio de envio (ogg, mpeg, mp4, aac, amr) entrou na whitelist pública para o provedor
+    // buscar pela URL; formato de áudio fora dela continua recusado.
     [Theory]
-    [InlineData("audio/ogg")]
+    [InlineData("audio/webm")]
     [InlineData("video/mp4")]
     [InlineData("text/plain")]
     public async Task UploadPublicoContinuaRecusandoMidiaDoAtendimento(string mime)
@@ -69,7 +71,7 @@ public class MidiaAtendimentoUploadPrivadoTests
     [Fact]
     public async Task UploadPrivadoSemAllowlistPropriaContinuaRecusandoAudio()
     {
-        var act = () => _storage.UploadAsync(new FileUploadRequest("logs", "a.ogg", "audio/ogg", [1, 2, 3], IsPublic: false));
+        var act = () => _storage.UploadAsync(new FileUploadRequest("logs", "a.webm", "audio/webm", [1, 2, 3], IsPublic: false));
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }

@@ -22,12 +22,12 @@ public class ListarContasPagarUseCase(IContaPagarRepository repo)
     public async Task<ContasPagarPaginadasResult> ExecuteAsync(ListarContasPagarQuery q, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(q.EmpresaId);
-        var page = Math.Max(1, q.Page);
-        var size = Math.Clamp(q.PageSize, 1, 200);
+        // #2095: página enorme não estoura o deslocamento (F7); vencimento é dia civil de Brasília (F4).
+        var (page, size) = ValidacaoFinanceira.Pagina(q.Page, q.PageSize);
 
         var (itens, total) = await repo.ListarAsync(
             q.EmpresaId, q.Status, q.FornecedorId, q.CategoriaId, q.CentroCustoId,
-            q.VencimentoDe, q.VencimentoAte, q.Busca,
+            DataUtc.InicioDoDiaCivilUtc(q.VencimentoDe), DataUtc.FimDoDiaCivilUtc(q.VencimentoAte), q.Busca,
             page, size, q.Sort, q.Order, ct);
 
         return new ContasPagarPaginadasResult(
