@@ -15,7 +15,7 @@ public class PilotAppPlugin extends Plugin {
         catch (Exception ignored) { /* noticeStatus returns a safe diagnostic. */ }
     }
     @Override protected void handleOnResume() {
-        try { NoticeManager.get(getContext()).statusAsync((state, ok) -> notifyListeners("noticeStatus", state)); }
+        try { NoticeManager.get(getContext()).refresh((state, ok) -> notifyListeners("noticeStatus", state), false); }
         catch (Exception ignored) { }
     }
     @Override protected void handleOnDestroy() {
