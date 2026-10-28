@@ -292,8 +292,15 @@
   function menuButton(action, label, icon, id = '') {
     return '<button type="button" class="pilot-menu-button" data-action="' + action + '"' + (id ? ' id="' + id + '"' : '') + '>' + menuContents(label, icon) + '</button>';
   }
+  function tileContents(label, icon) {
+    return pilotIcon(icon) + '<span>' + label + '</span>';
+  }
+  function tileButton(action, label, icon, tone = 'support', id = '') {
+    return '<button type="button" class="pilot-tile pilot-tile--' + tone + '" data-action="' + action + '"' + (id ? ' id="' + id + '"' : '') + '>' + tileContents(label, icon) + '</button>';
+  }
   root.cdbMenuButton = menuButton;
   root.cdbMenuContents = menuContents;
+  root.cdbTileContents = tileContents;
   if (typeof module !== 'undefined' && module.exports) module.exports = { validateManifest, connectionStatus, otaStatusText, confirmOtaHealth, noticePresentation, pilotIcon, menuButton, applyConsoleIcons, installAppChrome, refreshOperatorReview, installLabelWorkspace };
   if (!root.document || !root.CDB_CONFIG?.isPilot) return;
   const config = root.CDB_CONFIG;
@@ -315,7 +322,6 @@
   const bellIcon = pilotIcon('bell');
   const closeIcon = pilotIcon('fechar');
   const arrowIcon = pilotIcon('chevron-right');
-  const productionIcon = pilotIcon('producao');
   applyConsoleIcons(doc);
   const bell = (id, badge) => '<button type="button" id="' + id + '" class="pilot-bell" aria-label="Abrir avisos" title="Avisos" aria-haspopup="dialog" data-action="notices">' + bellIcon + '<span id="' + badge + '" class="pilot-bell-count" hidden aria-hidden="true"></span></button>';
   const rail = doc.createElement('div');
@@ -339,16 +345,16 @@
       <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
       <details id="pilotMigrationReceipt" class="pilot-help" hidden><summary>Última migração confirmada</summary><p id="pilotMigrationResult" class="pilot-feedback" role="status" tabindex="-1"></p></details>
       <div class="pilot-actions">
-        <button type="button" class="pilot-card pilot-production" data-action="production"><span class="pilot-action-icon">${productionIcon}</span><span class="pilot-card-copy"><strong>Produção</strong></span></button>
-        <button type="button" class="pilot-card pilot-orders" data-action="local-orders"><span class="pilot-action-icon">${pilotIcon('pedido-em-preparo')}</span><span class="pilot-card-copy"><strong>Pedidos</strong></span></button>
+        ${tileButton('production', 'Produção', 'producao', 'production')}
+        ${tileButton('local-orders', 'Pedidos', 'pedido-em-preparo', 'orders')}
       </div>
       <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p></div>
       <div class="pilot-home-controls">
-        ${menuButton('pair', 'Conectar', 'link', 'pilotPairButton')}
-        ${menuButton('printers', 'Impressoras', 'printer')}
-        ${menuButton('settings', 'Configurações', 'settings')}
-        ${menuButton('migration-guide', 'Sistema Antigo', 'archive')}
-        ${menuButton('update', 'Atualizar', 'refresh-cw', 'pilotUpdateButton')}
+        ${tileButton('pair', 'Conectar', 'link', 'support', 'pilotPairButton')}
+        ${tileButton('printers', 'Impressoras', 'printer')}
+        ${tileButton('settings', 'Configurações', 'settings')}
+        ${tileButton('migration-guide', 'Sistema Antigo', 'archive')}
+        ${tileButton('update', 'Atualizar', 'refresh-cw', 'support', 'pilotUpdateButton')}
       </div>
       <div class="pilot-home-support" hidden>
       <button type="button" id="pilotReconnect" data-action="reconnect" hidden>Reconectar</button>

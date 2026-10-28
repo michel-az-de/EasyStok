@@ -98,8 +98,8 @@
     settingsButton?.setAttribute('title', 'Configurações');
     const rollback = doc.getElementById('pilotRollback');
     if (rollback) {
-      rollback.className = 'pilot-menu-button';
-      rollback.innerHTML = environment.cdbMenuContents('Recuperar', 'historico');
+      rollback.className = 'pilot-tile pilot-tile--support';
+      rollback.innerHTML = environment.cdbTileContents('Recuperar', 'historico');
       doc.querySelector('.pilot-home-controls').append(rollback);
     }
     showRoot();

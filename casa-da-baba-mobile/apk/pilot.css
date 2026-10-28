@@ -826,7 +826,7 @@ body.pilot-app dialog.pilot-home[open]::backdrop { opacity: 1; }
   body.pilot-app :is(button, .pilot-card):active { scale: 1; }
 }
 
-/* Uma mesma linha de ação no início e em Configurações. */
+/* Navegação em lista nas Configurações; atalhos em blocos no início. */
 body.pilot-app .pilot-menu-button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 12px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: 600 15px/1.4 'Manrope', sans-serif; text-align: left; text-decoration: none; cursor: pointer; }
 body.pilot-app .pilot-menu-button > svg { flex: 0 0 22px; width: 22px; height: 22px; margin: 0; color: var(--ink-dim); }
 body.pilot-app .pilot-menu-button > span { flex: 1; min-width: 0; }
@@ -836,12 +836,30 @@ body.pilot-app .pilot-menu-button small { display: block; margin-top: 3px; color
 body.pilot-app .pilot-menu-button:active { background: var(--basil-soft); }
 body.pilot-app .pilot-menu-button:focus-visible { outline: 2px solid var(--basil); outline-offset: 2px; }
 body.pilot-app .pilot-menu-button[hidden], body.pilot-app .pilot-home-support[hidden] { display: none !important; }
-body.pilot-app .pilot-home .pilot-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 24px; }
-body.pilot-app .pilot-home .pilot-card { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 64px; padding: 12px 8px; }
-body.pilot-app .pilot-home .pilot-card strong { font-size: 16px; }
-body.pilot-app .pilot-home .pilot-card .pilot-action-icon > svg { width: 24px; height: 24px; }
+body.pilot-app .pilot-home .pilot-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 20px; }
+body.pilot-app #pilotHome .pilot-tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; min-width: 0; min-height: 88px; aspect-ratio: 1; padding: 10px 3px; border: 0; border-radius: 22px; background: var(--bg-elev-2); color: var(--ink); font: 600 14px/1.35 'Manrope', sans-serif; letter-spacing: -.015em; text-align: center; text-decoration: none; box-shadow: 0 3px 12px #352d2507; cursor: pointer; overflow: hidden; isolation: isolate; transition: scale 160ms var(--pilot-ease), translate 180ms var(--pilot-ease), box-shadow 180ms ease; animation: pilot-tile-enter 300ms var(--pilot-ease) both; }
+body.pilot-app #pilotHome .pilot-tile::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity 160ms ease; pointer-events: none; }
+body.pilot-app #pilotHome .pilot-tile > svg { width: 30px; height: 30px; flex: 0 0 auto; margin: 0; stroke-width: 1.75; }
+body.pilot-app #pilotHome .pilot-tile > span { flex: 0 0 auto; min-width: 0; max-width: 100%; }
+body.pilot-app #pilotHome .pilot-actions .pilot-tile { gap: 16px; padding: 20px; color: #fffaf2; font-size: 18px; }
+body.pilot-app #pilotHome .pilot-actions .pilot-tile > svg { width: 48px; height: 48px; }
+body.pilot-app #pilotHome .pilot-tile--production { background: var(--basil); }
+body.pilot-app #pilotHome .pilot-tile--orders { background: #a64e33; }
+body.pilot-app #pilotHome .pilot-tile:active { scale: .96; box-shadow: none; }
+body.pilot-app #pilotHome .pilot-tile:active::before { opacity: .07; }
+body.pilot-app #pilotHome .pilot-tile:focus-visible { outline: 2px solid var(--basil); outline-offset: 4px; }
+body.pilot-app #pilotHome .pilot-tile[hidden] { display: none; }
+body.pilot-app #pilotHome .pilot-tile:nth-child(2) { animation-delay: 30ms; }
+body.pilot-app #pilotHome .pilot-tile:nth-child(3) { animation-delay: 60ms; }
+body.pilot-app #pilotHome .pilot-tile:nth-child(4) { animation-delay: 90ms; }
+body.pilot-app #pilotHome .pilot-tile:nth-child(5) { animation-delay: 120ms; }
+body.pilot-app #pilotHome .pilot-tile:nth-child(6) { animation-delay: 150ms; }
+@keyframes pilot-tile-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (hover: hover) and (pointer: fine) { body.pilot-app #pilotHome .pilot-tile:hover { translate: 0 -2px; box-shadow: 0 6px 18px #352d2510; } }
+@media (max-width: 359px) { body.pilot-app #pilotHome .pilot-home-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { body.pilot-app #pilotHome .pilot-tile:active { scale: 1; } body.pilot-app #pilotHome .pilot-tile:hover { translate: 0; } }
 body.pilot-app .pilot-home .pilot-connection { margin: 0 0 12px; padding: 0; border: 0; }
-body.pilot-app .pilot-home-controls { display: grid; gap: 4px; }
+body.pilot-app .pilot-home-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 body.pilot-app .pilot-home #pilotPairButton { text-decoration: none; margin: 0; }
 body.pilot-app .pilot-home .pilot-update { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; }
 body.pilot-app .pilot-home #pilotVersion { font-size: 12px; font-weight: 400; }
@@ -887,4 +905,4 @@ body.pilot-app #pilotGuideImage[src$="catalogo.png"] { height: 300px; object-fit
 body.pilot-app #pilotGuideImage[src$="novo-inicio.png"] { height: 350px; object-fit: cover; object-position: top; }
 body.pilot-app .pilot-guide figcaption { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--ink-dim); }
 body.pilot-app .pilot-guide-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 0 0 auto; padding: 12px 20px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
-body.pilot-app .pilot-home-controls #pilotRollback { margin: 0; background: transparent; color: var(--ink); }
+body.pilot-app .pilot-home-controls #pilotRollback { margin: 0; }

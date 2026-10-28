@@ -106,7 +106,7 @@
         if (!node.classList.contains('pilot-out-of-scope')) node.classList.add('pilot-out-of-scope');
       });
       doc.querySelectorAll('button, .k-more-actions > summary, .pilot-product-options > summary, .pilot-label-options > summary').forEach(button => {
-        if (button.matches('.nav-btn, .screen-tab:not(.pilot-new-order):not(.pilot-orders-back), .pilot-menu-button, .pilot-settings-back, [data-guide], .pilot-card, .pilot-bell, .pilot-topline button, #pilotHomeButton, .qty-btn, .emoji-btn, .etq-format-chip') || button.querySelector('input,select,[id]')) return;
+        if (button.matches('.nav-btn, .screen-tab:not(.pilot-new-order):not(.pilot-orders-back), .pilot-menu-button, .pilot-tile, .pilot-settings-back, [data-guide], .pilot-card, .pilot-bell, .pilot-topline button, #pilotHomeButton, .qty-btn, .emoji-btn, .etq-format-chip') || button.querySelector('input,select,[id]')) return;
         const command = commandFor(button.textContent, button.getAttribute('onclick') || '');
         if (!command) return;
         if (button.matches('.msg-template-btn')) command.icon = '';
