@@ -62,7 +62,7 @@
     // As funções existentes continuam disponíveis; apenas muda a navegação.
     const support = doc.createElement('div'); support.className = 'pilot-settings-support';
     support.innerHTML = environment.cdbMenuButton('diagnostics', 'Diagnóstico', 'activity')
-      + environment.cdbMenuButton('guide', 'Sistema Antigo', 'archive');
+      + environment.cdbMenuButton('guide', 'Sistema Antigo', 'ajuda');
     support.addEventListener('click', event => {
       const action = event.target.closest('[data-action]')?.dataset.action;
       if (action === 'diagnostics') { environment.closeAjustes(); environment.openDiagnostics(); }
@@ -77,7 +77,7 @@
     }
     const update = modal.querySelector('[onclick="forceCheckUpdate()"]');
     if (update) update.onclick = () => { environment.closeAjustes(); environment.go('home'); environment.forceCheckUpdate(); };
-    const actions = { Exportar: 'download', Importar: 'upload', Recuperar: 'historico', Atualizar: 'refresh-cw', Diagnóstico: 'activity' };
+    const actions = { Exportar: 'download', Importar: 'upload', Recuperar: 'undo-2', Atualizar: 'refresh-cw', Diagnóstico: 'activity' };
     for (const button of modal.querySelectorAll('.ajustes-actions-stack > button')) {
       const label = button.dataset.command;
       if (!actions[label]) continue;
@@ -99,7 +99,7 @@
     const rollback = doc.getElementById('pilotRollback');
     if (rollback) {
       rollback.className = 'pilot-tile pilot-tile--support';
-      rollback.innerHTML = environment.cdbTileContents('Recuperar', 'historico');
+      rollback.innerHTML = environment.cdbTileContents('Recuperar', 'undo-2');
       doc.querySelector('.pilot-home-controls').append(rollback);
     }
     showRoot();
@@ -141,5 +141,5 @@
     environment.cdbHandleNativeBack = function () { if (dialog.open) { dialog.close(); return true; } return nativeBack?.apply(this, arguments); };
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = { GROUPS, STEPS, installSettings, installGuide };
-  if (root.document && root.CDB_CONFIG?.isPilot) { installSettings(root); installGuide(root); }
+  if (root.document && root.CDB_CONFIG?.isPilot) { installSettings(root); installGuide(root); root.cdbPilotSettingsReady = true; }
 })(typeof window !== 'undefined' ? window : globalThis);

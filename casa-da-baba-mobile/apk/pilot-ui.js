@@ -7,7 +7,7 @@
     Salvar: 'check', Confirmar: 'check', Etiquetar: 'printer', Imprimir: 'printer',
     Reimprimir: 'printer', Cadastrar: 'plus', Criar: 'plus', Adicionar: 'plus', Novo: 'plus',
     Editar: 'lapis', Excluir: 'lixeira', Descartar: 'lixeira',
-    Arquivar: 'archive', Recuperar: 'historico', Desfazer: 'historico',
+    Arquivar: 'archive', Compactar: 'archive', Recuperar: 'undo-2', Desfazer: 'undo-2',
     Cancelar: 'fechar', Fechar: 'fechar', Remover: 'fechar',
     Voltar: 'chevron-right', Limpar: 'fechar',
     Cobrar: 'ficha', Preparar: 'producao', Produzir: 'producao',
@@ -16,7 +16,7 @@
     Exportar: 'download', Baixar: 'download', Importar: 'upload',
     Ajustar: 'configuracoes', Configurar: 'settings', Ativar: 'bell',
     Guia: 'ajuda', Buscar: 'search', Trocar: 'refresh-cw', Continuar: 'chevron-right',
-    Reabrir: 'historico', Reverter: 'historico', Mesclar: 'producao',
+    Reabrir: 'historico', Reverter: 'undo-2', Mesclar: 'producao',
     Agendar: 'relogio', Retroativo: 'historico', Carregar: 'chevron-right',
     Opções: 'ellipsis', Pronto: 'check', Ajustes: 'settings', Diagnóstico: 'activity',
     Indicadores: 'ficha', Testar: 'printer', Pular: 'chevron-right',
@@ -24,14 +24,17 @@
     Selecionar: 'check', Restaurar: 'historico', Registrar: 'check', Concluir: 'check',
     'Sincronizando…': 'refresh-cw', 'Enviando…': 'enviar'
   };
+  // Exceções de duas palavras: a ação perde o objeto se encurtada.
+  // Cancelar pedido é destrutivo e não pode parecer o X de fechar.
+  const PHRASES = { 'Novo pedido': 'plus', 'Cancelar pedido': 'circle-x' };
   const SHORT_LABELS = {
-    'Novo pedido': 'Novo', '+ Novo pedido': 'Novo',
+    '+ Novo pedido': 'Novo pedido', 'Criar pedido': 'Novo pedido',
     'Cadastrar produto': 'Cadastrar', 'Cadastrar cliente': 'Cadastrar',
     'Criar e usar': 'Etiquetar', 'Criar e adicionar': 'Adicionar',
     'Salvar produto': 'Salvar', 'Salvar pedido': 'Salvar', 'Salvar PNG': 'Salvar',
     'Confirmar e abrir etiquetas': 'Etiquetar', 'Conferir produção': 'Produzir',
-    'Iniciar preparo': 'Preparar', 'Marcar pronto': 'Finalizar', 'Conferir entrega': 'Entregar',
-    'Preparar cobrança': 'Cobrar', 'Cancelar pedido': 'Cancelar',
+    'Iniciar preparo': 'Preparar', 'Marcar pronto': 'Pronto', 'Conferir entrega': 'Entregar',
+    'Preparar cobrança': 'Cobrar',
     'Imprimir etiqueta': 'Imprimir', 'Imprimir etiquetas': 'Imprimir',
     'Excluir lote': 'Excluir', 'Recuperar lote': 'Recuperar',
     'Compartilhar no WhatsApp': 'Compartilhar', 'Copiar mensagem toda': 'Copiar',
@@ -53,11 +56,11 @@
     'Agendar para depois? (entrega futura)': 'Agendar', '+ Cliente': 'Cadastrar',
     'Mesclar lote': 'Mesclar', 'Salvar ajuste': 'Salvar', 'Descartar lote': 'Descartar',
     'Importar backup': 'Importar', 'Exportar backup': 'Exportar',
-    'Configurar impressora': 'Configurar', 'Pular tour': 'Pular', 'Criar pedido': 'Adicionar',
+    'Configurar impressora': 'Configurar', 'Pular tour': 'Pular',
     'Buscar impressora': 'Buscar', 'Testar impressão': 'Testar',
     'Exportar backup (JSON)': 'Exportar', 'Restaurar de arquivo': 'Importar',
     'Verificar atualizações agora': 'Atualizar', 'Abrir diagnóstico': 'Diagnóstico',
-    'Forçar flush': 'Sincronizar',
+    'Forçar flush': 'Sincronizar', 'Compactar audit': 'Compactar', 'Salvar agora': 'Salvar',
     '+ Novo produto': 'Cadastrar', 'Escolher imagem': 'Escolher', 'Ver detalhes': 'Detalhes',
     'Excluir do registro': 'Excluir',
     'Exportar histórico JSON': 'Exportar', 'Restaurar do celular (auto)': 'Recuperar',
@@ -86,11 +89,15 @@
   function commandFor(text, handler = '') {
     const clean = text.trim().replace(/\s+/g, ' ').replace(/^[^\p{L}\p{N}+←]+/u, '').trim();
     const raw = clean.replace(/\s+/g, '');
+    if (/cancelOrder\(/.test(handler) && /^Cancelar/.test(clean)) return { label: 'Cancelar pedido', icon: PHRASES['Cancelar pedido'] };
+    // A contagem fica no botão: é a última conferência antes de gravar o lote.
+    const units = raw.match(/^Conferir(\d+)unidades?$/);
+    if (units) return { label: 'Produzir ' + units[1], icon: COMMANDS.Produzir };
     const label = SHORT_LABELS[clean]
-      || (/^Conferir\d+unidades?$/.test(raw) ? 'Produzir' : '')
       || (/^SalvarR\$/.test(raw) ? 'Salvar' : '')
       || clean;
-    if (/advanceOrder\(/.test(handler)) return { label: label === 'Entregar' ? 'Entregar' : label === 'Finalizar' ? 'Finalizar' : 'Preparar', icon: COMMANDS[label] || 'producao' };
+    if (PHRASES[label]) return { label, icon: PHRASES[label] };
+    if (/advanceOrder\(/.test(handler)) return { label: ['Entregar', 'Pronto'].includes(label) ? label : 'Preparar', icon: COMMANDS[label] || 'producao' };
     const verb = label.split(' ')[0];
     if (verb !== label && COMMANDS[verb] && /\b(?:go|open\w*|export\w*|reprint\w*|restore\w*|print\w*|save\w*|copy\w*|share\w*|delete\w*|archive\w*)\(/.test(handler)) {
       return { label: verb, icon: COMMANDS[verb] };
@@ -146,14 +153,14 @@
       const history = doc.createElement('button');
       history.className = 'screen-tab';
       history.type = 'button';
-      history.textContent = 'Histórico';
+      history.textContent = 'Movimentos';
       history.addEventListener('click', () => environment.go('historico'));
       tabs.append(history);
     }
     const productionTitle = doc.getElementById('productionConfirmTitle');
     if (productionTitle) productionTitle.textContent = 'Lote';
     const orderHistoryTitle = doc.querySelector?.('[data-screen="finalizados"] .screen-title');
-    if (orderHistoryTitle) orderHistoryTitle.textContent = 'Histórico';
+    if (orderHistoryTitle) orderHistoryTitle.textContent = 'Pedidos finalizados';
     doc.querySelectorAll('button.cobranca-close, button.modal-close, button.etq-close').forEach(button => {
       button.innerHTML = icon('fechar');
       button.setAttribute('aria-label', 'Fechar');
@@ -168,6 +175,7 @@
     });
     doc.querySelectorAll('[onclick*="factoryReset"], #themeToggleAjustes').forEach(button => button.closest('.ajustes-section')?.classList.add('pilot-out-of-scope'));
     refresh();
+    environment.cdbPilotUiReady = true;
     if (environment.MutationObserver) {
       let scheduled = false;
       new environment.MutationObserver(() => {

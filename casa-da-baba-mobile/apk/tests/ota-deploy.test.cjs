@@ -25,6 +25,8 @@ function scenario(name) {
   fs.writeFileSync(path.join(directory, 'google-services.json'), '{}');
   const wrapper = path.join(directory, 'invoke.ps1'), events = path.join(directory, 'events.json');
   const script = [
+    // No Windows a saída redirecionada usa a página OEM; o assert compara acentos em UTF-8.
+    '[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)',
     '$ErrorActionPreference = "Stop"',
     '$global:scenario = ' + quote(name),
     '$global:directory = ' + quote(directory),
