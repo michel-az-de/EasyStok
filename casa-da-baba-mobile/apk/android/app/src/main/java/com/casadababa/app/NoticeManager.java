@@ -166,8 +166,13 @@ public final class NoticeManager {
                 }
                 if (!registeredBefore) flush(8);
                 if (foreground || System.currentTimeMillis() - before.optLong("lastSyncAt", 0) > 900000) {
-                    JSONObject query = new JSONObject().put("kind", "cdb-inbox-v1").put("installationId", installationId).put("issuedAt", serverNow());
-                    JSONArray messages = post("inbox", sign(query)).getJSONArray("messages");
+                    JSONArray messages = null;
+                    // Same self-healing as the registration: the first 401 teaches the offset, the retry uses it.
+                    for (int attempt = 0; messages == null; attempt++) {
+                        JSONObject query = new JSONObject().put("kind", "cdb-inbox-v1").put("installationId", installationId).put("issuedAt", serverNow());
+                        try { messages = post("inbox", sign(query)).getJSONArray("messages"); }
+                        catch (ApiException failure) { if (failure.code != 401 || attempt > 0 || !NoticeClock.skewed(clockOffset)) throw failure; }
+                    }
                     SignedNoticePolicy.require(messages.length() <= 100, "Histórico excede o limite.");
                     skipped = SignedNoticePolicy.acceptEach(messages, envelope -> store.accept(envelope,
                         SignedNoticePolicy.verify(envelope, publisherKey, installationId, serverNow(), true), "sync", System.currentTimeMillis(), apkVersion));
