@@ -158,6 +158,8 @@ builder.Services.AddHealthChecks()
     .AddNotificacoesBacklog();
 builder.Services.AddHttpClient(HealthchecksPingService.NomeDoCliente);
 builder.Services.AddHostedService<HealthchecksPingService>();
+// #2107: sinal de vida para o healthcheck do Docker (Notifications:Monitoring:ArquivoDeVida; vazio desliga).
+builder.Services.AddHostedService<ArquivoDeVidaService>();
 
 // Validação de DI sob demanda (CI/diagnóstico): `dotnet run -- --validate-di` constrói
 // o grafo com ValidateOnBuild + ValidateScopes, pegando captive dependencies

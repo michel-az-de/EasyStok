@@ -96,7 +96,7 @@ export const numeroCurto = (numero) => String(numero).split('-').at(-1)
 // J2 (#1990, #1641-1 parte console): o "ref DB72EC58" na tela era id técnico; o curto fica só no título
 // (dica do mouse, para o suporte). A referência pequena ao lado da comanda passa a ser o número do dia
 // (`numeroDoDia`, a sequência que a cozinha fala), quando a API manda; ausente ou nulo, nada.
-const numeroDoDiaNaTela = (n) => (Number.isInteger(n) && n > 0 ? String(n).padStart(3, '0') : null)
+export const numeroDoDiaNaTela = (n) => (Number.isInteger(n) && n > 0 ? String(n).padStart(3, '0') : null)
 export function nomeDoPedido({ numeroComanda = null, numeroCurto = null, numeroDoDia = null } = {}) {
   const curto = numeroCurto ? String(numeroCurto) : null
   const dia = numeroDoDiaNaTela(numeroDoDia)

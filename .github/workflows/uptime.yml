@@ -1,0 +1,56 @@
+name: Uptime
+
+# Vigia externo da producao (#2107): roda fora da VPS, a cada 5 min, e abre uma issue
+# `uptime` atribuida ao responsavel quando um alvo de scripts/uptime/alvos.txt cai.
+# O app do GitHub avisa no celular. A issue fecha sozinha quando tudo volta.
+# Custo zero: repositorio publico. O cron do GitHub pode atrasar alguns minutos sob carga.
+#
+# Teste de disparo: Actions > Uptime > Run workflow, com alvo_extra
+#   TESTE disparo|https://api.easystok.online/health/teste-uptime-inexistente|
+# Abre a issue na hora; o proximo run agendado (sem o alvo extra) fecha.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      alvo_extra:
+        description: 'Alvo extra para teste de disparo: nome|url|texto'
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'scripts/uptime/**'
+      - '.github/workflows/uptime.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime-${{ github.event_name == 'pull_request' && github.ref || 'vigia' }}
+  cancel-in-progress: false
+
+jobs:
+  testes:
+    name: Testes do vigia
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/uptime/vigia.test.sh
+
+  vigia:
+    name: Vigia da producao
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8  # pior caso: 5 alvos x (15 s + 20 s + 15 s) = 250 s
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/uptime/vigia.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ALVO_EXTRA: ${{ inputs.alvo_extra }}

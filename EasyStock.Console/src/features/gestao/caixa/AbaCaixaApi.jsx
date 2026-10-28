@@ -7,6 +7,7 @@ import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { CampoReais } from '../../../componentes/CampoReais'
 import { Chip } from '../../../componentes/Chip'
+import { DiferencaDaGaveta } from '../../../componentes/DiferencaDaGaveta'
 import { Pilula } from '../../../componentes/Pilula'
 import { Modal } from '../../../componentes/Modal'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
@@ -16,11 +17,12 @@ import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
 import { relerParaFechar } from '../../../aplicacao/fechamentoDoCaixa'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import {
-  diaMes, dicaDoSaldoInicial, gavetaDoFechamento, observacaoDaAbertura, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
+  ROTULO_GAVETA_CONTADA_AGORA, avisoDaAberturaAConfirmar, diaMes, dicaDoSaldoInicial, gavetaDoFechamento, observacaoDaAbertura,
+  observacaoDaConfirmacao, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
-  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
-  nomeDoMetodoCaixa, temMovimentoNoDia, totaisDoFluxo,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
+  nomeDoMetodoCaixa, temMovimentoNoDia, tituloDaLinhaExtra, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
   horaCurta, lerMoeda, moeda, moedaAltaDemais, plural,
@@ -125,6 +127,47 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
   )
 }
 
+// #2113 (B1 da #2084): o caixa abriu sozinho no primeiro pagamento em dinheiro, com a gaveta do último
+// fechamento. A gerente ou a dona conta a gaveta inteira e confirma; a operadora vê o aviso sem a ação
+// (a API responde 403). O contado vai como `saldoInicial`; a API desconta o dinheiro do dia.
+function ConfirmarAbertura({ dia, gaveta, ultimo, podeGerenciar, executar, enviando, confirmando, erro }) {
+  const { agora } = useAtendimento()
+  const { abrirCaixa } = useAcoes()
+  const [centavos, setCentavos] = useState(null)
+  const conferencia = conferenciaDaGaveta(centavos, gaveta.naGaveta)
+  const confirmar = () => {
+    const contado = centavos / 100
+    executar(() => abrirCaixa(agora, contado, observacaoDaConfirmacao(contado, gaveta.naGaveta)), 'abertura')
+  }
+  return (
+    <div className={`${css.painel} ${css.abertura}`}>
+      <p className={css.avisoAtencao}>
+        {avisoDaAberturaAConfirmar(dia.saldoInicial, ultimo)}
+        {podeGerenciar ? ' Conte a gaveta inteira e confirme a abertura.' : ' A gerente ou a dona conta a gaveta e confirma a abertura.'}
+      </p>
+      {podeGerenciar && (
+        <>
+          <CampoReais
+            disabled={enviando}
+            rotulo={ROTULO_GAVETA_CONTADA_AGORA}
+            dica="O troco que veio do fechamento e o dinheiro que já entrou hoje."
+            placeholder="Digite o que contou"
+            centavos={centavos}
+            ler={lerMoeda}
+            erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null}
+            aoMudar={setCentavos}
+          />
+          <DiferencaDaGaveta conferencia={conferencia} className={css.corpoDiferenca} />
+          <Botao variante="primario" icone="check" disabled={enviando || centavos == null || moedaAltaDemais(centavos)} onClick={confirmar}>
+            {confirmando ? 'Confirmando…' : 'Confirmar abertura'}
+          </Botao>
+        </>
+      )}
+      {erro}
+    </div>
+  )
+}
+
 // #2078 (B11/E4): o modal mora aqui, junto do que ela digitou. O foco abre no valor e, com algo
 // digitado, Esc e clique fora não fecham; o X fecha.
 function ModalLancamento({ executar, enviando, erro, aoFechar }) {
@@ -202,8 +245,8 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
           ? (
             <li key={`${m.origem}-${m.tipo}-${m.em}-${m.valor}-${indice}`} className={css.linha}>
               <span className={css.linhaInfo}>
-                <strong>{m.tipo === 'estorno' ? 'Estorno de venda' : m.origem === 'Pedido' ? 'Pagamento de pedido' : 'Venda'}</strong>
-                <span className={css.dicaItem}>{horaCurta(m.em)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.tipo !== 'estorno' && m.descricao && ` · ${m.descricao}`}</span>
+                <strong>{tituloDaLinhaExtra(m)}</strong>
+                <span className={css.dicaItem}>{horaCurta(m.em)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.clienteNome && ` · ${m.clienteNome}`}{m.tipo !== 'estorno' && m.descricao && ` · ${m.descricao}`}</span>
               </span>
               <span className={m.valor < 0 ? `${css.linhaValor} ${css.valorSaida}` : css.linhaValor}>{m.valor < 0 ? '−' : '+'} {moeda(Math.abs(m.valor))}</span>
             </li>
@@ -503,12 +546,21 @@ export function AbaCaixaApi() {
               Fechado às {horaCurta(dia.fechamento.fechadoEm)}{dia.fechamento.fechadoPorNome ? ` por ${dia.fechamento.fechadoPorNome}` : ''}.
               {dia.fechamento.observacoes ? ` ${dia.fechamento.observacoes}` : ''}
               {dia.posFechamento !== 0 && ` ${dia.posFechamento > 0 ? 'Entrou' : 'Saiu'} ${moeda(Math.abs(dia.posFechamento))} depois de fechar, fora do total do dia.`}
+              {/* #2113 (B4 da #2084): o dinheiro vivo dessa conta vai para a gaveta sugerida na abertura seguinte. */}
+              {dia.dinheiroPosFechamento > 0 && ` ${moeda(dia.dinheiroPosFechamento)} em dinheiro entrou na gaveta depois de fechar e vai para a abertura de amanhã.`}
             </p>
+          )}
+          {dia.aberturaAConfirmar && !dia.fechado && (
+            <ConfirmarAbertura
+              dia={dia} gaveta={gaveta} ultimo={fechamentos[0] ?? null} podeGerenciar={podeGerenciar}
+              executar={executar} enviando={acao.enviando} confirmando={acao.enviando && acao.origem === 'abertura'}
+              erro={acao.origem === 'abertura' ? erro : null}
+            />
           )}
 
           <ResumoDoDia dia={dia} gaveta={gaveta} />
           {!fecharAberto && avisoDoFechamento && <p className={css.avisoFechado} role="alert">{avisoDoFechamento}</p>}
-          {!(podeLancar && lancamentoAberto) && erro}
+          {!(podeLancar && lancamentoAberto) && acao.origem !== 'abertura' && erro}
           {avisoDePermissao}
         </>
       )}

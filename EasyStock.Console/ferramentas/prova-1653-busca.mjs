@@ -15,9 +15,10 @@ assert.deepEqual(destinos(api, '  IMPRESSAO  '), ['#/m/configuracoes/impressao']
 assert.deepEqual(destinos(api, 'caixa'), ['#/m/financeiro/caixa'])
 assert.deepEqual(destinos(api, 'produção receitas'), ['#/m/producao/receitas'])
 assert.deepEqual(destinos(api, 'janelas entrega'), ['#/m/entregas/janelas'])
-// #1891: o financeiro gerencial está congelado; a área oferece só o Caixa do dia.
-assert.deepEqual(destinos(api, 'financeiro'), ['#/m/financeiro/caixa'], 'o nome da área oferece suas telas vivas')
-assert.deepEqual(destinos(api, 'extrato'), [], 'tela congelada não aparece na busca')
+// #2095: o financeiro gerencial foi descongelado; a área oferece todas as suas telas vivas.
+assert.deepEqual(destinos(api, 'financeiro'), ['caixa', 'visao-geral', 'pagar', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo'].map((tela) => `#/m/financeiro/${tela}`), 'o nome da área oferece suas telas vivas')
+assert.deepEqual(destinos(api, 'extrato'), ['#/m/financeiro/extrato'], 'extrato descongelado aparece na busca (#2095)')
+assert.deepEqual(destinos(modulosDoHall({ fonteApi: true, acoes: { gerenciarCaixa: true } }), 'extrato'), ['#/m/financeiro/caixa'], 'perfil sem contas não acha o extrato, só a área viva (#2095, F17)')
 assert.deepEqual(destinos(api, 'pratos preços'), [
   '#/m/cardapio/itens', '#/m/cardapio/categorias', '#/m/cardapio/imagens',
 ], 'busca pelo resumo preserva a descoberta da área')

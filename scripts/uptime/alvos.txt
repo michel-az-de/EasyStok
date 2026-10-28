@@ -1,0 +1,9 @@
+# Alvos do vigia externo (#2107): nome|url|texto que a resposta precisa conter (opcional).
+# Todo alvo precisa responder 200. Medidos em 27/10/2026.
+# /health/ready responde 503 quando o Postgres ou a configuracao falham.
+EZ API|https://api.easystok.online/health/ready|
+# O console e uma SPA: responde 200 para qualquer caminho, o texto prova que e ele.
+EZ Console|https://app.easystok.online/|easystok-console-sha
+EZ Site|https://easystok.online/|
+Loja Casa da Baba|https://casadababa.com/health|ok
+# Fora de proposito: /health/notificacoes (503 Degraded enquanto e-mail e SMS forem stub em producao).

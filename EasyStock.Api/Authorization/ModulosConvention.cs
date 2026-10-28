@@ -23,7 +23,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Mobile.MobileCash", "Mobile.MobileClients", "Mobile.MobileDiagnostics", "Mobile.MobileDiagTrace",
         "Mobile.MobileEstoque", "Mobile.MobileOrders", "Mobile.MobileProducts", "Mobile.MobileQuickReports",
         "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot",
-        "Mobile.PushReceipts" // Avisos públicos pré-pareamento, autenticados por assinatura por instalação/publicador.
+        "Mobile.PushReceipts"
     ];
     private static readonly HashSet<string> Bastidor =
     [

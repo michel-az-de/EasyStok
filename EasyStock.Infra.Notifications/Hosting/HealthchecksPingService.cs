@@ -20,6 +20,12 @@ public sealed class NotificacoesMonitoramentoOptions
 
     /// <summary>Intervalo entre pings, em segundos. Padrão 60: no máximo um ping por minuto, não um por rodada de 10 s.</summary>
     public int IntervaloSegundos { get; set; } = 60;
+
+    /// <summary>
+    /// Arquivo que o Worker regrava a cada 30 s enquanto os loops do motor batem heartbeat (#2107). O healthcheck do Docker
+    /// lê a idade dele. Vazio desliga.
+    /// </summary>
+    public string? ArquivoDeVida { get; set; }
 }
 
 /// <summary>

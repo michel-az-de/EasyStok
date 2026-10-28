@@ -179,5 +179,14 @@ public sealed class PushReceiptsTests : IDisposable
         EasyStock.Api.Authorization.ModulosConvention.Classificado(typeof(PushReceiptsController)).Should().BeTrue();
         EasyStock.Api.Authorization.ModulosConvention.ModulosDe(typeof(PushReceiptsController), "Receipt").Should().BeNull();
     }
+    [Fact]
+    public void ChavePublicadoraEstaIncluidaNaApiSemDependerDeArquivoExterno()
+    {
+        var bytes = PushSignature.PublisherKey();
+        using var key = RSA.Create();
+        key.ImportSubjectPublicKeyInfo(bytes, out var read);
+        read.Should().Be(bytes.Length);
+        key.KeySize.Should().BeGreaterThanOrEqualTo(3072);
+    }
     public void Dispose() { db.Dispose(); device.Dispose(); publisher.Dispose(); }
 }

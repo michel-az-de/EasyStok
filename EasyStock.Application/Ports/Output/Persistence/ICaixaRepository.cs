@@ -81,6 +81,10 @@ namespace EasyStock.Application.Ports.Output.Persistence
         // ── Fechamentos ───────────────────────────────────────────
         Task<FechamentoCaixa?> GetFechamentoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null);
 
+        /// <summary>#2084 (A2): o fechamento mais recente exatamente desta loja (<paramref name="lojaId"/> nulo = o caixa
+        /// da empresa sem loja). Cada loja herda a própria gaveta.</summary>
+        Task<FechamentoCaixa?> GetUltimoFechamentoDaLojaAsync(Guid empresaId, Guid? lojaId);
+
         Task<(IEnumerable<FechamentoCaixa> items, int total)> ListFechamentosAsync(
             Guid empresaId, int page, int pageSize,
             DateOnly? desde = null, DateOnly? ate = null);
