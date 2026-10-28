@@ -32,13 +32,16 @@ import { pagamentoDoRetrato } from '../dominio/avisoSonoro'
 // Provider. Sem `aoAvisar` (Cozinha e Entregas espelho), segue o de antes:
 // só "precisa de você" vai ao navegador.
 const DURACAO_DESTAQUE_MS = 1500
+// Identidade fixa: um `{}` novo a cada render refaria o efeito a cada render.
+const SEM_PAUSAS = {}
 
 const avisarSoNoNavegador = (aviso) => {
   if (aviso.tipo === TIPOS_DE_AVISO.PASSOU_PARA_VOCE) notificar(aviso.tipo, aviso.conversaId, aviso.titulo, aviso.corpo)
 }
 
 export function useAvisoSonoro({
-  conversas, som, agora, aberta = true, janelas = [], expediente = null, aoTocar, aoAvisar = avisarSoNoNavegador,
+  conversas, som, agora, aberta = true, janelas = [], expediente = null, automaticoPausado = SEM_PAUSAS, aoTocar,
+  aoAvisar = avisarSoNoNavegador,
 }) {
   const anterior = useRef(null)
   const [destacados, setDestacados] = useState(() => new Set())
@@ -57,14 +60,17 @@ export function useAvisoSonoro({
   useEffect(() => {
     const retrato = new Map((conversas ?? []).map((c) => {
       const ultimaDoCliente = (c.mensagens ?? []).filter((m) => m.dir === 'in').at(-1)
-      const precisa = precisaDeVoce(c, agora, true, aberta, janelas, expediente)
+      // #2135: a pausa é a da conversa, a mesma que o Balcão usa para contar; um `true` fixo tocava
+      // para conversa que o chip não contava.
+      const pausado = automaticoPausado[c.id] ?? false
+      const precisa = precisaDeVoce(c, agora, pausado, aberta, janelas, expediente)
       return [c.id, {
         ...pagamentoDoRetrato(c.pedido),
         precisa,
         ultimaMensagemClienteId: ultimaDoCliente?.id ?? null,
         etapa: c.pedido?.estado ?? null,
         nome: c.nome ?? '',
-        motivo: precisa ? motivoVisivel(c, agora, true, aberta, janelas, expediente) : null,
+        motivo: precisa ? motivoVisivel(c, agora, pausado, aberta, janelas, expediente) : null,
       }]
     }))
     const antes = anterior.current
@@ -79,7 +85,7 @@ export function useAvisoSonoro({
       aoAvisar?.(aviso)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversas, som, agora, aberta, janelas, expediente])
+  }, [conversas, som, agora, aberta, janelas, expediente, automaticoPausado])
 
   return destacados
 }

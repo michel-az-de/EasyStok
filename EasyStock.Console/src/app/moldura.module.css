@@ -245,9 +245,21 @@
 .lojaAberta:hover:not(:disabled) { color: var(--sucesso); background: var(--sucesso-pastel); filter: brightness(.97); }
 .lojaFechada:hover:not(:disabled) { color: var(--erro); background: var(--erro-pastel); filter: brightness(.97); }
 
-/* Integração: no celular o controle da loja vira só o ícone, para a linha de
-   cima caber em 390 px; o texto continua no nome acessível. */
+/* Integração: no celular o controle da loja troca o texto longo pelo curto, sob o ícone, para a linha
+   de cima caber em 390 px; o nome acessível segue inteiro no `aria-label`.
+   #2135: o alvo tem 44 x 44 px (eram 32 x 44, só o ícone) e a palavra aparece. Abaixo de 390 px não
+   sobra largura para ela: fica o ícone, no mesmo alvo, com a dica no `title`. */
+.lojaTextoCurto { display: none; }
 @media (max-width: 759px) {
-  .controleLoja > span { font-size: 0; gap: 0; padding: 6px; }
+  .controleLoja { min-width: var(--toque); }
+  .controleLoja > span {
+    flex-direction: column; justify-content: center; gap: 0; padding: 0 var(--e-1); min-width: var(--toque);
+    border-radius: var(--r-1); font-size: var(--t-minimo);
+  }
   .controleLoja svg { width: 20px; height: 20px; }
+  .lojaTextoLongo { display: none; }
+  .lojaTextoCurto { display: block; }
+}
+@media (max-width: 389px) {
+  .lojaTextoCurto { display: none; }
 }

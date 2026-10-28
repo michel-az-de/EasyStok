@@ -179,7 +179,7 @@ function Composicao({ rota }) {
   const sugestaoAgente = selecionada ? (
     <PainelAgente
       key={selecionada.id}
-      passouParaVoce={precisaDeVoce(selecionada, agora, true, aberta, janelas, horarioDaLoja)}
+      passouParaVoce={precisaDeVoce(selecionada, agora, automaticoPausado[selecionada.id] ?? false, aberta, janelas, horarioDaLoja)}
       bloqueada={envioBloqueado(selecionada, agora, canalDaConversa(canais, selecionada))}
       modo={FONTE_API ? 'api' : modoAgente}
       estado={agente.conversaId === selecionada.id ? agente.estado : 'ocioso'}

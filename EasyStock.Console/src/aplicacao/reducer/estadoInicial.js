@@ -18,7 +18,9 @@ export function estadoInicial({
     // primeiro toque no controle do topo.
     funcionamento,
     lojaAberta,
-    selecionadaId: conversas[0]?.id ?? null,
+    // #2135: abre sem conversa escolhida. A primeira do array não é a primeira da fila (a massa abria na
+    // 34ª linha, fora da lista visível), e a seleção que a atendente já fez volta pela visita da sessão.
+    selecionadaId: null,
     // Balcão (seção 1, rodada 5): duas abas, canais que ligam mais de um ao
     // mesmo tempo e uma ordem só. `MUDAR_FILTRO` é genérico (chave/valor), a
     // forma nova só muda o que mora em cada chave. #1442: abre em "Todas";

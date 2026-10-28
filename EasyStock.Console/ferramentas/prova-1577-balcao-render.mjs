@@ -247,7 +247,9 @@ await confere('A. reducer: despacho do campo com o texto que o global já tem de
 })
 
 await confere('A. reducer de verdade: sugestão soma o carimbo, o campo atrasado perde para ela e o envio limpa somando', () => {
-  const partida = estadoInicial({ conversas: carregarConversas(), catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' })
+  // #2135: a tela abre sem conversa escolhida; aqui a atendente já abriu a primeira.
+  const conversas = carregarConversas()
+  const partida = { ...estadoInicial({ conversas, catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' }), selecionadaId: conversas[0].id }
   const id = partida.selecionadaId
   assert.deepEqual(partida.escritasDeFora, {})
   const digitou = reducer(partida, { tipo: acao.DEFINIR_RASCUNHO, id, texto: 'vou ver', doCampo: true, escritaVista: 0 })
@@ -511,7 +513,11 @@ async function montar(filhos) {
   mock.timers.enable({ apis: ['setTimeout'] })
   const banca = {
     despachos: [], guardados: [], erros: [],
-    inicial: () => estadoInicial({ conversas: carregarConversas(), catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' }),
+    // #2135: a tela abre sem conversa escolhida; a prova começa com a primeira aberta, como a atendente faria.
+    inicial: () => {
+      const conversas = carregarConversas()
+      return { ...estadoInicial({ conversas, catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' }), selecionadaId: conversas[0].id }
+    },
   }
   const recipiente = documento.body.appendChild(new Elemento('div'))
   Object.assign(renders, { cartoes: [], baloes: [], vizinho: 0 })
