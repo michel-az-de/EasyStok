@@ -97,7 +97,11 @@
       || (/^SalvarR\$/.test(raw) ? 'Salvar' : '')
       || clean;
     if (PHRASES[label]) return { label, icon: PHRASES[label] };
-    if (/advanceOrder\(/.test(handler)) return { label: ['Entregar', 'Pronto'].includes(label) ? label : 'Preparar', icon: COMMANDS[label] || 'producao' };
+    if (/advanceOrder\(/.test(handler)) {
+      // O kanban escreve Finalizar para o pedido em preparo; a etapa seguinte é Pronto.
+      const step = label === 'Finalizar' ? 'Pronto' : label;
+      return { label: ['Entregar', 'Pronto'].includes(step) ? step : 'Preparar', icon: COMMANDS[step] || 'producao' };
+    }
     const verb = label.split(' ')[0];
     if (verb !== label && COMMANDS[verb] && /\b(?:go|open\w*|export\w*|reprint\w*|restore\w*|print\w*|save\w*|copy\w*|share\w*|delete\w*|archive\w*)\(/.test(handler)) {
       return { label: verb, icon: COMMANDS[verb] };

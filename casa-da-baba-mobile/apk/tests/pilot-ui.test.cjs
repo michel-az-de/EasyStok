@@ -33,6 +33,8 @@ test('ação destrutiva e criação de pedido dizem o objeto e não se confundem
   assert.equal(commandFor('Cancelar').icon, 'fechar', 'cancelar um formulário continua sendo fechar');
   for (const text of ['Novo pedido', '+ Novo pedido', 'Criar pedido']) assert.deepEqual(commandFor(text), { label: 'Novo pedido', icon: 'plus' });
   assert.deepEqual(commandFor('Marcar pronto', "advanceOrder('p1')"), { label: 'Pronto', icon: 'check' });
+  // O kanban do piloto escreve Finalizar para o pedido em preparo: não pode voltar a parecer Preparar.
+  assert.deepEqual(commandFor('Finalizar', "advanceOrder('p1')"), { label: 'Pronto', icon: 'check' });
   for (const verb of ['Desfazer', 'Reverter', 'Recuperar']) assert.equal(COMMANDS[verb], 'undo-2');
   assert.ok(pilotIcon('circle-x') && pilotIcon('undo-2'));
 });
