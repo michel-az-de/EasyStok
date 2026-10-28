@@ -46,6 +46,12 @@ export function pausaDaSituacao({ situacao, assumidaPorUsuarioId } = {}, usuario
   return assumidaPorUsuarioId === usuarioId ? PAUSA_POR_ASSUMIR : PAUSA_POR_OUTRO
 }
 
+// #2135: a pausa que vale para a conversa. No modo API o servidor manda (`pausaApi`, lida da situação
+// da conversa a cada sincronização) e o `pausado` do chamador só vale na demonstração. Assim o chip, o
+// cartão, o som e o painel do agente dão a mesma resposta mesmo que um deles passe a pausa errada.
+export const pausaDaConversa = (conversa, pausado = true) =>
+  conversa?.situacaoApi != null ? (conversa.pausaApi ?? false) : pausado
+
 // Os três momentos que pedem som na cozinha (D6). O nome mora aqui, no
 // domínio, porque a tela precisa listar e infra precisa tocar, e nenhuma das
 // duas pode depender da outra.
@@ -437,8 +443,15 @@ function leituraDaPergunta(mensagem) {
 // atrasado simplesmente não entra na conta, nunca quebra).
 // `expediente` (#1427) é `{ funcionamento, lojaAberta }`: com ele, o SLA de
 // resposta pausa fora do horário. Default `null` conta o relógio inteiro.
+//
+// #2135: UMA decisão para o chip, o destaque do cartão, a ordem, o som e o painel do agente. Encerrada
+// e bloqueada saem antes de tudo (a lista de cima nunca as mostra, então o chip não pode contá-las). No
+// modo API o servidor manda primeiro: a passagem que ele gravou vence, e a pausa vem da situação da
+// conversa (`pausaDaConversa`), não do que o chamador supõe. A leitura de texto do navegador
+// (`sinalUrgente`, o classificador do agente) só entra depois, onde o servidor não escalou.
 export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true, janelas = [], expediente = null) {
   if (!conversa) return null
+  if (foraDeAlcance(conversa)) return null
   if (passagemPendente(conversa)) {
     return {
       chave: 'passagem',
@@ -447,12 +460,11 @@ export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true,
       texto: conversa.passagem.motivo ?? MOTIVO_PADRAO,
     }
   }
-  if (foraDeAlcance(conversa)) return null
   return aguardandoAbertura(conversa, aberta)
     ?? ocorrenciaPendente(conversa)
     ?? sinalUrgente(conversa, agora)
     ?? pedidoAtrasadoVisivel(conversa, janelas, agora)
-    ?? esperaDoCliente(conversa, agora, pausado, expediente)
+    ?? esperaDoCliente(conversa, agora, pausaDaConversa(conversa, pausado), expediente)
     ?? cobrancaVencida(conversa, agora)
 }
 
@@ -467,7 +479,8 @@ export const motivoVisivel = (conversa, agora, pausado = true, aberta = true, ja
 // passagem ou reclamação com o cliente esperando além do prazo também piscam,
 // porque quem espera é o mesmo cliente.
 export const respostaAtrasada = (conversa, agora, pausado = true, expediente = null) =>
-  Boolean(conversa) && !foraDeAlcance(conversa) && esperaDoCliente(conversa, agora, pausado, expediente) != null
+  Boolean(conversa) && !foraDeAlcance(conversa)
+  && esperaDoCliente(conversa, agora, pausaDaConversa(conversa, pausado), expediente) != null
 
 // A Frente A do Balcão (rodada 5) passa o valor real de `automaticoPausado`
 // aqui: contar com o default (automático pausado) inflava "Precisa de você"

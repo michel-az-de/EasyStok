@@ -27,7 +27,8 @@ export const casosApi = {
     // saiu antes dela existir não pode devolver a seleção à primeira da lista: espera algumas voltas pela conversa.
     const pendente = estado.selecaoPendente
     const esperando = !aindaExiste && pendente?.id === estado.selecionadaId && pendente.voltas < VOLTAS_DA_SELECAO_PENDENTE
-    const selecionadaId = aindaExiste || esperando ? estado.selecionadaId : (mescladas[0]?.id ?? null)
+    // #2135: sem a escolhida, nenhuma. A primeira do servidor não é a primeira da fila exibida.
+    const selecionadaId = aindaExiste || esperando ? estado.selecionadaId : null
     const selecaoPendente = esperando ? { id: pendente.id, voltas: pendente.voltas + 1 } : null
     const pausas = Object.fromEntries(mescladas.map((c) => [c.id, c.pausaApi ?? false]))
     const automaticoPausado = mesmoConteudo(estado.automaticoPausado, pausas) ? estado.automaticoPausado : pausas

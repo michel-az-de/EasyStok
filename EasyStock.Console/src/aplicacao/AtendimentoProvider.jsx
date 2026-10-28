@@ -249,6 +249,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   const filaDeAvisos = useFilaDeAvisos()
   useAvisoSonoro({
     conversas: estado.conversas, som: estado.som, agora: agoraEfetivo, aberta, expediente: horarioDaLoja,
+    automaticoPausado: estado.automaticoPausado,
     janelas: estado.catalogo.janelas,
     aoAvisar: filaDeAvisos.avisar,
     aoTocar: (evento, conversaId) => {

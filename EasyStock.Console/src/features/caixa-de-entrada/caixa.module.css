@@ -29,6 +29,8 @@
 /* #1868: quem espera a equipe ganha o trilho âmbar de 3 px à esquerda, no lugar da etiqueta
    "Aguardando equipe" que se repetia em quase todo cartão. Vale também na selecionada. */
 .cartao.precisa, .cartao.precisa[aria-current='true'] { box-shadow: inset 3px 0 0 var(--alerta); }
+/* #2135: o motivo de tom perigo (reclamação, devolução, cobrando o pedido, atraso) tem o mesmo trilho, em vermelho. */
+.cartao.atrasada, .cartao.atrasada[aria-current='true'] { box-shadow: inset var(--trilho) 0 0 var(--erro); }
 /* #1761 (L16): a selecionada tem uma cor só. Antes era amarela ou rosa conforme o motivo, e a
    seleção se confundia com a urgência, que já tem a pílula. */
 

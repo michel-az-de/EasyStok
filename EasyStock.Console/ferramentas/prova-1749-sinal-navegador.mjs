@@ -73,6 +73,8 @@ const escolherDia = async data => {
 try {
   await page.goto(origem + '/#/m/atendimento/balcao')
   await page.getByText('Maria', { exact: true }).first().waitFor()
+  // #2135: a tela abre sem conversa escolhida; a atendente abre a Maria.
+  await page.getByText('Maria', { exact: true }).first().click()
   await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
   await page.getByRole('button', { name: /^Lasanha Bolonhesa Clássica 600 g/ }).click()
   await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()

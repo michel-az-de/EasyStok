@@ -41,6 +41,7 @@ function TelaCozinhaPronta({ estado, acoes }) {
   // MESMO estado que `conectarEspelho` já entrega, sem abrir conversa nenhuma.
   const destacados = useAvisoSonoro({
     conversas: estado.conversas, som: estado.som, agora, aberta, janelas: estado.catalogo.janelas,
+    automaticoPausado: estado.automaticoPausado,
   })
 
   const acoesComAgora = {

@@ -176,11 +176,24 @@ function abrirCozinha() {
 // sempre visível no topo. Mostra o efetivo (horário configurado combinado
 // com o estado manual, dominio/funcionamento.js), não só o que ela tocou por
 // último, porque "Estado visível sempre" é sobre o que vale agora.
+//
+// #2135: no celular o texto longo sai e entra o curto ("Aberta"/"Fechada") sob o ícone, com alvo de 44 px
+// e a dica do trilho do desktop. O nome acessível segue "Loja aberta"/"Loja fechada" (`aria-label`),
+// que contém o texto visível. Fechar dentro do horário continua pedindo justificativa (aplicacao/api/expediente.js).
 function ControleLoja({ aberta, aoAlternar }) {
+  const nome = aberta ? 'Loja aberta' : 'Loja fechada'
   return (
-    <button type="button" className={css.controleLoja} aria-pressed={aberta} onClick={aoAlternar}>
+    <button
+      type="button"
+      className={css.controleLoja}
+      aria-pressed={aberta}
+      aria-label={nome}
+      title={aberta ? 'Loja aberta: toque para fechar' : 'Loja fechada: toque para abrir'}
+      onClick={aoAlternar}
+    >
       <Pilula tom={aberta ? 'ok' : 'perigo'} icone={aberta ? 'circle-check' : 'lock'}>
-        {aberta ? 'Loja aberta' : 'Loja fechada'}
+        <span className={css.lojaTextoLongo}>{nome}</span>
+        <span className={css.lojaTextoCurto} aria-hidden="true">{aberta ? 'Aberta' : 'Fechada'}</span>
       </Pilula>
     </button>
   )

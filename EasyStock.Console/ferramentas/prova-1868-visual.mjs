@@ -82,7 +82,7 @@ confere('1  sem a etiqueta, o estado vai para o leitor de tela e a atenção vir
   assert.match(jsx, /\{!etiqueta && <span className="sr">, \{estado\.texto\}<\/span>\}/)
   assert.match(jsx, /title=\{nome\.titulo\}/)
   assert.match(fonte('features/caixa-de-entrada/caixa.module.css'), /\.cartao\.precisa, \.cartao\.precisa\[aria-current='true'\] \{ box-shadow: inset 3px 0 0 var\(--alerta\); \}/)
-  assert.match(fonte('features/caixa-de-entrada/classesDoCartao.js'), /motivo\?\.tom === 'aviso' \? css\.precisa/)
+  assert.match(fonte('features/caixa-de-entrada/classesDoCartao.js'), /motivo && motivo\.tom !== 'perigo' \? css\.precisa/) // #2135: todo motivo tem trilho, não só o `aviso`
 })
 
 // --- 2. Resumo ---------------------------------------------------------------------------------
