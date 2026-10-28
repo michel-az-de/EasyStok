@@ -1,6 +1,60 @@
 'use strict';
 module.exports = function ({ test, runInSandbox, assert }) {
   const run = body => JSON.parse(runInSandbox('(function(){ ' + body + ' })()'));
+  test('pedido: salvar tem ação explícita em todos os estados e preserva validação', () => {
+    const result = run(`
+      const old={client:selectedClient,items:currentOrderItems,get:document.getElementById};
+      const elements={};document.getElementById=id=>elements[id]||(elements[id]=old.get.call(document,id));
+      const states=[];const btn=document.getElementById('saveOrderBtn'),notes=document.getElementById('orderNotes');
+      const capture=()=>{updateSaveOrderBtn();states.push({text:btn.textContent,disabled:btn.disabled});};
+      try {
+        selectedClient=null;currentOrderItems=[{name:'Item',qty:1,unitPrice:34}];notes.value='';capture();
+        selectedClient={id:'fixture',name:'Cliente'};currentOrderItems=[];capture();
+        notes.value='Encomenda';capture();
+        notes.value='';currentOrderItems=[{name:'Item',qty:1,unitPrice:34}];capture();
+        currentOrderItems=[{name:'Item',qty:1,unitPrice:0}];capture();
+        return JSON.stringify(states);
+      } finally {selectedClient=old.client;currentOrderItems=old.items;document.getElementById=old.get;}
+    `);
+    assert.deepStrictEqual(result, [true, true, false, false, false].map(disabled => ({ text: 'Salvar pedido', disabled })));
+  });
+  test('impressora: recusa orienta pelo nome do APK e mantém erro técnico recolhido', () => {
+    const result = run(`
+      const old={get:document.getElementById,bs:window.bluetoothSerial,permission:ensureBluetoothPermission,config:window.CDB_CONFIG};
+      const nodes={printerPickerList:{innerHTML:''},printerPickerHint:{innerHTML:''}};let listings=0;
+      try {
+        document.getElementById=id=>nodes[id]||old.get.call(document,id);
+        window.CDB_CONFIG={isPilot:true};window.bluetoothSerial={list:()=>listings++};
+        ensureBluetoothPermission=cb=>cb(false);loadPrinterDevices();
+        return JSON.stringify({html:nodes.printerPickerHint.innerHTML,listings});
+      } finally {document.getElementById=old.get;window.bluetoothSerial=old.bs;ensureBluetoothPermission=old.permission;window.CDB_CONFIG=old.config;}
+    `);
+    assert.equal(result.listings, 0);
+    const visible = result.html.split('<details>')[0];
+    assert.match(visible, /Casa da Baba Piloto/);
+    assert.match(visible, /Permita usar dispositivos próximos/);
+    assert.match(visible, /Buscar de novo/);
+    assert.doesNotMatch(visible, /BLUETOOTH_CONNECT|\[permission\]|Easy Stock Mobile/);
+    assert.match(result.html, /<details><summary>Detalhes técnicos<\/summary>/);
+    assert.match(result.html, /BLUETOOTH_CONNECT/);
+  });
+  test('impressora: falha de listagem escapa detalhe e permite tentar novamente', () => {
+    const result = run(`
+      const old={get:document.getElementById,bs:window.bluetoothSerial,permission:ensureBluetoothPermission,config:window.CDB_CONFIG};
+      const nodes={printerPickerList:{innerHTML:''},printerPickerHint:{innerHTML:''}};let listings=0;
+      try {
+        document.getElementById=id=>nodes[id]||old.get.call(document,id);
+        window.CDB_CONFIG={isPilot:true};window.bluetoothSerial={list:(ok,fail)=>{listings++;fail('<img src=x onerror=alert(1)>');}};
+        ensureBluetoothPermission=cb=>cb(true);loadPrinterDevices();loadPrinterDevices();
+        return JSON.stringify({html:nodes.printerPickerHint.innerHTML,listings});
+      } finally {document.getElementById=old.get;window.bluetoothSerial=old.bs;ensureBluetoothPermission=old.permission;window.CDB_CONFIG=old.config;}
+    `);
+    assert.equal(result.listings, 2);
+    assert.match(result.html, /Não foi possível buscar as impressoras/);
+    assert.doesNotMatch(result.html, /<img/);
+    assert.match(result.html, /&lt;img/);
+    assert.match(result.html, /<details><summary>Detalhes técnicos<\/summary>/);
+  });
   test('#2069 cliente: abrir foca nome e cancelar devolve foco à ação de origem', () => {
     const result = run(`
       const old = { get: document.getElementById, query: document.querySelector, active: document.activeElement };

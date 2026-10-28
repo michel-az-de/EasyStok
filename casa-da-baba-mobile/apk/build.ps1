@@ -71,6 +71,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Gradle assembleRelease falhou.' }
     } finally { Pop-Location }
     $builtApk=Join-Path $apkRoot 'android\app\build\outputs\apk\release\app-release.apk'
+    & (Join-Path $apkRoot 'scripts\verify-apk-runtime.ps1') -ApkPath $builtApk -BuildToolsDirectory (Split-Path -Parent $apksigner)
     $verification=& $apksigner verify --print-certs $builtApk 2>&1
     if ($LASTEXITCODE -ne 0) { throw 'A verificação da assinatura do APK falhou.' }
     $certificateLine=$verification|Where-Object {$_ -match '^Signer #1 certificate SHA-256 digest: '}|Select-Object -First 1

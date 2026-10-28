@@ -183,7 +183,7 @@ Invoke-ApkRemote 'activate'
 $published = Invoke-RestMethod -Uri ($publicBase + 'latest.json?verify=' + [Guid]::NewGuid().ToString('N')) -TimeoutSec 30
 if ($published.versionCode -ne $manifest.versionCode -or $published.sha256 -ne $sha -or $published.url -ne $manifest.url) { throw 'A versão pública diverge da esperada. Conferir a publicação antes de entregar o link.' }
 $page = Invoke-WebRequest -UseBasicParsing -Uri ($publicBase + '?verify=' + [Guid]::NewGuid().ToString('N')) -TimeoutSec 30
-if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'Baixar app para Android') { throw 'A página pública de instalação não passou na verificação.' }
+if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'id="download"' -or $page.Content -notmatch "fetch\('./latest\.json") { throw 'A página pública de instalação não passou na verificação.' }
 Write-Output "Publicado e conferido por HTTPS: $publicBase"
 Write-Output "APK: $($manifest.url)"
 Write-Output "SHA-256: $sha"
