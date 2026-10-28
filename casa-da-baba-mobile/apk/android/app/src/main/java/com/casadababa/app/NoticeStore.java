@@ -57,7 +57,23 @@ public final class NoticeStore {
         if ("push".equals(source)) { item.put("source", "push"); next.put("lastPushAt", now); }
         else next.put("lastSyncAt", now);
         commit(next);
-        return fresh || ("push".equals(source) && firstSource);
+        // A late FCM delivery still records its receipt, but an opened notice is not announced again.
+        return fresh || ("push".equals(source) && firstSource && item.optLong("openedAt", 0) == 0);
+    }
+    /**
+     * A device transfer copies this file but not the Keystore key. Receipts signed by the lost key
+     * cannot be sent, so they are dropped; the visible history stays. Returns the discarded receipts.
+     */
+    public synchronized int resetIdentity(String installationId) throws Exception {
+        JSONObject next = snapshot();
+        int discarded = next.getJSONArray("pending").length();
+        JSONArray items = next.getJSONArray("items");
+        // Old notices are bound to the lost installation on the server: opening them must not queue a receipt.
+        for (int i = 0; i < items.length(); i++) items.getJSONObject(i).put("receiptless", true);
+        next.put("pending", new JSONArray()).put("installationId", installationId).put("registered", false);
+        next.remove("lastRegistrationAt"); next.remove("lastRegistrationIssuedAt");
+        commit(next);
+        return discarded;
     }
     public synchronized void opened(String id, long now, String version) throws Exception {
         JSONObject next = snapshot(); JSONObject item = find(next.getJSONArray("items"), id);
@@ -78,6 +94,7 @@ public final class NoticeStore {
         commit(next);
     }
     private static void enqueue(JSONObject next, JSONObject item, String event, String source, long now, String version) throws Exception {
+        if (item.optBoolean("receiptless", false)) return;
         JSONArray queue = next.getJSONArray("pending"); String key = item.getString("id") + ":" + event + ":" + source;
         for (int i = 0; i < queue.length(); i++) if (key.equals(queue.getJSONObject(i).getString("key"))) return;
         SignedNoticePolicy.require(queue.length() < 400, "Confirmações aguardando conexão.");

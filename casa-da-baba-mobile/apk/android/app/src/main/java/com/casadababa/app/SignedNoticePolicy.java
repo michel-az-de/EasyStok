@@ -52,6 +52,16 @@ public final class SignedNoticePolicy {
         if (fresh) require(created <= now + 300000 && expires > now, "Aviso fora da validade.");
         return value;
     }
+    public interface Acceptor { void accept(JSONObject envelope) throws Exception; }
+    /** One invalid or expired message must not hold back the rest of the inbox. Returns how many were skipped. */
+    public static int acceptEach(org.json.JSONArray messages, Acceptor acceptor) {
+        int skipped = 0;
+        for (int i = 0; i < messages.length(); i++) {
+            try { acceptor.accept(messages.getJSONObject(i)); }
+            catch (Exception rejected) { skipped++; }
+        }
+        return skipped;
+    }
     static byte[] decode(String value, int maximum) {
         require(value != null && value.length() <= ((maximum + 2) / 3) * 4, "Campo excede limite.");
         byte[] decoded = Base64.decode(value, Base64.NO_WRAP);
