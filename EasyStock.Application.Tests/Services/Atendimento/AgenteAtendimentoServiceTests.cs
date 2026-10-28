@@ -9,6 +9,7 @@ using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Sales;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -34,6 +35,7 @@ public class AgenteAtendimentoServiceTests
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IFerramentaAgente _consultarPedido = Substitute.For<IFerramentaAgente>();
     private readonly ICadernoRepository _caderno = Substitute.For<ICadernoRepository>();
+    private readonly IPedidoRepository _pedidos = Substitute.For<IPedidoRepository>();
     private readonly List<RequisicaoLlm> _requisicoes = [];
     private readonly Conversa _conversa;
     private readonly List<Mensagem> _historico = [];
@@ -75,7 +77,7 @@ public class AgenteAtendimentoServiceTests
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
         [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-        _caderno, NullLogger<AgenteAtendimentoService>.Instance);
+        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos);
 
     private static RespostaLlm Texto(string texto) =>
         new("end_turn", [new BlocoTextoLlm(texto)], 100, 20);
@@ -349,6 +351,83 @@ public class AgenteAtendimentoServiceTests
             "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.",
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
         (await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PedidoJaFinalizadoSoltaDaConversaAntesDoTurno(bool entregue)
+    {
+        // #2126: "quero uma lasanha" numa conversa ainda presa à comanda cancelada devolvia a comanda antiga.
+        var pedido = Pedido.Criar(_empresaId, origem: "whatsapp");
+        if (entregue)
+        {
+            pedido.MudarStatus(StatusPedido.Preparando);
+            pedido.MudarStatus(StatusPedido.Pronto);
+            pedido.MudarStatus(StatusPedido.Entregue);
+        }
+        else pedido.Cancelar();
+        VincularFinalizado(pedido, noBanco: pedido.Id);
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora.AddSeconds(-30), TipoConteudoMensagem.Texto,
+            "Eu quero uma lasanha", "wamid.in2"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _conversa.PedidoEmAndamentoId.Should().BeNull();
+        _requisicoes[0].System.Should().Contain("Pedido em andamento: nenhum")
+            .And.NotContain(pedido.Id.ToString());
+        await _conversaRepository.Received(1).TravarParaPedidoAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PedidoNovoVinculadoDuranteASolturaNaoEApagado()
+    {
+        var cancelado = Pedido.Criar(_empresaId, origem: "whatsapp");
+        cancelado.Cancelar();
+        var novo = Guid.NewGuid();
+        VincularFinalizado(cancelado, noBanco: novo);
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _conversa.PedidoEmAndamentoId.Should().Be(novo);
+    }
+
+    [Fact]
+    public async Task ConversaPresaAPedidoCanceladoVoltaAEncerrar()
+    {
+        _situacaoNoBanco = SituacaoConversa.Encerrada;
+        var cancelado = Pedido.Criar(_empresaId, origem: "whatsapp");
+        cancelado.Cancelar();
+        VincularFinalizado(cancelado, noBanco: cancelado.Id);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            UsoFerramenta("encerrar_conversa"), Texto("Até mais!"));
+
+        await CriarServico(new EncerrarConversaFerramenta()).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _conversa.Situacao.Should().Be(SituacaoConversa.Encerrada);
+    }
+
+    private void VincularFinalizado(Pedido pedido, Guid? noBanco)
+    {
+        _pedidos.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+        _conversa.DefinirPedidoEmAndamento(pedido.Id);
+        _conversaRepository.TravarParaPedidoAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>()).Returns(noBanco);
+        _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task PedidoEmAndamentoContinuaVinculado()
+    {
+        var pedido = Pedido.Criar(_empresaId, origem: "whatsapp");
+        pedido.MudarStatus(StatusPedido.Preparando);
+        _pedidos.GetByIdAsync(_empresaId, pedido.Id).Returns(pedido);
+        _conversa.DefinirPedidoEmAndamento(pedido.Id);
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _conversa.PedidoEmAndamentoId.Should().Be(pedido.Id);
+        _requisicoes[0].System.Should().Contain(pedido.Id.ToString());
     }
 
     [Theory]

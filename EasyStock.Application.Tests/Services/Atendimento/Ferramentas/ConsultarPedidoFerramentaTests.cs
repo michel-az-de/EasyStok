@@ -55,7 +55,8 @@ public sealed class ConsultarPedidoFerramentaTests
         json.RootElement.GetProperty("faltaPagar").GetString().Should().Be("R$ 10,00");
         json.RootElement.GetProperty("financeiro").GetProperty("convertidoEmCupom").GetDecimal().Should().Be(10);
         contexto.RespostaVerificada.Should().Contain("Cobertura atual: R$ 15,00").And.Contain("Falta pagar: R$ 10,00")
-            .And.Contain("Dinheiro recebido registrado: R$ 25,00").And.NotContain("crédito na sua conta");
+            .And.Contain("Dinheiro recebido registrado: R$ 25,00").And.NotContain("crédito na sua conta")
+            .And.Contain("Crédito emitido em cupom: R$ 10,00").And.NotContain("Devoluções registradas");
 
         conversa.VincularCliente(Guid.NewGuid());
         var outroCliente = new ContextoTurnoAgente(empresa, conversa, DateTime.UtcNow);
