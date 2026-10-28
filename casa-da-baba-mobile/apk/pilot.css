@@ -841,6 +841,7 @@ body.pilot-app #pilotHome .pilot-tile { position: relative; display: flex; flex-
 body.pilot-app #pilotHome .pilot-tile::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity 160ms ease; pointer-events: none; }
 body.pilot-app #pilotHome .pilot-tile > svg { width: 30px; height: 30px; flex: 0 0 auto; margin: 0; stroke-width: 1.75; }
 body.pilot-app #pilotHome .pilot-tile > span { flex: 0 0 auto; min-width: 0; max-width: 100%; }
+body.pilot-app #pilotHome .pilot-home-controls .pilot-tile > span { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 2.7em; }
 body.pilot-app #pilotHome .pilot-actions .pilot-tile { gap: 16px; padding: 20px; color: #fffaf2; font-size: 18px; }
 body.pilot-app #pilotHome .pilot-actions .pilot-tile > svg { width: 48px; height: 48px; }
 body.pilot-app #pilotHome .pilot-tile--production { background: var(--basil); }
