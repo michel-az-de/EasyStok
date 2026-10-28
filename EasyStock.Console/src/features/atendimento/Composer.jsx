@@ -324,7 +324,7 @@ export function Composer({
                 className={`${css.acaoComRotulo} ${complementoLigado ? css.chaveLigada : ''}`}
                 onClick={alternarComplemento}
               >
-                <Icone nome="agente" /><span className={css.rotuloAcao}>Completar com Tab</span>
+                <Icone nome="sparkles" /><span className={css.rotuloAcao}>Completar com Tab</span>
               </Botao>}
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
