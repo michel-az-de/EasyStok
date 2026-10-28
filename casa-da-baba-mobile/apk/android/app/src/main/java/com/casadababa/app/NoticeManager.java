@@ -38,6 +38,8 @@ public final class NoticeManager {
     private volatile Listener listener;
     private volatile String transientError = "";
     private volatile long retryAfter;
+    // Server minus phone clock, learned from the HTTP Date header of every API response.
+    private volatile long clockOffset;
     public interface Listener { void changed(JSObject status); }
     public interface Callback { void complete(JSObject status, boolean success); }
 
@@ -64,10 +66,16 @@ public final class NoticeManager {
         byte[] loadedPublic = keys.getCertificate(KEY_ALIAS).getPublicKey().getEncoded();
         String loadedId = SignedNoticePolicy.installationId(loadedPublic);
         try (InputStream input = context.getAssets().open("ota-public-key.der")) { publisherKey = NoticeStore.read(input, 2048); }
-        String recorded = store.snapshot().optString("installationId");
-        // Do not silently transfer receipts from a lost identity to a newly generated key.
-        SignedNoticePolicy.require(recorded.isEmpty() || loadedId.equals(recorded), "A identidade dos avisos mudou. Solicite suporte sem apagar os dados.");
+        JSONObject recordedState = store.snapshot();
+        String recorded = recordedState.optString("installationId");
+        clockOffset = recordedState.optLong("clockOffset", 0);
         if (recorded.isEmpty()) store.update("installationId", loadedId);
+        else if (!loadedId.equals(recorded)) {
+            // Device transfer or restored data without the Keystore key: receipts of the lost key are never
+            // moved to the new one. The history stays visible and this installation registers again.
+            store.resetIdentity(loadedId);
+            transientError = "Este aparelho recebeu uma identidade nova para os avisos. O histórico foi mantido.";
+        }
         privateKey = loadedPrivate; publicKey = loadedPublic; installationId = loadedId;
     }
     public void setListener(Listener value) { listener = value; }
@@ -124,35 +132,45 @@ public final class NoticeManager {
                 // Receipt authentication uses the existing installation key, not a fresh FCM token.
                 if (registeredBefore) flush(8);
                 String firebaseError = null;
+                int skipped = 0;
                 if (!before.optBoolean("registered", false) || System.currentTimeMillis() - before.optLong("lastRegistrationAt", 0) > 21600000) {
                     try {
                         long generation = tokenRegistration.begin();
                         String token = Tasks.await(FirebaseMessaging.getInstance().getToken(), 20, TimeUnit.SECONDS);
                         SignedNoticePolicy.require(token != null && !token.isEmpty() && token.length() <= 4096, "Token indisponível.");
-                        long issued = Math.max(System.currentTimeMillis(), before.optLong("lastRegistrationIssuedAt", before.optLong("lastRegistrationAt", 0)) + 1);
-                        store.update("lastRegistrationIssuedAt", issued);
-                        JSONObject registration = new JSONObject().put("kind", "cdb-installation-v1").put("installationId", installationId)
-                            .put("token", token).put("apkVersion", apkVersion).put("issuedAt", issued);
-                        JSONObject registered = post("installations", sign(registration));
+                        long previous = before.optLong("lastRegistrationIssuedAt", before.optLong("lastRegistrationAt", 0));
+                        long issued = 0;
+                        JSONObject registered = null;
+                        // A 401 from a wrong phone clock teaches the offset (Date header); the second attempt uses it.
+                        for (int attempt = 0; registered == null; attempt++) {
+                            issued = NoticeClock.issuedAt(serverNow(), previous);
+                            store.update("lastRegistrationIssuedAt", issued);
+                            JSONObject registration = new JSONObject().put("kind", "cdb-installation-v1").put("installationId", installationId)
+                                .put("token", token).put("apkVersion", apkVersion).put("issuedAt", issued);
+                            try { registered = post("installations", sign(registration)); }
+                            catch (ApiException failure) { if (failure.code != 401 || attempt > 0 || !NoticeClock.skewed(clockOffset)) throw failure; }
+                        }
+                        final long confirmedIssued = issued;
                         SignedNoticePolicy.require(registered.optBoolean("registered", false), "Registro não confirmado.");
                         tokenRegistration.complete(generation, () -> {
-                            store.update("registered", true); store.update("lastRegistrationAt", issued);
+                            store.update("registered", true); store.update("lastRegistrationAt", confirmedIssued);
                         });
                     } catch (TimeoutException | ExecutionException failure) {
                         if (!registeredBefore) throw failure;
                         firebaseError = "A verificação do Firebase será repetida. Os recibos restantes permanecem na fila.";
+                    } catch (ApiException failure) {
+                        // Periodic re-registration: a limited or unavailable server must not hold back inbox and receipts.
+                        if (!registeredBefore) throw failure;
+                        firebaseError = failure.safeMessage;
                     }
                 }
                 if (!registeredBefore) flush(8);
                 if (foreground || System.currentTimeMillis() - before.optLong("lastSyncAt", 0) > 900000) {
-                    JSONObject query = new JSONObject().put("kind", "cdb-inbox-v1").put("installationId", installationId).put("issuedAt", System.currentTimeMillis());
+                    JSONObject query = new JSONObject().put("kind", "cdb-inbox-v1").put("installationId", installationId).put("issuedAt", serverNow());
                     JSONArray messages = post("inbox", sign(query)).getJSONArray("messages");
                     SignedNoticePolicy.require(messages.length() <= 100, "Histórico excede o limite.");
-                    for (int i = 0; i < messages.length(); i++) {
-                        JSONObject envelope = messages.getJSONObject(i);
-                        JSONObject notice = SignedNoticePolicy.verify(envelope, publisherKey, installationId, System.currentTimeMillis(), true);
-                        store.accept(envelope, notice, "sync", System.currentTimeMillis(), apkVersion);
-                    }
+                    skipped = SignedNoticePolicy.acceptEach(messages, envelope -> store.accept(envelope,
+                        SignedNoticePolicy.verify(envelope, publisherKey, installationId, serverNow(), true), "sync", System.currentTimeMillis(), apkVersion));
                     store.update("lastSyncAt", System.currentTimeMillis());
                 }
                 flush(8);
@@ -170,6 +188,7 @@ public final class NoticeManager {
                 else if (!currentRegistration) error("O registro das notificações mudou durante a verificação e será atualizado automaticamente.");
                 else if (legacyRemoved) { transientError = ""; store.update("lastError", ""); }
                 else error("Os avisos novos foram verificados. A retirada do registro antigo no Firebase ainda será repetida.");
+                if (skipped > 0) error(skipped == 1 ? "Um aviso inválido ou vencido foi ignorado. Os demais foram recebidos." : skipped + " avisos inválidos ou vencidos foram ignorados. Os demais foram recebidos.");
                 success = firebaseError == null && currentRegistration && legacyRemoved && completed.getJSONArray("pending").length() == 0;
             } catch (TimeoutException timeout) { error("O registro no Firebase demorou. Confira a conexão e os serviços do Google Play; tentaremos novamente."); }
             catch (ApiException failure) { error(failure.safeMessage); }
@@ -192,7 +211,7 @@ public final class NoticeManager {
         boolean display;
         try {
             identity();
-            notice = SignedNoticePolicy.verify(envelope, publisherKey, installationId, System.currentTimeMillis(), true);
+            notice = SignedNoticePolicy.verify(envelope, publisherKey, installationId, serverNow(), true);
             display = store.accept(envelope, notice, "push", System.currentTimeMillis(), apkVersion);
         } catch (Exception rejected) {
             error("Um aviso não pôde ser validado ou salvo. Nenhuma confirmação foi criada para esta tentativa.");
@@ -210,6 +229,13 @@ public final class NoticeManager {
     }
     public void pendingOpen(String id) {
         try { store.pendingOpen(id); changed(); } catch (Exception failure) { error("Não foi possível abrir o aviso selecionado."); }
+    }
+    private long serverNow() { return System.currentTimeMillis() + clockOffset; }
+    private void learnClock(long serverDate) {
+        long next = NoticeClock.offset(serverDate, System.currentTimeMillis(), clockOffset);
+        if (Math.abs(next - clockOffset) < 5000) return;
+        clockOffset = next;
+        try { store.update("clockOffset", next); } catch (Exception ignored) { /* The offset is relearned on the next response. */ }
     }
     private JSONObject sign(JSONObject payload) throws Exception { return SignedNoticePolicy.sign(payload, privateKey, publicKey); }
     private void flush(int maximum) throws Exception {
@@ -230,20 +256,23 @@ public final class NoticeManager {
         try {
             try (OutputStream output = connection.getOutputStream()) { output.write(bytes); }
             int code = connection.getResponseCode();
+            learnClock(connection.getDate());
             if (code == 429) {
                 long delay = 60000;
                 try { delay = Math.min(3600000, Math.max(delay, Long.parseLong(connection.getHeaderField("Retry-After")) * 1000)); }
                 catch (NumberFormatException ignored) { }
                 retryAfter = android.os.SystemClock.elapsedRealtime() + delay;
             }
-            if (code != 200) throw new ApiException(code == 429 ? "Verificações temporariamente limitadas. Tentaremos novamente."
+            if (code != 200) throw new ApiException(code, code == 429 ? "Verificações temporariamente limitadas. Tentaremos novamente."
+                : code == 401 && NoticeClock.skewed(clockOffset) ? "A hora do celular está errada. Ative data e hora automáticas nas configurações do Android."
                 : code == 404 || code == 503 ? "O serviço de avisos está indisponível. Tentaremos novamente."
                 : "O servidor não confirmou os avisos (HTTP " + code + "). O histórico foi preservado.");
             try (InputStream input = connection.getInputStream()) { return new JSONObject(new String(NoticeStore.read(input, 1048576), StandardCharsets.UTF_8)); }
         } finally { connection.disconnect(); }
     }
     private static final class ApiException extends IOException {
+        final int code;
         final String safeMessage;
-        ApiException(String message) { super(message); safeMessage = message; }
+        ApiException(int code, String message) { super(message); this.code = code; safeMessage = message; }
     }
 }

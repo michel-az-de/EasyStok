@@ -96,7 +96,8 @@ public final class AppNotifications {
         if (intent == null || !"signed-notice".equals(intent.getStringExtra("kind"))) return false;
         String id = intent.getStringExtra("noticeId");
         intent.removeExtra("kind"); intent.removeExtra("noticeId");
-        if (id == null) return false;
+        // After process death, Recents redelivers the original intent with its extras: that is not a new tap.
+        if (id == null || (intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return false;
         try { NoticeManager.get(activity).pendingOpen(id); return true; }
         catch (Exception failure) { return false; }
     }
