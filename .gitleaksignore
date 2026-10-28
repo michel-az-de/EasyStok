@@ -5,3 +5,6 @@
 033f2c4558037586c0f60c2bbdd643f9881b26d9:EasyStock.Api.UnitTests/Pagamentos/MercadoPagoClientTests.cs:generic-api-key:157
 # Falso positivo (token de teste da comanda, ja trocado por AcessoChatSite.NovoToken() no commit seguinte da mesma PR #1959).
 53be5663a0bb152cb4b21cb1b1d9efb2e041c752:EasyStock.Api.UnitTests/Observability/Logging/SensitivePatternsTests.cs:generic-api-key:142
+# Falsos positivos: offeredKey e nome publico de localStorage para registrar a oferta de Bluetooth, nao uma credencial (#2091).
+8a574ee69318b4c19116ebf8029c7ba3d39150d0:EasyStock.Api/wwwroot/pwa/index.html:generic-api-key:23536
+8a574ee69318b4c19116ebf8029c7ba3d39150d0:tests/pwa/bluetooth-onboarding.test.js:generic-api-key:12
