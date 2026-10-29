@@ -8,6 +8,7 @@ using EasyStock.Application.UseCases.Cliente.Foto;
 using EasyStock.Application.UseCases.ClienteCrm;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
@@ -123,14 +124,16 @@ public class ClientesCrmControllerTests
         _cliente.MotivoBloqueio.Should().Be("golpe");
     }
 
-    [Fact]
-    public async Task FichaPdfDevolveArquivoPrivadoDoClienteDaSessao()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FichaPdfDevolveArquivoPrivadoDoClienteDaSessao(bool empresaExplicita)
     {
         var renderer = Substitute.For<IFichaClientePdfRenderer>();
         var bytes = System.Text.Encoding.ASCII.GetBytes("%PDF-1.7\nfixture do controller");
         renderer.RenderAsync(Arg.Any<DossieClienteDto>(), Arg.Any<byte[]?>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(bytes);
         var fotos = new ClienteFotoUseCase(_clientes, Substitute.For<IFileStorage>(), Substitute.For<IImageProcessor>(), _uow);
-        var resultado = await _controller.FichaPdf(_cliente.Id, null, renderer, fotos, CancellationToken.None);
+        var resultado = await _controller.FichaPdf(_cliente.Id, empresaExplicita ? _empresaId : null, renderer, fotos, CancellationToken.None);
         var arquivo = resultado.Should().BeOfType<FileContentResult>().Subject;
         arquivo.ContentType.Should().Be("application/pdf");
         arquivo.FileDownloadName.Should().Be($"ficha-cliente-{_cliente.Id:D}.pdf");
@@ -138,6 +141,57 @@ public class ClientesCrmControllerTests
         _controller.Response.Headers.CacheControl.ToString().Should().Be("private, no-store");
         await renderer.Received(1).RenderAsync(Arg.Is<DossieClienteDto>(d => d.Cliente.Id == _cliente.Id),
             null, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(NivelAcesso.Admin)]
+    [InlineData(NivelAcesso.Gerente)]
+    [InlineData(NivelAcesso.Operador)]
+    [InlineData(NivelAcesso.SuperAdmin)]
+    public async Task FichaPdfEmpresaDivergenteDevolve400SemConsultarDadosOuFoto(NivelAcesso nivel)
+    {
+        _currentUser.Nivel.Returns(nivel);
+        var renderer = Substitute.For<IFichaClientePdfRenderer>();
+        var storage = Substitute.For<IFileStorage>();
+        var fotos = new ClienteFotoUseCase(_clientes, storage, Substitute.For<IImageProcessor>(), _uow);
+        _clientes.ClearReceivedCalls();
+        _crm.ClearReceivedCalls();
+
+        (await _controller.FichaPdf(_cliente.Id, Guid.NewGuid(), renderer, fotos, CancellationToken.None))
+            .Should().BeOfType<BadRequestObjectResult>();
+
+        _clientes.ReceivedCalls().Should().BeEmpty();
+        _crm.ReceivedCalls().Should().BeEmpty();
+        renderer.ReceivedCalls().Should().BeEmpty();
+        storage.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(NivelAcesso.Admin, false)]
+    [InlineData(NivelAcesso.Admin, true)]
+    [InlineData(NivelAcesso.Gerente, false)]
+    [InlineData(NivelAcesso.Gerente, true)]
+    [InlineData(NivelAcesso.Operador, false)]
+    [InlineData(NivelAcesso.Operador, true)]
+    [InlineData(NivelAcesso.SuperAdmin, false)]
+    [InlineData(NivelAcesso.SuperAdmin, true)]
+    public async Task FichaPdfJwtSemEmpresaDevolve400MesmoComQuerySemAcessarDadosOuFoto(NivelAcesso nivel, bool empresaExplicita)
+    {
+        _currentUser.Nivel.Returns(nivel);
+        _currentUser.EmpresaId.Returns(Guid.Empty);
+        var renderer = Substitute.For<IFichaClientePdfRenderer>();
+        var storage = Substitute.For<IFileStorage>();
+        var fotos = new ClienteFotoUseCase(_clientes, storage, Substitute.For<IImageProcessor>(), _uow);
+        _clientes.ClearReceivedCalls();
+        _crm.ClearReceivedCalls();
+
+        (await _controller.FichaPdf(_cliente.Id, empresaExplicita ? _empresaId : null, renderer, fotos, CancellationToken.None))
+            .Should().BeOfType<BadRequestObjectResult>();
+
+        _clientes.ReceivedCalls().Should().BeEmpty();
+        _crm.ReceivedCalls().Should().BeEmpty();
+        renderer.ReceivedCalls().Should().BeEmpty();
+        storage.ReceivedCalls().Should().BeEmpty();
     }
 
     [Fact]

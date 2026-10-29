@@ -31,8 +31,11 @@ public class ClientesCrmController(
     [Authorize(Policy = "Operador")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<IActionResult> FichaPdf(Guid id, [FromQuery] Guid? empresaId,
-        [FromServices] IFichaClientePdfRenderer renderer, [FromServices] ClienteFotoUseCase fotos, CancellationToken ct) =>
-        Executar(empresaId, async emp =>
+        [FromServices] IFichaClientePdfRenderer renderer, [FromServices] ClienteFotoUseCase fotos, CancellationToken ct)
+    {
+        if (currentUser.EmpresaId == Guid.Empty || (empresaId.HasValue && empresaId != currentUser.EmpresaId))
+            return Task.FromResult<IActionResult>(DataBadRequest("A empresa informada difere da sessão."));
+        return Executar(currentUser.EmpresaId, async emp =>
         {
             var dados = await dossie.ExecuteAsync(new ObterDossieClienteQuery(emp, id), ct);
             if (dados is null) return DataNotFound("Cliente não encontrado.");
@@ -42,6 +45,7 @@ public class ClientesCrmController(
             Response.Headers["X-Content-Type-Options"] = "nosniff";
             return File(bytes, "application/pdf", $"ficha-cliente-{id:D}.pdf");
         });
+    }
 
     // ── Dossiê (S25) ───────────────────────────────────────────────────
 
