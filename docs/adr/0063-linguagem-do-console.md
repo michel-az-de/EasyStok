@@ -1,6 +1,6 @@
 # ADR-0063 · Linguagem do console: um conceito, um nome, um ícone, um componente
 
-- Status: Proposto (aguarda a label `aprovado`)
+- Status: Aceito (2026-10-29; Felipe aprovou na sessão da Onda 1, #2130)
 - Data: 2026-10-29
 - Decisor: Felipe
 - Relacionados: issue #2144, guarda-chuva #2130, plano `docs/plan/balcao-ux/README.md` (aprovado em
