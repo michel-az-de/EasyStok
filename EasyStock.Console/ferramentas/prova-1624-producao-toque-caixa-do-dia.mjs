@@ -591,7 +591,9 @@ await confere('Produção do dia: etiqueta que chega depois de ela sair da tela 
   globalThis.window = { print: () => { impressoes += 1 } }
   let entregar = null
   globalThis.fetch = () => new Promise((resolver) => { entregar = () => resolver(respostaJson({ etiquetas: [{ id: 'e-1', sequencial: 1, codigo: 'C1', produto: { nome: 'Talharim', pesoG: 500, fichaAlergenos: [] }, loteCodigo: 'LOT-261011-001', loteValidadeEm: null, loteCriadoEm: '2026-10-11T12:00:00' }] })) })
-  const imprimindo = doTipo(t.arvore, 'Botao').find((b) => /^Imprimir/.test(texto(b))).props.onClick()
+  const etiquetas = doTipo(t.arvore, 'BotaoIcone').find((b) => b.props.rotulo === 'Etiquetas do lote LOT-261011-001')
+  assert.equal(etiquetas.props.dica, 'Etiquetas')
+  const imprimindo = etiquetas.props.onClick()
   for (let i = 0; i < 50 && !entregar; i += 1) await esperar(0)
   t.desmontar()
   entregar()

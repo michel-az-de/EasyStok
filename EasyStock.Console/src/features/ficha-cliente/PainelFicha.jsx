@@ -185,7 +185,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
 
         {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
         <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={() => setSecao('cliente')}
-          aoVerEntrega={pedido ? () => setSecao('pedido') : undefined} />
+          aoVerEntrega={pedidoCriado ? () => setSecao('pedido') : undefined} />
 
         {editavel && comandaCompartilhada}
         {/* #1686 (item 3): pedido entregue ou cancelado, a mesma conversa começa outra compra. */}
@@ -247,7 +247,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           faixa={faixa}
           bloqueado={estaBloqueada(selecionada)}
           conversaId={selecionada.id}
-          numeroComanda={numero}
+          numeroComanda={pedidoCriado ? numero : null}
           clienteEscolhendo={clienteEscolhendo}
           simulacao={simulacao}
         />

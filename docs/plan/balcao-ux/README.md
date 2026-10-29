@@ -313,3 +313,24 @@ No navegador, as telas de Produção, consultas de insumos/receitas, Planejament
 - Integrações externas permaneceram falsas, stub ou desligadas: o teste não comprova Mercado Pago real, Meta/WhatsApp, SMS, e-mail externo, LLM, Google Maps ou Lalamove. Android físico e impressão física continuam fora desta homologação. O ambiente publicado recebeu somente a inspeção de consulta da seção 11.
 
 Evidências, roteiros locais, respostas e capturas em `.build/harmonia-ux/lab-real/`, ignorados pelo Git. O aceite técnico desta etapa é para revisão do PR; o aceite estético do Felipe e o merge/publicação são etapas posteriores.
+
+## 13. Atendimento, ficha e Gestão reconstruídos (29/10/2026)
+
+Superfícies quadradas, sem contornos decorativos; ações contextuais, Respostas em dropdown e Mais ferramentas. A tipografia da casa permanece na interface. Caveat é embarcada com sua licença OFL apenas nos post-its e apontamentos da comanda de papel, sem dependência nova. As denominações passam a Ficha, Pedido e entrega, itens e Cobrança pendente. O sinal discreto da cobrança respeita movimento reduzido, sem alterar o estado financeiro.
+
+Gestão abre com busca de tarefas permitidas para a sessão. Entrar numa tarefa transfere o foco ao painel; voltar transfere à busca. Reabrir Gestão retorna à entrada. Etiquetas usa BotaoIcone compartilhado com nome acessível, bloqueios e impressão preservados. Notas internas só viram post-its após confirmação da API. Podem ser soltas na tela, arrastadas, movidas por setas, restauradas e recolhidas. O armazenamento local guarda apenas coordenadas por conversa/nota, sem texto nem autor.
+
+A ficha reúne contato, tags, endereço, notas e histórico. A foto possui GET/POST/DELETE autenticados, validação do conteúdo, reprocessamento em JPEG de até 512 px e armazenamento privado. Não se presume foto de perfil no webhook da Meta. Calcular frete reutiliza o cálculo da vitrine da empresa da sessão, com endereço salvo e sem criar pedido. Fora da cobertura exige combinação, sem cotação falsa de zero. Pedido já criado abre a entrega existente; rascunho consulta o frete independentemente.
+
+Baixar PDF produz arquivo pelo servidor com foto privada, cadastro, compras, notas, conversas, data no fuso operacional e paginação. O teste HTTP descobriu erro com foto retangular; a correção preserva proporção. Também foi corrigido o singular de pedido. A migration `20261029052346_AddFotoCliente` adiciona somente a coluna opcional da chave privada. O snapshot gerado atualiza metadados preexistentes de push, sem DDL de push nesta migration. Aplicação e comparação do modelo verificadas no PostgreSQL descartável.
+
+### Evidência técnica
+
+- Qualidade do Console aprovada: lint, camadas, moeda, contraste e build. Os 102 comandos Node do workflow foram executados: 101 diretos e um grupo de três arquivos com 14 testes TAP. Cinco provas foram adaptadas aos novos contratos visuais/acessíveis e passaram na reexecução; falhas originais e logs foram preservados. A prova 2146 passou em três verificações; seu trecho opcional Chromium não foi executado neste ambiente.
+- Gate aprovado: build .NET e 60 testes de arquitetura. Testes focais de foto, processamento, acesso, frete e PDF aprovados. O renderizador cobre imagens quadradas, horizontais, verticais e ficha extensa com paginação.
+- HTTP real: foto com 28 verificações; frete com 19 requisições e nove verificações; PDF com 12 verificações. A matriz nova executou 58 requisições e 79 verificações nos perfis Dona, Atendimento e Cozinha, incluindo 14 recusas e refresh mantendo permissões.
+- O navegador cadastrou uma foto sintética e baixou o PDF correspondente. Arquivo aberto e renderizado: uma página, imagem incorporada, endereço, pedido e nota confirmados, sem cortes. Post-it moveu por teclado e arraste real, com posição conferida após recarga. Busca, foco e reabertura da Gestão e cotação real de R$ 12,00 também foram conferidos pela interface.
+
+Laboratório em loopback: API 18740, PostgreSQL 55740, frontend 5194. Evidências ignoradas em `.build/harmonia-ux/reconstrucao/` e `.build/harmonia-ux/lab-real/`. A divergência preexistente de EmpresaId explícito (403 em vez de 400) permanece na seção 12, com acesso negado e dados intactos. Integrações externas reais, Android físico e impressão física não foram homologados. Produção recebeu somente a inspeção de consulta da seção 11.
+
+Aceite técnico para revisão depende dos checks do commit final e da integração com o master atual. Aceite visual do Felipe, merge e publicação são etapas posteriores.

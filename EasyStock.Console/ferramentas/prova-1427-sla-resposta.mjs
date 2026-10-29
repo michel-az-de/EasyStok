@@ -174,7 +174,11 @@ confere('o cartão ganha a classe de pisca só com o SLA estourado', () => {
 
 confere('prazo vencido mantém destaque estático sem piscar sobre a seleção', () => {
   const folha = readFileSync(new URL('../src/features/caixa-de-entrada/caixa.module.css', import.meta.url), 'utf8')
-  assert.match(folha, /\.cartao\.slaEstourado\s*\{[^}]*box-shadow:[^}]*var\(--erro\)/)
+  assert.match(folha, /\.cartao\.slaEstourado \.avatarCartao::after\s*\{[^}]*content:\s*'!'/)
+  assert.match(folha, /\.cartao\.slaEstourado \.avatarCartao::after\s*\{[^}]*background:\s*var\(--erro\)/)
+  const cartao = readFileSync(new URL('../src/features/caixa-de-entrada/CartaoConversa.jsx', import.meta.url), 'utf8')
+  assert.match(cartao, /slaEstourado && <span className="sr">, prazo de resposta estourado<\/span>/)
+  assert.doesNotMatch(folha, /\[aria-current='true'\][^{]*\.avatarCartao::after\s*\{[^}]*(?:display:\s*none|visibility:\s*hidden|content:\s*(?:none|''|""))/)
   assert.doesNotMatch(folha, /piscaSla|infinite/)
   assert.match(folha, /\.cartao\[aria-current='true'\]\s*\{[^}]*background:\s*var\(--preenchimento-forte\)/)
 })

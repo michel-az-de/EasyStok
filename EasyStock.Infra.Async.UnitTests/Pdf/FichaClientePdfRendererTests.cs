@@ -1,4 +1,5 @@
 using System.Text;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Application.UseCases.ClienteCrm;
 using EasyStock.Infra.Async.Pdf;
@@ -15,7 +16,9 @@ public sealed class FichaClientePdfRendererTests
             extensa ? string.Join(" ", Enumerable.Repeat("Observação longa para conferir paginação legível.", 70))
                 : "<script>alert('texto privado')</script> · Prefere retirar no sábado.",
             "Ana", null, null, Consulta)).ToArray(),
-        [], null, null, 0, false, null, [], [], null);
+        Enumerable.Range(0, extensa ? 2 : 1).Select(_ => new PedidoResumoCliente(Guid.NewGuid(), "entregue", Consulta, 38,
+            [new("Ravióli", 1)])).ToArray(), null, Consulta, extensa ? 2 : 1, false, null, [], [], null,
+        TotalGasto: extensa ? 76 : 38);
 
     [Theory]
     [InlineData(false)]

@@ -695,8 +695,10 @@ await confere('4. "ao vivo" do KDS anima só opacity/transform; SLA vencido cons
   const folha = folhaDe('features/caixa-de-entrada/caixa.module.css')
   assert.equal(quadrosDe(folha, 'piscaSla'), null, 'SLA vencido não pisca sobre a conversa selecionada')
   assert.doesNotMatch(folha, /\.slaEstourado[^{}]*\{[^}]*animation/, 'o alerta de prazo permanece estático')
-  assert.match(regraDe(folha, '.cartao.slaEstourado'), /box-shadow:\s*inset 3px 0 0 var\(--erro\)/, 'o prazo vencido continua visível')
-  assert.match(folha, /\.cartao\.slaEstourado\[aria-current='true'\]\s*\{\s*box-shadow:\s*inset 3px 0 0 var\(--erro\)/, 'selecionar a conversa preserva o alerta')
+  assert.match(folha, /\.cartao\.slaEstourado \.avatarCartao::after\s*\{[^}]*content:\s*'!'/, 'o prazo vencido tem marcador visível no avatar')
+  assert.match(folha, /\.cartao\.slaEstourado \.avatarCartao::after\s*\{[^}]*background:\s*var\(--erro\)/, 'o marcador usa o tom de perigo')
+  assert.match(folhaDe('features/caixa-de-entrada/CartaoConversa.jsx'), /slaEstourado && <span className="sr">, prazo de resposta estourado<\/span>/, 'o prazo vencido também é anunciado ao leitor de tela')
+  assert.doesNotMatch(folha, /\[aria-current='true'\][^{]*\.avatarCartao::after\s*\{[^}]*(?:display:\s*none|visibility:\s*hidden|content:\s*(?:none|''|""))/, 'selecionar a conversa não esconde o marcador')
 })
 
 await confere('4. topo e rodapé da moldura sem desfoque de fundo; o botão flutuante mantém', () => {

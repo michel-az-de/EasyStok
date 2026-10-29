@@ -224,7 +224,7 @@ function Composicao({ rota }) {
         aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
         aoAbrirCardapio={() => setModal('cardapio')}
         aoAbrirAutomacoes={() => setModal('automacoes')}
-        aoAbrirGestao={() => setModal('gestao')}
+        aoAbrirGestao={() => { setAbaGestao(null); setModal('gestao') }}
         aoAbrirEntregas={() => setModal('entregas')}
         aoAbrirAjuda={() => setModal('ajuda')}
         simulando={simulando}

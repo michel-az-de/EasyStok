@@ -48,7 +48,7 @@ public sealed class FichaClientePdfRenderer : IFichaClientePdfRenderer
                     Campo(col, "Referência", endereco.Referencia);
                 }
                 Titulo(col, "Compras");
-                col.Item().Text($"{dossie.TotalPedidos} pedidos no cadastro · {dossie.TotalGasto.ToString("C", PtBr)} em compras");
+                col.Item().Text($"{dossie.TotalPedidos} {(dossie.TotalPedidos == 1 ? "pedido" : "pedidos")} no cadastro · {dossie.TotalGasto.ToString("C", PtBr)} em compras");
                 if (dossie.ItemFavorito is { } favorito) Campo(col, "Item mais pedido", favorito.Nome);
                 Titulo(col, "Pedidos recentes");
                 if (dossie.UltimosPedidos.Count == 0) col.Item().Text("Nenhum pedido registrado.");
