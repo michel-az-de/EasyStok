@@ -226,7 +226,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
     >
       {lead ? (
         <p className={css.faixaLead}>
-          Lead desde {quandoRelativo(diasEntre(conversa.mensagens[0]?.em ?? agora, agora))} · nenhum pedido
+          Contato desde {quandoRelativo(diasEntre(conversa.mensagens[0]?.em ?? agora, agora))} · nenhum pedido
         </p>
       ) : (
         <div className={css.faixaNumeros}>

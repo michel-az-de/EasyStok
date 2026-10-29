@@ -226,7 +226,7 @@ export function avisoDoPedidoAoEncerrar(conversa, { fonteApi = false } = {}) {
 
 export const ROTULO_CONVERTEU = {
   sim: 'Sim',
-  nao: 'Não, segue lead',
+  nao: 'Ainda não comprou',
   'ja-cliente': 'Já era cliente',
 }
 

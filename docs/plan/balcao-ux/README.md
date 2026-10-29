@@ -275,4 +275,40 @@ Ambiente: `https://app.easystok.online/`. A sessão autenticada disponível carr
 - A captura inicial nomeada 390 tinha 365 px e recorte. Foi preservada com nome explícito de captura incompleta e substituída por evidência real de 390 x 844. Manifesto local com dimensões e SHA-256 em `.build/harmonia-ux/producao/manifesto.json`; imagens e dados da loja permanecem fora do Git.
 - A bateria completa do workflow do Console voltou a passar: 97 scripts. As expectativas adaptadas de nomenclatura mantêm permissões, rascunhos, quantidades e idempotência.
 
-Permanecem abertos o aceite visual, a validação do candidato no ambiente de API e os demais perfis e estados operacionais. Esta continuação não autoriza merge ou publicação.
+Ao fim desta etapa permaneciam abertos o aceite visual, a validação do candidato no ambiente de API e os demais perfis e estados operacionais. A homologação local desses perfis continua na seção 12. Esta continuação não autoriza merge ou publicação.
+
+## 12. Homologação com API e perfis reais (#2140, 29/10/2026)
+
+Ambiente descartável exclusivo, sem dados ou credenciais de produção: API `127.0.0.1:18740`, PostgreSQL 17 `127.0.0.1:55740`, Console em build de produção com fonte `api` em `127.0.0.1:5194` e Mercado Pago falso em `127.0.0.1:18741`. Todos os listeners conferidos em loopback. API e Worker compilados após integrar `origin/master`, SHA `cdcec245f7305aaf58d5d130c97e47885aa8a31d`, confirmado por `/health/version`; `/health/ready` respondeu 200. Os complementos posteriores alteram apenas o Console e este registro.
+
+Os três usuários de teste foram criados por HTTP e vinculados explicitamente aos perfis canônicos Dona, Atendimento e Cozinha. As permissões foram extraídas da DLL do candidato e relidas no banco: 19, 7 e 3 respectivamente. Os usuários demo legados não substituem essa matriz.
+
+| Prova | Resultado |
+|---|---|
+| `onda1-perfis-http.ps1` | 70 verificações: login, módulos, entrada, capacidades, consultas permitidas, recusas de escrita e refresh dos três perfis |
+| `jornada_pedido_a_dinheiro.py` | 28 passos: três clientes pelo chat do site, cadastro/endereço, prévia e pedido, link de pagamento com webhook falso, cartão, dinheiro, KDS, entrega e fechamento do caixa |
+| Cardápio e Produção por HTTP | 28 requisições com status esperado e 13 verificações: cadastro/edição de categoria e prato, persistência, produção pela Cozinha, idempotência, contagem, perda e saldo; massa própria arquivada/ocultada ao fim |
+| Receitas, custos e planejamento por HTTP | 23 requisições e 11 verificações: insumo a R$ 3,00, receita de 2 porções com 4 unidades, custo de R$ 6,00/porção; Dona e Cozinha calculam 6 porções com 12 unidades necessárias e R$ 36,00; escritas gerenciais da Cozinha recusadas e quantidade zero validada |
+| Isolamento entre empresas | 13 verificações: EmpresaId divergente recusado; IDs de produto da outra empresa não consultáveis/alteráveis; produto e caixa da empresa B intactos |
+| Interface com login real | Dona cadastra prato e conclui conversa; Atendimento ajusta disponibilidade e relê após recarregar; Cozinha registra lote e visualiza etiqueta e saldo; rota administrativa bloqueada |
+
+Na jornada, a gaveta terminou em R$ 188,00: abertura de R$ 100,00 e pagamento em dinheiro de R$ 88,00. Pix e cartão somaram R$ 100,00 fora da gaveta; total do caixa de R$ 288,00. Dados relidos após o fechamento.
+
+No navegador, as telas de Produção, consultas de insumos/receitas, Planejamento, Perdas, Caixa, Entregas, Agenda, Canais, Integrações, Impressão, Usuários e Histórico de acesso foram carregadas com API real. Conferidos os estados de consulta da Cozinha e Atendimento, navegação móvel, tema claro/escuro, preservação do rascunho entre Conversa e Cliente e ausência de transbordamento horizontal em 320 px. A etiqueta foi visualizada; não houve impressão física.
+
+### Correções encontradas durante a homologação
+
+- Removido o jargão Lead do resumo e do histórico. Contato sem cadastro conserva o fato conhecido sem presumir que um histórico ainda não consultado não tenha compras.
+- O menu móvel de Gestão deixa de citar Balcão; Receitas apresenta descrição neutra para perfis de consulta e mostra Rende 1 porção no singular.
+- Os botões de metadados da mensagem, incluindo automática, mediam 19 px em 320 px. Agora usam o mesmo token de alvo dos controles: 40 px no desktop e 48 px no toque. Mantidas a ação de abrir a definição, a identificação da origem e a possibilidade de reenviar.
+
+### Revisão e limites
+
+- `npm run qualidade` aprovado após os ajustes: lint, camadas, moeda, 264 pares de contraste e build. O workflow completo contém 98 comandos Node: 97 scripts diretos e um grupo de três arquivos `node --test`, com 14 testes aprovados. Todos passaram nesta execução.
+- Gate final do repositório: build .NET e 60 testes de arquitetura aprovados.
+- A contrabanca revisou as correções, contestou a afirmação Contato sem compras e conferiu a abrangência do CSS. A prova de renderização adicional passou em 39 verificações.
+- No isolamento medido, o filtro de EmpresaId divergente retorna 403, embora a instrução do projeto peça 400. O acesso foi negado e os dados ficaram intactos. É uma discrepância preexistente de contrato, sem alteração de autorização neste PR.
+- A prova extra #1839, fora do workflow, conserva uma asserção de fonte desatualizada sobre `aDevolver`, reproduzida no HEAD anterior; não foi modificada. Mantido também o registro da prova antiga #1870 da seção 10.
+- Integrações externas permaneceram falsas, stub ou desligadas: o teste não comprova Mercado Pago real, Meta/WhatsApp, SMS, e-mail externo, LLM, Google Maps ou Lalamove. Android físico e impressão física continuam fora desta homologação. O ambiente publicado recebeu somente a inspeção de consulta da seção 11.
+
+Evidências, roteiros locais, respostas e capturas em `.build/harmonia-ux/lab-real/`, ignorados pelo Git. O aceite técnico desta etapa é para revisão do PR; o aceite estético do Felipe e o merge/publicação são etapas posteriores.

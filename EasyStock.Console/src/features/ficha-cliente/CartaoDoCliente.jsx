@@ -17,7 +17,7 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir }) {
     ? [`${pedidos} ${pedidos === 1 ? 'pedido' : 'pedidos'} no total`,
       cliente.totalGasto > 0 ? `${moeda(cliente.totalGasto)} em compras` : null,
       cliente.favorito ? `costuma pedir ${cliente.favorito}` : null].filter(Boolean).join(' · ')
-    : lead ? 'Lead: ainda sem cadastro' : dossieLido || !fonteApi ? 'Ainda não comprou com a casa' : null
+    : lead ? 'Contato sem cadastro' : dossieLido || !fonteApi ? 'Ainda não comprou com a casa' : null
   // #1920: a IA devolve a frase com ponto final ("Ainda não comprou com a casa."); comparar sem a
   // pontuação do fim para o cartão não repetir a mesma frase em duas linhas.
   const mesmaFrase = (a, b) => Boolean(a && b) && a.trim().replace(/[.!]+$/, '') === b.trim().replace(/[.!]+$/, '')

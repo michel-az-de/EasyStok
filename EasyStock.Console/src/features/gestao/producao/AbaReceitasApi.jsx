@@ -58,7 +58,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
 
   if (!podeEditar) return (
     <section className={css.aba} aria-label={`Receita de ${prato.nome}`}>
-      <p className={css.nome}>Rende {detalhe.rendimento} {rotuloDoRendimento(detalhe.unidadeRendimento)}</p>
+      <p className={css.nome}>Rende {detalhe.rendimento} {detalhe.unidadeRendimento === 'Un' && Number(detalhe.rendimento) === 1 ? 'porção' : rotuloDoRendimento(detalhe.unidadeRendimento)}</p>
       {detalhe.linhas.length === 0 ? <p className={css.descricao}>Receita ainda sem insumos cadastrados.</p> : (
         <ul className={css.lista}>
           {detalhe.linhas.map((l) => <li key={l.insumoId} className={css.linha}>
@@ -177,7 +177,7 @@ export function AbaReceitasApi() {
         {' '}<Botao variante="texto" icone="refresh-cw" onClick={gestao.recarregar}>Recarregar receitas</Botao>
       </p>}
       <p className={css.descricao}>
-        Cadastre rendimento e insumos para estimar o custo por porção. Os pratos aparecem após o primeiro registro em
+        Rendimento e insumos para estimar o custo por porção. Os pratos aparecem após o primeiro registro em
         {' '}<a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.
       </p>
       {!podeEditar && <p className={css.descricao}>Seu perfil permite apenas consultar as receitas.</p>}

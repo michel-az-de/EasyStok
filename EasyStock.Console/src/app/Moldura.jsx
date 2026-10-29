@@ -102,7 +102,7 @@ function MenuMais({
         // Automáticas, e a 390 px isso empurrava "Mais" para fora da tela.
         // O botão saiu do topo; o caminho para Gestão no celular/tablet
         // estreito passa a ser só por aqui.
-        { chave: '__gestao', titulo: 'Gestão', detalhe: 'Cardápio, produção e caixa sem sair do Balcão' },
+        { chave: '__gestao', titulo: 'Gestão', detalhe: 'Cardápio, produção e caixa' },
       ].filter((item) => item.chave !== '__entregas' || permite('entregas')),
     },
     { titulo: 'Ajuda', itens: [{ chave: '__ajuda', titulo: 'Ajuda do sistema', detalhe: 'O que cada módulo faz, primeiros passos e diagnóstico' }] },

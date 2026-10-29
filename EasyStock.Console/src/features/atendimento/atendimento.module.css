@@ -183,11 +183,10 @@
 }
 
 .selo { display: inline-flex; align-items: center; gap: 3px; }
-/* Item D (banca 10): a etiqueta "automática" virou botão (abre a definição),
-   sem parecer um botão de verdade — mesma cor e tamanho de antes, só com
-   sublinhado sutil para dizer que é clicável. */
+/* A etiqueta abre a definição e compartilha o alvo mínimo dos outros controles. */
 .seloBotao {
   border: 0; background: transparent; padding: 0; margin: 0; font: inherit; color: inherit;
+  min-width: var(--toque); min-height: var(--toque);
   cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
 }
 .seloBotao:hover, .seloBotao:focus-visible { color: var(--tinta); }
