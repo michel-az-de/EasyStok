@@ -216,10 +216,11 @@ function Composicao({ rota }) {
       <div className={css.areaAtendimento} data-conteudo-console>
       <Moldura
         tamanho={tamanho}
-        aoAbrirNota={() => {
-          if (selecionada) setNota((atual) => atual ?? { id: selecionada.id, nome: selecionada.nome })
+        aoAbrirNota={(texto) => {
+          if (selecionada) setNota((atual) => atual ?? { id: selecionada.id, nome: selecionada.nome, textoInicial: typeof texto === 'string' ? texto : '' })
           setModal('nota')
         }}
+        aoRascunho={(texto) => { if (selecionada && typeof texto === 'string') definirRascunho(selecionada.id, texto) }}
         aoAbrirGaleria={() => setModal('galeria')}
         aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
         aoAbrirCardapio={() => setModal('cardapio')}
@@ -242,6 +243,7 @@ function Composicao({ rota }) {
         <ModalNota
           visivel={modal === 'nota'}
           nomeCliente={nota.nome}
+          textoInicial={nota.textoInicial ?? ''}
           outraConversa={selecionada?.id !== nota.id}
           aoFechar={() => { setNota(null); setModal((atual) => atual === 'nota' ? null : atual) }}
           aoSalvar={(texto) => salvarNota(nota.id, texto)}

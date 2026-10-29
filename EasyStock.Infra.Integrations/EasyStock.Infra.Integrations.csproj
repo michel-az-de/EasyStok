@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <Description>Adapters de integração externa (pagamentos, fiscal, marketplace, logística) com pipelines de resiliência Polly e helpers de keyed DI. Implementa portas definidas em EasyStock.Application.Ports.Output.Integration.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="EasyStock.Infra.Integrations.UnitTests" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Polly v8 e Resilience extensions: pipelines de retry/circuit-breaker/timeout

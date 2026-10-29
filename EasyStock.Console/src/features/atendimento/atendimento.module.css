@@ -102,7 +102,7 @@
 .entrada {
   align-self: flex-start; background: var(--papel); border: 0;
   border-radius: var(--r-1);
-  box-shadow: 0 1px 2px light-dark(rgba(48, 32, 16, .08), rgba(0, 0, 0, .4)), 0 0 0 1px var(--linha);
+  box-shadow: 0 1px 2px light-dark(rgba(48, 32, 16, .08), rgba(0, 0, 0, .4));
 }
 .saida {
   align-self: flex-end; background: var(--marca-claro); color: var(--tinta);
@@ -366,13 +366,10 @@
 
 /* Rodada 6d (banca estética, item 1): dois tons só. Recebida em papel, a
    dela e a do automático na tinta clara da marca (o selo "automática" é que
-   diz quem mandou). Cauda, o canto de 6 px, só na bolha que troca de quem
-   fala; as seguintes do mesmo lado ficam redondas. Aviso do sistema vira
+   diz quem mandou). Aviso do sistema vira
    texto centralizado, sem caixa. */
 .entrada { border-radius: var(--r-2); }
 .saida { border-radius: var(--r-2); }
-.entrada.trocaDeVoz { border-top-left-radius: 6px; }
-.saida.trocaDeVoz { border-top-right-radius: 6px; }
 .saida.doAutomatico { background: var(--marca-claro); }
 .sistema {
   background: transparent; box-shadow: none; color: var(--tinta-3);

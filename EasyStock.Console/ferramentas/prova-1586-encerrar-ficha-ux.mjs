@@ -66,7 +66,7 @@ globalThis.__prova1586 = ctx
 
 const codigo = (texto) => 'data:text/javascript,' + encodeURIComponent(texto)
 const REACT = 'const h=globalThis.__prova1586.hooks; export const useState=h.useState,useRef=h.useRef,useId=h.useId,'
-  + 'useMemo=h.useMemo,useEffect=h.useEffect,useLayoutEffect=h.useEffect,useCallback=(f)=>f,forwardRef=(f)=>f,memo=(f)=>f'
+  + 'useMemo=h.useMemo,useEffect=h.useEffect,useLayoutEffect=h.useEffect,useCallback=(f)=>f,forwardRef=(f)=>f,memo=(f)=>f,createContext=(defaultValue)=>({defaultValue}),useContext=(c)=>c.defaultValue'
 const fronteiras = new Map([
   ['/aplicacao/contextos', 'const c=globalThis.__prova1586; export const useAtendimento=()=>c.atendimento, useCatalogo=()=>c.catalogo, useAcoes=()=>c.acoes'],
   ['/aplicacao/acessoModulos', 'export const useAcessoModulos=()=>({acoes:{cancelarPedidoPago:true}})'],

@@ -21,6 +21,7 @@ import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
 import { CompartilharComanda } from '../features/atendimento/CompartilharComanda'
 import { ChamarClientes } from '../features/atendimento/ChamarClientes'
 import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
+import { MesaDeNotas } from '../features/ficha-cliente/MesaDeNotas'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
 import { Popover } from '../componentes/Popover'
@@ -415,9 +416,13 @@ function BotaoSimular({ ativo, aoAlternar }) {
 }
 
 // Três arranjos para o mesmo conteúdo. Os painéis não sabem em qual estão.
-export function Moldura({
+export function Moldura(props) {
+  return <MesaDeNotas><ConteudoMoldura {...props} /></MesaDeNotas>
+}
+
+function ConteudoMoldura({
   tamanho, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca, aoAbrirCardapio, aoAbrirAutomacoes, aoAbrirGestao,
-  aoAbrirEntregas, aoAbrirAjuda, simulando, aoAlternarSimulacoes, larguras, largurasPadrao = larguras, aoRedimensionar, cardapioAberto = null,
+  aoAbrirEntregas, aoAbrirAjuda, aoRascunho, simulando, aoAlternarSimulacoes, larguras, largurasPadrao = larguras, aoRedimensionar, cardapioAberto = null,
 }) {
   const {
     visiveis, selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
@@ -541,7 +546,7 @@ export function Moldura({
             aoMudar={(valor) => aoRedimensionar('ficha', valor)}
           />
           <Coluna variante="ficha" titulo="Ficha" semTitulo>
-            <div className={css.painelFicha}><LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro></div>
+            <div className={css.painelFicha}><LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro></div>
             {/* #1474: lugar da fila de canhotos (FilaCanhotos), no pé da Ficha e no fluxo da
                 coluna: a pílula não cobre mais o título nem o topo da coluna. Vazio, não ocupa. */}
             <div className={css.slotFila} data-fila-canhotos="" />
@@ -564,7 +569,7 @@ export function Moldura({
           <section className={`${css.coluna} ${css.centro}`} aria-label="Conversa">{atendimento}</section>
           {gavetaAberta && (
             <Gaveta titulo="Ficha" aoFechar={fecharGaveta}>
-              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>
+              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>
             </Gaveta>
           )}
         </main>
@@ -582,7 +587,7 @@ export function Moldura({
   const painelDaAba = {
     balcao: <LimiteDeErro parte="Lista de conversas"><PainelConversas aoAbrir={irParaAtendimento} buscaDeClientes={ChamarClientes} /></LimiteDeErro>,
     atendimento,
-    ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>,
+    ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>,
   }
 
   return (

@@ -5,8 +5,8 @@ import css from './ModalNota.module.css'
 
 // #1839: a nota abre como um post-it pequeno logo acima do composer, sem cobrir a conversa. Esc fecha,
 // Ctrl+Enter salva. Salva, ela fica fixa no topo do Resumo, junto das tags e do cadastro.
-export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, outraConversa = false }) {
-  const [texto, setTexto] = useState('')
+export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, outraConversa = false, textoInicial = '' }) {
+  const [texto, setTexto] = useState(textoInicial)
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState(null)
   const salvando = useRef(false)

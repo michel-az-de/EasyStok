@@ -44,6 +44,9 @@ jobs:
       - run: node ferramentas/prova-foto-cliente.mjs
       - run: node ferramentas/prova-ficha-cliente-pdf.mjs
       - run: node ferramentas/prova-postits-cliente.mjs
+      - run: node ferramentas/prova-painel-movel.mjs
+      - run: node ferramentas/prova-ficha-colaborativa-ia.mjs
+      - run: node ferramentas/prova-mapa-viagem.mjs
       - run: node ferramentas/prova-1683-operacao.mjs
       - run: node ferramentas/prova-1420-sugestao-agente-api.mjs
       - run: node ferramentas/prova-1432-atendimento-email.mjs

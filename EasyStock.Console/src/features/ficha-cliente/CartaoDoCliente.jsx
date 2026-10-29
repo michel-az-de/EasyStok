@@ -7,11 +7,12 @@ import { ConsultaFreteCliente } from './ConsultaFreteCliente'
 import { NotasDoCliente } from './NotasDoCliente'
 import { moeda } from '../../dominio/formato'
 import css from './ficha.module.css'
+import notasCss from './NotasDoCliente.module.css'
 
 // #1839: o que se vê sempre no Resumo, sem abrir nada: quem é o cliente (resumo da IA), quanto já
 // comprou no total, o que costuma pedir, as tags e a última nota interna como post-it. O resto
 // (endereço, histórico, conversas) segue em "Cliente e histórico".
-export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVerEntrega }) {
+export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVerEntrega, aoCriarNota, aoConsultarFrete, aoVerAoLado, focoFrete }) {
   const { cliente } = conversa
   const fotoCadastro = useFotoCliente(cliente.fotoUrl)
   const [freteAberto, setFreteAberto] = useState(false)
@@ -47,17 +48,23 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
         {resumo.carregando && <span className={css.resumoIaCarregando}>Lendo o histórico do cliente…</span>}
         {numeros && <span className={css.numerosCliente}>{numeros}</span>}
       </button>
-      {aoVerEntrega && <Botao className={css.freteCliente} variante="texto" icone="moto" aria-label="Ver frete e entrega" onClick={aoVerEntrega}>Frete</Botao>}
-      {!aoVerEntrega && fonteApi && conversa.clienteId && (cliente.endereco
-        ? <Botao className={css.freteCliente} variante="texto" icone="moto" onClick={() => setFreteAberto(true)}>Calcular frete</Botao>
-        : <Botao variante="texto" icone="map-pin" onClick={aoAbrir}>Adicionar endereço</Botao>)}
+      <div className={notasCss.acoesCliente}>
+        {aoCriarNota && <Botao variante="texto" icone="plus" aria-label="Adicionar nota" onClick={aoCriarNota}
+          disabled={fonteApi && !conversa.clienteId} title={fonteApi && !conversa.clienteId ? 'Cadastre o cliente para adicionar uma nota.' : undefined}>Nota</Botao>}
+        {aoVerEntrega
+          ? <Botao data-foco-reserva={focoFrete} className={css.freteCliente} variante="texto" icone="moto" aria-label="Ver frete e entrega" onClick={aoConsultarFrete ?? aoVerEntrega}>Frete</Botao>
+          : fonteApi && conversa.clienteId && cliente.endereco ? <Botao data-foco-reserva={focoFrete} className={css.freteCliente} variante="texto" icone="moto" onClick={aoConsultarFrete ?? (() => setFreteAberto(true))}>Calcular frete</Botao>
+            : fonteApi && conversa.clienteId && <Botao variante="texto" icone="map-pin" onClick={aoAbrir}>Adicionar endereço</Botao>}
+      </div>
       {tags.length > 0 && (
         <ul className={css.tagsCliente} aria-label="Tags do cliente">
           {tags.map((t) => <li key={t}>{t}</li>)}
         </ul>
       )}
-      <NotasDoCliente key={conversa.id} conversaId={conversa.id} notas={cliente.notas ?? []} />
+      <NotasDoCliente key={conversa.id} conversaId={conversa.id} clienteId={conversa.clienteId ?? conversa.id}
+        clienteNome={conversa.nome} fonteApi={fonteApi && Boolean(conversa.clienteId)} notas={cliente.notas ?? []} />
       {freteAberto && <ConsultaFreteCliente conversa={conversa} aoFechar={() => setFreteAberto(false)}
+        aoVerAoLado={aoVerAoLado ? (dados) => { setFreteAberto(false); aoVerAoLado(dados) } : undefined}
         aoEditarEndereco={() => { setFreteAberto(false); aoAbrir() }} />}
     </section>
   )
