@@ -60,7 +60,7 @@ function provar(nome, fn) { fn(); total++; console.log('ok ' + nome) }
 for (const estado of ['aguardando', 'pago', 'entregue', 'cancelado']) {
   provar(`encerrado com pedido ${estado}: não exibe valores, itens, comanda compartilhada ou ações de venda`, () => {
     const html = renderizar({ estado: 'Encerrado', pedido: { ...pedido, estado } })
-    assert.match(html, /Atendimento encerrado/)
+    assert.match(html, /Conversa concluída/)
     assert.match(html, /Consultar pedido vinculado/)
     assert.match(html, /Cliente e histórico/)
     assert.doesNotMatch(html, /Lasanha|4321|R\$|Comanda compartilhada|Pagamento completo|Gerar cobrança|Começar preparo|Revisar seleção/)
@@ -74,7 +74,7 @@ provar('encerrado sem pedido permite histórico sem inventar uma venda', () => {
 })
 provar('lead sem compra abre antes da venda e aponta cadastro incompleto', () => {
   const html = renderizar({ conta: 'lead', clienteId: null, pedido: null, cliente: { tags: [], notas: [] } }, false)
-  assert.match(html, /Antes da venda|Vamos atender Ana/)
+  assert.match(html, /Antes da venda|Pedido de Ana/)
   assert.match(html, /Adicionar itens/)
   assert.match(html, /Conferir cadastro e endereço/)
   assert.doesNotMatch(html, /Pós-venda|Pedido e entrega|Pagamento completo/)
@@ -98,13 +98,13 @@ for (const estado of ['entregue', 'cancelado']) {
 }
 provar('cliente seguinte não herda nome, comanda nem saldo do anterior', () => {
   const html = renderizar({ id: 'bruno', nome: 'Bruno Lima', pedido: null })
-  assert.match(html, /Vamos atender Bruno/)
+  assert.match(html, /Pedido de Bruno/)
   assert.doesNotMatch(html, /Ana|4321|43,00|81,00/)
 })
 for (const fonteApi of [true, false]) provar(`seleção local ${fonteApi ? 'API' : 'demo'} não aparece como pedido criado ou pagamento pendente`, () => {
   const html = renderizar({ pedido: { numero: 'local', estado: 'aguardando', itens: [{ sku: 'lasanha', qtd: 1 }] } }, fonteApi)
   assert.match(html, /Antes da venda/)
-  assert.match(html, /Seleção não confirmada/)
+  assert.match(html, /Pedido em montagem/)
   assert.match(html, /Seleção do atendimento/)
   assert.doesNotMatch(html, /Pedido criado|Pedido e entrega|Pagamento completo|a receber|Ocorrências e devoluções/)
 })

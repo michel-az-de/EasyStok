@@ -109,7 +109,7 @@ confere('3  Enter na alça restaura o padrão da tela, não o padrão fixo antig
   assert.match(fonte('hooks/useLarguras.js'), /padrao: padraoPorTela\(tela\)/)
 })
 confere('2  com pedido criado, o convite do link fica só com o botão, sem o parágrafo de explicação', () => {
-  assert.match(fonte('features/ficha-cliente/ComandaDoCliente.jsx'), /\{!visiveis\.length && !erro && !pedido\?\.pedidoId && <p>Compartilhe com o cliente/)
+  assert.match(fonte('features/ficha-cliente/ComandaDoCliente.jsx'), /\{!visiveis\.length && !erro && !pedido\?\.pedidoId && <p>Envie o cardápio ao cliente/)
 })
 
 // --- 3. Larguras -------------------------------------------------------------------------------

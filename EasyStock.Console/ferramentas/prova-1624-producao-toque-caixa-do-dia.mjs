@@ -740,7 +740,7 @@ await confere('Caixa do dia: quem não é gerente não vê fechar nem estornar; 
   const botoes = (t) => doTipo(t.arvore, 'Botao').map(texto)
   assert.ok(botoes(operador).includes('Lançamento'))
   assert.ok(!botoes(operador).some((b) => /Fechar o caixa|Estornar/.test(b)), 'fechar e estornar são da dona ou gerente')
-  assert.match(limpo(operador.arvore), /ficam com a dona ou gerente/)
+  assert.match(limpo(operador.arvore), /Somente a gerência pode fechar o caixa e estornar lançamentos\./)
   operador.desmontar()
   g.acesso = gerente()
   g.caixa = caixaCom(dia({ aberto: true, fechado: true, saldoInicial: 100, totalEntradasExtras: 20, saldoEsperado: 120, movimentos,
@@ -1181,7 +1181,7 @@ await confere('#2113 B1: a operadora vê o aviso da abertura a confirmar, sem ca
   const t = montar(AbaCaixaApi)
   await t.assentar()
   assert.match(limpo(t.arvore), /abriu sozinho no primeiro pagamento em dinheiro/)
-  assert.match(limpo(t.arvore), /A gerente ou a dona conta a gaveta e confirma a abertura\./)
+  assert.match(limpo(t.arvore), /Peça à gerência para contar a gaveta e confirmar a abertura\./)
   assert.equal(andar(t.arvore, (n) => n.type === 'CampoReais').length, 0)
   assert.ok(!doTipo(t.arvore, 'Botao').some((b) => texto(b) === 'Confirmar abertura'))
 })

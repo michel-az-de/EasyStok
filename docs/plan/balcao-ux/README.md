@@ -220,7 +220,7 @@ Pedido do Felipe em 28/10/2026: revisar a harmonia do sistema inteiro com banca 
 
 - Transferir a clareza e a hierarquia do piloto, sem normalizar rótulos automaticamente. Ações ambíguas conservam verbo e objeto; valores, consequências e permissões permanecem explícitos.
 - Usar Conversas, Conversa e Cliente na navegação; Enviar cardápio e Concluir conversa nas ações; Assistente para quem responde. Contato substitui o jargão Lead sem prometer recência do cadastro.
-- Botões compartilham altura mínima de 40 px no desktop e 48 px em telas estreitas ou ponteiro de toque. O Composer deixou de impor exceções de 36/40/44 px. Campos, foco, temas e estados desabilitados seguem os tokens existentes.
+- O componente `Botao` compartilha altura mínima de 40 px no desktop e 48 px em telas estreitas ou ponteiro de toque. O Composer deixou de impor exceções de 36/40/44 px. Campos, foco, temas e estados desabilitados seguem os tokens existentes.
 - Secundários tonais, campos sem sombra interna e modais sem desfoque decorativo. Mantidos contraste, foco por teclado, proteção de rascunho e cores semânticas.
 - Configurações usa engrenagem; Assistente usa sparkles; opções usa reticências verticais; concluir conversa deixa de usar o ícone de sair da conta. Sem nova dependência.
 - Prazo de resposta vencido mantém trilho vermelho, motivo e texto acessível, com seleção e hover distinguíveis. Removido o pisca contínuo.
@@ -256,7 +256,7 @@ As evidências locais ficam em `.build/harmonia-ux/`, fora do versionamento. A m
 
 - `npm run qualidade`: lint, camadas, verificações de moeda, 264 pares de contraste nos dois temas e build.
 - Gate do repositório: build .NET e 60 testes de arquitetura aprovados.
-- Regressões de sincronização, clareza, SLA, acessibilidade e composição visual executadas. Expectativas de nomes atualizadas sem alterar os contratos funcionais.
+- Regressões de sincronização, clareza, SLA, acessibilidade e composição visual executadas. Após as falhas de nomenclatura no primeiro CI, executada toda a bateria do workflow do Console: 97 scripts aprovados localmente. Expectativas de nomes atualizadas sem alterar contratos funcionais, revisadas pela contrabanca.
 - A prova antiga #1870 conserva duas falhas de asserção já reproduzidas no baseline `f60107af8`: composição da faixa e implementação de Escape no menu da conta. Nenhuma foi introduzida por este sprint.
 - No Vite de desenvolvimento, os diálogos abriram e desmontaram; no build de produção local, abriram normalmente. A hipótese é o evento close enfileirado durante a dupla montagem do StrictMode; a lógica de Modal não foi alterada nesta rodada.
 

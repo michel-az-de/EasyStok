@@ -689,11 +689,14 @@ const quadrosDe = (folha, nome) => folha.match(new RegExp(`@keyframes ${nome}\\s
 const propriedadesDe = (quadros) => [...new Set([...quadros.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]))].toSorted()
 const regraDe = (folha, seletor) => folha.match(new RegExp(`(?:^|\\n)\\${seletor}\\s*\\{([^}]*)\\}`))?.[1] ?? null
 
-await confere('4. "ao vivo" do KDS e pisca de SLA animam só opacity e transform', () => {
+await confere('4. "ao vivo" do KDS anima só opacity/transform; SLA vencido conserva o alerta estático', () => {
   const pulso = quadrosDe(folhaDe('features/cozinha/cozinha.module.css'), 'pulsarVivo')
   assert.deepEqual(propriedadesDe(pulso), ['opacity', 'transform'], 'box-shadow animado repinta a cada quadro')
-  const pisca = quadrosDe(folhaDe('features/caixa-de-entrada/caixa.module.css'), 'piscaSla')
-  assert.deepEqual(propriedadesDe(pisca), ['opacity'], 'background animado repinta a cada quadro')
+  const folha = folhaDe('features/caixa-de-entrada/caixa.module.css')
+  assert.equal(quadrosDe(folha, 'piscaSla'), null, 'SLA vencido não pisca sobre a conversa selecionada')
+  assert.doesNotMatch(folha, /\.slaEstourado[^{}]*\{[^}]*animation/, 'o alerta de prazo permanece estático')
+  assert.match(regraDe(folha, '.cartao.slaEstourado'), /box-shadow:\s*inset 3px 0 0 var\(--erro\)/, 'o prazo vencido continua visível')
+  assert.match(folha, /\.cartao\.slaEstourado\[aria-current='true'\]\s*\{\s*box-shadow:\s*inset 3px 0 0 var\(--erro\)/, 'selecionar a conversa preserva o alerta')
 })
 
 await confere('4. topo e rodapé da moldura sem desfoque de fundo; o botão flutuante mantém', () => {

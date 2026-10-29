@@ -617,7 +617,7 @@ await confere('Planejamento: falha da nova data conserva as porções e permite 
   assert.equal(campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value, '99')
   assert.equal(botoes(t.arvore, 'Calcular insumos')[0].props.disabled, true)
   assert.ok(texto(t.arvore).includes('As porções abaixo são da consulta anterior'))
-  botoes(t.arvore, 'Tentar novamente')[0].props.onClick()
+  botoes(t.arvore, 'Tentar de novo')[0].props.onClick()
   await t.assentar()
   assert.equal(consultas, 3)
   assert.equal(campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value, '12')
