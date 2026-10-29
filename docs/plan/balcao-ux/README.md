@@ -301,6 +301,7 @@ No navegador, as telas de Produção, consultas de insumos/receitas, Planejament
 - Removido o jargão Lead do resumo e do histórico. Contato sem cadastro conserva o fato conhecido sem presumir que um histórico ainda não consultado não tenha compras.
 - O menu móvel de Gestão deixa de citar Balcão; Receitas apresenta descrição neutra para perfis de consulta e mostra Rende 1 porção no singular.
 - Os botões de metadados da mensagem, incluindo automática, mediam 19 px em 320 px. Agora usam o mesmo token de alvo dos controles: 40 px no desktop e 48 px no toque. Mantidas a ação de abrir a definição, a identificação da origem e a possibilidade de reenviar.
+- Os filtros da lista de conversas e o seletor Responsável ainda impunham 32 px; a faixa Não entregues, 44 px. Essas exceções também passam ao token compartilhado, mantendo as contagens, a rolagem dos canais e as ações.
 
 ### Revisão e limites
 
@@ -308,7 +309,7 @@ No navegador, as telas de Produção, consultas de insumos/receitas, Planejament
 - Gate final do repositório: build .NET e 60 testes de arquitetura aprovados.
 - A contrabanca revisou as correções, contestou a afirmação Contato sem compras e conferiu a abrangência do CSS. A prova de renderização adicional passou em 39 verificações.
 - No isolamento medido, o filtro de EmpresaId divergente retorna 403, embora a instrução do projeto peça 400. O acesso foi negado e os dados ficaram intactos. É uma discrepância preexistente de contrato, sem alteração de autorização neste PR.
-- A prova extra #1839, fora do workflow, conserva uma asserção de fonte desatualizada sobre `aDevolver`, reproduzida no HEAD anterior; não foi modificada. Mantido também o registro da prova antiga #1870 da seção 10.
+- As provas extras, fora do workflow, têm falhas preexistentes: #1839 conserva uma asserção de fonte obsoleta sobre `aDevolver`; #1442 falha ao conferir `estadoInicial` após importação e em dois rótulos anteriores. A causa da primeira falha de #1442 não foi diagnosticada; os arquivos envolvidos foram comparados com o HEAD anterior e não mudaram com os ajustes de alvo. Nenhuma asserção foi alterada. Mantido também o registro da prova antiga #1870 da seção 10.
 - Integrações externas permaneceram falsas, stub ou desligadas: o teste não comprova Mercado Pago real, Meta/WhatsApp, SMS, e-mail externo, LLM, Google Maps ou Lalamove. Android físico e impressão física continuam fora desta homologação. O ambiente publicado recebeu somente a inspeção de consulta da seção 11.
 
 Evidências, roteiros locais, respostas e capturas em `.build/harmonia-ux/lab-real/`, ignorados pelo Git. O aceite técnico desta etapa é para revisão do PR; o aceite estético do Felipe e o merge/publicação são etapas posteriores.
