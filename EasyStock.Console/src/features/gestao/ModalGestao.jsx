@@ -151,7 +151,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
         </div>
       ) : area ? (
         <>
-        <Botao variante="texto" icone="chevron-left" onClick={() => { mudarFoco.current = true; setInicio(true) }}>Gestão da loja</Botao>
+        <Botao variante="texto" icone="arrow-left" onClick={() => { mudarFoco.current = true; setInicio(true) }}>Gestão da loja</Botao>
         <div className={css.janelaGestao}>
           <div className={css.areasGestao}>
             <p className={css.rotuloAreas}>Áreas da loja</p>

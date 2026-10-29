@@ -17,7 +17,7 @@
 
 .aviso {
   margin: var(--e-4); padding: var(--e-4); text-align: center;
-  background: var(--elevado); border: var(--b-1) dashed var(--linha-forte);
+  background: var(--elevado); border: 0;
   border-radius: var(--r-2); color: var(--tinta-2);
 }
 

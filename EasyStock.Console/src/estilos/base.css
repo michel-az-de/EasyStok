@@ -34,6 +34,10 @@ time, data, output { font-variant-numeric: tabular-nums; }
 
 button { font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
 input, select, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
+:where(input[type='checkbox'], input[type='radio']) { accent-color: var(--marca); }
+:where(label:has(> input[type='checkbox']), label:has(> input[type='radio'])) {
+  display: inline-flex; align-items: center; min-height: var(--toque); gap: var(--e-2); cursor: pointer;
+}
 
 /* Estado de interação por cor. Transformações pertencem ao arraste ou à camada,
    sem encolher texto, linhas de tabela e botões ao pressionar. */
