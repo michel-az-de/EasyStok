@@ -5,7 +5,9 @@
 // feature (ferramentas/verificar-camadas.mjs) — mesmo motivo já documentado
 // no Composer.jsx para o picker de "Prato".
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
+import { Tooltip } from '../../componentes/Tooltip'
 import {
   amplitudeSimulada, duracaoExcedida, formatarDuracao, formatarTamanho,
 } from '../../dominio/anexos'
@@ -19,25 +21,28 @@ import css from './composerAnexos.module.css'
 // `rotulo`/`classeRotulo` (rodada 12, issue #16): o nome visível ao lado do
 // clipe. Sem `classeRotulo`, o nome continua só para leitor de tela.
 // `soImagem` (#1587): no modo API o seletor do sistema nem oferece PDF, que o EasyStok não envia.
+// `titulo` (#2146): a explicação inteira vai na dica do Tooltip, não mais no `title` nativo.
 export function BotaoAnexarArquivo({
   disabled, titulo, rotulo = 'Anexar', classeRotulo = 'sr', soImagem = false, descritoPor, aoEscolher,
 }) {
   return (
-    <label className={`${css.botaoAnexo} ${disabled ? css.desabilitado : ''}`} title={titulo}>
-      <Icone nome="anexo" /> <span className={classeRotulo}>{rotulo}</span>
-      <input
-        type="file"
-        className="sr"
-        disabled={disabled}
-        aria-describedby={descritoPor}
-        accept={`image/jpeg,image/png,image/webp,image/gif${soImagem ? '' : ',application/pdf'}`}
-        onChange={(evento) => {
-          const arquivo = evento.target.files?.[0]
-          evento.target.value = '' // permite escolher o mesmo arquivo de novo em seguida
-          if (arquivo) aoEscolher(arquivo)
-        }}
-      />
-    </label>
+    <Tooltip texto={titulo}>
+      <label className={`${css.botaoAnexo} ${disabled ? css.desabilitado : ''}`}>
+        <Icone nome="anexo" /> <span className={classeRotulo}>{rotulo}</span>
+        <input
+          type="file"
+          className="sr"
+          disabled={disabled}
+          aria-describedby={descritoPor}
+          accept={`image/jpeg,image/png,image/webp,image/gif${soImagem ? '' : ',application/pdf'}`}
+          onChange={(evento) => {
+            const arquivo = evento.target.files?.[0]
+            evento.target.value = '' // permite escolher o mesmo arquivo de novo em seguida
+            if (arquivo) aoEscolher(arquivo)
+          }}
+        />
+      </label>
+    </Tooltip>
   )
 }
 
@@ -54,14 +59,7 @@ export function PreviaAnexo({ anexo, aoRemover }) {
         <strong>{anexo.nome}</strong>
         <span>{anexo.tipo === 'pdf' ? 'PDF · ' : ''}{formatarTamanho(anexo.tamanho)}</span>
       </span>
-      <button
-        type="button"
-        className={css.previaRemover}
-        onClick={aoRemover}
-        aria-label={`Remover anexo ${anexo.nome}`}
-      >
-        <Icone nome="fechar" />
-      </button>
+      <BotaoIcone className={css.previaRemover} rotulo={`Remover anexo ${anexo.nome}`} icone="fechar" onClick={aoRemover} />
     </div>
   )
 }

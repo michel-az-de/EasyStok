@@ -1,0 +1,7 @@
+/* #2146: botão só com ícone, sobre o Botao. Quadrado redondo do tamanho do alvo, como o X do Modal
+   (`.fecharCanto`) e o do aviso (`Toast .fechar`); cor e fundo vêm da variante do Botao. */
+.botaoIcone {
+  width: var(--toque); height: var(--toque); padding: 0; gap: 0;
+  border-radius: var(--r-pilula); flex-shrink: 0;
+}
+.botaoIcone[aria-pressed='true'] { background: var(--preenchimento-forte); color: var(--tinta); }
