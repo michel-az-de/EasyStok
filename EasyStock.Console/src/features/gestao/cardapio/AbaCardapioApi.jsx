@@ -37,10 +37,10 @@ function DicaDoPrato({ item, pedirDica }) {
   }
   return (
     <p className={css.dica} aria-live="polite">
-      <span><strong>{resposta?.porIa ? 'Sugestão da IA: ' : 'Dica: '}</strong>{resposta?.texto || estatica}</span>
-      {resposta && !resposta.porIa && <small>{resposta.erro ? `A IA não respondeu (${resposta.erro}).` : 'IA não configurada; esta é a dica do sistema.'}</small>}
-      {pedirDica && (!resposta || resposta.erro) && <Botao variante="texto" disabled={pedindo} title="Pede à IA uma dica curta para este prato. Nada é alterado."
-        aria-label={`Pedir dica da IA para ${item.nome}`} onClick={pedir}>{pedindo ? 'Pedindo dica…' : 'Dica da IA'}</Botao>}
+      <span><strong>{resposta?.porIa ? 'Sugestão do Assistente: ' : 'Dica: '}</strong>{resposta?.texto || estatica}</span>
+      {resposta && !resposta.porIa && resposta.erro && <small>O Assistente não respondeu. Exibindo a dica do sistema.</small>}
+      {pedirDica && (!resposta || resposta.erro) && <Botao variante="texto" disabled={pedindo} title="Pedir ao Assistente uma dica para este prato. Nada será alterado."
+        aria-label={`Pedir dica para ${item.nome}`} onClick={pedir}>{pedindo ? 'Pedindo dica…' : 'Pedir dica'}</Botao>}
     </p>
   )
 }
@@ -74,7 +74,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando o cardápio…</output>
   if (gestao.estado === 'erro' && gestao.itens.length === 0 && !editor) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler o cardápio"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar o cardápio"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
         {gestao.erro}
       </Vazio>
@@ -128,14 +128,14 @@ export function AbaCardapioApi({ renderizarEditor }) {
       </div>
 
       {gestao.aviso && <div className={css.aviso} role="alert"><span>{gestao.aviso}</span><Botao variante="texto" onClick={gestao.fecharAviso}>Fechar aviso</Botao></div>}
-      {gestao.estado === 'erro' && <div className={css.aviso} role="alert"><span>Não consegui atualizar o cardápio: {gestao.erro}</span><Botao variante="texto" onClick={gestao.recarregar}>Tentar de novo</Botao></div>}
-      {!podeEditar && <p className={css.descricao}>Você pode consultar os pratos e ajustar a disponibilidade de hoje. As outras alterações ficam com a dona ou um gerente.</p>}
+      {gestao.estado === 'erro' && <div className={css.aviso} role="alert"><span>Não foi possível atualizar o cardápio. {gestao.erro}</span><Botao variante="texto" onClick={gestao.recarregar}>Tentar de novo</Botao></div>}
+      {!podeEditar && <p className={css.descricao}>Seu perfil permite consultar pratos e ajustar a disponibilidade de hoje.</p>}
 
       {itens.length === 0 ? (
         <Vazio icone={gestao.itens.length ? 'search' : 'cardapio'}
-          titulo={gestao.itens.length ? 'Nenhum prato neste recorte' : 'Seu primeiro prato começa aqui'}
+          titulo={gestao.itens.length ? 'Nenhum prato encontrado' : 'Nenhum prato cadastrado'}
           acao={gestao.itens.length ? <Botao onClick={limpar}>Ver todos os pratos</Botao> : temEditor ? <Botao variante="primario" onClick={() => abrirEditor()}>Novo prato</Botao> : null}>
-          {gestao.itens.length ? 'Experimente outro nome ou veja o cardápio completo.' : podeEditar ? 'Cadastre o nome, a foto e as porções para preparar o cardápio.' : 'A dona ou um gerente pode cadastrar os pratos.'}
+          {gestao.itens.length ? 'Busque outro nome ou limpe os filtros.' : podeEditar ? 'Adicione o primeiro prato ao cardápio.' : 'Peça à gerência para cadastrar os pratos.'}
         </Vazio>
       ) : (
         <ol className={css.lista}>

@@ -78,8 +78,8 @@ export function PainelAtendimento({
         )}
       >
         {primeira
-          ? 'Selecione um nome no Balcão para ver as mensagens e continuar o atendimento.'
-          : 'Confira a busca e os filtros do Balcão. As conversas recebidas aparecem por lá.'}
+          ? 'Escolha um cliente na lista para ver as mensagens.'
+          : 'Altere a busca ou os filtros para encontrar uma conversa.'}
       </Vazio>
     )
   }
@@ -147,8 +147,8 @@ export function PainelAtendimento({
           {/* #1239: passar a conversa para outra atendente (só no modo API). */}
           {fonteApi && !encerrada && !bloqueada && <PassarConversa key={'passar-' + selecionada.id} conversa={selecionada} />}
           {!encerrada && !bloqueada && (
-            <Botao variante="secundario" icone="log-out" className={css.encerrar} title="Encerrar atendimento" onClick={() => abrirEncerramento(selecionada.id)}>
-              Encerrar
+            <Botao variante="texto" icone="circle-check" className={css.encerrar} aria-label="Concluir conversa" title="Concluir conversa" onClick={() => abrirEncerramento(selecionada.id)}>
+              Concluir conversa
             </Botao>
           )}
         </div>

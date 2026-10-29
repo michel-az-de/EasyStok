@@ -174,10 +174,10 @@ confere('5  a janela continua no acesso "Pedido e entrega" do Resumo e o aviso d
 })
 confere('5  Balcão e Resumo sem cabeçalho só no desktop de três colunas; o nome segue no aria-label', () => {
   const moldura = fonte('app/Moldura.jsx')
-  assert.match(moldura, /<Coluna variante="entrada" titulo="Balcão" semTitulo>/)
-  assert.match(moldura, /<Coluna variante="ficha" titulo="Resumo" semTitulo>/)
+  assert.match(moldura, /<Coluna variante="entrada" titulo="Conversas" semTitulo>/)
+  assert.match(moldura, /<Coluna variante="ficha" titulo="Cliente" semTitulo>/)
   assert.match(moldura, /<section className=\{`\$\{css\.coluna\} \$\{css\[variante\]\}`\} aria-label=\{titulo\}>/)
-  assert.equal((moldura.match(/titulo="Balcão" semTitulo/g) ?? []).length, 1, 'tablet e celular mantêm o título')
+  assert.equal((moldura.match(/titulo="Conversas" semTitulo/g) ?? []).length, 1, 'tablet e celular mantêm o título')
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

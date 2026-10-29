@@ -279,21 +279,21 @@
    ganham fundo no hover, e o enviar redondo com seta, como no Mensagens. */
 .acoes > button:not(.enviar) {
   background: transparent; border-color: transparent; box-shadow: none;
-  color: var(--tinta-2); padding: 0 var(--e-3); min-height: 36px; gap: 6px;
+  color: var(--tinta-2); padding: 0 var(--e-3); min-height: var(--toque); gap: 6px;
 }
 .acoes > button:not(.enviar):hover:not(:disabled) { background: var(--preenchimento); color: var(--tinta); border-color: transparent; }
 /* #1868: desabilitado sem opacidade, como no Botao.module.css (opacidade derrubava o contraste). */
 .acoes > button:not(.enviar):disabled { background: transparent; color: var(--tinta-3); opacity: 1; }
 .acoes > button svg { width: 20px; height: 20px; }
 .acoes .enviar {
-  width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 0;
+  width: var(--toque); min-width: var(--toque); height: var(--toque); min-height: var(--toque); padding: 0;
   border-radius: var(--r-pilula);
 }
 .acoes .enviar:disabled { background: var(--preenchimento-forte); color: var(--tinta-3); }
 .acoes .enviar:not(:disabled) { animation: enviarPronto var(--dur-media) var(--ease-pulo); }
 @keyframes enviarPronto { from { transform: scale(.8); } to { transform: none; } }
 @media (max-width: 759px) {
-  .acoes .enviar { width: 40px; margin-left: auto; }
+  .acoes .enviar { width: var(--toque); margin-left: auto; }
 }
 
 /* Subtítulo da conversa numa linha só, com reticência, em vez de quebrar em
@@ -313,7 +313,7 @@
   padding: 6px 6px 6px 8px; border-radius: 24px;
 }
 .acoes { display: contents; }
-.acoes > button:not(.enviar) { order: 1; width: 36px; min-width: 36px; min-height: 36px; padding: 0; border-radius: var(--r-pilula); }
+.acoes > button:not(.enviar) { order: 1; width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-pilula); }
 .caixa > :not(.acoes) { order: 2; flex: 1; min-width: 0; }
 .acoes > .enviar { order: 3; margin-left: 0; }
 .caixa textarea,
@@ -324,7 +324,7 @@
    clara da marca, visível no claro e no escuro. */
 .acoes .enviar:disabled { background: var(--preenchimento); color: var(--tinta-3); opacity: 1; }
 @media (max-width: 759px) {
-  .acoes .enviar { width: 40px; margin-left: 0; }
+  .acoes .enviar { width: var(--toque); margin-left: 0; }
 }
 
 /* Rodada 10, pedido do dono (25/09 23h42, "não vi pra enviar uma lista de
@@ -335,7 +335,7 @@
 .acoes > button.botaoRespostas {
   width: auto; min-width: auto; padding: 0 var(--e-3) 0 10px; gap: 5px;
   /* #1868: mesma altura e raio dos vizinhos com rótulo (Anexar, Fotos, Programar, Nota). */
-  min-height: 44px; border-radius: var(--r-1);
+  min-height: var(--toque); border-radius: var(--r-1);
   font-size: var(--t-apoio); font-weight: 600;
 }
 
@@ -364,7 +364,7 @@
 /* Anexar é um label sobre o input de arquivo (rodada 7), não um Botao: mesmo
    desenho dos outros ícones da barra, no grupo da esquerda. */
 .acoes > label {
-  order: 1; width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0;
+  order: 1; width: var(--toque); min-width: var(--toque); height: var(--toque); min-height: var(--toque); padding: 0;
   display: inline-grid; place-items: center; border: 0; border-radius: var(--r-pilula);
   background: transparent; color: var(--tinta-2); cursor: pointer;
 }
@@ -463,13 +463,13 @@
    com a explicação inteira. */
 .acoes > button.acaoComRotulo,
 .acoes > label {
-  width: auto; min-width: 44px; min-height: 44px; height: auto; padding: 2px 6px; gap: 1px;
+  width: auto; min-width: var(--toque); min-height: var(--toque); height: auto; padding: 2px 6px; gap: 1px;
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
   font-size: var(--t-minimo); font-weight: 600; line-height: 1.1; border-radius: var(--r-1);
 }
 @container composer (max-width: 439px) {
   .acoes > button.acaoComRotulo,
-  .acoes > label { width: 36px; min-width: 36px; min-height: 36px; padding: 0; border-radius: var(--r-pilula); }
+  .acoes > label { width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-pilula); }
   .rotuloAcao {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
@@ -515,13 +515,28 @@
   .caixaEnxuta > .acoes > .enviar { margin-left: 0; }
 }
 @container composer (max-width: 359px) {
+  .caixa { column-gap: var(--e-1); }
+  .acoes { gap: var(--e-1); }
+  .acoes > button.botaoRespostas {
+    width: 96px; min-width: 96px; padding-inline: var(--e-1); gap: var(--e-1);
+    font-size: var(--t-minimo);
+  }
   .caixaEnxuta { flex-wrap: wrap; }
   .caixaEnxuta > :not(.acoes) { order: 0; flex-basis: 100%; }
   .caixaEnxuta > .acoes > .enviar { margin-left: auto; }
 }
-/* #1868: em coluna estreita os vizinhos viram ícones redondos de 36; Respostas acompanha a altura. */
+/* Em coluna estreita os vizinhos viram ícones; Respostas compartilha o alvo de toque. */
 @container composer (max-width: 439px) {
-  .acoes > button.botaoRespostas { min-height: 36px; border-radius: var(--r-pilula); }
+  .acoes > button.botaoRespostas { min-height: var(--toque); border-radius: var(--r-pilula); }
+}
+
+@media (max-width: 759px) {
+  .modoLinha { gap: var(--e-2); }
+  .modoLinha > :first-child > span { font-size: var(--t-minimo); }
+  .caixa textarea,
+  .caixa textarea:hover,
+  .caixa textarea:focus,
+  .caixa textarea:disabled { min-height: var(--toque); }
 }
 
 /* #1239: lista de quem pode receber a conversa, um botão largo por pessoa. */

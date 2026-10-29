@@ -1,5 +1,5 @@
 /* Chip (seções 1, 2 e 4 da direção visual): três papéis do mesmo desenho.
-   44 px de altura, raio pílula, a forma informa além da cor (WCAG 1.4.1).
+   Alvo de toque compartilhado, raio pílula, a forma informa além da cor (WCAG 1.4.1).
    Rodada 6: parado é preenchimento translúcido sem contorno; ligado ganha
    fundo da marca, texto da marca e um anel fino, e entra com mola. */
 .chip {
@@ -31,7 +31,7 @@ button.chip:hover:not(.ativo):not(.emBreve) { background: var(--preenchimento-fo
 .textoTag { white-space: nowrap; }
 .remover {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; margin: 0 calc(var(--e-3) * -1) 0 0;
+  width: var(--toque); height: var(--toque); flex-shrink: 0; margin: 0 calc(var(--e-3) * -1) 0 0;
   background: none; border: 0; border-radius: var(--r-pilula); color: inherit; opacity: .7;
 }
 .remover:hover { opacity: 1; background: var(--preenchimento-forte); }

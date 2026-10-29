@@ -116,7 +116,7 @@ export function CartaoEntrega({
             aria-label={'Mais ações da entrega de ' + conversa.nome}
             onClick={() => (menuAberto ? fecharMenu() : abrirMenu())}
           >
-            <Icone nome="ellipsis" tamanho={20} />
+            <Icone nome="ellipsis-vertical" tamanho={20} />
           </Botao>
           {menuAberto && (
             <Popover rotulo="Mais ações da entrega" posicao="abaixo" aoFechar={fecharMenu}>

@@ -53,11 +53,11 @@ function AcessoDaFicha({ titulo, resumo, aoAbrir }) {
 
 function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   const {
-    selecionada, visiveis, alertasEstoque, ultimoAvanco, agora, automaticoPausado, fonteApi,
+    selecionada, alertasEstoque, ultimoAvanco, agora, automaticoPausado, fonteApi,
   } = useAtendimento()
   const {
     avancarEsteira, cadastrarEndereco, fecharAlerta,
-    ajustarQuantidade, ajustarObservacao, gerarPedido, desfazerEsteira, corrigirPasso, selecionar,
+    ajustarQuantidade, ajustarObservacao, gerarPedido, desfazerEsteira, corrigirPasso,
     gerarCobranca, reenviarCobranca, confirmarPagamento,
     marcarComprovante, aceitarDivergencia, escolherJanela, forcarEncaixe,
     cancelarPedido, marcarEstorno, abrirEncerramento, decidirAreaEntrega, escolherMeioPagamento,
@@ -83,17 +83,9 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   })
 
   if (!selecionada) {
-    const primeira = visiveis[0]
     return (
-      <Vazio
-        titulo="Sem ficha na tela"
-        acao={primeira && (
-          <Botao variante="primario" onClick={() => selecionar(primeira.id)}>
-            Abrir ficha de {primeira.nome.split(' ')[0]}
-          </Botao>
-        )}
-      >
-        Selecione uma conversa para ver o próximo passo do atendimento.
+      <Vazio titulo="Cliente">
+        Escolha uma conversa para ver o cliente e o pedido.
       </Vazio>
     )
   }
@@ -181,11 +173,11 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
       <div className={css.conteudo}>
         <section ref={receberPrato} className={css.resumoAtual} data-recebendo-prato={recebendoPrato || undefined} aria-label="Resumo do atendimento">
           <p className={css.fase}>{!editavel ? 'Conversa encerrada' : posVenda ? 'Pós-venda' : pedidoCriado ? 'Pedido criado' : 'Antes da venda'}</p>
-          <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `${fonteApi ? 'Comanda' : 'Pedido'} ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
+          <h3>{!editavel ? 'Conversa concluída' : pedidoCriado ? `${fonteApi ? 'Comanda' : 'Pedido'} ${numero ?? ''}`.trim() : pedido ? 'Pedido em montagem' : 'Pedido de ' + primeiroNome}</h3>
           <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
             : pedido ? `${pedidoCriado ? rotuloDoResumo(pedido.estado, saldo, Array.isArray(pedido.pagamentosApi) ? totalPago(pedido) : null) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
-              : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. O que a conversa trouxe já vem preenchido.'
-                : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
+              : cadastrarPrimeiro ? 'Cadastre o cliente para montar o pedido. Os dados da conversa já estão preenchidos.'
+                : 'Adicione itens ou envie o cardápio ao cliente.'}</p>
           {destacaSaldo && <p className={css.saldoFicha}>{moeda(saldo)} a receber</p>}
           {aDevolver > 0 && <p className={css.saldoFicha}>{moeda(aDevolver)} a devolver</p>}
         </section>

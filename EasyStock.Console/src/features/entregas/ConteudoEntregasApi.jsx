@@ -115,7 +115,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
                   <div role="alertdialog" aria-label={`Recusar ${nomeDoPedido(x).frase}`}>
                     <p>{confirmacaoDaRecusa(nomeDoPedido(x).frase, x.clienteNome)}</p>
                     <div className={css.linha}>
-                      <Botao variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter</Botao>
+                      <Botao variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter pedido</Botao>
                       <Botao variante="primario" disabled={ocupado} onClick={() => { setRecusando(null); acoes.recusar(x.id) }}>
                         Recusar e devolver
                       </Botao>
@@ -166,7 +166,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
           <h3 className={css.cresce}>Viagens</h3>
           <Botao variante="secundario" icone="plus" disabled={ocupado} onClick={() => acoes.criarViagem(null)}>Nova viagem</Botao>
         </div>
-        {p.montando.length + p.emRota.length === 0 && <p className={css.vazio}>Nenhuma viagem montando ou na rua.</p>}
+        {p.montando.length + p.emRota.length === 0 && <p className={css.vazio}>Nenhuma viagem em preparação ou em rota.</p>}
       </section>
 
       {[...p.montando, ...p.emRota].map((v, i) => (
@@ -228,7 +228,7 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
             : acoes.definirEntregador(viagem.id, e.target.value))}
         />
       )}
-      {n === 0 && <p className={css.vazio}>Viagem vazia. Ponha um pedido pronto nela.</p>}
+      {n === 0 && <p className={css.vazio}>Adicione um pedido pronto à viagem.</p>}
       <ul className={css.lista}>
         {viagem.paradas.map((parada) => {
           // J2 (#1990): dinheiro na entrega diz ao entregador quanto receber e quanto troco levar. #2007: com o
@@ -274,7 +274,7 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
                 <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem + 1)}>Descer</Botao>
               )}
               {montando && (
-                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.retirarParada(viagem.id, parada.pedidoId)}>Tirar</Botao>
+                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.retirarParada(viagem.id, parada.pedidoId)}>Retirar da viagem</Botao>
               )}
               {!montando && !parada.entregueEm && (
                 <Botao variante="primario" disabled={ocupado} onClick={() => (aReceber > 0
@@ -328,7 +328,7 @@ function Chamados({ chamados, ocupado, acoes }) {
         {chamados.map((c) => (
           <li key={c.id} className={`${css.cartao} ${css.linha}`}>
             <span className={css.cresce}>{c.texto}</span>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.atenderChamado(c.id)}>Atendido</Botao>
+            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.atenderChamado(c.id)}>Concluir chamado</Botao>
             <Botao variante="texto" disabled={ocupado} onClick={() => acoes.cancelarChamado(c.id)}>Cancelar</Botao>
           </li>
         ))}

@@ -126,7 +126,7 @@ await provar('produção antiga da Cozinha congelada: a rota cai na Fila e a aju
 await provar('diagnóstico usa allowlist e nunca inclui sessão, URL ou erro arbitrário', () => {
   const texto = diagnosticoDoConsole({ rota: { ...rota, conversaId: 'cliente-secreto', query: 'token-secreto' }, fonteApi: true, versao: '97f3e157', onLine: true,
     token: 'JWT-secreto', url: 'https://servidor/?cpf=cpf-secreto', empresa: 'empresa-secreta', erro: 'nome-secreto', usuario: 'pessoa-secreta' })
-  assert.match(texto, /Atendimento · Balcão/)
+  assert.match(texto, /Atendimento · Conversas/)
   assert.match(texto, /serviço ainda não verificado/)
   assert.doesNotMatch(texto, /secreto|secreta|servidor|cpf=|JWT/)
 })

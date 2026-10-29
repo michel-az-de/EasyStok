@@ -209,7 +209,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
               <SeloCaptado quando={captado.nome} />
             </div>
             {lead ? (
-              <span className={css.situacao}>Lead · {chegouQuando(conversa, agora)}</span>
+              <span className={css.situacao}>Contato · {chegouQuando(conversa, agora)}</span>
             ) : cliente.desde && (
               // #1474: o cadastro da API não traz a data; sem ela, a linha não aparece vazia.
               <span className={css.situacao}>Cliente desde {cliente.desde}</span>
@@ -224,7 +224,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
               title="Mais ações do cliente"
               onClick={() => setMenuAberto((v) => !v)}
             >
-              <Icone nome="ellipsis" tamanho={24} />
+              <Icone nome="ellipsis-vertical" tamanho={24} />
             </Botao>
             {menuAberto && (
               <Popover rotulo="Mais ações do cliente" posicao="abaixo" aoFechar={() => setMenuAberto(false)}>

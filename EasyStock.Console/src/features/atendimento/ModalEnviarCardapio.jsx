@@ -57,7 +57,7 @@ export function ModalEnviarCardapio({
 
   return (
     <Modal
-      titulo="Link de compra"
+      titulo="Enviar cardápio"
       descricao={`${primeiroNome(nomeCliente)}${numero ? ` · Comanda ${numero}` : ''} · ${canalNome}`}
       aoFechar={() => { if (!trava.current) aoFechar() }}
       rodape={(

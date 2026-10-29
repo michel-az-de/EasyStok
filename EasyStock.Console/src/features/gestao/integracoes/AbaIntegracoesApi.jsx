@@ -107,14 +107,13 @@ function CartaoIntegracao({ item, ocupado, acoes }) {
 export function AbaIntegracoesApi() {
   const { lista, erro, ocupado, ...acoes } = useIntegracoesApi()
 
-  if (erro && !lista) return <div className={css.aba}><p role="alert">Não deu para ler as integrações: {erro}</p></div>
+  if (erro && !lista) return <div className={css.aba}><p role="alert">Não foi possível carregar as integrações. {erro}</p></div>
   if (!lista) return <div className={css.aba}><p>Carregando integrações…</p></div>
 
   return (
     <div className={css.aba}>
       <p className={css.intro}>
-        Chaves de cada integração da loja, guardadas cifradas no EasyStok. Testar não cobra nem faz pedido.
-        A cada 15 minutos o EasyStok testa sozinho e avisa no topo se alguma parar.
+        Configure e teste as conexões da loja. Os testes não geram cobranças nem pedidos.
       </p>
       <ul className={css.lista}>
         {lista.map((item) => <CartaoIntegracao key={item.provider} item={item} ocupado={ocupado} acoes={acoes} />)}
@@ -124,7 +123,7 @@ export function AbaIntegracoesApi() {
             <Pilula tom="ok" fina>Ligado</Pilula>
           </div>
           <Pilula tom="ok" fina>Padrão do despacho</Pilula>
-          <p className={css.motivo}>Entregador próprio é a forma de despacho desta versão.</p>
+          <p className={css.motivo}>As entregas são feitas pela equipe da loja.</p>
         </li>
       </ul>
     </div>

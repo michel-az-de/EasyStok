@@ -119,8 +119,7 @@
   --trilho: var(--b-3);
   --ponto: 8px;
 
-  /* Altura de controle: 40 px, o botão grande do macOS e confortável no
-     tablet da cozinha. */
+  /* Controles compactos no desktop; no toque, o alvo mínimo é 48 px. */
   --toque: 40px;
   --coluna: 320px;
   /* #1870/#1872: um trilho só, no Balcão e nos módulos (`componentes/Trilho.module.css`). O item cabe
@@ -175,5 +174,5 @@
 :root[data-theme='dark'] { color-scheme: only dark; }
 
 @media (max-width: 759px), (pointer: coarse) {
-  :root { --toque: 44px; }
+  :root { --toque: 48px; }
 }

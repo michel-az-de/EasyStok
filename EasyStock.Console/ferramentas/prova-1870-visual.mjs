@@ -124,7 +124,7 @@ confere('4  ficha compacta (blocos, acessos e barra Andamento) e Pós-venda cont
 })
 confere('4  faixa de modo: "Passou para você" não repete a frase; no desktop é uma linha só', () => {
   const barra = fonte('features/atendimento/BarraModo.jsx')
-  assert.match(barra, /const fraseRepetida = resumo\.chave === MODOS\.COM_VOCE && linha === resumo\.linha/)
+  assert.match(barra, /const fraseRepetida = \(resumo\.chave === MODOS\.COM_VOCE \|\| \(resumo\.chave === MODOS\.LIGADO && !semAutomatico\)\) && linha === resumo\.linha/)
   assert.match(barra, /<p className=\{fraseRepetida \? 'sr' : css\.modoTexto\} title=/)
   assert.match(fonte('features/atendimento/atendimento.module.css'), /@media \(min-width: 760px\) \{\s*\.modo \{ padding-inline: var\(--e-3\); \}\s*\.modoLinha \{ flex-wrap: nowrap; \}/)
 })

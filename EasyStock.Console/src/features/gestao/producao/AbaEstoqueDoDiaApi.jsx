@@ -136,7 +136,7 @@ export function AbaEstoqueDoDiaApi() {
   if (estoque.estado === 'carregando') return <output className={css.descricao}>Carregando o estoque…</output>
   if (estoque.estado === 'erro' && estoque.pratos.length === 0) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler o estoque"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar o estoque"
         acao={<Botao icone="refresh-cw" onClick={estoque.recarregar}>Tentar de novo</Botao>}>
         {estoque.erro}
       </Vazio>
@@ -261,7 +261,7 @@ export function AbaEstoqueDoDiaApi() {
                   </div>
                 )}
                 {impressao?.loteId === l.id && impressao.erro && (
-                  <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">Não consegui buscar as etiquetas deste lote. {impressao.erro}</p>
+                  <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">Não foi possível carregar as etiquetas deste lote. {impressao.erro}</p>
                 )}
               </li>
             ))}

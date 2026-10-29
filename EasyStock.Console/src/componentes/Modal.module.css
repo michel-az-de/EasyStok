@@ -1,13 +1,11 @@
-/* Modal (rodada 6): folha com raio de painel, sombra em camadas e entrada com
-   mola, subindo 12 px e crescendo de 96%. A cortina escurece e desfoca o que
-   ficou atrás, como a folha do iOS. O React desmonta a caixa ao fechar, então
-   só a entrada tem movimento. */
+/* A folha sobe para mostrar a mudança de contexto; a cortina mantém o foco
+   na tarefa. O React desmonta a caixa ao fechar. */
 .caixa {
   margin: auto; padding: 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-3);
   background: var(--papel); color: var(--tinta);
   width: min(560px, calc(100vw - var(--e-6))); max-height: 86dvh; overflow: hidden;
   max-width: calc(100vw - var(--e-4));
-  box-shadow: var(--sombra-alta), var(--brilho);
+  box-shadow: var(--sombra-media);
   /* `.caixa` em coluna e `.conteudo` como item flexível de `min-height: 0`
      (em vez de duas `max-height` iguais soltas, ancestral e filho): garante
      que o filho é sempre quem rola, nunca depende do conteúdo "adivinhar"
@@ -17,7 +15,6 @@
 .caixa[open] { animation: entrar var(--dur-media) var(--ease-saida) both; }
 .caixa::backdrop {
   background: var(--cortina);
-  backdrop-filter: blur(6px) saturate(120%);
   animation: cortina var(--dur-media) var(--ease-padrao) both;
 }
 @keyframes entrar {

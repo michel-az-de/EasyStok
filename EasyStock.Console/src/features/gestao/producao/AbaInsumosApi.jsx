@@ -98,7 +98,7 @@ export function AbaInsumosApi() {
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando os insumos…</output>
   if (gestao.estado === 'erro' && gestao.insumos.length === 0) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler os insumos"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar os insumos"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
         {gestao.erro}
       </Vazio>
@@ -175,7 +175,7 @@ export function AbaInsumosApi() {
           </label>
           <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !novo.nome.trim()}>{criando ? 'Cadastrando…' : 'Cadastrar insumo'}</Botao>
         </div>
-      </form></Modal>}</> : <p className={css.descricao}>Você pode consultar os insumos. O cadastro e os ajustes ficam com a dona ou gerente.</p>}
+      </form></Modal>}</> : <p className={css.descricao}>Seu perfil permite apenas consultar os insumos.</p>}
     </div>
   )
 }

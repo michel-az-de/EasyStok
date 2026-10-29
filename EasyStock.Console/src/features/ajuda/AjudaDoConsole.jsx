@@ -44,7 +44,7 @@ export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
           </div>
         </section>
         <section aria-labelledby="ajuda-guia" className={css.guia}>
-          <h3 id="ajuda-guia" className={css.titulo}><MarcaIcone nome="grade" /> Guia do Console</h3>
+          <h3 id="ajuda-guia" className={css.titulo}><MarcaIcone nome="grade" /> Guia do sistema</h3>
           <p className={css.apoio}>O que cada módulo faz e por onde começar.</p>
           {guia.map(modulo => (
             <details key={modulo.id} className={css.modulo} open={modulo.aberto} data-guia-modulo={modulo.id}>

@@ -8,13 +8,13 @@ import css from './notificacoes.module.css'
 const gravidade = { Critica: 'Crítica', Alta: 'Alta', Media: 'Média', Informativa: 'Informativa' }
 const tom = { Critica: 'perigo', Alta: 'aviso', Media: 'aviso', Informativa: 'info' }
 const textoAparelho = {
-  desligado: 'Receba avisos desta conta mesmo com o Console fechado.',
+  desligado: 'Receba avisos desta conta mesmo com o sistema fechado.',
   ativando: 'Aguarde a confirmação do navegador…',
   desativando: 'Desativando avisos neste aparelho…',
   ativo: 'Avisos desta conta ativados neste aparelho.',
   bloqueado: 'Avisos bloqueados neste navegador. Libere as notificações deste site nas configurações do navegador e ative de novo.',
   'sem-chave': 'Os avisos no aparelho ainda não estão configurados neste ambiente.',
-  indisponivel: 'Este navegador não oferece avisos com o Console fechado.',
+  indisponivel: 'Este navegador não oferece avisos com o sistema fechado.',
 }
 
 export function SinoDaSessao({ avisos, aparelho }) {

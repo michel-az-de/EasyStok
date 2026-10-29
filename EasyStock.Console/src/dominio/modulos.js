@@ -56,12 +56,12 @@ export const MODULOS = [
     numero: 3, id: 'atendimento', nome: 'Atendimento', icone: 'conversa',
     resumo: 'Conversas, pedidos e clientes',
     telas: [
-      { id: 'balcao', rotulo: 'Balcão', tipo: TELA_OPERACAO },
+      { id: 'balcao', rotulo: 'Conversas', tipo: TELA_OPERACAO },
       { id: 'horarios', rotulo: 'Horários e mensagens', tipo: TELA_AJUSTE, aba: 'atendimento', soApi: true },
       // #2096: o que chama a dona e o gerente (aparelho, e-mail e sino); mesma permissão do módulo.
       { id: 'avisos', rotulo: 'Avisos', tipo: TELA_AJUSTE, aba: 'avisos', soApi: true },
       // #1441: criar, editar e arquivar respostas prontas; ligar e escrever as automáticas.
-      { id: 'respostas', rotulo: 'Respostas e automáticas', tipo: TELA_AJUSTE, aba: 'respostas' },
+      { id: 'respostas', rotulo: 'Respostas e mensagens automáticas', tipo: TELA_AJUSTE, aba: 'respostas' },
     ],
   },
   {
@@ -96,7 +96,7 @@ export const MODULOS = [
     ],
   },
   {
-    numero: 7, id: 'configuracoes', nome: 'Configurações', icone: 'automacao',
+    numero: 7, id: 'configuracoes', nome: 'Configurações', icone: 'settings',
     resumo: 'Usuários, canais e integrações da loja',
     telas: [
       { id: 'canais', rotulo: 'Canais', tipo: TELA_AJUSTE, aba: 'canais', soApi: true },

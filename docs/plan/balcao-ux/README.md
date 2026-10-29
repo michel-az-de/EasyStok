@@ -211,3 +211,53 @@ Com o plano aprovado e versionado, as PRs das ondas 1 a 3 viram "spec de plano a
 | 4 | Pedido no desktop | **Folha sobre o painel Cliente**, com a lista sempre visível | manter o cardápio no lugar da lista |
 | 5 | #1766 (6 itens de 13/10) | **aceitar todos dentro da Onda 2** | decidir item a item |
 | 6 | Completar com Tab | **manter, com chave de desligar e aviso de privacidade** | fundir com o rascunho só sob demanda |
+
+## 10. Sprint transversal de linguagem e controles (#2140)
+
+Pedido do Felipe em 28/10/2026: revisar a harmonia do sistema inteiro com banca e contrabanca, tomando Produtos e Pedidos do piloto PWA como referência. Esta execução não encerra as ondas anteriores nem substitui seus aceites.
+
+### Decisões aplicadas
+
+- Transferir a clareza e a hierarquia do piloto, sem normalizar rótulos automaticamente. Ações ambíguas conservam verbo e objeto; valores, consequências e permissões permanecem explícitos.
+- Usar Conversas, Conversa e Cliente na navegação; Enviar cardápio e Concluir conversa nas ações; Assistente para quem responde. Contato substitui o jargão Lead sem prometer recência do cadastro.
+- Botões compartilham altura mínima de 40 px no desktop e 48 px em telas estreitas ou ponteiro de toque. O Composer deixou de impor exceções de 36/40/44 px. Campos, foco, temas e estados desabilitados seguem os tokens existentes.
+- Secundários tonais, campos sem sombra interna e modais sem desfoque decorativo. Mantidos contraste, foco por teclado, proteção de rascunho e cores semânticas.
+- Configurações usa engrenagem; Assistente usa sparkles; opções usa reticências verticais; concluir conversa deixa de usar o ícone de sair da conta. Sem nova dependência.
+- Prazo de resposta vencido mantém trilho vermelho, motivo e texto acessível, com seleção e hover distinguíveis. Removido o pisca contínuo.
+- No celular, o cabeçalho global fica em Conversas. Loja, sino e Mais continuam acessíveis ao voltar à lista pela barra inferior; deixam de ocupar espaço permanente em Conversa e Cliente. A troca de abas conserva conversa e rascunho.
+- Concluir conversa mostra mensagem e consequências primeiro; avaliação, anotações e relatório ficam em Ver resumo da conversa. Na leitura de uma conversa anterior, o resumo começa aberto. Imprimir e os dados do relatório foram preservados.
+
+### Banca e contrabanca
+
+A banca revisou linguagem, componentes e fontes dos módulos. A contrabanca leu o diff e as capturas, contestando as propostas antes do fechamento:
+
+| Achado | Correção |
+|---|---|
+| Compactação do piloto esconderia objeto e risco da ação | Não importar o normalizador; manter nomes explícitos |
+| Remover pedido sugeria cancelamento, mas a operação apenas retirava da viagem | Retirar da viagem |
+| Mensagem de permissão prometia consulta que o ramo não renderiza | Orientação à administração sem promessa falsa |
+| Engrenagem extrapolava viewBox | Vetor corrigido dentro de 2..22 |
+| Em 320 px, Enviar quebrava para terceira linha e Assumir para segunda | Composer e faixa ajustados preservando alvos de 48 px |
+| Cabeçalho e prévia de relatório consumiam área de trabalho | Cabeçalho contextual e resumo expansível |
+
+### Cobertura e limites
+
+| Área | Revisão desta rodada |
+|---|---|
+| Componentes, navegação, Atendimento, Cliente e conclusão | Código, build e navegador local em modo demonstração |
+| Início, Caixa, Configurações, Cozinha e Entregas | Código e navegação local de demonstração; capturas apenas após conteúdo montar |
+| Gestão: cardápio, categorias, produção, insumos, receitas, calculadora, planejamento, perdas, impressão, integrações, respostas e avisos | Trechos alterados revisados no fonte; compilação e verificações do Console |
+| Login | Leitura do fonte; sem alteração prioritária |
+| API, perfis reais, dispositivos físicos e produção publicada | Não homologados nesta rodada; dependem de ambiente/sessão identificados |
+
+As evidências locais ficam em `.build/harmonia-ux/`, fora do versionamento. A medição por viewport no navegador não equivale a prova em aparelho Android físico.
+
+### Validação
+
+- `npm run qualidade`: lint, camadas, verificações de moeda, 264 pares de contraste nos dois temas e build.
+- Gate do repositório: build .NET e 60 testes de arquitetura aprovados.
+- Regressões de sincronização, clareza, SLA, acessibilidade e composição visual executadas. Expectativas de nomes atualizadas sem alterar os contratos funcionais.
+- A prova antiga #1870 conserva duas falhas de asserção já reproduzidas no baseline `f60107af8`: composição da faixa e implementação de Escape no menu da conta. Nenhuma foi introduzida por este sprint.
+- No Vite de desenvolvimento, os diálogos abriram e desmontaram; no build de produção local, abriram normalmente. A hipótese é o evento close enfileirado durante a dupla montagem do StrictMode; a lógica de Modal não foi alterada nesta rodada.
+
+A revisão integral por perfil e a aceitação estética do Felipe permanecem abertas. As ondas de Tooltip, BotaoIcone, Folha do pedido e navegação Android do plano continuam com seus próprios aceites.

@@ -143,7 +143,7 @@ function ConfirmarAbertura({ dia, gaveta, ultimo, podeGerenciar, executar, envia
     <div className={`${css.painel} ${css.abertura}`}>
       <p className={css.avisoAtencao}>
         {avisoDaAberturaAConfirmar(dia.saldoInicial, ultimo)}
-        {podeGerenciar ? ' Conte a gaveta inteira e confirme a abertura.' : ' A gerente ou a dona conta a gaveta e confirma a abertura.'}
+        {podeGerenciar ? ' Conte a gaveta inteira e confirme a abertura.' : ' Peça à gerência para contar a gaveta e confirmar a abertura.'}
       </p>
       {podeGerenciar && (
         <>
@@ -460,7 +460,7 @@ export function AbaCaixaApi() {
     O caixa não foi atualizado. Os valores abaixo podem estar desatualizados. {caixa.erro}
     {' '}<Botao variante="texto" icone="refresh-cw" disabled={acao.enviando} onClick={caixa.recarregar}>Recarregar caixa</Botao>
   </p>
-  const avisoDePermissao = !podeGerenciar && <p className={css.corpoBloco}>O fechamento e o estorno de lançamentos ficam com a dona ou gerente.</p>
+  const avisoDePermissao = !podeGerenciar && <p className={css.corpoBloco}>Somente a gerência pode fechar o caixa e estornar lançamentos.</p>
 
   // #1474: a dona confere a gaveta; Pix e cartão não estão nela.
   const gaveta = gavetaDoDia(dia)
@@ -524,7 +524,7 @@ export function AbaCaixaApi() {
             </div>
             <div className={css.acoesTopo}>
               {podeGerenciar && dia.aberto && !dia.fechado && (
-                <Botao variante="texto" icone="log-out" disabled={acao.enviando || conferindo} onClick={abrirFechamento}>
+                <Botao variante="texto" icone="lock" disabled={acao.enviando || conferindo} onClick={abrirFechamento}>
                   {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
                 </Botao>
               )}
@@ -538,7 +538,7 @@ export function AbaCaixaApi() {
 
           {dia.esquecidoAberto && (
             <p className={css.avisoFechado}>
-              Este caixa ficou aberto desde {diaMes(dia.abertoDesde)}. {podeGerenciar ? 'Feche aquele dia (conferindo a gaveta) para abrir o de hoje.' : 'Peça à dona ou gerente para fechar aquele dia antes de abrir o de hoje.'}
+              Este caixa ficou aberto desde {diaMes(dia.abertoDesde)}. {podeGerenciar ? 'Confira a gaveta e feche aquele dia para abrir o de hoje.' : 'Peça à gerência para fechar aquele dia antes de abrir o de hoje.'}
             </p>
           )}
           {dia.fechado && dia.fechamento && (

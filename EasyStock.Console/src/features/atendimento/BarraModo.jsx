@@ -34,11 +34,11 @@ export function BarraModo({
   const semAutomatico = automaticoDesligadoNaConversa(conversa)
   const podeDevolver = (resumo.chave === MODOS.PAUSADO || resumo.chave === MODOS.COM_VOCE) && !semAutomatico
   // Automático desligado não está "pausado" nem "volta": a faixa diz só o que é verdade.
-  const linha = semAutomatico && !encerrada && resumo.chave !== MODOS.LIGADO ? 'O atendimento automático está desligado.' : resumo.linha
+  const linha = semAutomatico && !encerrada && resumo.chave !== MODOS.LIGADO ? 'O Assistente está desligado.' : resumo.linha
   const sugereEncerrar = resumo.sugereEncerrar && Boolean(aoEncerrar)
   // #1870: "Passou para você" já é o estado e o Assumir, a ação; a frase repetia os dois (e o
   // cartão do Balcão). Fica para o leitor de tela e no title da pílula; a faixa é uma linha só.
-  const fraseRepetida = resumo.chave === MODOS.COM_VOCE && linha === resumo.linha
+  const fraseRepetida = (resumo.chave === MODOS.COM_VOCE || (resumo.chave === MODOS.LIGADO && !semAutomatico)) && linha === resumo.linha
   const nome = primeiroNome(conversa.nome)
 
   const devolver = () => {
@@ -59,8 +59,8 @@ export function BarraModo({
               </Botao>
             )}
             {sugereEncerrar && (
-              <Botao variante="padrao" icone="log-out" className={css.acaoModo} onClick={aoEncerrar}>
-                Encerrar
+              <Botao variante="texto" icone="circle-check" className={css.acaoModo} onClick={aoEncerrar}>
+                Concluir conversa
               </Botao>
             )}
             {podeDevolver && (
@@ -68,11 +68,11 @@ export function BarraModo({
                 // #1761 (L5): nunca é o próximo passo; o primário da tela é o do pedido.
                 variante="padrao"
                 className={css.acaoModo}
-                title="O atendimento automático volta a responder esta conversa"
+                title="O Assistente volta a responder esta conversa"
                 aria-haspopup="dialog"
                 onClick={() => setConfirmandoDevolver(true)}
               >
-                Devolver ao automático
+                Devolver ao Assistente
               </Botao>
             )}
           </span>
@@ -81,13 +81,13 @@ export function BarraModo({
 
       {confirmandoDevolver && (
         <Modal
-          titulo="Devolver ao atendimento automático?"
-          descricao={`O atendimento automático volta a responder as próximas mensagens de ${nome}, sem você.`}
+          titulo="Devolver ao Assistente?"
+          descricao={`O Assistente volta a responder as próximas mensagens de ${nome}.`}
           aoFechar={() => setConfirmandoDevolver(false)}
           rodape={(
             <>
               <Botao onClick={() => setConfirmandoDevolver(false)}>Continuar comigo</Botao>
-              <Botao variante="primario" onClick={devolver}>Devolver ao automático</Botao>
+              <Botao variante="primario" onClick={devolver}>Devolver ao Assistente</Botao>
             </>
           )}
         >

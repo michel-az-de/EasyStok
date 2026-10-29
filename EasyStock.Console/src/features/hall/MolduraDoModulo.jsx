@@ -122,7 +122,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
                   {/* #1921: a tela existe, mas a matriz do perfil não a libera (ex.: Janelas de entrega). */}
                   {telaSemAcesso ? (
                     <Vazio titulo="Seu perfil não abre esta tela" acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
-                      Se você precisa trabalhar aqui, peça à dona para mudar o seu perfil.
+                      Para acessar esta área, peça à administração da loja para revisar seu perfil.
                     </Vazio>
                   ) : (
                     <Vazio titulo={`${modulo.nome}: em breve`} acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>

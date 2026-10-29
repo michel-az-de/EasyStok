@@ -163,7 +163,7 @@ export function AbaReceitasApi() {
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as receitas…</output>
   if (gestao.estado === 'erro' && gestao.receitas.length === 0) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler as receitas"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar as receitas"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
         {gestao.erro}
       </Vazio>
@@ -177,20 +177,18 @@ export function AbaReceitasApi() {
         {' '}<Botao variante="texto" icone="refresh-cw" onClick={gestao.recarregar}>Recarregar receitas</Botao>
       </p>}
       <p className={css.descricao}>
-        A receita de cada prato: quanto rende e os insumos. O custo por porção usa o custo dos insumos. Prato aparece
-        aqui depois da primeira produção, lançada em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a> (é
-        ela que liga o prato ao estoque).
+        Cadastre rendimento e insumos para estimar o custo por porção. Os pratos aparecem após o primeiro registro em
+        {' '}<a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.
       </p>
-      {!podeEditar && <p className={css.descricao}>Você pode consultar as receitas. A edição e a baixa automática ficam com a dona ou gerente.</p>}
+      {!podeEditar && <p className={css.descricao}>Seu perfil permite apenas consultar as receitas.</p>}
       {gestao.aviso && !avisoNoEditor && (
         <p className={css.aviso} role="alert">
           {gestao.aviso} <Botao variante="texto" onClick={gestao.fecharAviso}>Fechar</Botao>
         </p>
       )}
       {gestao.receitas.length === 0 ? (
-        <Vazio icone="nota" titulo="Nenhum prato ligado ao estoque ainda.">
-          A primeira produção liga o prato ao estoque: lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>. Depois,
-          a receita aparece aqui.
+        <Vazio icone="nota" titulo="Nenhum prato para cadastrar receita">
+          Registre a primeira produção em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.
         </Vazio>
       ) : (
         <ul className={css.lista}>

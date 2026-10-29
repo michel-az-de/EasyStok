@@ -67,7 +67,7 @@ export function PainelAgente({
   return (
     <section className={css.painel} aria-label="Agente de atendimento">
       <div className={css.cabeca}>
-        <h3><Icone nome="agente" /> Sugestão de resposta</h3>
+        <h3><Icone nome="sparkles" /> Sugestão de resposta</h3>
         {!aberto && (
           <span className={`${css.resumoFechado} ${chamaAtencao ? css.pendente : ''}`}>
             {pendencias}

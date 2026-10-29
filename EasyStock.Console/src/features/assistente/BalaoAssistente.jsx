@@ -254,7 +254,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
       aria-controls={aberto ? painelId : undefined}
       onClick={() => aberto ? fechar() : setAberto(true)}
     >
-      <Icone nome="agente" tamanho={cabecalhoDoAtendimento ? 20 : 26} />
+      <Icone nome="sparkles" tamanho={cabecalhoDoAtendimento ? 20 : 26} />
       {cabecalhoDoAtendimento && <span className={css.rotuloGatilho}>Assistente</span>}
       {!aberto && pedeAtencao && <span className={css.pontoAtencao} aria-hidden="true" />}
     </Botao>
@@ -270,7 +270,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
           <div className={css.colunaPainel}>
           <div className={`${css.cabecalho} ${solto ? css.cabecalhoArrastavel : ''}`} onPointerDown={aoDescerNoCabecalho}>
             <div className={css.identidade}>
-              <h2 id={tituloId}><Icone nome="agente" /> Assistente</h2>
+              <h2 id={tituloId}><Icone nome="sparkles" /> Assistente</h2>
               {selecionada && <p className={css.clienteDoPainel}>{selecionada.nome}</p>}
             </div>
             {!celular && (

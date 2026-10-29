@@ -172,13 +172,11 @@ confere('o cartão ganha a classe de pisca só com o SLA estourado', () => {
   assert.equal(classesDoCartao(css), 'c')
 })
 
-confere('com movimento reduzido não pisca: fica só o destaque de cor', () => {
+confere('prazo vencido mantém destaque estático sem piscar sobre a seleção', () => {
   const folha = readFileSync(new URL('../src/features/caixa-de-entrada/caixa.module.css', import.meta.url), 'utf8')
-  // #1577: quem pisca é a placa atrás do conteúdo (`::before`), só em `opacity`.
-  assert.match(folha, /\.cartao\.slaEstourado::before\s*\{[^}]*animation:[^}]*piscaSla[^}]*infinite/)
-  const reduzido = folha.slice(folha.indexOf('@media (prefers-reduced-motion: reduce)'))
-  assert.match(reduzido, /\.cartao\.slaEstourado\s*\{\s*animation:\s*none;\s*background:\s*var\(--erro-pastel\)/)
-  assert.match(reduzido, /\.cartao\.slaEstourado::before\s*\{\s*display:\s*none/)
+  assert.match(folha, /\.cartao\.slaEstourado\s*\{[^}]*box-shadow:[^}]*var\(--erro\)/)
+  assert.doesNotMatch(folha, /piscaSla|infinite/)
+  assert.match(folha, /\.cartao\[aria-current='true'\]\s*\{[^}]*background:\s*var\(--preenchimento-forte\)/)
 })
 
 confere('um segundo além do SLA já estoura, sem minuto extra', () => {

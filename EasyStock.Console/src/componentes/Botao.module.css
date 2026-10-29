@@ -1,11 +1,8 @@
-/* Três variantes, e só três (secao 4 da direção visual). `padrao` e `discreto`
-   são apelido dos nomes antigos: mesma classe, para nada quebrar.
-   Rodada 6: o contorno escuro de 2 px saiu. Primário é cheio com um brilho de
-   1 px no topo; secundário é papel com linha fina e sombra curta, o botão do
-   macOS; texto ganha fundo translúcido no hover em vez de sublinhado. */
+/* A hierarquia vem do preenchimento: primário cheio, secundário tonal e texto.
+   `padrao` e `discreto` preservam os nomes usados pelas telas existentes. */
 .botao {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--e-2);
-  padding: 0 var(--e-16); min-height: var(--toque);
+  padding: var(--e-2) var(--e-16); min-width: var(--toque); min-height: var(--toque);
   border-radius: var(--r-1);
   font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto);
   letter-spacing: -.01em;
@@ -18,22 +15,19 @@
 }
 .primario {
   background: var(--acao); border: var(--b-1) solid transparent; color: var(--sobre-acao);
-  box-shadow: 0 1px 2px rgba(120, 30, 8, .22);
 }
 .primario:hover:not(:disabled) { background: var(--acao-forte); }
-.primario:active:not(:disabled) { background: var(--acao-forte); box-shadow: inset 0 2px 4px rgba(0, 0, 0, .18); }
+.primario:active:not(:disabled) { background: var(--acao-forte); }
 /* #1683: confirmar ação destrutiva. Mesmo peso do primário, na cor de erro; o par
    --sobre-erro/--erro é conferido em ferramentas/verificar-contraste.mjs. */
 .perigo {
   background: var(--erro); border: var(--b-1) solid transparent; color: var(--sobre-erro);
-  box-shadow: var(--sombra);
 }
 .perigo:hover:not(:disabled), .perigo:active:not(:disabled) { filter: brightness(.9); }
 .secundario {
-  background: var(--papel); border: var(--b-1) solid var(--linha-media); color: var(--tinta);
-  box-shadow: var(--sombra);
+  background: var(--preenchimento); border: var(--b-1) solid transparent; color: var(--tinta);
 }
-.secundario:hover:not(:disabled) { background: var(--elevado); border-color: var(--linha-forte); }
+.secundario:hover:not(:disabled) { background: var(--preenchimento-forte); }
 .texto { background: transparent; border: var(--b-1) solid transparent; color: var(--tinta-2); }
 .texto:hover:not(:disabled) { background: var(--preenchimento); color: var(--tinta); }
 .texto:disabled, .discreto:disabled { background: transparent; }

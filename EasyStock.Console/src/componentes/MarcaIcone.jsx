@@ -1,4 +1,5 @@
 import css from './Icone.module.css'
+import { Icone } from './Icone'
 
 // Casa da Baba V4 / Essencial (01/10/2026), geometria própria de icones.cjs.
 // Origem: marca/sistema-visual-pranchas-v4 (repositório da marca). Os SVGs de referência saíram
@@ -16,7 +17,6 @@ const DESENHOS = {
   'cupom': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7H28V12C22 12 22 20 28 20V25H4V20C10 20 10 12 4 12Z M18 8V10 M18 14V17 M18 21V24"/></g>,
   'mensagem': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5H28V22H14L6 29V22H4Z M9 11H23 M9 16H19"/></g>,
   'entrega': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7H20V23H3Z M20 12H25L29 18V23H20 M20 18H29"/><circle cx="8" cy="24" r="3"/><circle cx="24" cy="24" r="3"/><path d="M6 11H14 M6 15H11"/></g>,
-  'configuracoes': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8H12 M20 8H28 M4 24H19 M27 24H28 M16 4V12 M23 20V28 M4 16H5 M13 16H28"/><circle cx="16" cy="8" r="4"/><circle cx="9" cy="16" r="4"/><circle cx="23" cy="24" r="4"/></g>,
   'link': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20 20 12 M10 17C4 22 4 28 9 29C12 30 15 27 18 24 M22 15C28 10 28 4 23 3C20 2 17 5 14 8"/></g>,
   'atencao': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3 30 28H2Z M16 11V19"/><circle cx="16" cy="24" r="0.7"/></g>,
   'anterior': <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 5 10 16 21 27"/></g>,
@@ -42,6 +42,7 @@ const DESENHOS = {
 }
 
 export function MarcaIcone({ nome, tamanho = 24, rotulo, className }) {
+  if (nome === 'configuracoes') return <Icone nome="settings" tamanho={tamanho} rotulo={rotulo} className={className} />
   const desenho = DESENHOS[nome]
   if (!Object.hasOwn(DESENHOS, nome)) return null
   const medida = typeof tamanho === 'number' ? `${tamanho}px` : tamanho

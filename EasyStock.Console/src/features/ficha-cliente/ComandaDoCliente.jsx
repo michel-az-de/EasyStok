@@ -293,7 +293,7 @@ function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompar
     {erro && !aberta && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar comanda</Botao></>}
     {carregando && !dados.length ? <output className={css.avisoCompartilhado}>Consultando a comanda…</output> : <>
       {acaoMontar}
-      {!visiveis.length && !erro && !pedido && <p>O cliente também pode escolher pelo Link de compra.</p>}
+      {!visiveis.length && !erro && !pedido && <p>O cliente também pode escolher pelo cardápio enviado.</p>}
       {visiveis.map(c => {
         const etapa = etapaDaSelecao(c)
         const quantidade = c.selecao.reduce((soma, item) => soma + item.qtd, 0)
@@ -339,7 +339,7 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
     </div>
     {erro && <p role="alert">{erro}</p>}
     {acaoMontar}
-    {!visiveis.length && !erro && !pedido?.pedidoId && <p>Compartilhe com o cliente pelo Link de compra ou adicione os itens por aqui.</p>}
+    {!visiveis.length && !erro && !pedido?.pedidoId && <p>Envie o cardápio ao cliente ou adicione os itens.</p>}
     {visiveis.map(c => {
       const pendente = (!c.pedidoEncerrado || c.envio?.situacao !== 'alteracao_aguardando_confirmacao')
         && ['alteracao_aguardando_confirmacao', 'estorno_pendente', 'estorno_recusado'].includes(c.envio?.situacao)

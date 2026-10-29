@@ -111,8 +111,8 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   if (carga.estado === 'carregando') return <output className={css.descricao}>Calculando a sugestão…</output>
   if (carga.estado === 'erro' && linhas.length === 0) return (
     <div className={css.aba} role="alert">
-      <p className={css.aviso}>Não consegui ler a sugestão: {carga.erro}</p>
-      <Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar novamente</Botao>
+      <p className={css.aviso}>Não foi possível carregar a sugestão. {carga.erro}</p>
+      <Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar de novo</Botao>
     </div>
   )
 
@@ -122,8 +122,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   return (
     <div className={css.aba}>
       <p className={css.descricao}>
-        Quanto produzir de cada prato para atender os pedidos agendados até a data, cobrir o que saiu sem saldo e
-        voltar ao mínimo. Mude as porções à vontade: calcular não mexe no estoque.
+        Ajuste as porções sugeridas para atender os pedidos e repor o estoque mínimo. Calcular não altera o estoque.
       </p>
       <label className={css.dataPlanejamento}>
         <span className={css.nome}>Pedidos até</span>
@@ -131,13 +130,13 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
       </label>
       {atualizando && <output className={css.descricao}>Atualizando a sugestão para a data escolhida…</output>}
       {carga.estado === 'erro' && <p className={css.aviso} role="alert">
-        Não consegui atualizar a sugestão. As porções abaixo são da consulta anterior. {carga.erro}
-        {' '}<Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar novamente</Botao>
+        Não foi possível atualizar a sugestão. As porções abaixo são da consulta anterior. {carga.erro}
+        {' '}<Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar de novo</Botao>
       </p>}
       {aviso && <p className={css.aviso} role="alert">{aviso} <Botao variante="texto" onClick={() => setAviso(null)}>Fechar</Botao></p>}
 
       {linhas.length === 0 ? (
-        <p className={css.descricao}>Nenhum prato ligado ao estoque ainda: a primeira produção liga o prato. Lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
+        <p className={css.descricao}>Registre a primeira produção em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a> para planejar os pratos.</p>
       ) : (
         <ul className={css.lista}>
           {linhas.map((l) => (

@@ -176,8 +176,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         <div className={css.abertura}>
           <div className={css.cabeca}>
             <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
-            {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada neste aparelho. Ao trocar de pessoa, toque no seu avatar e em Sair.</p>}
-            {modulos.length === 0 && !busca && <output>Seu perfil ainda não tem módulos liberados. Peça à dona para revisar seu acesso.</output>}
+            {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada. Ao trocar de pessoa, use Sair no menu da conta.</p>}
+            {modulos.length === 0 && !busca && <output>Seu perfil não tem módulos liberados. Peça à administração da loja para revisar seu acesso.</output>}
           </div>
           <div className={css.busca}>
             <CampoTexto ref={buscaRef} rotulo="Buscar módulo ou tela" tipo="search"
