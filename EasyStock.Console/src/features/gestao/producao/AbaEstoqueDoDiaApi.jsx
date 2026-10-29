@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { BotaoIcone } from '../../../componentes/BotaoIcone'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
@@ -256,8 +257,8 @@ export function AbaEstoqueDoDiaApi() {
                 </div>
                 {podeReimprimir(l) && (
                   <div className={css.acoes}>
-                    <Botao variante="texto" icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
-                      aria-label={`Etiquetas do lote ${l.codigo}`} title="Etiquetas" onClick={() => reimprimir(l.id)} />
+                    <BotaoIcone icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
+                      rotulo={`Etiquetas do lote ${l.codigo}`} dica="Etiquetas" onClick={() => reimprimir(l.id)} />
                   </div>
                 )}
                 {impressao?.loteId === l.id && impressao.erro && (

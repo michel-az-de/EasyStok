@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
@@ -70,7 +70,16 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
   const botoesArea = useRef({})
   const botoesTela = useRef({})
   const painelRef = useRef(null)
+  const buscaRef = useRef(null)
+  const mudarFoco = useRef(false)
+  useEffect(() => {
+    if (!mudarFoco.current) return
+    mudarFoco.current = false
+    if (inicio) buscaRef.current?.querySelector('input')?.focus({ preventScroll: true })
+    else painelRef.current?.focus({ preventScroll: true })
+  }, [inicio, abaAtiva])
   function escolherTela(item) {
+    mudarFoco.current = inicio
     setInicio(false)
     setAbaAtiva(item.aba)
     aoTrocarAba?.(item.aba)
@@ -121,7 +130,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
     >
       {area && inicio ? (
         <div className={css.inicioGestao}>
-          <CampoTexto rotulo="O que você quer fazer?" placeholder="Buscar por respostas, estoque, caixa…" value={busca} onChange={(evento) => setBusca(evento.target.value)} />
+          <div ref={buscaRef}><CampoTexto rotulo="O que você quer fazer?" placeholder="Buscar por respostas, estoque, caixa…" value={busca} onChange={(evento) => setBusca(evento.target.value)} /></div>
           <div className={css.tarefasGestao}>
             {encontradas.map((modulo) => (
               <section key={modulo.id} aria-label={modulo.nome}>
@@ -142,7 +151,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
         </div>
       ) : area ? (
         <>
-        <Botao variante="texto" icone="chevron-left" onClick={() => setInicio(true)}>Gestão da loja</Botao>
+        <Botao variante="texto" icone="chevron-left" onClick={() => { mudarFoco.current = true; setInicio(true) }}>Gestão da loja</Botao>
         <div className={css.janelaGestao}>
           <div className={css.areasGestao}>
             <p className={css.rotuloAreas}>Áreas da loja</p>

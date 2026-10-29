@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { BotaoIcone } from '../../../componentes/BotaoIcone'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Chip } from '../../../componentes/Chip'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
@@ -376,7 +377,7 @@ export function AbaProducaoDoDiaApi() {
                   <output key={lote.loteId} className={css.aviso}>
                     <strong>Lote {lote.codigo}</strong> lançado: {lote.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
                     <span className={grade.acoesDoAviso}>
-                      <Botao variante="texto" icone="printer" disabled={buscandoEtiquetas} aria-label={`Etiquetas do lote ${lote.codigo}`} title="Etiquetas" onClick={() => imprimir(lote.loteId)} />
+                      <BotaoIcone icone="printer" disabled={buscandoEtiquetas} rotulo={`Etiquetas do lote ${lote.codigo}`} dica="Etiquetas" onClick={() => imprimir(lote.loteId)} />
                       <Botao variante="texto" disabled={buscandoEtiquetas} aria-label={`Fechar o aviso do lote ${lote.codigo}`} onClick={() => dispensar(lote.loteId)}>Fechar aviso</Botao>
                     </span>
                     {impressao?.loteId === lote.loteId && impressao.erro && <>{' '}<strong>Não foi possível carregar as etiquetas deste lote. {impressao.erro}</strong></>}

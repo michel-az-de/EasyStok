@@ -186,7 +186,7 @@ try {
     const { ctx } = await contexto()
     const p = await abrir(ctx)
     await p.getByLabel('Mensagem para o cliente', { exact: true }).fill('Pode ser às 12h')
-    await p.getByRole('button', { name: 'Enviar', exact: true }).click()
+    await p.getByRole('button', { name: 'Enviar mensagem', exact: true }).click()
     await p.waitForFunction(() => window.ordem.length >= 2, null, { timeout: 4000 }).catch(() => {})
     assert.deepEqual(await ordemDe(p), ['assumir', 'enviar:Pode ser às 12h'])
     await ctx.close()
