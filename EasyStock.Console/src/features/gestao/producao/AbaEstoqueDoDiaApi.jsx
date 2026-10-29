@@ -201,7 +201,7 @@ export function AbaEstoqueDoDiaApi() {
       <section className={css.secao} aria-labelledby="estoque-saldo">
         <h3 id="estoque-saldo" className={css.tituloSecao}>Saldo por prato</h3>
         {estoque.pratos.length === 0 ? (
-          <p className={css.descricao}>Nenhum prato do cardápio está ligado ao estoque ainda. A primeira produção liga: lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
+          <p className={css.descricao}>Nenhum prato com estoque cadastrado. Registre o primeiro lote em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
         ) : (
           <ul className={css.lista}>
             {estoque.pratos.map((p) => (

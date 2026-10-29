@@ -63,7 +63,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
       </ul>
       {aparelho && <section className={css.aparelho} aria-label="Avisos neste aparelho">
         <div>
-          <h3>Avisos no celular ou computador</h3>
+          <h3>Avisos neste aparelho</h3>
           <p role={aparelho.estado === 'erro' ? 'alert' : 'status'}>{aparelho.mensagem ?? textoAparelho[aparelho.estado]}</p>
         </div>
         {['desligado', 'bloqueado', 'erro', 'sem-chave', 'ativando'].includes(aparelho.estado) && <Botao onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar avisos neste aparelho</Botao>}

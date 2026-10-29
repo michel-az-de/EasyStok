@@ -32,7 +32,7 @@
   display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; column-gap: var(--e-2); row-gap: var(--e-1);
 }
 .titulo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); }
-.atalho { font-family: var(--f-papel); font-size: var(--t-micro); color: var(--tinta-3); }
+.atalho { font-family: var(--f-corpo); font-size: var(--t-micro); color: var(--tinta-3); }
 .marca { font-size: var(--t-micro); color: var(--tinta-3); justify-self: start; }
 .texto {
   grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--tinta-2);
@@ -41,7 +41,7 @@
 .textoInteiro { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--tinta-2); white-space: pre-line; }
 .quando { grid-column: 1 / -1; font-size: var(--t-micro); color: var(--tinta-3); }
 .semTexto { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--alerta); }
-.chaveLinha { min-height: 0; justify-self: start; grid-column: 2 / -1; }
+.chaveLinha { min-height: var(--toque); justify-self: start; grid-column: 2 / -1; }
 
 .arquivada .titulo, .arquivada .texto { color: var(--tinta-3); }
 .desligada .titulo { color: var(--tinta-2); }

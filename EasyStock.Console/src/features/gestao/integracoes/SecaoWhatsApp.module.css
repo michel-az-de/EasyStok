@@ -3,7 +3,7 @@
 .secao {
   display: flex; flex-direction: column; gap: var(--e-3); align-items: flex-start;
   padding: var(--e-4); margin-bottom: var(--e-4);
-  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  border: 0; border-radius: var(--r-2);
 }
 
 .embutida { display: flex; flex-direction: column; gap: var(--e-3); align-items: flex-start; }

@@ -135,7 +135,7 @@ export function AbaInsumosApi() {
 
       {/* #2081 (E11): a ação principal é um botão do tamanho do texto no topo, não uma barra da largura da tela. */}
       <div className={css.topo}>
-        <p className={css.descricao}>Molho, recheio, massa e embalagem: o saldo, o mínimo e em quantas receitas entram.</p>
+        <p className={css.descricao}>Saldo, estoque mínimo e uso nas receitas.</p>
         {podeEditar && <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setCadastroAberto(true) }}>Cadastrar insumo</Botao>}
       </div>
 

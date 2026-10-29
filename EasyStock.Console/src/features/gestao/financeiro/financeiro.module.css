@@ -6,7 +6,7 @@
 .acoes { justify-content: flex-end; }
 .grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
 .indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--e-3); }
-.indicador { display: grid; gap: var(--e-2); padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--preenchimento); }
+.indicador { display: grid; gap: var(--e-2); padding: var(--e-4); border: 0; border-radius: var(--r-2); background: var(--preenchimento); }
 .indicador > span { color: var(--tinta-2); font-size: var(--t-apoio); }
 .indicador > strong { font-family: var(--f-dado); font-size: var(--t-titulo); }
 .indicador > small { color: var(--tinta-2); }
@@ -15,11 +15,11 @@
 .atalho:hover { background: var(--preenchimento-forte); }
 .filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); align-items: end; gap: var(--e-3); }
 .comContexto { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--e-4); }
-.contexto { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--preenchimento); }
+.contexto { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: 0; border-radius: var(--r-2); background: var(--preenchimento); }
 .contexto h2 { font-size: var(--t-forte); margin: 0; }
 .contexto p { margin: 0; color: var(--tinta-2); }
 .lista { display: grid; align-content: start; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
-.linha { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-3); padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); min-width: 0; }
+.linha { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-3); padding: var(--e-3); border: 0; border-radius: var(--r-2); min-width: 0; }
 /* #2095: a linha da conta é grade (descrição | valor com rótulo | ações); no celular as ações descem para baixo do valor. */
 .lista > .linha:has(> .valorLinha) { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; padding: var(--e-2) var(--e-3); }
 .valorLinha { display: grid; justify-items: end; gap: 2px; }
@@ -27,7 +27,7 @@
 .acoesLinha { display: flex; gap: var(--e-2); justify-content: flex-end; }
 .selecionar small { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e-1); }
 .chips { border: 0; margin: 0; min-width: 0; display: flex; gap: var(--e-2); overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
-.chip { flex: none; min-height: var(--toque); padding: 0 var(--e-4); border-radius: var(--r-pilula); border: var(--b-1) solid var(--linha); background: var(--elevado); color: var(--tinta); font: inherit; font-weight: 600; cursor: pointer; }
+.chip { flex: none; min-height: var(--toque); padding: 0 var(--e-4); border-radius: var(--r-pilula); border: var(--b-1) solid transparent; background: var(--preenchimento); color: var(--tinta); font: inherit; font-weight: 600; cursor: pointer; }
 .chip:hover { background: var(--preenchimento); }
 .chipAtivo, .chipAtivo:hover { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
 .chip:focus-visible, .verLista:focus-visible, .cartaoVencidas:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
@@ -40,7 +40,7 @@
 .maisFiltros[open] > summary { margin-bottom: var(--e-3); }
 .motivo { margin-right: auto; color: var(--tinta-2); font-size: var(--t-apoio); }
 .dia { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--e-4); }
-.ladoDia { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); }
+.ladoDia { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: 0; border-radius: var(--r-2); }
 .ladoDia h2 { margin: 0; font-size: var(--t-forte); }
 .ladoDia h3 { margin: 0; font-size: var(--t-corpo); }
 .cartaoVencidas { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0 var(--e-3); padding: var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); text-decoration: none; }
@@ -63,7 +63,7 @@
 .detalhes > div { min-width: 0; }
 .detalhes dt { color: var(--tinta-2); font-size: var(--t-apoio); }
 .detalhes dd { margin: var(--e-1) 0 0; overflow-wrap: anywhere; }
-.parcela { border: var(--b-1) solid var(--linha); border-radius: var(--r-2); padding: var(--e-3); display: grid; gap: var(--e-3); }
+.parcela { border: 0; border-radius: var(--r-2); padding: var(--e-3); display: grid; gap: var(--e-3);  background: var(--preenchimento); }
 .parcela h3 { margin: 0; font-size: var(--t-forte); }
 .parcela p { margin: 0; }
 .historico { padding-left: var(--e-4); display: grid; gap: var(--e-2); }

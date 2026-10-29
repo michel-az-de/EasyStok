@@ -62,7 +62,7 @@ function host(componente, props) {
 function elementos(no) { return Array.isArray(no) ? no.flatMap(elementos) : !no?.props ? [] : [no, ...elementos(no.props.children)] }
 const doTipo = (h, tipo) => elementos(h.arvore).filter(e => e.type === tipo)
 const texto = no => Array.isArray(no) ? no.map(texto).join('') : no?.props ? texto(no.props.children) : no == null ? '' : String(no)
-const botao = (h, rotulo) => doTipo(h, 'Botao').find(b => texto(b) === rotulo)
+const botao = (h, rotulo) => doTipo(h, 'Botao').find(b => texto(b) === rotulo || b.props['aria-label'] === rotulo)
 const enviar = h => doTipo(h, 'form')[0].props.onSubmit({ preventDefault() {} })
 let grupos = 0
 const provar = async (nome, fn) => { await fn(); grupos++; console.log('ok ' + nome) }
@@ -89,6 +89,7 @@ await provar('montagem só acontece no clique explícito; espera, evita duplica�
   h.render({ ...h.props, blocosSoltos: [`${geracao}:nota-1`] })
   assert.deepEqual(doTipo(h, BlocoColaborativoIa).map(b => b.props.bloco.tipo), ['comanda', 'frete', 'acao'])
   assert.equal(botao(h, 'Organizar com IA').props['data-organizar-ficha-ia'], conversa, 'retorno de foco permanece disponível após retirar o bloco da área')
+  assert.equal(texto(botao(h, 'Organizar com IA')), 'Organizar', 'ação curta mantém o nome acessível completo')
   assert.equal(botao(h, 'Organizar com IA').props.disabled, false)
   h.desmontar()
 })

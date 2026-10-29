@@ -6,7 +6,7 @@
 }
 .identidade { display: flex; align-items: center; gap: var(--e-3); min-width: 0; flex: 1; }
 .cabecalho h2 {
-  margin: 0; font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700;
+  margin: 0; font-family: var(--f-corpo); font-size: var(--t-forte); font-weight: 700;
   line-height: var(--lh-compacto); letter-spacing: -.01em;
 }
 .nomeCliente { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -45,7 +45,7 @@
   color: var(--tinta); font: inherit; font-size: var(--t-apoio); text-align: left; cursor: pointer;
 }
 .menuConversa button:hover:not(:disabled), .menuFerramentas button:hover:not(:disabled), .menuFerramentas label:hover { background: var(--preenchimento); }
-.menuFerramentas .rotuloAcao { display: inline; }
+.menuFerramentas .rotuloAcao { display: inline; position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; white-space: normal; }
 
 /* Uma área rolável só na coluna do meio: barra de modo, thread e painel do
    agente rolam juntos, o cabeçalho fica no teto e o composer no piso. Antes os
@@ -62,12 +62,12 @@
 
 /* A thread cresce com o conteúdo e empurra o resto: quem rola é a área acima. */
 .thread {
-  flex: 1 0 auto; padding: var(--e-4);
+  flex: 1 0 auto; padding: var(--e-4) var(--e-5);
   display: flex; flex-direction: column; background: transparent;
 }
 
 .balao {
-  max-width: min(76%, 62ch); padding: var(--e-2) var(--e-3);
+  max-width: min(76%, 62ch); padding: var(--e-3) var(--e-4);
   border-radius: var(--r-2); box-shadow: none;
   margin-top: 4px; animation: entradaBalao var(--dur-media) var(--ease-saida);
 }
@@ -76,7 +76,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 /* Troca de remetente respira mais. */
-.trocaDeVoz { margin-top: 12px; }
+.trocaDeVoz { margin-top: var(--e-5); }
 .balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--t-corpo); }
 .meta {
   display: flex; gap: var(--e-2); align-items: center; justify-content: flex-end;
@@ -90,7 +90,7 @@
    que falhou têm 32 px de altura para o toque. */
 .meta .falhou { flex-basis: 100%; display: flex; justify-content: flex-end; align-items: flex-start; gap: 4px; }
 .meta .falhou svg { flex-shrink: 0; margin-top: 2px; }
-.acaoDaBolha { min-height: 32px; display: inline-flex; align-items: center; }
+.acaoDaBolha { min-height: var(--toque); display: inline-flex; align-items: center; }
 /* #1444: "enviando" escrito, não só o ✓ cinza: a mídia demora e a dona precisa ver que está indo. */
 .enviando { display: inline-flex; align-items: center; gap: 4px; }
 .enviando::before {
@@ -102,12 +102,12 @@
 .entrada {
   align-self: flex-start; background: var(--papel); border: 0;
   border-radius: var(--r-1);
-  box-shadow: 0 1px 2px light-dark(rgba(48, 32, 16, .08), rgba(0, 0, 0, .4));
+  box-shadow: none;
 }
 .saida {
-  align-self: flex-end; background: var(--marca-claro); color: var(--tinta);
+  align-self: flex-end; background: var(--preenchimento-forte); color: var(--tinta);
   border-radius: var(--r-1);
-  box-shadow: 0 1px 2px light-dark(rgba(120, 40, 10, .08), rgba(0, 0, 0, .35));
+  box-shadow: none;
 }
 .saida .meta, .saida .meta * { color: var(--tinta-3); }
 /* #1761: lida se distingue de entregue pela palavra e pela cor. */
@@ -155,7 +155,7 @@
      janela (@media via viewport nunca disparava com o palco de três colunas
      aberto). */
   container: composer / inline-size;
-  display: flex; flex-direction: column; gap: var(--e-3);
+  display: flex; flex-direction: column; gap: var(--e-2);
 }
 .caixa {
   background: var(--papel); border: 0;
@@ -233,25 +233,28 @@
 .modo_encerrado { border-left-color: var(--linha-forte); }
 .modo_bloqueado { border-left-color: var(--erro); }
 
-/* #1442: uma linha só, rótulo + frase + ações. A frase encolhe com
-   reticência (inteira no `title`); em coluna estreita as ações descem. */
-/* #1761 (L6): a barra fica em uma linha e o texto não corta com reticência: se faltar largura,
-   quem quebra é a frase, ao lado da pílula e dos botões. */
-/* Com dois botões a frase não cabe ao lado: ela desce inteira para a linha de baixo, nunca é esmagada. */
-.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
-.modoLinha > :first-child { flex-shrink: 0; }
+/* Estado e Assumir permanecem à vista; as ações secundárias abrem no próprio contexto. */
+.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); }
+.modoLinha > :first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .modoTexto {
-  flex: 1 1 14rem; min-width: 0; margin: 0;
+  flex: 1 1 100%; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
-/* #1870: no desktop a faixa é sempre uma linha. A frase cede com reticência (inteira no title e
-   no leitor de tela) em vez de empurrar os botões para uma segunda linha. */
-@media (min-width: 760px) {
-  .modo { padding-inline: var(--e-3); }
-  .modoLinha { flex-wrap: nowrap; }
-  .modoTexto { flex: 1 1 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.modoAcoes { margin-left: auto; display: flex; align-items: center; gap: var(--e-1); flex: none; }
+.maisAcoesModo { position: relative; }
+.maisAcoesModo > summary {
+  display: flex; align-items: center; min-height: var(--toque); padding: 0 var(--e-2);
+  list-style: none; cursor: pointer; font-size: var(--t-apoio); color: var(--tinta-2);
 }
-.modoAcoes { margin-left: auto; display: flex; gap: var(--e-2); flex-shrink: 0; }
+.maisAcoesModo > summary::-webkit-details-marker { display: none; }
+.maisAcoesModo > summary:hover, .maisAcoesModo[open] > summary { background: var(--preenchimento); }
+.maisAcoesModo > summary:focus-visible { outline: 3px solid var(--halo); outline-offset: 2px; }
+.listaAcoesModo {
+  position: absolute; right: 0; top: calc(100% + var(--e-1)); z-index: 40;
+  display: grid; gap: var(--e-1); width: min(260px, calc(100vw - 32px));
+  padding: var(--e-2); background: var(--papel); box-shadow: var(--sombra);
+}
+.listaAcoesModo > button { justify-content: flex-start; text-align: left; white-space: normal; }
 .acaoModo { min-height: var(--toque); padding-block: 0; }
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
 
@@ -333,19 +336,21 @@
   display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: var(--e-1);
   padding: var(--e-2); border-radius: var(--r-2);
 }
+/* Campo vazio e ações ocupam cerca de 120px com o respiro externo; anexos e erros podem crescer. */
+.caixa:has(textarea) { min-height: 96px; }
 .acoes { display: flex; flex-wrap: nowrap; gap: var(--e-1); padding: 0; order: 1; }
 .acoes > button:not(.enviar) { order: 1; width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-2); }
 .caixa > :not(.acoes) { order: 0; flex: 1; min-width: 0; }
-.acoes > .enviar { order: 3; margin-left: 0; }
+.acoes > .enviar { order: 3; margin-left: auto; width: auto; min-width: var(--toque); padding-inline: var(--e-3); }
 .caixa textarea,
 .caixa textarea:hover,
 .caixa textarea:focus,
-.caixa textarea:disabled { min-height: 36px; padding: 7px 8px; line-height: 1.4; }
+.caixa textarea:disabled { min-height: var(--toque); padding: var(--e-2); line-height: var(--lh-corpo); }
 /* Enviar: a única mancha de cor da barra quando há texto; sem texto, tinta
    clara da marca, visível no claro e no escuro. */
 .acoes .enviar:disabled { background: var(--preenchimento); color: var(--tinta-3); opacity: 1; }
 @media (max-width: 759px) {
-  .acoes .enviar { width: var(--toque); margin-left: 0; }
+  .acoes .enviar { width: auto; min-width: var(--toque); margin-left: auto; }
 }
 
 /* Rodada 10, pedido do dono (25/09 23h42, "não vi pra enviar uma lista de
@@ -370,7 +375,7 @@
    texto centralizado, sem caixa. */
 .entrada { border-radius: var(--r-2); }
 .saida { border-radius: var(--r-2); }
-.saida.doAutomatico { background: var(--marca-claro); }
+.saida.doAutomatico { background: var(--preenchimento-forte); }
 .sistema {
   background: transparent; box-shadow: none; color: var(--tinta-3);
   font-size: var(--t-micro); padding: 2px var(--e-3); max-width: 80%;
@@ -494,18 +499,27 @@
   }
 }
 
-/* Nota interna como post-it no fio (#1441): papel amarelo de recado, do lado de quem
-   atende, levemente torto. Nunca parece balão de mensagem: o cliente não vê. */
+/* Nota interna é um evento compacto. Só a expansão mostra o papel manuscrito. */
 .postIt {
-  align-self: flex-end; max-width: min(320px, 80%);
-  margin: var(--e-2) var(--e-2) var(--e-2) 0; padding: var(--e-2) var(--e-3);
-  background: var(--alerta-pastel); color: var(--tinta);
+  align-self: center; max-width: 100%;
+  margin: var(--e-4) 0; padding: 0;
+  background: transparent; color: var(--tinta);
   border-radius: var(--r-2);
   box-shadow: none;
   font-size: var(--t-apoio); line-height: var(--lh-corpo);
 }
-.postIt p { margin: var(--e-1) 0 0; white-space: pre-line; font-family: var(--f-manuscrita); line-height: 1.6; }
-.postItQuem { display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-micro); font-weight: 600; color: var(--alerta); }
+.eventoNota { max-width: 100%; background: var(--alerta-pastel); }
+.eventoNota > summary {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); min-height: var(--toque);
+  padding: var(--e-1) var(--e-3); list-style: none; cursor: pointer;
+}
+.eventoNota > summary::-webkit-details-marker { display: none; }
+.eventoNota > summary:focus-visible { outline: 3px solid var(--halo); outline-offset: 2px; }
+.eventoNota[open] { width: min(340px, 100%); }
+.postIt p { margin: 0; padding: var(--e-2) var(--e-4) var(--e-4); white-space: pre-line; overflow-wrap: anywhere; font-family: var(--f-manuscrita); font-size: 24px; line-height: 1.4; }
+.postItQuem { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--e-1); font-size: var(--t-micro); font-weight: 600; color: var(--tinta-2); }
+.postItQuem > svg { flex: none; }
+.verNota { font-size: var(--t-micro); font-weight: 700; color: var(--marca-forte); }
 @media (prefers-reduced-motion: reduce) { .postIt { transform: none; } }
 
 /* #1868: com coluna larga (1920, ou 1440 com nome curto) o topo da conversa fica numa linha só:

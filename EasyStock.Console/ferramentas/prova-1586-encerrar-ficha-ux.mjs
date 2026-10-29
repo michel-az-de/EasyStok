@@ -694,9 +694,9 @@ await confere('#2079-C2 entregue com saldo: sem "nada pendente", com "Marcar pag
   tela.renderizar()
   assert.equal(doTipo(tela, 'BaixaAMao')[0].props.valorCobrado, 88)
   tela.encerrar()
-  // Quitado, a barra volta a dizer que nada falta.
+  // Quitado, a barra identifica o estado final e oferece concluir, sem cobrança.
   const quitado = new Tela(BarraProximoPasso, propsDaBarra(entregueComSaldo({ totalPagoApi: 88, alocadoApi: 88 }), { aoEncerrarAtendimento: nada }))
-  assert.ok(texto(quitado.arvore).includes('nada pendente'))
+  assert.match(texto(quitado.arvore), /Entregue/)
   assert.equal(botao(quitado, 'Marcar pago (R$'), undefined)
   assert.equal(botao(quitado, 'Concluir conversa').props.variante, 'primario')
   quitado.encerrar()

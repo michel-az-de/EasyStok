@@ -35,8 +35,8 @@ time, data, output { font-variant-numeric: tabular-nums; }
 button { font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
 input, select, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
 
-/* Toque que responde: todo botão afunda um pouco ao apertar e volta com mola.
-   O transform inline do arraste (dnd-kit) vence esta regra por ser inline. */
+/* Estado de interação por cor. Transformações pertencem ao arraste ou à camada,
+   sem encolher texto, linhas de tabela e botões ao pressionar. */
 button {
   -webkit-tap-highlight-color: transparent;
   transition:
@@ -44,13 +44,7 @@ button {
     border-color var(--dur-curta) var(--ease-padrao),
     color var(--dur-curta) var(--ease-padrao),
     box-shadow var(--dur-curta) var(--ease-padrao),
-    opacity var(--dur-curta) var(--ease-padrao),
-    transform var(--dur-media) var(--ease-mola);
-}
-button:active:not(:disabled) {
-  transform: scale(.975);
-  transition-duration: var(--dur-micro);
-  transition-timing-function: var(--ease-entrada);
+    opacity var(--dur-curta) var(--ease-padrao);
 }
 
 /* Foco: anel de 3 px com folga de 2. */

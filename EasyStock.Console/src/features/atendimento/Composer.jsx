@@ -302,7 +302,11 @@ export function Composer({
               }}>
                 <Tooltip texto="Mais ferramentas"><summary aria-label="Mais ferramentas"><Icone nome="mais" /></summary></Tooltip>
                 <div className={css.menuFerramentas} role="group" aria-label="Ferramentas da mensagem" onClick={(evento) => {
-                  if (evento.target.closest('button')) evento.currentTarget.closest('details').open = false
+                  if (evento.target.closest('button')) {
+                    const ferramentas = evento.currentTarget.closest('details')
+                    ferramentas.open = false
+                    ferramentas.querySelector('summary')?.focus({ preventScroll: true })
+                  }
                 }}>
 
               {acoes.anexar && <BotaoAnexarArquivo
@@ -358,16 +362,18 @@ export function Composer({
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
               {temTexto || anexo || !acoes.audio ? (
-                <BotaoIcone
-                  tom="primario"
+                <Tooltip texto={variavelSobrando ?? (temTexto || anexo ? 'Enviar mensagem' : restricao ?? 'Escreva a mensagem para enviar')}
+                  atalho={temTexto || anexo ? 'Enter' : undefined}>
+                <Botao
+                  variante="primario"
                   className={css.enviar}
-                  rotulo="Enviar mensagem"
-                  icone="arrow-up"
-                  atalho={temTexto || anexo ? 'Enter' : undefined}
-                  dica={variavelSobrando ?? (temTexto || anexo ? undefined : restricao ?? 'Escreva a mensagem para enviar')}
+                  aria-label="Enviar mensagem"
+                  icone="enviar"
+                  aria-keyshortcuts={temTexto || anexo ? 'Enter' : undefined}
                   disabled={!podeEscrever || assumindo || Boolean(variavelSobrando) || !(temTexto || anexo)}
                   onClick={enviarComposer}
-                />
+                >Enviar</Botao>
+                </Tooltip>
               ) : (
                 <BotaoIcone
                   tom="primario"
@@ -386,7 +392,7 @@ export function Composer({
               o curto; o motivo inteiro segue no title, no leitor de tela e no aria-describedby. */}
           {restricao && (podeAnexar || podeAudio
             ? <p id={idRestricao} className={css.restricao}>{restricao}</p>
-            : <p id={idRestricao} className={css.restricao} title={restricao}><span aria-hidden="true">Só texto neste canal</span><span className="sr">{restricao}</span></p>)}
+            : <p id={idRestricao} className="sr">{restricao}</p>)}
         </>
       )}
 

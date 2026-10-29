@@ -1,6 +1,6 @@
 .tema {
   display: inline-flex; flex: none; gap: 2px; padding: 3px;
-  background: var(--preenchimento); border-radius: calc(var(--r-1) + 3px);
+  background: var(--preenchimento); border-radius: var(--r-1);
 }
 .tema > button {
   min-height: var(--toque); padding: 0 var(--e-2);
@@ -8,7 +8,7 @@
 }
 .tema > button:hover { background: var(--elevado); color: var(--tinta); }
 .tema > button[aria-checked='true'] {
-  background: var(--papel); color: var(--marca-forte); border-color: var(--linha); box-shadow: var(--sombra);
+  background: var(--papel); color: var(--marca-forte); border-color: transparent; box-shadow: none;
 }
 .vertical { display: flex; flex-direction: column; margin-top: var(--e-2); }
 .vertical > button {

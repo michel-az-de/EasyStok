@@ -11,9 +11,9 @@
   pointer-events: auto; width: 100%;
   display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: var(--e-2);
   padding: var(--e-3) var(--e-2) var(--e-3) var(--e-3);
-  border: var(--b-1) solid var(--linha); border-left: 4px solid var(--tom, var(--marca));
+  border: 0;
   border-radius: var(--r-2); background: var(--papel); color: var(--tinta);
-  box-shadow: var(--sombra-alta);
+  box-shadow: var(--sombra-media);
   animation: entrarAviso var(--dur-media) var(--ease-saida) both;
 }
 .marca { --tom: var(--marca); }

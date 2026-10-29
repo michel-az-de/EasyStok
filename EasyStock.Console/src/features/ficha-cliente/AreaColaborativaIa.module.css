@@ -1,4 +1,4 @@
-.area { display: grid; gap: var(--e-3); padding-block: var(--e-3); min-width: 0; }
+.area { display: grid; gap: var(--e-2); margin-inline: var(--e-4); padding: var(--e-3); background: var(--elevado); min-width: 0; }
 .cabecalho { display: flex; gap: var(--e-2); align-items: center; }
 .cabecalho h3, .cabecalhoBloco h4 { margin: 0; }
 .cabecalho h3 { font-size: var(--t-apoio); flex: 1; }

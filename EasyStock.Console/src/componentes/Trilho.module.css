@@ -13,19 +13,18 @@
 .inicio {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   border-radius: var(--r-1); color: var(--tinta-2); text-decoration: none;
-  font-size: var(--t-minimo); font-weight: 600;
+  font-size: .75rem; font-weight: 600;
 }
 .inicio:hover { color: var(--marca); }
-/* `letter-spacing: inherit`: o rótulo "Atendimento" tem 76 px no espaçamento do corpo (-0,1 px) e só cabe no item de 84 px assim;
-   com 0 ele passava de 76 e quebrava em "Atendi-mento". */
+/* Rótulos de 12 px com espaçamento óptico para caber no item de 68 px. */
 /* `.filhos` marca o contêiner de botões que outro componente desenha (avisos e lembretes). */
 .item, .filhos > button, .filhos > div > button {
-  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  width: var(--largura-item-trilho); min-height: var(--altura-item-trilho); padding: 4px;
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex-shrink: 0;
+  width: var(--largura-item-trilho); min-height: max(var(--toque), var(--altura-item-trilho)); padding: 4px 0;
   border: 0; border-radius: var(--r-1); background: transparent; color: var(--tinta-2); box-shadow: none;
-  font-size: var(--t-minimo); font-weight: 600; letter-spacing: inherit; line-height: 1.1; text-align: center; text-decoration: none;
+  font-size: .75rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.2; text-align: center; text-decoration: none;
 }
-.item > span { max-width: 100%; overflow-wrap: anywhere; hyphens: auto; }
+.item > span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .item > svg { flex: none; }
 .item:hover:not(:disabled), .filhos > button:hover:not(:disabled), .filhos > div > button:hover:not(:disabled) {
   background: var(--preenchimento); color: var(--tinta);

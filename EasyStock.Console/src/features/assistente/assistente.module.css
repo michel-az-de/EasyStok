@@ -157,8 +157,8 @@
   .painel { right: var(--e-2); bottom: calc(54px + var(--e-2) + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 2 * var(--e-2)); max-height: calc(100dvh - 144px); }
   .acaoProposta { align-items: flex-start; flex-wrap: wrap; }
   .acaoTexto { flex: 1 1 180px; }
-  .acaoBotao { min-height: 44px; }
-  .dispensar { min-width: 44px; min-height: 44px; }
+  .acaoBotao { min-height: var(--toque); }
+  .dispensar { min-width: var(--toque); min-height: var(--toque); }
 }
 @media (prefers-reduced-motion: reduce) {
   .gatilho { transition: none; }

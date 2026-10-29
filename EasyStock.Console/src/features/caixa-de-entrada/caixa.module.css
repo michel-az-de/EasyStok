@@ -123,9 +123,15 @@
 
 /* Topo do Balcão: busca e ordenar (linha A) e filtros (linha B). */
 .barra {
-  padding: var(--e-2) var(--e-3); display: grid; gap: var(--e-2);
-  background: var(--elevado); flex-shrink: 0;
+  padding: 0 var(--e-3) var(--e-2); display: grid; gap: var(--e-2);
+  background: var(--papel); flex-shrink: 0;
 }
+.cabecalhoLista { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: 64px; }
+.cabecalhoLista h2 { margin: 0; font-size: var(--t-titulo); font-weight: 700; }
+.cabecalhoLista h2 span { margin-left: var(--e-1); color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 400; }
+.painelFiltros { display: grid; gap: var(--e-3); }
+.canaisNoFiltro { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin: 0; padding: 0; border: 0; }
+.canaisNoFiltro legend { color: var(--tinta-2); font-size: var(--t-minimo); margin-bottom: var(--e-2); }
 .filtroResponsavel { display: flex; align-items: center; gap: var(--e-2); color: var(--tinta-2); font-size: var(--t-micro); }
 /* #1868: linha B com os chips e o Responsável. Em linha de 396 px ou mais, na mesma linha (o
    rótulo vira texto de leitor de tela); mais estreita, o Responsável desce inteiro, com o rótulo.
@@ -184,10 +190,10 @@
    Sem quebra: com canal a mais, a linha rola de lado em vez de crescer. */
 .filtros {
   display: flex; align-items: center; gap: 6px; min-width: 0;
-  border: 0; margin: 0; padding: 0 var(--e-3) 0 0;
+  border: 0; margin: 0; padding: 0;
   overflow-x: auto; scrollbar-width: none;
   /* Esfumaça a borda direita: avisa que há mais chip rolando de lado. */
-  mask-image: linear-gradient(90deg, var(--impressao-tinta) calc(100% - 24px), transparent);
+  mask-image: none;
 }
 .filtros::-webkit-scrollbar { display: none; }
 /* Mesmo alvo dos controles: parado é
@@ -196,7 +202,7 @@
 .chipFiltro {
   flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
   min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-1);
-  border: 0; background: var(--preenchimento); color: var(--tinta-2);
+  border: 0; background: transparent; color: var(--tinta-2);
   font-size: var(--t-micro); font-weight: 600; white-space: nowrap;
   transition: background-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao);
 }

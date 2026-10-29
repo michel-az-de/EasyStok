@@ -9,23 +9,45 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Nunito Sans';
+  src: url('./fontes/NunitoSans-400.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nunito Sans';
+  src: url('./fontes/NunitoSans-600.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nunito Sans';
+  src: url('./fontes/NunitoSans-700.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light dark;
-  --fundo: light-dark(#F6F4F0, #1C1917);
+  --fundo: light-dark(#F5F5F1, #1C1917);
   --papel: light-dark(#FEFEFE, #241A12);
-  --elevado: light-dark(#F7F5F1, #302A24);
-  --creme: light-dark(#F7F4EE, #1C1917);
-  --chao-conversa: light-dark(#F5F3EF, #1C1917);
-  --preenchimento: light-dark(rgba(66, 40, 20, .07), rgba(246, 235, 221, .07));
-  --preenchimento-forte: light-dark(rgba(66, 40, 20, .12), rgba(246, 235, 221, .12));
+  --elevado: light-dark(#F7F6F2, #302A24);
+  --creme: light-dark(#F5F5F1, #1C1917);
+  --chao-conversa: light-dark(#F5F5F1, #1C1917);
+  --preenchimento: light-dark(#F0EDE7, #33291F);
+  --preenchimento-forte: light-dark(#E7E2D9, #3D332A);
   --vidro: light-dark(rgba(254, 254, 254, .94), rgba(36, 26, 18, .94));
   --desfoque: saturate(180%) blur(20px);
-  --linha: light-dark(#E5D5BE, #594532);
-  --linha-media: light-dark(#8C7259, #AA8A69);
-  --linha-forte: light-dark(#8C7259, #AA8A69);
-  --tinta: light-dark(#422814, #F6EBDD);
-  --tinta-2: light-dark(#5E4128, #D9C6B0);
-  --tinta-3: light-dark(#735A45, #C4AB91);
+  --linha: light-dark(#E6E1D8, #594532);
+  --linha-media: light-dark(#81786D, #AA8A69);
+  --linha-forte: light-dark(#81786D, #AA8A69);
+  --tinta: light-dark(#302A25, #F6EBDD);
+  --tinta-2: light-dark(#544C43, #D9C6B0);
+  --tinta-3: light-dark(#6B6258, #C4AB91);
   --marca: light-dark(#A25803, #F0A960);
   --marca-forte: light-dark(#874902, #FFC48A);
   --marca-claro: light-dark(#FFF0D8, #3A2918);
@@ -64,34 +86,31 @@
   --acao-sucesso: #2B6A45;
   /* Largura das colunas Balcão e Ficha, lida e escrita por localStorage pela
      Frente C (seção 9). */
-  --largura-balcao: 360px;
-  --largura-ficha:  420px;
+  --largura-balcao: 276px;
+  --largura-ficha:  316px;
 
-  /* --- profundidade: sombra em camadas, cor quente no claro --------------
-     No escuro a sombra preta some no fundo, então a elevação vem de uma
-     luz de 1 px no topo (--brilho) mais a linha fina. */
+  /* Sombra só para elevar camadas; sem contorno adicional na superfície. */
   --cortina: light-dark(rgba(28, 22, 16, .38), rgba(0, 0, 0, .6));
   --sombra:
-    0 1px 2px light-dark(rgba(16, 16, 24, .06), rgba(0, 0, 0, .4)),
-    0 1px 1px light-dark(rgba(16, 16, 24, .04), rgba(0, 0, 0, .2));
+    0 1px 2px light-dark(rgba(48, 42, 37, .06), rgba(0, 0, 0, .4)),
+    0 1px 1px light-dark(rgba(48, 42, 37, .04), rgba(0, 0, 0, .2));
   --sombra-media:
-    0 8px 20px -6px light-dark(rgba(16, 16, 24, .12), rgba(0, 0, 0, .55)),
-    0 2px 4px light-dark(rgba(16, 16, 24, .05), rgba(0, 0, 0, .3));
+    0 8px 20px -6px light-dark(rgba(48, 42, 37, .12), rgba(0, 0, 0, .55)),
+    0 2px 4px light-dark(rgba(48, 42, 37, .05), rgba(0, 0, 0, .3));
   --sombra-alta:
-    0 32px 64px -20px light-dark(rgba(16, 16, 24, .30), rgba(0, 0, 0, .75)),
-    0 12px 24px -10px light-dark(rgba(16, 16, 24, .14), rgba(0, 0, 0, .45)),
-    0 0 0 1px light-dark(rgba(16, 16, 24, .06), rgba(255, 240, 225, .08));
+    0 20px 48px -16px light-dark(rgba(48, 42, 37, .18), rgba(0, 0, 0, .65)),
+    0 4px 12px -4px light-dark(rgba(48, 42, 37, .08), rgba(0, 0, 0, .35));
   --brilho: inset 0 1px 0 light-dark(rgba(255, 255, 255, .7), rgba(255, 255, 255, .05));
 
   /* Escala por papel. */
   --t-minimo: .8125rem;
-  --t-micro: .875rem;
-  --t-apoio: 1rem;
-  --t-corpo: 1.0625rem;
-  --t-forte: 1.1875rem;
-  --t-titulo: 1.375rem;
-  --t-valor: 1.75rem;
-  --t-display: 2.25rem;
+  --t-micro: .8125rem;
+  --t-apoio: .875rem;
+  --t-corpo: .9375rem;
+  --t-forte: 1.0625rem;
+  --t-titulo: 1.25rem;
+  --t-valor: 1.5rem;
+  --t-display: 2rem;
 
   --lh-corpo: 1.45;
   --lh-compacto: 1.22;
@@ -101,14 +120,13 @@
   --ls-titulo: -.017em;
   --ls-display: -.026em;
 
-  /* --- espaço: 4 8 12 16 20 24 32 52 -------------------------------------
-     Dentro do bloco 8. Entre blocos 20. Respiro de região 32. */
+  /* Ritmo comum: 4, 8, 12, 16, 24 e 32 px. */
   --e-1: 4px;
   --e-2: 8px;
   --e-3: 12px;
-  --e-4: 20px;
-  --e-5: 32px;
-  --e-6: 52px;
+  --e-4: 16px;
+  --e-5: 24px;
+  --e-6: 32px;
   --e-16: 16px;
   --e-24: 24px;
   --e-0: var(--e-1);
@@ -130,24 +148,24 @@
   /* Controles compactos no desktop; no toque, o alvo mínimo é 48 px. */
   --toque: 40px;
   --coluna: 320px;
-  /* #1870/#1872: um trilho só, no Balcão e nos módulos (`componentes/Trilho.module.css`). O item cabe
-     "Atendimento" e "Automáticas" em uma linha (76 px no rótulo de 13 px).
+  /* #1870/#1872: um trilho só no atendimento e nos módulos. Os rótulos de
+     12 px cabem no item de 68 px do trilho de 76 px.
      `--largura-trilho` não é declarado aqui: vem de `TRILHO` em `dominio/paineis.js` (a mesma conta
      da conversa visível), aplicado na partida por `main.jsx`. O item é o trilho menos o respiro. */
-  --respiro-trilho: 8px;
+  --respiro-trilho: 4px;
   --largura-item-trilho: calc(var(--largura-trilho) - 2 * var(--respiro-trilho));
   --altura-item-trilho: 54px;
   --gaveta: 400px;
 
-  /* Nunito na operação; Lora nos marcos da marca; papel monoespaçado. */
+  /* A mesma família na operação. Caveat é opt-in nos papéis de nota/comanda. */
   --f-corpo: 'Nunito Sans', 'Segoe UI', system-ui, sans-serif;
-  --f-display: 'Lora', Georgia, serif;
+  --f-display: var(--f-corpo);
   --f-dado: var(--f-corpo);
   --f-titulo-marca: var(--f-display);
-  --f-papel: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --f-papel: var(--f-corpo);
   --f-manuscrita: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
   --fonte-apontamento: var(--f-manuscrita);
-  --papel-ficha: light-dark(#F0E5D2, #302A24);
+  --papel-ficha: var(--papel);
 
   /* --- movimento -----------------------------------------------------------
      micro: toque e hover. curta: troca de estado. media: entrada de camada.
@@ -172,8 +190,8 @@
    o mesmo tamanho em qualquer módulo. Quem quer a densidade compõe esta classe. */
 .densidade-compacta {
   --t-micro: .8125rem;
-  --t-apoio: .9375rem;
-  --t-corpo: 1rem;
+  --t-apoio: .875rem;
+  --t-corpo: .9375rem;
   --t-forte: 1.0625rem;
   --t-titulo: 1.25rem;
   --t-valor: 1.5rem;

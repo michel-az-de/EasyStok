@@ -59,6 +59,7 @@ registerHooks({
     if (spec === 'react-dom') return { url: codigo('export const createPortal=(elemento)=>elemento'), shortCircuit: true }
     if (spec === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment";export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx'), shortCircuit: true }
     if (spec.endsWith('/Icone')) return { url: codigo('export function Icone(){return null}'), shortCircuit: true }
+    if (spec.endsWith('/Botao')) return { url: codigo('export function Botao(props){return {type:"button",props}}'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: codigo('export default new Proxy({},{get:(_,p)=>String(p)})'), shortCircuit: true }
     if (spec.startsWith('.') && ctx.parentURL?.startsWith('file:') && !/\.[a-z]+$/i.test(spec)) {
       for (const ext of ['.js', '.jsx']) if (existsSync(new URL(spec + ext, ctx.parentURL))) return proximo(spec + ext, ctx)
@@ -168,7 +169,17 @@ document.querySelectorAll = () => []
 console.log('ok fechar devolve foco, respeita callback/ação externa, reserva e troca de contexto')
 const { NotasDoCliente } = await import('../src/features/ficha-cliente/NotasDoCliente.jsx')
 const notas = Array.from({ length: 120 }, (_, i) => ({ id: `real-${i}`, texto: `Conteúdo confirmado ${i}`, autor: 'Operador' }))
-const lista = montar(NotasDoCliente, { conversaId: 'muitas-notas', notas }).tree.props.children[0]
+const notasMontadas = montar(NotasDoCliente, { conversaId: 'muitas-notas', notas })
+let areaNotas, abrirNotas
+visitar(notasMontadas.tree, n => {
+  if (n.props?.id === 'notas-muitas-notas') areaNotas = n
+  if (n.type === 'button' && n.props?.['aria-controls'] === 'notas-muitas-notas') abrirNotas = n
+})
+assert.equal(areaNotas.props.hidden, true, 'notas recolhidas não ocupam a ficha')
+abrirNotas.props.onClick(); notasMontadas.render()
+visitar(notasMontadas.tree, n => { if (n.props?.id === 'notas-muitas-notas') areaNotas = n })
+assert.equal(areaNotas.props.hidden, false, 'o controle revela todas as notas')
+const lista = areaNotas.props.children[0]
 assert.equal(lista.length, 120)
 for (const item of lista) {
   const nota = montar(item.type, item.props)

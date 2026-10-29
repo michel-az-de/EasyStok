@@ -8,7 +8,7 @@
 //   2  Composer: todo botão tem nome acessível e todo botão só-ícone é um BotaoIcone;
 //   3  Tooltip: aparece no hover depois de 500 ms (não antes), também no foco por teclado, e some
 //      no Escape e ao sair; em toque (hasTouch/isMobile) não aparece;
-//   4  alvo do BotaoIcone >= 44 x 44 px a 390 px de largura;
+//   4  alvos do BotaoIcone e do Enviar textual >= 48 x 48 px a 390 px de largura;
 //   5  Aviso: remover o anexo mostra "Desfazer"; um aviso por vez (o novo substitui o anterior);
 //      o Desfazer devolve o anexo; fica no pé da tela, centralizado;
 //   6  movimento: sem preferência a dica usa 150 ms (--dur-curta); com reducedMotion 'reduce' a
@@ -76,9 +76,9 @@ await confere('1. o CSS dos componentes novos só usa os tokens de movimento (ne
 await confere('1. o Composer não tem `title` nativo em controle nem <button> cru', () => {
   const composer = fonte('features/atendimento/Composer.jsx')
   const anexos = fonte('features/atendimento/ComposerAnexos.jsx')
-  // O único `title` que fica é o da linha de restrição (um <p>, não controle), guardado pelas provas 1868 e 1870.
+  // A restrição continua em texto acessível; controles usam Tooltip e não title nativo.
   const titulos = [...composer.matchAll(/<(\w+)[^<>]*?\stitle=/g)].map((m) => m[1])
-  assert.deepEqual(titulos, ['p'], `title em: ${titulos.join(', ')}`)
+  assert.deepEqual(titulos, [], `title em: ${titulos.join(', ')}`)
   assert.equal((composer.match(/<button\b/g) ?? []).length, 0, '<button> cru no Composer')
   assert.doesNotMatch(anexos, /<label[^>]*\stitle=/, 'o Anexar ainda usa title nativo')
   assert.doesNotMatch(anexos, /aria-label=\{`Remover anexo/, 'o Remover anexo ainda é <button> cru')
@@ -92,7 +92,7 @@ if (!pastaDoPlaywright) {
   const { chromium } = createRequire(import.meta.url)(pastaDoPlaywright)
   const { build } = await import('vite')
   const pasta = mkdtempSync(join(tmpdir(), 'prova-2146-'))
-  await build({ root: RAIZ, logLevel: 'silent', build: { outDir: pasta, emptyOutDir: true } })
+  await build({ root: RAIZ, logLevel: 'silent', define: { 'import.meta.env.VITE_FONTE_DADOS': JSON.stringify('demo') }, build: { outDir: pasta, emptyOutDir: true } })
   const html = readFileSync(join(pasta, 'index.html'), 'utf8')
   const ORIGEM = 'http://localhost:5199'
   const navegador = await chromium.launch({ headless: true })
@@ -122,28 +122,56 @@ if (!pastaDoPlaywright) {
   }
   const dicaVisivel = (pagina) => pagina.locator('[role="tooltip"]').filter({ visible: true })
   const esperar = (pagina, ms) => pagina.waitForTimeout(ms)
+  async function abrirFerramentas(pagina, celular = false) {
+    const resumo = pagina.locator('summary[aria-label="Mais ferramentas"]')
+    await resumo.waitFor({ state: 'visible' })
+    if (!await resumo.evaluate((el) => el.closest('details').open)) {
+      if (celular) await resumo.tap()
+      else await resumo.click()
+    }
+    await pagina.getByRole('button', { name: 'Nota interna', exact: true }).waitFor({ state: 'visible' })
+  }
 
   try {
     await confere('2. Composer: todo botão tem nome acessível e todo botão só-ícone é BotaoIcone', async () => {
-      const { contexto, composer } = await abrir()
-      const arvore = await composer.ariaSnapshot()
-      const botoes = [...arvore.matchAll(/^\s*- button(?: "([^"]*)")?/gm)].map((m) => m[1] ?? '')
-      assert.ok(botoes.length >= 4, `só ${botoes.length} botões no Composer`)
-      assert.deepEqual(botoes.filter((nome) => !nome.trim()), [], 'botão sem nome')
-      const soIcone = await composer.evaluate((raiz) => [...raiz.querySelectorAll('button')]
-        .filter((b) => !b.innerText.trim() && b.querySelector('svg'))
-        .map((b) => ({ nome: b.getAttribute('aria-label'), botaoIcone: b.hasAttribute('data-botao-icone') })))
-      assert.ok(soIcone.length >= 1, 'nenhum botão só-ícone no Composer')
-      assert.deepEqual(soIcone.filter((b) => !b.botaoIcone).map((b) => b.nome), [], 'botão só-ícone fora do BotaoIcone')
-      const comTitle = await composer.evaluate((raiz) => raiz.querySelectorAll('button[title], label[title]').length)
-      assert.equal(comTitle, 0, `${comTitle} controles com title nativo`)
-      await contexto.close()
+      for (const celular of [false, true]) {
+        const { contexto, pagina, composer } = await abrir(celular ? { largura: 390, altura: 844, celular } : {})
+        await abrirFerramentas(pagina, celular)
+        const arvore = await composer.ariaSnapshot()
+        const botoes = [...arvore.matchAll(/^\s*- button(?: "([^"]*)")?/gm)].map((m) => m[1] ?? '')
+        assert.ok(botoes.length >= 4, `só ${botoes.length} botões no Composer`)
+        assert.deepEqual(botoes.filter((nome) => !nome.trim()), [], 'botão sem nome')
+        const soIcone = await composer.evaluate((raiz) => [...raiz.querySelectorAll('button')]
+          .filter((b) => {
+            if (!b.getClientRects().length || !b.querySelector('svg')) return false
+            const textos = document.createTreeWalker(b, NodeFilter.SHOW_TEXT)
+            for (let texto = textos.nextNode(); texto; texto = textos.nextNode()) {
+              if (!texto.textContent.trim()) continue
+              let visivel = true
+              for (let no = texto.parentElement; no && no !== b; no = no.parentElement) {
+                const estilo = getComputedStyle(no), caixa = no.getBoundingClientRect()
+                if (caixa.width <= 1 || caixa.height <= 1 || estilo.visibility === 'hidden' || estilo.clip !== 'auto' || estilo.clipPath !== 'none') visivel = false
+              }
+              if (visivel) return false
+            }
+            return true
+          })
+          .map((b) => ({ nome: b.getAttribute('aria-label'), botaoIcone: b.hasAttribute('data-botao-icone') })))
+        assert.ok(soIcone.length >= 1, 'nenhum botão só-ícone no Composer')
+        assert.deepEqual(soIcone.filter((b) => !b.botaoIcone).map((b) => b.nome), [], `botão só-ícone fora do BotaoIcone (${celular ? '390 toque' : 'desktop'})`)
+        const comTitle = await composer.evaluate((raiz) => raiz.querySelectorAll('button[title], label[title]').length)
+        assert.equal(comTitle, 0, `${comTitle} controles com title nativo`)
+        await contexto.close()
+      }
     })
 
     await confere('2. o Enviar se chama "Enviar mensagem" e o atalho Enter aparece na dica', async () => {
       const { contexto, pagina, campo } = await abrir()
       await campo.fill('Oi, tudo certo?')
       const enviar = pagina.getByRole('button', { name: 'Enviar mensagem', exact: true })
+      assert.equal(await enviar.innerText(), 'Enviar', 'o Enviar tem rótulo visual')
+      assert.equal(await enviar.getAttribute('data-botao-icone'), null, 'Enviar textual não é BotaoIcone')
+      assert.equal(await enviar.getAttribute('aria-keyshortcuts'), 'Enter')
       await enviar.hover()
       await esperar(pagina, 700)
       assert.match(await dicaVisivel(pagina).innerText(), /Enviar mensagem\s*Enter/)
@@ -151,12 +179,32 @@ if (!pastaDoPlaywright) {
     })
 
     await confere('3. hover: a dica não aparece antes de 500 ms, aparece depois e descreve o botão', async () => {
-      const { contexto, pagina } = await abrir()
+      const { contexto, pagina, campo } = await abrir()
+      await abrirFerramentas(pagina)
+      await campo.focus()
+      await pagina.mouse.move(5, 5)
+      await esperar(pagina, 100)
+      assert.equal(await dicaVisivel(pagina).count(), 0, 'nenhuma dica herdada da abertura do menu')
       const nota = pagina.getByRole('button', { name: 'Nota interna', exact: true })
+      await nota.evaluate((botao) => {
+        const dica = (botao.getAttribute('aria-describedby') ?? '').split(' ')
+          .map((id) => document.getElementById(id)).find((no) => no?.getAttribute('role') === 'tooltip')
+        if (!dica) throw new Error('Nota sem Tooltip associado')
+        window.__tempoDica2146 = { inicio: null, abriu: null }
+        botao.addEventListener('pointerover', () => { window.__tempoDica2146.inicio = performance.now() }, { once: true, capture: true })
+        dica.addEventListener('beforetoggle', (evento) => {
+          if (evento.newState === 'open') window.__tempoDica2146.abriu = performance.now()
+        })
+      })
       await nota.hover()
       await esperar(pagina, 250)
-      assert.equal(await dicaVisivel(pagina).count(), 0, 'apareceu antes de 500 ms')
+      const cedo = await pagina.evaluate(() => window.__tempoDica2146)
+      assert.notEqual(cedo.inicio, null, 'o hover real começou')
+      assert.ok(cedo.abriu == null || Math.round(cedo.abriu - cedo.inicio) >= 500, 'apareceu antes de 500 ms')
       await esperar(pagina, 450)
+      const tempo = await pagina.evaluate(() => window.__tempoDica2146)
+      assert.notEqual(tempo.abriu, null, 'a dica abriu depois do hover')
+      assert.ok(Math.round(tempo.abriu - tempo.inicio) >= 500, 'o relógio do navegador confirmou a espera de500ms')
       const dica = dicaVisivel(pagina)
       assert.equal(await dica.count(), 1, 'não apareceu depois de 500 ms')
       assert.equal(await dica.innerText(), 'Nota interna: fica na ficha, o cliente nunca vê')
@@ -185,11 +233,31 @@ if (!pastaDoPlaywright) {
       await contexto.close()
     })
 
+    await confere('3. nota no menu: teclado mostra a dica, Escape fecha menu e devolve foco ao abridor', async () => {
+      const { contexto, pagina } = await abrir()
+      await abrirFerramentas(pagina)
+      await pagina.keyboard.press('Tab')
+      await pagina.getByRole('button', { name: 'Nota interna', exact: true }).focus()
+      await esperar(pagina, 700)
+      assert.equal(await dicaVisivel(pagina).innerText(), 'Nota interna: fica na ficha, o cliente nunca vê')
+      await pagina.keyboard.press('Escape')
+      await esperar(pagina, 50)
+      assert.equal(await dicaVisivel(pagina).count(), 0)
+      const resumo = pagina.locator('summary[aria-label="Mais ferramentas"]')
+      assert.equal(await resumo.evaluate((el) => document.activeElement === el), true)
+      assert.equal(await resumo.evaluate((el) => el.closest('details').open), false)
+      await contexto.close()
+    })
+
     await confere('3. toque (hasTouch, isMobile): nem hover nem foco mostram a dica', async () => {
       const { contexto, pagina, campo } = await abrir({ largura: 390, altura: 844, celular: true })
+      await abrirFerramentas(pagina, true)
       await pagina.getByRole('button', { name: 'Nota interna', exact: true }).hover()
       await esperar(pagina, 700)
       assert.equal(await dicaVisivel(pagina).count(), 0, 'apareceu no hover em toque')
+      await pagina.getByRole('button', { name: 'Nota interna', exact: true }).focus()
+      await esperar(pagina, 700)
+      assert.equal(await dicaVisivel(pagina).count(), 0, 'apareceu no foco da nota em toque')
       await campo.focus()
       await pagina.keyboard.press('Tab')
       await esperar(pagina, 700)
@@ -197,7 +265,7 @@ if (!pastaDoPlaywright) {
       await contexto.close()
     })
 
-    await confere('4. celular 390: todo BotaoIcone do Composer tem alvo de pelo menos 44 x 44 px', async () => {
+    await confere('4. celular 390: BotaoIcone e Enviar textual têm alvo de pelo menos 48 x 48 px', async () => {
       const { contexto, pagina, composer } = await abrir({ largura: 390, altura: 844, celular: true })
       await composer.locator('input[type="file"]').setInputFiles({ name: 'prova.png', mimeType: 'image/png', buffer: PNG })
       await pagina.getByRole('button', { name: 'Remover anexo prova.png', exact: true }).waitFor()
@@ -205,8 +273,15 @@ if (!pastaDoPlaywright) {
         const caixa = b.getBoundingClientRect()
         return { nome: b.getAttribute('aria-label'), largura: Math.round(caixa.width), altura: Math.round(caixa.height) }
       }))
-      assert.ok(alvos.length >= 2, `só ${alvos.length} BotaoIcone (esperado Enviar e Remover anexo)`)
-      const pequenos = alvos.filter((a) => a.largura < 44 || a.altura < 44)
+      assert.ok(alvos.some((a) => a.nome === 'Remover anexo prova.png'), 'o Remover anexo é BotaoIcone')
+      const enviar = pagina.getByRole('button', { name: 'Enviar mensagem', exact: true })
+      assert.equal(await enviar.getAttribute('data-botao-icone'), null)
+      assert.equal(await enviar.innerText(), 'Enviar')
+      const caixaEnviar = await enviar.boundingBox()
+      assert.ok(caixaEnviar, 'Enviar tem caixa visível')
+      alvos.push({ nome: 'Enviar mensagem', largura: Math.round(caixaEnviar.width), altura: Math.round(caixaEnviar.height) })
+      assert.ok(alvos.length >= 2, `só ${alvos.length} alvos (esperado Enviar e Remover anexo)`)
+      const pequenos = alvos.filter((a) => a.largura < 48 || a.altura < 48)
       assert.deepEqual(pequenos, [], pequenos.map((a) => `${a.nome}: ${a.largura} x ${a.altura}`).join('; '))
       await contexto.close()
     })
@@ -237,7 +312,9 @@ if (!pastaDoPlaywright) {
     })
 
     await confere('6. movimento: sem preferência a dica entra em 150 ms (--dur-curta)', async () => {
-      const { contexto, pagina } = await abrir({ reduzir: false })
+      const { contexto, pagina, campo } = await abrir({ reduzir: false })
+      await abrirFerramentas(pagina)
+      await campo.focus()
       await pagina.getByRole('button', { name: 'Nota interna', exact: true }).hover()
       await esperar(pagina, 700)
       const duracao = await dicaVisivel(pagina).evaluate((el) => getComputedStyle(el).animationDuration)
@@ -246,7 +323,9 @@ if (!pastaDoPlaywright) {
     })
 
     await confere('6. movimento: com reducedMotion "reduce" a duração computada da dica e do aviso é zero', async () => {
-      const { contexto, pagina, composer } = await abrir({ reduzir: true })
+      const { contexto, pagina, campo, composer } = await abrir({ reduzir: true })
+      await abrirFerramentas(pagina)
+      await campo.focus()
       await pagina.getByRole('button', { name: 'Nota interna', exact: true }).hover()
       await esperar(pagina, 700)
       const segundos = (texto) => parseFloat(texto) * (texto.endsWith('ms') ? 0.001 : 1)

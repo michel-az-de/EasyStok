@@ -1089,7 +1089,7 @@ await confere('#2078 R1: quem não controla a loja não abre caixa nem loja pelo
   g.caixa = { ...caixaCom(dia()), fechamentos: [FECHAMENTO_DE_ONTEM] }
   const t = montar(ModalAbrirLoja, { aoFechar() {} })
   t.renderizar()
-  assert.match(t.arvore.props.descricao, /Só gerente ou dona abre a loja: peça a uma delas\./)
+  assert.match(t.arvore.props.descricao, /Peça a um gerente ou proprietário para abrir a loja\./)
   assert.deepEqual(doTipo(t.arvore.props.rodape, 'Botao').map(texto), ['Entendi'])
   assert.equal(andar(t.arvore, (n) => n.type === 'CampoReais').length, 0, 'sem campo de saldo inicial')
   assert.deepEqual(chamadas, [])
@@ -1107,7 +1107,7 @@ await confere('#2078 B9/B10: fechar a loja diz o estado do caixa e quem não pod
   g.caixa = caixaCom(dia({ aberto: true }))
   const operadora = montar(ModalFecharLoja, { aoFechar() {} })
   operadora.renderizar()
-  assert.match(operadora.arvore.props.descricao, /Só gerente ou dona fecha a loja agora: peça a uma delas\./)
+  assert.match(operadora.arvore.props.descricao, /Peça a um gerente ou proprietário para fechá-la agora\./)
   assert.equal(doTipo(operadora.arvore, 'CampoArea').length, 0, 'sem campo de justificativa')
   assert.deepEqual(doTipo(operadora.arvore.props.rodape, 'Botao').map(texto), ['Entendi'])
   assert.match(limpo(operadora.arvore), /O caixa continua aberto\. Para fechar o caixa, use Financeiro › Caixa do dia\./)

@@ -268,10 +268,10 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
             ) : (
             <div className={css.linha}>
               {montando && parada.ordem > 1 && (
-                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem - 1)}>Subir</Botao>
+                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem - 1)}>Subir na rota</Botao>
               )}
               {montando && parada.ordem < n && (
-                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem + 1)}>Descer</Botao>
+                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem + 1)}>Descer na rota</Botao>
               )}
               {montando && (
                 <Botao variante="texto" disabled={ocupado} onClick={() => acoes.retirarParada(viagem.id, parada.pedidoId)}>Retirar da viagem</Botao>
@@ -279,7 +279,7 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
               {!montando && !parada.entregueEm && (
                 <Botao variante="primario" disabled={ocupado} onClick={() => (aReceber > 0
                   ? perguntar(parada, aReceber)
-                  : marcarEntregue(parada))}>Entregue</Botao>
+                  : marcarEntregue(parada))}>Marcar entregue</Botao>
               )}
             </div>
             )}
@@ -321,7 +321,7 @@ function Chamados({ chamados, ocupado, acoes }) {
         <div className={css.cresce}>
           <CampoTexto rotulo="O que precisa" value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={500} disabled={ocupado} />
         </div>
-        <Botao tipo="submit" variante="secundario" disabled={ocupado || !texto.trim()}>Chamar</Botao>
+        <Botao tipo="submit" variante="secundario" disabled={ocupado || !texto.trim()}>Chamar entregador</Botao>
       </form>
       {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
       <ul className={css.lista}>
@@ -329,7 +329,7 @@ function Chamados({ chamados, ocupado, acoes }) {
           <li key={c.id} className={`${css.cartao} ${css.linha}`}>
             <span className={css.cresce}>{c.texto}</span>
             <Botao variante="texto" disabled={ocupado} onClick={() => acoes.atenderChamado(c.id)}>Concluir chamado</Botao>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.cancelarChamado(c.id)}>Cancelar</Botao>
+            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.cancelarChamado(c.id)}>Cancelar chamado</Botao>
           </li>
         ))}
       </ul>
@@ -361,7 +361,7 @@ function Entregadores({ entregadores, ocupado, acoes }) {
         <CampoTexto rotulo="Telefone" tipo="tel" {...campo('telefone')} />
         <CampoTexto rotulo="Veículo" {...campo('veiculo')} />
         <CampoTexto rotulo="Placa" {...campo('placa')} />
-        <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar</Botao>
+        <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar entregador</Botao>
       </form>
       {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
       <h3>Ativos</h3>

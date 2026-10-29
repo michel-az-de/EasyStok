@@ -99,17 +99,16 @@
   gap: var(--e-1);
   width: 100%;
   padding: var(--e-3);
-  border: var(--b-1) solid transparent;
+  border: 0;
   border-radius: var(--r-2);
-  background: var(--papel);
-  box-shadow: var(--sombra);
+  background: var(--elevado);
   text-align: left;
   cursor: pointer;
   min-height: var(--toque);
 }
 
 .cenario:hover {
-  box-shadow: var(--sombra-media);
+  background: var(--preenchimento);
 }
 
 .cenario strong {

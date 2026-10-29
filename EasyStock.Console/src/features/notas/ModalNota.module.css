@@ -11,7 +11,7 @@
   width: min(360px, calc(100vw - 32px)); display: grid; gap: var(--e-2);
   padding: var(--e-3) var(--e-4); background: var(--alerta-pastel); color: var(--tinta);
   border-radius: var(--r-2);
-  box-shadow: 0 8px 24px rgb(0 0 0 / .18);
+  box-shadow: var(--sombra-media);
 }
 .titulo { margin: 0; font-weight: 700; color: var(--alerta); }
 .titulo span { font-weight: 400; color: var(--tinta-2); }

@@ -374,7 +374,7 @@ export function Sininho({ comRotulo = false }) {
 
           {sonsRecentes.length > 0 && (
             <div className={css.secao}>
-              <p className={css.tituloSecao}>Sons de agora há pouco</p>
+              <p className={css.tituloSecao}>Sons recentes</p>
               <ul className={css.lista}>
                 {sonsRecentes.map((som) => {
                   const conversa = conversas.find((c) => c.id === som.conversaId)

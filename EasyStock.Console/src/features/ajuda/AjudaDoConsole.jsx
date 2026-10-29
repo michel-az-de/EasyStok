@@ -32,14 +32,14 @@ export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
 
   return (
     <Modal titulo="Ajuda" descricao={contexto.titulo} aoFechar={aoFechar} largura="620px"
-      rodape={<Botao onClick={aoFechar}>Voltar ao trabalho</Botao>}>
+      rodape={<Botao onClick={aoFechar}>Fechar ajuda</Botao>}>
       <div className={css.corpo}>
         <section aria-labelledby="ajuda-por-aqui">
           <h3 id="ajuda-por-aqui" className={css.titulo}><MarcaIcone nome="informacao" /> Como usar esta tela</h3>
           <ol className={css.passos}>{contexto.passos.map(passo => <li key={passo}>{passo}</li>)}</ol>
           <div className={css.caminhos}>
             <a href={HASH_HALL} onClick={aoFechar}><MarcaIcone nome="grade" tamanho={20} />Ver módulos</a>
-            {permite('atendimento') && rota.tipo !== 'principal' && <a href={hashDoModulo('atendimento', 'balcao')} onClick={aoFechar}><MarcaIcone nome="mensagem" tamanho={20} />Voltar ao Balcão</a>}
+            {permite('atendimento') && rota.tipo !== 'principal' && <a href={hashDoModulo('atendimento', 'balcao')} onClick={aoFechar}><MarcaIcone nome="mensagem" tamanho={20} />Voltar às conversas</a>}
             {contexto.atalho && permite(contexto.atalho.modulo) && <a href={hashDoModulo(contexto.atalho.modulo, contexto.atalho.tela)} onClick={aoFechar}><MarcaIcone nome="producao" tamanho={20} />{contexto.atalho.rotulo}</a>}
           </div>
         </section>

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PainelMovel, usePainelMovel } from '../../componentes/PainelMovel'
 import { Icone } from '../../componentes/Icone'
+import { Botao } from '../../componentes/Botao'
 import { lerPosicaoPostit } from '../../aplicacao/posicoesDosPostits'
 import { paginaNotasDaMesa } from '../../aplicacao/mesaDeNotas'
 import { useMesaDeNotas } from './MesaDeNotas'
+import { focarNotasDaConversa } from './focarCampoDaFicha'
 import css from './NotasDoCliente.module.css'
 const SEM_NOTAS = []
 
@@ -23,11 +25,11 @@ function NotaDoCliente({ conversaId, nota, indice }) {
       {nota.id && <button type="button" ref={botao} className={controle.solto ? css.recolher : css.soltar}
         aria-label={controle.solto ? 'Recolher nota à ficha' : undefined} title={controle.solto ? 'Recolher à ficha' : undefined}
         onClick={(e) => controle.solto ? controle.recolher() : soltar(e)}>
-        {controle.solto ? <Icone nome="arrow-left" tamanho={18} /> : 'Soltar na tela'}
+        {controle.solto ? <Icone nome="arrow-left" tamanho={18} /> : 'Destacar nota'}
       </button>}
       {controle.erro && !controle.solto && <output className={css.erro}>{controle.erro}</output>}
     </article>
-    <PainelMovel controle={controle} titulo={nota.autor ? `Nota · ${nota.autor}` : 'Nota'} larguraInicial={280}
+    <PainelMovel controle={{ ...controle, devolverFoco: () => controle.devolverFoco?.() || focarNotasDaConversa(conversaId) }} titulo={nota.autor ? `Nota · ${nota.autor}` : 'Nota'} larguraInicial={280}
       className={css.solto} classeCorpo={css.corpo} focar={focar} atributos={{ 'data-postit-solto': nota.id }}
       aoRecolher={() => requestAnimationFrame(() => botao.current?.focus({ preventScroll: true }))}>
       <p className={css.texto}>{nota.texto}</p>{nota.em && <small>{nota.em}</small>}
@@ -43,12 +45,13 @@ function NotaRegistrada({ mesa, conversaId, clienteId, clienteNome, nota }) {
     {nota.id && <button type="button" className={solta ? css.recolher : css.soltar} data-foco-reserva={mesa.chaveDeFoco(clienteId, nota.id)}
       aria-label={solta ? 'Recolher nota à ficha' : undefined} title={solta ? 'Recolher à ficha' : undefined}
       onClick={(e) => solta ? mesa.recolher(clienteId, nota.id) : mesa.soltar({ conversaId, clienteId, clienteNome, nota }, e)}>
-      {solta ? <Icone nome="arrow-left" tamanho={18} /> : 'Soltar na tela'}</button>}
+      {solta ? <Icone nome="arrow-left" tamanho={18} /> : 'Destacar nota'}</button>}
   </article>
 }
 
-export function NotasDoCliente({ conversaId, clienteId, clienteNome, fonteApi = false, notas = SEM_NOTAS }) {
+export function NotasDoCliente({ conversaId, clienteId, clienteNome, fonteApi = false, notas = SEM_NOTAS, aoCriarNota, podeCriarNota = true }) {
   const mesa = useMesaDeNotas()
+  const [abertas, setAbertas] = useState(false)
   const [pagina, setPagina] = useState({ clienteId, itens: [], proximaPagina: 1, temMais: true, carregando: false, erro: null })
   const pedido = useRef(null)
   const identidade = mesa?.identidade ?? null
@@ -75,11 +78,20 @@ export function NotasDoCliente({ conversaId, clienteId, clienteNome, fonteApi = 
   const atualizar = mesa?.atualizar
   useEffect(() => { atualizar?.(clienteId, clienteNome, lista, conversaId) }, [atualizar, clienteId, clienteNome, conversaId, lista])
   return <section className={css.coluna} data-destino-nota={conversaId} aria-label="Notas internas do cliente">
+    <header className={css.cabecalho}>
+      <button type="button" data-voltar-notas={conversaId} className={css.abrirNotas} aria-expanded={abertas} aria-controls={`notas-${conversaId}`} onClick={() => setAbertas(v => !v)}>
+        Notas {lista.length > 0 && <span>{lista.length}{fonteApi && pagina.temMais ? '+' : ''}</span>}<Icone nome="chevron-down" tamanho={16} />
+      </button>
+      {aoCriarNota && <Botao variante="texto" icone="plus" aria-label="Adicionar nota" onClick={aoCriarNota} disabled={!podeCriarNota}
+        title={!podeCriarNota ? 'Cadastre o cliente para adicionar uma nota.' : undefined}>Nota</Botao>}
+    </header>
+    {fonteApi && pagina.erro && <output className={css.erro}>{pagina.erro}</output>}
+    <div className={css.lista} id={`notas-${conversaId}`} hidden={!abertas}>
     {lista.map((nota, indice) => mesa
       ? <NotaRegistrada key={nota.id ?? indice} mesa={mesa} conversaId={conversaId} clienteId={clienteId} clienteNome={clienteNome} nota={nota} />
       : <NotaDoCliente key={nota.id ?? indice} conversaId={conversaId} nota={nota} indice={indice} />)}
-    {fonteApi && pagina.erro && <output className={css.erro}>{pagina.erro}</output>}
     {fonteApi && pagina.temMais && <button type="button" className={css.soltar} disabled={pagina.carregando}
       onClick={() => carregar(pagina.proximaPagina ?? 1)}>{pagina.carregando ? 'Carregando notas…' : pagina.erro ? 'Tentar novamente' : 'Carregar mais notas'}</button>}
+    </div>
   </section>
 }

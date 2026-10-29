@@ -44,10 +44,10 @@
 /* Palco: nas três colunas, os painéis flutuam sobre o fundo com raio de
    painel e sombra curta; o vão entre eles é a própria alça de largura. */
 .palco { display: flex; flex: 1; min-height: 0; position: relative; }
-.palcoTres { padding: var(--e-3) var(--e-3) var(--e-3); }
+.palcoTres { padding: 0; }
 .palcoTres > .coluna {
   border-radius: var(--r-2); border: 0;
-  box-shadow: var(--sombra);
+  box-shadow: none;
   animation: painelEntra var(--dur-longa) var(--ease-saida) backwards;
 }
 .palcoTres > .coluna:nth-of-type(2) { animation-delay: 40ms; }
@@ -67,8 +67,8 @@
    O mínimo antigo de 420 px no centro cortava a Ficha já em 1280 px. */
 .centro { flex: 1; min-width: 0; background: var(--chao-conversa); }
 .palcoTres > .centro { min-width: 320px; }
-.palcoTres > .entrada { min-width: 280px; flex-shrink: 1; }
-.palcoTres > .ficha { min-width: 320px; flex-shrink: 1; }
+.palcoTres > .entrada { min-width: 260px; flex-shrink: 1; }
+.palcoTres > .ficha { min-width: 292px; flex-shrink: 1; }
 .ficha { width: var(--largura-ficha, var(--coluna)); flex-shrink: 0; border-left: 0; }
 .rolavel { overflow-y: auto; flex: 1; min-height: 0; overscroll-behavior: contain; }
 .painelFicha { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
@@ -235,7 +235,7 @@
 .tituloCompacto { min-height: 52px; padding-block: 2px; }
 /* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
 .espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
-.espacoTrilho::after { content: ''; width: 32px; height: 1px; margin-bottom: 4px; background: var(--linha-media); }
+.espacoTrilho::after { content: none; }
 .atendente { composes: avatar from '../componentes/Trilho.module.css'; }
 /* 12: no celular, o painel que entra desliza brevemente da direita. */
 @keyframes painelDesliza { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }

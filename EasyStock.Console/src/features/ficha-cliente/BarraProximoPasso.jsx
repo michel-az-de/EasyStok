@@ -340,12 +340,6 @@ export function BarraProximoPasso({
       if (aReceberDoEntregue > 0) saldoNoBotao = true
       corpoAcao = (
         <div className={css.botoesPrimarios}>
-          {/* #1804: pedido concluído sem nada a cobrar: o atendimento acabou e só falta mandar ao histórico. */}
-          {pedido.estado === 'entregue' && !complementoEmAberto && aReceberDoEntregue === 0 && (
-            <p className={css.motivoDesabilitado}>
-              Pedido concluído, nada pendente. Encerre para a conversa ir ao histórico do cliente.
-            </p>
-          )}
           {aReceberDoEntregue > 0 && (
             <>
               <p className={css.motivoDesabilitado}>
@@ -497,7 +491,7 @@ export function BarraProximoPasso({
     <div className={css.barraPasso} data-etapa-confirmada={confirmacao ? '' : undefined}>
       <button type="button" className={css.resumoAndamento} aria-expanded={trilhaAberta}
         aria-controls={idTrilha} onClick={() => setTrilhaAberta(aberta => !aberta)}>
-        <span>Andamento <span className={css.contagemEtapa}>Etapa {marco.indice + 1} de {marco.total}</span></span>
+        <span className="sr">Etapa {marco.indice + 1} de {marco.total}</span>
         <span className={css.abrirEtapas}>{trilhaAberta ? 'Recolher' : 'Ver etapas'}<Icone nome={trilhaAberta ? 'chevron-up' : 'chevron-down'} tamanho={16} /></span>
       </button>
       <div id={idTrilha} hidden={!trilhaAberta}>

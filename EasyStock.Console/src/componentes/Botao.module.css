@@ -27,9 +27,10 @@
 .secundario {
   background: var(--preenchimento); border: var(--b-1) solid transparent; color: var(--tinta);
 }
-.secundario:hover:not(:disabled) { background: var(--preenchimento-forte); }
+.secundario:hover:not(:disabled), .secundario:active:not(:disabled) { background: var(--preenchimento-forte); }
 .texto { background: transparent; border: var(--b-1) solid transparent; color: var(--tinta-2); }
 .texto:hover:not(:disabled) { background: var(--preenchimento); color: var(--tinta); }
+.texto:active:not(:disabled) { background: var(--preenchimento-forte); color: var(--tinta); }
 .texto:disabled, .discreto:disabled { background: transparent; }
 .padrao { composes: secundario; }
 .discreto { composes: texto; }

@@ -16,8 +16,8 @@
    linha de baixo antes de esticar a caixa. */
 .linha {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); width: 100%;
-  padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
-  background: none; text-align: left; font: inherit; color: inherit; min-height: var(--toque);
+  padding: var(--e-2) var(--e-3); border: var(--b-1) solid transparent; border-radius: var(--r-2);
+  background: var(--preenchimento); text-align: left; font: inherit; color: inherit; min-height: var(--toque);
 }
 .codigoCupom { font-family: var(--f-dado); font-weight: 700; }
 .detalheLinha { flex: 1 1 160px; min-width: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
@@ -30,8 +30,8 @@
 
 .formLinha {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--e-3);
-  padding: var(--e-3); border: var(--b-1) dashed var(--linha-media); border-radius: var(--r-2);
-}
+  padding: var(--e-3); border: 0; border-radius: var(--r-2);
+ background: var(--preenchimento); }
 .acoesForm { display: flex; gap: var(--e-2); align-items: flex-end; grid-column: 1 / -1; }
 
 .notaProposta {

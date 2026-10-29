@@ -40,7 +40,6 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
         <Marca />
         <div>
           <h1 id="titulo-login" className={css.titulo}>Entrar na Casa da Baba</h1>
-          <p className={css.apoio}>Use seu e-mail e senha para acessar a operação.</p>
         </div>
         {avisoSaida && <p className={css.aviso} role="status">{avisoSaida}</p>}
         {erro && <p className={css.erro} role="alert">{erro}</p>}

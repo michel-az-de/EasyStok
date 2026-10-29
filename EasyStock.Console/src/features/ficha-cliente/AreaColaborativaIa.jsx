@@ -95,7 +95,7 @@ export function AreaColaborativaIa({ conversaId, blocosSoltos = [], ...callbacks
   return <section className={css.area} aria-label="Organizar a ficha com IA">
     <form onSubmit={organizar}>
       <header className={css.cabecalho}><AvatarAssistente tamanho={32} decorativo /><h3>Assistente</h3>
-        <Botao type="submit" data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando}>{carregando ? 'Organizando…' : 'Organizar com IA'}</Botao>
+        <Botao type="submit" aria-label={carregando ? 'Organizando ficha' : 'Organizar com IA'} data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando}>{carregando ? 'Organizando…' : 'Organizar'}</Botao>
       </header>
       <details className={css.orientar}><summary>Orientar</summary>
         <CampoTexto rotulo="Orientação (opcional)" placeholder="Ex.: preparar a retirada de sábado" maxLength={2000}

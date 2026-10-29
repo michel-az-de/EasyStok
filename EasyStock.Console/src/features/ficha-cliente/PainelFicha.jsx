@@ -33,6 +33,9 @@ import { BlocoEntrega } from './BlocoEntrega'
 import { BlocoFreteApi } from './BlocoFreteApi'
 import { BlocoPedido } from './BlocoPedido'
 import { CartaoDoCliente } from './CartaoDoCliente'
+import { NotasDoCliente } from './NotasDoCliente'
+import { BotaoBaixarFicha } from './BotaoBaixarFicha'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { AreaColaborativaIa, BlocoColaborativoIa } from './AreaColaborativaIa'
 import { ConsultaFreteCliente } from './ConsultaFreteCliente'
 import { MapaDaViagem } from './MapaViagem'
@@ -141,7 +144,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const numero = selecionada.numeroComanda || (pedido ? numeroDaComanda(pedido, { fonteApi }) : null)
   const posVenda = pedido && pedidoEncerrado(pedido)
   const pedidoCriado = Boolean(pedido && (fonteApi ? pedido.pedidoId : pedido.cobranca || pedido.estado !== 'aguardando'))
-  const tituloPedido = 'Pedido e entrega'
+  const tituloPedido = 'Revisar comanda'
   const total = pedido?.totalApi ?? totalDoPedido(pedido, cardapio)
   const saldo = faltaPagar(pedido, cardapio)
   const itens = pedido?.itens?.reduce((soma, item) => soma + item.qtd, 0) ?? 0
@@ -200,6 +203,13 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
   return (
     <div className={css.painel}>
+      <header className={css.cabecalhoFicha}>
+        <h2>Ficha</h2>
+        <span className={css.ferramentasFicha}>
+          <BotaoBaixarFicha key={selecionada.clienteId ?? selecionada.id} clienteId={selecionada.clienteId} fonteApi={fonteApi} />
+          <BotaoIcone className={css.iconeFicha} rotulo="Editar cadastro" icone="lapis" aria-haspopup="dialog" onClick={() => setSecao('cliente')} />
+        </span>
+      </header>
       {/* Alerta no topo, em corpo de texto e como região viva. Estava nascendo
           a 1140 px de altura, em 13 px, invisível na prática. Lista, não campo
           único: um segundo desacerto de saldo não pode apagar o primeiro antes
@@ -213,29 +223,27 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
       ))}
 
       <div className={css.conteudo}>
+        {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
+        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={() => setSecao('cliente')}
+          aoVerEntrega={pedidoCriado ? abrirComanda : undefined} aoVerAoLado={abrirMapaAoLado} focoFrete={mapaMovel.chave}
+          aoConsultarFrete={() => setFreteAberto(true)} />
+
         <section ref={receberPrato} className={css.resumoAtual} data-recebendo-prato={recebendoPrato || undefined} aria-label="Resumo do atendimento">
-          <p className={css.fase}>{!editavel ? 'Conversa encerrada' : posVenda ? 'Pós-venda' : pedidoCriado ? 'Pedido criado' : 'Antes da venda'}</p>
-          <h3>{!editavel ? 'Conversa concluída' : pedidoCriado ? `${fonteApi ? 'Comanda' : 'Pedido'} ${numero ?? ''} · ${selecionada.nome}`.trim() : pedido ? 'Pedido em montagem' : 'Pedido de ' + primeiroNome}</h3>
+          <h3>{!editavel ? 'Conversa concluída' : pedido ? 'Pedido' : 'Novo pedido'} {editavel && numero && <small>Comanda {numero}</small>}</h3>
           <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
             : pedido ? `${pedidoCriado ? rotuloDoResumo(pedido.estado, saldo, Array.isArray(pedido.pagamentosApi) ? totalPago(pedido) : null) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
-              : cadastrarPrimeiro ? 'Cadastre o cliente para montar o pedido. Os dados da conversa já estão preenchidos.'
+              : cadastrarPrimeiro ? 'Cadastre o cliente para montar o pedido.'
                 : 'Adicione itens ou envie o cardápio ao cliente.'}</p>
           {destacaSaldo && <p className={css.saldoFicha}>{moeda(saldo)} a receber</p>}
           {aDevolver > 0 && <p className={css.saldoFicha}>{moeda(aDevolver)} a devolver</p>}
         </section>
 
-        {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
-        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={() => setSecao('cliente')}
-          aoVerEntrega={pedidoCriado ? abrirComanda : undefined} aoCriarNota={aoAbrirNota} aoVerAoLado={abrirMapaAoLado} focoFrete={mapaMovel.chave}
-          aoConsultarFrete={() => setFreteAberto(true)} />
-
-        {fonteApi && editavel && <AreaColaborativaIa conversaId={selecionada.id}
-          aoAbrirComanda={pedido ? abrirComanda : undefined} aoProporNota={aoAbrirNota}
-          aoCalcularFrete={() => setFreteAberto(true)} aoAbrirCardapio={aoAbrirCardapio} aoRascunho={aoRascunho}
-          blocosSoltos={blocosSoltos.map((b) => `${b.geracaoId}:${b.id}`)}
-          aoSoltar={(bloco) => setBlocosSoltos((atuais) => atuais.some((b) => b.geracaoId === bloco.geracaoId && b.id === bloco.id) ? atuais : [...atuais, bloco])} />}
-
-        {editavel && comandaCompartilhada}
+        <div className={css.notasDaFicha}>
+          <NotasDoCliente key={selecionada.id} conversaId={selecionada.id} clienteId={selecionada.clienteId ?? selecionada.id}
+            clienteNome={selecionada.nome} fonteApi={fonteApi && Boolean(selecionada.clienteId)} notas={cliente.notas ?? []}
+            aoCriarNota={editavel ? aoAbrirNota : undefined} podeCriarNota={!fonteApi || Boolean(selecionada.clienteId)} />
+        </div>
+        {editavel && (pedido ? <details className={css.linkCompartilhado}><summary>Link do cliente<Icone nome="chevron-down" tamanho={16} /></summary>{comandaCompartilhada}</details> : comandaCompartilhada)}
         {/* #1686 (item 3): pedido entregue ou cancelado, a mesma conversa começa outra compra. */}
         {editavel && fonteApi && posVenda && novaComanda && (
           <div className={css.acaoMontar}>
@@ -247,11 +255,18 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
           {pedido && <AcessoDaFicha painel={comandaMovel.chave} icone="shopping-cart" titulo={editavel ? tituloPedido : 'Consultar pedido vinculado'}
             resumo={editavel ? faixa || 'Itens, horário e acompanhamento' : 'Consultar sem alterar o pedido'} aoAbrir={abrirComanda} />}
           {editavel && pedidoCriado && <AcessoDaFicha icone="credit-card" titulo="Pagamento" resumo={resumoPagamento} aoAbrir={() => setSecao('pagamento')} />}
-          <AcessoDaFicha icone="ficha" titulo="Ficha"
-            resumo={!cliente.endereco ? 'Conferir cadastro e endereço' : 'Cadastro, endereço e conversas anteriores'} aoAbrir={() => setSecao('cliente')} />
+          <AcessoDaFicha icone="historico" titulo="Histórico do cliente"
+            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'pedido' : 'pedidos'}` : 'Pedidos, notas e conversas'} aoAbrir={() => setSecao('cliente')} />
           {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha icone="undo-2" titulo="Pós-venda"
             resumo={pedido.ocorrencia ? 'Acompanhar problema relatado' : 'Ocorrências e devoluções'} aoAbrir={() => setSecao('pos-venda')} />}
         </nav>
+        {fonteApi && editavel && <AreaColaborativaIa conversaId={selecionada.id}
+          aoAbrirComanda={pedido ? abrirComanda : undefined} aoProporNota={aoAbrirNota}
+          aoCalcularFrete={() => setFreteAberto(true)} aoAbrirCardapio={aoAbrirCardapio} aoRascunho={aoRascunho}
+          blocosSoltos={blocosSoltos.map((b) => `${b.geracaoId}:${b.id}`)}
+          aoSoltar={(bloco) => setBlocosSoltos((atuais) => atuais.some((b) => b.geracaoId === bloco.geracaoId && b.id === bloco.id) ? atuais : [...atuais, bloco])} />}
+
+
       </div>
 
       {secao === 'cliente' && <ModalCliente conversa={selecionada} aoFechar={() => setSecao(null)}>

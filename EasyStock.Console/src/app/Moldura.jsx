@@ -290,10 +290,10 @@ function DisposicaoConversas({ larguras, padrao, aoRedimensionar }) {
       <div className={css.ajusteDisposicao}>
         <strong>Seu espaço de trabalho</strong>
         <label>Conversas <output>{larguras.balcao} px</output>
-          <input aria-label="Largura de Conversas" type="range" min="300" max="480" step="10" value={larguras.balcao} onChange={e => aoRedimensionar('balcao', Number(e.target.value))} />
+          <input aria-label="Largura de Conversas" type="range" min="244" max="480" step="1" value={larguras.balcao} onChange={e => aoRedimensionar('balcao', Number(e.target.value))} />
         </label>
         <label>Ficha <output>{larguras.ficha} px</output>
-          <input aria-label="Largura da ficha" type="range" min="320" max="520" step="10" value={larguras.ficha} onChange={e => aoRedimensionar('ficha', Number(e.target.value))} />
+          <input aria-label="Largura da ficha" type="range" min="292" max="520" step="1" value={larguras.ficha} onChange={e => aoRedimensionar('ficha', Number(e.target.value))} />
         </label>
         <Botao variante="texto" onClick={() => { aoRedimensionar('balcao', padrao.balcao); aoRedimensionar('ficha', padrao.ficha) }}>Restaurar disposição</Botao>
         <small>Guardado neste aparelho. Você também pode arrastar as divisórias.</small>
@@ -530,7 +530,7 @@ function ConteudoMoldura({
           <AlcaLargura
             rotulo="Redimensionar Conversas"
             valor={larguras.balcao}
-            min={300}
+            min={244}
             max={480}
             padrao={largurasPadrao.balcao}
             aoMudar={(valor) => aoRedimensionar('balcao', valor)}
@@ -539,7 +539,7 @@ function ConteudoMoldura({
           <AlcaLargura
             rotulo="Redimensionar ficha"
             valor={larguras.ficha}
-            min={320}
+            min={292}
             max={520}
             padrao={largurasPadrao.ficha}
             invertida

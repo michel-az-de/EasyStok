@@ -87,7 +87,7 @@
 .ondeEsta > svg { flex-shrink: 0; width: 20px; height: 20px; margin-top: 2px; }
 .ondeEsta > div { display: flex; flex-direction: column; gap: 0; }
 .rotuloEstado { display: block; font-size: var(--t-forte); font-weight: 700; }
-.cobrancaPendente { animation: chamarCobranca 2.4s ease-in-out infinite; }
+.cobrancaPendente { animation: chamarCobranca var(--dur-longa) var(--ease-padrao) 3; }
 @keyframes chamarCobranca { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .cobrancaPendente { animation: none; } }
 .depoisTexto { display: block; font-size: var(--t-apoio); color: var(--tinta-3); }
@@ -161,18 +161,31 @@
 .enderecoCapturado { margin: 0 0 var(--e-1); font-size: var(--t-apoio); }
 
 .painel { display: flex; flex-direction: column; flex: 1; height: 100%; min-height: 0; }
+.cabecalhoFicha { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: 64px; padding: var(--e-2) var(--e-4); flex-shrink: 0; }
+.cabecalhoFicha h2 { margin: 0; font-size: var(--t-titulo); font-weight: 700; }
+.ferramentasFicha { display: flex; align-items: center; }
+.iconeFicha { width: var(--toque); height: var(--toque); padding: 0; }
+.iconeFicha[aria-busy='true'] { cursor: progress; color: var(--tinta-3); }
+.pdfDaFicha { display: inline-flex; position: relative; }
+.erroPdf { position: absolute; top: 100%; right: 0; z-index: 20; width: min(280px, 80vw); padding: var(--e-3); background: var(--erro-pastel); color: var(--erro); font-size: var(--t-minimo); }
+.notasDaFicha { padding-inline: var(--e-4); }
+.linkCompartilhado { margin: 0 var(--e-4); }
+.linkCompartilhado > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: var(--toque); cursor: pointer; font-size: var(--t-apoio); color: var(--tinta-2); list-style: none; }
+.linkCompartilhado > summary::-webkit-details-marker { display: none; }
+.linkCompartilhado[open] > summary svg { transform: rotate(180deg); }
 /* Espaço entre blocos, 20 px, e nenhuma linha: a linha ficou para a borda
    entre regiões. É a regra que tira a ficha da pilha de faixas cinza. */
 .conteudo {
   overflow-y: auto; flex: 1; min-height: 0;
   display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-3); align-content: start;
-  padding: var(--e-3) 0;
+  padding: 0 0 var(--e-3);
 }
 
-.resumoAtual { padding: 0 var(--e-4); }
+.resumoAtual { padding: var(--e-3); margin: 0 var(--e-4); background: var(--elevado); }
 .resumoAtual[data-recebendo-prato] { outline: 2px solid var(--marca); outline-offset: -2px; background: var(--fundo); }
-.resumoAtual h3 { margin: var(--e-2) 0; font-size: var(--t-titulo); }
-.resumoAtual p { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: 1.5; }
+.resumoAtual h3 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2); margin: 0 0 var(--e-2); font-size: var(--t-corpo); }
+.resumoAtual h3 small { color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 400; }
+.resumoAtual p { margin: 0; color: var(--tinta-2); font-size: var(--t-minimo); line-height: 1.5; }
 .resumoAtual .fase { color: var(--tinta-3); font-size: var(--t-micro); font-weight: 600; }
 /* #1868: o saldo é o número que ela diz ao cliente; o maior valor da coluna, em tinta cheia. */
 .resumoAtual .saldoFicha {
@@ -187,10 +200,10 @@
 }
 .acessoFicha span { min-width: 0; }
 .acessoFicha > svg:first-child { color: var(--marca); }
-.acessoFicha > span { flex: 1; }
+.acessoFicha > span { flex: 1; display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
 .acessoFicha strong, .acessoFicha small { display: block; overflow-wrap: anywhere; }
-.acessoFicha strong { font-size: var(--t-corpo); }
-.acessoFicha small { margin-top: 2px; color: var(--tinta-2); font-size: var(--t-apoio); }
+.acessoFicha strong { font-size: var(--t-apoio); font-weight: 600; }
+.acessoFicha small { margin: 0; color: var(--tinta-2); font-size: var(--t-minimo); }
 .acessoFicha svg { flex-shrink: 0; color: var(--tinta-3); }
 .acessoFicha:hover { background: var(--fundo); }
 .acessoFicha:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
@@ -509,7 +522,7 @@
 .avisoErro { display: block; font-size: var(--t-apoio); color: var(--erro); }
 
 /* #1839: cartão do cliente no Resumo, sempre à vista. */
-.cartaoCliente { display: grid; gap: var(--e-3); margin: 0 var(--e-4); padding: var(--e-3); border: 0; border-radius: var(--r-2); background: var(--elevado); }
+.cartaoCliente { display: grid; gap: var(--e-2); margin: 0 var(--e-4); padding: 0; border: 0; border-radius: 0; background: transparent; }
 .identidadeCliente, .identidadeClienteAbrir { display: flex; align-items: center; gap: var(--e-3); min-width: 0; }
 .identidadeClienteAbrir { border: 0; padding: 0; background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; min-height: var(--toque); }
 .dadosIdentidadeCliente { display: grid; gap: var(--e-1); min-width: 0; }

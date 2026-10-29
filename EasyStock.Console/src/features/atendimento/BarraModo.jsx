@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
@@ -24,7 +24,8 @@ import css from './atendimento.module.css'
 export function BarraModo({
   conversa, pausado, bloqueada = false, aoAssumir, aoDevolver, aoEncerrar,
 }) {
-  const [confirmandoDevolver, setConfirmandoDevolver] = useState(false)
+  const [confirmandoDevolver, setConfirmandoDevolver] = useState(null)
+  const menu = useRef(null)
   const resumo = resumoDoModo(conversa, pausado, bloqueada)
   const encerrada = resumo.chave === MODOS.ENCERRADO
   // Assumir só faz sentido em conversa que ainda está no automático ou que
@@ -40,17 +41,24 @@ export function BarraModo({
   // cartão do Balcão). Fica para o leitor de tela e no title da pílula; a faixa é uma linha só.
   const fraseRepetida = (resumo.chave === MODOS.COM_VOCE || (resumo.chave === MODOS.LIGADO && !semAutomatico)) && linha === resumo.linha
   const nome = primeiroNome(conversa.nome)
+  const mostrarLinha = semAutomatico || bloqueada
+
+  const fecharAcoes = () => {
+    if (!menu.current) return
+    menu.current.open = false
+    menu.current.querySelector('summary')?.focus({ preventScroll: true })
+  }
 
   const devolver = () => {
-    setConfirmandoDevolver(false)
+    setConfirmandoDevolver(null)
     aoDevolver()
   }
 
   return (
     <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
-        <span title={fraseRepetida ? linha : undefined}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
-        <p className={fraseRepetida ? 'sr' : css.modoTexto} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>
+        <span title={resumo.detalhe}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
+        <p className={fraseRepetida || !mostrarLinha ? 'sr' : css.modoTexto} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>
         {!encerrada && !bloqueada && (
           <span className={css.modoAcoes}>
             {podeAssumir && (
@@ -58,35 +66,34 @@ export function BarraModo({
                 Assumir
               </Botao>
             )}
-            {sugereEncerrar && (
-              <Botao variante="texto" icone="circle-check" className={css.acaoModo} onClick={aoEncerrar}>
-                Concluir conversa
-              </Botao>
-            )}
-            {podeDevolver && (
-              <Botao
-                // #1761 (L5): nunca é o próximo passo; o primário da tela é o do pedido.
-                variante="padrao"
-                className={css.acaoModo}
-                title="O Assistente volta a responder esta conversa"
-                aria-haspopup="dialog"
-                onClick={() => setConfirmandoDevolver(true)}
-              >
-                Devolver ao Assistente
-              </Botao>
+            {(podeDevolver || sugereEncerrar) && (
+              <details key={conversa.id} ref={menu} className={css.maisAcoesModo} onKeyDown={(evento) => {
+                if (evento.key === 'Escape' && evento.currentTarget.open) {
+                  evento.preventDefault(); evento.stopPropagation(); fecharAcoes()
+                }
+              }}>
+                <summary>Mais ações</summary>
+                <div className={css.listaAcoesModo}>
+                  {podeDevolver && <Botao variante="texto" className={css.acaoModo}
+                    title="O Assistente volta a responder esta conversa" aria-haspopup="dialog"
+                    onClick={() => { fecharAcoes(); setConfirmandoDevolver({ conversaId: conversa.id }) }}>Devolver ao Assistente</Botao>}
+                  {sugereEncerrar && <Botao variante="texto" icone="circle-check" className={css.acaoModo}
+                    onClick={() => { fecharAcoes(); aoEncerrar() }}>Concluir conversa</Botao>}
+                </div>
+              </details>
             )}
           </span>
         )}
       </div>
 
-      {confirmandoDevolver && (
+      {confirmandoDevolver && confirmandoDevolver.conversaId === conversa.id && podeDevolver && !encerrada && !bloqueada && (
         <Modal
           titulo="Devolver ao Assistente?"
           descricao={`O Assistente volta a responder as próximas mensagens de ${nome}.`}
-          aoFechar={() => setConfirmandoDevolver(false)}
+          aoFechar={() => setConfirmandoDevolver(null)}
           rodape={(
             <>
-              <Botao onClick={() => setConfirmandoDevolver(false)}>Continuar comigo</Botao>
+              <Botao onClick={() => setConfirmandoDevolver(null)}>Continuar comigo</Botao>
               <Botao variante="primario" onClick={devolver}>Devolver ao Assistente</Botao>
             </>
           )}

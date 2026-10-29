@@ -10,7 +10,7 @@
   border: 0; border-radius: var(--r-1);
   background: var(--preenchimento); color: var(--tinta);
   font-size: var(--t-corpo); line-height: var(--lh-corpo);
-  transition: border-color var(--dur-curta) var(--ease-padrao);
+  transition: background-color var(--dur-curta) var(--ease-padrao);
 }
 .controle:is(input, select) { height: var(--toque); padding-block: var(--e-1); }
 .controle:hover:not(:disabled) { background: var(--preenchimento-forte); }
@@ -20,3 +20,4 @@
 .controle::placeholder { color: var(--tinta-3); }
 .area { min-height: 96px; resize: vertical; }
 .dica { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
+@media (max-width: 759px), (pointer: coarse) { .controle { font-size: 1rem; } }

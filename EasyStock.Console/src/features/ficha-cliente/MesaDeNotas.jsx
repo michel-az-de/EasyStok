@@ -6,6 +6,7 @@ import { PainelMovel, usePainelMovel } from '../../componentes/PainelMovel'
 import { chavePainelMovel, guardarPainelMovel, lerPainelMovel } from '../../hooks/estadoPainelMovel'
 import { lerPosicaoPostit } from '../../aplicacao/posicoesDosPostits'
 import css from './NotasDoCliente.module.css'
+import { focarNotasDaConversa } from './focarCampoDaFicha'
 
 const ContextoMesa = createContext(null)
 export const useMesaDeNotas = () => useContext(ContextoMesa)
@@ -16,7 +17,8 @@ function NotaNaMesa({ escopo, registro, aoRecolher }) {
   const solto = controle.solto
   const origem = useRef(registro.posicao ?? {})
   useEffect(() => { if (!solto) soltar(origem.current) }, [soltar, solto])
-  return <PainelMovel controle={controle} titulo={`Nota · ${registro.clienteNome}`} larguraInicial={280}
+  const controleComFoco = { ...controle, devolverFoco: () => controle.devolverFoco?.() || focarNotasDaConversa(registro.conversaId) }
+  return <PainelMovel controle={controleComFoco} titulo={`Nota · ${registro.clienteNome}`} larguraInicial={280}
     className={css.solto} classeCorpo={css.corpo} focar={registro.focar === true}
     atributos={{ 'data-postit-solto': registro.nota.id, 'data-cliente-nota': registro.clienteId }} aoRecolher={aoRecolher}>
     <p className={css.texto}>{registro.nota.texto}</p>

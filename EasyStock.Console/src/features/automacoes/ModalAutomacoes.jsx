@@ -345,7 +345,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
         )}
       </div>
 
-      {!editavel && <p className={css.descricao}>Só a dona ou um gerente liga, desliga e muda o texto das mensagens automáticas.</p>}
+      {!editavel && <p className={css.descricao}>Somente proprietário ou gerente pode alterar as mensagens automáticas.</p>}
       <ul className={css.lista}>
         {regras.map((regra) => (
           <Regra

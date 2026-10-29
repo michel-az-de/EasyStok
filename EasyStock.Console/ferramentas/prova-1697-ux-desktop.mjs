@@ -114,30 +114,40 @@ confere('2  com pedido criado, o convite do link fica só com o botão, sem o pa
 
 // --- 3. Larguras -------------------------------------------------------------------------------
 
-const TRILHO_E_FOLGAS = 120
+const TRILHO_E_FOLGAS = paineis.TRILHO + 3 * paineis.VAO
 const conversa = (vw) => { const p = larguras.padraoPorTela(vw); return vw - TRILHO_E_FOLGAS - p.balcao - p.ficha }
 confere('3  em notebook a conversa não fica menor que as colunas dos lados', () => {
   for (const vw of [1280, 1366]) {
     const p = larguras.padraoPorTela(vw)
     assert.ok(conversa(vw) >= 460, `${vw}: conversa com ${conversa(vw)} px`)
     assert.ok(conversa(vw) > p.balcao && conversa(vw) > p.ficha, `${vw}: a conversa é a coluna mais larga`)
-    assert.ok(p.balcao >= 300 && p.ficha >= 320, 'respeita os mínimos das alças')
+    assert.ok(p.balcao >= 244 && p.ficha >= 292, 'respeita os mínimos das alças')
+    assert.deepEqual(p, { balcao: 260, ficha: 292, cardapio: 460 })
   }
 })
-confere('3  em tela média nada muda; em tela larga Balcão e Ficha ganham largura', () => {
-  assert.deepEqual(larguras.padraoPorTela(1440), { balcao: 360, ficha: 420, cardapio: 460 })
-  // #1868: em 1920 a Ficha de 520 sobrava 200 px vazios; 60 deles foram para a prévia do Balcão.
-  assert.equal(larguras.padraoPorTela(1920).ficha, 480)
-  assert.equal(larguras.padraoPorTela(1920).balcao, 420)
-  assert.ok(1920 - TRILHO_E_FOLGAS - 420 - 480 >= 880, 'a conversa segue com cerca de 900 px')
+confere('3  telas médias e largas usam as proporções aprovadas sem encolher a conversa', () => {
+  assert.deepEqual(larguras.padraoPorTela(1440), { balcao: 276, ficha: 316, cardapio: 460 })
+  assert.deepEqual(larguras.padraoPorTela(1920), { balcao: 304, ficha: 340, cardapio: 460 })
+  assert.ok(conversa(1440) >= 730, 'a conversa mantém mais de metade da tela média')
+  assert.ok(conversa(1920) >= 1160, 'a tela larga preserva o espaço da conversa')
 })
-confere('3  o que a pessoa arrastou vale em qualquer tela; padrão antigo gravado sozinho não conta', () => {
-  assert.deepEqual(larguras.largurasDaTela({ ficha: 480 }, 1280), { ...larguras.padraoPorTela(1280), ficha: 480 })
-  // Antes desta rodada o padrão era gravado no primeiro uso, sem ninguém arrastar nada.
-  assert.deepEqual(larguras.escolhidasDoSalvo({ balcao: 360, ficha: 420, cardapio: 460 }), {})
-  assert.deepEqual(larguras.escolhidasDoSalvo({ balcao: 360, ficha: 500, cardapio: 460 }), { ficha: 500 })
+confere('3  só a migração v1 descarta os padrões antigos gravados sem arraste', () => {
+  assert.deepEqual(larguras.migrarLargurasAntigas({ balcao: 360, ficha: 420, cardapio: 460 }), {})
+  assert.deepEqual(larguras.migrarLargurasAntigas({ balcao: 360, ficha: 500, cardapio: 460 }), { ficha: 500 })
+  assert.deepEqual(larguras.migrarLargurasAntigas(null), {})
+})
+confere('3  escolhas v2 explícitas sobrevivem ao reload, inclusive 360/420 e os novos padrões', () => {
+  for (const escolha of [
+    { balcao: 360, ficha: 420, cardapio: 460 },
+    { balcao: 276, ficha: 316, cardapio: 460 },
+    { balcao: 400, ficha: 480, cardapio: 520 },
+  ]) {
+    const recarregada = larguras.escolhidasDoSalvo(JSON.parse(JSON.stringify(escolha)))
+    assert.deepEqual(recarregada, escolha)
+    for (const tela of [1280, 1440, 1920]) assert.deepEqual(larguras.largurasDaTela(recarregada, tela), escolha)
+  }
   assert.deepEqual(larguras.escolhidasDoSalvo(null), {})
-  assert.deepEqual(larguras.escolhidasDoSalvo({ ficha: 'larga', balcao: 400 }), { balcao: 400 })
+  assert.deepEqual(larguras.escolhidasDoSalvo({ ficha: 'larga', balcao: 400, desconhecida: 300, cardapio: Infinity }), { balcao: 400 })
 })
 
 // --- 4. Cardápio -------------------------------------------------------------------------------
@@ -154,7 +164,7 @@ confere('4  no computador o cardápio abre do lado do Balcão, com a alça do la
 })
 
 confere('4  com o cardápio aberto o Balcão abre espaço: o painel não corta o começo das mensagens', () => {
-  // Painel de 84 a 84 + cardápio; a conversa começa em 84 + balcão + 12 (alça).
+  // O painel começa no trilho; a conversa começa depois do Balcão e da alça.
   for (const vw of [1280, 1440, 1920]) {
     const l = larguras.largurasDaTela({}, vw)
     assert.ok(larguras.balcaoComCardapio(l) + 12 >= l.cardapio, `${vw}: a conversa começa depois do painel`)
