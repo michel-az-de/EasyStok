@@ -579,7 +579,7 @@ body.pilot-app #etiquetasPreview .pilot-label-options > summary { min-height: 48
 body.pilot-app #etiquetasPreview .pilot-label-options .etq-config-bar { padding: 4px 16px 10px; border: 0; gap: 8px; }
 body.pilot-app #etiquetasPreview .pilot-label-options .etq-chip { min-height: 48px; font-size: 14px; padding: 6px 10px; }
 body.pilot-app #etiquetasPreview .pilot-label-options .etq-note-bar { padding: 0 16px 12px; border: 0; }
-body.pilot-app #etiquetasPreview #etqBody { flex: 1 1 auto; min-height: 0; padding: 16px 16px 20px; }
+body.pilot-app #etiquetasPreview #etqBody { flex: 1 1 auto; min-height: 0; padding: 16px 16px 20px; background: #efe6d6; }
 body.pilot-app #etiquetasPreview .etq-success-banner { flex-shrink: 0; padding: 8px 16px; font-size: 14px; line-height: 1.4; }
 body.pilot-app #etiquetasPreview .etq-success-icon { font-size: 20px; }
 body.pilot-app #etiquetasPreview .pilot-label-toolbar { flex-shrink: 0; display: grid; grid-template-columns: 64px minmax(0, 1fr) 48px 48px; align-items: end; gap: 8px; padding: 10px 16px max(10px, env(safe-area-inset-bottom)); }

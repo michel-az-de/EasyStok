@@ -5429,6 +5429,13 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   background-size: 18px 18px, auto, auto;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
+.etq-termica { flex: 0 0 auto; width: 100%; max-width: 384px; }
+.etq-termica canvas {
+  display: block; width: 100%; height: auto;
+  background: #fff; border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 6px 18px rgba(0,0,0,.12);
+  image-rendering: pixelated;
+}
 .etq-card-wrap {
   /* Preserva a altura calculada após scale; o contêiner rola o lote inteiro. */
   flex: 0 0 auto;
@@ -19645,6 +19652,26 @@ function etiquetaProducaoHtml(et, nota) {
   return `${brand}${prodBlock}${photo}${infoBlock}${scanBlock}${notaBlock}`;
 }
 
+// #2141: etiqueta de produção da térmica como imagem (etiqueta-termica.js).
+// O mesmo bitmap é prévia, PNG e impressão; o texto ESC/POS fica de reserva.
+function etiquetaTermica(et) {
+  const T = window.cdbEtiquetaTermica;
+  if (!T) return null;
+  try {
+    return T.gerar(Object.assign({}, et, { empresa: et.empresa || getEmpresaName() }), {
+      formatar: { data: fmtDateBR, peso: fmtPesoG },
+      codigos: getProdScanMode(),
+      code128: drawCode128OnCanvas,
+      nota: et._nota || null
+    });
+  } catch (e) { console.warn('Etiqueta térmica em imagem falhou:', e); return null; }
+}
+
+function escPosEtiquetaProducao(et) {
+  const termica = etiquetaTermica(et);
+  return termica ? termica.bytes() : escPosLabelProducao(et);
+}
+
 function escPosLabelProducao(et) {
   // Layout de etiqueta de pote (cola na embalagem):
   //   - Empresa em negrito centralizado (fonte normal, sem big — evita esticado).
@@ -19695,6 +19722,20 @@ function escPosLabelProducao(et) {
  * Não usa biblioteca externa: só Canvas API + fillText/fillRect.
  */
 function etiquetasToPng(etiquetas, kind, note) {
+  if (kind !== 'order') {
+    const termicas = etiquetas.map(et => etiquetaTermica(Object.assign({}, et, { _nota: note || null })));
+    if (termicas.every(Boolean)) {
+      const gap = 24;
+      const canvas = document.createElement('canvas');
+      canvas.width = window.cdbEtiquetaTermica.LARGURA;
+      canvas.height = termicas.reduce((h, t) => h + t.altura + gap, gap);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      let y = gap;
+      termicas.forEach(t => { ctx.drawImage(t.canvas, 0, y); y += t.altura + gap; });
+      return new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob retornou null')), 'image/png'));
+    }
+  }
   const horizOrder = kind === 'order' && currentEtqOrient === 'horizontal';
   const W = horizOrder ? 620 : 384;
   const GAP = 20;
@@ -20422,6 +20463,19 @@ function refreshEtqPreview() {
       `<div class="etq-card-wrap"><div class="${cls}">${orderLabelHtml(et.order, horiz, nota)}</div></div>`
     ).join('');
   } else {
+    const termicas = currentEtiquetas.map(et => etiquetaTermica(Object.assign({}, et, { _nota: nota || null })));
+    if (termicas.every(Boolean)) {
+      body.innerHTML = '';
+      termicas.forEach((t, i) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'etq-termica';
+        t.canvas.setAttribute('role', 'img');
+        t.canvas.setAttribute('aria-label', `Etiqueta ${i + 1} de ${termicas.length}: ${currentEtiquetas[i].productName || ''}`);
+        wrap.appendChild(t.canvas);
+        body.appendChild(wrap);
+      });
+      return;
+    }
     body.innerHTML = currentEtiquetas.map(et =>
       `<div class="etq-card-wrap"><div class="${cls}">${etiquetaProducaoHtml(et, nota)}</div></div>`
     ).join('');
@@ -20499,6 +20553,9 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   try { currentEtqOrient = getEtqOrient(); } catch(e) {}
   document.getElementById('etqTitle').textContent = kind === 'order' ? 'Etiqueta do pedido' : 'Etiquetas geradas';
   document.getElementById('etqSubtitle').textContent = subtitle || '';
+  // A térmica de produção é um rolo de 58 mm: orientação só muda a etiqueta de pedido.
+  const orientRow = document.getElementById('etqOrientChips')?.closest?.('.etq-config-row');
+  if (orientRow) orientRow.hidden = kind !== 'order';
 
   // Sync config chips
   const curMode = getProdScanMode();
@@ -20780,7 +20837,7 @@ async function etqAction(action) {
         const parts = currentEtiquetas.map(et => {
           if (prodNota) et._nota = prodNota;
           try {
-            const b = escPosLabelProducao(et);
+            const b = escPosEtiquetaProducao(et);
             singleLen += b.length;
             return b;
           } finally {
@@ -21299,7 +21356,6 @@ function confirmProduction() {
   // O registro JÁ aconteceu acima (batches.push + persistAll); o preview
   // é apenas um passo opcional de impressão. Fechar o modal preserva o registro.
   const etiquetas = etiquetasFromBatch(batch);
-  showToast(`✓ Produção cadastrada · Lote ${codigoLote}`);
   if (etiquetas.length > 0) {
     showEtiquetasPreview(
       etiquetas,
@@ -21308,6 +21364,7 @@ function confirmProduction() {
       `Produção cadastrada · imprima as etiquetas abaixo`
     );
   } else {
+    showToast(`✓ Produção cadastrada · Lote ${codigoLote}`);
     go('home');
   }
   return true;
@@ -23123,6 +23180,7 @@ window.cdbApp = {
 </script>
 
 <script src="qrcode.min.js?v=20260429a"></script>
+<script src="etiqueta-termica.js?v=20261028a"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
 <script src="upload-photos.js?v=20260514b"></script>
