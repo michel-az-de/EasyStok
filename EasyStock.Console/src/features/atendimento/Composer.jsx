@@ -1,5 +1,8 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
+import { Tooltip } from '../../componentes/Tooltip'
+import { useAviso } from '../../componentes/Aviso'
 import { CampoArea } from '../../componentes/Campo'
 import { SugestaoDeTexto } from '../../componentes/SugestaoDeTexto'
 import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
@@ -54,6 +57,10 @@ export function Composer({
   // arquivo em espera (prévia antes de enviar) e o gravador de áudio.
   const [anexo, setAnexo] = useState(null)
   const [erroAnexo, setErroAnexo] = useState(null)
+  const aviso = useAviso()
+  // O Composer remonta por conversa (#1510): o "Desfazer" do anexo não vale na conversa seguinte.
+  const avisoDoAnexo = useRef(null)
+  useEffect(() => () => aviso.dispensar(avisoDoAnexo.current ?? -1), [aviso])
   // #1424: modal de programar mensagem, guardada pelo id da conversa (trocar de conversa fecha).
   const [programarEm, setProgramarEm] = useState(null)
   const { ler } = useArquivoComoDataUrl()
@@ -209,7 +216,13 @@ export function Composer({
       ) : (
         <>
           {anexo && (
-            <PreviaAnexo anexo={anexo} aoRemover={() => { setAnexo(null); setErroAnexo(null) }} />
+            <PreviaAnexo anexo={anexo} aoRemover={() => {
+              // #2146: remover não pergunta; o Aviso devolve o anexo por 8 s (desfazer em vez de "tem certeza?").
+              const removido = anexo
+              setAnexo(null)
+              setErroAnexo(null)
+              avisoDoAnexo.current = aviso.mostrar({ texto: `Anexo removido: ${removido.nome}`, acao: { rotulo: 'Desfazer', aoAgir: () => setAnexo(removido) } })
+            }} />
           )}
 
           {erroAnexo && <p className={css.restricao} role="alert">{erroAnexo}</p>}
@@ -265,23 +278,24 @@ export function Composer({
                   este botão ganha rótulo visível, mesma ideia de "Automáticas"
                   no trilho (ícone e palavra juntos); os vizinhos (Anexar,
                   Fotos, Cardápio, Nota, Enviar) continuam ícone só. */}
-              <Botao
-                ref={respostasRef}
-                disabled={!podeEscrever && !podeEnviarModelo}
-                aria-haspopup={podeEscrever ? 'listbox' : 'dialog'}
-                aria-expanded={podeEscrever ? barra.aberto : undefined}
-                aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
-                title={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}
-                className={css.botaoRespostas}
-                onClick={podeEscrever ? barra.abrir : aoAbrirModelos}
-              >
-                <Icone nome="respostas" />
-                <span>Respostas</span>
-              </Botao>
+              <Tooltip texto={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}>
+                <Botao
+                  ref={respostasRef}
+                  disabled={!podeEscrever && !podeEnviarModelo}
+                  aria-haspopup={podeEscrever ? 'listbox' : 'dialog'}
+                  aria-expanded={podeEscrever ? barra.aberto : undefined}
+                  aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
+                  className={css.botaoRespostas}
+                  onClick={podeEscrever ? barra.abrir : aoAbrirModelos}
+                >
+                  <Icone nome="respostas" />
+                  <span>Respostas</span>
+                </Botao>
+              </Tooltip>
               {/* Rodada 12 (issue #16, dúvida da Thatiane "esse botão é pra
                   quê?"): os quatro vizinhos ganham nome visível, como o
                   Respostas. Em coluna estreita o nome some por container
-                  query e fica o title com a explicação inteira. */}
+                  query e fica a dica (Tooltip, #2146) com a explicação inteira. */}
               {acoes.anexar && <BotaoAnexarArquivo
                 disabled={!podeEscrever || !podeAnexar}
                 descritoPor={!podeAnexar && restricao ? idRestricao : undefined}
@@ -291,59 +305,68 @@ export function Composer({
                 classeRotulo={css.rotuloAcao}
                 aoEscolher={aoEscolherArquivo}
               />}
-              {acoes.fotos && <Botao
-                title={motivoDeFormato(canal, 'foto') ?? 'Fotos dos pratos cadastrados na casa'}
+              {acoes.fotos && <Tooltip texto={motivoDeFormato(canal, 'foto') ?? 'Fotos dos pratos cadastrados na casa'}><Botao
                 aria-describedby={!podeFoto && restricao ? idRestricao : undefined}
                 className={css.acaoComRotulo} disabled={!podeEscrever || !podeFoto} onClick={aoAbrirGaleria}
               >
                 <Icone nome="imagem" /><span className={css.rotuloAcao}>Fotos</span>
-              </Botao>}
+              </Botao></Tooltip>}
               {/* #1424: a mensagem programada vai para o cliente cadastrado (a API exige o
                   clienteId). Não depende do `podeEscrever`: fora da janela sai por modelo. */}
-              <Botao
-                title={conversa.clienteId
-                  ? 'Programar mensagem para sair depois, no horário escolhido'
-                  : 'Cadastre o cliente primeiro: a mensagem programada vai para um cliente cadastrado'}
-                className={css.acaoComRotulo}
-                aria-haspopup="dialog"
-                disabled={!conversa.clienteId}
-                onClick={() => setProgramarEm(conversa.id)}
+              <Tooltip texto={conversa.clienteId
+                ? 'Programar mensagem para sair depois, no horário escolhido'
+                : 'Cadastre o cliente primeiro: a mensagem programada vai para um cliente cadastrado'}
               >
-                <Icone nome="relogio" /><span className={css.rotuloAcao}>Programar</span>
-              </Botao>
-              <Botao title="Nota interna: fica na ficha, o cliente nunca vê" aria-label="Nota interna" className={css.acaoComRotulo} onClick={aoAbrirNota}>
-                <Icone nome="nota" /><span className={css.rotuloAcao}>Nota</span>
-              </Botao>
+                <Botao
+                  className={css.acaoComRotulo}
+                  aria-haspopup="dialog"
+                  disabled={!conversa.clienteId}
+                  onClick={() => setProgramarEm(conversa.id)}
+                >
+                  <Icone nome="relogio" /><span className={css.rotuloAcao}>Programar</span>
+                </Botao>
+              </Tooltip>
+              <Tooltip texto="Nota interna: fica na ficha, o cliente nunca vê">
+                <Botao aria-label="Nota interna" className={css.acaoComRotulo} onClick={aoAbrirNota}>
+                  <Icone nome="nota" /><span className={css.rotuloAcao}>Nota</span>
+                </Botao>
+              </Tooltip>
               {/* #2134: chave do completar com Tab. Só existe no modo API (é lá que a sugestão chama o
                   provedor). Desligada, nenhuma chamada sai; vale por usuário, neste navegador. */}
-              {fonteApi && <Botao
+              {fonteApi && <Tooltip texto={complementoLigado
+                ? 'Completar com Tab: ligado. O que você digita é enviado à IA para sugerir a continuação. Toque para desligar.'
+                : 'Completar com Tab: desligado. Nada do que você digita é enviado à IA. Toque para ligar.'}
+              ><Botao
                 aria-pressed={complementoLigado}
-                title={complementoLigado
-                  ? 'Completar com Tab: ligado. O que você digita é enviado à IA para sugerir a continuação. Toque para desligar.'
-                  : 'Completar com Tab: desligado. Nada do que você digita é enviado à IA. Toque para ligar.'}
                 className={`${css.acaoComRotulo} ${complementoLigado ? css.chaveLigada : ''}`}
                 onClick={alternarComplemento}
               >
                 <Icone nome="sparkles" /><span className={css.rotuloAcao}>Completar com Tab</span>
-              </Botao>}
+              </Botao></Tooltip>}
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
               {temTexto || anexo || !acoes.audio ? (
-                <Botao variante="primario" className={css.enviar} aria-label="Enviar" title={variavelSobrando ?? (temTexto || anexo ? 'Enviar (Enter)' : restricao ?? 'Escreva a mensagem para enviar')} disabled={!podeEscrever || assumindo || Boolean(variavelSobrando) || !(temTexto || anexo)} onClick={enviarComposer}>
-                  <Icone nome="arrow-up" tamanho={20} />
-                </Botao>
-              ) : (
-                <Botao
-                  variante="primario"
+                <BotaoIcone
+                  tom="primario"
                   className={css.enviar}
-                  aria-label="Gravar áudio"
+                  rotulo="Enviar mensagem"
+                  icone="arrow-up"
+                  atalho={temTexto || anexo ? 'Enter' : undefined}
+                  dica={variavelSobrando ?? (temTexto || anexo ? undefined : restricao ?? 'Escreva a mensagem para enviar')}
+                  disabled={!podeEscrever || assumindo || Boolean(variavelSobrando) || !(temTexto || anexo)}
+                  onClick={enviarComposer}
+                />
+              ) : (
+                <BotaoIcone
+                  tom="primario"
+                  className={css.enviar}
+                  rotulo="Gravar áudio"
+                  icone="mic"
+                  dica={motivoDeFormato(canal, 'audio') ?? undefined}
                   disabled={!podeEscrever || !podeAudio}
-                  title={motivoDeFormato(canal, 'audio') ?? 'Gravar áudio'}
                   onClick={gravador.iniciar}
-                >
-                  <Icone nome="mic" tamanho={20} />
-                </Botao>
+                />
               )}
             </div>
           </div>
