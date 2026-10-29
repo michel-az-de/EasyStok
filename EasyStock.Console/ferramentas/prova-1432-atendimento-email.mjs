@@ -38,7 +38,7 @@ assert.equal(canal.aceitaModelo, false)
 assert.equal(canal.aceitaMidia.foto, true, 'foto sai como imagem no corpo')
 assert.match(restricoesDoCanal(canal), /arquivo/, 'o composer avisa que arquivo não vai')
 const icones = readFileSync(new URL('../src/componentes/Icone.jsx', import.meta.url), 'utf8')
-assert.match(icones, new RegExp(`\\n\\s*${canal.icone}: '`), 'o ícone do canal existe no conjunto')
+assert.match(icones, new RegExp(`\\n\\s*${canal.icone}: `), 'o ícone do canal existe no conjunto')
 
 // 2. Assunto da API até o cartão e o fio.
 const resumo = {

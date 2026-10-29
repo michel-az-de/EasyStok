@@ -36,6 +36,8 @@ registerHooks({
     if (spec === 'react/jsx-runtime') return { url: dados('export const jsx=(type,props)=>({type,props}),jsxs=jsx,Fragment="fragment";'), shortCircuit: true }
     if (spec === 'react-dom') return { url: dados('export const createPortal=(elemento)=>elemento;'), shortCircuit: true }
     if (spec === '../hooks/useTema') return { url: dados('export const useTema=()=>["light", globalThis.__provaSuperbancaAcessibilidade.trocarTema];'), shortCircuit: true }
+    // #2145: o Icone virou fachada do lucide-react (CJS que pede o React real); aqui basta o svg decorativo.
+    if (/(^|\/)Icone(\.jsx)?$/.test(spec)) return { url: dados('export const Icone=({rotulo})=>({type:"svg",props:{role:rotulo?"img":"presentation","aria-label":rotulo,"aria-hidden":rotulo?undefined:"true"}});'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: dados('export default new Proxy({}, {get:(_,k)=>k});'), shortCircuit: true }
     if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
       for (const extensao of ['.js', '.jsx']) { try { return proximo(spec + extensao, contexto) } catch { /* próxima extensão */ } }
