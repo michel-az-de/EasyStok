@@ -9,9 +9,10 @@
     "preview": "vite preview",
     "lint": "oxlint",
     "camadas": "node ferramentas/verificar-camadas.mjs",
+    "gramatica": "node ferramentas/verificar-gramatica.mjs",
     "reais": "node ferramentas/verificar-reais.mjs && node ferramentas/prova-2080-reais.mjs",
     "contraste": "node ferramentas/verificar-contraste.mjs",
-    "qualidade": "npm run lint && npm run camadas && npm run reais && npm run contraste && npm run build",
+    "qualidade": "npm run lint && npm run camadas && npm run gramatica && npm run reais && npm run contraste && npm run build",
     "agente": "node servidor/agente.mjs",
     "local": "npm run build && node servidor/agente.mjs"
   },
@@ -20,6 +21,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "lucide-react": "^1.57.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
