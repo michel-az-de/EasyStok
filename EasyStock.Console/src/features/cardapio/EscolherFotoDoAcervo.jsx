@@ -38,7 +38,7 @@ export function EscolherFotoDoAcervo({ aoEscolher, aoFechar }) {
     <label className={css.campo}>Buscar foto<input type="search" value={consulta.busca}
       onChange={(e) => setConsulta({ pagina: 0, busca: e.target.value })} placeholder="Nome da foto" /></label>
     {carregando ? <output>Carregando banco de imagens…</output> : resultado.erro ? <div role="alert" className={css.erro}>
-      <p>{resultado.erro}</p><Botao onClick={() => { setResultado(null); setTentativa((n) => n + 1) }}>Tentar novamente</Botao>
+      <p>{resultado.erro}</p><Botao onClick={() => { setResultado(null); setTentativa((n) => n + 1) }}>Tentar de novo</Botao>
     </div> : <>
       <div className={css.gradeAcervo}>{aprovadas.map((imagem) => <FotoDoAcervo key={imagem.id} imagem={imagem} aoEscolher={aoEscolher} />)}</div>
       {!aprovadas.length && <p>Nenhuma foto aprovada nesta página. Busque por outro nome ou aprove uma foto no Banco de imagens.</p>}

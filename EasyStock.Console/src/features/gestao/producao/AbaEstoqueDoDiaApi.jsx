@@ -238,7 +238,7 @@ export function AbaEstoqueDoDiaApi() {
       </section>
 
       <section className={css.secao} aria-labelledby="estoque-lotes">
-        <h3 id="estoque-lotes" className={css.tituloSecao}>Lotes ativos</h3>
+        <h3 id="estoque-lotes" className={css.tituloSecao}>Lotes</h3>
         {lotes.length === 0 ? (
           <p className={css.descricao}>Nenhum lote com saldo.</p>
         ) : (

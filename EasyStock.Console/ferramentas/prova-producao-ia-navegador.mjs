@@ -30,19 +30,19 @@ const teste = async (descricao, executar) => {
 }
 const puts = () => requests.filter((r) => r.metodo === 'PUT')
 const editor = () => page.locator('dialog').filter({ has: page.locator('h2', { hasText: /^Receita de Ravioli de teste$/ }) })
-const pesquisa = () => page.getByRole('dialog', { name: 'Pesquisar receita com IA', exact: true })
+const pesquisa = () => page.getByRole('dialog', { name: 'Pesquisar receita', exact: true })
 const abrirEditor = async () => {
   await page.goto(origem + '/#/m/producao/receitas')
   await page.getByRole('button', { name: 'Editar receita', exact: true }).click()
   await editor().getByLabel('Rendimento', { exact: true }).waitFor()
 }
 const abrirPesquisa = async () => {
-  await editor().getByRole('button', { name: 'Pesquisar receita com IA', exact: true }).click()
+  await editor().getByRole('button', { name: 'Pesquisar receita', exact: true }).click()
   await pesquisa().getByLabel('Nome para pesquisar', { exact: true }).waitFor()
 }
 const revisarSugestao = () => pesquisa().getByRole('region', { name: 'Receita sugerida', exact: true })
 const iniciarPesquisa = async () => {
-  await pesquisa().getByRole('button', { name: 'Pesquisar nas fontes públicas', exact: true }).click()
+  await pesquisa().getByRole('button', { name: 'Buscar receita', exact: true }).click()
 }
 const rascunho = async () => ({
   rendimento: await editor().getByLabel('Rendimento', { exact: true }).inputValue(),
@@ -104,7 +104,7 @@ try {
     await page.keyboard.press('Escape'); await pesquisa().waitFor({ state: 'hidden' })
     assert.equal(await editor().isVisible(), true)
     assert.deepEqual(await rascunho(), anterior)
-    assert.equal(await editor().getByRole('button', { name: 'Pesquisar receita com IA' }).evaluate((no) => no === document.activeElement), true)
+    assert.equal(await editor().getByRole('button', { name: 'Pesquisar receita' }).evaluate((no) => no === document.activeElement), true)
   })
   await teste('503, nova tentativa e cancelamento conservam o rascunho', async () => {
     modoReceita = 'erro'; await abrirPesquisa(); await iniciarPesquisa()
@@ -130,7 +130,7 @@ try {
     modoReceita = 'desconhecida'; await abrirPesquisa(); await iniciarPesquisa(); await revisarSugestao().waitFor()
     assert.match(await revisarSugestao().innerText(), /não informado pela fonte/)
     assert.match(await revisarSugestao().innerText(), /quantidade a conferir/)
-    await pesquisa().getByRole('button', { name: 'Aplicar à receita para revisar', exact: true }).click()
+    await pesquisa().getByRole('button', { name: 'Aplicar ao rascunho', exact: true }).click()
     assert.deepEqual(await rascunho(), { rendimento: '', quantidade: '', unidade: '', unidadeRendimento: '' })
     assert.equal(puts().length, 0)
     const salvar = editor().getByRole('button', { name: 'Salvar receita', exact: true })
@@ -195,7 +195,7 @@ try {
     await page.reload()
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark')
     await abrirEditor(); modoReceita = 'longa'; await abrirPesquisa(); await iniciarPesquisa(); await revisarSugestao().waitFor()
-    const aplicar = pesquisa().getByRole('button', { name: 'Aplicar à receita para revisar', exact: true })
+    const aplicar = pesquisa().getByRole('button', { name: 'Aplicar ao rascunho', exact: true })
     const caixa = await aplicar.boundingBox()
     assert.ok(caixa && caixa.y >= 0 && caixa.y + caixa.height <= 844, 'rodapé fica dentro da área visível')
     assert.equal(await pesquisa().evaluate((no) => no.scrollWidth <= no.clientWidth + 1), true)
@@ -210,7 +210,7 @@ try {
     await page.goto(origem + '/#/m/producao/receitas'); await page.reload()
     await page.getByRole('button', { name: 'Ver receita', exact: true }).click()
     await editor().waitFor()
-    assert.equal(await editor().getByRole('button', { name: 'Pesquisar receita com IA' }).count(), 0)
+    assert.equal(await editor().getByRole('button', { name: 'Pesquisar receita' }).count(), 0)
     assert.equal(await editor().getByRole('button', { name: 'Mais um insumo' }).count(), 0)
     assert.equal(await editor().getByRole('button', { name: 'Salvar receita' }).count(), 0)
     await page.keyboard.press('Escape')

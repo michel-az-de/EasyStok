@@ -261,3 +261,18 @@ As evidências locais ficam em `.build/harmonia-ux/`, fora do versionamento. A m
 - No Vite de desenvolvimento, os diálogos abriram e desmontaram; no build de produção local, abriram normalmente. A hipótese é o evento close enfileirado durante a dupla montagem do StrictMode; a lógica de Modal não foi alterada nesta rodada.
 
 A revisão integral por perfil e a aceitação estética do Felipe permanecem abertas. As ondas de Tooltip, BotaoIcone, Folha do pedido e navegação Android do plano continuam com seus próprios aceites.
+
+## 11. Continuação com o ambiente informado pelo Felipe
+
+Ambiente: `https://app.easystok.online/`. A sessão autenticada disponível carregou o frontend publicado `4f9304242d0252e95e924b8737588f435bdb9eb7`, ancestral da base desta PR. Não houve troca de perfil.
+
+- Inspeção de consulta em 21 telas: Início; Itens do cardápio, Categorias e Banco de imagens; Estoque do dia, Produção do dia, Insumos, Receitas, Calculadora, Planejamento e Perdas; Canais, Integrações, Impressão, Usuários e Histórico de acesso; Caixa do dia; Painel de entregas, Agenda de encomendas e Janelas de entrega; Cozinha. O formulário Novo prato foi aberto e cancelado sem preencher ou salvar.
+- Nenhuma ação operacional de cadastro, pedido, pagamento, envio ou configuração foi confirmada. Conversas não foram selecionadas: o código registra leitura ao abri-las. Isto é inspeção da interface publicada, não execução do candidato contra a API.
+- A tentativa de prévia do candidato na origem de produção não foi suportada pela ferramenta. O HTML publicado permaneceu original e a interceptação foi removida. Não há comprovação de bloqueio de escritas; nenhuma é alegada como tal.
+- O catálogo real confirmou o problema de busca alinhada no rodapé de um painel alto de chips. O candidato agora usa busca e Categoria no topo, com seletor nativo e contagens, disponibilidade abaixo e Limpar filtros quando existe recorte ativo. As categorias e a seleção continuam visíveis. Filtros, contagens e restrição de reordenação foram preservados.
+- Complementadas retentativas e mensagens de erro do Cardápio e Produção; pesquisa de receita usa Assistente e ações explícitas. Preservadas atribuição, licença e consequência de substituir insumos. Lotes deixa de dizer ativos quando a mesma lista inclui vencidos. Links de retorno e legendas acessíveis seguem Conversas.
+- O componente candidato foi exercitado no navegador por um harness local ignorado, com fixtures dos testes existentes e sem encaminhar chamadas ao backend. Categoria + disponibilidade, busca e Limpar filtros conferidos; campos, ajuda, menus e labels medidos em 48 px em 320/390. Capturas de 1440, 390 e 320 conferidas, com temas claro/escuro. Não é comparação com conteúdo idêntico: produção tinha 43 itens e a fixture tem 3.
+- A captura inicial nomeada 390 tinha 365 px e recorte. Foi preservada com nome explícito de captura incompleta e substituída por evidência real de 390 x 844. Manifesto local com dimensões e SHA-256 em `.build/harmonia-ux/producao/manifesto.json`; imagens e dados da loja permanecem fora do Git.
+- A bateria completa do workflow do Console voltou a passar: 97 scripts. As expectativas adaptadas de nomenclatura mantêm permissões, rascunhos, quantidades e idempotência.
+
+Permanecem abertos o aceite visual, a validação do candidato no ambiente de API e os demais perfis e estados operacionais. Esta continuação não autoriza merge ou publicação.

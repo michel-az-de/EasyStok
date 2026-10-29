@@ -304,7 +304,7 @@ function Trilho({
         <span>{aberta ? 'Loja aberta' : 'Loja fechada'}</span>
       </button>
       {/* #1870: o mesmo nome e o mesmo ícone do trilho dos módulos; a tela continua sendo o Balcão. */}
-      <span className={`${css.itemTrilho} ${css.itemAtual}`} aria-current="page" title="Balcão">
+      <span className={`${css.itemTrilho} ${css.itemAtual}`} aria-current="page" title="Atendimento">
         <IconeDoModulo modulo={MODULO_ATENDIMENTO} />
         <span>{MODULO_ATENDIMENTO.nome}</span>
       </span>

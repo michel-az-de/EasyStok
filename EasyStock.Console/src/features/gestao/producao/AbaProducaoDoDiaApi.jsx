@@ -101,7 +101,7 @@ function PreviaDasEtiquetas({ lote, impressao, aoImprimir, aoFechar }) {
         <Botao variante="texto" onClick={aoFechar}>Fechar</Botao>
         <Botao variante="primario" icone="printer" disabled={!folha || folha.etiquetas.length === 0} onClick={aoImprimir}>{rotulo}</Botao>
       </>}>
-      {erro ? <p className={css.aviso} role="alert">Não consegui buscar as etiquetas deste lote. {erro}</p>
+      {erro ? <p className={css.aviso} role="alert">Não foi possível carregar as etiquetas deste lote. {erro}</p>
         : !folha ? <p className={css.descricao}>Buscando as etiquetas…</p>
           : folha.etiquetas.length === 0 ? <p className={css.descricao}>Este lote não tem etiquetas para imprimir.</p>
             : (
@@ -314,14 +314,14 @@ export function AbaProducaoDoDiaApi() {
             </div>
             {estoque.estado === 'erro' && (
               <p className={css.aviso}>
-                Não consegui ler o saldo dos pratos agora. Dá para lançar a produção assim mesmo.
+                Não foi possível carregar o saldo dos pratos. Você pode registrar a produção mesmo assim.
                 {' '}<Botao variante="texto" icone="refresh-cw" onClick={recarregarEstoque}>Tentar de novo</Botao>
               </p>
             )}
             {cartoes.length === 0 ? (
               <Vazio icone="cardapio" titulo="Nenhum prato para produzir"
                 acao={<a className={css.link} href={hashDoModulo('cardapio', 'itens')}>Abrir Itens do cardápio</a>}>
-                A grade mostra os pratos do cardápio. Cadastre um prato em Itens do cardápio e ele aparece aqui para você somar as porções.
+                Cadastre um prato no cardápio para começar.
               </Vazio>
             ) : visiveis.length === 0 ? (
               <p className={css.descricao}>
@@ -379,7 +379,7 @@ export function AbaProducaoDoDiaApi() {
                       <Botao variante="primario" icone="printer" disabled={buscandoEtiquetas} aria-label={`Imprimir ${lote.etiquetas} ${lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'} do lote ${lote.codigo}`} onClick={() => imprimir(lote.loteId)}>Imprimir {lote.etiquetas} {lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'}</Botao>
                       <Botao variante="texto" disabled={buscandoEtiquetas} aria-label={`Fechar o aviso do lote ${lote.codigo}`} onClick={() => dispensar(lote.loteId)}>Fechar aviso</Botao>
                     </span>
-                    {impressao?.loteId === lote.loteId && impressao.erro && <>{' '}<strong>Não consegui buscar as etiquetas deste lote. {impressao.erro}</strong></>}
+                    {impressao?.loteId === lote.loteId && impressao.erro && <>{' '}<strong>Não foi possível carregar as etiquetas deste lote. {impressao.erro}</strong></>}
                     {lote.avisos.length > 0 && (
                       <ul aria-label="Avisos de insumo">
                         {lote.avisos.map((a) => <li key={a}>{a}</li>)}

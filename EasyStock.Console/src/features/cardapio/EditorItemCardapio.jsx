@@ -231,7 +231,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
             <small className={css.ajuda}>JPG, PNG ou WebP · até 6 MB</small>
             {fotoPendente && <div className={css.fotoPendente}>
               <span>{arquivo?.name ?? imagemAcervo.titulo}</span>
-              {imagemAcervo && !previaAcervo.url && <span>{previaAcervo.erro ? 'Não consegui carregar a prévia.' : 'Carregando prévia…'}</span>}
+              {imagemAcervo && !previaAcervo.url && <span>{previaAcervo.erro ? 'Não foi possível carregar a prévia.' : 'Carregando prévia…'}</span>}
               {id && <label className={css.opcao}><input type="checkbox" checked={galeria} disabled={salvando || fotosDoPrato.length >= 5} onChange={(e) => {
                 setGaleria(e.target.checked)
                 if (imagemAcervo) setImagemAcervo({ ...imagemAcervo, operacaoId: crypto.randomUUID() })
@@ -248,7 +248,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
         </aside>
         <form ref={formulario} onSubmit={salvar} onChange={() => setAlterado(true)} className={css.formulario} aria-label="Ficha do prato">
           {carga === 'carregando' && <output>Carregando a ficha do prato…</output>}
-          {erro && <div className={css.erro} role="alert" ref={erroRef} tabIndex={-1}>{erro}{carga === 'erro' && <Botao onClick={() => { setCarga('carregando'); setTentativa((t) => t + 1) }}>Tentar novamente</Botao>}{imagemAcervo && id && carga === 'ok' && <Botao disabled={salvando} onClick={conferirFotoAtual}>Conferir foto atual</Botao>}</div>}
+          {erro && <div className={css.erro} role="alert" ref={erroRef} tabIndex={-1}>{erro}{carga === 'erro' && <Botao onClick={() => { setCarga('carregando'); setTentativa((t) => t + 1) }}>Tentar de novo</Botao>}{imagemAcervo && id && carga === 'ok' && <Botao disabled={salvando} onClick={conferirFotoAtual}>Conferir foto atual</Botao>}</div>}
           <fieldset disabled={salvando || precisaReler || carga !== 'ok' || !podeEditar} className={css.campos}>
             <section className={css.secao}>
               <h3>Apresentação do prato</h3>
@@ -270,7 +270,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
             </section>
             <section className={css.secao}>
               <h3>Informações para atender bem</h3>
-              <p className={css.ajuda}>Consulte estes detalhes no Balcão para responder às dúvidas do cliente.</p>
+              <p className={css.ajuda}>Use estes detalhes para responder às dúvidas do cliente.</p>
               <label className={css.campo}>Ingredientes<textarea rows={2} maxLength={500} value={ficha.ingredientes} onChange={mudarFicha('ingredientes')} /></label>
               <label className={css.campo}>Alérgenos<input maxLength={200} value={ficha.alergenos} onChange={mudarFicha('alergenos')} placeholder="Ex.: trigo, leite e ovos" /><small>Informe os ingredientes e riscos de contato cruzado confirmados pela cozinha.</small></label>
               <label className={css.campo}>Tempo de preparo, em minutos<input type="number" min={1} max={1440} step={1} required={detalhe?.tempoPreparoMinutos != null} value={ficha.preparo} onChange={mudarFicha('preparo')} placeholder="Usa o tempo padrão da loja" /></label>

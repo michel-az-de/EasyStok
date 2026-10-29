@@ -307,35 +307,53 @@ const abrirCardapio = () => {
 const grupo = (t, legenda) => doTipo(t.arvore, 'fieldset').find((f) => limpo(doTipo(f, 'legend')[0]) === legenda)
 const chips = (t, legenda) => doTipo(grupo(t, legenda), 'button').map((b) => [limpo(b), b.props['aria-pressed']])
 const tocarChip = (t, legenda, rotulo) => { doTipo(grupo(t, legenda), 'button').find((b) => limpo(b).startsWith(rotulo)).props.onClick(); return t.renderizar() }
+const categoriaNaTela = (t) => doTipo(t.arvore, 'CampoSelecao').find((c) => c.props.rotulo === 'Categoria')
+const escolherCategoria = (t, valor) => { categoriaNaTela(t).props.onChange({ target: { value: valor } }); return t.renderizar() }
+const limparFiltros = (t) => doTipo(t.arvore, 'Botao').find((b) => limpo(b) === 'Limpar filtros')
 const pratosNaTela = (t) => andar(t.arvore, (n) => n.type === 'h3').map(limpo)
 
-await confere('Itens do cardápio: chips de categoria com contagem, Todas por padrão', async () => {
+await confere('Itens do cardápio: seletor de categoria com contagem, Todas por padrão e sem limpar inativo', async () => {
   const t = abrirCardapio()
-  assert.ok(grupo(t, 'Categoria'), 'há o grupo de categorias')
-  assert.deepEqual(chips(t, 'Categoria'), [['Todas 5', true], ['Massas 2', false], ['Molhos 1', false], ['Sobremesas 1', false]])
+  assert.ok(categoriaNaTela(t), 'o seletor de categoria permanece visível')
+  assert.equal(categoriaNaTela(t).props.value, '')
+  assert.deepEqual(categoriaNaTela(t).props.opcoes, [
+    { valor: '', rotulo: 'Todas (5)' }, { valor: 'Massas', rotulo: 'Massas (2)' },
+    { valor: 'Molhos', rotulo: 'Molhos (1)' }, { valor: 'Sobremesas', rotulo: 'Sobremesas (1)' },
+  ])
+  assert.equal(limparFiltros(t), undefined)
 })
 
 await confere('Itens do cardápio: categoria, disponibilidade e busca combinam; contagens acompanham', async () => {
   const t = abrirCardapio()
-  tocarChip(t, 'Categoria', 'Massas')
+  escolherCategoria(t, 'Massas')
   assert.deepEqual(pratosNaTela(t), ['Lasanha', 'Talharim'])
   assert.deepEqual(chips(t, 'Filtrar pratos').map(([r]) => r), ['Todos 2', 'Disponíveis hoje 1', 'Fora de hoje 1', 'Sem foto 1'])
   tocarChip(t, 'Filtrar pratos', 'Disponíveis hoje')
   assert.deepEqual(pratosNaTela(t), ['Lasanha'])
-  assert.deepEqual(chips(t, 'Categoria'), [['Todas 3', false], ['Massas 1', true], ['Molhos 1', false], ['Sobremesas 1', false]])
-  tocarChip(t, 'Categoria', 'Todas')
+  assert.equal(categoriaNaTela(t).props.value, 'Massas', 'o filtro ativo permanece visível no seletor')
+  assert.deepEqual(categoriaNaTela(t).props.opcoes, [
+    { valor: '', rotulo: 'Todas (3)' }, { valor: 'Massas', rotulo: 'Massas (1)' },
+    { valor: 'Molhos', rotulo: 'Molhos (1)' }, { valor: 'Sobremesas', rotulo: 'Sobremesas (1)' },
+  ])
+  escolherCategoria(t, '')
   doTipo(t.arvore, 'CampoTexto')[0].props.onChange({ target: { value: 'pudim' } })
   t.renderizar()
   assert.deepEqual(pratosNaTela(t), ['Pudim'])
+  limparFiltros(t).props.onClick(); t.renderizar()
+  assert.deepEqual(pratosNaTela(t), nomes(ITENS), 'limpar restaura a lista completa')
+  assert.equal(categoriaNaTela(t).props.value, '')
+  assert.equal(doTipo(t.arvore, 'CampoTexto')[0].props.value, '')
+  assert.equal(chips(t, 'Filtrar pratos')[0][1], true)
+  assert.equal(limparFiltros(t), undefined)
 })
 
 await confere('Itens do cardápio: reordenar pede Todos, Todas as categorias e busca vazia', async () => {
   const t = abrirCardapio()
   assert.ok(comRotulo(t.arvore, 'Subir Lasanha').length === 1, 'com tudo à mostra, dá para ordenar')
-  tocarChip(t, 'Categoria', 'Massas')
+  escolherCategoria(t, 'Massas')
   assert.equal(comRotulo(t.arvore, 'Subir Lasanha').length, 0, 'com uma categoria escolhida, não')
   assert.match(limpo(t.arvore), /Todas as categorias/)
-  tocarChip(t, 'Categoria', 'Todas')
+  escolherCategoria(t, '')
   assert.ok(comRotulo(t.arvore, 'Subir Lasanha').length === 1)
 })
 

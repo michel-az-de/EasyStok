@@ -97,7 +97,7 @@ try {
     await modal().getByRole('alert').filter({ hasText: 'Falha transitória' }).waitFor()
     assert.equal(await modal().locator('button').filter({ hasText: /1846 imagem/ }).count(), 0)
     falhar = false
-    await modal().getByRole('button', { name: 'Tentar novamente', exact: true }).click()
+    await modal().getByRole('button', { name: 'Tentar de novo', exact: true }).click()
     await modal().getByText('Nenhuma imagem aprovada nesta página.', { exact: true }).waitFor()
     await page.unroute('**/api/acervo/imagens?*')
     passa('Vazio e erro: nenhuma escolha obsoleta; recuperação no próprio modal')

@@ -158,7 +158,7 @@ export function BarraBalcao({ filtros, aoMudar }) {
           o chip "Precisa de você" e a contagem nunca ficam escondidos atrás do seletor. */}
       <div className={css.linhaB}>
       <fieldset className={css.filtros}>
-        <legend className="sr">Filtros do Balcão</legend>
+        <legend className="sr">Filtros das conversas</legend>
         <button
           type="button"
           aria-pressed={filtros.aba !== 'precisa'}

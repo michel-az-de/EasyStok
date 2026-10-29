@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
-import { CampoTexto } from '../../../componentes/Campo'
+import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
 import { MarcaIcone } from '../../../componentes/MarcaIcone'
 import { useGestaoCardapioApi } from '../../../aplicacao/useGestaoCardapioApi'
@@ -96,7 +96,12 @@ export function AbaCardapioApi({ renderizarEditor }) {
         <div className={css.busca}>
           <CampoTexto ref={buscaRef} tipo="search" rotulo="Buscar prato, categoria ou porção"
             placeholder="Ex.: lasanha, massas ou 800 g" value={busca} onChange={(e) => setBusca(e.target.value)} />
-          {busca && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
+          {contagens.categorias.length > 0 && <CampoSelecao rotulo="Categoria" value={categoria ?? ''}
+            onChange={(e) => setCategoria(e.target.value || null)}
+            opcoes={[
+              { valor: '', rotulo: `Todas (${contagens.todas})` },
+              ...contagens.categorias.map((c) => ({ valor: c.nome, rotulo: `${c.nome} (${c.total})` })),
+            ]} />}
         </div>
         <div className={css.faixaFiltros}><fieldset className={css.filtros}>
           <legend>Filtrar pratos</legend>
@@ -106,19 +111,9 @@ export function AbaCardapioApi({ renderizarEditor }) {
             </button>
           ))}
         </fieldset>
-        {contagens.categorias.length > 0 && <fieldset className={css.filtros}>
-          <legend>Categoria</legend>
-          <button type="button" aria-pressed={!categoria} className={css.filtro} title={EXPLICA.categoria} onClick={() => setCategoria(null)}>
-            Todas{' '}<span className={css.contagem}>{contagens.todas}</span>
-          </button>
-          {contagens.categorias.map((c) => (
-            <button type="button" key={c.nome} aria-pressed={categoria === c.nome} className={css.filtro} title={EXPLICA.categoria} onClick={() => setCategoria(c.nome)}>
-              {c.nome}{' '}<span className={css.contagem}>{c.total}</span>
-            </button>
-          ))}
-        </fieldset>}
       <div className={css.leitura}>
         <output className={css.descricao}>{itens.length} de {gestao.itens.length} {gestao.itens.length === 1 ? 'prato' : 'pratos'}</output>
+        {!ordenando && <Botao variante="texto" onClick={limpar}>Limpar filtros</Botao>}
         <details className={css.ajuda}>
           <summary>Entenda os controles</summary>
           <p><strong>Hoje</strong> permite oferecer o prato; desligado, ele só volta quando você religar. <strong>No site</strong> controla a exibição para o cliente. <strong>Arquivar</strong> tira do cardápio e permite repor depois. Um prato em validação só é oferecido pelo assistente depois de validado.</p>
@@ -181,7 +176,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
                   <Botao variante="texto" disabled={ocupado === item.sku} title={EXPLICA.editar} aria-label={`Editar prato ${item.nome}`} onClick={() => abrirEditor(item)}><MarcaIcone nome="editar" tamanho={20} /></Botao>
                 </div>}
                 <details className={css.outrasAcoes}>
-                  <summary title={EXPLICA.maisAcoes} aria-label={`Mais ações para ${item.nome}`}><span aria-hidden="true">•••</span></summary>
+                  <summary title={EXPLICA.maisAcoes} aria-label={`Mais ações para ${item.nome}`}><Icone nome="ellipsis-vertical" tamanho={20} /></summary>
                   <div className={css.painelAcoes}>
                     <label className={css.chave} title={EXPLICA.noSite}>
                       <input type="checkbox" checked={item.noSite} disabled={!podeEditar || ocupado === item.sku}

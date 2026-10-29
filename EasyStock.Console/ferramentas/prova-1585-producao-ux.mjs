@@ -400,8 +400,8 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   assert.equal(folha(t).length, 0, 'não sobra a folha do lote anterior')
   assert.equal(impressoes, 1)
   const [doLote2, doLote1] = avisosDeLote(t.arvore)
-  assert.match(texto(doLote1), /Não consegui buscar as etiquetas deste lote\. Sem conexão com o EasyStok\./)
-  assert.doesNotMatch(texto(doLote2), /Não consegui/)
+  assert.match(texto(doLote1), /Não foi possível carregar as etiquetas deste lote\. Sem conexão com o EasyStok\./)
+  assert.doesNotMatch(texto(doLote2), /Não foi possível carregar as etiquetas/)
   assert.equal(alertas(formulario(t.arvore)).length, 0, 'o erro da etiqueta não vai para o fim do formulário')
   cair = false
   await botoes(t.arvore, 'Imprimir 2 etiquetas')[0].props.onClick()

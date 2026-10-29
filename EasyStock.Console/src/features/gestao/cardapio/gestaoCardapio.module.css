@@ -2,11 +2,11 @@
 .cabecalho { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .apresentacao { display: flex; align-items: center; gap: var(--e-3); min-width: 0; }
 .descricao { margin: 0; font-size: var(--t-apoio); line-height: var(--lh-corpo); color: var(--tinta-2); }
-.ferramentas { display: grid; gap: var(--e-3); padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado); }
+.ferramentas { display: grid; gap: var(--e-3); }
 .faixaFiltros { display: grid; gap: var(--e-1); }
 .busca { display: flex; align-items: flex-end; gap: var(--e-2); }
 .busca > :first-child { flex: 1; min-width: 0; }
-.busca > button { flex: none; }
+.busca > :not(:first-child) { flex: 0 1 260px; min-width: 0; }
 .filtros { display: flex; gap: var(--e-1); flex-wrap: wrap; min-width: 0; margin: 0; padding: 0; border: 0; }
 .filtros legend { margin-bottom: var(--e-1); font-size: var(--t-apoio); color: var(--tinta); font-weight: 650; }
 .filtro { display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding: var(--e-2); color: var(--tinta-2); background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); font-size: var(--t-micro); transition: background var(--dur-micro) var(--ease-padrao), color var(--dur-micro) var(--ease-padrao); }
@@ -15,7 +15,7 @@
 .contagem { display: inline-grid; place-items: center; min-width: 20px; font-family: var(--f-dado); font-size: var(--t-micro); font-variant-numeric: tabular-nums; }
 .leitura { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .ajuda { font-size: var(--t-micro); color: var(--tinta-2); }
-.ajuda summary { cursor: pointer; padding-block: var(--e-2); color: var(--marca-forte); }
+.ajuda summary { cursor: pointer; min-height: var(--toque); align-content: center; padding-block: var(--e-2); color: var(--marca-forte); }
 .ajuda p { max-width: 70ch; margin: var(--e-2) 0 0; line-height: var(--lh-corpo); }
 .aviso { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; padding: var(--e-3); background: var(--alerta-pastel); color: var(--alerta); border-radius: var(--r-2); font-size: var(--t-apoio); }
 .aviso span { min-width: 0; overflow-wrap: anywhere; }
@@ -59,16 +59,10 @@ button.abrirFoto:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--marca-claro)
 .painelAcoes { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; padding-top: var(--e-2); text-align: left; }
 .painelAcoes > button { padding-inline: var(--e-2); }
 .painelAcoes > button:disabled, .ordem > button:disabled { background: transparent; }
-.chave { display: inline-flex; align-items: center; gap: var(--e-2); min-height: 40px; font-size: var(--t-apoio); }
+.chave { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); font-size: var(--t-apoio); }
 .chave input { width: 18px; height: 18px; margin: 0; accent-color: var(--marca); }
 .ordem { display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
 .ordem > button { padding-inline: var(--e-2); }
-
-@container (min-width: 960px) {
-  .ferramentas { grid-template-columns: minmax(280px, .9fr) minmax(0, 1.1fr); align-items: end; gap: var(--e-5); }
-  .faixaFiltros { gap: var(--e-1); }
-  .filtros { justify-content: flex-end; }
-}
 
 @container (min-width: 1100px) {
   .prato { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--e-5); }
@@ -84,7 +78,7 @@ button.abrirFoto:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--marca-claro)
   .cabecalho .descricao { font-size: var(--t-micro); }
   .ferramentas { gap: var(--e-2); }
   .busca { flex-wrap: wrap; }
-  .busca > :first-child { flex-basis: 100%; }
+  .busca > :first-child, .busca > :not(:first-child) { flex-basis: 100%; }
   .filtros { gap: 0 var(--e-1); }
   .faixaFiltros, .leitura { width: 100%; }
   .faixaFiltros > .filtros { flex-basis: 100%; }
