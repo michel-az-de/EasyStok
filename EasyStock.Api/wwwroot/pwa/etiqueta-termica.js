@@ -132,9 +132,13 @@
         qr = desenharQr(ctx, et.codigoBarras, y);
         if (qr) y += qr.altura;
       }
-      if ((codigos === 'barcode' || codigos === 'both') && typeof o.code128 === 'function') {
-        o.code128(ctx, et.codigoBarras, MARGEM, y + 4, util, 56);
+      // Barras só quando cabem com módulo de 2 pontos; senão o QR assume.
+      if ((codigos === 'barcode' || codigos === 'both') && typeof o.code128 === 'function' &&
+          o.code128(ctx, et.codigoBarras, MARGEM, y + 4, util, 56) !== false) {
         y += 64;
+      } else if (codigos === 'barcode' && !qr) {
+        qr = desenharQr(ctx, et.codigoBarras, y);
+        if (qr) y += qr.altura;
       }
       ctx.fillStyle = PRETO;
       ctx.textAlign = 'center';
@@ -187,10 +191,13 @@
 
   // No navegador: canvas recortado na altura exata, pronto para prévia,
   // PNG e impressão.
+  let rascunho = null;
   function gerar(et, opts) {
-    const rascunho = global.document.createElement('canvas');
-    rascunho.width = LARGURA;
-    rascunho.height = 1600;
+    if (!rascunho) {
+      rascunho = global.document.createElement('canvas');
+      rascunho.width = LARGURA;
+      rascunho.height = 1600;
+    }
     const r = rascunho.getContext('2d');
     if (!r) throw new Error('canvas indisponível');
     r.fillStyle = BRANCO;
@@ -200,7 +207,7 @@
     canvas.width = LARGURA;
     canvas.height = altura;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(rascunho, 0, 0);
+    ctx.drawImage(rascunho, 0, 0, LARGURA, altura, 0, 0, LARGURA, altura);
     // A prévia mostra os pontos exatos da impressora: o mesmo limiar do raster.
     const img = ctx.getImageData(0, 0, LARGURA, altura);
     const d = img.data;
@@ -213,5 +220,12 @@
     return { canvas, altura, bytes: () => bytes(ctx, altura) };
   }
 
-  global.cdbEtiquetaTermica = { LARGURA, FAIXA, desenhar, raster, bytes, gerar };
+  // Medir com a fonte de reserva muda a quebra do nome: a prévia espera as fontes.
+  function fontes() {
+    const f = global.document && global.document.fonts;
+    if (!f || typeof f.load !== 'function') return Promise.resolve();
+    return Promise.all([f.load(`800 24px ${SANS}`), f.load(`600 18px ${SANS}`), f.load(`700 26px ${SERIF}`)]).catch(() => {});
+  }
+
+  global.cdbEtiquetaTermica = { LARGURA, FAIXA, desenhar, raster, bytes, gerar, fontes };
 })(typeof window !== 'undefined' ? window : globalThis);

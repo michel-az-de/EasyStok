@@ -69,7 +69,7 @@ module.exports = function ({ test, assert }) {
     assert.deepEqual(bytes.slice(8), [0x80, 0x00, 0x00, 0x01]);
   });
 
-  test('Etiqueta térmica: raster alto sai em faixas para não estourar o buffer da WTP05', () => {
+  test('Etiqueta térmica: raster alto emite um GS v 0 por faixa de linhas', () => {
     const T = load();
     const h = T.FAIXA * 2 + 5;
     const bytes = Array.from(T.raster(new Uint8ClampedArray(8 * h * 4).fill(255), 8, h));
@@ -137,7 +137,7 @@ module.exports = function ({ test, assert }) {
 
   test('Etiqueta térmica: index.html carrega o gerador e a impressão de produção usa a imagem', () => {
     const gerado = [];
-    const { html, context } = fromIndex(['etiquetaTermica', 'escPosEtiquetaProducao'], {
+    const { html, context } = fromIndex(['etiquetaTermica', 'code128TermicaLegivel', 'escPosEtiquetaProducao'], {
       console, document: {}, fmtDateBR: String, fmtPesoG: String, getProdScanMode: () => 'qr', drawCode128OnCanvas() {},
       getEmpresaName: () => 'Casa da Baba', escPosLabelProducao: () => Uint8Array.of(0x54),
       window: { cdbEtiquetaTermica: { gerar: (et, opts) => { gerado.push({ et, opts }); return { bytes: () => Uint8Array.of(0x1D, 0x76, 0x30) }; } } },
@@ -152,11 +152,24 @@ module.exports = function ({ test, assert }) {
   });
 
   test('Etiqueta térmica: se a imagem falhar, imprime o texto antigo em vez de não imprimir', () => {
-    const { context } = fromIndex(['etiquetaTermica', 'escPosEtiquetaProducao'], {
+    const { context } = fromIndex(['etiquetaTermica', 'code128TermicaLegivel', 'escPosEtiquetaProducao'], {
       console: { warn() {} }, document: {}, fmtDateBR: String, fmtPesoG: String, getProdScanMode: () => 'both', drawCode128OnCanvas() {},
       getEmpresaName: () => 'Casa da Baba', escPosLabelProducao: () => Uint8Array.of(0x54),
       window: { cdbEtiquetaTermica: { gerar() { throw new Error('canvas indisponível'); } } },
     });
     assert.deepEqual(Array.from(context.escPosEtiquetaProducao({ productName: 'X' })), [0x54]);
+  });
+  test('Etiqueta térmica: barras que não cabem com 2 pontos dão lugar ao QR', () => {
+    const T = load();
+    const { layout } = render(T, ET, { codigos: 'barcode', code128: () => false });
+    assert.ok(layout.qr && layout.qr.modulo >= 3, 'QR assume quando as barras ficariam ilegíveis');
+    const desenhadas = render(T, ET, { codigos: 'barcode', code128: () => true }).layout;
+    assert.equal(desenhadas.qr, null, 'com barras legíveis não duplica com QR');
+  });
+
+  test('Etiqueta térmica: prazo do envio cresce com o tamanho da impressão', () => {
+    const { context } = fromIndex(['printWriteTimeoutMs'], {});
+    assert.equal(context.printWriteTimeoutMs(300), 16000);
+    assert.ok(context.printWriteTimeoutMs(1000000) >= 140000, 'lote de 1 MB não cai no prazo de 15 s');
   });
 };

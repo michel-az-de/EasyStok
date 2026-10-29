@@ -5434,7 +5434,6 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: block; width: 100%; height: auto;
   background: #fff; border-radius: 6px;
   box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 6px 18px rgba(0,0,0,.12);
-  image-rendering: pixelated;
 }
 .etq-card-wrap {
   /* Preserva a altura calculada após scale; o contêiner rola o lote inteiro. */
@@ -19361,6 +19360,12 @@ function releasePrinting() {
   isPrinting = false;
   if (printWatchdog) { clearTimeout(printWatchdog); printWatchdog = null; }
 }
+// #2141: etiqueta em imagem tem ~25 KB; o write só volta quando a WTP05
+// consome tudo. Prazo de 15 s mais 1 s a cada 8 KB (Bluetooth SPP lento).
+function printWriteTimeoutMs(length) {
+  return 15000 + Math.ceil((length || 0) / 8000) * 1000;
+}
+
 function printViaBluetooth(bytes, onFallback, printJob) {
   btStep('print:start');
   const bs = window.bluetoothSerial;
@@ -19416,7 +19421,7 @@ function printViaBluetooth(bytes, onFallback, printJob) {
       // Tenta fechar socket pra evitar leak — se o write travou, o socket
       // pode estar zumbi. Disconnect e silencioso (callbacks vazios).
       try { bs.disconnect(function () {}, function () {}); } catch (_) {}
-    }, 15000);
+    }, printWriteTimeoutMs(bytes.length));
     const send = () => {
       if (!active()) return;
       btStep('print:send-write');
@@ -19661,10 +19666,19 @@ function etiquetaTermica(et) {
     return T.gerar(Object.assign({}, et, { empresa: et.empresa || getEmpresaName() }), {
       formatar: { data: fmtDateBR, peso: fmtPesoG },
       codigos: getProdScanMode(),
-      code128: drawCode128OnCanvas,
+      code128: code128TermicaLegivel,
       nota: et._nota || null
     });
   } catch (e) { console.warn('Etiqueta térmica em imagem falhou:', e); return null; }
+}
+
+// Barras de 1 ponto não leem na térmica: só desenha com módulo >= 2.
+function code128TermicaLegivel(ctx, data, x, y, w, h) {
+  const modules = code128Modules(data);
+  const total = modules ? modules.split('').reduce((s, n) => s + Number(n || 0), 0) : 0;
+  if (!total || total * 2 > w) return false;
+  drawCode128OnCanvas(ctx, data, x, y, w, h);
+  return true;
 }
 
 function escPosEtiquetaProducao(et) {
@@ -20555,7 +20569,7 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   document.getElementById('etqSubtitle').textContent = subtitle || '';
   // A térmica de produção é um rolo de 58 mm: orientação só muda a etiqueta de pedido.
   const orientRow = document.getElementById('etqOrientChips')?.closest?.('.etq-config-row');
-  if (orientRow) orientRow.hidden = kind !== 'order';
+  if (orientRow) orientRow.style.display = kind === 'order' ? '' : 'none';
 
   // Sync config chips
   const curMode = getProdScanMode();
@@ -20576,6 +20590,9 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   }
 
   refreshEtqPreview();
+  if (kind !== 'order' && typeof window !== 'undefined' && window.cdbEtiquetaTermica) {
+    window.cdbEtiquetaTermica.fontes().then(refreshEtqPreview);
+  }
   rememberOperationalFocus('etiquetasPreview');
   document.getElementById('etiquetasPreview').classList.add('show');
   document.getElementById('etqTitle').focus();
