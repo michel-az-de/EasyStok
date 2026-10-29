@@ -77,6 +77,7 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
                 slaRespostaMinutos = 9,
                 assumidaPorNome = "Ana",
                 numeroComanda = cenario.ComPedido.NumeroComanda,
+                fotoUrl = (string?)null,
             },
             new
             {
@@ -98,10 +99,36 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
                 slaRespostaMinutos = 9,
                 assumidaPorNome = (string?)null,
                 numeroComanda = cenario.Escalada.NumeroComanda,
+                fotoUrl = (string?)null,
             },
         }, Json)!;
 
         real.ToJsonString().Should().Be(esperado.ToJsonString());
+    }
+
+    [SkippableFact]
+    public async Task Resumo_TrazFotoPrivadaVersionadaDoCliente_ENulaSemCadastro()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var cenario = await SemearAsync();
+        var versao = Guid.NewGuid().ToString("N");
+        await using (var alterar = fixture.CreateDbContext())
+        {
+            alterar.SetMobileTenantContext(cenario.EmpresaId);
+            var cliente = await alterar.Clientes.SingleAsync(c => c.EmpresaId == cenario.EmpresaId && c.Id == cenario.ClienteId);
+            cliente.FotoChave = $"clientes/{cenario.EmpresaId}/{cliente.Id}/{versao}.jpg";
+            await alterar.SaveChangesAsync();
+        }
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(cenario.EmpresaId);
+        var resumos = await Inbox(db).ExecuteAsync(new ListarConversasAtendimentoQuery(cenario.EmpresaId, null, null, 1, 10));
+
+        var doCliente = resumos.Single(r => r.Id == cenario.ComPedido.Id);
+        var esperada = $"/api/clientes/{cenario.ClienteId}/foto?v={versao}";
+        doCliente.FotoUrl.Should().Be(esperada);
+        resumos.Single(r => r.Id == cenario.Escalada.Id).FotoUrl.Should().BeNull("contato sem cadastro não herda a foto de outro cliente");
+        JsonSerializer.SerializeToNode(doCliente, Json)!["fotoUrl"]!.GetValue<string>().Should().Be(esperada);
     }
 
     [SkippableFact]
