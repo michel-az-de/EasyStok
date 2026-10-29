@@ -12,11 +12,28 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
   const salvando = useRef(false)
   const campo = useRef(null)
   const postit = useRef(null)
+  // Antes do commit: o efeito de abertura ainda não transferiu o foco ao campo.
+  const abridor = useRef(globalThis.document?.activeElement ?? null)
+  const montada = useRef(true)
   const animacao = useRef(null)
   const [confirmada, setConfirmada] = useState(false)
   const contextoAtual = useRef({ visivel, outraConversa })
   contextoAtual.current = { visivel, outraConversa }
   const vazio = texto.trim().length === 0
+
+  function fechar() {
+    if (!montada.current) return
+    const interno = () => postit.current?.contains?.(globalThis.document?.activeElement) === true
+    const contexto = contextoAtual.current
+    const devolver = montada.current && contexto.visivel && !contexto.outraConversa && interno()
+    aoFechar()
+    const destino = abridor.current
+    // O callback pode focar outro controle. Não disputa esse foco nem o de uma ação externa.
+    if (devolver && (interno() || document.activeElement === document.body)
+      && destino?.isConnected && destino !== document.body && destino !== document.documentElement
+      && typeof destino.focus === 'function' && !destino.disabled
+      && destino.getClientRects().length > 0) destino.focus({ preventScroll: true })
+  }
 
   async function salvar() {
     if (vazio || salvando.current) return
@@ -34,7 +51,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
           try {
             await new Promise((resolver) => requestAnimationFrame(resolver))
             if (contextoAtual.current.outraConversa || !contextoAtual.current.visivel || !postit.current) {
-              aoFechar()
+              fechar()
               return
             }
             const origem = postit.current.getBoundingClientRect()
@@ -50,7 +67,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
             await animacao.current.finished.catch(() => {})
           } catch { /* O retorno confirmado não depende da animação. */ }
         }
-        aoFechar()
+        fechar()
       }
     } catch (falha) {
       setErro(falha.message || 'Não foi possível salvar a nota. Seu texto continua aqui.')
@@ -62,9 +79,12 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
 
   // Foco só ao abrir: `aoFechar` muda de identidade a cada render do App e não pode refazer o foco.
   useEffect(() => { if (visivel) campo.current?.focus() }, [visivel])
-  useEffect(() => () => animacao.current?.cancel(), [])
+  useEffect(() => {
+    montada.current = true
+    return () => { montada.current = false; animacao.current?.cancel() }
+  }, [])
   // Esc só fecha quando o foco está no post-it: o Esc de um modal ou da barra "/" não apaga a nota.
-  const aoTeclar = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !salvando.current) { e.stopPropagation(); aoFechar() } }
+  const aoTeclar = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !salvando.current) { e.stopPropagation(); fechar() } }
 
   return (
     <dialog ref={postit} open={visivel} className={css.postit} aria-label="Nota interna" onKeyDown={aoTeclar}>
@@ -84,7 +104,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
       />
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       <div className={css.acoes}>
-        <Botao variante="texto" disabled={ocupado} onClick={aoFechar}>Cancelar</Botao>
+        <Botao variante="texto" disabled={ocupado} onClick={fechar}>Cancelar</Botao>
         <Botao variante="primario" disabled={vazio || ocupado} onClick={salvar}>
           {confirmada ? 'Nota salva' : ocupado ? 'Salvando…' : 'Fixar nota'}
         </Botao>

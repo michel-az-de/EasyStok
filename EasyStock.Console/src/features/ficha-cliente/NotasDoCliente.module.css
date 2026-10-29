@@ -1,10 +1,10 @@
-.coluna { display: grid; gap: var(--e-3); min-width: 0; }
+.coluna { display: grid; gap: var(--e-3); min-width: 0; max-height: min(32dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
 .acoesCliente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
 .nota, .solto { border: 0; border-radius: 0; background: var(--alerta-pastel); color: var(--tinta); }
 .nota { padding: var(--e-3); animation: aparecer var(--dur-curta) var(--ease-padrao); }
 .nota small, .corpo small { color: var(--tinta-2); font-size: var(--t-minimo); }
 .texto { margin: var(--e-2) 0; font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.nota .texto { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.nota .texto { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .soltar { padding: 0; min-height: var(--toque); border: 0; background: transparent; color: var(--tinta-2); font: inherit; font-size: var(--t-minimo); cursor: pointer; }
 .referencia { display: flex; align-items: center; gap: var(--e-2); min-width: 0; min-height: var(--toque); color: var(--tinta-2); font-size: var(--t-minimo); }
 .referencia span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

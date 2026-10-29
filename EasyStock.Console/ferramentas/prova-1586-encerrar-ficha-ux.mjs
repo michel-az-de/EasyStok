@@ -818,6 +818,85 @@ await confere('nota: reduced motion e mudança de conversa fecham no sucesso sem
   } finally { if (anterior === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = anterior }
 })
 
+async function comFocoDaNota(provar) {
+  const documentoAnterior = globalThis.document, movimentoAnterior = globalThis.matchMedia
+  const documento = { body: {}, documentElement: {}, activeElement: null }
+  const controle = (interno = false) => ({ interno, isConnected: true, disabled: false, focos: 0,
+    getClientRects: () => [{}], focus() { this.focos++; documento.activeElement = this } })
+  const abridor = controle(), externo = controle()
+  globalThis.document = documento
+  globalThis.matchMedia = () => ({ matches: true })
+  const abrir = (props = {}) => {
+    abridor.focos = 0; documento.activeElement = abridor
+    const tela = new Tela(ModalNota, { nomeCliente: 'Ana', textoInicial: 'Nota proposta', aoSalvar: async () => true, aoFechar: nada, ...props })
+    const campo = controle(true)
+    doTipo(tela, 'CampoArea')[0].props.ref.current = campo
+    doTipo(tela, 'dialog')[0].props.ref.current = { contains: (no) => no?.interno === true }
+    // Imita a transferência de foco da montagem, depois de o abridor ter sido capturado.
+    campo.focus()
+    return tela
+  }
+  try { await provar({ abrir, abridor, externo, documento }) }
+  finally {
+    if (documentoAnterior === undefined) delete globalThis.document; else globalThis.document = documentoAnterior
+    if (movimentoAnterior === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = movimentoAnterior
+  }
+}
+
+await confere('nota: Cancelar e Escape retornam ao abridor capturado antes do autofocus; cleanup não foca', async () => {
+  await comFocoDaNota(async ({ abrir, abridor, documento }) => {
+    for (const gesto of ['cancelar', 'escape']) {
+      let fechou = 0
+      const tela = abrir({ aoFechar: () => { fechou++ } })
+      if (gesto === 'cancelar') botao(tela, 'Cancelar').props.onClick()
+      else doTipo(tela, 'dialog')[0].props.onKeyDown({ key: 'Escape', defaultPrevented: false, stopPropagation: nada })
+      assert.equal(fechou, 1); assert.equal(documento.activeElement, abridor); assert.equal(abridor.focos, 1)
+      tela.encerrar(); assert.equal(abridor.focos, 1, 'desmontar não repete o foco')
+    }
+    const tela = abrir()
+    tela.encerrar(); assert.equal(abridor.focos, 0, 'cleanup sem fechamento explícito não devolve foco')
+  })
+})
+
+await confere('nota: confirmação devolve foco, mas respeita ação externa e prioridade do callback', async () => {
+  await comFocoDaNota(async ({ abrir, abridor, externo, documento }) => {
+    for (const caso of ['confirmada', 'foco-externo', 'callback']) {
+      const gravacao = pendente()
+      let fechou = 0
+      const tela = abrir({ aoSalvar: () => gravacao.promise, aoFechar: () => { fechou++; if (caso === 'callback') externo.focus() } })
+      const salvando = botao(tela, 'Fixar nota').props.onClick()
+      if (caso === 'foco-externo') externo.focus()
+      gravacao.resolver(true); await salvando
+      assert.equal(fechou, 1)
+      assert.equal(documento.activeElement, caso === 'confirmada' ? abridor : externo)
+      assert.equal(abridor.focos, caso === 'confirmada' ? 1 : 0)
+      tela.encerrar()
+    }
+  })
+})
+
+await confere('nota: contexto trocado, retorno após unmount e abridor indisponível não recebem foco', async () => {
+  await comFocoDaNota(async ({ abrir, abridor }) => {
+    for (const caso of ['outra-conversa', 'oculta', 'desmontada', 'desconectado', 'invisivel', 'desabilitado']) {
+      const gravacao = pendente()
+      let fechou = 0
+      const tela = abrir({ aoSalvar: () => gravacao.promise, aoFechar: () => { fechou++ } })
+      const salvando = botao(tela, 'Fixar nota').props.onClick()
+      if (caso === 'outra-conversa') tela.renderizar({ ...tela.props, outraConversa: true })
+      if (caso === 'oculta') tela.renderizar({ ...tela.props, visivel: false })
+      if (caso === 'desmontada') tela.encerrar()
+      if (caso === 'desconectado') abridor.isConnected = false
+      if (caso === 'invisivel') abridor.getClientRects = () => []
+      if (caso === 'desabilitado') abridor.disabled = true
+      gravacao.resolver(true); await salvando
+      assert.equal(abridor.focos, 0, caso)
+      assert.equal(fechou, caso === 'desmontada' ? 0 : 1, 'retorno após unmount não chama callback que poderia fechar outra nota')
+      tela.encerrar()
+      abridor.isConnected = true; abridor.disabled = false; abridor.getClientRects = () => [{}]
+    }
+  })
+})
+
 if (falhas.length > 0) {
   console.error(`\n${passou} ok, ${falhas.length} falha(s)`)
   process.exit(1)
