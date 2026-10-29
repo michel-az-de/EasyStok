@@ -38,7 +38,7 @@ function EntregaExterna({ controlador: c }) {
       aria-label="Consultar Lalamove (site externo, abre em nova aba)">Consultar Lalamove ↗</a>
     <ol className={css.historico}>
       <li>Confira endereço, horário e custo antes de contratar.</li>
-      <li>Com o cliente de acordo, revise a seleção e use Criar pedido no Atendimento ou peça que confirme pelo link.</li>
+      <li>Com o cliente de acordo, revise os itens e use Criar pedido em Pedido e entrega ou peça que confirme pelo link.</li>
       <li>Em Entregas, abra ou monte a viagem do pedido e use Registrar corrida para anotar o custo e o motorista.</li>
     </ol>
     <p className={css.apoio}>O custo do transportador é separado do frete cobrado do cliente.</p>

@@ -1,5 +1,7 @@
 using EasyStock.Api.Authentication;
 using EasyStock.Application.UseCases.Cliente.Dossie;
+using EasyStock.Application.UseCases.Cliente.Foto;
+using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Application.UseCases.ClienteCrm;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -25,6 +27,22 @@ public class ClientesCrmController(
     ObterDossieClienteUseCase dossie,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [HttpGet("ficha.pdf")]
+    [Authorize(Policy = "Operador")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<IActionResult> FichaPdf(Guid id, [FromQuery] Guid? empresaId,
+        [FromServices] IFichaClientePdfRenderer renderer, [FromServices] ClienteFotoUseCase fotos, CancellationToken ct) =>
+        Executar(empresaId, async emp =>
+        {
+            var dados = await dossie.ExecuteAsync(new ObterDossieClienteQuery(emp, id), ct);
+            if (dados is null) return DataNotFound("Cliente não encontrado.");
+            var foto = dados.Cliente.FotoUrl is null ? null : await fotos.ObterAsync(emp, id, ct);
+            var bytes = await renderer.RenderAsync(dados, foto, DateTime.UtcNow, ct);
+            Response.Headers.CacheControl = "private, no-store";
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return File(bytes, "application/pdf", $"ficha-cliente-{id:D}.pdf");
+        });
+
     // ── Dossiê (S25) ───────────────────────────────────────────────────
 
     [SwaggerOperation(Summary = "Customer dossier (orders, favorite, notes, tags, same household)",

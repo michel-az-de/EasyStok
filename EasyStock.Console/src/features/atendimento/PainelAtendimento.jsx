@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Avatar } from '../../componentes/Avatar'
+import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
@@ -33,6 +34,7 @@ export function PainelAtendimento({
     selecionar, abrirEncerramento, reenviar, carregarMensagensAnteriores,
   } = useAcoes()
   const { janelas, canais } = useCatalogo()
+  const fotoCadastrada = useFotoCliente(selecionada?.cliente?.fotoUrl)
   const { acoes: capacidades } = useAcessoModulos()
   const reabrirLigado = useAcaoDisponivel()('reabrir')
   const podeReabrir = reabrirLigado && (!fonteApi || capacidades.reabrirConversa === true)
@@ -114,7 +116,7 @@ export function PainelAtendimento({
         <span className={css.identidade}>
           <Avatar
             nome={selecionada.nome}
-            foto={fotoDoCliente(canal, selecionada.cliente)}
+            foto={fotoCadastrada.url ?? fotoDoCliente(canal, selecionada.cliente)}
             tamanho="grande"
           />
           <h2 tabIndex={-1} ref={cabecalhoRef} data-foco-reserva>
@@ -130,17 +132,21 @@ export function PainelAtendimento({
           </h2>
         </span>
         <div className={css.direita} data-ancora-assistente>
+          {bloqueada && <Pilula tom="perigo"><Icone nome="bloqueio" /> Bloqueado</Pilula>}
+          {!encerrada && !bloqueada && <details key={selecionada.id} className={css.opcoesConversa} onKeyDown={(evento) => {
+            if (evento.key !== 'Escape' || evento.defaultPrevented || evento.target.closest('dialog')) return
+            evento.preventDefault(); evento.stopPropagation()
+            evento.currentTarget.open = false
+            evento.currentTarget.querySelector('summary')?.focus()
+          }}>
+            <summary aria-label="Opções da conversa" title="Opções da conversa"><Icone nome="ellipsis" /></summary>
+            <div className={css.menuConversa} role="group" aria-label="Ações da conversa">
           {/* #1989: irmãos com a mesma chave (o id da conversa) faziam o React perder a conta e
               deixar um "Link de compra" velho a cada troca de conversa. Cada um tem o seu prefixo. */}
           {!encerrada && !bloqueada && <CompartilharComanda key={'compartilhar-' + selecionada.id} conversa={selecionada} canalNome={canal.nome} podeEnviar={pode} />}
           {/* Assumir e devolver ao automático moram na BarraModo, um lugar só.
               Aqui em cima fica o que é estado da conversa: bloqueio, encerrar
               e reabrir. */}
-          {bloqueada && (
-            <Pilula tom="perigo">
-              <Icone nome="bloqueio" /> Bloqueado
-            </Pilula>
-          )}
           {/* Rodada 5, seção 5 (passo zero): "Encerrar" abre a modal do
               resumo (vazia até a F5 construir o conteúdo); com a conversa já
               encerrada, dá lugar ao "Reabrir conversa" que já existia. */}
@@ -151,6 +157,8 @@ export function PainelAtendimento({
               Concluir conversa
             </Botao>
           )}
+            </div>
+          </details>}
         </div>
       </header>
 

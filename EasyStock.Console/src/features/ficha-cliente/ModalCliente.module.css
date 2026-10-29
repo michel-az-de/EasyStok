@@ -1,0 +1,40 @@
+.modal { background: var(--papel-ficha, var(--elevado)); border: 0; border-radius: var(--r-1); }
+.modal h2[class] { font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 600; padding-top: var(--e-4); }
+.modal > div { background: none; border: 0; scrollbar-color: var(--linha-media) transparent; }
+.papel { display: grid; gap: var(--e-16); min-width: 0; }
+.carimbo { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); color: var(--tinta-2); font-size: var(--t-minimo); }
+.cadastro { display: grid; gap: var(--e-16); min-width: 0; }
+.cadastro > section > h3 { margin: 0 0 var(--e-2); font-family: var(--f-corpo); font-size: var(--t-forte); }
+.cadastro section > h3 > button { min-height: var(--toque); }
+.cadastro [data-dados-cliente] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-2) var(--e-4); margin: 0; background: transparent; overflow: visible; border-radius: 0; }
+.cadastro [data-dados-cliente] > div { display: grid; grid-template-columns: 74px minmax(0, 1fr); align-items: baseline; gap: var(--e-2); border: 0; min-height: 0; padding: 0; }
+.cadastro [data-dados-cliente] > div > span[aria-hidden='true'] { display: none; }
+.cadastro [data-tags-cliente] { margin: 0; }
+.cadastro [data-tags-cliente] li > button { border: 0; background: transparent; }
+.cadastro [data-tags-cliente] li > span { border: 0; }
+.cadastro [data-resumo-cliente] h3 { margin: 0 0 var(--e-2); }
+.cadastro [data-resumo-cliente] { display: flex; align-items: flex-start; gap: var(--e-3); }
+.cadastro [data-resumo-cliente] > div { min-width: 0; }
+.cadastro [data-resumo-cliente] p { margin: 0; line-height: 1.6; }
+.historico { min-width: 0; }
+.historico > h3 { margin: 0 0 var(--e-3); font-family: var(--f-corpo); font-size: var(--t-forte); }
+.historico [data-historico-cliente] { display: grid; gap: var(--e-3); }
+.historico [role='tabpanel'] { padding-inline: 0; }
+.historico ul { min-width: 0; }
+.historico li { border: 0; box-shadow: none; background: transparent; }
+.historico textarea { background: var(--papel-ficha, var(--elevado)); }
+.acoes { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; width: 100%; }
+.acoes small { flex: 1 1 220px; color: var(--tinta-2); font-size: var(--t-minimo); }
+.erro { margin: 0; color: var(--erro); }
+.consultaFrete { display: grid; gap: var(--e-3); }
+.consultaFrete p { margin: 0; }
+.enderecoFrete { color: var(--tinta-2); overflow-wrap: anywhere; }
+.valorFrete { display: grid; gap: var(--e-2); }
+.valorFrete strong { font-size: var(--t-valor); }
+.valorFrete small { color: var(--tinta-2); }
+@media (max-width: 759px) {
+  .papel, .cadastro { gap: var(--e-4); }
+  .modal h2[class] { font-size: 1.5rem; }
+  .acoes small { flex-basis: 100%; }
+  .cadastro [data-dados-cliente] { grid-template-columns: minmax(0, 1fr); }
+}

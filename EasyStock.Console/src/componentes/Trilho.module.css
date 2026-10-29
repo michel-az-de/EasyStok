@@ -22,7 +22,7 @@
 .item, .filhos > button, .filhos > div > button {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   width: var(--largura-item-trilho); min-height: var(--altura-item-trilho); padding: 4px;
-  border: 0; border-radius: 14px; background: transparent; color: var(--tinta-2); box-shadow: none;
+  border: 0; border-radius: var(--r-1); background: transparent; color: var(--tinta-2); box-shadow: none;
   font-size: var(--t-minimo); font-weight: 600; letter-spacing: inherit; line-height: 1.1; text-align: center; text-decoration: none;
 }
 .item > span { max-width: 100%; overflow-wrap: anywhere; hyphens: auto; }
@@ -31,12 +31,8 @@
   background: var(--preenchimento); color: var(--tinta);
 }
 .inicio:focus-visible, .item:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
-/* O item da tela em que a pessoa está: fundo forte e a barrinha no canto do trilho. */
+/* O preenchimento identifica a tela atual sem uma borda decorativa. */
 .ativo, .ativo:hover:not(:disabled) { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
-.ativo::before {
-  content: ''; position: absolute; left: calc(-1 * var(--respiro-trilho)); top: 14px; bottom: 14px; width: 3px;
-  border-radius: 0 3px 3px 0; background: var(--tinta);
-}
 .espaco { flex: 1; }
 /* Quem está logado, no pé do trilho; a conta (e o Sair) abre dele. */
 .avatar { margin-top: var(--e-2); display: grid; place-items: center; }

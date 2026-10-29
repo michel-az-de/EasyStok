@@ -1,13 +1,21 @@
 /* Casa da Baba: paleta por papel, tema claro e escuro.
    Fonte da marca: docs/plan/erp-casa-da-baba/01-fundacao.md, M0.1.
    Pares de texto, ação, estado e foco verificados por verificar-contraste.mjs. */
+@font-face {
+  font-family: 'Caveat';
+  src: url('./fontes/Caveat.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light dark;
-  --fundo: light-dark(#F6EEDD, #1A120C);
+  --fundo: light-dark(#F6F4F0, #1C1917);
   --papel: light-dark(#FEFEFE, #241A12);
-  --elevado: light-dark(#FFF8E8, #302318);
-  --creme: light-dark(#FFF8E8, #1A120C);
-  --chao-conversa: light-dark(#FFF8E8, #1A120C);
+  --elevado: light-dark(#F7F5F1, #302A24);
+  --creme: light-dark(#F7F4EE, #1C1917);
+  --chao-conversa: light-dark(#F5F3EF, #1C1917);
   --preenchimento: light-dark(rgba(66, 40, 20, .07), rgba(246, 235, 221, .07));
   --preenchimento-forte: light-dark(rgba(66, 40, 20, .12), rgba(246, 235, 221, .12));
   --vidro: light-dark(rgba(254, 254, 254, .94), rgba(36, 26, 18, .94));
@@ -106,11 +114,11 @@
   --e-0: var(--e-1);
 
   /* raio por papel: controle, cartão, painel */
-  --r-1: 10px;
-  --r-2: 16px;
-  --r-3: 22px;
-  --r-pilula: 999px;
-  --r-ponta: 2px;
+  --r-1: 0px;
+  --r-2: 0px;
+  --r-3: 0px;
+  --r-pilula: 0px;
+  --r-ponta: 0px;
 
   --b-1: 1px;
   --b-2: 2px;
@@ -137,6 +145,9 @@
   --f-dado: var(--f-corpo);
   --f-titulo-marca: var(--f-display);
   --f-papel: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --f-manuscrita: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+  --fonte-apontamento: var(--f-manuscrita);
+  --papel-ficha: light-dark(#F0E5D2, #302A24);
 
   /* --- movimento -----------------------------------------------------------
      micro: toque e hover. curta: troca de estado. media: entrada de camada.

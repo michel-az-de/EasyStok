@@ -77,11 +77,14 @@ confere('1  a terceira linha só existe com etiqueta ou contexto', () => {
   assert.equal(cartao.temLinhaDeContexto({ etiqueta: false, contexto: [{ chave: 'pedido', texto: 'Sinal pago' }] }), true)
   assert.equal(cartao.temLinhaDeContexto({ etiqueta: true, contexto: [] }), true)
 })
-confere('1  sem a etiqueta, o estado vai para o leitor de tela e a atenção vira trilho lateral', () => {
+confere('1  sem a etiqueta, o estado vai para o leitor de tela e a atenção ganha marcador no avatar', () => {
   const jsx = fonte('features/caixa-de-entrada/CartaoConversa.jsx')
   assert.match(jsx, /\{!etiqueta && <span className="sr">, \{estado\.texto\}<\/span>\}/)
   assert.match(jsx, /title=\{nome\.titulo\}/)
-  assert.match(fonte('features/caixa-de-entrada/caixa.module.css'), /\.cartao\.precisa, \.cartao\.precisa\[aria-current='true'\] \{ box-shadow: inset 3px 0 0 var\(--alerta\); \}/)
+  const cssDaLista = fonte('features/caixa-de-entrada/caixa.module.css')
+  assert.match(cssDaLista, /\.cartao\.precisa \.avatarCartao::after/)
+  assert.match(cssDaLista, /content: '!'/)
+  assert.match(cssDaLista, /\.cartao\.slaEstourado \.avatarCartao::after \{ background: var\(--erro\)/)
   assert.match(fonte('features/caixa-de-entrada/classesDoCartao.js'), /motivo && motivo\.tom !== 'perigo' \? css\.precisa/) // #2135: todo motivo tem trilho, não só o `aviso`
 })
 
@@ -175,7 +178,7 @@ confere('5  a janela continua no acesso "Pedido e entrega" do Resumo e o aviso d
 confere('5  Balcão e Resumo sem cabeçalho só no desktop de três colunas; o nome segue no aria-label', () => {
   const moldura = fonte('app/Moldura.jsx')
   assert.match(moldura, /<Coluna variante="entrada" titulo="Conversas" semTitulo>/)
-  assert.match(moldura, /<Coluna variante="ficha" titulo="Cliente" semTitulo>/)
+  assert.match(moldura, /<Coluna variante="ficha" titulo="Ficha" semTitulo>/)
   assert.match(moldura, /<section className=\{`\$\{css\.coluna\} \$\{css\[variante\]\}`\} aria-label=\{titulo\}>/)
   assert.equal((moldura.match(/titulo="Conversas" semTitulo/g) ?? []).length, 1, 'tablet e celular mantêm o título')
 })

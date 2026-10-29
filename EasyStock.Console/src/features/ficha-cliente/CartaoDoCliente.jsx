@@ -1,12 +1,20 @@
+import { useState } from 'react'
 import { useResumoDoCliente } from '../../aplicacao/useResumoDoCliente'
+import { useFotoCliente } from '../../aplicacao/useFotoCliente'
+import { Avatar } from '../../componentes/Avatar'
+import { Botao } from '../../componentes/Botao'
+import { ConsultaFreteCliente } from './ConsultaFreteCliente'
+import { NotasDoCliente } from './NotasDoCliente'
 import { moeda } from '../../dominio/formato'
 import css from './ficha.module.css'
 
 // #1839: o que se vê sempre no Resumo, sem abrir nada: quem é o cliente (resumo da IA), quanto já
 // comprou no total, o que costuma pedir, as tags e a última nota interna como post-it. O resto
 // (endereço, histórico, conversas) segue em "Cliente e histórico".
-export function CartaoDoCliente({ conversa, fonteApi, aoAbrir }) {
+export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVerEntrega }) {
   const { cliente } = conversa
+  const fotoCadastro = useFotoCliente(cliente.fotoUrl)
+  const [freteAberto, setFreteAberto] = useState(false)
   const lead = conversa.conta === 'lead' || !conversa.clienteId
   const pedidos = cliente.pedidos ?? 0
   // `totalGasto` só existe depois que o dossiê chegou; antes disso os números ainda não valem.
@@ -21,28 +29,36 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir }) {
   // #1920: a IA devolve a frase com ponto final ("Ainda não comprou com a casa."); comparar sem a
   // pontuação do fim para o cartão não repetir a mesma frase em duas linhas.
   const mesmaFrase = (a, b) => Boolean(a && b) && a.trim().replace(/[.!]+$/, '') === b.trim().replace(/[.!]+$/, '')
-  const nota = cliente.notas?.[0] ?? null
   const tags = (cliente.tags ?? []).slice(0, 4)
-  // Lead sem tag nem nota: o Resumo já diz "primeiro o cadastro"; o cartão só repetiria.
-  if (lead && !nota && tags.length === 0) return null
+  const email = cliente.email || conversa.contatoInformado?.email
   return (
     <section className={css.cartaoCliente} aria-label={`Cliente ${conversa.nome}`}>
-      <button type="button" className={css.cartaoClienteAbrir} onClick={aoAbrir} aria-label={`Abrir Cliente e histórico de ${conversa.nome}`}>
+      <button type="button" className={css.cartaoClienteAbrir} onClick={aoAbrir} aria-label={`Abrir ficha de ${conversa.nome}`}>
+        <span className={css.identidadeCliente}>
+          <Avatar nome={conversa.nome} foto={fotoCadastro.url ?? foto} tamanho="grande" />
+          <span className={css.dadosIdentidadeCliente}>
+            <strong className={css.nomeClienteInline}>{conversa.nome}</strong>
+            {cliente.telefone && <span className={css.contatoClienteInline}>{cliente.telefone}</span>}
+            {email && <span className={css.contatoClienteInline}>{email}</span>}
+          </span>
+        </span>
+        {cliente.endereco && <span className={css.enderecoClienteInline}>{cliente.endereco}</span>}
         {resumo.texto && !mesmaFrase(resumo.texto, numeros) && <span className={css.resumoIa}>{resumo.texto}</span>}
         {resumo.carregando && <span className={css.resumoIaCarregando}>Lendo o histórico do cliente…</span>}
         {numeros && <span className={css.numerosCliente}>{numeros}</span>}
       </button>
+      {aoVerEntrega && <Botao className={css.freteCliente} variante="texto" icone="moto" aria-label="Ver frete e entrega" onClick={aoVerEntrega}>Frete</Botao>}
+      {!aoVerEntrega && fonteApi && conversa.clienteId && (cliente.endereco
+        ? <Botao className={css.freteCliente} variante="texto" icone="moto" onClick={() => setFreteAberto(true)}>Calcular frete</Botao>
+        : <Botao variante="texto" icone="map-pin" onClick={aoAbrir}>Adicionar endereço</Botao>)}
       {tags.length > 0 && (
         <ul className={css.tagsCliente} aria-label="Tags do cliente">
           {tags.map((t) => <li key={t}>{t}</li>)}
         </ul>
       )}
-      {nota && (
-        <p className={css.postitResumo}>
-          <span className={css.rotuloPostit}>Nota{nota.autor ? ` · ${nota.autor}` : ''}</span>
-          {nota.texto}
-        </p>
-      )}
+      <NotasDoCliente key={conversa.id} conversaId={conversa.id} notas={cliente.notas ?? []} />
+      {freteAberto && <ConsultaFreteCliente conversa={conversa} aoFechar={() => setFreteAberto(false)}
+        aoEditarEndereco={() => { setFreteAberto(false); aoAbrir() }} />}
     </section>
   )
 }

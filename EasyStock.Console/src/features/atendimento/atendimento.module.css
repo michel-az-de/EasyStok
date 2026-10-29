@@ -1,8 +1,8 @@
 .cabecalho {
   container-type: inline-size; container-name: topo-conversa;
-  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: nowrap;
   padding: var(--e-3) var(--e-4); background: var(--papel);
-  border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+  border: 0; flex-shrink: 0;
 }
 .identidade { display: flex; align-items: center; gap: var(--e-3); min-width: 0; flex: 1; }
 .cabecalho h2 {
@@ -20,10 +20,32 @@
   color: var(--tinta-3); line-height: var(--lh-compacto);
 }
 .direita {
-  width: 100%; display: flex; gap: var(--e-2); align-items: center;
-  flex-wrap: wrap; flex-shrink: 0;
+  width: auto; display: flex; gap: var(--e-2); align-items: center;
+  flex-wrap: nowrap; flex-shrink: 0;
 }
-.identidade { flex-basis: 100%; }
+.identidade { flex-basis: auto; }
+.opcoesConversa, .ferramentasComposer { position: relative; }
+.opcoesConversa > summary, .ferramentasComposer > summary {
+  display: grid; place-items: center; min-width: var(--toque); min-height: var(--toque);
+  padding: var(--e-2); border-radius: var(--r-2); list-style: none; cursor: pointer; color: var(--tinta-2);
+}
+.opcoesConversa > summary::-webkit-details-marker, .ferramentasComposer > summary::-webkit-details-marker { display: none; }
+.opcoesConversa > summary:hover, .ferramentasComposer > summary:hover { background: var(--preenchimento); }
+.opcoesConversa > summary:focus-visible, .ferramentasComposer > summary:focus-visible { outline: 2px solid var(--halo); outline-offset: 2px; }
+.menuConversa, .menuFerramentas {
+  position: absolute; z-index: 40; width: min(280px, calc(100vw - 32px));
+  display: grid; gap: var(--e-1); padding: var(--e-2); border-radius: var(--r-2);
+  background: var(--papel); box-shadow: var(--sombra); color: var(--tinta);
+}
+.menuConversa { top: calc(100% + var(--e-2)); right: 0; }
+.menuFerramentas { bottom: calc(100% + var(--e-2)); left: 0; }
+.menuConversa button, .menuFerramentas button, .menuFerramentas label {
+  width: 100%; justify-content: flex-start; min-height: var(--toque); padding: var(--e-2) var(--e-3);
+  border: 0; border-radius: var(--r-1); box-shadow: none; background: transparent;
+  color: var(--tinta); font: inherit; font-size: var(--t-apoio); text-align: left; cursor: pointer;
+}
+.menuConversa button:hover:not(:disabled), .menuFerramentas button:hover:not(:disabled), .menuFerramentas label:hover { background: var(--preenchimento); }
+.menuFerramentas .rotuloAcao { display: inline; }
 
 /* Uma área rolável só na coluna do meio: barra de modo, thread e painel do
    agente rolam juntos, o cabeçalho fica no teto e o composer no piso. Antes os
@@ -46,7 +68,7 @@
 
 .balao {
   max-width: min(76%, 62ch); padding: var(--e-2) var(--e-3);
-  border-radius: 18px; box-shadow: var(--sombra);
+  border-radius: var(--r-2); box-shadow: none;
   margin-top: 4px; animation: entradaBalao var(--dur-media) var(--ease-saida);
 }
 @keyframes entradaBalao {
@@ -79,12 +101,12 @@
 @keyframes girarMeta { to { transform: rotate(360deg); } }
 .entrada {
   align-self: flex-start; background: var(--papel); border: 0;
-  border-radius: 20px 20px 20px 6px;
+  border-radius: var(--r-1);
   box-shadow: 0 1px 2px light-dark(rgba(48, 32, 16, .08), rgba(0, 0, 0, .4)), 0 0 0 1px var(--linha);
 }
 .saida {
   align-self: flex-end; background: var(--marca-claro); color: var(--tinta);
-  border-radius: 20px 20px 6px 20px;
+  border-radius: var(--r-1);
   box-shadow: 0 1px 2px light-dark(rgba(120, 40, 10, .08), rgba(0, 0, 0, .35));
 }
 .saida .meta, .saida .meta * { color: var(--tinta-3); }
@@ -94,7 +116,7 @@
 .sistema {
   align-self: center; max-width: 94%; background: var(--elevado); color: var(--tinta-2);
   font-size: var(--t-apoio); box-shadow: none; text-align: center; padding: var(--e-2) var(--e-3);
-  border-radius: 18px;
+  border-radius: var(--r-1);
 }
 .resumo { font-family: var(--f-dado); font-size: var(--t-apoio); }
 /* Rodada 12 (#19): link do convite do cardápio, clicável na bolha. */
@@ -136,8 +158,8 @@
   display: flex; flex-direction: column; gap: var(--e-3);
 }
 .caixa {
-  background: var(--papel); border: var(--b-1) solid var(--linha-media);
-  border-radius: 16px; box-shadow: var(--sombra); padding: var(--e-3);
+  background: var(--papel); border: 0;
+  border-radius: var(--r-2); box-shadow: none; padding: var(--e-3);
   display: flex; flex-direction: column; gap: 0;
 }
 /* O campo some dentro da caixa: sem borda, sem fundo, sem alça de redimensionar.
@@ -152,8 +174,9 @@
 }
 .caixa:has(textarea:disabled) { background: var(--preenchimento); box-shadow: none; }
 .caixa:focus-within {
-  border-color: var(--marca); box-shadow: var(--sombra), 0 0 0 4px var(--halo);
+  box-shadow: none;
 }
+.caixa:has(:focus-visible) { outline: 3px solid var(--halo); outline-offset: 2px; }
 .acoes {
   display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
   padding: var(--e-2) 0 0 0; border-top: 0; margin: 0;
@@ -164,7 +187,7 @@
 /* #1761 (L8): conversa encerrada em uma linha neutra, no lugar do campo. */
 .linhaEncerrada {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap;
-  margin: 0; padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  margin: 0; padding: var(--e-2) var(--e-3); border: 0; border-radius: var(--r-2);
   background: var(--papel); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600;
 }
 
@@ -173,7 +196,7 @@
   display: flex; gap: var(--e-2); align-items: flex-start; flex-wrap: wrap;
   padding: 10px 16px; margin: 0 0 var(--e-3);
   background: var(--alerta-pastel); color: var(--alerta);
-  border: 0; border-radius: 12px; font-size: var(--t-apoio);
+  border: 0; border-radius: var(--r-1); font-size: var(--t-apoio);
 }
 .bloqueio strong { color: var(--tinta); font-weight: 600; }
 
@@ -201,8 +224,7 @@
    por fundo pastel, para não competir com os balões. */
 .modo {
   flex-shrink: 0; background: var(--papel);
-  border-bottom: var(--b-1) solid var(--linha);
-  border-left: var(--trilho) solid var(--linha-forte);
+  border: 0;
   padding: var(--e-2) var(--e-4);
 }
 .modo_ligado { border-left-color: var(--sucesso); }
@@ -286,7 +308,7 @@
 .acoes > button svg { width: 20px; height: 20px; }
 .acoes .enviar {
   width: var(--toque); min-width: var(--toque); height: var(--toque); min-height: var(--toque); padding: 0;
-  border-radius: var(--r-pilula);
+  border-radius: var(--r-2);
 }
 .acoes .enviar:disabled { background: var(--preenchimento-forte); color: var(--tinta-3); }
 .acoes .enviar:not(:disabled) { animation: enviarPronto var(--dur-media) var(--ease-pulo); }
@@ -308,12 +330,12 @@
    todo botão novo que entrar nela cai no grupo da esquerda sozinho, e quem
    levar a classe .enviar ocupa o lugar do enviar (o microfone, por exemplo). */
 .caixa {
-  flex-direction: row; align-items: flex-end; gap: 4px;
-  padding: 6px 6px 6px 8px; border-radius: 24px;
+  display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: var(--e-1);
+  padding: var(--e-2); border-radius: var(--r-2);
 }
-.acoes { display: contents; }
-.acoes > button:not(.enviar) { order: 1; width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-pilula); }
-.caixa > :not(.acoes) { order: 2; flex: 1; min-width: 0; }
+.acoes { display: flex; flex-wrap: nowrap; gap: var(--e-1); padding: 0; order: 1; }
+.acoes > button:not(.enviar) { order: 1; width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-2); }
+.caixa > :not(.acoes) { order: 0; flex: 1; min-width: 0; }
 .acoes > .enviar { order: 3; margin-left: 0; }
 .caixa textarea,
 .caixa textarea:hover,
@@ -347,8 +369,8 @@
    diz quem mandou). Cauda, o canto de 6 px, só na bolha que troca de quem
    fala; as seguintes do mesmo lado ficam redondas. Aviso do sistema vira
    texto centralizado, sem caixa. */
-.entrada { border-radius: 18px; }
-.saida { border-radius: 18px; }
+.entrada { border-radius: var(--r-2); }
+.saida { border-radius: var(--r-2); }
 .entrada.trocaDeVoz { border-top-left-radius: 6px; }
 .saida.trocaDeVoz { border-top-right-radius: 6px; }
 .saida.doAutomatico { background: var(--marca-claro); }
@@ -364,7 +386,7 @@
    desenho dos outros ícones da barra, no grupo da esquerda. */
 .acoes > label {
   order: 1; width: var(--toque); min-width: var(--toque); height: var(--toque); min-height: var(--toque); padding: 0;
-  display: inline-grid; place-items: center; border: 0; border-radius: var(--r-pilula);
+  display: inline-grid; place-items: center; border: 0; border-radius: var(--r-2);
   background: transparent; color: var(--tinta-2); cursor: pointer;
 }
 .acoes > label:hover { background: var(--preenchimento); color: var(--tinta); }
@@ -426,7 +448,7 @@
 .cardapioEnvio p { margin: 0; }
 .cardapioRotulo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-3); margin-top: var(--e-2) !important; }
 .cardapioMensagem {
-  padding: var(--e-3); border-radius: 12px; background: var(--marca-claro); color: var(--tinta);
+  padding: var(--e-3); border-radius: var(--r-1); background: var(--marca-claro); color: var(--tinta);
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .cardapioLink { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
@@ -446,10 +468,10 @@
 .programarOpcao input { margin-top: 3px; }
 .programarErro {
   padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--erro);
-  border-left: var(--trilho) solid var(--erro); background: var(--elevado);
+  border-left: 0; background: var(--elevado);
 }
 .programadas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
-.programadas li { display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3); border-radius: 12px; background: var(--elevado); }
+.programadas li { display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--elevado); }
 .programadaTopo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .programadaTopo button { margin-left: auto; }
 .programadaTexto { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tinta-2); }
@@ -468,7 +490,7 @@
 }
 @container composer (max-width: 439px) {
   .acoes > button.acaoComRotulo,
-  .acoes > label { width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-pilula); }
+  .acoes > label { width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-2); }
   .rotuloAcao {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
@@ -481,11 +503,11 @@
   align-self: flex-end; max-width: min(320px, 80%);
   margin: var(--e-2) var(--e-2) var(--e-2) 0; padding: var(--e-2) var(--e-3);
   background: var(--alerta-pastel); color: var(--tinta);
-  border-left: 3px solid var(--alerta); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
-  box-shadow: var(--sombra); transform: rotate(-.6deg);
+  border-radius: var(--r-2);
+  box-shadow: none;
   font-size: var(--t-apoio); line-height: var(--lh-corpo);
 }
-.postIt p { margin: var(--e-1) 0 0; white-space: pre-line; }
+.postIt p { margin: var(--e-1) 0 0; white-space: pre-line; font-family: var(--f-manuscrita); line-height: 1.6; }
 .postItQuem { display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-micro); font-weight: 600; color: var(--alerta); }
 @media (prefers-reduced-motion: reduce) { .postIt { transform: none; } }
 
@@ -502,7 +524,7 @@
   align-self: flex-start; max-width: min(100%, 62ch); text-align: left;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-corpo);
   padding: var(--e-2) var(--e-3); background: var(--papel);
-  border-left: var(--trilho) solid var(--linha-forte); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+  border-left: 0; border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
 }
 .sistema.sistemaPedido svg { display: inline-block; vertical-align: -3px; margin-right: var(--e-1); }
 
@@ -510,7 +532,7 @@
    lado do campo; a barra só quebra em coluna muito estreita. */
 @container composer (max-width: 760px) {
   .caixaEnxuta { flex-wrap: nowrap; }
-  .caixaEnxuta > :not(.acoes) { order: 2; flex-basis: auto; }
+  .caixaEnxuta > :not(.acoes) { order: 0; flex-basis: auto; }
   .caixaEnxuta > .acoes > .enviar { margin-left: 0; }
 }
 @container composer (max-width: 359px) {
@@ -526,7 +548,7 @@
 }
 /* Em coluna estreita os vizinhos viram ícones; Respostas compartilha o alvo de toque. */
 @container composer (max-width: 439px) {
-  .acoes > button.botaoRespostas { min-height: var(--toque); border-radius: var(--r-pilula); }
+  .acoes > button.botaoRespostas { min-height: var(--toque); border-radius: var(--r-2); }
 }
 
 @media (max-width: 759px) {

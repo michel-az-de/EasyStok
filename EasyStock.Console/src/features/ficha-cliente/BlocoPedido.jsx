@@ -263,7 +263,7 @@ export function BlocoPedido({
           </div>
         ))}
         {/* #1683: observação geral que o cliente deixou no pedido (a do item fica na linha). */}
-        {pedido.observacoes && <p className={css.notaTotal}>Observação do pedido: {pedido.observacoes}</p>}
+        {pedido.observacoes && <p className={`${css.notaTotal} ${css.apontamento}`}>Observação do pedido: {pedido.observacoes}</p>}
 
         <hr className={css.separador} />
         {diferencaPosPagamento > 0 && (

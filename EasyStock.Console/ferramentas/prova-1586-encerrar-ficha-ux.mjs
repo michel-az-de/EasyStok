@@ -25,7 +25,7 @@ const src = new URL('../src/', import.meta.url)
 
 // JSX real das duas pastas da issue, compilado antes dos ganchos (o `load` é síncrono).
 const compilados = new Map()
-for (const pasta of ['features/encerramento/', 'features/ficha-cliente/']) {
+for (const pasta of ['features/encerramento/', 'features/ficha-cliente/', 'features/notas/']) {
   for (const arquivo of readdirSync(new URL(pasta, src)).filter((f) => f.endsWith('.jsx'))) {
     const url = new URL(pasta + arquivo, src)
     compilados.set(url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code)
@@ -279,6 +279,7 @@ const { CampoEmLinha } = await import('../src/features/ficha-cliente/CampoEmLinh
 const { BarraProximoPasso } = await import('../src/features/ficha-cliente/BarraProximoPasso.jsx')
 const { BaixaAMao } = await import('../src/features/ficha-cliente/BlocoCobranca.jsx')
 const { ModalHistorico } = await import('../src/features/ficha-cliente/ModalHistorico.jsx')
+const { ModalNota } = await import('../src/features/notas/ModalNota.jsx')
 const { BlocoEnderecoCapturado } = await import('../src/features/ficha-cliente/BlocoEnderecoCapturado.jsx')
 
 class Tela {
@@ -747,6 +748,74 @@ await confere('#2079-D11 impresso: data e hora do encerramento são as da loja, 
   const folha = readFileSync(new URL('features/encerramento/FolhaResumo.jsx', src), 'utf8')
   assert.match(folha, /const dataCurta = \(iso\) => new Date\(iso\)\.toLocaleDateString\('pt-BR', \{ timeZone: FUSO \}\)/)
   assert.match(folha, /const dataHumana = \(iso\) => new Date\(iso\)\.toLocaleDateString\('pt-BR', \{ day: '2-digit', month: 'short', timeZone: FUSO \}\)/)
+})
+
+await confere('nota: só voa após persistir, segundo toque não duplica e fecha ao terminar a animação', async () => {
+  const globais = ['matchMedia', 'getComputedStyle', 'document', 'requestAnimationFrame', 'innerWidth']
+  const anteriores = new Map(globais.map((chave) => [chave, globalThis[chave]]))
+  const gravacao = pendente(), movimento = pendente()
+  let chamadas = 0, animacoes = 0, fechou = 0
+  try {
+    globalThis.matchMedia = () => ({ matches: false })
+    globalThis.getComputedStyle = () => ({ transform: 'none', getPropertyValue: (chave) => chave === '--dur-media' ? '220ms' : 'ease-out' })
+    globalThis.document = { querySelector: () => ({ getBoundingClientRect: () => ({ left: 650, top: 100, width: 200, height: 80 }) }) }
+    globalThis.requestAnimationFrame = (fn) => fn()
+    globalThis.innerWidth = 1000
+    const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: (valor) => { chamadas++; assert.equal(valor, 'Preferência confirmada'); return gravacao.promise }, aoFechar: () => { fechou++ } })
+    doTipo(tela, 'CampoArea')[0].props.onChange({ target: { value: '  Preferência confirmada  ' } })
+    tela.renderizar()
+    doTipo(tela, 'dialog')[0].props.ref.current = {
+      getBoundingClientRect: () => ({ left: 300, top: 500, width: 300, height: 200 }),
+      animate: () => { animacoes++; return { finished: movimento.promise, cancel: nada } },
+    }
+    const emVoo = botao(tela, 'Fixar nota').props.onClick()
+    await botao(tela, 'Fixar nota').props.onClick()
+    assert.deepEqual([chamadas, animacoes, fechou], [1, 0, 0])
+    gravacao.resolver(true)
+    await new Promise((resolver) => setTimeout(resolver, 0))
+    assert.deepEqual([chamadas, animacoes, fechou], [1, 1, 0])
+    movimento.resolver()
+    await emVoo
+    assert.equal(fechou, 1)
+    tela.encerrar()
+  } finally { for (const [chave, valor] of anteriores) { if (valor === undefined) delete globalThis[chave]; else globalThis[chave] = valor } }
+})
+await confere('nota: recusa ou erro conserva o rascunho, sem animar nem anunciar confirmação', async () => {
+  for (const recusar of [async () => false, async () => { throw new Error('Sem conexão') }]) {
+    let fechou = 0, animacoes = 0
+    const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: recusar, aoFechar: () => { fechou++ } })
+    doTipo(tela, 'CampoArea')[0].props.onChange({ target: { value: 'Texto que não pode sumir' } })
+    tela.renderizar()
+    doTipo(tela, 'dialog')[0].props.ref.current = { animate: () => { animacoes++ } }
+    await botao(tela, 'Fixar nota').props.onClick()
+    tela.renderizar()
+    assert.equal(doTipo(tela, 'CampoArea')[0].props.value, 'Texto que não pode sumir')
+    assert.equal(alertas(tela).length, 1)
+    assert.deepEqual([animacoes, fechou], [0, 0])
+    assert.equal(botao(tela, 'Fixar nota').props.disabled, false)
+    tela.encerrar()
+  }
+})
+await confere('nota: reduced motion e mudança de conversa fecham no sucesso sem voar para outro cliente', async () => {
+  const anterior = globalThis.matchMedia
+  try {
+    for (const caso of ['reduced-motion', 'outra-conversa', 'oculta']) {
+      globalThis.matchMedia = () => ({ matches: caso === 'reduced-motion' })
+      let fechou = 0, animacoes = 0
+      const gravacao = pendente()
+      const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: () => gravacao.promise, aoFechar: () => { fechou++ } })
+      doTipo(tela, 'CampoArea')[0].props.onChange({ target: { value: 'Nota persistida' } })
+      tela.renderizar()
+      doTipo(tela, 'dialog')[0].props.ref.current = { animate: () => { animacoes++ } }
+      const emVoo = botao(tela, 'Fixar nota').props.onClick()
+      if (caso === 'outra-conversa') tela.renderizar({ ...tela.props, outraConversa: true })
+      if (caso === 'oculta') tela.renderizar({ ...tela.props, visivel: false })
+      gravacao.resolver(true)
+      await emVoo
+      assert.deepEqual([animacoes, fechou], [0, 1])
+      tela.encerrar()
+    }
+  } finally { if (anterior === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = anterior }
 })
 
 if (falhas.length > 0) {

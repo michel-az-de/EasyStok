@@ -282,8 +282,8 @@ await confere('Produção do dia: o "−" e o contador do cartão têm tooltip e
   assert.ok(menos, 'o "−" existe')
   assert.equal(menos.props.title, 'Tirar 1 porção de Talharim 500 g')
   const contador = daClasse(cartao, 'contagem')[0]
-  assert.equal(contador.props.title, '2 porções de Talharim 500 g na seleção')
-  assert.equal(contador.props['aria-label'], '2 porções de Talharim 500 g na seleção')
+  assert.equal(contador.props.title, '2 porções de Talharim 500 g no lote')
+  assert.equal(contador.props['aria-label'], '2 porções de Talharim 500 g no lote')
   assert.match(limpo(contador), /^2/)
 })
 

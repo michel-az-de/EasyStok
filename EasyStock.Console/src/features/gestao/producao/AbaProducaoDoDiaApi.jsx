@@ -338,11 +338,11 @@ export function AbaProducaoDoDiaApi() {
                   // O rótulo do botão diz a ação; saldo e quantidade no lote vêm como descrição, para o leitor de tela também.
                   const idDoSaldo = cartao.saldo == null ? undefined : `saldo-${cartao.chave}`
                   const idDaContagem = noLote > 0 ? `lote-${cartao.chave}` : undefined
-                  const naSelecao = `${plural(noLote, 'porção', 'porções')} de ${nome} na seleção`
+                  const naSelecao = `${plural(noLote, 'porção', 'porções')} de ${nome} no lote`
                   return (
                     <li key={cartao.chave} data-prato={cartao.chave} className={`${grade.cartao} ${noLote > 0 ? grade.noLote : ''}`}>
                       <button type="button" className={grade.tocar} disabled={enviando} aria-label={`Somar 1 porção de ${nome}`}
-                        title={`Adicionar 1 porção de ${nome} à seleção. O estoque só muda ao confirmar.`}
+                        title={`Adicionar 1 porção de ${nome} ao lote. O estoque só muda ao confirmar.`}
                         aria-describedby={[idDoSaldo, idDaContagem].filter(Boolean).join(' ') || undefined} onClick={() => somar(cartao, 1)}>
                         {gradeComFoto && <FotoDoCartao foto={cartao.foto} />}
                         <span className={grade.nomeDoPrato}>{nomeVisual}</span>
@@ -376,7 +376,7 @@ export function AbaProducaoDoDiaApi() {
                   <output key={lote.loteId} className={css.aviso}>
                     <strong>Lote {lote.codigo}</strong> lançado: {lote.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
                     <span className={grade.acoesDoAviso}>
-                      <Botao variante="primario" icone="printer" disabled={buscandoEtiquetas} aria-label={`Imprimir ${lote.etiquetas} ${lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'} do lote ${lote.codigo}`} onClick={() => imprimir(lote.loteId)}>Imprimir {lote.etiquetas} {lote.etiquetas === 1 ? 'etiqueta' : 'etiquetas'}</Botao>
+                      <Botao variante="texto" icone="printer" disabled={buscandoEtiquetas} aria-label={`Etiquetas do lote ${lote.codigo}`} title="Etiquetas" onClick={() => imprimir(lote.loteId)} />
                       <Botao variante="texto" disabled={buscandoEtiquetas} aria-label={`Fechar o aviso do lote ${lote.codigo}`} onClick={() => dispensar(lote.loteId)}>Fechar aviso</Botao>
                     </span>
                     {impressao?.loteId === lote.loteId && impressao.erro && <>{' '}<strong>Não foi possível carregar as etiquetas deste lote. {impressao.erro}</strong></>}

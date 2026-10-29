@@ -90,15 +90,15 @@ export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi 
 // #1847: a janela de mensagens não impede criar uma cobrança para copiar, sem envio.
 // #1686 (item 9): cada motivo diz também onde se resolve (`alvo`): a barra o mostra como link que
 // abre a seção e põe o foco no campo. `cardapio` abre o cardápio; `cadastro` e `endereco`, a seção
-// Contato e endereço de "Cliente e histórico"; `janela`, a "Seleção do atendimento".
+// Contato e endereço da Ficha; `janela`, a seção Pedido e entrega.
 export const ALVOS_DO_MOTIVO = { CARDAPIO: 'cardapio', CADASTRO: 'cadastro', ENDERECO: 'endereco', JANELA: 'janela' }
 export function pendenciaAntesDeCobrar({ pedido, clienteId, endereco }, { fonteApi = false } = {}) {
   if (!pedido?.itens?.length) return { motivo: 'A comanda está vazia.', alvo: ALVOS_DO_MOTIVO.CARDAPIO }
   if (!fonteApi) return null
   if (!clienteId) return { motivo: 'Salve o cadastro do cliente (Contato e endereço).', alvo: ALVOS_DO_MOTIVO.CADASTRO }
   if (!endereco) return { motivo: 'Falta o endereço de entrega (Contato e endereço).', alvo: ALVOS_DO_MOTIVO.ENDERECO }
-  // #1865: a barra fica fora do modal; o seletor de janela está em "Seleção do atendimento".
-  if (!pedido.janela) return { motivo: 'Escolha a janela de entrega em Seleção do atendimento.', alvo: ALVOS_DO_MOTIVO.JANELA }
+  // #1865: a barra fica fora do modal; o seletor de janela está em Pedido e entrega.
+  if (!pedido.janela) return { motivo: 'Escolha a janela de entrega em Pedido e entrega.', alvo: ALVOS_DO_MOTIVO.JANELA }
   return null
 }
 export const motivoAntesDeCobrar = (dados, opcoes) => pendenciaAntesDeCobrar(dados, opcoes)?.motivo ?? null

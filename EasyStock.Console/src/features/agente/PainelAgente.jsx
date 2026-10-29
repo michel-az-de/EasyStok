@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
+import { AvatarAssistente } from '../../componentes/AvatarAssistente'
 import { Pilula } from '../../componentes/Pilula'
 import { MODOS, listaDeModos } from '../../dominio/modosDeConexao'
 import css from './agente.module.css'
@@ -67,7 +68,7 @@ export function PainelAgente({
   return (
     <section className={css.painel} aria-label="Agente de atendimento">
       <div className={css.cabeca}>
-        <h3><Icone nome="sparkles" /> Sugestão de resposta</h3>
+        <h3><AvatarAssistente tamanho={28} /> Sugestão de resposta</h3>
         {!aberto && (
           <span className={`${css.resumoFechado} ${chamaAtencao ? css.pendente : ''}`}>
             {pendencias}

@@ -148,7 +148,7 @@ confere('clienteEscolhendoPeloLink inclui seleção editável com itens ou ajuda
   assert.equal(escolhendo([{ ...ajudaVazia, podeEditar: false }], null), false)
   assert.equal(escolhendo([ajudaVazia], { pedidoId: PEDIDO, itens: [] }), false)
   assert.equal(pedido.LINHA_CLIENTE_ESCOLHENDO,
-    'O cliente está escolhendo pelo link. Abra Revisar seleção para acompanhar os itens antes de confirmar o pedido.')
+    'O cliente está escolhendo pelo link. Abra Revisar itens para acompanhar os itens antes de confirmar o pedido.')
 })
 
 // 6. Total sem frete avisa que é sem frete.
@@ -158,8 +158,8 @@ confere('rótulo do total da seleção diz quando o frete ainda não entrou', ()
   assert.equal(rotulo({ pedido: null }), 'Total dos itens, sem frete')
   assert.equal(rotulo({ pedido: null, freteCombinado: 0 }), 'Total previsto', 'frete combinado de zero já é frete')
   assert.equal(rotulo({ pedido: { total: 50 }, freteCombinado: null }), 'Total previsto')
-  assert.equal(rotulo({ pedido: { total: 50 } }, true), 'Total da seleção salva')
-  assert.equal(rotulo({ pedido: null }, true), 'Total da seleção salva, sem frete')
+  assert.equal(rotulo({ pedido: { total: 50 } }, true), 'Total dos itens salvos')
+  assert.equal(rotulo({ pedido: null }, true), 'Total dos itens salvos, sem frete')
 })
 
 console.log(`\n${passou} conferências passaram.`)

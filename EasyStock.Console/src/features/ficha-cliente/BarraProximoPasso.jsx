@@ -529,7 +529,7 @@ export function BarraProximoPasso({
       <div className={css.ondeEsta}>
         <Icone nome={iconeEstado} tamanho={32} />
         <div>
-          <span className={css.rotuloEstado}>
+          <span className={`${css.rotuloEstado} ${rotuloEstado === 'Cobrança pendente' ? css.cobrancaPendente : ''}`}>
             {rotuloEstado}
             {estornado && <span className={css.marcaEstorno}> · Estornado</span>}
           </span>

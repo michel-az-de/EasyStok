@@ -13,6 +13,7 @@ const jsx = new Map()
 for (const arquivo of [
   ...readdirSync(join(raiz, 'componentes')).filter(n => n.endsWith('.jsx')).map(n => join(raiz, 'componentes', n)),
   join(raiz, 'features/ficha-cliente/ComandaDoCliente.jsx'),
+  join(raiz, 'features/ficha-cliente/Cabecalho.jsx'),
   join(raiz, 'features/ficha-cliente/BlocoFreteApi.jsx'),
   join(raiz, 'features/ficha-cliente/SeletorJanelaApi.jsx'),
   join(raiz, 'aplicacao/acessoModulos.jsx'),
@@ -58,21 +59,21 @@ provar('ajuda e combinar entrega estão disponíveis antes de existir pedido, se
   assert.match(html, /Pedido de ajuda registrado/)
   assert.doesNotMatch(html, /Lalamove|lalamove\.com/, 'a Lalamove está congelada: nem link nem menção na seleção')
   assert.match(html, /<summary>Combinar entrega<\/summary>/)
-  assert.match(html, /<button(?![^>]*disabled)[^>]*>Combinar entrega desta seleção<\/button>/)
+  assert.match(html, /<button(?![^>]*disabled)[^>]*>Combinar entrega dos itens<\/button>/)
   assert.equal((html.match(/Quantidade de Lasanha/g) ?? []).length, 1)
   assert.doesNotMatch(html, /Confirmar alteração|Gerar cobrança/)
 })
 provar('endereço ausente explica o requisito e bloqueia encaminhamento', () => {
   const html = renderizar({ rascunho: { ...comanda.rascunho, endereco: null } })
-  assert.match(html, /<button[^>]*disabled=""[^>]*>Combinar entrega desta seleção<\/button>/)
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Combinar entrega dos itens<\/button>/)
   assert.match(html, /registre na Ficha/)
 })
 provar('edição local preservada exige salvar antes de encaminhar ou combinar frete', () => {
   const edicao = { revisao: 4, rascunho: comanda.rascunho }
-  assert.match(renderizar({}, edicao), /<button[^>]*disabled=""[^>]*>Combinar entrega desta seleção<\/button>/)
+  assert.match(renderizar({}, edicao), /<button[^>]*disabled=""[^>]*>Combinar entrega dos itens<\/button>/)
   const html = renderizar({ entregaACombinar: true }, edicao)
   assert.match(html, /<button[^>]*disabled=""[^>]*>Confirmar frete combinado<\/button>/)
-  assert.match(html, /Salve os ajustes da seleção/)
+  assert.match(html, /Salve os ajustes dos itens/)
 })
 provar('entrega encaminhada abre o frete e não repete a ação de encaminhar', () => {
   const html = renderizar({ entregaACombinar: true })
@@ -81,13 +82,13 @@ provar('entrega encaminhada abre o frete e não repete a ação de encaminhar', 
   assert.match(html, /Confirmar frete combinado/)
   assert.ok(html.indexOf('Quantidade de Lasanha') < html.indexOf('class="transporteCompartilhado"'), 'itens devem aparecer antes do formulário de frete')
   assert.ok(html.indexOf('type="date"') >= 0 && html.indexOf('type="date"') < html.indexOf('class="transporteCompartilhado"'), 'horário deve aparecer antes do formulário de frete')
-  assert.doesNotMatch(html, /Combinar entrega desta seleção/)
+  assert.doesNotMatch(html, /Combinar entrega dos itens/)
 })
 provar('frete confirmado fica visível sem voltar a oferecer encaminhamento', () => {
   const html = renderizar({ freteCombinado: 17.5 })
   assert.match(html, /Frete combinado: R\$\s*17,50/)
-  assert.match(html, /Salvar a seleção atualiza os itens no link/)
-  assert.doesNotMatch(html, /Combinar entrega desta seleção/)
+  assert.match(html, /Salvar os itens atualiza o link/)
+  assert.doesNotMatch(html, /Combinar entrega dos itens/)
 })
 provar('entrega completa recolhe campos; horário ou frete pendentes mantêm os campos abertos', () => {
   const completo = { freteCombinado: 0, rascunho: { ...comanda.rascunho, janelaId: 'j1', dataEntrega: '2026-10-14' } }
@@ -98,7 +99,7 @@ provar('entrega completa recolhe campos; horário ou frete pendentes mantêm os 
 })
 provar('pedido persistido não oferece encaminhamento pré-confirmação', () => {
   const html = renderizar({ podeEditar: false, pedido: { total: 38, alocado: 38 } })
-  assert.doesNotMatch(html, /Combinar entrega desta seleção|Confirmar frete combinado/)
+  assert.doesNotMatch(html, /Combinar entrega dos itens|Confirmar frete combinado/)
 })
 // #1891: a consulta à Lalamove está congelada (dominio/congelados.js); o bloco não renderiza nada,
 // com ou sem permissão em Entregas. Ao descongelar, volta a orientar o registro da corrida na viagem.
@@ -110,7 +111,7 @@ provar('consulta de transporte congelada não renderiza, com ou sem acesso a Ent
 provar('seleção sem janela mostra a criação bloqueada com requisito explícito', () => {
   const html = renderizar({ freteCombinado: 0 })
   assert.match(html, /<button[^>]*disabled=""[^>]*>Revisar e criar pedido<\/button>/)
-  assert.match(html, /Escolha uma janela de entrega disponível e salve a seleção/)
+  assert.match(html, /Escolha uma janela de entrega disponível e salve os itens/)
 })
 provar('confirmação exibe os valores persistidos, horário e endereço, inclusive frete zero', () => {
   const html = renderToStaticMarkup(createElement(ConfirmacaoPedidoCompartilhado, {
@@ -121,21 +122,21 @@ provar('confirmação exibe os valores persistidos, horário e endereço, inclus
   assert.match(html, /14\/10 · 12:00 às 13:00/)
   assert.match(html, /Frete combinado: <strong>R\$\s*0,00/)
   assert.match(html, /Total com frete: <strong>R\$\s*38,00/)
-  assert.match(html, /A seleção só vira pedido ao tocar em Criar pedido/)
+  assert.match(html, /Os itens só viram pedido ao tocar em Criar pedido/)
   assert.match(html, /Se houver saldo, ele ficará aguardando pagamento/)
 })
 provar('revisão alterada impede confirmar resumo antigo', () => {
   const html = renderToStaticMarkup(createElement(ConfirmacaoPedidoCompartilhado, {
     comanda: { ...comanda, freteCombinado: 0 }, janela: '14/10 · 12:00 às 13:00', desatualizado: true, aoFechar() {}, aoConfirmar() {},
   }))
-  assert.match(html, /A seleção mudou/)
+  assert.match(html, /Os itens mudaram/)
   assert.match(html, /<button[^>]*disabled=""[^>]*>Criar pedido<\/button>/)
 })
 provar('salvar seleção não se apresenta como criação do pedido', () => {
   const html = renderizar({}, { revisao: 4, rascunho: comanda.rascunho })
-  assert.match(html, /Não confirmada/)
-  assert.match(html, /Salvar seleção atualiza o link, sem criar um pedido/)
-  assert.match(html, /Salvar seleção<\/button>/)
+  assert.match(html, /Não confirmados/)
+  assert.match(html, /Salvar itens atualiza o link, sem criar um pedido/)
+  assert.match(html, /Salvar itens<\/button>/)
   assert.doesNotMatch(html, /Revisar e criar pedido<\/button>|Pedido criado/)
 })
 for (const podeEditar of [true, false]) provar(`alteração ${podeEditar ? 'em edição' : 'enviada'} separa o pedido atual da proposta`, () => {
@@ -153,7 +154,7 @@ provar('alteração recusada é histórico e mantém o total do pedido original'
   const html = renderizar({ podeEditar: false, pedido: { total: 76, alocado: 76, itens: [] }, envio: { situacao: 'alteracao_recusada' } })
   assert.match(html, /Alteração recusada/)
   assert.match(html, /Pedido atual · R\$\s*76,00/)
-  assert.match(html, /Seleção enviada pelo link/)
+  assert.match(html, /Itens enviados pelo link/)
   assert.doesNotMatch(html, /Confirmar alteração|Total proposto|Após aprovar/)
 })
 console.log(`${total} provas de estados da comanda do operador passaram.`)

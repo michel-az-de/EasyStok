@@ -62,14 +62,14 @@ for (const estado of ['aguardando', 'pago', 'entregue', 'cancelado']) {
     const html = renderizar({ estado: 'Encerrado', pedido: { ...pedido, estado } })
     assert.match(html, /Conversa concluída/)
     assert.match(html, /Consultar pedido vinculado/)
-    assert.match(html, /Cliente e histórico/)
-    assert.doesNotMatch(html, /Lasanha|4321|R\$|Comanda compartilhada|Pagamento completo|Gerar cobrança|Começar preparo|Revisar seleção/)
+    assert.match(html, /Ficha/)
+    assert.doesNotMatch(html, /Lasanha|4321|R\$|Comanda compartilhada|Pagamento completo|Gerar cobrança|Começar preparo|Revisar itens/)
     assert.doesNotMatch(html, /<dialog|<input|<textarea|<select/)
   })
 }
 provar('encerrado sem pedido permite histórico sem inventar uma venda', () => {
   const html = renderizar({ estado: 'Encerrado', pedido: null })
-  assert.match(html, /Cliente e histórico/)
+  assert.match(html, /Ficha/)
   assert.doesNotMatch(html, /Consultar pedido vinculado|Adicionar itens|Antes da venda/)
 })
 provar('lead sem compra abre antes da venda e aponta cadastro incompleto', () => {
@@ -105,8 +105,8 @@ for (const fonteApi of [true, false]) provar(`seleção local ${fonteApi ? 'API'
   const html = renderizar({ pedido: { numero: 'local', estado: 'aguardando', itens: [{ sku: 'lasanha', qtd: 1 }] } }, fonteApi)
   assert.match(html, /Antes da venda/)
   assert.match(html, /Pedido em montagem/)
-  assert.match(html, /Seleção do atendimento/)
-  assert.doesNotMatch(html, /Pedido criado|Pedido e entrega|Pagamento completo|a receber|Ocorrências e devoluções/)
+  assert.match(html, /Pedido e entrega/)
+  assert.doesNotMatch(html, /Pedido criado|Pagamento completo|a receber|Ocorrências e devoluções/)
 })
 const { BlocoOcorrenciasApi } = await import('../src/features/ficha-cliente/BlocoOcorrenciasApi.jsx')
 for (const gerente of [true, false]) provar(`abertura manual de ocorrência ${gerente ? 'disponível à gerente' : 'oculta para operador'}`, () => {

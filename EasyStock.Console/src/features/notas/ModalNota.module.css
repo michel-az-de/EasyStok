@@ -10,12 +10,15 @@
   position: fixed; z-index: 30; margin: 0; border: 0; bottom: 112px; left: 50%; transform: translateX(-50%);
   width: min(360px, calc(100vw - 32px)); display: grid; gap: var(--e-2);
   padding: var(--e-3) var(--e-4); background: var(--alerta-pastel); color: var(--tinta);
-  border-left: 3px solid var(--alerta); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+  border-radius: var(--r-2);
   box-shadow: 0 8px 24px rgb(0 0 0 / .18);
 }
 .titulo { margin: 0; font-weight: 700; color: var(--alerta); }
 .titulo span { font-weight: 400; color: var(--tinta-2); }
 .acoes { display: flex; justify-content: flex-end; gap: var(--e-2); }
+.postit textarea { font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6; border: 0; box-shadow: none; background: transparent; }
+.postit textarea:focus { outline: none; }
+.postit textarea:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 
 /* O display:grid do post-it não pode revelar o diálogo fechado. */
 .postit:not([open]) { display: none; }

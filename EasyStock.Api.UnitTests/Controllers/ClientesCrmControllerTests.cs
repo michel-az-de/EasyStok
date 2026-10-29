@@ -2,6 +2,9 @@ using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Ports.Output.Pdf;
+using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.Cliente.Foto;
 using EasyStock.Application.UseCases.ClienteCrm;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities;
@@ -118,6 +121,38 @@ public class ClientesCrmControllerTests
         resultado.Should().BeOfType<OkObjectResult>();
         _cliente.Bloqueado.Should().BeTrue();
         _cliente.MotivoBloqueio.Should().Be("golpe");
+    }
+
+    [Fact]
+    public async Task FichaPdfDevolveArquivoPrivadoDoClienteDaSessao()
+    {
+        var renderer = Substitute.For<IFichaClientePdfRenderer>();
+        var bytes = System.Text.Encoding.ASCII.GetBytes("%PDF-1.7\nfixture do controller");
+        renderer.RenderAsync(Arg.Any<DossieClienteDto>(), Arg.Any<byte[]?>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(bytes);
+        var fotos = new ClienteFotoUseCase(_clientes, Substitute.For<IFileStorage>(), Substitute.For<IImageProcessor>(), _uow);
+        var resultado = await _controller.FichaPdf(_cliente.Id, null, renderer, fotos, CancellationToken.None);
+        var arquivo = resultado.Should().BeOfType<FileContentResult>().Subject;
+        arquivo.ContentType.Should().Be("application/pdf");
+        arquivo.FileDownloadName.Should().Be($"ficha-cliente-{_cliente.Id:D}.pdf");
+        arquivo.FileContents.Should().Equal(bytes);
+        _controller.Response.Headers.CacheControl.ToString().Should().Be("private, no-store");
+        await renderer.Received(1).RenderAsync(Arg.Is<DossieClienteDto>(d => d.Cliente.Id == _cliente.Id),
+            null, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FichaPdfDeOutroTenantDevolve404SemAcessarFotoOuRenderer()
+    {
+        var outro = Cliente.Criar(Guid.NewGuid(), "Cliente de outra empresa");
+        _clientes.GetByIdWithDetailsAsync(outro.EmpresaId, outro.Id).Returns(outro);
+        var renderer = Substitute.For<IFichaClientePdfRenderer>();
+        var storage = Substitute.For<IFileStorage>();
+        var fotos = new ClienteFotoUseCase(_clientes, storage, Substitute.For<IImageProcessor>(), _uow);
+        (await _controller.FichaPdf(outro.Id, null, renderer, fotos, CancellationToken.None))
+            .Should().BeOfType<NotFoundObjectResult>();
+        await _clientes.Received(1).GetByIdWithDetailsAsync(_empresaId, outro.Id);
+        await renderer.DidNotReceiveWithAnyArgs().RenderAsync(default!, default, default, default);
+        await storage.DidNotReceiveWithAnyArgs().DownloadAsync(default!, default);
     }
 
     [Fact]

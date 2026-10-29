@@ -23,7 +23,7 @@
 .audio { display: flex; align-items: center; gap: var(--e-2); min-width: 220px; }
 .audioBotao {
   flex-shrink: 0; display: grid; place-items: center;
-  width: var(--toque); height: var(--toque); border-radius: 999px;
+  width: var(--toque); height: var(--toque); border-radius: var(--r-1);
   border: 0; background: var(--elevado); color: var(--tinta); cursor: pointer;
   transition: background 180ms ease;
 }

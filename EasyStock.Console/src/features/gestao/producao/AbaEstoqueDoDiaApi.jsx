@@ -257,7 +257,7 @@ export function AbaEstoqueDoDiaApi() {
                 {podeReimprimir(l) && (
                   <div className={css.acoes}>
                     <Botao variante="texto" icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
-                      aria-label={`Reimprimir as etiquetas do lote ${l.codigo}`} onClick={() => reimprimir(l.id)}>Reimprimir etiquetas</Botao>
+                      aria-label={`Etiquetas do lote ${l.codigo}`} title="Etiquetas" onClick={() => reimprimir(l.id)} />
                   </div>
                 )}
                 {impressao?.loteId === l.id && impressao.erro && (

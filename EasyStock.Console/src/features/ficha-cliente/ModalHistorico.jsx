@@ -205,7 +205,7 @@ function AbaAutomaticas({ envios }) {
   )
 }
 
-export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
+export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido = false, aoOcupar }) {
   const id = useId()
   const [aba, setAba] = useState('pedidos')
   const [salvandoNota, setSalvandoNota] = useState(false)
@@ -217,13 +217,8 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
   const financeiro = resumoFinanceiro(historico)
   const automaticas = enviosAutomaticos(conversa.mensagens)
 
-  return (
-    <Modal
-      titulo={`Histórico · ${conversa.nome}`}
-      aoFechar={salvandoNota ? undefined : aoFechar}
-      largura="min(880px, calc(100vw - 32px))"
-      rodape={<Botao disabled={salvandoNota} onClick={aoFechar}>Fechar</Botao>}
-    >
+  const conteudo = (
+    <>
       {lead ? (
         <p className={css.faixaLead}>
           Contato desde {quandoRelativo(diasEntre(conversa.mensagens[0]?.em ?? agora, agora))} · nenhum pedido
@@ -257,10 +252,14 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar }) {
           <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />
         )}
         <div hidden={aba !== 'notas'}>
-          <AbaNotas conversa={conversa} ocupado={salvandoNota} aoOcupar={setSalvandoNota} />
+          <AbaNotas conversa={conversa} ocupado={salvandoNota} aoOcupar={(ocupado) => { setSalvandoNota(ocupado); aoOcupar?.(ocupado) }} />
         </div>
         {aba === 'automaticas' && <AbaAutomaticas envios={automaticas} />}
       </div>
-    </Modal>
+    </>
   )
+  if (embutido) return <section data-historico-cliente aria-label="Histórico do cliente">{conteudo}</section>
+  return <Modal titulo={`Histórico · ${conversa.nome}`} aoFechar={salvandoNota ? undefined : aoFechar}
+    largura="min(880px, calc(100vw - 32px))"
+    rodape={<Botao disabled={salvandoNota} onClick={aoFechar}>Fechar</Botao>}>{conteudo}</Modal>
 }

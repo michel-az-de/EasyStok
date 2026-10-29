@@ -20,7 +20,8 @@ public sealed record ClienteResult(
     // inserir no meio quebraria o Map e todos os call-sites de uma vez.
     string TipoPessoa = "fisica",
     string? NomeFantasia = null,
-    string? InscricaoEstadual = null
+    string? InscricaoEstadual = null,
+    string? FotoUrl = null
 );
 
 /// <summary>Cliente com sub-coleções (pra tela de detalhe rica).</summary>

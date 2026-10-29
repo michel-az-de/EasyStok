@@ -143,7 +143,7 @@ export function Popover({
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Papel explícito varia entre menu de ações e grupo com busca/listbox.
     <div
       className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''}`}
-      role={papel === 'group' ? 'group' : 'menu'}
+      role={papel === 'group' ? 'group' : papel === 'dialog' ? 'dialog' : 'menu'}
       tabIndex={-1}
       aria-label={rotulo}
       ref={caixaRef}

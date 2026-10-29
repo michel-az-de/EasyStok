@@ -273,7 +273,7 @@ export function Composer({
                 aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
                 title={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}
                 className={css.botaoRespostas}
-                onClick={podeEscrever ? barra.abrir : aoAbrirModelos}
+                onClick={podeEscrever ? (barra.aberto ? barra.fechar : barra.abrir) : aoAbrirModelos}
               >
                 <Icone nome="respostas" />
                 <span>Respostas</span>
@@ -282,6 +282,16 @@ export function Composer({
                   quê?"): os quatro vizinhos ganham nome visível, como o
                   Respostas. Em coluna estreita o nome some por container
                   query e fica o title com a explicação inteira. */}
+              <details className={css.ferramentasComposer} onKeyDown={(evento) => {
+                if (evento.key !== 'Escape' || evento.defaultPrevented || evento.target.closest('dialog')) return
+                evento.preventDefault(); evento.stopPropagation()
+                evento.currentTarget.open = false
+                evento.currentTarget.querySelector('summary')?.focus()
+              }}>
+                <summary aria-label="Mais ferramentas" title="Mais ferramentas"><Icone nome="mais" /></summary>
+                <div className={css.menuFerramentas} role="group" aria-label="Ferramentas da mensagem" onClick={(evento) => {
+                  if (evento.target.closest('button')) evento.currentTarget.closest('details').open = false
+                }}>
               {acoes.anexar && <BotaoAnexarArquivo
                 disabled={!podeEscrever || !podeAnexar}
                 descritoPor={!podeAnexar && restricao ? idRestricao : undefined}
@@ -326,6 +336,8 @@ export function Composer({
               >
                 <Icone nome="sparkles" /><span className={css.rotuloAcao}>Completar com Tab</span>
               </Botao>}
+                </div>
+              </details>
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}

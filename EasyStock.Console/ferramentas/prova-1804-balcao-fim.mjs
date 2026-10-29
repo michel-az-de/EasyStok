@@ -208,7 +208,7 @@ await confere('#1686-9 o motivo que segura a barra é link: abre a seção e foc
   assert.deepEqual(r.pendenciaAntesDeCobrar({ pedido, clienteId: null }, { fonteApi: true }).alvo, 'cadastro')
   assert.deepEqual(r.pendenciaAntesDeCobrar({ pedido, clienteId: 'c', endereco: null }, { fonteApi: true }).alvo, 'endereco')
   assert.deepEqual(r.pendenciaAntesDeCobrar({ pedido, clienteId: 'c', endereco: 'Rua A' }, { fonteApi: true }).alvo, 'janela')
-  assert.equal(r.motivoAntesDeCobrar({ pedido, clienteId: 'c', endereco: 'Rua A' }, { fonteApi: true }), 'Escolha a janela de entrega em Seleção do atendimento.', 'o texto não muda')
+  assert.equal(r.motivoAntesDeCobrar({ pedido, clienteId: 'c', endereco: 'Rua A' }, { fonteApi: true }), 'Escolha a janela de entrega em Pedido e entrega.', 'o texto não muda')
   const barra = fonte('features/ficha-cliente/BarraProximoPasso.jsx')
   assert.match(barra, /<button type="button" className=\{css\.linkMotivo\} data-alvo-motivo=\{alvoDoPrerequisito\}\s+onClick=\{\(\) => aoIrParaMotivo\(alvoDoPrerequisito\)\}>\{info\.motivo\}<\/button>/)
   const ficha = fonte('features/ficha-cliente/PainelFicha.jsx')
