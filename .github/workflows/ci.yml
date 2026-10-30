@@ -150,6 +150,8 @@ jobs:
         env:
           EASYSTOK_SCRIBAN_TIMEOUT_MS: '2000'
           TESTCONTAINERS_RYUK_DISABLED: 'true'
+          # As factories usam Development, mas este job nao tem coletor OTLP.
+          OpenTelemetry__OtlpEndpoint: ''
         run: >-
           dotnet test EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj
           -c Release --no-build --no-restore
