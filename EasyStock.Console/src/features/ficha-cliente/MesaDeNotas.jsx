@@ -64,8 +64,8 @@ function MesaDaSessao({ children, escopo, identidade, fonteApi, conversas, selec
     const posicao = r ? { x: r.left, y: r.top } : eventoOuPosicao
     const id = idNotaNaMesa(registro.clienteId, registro.nota.id)
     setNotas(antes => ({ ...antes, [id]: { ...registro, posicao, focar: true } }))
-    alterarReferencias(antes => antes.some(r => idNotaNaMesa(r.clienteId, r.notaId) === id) ? antes
-      : [...antes, { clienteId: registro.clienteId, conversaId: registro.conversaId, notaId: registro.nota.id }])
+    alterarReferencias(antes => [...antes.filter(r => idNotaNaMesa(r.clienteId, r.notaId) !== id),
+      { clienteId: registro.clienteId, conversaId: registro.conversaId, notaId: registro.nota.id }])
   }, [alterarReferencias, liberada])
   const atualizar = useCallback((clienteId, clienteNome, recebidas, conversaId) => {
     if (!liberada) return
@@ -141,7 +141,8 @@ function MesaDaSessao({ children, escopo, identidade, fonteApi, conversas, selec
 
   return <ContextoMesa.Provider value={{ soltar, recolher, atualizar, escopo, identidade,
     chaveDeFoco: (clienteId, notaId) => chavePainelMovel(escopo, `nota:${clienteId}:${notaId}`),
-    estaSolta: (clienteId, notaId) => Object.hasOwn(notas, idNotaNaMesa(clienteId, notaId)) }}>
+    estaSolta: (clienteId, notaId) => Object.hasOwn(notas, idNotaNaMesa(clienteId, notaId))
+      && notas[idNotaNaMesa(clienteId, notaId)].conversaId === selecionadaId }}>
     {children}
     {liberada && Object.entries(notas).filter(([, registro]) => registro.conversaId === selecionadaId).map(([id, registro]) => <NotaNaMesa key={id} escopo={escopo} registro={registro}
       aoRecolher={() => recolher(registro.clienteId, registro.nota.id)} />)}

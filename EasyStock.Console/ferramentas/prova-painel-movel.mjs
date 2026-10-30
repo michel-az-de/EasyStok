@@ -237,17 +237,78 @@ function conferirPainelDaNota(elemento) {
   superficie.unmount(); notaHost.unmount()
 }
 conferirPainelDaNota(mesa.tree.props.children[1][0])
+const notaCompartilhada = mesa.tree.props.children[1][0].props.registro.nota
+function conferirFonteDaNota(conversaId, solta, destacar = false, mesaHost = mesa) {
+  // Mesma nota confirmada e mesmo cliente em duas conversas. A lista real usa
+  // o contexto da Mesa; só a paginação HTTP, já coberta abaixo, fica desligada.
+  const listaHost = montar(NotasDoCliente, { conversaId, clienteId, clienteNome: 'Nome atual do cadastro', notas: [notaCompartilhada] })
+  let abrir, lista
+  visitar(listaHost.tree, n => { if (n.type === 'button' && n.props?.['aria-controls'] === `notas-${conversaId}`) abrir = n })
+  abrir.props.onClick(); listaHost.render()
+  visitar(listaHost.tree, n => { if (n.props?.id === `notas-${conversaId}`) lista = n })
+  assert.equal(lista.props.hidden, false)
+  const elemento = lista.props.children[0].find(n => n.props.nota.id === notaId)
+  const fonteHost = montar(elemento.type, elemento.props)
+  let botao, texto
+  visitar(fonteHost.tree, n => {
+    if (n.type === 'button') botao = n
+    if (n.type === 'p') texto = n.props.children
+  })
+  assert.equal(mesaHost.tree.props.value.estaSolta(clienteId, notaId), solta, 'referência solta pertence apenas à conversa selecionada')
+  if (solta) {
+    assert.equal(botao.props['aria-label'], 'Recolher nota à ficha')
+    assert.equal(texto, undefined, 'texto completo fica no post-it desta ficha')
+  } else {
+    assert.equal(botao.props.children, 'Destacar nota')
+    assert.equal(texto, notaCompartilhada.texto, 'outra conversa do mesmo cliente mantém a nota legível na lista')
+  }
+  if (destacar) botao.props.onClick({ currentTarget: { getBoundingClientRect: () => ({ left: 500, top: 300 }) } })
+  fonteHost.unmount(); listaHost.unmount()
+}
+conferirFonteDaNota('conversa-a', true)
+const referenciasAntesDaTroca = lerReferenciasDaMesa(escopoA)
 mesa.props.selecionadaId = 'conversa-b'; mesa.render()
 assert.equal(mesa.tree.props.children[1].length, 0, 'trocar de ficha esconde as notas anteriores')
+conferirFonteDaNota('conversa-b', false)
+assert.deepEqual(lerReferenciasDaMesa(escopoA), referenciasAntesDaTroca, 'visitar outra conversa não transfere nem recolhe a nota de A')
+assert.deepEqual(lerPainelMovel(escopoA, `nota:${clienteId}:${notaId}`), geometriaMovida)
 mesa.props.selecionadaId = 'conversa-a'; mesa.render()
 assert.equal(mesa.tree.props.children[1].length, 1, 'voltar à ficha restaura sua nota')
 assert.equal(mesa.tree.props.children[1][0].props.registro.focar, false, 'voltar à ficha não repete foco da soltura original')
+conferirFonteDaNota('conversa-a', true)
+assert.equal(mesa.tree.props.children[1][0].props.registro.conversaId, 'conversa-a', 'A continua dona do post-it ao voltar')
 conferirPainelDaNota(mesa.tree.props.children[1][0])
 conferirPainelDaNota({ ...mesa.tree.props.children[1][0], props: { ...mesa.tree.props.children[1][0].props,
   registro: { ...mesa.tree.props.children[1][0].props.registro, posicao: undefined, focar: false } } })
 assert.deepEqual(lerPainelMovel(escopoA, `nota:${clienteId}:${notaId}`), geometriaMovida)
 assert.equal(chamadas.length, 1, 'voltar à ficha já lida não repete GET nem perde posição')
-console.log('ok mesa restaura somente a selecionada e conserva posição ao sair e voltar')
+console.log('ok mesa A → B do mesmo cliente → A preserva texto, referência, posição, persistência e foco')
+// Transferência acontece só após Destacar nota, nunca por navegar para B.
+mesa.props.selecionadaId = 'conversa-b'; mesa.render()
+conferirFonteDaNota('conversa-b', false, true); mesa.render()
+assert.equal(mesa.tree.props.children[1].length, 1, 'destacar a mesma nota não cria duplicata')
+assert.equal(mesa.tree.props.children[1][0].props.registro.conversaId, 'conversa-b')
+assert.equal(mesa.tree.props.children[1][0].props.registro.clienteId, clienteId)
+assert.equal(lerReferenciasDaMesa(escopoA).find(r => r.notaId === notaId).conversaId, 'conversa-b', 'a transferência explícita persiste B junto da dona em memória')
+const reloadB = montar(elementoMesa.type, { ...elementoMesa.props, selecionadaId: 'conversa-b' })
+assert.equal(chamadas.length, 2, 'reload lê apenas a nota agora fixada em B')
+assert.equal(chamadas[1].url, `/api/clientes/${clienteId}/notas/${notaId}`)
+responder({ clienteId, clienteNome: 'Nome atual do cadastro', nota: { id: notaId, texto: 'Somente do servidor', autor: 'Equipe', criadoEm: '2026-10-29T12:00:00Z' } })
+await new Promise(resolve => setImmediate(resolve)); reloadB.render()
+assert.equal(reloadB.tree.props.children[1].length, 1)
+assert.equal(reloadB.tree.props.children[1][0].props.registro.conversaId, 'conversa-b')
+assert.equal(reloadB.tree.props.children[1][0].props.registro.focar, false, 'reload não rouba o foco')
+conferirPainelDaNota(reloadB.tree.props.children[1][0])
+reloadB.props.selecionadaId = 'conversa-a'; reloadB.render()
+assert.equal(reloadB.tree.props.children[1].length, 0, 'após transferir, A não exibe o post-it de B')
+conferirFonteDaNota('conversa-a', false, false, reloadB)
+assert.deepEqual(lerPainelMovel(escopoA, `nota:${clienteId}:${notaId}`), geometriaMovida)
+assert.ok(chamadas.every(c => !c.opcoes.metodo || c.opcoes.metodo === 'GET'), 'posição não escreve nem cria nota no servidor')
+reloadB.unmount()
+mesa.props.selecionadaId = 'conversa-a'; mesa.render()
+conferirFonteDaNota('conversa-a', false, true); mesa.render()
+assert.equal(lerReferenciasDaMesa(escopoA).find(r => r.notaId === notaId).conversaId, 'conversa-a')
+console.log('ok Destacar em B transfere uma única referência, restaura em reload e mantém A legível sem nova nota')
 mesa.tree.props.value.soltar({ clienteId, conversaId: 'conversa-a', clienteNome: 'Nome atual do cadastro',
   nota: { id: 'nova-nota-confirmada', texto: 'Segunda nota confirmada', autor: 'Equipe' } }, { x: 200, y: 100 }); mesa.render()
 assert.equal(mesa.tree.props.children[1].length, 2)
@@ -257,6 +318,7 @@ assert.equal(lerReferenciasDaMesa('sessao:empresa-b:usuario-a').length, 0)
 console.log('ok mesa grava só IDs e separa preferências de usuários e empresas')
 const notaLegada = { id: 'nota-legada-confirmada', texto: 'Texto só do cadastro', autor: 'Equipe' }
 guardarPosicaoPostit('conversa-legada', notaLegada.id, { x: 71, y: 83 })
+mesa.props.selecionadaId = 'conversa-legada'; mesa.render()
 mesa.tree.props.value.atualizar(clienteId, 'Nome atual do cadastro', [notaLegada], 'conversa-legada'); mesa.render()
 const painelLegado = `nota:${clienteId}:${notaLegada.id}`
 assert.deepEqual(lerPainelMovel(escopoA, painelLegado), { solto: true, x: 71, y: 83 })
@@ -279,4 +341,4 @@ const mesaB = montar(mesaBElemento.type, mesaBElemento.props)
 assert.equal(mesaB.tree.props.children[1].length, 0)
 mesaB.unmount()
 console.log('ok logout limpa a mesa e a conta seguinte não herda texto nem portais')
-console.log('13 grupos de comportamento do painel e da mesa aprovados.')
+console.log('14 grupos de comportamento do painel e da mesa aprovados.')
