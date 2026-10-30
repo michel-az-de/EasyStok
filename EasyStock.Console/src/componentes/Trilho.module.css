@@ -24,7 +24,7 @@
   border: 0; border-radius: var(--r-1); background: transparent; color: var(--tinta-2); box-shadow: none;
   font-size: .75rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.2; text-align: center; text-decoration: none;
 }
-.item > span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.item > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item > svg { flex: none; }
 .item:hover:not(:disabled), .filhos > button:hover:not(:disabled), .filhos > div > button:hover:not(:disabled) {
   background: var(--preenchimento); color: var(--tinta);
