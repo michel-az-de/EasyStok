@@ -55,9 +55,9 @@ confere('o hall fica só com o nome da casa e não herda contagem de outra tela'
 
 confere('o Balcão leva a contagem na frente e some com ela quando zera', () => {
   const balcao = rota('#/m/atendimento/balcao')
-  assert.equal(tituloDaAba(balcao, 3), `(3) Balcão · ${TITULO_BASE}`)
-  assert.equal(tituloDaAba(balcao, 0), `Balcão · ${TITULO_BASE}`)
-  assert.equal(tituloDaAba(balcao), `Balcão · ${TITULO_BASE}`)
+  assert.equal(tituloDaAba(balcao, 3), `(3) Conversas · ${TITULO_BASE}`)
+  assert.equal(tituloDaAba(balcao, 0), `Conversas · ${TITULO_BASE}`)
+  assert.equal(tituloDaAba(balcao), `Conversas · ${TITULO_BASE}`)
 })
 
 confere('janela avulsa pelo apelido também diz o que é', () => {

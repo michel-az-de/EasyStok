@@ -216,7 +216,7 @@ export function cancelarCobranca(cobranca, agora) {
 // mesma cobrança sempre dá a mesma resposta.
 export function situacaoDaCobranca(cobranca, agora) {
   if (!cobranca) {
-    return { chave: 'nenhuma', tom: 'neutro', rotulo: 'Cobrança não gerada', restamMs: 0 }
+    return { chave: 'nenhuma', tom: 'neutro', rotulo: 'Cobrança pendente', restamMs: 0 }
   }
   // Desfechos que encerram a cobrança sem deixar o relógio vivo: checados
   // antes de `pagaEm` porque um estorno acontece SOBRE uma cobrança paga

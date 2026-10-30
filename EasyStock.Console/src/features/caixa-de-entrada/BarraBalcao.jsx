@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Popover } from '../../componentes/Popover'
@@ -56,6 +56,7 @@ function ChipCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
 // filtro com contador e os três cartões de canal viraram chips na mesma linha.
 export function BarraBalcao({ filtros, aoMudar }) {
   const [ordenarAberto, setOrdenarAberto] = useState(false)
+  const botaoFiltros = useRef(null)
   const { canais, janelas } = useCatalogo()
   const { conversas, agora, automaticoPausado, aberta, horarioDaLoja, sessao } = useAtendimento()
   const doResponsavel = conversas.filter((c) => combinaResponsavel(c, filtros.responsavel, sessao?.usuario))
@@ -81,116 +82,67 @@ export function BarraBalcao({ filtros, aoMudar }) {
   function escolherOrdem(opcao) {
     setOrdenarAberto(false)
     aoMudar('ordenacao', opcao.chave)
+    botaoFiltros.current?.focus({ preventScroll: true })
   }
 
+  const filtrando = filtros.canais.length > 0 || (filtros.responsavel ?? 'todas') !== 'todas' || filtros.ordenacao !== 'urgencia'
   return (
     <div className={css.barra}>
+      <header className={css.cabecalhoLista}>
+        <h2>Conversas <span>{doUniverso.length}</span></h2>
+        <span className={css.comOrdenar}>
+          <Botao ref={botaoFiltros} variante="texto" className={css.botaoOrdenar} aria-haspopup="dialog" aria-expanded={ordenarAberto}
+            aria-label={filtrando ? 'Filtrar conversas, filtros ativos' : 'Filtrar conversas'} title="Filtrar e ordenar conversas"
+            onClick={() => setOrdenarAberto(v => !v)}>
+            <Icone nome="list-filter" tamanho={20} />
+            {filtrando && <span className={css.pontoOrdem} aria-hidden="true" />}
+          </Botao>
+          {ordenarAberto && <Popover rotulo="Filtros das conversas" papel="dialog" posicao="abaixo" aoFechar={() => setOrdenarAberto(false)}>
+            <div className={css.painelFiltros}>
+              <FiltroResponsavel valor={filtros.responsavel ?? 'todas'} aoMudar={valor => aoMudar('responsavel', valor)} />
+              <fieldset className={css.canaisNoFiltro}>
+                <legend>Canais</legend>
+                {canais.map((c, indice) => !(congelado('canal-email') && c.nome === 'E-mail') && mostraChipDoCanal(contagemPorCanal[indice], filtros.canais.includes(c.nome)) && (
+                  <ChipCanal key={c.nome} canal={c} rotulo={c.nome} abertas={contagemPorCanal[indice].abertas}
+                    precisam={contagemPorCanal[indice].precisam} ligado={filtros.canais.includes(c.nome)} aoTrocar={() => trocarCanal(c.nome)} />
+                ))}
+              </fieldset>
+              <span className={css.rotuloResponsavel}>Ordenar</span>
+              <div className={css.menuOrdem}>
+                {OPCOES_DE_ORDEM.map(opcao => <button key={opcao.chave} type="button"
+                  aria-pressed={filtros.ordenacao === opcao.chave} className={css.itemOrdem} onClick={() => escolherOrdem(opcao)}>
+                  <Icone nome="check" tamanho={20} className={filtros.ordenacao === opcao.chave ? '' : css.semMarca} />
+                  <span><strong>{opcao.titulo}</strong><span className={css.detalheOrdem}>{opcao.detalhe}</span></span>
+                </button>)}
+              </div>
+            </div>
+          </Popover>}
+        </span>
+      </header>
       <div className={css.linhaA}>
         <span className={css.campoBusca}>
           <Icone nome="search" tamanho={20} />
           <label className="sr" htmlFor="balcao-busca">Buscar comanda, nome, telefone, mensagem ou tag</label>
-          <input
-            id="balcao-busca"
-            type="search"
-            className={css.entradaBusca}
-            placeholder="Nome, comanda ou tag"
-            value={filtros.busca}
-            onChange={(e) => {
-              // Integração: buscar um nome estando em "Precisa de você" dava
-              // "Nada com ..." para cliente que existe, só porque ele não
-              // espera resposta. Quem busca quer achar: a busca leva para Todas.
+          <input id="balcao-busca" type="search" className={css.entradaBusca} placeholder="Buscar conversa" value={filtros.busca}
+            onChange={e => {
               if (e.target.value.trim() && filtros.aba === 'precisa') aoMudar('aba', 'todas')
               aoMudar('busca', e.target.value)
-            }}
-          />
-          {filtros.busca && (
-            <button
-              type="button"
-              className={css.limparBusca}
-              aria-label="Limpar busca"
-              onClick={() => aoMudar('busca', '')}
-            >
-              <Icone nome="x" tamanho={20} />
-            </button>
-          )}
-        </span>
-
-        <span className={css.comOrdenar}>
-          <Botao
-            variante="secundario"
-            className={css.botaoOrdenar}
-            aria-haspopup="menu"
-            aria-expanded={ordenarAberto}
-            aria-label="Ordenar"
-            title="Ordenar"
-            onClick={() => setOrdenarAberto((v) => !v)}
-          >
-            <Icone nome="arrow-up-down" tamanho={20} />
-            {filtros.ordenacao !== 'urgencia' && <span className={css.pontoOrdem} aria-hidden="true" />}
-          </Botao>
-          {ordenarAberto && (
-            <Popover rotulo="Ordenar" posicao="abaixo" aoFechar={() => setOrdenarAberto(false)}>
-              <div className={css.menuOrdem}>
-                {OPCOES_DE_ORDEM.map((opcao) => (
-                  <button
-                    key={opcao.chave}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={filtros.ordenacao === opcao.chave}
-                    className={css.itemOrdem}
-                    onClick={() => escolherOrdem(opcao)}
-                  >
-                    <Icone nome="check" tamanho={20} className={filtros.ordenacao === opcao.chave ? '' : css.semMarca} />
-                    <span>
-                      <strong>{opcao.titulo}</strong>
-                      <span className={css.detalheOrdem}>{opcao.detalhe}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </Popover>
-          )}
+            }} />
+          {filtros.busca && <button type="button" className={css.limparBusca} aria-label="Limpar busca" onClick={() => aoMudar('busca', '')}>
+            <Icone nome="x" tamanho={20} />
+          </button>}
         </span>
       </div>
-
-      {/* #1868: com coluna de 396 px úteis ou mais, chips e Responsável na mesma linha (eram 45 px
-          a mais no topo da lista). Mais estreita, o Responsável desce com o rótulo, como antes:
-          o chip "Precisa de você" e a contagem nunca ficam escondidos atrás do seletor. */}
-      <div className={css.linhaB}>
       <fieldset className={css.filtros}>
-        <legend className="sr">Filtros do Balcão</legend>
-        <button
-          type="button"
-          aria-pressed={filtros.aba !== 'precisa'}
-          className={`${css.chipFiltro} ${filtros.aba !== 'precisa' ? css.chipLigado : ''}`}
-          onClick={() => aoMudar('aba', 'todas')}
-        >
+        <legend className="sr">Filtros das conversas</legend>
+        <button type="button" aria-pressed={filtros.aba !== 'precisa'} className={`${css.chipFiltro} ${filtros.aba !== 'precisa' ? css.chipLigado : ''}`} onClick={() => aoMudar('aba', 'todas')}>
           Todas <span className={css.numeroChip}>{doUniverso.length}</span>
         </button>
-        <button
-          type="button"
-          aria-pressed={filtros.aba === 'precisa'}
-          className={`${css.chipFiltro} ${filtros.aba === 'precisa' ? css.chipLigado : ''} ${quantasPrecisam > 0 ? css.chipAtencao : ''}`}
-          onClick={() => aoMudar('aba', filtros.aba === 'precisa' ? 'todas' : 'precisa')}
-        >
+        <button type="button" aria-pressed={filtros.aba === 'precisa'} className={`${css.chipFiltro} ${filtros.aba === 'precisa' ? css.chipLigado : ''}`}
+          onClick={() => aoMudar('aba', filtros.aba === 'precisa' ? 'todas' : 'precisa')}>
           Precisa de você <span className={css.numeroChip}>{quantasPrecisam}</span>
         </button>
-        <span className={css.divisorFiltros} aria-hidden="true" />
-        {/* #1761 (L15): canal sem conversa aberta não ocupa lugar ("Instagram 0"). #1891: o canal E-mail está congelado e não ganha chip. */}
-        {canais.map((c, i) => !(congelado('canal-email') && c.nome === 'E-mail') && mostraChipDoCanal(contagemPorCanal[i], filtros.canais.includes(c.nome)) && (
-          <ChipCanal
-            key={c.nome}
-            canal={c}
-            rotulo={c.nome}
-            abertas={contagemPorCanal[i].abertas}
-            precisam={contagemPorCanal[i].precisam}
-            ligado={filtros.canais.includes(c.nome)}
-            aoTrocar={() => trocarCanal(c.nome)}
-          />
-        ))}
       </fieldset>
-      <FiltroResponsavel valor={filtros.responsavel ?? 'todas'} aoMudar={(valor) => aoMudar('responsavel', valor)} />
-      </div>
     </div>
   )
 }
@@ -218,9 +170,9 @@ function FiltroResponsavel({ valor, aoMudar }) {
     <label className={css.filtroResponsavel}>
       <span className={css.rotuloResponsavel}>Responsável</span>
       <select aria-label="Responsável pelas conversas" value={valor} onChange={(e) => aoMudar(e.target.value)}>
-        <option value="todas">Todas</option>
-        <option value="minhas">Minhas</option>
-        <option value="sem-dono">Sem dono</option>
+        <option value="todas">Todos</option>
+        <option value="minhas">Comigo</option>
+        <option value="sem-dono">Sem responsável</option>
       </select>
     </label>
   )

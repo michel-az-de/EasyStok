@@ -289,6 +289,7 @@ const andar = (no, fn, achados = []) => {
 }
 const texto = (no) => (no == null ? '' : typeof no !== 'object' ? String(no) : Array.isArray(no) ? no.map(texto).join('') : texto(no.props?.children))
 const botoes = (no, rotulo) => andar(no, (n) => n.type === 'Botao' && texto(n).includes(rotulo))
+const botoesEtiquetas = (no, codigo) => andar(no, (n) => n.type === 'BotaoIcone' && n.props.rotulo === `Etiquetas do lote ${codigo}`)
 const campos = (no, tipo, rotulo) => andar(no, (n) => n.type === tipo && n.props.rotulo === rotulo)
 const alertas = (no) => andar(no, (n) => n.props?.role === 'alert')
 const links = (no) => andar(no, (n) => n.type === 'a').map((n) => [n.props.href, texto(n)])
@@ -371,7 +372,9 @@ await confere('Produção do dia: confirmar mostra o lote e zera as linhas; outr
   assert.match(texto(avisosDeLote(t.arvore)[0]), /Molho: faltaram 200 g\./)
   assert.equal(enviados(chamadas).length, 2)
   const volta = montar(AbaProducaoDoDiaApi)
-  assert.deepEqual(botoes(volta.renderizar(), 'Imprimir').map(texto), ['Imprimir 6 etiquetas', 'Imprimir 2 etiquetas'])
+  const etiquetas = andar(volta.renderizar(), (n) => n.type === 'BotaoIcone' && n.props.icone === 'printer')
+  assert.deepEqual(etiquetas.map((n) => n.props.rotulo), ['Etiquetas do lote LOT-261011-002', 'Etiquetas do lote LOT-261011-001'])
+  assert.ok(etiquetas.every((n) => n.props.dica === 'Etiquetas' && texto(n) === ''), 'ícone mantém nome acessível e dica, sem rótulo visível')
 })
 
 await confere('Produção do dia: cada lote imprime as próprias etiquetas, o erro fica no lote e dispensar tira', async () => {
@@ -389,22 +392,22 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   ])
   impressoes = 0
   const t = montar(AbaProducaoDoDiaApi)
-  await botoes(t.renderizar(), 'Imprimir 6 etiquetas')[0].props.onClick()
+  await botoesEtiquetas(t.renderizar(), 'LOT-261011-002')[0].props.onClick()
   await esperar(80)
   assert.match(etiquetasDaFolha(folha(t)[0]), /Lote LOT-261011-002 · 6\/6/)
   assert.equal(impressoes, 1)
   // Lote 1 com a rede fora: a folha do lote 2 sai, nada imprime e o erro aparece no aviso do lote 1.
   cair = true
-  await botoes(t.arvore, 'Imprimir 2 etiquetas')[0].props.onClick()
+  await botoesEtiquetas(t.arvore, 'LOT-261011-001')[0].props.onClick()
   await esperar(80)
   assert.equal(folha(t).length, 0, 'não sobra a folha do lote anterior')
   assert.equal(impressoes, 1)
   const [doLote2, doLote1] = avisosDeLote(t.arvore)
-  assert.match(texto(doLote1), /Não consegui buscar as etiquetas deste lote\. Sem conexão com o EasyStok\./)
-  assert.doesNotMatch(texto(doLote2), /Não consegui/)
+  assert.match(texto(doLote1), /Não foi possível carregar as etiquetas deste lote\. Sem conexão com o EasyStok\./)
+  assert.doesNotMatch(texto(doLote2), /Não foi possível carregar as etiquetas/)
   assert.equal(alertas(formulario(t.arvore)).length, 0, 'o erro da etiqueta não vai para o fim do formulário')
   cair = false
-  await botoes(t.arvore, 'Imprimir 2 etiquetas')[0].props.onClick()
+  await botoesEtiquetas(t.arvore, 'LOT-261011-001')[0].props.onClick()
   await esperar(80)
   assert.match(etiquetasDaFolha(folha(t)[0]), /Lote LOT-261011-001 · 2\/2/)
   assert.equal(impressoes, 2)
@@ -617,7 +620,7 @@ await confere('Planejamento: falha da nova data conserva as porções e permite 
   assert.equal(campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value, '99')
   assert.equal(botoes(t.arvore, 'Calcular insumos')[0].props.disabled, true)
   assert.ok(texto(t.arvore).includes('As porções abaixo são da consulta anterior'))
-  botoes(t.arvore, 'Tentar novamente')[0].props.onClick()
+  botoes(t.arvore, 'Tentar de novo')[0].props.onClick()
   await t.assentar()
   assert.equal(consultas, 3)
   assert.equal(campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value, '12')

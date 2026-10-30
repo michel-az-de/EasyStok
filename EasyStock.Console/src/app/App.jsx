@@ -216,15 +216,16 @@ function Composicao({ rota }) {
       <div className={css.areaAtendimento} data-conteudo-console>
       <Moldura
         tamanho={tamanho}
-        aoAbrirNota={() => {
-          if (selecionada) setNota((atual) => atual ?? { id: selecionada.id, nome: selecionada.nome })
+        aoAbrirNota={(texto) => {
+          if (selecionada) setNota((atual) => atual ?? { id: selecionada.id, nome: selecionada.nome, textoInicial: typeof texto === 'string' ? texto : '' })
           setModal('nota')
         }}
+        aoRascunho={(texto) => { if (selecionada && typeof texto === 'string') definirRascunho(selecionada.id, texto) }}
         aoAbrirGaleria={() => setModal('galeria')}
         aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
         aoAbrirCardapio={() => setModal('cardapio')}
         aoAbrirAutomacoes={() => setModal('automacoes')}
-        aoAbrirGestao={() => setModal('gestao')}
+        aoAbrirGestao={() => { setAbaGestao(null); setModal('gestao') }}
         aoAbrirEntregas={() => setModal('entregas')}
         aoAbrirAjuda={() => setModal('ajuda')}
         simulando={simulando}
@@ -242,6 +243,7 @@ function Composicao({ rota }) {
         <ModalNota
           visivel={modal === 'nota'}
           nomeCliente={nota.nome}
+          textoInicial={nota.textoInicial ?? ''}
           outraConversa={selecionada?.id !== nota.id}
           aoFechar={() => { setNota(null); setModal((atual) => atual === 'nota' ? null : atual) }}
           aoSalvar={(texto) => salvarNota(nota.id, texto)}
@@ -450,7 +452,7 @@ function NoModulo({ rota, children }) {
 
 function ControleAjuda({ rota }) {
   const [aberta, setAberta] = useState(false)
-  return <><Botao variante="texto" icone="ajuda" data-ajuda-console aria-label="Ajuda" title="Ajuda e guia do Console" aria-haspopup="dialog" onClick={() => setAberta(true)}>Ajuda</Botao>
+  return <><Botao variante="texto" icone="ajuda" data-ajuda-console aria-label="Ajuda" title="Ajuda do sistema" aria-haspopup="dialog" onClick={() => setAberta(true)}>Ajuda</Botao>
     {aberta && <AjudaDoConsole rota={rota} fonteApi={FONTE_API} aoFechar={() => setAberta(false)} />}</>
 }
 

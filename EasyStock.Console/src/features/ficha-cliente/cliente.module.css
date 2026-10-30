@@ -23,7 +23,7 @@
 .avisoBloqueio {
   margin: var(--e-3) 0; padding: var(--e-3);
   background: var(--elevado); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--erro);
+  border-left: 0;
 }
 .tituloBloqueio {
   display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
@@ -35,8 +35,8 @@
 .avisoBloqueio .rodapeBloco { margin-top: var(--e-1); }
 .corpoBloco { margin: 0 0 var(--e-3); font-size: var(--t-apoio); color: var(--tinta-2); }
 
-.numerosCliente { margin: 0 0 var(--e-3); display: grid; grid-auto-flow: column; auto-columns: 1fr; gap: 0; background: var(--elevado); border-radius: 14px; overflow: hidden; }
-.numerosCliente > span { display: flex; flex-direction: column; gap: var(--e-1); align-items: center; padding: var(--e-3); border-right: var(--b-1) solid var(--linha); text-align: center; }
+.numerosCliente { margin: 0 0 var(--e-3); display: grid; grid-auto-flow: column; auto-columns: 1fr; gap: 0; background: var(--elevado); border-radius: var(--r-1); overflow: hidden; }
+.numerosCliente > span { display: flex; flex-direction: column; gap: var(--e-1); align-items: center; padding: var(--e-3); border-right: 0; text-align: center; }
 .numerosCliente > span:last-child { border-right: 0; }
 .numerosCliente b { font-family: var(--f-dado); font-size: var(--t-titulo); font-weight: 700; font-variant-numeric: tabular-nums; }
 .numerosCliente i { font-size: var(--t-apoio); color: var(--tinta-3); font-style: normal; font-weight: 400; }
@@ -46,7 +46,7 @@
 
 /* --- Dados editáveis do cliente -------------------------------------------- */
 .dadosCliente { display: grid; gap: 0; margin-bottom: var(--e-3); background: var(--elevado); border-radius: var(--r-2); overflow: hidden; }
-.linhaDado { display: flex; align-items: flex-start; gap: var(--e-3); min-height: var(--toque); padding: var(--e-3); border-bottom: var(--b-1) solid var(--linha); }
+.linhaDado { display: flex; align-items: flex-start; gap: var(--e-3); min-height: var(--toque); padding: var(--e-3); border-bottom: 0; }
 .linhaDado:last-child { border-bottom: 0; }
 .rotuloDado { flex: 0 0 88px; font-size: var(--t-apoio); color: var(--tinta-3); font-weight: 400; }
 .linhaDado > .campoEmLinha { flex: 1; min-width: 0; overflow-wrap: normal; }
@@ -80,7 +80,7 @@
 .postIts { list-style: none; margin: 0 0 var(--e-3); padding: 0; display: grid; gap: var(--e-2); }
 .ultimaNota {
   margin: 0; padding: var(--e-3) var(--e-4);
-  background: var(--alerta-pastel); border-left: 3px solid var(--alerta);
+  background: var(--alerta-pastel); border-left: 0;
   border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
   box-shadow: var(--sombra); transform: rotate(-.5deg);
   font-size: var(--t-apoio); color: var(--tinta);
@@ -109,7 +109,7 @@
 .linhaDado > .campoEmLinha:has(.edicaoEmLinha) { grid-column: 1 / -1; }
 .controleEmLinha {
   flex: 1 0 100%; min-width: 0; min-height: var(--toque); padding: 0 var(--e-2);
-  border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1);
+  border: 0; border-radius: var(--r-1);
   background: var(--papel); color: var(--tinta); font-size: var(--t-corpo); font-family: inherit;
 }
 .controleComErro { border-width: var(--b-2); border-color: var(--erro); }
@@ -149,14 +149,14 @@
 .chipTracejado {
   display: inline-flex; align-items: center; gap: var(--e-1);
   min-height: var(--toque); padding: var(--e-1) var(--e-3);
-  border-radius: var(--r-pilula); border: var(--b-1) dashed var(--linha-forte);
+  border-radius: var(--r-pilula); border: 0;
   background: transparent; color: var(--tinta-3); font-size: var(--t-apoio); font-weight: 600; white-space: nowrap;
 }
 .sugestoesTag { margin-top: var(--e-2); display: grid; gap: var(--e-2); }
 .grupoSugestao { margin: 0 0 var(--e-1); font-size: var(--t-apoio); color: var(--tinta-3); }
 .chipSugestao {
   min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-pilula);
-  border: var(--b-1) solid var(--linha); background: var(--papel); color: var(--tinta-2);
+  border: 0; background: var(--papel); color: var(--tinta-2);
   font-size: var(--t-apoio);
 }
 .avisoDesfazer {
@@ -181,7 +181,7 @@
 .painelAba { margin-top: var(--e-4); }
 
 .listaPedidos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
-.linhaPedido { padding: var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); }
+.linhaPedido { padding: var(--e-3); border: 0; border-radius: var(--r-1); }
 .linhaPedido header { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
 .itensPedido { flex: 1; min-width: 120px; color: var(--tinta-2); font-size: var(--t-apoio); }
 .totalPedido { font-family: var(--f-dado); }
@@ -218,7 +218,7 @@
    (Bloco.module.css .destaque), para o campo vazio abaixo ler como parte da
    mesma pendência, não como um segundo dado desencontrado. */
 .linhaDadoPendente {
-  border-left: var(--trilho) solid var(--alerta); background: var(--alerta-pastel);
+  border-left: 0; background: var(--alerta-pastel);
   padding-left: calc(var(--e-3) - var(--trilho));
 }
 .linhaDadoPendente .valorVazio { color: var(--alerta); font-style: normal; }
@@ -237,7 +237,7 @@
    (base.css) corta o realce; o selo continua. */
 .seloCaptado {
   display: inline-flex; align-items: center; gap: 3px; margin-left: var(--e-1);
-  padding: 1px 7px; border-radius: 999px; vertical-align: middle;
+  padding: 1px 7px; border-radius: var(--r-1); vertical-align: middle;
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5; white-space: nowrap;
   color: var(--sucesso); background: var(--sucesso-pastel);
 }
@@ -253,7 +253,7 @@
    "sem sujar a UX atual"), mesmo tom pastel do selo captado acima. */
 .seloPontos {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px;
-  border-radius: 999px; font-size: var(--t-micro); font-weight: 600;
+  border-radius: var(--r-1); font-size: var(--t-micro); font-weight: 600;
   color: var(--marca); background: var(--marca-claro);
 }
 .linhaFidelidade {
@@ -267,7 +267,7 @@
    em 390 px. */
 .linhaRecompensa {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); padding: var(--e-2);
-  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  border: 0; border-radius: var(--r-2);
 }
 .iconeRecompensa {
   flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
@@ -283,7 +283,7 @@
   background: var(--info-fundo); border-radius: var(--r-2);
 }
 .seloInformado {
-  justify-self: start; padding: 1px 8px; border-radius: 999px;
+  justify-self: start; padding: 1px 8px; border-radius: var(--r-1);
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5;
   color: var(--info); background: var(--elevado);
 }

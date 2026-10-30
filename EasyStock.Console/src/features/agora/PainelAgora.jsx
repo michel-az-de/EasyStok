@@ -61,9 +61,9 @@ export function PainelAgora({ filas, podeVer, aoAbrirConversa, avisoResponder = 
     <section className={css.painel} aria-label="Agora">
       <p className={css.legenda}>Agora</p>
       <div className={css.filas}>
-        {podeVer.atendimento && <Fila titulo="Responder" apoio="Só o que o automático não resolve"
+        {podeVer.atendimento && <Fila titulo="Responder" apoio="Conversas que precisam de você"
           itens={filas.responder} emDia="Ninguém esperando você." aviso={avisoResponder}
-          href={hashDoModulo('atendimento', 'balcao')} rotuloDoLink="Balcão"
+          href={hashDoModulo('atendimento', 'balcao')} rotuloDoLink="Conversas"
           renderizar={(item) => (
             <button type="button" className={css.item} data-tom={item.tom} onClick={() => aoAbrirConversa(item.id)}>
               <span className={css.quem}>{item.nome}</span>
@@ -71,7 +71,7 @@ export function PainelAgora({ filas, podeVer, aoAbrirConversa, avisoResponder = 
               <span className={css.detalhe}>{item.texto}</span>
             </button>
           )} />}
-        {podeVer.cozinha && <Fila titulo="Cozinhar" apoio="Pago e em preparo, o que sai antes primeiro"
+        {podeVer.cozinha && <Fila titulo="Preparar" apoio="Pedidos pagos, por horário de entrega"
           itens={filas.cozinhar} emDia="Nada na fila de preparo."
           href={hashDoModulo('cozinha', 'fila')} rotuloDoLink="Cozinha" renderizar={Pedido} />}
         {podeVer.entregas && <Fila titulo="Despachar" apoio="Pronto e a caminho"

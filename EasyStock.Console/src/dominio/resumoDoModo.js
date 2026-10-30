@@ -10,8 +10,8 @@ import { origemDaPassagem } from './passagem'
 import { automaticoDesligadoNaConversa } from './motivoDeEscalada'
 
 const ROTULO = {
-  [MODOS.LIGADO]: 'Automático',
-  [MODOS.PAUSADO]: 'Com você',
+  [MODOS.LIGADO]: 'Assistente respondendo',
+  [MODOS.PAUSADO]: 'Você respondendo',
   [MODOS.COM_VOCE]: 'Passou para você',
   [MODOS.ENCERRADO]: 'Encerrada',
   [MODOS.BLOQUEADO]: 'Bloqueado',
@@ -19,13 +19,13 @@ const ROTULO = {
 
 const LINHA = {
   [MODOS.LIGADO]: 'Responde sozinho até você assumir.',
-  [MODOS.PAUSADO]: 'Automático pausado; avisos do pedido seguem.',
-  [MODOS.ENCERRADO]: 'Reabra para o automático voltar.',
-  [MODOS.BLOQUEADO]: 'Nada sai em canal nenhum. Desbloqueie na ficha.',
+  [MODOS.PAUSADO]: 'Assistente pausado; os avisos do pedido continuam.',
+  [MODOS.ENCERRADO]: 'Reabra a conversa para retomar o atendimento.',
+  [MODOS.BLOQUEADO]: 'Envios bloqueados. Desbloqueie em Cliente.',
 }
 
 const LINHA_DO_PROXIMO = {
-  'encerrar-ou-aguardar': 'Respondido: encerre se acabou, ou devolva ao automático.',
+  'encerrar-ou-aguardar': 'Conclua a conversa ou devolva ao Assistente.',
   aguardar: 'Respondido. Pedido em andamento: aguarde o cliente.',
   'aguardar-venda': 'Respondido. Venda em andamento: monte o pedido ou aguarde o cliente.',
 }
@@ -41,7 +41,7 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false) {
 
   let linha = LINHA[modo.chave]
   if (modo.chave === MODOS.COM_VOCE) linha = origemDaPassagem(conversa.passagem).motivo
-  else if (outro) linha = 'Automático pausado.'
+  else if (outro) linha = 'Assistente pausado.'
   else if (proximo) linha = LINHA_DO_PROXIMO[proximo.chave] ?? linha
   else if (modo.chave === MODOS.PAUSADO && motivo) linha = motivo
 

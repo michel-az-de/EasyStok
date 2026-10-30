@@ -6,14 +6,14 @@
 .layout { display: grid; grid-template-columns: 260px minmax(0,1fr); gap: var(--e-5); }
 .opcoes { display: flex; flex-direction: column; gap: var(--e-3); }
 .opcoes, .previa { min-width: 0; }
-.resumoPreparado { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); padding: var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-1); background: var(--preenchimento); }
+.resumoPreparado { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); padding: var(--e-3); border: 0; border-radius: var(--r-1); background: var(--preenchimento); }
 .resumoPreparado div { display: grid; gap: var(--e-1); }
 .resumoPreparado span { color: var(--tinta-2); font-size: var(--t-apoio); }
 .dica { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); line-height: 1.5; }
-.moldura { height: 460px; overflow: auto; background: white; border: 1px solid var(--linha-forte); border-radius: var(--r-1); }
+.moldura { height: 460px; overflow: auto; background: white; border: 0; border-radius: var(--r-1); }
 .folha { display: block; background: white; border: 0; }
 .zoom { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); margin-bottom: var(--e-2); }
-.vazia { min-height: 280px; display: grid; place-items: center; padding: var(--e-4); border: 1px dashed var(--linha-forte); border-radius: var(--r-1); color: var(--tinta-2); text-align: center; }
+.vazia { min-height: 280px; display: grid; place-items: center; padding: var(--e-4); border: 0; border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta-2); text-align: center; }
 .rodapeImpressao { width: 100%; display: grid; gap: var(--e-2); }
 .rodapeImpressao p { margin: 0; }
 .acoesRodape { display: flex; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; }

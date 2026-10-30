@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
         // PDF Renderer (Modulo Financeiro F4) — QuestPDF stateless + threadsafe
         // PDF de etiqueta + Nota de Entrada (P5) — QuestPDF + QRCoder, stateless/threadsafe
         services.AddSingleton<IDocumentoEntradaPdfRenderer, DocumentoEntradaPdfRenderer>();
+        services.AddSingleton<IFichaClientePdfRenderer, FichaClientePdfRenderer>();
 
         // Webhook processors (scoped)
         services.AddScoped<IGatewayWebhookProcessor, EfiPixWebhookProcessor>();

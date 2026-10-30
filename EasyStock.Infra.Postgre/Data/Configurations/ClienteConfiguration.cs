@@ -7,6 +7,7 @@
             builder.ToTable("clientes");
             builder.HasKey(c => c.Id);
             builder.Property(c => c.Nome).IsRequired().HasMaxLength(150);
+            builder.Property(c => c.FotoChave).HasMaxLength(512);
             builder.Property(c => c.Apt).HasMaxLength(32);
             builder.Property(c => c.Endereco).HasMaxLength(255);
             builder.Property(c => c.Telefone).HasMaxLength(32);

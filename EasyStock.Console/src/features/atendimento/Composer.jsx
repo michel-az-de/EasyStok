@@ -278,24 +278,37 @@ export function Composer({
                   este botão ganha rótulo visível, mesma ideia de "Automáticas"
                   no trilho (ícone e palavra juntos); os vizinhos (Anexar,
                   Fotos, Cardápio, Nota, Enviar) continuam ícone só. */}
-              <Tooltip texto={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}>
-                <Botao
-                  ref={respostasRef}
-                  disabled={!podeEscrever && !podeEnviarModelo}
-                  aria-haspopup={podeEscrever ? 'listbox' : 'dialog'}
-                  aria-expanded={podeEscrever ? barra.aberto : undefined}
-                  aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
-                  className={css.botaoRespostas}
-                  onClick={podeEscrever ? barra.abrir : aoAbrirModelos}
-                >
-                  <Icone nome="respostas" />
-                  <span>Respostas</span>
-                </Botao>
-              </Tooltip>
+              <Tooltip texto={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}><Botao
+                ref={respostasRef}
+                disabled={!podeEscrever && !podeEnviarModelo}
+                aria-haspopup={podeEscrever ? 'listbox' : 'dialog'}
+                aria-expanded={podeEscrever ? barra.aberto : undefined}
+                aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
+                className={css.botaoRespostas}
+                onClick={podeEscrever ? (barra.aberto ? barra.fechar : barra.abrir) : aoAbrirModelos}
+              >
+                <Icone nome="respostas" />
+                <span>Respostas</span>
+              </Botao></Tooltip>
               {/* Rodada 12 (issue #16, dúvida da Thatiane "esse botão é pra
                   quê?"): os quatro vizinhos ganham nome visível, como o
                   Respostas. Em coluna estreita o nome some por container
-                  query e fica a dica (Tooltip, #2146) com a explicação inteira. */}
+                  query e fica o title com a explicação inteira. */}
+              <details className={css.ferramentasComposer} onKeyDown={(evento) => {
+                if (evento.key !== 'Escape' || evento.defaultPrevented || evento.target.closest('dialog')) return
+                evento.preventDefault(); evento.stopPropagation()
+                evento.currentTarget.open = false
+                evento.currentTarget.querySelector('summary')?.focus()
+              }}>
+                <Tooltip texto="Mais ferramentas"><summary aria-label="Mais ferramentas"><Icone nome="mais" /></summary></Tooltip>
+                <div className={css.menuFerramentas} role="group" aria-label="Ferramentas da mensagem" onClick={(evento) => {
+                  if (evento.target.closest('button')) {
+                    const ferramentas = evento.currentTarget.closest('details')
+                    ferramentas.open = false
+                    ferramentas.querySelector('summary')?.focus({ preventScroll: true })
+                  }
+                }}>
+
               {acoes.anexar && <BotaoAnexarArquivo
                 disabled={!podeEscrever || !podeAnexar}
                 descritoPor={!podeAnexar && restricao ? idRestricao : undefined}
@@ -343,20 +356,24 @@ export function Composer({
               >
                 <Icone nome="sparkles" /><span className={css.rotuloAcao}>Completar com Tab</span>
               </Botao></Tooltip>}
+                </div>
+              </details>
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
               {temTexto || anexo || !acoes.audio ? (
-                <BotaoIcone
-                  tom="primario"
+                <Tooltip texto={variavelSobrando ?? (temTexto || anexo ? 'Enviar mensagem' : restricao ?? 'Escreva a mensagem para enviar')}
+                  atalho={temTexto || anexo ? 'Enter' : undefined}>
+                <Botao
+                  variante="primario"
                   className={css.enviar}
-                  rotulo="Enviar mensagem"
-                  icone="arrow-up"
-                  atalho={temTexto || anexo ? 'Enter' : undefined}
-                  dica={variavelSobrando ?? (temTexto || anexo ? undefined : restricao ?? 'Escreva a mensagem para enviar')}
+                  aria-label="Enviar mensagem"
+                  icone="enviar"
+                  aria-keyshortcuts={temTexto || anexo ? 'Enter' : undefined}
                   disabled={!podeEscrever || assumindo || Boolean(variavelSobrando) || !(temTexto || anexo)}
                   onClick={enviarComposer}
-                />
+                >Enviar</Botao>
+                </Tooltip>
               ) : (
                 <BotaoIcone
                   tom="primario"
@@ -375,7 +392,7 @@ export function Composer({
               o curto; o motivo inteiro segue no title, no leitor de tela e no aria-describedby. */}
           {restricao && (podeAnexar || podeAudio
             ? <p id={idRestricao} className={css.restricao}>{restricao}</p>
-            : <p id={idRestricao} className={css.restricao} title={restricao}><span aria-hidden="true">Só texto neste canal</span><span className="sr">{restricao}</span></p>)}
+            : <p id={idRestricao} className="sr">{restricao}</p>)}
         </>
       )}
 

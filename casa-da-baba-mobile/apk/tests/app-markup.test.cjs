@@ -6,6 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { adaptAppMarkup } = require('../scripts/app-markup.cjs');
 const { pilotIcon } = require('../pilot.js');
+const { loadConsoleIcons, geometry } = require('./helpers/console-icons.cjs');
 
 const source = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
 const start = '<!-- Modal novo produto -->';
@@ -149,10 +150,11 @@ test('estado vazio de pedidos gera SVG canônico e mantém ação Novo executáv
   assert.throws(() => adaptAppMarkup(source.replace('<span class="big">📭</span>', '')), /incompatível/);
 });
 
-test('compartilhar cobrança preserva handler e usa geometria oficial do WhatsApp', () => {
+test('compartilhar cobrança preserva handler e usa geometria oficial do WhatsApp', async () => {
   const icon = result.match(/<svg class="pilot-billing-whatsapp"[\s\S]*?<\/svg>/)[0];
-  const canonical = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Console/src/componentes/Icone.jsx'), 'utf8').match(/whatsapp: '([^']+)'/)[1];
-  assert.equal(icon.match(/<path d="([^"]+)"/)[1], canonical);
+  const canonical = await loadConsoleIcons();
+  try { assert.deepEqual(geometry(icon), geometry(canonical.svg('whatsapp'))); }
+  finally { await canonical.close(); }
   assert.match(icon, /stroke-width="1.75"/);
   assert.match(icon, /aria-hidden="true"/);
   const before = source.match(/<button class="btn-share"[\s\S]*?<\/button>/)[0];

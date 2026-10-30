@@ -6,6 +6,8 @@ import './prova-1757-complemento-texto.mjs'
 
 const arquivo = new URL('../src/features/ficha-cliente/ComandaDoCliente.jsx', import.meta.url)
 const compilado = (await transformWithOxc(readFileSync(arquivo, 'utf8'), arquivo.pathname, { jsx: { runtime: 'automatic' } })).code
+const cabecalhoArquivo = new URL('../src/features/ficha-cliente/Cabecalho.jsx', import.meta.url)
+const cabecalhoCompilado = (await transformWithOxc(readFileSync(cabecalhoArquivo, 'utf8'), cabecalhoArquivo.pathname, { jsx: { runtime: 'automatic' } })).code
 const modalArquivo = new URL('../src/features/atendimento/ModalEnviarCardapio.jsx', import.meta.url)
 const modalCompilado = (await transformWithOxc(readFileSync(modalArquivo, 'utf8'), modalArquivo.pathname, { jsx: { runtime: 'automatic' } })).code
 const compartilharArquivo = new URL('../src/features/atendimento/CompartilharComanda.jsx', import.meta.url)
@@ -32,10 +34,13 @@ registerHooks({
     if (spec.endsWith('/Modal')) return { url: codigo('export function Modal(){}'), shortCircuit: true }
     if (spec.endsWith('/BlocoFreteApi')) return { url: codigo('export function ConsultaTransporte(){}'), shortCircuit: true }
     if (spec.endsWith('/SeletorJanelaApi')) return { url: codigo('export function SeletorJanelaApi(){}'), shortCircuit: true }
+    if (spec.endsWith('/Cabecalho')) return { url: cabecalhoArquivo.href, shortCircuit: true }
     if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) return proximo(spec + '.js', ctx)
     return proximo(spec, ctx)
   },
   load(url, ctx, proximo) {
+    if (url === cabecalhoArquivo.href) return { format: 'module', source: cabecalhoCompilado, shortCircuit: true }
+    if (url.endsWith('/comanda.module.css')) return { format: 'module', source: 'export default new Proxy({}, { get: (_, p) => String(p) })', shortCircuit: true }
     if (url === arquivo.href || url === modalArquivo.href) return { format: 'module', source: url === arquivo.href ? compilado : modalCompilado, shortCircuit: true }
     if (url === compartilharArquivo.href) return { format: 'module', source: compartilharCompilado, shortCircuit: true }
     return proximo(url, ctx)
@@ -70,17 +75,17 @@ comanda.rascunho.itens[0].qtd = 3
 arvore = render()
 assert.equal(arvore.find(e => e.type === 'textarea').props.value, 'Molho à parte', 'SSE não apaga digitação')
 assert.ok(arvore.some(e => e.props.role === 'alert'), 'conflito exige decisão explícita')
-assert.ok(!arvore.some(e => e.props.children === 'Salvar seleção'), 'não sobrescreve seleção remota sem conferir')
+assert.ok(!arvore.some(e => e.props.children === 'Salvar itens'), 'não sobrescreve seleção remota sem conferir')
 arvore.find(e => e.props.children === 'Manter minha edição para conferir').props.onClick()
 arvore = render()
 contexto.sucesso = false
-await arvore.find(e => e.props.children === 'Salvar seleção').props.onClick()
+await arvore.find(e => e.props.children === 'Salvar itens').props.onClick()
 assert.equal(contexto.salvo[0].revisao, 8)
 assert.equal(contexto.salvo[1].itens[0].qtd, 1)
 assert.equal(contexto.salvo[1].observacoes, 'Molho à parte')
 assert.equal(render().find(e => e.type === 'textarea').props.value, 'Molho à parte', 'erro de API preserva edição')
 contexto.sucesso = true
-await render().find(e => e.props.children === 'Salvar seleção').props.onClick()
+await render().find(e => e.props.children === 'Salvar itens').props.onClick()
 assert.equal(contexto.estados[0], null)
 arvore = render()
 arvore.find(e => e.type === 'textarea').props.onChange({ target: { value: 'Sem queijo' } })
@@ -88,7 +93,7 @@ comanda.rascunho.pedidoAtualizadoEm = '2026-10-11T22:00:00Z'
 arvore = render()
 assert.ok(arvore.some(e => e.props.role === 'alert'), 'pedido pode mudar sem revisão nova do link')
 arvore.find(e => e.props.children === 'Manter minha edição para conferir').props.onClick()
-await render().find(e => e.props.children === 'Salvar seleção').props.onClick()
+await render().find(e => e.props.children === 'Salvar itens').props.onClick()
 assert.equal(contexto.salvo[1].pedidoAtualizadoEm, '2026-10-11T22:00:00Z')
 arvore = render()
 arvore.find(e => e.type === 'select').props.onChange({ target: { value: 'novo' } })
@@ -169,7 +174,7 @@ console.log('Comanda: conflito preserva edição, falha API preserva dados, adi�
 }
 console.log('Alteração para aprovar: data e janela novas aparecem ao lado dos itens.')
 for (const [podeEditar, pedido, situacao, estado, acao] of [
-  [true, null, null, 'Não confirmada', 'Revisar seleção'],
+  [true, null, null, 'Não confirmados', 'Revisar itens'],
   [true, { total: 60 }, null, 'Pedido atual mantido', 'Revisar alteração'],
   [false, { total: 60 }, 'alteracao_aguardando_confirmacao', 'Pedido atual mantido', 'Comparar e aprovar'],
   [false, { total: 60 }, 'aguardando_pagamento', 'Pedido criado', 'Consultar histórico'],
@@ -181,7 +186,7 @@ for (const [podeEditar, pedido, situacao, estado, acao] of [
   const resumo = elementos(ComandaDoCliente({ conversaId: 'conversa', ativo: true, compacta: true, pedido }))
   assert.ok(resumo.some(e => e.props.children === estado), 'resumo distingue etapa: ' + estado)
   assert.ok(resumo.some(e => e.type.name === 'Botao' && e.props.children === acao), 'ação corresponde à etapa: ' + acao)
-  assert.ok(!resumo.some(e => e.props.children === 'Seleção enviada'), 'envio não se confunde com criação ou aprovação')
+  assert.ok(!resumo.some(e => e.props.children === 'Itens enviados'), 'envio não se confunde com criação ou aprovação')
 }
 console.log('Resumo: seleção, edição, aprovação, pedido criado, recusa e devolução têm estados e ações distintos.')
 const { ModalEnviarCardapio } = await import(modalArquivo.href)

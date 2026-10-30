@@ -4,18 +4,23 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { build } from 'vite'
 import react from '@vitejs/plugin-react'
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const raiz = fileURLToPath(new URL('..', import.meta.url)).replaceAll('\\', '/')
+const artefatos = resolve(raiz, '../.build/harmonia-ux')
+const fatos = { tipo: 'Console em demonstração e componentes reais com respostas controladas; sem API real', etapas: [], requisicoesHttpBloqueadas: 0, passou: false }
+const bloquearRede = pagina => pagina.route(/^https?:\/\//, rota => { fatos.requisicoesHttpBloqueadas++; return rota.abort() })
 const navegador = await chromium.launch({ headless: true })
 try {
   const pagina = await navegador.newPage({ viewport: { width: 1440, height: 1000 } })
+  await bloquearRede(pagina)
   pagina.setDefaultTimeout(5000)
   await pagina.goto(pathToFileURL(resolve(raiz, 'dist/index.html')).href)
   await pagina.getByText('Abrir Atendimento', { exact: true }).click()
   await pagina.getByRole('button', { name: /Renan Okamoto/ }).click()
-  await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
+  await pagina.getByRole('button', { name: 'Adicionar nota', exact: true }).click()
   const texto = 'Nota de Renan preservada ao navegar #1847'
   await pagina.getByRole('textbox', { name: 'Texto da nota' }).fill(texto)
   await pagina.getByRole('button', { name: /Bianca Toledo/ }).click()
@@ -24,15 +29,35 @@ try {
   await pagina.getByRole('button', { name: 'Fixar nota', exact: true }).click()
   assert.equal(await pagina.getByText(texto, { exact: true }).count(), 0, 'não gravou na ficha de Bianca')
   await pagina.getByRole('button', { name: /Renan Okamoto/ }).click()
-  assert.equal(await pagina.getByText(texto, { exact: true }).count(), 1, 'gravou somente no cliente original')
+  const abrirNotas = pagina.locator('[data-destino-nota]').getByRole('button', { name: /^Notas\b/ })
+  assert.equal(await abrirNotas.getAttribute('aria-expanded'), 'false', 'notas começam recolhidas')
+  await abrirNotas.click()
+  assert.equal(await abrirNotas.getAttribute('aria-expanded'), 'true', 'o botão abre as notas da ficha')
+  const notaVisivel = pagina.locator('p:visible').filter({ hasText: texto })
+  assert.equal(await notaVisivel.count(), 1, 'uma única nota visível no cliente original; evento recolhido não duplica pixels')
+  assert.equal(await notaVisivel.innerText(), texto, 'texto completo preservado')
+  fatos.etapas.push('Nota preserva texto e destinatário ao trocar de conversa; nenhuma nota em Bianca e uma única nota visível em Renan')
   console.log('ok Console completo: troca de conversa preserva destinatário e texto')
 
+  const filtro = pagina.getByRole('button', { name: /^Filtrar conversas/ })
+  await filtro.click()
+  const filtros = pagina.getByRole('dialog', { name: 'Filtros das conversas' })
+  const recentes = filtros.getByRole('button', { name: /^Mais recentes/ })
+  await recentes.focus()
+  await recentes.press('Enter')
+  assert.equal(await filtros.count(), 0, 'escolher ordem fecha o diálogo de filtros')
+  assert.equal(await filtro.evaluate(el => el === document.activeElement), true, 'Enter devolve o foco ao acionador do filtro')
+  fatos.etapas.push('Filtros reais: Mais recentes por Enter fecha o diálogo e devolve o foco ao botão')
+  console.log('ok filtro real: seleção por teclado preserva o foco no acionador')
+
   // Componentes reais com resposta controlada: trocar de ferramenta durante save não remonta a nota.
-  // O cartão recebe a mesma quantidade de notas, mas com o novo id da 21ª nota.
+  // O cartão enxuto não mostra mais o resumo. Exercita seu hook real diretamente,
+  // preservando a regressão do cache: mesma quantidade, mas novo id da 21ª nota.
   const entrada = `import React,{useState}from '${raiz}/node_modules/react/index.js';
 import{createRoot}from '${raiz}/node_modules/react-dom/client.js';
 import{ModalNota}from '${raiz}/src/features/notas/ModalNota.jsx';
 import{CartaoDoCliente}from '${raiz}/src/features/ficha-cliente/CartaoDoCliente.jsx';
+import{useResumoDoCliente}from '${raiz}/src/aplicacao/useResumoDoCliente.js';
 import{ExtratoDoPedido}from '${raiz}/src/features/ficha-cliente/ExtratoDoPedido.jsx';
 import{BlocoCobranca}from '${raiz}/src/features/ficha-cliente/BlocoCobranca.jsx';
 function Prova(){const[visivel,mostrar]=useState(true);const[terminou,terminar]=useState(false);const[geracao,mudar]=useState(0);const[caso,proximo]=useState(0);const[cenaCobranca,proximaCobranca]=useState(0);
@@ -40,11 +65,13 @@ const pedidos=[{estado:'cancelado',totalPagoApi:0,alocadoApi:0},{estado:'cancela
 const cancelado=cenaCobranca%2===1;const manual=cenaCobranca>1;
 const cobranca={id:'cb',valor:15.5,link:manual?null:'https://mp.test/link',meio:'pix',criadaEm:1792065600000,expiraEm:1792067400000,canceladaEm:cancelado?1792065660000:null};
 const notas=Array.from({length:20},(_,i)=>({id:'nota'+(i+geracao),criadoEm:i+geracao,texto:'texto'+(i+geracao)}));
+const resumo=useResumoDoCliente('cliente-cache','2|'+notas.map(n=>n.id+':'+n.criadoEm).join(','),true);
 return React.createElement(React.Fragment,null,
 React.createElement('button',{onClick:()=>mostrar(v=>!v)},'Alternar ferramenta'),
 React.createElement('button',{onClick:()=>window.responder()},'Responder gravação'),
 React.createElement('button',{onClick:()=>mudar(1)},'Adicionar vigésima primeira nota'),
 React.createElement('output',null,terminou?'Gravou':'Aguardando'),
+React.createElement('output',null,resumo.texto),
 React.createElement('button',{onClick:()=>proximo(c=>c+1)},'Próximo extrato'),
 React.createElement('button',{onClick:()=>proximaCobranca(c=>c+1)},'Próxima cobrança'),
 React.createElement('section',{'aria-label':'Cobrança em teste'},React.createElement(BlocoCobranca,{pedido:{pedidoId:'p',estado:cancelado?'cancelado':'aguardando',statusApi:cancelado?'cancelado':'aguardando_pagamento',totalApi:31,sinalNaReserva:true,itens:[],cobranca},conversaId:'c',editavel:true,nomeCliente:'Maria',agora:1792065600000})),
@@ -60,6 +87,7 @@ React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cli
   const codigo = arquivos.find(a => a.type === 'chunk').code
   const estilo = arquivos.find(a => a.type === 'asset' && a.fileName.endsWith('.css'))?.source
   const componente = await navegador.newPage()
+  await bloquearRede(componente)
   componente.setDefaultTimeout(5000)
   componente.on('pageerror', erro => console.error('Componente: ' + erro.message))
   await componente.setContent('<div id="root"></div>')
@@ -79,9 +107,11 @@ React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cli
   assert.equal(await componente.evaluate(() => window.textoSalvo), 'Texto em gravação')
   assert.equal(await componente.getByRole('dialog').count(), 0)
   console.log('ok nota: gravação em voo e rascunho sobrevivem à troca de ferramenta')
+  fatos.etapas.push('Componente real de nota preserva gravação em voo, texto e destinatário ao alternar ferramenta')
   await componente.getByRole('button', { name: 'Adicionar vigésima primeira nota' }).click()
   await componente.getByText('Resumo 2', { exact: true }).waitFor()
   assert.equal(await componente.evaluate(() => window.resumos), 2)
+  fatos.etapas.push('Hook real do resumo mantém invalidação pela 21ª nota, sem depender da apresentação removida do cartão')
   console.log('ok cache: 21ª nota invalida o resumo apesar do limite de 20')
   const extrato = componente.getByRole('region', { name: 'Extrato do pedido' })
   for (const caso of [0, 1, 2]) {
@@ -116,4 +146,13 @@ React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cli
     }
   }
   console.log('ok cobrança real: cancelados preservam histórico sem instruir novo recebimento; ativos mantêm sinal e ação')
-} finally { await navegador.close() }
+  fatos.etapas.push('Extrato e cobrança preservam os casos financeiros existentes, inclusive cancelamentos e sinal')
+  fatos.passou = true
+} catch (erro) {
+  fatos.erro = erro.message
+  throw erro
+} finally {
+  await mkdir(artefatos, { recursive: true })
+  await writeFile(resolve(artefatos, 'prova-1847-nota-resumo.json'), JSON.stringify(fatos, null, 2))
+  await navegador.close()
+}

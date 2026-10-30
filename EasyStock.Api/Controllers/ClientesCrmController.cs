@@ -1,5 +1,7 @@
 using EasyStock.Api.Authentication;
 using EasyStock.Application.UseCases.Cliente.Dossie;
+using EasyStock.Application.UseCases.Cliente.Foto;
+using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Application.UseCases.ClienteCrm;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -25,6 +27,26 @@ public class ClientesCrmController(
     ObterDossieClienteUseCase dossie,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [HttpGet("ficha.pdf")]
+    [Authorize(Policy = "Operador")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<IActionResult> FichaPdf(Guid id, [FromQuery] Guid? empresaId,
+        [FromServices] IFichaClientePdfRenderer renderer, [FromServices] ClienteFotoUseCase fotos, CancellationToken ct)
+    {
+        if (currentUser.EmpresaId == Guid.Empty || (empresaId.HasValue && empresaId != currentUser.EmpresaId))
+            return Task.FromResult<IActionResult>(DataBadRequest("A empresa informada difere da sessão."));
+        return Executar(currentUser.EmpresaId, async emp =>
+        {
+            var dados = await dossie.ExecuteAsync(new ObterDossieClienteQuery(emp, id), ct);
+            if (dados is null) return DataNotFound("Cliente não encontrado.");
+            var foto = dados.Cliente.FotoUrl is null ? null : await fotos.ObterAsync(emp, id, ct);
+            var bytes = await renderer.RenderAsync(dados, foto, DateTime.UtcNow, ct);
+            Response.Headers.CacheControl = "private, no-store";
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return File(bytes, "application/pdf", $"ficha-cliente-{id:D}.pdf");
+        });
+    }
+
     // ── Dossiê (S25) ───────────────────────────────────────────────────
 
     [SwaggerOperation(Summary = "Customer dossier (orders, favorite, notes, tags, same household)",
@@ -82,6 +104,26 @@ public class ClientesCrmController(
     [Authorize(Policy = "Operador")]
     public Task<IActionResult> ListarNotas(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
         Executar(empresaId, async emp => DataOk(await listarNotas.ExecuteAsync(emp, id, ct)));
+
+    [HttpGet("notas/pagina")]
+    [Authorize(Policy = "Operador")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<IActionResult> PaginaNotas(Guid id, CancellationToken ct, [FromQuery] int pagina = 1, [FromQuery] int tamanho = 50)
+    {
+        if (currentUser.EmpresaId == Guid.Empty)
+            return Task.FromResult<IActionResult>(DataBadRequest("Selecione a empresa da sessão."));
+        return Executar(currentUser.EmpresaId, async emp => DataOk(await listarNotas.PaginaAsync(emp, id, pagina, tamanho, ct)));
+    }
+
+    [HttpGet("notas/{notaId:guid}")]
+    [Authorize(Policy = "Operador")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<IActionResult> ObterNota(Guid id, Guid notaId, CancellationToken ct)
+    {
+        if (currentUser.EmpresaId == Guid.Empty)
+            return Task.FromResult<IActionResult>(DataBadRequest("Selecione a empresa da sessão."));
+        return Executar(currentUser.EmpresaId, async emp => DataOk(await listarNotas.ObterAsync(emp, id, notaId, ct)));
+    }
 
     [SwaggerOperation(Summary = "Add internal note", Description = "PedidoId of another client → 400.")]
     [ProducesResponseType(StatusCodes.Status201Created)]

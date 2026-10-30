@@ -57,7 +57,7 @@ export function ModalFecharCaixa({
           <Botao variante="texto" disabled={enviando} onClick={aoFechar}>Cancelar</Botao>
           <Botao
             variante="primario"
-            icone="log-out"
+            icone="lock"
             disabled={enviando || !conferencia.pronta || moedaAltaDemais(centavosContado)}
             onClick={() => aoConfirmar(centavosContado / 100)}
           >

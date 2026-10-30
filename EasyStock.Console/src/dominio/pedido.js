@@ -175,7 +175,7 @@ export const clienteEscolhendoPeloLink = (comandas, pedido) => !pedido?.pedidoId
   && (comandas ?? []).some((c) => c.podeEditar && !c.pedido && (c.rascunho?.itens?.length > 0 || c.ajudaSolicitada))
 
 export const LINHA_CLIENTE_ESCOLHENDO =
-  'O cliente está escolhendo pelo link. Abra Revisar seleção para acompanhar os itens antes de confirmar o pedido.'
+  'O cliente está escolhendo pelo link. Abra Revisar itens para acompanhar os itens antes de confirmar o pedido.'
 
 // #1761: a Ficha dizia "Pedido em montagem" com o pedido já confirmado e pago. O título segue o
 // pedido: montagem só enquanto ele não existe no EasyStok.
@@ -206,7 +206,7 @@ export const pedidoAcabouDeNascer = (antes, depois) => Boolean(depois?.pedidoId)
 // #1683: sem pedido e sem frete combinado o EasyStok soma só os itens; o cliente já vê o frete.
 export function rotuloDoTotalDaSelecao(comanda, emEdicao = false) {
   const semFrete = !comanda.pedido && comanda.freteCombinado == null
-  if (emEdicao) return 'Total da seleção salva' + (semFrete ? ', sem frete' : '')
+  if (emEdicao) return 'Total dos itens salvos' + (semFrete ? ', sem frete' : '')
   return semFrete ? 'Total dos itens, sem frete' : 'Total previsto'
 }
 

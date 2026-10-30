@@ -18,7 +18,7 @@
   min-height: 64px;
   padding: var(--e-2) var(--e-4); padding-top: calc(var(--e-2) + env(safe-area-inset-top, 0px));
   background: var(--vidro);
-  border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+  border-bottom: 0; flex-shrink: 0;
 }
 /* Assinatura oficial completa, com placa clara também no tema escuro. */
 .marca { display: flex; align-items: center; margin: 0; }
@@ -44,10 +44,10 @@
 /* Palco: nas três colunas, os painéis flutuam sobre o fundo com raio de
    painel e sombra curta; o vão entre eles é a própria alça de largura. */
 .palco { display: flex; flex: 1; min-height: 0; position: relative; }
-.palcoTres { padding: var(--e-3) var(--e-3) var(--e-3); }
+.palcoTres { padding: 0; }
 .palcoTres > .coluna {
-  border-radius: var(--r-2); border: var(--b-1) solid var(--linha);
-  box-shadow: var(--sombra);
+  border-radius: var(--r-2); border: 0;
+  box-shadow: none;
   animation: painelEntra var(--dur-longa) var(--ease-saida) backwards;
 }
 .palcoTres > .coluna:nth-of-type(2) { animation-delay: 40ms; }
@@ -62,22 +62,27 @@
 }
 /* Largura padrão --coluna (320 px); no layout de três colunas a moldura
    sobrescreve --largura-balcao e --largura-ficha pela alça (seção 9). */
-.entrada { width: var(--largura-balcao, var(--coluna)); flex-shrink: 0; border-right: var(--b-1) solid var(--linha); }
+.entrada { width: var(--largura-balcao, var(--coluna)); flex-shrink: 0; border-right: 0; }
 /* Colunas cedem espaço respeitando a leitura mínima, inclusive após redimensionar.
    O mínimo antigo de 420 px no centro cortava a Ficha já em 1280 px. */
 .centro { flex: 1; min-width: 0; background: var(--chao-conversa); }
 .palcoTres > .centro { min-width: 320px; }
-.palcoTres > .entrada { min-width: 280px; flex-shrink: 1; }
-.palcoTres > .ficha { min-width: 320px; flex-shrink: 1; }
-.ficha { width: var(--largura-ficha, var(--coluna)); flex-shrink: 0; border-left: var(--b-1) solid var(--linha); }
+.palcoTres > .entrada { min-width: 260px; flex-shrink: 1; }
+.palcoTres > .ficha { min-width: 292px; flex-shrink: 1; }
+.ficha { width: var(--largura-ficha, var(--coluna)); flex-shrink: 0; border-left: 0; }
 .rolavel { overflow-y: auto; flex: 1; min-height: 0; overscroll-behavior: contain; }
 .painelFicha { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+.disposicao { position: relative; }
+.ajusteDisposicao { display: grid; gap: var(--e-3); width: min(300px, 80vw); padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta); }
+.ajusteDisposicao label { display: grid; grid-template-columns: 1fr auto; gap: var(--e-2); }
+.ajusteDisposicao input { grid-column: 1 / -1; width: 100%; min-height: var(--toque); accent-color: var(--marca); }
+.ajusteDisposicao output, .ajusteDisposicao small { font-size: var(--t-micro); color: var(--tinta-2); }
 
 /* Título de coluna: rótulo de seção discreto, no estilo da barra lateral do
    macOS, sem ícone e sem linha pesada. */
 .tituloColuna {
   display: flex; align-items: center; gap: var(--e-2); flex-shrink: 0;
-  min-height: 52px; padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
+  min-height: 52px; padding: var(--e-3) var(--e-4); border-bottom: 0;
   font-family: var(--f-corpo); font-size: var(--t-titulo); color: var(--tinta); font-weight: 700;
   line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo);
 }
@@ -88,14 +93,14 @@
   display: flex; gap: var(--e-3); flex-wrap: wrap; align-items: center; flex-shrink: 0;
   padding: var(--e-2) var(--e-4); padding-bottom: calc(var(--e-2) + env(safe-area-inset-bottom, 0px));
   background: var(--vidro);
-  border-top: var(--b-1) solid var(--linha);
+  border-top: 0;
   font-size: var(--t-apoio); color: var(--tinta-3);
 }
 /* Tablet: a ficha vira gaveta sobre o atendimento, deslizando da direita. */
 .gaveta.gaveta {
   position: fixed; inset: 0 0 0 auto; margin: 0 0 0 auto;
   height: 100dvh; max-height: 100dvh; max-width: 90vw; border-radius: 0;
-  border: 0; border-left: var(--b-1) solid var(--linha);
+  border: 0; border-left: 0;
   box-shadow: var(--sombra-alta);
 }
 .gaveta.gaveta[open] { animation: gavetaEntra var(--dur-media) var(--ease-saida) both; }
@@ -123,7 +128,7 @@
   position: fixed; left: var(--e-5); bottom: var(--e-5); z-index: 30;
   border-radius: var(--r-pilula) !important;
   background: var(--vidro) !important; -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
-  border: var(--b-1) solid var(--linha) !important; box-shadow: var(--sombra-media);
+  border: 0 !important; box-shadow: var(--sombra-media);
 }
 /* Tablet e celular têm rodapé (botão da Ficha ou barra de abas): a pílula
    sobe para cima dele em vez de cobrir o botão. */
@@ -230,7 +235,7 @@
 .tituloCompacto { min-height: 52px; padding-block: 2px; }
 /* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
 .espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
-.espacoTrilho::after { content: ''; width: 32px; height: 1px; margin-bottom: 4px; background: var(--linha-media); }
+.espacoTrilho::after { content: none; }
 .atendente { composes: avatar from '../componentes/Trilho.module.css'; }
 /* 12: no celular, o painel que entra desliza brevemente da direita. */
 @keyframes painelDesliza { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }

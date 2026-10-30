@@ -73,7 +73,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
           <Botao className={css.abrirMenu} icone="painel" aria-label={`Menu de ${modulo.nome}`} aria-haspopup="dialog" aria-expanded={menuAberto} onClick={() => setMenuAberto(true)}><span>Menu<span className={css.nomeNoMenu}>{modulo.nome}</span></span></Botao>
           {avulsa ? (
             <button type="button" className={`${css.voltar} ${css.voltarBotao}`} onClick={() => voltarAoBalcao(fonteApi)}>
-              <MarcaIcone nome="anterior" tamanho={20} /> <span>Voltar ao Balcão</span>
+              <MarcaIcone nome="anterior" tamanho={20} /> <span>Voltar às conversas</span>
             </button>
           ) : (
             <>
@@ -83,7 +83,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
               {/* #1474: quem veio da barra lateral do Balcão volta para ele num toque. */}
               {modulo.id !== MODULO_DO_BALCAO && permite(MODULO_DO_BALCAO) && (
                 <a className={css.voltar} href={HASH_BALCAO}>
-                  <MarcaIcone nome="mensagem" tamanho={24} /> <span>Balcão</span>
+                  <MarcaIcone nome="mensagem" tamanho={24} /> <span>Conversas</span>
                 </a>
               )}
             </>
@@ -122,7 +122,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
                   {/* #1921: a tela existe, mas a matriz do perfil não a libera (ex.: Janelas de entrega). */}
                   {telaSemAcesso ? (
                     <Vazio titulo="Seu perfil não abre esta tela" acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
-                      Se você precisa trabalhar aqui, peça à dona para mudar o seu perfil.
+                      Para acessar esta área, peça à administração da loja para revisar seu perfil.
                     </Vazio>
                   ) : (
                     <Vazio titulo={`${modulo.nome}: em breve`} acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>

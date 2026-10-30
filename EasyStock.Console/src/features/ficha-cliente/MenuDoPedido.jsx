@@ -35,7 +35,7 @@ export function MenuDoPedido({
         title="Mais ações do pedido"
         onClick={() => setAberto((v) => !v)}
       >
-        <Icone nome="ellipsis" tamanho={24} />
+        <Icone nome="ellipsis-vertical" tamanho={24} />
       </Botao>
       {aberto && (
         <Popover rotulo="Mais ações do pedido" posicao="abaixo" aoFechar={fechar} portal>

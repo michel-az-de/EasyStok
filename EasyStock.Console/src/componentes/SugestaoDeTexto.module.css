@@ -1,8 +1,8 @@
-.sugestao { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: center; gap: 8px; padding: 6px 10px; font-size: .875rem; }
+.sugestao { display: grid; grid-template-columns: minmax(0, 1fr) auto var(--toque); align-items: center; gap: var(--e-2); padding: 6px var(--e-3); font-size: var(--t-apoio); }
 .texto { overflow-wrap: anywhere; white-space: pre-wrap; }
-.texto small { display: block; font-size: .75rem; }
-.usar, .fechar { min-height: 44px; min-width: 44px; padding: 8px; color: inherit; border: 1px solid currentColor; border-radius: 8px; background: transparent; cursor: pointer; }
+.texto small { display: block; font-size: var(--t-minimo); }
+.usar, .fechar { min-height: var(--toque); min-width: var(--toque); padding: var(--e-2); color: inherit; border: 0; border-radius: var(--r-1); background: var(--preenchimento); cursor: pointer; }
 .fechar { border-color: transparent; font-size: 1.25rem; }
-.usar kbd { margin-left: 4px; font-size: .75rem; }
+.usar kbd { margin-left: var(--e-1); font-size: var(--t-minimo); }
 .usar:focus-visible, .fechar:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 @media (pointer: coarse) { .usar kbd { display: none; } }

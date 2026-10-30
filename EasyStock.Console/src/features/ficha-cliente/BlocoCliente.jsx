@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Avatar } from '../../componentes/Avatar'
+import { AvatarAssistente } from '../../componentes/AvatarAssistente'
 import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
@@ -68,7 +69,12 @@ function SeloCaptado({ quando }) {
 
 const NADA_RECOLHIDO = { contato: false, tags: false, historico: false }
 
-export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
+function SecaoCliente({ integrado, titulo, chave, children, ...resto }) {
+  if (!integrado) return <Bloco titulo={titulo} chave={chave} {...resto}>{children}</Bloco>
+  return <section data-secao-cliente={chave}>{chave !== 'cliente' && <h3>{titulo}</h3>}{children}</section>
+}
+
+export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false }) {
   const { cliente } = conversa
   const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
   // #1474 (R2): no modo API, mudar a entrega do pedido e os pontos não têm endpoint e somem.
@@ -199,9 +205,9 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
 
   return (
     <>
-      <Bloco titulo="Cliente" chave="cliente" resumo={conversa.nome}>
+      <SecaoCliente integrado={integrado} titulo="Cliente" chave="cliente" resumo={conversa.nome}>
         <div className={css.identidade}>
-          <Avatar nome={conversa.nome} foto={fotoDoCliente(canal, cliente)} tamanho="enorme" />
+          <Avatar nome={conversa.nome} foto={fotoCadastro ?? fotoDoCliente(canal, cliente)} tamanho="enorme" />
           <div className={css.identidadeTextos}>
             <div key={`nome-${captado.nome ?? ''}`} className={captado.nome ? css.captadoAgora : undefined}>
               <CampoEmLinha rotulo="Nome do cliente" valor={conversa.nome} validar={validarNome}
@@ -209,7 +215,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
               <SeloCaptado quando={captado.nome} />
             </div>
             {lead ? (
-              <span className={css.situacao}>Lead · {chegouQuando(conversa, agora)}</span>
+              <span className={css.situacao}>Contato · {chegouQuando(conversa, agora)}</span>
             ) : cliente.desde && (
               // #1474: o cadastro da API não traz a data; sem ela, a linha não aparece vazia.
               <span className={css.situacao}>Cliente desde {cliente.desde}</span>
@@ -224,11 +230,17 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
               title="Mais ações do cliente"
               onClick={() => setMenuAberto((v) => !v)}
             >
-              <Icone nome="ellipsis" tamanho={24} />
+              <Icone nome="ellipsis-vertical" tamanho={24} />
             </Botao>
             {menuAberto && (
               <Popover rotulo="Mais ações do cliente" posicao="abaixo" aoFechar={() => setMenuAberto(false)}>
                 <div className={css.menuAcoes}>
+                  {aoEscolherFoto && <button type="button" role="menuitem" className={css.itemMenu} disabled={alterandoFoto}
+                    onClick={() => { setMenuAberto(false); aoEscolherFoto() }}>
+                    <Icone nome="camera" />{cliente.fotoUrl ? 'Trocar foto' : 'Adicionar foto'}
+                  </button>}
+                  {aoRemoverFoto && <button type="button" role="menuitem" className={css.itemMenu} disabled={alterandoFoto}
+                    onClick={() => { setMenuAberto(false); aoRemoverFoto() }}><Icone nome="lixeira" />Remover foto</button>}
                   <button
                     type="button" role="menuitem" className={css.itemMenu}
                     disabled={Boolean(motivoSemBloqueio)}
@@ -258,11 +270,16 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
             <p className={css.rodapeBloco}>{resumoDoBloqueio(bloqueio)}</p>
           </div>
         )}
-      </Bloco>
+      </SecaoCliente>
+
+      {resumoIa && <section data-resumo-cliente aria-label="Resumo do assistente">
+        <AvatarAssistente tamanho={36} />
+        <div><h3>Apontamentos</h3><p>{resumoIa}</p></div>
+      </section>}
 
       {/* #1643 (item 6): o contato informado pelo visitante pede confirmação; a seção nasce aberta com
           ele e, recolhida, o resumo diz que ele está ali. */}
-      <Bloco titulo="Contato e endereço" chave="contato" recolhidoDePadrao={recolhidas.contato && !avisoEndereco && !informado}
+      <SecaoCliente integrado={integrado} titulo="Contato e endereço" chave="contato" recolhidoDePadrao={recolhidas.contato && !avisoEndereco && !informado}
         resumo={resumoDoContato(cliente, informado)}>
         {informado && (
           <div data-campo-ficha="cadastro" className={css.contents}>
@@ -310,7 +327,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
             </Botao>
           </div>
         ) : (
-          <div className={css.dadosCliente}>
+          <div className={css.dadosCliente} data-dados-cliente>
             <div key={`tel-${captado.telefone ?? ''}`} data-campo-ficha="telefone cadastro" className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
               <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={15} /></span>
               <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
@@ -331,6 +348,10 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
                 validar={fonteApi ? recusaDoEndereco : undefined}
                 aoSalvar={aoSalvarEndereco} />
             </div>
+            {cliente.email && <div className={css.linhaDado}>
+              <span className={css.rotuloDado}>E-mail</span>
+              <span className={css.valorCanal}>{cliente.email}</span>
+            </div>}
             {/* #1761 (L22): o canal já está no cabeçalho da conversa; aqui só o que ele não diz, o usuário. */}
             {cliente.usuario && (
               <div className={css.linhaDado}>
@@ -375,13 +396,13 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
             </button>
           </p>
         )}
-      </Bloco>
+      </SecaoCliente>
 
-      <Bloco titulo="Tags" chave="tags" recolhidoDePadrao={recolhidas.tags} resumo={resumoTags}>
+      <SecaoCliente integrado={integrado} titulo="Tags" chave="tags" recolhidoDePadrao={recolhidas.tags} resumo={resumoTags}>
         <TagsDoCliente conversa={conversa} />
 
         {/* #1441: as notas internas mais recentes como post-its, ao lado da conversa. */}
-        {cliente.notas.length > 0 && (
+        {!integrado && cliente.notas.length > 0 && (
           <ul className={css.postIts} aria-label="Notas internas">
             {notasRecentes(cliente.notas).map((nota) => (
               <li key={nota.id ?? nota.em + nota.texto.slice(0, 12)} className={css.ultimaNota}>
@@ -391,10 +412,10 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO }) {
             ))}
           </ul>
         )}
-      </Bloco>
+      </SecaoCliente>
 
       {/* #1761 (L22): sem pedido e sem pontos, o Histórico não tem o que abrir. */}
-      {mostraHistorico({ pedidos: cliente.pedidos, fonteApi, resgataPontos }) && (
+      {!integrado && mostraHistorico({ pedidos: cliente.pedidos, fonteApi, resgataPontos }) && (
       <Bloco titulo="Histórico" chave="historico" recolhidoDePadrao={recolhidas.historico} resumo={resumoHistorico}>
         {!lead && cliente.pedidos > 0 && (
           <div className={css.numerosCliente}>

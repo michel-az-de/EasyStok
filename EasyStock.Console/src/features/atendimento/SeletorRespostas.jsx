@@ -15,7 +15,7 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
   const opcaoAtiva = useRef(null)
   useLayoutEffect(() => {
     const opcao = opcaoAtiva.current
-    const caixa = opcao?.closest('[role="group"]')
+    const caixa = opcao?.closest('[role="listbox"]')
     if (!caixa) return
     const item = opcao.getBoundingClientRect()
     const janela = caixa.getBoundingClientRect()
@@ -27,7 +27,6 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
   return (
     <Popover rotulo="Respostas rápidas" papel="group" aoFechar={seletor.fechar} semAutoFoco portal>
       <div className={css.seletor}>
-        <p className={css.orientacao}>A resposta entra no rascunho. Confira o texto antes de enviar.</p>
         {!seletor.pelaBarra && (
           <input
             autoFocus
@@ -74,7 +73,7 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
         )}
 
         <div className={css.rodape}>
-          <span className={css.dica}>↑↓ escolhe · Enter insere · Esc fecha</span>
+          <span className={css.dica}>Enter insere no rascunho</span>
           <button
             type="button"
             className={css.gerenciar}

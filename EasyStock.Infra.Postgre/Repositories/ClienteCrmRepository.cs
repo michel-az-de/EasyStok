@@ -22,6 +22,16 @@ public sealed class ClienteCrmRepository(EasyStockDbContext db) : IClienteCrmRep
     public Task AdicionarNotaAsync(ClienteNota nota, CancellationToken ct = default) =>
         db.ClienteNotas.AddAsync(nota, ct).AsTask();
 
+    public async Task<IReadOnlyList<ClienteNota>> ListarPaginaNotasAsync(Guid empresaId, Guid clienteId, int ignorar, int quantidade, CancellationToken ct = default) =>
+        await db.ClienteNotas.AsNoTracking()
+            .Where(n => n.EmpresaId == empresaId && n.ClienteId == clienteId)
+            .OrderByDescending(n => n.CriadoEm).ThenByDescending(n => n.Id)
+            .Skip(ignorar).Take(quantidade).ToListAsync(ct);
+
+    public Task<ClienteNota?> ObterNotaAsync(Guid empresaId, Guid clienteId, Guid notaId, CancellationToken ct = default) =>
+        db.ClienteNotas.AsNoTracking()
+            .FirstOrDefaultAsync(n => n.EmpresaId == empresaId && n.ClienteId == clienteId && n.Id == notaId, ct);
+
     public Task<bool> PedidoEhDoClienteAsync(Guid empresaId, Guid pedidoId, Guid clienteId, CancellationToken ct = default) =>
         db.Pedidos.AnyAsync(p => p.EmpresaId == empresaId && p.Id == pedidoId && p.ClienteId == clienteId, ct);
 }

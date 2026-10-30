@@ -82,13 +82,13 @@
   // Subconjunto canônico do Console: MarcaIcone.jsx (Casa da Baba V4, grid32) e Icone.jsx (grid24).
   // Geometria sem redesenho; pilot-icons.test.cjs verifica paridade com essas fontes vivas.
   const CONSOLE_ICONS = {
-    "link": { "grid": 24, "size": 24, "body": "<path d=\"M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7\"/>" },
-    "relogio": { "grid": 24, "size": 24, "body": "<path d=\"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7v5l3 2\"/>" },
-    "check": { "grid": 24, "size": 24, "body": "<path d=\"M4 12.5 9.5 18 20 6.5\"/>" },
-    "plus": { "grid": 24, "size": 24, "body": "<path d=\"M12 5v14M5 12h14\"/>" },
-    "copy": { "grid": 24, "size": 24, "body": "<path d=\"M9 9h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1ZM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1\"/>" },
-    "lapis": { "grid": 24, "size": 24, "body": "<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497zM15 5l4 4\"/>" },
-    "lixeira": { "grid": 24, "size": 24, "body": "<path d=\"M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6\"/>" },
+    "link": { "grid": 24, "size": 24, "body": "<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"></path><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"></path>" },
+    "relogio": { "grid": 24, "size": 24, "body": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle><path d=\"M12 6v6l4 2\"></path>" },
+    "check": { "grid": 24, "size": 24, "body": "<path d=\"M20 6 9 17l-5-5\"></path>" },
+    "plus": { "grid": 24, "size": 24, "body": "<path d=\"M5 12h14\"></path><path d=\"M12 5v14\"></path>" },
+    "copy": { "grid": 24, "size": 24, "body": "<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"></rect><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"></path>" },
+    "lapis": { "grid": 24, "size": 24, "body": "<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"></path><path d=\"m15 5 4 4\"></path>" },
+    "lixeira": { "grid": 24, "size": 24, "body": "<path d=\"M10 11v6\"></path><path d=\"M14 11v6\"></path><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\"></path><path d=\"M3 6h18\"></path><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"></path>" },
     "caixa": {
       "grid": 32, "size": 24,
       "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 5H25L27 20H5Z M3 20H29V28H3Z M8 24H12\"/><rect x=\"10\" y=\"8\" width=\"12\" height=\"5\" rx=\"1.5\"/><path d=\"M11 17H12 M16 17H17 M21 17H22\"/></g>"
@@ -99,23 +99,23 @@
     },
     "shopping-cart": {
       "grid": 24, "size": 24,
-      "body": "<path d=\"M3 4h2.2l2.68 13.4a2 2 0 0 0 2 1.6h8.24a2 2 0 0 0 1.97-1.66L21.4 8H6M9 21a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6ZM18 21a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6Z\"/>"
+      "body": "<path d=\"m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18\"></path><path d=\"M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25\"></path><circle cx=\"18\" cy=\"20\" r=\"2\"></circle><circle cx=\"8\" cy=\"20\" r=\"2\"></circle>"
     },
     "archive": {
       "grid": 24, "size": 24,
-      "body": "<path d=\"M3 3h18a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4\"/>"
+      "body": "<rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\"></rect><path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\"></path><path d=\"M10 12h4\"></path>"
     },
     "ficha": {
       "grid": 24, "size": 24,
-      "body": "<path d=\"M7 3h10a1 1 0 0 1 1 1v16l-6-3-6 3V4a1 1 0 0 1 1-1ZM9 8h6M9 11h4\"/>"
+      "body": "<circle cx=\"12\" cy=\"8\" r=\"5\"></circle><path d=\"M20 21a8 8 0 0 0-16 0\"></path>"
     },
     "historico": {
       "grid": 24, "size": 24,
-      "body": "<path d=\"M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 8v4.5l3 1.8\"/>"
+      "body": "<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"></path><path d=\"M3 3v5h5\"></path><path d=\"M12 7v5l4 2\"></path>"
     },
     "ajuda": {
       "grid": 24, "size": 24,
-      "body": "<path d=\"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM9.6 9.4a2.5 2.5 0 0 1 4.9.7c0 1.7-2.5 2.1-2.5 3.9M12 17h.01\"/>"
+      "body": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"></path><path d=\"M12 17h.01\"></path>"
     },
     "producao": {
       "grid": 32,
@@ -138,66 +138,66 @@
       "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8 4H24L27 9V28H5V9Z M5 9H27 M8 4 10 9 M24 4 22 9\"/><rect x=\"10\" y=\"15\" width=\"12\" height=\"8\" rx=\"2\"/></g>"
     },
     "configuracoes": {
-      "grid": 32,
+      "grid": 24,
       "size": 24,
-      "body": "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 8H12 M20 8H28 M4 24H19 M27 24H28 M16 4V12 M23 20V28 M4 16H5 M13 16H28\"/><circle cx=\"16\" cy=\"8\" r=\"4\"/><circle cx=\"9\" cy=\"16\" r=\"4\"/><circle cx=\"23\" cy=\"24\" r=\"4\"/></g>"
+      "body": "<path d=\"M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle>"
     },
     "bell": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M10.268 21a2 2 0 0 0 3.464 0M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"/>"
+      "body": "<path d=\"M10.268 21a2 2 0 0 0 3.464 0\"></path><path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"></path>"
     },
     "fechar": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M6 6l12 12M18 6 6 18\"/>"
+      "body": "<path d=\"M18 6 6 18\"></path><path d=\"m6 6 12 12\"></path>"
     },
     "chevron-right": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M9 18l6-6-6-6\"/>"
+      "body": "<path d=\"m9 18 6-6-6-6\"></path>"
     },
     "printer": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6M6 14h12v8H6Z\"/>"
+      "body": "<path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"></path><path d=\"M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6\"></path><rect x=\"6\" y=\"14\" width=\"12\" height=\"8\" rx=\"1\"></rect>"
     },
     "download": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M12 15V3M7 10l5 5 5-5M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>"
+      "body": "<path d=\"M12 15V3\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path><path d=\"m7 10 5 5 5-5\"></path>"
     },
     // Lucide (ISC): settings.svg e upload.svg, como os utilitários do Console.
-    "settings": { "grid": 24, "size": 24, "body": "<path d=\"M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>" },
+    "settings": { "grid": 24, "size": 24, "body": "<path d=\"M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle>" },
     "upload": { "grid": 24, "size": 24, "body": "<path d=\"M12 3v12m5-7-5-5-5 5M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/>" },
     "activity": { "grid": 24, "size": 24, "body": "<path d=\"M22 12h-4l-3 9-6-18-3 9H2\"/>" },
     // Lucide (ISC): circle-x para cancelar um registro e undo-2 para desfazer, distintos de fechar e histórico.
-    "circle-x": { "grid": 24, "size": 24, "body": "<path d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20ZM15 9l-6 6M9 9l6 6\"/>" },
-    "undo-2": { "grid": 24, "size": 24, "body": "<path d=\"M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11\"/>" },
+    "circle-x": { "grid": 24, "size": 24, "body": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle><path d=\"m15 9-6 6\"></path><path d=\"m9 9 6 6\"></path>" },
+    "undo-2": { "grid": 24, "size": 24, "body": "<path d=\"M9 14 4 9l5-5\"></path><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\"></path>" },
     "enviar": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M4 12 20 5l-7 15-2-6-7-2Z\"/>"
+      "body": "<path d=\"M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z\"></path><path d=\"M6 12h16\"></path>"
     },
     "refresh-cw": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5\"/>"
+      "body": "<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"></path><path d=\"M21 3v5h-5\"></path><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"></path><path d=\"M8 16H3v5\"></path>"
     },
     "search": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14ZM16.5 16.5 21 21\"/>"
+      "body": "<path d=\"m21 21-4.34-4.34\"></path><circle cx=\"11\" cy=\"11\" r=\"8\"></circle>"
     },
     "house": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>"
+      "body": "<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"></path><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"></path>"
     },
     "ellipsis": {
       "grid": 24,
       "size": 24,
-      "body": "<path d=\"M12 11a1 1 0 1 0 0 2a1 1 0 0 0 0-2ZM19 11a1 1 0 1 0 0 2a1 1 0 0 0 0-2ZM5 11a1 1 0 1 0 0 2a1 1 0 0 0 0-2Z\"/>"
+      "body": "<circle cx=\"12\" cy=\"12\" r=\"1\"></circle><circle cx=\"12\" cy=\"5\" r=\"1\"></circle><circle cx=\"12\" cy=\"19\" r=\"1\"></circle>"
     }
   };
   function pilotIcon(name) {

@@ -41,5 +41,5 @@ dialog .destaque > h3 { color: var(--alerta); }
 .recolhido > h3 { margin-bottom: 0; }
 
 @media (max-width: 759px), (pointer: coarse) {
-  .gatilho { min-height: 44px; }
+  .gatilho { min-height: var(--toque); }
 }

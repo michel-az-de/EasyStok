@@ -71,38 +71,38 @@ export const listaDeEventosDeSom = () => Object.values(EVENTOS_DE_SOM)
 
 const DESCRICOES = {
   [MODOS.LIGADO]: {
-    rotulo: 'Automático ligado',
+    rotulo: 'Assistente respondendo',
     tom: 'ok',
     // Rodada 12 (issue #16): sem linha, "Automático ligado" não dizia o que
     // isso muda para ela.
-    detalhe: 'O atendimento automático responde esta conversa sozinho. Toque em Assumir para responder você.',
+    detalhe: 'O Assistente responde esta conversa. Toque em Assumir para responder você.',
   },
   [MODOS.PAUSADO]: {
-    rotulo: 'Pausado porque você escreveu',
+    rotulo: 'Você respondendo',
     tom: 'info',
     detalhe: 'Os avisos de preparo e entrega do pedido continuam saindo. O resto espera você devolver.',
   },
   // Mesma pausa, outra porta de entrada: ela apertou Assumir sem escrever nada.
   assumiu: {
-    rotulo: 'Pausado porque você assumiu',
+    rotulo: 'Você respondendo',
     tom: 'info',
     detalhe: 'Os avisos de preparo e entrega do pedido continuam saindo. O resto espera você devolver.',
   },
   // Modo API: a conversa está com outro atendente (F07, item 3).
   outro: {
-    rotulo: 'Pausado porque outro atendente assumiu',
+    rotulo: 'Outro atendente respondendo',
     tom: 'info',
-    detalhe: 'O automático não responde enquanto outro atendente cuida desta conversa.',
+    detalhe: 'O Assistente não responde enquanto outro atendente cuida desta conversa.',
   },
   [MODOS.COM_VOCE]: {
     rotulo: 'Passou para você',
     tom: 'aviso',
-    detalhe: 'O agente não responde isso sozinho.',
+    detalhe: 'O Assistente precisa da sua ajuda nesta conversa.',
   },
   [MODOS.ENCERRADO]: {
-    rotulo: 'Conversa encerrada',
+    rotulo: 'Conversa concluída',
     tom: 'neutro',
-    detalhe: 'Reabra a conversa para o automático voltar a valer.',
+    detalhe: 'Reabra a conversa para retomar o atendimento.',
   },
   // Cadastro bloqueado não tem botão de reabrir nem de assumir: a única porta
   // é o desbloqueio na ficha. Mandar reabrir aqui era prometer um botão que a
@@ -110,7 +110,7 @@ const DESCRICOES = {
   [MODOS.BLOQUEADO]: {
     rotulo: 'Cadastro bloqueado',
     tom: 'perigo',
-    detalhe: 'Nada sai em nenhum canal. Desbloqueie na ficha, bloco Cliente.',
+    detalhe: 'Envios bloqueados em todos os canais. Desbloqueie em Cliente.',
   },
 }
 

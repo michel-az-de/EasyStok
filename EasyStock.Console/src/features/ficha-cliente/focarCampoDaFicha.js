@@ -3,6 +3,14 @@
 // monta no próximo quadro: tenta por alguns quadros antes de desistir em silêncio.
 const FOCAVEL = ['input', 'select', 'textarea', 'button'].map((tag) => `${tag}:not([disabled])`)
 
+export function focarNotasDaConversa(conversaId) {
+  const alvo = [...(globalThis.document?.querySelectorAll?.('[data-voltar-notas]') ?? [])]
+    .find(no => no.getAttribute('data-voltar-notas') === conversaId && !no.disabled && no.getClientRects().length)
+  if (!alvo) return false
+  alvo.focus({ preventScroll: true })
+  return true
+}
+
 export function campoDaFicha(raiz, alvo) {
   const area = raiz?.querySelector?.(`[data-campo-ficha~="${alvo}"]`)
   if (!area) return null

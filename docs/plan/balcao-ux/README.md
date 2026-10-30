@@ -211,3 +211,175 @@ Com o plano aprovado e versionado, as PRs das ondas 1 a 3 viram "spec de plano a
 | 4 | Pedido no desktop | **Folha sobre o painel Cliente**, com a lista sempre visível | manter o cardápio no lugar da lista |
 | 5 | #1766 (6 itens de 13/10) | **aceitar todos dentro da Onda 2** | decidir item a item |
 | 6 | Completar com Tab | **manter, com chave de desligar e aviso de privacidade** | fundir com o rascunho só sob demanda |
+
+## 10. Sprint transversal de linguagem e controles (#2140)
+
+Pedido do Felipe em 28/10/2026: revisar a harmonia do sistema inteiro com banca e contrabanca, tomando Produtos e Pedidos do piloto PWA como referência. Esta execução não encerra as ondas anteriores nem substitui seus aceites.
+
+### Decisões aplicadas
+
+- Transferir a clareza e a hierarquia do piloto, sem normalizar rótulos automaticamente. Ações ambíguas conservam verbo e objeto; valores, consequências e permissões permanecem explícitos.
+- Usar Conversas, Conversa e Cliente na navegação; Enviar cardápio e Concluir conversa nas ações; Assistente para quem responde. Contato substitui o jargão Lead sem prometer recência do cadastro.
+- O componente `Botao` compartilha altura mínima de 40 px no desktop e 48 px em telas estreitas ou ponteiro de toque. O Composer deixou de impor exceções de 36/40/44 px. Campos, foco, temas e estados desabilitados seguem os tokens existentes.
+- Secundários tonais, campos sem sombra interna e modais sem desfoque decorativo. Mantidos contraste, foco por teclado, proteção de rascunho e cores semânticas.
+- Configurações usa engrenagem; Assistente usa sparkles; opções usa reticências verticais; concluir conversa deixa de usar o ícone de sair da conta. Sem nova dependência.
+- Prazo de resposta vencido mantém trilho vermelho, motivo e texto acessível, com seleção e hover distinguíveis. Removido o pisca contínuo.
+- No celular, o cabeçalho global fica em Conversas. Loja, sino e Mais continuam acessíveis ao voltar à lista pela barra inferior; deixam de ocupar espaço permanente em Conversa e Cliente. A troca de abas conserva conversa e rascunho.
+- Concluir conversa mostra mensagem e consequências primeiro; avaliação, anotações e relatório ficam em Ver resumo da conversa. Na leitura de uma conversa anterior, o resumo começa aberto. Imprimir e os dados do relatório foram preservados.
+
+### Banca e contrabanca
+
+A banca revisou linguagem, componentes e fontes dos módulos. A contrabanca leu o diff e as capturas, contestando as propostas antes do fechamento:
+
+| Achado | Correção |
+|---|---|
+| Compactação do piloto esconderia objeto e risco da ação | Não importar o normalizador; manter nomes explícitos |
+| Remover pedido sugeria cancelamento, mas a operação apenas retirava da viagem | Retirar da viagem |
+| Mensagem de permissão prometia consulta que o ramo não renderiza | Orientação à administração sem promessa falsa |
+| Engrenagem extrapolava viewBox | Vetor corrigido dentro de 2..22 |
+| Em 320 px, Enviar quebrava para terceira linha e Assumir para segunda | Composer e faixa ajustados preservando alvos de 48 px |
+| Cabeçalho e prévia de relatório consumiam área de trabalho | Cabeçalho contextual e resumo expansível |
+
+### Cobertura e limites
+
+| Área | Revisão desta rodada |
+|---|---|
+| Componentes, navegação, Atendimento, Cliente e conclusão | Código, build e navegador local em modo demonstração |
+| Início, Caixa, Configurações, Cozinha e Entregas | Código e navegação local de demonstração; capturas apenas após conteúdo montar |
+| Gestão: cardápio, categorias, produção, insumos, receitas, calculadora, planejamento, perdas, impressão, integrações, respostas e avisos | Trechos alterados revisados no fonte; compilação e verificações do Console |
+| Login | Leitura do fonte; sem alteração prioritária |
+| API, perfis reais, dispositivos físicos e produção publicada | Não homologados nesta rodada; dependem de ambiente/sessão identificados |
+
+As evidências locais ficam em `.build/harmonia-ux/`, fora do versionamento. A medição por viewport no navegador não equivale a prova em aparelho Android físico.
+
+### Validação
+
+- `npm run qualidade`: lint, camadas, verificações de moeda, 264 pares de contraste nos dois temas e build.
+- Gate do repositório: build .NET e 60 testes de arquitetura aprovados.
+- Regressões de sincronização, clareza, SLA, acessibilidade e composição visual executadas. Após as falhas de nomenclatura no primeiro CI, executada toda a bateria do workflow do Console: 97 scripts aprovados localmente. Expectativas de nomes atualizadas sem alterar contratos funcionais, revisadas pela contrabanca.
+- A prova antiga #1870 conserva duas falhas de asserção já reproduzidas no baseline `f60107af8`: composição da faixa e implementação de Escape no menu da conta. Nenhuma foi introduzida por este sprint.
+- No Vite de desenvolvimento, os diálogos abriram e desmontaram; no build de produção local, abriram normalmente. A hipótese é o evento close enfileirado durante a dupla montagem do StrictMode; a lógica de Modal não foi alterada nesta rodada.
+
+A revisão integral por perfil e a aceitação estética do Felipe permanecem abertas. As ondas de Tooltip, BotaoIcone, Folha do pedido e navegação Android do plano continuam com seus próprios aceites.
+
+## 11. Continuação com o ambiente informado pelo Felipe
+
+Ambiente: `https://app.easystok.online/`. A sessão autenticada disponível carregou o frontend publicado `4f9304242d0252e95e924b8737588f435bdb9eb7`, ancestral da base desta PR. Não houve troca de perfil.
+
+- Inspeção de consulta em 21 telas: Início; Itens do cardápio, Categorias e Banco de imagens; Estoque do dia, Produção do dia, Insumos, Receitas, Calculadora, Planejamento e Perdas; Canais, Integrações, Impressão, Usuários e Histórico de acesso; Caixa do dia; Painel de entregas, Agenda de encomendas e Janelas de entrega; Cozinha. O formulário Novo prato foi aberto e cancelado sem preencher ou salvar.
+- Nenhuma ação operacional de cadastro, pedido, pagamento, envio ou configuração foi confirmada. Conversas não foram selecionadas: o código registra leitura ao abri-las. Isto é inspeção da interface publicada, não execução do candidato contra a API.
+- A tentativa de prévia do candidato na origem de produção não foi suportada pela ferramenta. O HTML publicado permaneceu original e a interceptação foi removida. Não há comprovação de bloqueio de escritas; nenhuma é alegada como tal.
+- O catálogo real confirmou o problema de busca alinhada no rodapé de um painel alto de chips. O candidato agora usa busca e Categoria no topo, com seletor nativo e contagens, disponibilidade abaixo e Limpar filtros quando existe recorte ativo. As categorias e a seleção continuam visíveis. Filtros, contagens e restrição de reordenação foram preservados.
+- Complementadas retentativas e mensagens de erro do Cardápio e Produção; pesquisa de receita usa Assistente e ações explícitas. Preservadas atribuição, licença e consequência de substituir insumos. Lotes deixa de dizer ativos quando a mesma lista inclui vencidos. Links de retorno e legendas acessíveis seguem Conversas.
+- O componente candidato foi exercitado no navegador por um harness local ignorado, com fixtures dos testes existentes e sem encaminhar chamadas ao backend. Categoria + disponibilidade, busca e Limpar filtros conferidos; campos, ajuda, menus e labels medidos em 48 px em 320/390. Capturas de 1440, 390 e 320 conferidas, com temas claro/escuro. Não é comparação com conteúdo idêntico: produção tinha 43 itens e a fixture tem 3.
+- A captura inicial nomeada 390 tinha 365 px e recorte. Foi preservada com nome explícito de captura incompleta e substituída por evidência real de 390 x 844. Manifesto local com dimensões e SHA-256 em `.build/harmonia-ux/producao/manifesto.json`; imagens e dados da loja permanecem fora do Git.
+- A bateria completa do workflow do Console voltou a passar: 97 scripts. As expectativas adaptadas de nomenclatura mantêm permissões, rascunhos, quantidades e idempotência.
+
+Ao fim desta etapa permaneciam abertos o aceite visual, a validação do candidato no ambiente de API e os demais perfis e estados operacionais. A homologação local desses perfis continua na seção 12. Esta continuação não autoriza merge ou publicação.
+
+## 12. Homologação com API e perfis reais (#2140, 29/10/2026)
+
+Ambiente descartável exclusivo, sem dados ou credenciais de produção: API `127.0.0.1:18740`, PostgreSQL 17 `127.0.0.1:55740`, Console em build de produção com fonte `api` em `127.0.0.1:5194` e Mercado Pago falso em `127.0.0.1:18741`. Todos os listeners conferidos em loopback. API e Worker compilados após integrar `origin/master`, SHA `cdcec245f7305aaf58d5d130c97e47885aa8a31d`, confirmado por `/health/version`; `/health/ready` respondeu 200. Os complementos posteriores alteram apenas o Console e este registro.
+
+Os três usuários de teste foram criados por HTTP e vinculados explicitamente aos perfis canônicos Dona, Atendimento e Cozinha. As permissões foram extraídas da DLL do candidato e relidas no banco: 19, 7 e 3 respectivamente. Os usuários demo legados não substituem essa matriz.
+
+| Prova | Resultado |
+|---|---|
+| `onda1-perfis-http.ps1` | 70 verificações: login, módulos, entrada, capacidades, consultas permitidas, recusas de escrita e refresh dos três perfis |
+| `jornada_pedido_a_dinheiro.py` | 28 passos: três clientes pelo chat do site, cadastro/endereço, prévia e pedido, link de pagamento com webhook falso, cartão, dinheiro, KDS, entrega e fechamento do caixa |
+| Cardápio e Produção por HTTP | 28 requisições com status esperado e 13 verificações: cadastro/edição de categoria e prato, persistência, produção pela Cozinha, idempotência, contagem, perda e saldo; massa própria arquivada/ocultada ao fim |
+| Receitas, custos e planejamento por HTTP | 23 requisições e 11 verificações: insumo a R$ 3,00, receita de 2 porções com 4 unidades, custo de R$ 6,00/porção; Dona e Cozinha calculam 6 porções com 12 unidades necessárias e R$ 36,00; escritas gerenciais da Cozinha recusadas e quantidade zero validada |
+| Isolamento entre empresas | 13 verificações: EmpresaId divergente recusado; IDs de produto da outra empresa não consultáveis/alteráveis; produto e caixa da empresa B intactos |
+| Interface com login real | Dona cadastra prato e conclui conversa; Atendimento ajusta disponibilidade e relê após recarregar; Cozinha registra lote e visualiza etiqueta e saldo; rota administrativa bloqueada |
+
+Na jornada, a gaveta terminou em R$ 188,00: abertura de R$ 100,00 e pagamento em dinheiro de R$ 88,00. Pix e cartão somaram R$ 100,00 fora da gaveta; total do caixa de R$ 288,00. Dados relidos após o fechamento.
+
+No navegador, as telas de Produção, consultas de insumos/receitas, Planejamento, Perdas, Caixa, Entregas, Agenda, Canais, Integrações, Impressão, Usuários e Histórico de acesso foram carregadas com API real. Conferidos os estados de consulta da Cozinha e Atendimento, navegação móvel, tema claro/escuro, preservação do rascunho entre Conversa e Cliente e ausência de transbordamento horizontal em 320 px. A etiqueta foi visualizada; não houve impressão física.
+
+### Correções encontradas durante a homologação
+
+- Removido o jargão Lead do resumo e do histórico. Contato sem cadastro conserva o fato conhecido sem presumir que um histórico ainda não consultado não tenha compras.
+- O menu móvel de Gestão deixa de citar Balcão; Receitas apresenta descrição neutra para perfis de consulta e mostra Rende 1 porção no singular.
+- Os botões de metadados da mensagem, incluindo automática, mediam 19 px em 320 px. Agora usam o mesmo token de alvo dos controles: 40 px no desktop e 48 px no toque. Mantidas a ação de abrir a definição, a identificação da origem e a possibilidade de reenviar.
+- Os filtros da lista de conversas e o seletor Responsável ainda impunham 32 px; a faixa Não entregues, 44 px. Essas exceções também passam ao token compartilhado, mantendo as contagens, a rolagem dos canais e as ações.
+
+### Revisão e limites
+
+- `npm run qualidade` aprovado após os ajustes: lint, camadas, moeda, 264 pares de contraste e build. O workflow completo contém 98 comandos Node: 97 scripts diretos e um grupo de três arquivos `node --test`, com 14 testes aprovados. Todos passaram nesta execução.
+- Gate final do repositório: build .NET e 60 testes de arquitetura aprovados.
+- A contrabanca revisou as correções, contestou a afirmação Contato sem compras e conferiu a abrangência do CSS. A prova de renderização adicional passou em 39 verificações.
+- No isolamento medido, o filtro de EmpresaId divergente retorna 403, embora a instrução do projeto peça 400. O acesso foi negado e os dados ficaram intactos. É uma discrepância preexistente de contrato, sem alteração de autorização neste PR.
+- As provas extras, fora do workflow, têm falhas preexistentes: #1839 conserva uma asserção de fonte obsoleta sobre `aDevolver`; #1442 falha ao conferir `estadoInicial` após importação e em dois rótulos anteriores. A causa da primeira falha de #1442 não foi diagnosticada; os arquivos envolvidos foram comparados com o HEAD anterior e não mudaram com os ajustes de alvo. Nenhuma asserção foi alterada. Mantido também o registro da prova antiga #1870 da seção 10.
+- Integrações externas permaneceram falsas, stub ou desligadas: o teste não comprova Mercado Pago real, Meta/WhatsApp, SMS, e-mail externo, LLM, Google Maps ou Lalamove. Android físico e impressão física continuam fora desta homologação. O ambiente publicado recebeu somente a inspeção de consulta da seção 11.
+
+Evidências, roteiros locais, respostas e capturas em `.build/harmonia-ux/lab-real/`, ignorados pelo Git. O aceite técnico desta etapa é para revisão do PR; o aceite estético do Felipe e o merge/publicação são etapas posteriores.
+
+## 13. Atendimento, ficha e Gestão reconstruídos (29/10/2026)
+
+Superfícies quadradas, sem contornos decorativos; ações contextuais, Respostas em dropdown e Mais ferramentas. A tipografia da casa permanece na interface. Caveat é embarcada com sua licença OFL apenas nos post-its e apontamentos da comanda de papel, sem dependência nova. As denominações passam a Ficha, Pedido e entrega, itens e Cobrança pendente. O sinal discreto da cobrança respeita movimento reduzido, sem alterar o estado financeiro.
+
+Gestão abre com busca de tarefas permitidas para a sessão. Entrar numa tarefa transfere o foco ao painel; voltar transfere à busca. Reabrir Gestão retorna à entrada. Etiquetas usa BotaoIcone compartilhado com nome acessível, bloqueios e impressão preservados. Notas internas só viram post-its após confirmação da API. Podem ser soltas na tela, arrastadas, movidas por setas, restauradas e recolhidas. O armazenamento local guarda apenas coordenadas por conversa/nota, sem texto nem autor.
+
+A ficha reúne contato, tags, endereço, notas e histórico. A foto possui GET/POST/DELETE autenticados, validação do conteúdo, reprocessamento em JPEG de até 512 px e armazenamento privado. Não se presume foto de perfil no webhook da Meta. Calcular frete reutiliza o cálculo da vitrine da empresa da sessão, com endereço salvo e sem criar pedido. Fora da cobertura exige combinação, sem cotação falsa de zero. Pedido já criado abre a entrega existente; rascunho consulta o frete independentemente.
+
+Baixar PDF produz arquivo pelo servidor com foto privada, cadastro, compras, notas, conversas, data no fuso operacional e paginação. O teste HTTP descobriu erro com foto retangular; a correção preserva proporção. Também foi corrigido o singular de pedido. A migration `20261029052346_AddFotoCliente` adiciona somente a coluna opcional da chave privada. O snapshot gerado atualiza metadados preexistentes de push, sem DDL de push nesta migration. Aplicação e comparação do modelo verificadas no PostgreSQL descartável.
+
+### Evidência técnica
+
+- Qualidade do Console aprovada: lint, camadas, moeda, contraste e build. Os 102 comandos Node do workflow foram executados: 101 diretos e um grupo de três arquivos com 14 testes TAP. Cinco provas foram adaptadas aos novos contratos visuais/acessíveis e passaram na reexecução; falhas originais e logs foram preservados. A prova 2146 passou em três verificações; seu trecho opcional Chromium não foi executado neste ambiente.
+- Gate aprovado: build .NET e 60 testes de arquitetura. Testes focais de foto, processamento, acesso, frete e PDF aprovados. O renderizador cobre imagens quadradas, horizontais, verticais e ficha extensa com paginação.
+- HTTP real: foto com 28 verificações; frete com 19 requisições e nove verificações; PDF com 12 verificações. A matriz nova executou 58 requisições e 79 verificações nos perfis Dona, Atendimento e Cozinha, incluindo 14 recusas e refresh mantendo permissões.
+- O navegador cadastrou uma foto sintética e baixou o PDF correspondente. Arquivo aberto e renderizado: uma página, imagem incorporada, endereço, pedido e nota confirmados, sem cortes. Post-it moveu por teclado e arraste real, com posição conferida após recarga. Busca, foco e reabertura da Gestão e cotação real de R$ 12,00 também foram conferidos pela interface.
+
+Laboratório em loopback: API 18740, PostgreSQL 55740, frontend 5194. Evidências ignoradas em `.build/harmonia-ux/reconstrucao/` e `.build/harmonia-ux/lab-real/`. A divergência preexistente de EmpresaId explícito (403 em vez de 400) permanece na seção 12, com acesso negado e dados intactos. Integrações externas reais, Android físico e impressão física não foram homologados. Produção recebeu somente a inspeção de consulta da seção 11.
+
+Aceite técnico para revisão depende dos checks do commit final e da integração com o master atual. Aceite visual do Felipe, merge e publicação são etapas posteriores.
+
+A revisão cruzada final encontrou a exceção do helper comum que aceita outra empresa para SuperAdmin. Os novos endpoints de foto e PDF agora exigem a empresa do JWT inclusive para esse nível. Foto recusa divergência com 400; no PDF a guarda específica também recusa SuperAdmin com 400, mantendo o filtro preexistente do CRM que responde 403 para os demais níveis antes da action. A bateria focal de autorização, módulos e controllers passou em 61 testes, incluindo recusa antes de acessar repositório, arquivo ou renderizador. Os demais endpoints do CRM não foram alterados.
+
+A CI encontrou uma expectativa anterior do JSON da inbox sem o novo campo opcional `fotoUrl`. A comparação integral foi preservada e atualizada, com prova adicional de foto persistida retornando URL privada versionada e contato sem cadastro retornando nulo. A classe passou em cinco testes, sem ignorados, usando o PostgreSQL real do Testcontainers e sua fixture original; o banco do laboratório não foi usado nem alterado por essa prova.
+
+## 14. Mesa de trabalho, viagem e composição da ficha
+
+Os post-its acompanham somente a ficha selecionada. Podem ocupar a área da tela, ser redimensionados, movidos pelo cabeçalho ou pelas setas e recolhidos à ficha. O mesmo painel móvel recebe a comanda, a viagem e propostas da assistente. A posição é limitada à área visível e restaurada após recarregar. Entrada e saída usam movimentos curtos, respeitando a preferência por movimento reduzido. Os controles mantêm cantos quadrados e alvos de toque compartilhados; removidos também o contorno por sombra e a curva residual das mensagens recebidas.
+
+As preferências locais guardam somente IDs e geometria, separadas por empresa e usuário. O texto das notas vem da API privada e fica em memória. Trocar de ficha esconde suas notas sem perder a posição; sair da conta limpa os dados visíveis. A lista agora carrega páginas de 50 notas, sem o limite anterior de cem, em uma área de rolagem limitada com prévias de duas linhas. O texto integral permanece no post-it aberto e na ficha. A origem de uma nota solta vira uma linha compacta, sem duplicar o post-it.
+
+A viagem usa o pedido vinculado ao cliente, o itinerário e os estados existentes de Entregas. Exige Atendimento e Entregas, com validação da empresa do JWT e da relação cliente/pedido. O cálculo de frete pode manter a viagem iniciada ao lado da conversa, atualizando-a a cada 15 segundos. O sistema não tem posição GPS nessa projeção e não a simula. O mapa oficial embutido depende de `VITE_GOOGLE_MAPS_EMBED_KEY`, chave pública restrita por origem e API. Sem ela, aparecem aviso compacto, link para o Maps e paradas reais. A chave privada do cálculo de rotas não é exposta ao navegador.
+
+`POST /api/atendimento/assistente/ficha` faz uma inferência nova a partir da conversa e do dossiê da empresa autenticada. Retorna de um a seis blocos de tipos fechados; rejeita tipos, ações e propriedades desconhecidas. Comanda e frete continuam usando valores reais da aplicação. Nota e rascunho são propostas que exigem a ação da atendente; o modelo não executa ferramentas, envia mensagens ou salva notas. O endpoint usa a política de limite de chamadas de IA. A interface descarta respostas da conversa anterior, da sessão anterior ou recebidas após encerramento.
+
+O 503 investigado no laboratório vinha de `Anthropic:Enabled=false` e ausência de configuração ativa da API; não comprova falta de créditos. A ficha recebeu um provedor Claude Code CLI opcional, desligado por padrão, sem substituir o cliente dos agentes existentes. Para ativá-lo no ambiente autorizado: `MontagemFicha:Cli:Enabled=true`, `ExecutablePath` com caminho absoluto do executável oficial e autenticado pelo próprio CLI, e `TimeoutSegundos` entre 1 e 120 (padrão 60). Testado com Claude Code 2.1.268. A execução usa diretório temporário vazio, entrada privada por stdin, schema fechado, ferramentas/MCP/hooks/skills desligados e nenhuma persistência de sessão. Telemetria e captura de prompts são desativadas no processo filho. Há limite de saída, uma inferência simultânea e encerramento da árvore do processo por cancelamento ou timeout. O código não lê arquivos de credenciais nem altera o ambiente pai.
+
+### Evidência desta rodada
+
+- Os 105 comandos Node do workflow e a qualidade do Console passaram. A prova antiga #1804 exigia a seção de pedido removida; foi atualizada para exigir a abertura da comanda móvel e proibir a referência obsoleta, preservando a verificação de foco no horário.
+- A prova de painel/mesa passou em 13 grupos, incluindo 120 notas independentes, migração das coordenadas, isolamento de sessão, teclado, cancelamento, redimensionamento e remontagem do componente com posição e tamanho exatos. O navegador confirmou duas notas e a comanda simultâneas, arraste real, redimensionamento, teclado, ocultação ao trocar de ficha e restauração das posições após voltar e recarregar. Recolher a comanda devolveu o foco ao botão de origem. Dois defeitos encontrados nessa conferência, sobrescrita da posição inicial e foco indevido ao voltar, foram corrigidos e repetidos.
+- API e PostgreSQL reais do laboratório: 101 notas cadastradas pelo contrato HTTP e relidas em páginas de 50, 50 e uma, sem perdas ou duplicatas; 127 requisições e 20 verificações de notas. Viagem com 22 requisições e 11 verificações, incluindo permissões e isolamento. A fixture foi vinculada à conversa pelo domínio, preservando valores e estado, e relida por sete verificações HTTP. Frete de R$ 12,00 e viagem em rota foram conferidos pela interface, inclusive Ver ao lado.
+- A integração controlada de composição da ficha passou em 20 verificações HTTP, com provedor falso identificado como tal, incluindo entradas inválidas, contexto de outra empresa, contrato fechado e ausência de escrita. Ela não comprova inferência real. O ensaio de limite de chamadas confirmou recusas 429 sem chamar o provedor.
+- A inferência real pelo Claude autenticado passou primeiro no CLI e depois pela API secundária 18840: dez verificações HTTP, resposta válida em aproximadamente 23 segundos, sem chamar o provedor falso nem gravar mensagens ou notas. A aplicação enviou os dados sintéticos pelo stdin; credenciais não foram extraídas. Testes finais: 21 de integração do provedor, 33 de aplicação de IA, oito de controller da composição, 17 de aplicação de notas/viagem e dez de controller/repositório de notas/viagem, todos sem ignorados. Gate final com build e 60 testes de arquitetura aprovado.
+- Na interface do commit a2d459ad0, a API principal 18740 compôs cinco blocos com Claude real. Soltar e recolher uma proposta transferiu o foco para sua alça e de volta a Organizar. Revisar nota abriu o texto proposto sem salvar automaticamente; Cancelar não gravou. A mesma conferência encontrou perda de foco nesse cancelamento e altura ilimitada da lista de notas. O ajuste final devolve o foco somente ao abridor válido no fechamento explícito, respeitando troca de conversa, ação externa e callback; uma conclusão assíncrona após desmontagem não fecha outra nota. A prova existente #1586 passou em 41 casos, sem novo comando no workflow. A interface confirmou retorno ao botão Adicionar nota após cancelar e após salvar uma nova nota pela API; os 105 comandos e a qualidade foram repetidos com sucesso.
+
+Evidências ignoradas em `.build/harmonia-ux/movimentos/` e `.build/harmonia-ux/lab-real/`. As provas desta seção se referem ao candidato local; não representam publicação em produção. Fotos, PDF e jornadas por perfil da seção 13 continuam preservados.
+
+## 15. Harmonia aprovada e aplicação transversal, 29/10/2026
+
+Felipe aprovou a prancha 01 e pediu a mesma linguagem em todo o sistema. A direção usa branco quente, carvão marrom e âmbar pontual, superfícies retas sem contorno decorativo, Nunito na operação e Caveat apenas nos papéis. A escala comum é 15 px no corpo, 14 px no apoio e 13 px nos metadados; o trilho tem uma exceção de 12 px. Controles têm alvo de 40 px no computador e 48 px no toque. Foco visível, avisos, erros e movimento reduzido continuam explícitos. Fontes são locais, sem dependência do Google Fonts no Console.
+
+A aplicação alcança a fundação compartilhada e as áreas de Atendimento, Gestão, Entregas, Cozinha, automações, acesso, avisos, lembretes, ajuda, cardápios e áreas públicas. A Cozinha conserva estados e urgências visíveis; a leitura física à distância não integra esta prova. A ponte visual do PWA preserva os scripts de pedidos, compras, produção, sincronização e impressão; as fontes e o CSS entram no cache offline, sem reescrever a operação.
+
+No Atendimento, a conversa recebe a maior parte da largura, com lista e ficha compactas. Filtros de canal, responsável e ordenação ficam juntos e devolvem o foco após a escolha. Notas entram no fio como eventos recolhidos; o texto completo e os papéis móveis continuam disponíveis, só na ficha selecionada. A ficha apresenta identidade, pedido, notas e histórico antes dos recursos avançados, com acesso direto ao PDF. Enviar conserva rótulo e dica de teclado; ferramentas secundárias mantêm texto visível no menu estreito. Encerramento, cobrança, autorização e confirmação seguem o estado real do pedido.
+
+As larguras usam `cdb.larguras.v2`: a migração da chave antiga acontece uma vez, sem apagar a origem. Escolhas novas, inclusive 360/420 ou os valores dos padrões, sobrevivem ao recarregamento. As posições dos post-its não são alteradas por essa migração.
+
+A contrabanca repetiu consultas HTTP na API real do laboratório: 98 requisições, 141 verificações aprovadas, com perfis Dona, Atendimento e Cozinha, notas paginadas, foto e PDF privados, viagem e cálculo de frete. Não criou fixtures nem alterou notas, fotos, mensagens ou dinheiro. A consulta de PDF com empresa divergente é recusada com 403 pelo filtro existente; foto, frete e viagem recusam com 400. Essa diferença foi registrada, sem simular equivalência. Mapa embutido, provedores externos, aceite físico e publicação continuam fora dessa prova.
+
+As evidências de UI, PWA offline, perfis e revisões ficam em `.build/harmonia-ux/`, inclusive `pwa-visual/resultado.json`, `prova-1847-nota-resumo.json` e `lab-real/qa-global-consultas-readonly.json`. Aprovação da prancha define a direção visual; não substitui testes do código nem aceite operacional de produção.
+
+Na integração com o master, a fachada canônica do Lucide e a ADR-0063 foram preservadas. A prova de ícones passou em 21 verificações, incluindo aliases no componente real, canais e celular; o teto de termos internos caiu de 37 para 19. O workflow completo passou nos 105 comandos Node e na qualidade, com lint, gramática, camadas, moeda, contraste e build. O gate passou no build .NET e nos 60 testes de arquitetura. O PWA passou em 336 testes, com uma limitação explícita de IndexedDB no VM; recarga offline e fontes foram verificadas separadamente no Chromium real.
+
+Na interface ligada à API, a ficha carregou a foto privada e baixou o PDF mantendo o foco no botão. O frete retornou R$ 12,00; a ausência da chave de mapa continuou visível. Gestão, categorias, Entregas e Cozinha carregaram dados do laboratório, sem alterar pedidos. Campos da ficha passaram a ocupar toda a coluna, com avisos na cor da casa e alvo de 40 px. O trilho foi conferido com texto ampliado em 200%, sem rótulos cortados ou sobrepostos. Essa evidência digital não certifica leitura física à distância nem aparelho Android.
+
+A CI revelou que o piloto Android ainda copiava os desenhos utilitários anteriores ao Lucide. Foram alinhadas 26 geometrias ao componente real do Console, preservando seis marcas próprias e os handlers. Os testes agora renderizam `Icone` e `MarcaIcone` reais com as dependências já versionadas, comparam toda a geometria SVG e ampliam os aliases cobertos. A bateria do bridge passou em 211 testes, sem ignorados; o PWA repetiu 336 aprovados e um skip explícito. Isso valida contratos digitais, sem afirmar instalação ou uso físico do APK.
+
+A banca final antes do merge encontrou um P2: com duas conversas do mesmo cliente, a lista podia ocultar uma nota como solta na segunda conversa, sem haver post-it visível. A indicação agora considera a conversa selecionada. Destacar explicitamente na outra conversa atualiza a referência única tanto em memória quanto no armazenamento de IDs. A regressão falhou antes do ajuste e passou depois, cobrindo A → B → A, texto completo, transferência explícita, recarga privada, ausência de duplicação/escrita no servidor, posição e foco. Passaram 14 grupos da Mesa/Painel, quatro de post-its, 41 da prova 1586 e a qualidade completa do Console. Os recortes de backend e contrabanca de publicação não apontaram outro P0/P1/P2 concreto; os checks do novo commit continuam necessários antes do merge.

@@ -1,14 +1,17 @@
 'use strict';
-const { test } = require('node:test');
+const { test, before, after } = require('node:test');
+const { loadConsoleIcons, geometry } = require('./helpers/console-icons.cjs');
+let canonical;
+before(async () => { canonical = await loadConsoleIcons(); });
+after(async () => { await canonical?.close(); });
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pilotIcon, applyConsoleIcons } = require('../pilot.js');
 const components = path.resolve(__dirname, '../../../EasyStock.Console/src/componentes');
 const brand = fs.readFileSync(path.join(components, 'MarcaIcone.jsx'), 'utf8');
-const utility = fs.readFileSync(path.join(components, 'Icone.jsx'), 'utf8');
 const moduleIcons = fs.readFileSync(path.join(components, 'IconeDoModulo.jsx'), 'utf8');
-for (const name of ['producao', 'mensagem', 'pedido-em-preparo', 'produto', 'configuracoes', 'caixa', 'estoque']) {
+for (const name of ['producao', 'mensagem', 'pedido-em-preparo', 'produto', 'caixa', 'estoque']) {
   test('geometria V4 canônica do Console: ' + name, () => {
     const source = brand.match(new RegExp('^\\s*(?:\'' + name + '\'|' + name + '):\\s*(<g[^\\n]+</g>),', 'm'));
     assert.ok(source, 'Fonte canônica precisa continuar identificável');
@@ -20,13 +23,17 @@ for (const name of ['producao', 'mensagem', 'pedido-em-preparo', 'produto', 'con
     if (['producao', 'pedido-em-preparo'].includes(name)) assert.match(svg, /width="32" height="32"/);
   });
 }
-for (const name of ['bell', 'fechar', 'chevron-right', 'printer', 'download', 'enviar', 'refresh-cw', 'search', 'house', 'ellipsis', 'shopping-cart', 'archive', 'ficha', 'historico', 'ajuda', 'check', 'plus', 'copy', 'lapis', 'lixeira']) {
+test('Configurações segue a delegação canônica da marca para a engrenagem Lucide', () => {
+  const svg = pilotIcon('configuracoes');
+  assert.deepEqual(geometry(svg), geometry(canonical.brandSvg('configuracoes')));
+  assert.match(svg, /viewBox="0 0 24 24"/);
+  assert.match(svg, /stroke-width="1.75"/);
+  assert.match(svg, /aria-hidden="true" focusable="false"/);
+});
+for (const name of ['bell', 'fechar', 'chevron-right', 'printer', 'download', 'enviar', 'refresh-cw', 'search', 'house', 'ellipsis', 'shopping-cart', 'archive', 'ficha', 'historico', 'ajuda', 'check', 'plus', 'copy', 'lapis', 'lixeira', 'link', 'relogio', 'settings', 'circle-x', 'undo-2']) {
   test('traço utilitário canônico do Console: ' + name, () => {
-    const source = utility.match(new RegExp('^\\s*(?:\'' + name + '\'|' + name + '):\\s*((?:\'[^\']*\'\\s*\\+\\s*)*\'[^\']*\')', 'm'));
-    assert.ok(source);
-    const d = [...source[1].matchAll(/'([^']*)'/g)].map(part => part[1]).join('');
     const svg = pilotIcon(name);
-    assert.ok(svg.includes('<path d="' + d + '"/>'));
+    assert.deepEqual(geometry(svg), geometry(canonical.svg(name)), 'Geometria não pode divergir da fachada Lucide viva');
     assert.match(svg, /viewBox="0 0 24 24"/); assert.match(svg, /stroke-width="1.75"/);
   });
 }

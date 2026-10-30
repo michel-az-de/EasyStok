@@ -30,7 +30,8 @@ public sealed record ConversaResumoResult(
     int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos,
     string? AssumidaPorNome = null,
     string? PedidoStatus = null,
-    long NumeroComanda = 0)
+    long NumeroComanda = 0,
+    string? FotoUrl = null)
 {
     /// <summary>#1432: assunto do último e-mail recebido (canal E-mail); nulo nos outros canais.</summary>
     public string? Assunto { get; init; }
@@ -39,7 +40,8 @@ public sealed record ConversaResumoResult(
         i.Id, i.Canal, i.ContatoIdExterno, i.ContatoNome, i.ClienteId, i.Situacao, i.NaoLidas,
         i.UltimaMensagemEm, i.UltimaMensagemTexto, i.PedidoEmAndamentoId, i.AssumidaPorUsuarioId,
         Conversa.DentroDaJanela(i.Canal, i.UltimaMensagemEntradaEm, agora),
-        i.MotivoEscalada, i.UltimaMensagemEntradaEm, i.AguardaResposta, slaRespostaMinutos, i.AssumidaPorNome, i.PedidoStatus, i.NumeroComanda)
+        i.MotivoEscalada, i.UltimaMensagemEntradaEm, i.AguardaResposta, slaRespostaMinutos, i.AssumidaPorNome, i.PedidoStatus, i.NumeroComanda,
+        i.ClienteId is { } clienteId ? EasyStock.Application.UseCases.Cliente.Foto.ClienteFotoUseCase.Url(i.EmpresaId, clienteId, i.FotoClienteChave) : null)
     { Assunto = i.Assunto };
 }
 

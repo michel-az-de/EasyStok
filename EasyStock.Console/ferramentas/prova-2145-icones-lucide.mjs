@@ -13,8 +13,11 @@
 //   PLAYWRIGHT_MODULE=<pasta do playwright> node ferramentas/prova-2145-icones-lucide.mjs
 // Com EVIDENCIAS_2145=<pasta> grava uma captura por tela.
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { createRequire, registerHooks } from 'node:module'
+import { transformWithOxc } from 'vite'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 
@@ -97,10 +100,42 @@ try {
     assert.ok(canais.every((i) => i.desenhos > 0))
   })
   await confere('Atendimento: a chave de conceito desenha o ícone da tabela 3.2', async () => {
-    // cardapio -> book-open, moto -> bike, nota -> sticky-note, agente/sparkles -> sparkles.
-    for (const nome of ['book-open', 'bike', 'sticky-note', 'sparkles']) {
+    // Conceitos presentes neste cenário. A Assistente usa AvatarAssistente e o botão de
+    // completar com Sparkles só existe na API; seus dois aliases são provados no host abaixo.
+    for (const nome of ['book-open', 'bike', 'sticky-note']) {
       assert.ok(atendimento.some((i) => i.classe.split(' ').includes('lucide-' + nome)), 'falta lucide-' + nome)
     }
+  })
+
+  await confere('Icone real: agente e sparkles desenham o mesmo conceito, com tamanho e nome acessível preservados', async () => {
+    const arquivo = new URL('../src/componentes/Icone.jsx', import.meta.url)
+    const estilo = new URL('../src/componentes/Icone.module.css', import.meta.url)
+    const compilado = (await transformWithOxc(readFileSync(arquivo, 'utf8'), arquivo.pathname, { jsx: { runtime: 'automatic' } })).code
+    const hooks = registerHooks({
+      load(url, contexto, proximo) {
+        if (url === arquivo.href) return { format: 'module', shortCircuit: true, source: compilado }
+        // Apenas o nome da classe CSS é fornecido: a fachada e os desenhos vêm dos módulos reais.
+        if (url === estilo.href) return { format: 'module', shortCircuit: true, source: 'export default { icone: "icone" }' }
+        return proximo(url, contexto)
+      },
+    })
+    const host = await navegador.newPage()
+    try {
+      const { Icone } = await import(arquivo.href)
+      await host.setContent(renderToStaticMarkup(createElement('main', null,
+        createElement(Icone, { nome: 'agente', tamanho: 24, rotulo: 'Assistente' }),
+        createElement(Icone, { nome: 'sparkles', tamanho: 24 }),
+      )))
+      const aliases = await lerIcones(host)
+      assert.equal(aliases.length, 2)
+      assert.ok(aliases.every((icone) => icone.classe.split(' ').includes('lucide-sparkles') && icone.desenhos > 0))
+      assert.ok(aliases.every((icone) => icone.largura === 24 && icone.traco === '1.75' && icone.ponta === 'round' && icone.juncao === 'round'))
+      assert.equal(aliases[0].rotulo, 'Assistente')
+      assert.equal(await host.getByRole('img', { name: 'Assistente', exact: true }).count(), 1)
+      assert.equal(aliases[1].oculto, 'true')
+      const desenhos = await host.locator('svg').evaluateAll((svgs) => svgs.map((svg) => svg.innerHTML))
+      assert.equal(desenhos[0], desenhos[1], 'o alias conserva exatamente a mesma geometria')
+    } finally { await host.close(); hooks.deregister() }
   })
 
   await pagina.getByRole('button', { name: 'Gestão', exact: true }).first().click()

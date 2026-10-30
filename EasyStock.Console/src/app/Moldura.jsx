@@ -21,6 +21,7 @@ import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
 import { CompartilharComanda } from '../features/atendimento/CompartilharComanda'
 import { ChamarClientes } from '../features/atendimento/ChamarClientes'
 import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
+import { MesaDeNotas } from '../features/ficha-cliente/MesaDeNotas'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
 import { Popover } from '../componentes/Popover'
@@ -102,10 +103,10 @@ function MenuMais({
         // Automáticas, e a 390 px isso empurrava "Mais" para fora da tela.
         // O botão saiu do topo; o caminho para Gestão no celular/tablet
         // estreito passa a ser só por aqui.
-        { chave: '__gestao', titulo: 'Gestão', detalhe: 'Cardápio, produção e caixa sem sair do Balcão' },
+        { chave: '__gestao', titulo: 'Gestão', detalhe: 'Ajustes da loja' },
       ].filter((item) => item.chave !== '__entregas' || permite('entregas')),
     },
-    { titulo: 'Ajuda', itens: [{ chave: '__ajuda', titulo: 'Ajuda e guia do Console', detalhe: 'O que cada módulo faz, primeiros passos e diagnóstico' }] },
+    { titulo: 'Ajuda', itens: [{ chave: '__ajuda', titulo: 'Ajuda do sistema', detalhe: 'O que cada módulo faz, primeiros passos e diagnóstico' }] },
     grupoDoDia(emAndamento, naEsteira),
     // #1242 (D1): a faixa de baixo saiu do celular; quem está logado e o Sair vêm para cá.
     ...(aoSair ? [{
@@ -136,7 +137,7 @@ function MenuMais({
         aria-label="Mais"
         title="Mais"
       >
-        <Icone nome="ellipsis" tamanho={20} />
+        <Icone nome="ellipsis-vertical" tamanho={20} />
       </Botao>
       {/* `portal` (rodada 9, achado 1 da banca estética): `.topo` tem
           backdrop-filter, que vira containing block de position:fixed. Sem
@@ -279,9 +280,31 @@ function Cabecalho({
 // Trilho lateral do desktop (rodada 6c): a navegação de app com ícone e
 // rótulo curto, no lugar da barra de botões de texto do topo. Os mesmos
 // controles, os mesmos handlers; Balcão é a tela atual, não um botão.
+function DisposicaoConversas({ larguras, padrao, aoRedimensionar }) {
+  const [aberto, setAberto] = useState(false)
+  return <span className={css.disposicao}>
+    <Botao variante="texto" className={css.itemTrilho} aria-expanded={aberto} aria-haspopup="dialog" onClick={() => setAberto(!aberto)}>
+      <Icone nome="painel" tamanho={22} /><span>Disposição</span>
+    </Botao>
+    {aberto && <Popover rotulo="Disposição das conversas" papel="dialog" portal posicao="acima" aoFechar={() => setAberto(false)}>
+      <div className={css.ajusteDisposicao}>
+        <strong>Seu espaço de trabalho</strong>
+        <label>Conversas <output>{larguras.balcao} px</output>
+          <input aria-label="Largura de Conversas" type="range" min="244" max="480" step="1" value={larguras.balcao} onChange={e => aoRedimensionar('balcao', Number(e.target.value))} />
+        </label>
+        <label>Ficha <output>{larguras.ficha} px</output>
+          <input aria-label="Largura da ficha" type="range" min="292" max="520" step="1" value={larguras.ficha} onChange={e => aoRedimensionar('ficha', Number(e.target.value))} />
+        </label>
+        <Botao variante="texto" onClick={() => { aoRedimensionar('balcao', padrao.balcao); aoRedimensionar('ficha', padrao.ficha) }}>Restaurar disposição</Botao>
+        <small>Guardado neste aparelho. Você também pode arrastar as divisórias.</small>
+      </div>
+    </Popover>}
+  </span>
+}
+
 function Trilho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, simulando, aoAlternarSimulacoes,
-  atendente, aoAbrirAjuda,
+  atendente, aoAbrirAjuda, disposicao,
 }) {
   const { permite, notificacoes, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   return (
@@ -304,7 +327,7 @@ function Trilho({
         <span>{aberta ? 'Loja aberta' : 'Loja fechada'}</span>
       </button>
       {/* #1870: o mesmo nome e o mesmo ícone do trilho dos módulos; a tela continua sendo o Balcão. */}
-      <span className={`${css.itemTrilho} ${css.itemAtual}`} aria-current="page" title="Balcão">
+      <span className={`${css.itemTrilho} ${css.itemAtual}`} aria-current="page" title="Atendimento">
         <IconeDoModulo modulo={MODULO_ATENDIMENTO} />
         <span>{MODULO_ATENDIMENTO.nome}</span>
       </span>
@@ -330,9 +353,10 @@ function Trilho({
           Avisos logo abaixo, e quem clicava em Avisos abria Lembretes. */}
       <div className={css.avisosTrilho}>{notificacoes}</div>
       <div className={css.sinoTrilho}><Sininho comRotulo /></div>
-      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda e guia do Console">
+      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda do sistema">
         <MarcaIcone nome="informacao" tamanho={22} /><span>Ajuda</span>
       </Botao>
+      {disposicao}
       <span className={css.espacoTrilho} />
       {aoAlternarSimulacoes && !simularEscondido() && (
         <Botao variante="texto" className={css.itemTrilho} aria-pressed={simulando} onClick={aoAlternarSimulacoes} title="Simular (F2)">
@@ -392,9 +416,13 @@ function BotaoSimular({ ativo, aoAlternar }) {
 }
 
 // Três arranjos para o mesmo conteúdo. Os painéis não sabem em qual estão.
-export function Moldura({
+export function Moldura(props) {
+  return <MesaDeNotas><ConteudoMoldura {...props} /></MesaDeNotas>
+}
+
+function ConteudoMoldura({
   tamanho, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca, aoAbrirCardapio, aoAbrirAutomacoes, aoAbrirGestao,
-  aoAbrirEntregas, aoAbrirAjuda, simulando, aoAlternarSimulacoes, larguras, largurasPadrao = larguras, aoRedimensionar, cardapioAberto = null,
+  aoAbrirEntregas, aoAbrirAjuda, aoRascunho, simulando, aoAlternarSimulacoes, larguras, largurasPadrao = larguras, aoRedimensionar, cardapioAberto = null,
 }) {
   const {
     visiveis, selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
@@ -491,33 +519,34 @@ export function Moldura({
           aoAlternarSimulacoes={aoAlternarSimulacoes}
           atendente={atendente}
           aoAbrirAjuda={aoAbrirAjuda}
+          disposicao={<DisposicaoConversas larguras={larguras} padrao={largurasPadrao} aoRedimensionar={aoRedimensionar} />}
         />
-        <main className={`${css.palco} ${css.palcoTres}`} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Balcão">
+        <main className={`${css.palco} ${css.palcoTres}`} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Atendimento">
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
-          <Coluna variante="entrada" titulo="Balcão" semTitulo>
+          <Coluna variante="entrada" titulo="Conversas" semTitulo>
             <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
           </Coluna>
           <AlcaLargura
-            rotulo="Redimensionar Balcão"
+            rotulo="Redimensionar Conversas"
             valor={larguras.balcao}
-            min={300}
+            min={244}
             max={480}
             padrao={largurasPadrao.balcao}
             aoMudar={(valor) => aoRedimensionar('balcao', valor)}
           />
-          <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
+          <section className={`${css.coluna} ${css.centro}`} aria-label="Conversa">{atendimento}</section>
           <AlcaLargura
-            rotulo="Redimensionar Resumo"
+            rotulo="Redimensionar ficha"
             valor={larguras.ficha}
-            min={320}
+            min={292}
             max={520}
             padrao={largurasPadrao.ficha}
             invertida
             aoMudar={(valor) => aoRedimensionar('ficha', valor)}
           />
-          <Coluna variante="ficha" titulo="Resumo" semTitulo>
-            <div className={css.painelFicha}><LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro></div>
+          <Coluna variante="ficha" titulo="Ficha" semTitulo>
+            <div className={css.painelFicha}><LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro></div>
             {/* #1474: lugar da fila de canhotos (FilaCanhotos), no pé da Ficha e no fluxo da
                 coluna: a pílula não cobre mais o título nem o topo da coluna. Vazio, não ocupa. */}
             <div className={css.slotFila} data-fila-canhotos="" />
@@ -531,23 +560,23 @@ export function Moldura({
     return (
       <div className={css.app}>
         {cabecalho}
-        <main className={css.palco} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Balcão">
+        <main className={css.palco} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Atendimento">
           {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
               "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
-          <Coluna variante="entrada" titulo="Balcão">
+          <Coluna variante="entrada" titulo="Conversas">
             <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
           </Coluna>
-          <section className={`${css.coluna} ${css.centro}`} aria-label="Atendimento">{atendimento}</section>
+          <section className={`${css.coluna} ${css.centro}`} aria-label="Conversa">{atendimento}</section>
           {gavetaAberta && (
-            <Gaveta titulo="Resumo" aoFechar={fecharGaveta}>
-              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>
+            <Gaveta titulo="Ficha" aoFechar={fecharGaveta}>
+              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>
             </Gaveta>
           )}
         </main>
         <div className={css.slotFila} data-fila-canhotos="" />
         <footer className={css.rodape}>
           <Botao ref={botaoFichaRef} onClick={() => setGavetaAberta(true)}>
-            Resumo de {selecionada?.nome.split(' ')[0] ?? 'cliente'}
+            Ficha de {selecionada?.nome.split(' ')[0] ?? 'cliente'}
           </Botao>
         </footer>
         <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
@@ -558,15 +587,15 @@ export function Moldura({
   const painelDaAba = {
     balcao: <LimiteDeErro parte="Lista de conversas"><PainelConversas aoAbrir={irParaAtendimento} buscaDeClientes={ChamarClientes} /></LimiteDeErro>,
     atendimento,
-    ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>,
+    ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>,
   }
 
   return (
     <div className={css.app}>
-      {cabecalho}
+      {aba === 'balcao' && cabecalho}
       {/* Sem rolagem nesta seção: cada painel tem a área rolável dele por
           dentro, e é isso que mantém o composer preso no pé do celular. */}
-      <main className={css.palco} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Balcão">
+      <main className={css.palco} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Atendimento">
         <section
           className={`${css.coluna} ${css.centro}`}
           role="tabpanel"
@@ -576,7 +605,7 @@ export function Moldura({
         >
           {aba !== 'atendimento' && (
             <header className={`${css.tituloColuna} ${css.tituloCompacto}`}>
-              <span>{aba === 'ficha' ? `Resumo de ${selecionada?.nome.split(' ')[0] ?? 'cliente'}` : 'Balcão'}</span>
+              <span>{aba === 'ficha' ? `Ficha de ${selecionada?.nome.split(' ')[0] ?? 'cliente'}` : 'Conversas'}</span>
               <span className={css.espaco} data-ancora-assistente />
             </header>
           )}
@@ -588,9 +617,9 @@ export function Moldura({
         ativa={aba}
         aoTrocar={setAba}
         abas={[
-          { id: 'balcao', rotulo: 'Balcão', contador: visiveis.length },
-          { id: 'atendimento', rotulo: 'Atendimento' },
-          { id: 'ficha', rotulo: 'Resumo' },
+          { id: 'balcao', rotulo: 'Conversas', contador: visiveis.length },
+          { id: 'atendimento', rotulo: 'Conversa' },
+          { id: 'ficha', rotulo: 'Ficha' },
         ]}
       />
       <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />

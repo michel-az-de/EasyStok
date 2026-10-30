@@ -111,14 +111,14 @@ await confere('3. você assumiu: "Pausado porque você assumiu"', () => {
   const { conversa, pausa } = sincronizada(resumo({ situacao: 'Assumida', assumidaPorUsuarioId: 'u-eu' }))
   const modo = modoDoAtendimento(conversa, pausa)
   assert.equal(modo.chave, MODOS.PAUSADO)
-  assert.equal(modo.rotulo, 'Pausado porque você assumiu')
+  assert.equal(modo.rotulo, 'Você respondendo')
 })
 
 await confere('3. outro atendente assumiu: o texto não diz que foi você', () => {
   const { conversa, pausa } = sincronizada(resumo({ situacao: 'Assumida', assumidaPorUsuarioId: 'u-outro' }))
   const modo = modoDoAtendimento(conversa, pausa)
   assert.equal(modo.chave, MODOS.PAUSADO)
-  assert.equal(modo.rotulo, 'Pausado porque outro atendente assumiu')
+  assert.equal(modo.rotulo, 'Outro atendente respondendo')
 })
 
 await confere('3. o automático escalou com motivo: "Passou para você" e o selo com o motivo', () => {

@@ -29,7 +29,7 @@ function quandoVence(parcela) {
 }
 
 function EstadoFinanceiro({ consulta, children }) {
-  if (consulta.erro) return <div className={css.painel}><ErroFinanceiro erro={consulta.erro} /><Botao onClick={consulta.recarregar}>Tentar novamente</Botao></div>
+  if (consulta.erro) return <div className={css.painel}><ErroFinanceiro erro={consulta.erro} /><Botao onClick={consulta.recarregar}>Tentar de novo</Botao></div>
   if (consulta.carregando && !consulta.dados) return <Vazio titulo="Carregando financeiro">Aguarde um instante.</Vazio>
   return <div aria-busy={consulta.carregando}>{children}</div>
 }
@@ -329,7 +329,7 @@ function CadastrosFinanceiros({ tipo }) {
 export function PainelFinanceiro({ tela }) {
   const { acoes } = useAcessoModulos()
   const permitido = tela === 'pagar' ? acoes.visualizarContasPagar : tela === 'receber' ? acoes.visualizarContasReceber : acoes.visualizarContasPagar || acoes.visualizarContasReceber
-  if (!permitido) return <Vazio titulo="Seu perfil não pode consultar estas contas">Consulte o Caixa do dia ou peça à dona para revisar seu acesso.</Vazio>
+  if (!permitido) return <Vazio titulo="Seu perfil não pode consultar estas contas">Consulte o Caixa do dia ou peça à administração da loja para revisar seu acesso.</Vazio>
   if (['pagar', 'receber'].includes(tela)) return <ContasFinanceiras key={tela} lado={tela} />
   if (tela === 'extrato') return <ExtratoFinanceiro />
   if (tela === 'relatorios') return <RelatoriosFinanceiros />

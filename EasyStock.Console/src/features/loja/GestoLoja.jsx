@@ -139,7 +139,7 @@ export function ModalAbrirLoja({ aoFechar }) {
     return (
       <Modal
         titulo="Abrir a loja"
-        descricao="Só gerente ou dona abre a loja: peça a uma delas."
+        descricao="Peça a um gerente ou proprietário para abrir a loja."
         aoFechar={aoFechar}
         rodape={<Botao variante="primario" onClick={aoFechar}>Entendi</Botao>}
       >
@@ -308,7 +308,7 @@ export function ModalFecharLoja({ aoFechar }) {
       titulo="Fechar a loja no horário"
       descricao={podeFechar
         ? 'A loja está dentro do horário de funcionamento. Fechar agora pede justificativa.'
-        : 'A loja está dentro do horário de funcionamento. Só gerente ou dona fecha a loja agora: peça a uma delas.'}
+        : 'A loja está no horário de funcionamento. Peça a um gerente ou proprietário para fechá-la agora.'}
       aoFechar={aoFechar}
       rodape={podeFechar ? (
         <>

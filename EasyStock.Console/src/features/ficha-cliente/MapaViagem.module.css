@@ -1,0 +1,18 @@
+.painel { display: grid; gap: var(--e-3); min-width: 0; }
+.cabecalho { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-2); }
+.cabecalho h3 { margin: 0; font-size: var(--t-forte); }
+.conteudo { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); align-items: start; gap: var(--e-4); }
+.semMapa { grid-template-columns: 1fr; }
+.mapa, .viagem { min-width: 0; display: grid; gap: var(--e-2); }
+.mapa iframe { width: 100%; min-height: 280px; border: 0; background: var(--elevado); }
+.indisponivel { color: var(--tinta-2); font-size: var(--t-apoio); }
+.painel p { margin: 0; }
+.mapa a { display: inline-flex; align-items: center; min-height: var(--toque); color: var(--marca); }
+.mapa a:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.painel small { color: var(--tinta-2); font-size: var(--t-minimo); }
+.paradas { display: grid; gap: var(--e-2); margin: 0; padding-left: var(--e-4); }
+.paradas li { padding: var(--e-2); overflow-wrap: anywhere; }
+.paradas li[aria-current='step'] { background: var(--preenchimento); }
+.paradas li > * { display: block; }
+.paradas strong { font-size: var(--t-apoio); }
+.paradas span { margin-block: var(--e-1); color: var(--tinta-2); }

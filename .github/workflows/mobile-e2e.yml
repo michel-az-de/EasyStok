@@ -71,5 +71,9 @@ jobs:
       - name: Instalar dependências do bridge Android
         run: npm ci --prefix casa-da-baba-mobile/apk --ignore-scripts --no-audit --no-fund
 
+      # Os contratos de ícones renderizam a fachada JSX/Lucide do Console real.
+      - name: Instalar dependências canônicas dos ícones do Console
+        run: npm ci --prefix EasyStock.Console --ignore-scripts --no-audit --no-fund
+
       - name: Validar contratos do APK e do bridge Android
         run: node --test casa-da-baba-mobile/apk/tests/*.test.cjs

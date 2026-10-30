@@ -17,6 +17,7 @@ internal sealed class PublicUploadFileProvider(string root) : IFileProvider
             // Só imagens/áudios gerados para envio usam Guid no formato D. Recebidos WPP/Meta e
             // anexos de e-mail ficam acessíveis pelo endpoint autenticado da conversa.
             if (pasta.Equals("acervo", StringComparison.OrdinalIgnoreCase) ||
+                pasta.Equals("clientes", StringComparison.OrdinalIgnoreCase) ||
                 pasta.Equals("atendimento", StringComparison.OrdinalIgnoreCase) &&
                 !Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "D", out _))
                 return new NotFoundFileInfo(subpath);

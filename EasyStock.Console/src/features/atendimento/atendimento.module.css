@@ -1,12 +1,12 @@
 .cabecalho {
   container-type: inline-size; container-name: topo-conversa;
-  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: nowrap;
   padding: var(--e-3) var(--e-4); background: var(--papel);
-  border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+  border: 0; flex-shrink: 0;
 }
 .identidade { display: flex; align-items: center; gap: var(--e-3); min-width: 0; flex: 1; }
 .cabecalho h2 {
-  margin: 0; font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700;
+  margin: 0; font-family: var(--f-corpo); font-size: var(--t-forte); font-weight: 700;
   line-height: var(--lh-compacto); letter-spacing: -.01em;
 }
 .nomeCliente { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -20,10 +20,32 @@
   color: var(--tinta-3); line-height: var(--lh-compacto);
 }
 .direita {
-  width: 100%; display: flex; gap: var(--e-2); align-items: center;
-  flex-wrap: wrap; flex-shrink: 0;
+  width: auto; display: flex; gap: var(--e-2); align-items: center;
+  flex-wrap: nowrap; flex-shrink: 0;
 }
-.identidade { flex-basis: 100%; }
+.identidade { flex-basis: auto; }
+.opcoesConversa, .ferramentasComposer { position: relative; }
+.opcoesConversa > summary, .ferramentasComposer > summary {
+  display: grid; place-items: center; min-width: var(--toque); min-height: var(--toque);
+  padding: var(--e-2); border-radius: var(--r-2); list-style: none; cursor: pointer; color: var(--tinta-2);
+}
+.opcoesConversa > summary::-webkit-details-marker, .ferramentasComposer > summary::-webkit-details-marker { display: none; }
+.opcoesConversa > summary:hover, .ferramentasComposer > summary:hover { background: var(--preenchimento); }
+.opcoesConversa > summary:focus-visible, .ferramentasComposer > summary:focus-visible { outline: 2px solid var(--halo); outline-offset: 2px; }
+.menuConversa, .menuFerramentas {
+  position: absolute; z-index: 40; width: min(280px, calc(100vw - 32px));
+  display: grid; gap: var(--e-1); padding: var(--e-2); border-radius: var(--r-2);
+  background: var(--papel); box-shadow: var(--sombra); color: var(--tinta);
+}
+.menuConversa { top: calc(100% + var(--e-2)); right: 0; }
+.menuFerramentas { bottom: calc(100% + var(--e-2)); left: 0; }
+.menuConversa button, .menuFerramentas button, .menuFerramentas label {
+  width: 100%; justify-content: flex-start; min-height: var(--toque); padding: var(--e-2) var(--e-3);
+  border: 0; border-radius: var(--r-1); box-shadow: none; background: transparent;
+  color: var(--tinta); font: inherit; font-size: var(--t-apoio); text-align: left; cursor: pointer;
+}
+.menuConversa button:hover:not(:disabled), .menuFerramentas button:hover:not(:disabled), .menuFerramentas label:hover { background: var(--preenchimento); }
+.menuFerramentas .rotuloAcao { display: inline; position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; white-space: normal; }
 
 /* Uma área rolável só na coluna do meio: barra de modo, thread e painel do
    agente rolam juntos, o cabeçalho fica no teto e o composer no piso. Antes os
@@ -40,13 +62,13 @@
 
 /* A thread cresce com o conteúdo e empurra o resto: quem rola é a área acima. */
 .thread {
-  flex: 1 0 auto; padding: var(--e-4);
+  flex: 1 0 auto; padding: var(--e-4) var(--e-5);
   display: flex; flex-direction: column; background: transparent;
 }
 
 .balao {
-  max-width: min(76%, 62ch); padding: var(--e-2) var(--e-3);
-  border-radius: 18px; box-shadow: var(--sombra);
+  max-width: min(76%, 62ch); padding: var(--e-3) var(--e-4);
+  border-radius: var(--r-2); box-shadow: none;
   margin-top: 4px; animation: entradaBalao var(--dur-media) var(--ease-saida);
 }
 @keyframes entradaBalao {
@@ -54,7 +76,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 /* Troca de remetente respira mais. */
-.trocaDeVoz { margin-top: 12px; }
+.trocaDeVoz { margin-top: var(--e-5); }
 .balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--t-corpo); }
 .meta {
   display: flex; gap: var(--e-2); align-items: center; justify-content: flex-end;
@@ -68,7 +90,7 @@
    que falhou têm 32 px de altura para o toque. */
 .meta .falhou { flex-basis: 100%; display: flex; justify-content: flex-end; align-items: flex-start; gap: 4px; }
 .meta .falhou svg { flex-shrink: 0; margin-top: 2px; }
-.acaoDaBolha { min-height: 32px; display: inline-flex; align-items: center; }
+.acaoDaBolha { min-height: var(--toque); display: inline-flex; align-items: center; }
 /* #1444: "enviando" escrito, não só o ✓ cinza: a mídia demora e a dona precisa ver que está indo. */
 .enviando { display: inline-flex; align-items: center; gap: 4px; }
 .enviando::before {
@@ -79,13 +101,13 @@
 @keyframes girarMeta { to { transform: rotate(360deg); } }
 .entrada {
   align-self: flex-start; background: var(--papel); border: 0;
-  border-radius: 20px 20px 20px 6px;
-  box-shadow: 0 1px 2px light-dark(rgba(48, 32, 16, .08), rgba(0, 0, 0, .4)), 0 0 0 1px var(--linha);
+  border-radius: var(--r-1);
+  box-shadow: none;
 }
 .saida {
-  align-self: flex-end; background: var(--marca-claro); color: var(--tinta);
-  border-radius: 20px 20px 6px 20px;
-  box-shadow: 0 1px 2px light-dark(rgba(120, 40, 10, .08), rgba(0, 0, 0, .35));
+  align-self: flex-end; background: var(--preenchimento-forte); color: var(--tinta);
+  border-radius: var(--r-1);
+  box-shadow: none;
 }
 .saida .meta, .saida .meta * { color: var(--tinta-3); }
 /* #1761: lida se distingue de entregue pela palavra e pela cor. */
@@ -94,7 +116,7 @@
 .sistema {
   align-self: center; max-width: 94%; background: var(--elevado); color: var(--tinta-2);
   font-size: var(--t-apoio); box-shadow: none; text-align: center; padding: var(--e-2) var(--e-3);
-  border-radius: 18px;
+  border-radius: var(--r-1);
 }
 .resumo { font-family: var(--f-dado); font-size: var(--t-apoio); }
 /* Rodada 12 (#19): link do convite do cardápio, clicável na bolha. */
@@ -133,11 +155,11 @@
      janela (@media via viewport nunca disparava com o palco de três colunas
      aberto). */
   container: composer / inline-size;
-  display: flex; flex-direction: column; gap: var(--e-3);
+  display: flex; flex-direction: column; gap: var(--e-2);
 }
 .caixa {
-  background: var(--papel); border: var(--b-1) solid var(--linha-media);
-  border-radius: 16px; box-shadow: var(--sombra); padding: var(--e-3);
+  background: var(--papel); border: 0;
+  border-radius: var(--r-2); box-shadow: none; padding: var(--e-3);
   display: flex; flex-direction: column; gap: 0;
 }
 /* O campo some dentro da caixa: sem borda, sem fundo, sem alça de redimensionar.
@@ -152,8 +174,9 @@
 }
 .caixa:has(textarea:disabled) { background: var(--preenchimento); box-shadow: none; }
 .caixa:focus-within {
-  border-color: var(--marca); box-shadow: var(--sombra), 0 0 0 4px var(--halo);
+  box-shadow: none;
 }
+.caixa:has(:focus-visible) { outline: 3px solid var(--halo); outline-offset: 2px; }
 .acoes {
   display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
   padding: var(--e-2) 0 0 0; border-top: 0; margin: 0;
@@ -164,7 +187,7 @@
 /* #1761 (L8): conversa encerrada em uma linha neutra, no lugar do campo. */
 .linhaEncerrada {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap;
-  margin: 0; padding: var(--e-2) var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  margin: 0; padding: var(--e-2) var(--e-3); border: 0; border-radius: var(--r-2);
   background: var(--papel); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600;
 }
 
@@ -173,7 +196,7 @@
   display: flex; gap: var(--e-2); align-items: flex-start; flex-wrap: wrap;
   padding: 10px 16px; margin: 0 0 var(--e-3);
   background: var(--alerta-pastel); color: var(--alerta);
-  border: 0; border-radius: 12px; font-size: var(--t-apoio);
+  border: 0; border-radius: var(--r-1); font-size: var(--t-apoio);
 }
 .bloqueio strong { color: var(--tinta); font-weight: 600; }
 
@@ -183,11 +206,10 @@
 }
 
 .selo { display: inline-flex; align-items: center; gap: 3px; }
-/* Item D (banca 10): a etiqueta "automática" virou botão (abre a definição),
-   sem parecer um botão de verdade — mesma cor e tamanho de antes, só com
-   sublinhado sutil para dizer que é clicável. */
+/* A etiqueta abre a definição e compartilha o alvo mínimo dos outros controles. */
 .seloBotao {
   border: 0; background: transparent; padding: 0; margin: 0; font: inherit; color: inherit;
+  min-width: var(--toque); min-height: var(--toque);
   cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
 }
 .seloBotao:hover, .seloBotao:focus-visible { color: var(--tinta); }
@@ -202,8 +224,7 @@
    por fundo pastel, para não competir com os balões. */
 .modo {
   flex-shrink: 0; background: var(--papel);
-  border-bottom: var(--b-1) solid var(--linha);
-  border-left: var(--trilho) solid var(--linha-forte);
+  border: 0;
   padding: var(--e-2) var(--e-4);
 }
 .modo_ligado { border-left-color: var(--sucesso); }
@@ -212,25 +233,28 @@
 .modo_encerrado { border-left-color: var(--linha-forte); }
 .modo_bloqueado { border-left-color: var(--erro); }
 
-/* #1442: uma linha só, rótulo + frase + ações. A frase encolhe com
-   reticência (inteira no `title`); em coluna estreita as ações descem. */
-/* #1761 (L6): a barra fica em uma linha e o texto não corta com reticência: se faltar largura,
-   quem quebra é a frase, ao lado da pílula e dos botões. */
-/* Com dois botões a frase não cabe ao lado: ela desce inteira para a linha de baixo, nunca é esmagada. */
-.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
-.modoLinha > :first-child { flex-shrink: 0; }
+/* Estado e Assumir permanecem à vista; as ações secundárias abrem no próprio contexto. */
+.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); }
+.modoLinha > :first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .modoTexto {
-  flex: 1 1 14rem; min-width: 0; margin: 0;
+  flex: 1 1 100%; min-width: 0; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
-/* #1870: no desktop a faixa é sempre uma linha. A frase cede com reticência (inteira no title e
-   no leitor de tela) em vez de empurrar os botões para uma segunda linha. */
-@media (min-width: 760px) {
-  .modo { padding-inline: var(--e-3); }
-  .modoLinha { flex-wrap: nowrap; }
-  .modoTexto { flex: 1 1 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.modoAcoes { margin-left: auto; display: flex; align-items: center; gap: var(--e-1); flex: none; }
+.maisAcoesModo { position: relative; }
+.maisAcoesModo > summary {
+  display: flex; align-items: center; min-height: var(--toque); padding: 0 var(--e-2);
+  list-style: none; cursor: pointer; font-size: var(--t-apoio); color: var(--tinta-2);
 }
-.modoAcoes { margin-left: auto; display: flex; gap: var(--e-2); flex-shrink: 0; }
+.maisAcoesModo > summary::-webkit-details-marker { display: none; }
+.maisAcoesModo > summary:hover, .maisAcoesModo[open] > summary { background: var(--preenchimento); }
+.maisAcoesModo > summary:focus-visible { outline: 3px solid var(--halo); outline-offset: 2px; }
+.listaAcoesModo {
+  position: absolute; right: 0; top: calc(100% + var(--e-1)); z-index: 40;
+  display: grid; gap: var(--e-1); width: min(260px, calc(100vw - 32px));
+  padding: var(--e-2); background: var(--papel); box-shadow: var(--sombra);
+}
+.listaAcoesModo > button { justify-content: flex-start; text-align: left; white-space: normal; }
 .acaoModo { min-height: var(--toque); padding-block: 0; }
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
 
@@ -279,21 +303,21 @@
    ganham fundo no hover, e o enviar redondo com seta, como no Mensagens. */
 .acoes > button:not(.enviar) {
   background: transparent; border-color: transparent; box-shadow: none;
-  color: var(--tinta-2); padding: 0 var(--e-3); min-height: 36px; gap: 6px;
+  color: var(--tinta-2); padding: 0 var(--e-3); min-height: var(--toque); gap: 6px;
 }
 .acoes > button:not(.enviar):hover:not(:disabled) { background: var(--preenchimento); color: var(--tinta); border-color: transparent; }
 /* #1868: desabilitado sem opacidade, como no Botao.module.css (opacidade derrubava o contraste). */
 .acoes > button:not(.enviar):disabled { background: transparent; color: var(--tinta-3); opacity: 1; }
 .acoes > button svg { width: 20px; height: 20px; }
 .acoes .enviar {
-  width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 0;
-  border-radius: var(--r-pilula);
+  width: var(--toque); min-width: var(--toque); height: var(--toque); min-height: var(--toque); padding: 0;
+  border-radius: var(--r-2);
 }
 .acoes .enviar:disabled { background: var(--preenchimento-forte); color: var(--tinta-3); }
 .acoes .enviar:not(:disabled) { animation: enviarPronto var(--dur-media) var(--ease-pulo); }
 @keyframes enviarPronto { from { transform: scale(.8); } to { transform: none; } }
 @media (max-width: 759px) {
-  .acoes .enviar { width: 40px; margin-left: auto; }
+  .acoes .enviar { width: var(--toque); margin-left: auto; }
 }
 
 /* Subtítulo da conversa numa linha só, com reticência, em vez de quebrar em
@@ -309,22 +333,24 @@
    todo botão novo que entrar nela cai no grupo da esquerda sozinho, e quem
    levar a classe .enviar ocupa o lugar do enviar (o microfone, por exemplo). */
 .caixa {
-  flex-direction: row; align-items: flex-end; gap: 4px;
-  padding: 6px 6px 6px 8px; border-radius: 24px;
+  display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: var(--e-1);
+  padding: var(--e-2); border-radius: var(--r-2);
 }
-.acoes { display: contents; }
-.acoes > button:not(.enviar) { order: 1; width: 36px; min-width: 36px; min-height: 36px; padding: 0; border-radius: var(--r-pilula); }
-.caixa > :not(.acoes) { order: 2; flex: 1; min-width: 0; }
-.acoes > .enviar { order: 3; margin-left: 0; }
+/* Campo vazio e ações ocupam cerca de 120px com o respiro externo; anexos e erros podem crescer. */
+.caixa:has(textarea) { min-height: 96px; }
+.acoes { display: flex; flex-wrap: nowrap; gap: var(--e-1); padding: 0; order: 1; }
+.acoes > button:not(.enviar) { order: 1; width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-2); }
+.caixa > :not(.acoes) { order: 0; flex: 1; min-width: 0; }
+.acoes > .enviar { order: 3; margin-left: auto; width: auto; min-width: var(--toque); padding-inline: var(--e-3); }
 .caixa textarea,
 .caixa textarea:hover,
 .caixa textarea:focus,
-.caixa textarea:disabled { min-height: 36px; padding: 7px 8px; line-height: 1.4; }
+.caixa textarea:disabled { min-height: var(--toque); padding: var(--e-2); line-height: var(--lh-corpo); }
 /* Enviar: a única mancha de cor da barra quando há texto; sem texto, tinta
    clara da marca, visível no claro e no escuro. */
 .acoes .enviar:disabled { background: var(--preenchimento); color: var(--tinta-3); opacity: 1; }
 @media (max-width: 759px) {
-  .acoes .enviar { width: 40px; margin-left: 0; }
+  .acoes .enviar { width: auto; min-width: var(--toque); margin-left: auto; }
 }
 
 /* Rodada 10, pedido do dono (25/09 23h42, "não vi pra enviar uma lista de
@@ -335,7 +361,7 @@
 .acoes > button.botaoRespostas {
   width: auto; min-width: auto; padding: 0 var(--e-3) 0 10px; gap: 5px;
   /* #1868: mesma altura e raio dos vizinhos com rótulo (Anexar, Fotos, Programar, Nota). */
-  min-height: 44px; border-radius: var(--r-1);
+  min-height: var(--toque); border-radius: var(--r-1);
   font-size: var(--t-apoio); font-weight: 600;
 }
 
@@ -345,14 +371,11 @@
 
 /* Rodada 6d (banca estética, item 1): dois tons só. Recebida em papel, a
    dela e a do automático na tinta clara da marca (o selo "automática" é que
-   diz quem mandou). Cauda, o canto de 6 px, só na bolha que troca de quem
-   fala; as seguintes do mesmo lado ficam redondas. Aviso do sistema vira
+   diz quem mandou). Aviso do sistema vira
    texto centralizado, sem caixa. */
-.entrada { border-radius: 18px; }
-.saida { border-radius: 18px; }
-.entrada.trocaDeVoz { border-top-left-radius: 6px; }
-.saida.trocaDeVoz { border-top-right-radius: 6px; }
-.saida.doAutomatico { background: var(--marca-claro); }
+.entrada { border-radius: var(--r-2); }
+.saida { border-radius: var(--r-2); }
+.saida.doAutomatico { background: var(--preenchimento-forte); }
 .sistema {
   background: transparent; box-shadow: none; color: var(--tinta-3);
   font-size: var(--t-micro); padding: 2px var(--e-3); max-width: 80%;
@@ -364,8 +387,8 @@
 /* Anexar é um label sobre o input de arquivo (rodada 7), não um Botao: mesmo
    desenho dos outros ícones da barra, no grupo da esquerda. */
 .acoes > label {
-  order: 1; width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0;
-  display: inline-grid; place-items: center; border: 0; border-radius: var(--r-pilula);
+  order: 1; width: var(--toque); min-width: var(--toque); height: var(--toque); min-height: var(--toque); padding: 0;
+  display: inline-grid; place-items: center; border: 0; border-radius: var(--r-2);
   background: transparent; color: var(--tinta-2); cursor: pointer;
 }
 .acoes > label:hover { background: var(--preenchimento); color: var(--tinta); }
@@ -427,7 +450,7 @@
 .cardapioEnvio p { margin: 0; }
 .cardapioRotulo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-3); margin-top: var(--e-2) !important; }
 .cardapioMensagem {
-  padding: var(--e-3); border-radius: 12px; background: var(--marca-claro); color: var(--tinta);
+  padding: var(--e-3); border-radius: var(--r-1); background: var(--marca-claro); color: var(--tinta);
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .cardapioLink { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
@@ -447,10 +470,10 @@
 .programarOpcao input { margin-top: 3px; }
 .programarErro {
   padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--erro);
-  border-left: var(--trilho) solid var(--erro); background: var(--elevado);
+  border-left: 0; background: var(--elevado);
 }
 .programadas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
-.programadas li { display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3); border-radius: 12px; background: var(--elevado); }
+.programadas li { display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--elevado); }
 .programadaTopo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .programadaTopo button { margin-left: auto; }
 .programadaTexto { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tinta-2); }
@@ -463,31 +486,40 @@
    com a explicação inteira. */
 .acoes > button.acaoComRotulo,
 .acoes > label {
-  width: auto; min-width: 44px; min-height: 44px; height: auto; padding: 2px 6px; gap: 1px;
+  width: auto; min-width: var(--toque); min-height: var(--toque); height: auto; padding: 2px 6px; gap: 1px;
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
   font-size: var(--t-minimo); font-weight: 600; line-height: 1.1; border-radius: var(--r-1);
 }
 @container composer (max-width: 439px) {
   .acoes > button.acaoComRotulo,
-  .acoes > label { width: 36px; min-width: 36px; min-height: 36px; padding: 0; border-radius: var(--r-pilula); }
+  .acoes > label { width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-2); }
   .rotuloAcao {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
   }
 }
 
-/* Nota interna como post-it no fio (#1441): papel amarelo de recado, do lado de quem
-   atende, levemente torto. Nunca parece balão de mensagem: o cliente não vê. */
+/* Nota interna é um evento compacto. Só a expansão mostra o papel manuscrito. */
 .postIt {
-  align-self: flex-end; max-width: min(320px, 80%);
-  margin: var(--e-2) var(--e-2) var(--e-2) 0; padding: var(--e-2) var(--e-3);
-  background: var(--alerta-pastel); color: var(--tinta);
-  border-left: 3px solid var(--alerta); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
-  box-shadow: var(--sombra); transform: rotate(-.6deg);
+  align-self: center; max-width: 100%;
+  margin: var(--e-4) 0; padding: 0;
+  background: transparent; color: var(--tinta);
+  border-radius: var(--r-2);
+  box-shadow: none;
   font-size: var(--t-apoio); line-height: var(--lh-corpo);
 }
-.postIt p { margin: var(--e-1) 0 0; white-space: pre-line; }
-.postItQuem { display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-micro); font-weight: 600; color: var(--alerta); }
+.eventoNota { max-width: 100%; background: var(--alerta-pastel); }
+.eventoNota > summary {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); min-height: var(--toque);
+  padding: var(--e-1) var(--e-3); list-style: none; cursor: pointer;
+}
+.eventoNota > summary::-webkit-details-marker { display: none; }
+.eventoNota > summary:focus-visible { outline: 3px solid var(--halo); outline-offset: 2px; }
+.eventoNota[open] { width: min(340px, 100%); }
+.postIt p { margin: 0; padding: var(--e-2) var(--e-4) var(--e-4); white-space: pre-line; overflow-wrap: anywhere; font-family: var(--f-manuscrita); font-size: 24px; line-height: 1.4; }
+.postItQuem { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--e-1); font-size: var(--t-micro); font-weight: 600; color: var(--tinta-2); }
+.postItQuem > svg { flex: none; }
+.verNota { font-size: var(--t-micro); font-weight: 700; color: var(--marca-forte); }
 @media (prefers-reduced-motion: reduce) { .postIt { transform: none; } }
 
 /* #1868: com coluna larga (1920, ou 1440 com nome curto) o topo da conversa fica numa linha só:
@@ -503,7 +535,7 @@
   align-self: flex-start; max-width: min(100%, 62ch); text-align: left;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-corpo);
   padding: var(--e-2) var(--e-3); background: var(--papel);
-  border-left: var(--trilho) solid var(--linha-forte); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+  border-left: 0; border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
 }
 .sistema.sistemaPedido svg { display: inline-block; vertical-align: -3px; margin-right: var(--e-1); }
 
@@ -511,17 +543,32 @@
    lado do campo; a barra só quebra em coluna muito estreita. */
 @container composer (max-width: 760px) {
   .caixaEnxuta { flex-wrap: nowrap; }
-  .caixaEnxuta > :not(.acoes) { order: 2; flex-basis: auto; }
+  .caixaEnxuta > :not(.acoes) { order: 0; flex-basis: auto; }
   .caixaEnxuta > .acoes > .enviar { margin-left: 0; }
 }
 @container composer (max-width: 359px) {
+  .caixa { column-gap: var(--e-1); }
+  .acoes { gap: var(--e-1); }
+  .acoes > button.botaoRespostas {
+    width: 96px; min-width: 96px; padding-inline: var(--e-1); gap: var(--e-1);
+    font-size: var(--t-minimo);
+  }
   .caixaEnxuta { flex-wrap: wrap; }
   .caixaEnxuta > :not(.acoes) { order: 0; flex-basis: 100%; }
   .caixaEnxuta > .acoes > .enviar { margin-left: auto; }
 }
-/* #1868: em coluna estreita os vizinhos viram ícones redondos de 36; Respostas acompanha a altura. */
+/* Em coluna estreita os vizinhos viram ícones; Respostas compartilha o alvo de toque. */
 @container composer (max-width: 439px) {
-  .acoes > button.botaoRespostas { min-height: 36px; border-radius: var(--r-pilula); }
+  .acoes > button.botaoRespostas { min-height: var(--toque); border-radius: var(--r-2); }
+}
+
+@media (max-width: 759px) {
+  .modoLinha { gap: var(--e-2); }
+  .modoLinha > :first-child > span { font-size: var(--t-minimo); }
+  .caixa textarea,
+  .caixa textarea:hover,
+  .caixa textarea:focus,
+  .caixa textarea:disabled { min-height: var(--toque); }
 }
 
 /* #1239: lista de quem pode receber a conversa, um botão largo por pessoa. */

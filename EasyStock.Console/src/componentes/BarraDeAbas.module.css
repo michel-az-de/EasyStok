@@ -1,6 +1,5 @@
 .barra {
-  background: var(--vidro); -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
-  border-top: var(--b-1) solid var(--linha);
+  background: var(--papel); border-top: 0;
   padding-bottom: env(safe-area-inset-bottom, 0px); flex-shrink: 0;
 }
 .trilho { display: flex; }

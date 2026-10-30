@@ -74,7 +74,7 @@ function LogoDaLoja() {
               {enviando ? 'Enviando…' : loja?.logoUrl ? 'Trocar logo' : 'Enviar logo'}
             </Botao>
           </div>
-        ) : <p className={css.descricao}>O logo é enviado pela dona.</p>}
+        ) : <p className={css.descricao}>Peça à administração da loja para enviar o logo.</p>}
       </div>
       {situacao.estado === 'enviado' && <output className={css.retorno}>Logo salvo no EasyStok. Os próximos impressos já saem com ele.</output>}
       {situacao.estado === 'erro' && <p className={css.erro} role="alert">{situacao.mensagem}</p>}
@@ -98,10 +98,10 @@ function CanhotoSozinho({ ligado, aoMudar }) {
           aria-describedby={`${id}-automatico`}
           onChange={(evento) => aoMudar(evento.target.checked)}
         />
-        Imprimir o canhoto sozinho neste aparelho
+        Imprimir pedidos automaticamente neste aparelho
       </label>
       <p id={`${id}-automatico`} className={css.descricao}>
-        Cada pedido pago sai na impressora com o console aberto, em qualquer tela. Só uma aba imprime.
+        Pedidos pagos são impressos enquanto o sistema estiver aberto. Só uma aba imprime.
       </p>
       {ligado && (
         <div className={css.aviso}>
@@ -112,7 +112,7 @@ function CanhotoSozinho({ ligado, aoMudar }) {
               Abra o Chrome deste PC por um atalho com <code>--kiosk-printing</code>. No destino do atalho:
               <code className={css.atalho}>{atalhoDoChrome(enderecoDoConsole())}</code>
             </li>
-            <li>Entre no console por esse atalho e deixe-o aberto.</li>
+            <li>Abra o sistema por esse atalho e mantenha a janela aberta.</li>
           </ol>
         </div>
       )}
@@ -134,8 +134,7 @@ function PapeisDoAparelho() {
     <section className={css.secao} aria-labelledby={`${id}-papeis`}>
       <h3 id={`${id}-papeis`}>Impressora e papel neste aparelho</h3>
       <p className={css.descricao}>
-        Cada aparelho guarda o seu: o tablet da cozinha pode sair na bobina e o computador do balcão na A4.
-        A impressora escolhida já define o papel. Na hora de imprimir ainda dá para trocar.
+        Escolha o padrão deste aparelho. Você pode trocar a impressora e o papel ao imprimir.
       </p>
       <div className={css.papeis}>
         {DOCUMENTOS.map((documento) => {

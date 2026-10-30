@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url'
 const TETOS = {
   chaveForaDoDicionario: 0,
   botaoCru: 16,
-  termoProibido: 37,
+  termoProibido: 19,
   movimentoLiteral: 40,
 }
 

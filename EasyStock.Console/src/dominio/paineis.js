@@ -13,10 +13,10 @@ export const CONVERSA_MINIMA = 320
 // #1870/#1872: a largura do trilho do Balcão e dos módulos mora aqui e só aqui. O token CSS
 // `--largura-trilho` é gerado dela na partida (`tokensDaGeometria`, aplicado por `main.jsx`);
 // `tokens.css` deriva o item (`--largura-item-trilho`) do token.
-export const TRILHO = 100
+export const TRILHO = 76
 export const VAO = 12
 // Folga do assistente até a borda da tela (`--e-4`).
-export const MARGEM_ASSISTENTE = 20
+export const MARGEM_ASSISTENTE = 16
 
 // Cardápio: 440 é o mínimo do #1474 (nome, porção, preço e foto sem espremer o nome); 460 o padrão.
 export const CARDAPIO = { min: 440, max: 600, padrao: 460 }
