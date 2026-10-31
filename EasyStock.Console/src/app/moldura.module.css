@@ -232,7 +232,6 @@
 /* 13: as três colunas com a mesma faixa de título, de 64 px, e ícone antes. */
 .tituloColuna { min-height: 64px; gap: 10px; }
 .tituloColuna > svg { color: var(--tinta-3); }
-.tituloCompacto { min-height: 52px; padding-block: 2px; }
 /* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
 .espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
 .espacoTrilho::after { content: none; }
@@ -265,6 +264,6 @@
   .lojaTextoLongo { display: none; }
   .lojaTextoCurto { display: block; }
 }
-@media (max-width: 389px) {
+@media (min-width: 375px) and (max-width: 389px) {
   .lojaTextoCurto { display: none; }
 }
