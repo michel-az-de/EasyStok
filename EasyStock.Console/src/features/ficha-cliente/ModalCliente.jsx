@@ -54,7 +54,7 @@ export function ModalCliente({ conversa, aoFechar, children }) {
 
   return <Modal titulo="Ficha" largura="820px" className={css.modal} aoFechar={ocupado ? undefined : aoFechar}
     rodape={<div className={css.acoes}>
-      {!podeBaixarPdf && <small>{conversa.clienteId ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}
+      {!podeBaixarPdf && <small>{!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}
       <Botao variante="texto" disabled={ocupado} onClick={aoFechar}>Fechar</Botao>
       <Botao icone="download" disabled={ocupado || !podeBaixarPdf} onClick={baixarFicha}>{baixandoPdf ? 'Preparando PDF…' : 'Baixar PDF'}</Botao>
     </div>}>

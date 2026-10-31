@@ -1,8 +1,8 @@
 .barra {
   background: var(--papel); border-top: 0;
-  padding-bottom: env(safe-area-inset-bottom, 0px); flex-shrink: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px); flex-shrink: 0; min-width: 0;
 }
-.trilho { display: flex; }
+.trilho { display: flex; overflow-x: auto; overscroll-behavior-x: contain; }
 .aba {
   flex: 1; min-height: var(--toque); padding: var(--e-2) var(--e-1);
   background: none; border: 0; border-top: var(--b-3) solid transparent; border-radius: 0;

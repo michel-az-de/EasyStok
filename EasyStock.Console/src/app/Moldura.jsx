@@ -561,9 +561,7 @@ function ConteudoMoldura({
       <div className={css.app}>
         {cabecalho}
         <main className={css.palco} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label="Atendimento">
-          {/* Sem contagem ao lado do título (seção 1, corte #11): a aba
-              "Precisa de você"/"Todas" já conta, duas vezes é ruído. */}
-          <Coluna variante="entrada" titulo="Conversas">
+          <Coluna variante="entrada" titulo="Conversas" semTitulo>
             <LimiteDeErro parte="Lista de conversas"><PainelConversas buscaDeClientes={ChamarClientes} /></LimiteDeErro>
           </Coluna>
           <section className={`${css.coluna} ${css.centro}`} aria-label="Conversa">{atendimento}</section>
@@ -585,9 +583,9 @@ function ConteudoMoldura({
   }
 
   const painelDaAba = {
-    balcao: <LimiteDeErro parte="Lista de conversas"><PainelConversas aoAbrir={irParaAtendimento} buscaDeClientes={ChamarClientes} /></LimiteDeErro>,
+    balcao: <LimiteDeErro parte="Lista de conversas"><PainelConversas aoAbrir={irParaAtendimento} buscaDeClientes={ChamarClientes} acoesCabecalho={<span data-ancora-assistente />} /></LimiteDeErro>,
     atendimento,
-    ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>,
+    ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} acoesCabecalho={<span data-ancora-assistente />} /></LimiteDeErro>,
   }
 
   return (
@@ -603,12 +601,6 @@ function ConteudoMoldura({
           aria-labelledby={`aba-${aba}`}
           tabIndex={0}
         >
-          {aba !== 'atendimento' && (
-            <header className={`${css.tituloColuna} ${css.tituloCompacto}`}>
-              <span>{aba === 'ficha' ? `Ficha de ${selecionada?.nome.split(' ')[0] ?? 'cliente'}` : 'Conversas'}</span>
-              <span className={css.espaco} data-ancora-assistente />
-            </header>
-          )}
           {painelDaAba[aba]}
         </section>
       </main>

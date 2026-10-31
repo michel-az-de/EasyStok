@@ -127,7 +127,7 @@
   background: var(--papel); flex-shrink: 0;
 }
 .cabecalhoLista { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: 64px; }
-.cabecalhoLista h2 { margin: 0; font-size: var(--t-titulo); font-weight: 700; }
+.cabecalhoLista h2 { margin: 0 auto 0 0; font-size: var(--t-titulo); font-weight: 700; }
 .cabecalhoLista h2 span { margin-left: var(--e-1); color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 400; }
 .painelFiltros { display: grid; gap: var(--e-3); }
 .canaisNoFiltro { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin: 0; padding: 0; border: 0; }

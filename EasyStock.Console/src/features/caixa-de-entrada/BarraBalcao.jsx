@@ -54,7 +54,7 @@ function ChipCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
 // Linha A (busca e ordenar) e linha B (filtros) da seção 1. #1442
 // (homologação de 07/10): o Balcão abre em "Todas"; "Precisa de você" virou
 // filtro com contador e os três cartões de canal viraram chips na mesma linha.
-export function BarraBalcao({ filtros, aoMudar }) {
+export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
   const [ordenarAberto, setOrdenarAberto] = useState(false)
   const botaoFiltros = useRef(null)
   const { canais, janelas } = useCatalogo()
@@ -118,6 +118,7 @@ export function BarraBalcao({ filtros, aoMudar }) {
             </div>
           </Popover>}
         </span>
+        {acoesCabecalho}
       </header>
       <div className={css.linhaA}>
         <span className={css.campoBusca}>
@@ -128,7 +129,10 @@ export function BarraBalcao({ filtros, aoMudar }) {
               if (e.target.value.trim() && filtros.aba === 'precisa') aoMudar('aba', 'todas')
               aoMudar('busca', e.target.value)
             }} />
-          {filtros.busca && <button type="button" className={css.limparBusca} aria-label="Limpar busca" onClick={() => aoMudar('busca', '')}>
+          {filtros.busca && <button type="button" className={css.limparBusca} aria-label="Limpar busca" onClick={(evento) => {
+            evento.currentTarget.parentElement.querySelector('input')?.focus()
+            aoMudar('busca', '')
+          }}>
             <Icone nome="x" tamanho={20} />
           </button>}
         </span>

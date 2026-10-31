@@ -21,7 +21,7 @@ export function BotaoBaixarFicha({ clienteId, fonteApi }) {
   }
   return <span className={css.pdfDaFicha}>
     <BotaoIcone className={css.iconeFicha} rotulo={baixando ? 'Preparando PDF' : 'Baixar ficha em PDF'} icone="download"
-      dica={!clienteId ? 'Cadastre o cliente para baixar a ficha.' : !fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Baixar ficha em PDF'}
+      dica={!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : !clienteId ? 'Cadastre o cliente para baixar a ficha.' : 'Baixar ficha em PDF'}
       disabled={!fonteApi || !clienteId} aria-disabled={baixando || !fonteApi || !clienteId} aria-busy={baixando} onClick={baixar} />
     {erro && <output role="alert" className={css.erroPdf}>{erro}</output>}
   </span>

@@ -19,7 +19,7 @@
 .cadastro [data-resumo-cliente] p { margin: 0; line-height: 1.6; }
 .historico { min-width: 0; }
 .historico > h3 { margin: 0 0 var(--e-3); font-family: var(--f-corpo); font-size: var(--t-forte); }
-.historico [data-historico-cliente] { display: grid; gap: var(--e-3); }
+.historico [data-historico-cliente] { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-3); }
 .historico [role='tabpanel'] { padding-inline: 0; }
 .historico ul { min-width: 0; }
 .historico li { border: 0; box-shadow: none; background: transparent; }
