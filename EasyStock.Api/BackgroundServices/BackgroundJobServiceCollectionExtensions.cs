@@ -60,6 +60,11 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableCobrancaPedido)
             services.AddHostedService<CobrancaPedidoJob>();
 
+        // CorridasLalamoveJob (#2160, R6) — a cada 2 min, reconsulta as corridas da API em curso: o webhook pode
+        // não chegar, e a Lalamove desativa a URL depois de 10 falhas.
+        if (options.EnableCorridasLalamove)
+            services.AddHostedService<CorridasLalamoveJob>();
+
         // ImpressaoPendenteAlertaJob (S20) — a cada 2 min, canhoto pendente há mais de 3 min vira
         // impressao.atrasada no SSE de operação (o console avisa a dona).
         if (options.EnableImpressaoPendenteAlerta)

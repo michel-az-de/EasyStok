@@ -67,10 +67,19 @@ reconcilia. O id do provedor é único por provedor (`ux_corridas_externas_prove
 
 ### D5 · Webhook e dado pessoal (R5, R12)
 
-A entrada segue a ADR-0061 D3: chave opaca da loja no caminho da URL, assinatura com a chave e o segredo
-da loja, deduplicação em `WebhookRecebido` e reconsulta ao provedor antes de mudar estado. O corpo do
-webhook não é gravado, só o hash. Nome e telefone do motorista ficam só na corrida, e ao provedor vai só
-nome, telefone e endereço da entrega.
+Emenda à ADR-0061 D3 (linha da Lalamove): a URL é uma só para todas as lojas, `POST /api/webhooks/lalamove`,
+num controller próprio. O webhook traz o id do pedido, o id é único por provedor (D4) e é por ele que se acha
+a corrida e a loja. Depois vêm a chave e a assinatura com a conexão dessa loja, a deduplicação em
+`WebhookRecebido` e a reconsulta ao provedor antes de mudar estado. Sem chave opaca na URL, nada precisa ser
+gerado nem guardado por loja, e trocar a credencial não muda a URL.
+
+A fórmula da assinatura do webhook (timestamp em segundos, `POST`, caminho da URL e o JSON de `data`) se
+confirma no primeiro webhook do sandbox. Se não conferir, o webhook responde 200 e não muda nada: a Lalamove
+desativa a URL depois de 10 falhas, e a consulta de contingência a cada 2 minutos cobre o status.
+
+O corpo do webhook não é gravado, só o hash. Nome e telefone do motorista ficam só na corrida. Ao provedor
+vão só o nome, o telefone e o endereço da entrega, e a própria Lalamove manda ao cliente o SMS com o link de
+rastreio.
 
 ### D6 · A conexão da loja é a chave de liga e desliga
 
