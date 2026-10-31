@@ -23,8 +23,14 @@ public class AtendimentoCorridasController(
     SincronizarCorridaUseCase sincronizarUseCase,
     CancelarCorridaUseCase cancelarUseCase,
     AdicionarGorjetaCorridaUseCase gorjetaUseCase,
+    ConexaoDespachoUseCase conexaoUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [SwaggerOperation(Summary = "Whether the store can call rides by API", Description = "#2162: só diz se há conexão; nunca a chave.")]
+    [HttpGet("~/api/atendimento/corridas/conexao")]
+    public async Task<IActionResult> Conexao(CancellationToken ct) =>
+        DataOk(await conexaoUseCase.ExecuteAsync(currentUser.EmpresaId, ct));
+
     [SwaggerOperation(Summary = "List the external rides of a trip")]
     [HttpGet]
     public Task<IActionResult> Listar(Guid viagemId, CancellationToken ct) =>

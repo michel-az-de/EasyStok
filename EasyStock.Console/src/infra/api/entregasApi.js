@@ -37,6 +37,14 @@ export const sairParaEntrega = (id) => chamarApi(`${V}/${id}/sair`, { metodo: 'P
 export const listarCorridas = (id) => chamarApi(`${V}/${id}/corridas`)
 export const registrarCorrida = (id, corpo) => chamarApi(`${V}/${id}/corridas`, { metodo: 'POST', corpo })
 export const corrigirCorrida = (id, corridaId, corpo) => chamarApi(`${V}/${id}/corridas/${corridaId}`, { metodo: 'PUT', corpo })
+// #2162: corrida chamada pela API da Lalamove. A cotação vale 5 min; o preço da chamada vem dela, relida no servidor.
+export const conexaoDespacho = () => chamarApi('/api/atendimento/corridas/conexao')
+export const cotarCorrida = (id, veiculo) => chamarApi(`${V}/${id}/corridas/cotacao`, { metodo: 'POST', corpo: { veiculo } })
+export const chamarCorrida = (id, corpo) => chamarApi(`${V}/${id}/corridas/chamar`, { metodo: 'POST', corpo })
+export const atualizarCorrida = (id, corridaId) => chamarApi(`${V}/${id}/corridas/${corridaId}`)
+export const cancelarCorrida = (id, corridaId) => chamarApi(`${V}/${id}/corridas/${corridaId}/cancelar`, { metodo: 'POST' })
+export const gorjetaCorrida = (id, corridaId, centavos) =>
+  chamarApi(`${V}/${id}/corridas/${corridaId}/gorjeta`, { metodo: 'POST', corpo: { centavos } })
 // #1776 (item 19): com saldo a receber a API responde 409 SALDO_A_RECEBER até `confirmarSaldoAReceber`.
 export const marcarParadaEntregue = (id, pedidoId, confirmarSaldoAReceber = false) =>
   chamarApi(`${V}/${id}/paradas/${pedidoId}/entregue`, { metodo: 'POST', corpo: { confirmarSaldoAReceber }, keepalive: true })

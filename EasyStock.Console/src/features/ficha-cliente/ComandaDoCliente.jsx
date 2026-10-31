@@ -12,10 +12,8 @@ import {
 } from '../../dominio/pedido'
 import { useAcoes, useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { congelado } from '../../dominio/congelados'
 import { useComandasCliente, idDaJanela, janelaDoId } from '../../aplicacao/useComandasCliente'
 import { useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
-import { ConsultaTransporte } from './BlocoFreteApi'
 import { SeletorJanelaApi } from './SeletorJanelaApi'
 import { Cabecalho } from './Cabecalho'
 import css from './comanda.module.css'
@@ -240,8 +238,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
         dataInicial={c.rascunho.dataEntrega ?? ''} aoLerJanelas={setJanelas}
         aoEscolher={valor => { const escolhida = janelaDoId(valor); editar({ ...rascunho, janelaId: escolhida?.janelaId ?? null, dataEntrega: escolhida?.data ?? null }) }} />
       <details className={css.transporteCompartilhado} open={c.entregaACombinar}>
-        <summary>Combinar entrega{!congelado('lalamove') && ' · consultar Lalamove'}</summary>
-        <ConsultaTransporte semPedido />
+        <summary>Combinar entrega</summary>
         {!c.entregaACombinar && c.freteCombinado == null && <>
           <Botao disabled={ocupado || Boolean(edicao) || !c.rascunho.endereco || !c.rascunho.itens.length}
             onClick={() => encaminharEntrega(c)}>Combinar entrega dos itens</Botao>

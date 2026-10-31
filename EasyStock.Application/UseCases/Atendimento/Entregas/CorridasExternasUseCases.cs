@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Integration.Logistica;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -8,13 +9,18 @@ namespace EasyStock.Application.UseCases.Atendimento.Entregas;
 // toca SairParaEntregaUseCase nem as viagens; a viagem manual segue saindo com o entregador genérico do
 // provedor (RN-32 intacta).
 
+/// <summary>Corrida da viagem. Os campos depois de <c>CorrigidoEm</c> só vêm na corrida chamada pela API (#2162).</summary>
 public sealed record CorridaExternaResult(
     Guid Id, Guid ViagemId, EmpresaEntregador Provedor, OrigemCorridaExterna Origem, int CustoCentavos, string? Motorista,
-    Guid RegistradoPorUsuarioId, DateTime RegistradoEm, Guid? CorrigidoPorUsuarioId, DateTime? CorrigidoEm)
+    Guid RegistradoPorUsuarioId, DateTime RegistradoEm, Guid? CorrigidoPorUsuarioId, DateTime? CorrigidoEm,
+    StatusCorrida? Status = null, VeiculoCorrida? Veiculo = null, int? CustoCotadoCentavos = null, string? LinkRastreio = null,
+    string? MotoristaTelefone = null, string? MotoristaPlaca = null, bool Ativa = false, bool PodeCancelar = false)
 {
-    internal static CorridaExternaResult De(CorridaExterna c) => new(
+    internal static CorridaExternaResult De(CorridaExterna c, DateTime? agora = null) => new(
         c.Id, c.ViagemId, c.Provedor, c.Origem, c.CustoCentavos, c.Motorista,
-        c.RegistradoPorUsuarioId, c.RegistradoEm, c.CorrigidoPorUsuarioId, c.CorrigidoEm);
+        c.RegistradoPorUsuarioId, c.RegistradoEm, c.CorrigidoPorUsuarioId, c.CorrigidoEm,
+        c.Status, c.Veiculo, c.CustoCotadoCentavos, c.LinkRastreio, c.MotoristaTelefone, c.MotoristaPlaca, c.Ativa,
+        agora is { } instante && c.PodeCancelar(instante));
 }
 
 public sealed record RegistrarCorridaExternaInput(
@@ -59,13 +65,23 @@ public sealed class CorrigirCorridaExternaUseCase(
     }
 }
 
-public sealed class ListarCorridasDaViagemUseCase(IViagemRepository viagens, ICorridaExternaRepository corridas)
+public sealed class ListarCorridasDaViagemUseCase(IViagemRepository viagens, ICorridaExternaRepository corridas, TimeProvider relogio)
 {
     public async Task<IReadOnlyList<CorridaExternaResult>> ExecuteAsync(Guid empresaId, Guid viagemId, CancellationToken ct = default)
     {
         _ = await viagens.ObterAsync(empresaId, viagemId, ct) ?? throw new ViagemNaoEncontradaException(viagemId);
-        return (await corridas.ListarDaViagemAsync(empresaId, viagemId, ct)).Select(CorridaExternaResult.De).ToList();
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        return (await corridas.ListarDaViagemAsync(empresaId, viagemId, ct)).Select(c => CorridaExternaResult.De(c, agora)).ToList();
     }
+}
+
+/// <summary>#2162: o console só oferece "Chamar Lalamove" com a loja conectada. Nunca diz qual chave.</summary>
+public sealed class ConexaoDespachoUseCase(ILogisticaGateway gateway)
+{
+    public sealed record Resultado(bool LalamoveConectada);
+
+    public async Task<Resultado> ExecuteAsync(Guid empresaId, CancellationToken ct = default) =>
+        new(await gateway.ConectadoAsync(empresaId, ct));
 }
 
 public sealed record CustoDeEntregaViagem(Guid ViagemId, DateTime CriadaEm, int Paradas, int FreteCobradoCentavos, int CustoCentavos)
