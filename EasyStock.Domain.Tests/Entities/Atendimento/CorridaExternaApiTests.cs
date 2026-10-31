@@ -248,6 +248,19 @@ public class CorridaExternaApiTests
     }
 
     [Fact]
+    public void ViagemSaiComCorridaJaEntregueQuandoAColetaFoiPulada()
+    {
+        var viagem = ViagemComParada();
+        var corrida = Solicitada(viagem);
+        corrida.ConfirmarNoProvedor("ord-1", null);
+        corrida.AplicarStatus(StatusCorrida.Entregue, Agora.AddMinutes(30));
+
+        viagem.SairComCorrida(corrida, Agora.AddMinutes(30));
+
+        viagem.Situacao.Should().Be(SituacaoViagem.EmRota);
+    }
+
+    [Fact]
     public void ViagemNaoSaiComCorridaQueNaoColetouOuDeOutraViagem()
     {
         var viagem = ViagemComParada();

@@ -74,6 +74,8 @@ public static class DatabaseModule
                 builder.Services.AddEasyStockTestesIntegracao();
                 // Frete pela cotação da Lalamove com a chave de produção da loja (#1882).
                 builder.Services.AddEasyStockCotacaoFrete();
+                // Corrida chamada pela API da Lalamove (#2160, ADR-0064): liga pela conexão da loja.
+                builder.Services.AddEasyStockDespachoLalamove();
                 // Login com Google (#1324): Auth:Google:ClientId; desligado sem ele.
                 builder.Services.Configure<EasyStock.Infra.Integrations.Auth.GoogleAuthOptions>(
                     builder.Configuration.GetSection(EasyStock.Infra.Integrations.Auth.GoogleAuthOptions.Secao));
