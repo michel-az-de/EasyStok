@@ -31,7 +31,7 @@ export function ConsultaFreteCliente({ conversa, pedidoId = conversa.pedido?.ped
     return () => { ativo = false; controle.abort() }
   }, [clienteId, cliente.endereco, tentativa, chaveFrete])
 
-  return <Modal titulo="Frete e entrega" aoFechar={aoFechar} largura="900px"
+  return <Modal titulo="Frete e entrega" aoFechar={aoFechar} largura={consulta.viagem ? '900px' : undefined}
     rodape={<><Botao variante="texto" onClick={aoEditarEndereco}>Editar endereço</Botao><Botao onClick={aoFechar}>Fechar</Botao></>}>
     <div className={css.consultaFrete}>
       <p>{conversa.nome}</p>
