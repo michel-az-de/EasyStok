@@ -302,9 +302,19 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
 
         // #2155: nome do perfil, e-mail e localização entram no cadastro no mesmo commit da mensagem.
+        // Dado opcional do perfil nunca derruba a mensagem do cliente.
         if (perfilCliente is not null)
-            await perfilCliente.AplicarAsync(empresaId, conversa.ClienteId, identificacao?.Cliente, nomePerfil, msg,
-                mensagemEntidade.Id, relogio.GetUtcNow().UtcDateTime, ct);
+        {
+            try
+            {
+                await perfilCliente.AplicarAsync(empresaId, conversa.ClienteId, identificacao?.Cliente, nomePerfil, msg,
+                    mensagemEntidade.Id, relogio.GetUtcNow().UtcDateTime, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Webhook WhatsApp: perfil do cliente não foi completado pela mensagem {Wamid}.", msg.Wamid);
+            }
+        }
 
         // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
         // dona (Assumir + nota interna + aviso). O evento entra no outbox deste mesmo commit (ADR-0030).
