@@ -114,6 +114,26 @@ public class Viagem
         SaiuEm = Datas.Utc(agora);
     }
 
+    /// <summary>
+    /// R1 (ADR-0064): a viagem da corrida chamada pela API sai quando o provedor confirma a coleta, sem
+    /// <see cref="Entregador"/> cadastrado. O retrato da parada vem do motorista do provedor.
+    /// </summary>
+    public void SairComCorrida(CorridaExterna corrida, DateTime agora)
+    {
+        ArgumentNullException.ThrowIfNull(corrida);
+        GarantirMontando();
+        if (corrida.ViagemId != Id) throw new RegraDeDominioVioladaException("Corrida de outra viagem.");
+        if (corrida.Status != StatusCorrida.Coletada)
+            throw new RegraDeDominioVioladaException("A viagem só sai pela corrida depois que o motorista coletou.");
+        if (_paradas.Count == 0) throw new RegraDeDominioVioladaException("Viagem sem paradas não sai.");
+
+        var veiculo = corrida.Veiculo == VeiculoCorrida.Carro ? "Carro" : "Moto";
+        foreach (var parada in _paradas)
+            parada.GravarRetrato(corrida.Motorista, veiculo, corrida.MotoristaPlaca, corrida.Provedor);
+        Situacao = SituacaoViagem.EmRota;
+        SaiuEm = Datas.Utc(agora);
+    }
+
     public void MarcarParadaEntregue(Guid pedidoId, DateTime agora)
     {
         if (Situacao != SituacaoViagem.EmRota) throw new RegraDeDominioVioladaException("Só viagem em rota tem parada entregue.");

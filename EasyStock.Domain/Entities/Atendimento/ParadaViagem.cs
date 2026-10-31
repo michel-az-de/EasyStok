@@ -33,12 +33,15 @@ public class ParadaViagem
         Ordem = ordem;
     }
 
-    internal void GravarRetrato(Entregador entregador)
+    internal void GravarRetrato(Entregador entregador) =>
+        GravarRetrato(entregador.Nome, entregador.Veiculo, entregador.Placa, entregador.Empresa);
+
+    internal void GravarRetrato(string? nome, string? veiculo, string? placa, EmpresaEntregador empresa)
     {
-        EntregadorNome = entregador.Nome;
-        Veiculo = entregador.Veiculo;
-        Placa = entregador.Placa;
-        EmpresaEntregador = entregador.Empresa;
+        EntregadorNome = nome;
+        Veiculo = veiculo;
+        Placa = placa;
+        EmpresaEntregador = empresa;
     }
 
     internal void MarcarEntregue(DateTime em) => EntregueEm ??= em;
