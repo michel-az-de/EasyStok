@@ -27,7 +27,7 @@
 .acoes { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; width: 100%; }
 .acoes small { flex: 1 1 220px; color: var(--tinta-2); font-size: var(--t-minimo); }
 .erro { margin: 0; color: var(--erro); }
-.consultaFrete { display: grid; gap: var(--e-3); }
+.consultaFrete { display: grid; gap: var(--e-3); padding-bottom: var(--e-4); }
 .consultaFrete p { margin: 0; }
 .enderecoFrete { color: var(--tinta-2); overflow-wrap: anywhere; }
 .valorFrete { display: grid; gap: var(--e-2); }

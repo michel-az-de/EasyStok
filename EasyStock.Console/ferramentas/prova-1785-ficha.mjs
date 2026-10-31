@@ -91,14 +91,14 @@ provar('pedido com sinal mostra saldo do pedido inteiro incluindo frete', () => 
 })
 provar('rascunho com cliente cadastrado e endereço permite calcular o frete antes de criar pedido', () => {
   const html = renderizar({ pedido: { numero: 'local', estado: 'aguardando', itens: [{ sku: 'lasanha', qtd: 1 }] } })
-  assert.match(html, /aria-label="Calcular frete"/)
+  assert.match(html, /aria-label="Consultar frete"/)
   assert.match(html, />Frete<\/button>/)
   assert.doesNotMatch(html, /aria-label="Ver frete e entrega"/)
 })
 provar('pedido já criado conserva o acesso ao frete e à entrega do pedido', () => {
   const html = renderizar()
   assert.match(html, /aria-label="Ver frete e entrega"/)
-  assert.doesNotMatch(html, /aria-label="Calcular frete"/)
+  assert.doesNotMatch(html, /aria-label="Consultar frete"/)
 })
 for (const estado of ['entregue', 'cancelado']) {
   provar(`pedido ${estado} fica no pós-venda com acesso a ocorrências`, () => {

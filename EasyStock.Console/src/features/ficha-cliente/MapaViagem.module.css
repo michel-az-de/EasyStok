@@ -7,7 +7,8 @@
 .mapa iframe { width: 100%; min-height: 280px; border: 0; background: var(--elevado); }
 .indisponivel { color: var(--tinta-2); font-size: var(--t-apoio); }
 .painel p { margin: 0; }
-.mapa a { display: inline-flex; align-items: center; min-height: var(--toque); color: var(--marca); }
+.mapa a { display: inline-flex; align-items: center; justify-self: start; gap: var(--e-2); padding: var(--e-2) var(--e-3); min-height: var(--toque); background: var(--preenchimento); color: var(--tinta); font-size: var(--t-apoio); font-weight: 600; text-decoration: none; }
+.mapa a:hover { background: var(--preenchimento-forte); }
 .mapa a:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 .painel small { color: var(--tinta-2); font-size: var(--t-minimo); }
 .paradas { display: grid; gap: var(--e-2); margin: 0; padding-left: var(--e-4); }

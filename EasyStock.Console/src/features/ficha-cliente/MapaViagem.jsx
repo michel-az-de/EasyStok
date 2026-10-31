@@ -1,4 +1,5 @@
 import { mapaDaViagem, tituloDaViagem } from '../../dominio/mapaViagem'
+import { Icone } from '../../componentes/Icone'
 import css from './MapaViagem.module.css'
 
 const CHAVE_EMBED = import.meta.env?.VITE_GOOGLE_MAPS_EMBED_KEY ?? ''
@@ -16,8 +17,12 @@ export function MapaDaViagem({ viagem = null, endereco, pedidoId, nomeCliente })
         {mapa.embedUrl
           ? <iframe title={mapa.roteiro ? 'Mapa do roteiro da viagem' : 'Mapa do destino da entrega'} src={mapa.embedUrl}
             loading="lazy" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen />
-          : <p className={css.indisponivel}>{mapa.temEndereco ? 'Mapa indisponível neste ambiente.' : 'Adicione um endereço para ver o mapa.'}</p>}
-        {mapa.mapsUrl && <a href={mapa.mapsUrl} target="_blank" rel="noreferrer">{mapa.roteiroExterno ? 'Abrir roteiro no Maps' : 'Abrir destino no Maps'}</a>}
+          : !mapa.temEndereco && <p className={css.indisponivel}>Adicione um endereço para abrir no Maps.</p>}
+        {mapa.mapsUrl && <a href={mapa.mapsUrl} target="_blank" rel="noreferrer">
+          <Icone nome="map-pin" tamanho={20} />
+          {mapa.roteiroExterno ? 'Abrir roteiro no Maps' : 'Abrir no Maps'}
+          <Icone nome="external-link" tamanho={16} />
+        </a>}
         {viagem && <small>{mapa.roteiro ? 'Roteiro planejado' : 'Destino deste pedido'} · Sem posição em tempo real.</small>}
       </div>
       {viagem && <div className={css.viagem}>

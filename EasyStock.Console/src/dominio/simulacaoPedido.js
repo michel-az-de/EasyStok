@@ -9,11 +9,11 @@ export const simulacaoVale = (pedido) =>
   Boolean(pedido && !pedido.pedidoId && pedido.itens?.length > 0 && String(pedido.janela ?? '').includes('|'))
 
 // Linhas da comanda, na ordem em que se lê: frete, total com frete e, na encomenda, o sinal e o restante.
-// Fora da área não há número de frete, e nenhum total ou sinal é inventado.
+// Sem cotação não há número de frete, e nenhum total ou sinal é inventado.
 export function linhasDaSimulacao(simulacao) {
   if (!simulacao) return null
   if (simulacao.freteACombinar) {
-    return [{ chave: 'frete', texto: 'Frete a combinar com a equipe: o endereço está fora da área de entrega.' }]
+    return [{ chave: 'frete', texto: 'Frete a combinar com o cliente.' }]
   }
   const linhas = [
     { chave: 'frete', texto: `Frete ${moeda(simulacao.frete)}` },
