@@ -129,7 +129,7 @@ export function ModalProgramarMensagem({
       )}
     >
       <div className={css.programar}>
-        {bloqueado && <p className={css.programarErro}>Cliente bloqueado. Desbloqueie na ficha para programar. Você pode consultar e cancelar os agendamentos existentes.</p>}
+        {bloqueado && <p className={css.programarErro}>Cliente bloqueado. Novas mensagens não podem ser programadas.</p>}
         {!editavel && <p className={css.restricao}>Só a dona ou um gerente programa e cancela mensagens. Aqui você consulta as programadas desta conversa.</p>}
         <fieldset className={css.programarCampos} disabled={salvando || bloqueado || !editavel}>
         <div className={css.programarQuando}>

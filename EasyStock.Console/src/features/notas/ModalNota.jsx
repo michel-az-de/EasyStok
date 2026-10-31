@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
+import { proximaFrentePainel } from '../../hooks/estadoPainelMovel'
 import css from './ModalNota.module.css'
 
 // #1839: a nota abre como um post-it pequeno logo acima do composer, sem cobrir a conversa. Esc fecha,
@@ -9,6 +10,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
   const [texto, setTexto] = useState(textoInicial)
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState(null)
+  const [frente, setFrente] = useState(proximaFrentePainel)
   const salvando = useRef(false)
   const campo = useRef(null)
   const postit = useRef(null)
@@ -87,7 +89,8 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
   const aoTeclar = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !salvando.current) { e.stopPropagation(); fechar() } }
 
   return (
-    <dialog ref={postit} open={visivel} className={css.postit} aria-label="Nota interna" onKeyDown={aoTeclar}>
+    <dialog ref={postit} open={visivel} className={css.postit} style={{ zIndex: frente }} aria-label="Nota interna" onKeyDown={aoTeclar}
+      onFocusCapture={() => setFrente(proximaFrentePainel())} onPointerDownCapture={() => setFrente(proximaFrentePainel())}>
       <p className={css.titulo}>Nota interna <span>· só para a equipe</span></p>
       {outraConversa && <p role="status">Esta nota continua na ficha de {nomeCliente}.</p>}
       <CampoArea

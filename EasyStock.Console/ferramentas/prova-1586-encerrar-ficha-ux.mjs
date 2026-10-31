@@ -897,6 +897,22 @@ await confere('nota: contexto trocado, retorno após unmount e abridor indispon�
   })
 })
 
+await confere('nota nova e reativada fica à frente dos painéis móveis', async () => {
+  const { proximaFrentePainel } = await import('../src/hooks/estadoPainelMovel.js')
+  const frenteAnterior = proximaFrentePainel()
+  const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: nada, aoFechar: nada })
+  assert.ok(doTipo(tela, 'dialog')[0].props.style?.zIndex > frenteAnterior, 'nota abre acima do painel existente')
+  const outraFrente = proximaFrentePainel()
+  doTipo(tela, 'dialog')[0].props.onFocusCapture()
+  tela.renderizar()
+  assert.ok(doTipo(tela, 'dialog')[0].props.style.zIndex > outraFrente, 'retorno do foco traz o editor para frente')
+  const frentePonteiro = proximaFrentePainel()
+  doTipo(tela, 'dialog')[0].props.onPointerDownCapture()
+  tela.renderizar()
+  assert.ok(doTipo(tela, 'dialog')[0].props.style.zIndex > frentePonteiro)
+  tela.encerrar()
+})
+
 if (falhas.length > 0) {
   console.error(`\n${passou} ok, ${falhas.length} falha(s)`)
   process.exit(1)

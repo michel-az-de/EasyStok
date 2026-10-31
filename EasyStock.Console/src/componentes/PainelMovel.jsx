@@ -138,7 +138,7 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
   </aside>
 }
 
-export function PainelMovel({ controle, titulo, children, larguraInicial = 360, alturaInicial, className, classeCorpo, focar = false, aoRecolher, atributos }) {
+export function PainelMovel({ controle, titulo, children, larguraInicial = 360, alturaInicial, className, classeCorpo, focar = controle.foco, aoRecolher, atributos }) {
   if (!controle.solto || typeof document === 'undefined') return null
   return createPortal(<SuperficieMovel key={controle.chave} controle={controle} titulo={titulo} larguraInicial={larguraInicial}
     alturaInicial={alturaInicial} className={className} classeCorpo={classeCorpo} focar={focar} aoRecolher={aoRecolher} atributos={atributos}>{children}</SuperficieMovel>, document.body, controle.chave)

@@ -7,7 +7,7 @@
 
 /* #1839: post-it acima do composer, à direita da conversa; não cobre a lista nem o Resumo. */
 .postit {
-  position: fixed; z-index: 30; margin: 0; border: 0; bottom: 112px; left: 50%; transform: translateX(-50%);
+  position: fixed; margin: 0; border: 0; bottom: 112px; left: 50%; transform: translateX(-50%);
   width: min(360px, calc(100vw - 32px)); display: grid; gap: var(--e-2);
   padding: var(--e-3) var(--e-4); background: var(--alerta-pastel); color: var(--tinta);
   border-radius: var(--r-2);
