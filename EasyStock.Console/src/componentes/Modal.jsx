@@ -58,6 +58,8 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, className,
     // sumida, valor perdido). Se o fechamento estava segurado (ou indisponível), a folha reabre com o
     // que foi digitado, que é o motivo de segurar; senão o pai fica sabendo e desmonta, como no Esc.
     const aoFecharNativo = () => {
+      // O close anterior pode chegar depois da reabertura (inclusive no StrictMode).
+      if (dialogo.open) return
       if (segurarRef.current || !aoFecharRef.current) { if (!dialogo.open) dialogo.showModal() }
       else aoFecharRef.current()
     }

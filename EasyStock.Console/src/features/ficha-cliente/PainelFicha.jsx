@@ -85,7 +85,7 @@ function MapaMovelDaFicha({ controle, dados, clienteId }) {
   </PainelMovel>
 }
 
-function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoCompartilhar }) {
+function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoCompartilhar, acoesCabecalho }) {
   const {
     selecionada, alertasEstoque, ultimoAvanco, agora, automaticoPausado, fonteApi, sessao,
   } = useAtendimento()
@@ -208,6 +208,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         <span className={css.ferramentasFicha}>
           <BotaoBaixarFicha key={selecionada.clienteId ?? selecionada.id} clienteId={selecionada.clienteId} fonteApi={fonteApi} />
           <BotaoIcone className={css.iconeFicha} rotulo="Editar cadastro" icone="lapis" aria-haspopup="dialog" onClick={() => setSecao('cliente')} />
+          {acoesCabecalho}
         </span>
       </header>
       {/* Alerta no topo, em corpo de texto e como região viva. Estava nascendo
