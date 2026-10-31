@@ -751,15 +751,52 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("CorrigidoPorUsuarioId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CotacaoId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<int>("CustoCentavos")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CustoCotadoCentavos")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("EncerradaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IdExterno")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("IdExternoAnterior")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("LinkRastreio")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Motorista")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<DateTime?>("MotoristaAtribuidoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MotoristaIdExterno")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("MotoristaPlaca")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("MotoristaTelefone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<int>("Origem")
                         .HasColumnType("integer");
@@ -773,15 +810,29 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("RegistradoPorUsuarioId")
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Veiculo")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("ViagemId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ViagemId");
-
                     b.HasIndex("EmpresaId", "ViagemId")
                         .HasDatabaseName("ix_corridas_externas_empresa_viagem");
+
+                    b.HasIndex(new[] { "ViagemId" }, "IX_corridas_externas_ViagemId");
+
+                    b.HasIndex(new[] { "Provedor", "IdExterno" }, "ux_corridas_externas_provedor_id_externo")
+                        .IsUnique()
+                        .HasFilter("\"IdExterno\" IS NOT NULL");
+
+                    b.HasIndex(new[] { "ViagemId" }, "ux_corridas_externas_viagem_ativa")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN (1, 2, 3, 4)");
 
                     b.ToTable("corridas_externas", null, t =>
                         {
