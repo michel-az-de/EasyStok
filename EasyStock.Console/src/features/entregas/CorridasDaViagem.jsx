@@ -131,6 +131,7 @@ function CorridaPelaApi({ corrida, travado, cancelar, gorjeta }) {
       )}
       {corrida.ativa && (corrida.podeCancelar || corrida.status === 'ProcurandoMotorista') && (
         <div className={css.linha}>
+          {corrida.status === 'ProcurandoMotorista' && <span className={css.apoio}>Gorjeta para achar motorista:</span>}
           {corrida.status === 'ProcurandoMotorista' && GORJETAS_CENTAVOS.map((centavos) => (
             <Botao key={centavos} variante="texto" disabled={travado} aria-label={`Dar gorjeta de ${moeda(centavos / 100)} para achar motorista`}
               onClick={() => gorjeta(corrida.id, centavos)}>+ {moeda(centavos / 100)}</Botao>
