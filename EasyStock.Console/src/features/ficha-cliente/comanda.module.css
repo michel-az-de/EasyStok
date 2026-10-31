@@ -43,10 +43,7 @@
 .ajudaCompartilhada { display: grid; gap: var(--e-1); margin-block: var(--e-2); padding: var(--e-2) var(--e-3); border-left: 0; background: var(--alerta-pastel); border-radius: var(--r-1); }
 .transporteCompartilhado { margin-block: var(--e-2); }
 .transporteCompartilhado > summary { min-height: var(--toque); align-content: center; cursor: pointer; font-weight: 600; }
-.consultaTransporte { font-size: var(--t-apoio); }
-.consultaTransporte p { margin-block: var(--e-2); }
-.consultaTransporte a { display: inline-flex; align-items: center; min-height: var(--toque); color: var(--marca); text-underline-offset: 3px; }
-.consultaTransporte a:focus-visible, .transporteCompartilhado > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.transporteCompartilhado > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 .freteCompartilhado { margin-block: var(--e-3); }
 .confirmarCompartilhado { margin-block: var(--e-3); }
 

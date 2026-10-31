@@ -334,6 +334,48 @@ export const viagensConcluidasNoDia = (viagens, dia) => (viagens ?? [])
 
 export const custoDasCorridas = (corridas) => (corridas ?? []).reduce((soma, c) => soma + (c.custoCentavos ?? 0), 0)
 
+// #2162: corrida chamada pela API da Lalamove (`CorridaExternaResult` com `origem: 'Api'`). O status vem do
+// provedor; a tela só mostra e oferece o que a Lalamove ainda aceita.
+const STATUS_CORRIDA = {
+  Solicitando: { rotulo: 'Confirmando com a Lalamove', tom: 'info' },
+  ProcurandoMotorista: { rotulo: 'Procurando motorista', tom: 'aviso' },
+  MotoristaACaminho: { rotulo: 'Motorista a caminho da coleta', tom: 'info' },
+  Coletada: { rotulo: 'Saiu para entrega', tom: 'info' },
+  Entregue: { rotulo: 'Entregue', tom: 'ok' },
+  Cancelada: { rotulo: 'Cancelada', tom: 'neutro' },
+  Rejeitada: { rotulo: 'Recusada pelos motoristas', tom: 'perigo' },
+  Expirada: { rotulo: 'Expirou sem motorista', tom: 'perigo' },
+  Falha: { rotulo: 'Não foi criada', tom: 'perigo' },
+}
+export const VEICULOS_CORRIDA = [{ valor: 'Moto', rotulo: 'Moto' }, { valor: 'Carro', rotulo: 'Carro' }]
+export const GORJETAS_CENTAVOS = [300, 500, 1000]
+export const INTERVALO_CORRIDA_MS = 15000
+
+export const corridaDaApi = (corrida) => corrida?.origem === 'Api'
+export const statusDaCorrida = (corrida) => STATUS_CORRIDA[corrida?.status] ?? { rotulo: corrida?.status ?? '', tom: 'neutro' }
+export const corridaEmCurso = (corridas) => (corridas ?? []).some((c) => corridaDaApi(c) && c.ativa)
+
+// "Chamar Lalamove" só faz sentido com a loja conectada, a viagem montando, um pedido só (uma parada por corrida,
+// R7) e nenhuma corrida em curso. O motivo vira texto de apoio quando o botão não aparece.
+export function motivoSemChamada(viagem, corridas, conectada) {
+  if (!conectada) return null
+  if (viagem?.situacao !== 'Montando') return null
+  if ((viagem.paradas ?? []).length !== 1) return 'A Lalamove leva um pedido por vez: deixe uma parada só nesta viagem para chamar.'
+  if (corridaEmCurso(corridas)) return null
+  return ''
+}
+export const podeChamarLalamove = (viagem, corridas, conectada) => motivoSemChamada(viagem, corridas, conectada) === ''
+
+export const validadeDaCotacao = (cotacao, agoraMs) =>
+  Math.max(0, Math.floor((Date.parse(cotacao?.expiraEm ?? '') - agoraMs) / 1000)) || 0
+
+export const resumoDaCotacao = (cotacao) => [
+  moeda(cotacao.valorCentavos / 100),
+  cotacao.distanciaMetros ? `${(cotacao.distanciaMetros / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km` : null,
+].filter(Boolean).join(' · ')
+
+export const motoristaDaCorrida = (corrida) => [corrida.motorista, corrida.motoristaPlaca].filter(Boolean).join(' · ')
+
 export const resumoDaCorrida = (corrida) => [
   rotuloEmpresaEntregador(corrida.provedor), moeda(corrida.custoCentavos / 100), corrida.motorista, corrida.corrigidoEm ? 'corrigida' : null,
 ].filter(Boolean).join(' · ')

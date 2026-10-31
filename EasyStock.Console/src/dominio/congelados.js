@@ -11,7 +11,8 @@
 //
 // Para DESCONGELAR um item: tire-o da lista abaixo e confira se algum texto foi ajustado para não
 // mentir enquanto o item estava fora (resumo do módulo em dominio/modulos.js, guia em
-// dominio/guiaDoConsole.js). O financeiro gerencial voltou em 27/10/2026 (decisão do Felipe, #2095).
+// dominio/guiaDoConsole.js). O financeiro gerencial voltou em 27/10/2026 (decisão do Felipe, #2095). O despacho
+// da Lalamove voltou em 31/10/2026 (decisão do Felipe, #2162), agora pela API na corrida da viagem.
 // `ferramentas/prova-congelados.mjs` confere que cada item da lista existe no catálogo e está
 // fora da tela.
 
@@ -25,9 +26,6 @@ export const CONGELADOS = Object.freeze({
   ]),
   // Pontos avulsos das features (botão, link, chip), por chave.
   avulsos: Object.freeze([
-    // Cotação, chamado e link externo da Lalamove no despacho. O cartão em Integrações fica:
-    // a chave segue cotando o frete do pedido (#1885).
-    'lalamove',
     // Chip do canal E-mail no Balcão. `CANAIS` fica: `canalDaConversa` e a prova-1432 dependem.
     'canal-email',
   ]),
