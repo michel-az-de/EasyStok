@@ -31,22 +31,20 @@ export function ConsultaFreteCliente({ conversa, pedidoId = conversa.pedido?.ped
     return () => { ativo = false; controle.abort() }
   }, [clienteId, cliente.endereco, tentativa, chaveFrete])
 
-  return <Modal titulo="Calcular frete" aoFechar={aoFechar} largura="900px"
+  return <Modal titulo="Frete e entrega" aoFechar={aoFechar} largura="900px"
     rodape={<><Botao variante="texto" onClick={aoEditarEndereco}>Editar endereço</Botao><Botao onClick={aoFechar}>Fechar</Botao></>}>
     <div className={css.consultaFrete}>
       <p>{conversa.nome}</p>
       <p className={css.enderecoFrete}>{cliente.endereco}</p>
-      {frete.carregando && <output>Calculando frete…</output>}
+      {frete.carregando && <output>Consultando frete…</output>}
       {frete.dados && <output className={css.valorFrete}>
         <strong>{frete.dados.valorFormatado || moeda(frete.dados.valor / 100)}</strong>
         {frete.dados.etaLabel && <span>{frete.dados.etaLabel}</span>}
         {frete.dados.zonaLabel && <small>{frete.dados.zonaLabel}</small>}
       </output>}
       {frete.erro && <div role={frete.combinar ? 'status' : 'alert'}>
-        {frete.combinar && <h3>Frete a combinar</h3>}
-        <p>{frete.erro}</p>
-        {frete.combinar ? <p>Combine o frete com o cliente antes de cobrar.</p>
-          : <Botao onClick={() => setTentativa((v) => v + 1)}>Tentar de novo</Botao>}
+        {frete.combinar ? <><h3>Frete a combinar</h3><p>Combine o valor com o cliente antes de cobrar.</p></>
+          : <><p>{frete.erro}</p><Botao onClick={() => setTentativa((v) => v + 1)}>Tentar de novo</Botao></>}
       </div>}
     </div>
     {consulta.carregando && <output>Consultando a viagem…</output>}

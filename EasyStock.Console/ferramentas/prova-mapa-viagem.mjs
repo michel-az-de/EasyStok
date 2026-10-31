@@ -60,29 +60,38 @@ assert.equal(new URL(seis.embedUrl).searchParams.get('waypoints').split('|').len
 assert.equal(seis.roteiroExterno, false)
 console.log('ok limites oficiais de waypoints não truncam viagens em silêncio; link móvel abre o destino quando necessário')
 const urlComponente = new URL('../src/features/ficha-cliente/MapaViagem.jsx', import.meta.url)
-const compilado = (await transformWithOxc(readFileSync(urlComponente, 'utf8'), urlComponente.pathname, { jsx: { runtime: 'automatic' } })).code
+const compilados = new Map(await Promise.all([urlComponente, new URL('../src/componentes/Icone.jsx', import.meta.url)].map(async (url) =>
+  [url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code])))
 registerHooks({
   resolve(specifier, context, next) {
     if (context.parentURL === urlComponente.href && specifier.endsWith('/mapaViagem')) return next(specifier + '.js', context)
+    if (context.parentURL === urlComponente.href && specifier.endsWith('/Icone')) return next(specifier + '.jsx', context)
     return next(specifier, context)
   },
   load(url, context, next) {
-    if (url === urlComponente.href) return { format: 'module', shortCircuit: true, source: compilado }
-    if (url.endsWith('/MapaViagem.module.css')) return { format: 'module', shortCircuit: true, source: 'export default new Proxy({}, { get: (_, nome) => nome })' }
+    if (compilados.has(url)) return { format: 'module', shortCircuit: true, source: compilados.get(url) }
+    if (url.endsWith('.module.css')) return { format: 'module', shortCircuit: true, source: 'export default new Proxy({}, { get: (_, nome) => nome })' }
     return next(url, context)
   },
 })
 const { MapaDaViagem } = await import(urlComponente.href)
 const html = renderToStaticMarkup(MapaDaViagem({ viagem, pedidoId, nomeCliente: 'Cliente da viagem' }))
 assert.match(html, /conteudo semMapa/)
-assert.match(html, /<p class="indisponivel">Mapa indisponível neste ambiente\.<\/p>/)
+assert.doesNotMatch(html, /indisponível|neste ambiente/)
 assert.doesNotMatch(html, /<iframe/)
 assert.match(html, /Abrir roteiro no Maps/)
+assert.match(html, /target="_blank" rel="noreferrer"/)
+const destino = renderToStaticMarkup(MapaDaViagem({ endereco: 'Avenida Paulista, 1578, São Paulo' }))
+assert.match(destino, /Abrir no Maps/)
+assert.doesNotMatch(destino, /<iframe|indisponível/)
+const semEndereco = renderToStaticMarkup(MapaDaViagem({ endereco: '' }))
+assert.match(semEndereco, /Adicione um endereço para abrir no Maps/)
+assert.doesNotMatch(semEndereco, /href=|<iframe/)
 assert.match(html, /Sem posição em tempo real/)
 assert.match(html, /Rua da primeira parada, 1, São Paulo/)
 assert.match(html, /Rua do destino, 2, São Paulo/)
 const css = readFileSync(new URL('../src/features/ficha-cliente/MapaViagem.module.css', import.meta.url), 'utf8')
 assert.doesNotMatch(css.match(/\.indisponivel\s*\{([^}]+)\}/)[1], /height|padding|background/)
 assert.match(css, /\.mapa iframe\s*\{[^}]*min-height: 280px/)
-console.log('ok sem chave o componente real mostra aviso compacto, link e paradas; reserva de altura só no iframe')
+console.log('ok sem chave o componente real oferece Maps externo, preserva paradas e orienta endereço ausente; altura só no iframe')
 console.log('6 grupos do mapa/viagem aprovados. Esta prova não certifica uma chave Maps nem pixels do provedor.')
