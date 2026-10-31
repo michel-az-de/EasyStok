@@ -44,6 +44,9 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
         });
 
         services.AddScoped<StubWhatsAppCloudClient>();
+        // #2155: foto do perfil pelas pontes, num HttpClient sem a chave delas (o endereço é do CDN do WhatsApp).
+        services.AddHttpClient<BaixadorFotoPerfilWhatsApp>(BaixadorFotoPerfilWhatsApp.HttpClientNome,
+            client => client.Timeout = TimeSpan.FromSeconds(15));
         services.Configure<WppConnectOptions>(configuration.GetSection("Atendimento:WppConnect"));
         services.AddHttpClient<WppConnectClient>((sp, client) =>
         {

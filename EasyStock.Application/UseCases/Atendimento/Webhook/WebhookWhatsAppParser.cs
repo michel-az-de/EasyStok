@@ -88,6 +88,7 @@ public static class WebhookWhatsAppParser
             : DateTimeOffset.UtcNow;
 
         string? texto = null, midiaId = null, midiaMime = null, botaoRespostaId = null, botaoPayload = null;
+        LocalizacaoWhatsApp? localizacao = null;
 
         switch (tipo)
         {
@@ -105,7 +106,11 @@ public static class WebhookWhatsAppParser
                 break;
             case "location":
                 if (m.TryGetProperty("location", out var local))
+                {
                     texto = TextoDaLocalizacao(local);
+                    localizacao = LocalizacaoWhatsApp.Criar(Double(local, "latitude"), Double(local, "longitude"),
+                        GetString(local, "name"), GetString(local, "address"));
+                }
                 break;
             case "interactive":
                 if (m.TryGetProperty("interactive", out var interactive)
@@ -120,7 +125,7 @@ public static class WebhookWhatsAppParser
                 break;
         }
 
-        return new MensagemRecebidaWhatsApp(de, wamid, timestamp, tipo, texto, midiaId, midiaMime, botaoRespostaId, botaoPayload);
+        return new MensagemRecebidaWhatsApp(de, wamid, timestamp, tipo, texto, midiaId, midiaMime, botaoRespostaId, botaoPayload, localizacao);
     }
 
     private static StatusRecebidoWhatsApp ParseStatus(JsonElement s)
@@ -159,6 +164,9 @@ public static class WebhookWhatsAppParser
 
     private static string? Numero(JsonElement element, string propriedade) =>
         element.TryGetProperty(propriedade, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetRawText() : null;
+
+    private static double? Double(JsonElement element, string propriedade) =>
+        element.TryGetProperty(propriedade, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var d) ? d : null;
 
     private static string? GetString(JsonElement element, string propriedade) =>
         element.TryGetProperty(propriedade, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;

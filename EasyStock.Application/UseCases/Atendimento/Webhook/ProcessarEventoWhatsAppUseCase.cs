@@ -43,7 +43,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     IPublicadorEventoIntegracao? publicadorEventos = null,
     Ports.Output.Ai.ITranscritorAudio? transcritor = null,
     IPedidoRepository? pedidos = null,
-    IRegraAutomaticaRepository? regrasAutomaticas = null)
+    IRegraAutomaticaRepository? regrasAutomaticas = null,
+    PerfilClienteWhatsApp? perfilCliente = null)
 {
     private const string Provedor = "meta_whatsapp";
 
@@ -300,6 +301,11 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             mensagemEntidade.AguardarMidia(msg.MidiaId, DateTime.UtcNow); // #1397: pendência durável
         await conversaRepository.AddMensagemAsync(mensagemEntidade, ct);
 
+        // #2155: nome do perfil, e-mail e localização entram no cadastro no mesmo commit da mensagem.
+        if (perfilCliente is not null)
+            await perfilCliente.AplicarAsync(empresaId, conversa.ClienteId, identificacao?.Cliente, nomePerfil, msg,
+                mensagemEntidade.Id, relogio.GetUtcNow().UtcDateTime, ct);
+
         // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
         // dona (Assumir + nota interna + aviso). O evento entra no outbox deste mesmo commit (ADR-0030).
         if (identificacao?.Cliente.Bloqueado == true)
@@ -356,6 +362,13 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             {
                 await queueService.EnqueueAsync(FilaAtendimentoNomes.MidiaWhatsApp,
                     new ArmazenarMidiaWhatsAppJob(empresaId, conversa.Id, msg.Wamid, msg.MidiaId));
+            }
+
+            // #2155: conversa nova de cliente sem foto busca a foto do perfil, fora da requisição.
+            if (perfilCliente is not null && identificacao is { Cliente.FotoChave: null })
+            {
+                await queueService.EnqueueAsync(FilaAtendimentoNomes.FotoPerfilWhatsApp,
+                    new ColetarFotoPerfilWhatsAppJob(empresaId, identificacao.Cliente.Id, conversa.ContatoIdExterno));
             }
 
             // S24: conversa de cliente bloqueado já nasceu com a dona; nada automático responde.
