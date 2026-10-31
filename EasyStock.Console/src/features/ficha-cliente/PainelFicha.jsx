@@ -231,7 +231,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
         <section ref={receberPrato} className={css.resumoAtual} data-recebendo-prato={recebendoPrato || undefined} aria-label="Resumo do atendimento">
           <h3>{!editavel ? 'Conversa concluída' : pedido ? 'Pedido' : 'Novo pedido'} {editavel && numero && <small>Comanda {numero}</small>}</h3>
-          <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
+          <p>{!editavel ? 'O histórico está guardado.'
             : pedido ? `${pedidoCriado ? rotuloDoResumo(pedido.estado, saldo, Array.isArray(pedido.pagamentosApi) ? totalPago(pedido) : null) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
               : cadastrarPrimeiro ? 'Cadastre o cliente para montar o pedido.'
                 : 'Adicione itens ou envie o cardápio ao cliente.'}</p>
@@ -293,7 +293,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       {pedido && <PainelMovel controle={comandaMovel} titulo={`Comanda · ${selecionada.nome}`} larguraInicial={480} alturaInicial={560}>
         {editavel && !pedidoCriado && <p>Estes itens ainda estão em montagem. O pedido será criado ao gerar a cobrança.</p>}
-        {!editavel && <p>Consulta do atendimento encerrado. Reabra a conversa para fazer alterações.</p>}
+        {!editavel && <p>Consulta do atendimento encerrado.</p>}
         <BlocoPedido
           pedido={pedido}
           editavel={editavel}
