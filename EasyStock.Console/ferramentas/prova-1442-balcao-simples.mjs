@@ -11,6 +11,7 @@
 //   node ferramentas/prova-1442-balcao-simples.mjs
 
 import { registerHooks } from 'node:module'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 
 registerHooks({
@@ -19,6 +20,12 @@ registerHooks({
       try { return proximo(especificador + '.js', contexto) } catch { /* cai no original */ }
     }
     return proximo(especificador, contexto)
+  },
+  load(url, contexto, proximo) {
+    if (url.endsWith('/infra/fonteDados.js')) return { format: 'module', shortCircuit: true,
+      source: readFileSync(new URL(url), 'utf8').replaceAll('import.meta.env', '({ VITE_FONTE_DADOS: "demonstracao" })') }
+    if (url.endsWith('.json')) return { format: 'module', shortCircuit: true, source: 'export default ' + readFileSync(new URL(url), 'utf8') }
+    return proximo(url, contexto)
   },
 })
 
@@ -34,7 +41,7 @@ const confere = async (descricao, fn) => {
     console.log(`FALHA ${descricao}\n      ${erro.message.split('\n').filter(Boolean).slice(0, 3).join(' ')}`)
   }
 }
-const importar = (caminho) => import(caminho).catch(() => ({}))
+const importar = (caminho) => import(caminho)
 
 const { estadoInicial } = await importar('../src/aplicacao/reducer.js')
 const linha = await importar('../src/dominio/linhaDoBalcao.js')
@@ -161,15 +168,16 @@ await confere(`5. todas as linhas do banner cabem em ${LIMITE} caracteres`, () =
     assert.doesNotMatch(r.linha, /Próximo passo sugerido/)
   }
 })
-await confere('5. você assumiu: "Com você", automático pausado, aviso do pedido segue', () => {
+await confere('5. você assumiu: "Você respondendo", automático pausado, aviso do pedido segue', () => {
   const r = modo.resumoDoModo(conversa(), PAUSA_POR_ASSUMIR, false)
-  assert.equal(r.rotulo, 'Com você')
+  assert.equal(r.rotulo, 'Você respondendo')
   assert.match(r.linha, /pausado/i)
-  assert.match(r.detalhe, /Pausado porque você assumiu/)
+  assert.match(r.detalhe, /Você respondendo/)
+  assert.match(r.detalhe, /avisos de preparo e entrega do pedido continuam saindo/)
 })
 await confere('5. você respondeu, sem pedido: encerrar ou devolver, e oferece Encerrar', () => {
   const r = modo.resumoDoModo(respondeu(), PAUSA_POR_ASSUMIR, false)
-  assert.match(r.linha, /encerre/i)
+  assert.match(r.linha, /conclua/i)
   assert.match(r.linha, /devolva/i)
   assert.equal(r.sugereEncerrar, true)
   assert.match(r.detalhe, /Próximo passo sugerido/, 'a frase inteira fica no detalhe (title)')

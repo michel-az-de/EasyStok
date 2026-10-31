@@ -354,7 +354,7 @@
   min-height: var(--toque); padding: var(--e-2) var(--e-3);
   background: none; border: 0; color: inherit;
 }
-.escolhaJanela { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--e-2); min-height: 44px; }
+.escolhaJanela { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--e-2); }
 .escolhaJanela > .trilho { grid-column: 1 / -1; }
 .escolhaJanela:hover:not(:disabled) { background: var(--elevado); }
 .escolhaJanela:disabled { opacity: .65; cursor: not-allowed; }
