@@ -39,6 +39,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AvisoEquipeNoAparelho>(); // #1807: avisos do Balcão no aparelho (Web Push)
         services.AddScoped<OptOutPorPalavra>();
         services.AddScoped<SaudacaoAtendimento>();
+        services.AddScoped<PerfilClienteWhatsApp>(); // #2155: nome, e-mail e localização no cadastro
 
         // S42: variáveis e CRUDs agrupados (*UseCases, fora do sufixo da convenção).
         services.AddScoped<VariaveisAtendimento>();

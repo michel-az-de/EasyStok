@@ -30,7 +30,8 @@ public sealed class WahaWhatsAppClient(
     MenuNumeradoWaha menus,
     ResiliencePipelineProvider<string> pipelines,
     TimeProvider relogio,
-    ILogger<WahaWhatsAppClient> logger) : IWhatsAppCloudClient
+    ILogger<WahaWhatsAppClient> logger,
+    BaixadorFotoPerfilWhatsApp? fotos = null) : IWhatsAppCloudClient
 {
     public const string MotivoSemModelo =
         "A ponte do WhatsApp não envia modelo aprovado. Responda pelo celular da loja ou espere o cliente escrever.";
@@ -136,6 +137,26 @@ public sealed class WahaWhatsAppClient(
 
         var mime = resposta.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
         return (await resposta.Content.ReadAsStreamAsync(ct), mime);
+    }
+
+    /// <summary>#2155: <c>GET api/contacts/profile-picture</c> devolve o endereço da foto no CDN, ou nulo sem foto visível.</summary>
+    public async Task<FotoPerfilWhatsApp?> ObterFotoPerfilAsync(string waId, CancellationToken ct = default)
+    {
+        if (fotos is null) return null;
+        var conversa = await ConversaDaEmpresaAsync(waId, ct);
+        using var resposta = await http.GetAsync(
+            $"api/contacts/profile-picture?contactId={Uri.EscapeDataString(conversa)}&session={Uri.EscapeDataString(_opcoes.Sessao)}", ct);
+        if (!resposta.IsSuccessStatusCode)
+        {
+            logger.LogWarning("Ponte WAHA: a foto do perfil respondeu HTTP {Status}.", (int)resposta.StatusCode);
+            return null;
+        }
+
+        using var corpo = JsonDocument.Parse(await resposta.Content.ReadAsStringAsync(ct));
+        var url = corpo.RootElement.ValueKind == JsonValueKind.Object
+            && corpo.RootElement.TryGetProperty("profilePictureURL", out var valor) && valor.ValueKind == JsonValueKind.String
+            ? valor.GetString() : null;
+        return await fotos.BaixarAsync(url, ct);
     }
 
     private async Task<string> ConversaDaEmpresaAsync(string waId, CancellationToken ct)

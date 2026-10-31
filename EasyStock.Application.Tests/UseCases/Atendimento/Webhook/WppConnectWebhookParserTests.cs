@@ -33,6 +33,19 @@ public class WppConnectWebhookParserTests
         msg.MidiaId.Should().Be("wpp:media-id");
     }
 
+    [Theory]
+    [InlineData("-25.4284", "-49.2733")]
+    [InlineData("\"-25.4284\"", "\"-49.2733\"")]
+    public void Localizacao_preserva_coordenadas_e_descricao(string lat, string lng)
+    {
+        // #2155: antes só o caption sobrava e a localização chegava vazia.
+        var raw = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","id":"loc-1","from":"5511999999999@c.us","type":"location","body":"/9j/miniatura","lat":{{{lat}}},"lng":{{{lng}}},"loc":"Rua XV de Novembro, Curitiba","t":1793000000}""";
+        var msg = WppConnectWebhookParser.Parse(raw).Entradas.Single().Mensagens.Single();
+        msg.Tipo.Should().Be("location");
+        msg.Localizacao.Should().Be(new LocalizacaoWhatsApp(-25.4284, -49.2733, "Rua XV de Novembro, Curitiba", null));
+        msg.TextoCorpo.Should().Be("Rua XV de Novembro, Curitiba; -25.4284,-49.2733");
+    }
+
     [Fact]
     public void Eco_do_celular_nao_vira_entrada_do_cliente()
     {

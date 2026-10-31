@@ -13,7 +13,8 @@ public sealed class WppConnectOptions
     public string WebhookToken { get; set; } = "";
 }
 
-public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions> options, IRemetenteWhatsApp remetente)
+public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions> options, IRemetenteWhatsApp remetente,
+    BaixadorFotoPerfilWhatsApp? fotos = null)
     : IWhatsAppCloudClient, IWppConnectSessaoClient
 {
     private readonly WppConnectOptions _options = options.Value;
@@ -164,6 +165,16 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
         try { bytes = Convert.FromBase64String(base64); }
         catch (FormatException) { throw Falha("O WPPConnect devolveu mídia inválida.", 502); }
         return (new MemoryStream(bytes, writable: false), mime);
+    }
+
+    /// <summary>#2155: <c>profile-pic/{telefone}</c> devolve o endereço da foto no CDN (<c>eurl</c>), ou nada sem foto visível.</summary>
+    public async Task<FotoPerfilWhatsApp?> ObterFotoPerfilAsync(string waId, CancellationToken ct = default)
+    {
+        if (fotos is null) return null;
+        var sessao = await SessaoAsync(ct);
+        using var doc = await ChamarAsync(HttpMethod.Get, Path(sessao, $"profile-pic/{Uri.EscapeDataString(waId)}"), sessao, null, ct);
+        var dados = doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("response", out var r) ? r : default;
+        return await fotos.BaixarAsync(LerTexto(dados, "eurl") ?? LerTexto(dados, "imgFull"), ct);
     }
 
     private static string? LerTexto(JsonElement root, string nome) =>

@@ -6,6 +6,7 @@ namespace EasyStock.Api.BackgroundServices;
 /// <summary>
 /// Drena a fila em processo <see cref="FilaAtendimentoNomes.MidiaWhatsApp"/> (S03): o webhook
 /// enfileira, este loop chama <see cref="ProcessarMidiaWhatsAppJobUseCase"/> fora da requisição.
+/// Também drena <see cref="FilaAtendimentoNomes.FotoPerfilWhatsApp"/> (#2155).
 /// <see cref="FilaAtendimentoNomes.TurnoAgente"/> tem consumidor próprio (<c>AtendimentoFilaTurnoAgenteBackgroundService</c>, S06).
 /// Roda no processo da API, e não no Worker, porque <c>BackgroundQueueService</c> é em memória: só o
 /// processo que enfileira enxerga a fila. A fila não sobrevive a restart: por isso a pendência também fica na
@@ -40,6 +41,17 @@ public sealed class AtendimentoFilaMidiaBackgroundService(
                         using var scope = serviceProvider.CreateScope();
                         var processador = scope.ServiceProvider.GetRequiredService<ProcessarMidiaWhatsAppJobUseCase>();
                         await processador.ExecuteAsync(job, stoppingToken);
+                    },
+                    stoppingToken);
+
+                // #2155: a foto do perfil é mídia do mesmo canal e cabe no mesmo loop; perdida num restart, volta na
+                // próxima conversa nova do cliente sem foto.
+                await queueService.ProcessQueueAsync<ColetarFotoPerfilWhatsAppJob>(
+                    FilaAtendimentoNomes.FotoPerfilWhatsApp,
+                    async job =>
+                    {
+                        using var scope = serviceProvider.CreateScope();
+                        await scope.ServiceProvider.GetRequiredService<ColetarFotoPerfilWhatsAppUseCase>().ExecuteAsync(job, stoppingToken);
                     },
                     stoppingToken);
 

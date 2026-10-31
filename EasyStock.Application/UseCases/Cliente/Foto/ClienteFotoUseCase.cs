@@ -26,7 +26,7 @@ public sealed class ClienteFotoUseCase(
     }
 
     public async Task<FotoClienteResult?> EnviarAsync(Guid empresaId, Guid clienteId, Guid? usuarioId,
-        string nomeArquivo, string contentType, byte[] conteudo, CancellationToken ct = default)
+        string nomeArquivo, string contentType, byte[] conteudo, CancellationToken ct = default, string origem = "console")
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
         var cliente = await clientes.GetByIdAsync(empresaId, clienteId);
@@ -54,7 +54,7 @@ public sealed class ClienteFotoUseCase(
             // GetByIdAsync devolve a entidade rastreada: somente foto/data mudam, sem sobrescrever cadastro concorrente.
             cliente.FotoChave = salvo.StorageKey;
             cliente.AlteradoEm = DateTime.UtcNow;
-            await RegistrarAsync(cliente, usuarioId, anterior, salvo.StorageKey);
+            await RegistrarAsync(cliente, usuarioId, anterior, salvo.StorageKey, origem);
             await uow.CommitAsync();
         }
         catch
@@ -90,12 +90,12 @@ public sealed class ClienteFotoUseCase(
         return new(null);
     }
 
-    private Task RegistrarAsync(ClienteEntity cliente, Guid? usuarioId, string? anterior, string? atual) =>
+    private Task RegistrarAsync(ClienteEntity cliente, Guid? usuarioId, string? anterior, string? atual, string origem = "console") =>
         clientes.AddAlteracaoAsync(new ClienteAlteracao
         {
             Id = Guid.NewGuid(), EmpresaId = cliente.EmpresaId, ClienteId = cliente.Id,
             AlteradoPorUserId = usuarioId, Campo = "Foto", ValorAntigo = anterior, ValorNovo = atual,
-            AlteradoEm = cliente.AlteradoEm, Origem = "console"
+            AlteradoEm = cliente.AlteradoEm, Origem = origem
         });
 
     private async Task ApagarAsync(Guid empresaId, Guid clienteId, string? chave)
