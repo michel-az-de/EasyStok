@@ -188,11 +188,11 @@ public sealed class CheckoutCoreService(
 
         var pedido = DomainPedido.Criar(
             empresaId: storefront.EmpresaId,
-            origem: input.Origem);
+            origem: input.Origem,
+            statusInicial: StatusPedido.Rascunho);
 
         // Sobrescrever campos com dados do cliente Storefront
         pedido.ClienteId = input.ClienteId;
-        pedido.Status = StatusPedidoMapper.Rascunho;
         pedido.Observacoes = input.Observacoes;
         pedido.AgendadoParaEm = HorarioBrasil.InstanteUtc(input.DataEntrega, janela.HoraInicio);
         await enderecoEntrega.RegistrarAsync(pedido,
@@ -234,9 +234,7 @@ public sealed class CheckoutCoreService(
         catch (JanelaSemVagasException)
         {
             // Rollback fase 1: cancela pedido (status Rascunho → Cancelado)
-            pedido.Status = StatusPedidoMapper.Cancelado;
-            pedido.CanceladoEm = DateTime.UtcNow;
-            pedido.AlteradoEm = DateTime.UtcNow;
+            pedido.Cancelar();
             await pedidoRepository.UpdateAsync(pedido, ct);
 
             // Busca janelas alternativas (best-effort)
@@ -254,8 +252,7 @@ public sealed class CheckoutCoreService(
                     : "Escolha outro horário."));
         }
 
-        pedido.Status = StatusPedidoMapper.AguardandoPagamento;
-        pedido.AlteradoEm = DateTime.UtcNow;
+        pedido.MudarStatus(StatusPedido.AguardandoPagamento);
         await pedidoRepository.UpdateAsync(pedido, ct);
 
         logger.LogInformation(
