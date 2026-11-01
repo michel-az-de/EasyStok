@@ -1,8 +1,11 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Infra.Integrations.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Polly.CircuitBreaker;
+using Polly.Registry;
 
 namespace EasyStock.Infra.Integrations.Ia;
 
@@ -17,6 +20,7 @@ namespace EasyStock.Infra.Integrations.Ia;
 public sealed class AnthropicMessagesClient(
     HttpClient http,
     IOptions<AnthropicAgenteOptions> options,
+    ResiliencePipelineProvider<string> pipelines,
     ILogger<AnthropicMessagesClient> logger) : IAgenteLlmClient
 {
     public const string AnthropicVersion = "2023-06-01";
@@ -42,7 +46,19 @@ public sealed class AnthropicMessagesClient(
         request.Content = new ByteArrayContent(MontarCorpo(requisicao));
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
-        using var response = await http.SendAsync(request, ct);
+        // #2177: só disjuntor. O POST não tem chave de idempotência; com o disjuntor aberto nada sai.
+        HttpResponseMessage enviada;
+        try
+        {
+            enviada = await pipelines.GetPipeline(IntegrationCategories.Anthropic)
+                .ExecuteAsync(async pollyCt => await http.SendAsync(request, pollyCt), ct);
+        }
+        catch (BrokenCircuitException ex)
+        {
+            throw new HttpRequestException(HttpRequestError.ConnectionError,
+                "Anthropic temporariamente indisponível; o agente não foi chamado.", ex);
+        }
+        using var response = enviada;
         var corpo = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
