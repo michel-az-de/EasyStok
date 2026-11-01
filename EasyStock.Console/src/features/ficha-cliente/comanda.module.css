@@ -218,7 +218,6 @@
 /* Desktop: a ação do link já está no cabeçalho da conversa. */
 @media (min-width: 1180px) and (pointer: fine) {
   .clienteCompartilhado > .adicionarCompartilhado > button { display: none; }
-  .anotacaoCompartilhada:not([open]) > summary:not(:has(small)) { min-height: 32px; }
   .historicoCompartilhado[open] > div {
     margin-left: var(--e-2); padding-left: var(--e-3);
     border-left: 0;

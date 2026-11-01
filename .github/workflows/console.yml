@@ -63,6 +63,7 @@ jobs:
       - run: node ferramentas/prova-onda1-shell.mjs
       - run: node ferramentas/prova-perfis-modulos.mjs
       - run: node ferramentas/prova-financeiro.mjs
+      - run: node ferramentas/prova-1442-balcao-simples.mjs
       - run: node ferramentas/prova-sessao-cozinha.mjs
       - run: node ferramentas/prova-notificacoes-sessao.mjs
       - run: node ferramentas/prova-1446-cozinha-viva.mjs
@@ -131,6 +132,8 @@ jobs:
       - run: node ferramentas/prova-1804-balcao-fim.mjs
       - run: node ferramentas/prova-1803-categorias.mjs
       - run: node ferramentas/prova-1808-acervo-prato.mjs
+      - run: node ferramentas/prova-1808-ia-cardapio.mjs
+      - run: node ferramentas/prova-2081-producao-paridade.mjs
       - run: node ferramentas/prova-1809-producao-cardapio.mjs
       - run: node ferramentas/prova-1806-paineis.mjs
       - run: node ferramentas/prova-1806-lead-cadastro.mjs
