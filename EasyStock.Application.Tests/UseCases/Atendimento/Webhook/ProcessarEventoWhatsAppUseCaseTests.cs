@@ -64,7 +64,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
         ConfigurarCenario();
     }
 
-    private ProcessarEventoWhatsAppUseCase CriarUseCase(EasyStock.Application.Ports.Output.Ai.ITranscritorAudio? transcritor = null) =>
+    private ProcessarEventoWhatsAppUseCase CriarUseCase(EasyStock.Application.Ports.Output.Ai.ITranscritorAudio? transcritor = null,
+        PerfilClienteWhatsApp? perfil = null) =>
         new ProcessarEventoWhatsAppUseCase(
             _empresaRepository, _featureFlagRepository, _configuracaoRepository, _conversaRepository,
             _webhookRecebidoRepository, _cloudClient, _queueService, _eventPublisher, _tenantContext,
@@ -85,7 +86,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
             _publicadorEventos,
             transcritor,
             _pedidoRepository,
-            _regrasAutomaticas);
+            _regrasAutomaticas,
+            perfil);
 
     private void ConfigurarCenario()
     {
@@ -880,6 +882,51 @@ public class ProcessarEventoWhatsAppUseCaseTests
             Arg.Any<CancellationToken>());
         await _canalWhatsApp.Received(1).EnviarTextoAsync(ContatoWaId, OptOutPorPalavra.Confirmacao, Arg.Any<CancellationToken>());
         await _queueService.DidNotReceiveWithAnyArgs().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, default(ProcessarTurnoAgenteJob)!);
+    }
+
+    [Fact]
+    public async Task ConversaAbertaDeLeadProvisorioGanhaONomeDoPerfil()
+    {
+        // #2155: antes o nome do perfil só valia na conversa nova; o lead ficava "Cliente WhatsApp" para sempre.
+        var lead = ClienteEntity.Criar(_empresaId, IdentificarClientePorTelefoneUseCase.NomePadraoLead);
+        var aberta = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddMinutes(-5));
+        aberta.VincularCliente(lead.Id);
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
+            .Returns(aberta);
+        _conversaRepository.DevolverAberta(aberta);
+        _clienteRepository.GetByIdAsync(_empresaId, lead.Id).Returns(lead);
+        var useCase = CriarUseCase(perfil: new PerfilClienteWhatsApp(_clienteRepository, Substitute.For<IClienteCrmRepository>()));
+
+        await useCase.ExecuteAsync(PayloadTexto("wamid.nome", "meu email é fulano@exemplo.com"));
+
+        lead.Nome.Should().Be("Fulano");
+        lead.Email.Should().Be("fulano@exemplo.com");
+        await _unitOfWork.Received().CommitAsync();
+        await _queueService.DidNotReceiveWithAnyArgs().EnqueueAsync(FilaAtendimentoNomes.FotoPerfilWhatsApp, default(ColetarFotoPerfilWhatsAppJob)!);
+    }
+
+    [Fact]
+    public async Task ConversaNovaDeClienteSemFotoBuscaAFotoDoPerfil()
+    {
+        var useCase = CriarUseCase(perfil: new PerfilClienteWhatsApp(_clienteRepository, Substitute.For<IClienteCrmRepository>()));
+
+        await useCase.ExecuteAsync(PayloadTexto("wamid.foto", "oi"));
+
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.FotoPerfilWhatsApp,
+            Arg.Is<ColetarFotoPerfilWhatsAppJob>(j => j.EmpresaId == _empresaId && j.Contato == ContatoWaId && j.ClienteId != Guid.Empty));
+    }
+
+    [Fact]
+    public async Task LocalizacaoDoClienteViraNotaNoPerfil()
+    {
+        var crm = Substitute.For<IClienteCrmRepository>();
+        var useCase = CriarUseCase(perfil: new PerfilClienteWhatsApp(_clienteRepository, crm));
+
+        await useCase.ExecuteAsync(PayloadTipo("wamid.local", "location",
+            "\"location\":{\"latitude\":-25.4284,\"longitude\":-49.2733,\"name\":\"Prédio azul\"}"));
+
+        await crm.Received(1).AdicionarNotaAsync(
+            Arg.Is<ClienteNota>(n => n.Texto.Contains("maps?q=-25.4284,-49.2733") && n.Autor == "whatsapp"), Arg.Any<CancellationToken>());
     }
 
     private static string PayloadTipo(string wamid, string tipo, string conteudoJson) => """
