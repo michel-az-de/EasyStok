@@ -242,6 +242,16 @@ for (const item of lista) {
   visitar(nota.tree, n => { if (n.type === PainelMovel) janela = n })
   assert.equal(janela.props.controle.solto, true)
   assert.equal(janela.props.atributos['data-postit-solto'], item.props.nota.id)
+  if (item === lista[0]) {
+    const geometria = { x: 471, y: 157, largura: 347, altura: 224 }
+    janela.props.controle.guardar(geometria)
+    janela.props.controle.recolher(); nota.render()
+    visitar(nota.tree, n => { if (n.type === 'button') soltar = n })
+    soltar.props.onClick({ currentTarget: { closest: () => ({ getBoundingClientRect: () => ({ left: 900, top: 500 }) }) } })
+    nota.render()
+    visitar(nota.tree, n => { if (n.type === PainelMovel) janela = n })
+    for (const [chave, valor] of Object.entries(geometria)) assert.equal(janela.props.controle[chave], valor, 'reabrir nota conserva posição e tamanho')
+  }
 }
 assert.equal([...memoria.keys()].filter(k => k.includes('muitas-notas')).length, 120)
 assert.doesNotMatch([...memoria.values()].join(''), /Conteúdo confirmado|Operador/)
@@ -287,6 +297,8 @@ function conferirPainelDaNota(elemento) {
   { x: 471, y: 157, largura: 347, altura: 224 }, 'NotaNaMesa + hook + superfície conservam geometria salva, sem reaplicar origem930/399')
   superficie.unmount(); notaHost.unmount()
 }
+conferirPainelDaNota(mesa.tree.props.children[1][0])
+guardarPainelMovel(escopoA, `nota:${clienteId}:${notaId}`, { ...geometriaMovida, solto: false })
 conferirPainelDaNota(mesa.tree.props.children[1][0])
 const notaCompartilhada = mesa.tree.props.children[1][0].props.registro.nota
 function conferirFonteDaNota(conversaId, solta, destacar = false, mesaHost = mesa) {

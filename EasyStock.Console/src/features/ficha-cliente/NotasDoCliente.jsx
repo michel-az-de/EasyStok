@@ -16,7 +16,7 @@ function NotaDoCliente({ conversaId, nota, indice }) {
   function soltar(e) {
     const r = e.currentTarget.closest('article').getBoundingClientRect()
     setFocar(true)
-    controle.soltar({ x: r.left + (indice % 6) * 12, y: r.top })
+    controle.soltar(Number.isFinite(controle.x) && Number.isFinite(controle.y) ? {} : { x: r.left + (indice % 6) * 12, y: r.top })
   }
   return <>
     <article className={controle.solto ? css.referencia : css.nota}>

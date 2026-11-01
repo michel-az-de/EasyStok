@@ -223,6 +223,10 @@ export function BarraProximoPasso({
         ? () => executar(() => aoReenviarPix()) : null,
     })
     rotuloEstado = fonteApi && aguardaSinalManual(pedido) ? 'Aguardando sinal' : info.rotuloEstado
+    if (situacaoCob.chave === 'nenhuma') {
+      rotuloEstado = pedido.pedidoId ? 'Sem cobrança' : 'Em montagem'
+      depoisTexto = null
+    }
     if (fonteApi && aguardaSinalManual(pedido)) depoisTexto = pedido.requerAprovacao ? 'Próximo: Aprovação da loja' : 'Próximo: Fila de preparo'
 
     if (info.divergente) {

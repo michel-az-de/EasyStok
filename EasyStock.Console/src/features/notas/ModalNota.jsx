@@ -31,7 +31,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
     const contexto = contextoAtual.current
     const devolver = montada.current && contexto.visivel && !contexto.outraConversa && interno()
     aoFechar()
-    const destino = abridor.current
+    const destino = abridor.current?.isConnected ? abridor.current : globalThis.document?.querySelector?.('[data-area-envio] textarea:not(:disabled)')
     // O callback pode focar outro controle. Não disputa esse foco nem o de uma ação externa.
     if (devolver && (interno() || document.activeElement === document.body)
       && destino?.isConnected && destino !== document.body && destino !== document.documentElement
@@ -89,6 +89,9 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
       const janela = janelaDosPaineis()
       const altura = postit.current?.scrollHeight ?? 205
       const proxima = limitarPainelMovel({ x: (janela.largura - 360) / 2, y: (janela.reserva?.y ?? janela.altura - 104) - altura - 8 }, { largura: 360, altura }, janela)
+      if (proxima.altura < 48 && postit.current?.contains(globalThis.document?.activeElement)) {
+        document.querySelector('[data-area-envio] textarea:not(:disabled)')?.focus({ preventScroll: true })
+      }
       setGeometria(atual => atual && Object.keys(proxima).every(chave => proxima[chave] === atual[chave]) ? atual : proxima)
     }
     ajustar()
@@ -102,7 +105,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
   const aoTeclar = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !salvando.current) { e.stopPropagation(); fechar() } }
 
   return (
-    <dialog ref={postit} open={visivel} className={css.postit} style={{ zIndex: frente, ...(geometria ? { left: geometria.x, top: geometria.y, bottom: 'auto', transform: 'none', width: geometria.largura, maxHeight: geometria.altura } : {}) }} aria-label="Nota interna" onKeyDown={aoTeclar}
+    <dialog ref={postit} open={visivel} className={css.postit} style={{ zIndex: frente, ...(geometria ? { left: geometria.x, top: geometria.y, bottom: 'auto', transform: 'none', width: geometria.largura, maxHeight: geometria.altura, visibility: geometria.altura < 48 ? 'hidden' : undefined } : {}) }} aria-label="Nota interna" onKeyDown={aoTeclar}
       onFocusCapture={() => setFrente(proximaFrentePainel())} onPointerDownCapture={() => setFrente(proximaFrentePainel())}>
       <p className={css.titulo}>Nota interna <span>· só para a equipe</span></p>
       {outraConversa && <p role="status">Esta nota continua na ficha de {nomeCliente}.</p>}

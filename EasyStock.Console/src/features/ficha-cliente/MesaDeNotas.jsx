@@ -15,7 +15,7 @@ function NotaNaMesa({ escopo, registro, aoRecolher }) {
   const controle = usePainelMovel(escopo, `nota:${registro.clienteId}:${registro.nota.id}`)
   const soltar = controle.soltar
   const solto = controle.solto
-  const origem = useRef(registro.posicao ?? {})
+  const origem = useRef(Number.isFinite(controle.x) && Number.isFinite(controle.y) ? {} : registro.posicao ?? {})
   useEffect(() => { if (!solto) soltar(origem.current) }, [soltar, solto])
   const controleComFoco = { ...controle, devolverFoco: () => controle.devolverFoco?.() || focarNotasDaConversa(registro.conversaId) }
   return <PainelMovel controle={controleComFoco} titulo={`Nota · ${registro.clienteNome}`} larguraInicial={280}

@@ -84,6 +84,8 @@ provar('pedido com sinal mostra saldo do pedido inteiro incluindo frete', () => 
   const html = renderizar()
   assert.match(html, /<h3>Comanda 4321<\/h3>/)
   assert.match(html, /Aguardando pagamento/)
+  assert.match(html, /Sem cobrança/)
+  assert.doesNotMatch(html, /Cobrança pendente|Próximo: Pago/)
   assert.match(html, /81,00/)
   assert.match(html, /43,00 a receber/)
   assert.match(html, /Revisar comanda/)
@@ -102,6 +104,8 @@ provar('rascunho com cliente cadastrado e endereço permite calcular o frete ant
   assert.match(html, /<strong>Entrega<\/strong>/)
   assert.equal((html.match(/<strong>Entrega<\/strong>/g) ?? []).length, 1, 'um único acesso à entrega antes de criar pedido')
   assert.doesNotMatch(html, /<h3>Comanda compartilhada/)
+  assert.match(html, /Em montagem/)
+  assert.doesNotMatch(html, /Cobrança pendente|Próximo: Pago/)
 })
 provar('pedido já criado conserva o acesso ao frete e à entrega do pedido', () => {
   const html = renderizar()
