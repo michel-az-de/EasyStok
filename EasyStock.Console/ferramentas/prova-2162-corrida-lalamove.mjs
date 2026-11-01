@@ -9,7 +9,6 @@
 
 import { registerHooks } from 'node:module'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 
 registerHooks({
   resolve(especificador, contexto, proximo) {
@@ -59,9 +58,16 @@ await confere('1. Chamar Lalamove só com conexão, viagem montando, uma parada 
 })
 
 await confere('2. status do provedor em rótulo de balcão; corrida em curso liga a atualização', () => {
-  assert.deepEqual(dominio.statusDaCorrida({ status: 'MotoristaACaminho' }), { rotulo: 'Motorista a caminho da coleta', tom: 'info' })
-  assert.equal(dominio.statusDaCorrida({ status: 'Entregue' }).tom, 'ok')
-  assert.equal(dominio.statusDaCorrida({ status: 'Expirada' }).tom, 'perigo')
+  // #2168: cada status vira Selo (tom, ícone, texto) e etapa da linha do tempo; a tabela inteira, sem buraco.
+  const tabela = Object.fromEntries(['Solicitando', 'ProcurandoMotorista', 'MotoristaACaminho', 'Coletada', 'Entregue', 'Cancelada',
+    'Rejeitada', 'Expirada', 'Falha'].map((s) => [s, dominio.statusDaCorrida({ status: s })]))
+  assert.deepEqual(Object.fromEntries(Object.entries(tabela).map(([s, v]) => [s, [v.tom, v.icone, v.etapa]])), {
+    Solicitando: ['neutro', 'hourglass', 0], ProcurandoMotorista: ['alerta', 'lupa', 1], MotoristaACaminho: ['marca', 'moto', 2],
+    Coletada: ['marca', 'package', 3], Entregue: ['sucesso', 'circle-check', 4], Cancelada: ['neutro', 'circle-x', null],
+    Rejeitada: ['erro', 'alerta', null], Expirada: ['erro', 'alerta', null], Falha: ['erro', 'circle-x', null],
+  })
+  assert.equal(tabela.MotoristaACaminho.rotulo, 'Motorista a caminho da cozinha')
+  assert.ok(Object.values(tabela).every((v) => v.rotulo && !/_/.test(v.rotulo)), 'nenhum status cru da Lalamove na tela')
   assert.equal(dominio.corridaEmCurso([manual, emCurso]), true)
   assert.equal(dominio.corridaEmCurso([manual, { ...emCurso, ativa: false }]), false)
   assert.equal(dominio.corridaDaApi(manual), false)
@@ -77,6 +83,7 @@ await confere('3. rotas da API da corrida', async () => {
   await infra.atualizarCorrida('v1', 'c1')
   await infra.cancelarCorrida('v1', 'c1')
   await infra.gorjetaCorrida('v1', 'c1', 500)
+  await infra.liberarCorrida('v1', 'c1')
   assert.deepEqual(chamadas.map((c) => `${c.metodo} ${c.url}`), [
     'GET /api/atendimento/corridas/conexao',
     'POST /api/atendimento/viagens/v1/corridas/cotacao',
@@ -84,17 +91,15 @@ await confere('3. rotas da API da corrida', async () => {
     'GET /api/atendimento/viagens/v1/corridas/c1',
     'POST /api/atendimento/viagens/v1/corridas/c1/cancelar',
     'POST /api/atendimento/viagens/v1/corridas/c1/gorjeta',
+    'POST /api/atendimento/viagens/v1/corridas/c1/liberar',
   ])
   assert.deepEqual(chamadas[1].corpo, { veiculo: 'Carro' })
   assert.deepEqual(chamadas[5].corpo, { centavos: 500 })
 })
 
+// #2168: o corpo da chamada, a tela montada e o "Corrigir" só na corrida manual estão na prova-2168, com o cartão de verdade.
 await confere('4. a chamada leva só o id da cotação, nunca o preço', () => {
-  const tela = readFileSync(new URL('../src/features/entregas/CorridasDaViagem.jsx', import.meta.url), 'utf8')
-  const chamada = tela.match(/chamar\(\{([^}]*)\}\)/)?.[1] ?? ''
-  assert.match(chamada, /cotacaoId/)
-  assert.doesNotMatch(chamada, /valor|custo|preco/i, 'o servidor relê a cotação na Lalamove')
-  assert.match(tela, /Corrigir/, 'a corrida manual continua corrigível')
+  assert.deepEqual(chamadas[2].corpo, { cotacaoId: 'q1', veiculo: 'Carro', observacao: null }, 'o servidor relê a cotação na Lalamove')
 })
 
 console.log(`\n${passou} verificações passaram.`)

@@ -287,7 +287,8 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
           )
         })}
       </ul>
-      <CorridasDaViagem viagem={viagem} entregadores={entregadores} ocupado={ocupado} />
+      <CorridasDaViagem viagem={viagem} entregadores={entregadores} ocupado={ocupado}
+        pedido={n === 1 ? pedidoPorId?.get(viagem.paradas[0].pedidoId) ?? null : null} />
       {montando && acoes.adiadoAte(chaveDaSaida(viagem.id)) && (
         <DesfazerComPrazo className={css.linha} ate={acoes.adiadoAte(chaveDaSaida(viagem.id))}
           texto="A viagem sai e os clientes são avisados" aoDesfazer={() => acoes.desfazerEnvio(chaveDaSaida(viagem.id))} />

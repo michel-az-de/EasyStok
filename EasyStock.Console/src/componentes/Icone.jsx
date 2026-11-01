@@ -1,6 +1,6 @@
 import {
   Archive, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen,
-  Camera, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
+  Camera, Car, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
   Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink,
   FlaskConical, Frown, Gift, Globe, GripVertical, Hand, History, Hourglass, House, Image, Inbox,
   LayoutDashboard, LayoutTemplate, Lightbulb, Link, ListFilter, Lock, LogOut, Mail, MapPin,
@@ -53,6 +53,7 @@ const ICONES = {
   ficha: UserRound,
   cardapio: BookOpen,
   moto: Bike,
+  carro: Car,
   'circle-check': CircleCheck,
   'log-out': LogOut,
   relogio: Clock,
