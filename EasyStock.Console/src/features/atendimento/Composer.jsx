@@ -317,7 +317,11 @@ export function Composer({
                 <span>Respostas</span>
               </Botao></Tooltip>
               <Tooltip texto={notaEmRascunho ? 'Retomar a nota desta conversa. Só a equipe vê.' : 'Anotar para a equipe sem sair da conversa'}>
-                <Botao aria-label={notaEmRascunho ? 'Retomar nota interna' : 'Nota interna'} className={css.botaoNota} onClick={abrirNotaInterna}>
+                <Botao
+                  aria-label={notaEmRascunho ? 'Retomar nota interna' : 'Nota interna'} className={css.botaoNota}
+                  onPointerDown={(evento) => { if (barra.pelaBarra) evento.stopPropagation() }}
+                  onClick={abrirNotaInterna}
+                >
                   <Icone nome="nota" /><span>{notaEmRascunho ? 'Retomar nota' : 'Nota'}</span>
                 </Botao>
               </Tooltip>

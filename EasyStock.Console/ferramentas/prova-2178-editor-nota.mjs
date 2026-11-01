@@ -31,7 +31,7 @@ return <><nav><button onClick={()=>abrir('Marina')}>Nota Marina</button><button 
 function ProvaFoco(){const[nota,anotar]=useState(false);const[cliente,trocar]=useState('Marina');const[visivel,mostrar]=useState(true);const[mobile,celular]=useState(true);const[campo,escrever]=useState('Mensagem pública preservada');const agora=Date.now();const noop=()=>{};
 const conversa={id:cliente,nome:cliente,canal:'WhatsApp',estado:'Aberto',conta:'cliente',cliente:{tags:[],notas:[],pedidos:1},pedido:null,passagem:null,mensagens:[{id:'m1',dir:'in',texto:'Bom dia!',em:new Date(agora-60000).toISOString()}],ultimaEm:new Date(agora-60000).toISOString()};
 const acoes={descarregarRascunho:({texto})=>escrever(texto),enviarMidia:noop,definirRascunho:noop,devolverAutomatico:noop,selecionar:noop,abrirEncerramento:noop,reabrir:noop,listarAtendentes:async()=>[],enviar:noop,assumirAtendimento:async()=>true};
-const estado={selecionada:conversa,visiveis:[conversa],agora,automaticoPausado:{[cliente]:true},rascunho:campo,escritaDeFora:0,fonteApi:false};const catalogo={janelas:[],canais:CANAIS,respostasProntas:[],cardapio:[],linhas:[],adicionais:[]};
+const estado={selecionada:conversa,visiveis:[conversa],agora,automaticoPausado:{[cliente]:true},rascunho:campo,escritaDeFora:0,fonteApi:false};const catalogo={janelas:[],canais:CANAIS,respostasProntas:[{id:'cardapio',titulo:'Cardápio',atalho:'/cardapio',texto:'Cardápio de hoje',arquivada:false}],cardapio:[],linhas:[],adicionais:[]};
 return <ContextoEstado value={estado}><ContextoAcoes value={acoes}><ContextoCatalogo value={catalogo}>
 <button onClick={()=>{trocar('Carlos');anotar(false)}}>Trocar cliente durante nota</button><button onClick={()=>mostrar(true)}>Voltar ao painel</button><button onClick={()=>{celular(false);anotar(false)}}>Modo desktop</button>
 <section hidden={!visivel} style={{display:visivel?'flex':'none',height:600,flexDirection:'column',overflow:'hidden'}}>
@@ -131,6 +131,17 @@ try {
   assert.equal(await publico.evaluate(no => document.activeElement === no), true, 'Conversa devolve foco ao compositor público real depois de desocultar')
   assert.equal(await publico.evaluate(no => no === window.publicoOriginal), true)
   assert.deepEqual(await publico.evaluate(no => [no.selectionStart, no.selectionEnd]), [9, 16])
+  await publico.fill('/cardapio')
+  const respostasRapidas = pagina.getByRole('group', { name: 'Respostas rápidas', exact: true })
+  await respostasRapidas.waitFor({ state: 'visible' })
+  await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
+  await pagina.getByRole('textbox', { name: 'Texto da nota de Marina', exact: true }).waitFor({ state: 'visible' })
+  assert.equal(await pagina.evaluate(() => window.publicoOriginal.value), '/cardapio', 'pointerdown na Nota não descarta o prefixo público de resposta rápida')
+  assert.equal(await respostasRapidas.isVisible(), false, 'portal de respostas rápidas não cobre a nota privada')
+  await pagina.getByRole('button', { name: 'Conversa', exact: true }).click()
+  assert.equal(await publico.inputValue(), '/cardapio', 'Conversa retoma o prefixo literal, sem inserir a resposta')
+  assert.equal(await publico.evaluate(no => document.activeElement === no), true)
+  await publico.fill('Mensagem pública com seleção preservada')
   await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
   await pagina.getByRole('button', { name: 'Comanda', exact: true }).click()
   assert.equal(await pagina.evaluate(() => document.activeElement === window.publicoOriginal), false, 'Comanda não rouba foco para compositor oculto')

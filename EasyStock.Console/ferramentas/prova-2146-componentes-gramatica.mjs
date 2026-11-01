@@ -259,15 +259,17 @@ if (!pastaDoPlaywright) {
       await contexto.close()
     })
 
-    await confere('2178. abrir nota recolhe ferramentas sem apagar rascunho com barra', async () => {
-      const { contexto, pagina, campo } = await abrir()
-      await campo.fill('/rascunho interrompido')
-      await abrirFerramentas(pagina)
-      await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
-      assert.equal(await campo.inputValue(), '/rascunho interrompido')
-      assert.equal(await pagina.locator('summary[aria-label="Mais ferramentas"]').evaluate((el) => el.closest('details').open), false)
-      await contexto.close()
-    })
+    for (const [texto, menuAberto] of [['Rascunho interrompido', true], ['/cardapio', false]]) {
+      await confere(`2178. nota preserva "${texto}" e recolhe ferramentas`, async () => {
+        const { contexto, pagina, campo } = await abrir()
+        await campo.fill(texto)
+        if (menuAberto) await abrirFerramentas(pagina)
+        await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
+        assert.equal(await campo.inputValue(), texto)
+        assert.equal(await pagina.locator('summary[aria-label="Mais ferramentas"]').evaluate((el) => el.closest('details').open), false)
+        await contexto.close()
+      })
+    }
 
     await confere('3. toque (hasTouch, isMobile): nem hover nem foco mostram a dica', async () => {
       const { contexto, pagina, campo } = await abrir({ largura: 390, altura: 844, celular: true })
