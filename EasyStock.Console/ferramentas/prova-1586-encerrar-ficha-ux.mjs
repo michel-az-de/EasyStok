@@ -899,13 +899,15 @@ await confere('nota: contexto trocado, retorno após unmount e abridor indispon�
 
 await confere('nota: ao sair da aba Ficha retorna ao campo ou às ferramentas se a janela estiver fechada', async () => {
   await comFocoDaNota(async ({ abrir, abridor, externo, documento }) => {
-    for (const janelaFechada of [false, true]) {
+    for (const caso of ['aberta', 'aberta-com-botao-antes', 'fechada']) {
+      const janelaFechada = caso === 'fechada'
       abridor.isConnected = true
       externo.focos = 0
       const campo = { isConnected: true, disabled: false, getClientRects: () => [{}], focus() { documento.activeElement = this } }
       const tela = abrir({ aoFechar: () => { documento.activeElement = documento.body } })
       abridor.isConnected = false
-      documento.querySelector = seletor => seletor.includes('textarea') && !janelaFechada ? campo : seletor.includes('button') ? externo : null
+      documento.querySelector = seletor => seletor.includes(',') && caso === 'aberta-com-botao-antes' ? externo
+        : seletor.includes('textarea') && !janelaFechada ? campo : seletor.includes('button') ? externo : null
       doTipo(tela, 'dialog')[0].props.onKeyDown({ key: 'Escape', defaultPrevented: false, stopPropagation: nada })
       assert.equal(documento.activeElement, janelaFechada ? externo : campo, 'o foco permanece no compositor com ou sem campo habilitado')
       tela.encerrar()

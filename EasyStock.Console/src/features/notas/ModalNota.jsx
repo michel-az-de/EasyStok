@@ -5,7 +5,8 @@ import { limitarPainelMovel, proximaFrentePainel } from '../../hooks/estadoPaine
 import { janelaDosPaineis, observarAreaDosPaineis } from '../../hooks/areaDosPaineis'
 import css from './ModalNota.module.css'
 
-const FOCO_DO_COMPOSITOR = '[data-area-envio] textarea:not(:disabled), [data-area-envio] button:not(:disabled)'
+const focoDoCompositor = () => globalThis.document?.querySelector?.('[data-area-envio] textarea:not(:disabled)')
+  ?? globalThis.document?.querySelector?.('[data-area-envio] button:not(:disabled)')
 
 // #1839: a nota abre como um post-it pequeno logo acima do composer, sem cobrir a conversa. Esc fecha,
 // Ctrl+Enter salva. Salva, ela fica fixa no topo do Resumo, junto das tags e do cadastro.
@@ -33,7 +34,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
     const contexto = contextoAtual.current
     const devolver = montada.current && contexto.visivel && !contexto.outraConversa && interno()
     aoFechar()
-    const destino = abridor.current?.isConnected ? abridor.current : globalThis.document?.querySelector?.(FOCO_DO_COMPOSITOR)
+    const destino = abridor.current?.isConnected ? abridor.current : focoDoCompositor()
     // O callback pode focar outro controle. Não disputa esse foco nem o de uma ação externa.
     if (devolver && (interno() || document.activeElement === document.body)
       && destino?.isConnected && destino !== document.body && destino !== document.documentElement
@@ -92,7 +93,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
       const altura = postit.current?.scrollHeight ?? 205
       const proxima = limitarPainelMovel({ x: (janela.largura - 360) / 2, y: (janela.reserva?.y ?? janela.altura - 104) - altura - 8 }, { largura: 360, altura }, janela)
       if (proxima.altura < 48 && postit.current?.contains(globalThis.document?.activeElement)) {
-        document.querySelector(FOCO_DO_COMPOSITOR)?.focus({ preventScroll: true })
+        focoDoCompositor()?.focus({ preventScroll: true })
       }
       setGeometria(atual => atual && Object.keys(proxima).every(chave => proxima[chave] === atual[chave]) ? atual : proxima)
     }
