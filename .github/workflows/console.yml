@@ -59,6 +59,7 @@ jobs:
       - run: node ferramentas/prova-1697-ux-desktop.mjs
       - run: node ferramentas/prova-1447-hall-modulos.mjs
       - run: node ferramentas/prova-congelados.mjs
+      - run: node ferramentas/prova-2162-corrida-lalamove.mjs
       - run: node ferramentas/prova-1608-painel-agora.mjs
       - run: node ferramentas/prova-onda1-shell.mjs
       - run: node ferramentas/prova-perfis-modulos.mjs
