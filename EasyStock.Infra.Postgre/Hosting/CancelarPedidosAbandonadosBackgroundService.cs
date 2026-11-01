@@ -104,9 +104,7 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
             return;
         var statusAntigo = pedido.Status;
 
-        pedido.Status = StatusPedidoMapper.Cancelado;
-        pedido.CanceladoEm = DateTime.UtcNow;
-        pedido.AlteradoEm = DateTime.UtcNow;
+        pedido.Cancelar();
 
         // #1302: a liberação só marca a entidade. Vem antes do UpdateAsync, o único SaveChanges
         // do escopo, para o pedido cancelado e a vaga liberada gravarem juntos.
@@ -126,7 +124,7 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
             Detalhes = MotivoAbandonado,
             UsuarioNome = "Sistema",
             Origem = "sistema",
-            OcorridoEm = pedido.CanceladoEm.Value,
+            OcorridoEm = pedido.AlteradoEm,
         }, ct);
         await pedidoRepo.UpdateAsync(pedido, ct);
 
