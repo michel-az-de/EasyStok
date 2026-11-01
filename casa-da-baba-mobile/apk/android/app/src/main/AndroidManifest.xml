@@ -31,7 +31,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".WorkspaceActivity" android:exported="false" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode" android:theme="@style/AppTheme.NoActionBarLaunch" />
+        <activity android:name=".WorkspaceActivity" android:exported="false" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode" android:theme="@style/AppTheme.NoActionBar" />
         <service android:name=".updater.UpdateMessagingService" android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
