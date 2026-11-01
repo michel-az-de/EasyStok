@@ -110,7 +110,7 @@ const DESCRICOES = {
   [MODOS.BLOQUEADO]: {
     rotulo: 'Cadastro bloqueado',
     tom: 'perigo',
-    detalhe: 'Envios bloqueados em todos os canais. Desbloqueie em Cliente.',
+    detalhe: 'Envios bloqueados em todos os canais. Desbloqueie na ficha.',
   },
 }
 

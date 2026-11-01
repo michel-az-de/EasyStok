@@ -20,6 +20,10 @@
 .ajudaDosPassos { min-width: 0; }
 /* O botão fica na linha do "Como registrar", à direita; os passos abertos ocupam a largura toda embaixo. */
 .acoesDoTopo { position: absolute; top: 0; right: 0; display: flex; align-items: center; min-height: var(--toque); }
+.acoesDoTopo:empty { display: none; }
+@media (max-width: 759px) {
+  .acoesDoTopo { position: static; justify-content: flex-end; margin-top: var(--e-2); }
+}
 .ajudaDosPassos > summary {
   width: fit-content; min-height: var(--toque); display: flex; align-items: center; cursor: pointer;
   color: var(--marca); font-size: var(--t-apoio); font-weight: 600;

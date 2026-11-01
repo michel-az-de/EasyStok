@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
 
@@ -52,6 +53,12 @@ public static class WppConnectWebhookParser
         };
         var midia = tipo is "image" or "audio" or "video" or "document" or "sticker" ? $"wpp:{id}" : null;
         var texto = tipo == "text" ? Texto(root, "body") : Texto(root, "caption");
+        // #2155: na localização o body é a miniatura do mapa; ficam as coordenadas e a descrição do lugar.
+        var localizacao = tipo == "location"
+            ? LocalizacaoWhatsApp.Criar(Coordenada(root, "lat"), Coordenada(root, "lng"), Texto(root, "loc"), null)
+            : null;
+        if (localizacao is not null)
+            texto = localizacao.Nome is { } lugar ? $"{lugar}; {localizacao.Coordenadas}" : localizacao.Coordenadas;
         if (!root.TryGetProperty("t", out var t) || !t.TryGetInt64(out var segundos))
             throw new FormatException("Mensagem WPPConnect sem data.");
         var quando = DateTimeOffset.FromUnixTimeSeconds(segundos);
@@ -59,13 +66,21 @@ public static class WppConnectWebhookParser
         var nome = root.TryGetProperty("sender", out var remetente) ? Texto(remetente, "pushname") : null;
         var contatos = new ContatoWhatsApp[] { new(telefone, nome) };
         return new([new(sessao, rawBody, contatos,
-            eco ? [] : [new(telefone, externo, quando, tipo, texto, midia, Texto(root, "mimetype"), null, null)],
+            eco ? [] : [new(telefone, externo, quando, tipo, texto, midia, Texto(root, "mimetype"), null, null, localizacao)],
             [], eco ? [new(telefone, externo, quando, tipo, texto, midia, Texto(root, "mimetype"))] : [])]);
     }
 
     public static string? Texto(JsonElement root, string nome) =>
         root.ValueKind == JsonValueKind.Object && root.TryGetProperty(nome, out var valor) && valor.ValueKind == JsonValueKind.String
             ? valor.GetString() : null;
+
+    /// <summary>O WPPConnect manda <c>lat</c>/<c>lng</c> como número ou como texto, conforme a versão.</summary>
+    private static double? Coordenada(JsonElement root, string nome) =>
+        !root.TryGetProperty(nome, out var valor) ? null
+        : valor.ValueKind == JsonValueKind.Number && valor.TryGetDouble(out var numero) ? numero
+        : valor.ValueKind == JsonValueKind.String
+            && double.TryParse(valor.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var lido) ? lido
+        : null;
 
     public static string? Id(JsonElement root)
     {
