@@ -42,9 +42,22 @@ public interface IWhatsAppCloudClient
     Task MarcarComoLidaAsync(string wamid, CancellationToken ct = default);
 
     Task<(Stream Conteudo, string MimeType)> BaixarMidiaAsync(string mediaId, CancellationToken ct = default);
+
+    /// <summary>
+    /// #2155: foto do perfil do contato, ou <c>null</c> quando ele não tem foto, a privacidade dele esconde a foto ou o
+    /// canal não oferece. A Cloud API da Meta não expõe foto de perfil: só as pontes (WAHA, WPPConnect) respondem.
+    /// </summary>
+    Task<FotoPerfilWhatsApp?> ObterFotoPerfilAsync(string waId, CancellationToken ct = default) =>
+        Task.FromResult<FotoPerfilWhatsApp?>(null);
 }
 
 public sealed record EnvioWhatsAppResult(string Wamid);
+
+public sealed record FotoPerfilWhatsApp(byte[] Conteudo, string MimeType)
+{
+    /// <summary>Teto da foto baixada; a foto de perfil do WhatsApp tem algumas centenas de kB.</summary>
+    public const int TetoBytes = 5 * 1024 * 1024;
+}
 
 /// <summary>
 /// #1622-5: mídia recebida acima do teto. Não é baixada (ou a cópia para no teto) e não volta a ser tentada: a mensagem

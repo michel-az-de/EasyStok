@@ -50,6 +50,16 @@ public class WebhookWhatsAppParserTests
         msg.TextoCorpo.Should().Contain("Casa da Baba")
             .And.Contain("Av. Paulista, 1000")
             .And.Contain("-23.5613,-46.6565");
+        // #2155: as coordenadas também chegam estruturadas, para o perfil do cliente.
+        msg.Localizacao.Should().Be(new LocalizacaoWhatsApp(-23.5613, -46.6565, "Casa da Baba", "Av. Paulista, 1000"));
+    }
+
+    [Fact]
+    public void LocalizacaoComCoordenadaZerada_NaoViraLocalizacao()
+    {
+        var msg = Parse("location", "\"location\":{\"latitude\":0,\"longitude\":0}");
+
+        msg.Localizacao.Should().BeNull();
     }
 
     [Fact]
