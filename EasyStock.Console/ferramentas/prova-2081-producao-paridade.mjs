@@ -406,8 +406,9 @@ await confere('A8/A10: Estoque do dia mostra a origem e reimprime o lote do cons
   const linhas = andar(t.arvore, (n) => n.type === 'li' && /LOT-/.test(texto(n)))
   assert.match(texto(linhas.find((l) => /LOT-251026-200000/.test(texto(l)))), /Aparelho · Rosa · fab\. 25\/10/)
   assert.match(texto(linhas.find((l) => /LOT-261026-001/.test(texto(l)))), /Console · você · fab\. 26\/10/)
-  const reimprimir = doTipo(t.arvore, 'Botao').filter((b) => texto(b) === 'Reimprimir etiquetas')
+  const reimprimir = doTipo(t.arvore, 'BotaoIcone').filter((b) => b.props.rotulo?.startsWith('Etiquetas do lote '))
   assert.equal(reimprimir.length, 1, 'só o lote do console')
+  assert.equal(reimprimir[0].props.rotulo, 'Etiquetas do lote LOT-261026-001')
   await reimprimir[0].props.onClick()
   await new Promise((r) => setTimeout(r, 80))
   const folha = doTipo(t.renderizar(), 'FolhaImpressao')[0]

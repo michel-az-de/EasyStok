@@ -203,7 +203,7 @@ function ContasFinanceiras({ lado }) {
             <div><dt>Emissão</dt><dd>{dataCurta(selecionada.dataEmissao)}</dd></div></dl>
           {podeRegistrarNaConta(selecionada, podeGerenciar) && <Botao variante="primario" aria-haspopup="dialog" onClick={() => setPagamento({ conta: selecionada, parcela: proximaParcela(selecionada) })}>{palavras.verbo} a próxima parcela</Botao>}
           <Botao aria-haspopup="dialog" onClick={() => setDetalheId(selecionada.id)}>Parcelas e histórico</Botao>
-        </> : <><h2>Conta selecionada</h2><p>Toque numa conta para ver o resumo. Use {palavras.verbo} na linha para registrar a próxima parcela.</p></>}</aside>
+        </> : <><h2>Conta selecionada</h2><p>Selecione uma conta para consultar o resumo, as parcelas e o histórico.</p></>}</aside>
       </div>
     </EstadoFinanceiro>
     {nova && <EstadoCadastroEmModal consulta={cadastros} aoFechar={() => setNova(false)}><ModalContaFinanceira lado={lado} cadastros={cadastros.dados} aoFechar={() => setNova(false)} aoGravar={consulta.recarregar} aoCriar={(conta) => { setSelecionadaId(conta.id); setDetalheId(conta.id) }} /></EstadoCadastroEmModal>}
