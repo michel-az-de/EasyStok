@@ -25,7 +25,14 @@ public sealed class EntregadorRepository(EasyStockDbContext db) : IEntregadorRep
 public sealed class ViagemRepository(EasyStockDbContext db) : IViagemRepository
 {
     public Task<bool> VinculadaLogisticaAsync(Guid empresaId, Guid viagemId, CancellationToken ct = default) =>
-        db.Set<DespachoLogistica>().AnyAsync(d => d.EmpresaId == empresaId && d.ViagemId == viagemId, ct);
+        VinculadaAsync(empresaId, viagemId, ct);
+
+    // #2160: a corrida da API em curso também trava a edição da viagem (ADR-0064 D4).
+    private async Task<bool> VinculadaAsync(Guid empresaId, Guid viagemId, CancellationToken ct) =>
+        await db.Set<DespachoLogistica>().AnyAsync(d => d.EmpresaId == empresaId && d.ViagemId == viagemId, ct)
+        || await db.CorridasExternas.AnyAsync(c => c.EmpresaId == empresaId && c.ViagemId == viagemId
+            && (c.Status == StatusCorrida.Solicitando || c.Status == StatusCorrida.ProcurandoMotorista
+                || c.Status == StatusCorrida.MotoristaACaminho || c.Status == StatusCorrida.Coletada), ct);
     public Task AddAsync(Viagem viagem, CancellationToken ct = default) =>
         db.Viagens.AddAsync(viagem, ct).AsTask();
 

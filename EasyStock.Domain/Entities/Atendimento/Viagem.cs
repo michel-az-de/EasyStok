@@ -123,7 +123,8 @@ public class Viagem
         ArgumentNullException.ThrowIfNull(corrida);
         GarantirMontando();
         if (corrida.ViagemId != Id) throw new RegraDeDominioVioladaException("Corrida de outra viagem.");
-        if (corrida.Status != StatusCorrida.Coletada)
+        // Entregue também vale: a consulta pode pular a coleta quando o webhook não chegou a tempo.
+        if (corrida.Status is not (StatusCorrida.Coletada or StatusCorrida.Entregue))
             throw new RegraDeDominioVioladaException("A viagem só sai pela corrida depois que o motorista coletou.");
         if (_paradas.Count == 0) throw new RegraDeDominioVioladaException("Viagem sem paradas não sai.");
 

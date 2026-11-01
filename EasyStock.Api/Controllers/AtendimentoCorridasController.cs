@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Integration.Logistica;
 using EasyStock.Application.UseCases.Atendimento.Entregas;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Enums.Atendimento;
@@ -17,6 +18,11 @@ public class AtendimentoCorridasController(
     RegistrarCorridaExternaUseCase registrarUseCase,
     CorrigirCorridaExternaUseCase corrigirUseCase,
     ListarCorridasDaViagemUseCase listarUseCase,
+    CotarCorridaUseCase cotarUseCase,
+    ChamarCorridaUseCase chamarUseCase,
+    SincronizarCorridaUseCase sincronizarUseCase,
+    CancelarCorridaUseCase cancelarUseCase,
+    AdicionarGorjetaCorridaUseCase gorjetaUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "List the external rides of a trip")]
@@ -37,10 +43,44 @@ public class AtendimentoCorridasController(
         Executar(async () => DataOk(await corrigirUseCase.ExecuteAsync(new CorrigirCorridaExternaInput(
             currentUser.EmpresaId, currentUser.UsuarioId, viagemId, corridaId, body.CustoCentavos, body.Motorista), ct)));
 
+    [SwaggerOperation(Summary = "Quote a ride on the delivery provider API",
+        Description = "#2160: uma parada por corrida (R7). Coleta na cozinha da loja, entrega no endereço do pedido. A cotação vale 5 min.")]
+    [HttpPost("cotacao")]
+    public Task<IActionResult> Cotar(Guid viagemId, [FromBody] CotarCorridaBody body, CancellationToken ct) =>
+        Executar(async () => DataOk(await cotarUseCase.ExecuteAsync(
+            new CotarCorridaInput(currentUser.EmpresaId, viagemId, body.Veiculo, body.AgendarPara), ct)));
+
+    [SwaggerOperation(Summary = "Call the quoted ride on the delivery provider API",
+        Description = "#2160: só com o pedido pronto (R8). O preço vem da cotação relida no provedor. Uma corrida em curso por viagem.")]
+    [HttpPost("chamar")]
+    public Task<IActionResult> Chamar(Guid viagemId, [FromBody] ChamarCorridaBody body, CancellationToken ct) =>
+        Executar(async () => DataOk(await chamarUseCase.ExecuteAsync(new ChamarCorridaInput(
+            currentUser.EmpresaId, currentUser.UsuarioId, viagemId, body.CotacaoId, body.Veiculo, body.Observacao), ct)));
+
+    [SwaggerOperation(Summary = "Refresh a ride from the provider", Description = "Reconsulta o provedor e aplica o status na viagem e no pedido.")]
+    [HttpGet("{corridaId:guid}")]
+    public Task<IActionResult> Atualizar(Guid viagemId, Guid corridaId, CancellationToken ct) =>
+        Executar(async () =>
+        {
+            var corrida = await sincronizarUseCase.ExecuteAsync(currentUser.EmpresaId, corridaId, ct);
+            return corrida.ViagemId == viagemId ? DataOk(corrida) : throw new CorridaExternaNaoEncontradaException(corridaId);
+        });
+
+    [SwaggerOperation(Summary = "Cancel a ride on the provider", Description = "Só procurando motorista ou até 5 min depois do match.")]
+    [HttpPost("{corridaId:guid}/cancelar")]
+    public Task<IActionResult> Cancelar(Guid viagemId, Guid corridaId, CancellationToken ct) =>
+        Executar(async () => DataOk(await cancelarUseCase.ExecuteAsync(currentUser.EmpresaId, viagemId, corridaId, ct)));
+
+    [SwaggerOperation(Summary = "Add a priority fee to find a driver faster", Description = "Só enquanto procura motorista. Centavos, até R$ 100,00.")]
+    [HttpPost("{corridaId:guid}/gorjeta")]
+    public Task<IActionResult> Gorjeta(Guid viagemId, Guid corridaId, [FromBody] GorjetaCorridaBody body, CancellationToken ct) =>
+        Executar(async () => DataOk(await gorjetaUseCase.ExecuteAsync(currentUser.EmpresaId, viagemId, corridaId, body.Centavos, ct)));
+
     private async Task<IActionResult> Executar(Func<Task<IActionResult>> acao)
     {
         try { return await acao(); }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
+        catch (LogisticaNaoConectadaException ex) { return DataConflict(ex.Message); }
         catch (ViagemNaoEncontradaException ex) { return DataNotFound(ex.Message); }
         catch (CorridaExternaNaoEncontradaException ex) { return DataNotFound(ex.Message); }
     }
@@ -49,6 +89,12 @@ public class AtendimentoCorridasController(
 public sealed record CorridaExternaBody(EmpresaEntregador Provedor, int CustoCentavos, string? Motorista);
 
 public sealed record CorrecaoCorridaExternaBody(int CustoCentavos, string? Motorista);
+
+public sealed record CotarCorridaBody(VeiculoCorrida Veiculo = VeiculoCorrida.Moto, DateTimeOffset? AgendarPara = null);
+
+public sealed record ChamarCorridaBody(string CotacaoId, VeiculoCorrida Veiculo = VeiculoCorrida.Moto, string? Observacao = null);
+
+public sealed record GorjetaCorridaBody(int Centavos);
 
 /// <summary>Custo das corridas contra o frete cobrado (I9.1): só a dona e o administrador.</summary>
 [SwaggerTag("Delivery reports")]
