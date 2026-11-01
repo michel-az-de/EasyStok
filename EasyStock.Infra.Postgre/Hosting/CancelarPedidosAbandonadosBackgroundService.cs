@@ -124,7 +124,7 @@ public sealed class CancelarPedidosAbandonadosBackgroundService(
             Detalhes = MotivoAbandonado,
             UsuarioNome = "Sistema",
             Origem = "sistema",
-            OcorridoEm = pedido.CanceladoEm.Value,
+            OcorridoEm = pedido.AlteradoEm,
         }, ct);
         await pedidoRepo.UpdateAsync(pedido, ct);
 
