@@ -2,14 +2,14 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom'
 import { limitarPainelMovel, proximaFrentePainel } from '../hooks/estadoPainelMovel'
 import { usePainelMovel as useControlePainelMovel } from '../hooks/usePainelMovel'
+import { janelaDosPaineis as janelaAtual, observarAreaDosPaineis } from '../hooks/areaDosPaineis'
 import { Icone } from './Icone'
 import css from './PainelMovel.module.css'
 export const usePainelMovel = useControlePainelMovel
 
-const janelaAtual = () => ({ largura: window.innerWidth, altura: window.innerHeight })
 const movimentoReduzido = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 
-function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaInicial, className, classeCorpo, focar, aoRecolher, atributos }) {
+function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaInicial, className, classeCorpo, focar, aoRecolher, atributos, alinharDireita }) {
   const ajuda = useId()
   const papel = useRef(null)
   const alca = useRef(null)
@@ -19,7 +19,11 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
   const [frente, setFrente] = useState(proximaFrentePainel)
   const [saindo, setSaindo] = useState(false)
   const [arrastando, setArrastando] = useState(false)
-  const [geometria, setGeometria] = useState(() => ({ x: controle.x ?? 24, y: controle.y ?? 112,
+  const [disponivel, setDisponivel] = useState(true)
+  const inicio = () => ({ x: alinharDireita ? window.innerWidth - larguraInicial - 8 : 24,
+    y: alinharDireita ? (janelaAtual().area?.y ?? 64) + 8 : 112, largura: larguraInicial,
+    ...(alturaInicial ? { altura: alturaInicial } : {}) })
+  const [geometria, setGeometria] = useState(() => ({ x: controle.x ?? inicio().x, y: controle.y ?? inicio().y,
     largura: controle.largura ?? larguraInicial, ...(controle.altura || alturaInicial ? { altura: controle.altura ?? alturaInicial } : {}) }))
   const atual = useRef(geometria)
   const timer = useRef(null)
@@ -32,7 +36,7 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
     const dimensoes = { ...tamanho(), ...(nova.largura ? { largura: nova.largura } : {}), ...(nova.altura ? { altura: nova.altura } : {}) }
     const limitada = limitarPainelMovel(nova, dimensoes, janelaAtual())
     const proxima = { x: limitada.x, y: limitada.y, largura: limitada.largura,
-      altura: nova.altura ? limitada.altura : undefined }
+      altura: nova.altura || limitada.altura < dimensoes.altura ? limitada.altura : undefined }
     atual.current = proxima; setGeometria(proxima)
     if (salvar) controle.guardar(proxima)
     return proxima
@@ -41,18 +45,23 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
   useEffect(() => () => { clearTimeout(timer.current); limparFoco.current?.() }, [])
   useLayoutEffect(() => {
     const ajustar = () => {
-      const limitada = limitarPainelMovel(atual.current, tamanho(), janelaAtual())
+      const dimensoes = tamanho(), limitada = limitarPainelMovel(atual.current, dimensoes, janelaAtual())
+      const minimo = (papel.current?.querySelector?.('header')?.getBoundingClientRect().height || 40)
+        + (papel.current?.querySelector?.('[data-redimensionar-painel]')?.getBoundingClientRect().height || 40)
+      setDisponivel(limitada.altura >= minimo)
+      if (limitada.altura < minimo) {
+        if (papel.current?.contains(document.activeElement)) document.querySelector?.('[data-area-envio] textarea:not(:disabled)')?.focus({ preventScroll: true })
+        return
+      }
       const antes = atual.current
-      if (limitada.x !== antes.x || limitada.y !== antes.y || limitada.largura !== antes.largura || (antes.altura && limitada.altura !== antes.altura)) {
-        const proxima = { x: limitada.x, y: limitada.y, largura: limitada.largura, ...(antes.altura ? { altura: limitada.altura } : {}) }
+      if (limitada.x !== antes.x || limitada.y !== antes.y || limitada.largura !== antes.largura || (antes.altura && limitada.altura !== antes.altura) || limitada.altura < dimensoes.altura) {
+        const proxima = { x: limitada.x, y: limitada.y, largura: limitada.largura,
+          ...(antes.altura || limitada.altura < dimensoes.altura ? { altura: limitada.altura } : {}) }
         atual.current = proxima; setGeometria(proxima); guardar(proxima)
       }
     }
     ajustar()
-    window.addEventListener('resize', ajustar)
-    const observador = typeof ResizeObserver === 'function' ? new ResizeObserver(ajustar) : null
-    observador?.observe(papel.current)
-    return () => { window.removeEventListener('resize', ajustar); observador?.disconnect() }
+    return observarAreaDosPaineis(ajustar, papel.current)
   }, [guardar, tamanho])
 
   function iniciar(e, modo) {
@@ -118,7 +127,7 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
     onPointerCancel: (e) => terminar(e, true), onLostPointerCapture: (e) => terminar(e, true),
     onKeyDown: (e) => teclar(e, modo), onFocus: () => { origemTeclado.current = { ...atual.current } } })
   return <aside ref={papel} className={`${css.painel} ${className ?? ''} ${saindo ? css.saindo : ''}`}
-    style={{ left: geometria.x, top: geometria.y, width: geometria.largura, height: geometria.altura, zIndex: frente }}
+    style={{ left: geometria.x, top: geometria.y, width: geometria.largura, height: geometria.altura, zIndex: frente, visibility: disponivel ? undefined : 'hidden' }}
     data-painel-movel={controle.painelId} aria-label={titulo} {...atributos} onPointerDownCapture={() => setFrente(proximaFrentePainel())}
     onFocusCapture={() => setFrente(proximaFrentePainel())}>
     <header className={css.cabecalho}>
@@ -127,19 +136,19 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
         <Icone nome="grip-vertical" tamanho={18} /><span>{titulo}</span>
       </button>
       <button type="button" className={css.controle} aria-label={`Restaurar posição de ${titulo}`} title="Restaurar posição e tamanho" disabled={saindo}
-        onClick={() => mover({ x: 24, y: 112, largura: larguraInicial, ...(alturaInicial ? { altura: alturaInicial } : {}) }, true)}><Icone nome="undo-2" tamanho={18} /></button>
+        onClick={() => mover(inicio(), true)}><Icone nome="undo-2" tamanho={18} /></button>
       <button type="button" className={css.controle} aria-label={`Recolher ${titulo}`} title="Recolher" disabled={saindo} onClick={recolher}><Icone nome="arrow-left" tamanho={18} /></button>
     </header>
     <span id={ajuda} className="sr">Arraste pelo cabeçalho ou use as setas. Shift move mais rápido. Escape desfaz o movimento. Use o canto inferior para redimensionar.</span>
     <div className={`${css.corpo} ${classeCorpo ?? ''}`}>{children}</div>
     {controle.erro && <output className={css.erro}>{controle.erro}</output>}
-    <button type="button" className={css.redimensionar} aria-label={`Redimensionar ${titulo}`} aria-describedby={ajuda} disabled={saindo}
+    <button type="button" className={css.redimensionar} data-redimensionar-painel aria-label={`Redimensionar ${titulo}`} aria-describedby={ajuda} disabled={saindo}
       {...eventos('tamanho')}><span aria-hidden="true">↘</span></button>
   </aside>
 }
 
-export function PainelMovel({ controle, titulo, children, larguraInicial = 360, alturaInicial, className, classeCorpo, focar = controle.foco, aoRecolher, atributos }) {
+export function PainelMovel({ controle, titulo, children, larguraInicial = 360, alturaInicial, className, classeCorpo, focar = controle.foco, aoRecolher, atributos, alinharDireita = false }) {
   if (!controle.solto || typeof document === 'undefined') return null
   return createPortal(<SuperficieMovel key={controle.chave} controle={controle} titulo={titulo} larguraInicial={larguraInicial}
-    alturaInicial={alturaInicial} className={className} classeCorpo={classeCorpo} focar={focar} aoRecolher={aoRecolher} atributos={atributos}>{children}</SuperficieMovel>, document.body, controle.chave)
+    alturaInicial={alturaInicial} className={className} classeCorpo={classeCorpo} focar={focar} aoRecolher={aoRecolher} atributos={atributos} alinharDireita={alinharDireita}>{children}</SuperficieMovel>, document.body, controle.chave)
 }

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
-import { proximaFrentePainel } from '../../hooks/estadoPainelMovel'
+import { limitarPainelMovel, proximaFrentePainel } from '../../hooks/estadoPainelMovel'
+import { janelaDosPaineis, observarAreaDosPaineis } from '../../hooks/areaDosPaineis'
 import css from './ModalNota.module.css'
 
 // #1839: a nota abre como um post-it pequeno logo acima do composer, sem cobrir a conversa. Esc fecha,
@@ -14,6 +15,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
   const salvando = useRef(false)
   const campo = useRef(null)
   const postit = useRef(null)
+  const [geometria, setGeometria] = useState(null)
   // Antes do commit: o efeito de abertura ainda não transferiu o foco ao campo.
   const abridor = useRef(globalThis.document?.activeElement ?? null)
   const montada = useRef(true)
@@ -81,6 +83,17 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
 
   // Foco só ao abrir: `aoFechar` muda de identidade a cada render do App e não pode refazer o foco.
   useEffect(() => { if (visivel) campo.current?.focus() }, [visivel])
+  useLayoutEffect(() => {
+    if (!visivel) return
+    const ajustar = () => {
+      const janela = janelaDosPaineis()
+      const altura = postit.current?.scrollHeight ?? 205
+      const proxima = limitarPainelMovel({ x: (janela.largura - 360) / 2, y: (janela.reserva?.y ?? janela.altura - 104) - altura - 8 }, { largura: 360, altura }, janela)
+      setGeometria(atual => atual && Object.keys(proxima).every(chave => proxima[chave] === atual[chave]) ? atual : proxima)
+    }
+    ajustar()
+    return observarAreaDosPaineis(ajustar, postit.current)
+  }, [visivel])
   useEffect(() => {
     montada.current = true
     return () => { montada.current = false; animacao.current?.cancel() }
@@ -89,7 +102,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, visivel = true, out
   const aoTeclar = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !salvando.current) { e.stopPropagation(); fechar() } }
 
   return (
-    <dialog ref={postit} open={visivel} className={css.postit} style={{ zIndex: frente }} aria-label="Nota interna" onKeyDown={aoTeclar}
+    <dialog ref={postit} open={visivel} className={css.postit} style={{ zIndex: frente, ...(geometria ? { left: geometria.x, top: geometria.y, bottom: 'auto', transform: 'none', width: geometria.largura, maxHeight: geometria.altura } : {}) }} aria-label="Nota interna" onKeyDown={aoTeclar}
       onFocusCapture={() => setFrente(proximaFrentePainel())} onPointerDownCapture={() => setFrente(proximaFrentePainel())}>
       <p className={css.titulo}>Nota interna <span>· só para a equipe</span></p>
       {outraConversa && <p role="status">Esta nota continua na ficha de {nomeCliente}.</p>}

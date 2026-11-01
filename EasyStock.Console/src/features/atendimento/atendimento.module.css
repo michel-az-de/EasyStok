@@ -225,7 +225,7 @@
 .modo {
   flex-shrink: 0; background: var(--papel);
   border: 0;
-  padding: var(--e-2) var(--e-4);
+  padding: 0 var(--e-4); min-height: var(--toque);
 }
 .modo_ligado { border-left-color: var(--sucesso); }
 .modo_pausado { border-left-color: var(--linha-forte); }

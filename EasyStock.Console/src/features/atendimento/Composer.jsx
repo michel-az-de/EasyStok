@@ -177,7 +177,7 @@ export function Composer({
   // amarela e o campo apagado com Programar e Nota ativos). Fica uma linha neutra no lugar do campo.
   if (motivo?.acao === 'reabrir') {
     return (
-      <div className={css.composer}>
+      <div className={css.composer} data-area-envio>
         <p className={css.linhaEncerrada}>
           <span>Conversa encerrada</span>
           {aoReabrir && <Botao disabled={reabrindo} onClick={aoReabrir}>{reabrindo ? 'Reabrindo…' : 'Reabrir conversa'}</Botao>}
@@ -187,7 +187,7 @@ export function Composer({
   }
 
   return (
-    <div className={css.composer}>
+    <div className={css.composer} data-area-envio>
       {motivo && (
         <p className={`${css.bloqueio} ${motivo.acao === 'bloqueio' ? css.bloqueioGrave : ''}`}>
           <Icone nome={motivo.acao === 'bloqueio' ? 'bloqueio' : 'alerta'} />

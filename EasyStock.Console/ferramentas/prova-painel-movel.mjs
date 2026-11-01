@@ -6,6 +6,7 @@ import { registerHooks } from 'node:module'
 import { transformWithOxc } from 'vite'
 import { guardarPainelMovel, lerPainelMovel, limitarPainelMovel } from '../src/hooks/estadoPainelMovel.js'
 import { guardarPosicaoPostit } from '../src/aplicacao/posicoesDosPostits.js'
+import { janelaDosPaineis, observarAreaDosPaineis } from '../src/hooks/areaDosPaineis.js'
 
 const memoria = new Map()
 const storage = { getItem: (k) => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, v), removeItem: (k) => memoria.delete(k) }
@@ -26,6 +27,27 @@ for (const janela of [{ largura: 1440, altura: 900 }, { largura: 390, altura: 84
   assert.ok(p.x >= 8 && p.y >= 8 && p.x + p.largura <= janela.largura - 8 && p.y + p.altura <= janela.altura - 8)
 }
 console.log('ok posição e dimensões permanecem acessíveis em desktop e celulares')
+const semSobrepor = (a, b) => a.x + a.largura <= b.x || a.x >= b.x + b.largura
+  || a.y + a.altura <= b.y || a.y >= b.y + b.altura
+for (const janela of [
+  { largura: 1440, altura: 900, area: { x: 76, y: 64, largura: 1364, altura: 836 }, reserva: { x: 364, y: 772, largura: 760, altura: 128 } },
+  { largura: 320, altura: 568, area: { x: 0, y: 64, largura: 320, altura: 448 }, reserva: { x: 0, y: 390, largura: 320, altura: 122 } },
+  { largura: 844, altura: 390, area: { x: 0, y: 64, largura: 844, altura: 270 }, reserva: { x: 0, y: 214, largura: 844, altura: 120 } },
+]) {
+  for (const tamanho of [{ largura: 480, altura: 480 }, { largura: 280, altura: 200 }]) {
+    for (const posicao of [{ x: 600, y: 810 }, { x: 0, y: 0 }, { x: 5000, y: 5000 }]) {
+      const p = limitarPainelMovel(posicao, tamanho, janela)
+      assert.ok(semSobrepor(p, janela.reserva), 'Comanda e nota não cobrem campo, ferramentas nem Enviar')
+      assert.ok(p.x >= janela.area.x + 8 && p.y >= janela.area.y + 8)
+      assert.ok(p.x + p.largura <= janela.area.x + janela.area.largura - 8)
+      assert.ok(p.y + p.altura <= janela.area.y + janela.area.altura - 8)
+    }
+  }
+}
+const lateralLivre = limitarPainelMovel({ x: 1150, y: 710 }, { largura: 280, altura: 180 },
+  { largura: 1440, altura: 900, reserva: { x: 364, y: 772, largura: 760, altura: 128 } })
+assert.deepEqual(lateralLivre, { x: 1150, y: 710, largura: 280, altura: 180 }, 'a área lateral abaixo do envio continua livre para notas')
+console.log('ok área útil protege envio em desktop, retrato e paisagem sem perder a lateral livre')
 
 let hostAtual
 const iguais = (a, b) => a?.length === b?.length && a.every((x, i) => Object.is(x, b[i]))
@@ -76,6 +98,23 @@ const eventosDocumento = new Map()
 document.addEventListener = (nome, fn) => eventosDocumento.set(nome, fn)
 document.removeEventListener = (nome) => eventosDocumento.delete(nome)
 globalThis.ResizeObserver = class { observe() {} disconnect() {} }
+const eventosVisiveis = new Map()
+window.visualViewport = { height: 400, width: 900, offsetTop: 300, offsetLeft: 100, addEventListener: (nome, fn) => eventosVisiveis.set(nome, fn), removeEventListener: nome => eventosVisiveis.delete(nome) }
+document.querySelector = seletor => ({
+  '#conteudo-principal': { getBoundingClientRect: () => ({ left: 76, top: 64, width: 1364, height: 832 }) },
+  '[data-cabecalho-conversa]': { getBoundingClientRect: () => ({ left: 364, top: 64, width: 760, height: 56 }) },
+}[seletor] ?? null)
+const telaComTeclado = janelaDosPaineis()
+const notaComTeclado = limitarPainelMovel({ x: 200, y: 120 }, { largura: 280, altura: 240 }, telaComTeclado)
+assert.ok(notaComTeclado.x >= 108 && notaComTeclado.y >= 308)
+assert.ok(notaComTeclado.x + notaComTeclado.largura <= 992 && notaComTeclado.y + notaComTeclado.altura <= 692)
+const pararObservacao = observarAreaDosPaineis(() => {})
+assert.equal(typeof eventosVisiveis.get('scroll'), 'function', 'o deslocamento da área visível reposiciona as folhas')
+pararObservacao()
+assert.equal(eventosVisiveis.size, 0)
+delete window.visualViewport
+delete document.querySelector
+console.log('ok teclado e deslocamento da área visível mantêm a nota alcançável')
 function visitar(no, acao) { if (Array.isArray(no)) { no.forEach(n => visitar(n, acao)); return }; if (!no || typeof no !== 'object') return; acao(no); visitar(no.props?.children, acao) }
 function montar(fn, props) {
   const h = { valores: [], efeitos: [], props, pendentes: [], sujo: true }
@@ -353,4 +392,4 @@ const mesaB = montar(mesaBElemento.type, mesaBElemento.props)
 assert.equal(mesaB.tree.props.children[1].length, 0)
 mesaB.unmount()
 console.log('ok logout limpa a mesa e a conta seguinte não herda texto nem portais')
-console.log('15 grupos de comportamento do painel e da mesa aprovados.')
+console.log('17 grupos de comportamento do painel e da mesa aprovados.')

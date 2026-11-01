@@ -107,7 +107,7 @@ globalThis.sessionStorage = {
   getItem: () => JSON.stringify({ token: 't', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa' } }),
   setItem: () => {}, removeItem: () => {},
 }
-globalThis.window = globalThis.window ?? { dispatchEvent: () => {} }
+globalThis.window = globalThis.window ?? { innerWidth: 1000, innerHeight: 900, dispatchEvent: () => {}, addEventListener: () => {}, removeEventListener: () => {} }
 
 let passou = 0
 const falhas = []

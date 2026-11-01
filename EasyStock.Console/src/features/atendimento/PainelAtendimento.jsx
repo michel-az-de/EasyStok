@@ -112,7 +112,7 @@ export function PainelAtendimento({
 
   return (
     <>
-      <header className={css.cabecalho}>
+      <header className={css.cabecalho} data-cabecalho-conversa>
         <span className={css.identidade}>
           <Avatar
             nome={selecionada.nome}

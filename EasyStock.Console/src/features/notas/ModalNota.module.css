@@ -10,7 +10,7 @@
   position: fixed; margin: 0; border: 0; bottom: 112px; left: 50%; transform: translateX(-50%);
   width: min(360px, calc(100vw - 32px)); display: grid; gap: var(--e-2);
   padding: var(--e-3) var(--e-4); background: var(--alerta-pastel); color: var(--tinta);
-  border-radius: var(--r-2);
+  border-radius: var(--r-2); overflow-y: auto;
   box-shadow: var(--sombra-media);
 }
 .titulo { margin: 0; font-weight: 700; color: var(--alerta); }

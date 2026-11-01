@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AlcaLargura } from '../componentes/AlcaLargura'
 import { MenuDaConta } from '../componentes/MenuDaConta'
 import { Marca } from '../componentes/Marca'
@@ -7,7 +7,9 @@ import { trocarTema } from '../hooks/useTema'
 import { balcaoComCardapio, fichaComCardapio } from '../hooks/larguras'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
-import { Modal } from '../componentes/Modal'
+import { BotaoIcone } from '../componentes/BotaoIcone'
+import { limitarPainelMovel } from '../hooks/estadoPainelMovel'
+import { janelaDosPaineis, observarAreaDosPaineis } from '../hooks/areaDosPaineis'
 import { Icone } from '../componentes/Icone'
 import { MarcaIcone } from '../componentes/MarcaIcone'
 import { Pilula } from '../componentes/Pilula'
@@ -376,13 +378,29 @@ function Trilho({
   )
 }
 
-// #1551: a gaveta é um <dialog> e a FaixaApi fica atrás da cortina. O aviso da ação da API
-// (janela faltando, pedido não criado, cobrança que não saiu) vem para o rodapé dela.
 function Gaveta({ titulo, aoFechar, children }) {
+  const painel = useRef(null)
+  const medir = () => limitarPainelMovel({ x: window.innerWidth - 488, y: 72 },
+    { largura: 480, altura: window.innerHeight }, janelaDosPaineis())
+  const [posicao, setPosicao] = useState(medir)
+  useLayoutEffect(() => {
+    const ajustar = () => setPosicao(antes => {
+      const p = medir()
+      return ['x', 'y', 'largura', 'altura'].every(c => p[c] === antes[c]) ? antes : p
+    })
+    ajustar()
+    return observarAreaDosPaineis(ajustar, painel.current)
+  }, [])
+  useEffect(() => { painel.current?.querySelector('[data-fechar-ficha]')?.focus({ preventScroll: true }) }, [])
   return (
-    <Modal titulo={titulo} className={css.gaveta} largura="min(480px, 90vw)" aoFechar={aoFechar} rodape={<AvisoDaAcaoApi />}>
-      {children}
-    </Modal>
+    <dialog ref={painel} open aria-modal="false" aria-label={titulo} className={css.gaveta}
+      style={{ left: posicao.x, top: posicao.y, width: posicao.largura, height: posicao.altura }}
+      onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented && e.target.closest('dialog') === e.currentTarget) {
+        e.preventDefault(); e.stopPropagation(); aoFechar()
+      } }}>
+      <div className={css.conteudoGaveta}>{children}</div>
+      <AvisoDaAcaoApi />
+    </dialog>
   )
 }
 
@@ -567,7 +585,8 @@ function ConteudoMoldura({
           <section className={`${css.coluna} ${css.centro}`} aria-label="Conversa">{atendimento}</section>
           {gavetaAberta && (
             <Gaveta titulo="Ficha" aoFechar={fecharGaveta}>
-              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} /></LimiteDeErro>
+              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar}
+                acoesCabecalho={<BotaoIcone icone="fechar" rotulo="Fechar Ficha" data-fechar-ficha onClick={fecharGaveta} />} /></LimiteDeErro>
             </Gaveta>
           )}
         </main>

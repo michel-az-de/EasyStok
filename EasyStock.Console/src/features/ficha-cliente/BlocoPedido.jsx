@@ -228,7 +228,7 @@ export function BlocoPedido({
             <b>{moeda(pedido.totalApi ?? total)}</b>
           </p>
           {linhaDe('total') && <p className={css.total} data-simulacao-total><span>Total com frete</span><b>{moeda(simulacao.total)}</b></p>}
-          {fonteApi && !pedido.pedidoId && !linhasSimulacao && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
+          {fonteApi && !pedido.pedidoId && !linhasSimulacao && <p className={css.notaTotal}>Confira o frete antes de gerar a cobrança.</p>}
           {linhaDe('sinal') && <p className={css.notaTotal} data-simulacao-sinal>{linhaDe('sinal')}</p>}
           {previaSinal && !linhasSimulacao && (
             <p className={css.notaTotal}>
