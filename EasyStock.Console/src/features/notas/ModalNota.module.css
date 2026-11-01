@@ -15,6 +15,7 @@
 }
 .titulo { margin: 0; font-weight: 700; color: var(--alerta); }
 .titulo span { font-weight: 400; color: var(--tinta-2); }
+.requisito { margin: 0; font-size: var(--t-apoio); line-height: 1.4; color: var(--tinta-2); }
 .acoes { display: flex; justify-content: flex-end; gap: var(--e-2); }
 .postit textarea { font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6; border: 0; box-shadow: none; background: transparent; }
 .postit textarea:focus { outline: none; }
@@ -22,3 +23,21 @@
 
 /* O display:grid do post-it não pode revelar o diálogo fechado. */
 .postit:not([open]) { display: none; }
+
+/* No celular, o papel ocupa o lugar do compositor público e preserva o histórico acima. */
+.embutida {
+  position: relative; inset: auto; transform: none; z-index: auto; flex: 0 0 auto;
+  width: auto; max-width: 640px; margin: 0 var(--e-3) var(--e-3);
+  padding: var(--e-3); box-shadow: none;
+}
+.embutida .titulo { font-size: var(--t-apoio); line-height: 1.4; }
+.embutida textarea {
+  height: clamp(64px, 15dvh, 128px); min-height: 64px; max-height: 128px;
+  resize: none; font-size: 1.125rem; line-height: 1.4;
+}
+.embutida .acoes { display: grid; grid-template-columns: 1fr 1.12fr .86fr; gap: var(--e-1); }
+.embutida .acoes button { min-width: 0; min-height: 48px; padding-inline: var(--e-1); gap: var(--e-1); white-space: nowrap; }
+.embutida .acoes svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.embutida .acoes .cadastrar { padding-inline: 0; }
+.embutida .acoes:has(.cadastrar) { column-gap: 0; }
+.embutida .erro { margin: 0; max-height: 5em; overflow: auto; }

@@ -25,6 +25,7 @@ import css from './atendimento.module.css'
 export function PainelAtendimento({
   aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   focarAoTrocar = false,
+  slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, visivel = true,
 }) {
   const {
     selecionada, visiveis, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi,
@@ -65,8 +66,8 @@ export function PainelAtendimento({
   }
 
   useEffect(() => {
-    if (focarAoTrocar) cabecalhoRef.current?.focus()
-  }, [focarAoTrocar, selecionada?.id])
+    if (focarAoTrocar && visivel) cabecalhoRef.current?.focus()
+  }, [focarAoTrocar, selecionada?.id, visivel])
 
   if (!selecionada) {
     const primeira = visiveis[0]
@@ -165,6 +166,7 @@ export function PainelAtendimento({
       {/* #2134: quem responde a conversa e o Assumir ficam fixos entre o cabeçalho e a conversa.
           Dentro da área que rola, o aviso saía da tela (y=-228 px em 1280x720) e o campo seguia
           enviando como pessoa por cima do Assistente. */}
+      <div hidden={editorNotaVisivel} style={editorNotaVisivel ? undefined : { display: 'contents' }}>
       <BarraModo
         conversa={selecionada}
         pausado={pausado}
@@ -173,6 +175,7 @@ export function PainelAtendimento({
         aoDevolver={() => devolverAutomatico(selecionada.id)}
         aoEncerrar={() => abrirEncerramento(selecionada.id)}
       />
+      </div>
 
       {/* Uma área rolável só: conversa e painel do agente rolam juntos, e o composer fica
           preso no pé da coluna em qualquer largura. */}
@@ -194,6 +197,7 @@ export function PainelAtendimento({
       </div>
 
       {/* #1510: remonta por conversa; anexo em espera e gravação não passam para a próxima. */}
+      <div hidden={editorNotaVisivel} style={editorNotaVisivel ? undefined : { display: 'contents' }}>
       <Composer
         key={selecionada.id}
         conversa={selecionada}
@@ -215,11 +219,15 @@ export function PainelAtendimento({
         aoFecharModelos={() => setModelosDe(null)}
         aoAplicarTemplate={aplicarTemplate}
         aoAbrirNota={aoAbrirNota}
+        notaEmRascunho={notaEmRascunho}
+        visivel={visivel && !editorNotaVisivel}
         aoAbrirGaleria={aoAbrirGaleria}
         aoAbrirBiblioteca={aoAbrirBiblioteca}
         aoReabrir={podeReabrir ? aoReabrir : null}
         reabrindo={reabrindo}
       />
+      </div>
+      {slotEditorNota}
     </>
   )
 }

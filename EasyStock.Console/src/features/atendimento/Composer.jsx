@@ -6,6 +6,7 @@ import { useAviso } from '../../componentes/Aviso'
 import { CampoArea } from '../../componentes/Campo'
 import { SugestaoDeTexto } from '../../componentes/SugestaoDeTexto'
 import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
+import { useSugestaoProativa } from '../../aplicacao/useSugestaoProativa'
 import { useComplementoLigado } from '../../aplicacao/preferenciaDoComplemento'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
@@ -24,6 +25,7 @@ import { SeletorRespostas } from './SeletorRespostas'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
 import { acoesDoComposer } from './apresentacaoDaConversa'
+import { revisaoDoContexto } from '../../dominio/contextoDaSugestao'
 import css from './atendimento.module.css'
 
 export function Composer({
@@ -31,6 +33,7 @@ export function Composer({
   aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   aoReabrir, reabrindo = false, podeEnviarModelo = false, aoAssumirAntes = null,
   modeloAberto = false, aoAbrirModelos, aoFecharModelos, modelosFixos = true,
+  notaEmRascunho = false, visivel = true,
 }) {
   const { enviarMidia } = useAcoes()
   // #1577: a tecla muda só este campo. O rascunho global recebe o texto na pausa da digitação, ou na hora
@@ -135,9 +138,21 @@ export function Composer({
   const [complementoLigado, alternarComplemento] = useComplementoLigado()
   const sugestao = useComplementoDeTexto({
     texto: rascunho, contexto: 'cliente', conversaId: conversa.id,
-    ativo: fonteApi && podeEscrever && !barra.aberto && !anexo && !gravando && !enviandoAudio,
+    revisaoContexto: revisaoDoContexto(conversa),
+    ativo: visivel && fonteApi && podeEscrever && !barra.aberto && !anexo && !gravando && !enviandoAudio && !modeloAberto && !programarEm,
     aoCompletar: aoMudarRascunho,
   })
+  const proativa = useSugestaoProativa({
+    conversa, ativo: visivel && fonteApi && podeEscrever && !modeloAberto && !programarEm,
+    campoEmUso: Boolean(rascunho || barra.aberto || anexo || gravando || enviandoAudio || assumindo),
+  })
+  function usarProposta() {
+    const atual = proativa.obterSugestaoAtual()
+    if (!atual || rascunho.trim()) return
+    aoMudarRascunho(atual.texto)
+    proativa.dispensar()
+    campoRef.current?.querySelector('textarea')?.focus({ preventScroll: true })
+  }
   async function aoEnviarAudio() {
     setErroAnexo(null)
     setEnviandoAudio(true)
@@ -227,6 +242,10 @@ export function Composer({
 
           {erroAnexo && <p className={css.restricao} role="alert">{erroAnexo}</p>}
           {variavelSobrando && <p className={css.restricao} role="alert">{variavelSobrando}</p>}
+          <SugestaoDeTexto
+            sugestao={{ complemento: proativa.sugestao?.texto, aceitar: usarProposta, dispensar: proativa.dispensar }}
+            rotuloAcao="Usar no rascunho" atalho={null} compacta
+          />
 
           {/* Rodada 6d: composer em uma linha, como no Mensagens. Ícones à
               esquerda, o campo numa pílula que cresce com o texto, o enviar
@@ -290,6 +309,11 @@ export function Composer({
                 <Icone nome="respostas" />
                 <span>Respostas</span>
               </Botao></Tooltip>
+              <Tooltip texto={notaEmRascunho ? 'Retomar a nota desta conversa. Só a equipe vê.' : 'Anotar para a equipe sem sair da conversa'}>
+                <Botao aria-label={notaEmRascunho ? 'Retomar nota interna' : 'Nota interna'} className={css.botaoNota} onClick={aoAbrirNota}>
+                  <Icone nome="nota" /><span>{notaEmRascunho ? 'Retomar nota' : 'Nota'}</span>
+                </Botao>
+              </Tooltip>
               {/* Rodada 12 (issue #16, dúvida da Thatiane "esse botão é pra
                   quê?"): os quatro vizinhos ganham nome visível, como o
                   Respostas. Em coluna estreita o nome some por container
@@ -339,22 +363,17 @@ export function Composer({
                   <Icone nome="relogio" /><span className={css.rotuloAcao}>Programar</span>
                 </Botao>
               </Tooltip>
-              <Tooltip texto="Nota interna: fica na ficha, o cliente nunca vê">
-                <Botao aria-label="Nota interna" className={css.acaoComRotulo} onClick={aoAbrirNota}>
-                  <Icone nome="nota" /><span className={css.rotuloAcao}>Nota</span>
-                </Botao>
-              </Tooltip>
               {/* #2134: chave do completar com Tab. Só existe no modo API (é lá que a sugestão chama o
                   provedor). Desligada, nenhuma chamada sai; vale por usuário, neste navegador. */}
               {fonteApi && <Tooltip texto={complementoLigado
-                ? 'Completar com Tab: ligado. O que você digita é enviado à IA para sugerir a continuação. Toque para desligar.'
-                : 'Completar com Tab: desligado. Nada do que você digita é enviado à IA. Toque para ligar.'}
+                ? 'Sugestões de IA: ligadas. Usa a conversa e o que você digita para preparar rascunhos. Toque para desligar.'
+                : 'Sugestões de IA: desligadas. Toque para ligar.'}
               ><Botao
                 aria-pressed={complementoLigado}
                 className={`${css.acaoComRotulo} ${complementoLigado ? css.chaveLigada : ''}`}
                 onClick={alternarComplemento}
               >
-                <Icone nome="sparkles" /><span className={css.rotuloAcao}>Completar com Tab</span>
+                <Icone nome="sparkles" /><span className={css.rotuloAcao}>Sugestões de IA</span>
               </Botao></Tooltip>}
                 </div>
               </details>

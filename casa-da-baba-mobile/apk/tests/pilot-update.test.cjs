@@ -57,7 +57,9 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
       addEventListener(name, callback) { handlers.set(name, callback); },
       async click(action) { await handlers.get('click')?.({ target: { closest: () => ({ dataset: { action } }) } }); }
     };
-    Object.defineProperty(el, 'innerHTML', { set(html) {
+    let markup = '';
+    Object.defineProperty(el, 'innerHTML', { get() { return markup; }, set(html) {
+      markup = html;
       for (const match of html.matchAll(/id="([^"]+)"/g)) nodes.set(match[1], makeElement('element'));
     } });
     return el;
@@ -263,13 +265,66 @@ test('offline permite abrir Pedidos diretamente pelo início', async () => {
   assert.deepEqual(calls, ['pedidos']);
 });
 
-test('início limita as entradas principais a Produção e Pedidos', async () => {
+test('início preserva Produção, Pedidos e Conectar ao oferecer Atendimento', async () => {
   const { nodes, calls } = pilotHarness();
-  const markup = fs.readFileSync(path.resolve(__dirname, '../pilot.js'), 'utf8');
-  assert.doesNotMatch(markup, /workspace|Atendimento|atendimento/);
+  const markup = nodes.get('pilotHome').innerHTML;
+  assert.match(markup, /class="pilot-tile pilot-tile--support" data-action="workspace"[^]*?data-pilot-icon="mensagem"[^]*?<span>Atendimento<\/span>/);
+  assert.equal((markup.match(/data-action="workspace"/g) || []).length, 1);
+  assert.match(markup, /data-action="pair"[^]*?<span>Conectar<\/span>/);
   await nodes.get('pilotHome').click('production');
   await nodes.get('pilotHome').click('local-orders');
   assert.deepEqual(calls, ['producao', 'pedidos']);
+});
+
+test('Atendimento abre o workspace nativo uma vez e mantém a Home para o retorno', async () => {
+  const { root, nodes, calls } = pilotHarness();
+  let opens = 0, complete;
+  root.Capacitor = { Plugins: { PilotApp: { openWorkspace: () => { opens++; return new Promise(resolve => { complete = resolve; }); } } } };
+  const home = nodes.get('pilotHome');
+  const opening = home.click('workspace');
+  await home.click('workspace');
+  assert.equal(opens, 1);
+  assert.equal(nodes.get('pilotWorkspaceButton').disabled, true);
+  assert.equal(home.open, true);
+  complete();
+  await opening;
+  assert.equal(nodes.get('pilotWorkspaceButton').disabled, false);
+  assert.equal(home.open, true);
+  assert.deepEqual(calls, [], 'não troca o módulo local nem abre URL externa');
+});
+
+test('Atendimento offline mantém dados locais e explica a indisponibilidade', async () => {
+  const { root, doc, nodes, calls } = pilotHarness({ connected: false });
+  let opens = 0;
+  root.Capacitor = { Plugins: { PilotApp: { openWorkspace: async () => { opens++; } } } };
+  const sync = root.cdbSync;
+  await nodes.get('pilotHome').click('workspace');
+  assert.equal(opens, 0);
+  assert.equal(root.cdbSync, sync);
+  assert.equal(nodes.get('pilotHome').open, true);
+  assert.match(nodes.get('pilotError').textContent, /Atendimento precisa de conexão/);
+  assert.equal(doc.activeElement, nodes.get('pilotError'));
+  await nodes.get('pilotHome').click('local-orders');
+  assert.deepEqual(calls, ['pedidos']);
+});
+
+test('Atendimento sem bridge ou com falha permite tentar novamente sem simular abertura', async () => {
+  const { root, doc, nodes, calls } = pilotHarness();
+  const home = nodes.get('pilotHome');
+  await home.click('workspace');
+  assert.match(nodes.get('pilotError').textContent, /Atualize o APK/);
+  let opens = 0;
+  root.Capacitor = { Plugins: { PilotApp: { openWorkspace: async () => { opens++; throw new Error('Não foi possível abrir o atendimento.'); } } } };
+  await home.click('workspace');
+  assert.match(nodes.get('pilotError').textContent, /Não foi possível abrir o atendimento/);
+  assert.equal(home.open, true);
+  assert.equal(doc.activeElement, nodes.get('pilotError'));
+  assert.equal(nodes.get('pilotWorkspaceButton').disabled, false);
+  root.Capacitor.Plugins.PilotApp.openWorkspace = async () => { opens++; };
+  await home.click('workspace');
+  assert.equal(opens, 2);
+  assert.equal(nodes.get('pilotError').textContent, '');
+  assert.deepEqual(calls, []);
 });
 
 test('textos pequenos do início mantêm contraste mínimo de 4,5:1', () => {
