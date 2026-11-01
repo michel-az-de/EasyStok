@@ -40,6 +40,8 @@ export function PainelAtendimento({
   const reabrirLigado = useAcaoDisponivel()('reabrir')
   const podeReabrir = reabrirLigado && (!fonteApi || capacidades.reabrirConversa === true)
   const cabecalhoRef = useRef(null)
+  const compositorPublicoRef = useRef(null)
+  const contextoDaNota = useRef({ id: selecionada?.id, visivel: editorNotaVisivel })
   const reabrindoRef = useRef(false)
   const [reabrindo, setReabrindo] = useState(false)
   // #1761: "Modelos aprovados" abre do compositor e da bolha recusada fora da janela de 24 h.
@@ -68,6 +70,19 @@ export function PainelAtendimento({
   useEffect(() => {
     if (focarAoTrocar && visivel) cabecalhoRef.current?.focus()
   }, [focarAoTrocar, selecionada?.id, visivel])
+
+  useEffect(() => {
+    const anterior = contextoDaNota.current
+    contextoDaNota.current = { id: selecionada?.id, visivel: editorNotaVisivel }
+    if (!anterior.visivel || editorNotaVisivel || !visivel || !focarAoTrocar || anterior.id !== selecionada?.id) return
+    // O wrapper público já foi desocultado neste commit. Não remonta nem altera o rascunho.
+    const campo = compositorPublicoRef.current?.querySelector('textarea:not(:disabled)')
+    if (!campo?.getClientRects().length) return
+    const { selectionStart: inicio, selectionEnd: fim, selectionDirection: direcao, scrollTop: rolagem } = campo
+    campo.focus({ preventScroll: true })
+    campo.setSelectionRange(inicio, fim, direcao)
+    campo.scrollTop = rolagem
+  }, [editorNotaVisivel, visivel, focarAoTrocar, selecionada?.id])
 
   if (!selecionada) {
     const primeira = visiveis[0]
@@ -197,7 +212,7 @@ export function PainelAtendimento({
       </div>
 
       {/* #1510: remonta por conversa; anexo em espera e gravação não passam para a próxima. */}
-      <div hidden={editorNotaVisivel} style={editorNotaVisivel ? undefined : { display: 'contents' }}>
+      <div ref={compositorPublicoRef} hidden={editorNotaVisivel} style={editorNotaVisivel ? undefined : { display: 'contents' }}>
       <Composer
         key={selecionada.id}
         conversa={selecionada}

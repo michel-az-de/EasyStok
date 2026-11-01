@@ -13,6 +13,9 @@ const entrada = `import React,{useState,useSyncExternalStore}from '${raiz}/node_
 import{createRoot}from '${raiz}/node_modules/react-dom/client.js';
 import{ModalNota}from '${raiz}/src/features/notas/ModalNota.jsx';
 import{PainelMovel}from '${raiz}/src/componentes/PainelMovel.jsx';
+import{PainelAtendimento}from '${raiz}/src/features/atendimento/PainelAtendimento.jsx';
+import{ContextoAcoes,ContextoCatalogo,ContextoEstado}from '${raiz}/src/aplicacao/contextos.js';
+import{CANAIS}from '${raiz}/src/infra/catalogo.js';
 import{criarRascunhosDeNotas}from '${raiz}/src/aplicacao/rascunhosDeNotas.js';
 import '${raiz}/src/estilos/tokens.css';
 const memoria=criarRascunhosDeNotas('empresa:atendente');window.gravacoes=[];window.respostas={};
@@ -24,7 +27,18 @@ return <><nav><button onClick={()=>abrir('Marina')}>Nota Marina</button><button 
 {cadastro&&<button onClick={()=>{cadastrar(true);abrirCadastro(null)}}>Concluir cadastro de {cadastro}</button>}
 <button onClick={()=>abrir(cliente)}>Retomar nota</button>
 <PainelMovel visivel={pedido} controle={{solto:true,painelId:'comanda',chave:'teste:comanda',guardar:()=>{},recolher:()=>mostrarPedido(false),devolverFoco:()=>false}} titulo="Comanda de teste" larguraInicial={280} alturaInicial={240} focar><input aria-label="Observação do pedido" defaultValue="Sem molho"/></PainelMovel>
-</>};createRoot(document.getElementById('root')).render(<Prova/>);`
+</>};
+function ProvaFoco(){const[nota,anotar]=useState(false);const[cliente,trocar]=useState('Marina');const[visivel,mostrar]=useState(true);const[mobile,celular]=useState(true);const[campo,escrever]=useState('Mensagem pública preservada');const agora=Date.now();const noop=()=>{};
+const conversa={id:cliente,nome:cliente,canal:'WhatsApp',estado:'Aberto',conta:'cliente',cliente:{tags:[],notas:[],pedidos:1},pedido:null,passagem:null,mensagens:[{id:'m1',dir:'in',texto:'Bom dia!',em:new Date(agora-60000).toISOString()}],ultimaEm:new Date(agora-60000).toISOString()};
+const acoes={descarregarRascunho:({texto})=>escrever(texto),enviarMidia:noop,definirRascunho:noop,devolverAutomatico:noop,selecionar:noop,abrirEncerramento:noop,reabrir:noop,listarAtendentes:async()=>[],enviar:noop,assumirAtendimento:async()=>true};
+const estado={selecionada:conversa,visiveis:[conversa],agora,automaticoPausado:{[cliente]:true},rascunho:campo,escritaDeFora:0,fonteApi:false};const catalogo={janelas:[],canais:CANAIS,respostasProntas:[],cardapio:[],linhas:[],adicionais:[]};
+return <ContextoEstado value={estado}><ContextoAcoes value={acoes}><ContextoCatalogo value={catalogo}>
+<button onClick={()=>{trocar('Carlos');anotar(false)}}>Trocar cliente durante nota</button><button onClick={()=>mostrar(true)}>Voltar ao painel</button><button onClick={()=>{celular(false);anotar(false)}}>Modo desktop</button>
+<section hidden={!visivel} style={{display:visivel?'flex':'none',height:600,flexDirection:'column',overflow:'hidden'}}>
+<PainelAtendimento focarAoTrocar={mobile} visivel={visivel} editorNotaVisivel={nota&&mobile} aoAbrirNota={()=>anotar(true)} aoAbrirGaleria={noop} aoAbrirBiblioteca={noop}
+slotEditorNota={<ModalNota embutida={mobile} visivel={nota} nomeCliente={cliente} aoFechar={()=>anotar(false)} aoComanda={()=>{anotar(false);mostrar(false)}} aoSalvar={async()=>false}/>}/>
+</section></ContextoCatalogo></ContextoAcoes></ContextoEstado>}
+const raizReact=createRoot(document.getElementById('root'));raizReact.render(<Prova/>);window.mostrarPainelReal=()=>raizReact.render(<ProvaFoco/>);`
 const arquivoEntrada = join(tmpdir(), `easystok-prova-2178-${process.pid}.jsx`)
 await writeFile(arquivoEntrada, entrada)
 let compilado
@@ -106,6 +120,28 @@ try {
   await pagina.getByRole('button', { name: 'Salvar', exact: true }).click()
   assert.equal(await pagina.evaluate(() => window.gravacoes.at(-1).id), 'Lead')
   await pagina.evaluate(() => window.respostas.Lead(true))
+  await pagina.setViewportSize({ width: 390, height: 844 })
+  await pagina.evaluate(() => window.mostrarPainelReal())
+  const publico = pagina.getByRole('textbox', { name: 'Mensagem para o cliente', exact: true })
+  await publico.fill('Mensagem pública com seleção preservada')
+  await publico.evaluate(no => { window.publicoOriginal = no; no.setSelectionRange(9, 16) })
+  await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
+  await pagina.getByRole('textbox', { name: 'Texto da nota de Marina', exact: true }).fill('Privada')
+  await pagina.getByRole('button', { name: 'Conversa', exact: true }).click()
+  assert.equal(await publico.evaluate(no => document.activeElement === no), true, 'Conversa devolve foco ao compositor público real depois de desocultar')
+  assert.equal(await publico.evaluate(no => no === window.publicoOriginal), true)
+  assert.deepEqual(await publico.evaluate(no => [no.selectionStart, no.selectionEnd]), [9, 16])
+  await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
+  await pagina.getByRole('button', { name: 'Comanda', exact: true }).click()
+  assert.equal(await pagina.evaluate(() => document.activeElement === window.publicoOriginal), false, 'Comanda não rouba foco para compositor oculto')
+  await pagina.getByRole('button', { name: 'Voltar ao painel', exact: true }).click()
+  await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
+  await pagina.getByRole('button', { name: 'Trocar cliente durante nota', exact: true }).click()
+  assert.equal(await publico.evaluate(no => document.activeElement === no), false, 'trocar cliente não abre teclado por causa da nota anterior')
+  await pagina.getByRole('button', { name: 'Modo desktop', exact: true }).click()
+  await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
+  await pagina.getByRole('button', { name: 'Recolher', exact: true }).click()
+  assert.equal(await publico.evaluate(no => document.activeElement === no), false, 'desktop mantém seu retorno de foco existente')
   assert.deepEqual(erros, [])
   console.log('ok #2178: DOM/seleção/scroll/Undo, portal oculto preservado, falha e confirmação por dono; nenhuma escrita pública')
 } finally { await navegador.close() }

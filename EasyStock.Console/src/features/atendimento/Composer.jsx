@@ -53,8 +53,15 @@ export function Composer({
   // do próprio componente agora; aqui só sobra a ref.
   const campoRef = useRef(null)
   const respostasRef = useRef(null)
+  const ferramentasRef = useRef(null)
   const idListaRespostas = useId()
-  const sugestoesNoCampo = barra.aberto && barra.pelaBarra && barra.itens.length > 0
+  const sugestoesNoCampo = visivel && barra.aberto && barra.pelaBarra && barra.itens.length > 0
+  function abrirNotaInterna() {
+    // Recolhe ferramentas sem apagar um rascunho iniciado por "/".
+    if (!barra.pelaBarra) barra.fechar()
+    if (ferramentasRef.current) ferramentasRef.current.open = false
+    aoAbrirNota?.()
+  }
 
   // Frente Anexos (rodada 7, pedido do dono 24/09/2026 04h12): anexo de
   // arquivo em espera (prévia antes de enviar) e o gravador de áudio.
@@ -284,7 +291,7 @@ export function Composer({
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,
                   só que agora fora do overflow. */}
-              {barra.aberto && <SeletorRespostas seletor={barra} aoInserido={() => campoRef.current?.querySelector('textarea')?.focus()} idLista={idListaRespostas} aoGerenciar={() => {
+              {visivel && barra.aberto && <SeletorRespostas seletor={barra} aoInserido={() => campoRef.current?.querySelector('textarea')?.focus()} idLista={idListaRespostas} aoGerenciar={() => {
                 if (!barra.pelaBarra) respostasRef.current?.focus()
                 aoAbrirBiblioteca?.()
               }} />}
@@ -310,7 +317,7 @@ export function Composer({
                 <span>Respostas</span>
               </Botao></Tooltip>
               <Tooltip texto={notaEmRascunho ? 'Retomar a nota desta conversa. Só a equipe vê.' : 'Anotar para a equipe sem sair da conversa'}>
-                <Botao aria-label={notaEmRascunho ? 'Retomar nota interna' : 'Nota interna'} className={css.botaoNota} onClick={aoAbrirNota}>
+                <Botao aria-label={notaEmRascunho ? 'Retomar nota interna' : 'Nota interna'} className={css.botaoNota} onClick={abrirNotaInterna}>
                   <Icone nome="nota" /><span>{notaEmRascunho ? 'Retomar nota' : 'Nota'}</span>
                 </Botao>
               </Tooltip>
@@ -318,7 +325,7 @@ export function Composer({
                   quê?"): os quatro vizinhos ganham nome visível, como o
                   Respostas. Em coluna estreita o nome some por container
                   query e fica o title com a explicação inteira. */}
-              <details className={css.ferramentasComposer} onKeyDown={(evento) => {
+              <details ref={ferramentasRef} className={css.ferramentasComposer} onKeyDown={(evento) => {
                 if (evento.key !== 'Escape' || evento.defaultPrevented || evento.target.closest('dialog')) return
                 evento.preventDefault(); evento.stopPropagation()
                 evento.currentTarget.open = false
