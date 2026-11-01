@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Mobile;
@@ -19,6 +20,10 @@ namespace EasyStock.Api.IntegrationTests.Mobile;
 /// Helpers expostos cobrem o fluxo mais comum: provisionar empresa+loja,
 /// criar device pareado com api key conhecido, e gerar HttpClient
 /// autenticado pra chamar /api/mobile/*.
+///
+/// A API conecta com um login dono do banco, sem superusuário e sem BYPASSRLS (#2180): as policies
+/// <c>tenant_isolation</c> valem como em produção e o fluxo do APK (auth do device, pareamento, sync)
+/// precisa passar por elas. Semeadura e conferência pelos helpers usam o bypass da allowlist.
 /// </summary>
 public class MobileE2EFixture : IAsyncLifetime
 {
@@ -28,6 +33,8 @@ public class MobileE2EFixture : IAsyncLifetime
 
     public const string TestCiKey = "test-ci-key-do-fixture-min-32-chars-please";
     public static readonly Guid OwnerEmpresaId = Guid.Parse("e0e0e0e0-0000-0000-0000-0000000000ce");
+    private const string AppRole = "easystock_app_e2e";
+    private const string AppRolePassword = "senha-do-app-descartavel";
 
     public async Task InitializeAsync()
     {
@@ -41,6 +48,7 @@ public class MobileE2EFixture : IAsyncLifetime
                 .Build();
             await _pg.StartAsync();
             IsAvailable = true;
+            await CriarLoginDoAppAsync();
         }
         catch (DockerUnavailableException)
         {
@@ -56,7 +64,7 @@ public class MobileE2EFixture : IAsyncLifetime
                 // ("PostgreSQL configurado mas indisponivel"). Mesmo padrao do
                 // PedidoConversaConcorrenciaTests.
                 b.UseSetting("Database:Provider", "PostgreSql");
-                b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString());
+                b.UseSetting("ConnectionStrings:DefaultConnection", AppConnectionString);
                 // O registro JWT le estes valores antes de ConfigureAppConfiguration.
                 b.UseSetting("Jwt:SecretKey", "EasyStock-Test-SuperSecretKey-Min32Chars!!");
                 b.UseSetting("Jwt:Issuer", "EasyStock");
@@ -66,7 +74,7 @@ public class MobileE2EFixture : IAsyncLifetime
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["Database:Provider"] = "PostgreSql",
-                        ["ConnectionStrings:DefaultConnection"] = _pg!.GetConnectionString(),
+                        ["ConnectionStrings:DefaultConnection"] = AppConnectionString,
                         ["ConnectionStrings:Redis"] = "localhost:6379",
                         ["Jwt:Issuer"] = "EasyStock",
                         ["Jwt:Audience"] = "EasyStock",
@@ -82,6 +90,25 @@ public class MobileE2EFixture : IAsyncLifetime
                     });
                 });
             });
+    }
+
+    private string AppConnectionString => new NpgsqlConnectionStringBuilder(_pg!.GetConnectionString())
+    {
+        Username = AppRole,
+        Password = AppRolePassword,
+    }.ConnectionString;
+
+    /// <summary>Login do app: dono do banco e do schema (roda as migrations), sujeito ao FORCE RLS.</summary>
+    private async Task CriarLoginDoAppAsync()
+    {
+        await using var admin = new NpgsqlConnection(_pg!.GetConnectionString());
+        await admin.OpenAsync();
+        await using var cmd = new NpgsqlCommand($"""
+            CREATE ROLE {AppRole} LOGIN PASSWORD '{AppRolePassword}' NOSUPERUSER NOBYPASSRLS;
+            ALTER DATABASE easystock_mobile_e2e OWNER TO {AppRole};
+            ALTER SCHEMA public OWNER TO {AppRole};
+            """, admin);
+        await cmd.ExecuteNonQueryAsync();
     }
 
     public async Task DisposeAsync()
@@ -105,6 +132,7 @@ public class MobileE2EFixture : IAsyncLifetime
     {
         using var scope = Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var bypass = db.UseRowLevelSecurityBypass();
 
         var empresa = new Empresa
         {
@@ -142,6 +170,7 @@ public class MobileE2EFixture : IAsyncLifetime
     {
         using var scope = Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var bypass = db.UseRowLevelSecurityBypass();
 
         var apiKey = "tk-" + Guid.NewGuid().ToString("N");
         var apiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
@@ -169,6 +198,7 @@ public class MobileE2EFixture : IAsyncLifetime
     {
         using var scope = Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var bypass = db.UseRowLevelSecurityBypass();
         if (await db.Empresas.AnyAsync(e => e.Id == OwnerEmpresaId)) return;
         db.Empresas.Add(new Empresa
         {

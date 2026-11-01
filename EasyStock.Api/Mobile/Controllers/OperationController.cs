@@ -360,6 +360,9 @@ public class OperationController(
     public async Task Stream([FromQuery] string? token, [FromQuery] string? apiKey, CancellationToken ct)
     {
         MobileDevice? device = null;
+        // Anônimo (token ou apiKey na URL): sem tenant até achar o device. Bypass de RLS (#2180)
+        // só nos lookups; o stream em si não lê o banco.
+        using var rlsBypass = _db.UseRowLevelSecurityBypass();
 
         if (!string.IsNullOrWhiteSpace(token))
         {
@@ -386,6 +389,7 @@ public class OperationController(
             return;
         }
 
+        rlsBypass.Dispose();
         if (device == null || device.Revoked)
         {
             Response.StatusCode = 401;

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
@@ -58,6 +59,8 @@ public sealed class LembretesPedidoAgendadoTick(
     {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        // Lista de todas as empresas: bypass de RLS (#2180) só aqui; o update roda por tenant.
+        using var _ = scope.ServiceProvider.GetRequiredService<IRowLevelSecurityBypass>().Begin();
 
         // Candidatos: pedidos com agendamento + status ativo + ao menos
         // uma das 3 notificacoes pendente. EmpresaId nao pode ser null

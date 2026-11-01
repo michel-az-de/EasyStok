@@ -90,6 +90,7 @@ public class PareamentoMigracaoE2ETests(MobileE2EFixture fixture)
         (await novo.GetAsync(rota)).StatusCode.Should().Be(HttpStatusCode.OK);
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var bypass = db.UseRowLevelSecurityBypass();
         (await db.Set<MobileDevice>().CountAsync(d => d.Id == anterior.DeviceId)).Should().Be(1);
     }
 
