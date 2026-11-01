@@ -12,8 +12,9 @@ export function janelaDosPaineis() {
   const buscar = seletor => globalThis.document?.querySelector?.(seletor)
   const main = retangulo(buscar('#conteudo-principal'))
   const cabecalho = retangulo(buscar('[data-cabecalho-conversa]')) ?? retangulo(buscar('[data-cabecalho-ficha]'))
+  const controle = retangulo(buscar('[data-controle-conversa]'))
   const x = Math.max(esquerda, main?.x ?? 0)
-  const y = Math.max(topo, main?.y ?? 0, cabecalho ? cabecalho.y + cabecalho.altura : 0)
+  const y = Math.max(topo, main?.y ?? 0, cabecalho ? cabecalho.y + cabecalho.altura : 0, controle ? controle.y + controle.altura : 0)
   const area = { x, y, largura: Math.max(0, Math.min(direita, main ? main.x + main.largura : direita) - x), altura: Math.max(0, Math.min(fundo, main ? main.y + main.altura : fundo) - y) }
   const envio = buscar('[data-area-envio]')
   const partes = [envio, ...(envio?.querySelectorAll?.('details[open] > div') ?? [])].map(retangulo).filter(Boolean)
@@ -32,7 +33,8 @@ export function observarAreaDosPaineis(aoMudar, painel) {
   function sincronizar() {
     const main = globalThis.document?.querySelector?.('#conteudo-principal')
     const envio = globalThis.document?.querySelector?.('[data-area-envio]')
-    for (const no of [painel, main, envio].filter(Boolean)) {
+    const controle = globalThis.document?.querySelector?.('[data-controle-conversa]')
+    for (const no of [painel, main, envio, controle].filter(Boolean)) {
       if (!observados.has(no)) { observados.add(no); observador?.observe(no) }
     }
     for (const no of observados) if (no.isConnected === false) { observador?.unobserve?.(no); observados.delete(no) }

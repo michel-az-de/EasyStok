@@ -103,6 +103,7 @@ window.visualViewport = { height: 400, width: 900, offsetTop: 300, offsetLeft: 1
 document.querySelector = seletor => ({
   '#conteudo-principal': { getBoundingClientRect: () => ({ left: 76, top: 64, width: 1364, height: 832 }) },
   '[data-cabecalho-conversa]': { getBoundingClientRect: () => ({ left: 364, top: 64, width: 760, height: 56 }) },
+  '[data-controle-conversa]': { getBoundingClientRect: () => ({ left: 364, top: 120, width: 760, height: 48 }) },
 }[seletor] ?? null)
 const telaComTeclado = janelaDosPaineis()
 const notaComTeclado = limitarPainelMovel({ x: 200, y: 120 }, { largura: 280, altura: 240 }, telaComTeclado)
@@ -113,6 +114,7 @@ assert.equal(typeof eventosVisiveis.get('scroll'), 'function', 'o deslocamento d
 pararObservacao()
 assert.equal(eventosVisiveis.size, 0)
 delete window.visualViewport
+assert.equal(janelaDosPaineis().area.y, 168, 'o controle Assumir também fica acima da área disponível para as folhas')
 delete document.querySelector
 console.log('ok teclado e deslocamento da área visível mantêm a nota alcançável')
 function visitar(no, acao) { if (Array.isArray(no)) { no.forEach(n => visitar(n, acao)); return }; if (!no || typeof no !== 'object') return; acao(no); visitar(no.props?.children, acao) }
