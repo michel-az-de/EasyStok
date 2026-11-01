@@ -360,9 +360,6 @@ public class OperationController(
     public async Task Stream([FromQuery] string? token, [FromQuery] string? apiKey, CancellationToken ct)
     {
         MobileDevice? device = null;
-        // Anônimo (token ou apiKey na URL): sem tenant até achar o device. Bypass de RLS (#2180)
-        // só nos lookups; o stream em si não lê o banco.
-        using var rlsBypass = _db.UseRowLevelSecurityBypass();
 
         if (!string.IsNullOrWhiteSpace(token))
         {
@@ -372,16 +369,14 @@ public class OperationController(
                 Response.StatusCode = 401;
                 return;
             }
-            device = await _db.Set<MobileDevice>().AsNoTracking()
-                .FirstOrDefaultAsync(d => d.Id == deviceId, ct);
+            device = await BuscarDeviceSemTenantAsync(d => d.Id == deviceId, ct);
         }
         else if (!string.IsNullOrWhiteSpace(apiKey))
         {
             // Caminho legado — APKs antigos ainda mandam apiKey na URL.
             // Hash antes do lookup pra bater com o que está persistido.
             var apiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
-            device = await _db.Set<MobileDevice>().AsNoTracking()
-                .FirstOrDefaultAsync(d => d.ApiKeyHash == apiKeyHash, ct);
+            device = await BuscarDeviceSemTenantAsync(d => d.ApiKeyHash == apiKeyHash, ct);
         }
         else
         {
@@ -389,7 +384,6 @@ public class OperationController(
             return;
         }
 
-        rlsBypass.Dispose();
         if (device == null || device.Revoked)
         {
             Response.StatusCode = 401;
@@ -452,6 +446,17 @@ public class OperationController(
         var sub = User.FindFirstValue("sub")
                   ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(sub, out var g) ? g : null;
+    }
+
+    /// <summary>
+    /// Anônimo (token ou apiKey na URL): sem tenant até achar o device. Bypass de RLS (#2180) só neste
+    /// lookup; o stream em si não lê o banco.
+    /// </summary>
+    private async Task<MobileDevice?> BuscarDeviceSemTenantAsync(
+        System.Linq.Expressions.Expression<Func<MobileDevice, bool>> filtro, CancellationToken ct)
+    {
+        using (_db.UseRowLevelSecurityBypass())
+            return await _db.Set<MobileDevice>().AsNoTracking().FirstOrDefaultAsync(filtro, ct);
     }
 
     /// <summary>

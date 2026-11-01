@@ -337,8 +337,6 @@ public class DevicePairingController(
 
         // Idempotente: se mesmo deviceId já existe e não foi revogado, rotaciona apiKey
         // (re-install do APK, troca de aparelho com mesmo install token, etc).
-        // IgnoreQueryFilters pelo mesmo motivo do SELECT da loja acima — sem JWT
-        // o filter tenant zera o resultado.
         // Bypass de RLS (#2180) só neste lookup: o conflito com outra empresa precisa enxergar o
         // device de qualquer tenant; as gravações seguem com o tenant da config.
         MobileDevice? existing;

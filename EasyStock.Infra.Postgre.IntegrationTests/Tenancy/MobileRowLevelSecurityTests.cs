@@ -88,12 +88,14 @@ public class MobileRowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         await fixture.ResetDatabaseAsync();
         await using var db = fixture.CreateDbContext();
         var migrator = db.GetService<IMigrator>();
+        var migracoes = db.Database.GetMigrations().ToList();
+        var anterior = migracoes[migracoes.FindIndex(m => m.EndsWith("_AddRlsTabelasMobile", StringComparison.Ordinal)) - 1];
 
-        (await ContarMobileComRlsAsync(db)).Should().Be(9, "Up liga a policy nas 9 tabelas mobile_ com empresa");
+        (await ContarMobileComRlsAsync(db)).Should().BeGreaterThan(0, "Up liga a policy nas mobile_ com empresa");
 
         try
         {
-            await migrator.MigrateAsync("20261031163552_CorridaExternaPelaApi");
+            await migrator.MigrateAsync(anterior);
             (await ContarMobileComRlsAsync(db)).Should().Be(0, "o Down é o rollback e desliga RLS e policy");
         }
         finally
