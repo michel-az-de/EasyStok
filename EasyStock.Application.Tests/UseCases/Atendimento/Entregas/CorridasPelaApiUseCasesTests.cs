@@ -278,21 +278,202 @@ public class CorridasPelaApiUseCasesTests
         corrida.CustoCentavos.Should().Be(1890, "depois da coleta a corrida foi feita e é paga");
     }
 
+    // #2168: o pedido pode ter sido criado na Lalamove sem o EasyStok saber o id. Dar como falha sozinho liberava
+    // a viagem para uma segunda corrida, paga, por cima da primeira. Só a atendente, olhando o painel, libera.
     [Fact]
-    public async Task Solicitando_sem_resposta_por_dez_minutos_vira_falha()
+    public async Task Solicitando_sem_resposta_nunca_vira_falha_sozinha_e_pede_conferencia()
+    {
+        _gateway.ChamarAsync(_empresaId, Arg.Any<PedidoChamadaCorrida>(), Arg.Any<CancellationToken>())
+            .Returns<SituacaoCorridaProvedor>(_ => throw new LogisticaIndisponivelException("x"));
+        await FluentActions.Invoking(() => Chamar().ExecuteAsync(Input())).Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*painel da Lalamove*");
+        var corrida = _gravadas.Single();
+
+        _agora = Agora.AddHours(3);
+        var r = await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+
+        corrida.Status.Should().Be(StatusCorrida.Solicitando);
+        r.ConferirNoProvedor.Should().BeTrue();
+        await _gateway.DidNotReceive().ConsultarAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Atendente_libera_a_viagem_depois_de_conferir_que_nao_ha_pedido()
     {
         _gateway.ChamarAsync(_empresaId, Arg.Any<PedidoChamadaCorrida>(), Arg.Any<CancellationToken>())
             .Returns<SituacaoCorridaProvedor>(_ => throw new LogisticaIndisponivelException("x"));
         await FluentActions.Invoking(() => Chamar().ExecuteAsync(Input())).Should().ThrowAsync<UseCaseValidationException>();
         var corrida = _gravadas.Single();
+        var liberar = new DescartarSolicitacaoCorridaUseCase(_corridas, _uow, new Relogio(() => _agora));
 
-        _agora = Agora.AddMinutes(9);
-        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
-        corrida.Status.Should().Be(StatusCorrida.Solicitando);
+        var cedo = () => liberar.ExecuteAsync(_empresaId, _viagem.Id, corrida.Id);
+        await cedo.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*aguarde*");
 
-        _agora = Agora.AddMinutes(11);
+        _agora = Agora.AddMinutes(3);
+        var r = await liberar.ExecuteAsync(_empresaId, _viagem.Id, corrida.Id);
+
+        r.Status.Should().Be(StatusCorrida.Falha);
+        corrida.CustoCentavos.Should().Be(0);
+        _ordem.Should().EndWith("commit");
+    }
+
+    [Fact]
+    public async Task Chamar_persiste_o_id_do_provedor_num_segundo_commit()
+    {
+        ProvedorAceita();
+
+        await Chamar().ExecuteAsync(Input());
+
+        _ordem.Should().Equal("add", "commit", "post", "commit");
+    }
+
+    [Fact]
+    public async Task Recusa_definitiva_grava_a_falha_no_banco()
+    {
+        _gateway.ChamarAsync(_empresaId, Arg.Any<PedidoChamadaCorrida>(), Arg.Any<CancellationToken>())
+            .Returns<SituacaoCorridaProvedor>(c => { _ordem.Add("post"); throw new LogisticaRecusadaException("fora da área"); });
+
+        await FluentActions.Invoking(() => Chamar().ExecuteAsync(Input())).Should().ThrowAsync<UseCaseValidationException>();
+
+        _ordem.Should().Equal("add", "commit", "post", "commit");
+    }
+
+    [Fact]
+    public async Task Erro_inesperado_depois_do_post_deixa_a_corrida_solicitando_e_pede_conferencia()
+    {
+        _gateway.ChamarAsync(_empresaId, Arg.Any<PedidoChamadaCorrida>(), Arg.Any<CancellationToken>())
+            .Returns<SituacaoCorridaProvedor>(_ => throw new NullReferenceException("resposta sem campo"));
+
+        var act = () => Chamar().ExecuteAsync(Input());
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*painel da Lalamove*");
+        _gravadas.Single().Status.Should().Be(StatusCorrida.Solicitando, "o pedido pode existir lá: a viagem segue travada");
+    }
+
+    [Fact]
+    public async Task Motorista_que_nao_carregou_e_buscado_de_novo_na_proxima_consulta()
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(StatusCorrida.MotoristaACaminho, motorista: "drv-9");
+        _gateway.ObterMotoristaAsync(_empresaId, "ord-1", "drv-9", Arg.Any<CancellationToken>())
+            .Returns((MotoristaCorrida?)null, new MotoristaCorrida("drv-9", "Carlos", "11977776666", "XYZ9A88"));
+
         await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
-        corrida.Status.Should().Be(StatusCorrida.Falha);
+        var r = await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+
+        r.Motorista.Should().Be("Carlos");
+        r.MotoristaTelefone.Should().Be("11977776666");
+        await _gateway.Received(2).ObterMotoristaAsync(_empresaId, "ord-1", "drv-9", Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(StatusCorrida.Cancelada)]
+    [InlineData(StatusCorrida.Rejeitada)]
+    [InlineData(StatusCorrida.Expirada)]
+    public async Task Sem_motorista_antes_da_coleta_a_viagem_fica_montando_sem_custo(StatusCorrida final)
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(final);
+
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+
+        _viagem.Situacao.Should().Be(SituacaoViagem.Montando);
+        _pedido.StatusEnum.Should().Be(StatusPedido.Pronto);
+        corrida.CustoCentavos.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Corrida_encerrada_nao_reconsulta_o_provedor()
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(StatusCorrida.Cancelada);
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+        _gateway.ClearReceivedCalls();
+
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+
+        await _gateway.DidNotReceive().ConsultarAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Pedido_desconhecido_na_lalamove_nao_muda_nada()
+    {
+        var corrida = await ChamadaAsync();
+        _gateway.ConsultarAsync(_empresaId, "ord-1", Arg.Any<CancellationToken>()).Returns((SituacaoCorridaProvedor?)null);
+
+        var r = await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+
+        r.Status.Should().Be(StatusCorrida.ProcurandoMotorista);
+    }
+
+    [Fact]
+    public async Task Coleta_com_pedido_que_nao_aceita_a_transicao_nao_derruba_a_viagem()
+    {
+        var corrida = await ChamadaAsync();
+        _pedido.Status = StatusPedidoMapper.Cancelado;
+        ProvedorDiz(StatusCorrida.Coletada);
+
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+
+        _viagem.Situacao.Should().Be(SituacaoViagem.EmRota);
+        corrida.Status.Should().Be(StatusCorrida.Coletada);
+    }
+
+    [Fact]
+    public async Task Preco_do_provedor_com_gorjeta_entra_no_custo_enquanto_a_corrida_anda()
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(StatusCorrida.ProcurandoMotorista, valor: 2390);
+
+        var r = await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+
+        r.CustoCentavos.Should().Be(2390);
+        r.GorjetaCentavos.Should().Be(500);
+    }
+
+    [Fact]
+    public async Task Entregue_com_a_viagem_ja_concluida_a_mao_grava_o_preco_final()
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(StatusCorrida.Coletada);
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+        _viagem.MarcarParadaEntregue(_pedido.Id, Agora);
+        ProvedorDiz(StatusCorrida.Entregue, valor: 2140);
+
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+
+        corrida.CustoCentavos.Should().Be(2140);
+    }
+
+    [Fact]
+    public async Task Troca_de_pedido_de_corrida_cancelada_com_a_viagem_desfeita_nao_reabre()
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(StatusCorrida.Coletada);
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+        ProvedorDiz(StatusCorrida.Cancelada);
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+        _viagem.Situacao.Should().Be(SituacaoViagem.Desfeita);
+
+        var r = await Sincronizar().SubstituirPedidoAsync(_empresaId, corrida.Id, "ord-1", "ord-2");
+
+        r.Status.Should().Be(StatusCorrida.Cancelada);
+        corrida.IdExterno.Should().Be("ord-1");
+    }
+
+    [Fact]
+    public async Task Troca_de_pedido_com_outra_corrida_ja_em_curso_nao_derruba_o_webhook()
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(StatusCorrida.Cancelada);
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+        var outra = CorridaExterna.SolicitarPorApi(_viagem, EmpresaEntregador.Lalamove, VeiculoCorrida.Moto, "cot-2", 2000, _operadora, Agora);
+        _corridas.ListarDaViagemAsync(_empresaId, _viagem.Id, Arg.Any<CancellationToken>()).Returns([corrida, outra]);
+
+        var r = await Sincronizar().SubstituirPedidoAsync(_empresaId, corrida.Id, "ord-1", "ord-2");
+
+        r.Status.Should().Be(StatusCorrida.Cancelada);
+        corrida.IdExterno.Should().Be("ord-1");
     }
 
     [Fact]
@@ -349,6 +530,84 @@ public class CorridasPelaApiUseCasesTests
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*procura motorista*");
     }
 
+    private AdicionarGorjetaCorridaUseCase Gorjeta() => new(_corridas, _gateway, Sincronizar());
+
+    // #2168: na Lalamove a gorjeta nova SUBSTITUI a anterior e precisa ser maior. O valor da tela é o total.
+    [Fact]
+    public async Task Gorjeta_manda_o_total_ao_provedor()
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(StatusCorrida.ProcurandoMotorista);
+
+        await Gorjeta().ExecuteAsync(_empresaId, _viagem.Id, corrida.Id, 500);
+
+        await _gateway.Received(1).AdicionarGorjetaAsync(_empresaId, "ord-1", 500, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Gorjeta_igual_ou_menor_que_a_atual_nao_vai_ao_provedor()
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(StatusCorrida.ProcurandoMotorista, valor: 2390);
+        await Sincronizar().ExecuteAsync(_empresaId, corrida.Id);
+
+        var act = () => Gorjeta().ExecuteAsync(_empresaId, _viagem.Id, corrida.Id, 500);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*maior que a atual*R$ 5,00*");
+        await _gateway.DidNotReceive().AdicionarGorjetaAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(10_001)]
+    public async Task Gorjeta_fora_do_limite_nao_vai_ao_provedor(int centavos)
+    {
+        var corrida = await ChamadaAsync();
+
+        var act = () => Gorjeta().ExecuteAsync(_empresaId, _viagem.Id, corrida.Id, centavos);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _gateway.DidNotReceive().AdicionarGorjetaAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Cancelar_com_a_viagem_errada_nao_acha_a_corrida()
+    {
+        var corrida = await ChamadaAsync();
+
+        var act = () => new CancelarCorridaUseCase(_corridas, _gateway, Sincronizar(), new Relogio(() => _agora))
+            .ExecuteAsync(_empresaId, Guid.NewGuid(), corrida.Id);
+
+        await act.Should().ThrowAsync<CorridaExternaNaoEncontradaException>();
+        await _gateway.DidNotReceive().CancelarAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Atualizar_pela_rota_de_outra_viagem_nao_fala_com_o_provedor()
+    {
+        var corrida = await ChamadaAsync();
+        ProvedorDiz(StatusCorrida.Coletada);
+
+        var act = () => Sincronizar().ExecuteAsync(_empresaId, Guid.NewGuid(), corrida.Id);
+
+        await act.Should().ThrowAsync<CorridaExternaNaoEncontradaException>();
+        await _gateway.DidNotReceive().ConsultarAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        _viagem.Situacao.Should().Be(SituacaoViagem.Montando);
+    }
+
+    [Fact]
+    public async Task Cancelar_de_outra_loja_nao_acha_a_corrida()
+    {
+        var corrida = await ChamadaAsync();
+
+        var act = () => new CancelarCorridaUseCase(_corridas, _gateway, Sincronizar(), new Relogio(() => _agora))
+            .ExecuteAsync(Guid.NewGuid(), _viagem.Id, corrida.Id);
+
+        await act.Should().ThrowAsync<CorridaExternaNaoEncontradaException>();
+        await _gateway.DidNotReceive().CancelarAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
     private readonly IWebhookRecebidoRepository _webhooks = Substitute.For<IWebhookRecebidoRepository>();
     private readonly EasyStock.Application.Ports.Output.ITenantContextAccessor _tenant = Substitute.For<EasyStock.Application.Ports.Output.ITenantContextAccessor>();
 
@@ -401,6 +660,35 @@ public class CorridasPelaApiUseCasesTests
         desfecho.Should().Be(DesfechoWebhookLalamove.AssinaturaInvalida);
         corrida.Status.Should().Be(StatusCorrida.ProcurandoMotorista);
         await _gateway.DidNotReceive().ConsultarAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _webhooks.DidNotReceive().TryRegistrarAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Webhook_repetido_que_falhou_antes_e_reprocessado()
+    {
+        await ChamadaComWebhookAsync();
+        _webhooks.TryRegistrarAsync("Lalamove", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((WebhookRecebido?)null);
+        var anterior = WebhookRecebido.Criar("Lalamove", "ev-ord-1", "h");
+        _webhooks.ObterAsync("Lalamove", "ev-ord-1", Arg.Any<CancellationToken>()).Returns(anterior);
+        ProvedorDiz(StatusCorrida.MotoristaACaminho);
+
+        var desfecho = await Webhook().ExecuteAsync(CorpoWebhook("ORDER_STATUS_CHANGED", "ord-1"));
+
+        desfecho.Should().Be(DesfechoWebhookLalamove.Processado);
+        await _webhooks.Received(1).MarcarProcessadoAsync(anterior.Id, true, null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Webhook_cuja_reconsulta_falha_fica_marcado_para_a_lalamove_reenviar()
+    {
+        await ChamadaComWebhookAsync();
+        _gateway.ConsultarAsync(_empresaId, "ord-1", Arg.Any<CancellationToken>())
+            .Returns<SituacaoCorridaProvedor?>(_ => throw new LogisticaIndisponivelException("fora"));
+
+        var act = () => Webhook().ExecuteAsync(CorpoWebhook("ORDER_STATUS_CHANGED", "ord-1"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        await _webhooks.Received(1).MarcarProcessadoAsync(Arg.Any<Guid>(), false, Arg.Is<string>(s => s.StartsWith("UseCaseValidationException")), Arg.Any<CancellationToken>());
     }
 
     [Fact]

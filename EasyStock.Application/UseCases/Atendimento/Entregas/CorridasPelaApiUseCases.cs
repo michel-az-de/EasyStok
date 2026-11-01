@@ -16,12 +16,13 @@ namespace EasyStock.Application.UseCases.Atendimento.Entregas;
 public sealed record CorridaApiResult(
     Guid Id, Guid ViagemId, EmpresaEntregador Provedor, StatusCorrida Status, VeiculoCorrida? Veiculo, int CustoCentavos,
     int? CustoCotadoCentavos, string? IdExterno, string? LinkRastreio, string? Motorista, string? MotoristaTelefone,
-    string? MotoristaPlaca, DateTime RegistradoEm, DateTime? EncerradaEm, bool PodeCancelar)
+    string? MotoristaPlaca, DateTime RegistradoEm, DateTime? EncerradaEm, bool PodeCancelar,
+    int GorjetaCentavos = 0, DateTime? CancelaSemCustoAte = null, bool ConferirNoProvedor = false)
 {
     internal static CorridaApiResult De(CorridaExterna c, DateTime agora) => new(
         c.Id, c.ViagemId, c.Provedor, c.Status ?? StatusCorrida.Falha, c.Veiculo, c.CustoCentavos, c.CustoCotadoCentavos,
         c.IdExterno, c.LinkRastreio, c.Motorista, c.MotoristaTelefone, c.MotoristaPlaca, c.RegistradoEm, c.EncerradaEm,
-        c.PodeCancelar(agora));
+        c.PodeCancelar(agora), c.GorjetaCentavos, c.CancelaSemCustoAte, c.AguardaConferencia(agora));
 }
 
 public sealed record CotacaoCorridaResult(
@@ -128,18 +129,37 @@ public sealed class ChamarCorridaUseCase(
             await unitOfWork.CommitAsync();
             throw new UseCaseValidationException(ex.Message);
         }
-        catch (LogisticaIndisponivelException ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // R4: o POST não é repetido. A corrida fica "solicitando" e a reconsulta decide (ADR-0064 D4).
-            logger.LogWarning(ex, "Lalamove não respondeu ao chamar a corrida {CorridaId}; fica para a reconsulta.", corrida.Id);
-            throw new UseCaseValidationException(
-                "A Lalamove não respondeu. Não chame de novo: o EasyStok confere em até 2 minutos se a corrida foi criada.");
+            // R4 (#2168): o POST não é repetido e o pedido pode existir na Lalamove sem o número aqui. A corrida fica
+            // "solicitando", segura a viagem, e só a atendente libera depois de conferir no painel (ADR-0064 D4).
+            logger.LogWarning(ex, "Corrida {CorridaId} sem confirmação da Lalamove ({Tipo}); fica para a conferência.", corrida.Id, ex.GetType().Name);
+            throw new UseCaseValidationException(SemConfirmacao);
         }
         await unitOfWork.CommitAsync();
         return CorridaApiResult.De(corrida, Agora);
     }
 
+    public const string SemConfirmacao =
+        "A Lalamove não confirmou a corrida. Não chame de novo: confira no painel da Lalamove se ela foi criada.";
+
     private DateTime Agora => relogio.GetUtcNow().UtcDateTime;
+}
+
+/// <summary>
+/// #2168: a corrida que a Lalamove não confirmou segura a viagem. A atendente confere no painel da Lalamove e, sem
+/// pedido lá, libera a viagem para chamar de novo ou passar ao entregador próprio.
+/// </summary>
+public sealed class DescartarSolicitacaoCorridaUseCase(ICorridaExternaRepository corridas, IUnitOfWork unitOfWork, TimeProvider relogio)
+{
+    public async Task<CorridaApiResult> ExecuteAsync(Guid empresaId, Guid viagemId, Guid corridaId, CancellationToken ct = default)
+    {
+        var corrida = await CorridaDaApi.ObterAsync(corridas, empresaId, viagemId, corridaId, ct);
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        Regra.Validar(() => corrida.DescartarSemPedidoNoProvedor(agora));
+        await unitOfWork.CommitAsync();
+        return CorridaApiResult.De(corrida, agora);
+    }
 }
 
 /// <summary>Cancela sem custo: procurando motorista, ou até 5 minutos depois do match. Depois reconsulta.</summary>
@@ -158,11 +178,15 @@ public sealed class CancelarCorridaUseCase(
     }
 }
 
-/// <summary>Gorjeta (priority fee) para achar motorista mais rápido: só enquanto procura motorista.</summary>
+/// <summary>
+/// Gorjeta (priority fee) para achar motorista mais rápido: só enquanto procura motorista. Na Lalamove a gorjeta
+/// nova SUBSTITUI a anterior e precisa ser maior, então o valor pedido é o total (#2168).
+/// </summary>
 public sealed class AdicionarGorjetaCorridaUseCase(
     ICorridaExternaRepository corridas, ILogisticaGateway gateway, SincronizarCorridaUseCase sincronizar)
 {
     public const int GorjetaMaximaCentavos = 10_000;
+    private static readonly System.Globalization.CultureInfo Reais = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
 
     public async Task<CorridaApiResult> ExecuteAsync(Guid empresaId, Guid viagemId, Guid corridaId, int centavos, CancellationToken ct = default)
     {
@@ -171,6 +195,9 @@ public sealed class AdicionarGorjetaCorridaUseCase(
         var corrida = await CorridaDaApi.ObterAsync(corridas, empresaId, viagemId, corridaId, ct);
         if (corrida.Status != StatusCorrida.ProcurandoMotorista)
             throw new UseCaseValidationException("Gorjeta só enquanto a Lalamove procura motorista.");
+        if (centavos <= corrida.GorjetaCentavos)
+            throw new UseCaseValidationException(
+                $"A gorjeta nova precisa ser maior que a atual ({(corrida.GorjetaCentavos / 100m).ToString("C", Reais)}).");
         await Provedor.ChamarAsync(() => gateway.AdicionarGorjetaAsync(empresaId, corrida.IdExterno!, centavos, ct));
         return await sincronizar.ExecuteAsync(empresaId, corrida.Id, ct);
     }
@@ -184,8 +211,12 @@ public sealed class SincronizarCorridaUseCase(
     ICorridaExternaRepository corridas, IViagemRepository viagens, IPedidoRepository pedidos, IPublicadorEventoIntegracao publicador,
     ILogisticaGateway gateway, IUnitOfWork unitOfWork, TimeProvider relogio, ILogger<SincronizarCorridaUseCase> logger)
 {
-    /// <summary>Corrida "solicitando" sem resposta por mais que isto é dada como não criada (o POST não volta).</summary>
-    public static readonly TimeSpan PrazoSolicitacao = TimeSpan.FromMinutes(10);
+    /// <summary>A tela reconsulta pela rota da viagem: corrida de outra viagem é 404 antes de falar com o provedor.</summary>
+    public async Task<CorridaApiResult> ExecuteAsync(Guid empresaId, Guid viagemId, Guid corridaId, CancellationToken ct = default)
+    {
+        await CorridaDaApi.ObterAsync(corridas, empresaId, viagemId, corridaId, ct);
+        return await ExecuteAsync(empresaId, corridaId, ct);
+    }
 
     public async Task<CorridaApiResult> ExecuteAsync(Guid empresaId, Guid corridaId, CancellationToken ct = default)
     {
@@ -197,11 +228,11 @@ public sealed class SincronizarCorridaUseCase(
             var situacao = await Provedor.ChamarAsync(() => gateway.ConsultarAsync(empresaId, idExterno, ct));
             if (situacao is not null) await AplicarAsync(corrida, situacao, ct);
         }
-        else if (corrida.Status == StatusCorrida.Solicitando && Agora - corrida.RegistradoEm > PrazoSolicitacao)
+        else if (corrida.AguardaConferencia(Agora))
         {
-            logger.LogWarning("Corrida {CorridaId} sem confirmação da Lalamove em {Prazo}; dada como não criada. Confira o painel da Lalamove.",
-                corrida.Id, PrazoSolicitacao);
-            corrida.FalharSolicitacao(Agora);
+            // #2168: sem o número do pedido não há como perguntar à Lalamove. Dar como falha liberaria uma segunda
+            // corrida paga por cima da primeira: a atendente confere no painel e libera (DescartarSolicitacao).
+            logger.LogWarning("Corrida {CorridaId} sem confirmação da Lalamove; aguarda a conferência da atendente.", corrida.Id);
         }
         await unitOfWork.CommitAsync();
         return CorridaApiResult.De(corrida, Agora);
@@ -211,8 +242,31 @@ public sealed class SincronizarCorridaUseCase(
     public async Task<CorridaApiResult> SubstituirPedidoAsync(Guid empresaId, Guid corridaId, string idAnterior, string idNovo, CancellationToken ct = default)
     {
         var corrida = await corridas.ObterAsync(empresaId, corridaId, ct) ?? throw new CorridaExternaNaoEncontradaException(corridaId);
-        if (corrida.IdExterno == idAnterior) corrida.SubstituirPedidoNoProvedor(idAnterior, idNovo, Agora);
-        await unitOfWork.CommitAsync();
+        if (corrida.IdExterno != idAnterior) return await ExecuteAsync(empresaId, corridaId, ct);
+
+        // #2168: a corrida encerrada só reabre se a viagem ainda espera por ela. Viagem desfeita ou com outra corrida
+        // em curso fica como está: a atendente resolve com o suporte da Lalamove, e o webhook não volta em 503.
+        var viagem = await viagens.ObterAsync(empresaId, corrida.ViagemId, ct) ?? throw new ViagemNaoEncontradaException(corrida.ViagemId);
+        var estavaEncerrada = !corrida.Ativa;
+        if (estavaEncerrada && (viagem.Situacao is not (SituacaoViagem.Montando or SituacaoViagem.EmRota)
+            || (await corridas.ListarDaViagemAsync(empresaId, viagem.Id, ct)).Any(c => c.Id != corrida.Id && c.Ativa)))
+        {
+            logger.LogWarning("Troca de pedido da Lalamove na corrida {CorridaId} encerrada, com a viagem {Situacao} ou outra corrida em curso; não reabre.",
+                corrida.Id, viagem.Situacao);
+            return CorridaApiResult.De(corrida, Agora);
+        }
+        corrida.SubstituirPedidoNoProvedor(idAnterior, idNovo, Agora);
+        try
+        {
+            await unitOfWork.CommitAsync();
+        }
+        catch (Exception ex) when (estavaEncerrada && unitOfWork.EhViolacaoDeUnicidade(ex))
+        {
+            unitOfWork.DescartarAlteracoesPendentes();
+            logger.LogWarning("Troca de pedido da Lalamove na corrida {CorridaId} com outra corrida em curso na viagem; não reabre.", corridaId);
+            var relida = await corridas.ObterAsync(empresaId, corridaId, ct) ?? corrida;
+            return CorridaApiResult.De(relida, Agora);
+        }
         return await ExecuteAsync(empresaId, corridaId, ct);
     }
 
@@ -223,9 +277,14 @@ public sealed class SincronizarCorridaUseCase(
 
         if (situacao.MotoristaIdExterno is { } motoristaId && corrida.MotoristaIdExterno != motoristaId && corrida.IdExterno is { } idExterno)
         {
+            // Sem os dados do motorista ainda, nada é gravado: a próxima reconsulta busca de novo (#2168).
             var motorista = await Provedor.ChamarAsync(() => gateway.ObterMotoristaAsync(corrida.EmpresaId, idExterno, motoristaId, ct));
-            corrida.AtribuirMotorista(motoristaId, motorista?.Nome, motorista?.Telefone, motorista?.Placa);
+            if (motorista is not null) corrida.AtribuirMotorista(motoristaId, motorista.Nome, motorista.Telefone, motorista.Placa);
         }
+
+        // O preço do provedor já traz a gorjeta: entra no custo enquanto a corrida anda e no fim (#2168).
+        if (situacao.ValorCentavos is { } valor && (corrida.Ativa || corrida.Status == StatusCorrida.Entregue))
+            corrida.AtualizarCustoDoProvedor(valor);
 
         switch (corrida.Status)
         {
@@ -243,7 +302,6 @@ public sealed class SincronizarCorridaUseCase(
                         viagem.MarcarParadaEntregue(parada.PedidoId, Agora);
                         await TransicaoSeguraAsync(corrida.EmpresaId, parada.PedidoId, StatusPedido.Entregue, ct);
                     }
-                    if (situacao.ValorCentavos is { } final) corrida.AtualizarCustoDoProvedor(final);
                 }
                 break;
             case StatusCorrida.Cancelada or StatusCorrida.Rejeitada or StatusCorrida.Expirada:

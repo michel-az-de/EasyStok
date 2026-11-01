@@ -69,12 +69,32 @@ public sealed class LalamoveLogisticaGateway(
     public async Task<SituacaoCorridaProvedor> ChamarAsync(Guid empresaId, PedidoChamadaCorrida pedido, CancellationToken ct = default)
     {
         var (cliente, _) = await ClienteAsync(empresaId, ct);
-        var observacao = pedido.Observacao is { Length: > 0 } o ? " " + o : "";
-        return await ChamarAsync(async () => Situacao(await cliente.CriarAsync(new LalamoveEntregaRequest(
+        var recado = string.IsNullOrWhiteSpace(pedido.Observacao) ? null : pedido.Observacao.Trim();
+        var criado = await ChamarAsync(() => cliente.CriarAsync(new LalamoveEntregaRequest(
             pedido.Cotacao.CotacaoId,
             new LalamoveContato(pedido.Cotacao.ColetaParadaId, pedido.Remetente.Nome, Telefone(pedido.Remetente.Telefone)),
-            [new LalamoveContato(pedido.Cotacao.EntregaParadaId, (pedido.Destinatario.Nome + observacao).Trim(), Telefone(pedido.Destinatario.Telefone))],
-            Metadata: new Dictionary<string, string> { ["corridaId"] = pedido.CorridaId.ToString() }), ct)));
+            [new LalamoveContato(pedido.Cotacao.EntregaParadaId, pedido.Destinatario.Nome, Telefone(pedido.Destinatario.Telefone), recado)],
+            Metadata: new Dictionary<string, string> { ["corridaId"] = pedido.CorridaId.ToString() }), ct));
+        return PedidoCriado(criado);
+    }
+
+    /// <summary>
+    /// #2168: com o POST aceito o pedido existe lá. Nada daqui em diante vira recusa: sem o id fica indisponível
+    /// (a corrida espera a conferência da atendente); com o id, o que não se lê fica para a reconsulta.
+    /// </summary>
+    private SituacaoCorridaProvedor PedidoCriado(LalamoveEntregaResponse? r)
+    {
+        if (string.IsNullOrWhiteSpace(r?.OrderId))
+            throw new LogisticaIndisponivelException("A Lalamove aceitou o pedido sem devolver o número dele.");
+        try
+        {
+            return Situacao(r);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning("Resposta do pedido {OrderId} da Lalamove incompleta ({Tipo}); a reconsulta completa.", r.OrderId, ex.GetType().Name);
+            return new SituacaoCorridaProvedor(r.OrderId, StatusCorrida.ProcurandoMotorista, null, null, null, null);
+        }
     }
 
     public async Task<SituacaoCorridaProvedor?> ConsultarAsync(Guid empresaId, string idExterno, CancellationToken ct = default)
@@ -189,7 +209,7 @@ public sealed class LalamoveLogisticaGateway(
         return servicos.FirstOrDefault(s => s.Description?.Contains("carro", StringComparison.OrdinalIgnoreCase) ?? false)?.Key;
     }
 
-    /// <summary>Status da v3 para o domínio. Desconhecido não muda nada: fica como procurando motorista.</summary>
+    /// <summary>Status da v3 para o domínio. Desconhecido é recusa: a corrida não muda até a reconsulta entender.</summary>
     public static StatusCorrida MapearStatus(string status) => status switch
     {
         "ASSIGNING_DRIVER" => StatusCorrida.ProcurandoMotorista,
@@ -256,6 +276,10 @@ public sealed class LalamoveLogisticaGateway(
         "ERR_INSUFFICIENT_CREDIT" => "A carteira da Lalamove está sem saldo. Recarregue no painel da Lalamove.",
         "ERR_QUOTATION_EXPIRED" => "A cotação venceu. Cote de novo para ver o preço atual.",
         "ERR_CANCELLATION_FORBIDDEN" => "A Lalamove não deixa mais cancelar esta corrida.",
+        "ERR_INVALID_TIPS" => "A gorjeta nova precisa ser maior que a anterior.",
+        "ERR_EXCEED_MIN_TIPS" => "Gorjeta abaixo do mínimo da Lalamove.",
+        "ERR_EXCEED_MAX_TIPS" => "Gorjeta acima do máximo da Lalamove.",
+        "ERR_INVALID_ORDER_STATUS" => "A Lalamove só aceita gorjeta enquanto procura motorista.",
         "ERR_INVALID_PHONE_NUMBER" => "Telefone recusado pela Lalamove. Confira o telefone da loja e o do cliente.",
         _ when status == HttpStatusCode.PaymentRequired => "A carteira da Lalamove está sem saldo. Recarregue no painel da Lalamove.",
         _ when status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "A Lalamove recusou a chave da loja. Confira a conexão em Gestão > Integrações.",
