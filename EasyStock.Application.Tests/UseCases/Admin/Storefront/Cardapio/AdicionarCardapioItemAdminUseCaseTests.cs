@@ -14,7 +14,9 @@ public class AdicionarCardapioItemAdminUseCaseTests
     private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
-    private AdicionarCardapioItemAdminUseCase Sut() => new(_storefrontRepo, _cardapioRepo, _produtoRepo, _uow);
+    private readonly ICardapioSecaoRepository _secoes = Substitute.For<ICardapioSecaoRepository>();
+
+    private AdicionarCardapioItemAdminUseCase Sut() => new(_storefrontRepo, _cardapioRepo, _produtoRepo, _secoes, _uow);
 
     private static Produto ProdutoFake(Guid empresaId, Guid id, string nome = "Lasanha")
     {
@@ -93,6 +95,21 @@ public class AdicionarCardapioItemAdminUseCaseTests
     }
 
     // ── Modo AVULSO (ADR-0031) ─────────────────────────────────────────
+
+    // #2037: a seção tem de ser da vitrine do prato; cardapio_secoes não tem EmpresaId nem RLS.
+    [Fact]
+    public async Task SecaoDeOutraVitrine_Recusa()
+    {
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), "slug-sec", "SEC", 0m);
+        _storefrontRepo.GetByIdAsync(s.Id, Arg.Any<CancellationToken>()).Returns(s);
+        var deOutra = Guid.NewGuid();
+        _secoes.GetByIdAsync(s.Id, deOutra, Arg.Any<CancellationToken>()).Returns((CardapioSecao?)null);
+
+        var act = () => Sut().ExecuteAsync(NewCommandAvulso(s.Id) with { SecaoId = deOutra });
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Categoria*");
+        await _cardapioRepo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
 
     [Fact]
     public async Task DeveAdicionar_ItemAvulso_SemVinculoComProduto()
