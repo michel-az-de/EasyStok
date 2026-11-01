@@ -93,7 +93,8 @@ public sealed class LalamoveLogisticaGateway(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning("Resposta do pedido {OrderId} da Lalamove incompleta ({Tipo}); a reconsulta completa.", r.OrderId, ex.GetType().Name);
-            return new SituacaoCorridaProvedor(r.OrderId, StatusCorrida.ProcurandoMotorista, null, null, null, null);
+            return new SituacaoCorridaProvedor(r.OrderId, StatusCorrida.ProcurandoMotorista,
+                r.ShareLink is { Length: > 0 } link && link.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? link : null, null, null, null);
         }
     }
 

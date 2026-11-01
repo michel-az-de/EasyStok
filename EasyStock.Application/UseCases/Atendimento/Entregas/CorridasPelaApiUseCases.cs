@@ -169,8 +169,11 @@ public sealed class CancelarCorridaUseCase(
     public async Task<CorridaApiResult> ExecuteAsync(Guid empresaId, Guid viagemId, Guid corridaId, CancellationToken ct = default)
     {
         var corrida = await CorridaDaApi.ObterAsync(corridas, empresaId, viagemId, corridaId, ct);
-        if (!corrida.PodeCancelar(relogio.GetUtcNow().UtcDateTime))
-            throw new UseCaseValidationException(corrida.Status == StatusCorrida.Solicitando
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        if (!corrida.PodeCancelar(agora))
+            throw new UseCaseValidationException(corrida.AguardaConferencia(agora)
+                ? "A Lalamove não confirmou a corrida: confira no painel da Lalamove e cancele por lá, ou libere a viagem se ela não estiver lá."
+                : corrida.Status == StatusCorrida.Solicitando
                 ? "A corrida ainda está sendo confirmada pela Lalamove. Espere um instante."
                 : "A Lalamove só cancela sem custo até 5 minutos depois de achar o motorista. Fale com o motorista ou com o suporte da Lalamove.");
         await Provedor.ChamarAsync(() => gateway.CancelarAsync(empresaId, corrida.IdExterno!, ct));

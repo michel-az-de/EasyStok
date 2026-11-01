@@ -97,9 +97,7 @@ await confere('3. rotas da API da corrida', async () => {
   assert.deepEqual(chamadas[5].corpo, { centavos: 500 })
 })
 
-// #2168: o corpo da chamada, a tela montada e o "Corrigir" só na corrida manual estão na prova-2168, com o cartão de verdade.
-await confere('4. a chamada leva só o id da cotação, nunca o preço', () => {
-  assert.deepEqual(chamadas[2].corpo, { cotacaoId: 'q1', veiculo: 'Carro', observacao: null }, 'o servidor relê a cotação na Lalamove')
-})
+// #2168: o corpo da chamada (só o id da cotação, nunca o preço), a tela montada e o "Corrigir" só na corrida manual
+// estão na prova-2168, com o cartão de verdade.
 
 console.log(`\n${passou} verificações passaram.`)

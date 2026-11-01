@@ -20,6 +20,12 @@ export function CorridaLalamove({ corrida, travado, atualizadaEm, semResposta, c
   // A confirmação aparece no lugar do botão que a abriu: o foco vai para o botão que confirma.
   const confirmarRef = useRef(null)
   useEffect(() => { if (confirmando) confirmarRef.current?.focus() }, [confirmando])
+  // A corrida andou (achou motorista, encerrou): a pergunta aberta não vale mais.
+  const [statusDaPergunta, setStatusDaPergunta] = useState(corrida.status)
+  if (statusDaPergunta !== corrida.status) {
+    setStatusDaPergunta(corrida.status)
+    setConfirmando(null)
+  }
   const veiculo = corrida.veiculo === 'Carro' ? 'carro' : 'moto'
 
   if (!corrida.ativa) {
@@ -45,7 +51,8 @@ export function CorridaLalamove({ corrida, travado, atualizadaEm, semResposta, c
         <span aria-live="polite" className={css.cresce}><Selo tom={status.tom} icone={status.icone}>{status.rotulo}</Selo></span>
         <p className={css.custo}>
           {moedaDosCentavos(corrida.custoCentavos)}
-          <small>{corrida.gorjetaCentavos > 0 ? `com ${moedaDosCentavos(corrida.gorjetaCentavos)} de gorjeta` : `Lalamove de ${veiculo}`}</small>
+          {/* Diferença sobre a cotação: procurando motorista é a gorjeta; depois pode incluir ajuste da Lalamove. */}
+          <small>{corrida.gorjetaCentavos > 0 ? `${moedaDosCentavos(corrida.gorjetaCentavos)} acima da cotação` : `Lalamove de ${veiculo}`}</small>
         </p>
       </div>
 
@@ -166,7 +173,10 @@ function ConferirNoPainel({ travado, confirmando, confirmarRef, aoPedir, aoDesis
   return (
     <output className={css.aviso}>
       <strong>A Lalamove não confirmou esta corrida.</strong>
-      <span>Antes de chamar outra, confira no painel ou no app da Lalamove se ela foi criada. Se estiver lá, acompanhe por lá.</span>
+      <span>
+        Antes de chamar outra, confira no painel ou no app da Lalamove se ela foi criada. Se estiver lá, o EasyStok não
+        consegue acompanhá-la: cancele por lá antes de liberar, ou siga a entrega pelo app da Lalamove.
+      </span>
       {confirmando ? (
         <div className={css.confirmacao} role="alertdialog" aria-label="Confirmar a liberação da viagem">
           <p>Conferiu e a corrida não está na Lalamove? A viagem volta a montar e dá para chamar de novo.</p>

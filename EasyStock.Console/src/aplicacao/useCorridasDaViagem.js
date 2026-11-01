@@ -18,6 +18,8 @@ export function useCorridasDaViagem(viagemId) {
   const lendoRef = useRef(false)
   const leituraRef = useRef(0)
   const vivoRef = useRef(true)
+  // A última lista lida: a consulta de 15 s lê daqui e não precisa recriar o relógio a cada leitura.
+  const corridasRef = useRef(null)
 
   useEffect(() => {
     vivoRef.current = true
@@ -30,6 +32,7 @@ export function useCorridasDaViagem(viagemId) {
     return api.listarCorridas(viagemId)
       .then((lista) => {
         if (!vivoRef.current || minha !== leituraRef.current) return
+        corridasRef.current = lista ?? []
         setCorridas(lista ?? [])
         setAtualizadaEm(Date.now())
         setErroLeitura(null)
@@ -48,14 +51,15 @@ export function useCorridasDaViagem(viagemId) {
     if (lendoRef.current || enviandoRef.current) return
     lendoRef.current = true
     try {
-      const ativas = (corridas ?? []).filter((c) => c.origem === 'Api' && c.ativa)
+      // A que espera a conferência da atendente não tem número do pedido: não há o que perguntar à Lalamove.
+      const ativas = (corridasRef.current ?? []).filter((c) => c.origem === 'Api' && c.ativa && !c.conferirNoProvedor)
       const respostas = await Promise.all(ativas.map((c) => api.atualizarCorrida(viagemId, c.id).then(() => true, () => false)))
       if (vivoRef.current) setSemResposta(respostas.includes(false))
       await recarregar()
     } finally {
       lendoRef.current = false
     }
-  }, [corridas, viagemId, recarregar])
+  }, [viagemId, recarregar])
 
   const emCurso = corridaEmCurso(corridas)
   useEffect(() => {

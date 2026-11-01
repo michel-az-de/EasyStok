@@ -104,6 +104,30 @@ public class LalamoveLogisticaGatewayTests
         situacao.Should().Be(new SituacaoCorridaProvedor("3300000000000001", StatusCorrida.ProcurandoMotorista, null, null, null, null));
     }
 
+    [Fact]
+    public async Task Resposta_incompleta_do_post_aceito_guarda_o_link_de_rastreio()
+    {
+        _producao.Quando(HttpMethod.Post, "/v3/orders").Responde(HttpStatusCode.Created,
+            """{"data":{"orderId":"3300000000000001","status":"NOVO_STATUS","shareLink":"https://share.lalamove.com/x"}}""");
+
+        var situacao = await Sut().ChamarAsync(Empresa, Chamada());
+
+        situacao.LinkRastreio.Should().Be("https://share.lalamove.com/x");
+    }
+
+    [Fact]
+    public async Task Sem_recado_o_campo_remarks_nao_vai_no_corpo_assinado()
+    {
+        _producao.Quando(HttpMethod.Post, "/v3/orders").Responde(HttpStatusCode.Created, Pedido.Replace("__CORRIDA__", Corrida.ToString()));
+
+        await Sut().ChamarAsync(Empresa, Chamada() with { Observacao = "   " });
+
+        using var corpo = JsonDocument.Parse(_producao.Chamadas.Single().Corpo!);
+        var data = corpo.RootElement.GetProperty("data");
+        data.GetProperty("recipients")[0].TryGetProperty("remarks", out _).Should().BeFalse();
+        data.GetProperty("sender").TryGetProperty("remarks", out _).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("""{"data":{"status":"ASSIGNING_DRIVER"}}""")]
     [InlineData("""{"data":null}""")]

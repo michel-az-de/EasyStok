@@ -273,7 +273,7 @@ api = novaApi({ corridas: [corridaApi('ProcurandoMotorista', { podeCancelar: tru
 await confere('4b/5. gorjeta é total: só acima da atual, e pede confirmação', {}, async (t) => {
   const disponivel = (valor) => propsDe(t.botao(valor)).disabled !== true
   assert.deepEqual(['3,00', '5,00', '10,00'].map(disponivel), [false, false, true])
-  assert.match(t.texto(), /com R\$\s5,00 de gorjeta/)
+  assert.match(t.texto(), /R\$\s5,00 acima da cotação/)
   await t.clicar('10,00')
   assert.equal(api.conta('gorjetaCorrida'), 0)
   assert.match(t.texto(), /É o total, não um acréscimo/)
