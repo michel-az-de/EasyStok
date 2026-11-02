@@ -372,6 +372,43 @@ function conferirPainelDaNota(elemento) {
   superficie.unmount(); notaHost.unmount()
 }
 conferirPainelDaNota(mesa.tree.props.children[1][0])
+{
+  const registro = mesa.tree.props.children[1][0]
+  const nota = montar(registro.type, registro.props)
+  const portal = nota.tree.type(nota.tree.props)
+  const superficie = superficieDoPortal(portal)
+  const janela = montarPortal(portal)
+  const geometria = { ...janela.tree.props.style }
+  const focos = janela.focos
+  const referencias = lerReferenciasDaMesa(escopoA)
+  const pedidos = chamadas.length
+  for (const visivel of [false, true, false, true]) {
+    const elemento = MesaDeNotas({ children: 'ficha da conversa', visivel })
+    assert.equal(elemento.type, elementoMesa.type)
+    assert.equal(elemento.key, elementoMesa.key, 'mudar de aba não remonta a mesa da sessão')
+    mesa.props = elemento.props; mesa.render()
+    const atual = mesa.tree.props.children[1][0]
+    assert.equal(atual.type, registro.type)
+    assert.equal(atual.key, registro.key, 'a mesma nota continua montada ao abrir a lista')
+    assert.equal(atual.props.registro, registro.props.registro)
+    nota.props = atual.props; nota.render()
+    const proximoPortal = nota.tree.type(nota.tree.props)
+    assert.equal(proximoPortal.props.hidden, !visivel, 'lista de Conversas esconde o post-it que interceptava o toque')
+    assert.equal(proximoPortal.props.inert, !visivel, 'nota oculta também sai da navegação por teclado')
+    assert.equal(proximoPortal.props.style.display, visivel ? 'contents' : 'none')
+    const proximaSuperficie = superficieDoPortal(proximoPortal)
+    assert.equal(proximaSuperficie.type, superficie.type)
+    assert.equal(proximaSuperficie.key, superficie.key)
+    janela.props = proximaSuperficie.props; janela.render()
+    assert.deepEqual(janela.tree.props.style, geometria)
+    assert.equal(janela.focos, focos, 'voltar à Conversa não repete o foco de destacar a nota')
+    assert.deepEqual(lerPainelMovel(escopoA, `nota:${clienteId}:${notaId}`), geometriaMovida)
+    assert.deepEqual(lerReferenciasDaMesa(escopoA), referencias)
+    assert.equal(chamadas.length, pedidos, 'trocar aba não busca nem altera a nota')
+  }
+  janela.unmount(); nota.unmount()
+}
+console.log('ok MesaDeNotas real oculta os portais na lista sem desmontar, recolher, refocar ou perder geometria')
 guardarPainelMovel(escopoA, `nota:${clienteId}:${notaId}`, { ...geometriaMovida, solto: false })
 conferirPainelDaNota(mesa.tree.props.children[1][0])
 const notaCompartilhada = mesa.tree.props.children[1][0].props.registro.nota
@@ -404,6 +441,7 @@ function conferirFonteDaNota(conversaId, solta, destacar = false, mesaHost = mes
 }
 conferirFonteDaNota('conversa-a', true)
 const referenciasAntesDaTroca = lerReferenciasDaMesa(escopoA)
+mesa.props.visivel = false; mesa.render()
 mesa.props.selecionadaId = 'conversa-b'; mesa.render()
 assert.equal(mesa.tree.props.children[1].length, 0, 'trocar de ficha esconde as notas anteriores')
 conferirFonteDaNota('conversa-b', false)
@@ -412,6 +450,8 @@ assert.deepEqual(lerPainelMovel(escopoA, `nota:${clienteId}:${notaId}`), geometr
 mesa.props.selecionadaId = 'conversa-a'; mesa.render()
 assert.equal(mesa.tree.props.children[1].length, 1, 'voltar à ficha restaura sua nota')
 assert.equal(mesa.tree.props.children[1][0].props.registro.focar, false, 'voltar à ficha não repete foco da soltura original')
+assert.equal(mesa.tree.props.children[1][0].props.visivel, false, 'a nota de A permanece inerte enquanto a lista continua ativa')
+mesa.props.visivel = true; mesa.render()
 conferirFonteDaNota('conversa-a', true)
 assert.equal(mesa.tree.props.children[1][0].props.registro.conversaId, 'conversa-a', 'A continua dona do post-it ao voltar')
 conferirPainelDaNota(mesa.tree.props.children[1][0])
