@@ -85,11 +85,13 @@ Adotar **`lucide-react`**: é o mesmo traço que já está na tela, mais de 40 c
 | Componente | Regra | Substitui |
 |---|---|---|
 | `Tooltip` | hover e foco, atraso de 500 ms, "Verbo + objeto" e o atalho; nunca em toque | 100 `title` nativos |
-| `BotaoIcone` | exige `rotulo`; gera o aria-label e o Tooltip sozinho; alvo de 44 px no toque | 54 botões só-ícone |
+| `BotaoIcone` | exige `rotulo`; gera o aria-label e o Tooltip sozinho; alvo de `--toque` (40 px no mouse, 48 px no toque); ícone de 16, 20 ou 24 px | 54 botões só-ícone |
+| `MenuDeAcoes` | o menu ⋮, um só: gatilho `ellipsis-vertical` em `BotaoIcone`, itens com `motivo` ou `detalhe`, `marcado` para chave; sem item, o gatilho não existe; o que cada conversa oferece vem de `dominio/acoesDaConversa.js` (#2185) | 7 menus, com 5 rótulos e 3 ícones |
+| `Pilula contagem` | o contador do app: 18 px, número tabular, tom neutro, marca ou perigo; a folha da tela só diz o lugar (#2185) | 8 desenhos de contador |
 | `Aviso` (snackbar) | 3 tons, com "Desfazer" opcional, 1 por vez, no pé da tela | 6 mecanismos de feedback |
 | `Selo` | status = cor + ícone + texto; no máximo 4 estados de conversa | cerca de 25 selos à mão |
 | `Folha` | painel lateral no desktop e bottom sheet no celular | 5 overlays próprios, modal sobre modal |
-| `Modal` | 3 larguras (P, M, G), rodapé "Cancelar" + primário à direita | 14 larguras |
+| `Modal` | 3 larguras (`sm` 560, `md` 760, `lg` 880, tokens `--modal-*`), rodapé "Cancelar" + primário à direita | 14 larguras |
 | `Vazio` | frase + próxima ação | estados vazios mistos |
 
 **Guardas (testes de teto, padrão que o repo já usa):** nenhum `<button>` cru em `features/atendimento` e `features/caixa-de-entrada`; o `Icone` só aceita chave do dicionário; nenhum termo proibido em JSX; nenhuma duração ou easing literal em CSS. O teto começa no número atual e só desce.

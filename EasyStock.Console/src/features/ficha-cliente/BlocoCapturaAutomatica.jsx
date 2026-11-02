@@ -41,7 +41,7 @@ export function BlocoCapturaAutomatica({ conversa, pausado }) {
   return (
     <section className={css.capturaAuto} aria-label="Captação do Assistente">
       <p className={css.capturaTitulo}>
-        <Icone nome="raio" /> Captação do Assistente
+        <Icone nome="sparkles" /> Captação do Assistente
         <Pilula tamanho="inline" tom={conduzindo ? 'ok' : 'aviso'} className={css.capturaSelo}>{selo}</Pilula>
       </p>
       <ol className={css.capturaPassos}>

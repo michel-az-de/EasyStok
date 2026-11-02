@@ -205,7 +205,7 @@ export function RelogioPix({
                 Cancelar pedido
               </Botao>
             )}
-            <Botao largo variante="secundario" icone="log-out" onClick={aoEncerrarAtendimento}>
+            <Botao largo variante="secundario" icone="circle-check" onClick={aoEncerrarAtendimento}>
               Concluir conversa
             </Botao>
           </div>

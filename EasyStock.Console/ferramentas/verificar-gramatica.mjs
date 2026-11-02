@@ -44,6 +44,8 @@
 //   h. botao so de icone fora do `BotaoIcone` (#2185, R02): `<Botao>` ou `<button>` cujo unico
 //      filho e um `<Icone/>`, ou `<Botao icone=... />` sem texto. O BotaoIcone da o nome acessivel,
 //      a dica e o alvo de `--toque`.
+//   o. icone do ator na tela do Atendimento (#2185, plano secao 3.2): o Assistente e `sparkles`,
+//      concluir e `circle-check`. `raio` fica com o modulo Automaticas e `log-out` com sair da conta.
 //
 // Le o codigo como texto, sem dependencia. As contagens b, c e d sao heuristicas de
 // proposito: o que importa e que o numero so desca.
@@ -70,6 +72,7 @@ const TETOS = {
   raioForaDoToken: 0,
   camadaComBordaOuSombraPequena: 0,
   larguraDeModalLiteral: 0,
+  iconeDoAtorForaDoPlano: 0,
 }
 
 const CONSOLE = fileURLToPath(new URL('..', import.meta.url))
@@ -306,7 +309,7 @@ function contarMenusForaDoComponente(fontes) {
   for (const arquivo of fontes) {
     if (!arquivo.endsWith('.jsx') || /componentes[\\/](MenuDeAcoes|Icone)\.jsx$/.test(arquivo)) continue
     const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
-    for (const m of codigo.matchAll(/(?:nome|icone)=["']ellipsis(?:-vertical)?["']|Mais ações/g)) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} ${m[0]}`)
+    for (const m of codigo.matchAll(/(?:nome|icone)=["']ellipsis(?:-vertical)?["']|Mais ações|\srole=["']menu["']/g)) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} ${m[0]}`)
   }
   return faltas
 }
@@ -512,6 +515,19 @@ function contarLarguraDeModalLiteral(fontes) {
   return faltas
 }
 
+// --- o. icone do ator ---------------------------------------------------------------------
+
+function contarIconeDoAtorForaDoPlano(fontes) {
+  const faltas = []
+  for (const arquivo of fontes) {
+    const rel = relativo(arquivo)
+    if (!PASTAS_DO_VOCABULARIO.some((pasta) => rel.startsWith(pasta + '/')) && !ARQUIVOS_DO_VOCABULARIO.includes(rel)) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
+    for (const m of codigo.matchAll(/\b(?:nome|icone)(?:=|:\s*)(?:\{\s*)?['"](raio|log-out)['"]/g)) faltas.push(`${rel}:${linhaDe(codigo, m.index)} icone ${m[1]}`)
+  }
+  return faltas
+}
+
 // --- tetos ----------------------------------------------------------------------------
 
 const fontes = arquivos(RAIZ, /\.(jsx?|mjs)$/)
@@ -532,6 +548,7 @@ const GUARDAS = [
   ['raioForaDoToken', 'border-radius literal ou ponto fora de --ponto', contarRaiosForaDoToken(estilos)],
   ['camadaComBordaOuSombraPequena', 'camada flutuante com borda de 1px ou sombra pequena', contarCamadasComBordaOuSombraPequena(estilos)],
   ['larguraDeModalLiteral', 'Modal com largura fora de sm, md e lg', contarLarguraDeModalLiteral(fontes)],
+  ['iconeDoAtorForaDoPlano', 'icone do Assistente ou de concluir fora do plano (secao 3.2)', contarIconeDoAtorForaDoPlano(fontes)],
 ]
 
 let reprovou = false

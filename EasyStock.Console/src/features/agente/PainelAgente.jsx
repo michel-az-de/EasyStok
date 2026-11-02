@@ -93,14 +93,14 @@ export function PainelAgente({
             <output className={css.pensando}>
               {modo === 'simulado'
                 ? 'Preparando uma sugestão de demonstração…'
-                : 'Consultando a IA sobre esta conversa…'}
+                : 'Consultando o Assistente sobre esta conversa…'}
             </output>
           )}
 
           {estado === 'erro' && (
             <p className={css.erro} role="alert">
               <Icone nome="alerta" /> {erro?.includes('Anthropic:')
-                ? 'A conexão com a IA está indisponível. Peça ao responsável pelo sistema para verificar.'
+                ? 'A conexão com o Assistente está indisponível. Peça ao responsável pelo sistema para verificar.'
                 : erro || 'Não foi possível gerar uma sugestão. Tente novamente.'}
             </p>
           )}

@@ -45,7 +45,7 @@ function Digitando() {
     <div className={`${css.balao} ${css.saida} ${css.doAutomatico} ${css.digitando}`}>
       <span className={css.pontos} aria-hidden="true"><i /><i /><i /></span>
       <span className={css.meta}>
-        <span className={css.selo}><Icone nome="raio" /> Assistente digitando</span>
+        <span className={css.selo}><Icone nome="sparkles" /> Assistente digitando</span>
       </span>
     </div>
   )

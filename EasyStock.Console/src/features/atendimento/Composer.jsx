@@ -376,7 +376,7 @@ export function Composer({
                   // #2134: chave do completar com Tab. Só existe no modo API (é lá que a sugestão chama
                   // o provedor). Desligada, nenhuma chamada sai; vale por usuário, neste navegador.
                   fonteApi && {
-                    chave: 'sugestoes', rotulo: 'Sugestões de IA', icone: 'sparkles', marcado: complementoLigado,
+                    chave: 'sugestoes', rotulo: 'Sugestões do Assistente', icone: 'sparkles', marcado: complementoLigado,
                     aoEscolher: alternarComplemento,
                   },
                 ]}

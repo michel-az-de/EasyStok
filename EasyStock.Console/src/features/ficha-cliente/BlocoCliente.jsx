@@ -63,7 +63,7 @@ function SeloCaptado({ quando }) {
   if (!quando) return null
   return (
     <span className={css.seloCaptado} title={`Captado pelo Assistente às ${quando.slice(11, 16)}`}>
-      <Icone nome="raio" tamanho={16} /> {SELO_CAPTADO}
+      <Icone nome="sparkles" tamanho={16} /> {SELO_CAPTADO}
     </span>
   )
 }

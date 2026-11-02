@@ -306,10 +306,24 @@ try {
     assert.equal(await p.locator(`[id="${id}"]`).innerText(), 'Cadastre o cliente primeiro.')
     await ctx.close()
   })
+  await confere('10. item ligado diz o que aceita, ligado ao item por aria-describedby', async () => {
+    const { ctx, p } = await abrir('meu')
+    await p.getByRole('button', { name: 'Mais ferramentas', exact: true }).click()
+    const anexar = p.getByRole('menuitem', { name: 'Anexar' })
+    assert.equal(await anexar.isDisabled(), false)
+    const id = await anexar.getAttribute('aria-describedby')
+    assert.equal(await p.locator(`[id="${id}"]`).innerText(), 'Foto do computador (imagem, até 8 MB)')
+    await ctx.close()
+  })
+  await confere('11. conversa sem ação no menu não mostra o gatilho', async () => {
+    const { ctx, p } = await abrir('concluida')
+    assert.equal(await gatilho(p).count(), 0)
+    await ctx.close()
+  })
   await confere('10. chave de ligar mostra o estado no menu', async () => {
     const { ctx, p } = await abrir('meu')
     await p.getByRole('button', { name: 'Mais ferramentas', exact: true }).click()
-    assert.equal(await p.getByRole('menuitemcheckbox', { name: 'Sugestões de IA' }).getAttribute('aria-checked'), 'true')
+    assert.equal(await p.getByRole('menuitemcheckbox', { name: 'Sugestões do Assistente' }).getAttribute('aria-checked'), 'true')
     await ctx.close()
   })
 } finally {

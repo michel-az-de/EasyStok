@@ -123,11 +123,11 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
             title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}
             onClick={() => aoAbrirDefinicaoAutomatica?.(mensagem.regra)}
           >
-            <Icone nome="raio" /> Assistente
+            <Icone nome="sparkles" /> Assistente
           </button>
         ) : (
           <span className={css.selo} title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}>
-            <Icone nome="raio" /> Assistente
+            <Icone nome="sparkles" /> Assistente
           </span>
         ))}
         {mensagem.modelo && <span className={css.selo} title={mensagem.modeloNome}><Icone nome="modelo" /> modelo</span>}
@@ -145,7 +145,7 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
         {mensagem.porSms && <span className={css.selo}><Icone nome="check" /> saiu por SMS</span>}
         {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.modelo && !mensagem.semIdServidor && !mensagem.midia && !mensagem.aguardaCliente && (
           <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} disabled={reenvio === 'indo'} onClick={reenviar}>
-            <Icone nome="raio" /> {reenvio === 'indo' ? 'Reenviando…' : 'Reenviar'}
+            <Icone nome="refresh-cw" /> {reenvio === 'indo' ? 'Reenviando…' : 'Reenviar'}
           </button>
         )}
         {mensagem.status === 'falhou' && reenvio === 'falhou' && (

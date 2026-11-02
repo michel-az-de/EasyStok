@@ -215,6 +215,11 @@
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
 .modoAssumir { margin-left: auto; flex: none; }
+/* #2185: em coluna estreita o motivo, espremido ao lado de Assumir, quebrava em 3 linhas. Desce inteiro para baixo do estado. */
+.modoLinha { container: barra-modo / inline-size; }
+@container barra-modo (max-width: 559px) {
+  .modoTexto { order: 1; flex: 1 1 100%; padding-bottom: var(--e-2); }
+}
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
 
 

@@ -99,17 +99,17 @@ export function AreaColaborativaIa({ conversaId, blocosSoltos = [], ...callbacks
   const visivel = montagem?.conversaId === conversaId && montagem.identidadeSessao === identidade ? montagem : null
   const movidos = new Set(blocosSoltos)
   if (!aberta) return null
-  return <section className={css.area} aria-label="Organizar a ficha com IA">
+  return <section className={css.area} aria-label="Organizar a ficha com o Assistente">
     <form onSubmit={organizar}>
       <header className={css.cabecalho}><AvatarAssistente tamanho={32} decorativo /><h3>Assistente</h3>
-        <Botao type="submit" aria-label={carregando ? 'Organizando ficha' : 'Organizar com IA'} data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando}>{carregando ? 'Organizando…' : 'Organizar'}</Botao>
+        <Botao type="submit" aria-label={carregando ? 'Organizando ficha' : 'Organizar com o Assistente'} data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando}>{carregando ? 'Organizando…' : 'Organizar'}</Botao>
       </header>
       <details className={css.orientar}><summary>Orientar</summary>
         <CampoTexto rotulo="Orientação (opcional)" placeholder="Ex.: preparar a retirada de sábado" maxLength={2000}
           value={orientacao} disabled={carregando} onChange={(e) => setOrientacao(e.target.value)} />
       </details>
     </form>
-    {!fonteApi && <p>Conecte a loja para usar a IA.</p>}
+    {!fonteApi && <p>Conecte a loja para usar o Assistente.</p>}
     {carregando && <p role="status">Organizando a ficha…</p>}
     {erro && <p role="alert" className={css.erro}>{erro}</p>}
     {visivel && <><p className={css.data}>Proposta das {horaCurta(visivel.geradoEm)}</p><div className={css.blocos}>

@@ -136,7 +136,7 @@ export const CartaoConversa = memo(function CartaoConversa({
             {previa.prefixo && (
               <span className={css.prefixo}>
                 {previa.prefixo.startsWith('Assistente')
-                  ? <><Icone nome="raio" tamanho={16} /><span className="sr">{previa.prefixo}</span></>
+                  ? <><Icone nome="sparkles" tamanho={16} /><span className="sr">{previa.prefixo}</span></>
                   : previa.prefixo.trim()}
               </span>
             )}
