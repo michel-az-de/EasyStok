@@ -11,7 +11,7 @@ import { CARDAPIO, larguraDoCardapio, larguraMaxima, normalizarCardapio } from '
 import { useHash } from '../hooks/useHash'
 import { useLarguras } from '../hooks/useLarguras'
 import { useRelogio } from '../hooks/useRelogio'
-import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
+import { CELULAR, DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
 import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
 import { demonstracao } from '../infra/demonstracao'
@@ -19,6 +19,7 @@ import { telasDaDemonstracao } from './demonstracao'
 import { identidadeDaSessao } from '../infra/api/sessao'
 import { gravarVisita, lerVisita } from '../infra/api/visitaDaSessao'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
+import { useRascunhosDeNotas } from '../aplicacao/useRascunhosDeNotas'
 import { useNotificacoesDaSessao } from '../aplicacao/useNotificacoesDaSessao'
 import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
 import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
@@ -86,11 +87,11 @@ const abasDaDemonstracao = { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas
 function Composicao({ rota }) {
   const {
     selecionada, regras, encerrando, encerrandoNumero, agente, modoAgente, agora, aberta, horarioDaLoja,
-    conversas, automaticoPausado,
+    conversas, automaticoPausado, sessao,
   } = useAtendimento()
   const {
     salvarNota, adicionarItem, ajustarQuantidade, alternarRegra, fecharEncerramento,
-    consultarAgente, limparAgente, trocarModoAgente, definirRascunho,
+    consultarAgente, limparAgente, trocarModoAgente, definirRascunho, selecionar,
   } = useAcoes()
   const { canais, janelas } = useCatalogo()
 
@@ -98,8 +99,9 @@ function Composicao({ rota }) {
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
   useTituloDaAba(tituloDaAba(rota, contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas, horarioDaLoja)))
   const [modal, setModal] = useState(null)
-  // #1847: o rascunho pertence ao cliente escolhido ao abrir, mesmo ao navegar ou salvar.
-  const [nota, setNota] = useState(null)
+  const { rascunhos: notas, ativa: notaAtiva, memoria: memoriaNotas } = useRascunhosDeNotas(sessao)
+  const [solicitacaoPainel, setSolicitacaoPainel] = useState(null)
+  const solicitarPainel = (aba, destino = 'comanda', conversaId = selecionada?.id) => setSolicitacaoPainel((atual) => ({ aba, destino, conversaId, sequencia: (atual?.sequencia ?? 0) + 1 }))
   // #1761 (L3): gerada a cobrança, o cardápio virava "Consulta do cardápio" com tudo desligado,
   // cobrindo a lista e apertando a conversa. Fecha sozinho; "Ver cardápio" na Ficha reabre.
   const pedidoNaTela = { conversaId: selecionada?.id ?? null, pedidoId: selecionada?.pedido?.pedidoId ?? null }
@@ -131,6 +133,61 @@ function Composicao({ rota }) {
   // nota/cardápio/automáticas/entregas (esses sim se excluem entre si).
   const [simulando, setSimulando] = useState(false)
   const tamanho = useTamanhoTela()
+  const celular = tamanho === CELULAR
+  const notaSelecionada = notas.find((nota) => nota.id === selecionada?.id)
+  const editorNotaVisivel = celular && modal === 'nota' && notaAtiva === notaSelecionada?.chave
+  // Outra conversa abre no atendimento; o rascunho privado continua pertencendo à anterior.
+  const conversaDaNota = useRef(selecionada?.id)
+  useEffect(() => {
+    if (celular && conversaDaNota.current !== selecionada?.id) {
+      memoriaNotas.pausar()
+      setModal((atual) => atual === 'nota' ? null : atual)
+    }
+    conversaDaNota.current = selecionada?.id
+  }, [celular, selecionada?.id, memoriaNotas])
+
+  const precisaCadastrarParaNota = (id) => FONTE_API && !conversas.find((conversa) => conversa.id === id)?.clienteId
+  const pausarNota = (chave, aba = 'atendimento', destino = 'comanda') => {
+    if (memoriaNotas.ler().ativa !== chave) return
+    const dona = notas.find((nota) => nota.chave === chave)
+    memoriaNotas.pausar()
+    setModal((atual) => atual === 'nota' ? null : atual)
+    if (destino === 'cadastro' && dona?.id !== selecionada?.id) selecionar(dona.id)
+    if (celular || destino === 'cadastro') solicitarPainel(aba, destino, dona?.id)
+  }
+  const editoresNotas = notas.map((nota) => (
+    <ModalNota
+      key={nota.chave}
+      visivel={modal === 'nota' && notaAtiva === nota.chave && (!celular || selecionada?.id === nota.id)}
+      embutida={celular}
+      nomeCliente={nota.nome}
+      rascunho={nota}
+      outraConversa={selecionada?.id !== nota.id}
+      precisaCadastrar={precisaCadastrarParaNota(nota.id)}
+      aoCadastrar={() => pausarNota(nota.chave, 'ficha', 'cadastro')}
+      aoGuardar={(campo) => memoriaNotas.guardar(nota.chave, campo)}
+      aoFechar={() => pausarNota(nota.chave)}
+      aoComanda={() => pausarNota(nota.chave, 'ficha')}
+      aoSalvar={async (texto) => {
+        if (precisaCadastrarParaNota(nota.id)) return false
+        if (!memoriaNotas.iniciarGravacao(nota.chave)) return false
+        try {
+          const resultado = await salvarNota(nota.id, texto)
+          const confirmado = resultado === true || (!FONTE_API && resultado !== false)
+          const eraAtiva = memoriaNotas.ler().ativa === nota.chave
+          if (memoriaNotas.concluir(nota.chave, confirmado) && eraAtiva) {
+            setModal((atual) => atual === 'nota' ? null : atual)
+            if (celular) solicitarPainel('atendimento')
+          }
+          if (!confirmado) memoriaNotas.falharGravacao(nota.chave, 'Sem confirmação da nota. Seu texto continua aqui. Confira a ficha antes de tentar de novo.')
+          return confirmado
+        } catch (erro) {
+          memoriaNotas.falharGravacao(nota.chave, erro.message || 'Não foi possível salvar a nota. Seu texto continua aqui.')
+          throw erro
+        }
+      }}
+    />
+  ))
   // Larguras redimensionáveis por alça (seção 9): um hook só, aqui em cima,
   // porque Moldura e o painel do cardápio leem a mesma chave de localStorage
   // e duas instâncias do hook se pisariam na hora de gravar.
@@ -217,9 +274,15 @@ function Composicao({ rota }) {
       <Moldura
         tamanho={tamanho}
         aoAbrirNota={(texto) => {
-          if (selecionada) setNota((atual) => atual ?? { id: selecionada.id, nome: selecionada.nome, textoInicial: typeof texto === 'string' ? texto : '' })
+          if (!selecionada) return
+          memoriaNotas.abrir(selecionada.id, selecionada.nome, typeof texto === 'string' ? texto : '')
           setModal('nota')
+          if (celular) solicitarPainel('atendimento')
         }}
+        slotEditorNota={editoresNotas}
+        editorNotaVisivel={editorNotaVisivel}
+        notaEmRascunho={Boolean(notaSelecionada)}
+        solicitacaoPainel={solicitacaoPainel}
         aoRascunho={(texto) => { if (selecionada && typeof texto === 'string') definirRascunho(selecionada.id, texto) }}
         aoAbrirGaleria={() => setModal('galeria')}
         aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
@@ -239,16 +302,6 @@ function Composicao({ rota }) {
         cardapioAberto={modal === 'cardapio' && selecionada ? prefCardapio.lado : null}
       />
 
-      {nota && (
-        <ModalNota
-          visivel={modal === 'nota'}
-          nomeCliente={nota.nome}
-          textoInicial={nota.textoInicial ?? ''}
-          outraConversa={selecionada?.id !== nota.id}
-          aoFechar={() => { setNota(null); setModal((atual) => atual === 'nota' ? null : atual) }}
-          aoSalvar={(texto) => salvarNota(nota.id, texto)}
-        />
-      )}
 
       {/* Rodada 7 · frente Anexos: substitui o antigo "Prato" do composer
           (registro em auditoria/decisoes/61-anexos.md). */}

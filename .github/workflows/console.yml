@@ -49,6 +49,9 @@ jobs:
       - run: node ferramentas/prova-mapa-viagem.mjs
       - run: node ferramentas/prova-1683-operacao.mjs
       - run: node ferramentas/prova-1420-sugestao-agente-api.mjs
+      - run: node ferramentas/prova-2178-ia-contextual.mjs
+      - run: node ferramentas/prova-2178-rascunhos-notas.mjs
+      - run: node ferramentas/prova-2178-notas-sessao.mjs
       - run: node ferramentas/prova-1432-atendimento-email.mjs
       - run: node ferramentas/prova-f06-honestidade.mjs
       - run: node ferramentas/prova-f11-lote-papel.mjs
@@ -59,6 +62,7 @@ jobs:
       - run: node ferramentas/prova-1697-ux-desktop.mjs
       - run: node ferramentas/prova-1447-hall-modulos.mjs
       - run: node ferramentas/prova-congelados.mjs
+      - run: node ferramentas/prova-2162-corrida-lalamove.mjs
       - run: node ferramentas/prova-1608-painel-agora.mjs
       - run: node ferramentas/prova-onda1-shell.mjs
       - run: node ferramentas/prova-perfis-modulos.mjs

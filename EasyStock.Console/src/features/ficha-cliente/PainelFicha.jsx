@@ -60,7 +60,7 @@ function AcessoDaFicha({ titulo, resumo, icone, aoAbrir, painel, focoReserva = p
   </button>
 }
 
-function BlocoIaMovel({ bloco, escopoId, aoRecolher, ...acoes }) {
+function BlocoIaMovel({ bloco, escopoId, aoRecolher, visivel, ...acoes }) {
   const controle = usePainelMovel(escopoId, `ia:${bloco.geracaoId}:${bloco.id}`)
   const soltar = controle.soltar
   useEffect(() => { soltar() }, [soltar])
@@ -71,21 +71,22 @@ function BlocoIaMovel({ bloco, escopoId, aoRecolher, ...acoes }) {
     if (!alvo) return false
     alvo.focus({ preventScroll: true }); return true
   } }
-  return <PainelMovel controle={controleComFoco} titulo="Você + Assistente" larguraInicial={360} alturaInicial={360} focar aoRecolher={aoRecolher}>
+  return <PainelMovel controle={controleComFoco} titulo="Você + Assistente" larguraInicial={360} alturaInicial={360} focar aoRecolher={aoRecolher} visivel={visivel}>
     <BlocoColaborativoIa bloco={bloco} conversaId={bloco.conversaId} {...acoes} />
   </PainelMovel>
 }
 
-function MapaMovelDaFicha({ controle, dados, clienteId }) {
-  const acompanhamento = useViagemDoCliente({ clienteId: dados?.clienteId ?? clienteId, pedidoId: dados?.pedidoId, ativo: controle.solto && Boolean(dados?.pedidoId) })
+function MapaMovelDaFicha({ controle, dados, clienteId, visivel }) {
+  const acompanhamento = useViagemDoCliente({ clienteId: dados?.clienteId ?? clienteId, pedidoId: dados?.pedidoId, ativo: visivel && controle.solto && Boolean(dados?.pedidoId) })
   if (!dados) return null
-  return <PainelMovel controle={controle} titulo={`Viagem · ${dados.nomeCliente}`} larguraInicial={520} alturaInicial={560}>
+  return <PainelMovel controle={controle} titulo={`Viagem · ${dados.nomeCliente}`} larguraInicial={520} alturaInicial={560} visivel={visivel}>
     <MapaDaViagem {...dados} viagem={acompanhamento.lida ? acompanhamento.viagem : dados.viagem} />
     {acompanhamento.erro && <p role="status">Não foi possível atualizar a viagem. <Botao variante="texto" onClick={acompanhamento.atualizar}>Tentar de novo</Botao></p>}
   </PainelMovel>
 }
 
-function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoCompartilhar, acoesCabecalho }) {
+function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoCompartilhar, acoesCabecalho,
+  visivel = true, comandaVisivel = visivel, solicitacaoFicha, aoConsumirSolicitacaoFicha }) {
   const {
     selecionada, alertasEstoque, ultimoAvanco, agora, automaticoPausado, fonteApi, sessao,
   } = useAtendimento()
@@ -112,6 +113,16 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const escopoMovel = `ficha:${sessao?.empresa?.id ?? 'demo'}:${sessao?.usuario?.id ?? 'demo'}:${selecionada?.id ?? 'sem-conversa'}`
   const comandaMovel = usePainelMovel(escopoMovel, 'comanda')
   const mapaMovel = usePainelMovel(escopoMovel, 'mapa')
+  const soltarComanda = comandaMovel.soltar
+  useEffect(() => {
+    if (!visivel || !solicitacaoFicha || solicitacaoFicha.conversaId !== selecionada?.id) return
+    if (solicitacaoFicha.destino === 'cadastro') setSecao('cliente')
+    else {
+      setSecao(null)
+      if (selecionada?.pedido) soltarComanda()
+    }
+    aoConsumirSolicitacaoFicha?.()
+  }, [visivel, solicitacaoFicha, selecionada?.id, selecionada?.pedido, soltarComanda, aoConsumirSolicitacaoFicha])
   const abrirComanda = () => comandaMovel.soltar()
   const abrirMapaAoLado = (dados) => {
     setMapaAoLado(dados); setFreteAberto(false)
@@ -297,7 +308,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       </ModalCliente>}
 
-      {pedido && <PainelMovel controle={comandaMovel} titulo={`Comanda · ${selecionada.nome}`} larguraInicial={480} alturaInicial={480} alinharDireita>
+      {pedido && <PainelMovel controle={comandaMovel} titulo={`Comanda · ${selecionada.nome}`} larguraInicial={480} alturaInicial={480} alinharDireita visivel={comandaVisivel}>
         {editavel && !pedidoCriado && <p>Estes itens ainda estão em montagem. O pedido será criado ao gerar a cobrança.</p>}
         {!editavel && <p>Consulta do atendimento encerrado.</p>}
         <BlocoPedido
@@ -330,8 +341,8 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       {freteAberto && <ConsultaFreteCliente conversa={selecionada} pedidoId={pedido?.pedidoId} aoFechar={() => setFreteAberto(false)}
         aoEditarEndereco={() => { setFreteAberto(false); setSecao('cliente') }} aoVerAoLado={abrirMapaAoLado} />}
-      <MapaMovelDaFicha controle={mapaMovel} dados={mapaAoLado ?? (mapaMovel.solto ? { pedidoId: pedido?.pedidoId, endereco: cliente.endereco, nomeCliente: selecionada.nome } : null)} clienteId={selecionada.clienteId} />
-      {blocosSoltos.filter((b) => b.conversaId === selecionada.id).map((bloco) => <BlocoIaMovel key={`${bloco.geracaoId}:${bloco.id}`} bloco={bloco} escopoId={escopoMovel}
+      <MapaMovelDaFicha controle={mapaMovel} dados={mapaAoLado ?? (mapaMovel.solto ? { pedidoId: pedido?.pedidoId, endereco: cliente.endereco, nomeCliente: selecionada.nome } : null)} clienteId={selecionada.clienteId} visivel={visivel} />
+      {blocosSoltos.filter((b) => b.conversaId === selecionada.id).map((bloco) => <BlocoIaMovel key={`${bloco.geracaoId}:${bloco.id}`} bloco={bloco} escopoId={escopoMovel} visivel={visivel}
         aoAbrirComanda={pedido ? abrirComanda : undefined} aoProporNota={aoAbrirNota} aoCalcularFrete={() => setFreteAberto(true)}
         aoAbrirCardapio={aoAbrirCardapio} aoRascunho={aoRascunho}
         aoRecolher={() => setBlocosSoltos((atuais) => atuais.filter((b) => b !== bloco))} />)}

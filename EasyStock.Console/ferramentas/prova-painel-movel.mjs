@@ -119,7 +119,7 @@ delete document.querySelector
 console.log('ok teclado e deslocamento da área visível mantêm a nota alcançável')
 function visitar(no, acao) { if (Array.isArray(no)) { no.forEach(n => visitar(n, acao)); return }; if (!no || typeof no !== 'object') return; acao(no); visitar(no.props?.children, acao) }
 function montar(fn, props) {
-  const h = { valores: [], efeitos: [], props, pendentes: [], sujo: true }
+  const h = { valores: [], efeitos: [], props, pendentes: [], sujo: true, focos: 0 }
   h.render = () => {
     let limite = 0
     do {
@@ -130,7 +130,7 @@ function montar(fn, props) {
         if (n.type?.contexto) n.type.contexto.valor = n.props.value
         const alvo = n.props?.ref
         if (alvo && typeof alvo === 'object') alvo.current = {
-          focus() {}, getBoundingClientRect: () => ({ width: h.tree.props.style.width, height: h.tree.props.style.height ?? 180 }),
+          focus() { h.focos++; document.activeElement = this }, getBoundingClientRect: () => ({ width: h.tree.props.style.width, height: h.tree.props.style.height ?? 180 }),
           contains: no => no?.__host === h,
         }
       })
@@ -142,14 +142,26 @@ function montar(fn, props) {
   h.unmount = () => h.efeitos.forEach(e => e?.limpar?.())
   h.render(); return h
 }
+// O portal contém agora um envelope DOM de visibilidade. O host de hooks monta
+// o componente funcional descendente, sem tentar executar a tag do envelope.
+function superficieDoPortal(portal) {
+  const superficies = []
+  visitar(portal, no => { if (typeof no.type === 'function' && no.props?.controle) superficies.push(no) })
+  assert.equal(superficies.length, 1, 'o portal conserva uma única superfície funcional')
+  return superficies[0]
+}
+function montarPortal(portal) {
+  const superficie = superficieDoPortal(portal)
+  return montar(superficie.type, superficie.props)
+}
 let escopo = 'teste-conversa-a'
 const controle = montar(() => usePainelMovel(escopo, 'comanda'), {})
 assert.equal(controle.tree.foco, 0, 'painel fechado não pede foco')
 controle.tree.soltar({ x: 100, y: 120 }); controle.render()
 assert.equal(controle.tree.solto, true)
 const portal = PainelMovel({ controle: controle.tree, titulo: 'Comanda', larguraInicial: 360, alturaInicial: 300, children: 'conteúdo real' })
-assert.ok(portal.props.focar > 0, 'abertura explícita pede foco no painel')
-const primeiraAbertura = portal.props.focar
+assert.ok(portal.props.children.props.focar > 0, 'abertura explícita pede foco no painel')
+const primeiraAbertura = portal.props.children.props.focar
 controle.tree.soltar(); controle.render()
 assert.ok(controle.tree.foco > primeiraAbertura, 'abrir painel já solto renova o pedido de foco')
 const restaurado = montar(() => usePainelMovel(escopo, 'comanda'), {})
@@ -157,7 +169,7 @@ assert.equal(restaurado.tree.solto, true)
 assert.equal(restaurado.tree.foco, 0, 'restaurar posição salva não rouba foco')
 restaurado.unmount()
 console.log('ok abertura explícita pede foco e restauração mantém o foco atual')
-const painel = montar(portal.type, portal.props)
+const painel = montarPortal(portal)
 const capturas = new Set()
 const alvo = { focus() {}, setPointerCapture: id => capturas.add(id), hasPointerCapture: id => capturas.has(id), releasePointerCapture: id => capturas.delete(id) }
 const evento = (campos = {}) => ({ pointerType: 'mouse', button: 0, pointerId: 3, clientX: 10, clientY: 20, currentTarget: alvo, preventDefault() {}, stopPropagation() {}, ...campos })
@@ -196,12 +208,13 @@ assert.equal(controle.tree.solto, false)
 assert.equal(lerPainelMovel('teste-conversa-a', 'comanda').solto, false)
 assert.doesNotMatch([...memoria.values()].join(''), /conteúdo real/)
 console.log('ok recolher persiste sem conteúdo, com reduced-motion ativo')
+painel.unmount()
 const abridor = { isConnected: true, focus() { document.activeElement = this } }
 const outroFoco = { isConnected: true, focus() { document.activeElement = this } }
 async function provarRetornoDeFoco({ callback, moverFora = false, desmontar = false } = {}) {
   controle.tree.soltar({ currentTarget: abridor }); controle.render()
   const elemento = PainelMovel({ controle: controle.tree, titulo: 'Teste foco', children: 'Conteúdo', aoRecolher: callback })
-  const janela = montar(elemento.type, elemento.props)
+  const janela = montarPortal(elemento)
   document.activeElement = { __host: janela }
   window.matchMedia = () => ({ matches: false })
   janela.find('Recolher Teste foco').props.onClick()
@@ -220,6 +233,65 @@ document.querySelectorAll = () => [{ ...reserva, getAttribute: () => 'outro-esco
 controle.tree.devolverFoco(); assert.equal(document.activeElement, reserva)
 document.querySelectorAll = () => []
 console.log('ok fechar devolve foco, respeita callback/ação externa, reserva e troca de contexto')
+const campoConversa = { isConnected: true, disabled: false, getClientRects: () => [{}], focus() { document.activeElement = this } }
+const respostasConversa = { ...campoConversa }
+const abridorOculto = { ...campoConversa, getClientRects: () => [] }
+document.querySelector = seletor => seletor === '[data-area-envio] textarea:not(:disabled)'
+  ? (campoConversa.disabled ? null : campoConversa)
+  : seletor === '[data-area-envio] button:not(:disabled)' ? (respostasConversa.disabled ? null : respostasConversa) : null
+document.querySelectorAll = seletor => seletor === '[data-foco-reserva]' ? [] : [document.querySelector(seletor)].filter(Boolean)
+controle.tree.soltar({ currentTarget: abridorOculto }); controle.render()
+document.activeElement = document.body
+assert.equal(controle.tree.devolverFoco(), true)
+assert.equal(document.activeElement, campoConversa, 'Ficha oculta devolve ao campo habilitado da Conversa')
+campoConversa.disabled = true
+assert.equal(controle.tree.devolverFoco(), true)
+assert.equal(document.activeElement, respostasConversa, 'janela fechada devolve às ferramentas habilitadas')
+respostasConversa.disabled = true
+assert.equal(controle.tree.devolverFoco(), false, 'sem destino visível não inventa foco no corpo da página')
+campoConversa.disabled = false
+campoConversa.getClientRects = () => []
+respostasConversa.getClientRects = () => []
+const campoNota = { ...campoConversa, getClientRects: () => [{}] }
+document.querySelectorAll = seletor => seletor === '[data-area-envio] textarea:not(:disabled)' ? [campoConversa, campoNota] : []
+assert.equal(controle.tree.devolverFoco(), true)
+assert.equal(document.activeElement, campoNota, 'o editor de nota visível tem prioridade sobre o compositor público oculto')
+delete document.querySelector
+document.querySelectorAll = () => []
+console.log('ok recolher na Conversa com a Ficha oculta respeita campo, janela fechada e controles indisponíveis')
+const controleVisibilidade = montar(() => usePainelMovel('teste-visibilidade', 'comanda'), {})
+controleVisibilidade.tree.soltar({ x: 120, y: 140, largura: 340, altura: 280 }); controleVisibilidade.render()
+const propsVisibilidade = { controle: controleVisibilidade.tree, titulo: 'Comanda oculta', focar: true, children: 'conteúdo preservado' }
+const portalOculto = PainelMovel({ ...propsVisibilidade, visivel: false })
+assert.equal(portalOculto.props.hidden, true)
+assert.equal(portalOculto.props.inert, true)
+assert.equal(portalOculto.props.style.display, 'none', 'CSS da superfície não pode revelar o portal oculto')
+const superficieOculta = superficieDoPortal(portalOculto)
+const janelaVisibilidade = montarPortal(portalOculto)
+assert.equal(janelaVisibilidade.focos, 0, 'painel oculto não pede foco')
+assert.equal(listeners.has('resize'), false, 'painel oculto não mede retângulos inexistentes')
+const geometriaAntes = { ...janelaVisibilidade.tree.props.style }
+const portalVisivel = PainelMovel({ ...propsVisibilidade, visivel: true })
+assert.equal(portalVisivel.props.hidden, false)
+assert.equal(portalVisivel.props.inert, false)
+assert.equal(portalVisivel.props.style.display, 'contents')
+const superficieVisivel = superficieDoPortal(portalVisivel)
+assert.equal(superficieVisivel.type, superficieOculta.type)
+assert.equal(superficieVisivel.key, superficieOculta.key, 'trocar visibilidade não troca a identidade da superfície')
+janelaVisibilidade.props = superficieVisivel.props; janelaVisibilidade.render()
+assert.equal(janelaVisibilidade.focos, 1, 'ação de mostrar entrega o foco pedido')
+assert.equal(listeners.has('resize'), true)
+janelaVisibilidade.props = superficieOculta.props; janelaVisibilidade.render()
+assert.equal(janelaVisibilidade.focos, 1, 'ocultar não devolve foco a controle escondido')
+assert.equal(listeners.has('resize'), false)
+assert.deepEqual(janelaVisibilidade.tree.props.style, geometriaAntes, 'ocultar e mostrar conservam a geometria')
+assert.equal(janelaVisibilidade.tree.props.children[2].props.children, 'conteúdo preservado')
+janelaVisibilidade.props = superficieVisivel.props; janelaVisibilidade.render()
+assert.equal(janelaVisibilidade.focos, 1, 'voltar à Conversa não repete o pedido de foco já atendido')
+janelaVisibilidade.props = { ...superficieVisivel.props, focar: 2 }; janelaVisibilidade.render()
+assert.equal(janelaVisibilidade.focos, 2, 'uma nova abertura manual ou pela Home ainda pede foco')
+janelaVisibilidade.unmount(); controleVisibilidade.unmount()
+console.log('ok portal hidden/inert conserva identidade, conteúdo e geometria sem medir nem focar escondido')
 const { NotasDoCliente } = await import('../src/features/ficha-cliente/NotasDoCliente.jsx')
 const notas = Array.from({ length: 120 }, (_, i) => ({ id: `real-${i}`, texto: `Conteúdo confirmado ${i}`, autor: 'Operador' }))
 const notasMontadas = montar(NotasDoCliente, { conversaId: 'muitas-notas', notas })
@@ -293,7 +365,7 @@ guardarPainelMovel(escopoA, `nota:${clienteId}:${notaId}`, geometriaMovida)
 function conferirPainelDaNota(elemento) {
   const notaHost = montar(elemento.type, elemento.props)
   const portal = notaHost.tree.type(notaHost.tree.props)
-  const superficie = montar(portal.type, portal.props)
+  const superficie = montarPortal(portal)
   assert.deepEqual({ x: superficie.tree.props.style.left, y: superficie.tree.props.style.top,
     largura: superficie.tree.props.style.width, altura: superficie.tree.props.style.height },
   { x: 471, y: 157, largura: 347, altura: 224 }, 'NotaNaMesa + hook + superfície conservam geometria salva, sem reaplicar origem930/399')
@@ -406,4 +478,4 @@ const mesaB = montar(mesaBElemento.type, mesaBElemento.props)
 assert.equal(mesaB.tree.props.children[1].length, 0)
 mesaB.unmount()
 console.log('ok logout limpa a mesa e a conta seguinte não herda texto nem portais')
-console.log('17 grupos de comportamento do painel e da mesa aprovados.')
+console.log('Provas de comportamento do painel e da mesa aprovadas.')

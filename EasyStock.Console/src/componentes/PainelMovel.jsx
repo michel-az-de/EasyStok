@@ -9,10 +9,11 @@ export const usePainelMovel = useControlePainelMovel
 
 const movimentoReduzido = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 
-function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaInicial, className, classeCorpo, focar, aoRecolher, atributos, alinharDireita }) {
+function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaInicial, className, classeCorpo, focar, aoRecolher, atributos, alinharDireita, visivel }) {
   const ajuda = useId()
   const papel = useRef(null)
   const alca = useRef(null)
+  const focoAtendido = useRef(null)
   const gesto = useRef(null)
   const origemTeclado = useRef(null)
   const guardar = controle.guardar
@@ -41,9 +42,15 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
     if (salvar) controle.guardar(proxima)
     return proxima
   }
-  useEffect(() => { if (focar) alca.current?.focus({ preventScroll: true }) }, [focar])
+  useEffect(() => {
+    if (!focar) { focoAtendido.current = focar; return }
+    if (!visivel || focoAtendido.current === focar || !alca.current) return
+    alca.current.focus({ preventScroll: true })
+    focoAtendido.current = focar
+  }, [focar, visivel])
   useEffect(() => () => { clearTimeout(timer.current); limparFoco.current?.() }, [])
   useLayoutEffect(() => {
+    if (!visivel) return
     const ajustar = () => {
       const dimensoes = tamanho(), limitada = limitarPainelMovel(atual.current, dimensoes, janelaAtual())
       const minimo = (papel.current?.querySelector?.('header')?.getBoundingClientRect().height || 40)
@@ -62,7 +69,7 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
     }
     ajustar()
     return observarAreaDosPaineis(ajustar, papel.current)
-  }, [guardar, tamanho])
+  }, [guardar, tamanho, visivel])
 
   function iniciar(e, modo) {
     if (saindo || (e.pointerType === 'mouse' && e.button !== 0)) return
@@ -147,8 +154,10 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
   </aside>
 }
 
-export function PainelMovel({ controle, titulo, children, larguraInicial = 360, alturaInicial, className, classeCorpo, focar = controle.foco, aoRecolher, atributos, alinharDireita = false }) {
+export function PainelMovel({ controle, titulo, children, larguraInicial = 360, alturaInicial, className, classeCorpo, focar = controle.foco, aoRecolher, atributos, alinharDireita = false, visivel = true }) {
   if (!controle.solto || typeof document === 'undefined') return null
-  return createPortal(<SuperficieMovel key={controle.chave} controle={controle} titulo={titulo} larguraInicial={larguraInicial}
-    alturaInicial={alturaInicial} className={className} classeCorpo={classeCorpo} focar={focar} aoRecolher={aoRecolher} atributos={atributos} alinharDireita={alinharDireita}>{children}</SuperficieMovel>, document.body, controle.chave)
+  return createPortal(<div hidden={!visivel} inert={!visivel} style={{ display: visivel ? 'contents' : 'none' }}>
+    <SuperficieMovel key={controle.chave} controle={controle} titulo={titulo} larguraInicial={larguraInicial}
+      alturaInicial={alturaInicial} className={className} classeCorpo={classeCorpo} focar={focar} aoRecolher={aoRecolher} atributos={atributos} alinharDireita={alinharDireita} visivel={visivel}>{children}</SuperficieMovel>
+  </div>, document.body, controle.chave)
 }

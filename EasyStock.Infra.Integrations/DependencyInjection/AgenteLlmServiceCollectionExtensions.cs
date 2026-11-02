@@ -30,6 +30,7 @@ public static class AgenteLlmServiceCollectionExtensions
             client.DefaultRequestHeaders.UserAgent.ParseAdd("EasyStok/1.0 (+https://easystok.online)");
         }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
+        services.AddEasyStockIntegrationResilience(); // #2177: o agente passa pelo disjuntor da Anthropic
         services.AddHttpClient<IAgenteLlmClient, AnthropicMessagesClient>((sp, client) =>
         {
             var opts = sp.GetRequiredService<IOptions<AnthropicAgenteOptions>>().Value;

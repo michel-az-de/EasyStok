@@ -36,6 +36,8 @@ public class InicioPrevistoNaFilaTests
             "nasce Rascunho/AguardandoPagamento; entra na fila pelo ConfirmarPagamentoPedidoUseCase",
         ["EasyStock.Application/UseCases/Storefront/Checkout/IniciarCheckoutGuestUseCase.cs"] =
             "ponte #1306: sem janela nasce AguardandoAprovacaoBaba; atraso só vale em Aguardando",
+        ["EasyStock.Application/UseCases/Storefront/Aprovacao/AprovarPedidoStorefrontUseCase.cs"] =
+            "só AguardandoAprovacaoBaba -> AprovadoBaba (#2174 trocou a atribuição direta por MudarStatus)",
     };
 
     [Fact]

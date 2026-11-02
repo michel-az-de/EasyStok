@@ -5,4 +5,6 @@
 .fechar { border-color: transparent; font-size: 1.25rem; }
 .usar kbd { margin-left: var(--e-1); font-size: var(--t-minimo); }
 .usar:focus-visible, .fechar:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.compacta .texto { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.compacta .usar { max-width: 7.5rem; }
 @media (pointer: coarse) { .usar kbd { display: none; } }

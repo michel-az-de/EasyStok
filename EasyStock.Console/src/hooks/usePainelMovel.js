@@ -44,7 +44,9 @@ export function usePainelMovel(escopoId, painelId, { posicaoInicial } = {}) {
       && (!no.getClientRects || no.getClientRects().length > 0)
     const reserva = [...(globalThis.document?.querySelectorAll?.('[data-foco-reserva]') ?? [])]
       .find(no => no.getAttribute('data-foco-reserva') === chave && podeFocar(no))
-    const destino = podeFocar(abridor.current) ? abridor.current : reserva
+    const destino = (podeFocar(abridor.current) ? abridor.current : reserva)
+      ?? ['[data-area-envio] textarea:not(:disabled)', '[data-area-envio] button:not(:disabled)']
+        .flatMap(seletor => [...(globalThis.document?.querySelectorAll?.(seletor) ?? [])]).find(podeFocar)
     if (!destino) return false
     destino.focus({ preventScroll: true })
     return true

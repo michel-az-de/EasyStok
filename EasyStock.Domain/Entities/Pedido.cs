@@ -288,8 +288,13 @@ namespace EasyStock.Domain.Entities
         public ICollection<PedidoEvento> Eventos { get; set; } = new List<PedidoEvento>();
         public ICollection<PedidoPagamento> Pagamentos { get; set; } = new List<PedidoPagamento>();
 
-        public static Pedido Criar(Guid empresaId, Cliente? cliente = null, Guid? lojaId = null, string? origem = "web")
+        public static Pedido Criar(
+            Guid empresaId, Cliente? cliente = null, Guid? lojaId = null, string? origem = "web",
+            StatusPedido statusInicial = StatusPedido.Aguardando)
         {
+            if (!PedidoStateMachine.Entradas.Contains(statusInicial))
+                throw new RegraDeDominioVioladaException($"Pedido não pode nascer em {statusInicial}.");
+
             var agora = DateTime.UtcNow;
             return new Pedido
             {
@@ -300,7 +305,7 @@ namespace EasyStock.Domain.Entities
                 ClienteNome = cliente?.Nome,
                 ClienteApt = cliente?.Apt,
                 ClienteTelefone = cliente?.Telefone,
-                Status = StatusPedidoMapper.Aguardando,
+                Status = StatusPedidoMapper.Format(statusInicial),
                 Total = Dinheiro.Zero,
                 Origem = origem,
                 CriadoEm = agora,

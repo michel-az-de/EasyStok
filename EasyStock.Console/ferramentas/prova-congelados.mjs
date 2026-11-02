@@ -181,11 +181,15 @@ function exigirGate(arquivo, chave, literais) {
   return ocorrencias
 }
 
-confere('(c) Lalamove nas Entregas, na Ficha e na Comanda só existe atrás de congelado(\'lalamove\')', () => {
-  assert.ok(congelado('lalamove'), 'a chave lalamove está na lista')
-  assert.ok(exigirGate('features/entregas/EntregasDoDia.jsx', 'lalamove', ['Organizar transportes', 'Cotar esta janela', 'lalamove']) >= 2)
-  assert.ok(exigirGate('features/ficha-cliente/BlocoFreteApi.jsx', 'lalamove', ['web\\.lalamove\\.com', 'Consultar Lalamove', 'lalamove']) >= 3)
-  assert.ok(exigirGate('features/ficha-cliente/ComandaDoCliente.jsx', 'lalamove', ['lalamove']) >= 1)
+confere('(c) Lalamove descongelada (#2162): a comparação só na demonstração; o link externo não volta à Ficha nem à comanda', () => {
+  assert.ok(!congelado('lalamove'), 'a chave lalamove saiu da lista (decisão do Felipe, 31/10)')
+  const dia = semComentarios(fonte('features/entregas/EntregasDoDia.jsx'))
+  assert.match(dia, /\{demonstracao && <Botao[^\n]*Organizar transportes/, 'Organizar transportes só na loja de demonstração')
+  assert.match(dia, /aoCotar=\{demonstracao \?/, 'Cotar esta janela só na loja de demonstração')
+  for (const arquivo of ['features/ficha-cliente/BlocoFreteApi.jsx', 'features/ficha-cliente/ComandaDoCliente.jsx']) {
+    // Homologação B5 (#1839): o pedido do cliente não repete o atalho da Lalamove.
+    assert.doesNotMatch(semComentarios(fonte(arquivo)), /web\.lalamove\.com|Consultar Lalamove/i, `${arquivo} sem link externo da Lalamove`)
+  }
 })
 
 const { NOMES_DE_CANAL } = await import('../src/infra/catalogo.js')

@@ -45,7 +45,7 @@ public class CadeiaGeocodingTests
     }
 
     private static TomTomGeocodingClient TomTom(Resposta http) =>
-        new(new HttpClient(http) { BaseAddress = new Uri("https://tomtom.test/") }, "chave-de-teste", NullLogger<TomTomGeocodingClient>.Instance);
+        new(new HttpClient(http) { BaseAddress = new Uri("https://tomtom.test/") }, "chave-de-teste", PipelinesDeTeste.Reais(), NullLogger<TomTomGeocodingClient>.Instance);
 
     private static NominatimGeocodingClient Nominatim(Resposta http) =>
         new(new HttpClient(http) { BaseAddress = new Uri("https://nominatim.test/") }, NullLogger<NominatimGeocodingClient>.Instance);
@@ -67,7 +67,8 @@ public class CadeiaGeocodingTests
         Assert.NotNull(r);
         Assert.True(r!.Confiavel);
         Assert.Equal(-23.5615, r.Lat, 4);
-        Assert.Equal(1, tomtom.Chamadas);
+        // #2177: falha passageira (5xx, 429) repete 1 vez na TomTom antes de cair; 403 não repete.
+        Assert.Equal(falha == HttpStatusCode.Forbidden ? 1 : 2, tomtom.Chamadas);
         Assert.Equal(1, nominatim.Chamadas);
     }
 

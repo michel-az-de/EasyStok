@@ -108,6 +108,90 @@ public sealed class CorridaExternaPostgresTests(PostgreSqlDatabaseFixture fixtur
         (await act.Should().ThrowAsync<Exception>()).Which.ToString().Should().Contain("ck_corridas_externas_custo");
     }
 
+    [SkippableFact]
+    public async Task Corrida_da_api_grava_e_le_status_motorista_e_id_do_provedor()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = Guid.NewGuid();
+        var viagem = await SemearViagemComFreteAsync(empresaId, freteReais: 12m);
+        var corrida = CorridaExterna.SolicitarPorApi(viagem, EmpresaEntregador.Lalamove, VeiculoCorrida.Moto, "cot-1", 1890, Operadora, Agora);
+        corrida.ConfirmarNoProvedor($"ord-{Guid.NewGuid():N}", "https://share.lalamove.com/x");
+        corrida.AplicarStatus(StatusCorrida.MotoristaACaminho, Agora.AddMinutes(1));
+        corrida.AtribuirMotorista("drv-9", "Carlos", "11988887777", "XYZ9A88");
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresaId);
+            db.CorridasExternas.Add(corrida);
+            await db.SaveChangesAsync();
+        }
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(empresaId);
+        var lida = await new CorridaExternaRepository(leitura).ObterAsync(empresaId, corrida.Id);
+        lida!.Status.Should().Be(StatusCorrida.MotoristaACaminho);
+        lida.Origem.Should().Be(OrigemCorridaExterna.Api);
+        lida.IdExterno.Should().Be(corrida.IdExterno);
+        lida.MotoristaPlaca.Should().Be("XYZ9A88");
+        lida.MotoristaAtribuidoEm.Should().Be(Agora.AddMinutes(1));
+        lida.Ativa.Should().BeTrue();
+    }
+
+    [SkippableFact]
+    public async Task Segunda_corrida_em_curso_na_mesma_viagem_e_barrada_no_banco()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = Guid.NewGuid();
+        var viagem = await SemearViagemComFreteAsync(empresaId, freteReais: 12m);
+        var primeira = CorridaExterna.SolicitarPorApi(viagem, EmpresaEntregador.Lalamove, VeiculoCorrida.Moto, "cot-1", 1890, Operadora, Agora);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresaId);
+            db.CorridasExternas.Add(primeira);
+            // Corrida manual não tem status: não conta como em curso.
+            db.CorridasExternas.Add(CorridaExterna.RegistrarManual(viagem, EmpresaEntregador.NoveNove, 100, null, Operadora, Agora));
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresaId);
+            db.CorridasExternas.Add(CorridaExterna.SolicitarPorApi(viagem, EmpresaEntregador.Lalamove, VeiculoCorrida.Carro, "cot-2", 2500, Operadora, Agora));
+            var act = () => db.SaveChangesAsync();
+            (await act.Should().ThrowAsync<DbUpdateException>()).Which.ToString().Should().Contain("ux_corridas_externas_viagem_ativa");
+        }
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresaId);
+            var rastreada = await db.CorridasExternas.SingleAsync(c => c.Id == primeira.Id);
+            rastreada.FalharSolicitacao(Agora);
+            db.CorridasExternas.Add(CorridaExterna.SolicitarPorApi(viagem, EmpresaEntregador.Lalamove, VeiculoCorrida.Carro, "cot-2", 2500, Operadora, Agora));
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [SkippableFact]
+    public async Task Id_do_pedido_no_provedor_nao_se_repete()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = Guid.NewGuid();
+        var uma = await SemearViagemComFreteAsync(empresaId, freteReais: 12m);
+        var outra = await SemearViagemComFreteAsync(empresaId, freteReais: 12m, criarEmpresa: false);
+        var idExterno = $"ord-{Guid.NewGuid():N}";
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresaId);
+        foreach (var viagem in new[] { uma, outra })
+        {
+            var corrida = CorridaExterna.SolicitarPorApi(viagem, EmpresaEntregador.Lalamove, VeiculoCorrida.Moto, "cot", 1000, Operadora, Agora);
+            corrida.ConfirmarNoProvedor(idExterno, null);
+            db.CorridasExternas.Add(corrida);
+        }
+
+        var act = () => db.SaveChangesAsync();
+
+        (await act.Should().ThrowAsync<DbUpdateException>()).Which.ToString().Should().Contain("ux_corridas_externas_provedor_id_externo");
+    }
+
     private async Task<Viagem> SemearViagemComFreteAsync(Guid empresaId, decimal freteReais, bool desfazer = false, bool criarEmpresa = true)
     {
         await using var db = fixture.CreateDbContext();

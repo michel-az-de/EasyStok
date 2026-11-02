@@ -319,6 +319,7 @@
   let lastAutomaticCheck = 0;
   let pendingContent = '';
   let checkingConnection = false;
+  let openingWorkspace = false;
   let confirmingImport = false;
   let undoingImport = false;
   let migratingImport = false;
@@ -356,6 +357,7 @@
       </div>
       <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p></div>
       <div class="pilot-home-controls">
+        ${tileButton('workspace', 'Atendimento', 'mensagem', 'support', 'pilotWorkspaceButton')}
         ${tileButton('pair', 'Conectar', 'link', 'support', 'pilotPairButton')}
         ${tileButton('printers', 'Impressoras', 'printer')}
         ${tileButton('settings', 'Configurações', 'settings')}
@@ -865,6 +867,16 @@
       if (action === 'notices') openNotices();
       if (action === 'production') { closeHome(); root.go('producao'); }
       if (action === 'local-orders') { closeHome(); root.go('pedidos'); }
+      if (action === 'workspace') {
+        if (openingWorkspace) return;
+        if (root.navigator?.onLine === false) throw new Error('Atendimento precisa de conexão. Confira a internet e tente novamente.');
+        const app = native();
+        if (!app?.openWorkspace) throw new Error('Atualize o APK para abrir o Atendimento neste aparelho.');
+        const button = doc.getElementById('pilotWorkspaceButton');
+        openingWorkspace = true; button.disabled = true;
+        try { await app.openWorkspace(); }
+        finally { openingWorkspace = false; button.disabled = false; }
+      }
       if (action === 'printers') { closeHome(); root.openPrinterPicker(); }
       if (action === 'settings') { closeHome(); root.openAjustes(); }
       if (action === 'import-pwa') {

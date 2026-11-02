@@ -364,6 +364,10 @@
   min-height: var(--toque); border-radius: var(--r-1);
   font-size: var(--t-apoio); font-weight: 600;
 }
+.acoes > button.botaoNota {
+  width: auto; min-width: var(--toque); padding-inline: var(--e-2); gap: var(--e-1);
+  font-size: var(--t-apoio); white-space: nowrap;
+}
 
 /* Glifo real do canal (banca, item 24). */
 .canal_whatsapp { color: var(--c-whatsapp); }
