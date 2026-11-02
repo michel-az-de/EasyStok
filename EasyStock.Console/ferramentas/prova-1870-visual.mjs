@@ -77,7 +77,7 @@ confere('1  o tema do trilho do Balcão vai para o menu da conta (em 1280x720 o 
 confere('2  módulo com tela de operação mostra as telas na barra e esconde o menu lateral', () => {
   const moldura = fonte('features/hall/MolduraDoModulo.jsx')
   assert.match(moldura, /const telasNaBarra = telas\.length > 1 && telas\.some\(\(t\) => t\.tipo === TELA_OPERACAO\)/)
-  assert.match(moldura, /<nav className=\{css\.telasNaBarra\} aria-label=\{`Telas de \$\{modulo\.nome\}`\}>/)
+  assert.match(moldura, /<nav className=\{css\.telasNaBarra\} aria-label=\{`Telas de \$\{modulo\.nome\}`\} ref=\{abasRef\}>/)
   assert.equal((moldura.match(/semMenu=\{telasNaBarra\}/g) ?? []).length, 2, 'lateral e menu do tablet')
   assert.match(fonte('features/hall/MenuDosModulos.jsx'), /\{!semMenu && <nav className=\{css\.menu\}/)
 })
