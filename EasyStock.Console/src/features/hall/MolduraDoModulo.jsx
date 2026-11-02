@@ -5,7 +5,7 @@
 //
 // `operacao`: tela de trabalho (Cozinha, Entregas) ocupa a altura toda; tela de
 // ajuste ganha título e coluna de leitura. Módulo sem tela mostra "Em breve".
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
@@ -50,6 +50,16 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
   const modulo = moduloPorId(moduloId)
   const telas = telasDoMenu(modulo, { fonteApi, acoes })
   const tela = telas.find((t) => t.id === telaId) ?? null
+  const abasRef = useRef(null)
+  useEffect(() => {
+    const faixa = abasRef.current
+    if (!faixa) return
+    const revelar = () => faixa.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    revelar()
+    const observador = new ResizeObserver(revelar)
+    observador.observe(faixa)
+    return () => observador.disconnect()
+  }, [moduloId, tela?.id])
   const telaSemAcesso = !tela && Boolean(telaId) && telasDoMenu(modulo, { fonteApi }).some((t) => t.id === telaId)
   // #1921: a rota direta para a tela que o perfil não abre cai na primeira tela viva do módulo.
   const primeiraViva = telaSemAcesso ? telas[0]?.id ?? null : null
@@ -92,7 +102,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
             <IconeDoModulo modulo={modulo} /> {modulo.nome}
           </span>
           {telasNaBarra && (
-            <nav className={css.telasNaBarra} aria-label={`Telas de ${modulo.nome}`}>
+            <nav className={css.telasNaBarra} aria-label={`Telas de ${modulo.nome}`} ref={abasRef}>
               {telas.map((item) => <a key={item.id} href={hashDoModulo(modulo.id, item.id)} className={`${css.telaNaBarra} ${item.id === telaId ? css.telaAtiva : ''}`} aria-current={item.id === telaId ? 'page' : undefined}>{item.rotulo}</a>)}
             </nav>
           )}

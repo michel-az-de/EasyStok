@@ -149,17 +149,33 @@ await provar('clipboard ausente ou recusado permite cópia manual sem alegar suc
   assert.equal(await copiarDiagnostico('fixture', undefined), false)
   assert.equal(await copiarDiagnostico('fixture', { writeText: () => Promise.reject(new Error('permissão recusada fixture')) }), false)
 })
+const documentoDeFoco = (dialogos, destino) => ({
+  querySelector: seletor => seletor === 'dialog[open]' ? dialogos[0] ?? null : seletor === '[data-inicio-tela]' ? destino : null,
+  querySelectorAll: seletor => { assert.equal(seletor, 'dialog[open]'); return dialogos },
+})
+const dialogoDeFoco = modal => ({ getAttribute: atributo => { assert.equal(atributo, 'aria-modal'); return modal } })
 await provar('foco de navegação chega ao início real da tela e não altera o hash', () => {
   let foco = null
-  const documento = { querySelector: seletor => seletor === '[data-inicio-tela]' ? { focus: opcoes => { foco = opcoes } } : null }
+  const documento = documentoDeFoco([], { focus: opcoes => { foco = opcoes } })
   assert.equal(focarInicioDaTela(documento), true)
   assert.deepEqual(foco, { preventScroll: true })
 })
 await provar('foco não rouba interação de modal aberto nem tenta focar tela inexistente', () => {
-  let consultas = 0
-  assert.equal(focarInicioDaTela({ querySelector: seletor => { consultas++; assert.equal(seletor, 'dialog[open]'); return {} } }), false)
-  assert.equal(consultas, 1)
-  assert.equal(focarInicioDaTela({ querySelector: () => null }), false)
+  for (const modal of [null, 'true']) {
+    assert.equal(focarInicioDaTela(documentoDeFoco([dialogoDeFoco(modal)], { focus: () => assert.fail('modal conserva o foco') })), false)
+  }
+  assert.equal(focarInicioDaTela(documentoDeFoco([], null)), false)
+})
+await provar('Ficha explicitamente não modal permite pular ao conteúdo sem ignorar modal sobreposto', () => {
+  let focos = 0
+  const destino = { focus: opcoes => { assert.deepEqual(opcoes, { preventScroll: true }); focos++ } }
+  const ficha = dialogoDeFoco('false')
+  assert.equal(focarInicioDaTela(documentoDeFoco([ficha], destino)), true)
+  assert.equal(focos, 1)
+  for (const modal of [null, 'true']) {
+    assert.equal(focarInicioDaTela(documentoDeFoco([ficha, dialogoDeFoco(modal)], destino)), false)
+  }
+  assert.equal(focos, 1, 'o modal sobre a Ficha mantém a interação')
 })
 
 const resumo = { provas: resultados.length, aprovadas: resultados.length, telasCatalogadas: telasCatalogadas.length, resultados,

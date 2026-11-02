@@ -70,6 +70,7 @@
 }
 @media (max-width: 640px) {
   .barra { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--e-2); }
+  .telaNaBarra { flex: 0 0 auto; max-width: 100%; white-space: normal; }
   .contexto { grid-row: 1; grid-column: 1; }
   .acoes { display: contents; }
   .acoes > [role='radiogroup'] { grid-row: 2; grid-column: 1 / -1; justify-self: start; }
