@@ -229,6 +229,24 @@ await confere('F12. "Gerar cobrança e enviar" assume antes de pedir o pedido ao
   await Promise.resolve(api.gerarCobranca('c1', estadoRef.current.conversas[0].pedido, null, true)).catch(() => {})
   assert.equal(chamadas[0], 'POST assumir')
 })
+await confere('F12. trocar para o link online manda o link na conversa: assume antes', async () => {
+  const chamadas = rede()
+  const { api, estadoRef } = montar(false)
+  estadoRef.current.conversas[0].pedido = { numero: '7', pedidoId: 'p1', meio: 'maquininha', estado: 'aguardando', janela: 'j1|2026-11-05', itens: [{ sku: 'LAS', qtd: 1 }] }
+  await Promise.resolve(api.gerarCobranca('c1', estadoRef.current.conversas[0].pedido, 'pix', true)).catch(() => {})
+  assert.equal(chamadas[0], 'POST assumir')
+  chamadas.length = 0
+  await Promise.resolve(api.alterarMeioPagamento('c1', 'pix')).catch(() => {})
+  assert.equal(chamadas.filter((c) => c === 'POST assumir').length, 0, 'já assumida, não assume de novo')
+})
+await confere('F12. trocar para pagar na entrega não fala com o cliente: não assume', async () => {
+  const chamadas = rede()
+  const { api, estadoRef } = montar(false)
+  estadoRef.current.conversas[0].pedido = { numero: '7', pedidoId: 'p1', meio: 'pix', estado: 'aguardando', janela: 'j1|2026-11-05', itens: [{ sku: 'LAS', qtd: 1 }] }
+  await Promise.resolve(api.alterarMeioPagamento('c1', 'maquininha')).catch(() => {})
+  assert.equal(chamadas.includes('POST assumir'), false)
+  assert.equal(chamadas.length > 0, true, 'a troca foi ao servidor')
+})
 await confere('F12. gerar a cobrança SEM enviar ao cliente não assume', async () => {
   const chamadas = rede()
   const { api, estadoRef } = montar(false)
@@ -441,6 +459,44 @@ await confere('F29. nota proposta pela IA com rascunho já aberto é anexada, se
   assert.equal(terceira.chave, segunda.chave)
   assert.equal(terceira.versao, 1, 'sem texto novo a versão não anda')
   assert.equal(notas.abrir('c1', 'Maria').texto, 'Primeiro ajustado\n\nProposta da IA', 'abrir sem proposta só retoma')
+})
+await confere('F29. proposta que é só um pedaço do que está escrito ainda entra na nota', () => {
+  const notas = criarRascunhosDeNotas('e1:u1', armazenamento())
+  notas.abrir('c1', 'Maria', 'Sem cebola e sem alho')
+  const { texto, versao } = notas.abrir('c1', 'Maria', 'Sem cebola')
+  assert.equal(texto, 'Sem cebola e sem alho\n\nSem cebola')
+  const repetida = notas.abrir('c1', 'Maria', 'Sem cebola e sem alho')
+  assert.deepEqual([repetida.texto, repetida.versao], [texto, versao], 'o parágrafo inteiro repetido não duplica')
+})
+await confere('F8. abrir com a moldura desmontada: quem montar primeiro recebe a abertura, uma vez', async () => {
+  const { criarCanalDeAbertura } = await import('../src/aplicacao/aberturaDeConversa.js')
+  const canal = criarCanalDeAbertura(new EventTarget())
+  canal.anunciar('c9')
+  const moldura = []
+  const lista = []
+  const sairMoldura = canal.inscrever((id) => moldura.push(id))
+  const sairLista = canal.inscrever((id) => lista.push(id))
+  assert.deepEqual([moldura, lista], [['c9'], ['c9']], 'os dois da mesma montagem recebem')
+  await new Promise((r) => setTimeout(r, 5))
+  const tardio = []
+  const sairTardio = canal.inscrever((id) => tardio.push(id))
+  assert.deepEqual(tardio, [], 'quem monta depois não reabre')
+  canal.anunciar('c2')
+  assert.deepEqual([moldura, lista, tardio], [['c9', 'c2'], ['c9', 'c2'], ['c2']])
+  sairMoldura(); sairLista(); sairTardio()
+  await new Promise((r) => setTimeout(r, 5))
+  const novo = []
+  canal.inscrever((id) => novo.push(id))
+  assert.deepEqual(novo, [], 'com alguém ouvindo no anúncio não sobra pendência')
+})
+await confere('F9. ao trocar de conta a foto em espera da conta anterior sai da memória', async () => {
+  const { anexosEmEspera } = await import('../src/aplicacao/anexosEmEspera.js')
+  anexosEmEspera.guardar('e1:u1:c1', { arte: 'a' })
+  anexosEmEspera.guardar('e1:u2:c1', { arte: 'b' })
+  anexosEmEspera.manterSo('e1:u2')
+  assert.equal(anexosEmEspera.ler('e1:u1:c1'), null)
+  assert.deepEqual(anexosEmEspera.ler('e1:u2:c1'), { arte: 'b' })
+  anexosEmEspera.guardar('e1:u2:c1', null)
 })
 await confere('F10. o rascunho da nota sobrevive ao F5 (mesma sessão e mesma identidade)', () => {
   const guarda = armazenamento()

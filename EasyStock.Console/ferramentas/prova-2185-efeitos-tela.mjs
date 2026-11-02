@@ -124,7 +124,12 @@ function Cena() {
   const tamanho = useTamanhoTela()
   const [estado, despachar] = useReducer(reducer, null, iniciar)
   const [ocultoNoCelular, setOculto] = useState(false)
-  const [avisos, setAvisos] = useState(q.get('aviso') === '1' ? [{ id: 'av1', tipo: TIPOS_DE_AVISO.MENSAGEM_NOVA, titulo: 'Cliente meu', corpo: 'Oi de novo', conversaId: 'meu' }] : [])
+  const [avisos, setAvisos] = useState(q.get('aviso') === '1' ? [
+    { id: 'av1', tipo: TIPOS_DE_AVISO.MENSAGEM_NOVA, titulo: 'Cliente meu', corpo: 'Oi de novo', conversaId: 'meu' },
+    ...(q.get('dois') ? [{ id: 'av2', tipo: TIPOS_DE_AVISO.MENSAGEM_NOVA, titulo: 'Cliente lead', corpo: 'Outro aviso', conversaId: 'lead' }] : []),
+  ] : [])
+  const [nomeSincronizado, setNomeSincronizado] = useState(null)
+  window.sincronizarNome = setNomeSincronizado
   window.trocar = (id) => despachar({ tipo: A.SELECIONAR_CONVERSA, id })
   window.esconder = setOculto
   window.filtrar = (chave, valor) => despachar({ tipo: A.MUDAR_FILTRO, chave, valor })
@@ -171,7 +176,7 @@ function Cena() {
     visiveis, encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros, usuario),
     bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros, usuario),
     pagamentosNaoVistos: new Set(), avisosNaTela: avisos, dispensarAviso: (id) => setAvisos((a) => a.filter((x) => x.id !== id)),
-    pausarAvisos: () => chamadas.push(['pausarAvisos']), retomarAvisos: () => chamadas.push(['retomarAvisos']), permissaoNotificacao: 'granted', fidelidade: { resgatesPorCadastro: {}, config: {}, cupons: [], recompensas: [], sorteios: [] },
+    pausarAvisos: () => chamadas.push(['pausarAvisos']), retomarAvisos: () => chamadas.push(['retomarAvisos']), permissaoNotificacao: q.get('dois') ? 'default' : 'granted', fidelidade: { resgatesPorCadastro: {}, config: {}, cupons: [], recompensas: [], sorteios: [] },
     encerrando: estado.ui.encerrando, encerrandoNumero: null,
     lembretes: [], vistos: {}, eventosSonoros: [], consultaLembretes: { carregar: noop },
   }
@@ -180,7 +185,7 @@ function Cena() {
   return (
     <ContextoAcessoModulos.Provider value={acesso}><ContextoEstado value={ctx}><ContextoAcoes value={acoes}><ContextoCatalogo value={catalogo}>
       {cena === 'encerrar' && <ModalEncerrar conversaId={q.get('conversa') ?? 'robo'} aoFechar={acoes.fecharEncerramento} />}
-      {cena === 'ficha' && selecionada && <ModalCliente conversa={selecionada} aoFechar={() => chamadas.push(['fecharFicha'])} />}
+      {cena === 'ficha' && selecionada && <ModalCliente conversa={nomeSincronizado ? { ...selecionada, nome: nomeSincronizado } : selecionada} aoFechar={() => chamadas.push(['fecharFicha'])} />}
       {cena === 'bloco' && selecionada && (
         <BlocoColaborativoIa
           bloco={{ id: 'b1', geracaoId: 'g1', tipo: 'resposta', acao: 'rascunho', texto: 'Confirmo às 12h.', conversaId: selecionada.id, identidadeSessao: identidadeDaMontagem() }}
@@ -477,6 +482,18 @@ try {
     await outra.p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'fecharFicha'))
     await outra.ctx.close()
   })
+  await confere('F16. Ficha: dado que chega da sincronização sem ninguém digitar não segura a janela', async () => {
+    const { ctx, p } = await abrir('cena=ficha&inicial=lead')
+    const janela = p.getByRole('dialog', { name: 'Ficha' })
+    await janela.waitFor()
+    await p.evaluate(() => window.sincronizarNome('Nome que veio do WhatsApp'))
+    await janela.getByText('Nome que veio do WhatsApp').first().waitFor()
+    await janela.getByLabel('Endereço', { exact: true }).first().waitFor()
+    await p.keyboard.press('Escape')
+    await p.waitForTimeout(200)
+    assert.deepEqual((await chamadasDe(p)).filter((c) => c[0] === 'fecharFicha'), [['fecharFicha']])
+    await ctx.close()
+  })
 
   // --- F22: "Reabrindo…" ------------------------------------------------------------------------------------------------------
   await confere('F22. "Reabrindo…" é da conversa que pediu; a outra concluída segue com o botão ligado', async () => {
@@ -571,6 +588,18 @@ try {
     await p.waitForFunction(() => window.chamadas.filter((c) => c[0] === 'pausarAvisos').length === 2)
     await p.getByRole('searchbox').focus()
     await p.waitForFunction(() => window.chamadas.filter((c) => c[0] === 'retomarAvisos').length === 2)
+    await ctx.close()
+  })
+  await confere('F28. clicar na pilha com o mouse não deixa os avisos presos: tirar o ponteiro retoma', async () => {
+    const { ctx, p } = await abrir('inicial=robo&aviso=1&dois=1')
+    await esperarPainel(p)
+    const pilha = p.getByRole('status', { name: 'Avisos do atendimento' })
+    await pilha.getByRole('button', { name: 'Avisar também com o console minimizado' }).click()
+    await p.mouse.move(2, 2)
+    await p.waitForTimeout(300)
+    const eventos = (await chamadasDe(p)).map((c) => c[0]).filter((n) => n.endsWith('Avisos'))
+    assert.deepEqual(eventos.slice(0, 1), ['pausarAvisos'], 'o ponteiro pausou')
+    assert.equal(eventos.at(-1), 'retomarAvisos', 'o foco do clique não segura a pilha')
     await ctx.close()
   })
 

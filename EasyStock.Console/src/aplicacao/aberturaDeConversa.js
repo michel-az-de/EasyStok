@@ -6,16 +6,39 @@ import { useEffect, useRef } from 'react'
 // conversa e a lista leva o foco ao campo de mensagem, como já fazia ao abrir pelo clique na lista (#2135).
 export const EVENTO_ABRIR_CONVERSA = 'easystok:abrir-conversa'
 
-export function anunciarAberturaDeConversa(id) {
-  try { globalThis.window?.dispatchEvent(new CustomEvent(EVENTO_ABRIR_CONVERSA, { detail: { id } })) } catch { /* sem janela */ }
+// O aviso na tela também abre a conversa a partir da Cozinha, de Entregas e do Hall, onde a moldura ainda vai
+// montar. Sem ninguém ouvindo, a abertura fica pendente para quem montar; todos da mesma montagem recebem
+// (moldura e lista) e ela some em seguida, para quem montar depois não reabrir nada.
+export function criarCanalDeAbertura(alvo) {
+  let ouvintes = 0
+  let pendente = null
+  return {
+    anunciar(id) {
+      if (ouvintes === 0) pendente = { id }
+      try { alvo?.dispatchEvent(new CustomEvent(EVENTO_ABRIR_CONVERSA, { detail: { id } })) } catch { /* sem janela */ }
+    },
+    inscrever(aoAbrir) {
+      const ouvir = (evento) => aoAbrir(evento.detail?.id ?? null)
+      ouvintes += 1
+      alvo?.addEventListener(EVENTO_ABRIR_CONVERSA, ouvir)
+      if (pendente) {
+        aoAbrir(pendente.id)
+        setTimeout(() => { pendente = null })
+      }
+      return () => {
+        ouvintes -= 1
+        alvo?.removeEventListener(EVENTO_ABRIR_CONVERSA, ouvir)
+      }
+    },
+  }
 }
+
+const canal = criarCanalDeAbertura(globalThis.window)
+
+export const anunciarAberturaDeConversa = (id) => canal.anunciar(id)
 
 export function useAoAbrirConversa(aoAbrir) {
   const atual = useRef(aoAbrir)
   useEffect(() => { atual.current = aoAbrir })
-  useEffect(() => {
-    const ouvir = (evento) => atual.current?.(evento.detail?.id ?? null)
-    window.addEventListener(EVENTO_ABRIR_CONVERSA, ouvir)
-    return () => window.removeEventListener(EVENTO_ABRIR_CONVERSA, ouvir)
-  }, [])
+  useEffect(() => canal.inscrever((id) => atual.current?.(id)), [])
 }

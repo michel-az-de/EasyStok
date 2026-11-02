@@ -16,8 +16,9 @@ import css from './atendimento.module.css'
 // `title` (#1442, #1870). Cadastro bloqueado é explicado junto do campo de mensagem.
 export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = true, acoes, aoAssumir }) {
   const [confirmando, setConfirmando] = useState(null)
-  const [assumindoId, setAssumindoId] = useState(null)
-  const emVoo = useRef(false)
+  // A barra não remonta ao trocar de conversa: o Assumir em andamento é de uma conversa só (#2185 F22).
+  const [assumindo, setAssumindo] = useState(() => new Set())
+  const emVoo = useRef(new Set())
   const resumo = resumoDoModo(conversa, pausado, bloqueada, { podeReabrir })
   // Com o Assistente desligado na loja, "pausado" e "volta" prometem o que não acontece.
   const semAssistente = automaticoDesligadoNaConversa(conversa) && resumo.chave !== MODOS.ENCERRADO && resumo.chave !== MODOS.LIGADO
@@ -26,12 +27,13 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
 
   async function assumir() {
     setConfirmando(null)
-    if (emVoo.current) return
-    emVoo.current = true
-    setAssumindoId(conversa.id)
+    const id = conversa.id
+    if (emVoo.current.has(id)) return
+    emVoo.current.add(id)
+    setAssumindo(new Set(emVoo.current))
     try { await aoAssumir() } finally {
-      emVoo.current = false
-      setAssumindoId(null)
+      emVoo.current.delete(id)
+      setAssumindo(new Set(emVoo.current))
     }
   }
 
@@ -42,7 +44,7 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
         <p className={mostrarLinha ? css.modoTexto : 'sr'} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>
         {acoes.assumir && (
           <Botao
-            variante="primario" className={css.modoAssumir} disabled={assumindoId === conversa.id}
+            variante="primario" className={css.modoAssumir} disabled={assumindo.has(conversa.id)}
             aria-haspopup={acoes.confirmarAoAssumir ? 'dialog' : undefined}
             onClick={acoes.confirmarAoAssumir ? () => setConfirmando({ conversaId: conversa.id }) : assumir}
           >

@@ -97,8 +97,11 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   // Troca de conversa: recarrega o rascunho do cadastro rápido e limpa avisos
   // que eram da conversa anterior. Só depende do id: editar o formulário não
   // pode disparar este reset a cada tecla.
+  const formCarregado = useRef(form)
   useEffect(() => {
-    setForm(estadoInicialDoForm(conversa))
+    const inicial = estadoInicialDoForm(conversa)
+    formCarregado.current = inicial
+    setForm(inicial)
     setAvisoEndereco(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversa.id])
@@ -128,8 +131,9 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const precisaCadastro = lead && (!cliente.telefone || !cliente.endereco) && !cliente.enderecoCapturado
     && !conversa.captura && !informado
   // #2185 (F16): o cadastro rápido digitado e ainda não salvo avisa a janela, que então não fecha com Esc nem
-  // com o toque no fundo (no tablet um toque fora é fácil e levava nome, telefone e endereço).
-  const formSujo = precisaCadastro && JSON.stringify(form) !== JSON.stringify(estadoInicialDoForm(conversa))
+  // com o toque no fundo (no tablet um toque fora é fácil e levava nome, telefone e endereço). Compara com o que
+  // foi carregado no formulário: dado que chega da sincronização sem ninguém digitar não é digitação a perder.
+  const formSujo = precisaCadastro && JSON.stringify(form) !== JSON.stringify(formCarregado.current)
   useEffect(() => { aoMudarSujo?.(formSujo) }, [formSujo, aoMudarSujo])
   const domicilio = mesmoDomicilio(conversa, conversas)
   const financeiro = resumoFinanceiro(historico)

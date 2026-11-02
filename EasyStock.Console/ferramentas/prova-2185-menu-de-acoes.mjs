@@ -65,7 +65,7 @@ function Cena() {
     listarAtendentes: async () => [], enviar: noop, transferirConversa: async () => ({ ok: true }),
     abrirEncerramento: (id) => chamadas.push('concluir:' + id),
     devolverAutomatico: (id) => chamadas.push('devolver:' + id),
-    assumirAtendimento: async (id) => { chamadas.push('assumir:' + id); await new Promise((r) => setTimeout(r, 60)); return true },
+    assumirAtendimento: async (id) => { chamadas.push('assumir:' + id); await new Promise((r) => setTimeout(r, window.atrasoAssumir ?? 60)); return true },
   }
   const estado = {
     selecionada: conversa, visiveis: [conversa], agora, automaticoPausado: { [conversa.id]: CENAS[cena].pausado },
@@ -240,6 +240,18 @@ try {
     await ctx.close()
   })
 
+  await confere('5. Assumir em andamento numa conversa não trava o Assumir de outra', async () => {
+    const { ctx, p } = await abrir('robo')
+    await p.evaluate(() => { window.atrasoAssumir = 800 })
+    await p.getByRole('button', { name: 'Assumir', exact: true }).click()
+    await p.evaluate(() => window.trocar('fila'))
+    await p.getByText('Passou para você').waitFor()
+    const assumir = p.getByRole('button', { name: 'Assumir', exact: true })
+    assert.equal(await assumir.isDisabled(), false)
+    await assumir.click()
+    assert.deepEqual(await chamadas(p), ['assumir:robo', 'assumir:fila'])
+    await ctx.close()
+  })
   await confere('6. o lugar do Assistente vem antes do menu em toda conversa', async () => {
     const { ctx, p } = await abrir('robo')
     for (const cena of ['robo', 'meu', 'fila', 'outro', 'robo']) {

@@ -2,7 +2,7 @@
 // conversa; a foto na prévia morria junto com o Composer (que remonta por conversa e ao girar o tablet).
 // Só memória da página: a foto pesa, e quem recarrega a página escolhe de novo. A chave inclui quem está
 // logado, para outra conta no mesmo aparelho não herdar a foto.
-import { identidadeDaSessao } from '../infra/api/sessao'
+import { EVENTO_SESSAO_ALTERADA, identidadeDaSessao, lerSessao } from '../infra/api/sessao'
 
 const memoria = new Map()
 
@@ -14,4 +14,10 @@ export const anexosEmEspera = {
     if (anexo) memoria.set(chave, anexo)
     else memoria.delete(chave)
   },
+  // Conta que saiu não deixa foto de cliente na memória da página, como os rascunhos de nota.
+  manterSo(identidade) {
+    for (const chave of memoria.keys()) if (!chave.startsWith(`${identidade}:`)) memoria.delete(chave)
+  },
 }
+
+globalThis.addEventListener?.(EVENTO_SESSAO_ALTERADA, () => anexosEmEspera.manterSo(identidadeDaSessao(lerSessao())))

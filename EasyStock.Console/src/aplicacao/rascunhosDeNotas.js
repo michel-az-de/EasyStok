@@ -24,6 +24,9 @@ function lerGuardado(identidade, armazenamento) {
   } catch { return { rascunhos: [], sequencia: 0 } }
 }
 
+// A mesma proposta de novo não duplica; um pedaço de frase que já está escrito não é a mesma proposta.
+const temParagrafo = (texto, paragrafo) => `\n\n${texto.trim()}\n\n`.includes(`\n\n${paragrafo}\n\n`)
+
 export function criarRascunhosDeNotas(identidade, armazenamento = armazenamentoDaAba()) {
   const guardado = lerGuardado(identidade, armazenamento)
   let estado = { rascunhos: guardado.rascunhos, ativa: null }
@@ -53,7 +56,7 @@ export function criarRascunhosDeNotas(identidade, armazenamento = armazenamentoD
         nota = { id, nome, chave: novaChave(id), texto: textoInicial,
           inicio: textoInicial.length, fim: textoInicial.length, rolagem: 0, versao: 0, gravando: false, erro: null }
         estado = { ...estado, rascunhos: [...estado.rascunhos, nota] }
-      } else if (proposta && !nota.texto.includes(proposta) && !nota.gravando) {
+      } else if (proposta && !temParagrafo(nota.texto, proposta) && !nota.gravando) {
         const texto = nota.texto.trim() ? `${nota.texto.trimEnd()}\n\n${proposta}` : proposta
         Object.assign(nota, { texto, inicio: texto.length, fim: texto.length, rolagem: 0, versao: (nota.versao ?? 0) + 1 })
       }

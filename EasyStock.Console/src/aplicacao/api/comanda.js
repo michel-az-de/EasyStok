@@ -118,6 +118,12 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
       })
   })
 
+  // #2185 (F12): trocar para o link online faz o EasyStok mandar o link na conversa (`TextoLinkTrocado`). É fala
+  // humana como a cobrança: com o Assistente atendendo, assume antes. Pagar na entrega não fala com o cliente.
+  const trocarFormaFalando = (id, meio) => (formaDoMeio(meio) === FORMA_ONLINE
+    ? antesDeEnviar(id, () => trocarForma(id, meio), { erro: 'Não consegui assumir a conversa, então o link não saiu.' })
+    : trocarForma(id, meio))
+
   // "Enviar ao cliente", ou gerar a cobrança antes dele: o EasyStok cria o pedido, cobra e
   // manda o resumo pela conversa. Só o POST decide "não criado" (#1287): a recarga que
   // falha depois dele é só a tela atrasada, a polling traz o pedido.
@@ -205,7 +211,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
     }
     if (recusaPorStatusDesconhecido(id)) return undefined
     const atual = pedidoDe(id)
-    if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
+    if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarFormaFalando(id, meio)
     if (!atual?.cobranca && formaDoMeio(atual?.meio) === FORMA_ONLINE) return reemitir(id)
     if (formaDoMeio(atual?.meio) === FORMA_ONLINE && situacaoDaCobranca(atual.cobranca, Date.now()).chave === 'expirada') {
       return antesDeEnviar(id, () => mandarLinkNovo(id), { erro: 'Não consegui assumir a conversa, então o link novo não saiu.' })
@@ -364,7 +370,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
     // muda o meio nem diz que reenviou.
     alterarMeioPagamento: (id, meio) => {
       if (!pedidoCriado(id)) return acoes.alterarMeioPagamento(id, meio)
-      if (formaDoMeio(meio) !== formaDoMeio(pedidoDe(id)?.meio)) return trocarForma(id, meio)
+      if (formaDoMeio(meio) !== formaDoMeio(pedidoDe(id)?.meio)) return trocarFormaFalando(id, meio)
       avisar(MESMA_FORMA)
       return Promise.resolve({ erro: MESMA_FORMA })
     },
