@@ -525,7 +525,7 @@ public sealed class SessoesNativasConcorrenciaTests(PostgreSqlDatabaseFixture fi
         Assert.IsType<OkObjectResult>(await Parear(db, dados));
         var controller = Pareador(db, dados);
         Assert.IsType<NoContentResult>(await controller.Revoke(dados.Sessao.DispositivoId, CancellationToken.None));
-        db.Add(new MobileDevice { Id = "pending-2184", EmpresaId = dados.Empresa, LojaId = dados.Loja, ApiKeyHash = "placeholder-2184",
+        db.Add(new MobileDevice { Id = "pending-2184", EmpresaId = dados.Empresa, LojaId = dados.Loja, ApiKeyHash = new string('0', 64),
             PairingCode = "123456", PairingExpiresAt = DateTime.UtcNow.AddMinutes(5), PairedByUserId = dados.Usuario });
         await db.SaveChangesAsync();
         var parManual = await controller.Pair(new("123456", dados.Sessao.DispositivoId, null), CancellationToken.None);

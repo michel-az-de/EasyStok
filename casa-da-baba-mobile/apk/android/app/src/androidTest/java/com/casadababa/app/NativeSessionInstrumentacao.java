@@ -28,14 +28,14 @@ public final class NativeSessionInstrumentacao extends Instrumentation {
             SessionVault vault = new SessionVault(isolated);
             if ("prepare".equals(phase)) {
                 check(!prefs.contains("encrypted"), "Preferências de teste devem começar vazias.");
-                vault.write(new JSONObject().put("refreshToken", "credencial-sintetica-2184"));
+                vault.write(new JSONObject().put("refreshToken", "fixture"));
                 String ciphertext = prefs.getString("encrypted", "");
-                check(ciphertext.startsWith("v1.") && !ciphertext.contains("credencial-sintetica"), "Cofre deve guardar somente ciphertext.");
+                check(ciphertext.startsWith("v1.") && !ciphertext.contains("fixture"), "Cofre deve guardar somente ciphertext.");
                 check(CredentialManager.create(getTargetContext()) != null, "Credential Manager disponível.");
                 check(new GetGoogleIdOption.Builder().setServerClientId("qa2184.apps.googleusercontent.com")
                     .setFilterByAuthorizedAccounts(false).build() != null, "SDK Google compatível.");
             } else if ("resume".equals(phase)) {
-                check("credencial-sintetica-2184".equals(vault.read().getString("refreshToken")), "Cofre retoma após processo encerrado.");
+                check("fixture".equals(vault.read().getString("refreshToken")), "Cofre retoma após processo encerrado.");
                 String ciphertext = prefs.getString("encrypted", "");
                 String[] parts = ciphertext.split("\\.");
                 parts[2] = (parts[2].charAt(0) == 'A' ? "B" : "A") + parts[2].substring(1);
