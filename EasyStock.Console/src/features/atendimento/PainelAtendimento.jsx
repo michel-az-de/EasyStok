@@ -80,8 +80,15 @@ export function PainelAtendimento({
     contextoDaNota.current = { id: selecionada?.id, visivel: editorNotaVisivel }
     if (!anterior.visivel || editorNotaVisivel || !visivel || !focarAoTrocar || anterior.id !== selecionada?.id) return
     // O wrapper público já foi desocultado neste commit. Não remonta nem altera o rascunho.
+    const focoAtual = document.activeElement
+    if (focoAtual && focoAtual !== document.body && focoAtual !== document.documentElement && focoAtual.getClientRects().length) return
     const campo = compositorPublicoRef.current?.querySelector('textarea:not(:disabled)')
-    if (!campo?.getClientRects().length) return
+    if (!campo?.getClientRects().length) {
+      const ferramenta = [...(compositorPublicoRef.current?.querySelectorAll('button:not(:disabled)') ?? [])]
+        .find(no => no.getClientRects().length > 0)
+      ferramenta?.focus({ preventScroll: true })
+      return
+    }
     const { selectionStart: inicio, selectionEnd: fim, selectionDirection: direcao, scrollTop: rolagem } = campo
     campo.focus({ preventScroll: true })
     campo.setSelectionRange(inicio, fim, direcao)

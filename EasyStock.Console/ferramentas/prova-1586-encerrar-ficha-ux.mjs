@@ -933,6 +933,26 @@ await confere('nota nova e reativada fica à frente dos painéis móveis', async
   tela.encerrar()
 })
 
+await confere('nota embutida: recolher restaura envio aberto/fechado e preserva foco externo após confirmação tardia', () => {
+  const fonte = readFileSync(new URL('features/atendimento/PainelAtendimento.jsx', src), 'utf8')
+  const corpo = fonte.match(/useEffect\(\(\) => \{(\s+const anterior = contextoDaNota\.current[\s\S]*?)\}, \[editorNotaVisivel, visivel, focarAoTrocar, selecionada\?\.id\]\)/)?.[1]
+  assert.ok(corpo, 'o efeito real de retorno de foco foi localizado')
+  const executar = new Function('contextoDaNota', 'editorNotaVisivel', 'visivel', 'focarAoTrocar', 'selecionada', 'compositorPublicoRef', 'document', corpo)
+  for (const fechada of [false, true]) for (const fora of [false, true]) {
+    const documento = { body: {}, documentElement: {} }
+    const no = (visivel = true) => ({ getClientRects: () => visivel ? [{}] : [], focus() { documento.activeElement = this } })
+    const campo = { ...no(), selectionStart: 2, selectionEnd: 4, selectionDirection: 'forward', scrollTop: 12,
+      setSelectionRange(inicio, fim, direcao) { this.selecao = [inicio, fim, direcao] } }
+    const ferramenta = no(), externo = no()
+    documento.activeElement = fora ? externo : documento.body
+    executar({ current: { id: 'a', visivel: true } }, false, true, true, { id: 'a' }, { current: {
+      querySelector: () => fechada ? null : campo, querySelectorAll: () => [no(false), ferramenta],
+    } }, documento)
+    assert.equal(documento.activeElement, fora ? externo : fechada ? ferramenta : campo)
+    if (!fechada && !fora) assert.deepEqual(campo.selecao, [2, 4, 'forward'])
+  }
+})
+
 if (falhas.length > 0) {
   console.error(`\n${passou} ok, ${falhas.length} falha(s)`)
   process.exit(1)
