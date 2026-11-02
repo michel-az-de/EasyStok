@@ -109,7 +109,8 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
         {/* Item D (banca 10, pedido 24/09 04h12 "editar ali na hora"): a
             etiqueta que já marcava "automática" vira um botão que abre a
             definição correspondente na biblioteca de Respostas. */}
-        {mensagem.automatica && !mensagem.modelo && (
+        {/* #2185 (E25): sem regra (fala do agente, aviso do sistema) não há definição a abrir; o selo só informa. */}
+        {mensagem.automatica && !mensagem.modelo && (mensagem.regra ? (
           <button
             type="button"
             className={`${css.selo} ${css.seloBotao}`}
@@ -118,7 +119,11 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
           >
             <Icone nome="raio" /> automática
           </button>
-        )}
+        ) : (
+          <span className={css.selo} title={mensagem.origemAutomatica === 'agente' ? 'Escrita pelo agente do EasyStok' : 'Mensagem automática do sistema'}>
+            <Icone nome="raio" /> automática
+          </span>
+        ))}
         {mensagem.modelo && <span className={css.selo} title={mensagem.modeloNome}><Icone nome="modelo" /> modelo</span>}
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>

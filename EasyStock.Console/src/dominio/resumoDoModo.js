@@ -40,16 +40,21 @@ function rotuloDoModo(modo, conversa, outro) {
   return ROTULO[modo.chave]
 }
 
-export function resumoDoModo(conversa, pausado = false, bloqueada = false) {
+// #2185 (E22): quem não pode reabrir não recebe a ordem "reabra"; o botão nem existe para ela.
+const LINHA_ENCERRADA_SEM_PERMISSAO = 'Peça a quem pode reabrir a conversa.'
+
+export function resumoDoModo(conversa, pausado = false, bloqueada = false, { podeReabrir = true } = {}) {
   const modo = modoDoAtendimento(conversa, pausado, bloqueada)
-  const proximo = !bloqueada && modo.chave === MODOS.PAUSADO
+  const outro = modo.chave === MODOS.PAUSADO && pausado === PAUSA_POR_OUTRO
+  // #2185 (E20): "Você respondeu" só vale quando a pausa é minha; a conversa de um colega não é.
+  const proximo = !bloqueada && modo.chave === MODOS.PAUSADO && !outro
     ? proximoPassoDepoisDeResponder(conversa, pausado)
     : null
-  const detalhe = [modo.rotulo + '.', modo.detalhe, proximo?.texto].filter(Boolean).join(' ')
-  const outro = modo.chave === MODOS.PAUSADO && pausado === PAUSA_POR_OUTRO
+  const semReabrir = modo.chave === MODOS.ENCERRADO && !podeReabrir
+  const detalhe = [modo.rotulo + '.', semReabrir ? LINHA_ENCERRADA_SEM_PERMISSAO : modo.detalhe, proximo?.texto].filter(Boolean).join(' ')
   const motivo = conversa?.passagem?.motivo ?? null
 
-  let linha = LINHA[modo.chave]
+  let linha = semReabrir ? LINHA_ENCERRADA_SEM_PERMISSAO : LINHA[modo.chave]
   if (modo.chave === MODOS.COM_VOCE) linha = origemDaPassagem(conversa.passagem).motivo
   else if (outro) linha = 'Assistente pausado.'
   else if (proximo) linha = LINHA_DO_PROXIMO[proximo.chave] ?? linha

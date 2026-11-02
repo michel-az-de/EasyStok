@@ -66,7 +66,7 @@ function PostIt({ nota }) {
 }
 
 export function Thread({
-  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, digitando = false, notas = [],
+  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, digitando = false, notas = [], visivel = true,
   temAnteriores = false, abrindoAnteriores = false, aoVerAnteriores,
 }) {
   const fim = useRef(null)
@@ -76,7 +76,7 @@ export function Thread({
   const abrirModelos = useChamadaEstavel(aoAbrirModelos)
 
   // #1587: não rola mais a cada mensagem; a regra está no hook.
-  useRolagemDoFio(fim, { mensagens, chaveRolagem, digitando, totalDeNotas: notas.length })
+  useRolagemDoFio(fim, { mensagens, chaveRolagem, digitando, totalDeNotas: notas.length, visivel })
 
   // Intercala as divisórias na posição certa: por ÍNDICE (`aposIndice`), não
   // por horário — o relógio simulado anda em passos e duas mensagens de

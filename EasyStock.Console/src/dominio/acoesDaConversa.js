@@ -13,7 +13,8 @@ export const naFilaSemResponsavel = (conversa) =>
   conversa?.situacaoApi === 'Assumida' && !conversa.assumidaPorUsuarioId
 
 const NENHUMA = Object.freeze({
-  assumir: false, confirmarAoAssumir: false, devolver: false, concluir: false, enviarCardapio: false, passar: false,
+  assumir: false, confirmarAoAssumir: false, assumirAntesDeEnviar: false, devolver: false, concluir: false,
+  enviarCardapio: false, passar: false,
 })
 
 export function acoesDaConversa({ conversa, pausado = false, bloqueada = false, canal, permitePassar = false }) {
@@ -29,6 +30,9 @@ export function acoesDaConversa({ conversa, pausado = false, bloqueada = false, 
     assumir: chave === MODOS.LIGADO || chave === MODOS.COM_VOCE || deOutro || semResponsavel,
     // Tirar a conversa de um colega é a única tomada que pede confirmação: é de outra pessoa.
     confirmarAoAssumir: deOutro,
+    // #2185 (F12, E09): enviar por cima do Assistente (ou de um colega) é assumir antes, para texto, foto,
+    // cardápio, Assistente e cobrança. Com o automático desligado na loja ninguém responde: nada a assumir.
+    assumirAntesDeEnviar: (chave === MODOS.LIGADO && !automaticoDesligadoNaConversa(conversa)) || deOutro,
     // Só o WhatsApp tem Assistente (o servidor recusa nos outros canais) e, de outra pessoa, a
     // conversa só volta ao Assistente depois de assumida: não se devolve o que é de um colega.
     devolver: parouNoAssistente && Boolean(canal?.temAssistente) && !automaticoDesligadoNaConversa(conversa),

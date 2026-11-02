@@ -9,8 +9,9 @@ import css from './MenuDeAcoes.module.css'
 // clicar fora, e devolve o foco ao gatilho (tudo do Popover); no celular vira folha no pé da tela.
 //
 // `rotulo` é o nome acessível e a dica: "Mais opções" + o contexto ("da conversa", "do pedido").
-// `itens`: { chave, rotulo, icone, aoEscolher, tom: 'perigo', desabilitado, motivo, abreJanela,
-// marcado }. Condição falsa (`cond && {...}`) fica de fora, e sem item nenhum o gatilho não existe:
+// `itens`: { chave, rotulo, icone, aoEscolher, tom: 'perigo', desabilitado, motivo, detalhe, abreJanela,
+// marcado }. `motivo` diz por que não dá; `detalhe`, o que o item aceita ou faz (o primeiro manda).
+// Condição falsa (`cond && {...}`) fica de fora, e sem item nenhum o gatilho não existe:
 // menu que não leva a lugar nenhum não aparece. `marcado` (booleano) faz do item uma chave de ligar.
 // `grupos`/`aoEscolherGrupo` é a lista com título e detalhe do Popover, para o menu do topo.
 export function MenuDeAcoes({
@@ -36,7 +37,8 @@ export function MenuDeAcoes({
           {grupos ? undefined : (
             <div className={css.lista}>
               {lista.map((item) => {
-                const idMotivo = item.motivo ? `${prefixo}-${item.chave}` : undefined
+                const explicacao = item.motivo ?? item.detalhe
+                const idMotivo = explicacao ? `${prefixo}-${item.chave}` : undefined
                 const chave = typeof item.marcado === 'boolean'
                 return (
                   <div key={item.chave}>
@@ -51,7 +53,7 @@ export function MenuDeAcoes({
                       <span className={css.rotulo}>{item.rotulo}</span>
                       {item.marcado && <Icone nome="check" tamanho={20} />}
                     </button>
-                    {item.motivo && <p id={idMotivo} className={css.motivo}>{item.motivo}</p>}
+                    {explicacao && <p id={idMotivo} className={css.motivo}>{explicacao}</p>}
                   </div>
                 )
               })}

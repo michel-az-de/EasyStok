@@ -10,6 +10,7 @@ import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
+import { permissaoDeEscrita } from '../../dominio/janela'
 import { pedidoEncerrado } from '../../dominio/pedido'
 import {
   PEDE_TEXTO_DA_DESPEDIDA, avisoDoPedidoAoEncerrar, faltaTextoDaDespedida, montarResumoAtendimento, resumoParaImpresso,
@@ -50,7 +51,11 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   // (gatilho ENCERRAMENTO) já editável na hora. Reseta ao trocar de conversa,
   // mesmo padrão do formulário de cadastro rápido em BlocoCliente.jsx.
   const regraEncerramento = regraDoGatilho(regras, GATILHOS.ENCERRAMENTO)
-  const [enviarMensagem, setEnviarMensagem] = useState(Boolean(regraEncerramento))
+  // #2185 (E08): janela de 24 h fechada, cadastro bloqueado ou canal sem regra: a despedida não sai. A caixa
+  // nasce desmarcada e desligada, com o motivo, em vez de concluir "com ressalva" depois do toque.
+  const escrita = permissaoDeEscrita(conversa, agora, canalDaConversa(canais, conversa))
+  const podeDespedir = !conversa || escrita.pode
+  const [enviarMensagem, setEnviarMensagem] = useState(Boolean(regraEncerramento) && podeDespedir)
   const [textoMensagem, setTextoMensagem] = useState(() => (regraEncerramento
     ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora))
     : ''))
@@ -61,7 +66,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   useEffect(() => {
     setCancelarMarcado(false)
     pedidoJaCancelado.current = false
-    setEnviarMensagem(Boolean(regraEncerramento))
+    setEnviarMensagem(Boolean(regraEncerramento) && podeDespedir)
     setTextoMensagem(regraEncerramento ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora)) : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só reseta ao trocar de conversa, não a cada tecla
   }, [conversaId])
@@ -88,6 +93,11 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const [cobrouDespedida, setCobrouDespedida] = useState(false)
   const campoDespedida = useRef(null)
 
+  // #2185 (F32): conversa que sumiu ou foi concluída por outro atendente (na API não há resumo a ler) deixava
+  // `ui.encerrando` marcado com o modal em branco, e ele reaparecia sozinho ao reabrir. Fecha de verdade.
+  const semResumo = Boolean(conversaId) && (!conversa || !resumo)
+  useEffect(() => { if (semResumo) aoFechar() }, [semResumo, aoFechar])
+
   if (!conversaId || !conversa || !resumo) return null
 
   const pedido = conversa.pedido
@@ -103,7 +113,8 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const avisoEmailLigado = Boolean(conversa.cliente?.avisos?.email)
   const avisoSmsLigado = Boolean(conversa.cliente?.avisos?.sms)
 
-  const semDespedida = faltaTextoDaDespedida(enviarMensagem && !despedidaJaSaiu.current, textoMensagem)
+  const despedir = enviarMensagem && podeDespedir
+  const semDespedida = faltaTextoDaDespedida(despedir && !despedidaJaSaiu.current, textoMensagem)
 
   const clicarEncerrar = async () => {
     if (emVoo.current) return
@@ -125,7 +136,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
         pedidoJaCancelado.current = true
       }
       const resultado = await encerrarComResumo(conversa.id, agora, {
-        enviarMensagem: enviarMensagem && !despedidaJaSaiu.current,
+        enviarMensagem: despedir && !despedidaJaSaiu.current,
         textoMensagem,
         avisoEmail: avisoEmailLigado,
         avisoSms: avisoSmsLigado,
@@ -201,12 +212,19 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
                 <label>
                   <input
                     type="checkbox"
-                    checked={enviarMensagem}
+                    checked={despedir}
+                    disabled={!podeDespedir}
+                    aria-describedby={podeDespedir ? undefined : 'sem-despedida'}
                     onChange={(e) => setEnviarMensagem(e.target.checked)}
                   />
                   Mandar mensagem de encerramento ao cliente
                 </label>
-                {enviarMensagem && (
+                {!podeDespedir && (
+                  <p id="sem-despedida" className={css.avisosConfigurados}>
+                    A despedida não pode sair agora. {[escrita.motivo?.titulo, escrita.motivo?.detalhe].filter(Boolean).join(' ')}
+                  </p>
+                )}
+                {despedir && (
                   <div ref={campoDespedida}>
                     <CampoArea
                       rotulo="Mensagem de encerramento"

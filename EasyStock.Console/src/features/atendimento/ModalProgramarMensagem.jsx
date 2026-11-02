@@ -25,7 +25,8 @@ export function ModalProgramarMensagem({
   const { acoes } = useAcessoModulos()
   // #1992: agendar e cancelar é da gerência (a API recusa o Operador); a atendente consulta as programadas.
   const editavel = respostasEditaveis({ fonteApi, acoes })
-  const [quando, setQuando] = useState(() => horarioLocalPadrao(Date.now()))
+  const [quandoInicial] = useState(() => horarioLocalPadrao(Date.now()))
+  const [quando, setQuando] = useState(quandoInicial)
   const [texto, setTexto] = useState(rascunho ?? '')
   const [finalidade, setFinalidade] = useState(FINALIDADES[0].valor)
   const [usarModelo, setUsarModelo] = useState(false)
@@ -62,6 +63,8 @@ export function ModalProgramarMensagem({
   const agendadaPara = horarioLocalParaUtc(quando)
   const bloqueado = Boolean(conversa.bloqueio)
   const fechar = () => { if (!ocupado.current) aoFechar() }
+  // #2185 (F16): horário, texto ou modelo mexidos e ainda não programados: Esc e toque no fundo não descartam.
+  const sujo = quando !== quandoInicial || texto !== (rascunho ?? '') || usarModelo || nomeModelo !== '' || parametros !== ''
 
   async function programar() {
     if (ocupado.current || bloqueado || !editavel) return
@@ -119,6 +122,7 @@ export function ModalProgramarMensagem({
       largura="480px"
       descricao={`Tentaremos enviar para ${primeiroNome(conversa.nome)} pelo ${canal.nome}, mesmo com o console fechado.`}
       aoFechar={fechar}
+      segurarFechamento={sujo}
       rodape={(
         <>
           <Botao onClick={fechar} disabled={salvando}>Fechar</Botao>

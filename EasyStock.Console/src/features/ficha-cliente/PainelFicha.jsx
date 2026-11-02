@@ -17,6 +17,7 @@ import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoResumo, total
 import { faltaPagar, totalPago } from '../../dominio/pagamento'
 import { moeda } from '../../dominio/formato'
 import { ALVOS_DO_MOTIVO, pendenciaAntesDeCobrar } from '../../dominio/resumoPedido'
+import { pedidoMudou } from '../../dominio/cicloDaFicha'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { chavesDaFicha, primeiroPassoAntesDaVenda } from '../../dominio/ficha'
@@ -48,8 +49,17 @@ import css from './ficha.module.css'
 export function PainelFicha(props) {
   const { selecionada } = useAtendimento()
   // Nenhum formulário ou modal do ciclo anterior atravessa a troca de contexto.
-  const chave = `${selecionada?.id}:${conversaEncerrada(selecionada)}:${selecionada?.pedido?.pedidoId ?? selecionada?.pedido?.numero ?? ''}`
-  return <FichaDoAtendimento key={chave} {...props} />
+  // #2185 (F5): o rascunho que vira pedido (`pedidoId` aparece) segue o mesmo ciclo; antes a chave trocava e a
+  // Ficha remontava com o cadastro pela metade.
+  const agora = {
+    conversa: selecionada?.id, encerrada: conversaEncerrada(selecionada),
+    pedidoId: selecionada?.pedido?.pedidoId ?? null, numero: selecionada?.pedido?.numero ?? null,
+  }
+  const [visto, setVisto] = useState({ ...agora, ciclo: 0 })
+  const recomeca = visto.conversa !== agora.conversa || visto.encerrada !== agora.encerrada || pedidoMudou(visto, agora)
+  if (recomeca) setVisto({ ...agora, ciclo: visto.ciclo + 1 })
+  else if (visto.pedidoId !== agora.pedidoId || visto.numero !== agora.numero) setVisto({ ...visto, pedidoId: agora.pedidoId, numero: agora.numero })
+  return <FichaDoAtendimento key={`${visto.conversa}:${visto.ciclo}`} {...props} />
 }
 
 function AcessoDaFicha({ titulo, resumo, icone, aoAbrir, painel, focoReserva = painel }) {
@@ -168,7 +178,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
   const gerarSemEnviar = fonteApi && permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).motivo?.acao === 'janela'
   const pendencia = pedido
-    ? pendenciaAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, {
+    ? pendenciaAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco, bloqueado: estaBloqueada(selecionada) }, {
       fonteApi,
     })
     : null

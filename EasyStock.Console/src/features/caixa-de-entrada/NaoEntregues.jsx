@@ -9,6 +9,7 @@ import {
   RECARGA_NAO_ENTREGUES_MS, assinaturaDeFalhas, falhaDeEnvio, falhaNovaNaTela, textoDaFalhaDeEnvio, TIPOS_DE_FALHA,
 } from '../../dominio/falhaDeEnvio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { anunciarAberturaDeConversa } from '../../aplicacao/aberturaDeConversa'
 import css from './caixa.module.css'
 
 // S59 (#1391): mensagens que não chegaram ao cliente, de todas as conversas. Só aparece no modo API
@@ -133,6 +134,7 @@ export function NaoEntregues({ aoAbrir }) {
   function abrirConversa(item) {
     setAberto(false)
     selecionar(item.conversaId)
+    anunciarAberturaDeConversa(item.conversaId)
     aoAbrir?.(item.conversaId)
   }
 

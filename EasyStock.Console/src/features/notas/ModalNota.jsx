@@ -13,6 +13,14 @@ const focoDoCompositor = () => globalThis.document?.querySelector?.('[data-area-
 export function ModalNota({ nomeCliente, aoSalvar, aoFechar, aoComanda, aoGuardar, rascunho, precisaCadastrar = false, aoCadastrar,
   embutida = false, visivel = true, outraConversa = false, textoInicial = '' }) {
   const [texto, setTexto] = useState(rascunho?.texto ?? textoInicial)
+  // #2185 (F29): a nota proposta pela IA é somada ao rascunho por fora (`versao` sobe). O editor já aberto
+  // troca o texto dele em vez de seguir mostrando o antigo, e a posição vai para o fim do que entrou.
+  const versaoDoRascunho = rascunho?.versao ?? 0
+  const [versaoVista, setVersaoVista] = useState(versaoDoRascunho)
+  if (versaoDoRascunho !== versaoVista) {
+    setVersaoVista(versaoDoRascunho)
+    setTexto(rascunho.texto)
+  }
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState(null)
   const [frente, setFrente] = useState(proximaFrentePainel)
@@ -95,6 +103,12 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, aoComanda, aoGuarda
     }
   }
 
+  useLayoutEffect(() => {
+    if (versaoVista === 0 || !rascunho) return
+    posicao.current = { texto: rascunho.texto, inicio: rascunho.fim, fim: rascunho.fim, rolagem: 0 }
+    campo.current?.setSelectionRange(rascunho.fim, rascunho.fim)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando a versão muda
+  }, [versaoVista])
   // Mostrar o mesmo nó mantém desfazer. O espelho restaura seleção/rolagem também após remonte.
   useLayoutEffect(() => {
     if (!visivel || !campo.current) return

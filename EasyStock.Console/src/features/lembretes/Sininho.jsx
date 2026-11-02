@@ -3,6 +3,7 @@ import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { useEscape } from '../../hooks/useEscape'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { anunciarAberturaDeConversa } from '../../aplicacao/aberturaDeConversa'
 import { faixaDaJanela } from '../../dominio/entrega'
 import {
   ORIGENS, chaveLembrete, descreverPrazo, encaixeNaJanela, novoLembrete, tempoDoItem, vencido,
@@ -221,6 +222,7 @@ export function Sininho({ comRotulo = false }) {
   const abrirConversa = (conversaId) => {
     if (!conversaId) return
     selecionar(conversaId)
+    anunciarAberturaDeConversa(conversaId)
     fecharPainel()
   }
 

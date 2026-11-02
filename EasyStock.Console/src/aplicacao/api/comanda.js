@@ -41,7 +41,7 @@ const RECUSA_DEFINITIVA = new Set(['LOJA_FECHADA', 'JANELA_ESGOTADA', 'CEP_SEM_C
 
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'forcarEncaixe']
 
-export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
+export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnviar = (_id, fazer) => fazer() }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   // #1474: o aviso de uma tentativa que falhou some quando a ação seguinte dá certo.
   const limparAviso = () => despachar({ tipo: acao.FECHAR_AVISO_API })
@@ -195,14 +195,20 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
 
   // Com pedido criado, gerar ou reenviar a cobrança troca a forma (S11), sem cobrança online emite
   // o link e com o link vencido manda um novo (#1924). Link ainda valendo não sai de novo sozinho.
+  // #2185 (F12): a cobrança que manda o resumo ou o link ao cliente é fala humana; com o Assistente
+  // atendendo, assume antes. Gerar sem enviar não fala com ninguém.
   const cobrar = (id, meio, enviarAoCliente = true) => {
-    if (!pedidoCriado(id)) return criarPedido(id, meio, enviarAoCliente)
+    if (!pedidoCriado(id)) {
+      return enviarAoCliente
+        ? antesDeEnviar(id, () => criarPedido(id, meio, enviarAoCliente), { erro: 'Não consegui assumir a conversa, então a cobrança não saiu.' })
+        : criarPedido(id, meio, enviarAoCliente)
+    }
     if (recusaPorStatusDesconhecido(id)) return undefined
     const atual = pedidoDe(id)
     if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
     if (!atual?.cobranca && formaDoMeio(atual?.meio) === FORMA_ONLINE) return reemitir(id)
     if (formaDoMeio(atual?.meio) === FORMA_ONLINE && situacaoDaCobranca(atual.cobranca, Date.now()).chave === 'expirada') {
-      return mandarLinkNovo(id)
+      return antesDeEnviar(id, () => mandarLinkNovo(id), { erro: 'Não consegui assumir a conversa, então o link novo não saiu.' })
     }
     avisar(LINK_AINDA_VALE)
     return undefined

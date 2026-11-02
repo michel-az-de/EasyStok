@@ -226,7 +226,8 @@ assert.equal(renderCompartilhar()[1], false)
 assert.equal(geracoes, 0, 'cancelar não gera edição nem invalida o link ativo')
 renderCompartilhar()[0].props.onClick()
 modal = renderCompartilhar()[1]
-const gerado = await modal.props.aoGerar()
+// #2185: o modal mora em `ModalCompartilharComanda`, para o item do menu ⋮ abrir o mesmo.
+const gerado = await modal.type(modal.props).props.aoGerar()
 assert.equal(gerado.link, link)
 assert.ok(gerado.texto.includes(link), 'convite usa somente o endereço retornado pela API')
 

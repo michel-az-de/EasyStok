@@ -17,6 +17,7 @@ export function ModalCliente({ conversa, aoFechar, children }) {
   const [salvandoNota, setSalvandoNota] = useState(false)
   const [baixandoPdf, setBaixandoPdf] = useState(false)
   const [alterandoFoto, setAlterandoFoto] = useState(false)
+  const [cadastroSujo, setCadastroSujo] = useState(false)
   const arquivoFoto = useRef(null)
   const [erro, setErro] = useState(null)
   const [consultadaEm] = useState(() => new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }))
@@ -52,7 +53,7 @@ export function ModalCliente({ conversa, aoFechar, children }) {
     } finally { setAlterandoFoto(false) }
   }
 
-  return <Modal titulo="Ficha" largura="820px" className={css.modal} aoFechar={ocupado ? undefined : aoFechar}
+  return <Modal titulo="Ficha" largura="820px" className={css.modal} aoFechar={ocupado ? undefined : aoFechar} segurarFechamento={cadastroSujo}
     rodape={<div className={css.acoes}>
       {!podeBaixarPdf && <small>{!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}
       <Botao variante="texto" disabled={ocupado} onClick={aoFechar}>Fechar</Botao>
@@ -68,7 +69,7 @@ export function ModalCliente({ conversa, aoFechar, children }) {
       <div className={css.cadastro}><BlocoCliente conversa={conversa} integrado resumoIa={resumo.texto} fotoCadastro={foto.url}
         aoEscolherFoto={fonteApi && conversa.clienteId ? () => arquivoFoto.current?.click() : undefined}
         aoRemoverFoto={fonteApi && conversa.clienteId && cliente.fotoUrl ? () => alterarFoto() : undefined}
-        alterandoFoto={alterandoFoto} /></div>
+        alterandoFoto={alterandoFoto} aoMudarSujo={setCadastroSujo} /></div>
       <div className={css.historico}>
         <h3>Histórico e notas</h3>
         <ModalHistorico conversa={conversa} historico={historico} agora={agora} embutido aoOcupar={setSalvandoNota} />

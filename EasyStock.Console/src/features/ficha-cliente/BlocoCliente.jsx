@@ -75,7 +75,7 @@ function SecaoCliente({ integrado, titulo, chave, children, ...resto }) {
   return <section data-secao-cliente={chave}>{chave !== 'cliente' && <h3>{titulo}</h3>}{children}</section>
 }
 
-export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false }) {
+export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false, aoMudarSujo }) {
   const { cliente } = conversa
   const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
   // #1474 (R2): no modo API, mudar a entrega do pedido e os pontos não têm endpoint e somem.
@@ -100,7 +100,6 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   useEffect(() => {
     setForm(estadoInicialDoForm(conversa))
     setAvisoEndereco(null)
-    setMenuAberto(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversa.id])
 
@@ -128,6 +127,10 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const informado = lead ? conversa.contatoInformado : null
   const precisaCadastro = lead && (!cliente.telefone || !cliente.endereco) && !cliente.enderecoCapturado
     && !conversa.captura && !informado
+  // #2185 (F16): o cadastro rápido digitado e ainda não salvo avisa a janela, que então não fecha com Esc nem
+  // com o toque no fundo (no tablet um toque fora é fácil e levava nome, telefone e endereço).
+  const formSujo = precisaCadastro && JSON.stringify(form) !== JSON.stringify(estadoInicialDoForm(conversa))
+  useEffect(() => { aoMudarSujo?.(formSujo) }, [formSujo, aoMudarSujo])
   const domicilio = mesmoDomicilio(conversa, conversas)
   const financeiro = resumoFinanceiro(historico)
 

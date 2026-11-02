@@ -5,7 +5,9 @@ import { Popover } from '../../componentes/Popover'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { precisaDeVoce } from '../../dominio/automatico'
 import { congelado } from '../../dominio/congelados'
-import { combinaBusca, combinaCanal, combinaResponsavel, contarPorCanal, mostraChipDoCanal } from '../../dominio/conversa'
+import {
+  combinaBusca, combinaCanal, combinaResponsavel, contarAbertasDoBalcao, contarPorCanal, mostraChipDoCanal,
+} from '../../dominio/conversa'
 import css from './caixa.module.css'
 
 const OPCOES_DE_ORDEM = [
@@ -65,6 +67,8 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
   // busca da linha A (seção 1): trocar canal ou digitar não pode deixar o
   // número da aba discordando da lista embaixo.
   const doUniverso = doResponsavel.filter((c) => combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+  // #2185 (F18): o mesmo número no título, no chip "Todas" e na aba do celular: as abertas da lista.
+  const quantasAbertas = contarAbertasDoBalcao(conversas, filtros, sessao?.usuario)
   const quantasPrecisam = doUniverso
     .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, horarioDaLoja)).length
 
@@ -89,7 +93,7 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
   return (
     <div className={css.barra}>
       <header className={css.cabecalhoLista}>
-        <h2>Conversas <span>{doUniverso.length}</span></h2>
+        <h2>Conversas <span>{quantasAbertas}</span></h2>
         <span className={css.comOrdenar}>
           <Botao ref={botaoFiltros} variante="texto" className={css.botaoOrdenar} aria-haspopup="dialog" aria-expanded={ordenarAberto}
             aria-label={filtrando ? 'Filtrar conversas, filtros ativos' : 'Filtrar conversas'} title="Filtrar e ordenar conversas"
@@ -140,7 +144,7 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
       <fieldset className={css.filtros}>
         <legend className="sr">Filtros das conversas</legend>
         <button type="button" aria-pressed={filtros.aba !== 'precisa'} className={`${css.chipFiltro} ${filtros.aba !== 'precisa' ? css.chipLigado : ''}`} onClick={() => aoMudar('aba', 'todas')}>
-          Todas <span className={css.numeroChip}>{doUniverso.length}</span>
+          Todas <span className={css.numeroChip}>{quantasAbertas}</span>
         </button>
         <button type="button" aria-pressed={filtros.aba === 'precisa'} className={`${css.chipFiltro} ${filtros.aba === 'precisa' ? css.chipLigado : ''}`}
           onClick={() => aoMudar('aba', filtros.aba === 'precisa' ? 'todas' : 'precisa')}>

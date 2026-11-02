@@ -26,6 +26,7 @@ import { pedirPermissaoDeNotificacao, permissaoDeNotificacao } from '../infra/no
 import { lembretesAutomaticos, listaDeLembretes } from '../dominio/lembrete'
 import { useAvisoSonoro } from './useAvisoSonoro'
 import { useFilaDeAvisos } from './useFilaDeAvisos'
+import { semOPagamentoDaAberta } from './pagamentosNaoVistos'
 import { audioDestravado, destravarAudio } from '../infra/som'
 import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom'
 import { demonstracao } from '../infra/demonstracao'
@@ -265,15 +266,13 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // "Visto" nasce de um jeito só: ela abriu a conversa. Passar o tempo ou
   // fechar a tela nunca conta como ter visto (é exatamente o que o achado 4
   // reclamava do sinal verde).
+  // #2185 (F24): também limpa quando o pagamento cai na conversa que já está aberta com a aba à vista.
   useEffect(() => {
-    if (!estado.selecionadaId) return
-    setPagamentosNaoVistos((atual) => {
-      if (!atual.has(estado.selecionadaId)) return atual
-      const novo = new Set(atual)
-      novo.delete(estado.selecionadaId)
-      return novo
-    })
-  }, [estado.selecionadaId])
+    const limpar = () => setPagamentosNaoVistos((atual) => semOPagamentoDaAberta(atual, estado.selecionadaId, document.visibilityState !== 'hidden'))
+    limpar()
+    document.addEventListener('visibilitychange', limpar)
+    return () => document.removeEventListener('visibilitychange', limpar)
+  }, [estado.selecionadaId, pagamentosNaoVistos])
 
   // Lembra a escolha da chave entre uma visita e outra.
   useEffect(() => { gravarPreferenciaSom(estado.som) }, [estado.som])
@@ -433,6 +432,9 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       // #1807: pilha de avisos da tela (toast) e quem tira um da pilha.
       avisosNaTela: filaDeAvisos.avisos,
       dispensarAviso: filaDeAvisos.dispensar,
+      // #2185 (F28): ponteiro ou foco em cima do aviso para o relógio dele.
+      pausarAvisos: filaDeAvisos.pausar,
+      retomarAvisos: filaDeAvisos.retomar,
       // `ui.encerrando` (seção 5): id da conversa com a modal de
       // encerramento aberta, ou `null`.
       encerrando: estado.ui.encerrando,
@@ -456,7 +458,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       cargaDasRegras: estado.cargaDasRegras,
       sessao,
     }
-  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes, filaDeAvisos.avisos, filaDeAvisos.dispensar])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes, filaDeAvisos.avisos, filaDeAvisos.dispensar, filaDeAvisos.pausar, filaDeAvisos.retomar])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>

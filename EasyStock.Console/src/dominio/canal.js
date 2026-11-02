@@ -58,6 +58,14 @@ export function motivoDeAnexo(canal, tipo, { fonteApi = false } = {}) {
   return `${canal.nome} ainda não recebe ${NOME_DO_FORMATO[formato]} pelo EasyStok.`
 }
 
+// #2185 (F11): o áudio gravado também só sai pelo WhatsApp no modo API. No Instagram o microfone gravava,
+// o envio avisava "ainda não ligado" e a gravação se perdia sem balão. Sem o botão, não há o que perder.
+export function motivoDeAudio(canal, { fonteApi = false } = {}) {
+  const bloqueio = motivoDeFormato(canal, 'audio')
+  if (bloqueio || !fonteApi) return bloqueio
+  return canal.nome === CANAL_COM_FOTO_NA_API ? null : `${canal.nome} ainda não recebe áudio pelo EasyStok.`
+}
+
 // Uma linha só com tudo que o canal não aceita, para o pé do composer.
 // Integração: só o que o composer oferece hoje. Figurinha saiu no corte (23,
 // #54) e continua fora. Rodada 7 (frente Anexos, pedido do dono 24/09):

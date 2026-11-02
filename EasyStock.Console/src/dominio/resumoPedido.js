@@ -92,8 +92,11 @@ export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi 
 // abre a seção e põe o foco no campo. `cardapio` abre o cardápio; `cadastro` e `endereco`, a seção
 // Contato e endereço da Ficha; `janela`, a seção Pedido e entrega.
 export const ALVOS_DO_MOTIVO = { CARDAPIO: 'cardapio', CADASTRO: 'cadastro', ENDERECO: 'endereco', JANELA: 'janela' }
-export function pendenciaAntesDeCobrar({ pedido, clienteId, endereco }, { fonteApi = false } = {}) {
+// #2185 (E05): cadastro bloqueado não recebe nada em canal nenhum; o botão nasce desabilitado com o motivo
+// em vez de falhar depois do clique, nos dois modos.
+export function pendenciaAntesDeCobrar({ pedido, clienteId, endereco, bloqueado = false }, { fonteApi = false } = {}) {
   if (!pedido?.itens?.length) return { motivo: 'A comanda está vazia.', alvo: ALVOS_DO_MOTIVO.CARDAPIO }
+  if (bloqueado) return { motivo: 'Cliente bloqueado: desbloqueie o cadastro para cobrar.', alvo: ALVOS_DO_MOTIVO.CADASTRO }
   if (!fonteApi) return null
   if (!clienteId) return { motivo: 'Salve o cadastro do cliente (Contato e endereço).', alvo: ALVOS_DO_MOTIVO.CADASTRO }
   if (!endereco) return { motivo: 'Falta o endereço de entrega (Contato e endereço).', alvo: ALVOS_DO_MOTIVO.ENDERECO }
@@ -102,6 +105,11 @@ export function pendenciaAntesDeCobrar({ pedido, clienteId, endereco }, { fonteA
   return null
 }
 export const motivoAntesDeCobrar = (dados, opcoes) => pendenciaAntesDeCobrar(dados, opcoes)?.motivo ?? null
+
+// #2185 (E30): no modo API o rascunho da comanda ainda não é pedido (o frete e o número saem ao gerar a cobrança);
+// imprimir o canhoto dele seria mostrar algo que não existe. A demonstração imprime a comanda local.
+export const podeVerCanhoto = (pedido, { fonteApi = false } = {}) =>
+  (pedido?.itens?.length ?? 0) > 0 && (!fonteApi || Boolean(pedido.pedidoId))
 
 // #1474 (R5): antes de o pedido existir o frete ainda não foi calculado (é da zona, no EasyStok).
 export const rotuloDoTotal = (pedido, { fonteApi = false } = {}) =>

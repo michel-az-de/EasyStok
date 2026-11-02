@@ -7,7 +7,7 @@
 // "Precisa de você" no trilho lateral do cartão e no chip do filtro.
 
 import { origemDaPassagem } from '../../dominio/passagem'
-import { sinalVerde } from '../../dominio/cobranca'
+import { aguardaAprovacao, sinalVerde } from '../../dominio/cobranca'
 import { faltaPagar } from '../../dominio/pagamento'
 import { ehLead } from '../../dominio/conversa'
 import { passoPorId } from '../../dominio/esteira'
@@ -63,6 +63,8 @@ export function marcaDoPedido(conversa, cardapio, { fonteApi = false } = {}) {
   const passo = conversa.pedido ? passoPorId(conversa.pedido.estado) : null
   if (passo) {
     if (fonteApi && !conversa.pedido.pedidoId) return MARCA_EM_MONTAGEM
+    // #2185 (F3): o status da API cai em "pago" na esteira, mas a loja ainda não aprovou o pedido.
+    if (aguardaAprovacao(conversa.pedido)) return { texto: 'Aguardando aprovação', icone: 'alerta', tom: 'aviso' }
     const saldo = faltaPagar(conversa.pedido, cardapio)
     if (saldo > 0 && conversa.pedido.sinalNaReserva && conversa.pedido.cobranca?.pagaEm
       && Math.round(conversa.pedido.cobranca.valor * 100) === Math.round((conversa.pedido.totalApi - saldo) * 100)) {

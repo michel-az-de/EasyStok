@@ -10,7 +10,7 @@
 // Puro. Conversa antiga, sem os campos novos, cai no padrão seguro: automático
 // ligado e nada de "precisa de você".
 
-import { situacaoDaCobranca } from './cobranca'
+import { aguardaAprovacao, situacaoDaCobranca } from './cobranca'
 import { prazoDoPagamento } from './lembrete'
 import { duracao } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
@@ -340,6 +340,18 @@ function pedidoAtrasadoVisivel(conversa, janelas, agora) {
   }
 }
 
+// #2185 (F3): pedido de fora da área espera a aprovação da loja. A Ficha já dizia "Esperando sua aprovação";
+// a lista mostrava "Pago" e o chip não contava. Quem decide é a dona, então entra em "Precisa de você".
+function aguardandoAprovacao(conversa) {
+  if (!aguardaAprovacao(conversa.pedido)) return null
+  return {
+    chave: 'aprovacao',
+    rotulo: 'Aguardando aprovação',
+    tom: 'aviso',
+    texto: `Pedido ${conversa.pedido.numero} espera a aprovação da loja`,
+  }
+}
+
 // Cobrança vencida nos dois mundos: com Pix emitido vale o relógio dele, e sem
 // Pix vale o prazo da comanda gerada, que é o mesmo do lembrete de pagamento.
 function cobrancaVencida(conversa, agora) {
@@ -463,6 +475,7 @@ export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true,
   return aguardandoAbertura(conversa, aberta)
     ?? ocorrenciaPendente(conversa)
     ?? sinalUrgente(conversa, agora)
+    ?? aguardandoAprovacao(conversa)
     ?? pedidoAtrasadoVisivel(conversa, janelas, agora)
     ?? esperaDoCliente(conversa, agora, pausaDaConversa(conversa, pausado), expediente)
     ?? cobrancaVencida(conversa, agora)

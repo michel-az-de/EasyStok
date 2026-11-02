@@ -3,7 +3,13 @@
 // muda com a situação da cobrança (secao 2, "Alerta do Pix"). Substitui a
 // antiga trava, que só mostrava texto e travava a barra inteira.
 
-export function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoApi, linkPendenteApi = false, aoAbrirBaixa, aoGerarPix, aoReenviarPix, aoMandarLinkNovo = null }) {
+// #2185 (E05): cadastro bloqueado não recebe nada; os botões que mandam algo ao cliente nascem desabilitados.
+export const MOTIVO_BLOQUEADO_AO_ENVIAR = 'Cliente bloqueado: desbloqueie o cadastro para enviar.'
+
+export function acaoDoPix(situacaoCob, {
+  prerequisito, rotuloGerar, linkVencidoApi, linkPendenteApi = false, aoAbrirBaixa, aoGerarPix, aoReenviarPix, aoMandarLinkNovo = null,
+  bloqueado = false,
+}) {
   switch (situacaoCob.chave) {
     case 'nenhuma':
       return {
@@ -23,9 +29,9 @@ export function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoA
       // dizia "gere uma cobrança nova" e não havia onde gerar).
       if (linkVencidoApi && aoMandarLinkNovo) {
         return {
-          rotuloEstado: 'Cobrança venceu', motivo: linkVencidoApi,
+          rotuloEstado: 'Cobrança venceu', motivo: bloqueado ? MOTIVO_BLOQUEADO_AO_ENVIAR : linkVencidoApi,
           botoes: [
-            { rotulo: 'Mandar link novo', icone: 'refresh-cw', onClick: aoMandarLinkNovo },
+            { rotulo: 'Mandar link novo', icone: 'refresh-cw', onClick: aoMandarLinkNovo, desabilitado: bloqueado },
             { rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa, secundario: true },
           ],
         }
@@ -38,7 +44,8 @@ export function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoA
       }
       return {
         rotuloEstado: 'Cobrança venceu',
-        botoes: [{ rotulo: 'Reenviar cobrança', icone: 'refresh-cw', onClick: aoReenviarPix }],
+        ...(bloqueado ? { motivo: MOTIVO_BLOQUEADO_AO_ENVIAR } : null),
+        botoes: [{ rotulo: 'Reenviar cobrança', icone: 'refresh-cw', onClick: aoReenviarPix, desabilitado: bloqueado }],
       }
     case 'em-conferencia':
       return {

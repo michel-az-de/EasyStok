@@ -15,9 +15,10 @@ import { MarcaIcone } from '../componentes/MarcaIcone'
 import { Pilula } from '../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
 import { useAcessoModulos } from '../aplicacao/acessoModulos'
-import { contarAbertas, contarNaEsteira } from '../dominio/conversa'
+import { contarAbertas, contarAbertasDoBalcao, contarNaEsteira } from '../dominio/conversa'
 import { contarAtivas } from '../dominio/automacao'
-import { DESKTOP, TABLET, useTopoCompacto } from '../hooks/useTamanhoTela'
+import { CELULAR, DESKTOP, TABLET, useTopoCompacto } from '../hooks/useTamanhoTela'
+import { useAoAbrirConversa } from '../aplicacao/aberturaDeConversa'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
 import { CompartilharComanda } from '../features/atendimento/CompartilharComanda'
@@ -180,8 +181,10 @@ function Cabecalho({
   const { permite, notificacoes, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const compacto = useTopoCompacto()
   const botaoMaisRef = useRef(null)
+  const { fonteApi } = useAtendimento()
   const emAndamento = contarAbertas(conversas)
-  const naEsteira = contarNaEsteira(conversas)
+  // #2185 (F19): pedido cancelado e comanda ainda em montagem não estão na esteira.
+  const naEsteira = contarNaEsteira(conversas, { fonteApi })
 
   return (
     <header className={css.topo}>
@@ -411,7 +414,7 @@ function ConteudoMoldura({
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, solicitacaoPainel = null,
 }) {
   const {
-    visiveis, selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
+    selecionada, conversas, filtros, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
   } = useAtendimento()
   // Modo API (F06): contadores e avatar vêm da sessão e da API; da massa, nada.
   const regras = fonteApi ? null : regrasDaMassa
@@ -424,6 +427,9 @@ function ConteudoMoldura({
   const botaoFichaRef = useRef(null)
 
   const irParaAtendimento = useCallback(() => setAba('atendimento'), [])
+  // #2185 (F8): sino, aviso na tela e "Não entregues" abrem a conversa por fora da lista; no celular a tela
+  // da conversa é uma aba, e sem este passo a atendente seguia na lista com a conversa só marcada.
+  useAoAbrirConversa(() => { if (tamanho === CELULAR) setAba('atendimento') })
 
   // Rodada 11 (issue #8, registro 92): o cenário do Simular abre a conversa
   // nova (SIMULAR_CONVERSA seleciona a `sim-…`), mas no celular a aba ficava
@@ -457,11 +463,14 @@ function ConteudoMoldura({
   // F2 abre e fecha o painel de simulações de qualquer lugar da tela (seção
   // 7): Ctrl+Shift+S é captura de tela no Edge, F2 não tem dono em navegador
   // nenhum.
+  // #2185 (E29): no modo API não há Simular; o F2 só é capturado onde existe o que abrir, senão o atalho
+  // do navegador (renomear, editar) ficava mudo.
   useEffect(() => {
+    if (!aoAlternarSimulacoes) return undefined
     function aoTeclar(evento) {
       if (evento.key !== 'F2') return
       evento.preventDefault()
-      aoAlternarSimulacoes?.()
+      aoAlternarSimulacoes()
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
@@ -616,7 +625,8 @@ function ConteudoMoldura({
         ativa={aba}
         aoTrocar={setAba}
         abas={[
-          { id: 'balcao', rotulo: 'Conversas', contador: visiveis.length },
+          // #2185 (F18): o mesmo número do título da lista e do chip "Todas".
+          { id: 'balcao', rotulo: 'Conversas', contador: contarAbertasDoBalcao(conversas, filtros, sessao?.usuario) },
           { id: 'atendimento', rotulo: 'Conversa' },
           { id: 'ficha', rotulo: 'Ficha' },
         ]}

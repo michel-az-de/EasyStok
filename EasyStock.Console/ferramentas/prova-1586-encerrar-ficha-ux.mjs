@@ -144,6 +144,7 @@ const clienteDom = await import('../src/dominio/cliente.js')
 const cobrancaDom = await import('../src/dominio/cobranca.js')
 const { GATILHOS } = await import('../src/dominio/automacao.js')
 const { montarResumoAtendimento } = await import('../src/dominio/resumoAtendimento.js')
+const { CANAIS } = await import('../src/infra/catalogo.js')
 
 const AGORA = Date.parse('2026-10-11T15:00:00Z')
 const MENSAGEM_API = { id: 'm-api', direcao: 'Saida', status: 'Enviada', autor: 'Dona', enviadaEm: '2026-10-11T15:00:00Z', tipoConteudo: 'Texto', texto: 'ok' }
@@ -312,7 +313,8 @@ const alertas = (tela) => nos(tela.arvore).filter((n) => n.props?.role === 'aler
 const REGRA_ENCERRAMENTO = { id: 'encerramento', gatilho: GATILHOS.ENCERRAMENTO, ativa: true, texto: 'Obrigada, {nome}!' }
 const comoApi = (conversas = [conversaBase()]) => {
   ctx.atendimento = { fonteApi: true, conversas, agora: AGORA, regras: [REGRA_ENCERRAMENTO] }
-  ctx.catalogo = { canais: [], cardapio: [], entregadores: [] }
+  // #2185 (E08): a despedida só nasce marcada se o canal da conversa existe no catálogo e aceita escrever.
+  ctx.catalogo = { canais: CANAIS, cardapio: [], entregadores: [] }
 }
 const comoDemonstracao = (conversas = [conversaBase()]) => { comoApi(conversas); ctx.atendimento.fonteApi = false }
 const nada = () => {}

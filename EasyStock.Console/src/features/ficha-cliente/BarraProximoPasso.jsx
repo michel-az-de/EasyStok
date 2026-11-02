@@ -216,6 +216,7 @@ export function BarraProximoPasso({
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
       linkPendenteApi: fonteApi && Boolean(pedido.cobranca?.link),
       aoAbrirBaixa: () => setAbrindoBaixa(true),
+      bloqueado,
       // #1989 (#1765-3): com a forma já escolhida também abre o resumo; quem gera é o "Confirmar".
       aoGerarPix: () => { if (!pedindoMeio) setMeioNaBarra(pedido.meio ?? null); setPedindoMeio(true) },
       aoReenviarPix: () => executar(() => aoReenviarPix()),

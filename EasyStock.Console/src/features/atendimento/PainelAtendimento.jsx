@@ -13,7 +13,6 @@ import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { primeiroNome } from '../../dominio/mensagem'
-import { assistenteAtendendo } from '../../dominio/resumoDoModo'
 import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
@@ -44,8 +43,10 @@ export function PainelAtendimento({
   const cabecalhoRef = useRef(null)
   const compositorPublicoRef = useRef(null)
   const contextoDaNota = useRef({ id: selecionada?.id, visivel: editorNotaVisivel })
-  const reabrindoRef = useRef(false)
-  const [reabrindo, setReabrindo] = useState(false)
+  // #2185 (F22): "Reabrindo…" e "Abrindo…" são da conversa que pediu; o Painel não remonta por conversa, e
+  // o botão da outra nascia desabilitado até a primeira terminar.
+  const reabrindoIds = useRef(new Set())
+  const [reabrindoDe, setReabrindoDe] = useState(() => new Set())
   // #1761: "Modelos aprovados" abre do compositor e da bolha recusada fora da janela de 24 h.
   // Guardado pelo id da conversa: trocar de conversa fecha.
   const [modelosDe, setModelosDe] = useState(null)
@@ -53,22 +54,24 @@ export function PainelAtendimento({
   const [modalDoMenu, setModalDoMenu] = useState(null)
 
   // #2005 (console-09): só o modo API tem a ação; na demonstração o fio já é inteiro.
-  const anterioresEmCurso = useRef(false)
-  const [abrindoAnteriores, setAbrindoAnteriores] = useState(false)
+  const anterioresIds = useRef(new Set())
+  const [anterioresDe, setAnterioresDe] = useState(() => new Set())
   async function aoVerAnteriores() {
-    if (anterioresEmCurso.current || !selecionada) return
-    anterioresEmCurso.current = true
-    setAbrindoAnteriores(true)
-    try { await carregarMensagensAnteriores(selecionada.id) }
-    finally { anterioresEmCurso.current = false; setAbrindoAnteriores(false) }
+    if (!selecionada || anterioresIds.current.has(selecionada.id)) return
+    const id = selecionada.id
+    anterioresIds.current.add(id)
+    setAnterioresDe(new Set(anterioresIds.current))
+    try { await carregarMensagensAnteriores(id) }
+    finally { anterioresIds.current.delete(id); setAnterioresDe(new Set(anterioresIds.current)) }
   }
 
   async function aoReabrir() {
-    if (reabrindoRef.current || !selecionada) return
-    reabrindoRef.current = true
-    setReabrindo(true)
-    try { await reabrir(selecionada.id) }
-    finally { reabrindoRef.current = false; setReabrindo(false) }
+    if (!selecionada || reabrindoIds.current.has(selecionada.id)) return
+    const id = selecionada.id
+    reabrindoIds.current.add(id)
+    setReabrindoDe(new Set(reabrindoIds.current))
+    try { await reabrir(id) }
+    finally { reabrindoIds.current.delete(id); setReabrindoDe(new Set(reabrindoIds.current)) }
   }
 
   useEffect(() => {
@@ -113,6 +116,8 @@ export function PainelAtendimento({
     )
   }
 
+  const reabrindo = reabrindoDe.has(selecionada.id)
+  const abrindoAnteriores = anterioresDe.has(selecionada.id)
   const canal = canalDaConversa(canais, selecionada)
   const { pode, ofereceModelo, janela, motivo } = permissaoDeEscrita(selecionada, agora, canal)
   // Valor CRU, não booleano: a marca PAUSA_POR_ASSUMIR é o que separa "pausado
@@ -132,7 +137,9 @@ export function PainelAtendimento({
   const digitando = Boolean(selecionada.respostaPendente?.length) && !pausado && !bloqueada
   const faixa = faixaDaJanela(janelas, selecionada.pedido?.janela)
   // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
-  const podeEnviarModelo = fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada
+  // #2185 (E19): o modelo aprovado vai para um cliente cadastrado (o EasyStok exige o `clienteId`); sem
+  // cadastro o botão abria uma janela com tudo desligado.
+  const podeEnviarModelo = fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada && Boolean(selecionada.clienteId)
   const prazo = prazoNoCabecalho(janela)
 
   const aplicarTemplate = (template) => definirRascunho(
@@ -186,6 +193,7 @@ export function PainelAtendimento({
         conversa={selecionada}
         pausado={pausado}
         bloqueada={bloqueada}
+        podeReabrir={podeReabrir}
         acoes={acoesTela}
         aoAssumir={() => assumirAtendimento(selecionada.id)}
       />
@@ -203,6 +211,7 @@ export function PainelAtendimento({
           aoReenviar={reenviar ? (mensagemId) => reenviar(selecionada.id, mensagemId) : undefined}
           aoAbrirModelos={podeEnviarModelo ? () => setModelosDe(selecionada.id) : undefined}
           digitando={digitando}
+          visivel={visivel}
           notas={selecionada.cliente?.notas ?? []}
           temAnteriores={Boolean(selecionada.temAnteriores) && !selecionada.anterioresEsgotadas}
           abrindoAnteriores={abrindoAnteriores}
@@ -226,7 +235,8 @@ export function PainelAtendimento({
         escritaDeFora={escritaDeFora}
         aoEnviar={(texto) => enviar(selecionada.id, texto.trim())}
         // #2134: responder com o Assistente atendendo é assumir, pelo mesmo caminho do botão Assumir.
-        aoAssumirAntes={assistenteAtendendo(selecionada, pausado, bloqueada) || acoesTela.confirmarAoAssumir ? () => assumirAtendimento(selecionada.id) : null}
+        // #2185 (F12): a mesma conta do caminho do envio (`acoesDaConversa`): Assistente atendendo ou conversa de colega.
+        aoAssumirAntes={acoesTela.assumirAntesDeEnviar ? () => assumirAtendimento(selecionada.id) : null}
         podeEnviarModelo={podeEnviarModelo}
         modelosFixos={modelosAVista(janela)}
         modeloAberto={modelosDe === selecionada.id}

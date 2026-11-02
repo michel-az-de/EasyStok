@@ -13,7 +13,7 @@ function areaRolavel(no) {
 // ou quando quem lê já estava no fim (`dominio/rolagemDoFio.js`). "Estava no fim" é medido a cada
 // rolagem, antes de a mensagem nova aumentar o fio; depois dela a conta já sairia errada.
 export function useRolagemDoFio(fimRef, {
-  mensagens, chaveRolagem, digitando, totalDeNotas,
+  mensagens, chaveRolagem, digitando, totalDeNotas, visivel = true,
 }) {
   const noFim = useRef(true)
   const anterior = useRef(null)
@@ -27,6 +27,12 @@ export function useRolagemDoFio(fimRef, {
     area.addEventListener('scroll', medir, { passive: true })
     return () => area.removeEventListener('scroll', medir)
   }, [fimRef])
+
+  // #2185 (F31): no celular o painel da conversa fica `display:none` nas outras abas. A mensagem que chega
+  // com ele escondido rola sem layout nenhum; ao voltar, quem estava no fim volta para o fim.
+  useEffect(() => {
+    if (visivel && noFim.current) fimRef.current?.scrollIntoView({ block: 'end' })
+  }, [fimRef, visivel])
 
   const { total, ultimaId, ultimaDaCasa } = retratoDoFio(chaveRolagem, mensagens)
   useEffect(() => {

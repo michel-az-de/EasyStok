@@ -6,6 +6,7 @@
 // chega injetado em `executarAcaoDoAssistente`.
 import { primeiroNome } from './mensagem.js'
 import { textoConviteCardapio } from './cardapioLink.js'
+import { juntarAoRascunho } from './rascunho.js'
 
 export const ACOES_DO_ASSISTENTE = {
   RETOMAR_AUTOMATICO: 'retomar_automatico',
@@ -76,7 +77,7 @@ export function descreverAcaoDoAssistente(acao, nomeCliente) {
 }
 
 // Executa a ação confirmada pela atendente. `portas` são as ações da tela:
-// { obterLinkCardapio, enviar, salvarNota, definirRascunho, abrirTela }.
+// { obterLinkCardapio, enviar, salvarNota, definirRascunho, rascunhoAtual, abrirTela }.
 // O cardápio sai com o mesmo convite e o mesmo link do botão do compositor (#1353).
 export async function executarAcaoDoAssistente(acao, conversa, portas) {
   switch (acao.tipo) {
@@ -97,7 +98,8 @@ export async function executarAcaoDoAssistente(acao, conversa, portas) {
       }
       return
     case ACOES_DO_ASSISTENTE.RASCUNHO:
-      portas.definirRascunho(conversa.id, acao.texto)
+      // #2185 (F13): soma ao que ela já escreveu, como o botão Respostas.
+      portas.definirRascunho(conversa.id, juntarAoRascunho(portas.rascunhoAtual?.(conversa.id), acao.texto))
       return
     case ACOES_DO_ASSISTENTE.ABRIR_TELA:
       portas.abrirTela(acao.tela)

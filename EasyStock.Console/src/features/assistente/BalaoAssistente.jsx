@@ -14,6 +14,7 @@ import {
 } from '../../dominio/paineis'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { canalDaConversa } from '../../dominio/canal'
+import { conversaEncerrada } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, permissaoDeEscrita } from '../../dominio/janela'
 import {
   analisarFotoSuspeita, dicaCDC, padraoDeCompra, resumoCliente, revisarOrtografia, sentimentoDaConversa,
@@ -77,6 +78,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
         enviar: (...args) => { conferirContexto(); return enviar(...args) },
         salvarNota: (...args) => { conferirContexto(); return salvarNota(...args) },
         definirRascunho: (...args) => { conferirContexto(); return definirRascunho(...args) },
+        // #2185 (F13): "Usar no rascunho" soma ao que ela já escreveu em vez de apagar.
+        rascunhoAtual: () => rascunho,
         abrirTela: (tela) => { conferirContexto(); return aoAbrirTela?.(tela) },
       })
     },
@@ -105,12 +108,20 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     setDispensados(new Set())
   }
 
+  // #2185 (F6): fechar só devolve o foco ao gatilho quando ele estava no painel (ou perdido). Quem digita no
+  // campo de mensagem com o Assistente aberto ao lado não pode ter o foco roubado.
   function fechar() {
+    const foco = document.activeElement
+    const emOutroLugar = foco && foco !== document.body && foco !== botaoRef.current && !painelRef.current?.contains(foco)
     setAberto(false)
-    botaoRef.current?.focus()
+    if (!emOutroLugar) botaoRef.current?.focus()
   }
+  // Esc de quem está no painel ou no gatilho. Esc no campo de mensagem é da atendente (fechar sugestão,
+  // desistir) e não fecha o Assistente, que ela deixou aberto de propósito.
   useEscape(aberto, (evento) => {
     if (document.querySelector('dialog[open]')) return
+    const foco = document.activeElement
+    if (!(painelRef.current?.contains(foco) || foco === botaoRef.current || foco === document.body)) return
     evento.preventDefault()
     fechar()
   })
@@ -372,6 +383,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                             nomeCliente={selecionada.nome}
                             motivoDeEnvio={motivoDeEnvio}
                             semCadastro={fonteApi && !selecionada.clienteId}
+                            encerrada={conversaEncerrada(selecionada)}
                             aoExecutar={(acaoProposta) => aoExecutarAcao(t.id, acaoProposta)}
                           />
                           {t.erro && (

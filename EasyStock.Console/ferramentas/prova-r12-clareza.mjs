@@ -48,15 +48,15 @@ const ok = (texto) => { passos += 1; console.log(`ok ${passos} - ${texto}`) }
 const passagem = { motivo: 'Restrição alimentar, o automático não responde isso', em: iso(0), assumida: false }
 const origem = origemDaPassagem(passagem)
 assert.equal(origem.hora, '11:05')
-assert.match(origem.longo, /^O atendimento automático não soube responder e passou para você às 11:05\./)
+assert.match(origem.longo, /^O Assistente não soube responder e passou para você às 11:05\./)
 assert.match(origem.longo, /Motivo: restrição alimentar, o automático não responde isso\.$/)
-assert.equal(origem.curto, 'Automático não soube responder (11:05): restrição alimentar, o automático não responde isso')
+assert.equal(origem.curto, 'Assistente não soube responder (11:05): restrição alimentar, o automático não responde isso')
 ok('origem da passagem diz quem passou, a hora e o motivo')
 
 assert.equal(origemDaPassagem(null), null)
 const semHora = origemDaPassagem({ motivo: null, assumida: false })
 assert.equal(semHora.hora, null)
-assert.match(semHora.curto, /^Automático não soube responder: o agente preferiu não responder sozinho$/)
+assert.match(semHora.curto, /^Assistente não soube responder: o Assistente preferiu não responder sozinho$/)
 ok('passagem antiga, sem hora nem motivo, cai no texto padrão sem inventar hora')
 
 // --- 2. A barra da conversa conta a mesma origem ------------------------------

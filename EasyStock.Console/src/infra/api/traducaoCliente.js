@@ -1,4 +1,4 @@
-import { enderecoDasPartes, mascaraCep, partesDoEndereco } from '../../dominio/formato'
+import { diaMesHora, enderecoDasPartes, mascaraCep, partesDoEndereco } from '../../dominio/formato'
 import { favoritoDoCliente } from '../../dominio/ficha'
 import { instante } from './traducaoConversas'
 
@@ -62,7 +62,8 @@ export function contatoInformadoDoDossie(dossie) {
   return { nome: c.nome || null, telefone: c.telefone, email: c.email || null, informadoEm: c.informadoEm ?? null }
 }
 
-const quando = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+// #2185 (F27): no fuso da casa, não no do aparelho.
+const quando = diaMesHora
 
 // `criadoEm` (ISO, UTC) põe a nota no lugar certo do fio como post-it (#1441). Sem o Z o
 // navegador leria como hora local e a nota cairia três horas depois.

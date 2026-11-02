@@ -29,6 +29,7 @@ import { criarAcoesMensagensProgramadasApi } from './api/mensagensProgramadas'
 import { criarAcoesModelosApi } from './api/modelos'
 import { criarAcoesMensagensAnterioresApi } from './api/mensagensAnteriores'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
+import { criarAssumirAntesDeEnviar } from './api/assumirAntesDeEnviar'
 import { criarChavesDeMensagem } from './chavesDeMensagem'
 import { proximoInstante } from './relogioDeLeitura'
 
@@ -85,12 +86,16 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       return true
     })
     .catch((erro) => { avisar(erro); return false })
+  // #2185 (F12, E09): o botão Assumir, o campo e todo envio humano assumem pelo mesmo caminho.
+  const assumirDaConversa = criarAssumirAntesDeEnviar({
+    despachar, estadoRef, agoraRef, assumirNaApi: (id) => confirmarResponsavel(id, assumir),
+  })
 
   return {
     ...acoes,
     listarAtendentes,
     ...criarAvisosNaoLigadas(despachar),
-    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves }),
+    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves, assumirParaEnviar: assumirDaConversa.paraEnviar }),
     // #1474: sem `fixo`, fecha só o aviso de ação; o persistente (configuração) só com `fixo: true`.
     fecharAvisoApi: ({ fixo = false } = {}) => despachar({ tipo: acao.FECHAR_AVISO_API, fixo }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
@@ -101,7 +106,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     ...criarAcoesAgenteApi({ despachar }),
     ...criarAcoesConsentimentosApi(),
     ...criarAcoesOcorrenciasApi(),
-    ...criarAcoesComandaApi(acoes, { despachar, estadoRef }),
+    ...criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnviar: assumirDaConversa.antesDeEnviar }),
     ...clienteApi,
     // #1441: respostas prontas, automáticas e tags do cliente.
     ...criarAcoesRespostasApi({ despachar, estadoRef }),
@@ -133,17 +138,20 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
         return false
       }
       if (envioRecusado(id)) return false
-      const mensagemId = proximoId('msg')
-      despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
-      return chaves.enviar(id, { texto }, (chave) => enviarTexto(id, texto, { chave }))
-        .then((m) => {
-          despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
-          return true
-        })
-        .catch((erro) => {
-          despachar(falhaDoEnvio(id, mensagemId, erro))
-          return false
-        })
+      // #2185 (F12): cardápio, Assistente e campo assumem antes de falar; sem o que assumir, sai na hora.
+      return assumirDaConversa.antesDeEnviar(id, () => {
+        const mensagemId = proximoId('msg')
+        despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
+        return chaves.enviar(id, { texto }, (chave) => enviarTexto(id, texto, { chave }))
+          .then((m) => {
+            despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
+            return true
+          })
+          .catch((erro) => {
+            despachar(falhaDoEnvio(id, mensagemId, erro))
+            return false
+          })
+      })
     },
     // S57: só no modo API (a massa local não tem envio de verdade). A resposta substitui o balão.
     reenviar: (id, mensagemId) =>
@@ -174,7 +182,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       const c = estadoRef.current.conversas.find((x) => x.id === id)
       if (precisaLerFicha(c)) clienteApi.carregarClienteDaConversa(id)
     },
-    assumirAtendimento: (id) => confirmarResponsavel(id, assumir),
+    assumirAtendimento: assumirDaConversa.assumir,
     devolverAutomatico: (id) => confirmarResponsavel(id, liberarAutomatico),
     // #1239: "Passar para…" do cabeçalho da conversa. A resposta é a situação nova (outro dono);
     // a recusa (destino que não atende, conversa mudou) volta como `{ erro }` para o modal.

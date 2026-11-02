@@ -10,7 +10,7 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { ehLead } from '../../dominio/conversa'
 import { enviosAutomaticos } from '../../dominio/automacao'
 import { diasEntre, quandoRelativo, resumoFinanceiro } from '../../dominio/cliente'
-import { moeda } from '../../dominio/formato'
+import { FUSO, diaMesHora, moeda } from '../../dominio/formato'
 import { rotuloDoEstado } from '../../dominio/pedido'
 import { numeroParaEntregador, textoDoEntregador } from '../../dominio/despacho'
 import css from './cliente.module.css'
@@ -105,7 +105,7 @@ function AbaAtendimentos({ conversaId, atendimentos }) {
           <header>
             {/* `encerradoEm` é o relógio da tela em ms (casos/encerramento.js). */}
             <time dateTime={new Date(a.encerradoEm).toISOString()}>
-              {new Date(a.encerradoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              {new Date(a.encerradoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', timeZone: FUSO })}
             </time>
             <span>{a.numero} · {a.faixaHorario} · {a.duracaoTexto}</span>
             <b className={css.totalPedido}>{a.receita ? moeda(a.receita.liquido) : '—'}</b>
@@ -187,7 +187,7 @@ function AbaNotas({ conversa, ocupado, aoOcupar }) {
 // pedido e o agente). A API grava cada envio como mensagem; o gatilho de cada uma e os
 // disparos que não saíram (fora da janela, desligada) ainda não ficam registrados.
 const ROTULO_ORIGEM = { agente: 'Agente', sistema: 'Automática' }
-const horaCompleta = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+const horaCompleta = diaMesHora
 
 function AbaAutomaticas({ envios }) {
   if (envios.length === 0) return <p className={css.corpoBloco}>Nada automático nesta conversa.</p>
