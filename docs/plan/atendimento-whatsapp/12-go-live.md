@@ -67,13 +67,14 @@ select "PedidoId", count(*) from viagem_paradas where "EntregueEm" is null group
 Publique pelo script versionado (#1358) e registre os SHAs esperados do Console e da API:
 
 ```bash
-scripts/deploy/console-deploy.sh
+CONSOLE_SHA_ESPERADO="<sha-completo-revisado>" scripts/deploy/console-deploy.sh
 ```
 
 Ele monta o `origin/master` em modo API a partir de `git archive`, carimba
 `<meta name="easystok-console-sha">`, guarda os arquivos anteriores como `index.html.antes-<ts>` e
 `versao.json.antes-<ts>`, copia para a pasta que o Caddy serve e confere o HTML, o manifesto e o cache.
 Avisa quando a API está noutro SHA; este script publica somente o Console.
+Com `CONSOLE_SHA_ESPERADO`, recusa outro `master` antes de qualquer escrita remota.
 `--so-montar` só monta o `origin/master` e confere, sem SSH; não valida uma PR ainda não integrada.
 Rollback = restaurar o `index.html` e o `versao.json` do mesmo timestamp e conferir ambos pela URL pública.
 Falha na conferência pública pode retornar erro após a troca: confira a versão servida antes de restaurar.
