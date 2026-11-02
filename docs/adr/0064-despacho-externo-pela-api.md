@@ -62,8 +62,18 @@ existe (`Viagem.RegistrarRetorno` e `Pedido.RegistrarRetornoEntrega`). `PedidoSt
 
 A corrida nasce `Solicitando` e é gravada antes do POST, com o próprio id no `metadata` do pedido. Um
 índice único parcial (`ux_corridas_externas_viagem_ativa`, status 1 a 4) barra a segunda em curso na
-mesma viagem, venha de dois cliques ou de dois hosts. O POST não é repetido: num timeout, a reconsulta
-reconcilia. O id do provedor é único por provedor (`ux_corridas_externas_provedor_id_externo`).
+mesma viagem, venha de dois cliques ou de dois hosts. O POST não é repetido. O id do provedor é único por
+provedor (`ux_corridas_externas_provedor_id_externo`).
+
+Revisão de 2026-10-31 (#2168): a v3 não busca pedido pelo `metadata`, então sem o id do pedido não há o
+que reconsultar. A corrida que não recebeu o id (timeout, 5xx, resposta ilegível ou erro ao gravar) nunca
+vira `Falha` sozinha, porque isso liberaria uma segunda corrida paga por cima da primeira. Depois de
+`PrazoConfirmacao` (2 min) ela aparece como "confira no painel da Lalamove", e só a atendente libera a
+viagem (`POST .../corridas/{id}/liberar`). Com o id em mãos, resposta incompleta do POST nunca é recusa:
+a corrida segue procurando motorista e a reconsulta traz o resto.
+
+Gorjeta: na Lalamove a gorjeta nova substitui a anterior e precisa ser maior. A tela e a API trabalham com
+o total, e a gorjeta atual é o preço do provedor acima do cotado, relido a cada reconsulta.
 
 ### D5 · Webhook e dado pessoal (R5, R12)
 

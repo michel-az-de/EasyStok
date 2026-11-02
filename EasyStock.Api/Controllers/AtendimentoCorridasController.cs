@@ -23,6 +23,7 @@ public class AtendimentoCorridasController(
     SincronizarCorridaUseCase sincronizarUseCase,
     CancelarCorridaUseCase cancelarUseCase,
     AdicionarGorjetaCorridaUseCase gorjetaUseCase,
+    DescartarSolicitacaoCorridaUseCase liberarUseCase,
     ConexaoDespachoUseCase conexaoUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
@@ -66,11 +67,13 @@ public class AtendimentoCorridasController(
     [SwaggerOperation(Summary = "Refresh a ride from the provider", Description = "Reconsulta o provedor e aplica o status na viagem e no pedido.")]
     [HttpGet("{corridaId:guid}")]
     public Task<IActionResult> Atualizar(Guid viagemId, Guid corridaId, CancellationToken ct) =>
-        Executar(async () =>
-        {
-            var corrida = await sincronizarUseCase.ExecuteAsync(currentUser.EmpresaId, corridaId, ct);
-            return corrida.ViagemId == viagemId ? DataOk(corrida) : throw new CorridaExternaNaoEncontradaException(corridaId);
-        });
+        Executar(async () => DataOk(await sincronizarUseCase.ExecuteAsync(currentUser.EmpresaId, viagemId, corridaId, ct)));
+
+    [SwaggerOperation(Summary = "Release a trip whose ride the provider never confirmed",
+        Description = "#2168: a atendente conferiu no painel da Lalamove que o pedido não existe. Só 2 min depois da chamada.")]
+    [HttpPost("{corridaId:guid}/liberar")]
+    public Task<IActionResult> Liberar(Guid viagemId, Guid corridaId, CancellationToken ct) =>
+        Executar(async () => DataOk(await liberarUseCase.ExecuteAsync(currentUser.EmpresaId, viagemId, corridaId, ct)));
 
     [SwaggerOperation(Summary = "Cancel a ride on the provider", Description = "Só procurando motorista ou até 5 min depois do match.")]
     [HttpPost("{corridaId:guid}/cancelar")]
