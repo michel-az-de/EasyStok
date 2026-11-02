@@ -11,7 +11,7 @@ import { focarNotasDaConversa } from './focarCampoDaFicha'
 const ContextoMesa = createContext(null)
 export const useMesaDeNotas = () => useContext(ContextoMesa)
 
-function NotaNaMesa({ escopo, registro, aoRecolher }) {
+function NotaNaMesa({ escopo, registro, aoRecolher, visivel }) {
   const controle = usePainelMovel(escopo, `nota:${registro.clienteId}:${registro.nota.id}`)
   const soltar = controle.soltar
   const solto = controle.solto
@@ -19,14 +19,14 @@ function NotaNaMesa({ escopo, registro, aoRecolher }) {
   useEffect(() => { if (!solto) soltar(origem.current) }, [soltar, solto])
   const controleComFoco = { ...controle, devolverFoco: () => controle.devolverFoco?.() || focarNotasDaConversa(registro.conversaId) }
   return <PainelMovel controle={controleComFoco} titulo={`Nota · ${registro.clienteNome}`} larguraInicial={280}
-    className={css.solto} classeCorpo={css.corpo} focar={registro.focar === true}
+    className={css.solto} classeCorpo={css.corpo} focar={registro.focar === true} visivel={visivel}
     atributos={{ 'data-postit-solto': registro.nota.id, 'data-cliente-nota': registro.clienteId }} aoRecolher={aoRecolher}>
     <p className={css.texto}>{registro.nota.texto}</p>
     <small>{[registro.nota.autor, registro.nota.em].filter(Boolean).join(' · ')}</small>
   </PainelMovel>
 }
 
-function MesaDaSessao({ children, escopo, identidade, fonteApi, conversas, selecionadaId }) {
+function MesaDaSessao({ children, escopo, identidade, fonteApi, conversas, selecionadaId, visivel }) {
   const dadosLocais = fonteApi ? SEM_CONVERSAS : conversas
   const [notas, setNotas] = useState({})
   const notasAtuais = useRef(notas)
@@ -144,18 +144,18 @@ function MesaDaSessao({ children, escopo, identidade, fonteApi, conversas, selec
     estaSolta: (clienteId, notaId) => Object.hasOwn(notas, idNotaNaMesa(clienteId, notaId))
       && notas[idNotaNaMesa(clienteId, notaId)].conversaId === selecionadaId }}>
     {children}
-    {liberada && Object.entries(notas).filter(([, registro]) => registro.conversaId === selecionadaId).map(([id, registro]) => <NotaNaMesa key={id} escopo={escopo} registro={registro}
+    {liberada && Object.entries(notas).filter(([, registro]) => registro.conversaId === selecionadaId).map(([id, registro]) => <NotaNaMesa key={id} escopo={escopo} registro={registro} visivel={visivel}
       aoRecolher={() => recolher(registro.clienteId, registro.nota.id)} />)}
     {liberada && erro && <output className={css.avisoMesa}>{erro} <button type="button" onClick={() => { setErro(null); setTentativa(n => n + 1) }}>Tentar novamente</button></output>}
   </ContextoMesa.Provider>
 }
 
 const SEM_CONVERSAS = []
-export function MesaDeNotas({ children }) {
+export function MesaDeNotas({ children, visivel = true }) {
   const { sessao, fonteApi, selecionada, conversas = SEM_CONVERSAS } = useAtendimento()
   const identidade = identidadeDaMesa(sessao)
   if (fonteApi && !identidade) return children
   const escopo = fonteApi ? `sessao:${identidade}` : 'demonstracao'
   return <MesaDaSessao key={escopo} escopo={escopo} identidade={identidade} fonteApi={fonteApi} conversas={conversas}
-    selecionadaId={selecionada?.id ?? null}>{children}</MesaDaSessao>
+    selecionadaId={selecionada?.id ?? null} visivel={visivel}>{children}</MesaDaSessao>
 }

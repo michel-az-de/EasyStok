@@ -405,11 +405,27 @@ function BotaoSimular({ ativo, aoAlternar }) {
 
 // Três arranjos para o mesmo conteúdo. Os painéis não sabem em qual estão.
 export function Moldura(props) {
-  return <MesaDeNotas><ConteudoMoldura {...props} /></MesaDeNotas>
+  const { selecionada } = useAtendimento()
+  const selecionadaId = selecionada?.id ?? null
+  const solicitacaoPainel = props.solicitacaoPainel ?? null
+  const [aba, setAba] = useState('balcao')
+  const [selecaoDaAba, setSelecaoDaAba] = useState(selecionadaId)
+  const [pedidoDaAba, setPedidoDaAba] = useState(solicitacaoPainel)
+  if (selecionadaId !== selecaoDaAba) {
+    setSelecaoDaAba(selecionadaId)
+    if (selecionadaId?.startsWith('sim-')) setAba('atendimento')
+  }
+  if (solicitacaoPainel !== pedidoDaAba) {
+    setPedidoDaAba(solicitacaoPainel)
+    if (solicitacaoPainel) setAba(solicitacaoPainel.aba)
+  }
+  return <MesaDeNotas visivel={props.tamanho !== CELULAR || aba !== 'balcao'}>
+    <ConteudoMoldura {...props} aba={aba} setAba={setAba} />
+  </MesaDeNotas>
 }
 
 function ConteudoMoldura({
-  tamanho, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca, aoAbrirCardapio, aoAbrirAutomacoes, aoAbrirGestao,
+  tamanho, aba, setAba, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca, aoAbrirCardapio, aoAbrirAutomacoes, aoAbrirGestao,
   aoAbrirEntregas, aoAbrirAjuda, aoRascunho, simulando, aoAlternarSimulacoes, larguras, largurasPadrao = larguras, aoRedimensionar, cardapioAberto = null,
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, solicitacaoPainel = null,
 }) {
@@ -420,13 +436,12 @@ function ConteudoMoldura({
   const regras = fonteApi ? null : regrasDaMassa
   const atendente = fonteApi ? (sessao?.usuario?.nome ?? null) : 'Thatiane'
   const { alternarLoja } = useAcoes()
-  const [aba, setAba] = useState('balcao')
   const [pedidoPainelVisto, setPedidoPainelVisto] = useState(solicitacaoPainel)
   const [fichaSolicitada, setFichaSolicitada] = useState(null)
   const [gavetaAberta, setGavetaAberta] = useState(false)
   const botaoFichaRef = useRef(null)
 
-  const irParaAtendimento = useCallback(() => setAba('atendimento'), [])
+  const irParaAtendimento = useCallback(() => setAba('atendimento'), [setAba])
   // #2185 (F8): sino, aviso na tela e "Não entregues" abrem a conversa por fora da lista; no celular a tela
   // da conversa é uma aba, e sem este passo a atendente seguia na lista com a conversa só marcada.
   useAoAbrirConversa(() => { if (tamanho === CELULAR) setAba('atendimento') })
@@ -440,21 +455,17 @@ function ConteudoMoldura({
   // Rodada 11 (issue #8, registro 92): o cenário do Simular abre a conversa
   // nova (SIMULAR_CONVERSA seleciona a `sim-…`), mas no celular a aba ficava
   // no Balcão e a dona não via o automático responder. Quando a seleção muda
-  // para uma conversa simulada, a aba vai junto para Atendimento. Ajuste na
-  // própria renderização (padrão do React para "estado que segue uma prop"),
-  // não em efeito.
+  // para uma conversa simulada, a Moldura muda a aba e este conteúdo limpa a ficha anterior.
   const selecionadaId = selecionada?.id ?? null
   const acaoCompartilhar = selecionada && <CompartilharComanda key={'compartilhar-' + selecionada.id} conversa={selecionada} />
   const [selecaoVista, setSelecaoVista] = useState(selecionadaId)
   if (selecionadaId !== selecaoVista) {
     setSelecaoVista(selecionadaId)
     setFichaSolicitada(null)
-    if (selecionadaId?.startsWith('sim-')) setAba('atendimento')
   }
   if (solicitacaoPainel !== pedidoPainelVisto) {
     setPedidoPainelVisto(solicitacaoPainel)
     if (solicitacaoPainel) {
-      setAba(solicitacaoPainel.aba)
       setFichaSolicitada(solicitacaoPainel.aba === 'ficha' ? solicitacaoPainel : null)
       if (solicitacaoPainel.aba === 'ficha' && tamanho === TABLET) setGavetaAberta(true)
     }
