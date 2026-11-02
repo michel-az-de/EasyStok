@@ -6,8 +6,7 @@
 //   2  link do Mercado Pago pendente: "Marcar pago" deixa de ser o botão primário e a nota diz por quê;
 //      na demonstração e sem link ele segue primário;
 //   3  antes de gerar a cobrança a comanda diz o total dos itens e, na encomenda, o sinal de 50%;
-//   4  em "Seleção do atendimento" a escolha da janela vem antes da comanda (1026 px de conteúdo e a lista
-//      de 10 janelas começando a 541 px: nenhuma cabia sem rolar em 1366x768).
+//   4  no painel da comanda, itens e total precedem a escolha de janela (#2178), sem duplicar o seletor.
 //
 // A busca que abria a conversa errada não reproduziu (195 cliques conferidos pelo DOM em 6 cenários, 0
 // divergências) e por isso não tem prova nem código: ver a #1875.
@@ -139,14 +138,13 @@ await confere('3  a comanda mostra a prévia do sinal junto da nota do frete', (
 
 // --- 4. Janelas ---------------------------------------------------------------------------------
 
-await confere('4  na Seleção do atendimento a escolha da janela vem antes da comanda', () => {
+await confere('4  no painel da comanda os itens e o total vêm antes da escolha da janela', () => {
   const bloco = fonte('features/ficha-cliente/BlocoPedido.jsx')
-  const seletor = bloco.indexOf('const seletorDeJanela')
   const comanda = bloco.indexOf('id="comanda-pedido"')
-  assert.ok(seletor > 0 && comanda > 0, 'seletor e comanda no arquivo')
-  assert.match(bloco, /janelaPrimeiro && seletorDeJanela/)
-  assert.match(bloco, /!janelaPrimeiro && seletorDeJanela/)
-  assert.match(bloco, /const janelaPrimeiro = !fechado && fonteApi && !pedido\.pedidoId/)
+  const total = bloco.indexOf('className={css.resumoTotal}')
+  const seletor = bloco.indexOf('{seletorDeJanela}')
+  assert.ok(comanda > 0 && total > comanda && seletor > total, 'a seleção de janela não enterra a comanda')
+  assert.equal(bloco.match(/\{seletorDeJanela\}/g)?.length, 1, 'o seletor existente continua único')
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

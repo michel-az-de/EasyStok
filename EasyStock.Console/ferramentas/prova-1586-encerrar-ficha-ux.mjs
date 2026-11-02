@@ -843,12 +843,12 @@ async function comFocoDaNota(provar) {
   }
 }
 
-await confere('nota: Cancelar e Escape retornam ao abridor capturado antes do autofocus; cleanup não foca', async () => {
+await confere('nota: Recolher e Escape retornam ao abridor capturado antes do autofocus; cleanup não foca', async () => {
   await comFocoDaNota(async ({ abrir, abridor, documento }) => {
-    for (const gesto of ['cancelar', 'escape']) {
+    for (const gesto of ['recolher', 'escape']) {
       let fechou = 0
       const tela = abrir({ aoFechar: () => { fechou++ } })
-      if (gesto === 'cancelar') botao(tela, 'Cancelar').props.onClick()
+      if (gesto === 'recolher') botao(tela, 'Recolher').props.onClick()
       else doTipo(tela, 'dialog')[0].props.onKeyDown({ key: 'Escape', defaultPrevented: false, stopPropagation: nada })
       assert.equal(fechou, 1); assert.equal(documento.activeElement, abridor); assert.equal(abridor.focos, 1)
       tela.encerrar(); assert.equal(abridor.focos, 1, 'desmontar não repete o foco')

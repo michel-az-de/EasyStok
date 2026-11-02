@@ -184,9 +184,6 @@ export function BlocoPedido({
   // #1884: com a simulação do servidor a comanda mostra frete, total com frete e sinal em número.
   const linhasSimulacao = !pedido.pedidoId ? linhasDaSimulacao(simulacao) : null
   const linhaDe = (chave) => linhasSimulacao?.find((l) => l.chave === chave)?.texto ?? null
-  // #1875: na Seleção do atendimento (pedido ainda não criado) a janela vem antes da comanda: com a comanda
-  // primeiro, em 1366x768 a lista de 10 janelas começava a 541 px de um conteúdo de 1026 e nenhuma cabia sem rolar.
-  const janelaPrimeiro = !fechado && fonteApi && !pedido.pedidoId
   const seletorDeJanela = !fechado && fonteApi
     ? <SeletorJanelaApi key={conversaId} pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
     : null
@@ -199,7 +196,6 @@ export function BlocoPedido({
 
   return (
     <>
-      {janelaPrimeiro && seletorDeJanela}
       <section
         ref={soltarRef}
         id="comanda-pedido"
@@ -278,7 +274,7 @@ export function BlocoPedido({
       {/* No modo API a janela é da vitrine, com data; pedido criado troca a vaga no servidor.
           #1474 (R3): vem antes das ações, logo abaixo da comanda, onde o motivo da barra aponta.
           #1551: remonta por conversa; o "Dia da entrega" de um cliente não vale para o seguinte. */}
-      {!janelaPrimeiro && seletorDeJanela}
+      {seletorDeJanela}
 
       <div className={css.acoesPedido}>
         {!fechado && (

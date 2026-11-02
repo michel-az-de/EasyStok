@@ -9,7 +9,7 @@ export const usePainelMovel = useControlePainelMovel
 const janelaAtual = () => ({ largura: window.innerWidth, altura: window.innerHeight })
 const movimentoReduzido = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 
-function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaInicial, className, classeCorpo, focar, aoRecolher, atributos }) {
+function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaInicial, className, classeCorpo, focar, aoRecolher, atributos, visivel }) {
   const ajuda = useId()
   const papel = useRef(null)
   const alca = useRef(null)
@@ -37,9 +37,10 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
     if (salvar) controle.guardar(proxima)
     return proxima
   }
-  useEffect(() => { if (focar) alca.current?.focus({ preventScroll: true }) }, [focar])
+  useEffect(() => { if (focar && visivel) alca.current?.focus({ preventScroll: true }) }, [focar, visivel])
   useEffect(() => () => { clearTimeout(timer.current); limparFoco.current?.() }, [])
   useLayoutEffect(() => {
+    if (!visivel) return
     const ajustar = () => {
       const limitada = limitarPainelMovel(atual.current, tamanho(), janelaAtual())
       const antes = atual.current
@@ -53,7 +54,7 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
     const observador = typeof ResizeObserver === 'function' ? new ResizeObserver(ajustar) : null
     observador?.observe(papel.current)
     return () => { window.removeEventListener('resize', ajustar); observador?.disconnect() }
-  }, [guardar, tamanho])
+  }, [guardar, tamanho, visivel])
 
   function iniciar(e, modo) {
     if (saindo || (e.pointerType === 'mouse' && e.button !== 0)) return
@@ -138,8 +139,10 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
   </aside>
 }
 
-export function PainelMovel({ controle, titulo, children, larguraInicial = 360, alturaInicial, className, classeCorpo, focar = false, aoRecolher, atributos }) {
+export function PainelMovel({ controle, titulo, children, larguraInicial = 360, alturaInicial, className, classeCorpo, focar = false, aoRecolher, atributos, visivel = true }) {
   if (!controle.solto || typeof document === 'undefined') return null
-  return createPortal(<SuperficieMovel key={controle.chave} controle={controle} titulo={titulo} larguraInicial={larguraInicial}
-    alturaInicial={alturaInicial} className={className} classeCorpo={classeCorpo} focar={focar} aoRecolher={aoRecolher} atributos={atributos}>{children}</SuperficieMovel>, document.body, controle.chave)
+  return createPortal(<div hidden={!visivel} inert={!visivel} style={{ display: visivel ? 'contents' : 'none' }}>
+    <SuperficieMovel key={controle.chave} controle={controle} titulo={titulo} larguraInicial={larguraInicial}
+      alturaInicial={alturaInicial} className={className} classeCorpo={classeCorpo} focar={focar} aoRecolher={aoRecolher} atributos={atributos} visivel={visivel}>{children}</SuperficieMovel>
+  </div>, document.body, controle.chave)
 }
