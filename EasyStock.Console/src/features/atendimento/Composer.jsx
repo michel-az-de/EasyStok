@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { MenuDeAcoes } from '../../componentes/MenuDeAcoes'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Tooltip } from '../../componentes/Tooltip'
 import { useAviso } from '../../componentes/Aviso'
@@ -10,6 +11,8 @@ import { useSugestaoProativa } from '../../aplicacao/useSugestaoProativa'
 import { useComplementoLigado } from '../../aplicacao/preferenciaDoComplemento'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { respostasEditaveis } from '../../dominio/acessoModulos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
 import { useRascunhoLocal } from '../../aplicacao/useRascunhoLocal'
 import { aceitaFormato, motivoDeAnexo, motivoDeFormato, restricoesDoCanal } from '../../dominio/canal'
@@ -19,7 +22,7 @@ import {
 import { escolherFormatoGravacao } from '../../dominio/audio'
 import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
 import { useGravadorAudio } from '../../hooks/useGravadorAudio'
-import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
+import { EscolhaDeArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
 import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
 import { SeletorRespostas } from './SeletorRespostas'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
@@ -43,6 +46,8 @@ export function Composer({
   })
   // #1587: no modo API só a foto sai (e só no WhatsApp); o anexo é recusado ao escolher.
   const { fonteApi } = useAtendimento()
+  const { acoes: capacidades } = useAcessoModulos()
+  const programadasEditaveis = respostasEditaveis({ fonteApi, acoes: capacidades })
   // Seletor rápido (#1441): "/" no campo ou o botão Respostas abrem a lista
   // compacta de respostas prontas; Enter insere no campo.
   const barra = useAtalhoBarra({ rascunho, conversa, aoInserir: aoMudarRascunho })
@@ -53,13 +58,12 @@ export function Composer({
   // do próprio componente agora; aqui só sobra a ref.
   const campoRef = useRef(null)
   const respostasRef = useRef(null)
-  const ferramentasRef = useRef(null)
+  const arquivoRef = useRef(null)
   const idListaRespostas = useId()
   const sugestoesNoCampo = visivel && barra.aberto && barra.pelaBarra && barra.itens.length > 0
   function abrirNotaInterna() {
-    // Recolhe ferramentas sem apagar um rascunho iniciado por "/".
+    // Recolhe as respostas sem apagar um rascunho iniciado por "/".
     if (!barra.pelaBarra) barra.fechar()
-    if (ferramentasRef.current) ferramentasRef.current.open = false
     aoAbrirNota?.()
   }
 
@@ -329,65 +333,36 @@ export function Composer({
                   quê?"): os quatro vizinhos ganham nome visível, como o
                   Respostas. Em coluna estreita o nome some por container
                   query e fica o title com a explicação inteira. */}
-              <details ref={ferramentasRef} className={css.ferramentasComposer} onKeyDown={(evento) => {
-                if (evento.key !== 'Escape' || evento.defaultPrevented || evento.target.closest('dialog')) return
-                evento.preventDefault(); evento.stopPropagation()
-                evento.currentTarget.open = false
-                evento.currentTarget.querySelector('summary')?.focus()
-              }}>
-                <Tooltip texto="Mais ferramentas"><summary aria-label="Mais ferramentas"><Icone nome="mais" /></summary></Tooltip>
-                <div className={css.menuFerramentas} role="group" aria-label="Ferramentas da mensagem" onClick={(evento) => {
-                  if (evento.target.closest('button')) {
-                    const ferramentas = evento.currentTarget.closest('details')
-                    ferramentas.open = false
-                    ferramentas.querySelector('summary')?.focus({ preventScroll: true })
-                  }
-                }}>
-
-              {acoes.anexar && <BotaoAnexarArquivo
-                disabled={!podeEscrever || !podeAnexar}
-                descritoPor={!podeAnexar && restricao ? idRestricao : undefined}
-                soImagem={fonteApi}
-                titulo={!podeAnexar ? restricao : fonteApi ? 'Anexar foto do computador (imagem, até 8 MB)' : 'Anexar arquivo do computador: foto, cardápio em PDF ou comprovante (imagem ou PDF, até 8 MB)'}
-                rotulo="Anexar"
-                classeRotulo={css.rotuloAcao}
-                aoEscolher={aoEscolherArquivo}
-              />}
-              {acoes.fotos && <Tooltip texto={motivoDeFormato(canal, 'foto') ?? 'Fotos dos pratos cadastrados na casa'}><Botao
-                aria-describedby={!podeFoto && restricao ? idRestricao : undefined}
-                className={css.acaoComRotulo} disabled={!podeEscrever || !podeFoto} onClick={aoAbrirGaleria}
-              >
-                <Icone nome="imagem" /><span className={css.rotuloAcao}>Fotos</span>
-              </Botao></Tooltip>}
-              {/* #1424: a mensagem programada vai para o cliente cadastrado (a API exige o
-                  clienteId). Não depende do `podeEscrever`: fora da janela sai por modelo. */}
-              <Tooltip texto={conversa.clienteId
-                ? 'Programar mensagem para sair depois, no horário escolhido'
-                : 'Cadastre o cliente primeiro: a mensagem programada vai para um cliente cadastrado'}
-              >
-                <Botao
-                  className={css.acaoComRotulo}
-                  aria-haspopup="dialog"
-                  disabled={!conversa.clienteId}
-                  onClick={() => setProgramarEm(conversa.id)}
-                >
-                  <Icone nome="relogio" /><span className={css.rotuloAcao}>Programar</span>
-                </Botao>
-              </Tooltip>
-              {/* #2134: chave do completar com Tab. Só existe no modo API (é lá que a sugestão chama o
-                  provedor). Desligada, nenhuma chamada sai; vale por usuário, neste navegador. */}
-              {fonteApi && <Tooltip texto={complementoLigado
-                ? 'Sugestões de IA: ligadas. Usa a conversa e o que você digita para preparar rascunhos. Toque para desligar.'
-                : 'Sugestões de IA: desligadas. Toque para ligar.'}
-              ><Botao
-                aria-pressed={complementoLigado}
-                className={`${css.acaoComRotulo} ${complementoLigado ? css.chaveLigada : ''}`}
-                onClick={alternarComplemento}
-              >
-                <Icone nome="sparkles" /><span className={css.rotuloAcao}>Sugestões de IA</span>
-              </Botao></Tooltip>}
-                </div>
-              </details>
+              <EscolhaDeArquivo ref={arquivoRef} soImagem={fonteApi} aoEscolher={aoEscolherArquivo} />
+              <MenuDeAcoes
+                rotulo="Mais ferramentas" icone="mais" alinhar="inicio"
+                itens={[
+                  acoes.anexar && {
+                    chave: 'anexar', rotulo: 'Anexar', icone: 'anexo', desabilitado: !podeEscrever || !podeAnexar,
+                    motivo: !podeAnexar ? restricao : null, aoEscolher: () => arquivoRef.current?.click(),
+                  },
+                  acoes.fotos && {
+                    chave: 'fotos', rotulo: 'Fotos', icone: 'imagem', desabilitado: !podeEscrever || !podeFoto,
+                    motivo: motivoDeFormato(canal, 'foto'), aoEscolher: aoAbrirGaleria,
+                  },
+                  // #1424: a mensagem programada vai para o cliente cadastrado (a API exige o
+                  // clienteId). Não depende do `podeEscrever`: fora da janela sai por modelo.
+                  // #2185: quem não edita só consulta as programadas, e bloqueio impede novas.
+                  {
+                    chave: 'programar', rotulo: programadasEditaveis ? 'Programar' : 'Programadas', icone: 'relogio', abreJanela: true,
+                    desabilitado: !conversa.clienteId || (programadasEditaveis && Boolean(conversa.bloqueio)),
+                    motivo: !conversa.clienteId ? 'Cadastre o cliente primeiro.'
+                      : programadasEditaveis && conversa.bloqueio ? 'Cliente bloqueado.' : null,
+                    aoEscolher: () => setProgramarEm(conversa.id),
+                  },
+                  // #2134: chave do completar com Tab. Só existe no modo API (é lá que a sugestão chama
+                  // o provedor). Desligada, nenhuma chamada sai; vale por usuário, neste navegador.
+                  fonteApi && {
+                    chave: 'sugestoes', rotulo: 'Sugestões de IA', icone: 'sparkles', marcado: complementoLigado,
+                    aoEscolher: alternarComplemento,
+                  },
+                ]}
+              />
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}

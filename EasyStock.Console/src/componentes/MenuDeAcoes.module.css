@@ -1,0 +1,14 @@
+.menu { position: relative; display: inline-flex; flex: none; }
+.lista { display: grid; gap: var(--e-1); }
+.item {
+  display: flex; align-items: center; gap: var(--e-2); width: 100%;
+  min-height: var(--toque); padding: var(--e-2) var(--e-3);
+  border: 0; border-radius: var(--r-1); background: transparent; color: var(--tinta);
+  font: inherit; font-size: var(--t-apoio); text-align: left; cursor: pointer;
+}
+.item:hover:not(:disabled) { background: var(--preenchimento); }
+.item:focus-visible { background: var(--preenchimento); outline: 2px solid var(--halo); outline-offset: -2px; }
+.item:disabled { color: var(--tinta-3); cursor: not-allowed; }
+.perigo { color: var(--erro); }
+.rotulo { flex: 1; min-width: 0; }
+.motivo { margin: 0; padding: 0 var(--e-3) var(--e-2); font-size: var(--t-minimo); color: var(--tinta-2); }

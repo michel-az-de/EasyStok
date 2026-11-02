@@ -149,22 +149,22 @@ confere('4  ficha compacta mantém cabeçalho, cliente e acessos sem molduras, c
 })
 confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no contexto', () => {
   const barra = fonte('features/atendimento/BarraModo.jsx')
-  assert.match(barra, /const fraseRepetida = \(resumo\.chave === MODOS\.COM_VOCE \|\| \(resumo\.chave === MODOS\.LIGADO && !semAutomatico\)\) && linha === resumo\.linha/)
-  assert.match(barra, /<p className=\{fraseRepetida \|\| !mostrarLinha \? 'sr' : css\.modoTexto\} title=/)
-  assert.match(barra, /const mostrarLinha = semAutomatico \|\| bloqueada/)
-  assert.match(barra, /\{podeAssumir && \([\s\S]*?onClick=\{aoAssumir\}[\s\S]*?Assumir/)
-  assert.match(barra, /<details[^>]+className=\{css\.maisAcoesModo\}/)
-  assert.match(barra, /<summary>Mais ações<\/summary>/)
-  assert.match(barra, /evento\.key === 'Escape'/)
+  // #2185: o motivo da passagem fica à vista; a frase que só repete a pílula é para o leitor de tela.
+  assert.match(barra, /<p className=\{mostrarLinha \? css\.modoTexto : 'sr'\} title=/)
+  assert.match(barra, /const mostrarLinha = semAssistente \|\| resumo\.chave === MODOS\.COM_VOCE/)
+  assert.match(barra, /\{acoes\.assumir && \([\s\S]*?Assumir/)
+  // Devolver e Concluir moram no menu ⋮ do cabeçalho: nenhum segundo menu na barra.
+  assert.doesNotMatch(barra, /<details|<summary|>Mais ações</)
   const css = fonte('features/atendimento/atendimento.module.css')
   assert.doesNotMatch(css, /\.modoTexto\s*\{[^}]*text-overflow:\s*ellipsis/)
-  assert.match(css, /\.maisAcoesModo > summary:focus-visible \{ outline: 3px solid var\(--halo\)/)
+  assert.doesNotMatch(css, /maisAcoesModo|listaAcoesModo/)
 })
 confere('4  restrição de formato permanece acessível e problemas de envio continuam visíveis junto do campo', () => {
   const composer = fonte('features/atendimento/Composer.jsx')
   assert.match(composer, /\{restricao && \(podeAnexar \|\| podeAudio\s*\? <p id=\{idRestricao\} className=\{css\.restricao\}>\{restricao\}<\/p>\s*: <p id=\{idRestricao\} className="sr">\{restricao\}<\/p>\)\}/)
-  assert.match(composer, /aria-describedby=\{!podeFoto && restricao \? idRestricao : undefined\}/)
-  assert.match(composer, /descritoPor=\{!podeAnexar && restricao \? idRestricao : undefined\}/)
+  // #2185: Anexar e Fotos são itens do MenuDeAcoes; o motivo vai escrito no item (aria-describedby no componente).
+  assert.match(composer, /motivo: motivoDeFormato\(canal, 'foto'\)/)
+  assert.match(composer, /motivo: !podeAnexar \? restricao : null/)
   assert.match(composer, /\{motivo && \([\s\S]*?<p className=\{`\$\{css\.bloqueio\}[^`]*`\}>[\s\S]*?<strong>\{motivo\.titulo\}<\/strong>\s*<span>\{motivo\.detalhe\}<\/span>/, 'bloqueio e janela fora do prazo não ficam só no leitor de tela')
   for (const erro of ['erroAnexo', 'variavelSobrando']) assert.match(composer, new RegExp(`\\{${erro} && <p className=\\{css\\.restricao\\} role="alert">\\{${erro}\\}`))
   assert.match(composer, /\{erroAssumir && <p className=\{css\.erroAssumir\} role="alert">\{erroAssumir\}/)

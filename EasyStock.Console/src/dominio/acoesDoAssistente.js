@@ -49,12 +49,17 @@ export function respostaDoAssistente(resposta) {
   return { texto: textoLimpo(resposta?.texto), acoes }
 }
 
+// #2185: o modelo propõe sem saber a situação da conversa. A proposta de devolver só aparece onde a
+// barra oferece Devolver; a já executada fica à vista, para o "feito" não sumir com o estado novo.
+export const acoesPropostasVisiveis = (propostas, acoesDaTela) => (propostas ?? []).filter((proposta) =>
+  proposta.tipo !== ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO || acoesDaTela.devolver || proposta.estado === 'feita')
+
 // Rótulos do cartão. `saiParaCliente` marca o único botão que manda algo ao cliente.
 export function descreverAcaoDoAssistente(acao, nomeCliente) {
   const nome = nomeCliente ? primeiroNome(nomeCliente) : 'o cliente'
   switch (acao.tipo) {
     case ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO:
-      return { titulo: 'Assistente', detalhe: `O Assistente volta a responder a conversa com ${nome}.`, botao: 'Retomar Assistente', feito: 'Assistente retomado', saiParaCliente: false }
+      return { titulo: 'Assistente', detalhe: `O Assistente volta a responder a conversa com ${nome}.`, botao: 'Devolver ao Assistente', feito: 'Devolvida ao Assistente', saiParaCliente: false }
     case ACOES_DO_ASSISTENTE.ENVIAR_CARDAPIO:
       return { titulo: 'Mandar o cardápio', detalhe: `Link do cardápio para ${nome}.`, botao: 'Enviar ao cliente', feito: 'Cardápio enviado', saiParaCliente: true }
     case ACOES_DO_ASSISTENTE.NOTA_INTERNA:

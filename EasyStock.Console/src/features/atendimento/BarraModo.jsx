@@ -4,106 +4,65 @@ import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { MODOS } from '../../dominio/automatico'
 import { resumoDoModo } from '../../dominio/resumoDoModo'
-import { primeiroNome } from '../../dominio/mensagem'
 import { automaticoDesligadoNaConversa } from '../../dominio/motivoDeEscalada'
 import css from './atendimento.module.css'
 
-// Quem responde esta conversa. Um lugar só, no topo da thread, com os três
-// estados e os dois toques: Assumir e Devolver ao automático (RN-04, D4).
-// O log do automático saiu daqui (corte #39): cada mensagem automática já vem
-// marcada como tal na própria conversa, contar de novo era ruído.
-// Cadastro bloqueado não oferece toque nenhum: a conversa só volta a andar
-// pelo desbloqueio na ficha.
+// Quem responde esta conversa: o estado e, quando cabe, o Assumir. Uma linha, um lugar só, no topo
+// da conversa (RN-04, D4). O que cada estado oferece vem de `acoesDaConversa`; Devolver e Concluir
+// moram no menu ⋮ do cabeçalho (#2185: "Mais ações" era um segundo menu para a mesma conversa).
 //
-// Rodada 12 (issue #16, dúvidas da Thatiane): "Devolver ao automático" agora
-// explica o efeito e pede confirmação, e depois que ela responde a barra
-// sugere o próximo passo (encerrar x aguardar o cliente).
-//
-// #1442 (homologação de 07/10, "muito prolixo"): uma linha só. Rótulo curto,
-// uma frase objetiva e as ações; a frase inteira fica no `title` da linha.
-export function BarraModo({
-  conversa, pausado, bloqueada = false, aoAssumir, aoDevolver, aoEncerrar,
-}) {
-  const [confirmandoDevolver, setConfirmandoDevolver] = useState(null)
-  const menu = useRef(null)
+// O motivo da passagem fica à vista: "Passou para você" sem dizer "alergia a camarão" obrigava a
+// procurar o porquê. A frase dos outros estados repetia a pílula e fica para o leitor de tela e o
+// `title` (#1442, #1870). Cadastro bloqueado é explicado junto do campo de mensagem.
+export function BarraModo({ conversa, pausado, bloqueada = false, acoes, aoAssumir }) {
+  const [confirmando, setConfirmando] = useState(null)
+  const [assumindoId, setAssumindoId] = useState(null)
+  const emVoo = useRef(false)
   const resumo = resumoDoModo(conversa, pausado, bloqueada)
-  const encerrada = resumo.chave === MODOS.ENCERRADO
-  // Assumir só faz sentido em conversa que ainda está no automático ou que
-  // acabou de ser devolvida. Devolver só onde o automático está parado.
-  const podeAssumir = resumo.chave === MODOS.LIGADO || resumo.chave === MODOS.COM_VOCE
-  // #1761 (L6): com o automático desligado na loja não há para quem devolver.
-  const semAutomatico = automaticoDesligadoNaConversa(conversa)
-  const podeDevolver = (resumo.chave === MODOS.PAUSADO || resumo.chave === MODOS.COM_VOCE) && !semAutomatico
-  // Automático desligado não está "pausado" nem "volta": a faixa diz só o que é verdade.
-  const linha = semAutomatico && !encerrada && resumo.chave !== MODOS.LIGADO ? 'O Assistente está desligado.' : resumo.linha
-  const sugereEncerrar = resumo.sugereEncerrar && Boolean(aoEncerrar)
-  // #1870: "Passou para você" já é o estado e o Assumir, a ação; a frase repetia os dois (e o
-  // cartão do Balcão). Fica para o leitor de tela e no title da pílula; a faixa é uma linha só.
-  const fraseRepetida = (resumo.chave === MODOS.COM_VOCE || (resumo.chave === MODOS.LIGADO && !semAutomatico)) && linha === resumo.linha
-  const nome = primeiroNome(conversa.nome)
-  const mostrarLinha = semAutomatico || bloqueada
+  // Com o Assistente desligado na loja, "pausado" e "volta" prometem o que não acontece.
+  const semAssistente = automaticoDesligadoNaConversa(conversa) && resumo.chave !== MODOS.ENCERRADO && resumo.chave !== MODOS.LIGADO
+  const linha = semAssistente ? 'O Assistente está desligado.' : resumo.linha
+  const mostrarLinha = semAssistente || resumo.chave === MODOS.COM_VOCE
 
-  const fecharAcoes = () => {
-    if (!menu.current) return
-    menu.current.open = false
-    menu.current.querySelector('summary')?.focus({ preventScroll: true })
-  }
-
-  const devolver = () => {
-    setConfirmandoDevolver(null)
-    aoDevolver()
+  async function assumir() {
+    setConfirmando(null)
+    if (emVoo.current) return
+    emVoo.current = true
+    setAssumindoId(conversa.id)
+    try { await aoAssumir() } finally {
+      emVoo.current = false
+      setAssumindoId(null)
+    }
   }
 
   return (
-    <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} data-controle-conversa aria-label="Quem responde esta conversa">
+    <section className={css.modo} data-controle-conversa aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
-        <span title={resumo.detalhe}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
-        <p className={fraseRepetida || !mostrarLinha ? 'sr' : css.modoTexto} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>
-        {!encerrada && !bloqueada && (
-          <span className={css.modoAcoes}>
-            {podeAssumir && (
-              <Botao variante="primario" className={css.acaoModo} onClick={aoAssumir}>
-                Assumir
-              </Botao>
-            )}
-            {(podeDevolver || sugereEncerrar) && (
-              <details key={conversa.id} ref={menu} className={css.maisAcoesModo} onKeyDown={(evento) => {
-                if (evento.key === 'Escape' && evento.currentTarget.open) {
-                  evento.preventDefault(); evento.stopPropagation(); fecharAcoes()
-                }
-              }}>
-                <summary>Mais ações</summary>
-                <div className={css.listaAcoesModo}>
-                  {podeDevolver && <Botao variante="texto" className={css.acaoModo}
-                    title="O Assistente volta a responder esta conversa" aria-haspopup="dialog"
-                    onClick={() => { fecharAcoes(); setConfirmandoDevolver({ conversaId: conversa.id }) }}>Devolver ao Assistente</Botao>}
-                  {sugereEncerrar && <Botao variante="texto" icone="circle-check" className={css.acaoModo}
-                    onClick={() => { fecharAcoes(); aoEncerrar() }}>Concluir conversa</Botao>}
-                </div>
-              </details>
-            )}
-          </span>
+        <span className={css.modoEstado} title={resumo.detalhe}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
+        <p className={mostrarLinha ? css.modoTexto : 'sr'} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>
+        {acoes.assumir && (
+          <Botao
+            variante="primario" className={css.modoAssumir} disabled={assumindoId === conversa.id}
+            aria-haspopup={acoes.confirmarAoAssumir ? 'dialog' : undefined}
+            onClick={acoes.confirmarAoAssumir ? () => setConfirmando({ conversaId: conversa.id }) : assumir}
+          >
+            Assumir
+          </Botao>
         )}
       </div>
 
-      {confirmandoDevolver && confirmandoDevolver.conversaId === conversa.id && podeDevolver && !encerrada && !bloqueada && (
+      {confirmando?.conversaId === conversa.id && acoes.confirmarAoAssumir && (
         <Modal
-          titulo="Devolver ao Assistente?"
-          descricao={`O Assistente volta a responder as próximas mensagens de ${nome}.`}
-          aoFechar={() => setConfirmandoDevolver(null)}
+          titulo="Assumir esta conversa?"
+          descricao={`Ela está com ${conversa.responsavel ?? 'outro atendente'}. As próximas respostas passam a ser suas.`}
+          aoFechar={() => setConfirmando(null)}
           rodape={(
             <>
-              <Botao onClick={() => setConfirmandoDevolver(null)}>Continuar comigo</Botao>
-              <Botao variante="primario" onClick={devolver}>Devolver ao Assistente</Botao>
+              <Botao onClick={() => setConfirmando(null)}>Cancelar</Botao>
+              <Botao variante="primario" onClick={assumir}>Assumir conversa</Botao>
             </>
           )}
-        >
-          <ul className={css.listaEfeito}>
-            <li>Ele responde sozinho dúvida de cardápio, horário, entrega e pagamento.</li>
-            <li>Restrição alimentar, reclamação e prato sem saldo continuam vindo para você.</li>
-            <li>Você pode assumir de novo a qualquer momento, pelo botão Assumir.</li>
-          </ul>
-        </Modal>
+        />
       )}
     </section>
   )

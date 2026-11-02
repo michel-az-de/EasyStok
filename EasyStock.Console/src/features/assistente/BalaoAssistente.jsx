@@ -14,11 +14,12 @@ import {
 } from '../../dominio/paineis'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { canalDaConversa } from '../../dominio/canal'
-import { permissaoDeEscrita } from '../../dominio/janela'
+import { MOTIVO_BLOQUEIO, permissaoDeEscrita } from '../../dominio/janela'
 import {
   analisarFotoSuspeita, dicaCDC, padraoDeCompra, resumoCliente, revisarOrtografia, sentimentoDaConversa,
 } from '../../dominio/assistente'
-import { executarAcaoDoAssistente } from '../../dominio/acoesDoAssistente'
+import { acoesDaConversa } from '../../dominio/acoesDaConversa'
+import { acoesPropostasVisiveis, executarAcaoDoAssistente } from '../../dominio/acoesDoAssistente'
 import {
   CartaoCDC, CartaoCliente, CartaoFotoSuspeita, CartaoOrtografia, CartaoPadraoDeCompra, CartaoSentimento,
 } from './Cartoes'
@@ -45,7 +46,7 @@ const PASSO_MOVER = 16
 const PASSO_MOVER_GRANDE = 64
 
 export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
-  const { selecionada, agora, historico, rascunho, fonteApi } = useAtendimento()
+  const { selecionada, agora, historico, rascunho, fonteApi, automaticoPausado } = useAtendimento()
   const { canais } = useCatalogo()
   const { definirRascunho, perguntarAssistente, obterLinkCardapio, enviar, salvarNota, devolverAutomatico } = useAcoes()
 
@@ -134,6 +135,11 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const ortografia = selecionada && rascunho?.trim() ? revisarOrtografia(rascunho) : null
   const permissao = permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada))
   const motivoDeEnvio = permissao.pode ? null : [permissao.motivo?.titulo, permissao.motivo?.detalhe].filter(Boolean).join(' ')
+  // #2185: a mesma conta da barra e do menu ⋮. O modelo propõe sem saber quem está respondendo.
+  const acoesDaTela = acoesDaConversa({
+    conversa: selecionada, pausado: selecionada ? automaticoPausado?.[selecionada.id] ?? false : false,
+    bloqueada: permissao.motivo?.acao === MOTIVO_BLOQUEIO, canal: canalDaConversa(canais, selecionada),
+  })
 
   const sentimentoNotavel = sentimento && sentimento.classificacao !== 'neutro'
   const pedeAtencao = Boolean(cdc || foto || (sentimento && sentimento.classificacao === 'negativo'))
@@ -148,13 +154,15 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   // acessível sem cobrir as ações fixas da Cobrança.
   const [cabecalhoDoAtendimento, setCabecalhoDoAtendimento] = useState(null)
   useEffect(() => {
-    const achar = () => document.querySelector('[data-ancora-assistente]')
+    // #2185: no celular há uma âncora por aba e as outras ficam `hidden`. A primeira do DOM era a
+    // da lista: na aba Conversa o botão do Assistente nascia dentro de um painel oculto.
+    const achar = () => [...document.querySelectorAll('[data-ancora-assistente]')].find((n) => !n.closest('[hidden]')) ?? null
     setCabecalhoDoAtendimento(achar())
     const observador = new MutationObserver(() => {
       const novo = achar()
       setCabecalhoDoAtendimento((atual) => (atual === novo ? atual : novo))
     })
-    observador.observe(document.body, { childList: true, subtree: true })
+    observador.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] })
     return () => observador.disconnect()
   }, [])
 
@@ -358,9 +366,9 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                         <div key={t.id} className={css.troca}>
                           <div className={css.perguntaDaThatiane}><span className={css.autor}>Você</span><p>{t.pergunta}</p></div>
                           {t.resposta && <div className={css.respostaDoAssistente}><span className={css.autor}>Assistente</span><p>{t.resposta}</p></div>}
-                          {t.acoes.length > 0 && <p className={css.tituloAcoes}>Ações para confirmar</p>}
+                          {acoesPropostasVisiveis(t.acoes, acoesDaTela).length > 0 && <p className={css.tituloAcoes}>Ações para confirmar</p>}
                           <AcoesPropostas
-                            acoes={t.acoes}
+                            acoes={acoesPropostasVisiveis(t.acoes, acoesDaTela)}
                             nomeCliente={selecionada.nome}
                             motivoDeEnvio={motivoDeEnvio}
                             semCadastro={fonteApi && !selecionada.clienteId}

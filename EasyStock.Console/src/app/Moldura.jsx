@@ -26,6 +26,7 @@ import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
 import { MesaDeNotas } from '../features/ficha-cliente/MesaDeNotas'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
+import { MenuDeAcoes } from '../componentes/MenuDeAcoes'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
 import { HASH_HALL, HASH_MODULO_COZINHA } from '../dominio/rota'
@@ -80,8 +81,6 @@ function MenuMais({
   refBotao, aoAbrirEntregas, aoAbrirGestao, aoAbrirAjuda, emAndamento, naEsteira, atendente = null,
 }) {
   const { permite, aoSair, sessaoPersistente, conta } = useAcessoModulos()
-  const [aberto, setAberto] = useState(false)
-  const fechar = useCallback(() => setAberto(false), [])
 
   const grupos = [
     {
@@ -118,7 +117,6 @@ function MenuMais({
   ]
 
   function escolher(item) {
-    fechar()
     if (['__entregas', '__gestao', '__ajuda'].includes(item.chave)) refBotao.current?.focus()
     if (item.chave === '__modulos') window.location.hash = HASH_HALL
     if (item.chave === '__entregas') aoAbrirEntregas()
@@ -129,42 +127,11 @@ function MenuMais({
     if (item.chave === '__sair') aoSair?.()
   }
 
-  return (
-    <span className={css.comPopover}>
-      <Botao
-        ref={refBotao}
-        aria-haspopup="menu"
-        aria-expanded={aberto}
-        onClick={() => setAberto((v) => !v)}
-        aria-label="Mais"
-        title="Mais"
-      >
-        <Icone nome="ellipsis-vertical" tamanho={20} />
-      </Botao>
-      {/* `portal` (rodada 9, achado 1 da banca estética): `.topo` tem
-          backdrop-filter, que vira containing block de position:fixed. Sem
-          isso, o `.abaixo` do celular (fixed, ancorado no rodapé da tela)
-          media a partir de `.topo`, não do viewport, e Entregas nasce fora da
-          tela. */}
-      {aberto && (
-        <Popover
-          rotulo="Mais controles do topo"
-          posicao="abaixo"
-          grupos={grupos}
-          aoEscolher={escolher}
-          aoFechar={fechar}
-          portal
-        />
-      )}
-    </span>
-  )
+  // `portal` (rodada 9, achado 1 da banca estética) vem do MenuDeAcoes: `.topo` tem backdrop-filter,
+  // que vira containing block de position:fixed e fazia o menu nascer fora da tela no celular.
+  return <MenuDeAcoes refGatilho={refBotao} rotulo="Mais opções" tom="secundario" grupos={grupos} aoEscolherGrupo={escolher} />
 }
 
-// Abre a Cozinha (US-037, US-038) numa janela própria, o tablet da parede
-// (D6). Botão discreto e fixo, fora do `compacto ? MenuMais : ResumoEntregas`
-// que já existe: assim ela sempre acha o mesmo controle, larga ou estreita a
-// tela, sem duplicar o item em dois menus.
-//
 // Mantém o atendimento aberto. O KDS da API continua usando a rota protegida do módulo.
 function abrirCozinha() {
   const destino = FONTE_API ? HASH_MODULO_COZINHA : '#/cozinha'

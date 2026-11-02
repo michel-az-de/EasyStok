@@ -206,7 +206,7 @@ export function RelogioPix({
               </Botao>
             )}
             <Botao largo variante="secundario" icone="log-out" onClick={aoEncerrarAtendimento}>
-              Encerrar atendimento
+              Concluir conversa
             </Botao>
           </div>
         )}

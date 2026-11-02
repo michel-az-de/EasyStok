@@ -250,12 +250,16 @@ try {
     await p.getByRole('button', { name: 'Usar sugestão' }).waitFor({ timeout: 6000 })
     assert.equal(chamadasIA.length, 1, 'ligado: uma chamada ao provedor')
 
-    await p.getByLabel('Mais ferramentas', { exact: true }).click()
-    const chave = p.getByRole('button', { name: /sugestões de ia/i, includeHidden: true })
-    assert.equal(await chave.count(), 1, 'falta a chave para desligar o completar com Tab')
-    assert.equal(await chave.getAttribute('aria-pressed'), 'true')
-    await chave.click()
-    assert.equal(await chave.getAttribute('aria-pressed'), 'false')
+    // #2185: a chave é item do menu "Mais ferramentas", e o menu fecha ao escolher.
+    const chaveDe = (pagina) => pagina.getByRole('menuitemcheckbox', { name: /sugestões de ia/i })
+    const ferramentas = (pagina) => pagina.getByRole('button', { name: 'Mais ferramentas', exact: true })
+    await ferramentas(p).click()
+    assert.equal(await chaveDe(p).count(), 1, 'falta a chave para desligar o completar com Tab')
+    assert.equal(await chaveDe(p).getAttribute('aria-checked'), 'true')
+    await chaveDe(p).click()
+    await ferramentas(p).click()
+    assert.equal(await chaveDe(p).getAttribute('aria-checked'), 'false')
+    await p.keyboard.press('Escape')
     assert.equal(await p.getByRole('button', { name: 'Usar sugestão' }).count(), 0, 'a sugestão em tela some ao desligar')
 
     chamadasIA.length = 0
@@ -264,11 +268,11 @@ try {
     assert.equal(chamadasIA.length, 0, 'desligado: nenhuma chamada ao provedor')
 
     const p2 = await abrir(ctx, 'pausado=1&u=usuario-1')
-    await p2.getByLabel('Mais ferramentas', { exact: true }).click()
-    assert.equal(await p2.getByRole('button', { name: /sugestões de ia/i }).getAttribute('aria-pressed'), 'false', 'a escolha sobrevive ao recarregar')
+    await ferramentas(p2).click()
+    assert.equal(await chaveDe(p2).getAttribute('aria-checked'), 'false', 'a escolha sobrevive ao recarregar')
     const p3 = await abrir(ctx, 'pausado=1&u=usuario-2')
-    await p3.getByLabel('Mais ferramentas', { exact: true }).click()
-    assert.equal(await p3.getByRole('button', { name: /sugestões de ia/i }).getAttribute('aria-pressed'), 'true', 'outro usuário no mesmo navegador segue com o padrão')
+    await ferramentas(p3).click()
+    assert.equal(await chaveDe(p3).getAttribute('aria-checked'), 'true', 'outro usuário no mesmo navegador segue com o padrão')
     await ctx.close()
   })
 

@@ -6,14 +6,15 @@
 // frase inteira continua em `detalhe`, que a tela põe no `title`.
 
 import { MODOS, PAUSA_POR_OUTRO, modoDoAtendimento, proximoPassoDepoisDeResponder } from './automatico'
-import { origemDaPassagem } from './passagem'
+import { AGUARDANDO_EQUIPE, origemDaPassagem } from './passagem'
+import { naFilaSemResponsavel } from './acoesDaConversa'
 import { automaticoDesligadoNaConversa } from './motivoDeEscalada'
 
 const ROTULO = {
   [MODOS.LIGADO]: 'Assistente respondendo',
   [MODOS.PAUSADO]: 'Você respondendo',
   [MODOS.COM_VOCE]: 'Passou para você',
-  [MODOS.ENCERRADO]: 'Encerrada',
+  [MODOS.ENCERRADO]: 'Concluída',
   [MODOS.BLOQUEADO]: 'Bloqueado',
 }
 
@@ -28,6 +29,15 @@ const LINHA_DO_PROXIMO = {
   'encerrar-ou-aguardar': 'Conclua a conversa ou devolva ao Assistente.',
   aguardar: 'Respondido. Pedido em andamento: aguarde o cliente.',
   'aguardar-venda': 'Respondido. Venda em andamento: monte o pedido ou aguarde o cliente.',
+}
+
+// #2185: "Aguardando equipe" vale para a barra e o cartão (`modo.rotulo`), e quem é o outro atendente
+// aparece pelo nome. Sem responsável, a conversa nunca diz "Você respondendo".
+function rotuloDoModo(modo, conversa, outro) {
+  if (outro) return conversa?.responsavel && conversa.responsavel !== 'Outro atendente' ? `Com ${conversa.responsavel}` : 'Outro atendente'
+  if (modo.chave === MODOS.COM_VOCE) return modo.rotulo === AGUARDANDO_EQUIPE ? AGUARDANDO_EQUIPE : ROTULO[modo.chave]
+  if (modo.chave === MODOS.PAUSADO && naFilaSemResponsavel(conversa)) return AGUARDANDO_EQUIPE
+  return ROTULO[modo.chave]
 }
 
 export function resumoDoModo(conversa, pausado = false, bloqueada = false) {
@@ -48,7 +58,7 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false) {
   return {
     chave: modo.chave,
     tom: modo.tom,
-    rotulo: outro ? 'Outro atendente' : ROTULO[modo.chave],
+    rotulo: rotuloDoModo(modo, conversa, outro),
     linha,
     detalhe,
     proximo,

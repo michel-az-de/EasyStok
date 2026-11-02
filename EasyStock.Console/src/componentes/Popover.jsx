@@ -29,6 +29,7 @@ const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) 
 // plantado), então quem não passa `portal` renderiza exatamente como antes.
 export function Popover({
   rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu',
+  alinhar = 'fim', largura: larguraPedida = 360,
 }) {
   const caixaRef = useRef(null)
   const marcadorRef = useRef(null)
@@ -101,8 +102,10 @@ export function Popover({
     const margem = parseFloat(estilo.getPropertyValue('--e-4'))
     const espaco = parseFloat(estilo.getPropertyValue('--e-2'))
     const { larguraLimite, alturaLimite, inicioX, inicioY } = retangulo
-    const largura = Math.max(1, Math.min(360, larguraLimite - 2 * margem))
-    const esquerda = Math.max(inicioX + margem, Math.min(retangulo.left + retangulo.width - largura, inicioX + larguraLimite - largura - margem))
+    const largura = Math.max(1, Math.min(larguraPedida, larguraLimite - 2 * margem))
+    // `alinhar`: o menu cresce a partir da borda do gatilho que fica do lado de dentro da tela.
+    const origemX = alinhar === 'inicio' ? retangulo.left : retangulo.left + retangulo.width - largura
+    const esquerda = Math.max(inicioX + margem, Math.min(origemX, inicioX + larguraLimite - largura - margem))
     // O limite é o dialog ou a viewport. Menus do rodapé também precisam abrir para cima.
     Object.assign(caixa.style, {
       position: 'absolute', width: `${largura}px`, left: `${esquerda - retangulo.left}px`, right: 'auto',
@@ -117,7 +120,7 @@ export function Popover({
       maxHeight: `${Math.max(1, inverter ? acima : abaixo)}px`,
       transformOrigin: inverter ? 'bottom right' : 'top right',
     })
-  }, [retangulo, posicao])
+  }, [retangulo, posicao, alinhar, larguraPedida])
 
   // Sugestão presa ao campo de texto (atalho "/" do composer) não pode
   // roubar o foco: ela está digitando, e o Popover de clique de sempre foca

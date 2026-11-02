@@ -260,8 +260,10 @@ await confere('E  bloquear sem cadastro: motivo escrito só no modo API e só pa
   assert.equal(clienteDom.motivoParaNaoBloquear({ clienteId: null }, { fonteApi: false }), null)
   const fonte = readFileSync(new URL('features/ficha-cliente/BlocoCliente.jsx', src), 'utf8')
   assert.match(fonte, /motivoSemBloqueio = bloqueada \? null : motivoParaNaoBloquear\(conversa, \{ fonteApi \}\)/)
-  assert.match(fonte, /disabled=\{Boolean\(motivoSemBloqueio\)\}/)
-  assert.match(fonte, /\{motivoSemBloqueio && <p id=\{idMotivoBloqueio\}[^>]*>\{motivoSemBloqueio\}<\/p>\}/)
+  assert.match(fonte, /desabilitado: Boolean\(motivoSemBloqueio\), motivo: motivoSemBloqueio/)
+  // #2185: bloquear é da gerência; para a atendente o item não aparece.
+  assert.match(fonte, /const podeBloquear = !fonteApi \|\| capacidades\?\.controlarLoja === true/)
+  assert.match(fonte, /podeBloquear && \{/)
 })
 await confere('F  link vencido: o texto diz o que o job do EasyStok faz em cada tentativa', () => {
   // #1683: o job só reemite e cancela com o pedido esperando o pagamento; o status entra na pergunta.

@@ -3,11 +3,12 @@ import { Avatar } from '../../componentes/Avatar'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
-import { Pilula } from '../../componentes/Pilula'
+import { MenuDeAcoes } from '../../componentes/MenuDeAcoes'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
@@ -17,8 +18,9 @@ import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
 import { Composer } from './Composer'
-import { CompartilharComanda } from './CompartilharComanda'
-import { PassarConversa } from './PassarConversa'
+import { ModalCompartilharComanda } from './CompartilharComanda'
+import { ModalDevolverAssistente } from './ModalDevolverAssistente'
+import { ModalPassarConversa } from './PassarConversa'
 import { Thread } from './Thread'
 import css from './atendimento.module.css'
 
@@ -32,7 +34,7 @@ export function PainelAtendimento({
   } = useAtendimento()
   const {
     enviar, reabrir, definirRascunho, assumirAtendimento, devolverAutomatico,
-    selecionar, abrirEncerramento, reenviar, carregarMensagensAnteriores,
+    selecionar, abrirEncerramento, reenviar, carregarMensagensAnteriores, transferirConversa,
   } = useAcoes()
   const { janelas, canais } = useCatalogo()
   const fotoCadastrada = useFotoCliente(selecionada?.cliente?.fotoUrl)
@@ -47,6 +49,8 @@ export function PainelAtendimento({
   // #1761: "Modelos aprovados" abre do compositor e da bolha recusada fora da janela de 24 h.
   // Guardado pelo id da conversa: trocar de conversa fecha.
   const [modelosDe, setModelosDe] = useState(null)
+  // Modal aberto pelo menu ⋮, guardado pelo id da conversa: trocar de conversa fecha.
+  const [modalDoMenu, setModalDoMenu] = useState(null)
 
   // #2005 (console-09): só o modo API tem a ação; na demonstração o fio já é inteiro.
   const anterioresEmCurso = useRef(false)
@@ -112,6 +116,10 @@ export function PainelAtendimento({
   // Uma conta só na tela: quem diz que a conversa está bloqueada é a mesma
   // permissao de escrita que decide o composer e o reducer.
   const bloqueada = motivo?.acao === MOTIVO_BLOQUEIO
+  const acoesTela = acoesDaConversa({ conversa: selecionada, pausado, bloqueada, canal, permitePassar: Boolean(transferirConversa) })
+  const abrirModal = (tipo) => setModalDoMenu({ tipo, conversaId: selecionada.id })
+  const fecharModal = () => setModalDoMenu(null)
+  const modalAberto = modalDoMenu?.conversaId === selecionada.id ? modalDoMenu.tipo : null
   // Rodada 11 (registro 92): resposta automática na fila e automático ainda
   // conduzindo. Assumir apaga o "digitando" no mesmo toque.
   const digitando = Boolean(selecionada.respostaPendente?.length) && !pausado && !bloqueada
@@ -147,34 +155,19 @@ export function PainelAtendimento({
             </small>
           </h2>
         </span>
-        <div className={css.direita} data-ancora-assistente>
-          {bloqueada && <Pilula tom="perigo"><Icone nome="bloqueio" /> Bloqueado</Pilula>}
-          {!encerrada && !bloqueada && <details key={selecionada.id} className={css.opcoesConversa} onKeyDown={(evento) => {
-            if (evento.key !== 'Escape' || evento.defaultPrevented || evento.target.closest('dialog')) return
-            evento.preventDefault(); evento.stopPropagation()
-            evento.currentTarget.open = false
-            evento.currentTarget.querySelector('summary')?.focus()
-          }}>
-            <summary aria-label="Opções da conversa" title="Opções da conversa"><Icone nome="ellipsis" /></summary>
-            <div className={css.menuConversa} role="group" aria-label="Ações da conversa">
-          {/* #1989: irmãos com a mesma chave (o id da conversa) faziam o React perder a conta e
-              deixar um "Link de compra" velho a cada troca de conversa. Cada um tem o seu prefixo. */}
-          {!encerrada && !bloqueada && <CompartilharComanda key={'compartilhar-' + selecionada.id} conversa={selecionada} canalNome={canal.nome} podeEnviar={pode} />}
-          {/* Assumir e devolver ao automático moram na BarraModo, um lugar só.
-              Aqui em cima fica o que é estado da conversa: bloqueio, encerrar
-              e reabrir. */}
-          {/* Rodada 5, seção 5 (passo zero): "Encerrar" abre a modal do
-              resumo (vazia até a F5 construir o conteúdo); com a conversa já
-              encerrada, dá lugar ao "Reabrir conversa" que já existia. */}
-          {/* #1239: passar a conversa para outra atendente (só no modo API). */}
-          {fonteApi && !encerrada && !bloqueada && <PassarConversa key={'passar-' + selecionada.id} conversa={selecionada} />}
-          {!encerrada && !bloqueada && (
-            <Botao variante="texto" icone="circle-check" className={css.encerrar} aria-label="Concluir conversa" title="Concluir conversa" onClick={() => abrirEncerramento(selecionada.id)}>
-              Concluir conversa
-            </Botao>
-          )}
-            </div>
-          </details>}
+        <div className={css.direita}>
+          {/* O balão planta o gatilho do Assistente aqui. Com lugar próprio, ele não troca de lado com
+              o menu conforme a conversa (#2185: a ordem dependia de quem montou por último). */}
+          <span className={css.ancoraAssistente} data-ancora-assistente />
+          <MenuDeAcoes
+            rotulo="Mais opções da conversa"
+            itens={[
+              acoesTela.enviarCardapio && { chave: 'cardapio', rotulo: 'Enviar cardápio', icone: 'cardapio', abreJanela: true, aoEscolher: () => abrirModal('cardapio') },
+              acoesTela.passar && { chave: 'passar', rotulo: 'Passar conversa', icone: 'user-plus', abreJanela: true, aoEscolher: () => abrirModal('passar') },
+              acoesTela.devolver && { chave: 'devolver', rotulo: 'Devolver ao Assistente', icone: 'sparkles', abreJanela: true, aoEscolher: () => abrirModal('devolver') },
+              acoesTela.concluir && { chave: 'concluir', rotulo: 'Concluir conversa', icone: 'circle-check', abreJanela: true, aoEscolher: () => abrirEncerramento(selecionada.id) },
+            ]}
+          />
         </div>
       </header>
 
@@ -186,9 +179,8 @@ export function PainelAtendimento({
         conversa={selecionada}
         pausado={pausado}
         bloqueada={bloqueada}
+        acoes={acoesTela}
         aoAssumir={() => assumirAtendimento(selecionada.id)}
-        aoDevolver={() => devolverAutomatico(selecionada.id)}
-        aoEncerrar={() => abrirEncerramento(selecionada.id)}
       />
       </div>
 
@@ -227,7 +219,7 @@ export function PainelAtendimento({
         escritaDeFora={escritaDeFora}
         aoEnviar={(texto) => enviar(selecionada.id, texto.trim())}
         // #2134: responder com o Assistente atendendo é assumir, pelo mesmo caminho do botão Assumir.
-        aoAssumirAntes={assistenteAtendendo(selecionada, pausado, bloqueada) ? () => assumirAtendimento(selecionada.id) : null}
+        aoAssumirAntes={assistenteAtendendo(selecionada, pausado, bloqueada) || acoesTela.confirmarAoAssumir ? () => assumirAtendimento(selecionada.id) : null}
         podeEnviarModelo={podeEnviarModelo}
         modelosFixos={modelosAVista(janela)}
         modeloAberto={modelosDe === selecionada.id}
@@ -245,6 +237,10 @@ export function PainelAtendimento({
       </div>
       {slotEditorNota}
       </div>
+
+      {modalAberto === 'cardapio' && <ModalCompartilharComanda conversa={selecionada} aoFechar={fecharModal} />}
+      {modalAberto === 'passar' && <ModalPassarConversa conversa={selecionada} aoFechar={fecharModal} />}
+      {modalAberto === 'devolver' && <ModalDevolverAssistente conversa={selecionada} aoFechar={fecharModal} aoConfirmar={() => devolverAutomatico(selecionada.id)} />}
     </>
   )
 }

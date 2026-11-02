@@ -4,6 +4,7 @@
 // (âncora do Popover, `position: sticky`) e feature nenhuma importa outra
 // feature (ferramentas/verificar-camadas.mjs) — mesmo motivo já documentado
 // no Composer.jsx para o picker de "Prato".
+import { forwardRef } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
@@ -22,29 +23,23 @@ import css from './composerAnexos.module.css'
 // clipe. Sem `classeRotulo`, o nome continua só para leitor de tela.
 // `soImagem` (#1587): no modo API o seletor do sistema nem oferece PDF, que o EasyStok não envia.
 // `titulo` (#2146): a explicação inteira vai na dica do Tooltip, não mais no `title` nativo.
-export function BotaoAnexarArquivo({
-  disabled, titulo, rotulo = 'Anexar', classeRotulo = 'sr', soImagem = false, descritoPor, aoEscolher,
-}) {
+export const EscolhaDeArquivo = forwardRef(function EscolhaDeArquivo({ soImagem = false, aoEscolher }, ref) {
   return (
-    <Tooltip texto={titulo}>
-      <label className={`${css.botaoAnexo} ${disabled ? css.desabilitado : ''}`}>
-        <Icone nome="anexo" /> <span className={classeRotulo}>{rotulo}</span>
-        <input
-          type="file"
-          className="sr"
-          disabled={disabled}
-          aria-describedby={descritoPor}
-          accept={`image/jpeg,image/png,image/webp,image/gif${soImagem ? '' : ',application/pdf'}`}
-          onChange={(evento) => {
-            const arquivo = evento.target.files?.[0]
-            evento.target.value = '' // permite escolher o mesmo arquivo de novo em seguida
-            if (arquivo) aoEscolher(arquivo)
-          }}
-        />
-      </label>
-    </Tooltip>
+    <input
+      ref={ref}
+      type="file"
+      className="sr"
+      tabIndex={-1}
+      aria-hidden="true"
+      accept={`image/jpeg,image/png,image/webp,image/gif${soImagem ? '' : ',application/pdf'}`}
+      onChange={(evento) => {
+        const arquivo = evento.target.files?.[0]
+        evento.target.value = '' // permite escolher o mesmo arquivo de novo em seguida
+        if (arquivo) aoEscolher(arquivo)
+      }}
+    />
   )
-}
+})
 
 // Prévia antes de enviar (pesquisa seção B: "card com miniatura, nome do
 // arquivo, badge de tipo, botão de remover"). `anexo`: { tipo: 'imagem'|'pdf',

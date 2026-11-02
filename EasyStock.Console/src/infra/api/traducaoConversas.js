@@ -109,7 +109,9 @@ function passagemDaApi(resumo) {
     // #1761: o motivo gravado pelo EasyStok é texto de sistema; cartão, faixa e lembrete leem o traduzido.
     motivo: motivoDeEscalada(resumo.motivoEscalada), em: null, assumida: false,
     ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' }
-      : resumo.canal === 'ChatSite' ? { origem: 'chat-site', motivo: resumo.motivoEscalada || 'Visitante do site aguardando atendimento da equipe.' } : {}),
+      : resumo.canal === 'ChatSite' ? { origem: 'chat-site', motivo: resumo.motivoEscalada || 'Visitante do site aguardando atendimento da equipe.' }
+        // #2185: só o WhatsApp tem Assistente; nos outros canais a conversa já nasce na fila da equipe.
+        : resumo.canal !== 'WhatsApp' ? { origem: 'fila', motivo: resumo.motivoEscalada || 'Cliente aguardando atendimento da equipe.' } : {}),
   }
 }
 

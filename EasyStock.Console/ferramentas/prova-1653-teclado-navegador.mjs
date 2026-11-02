@@ -126,9 +126,9 @@ try {
   await campo.press('Escape')
   registrar('App: eventos IME de Enter/setas/Escape não enviam, inserem nem fecham sugestões')
 
-  const gatilho = page.getByRole('button', { name: 'Mais ações do pedido', exact: true })
+  const gatilho = page.getByRole('button', { name: 'Mais opções do pedido', exact: true })
   await gatilho.click()
-  const menu = page.getByRole('menu', { name: 'Mais ações do pedido', exact: true })
+  const menu = page.getByRole('menu', { name: 'Mais opções do pedido', exact: true })
   await menu.waitFor()
   await page.keyboard.press('ArrowDown')
   await menuInteiroVisivel(menu)

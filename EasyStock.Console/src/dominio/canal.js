@@ -16,6 +16,7 @@ export const CANAL_DESCONHECIDO = {
     foto: false, figurinha: false, audio: false, arquivo: false,
   },
   temFoto: false,
+  temAssistente: false,
   explicacao: ['Canal sem regra cadastrada.', 'Cadastre o canal para liberar envio.'],
 }
 

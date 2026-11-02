@@ -15,7 +15,7 @@ import { prazoDoPagamento } from './lembrete'
 import { duracao } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
 import { pedidoAtrasado } from './cozinha.js'
-import { MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
+import { AGUARDANDO_EQUIPE, MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
 import { pedidoEncerrado } from './pedido.js'
 import { ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
@@ -134,7 +134,7 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
   if (passagemPendente(conversa)) {
     const base = DESCRICOES[MODOS.COM_VOCE]
     return { chave: MODOS.COM_VOCE, ...base,
-      ...(conversa.passagem.origem === 'chat-site' ? { rotulo: 'Aguardando equipe' } : {}),
+      ...(['chat-site', 'fila'].includes(conversa.passagem.origem) ? { rotulo: AGUARDANDO_EQUIPE } : {}),
       detalhe: origemDaPassagem(conversa.passagem).longo }
   }
   if (pausado) {

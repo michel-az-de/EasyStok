@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Avatar } from '../../componentes/Avatar'
 import { AvatarAssistente } from '../../componentes/AvatarAssistente'
 import { Bloco } from '../../componentes/Bloco'
@@ -6,7 +7,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
-import { Popover } from '../../componentes/Popover'
+import { MenuDeAcoes } from '../../componentes/MenuDeAcoes'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import {
@@ -86,14 +87,12 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   } = useAcoes()
 
   const [modal, setModal] = useState(null)
-  const [menuAberto, setMenuAberto] = useState(false)
   const [avisoEndereco, setAvisoEndereco] = useState(null)
   const [form, setForm] = useState(() => estadoInicialDoForm(conversa))
   // #1586: espera e erro do "Salvar cadastro", presos à conversa que iniciou (a Ficha troca de
   // conversa sem remontar este bloco). A ref trava o segundo toque.
   const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null })
   const cadastrando = useRef(false)
-  const idMotivoBloqueio = useId()
 
   // Troca de conversa: recarrega o rascunho do cadastro rápido e limpa avisos
   // que eram da conversa anterior. Só depende do id: editar o formulário não
@@ -152,6 +151,8 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const erroCadastro = cadastro.id === conversa.id ? cadastro.erro : null
   // #1586: lead sem cadastro no modo API não tem o que bloquear; o item nasce desabilitado.
   const motivoSemBloqueio = bloqueada ? null : motivoParaNaoBloquear(conversa, { fonteApi })
+  const { acoes: capacidades } = useAcessoModulos()
+  const podeBloquear = !fonteApi || capacidades?.controlarLoja === true
 
   // Na demonstração a ação é síncrona e não devolve nada: o `await` segue como sucesso.
   async function aoSalvarCadastro() {
@@ -221,40 +222,19 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
               <span className={css.situacao}>Cliente desde {cliente.desde}</span>
             )}
           </div>
-          <span className={css.menuCliente}>
-            <Botao
-              className={css.gatilhoMenu}
-              aria-haspopup="menu"
-              aria-expanded={menuAberto}
-              aria-label="Mais ações do cliente"
-              title="Mais ações do cliente"
-              onClick={() => setMenuAberto((v) => !v)}
-            >
-              <Icone nome="ellipsis-vertical" tamanho={24} />
-            </Botao>
-            {menuAberto && (
-              <Popover rotulo="Mais ações do cliente" posicao="abaixo" aoFechar={() => setMenuAberto(false)}>
-                <div className={css.menuAcoes}>
-                  {aoEscolherFoto && <button type="button" role="menuitem" className={css.itemMenu} disabled={alterandoFoto}
-                    onClick={() => { setMenuAberto(false); aoEscolherFoto() }}>
-                    <Icone nome="camera" />{cliente.fotoUrl ? 'Trocar foto' : 'Adicionar foto'}
-                  </button>}
-                  {aoRemoverFoto && <button type="button" role="menuitem" className={css.itemMenu} disabled={alterandoFoto}
-                    onClick={() => { setMenuAberto(false); aoRemoverFoto() }}><Icone nome="lixeira" />Remover foto</button>}
-                  <button
-                    type="button" role="menuitem" className={css.itemMenu}
-                    disabled={Boolean(motivoSemBloqueio)}
-                    aria-describedby={motivoSemBloqueio ? idMotivoBloqueio : undefined}
-                    onClick={() => { setMenuAberto(false); setModal(bloqueada ? 'desbloquear' : 'bloquear') }}
-                  >
-                    <Icone nome="bloqueio" />
-                    {bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente'}
-                  </button>
-                  {motivoSemBloqueio && <p id={idMotivoBloqueio} className={css.motivoMenu}>{motivoSemBloqueio}</p>}
-                </div>
-              </Popover>
-            )}
-          </span>
+          <MenuDeAcoes
+            rotulo="Mais opções do cliente"
+            itens={[
+              aoEscolherFoto && { chave: 'foto', rotulo: cliente.fotoUrl ? 'Trocar foto' : 'Adicionar foto', icone: 'camera', desabilitado: alterandoFoto, aoEscolher: aoEscolherFoto },
+              aoRemoverFoto && { chave: 'sem-foto', rotulo: 'Remover foto', icone: 'lixeira', desabilitado: alterandoFoto, aoEscolher: aoRemoverFoto },
+              // #2185: bloquear é da gerência (o servidor devolve 403 à atendente).
+              podeBloquear && {
+                chave: 'bloqueio', rotulo: bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente', icone: 'bloqueio', abreJanela: true,
+                desabilitado: Boolean(motivoSemBloqueio), motivo: motivoSemBloqueio,
+                aoEscolher: () => setModal(bloqueada ? 'desbloquear' : 'bloquear'),
+              },
+            ]}
+          />
         </div>
 
         {/* Sinal forte de bloqueio: ícone, palavra e motivo. A cor sozinha não

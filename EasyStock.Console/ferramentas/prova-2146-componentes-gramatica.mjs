@@ -123,13 +123,13 @@ if (!pastaDoPlaywright) {
   const dicaVisivel = (pagina) => pagina.locator('[role="tooltip"]').filter({ visible: true })
   const esperar = (pagina, ms) => pagina.waitForTimeout(ms)
   async function abrirFerramentas(pagina, celular = false) {
-    const resumo = pagina.locator('summary[aria-label="Mais ferramentas"]')
-    await resumo.waitFor({ state: 'visible' })
-    if (!await resumo.evaluate((el) => el.closest('details').open)) {
-      if (celular) await resumo.tap()
-      else await resumo.click()
+    const gatilho = pagina.getByRole('button', { name: 'Mais ferramentas', exact: true })
+    await gatilho.waitFor({ state: 'visible' })
+    if (await gatilho.getAttribute('aria-expanded') !== 'true') {
+      if (celular) await gatilho.tap()
+      else await gatilho.click()
     }
-    await pagina.getByRole('button', { name: 'Nota interna', exact: true }).waitFor({ state: 'visible' })
+    await pagina.getByRole('menu', { name: 'Mais ferramentas', exact: true }).waitFor({ state: 'visible' })
   }
 
   try {
@@ -253,9 +253,9 @@ if (!pastaDoPlaywright) {
       const { contexto, pagina } = await abrir()
       await abrirFerramentas(pagina)
       await pagina.keyboard.press('Escape')
-      const resumo = pagina.locator('summary[aria-label="Mais ferramentas"]')
-      assert.equal(await resumo.evaluate((el) => document.activeElement === el), true)
-      assert.equal(await resumo.evaluate((el) => el.closest('details').open), false)
+      const gatilho = pagina.getByRole('button', { name: 'Mais ferramentas', exact: true })
+      assert.equal(await gatilho.evaluate((el) => document.activeElement === el), true)
+      assert.equal(await gatilho.getAttribute('aria-expanded'), 'false')
       await contexto.close()
     })
 
@@ -266,7 +266,7 @@ if (!pastaDoPlaywright) {
         if (menuAberto) await abrirFerramentas(pagina)
         await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
         assert.equal(await campo.inputValue(), texto)
-        assert.equal(await pagina.locator('summary[aria-label="Mais ferramentas"]').evaluate((el) => el.closest('details').open), false)
+        assert.equal(await pagina.getByRole('button', { name: 'Mais ferramentas', exact: true }).getAttribute('aria-expanded'), 'false')
         await contexto.close()
       })
     }
@@ -274,6 +274,8 @@ if (!pastaDoPlaywright) {
     await confere('3. toque (hasTouch, isMobile): nem hover nem foco mostram a dica', async () => {
       const { contexto, pagina, campo } = await abrir({ largura: 390, altura: 844, celular: true })
       await abrirFerramentas(pagina, true)
+      // #2185: no celular o menu vira folha no pé da tela, por cima da barra; fecha antes do hover.
+      await pagina.keyboard.press('Escape')
       await pagina.getByRole('button', { name: 'Nota interna', exact: true }).hover()
       await esperar(pagina, 700)
       assert.equal(await dicaVisivel(pagina).count(), 0, 'apareceu no hover em toque')

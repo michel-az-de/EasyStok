@@ -12,7 +12,9 @@
 //      nao contam;
 //   d. duracao (ms, s) ou easing (cubic-bezier, ease*) literal em transition/animation
 //      nos .css de src/. `var(--...)` nao conta e tokens.css fica fora: e la que os
-//      tokens de movimento moram.
+//      tokens de movimento moram;
+//   e. menu de opcoes fora do `MenuDeAcoes` (#2185): icone de reticencias ou o rotulo
+//      "Mais acoes" em outro componente. Eram 7 implementacoes, 5 rotulos e 3 icones.
 //
 // Le o codigo como texto, sem dependencia. As contagens b, c e d sao heuristicas de
 // proposito: o que importa e que o numero so desca.
@@ -29,6 +31,7 @@ const TETOS = {
   botaoCru: 16,
   termoProibido: 19,
   movimentoLiteral: 40,
+  menuForaDoComponente: 5,
 }
 
 const CONSOLE = fileURLToPath(new URL('..', import.meta.url))
@@ -229,6 +232,18 @@ function contarMovimentoLiteral(estilos) {
   return faltas
 }
 
+// --- e. menu de opcoes fora do MenuDeAcoes ---------------------------------------------
+
+function contarMenusForaDoComponente(fontes) {
+  const faltas = []
+  for (const arquivo of fontes) {
+    if (!arquivo.endsWith('.jsx') || /componentes[\\/](MenuDeAcoes|Icone)\.jsx$/.test(arquivo)) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
+    for (const m of codigo.matchAll(/(?:nome|icone)=["']ellipsis(?:-vertical)?["']|Mais ações/g)) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} ${m[0]}`)
+  }
+  return faltas
+}
+
 // --- tetos ----------------------------------------------------------------------------
 
 const fontes = arquivos(RAIZ, /\.(jsx?|mjs)$/)
@@ -239,6 +254,7 @@ const GUARDAS = [
   ['botaoCru', '<button cru em atendimento e caixa de entrada', contarBotoesCrus(fontes)],
   ['termoProibido', 'termo interno na tela (secao 3.1)', contarTermosProibidos(fontes)],
   ['movimentoLiteral', 'duracao ou easing literal em transition/animation', contarMovimentoLiteral(estilos)],
+  ['menuForaDoComponente', 'menu de opcoes fora do MenuDeAcoes', contarMenusForaDoComponente(fontes)],
 ]
 
 let reprovou = false

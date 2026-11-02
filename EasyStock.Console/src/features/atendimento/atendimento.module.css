@@ -24,28 +24,8 @@
   flex-wrap: nowrap; flex-shrink: 0;
 }
 .identidade { flex-basis: auto; }
-.opcoesConversa, .ferramentasComposer { position: relative; }
-.opcoesConversa > summary, .ferramentasComposer > summary {
-  display: grid; place-items: center; min-width: var(--toque); min-height: var(--toque);
-  padding: var(--e-2); border-radius: var(--r-2); list-style: none; cursor: pointer; color: var(--tinta-2);
-}
-.opcoesConversa > summary::-webkit-details-marker, .ferramentasComposer > summary::-webkit-details-marker { display: none; }
-.opcoesConversa > summary:hover, .ferramentasComposer > summary:hover { background: var(--preenchimento); }
-.opcoesConversa > summary:focus-visible, .ferramentasComposer > summary:focus-visible { outline: 2px solid var(--halo); outline-offset: 2px; }
-.menuConversa, .menuFerramentas {
-  position: absolute; z-index: 40; width: min(280px, calc(100vw - 32px));
-  display: grid; gap: var(--e-1); padding: var(--e-2); border-radius: var(--r-2);
-  background: var(--papel); box-shadow: var(--sombra); color: var(--tinta);
-}
-.menuConversa { top: calc(100% + var(--e-2)); right: 0; }
-.menuFerramentas { bottom: calc(100% + var(--e-2)); left: 0; }
-.menuConversa button, .menuFerramentas button, .menuFerramentas label {
-  width: 100%; justify-content: flex-start; min-height: var(--toque); padding: var(--e-2) var(--e-3);
-  border: 0; border-radius: var(--r-1); box-shadow: none; background: transparent;
-  color: var(--tinta); font: inherit; font-size: var(--t-apoio); text-align: left; cursor: pointer;
-}
-.menuConversa button:hover:not(:disabled), .menuFerramentas button:hover:not(:disabled), .menuFerramentas label:hover { background: var(--preenchimento); }
-.menuFerramentas .rotuloAcao { display: inline; position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; white-space: normal; }
+.ancoraAssistente { display: inline-flex; flex: none; }
+.ancoraAssistente:empty { display: none; }
 
 /* Uma área rolável só na coluna do meio: barra de modo, thread e painel do
    agente rolam juntos, o cabeçalho fica no teto e o composer no piso. Antes os
@@ -227,35 +207,14 @@
   border: 0;
   padding: 0 var(--e-4); min-height: var(--toque);
 }
-.modo_ligado { border-left-color: var(--sucesso); }
-.modo_pausado { border-left-color: var(--linha-forte); }
-.modo_com-voce { border-left-color: var(--alerta); }
-.modo_encerrado { border-left-color: var(--linha-forte); }
-.modo_bloqueado { border-left-color: var(--erro); }
-
 /* Estado e Assumir permanecem à vista; as ações secundárias abrem no próprio contexto. */
-.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); }
-.modoLinha > :first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-3); min-height: var(--toque); }
+.modoEstado { flex: none; }
 .modoTexto {
-  flex: 1 1 100%; min-width: 0; margin: 0;
+  flex: 1 1 0; min-width: 12ch; margin: 0;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
-.modoAcoes { margin-left: auto; display: flex; align-items: center; gap: var(--e-1); flex: none; }
-.maisAcoesModo { position: relative; }
-.maisAcoesModo > summary {
-  display: flex; align-items: center; min-height: var(--toque); padding: 0 var(--e-2);
-  list-style: none; cursor: pointer; font-size: var(--t-apoio); color: var(--tinta-2);
-}
-.maisAcoesModo > summary::-webkit-details-marker { display: none; }
-.maisAcoesModo > summary:hover, .maisAcoesModo[open] > summary { background: var(--preenchimento); }
-.maisAcoesModo > summary:focus-visible { outline: 3px solid var(--halo); outline-offset: 2px; }
-.listaAcoesModo {
-  position: absolute; right: 0; top: calc(100% + var(--e-1)); z-index: 40;
-  display: grid; gap: var(--e-1); width: min(260px, calc(100vw - 32px));
-  padding: var(--e-2); background: var(--papel); box-shadow: var(--sombra);
-}
-.listaAcoesModo > button { justify-content: flex-start; text-align: left; white-space: normal; }
-.acaoModo { min-height: var(--toque); padding-block: 0; }
+.modoAssumir { margin-left: auto; flex: none; }
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
 
 /* Alvo de toque de 44 px em qualquer ponteiro, não só no grosso. */
@@ -416,11 +375,6 @@
    "Encerrar" para leitor de tela e para as provas), para o nome do cliente
    caber na linha. */
 @container topo-conversa (max-width: 439px) {
-  .direita > button.encerrar { font-size: 0; gap: 0; padding: 0 10px; }
-  .direita > button.encerrar svg { width: 20px; height: 20px; }
-  /* #1239: "Passar para…" segue o Encerrar (o nome fica para o leitor de tela e o title). */
-  .direita > button.passar { font-size: 0; gap: 0; padding: 0 10px; }
-  .direita > button.passar svg { width: 20px; height: 20px; }
 }
 
 /* Rodada 9 (achado 5 da banca estética): no celular, canal + pedidos + janela
@@ -568,7 +522,6 @@
 
 @media (max-width: 759px) {
   .modoLinha { gap: var(--e-2); }
-  .modoLinha > :first-child > span { font-size: var(--t-minimo); }
   .caixa textarea,
   .caixa textarea:hover,
   .caixa textarea:focus,

@@ -116,15 +116,6 @@
 /* Ação: botão primário largo e o gatilho do menu ⋯ ao lado (secao 5, item 3). */
 .linhaAcao { display: flex; gap: var(--e-2); align-items: flex-end; }
 .botoesPrimarios { flex: 1; display: grid; gap: var(--e-2); }
-.comMenu { position: relative; display: inline-flex; flex-shrink: 0; }
-.gatilhoMenu { width: var(--toque); height: var(--toque); padding: 0; flex-shrink: 0; }
-.menuAcoes { display: grid; }
-.itemMenu {
-  display: flex; align-items: center; gap: var(--e-2); width: 100%; text-align: left;
-  background: none; border: 0; border-radius: var(--r-1); min-height: var(--toque);
-  padding: var(--e-2); font-size: var(--t-apoio); color: var(--tinta);
-}
-.itemMenu:hover { background: var(--elevado); }
 
 /* Confirmação em linha, no lugar do botão, nunca em modal (secao 4). Mesmo
    par pergunta/ação em toda ação destrutiva: voltar etapa, cancelar pedido,
