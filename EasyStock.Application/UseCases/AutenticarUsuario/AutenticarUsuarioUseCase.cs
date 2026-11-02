@@ -16,7 +16,9 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
         IReadOnlyCollection<Permissao> Permissoes,
         string? ModuloInicial = null,
         bool PermissoesExplicitas = false,
-        bool SessaoPersistente = false);
+        bool SessaoPersistente = false,
+        Guid? SessaoId = null,
+        string? DispositivoId = null);
 
     public class AutenticarUsuarioUseCase(
         IUsuarioRepository usuarioRepository,
@@ -97,8 +99,22 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             ConcluirAsync(usuario, empresaId ?? ResolveEmpresaIdPadrao(usuario) ?? PrimeiraEmpresaAtiva(usuario),
                 empresaDoSuperAdmin: empresaId ?? empresaPadrao);
 
+        /// <summary>Revalida o acesso depois da trava do aparelho, sem reaplicar escalares da identidade lida antes dela.</summary>
+        public async Task<AutenticarUsuarioResult> RevalidarLoginGoogleNativoAsync(Domain.Entities.Usuario identificado, Guid? empresaId, Guid? empresaPadrao, DateTime inicioAutenticacao)
+        {
+            // Dentro da transação nativa, este UPDATE trava a linha usada pelo corte administrativo.
+            // Só depois da trava lemos vínculo/perfil; um snapshot anterior ao commit não vira sessão nova.
+            await usuarioRepository.AtualizarUltimoAcessoAsync(identificado.Id, DateTime.UtcNow);
+            var atual = await usuarioRepository.GetByEmailAsync(identificado.Email);
+            if (atual is null || atual.Id != identificado.Id || !atual.Ativo || atual.EstaBloqueado()
+                || atual.SessoesValidasDesde is { } corte && corte >= inicioAutenticacao)
+                throw new CredenciaisInvalidasException("O acesso mudou durante o login. Entre novamente.");
+            return await ConcluirAsync(atual, empresaId ?? ResolveEmpresaIdPadrao(atual) ?? PrimeiraEmpresaAtiva(atual),
+                empresaDoSuperAdmin: empresaId ?? empresaPadrao, registrarAcesso: false);
+        }
+
         /// <summary>SuperAdmin, empresa, nível e permissões, e o último acesso. Credencial já conferida.</summary>
-        private async Task<AutenticarUsuarioResult> ConcluirAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaDoSuperAdmin = null)
+        private async Task<AutenticarUsuarioResult> ConcluirAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaDoSuperAdmin = null, bool registrarAcesso = true)
         {
             // SuperAdmin: perfil global com Perfil.EmpresaId=null. Nao tem vinculo
             // em UsuarioEmpresa, entao o fluxo padrao (que exige empresaId resolvido)
@@ -115,9 +131,12 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                     .Distinct()
                     .ToArray() ?? [];
 
-                usuario.AtualizarUltimoAcesso();
-                await usuarioRepository.UpdateAsync(usuario);
-                await unitOfWork.CommitAsync();
+                if (registrarAcesso)
+                {
+                    usuario.AtualizarUltimoAcesso();
+                    await usuarioRepository.UpdateAsync(usuario);
+                    await unitOfWork.CommitAsync();
+                }
 
                 return new AutenticarUsuarioResult(
                     UsuarioId: usuario.Id,
@@ -169,9 +188,12 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
                 }
             }
 
-            usuario.AtualizarUltimoAcesso();
-            await usuarioRepository.UpdateAsync(usuario);
-            await unitOfWork.CommitAsync();
+            if (registrarAcesso)
+            {
+                usuario.AtualizarUltimoAcesso();
+                await usuarioRepository.UpdateAsync(usuario);
+                await unitOfWork.CommitAsync();
+            }
 
             return new AutenticarUsuarioResult(
                 UsuarioId: usuario.Id,

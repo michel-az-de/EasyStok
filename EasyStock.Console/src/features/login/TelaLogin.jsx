@@ -7,7 +7,7 @@ import { BotaoGoogle } from './BotaoGoogle'
 import css from './login.module.css'
 
 // Um passo, com a empresa resolvida pela API (M0.2).
-export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
+export function TelaLogin({ entrarNaEmpresa, google, avisoSaida, retomando = false, erroRetomada = null }) {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState(null)
@@ -39,11 +39,17 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
       <section className={css.cartao} aria-labelledby="titulo-login">
         <Marca />
         <div>
-          <h1 id="titulo-login" className={css.titulo}>Entrar na Casa da Baba</h1>
+          <h1 id="titulo-login" className={css.titulo}>{retomando ? 'Abrindo sua conta…' : erroRetomada ? 'Retomar Atendimento' : 'Entrar na Casa da Baba'}</h1>
         </div>
         {avisoSaida && <p className={css.aviso} role="status">{avisoSaida}</p>}
         {erro && <p className={css.erro} role="alert">{erro}</p>}
-        <form className={css.formulario} onSubmit={aoEnviar} aria-busy={ocupado}>
+        {retomando && <p role="status">Retomando a conta do aplicativo.</p>}
+        {erroRetomada && <p className={css.aviso} role="status">{erroRetomada}</p>}
+        {google?.nativo && !retomando && <Botao variante="primario" largo disabled={ocupado}
+          onClick={() => tentar(erroRetomada ? google.retomarNativa : google.entrarNativo)}>
+          {ocupado ? 'Aguarde…' : erroRetomada ? 'Tentar novamente' : 'Entrar com Google'}
+        </Botao>}
+        {!google?.nativo && <form className={css.formulario} onSubmit={aoEnviar} aria-busy={ocupado}>
           <CampoTexto
             rotulo="E-mail" tipo="email" autoComplete="username" required
             value={email} onChange={(e) => setEmail(e.target.value)} readOnly={ocupado}
@@ -55,8 +61,8 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
           <Botao variante="primario" tipo="submit" largo disabled={ocupado}>
             {ocupado ? 'Entrando…' : 'Entrar'}
           </Botao>
-        </form>
-        {google && (
+        </form>}
+        {google && !google.nativo && (
           <div className={css.google}>
             <BotaoGoogle buscarClientId={google.buscarClientId} aoReceberToken={entrarComGoogle} aoFalhar={falhaDoGoogle} opcoes={google.opcoes} />
           </div>

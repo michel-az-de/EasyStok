@@ -352,6 +352,31 @@
     if (hasData) throw new Error('Este aparelho já tem dados vinculados. A equipe precisa revisar a conexão antes de parear novamente ou trocar de loja. Seus dados foram mantidos; não desinstale o app.');
   }
 
+  // A autenticação não autoriza escolher outra origem para uma fila já existente.
+  // Na retomada da mesma origem só a credencial muda, nunca os dados ou os IDs.
+  function applySessionPairing(data, options) {
+    const reject = (code, message) => { throw Object.assign(new Error(message), { code }); };
+    const sameContextId = (first, second) => String(first).toLowerCase() === String(second).toLowerCase();
+    if (!data || typeof data.apiKey !== 'string' || !data.apiKey || typeof data.empresaId !== 'string' || !data.empresaId
+      || typeof data.lojaId !== 'string' || !data.lojaId || data.deviceId !== deviceId)
+      reject('SESSION_PAIRING_INVALID', 'A conexão da conta não corresponde a este aparelho. Seus dados foram mantidos.');
+    const origin = pilotDataContext();
+    if (origin && (origin.invalid || !sameContextId(origin.empresaId, data.empresaId) || !sameContextId(origin.lojaId, data.lojaId)))
+      reject('LOCAL_CONTEXT_MISMATCH', 'Os dados deste aparelho pertencem a outra empresa ou loja. Nenhum dado foi enviado.');
+    const hasData = loadQueue().length > 0 || ['cdb-products', 'cdb-clients', 'cdb-orders', 'cdb-batches', 'cdb-cash', 'cdb-cash-closings', 'cdb-shopping', 'cdb-audit-log']
+      .some(key => { try { const rows = JSON.parse(localStorage.getItem(key) || '[]'); return !Array.isArray(rows) || rows.length > 0; } catch (_) { return true; } });
+    if (!origin && hasData && options?.confirmLocalContext !== true)
+      reject('LOCAL_CONTEXT_REQUIRED', 'Confira a empresa e a loja dos dados já existentes antes de sincronizar.');
+    savePairing({ apiKey: data.apiKey, empresaId: data.empresaId, lojaId: data.lojaId, deviceId,
+      label: data.label || null, defaultOperatorName: data.defaultOperatorName || null, pairedAt: data.pairedAt || null,
+      empresaNome: data.empresaNome || null, lojaNome: data.lojaNome || null });
+    if (!origin) resetPullCursor();
+    applyEmpresaNomeDoPareamento(data.empresaNome);
+    _pairingInvalid = false;
+    emitSyncStateChange();
+    return { paired: true };
+  }
+
   // ---- Device ID (primeiro boot gera um UUID, persiste) ----
   function getDeviceId() {
     let id = localStorage.getItem(DEVICE_ID_KEY);
@@ -422,6 +447,7 @@
     return true;
   }
   function getApiKey() {
+    if (window.CDB_CONFIG?.requiresGoogleSession && window.cdbAuth?.canSync?.() !== true) return null;
     const p = loadPairing();
     return (p && p.apiKey) || null;
   }
@@ -1950,6 +1976,7 @@
     // Tenta token efemero. Se servidor antigo (404) ou rede falha, cai no
     // fallback ?apiKey= pra nao perder realtime durante a transicao.
     const token = await fetchSseToken();
+    if (apiKey !== getApiKey()) return;
     const queryParam = token ? ('token=' + encodeURIComponent(token))
                               : ('apiKey=' + encodeURIComponent(apiKey));
 
@@ -2901,7 +2928,9 @@
   window.cdbSync = {
     flush, pull, stop, localReady,
     pingVersion, uploadErrorLog,
-    pairWithCode, pairAuto,
+    pairWithCode, pairAuto, applySessionPairing,
+    getDeviceId: () => deviceId,
+    getDataContext: pilotDataContext,
     openTicketAuto,
     // Contingência: trace + diagnóstico expostos pro Diagnóstico UI usar
     getTrace, clearTrace, exportTraceText,

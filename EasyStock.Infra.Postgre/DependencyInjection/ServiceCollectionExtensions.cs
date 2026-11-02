@@ -124,6 +124,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IUsuarioPerfilRepository, UsuarioPerfilRepository>();
             services.AddScoped<IAuditLogRepository, AuditLogRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Auth.IProtetorRefreshNativo, Services.Auth.ProtetorRefreshNativo>();
             services.AddScoped<IResetTokenRepository, ResetTokenRepository>();
             services.AddScoped<IEmailConfirmationTokenRepository, EmailConfirmationTokenRepository>();
             services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();

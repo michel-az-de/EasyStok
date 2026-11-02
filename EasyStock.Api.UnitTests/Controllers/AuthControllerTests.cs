@@ -53,6 +53,8 @@ public class AuthControllerTests
         _mockJwtService.ExpiresInSeconds.Returns(3600);
 
         _unitOfWork.CommitAsync().Returns(1);
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Microsoft.AspNetCore.Mvc.IActionResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<Microsoft.AspNetCore.Mvc.IActionResult>>>()(c.Arg<CancellationToken>()));
 
         var usuarioRepo2 = Substitute.For<IUsuarioRepository>();
         var unitOfWork2 = Substitute.For<IUnitOfWork>();
@@ -168,7 +170,42 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task Login_RevogaORefreshDosOutrosAparelhosMasNaoGravaOCarimboDeSessao()
+    public async Task GoogleNativo_NaoRevogaRefreshDoPc_EVinculaAparelhoAEmpresaEscolhida()
+    {
+        var empresa = Guid.NewGuid();
+        var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = empresa, Ativo = true });
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns("client-id-da-prova");
+        google.ValidarAsync("id-token-da-prova", Arg.Any<CancellationToken>())
+            .Returns(new EasyStock.Application.Ports.Output.Auth.IdentidadeGoogle(usuario.Email, true));
+        var identificar = new IdentificarUsuarioGoogleUseCase(google, _usuarioRepository, null!, _unitOfWork, TimeProvider.System);
+        var resolver = Substitute.For<IEmpresaPadraoResolver>();
+        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() };
+        var request = System.Text.Json.JsonSerializer.Deserialize<LoginGoogleRequest>(
+            System.Text.Json.JsonSerializer.Serialize(new { idToken = "id-token-da-prova", empresaId = empresa, dispositivoId = "android-prova-2184" }),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+
+        await _controller.LoginGoogle(request, google, identificar, resolver, CancellationToken.None);
+
+        await _refreshTokenRepository.DidNotReceive().RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
+        await _refreshTokenRepository.Received(1).TravarDispositivoAsync("android-prova-2184");
+        var resultado = _mockJwtService.ReceivedCalls().Single(c => c.GetMethodInfo().Name == "GerarToken").GetArguments()[0]!;
+        var claims = System.Text.Json.JsonSerializer.SerializeToElement(resultado);
+        claims.GetProperty("EmpresaId").GetGuid().Should().Be(empresa);
+        claims.GetProperty("DispositivoId").GetString().Should().Be("android-prova-2184");
+        claims.GetProperty("SessaoId").GetGuid().Should().NotBeEmpty();
+        await _controller.LoginGoogle(request, google, identificar, resolver, CancellationToken.None);
+        var familias = _mockJwtService.ReceivedCalls().Where(c => c.GetMethodInfo().Name == "GerarToken")
+            .Select(c => ((AutenticarUsuarioResult)c.GetArguments()[0]!).SessaoId).ToArray();
+        familias.Should().OnlyHaveUniqueItems("cada login explícito cria sua família para não ser encerrado por um logout offline anterior");
+        await _refreshTokenRepository.DidNotReceive().RevogarSessoesWebAsync(usuario.Id, Arg.Any<DateTime>());
+    }
+
+    [Fact]
+    public async Task LoginWeb_RevogaSomenteOutrosRefreshWeb_SemDerrubarSessaoNativa()
     {
         // #1352: logar em outro aparelho revoga só o refresh dos outros; o JWT deles segue valendo, então o
         // carimbo de sessão não pode mudar no login (logar o tablet derrubaria o balcão).
@@ -181,7 +218,8 @@ public class AuthControllerTests
 
         await _controller.Login(new LoginRequest(usuario.Email, "Senha@12345", null));
 
-        await _refreshTokenRepository.Received(1).RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
+        await _refreshTokenRepository.Received(1).RevogarSessoesWebAsync(usuario.Id, Arg.Any<DateTime>());
+        await _refreshTokenRepository.DidNotReceive().RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
         await _usuarioRepository.DidNotReceiveWithAnyArgs().AtualizarSessoesValidasDesdeAsync(default, default);
         usuario.SessoesValidasDesde.Should().BeNull();
     }
@@ -421,6 +459,7 @@ public class AuthControllerTests
         var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
         var dados = DadosDaResposta(ok);
         dados.GetProperty("habilitado").GetBoolean().Should().BeFalse();
+        dados.GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeTrue();
         (dados.TryGetProperty("clientId", out var clientId) ? clientId.ValueKind : System.Text.Json.JsonValueKind.Null)
             .Should().Be(System.Text.Json.JsonValueKind.Null);
     }
@@ -436,6 +475,7 @@ public class AuthControllerTests
         var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
         var dados = DadosDaResposta(ok);
         dados.GetProperty("habilitado").GetBoolean().Should().BeTrue();
+        dados.GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeTrue();
         dados.GetProperty("clientId").GetString().Should().Be("cliente-123.apps.googleusercontent.com");
     }
 

@@ -16,6 +16,18 @@ public sealed class LogoutUseCase(
 
         var tokenHash = TokenHashHelper.ComputeSha256Hash(command.RefreshToken);
         var refreshToken = await refreshTokenRepository.GetByTokenHashAsync(tokenHash);
+        // Mesmo o refresh consumido identifica a família: Sair durante uma renovação deve revogar o sucessor.
+        if (refreshToken?.SessaoNativaId is { } sessaoId)
+            return await unitOfWork.ExecuteInTransactionSemRetryAsync(async _ =>
+            {
+                var sessao = await refreshTokenRepository.ObterSessaoNativaComLockAsync(sessaoId);
+                if (sessao is null || sessao.UsuarioId != refreshToken.UsuarioId) return new LogoutResult(false);
+                await refreshTokenRepository.RevogarSessaoNativaAsync(sessao.Id, DateTime.UtcNow);
+                await auditLogRepository.AddAsync(AuditLog.Criar(sessao.UsuarioId, "logout_nativo", true,
+                    "Sessão do aparelho encerrada", null, null));
+                await unitOfWork.CommitAsync();
+                return new LogoutResult(true);
+            });
         if (refreshToken == null || !refreshToken.EstaValido())
         {
             logger.LogWarning("Tentativa de logout com token invalido");

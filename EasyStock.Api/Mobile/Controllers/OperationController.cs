@@ -318,13 +318,11 @@ public class OperationController(
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var agora = DateTime.UtcNow;
 
+        var claims = new List<Claim> { new("typ", SseTokenType), new("deviceId", device.Id) };
+        if (device.SessaoNativaId is { } sid) claims.Add(new Claim("sid", sid.ToString()));
         var descriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(new[]
-            {
-                new Claim("typ", SseTokenType),
-                new Claim("deviceId", device.Id),
-            }),
+            Subject = new ClaimsIdentity(claims),
             NotBefore = agora,
             IssuedAt = agora,
             Expires = agora.AddSeconds(SseTokenExpiresInSeconds),
@@ -360,15 +358,17 @@ public class OperationController(
     public async Task Stream([FromQuery] string? token, [FromQuery] string? apiKey, CancellationToken ct)
     {
         MobileDevice? device = null;
+        (string DeviceId, Guid? SessaoId, DateTimeOffset ExpiraEm)? identidadeSse = null;
 
         if (!string.IsNullOrWhiteSpace(token))
         {
-            var deviceId = TryReadSseTokenDeviceId(token);
-            if (deviceId == null)
+            identidadeSse = TryReadSseToken(token);
+            if (identidadeSse == null)
             {
                 Response.StatusCode = 401;
                 return;
             }
+            var deviceId = identidadeSse.Value.DeviceId;
             device = await _db.Set<MobileDevice>().AsNoTracking()
                 .FirstOrDefaultAsync(d => d.Id == deviceId, ct);
         }
@@ -389,6 +389,28 @@ public class OperationController(
         if (device == null || device.Revoked)
         {
             Response.StatusCode = 401;
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(token) && identidadeSse?.SessaoId != device.SessaoNativaId)
+        {
+            Response.StatusCode = 401;
+            return;
+        }
+        if (device.SessaoNativaId is { } sessaoId)
+        {
+            var validador = HttpContext.RequestServices.GetRequiredService<EasyStock.Api.Authentication.ValidadorSessaoUsuario>();
+            async Task<bool> AindaValida(CancellationToken cancelamento) =>
+                await validador.ValidarNativaAsync(sessaoId, device.Id, device.EmpresaId)
+                && await _db.Set<MobileDevice>().IgnoreQueryFilters().AsNoTracking().AnyAsync(d => d.Id == device.Id
+                    && !d.Revoked && d.SessaoNativaId == sessaoId && d.LojaId == device.LojaId, cancelamento);
+            if (!await AindaValida(ct)) { Response.StatusCode = 401; return; }
+            Response.Headers["Content-Type"] = "text/event-stream";
+            Response.Headers["Cache-Control"] = "no-cache, no-transform";
+            Response.Headers["X-Accel-Buffering"] = "no";
+            using var nativa = _eventBroker.Subscribe(device.Id + ":" + Guid.NewGuid().ToString("N"), device.EmpresaId, device.LojaId, device.Id);
+            await TransmissaoSse.TransmitirAsync(Response, nativa.Slot, TimeSpan.FromSeconds(25), identidadeSse?.ExpiraEm,
+                AindaValida, TimeProvider.System, ct);
             return;
         }
 
@@ -454,14 +476,14 @@ public class OperationController(
     /// Valida JWT efemero de SSE e devolve deviceId. Retorna null se token
     /// invalido, expirado, ou de tipo errado.
     /// </summary>
-    private string? TryReadSseTokenDeviceId(string token)
+    private (string DeviceId, Guid? SessaoId, DateTimeOffset ExpiraEm)? TryReadSseToken(string token)
     {
         var secretKey = _configuration["Jwt:SecretKey"];
         if (string.IsNullOrEmpty(secretKey)) return null;
 
         try
         {
-            var handler = new JwtSecurityTokenHandler();
+            var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
             var parameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
@@ -474,11 +496,13 @@ public class OperationController(
                 ClockSkew = TimeSpan.FromSeconds(30),
             };
 
-            var principal = handler.ValidateToken(token, parameters, out _);
+            var principal = handler.ValidateToken(token, parameters, out var validado);
             if (principal.FindFirstValue("typ") != SseTokenType) return null;
 
             var deviceId = principal.FindFirstValue("deviceId");
-            return string.IsNullOrEmpty(deviceId) ? null : deviceId;
+            var sid = principal.FindFirstValue("sid");
+            if (string.IsNullOrEmpty(deviceId) || sid is not null && !Guid.TryParse(sid, out _)) return null;
+            return (deviceId, sid is null ? null : Guid.Parse(sid), new DateTimeOffset(validado.ValidTo));
         }
         catch
         {

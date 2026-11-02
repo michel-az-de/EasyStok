@@ -1,5 +1,6 @@
 import { API_BASE } from '../fonteDados'
-import { atualizarTokens, empresaDoToken, gravarSessao, identidadeDaSessao, lerSessao, limparSessao } from './sessao'
+import { atualizarTokens, empresaDoToken, gravarSessao, gravarSessaoNativa, identidadeDaSessao, lerSessao, limparSessao } from './sessao'
+import { obterSessaoNativa, temSessaoNativa } from '../sessaoNativa'
 import { combinarSinais } from './sinais'
 
 // Erro de chamada à API com o que a tela precisa para falar com a dona:
@@ -29,6 +30,10 @@ function expirar(sessao) {
 
 export async function garantirSessao() {
   const sessao = lerSessao()
+  if (temSessaoNativa()) {
+    if (sessao?.nativa && sessao.expiraEm > Date.now()) return sessao
+    return gravarSessaoNativa(await obterSessaoNativa())
+  }
   if (!sessao?.persistente || sessao.expiraEm > Date.now()) return sessao
   if (!renovacao) {
     const renovar = async () => {
@@ -151,7 +156,22 @@ export async function chamarApi(caminho, {
   if (resposta.ok) return envelope ? json : json?.data ?? null
 
   if (resposta.status === 401 && autenticado) {
-    expirar(sessao)
+    if (sessao?.nativa && temSessaoNativa() && lerSessao()?.token === sessao.token) {
+      try {
+        const revalidada = await obterSessaoNativa({ tokenRejeitado: sessao.token })
+        if (lerSessao()?.token === sessao.token) {
+          if (revalidada?.autenticado) {
+            gravarSessaoNativa(revalidada)
+            // O comando original pode ter efeitos. A operadora decide a retentativa.
+            throw new ErroApi(401, 'CONTA_REVALIDADA', 'Sua conta foi reconectada. Tente essa ação novamente.')
+          }
+          expirar(sessao)
+        }
+      } catch (erro) {
+        if (erro.codigo === 'CONTA_REVALIDADA') throw erro
+        expirar(sessao)
+      }
+    } else expirar(sessao)
   }
   const codigo = json?.error?.code ?? json?.erro ?? `HTTP_${resposta.status}`
   const mensagem = mensagemDoErro(json, resposta.status)

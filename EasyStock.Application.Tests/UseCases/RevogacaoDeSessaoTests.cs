@@ -45,12 +45,12 @@ public class RevogacaoDeSessaoTests
         _usuarios.GetByIdAsync(_usuario.Id).Returns(_usuario);
     }
 
-    private async Task DeveTerRevogadoOUsuarioTodo()
+    private async Task DeveTerRevogadoOUsuarioTodo(int remocoesCache = 1)
     {
         _usuario.SessoesValidasDesde.Should().Be(Corte);
         await _usuarios.Received(1).AtualizarSessoesValidasDesdeAsync(_usuario.Id, Corte);
         await _refreshTokens.Received(1).RevogarSessoesAtivasAsync(_usuario.Id, Agora.UtcDateTime);
-        await _cache.Received(1).RemoveAsync(CacheKeys.Sessao(_usuario.Id));
+        await _cache.Received(remocoesCache).RemoveAsync(CacheKeys.Sessao(_usuario.Id));
         _unitOfWork.CommitCount.Should().Be(1, "o commit continua sendo do use case");
     }
 
@@ -171,7 +171,7 @@ public class RevogacaoDeSessaoTests
             .ExecuteAsync(new DesativarUsuarioCommand(_usuario.Id, empresaId));
 
         vinculo.Ativo.Should().BeFalse();
-        await DeveTerRevogadoOUsuarioTodo();
+        await DeveTerRevogadoOUsuarioTodo(remocoesCache: 2);
     }
 
     [Fact]
@@ -240,7 +240,7 @@ public class RevogacaoDeSessaoTests
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, perfilId, LojaId: null));
 
         await perfis.Received(1).AddAsync(Arg.Is<UsuarioPerfil>(p => p.PerfilId == perfilId));
-        await DeveTerRevogadoOUsuarioTodo();
+        await DeveTerRevogadoOUsuarioTodo(remocoesCache: 2);
     }
 
     [Fact]
@@ -257,7 +257,7 @@ public class RevogacaoDeSessaoTests
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, perfilId, LojaId: Guid.NewGuid()));
 
         await perfis.Received(1).UpdateAsync(existente);
-        await DeveTerRevogadoOUsuarioTodo();
+        await DeveTerRevogadoOUsuarioTodo(remocoesCache: 2);
     }
 
     [Theory]

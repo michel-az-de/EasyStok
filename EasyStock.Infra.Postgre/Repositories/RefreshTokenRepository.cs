@@ -39,10 +39,57 @@ public class RefreshTokenRepository(EasyStockDbContext context) : IRefreshTokenR
     public Task<int> DeleteAllByUsuarioIdAsync(Guid usuarioId) =>
         _context.RefreshTokens.Where(rt => rt.UsuarioId == usuarioId).ExecuteDeleteAsync();
 
-    public Task<int> RevogarSessoesAtivasAsync(Guid usuarioId, DateTime agora) =>
-        _context.RefreshTokens
+    public async Task<int> RevogarSessoesAtivasAsync(Guid usuarioId, DateTime agora)
+    {
+        await _context.Set<SessaoNativa>().IgnoreQueryFilters()
+            .Where(s => s.UsuarioId == usuarioId && s.RevogadaEm == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevogadaEm, agora));
+        return await _context.RefreshTokens
             .Where(rt => rt.UsuarioId == usuarioId && !rt.Revogado && rt.ExpiraEm > agora)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(rt => rt.Revogado, true)
                 .SetProperty(rt => rt.RevogadoEm, agora));
+    }
+
+    public Task<int> RevogarSessoesWebAsync(Guid usuarioId, DateTime agora) =>
+        _context.RefreshTokens.Where(rt => rt.UsuarioId == usuarioId && rt.SessaoNativaId == null && !rt.Revogado && rt.ExpiraEm > agora)
+            .ExecuteUpdateAsync(s => s.SetProperty(rt => rt.Revogado, true).SetProperty(rt => rt.RevogadoEm, agora));
+
+    public Task AdicionarSessaoNativaAsync(SessaoNativa sessao)
+    {
+        _context.Set<SessaoNativa>().Add(sessao);
+        return Task.CompletedTask;
+    }
+
+    // O refresh precede o JWT/tenant. A leitura é por segredo/ID conferido e o chamador verifica a identidade.
+    public Task<SessaoNativa?> ObterSessaoNativaAsync(Guid id) =>
+        _context.Set<SessaoNativa>().IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
+
+    public Task<SessaoNativa?> ObterSessaoNativaComLockAsync(Guid id) =>
+        _context.Set<SessaoNativa>().FromSqlInterpolated($"SELECT * FROM sessoes_nativas WHERE \"Id\" = {id} FOR UPDATE")
+            .IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync();
+
+    public async Task<bool> ConsumirAsync(Guid id, DateTime agora) =>
+        await _context.RefreshTokens.Where(r => r.Id == id && !r.Revogado && r.ExpiraEm > agora)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Revogado, true).SetProperty(r => r.RevogadoEm, agora)) == 1;
+
+    public async Task RevogarSessaoNativaAsync(Guid id, DateTime agora)
+    {
+        await _context.Set<SessaoNativa>().IgnoreQueryFilters().Where(s => s.Id == id && s.RevogadaEm == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevogadaEm, agora));
+        await _context.RefreshTokens.Where(r => r.SessaoNativaId == id && !r.Revogado)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Revogado, true).SetProperty(r => r.RevogadoEm, agora));
+    }
+
+    public Task<bool> DispositivoRevogadoAsync(string dispositivoId) =>
+        _context.Set<EasyStock.Domain.Entities.Mobile.MobileDevice>().IgnoreQueryFilters()
+            .AnyAsync(d => d.Id == dispositivoId && d.Revoked);
+
+    public async Task TravarDispositivoAsync(string dispositivoId) =>
+        await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM mobile_devices WHERE \"Id\" = {dispositivoId} FOR UPDATE");
+
+    public Task SalvarReciboRenovacaoAsync(Guid sessaoId, Guid? requisicaoId, Guid? refreshAnteriorId, string? sucessorProtegido) =>
+        _context.Set<SessaoNativa>().IgnoreQueryFilters().Where(s => s.Id == sessaoId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.UltimaRenovacaoId, requisicaoId)
+                .SetProperty(x => x.RefreshAnteriorId, refreshAnteriorId).SetProperty(x => x.RefreshSucessorProtegido, sucessorProtegido));
 }
