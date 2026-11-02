@@ -651,9 +651,23 @@ await confere('A. tela: "usar sugestão" no meio da digitação chega ao campo e
   assert.equal(t.estado.rascunhos[id], 'Sua marmita sai às 12h, Maria. Pode ser?', 'depois da sugestão ela segue digitando')
 }))
 
-await confere('A. tela: mensagem que sai por outro botão limpa o campo, como antes, mesmo no meio da digitação', naTela(atendimento, async (t) => {
+// #2185 (F2): mudou de propósito. Antes qualquer envio (cardápio, Assistente, despedida) apagava o que ela
+// estava digitando; agora só o envio do próprio rascunho esvazia o campo (ver o caso abaixo).
+await confere('A. tela: mensagem que sai por outro botão NÃO apaga o que ela estava digitando', naTela(atendimento, async (t) => {
   const id = t.estado.selecionadaId
   t.teclar('estava digitan')
+  t.agir(() => t.acoes.enviar(id, 'Segue o cardápio de hoje.'))
+  await assentar()
+  assert.equal(t.noCampo(), 'estava digitan')
+  await andar(1000)
+  assert.equal(t.noCampo(), 'estava digitan')
+  assert.equal(t.estado.rascunhos[id], 'estava digitan')
+}))
+
+await confere('A. tela: enviar o próprio rascunho limpa o campo', naTela(atendimento, async (t) => {
+  const id = t.estado.selecionadaId
+  t.teclar('Segue o cardápio de hoje.')
+  await andar(500)
   t.agir(() => t.acoes.enviar(id, 'Segue o cardápio de hoje.'))
   await assentar()
   assert.equal(t.noCampo(), '')

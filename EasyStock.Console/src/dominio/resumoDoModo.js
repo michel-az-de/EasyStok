@@ -6,14 +6,15 @@
 // frase inteira continua em `detalhe`, que a tela põe no `title`.
 
 import { MODOS, PAUSA_POR_OUTRO, modoDoAtendimento, proximoPassoDepoisDeResponder } from './automatico'
-import { origemDaPassagem } from './passagem'
+import { AGUARDANDO_EQUIPE, origemDaPassagem } from './passagem'
+import { naFilaSemResponsavel } from './acoesDaConversa'
 import { automaticoDesligadoNaConversa } from './motivoDeEscalada'
 
 const ROTULO = {
   [MODOS.LIGADO]: 'Assistente respondendo',
   [MODOS.PAUSADO]: 'Você respondendo',
   [MODOS.COM_VOCE]: 'Passou para você',
-  [MODOS.ENCERRADO]: 'Encerrada',
+  [MODOS.ENCERRADO]: 'Concluída',
   [MODOS.BLOQUEADO]: 'Bloqueado',
 }
 
@@ -21,7 +22,7 @@ const LINHA = {
   [MODOS.LIGADO]: 'Responde sozinho até você assumir.',
   [MODOS.PAUSADO]: 'Assistente pausado; os avisos do pedido continuam.',
   [MODOS.ENCERRADO]: 'Reabra a conversa para retomar o atendimento.',
-  [MODOS.BLOQUEADO]: 'Envios bloqueados. Desbloqueie na ficha.',
+  [MODOS.BLOQUEADO]: 'Envios bloqueados. A gerência desbloqueia na ficha.',
 }
 
 const LINHA_DO_PROXIMO = {
@@ -30,16 +31,30 @@ const LINHA_DO_PROXIMO = {
   'aguardar-venda': 'Respondido. Venda em andamento: monte o pedido ou aguarde o cliente.',
 }
 
-export function resumoDoModo(conversa, pausado = false, bloqueada = false) {
+// #2185: "Aguardando equipe" vale para a barra e o cartão (`modo.rotulo`), e quem é o outro atendente
+// aparece pelo nome. Sem responsável, a conversa nunca diz "Você respondendo".
+function rotuloDoModo(modo, conversa, outro) {
+  if (outro) return conversa?.responsavel && conversa.responsavel !== 'Outro atendente' ? `Com ${conversa.responsavel}` : 'Outro atendente'
+  if (modo.chave === MODOS.COM_VOCE) return modo.rotulo === AGUARDANDO_EQUIPE ? AGUARDANDO_EQUIPE : ROTULO[modo.chave]
+  if (modo.chave === MODOS.PAUSADO && naFilaSemResponsavel(conversa)) return AGUARDANDO_EQUIPE
+  return ROTULO[modo.chave]
+}
+
+// #2185 (E22): quem não pode reabrir não recebe a ordem "reabra"; o botão nem existe para ela.
+const LINHA_ENCERRADA_SEM_PERMISSAO = 'Peça a quem pode reabrir a conversa.'
+
+export function resumoDoModo(conversa, pausado = false, bloqueada = false, { podeReabrir = true } = {}) {
   const modo = modoDoAtendimento(conversa, pausado, bloqueada)
-  const proximo = !bloqueada && modo.chave === MODOS.PAUSADO
+  const outro = modo.chave === MODOS.PAUSADO && pausado === PAUSA_POR_OUTRO
+  // #2185 (E20): "Você respondeu" só vale quando a pausa é minha; a conversa de um colega não é.
+  const proximo = !bloqueada && modo.chave === MODOS.PAUSADO && !outro
     ? proximoPassoDepoisDeResponder(conversa, pausado)
     : null
-  const detalhe = [modo.rotulo + '.', modo.detalhe, proximo?.texto].filter(Boolean).join(' ')
-  const outro = modo.chave === MODOS.PAUSADO && pausado === PAUSA_POR_OUTRO
+  const semReabrir = modo.chave === MODOS.ENCERRADO && !podeReabrir
+  const detalhe = [modo.rotulo + '.', semReabrir ? LINHA_ENCERRADA_SEM_PERMISSAO : modo.detalhe, proximo?.texto].filter(Boolean).join(' ')
   const motivo = conversa?.passagem?.motivo ?? null
 
-  let linha = LINHA[modo.chave]
+  let linha = semReabrir ? LINHA_ENCERRADA_SEM_PERMISSAO : LINHA[modo.chave]
   if (modo.chave === MODOS.COM_VOCE) linha = origemDaPassagem(conversa.passagem).motivo
   else if (outro) linha = 'Assistente pausado.'
   else if (proximo) linha = LINHA_DO_PROXIMO[proximo.chave] ?? linha
@@ -48,7 +63,7 @@ export function resumoDoModo(conversa, pausado = false, bloqueada = false) {
   return {
     chave: modo.chave,
     tom: modo.tom,
-    rotulo: outro ? 'Outro atendente' : ROTULO[modo.chave],
+    rotulo: rotuloDoModo(modo, conversa, outro),
     linha,
     detalhe,
     proximo,

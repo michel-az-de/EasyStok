@@ -10,7 +10,7 @@ import { dataHora, moeda } from '../../dominio/formato'
 import css from './ficha.module.css'
 
 const categorias = { produto_improprio: 'Produto impróprio', atraso: 'Atraso', preferencia: 'Preferência', outro: 'Outro' }
-const origens = { dona: 'Loja', avaliacao: 'Avaliação', agente: 'Agente' }
+const origens = { dona: 'Loja', avaliacao: 'Avaliação', agente: 'Assistente' }
 
 function NovaOcorrencia({ ocupado, abrir }) {
   const [formulario, setFormulario] = useState(false)

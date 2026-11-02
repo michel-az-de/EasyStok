@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Avatar } from '../../componentes/Avatar'
 import { AvatarAssistente } from '../../componentes/AvatarAssistente'
 import { Bloco } from '../../componentes/Bloco'
@@ -6,7 +7,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoMascarado } from '../../componentes/CampoMascarado'
 import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
-import { Popover } from '../../componentes/Popover'
+import { MenuDeAcoes } from '../../componentes/MenuDeAcoes'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import {
@@ -61,8 +62,8 @@ function estadoInicialDoForm(conversa) {
 function SeloCaptado({ quando }) {
   if (!quando) return null
   return (
-    <span className={css.seloCaptado} title={`Captado pelo automático às ${quando.slice(11, 16)}`}>
-      <Icone nome="raio" tamanho={12} /> {SELO_CAPTADO}
+    <span className={css.seloCaptado} title={`Captado pelo Assistente às ${quando.slice(11, 16)}`}>
+      <Icone nome="sparkles" tamanho={16} /> {SELO_CAPTADO}
     </span>
   )
 }
@@ -74,7 +75,7 @@ function SecaoCliente({ integrado, titulo, chave, children, ...resto }) {
   return <section data-secao-cliente={chave}>{chave !== 'cliente' && <h3>{titulo}</h3>}{children}</section>
 }
 
-export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false }) {
+export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false, aoMudarSujo }) {
   const { cliente } = conversa
   const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
   // #1474 (R2): no modo API, mudar a entrega do pedido e os pontos não têm endpoint e somem.
@@ -86,22 +87,22 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   } = useAcoes()
 
   const [modal, setModal] = useState(null)
-  const [menuAberto, setMenuAberto] = useState(false)
   const [avisoEndereco, setAvisoEndereco] = useState(null)
   const [form, setForm] = useState(() => estadoInicialDoForm(conversa))
   // #1586: espera e erro do "Salvar cadastro", presos à conversa que iniciou (a Ficha troca de
   // conversa sem remontar este bloco). A ref trava o segundo toque.
   const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null })
   const cadastrando = useRef(false)
-  const idMotivoBloqueio = useId()
 
   // Troca de conversa: recarrega o rascunho do cadastro rápido e limpa avisos
   // que eram da conversa anterior. Só depende do id: editar o formulário não
   // pode disparar este reset a cada tecla.
+  const formCarregado = useRef(form)
   useEffect(() => {
-    setForm(estadoInicialDoForm(conversa))
+    const inicial = estadoInicialDoForm(conversa)
+    formCarregado.current = inicial
+    setForm(inicial)
     setAvisoEndereco(null)
-    setMenuAberto(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversa.id])
 
@@ -129,6 +130,13 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const informado = lead ? conversa.contatoInformado : null
   const precisaCadastro = lead && (!cliente.telefone || !cliente.endereco) && !cliente.enderecoCapturado
     && !conversa.captura && !informado
+  // #2185 (F16): o cadastro rápido digitado e ainda não salvo avisa a janela, que então não fecha com Esc nem
+  // com o toque no fundo (no tablet um toque fora é fácil e levava nome, telefone e endereço). Compara com o que
+  // foi carregado no formulário: dado que chega da sincronização sem ninguém digitar não é digitação a perder.
+  const formSujo = precisaCadastro && JSON.stringify(form) !== JSON.stringify(formCarregado.current)
+  // Efeito de layout: a janela precisa saber antes do próximo evento. Com efeito comum, um Esc logo depois da
+  // tecla (aparelho lento) ainda fechava e levava a digitação.
+  useLayoutEffect(() => { aoMudarSujo?.(formSujo) }, [formSujo, aoMudarSujo])
   const domicilio = mesmoDomicilio(conversa, conversas)
   const financeiro = resumoFinanceiro(historico)
 
@@ -152,6 +160,8 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const erroCadastro = cadastro.id === conversa.id ? cadastro.erro : null
   // #1586: lead sem cadastro no modo API não tem o que bloquear; o item nasce desabilitado.
   const motivoSemBloqueio = bloqueada ? null : motivoParaNaoBloquear(conversa, { fonteApi })
+  const { acoes: capacidades } = useAcessoModulos()
+  const podeBloquear = !fonteApi || capacidades?.controlarLoja === true
 
   // Na demonstração a ação é síncrona e não devolve nada: o `await` segue como sucesso.
   async function aoSalvarCadastro() {
@@ -221,40 +231,19 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
               <span className={css.situacao}>Cliente desde {cliente.desde}</span>
             )}
           </div>
-          <span className={css.menuCliente}>
-            <Botao
-              className={css.gatilhoMenu}
-              aria-haspopup="menu"
-              aria-expanded={menuAberto}
-              aria-label="Mais ações do cliente"
-              title="Mais ações do cliente"
-              onClick={() => setMenuAberto((v) => !v)}
-            >
-              <Icone nome="ellipsis-vertical" tamanho={24} />
-            </Botao>
-            {menuAberto && (
-              <Popover rotulo="Mais ações do cliente" posicao="abaixo" aoFechar={() => setMenuAberto(false)}>
-                <div className={css.menuAcoes}>
-                  {aoEscolherFoto && <button type="button" role="menuitem" className={css.itemMenu} disabled={alterandoFoto}
-                    onClick={() => { setMenuAberto(false); aoEscolherFoto() }}>
-                    <Icone nome="camera" />{cliente.fotoUrl ? 'Trocar foto' : 'Adicionar foto'}
-                  </button>}
-                  {aoRemoverFoto && <button type="button" role="menuitem" className={css.itemMenu} disabled={alterandoFoto}
-                    onClick={() => { setMenuAberto(false); aoRemoverFoto() }}><Icone nome="lixeira" />Remover foto</button>}
-                  <button
-                    type="button" role="menuitem" className={css.itemMenu}
-                    disabled={Boolean(motivoSemBloqueio)}
-                    aria-describedby={motivoSemBloqueio ? idMotivoBloqueio : undefined}
-                    onClick={() => { setMenuAberto(false); setModal(bloqueada ? 'desbloquear' : 'bloquear') }}
-                  >
-                    <Icone nome="bloqueio" />
-                    {bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente'}
-                  </button>
-                  {motivoSemBloqueio && <p id={idMotivoBloqueio} className={css.motivoMenu}>{motivoSemBloqueio}</p>}
-                </div>
-              </Popover>
-            )}
-          </span>
+          <MenuDeAcoes
+            rotulo="Mais opções do cliente"
+            itens={[
+              aoEscolherFoto && { chave: 'foto', rotulo: cliente.fotoUrl ? 'Trocar foto' : 'Adicionar foto', icone: 'camera', desabilitado: alterandoFoto, aoEscolher: aoEscolherFoto },
+              aoRemoverFoto && { chave: 'sem-foto', rotulo: 'Remover foto', icone: 'lixeira', desabilitado: alterandoFoto, aoEscolher: aoRemoverFoto },
+              // #2185: bloquear é da gerência (o servidor devolve 403 à atendente).
+              podeBloquear && {
+                chave: 'bloqueio', rotulo: bloqueada ? 'Desbloquear cliente' : 'Bloquear cliente', icone: 'bloqueio', abreJanela: true,
+                desabilitado: Boolean(motivoSemBloqueio), motivo: motivoSemBloqueio,
+                aoEscolher: () => setModal(bloqueada ? 'desbloquear' : 'bloquear'),
+              },
+            ]}
+          />
         </div>
 
         {/* Sinal forte de bloqueio: ícone, palavra e motivo. A cor sozinha não
@@ -329,10 +318,10 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
         ) : (
           <div className={css.dadosCliente} data-dados-cliente>
             <div key={`tel-${captado.telefone ?? ''}`} data-campo-ficha="telefone cadastro" className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
-              <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={15} /></span>
+              <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={16} /></span>
               <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
               <CampoEmLinha rotulo="Telefone" valor={cliente.telefone}
-                vazio={automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
+                vazio={automaticoCaptando ? 'O Assistente está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
                 validar={validarTelefone} aoSalvar={(v) => editarDadoCliente(conversa.id, 'telefone', v, agora)} />
             </div>
             <div
@@ -340,11 +329,11 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
               data-campo-ficha="endereco"
               className={`${css.linhaDado} ${enderecoPendente ? css.linhaDadoPendente : ''} ${captado.endereco ? css.captadoAgora : ''}`}
             >
-              <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={15} /></span>
+              <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={16} /></span>
               <span className={css.rotuloDado}>Endereço <SeloCaptado quando={captado.endereco} /></span>
               <CampoEmLinha rotulo="Endereço" valor={cliente.endereco}
                 vazio={enderecoPendente ? 'Aguardando confirmação acima'
-                  : automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar endereço'}
+                  : automaticoCaptando ? 'O Assistente está pedindo na conversa' : 'Adicionar endereço'}
                 validar={fonteApi ? recusaDoEndereco : undefined}
                 aoSalvar={aoSalvarEndereco} />
             </div>
@@ -355,7 +344,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
             {/* #1761 (L22): o canal já está no cabeçalho da conversa; aqui só o que ele não diz, o usuário. */}
             {cliente.usuario && (
               <div className={css.linhaDado}>
-                <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={15} /></span>
+                <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={16} /></span>
                 <span className={css.rotuloDado}>Canal</span>
                 <span className={css.valorCanal}>{canal.nome} · @{cliente.usuario}</span>
               </div>
@@ -444,7 +433,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
         {resgataPontos && (
           <div className={css.linhaFidelidade}>
             <span className={css.seloPontos}>
-              <Icone nome="estrela" tamanho={13} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
+              <Icone nome="estrela" tamanho={16} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
             </span>
             <Botao variante="texto" onClick={() => setModal('fidelidade')}>Resgatar</Botao>
           </div>

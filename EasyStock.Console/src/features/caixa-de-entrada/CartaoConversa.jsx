@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Avatar } from '../../componentes/Avatar'
 import { Icone } from '../../componentes/Icone'
+import { Pilula } from '../../componentes/Pilula'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { previaDaConversa, tagCorrespondida } from '../../dominio/conversa'
@@ -108,7 +109,7 @@ export const CartaoConversa = memo(function CartaoConversa({
           nome={conversa.nome}
           foto={fotoCadastrada.url ?? fotoDoCliente(canal, conversa.cliente)}
           tamanho="grande"
-          selo={{ titulo: canal.nome, icone: <Icone nome={canal.icone} tamanho={12} className={css['canal_' + canal.icone]} /> }}
+          selo={{ titulo: canal.nome, icone: <Icone nome={canal.icone} tamanho={16} className={css['canal_' + canal.icone]} /> }}
         />
       </span>
       <span className={css.corpo}>
@@ -131,36 +132,28 @@ export const CartaoConversa = memo(function CartaoConversa({
         <span className={css.linhaPrevia}>
           <span className={css.previa}>
             {/* Quem escreveu por último: "Você:" e "Sistema:" por extenso;
-                o automático vira o raio, já que a linha do estado diz a palavra. */}
+                o Assistente vira o raio, já que a linha do estado diz a palavra. */}
             {previa.prefixo && (
               <span className={css.prefixo}>
-                {previa.prefixo.startsWith('Automático')
-                  ? <><Icone nome="raio" tamanho={14} /><span className="sr">{previa.prefixo}</span></>
+                {previa.prefixo.startsWith('Assistente')
+                  ? <><Icone nome="sparkles" tamanho={16} /><span className="sr">{previa.prefixo}</span></>
                   : previa.prefixo.trim()}
               </span>
             )}
             {previa.corpo}
           </span>
           {pendentes > 0 && (
-            <span
-              className={css.naoLidas}
+            <Pilula
+              contagem={pendentes} tom="marca" className={css.naoLidas}
               aria-label={pendentes === 1 ? '1 mensagem sem resposta' : `${pendentes} mensagens sem resposta`}
-              title={pendentes === 1 ? '1 mensagem sem resposta' : `${pendentes} mensagens sem resposta`}
-            >
-              {pendentes}
-            </span>
+              titulo={pendentes === 1 ? '1 mensagem sem resposta' : `${pendentes} mensagens sem resposta`}
+            />
           )}
         </span>
         {temLinhaDeContexto({ etiqueta, contexto }) && <span className={css.contextoLinha} title={[etiqueta ? estado.texto : null, ...contexto.map((item) => item.texto)].filter(Boolean).join(' · ')}>
-          {etiqueta && <span className={`${css.estado} ${css['estado_' + estado.tom]}`} title={estado.titulo ?? undefined}>
-            {estado.icone && <Icone nome={estado.icone} tamanho={14} />}
-            {estado.texto}
-          </span>}
+          {etiqueta && <Pilula tamanho="inline" tom={estado.tom} icone={estado.icone ?? undefined} titulo={estado.titulo ?? undefined}>{estado.texto}</Pilula>}
           {contexto.map((item) => (
-            <span key={item.chave} className={`${css.itemContexto} ${css['contexto_' + item.tom] ?? ''}`}>
-              {item.icone && <Icone nome={item.icone} tamanho={14} />}
-              <span className={css.textoContexto}>{item.texto}</span>
-            </span>
+            <Pilula key={item.chave} tamanho="inline" tom={item.tom ?? 'neutro'} icone={item.icone ?? undefined}>{item.texto}</Pilula>
           ))}
         </span>}
       </span>

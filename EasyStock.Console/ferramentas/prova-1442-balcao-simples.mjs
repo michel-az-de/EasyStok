@@ -70,7 +70,8 @@ await confere('1. o Balcão abre em "Todas", não em "Precisa de você"', () => 
 await confere('2. automático ligado: "Automático"', () => {
   const e = linha.estadoDaLinha(conversa(), { pausado: false })
   assert.equal(e.chave, 'automatico')
-  assert.equal(e.texto, 'Automático')
+  assert.equal(e.texto, 'Assistente')
+  assert.equal(e.icone, 'sparkles')
 })
 await confere('2. ela assumiu ou escreveu: "Com você"', () => {
   assert.equal(linha.estadoDaLinha(conversa(), { pausado: PAUSA_POR_ASSUMIR }).texto, 'Com você')
@@ -82,7 +83,8 @@ await confere('2. outro atendente assumiu: não diz que é ela', () => {
   assert.equal(e.texto, 'Outro atendente')
 })
 await confere('2. encerrada e bloqueado vencem a pausa', () => {
-  assert.equal(linha.estadoDaLinha(conversa({ estado: 'Encerrado' }), { pausado: true }).texto, 'Encerrada')
+  assert.equal(linha.estadoDaLinha(conversa({ estado: 'Encerrado' }), { pausado: true }).texto, 'Concluída')
+  assert.equal(linha.estadoDaLinha(conversa({ estado: 'Encerrado' }), { pausado: true }).icone, 'circle-check')
   assert.equal(linha.estadoDaLinha(conversa(), { grupo: 'encerradas' }).chave, 'encerrada')
   assert.equal(linha.estadoDaLinha(conversa({ bloqueio: { motivo: 'x' } }), { pausado: true }).texto, 'Bloqueado')
 })

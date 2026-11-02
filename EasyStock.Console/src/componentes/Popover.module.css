@@ -26,8 +26,8 @@
 }
 .item:hover:not(.informativo) { background: var(--preenchimento-forte); }
 .informativo { cursor: default; }
-.item strong { display: block; font-size: var(--t-corpo); font-weight: 600; }
-.item span { display: block; font-size: var(--t-apoio); color: var(--tinta-2); margin-top: var(--e-0); }
+.item strong { display: block; font-size: var(--t-apoio); font-weight: 600; }
+.item span { display: block; font-size: var(--t-micro); color: var(--tinta-2); margin-top: var(--e-0); }
 /* Popover que abre para baixo, para gatilho que mora no topo da tela. Largura
    própria porque o gatilho é um botão estreito, não a barra inteira.
    `max-height` mais folgada que a do `.popover` base (340px/50dvh): este é o

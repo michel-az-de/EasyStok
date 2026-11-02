@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { limitarPainelMovel, proximaFrentePainel } from '../hooks/estadoPainelMovel'
 import { usePainelMovel as useControlePainelMovel } from '../hooks/usePainelMovel'
 import { janelaDosPaineis as janelaAtual, observarAreaDosPaineis } from '../hooks/areaDosPaineis'
+import { BotaoIcone } from './BotaoIcone'
 import { Icone } from './Icone'
 import css from './PainelMovel.module.css'
 export const usePainelMovel = useControlePainelMovel
@@ -140,11 +141,11 @@ function SuperficieMovel({ controle, titulo, children, larguraInicial, alturaIni
     <header className={css.cabecalho}>
       <button ref={alca} type="button" className={css.mover} aria-label={`Mover ${titulo}`} aria-describedby={ajuda}
         data-arrastando={arrastando || undefined} disabled={saindo} {...eventos('posicao')}>
-        <Icone nome="grip-vertical" tamanho={18} /><span>{titulo}</span>
+        <Icone nome="grip-vertical" tamanho={20} /><span>{titulo}</span>
       </button>
-      <button type="button" className={css.controle} aria-label={`Restaurar posição de ${titulo}`} title="Restaurar posição e tamanho" disabled={saindo}
-        onClick={() => mover(inicio(), true)}><Icone nome="undo-2" tamanho={18} /></button>
-      <button type="button" className={css.controle} aria-label={`Recolher ${titulo}`} title="Recolher" disabled={saindo} onClick={recolher}><Icone nome="arrow-left" tamanho={18} /></button>
+      <BotaoIcone rotulo={`Restaurar posição de ${titulo}`} dica="Restaurar posição e tamanho" icone="undo-2" disabled={saindo}
+        onClick={() => mover(inicio(), true)} />
+      <BotaoIcone rotulo={`Recolher ${titulo}`} dica="Recolher" icone="arrow-left" disabled={saindo} onClick={recolher} />
     </header>
     <span id={ajuda} className="sr">Arraste pelo cabeçalho ou use as setas. Shift move mais rápido. Escape desfaz o movimento. Use o canto inferior para redimensionar.</span>
     <div className={`${css.corpo} ${classeCorpo ?? ''}`}>{children}</div>

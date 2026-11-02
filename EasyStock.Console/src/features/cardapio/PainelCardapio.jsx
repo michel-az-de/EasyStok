@@ -517,7 +517,7 @@ function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
         <div className={css.rodapeItens}>
           {grupos.map((grupo) => (
             <div key={grupo.chave}>
-              <span className={css.rotuloGrupo}>{grupo.rotulo}</span>
+              <span>{grupo.rotulo}</span>
               <ul>
                 {grupo.itens.map((linha) => (
                   <li key={linha.sku}>

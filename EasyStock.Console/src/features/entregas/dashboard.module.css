@@ -194,7 +194,6 @@
 .anelNumero { font-family: var(--f-dado); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--t-micro); }
 
 /* --- Menu ⋯ (mesmo espírito de MenuDoPedido) ----------------------------- */
-.comMenu { position: relative; flex-shrink: 0; }
 .gatilhoMenu {
   padding: 0; min-width: var(--toque); min-height: var(--toque); border-radius: var(--r-pilula);
   background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--tinta-3);

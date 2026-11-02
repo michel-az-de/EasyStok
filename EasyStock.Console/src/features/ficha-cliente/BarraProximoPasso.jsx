@@ -216,6 +216,7 @@ export function BarraProximoPasso({
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
       linkPendenteApi: fonteApi && Boolean(pedido.cobranca?.link),
       aoAbrirBaixa: () => setAbrindoBaixa(true),
+      bloqueado,
       // #1989 (#1765-3): com a forma já escolhida também abre o resumo; quem gera é o "Confirmar".
       aoGerarPix: () => { if (!pedindoMeio) setMeioNaBarra(pedido.meio ?? null); setPedindoMeio(true) },
       aoReenviarPix: () => executar(() => aoReenviarPix()),
@@ -506,16 +507,15 @@ export function BarraProximoPasso({
       >
         {PASSOS.map((passo) => {
           const situacao = situacaoDoPasso(passo.id, pedido.estado)
-          const concluido = situacao.chave === 'feito' || situacao.chave === 'atual'
           return (
             <li
               key={passo.id}
               aria-current={situacao.chave === 'atual' ? 'step' : undefined}
-              className={`${css.trilhaItem} ${css[situacao.chave === 'proximo' ? 'futuro' : situacao.chave]} ${concluido ? css.concluido : ''}`}
+              className={`${css.trilhaItem} ${css[situacao.chave === 'proximo' ? 'futuro' : situacao.chave]}`}
               aria-label={`${naFilaSemQuitar && passo.id === 'pago' ? 'Fila' : passo.rotulo}, ${situacao.rotulo}`}
             >
               <span className={css.circuloPasso} aria-hidden="true">
-                <Icone nome={ICONE_DA_TRILHA[passo.id]} tamanho={18} />
+                <Icone nome={ICONE_DA_TRILHA[passo.id]} tamanho={20} />
               </span>
               <span className={css.rotuloPasso} aria-hidden="true">{naFilaSemQuitar && passo.id === 'pago' ? 'Fila' : ROTULO_CURTO[passo.id] ?? passo.rotulo}</span>
             </li>

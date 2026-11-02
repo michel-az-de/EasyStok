@@ -176,11 +176,11 @@ await confere('C  cartão, faixa e linha longa da conversa da API não trazem "L
   const resumo = { id: 'c7', situacao: 'Assumida', assumidaPorUsuarioId: null, motivoEscalada: MOTIVO_CRU, canal: 'WhatsApp', contatoNome: 'Marina', ultimaMensagemEm: '2026-10-13T21:40:00Z', naoLidas: 1 }
   const conversa = conversaDaApi(resumo, [], { id: 'u1', nome: 'Dona' }, AGORA)
   const origem = origemDaPassagem(conversa.passagem)
-  assert.equal(origem.curto, 'Sem automático')
+  assert.equal(origem.curto, 'Sem Assistente')
   assert.equal(resumoDoModo(conversa, false, false).linha, 'o atendimento automático está desligado')
   for (const texto of [origem.curto, origem.longo, origem.motivo]) assert.ok(!/LLM|agente desligado|não soube responder/i.test(texto), texto)
   // Motivo de verdade do agente segue com a frase de antes.
-  assert.equal(origemDaPassagem({ motivo: 'Cliente perguntou sobre alergia' }).curto, 'Automático não soube responder: cliente perguntou sobre alergia')
+  assert.equal(origemDaPassagem({ motivo: 'Cliente perguntou sobre alergia' }).curto, 'Assistente não soube responder: cliente perguntou sobre alergia')
 })
 await confere('C  "esteira" saiu da barra de modo e do aviso de encerrar; o número é o da comanda', () => {
   const pausada = modoDoAtendimento({ estado: 'Em atendimento', mensagens: [] }, PAUSA_POR_ASSUMIR, false)

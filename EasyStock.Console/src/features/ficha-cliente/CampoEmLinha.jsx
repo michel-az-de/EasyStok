@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { mascaraTelefone, telefoneDoE164 } from '../../dominio/formato'
 import css from './cliente.module.css'
@@ -119,25 +120,8 @@ export function CampoEmLinha({
           aria-busy={salvando || undefined}
           aria-invalid={Boolean(erro) || undefined}
         />
-        <button
-          type="button"
-          className={css.botaoIconeEdicao}
-          aria-label="Salvar"
-          disabled={salvando}
-          onClick={confirmar}
-        >
-          <Icone nome="check" tamanho={20} />
-        </button>
-        <button
-          type="button"
-          className={css.botaoIconeEdicao}
-          aria-label="Desfazer"
-          disabled={salvando}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={cancelar}
-        >
-          <Icone nome="x" tamanho={20} />
-        </button>
+        <BotaoIcone rotulo="Salvar" icone="check" disabled={salvando} onClick={confirmar} />
+        <BotaoIcone rotulo="Desfazer" icone="x" disabled={salvando} onMouseDown={(e) => e.preventDefault()} onClick={cancelar} />
       </div>
       {salvando && <output className={css.salvandoEmLinha}>Salvando…</output>}
       {erro && <p className={css.erroEmLinha} role="alert">{erro}</p>}

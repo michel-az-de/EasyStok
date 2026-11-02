@@ -45,16 +45,21 @@ export const casosApi = {
   },
 
   // #1276: cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
-  [acao.CLIENTE_DA_API]: (estado, { id, clienteId, nome, cliente, bloqueio }) =>
-    mapear(estado, id, (c) => ({
+  // #2185 (F4): o cadastro é um só. Bloqueio, nome e notas lidos numa conversa valem em todas as do mesmo
+  // cliente (WhatsApp e chat do site); antes a outra seguia com o bloqueio antigo e o campo liberado.
+  [acao.CLIENTE_DA_API]: (estado, { id, clienteId, nome, cliente, bloqueio }) => ({
+    ...estado,
+    conversas: estado.conversas.map((c) => (c.id !== id && !(clienteId && c.clienteId === clienteId) ? c : {
       ...c,
       clienteId,
       conta: 'cliente',
       nome: nome || c.nome,
       // #1474: o bloqueio do cadastro vem do dossiê; sem o campo, fica o que estava.
       bloqueio: bloqueio === undefined ? c.bloqueio : bloqueio,
-      cliente: { ...c.cliente, ...cliente, enderecoCapturado: null, daApi: true },
+      // O endereço que o automático captou numa conversa só some daquela; a outra mantém o dela.
+      cliente: { ...c.cliente, ...cliente, enderecoCapturado: c.id === id ? null : (c.cliente?.enderecoCapturado ?? null), daApi: true },
     })),
+  }),
 
   [acao.CONTATO_INFORMADO_API]: (estado, { id, contato }) =>
     mapear(estado, id, (c) => ({ ...c, contatoInformado: contato })),

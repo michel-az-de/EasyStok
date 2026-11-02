@@ -349,12 +349,18 @@ await confere('Itens do cardápio: categoria, disponibilidade e busca combinam; 
 
 await confere('Itens do cardápio: reordenar pede Todos, Todas as categorias e busca vazia', async () => {
   const t = abrirCardapio()
-  assert.ok(comRotulo(t.arvore, 'Subir Lasanha').length === 1, 'com tudo à mostra, dá para ordenar')
+  // #2185: a ordem mora no menu "Mais opções" do prato (`MenuDeAcoes`): Subir e Descer quando dá, e o motivo
+  // escrito num item desligado quando não dá.
+  const itensDe = (nome) => (doTipo(t.arvore, 'MenuDeAcoes').find((m) => m.props.rotulo === `Mais opções de ${nome}`)?.props.itens ?? []).filter(Boolean)
+  const sobeEDesce = (nome) => itensDe(nome).filter((i) => i.chave === 'subir' || i.chave === 'descer').length
+  assert.ok(sobeEDesce('Lasanha') === 2, 'com tudo à mostra, dá para ordenar')
   escolherCategoria(t, 'Massas')
-  assert.equal(comRotulo(t.arvore, 'Subir Lasanha').length, 0, 'com uma categoria escolhida, não')
-  assert.match(limpo(t.arvore), /Todas as categorias/)
+  assert.equal(sobeEDesce('Lasanha'), 0, 'com uma categoria escolhida, não')
+  const semOrdem = itensDe('Lasanha').find((i) => i.chave === 'ordem')
+  assert.match(semOrdem?.motivo ?? '', /Todas as categorias/)
+  assert.equal(semOrdem?.desabilitado, true)
   escolherCategoria(t, '')
-  assert.ok(comRotulo(t.arvore, 'Subir Lasanha').length === 1)
+  assert.ok(sobeEDesce('Lasanha') === 2)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

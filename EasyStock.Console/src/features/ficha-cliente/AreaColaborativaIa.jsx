@@ -4,6 +4,8 @@ import { Botao } from '../../componentes/Botao'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { CampoTexto } from '../../componentes/Campo'
 import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { canalDaConversa } from '../../dominio/canal'
+import { permissaoDeEscrita } from '../../dominio/janela'
 import { identidadeDaMontagem, organizarFicha } from '../../aplicacao/montagemFicha'
 import { comandaDaFichaIa, tituloDoBlocoIa } from '../../dominio/montagemFicha'
 import { horaCurta, moeda } from '../../dominio/formato'
@@ -11,8 +13,8 @@ import { conversaEncerrada } from '../../dominio/conversa'
 import css from './AreaColaborativaIa.module.css'
 
 export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAbrirComanda, aoProporNota, aoCalcularFrete, aoAbrirCardapio, aoRascunho, aoSoltar }) {
-  const { selecionada, fonteApi } = useAtendimento()
-  const { cardapio } = useCatalogo()
+  const { selecionada, fonteApi, agora } = useAtendimento()
+  const { cardapio, canais } = useCatalogo()
   const [erro, setErro] = useState(null)
   const [ocupado, setOcupado] = useState(false)
   const executando = useRef(false)
@@ -38,6 +40,9 @@ export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAb
         : bloco.acao === 'abrir_cardapio' ? { rotulo: 'Abrir cardápio', callback: aoAbrirCardapio, args: [] }
           : bloco.acao === 'rascunho' ? { rotulo: 'Usar no rascunho', callback: aoRascunho, args: [bloco.texto] } : null
   if (!valido) return null
+  // #2185 (E11): o rascunho não entra num campo fechado (janela de 24 h, conversa concluída, cadastro bloqueado).
+  const escrita = bloco.acao === 'rascunho' ? permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)) : null
+  const semCampo = escrita && !escrita.pode ? [escrita.motivo?.titulo, escrita.motivo?.detalhe].filter(Boolean).join(' ') : null
   return <article className={css.bloco} aria-label={tituloDoBlocoIa(bloco)}>
     <header className={css.cabecalhoBloco}>
       <h4>{tituloDoBlocoIa(bloco)}</h4>
@@ -52,7 +57,9 @@ export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAb
       {comanda.total != null && <p className={css.total}>{comanda.rotuloTotal} <strong>{moeda(comanda.total)}</strong></p>}
     </div> : <p>Nenhum pedido nesta conversa.</p>)}
     {bloco.tipo === 'frete' && <p className={css.endereco}>{selecionada.cliente?.endereco || 'Confira o endereço do cliente para consultar o frete.'}</p>}
-    {acao && <Botao variante="texto" disabled={!acao.callback || ocupado} onClick={() => agir(acao.callback, ...acao.args)}>{acao.rotulo}</Botao>}
+    {acao && <Botao variante="texto" disabled={!acao.callback || ocupado || Boolean(semCampo)} aria-describedby={semCampo ? `${bloco.id}-sem-campo` : undefined}
+      onClick={() => agir(acao.callback, ...acao.args)}>{acao.rotulo}</Botao>}
+    {semCampo && <p id={`${bloco.id}-sem-campo`} className={css.texto}>{semCampo}</p>}
     {erro && <p role="alert" className={css.erro}>{erro}</p>}
   </article>
 }
@@ -92,17 +99,17 @@ export function AreaColaborativaIa({ conversaId, blocosSoltos = [], ...callbacks
   const visivel = montagem?.conversaId === conversaId && montagem.identidadeSessao === identidade ? montagem : null
   const movidos = new Set(blocosSoltos)
   if (!aberta) return null
-  return <section className={css.area} aria-label="Organizar a ficha com IA">
+  return <section className={css.area} aria-label="Organizar a ficha com o Assistente">
     <form onSubmit={organizar}>
       <header className={css.cabecalho}><AvatarAssistente tamanho={32} decorativo /><h3>Assistente</h3>
-        <Botao type="submit" aria-label={carregando ? 'Organizando ficha' : 'Organizar com IA'} data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando}>{carregando ? 'Organizando…' : 'Organizar'}</Botao>
+        <Botao type="submit" aria-label={carregando ? 'Organizando ficha' : 'Organizar com o Assistente'} data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando}>{carregando ? 'Organizando…' : 'Organizar'}</Botao>
       </header>
       <details className={css.orientar}><summary>Orientar</summary>
         <CampoTexto rotulo="Orientação (opcional)" placeholder="Ex.: preparar a retirada de sábado" maxLength={2000}
           value={orientacao} disabled={carregando} onChange={(e) => setOrientacao(e.target.value)} />
       </details>
     </form>
-    {!fonteApi && <p>Conecte a loja para usar a IA.</p>}
+    {!fonteApi && <p>Conecte a loja para usar o Assistente.</p>}
     {carregando && <p role="status">Organizando a ficha…</p>}
     {erro && <p role="alert" className={css.erro}>{erro}</p>}
     {visivel && <><p className={css.data}>Proposta das {horaCurta(visivel.geradoEm)}</p><div className={css.blocos}>

@@ -17,6 +17,7 @@ import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoResumo, total
 import { faltaPagar, totalPago } from '../../dominio/pagamento'
 import { moeda } from '../../dominio/formato'
 import { ALVOS_DO_MOTIVO, pendenciaAntesDeCobrar } from '../../dominio/resumoPedido'
+import { pedidoMudou } from '../../dominio/cicloDaFicha'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { chavesDaFicha, primeiroPassoAntesDaVenda } from '../../dominio/ficha'
@@ -48,15 +49,24 @@ import css from './ficha.module.css'
 export function PainelFicha(props) {
   const { selecionada } = useAtendimento()
   // Nenhum formulário ou modal do ciclo anterior atravessa a troca de contexto.
-  const chave = `${selecionada?.id}:${conversaEncerrada(selecionada)}:${selecionada?.pedido?.pedidoId ?? selecionada?.pedido?.numero ?? ''}`
-  return <FichaDoAtendimento key={chave} {...props} />
+  // #2185 (F5): o rascunho que vira pedido (`pedidoId` aparece) segue o mesmo ciclo; antes a chave trocava e a
+  // Ficha remontava com o cadastro pela metade.
+  const agora = {
+    conversa: selecionada?.id, encerrada: conversaEncerrada(selecionada),
+    pedidoId: selecionada?.pedido?.pedidoId ?? null, numero: selecionada?.pedido?.numero ?? null,
+  }
+  const [visto, setVisto] = useState({ ...agora, ciclo: 0 })
+  const recomeca = visto.conversa !== agora.conversa || visto.encerrada !== agora.encerrada || pedidoMudou(visto, agora)
+  if (recomeca) setVisto({ ...agora, ciclo: visto.ciclo + 1 })
+  else if (visto.pedidoId !== agora.pedidoId || visto.numero !== agora.numero) setVisto({ ...visto, pedidoId: agora.pedidoId, numero: agora.numero })
+  return <FichaDoAtendimento key={`${visto.conversa}:${visto.ciclo}`} {...props} />
 }
 
 function AcessoDaFicha({ titulo, resumo, icone, aoAbrir, painel, focoReserva = painel }) {
   return <button type="button" className={css.acessoFicha} onClick={aoAbrir} aria-haspopup={painel ? undefined : 'dialog'} data-foco-reserva={focoReserva}>
     {icone && <Icone nome={icone} tamanho={20} />}
     <span><strong>{titulo}</strong><small>{resumo}</small></span>
-    <Icone nome="chevron-right" tamanho={18} />
+    <Icone nome="chevron-right" tamanho={20} />
   </button>
 }
 
@@ -168,7 +178,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
   const gerarSemEnviar = fonteApi && permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).motivo?.acao === 'janela'
   const pendencia = pedido
-    ? pendenciaAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, {
+    ? pendenciaAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco, bloqueado: estaBloqueada(selecionada) }, {
       fonteApi,
     })
     : null
@@ -205,9 +215,9 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
     ? (cadastrarPrimeiro
       ? <>
         <Botao largo variante="primario" disabled={!editavel} onClick={() => setSecao('cliente')}>Cadastrar cliente</Botao>
-        <Botao icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
+        <Botao largo icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
       </>
-      : <Botao variante="primario" icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>)
+      : <Botao largo variante="primario" icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>)
     : null
   const comandaCompartilhada = <ComandaDoCliente key={chaves.comandaCompartilhada} conversaId={selecionada.id} compacta
     nomeCliente={selecionada.nome}
@@ -310,7 +320,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       {pedido && <PainelMovel controle={comandaMovel} titulo={`Comanda · ${selecionada.nome}`} larguraInicial={480} alturaInicial={480} alinharDireita visivel={comandaVisivel}>
         {editavel && !pedidoCriado && <p>Estes itens ainda estão em montagem. O pedido será criado ao gerar a cobrança.</p>}
-        {!editavel && <p>Consulta do atendimento encerrado.</p>}
+        {!editavel && <p>Consulta da conversa concluída.</p>}
         <BlocoPedido
           pedido={pedido}
           editavel={editavel}
@@ -347,7 +357,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         aoAbrirCardapio={aoAbrirCardapio} aoRascunho={aoRascunho}
         aoRecolher={() => setBlocosSoltos((atuais) => atuais.filter((b) => b !== bloco))} />)}
 
-      {secao === 'pagamento' && editavel && pedido && <Modal titulo={`Pagamento · ${selecionada.nome}`} largura="680px" aoFechar={() => setSecao(null)}>
+      {secao === 'pagamento' && editavel && pedido && <Modal titulo={`Pagamento · ${selecionada.nome}`} largura="md" aoFechar={() => setSecao(null)}>
         {fonteApi && <ExtratoDoPedido pedido={pedido} aDevolver={aDevolver} />}
         <BlocoCobranca
           key={chaves.cobranca}
@@ -367,7 +377,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         />
       </Modal>}
 
-      {secao === 'pos-venda' && editavel && pedido && <Modal titulo={`Pós-venda · ${selecionada.nome}`} largura="760px" aoFechar={() => setSecao(null)}>
+      {secao === 'pos-venda' && editavel && pedido && <Modal titulo={`Pós-venda · ${selecionada.nome}`} largura="md" aoFechar={() => setSecao(null)}>
             {fonteApi && pedido.pedidoId && <BlocoDevolucoes
               key={chaves.devolucoes}
               pedidoId={pedido.pedidoId}

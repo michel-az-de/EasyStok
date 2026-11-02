@@ -387,7 +387,7 @@
 .apresentacao .linha .nome, .apresentacao .linha .preco { grid-column: 1; }
 .apresentacao .somar { display: none; }
 .apresentacao .linha .nome small:empty { display: none; }
-.apresentacao .linha .nome small { font-size: var(--t-minimo); }
+.apresentacao .linha .nome small { font-size: var(--t-micro); }
 .apresentacao .linhaComAjuste { display: flex; flex-wrap: wrap; padding: 0; }
 .apresentacao .linhaComAjuste .linha { width: 100%; }
 .apresentacao .acoesConsulta { justify-content: flex-start; gap: var(--e-1); }

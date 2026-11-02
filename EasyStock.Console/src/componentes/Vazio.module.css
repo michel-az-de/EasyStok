@@ -21,3 +21,9 @@
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
+
+/* #2185 (R13): vazio em linha. A frase em secundário (13) e a ação, texto da marca, na mesma linha. */
+.linha {
+  margin: 0; padding: var(--e-3) var(--e-4); display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-1) var(--e-2);
+  font-size: var(--t-apoio); color: var(--tinta-3);
+}

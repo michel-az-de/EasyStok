@@ -14,7 +14,7 @@ import { diferencaAposPagamento, totalPago } from '../../dominio/pagamento'
 import { linhasDaSimulacao } from '../../dominio/simulacaoPedido'
 import { situacaoDoItem } from '../../dominio/cardapio'
 import {
-  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, caminhoParaTrocarItem, podeCancelarParaRefazer, avisoDoEnvio, previaDoSinal, rotuloDoTotal, situacaoDoEnvio,
+  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, caminhoParaTrocarItem, podeCancelarParaRefazer, avisoDoEnvio, previaDoSinal, rotuloDoTotal, situacaoDoEnvio, podeVerCanhoto,
 } from '../../dominio/resumoPedido'
 import { Cabecalho } from './Cabecalho'
 import { ModalCanhoto } from './Canhoto'
@@ -325,7 +325,8 @@ export function BlocoPedido({
             )}
           </>
         )}
-        {itens.length > 0 && (
+        {/* #2185 (E30): no modo API o rascunho ainda não é pedido; imprimir seria mostrar algo que não existe. */}
+        {itens.length > 0 && podeVerCanhoto(pedido, { fonteApi }) && (
           <Botao largo icone="printer" onClick={() => setCanhotoAberto(true)}>Ver canhoto</Botao>
         )}
       </div>

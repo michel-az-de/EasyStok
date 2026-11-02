@@ -8,8 +8,13 @@ notas.pausar()
 assert.equal(notas.ler().ativa, null)
 const carlos = notas.abrir('carlos', 'Carlos', 'Sem queijo')
 assert.notEqual(carlos.chave, marina.chave)
-assert.equal(notas.abrir('marina', 'Marina', 'Não substituir').texto, 'Retirar depois das 18h, sem molho.')
-assert.deepEqual([marina.inicio, marina.fim, marina.rolagem], [8, 14, 76])
+assert.deepEqual([marina.inicio, marina.fim, marina.rolagem], [8, 14, 76], 'sem proposta nova a posição fica como estava')
+// #2185 (F29): mudou de propósito. A proposta nova nunca substitui o que ela escreveu, mas deixou de ser ignorada
+// calada: é somada ao fim do rascunho (o texto antigo fica inteiro) e a chave da nota é a mesma.
+assert.equal(notas.abrir('marina', 'Marina', 'Não substituir').texto, 'Retirar depois das 18h, sem molho.\n\nNão substituir')
+assert.equal(notas.abrir('marina', 'Marina', 'Não substituir').chave, marina.chave)
+assert.equal(notas.ler().rascunhos.find((n) => n.id === 'marina').texto, 'Retirar depois das 18h, sem molho.\n\nNão substituir', 'a mesma proposta de novo não duplica')
+assert.deepEqual([marina.inicio, marina.fim, marina.rolagem], [marina.texto.length, marina.texto.length, 0], 'com a proposta somada o cursor vai para o fim')
 
 // A resposta da API de Marina pode chegar enquanto Carlos está sendo escrito.
 notas.abrir('carlos', 'Carlos')

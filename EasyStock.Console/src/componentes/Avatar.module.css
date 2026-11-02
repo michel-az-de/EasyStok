@@ -18,12 +18,14 @@
 }
 .grande .inicial { font-size: var(--t-forte); }
 .enorme .inicial { font-size: var(--t-titulo); }
+/* #2185: a moeda do canal cobria a base da segunda letra ("GB", "LC"). Com selo, as iniciais sobem para o canto livre. */
+.inicialComSelo { box-sizing: border-box; padding: 0 var(--e-2) var(--e-2) 0; }
 
 .selo {
   position: absolute; right: -2px; bottom: -2px;
   width: 18px; height: 18px; border-radius: var(--r-pilula);
   background: var(--papel); box-shadow: 0 0 0 2px var(--papel), var(--sombra);
-  display: grid; place-items: center; font-size: 10px; line-height: 1;
+  display: grid; place-items: center; font-size: var(--t-micro); line-height: 1;
 }
 
 /* Selo do canal: moeda branca com o ícone colorido, anel do papel em volta. */
