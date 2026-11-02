@@ -6,6 +6,7 @@
 // Puro. `pausado` é o valor CRU de `automaticoPausado`: a marca separa "assumi" de "é de outra pessoa".
 
 import { MODOS, PAUSA_POR_OUTRO, modoDoAtendimento } from './automatico'
+import { conversaEncerrada } from './conversa'
 import { automaticoDesligadoNaConversa } from './motivoDeEscalada'
 
 // `Assumida` sem responsável na API é a fila humana: ninguém pegou, mesmo sem pendência a mostrar.
@@ -20,7 +21,8 @@ const NENHUMA = Object.freeze({
 export function acoesDaConversa({ conversa, pausado = false, bloqueada = false, canal, permitePassar = false }) {
   if (!conversa) return NENHUMA
   const { chave } = modoDoAtendimento(conversa, pausado, bloqueada)
-  const aberta = chave !== MODOS.ENCERRADO
+  // Bloqueio vence no modo; conversa concluída de cliente bloqueado continua concluída.
+  const aberta = !conversaEncerrada(conversa)
   const livre = aberta && chave !== MODOS.BLOQUEADO
   const pausada = chave === MODOS.PAUSADO
   const deOutro = pausada && pausado === PAUSA_POR_OUTRO
@@ -28,7 +30,8 @@ export function acoesDaConversa({ conversa, pausado = false, bloqueada = false, 
   const parouNoAssistente = (pausada && !deOutro) || chave === MODOS.COM_VOCE
   return {
     assumir: chave === MODOS.LIGADO || chave === MODOS.COM_VOCE || deOutro || semResponsavel,
-    // Tirar a conversa de um colega é a única tomada que pede confirmação: é de outra pessoa.
+    // O botão Assumir na conversa de um colega pede confirmação: é de outra pessoa. Enviar por cima assume
+    // sem perguntar (`assumirAntesDeEnviar`, abaixo).
     confirmarAoAssumir: deOutro,
     // #2185 (F12, E09): enviar por cima do Assistente (ou de um colega) é assumir antes, para texto, foto,
     // cardápio, Assistente e cobrança. Com o automático desligado na loja ninguém responde: nada a assumir.

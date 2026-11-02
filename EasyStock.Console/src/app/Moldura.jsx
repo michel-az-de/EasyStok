@@ -414,7 +414,7 @@ function ConteudoMoldura({
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, solicitacaoPainel = null,
 }) {
   const {
-    selecionada, conversas, filtros, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
+    selecionada, conversas, filtros, regras: regrasDaMassa, agora, aberta, fonteApi, sessao, marcarPainelDaConversa,
   } = useAtendimento()
   // Modo API (F06): contadores e avatar vêm da sessão e da API; da massa, nada.
   const regras = fonteApi ? null : regrasDaMassa
@@ -430,6 +430,12 @@ function ConteudoMoldura({
   // #2185 (F8): sino, aviso na tela e "Não entregues" abrem a conversa por fora da lista; no celular a tela
   // da conversa é uma aba, e sem este passo a atendente seguia na lista com a conversa só marcada.
   useAoAbrirConversa(() => { if (tamanho === CELULAR) setAba('atendimento') })
+  // #2185 (F24): pagamento só conta como visto com o painel da conversa na tela.
+  const painelDaConversaNaTela = tamanho !== CELULAR || aba === 'atendimento'
+  useEffect(() => {
+    marcarPainelDaConversa?.(painelDaConversaNaTela)
+    return () => marcarPainelDaConversa?.(false)
+  }, [painelDaConversaNaTela, marcarPainelDaConversa])
 
   // Rodada 11 (issue #8, registro 92): o cenário do Simular abre a conversa
   // nova (SIMULAR_CONVERSA seleciona a `sim-…`), mas no celular a aba ficava

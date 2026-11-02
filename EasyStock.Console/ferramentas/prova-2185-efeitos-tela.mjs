@@ -51,6 +51,7 @@ import { BalaoAssistente } from '/src/features/assistente/BalaoAssistente.jsx'
 import { PainelConversas } from '/src/features/caixa-de-entrada/PainelConversas.jsx'
 import { ModalEncerrar } from '/src/features/encerramento/ModalEncerrar.jsx'
 import { ModalCliente } from '/src/features/ficha-cliente/ModalCliente.jsx'
+import { ProvedorDeAviso } from '/src/componentes/Aviso.jsx'
 import { PilhaDeAvisos } from '/src/app/PilhaDeAvisos.jsx'
 import { Moldura } from '/src/app/Moldura.jsx'
 import { ModalNota } from '/src/features/notas/ModalNota.jsx'
@@ -71,6 +72,7 @@ const agora = Date.now()
 const noop = () => {}
 const chamadas = []
 window.chamadas = chamadas
+const marcarPainel = (naTela) => chamadas.push(['painelNaTela', naTela])
 window.controle = { assumirLento: q.get('lento') === '1', liberar: null }
 const h = (min) => new Date(agora - min * 60000).toISOString()
 const SESSAO = { usuario: { id: 'u1', nome: 'Eu' }, empresa: { id: 'e1' } }
@@ -175,7 +177,7 @@ function Cena() {
     ...estado, selecionada, agora, aberta: true, rascunho: estado.rascunhos[estado.selecionadaId] ?? '', escritaDeFora: estado.escritasDeFora[estado.selecionadaId] ?? 0, horarioDaLoja: null, fonteApi: true, sessao: SESSAO, historico: [],
     visiveis, encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros, usuario),
     bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros, usuario),
-    pagamentosNaoVistos: new Set(), avisosNaTela: avisos, dispensarAviso: (id) => setAvisos((a) => a.filter((x) => x.id !== id)),
+    marcarPainelDaConversa: marcarPainel, pagamentosNaoVistos: new Set(), avisosNaTela: avisos, dispensarAviso: (id) => setAvisos((a) => a.filter((x) => x.id !== id)),
     pausarAvisos: () => chamadas.push(['pausarAvisos']), retomarAvisos: () => chamadas.push(['retomarAvisos']), permissaoNotificacao: q.get('dois') ? 'default' : 'granted', fidelidade: { resgatesPorCadastro: {}, config: {}, cupons: [], recompensas: [], sorteios: [] },
     encerrando: estado.ui.encerrando, encerrandoNumero: null,
     lembretes: [], vistos: {}, eventosSonoros: [], consultaLembretes: { carregar: noop },
@@ -184,7 +186,7 @@ function Cena() {
   const cena = q.get('cena') ?? 'painel'
   return (
     <ContextoAcessoModulos.Provider value={acesso}><ContextoEstado value={ctx}><ContextoAcoes value={acoes}><ContextoCatalogo value={catalogo}>
-      {cena === 'encerrar' && <ModalEncerrar conversaId={q.get('conversa') ?? 'robo'} aoFechar={acoes.fecharEncerramento} />}
+      {cena === 'encerrar' && <ProvedorDeAviso><ModalEncerrar conversaId={q.get('conversa') ?? 'robo'} aoFechar={acoes.fecharEncerramento} /></ProvedorDeAviso>}
       {cena === 'ficha' && selecionada && <ModalCliente conversa={nomeSincronizado ? { ...selecionada, nome: nomeSincronizado } : selecionada} aoFechar={() => chamadas.push(['fecharFicha'])} />}
       {cena === 'bloco' && selecionada && (
         <BlocoColaborativoIa
@@ -410,6 +412,7 @@ try {
   await confere('F32. conversa que não existe mais fecha o modal em vez de ficar marcada como aberta', async () => {
     const { ctx, p } = await abrir('cena=encerrar&conversa=inexistente&inicial=meu')
     await p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'fecharEncerramento'), null, { timeout: 4000 })
+    await p.getByText('Esta conversa já não está aberta.').waitFor({ timeout: 3000 })
     await ctx.close()
   })
 
@@ -425,6 +428,38 @@ try {
     assert.equal(await p.getByText('bolo.png', { exact: true }).count(), 0, 'a prévia é da outra conversa')
     await p.evaluate(() => window.trocar('meu'))
     await p.getByText('bolo.png', { exact: true }).waitFor({ timeout: 3000 })
+    await ctx.close()
+  })
+
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64')
+  const midias = async (p) => (await chamadasDe(p)).filter((c) => c[0] === 'midia').length
+  await confere('F23. foto com legenda: o que ela digita durante o assumir fica no campo', async () => {
+    const { ctx, p } = await abrir('inicial=robo&lento=1')
+    await esperarPainel(p)
+    await p.locator('input[type="file"]').setInputFiles({ name: 'bolo.png', mimeType: 'image/png', buffer: PNG })
+    await p.getByText('bolo.png', { exact: true }).waitFor()
+    await campo(p).fill('Legenda')
+    await campo(p).press('Enter')
+    await p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'assumir'))
+    await campo(p).pressSequentially(' e mais', { delay: 5 })
+    await p.evaluate(() => window.controle.liberar())
+    await p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'midia'))
+    await p.waitForFunction(() => document.querySelector('textarea')?.value === 'e mais')
+    assert.equal(await midias(p), 1)
+    await ctx.close()
+  })
+  await confere('F23. foto removida enquanto o assumir espera não sai', async () => {
+    const { ctx, p } = await abrir('inicial=robo&lento=1')
+    await esperarPainel(p)
+    await p.locator('input[type="file"]').setInputFiles({ name: 'bolo.png', mimeType: 'image/png', buffer: PNG })
+    await p.getByText('bolo.png', { exact: true }).waitFor()
+    await campo(p).press('Enter')
+    await p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'assumir'))
+    await p.getByRole('button', { name: /^Remover/ }).first().click()
+    await p.getByText('bolo.png', { exact: true }).waitFor({ state: 'detached' })
+    await p.evaluate(() => window.controle.liberar())
+    await p.waitForTimeout(250)
+    assert.equal(await midias(p), 0)
     await ctx.close()
   })
 
@@ -663,6 +698,23 @@ try {
     assert.equal(await aba(p, 'Conversas').getAttribute('aria-selected'), 'true')
     await p.getByRole('status', { name: 'Avisos do atendimento' }).getByRole('button', { name: 'Cliente meu Oi de novo' }).click()
     await p.waitForFunction(() => [...document.querySelectorAll('[role="tab"]')].find((t) => /^Conversa$/.test(t.textContent.trim()))?.getAttribute('aria-selected') === 'true')
+    await ctx.close()
+  })
+  await confere('F24. no celular, o painel da conversa só conta como à vista na aba Conversa', async () => {
+    const { ctx, p } = await abrir('cena=moldura&inicial=meu', celular)
+    await aba(p, 'Conversas').waitFor()
+    const naTela = async () => (await chamadasDe(p)).filter((c) => c[0] === 'painelNaTela').at(-1)?.[1]
+    assert.equal(await naTela(), false)
+    await aba(p, 'Conversa').click()
+    await p.waitForFunction(() => window.chamadas.filter((c) => c[0] === 'painelNaTela').at(-1)?.[1] === true)
+    await aba(p, 'Conversas').click()
+    await p.waitForFunction(() => window.chamadas.filter((c) => c[0] === 'painelNaTela').at(-1)?.[1] === false)
+    await ctx.close()
+  })
+  await confere('F24. no computador, a conversa está sempre à vista com a moldura montada', async () => {
+    const { ctx, p } = await abrir('cena=moldura&inicial=meu')
+    await p.getByRole('navigation', { name: 'Navegação' }).waitFor()
+    assert.equal((await chamadasDe(p)).filter((c) => c[0] === 'painelNaTela').at(-1)?.[1], true)
     await ctx.close()
   })
   await confere('F18. a aba "Conversas" do celular mostra o mesmo número do título da lista', async () => {

@@ -22,7 +22,7 @@ const LINHA = {
   [MODOS.LIGADO]: 'Responde sozinho até você assumir.',
   [MODOS.PAUSADO]: 'Assistente pausado; os avisos do pedido continuam.',
   [MODOS.ENCERRADO]: 'Reabra a conversa para retomar o atendimento.',
-  [MODOS.BLOQUEADO]: 'Envios bloqueados. Desbloqueie na ficha.',
+  [MODOS.BLOQUEADO]: 'Envios bloqueados. A gerência desbloqueia na ficha.',
 }
 
 const LINHA_DO_PROXIMO = {

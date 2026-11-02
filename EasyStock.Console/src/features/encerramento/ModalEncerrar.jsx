@@ -5,6 +5,7 @@ import { Modal } from '../../componentes/Modal'
 import { FolhaImpressao } from '../../componentes/FolhaImpressao'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoResumo } from '../../aplicacao/impressos'
+import { useAviso } from '../../componentes/Aviso'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
@@ -96,7 +97,13 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   // #2185 (F32): conversa que sumiu ou foi concluída por outro atendente (na API não há resumo a ler) deixava
   // `ui.encerrando` marcado com o modal em branco, e ele reaparecia sozinho ao reabrir. Fecha de verdade.
   const semResumo = Boolean(conversaId) && (!conversa || !resumo)
-  useEffect(() => { if (semResumo) aoFechar() }, [semResumo, aoFechar])
+  const aviso = useAviso()
+  useEffect(() => {
+    if (!semResumo) return
+    // Quem escreveu a despedida precisa saber por que a janela fechou.
+    aviso.mostrar({ texto: 'Esta conversa já não está aberta.' })
+    aoFechar()
+  }, [semResumo, aoFechar, aviso])
 
   if (!conversaId || !conversa || !resumo) return null
 

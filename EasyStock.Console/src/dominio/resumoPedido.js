@@ -96,7 +96,7 @@ export const ALVOS_DO_MOTIVO = { CARDAPIO: 'cardapio', CADASTRO: 'cadastro', END
 // em vez de falhar depois do clique, nos dois modos.
 export function pendenciaAntesDeCobrar({ pedido, clienteId, endereco, bloqueado = false }, { fonteApi = false } = {}) {
   if (!pedido?.itens?.length) return { motivo: 'A comanda está vazia.', alvo: ALVOS_DO_MOTIVO.CARDAPIO }
-  if (bloqueado) return { motivo: 'Cliente bloqueado: desbloqueie o cadastro para cobrar.', alvo: ALVOS_DO_MOTIVO.CADASTRO }
+  if (bloqueado) return { motivo: 'Cliente bloqueado: a gerência desbloqueia na ficha.', alvo: ALVOS_DO_MOTIVO.CADASTRO }
   if (!fonteApi) return null
   if (!clienteId) return { motivo: 'Salve o cadastro do cliente (Contato e endereço).', alvo: ALVOS_DO_MOTIVO.CADASTRO }
   if (!endereco) return { motivo: 'Falta o endereço de entrega (Contato e endereço).', alvo: ALVOS_DO_MOTIVO.ENDERECO }

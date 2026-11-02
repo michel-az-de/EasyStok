@@ -1,5 +1,6 @@
 import { MenuDeAcoes } from '../../componentes/MenuDeAcoes'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { conversaEncerrada } from '../../dominio/conversa'
 
 // Menu de ações do pedido (seção 5 da direção visual): cancelar, estornar, voltar etapa e, desde a
 // rodada 5, concluir a conversa. A confirmação em linha de cancelar e estornar (nunca modal) mora em
@@ -20,7 +21,7 @@ export function MenuDoPedido({
         // UC-06 passo 5: abre o formulário de motivo (obrigatório) e valor, não um confirmar direto.
         podeEstornar && { chave: 'estornar', rotulo: 'Marcar estorno', icone: 'undo-2', aoEscolher: () => aoEscolher('estornar') },
         podeVoltarEtapa && { chave: 'voltar', rotulo: 'Voltar etapa', icone: 'arrow-left', aoEscolher: () => aoEscolher('voltar') },
-        selecionada && { chave: 'concluir', rotulo: 'Concluir conversa', icone: 'circle-check', abreJanela: true, aoEscolher: () => abrirEncerramento(selecionada.id) },
+        selecionada && !conversaEncerrada(selecionada) && { chave: 'concluir', rotulo: 'Concluir conversa', icone: 'circle-check', abreJanela: true, aoEscolher: () => abrirEncerramento(selecionada.id) },
       ]}
     />
   )

@@ -239,6 +239,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // precisa viajar pelo canal entre janelas (rodada 10, fronteira da 82).
   const [eventosSonoros, setEventosSonoros] = useState([])
   const [pagamentosNaoVistos, setPagamentosNaoVistos] = useState(() => new Set())
+  // A moldura diz se o painel da conversa está na tela: em Entregas, no Hall ou na aba Conversas do celular, não.
+  const [painelDaConversaNaTela, setPainelDaConversaNaTela] = useState(false)
 
   // Som da cozinha (D6, US-010). O timbre de cada evento mora em
   // infra/som.js; aqui só o QUANDO, por diferença de estado. Rodada 10:
@@ -266,13 +268,14 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // "Visto" nasce de um jeito só: ela abriu a conversa. Passar o tempo ou
   // fechar a tela nunca conta como ter visto (é exatamente o que o achado 4
   // reclamava do sinal verde).
-  // #2185 (F24): também limpa quando o pagamento cai na conversa que já está aberta com a aba à vista.
+  // #2185 (F24): também limpa quando o pagamento cai na conversa que está mesmo à vista: aba do navegador
+  // visível e painel da conversa na tela.
   useEffect(() => {
-    const limpar = () => setPagamentosNaoVistos((atual) => semOPagamentoDaAberta(atual, estado.selecionadaId, document.visibilityState !== 'hidden'))
+    const limpar = () => setPagamentosNaoVistos((atual) => semOPagamentoDaAberta(atual, estado.selecionadaId, painelDaConversaNaTela && document.visibilityState !== 'hidden'))
     limpar()
     document.addEventListener('visibilitychange', limpar)
     return () => document.removeEventListener('visibilitychange', limpar)
-  }, [estado.selecionadaId, pagamentosNaoVistos])
+  }, [estado.selecionadaId, pagamentosNaoVistos, painelDaConversaNaTela])
 
   // Lembra a escolha da chave entre uma visita e outra.
   useEffect(() => { gravarPreferenciaSom(estado.som) }, [estado.som])
@@ -434,6 +437,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       dispensarAviso: filaDeAvisos.dispensar,
       // #2185 (F28): ponteiro ou foco em cima do aviso para o relógio dele.
       pausarAvisos: filaDeAvisos.pausar,
+      marcarPainelDaConversa: setPainelDaConversaNaTela,
       retomarAvisos: filaDeAvisos.retomar,
       // `ui.encerrando` (seção 5): id da conversa com a modal de
       // encerramento aberta, ou `null`.

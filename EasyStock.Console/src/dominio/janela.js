@@ -97,7 +97,7 @@ function motivoForaDaJanela(janela, canal) {
 function detalheDoBloqueio(bloqueio) {
   const quando = bloqueio?.em || bloqueio?.por ? resumoDoBloqueio(bloqueio) : ''
   const motivo = String(bloqueio?.motivo ?? '').trim().replace(/[.!?]+$/, '')
-  return [quando, motivo && `Motivo: ${motivo}.`, 'Vale em todos os canais.', 'Desbloqueie na ficha para escrever.']
+  return [quando, motivo && `Motivo: ${motivo}.`, 'Vale em todos os canais.', 'A gerência desbloqueia na ficha.']
     .filter(Boolean).join(' ')
 }
 

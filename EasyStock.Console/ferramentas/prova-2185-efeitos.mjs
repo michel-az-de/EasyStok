@@ -247,6 +247,25 @@ await confere('F12. trocar para pagar na entrega não fala com o cliente: não a
   assert.equal(chamadas.includes('POST assumir'), false)
   assert.equal(chamadas.length > 0, true, 'a troca foi ao servidor')
 })
+await confere('F12. modelo aprovado com o Assistente atendendo assume antes; sem assumir, não sai', async () => {
+  const MODELO = { nome: 'retomada', idioma: 'pt_BR', parametros: [] }
+  let chamadas = rede()
+  let { api } = montar(false)
+  await api.enviarModelo('c1', MODELO)
+  assert.equal(chamadas[0], 'POST assumir')
+  chamadas = rede({ assumir: 'falha' })
+  ;({ api } = montar(false))
+  await assert.rejects(api.enviarModelo('c1', MODELO), /Não consegui assumir a conversa/)
+  assert.deepEqual(chamadas, ['POST assumir'])
+})
+await confere('F12. despedida barrada porque não deu para assumir não aponta para mensagem que não existe', async () => {
+  rede({ assumir: 'falha' })
+  const { api, despachados } = montar(false)
+  await api.encerrarComResumo('c1', 0, { enviarMensagem: true, textoMensagem: 'Obrigado!' })
+  const avisos = despachados.filter((d) => d.tipo === acao.AVISO_API).map((d) => d.mensagem)
+  assert.equal(avisos.some((a) => a.includes('veja a mensagem')), false, avisos.join(' | '))
+  assert.equal(avisos.some((a) => a.includes('A despedida não saiu.')), true, avisos.join(' | '))
+})
 await confere('F12. gerar a cobrança SEM enviar ao cliente não assume', async () => {
   const chamadas = rede()
   const { api, estadoRef } = montar(false)
@@ -304,7 +323,7 @@ await confere('E05. cadastro bloqueado: a cobrança nasce desabilitada com o mot
   const dados = { pedido: { itens: [{ sku: 'X', qtd: 1 }], janela: 'j|d' }, clienteId: 'cl1', endereco: 'Rua A, 1', bloqueado: true }
   for (const fonteApi of [true, false]) {
     const pendencia = pendenciaAntesDeCobrar(dados, { fonteApi })
-    assert.equal(pendencia?.motivo, 'Cliente bloqueado: desbloqueie o cadastro para cobrar.', `fonteApi=${fonteApi}`)
+    assert.equal(pendencia?.motivo, 'Cliente bloqueado: a gerência desbloqueia na ficha.', `fonteApi=${fonteApi}`)
   }
   assert.equal(pendenciaAntesDeCobrar({ ...dados, bloqueado: false }, { fonteApi: true }), null)
   assert.equal(pendenciaAntesDeCobrar({ ...dados, pedido: { itens: [] } }, { fonteApi: true }).motivo, 'A comanda está vazia.', 'comanda vazia vem antes')
@@ -314,10 +333,10 @@ await confere('E05. reenviar a cobrança e mandar link novo também nascem desab
   const base = { rotuloGerar: 'Gerar cobrança', aoReenviarPix() {}, aoAbrirBaixa() {}, aoGerarPix() {} }
   const reenviar = acaoDoPix({ chave: 'expirada' }, { ...base, bloqueado: true })
   assert.equal(reenviar.botoes[0].desabilitado, true)
-  assert.equal(reenviar.motivo, 'Cliente bloqueado: desbloqueie o cadastro para enviar.')
+  assert.equal(reenviar.motivo, 'Cliente bloqueado: a gerência desbloqueia na ficha.')
   const novo = acaoDoPix({ chave: 'expirada' }, { ...base, linkVencidoApi: 'O link venceu.', aoMandarLinkNovo() {}, bloqueado: true })
   assert.equal(novo.botoes[0].desabilitado, true)
-  assert.equal(novo.motivo, 'Cliente bloqueado: desbloqueie o cadastro para enviar.')
+  assert.equal(novo.motivo, 'Cliente bloqueado: a gerência desbloqueia na ficha.')
   assert.equal(acaoDoPix({ chave: 'expirada' }, { ...base, bloqueado: false }).botoes[0].desabilitado, false)
   assert.equal(acaoDoPix({ chave: 'expirada' }, { ...base, bloqueado: false }).motivo, undefined)
 })

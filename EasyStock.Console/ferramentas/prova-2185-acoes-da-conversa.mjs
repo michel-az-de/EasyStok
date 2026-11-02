@@ -61,6 +61,7 @@ const MATRIZ = [
   ['Assistente desligado na loja', { conversa: conversa({ passagem: { ...FILA, motivo: MOTIVO_DESLIGADO } }), canal: WHATSAPP, pausado: true }, [1, 0, 0, 1, 1, 1]],
   ['concluída', { conversa: conversa({ estado: 'Encerrado' }), canal: WHATSAPP }, [0, 0, 0, 0, 0, 0]],
   ['bloqueada', { conversa: conversa(), canal: WHATSAPP, pausado: true, bloqueada: true }, [0, 0, 0, 1, 0, 0]],
+  ['concluída com cadastro bloqueado', { conversa: conversa({ estado: 'Encerrado' }), canal: WHATSAPP, pausado: true, bloqueada: true }, [0, 0, 0, 0, 0, 0]],
 ]
 
 let passou = 0

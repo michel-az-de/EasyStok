@@ -4,7 +4,7 @@
 // antiga trava, que só mostrava texto e travava a barra inteira.
 
 // #2185 (E05): cadastro bloqueado não recebe nada; os botões que mandam algo ao cliente nascem desabilitados.
-export const MOTIVO_BLOQUEADO_AO_ENVIAR = 'Cliente bloqueado: desbloqueie o cadastro para enviar.'
+export const MOTIVO_BLOQUEADO_AO_ENVIAR = 'Cliente bloqueado: a gerência desbloqueia na ficha.'
 
 export function acaoDoPix(situacaoCob, {
   prerequisito, rotuloGerar, linkVencidoApi, linkPendenteApi = false, aoAbrirBaixa, aoGerarPix, aoReenviarPix, aoMandarLinkNovo = null,

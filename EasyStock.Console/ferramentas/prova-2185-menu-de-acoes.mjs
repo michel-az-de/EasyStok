@@ -332,6 +332,17 @@ try {
     assert.equal(await gatilho(p).count(), 0)
     await ctx.close()
   })
+  await confere('11. menu aberto numa conversa que fica sem ações não reabre sozinho ao voltar', async () => {
+    const { ctx, p } = await abrir('meu')
+    await gatilho(p).click()
+    await p.getByRole('menu', { name: GATILHO }).waitFor()
+    await p.evaluate(() => window.trocar('concluida'))
+    await gatilho(p).waitFor({ state: 'detached' })
+    await p.evaluate(() => window.trocar('meu'))
+    await gatilho(p).waitFor()
+    assert.equal(await p.getByRole('menu', { name: GATILHO }).count(), 0)
+    await ctx.close()
+  })
   await confere('10. chave de ligar mostra o estado no menu', async () => {
     const { ctx, p } = await abrir('meu')
     await p.getByRole('button', { name: 'Mais ferramentas', exact: true }).click()

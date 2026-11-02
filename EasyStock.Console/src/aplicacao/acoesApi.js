@@ -75,7 +75,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     const { conversas = [], catalogo } = estadoRef.current
     const conversa = conversas.find((c) => c.id === id)
     if (!conversa || !envioBloqueado(conversa, agoraRef.current, canalDaConversa(catalogo?.canais, conversa))) return false
-    despachar({ tipo: acao.AVISO_API, mensagem: 'Cadastro bloqueado: a mensagem não saiu. Desbloqueie na ficha para escrever.' })
+    despachar({ tipo: acao.AVISO_API, mensagem: 'Cadastro bloqueado: a mensagem não saiu. A gerência desbloqueia na ficha.' })
     return true
   }
   const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
@@ -116,7 +116,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     // #1241: cardápio do dia (disponibilidade e saldo) no EasyStok.
     ...criarAcoesCardapioApi({ despachar, estadoRef, comItensForaRef }),
     ...criarAcoesMensagensProgramadasApi({ estadoRef }),
-    ...criarAcoesModelosApi({ despachar }),
+    ...criarAcoesModelosApi({ despachar, antesDeEnviar: assumirDaConversa.antesDeEnviar }),
     // #2005 (console-09): "Ver mensagens anteriores" no topo do fio.
     ...criarAcoesMensagensAnterioresApi({ despachar, estadoRef }),
     enviar: (id, texto, opcoes = {}) => {

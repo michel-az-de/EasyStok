@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { BotaoIcone } from './BotaoIcone'
 import { Icone } from './Icone'
 import { Popover } from './Popover'
@@ -20,7 +20,10 @@ export function MenuDeAcoes({
   const [aberto, setAberto] = useState(false)
   const prefixo = useId()
   const lista = (itens ?? []).filter(Boolean)
-  if (!lista.length && !grupos?.length) return null
+  const vazio = !lista.length && !grupos?.length
+  // Menu aberto que ficou sem itens fecha de verdade: sem isto, reabria sozinho quando os itens voltassem.
+  useEffect(() => { if (vazio) setAberto(false) }, [vazio])
+  if (vazio) return null
   const fechar = () => setAberto(false)
 
   return (

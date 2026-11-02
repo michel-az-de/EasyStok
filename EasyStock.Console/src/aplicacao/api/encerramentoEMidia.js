@@ -112,7 +112,7 @@ export function criarAcoesEncerramentoEMidiaApi({
     despachar({ tipo: acao.FECHAR_ENCERRAMENTO })
     // Só ressalva acende a faixa: encerrar que deu certo não sai em tom de alerta.
     const ressalvas = []
-    if (despedidaSaiu === false) ressalvas.push('A despedida não saiu (veja a mensagem na conversa).')
+    if (despedidaSaiu === false) ressalvas.push('A despedida não saiu.')
     if (!pedidoCancelado && pedido?.pedidoId && pedido.estado === 'aguardando') ressalvas.push('O pedido sem pagamento segue aberto no EasyStok.')
     if (avisoEmail || avisoSms) ressalvas.push('O aviso por e-mail e SMS ainda não sai nesta versão.')
     if (ressalvas.length > 0) avisar(['Conversa concluída no EasyStok.', ...ressalvas].join(' '))

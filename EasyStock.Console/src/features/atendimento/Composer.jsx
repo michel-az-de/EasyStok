@@ -136,12 +136,16 @@ export function Composer({
     const enviado = rascunho
     if (!(await assumirSePreciso())) return
     if (anexo) {
-      const molde = anexo.tipo === 'imagem'
-        ? mensagemDeImagemAnexada({ nomeArquivo: anexo.nome, dataUrl: anexo.dataUrl, legenda: rascunho })
+      // Tirou a prévia enquanto o servidor assumia: a foto não sai.
+      if (anexosEmEspera.ler(chaveAnexo) !== anexo) return
+      const comLegenda = anexo.tipo === 'imagem'
+      const molde = comLegenda
+        ? mensagemDeImagemAnexada({ nomeArquivo: anexo.nome, dataUrl: anexo.dataUrl, legenda: enviado })
         : mensagemDeArquivoAnexado({ nomeArquivo: anexo.nome, tamanho: anexo.tamanho, dataUrl: anexo.dataUrl })
       enviarMidia(conversa.id, molde)
       setAnexo(null)
-      aoMudarRascunho('')
+      // Só a legenda sai com a mídia: arquivo não leva texto, e o que está no campo continua lá.
+      if (comLegenda) aoMudarRascunho(restoDoEnvio(lerTexto(), enviado))
       return
     }
     // O campo é quem tem o texto de agora; o rascunho global pode estar uma pausa atrás.

@@ -70,6 +70,8 @@ const REACT = 'const h=globalThis.__prova1586.hooks; export const useState=h.use
 const fronteiras = new Map([
   ['/aplicacao/contextos', 'const c=globalThis.__prova1586; export const useAtendimento=()=>c.atendimento, useCatalogo=()=>c.catalogo, useAcoes=()=>c.acoes'],
   ['/aplicacao/acessoModulos', 'export const useAcessoModulos=()=>({acoes:{cancelarPedidoPago:true}})'],
+  // #2185 (F32): o modal avisa quando a conversa deixa de estar aberta; a casca genérica devolveria `null` no gancho.
+  ['/componentes/Aviso', 'export const useAviso=()=>({mostrar(){},dispensar(){}}); export function ProvedorDeAviso(){return null}'],
 ])
 // Componente de `componentes/` vira casca com o mesmo nome: a árvore guarda o tipo e as props.
 function cascaDoComponente(arquivo) {
