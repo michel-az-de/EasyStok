@@ -101,11 +101,6 @@
   background: var(--papel); color: var(--tinta); font-size: var(--t-corpo); font-family: inherit;
 }
 .controleComErro { border-width: var(--b-2); border-color: var(--erro); }
-.botaoIconeEdicao {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: var(--toque); height: var(--toque); flex-shrink: 0;
-  background: none; border: 0; color: var(--tinta-2);
-}
 .erroEmLinha { margin: var(--e-1) 0 0; color: var(--erro); font-size: var(--t-apoio); }
 .salvandoEmLinha { display: block; margin: var(--e-1) 0 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 
@@ -123,12 +118,7 @@
 }
 .chipRestricao { border-color: var(--alerta); color: var(--tinta); background: var(--alerta-pastel); }
 .chipTexto { background: none; border: 0; padding: var(--e-1) 0; font: inherit; color: inherit; min-width: var(--toque); min-height: var(--toque); overflow-wrap: anywhere; text-align: left; }
-.chipRemover {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: var(--toque); height: var(--toque); flex: none; margin: 0; border-radius: var(--r-pilula);
-  background: none; border: 0; color: var(--tinta-3);
-}
-.chipRemover:hover { background: var(--preenchimento-forte); color: var(--tinta); }
+.chipRemover { color: var(--tinta-3); }
 .chipEdicao {
   min-height: var(--toque); min-width: 96px; max-width: 100%; padding: 0 var(--e-3);
   border-radius: var(--r-pilula); border: var(--b-2) solid var(--marca);
@@ -198,7 +188,7 @@
 .linhaDado > :not(.azulejo) { grid-column: 2; }
 .azulejo {
   grid-row: 1 / span 2; align-self: center;
-  width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: var(--r-2); display: grid; place-items: center;
   color: var(--branco); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 2px rgba(0, 0, 0, .12);
 }
 .azVerde, .az_conversa { background: var(--canal-whatsapp-fundo); }
@@ -259,7 +249,7 @@
   border: 0; border-radius: var(--r-2);
 }
 .iconeRecompensa {
-  flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+  flex: none; width: 30px; height: 30px; border-radius: var(--r-2); display: grid; place-items: center;
   color: var(--marca); background: var(--marca-claro);
 }
 .textoRecompensa { flex: 1 1 140px; min-width: 0; display: grid; }
@@ -269,7 +259,7 @@
    Selo em azul de informação (não é o verde de "feito": ninguém confirmou ainda). */
 .contatoInformado {
   display: grid; gap: var(--e-2); margin-bottom: var(--e-3); padding: var(--e-3);
-  background: var(--info-fundo); border-radius: var(--r-2);
+  background: var(--info-pastel); border-radius: var(--r-2);
 }
 .seloInformado {
   justify-self: start; padding: 1px 8px; border-radius: var(--r-1);

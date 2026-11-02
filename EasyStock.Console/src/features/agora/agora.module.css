@@ -1,5 +1,5 @@
 .painel { margin-bottom: var(--e-6); padding-bottom: var(--e-6); border-bottom: 0; }
-.legenda { margin: 0 0 var(--e-3); font-size: var(--t-minimo); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--marca-forte); }
+.legenda { margin: 0 0 var(--e-3); font-size: var(--t-micro); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--marca-forte); }
 .filas { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--e-4); }
 
 .fila { display: flex; flex-direction: column; gap: var(--e-3); min-width: 0; padding: var(--e-4); background: var(--papel); border: 0; border-radius: var(--r-2); }

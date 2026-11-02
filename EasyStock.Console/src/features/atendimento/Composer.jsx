@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { MenuDeAcoes } from '../../componentes/MenuDeAcoes'
-import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Tooltip } from '../../componentes/Tooltip'
 import { useAviso } from '../../componentes/Aviso'
 import { CampoArea } from '../../componentes/Campo'
@@ -222,7 +221,7 @@ export function Composer({
     return (
       <div className={css.composer} data-area-envio>
         <p className={css.linhaEncerrada}>
-          <span>Conversa encerrada</span>
+          <span>Conversa concluída</span>
           {aoReabrir && <Botao disabled={reabrindo} onClick={aoReabrir}>{reabrindo ? 'Reabrindo…' : 'Reabrir conversa'}</Botao>}
         </p>
       </div>
@@ -399,15 +398,18 @@ export function Composer({
                 >Enviar</Botao>
                 </Tooltip>
               ) : (
-                <BotaoIcone
-                  tom="primario"
-                  className={css.enviar}
-                  rotulo="Gravar áudio"
-                  icone="mic"
-                  dica={motivoDeFormato(canal, 'audio') ?? undefined}
-                  disabled={!podeEscrever || !podeAudio}
-                  onClick={gravador.iniciar}
-                />
+                // #2185 (R15): o microfone ocupa o lugar do Enviar com o mesmo tamanho e o mesmo desenho (ícone e
+                // palavra), para o botão da direita não mudar de largura quando o campo esvazia.
+                <Tooltip texto={motivoDeFormato(canal, 'audio') ?? 'Gravar áudio'}>
+                  <Botao
+                    variante="primario"
+                    className={css.enviar}
+                    aria-label="Gravar áudio"
+                    icone="mic"
+                    disabled={!podeEscrever || !podeAudio}
+                    onClick={gravador.iniciar}
+                  >Gravar</Botao>
+                </Tooltip>
               )}
             </div>
           </div>

@@ -53,7 +53,7 @@ export function ModalCliente({ conversa, aoFechar, children }) {
     } finally { setAlterandoFoto(false) }
   }
 
-  return <Modal titulo="Ficha" largura="820px" className={css.modal} aoFechar={ocupado ? undefined : aoFechar} segurarFechamento={cadastroSujo}
+  return <Modal titulo="Ficha" largura="lg" className={css.modal} aoFechar={ocupado ? undefined : aoFechar} segurarFechamento={cadastroSujo}
     rodape={<div className={css.acoes}>
       {!podeBaixarPdf && <small>{!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}
       <Botao variante="texto" disabled={ocupado} onClick={aoFechar}>Fechar</Botao>

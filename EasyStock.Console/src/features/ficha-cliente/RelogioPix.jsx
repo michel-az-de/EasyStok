@@ -124,7 +124,7 @@ export function RelogioPix({
       <div className={css.relogio}>
         {anuncioRegiao}
         <Anel tamanho={DIAMETRO} traco={TRACO} fracao={1} tom="ok">
-          <Icone nome="check" tamanho={40} rotulo="Pago" />
+          <Icone nome="check" tamanho={32} rotulo="Pago" />
         </Anel>
         <p className={css.pago}>
           <span className={css.rotuloPago}>{rotuloPago}</span>

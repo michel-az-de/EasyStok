@@ -154,7 +154,7 @@ export function NaoEntregues({ aoAbrir }) {
       {aberto && (
         <Modal
           titulo="Não entregues"
-          largura="min(740px, calc(100vw - 24px))"
+          largura="md"
           descricao="Mensagens que o WhatsApp não entregou. Falha temporária tenta de novo sozinha por até 6 h."
           aoFechar={fechar}
           rodape={<><Botao ref={atualizarRef} disabled={carregando || Boolean(ocupado)} onClick={() => carregar()}>Atualizar lista</Botao><Botao onClick={fechar}>Fechar</Botao></>}

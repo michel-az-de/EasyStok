@@ -82,6 +82,7 @@ registerHooks({
     if (spec === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment";export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx'), shortCircuit: true }
     if (spec.endsWith('/Icone')) return { url: codigo('export function Icone(){return null}'), shortCircuit: true }
     if (spec.endsWith('/Botao')) return { url: codigo('export function Botao(props){return {type:"button",props}}'), shortCircuit: true }
+    if (spec.endsWith('/BotaoIcone')) return { url: codigo('export function BotaoIcone(props){return {type:"button",props}}'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: codigo('export default new Proxy({},{get:(_,p)=>String(p)})'), shortCircuit: true }
     if (spec.startsWith('.') && ctx.parentURL?.startsWith('file:') && !/\.[a-z]+$/i.test(spec)) {
       for (const ext of ['.js', '.jsx']) if (existsSync(new URL(spec + ext, ctx.parentURL))) return proximo(spec + ext, ctx)
@@ -138,7 +139,7 @@ function montar(fn, props) {
     } while (h.sujo)
     return h.tree
   }
-  h.find = (rotulo) => { let resultado; visitar(h.tree, n => { if (n.props?.['aria-label'] === rotulo) resultado = n }); assert.ok(resultado, rotulo); return resultado }
+  h.find = (rotulo) => { let resultado; visitar(h.tree, n => { if (n.props?.['aria-label'] === rotulo || n.props?.rotulo === rotulo) resultado = n }); assert.ok(resultado, rotulo); return resultado }
   h.unmount = () => h.efeitos.forEach(e => e?.limpar?.())
   h.render(); return h
 }

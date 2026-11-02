@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { BotaoIcone } from './BotaoIcone'
 import { Icone } from './Icone'
 import css from './Toast.module.css'
 
@@ -62,9 +63,7 @@ export function Toast({ itens, aoFechar, aoAbrir, aoPausar, aoRetomar, rotulo = 
               <span>{item.corpo}</span>
             </p>
           )}
-          <button type="button" className={css.fechar} aria-label={`Fechar aviso: ${item.titulo}`} title="Fechar" onClick={() => aoFechar(item.id)}>
-            <Icone nome="x" tamanho={18} />
-          </button>
+          <BotaoIcone rotulo={`Fechar aviso: ${item.titulo}`} dica="Fechar" icone="x" onClick={() => aoFechar(item.id)} />
         </div>
       ))}
       {itens.length > 0 && rodape}

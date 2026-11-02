@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import {
@@ -96,14 +97,7 @@ export function TagsDoCliente({ conversa }) {
                 <button type="button" className={css.chipTexto} onClick={() => abrirEdicao(tag)}>
                   {rotuloDaTag(tag)}
                 </button>
-                <button
-                  type="button"
-                  className={css.chipRemover}
-                  aria-label={`Tirar tag ${rotuloDaTag(tag)}`}
-                  onClick={() => remover(tag)}
-                >
-                  <Icone nome="x" tamanho={20} />
-                </button>
+                <BotaoIcone rotulo={`Tirar tag ${rotuloDaTag(tag)}`} icone="x" className={css.chipRemover} onClick={() => remover(tag)} />
               </span>
             )}
           </li>

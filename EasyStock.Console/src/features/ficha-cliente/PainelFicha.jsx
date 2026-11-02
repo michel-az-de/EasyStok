@@ -66,7 +66,7 @@ function AcessoDaFicha({ titulo, resumo, icone, aoAbrir, painel, focoReserva = p
   return <button type="button" className={css.acessoFicha} onClick={aoAbrir} aria-haspopup={painel ? undefined : 'dialog'} data-foco-reserva={focoReserva}>
     {icone && <Icone nome={icone} tamanho={20} />}
     <span><strong>{titulo}</strong><small>{resumo}</small></span>
-    <Icone nome="chevron-right" tamanho={18} />
+    <Icone nome="chevron-right" tamanho={20} />
   </button>
 }
 
@@ -215,9 +215,9 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
     ? (cadastrarPrimeiro
       ? <>
         <Botao largo variante="primario" disabled={!editavel} onClick={() => setSecao('cliente')}>Cadastrar cliente</Botao>
-        <Botao icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
+        <Botao largo icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
       </>
-      : <Botao variante="primario" icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>)
+      : <Botao largo variante="primario" icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>)
     : null
   const comandaCompartilhada = <ComandaDoCliente key={chaves.comandaCompartilhada} conversaId={selecionada.id} compacta
     nomeCliente={selecionada.nome}
@@ -320,7 +320,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       {pedido && <PainelMovel controle={comandaMovel} titulo={`Comanda · ${selecionada.nome}`} larguraInicial={480} alturaInicial={480} alinharDireita visivel={comandaVisivel}>
         {editavel && !pedidoCriado && <p>Estes itens ainda estão em montagem. O pedido será criado ao gerar a cobrança.</p>}
-        {!editavel && <p>Consulta do atendimento encerrado.</p>}
+        {!editavel && <p>Consulta da conversa concluída.</p>}
         <BlocoPedido
           pedido={pedido}
           editavel={editavel}
@@ -357,7 +357,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         aoAbrirCardapio={aoAbrirCardapio} aoRascunho={aoRascunho}
         aoRecolher={() => setBlocosSoltos((atuais) => atuais.filter((b) => b !== bloco))} />)}
 
-      {secao === 'pagamento' && editavel && pedido && <Modal titulo={`Pagamento · ${selecionada.nome}`} largura="680px" aoFechar={() => setSecao(null)}>
+      {secao === 'pagamento' && editavel && pedido && <Modal titulo={`Pagamento · ${selecionada.nome}`} largura="md" aoFechar={() => setSecao(null)}>
         {fonteApi && <ExtratoDoPedido pedido={pedido} aDevolver={aDevolver} />}
         <BlocoCobranca
           key={chaves.cobranca}
@@ -377,7 +377,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         />
       </Modal>}
 
-      {secao === 'pos-venda' && editavel && pedido && <Modal titulo={`Pós-venda · ${selecionada.nome}`} largura="760px" aoFechar={() => setSecao(null)}>
+      {secao === 'pos-venda' && editavel && pedido && <Modal titulo={`Pós-venda · ${selecionada.nome}`} largura="md" aoFechar={() => setSecao(null)}>
             {fonteApi && pedido.pedidoId && <BlocoDevolucoes
               key={chaves.devolucoes}
               pedidoId={pedido.pedidoId}

@@ -6,8 +6,8 @@
 }
 .identidade { display: flex; align-items: center; gap: var(--e-3); min-width: 0; flex: 1; }
 .cabecalho h2 {
-  margin: 0; font-family: var(--f-corpo); font-size: var(--t-forte); font-weight: 700;
-  line-height: var(--lh-compacto); letter-spacing: -.01em;
+  margin: 0; font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700;
+  line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo);
 }
 .nomeCliente { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A linha de apoio corre como texto: o ícone do canal é bloco (Icone.jsx) e
@@ -74,7 +74,7 @@
 /* #1444: "enviando" escrito, não só o ✓ cinza: a mídia demora e a dona precisa ver que está indo. */
 .enviando { display: inline-flex; align-items: center; gap: 4px; }
 .enviando::before {
-  content: ""; width: 9px; height: 9px; border-radius: 50%;
+  content: ""; width: var(--ponto); height: var(--ponto); border-radius: var(--r-circulo);
   border: 1.5px solid var(--linha-media); border-top-color: currentColor;
   animation: girarMeta .8s linear infinite;
 }
@@ -217,13 +217,11 @@
 .modoAssumir { margin-left: auto; flex: none; }
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
 
-/* Alvo de toque de 44 px em qualquer ponteiro, não só no grosso. */
-.acaoToque { min-height: var(--toque); }
 
 /* Trava por bloqueio de cadastro. Vermelho aqui é o único caso no composer:
    os outros avisos são âmbar porque voltam sozinhos, este só sai pela mão. */
 .bloqueioGrave {
-  background: var(--erro-pastel); color: var(--erro); border-left-color: var(--erro);
+  background: var(--erro-pastel); color: var(--erro);
 }
 .bloqueioGrave span { color: var(--tinta); }
 
@@ -240,8 +238,6 @@
 }
 .avisoAssumiu { color: var(--sucesso); }
 .erroAssumir { color: var(--erro); }
-/* Chave do completar com Tab: ligada fica com o fundo marcado, como um botão apertado. */
-.acoes > button.chaveLigada { background: var(--preenchimento-forte); }
 
 /* Cor por canal, pelo nome do ícone do catálogo (conversa, camera, globo). */
 .canal_conversa { color: var(--c-whatsapp); }
@@ -345,17 +341,8 @@
 }
 
 /* Banca, item 13: o cabeçalho da conversa na mesma altura das colunas. */
-.cabecalho { min-height: 64px; padding-top: var(--e-2); padding-bottom: var(--e-2); }
+.cabecalho { min-height: var(--altura-regiao); padding-top: var(--e-2); padding-bottom: var(--e-2); }
 
-/* Anexar é um label sobre o input de arquivo (rodada 7), não um Botao: mesmo
-   desenho dos outros ícones da barra, no grupo da esquerda. */
-.acoes > label {
-  order: 1; width: var(--toque); min-width: var(--toque); height: var(--toque); min-height: var(--toque); padding: 0;
-  display: inline-grid; place-items: center; border: 0; border-radius: var(--r-2);
-  background: transparent; color: var(--tinta-2); cursor: pointer;
-}
-.acoes > label:hover { background: var(--preenchimento); color: var(--tinta); }
-.acoes > label svg { width: 20px; height: 20px; }
 
 /* Integração: no celular (e em qualquer coluna estreita, rodada 9) o campo
    ocupa a linha de cima inteira e os ícones descem para a de baixo; em
@@ -374,8 +361,6 @@
 /* Integração: no celular o Encerrar fica só com o ícone (o nome continua
    "Encerrar" para leitor de tela e para as provas), para o nome do cliente
    caber na linha. */
-@container topo-conversa (max-width: 439px) {
-}
 
 /* Rodada 9 (achado 5 da banca estética): no celular, canal + pedidos + janela
    quase sempre passam de 2 linhas ("23 h 5 min na janela" sozinho já usa
@@ -393,7 +378,7 @@
 .digitando { min-width: 132px; }
 .pontos { display: inline-flex; gap: 5px; align-items: center; height: 18px; padding: 0 2px; }
 .pontos i {
-  width: 7px; height: 7px; border-radius: 50%; background: var(--tinta-3);
+  width: var(--ponto); height: var(--ponto); border-radius: var(--r-circulo); background: var(--tinta-3);
   animation: pontoDigitando 1.1s ease-in-out infinite;
 }
 .pontos i:nth-child(2) { animation-delay: .15s; }
@@ -436,22 +421,8 @@
 .programadaTopo button { margin-left: auto; }
 .programadaTexto { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tinta-2); }
 
-/* Rodada 12 (issue #16, dúvidas da Thatiane): Anexar, Fotos, Cardápio e Nota
-   ganham nome visível embaixo do ícone, no desenho do trilho lateral (ícone
-   em cima, nome pequeno embaixo). Ao lado do ícone, como no Respostas, os
-   quatro somavam 530 px numa barra de 444 e quebravam linha. Em coluna
-   estreita (celular) o nome vira texto só para leitor de tela e fica o title
-   com a explicação inteira. */
-.acoes > button.acaoComRotulo,
-.acoes > label {
-  width: auto; min-width: var(--toque); min-height: var(--toque); height: auto; padding: 2px 6px; gap: 1px;
-  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-  font-size: var(--t-minimo); font-weight: 600; line-height: 1.1; border-radius: var(--r-1);
-}
 @container composer (max-width: 439px) {
-  .acoes > button.acaoComRotulo,
-  .acoes > label { width: var(--toque); min-width: var(--toque); min-height: var(--toque); padding: 0; border-radius: var(--r-2); }
-  .rotuloAcao {
+    .rotuloAcao {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
   }
@@ -474,7 +445,7 @@
 .eventoNota > summary::-webkit-details-marker { display: none; }
 .eventoNota > summary:focus-visible { outline: 3px solid var(--halo); outline-offset: 2px; }
 .eventoNota[open] { width: min(340px, 100%); }
-.postIt p { margin: 0; padding: var(--e-2) var(--e-4) var(--e-4); white-space: pre-line; overflow-wrap: anywhere; font-family: var(--f-manuscrita); font-size: 24px; line-height: 1.4; }
+.postIt p { margin: 0; padding: var(--e-2) var(--e-4) var(--e-4); white-space: pre-line; overflow-wrap: anywhere; font-family: var(--f-manuscrita); font-size: var(--t-valor); line-height: 1.4; }
 .postItQuem { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--e-1); font-size: var(--t-micro); font-weight: 600; color: var(--tinta-2); }
 .postItQuem > svg { flex: none; }
 .verNota { font-size: var(--t-micro); font-weight: 700; color: var(--marca-forte); }
@@ -509,7 +480,7 @@
   .acoes { gap: var(--e-1); }
   .acoes > button.botaoRespostas {
     width: 96px; min-width: 96px; padding-inline: var(--e-1); gap: var(--e-1);
-    font-size: var(--t-minimo);
+    font-size: var(--t-micro);
   }
   .caixaEnxuta { flex-wrap: wrap; }
   .caixaEnxuta > :not(.acoes) { order: 0; flex-basis: 100%; }

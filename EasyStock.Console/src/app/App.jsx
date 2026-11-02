@@ -354,7 +354,7 @@ function Composicao({ rota }) {
       {modal === 'respostas' && (
         <Modal
           titulo="Respostas e automáticas"
-          largura="min(880px, calc(100vw - 24px))"
+          largura="lg"
           aoFechar={fechar}
           rodape={<><AvisoDaAcaoApi /><Botao onClick={fechar}>Fechar</Botao></>}
         >

@@ -1,4 +1,5 @@
 import { Icone } from '../../componentes/Icone'
+import { Pilula } from '../../componentes/Pilula'
 import { CAMPOS, automaticoConduzindo } from '../../dominio/captura'
 import css from './ficha.module.css'
 
@@ -32,16 +33,16 @@ export function BlocoCapturaAutomatica({ conversa, pausado }) {
   const esperaVoce = Boolean(conversa.passagem && !conversa.passagem.assumida) || Boolean(conversa.cliente.enderecoCapturado)
   let status = 'Conduzindo a conversa sozinho. Assuma pela barra da conversa quando quiser.'
   if (conversa.cliente.enderecoCapturado) status = 'Endereço fora da área: a decisão é sua, logo abaixo.'
-  else if (esperaVoce) status = 'Passou para você: o automático parou aqui. O que ele captou continua na ficha.'
-  else if (!conduzindo) status = 'Você está no controle: o automático parou aqui. O que ele captou continua na ficha.'
-  else if (tudoFeito) status = 'Pedido anotado pelo automático. Confira a comanda e gere a cobrança.'
+  else if (esperaVoce) status = 'Passou para você: o Assistente parou aqui. O que ele captou continua na ficha.'
+  else if (!conduzindo) status = 'Você está no controle: o Assistente parou aqui. O que ele captou continua na ficha.'
+  else if (tudoFeito) status = 'Pedido anotado pelo Assistente. Confira a comanda e gere a cobrança.'
   const selo = esperaVoce ? 'com você' : conduzindo ? 'ativo' : 'parado'
 
   return (
-    <section className={css.capturaAuto} aria-label="Atendimento automático">
+    <section className={css.capturaAuto} aria-label="Captação do Assistente">
       <p className={css.capturaTitulo}>
-        <Icone nome="raio" /> Atendimento automático
-        <span className={conduzindo ? css.capturaAtivo : css.capturaParado}>{selo}</span>
+        <Icone nome="raio" /> Captação do Assistente
+        <Pilula tamanho="inline" tom={conduzindo ? 'ok' : 'aviso'} className={css.capturaSelo}>{selo}</Pilula>
       </p>
       <ol className={css.capturaPassos}>
         {PASSOS.map((passo) => {
@@ -51,7 +52,7 @@ export function BlocoCapturaAutomatica({ conversa, pausado }) {
           return (
             <li key={passo.chave} className={classe}>
               <span className={css.passoMarca} aria-hidden="true">
-                {pronto ? <Icone nome="check" tamanho={12} /> : null}
+                {pronto ? <Icone nome="check" tamanho={16} /> : null}
               </span>
               {passo.rotulo}
               <span className="sr">{pronto ? ', feito' : agora ? ', pedindo agora' : ', falta'}</span>

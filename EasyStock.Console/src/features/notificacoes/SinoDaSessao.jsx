@@ -37,7 +37,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
       <span>Avisos{erro ? ' !' : total ? ` (${total})` : ''}</span>
       {semAvisoNoAparelho && <span className={css.pontoAparelho} data-aparelho-desligado aria-hidden="true" />}
     </Botao>
-    {aberto && <Modal titulo="Avisos" largura="min(760px, calc(100vw - 24px))" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."
+    {aberto && <Modal titulo="Avisos" largura="md" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."
       aoFechar={() => setAberto(false)} rodape={<><Botao ref={atualizarRef} onClick={() => carregar()} disabled={carregando || Boolean(lendo)}>Atualizar avisos</Botao><Botao onClick={() => setAberto(false)}>Fechar</Botao></>}>
       {erro && <p role="alert" className={css.erro}>Sem atualizar: {erro}</p>}
       {carregando && <p role="status" className={css.resumo}>Atualizando avisos…</p>}

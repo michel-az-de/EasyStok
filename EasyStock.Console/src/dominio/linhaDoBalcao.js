@@ -12,10 +12,10 @@ import { mensagensSemRespostaReal } from './mensagem'
 
 const ESTADOS = {
   bloqueado: { chave: 'bloqueado', texto: 'Bloqueado', tom: 'perigo', icone: 'lock' },
-  encerrada: { chave: 'encerrada', texto: 'Encerrada', tom: 'neutro', icone: 'log-out' },
+  encerrada: { chave: 'encerrada', texto: 'Concluída', tom: 'neutro', icone: 'log-out' },
   outro: { chave: 'outro', texto: 'Outro atendente', tom: 'neutro', icone: null },
   voce: { chave: 'voce', texto: 'Com você', tom: 'ok', icone: 'hand' },
-  automatico: { chave: 'automatico', texto: 'Automático', tom: 'neutro', icone: 'raio' },
+  automatico: { chave: 'automatico', texto: 'Assistente', tom: 'neutro', icone: 'raio' },
 }
 
 // Um estado por linha, por precedência: bloqueio e encerramento calam o resto;

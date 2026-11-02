@@ -12,7 +12,7 @@
 .item { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); padding: var(--e-2); border-radius: var(--r-1); text-decoration: none; color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600; }
 .item:hover { background: var(--preenchimento); color: var(--tinta); }
 .item > span { min-width: 0; overflow-wrap: anywhere; }
-.preparacao { display: block; font-size: var(--t-minimo); font-weight: 400; color: var(--tinta-2); margin-top: var(--e-1); }
+.preparacao { display: block; font-size: var(--t-micro); font-weight: 400; color: var(--tinta-2); margin-top: var(--e-1); }
 .itemAtivo, .itemAtivo:hover { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
 .item > svg, .modulo > svg, .titulo > svg { flex: none; }
 .item:focus-visible, .voltar:focus-visible, .link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
@@ -62,7 +62,7 @@
   .modulo, .contexto > a { display: none; }
   .abrirMenu { min-width: 0; max-width: 100%; text-align: left; }
   .abrirMenu > span { min-width: 0; overflow-wrap: anywhere; }
-  .nomeNoMenu { display: block; font-size: var(--t-minimo); font-weight: 400; }
+  .nomeNoMenu { display: block; font-size: var(--t-micro); font-weight: 400; }
   .acoes { gap: var(--e-1); }
   .acoes > :global([data-ajuda-console]) { font-size: 0; gap: 0; width: var(--toque); padding: 0; }
   .ajuste { padding: 0 var(--e-2) var(--e-2); }

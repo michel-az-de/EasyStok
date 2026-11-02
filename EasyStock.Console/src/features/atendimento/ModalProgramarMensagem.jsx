@@ -119,7 +119,6 @@ export function ModalProgramarMensagem({
   return (
     <Modal
       titulo="Programar mensagem"
-      largura="480px"
       descricao={`Tentaremos enviar para ${primeiroNome(conversa.nome)} pelo ${canal.nome}, mesmo com o console fechado.`}
       aoFechar={fechar}
       segurarFechamento={sujo}

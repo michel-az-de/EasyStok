@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
+import { Pilula } from '../../componentes/Pilula'
 import { useEscape } from '../../hooks/useEscape'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { anunciarAberturaDeConversa } from '../../aplicacao/aberturaDeConversa'
@@ -62,13 +64,7 @@ function ItemAtivo({ lembrete, agora, conversas, comPonto, aoAbrir, aoConcluir, 
         <strong>{lembrete.titulo}</strong>
         <em>{subtituloDoItem(lembrete, agora, conversas)}</em>
       </button>
-      <Botao
-        variante="texto" className={css.acaoItem} title="Concluir" aria-label="Concluir"
-        disabled={concluindo}
-        onClick={() => aoConcluir(lembrete)}
-      >
-        <Icone nome="check" tamanho={24} />
-      </Botao>
+      <BotaoIcone rotulo="Concluir" icone="check" tamanhoIcone={24} disabled={concluindo} onClick={() => aoConcluir(lembrete)} />
     </li>
   )
 }
@@ -280,19 +276,14 @@ export function Sininho({ comRotulo = false }) {
             quem clicava em "Avisos" abrir Lembretes. */}
         <Icone nome="relogio" tamanho={24} />
         {comRotulo && <span>Lembretes</span>}
-        {contagem > 0 && <span className={css.badge} aria-hidden="true">{rotuloBadge}</span>}
+        {contagem > 0 && <Pilula contagem={rotuloBadge} tom="perigo" className={css.badge} aria-hidden="true" />}
       </Botao>
 
       {aberto && (
         <section className={css.painel} aria-label="Lembretes" ref={painelRef}>
           <div className={css.cabecalho}>
             <h2>Lembretes</h2>
-            <Botao
-              variante="texto" className={css.mais} aria-label="Programar lembrete" title="Programar lembrete"
-              onClick={() => setModalAberta(true)}
-            >
-              <Icone nome="mais" tamanho={24} />
-            </Botao>
+            <BotaoIcone rotulo="Programar lembrete" icone="mais" tamanhoIcone={24} onClick={() => setModalAberta(true)} />
           </div>
 
           {erro && <p role="alert" className={css.erro}>{erro}</p>}

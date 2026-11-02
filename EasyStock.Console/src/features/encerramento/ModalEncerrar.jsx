@@ -149,7 +149,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
           : resultado.erro)
       }
     } catch (erro) {
-      setErroAoEncerrar(erro.message || 'Não foi possível encerrar. Tente de novo.')
+      setErroAoEncerrar(erro.message || 'Não foi possível concluir a conversa. Tente de novo.')
     } finally {
       emVoo.current = false
       setEncerrandoAgora(false)

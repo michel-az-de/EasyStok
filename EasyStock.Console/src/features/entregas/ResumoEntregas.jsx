@@ -1,5 +1,6 @@
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
+import { Pilula } from '../../componentes/Pilula'
 import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { ocupacaoDeHoje, resumoDeHoje } from '../../dominio/entrega'
 import css from './entregas.module.css'
@@ -25,9 +26,9 @@ export function ResumoEntregas({ aoAbrir, noTrilho = false, classeItem, classeSe
     const texto = apertadas.map((j) => j.texto).join(', ')
     return (
       <Botao variante="texto" className={classeItem} onClick={aoAbrir} title={texto ? `Entregas, ${texto}` : 'Entregas'}>
-        <Icone nome="moto" tamanho={22} />
+        <Icone nome="moto" tamanho={24} />
         <span>Entregas</span>
-        {apertadas.length > 0 && <span className={classeSelo} aria-hidden="true">{apertadas[0].texto.split('·').pop().trim()}</span>}
+        {apertadas.length > 0 && <Pilula contagem={apertadas[0].texto.split('·').pop().trim()} tom="perigo" className={classeSelo} aria-hidden="true" />}
       </Botao>
     )
   }

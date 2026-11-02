@@ -211,7 +211,7 @@ function Cabecalho({
         <Botao icone="raio" onClick={aoAbrirAutomacoes} aria-label={rotuloAutomaticas(regras)}>
           <span className={css.rotuloLongo}>Automáticas</span>
           <span className={css.rotuloCurto} aria-hidden="true">Auto</span>
-          {regras && <span className={css.conta}>{contarAtivas(regras)}</span>}
+          {regras && <Pilula contagem={contarAtivas(regras)} />}
         </Botao>
         {/* Casca da rodada 13 (issue das 5 frentes): mesmo lugar de
             Automáticas, ao lado dela. Rodada 13, achado da validação
@@ -256,7 +256,7 @@ function DisposicaoConversas({ larguras, padrao, aoRedimensionar }) {
   const [aberto, setAberto] = useState(false)
   return <span className={css.disposicao}>
     <Botao variante="texto" className={css.itemTrilho} aria-expanded={aberto} aria-haspopup="dialog" onClick={() => setAberto(!aberto)}>
-      <Icone nome="painel" tamanho={22} /><span>Disposição</span>
+      <Icone nome="painel" tamanho={24} /><span>Disposição</span>
     </Botao>
     {aberto && <Popover rotulo="Disposição das conversas" papel="dialog" portal posicao="acima" aoFechar={() => setAberto(false)}>
       <div className={css.ajusteDisposicao}>
@@ -295,7 +295,7 @@ function Trilho({
         onClick={aoAlternarLoja}
         title={aberta ? 'Loja aberta: toque para fechar' : 'Loja fechada: toque para abrir'}
       >
-        <Icone nome={aberta ? 'circle-check' : 'lock'} tamanho={22} />
+        <Icone nome={aberta ? 'circle-check' : 'lock'} tamanho={24} />
         <span>{aberta ? 'Loja aberta' : 'Loja fechada'}</span>
       </button>
       {/* #1870: o mesmo nome e o mesmo ícone do trilho dos módulos; a tela continua sendo o Balcão. */}
@@ -308,16 +308,16 @@ function Trilho({
         noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho}
       />}
       {permite('cozinha') && <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
-        <Icone nome="cooking-pot" tamanho={22} />
+        <Icone nome="cooking-pot" tamanho={24} />
         <span>Cozinha</span>
       </Botao>}
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={rotuloAutomaticas(regras)} title="Automáticas">
-        <Icone nome="raio" tamanho={22} />
+        <Icone nome="raio" tamanho={24} />
         <span>Automáticas</span>
-        {regras && <span className={css.contaTrilho} aria-hidden="true">{contarAtivas(regras)}</span>}
+        {regras && <Pilula contagem={contarAtivas(regras)} className={css.contaTrilho} aria-hidden="true" />}
       </Botao>
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirGestao} title="Gestão" aria-haspopup="dialog">
-        <Icone nome="painel" tamanho={22} />
+        <Icone nome="painel" tamanho={24} />
         <span>Gestão</span>
       </Botao>
       {/* #1807: Avisos (sino) e Lembretes (relógio) com ícone e rótulo próprios, cada rótulo
@@ -326,13 +326,13 @@ function Trilho({
       <div className={css.avisosTrilho}>{notificacoes}</div>
       <div className={css.sinoTrilho}><Sininho comRotulo /></div>
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda do sistema">
-        <MarcaIcone nome="informacao" tamanho={22} /><span>Ajuda</span>
+        <MarcaIcone nome="informacao" tamanho={24} /><span>Ajuda</span>
       </Botao>
       {disposicao}
       <span className={css.espacoTrilho} />
       {aoAlternarSimulacoes && !simularEscondido() && (
         <Botao variante="texto" className={css.itemTrilho} aria-pressed={simulando} onClick={aoAlternarSimulacoes} title="Simular (F2)">
-          <Icone nome="flask-conical" tamanho={22} />
+          <Icone nome="flask-conical" tamanho={24} />
           <span>Simular</span>
         </Botao>
       )}

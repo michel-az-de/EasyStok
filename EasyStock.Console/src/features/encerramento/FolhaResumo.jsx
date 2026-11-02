@@ -155,7 +155,7 @@ export function FolhaResumo({
                   className={css.parteMensagem + ' ' + css.parteAutomatico}
                   style={{ '--peso': mensagens.automatico / totalMensagens }}
                 >
-                  Automático {mensagens.automatico}
+                  Assistente {mensagens.automatico}
                 </span>
               )}
             </div>
@@ -259,8 +259,8 @@ export function FolhaResumo({
       <footer className={css.rodape}>
         <span>
           {resumo.encerradoEm
-            ? `Encerrado por ${resumo.encerradoPor} às ${horaCurta(resumo.encerradoEm)}`
-            : 'Prévia, ainda não encerrado'}
+            ? `Concluído por ${resumo.encerradoPor} às ${horaCurta(resumo.encerradoEm)}`
+            : 'Prévia, ainda não concluído'}
         </span>
         <span>página 1/1</span>
       </footer>

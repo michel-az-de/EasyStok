@@ -13,5 +13,5 @@
 .vertical { display: flex; flex-direction: column; margin-top: var(--e-2); }
 .vertical > button {
   flex-direction: column; gap: 2px; width: 56px; min-height: 52px; padding: 0;
-  font-size: var(--t-minimo); line-height: 1.1;
+  font-size: var(--t-micro); line-height: 1.1;
 }

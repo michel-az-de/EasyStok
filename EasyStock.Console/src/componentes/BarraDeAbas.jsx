@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Icone } from './Icone'
+import { Pilula } from './Pilula'
 import css from './BarraDeAbas.module.css'
 
 // Ícone de cada aba (banca estética, item 6): mesmo desenho do trilho do desktop.
@@ -47,7 +48,7 @@ export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba',
           >
             {ICONE_DA_ABA[aba.id] && <Icone nome={ICONE_DA_ABA[aba.id]} tamanho={24} />}
             <span>{aba.rotulo}</span>
-            {aba.contador != null && <span className={css.contador}>{aba.contador}</span>}
+            {aba.contador != null && <Pilula contagem={aba.contador} className={css.contador} />}
           </button>
         ))}
       </div>

@@ -1,3 +1,4 @@
+import { BotaoIcone } from './BotaoIcone'
 import css from './SugestaoDeTexto.module.css'
 
 export function SugestaoDeTexto({ sugestao, rotuloAcao = 'Usar sugestão', atalho = 'Tab', compacta = false }) {
@@ -5,6 +6,6 @@ export function SugestaoDeTexto({ sugestao, rotuloAcao = 'Usar sugestão', atalh
   return <div className={`${css.sugestao} ${compacta ? css.compacta : ''}`}>
     <span className={css.texto} role="status"><small>Sugestão de IA</small>{sugestao.complemento}</span>
     <button type="button" className={css.usar} onClick={sugestao.aceitar}>{rotuloAcao}{atalho && <kbd>{atalho}</kbd>}</button>
-    <button type="button" className={css.fechar} aria-label="Dispensar sugestão" onClick={sugestao.dispensar}>×</button>
+    <BotaoIcone rotulo="Dispensar sugestão" icone="x" onClick={sugestao.dispensar} />
   </div>
 }

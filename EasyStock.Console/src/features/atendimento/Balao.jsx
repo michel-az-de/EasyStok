@@ -63,6 +63,12 @@ function LinkDoCardapio({ url }) {
   )
 }
 
+// #2185 (R08): quem responde sozinho é o Assistente, qualquer que seja a origem. O `title` só diz de onde veio.
+const TITULO_DO_ASSISTENTE = Object.freeze({
+  agente: 'Escrita pelo Assistente',
+  regra: 'Enviada pelo Assistente, por uma regra de Automáticas',
+})
+
 // #1577: em `memo`. Mensagem nova na conversa não re-renderiza os balões antigos (até 100, cada um com a
 // regex de link). A mensagem compara por conteúdo: a leitura da API a devolve como objeto novo sem ter mudado.
 export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos }) {
@@ -114,21 +120,21 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
           <button
             type="button"
             className={`${css.selo} ${css.seloBotao}`}
-            title={mensagem.origemAutomatica === 'agente' ? 'Escrita pelo agente do EasyStok' : 'Mensagem automática do sistema'}
+            title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}
             onClick={() => aoAbrirDefinicaoAutomatica?.(mensagem.regra)}
           >
-            <Icone nome="raio" /> automática
+            <Icone nome="raio" /> Assistente
           </button>
         ) : (
-          <span className={css.selo} title={mensagem.origemAutomatica === 'agente' ? 'Escrita pelo agente do EasyStok' : 'Mensagem automática do sistema'}>
-            <Icone nome="raio" /> automática
+          <span className={css.selo} title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}>
+            <Icone nome="raio" /> Assistente
           </span>
         ))}
         {mensagem.modelo && <span className={css.selo} title={mensagem.modeloNome}><Icone nome="modelo" /> modelo</span>}
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
         {mensagem.status === 'falhou' && (
-          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={14} /> {falha.texto}</span>
+          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={16} /> {falha.texto}</span>
         )}
         {falha?.tipo === TIPOS_DE_FALHA.FORA_DA_JANELA && mensagem.dir === 'out' && aoAbrirModelos && (
           <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-haspopup="dialog" onClick={aoAbrirModelos}>

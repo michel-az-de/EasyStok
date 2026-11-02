@@ -45,7 +45,7 @@ export function AcoesPropostas({ acoes, nomeCliente, aoExecutar, motivoDeEnvio, 
               <span className={css.acaoTitulo}><Icone nome={ICONE[acao.tipo]} tamanho={16} /> {rotulo.titulo}</span>
               {rotulo.detalhe && <span className={css.acaoDetalhe}>{rotulo.detalhe}</span>}
               {acao.estado === 'falhou' && (
-                <span className={css.acaoErro} id={erroId} role="alert"><Icone nome="alerta" tamanho={14} /> {acao.erro}</span>
+                <span className={css.acaoErro} id={erroId} role="alert"><Icone nome="alerta" tamanho={16} /> {acao.erro}</span>
               )}
               {impedimento && acao.estado !== 'feita' && <span className={css.acaoDetalhe} id={`${erroId}-impedimento`}>{impedimento}</span>}
             </div>

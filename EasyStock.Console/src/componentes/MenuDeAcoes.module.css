@@ -11,4 +11,4 @@
 .item:disabled { color: var(--tinta-3); cursor: not-allowed; }
 .perigo { color: var(--erro); }
 .rotulo { flex: 1; min-width: 0; }
-.motivo { margin: 0; padding: 0 var(--e-3) var(--e-2); font-size: var(--t-minimo); color: var(--tinta-2); }
+.motivo { margin: 0; padding: 0 var(--e-3) var(--e-2); font-size: var(--t-micro); color: var(--tinta-2); }

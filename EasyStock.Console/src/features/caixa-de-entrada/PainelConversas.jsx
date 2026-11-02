@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
+import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { useAoAbrirConversa } from '../../aplicacao/aberturaDeConversa'
@@ -45,14 +47,9 @@ function GrupoRecolhido({
   )
 }
 
-// Lista vazia em uma linha de texto e um link (#1442).
+// Lista vazia em uma linha de texto e uma ação (#1442): o `Vazio` em linha (#2185, R13).
 function VazioEmLinha({ texto, acao, aoAgir }) {
-  return (
-    <p className={css.vazioLinha}>
-      {texto}
-      {acao && <button type="button" className={css.linkVazio} onClick={aoAgir}>{acao}</button>}
-    </p>
-  )
+  return <Vazio variante="linha" titulo={texto} acao={acao && <Botao variante="texto" onClick={aoAgir}>{acao}</Botao>} />
 }
 
 // #1408: `buscaDeClientes` é o componente que a Moldura entrega para a busca achar cliente cadastrado sem conversa.
@@ -187,7 +184,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
           <>
             <GrupoRecolhido
               chave="encerradas"
-              titulo="Encerradas"
+              titulo="Concluídas"
               conversas={encerradasDoBalcao}
               aberto={gruposAbertos.encerradas}
               aoAlternar={() => alternarGrupo('encerradas')}

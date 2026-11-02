@@ -222,7 +222,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
       </div>}
       <div className={css.editor}>
         <aside className={css.apresentacao}>
-          <div className={css.foto}>{foto ? <img src={foto} alt={`Foto de ${nome}`} /> : <div className={css.semFoto}><Icone nome="imagem" tamanho={40} /><span>Seu prato começa pela foto</span></div>}</div>
+          <div className={css.foto}>{foto ? <img src={foto} alt={`Foto de ${nome}`} /> : <div className={css.semFoto}><Icone nome="imagem" tamanho={32} /><span>Seu prato começa pela foto</span></div>}</div>
           {fonteApi && podeEditar && <div className={css.fotosEditor}>
             <Botao disabled={salvando || carga !== 'ok'} icone="imagem" aria-label="Escolher do banco de imagens" onClick={() => setEscolhendoAcervo(true)}>Escolher do banco</Botao>
             <label className={css.escolherFoto}><Icone nome="camera" tamanho={20} />Enviar foto

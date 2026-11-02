@@ -66,7 +66,7 @@ export function PainelAgente({
   }, [estado, sugestao])
 
   return (
-    <section className={css.painel} aria-label="Agente de atendimento">
+    <section className={css.painel} aria-label="Assistente">
       <div className={css.cabeca}>
         <h3><AvatarAssistente tamanho={28} /> Sugestão de resposta</h3>
         {!aberto && (
@@ -117,7 +117,7 @@ export function PainelAgente({
                   foram para a bancada de teste, no fim do painel. */}
               <p className={css.marcaSugestao}>
                 {passarParaDona
-                  ? <Pilula tom="aviso">o automático não responde isso</Pilula>
+                  ? <Pilula tom="aviso">o Assistente não responde isso</Pilula>
                   : <Pilula tom="info" fina>{sugestao.intencao.rotulo}</Pilula>}
               </p>
               <div className={css.rodapeSugestao}>

@@ -179,7 +179,7 @@ await confere('A  encerrar recusado devolve { erro } ao modal e não fecha a con
   const { api, despachos } = montarAcoes()
   atender = (c) => (c.url.endsWith('/encerrar') ? resposta('A conversa mudou em outra tela.', 409) : resposta(MENSAGEM_API))
   const r = await api.encerrarComResumo('c1', AGORA, { enviarMensagem: true, textoMensagem: 'Obrigada!' })
-  assert.equal(r?.erro, 'Atendimento não encerrado: A conversa mudou em outra tela.')
+  assert.equal(r?.erro, 'Conversa não concluída: A conversa mudou em outra tela.')
   assert.equal(r.despedidaSaiu, true, 'o modal precisa saber que a despedida já foi')
   assert.ok(!despachos.some((d) => d.tipo === acao.ENCERRAR_ATENDIMENTO || d.tipo === acao.FECHAR_ENCERRAMENTO))
 })
@@ -217,7 +217,7 @@ await confere('B  "segue aberto" só sai quando o modal não cancelou o pedido s
   const aberto = montarAcoes()
   await aberto.api.encerrarComResumo('c2', AGORA, { pedidoCancelado: false })
   assert.equal(avisos(aberto.despachos).length, 1)
-  assert.match(avisos(aberto.despachos)[0], /^Atendimento encerrado no EasyStok\. O pedido sem pagamento segue aberto/)
+  assert.match(avisos(aberto.despachos)[0], /^Conversa concluída no EasyStok\. O pedido sem pagamento segue aberto/)
   assert.doesNotMatch(avisos(aberto.despachos)[0], /não são guardados/)
 })
 await confere('B  avaliação e anotação do encerramento não estão disponíveis no modo API', () => {
@@ -306,8 +306,9 @@ const nos = (arvore) => (Array.isArray(arvore) ? arvore.flatMap(nos)
 const texto = (arvore) => (Array.isArray(arvore) ? arvore.map(texto).join('')
   : arvore == null || typeof arvore === 'boolean' ? '' : typeof arvore !== 'object' ? String(arvore) : texto(arvore.props?.children))
 const doTipo = (tela, nome) => nos(tela.arvore).filter((n) => n.type === nome || n.type?.name === nome)
-const botao = (tela, rotulo) => nos(tela.arvore).find((n) => (n.type === 'button' || n.type?.name === 'Botao')
-  && (texto(n).includes(rotulo) || n.props['aria-label'] === rotulo))
+// #2185: o salvar e o desfazer do campo em linha são `BotaoIcone` (o nome vai em `rotulo`).
+const botao = (tela, rotulo) => nos(tela.arvore).find((n) => (n.type === 'button' || n.type?.name === 'Botao' || n.type?.name === 'BotaoIcone')
+  && (texto(n).includes(rotulo) || n.props['aria-label'] === rotulo || n.props.rotulo === rotulo))
 const alertas = (tela) => nos(tela.arvore).filter((n) => n.props?.role === 'alert').map(texto)
 
 const REGRA_ENCERRAMENTO = { id: 'encerramento', gatilho: GATILHOS.ENCERRAMENTO, ativa: true, texto: 'Obrigada, {nome}!' }
@@ -340,14 +341,14 @@ await confere('A  modal: o segundo toque em Encerrar não chama de novo, e o bot
 await confere('A  modal: o erro aparece dentro dele e a nova tentativa não repete a despedida', async () => {
   comoApi()
   const idas = []
-  let devolver = { erro: 'Atendimento não encerrado: Sem conexão com o EasyStok.', despedidaSaiu: true }
+  let devolver = { erro: 'Conversa não concluída: Sem conexão com o EasyStok.', despedidaSaiu: true }
   ctx.acoes = acoesDoModal({ encerrarComResumo: async (...args) => { idas.push(args); return devolver } })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
   await botao(tela, 'Concluir conversa').props.onClick()
   tela.renderizar()
   const rodape = doTipo(tela, 'Modal')[0].props.rodape
   assert.match(nos(rodape).filter((n) => n.props?.role === 'alert').map(texto).join(''),
-    /Atendimento não encerrado: Sem conexão com o EasyStok\. A despedida já foi enviada: tentar de novo não manda outra\./)
+    /Conversa não concluída: Sem conexão com o EasyStok\. A despedida já foi enviada: tentar de novo não manda outra\./)
   assert.equal(botao(tela, 'Concluir conversa').props.disabled, false, 'o botão volta para a nova tentativa')
   devolver = undefined
   await botao(tela, 'Concluir conversa').props.onClick()
@@ -438,7 +439,7 @@ await confere('A  modal: pedido já cancelado não é cancelado de novo quando s
   const comPedido = conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: null } })
   comoApi([comPedido])
   const ordem = []
-  let devolver = { erro: 'Atendimento não encerrado: Sem conexão com o EasyStok.' }
+  let devolver = { erro: 'Conversa não concluída: Sem conexão com o EasyStok.' }
   ctx.acoes = acoesDoModal({
     cancelarPedido: async () => { ordem.push('cancelar'); return { ok: true } },
     encerrarComResumo: async (_id, _agora, opcoes) => { ordem.push('encerrar'); assert.equal(opcoes.pedidoCancelado, true); return devolver },

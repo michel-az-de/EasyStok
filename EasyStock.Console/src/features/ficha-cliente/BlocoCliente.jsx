@@ -62,8 +62,8 @@ function estadoInicialDoForm(conversa) {
 function SeloCaptado({ quando }) {
   if (!quando) return null
   return (
-    <span className={css.seloCaptado} title={`Captado pelo automático às ${quando.slice(11, 16)}`}>
-      <Icone nome="raio" tamanho={12} /> {SELO_CAPTADO}
+    <span className={css.seloCaptado} title={`Captado pelo Assistente às ${quando.slice(11, 16)}`}>
+      <Icone nome="raio" tamanho={16} /> {SELO_CAPTADO}
     </span>
   )
 }
@@ -312,10 +312,10 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
         ) : (
           <div className={css.dadosCliente} data-dados-cliente>
             <div key={`tel-${captado.telefone ?? ''}`} data-campo-ficha="telefone cadastro" className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
-              <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={15} /></span>
+              <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={16} /></span>
               <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
               <CampoEmLinha rotulo="Telefone" valor={cliente.telefone}
-                vazio={automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
+                vazio={automaticoCaptando ? 'O Assistente está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
                 validar={validarTelefone} aoSalvar={(v) => editarDadoCliente(conversa.id, 'telefone', v, agora)} />
             </div>
             <div
@@ -323,11 +323,11 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
               data-campo-ficha="endereco"
               className={`${css.linhaDado} ${enderecoPendente ? css.linhaDadoPendente : ''} ${captado.endereco ? css.captadoAgora : ''}`}
             >
-              <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={15} /></span>
+              <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={16} /></span>
               <span className={css.rotuloDado}>Endereço <SeloCaptado quando={captado.endereco} /></span>
               <CampoEmLinha rotulo="Endereço" valor={cliente.endereco}
                 vazio={enderecoPendente ? 'Aguardando confirmação acima'
-                  : automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar endereço'}
+                  : automaticoCaptando ? 'O Assistente está pedindo na conversa' : 'Adicionar endereço'}
                 validar={fonteApi ? recusaDoEndereco : undefined}
                 aoSalvar={aoSalvarEndereco} />
             </div>
@@ -338,7 +338,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
             {/* #1761 (L22): o canal já está no cabeçalho da conversa; aqui só o que ele não diz, o usuário. */}
             {cliente.usuario && (
               <div className={css.linhaDado}>
-                <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={15} /></span>
+                <span className={`${css.azulejo} ${css['az_' + canal.icone] ?? css.azCinza}`} aria-hidden="true"><Icone nome={canal.icone} tamanho={16} /></span>
                 <span className={css.rotuloDado}>Canal</span>
                 <span className={css.valorCanal}>{canal.nome} · @{cliente.usuario}</span>
               </div>
@@ -427,7 +427,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
         {resgataPontos && (
           <div className={css.linhaFidelidade}>
             <span className={css.seloPontos}>
-              <Icone nome="estrela" tamanho={13} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
+              <Icone nome="estrela" tamanho={16} /> {saldoPontos} {saldoPontos === 1 ? 'ponto' : 'pontos'}
             </span>
             <Botao variante="texto" onClick={() => setModal('fidelidade')}>Resgatar</Botao>
           </div>

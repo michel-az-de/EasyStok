@@ -81,7 +81,7 @@ export function GravadorAudio({ gravador, enviando = false, aoCancelar, aoEnviar
     return (
       <p className={css.erro} role="alert">
         <Icone nome="alerta" /> {gravador.erro}
-        <button type="button" onClick={gravador.limparErro}>Fechar</button>
+        <Botao variante="texto" onClick={gravador.limparErro}>Fechar</Botao>
       </p>
     )
   }

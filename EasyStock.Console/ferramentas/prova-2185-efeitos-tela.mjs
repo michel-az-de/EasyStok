@@ -15,8 +15,8 @@
 //   F22     "Reabrindo…" é da conversa que pediu
 //   E19     conversa sem cadastro não oferece modelo aprovado
 //   E18     sugestão proativa não roda com o Assistente respondendo
-//   E25     selo "automática" só é botão quando há regra para abrir
-//   F25/F18 conversa aberta a partir de "Encerradas" ganha destaque; título e chip dizem o mesmo número
+//   E25     selo "Assistente" só é botão quando há regra para abrir
+//   F25/F18 conversa aberta a partir de "Concluídas" ganha destaque; título e chip dizem o mesmo número
 //   F26     abrir pelo aviso na tela leva o foco ao campo
 //   F28     o aviso na tela espera o ponteiro
 //   F31     o fio volta ao fim quando o painel escondido reaparece
@@ -373,7 +373,7 @@ try {
   })
   await confere('E10. "Abrir cardápio" em conversa concluída fica desligado com o motivo', async () => {
     const { ctx, p } = await abrir('inicial=enc1')
-    await p.getByText('Conversa encerrada').waitFor()
+    await p.getByText('Conversa concluída').waitFor()
     await pedirAoAssistente(p, [{ tipo: 'abrir_tela', tela: 'cardapio' }])
     const botao = p.getByRole('button', { name: 'Abrir cardápio', exact: true })
     await botao.waitFor()
@@ -516,20 +516,21 @@ try {
   })
 
   // --- E25 --------------------------------------------------------------------------------------------------------------------------
-  await confere('E25. selo "automática" só é botão quando há regra para abrir', async () => {
+  await confere('E25. selo "Assistente" só é botão quando há regra para abrir', async () => {
     const { ctx, p } = await abrir('inicial=auto')
     await p.getByText('Resposta do agente sem regra').waitFor()
-    const comoBotao = await p.getByRole('button', { name: /automática/ }).count()
+    const fio = p.getByRole('log', { name: 'Mensagens da conversa' })
+    const comoBotao = await fio.getByRole('button', { name: /Assistente/ }).count()
     assert.equal(comoBotao, 1, 'só a mensagem da regra esteira-preparo')
-    assert.equal(await p.getByText('automática', { exact: true }).count(), 2, 'as duas mostram o selo')
+    assert.equal(await fio.getByText('Assistente', { exact: true }).count(), 2, 'as duas mostram o selo')
     await ctx.close()
   })
 
   // --- F25 / F18 ---------------------------------------------------------------------------------------------------------------------
-  await confere('F25. conversa aberta a partir de "Encerradas" ganha o destaque da selecionada', async () => {
+  await confere('F25. conversa aberta a partir de "Concluídas" ganha o destaque da selecionada', async () => {
     const { ctx, p } = await abrir('inicial=meu')
     await esperarPainel(p)
-    await p.getByRole('button', { name: /^Encerradas/ }).click()
+    await p.getByRole('button', { name: /^Concluídas/ }).click()
     await p.getByText('Cliente fechada0').first().click()
     await p.waitForFunction(() => document.querySelector('[aria-current="true"]') !== null)
     assert.match(await p.locator('[aria-current="true"]').first().innerText(), /fechada0/)

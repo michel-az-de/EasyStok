@@ -56,7 +56,7 @@ export function TelaCanais() {
     <div className={css.tela}>
       <section className={css.canal} aria-labelledby="canal-whatsapp">
         <header className={css.cabeca}>
-          <span className={css.selo}><Icone nome="whatsapp" tamanho={28} /></span>
+          <span className={css.selo}><Icone nome="whatsapp" tamanho={32} /></span>
           <div>
             <h2 id="canal-whatsapp" className={css.titulo}>WhatsApp Business</h2>
           </div>
@@ -64,18 +64,18 @@ export function TelaCanais() {
         <EstadoDoCanal />
       </section>
 
-      <nav className={css.ligadas} aria-labelledby="canal-ligadas">
+      <nav aria-labelledby="canal-ligadas">
         <h3 id="canal-ligadas" className={css.subtitulo}>Onde o canal aparece</h3>
         <ul className={css.listaLigadas}>
           {LIGADAS.map((item) => (
             <li key={item.href}>
               <a className={css.ligada} href={item.href}>
-                <Icone nome={item.icone} tamanho={22} />
+                <Icone nome={item.icone} tamanho={24} />
                 <span className={css.textoLigada}>
                   <strong>{item.titulo}</strong>
                   <span>{item.detalhe}</span>
                 </span>
-                <Icone nome="chevron-right" tamanho={18} />
+                <Icone nome="chevron-right" tamanho={20} />
               </a>
             </li>
           ))}

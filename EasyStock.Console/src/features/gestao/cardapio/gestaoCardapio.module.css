@@ -30,9 +30,9 @@ button.abrirFoto { transition: box-shadow var(--dur-micro) var(--ease-padrao); }
 button.abrirFoto:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--marca-claro), var(--sombra); }
 .foto { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .semFoto { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--e-1); height: 100%; border-radius: inherit; color: var(--tinta-3); background: var(--elevado); }
-.semFoto span { font-size: var(--t-minimo); line-height: var(--lh-compacto); max-width: 84px; text-align: center; }
+.semFoto span { font-size: var(--t-micro); line-height: var(--lh-compacto); max-width: 84px; text-align: center; }
 .resumo { min-width: 0; }
-.categoria { display: block; margin-bottom: var(--e-1); color: var(--tinta-3); font-size: var(--t-minimo); font-weight: 600; }
+.categoria { display: block; margin-bottom: var(--e-1); color: var(--tinta-3); font-size: var(--t-micro); font-weight: 600; }
 .nome { margin: 0; color: var(--tinta); font-size: var(--t-corpo); letter-spacing: var(--ls-titulo); line-height: var(--lh-compacto); font-weight: 750; overflow-wrap: anywhere; }
 .detalhe { margin: var(--e-1) 0 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
 .situacao { margin: var(--e-1) 0 0; color: var(--tinta-3); font-size: var(--t-micro); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
@@ -100,7 +100,7 @@ button.abrirFoto:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--marca-claro)
   .nome { font-size: var(--t-corpo); }
   .categoria { margin-bottom: var(--e-1); }
   .preco { font-size: var(--t-forte); }
-  .filtro { gap: var(--e-1); font-size: var(--t-minimo); }
+  .filtro { gap: var(--e-1); font-size: var(--t-micro); }
   .contagem { min-width: 20px; }
   .rodapePrato { gap: var(--e-1); }
 }

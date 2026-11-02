@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AlcaLargura } from '../../componentes/AlcaLargura'
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { AvatarAssistente } from '../../componentes/AvatarAssistente'
@@ -311,17 +312,10 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                   </button>
                 )}
                 {POSICOES.map((p) => (
-                  <button
-                    type="button"
-                    key={p.lado}
-                    className={css.botaoPosicao}
-                    aria-label={p.rotulo}
-                    title={p.rotulo}
-                    aria-pressed={lado === p.lado}
+                  <BotaoIcone
+                    key={p.lado} rotulo={p.rotulo} icone={p.icone} pressionado={lado === p.lado}
                     onClick={() => definirPosicaoPainel({ lado: p.lado })}
-                  >
-                    <Icone nome={p.icone} />
-                  </button>
+                  />
                 ))}
               </fieldset>
             )}
@@ -329,9 +323,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 rótulo (alterna Abrir/Fechar assistente), e o landmark
                 aria-label="Assistente" do painel já dá o contexto para quem
                 usa leitor de tela, sem repetir a palavra em dois controles. */}
-            <Botao variante="texto" aria-label="Fechar" onClick={fechar}>
-              <Icone nome="fechar" tamanho={20} />
-            </Botao>
+            <BotaoIcone rotulo="Fechar" icone="x" onClick={fechar} />
           </div>
 
           <div className={css.corpo} ref={corpoRef}>
@@ -421,12 +413,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent?.isComposing) enviarPergunta(e)
                 }}
               />
-              <Botao
-                tipo="submit"
-                variante="primario"
-                className={css.botaoEnviar}
-                icone="enviar"
-                aria-label="Perguntar"
+              <BotaoIcone
+                tipo="submit" tom="primario" className={css.botaoEnviar} rotulo="Perguntar" icone="enviar"
                 disabled={perguntando || !pergunta.trim()}
               />
             </form>

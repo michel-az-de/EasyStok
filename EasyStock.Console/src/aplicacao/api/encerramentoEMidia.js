@@ -103,7 +103,7 @@ export function criarAcoesEncerramentoEMidiaApi({
     try {
       await encerrar(id)
     } catch (erro) {
-      const mensagem = `Atendimento não encerrado: ${erro.message}`
+      const mensagem = `Conversa não concluída: ${erro.message}`
       avisar(mensagem)
       return { erro: mensagem, despedidaSaiu: despedidaSaiu === true }
     }
@@ -115,7 +115,7 @@ export function criarAcoesEncerramentoEMidiaApi({
     if (despedidaSaiu === false) ressalvas.push('A despedida não saiu (veja a mensagem na conversa).')
     if (!pedidoCancelado && pedido?.pedidoId && pedido.estado === 'aguardando') ressalvas.push('O pedido sem pagamento segue aberto no EasyStok.')
     if (avisoEmail || avisoSms) ressalvas.push('O aviso por e-mail e SMS ainda não sai nesta versão.')
-    if (ressalvas.length > 0) avisar(['Atendimento encerrado no EasyStok.', ...ressalvas].join(' '))
+    if (ressalvas.length > 0) avisar(['Conversa concluída no EasyStok.', ...ressalvas].join(' '))
     else despachar({ tipo: acao.FECHAR_AVISO_API })
     return undefined
   }

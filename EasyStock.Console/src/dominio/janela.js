@@ -92,6 +92,15 @@ function motivoForaDaJanela(janela, canal) {
   }
 }
 
+// #2185: "Cadastro bloqueado. Bloqueado. Motivo: X Vale em todos..." repetia a palavra e engolia o ponto
+// do motivo. A frase agora é uma lista de períodos: quando e quem (só se houver), motivo, alcance, saída.
+function detalheDoBloqueio(bloqueio) {
+  const quando = bloqueio?.em || bloqueio?.por ? resumoDoBloqueio(bloqueio) : ''
+  const motivo = String(bloqueio?.motivo ?? '').trim().replace(/[.!?]+$/, '')
+  return [quando, motivo && `Motivo: ${motivo}.`, 'Vale em todos os canais.', 'Desbloqueie na ficha para escrever.']
+    .filter(Boolean).join(' ')
+}
+
 // Um único lugar decide se o composer aceita texto livre, se sobra o modelo
 // aprovado como saída, e por quê. `ofereceModelo` nasce aqui porque depende das
 // MESMAS condições de `pode`: bloqueio, conversa encerrada, canal cadastrado e
@@ -110,8 +119,7 @@ export function permissaoDeEscrita(conversa, agora, canal) {
       janela,
       motivo: {
         titulo: 'Cadastro bloqueado.',
-        detalhe: `${resumoDoBloqueio(bloqueio)} Motivo: ${bloqueio.motivo} `
-          + 'Vale em todos os canais. Desbloqueie na ficha para escrever.',
+        detalhe: detalheDoBloqueio(bloqueio),
         acao: 'bloqueio',
       },
     }
@@ -122,7 +130,7 @@ export function permissaoDeEscrita(conversa, agora, canal) {
       ofereceModelo: false,
       janela,
       motivo: {
-        titulo: 'Conversa encerrada.',
+        titulo: 'Conversa concluída.',
         detalhe: 'Reabra a conversa para voltar a escrever.',
         acao: 'reabrir',
       },

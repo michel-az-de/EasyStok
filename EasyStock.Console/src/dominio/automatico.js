@@ -151,12 +151,12 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
 // Motivo curto da passagem, na voz da casa. É o que aparece no cartão do
 // balcão, então cabe em uma linha.
 const MOTIVO_POR_INTENCAO = {
-  restricao: 'Restrição alimentar, o automático não responde isso',
+  restricao: 'Restrição alimentar, o Assistente não responde isso',
   'elogio-ou-queixa': 'Retorno sobre o pedido, precisa da sua voz',
   'pergunta-entrega': 'Pergunta de entrega fora do combinado',
-  'fechar-pedido': 'Fechamento de pedido que o automático não conclui',
+  'fechar-pedido': 'Fechamento de pedido que o Assistente não conclui',
   acompanhar: 'Cobrança de prazo que só você pode confirmar',
-  'pedido-especial': 'Pede algo que o automático não resolve sozinho',
+  'pedido-especial': 'Pede algo que o Assistente não resolve sozinho',
 }
 
 
@@ -169,7 +169,7 @@ const MOTIVO_AREA_FORA = 'Lead fora da área de entrega insistiu, decida a exce�
 export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida = false, textoDoPedido = null) {
   if (areaForaInsistida) return MOTIVO_AREA_FORA
   if (semSaldo.length > 0) {
-    return `${semSaldo[0].nome} sem saldo, o automático não vende`
+    return `${semSaldo[0].nome} sem saldo, o Assistente não vende`
   }
   if (textoDoPedido) return textoDoPedido
   return MOTIVO_POR_INTENCAO[intencaoChave] ?? MOTIVO_PADRAO
@@ -195,7 +195,7 @@ export function proximoPassoDepoisDeResponder(conversa, pausado) {
     return {
       chave: 'aguardar',
       texto: 'Você respondeu. Próximo passo sugerido: aguardar o cliente. O pedido ainda está em andamento, '
-        + 'então não encerre; devolva ao automático se quiser que ele responda quando o cliente voltar.',
+        + 'então não conclua; devolva ao Assistente se quiser que ele responda quando o cliente voltar.',
     }
   }
   // #1989: a venda começa antes do primeiro item na comanda (o cliente pediu, mandou o endereço ou
@@ -207,13 +207,13 @@ export function proximoPassoDepoisDeResponder(conversa, pausado) {
     return {
       chave: 'aguardar-venda',
       texto: 'Você respondeu. Próximo passo sugerido: montar o pedido ou aguardar o cliente. A venda está em andamento, '
-        + 'então não encerre.',
+        + 'então não conclua.',
     }
   }
   return {
     chave: 'encerrar-ou-aguardar',
-    texto: 'Você respondeu. Próximo passo sugerido: se o assunto acabou, encerre a conversa; '
-      + 'se ainda espera o cliente, devolva ao automático para ele responder quando o cliente voltar.',
+    texto: 'Você respondeu. Próximo passo sugerido: se o assunto acabou, conclua a conversa; '
+      + 'se ainda espera o cliente, devolva ao Assistente para ele responder quando o cliente voltar.',
   }
 }
 

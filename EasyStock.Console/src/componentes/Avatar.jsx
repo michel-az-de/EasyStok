@@ -31,7 +31,7 @@ export function Avatar({ nome, foto, tamanho = 'medio', selo }) {
       {mostrarFoto
         ? <img className={css.foto} src={foto} alt={'Foto de ' + nomeDoContato} onError={() => setFalhou(foto)} />
         : (
-          <span className={css.inicial} style={estilo} aria-hidden="true">
+          <span className={selo ? `${css.inicial} ${css.inicialComSelo}` : css.inicial} style={estilo} aria-hidden="true">
             {iniciais(nomeDoContato) || '?'}
           </span>
         )}

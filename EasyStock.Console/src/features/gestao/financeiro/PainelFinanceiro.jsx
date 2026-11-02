@@ -40,7 +40,7 @@ function SituacaoConta({ status, lado }) { return <Pilula tom={tomDoStatusConta(
 function ListaDoDia({ titulo, lado, chip, itens, podeGerenciar, aoPagar, vazio }) {
   const palavras = palavrasDoLado(lado)
   // Cada item é uma parcela: o "Falta" e o total do bloco são o saldo dela, e o botão paga essa mesma parcela.
-  return <section className={css.blocoDia} aria-label={`${titulo} a ${lado}`}>
+  return <section aria-label={`${titulo} a ${lado}`}>
     <div className={css.barra}><h3>{titulo}{itens.length ? ` · ${moeda(somaSaldos(itens))}` : ''}</h3><a className={css.verLista} href={hashDoChip(lado, chip)}>{itens.length ? 'Ver na lista' : 'Abrir a lista'}</a></div>
     {itens.length ? <ul className={css.itensDia}>{itens.slice(0, 5).map(({ conta, parcela }) => <li key={parcela.id} className={css.itemDia}>
       <div><strong>{conta.descricao}</strong><small>{quandoVence(parcela)}{conta.parcelas.length > 1 ? ` · parcela ${parcela.numero} de ${conta.parcelas.length}` : ''}</small></div>

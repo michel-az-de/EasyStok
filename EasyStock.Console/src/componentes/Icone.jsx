@@ -1,5 +1,5 @@
 import {
-  Archive, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen,
+  Archive, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen,
   Camera, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
   Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink,
   FlaskConical, Frown, Gift, Globe, GripVertical, Hand, History, Hourglass, House, Image, Inbox,
@@ -116,6 +116,7 @@ const ICONES = {
 
   // Navegação e ordem.
   'arrow-up': ArrowUp,
+  'arrow-down': ArrowDown,
   'arrow-up-down': ArrowUpDown,
   'chevron-up': ChevronUp, 'chevron-down': ChevronDown, 'chevron-right': ChevronRight,
   painel: LayoutDashboard,
@@ -132,16 +133,28 @@ const ICONES = {
   ...PROPRIOS,
 }
 
-export function Icone({ nome, tamanho = '1.15em', rotulo, className }) {
+// #2185 (R03): quatro degraus, sempre o mesmo vocabulário. 16 vai junto de texto de 13 a 15 px (selo,
+// linha de contexto, item de lista); 20 é o do controle (padrão do Botao e do BotaoIcone); 24 é o de
+// destaque de região (trilho, Vazio compacto); 32 é o de tile e de estado vazio. O `tamanho` aceita o
+// número ou o nome do degrau; fora da escala, só o aviso de desenvolvimento reclama.
+export const TAMANHOS_DE_ICONE = Object.freeze({ pequeno: 16, medio: 20, grande: 24, destaque: 32 })
+const ESCALA = new Set(Object.values(TAMANHOS_DE_ICONE))
+
+// Sem `tamanho`, o ícone acompanha a fonte do pai (era 1.15em) e encaixa no degrau mais próximo
+// (16, 20 ou 24): ninguém fica com 17,25 px ao lado de um texto de 15.
+export function Icone({ nome, tamanho, rotulo, className }) {
   const Desenho = ICONES[nome]
   if (!Desenho) return null
-  // `tamanho` aceita número em px (secao 10 da direção visual), além do `em`
-  // de sempre para crescer com a fonte do sistema.
-  const medida = typeof tamanho === 'number' ? `${tamanho}px` : tamanho
+  const medida = TAMANHOS_DE_ICONE[tamanho] ?? tamanho
+  if (import.meta.env?.DEV && typeof medida === 'number' && !ESCALA.has(medida)) {
+    // oxlint-disable-next-line no-console -- aviso só de desenvolvimento.
+    console.warn(`Icone "${nome}" com ${medida}px: a escala é ${[...ESCALA].join(', ')}.`)
+  }
+  const classes = [css.icone, medida === undefined ? css.acompanha : '', className].filter(Boolean).join(' ')
   return (
     <Desenho
-      className={className ? `${css.icone} ${className}` : css.icone}
-      size={medida}
+      className={classes}
+      size={typeof medida === 'number' ? `${medida}px` : medida}
       strokeWidth={1.75}
       role={rotulo ? 'img' : 'presentation'}
       aria-label={rotulo}
