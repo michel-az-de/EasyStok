@@ -19,6 +19,11 @@ public final class NativeSessionInstrumentacao extends Instrumentation {
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
+            if ("pairing".equals(phase)) {
+                NativePairingInstrumentacao.run(getTargetContext());
+                result.putString("stream", "\n#2184 pairing: renovação, revogação e limite de tentativas aprovados.\n");
+                finish(Activity.RESULT_OK, result); return;
+            }
             Context isolated = new ContextWrapper(getTargetContext()) {
                 @Override public SharedPreferences getSharedPreferences(String name, int mode) {
                     return super.getSharedPreferences("qa2184-" + name, mode);

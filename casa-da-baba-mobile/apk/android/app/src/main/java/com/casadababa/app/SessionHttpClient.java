@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import javax.net.ssl.HttpsURLConnection;
 import org.json.JSONObject;
 
-final class SessionHttpClient {
+class SessionHttpClient {
     static final String ORIGIN = "https://api.easystok.online";
 
     static final class Failure extends Exception {

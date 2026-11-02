@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Auth;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.AlterarSenha;
 using Microsoft.AspNetCore.RateLimiting;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
@@ -66,7 +67,8 @@ public class AuthController(
     AtualizarUsuarioAtualUseCase atualizarUsuarioAtualUseCase,
     AlterarSenhaUseCase alterarSenhaUseCase,
     ExportarMeusDadosUseCase exportarMeusDadosUseCase,
-    AnonimizarMeusDadosUseCase anonimizarMeusDadosUseCase) : EasyStockControllerBase
+    AnonimizarMeusDadosUseCase anonimizarMeusDadosUseCase,
+    IRowLevelSecurityBypass? rlsBypass = null) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Authenticate and obtain JWT token", Description = "Validates email+password and returns JWT access token and refresh token. Rate limited by IP.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -114,6 +116,9 @@ public class AuthController(
             var usuario = await identificar.ExecuteAsync(request.IdToken ?? string.Empty, ct);
             var empresaPadrao = await empresaPadraoResolver.ResolverAsync(ct);
             if (request.DispositivoId is { } dispositivo)
+            {
+                // Pré-auth: ainda não existe tenant JWT. Inclui o INSERT diferido da família até Commit.
+                await using var rls = rlsBypass is null ? null : await rlsBypass.BeginAsync(ct);
                 return await unitOfWork.ExecuteInTransactionSemRetryAsync(async _ =>
                 {
                     await refreshTokenRepository.TravarDispositivoAsync(dispositivo);
@@ -121,6 +126,7 @@ public class AuthController(
                         usuario, request.EmpresaId, empresaPadrao, inicioAutenticacao);
                     return await GravarSessaoAsync(atual, "login_google", dispositivo, inicioAutenticacao);
                 });
+            }
             var resultado = await autenticarUseCase.ConcluirLoginGoogleAsync(usuario, request.EmpresaId, empresaPadrao);
             return await EmitirSessaoAsync(resultado, "login_google");
         }

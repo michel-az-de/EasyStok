@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.AutenticarUsuario;
 using AuditLogEntity = EasyStock.Domain.Entities.AuditLog;
 using RefreshTokenEntity = EasyStock.Domain.Entities.RefreshToken;
@@ -12,7 +13,8 @@ public sealed class RefreshTokenUseCase(
     IJwtTokenService jwtTokenService,
     IUnitOfWork unitOfWork,
     ILogger<RefreshTokenUseCase> logger,
-    Ports.Output.Auth.IProtetorRefreshNativo? protetor = null) : IUseCase<RefreshTokenCommand, RefreshTokenResult>
+    Ports.Output.Auth.IProtetorRefreshNativo? protetor = null,
+    IRowLevelSecurityBypass? rlsBypass = null) : IUseCase<RefreshTokenCommand, RefreshTokenResult>
 {
     public async Task<RefreshTokenResult> ExecuteAsync(RefreshTokenCommand command)
     {
@@ -21,6 +23,9 @@ public sealed class RefreshTokenUseCase(
         var tokenHash = TokenHashHelper.ComputeSha256Hash(command.RefreshToken);
         var refreshToken = await refreshTokenRepository.GetByTokenHashAsync(tokenHash);
         if (refreshToken?.SessaoNativaId is { } sessaoId)
+        {
+            // O segredo identifica a família antes de existir JWT/tenant; escopo termina após Commit/rollback.
+            await using var rls = rlsBypass is null ? null : await rlsBypass.BeginAsync();
             return await unitOfWork.ExecuteInTransactionSemRetryAsync(async _ =>
             {
                 var sessao = await refreshTokenRepository.ObterSessaoNativaComLockAsync(sessaoId);
@@ -44,6 +49,7 @@ public sealed class RefreshTokenUseCase(
                     throw new CredenciaisInvalidasException("Refresh já utilizado.");
                 return await RenovarAsync(refreshToken, sessao, command.RequisicaoId, usuario);
             });
+        }
         return await RenovarAsync(refreshToken, null);
     }
 

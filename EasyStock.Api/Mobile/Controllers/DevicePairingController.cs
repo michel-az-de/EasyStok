@@ -1,3 +1,4 @@
+using EasyStock.Infra.Postgre.Security;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using EasyStock.Api.Mobile.Security;
@@ -739,11 +740,15 @@ public class DevicePairingController(
                 .FromSqlInterpolated($"SELECT * FROM mobile_devices WHERE \"Id\" = {id} FOR UPDATE").SingleOrDefaultAsync(token);
             if (device == null) return NotFound();
             var agora = DateTime.UtcNow;
-            var familias = _db.Set<SessaoNativa>().IgnoreQueryFilters()
-                .Where(s => s.DispositivoId == id && s.EmpresaId == device.EmpresaId);
-            await familias.Where(s => s.RevogadaEm == null).ExecuteUpdateAsync(s => s.SetProperty(x => x.RevogadaEm, agora), token);
-            await _db.Set<RefreshToken>().Where(r => !r.Revogado && familias.Any(s => s.Id == r.SessaoNativaId))
-                .ExecuteUpdateAsync(r => r.SetProperty(x => x.Revogado, true).SetProperty(x => x.RevogadoEm, agora), token);
+            // SuperAdmin pode revogar outro tenant: autorização acima, escrita limitada ao aparelho e empresa dele.
+            await using (await _db.UseRowLevelSecurityBypassAsync(token))
+            {
+                var familias = _db.Set<SessaoNativa>().IgnoreQueryFilters()
+                    .Where(s => s.DispositivoId == id && s.EmpresaId == device.EmpresaId);
+                await familias.Where(s => s.RevogadaEm == null).ExecuteUpdateAsync(s => s.SetProperty(x => x.RevogadaEm, agora), token);
+                await _db.Set<RefreshToken>().Where(r => !r.Revogado && familias.Any(s => s.Id == r.SessaoNativaId))
+                    .ExecuteUpdateAsync(r => r.SetProperty(x => x.Revogado, true).SetProperty(x => x.RevogadoEm, agora), token);
+            }
             device.Revoked = true;
             device.RevokedAt = agora;
             device.RevokedByUserId = ResolveUserId();

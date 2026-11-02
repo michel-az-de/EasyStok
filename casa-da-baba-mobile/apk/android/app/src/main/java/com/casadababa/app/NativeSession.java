@@ -36,8 +36,9 @@ final class NativeSession {
     interface Listener { void changed(boolean authenticated, long version); }
     private static NativeSession instance;
     private final SessionVault vault;
-    private final SessionHttpClient api = new SessionHttpClient();
+    private final SessionHttpClient api;
     private final CredentialManager credentials;
+    private final Runnable clearProvider;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final ExecutorService revocations = Executors.newSingleThreadExecutor();
@@ -47,8 +48,15 @@ final class NativeSession {
     private final Set<Listener> listeners = new CopyOnWriteArraySet<>();
 
     private NativeSession(Context context) {
-        vault = new SessionVault(context);
+        this(context, new SessionVault(context), new SessionHttpClient(), null);
+    }
+
+    // Transporte e cofre isolados permitem exercitar o proprietário no Android sem contas reais.
+    NativeSession(Context context, SessionVault vault, SessionHttpClient api, Runnable clearProvider) {
+        this.vault = vault;
+        this.api = api;
         credentials = CredentialManager.create(context);
+        this.clearProvider = clearProvider == null ? this::clearGoogleState : clearProvider;
     }
 
     static synchronized NativeSession get(Context context) {
@@ -290,6 +298,7 @@ final class NativeSession {
             try {
                 JSONObject saved = fresh(version);
                 if (!saved.has("refreshToken")) throw new SessionHttpClient.Failure(401, "LOGIN_NECESSARIO", "Entre com Google para conectar o aparelho.");
+                requireCurrent(version);
                 JSONObject existing = saved.optJSONObject("pairing");
                 if (existing != null && existing.optString("apiKey").equals(context.optString("apiKeyRejeitada"))) {
                     saved.remove("pairing"); saveCurrent(saved, version); existing = null;
@@ -300,7 +309,20 @@ final class NativeSession {
                 JSONObject body = new JSONObject().put("dispositivoId", saved.getString("dispositivoId")).put("label", "Celular Casa da Baba");
                 if (!context.optString("lojaId").trim().isEmpty()) body.put("lojaId", context.getString("lojaId"));
                 String currentKey = context.optString("apiKeyAtual");
-                JSONObject linked = api.request("/api/mobile/devices/pair-session", body, saved.getString("token"), currentKey.trim().isEmpty() ? null : currentKey);
+                String keyProof = currentKey.trim().isEmpty() ? null : currentKey;
+                JSONObject linked;
+                try { linked = api.request("/api/mobile/devices/pair-session", body, saved.getString("token"), keyProof); }
+                catch (SessionHttpClient.Failure rejected) {
+                    if (rejected.status != 401) throw rejected;
+                    saved = fresh(version, saved.getString("token"));
+                    requireCurrent(version);
+                    // A primeira recusa ocorreu antes do pareamento. Só esta operação pode ter um retry.
+                    try { linked = api.request("/api/mobile/devices/pair-session", body, saved.getString("token"), keyProof); }
+                    catch (SessionHttpClient.Failure repeated) {
+                        if (repeated.status == 401) { saved.put("exigirRenovacao", true); saveCurrent(saved, version); }
+                        throw repeated;
+                    }
+                }
                 requireCurrent(version);
                 if (!claims(saved.getString("token")).getString("empresaId").equals(linked.optString("empresaId"))
                     || !saved.getString("dispositivoId").equals(linked.optString("deviceId")))
@@ -332,16 +354,18 @@ final class NativeSession {
                 vault.write(cleared);
             }
             changed(false, version); done(callback, new JSONObject().put("autenticado", false), version);
-            worker.execute(() -> {
-                try {
-                credentials.clearCredentialStateAsync(new ClearCredentialStateRequest(), new CancellationSignal(), worker,
-                    new CredentialManagerCallback<Void, ClearCredentialException>() {
-                        @Override public void onResult(Void result) { }
-                        @Override public void onError(ClearCredentialException error) { }
-                    });
-                } catch (Exception unavailable) { /* sair do app não depende do provedor Google */ }
-            });
+            worker.execute(clearProvider);
             scheduleRevocations();
         } catch (Exception failure) { failed(callback, failure); }
+    }
+
+    private void clearGoogleState() {
+        try {
+            credentials.clearCredentialStateAsync(new ClearCredentialStateRequest(), new CancellationSignal(), worker,
+                new CredentialManagerCallback<Void, ClearCredentialException>() {
+                    @Override public void onResult(Void result) { }
+                    @Override public void onError(ClearCredentialException error) { }
+                });
+        } catch (Exception unavailable) { /* sair do app não depende do provedor Google */ }
     }
 }
