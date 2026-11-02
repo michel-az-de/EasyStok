@@ -97,6 +97,10 @@ public class RlsBypassAllowlistTests
         // bypass (cross-tenant por natureza); cada empresa gera o evento num escopo proprio com o tenant ligado.
         "EasyStock.Infra.Postgre/Notifications/Collectors/ColetorRotinasAgendadas.cs",
 
+        // #2180: os lembretes de pedido agendado listam candidatos de todas as empresas numa leitura curta sob bypass
+        // (mobile_orders ganhou RLS); cada lembrete grava num escopo proprio com o tenant do pedido ligado.
+        "EasyStock.Infra.Postgre/Notifications/Agendamento/LembretesPedidoAgendadoTick.cs",
+
         // N1, #1344: o health de backlog mede o outbox e os eventos de todas as empresas com consultas agregadas.
         "EasyStock.Infra.Postgre/Notifications/Backlog/BacklogNotificacoesQuery.cs",
 

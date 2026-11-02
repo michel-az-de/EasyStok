@@ -397,6 +397,7 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var bypass = db.UseRowLevelSecurityBypass();
         return await consulta(db);
     }
 

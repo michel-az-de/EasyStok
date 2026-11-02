@@ -74,9 +74,14 @@ internal sealed class MobileApiKeyFilter(
         var apiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
 
         // Lookup pelo hash (indexed unique). DB nunca vê plaintext da key.
-        var device = await db.Set<MobileDevice>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.ApiKeyHash == apiKeyHash);
+        // Ainda não há tenant: o bypass de RLS (#2180) vale só para este lookup e não chega à action.
+        MobileDevice? device;
+        using (db.UseRowLevelSecurityBypass())
+        {
+            device = await db.Set<MobileDevice>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.ApiKeyHash == apiKeyHash);
+        }
 
         if (device == null || device.Revoked)
         {
@@ -110,6 +115,7 @@ internal sealed class MobileApiKeyFilter(
         // context instance" em endpoints com muitas queries (ex: backfill).
         // Agora abre novo scope com novo DbContext, sem interferencia.
         var deviceId = device.Id;
+        var empresaId = device.EmpresaId;
         var remoteIp = http.Connection.RemoteIpAddress?.ToString() ?? "";
 
         // #1566: o PWA faz polling a cada 30 s. Sem este corte cada request virava um UPDATE;
@@ -128,6 +134,7 @@ internal sealed class MobileApiKeyFilter(
             {
                 using var scope = scopeFactory.CreateScope();
                 var bgDb = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+                bgDb.SetMobileTenantContext(empresaId);
                 await bgDb.Database.ExecuteSqlInterpolatedAsync($@"
                     UPDATE mobile_devices
                     SET last_seen_at = {DateTime.UtcNow},

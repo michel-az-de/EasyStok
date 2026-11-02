@@ -138,8 +138,14 @@ public class DevicePairingController(
         var code = req.PairingCode.Trim();
         var deviceFromApp = req.DeviceId.Trim();
 
-        var device = await _db.Set<MobileDevice>()
-            .FirstOrDefaultAsync(d => d.PairingCode == code && !d.Revoked, ct);
+        // Anônimo: a empresa sai do próprio código. O bypass de RLS (#2180) cobre só os lookups;
+        // as gravações rodam com o tenant do device.
+        MobileDevice? device;
+        using (_db.UseRowLevelSecurityBypass())
+        {
+            device = await _db.Set<MobileDevice>()
+                .FirstOrDefaultAsync(d => d.PairingCode == code && !d.Revoked, ct);
+        }
 
         if (device == null)
         {
@@ -163,9 +169,13 @@ public class DevicePairingController(
 
         // #1474: o aparelho já pareado antes (ou revogado) volta com o mesmo deviceId. Inserir
         // de novo esbarrava na PK (409); reaproveita o registro com a loja e a key novas.
-        var jaPareado = device.Id.StartsWith("pending-")
-            ? await _db.Set<MobileDevice>().FirstOrDefaultAsync(d => d.Id == deviceFromApp, ct)
-            : null;
+        MobileDevice? jaPareado = null;
+        if (device.Id.StartsWith("pending-"))
+        {
+            using (_db.UseRowLevelSecurityBypass())
+                jaPareado = await _db.Set<MobileDevice>().FirstOrDefaultAsync(d => d.Id == deviceFromApp, ct);
+        }
+        _db.SetMobileTenantContext(device.EmpresaId);
         if (jaPareado is not null)
         {
             if (jaPareado.EmpresaId != device.EmpresaId)
@@ -301,6 +311,9 @@ public class DevicePairingController(
             return Unauthorized(new { error = "provisioning token inválido" });
         }
 
+        // Secret válido: o tenant é o da config do servidor (RLS tenant_isolation, #2180).
+        _db.SetMobileTenantContext(empresaId);
+
         // Valida loja existe e pertence à empresa configurada.
         // IgnoreQueryFilters: endpoint anônimo (sem JWT) então o Global Query Filter
         // tenant veria CurrentTenantId=Guid.Empty e descartaria tudo. A validação
@@ -324,10 +337,14 @@ public class DevicePairingController(
 
         // Idempotente: se mesmo deviceId já existe e não foi revogado, rotaciona apiKey
         // (re-install do APK, troca de aparelho com mesmo install token, etc).
-        // IgnoreQueryFilters pelo mesmo motivo do SELECT da loja acima — sem JWT
-        // o filter tenant zera o resultado.
-        var existing = await _db.Set<MobileDevice>().IgnoreQueryFilters()
-            .FirstOrDefaultAsync(d => d.Id == deviceFromApp, ct);
+        // Bypass de RLS (#2180) só neste lookup: o conflito com outra empresa precisa enxergar o
+        // device de qualquer tenant; as gravações seguem com o tenant da config.
+        MobileDevice? existing;
+        using (_db.UseRowLevelSecurityBypass())
+        {
+            existing = await _db.Set<MobileDevice>().IgnoreQueryFilters()
+                .FirstOrDefaultAsync(d => d.Id == deviceFromApp, ct);
+        }
 
         if (existing != null)
         {

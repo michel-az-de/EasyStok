@@ -56,8 +56,12 @@ public class MobileDiagTraceController(
         MobileDevice? device = null;
         if (!string.IsNullOrWhiteSpace(req.DeviceId))
         {
-            device = await db.Set<MobileDevice>().AsNoTracking()
-                .FirstOrDefaultAsync(d => d.Id == req.DeviceId, ct);
+            // Anônimo: bypass de RLS (#2180) só para achar o device do log.
+            using (db.UseRowLevelSecurityBypass())
+            {
+                device = await db.Set<MobileDevice>().AsNoTracking()
+                    .FirstOrDefaultAsync(d => d.Id == req.DeviceId, ct);
+            }
         }
 
         log.LogWarning(
