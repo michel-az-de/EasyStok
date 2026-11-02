@@ -6,6 +6,7 @@ import { registerHooks } from 'node:module'
 import { transformWithOxc } from 'vite'
 import { guardarPainelMovel, lerPainelMovel, limitarPainelMovel } from '../src/hooks/estadoPainelMovel.js'
 import { guardarPosicaoPostit } from '../src/aplicacao/posicoesDosPostits.js'
+import { janelaDosPaineis, observarAreaDosPaineis } from '../src/hooks/areaDosPaineis.js'
 
 const memoria = new Map()
 const storage = { getItem: (k) => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, v), removeItem: (k) => memoria.delete(k) }
@@ -26,6 +27,27 @@ for (const janela of [{ largura: 1440, altura: 900 }, { largura: 390, altura: 84
   assert.ok(p.x >= 8 && p.y >= 8 && p.x + p.largura <= janela.largura - 8 && p.y + p.altura <= janela.altura - 8)
 }
 console.log('ok posição e dimensões permanecem acessíveis em desktop e celulares')
+const semSobrepor = (a, b) => a.x + a.largura <= b.x || a.x >= b.x + b.largura
+  || a.y + a.altura <= b.y || a.y >= b.y + b.altura
+for (const janela of [
+  { largura: 1440, altura: 900, area: { x: 76, y: 64, largura: 1364, altura: 836 }, reserva: { x: 364, y: 772, largura: 760, altura: 128 } },
+  { largura: 320, altura: 568, area: { x: 0, y: 64, largura: 320, altura: 448 }, reserva: { x: 0, y: 390, largura: 320, altura: 122 } },
+  { largura: 844, altura: 390, area: { x: 0, y: 64, largura: 844, altura: 270 }, reserva: { x: 0, y: 214, largura: 844, altura: 120 } },
+]) {
+  for (const tamanho of [{ largura: 480, altura: 480 }, { largura: 280, altura: 200 }]) {
+    for (const posicao of [{ x: 600, y: 810 }, { x: 0, y: 0 }, { x: 5000, y: 5000 }]) {
+      const p = limitarPainelMovel(posicao, tamanho, janela)
+      assert.ok(semSobrepor(p, janela.reserva), 'Comanda e nota não cobrem campo, ferramentas nem Enviar')
+      assert.ok(p.x >= janela.area.x + 8 && p.y >= janela.area.y + 8)
+      assert.ok(p.x + p.largura <= janela.area.x + janela.area.largura - 8)
+      assert.ok(p.y + p.altura <= janela.area.y + janela.area.altura - 8)
+    }
+  }
+}
+const lateralLivre = limitarPainelMovel({ x: 1150, y: 710 }, { largura: 280, altura: 180 },
+  { largura: 1440, altura: 900, reserva: { x: 364, y: 772, largura: 760, altura: 128 } })
+assert.deepEqual(lateralLivre, { x: 1150, y: 710, largura: 280, altura: 180 }, 'a área lateral abaixo do envio continua livre para notas')
+console.log('ok área útil protege envio em desktop, retrato e paisagem sem perder a lateral livre')
 
 let hostAtual
 const iguais = (a, b) => a?.length === b?.length && a.every((x, i) => Object.is(x, b[i]))
@@ -76,6 +98,25 @@ const eventosDocumento = new Map()
 document.addEventListener = (nome, fn) => eventosDocumento.set(nome, fn)
 document.removeEventListener = (nome) => eventosDocumento.delete(nome)
 globalThis.ResizeObserver = class { observe() {} disconnect() {} }
+const eventosVisiveis = new Map()
+window.visualViewport = { height: 400, width: 900, offsetTop: 300, offsetLeft: 100, addEventListener: (nome, fn) => eventosVisiveis.set(nome, fn), removeEventListener: nome => eventosVisiveis.delete(nome) }
+document.querySelector = seletor => ({
+  '#conteudo-principal': { getBoundingClientRect: () => ({ left: 76, top: 64, width: 1364, height: 832 }) },
+  '[data-cabecalho-conversa]': { getBoundingClientRect: () => ({ left: 364, top: 64, width: 760, height: 56 }) },
+  '[data-controle-conversa]': { getBoundingClientRect: () => ({ left: 364, top: 120, width: 760, height: 48 }) },
+}[seletor] ?? null)
+const telaComTeclado = janelaDosPaineis()
+const notaComTeclado = limitarPainelMovel({ x: 200, y: 120 }, { largura: 280, altura: 240 }, telaComTeclado)
+assert.ok(notaComTeclado.x >= 108 && notaComTeclado.y >= 308)
+assert.ok(notaComTeclado.x + notaComTeclado.largura <= 992 && notaComTeclado.y + notaComTeclado.altura <= 692)
+const pararObservacao = observarAreaDosPaineis(() => {})
+assert.equal(typeof eventosVisiveis.get('scroll'), 'function', 'o deslocamento da área visível reposiciona as folhas')
+pararObservacao()
+assert.equal(eventosVisiveis.size, 0)
+delete window.visualViewport
+assert.equal(janelaDosPaineis().area.y, 168, 'o controle Assumir também fica acima da área disponível para as folhas')
+delete document.querySelector
+console.log('ok teclado e deslocamento da área visível mantêm a nota alcançável')
 function visitar(no, acao) { if (Array.isArray(no)) { no.forEach(n => visitar(n, acao)); return }; if (!no || typeof no !== 'object') return; acao(no); visitar(no.props?.children, acao) }
 function montar(fn, props) {
   const h = { valores: [], efeitos: [], props, pendentes: [], sujo: true, focos: 0 }
@@ -115,9 +156,19 @@ function montarPortal(portal) {
 }
 let escopo = 'teste-conversa-a'
 const controle = montar(() => usePainelMovel(escopo, 'comanda'), {})
+assert.equal(controle.tree.foco, 0, 'painel fechado não pede foco')
 controle.tree.soltar({ x: 100, y: 120 }); controle.render()
 assert.equal(controle.tree.solto, true)
 const portal = PainelMovel({ controle: controle.tree, titulo: 'Comanda', larguraInicial: 360, alturaInicial: 300, children: 'conteúdo real' })
+assert.ok(portal.props.children.props.focar > 0, 'abertura explícita pede foco no painel')
+const primeiraAbertura = portal.props.children.props.focar
+controle.tree.soltar(); controle.render()
+assert.ok(controle.tree.foco > primeiraAbertura, 'abrir painel já solto renova o pedido de foco')
+const restaurado = montar(() => usePainelMovel(escopo, 'comanda'), {})
+assert.equal(restaurado.tree.solto, true)
+assert.equal(restaurado.tree.foco, 0, 'restaurar posição salva não rouba foco')
+restaurado.unmount()
+console.log('ok abertura explícita pede foco e restauração mantém o foco atual')
 const painel = montarPortal(portal)
 const capturas = new Set()
 const alvo = { focus() {}, setPointerCapture: id => capturas.add(id), hasPointerCapture: id => capturas.has(id), releasePointerCapture: id => capturas.delete(id) }
@@ -147,7 +198,9 @@ const zAntes = painel.tree.props.style.zIndex
 painel.tree.props.onFocusCapture(); painel.render()
 assert.ok(painel.tree.props.style.zIndex > zAntes)
 escopo = 'teste-conversa-b'; controle.render(); assert.equal(controle.tree.solto, false)
+assert.equal(controle.tree.foco, 0)
 escopo = 'teste-conversa-a'; controle.render(); assert.equal(controle.tree.solto, true)
+assert.equal(controle.tree.foco, 0, 'retornar à conversa restaura sem repetir o foco')
 console.log('ok frente responde ao foco e troca de contexto não herda o painel anterior')
 painel.find('Recolher Comanda').props.onClick()
 await new Promise(resolve => setTimeout(resolve, 5)); controle.render()
@@ -180,6 +233,32 @@ document.querySelectorAll = () => [{ ...reserva, getAttribute: () => 'outro-esco
 controle.tree.devolverFoco(); assert.equal(document.activeElement, reserva)
 document.querySelectorAll = () => []
 console.log('ok fechar devolve foco, respeita callback/ação externa, reserva e troca de contexto')
+const campoConversa = { isConnected: true, disabled: false, getClientRects: () => [{}], focus() { document.activeElement = this } }
+const respostasConversa = { ...campoConversa }
+const abridorOculto = { ...campoConversa, getClientRects: () => [] }
+document.querySelector = seletor => seletor === '[data-area-envio] textarea:not(:disabled)'
+  ? (campoConversa.disabled ? null : campoConversa)
+  : seletor === '[data-area-envio] button:not(:disabled)' ? (respostasConversa.disabled ? null : respostasConversa) : null
+document.querySelectorAll = seletor => seletor === '[data-foco-reserva]' ? [] : [document.querySelector(seletor)].filter(Boolean)
+controle.tree.soltar({ currentTarget: abridorOculto }); controle.render()
+document.activeElement = document.body
+assert.equal(controle.tree.devolverFoco(), true)
+assert.equal(document.activeElement, campoConversa, 'Ficha oculta devolve ao campo habilitado da Conversa')
+campoConversa.disabled = true
+assert.equal(controle.tree.devolverFoco(), true)
+assert.equal(document.activeElement, respostasConversa, 'janela fechada devolve às ferramentas habilitadas')
+respostasConversa.disabled = true
+assert.equal(controle.tree.devolverFoco(), false, 'sem destino visível não inventa foco no corpo da página')
+campoConversa.disabled = false
+campoConversa.getClientRects = () => []
+respostasConversa.getClientRects = () => []
+const campoNota = { ...campoConversa, getClientRects: () => [{}] }
+document.querySelectorAll = seletor => seletor === '[data-area-envio] textarea:not(:disabled)' ? [campoConversa, campoNota] : []
+assert.equal(controle.tree.devolverFoco(), true)
+assert.equal(document.activeElement, campoNota, 'o editor de nota visível tem prioridade sobre o compositor público oculto')
+delete document.querySelector
+document.querySelectorAll = () => []
+console.log('ok recolher na Conversa com a Ficha oculta respeita campo, janela fechada e controles indisponíveis')
 const controleVisibilidade = montar(() => usePainelMovel('teste-visibilidade', 'comanda'), {})
 controleVisibilidade.tree.soltar({ x: 120, y: 140, largura: 340, altura: 280 }); controleVisibilidade.render()
 const propsVisibilidade = { controle: controleVisibilidade.tree, titulo: 'Comanda oculta', focar: true, children: 'conteúdo preservado' }
@@ -207,6 +286,10 @@ assert.equal(janelaVisibilidade.focos, 1, 'ocultar não devolve foco a controle 
 assert.equal(listeners.has('resize'), false)
 assert.deepEqual(janelaVisibilidade.tree.props.style, geometriaAntes, 'ocultar e mostrar conservam a geometria')
 assert.equal(janelaVisibilidade.tree.props.children[2].props.children, 'conteúdo preservado')
+janelaVisibilidade.props = superficieVisivel.props; janelaVisibilidade.render()
+assert.equal(janelaVisibilidade.focos, 1, 'voltar à Conversa não repete o pedido de foco já atendido')
+janelaVisibilidade.props = { ...superficieVisivel.props, focar: 2 }; janelaVisibilidade.render()
+assert.equal(janelaVisibilidade.focos, 2, 'uma nova abertura manual ou pela Home ainda pede foco')
 janelaVisibilidade.unmount(); controleVisibilidade.unmount()
 console.log('ok portal hidden/inert conserva identidade, conteúdo e geometria sem medir nem focar escondido')
 const { NotasDoCliente } = await import('../src/features/ficha-cliente/NotasDoCliente.jsx')
@@ -233,6 +316,16 @@ for (const item of lista) {
   visitar(nota.tree, n => { if (n.type === PainelMovel) janela = n })
   assert.equal(janela.props.controle.solto, true)
   assert.equal(janela.props.atributos['data-postit-solto'], item.props.nota.id)
+  if (item === lista[0]) {
+    const geometria = { x: 471, y: 157, largura: 347, altura: 224 }
+    janela.props.controle.guardar(geometria)
+    janela.props.controle.recolher(); nota.render()
+    visitar(nota.tree, n => { if (n.type === 'button') soltar = n })
+    soltar.props.onClick({ currentTarget: { closest: () => ({ getBoundingClientRect: () => ({ left: 900, top: 500 }) }) } })
+    nota.render()
+    visitar(nota.tree, n => { if (n.type === PainelMovel) janela = n })
+    for (const [chave, valor] of Object.entries(geometria)) assert.equal(janela.props.controle[chave], valor, 'reabrir nota conserva posição e tamanho')
+  }
 }
 assert.equal([...memoria.keys()].filter(k => k.includes('muitas-notas')).length, 120)
 assert.doesNotMatch([...memoria.values()].join(''), /Conteúdo confirmado|Operador/)
@@ -279,6 +372,45 @@ function conferirPainelDaNota(elemento) {
   superficie.unmount(); notaHost.unmount()
 }
 conferirPainelDaNota(mesa.tree.props.children[1][0])
+{
+  const registro = mesa.tree.props.children[1][0]
+  const nota = montar(registro.type, registro.props)
+  const portal = nota.tree.type(nota.tree.props)
+  const superficie = superficieDoPortal(portal)
+  const janela = montarPortal(portal)
+  const geometria = { ...janela.tree.props.style }
+  const focos = janela.focos
+  const referencias = lerReferenciasDaMesa(escopoA)
+  const pedidos = chamadas.length
+  for (const visivel of [false, true, false, true]) {
+    const elemento = MesaDeNotas({ children: 'ficha da conversa', visivel })
+    assert.equal(elemento.type, elementoMesa.type)
+    assert.equal(elemento.key, elementoMesa.key, 'mudar de aba não remonta a mesa da sessão')
+    mesa.props = elemento.props; mesa.render()
+    const atual = mesa.tree.props.children[1][0]
+    assert.equal(atual.type, registro.type)
+    assert.equal(atual.key, registro.key, 'a mesma nota continua montada ao abrir a lista')
+    assert.equal(atual.props.registro, registro.props.registro)
+    nota.props = atual.props; nota.render()
+    const proximoPortal = nota.tree.type(nota.tree.props)
+    assert.equal(proximoPortal.props.hidden, !visivel, 'lista de Conversas esconde o post-it que interceptava o toque')
+    assert.equal(proximoPortal.props.inert, !visivel, 'nota oculta também sai da navegação por teclado')
+    assert.equal(proximoPortal.props.style.display, visivel ? 'contents' : 'none')
+    const proximaSuperficie = superficieDoPortal(proximoPortal)
+    assert.equal(proximaSuperficie.type, superficie.type)
+    assert.equal(proximaSuperficie.key, superficie.key)
+    janela.props = proximaSuperficie.props; janela.render()
+    assert.deepEqual(janela.tree.props.style, geometria)
+    assert.equal(janela.focos, focos, 'voltar à Conversa não repete o foco de destacar a nota')
+    assert.deepEqual(lerPainelMovel(escopoA, `nota:${clienteId}:${notaId}`), geometriaMovida)
+    assert.deepEqual(lerReferenciasDaMesa(escopoA), referencias)
+    assert.equal(chamadas.length, pedidos, 'trocar aba não busca nem altera a nota')
+  }
+  janela.unmount(); nota.unmount()
+}
+console.log('ok MesaDeNotas real oculta os portais na lista sem desmontar, recolher, refocar ou perder geometria')
+guardarPainelMovel(escopoA, `nota:${clienteId}:${notaId}`, { ...geometriaMovida, solto: false })
+conferirPainelDaNota(mesa.tree.props.children[1][0])
 const notaCompartilhada = mesa.tree.props.children[1][0].props.registro.nota
 function conferirFonteDaNota(conversaId, solta, destacar = false, mesaHost = mesa) {
   // Mesma nota confirmada e mesmo cliente em duas conversas. A lista real usa
@@ -309,6 +441,7 @@ function conferirFonteDaNota(conversaId, solta, destacar = false, mesaHost = mes
 }
 conferirFonteDaNota('conversa-a', true)
 const referenciasAntesDaTroca = lerReferenciasDaMesa(escopoA)
+mesa.props.visivel = false; mesa.render()
 mesa.props.selecionadaId = 'conversa-b'; mesa.render()
 assert.equal(mesa.tree.props.children[1].length, 0, 'trocar de ficha esconde as notas anteriores')
 conferirFonteDaNota('conversa-b', false)
@@ -317,6 +450,8 @@ assert.deepEqual(lerPainelMovel(escopoA, `nota:${clienteId}:${notaId}`), geometr
 mesa.props.selecionadaId = 'conversa-a'; mesa.render()
 assert.equal(mesa.tree.props.children[1].length, 1, 'voltar à ficha restaura sua nota')
 assert.equal(mesa.tree.props.children[1][0].props.registro.focar, false, 'voltar à ficha não repete foco da soltura original')
+assert.equal(mesa.tree.props.children[1][0].props.visivel, false, 'a nota de A permanece inerte enquanto a lista continua ativa')
+mesa.props.visivel = true; mesa.render()
 conferirFonteDaNota('conversa-a', true)
 assert.equal(mesa.tree.props.children[1][0].props.registro.conversaId, 'conversa-a', 'A continua dona do post-it ao voltar')
 conferirPainelDaNota(mesa.tree.props.children[1][0])
@@ -383,4 +518,4 @@ const mesaB = montar(mesaBElemento.type, mesaBElemento.props)
 assert.equal(mesaB.tree.props.children[1].length, 0)
 mesaB.unmount()
 console.log('ok logout limpa a mesa e a conta seguinte não herda texto nem portais')
-console.log('15 grupos de comportamento do painel e da mesa aprovados.')
+console.log('Provas de comportamento do painel e da mesa aprovadas.')

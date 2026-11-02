@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AlcaLargura } from '../componentes/AlcaLargura'
 import { MenuDaConta } from '../componentes/MenuDaConta'
 import { Marca } from '../componentes/Marca'
@@ -7,7 +7,9 @@ import { trocarTema } from '../hooks/useTema'
 import { balcaoComCardapio, fichaComCardapio } from '../hooks/larguras'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
-import { Modal } from '../componentes/Modal'
+import { BotaoIcone } from '../componentes/BotaoIcone'
+import { limitarPainelMovel } from '../hooks/estadoPainelMovel'
+import { janelaDosPaineis, observarAreaDosPaineis } from '../hooks/areaDosPaineis'
 import { Icone } from '../componentes/Icone'
 import { MarcaIcone } from '../componentes/MarcaIcone'
 import { Pilula } from '../componentes/Pilula'
@@ -15,7 +17,7 @@ import { useAcoes, useAtendimento } from '../aplicacao/contextos'
 import { useAcessoModulos } from '../aplicacao/acessoModulos'
 import { contarAbertas, contarNaEsteira } from '../dominio/conversa'
 import { contarAtivas } from '../dominio/automacao'
-import { DESKTOP, TABLET, useTopoCompacto } from '../hooks/useTamanhoTela'
+import { CELULAR, DESKTOP, TABLET, useTopoCompacto } from '../hooks/useTamanhoTela'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
 import { CompartilharComanda } from '../features/atendimento/CompartilharComanda'
@@ -376,13 +378,29 @@ function Trilho({
   )
 }
 
-// #1551: a gaveta é um <dialog> e a FaixaApi fica atrás da cortina. O aviso da ação da API
-// (janela faltando, pedido não criado, cobrança que não saiu) vem para o rodapé dela.
 function Gaveta({ titulo, aoFechar, children }) {
+  const painel = useRef(null)
+  const medir = () => limitarPainelMovel({ x: window.innerWidth - 488, y: 72 },
+    { largura: 480, altura: window.innerHeight }, janelaDosPaineis())
+  const [posicao, setPosicao] = useState(medir)
+  useLayoutEffect(() => {
+    const ajustar = () => setPosicao(antes => {
+      const p = medir()
+      return ['x', 'y', 'largura', 'altura'].every(c => p[c] === antes[c]) ? antes : p
+    })
+    ajustar()
+    return observarAreaDosPaineis(ajustar, painel.current)
+  }, [])
+  useEffect(() => { painel.current?.querySelector('[data-fechar-ficha]')?.focus({ preventScroll: true }) }, [])
   return (
-    <Modal titulo={titulo} className={css.gaveta} largura="min(480px, 90vw)" aoFechar={aoFechar} rodape={<AvisoDaAcaoApi />}>
-      {children}
-    </Modal>
+    <dialog ref={painel} open aria-modal="false" aria-label={titulo} className={css.gaveta}
+      style={{ left: posicao.x, top: posicao.y, width: posicao.largura, height: posicao.altura }}
+      onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented && e.target.closest('dialog') === e.currentTarget) {
+        e.preventDefault(); e.stopPropagation(); aoFechar()
+      } }}>
+      <div className={css.conteudoGaveta}>{children}</div>
+      <AvisoDaAcaoApi />
+    </dialog>
   )
 }
 
@@ -417,11 +435,27 @@ function BotaoSimular({ ativo, aoAlternar }) {
 
 // Três arranjos para o mesmo conteúdo. Os painéis não sabem em qual estão.
 export function Moldura(props) {
-  return <MesaDeNotas><ConteudoMoldura {...props} /></MesaDeNotas>
+  const { selecionada } = useAtendimento()
+  const selecionadaId = selecionada?.id ?? null
+  const solicitacaoPainel = props.solicitacaoPainel ?? null
+  const [aba, setAba] = useState('balcao')
+  const [selecaoDaAba, setSelecaoDaAba] = useState(selecionadaId)
+  const [pedidoDaAba, setPedidoDaAba] = useState(solicitacaoPainel)
+  if (selecionadaId !== selecaoDaAba) {
+    setSelecaoDaAba(selecionadaId)
+    if (selecionadaId?.startsWith('sim-')) setAba('atendimento')
+  }
+  if (solicitacaoPainel !== pedidoDaAba) {
+    setPedidoDaAba(solicitacaoPainel)
+    if (solicitacaoPainel) setAba(solicitacaoPainel.aba)
+  }
+  return <MesaDeNotas visivel={props.tamanho !== CELULAR || aba !== 'balcao'}>
+    <ConteudoMoldura {...props} aba={aba} setAba={setAba} />
+  </MesaDeNotas>
 }
 
 function ConteudoMoldura({
-  tamanho, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca, aoAbrirCardapio, aoAbrirAutomacoes, aoAbrirGestao,
+  tamanho, aba, setAba, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca, aoAbrirCardapio, aoAbrirAutomacoes, aoAbrirGestao,
   aoAbrirEntregas, aoAbrirAjuda, aoRascunho, simulando, aoAlternarSimulacoes, larguras, largurasPadrao = larguras, aoRedimensionar, cardapioAberto = null,
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, solicitacaoPainel = null,
 }) {
@@ -432,32 +466,27 @@ function ConteudoMoldura({
   const regras = fonteApi ? null : regrasDaMassa
   const atendente = fonteApi ? (sessao?.usuario?.nome ?? null) : 'Thatiane'
   const { alternarLoja } = useAcoes()
-  const [aba, setAba] = useState('balcao')
   const [pedidoPainelVisto, setPedidoPainelVisto] = useState(solicitacaoPainel)
   const [fichaSolicitada, setFichaSolicitada] = useState(null)
   const [gavetaAberta, setGavetaAberta] = useState(false)
   const botaoFichaRef = useRef(null)
 
-  const irParaAtendimento = useCallback(() => setAba('atendimento'), [])
+  const irParaAtendimento = useCallback(() => setAba('atendimento'), [setAba])
 
   // Rodada 11 (issue #8, registro 92): o cenário do Simular abre a conversa
   // nova (SIMULAR_CONVERSA seleciona a `sim-…`), mas no celular a aba ficava
   // no Balcão e a dona não via o automático responder. Quando a seleção muda
-  // para uma conversa simulada, a aba vai junto para Atendimento. Ajuste na
-  // própria renderização (padrão do React para "estado que segue uma prop"),
-  // não em efeito.
+  // para uma conversa simulada, a Moldura muda a aba e este conteúdo limpa a ficha anterior.
   const selecionadaId = selecionada?.id ?? null
   const acaoCompartilhar = selecionada && <CompartilharComanda key={'compartilhar-' + selecionada.id} conversa={selecionada} />
   const [selecaoVista, setSelecaoVista] = useState(selecionadaId)
   if (selecionadaId !== selecaoVista) {
     setSelecaoVista(selecionadaId)
     setFichaSolicitada(null)
-    if (selecionadaId?.startsWith('sim-')) setAba('atendimento')
   }
   if (solicitacaoPainel !== pedidoPainelVisto) {
     setPedidoPainelVisto(solicitacaoPainel)
     if (solicitacaoPainel) {
-      setAba(solicitacaoPainel.aba)
       setFichaSolicitada(solicitacaoPainel.aba === 'ficha' ? solicitacaoPainel : null)
       if (solicitacaoPainel.aba === 'ficha' && tamanho === TABLET) setGavetaAberta(true)
     }
@@ -584,7 +613,8 @@ function ConteudoMoldura({
           <section className={`${css.coluna} ${css.centro}`} aria-label="Conversa">{atendimento}</section>
           {gavetaAberta && (
             <Gaveta titulo="Ficha" aoFechar={fecharGaveta}>
-              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} {...solicitacaoDaFicha} /></LimiteDeErro>
+              <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={() => { fecharGaveta(); aoAbrirCardapio() }} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar}
+                {...solicitacaoDaFicha} acoesCabecalho={<BotaoIcone icone="fechar" rotulo="Fechar Ficha" data-fechar-ficha onClick={fecharGaveta} />} /></LimiteDeErro>
             </Gaveta>
           )}
         </main>
@@ -603,7 +633,7 @@ function ConteudoMoldura({
     balcao: <LimiteDeErro parte="Lista de conversas"><PainelConversas aoAbrir={irParaAtendimento} buscaDeClientes={ChamarClientes} acoesCabecalho={<span data-ancora-assistente />} /></LimiteDeErro>,
     atendimento,
     ficha: <LimiteDeErro parte="Resumo"><PainelFicha aoAbrirCardapio={aoAbrirCardapio} aoAbrirNota={aoAbrirNota} aoRascunho={aoRascunho} acaoCompartilhar={acaoCompartilhar} acoesCabecalho={<span data-ancora-assistente />}
-      visivel={aba === 'ficha'} {...solicitacaoDaFicha} /></LimiteDeErro>,
+      visivel={aba === 'ficha'} comandaVisivel={aba === 'ficha' || aba === 'atendimento'} {...solicitacaoDaFicha} /></LimiteDeErro>,
   }
 
   return (

@@ -181,7 +181,7 @@
   padding: 0 0 var(--e-3);
 }
 
-.resumoAtual { padding: var(--e-3); margin: 0 var(--e-4); background: var(--elevado); }
+.resumoAtual { padding: 0; margin: 0 var(--e-4); background: transparent; }
 .resumoAtual[data-recebendo-prato] { outline: 2px solid var(--marca); outline-offset: -2px; background: var(--fundo); }
 .resumoAtual h3 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2); margin: 0 0 var(--e-2); font-size: var(--t-corpo); }
 .resumoAtual h3 small { color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 400; }
@@ -195,7 +195,7 @@
 .acessosFicha { padding: 0 var(--e-4); }
 .acessoFicha {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
-  width: 100%; min-height: var(--toque); padding: var(--e-3); border: 0; border-radius: var(--r-1);
+  width: 100%; min-height: var(--toque); padding: var(--e-2) 0; border: 0; border-radius: var(--r-1);
   background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer;
 }
 .acessoFicha span { min-width: 0; }
@@ -537,7 +537,9 @@
 .resumoIaCarregando { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .numerosCliente { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .tagsCliente { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1); }
-.tagsCliente li { padding: 2px var(--e-2); border-radius: var(--r-1); background: var(--preenchimento); font-size: var(--t-apoio); }
+.tagsCliente li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 2px var(--e-2); border-radius: var(--r-1); background: var(--preenchimento); font-size: var(--t-apoio); }
+.tagsCliente li.tagRestricao { display: flex; align-items: center; gap: var(--e-1); background: var(--alerta-pastel); color: var(--alerta); }
+.tagRestricao svg { flex: none; }
 .postitResumo {
   margin: 0; padding: var(--e-2) var(--e-3); background: var(--alerta-pastel); color: var(--tinta);
   font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6;

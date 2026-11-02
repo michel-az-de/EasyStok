@@ -67,8 +67,8 @@ confere('o aviso entra uma vez só e a gaveta só existe no arranjo de tablet (d
   assert.ok(gaveta > tablet && gaveta < celular, '<Gaveta> fora do arranjo de tablet')
 })
 confere('sem aviso, o rodapé vazio da gaveta não ocupa espaço', () => {
-  const css = ler('app/moldura.module.css')
-  assert.match(css, /\.gaveta > h2 \+ div \+ div:empty \{ display: none; \}/)
+  const moldura = ler('app/Moldura.jsx')
+  assert.match(moldura, /<div className=\{css\.conteudoGaveta\}>\{children\}<\/div>\s*<AvisoDaAcaoApi \/>/)
 })
 confere('o aviso continua calado na demonstração e sem aviso pendente', () => {
   const faixa = semComentarios(ler('app/FaixaApi.jsx'))

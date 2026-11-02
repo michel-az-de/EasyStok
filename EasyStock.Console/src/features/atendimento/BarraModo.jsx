@@ -55,7 +55,7 @@ export function BarraModo({
   }
 
   return (
-    <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} aria-label="Quem responde esta conversa">
+    <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} data-controle-conversa aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
         <span title={resumo.detalhe}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
         <p className={fraseRepetida || !mostrarLinha ? 'sr' : css.modoTexto} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>

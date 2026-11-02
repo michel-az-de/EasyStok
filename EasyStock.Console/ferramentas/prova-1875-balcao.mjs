@@ -133,7 +133,8 @@ await confere('3  a comanda mostra a prévia do sinal junto da nota do frete', (
   const bloco = fonte('features/ficha-cliente/BlocoPedido.jsx')
   assert.match(bloco, /previaDoSinal\(pedido,/)
   assert.match(bloco, /sinal de 50% do total com o frete/)
-  assert.match(bloco, /O frete entra ao gerar a cobrança/)
+  assert.match(bloco, /Confira o frete antes de gerar a cobrança/)
+  assert.doesNotMatch(bloco, /O frete entra ao gerar a cobrança/)
 })
 
 // --- 4. Janelas ---------------------------------------------------------------------------------

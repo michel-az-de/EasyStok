@@ -11,12 +11,12 @@ import { contextoDaAjuda, copiarDiagnostico, diagnosticoDoConsole } from './diag
 import css from './ajuda.module.css'
 
 export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
-  const { permite } = useAcessoModulos()
+  const { permite, acoes } = useAcessoModulos()
   const [aviso, setAviso] = useState('')
   const [diagnostico, setDiagnostico] = useState('')
   const dadosRef = useRef(null)
-  const contexto = contextoDaAjuda(rota, fonteApi)
-  const guia = guiaDoConsole({ rota, fonteApi, permite })
+  const contexto = contextoDaAjuda(rota, fonteApi, { acoes, permite })
+  const guia = guiaDoConsole({ rota, fonteApi, permite, acoes })
 
   async function copiar() {
     const texto = diagnosticoDoConsole({

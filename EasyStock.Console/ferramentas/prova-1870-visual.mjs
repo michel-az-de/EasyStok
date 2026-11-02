@@ -77,7 +77,7 @@ confere('1  o tema do trilho do Balcão vai para o menu da conta (em 1280x720 o 
 confere('2  módulo com tela de operação mostra as telas na barra e esconde o menu lateral', () => {
   const moldura = fonte('features/hall/MolduraDoModulo.jsx')
   assert.match(moldura, /const telasNaBarra = telas\.length > 1 && telas\.some\(\(t\) => t\.tipo === TELA_OPERACAO\)/)
-  assert.match(moldura, /<nav className=\{css\.telasNaBarra\} aria-label=\{`Telas de \$\{modulo\.nome\}`\}>/)
+  assert.match(moldura, /<nav className=\{css\.telasNaBarra\} aria-label=\{`Telas de \$\{modulo\.nome\}`\} ref=\{abasRef\}>/)
   assert.equal((moldura.match(/semMenu=\{telasNaBarra\}/g) ?? []).length, 2, 'lateral e menu do tablet')
   assert.match(fonte('features/hall/MenuDosModulos.jsx'), /\{!semMenu && <nav className=\{css\.menu\}/)
 })
@@ -142,7 +142,7 @@ confere('4  ficha compacta mantém cabeçalho, cliente e acessos sem molduras, c
   assert.match(regra('acessoFicha'), /min-height: var\(--toque\);/, 'alvo acompanha desktop e toque')
   assert.match(regra('cabecalhoFicha'), /flex-shrink: 0;/, 'cabeçalho não participa da rolagem')
   const painel = fonte('features/ficha-cliente/PainelFicha.jsx')
-  assert.match(painel, /<header className=\{css\.cabecalhoFicha\}>/)
+  assert.match(painel, /<header className=\{css\.cabecalhoFicha\} data-cabecalho-ficha>/)
   assert.match(painel, /<div className=\{css\.conteudo\}>[\s\S]*?<CartaoDoCliente conversa=\{selecionada\}/)
   assert.match(painel, /<nav className=\{css\.acessosFicha\} aria-label="Detalhes do atendimento">/)
   assert.match(painel, /titulo="Pós-venda"/)

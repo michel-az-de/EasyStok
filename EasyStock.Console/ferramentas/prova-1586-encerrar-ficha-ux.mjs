@@ -107,7 +107,7 @@ globalThis.sessionStorage = {
   getItem: () => JSON.stringify({ token: 't', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa' } }),
   setItem: () => {}, removeItem: () => {},
 }
-globalThis.window = globalThis.window ?? { dispatchEvent: () => {} }
+globalThis.window = globalThis.window ?? { innerWidth: 1000, innerHeight: 900, dispatchEvent: () => {}, addEventListener: () => {}, removeEventListener: () => {} }
 
 let passou = 0
 const falhas = []
@@ -895,6 +895,60 @@ await confere('nota: contexto trocado, retorno após unmount e abridor indispon�
       abridor.isConnected = true; abridor.disabled = false; abridor.getClientRects = () => [{}]
     }
   })
+})
+
+await confere('nota: ao sair da aba Ficha retorna ao campo ou às ferramentas se a janela estiver fechada', async () => {
+  await comFocoDaNota(async ({ abrir, abridor, externo, documento }) => {
+    for (const caso of ['aberta', 'aberta-com-botao-antes', 'fechada']) {
+      const janelaFechada = caso === 'fechada'
+      abridor.isConnected = true
+      externo.focos = 0
+      const campo = { isConnected: true, disabled: false, getClientRects: () => [{}], focus() { documento.activeElement = this } }
+      const tela = abrir({ aoFechar: () => { documento.activeElement = documento.body } })
+      abridor.isConnected = false
+      documento.querySelector = seletor => seletor.includes(',') && caso === 'aberta-com-botao-antes' ? externo
+        : seletor.includes('textarea') && !janelaFechada ? campo : seletor.includes('button') ? externo : null
+      doTipo(tela, 'dialog')[0].props.onKeyDown({ key: 'Escape', defaultPrevented: false, stopPropagation: nada })
+      assert.equal(documento.activeElement, janelaFechada ? externo : campo, 'o foco permanece no compositor com ou sem campo habilitado')
+      tela.encerrar()
+    }
+  })
+})
+
+await confere('nota nova e reativada fica à frente dos painéis móveis', async () => {
+  const { proximaFrentePainel } = await import('../src/hooks/estadoPainelMovel.js')
+  const frenteAnterior = proximaFrentePainel()
+  const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: nada, aoFechar: nada })
+  assert.ok(doTipo(tela, 'dialog')[0].props.style?.zIndex > frenteAnterior, 'nota abre acima do painel existente')
+  const outraFrente = proximaFrentePainel()
+  doTipo(tela, 'dialog')[0].props.onFocusCapture()
+  tela.renderizar()
+  assert.ok(doTipo(tela, 'dialog')[0].props.style.zIndex > outraFrente, 'retorno do foco traz o editor para frente')
+  const frentePonteiro = proximaFrentePainel()
+  doTipo(tela, 'dialog')[0].props.onPointerDownCapture()
+  tela.renderizar()
+  assert.ok(doTipo(tela, 'dialog')[0].props.style.zIndex > frentePonteiro)
+  tela.encerrar()
+})
+
+await confere('nota embutida: recolher restaura envio aberto/fechado e preserva foco externo após confirmação tardia', () => {
+  const fonte = readFileSync(new URL('features/atendimento/PainelAtendimento.jsx', src), 'utf8')
+  const corpo = fonte.match(/useEffect\(\(\) => \{(\s+const anterior = contextoDaNota\.current[\s\S]*?)\}, \[editorNotaVisivel, visivel, focarAoTrocar, selecionada\?\.id\]\)/)?.[1]
+  assert.ok(corpo, 'o efeito real de retorno de foco foi localizado')
+  const executar = new Function('contextoDaNota', 'editorNotaVisivel', 'visivel', 'focarAoTrocar', 'selecionada', 'compositorPublicoRef', 'document', corpo)
+  for (const fechada of [false, true]) for (const fora of [false, true]) {
+    const documento = { body: {}, documentElement: {} }
+    const no = (visivel = true) => ({ getClientRects: () => visivel ? [{}] : [], focus() { documento.activeElement = this } })
+    const campo = { ...no(), selectionStart: 2, selectionEnd: 4, selectionDirection: 'forward', scrollTop: 12,
+      setSelectionRange(inicio, fim, direcao) { this.selecao = [inicio, fim, direcao] } }
+    const ferramenta = no(), externo = no()
+    documento.activeElement = fora ? externo : documento.body
+    executar({ current: { id: 'a', visivel: true } }, false, true, true, { id: 'a' }, { current: {
+      querySelector: () => fechada ? null : campo, querySelectorAll: () => [no(false), ferramenta],
+    } }, documento)
+    assert.equal(documento.activeElement, fora ? externo : fechada ? ferramenta : campo)
+    if (!fechada && !fora) assert.deepEqual(campo.selecao, [2, 4, 'forward'])
+  }
 })
 
 if (falhas.length > 0) {

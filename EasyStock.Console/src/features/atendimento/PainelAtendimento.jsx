@@ -76,8 +76,15 @@ export function PainelAtendimento({
     contextoDaNota.current = { id: selecionada?.id, visivel: editorNotaVisivel }
     if (!anterior.visivel || editorNotaVisivel || !visivel || !focarAoTrocar || anterior.id !== selecionada?.id) return
     // O wrapper público já foi desocultado neste commit. Não remonta nem altera o rascunho.
+    const focoAtual = document.activeElement
+    if (focoAtual && focoAtual !== document.body && focoAtual !== document.documentElement && focoAtual.getClientRects().length) return
     const campo = compositorPublicoRef.current?.querySelector('textarea:not(:disabled)')
-    if (!campo?.getClientRects().length) return
+    if (!campo?.getClientRects().length) {
+      const ferramenta = [...(compositorPublicoRef.current?.querySelectorAll('button:not(:disabled)') ?? [])]
+        .find(no => no.getClientRects().length > 0)
+      ferramenta?.focus({ preventScroll: true })
+      return
+    }
     const { selectionStart: inicio, selectionEnd: fim, selectionDirection: direcao, scrollTop: rolagem } = campo
     campo.focus({ preventScroll: true })
     campo.setSelectionRange(inicio, fim, direcao)
@@ -128,7 +135,7 @@ export function PainelAtendimento({
 
   return (
     <>
-      <header className={css.cabecalho}>
+      <header className={css.cabecalho} data-cabecalho-conversa>
         <span className={css.identidade}>
           <Avatar
             nome={selecionada.nome}
@@ -212,6 +219,7 @@ export function PainelAtendimento({
       </div>
 
       {/* #1510: remonta por conversa; anexo em espera e gravação não passam para a próxima. */}
+      <div data-area-envio style={{ flexShrink: 0 }}>
       <div ref={compositorPublicoRef} hidden={editorNotaVisivel} style={editorNotaVisivel ? undefined : { display: 'contents' }}>
       <Composer
         key={selecionada.id}
@@ -243,6 +251,7 @@ export function PainelAtendimento({
       />
       </div>
       {slotEditorNota}
+      </div>
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
 import { Marca } from '../../componentes/Marca'
@@ -12,8 +12,11 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState(null)
   const [ocupado, setOcupado] = useState(false)
+  const tentativaEmCurso = useRef(false)
 
   const tentar = async (acao, mensagem401) => {
+    if (tentativaEmCurso.current) return
+    tentativaEmCurso.current = true
     setErro(null)
     setOcupado(true)
     try {
@@ -22,6 +25,7 @@ export function TelaLogin({ entrarNaEmpresa, google, avisoSaida }) {
       const semMensagemDeAcesso = e.status === 401 && e.codigo === 'HTTP_401' && e.message === 'Sessão expirada. Entre de novo.'
       setErro(semMensagemDeAcesso && mensagem401 ? mensagem401 : e.message)
     } finally {
+      tentativaEmCurso.current = false
       setOcupado(false)
     }
   }

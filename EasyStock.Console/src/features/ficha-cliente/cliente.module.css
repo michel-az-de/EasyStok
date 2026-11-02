@@ -124,25 +124,25 @@
 /* --- Tags (TagsDoCliente.jsx) ---------------------------------------------- */
 .blocoTags { margin-bottom: var(--e-3); }
 .tagsLinha { display: flex; gap: var(--e-2); flex-wrap: wrap; list-style: none; margin: 0; padding: 0; align-items: center; }
-.tagsLinha li { display: inline-flex; }
+.tagsLinha li { display: inline-flex; min-width: 0; max-width: 100%; }
 
 .chip {
-  display: inline-flex; align-items: center; gap: var(--e-1);
+  display: inline-flex; align-items: center; gap: var(--e-1); min-width: 0; max-width: 100%;
   min-height: var(--toque); padding: 0 var(--e-1) 0 var(--e-3);
   border-radius: var(--r-pilula); border: var(--b-1) solid transparent;
   background: var(--preenchimento); color: var(--tinta);
-  font-size: var(--t-apoio); font-weight: 600; line-height: 1; white-space: nowrap;
+  font-size: var(--t-apoio); font-weight: 600; line-height: 1.35;
 }
 .chipRestricao { border-color: var(--alerta); color: var(--tinta); background: var(--alerta-pastel); }
-.chipTexto { background: none; border: 0; padding: 0; font: inherit; color: inherit; min-height: auto; }
+.chipTexto { background: none; border: 0; padding: var(--e-1) 0; font: inherit; color: inherit; min-width: var(--toque); min-height: var(--toque); overflow-wrap: anywhere; text-align: left; }
 .chipRemover {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; margin: 0; border-radius: var(--r-pilula);
+  width: var(--toque); height: var(--toque); flex: none; margin: 0; border-radius: var(--r-pilula);
   background: none; border: 0; color: var(--tinta-3);
 }
 .chipRemover:hover { background: var(--preenchimento-forte); color: var(--tinta); }
 .chipEdicao {
-  min-height: var(--toque); min-width: 96px; padding: 0 var(--e-3);
+  min-height: var(--toque); min-width: 96px; max-width: 100%; padding: 0 var(--e-3);
   border-radius: var(--r-pilula); border: var(--b-2) solid var(--marca);
   background: var(--papel); color: var(--tinta); font-size: var(--t-apoio); font-weight: 600;
 }
@@ -155,15 +155,16 @@
 .sugestoesTag { margin-top: var(--e-2); display: grid; gap: var(--e-2); }
 .grupoSugestao { margin: 0 0 var(--e-1); font-size: var(--t-apoio); color: var(--tinta-3); }
 .chipSugestao {
+  max-width: 100%; overflow-wrap: anywhere;
   min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-pilula);
   border: 0; background: var(--papel); color: var(--tinta-2);
   font-size: var(--t-apoio);
 }
 .avisoDesfazer {
-  display: flex; align-items: center; gap: var(--e-1); margin: var(--e-2) 0 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-1); margin: var(--e-2) 0 0;
   font-size: var(--t-apoio); color: var(--tinta-2);
 }
-.avisoDesfazer button { background: none; border: 0; color: var(--marca); font-weight: 600; padding: 0 var(--e-1); }
+.avisoDesfazer button { background: none; border: 0; color: var(--marca); font-weight: 600; padding: 0 var(--e-1); min-width: var(--toque); min-height: var(--toque); }
 
 /* --- Modal Histórico -------------------------------------------------------- */
 .faixaLead { margin: 0 0 var(--e-4); color: var(--tinta-2); font-size: var(--t-apoio); }
