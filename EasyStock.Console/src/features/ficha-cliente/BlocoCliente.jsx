@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Avatar } from '../../componentes/Avatar'
 import { AvatarAssistente } from '../../componentes/AvatarAssistente'
@@ -134,7 +134,9 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   // com o toque no fundo (no tablet um toque fora é fácil e levava nome, telefone e endereço). Compara com o que
   // foi carregado no formulário: dado que chega da sincronização sem ninguém digitar não é digitação a perder.
   const formSujo = precisaCadastro && JSON.stringify(form) !== JSON.stringify(formCarregado.current)
-  useEffect(() => { aoMudarSujo?.(formSujo) }, [formSujo, aoMudarSujo])
+  // Efeito de layout: a janela precisa saber antes do próximo evento. Com efeito comum, um Esc logo depois da
+  // tecla (aparelho lento) ainda fechava e levava a digitação.
+  useLayoutEffect(() => { aoMudarSujo?.(formSujo) }, [formSujo, aoMudarSujo])
   const domicilio = mesmoDomicilio(conversa, conversas)
   const financeiro = resumoFinanceiro(historico)
 
