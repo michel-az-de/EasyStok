@@ -26,7 +26,7 @@ registerHooks({
 
 const guia = await import('../src/dominio/guiaDoConsole.js').catch((erro) => ({ erro }))
 const { MODULOS, hashDoModulo, modulosDoHall } = await import('../src/dominio/modulos.js')
-const { diagnosticoDoConsole } = await import('../src/features/ajuda/diagnosticoDoConsole.js')
+const { contextoDaAjuda, diagnosticoDoConsole } = await import('../src/features/ajuda/diagnosticoDoConsole.js')
 
 let passou = 0
 const falhas = []
@@ -86,6 +86,40 @@ await confere('D. telas do guia são as do menu, com caminho', () => {
   assert.ok(!demo.telas.some((t) => t.id === 'horarios'), 'tela só da API some na demonstração')
 })
 
+await confere('D2. perfil sem contas ou ajuste de entrega não recebe links nem instruções dessas telas', () => {
+  const lista = guia.guiaDoConsole({ rota: rotaBalcao, fonteApi: true, permite: todos, acoes: {} })
+  const financeiro = lista.find((m) => m.id === 'financeiro')
+  assert.deepEqual(financeiro.telas.map((t) => t.id), ['caixa'])
+  assert.doesNotMatch([financeiro.faz, ...financeiro.passos].join(' '), /Contas a pagar|Contas a receber|Relatórios|categorias/i)
+  const entregas = lista.find((m) => m.id === 'entregas')
+  assert.deepEqual(entregas.telas.map((t) => t.id), ['painel', 'agenda'])
+  assert.doesNotMatch([entregas.faz, ...entregas.passos].join(' '), /Janelas de entrega|ajuste horários/i)
+})
+
+await confere('D3. acesso só a contas a pagar preserva suas instruções sem sugerir contas a receber', () => {
+  const acoes = { visualizarContasPagar: true }
+  const financeiro = guia.guiaDoConsole({ rota: rotaModulo('financeiro', 'pagar'), fonteApi: true, permite: todos, acoes })
+    .find((m) => m.id === 'financeiro')
+  assert.ok(financeiro.telas.some((t) => t.id === 'pagar'))
+  assert.ok(!financeiro.telas.some((t) => t.id === 'receber'))
+  assert.match(financeiro.passos.join(' '), /Contas a pagar/)
+  assert.doesNotMatch(financeiro.passos.join(' '), /Contas a receber/)
+})
+
+await confere('D4. ajuda da tela de entregas não orienta abrir janelas sem acesso', () => {
+  const contexto = contextoDaAjuda(rotaModulo('entregas', 'painel'), true, { acoes: {}, permite: todos })
+  assert.doesNotMatch(contexto.passos.join(' '), /Janelas de entrega/)
+  const hallDaCozinha = contextoDaAjuda({ tipo: 'hall' }, true, { acoes: {}, permite: (id) => id === 'cozinha' })
+  assert.doesNotMatch(hallDaCozinha.passos.join(' '), /Atendimento|Conversas|Balcão/)
+})
+
+await confere('D5. guia e instruções usam o nome Conversas que existe no menu', () => {
+  const atendimento = guia.guiaDoConsole({ rota: rotaBalcao, fonteApi: true, permite: todos }).find((m) => m.id === 'atendimento')
+  assert.match([atendimento.faz, ...atendimento.passos].join(' '), /Conversas/)
+  assert.doesNotMatch([atendimento.faz, ...atendimento.passos].join(' '), /Balcão/)
+  assert.doesNotMatch(contextoDaAjuda({ tipo: 'hall' }, true).passos.join(' '), /Balcão/)
+})
+
 await confere('E. o Atendimento ensina a ligar os avisos com o console fechado', () => {
   const passos = guia.GUIA_POR_MODULO.atendimento.passos.join(' ')
   assert.match(passos, /Ativar avisos neste aparelho/)
@@ -93,7 +127,7 @@ await confere('E. o Atendimento ensina a ligar os avisos com o console fechado',
 
 await confere('F. diagnóstico segue o mesmo', () => {
   const texto = diagnosticoDoConsole({ rota: rotaBalcao, fonteApi: true, versao: 'abc1234', onLine: true })
-  assert.match(texto, /^Diagnóstico do Console EasyStok\nTela: Atendimento · Balcão\nVersão: abc1234/)
+  assert.match(texto, /^Diagnóstico do Console EasyStok\nTela: Atendimento · Conversas\nVersão: abc1234/)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

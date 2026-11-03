@@ -751,15 +751,52 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("CorrigidoPorUsuarioId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CotacaoId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<int>("CustoCentavos")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CustoCotadoCentavos")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("EncerradaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IdExterno")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("IdExternoAnterior")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("LinkRastreio")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Motorista")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<DateTime?>("MotoristaAtribuidoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MotoristaIdExterno")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("MotoristaPlaca")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("MotoristaTelefone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<int>("Origem")
                         .HasColumnType("integer");
@@ -773,15 +810,29 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid>("RegistradoPorUsuarioId")
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Veiculo")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("ViagemId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ViagemId");
-
                     b.HasIndex("EmpresaId", "ViagemId")
                         .HasDatabaseName("ix_corridas_externas_empresa_viagem");
+
+                    b.HasIndex(new[] { "ViagemId" }, "IX_corridas_externas_ViagemId");
+
+                    b.HasIndex(new[] { "Provedor", "IdExterno" }, "ux_corridas_externas_provedor_id_externo")
+                        .IsUnique()
+                        .HasFilter("\"IdExterno\" IS NOT NULL");
+
+                    b.HasIndex(new[] { "ViagemId" }, "ux_corridas_externas_viagem_ativa")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN (1, 2, 3, 4)");
 
                     b.ToTable("corridas_externas", null, t =>
                         {
@@ -2081,6 +2132,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("Endereco")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<string>("FotoChave")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<string>("InscricaoEstadual")
                         .HasMaxLength(20)
@@ -5819,6 +5874,221 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasDatabaseName("ix_mobile_products_empresa_carimbo");
 
                     b.ToTable("mobile_products");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Mobile.PushInstallation", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ApkVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("apk_version");
+
+                    b.Property<long>("IssuedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("issued_at");
+
+                    b.Property<long>("LastSeenAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("public_key");
+
+                    b.Property<long>("RegisteredAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("registered_at");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("token");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("mobile_push_installations", null, t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Mobile.PushMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("InstallationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("installation_id");
+
+                    b.Property<string>("Nonce")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("nonce");
+
+                    b.Property<string>("PayloadBase64")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("payload_base64");
+
+                    b.Property<string>("SignatureBase64")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("signature_base64");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nonce")
+                        .IsUnique();
+
+                    b.HasIndex("InstallationId", "ExpiresAt");
+
+                    b.ToTable("mobile_push_messages", null, t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Mobile.PushProviderEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("InstallationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("installation_id");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<string>("ProviderMessageId")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("provider_message_id");
+
+                    b.Property<long>("RecordedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId");
+
+                    b.ToTable("mobile_push_provider_events", null, t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Mobile.PushReceipt", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ApkVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("apk_version");
+
+                    b.Property<long>("ConfirmedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("event");
+
+                    b.Property<string>("InstallationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("installation_id");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<long>("OccurredAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("PayloadBase64")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("payload_base64");
+
+                    b.Property<string>("SignatureBase64")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("signature_base64");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId", "InstallationId", "Event", "Source")
+                        .IsUnique();
+
+                    b.ToTable("mobile_push_receipts", null, t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.MobileProcessedMutation", b =>

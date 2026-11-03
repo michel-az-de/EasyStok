@@ -1,13 +1,11 @@
-/* Área de toque de 12 px (seção 9 da direção visual). Rodada 6: a linha de
-   ponta a ponta virou uma pega de 4 x 40 px no meio do vão entre painéis,
-   que cresce no hover e vira a altura inteira em --marca no foco e no arrasto. */
+/* A alça aparece no hover, foco e arrasto, deixando o vão livre em repouso. */
 .alca {
   flex-shrink: 0; width: 12px; align-self: stretch;
   display: flex; align-items: center; justify-content: center;
   cursor: col-resize; touch-action: none;
 }
 .linha {
-  width: 4px; height: 40px; background: var(--linha-media); border-radius: var(--r-pilula);
+  width: 4px; height: 40px; background: transparent; border-radius: var(--r-pilula);
   transition:
     height var(--dur-media) var(--ease-mola),
     background-color var(--dur-curta) var(--ease-padrao);

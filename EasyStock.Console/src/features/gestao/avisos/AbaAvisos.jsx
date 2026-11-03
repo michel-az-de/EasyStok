@@ -98,7 +98,7 @@ function FormularioDeAvisos() {
       <div className={css.secao} role="alert">
         <p className={css.erro}>Os avisos não carregaram: {carga.mensagem}</p>
         <div className={css.acoes}>
-          <Botao className={css.toque} onClick={() => { setCarga({ estado: 'carregando' }); buscar() }}>Tentar novamente</Botao>
+          <Botao className={css.toque} onClick={() => { setCarga({ estado: 'carregando' }); buscar() }}>Tentar de novo</Botao>
         </div>
       </div>
     )
@@ -168,12 +168,12 @@ export function AbaAvisos() {
   return (
     <div className={css.aba}>
       <p className={css.introducao}>
-        Vão para a dona e o gerente por aviso no aparelho, e-mail e sino. Para receber no aparelho, ative em
+        A gerência recebe os avisos no aparelho, por e-mail e no sino. Para receber no aparelho, use
         {' '}&lsquo;Ativar avisos neste aparelho&rsquo; no sino.
       </p>
       {acoes.editarAtendimento === true
         ? <FormularioDeAvisos />
-        : <p className={css.descricao}>Os avisos são configurados pela dona.</p>}
+        : <p className={css.descricao}>A configuração dos avisos fica com a administração da loja.</p>}
     </div>
   )
 }

@@ -492,7 +492,7 @@ await conferirAssincrono('convite de dona acessível: a caixa lê a explicação
     digitar(tela, 'E-mail', 'bia@exemplo.test')
     escolher(tela, 'Perfil', 'p-adm')
     const caixa = caixaDe(tela, 'Convidar como dona')
-    const [dica] = elementos(tela, (no) => no.localName === 'p' && no.textContent.startsWith('A dona pode tudo'))
+    const [dica] = elementos(tela, (no) => no.localName === 'p' && no.textContent.startsWith('Quem é dona pode tudo'))
     assert.ok(dica?.getAttribute('id'), 'a explicação tem id')
     assert.equal(caixa.getAttribute('aria-describedby'), dica.getAttribute('id'), 'a caixa aponta para a explicação')
 

@@ -46,6 +46,7 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
             "img-src 'self' data: https:; " +
             "font-src 'self' data: https://fonts.gstatic.com; " +
             "connect-src 'self'; " +
+            "frame-src 'self' https://www.google.com; " +
             "frame-ancestors 'none'; " +
             "base-uri 'self'; " +
             "form-action 'self'";

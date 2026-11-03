@@ -100,7 +100,7 @@ export function FolhaResumo({
         <p className={css.nomeCliente}>{nomeCliente}</p>
         <p className={css.subCliente}>{[canalNome, telefone].filter(Boolean).join(' · ')}</p>
         {resumo.converteu === 'sim' && (
-          <p className={css.conversao}>Lead que virou cliente neste atendimento</p>
+          <p className={css.conversao}>Primeira compra neste atendimento</p>
         )}
       </div>
 
@@ -123,7 +123,7 @@ export function FolhaResumo({
           )}
         </div>
         <div className={css.estatistica}>
-          <p className={css.rotuloEstatistica}>Converteu</p>
+          <p className={css.rotuloEstatistica}>Novo cliente</p>
           <p className={css.valorEstatistica + ' ' + css.valorTexto}>{ROTULO_CONVERTEU[resumo.converteu]}</p>
         </div>
       </div>

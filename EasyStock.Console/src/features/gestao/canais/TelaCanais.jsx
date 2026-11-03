@@ -14,7 +14,7 @@ import { TesteEmailDaSessao } from './TesteEmailDaSessao'
 import css from './TelaCanais.module.css'
 
 const LIGADAS = [
-  { href: hashDoModulo('atendimento'), icone: 'conversa', titulo: 'Balcão', detalhe: 'As conversas do WhatsApp chegam aqui' },
+  { href: hashDoModulo('atendimento'), icone: 'conversa', titulo: 'Conversas', detalhe: 'As conversas do WhatsApp chegam aqui' },
   {
     href: hashDoModulo('atendimento', 'horarios'), icone: 'relogio',
     titulo: 'Horários e mensagens', detalhe: 'O que o cliente recebe com a loja fechada',

@@ -12,6 +12,9 @@ public interface IClienteCrmRepository
     /// <summary>Notas mais recentes primeiro.</summary>
     Task<IReadOnlyList<ClienteNota>> ListarNotasAsync(Guid empresaId, Guid clienteId, int maximo, CancellationToken ct = default);
 
+    Task<IReadOnlyList<ClienteNota>> ListarPaginaNotasAsync(Guid empresaId, Guid clienteId, int ignorar, int quantidade, CancellationToken ct = default);
+    Task<ClienteNota?> ObterNotaAsync(Guid empresaId, Guid clienteId, Guid notaId, CancellationToken ct = default);
+
     Task AdicionarNotaAsync(ClienteNota nota, CancellationToken ct = default);
 
     /// <summary>true só quando o pedido existe na empresa e é deste cliente.</summary>

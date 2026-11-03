@@ -161,12 +161,13 @@ public sealed class IniciarCheckoutGuestUseCase(
             storefrontId, itensPedidos.Select(i => i.CardapioItemId), ct);
         CheckoutCoreService.ValidarItens(itensPedidos, cardapioItens);
 
-        var pedido = DomainPedido.Criar(empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest);
+        var pedido = DomainPedido.Criar(
+            empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest,
+            statusInicial: StatusPedido.AguardandoAprovacaoBaba);
         await enderecoEntrega.RegistrarAsync(pedido,
             input.EnderecoEntrega ?? new EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega(null, input.Numero, null, null, null, null, input.Cep), ct);
         pedido.ClienteNome = nome;
         pedido.ClienteTelefone = telefoneE164;
-        pedido.Status = StatusPedidoMapper.AguardandoAprovacaoBaba;
         pedido.Observacoes = MontarObservacoes(input.Observacoes, cep, input.Numero);
         await pedidoRepository.AddAsync(pedido, ct);
 

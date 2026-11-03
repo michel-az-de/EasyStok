@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
+import { CELULAR, useTamanhoTela } from '../../hooks/useTamanhoTela'
 import { CartaoConversa } from './CartaoConversa'
 import { BarraBalcao } from './BarraBalcao'
 import { NaoEntregues } from './NaoEntregues'
+import { focaOCampoAoAbrir, focarCampoDeMensagem, temPonteiroFino } from './focoDoCampo'
 import css from './caixa.module.css'
 
 // Grupo recolhido do fim de "Todas" (seção 1): Encerradas e Bloqueados, cada
@@ -53,7 +55,7 @@ function VazioEmLinha({ texto, acao, aoAgir }) {
 }
 
 // #1408: `buscaDeClientes` é o componente que a Moldura entrega para a busca achar cliente cadastrado sem conversa.
-export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = null }) {
+export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = null, acoesCabecalho }) {
   const {
     conversas, visiveis, encerradasDoBalcao, bloqueadasDoBalcao, selecionadaId, filtros, agora,
     automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos, fonteApi,
@@ -71,10 +73,21 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
     setGruposAbertos({ encerradas: abrir, bloqueados: abrir })
   }
 
+  // #2135: abrir a conversa leva o foco ao campo de mensagem, por clique ou por teclado, menos no
+  // celular. O campo só existe na tela depois que a conversa nova monta, então o pedido espera o commit.
+  const tamanho = useTamanhoTela()
+  const [pedidosDeFoco, setPedidosDeFoco] = useState(0)
+  useEffect(() => {
+    if (pedidosDeFoco > 0) focarCampoDeMensagem()
+  }, [pedidosDeFoco])
+
   // #1577: identidade fixa, senão o `memo` do cartão não segura.
   const abrir = useChamadaEstavel((id) => {
     selecionar(id)
     aoAbrir?.(id)
+    if (focaOCampoAoAbrir({ celular: tamanho === CELULAR, ponteiroFino: temPonteiroFino() })) {
+      setPedidosDeFoco((n) => n + 1)
+    }
   })
 
   function alternarGrupo(chave) {
@@ -117,7 +130,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
 
   return (
     <>
-      <BarraBalcao filtros={filtros} aoMudar={mudarFiltro} />
+      <BarraBalcao filtros={filtros} aoMudar={mudarFiltro} acoesCabecalho={acoesCabecalho} />
       <NaoEntregues aoAbrir={aoAbrir} />
       <div
         className={css.rolagem}

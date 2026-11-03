@@ -133,11 +133,11 @@ await confere('1. falha e volta da sincronização ainda trocam o estado', () =>
   assert.equal(voltou.conversas, primeiro.conversas, 'a lista não mudou, só a situação da sincronização')
 })
 
-await confere('1. conversa que saiu da lista sai do estado e a seleção anda', () => {
+await confere('1. conversa que saiu da lista sai do estado e a seleção some com ela (#2135: nenhuma, não a primeira do servidor)', () => {
   const primeiro = { ...partida(), selecionadaId: 'c-2' }
   const semSegunda = sincronizar(primeiro, leitura().slice(0, 1))
   assert.equal(semSegunda.conversas.length, 1)
-  assert.equal(semSegunda.selecionadaId, 'c-1')
+  assert.equal(semSegunda.selecionadaId, null)
 })
 
 // --- 2. Consulta que se repete sozinha ---------------------------------------------------

@@ -809,7 +809,7 @@ await provar('D9 "Concluir" recusado com 403 HIERARQUIA mostra o motivo e não s
   servidor(estadoDaApi({}, {}, { ehDona: false, podeConcluir: false, abrirSozinho: false }))
   const outra = await montarTela({ passo: 'pronto' })
   assert.ok(!botao(outra.raiz, 'Concluir'), 'Administração não vê Concluir')
-  assert.match(todoTexto(outra.raiz), /Só a dona conclui os primeiros passos\./)
+  assert.match(todoTexto(outra.raiz), /Só quem é dona da loja conclui os primeiros passos\./)
 })
 
 await provar('D10 "Continuar depois": a dona adia (POST) e vai à porta de entrada; a Administração só sai', async () => {

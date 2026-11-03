@@ -57,8 +57,10 @@ function Digitando() {
 function PostIt({ nota }) {
   return (
     <aside className={css.postIt} aria-label="Nota interna">
-      <span className={css.postItQuem}><Icone nome="nota" /> Nota interna · {nota.autor} · {nota.em}</span>
-      <p>{nota.texto}</p>
+      <details className={css.eventoNota}>
+        <summary aria-label={`Nota interna${nota.autor ? ` de ${nota.autor}` : ''}${nota.em ? `, ${nota.em}` : ''}`}><span className={css.postItQuem}><Icone nome="lock" /> Nota interna · {nota.autor} · {nota.em}</span><span className={css.verNota}>Ver nota</span></summary>
+        <p>{nota.texto}</p>
+      </details>
     </aside>
   )
 }

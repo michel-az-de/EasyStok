@@ -3,11 +3,16 @@ import { complementoDaResposta, podeAceitarComplemento, perguntaDeComplemento } 
 import { perguntarAssistente } from '../infra/api/assistenteApi'
 import { EVENTO_SESSAO_ALTERADA, identidadeDaSessao, lerSessao } from '../infra/api/sessao'
 import { combinarSinais } from '../infra/api/sinais'
+import { useComplementoLigado } from './preferenciaDoComplemento'
 
 let emVoo = null
 let proximaChamada = 0
 
-export function useComplementoDeTexto({ texto = '', contexto, conversaId, ativo, aoCompletar, limite = 2000 }) {
+export function useComplementoDeTexto({ texto = '', contexto, conversaId, revisaoContexto = '', ativo: ativoPelaTela, aoCompletar, limite = 2000 }) {
+  // #2134: a chave da pessoa vence a tela. Desligado, nenhuma chamada ao provedor sai.
+  const [ligadoPelaPessoa] = useComplementoLigado()
+  const [visivel, setVisivel] = useState(() => document.visibilityState === 'visible')
+  const ativo = ativoPelaTela && ligadoPelaPessoa && visivel
   const [focado, setFocado] = useState(false)
   const [identidade, setIdentidade] = useState(() => identidadeDaSessao(lerSessao()))
   const [resposta, setResposta] = useState(null)
@@ -15,11 +20,21 @@ export function useComplementoDeTexto({ texto = '', contexto, conversaId, ativo,
   const cache = useRef(new Map())
   const campo = useRef(null)
   const ultimaAceita = useRef(null)
-  const chave = JSON.stringify([identidade, conversaId, contexto, texto, limite])
+  const controleAtual = useRef(null)
+  const chave = JSON.stringify([identidade, conversaId, contexto, revisaoContexto, texto, limite])
   const atual = useRef(chave)
-  atual.current = chave
+  atual.current = ativo ? chave : null
 
   useEffect(() => { setDispensada(null) }, [chave])
+
+  useEffect(() => {
+    const atualizar = () => {
+      if (document.visibilityState !== 'visible') controleAtual.current?.abort()
+      setVisivel(document.visibilityState === 'visible')
+    }
+    document.addEventListener('visibilitychange', atualizar)
+    return () => document.removeEventListener('visibilitychange', atualizar)
+  }, [])
 
   useEffect(() => {
     const atualizar = () => { cache.current.clear(); setIdentidade(identidadeDaSessao(lerSessao())); setResposta(null) }
@@ -32,12 +47,14 @@ export function useComplementoDeTexto({ texto = '', contexto, conversaId, ativo,
     if (!ativo || !focado || !lerSessao() || dispensada === chave || ultimaAceita.current === chave
       || texto.trim().length < 16 || texto.length > 1000 || texto.startsWith('/')) return
     const controle = new AbortController()
+    controleAtual.current = controle
     const guardada = cache.current.get(chave)
     const aplicar = (complemento) => {
-      if (!controle.signal.aborted && atual.current === chave && identidadeDaSessao(lerSessao()) === identidade)
+      if (!controle.signal.aborted && document.visibilityState === 'visible' && atual.current === chave && identidadeDaSessao(lerSessao()) === identidade)
         setResposta({ chave, complemento })
     }
     const temporizador = setTimeout(async () => {
+      if (controle.signal.aborted || document.visibilityState !== 'visible' || atual.current !== chave) return
       if (guardada && guardada.ate > Date.now()) { aplicar(guardada.complemento); return }
       if (emVoo) return
       emVoo = controle
@@ -57,15 +74,15 @@ export function useComplementoDeTexto({ texto = '', contexto, conversaId, ativo,
       } catch { /* Sugestão opcional: a escrita e o envio continuam disponíveis. */ }
       finally { if (emVoo === controle) emVoo = null }
     }, guardada && guardada.ate > Date.now() ? 0 : Math.max(1200, proximaChamada - Date.now()))
-    return () => { clearTimeout(temporizador); controle.abort() }
+    return () => { clearTimeout(temporizador); controle.abort(); if (controleAtual.current === controle) controleAtual.current = null }
   }, [ativo, focado, texto, contexto, conversaId, identidade, chave, dispensada, limite])
 
   const complemento = ativo && resposta?.chave === chave && dispensada !== chave ? resposta.complemento : ''
   const aceitar = () => {
-    if (!complemento || identidadeDaSessao(lerSessao()) !== identidade) return false
+    if (!complemento || document.visibilityState !== 'visible' || atual.current !== chave || identidadeDaSessao(lerSessao()) !== identidade) return false
     setDispensada(chave)
     const completo = texto + complemento
-    ultimaAceita.current = JSON.stringify([identidade, conversaId, contexto, completo, limite])
+    ultimaAceita.current = JSON.stringify([identidade, conversaId, contexto, revisaoContexto, completo, limite])
     aoCompletar(completo)
     requestAnimationFrame(() => {
       if (atual.current === ultimaAceita.current && identidadeDaSessao(lerSessao()) === identidade && campo.current?.isConnected) {

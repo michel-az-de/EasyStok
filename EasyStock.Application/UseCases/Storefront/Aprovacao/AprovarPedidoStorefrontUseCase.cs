@@ -90,7 +90,7 @@ public sealed class AprovarPedidoStorefrontUseCase(
 
             // 4. Aplicar transição + audit trail.
             var agora = DateTime.UtcNow;
-            pedido.Status = StatusPedidoMapper.AprovadoBaba;
+            pedido.MudarStatus(StatusPedido.AprovadoBaba);
             pedido.AprovadoEm = agora;
             pedido.AprovadoPorUsuarioId = input.UsuarioId;
             pedido.AlteradoEm = agora;

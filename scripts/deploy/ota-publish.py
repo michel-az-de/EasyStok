@@ -128,7 +128,10 @@ def publish(root, staging, mode):
         release_name = "release-" + str(payload["sequence"]) + ".json"
         require(releases[0].name == release_name, "Nome da release diverge da sequencia.")
         data = releases[0].read_bytes()
-        latest = root / "latest.json"
+        # APKs antigos consultam o caminho global; versões novas têm ponteiros compatíveis próprios.
+        channel_root = root / ("native-" + str(payload["nativeVersionCode"])) if payload["nativeVersionCode"] >= 5 else root
+        require(not channel_root.is_symlink() and (not channel_root.exists() or channel_root.is_dir()), "Diretorio do canal invalido.")
+        latest = channel_root / "latest.json"
         if latest.exists():
             require(trusted_key.exists(), "Manifesto sem chave confiavel.")
             current = manifest(latest, trusted_key)
@@ -148,8 +151,9 @@ def publish(root, staging, mode):
         else:
             require(trusted_key.exists() and (root / release_name).read_bytes() == data, "Release nao instalada.")
             verify_zip(bundle_dir / "bundle.zip", payload)
+            channel_root.mkdir(exist_ok=True)
             if latest.exists() and latest.read_bytes() != data:
-                replace(root / "previous.json", latest.read_bytes())
+                replace(channel_root / "previous.json", latest.read_bytes())
             replace(latest, data)
             shutil.rmtree(staging)  # Tudo já está nos caminhos imutáveis; o staging não fica servido.
         return {"phase": mode, "sequence": payload["sequence"], "sha256": payload["sha256"]}

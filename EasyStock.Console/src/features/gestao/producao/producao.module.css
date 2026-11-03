@@ -16,11 +16,10 @@
 .legenda { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .legendaFina { color: var(--tinta-3); font-size: var(--t-apoio); }
 
-/* Cartão de formulário (registrar produção / ajustar contagem): mesma moldura
-   da direção visual, papel elevado com borda fina. */
+/* Formulários em superfície preenchida, com espaço entre os grupos. */
 .cartao {
   display: grid; gap: var(--e-3); padding: var(--e-4);
-  border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
+  border: 0; border-radius: var(--r-2); background: var(--elevado);
 }
 .tituloCartao { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
 
@@ -39,7 +38,7 @@
 .linhaPorcao {
   display: grid; gap: var(--e-2); align-items: end;
   grid-template-columns: minmax(140px, 1fr) 90px 90px minmax(120px, 1fr) auto auto;
-  padding: var(--e-2); border: var(--b-1) dashed var(--linha-media); border-radius: var(--r-1);
+  padding: var(--e-2); border: 0; border-radius: var(--r-1); background: var(--preenchimento);
 }
 @media (max-width: 640px) {
   .linhaPorcao { grid-template-columns: 1fr 1fr; }
@@ -55,7 +54,7 @@
    `tr` siga como item direto do grid do `<table>`; cada `tr` é, por sua vez,
    grid container das próprias células, igual à divisão de colunas antiga. */
 .tabela {
-  display: grid; gap: 0; width: 100%; border: var(--b-1) solid var(--linha);
+  display: grid; gap: 0; width: 100%; border: 0;
   border-radius: var(--r-2); overflow: hidden; border-collapse: collapse;
 }
 .tabela thead, .tabela tbody { display: contents; }
@@ -85,8 +84,8 @@
 
 .linhaLote {
   display: grid; gap: var(--e-1); padding: var(--e-3);
-  border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
-}
+  border: 0; border-radius: var(--r-2);
+ background: var(--preenchimento); }
 .cabecalhoLote { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .porcoesLote { margin: var(--e-1) 0 0; padding-left: var(--e-4); font-size: var(--t-apoio); color: var(--tinta-2); }
 

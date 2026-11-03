@@ -80,6 +80,12 @@ public sealed class BackgroundJobOptions
     public bool EnableCobrancaPedido { get; set; } = true;
 
     /// <summary>
+    /// Consulta de contingência das corridas da Lalamove (#2160, R6): a cada 2 min reconsulta as corridas em curso,
+    /// porque o webhook pode não chegar (<c>BackgroundJobs:EnableCorridasLalamove</c>). Default true; <c>false</c> é o rollback.
+    /// </summary>
+    public bool EnableCorridasLalamove { get; set; } = true;
+
+    /// <summary>
     /// Quando <c>true</c>, registra o <c>ImpressaoPendenteAlertaJob</c> (S20): a cada 2 min publica
     /// <c>impressao.atrasada</c> para canhoto pendente há mais de 3 min
     /// (<c>BackgroundJobs:EnableImpressaoPendenteAlerta</c>). Default true; <c>false</c> desliga o alerta.

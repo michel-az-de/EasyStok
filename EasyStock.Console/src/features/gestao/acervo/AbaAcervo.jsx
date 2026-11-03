@@ -46,7 +46,7 @@ function EscolhaDeImagem({ listar, ocupado, pratoId, aoEscolher }) {
       <Botao disabled={imagens.length < 60 || carregando || ocupado} onClick={() => setPagina(pagina + 1)}>Próxima</Botao>
       {busca && <Botao disabled={ocupado} onClick={() => { setBusca(''); setPagina(0) }}>Limpar busca</Botao>}
     </div>
-    {carregando ? <output>Carregando imagens…</output> : erro ? <div><p role="alert" className={css.erro}>{erro}</p><Botao disabled={ocupado} onClick={() => setTentativa(tentativa + 1)}>Tentar novamente</Botao></div> : <>
+    {carregando ? <output>Carregando imagens…</output> : erro ? <div><p role="alert" className={css.erro}>{erro}</p><Botao disabled={ocupado} onClick={() => setTentativa(tentativa + 1)}>Tentar de novo</Botao></div> : <>
       <div className={css.grade}>{imagens.filter(i => i.aprovadoEm).map(i =>
         <button type="button" key={i.id} className={css.cartao} disabled={ocupado} onClick={() => aoEscolher(i)}>
           <Foto imagem={i} /><strong>{i.titulo}</strong><span>{ids(i).includes(pratoId) ? 'Já vinculada a este prato' : i.origem + ' · ' + i.formato}</span>

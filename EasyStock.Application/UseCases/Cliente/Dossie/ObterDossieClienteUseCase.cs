@@ -72,7 +72,8 @@ public sealed class ObterDossieClienteUseCase(
         var compras = historico.Where(EhCompra).ToList();
 
         return new DossieClienteDto(
-            new DossieClienteDados(cliente.Id, cliente.Nome, cliente.Telefone, cliente.Email, cliente.Observacoes, cliente.MotivoBloqueio),
+            new DossieClienteDados(cliente.Id, cliente.Nome, cliente.Telefone, cliente.Email, cliente.Observacoes, cliente.MotivoBloqueio,
+                EasyStock.Application.UseCases.Cliente.Foto.ClienteFotoUseCase.Url(cliente)),
             cliente.Enderecos
                 .OrderByDescending(e => e.Padrao).ThenByDescending(e => e.CriadoEm)
                 .Select(e => new ClienteEnderecoResult(

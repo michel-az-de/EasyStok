@@ -165,7 +165,7 @@ await confere('Cozinha: com a tela aberta em Amanhã, a virada devolve a fila de
   el = t.renderizar()
   assert.equal(g.cozinha.args.data, '2026-03-15')
   assert.equal(chip(el, 'Amanhã').props.ativo, true)
-  assert.match(texto(el), /Nenhum pedido pago para amanhã ainda\./)
+  assert.match(texto(el), /Nenhum pedido liberado para o preparo de amanhã ainda\./)
 
   g.agora = VIRADA
   el = t.renderizar()

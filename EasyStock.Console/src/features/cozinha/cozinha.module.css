@@ -9,7 +9,7 @@
 }
 .topoPagina {
   display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
-  padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
+  padding: var(--e-3) var(--e-4); border-bottom: 0;
   flex-shrink: 0;
 }
 .topoPagina h1 { margin: 0; font-size: var(--t-forte); font-weight: 700; flex: 1; }
@@ -17,7 +17,7 @@
 
 .aviso {
   margin: var(--e-4); padding: var(--e-4); text-align: center;
-  background: var(--elevado); border: var(--b-1) dashed var(--linha-forte);
+  background: var(--elevado); border: 0;
   border-radius: var(--r-2); color: var(--tinta-2);
 }
 
@@ -68,13 +68,12 @@
 .listaColuna { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); min-height: 60px; overflow-y: auto; }
 
 /* --- Cartão de pedido ------------------------------------------------------
-   Cor + rótulo escrito, nunca cor sozinha (RN-30). O trilho de 4px carrega a
-   cor, o texto do rótulo carrega o significado: quem não distingue cor lê o
-   rótulo, quem bate o olho lê a cor. */
+   O rótulo escrito identifica o estado (RN-30); sua cor reforça a leitura
+   sem acrescentar um trilho decorativo ao cartão. */
 .cartao {
   display: grid; gap: var(--e-2); padding: var(--e-3);
-  background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
-  border-left-width: 4px;
+  background: var(--papel); border: var(--b-1) solid transparent; border-radius: var(--r-2);
+  border-left-width: 0;
 }
 .cor-esperando { border-left-color: var(--info); }
 .cor-atraso { border-left-color: var(--erro); }
@@ -263,14 +262,14 @@ escritos e desliga as animações, inclusive a volta do overlay. */
 }
 
 .aoVivo { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--tinta-2); font-size: var(--t-apoio); }
-.pontoVivo { position: relative; width: 8px; height: 8px; border-radius: 50%; background: var(--tinta-3); }
+.pontoVivo { position: relative; width: 8px; height: 8px; border-radius: var(--r-1); background: var(--tinta-3); }
 .aoVivoLigado .pontoVivo { background: var(--sucesso); }
 /* #1577: o anel do "ao vivo" pulsa o dia inteiro no KDS. Em `box-shadow`, cada quadro repintava
    a página; num disco sobre o ponto, só com `transform` e `opacity`, quem anima é o compositor.
    O desenho é o mesmo: o disco vai de 8 a 20 px (o ponto mais 6 px de anel de cada lado) e de 50%
    a transparente, e sobre o ponto a cor dele é a do próprio ponto. */
 .aoVivoLigado .pontoVivo::after {
-  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  content: ''; position: absolute; inset: 0; border-radius: var(--r-1);
   background: var(--sucesso); opacity: 0; pointer-events: none;
   animation: pulsarVivo 2s var(--ease-padrao) infinite;
 }
@@ -313,7 +312,7 @@ escritos e desliga as animações, inclusive a volta do overlay. */
 .trilha { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-3); font-size: var(--t-apoio); }
 .trilha > li { display: inline-flex; align-items: center; gap: var(--e-1); }
 .marcaEtapa {
-  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: var(--r-1);
   font-family: var(--f-dado); font-size: 12px; border: var(--b-1) solid var(--linha-forte); color: var(--tinta-3);
 }
 .etapa-feita { color: var(--tinta-2); }

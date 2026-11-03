@@ -39,7 +39,7 @@ export function CadastroEntregadores({ entregadores, ocupado, acoes, aoMudarPend
         <CampoTexto rotulo="Telefone" tipo="tel" {...campo('telefone')} />
         <CampoTexto rotulo="Veículo" {...campo('veiculo')} />
         <CampoTexto rotulo="Placa" {...campo('placa')} />
-        <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar</Botao>
+        <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar entregador</Botao>
       </form>
       {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
       <h3>Ativos</h3>

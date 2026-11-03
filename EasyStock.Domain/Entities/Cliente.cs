@@ -19,6 +19,7 @@ using EasyStock.Domain.ValueObjects;
         public Guid EmpresaId { get; set; }
 
         public string Nome { get; set; } = null!;
+        public string? FotoChave { get; set; }
 
         // ── Campos primários (snapshot rápido — usado pelo app) ─────────
         public string? Apt { get; set; }

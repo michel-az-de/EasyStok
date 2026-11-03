@@ -15,6 +15,8 @@ public sealed class PublicUploadFileProviderTests
     [InlineData("atendimento/empresa/conversa/7baba59f-cad2-480a-859c-656d502d517e.jpg", true)]
     [InlineData("acervo//empresa/foto.jpg", false)]
     [InlineData("produtos/empresa/foto.jpg", true)]
+    [InlineData("clientes/empresa/cliente/foto.jpg", false)]
+    [InlineData("clientes//empresa/cliente/foto.jpg", false)]
     public void SomenteMidiaGeradaParaEnvioFicaPublicaNoAtendimento(string subpath, bool publica)
     {
         var root = Path.Combine(Path.GetTempPath(), "easystok-public-upload-" + Guid.NewGuid().ToString("N"));

@@ -54,7 +54,7 @@ export function descreverAcaoDoAssistente(acao, nomeCliente) {
   const nome = nomeCliente ? primeiroNome(nomeCliente) : 'o cliente'
   switch (acao.tipo) {
     case ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO:
-      return { titulo: 'IA no atendimento', detalhe: `Continuar a conversa com ${nome} no modo automático.`, botao: 'IA assumir atendimento', feito: 'Atendimento automático retomado', saiParaCliente: false }
+      return { titulo: 'Assistente', detalhe: `O Assistente volta a responder a conversa com ${nome}.`, botao: 'Retomar Assistente', feito: 'Assistente retomado', saiParaCliente: false }
     case ACOES_DO_ASSISTENTE.ENVIAR_CARDAPIO:
       return { titulo: 'Mandar o cardápio', detalhe: `Link do cardápio para ${nome}.`, botao: 'Enviar ao cliente', feito: 'Cardápio enviado', saiParaCliente: true }
     case ACOES_DO_ASSISTENTE.NOTA_INTERNA:

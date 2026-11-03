@@ -1,0 +1,24 @@
+.coluna { display: grid; gap: 0; min-width: 0; }
+.cabecalho { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
+.abrirNotas { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); min-width: var(--toque); padding: 0; border: 0; background: transparent; font: inherit; font-size: var(--t-apoio); cursor: pointer; }
+.abrirNotas span { color: var(--tinta-2); }
+.abrirNotas[aria-expanded='true'] svg { transform: rotate(180deg); }
+.lista { display: grid; gap: var(--e-2); max-height: min(32dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
+.lista[hidden] { display: none; }
+.acoesCliente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.nota, .solto { border: 0; border-radius: 0; color: var(--tinta); }
+.solto { background: var(--alerta-pastel); }
+.nota { padding: var(--e-2); background: var(--preenchimento); animation: aparecer var(--dur-curta) var(--ease-padrao); }
+.nota small, .corpo small { color: var(--tinta-2); font-size: var(--t-minimo); }
+.texto { margin: var(--e-2) 0; font-family: var(--f-corpo); font-size: var(--t-apoio); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.nota .texto { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.soltar { padding: 0; min-height: var(--toque); border: 0; background: transparent; color: var(--tinta-2); font: inherit; font-size: var(--t-minimo); cursor: pointer; }
+.referencia { display: flex; align-items: center; gap: var(--e-2); min-width: 0; min-height: var(--toque); color: var(--tinta-2); font-size: var(--t-minimo); }
+.referencia span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recolher { display: grid; place-items: center; flex: none; width: var(--toque); height: var(--toque); padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; cursor: pointer; }
+.corpo .texto { margin-top: 0; font-family: var(--f-manuscrita); font-size: 1.5rem; line-height: 1.35; }
+.erro { margin: 0; font-size: var(--t-minimo); color: var(--erro); }
+.avisoMesa { position: fixed; right: var(--e-3); bottom: var(--e-3); z-index: 121; max-width: min(420px, calc(100vw - 24px)); padding: var(--e-3); background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-media); font-size: var(--t-minimo); }
+.avisoMesa button { min-height: var(--toque); padding: 0 var(--e-2); border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+@keyframes aparecer { from { opacity: .9; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nota { animation: none; } }

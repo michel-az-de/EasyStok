@@ -83,7 +83,7 @@ function FichaDoItem({ item, adicionais, linhas, aoEditar }) {
     <div className={css.ficha}>
       {(detalhe?.descricao || item.descricao) && <p className={css.descricaoPrato}>{detalhe?.descricao || item.descricao}</p>}
       {fonteApi && !detalhe && !erro && <output>Consultando informações do prato…</output>}
-      {erro && <p role="alert">{erro} <Botao variante="texto" onClick={() => setTentativa((v) => v + 1)}>Tentar novamente</Botao></p>}
+      {erro && <p role="alert">{erro} <Botao variante="texto" onClick={() => setTentativa((v) => v + 1)}>Tentar de novo</Botao></p>}
       <dl className={css.dados}>
         <div><dt>Como sai</dt><dd>{linhas[item.linha]?.dica}</dd></div>
         {detalhe && <>
@@ -690,8 +690,8 @@ export function PainelCardapio({
                 <Icone nome={amplo ? 'reduzir' : 'ampliar'} />
               </button>
             )}
-            <button type="button" ref={fecharRef} className={css.fechar} onClick={aoFechar}>
-              <Icone nome="fechar" rotulo="Fechar cardápio" />
+            <button type="button" ref={fecharRef} className={css.fechar} aria-label="Fechar cardápio" title="Fechar cardápio" onClick={aoFechar}>
+              <Icone nome="fechar" />
             </button>
           </div>
         </header>

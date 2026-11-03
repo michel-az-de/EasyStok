@@ -1,0 +1,23 @@
+/* #2146: dica do Tooltip. Tinta sobre papel invertido, o mesmo par do aviso de envio da comanda.
+   `popover` traz do navegador inset 0 e margem automática (centraliza): aqui a posição é a que o
+   componente mede. Não recebe ponteiro, para nunca roubar o hover do gatilho. */
+.dica {
+  position: fixed; inset: auto; margin: 0; z-index: 100;
+  max-width: min(20rem, calc(100vw - 2 * var(--e-16)));
+  padding: var(--e-1) var(--e-2); border: 0; border-radius: var(--r-1); overflow: visible;
+  background: var(--tinta); color: var(--papel); box-shadow: var(--sombra-media);
+  font-size: var(--t-micro); font-weight: 600; line-height: var(--lh-compacto);
+  overflow-wrap: anywhere; pointer-events: none;
+  /* Fade de entrada (seção 3.4): duração curta, curva de quem entra. */
+  animation: aparecerDica var(--dur-curta) var(--ease-saida) both;
+}
+.dica[hidden] { display: none; }
+.atalho {
+  margin-left: var(--e-2); padding: 0 var(--e-1);
+  border: var(--b-1) solid currentColor; border-radius: var(--r-ponta);
+  font: inherit; font-weight: 400; white-space: nowrap;
+}
+@keyframes aparecerDica {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

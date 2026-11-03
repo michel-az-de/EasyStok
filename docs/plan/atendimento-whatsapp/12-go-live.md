@@ -64,16 +64,20 @@ select "PedidoId", count(*) from viagem_paradas where "EntregueEm" is null group
 
 ### 4. Console
 
-Do mesmo SHA publicado na API, pelo script versionado (#1358):
+Publique pelo script versionado (#1358) e registre os SHAs esperados do Console e da API:
 
 ```bash
-scripts/deploy/console-deploy.sh
+CONSOLE_SHA_ESPERADO="<sha-completo-revisado>" scripts/deploy/console-deploy.sh
 ```
 
 Ele monta o `origin/master` em modo API a partir de `git archive`, carimba
-`<meta name="easystok-console-sha">`, guarda o `index.html` anterior como `index.html.antes-<ts>`,
-copia para a pasta que o Caddy serve e confere o SHA servido. Avisa quando a API está noutro SHA.
-`--so-montar` só monta e confere, sem SSH. Rollback = copiar o `index.html.antes-<ts>` de volta.
+`<meta name="easystok-console-sha">`, guarda os arquivos anteriores como `index.html.antes-<ts>` e
+`versao.json.antes-<ts>`, copia para a pasta que o Caddy serve e confere o HTML, o manifesto e o cache.
+Avisa quando a API está noutro SHA; este script publica somente o Console.
+Com `CONSOLE_SHA_ESPERADO`, recusa outro `master` antes de qualquer escrita remota.
+`--so-montar` só monta o `origin/master` e confere, sem SSH; não valida uma PR ainda não integrada.
+Rollback = restaurar o `index.html` e o `versao.json` do mesmo timestamp e conferir ambos pela URL pública.
+Falha na conferência pública pode retornar erro após a troca: confira a versão servida antes de restaurar.
 Nunca publicar cópia manual de pasta de sessão: em 01/10 isso deixou o console atrás da API sem
 ninguém ver. Alternativa em contêiner:
 `Dockerfile.web` com `--build-arg VITE_FONTE_DADOS=api` e `API_UPSTREAM=http://ez-api:8080`
@@ -81,8 +85,8 @@ ninguém ver. Alternativa em contêiner:
 
 ### 5. Conferência
 
-- `GET https://api.easystok.online/health/version` → `buildSha` igual ao SHA publicado.
-- `app.easystok.online` → `<meta name="easystok-console-sha">` com o mesmo SHA.
+- `GET https://api.easystok.online/health/version` → `buildSha` igual ao SHA esperado da API.
+- `app.easystok.online` → `<meta name="easystok-console-sha">` e `/versao.json` com o SHA esperado do Console.
 - `https://app.easystok.online` abre o login; depois do login a faixa do rodapé diz "Conversas ao vivo do EasyStok".
 - Gestão › Entregas e integrações mostra os cartões (só Admin) e o botão Testar responde.
 

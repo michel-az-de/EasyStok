@@ -25,6 +25,7 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 {
     private PostgreSqlContainer? _pg;
     private bool _isAvailable;
+    private string? _motivoIndisponivel;
     private string? _connString;
     private readonly VariaveisDeProcesso _variaveis = new();
 
@@ -77,9 +78,10 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
             _connString = _pg.GetConnectionString();
             _isAvailable = true;
         }
-        catch (DockerUnavailableException)
+        catch (DockerUnavailableException ex)
         {
             _isAvailable = false;
+            _motivoIndisponivel = ex.Message;
         }
     }
 
@@ -177,6 +179,29 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         {
             _seedDemoCheckLock.Release();
         }
+    }
+
+    // ─── Canário do harness ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Guarda anti-falso-verde do projeto (#2176), no desenho de
+    /// <c>EasyStock.Infra.Postgre.IntegrationTests/HarnessCanaryTests</c>. O job
+    /// <c>api-integration</c> não define <c>EASYSTOCK_IT_PG</c> e depende do
+    /// Testcontainers: se o Docker do runner degradar, todos os
+    /// <c>[SkippableFact]</c> deste projeto pulam e o gate fica verde-vazio. No GitHub
+    /// Actions isso vira VERMELHO. Localmente, sem a env var, SKIPa visível (ADR-0023).
+    /// </summary>
+    [SkippableFact]
+    public void Harness_executa_de_verdade_no_CI()
+    {
+        var noGitHubActions = string.Equals(
+            Environment.GetEnvironmentVariable("GITHUB_ACTIONS"), "true",
+            StringComparison.OrdinalIgnoreCase);
+        Skip.IfNot(noGitHubActions, "GITHUB_ACTIONS ausente (rodada local).");
+
+        _isAvailable.Should().BeTrue(
+            "no CI o Postgres de teste é obrigatório; sem ele os SkippableFact deste "
+            + "projeto pulariam verdes: " + (_motivoIndisponivel ?? "(sem motivo)"));
     }
 
     // ─── Health Check ─────────────────────────────────────────────────────────

@@ -9,16 +9,16 @@ export function PersonalizarHall({ preferencia, modulos, aoSalvar, aoFechar, aoO
   const [rascunho, setRascunho] = useState(preferencia)
   const mudar = (campo, valor) => setRascunho((atual) => ({ ...atual, [campo]: valor }))
   const paineis = ordenarPaineisDoHall(rascunho, modulos.map((modulo) => modulo.id))
-  return <Modal titulo="Ajustar tela inicial" descricao="As preferências ficam neste navegador, separadas por pessoa e empresa." aoFechar={aoFechar} largura="720px"
+  return <Modal titulo="Ajustar tela inicial" descricao="Ajustes salvos neste navegador para sua conta e empresa." aoFechar={aoFechar} largura="720px"
     rodape={<>{aoOrganizar && <Botao variante="texto" onClick={aoOrganizar}>Organizar áreas e favoritos</Botao>}<Botao variante="texto" onClick={aoFechar}>Cancelar</Botao><Botao variante="primario" onClick={() => aoSalvar(normalizarPreferenciasHall(rascunho))}>Aplicar ajustes</Botao></>}>
-    <fieldset className={css.configGrupo}><legend>Modelo do painel</legend><p>O modelo reorganiza as áreas e escolhe quais números mostrar. Seus favoritos são mantidos.</p>
+    <fieldset className={css.configGrupo}><legend>Modelo do painel</legend><p>Escolha a ordem das áreas e os indicadores. Seus favoritos são mantidos.</p>
       <div className={css.modelos}>{FOCOS_DO_HALL.map((foco) => <label key={foco.id} className={css.modelo}>
         <input type="radio" name="foco-hall" value={foco.id} checked={rascunho.foco === foco.id} onChange={() => setRascunho(aplicarFocoDoHall(rascunho, foco.id))} onClick={() => setRascunho(aplicarFocoDoHall(rascunho, foco.id))} />
         <span>{foco.nome}</span>
       </label>)}</div>
-      <p className={css.previaModelo} role="status">{paineis.length ? `No painel: ${paineis.map((id) => modulos.find((modulo) => modulo.id === id).nome).join(' → ')}.` : 'Nenhum número selecionado.'}</p>
+      <p className={css.previaModelo} role="status">{paineis.length ? `No painel: ${paineis.map((id) => modulos.find((modulo) => modulo.id === id).nome).join(' → ')}.` : 'Nenhum indicador selecionado.'}</p>
     </fieldset>
-    <fieldset className={css.configGrupo}><legend>Números no painel</legend>
+    <fieldset className={css.configGrupo}><legend>Indicadores no painel</legend>
       {modulos.filter((modulo) => ['atendimento', 'cozinha', 'entregas', 'financeiro'].includes(modulo.id)).map((modulo) => <label key={modulo.id} className={css.configOpcao}>
         <input type="checkbox" checked={rascunho.paineis.includes(modulo.id)} onChange={(evento) => mudar('paineis', evento.target.checked ? [...rascunho.paineis, modulo.id] : rascunho.paineis.filter((id) => id !== modulo.id))} />
         <IconeDoModulo modulo={modulo} tamanho={24} /><span>{modulo.nome}</span>

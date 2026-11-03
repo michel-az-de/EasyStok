@@ -87,7 +87,7 @@ export function Convite({ perfis, aoConvidar, aoCancelar }) {
               <input type="checkbox" checked={estado.comoDona} onChange={trocarDona} disabled={enviando} aria-describedby={`${id}-dona`} />
               Convidar como dona
             </label>
-            <p id={`${id}-dona`} className={css.dicaDona}>A dona pode tudo, inclusive marcar outras donas. Use um e-mail que ainda não tenha conta.</p>
+            <p id={`${id}-dona`} className={css.dicaDona}>Quem é dona pode tudo, inclusive marcar outras donas. Use um e-mail que ainda não tenha conta.</p>
           </div>
           {estado.pedeEmailDeNovo && (
             <CampoTexto

@@ -903,7 +903,7 @@ await provar('B5 avisos: ligar neste aparelho usa a ativação que já existe', 
   g.acesso = { acoes: {} }
   const solta = await montar(AvisosNesteAparelho)
   assert.equal(botao(solta.raiz, 'Ativar avisos neste aparelho'), undefined)
-  assert.match(texto(solta.raiz.arvore), /Ligar os avisos neste aparelho não está disponível nesta tela\. Ao sair dela, use o sino de Avisos no topo do Console\./)
+  assert.match(texto(solta.raiz.arvore), /Ligar os avisos neste aparelho não está disponível nesta tela\. Ao sair dela, use o sino de Avisos no topo da tela\./)
   assert.doesNotMatch(texto(solta.raiz.arvore), /toque no sino/, 'não aponta para um sino que talvez não esteja à vista')
   assert.deepEqual(tocou, [])
   assert.deepEqual(rede.chamadas, [], 'nem conferir nem inscrever de novo')
@@ -957,7 +957,7 @@ await provar('B6 entregadores: a versão autônoma lê e cadastra pela rota de e
   assert.equal(texto(alerta).trim(), 'O entregador não foi cadastrado: Seu usuário não tem permissão para isso.')
   assert.equal(botao(raiz, 'Tentar de novo'), undefined, 'erro de cadastro não oferece reler a lista')
   assert.equal(campo(raiz, 'Nome').props.value, 'Bia', 'o formulário fica para enviar de novo')
-  assert.equal(botao(raiz, 'Cadastrar').props.disabled, false)
+  assert.equal(botao(raiz, 'Cadastrar entregador').props.disabled, false)
 })
 
 await provar('B6 entregadores: a lista que não carregou oferece tentar de novo e relê', async () => {

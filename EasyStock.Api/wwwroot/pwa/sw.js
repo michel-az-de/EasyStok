@@ -17,12 +17,17 @@
 // recebido com cdb-pwa-installed-version local; quando diferente, pede update.
 // Web Admin pode forçar isso via comando remoto pwa_update (ver sync.js).
 
-const CACHE_VERSION = 'cdb-v27-calculadora-cesta';
+const CACHE_VERSION = 'cdb-v29-harmonia';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './harmonia.css',
+  './fontes/NunitoSans-400.woff2',
+  './fontes/NunitoSans-600.woff2',
+  './fontes/NunitoSans-700.woff2',
   './qrcode.min.js',
+  './etiqueta-termica.js',
   './queue-store.js',
   './photo-store.js',
   './upload-photos.js',

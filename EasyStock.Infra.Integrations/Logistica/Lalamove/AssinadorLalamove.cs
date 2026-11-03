@@ -35,6 +35,22 @@ public static class AssinadorLalamove
         }
     }
 
+    /// <summary>
+    /// Webhook (#2160): mesma fórmula, com o timestamp do corpo (em segundos), <c>POST</c>, o caminho da URL cadastrada
+    /// e o JSON bruto de <c>data</c>. A fórmula exata se confirma no primeiro webhook do sandbox (plano #1597, seção 3);
+    /// se não conferir, nada muda de estado e a consulta de contingência cobre.
+    /// </summary>
+    public static bool WebhookConfere(string secret, string timestamp, string caminho, string dataBruto, string assinatura)
+    {
+        if (string.IsNullOrEmpty(secret) || string.IsNullOrEmpty(timestamp) || assinatura.Length != 64) return false;
+        byte[] recebida;
+        try { recebida = Convert.FromHexString(assinatura); }
+        catch (FormatException) { return false; }
+        var bruto = $"{timestamp}\r\nPOST\r\n{caminho}\r\n\r\n{dataBruto}";
+        var esperada = HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(bruto));
+        return CryptographicOperations.FixedTimeEquals(esperada, recebida);
+    }
+
     public static string Autorizacao(string apiKey, string secret, long timestampMs, string metodo, string caminho, string? corpo)
     {
         ArgumentException.ThrowIfNullOrEmpty(apiKey);

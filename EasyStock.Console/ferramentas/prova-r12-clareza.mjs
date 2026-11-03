@@ -77,7 +77,7 @@ ok('lembrete "Responder Beatriz" diz que veio do automático, com hora e motivo'
 // --- 4. Automático ligado se explica -----------------------------------------
 const ligado = modoDoAtendimento({ ...beatriz, passagem: null }, false, false)
 assert.equal(ligado.chave, MODOS.LIGADO)
-assert.match(ligado.detalhe, /atendimento automático responde/)
+assert.match(ligado.detalhe, /Assistente responde/)
 ok('automático ligado explica quem responde e como assumir')
 
 // --- 5. Próximo passo depois de ela responder ---------------------------------

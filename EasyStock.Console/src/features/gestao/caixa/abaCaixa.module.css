@@ -59,11 +59,11 @@
 }
 
 .tiposLancamento { display: flex; gap: var(--e-2); }
-.tiposLancamento button { border: 0; border-radius: var(--e-1); background: transparent; }
+.tiposLancamento button { border: 0; border-radius: var(--r-1); background: transparent; }
 .tiposLancamento button[aria-checked='true'] { background: var(--preenchimento); color: var(--tinta); font-weight: 800; }
 
 .categoriasSugeridas { display: flex; gap: var(--e-1); flex-wrap: wrap; }
-.categoriasSugeridas button { font-size: var(--t-micro); border: 0; border-radius: var(--e-1); background: transparent; padding-inline: var(--e-2); text-decoration: underline; text-underline-offset: 3px; }
+.categoriasSugeridas button { font-size: var(--t-micro); border: 0; border-radius: var(--r-1); background: transparent; padding-inline: var(--e-2); text-decoration: underline; text-underline-offset: 3px; }
 .categoriasSugeridas button[aria-pressed='true'] { color: var(--tinta); font-weight: 800; }
 
 .formGrade { display: grid; gap: var(--e-3); grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }

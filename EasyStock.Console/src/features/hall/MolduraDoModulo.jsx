@@ -5,7 +5,7 @@
 //
 // `operacao`: tela de trabalho (Cozinha, Entregas) ocupa a altura toda; tela de
 // ajuste ganha título e coluna de leitura. Módulo sem tela mostra "Em breve".
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
@@ -50,6 +50,16 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
   const modulo = moduloPorId(moduloId)
   const telas = telasDoMenu(modulo, { fonteApi, acoes })
   const tela = telas.find((t) => t.id === telaId) ?? null
+  const abasRef = useRef(null)
+  useEffect(() => {
+    const faixa = abasRef.current
+    if (!faixa) return
+    const revelar = () => faixa.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    revelar()
+    const observador = new ResizeObserver(revelar)
+    observador.observe(faixa)
+    return () => observador.disconnect()
+  }, [moduloId, tela?.id])
   const telaSemAcesso = !tela && Boolean(telaId) && telasDoMenu(modulo, { fonteApi }).some((t) => t.id === telaId)
   // #1921: a rota direta para a tela que o perfil não abre cai na primeira tela viva do módulo.
   const primeiraViva = telaSemAcesso ? telas[0]?.id ?? null : null
@@ -75,7 +85,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
           <Botao className={css.abrirMenu} icone="painel" aria-label={`Menu de ${modulo.nome}`} aria-haspopup="dialog" aria-expanded={menuAberto} onClick={() => setMenuAberto(true)}><span>Menu<span className={css.nomeNoMenu}>{modulo.nome}</span></span></Botao>
           {avulsa ? (
             <button type="button" className={`${css.voltar} ${css.voltarBotao}`} onClick={() => voltarAoBalcao(fonteApi)}>
-              <MarcaIcone nome="anterior" tamanho={20} /> <span>Voltar ao Balcão</span>
+              <MarcaIcone nome="anterior" tamanho={20} /> <span>Voltar às conversas</span>
             </button>
           ) : (
             <>
@@ -85,7 +95,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
               {/* #1474: quem veio da barra lateral do Balcão volta para ele num toque. */}
               {modulo.id !== MODULO_DO_BALCAO && permite(MODULO_DO_BALCAO) && (
                 <a className={css.voltar} href={HASH_BALCAO}>
-                  <MarcaIcone nome="mensagem" tamanho={24} /> <span>Balcão</span>
+                  <MarcaIcone nome="mensagem" tamanho={24} /> <span>Conversas</span>
                 </a>
               )}
             </>
@@ -94,7 +104,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
             <IconeDoModulo modulo={modulo} /> {modulo.nome}
           </span>
           {telasNaBarra && (
-            <nav className={css.telasNaBarra} aria-label={`Telas de ${modulo.nome}`}>
+            <nav className={css.telasNaBarra} aria-label={`Telas de ${modulo.nome}`} ref={abasRef}>
               {telas.map((item) => <a key={item.id} href={hashDoModulo(modulo.id, item.id)} className={`${css.telaNaBarra} ${item.id === telaId ? css.telaAtiva : ''}`} aria-current={item.id === telaId ? 'page' : undefined}>{item.rotulo}</a>)}
             </nav>
           )}
@@ -124,7 +134,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
                   {/* #1921: a tela existe, mas a matriz do perfil não a libera (ex.: Janelas de entrega). */}
                   {telaSemAcesso ? (
                     <Vazio titulo="Seu perfil não abre esta tela" acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>
-                      Se você precisa trabalhar aqui, peça à dona para mudar o seu perfil.
+                      Para acessar esta área, peça à administração da loja para revisar seu perfil.
                     </Vazio>
                   ) : (
                     <Vazio titulo={`${modulo.nome}: em breve`} acao={<a className={css.link} href={HASH_HALL}>Voltar aos módulos</a>}>

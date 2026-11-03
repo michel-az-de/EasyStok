@@ -200,7 +200,7 @@ provar('sem disco, voltar de um módulo conserva a rotina em memória só da con
 provar('busca conserva a ordem personalizada e a permissão vigente', () => {
   const preferencia = normalizarPreferenciasHall({ ordem: ['entregas', 'atendimento'] })
   const permitidos = api.filter((modulo) => modulo.id === 'atendimento')
-  assert.deepEqual(ids(filtrarModulos(ordenarModulosDoHall(permitidos, preferencia), 'balcao')), ['atendimento'])
+  assert.deepEqual(ids(filtrarModulos(ordenarModulosDoHall(permitidos, preferencia), 'conversas')), ['atendimento'])
   assert.deepEqual(filtrarModulos(ordenarModulosDoHall(permitidos, preferencia), 'entregas'), [])
 })
 

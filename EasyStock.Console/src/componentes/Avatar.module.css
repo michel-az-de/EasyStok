@@ -10,15 +10,14 @@
   width: 100%; height: 100%; border-radius: var(--r-pilula);
   object-fit: cover; display: grid; place-items: center;
 }
-.foto { box-shadow: 0 0 0 1px var(--linha); }
 
 .inicial {
-  background: var(--avatar-fundo);
-  color: var(--branco); text-shadow: 0 1px 1px rgba(0, 0, 0, .18);
-  box-shadow: inset 0 0 0 1px light-dark(hsl(var(--matiz) 30% 80% / .9), hsl(var(--matiz) 24% 40% / .6));
+  background: var(--preenchimento-forte); color: var(--tinta-2);
   font-family: var(--f-corpo); font-weight: 600; font-size: var(--t-apoio);
   line-height: 1; letter-spacing: .01em;
 }
+.grande .inicial { font-size: var(--t-forte); }
+.enorme .inicial { font-size: var(--t-titulo); }
 
 .selo {
   position: absolute; right: -2px; bottom: -2px;
@@ -30,5 +29,5 @@
 /* Selo do canal: moeda branca com o ícone colorido, anel do papel em volta. */
 .selo {
   width: 20px; height: 20px; right: -3px; bottom: -3px; border: 0;
-  background: var(--papel); box-shadow: 0 0 0 2px var(--papel), 0 1px 3px rgba(0, 0, 0, .18);
+  background: var(--papel); box-shadow: 0 0 0 2px var(--papel);
 }

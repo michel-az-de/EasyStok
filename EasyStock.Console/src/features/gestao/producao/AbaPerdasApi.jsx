@@ -39,7 +39,7 @@ export function AbaPerdasApi() {
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as perdas…</output>
   if (gestao.estado === 'erro' && !gestao.resumo) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler as perdas"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar as perdas"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
         {gestao.erro}
       </Vazio>

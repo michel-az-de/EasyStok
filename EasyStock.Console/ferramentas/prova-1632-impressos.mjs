@@ -6,6 +6,7 @@
 //      indisponível (a escolha vale para a visita);
 //   B. montagem do endereço do impresso e do canhoto de cozinha;
 //   C. a aba Impressão mora em Configurações e só existe no modo API.
+//   F. adaptador real da loja: seleção ativa, ausência e formato de resposta, sem rede.
 // Diálogo de impressão, iframe e envio do logo exigem navegador e API.
 //
 // Roda com: node ferramentas/prova-1632-impressos.mjs
@@ -252,5 +253,58 @@ confere('conteúdo mais largo que o papel ou etiqueta que não cabe barram a imp
 confere('página sem folha de impresso (HTML antigo ou vazio) segue como veio', () => {
   assert.equal(paginaDoImpresso([]), null)
 })
+
+// --- F. Loja do logo: adaptador real, com sessão e transporte controlados -----------------------
+const transporteLoja = { resposta: null, caminhos: [] }
+globalThis.__lojaImpressos1632 = transporteLoja
+const fetchAnterior = globalThis.fetch
+globalThis.fetch = () => { throw new Error('Esta prova não permite rede.') }
+registerHooks({
+  load(url, contexto, proximo) {
+    if (url.endsWith('/infra/fonteDados.js')) return {
+      format: 'module', shortCircuit: true, source: "export const API_BASE = '';",
+    }
+    if (url.endsWith('/infra/api/sessao.js')) return {
+      format: 'module', shortCircuit: true, source: "export const lerSessao = () => ({ empresa: { id: 'empresa-sintetica' } });",
+    }
+    if (url.endsWith('/infra/api/cliente.js')) return {
+      format: 'module', shortCircuit: true,
+      source: 'export const chamarApi = async (caminho) => { const t = globalThis.__lojaImpressos1632; t.caminhos.push(caminho); return t.resposta; };',
+    }
+    return proximo(url, contexto)
+  },
+})
+const confereLoja = async (descricao, fn) => { await fn(); passou += 1; console.log('ok  ' + descricao) }
+try {
+  const { obterLojaDaEmpresa } = await import('../src/infra/api/impressosApi.js')
+  await confereLoja('logo: loja ativa preserva id, nome e logo e consulta só a empresa da sessão', async () => {
+    transporteLoja.resposta = [{ id: 'loja-ativa', nome: 'Loja sintética', ativa: true, logoUrl: '/logo.png' }]
+    assert.deepEqual(await obterLojaDaEmpresa(), { id: 'loja-ativa', nome: 'Loja sintética', logoUrl: '/logo.png' })
+    assert.equal(transporteLoja.caminhos.at(-1), '/api/lojas?empresaId=empresa-sintetica')
+  })
+  await confereLoja('logo: loja inativa antes da ativa não recebe o logo', async () => {
+    transporteLoja.resposta = [{ id: 'loja-inativa', ativa: false }, { id: 'loja-ativa', nome: 'Ativa', ativa: true }]
+    assert.deepEqual(await obterLojaDaEmpresa(), { id: 'loja-ativa', nome: 'Ativa', logoUrl: null })
+  })
+  await confereLoja('logo: lista vazia informa ausência de loja ativa', async () => {
+    transporteLoja.resposta = []
+    await assert.rejects(obterLojaDaEmpresa(), /Nenhuma loja ativa encontrada para esta empresa\./)
+  })
+  await confereLoja('logo: resposta sem dados informa ausência de loja ativa', async () => {
+    transporteLoja.resposta = null
+    await assert.rejects(obterLojaDaEmpresa(), /Nenhuma loja ativa encontrada para esta empresa\./)
+  })
+  await confereLoja('logo: só lojas inativas não libera um destino para envio', async () => {
+    transporteLoja.resposta = [{ id: 'loja-inativa', ativa: false }]
+    await assert.rejects(obterLojaDaEmpresa(), /Nenhuma loja ativa encontrada para esta empresa\./)
+  })
+  await confereLoja('logo: DTO que não é lista não é tratado como ausência de loja ativa', async () => {
+    transporteLoja.resposta = { items: [] }
+    await assert.rejects(obterLojaDaEmpresa(), /find is not a function/)
+  })
+} finally {
+  globalThis.fetch = fetchAnterior
+  delete globalThis.__lojaImpressos1632
+}
 
 console.log(`\n${passou} verificações passaram.`)

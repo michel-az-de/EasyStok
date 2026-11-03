@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEscape } from '../hooks/useEscape'
+import { proximaFrentePainel } from '../hooks/estadoPainelMovel'
 import css from './Popover.module.css'
 
 const SELETOR_ITENS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
@@ -31,8 +32,9 @@ export function Popover({
 }) {
   const caixaRef = useRef(null)
   const marcadorRef = useRef(null)
-  const origemRef = useRef(null)
+  const origemRef = useRef(globalThis.document?.activeElement ?? null)
   const [retangulo, setRetangulo] = useState(null)
+  const [frente, setFrente] = useState(proximaFrentePainel)
   useEscape(true, (evento) => {
     if (evento.isComposing || evento.keyCode === 229) return
     // Uma janela aberta sobre este menu recebe seu próprio Escape nativo.
@@ -143,7 +145,7 @@ export function Popover({
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Papel explícito varia entre menu de ações e grupo com busca/listbox.
     <div
       className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''}`}
-      role={papel === 'group' ? 'group' : 'menu'}
+      role={papel === 'group' ? 'group' : papel === 'dialog' ? 'dialog' : 'menu'}
       tabIndex={-1}
       aria-label={rotulo}
       ref={caixaRef}
@@ -208,10 +210,11 @@ export function Popover({
           width: retangulo.width,
           top: retangulo.top,
           height: retangulo.height,
-          zIndex: 70,
+          zIndex: frente,
           pointerEvents: 'none',
         }}
-        >
+        onFocusCapture={() => setFrente(proximaFrentePainel())}
+        onPointerDownCapture={() => setFrente(proximaFrentePainel())}>
           {corpo}
         </div>,
         retangulo.destino,

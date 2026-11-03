@@ -19,6 +19,29 @@ public sealed class CorridaExternaRepository(EasyStockDbContext db) : ICorridaEx
             .Where(c => c.EmpresaId == empresaId && c.ViagemId == viagemId)
             .OrderBy(c => c.RegistradoEm)
             .ToListAsync(ct);
+
+    public async Task<CorridaLocalizada?> LocalizarPorIdExternoAsync(EmpresaEntregador provedor, string idExterno, CancellationToken ct = default)
+    {
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.CorridasExternas.IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.Provedor == provedor && (c.IdExterno == idExterno || c.IdExternoAnterior == idExterno))
+            .OrderByDescending(c => c.IdExterno == idExterno)
+            .Select(c => new CorridaLocalizada(c.EmpresaId, c.Id))
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<CorridaLocalizada>> ListarEmCursoAsync(int maximo, CancellationToken ct = default)
+    {
+        using var _ = db.UseRowLevelSecurityBypass();
+        return await db.CorridasExternas.IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.Origem == OrigemCorridaExterna.Api
+                        && (c.Status == StatusCorrida.Solicitando || c.Status == StatusCorrida.ProcurandoMotorista
+                            || c.Status == StatusCorrida.MotoristaACaminho || c.Status == StatusCorrida.Coletada))
+            .OrderBy(c => c.RegistradoEm)
+            .Take(Math.Clamp(maximo, 1, 500))
+            .Select(c => new CorridaLocalizada(c.EmpresaId, c.Id))
+            .ToListAsync(ct);
+    }
 }
 
 /// <summary>

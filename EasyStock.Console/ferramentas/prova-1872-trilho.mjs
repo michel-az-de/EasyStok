@@ -6,7 +6,7 @@
 //   3  a camada da conta sai do bloco de contenção do ancestral (popover), com o `fixed` de reserva.
 //
 // Leitura do fonte onde só existe composição. Com CONSOLE_URL (console em modo API contra o
-// laboratório) e PLAYWRIGHT_MODULE a prova também mede na tela real: trilho 100, item 84 e 54 px
+// laboratório) e PLAYWRIGHT_MODULE a prova também mede na tela real: trilho 76, item 68 e 54 px
 // de altura mínima nos dois trilhos em 1280/1440/1920, e a camada da conta colada ao avatar dentro
 // do menu do tablet (1024 px), com a animação do Modal correndo e depois dela. Sem as variáveis,
 // essa parte é pulada e dita.
@@ -77,7 +77,7 @@ await confere('2  TRILHO é a fonte: o token nasce dele, tokens.css não tem seg
   assert.doesNotMatch(tokens, /--largura-trilho:/)
   const respiro = Number(tokens.match(/--respiro-trilho: (\d+)px;/)[1])
   assert.match(tokens, /--largura-item-trilho: calc\(var\(--largura-trilho\) - 2 \* var\(--respiro-trilho\)\);/)
-  assert.equal(TRILHO - 2 * respiro, 84, 'item de 84 px com trilho de 100')
+  assert.equal(TRILHO - 2 * respiro, 68, 'item de 68 px com trilho de 76')
   assert.match(fonte('componentes/Trilho.module.css'), /padding: var\(--e-3\) var\(--respiro-trilho\)/, 'o respiro é o do padding do trilho')
   assert.match(fonte('main.jsx'), /Object\.entries\(tokensDaGeometria\(\)\)[^\n]*style\.setProperty\(nome, valor\)/)
 })
@@ -119,7 +119,7 @@ if (!origem || !usuario || !senha || !process.env.PLAYWRIGHT_MODULE) {
   }, rotulo)
   try {
     for (const [largura, altura] of [[1280, 720], [1440, 900], [1920, 1080]]) {
-      await confere(`4  ${largura}: trilho 100, item 84 e altura mínima 54 px no Balcão e nos módulos`, async () => {
+      await confere(`4  ${largura}: trilho 76, item 68 e altura mínima 54 px no Balcão e nos módulos`, async () => {
         const { contexto, pagina } = await abrir(largura, altura)
         try {
           await pagina.goto(origem + '/#/m/atendimento', { waitUntil: 'networkidle' })
@@ -129,10 +129,10 @@ if (!origem || !usuario || !senha || !process.env.PLAYWRIGHT_MODULE) {
           await pagina.waitForSelector('nav[aria-label="Módulos da loja"]')
           const modulos = await medirTrilho(pagina, 'Módulos da loja')
           for (const [nome, medida] of [['Balcão', balcao], ['módulos', modulos]]) {
-            assert.equal(medida.trilho, 100, `${nome}: trilho ${medida.trilho}`)
+            assert.equal(medida.trilho, 76, `${nome}: trilho ${medida.trilho}`)
             assert.ok(medida.itens.length >= 5, `${nome}: itens ${medida.itens.length}`)
             for (const item of medida.itens) {
-              assert.equal(item.w, 84, `${nome}: item ${item.w} px`)
+              assert.equal(item.w, 68, `${nome}: item ${item.w} px`)
               assert.ok(item.h >= 54, `${nome}: item com ${item.h} px de altura`)
             }
           }

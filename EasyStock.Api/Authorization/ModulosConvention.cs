@@ -14,7 +14,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Consentimentos", "ContatoUsuario",
         "AdminTenants", "AdminNotificacoes", "WebhookGateway", "WebhookPix",
         "Internal.NotificacoesJobs", "Webhooks.WebhookMensageriaMeta", "Webhooks.WebhookWhatsApp",
-        "Webhooks.WebhookWhatsAppPlataforma", "Webhooks.WebhookWppConnect", "Webhooks.WebhookWaha",
+        "Webhooks.WebhookWhatsAppPlataforma", "Webhooks.WebhookWppConnect", "Webhooks.WebhookWaha", "Webhooks.WebhookLalamove",
         "Storefront.Agendamento", "Storefront.Auth", "Storefront.Avaliacao", "Storefront.CardapioConversa",
         "Storefront.ChatSite", "Storefront.ChatSiteMidia", "Storefront.Checkout", "Storefront.ComandaCliente", "Storefront.FotosCardapioPublicas",
         "Storefront.Frete", "Storefront.Menu", "Storefront.PedidosCliente",
@@ -22,7 +22,8 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Mobile.DeviceBackup", "Mobile.DevicePairing", "Mobile.MobileBatches", "Mobile.MobileCalculadora",
         "Mobile.MobileCash", "Mobile.MobileClients", "Mobile.MobileDiagnostics", "Mobile.MobileDiagTrace",
         "Mobile.MobileEstoque", "Mobile.MobileOrders", "Mobile.MobileProducts", "Mobile.MobileQuickReports",
-        "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot"
+        "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot",
+        "Mobile.PushReceipts"
     ];
     private static readonly HashSet<string> Bastidor =
     [
@@ -84,7 +85,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Atendimento, "AtendimentoAtendentes", "AtendimentoCaderno", "AtendimentoAssistente",
             "AtendimentoAvisos", "AtendimentoComanda", "AtendimentoComandasCliente", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
             "AtendimentoAutomacoes", "AtendimentoEsteira", "AtendimentoExpediente", "AtendimentoMensagensProgramadas",
-            "AtendimentoLembretes", "AtendimentoRespostasProntas", "Clientes", "ClientesCrm", "ClienteInteresses",
+            "AtendimentoLembretes", "AtendimentoRespostasProntas", "Clientes", "ClientesFoto", "ClientesFrete", "ClientesViagem", "ClientesCrm", "ClienteInteresses",
             "Ocorrencias", "Pedidos", "PedidosCobranca");
         Associar(Modulo.Cozinha, "Kds");
         Associar(Modulo.Caixa, "Caixa", "Venda");

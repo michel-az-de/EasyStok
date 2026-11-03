@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { BotaoIcone } from '../../../componentes/BotaoIcone'
 import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
@@ -136,7 +137,7 @@ export function AbaEstoqueDoDiaApi() {
   if (estoque.estado === 'carregando') return <output className={css.descricao}>Carregando o estoque…</output>
   if (estoque.estado === 'erro' && estoque.pratos.length === 0) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler o estoque"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar o estoque"
         acao={<Botao icone="refresh-cw" onClick={estoque.recarregar}>Tentar de novo</Botao>}>
         {estoque.erro}
       </Vazio>
@@ -200,7 +201,7 @@ export function AbaEstoqueDoDiaApi() {
       <section className={css.secao} aria-labelledby="estoque-saldo">
         <h3 id="estoque-saldo" className={css.tituloSecao}>Saldo por prato</h3>
         {estoque.pratos.length === 0 ? (
-          <p className={css.descricao}>Nenhum prato do cardápio está ligado ao estoque ainda. A primeira produção liga: lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
+          <p className={css.descricao}>Nenhum prato com estoque cadastrado. Registre o primeiro lote em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
         ) : (
           <ul className={css.lista}>
             {estoque.pratos.map((p) => (
@@ -238,7 +239,7 @@ export function AbaEstoqueDoDiaApi() {
       </section>
 
       <section className={css.secao} aria-labelledby="estoque-lotes">
-        <h3 id="estoque-lotes" className={css.tituloSecao}>Lotes ativos</h3>
+        <h3 id="estoque-lotes" className={css.tituloSecao}>Lotes</h3>
         {lotes.length === 0 ? (
           <p className={css.descricao}>Nenhum lote com saldo.</p>
         ) : (
@@ -256,12 +257,12 @@ export function AbaEstoqueDoDiaApi() {
                 </div>
                 {podeReimprimir(l) && (
                   <div className={css.acoes}>
-                    <Botao variante="texto" icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
-                      aria-label={`Reimprimir as etiquetas do lote ${l.codigo}`} onClick={() => reimprimir(l.id)}>Reimprimir etiquetas</Botao>
+                    <BotaoIcone icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
+                      rotulo={`Etiquetas do lote ${l.codigo}`} dica="Etiquetas" onClick={() => reimprimir(l.id)} />
                   </div>
                 )}
                 {impressao?.loteId === l.id && impressao.erro && (
-                  <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">Não consegui buscar as etiquetas deste lote. {impressao.erro}</p>
+                  <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">Não foi possível carregar as etiquetas deste lote. {impressao.erro}</p>
                 )}
               </li>
             ))}

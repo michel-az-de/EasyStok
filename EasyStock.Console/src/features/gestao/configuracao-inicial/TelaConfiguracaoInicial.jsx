@@ -190,7 +190,7 @@ export function TelaConfiguracaoInicial({ passo: passoDaRota = null, renderizarA
           <Botao variante="texto" disabled={!anterior} onClick={() => comConfirmacao(() => irPara(anterior))}>Voltar</Botao>
           {estado.podeConcluir === true
             ? <Botao variante="primario" className={css.primario} disabled={ocupada} onClick={concluirTudo}>Concluir</Botao>
-            : <p className={css.apoio}>Só a dona conclui os primeiros passos.</p>}
+            : <p className={css.apoio}>Só quem é dona da loja conclui os primeiros passos.</p>}
         </>}
         {!final && semAcesso && <>
           <Botao variante="texto" disabled={!anterior} onClick={() => comConfirmacao(() => irPara(anterior))}>Voltar</Botao>

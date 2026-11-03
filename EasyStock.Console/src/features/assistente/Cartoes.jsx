@@ -50,7 +50,7 @@ export function CartaoSentimento({ dado, aoDispensar }) {
     <Cartao icone="termometro" titulo="Tom da conversa" tom={dado.classificacao === 'negativo' ? 'perigo' : 'ok'} aoDispensar={aoDispensar}>
       <p><Pilula tom={TOM_SENTIMENTO[dado.classificacao]}>{ROTULO_SENTIMENTO[dado.classificacao]}</Pilula></p>
       {dado.trecho && <p>"{dado.trecho}"</p>}
-      <p>Leitura das palavras da mensagem. Confirme pelo contexto.</p>
+      <p>Interpretação da mensagem. Confira a conversa antes de usar.</p>
     </Cartao>
   )
 }

@@ -168,10 +168,11 @@ await confere('3  409 LOJA_FECHADA mostra o motivo e não relê a conversa', asy
   assert.equal(leituras(t).length, 0, 'releu a conversa numa recusa definitiva')
 })
 
-await confere('3  409 CEP_SEM_COBERTURA mostra a frase da área de entrega, sem reler', async () => {
+await confere('3  409 CEP_SEM_COBERTURA orienta frete a combinar, sem presumir área nem reler', async () => {
   const t = montar(rascunho(), recusaPost('CEP_SEM_COBERTURA', 'Vamos combinar a entrega e o frete com a equipe.'))
   const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
-  assert.match(resultado?.erro ?? '', /^Pedido não criado: o endereço do cliente está fora da área de entrega\./)
+  assert.match(resultado?.erro ?? '', /^Pedido não criado: o frete está a combinar\./)
+  assert.doesNotMatch(resultado?.erro ?? '', /fora da área de entrega/)
   assert.equal(leituras(t).length, 0)
 })
 

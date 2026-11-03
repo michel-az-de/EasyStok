@@ -1,4 +1,3 @@
-using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
@@ -54,23 +53,7 @@ public sealed class LogisticaViagemUseCase(IViagemRepository viagens, IEntregado
         }
         else if (evento == "cancelado") viagem.Desfazer();
         else if (evento == "devolvido" && viagem.Situacao == SituacaoViagem.EmRota)
-        {
-            foreach (var parada in viagem.Paradas.Where(p => !p.Entregue).ToList())
-            {
-                var pedido = await pedidos.GetByIdAsync(despacho.EmpresaId, parada.PedidoId)
-                    ?? throw new PedidoNaoEncontradoParaViagemException(parada.PedidoId);
-                var antigo = pedido.Status;
-                pedido.RegistrarRetornoEntrega();
-                await pedidos.AddEventoAsync(new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id,
-                    Tipo = "status_changed", StatusAntigo = antigo, StatusNovo = pedido.Status,
-                    UsuarioId = despacho.UsuarioId, Origem = "logistica", OcorridoEm = Agora });
-                await publicador.PublicarAsync(pedido.EmpresaId, "pedido.mudou_status", "pedido", pedido.Id,
-                    new PedidoMudouStatusEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, antigo, pedido.Status, "logistica", despacho.UsuarioId, null, Agora),
-                    correlationId: pedido.Id.ToString(), ct: ct);
-                await pedidos.UpdateAsync(pedido);
-            }
-            viagem.RegistrarRetorno(Agora);
-        }
+            await RetornoViagem.AplicarAsync(pedidos, publicador, viagem, despacho.UsuarioId, "logistica", Agora, ct);
     }
     private DateTime Agora => relogio.GetUtcNow().UtcDateTime;
 }
@@ -80,6 +63,6 @@ internal static class ViagemContratadaGuard
     public static async Task ExigirFluxoManualAsync(IViagemRepository viagens, Guid empresaId, Guid viagemId, CancellationToken ct)
     {
         if (await viagens.VinculadaLogisticaAsync(empresaId, viagemId, ct))
-            throw new UseCaseValidationException("Esta viagem tem frete contratado. Use Cotar frete e acompanhamento para atualizar ou cancelar a entrega.");
+            throw new UseCaseValidationException("Esta viagem tem frete contratado ou corrida em curso. Acompanhe ou cancele pela corrida antes de mudar a viagem.");
     }
 }

@@ -106,7 +106,7 @@ export function AbaCategoriasApi() {
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as categorias…</output>
   if (gestao.estado === 'erro' && gestao.secoes.length === 0) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler as categorias"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar as categorias"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
         {gestao.erro}
       </Vazio>
@@ -119,7 +119,7 @@ export function AbaCategoriasApi() {
         As categorias não foram atualizadas. A lista abaixo pode estar desatualizada. {gestao.erro}
         {' '}<Botao variante="texto" icone="refresh-cw" onClick={gestao.recarregar}>Recarregar categorias</Botao>
       </p>}
-      <p className={css.descricao}>Você pode consultar as categorias. As alterações ficam com a dona ou gerente.</p>
+      <p className={css.descricao}>Seu perfil permite apenas consultar as categorias.</p>
       {gestao.secoes.length === 0 ? <p>Nenhuma categoria cadastrada.</p> : (
         <ol className={css.lista}>{gestao.secoes.map((secao) => (
           <li className={css.linha} key={secao.id}><span className={css.nome}>{secao.nome}</span><span>{secao.itens} {secao.itens === 1 ? 'prato' : 'pratos'}</span></li>

@@ -7,7 +7,7 @@ export function acaoDoPix(situacaoCob, { prerequisito, rotuloGerar, linkVencidoA
   switch (situacaoCob.chave) {
     case 'nenhuma':
       return {
-        rotuloEstado: 'Cobrança não gerada',
+        rotuloEstado: 'Cobrança pendente',
         // #1474 (R3): o que falta vem pronto de quem monta a barra (comanda vazia, cadastro,
         // endereço, janela), para o botão nascer desabilitado com o motivo à vista.
         motivo: prerequisito,

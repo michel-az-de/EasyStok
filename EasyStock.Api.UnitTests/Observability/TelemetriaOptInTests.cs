@@ -17,7 +17,7 @@ namespace EasyStock.Api.UnitTests.Observability;
 /// </summary>
 public class TelemetriaOptInTests
 {
-    private static ServiceProvider Montar(string? endpoint)
+    private static ServiceProvider Montar(string? endpoint, string ambiente = "Production")
     {
         var services = new ServiceCollection();
         services.AddMetrics();
@@ -26,19 +26,22 @@ public class TelemetriaOptInTests
             .AddInMemoryCollection(new Dictionary<string, string?> { ["OpenTelemetry:OtlpEndpoint"] = endpoint })
             .Build();
         var env = Substitute.For<IWebHostEnvironment>();
-        env.EnvironmentName.Returns("Production");
+        env.EnvironmentName.Returns(ambiente);
 
         services.AddEasyStockObservability(config, env);
         return services.BuildServiceProvider();
     }
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Sem_endpoint_nao_registra_provider_nem_exporter(string? endpoint)
+    [InlineData(null, "Production")]
+    [InlineData("", "Production")]
+    [InlineData("   ", "Production")]
+    [InlineData(null, "Development")]
+    [InlineData("", "Development")]
+    [InlineData("   ", "Development")]
+    public void Sem_endpoint_nao_registra_provider_nem_exporter(string? endpoint, string ambiente)
     {
-        using var sp = Montar(endpoint);
+        using var sp = Montar(endpoint, ambiente);
 
         sp.GetService<TracerProvider>().Should().BeNull("sem endpoint a telemetria é no-op, nada de exporter falando com o vazio");
         sp.GetService<MeterProvider>().Should().BeNull();

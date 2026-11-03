@@ -318,7 +318,7 @@ public final class OtaManager {
     }
 
     private JSONObject manifest() throws Exception {
-        JSONObject envelope = new JSONObject(new String(fetch(UpdatePolicy.MANIFEST_URL, 65536), StandardCharsets.UTF_8));
+        JSONObject envelope = new JSONObject(new String(fetch(UpdatePolicy.manifestUrl(nativeCode), 65536), StandardCharsets.UTF_8));
         byte[] payload = decode(string(envelope, "payloadBase64"));
         byte[] signature = decode(string(envelope, "signatureBase64"));
         try (InputStream key = context.getAssets().open("ota-public-key.der")) {
