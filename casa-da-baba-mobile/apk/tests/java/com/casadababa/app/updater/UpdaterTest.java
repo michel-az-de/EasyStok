@@ -221,6 +221,12 @@ public class UpdaterTest {
         check(!UpdatePolicy.isUpdateAnnouncement("/topics/casa-da-baba-piloto-updates", "execute", "10"), "Other message kind rejected");
         for (String sequence : new String[] { "0", "-1", "1.5", "1e6", "9999999999999999999", " 1", "01" })
             check(!UpdatePolicy.isUpdateAnnouncement("/topics/casa-da-baba-piloto-updates", "ota-update", sequence), "Malformed push sequence rejected");
+        check(!UpdatePolicy.isUpdateAnnouncement("/topics/casa-da-baba-piloto-updates", "apk-update", "10"), "APK notice never triggers the silent OTA job");
+        check(UpdatePolicy.shouldAnnounceContent("0.8.8.1", ""), "First prepared content is announced");
+        check(!UpdatePolicy.shouldAnnounceContent("0.8.8.1", "0.8.8.1"), "Same prepared content is announced only once");
+        check(UpdatePolicy.shouldAnnounceContent("0.8.8.2", "0.8.8.1"), "Newer prepared content is announced");
+        check(!UpdatePolicy.shouldAnnounceContent("", "0.8.8.1"), "Nothing prepared, nothing announced");
+        check(!UpdatePolicy.shouldAnnounceContent(null, ""), "Missing pending version is not announced");
     }
 
     private static JSONObject checkUpdate(OtaManager app) throws Exception {

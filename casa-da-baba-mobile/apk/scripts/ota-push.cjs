@@ -60,6 +60,24 @@ function message(payload, validateOnly) {
     }
   };
 }
+const APK_BASE = 'https://easystok.online/downloads/casa-da-baba/';
+// Com bloco notification o Android mostra o aviso sozinho com o app em segundo plano, em qualquer APK inscrito
+// no tópico. O kind apk-update é ignorado pelo nativo e nunca dispara o job silencioso de OTA.
+function apkMessage(release, validateOnly) {
+  requireValue(release && release.appId === ota.APP, 'APK de outro pacote.');
+  requireValue(Number.isSafeInteger(release.versionCode) && release.versionCode > 0 && release.versionCode <= 2100000000, 'versionCode do APK inválido.');
+  requireValue(typeof release.version === 'string' && /^[0-9]+\.[0-9]+\.[0-9]+$/.test(release.version), 'Versão do APK inválida.');
+  requireValue(typeof release.url === 'string' && release.url.startsWith(APK_BASE) && /^[A-Za-z0-9_-][A-Za-z0-9._-]*\.apk$/.test(release.url.slice(APK_BASE.length)) && !release.url.includes('..'), 'Endereço do APK fora da distribuição.');
+  return {
+    validate_only: validateOnly,
+    message: {
+      topic: TOPIC,
+      notification: { title: 'Casa da Baba ' + release.version + ' disponível', body: 'Abra o app e toque em Atualizar para instalar sem desinstalar. Se já estiver nesta versão, ignore.' },
+      data: { kind: 'apk-update', version: release.version, versionCode: String(release.versionCode) },
+      android: { priority: 'high', ttl: '604800s', collapse_key: 'apk-update', notification: { channel_id: 'cdb-operacao', tag: 'apk-update' } }
+    }
+  };
+}
 function requestJson(url, body, headers) {
   return new Promise((resolve, reject) => {
     // URLs são construídas internamente; não seguir redirects nem usar token_uri arbitrário.
@@ -84,18 +102,27 @@ function requestJson(url, body, headers) {
     request.end(body);
   });
 }
-async function sendUpdate(options, request = requestJson) {
-  const credentials = configuration(options.credentials, options.appConfig);
-  const key = crypto.createPublicKey({ key: fs.readFileSync(options.publicKey), format: 'der', type: 'spki' });
-  const payload = ota.verify(readJson(options.release, 24576), key);
+async function deliver(credentials, fcmMessage, request) {
   const jwt = assertion(credentials);
   const grant = new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }).toString();
   const token = await request(TOKEN_URL, grant, { 'Content-Type': 'application/x-www-form-urlencoded' });
   requireValue(typeof token.access_token === 'string' && token.access_token.length > 0 && token.access_token.length <= 8192 && !/[\r\n]/.test(token.access_token), 'OAuth não retornou token válido.');
-  const body = JSON.stringify(message(payload, options.validateOnly !== false));
-  await request('https://fcm.googleapis.com/v1/projects/' + encodeURIComponent(credentials.project_id) + '/messages:send', body,
+  await request('https://fcm.googleapis.com/v1/projects/' + encodeURIComponent(credentials.project_id) + '/messages:send', JSON.stringify(fcmMessage),
     { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token.access_token });
-  return { status: options.validateOnly !== false ? 'validated' : 'accepted', sequence: payload.sequence, projectId: credentials.project_id, topic: TOPIC };
+  return fcmMessage.validate_only ? 'validated' : 'accepted';
+}
+async function sendUpdate(options, request = requestJson) {
+  const credentials = configuration(options.credentials, options.appConfig);
+  const key = crypto.createPublicKey({ key: fs.readFileSync(options.publicKey), format: 'der', type: 'spki' });
+  const payload = ota.verify(readJson(options.release, 24576), key);
+  const status = await deliver(credentials, message(payload, options.validateOnly !== false), request);
+  return { status, sequence: payload.sequence, projectId: credentials.project_id, topic: TOPIC };
+}
+async function sendApkUpdate(options, request = requestJson) {
+  const credentials = configuration(options.credentials, options.appConfig);
+  const release = readJson(options.apkRelease, 24576);
+  const status = await deliver(credentials, apkMessage(release, options.validateOnly !== false), request);
+  return { status, versionCode: release.versionCode, projectId: credentials.project_id, topic: TOPIC };
 }
 async function main(argv) {
   const args = {};
@@ -103,12 +130,13 @@ async function main(argv) {
     const flag = argv.shift();
     if (flag === '--send' || flag === '--validate-only') { requireValue(!args.mode, 'Selecione somente --send ou --validate-only.'); args.mode = flag; continue; }
     const value = argv.shift();
-    requireValue(['--credentials', '--app-config', '--release', '--public-key'].includes(flag) && value && !value.startsWith('--') && !args[flag], 'Argumentos inválidos.');
+    requireValue(['--credentials', '--app-config', '--release', '--apk-release', '--public-key'].includes(flag) && value && !value.startsWith('--') && !args[flag], 'Argumentos inválidos.');
     args[flag] = value;
   }
-  requireValue(args['--credentials'] && args['--app-config'] && args['--release'], 'Informe --credentials, --app-config e --release. O padrão é validate_only.');
+  requireValue(args['--credentials'] && args['--app-config'] && !!args['--release'] !== !!args['--apk-release'], 'Informe --credentials, --app-config e --release (OTA) ou --apk-release (latest.json do APK). O padrão é validate_only.');
+  if (args['--apk-release']) return sendApkUpdate({ credentials: args['--credentials'], appConfig: args['--app-config'], apkRelease: args['--apk-release'], validateOnly: args.mode !== '--send' });
   return sendUpdate({ credentials: args['--credentials'], appConfig: args['--app-config'], release: args['--release'],
     publicKey: args['--public-key'] || path.resolve(__dirname, '../android/app/src/main/assets/ota-public-key.der'), validateOnly: args.mode !== '--send' });
 }
-module.exports = { TOKEN_URL, SCOPE, TOPIC, configuration, assertion, message, requestJson, sendUpdate, main };
+module.exports = { TOKEN_URL, SCOPE, TOPIC, configuration, assertion, message, apkMessage, requestJson, sendUpdate, sendApkUpdate, main };
 if (require.main === module) main(process.argv.slice(2)).then(result => console.log(JSON.stringify(result))).catch(error => { console.error(error.message); process.exitCode = 1; });
