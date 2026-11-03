@@ -61,6 +61,10 @@ public sealed class ConvitesDeAcesso(
     public Task<int> EmissoesNaUltimaHoraAsync(Guid usuarioId) =>
         tokens.ContarEmissoesDeConviteAsync(usuarioId, relogio.GetUtcNow().UtcDateTime.AddHours(-1));
 
+    /// <summary>O usuário tem convite aberto agora (#2070, A3): vencido ou revogado não vale para o Google.</summary>
+    public Task<bool> TemConviteAbertoAsync(Guid usuarioId) =>
+        tokens.TemConviteAbertoAsync(usuarioId, relogio.GetUtcNow().UtcDateTime);
+
     /// <summary>Revoga os convites abertos do usuário (todos os canais) e devolve quantos caíram.</summary>
     public Task<int> RevogarAbertosAsync(Guid usuarioId) => tokens.InvalidarConvitesAbertosAsync(usuarioId);
 

@@ -8,12 +8,18 @@ using EasyStock.Application.UseCases.AtualizarUsuario;
 using EasyStock.Application.UseCases.CriarUsuario;
 using EasyStock.Application.UseCases.DesativarUsuario;
 using EasyStock.Application.UseCases.ListarUsuarios;
+using EasyStock.Application.UseCases.MarcarDona;
 using EasyStock.Application.UseCases.ReenviarConvite;
 using EasyStock.Application.Validators;
+using EasyStock.Api.Services;
 using EasyStock.Domain.Enums;
+using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace EasyStock.Api.UnitTests.Controllers;
@@ -55,10 +61,13 @@ public class UsuarioControllerTests
             Substitute.For<IEmpresaRepository>(),
             new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), TimeProvider.System,
             Substitute.For<ILogger<ConvitesDeAcesso>>());
+        var hierarquia = new HierarquiaDeUsuarios(
+            _usuarioRepository, _usuarioEmpresaRepository, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            Substitute.For<ILogger<HierarquiaDeUsuarios>>());
         _criarUseCase = new CriarUsuarioUseCase(
             _usuarioRepository, _assinaturaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository,
             Substitute.For<IPerfilRepository>(),
-            Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), convites,
+            Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), convites, hierarquia,
             _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, passwordHasher, criarLogger);
         _atualizarUseCase = new AtualizarUsuarioUseCase(
             _usuarioRepository, _currentUser, _unitOfWork,
@@ -68,23 +77,30 @@ public class UsuarioControllerTests
                 Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(), _currentUser, passwordHasher,
                 _unitOfWork, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), TimeProvider.System,
                 Substitute.For<ILogger<TrocaDeContatoService>>()),
-            convites, Substitute.For<IAuditLogRepository>(), atualizarLogger);
+            convites, hierarquia, Substitute.For<IAuditLogRepository>(), atualizarLogger);
         _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), revogadorSessoes, _unitOfWork, passwordHasher, alterarSenhaLogger);
-        _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, revogadorSessoes, convites, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, desativarLogger);
-        _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository);
-        _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, Substitute.For<IPerfilRepository>(), revogadorSessoes, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, atribuirPerfilLogger);
+        _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, revogadorSessoes, convites, hierarquia, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, desativarLogger);
+        _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository, hierarquia);
+        _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, _usuarioEmpresaRepository, Substitute.For<IPerfilRepository>(), revogadorSessoes, hierarquia, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, atribuirPerfilLogger);
 
         _reenviarConviteUseCase = new ReenviarConviteUseCase(
-            _usuarioRepository, _currentUser, convites, Substitute.For<ITenantContextAccessor>(),
+            _usuarioRepository, _currentUser, convites, hierarquia, Substitute.For<ITenantContextAccessor>(),
             Substitute.For<IAuditLogRepository>(), _unitOfWork, Substitute.For<ILogger<ReenviarConviteUseCase>>());
+        var marcarDona = new MarcarDonaUseCase(
+            _usuarioRepository, _usuarioEmpresaRepository, hierarquia, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            Substitute.For<ILogger<MarcarDonaUseCase>>());
+        var adminAudit = new AdminAuditService(
+            new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options),
+            new HttpContextAccessor(), NullLogger<AdminAuditService>.Instance);
 
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
         _controller = new UsuarioController(_criarUseCase, _atualizarUseCase, _alterarSenhaUseCase, _desativarUseCase, _listarUseCase, _atribuirPerfilUseCase, _reenviarConviteUseCase,
             new EasyStock.Application.UseCases.ReativarUsuario.ReativarUsuarioUseCase(
-                _usuarioRepository, _usuarioEmpresaRepository, _assinaturaRepository, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork,
+                _usuarioRepository, _usuarioEmpresaRepository, _assinaturaRepository, hierarquia, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork,
                 Substitute.For<ILogger<EasyStock.Application.UseCases.ReativarUsuario.ReativarUsuarioUseCase>>()),
-            new ListarPerfisAtribuiveisUseCase(Substitute.For<IPerfilRepository>()),
+            new ListarPerfisAtribuiveisUseCase(Substitute.For<IPerfilRepository>(), hierarquia),
             new ListarAuditoriaDeAcessoUseCase(Substitute.For<IAuditLogRepository>(), _usuarioRepository),
+            marcarDona, adminAudit,
             _currentUser);
     }
 
@@ -119,5 +135,42 @@ public class UsuarioControllerTests
         var result = await _controller.AtribuirPerfil(Guid.NewGuid(), new AtribuirPerfilRequest(Guid.NewGuid(), Guid.NewGuid(), null));
 
         result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task MarcarDona_DeveRetornarForbid_QuandoEmpresaForDiferenteDoUsuarioAtual()
+    {
+        _currentUser.Nivel.Returns(NivelAcesso.Admin);
+        _currentUser.EmpresaId.Returns(Guid.NewGuid());
+
+        var result = await _controller.MarcarDona(Guid.NewGuid(), new MarcarDonaRequest(true, null, Guid.NewGuid()), CancellationToken.None);
+
+        result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task MarcarDona_SemOCampoDona_DeveRetornarBadRequestSemTocarNaMarca()
+    {
+        // Antes: bool não anulável, e um corpo sem o campo (ou com o nome errado) virava dona=false, tirando a marca em silêncio.
+        var corpo = System.Text.Json.JsonSerializer.Deserialize<MarcarDonaRequest>(
+            """{"motivo":"pedido formal da titular"}""", new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        _currentUser.EmpresaId.Returns(Guid.NewGuid());
+
+        var result = await _controller.MarcarDona(Guid.NewGuid(), corpo, CancellationToken.None);
+
+        corpo.Dona.Should().BeNull();
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _usuarioRepository.DidNotReceiveWithAnyArgs().GetByIdAsync(default);
+        await _usuarioEmpresaRepository.DidNotReceiveWithAnyArgs().DefinirDonaAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task MarcarDona_SemEmpresaNoTokenNemNoCorpo_DeveRetornarBadRequest()
+    {
+        _currentUser.EmpresaId.Returns(Guid.Empty);
+
+        var result = await _controller.MarcarDona(Guid.NewGuid(), new MarcarDonaRequest(true), CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
     }
 }

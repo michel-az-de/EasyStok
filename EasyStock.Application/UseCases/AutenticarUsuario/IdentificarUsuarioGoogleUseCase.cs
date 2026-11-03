@@ -11,6 +11,10 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario;
 /// N9: identidade com e-mail verificado de convidado pendente consome o convite: confirma o e-mail, grava a via
 /// <c>Google</c> e revoga os convites abertos. A senha segue inutilizável até a pessoa definir uma por "esqueci a senha".
 /// </para>
+/// <para>
+/// #2070: só consome convite aberto (token <c>Convite</c> não usado e não vencido, A3); vencido ou revogado responde
+/// "Seu convite venceu: peça um novo". O bloqueio por senha errada é do login por senha e não barra o Google (B4).
+/// </para>
 /// </summary>
 public class IdentificarUsuarioGoogleUseCase(
     IGoogleIdTokenValidator validador,
@@ -32,11 +36,13 @@ public class IdentificarUsuarioGoogleUseCase(
 
         if (usuario is null || !usuario.Ativo)
             throw new CredenciaisInvalidasException("Esta conta Google não tem acesso ao EasyStok.");
-        if (usuario.EstaBloqueado())
-            throw new CredenciaisInvalidasException("Conta bloqueada temporariamente.");
 
         if (usuario.ConvitePendente && !usuario.EhSuperAdmin())
+        {
+            if (!await convites.TemConviteAbertoAsync(usuario.Id))
+                throw new CredenciaisInvalidasException("Seu convite venceu: peça um novo.");
             await ConsumirConviteAsync(usuario);
+        }
 
         return usuario;
     }

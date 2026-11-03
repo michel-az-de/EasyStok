@@ -14,8 +14,9 @@
 // `#/entregas` e `#/cardapio-link/<id>` abrem a mesma tela de sempre.
 
 import { PREFIXO_ROTA as PREFIXO_CARDAPIO_LINK } from './cardapioLink'
+import { MODULO_DOS_PRIMEIROS_PASSOS, TELA_PRIMEIROS_PASSOS, ehPassoConhecido } from './configuracaoInicial'
 import { moduloCongelado } from './congelados'
-import { TELA_OPERACAO, moduloPorId, telasDoMenu } from './modulos'
+import { TELA_OPERACAO, hashDoModulo, moduloPorId, telasDoMenu } from './modulos'
 
 export const ROTA_HALL = 'hall'
 export const ROTA_MODULO = 'modulo'
@@ -42,8 +43,13 @@ const ROTA_DA_OPERACAO = {
   'entregas/agenda': ROTA_ENTREGAS,
 }
 
+// #2070: Primeiros passos guarda o passo no terceiro segmento (o Voltar do navegador volta um passo). Passo fora do
+// mapa vira `null` e a tela retoma do primeiro em aberto.
+const ehPrimeirosPassos = (moduloId, telaId) => moduloId === MODULO_DOS_PRIMEIROS_PASSOS && telaId === TELA_PRIMEIROS_PASSOS
+export const hashDoPasso = (passo) => `${hashDoModulo(MODULO_DOS_PRIMEIROS_PASSOS, TELA_PRIMEIROS_PASSOS)}/${passo}`
+
 function rotaDoModulo(caminho, fonteApi) {
-  const [moduloId, telaId] = caminho.split('/')
+  const [moduloId, telaId, passoId] = caminho.split('/')
   const modulo = moduloPorId(moduloId)
   // Módulo congelado (#1891) é tratado como inexistente: cai no hall, sem moldura vazia.
   if (!modulo || moduloCongelado(modulo.id)) return { tipo: ROTA_HALL }
@@ -54,7 +60,8 @@ function rotaDoModulo(caminho, fonteApi) {
   if (tela.tipo === TELA_OPERACAO) {
     return { tipo: ROTA_DA_OPERACAO[`${modulo.id}/${tela.id}`], modulo: modulo.id, tela: tela.id }
   }
-  return { tipo: ROTA_MODULO, modulo: modulo.id, tela: tela.id, aba: tela.aba }
+  const rota = { tipo: ROTA_MODULO, modulo: modulo.id, tela: tela.id, aba: tela.aba }
+  return ehPrimeirosPassos(modulo.id, tela.id) ? { ...rota, passo: ehPassoConhecido(passoId) ? passoId : null } : rota
 }
 
 // `hash` é `window.location.hash` (string vazia ou ausente na carga sem hash

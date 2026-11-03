@@ -88,7 +88,7 @@ public static class SuperAdminSeed
         // tentaria duplicar.
         var perfilSuper = await context.Perfis
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(p => p.Nivel == NivelAcesso.SuperAdmin && p.EmpresaId == null);
+            .FirstOrDefaultAsync(Perfil.SuporteGlobal);
 
         if (perfilSuper is null)
         {

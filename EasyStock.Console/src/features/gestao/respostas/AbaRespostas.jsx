@@ -4,6 +4,7 @@ import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
 import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contextos'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { usePendenciaDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { automacoesEditaveis, respostasEditaveis } from '../../../dominio/acessoModulos'
 import {
   VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, variaveisForaDaApi,
@@ -26,6 +27,9 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
   const [texto, setTexto] = useState(inicial?.texto ?? '')
   const [salvando, setSalvando] = useState(false)
   const pronto = titulo.trim() && texto.trim()
+  // #2070: a edição aberta segura o "Conferi, seguir" dos Primeiros passos e o aviso de sair.
+  const mudou = titulo !== (inicial?.titulo ?? '') || atalho !== (inicial?.atalho ?? '') || texto !== (inicial?.texto ?? '')
+  usePendenciaDoAjuste(`resposta-pronta:${inicial?.id ?? 'nova'}`, mudou)
 
   function salvar(evento) {
     evento.preventDefault()
@@ -156,6 +160,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
   const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const editando = rascunho !== null
+  usePendenciaDoAjuste(`mensagem-automatica:${regra.id}`, editando && rascunho !== (regra.texto || regra.sugestao || ''))
   const foraDaApi = fonteApi ? variaveisForaDaApi(rascunho ?? regra.texto) : []
   // #1474: no modo API a saudação de Horários e mensagens sai sempre na primeira mensagem.
   const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null

@@ -40,6 +40,36 @@ namespace EasyStock.Domain.Entities
         /// <summary>Id da conta profissional do Instagram: roteia o webhook do Instagram pelo <c>recipient.id</c> (S35).</summary>
         public string? InstagramAccountId { get; set; }
 
+        /// <summary>Quando a configuração inicial da loja foi concluída (#2070). Nulo: pendente.</summary>
+        public DateTime? ConfiguracaoInicialConcluidaEm { get; private set; }
+
+        /// <summary>Quem concluiu a configuração inicial: a dona ou o suporte.</summary>
+        public Guid? ConfiguracaoInicialConcluidaPorId { get; private set; }
+
+        /// <summary>Último "continuar depois" do assistente. Com ele, o assistente não abre sozinho.</summary>
+        public DateTime? ConfiguracaoInicialAdiadaEm { get; private set; }
+
+        /// <summary>Conclui a configuração inicial. Concluir de novo não muda nada: vale a primeira conclusão.</summary>
+        public void ConcluirConfiguracaoInicial(Guid porUsuarioId, DateTime agoraUtc)
+        {
+            if (porUsuarioId == Guid.Empty)
+                throw new RegraDeDominioVioladaException("Informe quem concluiu a configuração inicial.");
+            if (ConfiguracaoInicialConcluidaEm is not null) return;
+
+            ConfiguracaoInicialConcluidaEm = agoraUtc;
+            ConfiguracaoInicialConcluidaPorId = porUsuarioId;
+            AlteradoEm = agoraUtc;
+        }
+
+        /// <summary>Adia a configuração inicial ("continuar depois"). Depois de concluída, não muda nada.</summary>
+        public void AdiarConfiguracaoInicial(DateTime agoraUtc)
+        {
+            if (ConfiguracaoInicialConcluidaEm is not null) return;
+
+            ConfiguracaoInicialAdiadaEm = agoraUtc;
+            AlteradoEm = agoraUtc;
+        }
+
         public static Empresa Criar(string nome, string? documento)
         {
             var agora = DateTime.UtcNow;

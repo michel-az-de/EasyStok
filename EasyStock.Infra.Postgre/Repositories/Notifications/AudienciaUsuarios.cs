@@ -24,12 +24,13 @@ public sealed class AudienciaUsuarios(EasyStockDbContext db) : IAudienciaUsuario
     public async Task<IReadOnlyList<UsuarioParaAudiencia>> ListarDaEmpresaAsync(
         Guid empresaId, IReadOnlyCollection<NivelAcesso> niveis, CancellationToken ct = default)
     {
-        // Sempre a empresa do evento: o vínculo ativo e o perfil são dela, e quem é SuperAdmin fica de fora.
+        // Sempre a empresa do evento: o vínculo ativo e o perfil são dela, e o suporte global fica de fora (B1, #2070).
+        var perfisDeSuporte = PerfisDeSuporte();
         var usuarios = db.Usuarios.AsNoTracking()
             .Where(u => u.Ativo
                         && u.Empresas.Any(ue => ue.EmpresaId == empresaId && ue.Ativo)
                         && u.Perfis.Any(up => up.EmpresaId == empresaId && up.Perfil != null && niveis.Contains(up.Perfil.Nivel))
-                        && !u.Perfis.Any(up => up.Perfil != null && up.Perfil.Nivel == NivelAcesso.SuperAdmin));
+                        && !u.Perfis.Any(up => perfisDeSuporte.Contains(up.PerfilId)));
 
         var linhas = await usuarios
             .OrderBy(u => u.Nome)
@@ -45,10 +46,11 @@ public sealed class AudienciaUsuarios(EasyStockDbContext db) : IAudienciaUsuario
     public async Task<IReadOnlyList<UsuarioParaAudiencia>> ListarComPermissaoAsync(
         Guid empresaId, Permissao permissao, CancellationToken ct = default)
     {
+        var perfisDeSuporte = PerfisDeSuporte();
         var linhas = await db.Usuarios.AsNoTracking()
             .Where(u => u.Ativo
                         && u.Empresas.Any(ue => ue.EmpresaId == empresaId && ue.Ativo)
-                        && !u.Perfis.Any(up => up.Perfil != null && up.Perfil.Nivel == NivelAcesso.SuperAdmin))
+                        && !u.Perfis.Any(up => perfisDeSuporte.Contains(up.PerfilId)))
             .OrderBy(u => u.Nome)
             .Select(u => new
             {
@@ -71,4 +73,8 @@ public sealed class AudienciaUsuarios(EasyStockDbContext db) : IAudienciaUsuario
                 u.Id, u.Nome, u.Email, u.EmailConfirmado, u.Ativo, u.Telefone?.Value, u.TelefoneVerificadoEm))
             .ToList();
     }
+
+    /// <summary>Os perfis do suporte global, pela regra única do domínio (<see cref="Perfil.SuporteGlobal"/>), como subconsulta.</summary>
+    private IQueryable<Guid> PerfisDeSuporte() =>
+        db.Perfis.IgnoreQueryFilters().Where(Perfil.SuporteGlobal).Select(p => p.Id);
 }

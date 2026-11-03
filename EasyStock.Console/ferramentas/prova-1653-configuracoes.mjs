@@ -7,7 +7,7 @@ import { transformWithOxc } from 'vite'
 
 const url = new URL('../src/features/gestao/atendimento/AbaAtendimento.jsx', import.meta.url)
 const fontes = new Map()
-for (const caminho of ['gestao/atendimento/AbaAtendimento', 'automacoes/ModalAutomacoes', 'automacoes/ModalHorariosDaSemana']) {
+for (const caminho of ['gestao/atendimento/AbaAtendimento', 'automacoes/ModalAutomacoes', 'automacoes/ModalHorariosDaSemana', 'automacoes/FormularioHorariosDaSemana']) {
   const arquivo = new URL(`../src/features/${caminho}.jsx`, import.meta.url)
   fontes.set(arquivo.href, (await transformWithOxc(readFileSync(arquivo, 'utf8'), arquivo.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
@@ -92,6 +92,8 @@ registerHooks({
 })
 const { AbaAtendimento } = await import(url.href)
 const { ModalHorariosDaSemana } = await import('../src/features/automacoes/ModalHorariosDaSemana.jsx')
+// #2070: o modal é casca do FormularioHorariosDaSemana; a tela montada é o formulário com a moldura do modal.
+const montarHorarios = (props) => { const casca = ModalHorariosDaSemana(props); return new Tela(casca.type, casca.props) }
 const { criarAcoesExpedienteApi } = await import('../src/aplicacao/api/expediente.js')
 const { FUNCIONAMENTO_PADRAO } = await import('../src/dominio/funcionamento.js')
 const { useGravacoesDosAjustes } = await import('../src/aplicacao/rascunhosDosAjustes.js')
@@ -298,10 +300,10 @@ await provar('horários chegam por composição na seção da loja', () => {
 await provar('horários: editar e fechar conserva draft sem disparar autosave', async () => {
   recarregarExpediente = async () => ({ funcionamento: semana() })
   let fechou = 0
-  const tela = new Tela(ModalHorariosDaSemana, { aoFechar: () => { fechou++ } }); await tela.atualizar()
+  const tela = montarHorarios({ aoFechar: () => { fechou++ } }); await tela.atualizar()
   mudar(tela, 'Abre, Segunda', '09:00'); botao(tela, 'Fechar').props.onClick()
   assert.equal(fechou, 1); assert.equal(escritas.length, 0); assert.equal(g.rascunhos.get('horarios-atendimento').segunda.abre, '09:00')
-  tela.desmontar(); const volta = new Tela(ModalHorariosDaSemana, { aoFechar() {} }); await volta.atualizar()
+  tela.desmontar(); const volta = montarHorarios({ aoFechar() {} }); await volta.atualizar()
   assert.equal(campo(volta, 'Abre, Segunda').props.value, '09:00')
   botao(volta, 'Desfazer edição').props.onClick(); await volta.atualizar()
   assert.equal(campo(volta, 'Abre, Segunda').props.value, '08:00'); assert.equal(g.rascunhos.size, 0)
@@ -309,7 +311,7 @@ await provar('horários: editar e fechar conserva draft sem disparar autosave', 
 await provar('horários: gravação pendente bloqueia fechar, desfazer e envio duplicado', async () => {
   recarregarExpediente = async () => ({ funcionamento: semana() })
   let fechou = 0
-  const tela = new Tela(ModalHorariosDaSemana, { aoFechar: () => { fechou++ } }); await tela.atualizar()
+  const tela = montarHorarios({ aoFechar: () => { fechou++ } }); await tela.atualizar()
   mudar(tela, 'Abre, Segunda', '09:00')
   const fecharAntigo = tela.arvore.props.aoFechar, espera = adiado()
   salvarHorarios = () => espera.promessa
@@ -322,7 +324,7 @@ await provar('horários: gravação pendente bloqueia fechar, desfazer e envio d
 })
 await provar('horários: campo vazio e falha HTTP preservam a edição sem falso salvo', async () => {
   recarregarExpediente = async () => ({ funcionamento: semana() })
-  const tela = new Tela(ModalHorariosDaSemana, { aoFechar() {} }); await tela.atualizar()
+  const tela = montarHorarios({ aoFechar() {} }); await tela.atualizar()
   mudar(tela, 'Abre, Segunda', '')
   await enviar(tela, false); assert.equal(escritas.length, 0); assert.equal(campo(tela, 'Abre, Segunda').props.required, true)
   mudar(tela, 'Abre, Segunda', '09:00'); salvarHorarios = async () => { throw new Error('Sem conexão') }
@@ -333,10 +335,10 @@ await provar('horários: campo vazio e falha HTTP preservam a edição sem falso
 await provar('horários: nova edição aguarda o modal anterior, preserva B e desfazer mostra A', async () => {
   let funcionamento = semana()
   recarregarExpediente = async () => ({ funcionamento })
-  const tela = new Tela(ModalHorariosDaSemana, { aoFechar() {} }); await tela.atualizar(); mudar(tela, 'Abre, Segunda', '09:00')
+  const tela = montarHorarios({ aoFechar() {} }); await tela.atualizar(); mudar(tela, 'Abre, Segunda', '09:00')
   const espera = adiado(); salvarHorarios = async (dados) => { await espera.promessa; funcionamento = dados; return { funcionamento } }
   const envio = enviar(tela); tela.desmontar()
-  const volta = new Tela(ModalHorariosDaSemana, { aoFechar() {} }); await volta.atualizar(); mudar(volta, 'Abre, Segunda', '10:00')
+  const volta = montarHorarios({ aoFechar() {} }); await volta.atualizar(); mudar(volta, 'Abre, Segunda', '10:00')
   assert.equal(botao(volta, 'Salvar horários').props.disabled, true)
   assert.match(texto(volta.arvore), /Outro ajuste está sendo salvo/)
   await enviar(volta); assert.equal(escritas.length, 1)
@@ -374,7 +376,7 @@ await provar('mensagens e horários compartilham a gravação; configuração co
   let funcionamento = semana()
   recarregarExpediente = async () => ({ funcionamento })
   const mensagens = montar('MensagensDoExpediente'); mudar(mensagens, 'Fora do horário', 'Voltamos às 10h')
-  const horarios = new Tela(ModalHorariosDaSemana, { aoFechar() {} }); await horarios.atualizar(); mudar(horarios, 'Abre, Segunda', '09:00')
+  const horarios = montarHorarios({ aoFechar() {} }); await horarios.atualizar(); mudar(horarios, 'Abre, Segunda', '09:00')
   const config = montar('ConfiguracaoDoAtendimento'); await config.atualizar(); mudar(config, 'Tom', 'direto')
   const esperaMensagem = adiado(); salvarMensagens = async () => { await esperaMensagem.promessa; throw new Error('Conexão perdida') }
   const envioMensagem = enviar(mensagens); await horarios.atualizar(); await config.atualizar()
@@ -412,11 +414,11 @@ await provar('mensagens: voltar ao valor antigo durante gravação conserva essa
 })
 await provar('horários: voltar ao valor antigo durante gravação conserva essa nova escolha', async () => {
   let funcionamento = semana(); recarregarExpediente = async () => ({ funcionamento })
-  const tela = new Tela(ModalHorariosDaSemana, { aoFechar() {} }); await tela.atualizar(); mudar(tela, 'Abre, Segunda', '09:00')
+  const tela = montarHorarios({ aoFechar() {} }); await tela.atualizar(); mudar(tela, 'Abre, Segunda', '09:00')
   const espera = adiado(); salvarHorarios = async (dados) => { await espera.promessa; funcionamento = dados; return { funcionamento } }
   const envio = enviar(tela); tela.desmontar()
-  const volta = new Tela(ModalHorariosDaSemana, { aoFechar() {} }); await volta.atualizar(); mudar(volta, 'Abre, Segunda', '08:00')
-  volta.desmontar(); const outraVolta = new Tela(ModalHorariosDaSemana, { aoFechar() {} }); await outraVolta.atualizar()
+  const volta = montarHorarios({ aoFechar() {} }); await volta.atualizar(); mudar(volta, 'Abre, Segunda', '08:00')
+  volta.desmontar(); const outraVolta = montarHorarios({ aoFechar() {} }); await outraVolta.atualizar()
   espera.resolver(); await envio; await outraVolta.atualizar()
   assert.equal(campo(outraVolta, 'Abre, Segunda').props.value, '08:00'); assert.equal(pendente(outraVolta), true)
 })

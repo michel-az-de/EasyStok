@@ -45,6 +45,26 @@ public class RevogacaoDeSessaoTests
         _usuarios.GetByIdAsync(_usuario.Id).Returns(_usuario);
     }
 
+    /// <summary>
+    /// #2070: a política lê o ator do banco. A dona da empresa, com perfil de nível Admin e a marca, faz as escritas de
+    /// hierarquia destes testes; a revogação que eles provam é a do alvo.
+    /// </summary>
+    private (ICurrentUserAccessor Atual, HierarquiaDeUsuarios Hierarquia) Dona(Guid empresaId)
+    {
+        var dona = Usuario.Criar("Baba", "baba@exemplo.test", "hash");
+        CenarioDeAcesso.DarPerfil(dona, empresaId, NivelAcesso.Admin, dona: true);
+        _usuarios.GetByIdAsync(dona.Id).Returns(dona);
+        var atual = Substitute.For<ICurrentUserAccessor>();
+        atual.UsuarioId.Returns(dona.Id);
+        atual.EmpresaId.Returns(empresaId);
+        atual.Nivel.Returns(NivelAcesso.Admin);
+        var vinculos = Substitute.For<IUsuarioEmpresaRepository>();
+        vinculos.ContarDonasAtivasAsync(empresaId, Arg.Any<CancellationToken>()).Returns(1);
+        var hierarquia = new HierarquiaDeUsuarios(_usuarios, vinculos, atual, Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            Substitute.For<ILogger<HierarquiaDeUsuarios>>());
+        return (atual, hierarquia);
+    }
+
     private async Task DeveTerRevogadoOUsuarioTodo()
     {
         _usuario.SessoesValidasDesde.Should().Be(Corte);
@@ -162,11 +182,13 @@ public class RevogacaoDeSessaoTests
     {
         var empresaId = Guid.NewGuid();
         var vinculo = new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = _usuario.Id, EmpresaId = empresaId, Ativo = true, CriadoEm = DateTime.UtcNow };
+        _usuario.Empresas.Add(vinculo);
         var vinculos = Substitute.For<IUsuarioEmpresaRepository>();
         vinculos.GetByUsuarioEEmpresaAsync(_usuario.Id, empresaId).Returns(vinculo);
+        var (atual, hierarquia) = Dona(empresaId);
 
         await new DesativarUsuarioUseCase(
-                _usuarios, vinculos, _revogador, new CenarioDeAcesso().Convites(), Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+                _usuarios, vinculos, _revogador, new CenarioDeAcesso().Convites(), hierarquia, atual, Substitute.For<IAuditLogRepository>(), _unitOfWork,
                 Substitute.For<ILogger<DesativarUsuarioUseCase>>())
             .ExecuteAsync(new DesativarUsuarioCommand(_usuario.Id, empresaId));
 
@@ -178,11 +200,13 @@ public class RevogacaoDeSessaoTests
     public async Task DesativarSemVinculoNaoRevoga()
     {
         var vinculos = Substitute.For<IUsuarioEmpresaRepository>();
+        var empresaId = Guid.NewGuid();
+        var (atual, hierarquia) = Dona(empresaId);
 
         await Assert.ThrowsAsync<UseCaseValidationException>(() => new DesativarUsuarioUseCase(
-                _usuarios, vinculos, _revogador, new CenarioDeAcesso().Convites(), Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+                _usuarios, vinculos, _revogador, new CenarioDeAcesso().Convites(), hierarquia, atual, Substitute.For<IAuditLogRepository>(), _unitOfWork,
                 Substitute.For<ILogger<DesativarUsuarioUseCase>>())
-            .ExecuteAsync(new DesativarUsuarioCommand(_usuario.Id, Guid.NewGuid())));
+            .ExecuteAsync(new DesativarUsuarioCommand(_usuario.Id, empresaId)));
 
         await NaoDeveTerRevogadoNada();
     }
@@ -199,33 +223,41 @@ public class RevogacaoDeSessaoTests
         return repo;
     }
 
-    [Fact]
-    public async Task AtribuirPerfil_DeveRecusarPerfilSuperAdmin()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AtribuirPerfil_DeveRecusarPerfilDeNivelSuperAdmin(bool global)
     {
-        var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
-            PerfilComum(NivelAcesso.SuperAdmin), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
-            Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+        // Com o vínculo ativo, a recusa é pelo perfil (o global de suporte e o de empresa com nível SuperAdmin, B1).
+        var empresaId = Guid.NewGuid();
+        VincularA(empresaId);
+        var uc = AtribuirPerfil(Substitute.For<IUsuarioPerfilRepository>(), empresaId,
+            PerfilComum(NivelAcesso.SuperAdmin, global ? null : empresaId));
 
-        var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
+        var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, Guid.NewGuid(), null));
 
-        await act.Should().ThrowAsync<UseCaseValidationException>();
+        (await act.Should().ThrowAsync<UseCaseValidationException>()).Which.Message.Should().Be("Perfil invalido.");
+        await NaoDeveTerRevogadoNada();
     }
 
     [Fact]
     public async Task AtribuirPerfil_DeveRecusarPerfilDeOutraEmpresa()
     {
-        var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
-            PerfilComum(NivelAcesso.Admin, Guid.NewGuid()), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
-            Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+        var empresaId = Guid.NewGuid();
+        VincularA(empresaId);
+        var uc = AtribuirPerfil(Substitute.For<IUsuarioPerfilRepository>(), empresaId, PerfilComum(NivelAcesso.Admin, Guid.NewGuid()));
 
-        var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
+        var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, Guid.NewGuid(), null));
 
-        await act.Should().ThrowAsync<UseCaseValidationException>();
+        (await act.Should().ThrowAsync<UseCaseValidationException>()).Which.Message.Should().Be("Perfil invalido.");
     }
 
-    private AtribuirPerfilUsuarioUseCase AtribuirPerfil(IUsuarioPerfilRepository perfis) =>
-        new(_usuarios, perfis, PerfilComum(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
-            Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+    private AtribuirPerfilUsuarioUseCase AtribuirPerfil(IUsuarioPerfilRepository perfis, Guid empresaId, IPerfilRepository? perfil = null)
+    {
+        var (atual, hierarquia) = Dona(empresaId);
+        return new(_usuarios, perfis, Substitute.For<IUsuarioEmpresaRepository>(), perfil ?? PerfilComum(), _revogador, hierarquia, atual,
+            Substitute.For<IAuditLogRepository>(), _unitOfWork, Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
+    }
 
     [Fact]
     public async Task TrocaDePerfilRevoga()
@@ -236,7 +268,7 @@ public class RevogacaoDeSessaoTests
         var perfis = Substitute.For<IUsuarioPerfilRepository>();
         perfis.ListarPorUsuarioEEmpresaAsync(_usuario.Id, empresaId).Returns([]);
 
-        await AtribuirPerfil(perfis)
+        await AtribuirPerfil(perfis, empresaId)
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, perfilId, LojaId: null));
 
         await perfis.Received(1).AddAsync(Arg.Is<UsuarioPerfil>(p => p.PerfilId == perfilId));
@@ -253,7 +285,7 @@ public class RevogacaoDeSessaoTests
         var perfis = Substitute.For<IUsuarioPerfilRepository>();
         perfis.ListarPorUsuarioEEmpresaAsync(_usuario.Id, empresaId).Returns([existente]);
 
-        await AtribuirPerfil(perfis)
+        await AtribuirPerfil(perfis, empresaId)
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, perfilId, LojaId: Guid.NewGuid()));
 
         await perfis.Received(1).UpdateAsync(existente);
@@ -261,12 +293,12 @@ public class RevogacaoDeSessaoTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PerfilEmEmpresaOndeOUsuarioNaoEstaAtivoNaoDerrubaASessao(bool temVinculoInativo)
+    [InlineData(false, null)]
+    [InlineData(true, "USUARIO_DESATIVADO")]
+    public async Task PerfilEmEmpresaOndeOUsuarioNaoEstaAtivoERecusadoSemDerrubarASessao(bool temVinculoInativo, string? codigo)
     {
-        // O corte é do usuário todo, e esta rota só confere a empresa do chamador: um Admin de outra empresa
-        // não pode usá-la para deslogar quem não é dele. A atribuição segue como sempre; só não revoga.
+        // O corte é do usuário todo, e um Admin de outra empresa não pode usar esta rota para deslogar quem não é dele.
+        // #2070 (B3): a atribuição exige vínculo ativo com a empresa; sem ele nada muda (antes atribuía e só não revogava).
         var empresaDoAdmin = Guid.NewGuid();
         var perfilId = Guid.NewGuid();
         VincularA(Guid.NewGuid()); // vínculo ativo, mas com outra empresa
@@ -274,10 +306,13 @@ public class RevogacaoDeSessaoTests
         var perfis = Substitute.For<IUsuarioPerfilRepository>();
         perfis.ListarPorUsuarioEEmpresaAsync(_usuario.Id, empresaDoAdmin).Returns([]);
 
-        await AtribuirPerfil(perfis)
+        var atribuir = () => AtribuirPerfil(perfis, empresaDoAdmin)
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaDoAdmin, perfilId, LojaId: null));
 
-        await perfis.Received(1).AddAsync(Arg.Is<UsuarioPerfil>(p => p.PerfilId == perfilId));
+        var recusa = (await atribuir.Should().ThrowAsync<UseCaseValidationException>()).Which;
+        recusa.Code.Should().Be(codigo);
+        if (codigo is null) recusa.Message.Should().Be("Usuario nao encontrado.");
+        await perfis.DidNotReceiveWithAnyArgs().AddAsync(default!);
         await NaoDeveTerRevogadoNada();
     }
 

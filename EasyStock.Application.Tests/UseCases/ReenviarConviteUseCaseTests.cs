@@ -18,13 +18,18 @@ public class ReenviarConviteUseCaseTests
     public ReenviarConviteUseCaseTests()
     {
         _atual.EmpresaId.Returns(_empresaId);
-        _atual.UsuarioId.Returns(Guid.NewGuid());
+        // #2070: a política lê o ator do banco; quem reenvia aqui é a dona da empresa.
+        var dona = Usuario.Criar("Baba", "baba@exemplo.test", "hash");
+        CenarioDeAcesso.DarPerfil(dona, _empresaId, NivelAcesso.Admin, dona: true);
+        _c.Usuarios.GetByIdAsync(dona.Id).Returns(dona);
+        _atual.UsuarioId.Returns(dona.Id);
         _atual.Nivel.Returns(NivelAcesso.Admin);
         _atual.Ip.Returns("198.51.100.9");
     }
 
     private ReenviarConviteUseCase UseCase() => new(
-        _c.Usuarios, _atual, _c.Convites(), _c.Tenant, _c.Auditoria, _c.UnitOfWork, Substitute.For<ILogger<ReenviarConviteUseCase>>());
+        _c.Usuarios, _atual, _c.Convites(), _c.Hierarquia(_atual), _c.Tenant, _c.Auditoria, _c.UnitOfWork,
+        Substitute.For<ILogger<ReenviarConviteUseCase>>());
 
     private Task Reenviar(Usuario usuario) => UseCase().ExecuteAsync(new ReenviarConviteCommand(usuario.Id));
 
@@ -141,6 +146,10 @@ public class ReenviarConviteUseCaseTests
     {
         _atual.Nivel.Returns(NivelAcesso.SuperAdmin);
         _atual.EmpresaId.Returns(Guid.Empty);
+        var suporte = Usuario.Criar("Suporte", "suporte@exemplo.test", "hash");
+        CenarioDeAcesso.TornarSuperAdmin(suporte);
+        _c.Usuarios.GetByIdAsync(suporte.Id).Returns(suporte);
+        _atual.UsuarioId.Returns(suporte.Id);
         var empresaDoUsuario = Guid.NewGuid();
         var usuario = _c.CriarConvidado(empresaId: empresaDoUsuario);
 

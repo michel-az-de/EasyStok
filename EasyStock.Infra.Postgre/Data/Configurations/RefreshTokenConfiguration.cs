@@ -40,6 +40,11 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasMaxLength(500)
                 .HasColumnType("character varying(500)");
 
+            // #2070 (M3): a empresa da sessão emitida. Sem FK de propósito: a sessão não segura a empresa, e o refresh
+            // só confere o vínculo ativo com ela.
+            builder.Property(rt => rt.EmpresaDaSessaoId)
+                .HasColumnType("uuid");
+
             builder.HasOne(rt => rt.Usuario)
                 .WithMany()
                 .HasForeignKey(rt => rt.UsuarioId)

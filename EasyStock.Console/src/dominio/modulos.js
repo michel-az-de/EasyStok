@@ -14,7 +14,7 @@
 // e o shell filtra a lista usando a matriz devolvida pelo servidor.
 
 import { moduloCongelado, telaCongelada } from './congelados'
-import { podeAjustarEntrega } from './acessoModulos'
+import { PODE_NA_TELA } from './acessoModulos'
 import { partesNoFuso } from './formato'
 
 export const TELA_OPERACAO = 'operacao'
@@ -106,6 +106,14 @@ export const MODULOS = [
       // #1753 (M7.2): quem tem acesso à casa e o histórico de acesso (só modo API, só a dona).
       { id: 'usuarios', rotulo: 'Usuários', tipo: TELA_AJUSTE, aba: 'usuarios', soApi: true },
       { id: 'auditoria', rotulo: 'Histórico de acesso', tipo: TELA_AJUSTE, aba: 'auditoria', soApi: true },
+      // #2070: os formulários da loja que só tinham API (ou só o Web legado), com a ação da rota de cada um.
+      { id: 'dados-da-loja', rotulo: 'Dados da loja', tipo: TELA_AJUSTE, aba: 'dados-da-loja', soApi: true, acao: 'configurarLoja' },
+      { id: 'site-e-impressos', rotulo: 'Site e impressos', tipo: TELA_AJUSTE, aba: 'site-e-impressos', soApi: true, acao: 'configurarLoja' },
+      { id: 'alertas-de-estoque', rotulo: 'Alertas de estoque', tipo: TELA_AJUSTE, aba: 'alertas-de-estoque', soApi: true, acao: 'configurarLoja' },
+      // O caderno é rota do Atendimento (`AtendimentoCaderno`): o administrador com o atendimento liberado.
+      { id: 'caderno', rotulo: 'Caderno do agente', tipo: TELA_AJUSTE, aba: 'caderno', soApi: true, acao: 'editarAtendimento' },
+      // #2070: o assistente da dona. Fora da janela de Gestão e em tela cheia, sem o menu lateral.
+      { id: 'primeiros-passos', rotulo: 'Primeiros passos', tipo: TELA_AJUSTE, aba: 'primeiros-passos', soApi: true, acao: 'configurarLoja', foraDaGestao: true, telaCheia: true },
     ],
   },
   {
@@ -116,6 +124,8 @@ export const MODULOS = [
       { id: 'agenda', rotulo: 'Agenda de encomendas', tipo: TELA_OPERACAO, soApi: true },
       // #1921: o cadastro de janelas é da policy Admin da API; quem não pode não vê a tela.
       { id: 'janelas', rotulo: 'Janelas de entrega', tipo: TELA_AJUSTE, aba: 'janelas', acao: 'ajustarEntrega' },
+      // #2070: o cadastro de entregadores (policy Operador, módulo Entregas), fora do painel do dia.
+      { id: 'entregadores', rotulo: 'Entregadores', tipo: TELA_AJUSTE, aba: 'entregadores', soApi: true },
     ],
   },
 ]
@@ -128,17 +138,7 @@ export const hashDoModulo = (moduloId, telaId) => `#/m/${moduloId}${telaId ? '/'
 // some nos dois modos: módulo congelado não tem menu (sai do trilho e da Gestão) e tela
 // congelada sai do menu do módulo vivo.
 // #1921: tela com `acao` só aparece no modo API para quem a matriz libera (`podeNaTela`); sem a matriz
-// (`acoes` ausente: demonstração, catálogo do guia) a tela fica.
-const verContas = (acoes) => acoes?.visualizarContasPagar === true || acoes?.visualizarContasReceber === true
-const PODE_NA_TELA = {
-  ajustarEntrega: podeAjustarEntrega,
-  verContas,
-  verContasPagar: (acoes) => acoes?.visualizarContasPagar === true,
-  verContasReceber: (acoes) => acoes?.visualizarContasReceber === true,
-  // O GET de categorias e de centros exige visualizar contas (a pagar ou a receber); só gerenciar não lista (#2105, achado 8).
-  verCategoriasFinanceiras: verContas,
-  verCentrosCusto: verContas,
-}
+// (`acoes` ausente: demonstração, catálogo do guia) a tela fica. A regra de cada ação mora em `acessoModulos.js`.
 const podeNaTela = (tela, { fonteApi, acoes }) => !tela.acao || !fonteApi || !acoes || PODE_NA_TELA[tela.acao]?.(acoes) === true
 export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
   moduloCongelado(modulo?.id) ? [] : (modulo?.telas ?? []).filter((t) => (fonteApi || !t.soApi) && !telaCongelada(modulo.id, t.id)

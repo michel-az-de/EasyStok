@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { usePendenciaDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { Botao } from '../../componentes/Botao'
 import { Chip } from '../../componentes/Chip'
 import { CampoTexto } from '../../componentes/Campo'
@@ -42,6 +43,8 @@ function FormularioJanela({ inicial, editando, janelas, propria = null, aoSalvar
   const [f, setF] = useState(inicial)
   const [erro, setErro] = useState(null)
   const formularioRef = useRef(null)
+  // #2070: janela começada e não salva segura o passo das janelas nos Primeiros passos.
+  usePendenciaDoAjuste(`janela-de-entrega:${propria ?? 'nova'}`, JSON.stringify(f) !== JSON.stringify(inicial))
   useEffect(() => { formularioRef.current?.querySelector('button')?.focus() }, [])
   const campo = (k) => ({ value: f[k], disabled: ocupado, onChange: (e) => setF({ ...f, [k]: e.target.value }) })
   const salvar = (e) => {

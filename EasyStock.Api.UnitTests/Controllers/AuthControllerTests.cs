@@ -124,7 +124,7 @@ public class AuthControllerTests
         var anonimizarLogger = Substitute.For<ILogger<EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase>>();
         var usuarioEmpresaRepo = Substitute.For<IUsuarioEmpresaRepository>();
         var exportarUseCase = new EasyStock.Application.UseCases.ExportarMeusDados.ExportarMeusDadosUseCase(usuarioRepo2, usuarioEmpresaRepo, refreshTokenRepo2, Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Notifications.IPreferenciaNotificacaoRepository>(), currentUser, exportarLogger);
-        var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Notifications.IPreferenciaNotificacaoRepository>(), currentUser, unitOfWork2, anonimizarLogger);
+        var anonimizarUseCase = new EasyStock.Application.UseCases.AnonimizarMeusDados.AnonimizarMeusDadosUseCase(usuarioRepo2, refreshTokenRepo2, resetTokenRepo, emailTokenRepo, Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Notifications.IPreferenciaNotificacaoRepository>(), new HierarquiaDeUsuarios(usuarioRepo2, usuarioEmpresaRepo, currentUser, auditLogRepo2, unitOfWork2, Substitute.For<ILogger<HierarquiaDeUsuarios>>()), currentUser, unitOfWork2, anonimizarLogger);
 
         var listarEmpresasLogger = Substitute.For<ILogger<ListarEmpresasParaLoginUseCase>>();
         var listarEmpresasUseCase = new ListarEmpresasParaLoginUseCase(
@@ -298,6 +298,79 @@ public class AuthControllerTests
         var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
         acoes.GetProperty("editarRespostas").GetBoolean().Should().Be(esperado);
+    }
+
+    // #2070: o assistente de primeiros passos é de quem configura a loja: nível Admin ou suporte, empresa no token e
+    // módulo Configurações liberado. Sem ler banco, como as demais ações.
+    [Theory]
+    [InlineData(NivelAcesso.SuperAdmin, true, true, true)]
+    [InlineData(NivelAcesso.Admin, true, true, true)]
+    [InlineData(NivelAcesso.Gerente, true, true, false)]
+    [InlineData(NivelAcesso.Operador, true, true, false)]
+    [InlineData(NivelAcesso.Admin, false, true, false)]
+    [InlineData(NivelAcesso.Admin, true, false, false)]
+    [InlineData(NivelAcesso.SuperAdmin, false, true, false)]
+    public void ConfigurarLojaExigeAdminEmpresaEModuloConfiguracoes(NivelAcesso nivel, bool comEmpresa, bool modulo, bool esperado)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(comEmpresa ? Guid.NewGuid() : Guid.Empty);
+        usuario.Nivel.Returns(nivel);
+        usuario.TemPermissao(EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Configuracoes)).Returns(modulo);
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+        acoes.GetProperty("configurarLoja").GetBoolean().Should().Be(esperado);
+    }
+
+    // #2070: o `disponivel` de cada passo da configuração inicial é a mesma regra da ação que a rota do passo exige.
+    // Esta guarda pega a regra que mudar só de um lado.
+    private static readonly (string Passo, string Acao)[] PassosComAcao =
+    [
+        ("horarios", "editarAtendimento"), ("atendimento", "editarAtendimento"), ("agente", "editarAtendimento"),
+        ("cardapio", "editarCardapio"), ("producao", "editarProducao"), ("respostas", "editarRespostas"),
+        ("janelas", "ajustarEntrega"), ("frete", "ajustarEntrega"),
+        ("site-e-impressos", "configurarLoja"), ("equipe", "configurarLoja"), ("dados-da-loja", "configurarLoja"),
+        ("estoque", "configurarLoja"),
+    ];
+
+    public static TheoryData<NivelAcesso, Modulo?, bool, bool> AcessosDosPassos()
+    {
+        var dados = new TheoryData<NivelAcesso, Modulo?, bool, bool>();
+        Modulo?[] negados = [null, Modulo.Atendimento, Modulo.Cardapio, Modulo.Producao, Modulo.Configuracoes, Modulo.Entregas];
+        foreach (var nivel in new[] { NivelAcesso.SuperAdmin, NivelAcesso.Admin, NivelAcesso.Gerente, NivelAcesso.Operador })
+            foreach (var negado in negados)
+                foreach (var atender in new[] { true, false })
+                    foreach (var comEmpresa in new[] { true, false })
+                        dados.Add(nivel, negado, atender, comEmpresa);
+        return dados;
+    }
+
+    [Theory]
+    [MemberData(nameof(AcessosDosPassos))]
+    public void DisponivelDosPassosDaConfiguracaoInicialSegueAsAcoes(NivelAcesso nivel, Modulo? negado, bool atender, bool comEmpresa)
+    {
+        UsarContextoHttp();
+        var usuario = NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.ICurrentUserAccessor>();
+        usuario.EmpresaId.Returns(comEmpresa ? Guid.NewGuid() : Guid.Empty);
+        usuario.Nivel.Returns(nivel);
+        usuario.TemPermissao(Arg.Any<Permissao>()).Returns(c => (Permissao)c[0] switch
+        {
+            Permissao.AtenderConversas => atender,
+            var p when negado is { } m && p == EasyStock.Domain.Services.AcessoModulos.PermissaoDe(m) => false,
+            _ => true
+        });
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var dados = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data");
+        var acoes = dados.GetProperty("acoes");
+
+        foreach (var (passo, acao) in PassosComAcao)
+            EasyStock.Application.UseCases.PrimeirosPassos.DisponibilidadeDosPassos.Avaliar(passo, usuario).Disponivel
+                .Should().Be(acoes.GetProperty(acao).GetBoolean(), $"o passo {passo} segue a ação {acao}");
+        var entregas = dados.GetProperty("modulos").EnumerateArray().Single(m => m.GetProperty("id").GetString() == "entregas");
+        EasyStock.Application.UseCases.PrimeirosPassos.DisponibilidadeDosPassos.Avaliar("entregadores", usuario).Disponivel
+            .Should().Be(entregas.GetProperty("liberado").GetBoolean(), "entregadores segue o módulo Entregas da rota");
     }
 
     // ── N8: esqueci a senha ───────────────────────────────────────────────────────────────────

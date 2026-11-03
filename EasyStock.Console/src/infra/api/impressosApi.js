@@ -1,6 +1,6 @@
 import { API_BASE } from '../fonteDados'
 import { chamarApi } from './cliente'
-import { lerSessao } from './sessao'
+import { listarLojasDaEmpresa } from './lojasApi'
 
 export const prepararImpresso = (pedidoId, corpo, sinal) =>
   chamarApi(`/api/pedidos/${pedidoId}/impressoes`, { metodo: 'POST', corpo, sinal })
@@ -17,23 +17,25 @@ export const historicoDoPedido = (pedidoId, pagina, sinal) =>
 export const confirmarDocumentoImpresso = (id, canhotoId = null) =>
   chamarApi(`/api/impressao/${id}/confirmar-documento`, { metodo: 'POST', corpo: { canhotoId } })
 
-const urlDoLogo = (url) => (typeof url === 'string' && url ? (url.startsWith('/') ? API_BASE + url : url) : null)
+// Caminho relativo da API vira endereço que o <img> abre.
+export const urlDoLogo = (url) => (typeof url === 'string' && url ? (url.startsWith('/') ? API_BASE + url : url) : null)
 
 // A loja que recebe o logo: a primeira ativa da empresa logada (tenant único, uma loja).
 export async function obterLojaDaEmpresa() {
-  const empresaId = lerSessao()?.empresa?.id
-  if (!empresaId) throw new Error('Entre novamente na empresa para continuar.')
-  const lojas = await chamarApi(`/api/lojas?empresaId=${encodeURIComponent(empresaId)}`)
-  const loja = (lojas ?? []).find((l) => l.ativa !== false) ?? null
+  const lojas = await listarLojasDaEmpresa()
+  const loja = lojas.find((l) => l.ativa !== false) ?? null
   if (!loja) throw new Error('Nenhuma loja ativa encontrada para esta empresa.')
   return { id: loja.id, nome: loja.nome ?? '', logoUrl: urlDoLogo(loja.logoUrl) }
 }
 
-export async function enviarLogoDaLoja(lojaId, arquivo) {
+// A URL como a API gravou na loja: é ela que o site guarda também (#2070).
+export async function enviarArquivoDoLogo(lojaId, arquivo) {
   const formulario = new FormData()
   formulario.append('file', arquivo)
   const resultado = await chamarApi(`/api/uploads/loja/logo?lojaId=${encodeURIComponent(lojaId)}`, {
     metodo: 'POST', formulario,
   })
-  return urlDoLogo(resultado?.url)
+  return resultado?.url ?? null
 }
+
+export const enviarLogoDaLoja = async (lojaId, arquivo) => urlDoLogo(await enviarArquivoDoLogo(lojaId, arquivo))

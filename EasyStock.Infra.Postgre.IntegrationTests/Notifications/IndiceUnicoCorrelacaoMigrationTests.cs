@@ -68,10 +68,12 @@ public class IndiceUnicoCorrelacaoMigrationTests(PostgreSqlDatabaseFixture fixtu
         var anterior = migracoes[migracoes.IndexOf(alvo) - 1];
         var migrator = db.GetService<IMigrator>();
 
+        // A empresa nasce no esquema atual: o modelo tem colunas de migrações posteriores (#2070) que o esquema antigo não tem.
+        var empresa = await _s.SemearEmpresaAsync();
+
         // Desfaz só o índice (Down) e semeia eventos, inclusive repetidos, como o banco de antes da migração permitia.
         await migrator.MigrateAsync(anterior);
         (await IndiceExisteAsync(db)).Should().BeFalse("o Down remove o índice");
-        var empresa = await _s.SemearEmpresaAsync();
         var repetida = $"antiga-{Guid.NewGuid():N}";
         var outros = new[] { Evento(empresa, repetida), Evento(empresa, Guid.NewGuid().ToString("N")) };
         await SalvarAsync(outros);

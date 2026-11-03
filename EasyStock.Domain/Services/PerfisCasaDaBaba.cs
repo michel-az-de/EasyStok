@@ -14,15 +14,26 @@ public static class PerfisCasaDaBaba
             && cozinha.Permissoes.ToHashSet().SetEquals(perfil.Permissoes.Select(p => p.Permissao));
     }
 
+    /// <summary>Nome antigo do perfil de nível Admin (#2070): o seed renomeia a linha para <see cref="Administracao"/>.</summary>
+    public const string NomeAntigoDaAdministracao = "Dona";
+
+    public const string Administracao = "Administração";
+
+    // #2070: "Dona" na tela vem só da marca do vínculo (UsuarioEmpresa.EhDona); o perfil de nível Admin é a Administração.
     public static IReadOnlyList<PerfilCasaDaBaba> Iniciais { get; } =
     [
-        new("Dona", NivelAcesso.Admin, null,
+        new(Administracao, NivelAcesso.Admin, null,
         [
             .. Enum.GetValues<Modulo>().Select(AcessoModulos.PermissaoDe),
             Permissao.GerenciarUsuarios, Permissao.GerenciarProdutos, Permissao.GerenciarEstoque,
             Permissao.VisualizarRelatorios, Permissao.VisualizarContasAPagar, Permissao.GerenciarContasAPagar,
             Permissao.VisualizarContasAReceber, Permissao.GerenciarContasAReceber,
             Permissao.GerenciarCategoriasFinanceiras, Permissao.GerenciarCentrosCusto, Permissao.AtenderConversas
+        ]),
+        new("Gerência", NivelAcesso.Gerente, null,
+        [
+            .. Enum.GetValues<Modulo>().Where(m => m != Modulo.Configuracoes).Select(AcessoModulos.PermissaoDe),
+            Permissao.AtenderConversas, Permissao.GerenciarProdutos, Permissao.GerenciarEstoque, Permissao.VisualizarRelatorios
         ]),
         new("Atendimento", NivelAcesso.Operador, "atendimento",
         [

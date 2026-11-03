@@ -3,11 +3,13 @@
 // composição do App, sem acoplar os editores de áreas diferentes.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { usePendenciaAvisada } from '../../../aplicacao/formularioDeAjuste'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { Botao } from '../../../componentes/Botao'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
+import { hashDoModulo } from '../../../dominio/modulos'
 import css from './abaAtendimento.module.css'
 
 const TAMANHO_MENSAGEM = 500
@@ -23,6 +25,7 @@ const CAMPOS_CONFIGURACAO = [
   'fraseEspera', 'mensagemForaArea', 'modeloRetomadaNome', 'respiroMinutos',
   'tempoPreparoPadraoMinutos', 'slaRespostaMinutos',
 ]
+const CAMPOS_SEM_O_AGENTE = CAMPOS_CONFIGURACAO.filter((campo) => campo !== 'ativo')
 const valorComparavel = (valor) => String(valor ?? '')
 const camposMudaram = (atual, salvo, campos) => campos.some((campo) => valorComparavel(atual?.[campo]) !== valorComparavel(salvo?.[campo]))
 
@@ -172,7 +175,10 @@ function MensagensDoExpediente() {
   )
 }
 
-function ConfiguracaoDoAtendimento() {
+// `comLigaDesliga` falso (#2070): os Primeiros passos ajustam o atendimento sem ligar o agente. O rascunho da visita
+// pode trazer o liga e desliga marcado em outra tela: aqui ele não conta como pendência, a gravação reenvia o `ativo`
+// gravado e salvar ou desfazer deixa esse liga e desliga no rascunho, para a aba de Atendimento.
+function ConfiguracaoDoAtendimento({ comLigaDesliga = true, aoMudarPendencia }) {
   const { carregarConfiguracao, salvarConfiguracao } = useAcoes()
   const [carga, setCarga] = useState({ estado: 'carregando' })
   const [rascunho, setRascunho] = useRascunhoDoAjuste('configuracao-atendimento')
@@ -208,6 +214,11 @@ function ConfiguracaoDoAtendimento() {
   }
 
   useAtualizarAposLimparRascunho(rascunho, situacao, buscar, gravando)
+  const camposAVista = comLigaDesliga ? CAMPOS_CONFIGURACAO : CAMPOS_SEM_O_AGENTE
+  const pendente = carga.estado === 'ok' && camposMudaram(form, gravado, camposAVista)
+  usePendenciaAvisada(pendente || gravando, aoMudarPendencia)
+  // O que fica no rascunho depois de salvar ou desfazer: nada, ou só o liga e desliga que veio de outra tela.
+  const soOLigaDesliga = (base) => (!comLigaDesliga && rascunho && rascunho.ativo !== base.ativo ? { ...base, ativo: rascunho.ativo } : null)
 
   if (carga.estado === 'carregando') return <p className={css.descricao}>Carregando a configuração…</p>
   if (carga.estado === 'erro') {
@@ -227,7 +238,6 @@ function ConfiguracaoDoAtendimento() {
     const proximo = { ...form, [campo]: lerValor(e) }
     setRascunho(gravando || camposMudaram(proximo, gravado, CAMPOS_CONFIGURACAO) ? proximo : null)
   }
-  const pendente = camposMudaram(form, gravado, CAMPOS_CONFIGURACAO)
 
   async function aoSalvar(evento) {
     evento.preventDefault()
@@ -242,13 +252,13 @@ function ConfiguracaoDoAtendimento() {
     // A resposta é o que ficou gravado: o formulário passa a mostrar isso.
     const { ok, resultado } = await salvar(async () => {
       atual = ++consulta.current
-      const confirmado = await salvarConfiguracao(form)
+      const confirmado = await salvarConfiguracao(comLigaDesliga ? form : { ...form, ativo: gravado.ativo })
       if (!confirmado || typeof confirmado.ativo !== 'boolean') throw new Error('O EasyStok não confirmou a configuração. Tente novamente; sua edição continua nesta tela.')
       return confirmado
     })
     if (ok) {
       if (atual === consulta.current) setGravado(resultado)
-      setRascunho((atual) => atual === rascunho ? null : atual)
+      setRascunho((atual) => atual === rascunho ? soOLigaDesliga(resultado) : atual)
     }
   }
 
@@ -257,7 +267,7 @@ function ConfiguracaoDoAtendimento() {
       <fieldset disabled={situacao.estado === 'salvando'} className={css.campos}>
         <div className={css.topo}>
           <h3 id="gestao-atend-config">Como o automático atende</h3>
-          <label className={css.chave}>
+          {comLigaDesliga && <label className={css.chave}>
             <input
               type="checkbox"
               checked={form.ativo}
@@ -265,15 +275,15 @@ function ConfiguracaoDoAtendimento() {
               onChange={mudar('ativo', (e) => e.target.checked)}
             />
             Atendimento automático
-          </label>
+          </label>}
         </div>
         <Pendencia visivel={pendente && situacao.estado !== 'salvando'} />
         {/* #1475: o backend lê este campo; desligado, o agente não responde e a conversa vai para a dona. */}
-        <p id="gestao-atend-config-efeito" className={css.descricao}>
+        {comLigaDesliga && <p id="gestao-atend-config-efeito" className={css.descricao}>
           {form.ativo
             ? 'Responde no WhatsApp e chama você quando precisa. A mudança só vale depois de salvar.'
             : 'As conversas vão para você; a saudação continua automática. A mudança só vale depois de salvar.'}
-        </p>
+        </p>}
         <CampoTexto
           rotulo="Tom"
           dica="Exemplos: acolhedor, direto, sem gírias."
@@ -348,7 +358,7 @@ function ConfiguracaoDoAtendimento() {
           <Botao variante="primario" tipo="submit" className={css.toque} disabled={!pendente || gravando || situacao.estado === 'salvando'}>
             Salvar configuração
           </Botao>
-          <Botao variante="texto" disabled={!pendente || situacao.estado === 'salvando'} onClick={() => { setRascunho(null); limpar() }}>
+          <Botao variante="texto" disabled={!pendente || situacao.estado === 'salvando'} onClick={() => { setRascunho(soOLigaDesliga(gravado)); limpar() }}>
             Desfazer edição da configuração
           </Botao>
           <Retorno situacao={situacao} gravando={gravando} />
@@ -358,11 +368,46 @@ function ConfiguracaoDoAtendimento() {
   )
 }
 
-export function AbaAtendimento({ horariosAtendimento = null }) {
+// #2070: a situação do agente, só leitura. Ligar e desligar fica em Atendimento › Horários e mensagens.
+function SituacaoDoAgente() {
+  const { carregarConfiguracao } = useAcoes()
+  const [carga, setCarga] = useState({ estado: 'carregando' })
+  const buscar = useCallback(() => carregarConfiguracao()
+    .then((c) => setCarga({ estado: 'ok', ativo: c?.ativo === true }))
+    .catch((erro) => setCarga({ estado: 'erro', mensagem: erro.message })), [carregarConfiguracao])
+  useEffect(() => { buscar() }, [buscar])
+  return (
+    <section className={css.secao} aria-labelledby="gestao-atend-agente">
+      <h3 id="gestao-atend-agente">Situação do agente</h3>
+      {carga.estado === 'carregando' && <output className={css.descricao}>Conferindo o atendimento automático…</output>}
+      {carga.estado === 'erro' && <p className={css.erro} role="alert">A situação do agente não carregou: {carga.mensagem}</p>}
+      {carga.estado === 'ok' && <p className={css.descricao}>Atendimento automático: {carga.ativo ? 'ligado' : 'desligado'}.</p>}
+      <p className={css.descricao}>
+        Para ligar ou desligar, abra <a href={hashDoModulo('atendimento', 'horarios')}>Atendimento › Horários e mensagens</a>.
+      </p>
+    </section>
+  )
+}
+
+// `secoes` (#2070): os Primeiros passos montam só uma parte. 'horarios': a semana (`horariosDaSemana`, do App) e as
+// mensagens de quando a loja não atende; 'configuracao': o atendimento sem o liga e desliga do agente; 'agente': a
+// situação do agente. Nenhuma delas mostra "Abrir loja agora". Sem `secoes`, a aba de sempre.
+export function AbaAtendimento({ horariosAtendimento = null, secoes = null, horariosDaSemana = null, aoMudarPendencia }) {
   const { recarregarExpediente } = useAcoes()
   const { acoes } = useAcessoModulos()
   // O expediente pode ter mudado em outro aparelho: abrir a aba traz o de agora.
   useEffect(() => { recarregarExpediente() }, [recarregarExpediente])
+  if (secoes) {
+    const administra = acoes.editarAtendimento === true
+    return (
+      <div className={css.aba}>
+        {secoes.includes('horarios') && <>{horariosDaSemana}{administra && <MensagensDoExpediente />}</>}
+        {secoes.includes('configuracao') && administra && <ConfiguracaoDoAtendimento comLigaDesliga={false} aoMudarPendencia={aoMudarPendencia} />}
+        {secoes.includes('agente') && <SituacaoDoAgente />}
+        {!administra && !secoes.includes('agente') && <p className={css.descricao}>Horários, mensagens e prazo de resposta são configurados pela dona.</p>}
+      </div>
+    )
+  }
   return (
     <div className={css.aba}>
       <LojaAgora horariosAtendimento={horariosAtendimento} />

@@ -55,7 +55,13 @@ namespace EasyStock.Domain.Entities
         public ICollection<UsuarioPerfil> Perfis { get; set; } = new List<UsuarioPerfil>();
 
         /// <summary>Tem perfil global de SuperAdmin (<c>Perfil.EmpresaId</c> nulo). Exige <see cref="Perfis"/> carregado com o perfil.</summary>
-        public bool EhSuperAdmin() => Perfis.Any(up => up.Perfil is { Nivel: NivelAcesso.SuperAdmin });
+        public bool EhSuperAdmin() => Perfis.Any(up => up.Perfil is { EhSuporteGlobal: true });
+
+        /// <summary>
+        /// A caixa de e-mail foi provada (#2070): e-mail confirmado ou convite aceito por e-mail ou Google, nunca só pelo
+        /// WhatsApp. Só conta provada pode receber a marca de dona.
+        /// </summary>
+        public bool ContaProvada => EmailConfirmado || ConviteAceitoVia is ViaDoConvite.Email or ViaDoConvite.Google;
 
         /// <summary>
         /// #1781: forma única do e-mail da conta (trim + minúsculas), a gravada e a buscada no login. Não valida o

@@ -1,7 +1,18 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 
 // A memória pertence à visita autenticada, nunca ao navegador nem a outra conta.
 export const ContextoRascunhosDosAjustes = createContext(null)
+
+// #2070: formulário com estado próprio que só avisa a edição aberta. O valor fica no formulário; a chave no contexto
+// segura o "Conferi, seguir" dos Primeiros passos e pede confirmação ao sair. Salvar, cancelar ou desmontar tira a chave.
+export function usePendenciaDoAjuste(chave, pendente) {
+  const definir = useContext(ContextoRascunhosDosAjustes)?.definir
+  useEffect(() => {
+    if (!pendente || !definir) return undefined
+    definir(chave, true)
+    return () => definir(chave, null)
+  }, [chave, pendente, definir])
+}
 
 export function useGravacoesDosAjustes() {
   const emAndamento = useRef(new Map())

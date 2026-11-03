@@ -55,13 +55,55 @@ public class PerfisCasaDaBabaSeedTests
         await PerfisCasaDaBabaSeed.ExecutarAsync(db, empresa.Id);
         await PerfisCasaDaBabaSeed.ExecutarAsync(db, empresa.Id);
         var perfis = await db.Perfis.IgnoreQueryFilters().Include(p => p.Permissoes).ToListAsync();
-        perfis.Should().HaveCount(3).And.OnlyContain(p => p.EmpresaId == empresa.Id);
+        perfis.Should().HaveCount(4).And.OnlyContain(p => p.EmpresaId == empresa.Id);
         personalizado.Nivel.Should().Be(NivelAcesso.Gerente);
         personalizado.ModuloInicial.Should().Be("financeiro");
         personalizado.Permissoes.Should().BeEmpty();
         personalizado.PermissoesExplicitas.Should().BeFalse();
-        perfis.Single(p => p.Nome == "Dona").Permissoes.Should().HaveCount(19);
+        perfis.Single(p => p.Nome == "Administração").Permissoes.Should().HaveCount(19);
+        perfis.Single(p => p.Nome == "Gerência").Nivel.Should().Be(NivelAcesso.Gerente);
         perfis.Single(p => p.Nome == "Cozinha").Permissoes.Should().HaveCount(3);
         (await db.Usuarios.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task PerfilDonaDeNivelAdminViraAdministracaoComOMesmoIdEPermissoes()
+    {
+        // #2070: a linha "Dona" (nível Admin) é renomeada, não duplicada; quem já a tinha continua com o mesmo perfil.
+        using var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        var empresa = Empresa.Criar("Casa da Baba teste", null);
+        db.Empresas.Add(empresa);
+        var antiga = new Perfil { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Dona", Nivel = NivelAcesso.Admin,
+            PermissoesExplicitas = true, CriadoEm = DateTime.UtcNow,
+            Permissoes = [new PerfilPermissao { Id = Guid.NewGuid(), Permissao = Permissao.GerenciarUsuarios }] };
+        db.Perfis.Add(antiga);
+        await db.SaveChangesAsync();
+
+        await PerfisCasaDaBabaSeed.ExecutarAsync(db, empresa.Id);
+        await PerfisCasaDaBabaSeed.ExecutarAsync(db, empresa.Id);
+
+        var perfis = await db.Perfis.IgnoreQueryFilters().Include(p => p.Permissoes).ToListAsync();
+        perfis.Select(p => p.Nome).Should().BeEquivalentTo(["Administração", "Gerência", "Atendimento", "Cozinha"]);
+        var renomeado = perfis.Single(p => p.Nome == "Administração");
+        renomeado.Id.Should().Be(antiga.Id);
+        renomeado.Permissoes.Select(p => p.Permissao).Should().Equal(Permissao.GerenciarUsuarios);
+    }
+
+    [Fact]
+    public async Task PerfilDonaPersonalizadoDeOutroNivelNaoERenomeado()
+    {
+        using var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        var empresa = Empresa.Criar("Casa da Baba teste", null);
+        db.Empresas.Add(empresa);
+        db.Perfis.Add(new Perfil { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Dona", Nivel = NivelAcesso.Gerente,
+            CriadoEm = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+
+        await PerfisCasaDaBabaSeed.ExecutarAsync(db, empresa.Id);
+
+        var nomes = await db.Perfis.IgnoreQueryFilters().Select(p => p.Nome).ToListAsync();
+        nomes.Should().BeEquivalentTo(["Dona", "Administração", "Gerência", "Atendimento", "Cozinha"]);
     }
 }

@@ -61,10 +61,8 @@ public class ListarEmpresasParaLoginUseCase(
 
         logger.LogDebug("ListarEmpresasParaLogin: credenciais válidas para {Domain}", MaskEmail(command.Email));
 
-        // SuperAdmin: não tem empresas — login direto sem seleção.
-        var isSuperAdmin = usuario.Perfis?
-            .Select(up => up.Perfil)
-            .Any(p => p != null && p.Nivel == NivelAcesso.SuperAdmin) ?? false;
+        // SuperAdmin: não tem empresas — login direto sem seleção. Só o perfil global de suporte conta (B1, #2070).
+        var isSuperAdmin = usuario.Perfis is not null && usuario.EhSuperAdmin();
 
         if (isSuperAdmin)
             return new ListarEmpresasParaLoginResult(true, []);

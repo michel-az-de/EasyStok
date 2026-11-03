@@ -15,13 +15,19 @@
 /* Alinha os botões com os campos, que têm o rótulo em cima. */
 .botoesDoConvite { display: flex; gap: var(--e-2); align-self: start; margin-top: calc(var(--t-apoio) * 1.4 + var(--e-1)); white-space: nowrap; }
 .erroDoConvite { grid-column: 1 / -1; margin: 0; color: var(--erro); font-size: var(--t-apoio); }
+/* #2070: "Convidar como dona" ocupa a linha de baixo, com a confirmação do e-mail sob o campo do e-mail. */
+.dona { grid-column: 1 / 4; display: grid; grid-template-columns: subgrid; gap: var(--e-3); align-items: start; }
+.opcaoDona { display: grid; gap: var(--e-1); }
+.marcarDona { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); font-size: var(--t-corpo); color: var(--tinta); font-weight: 600; }
+.marcarDona input { width: 20px; height: 20px; accent-color: var(--marca); }
+.dicaDona { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
 /* As colunas são da lista e as linhas herdam (subgrid): a coluna das ações tem a largura do maior conjunto
-   de botões e nenhuma linha quebra em duas. */
+   de botões; sem espaço (três botões numa tela de 1280 px), os botões descem para uma segunda linha. */
 .pessoas {
   list-style: none; margin: 0; padding: 0; border-top: var(--b-1) solid var(--linha);
   display: grid; column-gap: var(--e-3);
-  grid-template-columns: minmax(260px, 1fr) 160px 180px max-content;
+  grid-template-columns: minmax(260px, 1fr) 160px 180px auto;
 }
 .pessoa {
   display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center;
@@ -30,6 +36,7 @@
 .pessoa[data-desativado] .nome, .pessoa[data-desativado] .email { color: var(--tinta-3); }
 
 .quem { min-width: 0; display: grid; gap: 2px; }
+.identificacao { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--e-2); min-width: 0; }
 .nome { font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); overflow-wrap: anywhere; }
 .voce { font-weight: 400; color: var(--tinta-2); }
 .email { font-size: var(--t-apoio); color: var(--tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -40,9 +47,17 @@
 .perfil .seletor:not(:hover, :focus, :focus-visible) { border-color: transparent; background-color: transparent; box-shadow: none; }
 .situacao { display: grid; gap: var(--e-1); justify-items: start; }
 .acesso { font-size: var(--t-apoio); color: var(--tinta-2); }
-.acoes { display: flex; gap: var(--e-2); justify-content: flex-end; flex-wrap: nowrap; white-space: nowrap; min-height: var(--toque); align-items: center; }
+.acoes { display: flex; gap: var(--e-2); justify-content: flex-end; flex-wrap: wrap; white-space: nowrap; min-height: var(--toque); align-items: center; }
 /* Em 1280 px de janela sobram 888 px para a lista: os botões da linha ficam mais justos para caber lado a lado. */
 .acoes button { padding-inline: var(--e-2); }
+/* #2070: confirmação da marca de dona, na largura da linha (o motivo do suporte precisa de espaço). */
+.confirmacao {
+  grid-column: 1 / -1; display: grid; gap: var(--e-2); justify-items: start; min-width: 0;
+  margin: var(--e-2) 0 0; padding: var(--e-3); border: 0; border-radius: var(--r-1); background: var(--preenchimento);
+}
+.confirmacao > div { width: min(100%, 480px); }
+.textoDaConfirmacao { margin: 0; font-size: var(--t-apoio); color: var(--tinta); max-width: 72ch; }
+.botoesDaConfirmacao { display: flex; flex-wrap: wrap; gap: var(--e-2); }
 
 /* Altura reservada para uma linha de aviso: a lista não sai do lugar quando ele aparece ou some. */
 /* Gruda no topo da área que rola: a ação feita numa linha lá embaixo ainda mostra o retorno. */
@@ -75,6 +90,7 @@
 
 @media (max-width: 1100px) {
   .convite { grid-template-columns: 1fr 1fr; }
+  .dona { grid-column: 1 / -1; }
   .botoesDoConvite { margin-top: 0; }
   .pessoas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 0; }
   .pessoa { row-gap: var(--e-2); padding: var(--e-3) 0; }

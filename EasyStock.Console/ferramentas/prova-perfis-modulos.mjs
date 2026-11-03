@@ -47,10 +47,11 @@ assert.equal(acesso.podeVerIntegracoes(null), false)
 
 const entregas = moduloPorId('entregas')
 const ids = (telas) => telas.map((t) => t.id)
-assert.deepEqual(ids(telasDoMenu(entregas, { fonteApi: true, acoes: ATENDENTE })), ['painel', 'agenda'], 'a atendente não vê Janelas de entrega')
-assert.deepEqual(ids(telasDoMenu(entregas, { fonteApi: true, acoes: DONA })), ['painel', 'agenda', 'janelas'])
+// #2070: Entregadores (policy Operador, só no modo API) fica para a atendente.
+assert.deepEqual(ids(telasDoMenu(entregas, { fonteApi: true, acoes: ATENDENTE })), ['painel', 'agenda', 'entregadores'], 'a atendente não vê Janelas de entrega')
+assert.deepEqual(ids(telasDoMenu(entregas, { fonteApi: true, acoes: DONA })), ['painel', 'agenda', 'janelas', 'entregadores'])
 assert.deepEqual(ids(telasDoMenu(entregas, { fonteApi: false, acoes: ATENDENTE })), ['painel', 'janelas'], 'na demonstração a matriz não decide')
-assert.deepEqual(ids(telasDoMenu(entregas, { fonteApi: true })), ['painel', 'agenda', 'janelas'], 'sem a matriz (guia, rota), a tela fica')
+assert.deepEqual(ids(telasDoMenu(entregas, { fonteApi: true })), ['painel', 'agenda', 'janelas', 'entregadores'], 'sem a matriz (guia, rota), a tela fica')
 assert.ok(!modulosDoHall({ fonteApi: true, acoes: ATENDENTE }).find((m) => m.id === 'entregas').telas.some((t) => t.id === 'janelas'))
 for (const caminho of ['features/hall/MolduraDoModulo.jsx', 'features/hall/MenuDosModulos.jsx', 'features/gestao/ModalGestao.jsx']) {
   assert.match(fonte(caminho), /telasDoMenu\((modulo|item), \{ fonteApi, acoes \}\)/, caminho)
@@ -116,3 +117,24 @@ assert.match(modalProgramar, /const editavel = respostasEditaveis\(\{ fonteApi, 
 assert.match(modalProgramar, /disabled=\{salvando \|\| bloqueado \|\| !editavel\} onClick=\{programar\}/, '"Programar" segue ativo para o Operador')
 assert.match(modalProgramar, /\{editavel && podeCancelar\(p\) && \(/, '"Cancelar" segue à vista para o Operador')
 console.log('Perfis: só a gerência cria, edita e arquiva respostas prontas e agenda e cancela mensagens programadas.')
+
+// #2070: Primeiros passos e os formulários da loja em Configurações. `configurarLoja` é estrita (nível Admin ou suporte,
+// módulo Configurações): sem a chave do servidor nada disso aparece; o caderno é do administrador do atendimento.
+const configuracoes = moduloPorId('configuracoes')
+const ADMINISTRACAO = { ...DONA, configurarLoja: true }
+const GERENCIA = { editarAtendimento: false, controlarLoja: true, configurarLoja: false }
+const DA_LOJA = ['dados-da-loja', 'site-e-impressos', 'alertas-de-estoque', 'caderno', 'primeiros-passos']
+const telasDaLoja = (opcoes) => ids(telasDoMenu(configuracoes, opcoes)).filter((id) => DA_LOJA.includes(id))
+assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: ADMINISTRACAO }), DA_LOJA)
+assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: DONA }), ['caderno'], 'API sem a chave configurarLoja: só o que não depende dela')
+assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: GERENCIA }), [])
+assert.deepEqual(telasDaLoja({ fonteApi: true, acoes: ATENDENTE }), [])
+assert.deepEqual(telasDaLoja({ fonteApi: true }), DA_LOJA, 'sem a matriz (guia, rota), as telas ficam')
+assert.deepEqual(telasDaLoja({ fonteApi: false, acoes: ADMINISTRACAO }), [], 'na demonstração não existem')
+assert.equal(acesso.podeConfigurarLoja(ADMINISTRACAO), true)
+assert.equal(acesso.podeConfigurarLoja({ configurarLoja: 1 }), false, 'só o booleano verdadeiro')
+assert.equal(acesso.podeConfigurarLoja(DONA), false, 'sem fallback de editarAtendimento')
+assert.ok(!modulosDoHall({ fonteApi: true, acoes: GERENCIA }).find((m) => m.id === 'configuracoes').telas.some((t) => t.id === 'primeiros-passos'))
+assert.match(fonte('features/gestao/ModalGestao.jsx'), /tela\.tipo === TELA_AJUSTE && !tela\.foraDaGestao/, 'Primeiros passos fica fora da Gestão')
+assert.match(fonte('app/App.jsx'), /useConfiguracaoInicialApi\(\{ ativo: podeConfigurarLoja\(dados\?\.acoes\) \}\)/, 'sem a ação o Console nem lê a configuração inicial')
+console.log('Perfis: Primeiros passos e os formulários da loja só com configurarLoja; Gerência e atendente não veem; o caderno pede o administrador do atendimento.')

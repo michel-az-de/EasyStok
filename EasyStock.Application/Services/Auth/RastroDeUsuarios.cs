@@ -11,6 +11,11 @@ public static class RastroDeUsuarios
     public const string PerfilTrocado = "perfil-trocado";
     public const string Convidado = "usuario-convidado";
     public const string Criado = "usuario-criado";
+    public const string DonaMarcada = "dona-marcada";
+    public const string DonaDesmarcada = "dona-desmarcada";
+
+    /// <summary>A política de hierarquia recusou (#2070): linha com <c>Sucesso = false</c>, o código e quem tentou.</summary>
+    public const string HierarquiaRecusada = "hierarquia-recusada";
 
     /// <summary>Nome de quem está fazendo a ação; sem cadastro legível (suporte, job) vira "suporte".</summary>
     public static async Task<string> AutorAsync(IUsuarioRepository usuarios, ICurrentUserAccessor atual)
@@ -19,9 +24,10 @@ public static class RastroDeUsuarios
         return string.IsNullOrWhiteSpace(nome) ? "suporte" : nome.Trim();
     }
 
-    public static AuditLog Linha(Guid afetadoId, string acao, string detalhes, ICurrentUserAccessor atual, Guid empresaId)
+    public static AuditLog Linha(
+        Guid afetadoId, string acao, string detalhes, ICurrentUserAccessor atual, Guid empresaId, bool sucesso = true)
     {
-        var linha = AuditLog.Criar(afetadoId, acao, true, detalhes, atual.Ip, atual.UserAgent);
+        var linha = AuditLog.Criar(afetadoId, acao, sucesso, detalhes, atual.Ip, atual.UserAgent);
         linha.EmpresaId = empresaId;
         return linha;
     }

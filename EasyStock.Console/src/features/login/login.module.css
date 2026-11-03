@@ -56,6 +56,10 @@
   justify-content: center;
   margin-top: 1rem;
 }
+/* #2070: no convite o Google vem primeiro; "ou crie uma senha" separa do formulário. */
+.googleDoConvite { display: grid; justify-items: center; gap: var(--e-3); }
+.googleDoConvite:empty { display: none; }
+.ou { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
 @media (max-width: 480px) {
   .tela { padding: var(--e-3); }

@@ -26,14 +26,18 @@ public class CriarUsuarioUseCaseTests
     {
         _atual.UsuarioId.Returns(_donaId);
         _atual.EmpresaId.Returns(_empresaId);
+        // #2070: a política lê o ator do banco; quem convida é a dona da empresa.
+        var dona = Usuario.Criar("Baba", "baba@casadababa.com", "$2a$11$hash");
+        CenarioDeAcesso.DarPerfil(dona, _empresaId, NivelAcesso.Admin, dona: true);
+        _c.Usuarios.GetByIdAsync(_donaId).Returns(dona);
         _atual.Ip.Returns("198.51.100.9");
         _c.Usuarios.AddAsync(Arg.Do<Usuario>(_adicionados.Add)).Returns(Task.CompletedTask);
         _hasher.Hash(Arg.Any<string>()).Returns("$2a$11$hash-da-senha");
     }
 
     private CriarUsuarioUseCase UseCase() => new(
-        _c.Usuarios, _assinaturas, _vinculos, _perfisDoUsuario, _perfis, _c.Consentimentos, _c.Convites(), _atual,
-        _c.Auditoria, _c.UnitOfWork, _hasher, Substitute.For<ILogger<CriarUsuarioUseCase>>());
+        _c.Usuarios, _assinaturas, _vinculos, _perfisDoUsuario, _perfis, _c.Consentimentos, _c.Convites(),
+        _c.Hierarquia(_atual, _vinculos), _atual, _c.Auditoria, _c.UnitOfWork, _hasher, Substitute.For<ILogger<CriarUsuarioUseCase>>());
 
     private CriarUsuarioCommand Convite(
         string? telefone = null, bool atesta = false, Guid? perfilId = null, string? senha = null) =>
@@ -66,8 +70,6 @@ public class CriarUsuarioUseCaseTests
     [Fact]
     public async Task ConvidarDeixaRastroComOPerfilEQuemConvidou()
     {
-        var dona = Usuario.Criar("Baba", "baba@casadababa.com", "$2a$11$hash");
-        _c.Usuarios.GetByIdAsync(_donaId).Returns(dona);
         var perfil = new Perfil { Id = Guid.NewGuid(), Nome = "Atendimento", Nivel = NivelAcesso.Operador, EmpresaId = _empresaId };
         _perfis.GetByIdAsync(perfil.Id).Returns(perfil);
 

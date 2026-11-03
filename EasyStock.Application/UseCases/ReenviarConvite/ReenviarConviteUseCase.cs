@@ -8,13 +8,15 @@ public sealed record ReenviarConviteCommand(Guid UsuarioId) : ICommand;
 /// Reenvio do convite pela dona (N9): revoga os convites abertos e emite novos, no máximo
 /// <see cref="ConvitesDeAcesso.EmissoesPorHora"/> por hora por usuário, contados nas linhas <c>Convite</c> de <c>reset_tokens</c>
 /// (a criação do usuário também ocupa uma vaga). Só vale para convite pendente e nunca para superadmin. O WhatsApp vai junto
-/// quando o telefone tem o atestado da dona. Mesma guarda de tenant do <c>AtualizarUsuarioUseCase</c> (#764), com a mesma
-/// mensagem do não encontrado para não confirmar a existência entre empresas.
+/// quando o telefone tem o atestado da dona, menos para a dona, que só recebe por e-mail (#2070). Mesma guarda de tenant do
+/// <c>AtualizarUsuarioUseCase</c> (#764), com a mesma mensagem do não encontrado para não confirmar a existência entre
+/// empresas. Quem pode reenviar a quem é da política de hierarquia (#2070).
 /// </summary>
 public sealed class ReenviarConviteUseCase(
     IUsuarioRepository usuarioRepository,
     ICurrentUserAccessor currentUser,
     ConvitesDeAcesso convites,
+    HierarquiaDeUsuarios hierarquia,
     ITenantContextAccessor tenant,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
@@ -31,8 +33,7 @@ public sealed class ReenviarConviteUseCase(
 
         if (usuario.EhSuperAdmin())
             throw new UseCaseValidationException("CONVITE_SUPERADMIN", "Superadmin não recebe convite.");
-        if (!usuario.Ativo || !usuario.ConvitePendente)
-            throw new UseCaseValidationException("CONVITE_NAO_PENDENTE", "Este usuário não tem convite pendente.");
+        if (!usuario.Ativo || !usuario.ConvitePendente) throw NaoPendente();
 
         if (await convites.EmissoesNaUltimaHoraAsync(usuario.Id) >= ConvitesDeAcesso.EmissoesPorHora)
         {
@@ -41,18 +42,26 @@ public sealed class ReenviarConviteUseCase(
         }
 
         var empresaId = EmpresaDoEvento(usuario);
-        var comWhatsApp = await convites.ElegivelAoWhatsAppAsync(usuario);
-        await convites.EmitirAsync(usuario, empresaId, comWhatsApp, currentUser.Ip, currentUser.UserAgent);
+        return await hierarquia.ExecutarAsync(
+            new PedidoDeHierarquia(empresaId, usuario.Id, AcaoSobreUsuario.ReenviarConvite),
+            async (contexto, _) =>
+            {
+                var alvo = contexto.Alvo!;
+                if (!alvo.Ativo || !alvo.ConvitePendente) throw NaoPendente();
 
-        var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
-        await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
-            usuario.Id, "convite-reenviado",
-            $"Convite reenviado por {autor}{(comWhatsApp ? ", também pelo WhatsApp" : string.Empty)}",
-            currentUser, empresaId));
-        await unitOfWork.CommitAsync();
+                var comWhatsApp = !contexto.ParticipanteAlvo.EhDona && await convites.ElegivelAoWhatsAppAsync(alvo);
+                await convites.EmitirAsync(alvo, empresaId, comWhatsApp, currentUser.Ip, currentUser.UserAgent);
 
-        logger.LogInformation("Convite reenviado ao usuario {UsuarioId} por {Executor}", usuario.Id, currentUser.UsuarioId);
-        return true;
+                var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
+                await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
+                    alvo.Id, "convite-reenviado",
+                    $"Convite reenviado por {autor}{(comWhatsApp ? ", também pelo WhatsApp" : string.Empty)}",
+                    currentUser, empresaId));
+                await unitOfWork.CommitAsync();
+
+                logger.LogInformation("Convite reenviado ao usuario {UsuarioId} por {Executor}", alvo.Id, currentUser.UsuarioId);
+                return true;
+            });
     }
 
     /// <summary>
@@ -68,4 +77,7 @@ public sealed class ReenviarConviteUseCase(
         tenant.SetCurrentTenant(empresaId);
         return empresaId;
     }
+
+    private static UseCaseValidationException NaoPendente() =>
+        new("CONVITE_NAO_PENDENTE", "Este usuário não tem convite pendente.");
 }
