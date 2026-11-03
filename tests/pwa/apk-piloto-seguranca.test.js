@@ -73,7 +73,7 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.deepStrictEqual(result, { writes: 1, connections: 1, busy: false });
   });
 
-  test('#2063 impressão: troca encerra conexão anterior e Oasis sem driver não envia bytes', () => {
+  test('#2063 #2193 impressão: troca encerra conexão anterior e a Oasis (TSPL) também recebe bytes', () => {
     const result = run(`
       const old={bs:window.bluetoothSerial,permission:ensureBluetoothPermission,printer:getSavedPrinter};
       const steps=[];let selected={name:'Atual',address:'A',profile:'escpos'},connected=null;
@@ -85,11 +85,11 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
           write:(bytes,ok)=>{steps.push('write:'+connected);ok();}
         };
         printViaBluetooth([1]);selected={name:'Segunda compatível',address:'B',profile:'escpos'};printViaBluetooth([2]);
-        selected={name:'Oasis OIA-8381-B',address:'C',profile:'oasis-pending'};printViaBluetooth([3]);
+        selected={name:'Oasis OIA-8381-B',address:'C',profile:'tspl'};printViaBluetooth([3]);
         return JSON.stringify(steps);
       } finally {releasePrinting();window.bluetoothSerial=old.bs;ensureBluetoothPermission=old.permission;getSavedPrinter=old.printer;}
     `);
-    assert.deepStrictEqual(result, ['disconnect','connect:A','write:A','disconnect','connect:B','write:B']);
+    assert.deepStrictEqual(result, ['disconnect','connect:A','write:A','disconnect','connect:B','write:B','disconnect','connect:C','write:C']);
   });
 
   async function pilotPairingCase(fn) {

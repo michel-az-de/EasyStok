@@ -28,6 +28,7 @@ const STATIC_ASSETS = [
   './fontes/NunitoSans-700.woff2',
   './qrcode.min.js',
   './etiqueta-termica.js',
+  './impressora-tspl.js',
   './queue-store.js',
   './photo-store.js',
   './upload-photos.js',
