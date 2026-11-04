@@ -1,0 +1,123 @@
+{
+  "contrato": "Regra de impressão da loja v1 (spec impressão v2, D2; auditoria 3, seção 8.4). Fonte: GET e PUT api/lojas/{lojaId}/impressao.",
+  "uso": "O normalizador do servidor (C#) e o do cliente (JS) devem dar a mesma 'saida' para cada 'entrada' válida, e normalizar a 'saida' de novo não muda nada. Cada caso de 'invalidos' é recusado pelo validador com erro no 'campo' indicado.",
+  "catalogos": {
+    "documentos": ["etiqueta-producao", "etiqueta-pedido", "pedido"],
+    "papeis": ["cupom-58", "cupom-80", "etiqueta-52", "etiqueta-80", "etiqueta-10x15", "a4", "a5"],
+    "orientacoes": ["vertical", "horizontal"],
+    "codigos": ["qr", "barras"],
+    "origensTemplate": ["Sistema", "Empresa"],
+    "copias": { "min": 1, "max": 10, "padrao": 1 }
+  },
+  "normalizacao": [
+    {
+      "nome": "exemplo da auditoria 3, seção 8.4",
+      "entrada": {
+        "v": 1,
+        "documentos": {
+          "etiqueta-producao": {
+            "papel": "etiqueta-10x15",
+            "template": { "origem": "Sistema", "id": "3f2b6c1e-9a4d-4b7e-8c21-5d0e6f7a8b90" },
+            "orientacao": "vertical",
+            "codigos": ["qr", "barras"],
+            "copias": 1
+          },
+          "etiqueta-pedido": { "papel": "cupom-58", "template": null, "orientacao": "vertical", "codigos": ["qr"] },
+          "pedido": { "papel": "a4", "template": null }
+        }
+      },
+      "saida": {
+        "v": 1,
+        "documentos": {
+          "etiqueta-producao": {
+            "papel": "etiqueta-10x15",
+            "template": { "origem": "Sistema", "id": "3f2b6c1e-9a4d-4b7e-8c21-5d0e6f7a8b90" },
+            "orientacao": "vertical",
+            "codigos": ["qr", "barras"],
+            "copias": 1
+          },
+          "etiqueta-pedido": { "papel": "cupom-58", "template": null, "orientacao": "vertical", "codigos": ["qr"], "copias": 1 },
+          "pedido": { "papel": "a4", "template": null, "orientacao": null, "codigos": null, "copias": 1 }
+        }
+      }
+    },
+    {
+      "nome": "campos ausentes viram null (herda do template) e copias 1",
+      "entrada": { "v": 1, "documentos": { "pedido": { "papel": "a5" } } },
+      "saida": {
+        "v": 1,
+        "documentos": { "pedido": { "papel": "a5", "template": null, "orientacao": null, "codigos": null, "copias": 1 } }
+      }
+    },
+    {
+      "nome": "codigos na ordem do catálogo e sem repetição",
+      "entrada": {
+        "v": 1,
+        "documentos": { "etiqueta-producao": { "papel": "etiqueta-80", "codigos": ["barras", "qr", "barras"], "copias": 3 } }
+      },
+      "saida": {
+        "v": 1,
+        "documentos": {
+          "etiqueta-producao": { "papel": "etiqueta-80", "template": null, "orientacao": null, "codigos": ["qr", "barras"], "copias": 3 }
+        }
+      }
+    },
+    {
+      "nome": "lista de codigos vazia esconde todos os códigos",
+      "entrada": { "v": 1, "documentos": { "etiqueta-producao": { "papel": "etiqueta-52", "codigos": [] } } },
+      "saida": {
+        "v": 1,
+        "documentos": {
+          "etiqueta-producao": { "papel": "etiqueta-52", "template": null, "orientacao": null, "codigos": [], "copias": 1 }
+        }
+      }
+    },
+    {
+      "nome": "documentos na ordem do catálogo, id do template em minúsculas e campo desconhecido descartado",
+      "entrada": {
+        "v": 1,
+        "documentos": {
+          "pedido": { "papel": "a4", "extra": true },
+          "etiqueta-producao": {
+            "papel": "etiqueta-10x15",
+            "template": { "origem": "Empresa", "id": "AB12CD34-0000-4000-8000-00000000BEEF" },
+            "orientacao": "horizontal"
+          }
+        }
+      },
+      "saida": {
+        "v": 1,
+        "documentos": {
+          "etiqueta-producao": {
+            "papel": "etiqueta-10x15",
+            "template": { "origem": "Empresa", "id": "ab12cd34-0000-4000-8000-00000000beef" },
+            "orientacao": "horizontal",
+            "codigos": null,
+            "copias": 1
+          },
+          "pedido": { "papel": "a4", "template": null, "orientacao": null, "codigos": null, "copias": 1 }
+        }
+      }
+    },
+    {
+      "nome": "nenhum documento configurado",
+      "entrada": { "v": 1, "documentos": {} },
+      "saida": { "v": 1, "documentos": {} }
+    }
+  ],
+  "invalidos": [
+    { "nome": "versão diferente de 1", "campo": "v", "entrada": { "v": 2, "documentos": {} } },
+    { "nome": "sem documentos", "campo": "documentos", "entrada": { "v": 1 } },
+    { "nome": "documento fora do catálogo", "campo": "documentos.cozinha", "entrada": { "v": 1, "documentos": { "cozinha": { "papel": "cupom-80" } } } },
+    { "nome": "documento nulo", "campo": "documentos.pedido", "entrada": { "v": 1, "documentos": { "pedido": null } } },
+    { "nome": "sem papel", "campo": "documentos.pedido.papel", "entrada": { "v": 1, "documentos": { "pedido": { "template": null } } } },
+    { "nome": "papel fora do catálogo", "campo": "documentos.pedido.papel", "entrada": { "v": 1, "documentos": { "pedido": { "papel": "carta" } } } },
+    { "nome": "papel com caixa diferente", "campo": "documentos.pedido.papel", "entrada": { "v": 1, "documentos": { "pedido": { "papel": "A4" } } } },
+    { "nome": "orientação desconhecida", "campo": "documentos.pedido.orientacao", "entrada": { "v": 1, "documentos": { "pedido": { "papel": "a4", "orientacao": "paisagem" } } } },
+    { "nome": "código desconhecido", "campo": "documentos.etiqueta-producao.codigos", "entrada": { "v": 1, "documentos": { "etiqueta-producao": { "papel": "etiqueta-80", "codigos": ["ean13"] } } } },
+    { "nome": "zero cópias", "campo": "documentos.pedido.copias", "entrada": { "v": 1, "documentos": { "pedido": { "papel": "a4", "copias": 0 } } } },
+    { "nome": "cópias acima do teto", "campo": "documentos.pedido.copias", "entrada": { "v": 1, "documentos": { "pedido": { "papel": "a4", "copias": 11 } } } },
+    { "nome": "origem do template desconhecida", "campo": "documentos.pedido.template.origem", "entrada": { "v": 1, "documentos": { "pedido": { "papel": "a4", "template": { "origem": "Loja", "id": "3f2b6c1e-9a4d-4b7e-8c21-5d0e6f7a8b90" } } } } },
+    { "nome": "template sem id", "campo": "documentos.pedido.template.id", "entrada": { "v": 1, "documentos": { "pedido": { "papel": "a4", "template": { "origem": "Sistema" } } } } }
+  ]
+}
