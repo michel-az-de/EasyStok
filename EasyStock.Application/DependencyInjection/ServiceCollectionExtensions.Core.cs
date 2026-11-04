@@ -30,6 +30,7 @@ using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
 using EasyStock.Application.UseCases.Etiquetas;
+using EasyStock.Application.UseCases.Etiquetas.Folha;
 using EasyStock.Application.UseCases.ListasCompras;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.GerenciarProduto;
@@ -130,6 +131,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<MontarPayloadRenderUseCase>();
         services.AddScoped<MarcarEtiquetasImpressasUseCase>();
         services.AddScoped<SalvarFichaTecnicaUseCase>();
+        services.AddScoped<GerarFolhaEtiquetasPdfUseCase>(); // #2200: folha A4 em PDF
 
         // Onda P5.B — Listas de Compras
         services.AddScoped<ListarListasComprasUseCase>();
