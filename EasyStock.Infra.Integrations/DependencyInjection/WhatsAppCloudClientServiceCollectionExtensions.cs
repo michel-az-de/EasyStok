@@ -44,6 +44,19 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
         });
 
         services.AddScoped<StubWhatsAppCloudClient>();
+        // #2155: foto do perfil pelas pontes, num HttpClient sem a chave delas (o endereço é do CDN do WhatsApp).
+        services.AddHttpClient<BaixadorFotoPerfilWhatsApp>(BaixadorFotoPerfilWhatsApp.HttpClientNome,
+            client => client.Timeout = TimeSpan.FromSeconds(15))
+            // A lista de hosts vale só para o endereço conferido: redirect levaria o download para fora dela.
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.Configure<WppConnectOptions>(configuration.GetSection("Atendimento:WppConnect"));
+        services.AddHttpClient<WppConnectClient>((sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<WppConnectOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        }).RemoveAllLoggers(); // generate-token carrega o segredo no caminho: nunca registrar a URL.
+        services.AddScoped<IWppConnectSessaoClient>(sp => sp.GetRequiredService<WppConnectClient>());
 
         services.AddHttpClient<CatalogoModelosWhatsApp>((sp, client) =>
         {
@@ -73,6 +86,9 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<WhatsAppCloudClient>());
         else
             services.AddScoped<IWhatsAppCloudClient>(sp => sp.GetRequiredService<StubWhatsAppCloudClient>());
+
+        if (configuration.GetValue<bool>("Atendimento:WppConnect:Habilitado"))
+            services.AddScoped<IWhatsAppCloudClient, RoteadorWhatsAppClient>();
 
         // N6: WhatsApp de plataforma. Mesma classe (mesmo HttpClient, token e pipeline sem retry), métodos que não usam
         // o remetente do tenant. Registrado sempre: só o provider de plataforma o consome, e só com Provider=meta.

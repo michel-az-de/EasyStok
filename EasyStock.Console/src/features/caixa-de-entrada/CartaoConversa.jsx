@@ -3,6 +3,7 @@ import { AssuntoEmail } from '../../componentes/AssuntoEmail'
 import { Avatar } from '../../componentes/Avatar'
 import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
+import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { previaDaConversa, tagCorrespondida } from '../../dominio/conversa'
 import { motivoDePrecisar, respostaAtrasada } from '../../dominio/automatico'
 import { contextoDaLinha, estadoDaLinha, pendentesDaLinha } from '../../dominio/linhaDoBalcao'
@@ -59,6 +60,7 @@ export const CartaoConversa = memo(function CartaoConversa({
   grupo, busca, aoAbrir, fonteApi = false,
 }) {
   const { canais, janelas, cardapio } = useCatalogo()
+  const fotoCadastrada = useFotoCliente(conversa.cliente?.fotoUrl)
   const canal = canalDaConversa(canais, conversa)
   const motivo = grupo ? null : motivoDaLinha(motivoDePrecisar(conversa, agora, pausado, aberta, janelas, expediente), conversa.passagem?.origem)
   const slaEstourado = !grupo && respostaAtrasada(conversa, agora, pausado, expediente)
@@ -104,7 +106,7 @@ export const CartaoConversa = memo(function CartaoConversa({
       <span className={css.avatarCartao}>
         <Avatar
           nome={conversa.nome}
-          foto={fotoDoCliente(canal, conversa.cliente)}
+          foto={fotoCadastrada.url ?? fotoDoCliente(canal, conversa.cliente)}
           tamanho="grande"
           selo={{ titulo: canal.nome, icone: <Icone nome={canal.icone} tamanho={12} className={css['canal_' + canal.icone]} /> }}
         />
@@ -112,7 +114,7 @@ export const CartaoConversa = memo(function CartaoConversa({
       <span className={css.corpo}>
         <span className={css.topo}>
           <strong className={pendentes > 0 ? css.semResposta : ''} title={nome.titulo}>
-            {nome.principal}{nome.complemento && <small> · {nome.complemento}</small>}
+            {nome.principal}{nome.complemento && <small aria-label={nome.complemento}> · {nome.complemento.replace(/^Comanda /, '#')}</small>}
           </strong>
           {!etiqueta && <span className="sr">, {estado.texto}</span>}
           {selecionada && <span className="sr">, conversa aberta</span>}

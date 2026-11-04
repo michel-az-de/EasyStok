@@ -34,7 +34,7 @@ export function NomeInsumoPesquisado({ value, onChange, disabled }) {
 
 export function PesquisaReceitaIa({ nome, aoAplicar, disabled }) {
   const [aberto, setAberto] = useState(false)
-  return <><Botao icone="sparkles" aria-haspopup="dialog" disabled={disabled} onClick={() => setAberto(true)}>Pesquisar receita com IA</Botao>
+  return <><Botao icone="sparkles" aria-haspopup="dialog" disabled={disabled} onClick={() => setAberto(true)}>Pesquisar receita</Botao>
     {aberto && <ModalPesquisaReceita nome={nome} aoAplicar={(sugestao) => { aoAplicar(sugestao); setAberto(false) }} aoFechar={() => setAberto(false)} />}
   </>
 }
@@ -60,13 +60,13 @@ function ModalPesquisaReceita({ nome, aoAplicar, aoFechar }) {
     } catch (e) { if (!atual.signal.aborted) setErro(e.message) }
     finally { if (!atual.signal.aborted) { controle.current = null; setOcupado(false) } }
   }
-  return <Modal titulo="Pesquisar receita com IA" aoFechar={aoFechar} largura="min(900px, calc(100vw - 24px))" rodape={<>
+  return <Modal titulo="Pesquisar receita" aoFechar={aoFechar} largura="min(900px, calc(100vw - 24px))" rodape={<>
     <Botao onClick={aoFechar}>Cancelar</Botao>
-    <Botao tipo="submit" form={formId} disabled={ocupado || termo.trim().length < 3 || termo.trim().length > 100}>{ocupado ? 'Pesquisando…' : 'Pesquisar nas fontes públicas'}</Botao>
-    {resultado && <Botao variante="primario" onClick={() => aoAplicar(resultado)}>Aplicar à receita para revisar</Botao>}
+    <Botao tipo="submit" form={formId} disabled={ocupado || termo.trim().length < 3 || termo.trim().length > 100}>{ocupado ? 'Pesquisando…' : 'Buscar receita'}</Botao>
+    {resultado && <Botao variante="primario" onClick={() => aoAplicar(resultado)}>Aplicar ao rascunho</Botao>}
   </>}>
     <form id={formId} onSubmit={pesquisar}><CampoTexto rotulo="Nome para pesquisar" value={termo} maxLength={100} disabled={ocupado} onChange={(e) => { setTermo(e.target.value); setResultado(null) }} /></form>
-    <p>Pesquisa no Livro de receitas do Wikilivros. A IA organiza a referência para você conferir. Aplicar substitui os insumos do rascunho; a receita só é gravada em Salvar receita.</p>
+    <p>O Assistente pesquisa no Livro de receitas do Wikilivros. Aplicar substitui os insumos do rascunho; a receita só é gravada em Salvar receita.</p>
     {erro && <p role="alert">{erro}</p>}
     {resultado && <section aria-label="Receita sugerida">
       <p>Rendimento: {resultado.rendimento == null ? 'não informado pela fonte' : `${resultado.rendimento} ${resultado.unidadeRendimento ?? '(unidade a conferir)'}`}</p>

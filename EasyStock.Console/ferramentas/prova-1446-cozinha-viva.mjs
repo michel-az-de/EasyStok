@@ -448,4 +448,16 @@ confere('#2055 pedido aprovado pela dona fica em Na fila e o próximo toque é C
   assert.match(tela, /filtrarPorColunaKds\(visiveis, coluna\.status\)/, 'a coluna junta os status dela')
 })
 
+// #2079 (C1): na Cozinha, "Marcar entregue" com saldo só confirmava o saldo; o Caixa nunca via o dinheiro.
+confere('#2079-C1 a pergunta do saldo da Cozinha é a da porta: "Recebi R$ X" lança o pagamento', () => {
+  const tela = fonte('features/cozinha/TelaCozinhaApi.jsx')
+  assert.doesNotMatch(tela, /Marque entregue se recebeu na porta/, 'o texto prometia um recebimento que não era gravado')
+  assert.match(tela, /receberEEntregar\(saldoPendente\.id, saldoPendente\.status, saldoPendente\.valor, metodo\)/)
+  assert.match(tela, /Recebi \{moeda\(saldo\.valor\)\}/)
+  assert.match(tela, /opcoes=\{METODOS_NA_PORTA\}/)
+  assert.match(tela, /metodoSugeridoNaPorta\(pedido\.observacoes\)/)
+  assert.match(tela, />Entregue sem receber</, 'confirmar sem receber continua, como saída explícita')
+  assert.match(tela, /disabled=\{ocupado \|\| !metodo\}/, 'sem forma escolhida, nada sai')
+})
+
 console.log(`prova #1446 (cozinha viva no modo API): ${passou} conferências ok`)

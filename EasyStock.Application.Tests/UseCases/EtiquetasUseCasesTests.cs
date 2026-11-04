@@ -276,12 +276,58 @@ public class EtiquetasUseCasesTests
     private MontarPayloadRenderUseCase BuildRender(
         IEtiquetaTemplateRepository? tplRepo = null,
         ILoteRepository? loteRepo = null,
-        ILojaRepository? lojaRepo = null)
+        ILojaRepository? lojaRepo = null,
+        ILoteNumeroCurtoRepository? numeroCurtoRepo = null)
     {
         tplRepo  ??= Substitute.For<IEtiquetaTemplateRepository>();
         loteRepo ??= Substitute.For<ILoteRepository>();
         lojaRepo ??= Substitute.For<ILojaRepository>();
-        return new MontarPayloadRenderUseCase(tplRepo, loteRepo, lojaRepo);
+        numeroCurtoRepo ??= Substitute.For<ILoteNumeroCurtoRepository>();
+        return new MontarPayloadRenderUseCase(tplRepo, loteRepo, lojaRepo, numeroCurtoRepo);
+    }
+
+    [Fact]
+    public async Task Render_leva_o_numero_curto_do_lote_para_o_codigo_de_barras()
+    {
+        var (loteRepo, tplRepo, lojaRepo) = RenderDeUmaEtiqueta(new Lote { Id = LoteId, Codigo = "LOT-001", NumeroCurto = "00000042" });
+        var numeroCurtoRepo = Substitute.For<ILoteNumeroCurtoRepository>();
+
+        var res = await BuildRender(tplRepo, loteRepo, lojaRepo, numeroCurtoRepo)
+            .ExecuteAsync(new MontarPayloadRenderQuery(EmpId, LoteId, null, null));
+
+        res!.Etiquetas.Single().LoteNumeroCurto.Should().Be("00000042");
+        await numeroCurtoRepo.DidNotReceiveWithAnyArgs().GarantirAsync(default, default, default);
+    }
+
+    [Fact]
+    public async Task Render_de_lote_antigo_sem_numero_curto_pede_um_e_usa()
+    {
+        var (loteRepo, tplRepo, lojaRepo) = RenderDeUmaEtiqueta(new Lote { Id = LoteId, Codigo = "LOT-001", NumeroCurto = null });
+        var numeroCurtoRepo = Substitute.For<ILoteNumeroCurtoRepository>();
+        numeroCurtoRepo.GarantirAsync(EmpId, LoteId, Arg.Any<CancellationToken>()).Returns("00000007");
+
+        var res = await BuildRender(tplRepo, loteRepo, lojaRepo, numeroCurtoRepo)
+            .ExecuteAsync(new MontarPayloadRenderQuery(EmpId, LoteId, null, null));
+
+        res!.Etiquetas.Single().LoteNumeroCurto.Should().Be("00000007");
+    }
+
+    private static (ILoteRepository, IEtiquetaTemplateRepository, ILojaRepository) RenderDeUmaEtiqueta(Lote lote)
+    {
+        var prod = new EasyStock.Domain.Entities.Produto { Id = Guid.NewGuid(), Nome = "Pão" };
+        var etq = new LoteEtiqueta
+        {
+            Id = Guid.NewGuid(), Sequencial = 1, Codigo = "ETQ-001", Status = LoteEtiquetaStatus.Pendente,
+            LoteId = lote.Id, Lote = lote, LoteItem = new EasyStock.Domain.Entities.LoteItem { Produto = prod },
+        };
+        var loteRepo = Substitute.For<ILoteRepository>();
+        loteRepo.GetEtiquetasForRenderAsync(EmpId, LoteId).Returns([etq]);
+        var tplRepo = Substitute.For<IEtiquetaTemplateRepository>();
+        tplRepo.GetDefaultAsync(EmpId).Returns((EasyStock.Domain.Entities.EtiquetaEmpresaDefault?)null);
+        tplRepo.ListSistemaAsync().Returns([new EasyStock.Domain.Entities.EtiquetaTemplateSistema { Id = Guid.NewGuid(), LayoutJson = Layout }]);
+        var lojaRepo = Substitute.For<ILojaRepository>();
+        lojaRepo.GetByEmpresaAsync(EmpId).Returns([]);
+        return (loteRepo, tplRepo, lojaRepo);
     }
 
     [Fact]

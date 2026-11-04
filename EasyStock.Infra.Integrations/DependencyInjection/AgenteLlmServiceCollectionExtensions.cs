@@ -16,6 +16,12 @@ public static class AgenteLlmServiceCollectionExtensions
     public static IServiceCollection AddEasyStockAgenteLlm(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<AnthropicAgenteOptions>(configuration.GetSection(AnthropicAgenteOptions.Secao));
+        services.Configure<MontagemFichaCliOptions>(configuration.GetSection(MontagemFichaCliOptions.Secao));
+        services.AddSingleton<ClaudeCliMontagemFichaClient>();
+        services.AddScoped<IMontagemFichaLlmClient>(sp =>
+            sp.GetRequiredService<IOptions<MontagemFichaCliOptions>>().Value.Enabled
+                ? sp.GetRequiredService<ClaudeCliMontagemFichaClient>()
+                : new MontagemFichaApiClient(sp.GetRequiredService<IAgenteLlmClient>()));
         services.AddScoped<EasyStock.Application.UseCases.Atendimento.Producao.SugerirReceitaUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Acervo.AssistenteDoCardapioUseCase>();
         services.AddHttpClient<IPesquisaProducaoWeb, PesquisaProducaoWeb>(client =>
@@ -24,6 +30,7 @@ public static class AgenteLlmServiceCollectionExtensions
             client.DefaultRequestHeaders.UserAgent.ParseAdd("EasyStok/1.0 (+https://easystok.online)");
         }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
+        services.AddEasyStockIntegrationResilience(); // #2177: o agente passa pelo disjuntor da Anthropic
         services.AddHttpClient<IAgenteLlmClient, AnthropicMessagesClient>((sp, client) =>
         {
             var opts = sp.GetRequiredService<IOptions<AnthropicAgenteOptions>>().Value;
@@ -41,5 +48,11 @@ public static class AgenteLlmServiceCollectionExtensions
         });
 
         return services;
+    }
+
+    private sealed class MontagemFichaApiClient(IAgenteLlmClient client) : IMontagemFichaLlmClient
+    {
+        public bool Disponivel => client.Disponivel;
+        public Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default) => client.EnviarAsync(requisicao, ct);
     }
 }

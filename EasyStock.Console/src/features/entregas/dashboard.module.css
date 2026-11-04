@@ -11,14 +11,14 @@
   width: min(720px, calc(100vw - 32px));
   display: flex; flex-direction: column;
   background: var(--fundo); color: var(--tinta);
-  border-left: var(--b-1) solid var(--linha); box-shadow: var(--sombra-alta);
+  border-left: 0; box-shadow: var(--sombra);
   animation: gavetaEntra var(--dur-longa) var(--ease-mola) both;
 }
 @keyframes gavetaEntra { from { transform: translateX(100%); } to { transform: none; } }
 .cortina {
   position: fixed; inset: 0; z-index: 59;
   background: var(--cortina); border: 0; padding: 0; width: 100%;
-  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 .cortina:active:not(:disabled) { transform: none; }
 /* #1810: no desktop (1180 px ou mais) o trilho fica fora da cortina. Coberto, o primeiro clique em
@@ -29,8 +29,8 @@
 }
 .topoGaveta {
   display: flex; align-items: center; gap: var(--e-2); flex-shrink: 0;
-  min-height: 64px; padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
-  background: var(--vidro); -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
+  min-height: 64px; padding: var(--e-3) var(--e-4); border-bottom: 0;
+  background: var(--papel); -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 .topoGaveta h2 { margin: 0; flex: 1; font-size: var(--t-titulo); font-weight: 700; letter-spacing: var(--ls-titulo); }
 
@@ -40,7 +40,7 @@
 }
 .topoPagina {
   display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
-  padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
+  padding: var(--e-3) var(--e-4); border-bottom: 0;
   flex-shrink: 0;
 }
 .topoPagina h1 { margin: 0; font-size: var(--t-forte); font-weight: 700; flex: 1; }
@@ -131,14 +131,14 @@
 /* --- Cartão de entrega --------------------------------------------------- */
 .cartao {
   display: grid; gap: 6px; padding: var(--e-3) var(--e-3) var(--e-3) var(--e-2);
-  background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
-  box-shadow: var(--sombra);
+  background: var(--papel); border: var(--b-1) solid transparent; border-radius: var(--r-2);
+  box-shadow: none;
   transition: box-shadow var(--dur-curta) var(--ease-padrao), transform var(--dur-media) var(--ease-mola);
   /* backwards e não both: com o fim da animação preso, cada cartão virava
      camada própria e o menu ⋯ de um ficava por baixo do cartão seguinte. */
   animation: cartaoEntra var(--dur-media) var(--ease-saida) backwards;
 }
-.cartao:hover { box-shadow: var(--sombra-media); }
+.cartao:hover { box-shadow: none;  background: var(--preenchimento); }
 @keyframes cartaoEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .cartao:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 
@@ -196,7 +196,7 @@
 /* --- Menu ⋯ (mesmo espírito de MenuDoPedido) ----------------------------- */
 .comMenu { position: relative; flex-shrink: 0; }
 .gatilhoMenu {
-  padding: 0; min-width: 36px; min-height: 36px; border-radius: var(--r-pilula);
+  padding: 0; min-width: var(--toque); min-height: var(--toque); border-radius: var(--r-pilula);
   background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--tinta-3);
 }
 .gatilhoMenu:hover { background: var(--preenchimento) !important; color: var(--tinta); }
@@ -236,7 +236,7 @@
 .numeroParada { font-family: var(--f-dado); color: var(--tinta-3); width: 1.5em; }
 .nomeParada { flex: 1; }
 .botoesOrdem { display: flex; }
-.botaoOrdem { padding: 4px; min-width: 36px; min-height: 36px; }
+.botaoOrdem { padding: var(--e-1); min-width: var(--toque); min-height: var(--toque); }
 .baixo { transform: rotate(180deg); }
 
 .acoesViagem { display: flex; gap: var(--e-2); flex-wrap: wrap; }
@@ -275,7 +275,7 @@
 .linha3 > button,
 .linha3 > button:hover:not(:disabled) {
   background: var(--marca-claro); color: var(--marca); border-color: transparent;
-  box-shadow: none; min-height: 36px;
+  box-shadow: none; min-height: var(--toque);
 }
 .linha3 > button:hover:not(:disabled) { background: color-mix(in srgb, var(--marca) 18%, var(--marca-claro)); }
 

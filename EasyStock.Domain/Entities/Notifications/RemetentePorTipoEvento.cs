@@ -73,6 +73,7 @@ public static class RemetentePorTipoEvento
             or TipoEventoNotificacao.ConviteAcesso
             or TipoEventoNotificacao.IncidenteSistema
             or TipoEventoNotificacao.PrazoEstourado
+            or TipoEventoNotificacao.AlertaOperacao
             or TipoEventoNotificacao.ResumoDiario
             or TipoEventoNotificacao.ContatoAlterado
             or TipoEventoNotificacao.SenhaAlterada => OrigemRemetente.Plataforma,

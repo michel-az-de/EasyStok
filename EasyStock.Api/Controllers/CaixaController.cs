@@ -1,3 +1,4 @@
+using EasyStock.Api.Authentication;
 using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Common;
@@ -54,6 +55,8 @@ public class CaixaController(
             // Origem server-side (trilha de auditoria), NUNCA do body — o caminho mobile
             // legitimo abre caixa via MobileCashController. #766
             Origem = "web",
+            // #2084 (A3): só gerente ou dona confirma a abertura automática; nunca do corpo.
+            PodeConfirmarAberturaAutomatica = currentUser.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin or NivelAcesso.Gerente,
             // #1615: a abertura e sempre de agora. Com data futura no body ela virava para sempre
             // o ultimo evento do caixa e nenhum dia fechava mais.
             DataMovimento = null
@@ -70,7 +73,10 @@ public class CaixaController(
         var result = await fecharUseCase.ExecuteAsync(command with
         {
             EmpresaId = emp,
-            FechadoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null
+            FechadoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            // #2082 B13: o nome sai do token, nunca do corpo (o corpo atribuiria o fechamento a outra pessoa).
+            // A coluna tem 120 caracteres.
+            FechadoPorNome = User.NomeExibicao() is { } nome ? nome[..Math.Min(nome.Length, 120)] : null
         });
         return DataOk(result);
     }

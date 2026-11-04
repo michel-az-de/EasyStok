@@ -21,8 +21,9 @@ export const estornarMovimento = (id, motivo) =>
   chamarApi(`${BASE}/movimentos/${id}/estornar`, { metodo: 'POST', corpo: { motivo } })
 
 // Sem data: a API fecha a sessão aberta, que pode ser de um dia anterior (#640).
-export const fecharCaixa = ({ observacoes }) =>
-  chamarApi(`${BASE}/fechar`, { metodo: 'POST', corpo: { observacoes } })
+// #2113 (B3 da #2084): o contado vai em campo próprio; a abertura seguinte parte dele.
+export const fecharCaixa = ({ observacoes, valorContado = null }) =>
+  chamarApi(`${BASE}/fechar`, { metodo: 'POST', corpo: { observacoes, valorContado } })
 
 export const fechamentoDaApi = (f) => (f ? {
   id: f.id,
@@ -72,9 +73,18 @@ export function caixaDiaDaApi(d) {
     posFechamento: d.posFechamento ?? 0,
     esquecidoAberto: Boolean(d.aberturaPendenteCrossDay),
     abertoDesde: d.abertoDesde ?? null,
+    // #2113 (#2084): B1, o caixa abriu sozinho no primeiro pagamento e espera a gerente conferir; D1, no caixa
+    // esquecido, o esperado do dia da abertura e o dinheiro de hoje que fica no caixa de hoje; B4, no dia
+    // fechado, o dinheiro que entrou depois de fechar e vai para a abertura seguinte.
+    aberturaAConfirmar: Boolean(d.aberturaAConfirmar),
+    dinheiroEsperadoNoFechamento: d.dinheiroEsperadoNoFechamento ?? null,
+    dinheiroEntrouDepois: d.dinheiroEntrouDepois ?? null,
+    dinheiroPosFechamento: d.dinheiroPosFechamento ?? 0,
     movimentos: (d.movimentos ?? []).map(movimentoDaApi),
     linhasExtras: (d.linhasExtras ?? []).map((l) => ({
       em: l.hora, tipo: l.tipo, valor: l.valor, descricao: l.descricao ?? '', meio: l.metodo ?? null, origem: l.origem,
+      // #2098: só no pagamento de pedido.
+      pedidoNumeroDoDia: l.pedidoNumeroDoDia ?? null, clienteNome: l.clienteNome ?? null,
     })),
   }
 }

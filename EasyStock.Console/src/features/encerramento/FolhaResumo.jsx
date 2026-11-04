@@ -2,15 +2,16 @@ import { Chip } from '../../componentes/Chip'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
-import { horaCurta, moeda } from '../../dominio/formato'
+import { FUSO, horaCurta, moeda } from '../../dominio/formato'
 import { ROTULO_CONVERTEU } from '../../dominio/resumoAtendimento'
 import css from './encerramento.module.css'
 
 // Duas gramáticas de data (achado 6): numérica só no impresso (`impresso`
 // true), humana na tela, igual à Ficha ("22 de set."). Antes as duas
 // convivam na mesma folha (tela em "22/09/2026", Ficha em "22 de set.").
-const dataCurta = (iso) => new Date(iso).toLocaleDateString('pt-BR')
-const dataHumana = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+// #2079 (D11): a data é a do dia da loja, como a hora (`horaCurta`), em qualquer fuso do aparelho.
+const dataCurta = (iso) => new Date(iso).toLocaleDateString('pt-BR', { timeZone: FUSO })
+const dataHumana = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', timeZone: FUSO })
 
 const AVALIACOES_CLIENTE = [
   { valor: 'positiva', rotulo: 'Positiva', icone: 'thumbs-up' },
@@ -99,7 +100,7 @@ export function FolhaResumo({
         <p className={css.nomeCliente}>{nomeCliente}</p>
         <p className={css.subCliente}>{[canalNome, telefone].filter(Boolean).join(' · ')}</p>
         {resumo.converteu === 'sim' && (
-          <p className={css.conversao}>Lead que virou cliente neste atendimento</p>
+          <p className={css.conversao}>Primeira compra neste atendimento</p>
         )}
       </div>
 
@@ -122,7 +123,7 @@ export function FolhaResumo({
           )}
         </div>
         <div className={css.estatistica}>
-          <p className={css.rotuloEstatistica}>Converteu</p>
+          <p className={css.rotuloEstatistica}>Novo cliente</p>
           <p className={css.valorEstatistica + ' ' + css.valorTexto}>{ROTULO_CONVERTEU[resumo.converteu]}</p>
         </div>
       </div>

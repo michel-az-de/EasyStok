@@ -86,7 +86,10 @@ public class NotificacoesGlobaisSeedTests
 
         rotina.TipoEvento.Should().Be(tipo);
         rotina.Categoria.Should().Be(categoria);
-        rotina.CanaisOrdemFallbackJson.Should().Be("[\"Email\",\"WhatsApp\"]");
+        // #2096: o prazo estourado também chega no aparelho da dona e do gerente.
+        rotina.CanaisOrdemFallbackJson.Should().Be(tipo == TipoEventoNotificacao.PrazoEstourado
+            ? "[\"Push\",\"Email\",\"WhatsApp\"]"
+            : "[\"Email\",\"WhatsApp\"]");
         rotina.EmpresaId.Should().BeNull();
         rotina.Ativa.Should().Be(ativa);
 

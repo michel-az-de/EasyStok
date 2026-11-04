@@ -155,12 +155,12 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   return (
     <>
       <Modal
-        titulo={leitura ? `Resumo do atendimento ${resumo.numero}` : 'Encerrar atendimento'}
+        titulo={leitura ? `Resumo do atendimento ${resumo.numero}` : 'Concluir conversa'}
         aoFechar={aoFechar}
         rodape={(
           <>
             {erroAoEncerrar && <p className={css.erroAoEncerrar} role="alert">{erroAoEncerrar}</p>}
-            <Botao variante="texto" onClick={aoFechar}>Voltar</Botao>
+            <Botao variante="texto" onClick={aoFechar}>{leitura ? 'Fechar' : 'Cancelar'}</Botao>
             {/* #1839: no EasyStok o resumo sai pelo mesmo modal, papel e prévia dos impressos; o
                 "Salvar como PDF" fica no diálogo. A demonstração segue com a folha da tela. */}
             {fonteApi
@@ -171,8 +171,8 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
                 </Botao>
               )}
             {!encerrada && (
-              <Botao variante="primario" icone="log-out" disabled={encerrandoAgora} onClick={clicarEncerrar}>
-                {encerrandoAgora ? 'Encerrando…' : 'Encerrar'}
+              <Botao variante="primario" icone="circle-check" disabled={encerrandoAgora} onClick={clicarEncerrar}>
+                {encerrandoAgora ? 'Concluindo…' : 'Concluir conversa'}
               </Botao>
             )}
           </>
@@ -229,15 +229,18 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
                 )}
               </div>
             )}
-            <FolhaResumo
-              {...propsDaFolha}
-              editavel={!encerrada}
-              comAvaliacaoEAnotacao={guardaAvaliacaoEAnotacao}
-              aoMarcarAvaliacaoCliente={(valor) => salvarAvaliacaoCliente(conversa.id, valor)}
-              aoMarcarAutoavaliacao={(valor) => salvarAutoavaliacao(conversa.id, valor)}
-              aoMudarAnotacao={(texto) => salvarAnotacaoFechamento(conversa.id, { texto })}
-              aoMudarGuardarNota={(guardarNota) => salvarAnotacaoFechamento(conversa.id, { guardarNota })}
-            />
+            <details open={leitura || undefined} className={css.detalhesResumo}>
+              <summary>Ver resumo da conversa</summary>
+              <FolhaResumo
+                {...propsDaFolha}
+                editavel={!encerrada}
+                comAvaliacaoEAnotacao={guardaAvaliacaoEAnotacao}
+                aoMarcarAvaliacaoCliente={(valor) => salvarAvaliacaoCliente(conversa.id, valor)}
+                aoMarcarAutoavaliacao={(valor) => salvarAutoavaliacao(conversa.id, valor)}
+                aoMudarAnotacao={(texto) => salvarAnotacaoFechamento(conversa.id, { texto })}
+                aoMudarGuardarNota={(guardarNota) => salvarAnotacaoFechamento(conversa.id, { guardarNota })}
+              />
+            </details>
           </div>
         </div>
       </Modal>

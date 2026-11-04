@@ -208,17 +208,20 @@ public class CriarContaReceberUseCaseTests
     }
 
     [Fact]
-    public async Task DeveSerIdempotente_QuandoDocumentoReferenciaJaExiste()
+    // #2095 (F6): documento repetido em conta manual não é idempotência, é outra dívida. Antes devolvia a conta antiga
+    // (201) e a nova não era registrada; agora recusa com 409. Continua sem gravar nada.
+    public async Task DocumentoReferenciaJaExistente_RecusaComConflito_SemGravar()
     {
         StubCategoria();
         var existente = ContaReceber.Criar(_empresaId, null, _categoriaId, "Existente", DateTime.UtcNow);
         _repo.GetByDocumentoReferenciaAsync(_empresaId, "NF-123", Arg.Any<CancellationToken>())
              .Returns(existente);
 
-        var result = await Sut().ExecuteAsync(Cmd(
+        var acao = () => Sut().ExecuteAsync(Cmd(
             new[] { new ParcelaSpec(1, 100m, DateTime.UtcNow.AddDays(30)) }, documentoReferencia: "NF-123"));
 
-        result.Id.Should().Be(existente.Id);
+        (await acao.Should().ThrowAsync<ContaFinanceiraDuplicadaException>().WithMessage("Já existe conta com o documento NF-123."))
+            .Which.ContaExistenteId.Should().Be(existente.Id);
         await _repo.DidNotReceive().AddAsync(Arg.Any<ContaReceber>(), Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().CommitAsync();
     }

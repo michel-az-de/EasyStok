@@ -35,6 +35,8 @@ export function clienteDoDossie(dossie) {
       : null,
     cliente: {
       telefone: dados.telefone || null,
+      email: dados.email || null,
+      fotoUrl: dados.fotoUrl ?? null,
       endereco: endereco || null,
       pedidos: dossie.totalPedidos ?? 0,
       // #1839: soma e favorito do servidor sobre todas as compras, não só as 10 da lista.

@@ -28,8 +28,8 @@ export function criarAcoesCaixaApi({ gerarChave } = {}) {
 
     estornarMovimentoCaixa: (_agora, movimentoId, motivo) => estornarMovimento(movimentoId, (motivo ?? '').trim()),
 
-    // A API não guarda o contado: ele vai nas observações junto da diferença.
+    // #2113: o contado vai em `valorContado` (a API grava desde a #2084) e continua nas observações, com a diferença.
     fecharCaixa: (_agora, contado, saldoEsperado, nota) =>
-      fecharCaixa({ observacoes: observacaoDoFechamento({ contado, saldoEsperado, nota }) }),
+      fecharCaixa({ observacoes: observacaoDoFechamento({ contado, saldoEsperado, nota }), valorContado: contado }),
   }
 }

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
-import { CampoTexto } from '../../../componentes/Campo'
+import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
 import { MarcaIcone } from '../../../componentes/MarcaIcone'
 import { useGestaoCardapioApi } from '../../../aplicacao/useGestaoCardapioApi'
@@ -37,10 +37,10 @@ function DicaDoPrato({ item, pedirDica }) {
   }
   return (
     <p className={css.dica} aria-live="polite">
-      <span><strong>{resposta?.porIa ? 'Sugestão da IA: ' : 'Dica: '}</strong>{resposta?.texto || estatica}</span>
-      {resposta && !resposta.porIa && <small>{resposta.erro ? `A IA não respondeu (${resposta.erro}).` : 'IA não configurada; esta é a dica do sistema.'}</small>}
-      {pedirDica && (!resposta || resposta.erro) && <Botao variante="texto" disabled={pedindo} title="Pede à IA uma dica curta para este prato. Nada é alterado."
-        aria-label={`Pedir dica da IA para ${item.nome}`} onClick={pedir}>{pedindo ? 'Pedindo dica…' : 'Dica da IA'}</Botao>}
+      <span><strong>{resposta?.porIa ? 'Sugestão do Assistente: ' : 'Dica: '}</strong>{resposta?.texto || estatica}</span>
+      {resposta && !resposta.porIa && resposta.erro && <small>O Assistente não respondeu. Exibindo a dica do sistema.</small>}
+      {pedirDica && (!resposta || resposta.erro) && <Botao variante="texto" disabled={pedindo} title="Pedir ao Assistente uma dica para este prato. Nada será alterado."
+        aria-label={`Pedir dica para ${item.nome}`} onClick={pedir}>{pedindo ? 'Pedindo dica…' : 'Pedir dica'}</Botao>}
     </p>
   )
 }
@@ -74,7 +74,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando o cardápio…</output>
   if (gestao.estado === 'erro' && gestao.itens.length === 0 && !editor) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler o cardápio"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar o cardápio"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
         {gestao.erro}
       </Vazio>
@@ -96,7 +96,12 @@ export function AbaCardapioApi({ renderizarEditor }) {
         <div className={css.busca}>
           <CampoTexto ref={buscaRef} tipo="search" rotulo="Buscar prato, categoria ou porção"
             placeholder="Ex.: lasanha, massas ou 800 g" value={busca} onChange={(e) => setBusca(e.target.value)} />
-          {busca && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
+          {contagens.categorias.length > 0 && <CampoSelecao rotulo="Categoria" value={categoria ?? ''}
+            onChange={(e) => setCategoria(e.target.value || null)}
+            opcoes={[
+              { valor: '', rotulo: `Todas (${contagens.todas})` },
+              ...contagens.categorias.map((c) => ({ valor: c.nome, rotulo: `${c.nome} (${c.total})` })),
+            ]} />}
         </div>
         <div className={css.faixaFiltros}><fieldset className={css.filtros}>
           <legend>Filtrar pratos</legend>
@@ -106,19 +111,9 @@ export function AbaCardapioApi({ renderizarEditor }) {
             </button>
           ))}
         </fieldset>
-        {contagens.categorias.length > 0 && <fieldset className={css.filtros}>
-          <legend>Categoria</legend>
-          <button type="button" aria-pressed={!categoria} className={css.filtro} title={EXPLICA.categoria} onClick={() => setCategoria(null)}>
-            Todas{' '}<span className={css.contagem}>{contagens.todas}</span>
-          </button>
-          {contagens.categorias.map((c) => (
-            <button type="button" key={c.nome} aria-pressed={categoria === c.nome} className={css.filtro} title={EXPLICA.categoria} onClick={() => setCategoria(c.nome)}>
-              {c.nome}{' '}<span className={css.contagem}>{c.total}</span>
-            </button>
-          ))}
-        </fieldset>}
       <div className={css.leitura}>
         <output className={css.descricao}>{itens.length} de {gestao.itens.length} {gestao.itens.length === 1 ? 'prato' : 'pratos'}</output>
+        {!ordenando && <Botao variante="texto" onClick={limpar}>Limpar filtros</Botao>}
         <details className={css.ajuda}>
           <summary>Entenda os controles</summary>
           <p><strong>Hoje</strong> permite oferecer o prato; desligado, ele só volta quando você religar. <strong>No site</strong> controla a exibição para o cliente. <strong>Arquivar</strong> tira do cardápio e permite repor depois. Um prato em validação só é oferecido pelo assistente depois de validado.</p>
@@ -128,14 +123,14 @@ export function AbaCardapioApi({ renderizarEditor }) {
       </div>
 
       {gestao.aviso && <div className={css.aviso} role="alert"><span>{gestao.aviso}</span><Botao variante="texto" onClick={gestao.fecharAviso}>Fechar aviso</Botao></div>}
-      {gestao.estado === 'erro' && <div className={css.aviso} role="alert"><span>Não consegui atualizar o cardápio: {gestao.erro}</span><Botao variante="texto" onClick={gestao.recarregar}>Tentar de novo</Botao></div>}
-      {!podeEditar && <p className={css.descricao}>Você pode consultar os pratos e ajustar a disponibilidade de hoje. As outras alterações ficam com a dona ou um gerente.</p>}
+      {gestao.estado === 'erro' && <div className={css.aviso} role="alert"><span>Não foi possível atualizar o cardápio. {gestao.erro}</span><Botao variante="texto" onClick={gestao.recarregar}>Tentar de novo</Botao></div>}
+      {!podeEditar && <p className={css.descricao}>Seu perfil permite consultar pratos e ajustar a disponibilidade de hoje.</p>}
 
       {itens.length === 0 ? (
         <Vazio icone={gestao.itens.length ? 'search' : 'cardapio'}
-          titulo={gestao.itens.length ? 'Nenhum prato neste recorte' : 'Seu primeiro prato começa aqui'}
+          titulo={gestao.itens.length ? 'Nenhum prato encontrado' : 'Nenhum prato cadastrado'}
           acao={gestao.itens.length ? <Botao onClick={limpar}>Ver todos os pratos</Botao> : temEditor ? <Botao variante="primario" onClick={() => abrirEditor()}>Novo prato</Botao> : null}>
-          {gestao.itens.length ? 'Experimente outro nome ou veja o cardápio completo.' : podeEditar ? 'Cadastre o nome, a foto e as porções para preparar o cardápio.' : 'A dona ou um gerente pode cadastrar os pratos.'}
+          {gestao.itens.length ? 'Busque outro nome ou limpe os filtros.' : podeEditar ? 'Adicione o primeiro prato ao cardápio.' : 'Peça à gerência para cadastrar os pratos.'}
         </Vazio>
       ) : (
         <ol className={css.lista}>
@@ -181,7 +176,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
                   <Botao variante="texto" disabled={ocupado === item.sku} title={EXPLICA.editar} aria-label={`Editar prato ${item.nome}`} onClick={() => abrirEditor(item)}><MarcaIcone nome="editar" tamanho={20} /></Botao>
                 </div>}
                 <details className={css.outrasAcoes}>
-                  <summary title={EXPLICA.maisAcoes} aria-label={`Mais ações para ${item.nome}`}><span aria-hidden="true">•••</span></summary>
+                  <summary title={EXPLICA.maisAcoes} aria-label={`Mais ações para ${item.nome}`}><Icone nome="ellipsis-vertical" tamanho={20} /></summary>
                   <div className={css.painelAcoes}>
                     <label className={css.chave} title={EXPLICA.noSite}>
                       <input type="checkbox" checked={item.noSite} disabled={!podeEditar || ocupado === item.sku}

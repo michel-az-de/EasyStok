@@ -1,3 +1,5 @@
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Enums.Financeiro;
 using EasyStock.Infra.Postgre.Data;
@@ -109,7 +111,9 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
         if (empresaId == Guid.Empty) throw new ArgumentException("EmpresaId obrigatorio.", nameof(empresaId));
         if (fim <= inicio) throw new ArgumentException("Periodo invalido (fim <= inicio).");
 
-        var buckets = GerarBuckets(inicio, fim, periodicidade);
+        // #2095 (F13): as linhas sao dias civis de Brasilia. O console manda o inicio e o fim do dia em -03:00
+        // (03:00Z e 02:59:59.999Z do dia seguinte); data sem fuso e horario de Brasilia.
+        var buckets = GerarBuckets(DiaCivil(DataUtc.InicioDoPeriodoUtc(inicio)!.Value), DiaCivil(DataUtc.FimDoPeriodoUtc(fim)!.Value), periodicidade);
         // Exclui Rascunho: previsao de fluxo so conta obrigacoes commitadas (BUG-021).
         var pagar = db.ParcelasPagar.AsNoTracking()
             .Where(p => p.EmpresaId == empresaId &&
@@ -144,87 +148,88 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
 
         // Uma consulta por série evita quatro consultas por bucket. A projeção direta
         // em tuplas também evita copiar cada lista antes da distribuição pelos buckets.
-        var inicioGeral = buckets[0].Inicio;
-        var fimGeral = buckets[^1].Fim;
+        // Vencimento e data civil (00:00Z ou 03:00Z do dia: o dia UTC e o dia civil); pagamento e instante real.
+        var civilIni = HorarioBrasil.CivilComoInstanteUtc(buckets[0].Inicio);
+        var civilFim = HorarioBrasil.CivilComoInstanteUtc(buckets[^1].FimExclusivo);
+        var realIni = HorarioBrasil.InicioRealDoDiaUtc(buckets[0].Inicio);
+        var realFim = HorarioBrasil.InicioRealDoDiaUtc(buckets[^1].FimExclusivo);
 
         var prevPagarRows = await pagar
-            .Where(p => p.DataVencimento >= inicioGeral && p.DataVencimento <= fimGeral)
+            .Where(p => p.DataVencimento >= civilIni && p.DataVencimento < civilFim)
             .Select(p => new ValueTuple<DateTime, decimal>(p.DataVencimento, p.Valor))
             .ToListAsync(ct);
         var prevReceberRows = await receber
-            .Where(p => p.DataVencimento >= inicioGeral && p.DataVencimento <= fimGeral)
+            .Where(p => p.DataVencimento >= civilIni && p.DataVencimento < civilFim)
             .Select(p => new ValueTuple<DateTime, decimal>(p.DataVencimento, p.Valor))
             .ToListAsync(ct);
         var realPagarRows = await pagamentos
             .Where(pg => pg.Lado == TipoLadoFinanceiro.Pagar &&
-                         pg.DataPagamento >= inicioGeral && pg.DataPagamento <= fimGeral)
+                         pg.DataPagamento >= realIni && pg.DataPagamento < realFim)
             .Select(pg => new ValueTuple<DateTime, decimal>(pg.DataPagamento, pg.Valor))
             .ToListAsync(ct);
         var realReceberRows = await pagamentos
             .Where(pg => pg.Lado == TipoLadoFinanceiro.Receber &&
-                         pg.DataPagamento >= inicioGeral && pg.DataPagamento <= fimGeral)
+                         pg.DataPagamento >= realIni && pg.DataPagamento < realFim)
             .Select(pg => new ValueTuple<DateTime, decimal>(pg.DataPagamento, pg.Valor))
             .ToListAsync(ct);
 
         var resultado = new List<FluxoBucketDto>(buckets.Count);
         foreach (var (bIni, bFim, rotulo) in buckets)
         {
+            var (cIni, cFim) = (HorarioBrasil.CivilComoInstanteUtc(bIni), HorarioBrasil.CivilComoInstanteUtc(bFim));
+            var (rIni, rFim) = (HorarioBrasil.InicioRealDoDiaUtc(bIni), HorarioBrasil.InicioRealDoDiaUtc(bFim));
             resultado.Add(new FluxoBucketDto(
-                bIni, bFim, rotulo,
-                SomaNoIntervalo(prevPagarRows, bIni, bFim),
-                SomaNoIntervalo(prevReceberRows, bIni, bFim),
-                SomaNoIntervalo(realPagarRows, bIni, bFim),
-                SomaNoIntervalo(realReceberRows, bIni, bFim)));
+                cIni, cFim.AddTicks(-1), rotulo,
+                SomaNoIntervalo(prevPagarRows, cIni, cFim),
+                SomaNoIntervalo(prevReceberRows, cIni, cFim),
+                SomaNoIntervalo(realPagarRows, rIni, rFim),
+                SomaNoIntervalo(realReceberRows, rIni, rFim)));
         }
 
         return resultado;
     }
 
-    // Soma os valores cujas datas caem no intervalo [ini, fim] do bucket. Os intervalos
-    // de GerarBuckets sao contiguos e nao se sobrepoem, entao cada linha cai em no maximo
-    // um bucket — mesma atribuicao do filtro SQL por-bucket anterior.
+    /// <summary>Teto de linhas do fluxo: um ano no diário, sete anos no semanal, trinta no mensal.</summary>
+    public const int MaximoLinhas = 366;
+
+    private static DateOnly DiaCivil(DateTime utc) =>
+        utc <= DateTime.MinValue.AddDays(1) ? DateOnly.MinValue
+        : utc >= DateTime.MaxValue.AddDays(-1) ? DateOnly.MaxValue
+        : HorarioBrasil.DataOperacional(utc);
+
+    // Soma os valores no intervalo [ini, fim) da linha. As linhas sao contiguas e nao se sobrepoem.
     private static decimal SomaNoIntervalo(List<(DateTime Data, decimal Valor)> rows, DateTime ini, DateTime fim)
     {
         decimal soma = 0m;
         foreach (var (data, valor) in rows)
-            if (data >= ini && data <= fim) soma += valor;
+            if (data >= ini && data < fim) soma += valor;
         return soma;
     }
 
-    private static List<(DateTime Inicio, DateTime Fim, string Rotulo)> GerarBuckets(
-        DateTime inicio, DateTime fim, PeriodicidadeFluxo p)
+    /// <summary>
+    /// Linhas [Inicio, FimExclusivo) em dias civis, a ultima cortada no dia final. Passar de <see cref="MaximoLinhas"/>
+    /// e recusado com mensagem (#2095, F13): antes cortava em 24 linhas sem avisar.
+    /// </summary>
+    private static List<(DateOnly Inicio, DateOnly FimExclusivo, string Rotulo)> GerarBuckets(
+        DateOnly inicio, DateOnly fim, PeriodicidadeFluxo p)
     {
-        var ret = new List<(DateTime, DateTime, string)>();
-        var cursor = inicio.Date;
-        while (cursor <= fim.Date && ret.Count < 24)
+        if (fim < inicio) throw new ArgumentException("Período inválido: o fim é antes do início.");
+        var ret = new List<(DateOnly, DateOnly, string)>();
+        var cursor = inicio;
+        while (cursor <= fim)
         {
-            DateTime bFim;
-            string rotulo;
-            switch (p)
-            {
-                case PeriodicidadeFluxo.Diario:
-                    bFim = cursor.AddDays(1).AddTicks(-1);
-                    rotulo = cursor.ToString("dd/MM");
-                    break;
-                case PeriodicidadeFluxo.Semanal:
-                    bFim = cursor.AddDays(7).AddTicks(-1);
-                    rotulo = $"{cursor:dd/MM}";
-                    break;
-                case PeriodicidadeFluxo.Mensal:
-                default:
-                    bFim = cursor.AddMonths(1).AddTicks(-1);
-                    rotulo = cursor.ToString("MM/yyyy");
-                    break;
-            }
-            if (bFim > fim) bFim = fim;
-            ret.Add((cursor, bFim, rotulo));
-
-            cursor = p switch
+            if (ret.Count == MaximoLinhas)
+                throw new ArgumentException(
+                    $"Período longo demais para a periodicidade {p}: no máximo {MaximoLinhas} linhas. Encurte o período ou use uma periodicidade maior.");
+            var proximo = p switch
             {
                 PeriodicidadeFluxo.Diario => cursor.AddDays(1),
                 PeriodicidadeFluxo.Semanal => cursor.AddDays(7),
                 _ => cursor.AddMonths(1)
             };
+            var rotulo = p == PeriodicidadeFluxo.Mensal ? cursor.ToString("MM/yyyy") : cursor.ToString("dd/MM");
+            ret.Add((cursor, proximo > fim ? fim.AddDays(1) : proximo, rotulo));
+            cursor = proximo;
         }
         return ret;
     }

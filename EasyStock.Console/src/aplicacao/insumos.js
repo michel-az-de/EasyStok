@@ -23,6 +23,20 @@ export const rotuloDaEmbalagem = ({ receitas = 0, porcoes = 0 }) =>
 
 const numeroOuNulo = (texto) => (String(texto ?? '').trim() === '' ? null : Number(String(texto).replace(',', '.')))
 
+// #2081 (E9): o custo segue a leitura do campo de dinheiro (`lerMoeda`, #1510): "1.500" é mil e
+// quinhentos, não 1,5 como antes. A vírgula é sempre a decimal e não arredonda para centavos, porque
+// o custo de um grama precisa de mais casas ("0,005").
+export function lerCusto(texto) {
+  const limpo = String(texto ?? '').replace(/[R$\s]/g, '')
+  if (limpo === '') return null
+  if (!/^\d[\d.,]*$/.test(limpo)) return NaN
+  const virgula = limpo.lastIndexOf(',')
+  if (virgula >= 0) return Number(`${limpo.slice(0, virgula).replace(/\./g, '') || '0'}.${limpo.slice(virgula + 1)}`)
+  const partes = limpo.split('.')
+  const milhar = partes.length > 1 && partes.slice(1).every((p) => p.length === 3) && /[1-9]/.test(partes[0])
+  return Number(milhar ? partes.join('') : limpo)
+}
+
 export function criarGestaoInsumos({ recarregar, aoErro }) {
   const gravar = async (chamada) => {
     try {
@@ -46,7 +60,7 @@ export function criarGestaoInsumos({ recarregar, aoErro }) {
     criar: ({ nome, unidade, minimo, custo, embalagem = false }) => {
       if (!nome?.trim()) { aoErro('Informe o nome do insumo.'); return Promise.resolve(false) }
       const m = numeroOuNulo(minimo)
-      const c = numeroOuNulo(custo)
+      const c = lerCusto(custo)
       const erro = validar(m, c)
       if (erro) { aoErro(erro); return Promise.resolve(false) }
       return gravar(() => criarInsumo({
@@ -55,7 +69,7 @@ export function criarGestaoInsumos({ recarregar, aoErro }) {
     },
     atualizar: (id, { minimo, custo }) => {
       const m = numeroOuNulo(minimo)
-      const c = numeroOuNulo(custo)
+      const c = lerCusto(custo)
       const erro = validar(m, c)
       if (erro) { aoErro(erro); return Promise.resolve(false) }
       // #1563: na API `minimo: null` é "não mexe" e zero vence a herança da categoria. Campo apagado

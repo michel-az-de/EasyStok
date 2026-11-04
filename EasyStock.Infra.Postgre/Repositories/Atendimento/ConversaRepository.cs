@@ -202,6 +202,8 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                     .Select(m => m.Texto)
                     .FirstOrDefault(),
                 // O mesmo texto que a rota do pedido da conversa devolve em "status" (Pedido.Status, sem conversão).
+                FotoClienteChave = db.Clientes.Where(cliente => cliente.EmpresaId == empresaId && cliente.Id == c.ClienteId)
+                    .Select(cliente => cliente.FotoChave).FirstOrDefault(),
                 PedidoStatus = db.Pedidos
                     .Where(p => p.EmpresaId == empresaId && p.Id == c.PedidoEmAndamentoId)
                     .Select(p => p.Status).FirstOrDefault(),
@@ -211,7 +213,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         return linhas.Select(l => new ConversaInboxItem(
             l.Id, l.EmpresaId, l.Canal, l.ContatoIdExterno, l.ContatoNome, l.ClienteId, l.Situacao, l.NaoLidas,
             l.UltimaMensagemEm, l.UltimaMensagemEntradaEm, l.PedidoEmAndamentoId, l.AssumidaPorUsuarioId, l.MotivoEscalada,
-            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto)).ToList();
+            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto, l.FotoClienteChave)).ToList();
     }
 
     public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(

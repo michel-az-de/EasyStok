@@ -62,7 +62,8 @@ export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metod
 
 // Sugestão do agente para a dona (#1420): `{ texto, tokens, latenciaMs }`. Nada sai ao cliente.
 // Sem a chave da Anthropic na API, 503 com a mensagem que o painel mostra.
-export const sugerirResposta = (id) => chamarApi(`${BASE}/${id}/sugestao`, { metodo: 'POST' })
+export const sugerirResposta = (id, { sinal, identidadeEsperada } = {}) =>
+  chamarApi(`${BASE}/${id}/sugestao`, { metodo: 'POST', sinal, identidadeEsperada })
 
 // Link do cardápio da loja ligado à conversa, o mesmo que o agente manda (#1353, S48).
 export const gerarLinkCardapio = (id) => chamarApi(`${BASE}/${id}/link-cardapio`, { metodo: 'POST' })

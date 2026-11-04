@@ -1,6 +1,8 @@
 .vazio {
   padding: var(--e-6) var(--e-4); margin: 0; text-align: center;
-  display: grid; justify-items: center; gap: var(--e-3);
+  /* #2135: `align-content: start` porque, em pai que estica (a coluna da Ficha), as linhas da grade se
+     repartiam pela altura toda e o botão virava um bloco de 220 px. */
+  display: grid; justify-items: center; align-content: start; gap: var(--e-3);
   animation: surgirVazio var(--dur-media) var(--ease-saida) both;
 }
 .icone { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--r-2); color: var(--marca); background: var(--preenchimento); }

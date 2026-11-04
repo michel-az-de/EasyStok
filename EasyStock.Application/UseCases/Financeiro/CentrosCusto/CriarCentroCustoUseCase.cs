@@ -21,6 +21,7 @@ public class CriarCentroCustoUseCase(
             throw new UseCaseValidationException("Codigo e obrigatorio.");
         if (string.IsNullOrWhiteSpace(cmd.Nome))
             throw new UseCaseValidationException("Nome e obrigatorio.");
+        ValidarTextos(cmd.Codigo, cmd.Nome, cmd.Descricao);
 
         if (await repo.GetByCodigoAsync(cmd.EmpresaId, cmd.Codigo, ct) is not null)
             throw new UseCaseValidationException("Ja existe centro de custo com este codigo.");
@@ -36,5 +37,16 @@ public class CriarCentroCustoUseCase(
         {
             throw new UseCaseValidationException(ex.Message);
         }
+    }
+
+    /// <summary>#2095 (F7/F15): tamanho da coluna e sem tags HTML (o centro aceitava "&lt;script&gt;").</summary>
+    internal static void ValidarTextos(string? codigo, string? nome, string? descricao)
+    {
+        ValidacaoFinanceira.Texto(codigo, ValidacaoFinanceira.CodigoCentroMax, "Código do centro de custo");
+        ValidacaoFinanceira.Texto(nome, ValidacaoFinanceira.NomeCadastroMax, "Nome do centro de custo");
+        ValidacaoFinanceira.Texto(descricao, ValidacaoFinanceira.DescricaoCentroMax, "Descrição do centro de custo");
+        UseCaseGuards.EnsureSemTagsHtml(codigo, "Código do centro de custo");
+        UseCaseGuards.EnsureSemTagsHtml(nome, "Nome do centro de custo");
+        UseCaseGuards.EnsureSemTagsHtml(descricao, "Descrição do centro de custo");
     }
 }

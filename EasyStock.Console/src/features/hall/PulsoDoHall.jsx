@@ -12,7 +12,8 @@ const frentes = {
   atendimento: { nome: 'Atendimento pendente', icone: 'mensagem', acao: 'Abrir Atendimento', tela: 'balcao' },
   cozinha: { nome: 'Em preparo ou na fila', icone: 'producao', acao: 'Ver fila de preparo', tela: 'fila' },
   entregas: { nome: 'Prontos para sair', icone: 'entrega', acao: 'Organizar entregas', tela: 'painel' },
-  financeiro: { nome: 'Total do caixa', icone: 'caixa', acao: 'Conferir caixa', tela: 'caixa' },
+  // #2078: o rótulo do número que o Caixa do dia destaca; sem abrir o caixa vira "Em dinheiro" (`item.rotulo`).
+  financeiro: { nome: 'Na gaveta (dinheiro)', icone: 'caixa', acao: 'Conferir caixa', tela: 'caixa' },
 }
 const hora = (em) => new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(em)
 const dinheiro = (valor) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -31,7 +32,7 @@ function Indicador({ item, movimentos }) {
     style={{ transform: CSS.Transform.toString(transform), transition }}>
     <a ref={setActivatorNodeRef} data-indicador={item.id} data-estado={item.estado} className={css.indicador}
       href={hashDoModulo(item.id, frente.tela)} title={item.detalhe || undefined} {...alcaDoLink(attributes, listeners)}>
-      <span className={css.cabecaIndicador}><MarcaIcone nome={frente.icone} tamanho={20} />{frente.nome}</span>
+      <span className={css.cabecaIndicador}><MarcaIcone nome={frente.icone} tamanho={20} />{item.rotulo ?? frente.nome}</span>
       <strong className={css.valor}>{valor}</strong>
       {aviso && <span className={css.frescor}><MarcaIcone nome="atencao" tamanho={16} />{aviso}</span>}
       <span className={css.oculto}>{frente.acao}</span>

@@ -15,6 +15,15 @@ public static class MobileModelRegistrar
 {
     public static ModelBuilder RegisterMobileModels(this ModelBuilder mb)
     {
+        // Pré-pareamento, somente avisos públicos. Schema SQL 013, sem acesso a tenant.
+        mb.Entity<PushInstallation>().ToTable("mobile_push_installations", t => t.ExcludeFromMigrations());
+        mb.Entity<PushMessage>().ToTable("mobile_push_messages", t => t.ExcludeFromMigrations());
+        mb.Entity<PushMessage>().HasIndex(x => x.Nonce).IsUnique();
+        mb.Entity<PushMessage>().HasIndex(x => new { x.InstallationId, x.ExpiresAt });
+        mb.Entity<PushReceipt>().ToTable("mobile_push_receipts", t => t.ExcludeFromMigrations());
+        mb.Entity<PushReceipt>().HasIndex(x => new { x.MessageId, x.InstallationId, x.Event, x.Source }).IsUnique();
+        mb.Entity<PushProviderEvent>().ToTable("mobile_push_provider_events", t => t.ExcludeFromMigrations());
+        mb.Entity<PushProviderEvent>().HasIndex(x => x.MessageId);
         mb.Entity<Product>();
         mb.Entity<Client>();
 

@@ -19,12 +19,13 @@ public class AdicionarParcelaContaPagarUseCase(
     public async Task<ContaPagarResult?> ExecuteAsync(AdicionarParcelaContaPagarCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        var valor = ValidacaoFinanceira.Parcela(cmd.Valor, cmd.MetodoPlanejado);
         var c = await repo.GetByIdAsync(cmd.EmpresaId, cmd.ContaPagarId, ct);
         if (c is null) return null;
 
         try
         {
-            c.AdicionarParcela(cmd.Numero, cmd.Valor, DataUtc.ParaUtc(cmd.DataVencimento), cmd.MetodoPlanejado);
+            c.AdicionarParcela(cmd.Numero, valor, DataUtc.ParaUtc(cmd.DataVencimento), cmd.MetodoPlanejado);
         }
         catch (RegraDeDominioVioladaException ex)
         {
@@ -33,7 +34,7 @@ public class AdicionarParcelaContaPagarUseCase(
 
         await repo.AddEventoAsync(ContaFinanceiraEvento.ParaContaPagar(
             c.EmpresaId, c.Id, TipoEventoContaFinanceira.ParcelaAdicionada,
-            descricao: $"Parcela {cmd.Numero} adicionada (R$ {cmd.Valor:F2}).",
+            descricao: $"Parcela {cmd.Numero} adicionada (R$ {valor:F2}).",
             origem: "api"), ct);
         await repo.UpdateAsync(c, ct);
         await uow.CommitAsync();

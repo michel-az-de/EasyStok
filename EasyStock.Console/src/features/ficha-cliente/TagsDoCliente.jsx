@@ -74,7 +74,7 @@ export function TagsDoCliente({ conversa }) {
     : null
 
   return (
-    <div className={css.blocoTags}>
+    <div className={css.blocoTags} data-tags-cliente>
       <ul className={css.tagsLinha} aria-label="Tags do cliente">
         {ordenarTags(tags, restricoes).map((tag) => (
           <li key={tag}>

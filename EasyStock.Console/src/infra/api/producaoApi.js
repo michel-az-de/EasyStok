@@ -77,6 +77,27 @@ export const etiquetasDaApi = (r) => (r?.etiquetas ?? []).map((e) => ({
   validadeEm: e.loteValidadeEm ?? null,
 }))
 
+// #2081 (A4): a folha leva o nome da empresa, que a etiqueta do aparelho imprime no topo. O
+// `layoutJson` da API fica de fora: o padrão dele traz a marca EasyStok e só o QR, e a etiqueta do
+// console copia a do APK (QR e barras, 80x40 mm).
+export const folhaDeEtiquetasDaApi = (r) => ({
+  empresa: r?.empresa?.nome ?? '',
+  etiquetas: etiquetasDaApi(r),
+})
+
+// #2081 (A8, A10): os lotes recentes, para a tela achar o id (reimprimir) e dizer de onde veio cada
+// lote, quem registrou e quando foi fabricado. O Estoque do dia só manda o código do lote.
+export const listarLotesRecentes = () => chamarApi('/api/lotes?pageSize=200&sort=dataproducao&order=desc')
+
+export const loteDaListaDaApi = (l) => ({
+  id: l.id,
+  codigo: l.codigo,
+  origem: l.origem ?? null,
+  operadorNome: l.operadorNome ?? null,
+  operadorUserId: l.operadorUserId ?? null,
+  fabricadoEm: l.dataProducao ?? null,
+})
+
 // M2.3 (#1496): insumos da produção (intermediário e embalagem). Cadastro e ajuste são do Gerente.
 export const listarInsumos = () => chamarApi(`${PRODUCAO}/insumos`)
 export const criarInsumo = (dados) => chamarApi(`${PRODUCAO}/insumos`, { metodo: 'POST', corpo: dados })

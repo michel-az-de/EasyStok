@@ -261,11 +261,11 @@ await provar('resumo sem histórico: não lê histórico, não grava tentativa e
   t.encerrar()
 })
 const { resumoParaImpresso } = await import('../src/dominio/resumoAtendimento.js')
-await provar('o corpo do resumo leva o que a folha mostra, com hora local e sem avaliação quando a loja não guarda', async () => {
-  const resumo = { numero: 12, encerradoEm: new Date(2026, 9, 15, 9, 58).toISOString(), ate: null, duracaoTexto: '13 d', faixaHorario: '20:09 a 10:00',
+await provar('o corpo do resumo leva o que a folha mostra, com a hora da loja (#2079, D11) e sem avaliação quando a loja não guarda', async () => {
+  const resumo = { numero: 12, encerradoEm: '2026-10-15T12:58:00Z', ate: null, duracaoTexto: '13 d', faixaHorario: '20:09 a 10:00',
     mensagens: { cliente: 10, voce: 13, automatico: 8, total: 31 }, receita: { liquido: 263, estorno: 0, faltaReceber: 0 }, converteu: 'sim',
     vendas: [{ numero: 5, itensTexto: '1x Lasanha', meio: 'Pix', valor: 263, situacao: 'Entregue' }], vendasTotal: 263,
-    marcos: [{ em: new Date(2026, 9, 13, 10, 19).toISOString(), rotulo: 'Pago' }], avaliacaoCliente: 'positiva', autoavaliacao: 'bom', anotacao: 'Tarde' }
+    marcos: [{ em: '2026-10-13T13:19:00Z', rotulo: 'Pago' }], avaliacaoCliente: 'positiva', autoavaliacao: 'bom', anotacao: 'Tarde' }
   const corpo = resumoParaImpresso({ nomeCliente: 'Felipe', canalNome: 'WhatsApp', telefone: '+55 11', resumo })
   assert.deepEqual([corpo.numero, corpo.data, corpo.contato, corpo.converteu, corpo.virouCliente], ['12', '2026-10-15T09:58:00', 'WhatsApp · +55 11', 'Sim', true])
   assert.deepEqual(corpo.vendas[0], { numero: '5', itens: '1x Lasanha', meio: 'Pix', valor: 263, situacao: 'Entregue' })

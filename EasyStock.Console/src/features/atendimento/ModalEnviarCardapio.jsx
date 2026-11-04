@@ -57,7 +57,7 @@ export function ModalEnviarCardapio({
 
   return (
     <Modal
-      titulo="Link de compra"
+      titulo="Enviar cardápio"
       descricao={`${primeiroNome(nomeCliente)}${numero ? ` · Comanda ${numero}` : ''} · ${canalNome}`}
       aoFechar={() => { if (!trava.current) aoFechar() }}
       rodape={(
@@ -73,7 +73,7 @@ export function ModalEnviarCardapio({
         {erro && <p role="alert">{erro}</p>}
         {!podeEnviar && <p>O canal não permite enviar texto agora. Você pode copiar o link ou usar um modelo aprovado na conversa.</p>}
         {!conteudo && <>
-          <p>O cliente escolhe pelo link. Você acompanha a seleção nesta conversa.</p>
+          <p>O cliente escolhe pelo link. Você acompanha os itens nesta conversa.</p>
           <p>Se houver um link ainda não confirmado, ele será substituído ao gerar outro.</p>
         </>}
         {conteudo && <><p className={css.cardapioRotulo}>Mensagem</p>
@@ -88,7 +88,7 @@ export function ModalEnviarCardapio({
           // #1353: o mesmo link que o agente manda (S48). Vale 24 h e um pedido.
           <p>
             É a comanda pessoal no site da Casa da Baba (<strong>{endereco}</strong>). Cliente e
-            atendimento acompanham a mesma seleção. Cada link aceita uma confirmação; outro link permite
+            atendimento acompanham os mesmos itens. Cada link aceita uma confirmação; outro link permite
             acrescentar ou solicitar uma troca antes da entrega. O pagamento é por pedido ou diferença.
             Um novo link mantém o número e substitui a edição anterior ainda não confirmada.
           </p>

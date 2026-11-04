@@ -67,8 +67,8 @@ confere('o aviso entra uma vez só e a gaveta só existe no arranjo de tablet (d
   assert.ok(gaveta > tablet && gaveta < celular, '<Gaveta> fora do arranjo de tablet')
 })
 confere('sem aviso, o rodapé vazio da gaveta não ocupa espaço', () => {
-  const css = ler('app/moldura.module.css')
-  assert.match(css, /\.gaveta > h2 \+ div \+ div:empty \{ display: none; \}/)
+  const moldura = ler('app/Moldura.jsx')
+  assert.match(moldura, /<div className=\{css\.conteudoGaveta\}>\{children\}<\/div>\s*<AvisoDaAcaoApi \/>/)
 })
 confere('o aviso continua calado na demonstração e sem aviso pendente', () => {
   const faixa = semComentarios(ler('app/FaixaApi.jsx'))
@@ -123,7 +123,9 @@ confere('botão e dica do campo dependem do mesmo sinal: sem o botão, a dica n�
   assert.match(composer, /\{modelosFixos && podeEnviarModelo && podeEscrever && <Botao className=\{css\.abrirModelos\}/)
   assert.match(composer, /podeEnviarModelo \? 'Janela fechada: escolha um modelo aprovado em Respostas' : 'Mensagem indisponível nesta conversa'/)
   assert.match(composer, /disabled=\{!podeEscrever && !podeEnviarModelo\}/)
-  assert.match(composer, /onClick=\{podeEscrever \? barra\.abrir : aoAbrirModelos\}/)
+  assert.match(composer, /onClick=\{podeEscrever \? \(barra\.aberto \? barra\.fechar : barra\.abrir\) : aoAbrirModelos\}/)
+  assert.match(composer, /aria-expanded=\{podeEscrever \? barra\.aberto : undefined\}/)
+  assert.match(composer, /<SeletorRespostas seletor=\{barra\} aoInserido=\{\(\) => campoRef\.current\?\.querySelector\('textarea'\)\?\.focus\(\)\}/)
 })
 confere('na demonstração a ação continua recusando, sem fingir envio', () => {
   const acoes = ler('aplicacao/acoes/demonstracao.js')

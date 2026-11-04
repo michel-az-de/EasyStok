@@ -66,6 +66,9 @@
     <None Update="Mobile\Schema\*.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <EmbeddedResource Include="Mobile\Security\push-publisher.der">
+      <LogicalName>Mobile.PushPublisherKey</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

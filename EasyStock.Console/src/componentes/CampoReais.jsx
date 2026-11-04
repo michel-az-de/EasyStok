@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { textoDigitadoEmReais, textoDosCentavos } from './moedaNoCampo'
+import { centavosCortados, textoDigitadoEmReais, textoDoCampo, textoDosCentavos } from './moedaNoCampo'
 import base from './CampoMascarado.module.css'
 import css from './CampoReais.module.css'
 
@@ -11,14 +11,16 @@ import css from './CampoReais.module.css'
 //
 // `centavos` nulo é campo vazio; `aoMudar` recebe nulo quando ela apaga tudo.
 export function CampoReais({
-  rotulo, rotuloOculto, dica, erro, centavos, aoMudar, ler, id: idInformado, className, onBlur, placeholder = '0,00', ...resto
+  rotulo, rotuloOculto, dica, erro, centavos, aoMudar, ler, mostrarZero = false, id: idInformado, className, onBlur, placeholder = '0,00', ...resto
 }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
   // Zero aparece vazio (com "0,00" de exemplo): o campo que nascia "0,00" fazia a tecla cair depois
   // dos centavos e não entrar.
-  const mostrar = (valor) => (valor ? textoDosCentavos(valor) : '')
+  const mostrar = (valor) => textoDoCampo(valor, mostrarZero)
   const [texto, setTexto] = useState(() => mostrar(centavos))
+  // #2080: "1,500" não cabe (centavos têm 2 casas): o campo diz o que ficou em vez de calar.
+  const [cortou, setCortou] = useState(false)
   const lido = (valor) => (valor.trim() ? ler(valor) : null)
 
   // Valor trocado por fora (zerou depois de lançar, a sugestão chegou): o texto acompanha. O que
@@ -26,11 +28,12 @@ export function CampoReais({
   const [anterior, setAnterior] = useState(centavos)
   if (centavos !== anterior) {
     setAnterior(centavos)
-    if ((lido(texto) ?? 0) !== (centavos ?? 0)) setTexto(mostrar(centavos))
+    if ((lido(texto) ?? 0) !== (centavos ?? 0)) { setTexto(mostrar(centavos)); setCortou(false) }
   }
 
   function aoDigitar(evento) {
     const novo = textoDigitadoEmReais(evento.target.value)
+    setCortou(centavosCortados(evento.target.value))
     setTexto(novo)
     aoMudar(lido(novo))
   }
@@ -60,6 +63,7 @@ export function CampoReais({
         />
       </div>
       {erro && <p id={`${id}-erro`} className={base.erroTexto} role="alert">{erro}</p>}
+      {!erro && cortou && <output className={base.dica}>Centavos têm 2 casas: ficou R$ {texto}.</output>}
       {!erro && dica && <p id={`${id}-dica`} className={base.dica}>{dica}</p>}
     </div>
   )

@@ -40,6 +40,9 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.SaldoFinal).HasColumnType("numeric(14,2)");
             b.Property(x => x.FechadoPorNome).HasMaxLength(120);
             b.Property(x => x.Observacoes).HasColumnType("text");
+            b.Property(x => x.ValorContado).HasColumnType("numeric(14,2)");
+            b.Property(x => x.DinheiroEsperado).HasColumnType("numeric(14,2)");
+            b.Property(x => x.DinheiroEntrouDepois).HasColumnType("numeric(14,2)");
 
             b.HasOne(x => x.Empresa).WithMany().HasForeignKey(x => x.EmpresaId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne(x => x.Loja).WithMany().HasForeignKey(x => x.LojaId).OnDelete(DeleteBehavior.SetNull);

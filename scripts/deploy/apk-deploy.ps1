@@ -7,7 +7,11 @@ param(
     [string]$JavaHome,
     [string]$SshHost = 'hostinger',
     [string]$OutputDirectory,
-    [switch]$PrepareOnly
+    [switch]$PrepareOnly,
+    [string]$PushCredentials = 'C:\rep\keystores\casa-da-baba-piloto\firebase-push.json',
+    [string]$FirebaseConfig,
+    [switch]$PushValidateOnly,
+    [switch]$SkipPush
 )
 
 $ErrorActionPreference = 'Stop'
@@ -94,6 +98,22 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'apk-site/index.html') -Destinat
 Write-Output "APK conferido: $($manifest.version) ($($manifest.versionCode)); pacote e assinatura válidos."
 Write-Output "Distribuição preparada: $output"
 if ($PrepareOnly) { return }
+
+# Push visível de APK novo (#2195): valida antes de tocar a VPS e envia só depois do latest ativo.
+if ($SkipPush -and $PushValidateOnly) { throw '-SkipPush e -PushValidateOnly são incompatíveis.' }
+$apkPushScript = Join-Path $sourceRoot 'casa-da-baba-mobile/apk/scripts/ota-push.cjs'
+$apkPushRelease = Join-Path $output 'latest.json'
+if (-not $FirebaseConfig) { $FirebaseConfig = Join-Path $sourceRoot 'casa-da-baba-mobile/apk/android/app/google-services.json' }
+if (-not $SkipPush) {
+    if ([string]::IsNullOrWhiteSpace($PushCredentials) -or -not (Test-Path -LiteralPath $PushCredentials -PathType Leaf)) {
+        throw 'Credencial Firebase ausente. Nada foi enviado à VPS. Configure firebase-push.json ou use -SkipPush explicitamente.'
+    }
+    $apkPreflight = & node $apkPushScript --credentials $PushCredentials --app-config $FirebaseConfig --apk-release $apkPushRelease --validate-only 2>&1
+    if ($LASTEXITCODE -ne 0) { throw ('Push do APK não validado; nada foi enviado à VPS. ' + ($apkPreflight -join ' ')) }
+    Write-Output ('Push do APK validado antes da publicação: ' + ($apkPreflight -join ' '))
+} else {
+    Write-Warning 'Publicação sem push explicitamente selecionada (-SkipPush). Os aparelhos só verão a versão ao abrir o app.'
+}
 
 # O manifesto só muda depois de conferir o APK baixado pelo HTTPS público.
 $stage = "$destination/.incoming-$([Guid]::NewGuid().ToString('N'))"
@@ -183,7 +203,16 @@ Invoke-ApkRemote 'activate'
 $published = Invoke-RestMethod -Uri ($publicBase + 'latest.json?verify=' + [Guid]::NewGuid().ToString('N')) -TimeoutSec 30
 if ($published.versionCode -ne $manifest.versionCode -or $published.sha256 -ne $sha -or $published.url -ne $manifest.url) { throw 'A versão pública diverge da esperada. Conferir a publicação antes de entregar o link.' }
 $page = Invoke-WebRequest -UseBasicParsing -Uri ($publicBase + '?verify=' + [Guid]::NewGuid().ToString('N')) -TimeoutSec 30
-if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'Baixar app para Android') { throw 'A página pública de instalação não passou na verificação.' }
+if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'id="download"' -or $page.Content -notmatch "fetch\('./latest\.json") { throw 'A página pública de instalação não passou na verificação.' }
 Write-Output "Publicado e conferido por HTTPS: $publicBase"
 Write-Output "APK: $($manifest.url)"
 Write-Output "SHA-256: $sha"
+if (-not $SkipPush) {
+    $apkPushMode = if ($PushValidateOnly) { '--validate-only' } else { '--send' }
+    $apkPushResult = & node $apkPushScript --credentials $PushCredentials --app-config $FirebaseConfig --apk-release $apkPushRelease $apkPushMode 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning ('APK publicado; push pendente. O latest permanece ativo, sem rollback automático. ' + ($apkPushResult -join ' '))
+        exit 1
+    }
+    Write-Output ('Push do APK: ' + ($apkPushResult -join ' ') + '. Aceite do FCM não prova entrega no aparelho.')
+}

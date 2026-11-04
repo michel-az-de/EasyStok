@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Integration.Logistica;
 using EasyStock.Application.Ports.Output.Integrations;
 using EasyStock.Infra.Integrations.Logistica.Lalamove;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,28 @@ public static class CotacaoFreteServiceCollectionExtensions
             c.BaseAddress = new Uri(CotadorFreteLalamove.HostProducao);
             c.Timeout = TimeSpan.FromSeconds(5);
         });
+        return services;
+    }
+
+    /// <summary>
+    /// Despacho da corrida pela API da Lalamove (#2160, ADR-0064): um cliente por ambiente, sem retry (R3), porque o
+    /// POST de criação não tem idempotência. O ambiente vem da conexão da loja.
+    /// </summary>
+    public static IServiceCollection AddEasyStockDespachoLalamove(this IServiceCollection services)
+    {
+        services.AddMemoryCache();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddHttpClient(LalamoveLogisticaGateway.ClienteProducao, c =>
+        {
+            c.BaseAddress = new Uri(CotadorFreteLalamove.HostProducao);
+            c.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddHttpClient(LalamoveLogisticaGateway.ClienteSandbox, c =>
+        {
+            c.BaseAddress = new Uri(Conexao.TestadorLalamove.HostSandbox);
+            c.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddScoped<ILogisticaGateway, LalamoveLogisticaGateway>();
         return services;
     }
 }

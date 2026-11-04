@@ -21,6 +21,9 @@ public final class UpdatePolicy {
     public static final String APP_ID = "com.casadababa.piloto";
     public static final String CHANNEL = "piloto";
     public static final String MANIFEST_URL = "https://easystok.online/downloads/casa-da-baba/ota/latest.json";
+    public static String manifestUrl(int nativeCode) {
+        return nativeCode >= 5 ? MANIFEST_URL.replace("latest.json", "native-" + nativeCode + "/latest.json") : MANIFEST_URL;
+    }
     private UpdatePolicy() {}
 
     public static void require(boolean condition, String message) throws IOException {
@@ -123,6 +126,11 @@ public final class UpdatePolicy {
     /** trialBoots conta as aberturas já feitas em teste; volta só quando a nova abertura excederia o limite. */
     public static boolean mustFallback(boolean trial, boolean recreatedInSameProcess, long trialBoots) {
         return trial && !recreatedInSameProcess && trialBoots >= MAX_TRIAL_BOOTS;
+    }
+
+    /** Avisa uma vez por conteúdo preparado em segundo plano; o mesmo pacote nunca gera duas notificações. */
+    public static boolean shouldAnnounceContent(String pendingVersion, String alreadyAnnounced) {
+        return pendingVersion != null && !pendingVersion.isEmpty() && !pendingVersion.equals(alreadyAnnounced);
     }
 
     public static boolean isUpdateAnnouncement(String sender, String kind, String sequence) {

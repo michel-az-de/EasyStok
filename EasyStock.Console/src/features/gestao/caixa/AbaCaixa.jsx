@@ -161,7 +161,7 @@ export function AbaCaixa() {
           <Botao variante="secundario" icone="shopping-cart" onClick={() => setVendaAvulsaAberta(true)}>
             Venda avulsa
           </Botao>
-          <Botao variante="secundario" icone="log-out" onClick={() => setFecharAberto(true)}>
+          <Botao variante="secundario" icone="lock" onClick={() => setFecharAberto(true)}>
             Fechar o caixa
           </Botao>
         </div>

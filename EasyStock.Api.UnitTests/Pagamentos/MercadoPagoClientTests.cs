@@ -52,7 +52,7 @@ public class MercadoPagoClientTests
         var handler = Falso(status, resposta);
         var http = handler.CriarClient("https://api.mp.test/");
         var opcoes = Options.Create(new MercadoPagoOptions { AccessToken = "fake" });
-        return (new MercadoPagoClient(http, opcoes, NullLogger<MercadoPagoClient>.Instance), handler);
+        return (new MercadoPagoClient(http, opcoes, PipelinesDeTeste.Reais(), NullLogger<MercadoPagoClient>.Instance), handler);
     }
 
     [Fact]
@@ -294,7 +294,7 @@ public class MercadoPagoClientTests
         var http = handler.CriarClient("https://api.mp.test/");
         http.Timeout = TimeSpan.FromMilliseconds(80);
         var client = new MercadoPagoClient(http, Options.Create(new MercadoPagoOptions { AccessToken = "fake" }),
-            NullLogger<MercadoPagoClient>.Instance);
+            PipelinesDeTeste.Reais(), NullLogger<MercadoPagoClient>.Instance);
 
         var act = () => client.EstornarAsync("20359978", 10m, "operacao-1");
 

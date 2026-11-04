@@ -215,7 +215,7 @@ function ConfiguracaoDoAtendimento() {
       <div className={css.secao} role="alert">
         <p className={css.erro}>A configuração não carregou: {carga.mensagem}</p>
         <div className={css.acoes}>
-          <Botao className={css.toque} onClick={tentarDeNovo}>Tentar novamente</Botao>
+          <Botao className={css.toque} onClick={tentarDeNovo}>Tentar de novo</Botao>
         </div>
       </div>
     )
@@ -369,7 +369,7 @@ export function AbaAtendimento({ horariosAtendimento = null }) {
       {acoes.editarAtendimento === true ? <>
         <MensagensDoExpediente />
         <ConfiguracaoDoAtendimento />
-      </> : <p className={css.descricao}>Horários, mensagens e prazo de resposta são configurados pela dona.</p>}
+      </> : <p className={css.descricao}>Peça à administração da loja para alterar horários e mensagens.</p>}
     </div>
   )
 }

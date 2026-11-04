@@ -31,7 +31,8 @@ public sealed record DossieClienteDto(
 /// perfil do canal.
 /// </summary>
 public sealed record DossieClienteDados(
-    Guid? Id, string? Nome, string? Telefone, string? Email, string? Observacoes, string? MotivoBloqueio);
+    Guid? Id, string? Nome, string? Telefone, string? Email, string? Observacoes, string? MotivoBloqueio,
+    string? FotoUrl = null);
 
 /// <summary>Item que aparece em mais pedidos (desempate: maior quantidade somada).</summary>
 public sealed record ItemFavoritoDossie(string Nome, int Pedidos, decimal Quantidade);

@@ -1,8 +1,13 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
+import { Tooltip } from '../../componentes/Tooltip'
+import { useAviso } from '../../componentes/Aviso'
 import { CampoArea } from '../../componentes/Campo'
 import { SugestaoDeTexto } from '../../componentes/SugestaoDeTexto'
 import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
+import { useSugestaoProativa } from '../../aplicacao/useSugestaoProativa'
+import { useComplementoLigado } from '../../aplicacao/preferenciaDoComplemento'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAtalhoBarra } from '../../aplicacao/useAtalhoBarra'
@@ -20,13 +25,15 @@ import { SeletorRespostas } from './SeletorRespostas'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
 import { acoesDoComposer } from './apresentacaoDaConversa'
+import { revisaoDoContexto } from '../../dominio/contextoDaSugestao'
 import css from './atendimento.module.css'
 
 export function Composer({
   conversa, canal, podeEscrever, motivo, rascunho: rascunhoGlobal, escritaDeFora,
   aoEnviar, aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
-  aoReabrir, reabrindo = false, podeEnviarModelo = false,
+  aoReabrir, reabrindo = false, podeEnviarModelo = false, aoAssumirAntes = null,
   modeloAberto = false, aoAbrirModelos, aoFecharModelos, modelosFixos = true,
+  notaEmRascunho = false, visivel = true,
 }) {
   const { enviarMidia } = useAcoes()
   // #1577: a tecla muda só este campo. O rascunho global recebe o texto na pausa da digitação, ou na hora
@@ -46,13 +53,24 @@ export function Composer({
   // do próprio componente agora; aqui só sobra a ref.
   const campoRef = useRef(null)
   const respostasRef = useRef(null)
+  const ferramentasRef = useRef(null)
   const idListaRespostas = useId()
-  const sugestoesNoCampo = barra.aberto && barra.pelaBarra && barra.itens.length > 0
+  const sugestoesNoCampo = visivel && barra.aberto && barra.pelaBarra && barra.itens.length > 0
+  function abrirNotaInterna() {
+    // Recolhe ferramentas sem apagar um rascunho iniciado por "/".
+    if (!barra.pelaBarra) barra.fechar()
+    if (ferramentasRef.current) ferramentasRef.current.open = false
+    aoAbrirNota?.()
+  }
 
   // Frente Anexos (rodada 7, pedido do dono 24/09/2026 04h12): anexo de
   // arquivo em espera (prévia antes de enviar) e o gravador de áudio.
   const [anexo, setAnexo] = useState(null)
   const [erroAnexo, setErroAnexo] = useState(null)
+  const aviso = useAviso()
+  // O Composer remonta por conversa (#1510): o "Desfazer" do anexo não vale na conversa seguinte.
+  const avisoDoAnexo = useRef(null)
+  useEffect(() => () => aviso.dispensar(avisoDoAnexo.current ?? -1), [aviso])
   // #1424: modal de programar mensagem, guardada pelo id da conversa (trocar de conversa fecha).
   const [programarEm, setProgramarEm] = useState(null)
   const { ler } = useArquivoComoDataUrl()
@@ -74,13 +92,38 @@ export function Composer({
     }
   }
 
+  // #2134: responder com o Assistente atendendo é assumir. `aoAssumirAntes` só vem preenchido nesse
+  // caso e assume pelo mesmo caminho do botão Assumir. Se falhar, nada sai e o erro fica aqui,
+  // junto do campo (o aviso da barra de modo pode estar fora da tela).
+  const assumindoRef = useRef(false)
+  const [assumindo, setAssumindo] = useState(false)
+  const [assumiu, setAssumiu] = useState(false)
+  const [erroAssumir, setErroAssumir] = useState(null)
+  async function assumirSePreciso() {
+    if (!aoAssumirAntes) return true
+    assumindoRef.current = true
+    setAssumindo(true)
+    setErroAssumir(null)
+    let assumida = false
+    try { assumida = (await aoAssumirAntes()) !== false } catch { assumida = false } finally {
+      assumindoRef.current = false
+      setAssumindo(false)
+    }
+    if (assumida) setAssumiu(true)
+    else setErroAssumir('Não consegui assumir a conversa, então a mensagem não saiu. Tente enviar de novo.')
+    return assumida
+  }
+
   // "Enviar" com anexo em espera manda o anexo (o texto digitado vira legenda
   // de imagem, se houver); sem anexo, segue o fluxo de sempre. Um só botão,
   // uma só tecla Enter, sem o composer perguntar qual dos dois você quis.
-  function enviarComposer() {
+  async function enviarComposer() {
     // #1474: {pedido} sem valor sairia literal para o cliente (texto ou legenda); o aviso está
     // acima do campo e o Enviar fica desligado até ela trocar.
-    if (variavelSobrando) return
+    if (variavelSobrando || assumindoRef.current) return
+    // Enter com o campo vazio não manda balão vazio (#1287).
+    if (!anexo && !rascunho.trim()) return
+    if (!(await assumirSePreciso())) return
     if (anexo) {
       const molde = anexo.tipo === 'imagem'
         ? mensagemDeImagemAnexada({ nomeArquivo: anexo.nome, dataUrl: anexo.dataUrl, legenda: rascunho })
@@ -90,8 +133,6 @@ export function Composer({
       aoMudarRascunho('')
       return
     }
-    // Enter com o campo vazio não manda balão vazio (#1287).
-    if (!rascunho.trim()) return
     // O campo é quem tem o texto de agora; o rascunho global pode estar uma pausa atrás.
     descarregar()
     aoEnviar(rascunho)
@@ -101,15 +142,29 @@ export function Composer({
   // envio até o EasyStok responder; o balão na conversa nasce "enviando". Se não sair, o motivo
   // fica no balão e aqui só o aviso curto.
   const [enviandoAudio, setEnviandoAudio] = useState(false)
+  const [complementoLigado, alternarComplemento] = useComplementoLigado()
   const sugestao = useComplementoDeTexto({
     texto: rascunho, contexto: 'cliente', conversaId: conversa.id,
-    ativo: fonteApi && podeEscrever && !barra.aberto && !anexo && !gravando && !enviandoAudio,
+    revisaoContexto: revisaoDoContexto(conversa),
+    ativo: visivel && fonteApi && podeEscrever && !barra.aberto && !anexo && !gravando && !enviandoAudio && !modeloAberto && !programarEm,
     aoCompletar: aoMudarRascunho,
   })
+  const proativa = useSugestaoProativa({
+    conversa, ativo: visivel && fonteApi && podeEscrever && !modeloAberto && !programarEm,
+    campoEmUso: Boolean(rascunho || barra.aberto || anexo || gravando || enviandoAudio || assumindo),
+  })
+  function usarProposta() {
+    const atual = proativa.obterSugestaoAtual()
+    if (!atual || rascunho.trim()) return
+    aoMudarRascunho(atual.texto)
+    proativa.dispensar()
+    campoRef.current?.querySelector('textarea')?.focus({ preventScroll: true })
+  }
   async function aoEnviarAudio() {
     setErroAnexo(null)
     setEnviandoAudio(true)
     try {
+      if (!(await assumirSePreciso())) return
       const resultado = await gravador.finalizar()
       if (!resultado) return
       const saiu = await enviarMidia(conversa.id, mensagemDeAudio(resultado))
@@ -144,7 +199,7 @@ export function Composer({
   // amarela e o campo apagado com Programar e Nota ativos). Fica uma linha neutra no lugar do campo.
   if (motivo?.acao === 'reabrir') {
     return (
-      <div className={css.composer}>
+      <div className={css.composer} data-area-envio>
         <p className={css.linhaEncerrada}>
           <span>Conversa encerrada</span>
           {aoReabrir && <Botao disabled={reabrindo} onClick={aoReabrir}>{reabrindo ? 'Reabrindo…' : 'Reabrir conversa'}</Botao>}
@@ -154,7 +209,7 @@ export function Composer({
   }
 
   return (
-    <div className={css.composer}>
+    <div className={css.composer} data-area-envio>
       {motivo && (
         <p className={`${css.bloqueio} ${motivo.acao === 'bloqueio' ? css.bloqueioGrave : ''}`}>
           <Icone nome={motivo.acao === 'bloqueio' ? 'bloqueio' : 'alerta'} />
@@ -171,6 +226,10 @@ export function Composer({
       </Botao>}
       {modelosFixos && podeEnviarModelo && podeEscrever && <p className={css.restricao}>Mensagens prontas aprovadas pelo WhatsApp para retomar a conversa fora da janela de resposta.</p>}
 
+      {/* #2134: junto do campo, onde a atendente olha ao enviar. */}
+      {assumiu && <p className={css.avisoAssumiu} role="status"><Icone nome="check" /> Você assumiu a conversa</p>}
+      {erroAssumir && <p className={css.erroAssumir} role="alert">{erroAssumir}</p>}
+
       {/* Gravando substitui o campo de texto e as ações: gravar e escrever ao
           mesmo tempo não é o gesto que o dono pediu ("gravar... cancelar ou
           enviar"), e um estado só por vez é mais fácil de entender. */}
@@ -179,11 +238,21 @@ export function Composer({
       ) : (
         <>
           {anexo && (
-            <PreviaAnexo anexo={anexo} aoRemover={() => { setAnexo(null); setErroAnexo(null) }} />
+            <PreviaAnexo anexo={anexo} aoRemover={() => {
+              // #2146: remover não pergunta; o Aviso devolve o anexo por 8 s (desfazer em vez de "tem certeza?").
+              const removido = anexo
+              setAnexo(null)
+              setErroAnexo(null)
+              avisoDoAnexo.current = aviso.mostrar({ texto: `Anexo removido: ${removido.nome}`, acao: { rotulo: 'Desfazer', aoAgir: () => setAnexo(removido) } })
+            }} />
           )}
 
           {erroAnexo && <p className={css.restricao} role="alert">{erroAnexo}</p>}
           {variavelSobrando && <p className={css.restricao} role="alert">{variavelSobrando}</p>}
+          <SugestaoDeTexto
+            sugestao={{ complemento: proativa.sugestao?.texto, aceitar: usarProposta, dispensar: proativa.dispensar }}
+            rotuloAcao="Usar no rascunho" atalho={null} compacta
+          />
 
           {/* Rodada 6d: composer em uma linha, como no Mensagens. Ícones à
               esquerda, o campo numa pílula que cresce com o texto, o enviar
@@ -207,7 +276,7 @@ export function Composer({
                     // Respostas, com rótulo, já mostra o caminho, e a frase longa
                     // quebrava em três linhas no campo (rodada 10, integração).
                     : `Escreva para ${conversa.nome.split(' ')[0]}`}
-                onChange={(e) => digitar(e.target.value)}
+                onChange={(e) => { digitar(e.target.value); setAssumiu(false); setErroAssumir(null) }}
                 onFocus={sugestao.aoFocar}
                 onBlur={() => { sugestao.aoSair(); descarregar() }}
                 onKeyDown={(e) => {
@@ -222,7 +291,7 @@ export function Composer({
                   do próprio Popover) e planta o conteúdo em document.body,
                   fora do recorte de `.composer`. Visual idêntico ao de antes,
                   só que agora fora do overflow. */}
-              {barra.aberto && <SeletorRespostas seletor={barra} aoInserido={() => campoRef.current?.querySelector('textarea')?.focus()} idLista={idListaRespostas} aoGerenciar={() => {
+              {visivel && barra.aberto && <SeletorRespostas seletor={barra} aoInserido={() => campoRef.current?.querySelector('textarea')?.focus()} idLista={idListaRespostas} aoGerenciar={() => {
                 if (!barra.pelaBarra) respostasRef.current?.focus()
                 aoAbrirBiblioteca?.()
               }} />}
@@ -235,23 +304,46 @@ export function Composer({
                   este botão ganha rótulo visível, mesma ideia de "Automáticas"
                   no trilho (ícone e palavra juntos); os vizinhos (Anexar,
                   Fotos, Cardápio, Nota, Enviar) continuam ícone só. */}
-              <Botao
+              <Tooltip texto={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}><Botao
                 ref={respostasRef}
                 disabled={!podeEscrever && !podeEnviarModelo}
                 aria-haspopup={podeEscrever ? 'listbox' : 'dialog'}
                 aria-expanded={podeEscrever ? barra.aberto : undefined}
                 aria-controls={podeEscrever && barra.aberto && barra.itens.length > 0 ? idListaRespostas : undefined}
-                title={podeEscrever ? 'Respostas prontas (atalho: / no campo)' : 'Janela fechada: só modelos aprovados pelo WhatsApp saem até o cliente responder'}
                 className={css.botaoRespostas}
-                onClick={podeEscrever ? barra.abrir : aoAbrirModelos}
+                onClick={podeEscrever ? (barra.aberto ? barra.fechar : barra.abrir) : aoAbrirModelos}
               >
                 <Icone nome="respostas" />
                 <span>Respostas</span>
-              </Botao>
+              </Botao></Tooltip>
+              <Tooltip texto={notaEmRascunho ? 'Retomar a nota desta conversa. Só a equipe vê.' : 'Anotar para a equipe sem sair da conversa'}>
+                <Botao
+                  aria-label={notaEmRascunho ? 'Retomar nota interna' : 'Nota interna'} className={css.botaoNota}
+                  onPointerDown={(evento) => { if (barra.pelaBarra) evento.stopPropagation() }}
+                  onClick={abrirNotaInterna}
+                >
+                  <Icone nome="nota" /><span>{notaEmRascunho ? 'Retomar nota' : 'Nota'}</span>
+                </Botao>
+              </Tooltip>
               {/* Rodada 12 (issue #16, dúvida da Thatiane "esse botão é pra
                   quê?"): os quatro vizinhos ganham nome visível, como o
                   Respostas. Em coluna estreita o nome some por container
                   query e fica o title com a explicação inteira. */}
+              <details ref={ferramentasRef} className={css.ferramentasComposer} onKeyDown={(evento) => {
+                if (evento.key !== 'Escape' || evento.defaultPrevented || evento.target.closest('dialog')) return
+                evento.preventDefault(); evento.stopPropagation()
+                evento.currentTarget.open = false
+                evento.currentTarget.querySelector('summary')?.focus()
+              }}>
+                <Tooltip texto="Mais ferramentas"><summary aria-label="Mais ferramentas"><Icone nome="mais" /></summary></Tooltip>
+                <div className={css.menuFerramentas} role="group" aria-label="Ferramentas da mensagem" onClick={(evento) => {
+                  if (evento.target.closest('button')) {
+                    const ferramentas = evento.currentTarget.closest('details')
+                    ferramentas.open = false
+                    ferramentas.querySelector('summary')?.focus({ preventScroll: true })
+                  }
+                }}>
+
               {acoes.anexar && <BotaoAnexarArquivo
                 disabled={!podeEscrever || !podeAnexar}
                 descritoPor={!podeAnexar && restricao ? idRestricao : undefined}
@@ -261,47 +353,67 @@ export function Composer({
                 classeRotulo={css.rotuloAcao}
                 aoEscolher={aoEscolherArquivo}
               />}
-              {acoes.fotos && <Botao
-                title={motivoDeFormato(canal, 'foto') ?? 'Fotos dos pratos cadastrados na casa'}
+              {acoes.fotos && <Tooltip texto={motivoDeFormato(canal, 'foto') ?? 'Fotos dos pratos cadastrados na casa'}><Botao
                 aria-describedby={!podeFoto && restricao ? idRestricao : undefined}
                 className={css.acaoComRotulo} disabled={!podeEscrever || !podeFoto} onClick={aoAbrirGaleria}
               >
                 <Icone nome="imagem" /><span className={css.rotuloAcao}>Fotos</span>
-              </Botao>}
+              </Botao></Tooltip>}
               {/* #1424: a mensagem programada vai para o cliente cadastrado (a API exige o
                   clienteId). Não depende do `podeEscrever`: fora da janela sai por modelo. */}
-              <Botao
-                title={conversa.clienteId
-                  ? 'Programar mensagem para sair depois, no horário escolhido'
-                  : 'Cadastre o cliente primeiro: a mensagem programada vai para um cliente cadastrado'}
-                className={css.acaoComRotulo}
-                aria-haspopup="dialog"
-                disabled={!conversa.clienteId}
-                onClick={() => setProgramarEm(conversa.id)}
+              <Tooltip texto={conversa.clienteId
+                ? 'Programar mensagem para sair depois, no horário escolhido'
+                : 'Cadastre o cliente primeiro: a mensagem programada vai para um cliente cadastrado'}
               >
-                <Icone nome="relogio" /><span className={css.rotuloAcao}>Programar</span>
-              </Botao>
-              <Botao title="Nota interna: fica na ficha, o cliente nunca vê" aria-label="Nota interna" className={css.acaoComRotulo} onClick={aoAbrirNota}>
-                <Icone nome="nota" /><span className={css.rotuloAcao}>Nota</span>
-              </Botao>
+                <Botao
+                  className={css.acaoComRotulo}
+                  aria-haspopup="dialog"
+                  disabled={!conversa.clienteId}
+                  onClick={() => setProgramarEm(conversa.id)}
+                >
+                  <Icone nome="relogio" /><span className={css.rotuloAcao}>Programar</span>
+                </Botao>
+              </Tooltip>
+              {/* #2134: chave do completar com Tab. Só existe no modo API (é lá que a sugestão chama o
+                  provedor). Desligada, nenhuma chamada sai; vale por usuário, neste navegador. */}
+              {fonteApi && <Tooltip texto={complementoLigado
+                ? 'Sugestões de IA: ligadas. Usa a conversa e o que você digita para preparar rascunhos. Toque para desligar.'
+                : 'Sugestões de IA: desligadas. Toque para ligar.'}
+              ><Botao
+                aria-pressed={complementoLigado}
+                className={`${css.acaoComRotulo} ${complementoLigado ? css.chaveLigada : ''}`}
+                onClick={alternarComplemento}
+              >
+                <Icone nome="sparkles" /><span className={css.rotuloAcao}>Sugestões de IA</span>
+              </Botao></Tooltip>}
+                </div>
+              </details>
               {/* Microfone ocupa o lugar do Enviar quando o campo está vazio e
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
               {temTexto || anexo || !acoes.audio ? (
-                <Botao variante="primario" className={css.enviar} aria-label="Enviar" title={variavelSobrando ?? (temTexto || anexo ? 'Enviar (Enter)' : restricao ?? 'Escreva a mensagem para enviar')} disabled={!podeEscrever || Boolean(variavelSobrando) || !(temTexto || anexo)} onClick={enviarComposer}>
-                  <Icone nome="arrow-up" tamanho={20} />
-                </Botao>
-              ) : (
+                <Tooltip texto={variavelSobrando ?? (temTexto || anexo ? 'Enviar mensagem' : restricao ?? 'Escreva a mensagem para enviar')}
+                  atalho={temTexto || anexo ? 'Enter' : undefined}>
                 <Botao
                   variante="primario"
                   className={css.enviar}
-                  aria-label="Gravar áudio"
+                  aria-label="Enviar mensagem"
+                  icone="enviar"
+                  aria-keyshortcuts={temTexto || anexo ? 'Enter' : undefined}
+                  disabled={!podeEscrever || assumindo || Boolean(variavelSobrando) || !(temTexto || anexo)}
+                  onClick={enviarComposer}
+                >Enviar</Botao>
+                </Tooltip>
+              ) : (
+                <BotaoIcone
+                  tom="primario"
+                  className={css.enviar}
+                  rotulo="Gravar áudio"
+                  icone="mic"
+                  dica={motivoDeFormato(canal, 'audio') ?? undefined}
                   disabled={!podeEscrever || !podeAudio}
-                  title={motivoDeFormato(canal, 'audio') ?? 'Gravar áudio'}
                   onClick={gravador.iniciar}
-                >
-                  <Icone nome="mic" tamanho={20} />
-                </Botao>
+                />
               )}
             </div>
           </div>
@@ -310,7 +422,7 @@ export function Composer({
               o curto; o motivo inteiro segue no title, no leitor de tela e no aria-describedby. */}
           {restricao && (podeAnexar || podeAudio
             ? <p id={idRestricao} className={css.restricao}>{restricao}</p>
-            : <p id={idRestricao} className={css.restricao} title={restricao}><span aria-hidden="true">Só texto neste canal</span><span className="sr">{restricao}</span></p>)}
+            : <p id={idRestricao} className="sr">{restricao}</p>)}
         </>
       )}
 

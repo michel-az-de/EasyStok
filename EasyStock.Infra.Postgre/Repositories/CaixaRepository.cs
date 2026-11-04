@@ -163,6 +163,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             db.FechamentosCaixa.FirstOrDefaultAsync(f =>
                 f.EmpresaId == empresaId && f.Data == data && f.LojaId == lojaId);
 
+        public Task<FechamentoCaixa?> GetUltimoFechamentoDaLojaAsync(Guid empresaId, Guid? lojaId) =>
+            db.FechamentosCaixa.AsNoTracking()
+                .Where(f => f.EmpresaId == empresaId && (lojaId == null ? f.LojaId == null : f.LojaId == lojaId))
+                .OrderByDescending(f => f.Data).ThenByDescending(f => f.FechadoEm)
+                .FirstOrDefaultAsync();
+
         public async Task<(IEnumerable<FechamentoCaixa> items, int total)> ListFechamentosAsync(
             Guid empresaId, int page, int pageSize, DateOnly? desde = null, DateOnly? ate = null)
         {
@@ -266,7 +272,9 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<IReadOnlyList<PedidoPagamento>> GetPagamentosPedidosListaNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
-            return await db.Set<PedidoPagamento>().AsNoTracking()
+            // #2082 B16: o mesmo SELECT traz o pedido de cada pagamento (a linha do caixa mostra o número do dia e o
+            // cliente), em vez de um GetById por linha.
+            var linhas = await db.Set<PedidoPagamento>().AsNoTracking()
                 .Where(pg => pg.PagoEm >= iniUtc && pg.PagoEm < fimUtc)
                 .Join(db.Pedidos.AsNoTracking(),
                       pg => pg.PedidoId,
@@ -283,8 +291,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                          && x.p.VendaId == null
                          && (lojaId == null || x.p.LojaId == lojaId))
                 .OrderBy(x => x.pg.PagoEm)
-                .Select(x => x.pg)
+                .Select(x => new { x.pg, x.p })
                 .ToListAsync();
+            foreach (var linha in linhas) linha.pg.Pedido = linha.p;
+            return linhas.Select(l => l.pg).ToList();
         }
 
         // #1630-4: uma linha por venda estornada, na forma da venda, para a soma das linhas por forma

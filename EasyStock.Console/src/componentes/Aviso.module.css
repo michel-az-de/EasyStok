@@ -1,0 +1,40 @@
+/* #2146: Aviso (snackbar) no pé da tela, centralizado. Superfície invertida, tinta sobre papel trocados,
+   como o aviso de envio da comanda; erro no par --sobre-erro/--erro (o do Botao perigo). Acima da
+   faixa de atualização (z 80), na altura da pilha de notificações (z 90), abaixo de um <dialog>. */
+.pe {
+  position: fixed; left: 50%; bottom: calc(var(--e-4) + env(safe-area-inset-bottom, 0px)); z-index: 90;
+  transform: translateX(-50%); width: max-content; max-width: calc(100vw - 2 * var(--e-16));
+  pointer-events: none;
+}
+.regiao:empty { display: none; }
+.aviso {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: var(--e-2);
+  min-height: var(--toque); padding: var(--e-1) var(--e-1) var(--e-1) var(--e-16);
+  border-radius: var(--r-2); background: var(--tinta); color: var(--papel); box-shadow: var(--sombra-alta);
+  font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto);
+  /* Seção 3.4: o Aviso entra em fade, duração curta. */
+  animation: aparecerAviso var(--dur-curta) var(--ease-padrao) both;
+}
+.erro { background: var(--erro); color: var(--sobre-erro); }
+.icone { flex-shrink: 0; }
+.texto { margin: 0; padding: var(--e-1) 0; min-width: 0; overflow-wrap: anywhere; }
+/* Ação e Fechar herdam a cor da superfície: o cinza do Botao texto some no fundo invertido. */
+.aviso .acao, .aviso .fechar { color: inherit; background: transparent; flex-shrink: 0; }
+.aviso .acao { padding: 0 var(--e-3); text-decoration: underline; text-underline-offset: 3px; }
+.aviso .acao:hover:not(:disabled), .aviso .fechar:hover:not(:disabled) {
+  color: inherit; background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.aviso .acao:focus-visible, .aviso .fechar:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+@keyframes aparecerAviso {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* No celular ocupa a largura (menos o respiro) e sobe acima da barra de abas do pé, que tem a
+   altura de um toque mais o respiro. */
+@media (max-width: 759px) {
+  .pe {
+    left: var(--e-16); right: var(--e-16); width: auto; max-width: none; transform: none;
+    bottom: calc(var(--toque) + var(--e-5) + env(safe-area-inset-bottom, 0px));
+  }
+}

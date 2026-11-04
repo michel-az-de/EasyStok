@@ -22,7 +22,7 @@ public class GoogleRotasClientTests
         handler = new HttpFalso();
         handler.QuandoQualquer().Responde(status, body);
         var http = handler.CriarClient("https://routes.test/");
-        return new GoogleRotasClient(http, Chave, NullLogger<GoogleRotasClient>.Instance);
+        return new GoogleRotasClient(http, Chave, PipelinesDeTeste.Reais(), NullLogger<GoogleRotasClient>.Instance);
     }
 
     [Fact]

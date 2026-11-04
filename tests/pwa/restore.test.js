@@ -8,6 +8,68 @@
 module.exports = function ({ test, sandbox, assert }) {
   const cdbSync = () => sandbox.window && sandbox.window.cdbSync;
 
+  // Executa a função real do HTML em armazenamento isolado, sem tocar nos dados
+  // do harness nem depender de permissões Android para reproduzir o primeiro boot.
+  function onboardingFixture(backup, accept = false, existing = null) {
+    const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+    const html = fs.readFileSync(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+    const begin = html.indexOf('async function maybeOfferLocalRestore() {');
+    const end = html.indexOf('// HEALTH CHECK', begin);
+    assert.ok(begin >= 0 && end > begin);
+    const calls = { reads: 0, prompts: [], picks: 0, applied: [], writes: [], alerts: [], timers: [] };
+    const context = {
+      localStorage: { getItem: key => key === 'cdb-orders' ? existing : null, setItem: (key, value) => calls.writes.push([key, value]) },
+      window: { cdbSync: {
+        readLocalBackup: async () => { calls.reads++; return backup; },
+        hasPublicBackupPlugin: () => true,
+        pickBackupViaSAF: async () => { calls.picks++; return null; }
+      } },
+      confirm: message => { calls.prompts.push(message); return accept; },
+      applyBackupPayload: async payload => calls.applied.push(payload),
+      alert: message => calls.alerts.push(message),
+      setTimeout: (callback, delay) => calls.timers.push(delay),
+      console: { warn: error => { throw error; } }
+    };
+    vm.createContext(context);
+    vm.runInContext(html.slice(begin, end), context);
+    return { calls, run: () => context.maybeOfferLocalRestore() };
+  }
+
+  test('#2091 onboarding: instalação vazia com plugin e sem backup não interrompe nem escreve', async () => {
+    const fixture = onboardingFixture(null, true);
+    await fixture.run();
+    assert.deepStrictEqual(fixture.calls, { reads: 1, prompts: [], picks: 0, applied: [], writes: [], alerts: [], timers: [] });
+  });
+
+  test('#2091 onboarding: backup vazio não oferece restauração', async () => {
+    const fixture = onboardingFixture({ data: { 'cdb-orders': '[]' } }, true);
+    await fixture.run();
+    assert.strictEqual(fixture.calls.prompts.length, 0);
+    assert.strictEqual(fixture.calls.picks, 0);
+    assert.strictEqual(fixture.calls.applied.length, 0);
+    assert.strictEqual(fixture.calls.writes.length, 0);
+  });
+
+  for (const accept of [false, true]) {
+    test('#2091 onboarding: backup real ' + (accept ? 'restaura somente após confirmação' : 'respeita recusa sem escrita'), async () => {
+      const backup = { capturedAt: 1700000000000, data: { 'cdb-orders': '[{"id":"preservado"}]' } };
+      const fixture = onboardingFixture(backup, accept);
+      await fixture.run();
+      assert.strictEqual(fixture.calls.prompts.length, 1);
+      assert.ok(fixture.calls.prompts[0].includes('1 pedidos'));
+      assert.strictEqual(fixture.calls.picks, 0);
+      assert.deepStrictEqual(fixture.calls.applied, accept ? [backup] : []);
+      assert.strictEqual(fixture.calls.writes.length, accept ? 2 : 0);
+      assert.deepStrictEqual(fixture.calls.timers, accept ? [600] : []);
+    });
+  }
+
+  test('#2091 onboarding: dados existentes impedem consulta e oferta de backup', async () => {
+    const fixture = onboardingFixture({ data: { 'cdb-orders': '[{"id":"backup"}]' } }, true, '[{"id":"atual"}]');
+    await fixture.run();
+    assert.deepStrictEqual(fixture.calls, { reads: 0, prompts: [], picks: 0, applied: [], writes: [], alerts: [], timers: [] });
+  });
+
   test('A5: applyBackupSnapshot escreve chaves cdb-* no localStorage', () => {
     assert.ok(cdbSync() && cdbSync().applyBackupSnapshot, 'cdbSync.applyBackupSnapshot deve existir apos boot');
     sandbox.localStorage.clear();

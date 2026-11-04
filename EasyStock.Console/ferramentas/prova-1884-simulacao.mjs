@@ -74,10 +74,11 @@ await confere('3  linhas da comanda: frete, total com frete e o sinal da encomen
   assert.ok(texto.includes(`${moeda(12.5)} na entrega`), texto)
 })
 
-await confere('3  fora da área o frete é a combinar e não inventa total nem sinal; fora da encomenda não tem sinal', () => {
+await confere('3  sem cotação o frete é a combinar e não inventa área, total nem sinal; fora da encomenda não tem sinal', () => {
   const fora = simulacaoDoPedido.linhasDaSimulacao({ itens: 20, frete: null, freteACombinar: true, total: null, encomenda: true, sinal: null, restante: null })
   const texto = fora.map((l) => l.texto).join(' | ')
-  assert.match(texto, /Frete a combinar com a equipe/)
+  assert.match(texto, /Frete a combinar com o cliente/)
+  assert.doesNotMatch(texto, /fora da área/)
   assert.doesNotMatch(texto, /Total com frete|sinal de/)
   const hoje = simulacaoDoPedido.linhasDaSimulacao({ itens: 20, frete: 5, freteACombinar: false, total: 25, encomenda: false, sinal: null, restante: null })
   assert.doesNotMatch(hoje.map((l) => l.texto).join(' | '), /sinal/i)

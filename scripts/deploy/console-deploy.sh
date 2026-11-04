@@ -17,8 +17,9 @@
 #   scripts/deploy/console-deploy.sh --so-montar  # so monta e confere, sem SSH
 #
 # Variaveis: VPS_HOST (hostinger), DESTINO (/opt/stacks/shared/docs/easystok-console),
-# URL_CONSOLE (https://app.easystok.online), URL_VERSAO_API (https://api.easystok.online/health/version).
-# Saidas: 0 publicado e conferido | 1 falha | 9 SHA servido diferente do publicado.
+# URL_CONSOLE (https://app.easystok.online), URL_VERSAO_API (https://api.easystok.online/health/version),
+# CONSOLE_SHA_ESPERADO (opcional, SHA completo revisado; recusa outro master antes de publicar).
+# Saidas: 0 publicado e conferido | 1 falha | 2 SHA esperado invalido | 7 SHA divergente | 9 SHA servido diferente do publicado.
 # =============================================================================
 set -euo pipefail
 
@@ -32,6 +33,10 @@ SO_MONTAR=0
 REPO="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 git -C "$REPO" fetch -q origin
 SHA="$(git -C "$REPO" rev-parse --verify 'origin/master^{commit}')"
+if [ -n "${CONSOLE_SHA_ESPERADO:-}" ]; then
+  [[ "$CONSOLE_SHA_ESPERADO" =~ ^[0-9a-f]{40}$ ]] || { echo 'ERRO: CONSOLE_SHA_ESPERADO exige SHA completo.' >&2; exit 2; }
+  [ "$SHA" = "$CONSOLE_SHA_ESPERADO" ] || { echo "ERRO: master divergiu do SHA revisado; nada publicado." >&2; exit 7; }
+fi
 echo "==> Console de ${SHA:0:8} ($(git -C "$REPO" log -1 --format=%s "$SHA" | cut -c1-70))"
 
 API_SHA="$(curl -s -m 15 "$URL_VERSAO_API" | sed -n 's/.*"buildSha":"\([0-9a-f]*\)".*/\1/p' || true)"

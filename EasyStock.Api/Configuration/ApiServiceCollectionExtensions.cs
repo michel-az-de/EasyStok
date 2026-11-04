@@ -197,6 +197,12 @@ public static class ApiServiceCollectionExtensions
             // evitar abuso (tentativa de adivinhar pairing code, flood).
             // Limites generosos pra não atrapalhar uso legítimo (PWA pinga
             // version no boot a cada reload).
+            // Recibos em fila de aparelhos na mesma rede. O cadastro continua limitado separadamente.
+            options.AddPolicy("mobile-push-receipts", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    _ => new FixedWindowRateLimiterOptions
+                    { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             options.AddPolicy("mobile-anonymous", context =>
             {
                 var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
@@ -422,11 +428,13 @@ public static class ApiServiceCollectionExtensions
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddEnderecoForaDoLogHttp();
 
-        // string.IsNullOrWhiteSpace (nao `??`): o compose da VM injeta a env como string
-        // vazia quando OTEL_COLLECTOR_ENDPOINT nao esta no .env, e new Uri("") lanca
-        // UriFormatException derrubando a API no startup (issue 1002).
+        // Opt-in, como no Web e no Worker (issue 1002): sem endpoint nao ha provider nem exporter.
+        // Antes caia em localhost:4317 e mandava traces e metricas para o vazio em producao (#2107).
+        // string.IsNullOrWhiteSpace: o compose injeta a env como string vazia.
         var otlpConfigured = configuration[ConfigurationKeys.OtlpEndpoint];
-        var otlpEndpoint = new Uri(string.IsNullOrWhiteSpace(otlpConfigured) ? "http://localhost:4317" : otlpConfigured);
+        if (string.IsNullOrWhiteSpace(otlpConfigured))
+            return services;
+        var otlpEndpoint = new Uri(otlpConfigured);
 
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService("EasyStock.Api"))

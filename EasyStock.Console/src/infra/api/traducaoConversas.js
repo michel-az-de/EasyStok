@@ -151,7 +151,7 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     slaMinutos: resumo.slaRespostaMinutos ?? null,
     aguardaResposta: resumo.aguardaResposta ?? false,
     ultimaEntradaEm: resumo.ultimaMensagemEntradaEm ? instante(resumo.ultimaMensagemEntradaEm) : null,
-    cliente: { desde: null, endereco: null, enderecoCapturado: null, pedidos: 0, tags: [], notas: [] },
+    cliente: { desde: null, endereco: null, enderecoCapturado: null, pedidos: 0, tags: [], notas: [], fotoUrl: resumo.fotoUrl ?? null },
     pedido: null,
     mensagens,
     // #2005 (console-09): página cheia, pode haver mensagens mais antigas para abrir.

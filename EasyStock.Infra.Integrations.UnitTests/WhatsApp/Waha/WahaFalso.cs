@@ -92,7 +92,8 @@ public sealed class WahaFalso : HttpMessageHandler
         new(cache, opcoes, NullLogger<MenuNumeradoWaha>.Instance);
 
     public WahaWhatsAppClient Cliente(
-        IDistributedCache? cache = null, IOptions<WahaOptions>? opcoes = null, string? numeroDaEmpresa = NumeroDaLoja, bool haTenant = true)
+        IDistributedCache? cache = null, IOptions<WahaOptions>? opcoes = null, string? numeroDaEmpresa = NumeroDaLoja, bool haTenant = true,
+        EasyStock.Infra.Integrations.WhatsApp.BaixadorFotoPerfilWhatsApp? fotos = null)
     {
         cache ??= Cache();
         opcoes ??= Opcoes();
@@ -104,6 +105,6 @@ public sealed class WahaFalso : HttpMessageHandler
         pipelines.GetPipeline(Arg.Any<string>()).Returns(ResiliencePipeline.Empty);
 
         return new WahaWhatsAppClient(Http(), opcoes, remetente, Resolvedor(cache, opcoes), Menus(cache, opcoes), pipelines,
-            TimeProvider.System, NullLogger<WahaWhatsAppClient>.Instance);
+            TimeProvider.System, NullLogger<WahaWhatsAppClient>.Instance, fotos);
     }
 }

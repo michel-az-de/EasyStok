@@ -14,7 +14,7 @@ export function MenuDosModulos({ moduloId, telaId, fonteApi, aoNavegar, semMenu 
   return <>
     <nav className={css.trilho} aria-label="Módulos da loja">
       <a className={css.inicioTrilho} href={HASH_HALL} onClick={aoNavegar} aria-label="Ir para os módulos"><Marca compacta /><span>Módulos</span></a>
-      {areas.map((item) => <a key={item.id} href={hashDoModulo(item.id)} onClick={aoNavegar} className={`${css.itemTrilho} ${item.id === moduloId ? css.moduloAtivo : ''}`} aria-current={item.id === moduloId ? 'true' : undefined}>
+      {areas.map((item) => <a key={item.id} href={hashDoModulo(item.id)} onClick={aoNavegar} className={`${css.itemTrilho} ${item.id === moduloId ? css.moduloAtivo : ''}`} aria-current={item.id === moduloId ? 'true' : undefined} title={item.nome}>
         <IconeDoModulo modulo={item} /><span>{item.nome}</span>
       </a>)}
       {/* #1839 (F1): as automáticas só abriam pelo trilho do Balcão. O atalho leva à tela que as liga e escreve. */}

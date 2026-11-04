@@ -25,14 +25,21 @@ public class CriarContaReceberUseCase(
     ICategoriaFinanceiraRepository categoriaRepo,
     ICentroCustoRepository centroRepo,
     IUnitOfWork uow,
-    ILogger<CriarContaReceberUseCase> logger)
+    ILogger<CriarContaReceberUseCase> logger,
+    IClienteRepository? clientes = null,
+    ILojaRepository? lojas = null)
 {
     public async Task<ContaReceberResult> ExecuteAsync(CriarContaReceberCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.CategoriaFinanceiraId, nameof(cmd.CategoriaFinanceiraId));
         if (cmd.Parcelas is null || cmd.Parcelas.Count == 0)
-            throw new UseCaseValidationException("Pelo menos uma parcela e obrigatoria.");
+            throw new UseCaseValidationException("Pelo menos uma parcela é obrigatória.");
+        // #2095 (F7): tamanho e faixa antes do banco (estourar a coluna respondia 500).
+        ValidacaoFinanceira.TextosDaConta(cmd.Descricao, cmd.Observacoes, cmd.DocumentoReferencia);
+        var parcelas = cmd.Parcelas
+            .Select(p => p with { Valor = ValidacaoFinanceira.Parcela(p.Valor, p.MetodoPlanejado) })
+            .ToList();
 
         var categoria = await categoriaRepo.GetByIdAsync(cmd.EmpresaId, cmd.CategoriaFinanceiraId, ct)
             ?? throw new UseCaseValidationException("Categoria financeira nao encontrada.");
@@ -48,15 +55,22 @@ public class CriarContaReceberUseCase(
                 throw new UseCaseValidationException("Centro de custo invalido ou inativo.");
         }
 
-        if (!string.IsNullOrWhiteSpace(cmd.DocumentoReferencia))
-        {
-            var existente = await repo.GetByDocumentoReferenciaAsync(cmd.EmpresaId, cmd.DocumentoReferencia, ct);
-            if (existente is not null) return ContaReceberResult.De(existente);
-        }
+        await ValidacaoFinanceira.GarantirReferenciasAsync(cmd.EmpresaId,
+            clienteId: cmd.ClienteId, clientes: clientes, lojaId: cmd.LojaId, lojas: lojas);
+
+        // Idempotencia das integracoes: Origem+OrigemRefId ja existe, devolve a conta.
         if (cmd.OrigemRefId.HasValue && cmd.Origem != OrigemContaFinanceira.Manual)
         {
             var existente = await repo.GetByOrigemAsync(cmd.EmpresaId, cmd.Origem, cmd.OrigemRefId.Value, ct);
             if (existente is not null) return ContaReceberResult.De(existente);
+        }
+        // #2095 (F6): documento repetido nao e idempotencia, e outra divida (ou erro de digitacao): 409, nunca a
+        // conta antiga em silencio. O indice unico (EmpresaId, DocumentoReferencia) continua; por fornecedor e migracao.
+        if (!string.IsNullOrWhiteSpace(cmd.DocumentoReferencia))
+        {
+            var documento = cmd.DocumentoReferencia.Trim();
+            var existente = await repo.GetByDocumentoReferenciaAsync(cmd.EmpresaId, documento, ct);
+            if (existente is not null) throw new ContaFinanceiraDuplicadaException(documento, existente.Id);
         }
 
         try
@@ -68,7 +82,7 @@ public class CriarContaReceberUseCase(
                 cmd.Origem, cmd.OrigemRefId, cmd.DocumentoReferencia,
                 DataUtc.ParaUtcOpcional(cmd.DataCompetencia), cmd.Observacoes);
 
-            foreach (var p in cmd.Parcelas.OrderBy(x => x.Numero))
+            foreach (var p in parcelas.OrderBy(x => x.Numero))
                 conta.AdicionarParcela(p.Numero, p.Valor, DataUtc.ParaUtc(p.DataVencimento), p.MetodoPlanejado);
 
             if (cmd.EmitirAposCriar) conta.Emitir();

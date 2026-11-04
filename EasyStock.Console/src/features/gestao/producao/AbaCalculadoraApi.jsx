@@ -25,9 +25,9 @@ export function AbaCalculadoraApi() {
     finally { enviando.current = false; setOcupado(false) }
   }
   if (catalogo.estado === 'carregando') return <output>Carregando as receitas…</output>
-  if (catalogo.estado === 'erro') return <div role="alert">{catalogo.erro}<Botao onClick={catalogo.recarregar}>Tentar novamente</Botao></div>
+  if (catalogo.estado === 'erro') return <div role="alert">{catalogo.erro}<Botao onClick={catalogo.recarregar}>Tentar de novo</Botao></div>
   return <div className={css.aba}>
-    <p className={css.descricao}>Simule a quantidade desejada a partir da receita salva. Confira insumos, faltas e custo estimado dos lotes disponíveis. A simulação não altera o estoque; embalagem da porção e peso real são conferidos na produção.</p>
+    <p className={css.descricao}>Calcule insumos e custo estimado sem alterar o estoque.</p>
     <form className={`${css.campos} ${css.formulario}`} onSubmit={calcular} aria-label="Calculadora da produção">
       <CampoSelecao rotulo="Receita" disabled={ocupado} value={produtoId} onChange={(e) => setProdutoId(e.target.value)} opcoes={[{ valor: '', rotulo: 'Escolha uma receita' }, ...catalogo.receitas.filter((r) => r.linhas > 0).map((r) => ({ valor: r.produtoId, rotulo: r.nome }))]} />
       <CampoTexto rotulo="Quantidade desejada" inputMode="decimal" disabled={ocupado} value={quantidade} onChange={(e) => setQuantidade(e.target.value)} />

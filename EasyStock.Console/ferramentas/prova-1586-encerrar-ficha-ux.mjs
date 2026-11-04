@@ -25,7 +25,7 @@ const src = new URL('../src/', import.meta.url)
 
 // JSX real das duas pastas da issue, compilado antes dos ganchos (o `load` é síncrono).
 const compilados = new Map()
-for (const pasta of ['features/encerramento/', 'features/ficha-cliente/']) {
+for (const pasta of ['features/encerramento/', 'features/ficha-cliente/', 'features/notas/']) {
   for (const arquivo of readdirSync(new URL(pasta, src)).filter((f) => f.endsWith('.jsx'))) {
     const url = new URL(pasta + arquivo, src)
     compilados.set(url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code)
@@ -66,7 +66,7 @@ globalThis.__prova1586 = ctx
 
 const codigo = (texto) => 'data:text/javascript,' + encodeURIComponent(texto)
 const REACT = 'const h=globalThis.__prova1586.hooks; export const useState=h.useState,useRef=h.useRef,useId=h.useId,'
-  + 'useMemo=h.useMemo,useEffect=h.useEffect,useLayoutEffect=h.useEffect,useCallback=(f)=>f,forwardRef=(f)=>f,memo=(f)=>f'
+  + 'useMemo=h.useMemo,useEffect=h.useEffect,useLayoutEffect=h.useEffect,useCallback=(f)=>f,forwardRef=(f)=>f,memo=(f)=>f,createContext=(defaultValue)=>({defaultValue}),useContext=(c)=>c.defaultValue'
 const fronteiras = new Map([
   ['/aplicacao/contextos', 'const c=globalThis.__prova1586; export const useAtendimento=()=>c.atendimento, useCatalogo=()=>c.catalogo, useAcoes=()=>c.acoes'],
   ['/aplicacao/acessoModulos', 'export const useAcessoModulos=()=>({acoes:{cancelarPedidoPago:true}})'],
@@ -107,7 +107,7 @@ globalThis.sessionStorage = {
   getItem: () => JSON.stringify({ token: 't', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa' } }),
   setItem: () => {}, removeItem: () => {},
 }
-globalThis.window = globalThis.window ?? { dispatchEvent: () => {} }
+globalThis.window = globalThis.window ?? { innerWidth: 1000, innerHeight: 900, dispatchEvent: () => {}, addEventListener: () => {}, removeEventListener: () => {} }
 
 let passou = 0
 const falhas = []
@@ -279,6 +279,7 @@ const { CampoEmLinha } = await import('../src/features/ficha-cliente/CampoEmLinh
 const { BarraProximoPasso } = await import('../src/features/ficha-cliente/BarraProximoPasso.jsx')
 const { BaixaAMao } = await import('../src/features/ficha-cliente/BlocoCobranca.jsx')
 const { ModalHistorico } = await import('../src/features/ficha-cliente/ModalHistorico.jsx')
+const { ModalNota } = await import('../src/features/notas/ModalNota.jsx')
 const { BlocoEnderecoCapturado } = await import('../src/features/ficha-cliente/BlocoEnderecoCapturado.jsx')
 
 class Tela {
@@ -321,14 +322,14 @@ await confere('A  modal: o segundo toque em Encerrar não chama de novo, e o bot
   const idas = []
   ctx.acoes = acoesDoModal({ encerrarComResumo: (...args) => { idas.push(args); return espera.promise } })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
-  const toque = botao(tela, 'Encerrar')
+  const toque = botao(tela, 'Concluir conversa')
   assert.equal(toque.props.disabled, false)
   const primeiro = toque.props.onClick()
   await turno()
   await toque.props.onClick()
   tela.renderizar()
   assert.equal(idas.length, 1, 'encerrarComResumo chamado mais de uma vez')
-  assert.equal(botao(tela, 'Encerrando…').props.disabled, true)
+  assert.equal(botao(tela, 'Concluindo…').props.disabled, true)
   assert.deepEqual(idas[0][2], { enviarMensagem: true, textoMensagem: 'Obrigada, Ana!', avisoEmail: false, avisoSms: false, pedidoCancelado: false })
   espera.resolver(undefined); await primeiro; tela.encerrar()
 })
@@ -338,14 +339,14 @@ await confere('A  modal: o erro aparece dentro dele e a nova tentativa não repe
   let devolver = { erro: 'Atendimento não encerrado: Sem conexão com o EasyStok.', despedidaSaiu: true }
   ctx.acoes = acoesDoModal({ encerrarComResumo: async (...args) => { idas.push(args); return devolver } })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   tela.renderizar()
   const rodape = doTipo(tela, 'Modal')[0].props.rodape
   assert.match(nos(rodape).filter((n) => n.props?.role === 'alert').map(texto).join(''),
     /Atendimento não encerrado: Sem conexão com o EasyStok\. A despedida já foi enviada: tentar de novo não manda outra\./)
-  assert.equal(botao(tela, 'Encerrar').props.disabled, false, 'o botão volta para a nova tentativa')
+  assert.equal(botao(tela, 'Concluir conversa').props.disabled, false, 'o botão volta para a nova tentativa')
   devolver = undefined
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   tela.renderizar()
   assert.equal(idas[1][2].enviarMensagem, false, 'a despedida que já saiu foi pedida de novo')
   assert.deepEqual(alertas(tela), [])
@@ -355,10 +356,10 @@ await confere('A  modal: promessa rejeitada também vira erro dentro dele e solt
   comoApi()
   ctx.acoes = acoesDoModal({ encerrarComResumo: () => Promise.reject(new Error('Conexão interrompida')) })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   tela.renderizar()
   assert.deepEqual(alertas(tela), ['Conexão interrompida'])
-  assert.equal(botao(tela, 'Encerrar').props.disabled, false)
+  assert.equal(botao(tela, 'Concluir conversa').props.disabled, false)
   tela.encerrar()
 })
 // #1683: o cancelamento do pedido sem pagamento é escolha da atendente, numa caixa que nasce desmarcada.
@@ -388,7 +389,7 @@ await confere('A  modal: com link em aberto a caixa de cancelar nasce desmarcada
   assert.equal(texto(caixa), 'Cancelar também o pedido Nº P1ABCDEF, que ainda não foi pago')
   assert.equal(caixaDeCancelar(tela).props.checked, false)
   assert.ok(!/será cancelado/.test(texto(tela.arvore)), 'a tela ainda promete cancelar sem perguntar')
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   assert.deepEqual(ordem, ['encerrar'])
   tela.encerrar()
 })
@@ -402,7 +403,7 @@ await confere('A  modal: com a caixa marcada o pedido é cancelado antes, e o re
   })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
   marcarCancelar(tela)
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   assert.deepEqual(ordem, ['cancelar', 'encerrar'])
   tela.encerrar()
 })
@@ -417,13 +418,13 @@ await confere('A  modal: cancelamento que falha não encerra, e o erro aparece d
   })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
   marcarCancelar(tela)
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   tela.renderizar()
   assert.deepEqual(ordem, ['cancelar'], 'encerrou mesmo com o cancelamento recusado')
   assert.deepEqual(alertas(tela), ['Não deu para cancelar o pedido Nº P1ABCDEF: Sem conexão com o EasyStok. O atendimento continua aberto. Tente de novo ou desmarque a caixa de cancelar.'])
-  assert.equal(botao(tela, 'Encerrar').props.disabled, false, 'o botão volta para a nova tentativa')
+  assert.equal(botao(tela, 'Concluir conversa').props.disabled, false, 'o botão volta para a nova tentativa')
   devolver = { ok: true }
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   tela.renderizar()
   assert.deepEqual(ordem, ['cancelar', 'cancelar', 'encerrar'])
   assert.deepEqual(alertas(tela), [])
@@ -440,9 +441,9 @@ await confere('A  modal: pedido já cancelado não é cancelado de novo quando s
   })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
   marcarCancelar(tela)
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   devolver = undefined
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   assert.deepEqual(ordem, ['cancelar', 'encerrar', 'encerrar'])
   tela.encerrar()
 })
@@ -499,11 +500,11 @@ await confere('A  modal na demonstração: ações síncronas seguem valendo, se
   ctx.acoes = acoesDoModal({ cancelarPedido: () => { ordem.push('cancelar') }, encerrarComResumo: () => { ordem.push('encerrar') } })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
   marcarCancelar(tela)
-  await botao(tela, 'Encerrar').props.onClick()
+  await botao(tela, 'Concluir conversa').props.onClick()
   tela.renderizar()
   assert.deepEqual(ordem, ['cancelar', 'encerrar'])
   assert.deepEqual(alertas(tela), [])
-  assert.equal(botao(tela, 'Encerrar').props.disabled, false)
+  assert.equal(botao(tela, 'Concluir conversa').props.disabled, false)
   tela.encerrar()
 })
 
@@ -669,6 +670,285 @@ await confere('F  link vencido: no modo API o texto substitui "Reenviar cobranç
   assert.ok(botao(demo, 'Reenviar cobrança'))
   assert.ok(!texto(demo.arvore).includes('manda um link novo'))
   demo.encerrar()
+})
+
+// #2079 (C2): entregue com dinheiro na entrega não lançado dizia "Pedido concluído, nada pendente".
+const entregueComSaldo = (extra = {}) => pedidoComLink({
+  estado: 'entregue', statusApi: 'entregue', meio: 'dinheiro', totalApi: 88, totalPagoApi: 0, alocadoApi: 0,
+  cobranca: { id: 'cb', meio: 'dinheiro', manual: true, valor: 88, link: null, criadaEm: AGORA - 60000, expiraEm: null, tentativa: 1, diferenca: false, statusApi: 'Pendente' },
+  ...extra,
+})
+await confere('#2079-C2 entregue com saldo: sem "nada pendente", com "Marcar pago (R$ 88,00)" à frente', async () => {
+  comoApi()
+  const idas = []
+  const tela = new Tela(BarraProximoPasso, propsDaBarra(entregueComSaldo(), { aoConfirmarPagamento: async (...a) => { idas.push(a) }, aoEncerrarAtendimento: nada }))
+  const tudo = texto(tela.arvore).replace(/ /g, ' ')
+  assert.ok(!tudo.includes('nada pendente'), 'dizia "nada pendente" com R$ 88,00 a receber')
+  assert.match(tudo, /R\$ 88,00 a receber/)
+  const marcar = botao(tela, 'Marcar pago (R$')
+  assert.ok(marcar, 'falta o "Marcar pago" com o saldo')
+  assert.match(texto(marcar).replace(/ /g, ' '), /Marcar pago \(R\$ 88,00\)/)
+  assert.equal(marcar.props.variante, 'primario', 'receber vem antes de encerrar')
+  assert.equal(botao(tela, 'Concluir conversa').props.variante, 'secundario')
+  marcar.props.onClick()
+  tela.renderizar()
+  assert.equal(doTipo(tela, 'BaixaAMao')[0].props.valorCobrado, 88)
+  tela.encerrar()
+  // Quitado, a barra identifica o estado final e oferece concluir, sem cobrança.
+  const quitado = new Tela(BarraProximoPasso, propsDaBarra(entregueComSaldo({ totalPagoApi: 88, alocadoApi: 88 }), { aoEncerrarAtendimento: nada }))
+  assert.match(texto(quitado.arvore), /Entregue/)
+  assert.equal(botao(quitado, 'Marcar pago (R$'), undefined)
+  assert.equal(botao(quitado, 'Concluir conversa').props.variante, 'primario')
+  quitado.encerrar()
+})
+
+// #2079 (D3/E2): pedido pago R$ 69 no Pix, cancelado e devolvido pelo Mercado Pago. O servidor mantém o
+// `totalPago` e tira a devolução do `alocado`; a folha dizia "Receita R$ 69,00" e o impresso, estorno 0.
+const { resumoParaImpresso } = await import('../src/dominio/resumoAtendimento.js')
+const PAGO_E_DEVOLVIDO = (extra = {}) => ({
+  pedidoId: '22222222-2222-2222-2222-222222222222', status: 'cancelado', total: 69, frete: 12, itens: [{ cardapioItemId: 'massa', nome: 'Lasanha', quantidade: 1, precoUnitario: 57 }],
+  totalPago: 69, alocado: 0, pagamentos: [{ id: 'pg5', valor: 69, metodo: 'pix', pagoEm: '2026-10-11T14:50:00Z' }],
+  cobranca: { cobrancaId: 'cb5', provedor: 'mercadopago', status: 'Paga', valor: 69, valorPago: 69, tentativa: 1, criadaEm: '2026-10-11T14:40:00Z', pagaEm: '2026-10-11T14:50:00Z' },
+  ...extra,
+})
+await confere('#2079-D3 resumo e impresso: pedido estornado não conta como receita', () => {
+  const total = montarResumoAtendimento(conversaBase({ pedido: pedidoDaApi(PAGO_E_DEVOLVIDO()) }), [], AGORA, {})
+  assert.equal(total.receita.liquido, 0, 'receita de pedido devolvido inteiro')
+  assert.equal(total.receita.estorno, 69)
+  assert.equal(total.vendas[0].situacao, 'Cancelado')
+  assert.equal(total.vendasTotal, 0, 'venda cancelada somava no Total')
+  const papel = resumoParaImpresso({ nomeCliente: 'Ana', canalNome: 'WhatsApp', resumo: total })
+  assert.equal(papel.receita, 0)
+  assert.equal(papel.estorno, 69)
+  assert.equal(papel.vendasTotal, 0)
+  // Parcial: R$ 80 recebidos, R$ 30 devolvidos e R$ 50 ainda a devolver.
+  const parcial = montarResumoAtendimento(conversaBase({ pedido: pedidoDaApi(PAGO_E_DEVOLVIDO({ total: 80, totalPago: 80, alocado: 50,
+    pagamentos: [{ id: 'pg6', valor: 80, metodo: 'credito', pagoEm: '2026-10-11T14:50:00Z' }] })) }), [], AGORA, {})
+  assert.deepEqual([parcial.receita.bruto, parcial.receita.estorno, parcial.receita.liquido], [80, 30, 50])
+  // Sem devolução nada muda; cupom usado (alocado acima do pago) não vira estorno negativo.
+  const pago = montarResumoAtendimento(conversaBase({ pedido: pedidoDaApi(PAGO_E_DEVOLVIDO({ status: 'entregue', alocado: 69 })) }), [], AGORA, {})
+  assert.deepEqual([pago.receita.estorno, pago.receita.liquido, pago.vendasTotal], [0, 69, 69])
+  const comCupom = montarResumoAtendimento(conversaBase({ pedido: pedidoDaApi(PAGO_E_DEVOLVIDO({ status: 'entregue', totalPago: 59, alocado: 69,
+    pagamentos: [{ id: 'pg7', valor: 59, metodo: 'pix', pagoEm: '2026-10-11T14:50:00Z' }] })) }), [], AGORA, {})
+  assert.deepEqual([comCupom.receita.estorno, comCupom.receita.liquido], [0, 59])
+})
+await confere('#2079-D11 impresso: data e hora do encerramento são as da loja, em qualquer fuso do aparelho', () => {
+  const fusoOriginal = process.env.TZ
+  try {
+    for (const fuso of ['UTC', 'Asia/Tokyo', 'America/Sao_Paulo']) {
+      process.env.TZ = fuso
+      // 21:30 em Brasília é 00:30Z do dia seguinte.
+      const resumo = { ...montarResumoAtendimento(conversaBase(), [], AGORA, {}), encerradoEm: '2026-10-27T00:30:00Z',
+        marcos: [{ em: '2026-10-27T00:30:00Z', rotulo: 'pagamento confirmado' }] }
+      const papel = resumoParaImpresso({ nomeCliente: 'Ana', resumo })
+      assert.equal(papel.data, '2026-10-26T21:30:00', fuso)
+      assert.equal(papel.marcos[0].hora, '21:30', fuso)
+    }
+  } finally { process.env.TZ = fusoOriginal }
+  const folha = readFileSync(new URL('features/encerramento/FolhaResumo.jsx', src), 'utf8')
+  assert.match(folha, /const dataCurta = \(iso\) => new Date\(iso\)\.toLocaleDateString\('pt-BR', \{ timeZone: FUSO \}\)/)
+  assert.match(folha, /const dataHumana = \(iso\) => new Date\(iso\)\.toLocaleDateString\('pt-BR', \{ day: '2-digit', month: 'short', timeZone: FUSO \}\)/)
+})
+
+await confere('nota: só voa após persistir, segundo toque não duplica e fecha ao terminar a animação', async () => {
+  const globais = ['matchMedia', 'getComputedStyle', 'document', 'requestAnimationFrame', 'innerWidth']
+  const anteriores = new Map(globais.map((chave) => [chave, globalThis[chave]]))
+  const gravacao = pendente(), movimento = pendente()
+  let chamadas = 0, animacoes = 0, fechou = 0
+  try {
+    globalThis.matchMedia = () => ({ matches: false })
+    globalThis.getComputedStyle = () => ({ transform: 'none', getPropertyValue: (chave) => chave === '--dur-media' ? '220ms' : 'ease-out' })
+    globalThis.document = { querySelector: () => ({ getBoundingClientRect: () => ({ left: 650, top: 100, width: 200, height: 80 }) }) }
+    globalThis.requestAnimationFrame = (fn) => fn()
+    globalThis.innerWidth = 1000
+    const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: (valor) => { chamadas++; assert.equal(valor, 'Preferência confirmada'); return gravacao.promise }, aoFechar: () => { fechou++ } })
+    doTipo(tela, 'CampoArea')[0].props.onChange({ target: { value: '  Preferência confirmada  ' } })
+    tela.renderizar()
+    doTipo(tela, 'dialog')[0].props.ref.current = {
+      getBoundingClientRect: () => ({ left: 300, top: 500, width: 300, height: 200 }),
+      animate: () => { animacoes++; return { finished: movimento.promise, cancel: nada } },
+    }
+    const emVoo = botao(tela, 'Fixar nota').props.onClick()
+    await botao(tela, 'Fixar nota').props.onClick()
+    assert.deepEqual([chamadas, animacoes, fechou], [1, 0, 0])
+    gravacao.resolver(true)
+    await new Promise((resolver) => setTimeout(resolver, 0))
+    assert.deepEqual([chamadas, animacoes, fechou], [1, 1, 0])
+    movimento.resolver()
+    await emVoo
+    assert.equal(fechou, 1)
+    tela.encerrar()
+  } finally { for (const [chave, valor] of anteriores) { if (valor === undefined) delete globalThis[chave]; else globalThis[chave] = valor } }
+})
+await confere('nota: recusa ou erro conserva o rascunho, sem animar nem anunciar confirmação', async () => {
+  for (const recusar of [async () => false, async () => { throw new Error('Sem conexão') }]) {
+    let fechou = 0, animacoes = 0
+    const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: recusar, aoFechar: () => { fechou++ } })
+    doTipo(tela, 'CampoArea')[0].props.onChange({ target: { value: 'Texto que não pode sumir' } })
+    tela.renderizar()
+    doTipo(tela, 'dialog')[0].props.ref.current = { animate: () => { animacoes++ } }
+    await botao(tela, 'Fixar nota').props.onClick()
+    tela.renderizar()
+    assert.equal(doTipo(tela, 'CampoArea')[0].props.value, 'Texto que não pode sumir')
+    assert.equal(alertas(tela).length, 1)
+    assert.deepEqual([animacoes, fechou], [0, 0])
+    assert.equal(botao(tela, 'Fixar nota').props.disabled, false)
+    tela.encerrar()
+  }
+})
+await confere('nota: reduced motion e mudança de conversa fecham no sucesso sem voar para outro cliente', async () => {
+  const anterior = globalThis.matchMedia
+  try {
+    for (const caso of ['reduced-motion', 'outra-conversa', 'oculta']) {
+      globalThis.matchMedia = () => ({ matches: caso === 'reduced-motion' })
+      let fechou = 0, animacoes = 0
+      const gravacao = pendente()
+      const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: () => gravacao.promise, aoFechar: () => { fechou++ } })
+      doTipo(tela, 'CampoArea')[0].props.onChange({ target: { value: 'Nota persistida' } })
+      tela.renderizar()
+      doTipo(tela, 'dialog')[0].props.ref.current = { animate: () => { animacoes++ } }
+      const emVoo = botao(tela, 'Fixar nota').props.onClick()
+      if (caso === 'outra-conversa') tela.renderizar({ ...tela.props, outraConversa: true })
+      if (caso === 'oculta') tela.renderizar({ ...tela.props, visivel: false })
+      gravacao.resolver(true)
+      await emVoo
+      assert.deepEqual([animacoes, fechou], [0, 1])
+      tela.encerrar()
+    }
+  } finally { if (anterior === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = anterior }
+})
+
+async function comFocoDaNota(provar) {
+  const documentoAnterior = globalThis.document, movimentoAnterior = globalThis.matchMedia
+  const documento = { body: {}, documentElement: {}, activeElement: null }
+  const controle = (interno = false) => ({ interno, isConnected: true, disabled: false, focos: 0,
+    getClientRects: () => [{}], focus() { this.focos++; documento.activeElement = this } })
+  const abridor = controle(), externo = controle()
+  globalThis.document = documento
+  globalThis.matchMedia = () => ({ matches: true })
+  const abrir = (props = {}) => {
+    abridor.focos = 0; documento.activeElement = abridor
+    const tela = new Tela(ModalNota, { nomeCliente: 'Ana', textoInicial: 'Nota proposta', aoSalvar: async () => true, aoFechar: nada, ...props })
+    const campo = controle(true)
+    doTipo(tela, 'CampoArea')[0].props.ref.current = campo
+    doTipo(tela, 'dialog')[0].props.ref.current = { contains: (no) => no?.interno === true }
+    // Imita a transferência de foco da montagem, depois de o abridor ter sido capturado.
+    campo.focus()
+    return tela
+  }
+  try { await provar({ abrir, abridor, externo, documento }) }
+  finally {
+    if (documentoAnterior === undefined) delete globalThis.document; else globalThis.document = documentoAnterior
+    if (movimentoAnterior === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = movimentoAnterior
+  }
+}
+
+await confere('nota: Recolher e Escape retornam ao abridor capturado antes do autofocus; cleanup não foca', async () => {
+  await comFocoDaNota(async ({ abrir, abridor, documento }) => {
+    for (const gesto of ['recolher', 'escape']) {
+      let fechou = 0
+      const tela = abrir({ aoFechar: () => { fechou++ } })
+      if (gesto === 'recolher') botao(tela, 'Recolher').props.onClick()
+      else doTipo(tela, 'dialog')[0].props.onKeyDown({ key: 'Escape', defaultPrevented: false, stopPropagation: nada })
+      assert.equal(fechou, 1); assert.equal(documento.activeElement, abridor); assert.equal(abridor.focos, 1)
+      tela.encerrar(); assert.equal(abridor.focos, 1, 'desmontar não repete o foco')
+    }
+    const tela = abrir()
+    tela.encerrar(); assert.equal(abridor.focos, 0, 'cleanup sem fechamento explícito não devolve foco')
+  })
+})
+
+await confere('nota: confirmação devolve foco, mas respeita ação externa e prioridade do callback', async () => {
+  await comFocoDaNota(async ({ abrir, abridor, externo, documento }) => {
+    for (const caso of ['confirmada', 'foco-externo', 'callback']) {
+      const gravacao = pendente()
+      let fechou = 0
+      const tela = abrir({ aoSalvar: () => gravacao.promise, aoFechar: () => { fechou++; if (caso === 'callback') externo.focus() } })
+      const salvando = botao(tela, 'Fixar nota').props.onClick()
+      if (caso === 'foco-externo') externo.focus()
+      gravacao.resolver(true); await salvando
+      assert.equal(fechou, 1)
+      assert.equal(documento.activeElement, caso === 'confirmada' ? abridor : externo)
+      assert.equal(abridor.focos, caso === 'confirmada' ? 1 : 0)
+      tela.encerrar()
+    }
+  })
+})
+
+await confere('nota: contexto trocado, retorno após unmount e abridor indisponível não recebem foco', async () => {
+  await comFocoDaNota(async ({ abrir, abridor }) => {
+    for (const caso of ['outra-conversa', 'oculta', 'desmontada', 'desconectado', 'invisivel', 'desabilitado']) {
+      const gravacao = pendente()
+      let fechou = 0
+      const tela = abrir({ aoSalvar: () => gravacao.promise, aoFechar: () => { fechou++ } })
+      const salvando = botao(tela, 'Fixar nota').props.onClick()
+      if (caso === 'outra-conversa') tela.renderizar({ ...tela.props, outraConversa: true })
+      if (caso === 'oculta') tela.renderizar({ ...tela.props, visivel: false })
+      if (caso === 'desmontada') tela.encerrar()
+      if (caso === 'desconectado') abridor.isConnected = false
+      if (caso === 'invisivel') abridor.getClientRects = () => []
+      if (caso === 'desabilitado') abridor.disabled = true
+      gravacao.resolver(true); await salvando
+      assert.equal(abridor.focos, 0, caso)
+      assert.equal(fechou, caso === 'desmontada' ? 0 : 1, 'retorno após unmount não chama callback que poderia fechar outra nota')
+      tela.encerrar()
+      abridor.isConnected = true; abridor.disabled = false; abridor.getClientRects = () => [{}]
+    }
+  })
+})
+
+await confere('nota: ao sair da aba Ficha retorna ao campo ou às ferramentas se a janela estiver fechada', async () => {
+  await comFocoDaNota(async ({ abrir, abridor, externo, documento }) => {
+    for (const caso of ['aberta', 'aberta-com-botao-antes', 'fechada']) {
+      const janelaFechada = caso === 'fechada'
+      abridor.isConnected = true
+      externo.focos = 0
+      const campo = { isConnected: true, disabled: false, getClientRects: () => [{}], focus() { documento.activeElement = this } }
+      const tela = abrir({ aoFechar: () => { documento.activeElement = documento.body } })
+      abridor.isConnected = false
+      documento.querySelector = seletor => seletor.includes(',') && caso === 'aberta-com-botao-antes' ? externo
+        : seletor.includes('textarea') && !janelaFechada ? campo : seletor.includes('button') ? externo : null
+      doTipo(tela, 'dialog')[0].props.onKeyDown({ key: 'Escape', defaultPrevented: false, stopPropagation: nada })
+      assert.equal(documento.activeElement, janelaFechada ? externo : campo, 'o foco permanece no compositor com ou sem campo habilitado')
+      tela.encerrar()
+    }
+  })
+})
+
+await confere('nota nova e reativada fica à frente dos painéis móveis', async () => {
+  const { proximaFrentePainel } = await import('../src/hooks/estadoPainelMovel.js')
+  const frenteAnterior = proximaFrentePainel()
+  const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: nada, aoFechar: nada })
+  assert.ok(doTipo(tela, 'dialog')[0].props.style?.zIndex > frenteAnterior, 'nota abre acima do painel existente')
+  const outraFrente = proximaFrentePainel()
+  doTipo(tela, 'dialog')[0].props.onFocusCapture()
+  tela.renderizar()
+  assert.ok(doTipo(tela, 'dialog')[0].props.style.zIndex > outraFrente, 'retorno do foco traz o editor para frente')
+  const frentePonteiro = proximaFrentePainel()
+  doTipo(tela, 'dialog')[0].props.onPointerDownCapture()
+  tela.renderizar()
+  assert.ok(doTipo(tela, 'dialog')[0].props.style.zIndex > frentePonteiro)
+  tela.encerrar()
+})
+
+await confere('nota embutida: recolher restaura envio aberto/fechado e preserva foco externo após confirmação tardia', () => {
+  const fonte = readFileSync(new URL('features/atendimento/PainelAtendimento.jsx', src), 'utf8')
+  const corpo = fonte.match(/useEffect\(\(\) => \{(\s+const anterior = contextoDaNota\.current[\s\S]*?)\}, \[editorNotaVisivel, visivel, focarAoTrocar, selecionada\?\.id\]\)/)?.[1]
+  assert.ok(corpo, 'o efeito real de retorno de foco foi localizado')
+  const executar = new Function('contextoDaNota', 'editorNotaVisivel', 'visivel', 'focarAoTrocar', 'selecionada', 'compositorPublicoRef', 'document', corpo)
+  for (const fechada of [false, true]) for (const fora of [false, true]) {
+    const documento = { body: {}, documentElement: {} }
+    const no = (visivel = true) => ({ getClientRects: () => visivel ? [{}] : [], focus() { documento.activeElement = this } })
+    const campo = { ...no(), selectionStart: 2, selectionEnd: 4, selectionDirection: 'forward', scrollTop: 12,
+      setSelectionRange(inicio, fim, direcao) { this.selecao = [inicio, fim, direcao] } }
+    const ferramenta = no(), externo = no()
+    documento.activeElement = fora ? externo : documento.body
+    executar({ current: { id: 'a', visivel: true } }, false, true, true, { id: 'a' }, { current: {
+      querySelector: () => fechada ? null : campo, querySelectorAll: () => [no(false), ferramenta],
+    } }, documento)
+    assert.equal(documento.activeElement, fora ? externo : fechada ? ferramenta : campo)
+    if (!fechada && !fora) assert.deepEqual(campo.selecao, [2, 4, 'forward'])
+  }
 })
 
 if (falhas.length > 0) {

@@ -47,4 +47,7 @@
   color: var(--sucesso); font-size: var(--t-apoio); font-weight: 600;
 }
 
+/* #2079 (C7): estornado e cancelado não usam o verde do pago (`situacaoDaCobranca` já diz tom neutro). */
+.recolhido.encerrado { color: var(--tinta-2); }
+
 .confirmacao { display: grid; gap: var(--e-2); width: 100%; margin-top: var(--e-2); }

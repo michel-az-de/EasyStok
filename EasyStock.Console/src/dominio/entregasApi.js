@@ -2,7 +2,7 @@
 // do KDS (S19, com endereço e aprovação da S12/S14) e viagens da S44. Nada de
 // rede aqui; quem busca é `infra/api/entregasApi.js`.
 import { faixaDeHorarios, minutosDoDia } from './entrega'
-import { dataIsoNoFuso, moeda } from './formato'
+import { dataIsoNoFuso, lerReais, moeda, textoDosCentavos } from './formato'
 import { normalizarBusca } from './respostas'
 
 // Status que a gaveta pede ao KDS: aprovação manual, pronto e em rota.
@@ -102,6 +102,7 @@ export function motivoDeSaida(viagem) {
 }
 
 const hora = (h) => (h.length === 5 ? `${h}:00` : h)
+// Distância (km) e fator de rota. Reais NÃO passam por aqui: todo valor em dinheiro lê por `lerReais`.
 const numero = (v) => Number(String(v).replace(',', '.'))
 const digitos = (v) => String(v ?? '').replace(/\D/g, '')
 
@@ -118,7 +119,7 @@ export function corpoZona(f) {
   const porCep = f.cobertura === 'cep'
   return {
     label: f.label.trim(),
-    valor: numero(f.valor),
+    valor: lerReais(f.valor) / 100,
     tempoEstimadoMinutos: Number(f.tempoEstimadoMinutos),
     ordem: Number(f.ordem),
     cepInicio: porCep ? digitos(f.cepInicio) : null,
@@ -191,7 +192,7 @@ export const camposDaJanela = (j) => {
 // #1776 (item 22): zona da API -> campos do formulário (o mesmo da criação).
 export const camposDaZona = (z) => ({
   label: z.label ?? '',
-  valor: String(z.valor ?? '').replace('.', ','),
+  valor: z.valor == null ? '' : textoDosCentavos(Math.round(Number(z.valor) * 100)),
   tempoEstimadoMinutos: String(z.tempoEstimadoMinutos ?? ''),
   ordem: String(z.ordem ?? 0),
   cobertura: z.cepInicio ? 'cep' : 'bairros',
@@ -225,14 +226,14 @@ export function avisoDeSobreposicao(f, zonas, propria = null) {
 const FAIXA_VAZIA = { ateKm: '', valor: '' }
 const decimalBr = (n) => String(n).replace('.', ',')
 const emMetros = (km) => Math.round(numero(km) * 1000)
-const emCentavos = (valor) => Math.round(numero(valor) * 100)
+const emCentavos = (valor) => lerReais(valor)
 const preenchido = (v) => String(v ?? '').trim() !== ''
 const faixasPreenchidas = (f) => (f.faixas ?? []).filter((x) => preenchido(x.ateKm) || preenchido(x.valor))
 
 export function formularioDoFreteRaio(config) {
   if (!config?.configurado) return { cep: '', numero: '', raioKm: '', gratisKm: '0', fatorRota: '1,4', faixas: [{ ...FAIXA_VAZIA }] }
   const faixas = (config.faixas ?? []).map((x) => ({
-    ateKm: decimalBr(x.ateMetros / 1000), valor: (x.valorCentavos / 100).toFixed(2).replace('.', ','),
+    ateKm: decimalBr(x.ateMetros / 1000), valor: textoDosCentavos(x.valorCentavos),
   }))
   return {
     cep: '', numero: '',
@@ -304,14 +305,10 @@ export const empresaPadraoDaCorrida = (viagem, entregadores) => {
   return EMPRESAS_DE_CORRIDA.some((e) => e.valor === empresa) ? empresa : 'NoveNove'
 }
 
-// "18,90", "18.9" e "R$ 18,90" valem o mesmo; o que não é número vira NaN e o formulário avisa.
-const custoEmCentavos = (texto) => {
-  const limpo = String(texto ?? '').replace(/R\$/i, '').trim()
-  return limpo === '' ? NaN : Math.round(numero(limpo) * 100)
-}
-
+// O custo lê como no caixa (`lerReais`): "18,90", "18.9", "R$ 18,90" e "1.234,56" valem o que dizem; o
+// que não é número vira NaN e o formulário avisa.
 export function erroDoFormularioCorrida(f) {
-  const custo = custoEmCentavos(f.custo)
+  const custo = lerReais(f.custo)
   if (Number.isNaN(custo)) return 'Informe o custo da corrida.'
   if (custo < 0) return 'O custo da corrida não pode ser negativo.'
   if (custo > CORRIDA_CUSTO_MAXIMO_CENTAVOS) return 'Custo acima de R$ 5.000,00. Confira o valor.'
@@ -320,13 +317,13 @@ export function erroDoFormularioCorrida(f) {
 
 export const corpoCorrida = (f) => ({
   provedor: f.empresa,
-  custoCentavos: custoEmCentavos(f.custo),
+  custoCentavos: lerReais(f.custo),
   motorista: String(f.motorista ?? '').trim() || null,
 })
 
 export const formularioDaCorrida = (corrida) => ({
   empresa: corrida.provedor,
-  custo: (corrida.custoCentavos / 100).toFixed(2).replace('.', ','),
+  custo: textoDosCentavos(corrida.custoCentavos),
   motorista: corrida.motorista ?? '',
 })
 
@@ -336,6 +333,48 @@ export const viagensConcluidasNoDia = (viagens, dia) => (viagens ?? [])
   .filter((v) => v.situacao === 'Concluida' && v.concluidaEm && dataIsoNoFuso(Date.parse(v.concluidaEm)) === dia)
 
 export const custoDasCorridas = (corridas) => (corridas ?? []).reduce((soma, c) => soma + (c.custoCentavos ?? 0), 0)
+
+// #2162: corrida chamada pela API da Lalamove (`CorridaExternaResult` com `origem: 'Api'`). O status vem do
+// provedor; a tela só mostra e oferece o que a Lalamove ainda aceita.
+const STATUS_CORRIDA = {
+  Solicitando: { rotulo: 'Confirmando com a Lalamove', tom: 'info' },
+  ProcurandoMotorista: { rotulo: 'Procurando motorista', tom: 'aviso' },
+  MotoristaACaminho: { rotulo: 'Motorista a caminho da coleta', tom: 'info' },
+  Coletada: { rotulo: 'Saiu para entrega', tom: 'info' },
+  Entregue: { rotulo: 'Entregue', tom: 'ok' },
+  Cancelada: { rotulo: 'Cancelada', tom: 'neutro' },
+  Rejeitada: { rotulo: 'Recusada pelos motoristas', tom: 'perigo' },
+  Expirada: { rotulo: 'Expirou sem motorista', tom: 'perigo' },
+  Falha: { rotulo: 'Não foi criada', tom: 'perigo' },
+}
+export const VEICULOS_CORRIDA = [{ valor: 'Moto', rotulo: 'Moto' }, { valor: 'Carro', rotulo: 'Carro' }]
+export const GORJETAS_CENTAVOS = [300, 500, 1000]
+export const INTERVALO_CORRIDA_MS = 15000
+
+export const corridaDaApi = (corrida) => corrida?.origem === 'Api'
+export const statusDaCorrida = (corrida) => STATUS_CORRIDA[corrida?.status] ?? { rotulo: corrida?.status ?? '', tom: 'neutro' }
+export const corridaEmCurso = (corridas) => (corridas ?? []).some((c) => corridaDaApi(c) && c.ativa)
+
+// "Chamar Lalamove" só faz sentido com a loja conectada, a viagem montando, um pedido só (uma parada por corrida,
+// R7) e nenhuma corrida em curso. O motivo vira texto de apoio quando o botão não aparece.
+export function motivoSemChamada(viagem, corridas, conectada) {
+  if (!conectada) return null
+  if (viagem?.situacao !== 'Montando') return null
+  if ((viagem.paradas ?? []).length !== 1) return 'A Lalamove leva um pedido por vez: deixe uma parada só nesta viagem para chamar.'
+  if (corridaEmCurso(corridas)) return null
+  return ''
+}
+export const podeChamarLalamove = (viagem, corridas, conectada) => motivoSemChamada(viagem, corridas, conectada) === ''
+
+export const validadeDaCotacao = (cotacao, agoraMs) =>
+  Math.max(0, Math.floor((Date.parse(cotacao?.expiraEm ?? '') - agoraMs) / 1000)) || 0
+
+export const resumoDaCotacao = (cotacao) => [
+  moeda(cotacao.valorCentavos / 100),
+  cotacao.distanciaMetros ? `${(cotacao.distanciaMetros / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km` : null,
+].filter(Boolean).join(' · ')
+
+export const motoristaDaCorrida = (corrida) => [corrida.motorista, corrida.motoristaPlaca].filter(Boolean).join(' · ')
 
 export const resumoDaCorrida = (corrida) => [
   rotuloEmpresaEntregador(corrida.provedor), moeda(corrida.custoCentavos / 100), corrida.motorista, corrida.corrigidoEm ? 'corrigida' : null,

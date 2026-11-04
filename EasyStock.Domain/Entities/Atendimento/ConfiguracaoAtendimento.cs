@@ -127,6 +127,16 @@ public class ConfiguracaoAtendimento
         AlteradoEm = DateTime.UtcNow;
     }
 
+    /// <summary>Avisos da operação para a dona e o gerente (#2096). Linha antiga sem o documento lê o padrão.</summary>
+    public AvisosOperacao Avisos { get; private set; } = AvisosOperacao.Padrao;
+
+    public void DefinirAvisos(AvisosOperacao avisos)
+    {
+        ArgumentNullException.ThrowIfNull(avisos);
+        Avisos = avisos.Validado();
+        AlteradoEm = DateTime.UtcNow;
+    }
+
     public void RegistrarWebhookVerificado(DateTime quando) => WebhookVerificadoEm = quando;
 
     public void RegistrarMensagemRecebida(DateTime quando) => UltimaMensagemRecebidaEm = quando;

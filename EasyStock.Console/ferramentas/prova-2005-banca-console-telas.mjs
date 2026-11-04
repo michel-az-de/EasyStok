@@ -89,6 +89,8 @@ class Elemento extends No {
   get parentElement() { return this.parentNode?.nodeType === 1 ? this.parentNode : null }
   get isConnected() { return documento.contains(this) }
   closest() { return null }
+  // #2078: o Modal de dinheiro procura o campo do foco inicial; este DOM não tem seletor, nem foco de verdade.
+  querySelector() { return null }
 }
 class Dialogo extends Elemento {
   showModal() { this.open = true }
@@ -387,6 +389,23 @@ const SINAL_PAGO = {
   },
 }
 const AGORA = Date.parse('2026-10-23T15:00:00Z')
+
+// #2079 (C5): encomenda de R$ 118 com o link do sinal (R$ 59) pendente: a Cobrança dizia "Total R$ 59,00".
+await confere('#2079-C5 link do sinal pendente: a Cobrança diz "Sinal agora", não "Total"', () => {
+  const pedido = pedidoDaApi({
+    pedidoId: NO_PEDIDO, status: 'aguardando_pagamento', total: 118, frete: 12, itens: [], totalPago: 0, alocado: 0, sinalNaReserva: true,
+    pagamentos: [],
+    cobranca: { cobrancaId: 'cb2', provedor: 'mercadopago', status: 'Pendente', valor: 59, tentativa: 1,
+      criadaEm: '2026-10-23T14:50:00Z', expiraEm: '2026-10-23T15:20:00Z', linkPagamento: 'https://pagamento.exemplo/cb2' },
+  })
+  const html = renderToStaticMarkup(noContexto({}, h(BlocoCobranca, {
+    pedido, agora: AGORA, editavel: true, nomeCliente: 'Ana', conversaId: 'c1', aoGerar() {}, aoReenviar() {}, aoMarcarComprovante() {},
+    aoAceitarDivergencia() {}, aoAbrirCardapio() {}, aoCancelarPedido() {}, aoEncerrarAtendimento() {}, aoAlterarMeio() {},
+  }))).replaceAll(' ', ' ')
+  assert.doesNotMatch(html, />Total<\/span><b[^>]*>R\$ 59,00/, 'o valor do sinal vinha rotulado "Total"')
+  assert.match(html, />Sinal agora<\/span><b[^>]*>R\$ 59,00/)
+  assert.match(html, /Total do pedido: R\$ 118,00\. Restante na entrega: R\$ 59,00\./)
+})
 
 await confere('01. sinal pago na Cobrança: diz o restante da entrega, sem "item novo" e sem Cobrar diferença', () => {
   const pedido = pedidoDaApi(SINAL_PAGO)

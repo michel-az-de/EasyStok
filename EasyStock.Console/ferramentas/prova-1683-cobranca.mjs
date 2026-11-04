@@ -168,10 +168,11 @@ await confere('3  409 LOJA_FECHADA mostra o motivo e não relê a conversa', asy
   assert.equal(leituras(t).length, 0, 'releu a conversa numa recusa definitiva')
 })
 
-await confere('3  409 CEP_SEM_COBERTURA mostra a frase da área de entrega, sem reler', async () => {
+await confere('3  409 CEP_SEM_COBERTURA orienta frete a combinar, sem presumir área nem reler', async () => {
   const t = montar(rascunho(), recusaPost('CEP_SEM_COBERTURA', 'Vamos combinar a entrega e o frete com a equipe.'))
   const resultado = await t.acoes.gerarCobranca('conversa', null, 'pix')
-  assert.match(resultado?.erro ?? '', /^Pedido não criado: o endereço do cliente está fora da área de entrega\./)
+  assert.match(resultado?.erro ?? '', /^Pedido não criado: o frete está a combinar\./)
+  assert.doesNotMatch(resultado?.erro ?? '', /fora da área de entrega/)
   assert.equal(leituras(t).length, 0)
 })
 
@@ -494,6 +495,36 @@ await confere('15  J2-9 "costuma pedir" só com o mesmo item em 2 pedidos ou mai
 
 await confere('K9  #2007: a cobrança do restante do sinal se chama "restante" no botão, não "complemento"', async () => {
   assert.match(barra, /\{pedido\.sinalNaReserva && \(pedido\.alocadoApi \?\? pedido\.totalPagoApi \?\? 0\) \* 2 <= \(pedido\.totalApi \?\? 0\) \+ 0\.01\s+\? <>Marcar pago \(restante \{moeda\(pedido\.cobranca\.valor\)\}\)<\/>\s+: <>Marcar pago \(complemento \{moeda\(pedido\.cobranca\.valor\)\}\)<\/>\}/)
+})
+
+await confere('#2079-C3 "Marcar pago" com o link do sinal pendente sugere o sinal, não o total', async () => {
+  const comLink = { sinalNaReserva: true, statusApi: 'aguardando_pagamento', totalApi: 80, totalPagoApi: 0,
+    cobranca: { valor: 40, link: 'https://mp/sinal', pagaEm: null, canceladaEm: null } }
+  assert.equal(cobranca.valorSugeridoParaBaixa(comLink), 40, 'vinha R$ 80,00 com o link de R$ 40,00 pendente')
+  assert.equal(cobranca.valorSugeridoParaBaixa({ ...comLink, totalPagoApi: 10 }), 30)
+  // Sinal já pago (a encomenda saiu de aguardando_pagamento): o restante é o que falta.
+  assert.equal(cobranca.valorSugeridoParaBaixa({ ...comLink, statusApi: 'aguardando', totalPagoApi: 40,
+    cobranca: { valor: 40, link: 'https://mp/restante', pagaEm: null } }), 40)
+  // Link cancelado não conta como sinal pendente; encomenda sem sinal sugere o total.
+  assert.equal(cobranca.valorSugeridoParaBaixa({ ...comLink, cobranca: { ...comLink.cobranca, canceladaEm: 1 } }), 80)
+  assert.equal(cobranca.valorSugeridoParaBaixa({ ...comLink, sinalNaReserva: false }), 80)
+})
+
+await confere('#2079-C5 o link do sinal pendente se chama "Sinal agora" na Cobrança, não "Total"', async () => {
+  assert.match(bloco, /<span className=\{css\.rotuloTotal\}>\{sinalAgora \? 'Sinal agora' : 'Total'\}<\/span>/)
+  assert.match(bloco, /\{sinalAgora && \(\s+<p className=\{css\.corpoBloco\}>Total do pedido: \{moeda\(pedido\.totalApi\)\}\. Restante na entrega:/)
+})
+
+await confere('#2079-C7 estornado e cancelado saem em tom neutro, não no verde do pago', async () => {
+  const fim = trecho(relogio, "if (situacao.chave === 'cancelada' || situacao.chave === 'estornada') {", '// Pago (por qualquer via)')
+  assert.match(fim, /<p className=\{`\$\{css\.recolhido\} \$\{css\.encerrado\}`\}>/)
+  const folha = readFileSync(new URL('../src/features/ficha-cliente/RelogioPix.module.css', import.meta.url), 'utf8')
+  assert.match(folha, /\.recolhido\.encerrado \{ color: var\(--tinta-2\); \}/)
+  assert.equal(cobranca.situacaoDaCobranca({ estornadaEm: 1 }, 0).tom, 'neutro', 'o domínio já declarava neutro')
+})
+await confere('#2079-C11 Devoluções não diz "Devolução manual confirmada: R$ 0,00" ao lado do estorno online', async () => {
+  const bloco = fonte('features/ficha-cliente/BlocoDevolucoes.jsx')
+  assert.match(bloco, /\{\(totalDevolvido > 0 \|\| !comOnline\) && <> Devolução manual confirmada: \{moeda\(totalDevolvido\)\}\.<\/>\}/)
 })
 
 if (falhas.length > 0) {

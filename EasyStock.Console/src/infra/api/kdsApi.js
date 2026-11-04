@@ -1,3 +1,4 @@
+import { DOCUMENTO_COZINHA, caminhoDoImpresso } from '../../dominio/impressos'
 import { chamarApi } from './cliente'
 
 // KDS do console (S19, `api/kds`) e reimpressão do canhoto (S20). O canhoto em si é o
@@ -20,6 +21,17 @@ export const reimprimirCanhoto = (id) => chamarApi(`/api/pedidos/${id}/reimprimi
 
 // Fila de impressão (S20) consumida pela aba da Cozinha (issue #1446): o pedido pago entra
 // pendente; a aba imprime o canhoto e confirma. Confirmar é idempotente na API.
-export const listarImpressoesPendentes = () => chamarApi('/api/impressao/pendentes?limite=20')
+// #2096: `desde` filtra no servidor; o acumulado de antes de ligar a impressão automática não ocupa a fila.
+export const listarImpressoesPendentes = (desde) =>
+  chamarApi(`/api/impressao/pendentes?limite=20${desde ? `&desde=${encodeURIComponent(desde)}` : ''}`)
 
 export const confirmarImpressao = (id) => chamarApi(`/api/impressao/${id}/impressa`, { metodo: 'POST' })
+
+// #2096: a impressão automática não conseguiu imprimir; a dona reimprime pelo console.
+export const registrarFalhaImpressao = (id, erro) =>
+  chamarApi(`/api/impressao/${id}/falhou`, { metodo: 'POST', corpo: { erro: erro ? String(erro).slice(0, 500) : null } })
+
+// #2096: o canhoto de cozinha em HTML no papel escolhido para este aparelho (a rota `canhoto?formato=html`
+// da S20 só sai em 80 mm). Mesma credencial da fila.
+export const obterCanhotoParaImprimir = (pedidoId, { modelo, logoTermica = false } = {}, sinal) =>
+  chamarApi(caminhoDoImpresso(pedidoId, { documento: DOCUMENTO_COZINHA, modelo, logoTermica }), { texto: true, sinal, prazoComCancelamento: true })

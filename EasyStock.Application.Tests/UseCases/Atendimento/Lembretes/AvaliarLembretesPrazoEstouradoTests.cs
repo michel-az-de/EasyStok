@@ -188,7 +188,7 @@ public class AvaliarLembretesPrazoEstouradoTests
 
         var payload = Payload(Prazos().Single());
         payload.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(
-            "tipo_legivel", "referencia", "prazo_texto", "atraso_texto", "cliente", "link", "chaveIdempotencia");
+            "aviso", "tipo_legivel", "referencia", "prazo_texto", "atraso_texto", "cliente", "link", "chaveIdempotencia");
         payload.GetProperty("cliente").GetString().Should().Be("Mariana Souza");
         payload.GetProperty("link").GetString().Should().Be("https://app.easystok.online/#/m/atendimento/balcao");
         payload.GetProperty("chaveIdempotencia").GetString().Should().Be($"prazo:cliente_sem_resposta:{conversaId}");

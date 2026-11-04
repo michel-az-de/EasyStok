@@ -1,0 +1,41 @@
+# Collector da observabilidade (#2107): recebe OTLP gRPC das aplicações na rede "edge" e repassa ao OpenObserve
+# por OTLP HTTP com Basic auth (OO_AUTH = base64 de email:senha, gerado na VPS). Sem porta publicada.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 150
+    spike_limit_mib: 40
+  batch:
+    timeout: 5s
+
+exporters:
+  otlp_http/openobserve:
+    # Sem barra no fim: o collector acrescenta /v1/logs, /v1/traces e /v1/metrics.
+    endpoint: http://ez-openobserve:5080/api/default
+    headers:
+      Authorization: "Basic ${env:OO_AUTH}"
+      stream-name: easystok
+
+service:
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/openobserve]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/openobserve]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/openobserve]

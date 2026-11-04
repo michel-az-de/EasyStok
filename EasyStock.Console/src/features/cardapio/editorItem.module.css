@@ -1,6 +1,6 @@
 .editor { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 32px; padding-top: 16px; font-size: 1rem; line-height: 1.5; }
 .apresentacao { min-width: 0; align-self: start; position: sticky; top: 0; }
-.foto { aspect-ratio: 1; background: var(--elevado); border-radius: 12px; overflow: hidden; }
+.foto { aspect-ratio: 1; background: var(--elevado); border-radius: var(--r-1); overflow: hidden; }
 .foto img { width: 100%; height: 100%; object-fit: cover; }
 .semFoto { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; padding: 24px; text-align: center; color: var(--tinta-3); }
 .previa { display: grid; gap: 4px; margin-top: 16px; }
@@ -15,11 +15,11 @@
 .secao + .secao { border-top: 1px solid var(--linha); padding-top: 24px; }
 .secao h3 { font: 700 1.0625rem/1.3 var(--f-corpo); margin: 0; letter-spacing: normal; }
 .campo { display: grid; gap: 6px; font-size: .9375rem; font-weight: 700; min-width: 0; }
-.campo input, .campo select, .campo textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--linha-media); border-radius: 8px; color: var(--tinta); background: var(--papel); font: 400 1rem/1.4 var(--f-corpo); }
+.campo input, .campo select, .campo textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--linha-media); border-radius: var(--r-1); color: var(--tinta); background: var(--papel); font: 400 1rem/1.4 var(--f-corpo); }
 .campo textarea { resize: vertical; }
 .campo small { color: var(--tinta-3); font-size: .8125rem; font-weight: 400; }
 .dupla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.opcao { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+.opcao { display: flex; align-items: center; gap: 8px; min-height: var(--toque); }
 .opcao input { width: 18px; height: 18px; accent-color: var(--marca); }
 .vinculo { margin: 0; padding: 16px 0; display: flex; align-items: flex-start; gap: 12px; color: var(--tinta-3); font-size: .875rem; }
 .vinculo span { display: grid; gap: 4px; }
@@ -29,7 +29,7 @@
 .confirmacao button { margin-right: 8px; }
 .statusRodape { margin-right: auto; align-self: center; color: var(--tinta-3); font-size: .875rem; }
 .fotosEditor { display: grid; gap: 12px; margin-top: 20px; }
-.escolherFoto { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; position: relative; border: 1px solid var(--linha-media); border-radius: 8px; color: var(--marca-forte); font-weight: 700; cursor: pointer; }
+.escolherFoto { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--toque); position: relative; border: 1px solid var(--linha-media); border-radius: var(--r-1); color: var(--marca-forte); font-weight: 700; cursor: pointer; }
 .escolherFoto input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
 .escolherFoto:focus-within { outline: 3px solid var(--marca); outline-offset: 2px; }
 .fotoPendente { display: grid; gap: 8px; font-size: .875rem; overflow-wrap: anywhere; }
@@ -37,15 +37,15 @@
 .acoesFoto > span { align-self: center; }
 .gradeAcervo { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin: 20px 0; }
 .imagemAcervo { min-width: 0; }
-.imagemAcervo > button:first-child { display: grid; gap: 8px; width: 100%; padding: 8px; border: 1px solid var(--linha); border-radius: 8px; background: var(--papel); color: var(--tinta); font: inherit; text-align: left; cursor: pointer; }
-.imagemAcervo img, .imagemAcervo > button > span { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
+.imagemAcervo > button:first-child { display: grid; gap: 8px; width: 100%; padding: 8px; border: 1px solid var(--linha); border-radius: var(--r-1); background: var(--papel); color: var(--tinta); font: inherit; text-align: left; cursor: pointer; }
+.imagemAcervo img, .imagemAcervo > button > span { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-1); }
 .imagemAcervo strong { overflow-wrap: anywhere; }
 .imagemAcervo button:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .imagemAcervo button:disabled { cursor: default; opacity: .6; }
 .sucesso { display: flex; align-items: center; gap: 8px; color: var(--sucesso); }
 .galeria { display: grid; gap: 8px; font-size: .875rem; color: var(--tinta-3); }
 .galeria > div { display: flex; flex-wrap: wrap; gap: 6px; }
-.galeria img { width: 64px; height: 64px; border-radius: 6px; object-fit: cover; }
+.galeria img { width: 64px; height: 64px; border-radius: var(--r-1); object-fit: cover; }
 .porcao { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, .8fr); gap: 8px 12px; padding: 16px 0; border-bottom: 1px solid var(--linha); }
 .porcao .opcao { font-size: .8125rem; }
 .porcao .embalagemDaPorcao { grid-column: 1 / -1; }

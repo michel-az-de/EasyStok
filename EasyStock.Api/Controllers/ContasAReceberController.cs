@@ -72,6 +72,7 @@ public class ContasAReceberController(
             return DataCreated($"/api/contas-a-receber/{r.Id}", r);
         }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
+        catch (EasyStock.Application.UseCases.Financeiro.Common.ContaFinanceiraDuplicadaException ex) { return DataConflict(ex.Message); }
     }
 
     [HttpPatch("{id:guid}")]
@@ -150,7 +151,7 @@ public class ContasAReceberController(
         [FromBody] RegistrarPagamentoBody body,
         CancellationToken ct = default)
     {
-        if (!RequerVisualizar(out var permErr)) return permErr!;
+        if (!RequerGerenciar(out var permErr)) return permErr!;
         if (!TryResolveEmpresaId(currentUser, body.EmpresaId, out var eid, out var err)) return err!;
         try
         {
@@ -209,12 +210,15 @@ public class ContasAReceberController(
     }
 
     [HttpPost("parcelas/{parcelaId:guid}/reconciliar")]
-    public async Task<IActionResult> ReconciliarManual(Guid parcelaId, [FromBody] ReconciliarBody body, CancellationToken ct = default)
+    public async Task<IActionResult> ReconciliarManual(Guid parcelaId, [FromBody] ReconciliarBody body, [FromQuery] Guid? empresaId, CancellationToken ct = default)
     {
         if (!RequerGerenciar(out var permErr)) return permErr!;
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var eid, out var err)) return err!;
+        // #2095 (F3): a baixa manual vale só para a parcela da rota, na empresa de quem chama, e o valor vem da
+        // consulta à Efí; o corpo não informa valor (antes o valor do corpo baixava sem conferir o gateway).
         var r = await reconciliarPixUseCase.ExecuteAsync(new ReconciliarPixParcelaReceberCommand(
-            body.Txid, body.ValorPagoEfi, body.PagoEm, null), ct);
-        return DataOk(r);
+            body.Txid, EmpresaId: eid, ParcelaIdEsperada: parcelaId), ct);
+        return r.ParcelaId is null ? DataNotFound() : DataOk(r);
     }
 
     public sealed record CancelarContaRequest(Guid EmpresaId, string Motivo);
@@ -228,7 +232,7 @@ public class ContasAReceberController(
         string? GatewayTransactionId);
     public sealed record EstornarPagamentoBody(Guid EmpresaId, string? Motivo);
     public sealed record GerarPixBody(Guid EmpresaId);
-    public sealed record ReconciliarBody(string Txid, decimal? ValorPagoEfi, DateTime? PagoEm);
+    public sealed record ReconciliarBody(string Txid);
 
     private bool RequerVisualizar(out IActionResult? error)
     {

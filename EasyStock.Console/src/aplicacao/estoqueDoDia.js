@@ -1,9 +1,49 @@
-import { obterEstoqueDoDia, estoqueDoDiaDaApi } from '../infra/api/producaoApi'
+import { obterEstoqueDoDia, estoqueDoDiaDaApi, listarLotesRecentes, loteDaListaDaApi } from '../infra/api/producaoApi'
 import { ajustarSaldoDoItem } from '../infra/api/cardapioApi'
+import { lerSessao } from '../infra/api/sessao'
+import { FUSO } from '../dominio/formato'
 
 // Estoque do dia no modo API (M2.1, #1490). Lê do EasyStok e relê depois de cada ajuste. O ajuste
 // é a contagem que ela fez (absoluta) com o motivo, pela rota do prato (#1241), que resolve o produto.
-export const lerEstoqueDoDia = async () => estoqueDoDiaDaApi(await obterEstoqueDoDia())
+// #2081 (A8, A10): cada lote ganha o id (para reimprimir as etiquetas), a origem, quem registrou e a
+// fabricação, lidos da lista de lotes. Sem a lista, o estoque continua servindo, sem esses dados.
+export async function lerEstoqueDoDia() {
+  const [estoque, lista] = await Promise.all([
+    obterEstoqueDoDia(),
+    listarLotesRecentes().catch(() => null),
+  ])
+  const r = estoqueDoDiaDaApi(estoque)
+  const porCodigo = new Map((lista ?? []).map(loteDaListaDaApi).map((l) => [l.codigo, l]))
+  const usuario = lerSessao()?.usuario?.id ?? null
+  return {
+    ...r,
+    pratos: r.pratos.map((p) => ({
+      ...p,
+      lotes: p.lotes.map((l) => {
+        const daLista = l.codigo ? porCodigo.get(l.codigo) : null
+        return daLista ? { ...l, id: daLista.id, origem: origemDoLote(daLista, usuario), deAparelho: daLista.origem === 'mobile' } : l
+      }),
+    })),
+  }
+}
+
+// "Aparelho · Rosa · fab. 25/10" ou "Console · você · fab. 26/10". O aparelho manda o nome de quem
+// operou; o console grava o usuário, então só dá para dizer quando foi a própria pessoa.
+const ORIGENS = { mobile: 'Aparelho', producao: 'Console', web: 'Painel', entrada: 'Entrada de estoque' }
+const diaCurto = (iso) => new Date(iso).toLocaleDateString('pt-BR', { timeZone: FUSO, day: '2-digit', month: '2-digit' })
+export function origemDoLote({ origem, operadorNome, operadorUserId, fabricadoEm }, usuarioId = null) {
+  const quem = operadorNome?.trim() || (usuarioId && operadorUserId === usuarioId ? 'você' : null)
+  return [ORIGENS[origem] ?? null, quem, fabricadoEm ? `fab. ${diaCurto(fabricadoEm)}` : null].filter(Boolean).join(' · ') || null
+}
+
+// #2081 (A8): só o lote que tem etiquetas no EasyStok reimprime. O do aparelho imprime no aparelho.
+export const podeReimprimir = (lote) => Boolean(lote?.id) && !lote.deAparelho
+
+// #2081 (A16): "Lasanha 1 kg" com a porção "1 kg" embaixo dizia a mesma coisa duas vezes.
+export const porcaoQueNaoRepete = (nome, porcao) => {
+  const p = String(porcao ?? '').trim()
+  return p && !String(nome ?? '').trim().toLowerCase().endsWith(p.toLowerCase()) ? p : ''
+}
 
 // M1.4d (#1542): em prato com porções o saldo é de cada porção, então a contagem também. Só entra
 // porção que já tem lote (a contagem cai nos lotes dela; sem lote, quem cria é a produção); o que

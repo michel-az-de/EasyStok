@@ -64,6 +64,8 @@ try {
   const { context, page } = await novaPagina()
   await context.route(url => url.pathname.startsWith('/api/'), route => route.fulfill({ json: { data: [] } }))
   await page.goto(origem + '/#/m/atendimento')
+  // #2135: a tela abre sem conversa escolhida; a atendente abre a José Moretti, que está no automático.
+  await page.locator('button[aria-current]', { hasText: 'José Moretti' }).click()
   await page.getByRole('button', { name: 'Assumir', exact: true }).click()
   const campo = page.getByRole('textbox', { name: 'Mensagem para o cliente', exact: true })
   await campo.fill('/')

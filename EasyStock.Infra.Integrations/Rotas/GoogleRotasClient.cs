@@ -2,7 +2,10 @@ using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using EasyStock.Application.Ports.Output.Lookup;
+using EasyStock.Infra.Integrations.Resilience;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Registry;
 
 namespace EasyStock.Infra.Integrations.Rotas;
 
@@ -12,7 +15,7 @@ namespace EasyStock.Infra.Integrations.Rotas;
 /// que não é mais habilitável em projeto novo (issue #1274).
 ///
 /// <para>
-/// <strong>Contrato</strong>: nunca lança. Sem rota, timeout, 4xx/5xx ou JSON inválido
+/// <strong>Contrato</strong>: nunca lança. Sem rota, timeout, 4xx/5xx, disjuntor aberto (#2177) ou JSON inválido
 /// viram <see langword="null"/>. A chave vai no header <c>X-Goog-Api-Key</c>, nunca na URL.
 /// O <c>X-Goog-FieldMask</c> pede só distância e duração (a Routes API cobra por campo).
 /// </para>
@@ -23,13 +26,15 @@ public sealed class GoogleRotasClient : IRotaClient
 
     private readonly HttpClient _http;
     private readonly string _apiKey;
+    private readonly ResiliencePipelineProvider<string> _pipelines;
     private readonly ILogger<GoogleRotasClient> _logger;
 
-    public GoogleRotasClient(HttpClient http, string apiKey, ILogger<GoogleRotasClient> logger)
+    public GoogleRotasClient(HttpClient http, string apiKey, ResiliencePipelineProvider<string> pipelines, ILogger<GoogleRotasClient> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
         _http = http;
         _apiKey = apiKey;
+        _pipelines = pipelines;
         _logger = logger;
     }
 
@@ -45,16 +50,19 @@ public sealed class GoogleRotasClient : IRotaClient
             routingPreference = "TRAFFIC_UNAWARE",
         };
 
-        using var req = new HttpRequestMessage(HttpMethod.Post, "directions/v2:computeRoutes")
-        {
-            Content = JsonContent.Create(corpo),
-        };
-        req.Headers.Add("X-Goog-Api-Key", _apiKey);
-        req.Headers.Add("X-Goog-FieldMask", FieldMask);
-
         try
         {
-            using var resp = await _http.SendAsync(req, ct);
+            // #2177: computeRoutes é POST de leitura; repete 1 vez. A requisição é montada a cada tentativa.
+            using var resp = await _pipelines.GetPipeline(IntegrationCategories.GoogleRotas).ExecuteAsync(async pollyCt =>
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Post, "directions/v2:computeRoutes")
+                {
+                    Content = JsonContent.Create(corpo),
+                };
+                req.Headers.Add("X-Goog-Api-Key", _apiKey);
+                req.Headers.Add("X-Goog-FieldMask", FieldMask);
+                return await _http.SendAsync(req, pollyCt);
+            }, ct);
             if (!resp.IsSuccessStatusCode)
             {
                 // 403/429 indicam chave ou cota, não endereço ruim.
@@ -77,6 +85,11 @@ public sealed class GoogleRotasClient : IRotaClient
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             _logger.LogDebug("Google Routes timeout");
+            return null;
+        }
+        catch (ExecutionRejectedException)
+        {
+            _logger.LogDebug("Google Routes recusado pelo Polly (disjuntor aberto ou timeout)");
             return null;
         }
         catch (HttpRequestException ex)

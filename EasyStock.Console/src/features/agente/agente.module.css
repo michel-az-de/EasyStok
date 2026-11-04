@@ -105,5 +105,5 @@
 @media (max-width: 759px) {
   .painel { padding: var(--e-3); }
   .cabeca .direita { margin-left: 0; width: 100%; }
-  .direita button { min-height: 44px; }
+  .direita button { min-height: var(--toque); }
 }

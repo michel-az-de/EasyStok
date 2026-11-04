@@ -14,6 +14,7 @@
 import { inicioDoDiaNoFuso, moeda, plural } from './formato.js'
 import { pagamentosDoPedido } from './pagamento.js'
 import { itemPorSku } from './cardapio.js'
+import { numeroDoDiaNaTela } from './pedido.js'
 
 export const TIPOS_MOVIMENTO = {
   ABERTURA: 'abertura', ENTRADA: 'entrada', SAIDA: 'saida', FECHAMENTO: 'fechamento',
@@ -402,7 +403,8 @@ export const temMovimentoNoDia = (dia) =>
 
 // Lançamentos do dia numa lista só, na ordem da hora (movimentos e pagamentos vinham em
 // dois blocos e a sangria das 20:30 aparecia entre 20:18 e 20:28). DateTime sem fuso vem
-// da API em UTC: o Z completa antes de comparar.
+// da API em UTC: o Z completa antes de comparar. #2078 (B15): o mais recente primeiro; num dia de
+// 18 lançamentos o último ficava em 18º, abaixo da dobra.
 const instanteDe = (valor) => Date.parse(/[zZ]|[+-]\d{2}:\d{2}$/.test(valor ?? '') ? valor : `${valor}Z`)
 
 export function lancamentosEmOrdem(dia) {
@@ -410,16 +412,46 @@ export function lancamentosEmOrdem(dia) {
     .filter((m) => m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
     .map((m) => ({ ...m, origemLinha: 'movimento' }))
   const extras = (dia?.linhasExtras ?? []).map((l) => ({ ...l, origemLinha: 'extra' }))
-  return [...movimentos, ...extras].sort((a, b) => instanteDe(a.em) - instanteDe(b.em))
+  return [...movimentos, ...extras].sort((a, b) => instanteDe(b.em) - instanteDe(a.em))
 }
 
 // Conferência da gaveta (#1474): o campo "contei" nasce vazio (`null`), porque nascer com o
 // esperado mostrava "bate certo" sem ninguém contar. Diferença dita do jeito que ela fala:
 // faltam, sobram ou bate certo. Até 5 reais de diferença é aviso; acima, perigo.
+// #2078 (E5): a gravidade também vai em palavra; "Faltam R$ 3" e "Faltam R$ 300" só mudavam a cor.
 export function conferenciaDaGaveta(centavosContados, esperado) {
-  if (centavosContados == null) return { pronta: false, texto: null, tom: 'neutro', diferenca: null }
+  if (centavosContados == null) return { pronta: false, texto: null, tom: 'neutro', diferenca: null, gravidade: null }
   const diferenca = (centavosContados - centavos(esperado)) / 100
-  if (diferenca === 0) return { pronta: true, texto: 'Bate certo', tom: 'ok', diferenca }
+  if (diferenca === 0) return { pronta: true, texto: 'Bate certo', tom: 'ok', diferenca, gravidade: null }
   const texto = `${diferenca < 0 ? 'Faltam' : 'Sobram'} ${moeda(Math.abs(diferenca))}`
-  return { pronta: true, texto, tom: Math.abs(diferenca) <= 5 ? 'aviso' : 'perigo', diferenca }
+  const pequena = Math.abs(diferenca) <= 5
+  return {
+    pronta: true, texto, tom: pequena ? 'aviso' : 'perigo', diferenca,
+    gravidade: pequena ? 'Diferença pequena.' : 'Diferença grande: conte de novo antes de fechar.',
+  }
+}
+
+// #2113 (D1 da #2084): no caixa esquecido, a API diz o esperado do dia da abertura (o que o fechamento
+// retrata, ADR-0034) e o dinheiro de hoje que já está na gaveta e fica no caixa de hoje. Sem os campos
+// (API anterior à #2084), nulo, e a conferência é a de sempre.
+export const ROTULO_ENTROU_DEPOIS = 'Entrou depois, fica no caixa de hoje'
+export const ROTULO_CONTADO_DO_ESQUECIDO = 'Quanto você contou na gaveta (todo o dinheiro)'
+export function esperadoDoEsquecido(dia) {
+  if (!dia?.esquecidoAberto || dia.dinheiroEsperadoNoFechamento == null) return null
+  return { esperado: dia.dinheiroEsperadoNoFechamento, entrouDepois: dia.dinheiroEntrouDepois ?? 0 }
+}
+
+// Ela conta a gaveta inteira; no caixa esquecido, a conferência tira o que entrou depois e compara com o
+// esperado do dia da abertura. O contado continua indo inteiro para a API, que faz a mesma separação.
+export function conferenciaDoFechamento(centavosContados, naGaveta, esquecido = null) {
+  if (!esquecido) return conferenciaDaGaveta(centavosContados, naGaveta)
+  return conferenciaDaGaveta(centavosContados == null ? null : centavosContados - centavos(esquecido.entrouDepois), esquecido.esperado)
+}
+
+// #2113 (#2098): a linha do pagamento de pedido diz qual pedido, com o número que a cozinha fala.
+export function tituloDaLinhaExtra(linha) {
+  if (linha.tipo === 'estorno') return 'Estorno de venda'
+  if (linha.origem !== 'Pedido') return 'Venda'
+  const numero = numeroDoDiaNaTela(linha.pedidoNumeroDoDia)
+  return numero ? `Pagamento do pedido nº ${numero}` : 'Pagamento de pedido'
 }

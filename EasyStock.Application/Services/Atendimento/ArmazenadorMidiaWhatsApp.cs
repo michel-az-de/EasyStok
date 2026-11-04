@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Storage;
 
@@ -52,7 +54,10 @@ public sealed class ArmazenadorMidiaWhatsApp(IWhatsAppCloudClient cloudClient, I
         }
 
         var bucketPath = $"atendimento/{empresaId}/{conversaId}";
-        var fileName = $"{wamid}{ExtensaoPara(mime)}";
+        var nomeMensagem = wamid.StartsWith("wpp:", StringComparison.Ordinal)
+            ? $"wpp-{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(wamid)))}"
+            : wamid;
+        var fileName = $"{nomeMensagem}{ExtensaoPara(mime)}";
 
         var resultado = await fileStorage.UploadAsync(
             new FileUploadRequest(bucketPath, fileName, mime, memoria.ToArray(), IsPublic: false, MimesPermitidos), ct);

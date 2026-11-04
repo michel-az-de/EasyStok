@@ -115,7 +115,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
                   <div role="alertdialog" aria-label={`Recusar ${nomeDoPedido(x).frase}`}>
                     <p>{confirmacaoDaRecusa(nomeDoPedido(x).frase, x.clienteNome)}</p>
                     <div className={css.linha}>
-                      <Botao variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter</Botao>
+                      <Botao variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter pedido</Botao>
                       <Botao variante="primario" disabled={ocupado} onClick={() => { setRecusando(null); acoes.recusar(x.id) }}>
                         Recusar e devolver
                       </Botao>
@@ -166,7 +166,7 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
           <h3 className={css.cresce}>Viagens</h3>
           <Botao variante="secundario" icone="plus" disabled={ocupado} onClick={() => acoes.criarViagem(null)}>Nova viagem</Botao>
         </div>
-        {p.montando.length + p.emRota.length === 0 && <p className={css.vazio}>Nenhuma viagem montando ou na rua.</p>}
+        {p.montando.length + p.emRota.length === 0 && <p className={css.vazio}>Nenhuma viagem em preparação ou em rota.</p>}
       </section>
 
       {[...p.montando, ...p.emRota].map((v, i) => (
@@ -228,7 +228,7 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
             : acoes.definirEntregador(viagem.id, e.target.value))}
         />
       )}
-      {n === 0 && <p className={css.vazio}>Viagem vazia. Ponha um pedido pronto nela.</p>}
+      {n === 0 && <p className={css.vazio}>Adicione um pedido pronto à viagem.</p>}
       <ul className={css.lista}>
         {viagem.paradas.map((parada) => {
           // J2 (#1990): dinheiro na entrega diz ao entregador quanto receber e quanto troco levar. #2007: com o
@@ -268,18 +268,18 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
             ) : (
             <div className={css.linha}>
               {montando && parada.ordem > 1 && (
-                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem - 1)}>Subir</Botao>
+                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem - 1)}>Subir na rota</Botao>
               )}
               {montando && parada.ordem < n && (
-                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem + 1)}>Descer</Botao>
+                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.reordenar(viagem.id, parada.pedidoId, parada.ordem + 1)}>Descer na rota</Botao>
               )}
               {montando && (
-                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.retirarParada(viagem.id, parada.pedidoId)}>Tirar</Botao>
+                <Botao variante="texto" disabled={ocupado} onClick={() => acoes.retirarParada(viagem.id, parada.pedidoId)}>Retirar da viagem</Botao>
               )}
               {!montando && !parada.entregueEm && (
                 <Botao variante="primario" disabled={ocupado} onClick={() => (aReceber > 0
                   ? perguntar(parada, aReceber)
-                  : marcarEntregue(parada))}>Entregue</Botao>
+                  : marcarEntregue(parada))}>Marcar entregue</Botao>
               )}
             </div>
             )}
@@ -321,15 +321,15 @@ function Chamados({ chamados, ocupado, acoes }) {
         <div className={css.cresce}>
           <CampoTexto rotulo="O que precisa" value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={500} disabled={ocupado} />
         </div>
-        <Botao tipo="submit" variante="secundario" disabled={ocupado || !texto.trim()}>Chamar</Botao>
+        <Botao tipo="submit" variante="secundario" disabled={ocupado || !texto.trim()}>Chamar entregador</Botao>
       </form>
       {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
       <ul className={css.lista}>
         {chamados.map((c) => (
           <li key={c.id} className={`${css.cartao} ${css.linha}`}>
             <span className={css.cresce}>{c.texto}</span>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.atenderChamado(c.id)}>Atendido</Botao>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.cancelarChamado(c.id)}>Cancelar</Botao>
+            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.atenderChamado(c.id)}>Concluir chamado</Botao>
+            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.cancelarChamado(c.id)}>Cancelar chamado</Botao>
           </li>
         ))}
       </ul>
@@ -361,7 +361,7 @@ function Entregadores({ entregadores, ocupado, acoes }) {
         <CampoTexto rotulo="Telefone" tipo="tel" {...campo('telefone')} />
         <CampoTexto rotulo="Veículo" {...campo('veiculo')} />
         <CampoTexto rotulo="Placa" {...campo('placa')} />
-        <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar</Botao>
+        <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar entregador</Botao>
       </form>
       {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
       <h3>Ativos</h3>

@@ -1,0 +1,13 @@
+.painel { position: fixed; display: flex; flex-direction: column; min-width: 0; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border: 0; border-radius: 0; background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-media); animation: aparecer var(--dur-curta) var(--ease-padrao); }
+.cabecalho { display: flex; align-items: center; gap: var(--e-1); padding: 0 var(--e-1); flex: none; }
+.mover { display: flex; align-items: center; gap: var(--e-1); flex: 1; min-width: 0; min-height: var(--toque); padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--tinta-2); font: inherit; font-size: var(--t-minimo); text-align: left; touch-action: none; cursor: grab; }
+.mover span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mover[data-arrastando] { cursor: grabbing; }
+.controle { display: grid; place-items: center; flex: none; width: var(--toque); height: var(--toque); padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--tinta-2); cursor: pointer; }
+.corpo { padding: 0 var(--e-3) var(--e-3); min-height: 0; overflow: auto; overscroll-behavior: contain; flex: 1; }
+.redimensionar { align-self: flex-end; display: grid; place-items: center; flex: none; width: var(--toque); height: var(--toque); padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--tinta-2); touch-action: none; cursor: nwse-resize; font-size: 20px; }
+.erro { padding: 0 var(--e-3); margin: 0; font-size: var(--t-minimo); color: var(--erro); }
+.saindo { animation: recolher var(--dur-curta) var(--ease-padrao) both; pointer-events: none; }
+@keyframes aparecer { from { opacity: .9; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes recolher { to { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .painel, .saindo { animation: none; } }

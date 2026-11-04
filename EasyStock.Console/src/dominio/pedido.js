@@ -96,7 +96,7 @@ export const numeroCurto = (numero) => String(numero).split('-').at(-1)
 // J2 (#1990, #1641-1 parte console): o "ref DB72EC58" na tela era id técnico; o curto fica só no título
 // (dica do mouse, para o suporte). A referência pequena ao lado da comanda passa a ser o número do dia
 // (`numeroDoDia`, a sequência que a cozinha fala), quando a API manda; ausente ou nulo, nada.
-const numeroDoDiaNaTela = (n) => (Number.isInteger(n) && n > 0 ? String(n).padStart(3, '0') : null)
+export const numeroDoDiaNaTela = (n) => (Number.isInteger(n) && n > 0 ? String(n).padStart(3, '0') : null)
 export function nomeDoPedido({ numeroComanda = null, numeroCurto = null, numeroDoDia = null } = {}) {
   const curto = numeroCurto ? String(numeroCurto) : null
   const dia = numeroDoDiaNaTela(numeroDoDia)
@@ -175,7 +175,7 @@ export const clienteEscolhendoPeloLink = (comandas, pedido) => !pedido?.pedidoId
   && (comandas ?? []).some((c) => c.podeEditar && !c.pedido && (c.rascunho?.itens?.length > 0 || c.ajudaSolicitada))
 
 export const LINHA_CLIENTE_ESCOLHENDO =
-  'O cliente está escolhendo pelo link. Abra Revisar seleção para acompanhar os itens antes de confirmar o pedido.'
+  'O cliente está escolhendo pelo link. Abra Revisar itens para acompanhar os itens antes de confirmar o pedido.'
 
 // #1761: a Ficha dizia "Pedido em montagem" com o pedido já confirmado e pago. O título segue o
 // pedido: montagem só enquanto ele não existe no EasyStok.
@@ -206,7 +206,7 @@ export const pedidoAcabouDeNascer = (antes, depois) => Boolean(depois?.pedidoId)
 // #1683: sem pedido e sem frete combinado o EasyStok soma só os itens; o cliente já vê o frete.
 export function rotuloDoTotalDaSelecao(comanda, emEdicao = false) {
   const semFrete = !comanda.pedido && comanda.freteCombinado == null
-  if (emEdicao) return 'Total da seleção salva' + (semFrete ? ', sem frete' : '')
+  if (emEdicao) return 'Total dos itens salvos' + (semFrete ? ', sem frete' : '')
   return semFrete ? 'Total dos itens, sem frete' : 'Total previsto'
 }
 
@@ -239,13 +239,13 @@ export function rotuloDoResumo(estado, saldo, pago = null) {
 
 // #1709: CEP sem cobertura volta do EasyStok com a frase escrita para o cliente
 // (`CepSemCoberturaException`, sem código próprio na resposta). No console quem lê é a equipe:
-// a linha diz o motivo e os dois caminhos que existem hoje.
+// a linha orienta os caminhos existentes sem presumir uma área de entrega configurada.
 const CEP_SEM_COBERTURA = 'Vamos combinar a entrega e o frete com a equipe.'
-const FORA_DA_AREA = 'o endereço do cliente está fora da área de entrega. Mande o Link de compra para combinar o frete com ele, ou cadastre a região em Entregas, Janelas de entrega, Frete.'
+const FRETE_A_COMBINAR = 'o frete está a combinar. Mande o Link de compra para combinar o valor com o cliente, ou cadastre a região em Entregas, Janelas de entrega, Frete.'
 
 export function motivoDoPedidoNaoCriado(erro) {
   const mensagem = String(erro?.message ?? '').trim()
-  return `Pedido não criado: ${mensagem === CEP_SEM_COBERTURA ? FORA_DA_AREA : mensagem}`
+  return `Pedido não criado: ${mensagem === CEP_SEM_COBERTURA ? FRETE_A_COMBINAR : mensagem}`
 }
 
 // --- Alteração com data nova (#2007, item 4) ------------------------------------------------------

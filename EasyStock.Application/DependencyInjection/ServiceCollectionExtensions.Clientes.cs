@@ -19,6 +19,7 @@ using EasyStock.Application.UseCases.ClienteCrm;
 using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.UseCases.Campanhas;
 using EasyStock.Application.UseCases.Cliente.Dossie;
+using EasyStock.Application.UseCases.Cliente.Foto;
 
 namespace EasyStock.Application.DependencyInjection;
 
@@ -39,6 +40,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarClientesUseCase>();
         services.AddScoped<BuscarClienteUseCase>();
         services.AddScoped<ObterClienteDetalhesUseCase>();
+        services.AddScoped<ClienteFotoUseCase>();
         services.AddScoped<DesativarClienteUseCase>();
         services.AddScoped<ReativarClienteUseCase>();
 

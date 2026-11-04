@@ -1,0 +1,30 @@
+# Override do stack /opt/stacks/easystok para a observabilidade (#2107, F2). Vai como compose.observabilidade.yaml,
+# acrescentado ao COMPOSE_FILE do .env por scripts/deploy/observabilidade-deploy.sh ligar. Daí em diante o vps-deploy.sh
+# já sobe com ele. O redis fica de fora de propósito: recriá-lo apaga as sessões.
+x-logs: &logs
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+services:
+  api:
+    logging: *logs
+    environment:
+      OpenTelemetry__OtlpEndpoint: http://ez-otel:4317
+
+  web:
+    logging: *logs
+    environment:
+      OpenTelemetry__OtlpEndpoint: http://ez-otel:4317
+
+  worker:
+    logging: *logs
+    environment:
+      OpenTelemetry__OtlpEndpoint: http://ez-otel:4317
+      Notifications__Monitoring__ArquivoDeVida: /tmp/ez-worker-vivo
+    healthcheck:
+      # O ArquivoDeVidaService regrava o arquivo a cada 30 s enquanto os loops do motor batem heartbeat.
+      test: ["CMD", "bash", "-c", "f=/tmp/ez-worker-vivo; [ -f $$f ] && [ $$(( $$(date +%s) - $$(stat -c %Y $$f) )) -lt 120 ]"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s

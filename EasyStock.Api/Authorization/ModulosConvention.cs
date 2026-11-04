@@ -14,7 +14,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Consentimentos", "ContatoUsuario",
         "AdminTenants", "AdminNotificacoes", "WebhookGateway", "WebhookPix",
         "Internal.NotificacoesJobs", "Webhooks.WebhookMensageriaMeta", "Webhooks.WebhookWhatsApp",
-        "Webhooks.WebhookWhatsAppPlataforma", "Webhooks.WebhookWaha",
+        "Webhooks.WebhookWhatsAppPlataforma", "Webhooks.WebhookWppConnect", "Webhooks.WebhookWaha", "Webhooks.WebhookLalamove",
         "Storefront.Agendamento", "Storefront.Auth", "Storefront.Avaliacao", "Storefront.CardapioConversa",
         "Storefront.ChatSite", "Storefront.ChatSiteMidia", "Storefront.Checkout", "Storefront.ComandaCliente", "Storefront.FotosCardapioPublicas",
         "Storefront.Frete", "Storefront.Menu", "Storefront.PedidosCliente",
@@ -22,7 +22,8 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Mobile.DeviceBackup", "Mobile.DevicePairing", "Mobile.MobileBatches", "Mobile.MobileCalculadora",
         "Mobile.MobileCash", "Mobile.MobileClients", "Mobile.MobileDiagnostics", "Mobile.MobileDiagTrace",
         "Mobile.MobileEstoque", "Mobile.MobileOrders", "Mobile.MobileProducts", "Mobile.MobileQuickReports",
-        "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot"
+        "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot",
+        "Mobile.PushReceipts"
     ];
     private static readonly HashSet<string> Bastidor =
     [
@@ -46,6 +47,9 @@ public sealed class ModulosConvention : IApplicationModelConvention
         if (chave == "AtendimentoLogistica" && acao == "Pagar") return [Modulo.Caixa];
         // Upload transversal, menos a foto do produto: é edição de cardápio, como /api/produtos/{id}/fotos.
         if (chave == "Uploads" && acao == "UploadFotoProduto") return [Modulo.Cardapio];
+        // #2199: quem imprime lê a regra da loja; só Configurações grava.
+        if (chave == "LojaImpressao" && acao == "Obter")
+            return [Modulo.Configuracoes, Modulo.Producao, Modulo.Atendimento, Modulo.Caixa, Modulo.Cozinha, Modulo.Entregas];
         return Mapa.GetValueOrDefault(chave);
     }
 
@@ -80,21 +84,22 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Cardapio, "Acervo", "Produto", "Categoria", "IaAutoPreenchimento", "AtendimentoItensCardapio",
             "AtendimentoSecoesCardapio", "Storefront.TenantVitrineCardapio");
         Associar(Modulo.Producao, "Producao", "ProdutoComposicao", "Lotes", "ItemEstoque", "Movimentacao",
-            "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "AtendimentoProducao", "AtendimentoProducaoPesquisa");
+            "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "EtiquetasPdf", "AtendimentoProducao", "AtendimentoProducaoPesquisa");
         Associar(Modulo.Atendimento, "AtendimentoAtendentes", "AtendimentoCaderno", "AtendimentoAssistente",
-            "AtendimentoComanda", "AtendimentoComandasCliente", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
+            "AtendimentoAvisos", "AtendimentoComanda", "AtendimentoComandasCliente", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
             "AtendimentoAutomacoes", "AtendimentoEsteira", "AtendimentoExpediente", "AtendimentoMensagensProgramadas",
-            "AtendimentoLembretes", "AtendimentoRespostasProntas", "Clientes", "ClientesCrm", "ClienteInteresses",
+            "AtendimentoLembretes", "AtendimentoRespostasProntas", "Clientes", "ClientesFoto", "ClientesFrete", "ClientesViagem", "ClientesCrm", "ClienteInteresses",
             "Ocorrencias", "Pedidos", "PedidosCobranca");
         Associar(Modulo.Cozinha, "Kds");
         Associar(Modulo.Caixa, "Caixa", "Venda");
         Associar(Modulo.Campanhas, "Campanhas", "CampanhasSugestoes");
-        Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "NotificacoesConfiguracao",
-            "Integracoes", "IntegracoesWhatsApp", "IntegracoesEmail", "Storefront.StorefrontConfiguracao");
+        Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "LojaImpressao", "NotificacoesConfiguracao",
+            "Integracoes", "IntegracoesWhatsApp", "IntegracoesWppConnect", "IntegracoesEmail", "Storefront.StorefrontConfiguracao");
         Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoAgenda", "AtendimentoRelatoriosEntrega", "AtendimentoCorridas", "AtendimentoRelatorioCustoDeEntrega",
             "Storefront.TenantVitrineEntrega");
         mapa.Add("Storefront.AprovacaoPedido", [Modulo.Atendimento, Modulo.Entregas]);
         mapa.Add("PedidoJanela", [Modulo.Atendimento, Modulo.Entregas]);
+        mapa.Add("PedidoConfirmacaoCliente", [Modulo.Atendimento, Modulo.Entregas]); // #2096
         mapa.Add("AtendimentoLogistica", [Modulo.Atendimento, Modulo.Entregas]);
         mapa.Add("AtendimentoCardapioDoDia", [Modulo.Cardapio, Modulo.Producao, Modulo.Atendimento]);
         mapa.Add("OperacaoEventos", [Modulo.Atendimento, Modulo.Cozinha, Modulo.Entregas]);

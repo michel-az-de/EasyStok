@@ -9,6 +9,7 @@ using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
 using EasyStock.Infra.Notifications.Hosting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using Serilog.Context;
@@ -225,9 +226,13 @@ public static class PipelineExtensions
                     servePath = absBase.AbsolutePath;
                 servePath = "/" + servePath.Trim('/');
 
+                var tiposUpload = new FileExtensionContentTypeProvider();
+                tiposUpload.Mappings[".ogg"] = "audio/ogg";
+
                 app.UseStaticFiles(new StaticFileOptions
                 {
                     FileProvider = new PublicUploadFileProvider(rootPath),
+                    ContentTypeProvider = tiposUpload,
                     RequestPath = servePath
                 });
             }

@@ -86,7 +86,8 @@ export function RelogioPix({
     return (
       <div className={css.relogio}>
         <output className="sr" aria-live="polite">{situacao.rotulo}.</output>
-        <p className={css.recolhido}>
+        {/* #2079 (C7): estorno e cancelamento em tom neutro; o verde é só do dinheiro que ficou. */}
+        <p className={`${css.recolhido} ${css.encerrado}`}>
           <Icone nome="circle-x" tamanho={20} />
           {situacao.rotulo}
         </p>

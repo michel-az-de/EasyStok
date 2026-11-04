@@ -20,7 +20,9 @@ public sealed record LoteResult(
     int EtiquetasDivergentes,
     DateTime CriadoEm,
     DateTime AlteradoEm,
-    DateTime? FinalizadoEm
+    DateTime? FinalizadoEm,
+    // #2199 (D4): número do código de barras; nulo só em lote anterior a ele que ainda não imprimiu.
+    string? NumeroCurto = null
 );
 
 public sealed record LoteDetalheResult(

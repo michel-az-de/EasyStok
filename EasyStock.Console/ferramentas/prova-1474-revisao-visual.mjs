@@ -89,6 +89,7 @@ const automacao = await import('../src/dominio/automacao.js')
 const cliente = await import('../src/dominio/cliente.js')
 const { novoPedido } = await import('../src/dominio/pedido.js')
 const caixa = await import('../src/dominio/caixa.js')
+const loja2078 = await import('../src/dominio/aberturaDaLoja.js')
 const { resumoDoWhatsApp } = await import('../src/dominio/canais.js')
 const kds = await import('../src/dominio/kds.js')
 const kdsApi = await import('../src/infra/api/kdsApi.js')
@@ -333,9 +334,11 @@ await confere('C16 gaveta só com dinheiro; Pix e cartão à parte', () => {
   assert.equal(g.naGaveta, 130.5)
   assert.equal(g.pixECartao, 50)
 })
-await confere('C16 lançamentos em ordem de hora, juntando movimentos e pagamentos', () => {
+// #2078 (B15): do mais recente para o mais antigo. Em ordem crescente, num dia de 18 lançamentos, o
+// último ficava em 18º e a tela abria nos de 20:01.
+await confere('C16 lançamentos em ordem de hora, juntando movimentos e pagamentos, o mais recente primeiro', () => {
   const ordem = caixa.lancamentosEmOrdem(DIA).map((l) => l.em.slice(11, 16))
-  assert.deepEqual(ordem, ['20:00', '20:10', '20:18', '20:28', '20:30', '20:31'])
+  assert.deepEqual(ordem, ['20:31', '20:30', '20:28', '20:18', '20:10', '20:00'])
 })
 
 // ── C17 ────────────────────────────────────────────────────────────────────
@@ -389,6 +392,38 @@ await confere('K2 conferência começa sem contagem e diz faltam, sobram ou bate
   assert.equal(caixa.conferenciaDaGaveta(10000, 100).texto, 'Bate certo')
   assert.equal(caixa.conferenciaDaGaveta(10000, 100).tom, 'ok')
   assert.equal(caixa.conferenciaDaGaveta(2000, 100).tom, 'perigo')
+})
+// #2078 (E5): "Faltam R$ 3" e "Faltam R$ 300" só mudavam a cor do ponto. A gravidade vai por palavra.
+await confere('K2 a gravidade da diferença é dita em palavra, não só pela cor', () => {
+  assert.equal(caixa.conferenciaDaGaveta(10000, 100).gravidade, null)
+  assert.equal(caixa.conferenciaDaGaveta(9700, 100).gravidade, 'Diferença pequena.')
+  assert.equal(caixa.conferenciaDaGaveta(10500, 100).gravidade, 'Diferença pequena.')
+  assert.equal(caixa.conferenciaDaGaveta(7000, 100).gravidade, 'Diferença grande: conte de novo antes de fechar.')
+  assert.equal(caixa.conferenciaDaGaveta(null, 100).gravidade, null)
+})
+// #2078 (B20): o fechamento grava com as mesmas palavras do modal (faltam, sobram, bate certo).
+await confere('K2 a observação do fechamento usa faltam/sobram, como o modal', () => {
+  const abertura = loja2078
+  assert.match(abertura.observacaoDoFechamento({ contado: 320, saldoEsperado: 322.6 }), /^Contado na gaveta: R\$\s320,00\. Faltam R\$\s2,60\.$/)
+  assert.match(abertura.observacaoDoFechamento({ contado: 330, saldoEsperado: 322.6 }), /^Contado na gaveta: R\$\s330,00\. Sobram R\$\s7,40\.$/)
+  assert.match(abertura.observacaoDoFechamento({ contado: 322.6, saldoEsperado: 322.6, nota: 'Fechado ao abrir a loja.' }), /^Contado na gaveta: R\$\s322,60\. Bate certo\. Fechado ao abrir a loja\.$/)
+  assert.doesNotMatch(abertura.observacaoDoFechamento({ contado: 320, saldoEsperado: 322.6 }), /-R\$|−R\$/)
+})
+// #2078 (D6/B18): sem abertura, o dinheiro de hoje já está na conta; a gaveta tem esse dinheiro e o troco.
+// "Conte a gaveta" fazia ela registrar os dois como saldo inicial e o esperado contava hoje duas vezes.
+await confere('K2 saldo inicial com dinheiro já recebido hoje pede só o troco', () => {
+  const comDinheiro = { saldoInicial: 0, aberto: false, fechado: false, movimentos: [], linhasExtras: [{ valor: 319, meio: 'dinheiro' }, { valor: 80, meio: 'pix' }] }
+  assert.match(loja2078.dicaDoSaldoInicial(comDinheiro), /^Só o troco que ficou de ontem, sem os R\$\s319,00 em dinheiro que já entraram hoje: eles já estão na conta\.$/)
+  assert.equal(loja2078.dicaDoSaldoInicial({ saldoInicial: 0, movimentos: [], linhasExtras: [{ valor: 80, meio: 'pix' }] }), 'O troco que está na gaveta ao abrir o dia.')
+  assert.equal(loja2078.dicaDoSaldoInicial(null), 'O troco que está na gaveta ao abrir o dia.')
+})
+// #2078 (B9): "O caixa continua aberto" aparecia com o caixa fechado ou sem abrir.
+await confere('K2 fechar a loja diz o estado real do caixa', () => {
+  assert.equal(loja2078.caixaAoFecharLoja({ aberto: true, fechado: false }), 'O caixa continua aberto. Para fechar o caixa, use Financeiro › Caixa do dia.')
+  assert.equal(loja2078.caixaAoFecharLoja({ aberto: true, fechado: true }), 'O caixa de hoje já está fechado.')
+  assert.equal(loja2078.caixaAoFecharLoja({ aberto: false, fechado: false }), 'O caixa de hoje não foi aberto.')
+  assert.equal(loja2078.caixaAoFecharLoja({ aberto: true, esquecidoAberto: true, abertoDesde: '2026-10-25' }), 'O caixa de 25/10 continua aberto. Para fechar o caixa, use Financeiro › Caixa do dia.')
+  assert.equal(loja2078.caixaAoFecharLoja(null), 'Fechar a loja não fecha o caixa.')
 })
 await confere('K3 suprimento é entrada (reforço de troco) e soma na gaveta', () => {
   assert.deepEqual(caixa.CATEGORIAS_SAIDA_SUGERIDAS, ['Sangria', 'Despesa'])

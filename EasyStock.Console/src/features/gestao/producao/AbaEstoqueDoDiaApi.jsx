@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { BotaoIcone } from '../../../componentes/BotaoIcone'
+import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
-import { contagemInicial, porcaoSugerida, porcoesParaAjuste, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
+import { contagemInicial, podeReimprimir, porcaoQueNaoRepete, porcaoSugerida, porcoesParaAjuste, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
+import { producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
+import { EtiquetaDeProducao } from './etiqueta/EtiquetaDeProducao'
+import etq from './etiqueta/etiqueta.module.css'
 
 // M2 › Estoque do dia (M2.1, #1490). O que a Thati usa todo dia, lido do EasyStok: os alertas de
 // venda sem saldo (avisa, não trava; RN-48), o saldo em porções por prato e os lotes com o
@@ -99,6 +104,25 @@ export function AbaEstoqueDoDiaApi() {
   const [ajustando, setAjustando] = useState(null)
   const [avisoDaContagem, setAvisoDaContagem] = useState(null)
   const avisoNoFormulario = ajustando !== null && ajustando === avisoDaContagem
+  // #2081 (A8): reimprimir as etiquetas de um lote ativo. { loteId } buscando, com `folha` pronta, com `erro` falhou.
+  const [impressao, setImpressao] = useState(null)
+  const montada = useRef(true)
+  useEffect(() => {
+    montada.current = true
+    return () => { montada.current = false }
+  }, [])
+
+  async function reimprimir(loteId) {
+    setImpressao({ loteId })
+    try {
+      const folha = await producaoDoDia.folhaDeEtiquetas(loteId)
+      if (!montada.current) return
+      setImpressao({ loteId, folha })
+      setTimeout(() => { if (montada.current) window.print() }, 50)
+    } catch (e) {
+      if (montada.current) setImpressao({ loteId, erro: e.message })
+    }
+  }
 
   const trocarAjuste = (alvo) => {
     setAvisoDaContagem(null)
@@ -113,7 +137,7 @@ export function AbaEstoqueDoDiaApi() {
   if (estoque.estado === 'carregando') return <output className={css.descricao}>Carregando o estoque…</output>
   if (estoque.estado === 'erro' && estoque.pratos.length === 0) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler o estoque"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar o estoque"
         acao={<Botao icone="refresh-cw" onClick={estoque.recarregar}>Tentar de novo</Botao>}>
         {estoque.erro}
       </Vazio>
@@ -177,16 +201,17 @@ export function AbaEstoqueDoDiaApi() {
       <section className={css.secao} aria-labelledby="estoque-saldo">
         <h3 id="estoque-saldo" className={css.tituloSecao}>Saldo por prato</h3>
         {estoque.pratos.length === 0 ? (
-          <p className={css.descricao}>Nenhum prato do cardápio está ligado ao estoque ainda. A primeira produção liga: lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
+          <p className={css.descricao}>Nenhum prato com estoque cadastrado. Registre o primeiro lote em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
         ) : (
           <ul className={css.lista}>
             {estoque.pratos.map((p) => (
               <li key={p.sku} className={css.linha}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{p.nome}</span>
-                  <span className={css.detalhe}>
-                    {p.porcoes.length > 0 ? p.porcoes.map(saldoDaPorcao).join(' · ') : p.porcao}
-                  </span>
+                  {/* #2081 (A16): a porção só aparece quando o nome ainda não diz qual é. */}
+                  {(p.porcoes.length > 0 || porcaoQueNaoRepete(p.nome, p.porcao)) && <span className={css.detalhe}>
+                    {p.porcoes.length > 0 ? p.porcoes.map(saldoDaPorcao).join(' · ') : porcaoQueNaoRepete(p.nome, p.porcao)}
+                  </span>}
                 </div>
                 <span className={css.preco}>{porcoes(p.saldo)}</span>
                 <div className={css.estados}>
@@ -214,7 +239,7 @@ export function AbaEstoqueDoDiaApi() {
       </section>
 
       <section className={css.secao} aria-labelledby="estoque-lotes">
-        <h3 id="estoque-lotes" className={css.tituloSecao}>Lotes ativos</h3>
+        <h3 id="estoque-lotes" className={css.tituloSecao}>Lotes</h3>
         {lotes.length === 0 ? (
           <p className={css.descricao}>Nenhum lote com saldo.</p>
         ) : (
@@ -223,17 +248,35 @@ export function AbaEstoqueDoDiaApi() {
               <li key={`${l.codigo}-${i}`} className={css.linha}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{l.prato}</span>
-                  <span className={css.detalhe}>{l.codigo ?? 'sem código'}</span>
+                  {/* #2081 (A10): de onde veio o lote, quem registrou e quando foi fabricado. */}
+                  <span className={css.detalhe}>{[l.codigo ?? 'sem código', l.origem].filter(Boolean).join(' · ')}</span>
                 </div>
                 <span className={css.preco}>{porcoes(l.quantidade)}</span>
                 <div className={css.estados}>
                   <Pilula tom={l.vencido ? 'perigo' : l.vencendo ? 'aviso' : 'neutro'} fina>{quandoVence(l)}</Pilula>
                 </div>
+                {podeReimprimir(l) && (
+                  <div className={css.acoes}>
+                    <BotaoIcone icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
+                      rotulo={`Etiquetas do lote ${l.codigo}`} dica="Etiquetas" onClick={() => reimprimir(l.id)} />
+                  </div>
+                )}
+                {impressao?.loteId === l.id && impressao.erro && (
+                  <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">Não foi possível carregar as etiquetas deste lote. {impressao.erro}</p>
+                )}
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {impressao?.folha && impressao.folha.etiquetas.length > 0 && (
+        <FolhaImpressao>
+          <div className={etq.folha}>
+            {impressao.folha.etiquetas.map((e) => <EtiquetaDeProducao key={e.id} etiqueta={e} empresa={impressao.folha.empresa} total={impressao.folha.etiquetas.length} />)}
+          </div>
+        </FolhaImpressao>
+      )}
     </div>
   )
 }

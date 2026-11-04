@@ -5177,6 +5177,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   background: var(--bg-card, #2a2520); color: var(--ink, #f4eee5);
   border: 1px solid var(--line, #3d362e); border-radius: 16px;
   padding: 28px 24px; max-width: 360px; width: 100%;
+  max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow-y: auto;
   text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
   animation: upd-pop 0.25s ease-out;
 }
@@ -5428,6 +5429,12 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
     #111827;
   background-size: 18px 18px, auto, auto;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.etq-termica { flex: 0 0 auto; width: 100%; max-width: 384px; }
+.etq-termica canvas {
+  display: block; width: 100%; height: auto;
+  background: #fff; border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 6px 18px rgba(0,0,0,.12);
 }
 .etq-card-wrap {
   /* Preserva a altura calculada após scale; o contêiner rola o lote inteiro. */
@@ -6100,6 +6107,15 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   font-family: inherit;
 }
 .k-card .k-cancel:hover { color: #ef6b6b; background: rgba(239,107,107,0.14); }
+.k-card .k-primary-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+.k-card .k-support-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.k-card .k-primary-actions button, .k-card .k-support-actions button { min-height: 44px; min-width: 0; margin: 0; }
+.k-card .k-more-actions { min-width: 0; }
+.k-card .k-more-actions[open], .k-card .k-more-actions:only-child { grid-column: 1 / -1; }
+.k-card .k-more-actions summary { box-sizing: border-box; min-height: 44px; padding: 12px 10px; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; line-height: 20px; cursor: pointer; }
+.k-card .k-more-actions summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.k-card .k-secondary-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-top: 8px; }
+.k-card .k-more-actions .k-cancel { grid-column: 1 / -1; width: auto; height: auto; padding: 10px; font-size: 12px; }
 .k-card.blink {
   animation: blinkHighlight 1.5s ease-in-out 0s 2;
 }
@@ -7234,6 +7250,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 }
 
 </style>
+<link rel="stylesheet" href="harmonia.css">
 </head>
 <body>
 
@@ -7301,7 +7318,7 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="title"><span class="brand-name" id="brandName">Minha empresa</span><span class="suffix">Mobile</span></div>
       <button class="sync-chip pending" id="syncChip" type="button" onclick="syncNow()" aria-live="polite">
         <span class="dot"></span>
-        <span id="syncText">Tudo sincronizado</span>
+        <span id="syncText">Conferindo fila de envio</span>
       </button>
     </div>
     <div class="greeting">
@@ -7483,11 +7500,11 @@ body.ux-calm [data-screen="producao"] .section-label {
            quando outro device sincroniza. Tocar num produto pré-seleciona quantidade. -->
       <div class="prod-demand" id="prodDemand" hidden>
         <div class="pd-head">
-          <span class="pd-title">📋 Demanda dos pedidos abertos</span>
+          <span class="pd-title"><span data-op-icon="ficha" aria-hidden="true">📋</span> Demanda dos pedidos abertos</span>
           <span class="pd-count" id="prodDemandCount">0 pedidos</span>
         </div>
         <div class="pd-chips" id="prodDemandChips"></div>
-        <button type="button" class="cta-btn" onclick="openCestaCalcFromDemand()" style="margin-top:10px;font-size:13px;">🧮 Conferir insumos da demanda</button>
+        <button type="button" class="cta-btn" onclick="openCestaCalcFromDemand()" style="margin-top:10px;font-size:13px;"><span data-op-icon="produto" aria-hidden="true">🧮</span> Conferir insumos da demanda</button>
       </div>
       <div class="prod-screen-summary" id="prodScreenSummary" style="display:none">
         <div>
@@ -7501,7 +7518,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="cta-row">
         <button class="cta-btn" onclick="clearProduction()">Limpar</button>
-        <button class="cta-btn primary" id="saveProdBtn" onclick="openProductionConfirm()" disabled>Registrar produção</button>
+        <button class="cta-btn primary" id="saveProdBtn" onclick="openProductionConfirm()" disabled>Conferir produção</button>
       </div>
       </section>
 
@@ -8079,7 +8096,7 @@ body.ux-calm [data-screen="producao"] .section-label {
   <div class="modal-overlay" id="productionConfirmModal" role="dialog" aria-modal="true" aria-labelledby="productionConfirmTitle">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
-      <div class="modal-title" id="productionConfirmTitle">Registrar <span class="accent">produção</span></div>
+      <div class="modal-title" id="productionConfirmTitle">Conferir <span class="accent">produção</span></div>
       <div class="modal-sub" id="batchDate">lote de hoje</div>
 
       <label class="modal-label">Itens</label>
@@ -8101,7 +8118,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div class="modal-ctas">
         <button class="cta-btn" onclick="closeProductionConfirm()">Cancelar</button>
-        <button class="cta-btn primary" onclick="confirmProduction()">Registrar e abrir etiquetas</button>
+        <button class="cta-btn primary" onclick="confirmProduction()">Confirmar e abrir etiquetas</button>
       </div>
     </div>
   </div>
@@ -8364,15 +8381,17 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
 
       <div class="ajustes-section" data-group="eq">
-        <h4>Impressora térmica</h4>
-        <p class="hint">Hipertech WTP05 ou outra ESC/POS Bluetooth 58mm. Pareie pelo Android antes.</p>
+        <h4>Impressoras</h4>
+        <p class="hint">Uma para a etiqueta de produção (Oasis OIA-8381-B) e outra para o cupom (WTP05, MTP-II), ou uma só para tudo. Pareie pelo Android antes.</p>
         <div class="printer-status none" id="printerStatus">
           <span id="printerStatusLabel">Nenhuma impressora selecionada</span>
         </div>
+        <div id="impressorasLista"></div>
         <div class="ajustes-actions-row">
           <button class="btn-ajustes-printer primary-soft" onclick="pickPrinter()" style="flex:1">Buscar impressora</button>
           <button class="btn-ajustes-printer success-soft" onclick="testPrint()" style="flex:1">Testar impressão</button>
         </div>
+        <p class="hint" id="printerTsplDica" style="display:none">O teste de alinhamento imprime uma moldura, uma cruz no centro e uma régua de 10 mm. Calibrar mede a etiqueta recortada e o espaço entre uma e outra.</p>
         <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnóstico</button>
       </div>
 
@@ -8646,15 +8665,32 @@ body.ux-calm [data-screen="producao"] .section-label {
        Lista os dispositivos Bluetooth ja pareados pelo Android. -->
   <div class="np-overlay" id="printerPickerModal" role="dialog" aria-modal="true">
     <div class="np-sheet">
-      <div class="np-icon">🖨️</div>
-      <h3 class="np-title">Selecionar impressora</h3>
-      <p class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</p>
-      <div id="savedPrinterProfiles" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
-      <label for="printerProfile">Modelo do dispositivo que será selecionado</label>
-      <select id="printerProfile" class="np-btn np-secondary"><option value="escpos">Atual · Hipertech WTP05 (ESC/POS)</option><option value="oasis-pending">Oasis · driver pendente de validação</option></select>
-      <p class="np-text" style="font-size:12px">A Oasis pode ser cadastrada, mas a impressão será liberada depois de confirmar o modelo e o protocolo.</p>
-      <div id="printerPickerList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:280px;overflow-y:auto"></div>
-      <button class="np-btn np-secondary" onclick="loadPrinterDevices()">↻ Buscar de novo</button>
+      <h3 class="np-title" id="printerPickerTitle">Passo 1 de 3 · Qual impressora?</h3>
+      <div id="printerPickerPasso1">
+        <div class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</div>
+        <div id="savedPrinterProfiles" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+        <div id="printerPickerList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:280px;overflow-y:auto"></div>
+        <button class="np-btn np-secondary" onclick="loadPrinterDevices()">↻ Buscar de novo</button>
+      </div>
+      <div id="printerPickerPasso2" style="display:none">
+        <div class="np-text">Cada papel pode ter a sua impressora.</div>
+        <button class="np-btn np-secondary" data-uso="etiqueta" onclick="escolherUso('etiqueta')">Etiqueta de produção</button>
+        <button class="np-btn np-secondary" data-uso="cupom" onclick="escolherUso('cupom')">Cupom e etiqueta de pedido</button>
+        <button class="np-btn np-secondary" data-uso="ambos" onclick="escolherUso('ambos')">As duas coisas</button>
+        <details style="margin:8px 0;font-size:13px"><summary>Avançado</summary>
+          <label for="printerProfile">Linguagem da impressora</label>
+          <select id="printerProfile" class="np-btn np-secondary" onchange="preencherPapeisSeletor()"><option value="auto">Detectar pelo nome</option><option value="escpos">Cupom (ESC/POS) · WTP05, MTP-II</option><option value="tspl">Etiqueta (TSPL) · Oasis OIA-8381-B</option></select>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="printerInvert"> Inverter cores (se a etiqueta sair em negativo)</label>
+        </details>
+        <button class="np-btn np-tertiary" onclick="irPassoSeletor(1)">Voltar</button>
+      </div>
+      <div id="printerPickerPasso3" style="display:none">
+        <label for="printerLabelSize">Papel na impressora</label>
+        <select id="printerLabelSize" class="np-btn np-secondary"></select>
+        <div class="np-text" id="printerPapelDica" style="font-size:13px"></div>
+        <button class="np-btn np-primary" onclick="salvarSeletor()">Salvar</button>
+        <button class="np-btn np-tertiary" onclick="irPassoSeletor(2)">Voltar</button>
+      </div>
       <button class="np-btn np-tertiary"  onclick="closePrinterPicker()">Cancelar</button>
     </div>
   </div>
@@ -8665,7 +8701,7 @@ body.ux-calm [data-screen="producao"] .section-label {
     <div class="np-sheet">
       <div class="np-icon">💾</div>
       <h3 class="np-title">Hora do backup</h3>
-      <p class="np-text">Já fazem alguns dias ou várias mudanças desde o último backup. Salvar agora protege seus dados em caso de problema com o celular.</p>
+      <p class="np-text">Já faz alguns dias ou houve várias mudanças desde o último backup. Salvar agora protege seus dados em caso de problema com o celular.</p>
       <button class="np-btn np-primary"   onclick="autoBackupAction('save')">Salvar agora</button>
       <button class="np-btn np-tertiary"  onclick="autoBackupAction('skip')">Pular dessa vez</button>
     </div>
@@ -8725,9 +8761,9 @@ body.ux-calm [data-screen="producao"] .section-label {
         <div class="etq-config-row">
           <span class="etq-config-lbl">Código</span>
           <div class="etq-config-chips" id="etqCodeChips">
-            <button class="etq-chip active" onclick="setEtqCode('both')">QR + Barras</button>
+            <button class="etq-chip active" onclick="setEtqCode('both')">QR + barras</button>
             <button class="etq-chip" onclick="setEtqCode('qr')">Só QR</button>
-            <button class="etq-chip" onclick="setEtqCode('barcode')">Só Barras</button>
+            <button class="etq-chip" onclick="setEtqCode('barcode')">Só barras</button>
             <button class="etq-chip" onclick="setEtqCode('none')">Sem código</button>
           </div>
         </div>
@@ -9673,34 +9709,8 @@ async function maybeOfferLocalRestore() {
     if (!window.cdbSync || typeof window.cdbSync.readLocalBackup !== 'function') return;
     var backup = await window.cdbSync.readLocalBackup();
 
-    // Auto-read falhou (Android 11+ pos-reinstall, app perdeu ownership do
-    // MediaStore). Oferece SAF picker pro user selecionar o arquivo.
-    if ((!backup || !backup.data) && typeof window.cdbSync.pickBackupViaSAF === 'function'
-        && window.cdbSync.hasPublicBackupPlugin && window.cdbSync.hasPublicBackupPlugin()) {
-      var ofereceuSAF = confirm(
-        'Bem-vindo de volta!\n\n'
-        + 'Parece que voce reinstalou o app. Tem um arquivo de backup salvo no '
-        + 'celular (em Documentos/casa-da-baba ou Downloads).\n\n'
-        + 'Quer selecionar o arquivo backup-latest.json pra restaurar seus dados?'
-      );
-      if (!ofereceuSAF) return;
-      var picked = await window.cdbSync.pickBackupViaSAF();
-      if (!picked) return;
-      if (picked.kind === 'export' && picked.payload && typeof applyBackupPayload === 'function') {
-        // Formato do exportBackup manual: tem .state estruturado.
-        await applyBackupPayload(picked.payload);
-        try {
-          localStorage.setItem('cdb-restore-source', 'saf-export-' + (picked.filename || ''));
-          localStorage.setItem('cdb-restore-at', String(Date.now()));
-        } catch (e) {}
-        alert('Dados restaurados de ' + (picked.filename || 'arquivo') + ' · recarregando...');
-        setTimeout(function () { location.reload(); }, 600);
-        return;
-      }
-      // kind === 'snapshot' (auto-backup-v1): cai no fluxo normal abaixo
-      backup = picked.payload;
-    }
-
+    // Plugin disponível não prova que existe backup nem que houve reinstalação.
+    // Sem arquivo lido, a seleção manual continua disponível em Ajustes.
     if (!backup || !backup.data) return;
 
     var capturedAt = backup.capturedAt ? new Date(backup.capturedAt).toLocaleString('pt-BR') : '?';
@@ -10034,7 +10044,18 @@ async function restoreFromPublicStorage() {
 // Exporta coleções, preferências permitidas, fila e anexos operacionais.
 // Identidade do aparelho, credenciais e cursores não são transferidos.
 const BACKUP_COLLECTIONS = { products: 'cdb-products', clients: 'cdb-clients', orders: 'cdb-orders', cashEntries: 'cdb-cash', cashClosings: 'cdb-cash-closings', batches: 'cdb-batches' };
-const BACKUP_PREFERENCES = ['cdb-operator-name', 'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-pix-type', 'cdb-printer', 'cdb-printers', 'cdb-theme', 'cdb-onboarding-done'];
+const BACKUP_PREFERENCES = ['cdb-operator-name', 'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-pix-type', 'cdb-printer', 'cdb-printers', 'cdb-impressoras.v2', 'cdb-regra-impressao.v1', 'cdb-theme', 'cdb-onboarding-done'];
+// A restauração não sobrescreve preferência do aparelho. O v2 sem impressora
+// nenhuma conta como ausente: é o que uma versão antiga gravava ao só ler.
+function preferenciaAusente(key) {
+  const atual = localStorage.getItem(key);
+  if (atual === null) return true;
+  if (key !== 'cdb-impressoras.v2') return false;
+  try {
+    const v = JSON.parse(atual);
+    return !v || !v.impressoras || !Object.keys(v.impressoras).length;
+  } catch (e) { return true; }
+}
 const BACKUP_ARCHIVE_KEYS = ['cdb-shopping', 'cdb-audit-log', 'cdb-audit-log-archive'];
 function backupArchiveEntries(entries, legacyStorage = {}) {
   if (!Array.isArray(entries)) throw new Error('Anexos do backup inválidos.');
@@ -10154,7 +10175,7 @@ function prepareBackupImport(input) {
   const queueAdded = added - queueBefore;
   added -= queueAdded;
   const preferences = {};
-  BACKUP_PREFERENCES.forEach(key => { if (typeof ls[key] === 'string' && localStorage.getItem(key) === null) preferences[key] = ls[key]; });
+  BACKUP_PREFERENCES.forEach(key => { if (typeof ls[key] === 'string' && preferenciaAusente(key)) preferences[key] = ls[key]; });
   const photos = payload.photos || [];
   if (!Array.isArray(photos) || photos.length > 10000) throw new Error('Fotos do backup inválidas.');
   const photoBytes = new Map();
@@ -10491,6 +10512,9 @@ let _currentFabAction = null;
 function updateFab(screen) {
   const fab = document.getElementById('fab');
   if (!fab) return;
+  if (screen === 'pedidos' && window.CDB_CONFIG?.isPilot) {
+    fab.classList.remove('show'); _currentFabAction = null; return;
+  }
   let cfg = FAB_CONFIG[screen] || null;
   // Caso especial: na tela Pedidos, FAB so aparece na aba Andamento
   // (na aba Novo o operador ja esta no formulario).
@@ -10608,6 +10632,14 @@ function updateNavA11y() {
 
 // Tabs da tela Pedidos: alterna entre "novo" (form) e "andamento" (kanban)
 function goPedidosTab(tab) {
+  if (window.CDB_CONFIG?.isPilot) {
+    const header = document.querySelector('.pilot-orders-header');
+    if (header) {
+      header.dataset.view = tab;
+      const title = header.querySelector('h2');
+      if (title) title.textContent = tab === 'novo' ? 'Novo pedido' : 'Pedidos';
+    }
+  }
   document.querySelectorAll('#content [data-screen="pedidos"] .screen-tab').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('#content [data-screen="pedidos"] .pedidos-tab-section').forEach(s =>
@@ -10628,16 +10660,36 @@ function updatePedidosTabBadge() {
 // =========================
 // SYNC
 // =========================
-function syncNow() {
+async function syncNow() {
   if (navigator.onLine === false) {
     updateSync();
-    showToast('Sem internet. Suas ações ficam salvas e sincronizam quando voltar.');
-    return;
+    showToast('Sem internet. As alterações continuam neste aparelho. O envio depende de conexão e vínculo válido com o EasyStok.');
+    return 'offline';
   }
-  pendingSync = 0;
-  try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {}
-  updateSync();
-  showToast('Sincronizado com EasyStock');
+  const sync = window.cdbSync;
+  if (!sync || typeof sync.flush !== 'function') {
+    showToast('Sincronização indisponível. As alterações continuam neste aparelho.');
+    return 'unavailable';
+  }
+  try {
+    const result = await sync.flush();
+    updateSync();
+    const messages = {
+      auth: 'Vincule ou reconecte este aparelho ao EasyStok para enviar as alterações.',
+      review: 'Envio pausado. Confira a origem dos dados importados antes de sincronizar.',
+      empty: 'Nenhuma alteração na fila de envio deste aparelho.',
+      offline: 'Sem internet. As alterações continuam neste aparelho.',
+      retry: 'O envio não foi confirmado. As alterações continuam neste aparelho para nova tentativa.'
+    };
+    // HTTP 200 pode conter recusas. Só cdb-sync-success confirma os IDs aceitos.
+    if (messages[result]) showToast(messages[result]);
+    else if (result !== 'ok') showToast('O envio não foi confirmado. Confira a fila de envio.');
+    return result;
+  } catch (_) {
+    updateSync();
+    showToast('O envio não foi confirmado. As alterações continuam neste aparelho para nova tentativa.');
+    return 'retry';
+  }
 }
 function updateSync() {
   const chip = document.getElementById('syncChip');
@@ -10679,7 +10731,7 @@ function updateSync() {
     txt.textContent = pendingSync + (pendingSync === 1 ? ' item pra sincronizar' : ' itens pra sincronizar');
   } else {
     chip.classList.remove('pending');
-    txt.textContent = 'Tudo sincronizado';
+    txt.textContent = 'Nenhuma alteração na fila de envio';
   }
   if (typeof renderTrustBadges === 'function') renderTrustBadges();
   if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
@@ -10816,14 +10868,14 @@ function getOrderPrimaryActions(o) {
         return [
           { key: 'confer', label: 'Conferir', icon: '✅', primary: true,
             handler: 'openConfer', args: [id] },
-          { key: 'charge', label: 'Cobrar', icon: '💰', primary: false,
+          { key: 'charge', label: 'Preparar cobrança', icon: '💰', primary: false,
             handler: 'openCobranca', args: [id] }
         ];
       }
       return [
         { key: 'deliver', label: 'Marcar entregue', icon: '✓', primary: true,
           handler: 'applyAdvanceTransition', args: [id, 'entregue'] },
-        { key: 'charge', label: 'Cobrar', icon: '💰', primary: false,
+        { key: 'charge', label: 'Preparar cobrança', icon: '💰', primary: false,
           handler: 'openCobranca', args: [id] }
       ];
     }
@@ -11390,7 +11442,7 @@ function _normalizeSearch(s) {
 const GS_SHORTCUTS = [
   { key: 'novo-pedido', label: 'Novo pedido', icon: '➕', kind: 'shortcut',
     keywords: 'novo pedido criar adicionar', action: function () { go('pedidos'); if (typeof goPedidosTab === 'function') goPedidosTab('novo'); } },
-  { key: 'producao', label: 'Registrar produção', icon: '🏭', kind: 'shortcut',
+  { key: 'producao', label: 'Produção', icon: '🏭', kind: 'shortcut',
     keywords: 'producao lote registrar', action: function () { go('producao'); } },
   { key: 'conferencia', label: 'Abrir conferência', icon: '✅', kind: 'shortcut',
     keywords: 'conferencia conferir scanner qr', action: function () { go('conferencia'); } },
@@ -12166,7 +12218,7 @@ function renderOpenOrders() {
         : `advanceOrder('${o.id}')`;
       const secondaryActions = calm
         ? `<button class="open-full" onclick="go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)">Abrir</button>`
-        : `<button onclick="openCobranca('${o.id}')" title="Gerar cobranca">Cobrar</button>
+        : `<button onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>
           <button onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Etiqueta</button>`;
       card.innerHTML = `
         <div class="home-order-top">
@@ -12278,8 +12330,13 @@ function advanceOrder(id) {
   const idx = ORDER_FLOW.indexOf(o.status);
   if (idx < 0 || idx === ORDER_FLOW.length - 1) return;
   const nextStatus = ORDER_FLOW[idx + 1];
+  if (window.CDB_CONFIG?.isPilot
+      && document.querySelector('[data-screen="pedidos"].active .pedidos-tab-section[data-tab="andamento"]')?.style.display === ''
+      && document.querySelector('[data-screen="pedidos"].active')) {
+    pilotOrderAdvance = { id, from: o.status };
+  }
   // 'entregue' exige conferência manual primeiro — confirmConfer() retoma.
-  if (nextStatus === STATUS.ENTREGUE) { openConfer(id); return; }
+  if (nextStatus === STATUS.ENTREGUE && !window.CDB_CONFIG?.isPilot) { openConfer(id); return; }
   applyAdvanceTransition(id, nextStatus);
 }
 
@@ -12326,8 +12383,8 @@ function cancelOrder(id) {
   const stockAlreadyTaken = (prev === STATUS.PRONTO || prev === STATUS.ENTREGUE);
   if (stockAlreadyTaken) {
     const promptMsg = wasDelivered
-      ? `Cancelar pedido JA ENTREGUE de ${money(o.total)}?\n\nEstoque sera devolvido e o valor sai do caixa de hoje.`
-      : 'Cancelar pedido pronto? Estoque sera devolvido.';
+      ? `Cancelar pedido JÁ ENTREGUE de ${money(o.total)}?\n\nEstoque será devolvido e o valor sai do caixa de hoje.`
+      : 'Cancelar pedido pronto? Estoque será devolvido.';
     if (!confirm(promptMsg)) return;
     o.items.forEach(it => {
       const p = products.find(x => x.id === it.productId);
@@ -12616,9 +12673,9 @@ function renderProductGrid() {
   if (prodMetricLow) prodMetricLow.textContent = lowStock;
   const saveBtn = document.getElementById('saveProdBtn');
   saveBtn.disabled = !anyCounted;
-  saveBtn.textContent = anyCounted
-    ? `Registrar ${totalUnits} unidade${totalUnits === 1 ? '' : 's'}`
-    : 'Registrar produção';
+  saveBtn.textContent = window.CDB_CONFIG?.isPilot ? 'Produzir' : anyCounted
+    ? `Conferir ${totalUnits} unidade${totalUnits === 1 ? '' : 's'}`
+    : 'Conferir produção';
 }
 
 function clearProduction(productIds = null) {
@@ -13134,6 +13191,7 @@ const HIST_ACTION_META = {
   'batch.unit_confirm_adjust': { icon: '✏️', label: 'Unidade ajustada',  type: 'batch' },
   'batch.delete':              { icon: '🗑️', label: 'Lote excluído',     type: 'batch' },
   'batch.restore':             { icon: '↩️', label: 'Lote recuperado',   type: 'batch' },
+  'etiqueta.print':             { icon: '🖨️', label: 'Etiqueta impressa', type: 'label' },
   'order.purge':               { icon: '⌫', label: 'Registro removido', type: 'order' },
   'cash.entry_delete':         { icon: '🗑️', label: 'Lançamento excluído', type: 'cash' },
   'cash.entry_edit':           { icon: '✏️', label: 'Lançamento editado', type: 'cash' },
@@ -13206,7 +13264,8 @@ function buildHistoryEvents() {
 function renderHistoricoScreen() {
   const list = document.getElementById('histList');
   if (!list) return;
-  const all = buildHistoryEvents();
+  const all = buildHistoryEvents().filter(e => !window.CDB_CONFIG?.isPilot
+    || (['product', 'batch', 'order', 'label'].includes(e.type) && !/^(order\.confirm|batch\.unit_confirm)/.test(e.action || '')));
   const filtered = histFilter === 'all' ? all : all.filter(e => e.type === histFilter);
   const batchCount = all.filter(e => e.type === 'batch').length;
   const orderCount = all.filter(e => e.type === 'order').length;
@@ -13225,8 +13284,8 @@ function renderHistoricoScreen() {
       <div class="stock-ledger-card">
         <div class="stock-ledger-top">
           <div>
-            <div class="stock-ledger-name">Auditoria operacional</div>
-            <div class="stock-ledger-meta">Eventos rastreáveis, lotes, pedidos e caixa</div>
+            <div class="stock-ledger-name">${window.CDB_CONFIG?.isPilot ? 'Histórico' : 'Auditoria operacional'}</div>
+            <div class="stock-ledger-meta">${window.CDB_CONFIG?.isPilot ? 'Produtos, lotes e pedidos' : 'Eventos rastreáveis, lotes, pedidos e caixa'}</div>
           </div>
           <span class="stock-ledger-badge ok">${all.length} eventos</span>
         </div>
@@ -13249,12 +13308,13 @@ function renderHistoricoScreen() {
       if (batch) {
         const btns = [];
         if (!batch.deleted) {
-          btns.push(`<button class="hist-action" onclick="reprintFromBatchId('${e.entityId}')">🖨️ Reimprimir</button>`);
-          btns.push(`<button class="hist-action danger" onclick="deleteBatch('${e.entityId}')">🗑️ Excluir lote</button>`);
+          btns.push(`<button class="hist-action" onclick="reprintFromBatchId('${e.entityId}')"><span data-op-icon="printer" aria-hidden="true">🖨️</span> Reimprimir</button>`);
+          btns.push(`<button class="hist-action" onclick="openBatchDetails('${e.entityId}')"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
+          btns.push(`<button class="hist-action danger" onclick="deleteBatch('${e.entityId}')"><span data-op-icon="lixeira" aria-hidden="true">🗑️</span> Excluir lote</button>`);
         } else {
-          btns.push(`<button class="hist-action" onclick="restoreBatch('${e.entityId}')">↩️ Recuperar lote</button>`);
+          btns.push(`<button class="hist-action" onclick="restoreBatch('${e.entityId}')"><span data-op-icon="undo-2" aria-hidden="true">↩️</span> Recuperar lote</button>`);
+          btns.push(`<button class="hist-action" onclick="openBatchDetails('${e.entityId}')"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
         }
-        btns.push(`<button class="hist-action" onclick="openBatchDetails('${e.entityId}')">Detalhes</button>`);
         actions = `<div class="mov-actions">${btns.join('')}</div>`;
       }
     }
@@ -13264,7 +13324,7 @@ function renderHistoricoScreen() {
     return `
       <div class="mov-item ${e.type}">
         <div class="mov-head">
-          <span class="mov-type">${e.icon} ${escapeHtml(e.label)}</span>
+          <span class="mov-type"><span data-op-icon="${e.type === 'batch' ? 'producao' : 'historico'}" aria-hidden="true">${e.icon}</span> ${escapeHtml(e.label)}</span>
           <span>${dateStr}</span>
         </div>
         <div class="mov-items">${escapeHtml(e.summary || '')}</div>
@@ -14312,6 +14372,17 @@ const KANBAN_COLS = [
 ];
 
 let highlightOrderId = null; // id do pedido que acabou de ser criado (pisca)
+let pilotOrderStatus = null;
+let pilotHighlightedOrder = null;
+let pilotOrderAdvance = null;
+
+function selectPilotOrderStatus(status) {
+  if (!window.CDB_CONFIG?.isPilot || !KANBAN_COLS.some(col => col.key === status)) return;
+  pilotOrderStatus = status;
+  pilotOrderAdvance = null;
+  renderKanban();
+  document.querySelector(`#kanban [data-order-status="${status}"]`)?.focus({ preventScroll: true });
+}
 
 function renderKanban() {
   const root = document.getElementById('kanban');
@@ -14324,7 +14395,7 @@ function renderKanban() {
     o.status === 'aguardando' || o.status === 'preparando' || o.status === 'pronto'
   );
 
-  if (openItems.length === 0) {
+  if (openItems.length === 0 && !window.CDB_CONFIG?.isPilot) {
     root.innerHTML = '<div class="empty"><span class="big">📭</span>Nenhum pedido em aberto</div><button class="export-btn" onclick="goPedidosTab(\'novo\')">Criar pedido</button>';
     return;
   }
@@ -14336,6 +14407,32 @@ function renderKanban() {
   Object.keys(byStatus).forEach(k => byStatus[k].sort((a, b) =>
     (a.scheduledDeliveryAt || a.createdAt) - (b.scheduledDeliveryAt || b.createdAt)
   ));
+
+  if (window.CDB_CONFIG?.isPilot) {
+    if (!pilotOrderStatus && openItems.length) pilotOrderStatus = KANBAN_COLS.find(col => byStatus[col.key].length).key;
+    if (highlightOrderId && highlightOrderId !== pilotHighlightedOrder) {
+      const highlighted = openItems.find(o => o.id === highlightOrderId);
+      if (highlighted) pilotOrderStatus = highlighted.status;
+    }
+    pilotHighlightedOrder = highlightOrderId;
+    if (pilotOrderAdvance) {
+      const moved = orders.find(o => o.id === pilotOrderAdvance.id);
+      if (!moved || moved.status !== pilotOrderAdvance.from) {
+        if (moved && byStatus[moved.status]
+            && document.querySelector('[data-screen="pedidos"].active .pedidos-tab-section[data-tab="andamento"]')?.style.display === ''
+            && document.querySelector('[data-screen="pedidos"].active')) pilotOrderStatus = moved.status;
+        pilotOrderAdvance = null;
+      }
+    }
+    const selected = KANBAN_COLS.find(col => col.key === pilotOrderStatus) || KANBAN_COLS[0];
+    const list = byStatus[selected.key];
+    root.innerHTML = `<div class="pilot-order-filters" role="group" aria-label="Etapas dos pedidos">${KANBAN_COLS.map(col =>
+      `<button type="button" data-order-status="${col.key}" aria-pressed="${col.key === selected.key}" onclick="selectPilotOrderStatus('${col.key}')"><span>${col.label}</span><strong>${byStatus[col.key].length}</strong></button>`).join('')}</div>`
+      + `<div class="pilot-order-list" aria-label="Pedidos: ${selected.label}">${list.length
+        ? list.map(o => renderKanbanCard(o, selected)).join('')
+        : `<div class="pilot-order-empty">${openItems.length ? 'Nenhum pedido nesta etapa.' : 'Nenhum pedido em aberto.'}</div>`}</div>`;
+    return;
+  }
 
   const overview = `
     <div class="kanban-overview" aria-label="Resumo da esteira">
@@ -14365,6 +14462,7 @@ function jumpKanban(status) {
 }
 
 function renderKanbanCard(o, col) {
+  const pilot = window.CDB_CONFIG?.isPilot === true;
   const isHighlight = highlightOrderId === o.id;
   // Bug 5 (Onda 4): filtra items com qty=0 (resultado de ajuste). Sem isso,
   // o card mostrava "0× Talharim Fresco" ate o pedido ser cancelado.
@@ -14381,8 +14479,8 @@ function renderKanbanCard(o, col) {
   const itemCount = visibleItems.reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
   // Selo de status de conferência ao lado do status do kanban
   const cs = getConferStatus(o);
-  const badgeLabel = cs === CONFER_STATUS.PENDENTE ? 'Conf. pendente' : conferStatusLabel(cs);
-  const conferBadge = `<span class="k-confer-badge ${cs}">${badgeLabel}</span>`;
+  const badgeLabel = cs === CONFER_STATUS.PENDENTE ? (pilot ? 'Conferência pendente' : 'Conf. pendente') : conferStatusLabel(cs);
+  const conferBadge = pilot ? '' : `<span class="k-confer-badge ${cs}">${badgeLabel}</span>`;
   const conferBtnLabel = cs === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Reconferir';
 
   // Quick-actions WA + Mapa pro entregador. Phone vem do cliente cadastrado
@@ -14405,34 +14503,39 @@ function renderKanbanCard(o, col) {
   return `
     <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
       <div class="k-topline">
-        <span class="k-status">${col.label}</span>${conferBadge}${o.channel ? `<span class="k-confer-badge" title="Canal">${escapeHtml(channelLabel(o.channel))}</span>` : ''}
-        <div class="k-time">${timeOf(o.createdAt)}</div>
+        ${pilot ? '' : `<span class="k-status">${col.label}</span>`}${conferBadge}${o.channel ? `<span class="k-confer-badge" title="Canal">${escapeHtml(channelLabel(o.channel))}</span>` : ''}
+        ${pilot ? '' : `<div class="k-time">${timeOf(o.createdAt)}</div>`}
       </div>
       <div class="k-head">
-        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}<span class="apt">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref))}</span></div>
+        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}${!pilot || safeRefDisplay(o.clientSnapshot?.ref) ? `<span class="apt">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref))}</span>` : ''}</div>
         <span class="k-total">${money(o.total)}</span>
       </div>
       ${quickActions}
-      <div class="k-meta">
+      ${pilot ? `<div class="k-meta pilot-order-meta"><span>${itemCount} item${itemCount === 1 ? '' : 's'}</span>${o.id ? `<span>Pedido ${escapeHtml(o.id.slice(-8))}</span>` : ''}${o.createdAt ? `<span>${timeOf(o.createdAt)}</span>` : ''}${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}</div>` : `<div class="k-meta">
         <span class="k-chip">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
         <span class="k-chip">Pedido ${(o.id || '').slice(-8)}</span>
         ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
-      </div>
+      </div>`}
       <div class="k-items">${itemsLine}</div>
       ${negStockBanner}
       ${notes}
       <div class="k-progress">${renderProgressDots(o.status, { small: true, showLabel: false })}</div>
       <div class="k-foot">
-        <div class="k-actions">
-          <button class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>
-          ${(o.status === 'aguardando' || o.status === 'preparando') ? `<button class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
-          ${(Number(o.total) || 0) > 0 ? `<button class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Gerar cobrança">Cobrar</button>` : ''}
-          <button class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir</button>
-          <button class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Historico</button>
+        <div class="k-primary-actions">
+          <button type="button" class="k-advance" onclick="advanceOrder('${o.id}')">${pilot ? (o.status === 'pronto' ? 'Entregar' : o.status === 'preparando' ? 'Finalizar' : 'Preparar') : o.status === 'pronto' ? 'Conferir entrega' : col.next}</button>
         </div>
-        <div class="k-actions">
-          <button class="k-advance" onclick="advanceOrder('${o.id}')">${col.next}</button>
-          <button class="k-cancel" onclick="cancelOrder('${o.id}')" aria-label="Cancelar" title="Cancelar">×</button>
+        <div class="k-support-actions">
+          ${(Number(o.total) || 0) > 0 ? `<button type="button" class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>` : ''}
+          <details class="k-more-actions">
+            <summary aria-label="Mais ações do pedido ${escapeHtml((o.id || '').slice(-8))}">Mais ações</summary>
+            <div class="k-secondary-actions">
+              ${!pilot ? `<button type="button" class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>` : ''}
+              ${!pilot && (o.status === 'aguardando' || o.status === 'preparando') ? `<button type="button" class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
+              <button type="button" class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir etiqueta</button>
+              <button type="button" class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Histórico</button>
+              <button type="button" class="k-cancel" onclick="cancelOrder('${o.id}')">Cancelar pedido</button>
+            </div>
+          </details>
         </div>
       </div>
     </div>
@@ -15262,16 +15365,94 @@ function ensureBluetoothPermission(cb) {
   } catch (e) { cb(false); }
 }
 
-function getSavedPrinter() { return load('cdb-printer', null); }
+// #2193: perfil por impressora. TSPL (etiqueta) não entende ESC/POS: a
+// Oasis OIA-8381-B recebia bytes ESC/POS, confirmava o envio e não imprimia.
+const TSPL_NOMES = /^(OIA|OASIS)|TSPL|\bTSC\b|^TTP|^XP-?(3|4)\d\dB|^L42/i;
+function perfilPorNome(name) { return TSPL_NOMES.test(String(name || '')) ? 'tspl' : 'escpos'; }
+function normalizarImpressora(p) {
+  if (!p || typeof p !== 'object') return p;
+  const out = Object.assign({}, p);
+  if (out.profile === 'oasis-pending') out.profile = 'tspl';
+  if (!out.perfilManual && (!out.profile || out.profile === 'escpos')) out.profile = perfilPorNome(out.name);
+  if (out.profile !== 'tspl') out.profile = 'escpos';
+  return out;
+}
+function perfilImpressora(p) { return (normalizarImpressora(p) || {}).profile || 'escpos'; }
+// #2202 (D1): sem altura a mídia é rolo contínuo. A mídia do v2 (midia) manda.
+function tsplConfig(p) {
+  const e = (p && p.etiqueta) || {};
+  const m = p && p.midia;
+  if (m && Number(m.larguraMm) > 0 && m.tipo !== 'bobina') {
+    const cont = m.tipo !== 'etiqueta';
+    return { larguraMm: Number(m.larguraMm), alturaMm: cont ? 0 : Number(m.alturaMm), gapMm: cont ? 0 : (Number(m.gapMm) || 2), continuo: cont, inverter: !!(p.inverter || e.inverter) };
+  }
+  // O master gravava 80 x 40 recortada sem o operador escolher (era o padrão
+  // do seletor). Sem midia, esse registro vale o padrão D1: rolo contínuo.
+  const padraoDoMaster = !m && Number(e.larguraMm) === 80 && Number(e.alturaMm) === 40 && (e.gapMm == null || Number(e.gapMm) === 2) && e.continuo !== true;
+  const continuo = padraoDoMaster || e.continuo === true || !(Number(e.alturaMm) > 0);
+  return { larguraMm: e.larguraMm || 80, alturaMm: continuo ? 0 : e.alturaMm, gapMm: continuo ? 0 : (e.gapMm === 0 ? 0 : (e.gapMm || 2)), continuo, inverter: !!e.inverter };
+}
+// Ações da Oasis: alinhamento para qualquer papel TSPL; calibrar só na
+// etiqueta recortada (rolo contínuo não tem recorte para medir).
+function acoesTspl(p) {
+  const tspl = !!p && !!p.address && perfilImpressora(p) === 'tspl';
+  return { alinhar: tspl, calibrar: tspl && !tsplConfig(p).continuo };
+}
+function descreverPerfil(p) {
+  if (perfilImpressora(p) !== 'tspl') { const l = Number(p && p.midia && p.midia.larguraMm); return 'ESC/POS ' + (l > 0 ? l : 58) + ' mm'; }
+  const c = tsplConfig(p);
+  return 'TSPL ' + (c.continuo ? 'bobina contínua' : c.larguraMm + ' x ' + c.alturaMm + ' mm');
+}
+function tsplBytesDoCanvas(canvas, printer, copias) {
+  return window.cdbTspl.paraEtiqueta(canvas, Object.assign(tsplConfig(printer), { copias: copias || 1 }));
+}
+// #2202 (F1): impressoras no modelo v2 (impressoras.js): cada papel tem a sua.
+// cdb-printer e cdb-printers seguem espelhadas para quem ainda as lê.
+// Os dois módulos juntos: um impressoras.js novo com o catálogo antigo no
+// cache quebraria a leitura e a impressão cairia sem impressora.
+function impressorasV2() { return window.cdbImpressoras && window.cdbPapeis ? window.cdbImpressoras.ler(localStorage) : null; }
+function legadoDaV2(imp) { return imp ? normalizarImpressora(window.cdbImpressoras.paraLegado(imp)) : null; }
+function getSavedPrinter() {
+  const v2 = impressorasV2();
+  if (!v2) return normalizarImpressora(load('cdb-printer', null));
+  return legadoDaV2(v2.impressoras[v2.papeis.etiqueta] || v2.impressoras[v2.papeis.cupom] || null);
+}
+// Impressora do documento: produção vai para a de etiqueta; pedido, recibo e
+// teste, para a de cupom. Sem v2, a selecionada.
+function impressoraPara(documento) {
+  const I = window.cdbImpressoras;
+  const v2 = impressorasV2();
+  if (!v2) return getSavedPrinter();
+  return legadoDaV2(I.resolver(v2, I.papelDoDocumento(documento)));
+}
 function getPrinterProfiles() {
+  const v2 = impressorasV2();
+  if (v2) return Object.values(v2.impressoras).map(legadoDaV2);
   const stored = load('cdb-printers', []);
-  const profiles = Array.isArray(stored) ? stored : [];
-  const saved = getSavedPrinter();
+  const profiles = (Array.isArray(stored) ? stored : []).map(normalizarImpressora);
+  const saved = normalizarImpressora(load('cdb-printer', null));
   if (saved && saved.address && !profiles.some(p => p.address === saved.address)) profiles.push(saved);
   return profiles;
 }
+// Cadastra a impressora no v2; papeis diz o que ela imprime (padrão: tudo,
+// como a seleção antiga). Mídia só muda quando a escolha traz mídia.
+function registrarImpressora(p, papeis) {
+  const I = window.cdbImpressoras;
+  let v2 = I.ler(localStorage);
+  const imp = I.deLegado(normalizarImpressora(p));
+  if (!imp) return v2;
+  const dados = { address: imp.address, nome: imp.nome, linguagem: imp.linguagem, linguagemManual: imp.linguagemManual };
+  if (p.midia || p.etiqueta) { dados.midia = imp.midia; dados.midiaConfirmada = imp.midiaConfirmada; dados.inverter = imp.inverter; }
+  if (p.apelido !== undefined) dados.apelido = imp.apelido;
+  v2 = I.cadastrar(v2, dados);
+  I.PAPEIS.forEach(papel => {
+    if (!papeis || papeis.indexOf(papel) >= 0) v2 = I.definirPapel(v2, papel, imp.address);
+    else if (v2.papeis[papel] === imp.address) v2 = I.definirPapel(v2, papel, null);
+  });
+  return I.salvar(localStorage, v2);
+}
 function printerReady(printer) {
-  return !!printer && printer.profile !== 'oasis-pending' && !!printer.address;
+  return !!printer && !!printer.address && (perfilImpressora(printer) !== 'tspl' || !!window.cdbTspl);
 }
 function renderSavedPrinters() {
   const host = document.getElementById('savedPrinterProfiles');
@@ -15280,13 +15461,21 @@ function renderSavedPrinters() {
   getPrinterProfiles().forEach(p => {
     const button = document.createElement('button');
     button.className = 'np-btn np-secondary';
-    button.textContent = p.name + (p.profile === 'oasis-pending' ? ' · aguardando driver' : ' · salva');
-    button.onclick = () => selectPrinter(p);
+    button.textContent = p.name + ' · ' + descreverPerfil(p);
+    button.onclick = () => escolherNoSeletor(p.address, p.name);
     host.appendChild(button);
   });
 }
-function setSavedPrinter(p) {
-  if (p) {
+function setSavedPrinter(p, papeis) {
+  const I = window.cdbImpressoras;
+  if (I) {
+    if (p && p.address) registrarImpressora(p, papeis);
+    else {
+      let v2 = I.ler(localStorage);
+      I.PAPEIS.forEach(papel => { v2 = I.definirPapel(v2, papel, null); });
+      I.salvar(localStorage, v2);
+    }
+  } else if (p) {
     const profiles = getPrinterProfiles().filter(item => item.address !== p.address);
     profiles.push(p);
     save('cdb-printers', profiles);
@@ -15300,13 +15489,17 @@ function renderPrinterStatus() {
   const lab = document.getElementById('printerStatusLabel');
   const p   = getSavedPrinter();
   if (!el || !lab) return;
+  const v2Status = impressorasV2();
+  renderImpressorasLista(v2Status);
+  const tspls = v2Status ? Object.values(v2Status.impressoras).map(legadoDaV2).filter(x => acoesTspl(x).alinhar) : [];
+  const dicaTspl = document.getElementById('printerTsplDica');
+  if (dicaTspl) {
+    dicaTspl.style.display = tspls.length ? '' : 'none';
+    dicaTspl.textContent = 'O teste de alinhamento imprime uma moldura na borda do papel, uma cruz no centro e uma régua de 10 mm. Moldura cortada: toque Ajustar e confira o papel.'
+      + (tspls.some(x => acoesTspl(x).calibrar) ? ' Calibrar mede a etiqueta recortada e o espaço entre uma e outra.' : '');
+  }
 
   const bs = window.bluetoothSerial;
-  if (p && p.profile === 'oasis-pending') {
-    el.classList.add('none'); el.classList.remove('ok');
-    lab.textContent = 'Oasis OIA-8381-B selecionada · driver pendente de validação';
-    return;
-  }
   if (!bs) {
     // Plugin Cordova nao carregado: rodando no browser ou APK sem o plugin
     el.classList.add('none'); el.classList.remove('ok');
@@ -15314,13 +15507,147 @@ function renderPrinterStatus() {
     return;
   }
 
-  if (p && p.address) {
+  const v2 = impressorasV2();
+  if (v2 && Object.keys(v2.impressoras).length) {
     el.classList.add('none'); el.classList.remove('ok');
-    lab.innerHTML = 'Selecionada: ' + escapeHtml(p.name || p.address) + '<br><span style="font-size:12px">A conexão será verificada ao imprimir.</span>';
+    const linha = (rotulo, papel) => {
+      const imp = window.cdbImpressoras.resolver(v2, papel);
+      if (!imp) return rotulo + ': nenhuma';
+      const aviso = imp.midiaConfirmada === false ? ' · <b>confirme o papel</b>' : '';
+      return rotulo + ': ' + escapeHtml(imp.apelido || imp.nome) + ' · ' + escapeHtml(window.cdbPapeis.descrever(window.cdbPapeis.daMidia(imp.midia))) + aviso;
+    };
+    lab.innerHTML = linha('Etiqueta', 'etiqueta') + '<br>' + linha('Cupom', 'cupom') + '<br><span style="font-size:12px">A conexão será verificada ao imprimir.</span>';
+  } else if (p && p.address) {
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.innerHTML = 'Selecionada: ' + escapeHtml(p.name || p.address) + ' · ' + escapeHtml(descreverPerfil(p)) + '<br><span style="font-size:12px">A conexão será verificada ao imprimir.</span>';
   } else {
     el.classList.add('none'); el.classList.remove('ok');
     lab.innerHTML = 'Nenhuma impressora selecionada<br><span style="font-size:10px;opacity:.7">Bluetooth disponível — toque "Buscar impressora"</span>';
   }
+}
+// #2202 (F1): uma linha por impressora em Ajustes, com o que ela imprime, o
+// papel e as ações. Calibrar e alinhar só existem na de etiqueta (TSPL).
+function renderImpressorasLista(v2) {
+  const host = document.getElementById('impressorasLista');
+  if (!host) return;
+  host.innerHTML = '';
+  if (!v2 || !window.cdbPapeis) return;
+  const I = window.cdbImpressoras;
+  Object.values(v2.impressoras).forEach(imp => {
+    // O mesmo critério da impressão: a escolhida, a única da classe ou a única.
+    const usos = I.PAPEIS.filter(p => I.resolver(v2, p) === imp).map(p => (p === 'etiqueta' ? 'etiqueta' : 'cupom'));
+    const papel = window.cdbPapeis.daMidia(imp.midia);
+    const card = document.createElement('div');
+    card.className = 'impressora-card';
+    card.style.cssText = 'border:1px solid var(--line,#ddd);border-radius:10px;padding:10px;margin-top:8px;font-size:14px';
+    const nomeTecnico = imp.apelido && imp.apelido !== imp.nome ? ' <span style="opacity:.7">' + escapeHtml(imp.nome) + '</span>' : '';
+    card.innerHTML = '<b>' + escapeHtml(imp.apelido || imp.nome) + '</b>' + nomeTecnico
+      + '<div>Imprime: ' + escapeHtml(usos.length ? usos.join(' e ') : 'nada ainda') + '</div>'
+      + '<div>Papel: ' + escapeHtml(window.cdbPapeis.descrever(papel)) + (imp.midiaConfirmada === false ? ' · <b>confirme o papel</b>' : '') + '</div>';
+    const acoes = document.createElement('div');
+    acoes.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px';
+    const botao = (texto, fn) => { const b = document.createElement('button'); b.className = 'btn-ajustes-printer subtle'; b.textContent = texto; b.onclick = fn; acoes.appendChild(b); };
+    botao('Ajustar', () => { openPrinterPicker(); escolherNoSeletor(imp.address, imp.nome); });
+    botao('Testar', () => testPrint(imp.address));
+    const acoesImp = acoesTspl(legadoDaV2(imp));
+    if (acoesImp.calibrar) botao('Calibrar', () => calibrarImpressora(imp.address));
+    if (acoesImp.alinhar) botao('Teste de alinhamento', () => alinharImpressora(imp.address));
+    botao('Esquecer', () => esquecerImpressora(imp.address));
+    card.appendChild(acoes);
+    host.appendChild(card);
+  });
+}
+function midiaTspl(imp) {
+  const m = imp.midia || {};
+  return { larguraMm: m.larguraMm, alturaMm: m.alturaMm, gapMm: m.gapMm, continuo: m.tipo !== 'etiqueta', densidade: imp.densidade, velocidade: imp.velocidade };
+}
+// Recortada: GAPDETECT mede etiqueta e gap. Contínua: grava GAP 0,0 para a
+// Oasis parar de procurar o recorte.
+// O printViaBluetooth já explica falha de conexão e permissão; aqui só
+// falta o caso sem Bluetooth (PWA no navegador).
+function semBluetoothNoAjuste() {
+  if (!window.bluetoothSerial) showToast('Bluetooth indisponível neste aparelho');
+}
+function tsplAtual(funcao) {
+  if (window.cdbTspl && typeof window.cdbTspl[funcao] === 'function') return true;
+  showToast('Feche e abra o app para atualizar a impressão');
+  return false;
+}
+// Sem mac, a impressora de etiqueta salva.
+function impressoraDoAjuste(mac) {
+  const v2 = impressorasV2();
+  if (!v2) return null;
+  return v2.impressoras[mac || v2.papeis.etiqueta || v2.papeis.cupom] || null;
+}
+function calibrarImpressora(mac) {
+  const I = window.cdbImpressoras;
+  const imp = impressoraDoAjuste(mac);
+  if (!imp || !acoesTspl(legadoDaV2(imp)).calibrar || !tsplAtual('calibracao')) return;
+  printViaBluetooth(window.cdbTspl.calibracao(midiaTspl(imp)), semBluetoothNoAjuste, null, legadoDaV2(imp), () => {
+    const atual = I.ler(localStorage);
+    I.salvar(localStorage, I.cadastrar(atual, { address: imp.address, calibradaEm: new Date().toISOString(), midiaConfirmada: true }));
+    renderPrinterStatus();
+  });
+}
+function alinharImpressora(mac) {
+  const imp = impressoraDoAjuste(mac);
+  if (!imp || !acoesTspl(legadoDaV2(imp)).alinhar || !tsplAtual('alinhamento')) return;
+  printViaBluetooth(window.cdbTspl.alinhamento(midiaTspl(imp)), semBluetoothNoAjuste, null, legadoDaV2(imp));
+}
+function esquecerImpressora(mac) {
+  const I = window.cdbImpressoras;
+  if (!confirm('Esquecer esta impressora neste aparelho?')) return;
+  I.salvar(localStorage, I.esquecer(I.ler(localStorage), mac));
+  renderPrinterStatus();
+}
+
+// Seletor em 3 passos: qual impressora, o que ela imprime, qual papel.
+let seletorEscolha = null;
+function irPassoSeletor(n) {
+  [1, 2, 3].forEach(i => { const el = document.getElementById('printerPickerPasso' + i); if (el) el.style.display = i === n ? '' : 'none'; });
+  const titulo = document.getElementById('printerPickerTitle');
+  if (titulo) titulo.textContent = ['', 'Passo 1 de 3 · Qual impressora?', 'Passo 2 de 3 · O que ela imprime?', 'Passo 3 de 3 · Qual papel está nela?'][n];
+}
+function linguagemDoSeletor() {
+  const escolha = (document.getElementById('printerProfile') || {}).value || 'auto';
+  return escolha === 'auto' ? perfilPorNome(seletorEscolha && seletorEscolha.name) : escolha;
+}
+function escolherNoSeletor(addr, name) {
+  const v2 = impressorasV2();
+  const imp = v2 && v2.impressoras[addr];
+  seletorEscolha = { addr, name, imp };
+  const perfil = document.getElementById('printerProfile');
+  if (perfil) perfil.value = imp && imp.linguagemManual ? imp.linguagem : 'auto';
+  const inverter = document.getElementById('printerInvert');
+  if (inverter) inverter.checked = !!(imp && imp.inverter);
+  const usos = v2 ? window.cdbImpressoras.PAPEIS.filter(p => v2.papeis[p] === addr) : [];
+  const padrao = usos.length === 2 ? 'ambos' : usos[0] || (linguagemDoSeletor() === 'tspl' ? 'etiqueta' : 'cupom');
+  document.querySelectorAll('#printerPickerPasso2 [data-uso]').forEach(b => { b.className = 'np-btn ' + (b.dataset.uso === padrao ? 'np-primary' : 'np-secondary'); });
+  irPassoSeletor(2);
+}
+function escolherUso(uso) {
+  if (!seletorEscolha) return;
+  seletorEscolha.uso = uso;
+  preencherPapeisSeletor();
+  irPassoSeletor(3);
+}
+function preencherPapeisSeletor() {
+  const sel = document.getElementById('printerLabelSize');
+  if (!sel || !window.cdbPapeis || !seletorEscolha) return;
+  const P = window.cdbPapeis;
+  const tspl = linguagemDoSeletor() === 'tspl';
+  const papeis = tspl ? P.lista({ classe: 'etiqueta' }) : [P.porId(P.PADRAO_ESCPOS)];
+  const atual = seletorEscolha.imp && P.daMidia(seletorEscolha.imp.midia);
+  const escolhido = atual && papeis.some(p => p.id === atual.id) ? atual.id : (tspl ? P.PADRAO_TSPL : P.PADRAO_ESCPOS);
+  sel.innerHTML = papeis.map(p => '<option value="' + escapeHtml(p.id) + '"' + (p.id === escolhido ? ' selected' : '') + '>' + escapeHtml(p.rotulo) + '</option>').join('');
+  const dica = document.getElementById('printerPapelDica');
+  if (dica) dica.textContent = tspl ? 'Escolha o papel que está na impressora. Rolo contínuo gasta só o tamanho da etiqueta. Etiqueta recortada: depois de salvar, toque Calibrar no cartão dela em Ajustes.' : 'Bobina de cupom de 58 mm, a mesma da maquininha.';
+}
+function salvarSeletor() {
+  const e = seletorEscolha;
+  if (!e) return;
+  const papeis = e.uso === 'ambos' ? ['etiqueta', 'cupom'] : [e.uso || 'etiqueta'];
+  selectPrinter(impressoraDoSeletor(e.addr, e.name), papeis);
 }
 // Callback chamado apos o operador selecionar uma impressora no modal.
 // Usado tanto pra Ajustes > Buscar impressora (callback null = so salvar)
@@ -15336,6 +15663,8 @@ function pickPrinter() {
 function openPrinterPicker() {
   const modal = document.getElementById('printerPickerModal');
   modal.classList.add('show');
+  seletorEscolha = null;
+  irPassoSeletor(1);
   renderSavedPrinters();
   loadPrinterDevices();
 }
@@ -15358,29 +15687,27 @@ function closePrinterPicker() {
 function loadPrinterDevices() {
   const list = document.getElementById('printerPickerList');
   const hint = document.getElementById('printerPickerHint');
+  const appName = window.CDB_CONFIG?.isPilot ? 'Casa da Baba Piloto' : 'Easy Stock Mobile';
   list.innerHTML = '<div class="cat-empty">Buscando...</div>';
 
   const bs = window.bluetoothSerial;
   if (!bs || !bs.list) {
     list.innerHTML = '';
-    hint.innerHTML = '⚠️ <b>Plugin Bluetooth não carregou</b><br>'
-                   + '<span style="font-size:12px">Você precisa abrir pelo APK Android (não funciona no navegador). '
-                   + 'Se já está no APK, force fechar e reabrir.</span>';
+    hint.innerHTML = '<b>Impressão Bluetooth indisponível</b><br>'
+                   + 'Abra o ' + appName + ' no Android. Se já estiver no app, feche e abra novamente.';
     return;
   }
 
   const showError = (where, err) => {
     const detail = err && (err.message || err.toString && err.toString()) || JSON.stringify(err) || '(sem detalhe)';
     list.innerHTML = '';
-    hint.innerHTML = '⚠️ <b>Bluetooth bloqueado</b><br>'
-                   + '<span style="font-size:11px;opacity:.8">[' + where + '] ' + escapeHtml(String(detail)) + '</span><br><br>'
-                   + '<b>Como resolver:</b><br>'
-                   + '<span style="font-size:12px">'
-                   + '1. Configuracoes Android -> Apps -> <b>Easy Stock Mobile</b><br>'
-                   + '2. Permissões → ative <b>"Dispositivos próximos"</b> (ou "Nearby devices")<br>'
-                   + '3. Verifique também que Bluetooth está <b>ligado</b><br>'
-                   + '4. Volte aqui e toque "Buscar de novo"'
-                   + '</span>';
+    hint.innerHTML = '<b>' + (where === 'permission' ? 'Permita usar dispositivos próximos' : 'Não foi possível buscar as impressoras') + '</b>'
+                   + '<ol style="text-align:left;padding-left:20px">'
+                   + '<li>No Android, abra Configurações → Apps → <b>' + appName + '</b> → Permissões.</li>'
+                   + '<li>Permita <b>Dispositivos próximos</b> e confira se o Bluetooth está ligado.</li>'
+                   + '<li>Volte ao app e toque em <b>Buscar de novo</b>.</li></ol>'
+                   + '<details><summary>Detalhes técnicos</summary><p style="overflow-wrap:anywhere">['
+                   + escapeHtml(String(where)) + '] ' + escapeHtml(String(detail)) + '</p></details>';
   };
 
   const doList = () => {
@@ -15403,8 +15730,8 @@ function loadPrinterDevices() {
           row.className = 'np-btn ' + (isSaved ? 'np-primary' : 'np-secondary');
           row.style.textAlign = 'left';
           row.innerHTML = (isSaved ? '✓ ' : '') + escapeHtml(name)
-                        + '<br><span style="font-size:11px;opacity:.7">' + escapeHtml(addr) + '</span>';
-          row.onclick = () => selectPrinter({ address: addr, name, profile: document.getElementById('printerProfile').value });
+                        + '<br><span style="font-size:11px;opacity:.7">' + escapeHtml(addr) + ' · ' + escapeHtml(avisoDispositivo(d, name)) + '</span>';
+          row.onclick = () => escolherNoSeletor(addr, name);
           list.appendChild(row);
         });
       }, (err) => showError('list', err));
@@ -15437,7 +15764,7 @@ function loadPrinterDevices() {
 const DIAG_KNOWN_KEYS = [
   'cdb-products', 'cdb-orders', 'cdb-clients', 'cdb-cash', 'cdb-cash-closings',
   'cdb-batches', 'cdb-audit-log', 'cdb-audit-log-archive', 'cdb-sync-queue',
-  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-printers', 'cdb-operator-name',
+  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-printers', 'cdb-impressoras.v2', 'cdb-regra-impressao.v1', 'cdb-operator-name',
   'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-device-id',
   'cdb-last-sync', 'cdb-theme', 'cdb-prod-scan-mode', 'cdb-demo-mode', 'cdb-schema-version',
   'cdb-pre-reset-backup'
@@ -15531,7 +15858,7 @@ function checkIntegrity() {
 }
 
 function collectDiagnostics() {
-  const ver = (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || '(desconhecida)';
+  const ver = (window.CDB_CONFIG?.isPilot && window.CDB_CONFIG.bundleVersion) || (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || '(desconhecida)';
   const platform = window.Capacitor
     ? (window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'capacitor')
     : 'web';
@@ -16006,6 +16333,8 @@ function openDiagnostics() {
   const friendlyLevel = (!d.sync.online || d.sync.queueSize > 0 || d.server.status !== 'ok') ? 'warn' : 'ok';
   const friendlyText = !d.sync.online
     ? 'Sem internet agora. O app continua funcionando e guarda as alterações para sincronizar depois.'
+    : d.sync.queueSize > 0 && !d.server.pairing
+      ? `Existem ${d.sync.queueSize} item(ns) só neste aparelho. Conecte o aparelho à loja para enviar.`
     : d.sync.queueSize > 0
       ? `Existem ${d.sync.queueSize} item(ns) aguardando envio. Toque em Forçar flush se quiser tentar agora.`
       : `Tudo em dia. Última sincronização ${_fmtRelTime(d.sync.lastSync)}.`;
@@ -16297,6 +16626,7 @@ function closeDiagnostics() { toggleModal('diagnosticsModal', false); }
 
 // Acoes do diagnostico — todas chamam window.cdbSync (existente).
 function diagForceFlush() {
+  if (window.CDB_CONFIG?.isPilot) return syncNow().finally(() => openDiagnostics());
   if (window.cdbSync && typeof window.cdbSync.flush === 'function') {
     window.cdbSync.flush().then(() => { showToast('Sync forçado'); openDiagnostics(); });
   } else { showToast('Sincronização indisponível'); }
@@ -16567,7 +16897,7 @@ function openMapsPedidoRef(ref) {
 // Compat com botao existente em Ajustes > Equipamento.
 // Antes era alert(); agora abre o modal completo (operador encontra a
 // secao Impressora rolando, mas tambem ve o resto do estado do app).
-function printerDiagnostics() { openDiagnostics(); }
+function printerDiagnostics() { if (window.CDB_CONFIG?.isPilot) closeAjustes(); openDiagnostics(); }
 
 // Step logger persistente — sobrevive a native crash (JNI), permite ver
 // onde o app morreu reabrindo Ajustes > Diagnóstico apos restart.
@@ -16580,12 +16910,39 @@ function btStep(label) {
   } catch (e) {}
 }
 
-function selectPrinter(printer) {
+// Aviso por aparelho a partir da classificação do plugin nativo (#2193).
+function avisoDispositivo(d, name) {
+  if (d && d.supported === false) return 'só Bluetooth LE: o app imprime por Bluetooth clássico';
+  const perfil = perfilPorNome(name) === 'tspl' ? 'TSPL' : 'ESC/POS';
+  if (d && d.spp === false) return perfil + ' · sem serviço serial anunciado, pode falhar';
+  return perfil + (d && d.printerClass ? ' · impressora' : '');
+}
+// #2202 (F0): o papel vem do catálogo único (impressao-papeis.js). Sem
+// escolha, o padrão da linguagem: rolo contínuo de 80 mm ou bobina de 58 mm.
+function impressoraDoSeletor(addr, name) {
+  const escolha = (document.getElementById('printerProfile') || {}).value || 'auto';
+  const preset = (document.getElementById('printerLabelSize') || {}).value || '';
+  const inverter = !!(document.getElementById('printerInvert') || {}).checked;
+  const profile = escolha === 'auto' ? perfilPorNome(name) : escolha;
+  const P = window.cdbPapeis;
+  // Papel que não serve à linguagem (etiqueta na de cupom) cai no padrão dela.
+  const serve = x => !!x && (x.tipo !== 'bobina') === (profile === 'tspl');
+  const escolhido = P ? P.porId(preset) : null;
+  const papel = P ? (serve(escolhido) ? escolhido : P.porId(profile === 'tspl' ? P.PADRAO_TSPL : P.PADRAO_ESCPOS)) : null;
+  const etiqueta = papel && papel.tipo === 'etiqueta'
+    ? { larguraMm: papel.larguraMm, alturaMm: papel.alturaMm, gapMm: papel.gapMm, continuo: false, inverter }
+    : { larguraMm: papel ? papel.larguraMm : 80, alturaMm: 0, gapMm: 0, continuo: true, inverter };
+  const out = { address: addr, name, profile, perfilManual: escolha !== 'auto', etiqueta, inverter };
+  if (papel) { out.midia = P.paraMidia(papel); out.midiaConfirmada = serve(escolhido); }
+  return out;
+}
+
+function selectPrinter(printer, papeis) {
   btStep('select:start ' + (printer && printer.address));
   try {
-    setSavedPrinter(printer);
+    setSavedPrinter(printer, papeis);
     btStep('select:saved');
-    showToast(printer.profile === 'oasis-pending' ? 'Oasis salva. Impressão aguarda validação do driver.' : 'Impressora selecionada: ' + printer.name + '. Toque Imprimir novamente.');
+    showToast('Impressora selecionada: ' + printer.name + ' (' + descreverPerfil(printer) + '). Toque Imprimir novamente.');
     logAction({
       action: 'settings.update',
       entityType: 'settings',
@@ -16603,16 +16960,25 @@ function selectPrinter(printer) {
     showToast('Erro ao salvar: ' + (e.message || e));
   }
 }
-function testPrint() {
-  const bytes = escPosTextLines('TESTE', [
-    'Easy Stock Mobile',
-    'Hipertech WTP05',
-    'Impressao OK ' + new Date().toLocaleTimeString('pt-BR').slice(0,5)
-  ]);
-  printViaBluetooth(bytes, () => {
+// Sem mac: a impressora selecionada (a de etiqueta, senão a de cupom).
+function testPrint(mac) {
+  const v2 = mac ? impressorasV2() : null;
+  const printer = v2 && v2.impressoras[mac] ? legadoDaV2(v2.impressoras[mac]) : getSavedPrinter();
+  const nome = (printer && printer.name) || 'Impressora';
+  const linhas = [getEmpresaName() || 'Easy Stock Mobile', nome + ' · ' + descreverPerfil(printer),
+    'Impressão OK ' + new Date().toLocaleTimeString('pt-BR').slice(0,5)];
+  let bytes;
+  try {
+    bytes = perfilImpressora(printer) === 'tspl' && window.cdbTspl
+      ? tsplBytesDoCanvas(window.cdbTspl.linhasParaCanvas('TESTE', linhas), printer)
+      : escPosTextLines('TESTE', linhas);
+  } catch (e) { showToast('Falha ao montar o teste: ' + ((e && e.message) || e)); return; }
+  // Falha já explicada (conexão, permissão): o erro fica na tela, sem impressão do sistema.
+  printViaBluetooth(bytes, explicado => {
+    if (explicado) return;
     showToast('Bluetooth indisponível — usando impressão do sistema');
-    printAreaHtml('<div class="pa-title">TESTE</div><div class="pa-center">Easy Stock Mobile<br>Hipertech WTP05<br>Sistema fallback</div>');
-  });
+    printAreaHtml('<div class="pa-title">TESTE</div><div class="pa-center">' + linhas.map(escapeHtml).join('<br>') + '</div>');
+  }, null, printer);
 }
 
 // ================================================================
@@ -17619,6 +17985,7 @@ function renderConferProPanel() {
 }
 
 function batchCardHtml(batch) {
+  const pilot = window.CDB_CONFIG?.isPilot === true;
   const isClosed = getBatchStatus(batch) === 'closed';
   const ets = etiquetasFromBatch(batch);
   const total = ets.length;
@@ -17636,9 +18003,9 @@ function batchCardHtml(batch) {
   }).filter(Boolean).join(' · ');
   const dateStr = new Date(batch.createdAt).toLocaleDateString('pt-BR') + ' ' +
     new Date(batch.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
-  const progress = `Controle de etiquetas · ${conferidos}/${total} conferido${conferidos === 1 ? '' : 's'}` +
+  const progress = pilot ? '' : `Controle de etiquetas · ${conferidos}/${total} conferido${conferidos === 1 ? '' : 's'}` +
     (divergencias ? ` · ${divergencias} divergência${divergencias === 1 ? '' : 's'}` : '');
-  const unitsHtml = ets.map(et => {
+  const unitsHtml = pilot ? '' : ets.map(et => {
     const st = getUnitStatus(batch, et.idxStr);
     const statusBadge = `<span class="u-status ${st}">${conferStatusLabel(st)}</span>`;
     const actionLabel = st === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Ver';
@@ -17658,7 +18025,7 @@ function batchCardHtml(batch) {
   // #441 — botao Descartar/Reverter em todas as acoes
   const discardBtn = isDiscarded
     ? `<button class="batch-action" onclick="event.stopPropagation();revertBatchDiscard('${batch.id}')">↩ Reverter</button>`
-    : `<button class="batch-action" style="color:var(--accent)" onclick="event.stopPropagation();openBatchDiscardModal('${batch.id}')">⛔ Descartar</button>`;
+    : `<button class="batch-action" style="color:var(--accent)" onclick="event.stopPropagation();openBatchDiscardModal('${batch.id}')"><span data-op-icon="lixeira" aria-hidden="true">⛔</span> Descartar</button>`;
   const actionsHtml = isDiscarded ? `
     <div class="batch-actions closed-actions">
       <span style="font-size:12px;color:var(--ink-mute);flex:1">${escapeHtml(batch.discardReason || 'descartado')}</span>
@@ -17677,12 +18044,12 @@ function batchCardHtml(batch) {
       ${discardBtn}
     </div>`;
   return `<div class="batch-card${isClosed ? ' closed' : ''}" id="bc-${batch.id}">
-    <div class="batch-card-head" onclick="document.getElementById('bc-${batch.id}').classList.toggle('open')">
+    <div class="batch-card-head" ${pilot ? '' : `onclick="document.getElementById('bc-${batch.id}').classList.toggle('open')"`}>
       <div class="bc-info">
         <div class="bc-lote">${escapeHtml(batch.lote || batch.code || batch.id)} · ${escapeHtml(dateStr)} ${statusBadge}</div>
         <div class="bc-summary">${escapeHtml(items)}</div>
         ${validadeHtml ? '<div class="bc-progress">' + validadeHtml + '</div>' : ''}
-        <div class="bc-progress">${escapeHtml(progress)}</div>
+        ${progress ? `<div class="bc-progress">${escapeHtml(progress)}</div>` : ''}
         ${(function(){
           // #437 — historico de impressoes: le do audit log as entradas 'etiqueta.print' do lote.
           try {
@@ -17696,7 +18063,7 @@ function batchCardHtml(batch) {
           } catch(_) { return ''; }
         })()}
       </div>
-      <span class="bc-toggle">›</span>
+      ${pilot ? '' : '<span class="bc-toggle">›</span>'}
     </div>
     ${actionsHtml}
     <div class="batch-units">${unitsHtml}</div>
@@ -18985,7 +19352,7 @@ function _proceedAdvance(id, nextStatus) {
   renderHome();
   renderOrdersFeed();
   haptic();
-  if (nextStatus === STATUS.ENTREGUE) showToast('Pedido entregue, entrou no caixa');
+  if (nextStatus === STATUS.ENTREGUE) showToast(window.CDB_CONFIG?.isPilot ? 'Pedido entregue' : 'Pedido entregue, entrou no caixa');
   else if (nextStatus === STATUS.PRONTO && negatives.length > 0) showToast('Pronto. Estoque negativo: ' + negatives.join(', '));
   else if (nextStatus === STATUS.PRONTO) showToast('Marcado como pronto');
   else if (nextStatus === STATUS.PREPARANDO) showToast('Preparo iniciado');
@@ -19288,36 +19655,68 @@ function releasePrinting() {
   isPrinting = false;
   if (printWatchdog) { clearTimeout(printWatchdog); printWatchdog = null; }
 }
-function printViaBluetooth(bytes, onFallback, printJob) {
+// #2141: etiqueta em imagem tem ~25 KB; o write só volta quando a WTP05
+// consome tudo. Prazo de 15 s mais 1 s a cada 8 KB (Bluetooth SPP lento).
+function printWriteTimeoutMs(length) {
+  return 15000 + Math.ceil((length || 0) / 8000) * 1000;
+}
+
+// #2202 (F1): printerArg escolhe a impressora do documento. Trabalho para
+// outra impressora enquanto uma imprime entra na fila (até 4) e sai em
+// seguida: desconecta uma, conecta a outra. Impressora já ocupada (a que
+// imprime ou uma que espera na fila) segue descartada: toque duplo não
+// gera dois trabalhos. onFallback(explicado): true quando o erro já foi
+// mostrado ao operador; false quando não há Bluetooth nem impressora.
+const FILA_IMPRESSAO_MAX = 4;
+function printViaBluetooth(bytes, onFallback, printJob, printerArg, onSent) {
   btStep('print:start');
   const bs = window.bluetoothSerial;
-  const printer = getSavedPrinter();
-  if (printer && printer.profile === 'oasis-pending') {
-    showToast('Oasis: confirme o modelo e o driver antes de imprimir');
-    return;
-  }
+  const printer = printerArg || getSavedPrinter();
   if (!bs || !printer || !printer.address) {
     btStep('print:no-printer-or-bs bs=' + !!bs + ' p=' + !!printer);
-    if (typeof onFallback === 'function') onFallback();
+    if (typeof onFallback === 'function') onFallback(false);
     return;
   }
-  if (isPrinting) { showToast('Impressão em andamento, aguarda…'); return; }
+  // drenando: o próximo da fila já tem a vez, nos 300 ms até ele começar.
+  if (isPrinting || printViaBluetooth.drenando) {
+    const fila = printViaBluetooth.fila || (printViaBluetooth.fila = []);
+    const ocupada = printViaBluetooth.ativa === printer.address || fila.some(t => t[3] && t[3].address === printer.address);
+    if (!ocupada && fila.length < FILA_IMPRESSAO_MAX) {
+      fila.push([bytes, onFallback, printJob, printer, onSent]);
+      showToast('Na fila: imprime em seguida na ' + (printer.apelido || printer.name || 'outra impressora'));
+      return;
+    }
+    showToast(ocupada ? 'Impressão em andamento: toque de novo quando terminar' : 'Fila cheia: toque de novo em instantes'); return;
+  }
 
   // Reserva o envio antes do diálogo Android: dois toques não geram dois trabalhos.
   const job = {};
   printViaBluetooth.activeJob = job;
+  printViaBluetooth.ativa = printer.address;
   isPrinting = true;
   const active = () => isPrinting && printViaBluetooth.activeJob === job;
   const finish = () => {
     if (!active()) return;
     printViaBluetooth.activeJob = null;
+    printViaBluetooth.ativa = null;
     releasePrinting();
+    const fila = printViaBluetooth.fila;
+    if (fila && fila.length) {
+      const proximo = fila.shift();
+      printViaBluetooth.ativa = proximo[3].address;
+      printViaBluetooth.drenando = true;
+      setTimeout(() => {
+        printViaBluetooth.drenando = false;
+        printViaBluetooth.ativa = null;
+        printViaBluetooth.apply(null, proximo);
+      }, 300);
+    }
   };
   const failed = (err, fallback) => {
     if (!active()) return;
     showError(err, 'print');
     finish();
-    if (fallback && typeof onFallback === 'function') onFallback();
+    if (fallback && typeof onFallback === 'function') onFallback(true);
   };
   printWatchdog = setTimeout(() => {
     if (!active()) return;
@@ -19332,7 +19731,7 @@ function printViaBluetooth(bytes, onFallback, printJob) {
     if (!granted) {
       showToast('Permissão Bluetooth negada. Ative Dispositivos próximos nas permissões deste app.');
       finish();
-      if (typeof onFallback === 'function') onFallback();
+      if (typeof onFallback === 'function') onFallback(true);
       return;
     }
     if (printWatchdog) clearTimeout(printWatchdog);
@@ -19343,7 +19742,7 @@ function printViaBluetooth(bytes, onFallback, printJob) {
       // Tenta fechar socket pra evitar leak — se o write travou, o socket
       // pode estar zumbi. Disconnect e silencioso (callbacks vazios).
       try { bs.disconnect(function () {}, function () {}); } catch (_) {}
-    }, 15000);
+    }, printWriteTimeoutMs(bytes.length));
     const send = () => {
       if (!active()) return;
       btStep('print:send-write');
@@ -19354,6 +19753,7 @@ function printViaBluetooth(bytes, onFallback, printJob) {
             btStep('print:write-ok');
             showToast('Enviado pra impressora');
             finish();
+            if (typeof onSent === 'function') { try { onSent(); } catch (e) { console.warn('onSent falhou:', e); } }
             if (printJob && printJob.entityId) {
               logAction({
                 action: 'etiqueta.print', entityType: printJob.entityType, entityId: printJob.entityId,
@@ -19514,6 +19914,8 @@ function etiquetasFromBatch(batch) {
         idxStr,
         codigoBarras: `${sku}-${lote}-${idxStr}`,
         codigoBarrasLegado: `${sku}-${loteLegado}-${idxStr}`,
+        // #2202 (D4): Code128 C só com o número curto do lote; sem ele, sem barra.
+        chaveCurta: batch.numeroCurto ? String(batch.numeroCurto).replace(/\D/g, '') + idxStr : null,
         weightG: it.weightG ?? null,
         productionDate: batch.createdAt,
         expiresAt: it.expiresAt ?? null,
@@ -19579,6 +19981,124 @@ function etiquetaProducaoHtml(et, nota) {
   return `${brand}${prodBlock}${photo}${infoBlock}${scanBlock}${notaBlock}`;
 }
 
+// #2141: etiqueta de produção da térmica como imagem (etiqueta-termica.js).
+// O mesmo bitmap é prévia, PNG e impressão; o texto ESC/POS fica de reserva.
+function etiquetaTermica(et) {
+  const T = window.cdbEtiquetaTermica;
+  if (!T) return null;
+  try {
+    return T.gerar(Object.assign({}, et, { empresa: et.empresa || getEmpresaName() }), {
+      formatar: { data: fmtDateBR, peso: fmtPesoG },
+      codigos: getProdScanMode(),
+      code128: code128TermicaLegivel,
+      nota: et._nota || null
+    });
+  } catch (e) { console.warn('Etiqueta térmica em imagem falhou:', e); return null; }
+}
+
+// Barras de 1 ponto não leem na térmica: só desenha com módulo >= 2.
+function code128TermicaLegivel(ctx, data, x, y, w, h) {
+  const modules = code128Modules(data);
+  const total = modules ? modules.split('').reduce((s, n) => s + Number(n || 0), 0) : 0;
+  if (!total || total * 2 > w) return false;
+  drawCode128OnCanvas(ctx, data, x, y, w, h);
+  return true;
+}
+
+// #2193: TSPL imprime a mesma imagem da prévia. Produção usa o bitmap da
+// etiqueta térmica; pedido usa o PNG da prévia. Uma etiqueta TSPL por item.
+async function canvasDoBlob(blob) {
+  const bmp = await createImageBitmap(blob);
+  const c = document.createElement('canvas');
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  if (typeof bmp.close === 'function') bmp.close();
+  return c;
+}
+// #2202 (F2): etiqueta de produção na TSPL pelo LayoutJson no tamanho final
+// (etiqueta-canvas.js). Não cabe: recusa com o motivo, sem encolher.
+function camposDaEtiqueta(et, nota) {
+  return {
+    empresa: et.empresa || getEmpresaName(),
+    nome: et.productName + (et.unit ? ' (' + et.unit + ')' : ''),
+    validade: et.expiresAt ? fmtDateBR(et.expiresAt) : '',
+    fabricacao: et.productionDate ? fmtDateBR(et.productionDate) : '',
+    lote: et.lote || '',
+    peso: et.weightG ? 'PESO ' + fmtPesoG(et.weightG) : '',
+    nota: nota || '',
+    qr: et.codigoBarras,
+    barras: et.chaveCurta || ''
+  };
+}
+function midiaDaImpressora(printer) {
+  if (printer && printer.midia && printer.midia.tipo !== 'bobina' && Number(printer.midia.larguraMm) > 0) return printer.midia;
+  const c = tsplConfig(printer);
+  return { tipo: c.continuo ? 'continuo' : 'etiqueta', larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm };
+}
+// undefined: módulos novos ausentes (segue o caminho antigo). null: recusa.
+function etiquetaProducaoTsplV2(et, nota, printer, copias) {
+  const C = window.cdbEtiquetaCanvas, P = window.cdbPapeis, I = window.cdbImpressoras;
+  if (!C || !P || !I || !window.cdbResolverEtiqueta) return undefined;
+  const regra = I.regra(localStorage, 'etiqueta-producao');
+  const r = C.tspl({
+    campos: camposDaEtiqueta(et, nota), papel: P.daMidia(midiaDaImpressora(printer)),
+    orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, copias, document
+  });
+  if (r.recusa) { etiquetasTspl.recusa = r.recusa; return null; }
+  if (!etiquetasTspl.aviso) etiquetasTspl.aviso = window.cdbResolverEtiqueta.resumo ? window.cdbResolverEtiqueta.resumo(r) : '';
+  return r.bytes;
+}
+// Frase do envio: o que mudou na etiqueta e, com papel nunca confirmado, o
+// papel que o app está usando para o operador conferir.
+function avisoDaImpressao(printer, aviso) {
+  const partes = aviso ? [aviso] : [];
+  const P = window.cdbPapeis;
+  if (printer && printer.midiaConfirmada === false && P) {
+    const papel = P.daMidia(midiaDaImpressora(printer));
+    if (papel) partes.push('Confira o papel em Ajustes: o app usa ' + P.descrever(papel) + '.');
+  }
+  return partes.join(' ');
+}
+// A recusa já diz o motivo e o que fazer; o toast começa pelo que fazer.
+function avisoDaRecusa(recusa) {
+  const acao = 'Escolha um papel maior em Ajustes';
+  const motivo = String(recusa || '').replace('. ' + acao, '');
+  return acao + '. ' + motivo.charAt(0).toUpperCase() + motivo.slice(1) + '.';
+}
+async function etiquetasTspl(etiquetas, kind, nota, printer, copias) {
+  if (!window.cdbTspl) return null;
+  etiquetasTspl.recusa = null;
+  etiquetasTspl.aviso = '';
+  const partes = [];
+  for (const et of etiquetas) {
+    let canvas = null;
+    if (kind !== 'order') {
+      const v2 = etiquetaProducaoTsplV2(et, nota, printer, copias);
+      if (v2 === null) return null;
+      if (v2) { partes.push(v2); continue; }
+    }
+    if (kind === 'order') {
+      const blob = await etiquetasToPng([et], 'order', nota);
+      if (blob) canvas = await canvasDoBlob(blob);
+    } else {
+      if (nota) et._nota = nota;
+      try { const t = etiquetaTermica(et); canvas = t && t.canvas; } finally { delete et._nota; }
+    }
+    if (!canvas) return null;
+    partes.push(tsplBytesDoCanvas(canvas, printer, copias));
+  }
+  const total = partes.reduce((n, b) => n + b.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const b of partes) { out.set(b, off); off += b.length; }
+  return out;
+}
+
+function escPosEtiquetaProducao(et) {
+  const termica = etiquetaTermica(et);
+  return termica ? termica.bytes() : escPosLabelProducao(et);
+}
+
 function escPosLabelProducao(et) {
   // Layout de etiqueta de pote (cola na embalagem):
   //   - Empresa em negrito centralizado (fonte normal, sem big — evita esticado).
@@ -19629,6 +20149,20 @@ function escPosLabelProducao(et) {
  * Não usa biblioteca externa: só Canvas API + fillText/fillRect.
  */
 function etiquetasToPng(etiquetas, kind, note) {
+  if (kind !== 'order') {
+    const termicas = etiquetas.map(et => etiquetaTermica(Object.assign({}, et, { _nota: note || null })));
+    if (termicas.every(Boolean)) {
+      const gap = 24;
+      const canvas = document.createElement('canvas');
+      canvas.width = window.cdbEtiquetaTermica.LARGURA;
+      canvas.height = termicas.reduce((h, t) => h + t.altura + gap, gap);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      let y = gap;
+      termicas.forEach(t => { ctx.drawImage(t.canvas, 0, y); y += t.altura + gap; });
+      return new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob retornou null')), 'image/png'));
+    }
+  }
   const horizOrder = kind === 'order' && currentEtqOrient === 'horizontal';
   const W = horizOrder ? 620 : 384;
   const GAP = 20;
@@ -20325,7 +20859,7 @@ let currentEtqOrient = 'vertical';     // 'vertical' | 'horizontal'
 
 function setEtqCode(mode) {
   setScanModeChoice(mode, true);
-  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => b.classList.toggle('active', b.textContent.trim() === prodScanModeLabel(mode)));
+  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => b.classList.toggle('active', b.getAttribute?.('onclick')?.includes("setEtqCode('" + mode + "')") || b.textContent.trim() === prodScanModeLabel(mode)));
   refreshEtqPreview();
 }
 // Alias: chama o setOrientChoice unificado que cuida de Ajustes + Preview + state + audit
@@ -20356,6 +20890,19 @@ function refreshEtqPreview() {
       `<div class="etq-card-wrap"><div class="${cls}">${orderLabelHtml(et.order, horiz, nota)}</div></div>`
     ).join('');
   } else {
+    const termicas = currentEtiquetas.map(et => etiquetaTermica(Object.assign({}, et, { _nota: nota || null })));
+    if (termicas.every(Boolean)) {
+      body.innerHTML = '';
+      termicas.forEach((t, i) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'etq-termica';
+        t.canvas.setAttribute('role', 'img');
+        t.canvas.setAttribute('aria-label', `Etiqueta ${i + 1} de ${termicas.length}: ${currentEtiquetas[i].productName || ''}`);
+        wrap.appendChild(t.canvas);
+        body.appendChild(wrap);
+      });
+      return;
+    }
     body.innerHTML = currentEtiquetas.map(et =>
       `<div class="etq-card-wrap"><div class="${cls}">${etiquetaProducaoHtml(et, nota)}</div></div>`
     ).join('');
@@ -20433,12 +20980,15 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   try { currentEtqOrient = getEtqOrient(); } catch(e) {}
   document.getElementById('etqTitle').textContent = kind === 'order' ? 'Etiqueta do pedido' : 'Etiquetas geradas';
   document.getElementById('etqSubtitle').textContent = subtitle || '';
+  // A térmica de produção é um rolo de 58 mm: orientação só muda a etiqueta de pedido.
+  const orientRow = document.getElementById('etqOrientChips')?.closest?.('.etq-config-row');
+  if (orientRow) orientRow.style.display = kind === 'order' ? '' : 'none';
 
   // Sync config chips
   const curMode = getProdScanMode();
   document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => {
     const lbl = b.textContent.trim();
-    b.classList.toggle('active', lbl === prodScanModeLabel(curMode));
+    b.classList.toggle('active', b.getAttribute?.('onclick')?.includes("setEtqCode('" + curMode + "')") || lbl === prodScanModeLabel(curMode));
   });
   document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b => {
     b.classList.toggle('active', b.textContent.trim() === (currentEtqOrient === 'horizontal' ? 'Horizontal' : 'Vertical'));
@@ -20453,6 +21003,9 @@ function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
   }
 
   refreshEtqPreview();
+  if (kind !== 'order' && typeof window !== 'undefined' && window.cdbEtiquetaTermica) {
+    window.cdbEtiquetaTermica.fontes().then(refreshEtqPreview);
+  }
   rememberOperationalFocus('etiquetasPreview');
   document.getElementById('etiquetasPreview').classList.add('show');
   document.getElementById('etqTitle').focus();
@@ -20476,6 +21029,7 @@ function closeEtiquetasPreview() {
 let _etqLastPrintBytes = null;
 let _etqLastPrintKind  = null;
 let _etqLastPrintJob = null;
+let _etqLastPrinter = null;
 function etiquetaPrintJob(etiquetas, kind, copies) {
   const first = etiquetas[0];
   return first ? {
@@ -20493,13 +21047,16 @@ function _etqHideRetry() {
   const btn = document.getElementById('etqRetryBtn');
   if (btn) btn.style.display = 'none';
 }
+// Falha de envio: com o erro já explicado (permissão, conexão) o toast dele
+// fica; sem Bluetooth ou impressora, sugere salvar ou compartilhar.
+function _etqSemConexao(explicado) {
+  if (!explicado) showToast('Sem conexão BT — use Salvar ou Compartilhar');
+  _etqShowRetry();
+}
 function etqRetry() {
   if (!_etqLastPrintBytes) { showToast('Nada para reimprimir'); return; }
   _etqHideRetry();
-  printViaBluetooth(_etqLastPrintBytes, function () {
-    showToast('Sem conexão BT — use Salvar ou Compartilhar');
-    _etqShowRetry();
-  }, _etqLastPrintJob);
+  printViaBluetooth(_etqLastPrintBytes, _etqSemConexao, _etqLastPrintJob, _etqLastPrinter);
 }
 
 function getEtqCopies() {
@@ -20661,7 +21218,9 @@ async function etqAction(action) {
       try { if (typeof window.cdbInstallThermalShim === 'function') window.cdbInstallThermalShim(); } catch (_) {}
 
       let bs = window.bluetoothSerial;
-      const printer = getSavedPrinter();
+      // #2202 (F1): produção vai para a impressora de etiqueta; pedido, para a de cupom.
+      const printer = impressoraPara(currentEtiquetasKind === 'order' ? 'etiqueta-pedido' : 'etiqueta-producao') || getSavedPrinter();
+      _etqLastPrinter = printer;
       const hasCapacitor = !!(window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() !== 'web');
       const hasNativePlugin = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter);
 
@@ -20688,7 +21247,18 @@ async function etqAction(action) {
         openPrinterPicker();
         return;
       }
-      if (!printerReady(printer)) { showToast('Oasis: modelo e driver pendentes de validação'); return; }
+      if (!printerReady(printer)) { showToast('A impressão de etiqueta não carregou: feche e reabra o app'); return; }
+      if (perfilImpressora(printer) === 'tspl') {
+        const copiasTspl = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
+        _etqHideRetry();
+        _etqLastPrintJob = etiquetaPrintJob(currentEtiquetas, currentEtiquetasKind, copiasTspl);
+        const bytesTspl = await etiquetasTspl(currentEtiquetas, currentEtiquetasKind, getEtqNota() || null, printer, copiasTspl);
+        if (!bytesTspl) { showToast(etiquetasTspl.recusa ? avisoDaRecusa(etiquetasTspl.recusa) : 'Falha ao montar a etiqueta'); return; }
+        _etqLastPrintBytes = bytesTspl;
+        const avisoEnvio = avisoDaImpressao(printer, etiquetasTspl.aviso);
+        printViaBluetooth(bytesTspl, _etqSemConexao, _etqLastPrintJob, printer, avisoEnvio ? () => showToast('Enviado. ' + avisoEnvio) : undefined);
+        return;
+      }
       // #437: cópias (1/2/5/10) e retry
       const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
       _etqHideRetry();
@@ -20701,10 +21271,7 @@ async function etqAction(action) {
         const totalBytes = new Uint8Array(oneShot.length * copies);
         for (let ci = 0; ci < copies; ci++) totalBytes.set(oneShot, ci * oneShot.length);
         _etqLastPrintBytes = totalBytes;
-        printViaBluetooth(totalBytes, function () {
-          showToast('Sem conexão BT — use Salvar ou Compartilhar');
-          _etqShowRetry();
-        }, _etqLastPrintJob);
+        printViaBluetooth(totalBytes, _etqSemConexao, _etqLastPrintJob, printer);
       } else {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
@@ -20714,7 +21281,7 @@ async function etqAction(action) {
         const parts = currentEtiquetas.map(et => {
           if (prodNota) et._nota = prodNota;
           try {
-            const b = escPosLabelProducao(et);
+            const b = escPosEtiquetaProducao(et);
             singleLen += b.length;
             return b;
           } finally {
@@ -20728,10 +21295,7 @@ async function etqAction(action) {
         const totalBytes = new Uint8Array(singleLen * copies);
         for (let ci = 0; ci < copies; ci++) totalBytes.set(singleRun, ci * singleLen);
         _etqLastPrintBytes = totalBytes;
-        printViaBluetooth(totalBytes, function () {
-          showToast('Sem conexão BT — use Salvar ou Compartilhar');
-          _etqShowRetry();
-        }, _etqLastPrintJob);
+        printViaBluetooth(totalBytes, _etqSemConexao, _etqLastPrintJob, printer);
       }
       return;
     }
@@ -21233,7 +21797,6 @@ function confirmProduction() {
   // O registro JÁ aconteceu acima (batches.push + persistAll); o preview
   // é apenas um passo opcional de impressão. Fechar o modal preserva o registro.
   const etiquetas = etiquetasFromBatch(batch);
-  showToast(`✓ Produção cadastrada · Lote ${codigoLote}`);
   if (etiquetas.length > 0) {
     showEtiquetasPreview(
       etiquetas,
@@ -21242,6 +21805,7 @@ function confirmProduction() {
       `Produção cadastrada · imprima as etiquetas abaixo`
     );
   } else {
+    showToast(`✓ Produção cadastrada · Lote ${codigoLote}`);
     go('home');
   }
   return true;
@@ -21760,10 +22324,7 @@ function updateSaveOrderBtn() {
   const notes = document.getElementById('orderNotes').value.trim();
   // Pra salvar: precisa ter cliente + (pelo menos 1 item OU observação preenchida)
   btn.disabled = !selectedClient || (currentOrderItems.length === 0 && !notes);
-  const total = currentOrderItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
-  btn.textContent = btn.disabled
-    ? 'Salvar pedido'
-    : 'Salvar ' + (total > 0 ? money(total) : 'pedido');
+  btn.textContent = 'Salvar pedido';
   renderOrderDraftSummary();
 }
 document.getElementById('orderNotes').addEventListener('input', updateSaveOrderBtn);
@@ -21936,10 +22497,10 @@ function saveOrder() {
     : `<span class="hi">✓ Pedido criado</span> pra ${escapeHtml(nomeCli)} · ${money(total)}`;
   const actions = retroAtMs ? [
     { label: '🖨️ Imprimir',     fn: () => printEtiqueta(order.id) },
-    { label: '💳 Cobrar',       fn: () => openCobranca(order.id) },
+    { label: '💳 Preparar cobrança',       fn: () => openCobranca(order.id) },
     { label: 'Ver caixa',       fn: () => go('movimento') }
   ] : [
-    { label: '💳 Cobrar',       fn: () => openCobranca(order.id) },
+    { label: '💳 Preparar cobrança',       fn: () => openCobranca(order.id) },
     { label: 'Iniciar preparo', fn: () => { advanceOrder(order.id); go('pedidos'); } },
     { label: 'Ver esteira',     fn: () => {
         go('pedidos');
@@ -23060,6 +23621,12 @@ window.cdbApp = {
 </script>
 
 <script src="qrcode.min.js?v=20260429a"></script>
+<script src="etiqueta-termica.js?v=20261028a"></script>
+<script src="impressao-papeis.js?v=20261104b"></script>
+<script src="impressoras.js?v=20261104c"></script>
+<script src="etiqueta-resolver.js?v=20261104c"></script>
+<script src="etiqueta-canvas.js?v=20261104c"></script>
+<script src="impressora-tspl.js?v=20261104b"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
 <script src="upload-photos.js?v=20260514b"></script>
@@ -23215,7 +23782,7 @@ window.cdbApp = {
     'updateModal','autoBackupModal','noPrinterModal','productActionsModal',
     'ajustarModal','problemaModal','conferProdModal','prodProblemaModal',
     'cashCloseModal','etiquetasPreview','ajustesModal','cashEntryModal',
-    'newProductModal','productionConfirmModal',
+    'newProductModal','productionConfirmModal','cobrancaModal','newClientModal','itemPickerModal',
     'productModal','clientModal','batchModal','novoProdutoModal',
     'globalSearchModal','diagnosticsModal','supportModal'
   ];
@@ -23244,6 +23811,9 @@ window.cdbApp = {
       ajustesModal: 'closeAjustes',
       etiquetasPreview: 'closeEtiquetasPreview',
       newProductModal: 'closeProductModal',
+      cobrancaModal: 'closeCobranca',
+      newClientModal: 'closeClientModal',
+      itemPickerModal: 'closeItemPicker',
       productionConfirmModal: 'closeProductionConfirm',
       noPrinterModal: 'closeNoPrinterModal',
       updateModal: 'closeUpdateModal',
@@ -23277,26 +23847,33 @@ window.cdbApp = {
   function handleBack(event) {
     try {
       // 1. Imprimindo: protege o fluxo
-      if (window.isPrinting === true) {
+      if (isPrinting === true) {
         try { showToast && showToast('Aguarde a impressão terminar'); } catch (_) {}
-        return; // intercept silencioso
+        return true; // intercept silencioso
       }
       // 2. Modal aberto
       var modal = findOpenModal();
       if (modal) {
         tryCloseModal(modal);
-        return;
+        return true;
       }
       // 3. Mais menu aberto
       if (isMoreMenuOpen() && typeof closeMoreMenu === 'function') {
         closeMoreMenu();
-        return;
+        return true;
+      }
+      // No APK, o formulário pertence à lista de Pedidos; mantém o rascunho.
+      if (window.CDB_CONFIG?.isPilot && typeof currentScreen !== 'undefined' && currentScreen === 'pedidos'
+          && document.querySelector('[data-screen="pedidos"] .pedidos-tab-section[data-tab="novo"]')?.style.display === ''
+          && typeof goPedidosTab === 'function') {
+        goPedidosTab('andamento');
+        return true;
       }
       // 4. Não estamos em home — volta na história
       if (typeof currentScreen !== 'undefined' && currentScreen !== 'home'
           && typeof goBack === 'function') {
         goBack();
-        return;
+        return true;
       }
       // 5. Em home, sem modais — minimiza ao invés de fechar (preserva estado)
       try {
@@ -23308,7 +23885,12 @@ window.cdbApp = {
     } catch (e) {
       console.warn('[backbutton] handler erro:', e);
     }
+    return false;
   }
+
+  // O APK usa a ponte própria; não depende do plugin opcional @capacitor/app.
+  window.cdbHandleBack = handleBack;
+  window.cdbIsPrinting = function () { return isPrinting === true; };
 
   function attach() {
     try {
@@ -23536,22 +24118,26 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Pede permissao Bluetooth na 1a abertura do app — sem isso, qualquer
-// chamada bs.* no Android 12+ crasha. Roda apos deviceready (cordova) ou
-// logo que window.cordova existe (Capacitor injeta antes do load).
-document.addEventListener('deviceready', () => {
-  if (typeof ensureBluetoothPermission === 'function') {
-    ensureBluetoothPermission(() => {/* prompt mostrado, segue */});
-  }
-}, false);
-// Fallback: Capacitor nao dispara deviceready em todas as versoes.
-// Tenta de novo 2s apos load — se ja tiver permissao, no-op silencioso.
+// Oferta inicial única. Recusar não impede usar o app nem provoca novo prompt
+// pelo fallback. Impressoras/Imprimir continuam pedindo a permissão ao usar.
+let initialBluetoothOfferStarted = false;
+function offerInitialBluetoothPermission() {
+  if (initialBluetoothOfferStarted || typeof ensureBluetoothPermission !== 'function') return;
+  const nativePrinter = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter;
+  const legacyPermissions = window.cordova && window.cordova.plugins && window.cordova.plugins.permissions;
+  if (!(nativePrinter && typeof nativePrinter.requestPermissions === 'function')
+      && !(legacyPermissions && typeof legacyPermissions.requestPermissions === 'function')) return;
+  const offeredKey = 'cdb-bluetooth-initial-offer-v1';
+  try { if (localStorage.getItem(offeredKey) === '1') return; } catch (_) {}
+  initialBluetoothOfferStarted = true;
+  // A marca descreve a oferta, não o estado da permissão, e precede o diálogo.
+  try { localStorage.setItem(offeredKey, '1'); } catch (_) {}
+  try { ensureBluetoothPermission(() => {}); } catch (_) {}
+}
+document.addEventListener('deviceready', offerInitialBluetoothPermission, false);
+// Capacitor pode disponibilizar o bridge sem emitir deviceready.
 window.addEventListener('load', () => {
-  setTimeout(() => {
-    if (typeof ensureBluetoothPermission === 'function') {
-      try { ensureBluetoothPermission(() => {}); } catch (e) {}
-    }
-  }, 2000);
+  setTimeout(offerInitialBluetoothPermission, 2000);
 });
 
 // Hooks globais de erro — registram window.onerror e unhandledrejection

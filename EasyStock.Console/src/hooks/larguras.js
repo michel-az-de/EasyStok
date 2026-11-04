@@ -4,32 +4,34 @@
 // Medido na tela real: com 360 e 420 fixos, em 1280 a conversa ficava com 380 px, menor que o
 // Balcão e a Ficha, e em 1920 a Ficha rolava 3,3 telas ao lado de 400 px vazios na conversa.
 
-// Ficha em 420 (rodada 4): 320 espremia o nome do prato a 0 px de largura com
-// a alça de arrastar e o contador na mesma linha (achado do corte na coluna).
-// Balcão em 360 (rodada 5, seção 1): os chips de canal cabem numa linha só a
-// partir de 336 px úteis.
+// A ficha é um resumo; a comanda abre no painel móvel. Busca e filtros
+// avançados têm controles próprios, então não determinam a largura da lista.
 // Cardápio em 460 (#1474): com foto, preço e o botão de enviar foto, 400 deixava o nome
 // do prato em quatro linhas.
-export const PADRAO = { balcao: 360, ficha: 420, cardapio: 460 }
+export const PADRAO = { balcao: 276, ficha: 316, cardapio: 460 }
+const PADRAO_ANTERIOR = { balcao: 360, ficha: 420, cardapio: 460 }
 
 const NOTEBOOK = 1400
 const TELA_LARGA = 1700
 
 export function padraoPorTela(larguraDaTela) {
-  if (larguraDaTela < NOTEBOOK) return { ...PADRAO, balcao: 320, ficha: 360 }
-  // #1868: em 1920 a Ficha de 520 sobrava 200 px vazios; a lista ganha 60 px de prévia e a conversa
-  // segue com cerca de 900.
-  if (larguraDaTela >= TELA_LARGA) return { ...PADRAO, balcao: 420, ficha: 480 }
+  if (larguraDaTela < NOTEBOOK) return { ...PADRAO, balcao: 260, ficha: 292 }
+  // Em tela larga, a conversa recebe a maior parte do espaço adicional.
+  if (larguraDaTela >= TELA_LARGA) return { ...PADRAO, balcao: 304, ficha: 340 }
   return { ...PADRAO }
 }
 
-// Só o que a pessoa arrastou. Até esta rodada o padrão era gravado no primeiro uso, sem ninguém
-// arrastar nada: valor salvo igual ao padrão antigo não é escolha.
+// A versão atual guarda apenas escolhas explícitas, inclusive o valor de um padrão anterior.
 export function escolhidasDoSalvo(salvo) {
   if (!salvo || typeof salvo !== 'object' || Array.isArray(salvo)) return {}
   return Object.fromEntries(Object.entries(salvo)
-    .filter(([chave, valor]) => chave in PADRAO && Number.isFinite(valor) && valor !== PADRAO[chave]))
+    .filter(([chave, valor]) => chave in PADRAO && Number.isFinite(valor)))
 }
+
+// A comparação com o padrão antigo só vale na migração. Na versão nova, até
+// 360/420 podem ser escolhas explícitas e precisam sobreviver ao recarregamento.
+export const migrarLargurasAntigas = (salvo) => Object.fromEntries(Object.entries(escolhidasDoSalvo(salvo))
+  .filter(([chave, valor]) => valor !== PADRAO_ANTERIOR[chave]))
 
 // Com o cardápio aberto do lado do Balcão, a coluna abre espaço para ele em vez de deixar o
 // painel por cima do começo das mensagens. 440 é a largura mínima do painel (`PainelCardapio`)

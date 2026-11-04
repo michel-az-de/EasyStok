@@ -81,7 +81,8 @@ try {
     try { Invoke-OtaRemote 'discard' } catch { Write-Warning ('Staging não descartado: ' + $stage) }
     throw
 }
-$published = Invoke-RestMethod -MaximumRedirection 0 -Uri ($publicBase + 'latest.json?verify=' + [Guid]::NewGuid().ToString('N')) -TimeoutSec 30
+$manifestPath = if ($payload.nativeVersionCode -ge 5) { 'native-' + $payload.nativeVersionCode + '/latest.json' } else { 'latest.json' }
+$published = Invoke-RestMethod -MaximumRedirection 0 -Uri ($publicBase + $manifestPath + '?verify=' + [Guid]::NewGuid().ToString('N')) -TimeoutSec 30
 $expected = Get-Content -LiteralPath $release.FullName -Raw | ConvertFrom-Json
 if ($published.payloadBase64 -ne $expected.payloadBase64 -or $published.signatureBase64 -ne $expected.signatureBase64) {
     throw 'Manifesto público divergente. Confira a publicação antes de entregá-la.'

@@ -14,7 +14,8 @@ public class IntegracoesWhatsAppController(
     ObterStatusIntegracaoWhatsAppUseCase obterStatusUseCase,
     IOptions<MetaCloudWhatsAppOptions> metaOptions,
     IConfiguration configuration,
-    ICurrentUserAccessor currentUser) : EasyStockControllerBase
+    ICurrentUserAccessor currentUser,
+    GerenciarWppConnectUseCase? gerenciarWeb = null) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "WhatsApp integration status for the tenant (Admin only)",
         Description = "404 when the ModuloAtendimento feature flag is not active for the tenant.")]
@@ -30,13 +31,16 @@ public class IntegracoesWhatsAppController(
         if (status is null)
             return DataNotFound("Modulo de atendimento nao esta ativo para esta empresa.");
 
+        var web = gerenciarWeb is null ? null : await gerenciarWeb.ObterAsync(currentUser.EmpresaId, ct);
+
         return DataOk(new
         {
             phoneNumberId = status.PhoneNumberId,
             apiVersion = metaOptions.Value.ApiVersion,
             webhookVerificadoEm = status.WebhookVerificadoEm,
             ultimaMensagemRecebidaEm = status.UltimaMensagemRecebidaEm,
-            provider = configuration["Notifications:WhatsApp:Provider"] ?? "stub"
+            provider = web?.Vinculado == true ? "wppconnect" : configuration["Notifications:WhatsApp:Provider"] ?? "stub",
+            sessaoWeb = web?.Vinculado == true ? web : null
         });
     }
 

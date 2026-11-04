@@ -10,6 +10,9 @@ import {
 } from '../../dominio/kds'
 import { ORDEM_DAS_LINHAS, nomeDoPedido } from '../../dominio/pedido'
 import { useCozinhaApi } from '../../aplicacao/useCozinhaApi'
+import { METODOS_NA_PORTA, metodoSugeridoNaPorta } from '../../aplicacao/recebimentoNaEntrega'
+import { trocoDaPorta } from '../../dominio/roteiroDoDia'
+import { CampoSelecao } from '../../componentes/Campo'
 import { SEGUNDOS_PARA_DESFAZER_ETAPA } from '../../aplicacao/envioComDesfazer'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
@@ -70,7 +73,7 @@ export function TelaCozinhaApi({ linhas }) {
   const { amanha, data: dataDaFila } = diaDaFilaDaCozinha(amanhaDesde, agora)
   const {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes, saldoPendente, descartarSaldoPendente,
-    avancar, recarregar, reimprimir, limparErro, adiados = SEM_ADIADOS, desfazerAvanco,
+    avancar, receberEEntregar, recarregar, reimprimir, limparErro, adiados = SEM_ADIADOS, desfazerAvanco,
   } = useCozinhaApi({ data: dataDaFila })
   const [linhaFiltro, setLinhaFiltro] = useState(null)
   const [abertoId, setAbertoId] = useState(null)
@@ -166,17 +169,13 @@ export function TelaCozinhaApi({ linhas }) {
         </p>
       )}
       {saldoPendente && (
-        <div className={css.motivoRecusa} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
-          <Icone nome="alerta" tamanho={16} />
-          <span>
-            {nomeDoPedido((pedidos ?? []).find((p) => p.id === saldoPendente.id) ?? {}).frase}: falta receber {moeda(saldoPendente.valor)}.
-            Marque entregue se recebeu na porta ou combinou a cobrança.
-          </span>
-          <span>
-            <Botao variante="primario" onClick={() => avancar(saldoPendente.id, saldoPendente.status, true)}>Marcar entregue</Botao>
-            <Botao variante="texto" onClick={descartarSaldoPendente}>Voltar</Botao>
-          </span>
-        </div>
+        <PerguntaDoSaldo
+          key={`${saldoPendente.id}|${saldoPendente.valor}`} saldo={saldoPendente}
+          pedido={lista.find((p) => p.id === saldoPendente.id) ?? {}} ocupado={movendo.has(saldoPendente.id)}
+          aoReceber={(metodo) => receberEEntregar(saldoPendente.id, saldoPendente.status, saldoPendente.valor, metodo)}
+          aoEntregarSemReceber={() => avancar(saldoPendente.id, saldoPendente.status, true)}
+          aoVoltar={descartarSaldoPendente}
+        />
       )}
       {avisoDeFilaNoTeto(lista.length) && (
         <p className={css.motivoRecusa} role="alert">
@@ -282,6 +281,31 @@ export function TelaCozinhaApi({ linhas }) {
           aoFechar={() => setAbertoId(null)}
         />
       )}
+    </div>
+  )
+}
+
+// #2079 (C1): a pergunta do saldo é a da porta das Entregas (J2): "Recebi R$ X" lança o pagamento e marca
+// entregue; "Entregue sem receber" é a saída explícita de quem combinou a cobrança para depois.
+function PerguntaDoSaldo({ saldo, pedido, ocupado, aoReceber, aoEntregarSemReceber, aoVoltar }) {
+  const [metodo, setMetodo] = useState(() => metodoSugeridoNaPorta(pedido.observacoes))
+  const troco = trocoDaPorta(pedido.observacoes, saldo.valor)
+  return (
+    <div className={css.motivoRecusa} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
+      <Icone nome="alerta" tamanho={16} />
+      <span>
+        {nomeDoPedido(pedido).frase}: falta receber {moeda(saldo.valor)}. Recebeu na porta? Diga como e o pagamento
+        entra no Caixa junto com a entrega.{troco && <> {troco}.</>}
+      </span>
+      <span>
+        <CampoSelecao rotulo="Como recebeu" rotuloOculto opcoes={METODOS_NA_PORTA} value={metodo}
+          disabled={ocupado} onChange={(e) => setMetodo(e.target.value)} />
+        <Botao variante="primario" disabled={ocupado || !metodo} onClick={() => aoReceber(metodo)}>
+          Recebi {moeda(saldo.valor)}
+        </Botao>
+        <Botao variante="secundario" disabled={ocupado} onClick={aoEntregarSemReceber}>Entregue sem receber</Botao>
+        <Botao variante="texto" disabled={ocupado} onClick={aoVoltar}>Voltar</Botao>
+      </span>
     </div>
   )
 }

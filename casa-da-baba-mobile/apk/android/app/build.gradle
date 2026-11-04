@@ -49,6 +49,14 @@ android {
 repositories {
     flatDir { dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs' }
 }
+// Sem o plugin Kotlin, o app Java seleciona variantes JVM sem as classes Android usadas pelo FCM.
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        ['datastore', 'datastore-core', 'datastore-preferences'].each { name ->
+            substitute(module("androidx.datastore:$name")).using(module("androidx.datastore:$name-android:1.1.7"))
+        }
+    }
+}
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
@@ -57,5 +65,6 @@ dependencies {
     implementation project(':capacitor-android')
     implementation project(':capacitor-cordova-android-plugins')
     implementation 'com.google.firebase:firebase-messaging:25.0.2'
+    implementation 'androidx.datastore:datastore-preferences:1.1.7'
 }
 apply from: 'capacitor.build.gradle'

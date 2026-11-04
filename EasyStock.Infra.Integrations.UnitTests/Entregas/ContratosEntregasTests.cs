@@ -147,7 +147,7 @@ public sealed class ContratosEntregasTests
         Assert.Equal("16.90", resposta.PriceBreakdown.Total);
         var chamada = handler.UltimaChamada!;
         var timestamp = new DateTimeOffset(Agora).ToUnixTimeMilliseconds().ToString();
-        var expected = AssinaturasEntrega.Lalamove("secret", timestamp, "POST", "/v3/quotations", chamada.Corpo!);
+        var expected = EasyStock.Infra.Integrations.Logistica.Lalamove.AssinadorLalamove.Assinar("secret", long.Parse(timestamp, System.Globalization.CultureInfo.InvariantCulture), "POST", "/v3/quotations", chamada.Corpo!);
         Assert.Equal($"hmac key:{timestamp}:{expected}", chamada.Cabecalho("Authorization"));
         Assert.Equal("BR", chamada.Cabecalho("Market"));
         using var json = JsonDocument.Parse(chamada.Corpo!);

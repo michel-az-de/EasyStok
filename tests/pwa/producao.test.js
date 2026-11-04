@@ -43,6 +43,44 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.strictEqual(runInSandbox(`prodScanModeLabel('xyz')`), 'QR + barras');
   });
 
+  function labelSelectionFixture(mode) {
+    const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+    const html = fs.readFileSync(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+    const chips = [...html.matchAll(/<button[^>]*onclick="setEtqCode\('([^']+)'\)"[^>]*>([^<]+)<\/button>/g)].map(match => {
+      const chip = { mode: match[1], textContent: match[2], active: false };
+      chip.classList = { toggle: (_, selected) => { chip.active = selected; } }; return chip;
+    });
+    assert.deepStrictEqual(chips.map(chip => chip.mode), ['both', 'qr', 'barcode', 'none']);
+    const context = { document: {
+      querySelectorAll: selector => selector === '#etqCodeChips .etq-chip' ? chips : [],
+      getElementById: () => ({ style: {}, classList: { add() {} }, focus() {} })
+    }, getProdScanMode: () => mode, setScanModeChoice: value => { mode = value; }, getEtqOrient: () => 'vertical',
+    refreshEtqPreview() {}, rememberOperationalFocus() {} };
+    vm.createContext(context);
+    for (const name of ['prodScanModeLabel', 'setEtqCode', 'showEtiquetasPreview']) {
+      const start = html.indexOf('function ' + name + '(');
+      const end = html.indexOf('\nfunction ', start + 1);
+      assert.ok(start >= 0 && end > start);
+      vm.runInContext(html.slice(start, end), context);
+    }
+    return { chips, context };
+  }
+
+  for (const mode of ['both', 'qr', 'barcode', 'none']) {
+    test('#2091 etiquetas: chip real selecionado ao abrir em ' + mode, () => {
+      const { chips, context } = labelSelectionFixture(mode);
+      context.showEtiquetasPreview([{ id: 'lote-teste' }], 'producao', 'Teste');
+      assert.deepStrictEqual(chips.filter(chip => chip.active).map(chip => chip.mode), [mode]);
+    });
+    test('#2091 etiquetas: chip real selecionado ao alterar para ' + mode, () => {
+      const { chips, context } = labelSelectionFixture(mode === 'none' ? 'both' : 'none');
+      context.showEtiquetasPreview([{ id: 'lote-teste' }], 'producao', 'Teste');
+      context.setEtqCode(mode);
+      assert.deepStrictEqual(chips.filter(chip => chip.active).map(chip => chip.mode), [mode]);
+      assert.strictEqual(context.getProdScanMode(), mode);
+    });
+  }
+
   // A4 — switchLoja deve drenar a fila antes de trocar pra evitar mutations
   // da loja antiga subirem APOS o switch atribuidas a loja nova (drama
   // silencioso cross-loja). Testes validam o contrato de entrada.
