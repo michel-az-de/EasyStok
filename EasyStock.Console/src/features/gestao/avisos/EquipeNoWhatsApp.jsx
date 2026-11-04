@@ -1,7 +1,7 @@
 // #2211: quem da equipe recebe no WhatsApp da loja os avisos do grupo "WhatsApp da equipe". Cada marcação
 // grava na hora (uma pessoa por vez). Sem telefone confirmado a marcação fica, mas nada chega: a linha avisa.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { obterEquipeAvisada, salvarPessoaAvisada } from '../../../infra/api/avisosApi'
+import { carregarEquipeAvisada, gravarPessoaAvisada } from '../../../aplicacao/avisosDaOperacao'
 import { Botao } from '../../../componentes/Botao'
 import css from './abaAvisos.module.css'
 
@@ -18,7 +18,7 @@ function LinhaDaPessoa({ pessoa, aoMudar }) {
     const proxima = { ...pessoa, [campo]: ligado }
     setSituacao({ estado: 'salvando' })
     try {
-      const salva = await salvarPessoaAvisada(pessoa.usuarioId, proxima)
+      const salva = await gravarPessoaAvisada(pessoa.usuarioId, proxima)
       aoMudar(salva && typeof salva === 'object' ? salva : proxima)
       setSituacao({ estado: 'salvo' })
     } catch (erro) {
@@ -59,7 +59,7 @@ export function EquipeNoWhatsApp() {
 
   const buscar = useCallback(() => {
     const atual = ++consulta.current
-    return obterEquipeAvisada()
+    return carregarEquipeAvisada()
       .then((dados) => { if (atual === consulta.current) setCarga({ estado: 'ok', pessoas: Array.isArray(dados) ? dados : [] }) })
       .catch((erro) => { if (atual === consulta.current) setCarga({ estado: 'erro', mensagem: erro.message, pessoas: [] }) })
   }, [])
