@@ -107,6 +107,22 @@ public class GravarRegraImpressaoLojaUseCaseTests
     }
 
     [Fact]
+    public async Task Corrida_perdida_para_o_mesmo_corpo_nao_e_conflito()
+    {
+        // Banca #2205: duplo clique ou retry em voo, dois PUTs iguais com o mesmo If-Match. O perdedor encontra o seu corpo gravado.
+        _repo.ObterAsync(EmpresaId, LojaId, Arg.Any<CancellationToken>())
+            .Returns(new RegraImpressaoSalva(CanonicoA4, 5, Agora.UtcDateTime),
+                     new RegraImpressaoSalva(CanonicoA5, 6, Agora.UtcDateTime));
+        _repo.GravarAsync(EmpresaId, LojaId, 5, CanonicoA5, Agora.UtcDateTime, Arg.Any<CancellationToken>())
+            .Returns(new GravacaoRegraImpressao(false, 6));
+
+        var resultado = await _useCase.ExecuteAsync(Comando(versao: 5, Pedido("a5")));
+
+        resultado.Desfecho.Should().Be(DesfechoGravacaoImpressao.SemMudanca);
+        resultado.Atual!.Versao.Should().Be(6);
+    }
+
+    [Fact]
     public async Task Corpo_invalido_e_recusado_com_o_campo()
     {
         _repo.ObterAsync(EmpresaId, LojaId, Arg.Any<CancellationToken>()).Returns(new RegraImpressaoSalva(null, 0, null));

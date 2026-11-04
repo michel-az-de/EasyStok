@@ -91,11 +91,13 @@ public class GravarRegraImpressaoLojaUseCase(
                 new RegraImpressaoLojaResult(command.LojaId, gravacao.Versao, RegraImpressaoLojaResult.Elemento(json), agora));
         }
 
-        // Outra gravação chegou entre a leitura e o UPDATE: devolve o que venceu.
+        // Outra gravação chegou entre a leitura e o UPDATE: devolve o que venceu. Se venceu o mesmo corpo
+        // (duplo clique, retry em voo), o pedido já está atendido e não é conflito.
         var vencedora = await repositorio.ObterAsync(command.EmpresaId, command.LojaId, ct);
+        var resultadoVencedor = vencedora is null ? null : RegraImpressaoLojaResult.De(command.LojaId, vencedora);
         return new GravarRegraImpressaoResult(
-            DesfechoGravacaoImpressao.Conflito,
-            vencedora is null ? null : RegraImpressaoLojaResult.De(command.LojaId, vencedora));
+            resultadoVencedor?.Impressao?.GetRawText() == json ? DesfechoGravacaoImpressao.SemMudanca : DesfechoGravacaoImpressao.Conflito,
+            resultadoVencedor);
     }
 
     private async Task ValidarTemplatesAsync(Guid empresaId, RegraImpressaoLoja regra)
