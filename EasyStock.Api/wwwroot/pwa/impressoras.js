@@ -247,8 +247,48 @@
     };
   }
 
+  // #2209 (F4): a forma canônica do servidor (RegraImpressaoNormalizador). Documentos
+  // e códigos na ordem do catálogo, o que não é do contrato sai, as chaves na ordem
+  // do texto canônico. Nunca lança: a regra ruim vira o padrão, não derruba a impressão.
+  const CATALOGO_REGRA = {
+    documentos: ['etiqueta-producao', 'etiqueta-pedido', 'pedido'],
+    papeis: ['cupom-58', 'cupom-80', 'etiqueta-52', 'etiqueta-80', 'etiqueta-10x15', 'a4', 'a5'],
+    orientacoes: ['vertical', 'horizontal'],
+    codigos: ['qr', 'barras'],
+    origens: ['Sistema', 'Empresa'],
+    copias: { min: 1, max: 10, padrao: 1 }
+  };
+  const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const GUID_VAZIO = '00000000-0000-0000-0000-000000000000';
+
+  function templateDaRegra(t) {
+    if (!t || typeof t !== 'object' || CATALOGO_REGRA.origens.indexOf(t.origem) < 0) return null;
+    const id = typeof t.id === 'string' && GUID.test(t.id) ? t.id.toLowerCase() : GUID_VAZIO;
+    return id === GUID_VAZIO ? null : { origem: t.origem, id };
+  }
+
+  function normalizarRegra(entrada) {
+    const docs = entrada && typeof entrada.documentos === 'object' && entrada.documentos ? entrada.documentos : {};
+    const documentos = {};
+    const C = CATALOGO_REGRA;
+    C.documentos.forEach(nome => {
+      const d = Object.prototype.hasOwnProperty.call(docs, nome) ? docs[nome] : null;
+      if (!d || typeof d !== 'object' || C.papeis.indexOf(d.papel) < 0) return;
+      const copias = Number.isInteger(d.copias) ? d.copias : C.copias.padrao;
+      documentos[nome] = {
+        papel: d.papel,
+        template: templateDaRegra(d.template),
+        orientacao: C.orientacoes.indexOf(d.orientacao) >= 0 ? d.orientacao : null,
+        codigos: Array.isArray(d.codigos) ? C.codigos.filter(c => d.codigos.indexOf(c) >= 0) : null,
+        copias: Math.min(C.copias.max, Math.max(C.copias.min, copias))
+      };
+    });
+    return { v: 1, documentos };
+  }
+
   global.cdbImpressoras = {
     CHAVE, REGRA, PAPEIS: PAPEIS.slice(),
-    linguagemPorNome, deLegado, paraLegado, migrar, ler, salvar, cadastrar, esquecer, definirPapel, resolver, papelDoDocumento, regra
+    linguagemPorNome, deLegado, paraLegado, migrar, ler, salvar, cadastrar, esquecer, definirPapel, resolver, papelDoDocumento, regra,
+    normalizarRegra
   };
 })(typeof window !== 'undefined' ? window : globalThis);

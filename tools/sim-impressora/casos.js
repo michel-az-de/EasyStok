@@ -12,7 +12,8 @@ const ORIENTACOES = ['vertical', 'horizontal'];
 const CODIGOS = { qr: ['qr'], barras: ['barras'], ambos: ['qr', 'barras'] };
 const MIDIAS = ['continuo', 'recortado'];
 
-// Dados do protótipo da auditoria 2 (mesmo QR e mesma chave curta).
+// Dados do protótipo da auditoria 2 (mesmo QR). #2209: a chave curta segue o
+// servidor, número curto de 8 dígitos + unidade com 4 = 12 dígitos.
 const DADOS = {
   empresa: 'Casa da Baba',
   produto: { id: 'talharim-espinafre', name: 'Talharim Fresco de Espinafre', sku: 'TALHARIM' },
@@ -21,10 +22,10 @@ const DADOS = {
   validade: Date.UTC(2026, 10, 6, 15, 0),
   batchId: 'lote-0001-707082',
   loteDoDia: 'LOT-261103',
-  numeroCurto: '2611037070820',
+  numeroCurto: '00707082',
   pesoG: 300,
   qr: 'TALHARIM-LOT-261103-707082-001',
-  barras: '2611037070820001'
+  barras: '007070820001'
 };
 
 function casos() {

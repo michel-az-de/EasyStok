@@ -17372,7 +17372,8 @@ function findUnitByCode(code) {
   for (const batch of allBatches) {
     const ets = etiquetasFromBatch(batch);
     for (const et of ets) {
-      if (String(et.codigoBarras || '').toUpperCase() === c) {
+      // #2209: o QR traz o código longo; a barra, a chave do número curto.
+      if (String(et.codigoBarras || '').toUpperCase() === c || (et.chaveCurta && et.chaveCurta === c)) {
         return { batch, et, idxStr: et.idxStr };
       }
     }
@@ -19890,12 +19891,18 @@ function generateCode128Svg(data, width = 260, height = 58) {
  * Expande um batch em N etiquetas (1 por unidade produzida) com todos os
  * dados que cada etiqueta precisa pra ser renderizada/impressa.
  */
+// #2209 (F4): a unidade vai na barra com 4 dígitos, então um lote numera até 9.999.
+const UNIDADES_MAX_DA_BARRA = 9999;
+const RECUSA_BARRA_EXCEDIDA = 'Escolha só o QR em Ajustes. A barra numera até 9.999 etiquetas por lote, e este lote passa disso.';
 function etiquetasFromBatch(batch) {
   const out = [];
   const lote = codigoDoLote(batch);
   // Formato antigo (so o lote do dia): etiquetas ja impressas continuam achaveis.
   const loteLegado = batch.lote || getLoteDoDia(new Date(batch.createdAt));
   const empresa = getEmpresaName();
+  const numeroCurto = batch.numeroCurto ? String(batch.numeroCurto).replace(/\D/g, '') : '';
+  // Acima do teto a chave não cabe: nenhuma etiqueta leva chave truncada.
+  const barraExcedida = (batch.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0) > UNIDADES_MAX_DA_BARRA;
   let serial = 1;
   (batch.items || []).forEach(it => {
     const product = products.find(p => p.id === it.productId);
@@ -19915,7 +19922,9 @@ function etiquetasFromBatch(batch) {
         codigoBarras: `${sku}-${lote}-${idxStr}`,
         codigoBarrasLegado: `${sku}-${loteLegado}-${idxStr}`,
         // #2202 (D4): Code128 C só com o número curto do lote; sem ele, sem barra.
-        chaveCurta: batch.numeroCurto ? String(batch.numeroCurto).replace(/\D/g, '') + idxStr : null,
+        // #2209: número curto + unidade com 4 dígitos (12 ou 14 dígitos, par). O QR fica com 3.
+        chaveCurta: numeroCurto && !barraExcedida ? numeroCurto + String(serial).padStart(4, '0') : null,
+        barraExcedida,
         weightG: it.weightG ?? null,
         productionDate: batch.createdAt,
         expiresAt: it.expiresAt ?? null,
@@ -20040,6 +20049,7 @@ function etiquetaProducaoTsplV2(et, nota, printer, copias) {
   const C = window.cdbEtiquetaCanvas, P = window.cdbPapeis, I = window.cdbImpressoras;
   if (!C || !P || !I || !window.cdbResolverEtiqueta) return undefined;
   const regra = I.regra(localStorage, 'etiqueta-producao');
+  if (et.barraExcedida && regra.codigos.indexOf('barras') >= 0) { etiquetasTspl.recusa = RECUSA_BARRA_EXCEDIDA; return null; }
   const r = C.tspl({
     campos: camposDaEtiqueta(et, nota), papel: P.daMidia(midiaDaImpressora(printer)),
     orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, copias, document
@@ -20061,6 +20071,8 @@ function avisoDaImpressao(printer, aviso) {
 }
 // A recusa já diz o motivo e o que fazer; o toast começa pelo que fazer.
 function avisoDaRecusa(recusa) {
+  // #2209: a recusa que já começa pelo que fazer sai como está.
+  if (/^Escolha /.test(String(recusa || ''))) return String(recusa);
   const acao = 'Escolha um papel maior em Ajustes';
   const motivo = String(recusa || '').replace('. ' + acao, '');
   return acao + '. ' + motivo.charAt(0).toUpperCase() + motivo.slice(1) + '.';

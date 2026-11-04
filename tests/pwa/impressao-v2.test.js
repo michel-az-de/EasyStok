@@ -146,12 +146,13 @@ module.exports = function ({ test, runInSandbox, assert }) {
       try {
         products=[{id:'p1',name:'Talharim',sku:'TALHARIM'}];
         const base={id:'b1',lote:'261103',createdAt:'2026-11-03T12:00:00-03:00',items:[{productId:'p1',name:'Talharim',qty:2}]};
-        const com=etiquetasFromBatch(Object.assign({numeroCurto:'2611-0370708-20'},base));
+        // #2209: número curto de 8 dígitos do servidor + unidade com 4 = 12 dígitos.
+        const com=etiquetasFromBatch(Object.assign({numeroCurto:'0070-7082'},base));
         const sem=etiquetasFromBatch(base);
         return JSON.stringify({com:com.map(e=>e.chaveCurta),sem:sem.map(e=>e.chaveCurta)});
       } finally { products=old; }
     `);
-    assert.deepStrictEqual(r, { com: ['2611037070820001', '2611037070820002'], sem: [null, null] });
+    assert.deepStrictEqual(r, { com: ['007070820001', '007070820002'], sem: [null, null] });
   });
 
   test('#2202 F2 resolvedor: rolo de 80 mm cabe no tamanho final, sem letra nem QR abaixo do piso', () => {

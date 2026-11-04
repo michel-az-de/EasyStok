@@ -36,7 +36,7 @@ comê-la.
 
 | Caminho | Papel |
 |---|---|
-| `casos.js` | a matriz e os dados do protótipo (mesmo QR e mesma chave curta) |
+| `casos.js` | a matriz e os dados do protótipo (mesmo QR; chave curta de 12 dígitos, #2209) |
 | `lib/ambiente.js` | carrega a PWA num `vm` com canvas real e as fontes de `fontes/` |
 | `lib/tspl.js`, `lib/escpos.js` | interpretam os bytes e devolvem a tinta por ponto |
 | `lib/leitura.js` | lê QR (jsQR e ZXing) e Code128 (ZXing) da tinta |
