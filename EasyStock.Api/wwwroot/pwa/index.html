@@ -7889,7 +7889,7 @@ body.ux-calm [data-screen="producao"] .section-label {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <div class="screen-title-wrap">
-          <h2 class="screen-title">Historico</h2>
+          <h2 class="screen-title">Histórico</h2>
           <span class="screen-subtitle">Auditoria e acoes registradas</span>
         </div>
       </div>
@@ -8294,8 +8294,8 @@ body.ux-calm [data-screen="producao"] .section-label {
             <option value="qr">Somente QR Code</option>
             <option value="none">Sem código</option>
           </select>
-          <div class="scan-mode-options" id="scanModeOptions">
-            <button type="button" class="scan-mode-card" data-mode="both" aria-pressed="false" onclick="setScanModeChoice('both', true)">
+          <div class="scan-mode-options" id="scanModeOptions" role="radiogroup" aria-label="Código impresso na produção">
+            <button type="button" class="scan-mode-card" data-mode="both" role="radio" aria-checked="false" onclick="setScanModeChoice('both', true)">
               <span class="scan-mode-icon">2</span>
               <span class="scan-mode-text">
                 <strong>QR + barras</strong>
@@ -8303,7 +8303,7 @@ body.ux-calm [data-screen="producao"] .section-label {
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-mode="barcode" aria-pressed="false" onclick="setScanModeChoice('barcode', true)">
+            <button type="button" class="scan-mode-card" data-mode="barcode" role="radio" aria-checked="false" onclick="setScanModeChoice('barcode', true)">
               <span class="scan-mode-icon">|||</span>
               <span class="scan-mode-text">
                 <strong>Código de barras</strong>
@@ -8311,7 +8311,7 @@ body.ux-calm [data-screen="producao"] .section-label {
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-mode="qr" aria-pressed="false" onclick="setScanModeChoice('qr', true)">
+            <button type="button" class="scan-mode-card" data-mode="qr" role="radio" aria-checked="false" onclick="setScanModeChoice('qr', true)">
               <span class="scan-mode-icon">QR</span>
               <span class="scan-mode-text">
                 <strong>QR Code</strong>
@@ -8319,7 +8319,7 @@ body.ux-calm [data-screen="producao"] .section-label {
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-mode="none" aria-pressed="false" onclick="setScanModeChoice('none', true)">
+            <button type="button" class="scan-mode-card" data-mode="none" role="radio" aria-checked="false" onclick="setScanModeChoice('none', true)">
               <span class="scan-mode-icon">—</span>
               <span class="scan-mode-text">
                 <strong>Sem código</strong>
@@ -8331,8 +8331,8 @@ body.ux-calm [data-screen="producao"] .section-label {
         </div>
         <div class="field" style="margin-top:12px">
           <label>Orientação da etiqueta</label>
-          <div class="scan-mode-options" id="orientModeOptions">
-            <button type="button" class="scan-mode-card" data-orient="vertical" aria-pressed="false" onclick="setOrientChoice('vertical', true)">
+          <div class="scan-mode-options" id="orientModeOptions" role="radiogroup" aria-label="Orientação da etiqueta">
+            <button type="button" class="scan-mode-card" data-orient="vertical" role="radio" aria-checked="false" onclick="setOrientChoice('vertical', true)">
               <span class="scan-mode-icon" aria-hidden="true"><svg width="14" height="20" viewBox="0 0 14 20"><rect x="1" y="1" width="12" height="18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
               <span class="scan-mode-text">
                 <strong>Vertical</strong>
@@ -8340,7 +8340,7 @@ body.ux-calm [data-screen="producao"] .section-label {
               </span>
               <span class="scan-mode-check">✓</span>
             </button>
-            <button type="button" class="scan-mode-card" data-orient="horizontal" aria-pressed="false" onclick="setOrientChoice('horizontal', true)">
+            <button type="button" class="scan-mode-card" data-orient="horizontal" role="radio" aria-checked="false" onclick="setOrientChoice('horizontal', true)">
               <span class="scan-mode-icon" aria-hidden="true"><svg width="20" height="14" viewBox="0 0 20 14"><rect x="1" y="1" width="18" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
               <span class="scan-mode-text">
                 <strong>Horizontal</strong>
@@ -9276,7 +9276,15 @@ function refreshAjustesThemeLabel() {
 }
 // Aplica tema salvo antes de renderizar (evita flash) — getItem direto
 // para não passar por JSON.parse do load().
-applyTheme((() => { const fallback = window.CDB_CONFIG?.isPilot ? 'light' : 'dark'; try { return localStorage.getItem('cdb-theme') || fallback; } catch (e) { return fallback; } })());
+// Tema inicial: no APK acompanha o claro/escuro do Android (sem seletor
+// próprio); no PWA vale a escolha salva, com escuro como padrão.
+function resolveTheme() {
+  if (window.CDB_CONFIG?.isPilot) return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  try { return localStorage.getItem('cdb-theme') || 'dark'; } catch (e) { return 'dark'; }
+}
+applyTheme(resolveTheme());
+if (window.CDB_CONFIG?.isPilot) window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme(resolveTheme()));
+// Fim do tema inicial
 
 // Mini-stats <details>: persiste estado collapsed/expanded em localStorage.
 // Default: collapsed (mostra so summary "N em aberto").
@@ -15033,7 +15041,7 @@ function setScanModeChoice(mode, persistNow = false) {
   document.querySelectorAll('#scanModeOptions .scan-mode-card').forEach(card => {
     const isActive = card.dataset.mode === normalized;
     card.classList.toggle('active', isActive);
-    card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    card.setAttribute('aria-checked', isActive ? 'true' : 'false');
   });
   redrawAjustesEtqThumb();
   if (persistNow) {
@@ -15063,7 +15071,7 @@ function setOrientChoice(orient, persistNow = false) {
   document.querySelectorAll('#orientModeOptions .scan-mode-card').forEach(card => {
     const isActive = card.dataset.orient === normalized;
     card.classList.toggle('active', isActive);
-    card.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    card.setAttribute('aria-checked', isActive ? 'true' : 'false');
   });
   // Atualiza chips na Preview overlay
   document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b =>
@@ -16347,7 +16355,7 @@ function openDiagnostics() {
     + section('App', 'ok', ''
         + _diagRow('Bundle', escapeHtml(d.app.ver))
         + _diagRow('Plataforma', escapeHtml(d.app.platform))
-        + _diagRow('Tema', escapeHtml(d.app.theme))
+        + _diagRow('Tema', d.app.theme === 'light' ? 'Claro' : 'Escuro')
         + _diagRow('Operador', escapeHtml(d.app.operator))
       , '', '')
     + section('Sync', syncLevel, ''
@@ -16677,7 +16685,7 @@ function copyDiagnosticsToClipboard() {
   lines.push('');
   lines.push('[APP]');
   lines.push('Bundle: ' + d.app.ver);
-  lines.push('Plataforma: ' + d.app.platform + ' · Tema: ' + d.app.theme);
+  lines.push('Plataforma: ' + d.app.platform + ' · Tema: ' + (d.app.theme === 'light' ? 'Claro' : 'Escuro'));
   lines.push('Operador: ' + d.app.operator + ' · Device: ' + d.app.deviceId);
   lines.push('');
   lines.push('[SYNC]');
@@ -23779,7 +23787,8 @@ window.cdbApp = {
   // Lista de IDs de modais conhecidos do app. Quando qualquer um esta com
   // .show ou .open, o back fecha ele em vez de navegar/minimizar.
   var MODAL_IDS = [
-    'updateModal','autoBackupModal','noPrinterModal','productActionsModal',
+    // Ordem = prioridade: overlays abertos por cima de outros vêm primeiro.
+    'updateModal','autoBackupModal','noPrinterModal','printerPickerModal','productActionsModal',
     'ajustarModal','problemaModal','conferProdModal','prodProblemaModal',
     'cashCloseModal','etiquetasPreview','ajustesModal','cashEntryModal',
     'newProductModal','productionConfirmModal','cobrancaModal','newClientModal','itemPickerModal',
@@ -23794,10 +23803,12 @@ window.cdbApp = {
         return el;
       }
     }
-    // Fallback: procura qualquer overlay generico .np-overlay aberto
+    // Fallback: procura qualquer overlay generico .np-overlay aberto.
+    // Overlays sao position: fixed (offsetParent sempre null); getClientRects
+    // so fica vazio quando o elemento nao esta renderizado.
     var overlays = document.querySelectorAll('.np-overlay.show, .modal.show, .overlay.show');
     for (var j = 0; j < overlays.length; j++) {
-      if (overlays[j].offsetParent !== null) return overlays[j]; // visible check
+      if (overlays[j].getClientRects().length > 0) return overlays[j];
     }
     return null;
   }
@@ -23816,6 +23827,7 @@ window.cdbApp = {
       itemPickerModal: 'closeItemPicker',
       productionConfirmModal: 'closeProductionConfirm',
       noPrinterModal: 'closeNoPrinterModal',
+      printerPickerModal: 'closePrinterPicker',
       updateModal: 'closeUpdateModal',
       autoBackupModal: function () { autoBackupAction && autoBackupAction('skip'); },
       cashEntryModal: 'closeCashModal',
@@ -23867,6 +23879,13 @@ window.cdbApp = {
           && document.querySelector('[data-screen="pedidos"] .pedidos-tab-section[data-tab="novo"]')?.style.display === ''
           && typeof goPedidosTab === 'function') {
         goPedidosTab('andamento');
+        return true;
+      }
+      // No APK, Produção e Pedidos são abas de topo: o Voltar leva ao Início,
+      // sem depender de qual aba foi visitada antes.
+      if (window.CDB_CONFIG?.isPilot && typeof currentScreen !== 'undefined' && (currentScreen === 'producao' || currentScreen === 'pedidos')
+          && typeof go === 'function') {
+        go('home');
         return true;
       }
       // 4. Não estamos em home — volta na história
