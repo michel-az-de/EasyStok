@@ -47,6 +47,9 @@ public sealed class ModulosConvention : IApplicationModelConvention
         if (chave == "AtendimentoLogistica" && acao == "Pagar") return [Modulo.Caixa];
         // Upload transversal, menos a foto do produto: é edição de cardápio, como /api/produtos/{id}/fotos.
         if (chave == "Uploads" && acao == "UploadFotoProduto") return [Modulo.Cardapio];
+        // #2199: quem imprime lê a regra da loja; só Configurações grava.
+        if (chave == "LojaImpressao" && acao == "Obter")
+            return [Modulo.Configuracoes, Modulo.Producao, Modulo.Atendimento, Modulo.Caixa, Modulo.Cozinha, Modulo.Entregas];
         return Mapa.GetValueOrDefault(chave);
     }
 
@@ -90,7 +93,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Cozinha, "Kds");
         Associar(Modulo.Caixa, "Caixa", "Venda");
         Associar(Modulo.Campanhas, "Campanhas", "CampanhasSugestoes");
-        Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "NotificacoesConfiguracao",
+        Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "LojaImpressao", "NotificacoesConfiguracao",
             "Integracoes", "IntegracoesWhatsApp", "IntegracoesWppConnect", "IntegracoesEmail", "Storefront.StorefrontConfiguracao");
         Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoAgenda", "AtendimentoRelatoriosEntrega", "AtendimentoCorridas", "AtendimentoRelatorioCustoDeEntrega",
             "Storefront.TenantVitrineEntrega");
