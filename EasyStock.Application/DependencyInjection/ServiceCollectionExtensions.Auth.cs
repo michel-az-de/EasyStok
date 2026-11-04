@@ -55,6 +55,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AceitarConviteUseCase>();        // aceite do convite de primeiro acesso (N9)
         services.AddScoped<ReenviarConviteUseCase>();       // reenvio do convite pela dona (N9)
         services.AddScoped<ConvitesDeAcesso>();             // emissao e revogacao do convite de primeiro acesso (N9)
+        services.AddScoped<EasyStock.Application.UseCases.ChaveDeAcesso.EmitirChaveDeAcessoUseCase>(); // chave de uso único (#2201)
+        services.AddScoped<EasyStock.Application.UseCases.ChaveDeAcesso.AtivarComChaveUseCase>();
         services.AddScoped<ConfirmEmailUseCase>();
 
         // Perfil do usuário autenticado

@@ -534,7 +534,7 @@ const CHAVE_DO_CONVITE = 'easystok.convite'
 
 export function App() {
   const hash = useHash()
-  const { sessao, entrarNaEmpresa, google, encerrarSessao, avisoSaida } = useSessaoApi()
+  const { sessao, entrarNaEmpresa, entrarPorCodigo, google, encerrarSessao, avisoSaida } = useSessaoApi()
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
   // #1582: cada tela diz o próprio nome na aba. No Balcão quem escreve é a `Composicao`, com a contagem.
   useTituloDaAba(FONTE_API && !sessao ? TITULO_BASE : rota.tipo === ROTA_PRINCIPAL ? null : tituloDaAba(rota))
@@ -560,7 +560,7 @@ export function App() {
     }
     return <TelaConvite key={token ?? 'sem-token'} token={token} aoConcluir={aoConcluir} />
   }
-  if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} avisoSaida={avisoSaida} />
+  if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} entrarPorCodigo={entrarPorCodigo} google={google} avisoSaida={avisoSaida} />
   if (FONTE_API) return <><NavegacaoDoConsole hash={hash} /><AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} /></>
   if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} />
   if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaEntregas /></NoModulo>

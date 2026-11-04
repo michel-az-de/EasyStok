@@ -97,6 +97,10 @@ namespace EasyStock.Application.UseCases.AutenticarUsuario
             ConcluirAsync(usuario, empresaId ?? ResolveEmpresaIdPadrao(usuario) ?? PrimeiraEmpresaAtiva(usuario),
                 empresaDoSuperAdmin: empresaId ?? empresaPadrao);
 
+        /// <summary>#2201: final do login pela chave de acesso, na empresa gravada na chave. Vínculo ativo conferido de novo aqui.</summary>
+        public Task<AutenticarUsuarioResult> ConcluirLoginPorChaveAsync(Domain.Entities.Usuario usuario, Guid empresaId) =>
+            ConcluirAsync(usuario, empresaId);
+
         /// <summary>SuperAdmin, empresa, nível e permissões, e o último acesso. Credencial já conferida.</summary>
         private async Task<AutenticarUsuarioResult> ConcluirAsync(Domain.Entities.Usuario usuario, Guid? empresaId, Guid? empresaDoSuperAdmin = null)
         {
