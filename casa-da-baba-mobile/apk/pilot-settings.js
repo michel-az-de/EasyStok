@@ -35,7 +35,10 @@
       title.innerHTML = icon('settings') + '<span>Configurações</span>';
       sheet.scrollTop = 0;
     }
-    environment.openAjustes = function () { const result = open.apply(this, arguments); modal.dataset.dirty = 'false'; showRoot(); return result; };
+    environment.openAjustes = function () { const result = open.apply(this, arguments); modal.dataset.dirty = 'false'; modal.dataset.entry = 'root'; showRoot(); return result; };
+    // Atalho direto (ex.: Impressoras no Início): Voltar devolve a quem abriu, sem passar pela lista.
+    environment.cdbOpenAjustesAt = function (group) { environment.openAjustes(); environment.setAjustesTab(group); modal.dataset.entry = 'direct'; };
+    const leaveSection = () => modal.dataset.entry === 'direct' ? environment.closeAjustes() : showRoot();
     modal.addEventListener('input', () => { modal.dataset.dirty = 'true'; });
     modal.addEventListener('change', () => { modal.dataset.dirty = 'true'; });
     environment.setAjustesTab = function (group) {
@@ -46,12 +49,12 @@
       sheet.scrollTop = 0;
       return result;
     };
-    back.addEventListener('click', () => modal.dataset.view === 'root' ? environment.closeAjustes() : showRoot());
+    back.addEventListener('click', () => modal.dataset.view === 'root' ? environment.closeAjustes() : leaveSection());
     // O botão Voltar do Android retorna à lista antes de fechar Configurações.
     const nativeBack = environment.cdbHandleNativeBack;
     environment.cdbHandleNativeBack = function () {
       if (modal.classList.contains('show') && modal.dataset.view !== 'root'
-          && !doc.querySelector('#diagnosticsModal.show, #printerPickerModal.show, #etiquetasPreview.show')) { showRoot(); return true; }
+          && !doc.querySelector('#diagnosticsModal.show, #printerPickerModal.show, #etiquetasPreview.show')) { leaveSection(); return true; }
       return nativeBack?.apply(this, arguments);
     };
     tabs.querySelectorAll('button').forEach(button => {

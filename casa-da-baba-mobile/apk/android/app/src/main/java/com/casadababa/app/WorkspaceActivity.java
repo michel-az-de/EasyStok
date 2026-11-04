@@ -4,10 +4,14 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
+import android.webkit.WebBackForwardList;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -16,7 +20,6 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -36,7 +39,39 @@ public class WorkspaceActivity extends Activity {
     }
 
     private void returnToApp() {
+        finish();
         startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+    }
+
+    // Só volta no histórico quando a entrada anterior é uma página real do app.
+    private boolean hasRealPreviousPage() {
+        if (!web.canGoBack()) return false;
+        WebBackForwardList list = web.copyBackForwardList();
+        int index = list.getCurrentIndex() - 1;
+        if (index < 0) return false;
+        String url = list.getItemAtIndex(index).getUrl();
+        return url != null && !url.isEmpty() && !"about:blank".equals(url) && trustedOrigin(Uri.parse(url));
+    }
+
+    private int dp(int value) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics()));
+    }
+
+    private TextView barAction(String label, String description, int ink) {
+        TextView action = new TextView(this);
+        action.setText(label);
+        action.setContentDescription(description);
+        action.setTextColor(ink);
+        action.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        action.setGravity(Gravity.CENTER_VERTICAL);
+        action.setMinWidth(dp(48));
+        action.setPadding(dp(16), 0, dp(16), 0);
+        action.setClickable(true);
+        action.setFocusable(true);
+        TypedValue ripple = new TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, ripple, true);
+        action.setBackgroundResource(ripple.resourceId);
+        return action;
     }
 
     @Override
@@ -44,23 +79,38 @@ public class WorkspaceActivity extends Activity {
         super.onCreate(savedInstanceState);
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setBackgroundColor(Color.rgb(251, 248, 242));
+        boolean night = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        int paper = night ? Color.rgb(36, 34, 29) : Color.rgb(251, 246, 236);
+        int ink = night ? Color.rgb(240, 233, 222) : Color.rgb(53, 45, 37);
+        layout.setBackgroundColor(paper);
+        getWindow().setStatusBarColor(paper);
+        // Barra fina da marca: Início à esquerda, título e recarregar à direita (56dp, 48dp de toque).
         LinearLayout actions = new LinearLayout(this);
-        Button back = new Button(this);
-        back.setText("Voltar ao app");
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        actions.setBackgroundColor(paper);
+        TextView back = barAction("\u2039  Início", "Voltar ao início", ink);
         back.setOnClickListener(view -> returnToApp());
-        Button retry = new Button(this);
-        retry.setText("Recarregar");
+        TextView title = new TextView(this);
+        title.setText("Atendimento");
+        title.setTextColor(ink);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        TextView retry = barAction("\u21bb", "Recarregar", ink);
+        retry.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
         retry.setOnClickListener(view -> {
             error.setVisibility(View.GONE);
             web.setVisibility(View.VISIBLE);
             web.reload();
         });
-        actions.addView(back, new LinearLayout.LayoutParams(0, -2, 1));
-        actions.addView(retry, new LinearLayout.LayoutParams(0, -2, 1));
-        layout.addView(actions);
+        actions.addView(back, new LinearLayout.LayoutParams(-2, -1));
+        actions.addView(title, new LinearLayout.LayoutParams(0, -1, 1));
+        actions.addView(retry, new LinearLayout.LayoutParams(-2, -1));
+        layout.addView(actions, new LinearLayout.LayoutParams(-1, dp(56)));
         error = new TextView(this);
-        error.setPadding(24, 24, 24, 24);
+        error.setPadding(dp(16), dp(16), dp(16), dp(16));
+        error.setTextColor(ink);
+        error.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         error.setText("O atendimento precisa de conexão. Confira a internet e toque em Recarregar.");
         error.setVisibility(View.GONE);
         layout.addView(error);
@@ -163,7 +213,7 @@ public class WorkspaceActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (web.canGoBack()) web.goBack(); else returnToApp();
+        if (hasRealPreviousPage()) web.goBack(); else returnToApp();
     }
 
     @Override
