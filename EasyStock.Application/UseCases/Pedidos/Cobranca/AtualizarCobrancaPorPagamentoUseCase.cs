@@ -116,6 +116,8 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
             var motivoEstorno = $"estorno_mp: pagamento {input.PagamentoExternoId} ({status})";
             paga.MarcarEstornada(motivoEstorno, agora);
             await RegistrarNaTrilhaAsync(pedido.Id, "pagamento_estornado", motivoEstorno, agora, ct);
+            await AvisarProblemaAsync(pedido, status == "charged_back" ? "o cliente contestou e o dinheiro voltou" : "o pagamento foi estornado",
+                $"{input.PagamentoExternoId}:{status}", ct);
             await unitOfWork.CommitAsync();
             return (SituacaoAtualizacaoCobranca.Estornada, null, null);
         }
@@ -132,12 +134,16 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
 
         alvo.RegistrarMotivo(motivo, agora);
         await RegistrarNaTrilhaAsync(pedido.Id, "pagamento_recusado", motivo, agora, ct);
-        await unitOfWork.CommitAsync();
-
         // #1289: Pix vencido chega como cancelled no instante do vencimento, antes de o job (60 s) expirar a
         // cobrança. "Tente de novo no mesmo link" mandaria um link morto; o job cuida do link novo ou do cancelamento.
         var linkVencido = alvo.Venceu(agora)
             || string.Equals(input.StatusDetalhe?.Trim(), StatusDetalheExpirado, StringComparison.OrdinalIgnoreCase);
+        // #2211: o vencimento já avisa a equipe pelo job; aqui só a recusa ou o cancelamento de quem tentou pagar.
+        if (!linkVencido)
+            await AvisarProblemaAsync(pedido, status == "rejected" ? "o pagamento foi recusado" : "o pagamento foi cancelado",
+                $"{input.PagamentoExternoId}:{status}", ct);
+        await unitOfWork.CommitAsync();
+
         return alvo.EstaPendente && !linkVencido
             ? (SituacaoAtualizacaoCobranca.Recusada, alvo.ConversaId, alvo.LinkPagamento)
             : (SituacaoAtualizacaoCobranca.Recusada, null, null);
@@ -165,9 +171,15 @@ public sealed class AtualizarCobrancaPorPagamentoUseCase(
         });
         await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.PagamentoEmMediacao, pedido.EmpresaId, payload,
             pedido.Id, ct, correlacao);
+        await AvisarProblemaAsync(pedido, "o cliente abriu disputa no Mercado Pago", $"{pagamentoExternoId}:{status}", ct);
         await unitOfWork.CommitAsync();
         return (SituacaoAtualizacaoCobranca.EmMediacao, null, null);
     }
+
+    // #2211: o WhatsApp da equipe inscrita, na mesma unidade de trabalho da trilha.
+    private Task AvisarProblemaAsync(EasyStock.Domain.Entities.Pedido pedido, string problema, string chave, CancellationToken ct) =>
+        new PublicadorAvisoEquipe(notificador).ProblemaNoPagamentoAsync(
+            pedido.EmpresaId, pedido.Id, pedido.ClienteNome, problema, chave, ct);
 
     public static string CorrelacaoAvisoMediacao(string pagamentoExternoId) => $"pagamento-em-mediacao:{pagamentoExternoId}";
 

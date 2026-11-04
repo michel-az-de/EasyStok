@@ -195,7 +195,7 @@ internal sealed class CobrancaPedidoFixture
         new(new Lazy<IMercadoPagoClient>(() => MpClient), Relogio, NullLogger<ExpiracaoPreferenciaMercadoPago>.Instance);
 
     private QuitacaoPedido Quitacao() => QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, ConversaRepo, ImpressaoRepo, Publicador,
-        OperacaoEventos, PrazoQueries, Expiracao(), Saldos());
+        OperacaoEventos, PrazoQueries, Expiracao(), Saldos(), Notificador);
 
     /// <summary>Baixa manual pelo console (Pix, dinheiro, maquininha) sobre o mesmo pedido.</summary>
     public RegistrarPagamentoPedidoUseCase RegistrarManual() =>

@@ -40,7 +40,8 @@ public sealed class AgenteAtendimentoService(
     ObterDossieClienteUseCase dossieUseCase,
     ICadernoRepository caderno,
     ILogger<AgenteAtendimentoService> logger,
-    IPedidoRepository? pedidos = null)
+    IPedidoRepository? pedidos = null,
+    Notifications.IContatoDaEquipeAvisada? equipe = null)
 {
     public const int MaximoIteracoes = 6;
     public const int UltimasMensagens = 20;
@@ -50,6 +51,7 @@ public sealed class AgenteAtendimentoService(
 
     public const string MotivoAgenteDesligado = "agente desligado (LLM indisponível)";
     public const string MotivoAtendimentoAutomaticoDesligado = "atendimento automático desligado na configuração";
+    public const string MotivoContatoDaEquipe = "contato da equipe que recebe os avisos: o robô não responde";
 
     public async Task<ResultadoTurnoAgente> ProcessarTurnoAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
     {
@@ -71,9 +73,11 @@ public sealed class AgenteAtendimentoService(
         // (Anthropic:Enabled=false ou sem chave) ou canal sem agente (o agente envia pelo cliente do WhatsApp;
         // em outro canal sairia pelo canal errado). Passa de fato para a dona, senão a conversa fica
         // Automatica sem ninguém e fora do lembrete (#1288).
+        // #2211: quem recebe os avisos pelo número da loja e responde a eles fala com gente, nunca com o robô.
         var motivoSemAgente = !configuracao.Ativo ? MotivoAtendimentoAutomaticoDesligado
             : !llm.Disponivel ? MotivoAgenteDesligado
             : !conversa.TemAgente ? $"o canal {conversa.Canal} não tem agente"
+            : equipe is not null && await equipe.EhInscritoAsync(empresaId, conversa.ContatoIdExterno, ct) ? MotivoContatoDaEquipe
             : null;
         if (motivoSemAgente is not null)
         {

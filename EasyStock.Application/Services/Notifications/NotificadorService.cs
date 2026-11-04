@@ -17,7 +17,8 @@ public sealed class NotificadorService(
     ResolvedorCanal resolvedorCanal,
     IUnitOfWork unitOfWork,
     ILogger<NotificadorService> logger,
-    IResolvedorAudiencia? resolvedorAudiencia = null) : INotificadorService
+    IResolvedorAudiencia? resolvedorAudiencia = null,
+    Anexos.IAnexadorMensagem? anexador = null) : INotificadorService
 {
     /// <summary>
     /// Chave do payload com a identidade de negócio do aviso (S13: <c>pedidoId|status</c>). Presente, vira a
@@ -35,7 +36,7 @@ public sealed class NotificadorService(
 
     public const string PrefixoTeste = "[TESTE] ";
 
-    private readonly ConstrutorMensagemOutbox _construtor = new(templateRepository, renderer);
+    private readonly ConstrutorMensagemOutbox _construtor = new(templateRepository, renderer, anexador);
 
     public async Task PublicarEventoAsync(
         TipoEventoNotificacao tipo,

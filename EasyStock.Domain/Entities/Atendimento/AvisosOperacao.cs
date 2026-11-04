@@ -38,6 +38,11 @@ public sealed record AvisosOperacao
     public bool ReclamacaoCliente { get; init; } = true;
     public bool SuspeitaAtendimento { get; init; } = true;
 
+    /// <summary>#2211: avisos da equipe pelo WhatsApp. Só chegam a quem a dona inscreveu; aqui o interruptor da loja.</summary>
+    public bool EquipeAtencao { get; init; } = true;
+    public bool EquipePedido { get; init; } = true;
+    public bool EquipePagamento { get; init; } = true;
+
     /// <summary>Confere as faixas. Lança <see cref="RegraDeDominioVioladaException"/> com a mensagem para a tela.</summary>
     public AvisosOperacao Validado()
     {
@@ -65,6 +70,9 @@ public sealed record AvisosOperacao
         CodigosAviso.EstoqueParaConferir => EstoqueVencendoDias > 0 || EstoqueParadoDias > 0,
         CodigosAviso.ReclamacaoCliente => ReclamacaoCliente,
         CodigosAviso.SuspeitaAtendimento => SuspeitaAtendimento,
+        CodigosAviso.EquipeAtencao => EquipeAtencao,
+        CodigosAviso.EquipePedido => EquipePedido,
+        CodigosAviso.EquipePagamento => EquipePagamento,
         _ => true,
     };
 
@@ -88,4 +96,7 @@ public static class CodigosAviso
     public const string EstoqueParaConferir = "estoque_para_conferir";
     public const string ReclamacaoCliente = "reclamacao_cliente";
     public const string SuspeitaAtendimento = "suspeita_atendimento";
+    public const string EquipeAtencao = "equipe_atencao";
+    public const string EquipePedido = "equipe_pedido";
+    public const string EquipePagamento = "equipe_pagamento";
 }

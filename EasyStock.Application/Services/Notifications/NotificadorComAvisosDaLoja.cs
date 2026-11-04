@@ -8,7 +8,8 @@ namespace EasyStock.Application.Services.Notifications;
 
 /// <summary>
 /// Interruptor da loja para os avisos da operação (#2096). Fica na frente do <see cref="NotificadorService"/>: evento
-/// <see cref="TipoEventoNotificacao.PrazoEstourado"/> ou <see cref="TipoEventoNotificacao.AlertaOperacao"/> com a chave
+/// <see cref="TipoEventoNotificacao.PrazoEstourado"/>, <see cref="TipoEventoNotificacao.AlertaOperacao"/> ou aviso da equipe
+/// (#2211) com a chave
 /// <c>aviso</c> no payload só é enfileirado se a dona deixou o aviso ligado na tela Avisos. Assim os produtores (fila,
 /// atraso, impressão, caixa, vigia, IA) não precisam saber da preferência. Sem a chave, nada muda (disparo de teste,
 /// produtor antigo).
@@ -33,6 +34,8 @@ public sealed class NotificadorComAvisosDaLoja(
         CancellationToken ct = default, string? correlationId = null)
     {
         if (tipo is TipoEventoNotificacao.PrazoEstourado or TipoEventoNotificacao.AlertaOperacao
+                or TipoEventoNotificacao.AvisoEquipeAtencaoAtendimento or TipoEventoNotificacao.AvisoEquipePedidoComCanhoto
+                or TipoEventoNotificacao.AvisoEquipeProblemaPagamento
             && LerAviso(payloadJson) is { } aviso
             && !await LigadoAsync(empresaId, aviso))
         {

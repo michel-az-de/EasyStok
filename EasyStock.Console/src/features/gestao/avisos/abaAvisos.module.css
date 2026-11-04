@@ -52,6 +52,8 @@
 .retorno { font-size: var(--t-apoio); color: var(--tinta-2); }
 .erro { color: var(--erro); font-size: var(--t-apoio); margin: 0; }
 .secao { display: grid; gap: var(--e-3); }
+/* #2211: uma pessoa da equipe e os avisos que recebe no WhatsApp. */
+.pessoa { display: grid; gap: var(--e-1); margin: 0; padding: 0; min-width: 0; border: 0; }
 
 @media (max-width: 420px) {
   .prazo { padding-left: 0; }

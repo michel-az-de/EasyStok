@@ -50,6 +50,15 @@ export const GRUPOS_DE_AVISOS = [
       ligado('suspeitaAtendimento', 'A IA percebeu algo suspeito na conversa'),
     ],
   },
+  {
+    // #2211: saem pelo WhatsApp da loja só para quem está inscrito em "Quem recebe no WhatsApp".
+    id: 'equipe', titulo: 'WhatsApp da equipe',
+    avisos: [
+      ligado('equipeAtencao', 'Atendimento precisa de atenção', 'Quando o robô tem dúvida ou chama uma pessoa.'),
+      ligado('equipePedido', 'Pedido pago com o canhoto', 'Manda a imagem do canhoto de cada pedido pago.'),
+      ligado('equipePagamento', 'Problema no pagamento', 'Pagamento recusado, estornado, em disputa ou vencido.'),
+    ],
+  },
 ]
 
 export const AVISOS = GRUPOS_DE_AVISOS.flatMap((grupo) => grupo.avisos)
