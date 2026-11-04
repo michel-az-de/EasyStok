@@ -49,7 +49,9 @@ public class NumeroCurtoDoLoteE2ETests(MobileE2EFixture fixture)
         var reenvio = await PushAsync(a, envio);
 
         reenvio.Aceitas.Should().Contain(envio.Id);
-        reenvio.Numeros.Should().Contain(lote, await NumeroNoBancoAsync(lote));
+        var noBanco = await NumeroNoBancoAsync(lote);
+        noBanco.Should().MatchRegex("^[0-9]{8}$");
+        reenvio.Numeros.Should().Contain(lote, noBanco);
     }
 
     [SkippableFact]
