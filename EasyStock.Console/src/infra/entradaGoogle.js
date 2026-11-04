@@ -9,7 +9,7 @@ const travada = () => {
 
 export function opcoesDaEntradaGoogle() {
   const sozinha = !travada()
-  return { auto_select: sozinha, oferecer: sozinha }
+  return { auto_select: sozinha, oferecer: sozinha, fedcm_no_botao: fedcmNoBotaoGoogle() }
 }
 
 export function travarEntradaSozinha() {

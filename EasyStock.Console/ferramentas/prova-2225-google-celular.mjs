@@ -1,9 +1,10 @@
 /* eslint-disable no-console */
 // Prova #2225: no Chrome do Android, o botão "Entrar com Google" abria uma aba nova
 // (accounts.google.com/gsi/transform) que ficava em branco e não devolvia o login ao console.
-// Lá o botão passa a usar o seletor de conta do próprio Chrome (FedCM), sem aba nova. Nos demais
+// Lá o botão passa a pedir ao Google o seletor de conta do próprio Chrome (FedCM). Nos demais
 // navegadores fica o popup de hoje: o Google não avisa quando o FedCM falha, e um Chromium sem a
 // tela do FedCM deixaria o botão mudo (medido no navegador embutido).
+// Esta prova guarda a configuração enviada ao Google; o efeito no aparelho se confere no Android.
 //
 //   node ferramentas/prova-2225-google-celular.mjs
 
@@ -36,7 +37,6 @@ registerHooks({
   resolve(spec, ctx, proximo) {
     if (spec === 'react') return { url: codigo('const h=globalThis.__prova2225;export const useState=h.useState,useRef=h.useRef,useEffect=h.useEffect'), shortCircuit: true }
     if (spec === 'react/jsx-runtime') return { url: codigo('export const jsx=(type,props)=>({type,props});export const jsxs=jsx'), shortCircuit: true }
-    if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) return proximo(spec + '.js', ctx)
     return proximo(spec, ctx)
   },
   load(url, ctx, proximo) {
@@ -45,40 +45,43 @@ registerHooks({
   },
 })
 const { BotaoGoogle } = await import(arquivo.href)
-const { fedcmNoBotaoGoogle } = await import('../src/infra/entradaGoogle.js')
+const { fedcmNoBotaoGoogle, opcoesDaEntradaGoogle } = await import('../src/infra/entradaGoogle.js')
 
+const chrome = (versao, extra = '') => `Mozilla/5.0 (Linux; Android 14; K${extra}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${versao}.0.0.0 Mobile Safari/537.36`
 const AGENTES = {
-  chromeAndroid: 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36',
-  chromeAndroidAntigo: 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
-  webviewAndroid: 'Mozilla/5.0 (Linux; Android 14; K; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/142.0.0.0 Mobile Safari/537.36',
-  samsung: 'Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36',
-  edgeAndroid: 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36 EdgA/142.0.0.0',
-  operaAndroid: 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36 OPR/90.0.0.0',
-  firefoxAndroid: 'Mozilla/5.0 (Android 14; Mobile; rv:144.0) Gecko/144.0 Firefox/144.0',
-  chromeIphone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/142.0.0.0 Mobile/15E148 Safari/604.1',
-  chromeWindows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
-  electron: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Claude/1.0 Chrome/142.0.0.0 Electron/39.0.0 Safari/537.36',
+  chromeAndroid: [chrome(142), true],
+  chromeAndroid132: [chrome(132), true],
+  chromeAndroid131: [chrome(131), false],
+  webviewAndroid: ['Mozilla/5.0 (Linux; Android 14; K; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/142.0.0.0 Mobile Safari/537.36', false],
+  samsung: ['Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/28.0 Chrome/136.0.0.0 Mobile Safari/537.36', false],
+  edgeAndroid: [chrome(142) + ' EdgA/142.0.0.0', false],
+  operaAndroid: [chrome(142) + ' OPR/90.0.0.0', false],
+  yandexAndroid: [chrome(142) + ' YaBrowser/25.10.0.0', false],
+  firefoxAndroid: ['Mozilla/5.0 (Android 14; Mobile; rv:144.0) Gecko/144.0 Firefox/144.0', false],
+  chromeIphone: ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/142.0.0.0 Mobile/15E148 Safari/604.1', false],
+  chromeWindows: ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', false],
+  electron: ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Claude/1.0 Chrome/142.0.0.0 Electron/39.0.0 Safari/537.36', false],
 }
 const usarAgente = (agente) => Object.defineProperty(globalThis, 'navigator', { value: { userAgent: agente }, configurable: true })
 
 const esperar = async () => { for (let i = 0; i < 30; i++) await Promise.resolve() }
 
-// Monta o botão real com o Google falso; devolve o que o componente pediu ao Google.
-async function montar({ oferecer, agente = AGENTES.chromeAndroid }) {
-  usarAgente(agente)
-  const google = { inicios: [], botoes: [], prompts: 0, limpezas: 0 }
+// Monta o botão real com o Google falso e registra, em ordem, o que o componente pediu.
+async function montar(opcoes) {
+  const pedidos = [], inicios = []
   globalThis.window = { google: { accounts: { id: {
-    initialize: (config) => google.inicios.push(config),
-    renderButton: (elemento, config) => google.botoes.push({ elemento, config }),
-    prompt: () => { google.prompts += 1 },
+    initialize: (config) => { pedidos.push('initialize'); inicios.push(config) },
+    renderButton: (alvo, config) => { pedidos.push('renderButton'); alvo.filhos.push({ botao: config }) },
+    prompt: () => pedidos.push('prompt'),
   } } } }
-  const elemento = { replaceChildren: () => { google.limpezas += 1 } }
+  // Um botão de uma montagem anterior já está no alvo (#1354).
+  const elemento = { filhos: [{ botao: 'antigo' }], replaceChildren() { pedidos.push('replaceChildren'); this.filhos = [] } }
   const tokens = [], falhas = []
   const props = {
     buscarClientId: async () => 'client-id-fixture',
     aoReceberToken: (token) => tokens.push(token),
     aoFalhar: (msg) => falhas.push(msg),
-    opcoes: () => ({ auto_select: oferecer, oferecer }),
+    opcoes: opcoes === null ? null : () => opcoes,
   }
   const h = { valores: [], indice: 0, pendentes: [], agendado: false }
   h.agendar = () => { if (!h.agendado) { h.agendado = true; queueMicrotask(() => { h.agendado = false; desenhar() }) } }
@@ -90,59 +93,62 @@ async function montar({ oferecer, agente = AGENTES.chromeAndroid }) {
   }
   desenhar()
   await esperar()
-  return { google, elemento, tokens, falhas }
+  assert.deepEqual(falhas, [])
+  return { pedidos, inicios, elemento, tokens }
 }
 
 let passos = 0
 const ok = (texto) => { passos += 1; console.log(`ok ${passos} - ${texto}`) }
 
+for (const [nome, [agente, esperado]] of Object.entries(AGENTES)) {
+  assert.equal(fedcmNoBotaoGoogle(agente), esperado, `FedCM no botão para ${nome}`)
+}
+assert.equal(fedcmNoBotaoGoogle(''), false, 'sem agente, fica o popup')
+assert.equal(fedcmNoBotaoGoogle(undefined), false)
+ok('só o Chrome do Android 132 ou mais pede o FedCM no botão; os demais ficam no popup')
+
+usarAgente(AGENTES.chromeAndroid[0])
+assert.equal(opcoesDaEntradaGoogle().fedcm_no_botao, true, 'a opção sai do navegador em uso')
+usarAgente(AGENTES.chromeWindows[0])
+assert.equal(opcoesDaEntradaGoogle().fedcm_no_botao, false)
+ok('as opções da entrada Google levam a escolha do FedCM ao botão')
+
 {
-  const sim = ['chromeAndroid']
-  for (const [nome, agente] of Object.entries(AGENTES)) {
-    assert.equal(fedcmNoBotaoGoogle(agente), sim.includes(nome), `FedCM no botão para ${nome}`)
-  }
-  assert.equal(fedcmNoBotaoGoogle(''), false, 'sem agente, fica o popup')
-  assert.equal(fedcmNoBotaoGoogle(undefined), false)
-  ok('só o Chrome do Android (132 ou mais) usa o FedCM no botão; os demais ficam no popup')
+  const { inicios } = await montar({ auto_select: false, oferecer: false, fedcm_no_botao: true })
+  assert.equal(inicios.length, 1, 'o Google é iniciado uma vez')
+  assert.equal(inicios[0].client_id, 'client-id-fixture')
+  assert.equal(inicios[0].use_fedcm_for_button, true, 'no Chrome do Android o botão pede o FedCM')
+  assert.equal(inicios[0].use_fedcm_for_prompt, true, 'o One Tap segue pelo FedCM')
+  assert.equal(inicios[0].ux_mode, undefined, 'sem sair da página do console')
+  ok('no Chrome do Android o botão envia use_fedcm_for_button ao Google')
 }
 
 {
-  const { google, falhas } = await montar({ oferecer: false, agente: AGENTES.chromeAndroid })
-  assert.deepEqual(falhas, [])
-  assert.equal(google.inicios.length, 1, 'o Google é iniciado uma vez')
-  const config = google.inicios[0]
-  assert.equal(config.client_id, 'client-id-fixture')
-  assert.equal(config.use_fedcm_for_button, true, 'no Chrome do Android o botão usa o seletor de conta do Chrome (FedCM), sem aba nova')
-  assert.equal(config.ux_mode, undefined, 'sem sair da página do console')
-  ok('no Chrome do Android o botão pede o FedCM, que não abre a aba que ficava em branco')
+  const sem = await montar({ auto_select: false, oferecer: false, fedcm_no_botao: false })
+  assert.equal(sem.inicios[0].use_fedcm_for_button, false, 'fora do Chrome do Android fica o popup')
+  assert.equal(sem.inicios[0].use_fedcm_for_prompt, true)
+  const nulo = await montar(null)
+  assert.equal(nulo.inicios[0].use_fedcm_for_button, false, 'sem opções, fica o popup')
+  ok('no computador, no iPhone e sem opções o botão continua no popup de hoje')
 }
 
 {
-  for (const nome of ['chromeWindows', 'electron', 'chromeIphone']) {
-    const { google } = await montar({ oferecer: false, agente: AGENTES[nome] })
-    assert.equal(google.inicios[0].use_fedcm_for_button, false, `${nome} fica no popup de hoje`)
-  }
-  ok('no computador e no iPhone o botão continua no popup de hoje')
-}
-
-{
-  const { google, elemento, tokens } = await montar({ oferecer: false })
-  assert.equal(google.limpezas, 1, 'limpa o alvo antes de desenhar (#1354)')
-  assert.equal(google.botoes.length, 1)
-  assert.equal(google.botoes[0].elemento, elemento)
-  assert.equal(google.botoes[0].config.locale, 'pt-BR')
-  google.inicios[0].callback({ credential: 'token-fixture' })
+  const { pedidos, elemento, inicios, tokens } = await montar({ auto_select: true, oferecer: true, fedcm_no_botao: true })
+  assert.deepEqual(pedidos, ['initialize', 'replaceChildren', 'renderButton', 'prompt'], 'inicia, limpa, desenha e só então oferece')
+  assert.equal(elemento.filhos.length, 1, 'um botão só no alvo (#1354)')
+  assert.equal(elemento.filhos[0].botao.locale, 'pt-BR')
+  inicios[0].callback({ credential: 'token-fixture' })
   assert.deepEqual(tokens, ['token-fixture'], 'o token do Google chega a quem faz o login')
-  ok('o token devolvido pelo Google chega ao login do console')
+  ok('o botão é desenhado uma vez e o token devolvido pelo Google chega ao login do console')
 }
 
 {
-  const sem = await montar({ oferecer: false })
-  assert.equal(sem.google.prompts, 0, 'depois de Sair não oferece entrar sozinho (#1810)')
-  assert.equal(sem.google.inicios[0].auto_select, false)
-  const com = await montar({ oferecer: true })
-  assert.equal(com.google.prompts, 1, 'na primeira visita oferece o One Tap (#1810)')
-  assert.equal(com.google.inicios[0].auto_select, true)
+  const sem = await montar({ auto_select: false, oferecer: false, fedcm_no_botao: true })
+  assert.equal(sem.pedidos.includes('prompt'), false, 'depois de Sair não oferece entrar sozinho (#1810)')
+  assert.equal(sem.inicios[0].auto_select, false)
+  const com = await montar({ auto_select: true, oferecer: true, fedcm_no_botao: false })
+  assert.equal(com.pedidos.filter((p) => p === 'prompt').length, 1, 'na primeira visita oferece o One Tap (#1810)')
+  assert.equal(com.inicios[0].auto_select, true)
   ok('o One Tap segue a regra de entrar sozinho da #1810')
 }
 
