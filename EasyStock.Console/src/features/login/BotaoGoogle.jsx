@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { fedcmNoBotaoGoogle } from '../../infra/entradaGoogle'
 
 const SCRIPT_GOOGLE = 'https://accounts.google.com/gsi/client'
 
@@ -48,6 +49,8 @@ export function BotaoGoogle({ buscarClientId, aoReceberToken, aoFalhar, opcoes =
           auto_select: autoSelect,
           cancel_on_tap_outside: true,
           use_fedcm_for_prompt: true,
+          // #2225: no Chrome do Android o seletor de conta abre na própria página (FedCM).
+          use_fedcm_for_button: fedcmNoBotaoGoogle(),
         })
         // #1354: o renderButton acrescenta; limpar antes garante um botão só.
         alvo.current.replaceChildren()

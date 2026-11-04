@@ -146,4 +146,5 @@ jobs:
       - run: node ferramentas/prova-1806-lead-cadastro.mjs
       - run: node ferramentas/prova-1807-avisos.mjs
       - run: node ferramentas/prova-1810-entrada-google.mjs
+      - run: node ferramentas/prova-2225-google-celular.mjs
       - run: node ferramentas/prova-r11-impressao.mjs
