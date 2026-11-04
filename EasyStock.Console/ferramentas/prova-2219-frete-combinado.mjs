@@ -68,7 +68,7 @@ await confere('3  a ação é da tela e a comanda mostra o campo só com o frete
   assert.match(fonte('aplicacao/api/naoLigadas.js'), /'definirFreteCombinado'/)
   assert.match(fonte('aplicacao/acoes/locais.js'), /definirFreteCombinado: \(id, freteCombinado\) => despachar\(\{ tipo: acao\.DEFINIR_FRETE_COMBINADO, id, freteCombinado \}\)/)
   const bloco = fonte('features/ficha-cliente/BlocoPedido.jsx')
-  assert.match(bloco, /simulacao\?\.freteACombinar \|\| pedido\.freteCombinado != null/)
+  assert.match(bloco, /simulacao\?\.freteACombinar \|\| pedido\.freteCombinado !== undefined/, 'apagar não some com o campo')
   assert.match(bloco, /rotulo="Frete combinado"/)
   assert.match(bloco, /definirFreteCombinado\(conversaId, centavos == null \? null : centavos \/ 100\)/)
 })

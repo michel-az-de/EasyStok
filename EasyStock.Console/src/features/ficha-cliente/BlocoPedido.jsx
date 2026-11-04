@@ -185,9 +185,10 @@ export function BlocoPedido({
   // #1884: com a simulação do servidor a comanda mostra frete, total com frete e sinal em número.
   const linhasSimulacao = !pedido.pedidoId ? linhasDaSimulacao(simulacao, { combinado: pedido.freteCombinado != null }) : null
   // #2219: CEP fora da área. A equipe combina o frete com o cliente e digita aqui; o valor vai na simulação e
-  // no pedido, e a cobrança sai pela tela como qualquer outra. Vazio volta ao frete a combinar.
+  // no pedido, e a cobrança sai pela tela como qualquer outra. Vazio volta ao frete a combinar; o campo
+  // continua na tela depois de usado (null), para não sumir e perder o foco enquanto a simulação refaz.
   const pedeFreteCombinado = fonteApi && !pedido.pedidoId && !fechado
-    && Boolean(simulacao?.freteACombinar || pedido.freteCombinado != null)
+    && Boolean(simulacao?.freteACombinar || pedido.freteCombinado !== undefined)
   const linhaDe = (chave) => linhasSimulacao?.find((l) => l.chave === chave)?.texto ?? null
   const seletorDeJanela = !fechado && fonteApi
     ? <SeletorJanelaApi key={conversaId} pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
