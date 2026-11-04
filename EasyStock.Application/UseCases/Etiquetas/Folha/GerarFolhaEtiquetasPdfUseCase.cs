@@ -10,7 +10,7 @@ namespace EasyStock.Application.UseCases.Etiquetas.Folha;
 /// silêncio, layout que não cabe na posição. Também recusa, antes de gastar CPU, o pedido grande demais: grade com
 /// posições demais, texto demais, códigos distintos demais.
 /// </summary>
-public sealed class GerarFolhaEtiquetasPdfUseCase(IFolhaEtiquetasPdfRenderer renderer, IQrCodeEncoder qr)
+public sealed class GerarFolhaEtiquetasPdfUseCase(IFolhaEtiquetasPdfRenderer renderer, IQrCodeEncoder qr, VagasDeFolhaPdf vagas)
 {
     public const string CodigoErro = "ETIQUETA_PDF_INVALIDA";
     public const string ModeloPimaco = "pimaco-a4256";
@@ -24,6 +24,12 @@ public sealed class GerarFolhaEtiquetasPdfUseCase(IFolhaEtiquetasPdfRenderer ren
     /// <summary>Soma dos caracteres dos elementos de texto de todas as etiquetas, já com as cópias.</summary>
     public const int MaxCaracteresDeTexto = 200_000;
 
+    /// <summary>
+    /// Caracteres distintos que a Lato não tem (CJK, emoji, outros alfabetos), em todo o pedido. Cada um custa uma busca
+    /// de fonte no render quando o host tem fontes instaladas: cerca de 9 ms, medido na banca.
+    /// </summary>
+    public const int MaxGlifosForaDoLatino = 64;
+
     public const decimal MargemPadraoMm = 5m;
     public const decimal EspacoPadraoMm = 3m;
     public const decimal MargemMaximaMm = 50m;
@@ -33,8 +39,11 @@ public sealed class GerarFolhaEtiquetasPdfUseCase(IFolhaEtiquetasPdfRenderer ren
     private const int MaxErrosNoDetalhe = 100;
     private const int MaxEcoDaExcecao = 200;
 
+    /// <summary>Planeja e desenha sob uma vaga de <see cref="VagasDeFolhaPdf"/>: os QR e o render são CPU síncrona.</summary>
+    /// <exception cref="FolhaPdfOcupadaException">Sem vaga dentro da espera; nenhum código foi gerado.</exception>
     public async Task<byte[]> ExecuteAsync(GerarFolhaEtiquetasPdfCommand command, CancellationToken ct = default)
     {
+        using var vaga = await vagas.OcuparAsync(ct);
         var plano = Planejar(command, ct);
         ct.ThrowIfCancellationRequested();
         return await renderer.RenderAsync(plano, ct);
@@ -71,6 +80,7 @@ public sealed class GerarFolhaEtiquetasPdfUseCase(IFolhaEtiquetasPdfRenderer ren
         // Fase 1, barata: lê os layouts e confere tamanho, carga, encaixe e páginas. Nenhum QR nem barra sai daqui.
         var lidas = new List<(LayoutJsonDocument Layout, Medida Medida)>(pedidas!.Count);
         var distintos = new HashSet<(string?, string?)>();
+        var foraDoLatino = new HashSet<int>();
         var total = 0;
         long caracteres = 0;
         for (var i = 0; i < pedidas.Count; i++)
@@ -92,12 +102,15 @@ public sealed class GerarFolhaEtiquetasPdfUseCase(IFolhaEtiquetasPdfRenderer ren
             lidas.Add((layout, new Medida(layout.Size!.WMm, layout.Size.HMm, vezes, rotulo)));
             caracteres += (long)vezes * LayoutParaPdf.CaracteresDeTexto(layout);
             LayoutParaPdf.CodigosDe(layout, distintos);
+            LayoutParaPdf.GlifosForaDoLatino(layout, foraDoLatino, MaxGlifosForaDoLatino);
         }
         if (total > MaxEtiquetas) erros.Add($"no máximo {MaxEtiquetas} etiquetas por pedido; vieram {total}.");
         if (caracteres > MaxCaracteresDeTexto)
             erros.Add(string.Create(PtBr, $"no máximo {MaxCaracteresDeTexto:N0} caracteres de texto por pedido, somadas as cópias; vieram {caracteres:N0}."));
         if (distintos.Count > MaxCodigosDistintos)
             erros.Add($"no máximo {MaxCodigosDistintos} códigos distintos (QR e barras) por pedido; vieram {distintos.Count}.");
+        if (foraDoLatino.Count > MaxGlifosForaDoLatino)
+            erros.Add($"no máximo {MaxGlifosForaDoLatino} caracteres distintos fora do alfabeto latino por pedido; a fonte da etiqueta não os desenha.");
         if (erros.Count > 0) throw Falha(erros);
 
         var medidas = lidas.Select(l => l.Medida).ToList();
@@ -183,16 +196,29 @@ public sealed class GerarFolhaEtiquetasPdfUseCase(IFolhaEtiquetasPdfRenderer ren
         return Desserializar(documento.RootElement, rotulo, erros);
     }
 
-    /// <summary>Confere o tamanho do array de elementos antes de desserializar cada um deles.</summary>
+    /// <summary>
+    /// Confere o tamanho do array de elementos antes de desserializar cada um deles. Percorre todas as chaves: com
+    /// <c>elements</c> repetida, o <c>TryGetProperty</c> vê a última e o desserializador materializa todas.
+    /// </summary>
     private static LayoutJsonDocument? Desserializar(JsonElement json, string rotulo, List<string> erros)
     {
-        if (json.ValueKind == JsonValueKind.Object
-            && json.TryGetProperty("elements", out var elementos)
-            && elementos.ValueKind == JsonValueKind.Array
-            && elementos.GetArrayLength() > LayoutParaPdf.MaxElementos)
+        if (json.ValueKind == JsonValueKind.Object)
         {
-            erros.Add($"{rotulo}: no máximo {LayoutParaPdf.MaxElementos} elementos.");
-            return null;
+            var vistas = 0;
+            foreach (var chave in json.EnumerateObject())
+            {
+                if (!chave.NameEquals("elements")) continue;
+                if (++vistas > 1)
+                {
+                    erros.Add($"{rotulo}: a chave elements aparece mais de uma vez.");
+                    return null;
+                }
+                if (chave.Value.ValueKind == JsonValueKind.Array && chave.Value.GetArrayLength() > LayoutParaPdf.MaxElementos)
+                {
+                    erros.Add($"{rotulo}: no máximo {LayoutParaPdf.MaxElementos} elementos.");
+                    return null;
+                }
+            }
         }
         return json.Deserialize<LayoutJsonDocument>();
     }

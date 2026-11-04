@@ -96,6 +96,27 @@ public static class LayoutParaPdf
                 distintos.Add((e.Format, e.Content));
     }
 
+    /// <summary>
+    /// Acrescenta a <paramref name="distintos"/> cada caractere de texto que a Lato não desenha. Para de contar
+    /// depois de <paramref name="limite"/>: o pedido já vai ser recusado.
+    /// </summary>
+    public static void GlifosForaDoLatino(LayoutJsonDocument layout, ISet<int> distintos, int limite)
+    {
+        if (layout.Elements is null) return;
+        foreach (var e in layout.Elements)
+        {
+            if (e?.Type != "text" || e.Content is null) continue;
+            foreach (var caractere in e.Content.EnumerateRunes())
+            {
+                if (distintos.Count > limite) return;
+                if (!DesenhadoPelaLato(caractere.Value)) distintos.Add(caractere.Value);
+            }
+        }
+    }
+
+    /// <summary>Latim básico, Latin-1 e Latin Extended-A, a pontuação tipográfica (travessão, aspas, reticências), € e ™.</summary>
+    private static bool DesenhadoPelaLato(int c) => c <= 0x017F || c is >= 0x2010 and <= 0x203A or 0x20AC or 0x2122;
+
     /// <summary>Converte ou devolve nulo, acrescentando a <paramref name="erros"/> cada motivo de recusa.</summary>
     public static EtiquetaPlano? Converter(LayoutJsonDocument? layout, IQrCodeEncoder qr, ICollection<string> erros, string rotulo) =>
         Converter(layout, new CodigosDoPedido(qr), erros, rotulo);

@@ -18,7 +18,7 @@ public class LimitesDeCargaFolhaTests
     public LimitesDeCargaFolhaTests()
     {
         _qr.Matriz(Arg.Any<string>()).Returns(_ => new bool[29, 29]);
-        _sut = new GerarFolhaEtiquetasPdfUseCase(Substitute.For<IFolhaEtiquetasPdfRenderer>(), _qr);
+        _sut = ComVagas(new VagasDeFolhaPdf());
     }
 
     private static GerarFolhaEtiquetasPdfCommand Pimaco(params EtiquetaNaFolha[] etiquetas) =>
@@ -201,5 +201,116 @@ public class LimitesDeCargaFolhaTests
 
         mensagem.Should().Contain(new string('A', 40)).And.NotContain(new string('A', 100));
         mensagem.Length.Should().BeLessThan(1000);
+    }
+
+    // ---------- 6. Rebanca: chave "elements" repetida burlava o teto de 40 ----------
+
+    private static readonly string ElementosGrandes =
+        "[" + string.Join(",", new[] { """{"x_mm":"abc"}""" }.Concat(Enumerable.Repeat("{}", 40))) + "]";
+
+    private static readonly string ElementosPequenos = new JsonArray(Divisor(0m, 0m, 10m, 1m)).ToJsonString();
+
+    private static EtiquetaNaFolha ComElementsDuasVezes(string primeiro, string segundo)
+    {
+        var tamanho = new JsonObject { ["preset"] = "custom", ["w_mm"] = 63.5m, ["h_mm"] = 38.1m, ["orientation"] = "horizontal" }.ToJsonString();
+        using var documento = JsonDocument.Parse($$"""{"v":1,"size":{{tamanho}},"elements":{{primeiro}},"elements":{{segundo}}}""");
+        return new EtiquetaNaFolha(documento.RootElement.Clone(), null);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Layout_ComChaveElementsRepetida_RecusaSemDesserializarOsElementos(bool grandePrimeiro)
+    {
+        var etiqueta = grandePrimeiro
+            ? ComElementsDuasVezes(ElementosGrandes, ElementosPequenos)
+            : ComElementsDuasVezes(ElementosPequenos, ElementosGrandes);
+
+        Recusa(Pimaco(etiqueta)).Should().NotContain("LayoutJson", "o elemento inválido do array grande não pode ser desserializado");
+    }
+
+    [Fact]
+    public void Layout_ComChaveElementsRepetida_MesmoPequena_Recusa() =>
+        Recusa(Pimaco(ComElementsDuasVezes(ElementosPequenos, ElementosPequenos))).Should().Contain("elements aparece mais de uma vez");
+
+    // ---------- 7. Rebanca: cada glifo fora da Lato custa uma busca de fonte no render ----------
+
+    private static string Cjk(int inicio, int quantos) =>
+        string.Concat(Enumerable.Range(0x4E00 + inicio, quantos).Select(c => (char)c));
+
+    private static EtiquetaNaFolha EtiquetaComTexto(string texto, int? copias = null) =>
+        Etiqueta(Layout(63.5m, 38.1m, "horizontal", Texto("nome", texto, 1m, 1m, 60m, 5m, 10m)), copias);
+
+    [Fact]
+    public void Pedido_ComMaisDe64GlifosDistintosForaDoLatino_SomadosEntreEtiquetas_Recusa() =>
+        Recusa(Pimaco(EtiquetaComTexto(Cjk(0, 40)), EtiquetaComTexto(Cjk(40, 25)))).Should().Contain("64");
+
+    [Fact]
+    public void Pedido_Com64GlifosForaDoLatino_RepetidosECopiados_Aceita() =>
+        _sut.Planejar(Pimaco(EtiquetaComTexto(Cjk(0, 64) + Cjk(0, 64), copias: 10))).Paginas.Should().NotBeEmpty();
+
+    [Fact]
+    public void Texto_ComTodoOLatin1EOLatinExtendedA_NaoContaComoGlifoForaDoLatino()
+    {
+        var latino = string.Concat(Enumerable.Range(0xA0, 0x180 - 0xA0).Select(c => (char)c)) + "–—‘’“”•…€™";
+
+        _sut.Planejar(Pimaco(EtiquetaComTexto(latino))).Paginas.Should().NotBeEmpty();
+    }
+
+    // ---------- 8. Rebanca: os QR rodavam fora do teto de renders simultâneos ----------
+
+    private GerarFolhaEtiquetasPdfUseCase ComVagas(VagasDeFolhaPdf vagas) =>
+        new(Substitute.For<IFolhaEtiquetasPdfRenderer>(), _qr, vagas);
+
+    [Fact]
+    public async Task ExecuteAsync_SemVaga_RecusaComOcupadoSemGerarQr()
+    {
+        var vagas = new VagasDeFolhaPdf(1, TimeSpan.FromMilliseconds(50));
+        using var ocupada = await vagas.OcuparAsync();
+
+        var gerar = () => ComVagas(vagas).ExecuteAsync(Pimaco(Etiqueta(Layout(63.5m, 38.1m, "horizontal", QrCom("LOT-1")))));
+
+        await gerar.Should().ThrowAsync<FolhaPdfOcupadaException>();
+        _qr.DidNotReceiveWithAnyArgs().Matriz(default!);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DevolveAVaga_DepoisDoPdfEDepoisDaRecusa()
+    {
+        var vagas = new VagasDeFolhaPdf(1, TimeSpan.FromMilliseconds(50));
+        var sut = ComVagas(vagas);
+
+        await sut.ExecuteAsync(Pimaco(Etiqueta(Layout(63.5m, 38.1m, "horizontal", QrCom("LOT-1")))));
+        var recusa = () => sut.ExecuteAsync(Pimaco());
+        await recusa.Should().ThrowAsync<UseCaseValidationException>();
+
+        var ocupar = () => vagas.OcuparAsync();
+        await ocupar.Should().NotThrowAsync("a vaga volta no fim do pedido, com PDF ou com 400");
+    }
+
+    [Fact]
+    public async Task OcuparAsync_ComTodasAsVagasOcupadas_CancelaComOToken()
+    {
+        var vagas = new VagasDeFolhaPdf(1, TimeSpan.FromMinutes(1));
+        using var ocupada = await vagas.OcuparAsync();
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        var ocupar = () => vagas.OcuparAsync(cts.Token);
+
+        await ocupar.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task Vaga_DevolvidaDuasVezes_ContaUmaSo()
+    {
+        var vagas = new VagasDeFolhaPdf(1, TimeSpan.FromMilliseconds(50));
+        var vaga = await vagas.OcuparAsync();
+        vaga.Dispose();
+        vaga.Dispose();
+
+        using var primeira = await vagas.OcuparAsync();
+        var segunda = () => vagas.OcuparAsync();
+
+        await segunda.Should().ThrowAsync<FolhaPdfOcupadaException>();
     }
 }

@@ -12,7 +12,7 @@ public sealed class FolhaEtiquetasPdfRendererTests
 {
     private const string ConteudoQr = "TALHARIM-LOT-261103-707082-001";
     private static readonly QrCoderEncoder Qr = new();
-    private static readonly GerarFolhaEtiquetasPdfUseCase UseCase = new(new FolhaEtiquetasPdfRenderer(), Qr);
+    private static readonly GerarFolhaEtiquetasPdfUseCase UseCase = new(new FolhaEtiquetasPdfRenderer(), Qr, new VagasDeFolhaPdf());
 
     private static JsonObject Texto(string id, string conteudo, decimal x, decimal y, decimal w, decimal h, decimal pt, int peso) => new()
     {

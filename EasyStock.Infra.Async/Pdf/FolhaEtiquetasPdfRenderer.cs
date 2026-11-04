@@ -23,25 +23,12 @@ public sealed class FolhaEtiquetasPdfRenderer : IFolhaEtiquetasPdfRenderer
 
     static FolhaEtiquetasPdfRenderer() => QuestPDF.Settings.License = LicenseType.Community;
 
-    /// <summary>Quantos PDFs a API desenha ao mesmo tempo; o QuestPDF é síncrono e usa CPU e memória na proporção da folha.</summary>
-    public const int RendersSimultaneosMax = 2;
-
-    /// <summary>Vagas de render, compartilhadas pelo processo. Quem não consegue vaga espera, até o token cancelar.</summary>
-    internal static readonly SemaphoreSlim Vagas = new(RendersSimultaneosMax, RendersSimultaneosMax);
-
-    public async Task<byte[]> RenderAsync(PlanoFolhaEtiquetas plano, CancellationToken ct = default)
+    /// <summary>Síncrono e pesado; quem limita quantos rodam ao mesmo tempo é a <see cref="VagasDeFolhaPdf"/> do use case.</summary>
+    public Task<byte[]> RenderAsync(PlanoFolhaEtiquetas plano, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(plano);
-        await Vagas.WaitAsync(ct);
-        try
-        {
-            ct.ThrowIfCancellationRequested();
-            return Gerar(plano);
-        }
-        finally
-        {
-            Vagas.Release();
-        }
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(Gerar(plano));
     }
 
     private static byte[] Gerar(PlanoFolhaEtiquetas plano)

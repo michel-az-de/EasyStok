@@ -26,10 +26,29 @@ public class EtiquetasPdfControllerTests
     public EtiquetasPdfControllerTests()
     {
         _renderer.RenderAsync(Arg.Any<PlanoFolhaEtiquetas>(), Arg.Any<CancellationToken>()).Returns(PdfFalso);
-        _controller = new EtiquetasPdfController(new GerarFolhaEtiquetasPdfUseCase(_renderer, Substitute.For<IQrCodeEncoder>()))
+        _controller = Controller(new VagasDeFolhaPdf());
+    }
+
+    private EtiquetasPdfController Controller(VagasDeFolhaPdf vagas) =>
+        new(new GerarFolhaEtiquetasPdfUseCase(_renderer, Substitute.For<IQrCodeEncoder>(), vagas))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
+
+    [Fact]
+    public async Task Gerar_SemVaga_Devolve503ComRetryAfterSemRenderizar()
+    {
+        var vagas = new VagasDeFolhaPdf(1, TimeSpan.FromMilliseconds(20));
+        using var ocupada = await vagas.OcuparAsync();
+        var controller = Controller(vagas);
+
+        var resultado = await controller.Gerar(Pedido(Etiqueta()), CancellationToken.None);
+
+        var objeto = resultado.Should().BeOfType<ObjectResult>().Subject;
+        objeto.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        objeto.Value.Should().BeOfType<ApiErrorResponse>().Which.Error.Code.Should().Be(EtiquetasPdfController.CodigoOcupado);
+        controller.Response.Headers.RetryAfter.ToString().Should().Be(FolhaPdfOcupadaException.TenteDeNovoEmSegundos.ToString());
+        await _renderer.DidNotReceiveWithAnyArgs().RenderAsync(default!, default);
     }
 
     private static EtiquetaNaFolha Etiqueta(decimal nomePt = 10m) => new(JsonSerializer.SerializeToElement(new JsonObject

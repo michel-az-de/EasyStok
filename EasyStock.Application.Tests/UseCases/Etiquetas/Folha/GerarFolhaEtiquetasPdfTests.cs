@@ -11,7 +11,7 @@ public class GerarFolhaEtiquetasPdfTests
     private readonly IFolhaEtiquetasPdfRenderer _renderer = Substitute.For<IFolhaEtiquetasPdfRenderer>();
     private readonly GerarFolhaEtiquetasPdfUseCase _sut;
 
-    public GerarFolhaEtiquetasPdfTests() => _sut = new GerarFolhaEtiquetasPdfUseCase(_renderer, new QrFalso());
+    public GerarFolhaEtiquetasPdfTests() => _sut = new GerarFolhaEtiquetasPdfUseCase(_renderer, new QrFalso(), new VagasDeFolhaPdf());
 
     private static GerarFolhaEtiquetasPdfCommand Pimaco(int pular = 0, params EtiquetaNaFolha[] etiquetas) =>
         new(new FolhaSpec("pimaco-a4256", null, null, null), Guias: true, pular, etiquetas);

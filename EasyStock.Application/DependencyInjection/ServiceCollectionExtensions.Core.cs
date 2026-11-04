@@ -132,6 +132,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<MarcarEtiquetasImpressasUseCase>();
         services.AddScoped<SalvarFichaTecnicaUseCase>();
         services.AddScoped<GerarFolhaEtiquetasPdfUseCase>(); // #2200: folha A4 em PDF
+        services.AddSingleton(_ => new VagasDeFolhaPdf()); // #2200: teto de folhas em PDF ao mesmo tempo, no processo
 
         // Onda P5.B — Listas de Compras
         services.AddScoped<ListarListasComprasUseCase>();
