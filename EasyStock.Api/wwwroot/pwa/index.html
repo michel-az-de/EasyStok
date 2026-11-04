@@ -8389,6 +8389,11 @@ body.ux-calm [data-screen="producao"] .section-label {
           <button class="btn-ajustes-printer primary-soft" onclick="pickPrinter()" style="flex:1">Buscar impressora</button>
           <button class="btn-ajustes-printer success-soft" onclick="testPrint()" style="flex:1">Testar impressão</button>
         </div>
+        <div class="ajustes-actions-row" id="printerTsplAcoes" style="display:none;margin-top:8px">
+          <button class="btn-ajustes-printer subtle" onclick="alinharImpressora()" style="flex:1">Teste de alinhamento</button>
+          <button class="btn-ajustes-printer subtle" id="printerCalibrar" onclick="calibrarImpressora()" style="flex:1">Calibrar etiqueta</button>
+        </div>
+        <p class="hint" id="printerTsplDica" style="display:none">O teste de alinhamento imprime uma moldura, uma cruz no centro e uma régua de 10 mm. Calibrar mede a etiqueta recortada e o espaço entre uma e outra.</p>
         <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnóstico</button>
       </div>
 
@@ -8666,10 +8671,11 @@ body.ux-calm [data-screen="producao"] .section-label {
       <div class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</div>
       <div id="savedPrinterProfiles" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
       <label for="printerProfile">Modelo da impressora</label>
-      <select id="printerProfile" class="np-btn np-secondary"><option value="auto">Detectar pelo nome</option><option value="escpos">ESC/POS 58 mm · Hipertech WTP05, MTP-II</option><option value="tspl">TSPL etiqueta · Oasis OIA-8381-B</option></select>
-      <label for="printerLabelSize">Etiqueta (só TSPL)</label>
-      <select id="printerLabelSize" class="np-btn np-secondary"><option value="40x25">40 x 25 mm</option><option value="50x30">50 x 30 mm</option><option value="60x40">60 x 40 mm</option><option value="80x40" selected>80 x 40 mm</option><option value="100x50">100 x 50 mm</option><option value="100x100">100 x 100 mm</option><option value="100x150">100 x 150 mm</option><option value="continuo">Bobina contínua</option></select>
-      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="printerInvert"> Inverter cores (se a etiqueta TSPL sair em negativo)</label>
+      <select id="printerProfile" class="np-btn np-secondary" onchange="mexeuNoSeletor('perfil'); preencherPapeisSeletor()"><option value="auto">Detectar pelo nome</option><option value="escpos">ESC/POS 58 mm · Hipertech WTP05, MTP-II</option><option value="tspl">TSPL etiqueta · Oasis OIA-8381-B</option></select>
+      <label for="printerLabelSize">Papel na impressora</label>
+      <select id="printerLabelSize" class="np-btn np-secondary" onchange="mexeuNoSeletor('papel')"></select>
+      <div class="np-text" id="printerPapelDica" style="font-size:13px"></div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="printerInvert" onchange="mexeuNoSeletor('inverter')"> Inverter cores (se a etiqueta TSPL sair em negativo)</label>
       <div id="printerPickerList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:280px;overflow-y:auto"></div>
       <button class="np-btn np-secondary" onclick="loadPrinterDevices()">↻ Buscar de novo</button>
       <button class="np-btn np-tertiary"  onclick="closePrinterPicker()">Cancelar</button>
@@ -15348,9 +15354,29 @@ function normalizarImpressora(p) {
   return out;
 }
 function perfilImpressora(p) { return (normalizarImpressora(p) || {}).profile || 'escpos'; }
+// #2202 (D1): sem altura a mídia é rolo contínuo. A mídia do catálogo (midia) manda.
 function tsplConfig(p) {
   const e = (p && p.etiqueta) || {};
-  return { larguraMm: e.larguraMm || 80, alturaMm: e.alturaMm || 40, gapMm: e.gapMm === 0 ? 0 : (e.gapMm || 2), continuo: !!e.continuo, inverter: !!e.inverter };
+  const m = p && p.midia;
+  if (m && Number(m.larguraMm) > 0 && m.tipo !== 'bobina') {
+    const cont = m.tipo !== 'etiqueta';
+    return { larguraMm: Number(m.larguraMm), alturaMm: cont ? 0 : Number(m.alturaMm), gapMm: cont ? 0 : (Number(m.gapMm) || 2), continuo: cont, inverter: !!(p.inverter || e.inverter) };
+  }
+  const continuo = e.continuo === true || !(Number(e.alturaMm) > 0);
+  return { larguraMm: e.larguraMm || 80, alturaMm: continuo ? 0 : e.alturaMm, gapMm: continuo ? 0 : (e.gapMm === 0 ? 0 : (e.gapMm || 2)), continuo, inverter: !!e.inverter };
+}
+// Papel do catálogo que a impressora salva usa. Sem papel salvo, o padrão da
+// linguagem: rolo contínuo de 80 mm (D1) ou bobina de 58 mm.
+function papelDaImpressora(p) {
+  const P = window.cdbPapeis;
+  if (!P || !p) return null;
+  const tspl = perfilImpressora(p) === 'tspl';
+  const salvo = p.midia ? P.daMidia(p.midia) : null;
+  if (salvo && (salvo.tipo !== 'bobina') === tspl && P.porId(salvo.id)) return salvo.id;
+  if (!tspl) return P.PADRAO_ESCPOS;
+  const c = tsplConfig(p);
+  const papel = P.daMidia(c.continuo ? { tipo: 'continuo', larguraMm: c.larguraMm } : { tipo: 'etiqueta', larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm });
+  return papel && P.porId(papel.id) ? papel.id : P.PADRAO_TSPL;
 }
 function descreverPerfil(p) {
   if (perfilImpressora(p) !== 'tspl') return 'ESC/POS 58 mm';
@@ -15379,7 +15405,7 @@ function renderSavedPrinters() {
     const button = document.createElement('button');
     button.className = 'np-btn np-secondary';
     button.textContent = p.name + ' · ' + descreverPerfil(p);
-    button.onclick = () => selectPrinter(p);
+    button.onclick = () => selectPrinter(impressoraDoSeletor(p.address, p.name));
     host.appendChild(button);
   });
 }
@@ -15398,6 +15424,11 @@ function renderPrinterStatus() {
   const lab = document.getElementById('printerStatusLabel');
   const p   = getSavedPrinter();
   if (!el || !lab) return;
+  const acoes = acoesTspl(p);
+  [['printerTsplAcoes', acoes.alinhar], ['printerTsplDica', acoes.alinhar], ['printerCalibrar', acoes.calibrar]].forEach(([id, ver]) => {
+    const alvo = document.getElementById(id);
+    if (alvo) alvo.style.display = ver ? '' : 'none';
+  });
 
   const bs = window.bluetoothSerial;
   if (!bs) {
@@ -15429,6 +15460,7 @@ function pickPrinter() {
 function openPrinterPicker() {
   const modal = document.getElementById('printerPickerModal');
   modal.classList.add('show');
+  preencherSeletor(getSavedPrinter());
   renderSavedPrinters();
   loadPrinterDevices();
 }
@@ -16681,16 +16713,83 @@ function avisoDispositivo(d, name) {
   if (d && d.spp === false) return perfil + ' · sem serviço serial anunciado, pode falhar';
   return perfil + (d && d.printerClass ? ' · impressora' : '');
 }
-function impressoraDoSeletor(addr, name) {
+// #2202 (F0): o seletor abre com o papel, a linguagem e a inversão da
+// impressora selecionada (antes abria sempre em 80 x 40 recortada e gravava
+// isso de novo). Ao tocar numa impressora, vale o que o operador mudou aqui;
+// o que ele não mexeu vem do perfil salvo dela.
+let seletorMexido = {};
+let seletorLinguagem = null;
+function mexeuNoSeletor(campo) { seletorMexido[campo] = true; }
+function inversaoSalva(p) { return !!(p && (p.inverter || (p.etiqueta && p.etiqueta.inverter))); }
+function preencherSeletor(p) {
+  seletorMexido = {};
+  seletorLinguagem = p && p.address ? perfilImpressora(p) : null;
+  const perfil = document.getElementById('printerProfile');
+  if (perfil) perfil.value = p && p.perfilManual ? perfilImpressora(p) : 'auto';
+  const inverter = document.getElementById('printerInvert');
+  if (inverter) inverter.checked = inversaoSalva(p);
+  preencherPapeisSeletor(p && p.address ? papelDaImpressora(p) : null);
+}
+// Lista do select pela linguagem: etiqueta e rolo para TSPL, bobina de 58 mm
+// para ESC/POS (o cupom só sai em 58 mm hoje). Sem linguagem, as duas.
+function papeisDaLinguagem(lingua) {
+  const P = window.cdbPapeis;
+  const etiqueta = P.lista({ classe: 'etiqueta' });
+  const cupom = [P.porId(P.PADRAO_ESCPOS)];
+  return lingua === 'tspl' ? etiqueta : lingua === 'escpos' ? cupom : etiqueta.concat(cupom);
+}
+function preencherPapeisSeletor(escolhido) {
+  const sel = document.getElementById('printerLabelSize');
+  const P = window.cdbPapeis;
+  if (!sel || !P) return;
   const escolha = (document.getElementById('printerProfile') || {}).value || 'auto';
-  const tamanho = (document.getElementById('printerLabelSize') || {}).value || '80x40';
-  const inverter = !!(document.getElementById('printerInvert') || {}).checked;
+  const lingua = escolha !== 'auto' ? escolha : seletorLinguagem;
+  const papeis = papeisDaLinguagem(lingua);
+  const atual = escolhido || sel.value;
+  const id = papeis.some(p => p.id === atual) ? atual : (lingua === 'escpos' ? P.PADRAO_ESCPOS : P.PADRAO_TSPL);
+  sel.innerHTML = papeis.map(p => '<option value="' + escapeHtml(p.id) + '"' + (p.id === id ? ' selected' : '') + '>' + escapeHtml(p.rotulo) + '</option>').join('');
+  sel.value = id;
+  const dica = document.getElementById('printerPapelDica');
+  if (dica) dica.textContent = 'Rolo contínuo não tem recorte e gasta só o tamanho da etiqueta. Etiqueta recortada tem um espaço entre uma e outra: depois de escolher, toque Calibrar etiqueta em Ajustes.';
+}
+function impressoraDoSeletor(addr, name) {
+  const salva = getPrinterProfiles().find(p => p.address === addr) || null;
+  const campo = id => document.getElementById(id) || {};
+  const escolha = seletorMexido.perfil ? (campo('printerProfile').value || 'auto') : (salva && salva.perfilManual ? perfilImpressora(salva) : 'auto');
   const profile = escolha === 'auto' ? perfilPorNome(name) : escolha;
-  const medidas = /^(\d+)x(\d+)$/.exec(tamanho);
-  const etiqueta = medidas
-    ? { larguraMm: Number(medidas[1]), alturaMm: Number(medidas[2]), gapMm: 2, continuo: false, inverter }
-    : { larguraMm: 80, alturaMm: 0, gapMm: 0, continuo: true, inverter };
-  return { address: addr, name, profile, perfilManual: escolha !== 'auto', etiqueta };
+  const inverter = seletorMexido.inverter ? !!campo('printerInvert').checked : inversaoSalva(salva);
+  const P = window.cdbPapeis;
+  const tspl = profile === 'tspl';
+  const serve = papel => !!papel && (papel.tipo !== 'bobina') === tspl;
+  let papel = P && seletorMexido.papel ? P.porId(campo('printerLabelSize').value) : null;
+  if (P && !serve(papel) && salva && perfilImpressora(salva) === profile) papel = P.porId(papelDaImpressora(salva));
+  if (P && !serve(papel)) papel = P.porId(tspl ? P.PADRAO_TSPL : P.PADRAO_ESCPOS);
+  const etiqueta = papel && papel.tipo === 'etiqueta'
+    ? { larguraMm: papel.larguraMm, alturaMm: papel.alturaMm, gapMm: papel.gapMm, continuo: false, inverter }
+    : { larguraMm: papel && papel.tipo === 'continuo' ? papel.larguraMm : 80, alturaMm: 0, gapMm: 0, continuo: true, inverter };
+  const out = Object.assign({}, salva, { address: addr, name, profile, perfilManual: escolha !== 'auto', etiqueta, inverter });
+  if (papel) out.midia = P.paraMidia(papel);
+  return out;
+}
+// Ações da Oasis em Ajustes: alinhamento para qualquer papel TSPL; calibrar
+// só na etiqueta recortada (rolo contínuo não tem recorte para medir).
+function acoesTspl(p) {
+  const tspl = !!p && !!p.address && perfilImpressora(p) === 'tspl';
+  return { alinhar: tspl, calibrar: tspl && !tsplConfig(p).continuo };
+}
+function midiaTsplSalva(p) {
+  const c = tsplConfig(p);
+  return { larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm, continuo: c.continuo };
+}
+function calibrarImpressora() {
+  const p = getSavedPrinter();
+  if (!acoesTspl(p).calibrar || !window.cdbTspl) return;
+  printViaBluetooth(window.cdbTspl.calibracao(midiaTsplSalva(p)), () => showToast('Sem conexão com a impressora'));
+}
+function alinharImpressora() {
+  const p = getSavedPrinter();
+  if (!acoesTspl(p).alinhar || !window.cdbTspl) return;
+  printViaBluetooth(window.cdbTspl.alinhamento(midiaTsplSalva(p)), () => showToast('Sem conexão com a impressora'));
 }
 
 function selectPrinter(printer) {
@@ -23286,7 +23385,8 @@ window.cdbApp = {
 
 <script src="qrcode.min.js?v=20260429a"></script>
 <script src="etiqueta-termica.js?v=20261028a"></script>
-<script src="impressora-tspl.js?v=20261103a"></script>
+<script src="impressao-papeis.js?v=20261104a"></script>
+<script src="impressora-tspl.js?v=20261104a"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
 <script src="upload-photos.js?v=20260514b"></script>

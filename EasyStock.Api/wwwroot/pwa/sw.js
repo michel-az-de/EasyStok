@@ -29,6 +29,7 @@ const STATIC_ASSETS = [
   './qrcode.min.js',
   './etiqueta-termica.js',
   './impressora-tspl.js',
+  './impressao-papeis.js',
   './queue-store.js',
   './photo-store.js',
   './upload-photos.js',
