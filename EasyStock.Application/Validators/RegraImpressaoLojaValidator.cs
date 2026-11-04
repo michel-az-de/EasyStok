@@ -24,6 +24,14 @@ public sealed class RegraImpressaoLojaValidator : AbstractValidator<RegraImpress
         RuleFor(x => x.Documentos).Custom((documentos, ctx) =>
         {
             if (documentos is null) return;
+            // Um erro só para corpo inchado: 1 erro por chave deixava um PUT pequeno gerar uma resposta enorme.
+            if (documentos.Count > RegraImpressaoCatalogo.Documentos.Count)
+            {
+                ctx.AddFailure("documentos",
+                    $"documentos aceita no máximo {RegraImpressaoCatalogo.Documentos.Count} chaves: {Lista(RegraImpressaoCatalogo.Documentos)}.");
+                return;
+            }
+
             foreach (var (nome, doc) in documentos)
             {
                 var caminho = $"documentos.{nome}";

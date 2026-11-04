@@ -22,6 +22,9 @@ public sealed class LojaImpressaoController(
     public const string CodigoConflito = "IMPRESSAO_CONFLITO";
     public const string CodigoSemIfMatch = "IMPRESSAO_SEM_IF_MATCH";
 
+    /// <summary>A regra canônica completa tem menos de 1 KB; 8 KB folga para espaços e chaves a mais sem abrir amplificação.</summary>
+    public const int TamanhoMaximoCorpo = 8 * 1024;
+
     [SwaggerOperation(Summary = "Regra de impressão da loja", Description = "ETag \"n\" é a versão; impressao null = nunca configurada.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -47,6 +50,7 @@ public sealed class LojaImpressaoController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status428PreconditionRequired)]
     [Authorize(Policy = "Gerente")]
+    [RequestSizeLimit(TamanhoMaximoCorpo)]
     [HttpPut]
     public async Task<IActionResult> Gravar(
         Guid lojaId,

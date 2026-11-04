@@ -95,6 +95,18 @@ public class RegraImpressaoContratoTests
             """{"v":1,"documentos":{"etiqueta-pedido":{"papel":"cupom-58","template":null,"orientacao":null,"codigos":["qr"],"copias":10}}}""");
     }
 
+    [Fact]
+    public void Documentos_alem_do_catalogo_viram_um_erro_so()
+    {
+        // Banca de segurança #2205: 1 erro por chave desconhecida deixava um corpo pequeno gerar uma resposta enorme.
+        var documentos = Enumerable.Range(0, 5000)
+            .ToDictionary(i => $"x{i}", _ => (RegraImpressaoDocumentoEntrada?)new("a4", null, null, null, null));
+
+        var validacao = Validator.Validate(new RegraImpressaoLojaEntrada(1, documentos));
+
+        validacao.Errors.Should().ContainSingle().Which.PropertyName.Should().Be("documentos");
+    }
+
     private static RegraImpressaoLojaEntrada Ler(JsonNode node) =>
         node.Deserialize<RegraImpressaoLojaEntrada>(Web)!;
 

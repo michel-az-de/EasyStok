@@ -157,6 +157,17 @@ public class LojaImpressaoControllerTests
         resposta.Should().BeOfType<NotFoundObjectResult>();
     }
 
+    [Fact]
+    public void Put_limita_o_tamanho_do_corpo()
+    {
+        // A regra canônica completa tem menos de 1 KB; o limite padrão do Kestrel (30 MB) deixava amplificar o 400.
+        var limite = typeof(LojaImpressaoController).GetMethod(nameof(LojaImpressaoController.Gravar))!
+            .GetCustomAttributes(typeof(RequestSizeLimitAttribute), false).Cast<RequestSizeLimitAttribute>().SingleOrDefault();
+
+        limite.Should().NotBeNull();
+        LojaImpressaoController.TamanhoMaximoCorpo.Should().BeLessThanOrEqualTo(16 * 1024);
+    }
+
     private static RegraImpressaoLojaResult Dados(IActionResult resposta) =>
         resposta.Should().BeOfType<OkObjectResult>().Subject.Value
             .Should().BeOfType<ApiResponse<RegraImpressaoLojaResult>>().Subject.Data;
