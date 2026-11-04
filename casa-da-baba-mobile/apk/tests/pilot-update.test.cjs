@@ -127,7 +127,8 @@ test('Back nativo fecha formulário com o fechador PWA real e só minimiza no in
   const context = installPwaBack(root, doc);
   assert.equal(root.cdbHandleNativeBack(), true);
   assert.equal(closed, 1); assert.equal(visible.size, 0);
-  context.goBack = () => { context.currentScreen = 'home'; doc.querySelector = () => ({ dataset: { screen: 'home' } }); };
+  // Produção é aba de topo no APK: o Voltar vai direto ao Início, sem depender da história.
+  context.go = screen => { context.currentScreen = screen; doc.querySelector = () => ({ dataset: { screen } }); };
   assert.equal(root.cdbHandleNativeBack(), true);
   assert.equal(nodes.get('pilotHome').open, true);
   assert.equal(root.cdbHandleNativeBack(), false);
@@ -169,7 +170,7 @@ test('Back protege impressão lexical antes de avisos/home, e libera navegação
   const notices = nodes.get('pilotNotices'); notices.showModal();
   doc.querySelectorAll = () => [];
   const context = installPwaBack(root, doc); let navigated = 0;
-  context.showToast = () => {}; context.goBack = () => { navigated++; };
+  context.showToast = () => {}; context.goBack = () => { navigated++; }; context.go = () => { navigated++; };
   vm.runInContext('isPrinting = true', context);
   assert.equal(root.isPrinting, undefined); assert.equal(context.isPrinting, undefined);
   assert.equal(root.cdbHandleNativeBack(), true); assert.equal(notices.open, true);
@@ -340,9 +341,20 @@ test('textos pequenos do início mantêm contraste mínimo de 4,5:1', () => {
     return rgb.map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
       .reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
   };
+  // Cores vêm de tokens: confere nos dois temas (escuro em body.pilot-app, claro sobrepõe).
+  const tokens = selector => {
+    const rule = css.split('\n').find(line => line.startsWith(selector + ' {'));
+    assert.ok(rule, selector);
+    return Object.fromEntries([...rule.matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)].map(match => [match[1], match[2]]));
+  };
+  const dark = tokens('body.pilot-app');
+  const themes = { escuro: dark, claro: { ...dark, ...tokens('[data-theme=light] body.pilot-app') } };
+  const resolve = (value, theme) => value.replace(/var\((--[\w-]+)\)/, (_, name) => themes[theme][name]);
   for (const [text, background] of [['.pilot-topline', '.pilot-home'], ['.pilot-update', '.pilot-home'], ['.pilot-production', '.pilot-production'], ['.pilot-orders', '.pilot-orders'], ['.pilot-rail button span', '.pilot-rail'], ['.pilot-app .etq-actions .etq-save', '.pilot-app .etq-actions .etq-save'], ['.pilot-app .etq-actions .etq-share', '.pilot-app .etq-actions .etq-share']]) {
-    const levels = [luminance(style(text).color), luminance(style(background).background)].sort((a, b) => a - b);
-    assert.ok((levels[1] + .05) / (levels[0] + .05) >= 4.5, text);
+    for (const theme of Object.keys(themes)) {
+      const levels = [luminance(resolve(style(text).color, theme)), luminance(resolve(style(background).background, theme))].sort((a, b) => a - b);
+      assert.ok((levels[1] + .05) / (levels[0] + .05) >= 4.5, text + ' (' + theme + ')');
+    }
   }
   assert.equal(style('.pilot-card .pilot-step').opacity, undefined);
 });

@@ -225,7 +225,7 @@
     ]) for (const element of document.querySelectorAll('#moreMenu button[onclick="' + action + '"] .more-menu-icon')) element.innerHTML = pilotIcon(name);
   }
 
-  function installAppChrome(environment, openHome) {
+  function installAppChrome(environment, openHome, closeHome) {
     const document = environment.document;
     const header = document.querySelector?.('.phone > .header');
     if (!header) return;
@@ -240,6 +240,7 @@
     if (typeof navigate === 'function') environment.go = function (screen, options) {
       const result = navigate.call(this, screen, options);
       if (screen === 'home') openHome();
+      else closeHome?.();
       return result;
     };
   }
@@ -361,7 +362,6 @@
         ${tileButton('pair', 'Conectar', 'link', 'support', 'pilotPairButton')}
         ${tileButton('printers', 'Impressoras', 'printer')}
         ${tileButton('settings', 'Configurações', 'settings')}
-        ${tileButton('migration-guide', 'Sistema Antigo', 'ajuda')}
         ${tileButton('update', 'Atualizar', 'refresh-cw', 'support', 'pilotUpdateButton')}
       </div>
       <div class="pilot-home-support" hidden>
@@ -377,7 +377,7 @@
       <button type="button" id="pilotDownload" data-action="download" hidden>Atualizar APK</button>
     </div>`;
   doc.body.append(home);
-  installAppChrome(root, openHome);
+  installAppChrome(root, openHome, closeHome);
   installLabelWorkspace(root);
   if (doc.querySelector && root.MutationObserver) {
     for (const id of ['newProductModal', 'productionConfirmModal']) {
@@ -599,6 +599,12 @@
     refreshOtaStatus();
   }
   function closeHome() { home.close(); }
+  // Impressoras tem um único lugar: Configurações > Etiquetas, seção Impressoras.
+  function openPrinterSettings() {
+    root.openAjustes();
+    root.setAjustesTab('eq');
+    doc.getElementById('impressorasLista')?.closest('.ajustes-section')?.scrollIntoView({ block: 'start' });
+  }
   root.cdbHandleNativeBack = function () {
     if (root.cdbIsPrinting?.()) return root.cdbHandleBack?.() === true;
     if (notices.open) {
@@ -877,7 +883,7 @@
         try { await app.openWorkspace(); }
         finally { openingWorkspace = false; button.disabled = false; }
       }
-      if (action === 'printers') { closeHome(); root.openPrinterPicker(); }
+      if (action === 'printers') { closeHome(); openPrinterSettings(); }
       if (action === 'settings') { closeHome(); root.openAjustes(); }
       if (action === 'import-pwa') {
         const input = doc.getElementById('backupFileInput');
