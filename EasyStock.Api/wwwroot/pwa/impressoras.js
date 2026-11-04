@@ -231,8 +231,16 @@
     return documento === 'etiqueta-producao' || documento === 'production' || documento === 'producao' ? 'etiqueta' : 'cupom';
   }
 
-  // Regra da loja (cache local até a F4). Códigos: a regra; senão o modo de
-  // leitura salvo; senão só o QR (D4: a barra espera o número curto do lote).
+  // #2209: o papel da regra é o do catálogo da loja (etiqueta-52, cupom-58...); no aparelho
+  // ele escolhe a impressora pela classe. Folha (a4, a5) não sai na térmica: fica a do documento.
+  function classeDoPapel(papel, documento) {
+    if (typeof papel === 'string' && /^etiqueta(-|$)/.test(papel)) return 'etiqueta';
+    if (typeof papel === 'string' && /^cupom(-|$)/.test(papel)) return 'cupom';
+    return papelDoDocumento(documento);
+  }
+
+  // Regra da loja (do servidor desde a F4, guardada pelo sync.js). Códigos: a regra; senão o
+  // modo de leitura salvo; senão só o QR (D4: a barra espera o número curto do lote).
   function regra(storage, documento) {
     const r = json(cru(storage, REGRA));
     const d = (r && r.documentos && r.documentos[documento]) || {};
@@ -240,7 +248,7 @@
     if (!codigos) { const modo = cru(storage, 'cdb-prod-scan-mode'); codigos = MODOS[modo] ? MODOS[modo].slice() : ['qr']; }
     const orient = d.orientacao || cru(storage, 'cdb-etq-orient');
     return {
-      papel: d.papel || papelDoDocumento(documento),
+      papel: classeDoPapel(d.papel, documento),
       orientacao: orient === 'horizontal' ? 'horizontal' : 'vertical',
       codigos,
       copias: Math.max(1, Math.floor(positivo(d.copias, 1)))

@@ -17369,15 +17369,22 @@ function findUnitByCode(code) {
   const c = String(code || '').trim().toUpperCase();
   if (!c) return null;
   const allBatches = batches || [];
+  // #2209: o QR traz o código longo; a barra, a chave do número curto. O número só é único na
+  // loja (o lote sem loja tem contador próprio), então a chave que bate em dois lotes não escolhe
+  // um: o operador lê o QR.
+  let pelaChave = null;
+  let chaveAmbigua = false;
   for (const batch of allBatches) {
     const ets = etiquetasFromBatch(batch);
     for (const et of ets) {
-      // #2209: o QR traz o código longo; a barra, a chave do número curto.
-      if (String(et.codigoBarras || '').toUpperCase() === c || (et.chaveCurta && et.chaveCurta === c)) {
-        return { batch, et, idxStr: et.idxStr };
+      if (String(et.codigoBarras || '').toUpperCase() === c) return { batch, et, idxStr: et.idxStr };
+      if (et.chaveCurta && et.chaveCurta === c) {
+        if (!pelaChave) pelaChave = { batch, et, idxStr: et.idxStr };
+        else if (pelaChave.batch !== batch) chaveAmbigua = true;
       }
     }
   }
+  if (pelaChave) return chaveAmbigua ? null : pelaChave;
   // Etiqueta impressa antes do #1471 (sem sufixo do lote). Pode colidir entre lotes
   // do mesmo dia; devolve o primeiro, como antes.
   for (const batch of allBatches) {
@@ -20079,10 +20086,42 @@ function avisoDaRecusa(recusa) {
   const motivo = String(recusa || '').replace('. ' + acao, '');
   return acao + '. ' + motivo.charAt(0).toUpperCase() + motivo.slice(1) + '.';
 }
+// #2209: a etiqueta do lote recém-lançado é montada antes de o servidor responder ao push com o
+// número do lote. Com a barra na regra, espera o envio em andamento (até 5 s) e refaz as chaves;
+// sem resposta, a etiqueta sai só com o QR, como sem rede.
+const ESPERA_DO_NUMERO_MS = 5000;
+async function completarChavesDaBarra(etiquetas) {
+  const faltam = (etiquetas || []).filter(et => et && et.batchId && !et.chaveCurta && !et.barraExcedida);
+  const I = window.cdbImpressoras, S = window.cdbSync;
+  if (!faltam.length || !I || !S || typeof S.flush !== 'function') return;
+  if (I.regra(localStorage, 'etiqueta-producao').codigos.indexOf('barras') < 0) return;
+  const loteDe = id => (batches || []).find(b => b && b.id === id);
+  const semNumero = () => faltam.some(et => { const b = loteDe(et.batchId); return b && !b.numeroCurto; });
+  // O flush devolve o envio em andamento, que pode ser anterior ao lote: sem o número, um segundo
+  // envio dentro do mesmo prazo leva o lote.
+  const ate = Date.now() + ESPERA_DO_NUMERO_MS;
+  for (let envio = 0; envio < 2 && semNumero() && Date.now() < ate; envio++) {
+    let limite = null;
+    try {
+      await Promise.race([
+        Promise.resolve().then(() => S.flush()).catch(() => {}),
+        new Promise(r => { limite = setTimeout(r, Math.max(0, ate - Date.now())); })
+      ]);
+    } finally { clearTimeout(limite); }
+  }
+  const refeitas = {};
+  faltam.forEach(et => {
+    const b = loteDe(et.batchId);
+    if (!b || !b.numeroCurto) return;
+    const nova = (refeitas[b.id] || (refeitas[b.id] = etiquetasFromBatch(b))).find(n => n.idx === et.idx);
+    if (nova) { et.chaveCurta = nova.chaveCurta; et.barraExcedida = nova.barraExcedida; }
+  });
+}
 async function etiquetasTspl(etiquetas, kind, nota, printer, copias) {
   if (!window.cdbTspl) return null;
   etiquetasTspl.recusa = null;
   etiquetasTspl.aviso = '';
+  if (kind !== 'order') await completarChavesDaBarra(etiquetas);
   const partes = [];
   for (const et of etiquetas) {
     let canvas = null;
@@ -21290,6 +21329,7 @@ async function etqAction(action) {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
         // etiqueta, travando o app pra batches de 100+ unidades).
+        // #2209: o ESC/POS imprime o código do QR, não a chave curta; não espera o número do lote.
         const prodNota = getEtqNota() || null;
         let singleLen = 0;
         const parts = currentEtiquetas.map(et => {
