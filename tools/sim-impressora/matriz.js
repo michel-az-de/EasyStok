@@ -13,7 +13,7 @@ const { etiquetaProducao } = require('./lib/app');
 const { casos, DADOS } = require('./casos');
 
 const PT_MM = 25.4 / 72;
-const PISO = { nome: 10, dado: 7.5, validade: 9, qrModulo: 3, barraModulo: 2, barraQuieta: 10, barraAlturaMm: 8 };
+const PISO = { nome: 10, dado: 7.5, validade: 9, qrModulo: 3, qrQuieta: 4, barraModulo: 2, barraQuieta: 10, barraAlturaMm: 8 };
 const LIMITE_GOLDEN = 0.005;
 
 function opt(nome, padrao) {
@@ -84,6 +84,12 @@ async function rodarCaso(env, caso) {
     if (a && a.caixa) r.qrCaixa = Object.assign({ mod: a.moduloExato }, a.caixa);
     ok('qr', a && a.texto === DADOS.qr && b && b.texto === DADOS.qr, `jsQR=${a ? a.texto : 'não leu'} ZXing=${b ? b.texto : 'não leu'}`, 'P3');
     if (a) ok('piso-qr', a.moduloPontos >= PISO.qrModulo - 0.2, `módulo ${a.moduloPontos} pontos (piso ${PISO.qrModulo})`, 'P1');
+    // Zona quieta de 4 módulos entre o símbolo e cada borda do papel (a leitura
+    // estima os cantos, daí a folga de meio módulo).
+    if (a && a.caixa) {
+      const q = a.caixa, folga = Math.min(q.y0, q.x0, p.w - 1 - q.x1, p.h - 1 - q.y1) / a.moduloExato;
+      ok('quieta-qr', folga >= PISO.qrQuieta - 0.5, `zona quieta do QR até a borda: ${folga.toFixed(1)} módulos (mínimo ${PISO.qrQuieta})`, 'P3');
+    }
   }
   if (caso.lista.includes('barras')) {
     const b = lerBarras(p.tinta, p.w, p.h);
@@ -105,7 +111,8 @@ async function rodarCaso(env, caso) {
   const exigidos = [
     ['validade', new Date(g.et.expiresAt).toLocaleDateString('pt-BR')],
     ['fabricação', new Date(DADOS.criadoEm).toLocaleDateString('pt-BR')],
-    ['lote', DADOS.loteDoDia]
+    // O código inteiro do lote (lote do dia e o sufixo do batch), não só o prefixo.
+    ['lote', `${DADOS.loteDoDia}-${DADOS.batchId.slice(-6)}`]
   ].concat(String(g.et.productName).split(/\s+/).map(t => ['nome', t]));
   if (caso.lista.includes('barras')) exigidos.push(['número das barras', DADOS.barras]);
   const faltam = exigidos.filter(([, v]) => !textos.includes(v)).map(([k, v]) => `${k} "${v}"`);

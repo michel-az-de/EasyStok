@@ -16973,7 +16973,9 @@ function testPrint(mac) {
       ? tsplBytesDoCanvas(window.cdbTspl.linhasParaCanvas('TESTE', linhas), printer)
       : escPosTextLines('TESTE', linhas);
   } catch (e) { showToast('Falha ao montar o teste: ' + ((e && e.message) || e)); return; }
-  printViaBluetooth(bytes, () => {
+  // Falha já explicada (conexão, permissão): o erro fica na tela, sem impressão do sistema.
+  printViaBluetooth(bytes, explicado => {
+    if (explicado) return;
     showToast('Bluetooth indisponível — usando impressão do sistema');
     printAreaHtml('<div class="pa-title">TESTE</div><div class="pa-center">' + linhas.map(escapeHtml).join('<br>') + '</div>');
   }, null, printer);
@@ -19684,7 +19686,7 @@ function printViaBluetooth(bytes, onFallback, printJob, printerArg, onSent) {
       showToast('Na fila: imprime em seguida na ' + (printer.apelido || printer.name || 'outra impressora'));
       return;
     }
-    showToast('Impressão em andamento, aguarda…'); return;
+    showToast(ocupada ? 'Impressão em andamento: toque de novo quando terminar' : 'Fila cheia: toque de novo em instantes'); return;
   }
 
   // Reserva o envio antes do diálogo Android: dois toques não geram dois trabalhos.

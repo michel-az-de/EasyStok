@@ -60,7 +60,20 @@
   // campos: { empresa, nome, validade, fabricacao, lote, peso, qr, barras }
   // area: { w_mm, h_mm, continuo, girar } no sentido do desenho.
   // opcoes: { codigos: ['qr','barras'], medir?, document? }
+  // O QR nasce no maior módulo que cabe. Se assim a etiqueta recusa ou perde o
+  // peso, tenta módulos menores, até o mínimo legível, antes de desistir.
   function resolver(campos, area, opcoes) {
+    const perde = r => (r.recusa ? 2 : r.omitidos.indexOf('peso') >= 0 ? 1 : 0);
+    let melhor = resolverCom(campos, area, opcoes, 0);
+    for (let d = Math.round(melhor._qrMod / PONTO) - 1; perde(melhor) && d >= MIN.qrModulo; d--) {
+      const r = resolverCom(campos, area, opcoes, d * PONTO);
+      if (perde(r) < perde(melhor)) melhor = r;
+    }
+    delete melhor._qrMod;
+    return melhor;
+  }
+
+  function resolverCom(campos, area, opcoes, qrForcado) {
     const o = Object.assign({ codigos: ['qr'] }, opcoes);
     const medir = medidor(o);
     const W = area.w_mm;
@@ -72,14 +85,14 @@
     const avisos = [];
     const omitidos = [];
     const codigos = [];
-    const recusar = motivo => ({ layout: null, avisos, omitidos, recusa: motivo });
+    const recusar = motivo => ({ layout: null, avisos, omitidos, recusa: motivo, _qrMod: qrMod });
 
     const pediuBarras = o.codigos.indexOf('barras') >= 0;
     let querBarras = pediuBarras;
     // D4: a barra leva a chave curta do lote (número curto + unidade). Code128 C
     // só codifica pares de dígitos; chave ímpar não sai, para o leitor não ler
     // um número diferente do lote. Contrato com a F4: a chave tem tamanho par.
-    const barras = String(campos.barras || '');
+    const barras = String(campos.barras || '').trim();
     if (querBarras && !/^\d+$/.test(barras)) {
       avisos.push('sem código de barras: o lote ainda não tem número curto');
       querBarras = false;
@@ -100,7 +113,7 @@
       const alvo = horiz
         ? Math.min(H - 2 * m - (querBarras ? MIN.barraAlturaMm + HRI_PT * PT_MM * 1.3 + 1 : 0), (W - 2 * m) * 0.42)
         : Math.min((W - 2 * m) * 0.45, H * 0.3);
-      qrMod = Math.min(MIN.qrModuloMax * PONTO, grade(alvo / (qrN + 2 * MIN.qrQuieta)));
+      qrMod = qrForcado || Math.min(MIN.qrModuloMax * PONTO, grade(alvo / (qrN + 2 * MIN.qrQuieta)));
       if (qrMod < MIN.qrModulo * PONTO) return recusar(`o QR não cabe: precisaria de ${((qrN + 8) * MIN.qrModulo * PONTO).toFixed(1)} mm e há ${alvo.toFixed(1)} mm`);
       qrLado = qrMod * (qrN + 2 * MIN.qrQuieta);
     }
@@ -141,13 +154,13 @@
     // conjunta do maior corpo. Os dados vêm logo abaixo do nome; só sem
     // código nenhum, na altura fixa, eles descem até o fundo.
     const dados = [
-      // Sem validade a linha fica, como no master ("Validade —").
+      // Sem validade ou sem lote a linha fica, como no master ("Validade —", "LOTE:").
       { id: 'val', texto: `VAL ${campos.validade || '—'}`, peso: 700, min: MIN.valPt, pri: 1 },
       { id: 'fab', texto: campos.fabricacao ? `FAB ${campos.fabricacao}` : '', peso: 400, min: MIN.dadoPt, pri: 1 },
-      { id: 'lote', texto: campos.lote ? `LOTE ${campos.lote}` : '', peso: 700, min: MIN.dadoPt, pri: 1 },
+      { id: 'lote', texto: `LOTE ${campos.lote || '—'}`, peso: 700, min: MIN.dadoPt, pri: 1 },
       { id: 'peso', texto: campos.peso || '', peso: 400, min: MIN.dadoPt, pri: 2 },
       // A observação é a primeira a sair: peso e empresa vêm antes dela.
-      { id: 'nota', texto: campos.nota || '', peso: 400, min: MIN.dadoPt, pri: 4, quebra: 2 },
+      { id: 'nota', texto: String(campos.nota || '').trim(), peso: 400, min: MIN.dadoPt, pri: 4, quebra: 2 },
       { id: 'empresa', texto: campos.empresa || '', peso: 600, min: EMPRESA_PT, pri: 3, topo: true }
     ].filter(l => l.texto);
 
@@ -249,8 +262,12 @@
       }
       if (!Number.isFinite(sobe)) sobe = codigos.length ? Math.min.apply(null, codigos.map(c => caixaCodigo(c).y0)) - m : 0;
       sobe = Math.max(0, sobe);
-      codigos.forEach(c => { c.y_mm -= sobe; });
-      if (qrBox) qrBox.y -= sobe;
+      // Nenhum código passa da margem de cima: deitada com barras, o QR já nasce
+      // no topo e subir junto com as barras cortaria a zona quieta dele.
+      const passo = c => Math.max(0, Math.min(sobe, caixaCodigo(c).y0 - m));
+      const passos = codigos.map(passo);
+      codigos.forEach((c, i) => { c.y_mm -= passos[i]; });
+      if (qrBox) qrBox.y -= Math.max(0, Math.min(sobe, qrBox.y - m));
       const fundo = Math.max.apply(null, elementos.concat(codigos).map(e => e.y_mm + e.h_mm).concat(qrBox ? [qrBox.y + qrBox.lado] : []));
       altura = Math.min(H, Math.ceil((fundo + m) / PONTO) * PONTO);
     }
@@ -260,7 +277,7 @@
       size: { preset: `${W}x${altura}mm`, w_mm: W, h_mm: altura, orientation: o.orientacao === 'horizontal' || (!o.orientacao && horiz) ? 'horizontal' : 'vertical' },
       elements: elementos.concat(codigos)
     };
-    return { layout, avisos, omitidos, recusa: null, qrCaixa: qrBox && { x_mm: qrBox.x, y_mm: qrBox.y, lado_mm: qrBox.lado } };
+    return { layout, avisos, omitidos, recusa: null, qrCaixa: qrBox && { x_mm: qrBox.x, y_mm: qrBox.y, lado_mm: qrBox.lado }, _qrMod: qrMod };
   }
 
   // Uma frase para o operador com o que mudou na etiqueta: código trocado,

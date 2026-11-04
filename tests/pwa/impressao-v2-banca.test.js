@@ -234,4 +234,63 @@ module.exports = function ({ test, runInSandbox, assert }) {
     assert.strictEqual(r.confirmado, '');
     assert.strictEqual(r.junto, 'Saiu deitada.');
   });
+
+  // Rodada 2. Achado 1: o QR nascia grande e a 52 x 30 recusava nas duas orientações.
+  test('#2202 banca r2 1: QR encolhe até o mínimo legível antes de recusar a etiqueta pequena', () => {
+    const C = resolvedor();
+    const K = C.cdbEtiquetaCanvas, P = C.cdbPapeis;
+    const r = K.resolverNoPapel(CAMPOS, P.porId('etiqueta-52x30'), 'horizontal', { codigos: ['qr'], medir });
+    assert.strictEqual(r.recusa, null);
+    const qr = r.layout.elements.find(e => e.format === 'qr');
+    assert.ok(qr, 'sai com QR');
+    assert.ok(qr._mod >= 3 * 0.125 - 1e-9, 'módulo do QR no mínimo de 3 pontos');
+    assert.ok(r.layout.elements.some(e => e.id === 'peso'), 'o peso não sai para o QR ficar grande');
+    // Quem já cabia não muda: no rolo de 80 mm o QR segue no módulo máximo.
+    const rolo = C.cdbResolverEtiqueta.resolver(CAMPOS, ROLO_80, { codigos: ['qr'], medir });
+    assert.strictEqual(rolo.layout.elements.find(e => e.format === 'qr')._mod, 4 * 0.125);
+    assert.ok(!('_qrMod' in rolo));
+  });
+
+  // Achado 4: sem lote a linha sumia; o master sempre imprimiu "LOTE:".
+  test('#2202 banca r2 4: sem lote a linha LOTE fica com travessão de vazio', () => {
+    const R = resolvedor().cdbResolverEtiqueta;
+    const r = R.resolver(Object.assign({}, CAMPOS, { lote: '' }), ROLO_80, { codigos: ['qr'], medir });
+    assert.ok(r.layout.elements.some(e => e.id === 'lote' && e.content === 'LOTE —'));
+  });
+
+  // Achados 3 e 6: espaço em volta da chave derrubava a barra; nota só de espaços ocupava altura.
+  test('#2202 banca r2 3: espaço em volta da chave e nota em branco não mudam a etiqueta', () => {
+    const R = resolvedor().cdbResolverEtiqueta;
+    const r = R.resolver(Object.assign({}, CAMPOS, { barras: ' 2611037070820001\n', nota: '   ' }), ROLO_80, { codigos: ['qr', 'barras'], medir });
+    const barra = r.layout.elements.find(e => e.format === 'barcode-code128');
+    assert.ok(barra, 'a barra sai');
+    assert.strictEqual(barra.content, '2611037070820001');
+    assert.ok(!r.layout.elements.some(e => e.id === 'nota'));
+    assert.deepStrictEqual(puro(r.avisos), []);
+  });
+
+  // Achado fluxo 1: o teste de impressão trocava o erro explicado pela impressão do sistema.
+  test('#2202 banca r2 fluxo 1: teste de impressão com erro explicado não abre a impressão do sistema', () => {
+    const r = fila(`
+      window.bluetoothSerial.connect=(addr,ok,erro)=>erro('Dispositivo desligado');
+      const oldErr=showError,oldArea=printAreaHtml,oldSaved=getSavedPrinter;const area=[];
+      showError=e=>toasts.push('erro:'+e);printAreaHtml=h=>area.push(h);getSavedPrinter=()=>B;
+      try { testPrint(); } finally { showError=oldErr;printAreaHtml=oldArea;getSavedPrinter=oldSaved; }
+      return JSON.stringify({erro:toasts.some(t=>/Dispositivo desligado/.test(t)),sistema:area.length,troca:toasts.some(t=>/indisponível/.test(t))});
+    `);
+    assert.deepStrictEqual(r, { erro: true, sistema: 0, troca: false });
+  });
+  // Achado impressão 1: no rolo de 80 mm deitado com barras, o QR subia junto com
+  // as barras e ficava a 0,6 mm do topo, sem a zona quieta de 4 módulos.
+  test('#2202 banca r2 impressão 1: no rolo deitado com barras o QR mantém a zona quieta no topo', () => {
+    const C = resolvedor();
+    const r = C.cdbEtiquetaCanvas.resolverNoPapel(CAMPOS, C.cdbPapeis.porId('continuo-80'), 'horizontal', { codigos: ['qr', 'barras'], medir });
+    assert.strictEqual(r.recusa, null);
+    const qr = r.layout.elements.find(e => e.format === 'qr');
+    const barra = r.layout.elements.find(e => e.format === 'barcode-code128');
+    assert.ok(qr && barra, 'sai com QR e barra');
+    // A caixa do QR leva 1 módulo de zona quieta; o símbolo começa depois dele.
+    assert.ok(qr.y_mm + qr._mod >= 4 * qr._mod - 1e-9, `símbolo a ${(qr.y_mm + qr._mod).toFixed(2)} mm do topo`);
+    assert.ok(barra.y_mm >= 0 && fim(barra) <= r.layout.size.h_mm + 1e-9, 'a barra fica dentro da etiqueta');
+  });
 };

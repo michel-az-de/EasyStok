@@ -36,20 +36,29 @@ Em cada uma confira:
 A barra (Code128) ainda não sai: ela espera o número curto do lote, que vem do
 servidor (decisão D4). Escolher "QR e barra" hoje imprime só o QR.
 
+| Caso | Faça | Esperado |
+|---|---|---|
+| 2.4 | Em Ajustes, leitura: **Só barras**. Imprima | Sai com o QR. Aviso "Enviado. Sem código de barras: o lote ainda não tem número curto. Saiu o QR no lugar." |
+| 2.5 | Toque em imprimir duas vezes seguidas | Sai uma etiqueta só. O segundo toque mostra "Impressão em andamento: toque de novo quando terminar". |
+
 ## 3. Duas impressoras
 
 | Passo | Faça | Esperado |
 |---|---|---|
 | 3.1 | Imprima a etiqueta de um pedido | Sai na MTP-II, igual a antes da atualização. |
 | 3.2 | Imprima uma etiqueta de produção e, sem esperar, a de um pedido | Aparece "Na fila: imprime em seguida na MTP-II". As duas saem, uma depois da outra. |
-| 3.3 | Desligue a Oasis e imprima uma etiqueta de produção | Aviso "Algo deu errado" com o erro de conexão. O app não trava: em seguida o cupom de um pedido sai na MTP-II. |
+| 3.3 | Desligue a Oasis e imprima uma etiqueta de produção | Aviso com o erro do Bluetooth (não "Sem conexão BT") e o botão de reimprimir. O app não trava: em seguida o cupom de um pedido sai na MTP-II. |
 
 ## 4. Papel que não cabe
 
 | Passo | Faça | Esperado |
 |---|---|---|
-| 4.1 | Na Oasis, passo 3: **Etiqueta 40 x 25 mm**. Imprima a etiqueta de produção | Não imprime. Aparece "A etiqueta não cabe no papel:" com o motivo. |
+| 4.1 | Na Oasis, passo 3: **Etiqueta 40 x 25 mm**. Imprima a etiqueta de produção | Não imprime. Aparece "Escolha um papel maior em Ajustes." seguido do motivo. |
 | 4.2 | Volte para **Rolo contínuo de 80 mm** | Imprime normal de novo. |
+
+Só com etiqueta 50 x 30 mm recortada carregada (no rolo contínuo a Oasis procuraria o
+recorte): vertical, só QR e um produto de nome curto sai deitada, com o aviso
+"Enviado. Saiu deitada: em pé não cabe."
 
 ## O que me mandar
 
