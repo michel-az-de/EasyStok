@@ -20,6 +20,9 @@ function isolado(arquivos) {
 module.exports = function ({ test, runInSandbox, assert }) {
   const run = body => JSON.parse(runInSandbox(`(function(){ ${body} })()`));
   const lote = qty => `{id:'b-1730700000001',lote:'LOT-261104',createdAt:'2026-11-04T12:00:00-03:00',items:[{productId:'p1',name:'Talharim',qty:${qty}}]}`;
+  const misto = (a, b) => `{numeroCurto:'00000042',id:'b-1730700000002',lote:'LOT-261104',createdAt:'2026-11-04T12:00:00-03:00',items:[{productId:'p1',name:'Talharim',qty:${a}},{productId:'p2',name:'Nhoque',qty:${b}}]}`;
+  const PRODUTOS = `[{id:'p1',name:'Talharim',sku:'TALHARIM'},{id:'p2',name:'Nhoque',sku:'NHOQUE'}]`;
+  const VOLTA_MODO = `if (modo === null) localStorage.removeItem('cdb-prod-scan-mode'); else localStorage.setItem('cdb-prod-scan-mode', modo);`;
 
   test('#2209 chave da barra: número curto de 8 dígitos e unidade com 4 dá 12 dígitos, e o QR não muda', () => {
     const r = run(`
@@ -49,7 +52,7 @@ module.exports = function ({ test, runInSandbox, assert }) {
         const comBarra=etiquetaProducaoTsplV2(ets[0],'',{name:'OIA-8381-B',address:'DC:0D:30:83:81:0B',linguagem:'tspl'},1);
         const recusa=etiquetasTspl.recusa;
         return JSON.stringify({semChave:ets.every(e=>e.chaveCurta===null),excedida:ets[0].barraExcedida===true,comBarra,aviso:avisoDaRecusa(recusa)});
-      } finally { products=old; localStorage.setItem('cdb-prod-scan-mode',modo); }
+      } finally { products=old; ${VOLTA_MODO} }
     `);
     assert.strictEqual(r.semChave, true, 'nenhuma etiqueta leva chave truncada');
     assert.strictEqual(r.excedida, true);
@@ -72,6 +75,56 @@ module.exports = function ({ test, runInSandbox, assert }) {
       } finally { products=oldP; batches=oldB; }
     `);
     assert.deepStrictEqual(r, { barra: '003', qr: '003', outra: null });
+  });
+
+  test('#2209 teto: 9.999 etiquetas levam chave, e a quantidade fracionária conta pelo que o laço gera', () => {
+    const r = run(`
+      const old=products;
+      try {
+        products=${PRODUTOS};
+        const teto=etiquetasFromBatch(Object.assign({numeroCurto:'00000042'},${lote(9999)}));
+        const frac=etiquetasFromBatch(${misto(4999.5, 4999.5)});
+        return JSON.stringify({n:teto.length,ultima:teto[9998].chaveCurta,excedida:teto.some(e=>e.barraExcedida),
+          fracN:frac.length,fracSemChave:frac.every(e=>e.chaveCurta===null),fracExcedida:frac.every(e=>e.barraExcedida===true)});
+      } finally { products=old; }
+    `);
+    assert.deepStrictEqual(r, { n: 9999, ultima: '000000429999', excedida: false, fracN: 10000, fracSemChave: true, fracExcedida: true });
+  });
+
+  test('#2209 lote misto: a unidade corre pelo lote todo, e o leitor acha o segundo produto pela chave', () => {
+    const r = run(`
+      const oldP=products, oldB=batches;
+      try {
+        products=${PRODUTOS};
+        batches=[${misto(2, 2)}];
+        const u=findUnitByCode('000000420003');
+        return JSON.stringify({chaves:etiquetasFromBatch(batches[0]).map(e=>e.chaveCurta),nome:u&&u.et.productName,idx:u&&u.idxStr});
+      } finally { products=oldP; batches=oldB; }
+    `);
+    assert.deepStrictEqual(r, { chaves: ['000000420001', '000000420002', '000000420003', '000000420004'], nome: 'Nhoque', idx: '003' });
+  });
+
+  test('#2209 lote acima de 9.999: só QR e nenhum código imprimem; barra e ambos recusam sem montar', () => {
+    const r = run(`
+      const old=products, modo=localStorage.getItem('cdb-prod-scan-mode'), C=window.cdbEtiquetaCanvas, orig=C.tspl;
+      let chamadas=0;
+      try {
+        products=${PRODUTOS};
+        const ets=etiquetasFromBatch(Object.assign({numeroCurto:'00000042'},${lote(10000)}));
+        C.tspl=()=>{ chamadas++; return {bytes:[1]}; };
+        const out={};
+        for (const m of ['qr','none','barcode','both']) {
+          chamadas=0; localStorage.setItem('cdb-prod-scan-mode',m);
+          const b=etiquetaProducaoTsplV2(ets[0],'',{name:'OIA-8381-B',address:'DC:0D:30:83:81:0B',linguagem:'tspl'},1);
+          out[m]={imprime:Array.isArray(b),chamadas};
+        }
+        return JSON.stringify(out);
+      } finally { C.tspl=orig; products=old; ${VOLTA_MODO} }
+    `);
+    assert.deepStrictEqual(r, {
+      qr: { imprime: true, chamadas: 1 }, none: { imprime: true, chamadas: 1 },
+      barcode: { imprime: false, chamadas: 0 }, both: { imprime: false, chamadas: 0 }
+    });
   });
 
   test('#2209 regra da loja: o normalizador JS dá a saída da fixture, no mesmo texto canônico, e é idempotente', () => {

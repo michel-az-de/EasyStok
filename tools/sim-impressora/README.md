@@ -16,6 +16,9 @@ node regressao.js --antes <pwa do master>        # 58 mm ESC/POS e cupom, byte a
 
 Uma PWA do master sai de `git archive origin/master EasyStock.Api/wwwroot/pwa`.
 
+O ANTES de um master anterior à F4 (#2209) reprova a barra nos 24 casos com
+código: lá a chave fica com 11 dígitos, ímpar, e o Code128 C não sai.
+
 ## O que a matriz reprova
 
 3 tamanhos (52, 80, 10x15) x 2 orientações x 3 opções de código (QR, barra,

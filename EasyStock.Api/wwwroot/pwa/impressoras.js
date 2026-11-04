@@ -267,6 +267,8 @@
     return id === GUID_VAZIO ? null : { origem: t.origem, id };
   }
 
+  // Para a loja nunca configurada o servidor devolve impressao null: trate antes,
+  // porque aqui null vira a regra vazia e a diferença some.
   function normalizarRegra(entrada) {
     const docs = entrada && typeof entrada.documentos === 'object' && entrada.documentos ? entrada.documentos : {};
     const documentos = {};
