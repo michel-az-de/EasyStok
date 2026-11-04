@@ -10,13 +10,14 @@ export const simulacaoVale = (pedido) =>
 
 // Linhas da comanda, na ordem em que se lê: frete, total com frete e, na encomenda, o sinal e o restante.
 // Sem cotação não há número de frete, e nenhum total ou sinal é inventado.
-export function linhasDaSimulacao(simulacao) {
+// #2219: `combinado` marca o frete que a equipe digitou (CEP fora da área), para não parecer cotação.
+export function linhasDaSimulacao(simulacao, { combinado = false } = {}) {
   if (!simulacao) return null
   if (simulacao.freteACombinar) {
     return [{ chave: 'frete', texto: 'Frete a combinar com o cliente.' }]
   }
   const linhas = [
-    { chave: 'frete', texto: `Frete ${moeda(simulacao.frete)}` },
+    { chave: 'frete', texto: `${combinado ? 'Frete combinado' : 'Frete'} ${moeda(simulacao.frete)}` },
     { chave: 'total', texto: `Total com frete ${moeda(simulacao.total)}` },
   ]
   if (simulacao.encomenda && simulacao.sinal != null) {

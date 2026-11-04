@@ -46,6 +46,14 @@ export const casosMeioDePagamento = {
     return mapear(estado, id, (c) => ({ ...c, pedido: { ...c.pedido, trocoPara } }))
   },
 
+  // #2219: CEP fora da área deixa o frete a combinar. O valor que a equipe combinou com o cliente mora
+  // no rascunho, como o troco, e vai na simulação e no POST do pedido. Pedido criado: vale o gravado.
+  [acao.DEFINIR_FRETE_COMBINADO]: (estado, { id, freteCombinado }) => {
+    const conversa = estado.conversas.find((c) => c.id === id)
+    if (!conversa?.pedido || conversa.pedido.pedidoId) return estado
+    return mapear(estado, id, (c) => ({ ...c, pedido: { ...c.pedido, freteCombinado } }))
+  },
+
   // Rodada 12 (issue #13): "Alterar forma de pagamento". Numa ação só: a
   // cobrança pendente vai para o histórico, cancelada; sai uma nova na forma
   // escolhida, com texto que conta a troca ao cliente; a conversa ganha o
