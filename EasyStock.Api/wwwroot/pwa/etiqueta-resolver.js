@@ -74,14 +74,22 @@
     const codigos = [];
     const recusar = motivo => ({ layout: null, avisos, omitidos, recusa: motivo });
 
-    const querQr = o.codigos.indexOf('qr') >= 0 && !!campos.qr;
-    let querBarras = o.codigos.indexOf('barras') >= 0;
-    if (querBarras && !/^\d+$/.test(String(campos.barras || '')) ) {
-      // D4: a barra leva o número curto do lote. Sem ele, ela não sai.
-      avisos.push('código de barras desligado: o lote ainda não tem número curto');
+    const pediuBarras = o.codigos.indexOf('barras') >= 0;
+    let querBarras = pediuBarras;
+    // D4: a barra leva a chave curta do lote (número curto + unidade). Code128 C
+    // só codifica pares de dígitos; chave ímpar não sai, para o leitor não ler
+    // um número diferente do lote. Contrato com a F4: a chave tem tamanho par.
+    const barras = String(campos.barras || '');
+    if (querBarras && !/^\d+$/.test(barras)) {
+      avisos.push('sem código de barras: o lote ainda não tem número curto');
+      querBarras = false;
+    } else if (querBarras && barras.length % 2) {
+      avisos.push('sem código de barras: a chave do lote tem número ímpar de dígitos');
       querBarras = false;
     }
-    const barras = querBarras && String(campos.barras).length % 2 ? '0' + campos.barras : campos.barras;
+    // Pediu só a barra e ela não sai: o QR entra para a etiqueta ter código.
+    const querQr = !!campos.qr && (o.codigos.indexOf('qr') >= 0 || (pediuBarras && !querBarras));
+    if (querQr && o.codigos.indexOf('qr') < 0) avisos.push('saiu o QR no lugar');
 
     // 1. QR: coluna da direita (horizontal) ou acima das barras, à direita dos dados (vertical).
     let qrLado = 0;
@@ -117,8 +125,11 @@
     }
     let qrBox = null;
     if (querQr) {
+      // No pé: os dados ficam colados no nome e o código leva a tinta até a
+      // borda de baixo (ocupação da spec). Deitada com barras, o QR fica no
+      // topo: no pé ele encostaria nas barras e comeria a zona quieta delas.
       const x = W - m - qrLado;
-      const y = horiz ? m : yBase - qrLado;
+      const y = horiz ? (querBarras ? m : H - m - qrLado) : yBase - qrLado;
       qrBox = { x, y, lado: qrLado };
       // A caixa leva o símbolo e 1 módulo; o resto da zona quieta fica em volta.
       const q = (MIN.qrQuieta - 1) * qrMod;
@@ -127,13 +138,16 @@
     const fundoTexto = yBase;
 
     // 3. Texto: empresa, nome (até 3 linhas) e dados por prioridade. Busca
-    // conjunta do maior corpo; na altura fixa os dados descem até o fundo.
+    // conjunta do maior corpo. Os dados vêm logo abaixo do nome; só sem
+    // código nenhum, na altura fixa, eles descem até o fundo.
     const dados = [
-      { id: 'val', texto: campos.validade ? `VAL ${campos.validade}` : '', peso: 700, min: MIN.valPt, pri: 1 },
+      // Sem validade a linha fica, como no master ("Validade —").
+      { id: 'val', texto: `VAL ${campos.validade || '—'}`, peso: 700, min: MIN.valPt, pri: 1 },
       { id: 'fab', texto: campos.fabricacao ? `FAB ${campos.fabricacao}` : '', peso: 400, min: MIN.dadoPt, pri: 1 },
       { id: 'lote', texto: campos.lote ? `LOTE ${campos.lote}` : '', peso: 700, min: MIN.dadoPt, pri: 1 },
       { id: 'peso', texto: campos.peso || '', peso: 400, min: MIN.dadoPt, pri: 2 },
-      { id: 'nota', texto: campos.nota || '', peso: 400, min: MIN.dadoPt, pri: 2 },
+      // A observação é a primeira a sair: peso e empresa vêm antes dela.
+      { id: 'nota', texto: campos.nota || '', peso: 400, min: MIN.dadoPt, pri: 4, quebra: 2 },
       { id: 'empresa', texto: campos.empresa || '', peso: 600, min: EMPRESA_PT, pri: 3, topo: true }
     ].filter(l => l.texto);
 
@@ -141,6 +155,23 @@
       if (horiz || !qrBox) return colTexto;
       return y + h > qrBox.y && y < qrBox.y + qrBox.lado ? colTexto - qrBox.lado : colTexto;
     }
+    const estreita = horiz || !qrBox ? colTexto : colTexto - qrBox.lado;
+    const empurra = !flexivel && !codigos.length;
+
+    // Linhas dos dados no corpo pt; a nota quebra em até 2 linhas na largura
+    // dada (a coluna toda, acima do QR, ou a parte ao lado dele). null: a
+    // nota não cabe nesse corpo.
+    function linhasNoCorpo(linhas, pt, largura) {
+      const out = [];
+      for (const d of linhas) {
+        const corpo = d.id === 'val' ? Math.max(pt + 1, d.min) : Math.max(pt, d.min);
+        const partes = d.quebra && medir(d.texto, corpo, d.peso) > largura ? quebrar(medir, d.texto, largura, corpo, d.peso, d.quebra) : [d.texto];
+        if (!partes) return null;
+        partes.forEach(t => out.push({ id: d.id, texto: t, peso: d.peso, corpo, h: corpo * PT_MM * 1.3 }));
+      }
+      return out;
+    }
+    const larguras = estreita === colTexto ? [colTexto] : [colTexto, estreita];
 
     function montar(incluidas) {
       const fixos = [];
@@ -162,25 +193,28 @@
         for (let pt = Math.min(13, pn - 1); pt >= MIN.dadoPt; pt -= 0.5) {
           const nota = pt + pn / 2 - (nome.length - 1) * 1.5;
           if (melhor && nota <= melhor.nota) break;
-          const corpos = linhas.map(d => (d.id === 'val' ? Math.max(pt + 1, d.min) : Math.max(pt, d.min)));
-          const alturas = corpos.map(c => c * PT_MM * 1.3);
-          const bloco = alturas.reduce((s, h) => s + h, 0);
-          // Altura fixa: os dados descem até o fundo; se ao lado do QR não
-          // cabem, sobem para logo abaixo do nome, na largura toda.
-          const inicios = flexivel ? [y1] : [Math.max(y1, fundoTexto - bloco), y1];
           let els = null;
-          for (const ini of inicios) {
-            if (els || ini + bloco > fundoTexto + 0.01) continue;
-            const tent = [];
-            let y2 = ini;
-            let ok = true;
-            for (let i = 0; i < linhas.length && ok; i++) {
-              const largura = lim(y2, alturas[i]);
-              if (medir(linhas[i].texto, corpos[i], linhas[i].peso) > largura) ok = false;
-              else tent.push(texto(linhas[i].id, linhas[i].texto, m, y2, largura, alturas[i], corpos[i], linhas[i].peso));
-              y2 += alturas[i];
+          for (const larg of larguras) {
+            const fila = els ? null : linhasNoCorpo(linhas, pt, larg);
+            if (!fila) continue;
+            const bloco = fila.reduce((s, l) => s + l.h, 0);
+            // Sem código, na altura fixa: os dados descem até o fundo; se não
+            // cabem lá, ficam logo abaixo do nome.
+            const inicios = empurra ? [Math.max(y1, fundoTexto - bloco), y1] : [y1];
+            for (const ini of inicios) {
+              if (els || ini + bloco > fundoTexto + 0.01) continue;
+              const tent = [];
+              let y2 = ini;
+              let ok = true;
+              for (let i = 0; i < fila.length && ok; i++) {
+                const l = fila[i];
+                const largura = lim(y2, l.h);
+                if (medir(l.texto, l.corpo, l.peso) > largura) ok = false;
+                else tent.push(texto(l.id, l.texto, m, y2, largura, l.h, l.corpo, l.peso));
+                y2 += l.h;
+              }
+              if (ok) els = tent;
             }
-            if (ok) els = tent;
           }
           if (!els) continue;
           const nomes = nome.map((t, i) => texto('nome', t, m, y0 + i * hn, lim(y0 + i * hn, hn), hn, pn, 700));
@@ -192,7 +226,7 @@
 
     let incluidas = dados.slice();
     let elementos = montar(incluidas);
-    for (const pri of [3, 2]) {
+    for (const pri of [4, 3, 2]) {
       if (elementos) break;
       omitidos.push.apply(omitidos, incluidas.filter(l => l.pri === pri).map(l => l.id));
       incluidas = incluidas.filter(l => l.pri < pri);
@@ -229,5 +263,15 @@
     return { layout, avisos, omitidos, recusa: null, qrCaixa: qrBox && { x_mm: qrBox.x, y_mm: qrBox.y, lado_mm: qrBox.lado } };
   }
 
-  global.cdbResolverEtiqueta = { resolver, MIN, FONTE, PT_MM, PONTO, QR_NIVEL, modulosBarras, modulosQr };
+  // Uma frase para o operador com o que mudou na etiqueta: código trocado,
+  // orientação trocada e campo que não coube. Vazio quando nada mudou.
+  const NOMES = { empresa: 'empresa', peso: 'peso', nota: 'observação' };
+  function resumo(r) {
+    const partes = ((r && r.avisos) || []).slice();
+    const fora = ((r && r.omitidos) || []).map(id => NOMES[id] || id);
+    if (fora.length) partes.push('não coube: ' + fora.join(', '));
+    return partes.length ? partes.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('. ') + '.' : '';
+  }
+
+  global.cdbResolverEtiqueta = { resolver, resumo, MIN, FONTE, PT_MM, PONTO, QR_NIVEL, modulosBarras, modulosQr };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -115,7 +115,7 @@ module.exports = function ({ test, runInSandbox, assert }) {
         return JSON.stringify({naFila,conexoes,escritos:writes.map(w=>w.bytes[0]),enviados,
           fila:printViaBluetooth.fila.length,ocupado:isPrinting,avisoFila:toasts.some(t=>/Na fila/.test(t)),descarte:toasts.some(t=>/andamento/.test(t))});
       } finally {
-        releasePrinting();printViaBluetooth.fila=[];printViaBluetooth.ativa=null;window.bluetoothSerial=old.bs;
+        releasePrinting();printViaBluetooth.fila=[];printViaBluetooth.ativa=null;printViaBluetooth.drenando=false;window.bluetoothSerial=old.bs;
         ensureBluetoothPermission=old.permission;setTimeout=old.timeout;clearTimeout=old.clear;showToast=old.toast;
       }
     `);
@@ -130,10 +130,10 @@ module.exports = function ({ test, runInSandbox, assert }) {
         ensureBluetoothPermission=cb=>cb(true);setTimeout=()=>0;clearTimeout=()=>{};
         window.bluetoothSerial={disconnect:ok=>ok(),connect:(addr,ok)=>ok(),write:()=>{}};
         printViaBluetooth([1],null,null,{name:'A',address:'A'});
-        for(let i=0;i<6;i++) printViaBluetooth([2+i],null,null,{name:'B',address:'B'});
+        for(let i=0;i<6;i++) printViaBluetooth([2+i],null,null,{name:'B'+i,address:'B'+i});
         return JSON.stringify({fila:printViaBluetooth.fila.length});
       } finally {
-        releasePrinting();printViaBluetooth.fila=[];printViaBluetooth.ativa=null;window.bluetoothSerial=old.bs;
+        releasePrinting();printViaBluetooth.fila=[];printViaBluetooth.ativa=null;printViaBluetooth.drenando=false;window.bluetoothSerial=old.bs;
         ensureBluetoothPermission=old.permission;setTimeout=old.timeout;clearTimeout=old.clear;
       }
     `);

@@ -10045,6 +10045,17 @@ async function restoreFromPublicStorage() {
 // Identidade do aparelho, credenciais e cursores não são transferidos.
 const BACKUP_COLLECTIONS = { products: 'cdb-products', clients: 'cdb-clients', orders: 'cdb-orders', cashEntries: 'cdb-cash', cashClosings: 'cdb-cash-closings', batches: 'cdb-batches' };
 const BACKUP_PREFERENCES = ['cdb-operator-name', 'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-pix-type', 'cdb-printer', 'cdb-printers', 'cdb-impressoras.v2', 'cdb-regra-impressao.v1', 'cdb-theme', 'cdb-onboarding-done'];
+// A restauração não sobrescreve preferência do aparelho. O v2 sem impressora
+// nenhuma conta como ausente: é o que uma versão antiga gravava ao só ler.
+function preferenciaAusente(key) {
+  const atual = localStorage.getItem(key);
+  if (atual === null) return true;
+  if (key !== 'cdb-impressoras.v2') return false;
+  try {
+    const v = JSON.parse(atual);
+    return !v || !v.impressoras || !Object.keys(v.impressoras).length;
+  } catch (e) { return true; }
+}
 const BACKUP_ARCHIVE_KEYS = ['cdb-shopping', 'cdb-audit-log', 'cdb-audit-log-archive'];
 function backupArchiveEntries(entries, legacyStorage = {}) {
   if (!Array.isArray(entries)) throw new Error('Anexos do backup inválidos.');
@@ -10164,7 +10175,7 @@ function prepareBackupImport(input) {
   const queueAdded = added - queueBefore;
   added -= queueAdded;
   const preferences = {};
-  BACKUP_PREFERENCES.forEach(key => { if (typeof ls[key] === 'string' && localStorage.getItem(key) === null) preferences[key] = ls[key]; });
+  BACKUP_PREFERENCES.forEach(key => { if (typeof ls[key] === 'string' && preferenciaAusente(key)) preferences[key] = ls[key]; });
   const photos = payload.photos || [];
   if (!Array.isArray(photos) || photos.length > 10000) throw new Error('Fotos do backup inválidas.');
   const photoBytes = new Map();
@@ -15397,7 +15408,9 @@ function tsplBytesDoCanvas(canvas, printer, copias) {
 }
 // #2202 (F1): impressoras no modelo v2 (impressoras.js): cada papel tem a sua.
 // cdb-printer e cdb-printers seguem espelhadas para quem ainda as lê.
-function impressorasV2() { return window.cdbImpressoras ? window.cdbImpressoras.ler(localStorage) : null; }
+// Os dois módulos juntos: um impressoras.js novo com o catálogo antigo no
+// cache quebraria a leitura e a impressão cairia sem impressora.
+function impressorasV2() { return window.cdbImpressoras && window.cdbPapeis ? window.cdbImpressoras.ler(localStorage) : null; }
 function legadoDaV2(imp) { return imp ? normalizarImpressora(window.cdbImpressoras.paraLegado(imp)) : null; }
 function getSavedPrinter() {
   const v2 = impressorasV2();
@@ -15519,13 +15532,16 @@ function renderImpressorasLista(v2) {
   if (!host) return;
   host.innerHTML = '';
   if (!v2 || !window.cdbPapeis) return;
+  const I = window.cdbImpressoras;
   Object.values(v2.impressoras).forEach(imp => {
-    const usos = window.cdbImpressoras.PAPEIS.filter(p => v2.papeis[p] === imp.address).map(p => (p === 'etiqueta' ? 'etiqueta' : 'cupom'));
+    // O mesmo critério da impressão: a escolhida, a única da classe ou a única.
+    const usos = I.PAPEIS.filter(p => I.resolver(v2, p) === imp).map(p => (p === 'etiqueta' ? 'etiqueta' : 'cupom'));
     const papel = window.cdbPapeis.daMidia(imp.midia);
     const card = document.createElement('div');
     card.className = 'impressora-card';
     card.style.cssText = 'border:1px solid var(--line,#ddd);border-radius:10px;padding:10px;margin-top:8px;font-size:14px';
-    card.innerHTML = '<b>' + escapeHtml(imp.apelido || imp.nome) + '</b> <span style="opacity:.7">' + escapeHtml(imp.nome) + '</span>'
+    const nomeTecnico = imp.apelido && imp.apelido !== imp.nome ? ' <span style="opacity:.7">' + escapeHtml(imp.nome) + '</span>' : '';
+    card.innerHTML = '<b>' + escapeHtml(imp.apelido || imp.nome) + '</b>' + nomeTecnico
       + '<div>Imprime: ' + escapeHtml(usos.length ? usos.join(' e ') : 'nada ainda') + '</div>'
       + '<div>Papel: ' + escapeHtml(window.cdbPapeis.descrever(papel)) + (imp.midiaConfirmada === false ? ' · <b>confirme o papel</b>' : '') + '</div>';
     const acoes = document.createElement('div');
@@ -19645,7 +19661,10 @@ function printWriteTimeoutMs(length) {
 
 // #2202 (F1): printerArg escolhe a impressora do documento. Trabalho para
 // outra impressora enquanto uma imprime entra na fila (até 4) e sai em
-// seguida: desconecta uma, conecta a outra. Mesmo endereço segue descartado.
+// seguida: desconecta uma, conecta a outra. Impressora já ocupada (a que
+// imprime ou uma que espera na fila) segue descartada: toque duplo não
+// gera dois trabalhos. onFallback(explicado): true quando o erro já foi
+// mostrado ao operador; false quando não há Bluetooth nem impressora.
 const FILA_IMPRESSAO_MAX = 4;
 function printViaBluetooth(bytes, onFallback, printJob, printerArg, onSent) {
   btStep('print:start');
@@ -19653,12 +19672,14 @@ function printViaBluetooth(bytes, onFallback, printJob, printerArg, onSent) {
   const printer = printerArg || getSavedPrinter();
   if (!bs || !printer || !printer.address) {
     btStep('print:no-printer-or-bs bs=' + !!bs + ' p=' + !!printer);
-    if (typeof onFallback === 'function') onFallback();
+    if (typeof onFallback === 'function') onFallback(false);
     return;
   }
-  if (isPrinting) {
+  // drenando: o próximo da fila já tem a vez, nos 300 ms até ele começar.
+  if (isPrinting || printViaBluetooth.drenando) {
     const fila = printViaBluetooth.fila || (printViaBluetooth.fila = []);
-    if (printViaBluetooth.ativa && printViaBluetooth.ativa !== printer.address && fila.length < FILA_IMPRESSAO_MAX) {
+    const ocupada = printViaBluetooth.ativa === printer.address || fila.some(t => t[3] && t[3].address === printer.address);
+    if (!ocupada && fila.length < FILA_IMPRESSAO_MAX) {
       fila.push([bytes, onFallback, printJob, printer, onSent]);
       showToast('Na fila: imprime em seguida na ' + (printer.apelido || printer.name || 'outra impressora'));
       return;
@@ -19678,13 +19699,22 @@ function printViaBluetooth(bytes, onFallback, printJob, printerArg, onSent) {
     printViaBluetooth.ativa = null;
     releasePrinting();
     const fila = printViaBluetooth.fila;
-    if (fila && fila.length) { const proximo = fila.shift(); setTimeout(() => printViaBluetooth.apply(null, proximo), 300); }
+    if (fila && fila.length) {
+      const proximo = fila.shift();
+      printViaBluetooth.ativa = proximo[3].address;
+      printViaBluetooth.drenando = true;
+      setTimeout(() => {
+        printViaBluetooth.drenando = false;
+        printViaBluetooth.ativa = null;
+        printViaBluetooth.apply(null, proximo);
+      }, 300);
+    }
   };
   const failed = (err, fallback) => {
     if (!active()) return;
     showError(err, 'print');
     finish();
-    if (fallback && typeof onFallback === 'function') onFallback();
+    if (fallback && typeof onFallback === 'function') onFallback(true);
   };
   printWatchdog = setTimeout(() => {
     if (!active()) return;
@@ -19699,7 +19729,7 @@ function printViaBluetooth(bytes, onFallback, printJob, printerArg, onSent) {
     if (!granted) {
       showToast('Permissão Bluetooth negada. Ative Dispositivos próximos nas permissões deste app.');
       finish();
-      if (typeof onFallback === 'function') onFallback();
+      if (typeof onFallback === 'function') onFallback(true);
       return;
     }
     if (printWatchdog) clearTimeout(printWatchdog);
@@ -20013,11 +20043,30 @@ function etiquetaProducaoTsplV2(et, nota, printer, copias) {
     orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, copias, document
   });
   if (r.recusa) { etiquetasTspl.recusa = r.recusa; return null; }
+  if (!etiquetasTspl.aviso) etiquetasTspl.aviso = window.cdbResolverEtiqueta.resumo ? window.cdbResolverEtiqueta.resumo(r) : '';
   return r.bytes;
+}
+// Frase do envio: o que mudou na etiqueta e, com papel nunca confirmado, o
+// papel que o app está usando para o operador conferir.
+function avisoDaImpressao(printer, aviso) {
+  const partes = aviso ? [aviso] : [];
+  const P = window.cdbPapeis;
+  if (printer && printer.midiaConfirmada === false && P) {
+    const papel = P.daMidia(midiaDaImpressora(printer));
+    if (papel) partes.push('Confira o papel em Ajustes: o app usa ' + P.descrever(papel) + '.');
+  }
+  return partes.join(' ');
+}
+// A recusa já diz o motivo e o que fazer; o toast começa pelo que fazer.
+function avisoDaRecusa(recusa) {
+  const acao = 'Escolha um papel maior em Ajustes';
+  const motivo = String(recusa || '').replace('. ' + acao, '');
+  return acao + '. ' + motivo.charAt(0).toUpperCase() + motivo.slice(1) + '.';
 }
 async function etiquetasTspl(etiquetas, kind, nota, printer, copias) {
   if (!window.cdbTspl) return null;
   etiquetasTspl.recusa = null;
+  etiquetasTspl.aviso = '';
   const partes = [];
   for (const et of etiquetas) {
     let canvas = null;
@@ -20996,13 +21045,16 @@ function _etqHideRetry() {
   const btn = document.getElementById('etqRetryBtn');
   if (btn) btn.style.display = 'none';
 }
+// Falha de envio: com o erro já explicado (permissão, conexão) o toast dele
+// fica; sem Bluetooth ou impressora, sugere salvar ou compartilhar.
+function _etqSemConexao(explicado) {
+  if (!explicado) showToast('Sem conexão BT — use Salvar ou Compartilhar');
+  _etqShowRetry();
+}
 function etqRetry() {
   if (!_etqLastPrintBytes) { showToast('Nada para reimprimir'); return; }
   _etqHideRetry();
-  printViaBluetooth(_etqLastPrintBytes, function () {
-    showToast('Sem conexão BT — use Salvar ou Compartilhar');
-    _etqShowRetry();
-  }, _etqLastPrintJob, _etqLastPrinter);
+  printViaBluetooth(_etqLastPrintBytes, _etqSemConexao, _etqLastPrintJob, _etqLastPrinter);
 }
 
 function getEtqCopies() {
@@ -21193,18 +21245,16 @@ async function etqAction(action) {
         openPrinterPicker();
         return;
       }
-      if (!printerReady(printer)) { showToast('Driver TSPL não carregou: feche e reabra o app'); return; }
+      if (!printerReady(printer)) { showToast('A impressão de etiqueta não carregou: feche e reabra o app'); return; }
       if (perfilImpressora(printer) === 'tspl') {
         const copiasTspl = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
         _etqHideRetry();
         _etqLastPrintJob = etiquetaPrintJob(currentEtiquetas, currentEtiquetasKind, copiasTspl);
         const bytesTspl = await etiquetasTspl(currentEtiquetas, currentEtiquetasKind, getEtqNota() || null, printer, copiasTspl);
-        if (!bytesTspl) { showToast(etiquetasTspl.recusa ? 'A etiqueta não cabe no papel: ' + etiquetasTspl.recusa : 'Falha ao montar a etiqueta TSPL'); return; }
+        if (!bytesTspl) { showToast(etiquetasTspl.recusa ? avisoDaRecusa(etiquetasTspl.recusa) : 'Falha ao montar a etiqueta'); return; }
         _etqLastPrintBytes = bytesTspl;
-        printViaBluetooth(bytesTspl, function () {
-          showToast('Sem conexão BT — use Salvar ou Compartilhar');
-          _etqShowRetry();
-        }, _etqLastPrintJob, printer);
+        const avisoEnvio = avisoDaImpressao(printer, etiquetasTspl.aviso);
+        printViaBluetooth(bytesTspl, _etqSemConexao, _etqLastPrintJob, printer, avisoEnvio ? () => showToast('Enviado. ' + avisoEnvio) : undefined);
         return;
       }
       // #437: cópias (1/2/5/10) e retry
@@ -21219,10 +21269,7 @@ async function etqAction(action) {
         const totalBytes = new Uint8Array(oneShot.length * copies);
         for (let ci = 0; ci < copies; ci++) totalBytes.set(oneShot, ci * oneShot.length);
         _etqLastPrintBytes = totalBytes;
-        printViaBluetooth(totalBytes, function () {
-          showToast('Sem conexão BT — use Salvar ou Compartilhar');
-          _etqShowRetry();
-        }, _etqLastPrintJob, printer);
+        printViaBluetooth(totalBytes, _etqSemConexao, _etqLastPrintJob, printer);
       } else {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
@@ -21246,10 +21293,7 @@ async function etqAction(action) {
         const totalBytes = new Uint8Array(singleLen * copies);
         for (let ci = 0; ci < copies; ci++) totalBytes.set(singleRun, ci * singleLen);
         _etqLastPrintBytes = totalBytes;
-        printViaBluetooth(totalBytes, function () {
-          showToast('Sem conexão BT — use Salvar ou Compartilhar');
-          _etqShowRetry();
-        }, _etqLastPrintJob, printer);
+        printViaBluetooth(totalBytes, _etqSemConexao, _etqLastPrintJob, printer);
       }
       return;
     }
@@ -23577,9 +23621,9 @@ window.cdbApp = {
 <script src="qrcode.min.js?v=20260429a"></script>
 <script src="etiqueta-termica.js?v=20261028a"></script>
 <script src="impressao-papeis.js?v=20261104b"></script>
-<script src="impressoras.js?v=20261104b"></script>
-<script src="etiqueta-resolver.js?v=20261104b"></script>
-<script src="etiqueta-canvas.js?v=20261104b"></script>
+<script src="impressoras.js?v=20261104c"></script>
+<script src="etiqueta-resolver.js?v=20261104c"></script>
+<script src="etiqueta-canvas.js?v=20261104c"></script>
 <script src="impressora-tspl.js?v=20261104b"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>

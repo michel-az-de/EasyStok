@@ -99,6 +99,17 @@ async function rodarCaso(env, caso) {
   r.fontes = f;
   ok('piso-fonte', f.menorPt >= PISO.dado && f.nomePt >= PISO.nome && f.validadePt >= PISO.validade,
     `nome ${f.nomePt} pt, validade ${f.validadePt} pt, menor ${f.menorPt} pt (escala ${f.escala})`, 'P1');
+  // 2b. Conteúdo, em qualquer formato: validade, fabricação, lote e o nome
+  // inteiro; com barras pedidas, o número embaixo delas (P3).
+  const textos = g.log.filter(l => l.texto && l.texto.trim()).map(l => l.texto).join(' ');
+  const exigidos = [
+    ['validade', new Date(g.et.expiresAt).toLocaleDateString('pt-BR')],
+    ['fabricação', new Date(DADOS.criadoEm).toLocaleDateString('pt-BR')],
+    ['lote', DADOS.loteDoDia]
+  ].concat(String(g.et.productName).split(/\s+/).map(t => ['nome', t]));
+  if (caso.lista.includes('barras')) exigidos.push(['número das barras', DADOS.barras]);
+  const faltam = exigidos.filter(([, v]) => !textos.includes(v)).map(([k, v]) => `${k} "${v}"`);
+  ok('conteudo', !faltam.length, faltam.length ? 'falta ' + faltam.join(', ') : 'validade, fabricação, lote e nome presentes', 'P3');
   // 3. Ocupação da área útil (margem 1,5 mm abaixo de 40 mm, senão 2 mm).
   const larguraMm = Math.min(fis.larguraMm, etq.larguraMm), alturaMm = fis.tipo === 'continuo' ? etq.alturaMm : fis.alturaMm;
   const m = Math.min(larguraMm, alturaMm) < 40 ? 1.5 : 2;

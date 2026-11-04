@@ -128,16 +128,36 @@
     return Object.assign({}, a, { h_mm: h, continuo: true, girar: false });
   }
 
+  // Resolve no papel na orientação pedida; se não cabe, tenta a outra e avisa.
+  // Nas duas sem caber, a recusa diz o que fazer. Devolve o resultado do
+  // resolver com { orientacao, area } da tentativa usada.
+  function resolverNoPapel(campos, papel, orientacao, opcoes) {
+    const tentar = ori => {
+      const area = areaDoPapel(papel, ori);
+      return Object.assign(R().resolver(campos || {}, area, Object.assign({}, opcoes, { orientacao: ori })), { orientacao: ori, area });
+    };
+    const r = tentar(orientacao);
+    if (!r.recusa) return r;
+    const outra = orientacao === 'horizontal' ? 'vertical' : 'horizontal';
+    const r2 = tentar(outra);
+    if (!r2.recusa) {
+      r2.avisos.push(outra === 'horizontal' ? 'saiu deitada: em pé não cabe' : 'saiu em pé: deitada não cabe');
+      return r2;
+    }
+    r.recusa += '. Escolha um papel maior em Ajustes';
+    return r;
+  }
+
   // entrada: { campos, papel, orientacao, codigos, document?, medir?, padroes128? }
-  // Devolve { canvas, layout, recusa, avisos, omitidos, papel, continuo }.
+  // Devolve { canvas, layout, recusa, avisos, omitidos, papel, continuo, orientacao }.
   function desenhar(entrada) {
     const e = entrada || {};
     const doc = e.document || global.document;
     const papel = typeof e.papel === 'string' ? global.cdbPapeis.porId(e.papel) : e.papel;
     if (!papel) return { canvas: null, layout: null, recusa: 'papel não informado', avisos: [], omitidos: [] };
-    const area = areaDoPapel(papel, e.orientacao);
-    const r = R().resolver(e.campos || {}, area, { codigos: e.codigos || ['qr'], orientacao: e.orientacao, medir: e.medir, document: doc });
-    if (r.recusa) return { canvas: null, layout: null, recusa: r.recusa, avisos: r.avisos, omitidos: r.omitidos, papel, continuo: area.continuo };
+    const r = resolverNoPapel(e.campos, papel, e.orientacao, { codigos: e.codigos || ['qr'], medir: e.medir, document: doc });
+    const area = r.area;
+    if (r.recusa) return { canvas: null, layout: null, recusa: r.recusa, avisos: r.avisos, omitidos: r.omitidos, papel, continuo: area.continuo, orientacao: r.orientacao };
     let c = rasterizar(r.layout, { document: doc, padroes128: e.padroes128 });
     // Caixas dos códigos com a zona quieta: o aparar não pode comê-las.
     const caixas = [];
@@ -151,7 +171,7 @@
     }
     if (area.girar) c = girar90(c, doc);
     if (area.continuo) c = aparar(c, protegido, doc);
-    return { canvas: c, layout: r.layout, recusa: null, avisos: r.avisos, omitidos: r.omitidos, papel, continuo: area.continuo };
+    return { canvas: c, layout: r.layout, recusa: null, avisos: r.avisos, omitidos: r.omitidos, papel, continuo: area.continuo, orientacao: r.orientacao };
   }
 
   function rgba(c) { return c.getContext('2d').getImageData(0, 0, c.width, c.height).data; }
@@ -197,5 +217,5 @@
     return Object.assign(r, { bytes: out });
   }
 
-  global.cdbEtiquetaCanvas = { PONTOS_MM, rasterizar, girar90, aparar, areaDoPapel, desenhar, tspl, escpos, code128C };
+  global.cdbEtiquetaCanvas = { PONTOS_MM, rasterizar, girar90, aparar, areaDoPapel, resolverNoPapel, desenhar, tspl, escpos, code128C };
 })(typeof window !== 'undefined' ? window : globalThis);

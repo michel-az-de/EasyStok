@@ -134,7 +134,9 @@
     if (!v2) {
       v2 = migrar(json(agora.printer), json(agora.printers));
       v2.legado = agora;
-      gravar(storage, v2);
+      // Sem impressora nenhuma não grava: a chave vazia apagaria a
+      // preferência que o backup do aparelho ainda vai restaurar.
+      if (Object.keys(v2.impressoras).length) gravar(storage, v2);
       return v2;
     }
     if (!v2.legado) { v2.legado = agora; gravar(storage, v2); return v2; }

@@ -6,7 +6,7 @@ a impressora: TSPL na Oasis OIA-8381-B (cabeça de 104 mm, 8 pontos/mm) e
 ESC/POS na térmica de 58 mm.
 
 ```
-npm ci
+npm install
 node matriz.js                                   # 36 casos contra a PWA deste checkout
 node matriz.js --golden golden                   # idem, comparando com os goldens
 node matriz.js --pwa <pwa do master> --saida saida/antes
