@@ -43,6 +43,8 @@ public static class ServiceCollectionExtensions
         // PDF de etiqueta + Nota de Entrada (P5) — QuestPDF + QRCoder, stateless/threadsafe
         services.AddSingleton<IDocumentoEntradaPdfRenderer, DocumentoEntradaPdfRenderer>();
         services.AddSingleton<IFichaClientePdfRenderer, FichaClientePdfRenderer>();
+        services.AddSingleton<IFolhaEtiquetasPdfRenderer, FolhaEtiquetasPdfRenderer>();
+        services.AddSingleton<IQrCodeEncoder, QrCoderEncoder>();
 
         // Webhook processors (scoped)
         services.AddScoped<IGatewayWebhookProcessor, EfiPixWebhookProcessor>();
