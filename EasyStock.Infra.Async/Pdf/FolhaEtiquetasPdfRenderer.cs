@@ -23,12 +23,31 @@ public sealed class FolhaEtiquetasPdfRenderer : IFolhaEtiquetasPdfRenderer
 
     static FolhaEtiquetasPdfRenderer() => QuestPDF.Settings.License = LicenseType.Community;
 
-    public Task<byte[]> RenderAsync(PlanoFolhaEtiquetas plano, CancellationToken ct = default)
+    /// <summary>Quantos PDFs a API desenha ao mesmo tempo; o QuestPDF é síncrono e usa CPU e memória na proporção da folha.</summary>
+    public const int RendersSimultaneosMax = 2;
+
+    /// <summary>Vagas de render, compartilhadas pelo processo. Quem não consegue vaga espera, até o token cancelar.</summary>
+    internal static readonly SemaphoreSlim Vagas = new(RendersSimultaneosMax, RendersSimultaneosMax);
+
+    public async Task<byte[]> RenderAsync(PlanoFolhaEtiquetas plano, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(plano);
-        ct.ThrowIfCancellationRequested();
-        var svgs = new Dictionary<string, SvgImage>(StringComparer.Ordinal);
-        var pdf = Document.Create(documento =>
+        await Vagas.WaitAsync(ct);
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+            return Gerar(plano);
+        }
+        finally
+        {
+            Vagas.Release();
+        }
+    }
+
+    private static byte[] Gerar(PlanoFolhaEtiquetas plano)
+    {
+        var svgs = new Dictionary<object, SvgImage>();
+        return Document.Create(documento =>
         {
             foreach (var pagina in plano.Paginas)
                 documento.Page(page =>
@@ -46,10 +65,9 @@ public sealed class FolhaEtiquetasPdfRenderer : IFolhaEtiquetasPdfRenderer
                     });
                 });
         }).GeneratePdf();
-        return Task.FromResult(pdf);
     }
 
-    private static void Etiqueta(IContainer camada, CelulaPlano celula, EtiquetaPlano etiqueta, Dictionary<string, SvgImage> svgs)
+    private static void Etiqueta(IContainer camada, CelulaPlano celula, EtiquetaPlano etiqueta, Dictionary<object, SvgImage> svgs)
     {
         var (w, h) = celula.Girar ? (etiqueta.HMm, etiqueta.WMm) : (etiqueta.WMm, etiqueta.HMm);
         var caixa = Em(camada, celula.EtiquetaXMm, celula.EtiquetaYMm, w).Height(F(h), Unit.Millimetre);
@@ -63,7 +81,7 @@ public sealed class FolhaEtiquetasPdfRenderer : IFolhaEtiquetasPdfRenderer
         });
     }
 
-    private static void Elemento(IContainer camada, ElementoPlano elemento, Dictionary<string, SvgImage> svgs)
+    private static void Elemento(IContainer camada, ElementoPlano elemento, Dictionary<object, SvgImage> svgs)
     {
         switch (elemento)
         {
@@ -71,7 +89,7 @@ public sealed class FolhaEtiquetasPdfRenderer : IFolhaEtiquetasPdfRenderer
                 Texto(camada, t);
                 break;
             case QrPlano q:
-                Em(camada, q.XMm, q.YMm, q.LadoMm).Height(F(q.LadoMm), Unit.Millimetre).Svg(Svg(svgs, SvgQr(q.Matriz))).FitArea();
+                Em(camada, q.XMm, q.YMm, q.LadoMm).Height(F(q.LadoMm), Unit.Millimetre).Svg(Svg(svgs, q.Matriz, () => SvgQr(q.Matriz))).FitArea();
                 break;
             case BarrasPlano b:
                 Em(camada, b.XMm, b.YMm, b.WMm).Height(F(b.HMm), Unit.Millimetre).Svg(Svg(svgs, SvgBarras(b))).FitArea();
@@ -107,7 +125,7 @@ public sealed class FolhaEtiquetasPdfRenderer : IFolhaEtiquetasPdfRenderer
             });
     }
 
-    private static void Guia(IContainer camada, CelulaGrade celula, Dictionary<string, SvgImage> svgs)
+    private static void Guia(IContainer camada, CelulaGrade celula, Dictionary<object, SvgImage> svgs)
     {
         var w = F(celula.WMm);
         var h = F(celula.HMm);
@@ -159,9 +177,15 @@ public sealed class FolhaEtiquetasPdfRenderer : IFolhaEtiquetasPdfRenderer
     private static IContainer Em(IContainer camada, decimal x, decimal y, decimal w) =>
         camada.PaddingLeft(F(x), Unit.Millimetre).PaddingTop(F(y), Unit.Millimetre).Unconstrained().Width(F(w), Unit.Millimetre);
 
-    private static SvgImage Svg(Dictionary<string, SvgImage> cache, string svg)
+    private static SvgImage Svg(Dictionary<object, SvgImage> cache, string svg) => Svg(cache, svg, () => svg);
+
+    /// <summary>
+    /// Uma imagem por <paramref name="chave"/>: o texto do SVG ou, no QR, a própria matriz (a mesma instância serve a
+    /// todas as cópias do código), assim o SVG do QR só é montado uma vez.
+    /// </summary>
+    private static SvgImage Svg(Dictionary<object, SvgImage> cache, object chave, Func<string> svg)
     {
-        if (!cache.TryGetValue(svg, out var imagem)) cache[svg] = imagem = SvgImage.FromText(svg);
+        if (!cache.TryGetValue(chave, out var imagem)) cache[chave] = imagem = SvgImage.FromText(svg());
         return imagem;
     }
 

@@ -21,6 +21,13 @@ public static class LayoutParaPdf
     public const int MaxElementos = 40;
     public const int MaxCodigos = 2;
     public const int MaxTexto = 500;
+
+    /// <summary>Maior tamanho ou coordenada aceito, em mm. Acima disso a conta com decimal estoura em vez de recusar.</summary>
+    public const decimal MaxDimensaoMm = 1000m;
+
+    /// <summary>Quantos caracteres de um valor do pedido voltam numa mensagem de erro.</summary>
+    public const int MaxEco = 40;
+
     public const decimal MmPorPt = 25.4m / 72m;
 
     private const decimal Tol = 0.01m;
@@ -43,16 +50,69 @@ public static class LayoutParaPdf
         : id.StartsWith("val", StringComparison.OrdinalIgnoreCase) ? ValidadeMinPt
         : DadoMinPt;
 
+    /// <summary>
+    /// Valor vindo do pedido, curto e sem quebra de linha, para voltar numa mensagem de erro sem espelhar um texto
+    /// de qualquer tamanho.
+    /// </summary>
+    public static string Eco(string? valor, int max = MaxEco)
+    {
+        if (string.IsNullOrEmpty(valor)) return "";
+        var corte = Math.Min(valor.Length, max);
+        if (corte < valor.Length && corte > 0 && char.IsHighSurrogate(valor[corte - 1])) corte--;
+        var limpo = string.Create(corte, valor, (destino, origem) =>
+        {
+            for (var i = 0; i < destino.Length; i++) destino[i] = char.IsControl(origem[i]) ? ' ' : origem[i];
+        });
+        return corte < valor.Length ? limpo + "…" : limpo;
+    }
+
+    /// <summary>Confere que a etiqueta tem largura e altura entre zero (exclusivo) e <see cref="MaxDimensaoMm"/>.</summary>
+    public static bool TamanhoValido(LayoutJsonDocument layout, ICollection<string> erros, string rotulo)
+    {
+        var tamanho = layout.Size;
+        if (tamanho is null || tamanho.WMm <= 0 || tamanho.HMm <= 0)
+        {
+            erros.Add($"{rotulo}: size.w_mm e size.h_mm devem ser maiores que zero.");
+            return false;
+        }
+        if (tamanho.WMm > MaxDimensaoMm || tamanho.HMm > MaxDimensaoMm)
+        {
+            erros.Add(string.Create(PtBr, $"{rotulo}: size.w_mm e size.h_mm devem ser no máximo {MaxDimensaoMm:0} mm."));
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>Caracteres dos elementos de texto da etiqueta, para o teto de texto do pedido.</summary>
+    public static long CaracteresDeTexto(LayoutJsonDocument layout) =>
+        layout.Elements?.Where(e => e?.Type == "text").Sum(e => (long)(e.Content?.Length ?? 0)) ?? 0;
+
+    /// <summary>Acrescenta a <paramref name="distintos"/> o par (formato, conteúdo) de cada código da etiqueta.</summary>
+    public static void CodigosDe(LayoutJsonDocument layout, ISet<(string?, string?)> distintos)
+    {
+        if (layout.Elements is null) return;
+        foreach (var e in layout.Elements)
+            if (e?.Type == "code" && !string.IsNullOrWhiteSpace(e.Content))
+                distintos.Add((e.Format, e.Content));
+    }
+
     /// <summary>Converte ou devolve nulo, acrescentando a <paramref name="erros"/> cada motivo de recusa.</summary>
-    public static EtiquetaPlano? Converter(LayoutJsonDocument? layout, IQrCodeEncoder qr, ICollection<string> erros, string rotulo)
+    public static EtiquetaPlano? Converter(LayoutJsonDocument? layout, IQrCodeEncoder qr, ICollection<string> erros, string rotulo) =>
+        Converter(layout, new CodigosDoPedido(qr), erros, rotulo);
+
+    /// <summary>
+    /// Converte ou devolve nulo, acrescentando a <paramref name="erros"/> cada motivo de recusa. Os QR e as barras
+    /// saem de <paramref name="codigos"/>, que gera cada conteúdo uma vez só no pedido.
+    /// </summary>
+    public static EtiquetaPlano? Converter(LayoutJsonDocument? layout, CodigosDoPedido codigos, ICollection<string> erros, string rotulo)
     {
         var antes = erros.Count;
         void Erro(FormattableString msg) => erros.Add(rotulo + ": " + msg.ToString(PtBr));
 
         if (layout is null) { Erro($"layout ausente."); return null; }
         if (layout.V != 1) Erro($"versão do layout deve ser 1.");
+        if (!TamanhoValido(layout, erros, rotulo)) return null;
         var tamanho = layout.Size;
-        if (tamanho is null || tamanho.WMm <= 0 || tamanho.HMm <= 0) { Erro($"size.w_mm e size.h_mm devem ser maiores que zero."); return null; }
         if (tamanho.Orientation is not ("horizontal" or "vertical")) Erro($"size.orientation deve ser 'horizontal' ou 'vertical'.");
         var elementos = layout.Elements;
         if (elementos is null || elementos.Count == 0) { Erro($"elements não pode estar vazio."); return null; }
@@ -69,11 +129,18 @@ public static class LayoutParaPdf
         {
             var e = elementos[i];
             if (e is null) { Erro($"elemento {i + 1} vazio."); caixas.Add(new Caixa(0, 0, 0, 0)); continue; }
-            var id = string.IsNullOrWhiteSpace(e.Id) ? $"#{i + 1}" : e.Id;
+            var id = string.IsNullOrWhiteSpace(e.Id) ? $"#{i + 1}" : Eco(e.Id);
             void ErroEl(FormattableString msg) => Erro($"elemento '{id}' {msg}");
-            caixas.Add(new Caixa(e.XMm, e.YMm, e.WMm, e.HMm));
 
             if (string.IsNullOrWhiteSpace(e.Id)) ErroEl($"sem id.");
+            if (ForaDoLimite(e.XMm) || ForaDoLimite(e.YMm) || ForaDoLimite(e.WMm) || ForaDoLimite(e.HMm) || ForaDoLimite(e.QuietZoneMm ?? 0m))
+            {
+                caixas.Add(new Caixa(0, 0, 0, 0));
+                ErroEl($"tem x_mm, y_mm, w_mm, h_mm ou quiet_zone_mm fora do limite de {MaxDimensaoMm:0} mm.");
+                continue;
+            }
+            caixas.Add(new Caixa(e.XMm, e.YMm, e.WMm, e.HMm));
+
             if (e.WMm <= 0 || e.HMm <= 0) { ErroEl($"precisa de largura e altura maiores que zero."); continue; }
             if (e.XMm < -Tol || e.YMm < -Tol || e.XMm + e.WMm > larguraEtq + Tol || e.YMm + e.HMm > alturaEtq + Tol)
                 ErroEl($"sai da etiqueta de {larguraEtq:0.##} x {alturaEtq:0.##} mm.");
@@ -85,7 +152,7 @@ public static class LayoutParaPdf
                     if (texto is not null) plano.Add(texto);
                     break;
                 case "code":
-                    var codigo = Codigo(e, larguraEtq, alturaEtq, qr, ErroEl, out var zona);
+                    var codigo = Codigo(e, larguraEtq, alturaEtq, codigos, ErroEl, out var zona);
                     if (codigo is not null) plano.Add(codigo);
                     if (zona is not null) zonas.Add((i, id, zona));
                     break;
@@ -96,7 +163,7 @@ public static class LayoutParaPdf
                     ErroEl($"do tipo '{tipo}' ainda não sai no PDF.");
                     break;
                 default:
-                    ErroEl($"tem tipo '{e.Type}' não permitido.");
+                    ErroEl($"tem tipo '{Eco(e.Type)}' não permitido.");
                     break;
             }
         }
@@ -104,10 +171,12 @@ public static class LayoutParaPdf
         foreach (var (indice, id, zona) in zonas)
             for (var j = 0; j < caixas.Count; j++)
                 if (j != indice && zona.Sobrepoe(caixas[j]))
-                    Erro($"elemento '{elementos[j]?.Id}' invade a zona de silêncio do código '{id}'.");
+                    Erro($"elemento '{Eco(elementos[j]?.Id)}' invade a zona de silêncio do código '{id}'.");
 
         return erros.Count == antes ? new EtiquetaPlano(larguraEtq, alturaEtq, plano) : null;
     }
+
+    private static bool ForaDoLimite(decimal mm) => mm is < -MaxDimensaoMm or > MaxDimensaoMm;
 
     private static TextoPlano? Texto(LayoutElement e, Action<FormattableString> erro)
     {
@@ -132,7 +201,7 @@ public static class LayoutParaPdf
         return ok ? new TextoPlano(e.XMm, e.YMm, e.WMm, e.HMm, e.Content!, pt, peso, alinhamento) : null;
     }
 
-    private static ElementoPlano? Codigo(LayoutElement e, decimal larguraEtq, decimal alturaEtq, IQrCodeEncoder qr, Action<FormattableString> erro, out Caixa? zona)
+    private static ElementoPlano? Codigo(LayoutElement e, decimal larguraEtq, decimal alturaEtq, CodigosDoPedido codigos, Action<FormattableString> erro, out Caixa? zona)
     {
         zona = null;
         if (!ConteudoValido(e.Content, erro)) return null;
@@ -145,7 +214,7 @@ public static class LayoutParaPdf
             case "qr":
             {
                 if (Math.Abs(e.WMm - e.HMm) > TolQuadrado) { erro($"QR precisa de caixa quadrada."); return null; }
-                var matriz = qr.Matriz(conteudo);
+                var matriz = codigos.Qr(conteudo);
                 var n = matriz.GetLength(0);
                 var lado = Math.Min(e.WMm, e.HMm) - 2 * q;
                 var modulo = lado / n;
@@ -170,7 +239,7 @@ public static class LayoutParaPdf
             {
                 var problema = Code128.Problema(conteudo);
                 if (problema is not null) { erro($"CODE128 inválido: {problema}."); return null; }
-                var modulos = Code128.Codificar(conteudo).Modulos;
+                var modulos = codigos.Barras(conteudo);
                 var largura = e.WMm - 2 * q;
                 var modulo = largura / modulos.Length;
                 var ok = true;
@@ -199,7 +268,7 @@ public static class LayoutParaPdf
                 erro($"EAN-13 exige GTIN registrado na GS1 e ainda não sai no PDF; use barcode-code128.");
                 return null;
             default:
-                erro($"tem format '{e.Format}' não permitido.");
+                erro($"tem format '{Eco(e.Format)}' não permitido.");
                 return null;
         }
     }
@@ -209,7 +278,7 @@ public static class LayoutParaPdf
         if (string.IsNullOrWhiteSpace(conteudo)) { erro($"sem content."); return false; }
         if (conteudo.Length > MaxTexto) { erro($"com content acima de {MaxTexto} caracteres."); return false; }
         var variavel = Variavel.Match(conteudo);
-        if (variavel.Success) { erro($"com variável não resolvida {variavel.Value}."); return false; }
+        if (variavel.Success) { erro($"com variável não resolvida {Eco(variavel.Value)}."); return false; }
         return true;
     }
 

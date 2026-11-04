@@ -1,0 +1,205 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using EasyStock.Application.Ports.Output.Pdf;
+using EasyStock.Application.UseCases.Etiquetas.Folha;
+using static EasyStock.Application.Tests.UseCases.Etiquetas.Folha.LayoutsDeTeste;
+
+namespace EasyStock.Application.Tests.UseCases.Etiquetas.Folha;
+
+/// <summary>
+/// #2200, banca de DoS: grade sem piso, layout gigante, CPU sem teto, estouro de decimal e valores ecoados sem limite.
+/// Tudo vira 400 antes de gerar um QR ou uma barra.
+/// </summary>
+public class LimitesDeCargaFolhaTests
+{
+    private readonly IQrCodeEncoder _qr = Substitute.For<IQrCodeEncoder>();
+    private readonly GerarFolhaEtiquetasPdfUseCase _sut;
+
+    public LimitesDeCargaFolhaTests()
+    {
+        _qr.Matriz(Arg.Any<string>()).Returns(_ => new bool[29, 29]);
+        _sut = new GerarFolhaEtiquetasPdfUseCase(Substitute.For<IFolhaEtiquetasPdfRenderer>(), _qr);
+    }
+
+    private static GerarFolhaEtiquetasPdfCommand Pimaco(params EtiquetaNaFolha[] etiquetas) =>
+        new(new FolhaSpec("pimaco-a4256", null, null, null), Guias: false, 0, etiquetas);
+
+    private static GerarFolhaEtiquetasPdfCommand QuantasCabem(decimal margem, decimal espaco, params EtiquetaNaFolha[] etiquetas) =>
+        new(new FolhaSpec("quantas-cabem", null, margem, espaco), Guias: false, 0, etiquetas);
+
+    private static JsonObject Divisor(decimal x, decimal y, decimal w, decimal h) => new()
+    {
+        ["id"] = "div", ["type"] = "divider", ["x_mm"] = x, ["y_mm"] = y, ["w_mm"] = w, ["h_mm"] = h,
+    };
+
+    private static JsonObject QrCom(string conteudo) => Codigo("qr", "qr", conteudo, 45m, 3m, 15.5m, 15.5m, 0.5m);
+
+    private static JsonObject EtiquetaPesadaDeTexto() => Layout(63.5m, 38.1m, "horizontal",
+        Enumerable.Range(0, 40).Select(i => Texto($"dado{i}", new string('a', 500), 1m, 1m + i % 10 * 3.5m, 60m, 3.2m, 7.5m)).ToArray());
+
+    private string Recusa(GerarFolhaEtiquetasPdfCommand command)
+    {
+        var planejar = () => _sut.Planejar(command);
+        var ex = planejar.Should().Throw<UseCaseValidationException>().Which;
+        ex.Code.Should().Be(GerarFolhaEtiquetasPdfUseCase.CodigoErro);
+        return ex.Message;
+    }
+
+    // ---------- 1. "quantas-cabem" sem piso ----------
+
+    [Fact]
+    public void QuantasCabem_EtiquetaDe05mm_RecusaAntesDeMontarAGrade() =>
+        Recusa(QuantasCabem(0m, 0m, Etiqueta(Layout(0.5m, 0.5m, "horizontal", Divisor(0m, 0m, 0.5m, 0.5m)))))
+            .Should().Contain("10 mm");
+
+    [Fact]
+    public void QuantasCabem_SoAAlturaAbaixoDe10mm_Recusa() =>
+        Recusa(QuantasCabem(5m, 3m, Etiqueta(Layout(50m, 9.9m, "horizontal", Divisor(0m, 0m, 50m, 9.9m)))))
+            .Should().Contain("10 mm");
+
+    [Fact]
+    public void QuantasCabem_MaisDe500PosicoesPorFolha_Recusa() =>
+        Recusa(QuantasCabem(0m, 0m, Etiqueta(Layout(10m, 10m, "horizontal", Divisor(0m, 0m, 10m, 10m)))))
+            .Should().Contain("500");
+
+    [Fact]
+    public void QuantasCabem_10mmComMargemPadrao_AbaixoDoTeto_Aceita()
+    {
+        var plano = _sut.Planejar(QuantasCabem(5m, 3m, Etiqueta(Layout(10m, 10m, "horizontal", Divisor(0m, 0m, 10m, 10m)))));
+
+        plano.Paginas[0].Celulas.Should().HaveCount(15 * 22);
+    }
+
+    [Fact]
+    public void GradeFolha_QuantasCabem_AcimaDoTetoDeCelulas_DevolveNulo() =>
+        GradeFolha.QuantasCabem(0.5m, 0.5m, 0m, 0m).Should().BeNull();
+
+    // ---------- 2. Layout gigante desserializado antes do teto de 40 ----------
+
+    [Fact]
+    public void Layout_ComMaisDe40Elementos_RecusaSemDesserializarOsElementos()
+    {
+        var elementos = new[] { new JsonObject { ["x_mm"] = "abc" } }.Concat(Enumerable.Range(0, 40).Select(_ => new JsonObject())).ToArray();
+
+        var mensagem = Recusa(Pimaco(Etiqueta(Layout(63.5m, 38.1m, "horizontal", elementos))));
+
+        mensagem.Should().Contain("40 elementos").And.NotContain("LayoutJson");
+    }
+
+    [Fact]
+    public void LayoutEmTexto_ComMaisDe40Elementos_RecusaSemDesserializarOsElementos()
+    {
+        var elementos = new[] { new JsonObject { ["x_mm"] = "abc" } }.Concat(Enumerable.Range(0, 40).Select(_ => new JsonObject())).ToArray();
+        var emTexto = new EtiquetaNaFolha(JsonSerializer.SerializeToElement(Layout(63.5m, 38.1m, "horizontal", elementos).ToJsonString()), null);
+
+        var mensagem = Recusa(Pimaco(emTexto));
+
+        mensagem.Should().Contain("40 elementos").And.NotContain("LayoutJson");
+    }
+
+    // ---------- 3. CPU sem teto ----------
+
+    [Fact]
+    public void Pimaco_LayoutQueNaoCabe_RecusaSemGerarQr()
+    {
+        Recusa(Pimaco(Etiqueta(Layout(200m, 130m, "horizontal", Qr(10m, 10m, 40m, 0m))))).Should().Contain("não cabe");
+
+        _qr.DidNotReceiveWithAnyArgs().Matriz(default!);
+    }
+
+    [Fact]
+    public void QuantasCabem_MaisDe50Paginas_RecusaSemGerarQr()
+    {
+        Recusa(QuantasCabem(5m, 3m, Etiqueta(Layout(150m, 250m, "vertical", Qr(10m, 10m, 40m, 0m)), copias: 51)))
+            .Should().Contain("50 páginas");
+
+        _qr.DidNotReceiveWithAnyArgs().Matriz(default!);
+    }
+
+    [Fact]
+    public void CodigosIguais_EmEtiquetasDiferentes_GeramUmaMatrizSoNoPedido()
+    {
+        var etiquetas = Enumerable.Range(0, 3).Select(_ => Etiqueta(PimacoCompleta(), copias: 2)).ToArray();
+
+        _sut.Planejar(Pimaco(etiquetas));
+
+        _qr.Received(1).Matriz(ConteudoQr);
+    }
+
+    [Fact]
+    public void Pedido_ComMaisDe200CodigosDistintos_RecusaSemGerarQr()
+    {
+        var etiquetas = Enumerable.Range(0, 201)
+            .Select(i => Etiqueta(Layout(63.5m, 38.1m, "horizontal", QrCom($"LOT-{i}")))).ToArray();
+
+        Recusa(Pimaco(etiquetas)).Should().Contain("200 códigos");
+
+        _qr.DidNotReceiveWithAnyArgs().Matriz(default!);
+    }
+
+    [Fact]
+    public void Pedido_Com200CodigosDistintos_Aceita()
+    {
+        var etiquetas = Enumerable.Range(0, 200)
+            .Select(i => Etiqueta(Layout(63.5m, 38.1m, "horizontal", QrCom($"LOT-{i}")))).ToArray();
+
+        _sut.Planejar(Pimaco(etiquetas));
+
+        _qr.ReceivedWithAnyArgs(200).Matriz(default!);
+    }
+
+    [Fact]
+    public void Pedido_ComMaisDe200MilCaracteresDeTexto_Recusa() =>
+        Recusa(Pimaco(Etiqueta(EtiquetaPesadaDeTexto(), copias: 11))).Should().Contain("texto");
+
+    [Fact]
+    public void Pedido_Com200MilCaracteresDeTexto_Aceita()
+    {
+        var plano = _sut.Planejar(Pimaco(Etiqueta(EtiquetaPesadaDeTexto(), copias: 10)));
+
+        plano.Paginas.Should().NotBeEmpty();
+    }
+
+    // ---------- 4. Estouro de decimal vira 400 ----------
+
+    [Fact]
+    public void Overflow_LarguraDaEtiquetaNoMaximoDoDecimal_Recusa400() =>
+        Recusa(QuantasCabem(5m, 3m, Etiqueta(Layout(decimal.MaxValue, 10m, "horizontal", Divisor(0m, 0m, 10m, 10m)))))
+            .Should().Contain("1000 mm");
+
+    [Fact]
+    public void Overflow_ElementoComXMaisWNoMaximoDoDecimal_Recusa400() =>
+        Recusa(Pimaco(Etiqueta(Layout(50m, 30m, "horizontal", Divisor(decimal.MaxValue, 0m, decimal.MaxValue, 1m)))))
+            .Should().Contain("1000 mm");
+
+    [Fact]
+    public void Overflow_QuietZoneNoMaximoDoDecimal_Recusa400() =>
+        Recusa(Pimaco(Etiqueta(Layout(63.5m, 38.1m, "horizontal", Qr(45m, 3m, 15.5m, decimal.MaxValue)))))
+            .Should().Contain("1000 mm");
+
+    [Fact]
+    public void Etiqueta_ComMaisDe1000mm_Recusa() =>
+        Recusa(Pimaco(Etiqueta(Layout(1001m, 10m, "horizontal", Divisor(0m, 0m, 10m, 10m))))).Should().Contain("1000 mm");
+
+    [Fact]
+    public void Elemento_ComMaisDe1000mm_Recusa() =>
+        Recusa(Pimaco(Etiqueta(Layout(50m, 30m, "horizontal", Divisor(0m, 0m, 1001m, 1m))))).Should().Contain("1000 mm");
+
+    // ---------- 5. Valores ecoados sem limite ----------
+
+    [Fact]
+    public void ValoresEcoadosNosErros_SaemTruncados()
+    {
+        var longo = new string('A', 5000);
+        var layout = Layout(63.5m, 38.1m, "horizontal",
+            new JsonObject { ["id"] = longo, ["type"] = longo, ["x_mm"] = 1m, ["y_mm"] = 20m, ["w_mm"] = 5m, ["h_mm"] = 5m },
+            new JsonObject { ["id"] = "c", ["type"] = "code", ["format"] = longo, ["content"] = "x", ["x_mm"] = 10m, ["y_mm"] = 20m, ["w_mm"] = 5m, ["h_mm"] = 5m },
+            Qr(),
+            Texto(longo, "x", 44m, 3m, 5m, 3.5m, 7.5m));
+
+        var mensagem = Recusa(Pimaco(Etiqueta(layout)));
+
+        mensagem.Should().Contain(new string('A', 40)).And.NotContain(new string('A', 100));
+        mensagem.Length.Should().BeLessThan(1000);
+    }
+}

@@ -11,6 +11,12 @@ public sealed class GradeFolha
     public const decimal A4LarguraMm = 210m;
     public const decimal A4AlturaMm = 297m;
 
+    /// <summary>Menor lado de etiqueta que o "quantas cabem" aceita; abaixo disso a grade vira milhares de posições.</summary>
+    public const decimal LadoMinimoMm = 10m;
+
+    /// <summary>Teto de posições por página no "quantas cabem". A Pimaco A4256 tem 21.</summary>
+    public const int MaxCelulasPorPagina = 500;
+
     private GradeFolha(int colunas, int linhas, IReadOnlyList<CelulaGrade> celulas)
     {
         Colunas = colunas;
@@ -31,15 +37,27 @@ public sealed class GradeFolha
         Montar(3, 7, 63.5m, 38.1m, 7.21m, 15.15m, 66.04m, 38.1m);
 
     /// <summary>
+    /// Quantas colunas e linhas de <paramref name="wMm"/> x <paramref name="hMm"/> cabem na A4 retrato com a margem e
+    /// o espaço pedidos, sem montar nenhuma posição. Zero quando nem uma cabe.
+    /// </summary>
+    public static (int Colunas, int Linhas) Dimensionar(decimal wMm, decimal hMm, decimal margemMm, decimal espacoMm)
+    {
+        if (wMm <= 0 || hMm <= 0) return (0, 0);
+        var colunas = (int)Math.Floor((A4LarguraMm - 2 * margemMm + espacoMm) / (wMm + espacoMm));
+        var linhas = (int)Math.Floor((A4AlturaMm - 2 * margemMm + espacoMm) / (hMm + espacoMm));
+        return (Math.Max(colunas, 0), Math.Max(linhas, 0));
+    }
+
+    /// <summary>
     /// Quantas etiquetas de <paramref name="wMm"/> x <paramref name="hMm"/> cabem na A4 retrato com a margem e o
-    /// espaço pedidos, grade centralizada na página. Nulo quando nem uma cabe.
+    /// espaço pedidos, grade centralizada na página. Nulo quando nem uma cabe, quando um lado fica abaixo de
+    /// <see cref="LadoMinimoMm"/> ou quando passam de <see cref="MaxCelulasPorPagina"/> posições.
     /// </summary>
     public static GradeFolha? QuantasCabem(decimal wMm, decimal hMm, decimal margemMm, decimal espacoMm)
     {
-        if (wMm <= 0 || hMm <= 0) return null;
-        var colunas = (int)Math.Floor((A4LarguraMm - 2 * margemMm + espacoMm) / (wMm + espacoMm));
-        var linhas = (int)Math.Floor((A4AlturaMm - 2 * margemMm + espacoMm) / (hMm + espacoMm));
-        if (colunas < 1 || linhas < 1) return null;
+        if (wMm < LadoMinimoMm || hMm < LadoMinimoMm) return null;
+        var (colunas, linhas) = Dimensionar(wMm, hMm, margemMm, espacoMm);
+        if (colunas < 1 || linhas < 1 || colunas * linhas > MaxCelulasPorPagina) return null;
 
         var esquerda = (A4LarguraMm - (colunas * wMm + (colunas - 1) * espacoMm)) / 2;
         var topo = (A4AlturaMm - (linhas * hMm + (linhas - 1) * espacoMm)) / 2;
