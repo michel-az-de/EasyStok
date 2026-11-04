@@ -233,7 +233,8 @@ module.exports = function ({ test, runInSandbox, assert }) {
         return JSON.stringify({enviado,titulo:recebido.c.titulo,linhas:recebido.c.linhas.length,larg:recebido.cfg.larguraMm,alt:recebido.cfg.alturaMm,copias:recebido.cfg.copias});
       } finally { printViaBluetooth=old.print; getSavedPrinter=old.printer; window.cdbTspl=old.tspl; }
     `);
-    assert.deepStrictEqual(result, { enviado:[84,83,80,76], titulo:'TESTE', linhas:3, larg:80, alt:40, copias:1 });
+    // 80 x 40 sem midia era o padrão silencioso do master: vira rolo contínuo (#2202, D1).
+    assert.deepStrictEqual(result, { enviado:[84,83,80,76], titulo:'TESTE', linhas:3, larg:80, alt:0, copias:1 });
   });
 
   test('#2063 impressão: log usa lote e impressora capturados, somente após envio; falha e teste não registram etiqueta', () => {
