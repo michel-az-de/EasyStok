@@ -43,6 +43,9 @@ public sealed record AceitarConviteRequest([Required] string Token, [Required] s
 /// <summary>Reset pelo código de 6 dígitos do WhatsApp (N8).</summary>
 public sealed record ResetarSenhaPorCodigoRequest([Required] string Email, [Required] string Codigo, [Required] string NovaSenha);
 
+/// <summary>Chave de acesso de uso único (#2201). IP e agente saem da conexão.</summary>
+public sealed record LoginChaveAcessoRequest(string? Chave);
+
 public sealed record LoginUsuarioInfo(Guid id, string nome, string email, string nivel);
 public sealed record LoginResponse(string token, string refreshToken, int expiresIn, LoginUsuarioInfo usuario);
 
@@ -113,6 +116,37 @@ public class AuthController(
         catch (CredenciaisInvalidasException ex)
         {
             return Unauthorized(new { error = new { code = "INVALID_CREDENTIALS", message = ex.Message } });
+        }
+    }
+
+    [SwaggerOperation(Summary = "Sign in with a single-use access key",
+        Description = "Anônimo (#2201). A chave vem da dona pelo Console, vale 30 dias e morre no primeiro uso. Toda recusa responde " +
+                      "igual (401). Limite por IP da N8 (429). Devolve a mesma sessão do login.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [EnableRateLimiting("auth")]
+    [HttpPost("chave-acesso")]
+    [AllowAnonymous]
+    public async Task<IActionResult> LoginChaveAcesso(
+        [FromBody] LoginChaveAcessoRequest request,
+        [FromServices] EasyStock.Application.UseCases.ChaveDeAcesso.AtivarComChaveUseCase ativar)
+    {
+        try
+        {
+            var identificado = await ativar.ExecuteAsync(new EasyStock.Application.UseCases.ChaveDeAcesso.AtivarComChaveCommand(
+                request.Chave ?? string.Empty, ClientIp(), ClientUserAgent()));
+            var resultado = await autenticarUseCase.ConcluirLoginPorChaveAsync(identificado.Usuario, identificado.EmpresaId);
+            return await EmitirSessaoAsync(resultado, ChavesDeAcesso.AcaoUsada);
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+        catch (Exception ex) when (ex is Domain.Exceptions.RegraDeDominioVioladaException or CredenciaisInvalidasException)
+        {
+            return Unauthorized(new { error = new { code = "INVALID_ACCESS_KEY",
+                message = EasyStock.Application.UseCases.ChaveDeAcesso.AtivarComChaveUseCase.MensagemDeRecusa } });
         }
     }
 

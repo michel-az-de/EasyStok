@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { configGoogle, entrar, entrarComGoogle, sair } from '../infra/api/autenticacao'
+import { configGoogle, entrar, entrarComChave, entrarComGoogle, sair } from '../infra/api/autenticacao'
 import { EVENTO_SESSAO_EXPIRADA, garantirSessao } from '../infra/api/cliente'
 import { EVENTO_FALHA_SAIDA_PUSH, EVENTO_SESSAO_ALTERADA, lerSessao, limparSessao } from '../infra/api/sessao'
 import { AVISO_SESSAO_VENCIDA } from '../dominio/sessao'
@@ -55,6 +55,12 @@ export function useSessaoApi() {
     liberarEntradaSozinha()
   }, [])
 
+  // #2201: código de acesso de uso único, gerado pela responsável em Gestão > Usuários.
+  const entrarPorCodigo = useCallback(async (chave) => {
+    setAvisoSaida(null)
+    setSessao(await entrarComChave(chave))
+  }, [])
+
   const encerrarSessao = useCallback(() => {
     // #1810: sair não pode virar entrar de novo pelo One Tap.
     travarEntradaSozinha()
@@ -65,5 +71,5 @@ export function useSessaoApi() {
 
   // #1354: identidade estável; um objeto novo a cada render redesenhava o botão do Google.
   const google = useMemo(() => ({ buscarClientId: configGoogle, entrar: entrarGoogle, opcoes: opcoesDaEntradaGoogle }), [entrarGoogle])
-  return { sessao, entrarNaEmpresa, google, encerrarSessao, avisoSaida }
+  return { sessao, entrarNaEmpresa, entrarPorCodigo, google, encerrarSessao, avisoSaida }
 }
