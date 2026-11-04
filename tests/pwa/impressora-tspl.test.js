@@ -36,8 +36,8 @@ module.exports = function ({ test }) {
     const T = carregar();
     const { cabeca, rodape } = separar(T.etiqueta(rgbaBranco(384, 80), 384, 80, {}));
     const linhas = cabeca.split('\r\n');
-    assert.deepEqual(linhas.slice(0, 7), ['SIZE 104 mm,12 mm', 'GAP 0,0', 'DIRECTION 1', 'REFERENCE 0,0', 'DENSITY 8', 'SPEED 4', 'CLS']);
-    assert.match(linhas[7], /^BITMAP \d+,0,48,80,0,$/);
+    assert.deepEqual(linhas.slice(0, 8), ['SIZE 104 mm,12 mm', 'GAP 0,0', 'SET TEAR ON', 'DIRECTION 1', 'REFERENCE 0,0', 'DENSITY 8', 'SPEED 4', 'CLS']);
+    assert.match(linhas[8], /^BITMAP \d+,0,48,80,0,$/);
     assert.equal(rodape, '\r\nPRINT 1,1\r\n');
     assert.equal(T.DPI, 203);
     assert.equal(T.PONTOS_MM, 8);
@@ -49,14 +49,14 @@ module.exports = function ({ test }) {
     assert.ok(cabeca.startsWith('SIZE 58 mm,40 mm\r\nGAP 0,0\r\n'));
   });
 
-  test('recortada manda o gap da mídia e SET TEAR ON; contínua não', () => {
+  test('recortada manda o gap da mídia; as duas mandam SET TEAR ON para parar na serrilha', () => {
     const T = carregar();
     const rec = separar(T.etiqueta(rgbaBranco(16, 8), 16, 8, { larguraMm: 52, alturaMm: 30, gapMm: 3, densidade: 10, velocidade: 3 })).cabeca;
     assert.ok(rec.startsWith('SIZE 52 mm,30 mm\r\nGAP 3 mm,0 mm\r\nSET TEAR ON\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nDENSITY 10\r\nSPEED 3\r\nCLS\r\n'), rec);
     const forcada = separar(T.etiqueta(rgbaBranco(16, 8), 16, 8, { continuo: false, larguraMm: 80, alturaMm: 40 })).cabeca;
     assert.match(forcada, /GAP 2 mm,0 mm\r\nSET TEAR ON/);
     const cont = separar(T.etiqueta(rgbaBranco(16, 8), 16, 8, { continuo: true, gapMm: 2, larguraMm: 80, alturaMm: 40 })).cabeca;
-    assert.ok(!/TEAR|GAP 2/.test(cont), cont);
+    assert.ok(/GAP 0,0\r\nSET TEAR ON\r\n/.test(cont) && !/GAP 2/.test(cont), cont);
   });
 
   test('opts.x fixa a coluna do BITMAP', () => {
@@ -80,7 +80,7 @@ module.exports = function ({ test }) {
     const linhas = txt.split('\r\n');
     assert.equal(linhas[0], 'SIZE 52 mm,30 mm');
     assert.ok(linhas.includes('GAP 2 mm,0 mm') && linhas.includes('SET TEAR ON'));
-    assert.ok(linhas.includes('BOX 4,4,411,235,2'), 'moldura a 0,5 mm da borda');
+    assert.ok(linhas.includes('BOX 8,8,407,231,2'), 'moldura a 1 mm da borda');
     const ticks = linhas.filter(l => /^BAR \d+,\d+,1,\d+$/.test(l)).map(l => Number(l.split(/[ ,]/)[1]));
     assert.equal(ticks.length, 11);
     assert.equal(ticks[10] - ticks[0], 80, 'régua de 10 mm = 80 pontos');
@@ -89,6 +89,7 @@ module.exports = function ({ test }) {
     assert.equal(linhas[linhas.length - 2], 'PRINT 1,1');
     const cont = Buffer.from(T.alinhamento({ larguraMm: 80, continuo: true })).toString('latin1');
     assert.ok(cont.startsWith('SIZE 80 mm,30 mm\r\nGAP 0,0\r\n'));
+    assert.ok(cont.split('\r\n').some(l => l === 'TEXT 16,16,"2",0,1,1,"ROLO 80 mm"'));
   });
 
   test('largura em bytes arredonda para cima', () => {
@@ -171,6 +172,22 @@ module.exports = function ({ test }) {
     const alvo = doc.criados[0];
     assert.equal(alvo.width, 624);
     assert.ok(cabeca.startsWith('SIZE 80 mm,' + (Math.ceil(alvo.height / 8) + 2) + ' mm\r\nGAP 0,0\r\n'));
+  });
+
+  test('#2202 paraEtiqueta no rolo contínuo corta o branco acima e abaixo do desenho', () => {
+    const T = carregar();
+    const rgba = rgbaBranco(384, 800);
+    for (let y = 300; y < 400; y++) pintar(rgba, 384, 10, y);
+    const fonte = { width: 384, height: 800, getContext: () => ({ getImageData: () => ({ data: rgba }) }) };
+    const doc = documentoFalso();
+    const { cabeca } = separar(T.paraEtiqueta(fonte, { larguraMm: 80, continuo: true, document: doc }));
+    const alvo = doc.criados[0];
+    assert.deepStrictEqual(alvo.desenhos[0].slice(1, 5), [0, 300, 384, 100], 'só a faixa com tinta');
+    assert.equal(alvo.height, 162);
+    assert.ok(cabeca.startsWith('SIZE 80 mm,23 mm\r\nGAP 0,0\r\n'), cabeca.slice(0, 40));
+    const doc2 = documentoFalso();
+    T.paraEtiqueta(fonte, { larguraMm: 80, alturaMm: 40, document: doc2 });
+    assert.deepStrictEqual(doc2.criados[0].desenhos[0].slice(1, 5), [0, 0, 384, 800], 'recortada mantém o desenho inteiro');
   });
 
   test('inverter troca a polaridade e cópias chegam ao PRINT', () => {

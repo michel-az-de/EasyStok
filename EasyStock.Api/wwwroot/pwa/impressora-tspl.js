@@ -56,11 +56,11 @@
     return !(Number(o.gapMm) > 0);
   }
 
-  // Cabeçalho comum: SIZE, GAP (e TEAR no recortado), direção e CLS.
+  // Cabeçalho comum: SIZE, GAP, TEAR, direção e CLS. TEAR vai nos dois papéis
+  // para a etiqueta parar na serrilha qualquer que seja o estado gravado na Oasis.
   function cabecalho(o, larguraMm, alturaMm) {
     const linhas = [`SIZE ${larguraMm} mm,${alturaMm} mm`];
-    if (ehContinuo(o)) linhas.push('GAP 0,0');
-    else linhas.push(`GAP ${num(o.gapMm, 2)} mm,0 mm`, 'SET TEAR ON');
+    linhas.push(ehContinuo(o) ? 'GAP 0,0' : `GAP ${num(o.gapMm, 2)} mm,0 mm`, 'SET TEAR ON');
     linhas.push('DIRECTION 1', 'REFERENCE 0,0', `DENSITY ${num(o.densidade, 8)}`, `SPEED ${num(o.velocidade, 4)}`, 'CLS');
     return linhas;
   }
@@ -99,7 +99,7 @@
     return ascii([`SIZE ${larguraMm} mm,${num(m.alturaMm, 40)} mm`, `GAP ${num(m.gapMm, 2)} mm,0 mm`, 'SET TEAR ON', 'GAPDETECT', ''].join('\r\n'));
   }
 
-  // Teste de alinhamento com comandos nativos: moldura a 0,5 mm da borda,
+  // Teste de alinhamento com comandos nativos: moldura a 1 mm da borda,
   // cruz no centro e régua de 10 mm com traço a cada 1 mm. Moldura cortada ou
   // régua fora de 10 mm indicam mídia errada.
   function alinhamento(midia, opts) {
@@ -108,7 +108,7 @@
     const larguraMm = num(m.larguraMm, 80);
     const alturaMm = continuo ? 30 : num(m.alturaMm, 40);
     const W = Math.round(larguraMm * PONTOS_MM), H = Math.round(alturaMm * PONTOS_MM);
-    const borda = 4;
+    const borda = 8;
     const cx = Math.round(W / 2), cy = Math.round(H / 2);
     const braco = Math.min(40, Math.floor(Math.min(W, H) / 4));
     const linhas = cabecalho(Object.assign({}, m, opts || {}, { continuo }), larguraMm, alturaMm);
@@ -120,7 +120,7 @@
       const alto = i % 5 === 0 ? 22 : 12;
       linhas.push(`BAR ${rx + i * PONTOS_MM},${base - alto},1,${alto}`);
     }
-    const rotulo = `${larguraMm} x ${continuo ? 'continuo' : alturaMm + ' mm'}`;
+    const rotulo = continuo ? `ROLO ${larguraMm} mm` : `${larguraMm} x ${alturaMm} mm`;
     linhas.push(`TEXT 16,16,"2",0,1,1,"${rotulo}"`, 'PRINT 1,1', '');
     return ascii(linhas.join('\r\n'));
   }
@@ -131,9 +131,26 @@
     return etiqueta(img.data, canvas.width, canvas.height, opts);
   }
 
+  // Linhas da primeira e da última tinta do desenho. Sem leitura de pixels
+  // (canvas sem getImageData), devolve null e nada é cortado.
+  function faixaComTinta(canvas) {
+    try {
+      const w = canvas.width, h = canvas.height;
+      const rgba = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+      let topo = -1, base = -1;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (escuro(rgba, (y * w + x) * 4)) { if (topo < 0) topo = y; base = y; break; }
+        }
+      }
+      return topo < 0 ? null : { topo, base };
+    } catch (e) { return null; }
+  }
+
   // Encaixa o desenho (384 px) na etiqueta configurada: escala até caber na
   // largura e na altura úteis, centraliza na vertical. Bobina contínua só
-  // limita pela largura e a etiqueta cresce com o desenho.
+  // limita pela largura e a etiqueta cresce com o desenho; o branco acima e
+  // abaixo da tinta fica de fora para gastar só o conteúdo (#2202, P2).
   function paraEtiqueta(canvas, cfg) {
     const c = cfg || {};
     const doc = c.document || global.document;
@@ -143,9 +160,12 @@
     // D1: sem altura informada, é rolo contínuo (cresce com o desenho).
     const continuo = c.continuo === true || (c.continuo !== false && !(Number(c.alturaMm) > 0));
     const maxA = continuo ? Infinity : num(c.alturaMm, 40) * PONTOS_MM - margem;
-    const escala = Math.min(maxL / canvas.width, maxA / canvas.height);
+    const faixa = continuo ? faixaComTinta(canvas) : null;
+    const sy = faixa ? faixa.topo : 0;
+    const sh = faixa ? faixa.base - faixa.topo + 1 : canvas.height;
+    const escala = Math.min(maxL / canvas.width, maxA / sh);
     const largura = Math.max(8, Math.floor(canvas.width * escala));
-    const altura = Math.max(1, Math.floor(canvas.height * escala));
+    const altura = Math.max(1, Math.floor(sh * escala));
     const alvo = doc.createElement('canvas');
     alvo.width = largura;
     alvo.height = altura;
@@ -153,7 +173,7 @@
     ctx.imageSmoothingEnabled = escala < 1;
     ctx.fillStyle = BRANCO;
     ctx.fillRect(0, 0, largura, altura);
-    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, largura, altura);
+    ctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, largura, altura);
     const alturaMm = continuo ? Math.ceil(altura / PONTOS_MM) + 2 : num(c.alturaMm, 40);
     const y = continuo ? PONTOS_MM : Math.max(0, Math.floor((alturaMm * PONTOS_MM - altura) / 2));
     return doCanvas(alvo, Object.assign({}, c, { larguraMm, alturaMm, y, continuo }));

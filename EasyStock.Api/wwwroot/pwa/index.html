@@ -5177,6 +5177,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   background: var(--bg-card, #2a2520); color: var(--ink, #f4eee5);
   border: 1px solid var(--line, #3d362e); border-radius: 16px;
   padding: 28px 24px; max-width: 360px; width: 100%;
+  max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow-y: auto;
   text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
   animation: upd-pop 0.25s ease-out;
 }
@@ -8390,6 +8391,7 @@ body.ux-calm [data-screen="producao"] .section-label {
           <button class="btn-ajustes-printer primary-soft" onclick="pickPrinter()" style="flex:1">Buscar impressora</button>
           <button class="btn-ajustes-printer success-soft" onclick="testPrint()" style="flex:1">Testar impressão</button>
         </div>
+        <p class="hint" id="printerTsplDica" style="display:none">O teste de alinhamento imprime uma moldura, uma cruz no centro e uma régua de 10 mm. Calibrar mede a etiqueta recortada e o espaço entre uma e outra.</p>
         <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnóstico</button>
       </div>
 
@@ -15373,8 +15375,17 @@ function tsplConfig(p) {
     const cont = m.tipo !== 'etiqueta';
     return { larguraMm: Number(m.larguraMm), alturaMm: cont ? 0 : Number(m.alturaMm), gapMm: cont ? 0 : (Number(m.gapMm) || 2), continuo: cont, inverter: !!(p.inverter || e.inverter) };
   }
-  const continuo = e.continuo === true || !(Number(e.alturaMm) > 0);
+  // O master gravava 80 x 40 recortada sem o operador escolher (era o padrão
+  // do seletor). Sem midia, esse registro vale o padrão D1: rolo contínuo.
+  const padraoDoMaster = !m && Number(e.larguraMm) === 80 && Number(e.alturaMm) === 40 && (e.gapMm == null || Number(e.gapMm) === 2) && e.continuo !== true;
+  const continuo = padraoDoMaster || e.continuo === true || !(Number(e.alturaMm) > 0);
   return { larguraMm: e.larguraMm || 80, alturaMm: continuo ? 0 : e.alturaMm, gapMm: continuo ? 0 : (e.gapMm === 0 ? 0 : (e.gapMm || 2)), continuo, inverter: !!e.inverter };
+}
+// Ações da Oasis: alinhamento para qualquer papel TSPL; calibrar só na
+// etiqueta recortada (rolo contínuo não tem recorte para medir).
+function acoesTspl(p) {
+  const tspl = !!p && !!p.address && perfilImpressora(p) === 'tspl';
+  return { alinhar: tspl, calibrar: tspl && !tsplConfig(p).continuo };
 }
 function descreverPerfil(p) {
   if (perfilImpressora(p) !== 'tspl') { const l = Number(p && p.midia && p.midia.larguraMm); return 'ESC/POS ' + (l > 0 ? l : 58) + ' mm'; }
@@ -15465,7 +15476,15 @@ function renderPrinterStatus() {
   const lab = document.getElementById('printerStatusLabel');
   const p   = getSavedPrinter();
   if (!el || !lab) return;
-  renderImpressorasLista(impressorasV2());
+  const v2Status = impressorasV2();
+  renderImpressorasLista(v2Status);
+  const tspls = v2Status ? Object.values(v2Status.impressoras).map(legadoDaV2).filter(x => acoesTspl(x).alinhar) : [];
+  const dicaTspl = document.getElementById('printerTsplDica');
+  if (dicaTspl) {
+    dicaTspl.style.display = tspls.length ? '' : 'none';
+    dicaTspl.textContent = 'O teste de alinhamento imprime uma moldura na borda do papel, uma cruz no centro e uma régua de 10 mm. Moldura cortada: toque Ajustar e confira o papel.'
+      + (tspls.some(x => acoesTspl(x).calibrar) ? ' Calibrar mede a etiqueta recortada e o espaço entre uma e outra.' : '');
+  }
 
   const bs = window.bluetoothSerial;
   if (!bs) {
@@ -15514,10 +15533,9 @@ function renderImpressorasLista(v2) {
     const botao = (texto, fn) => { const b = document.createElement('button'); b.className = 'btn-ajustes-printer subtle'; b.textContent = texto; b.onclick = fn; acoes.appendChild(b); };
     botao('Ajustar', () => { openPrinterPicker(); escolherNoSeletor(imp.address, imp.nome); });
     botao('Testar', () => testPrint(imp.address));
-    if (imp.linguagem === 'tspl') {
-      botao('Calibrar', () => calibrarImpressora(imp.address));
-      botao('Teste de alinhamento', () => alinharImpressora(imp.address));
-    }
+    const acoesImp = acoesTspl(legadoDaV2(imp));
+    if (acoesImp.calibrar) botao('Calibrar', () => calibrarImpressora(imp.address));
+    if (acoesImp.alinhar) botao('Teste de alinhamento', () => alinharImpressora(imp.address));
     botao('Esquecer', () => esquecerImpressora(imp.address));
     card.appendChild(acoes);
     host.appendChild(card);
@@ -15529,22 +15547,36 @@ function midiaTspl(imp) {
 }
 // Recortada: GAPDETECT mede etiqueta e gap. Contínua: grava GAP 0,0 para a
 // Oasis parar de procurar o recorte.
+// O printViaBluetooth já explica falha de conexão e permissão; aqui só
+// falta o caso sem Bluetooth (PWA no navegador).
+function semBluetoothNoAjuste() {
+  if (!window.bluetoothSerial) showToast('Bluetooth indisponível neste aparelho');
+}
+function tsplAtual(funcao) {
+  if (window.cdbTspl && typeof window.cdbTspl[funcao] === 'function') return true;
+  showToast('Feche e abra o app para atualizar a impressão');
+  return false;
+}
+// Sem mac, a impressora de etiqueta salva.
+function impressoraDoAjuste(mac) {
+  const v2 = impressorasV2();
+  if (!v2) return null;
+  return v2.impressoras[mac || v2.papeis.etiqueta || v2.papeis.cupom] || null;
+}
 function calibrarImpressora(mac) {
   const I = window.cdbImpressoras;
-  const v2 = I.ler(localStorage);
-  const imp = v2.impressoras[mac];
-  if (!imp || !window.cdbTspl) return;
-  printViaBluetooth(window.cdbTspl.calibracao(midiaTspl(imp)), () => showToast('Sem conexão com a impressora'), null, legadoDaV2(imp), () => {
+  const imp = impressoraDoAjuste(mac);
+  if (!imp || !acoesTspl(legadoDaV2(imp)).calibrar || !tsplAtual('calibracao')) return;
+  printViaBluetooth(window.cdbTspl.calibracao(midiaTspl(imp)), semBluetoothNoAjuste, null, legadoDaV2(imp), () => {
     const atual = I.ler(localStorage);
-    I.salvar(localStorage, I.cadastrar(atual, { address: mac, calibradaEm: new Date().toISOString(), midiaConfirmada: true }));
+    I.salvar(localStorage, I.cadastrar(atual, { address: imp.address, calibradaEm: new Date().toISOString(), midiaConfirmada: true }));
     renderPrinterStatus();
   });
 }
 function alinharImpressora(mac) {
-  const v2 = impressorasV2();
-  const imp = v2 && v2.impressoras[mac];
-  if (!imp || !window.cdbTspl) return;
-  printViaBluetooth(window.cdbTspl.alinhamento(midiaTspl(imp)), () => showToast('Sem conexão com a impressora'), null, legadoDaV2(imp));
+  const imp = impressoraDoAjuste(mac);
+  if (!imp || !acoesTspl(legadoDaV2(imp)).alinhar || !tsplAtual('alinhamento')) return;
+  printViaBluetooth(window.cdbTspl.alinhamento(midiaTspl(imp)), semBluetoothNoAjuste, null, legadoDaV2(imp));
 }
 function esquecerImpressora(mac) {
   const I = window.cdbImpressoras;
@@ -15588,12 +15620,12 @@ function preencherPapeisSeletor() {
   if (!sel || !window.cdbPapeis || !seletorEscolha) return;
   const P = window.cdbPapeis;
   const tspl = linguagemDoSeletor() === 'tspl';
-  const papeis = tspl ? P.lista({ classe: 'etiqueta' }) : P.lista({ tipo: 'bobina' });
+  const papeis = tspl ? P.lista({ classe: 'etiqueta' }) : [P.porId(P.PADRAO_ESCPOS)];
   const atual = seletorEscolha.imp && P.daMidia(seletorEscolha.imp.midia);
   const escolhido = atual && papeis.some(p => p.id === atual.id) ? atual.id : (tspl ? P.PADRAO_TSPL : P.PADRAO_ESCPOS);
   sel.innerHTML = papeis.map(p => '<option value="' + escapeHtml(p.id) + '"' + (p.id === escolhido ? ' selected' : '') + '>' + escapeHtml(p.rotulo) + '</option>').join('');
   const dica = document.getElementById('printerPapelDica');
-  if (dica) dica.textContent = tspl ? 'Rolo contínuo não tem recorte entre etiquetas. Etiqueta recortada tem um espaço entre uma e outra; depois de salvar, toque Calibrar.' : 'Bobina de cupom, a mesma da maquininha.';
+  if (dica) dica.textContent = tspl ? 'Escolha o papel que está na impressora. Rolo contínuo gasta só o tamanho da etiqueta. Etiqueta recortada: depois de salvar, toque Calibrar no cartão dela em Ajustes.' : 'Bobina de cupom de 58 mm, a mesma da maquininha.';
 }
 function salvarSeletor() {
   const e = seletorEscolha;
@@ -16877,12 +16909,15 @@ function impressoraDoSeletor(addr, name) {
   const inverter = !!(document.getElementById('printerInvert') || {}).checked;
   const profile = escolha === 'auto' ? perfilPorNome(name) : escolha;
   const P = window.cdbPapeis;
-  const papel = P ? (P.porId(preset) || P.porId(profile === 'tspl' ? P.PADRAO_TSPL : P.PADRAO_ESCPOS)) : null;
+  // Papel que não serve à linguagem (etiqueta na de cupom) cai no padrão dela.
+  const serve = x => !!x && (x.tipo !== 'bobina') === (profile === 'tspl');
+  const escolhido = P ? P.porId(preset) : null;
+  const papel = P ? (serve(escolhido) ? escolhido : P.porId(profile === 'tspl' ? P.PADRAO_TSPL : P.PADRAO_ESCPOS)) : null;
   const etiqueta = papel && papel.tipo === 'etiqueta'
     ? { larguraMm: papel.larguraMm, alturaMm: papel.alturaMm, gapMm: papel.gapMm, continuo: false, inverter }
     : { larguraMm: papel ? papel.larguraMm : 80, alturaMm: 0, gapMm: 0, continuo: true, inverter };
   const out = { address: addr, name, profile, perfilManual: escolha !== 'auto', etiqueta, inverter };
-  if (papel) { out.midia = P.paraMidia(papel); out.midiaConfirmada = !!P.porId(preset); }
+  if (papel) { out.midia = P.paraMidia(papel); out.midiaConfirmada = serve(escolhido); }
   return out;
 }
 
@@ -23541,11 +23576,11 @@ window.cdbApp = {
 
 <script src="qrcode.min.js?v=20260429a"></script>
 <script src="etiqueta-termica.js?v=20261028a"></script>
-<script src="impressao-papeis.js?v=20261103a"></script>
-<script src="impressoras.js?v=20261103a"></script>
-<script src="etiqueta-resolver.js?v=20261103a"></script>
-<script src="etiqueta-canvas.js?v=20261103a"></script>
-<script src="impressora-tspl.js?v=20261103b"></script>
+<script src="impressao-papeis.js?v=20261104b"></script>
+<script src="impressoras.js?v=20261104b"></script>
+<script src="etiqueta-resolver.js?v=20261104b"></script>
+<script src="etiqueta-canvas.js?v=20261104b"></script>
+<script src="impressora-tspl.js?v=20261104b"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
 <script src="upload-photos.js?v=20260514b"></script>
