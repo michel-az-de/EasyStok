@@ -8381,18 +8381,15 @@ body.ux-calm [data-screen="producao"] .section-label {
       </div>
 
       <div class="ajustes-section" data-group="eq">
-        <h4>Impressora térmica</h4>
-        <p class="hint">ESC/POS de 58 mm (Hipertech WTP05, MTP-II) ou TSPL de etiqueta (Oasis OIA-8381-B). Pareie pelo Android antes.</p>
+        <h4>Impressoras</h4>
+        <p class="hint">Uma para a etiqueta de produção (Oasis OIA-8381-B) e outra para o cupom (WTP05, MTP-II), ou uma só para tudo. Pareie pelo Android antes.</p>
         <div class="printer-status none" id="printerStatus">
           <span id="printerStatusLabel">Nenhuma impressora selecionada</span>
         </div>
+        <div id="impressorasLista"></div>
         <div class="ajustes-actions-row">
           <button class="btn-ajustes-printer primary-soft" onclick="pickPrinter()" style="flex:1">Buscar impressora</button>
           <button class="btn-ajustes-printer success-soft" onclick="testPrint()" style="flex:1">Testar impressão</button>
-        </div>
-        <div class="ajustes-actions-row" id="printerTsplAcoes" style="display:none;margin-top:8px">
-          <button class="btn-ajustes-printer primary-soft" onclick="alinharImpressora()" style="flex:1">Teste de alinhamento</button>
-          <button class="btn-ajustes-printer primary-soft" id="printerCalibrar" onclick="calibrarImpressora()" style="flex:1">Calibrar etiqueta</button>
         </div>
         <p class="hint" id="printerTsplDica" style="display:none">O teste de alinhamento imprime uma moldura, uma cruz no centro e uma régua de 10 mm. Calibrar mede a etiqueta recortada e o espaço entre uma e outra.</p>
         <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnóstico</button>
@@ -8668,17 +8665,32 @@ body.ux-calm [data-screen="producao"] .section-label {
        Lista os dispositivos Bluetooth ja pareados pelo Android. -->
   <div class="np-overlay" id="printerPickerModal" role="dialog" aria-modal="true">
     <div class="np-sheet">
-      <h3 class="np-title">Selecionar impressora</h3>
-      <div class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</div>
-      <div id="savedPrinterProfiles" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
-      <label for="printerProfile">Modelo da impressora</label>
-      <select id="printerProfile" class="np-btn np-secondary" onchange="mexeuNoSeletor('perfil'); preencherPapeisSeletor()"><option value="auto">Detectar pelo nome</option><option value="escpos">ESC/POS 58 mm · Hipertech WTP05, MTP-II</option><option value="tspl">TSPL etiqueta · Oasis OIA-8381-B</option></select>
-      <label for="printerLabelSize">Papel na impressora</label>
-      <select id="printerLabelSize" class="np-btn np-secondary" onchange="mexeuNoSeletor('papel')"></select>
-      <div class="np-text" id="printerPapelDica" style="font-size:13px"></div>
-      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="printerInvert" onchange="mexeuNoSeletor('inverter')"> Inverter cores (se a etiqueta TSPL sair em negativo)</label>
-      <div id="printerPickerList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:280px;overflow-y:auto"></div>
-      <button class="np-btn np-secondary" onclick="loadPrinterDevices()">↻ Buscar de novo</button>
+      <h3 class="np-title" id="printerPickerTitle">Passo 1 de 3 · Qual impressora?</h3>
+      <div id="printerPickerPasso1">
+        <div class="np-text" id="printerPickerHint">Toque na impressora térmica que vai usar.</div>
+        <div id="savedPrinterProfiles" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+        <div id="printerPickerList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:280px;overflow-y:auto"></div>
+        <button class="np-btn np-secondary" onclick="loadPrinterDevices()">↻ Buscar de novo</button>
+      </div>
+      <div id="printerPickerPasso2" style="display:none">
+        <div class="np-text">Cada papel pode ter a sua impressora.</div>
+        <button class="np-btn np-secondary" data-uso="etiqueta" onclick="escolherUso('etiqueta')">Etiqueta de produção</button>
+        <button class="np-btn np-secondary" data-uso="cupom" onclick="escolherUso('cupom')">Cupom e etiqueta de pedido</button>
+        <button class="np-btn np-secondary" data-uso="ambos" onclick="escolherUso('ambos')">As duas coisas</button>
+        <details style="margin:8px 0;font-size:13px"><summary>Avançado</summary>
+          <label for="printerProfile">Linguagem da impressora</label>
+          <select id="printerProfile" class="np-btn np-secondary" onchange="preencherPapeisSeletor()"><option value="auto">Detectar pelo nome</option><option value="escpos">Cupom (ESC/POS) · WTP05, MTP-II</option><option value="tspl">Etiqueta (TSPL) · Oasis OIA-8381-B</option></select>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="printerInvert"> Inverter cores (se a etiqueta sair em negativo)</label>
+        </details>
+        <button class="np-btn np-tertiary" onclick="irPassoSeletor(1)">Voltar</button>
+      </div>
+      <div id="printerPickerPasso3" style="display:none">
+        <label for="printerLabelSize">Papel na impressora</label>
+        <select id="printerLabelSize" class="np-btn np-secondary"></select>
+        <div class="np-text" id="printerPapelDica" style="font-size:13px"></div>
+        <button class="np-btn np-primary" onclick="salvarSeletor()">Salvar</button>
+        <button class="np-btn np-tertiary" onclick="irPassoSeletor(2)">Voltar</button>
+      </div>
       <button class="np-btn np-tertiary"  onclick="closePrinterPicker()">Cancelar</button>
     </div>
   </div>
@@ -10032,7 +10044,18 @@ async function restoreFromPublicStorage() {
 // Exporta coleções, preferências permitidas, fila e anexos operacionais.
 // Identidade do aparelho, credenciais e cursores não são transferidos.
 const BACKUP_COLLECTIONS = { products: 'cdb-products', clients: 'cdb-clients', orders: 'cdb-orders', cashEntries: 'cdb-cash', cashClosings: 'cdb-cash-closings', batches: 'cdb-batches' };
-const BACKUP_PREFERENCES = ['cdb-operator-name', 'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-pix-type', 'cdb-printer', 'cdb-printers', 'cdb-theme', 'cdb-onboarding-done'];
+const BACKUP_PREFERENCES = ['cdb-operator-name', 'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-pix-type', 'cdb-printer', 'cdb-printers', 'cdb-impressoras.v2', 'cdb-regra-impressao.v1', 'cdb-theme', 'cdb-onboarding-done'];
+// A restauração não sobrescreve preferência do aparelho. O v2 sem impressora
+// nenhuma conta como ausente: é o que uma versão antiga gravava ao só ler.
+function preferenciaAusente(key) {
+  const atual = localStorage.getItem(key);
+  if (atual === null) return true;
+  if (key !== 'cdb-impressoras.v2') return false;
+  try {
+    const v = JSON.parse(atual);
+    return !v || !v.impressoras || !Object.keys(v.impressoras).length;
+  } catch (e) { return true; }
+}
 const BACKUP_ARCHIVE_KEYS = ['cdb-shopping', 'cdb-audit-log', 'cdb-audit-log-archive'];
 function backupArchiveEntries(entries, legacyStorage = {}) {
   if (!Array.isArray(entries)) throw new Error('Anexos do backup inválidos.');
@@ -10152,7 +10175,7 @@ function prepareBackupImport(input) {
   const queueAdded = added - queueBefore;
   added -= queueAdded;
   const preferences = {};
-  BACKUP_PREFERENCES.forEach(key => { if (typeof ls[key] === 'string' && localStorage.getItem(key) === null) preferences[key] = ls[key]; });
+  BACKUP_PREFERENCES.forEach(key => { if (typeof ls[key] === 'string' && preferenciaAusente(key)) preferences[key] = ls[key]; });
   const photos = payload.photos || [];
   if (!Array.isArray(photos) || photos.length > 10000) throw new Error('Fotos do backup inválidas.');
   const photoBytes = new Map();
@@ -15355,7 +15378,7 @@ function normalizarImpressora(p) {
   return out;
 }
 function perfilImpressora(p) { return (normalizarImpressora(p) || {}).profile || 'escpos'; }
-// #2202 (D1): sem altura a mídia é rolo contínuo. A mídia do catálogo (midia) manda.
+// #2202 (D1): sem altura a mídia é rolo contínuo. A mídia do v2 (midia) manda.
 function tsplConfig(p) {
   const e = (p && p.etiqueta) || {};
   const m = p && p.midia;
@@ -15369,34 +15392,64 @@ function tsplConfig(p) {
   const continuo = padraoDoMaster || e.continuo === true || !(Number(e.alturaMm) > 0);
   return { larguraMm: e.larguraMm || 80, alturaMm: continuo ? 0 : e.alturaMm, gapMm: continuo ? 0 : (e.gapMm === 0 ? 0 : (e.gapMm || 2)), continuo, inverter: !!e.inverter };
 }
-// Papel do catálogo que a impressora salva usa. Sem papel salvo, o padrão da
-// linguagem: rolo contínuo de 80 mm (D1) ou bobina de 58 mm.
-function papelDaImpressora(p) {
-  const P = window.cdbPapeis;
-  if (!P || !p) return null;
-  const tspl = perfilImpressora(p) === 'tspl';
-  const salvo = p.midia ? P.daMidia(p.midia) : null;
-  if (salvo && (salvo.tipo !== 'bobina') === tspl && P.porId(salvo.id)) return salvo.id;
-  if (!tspl) return P.PADRAO_ESCPOS;
-  const c = tsplConfig(p);
-  const papel = P.daMidia(c.continuo ? { tipo: 'continuo', larguraMm: c.larguraMm } : { tipo: 'etiqueta', larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm });
-  return papel && P.porId(papel.id) ? papel.id : P.PADRAO_TSPL;
+// Ações da Oasis: alinhamento para qualquer papel TSPL; calibrar só na
+// etiqueta recortada (rolo contínuo não tem recorte para medir).
+function acoesTspl(p) {
+  const tspl = !!p && !!p.address && perfilImpressora(p) === 'tspl';
+  return { alinhar: tspl, calibrar: tspl && !tsplConfig(p).continuo };
 }
 function descreverPerfil(p) {
-  if (perfilImpressora(p) !== 'tspl') return 'ESC/POS 58 mm';
+  if (perfilImpressora(p) !== 'tspl') { const l = Number(p && p.midia && p.midia.larguraMm); return 'ESC/POS ' + (l > 0 ? l : 58) + ' mm'; }
   const c = tsplConfig(p);
   return 'TSPL ' + (c.continuo ? 'bobina contínua' : c.larguraMm + ' x ' + c.alturaMm + ' mm');
 }
 function tsplBytesDoCanvas(canvas, printer, copias) {
   return window.cdbTspl.paraEtiqueta(canvas, Object.assign(tsplConfig(printer), { copias: copias || 1 }));
 }
-function getSavedPrinter() { return normalizarImpressora(load('cdb-printer', null)); }
+// #2202 (F1): impressoras no modelo v2 (impressoras.js): cada papel tem a sua.
+// cdb-printer e cdb-printers seguem espelhadas para quem ainda as lê.
+// Os dois módulos juntos: um impressoras.js novo com o catálogo antigo no
+// cache quebraria a leitura e a impressão cairia sem impressora.
+function impressorasV2() { return window.cdbImpressoras && window.cdbPapeis ? window.cdbImpressoras.ler(localStorage) : null; }
+function legadoDaV2(imp) { return imp ? normalizarImpressora(window.cdbImpressoras.paraLegado(imp)) : null; }
+function getSavedPrinter() {
+  const v2 = impressorasV2();
+  if (!v2) return normalizarImpressora(load('cdb-printer', null));
+  return legadoDaV2(v2.impressoras[v2.papeis.etiqueta] || v2.impressoras[v2.papeis.cupom] || null);
+}
+// Impressora do documento: produção vai para a de etiqueta; pedido, recibo e
+// teste, para a de cupom. Sem v2, a selecionada.
+function impressoraPara(documento) {
+  const I = window.cdbImpressoras;
+  const v2 = impressorasV2();
+  if (!v2) return getSavedPrinter();
+  return legadoDaV2(I.resolver(v2, I.papelDoDocumento(documento)));
+}
 function getPrinterProfiles() {
+  const v2 = impressorasV2();
+  if (v2) return Object.values(v2.impressoras).map(legadoDaV2);
   const stored = load('cdb-printers', []);
   const profiles = (Array.isArray(stored) ? stored : []).map(normalizarImpressora);
-  const saved = getSavedPrinter();
+  const saved = normalizarImpressora(load('cdb-printer', null));
   if (saved && saved.address && !profiles.some(p => p.address === saved.address)) profiles.push(saved);
   return profiles;
+}
+// Cadastra a impressora no v2; papeis diz o que ela imprime (padrão: tudo,
+// como a seleção antiga). Mídia só muda quando a escolha traz mídia.
+function registrarImpressora(p, papeis) {
+  const I = window.cdbImpressoras;
+  let v2 = I.ler(localStorage);
+  const imp = I.deLegado(normalizarImpressora(p));
+  if (!imp) return v2;
+  const dados = { address: imp.address, nome: imp.nome, linguagem: imp.linguagem, linguagemManual: imp.linguagemManual };
+  if (p.midia || p.etiqueta) { dados.midia = imp.midia; dados.midiaConfirmada = imp.midiaConfirmada; dados.inverter = imp.inverter; }
+  if (p.apelido !== undefined) dados.apelido = imp.apelido;
+  v2 = I.cadastrar(v2, dados);
+  I.PAPEIS.forEach(papel => {
+    if (!papeis || papeis.indexOf(papel) >= 0) v2 = I.definirPapel(v2, papel, imp.address);
+    else if (v2.papeis[papel] === imp.address) v2 = I.definirPapel(v2, papel, null);
+  });
+  return I.salvar(localStorage, v2);
 }
 function printerReady(printer) {
   return !!printer && !!printer.address && (perfilImpressora(printer) !== 'tspl' || !!window.cdbTspl);
@@ -15409,12 +15462,20 @@ function renderSavedPrinters() {
     const button = document.createElement('button');
     button.className = 'np-btn np-secondary';
     button.textContent = p.name + ' · ' + descreverPerfil(p);
-    button.onclick = () => selectPrinter(impressoraDoSeletor(p.address, p.name));
+    button.onclick = () => escolherNoSeletor(p.address, p.name);
     host.appendChild(button);
   });
 }
-function setSavedPrinter(p) {
-  if (p) {
+function setSavedPrinter(p, papeis) {
+  const I = window.cdbImpressoras;
+  if (I) {
+    if (p && p.address) registrarImpressora(p, papeis);
+    else {
+      let v2 = I.ler(localStorage);
+      I.PAPEIS.forEach(papel => { v2 = I.definirPapel(v2, papel, null); });
+      I.salvar(localStorage, v2);
+    }
+  } else if (p) {
     const profiles = getPrinterProfiles().filter(item => item.address !== p.address);
     profiles.push(p);
     save('cdb-printers', profiles);
@@ -15428,14 +15489,15 @@ function renderPrinterStatus() {
   const lab = document.getElementById('printerStatusLabel');
   const p   = getSavedPrinter();
   if (!el || !lab) return;
-  const acoes = acoesTspl(p);
-  [['printerTsplAcoes', acoes.alinhar], ['printerTsplDica', acoes.alinhar], ['printerCalibrar', acoes.calibrar]].forEach(([id, ver]) => {
-    const alvo = document.getElementById(id);
-    if (alvo) alvo.style.display = ver ? '' : 'none';
-  });
+  const v2Status = impressorasV2();
+  renderImpressorasLista(v2Status);
+  const tspls = v2Status ? Object.values(v2Status.impressoras).map(legadoDaV2).filter(x => acoesTspl(x).alinhar) : [];
   const dicaTspl = document.getElementById('printerTsplDica');
-  if (dicaTspl && acoes.alinhar) dicaTspl.textContent = 'O teste de alinhamento imprime uma moldura na borda do papel, uma cruz no centro e uma régua de 10 mm. Moldura cortada: confira o papel em Buscar impressora.'
-    + (acoes.calibrar ? ' Calibrar mede a etiqueta recortada e o espaço entre uma e outra.' : '');
+  if (dicaTspl) {
+    dicaTspl.style.display = tspls.length ? '' : 'none';
+    dicaTspl.textContent = 'O teste de alinhamento imprime uma moldura na borda do papel, uma cruz no centro e uma régua de 10 mm. Moldura cortada: toque Ajustar e confira o papel.'
+      + (tspls.some(x => acoesTspl(x).calibrar) ? ' Calibrar mede a etiqueta recortada e o espaço entre uma e outra.' : '');
+  }
 
   const bs = window.bluetoothSerial;
   if (!bs) {
@@ -15445,13 +15507,147 @@ function renderPrinterStatus() {
     return;
   }
 
-  if (p && p.address) {
+  const v2 = impressorasV2();
+  if (v2 && Object.keys(v2.impressoras).length) {
+    el.classList.add('none'); el.classList.remove('ok');
+    const linha = (rotulo, papel) => {
+      const imp = window.cdbImpressoras.resolver(v2, papel);
+      if (!imp) return rotulo + ': nenhuma';
+      const aviso = imp.midiaConfirmada === false ? ' · <b>confirme o papel</b>' : '';
+      return rotulo + ': ' + escapeHtml(imp.apelido || imp.nome) + ' · ' + escapeHtml(window.cdbPapeis.descrever(window.cdbPapeis.daMidia(imp.midia))) + aviso;
+    };
+    lab.innerHTML = linha('Etiqueta', 'etiqueta') + '<br>' + linha('Cupom', 'cupom') + '<br><span style="font-size:12px">A conexão será verificada ao imprimir.</span>';
+  } else if (p && p.address) {
     el.classList.add('none'); el.classList.remove('ok');
     lab.innerHTML = 'Selecionada: ' + escapeHtml(p.name || p.address) + ' · ' + escapeHtml(descreverPerfil(p)) + '<br><span style="font-size:12px">A conexão será verificada ao imprimir.</span>';
   } else {
     el.classList.add('none'); el.classList.remove('ok');
     lab.innerHTML = 'Nenhuma impressora selecionada<br><span style="font-size:10px;opacity:.7">Bluetooth disponível — toque "Buscar impressora"</span>';
   }
+}
+// #2202 (F1): uma linha por impressora em Ajustes, com o que ela imprime, o
+// papel e as ações. Calibrar e alinhar só existem na de etiqueta (TSPL).
+function renderImpressorasLista(v2) {
+  const host = document.getElementById('impressorasLista');
+  if (!host) return;
+  host.innerHTML = '';
+  if (!v2 || !window.cdbPapeis) return;
+  const I = window.cdbImpressoras;
+  Object.values(v2.impressoras).forEach(imp => {
+    // O mesmo critério da impressão: a escolhida, a única da classe ou a única.
+    const usos = I.PAPEIS.filter(p => I.resolver(v2, p) === imp).map(p => (p === 'etiqueta' ? 'etiqueta' : 'cupom'));
+    const papel = window.cdbPapeis.daMidia(imp.midia);
+    const card = document.createElement('div');
+    card.className = 'impressora-card';
+    card.style.cssText = 'border:1px solid var(--line,#ddd);border-radius:10px;padding:10px;margin-top:8px;font-size:14px';
+    const nomeTecnico = imp.apelido && imp.apelido !== imp.nome ? ' <span style="opacity:.7">' + escapeHtml(imp.nome) + '</span>' : '';
+    card.innerHTML = '<b>' + escapeHtml(imp.apelido || imp.nome) + '</b>' + nomeTecnico
+      + '<div>Imprime: ' + escapeHtml(usos.length ? usos.join(' e ') : 'nada ainda') + '</div>'
+      + '<div>Papel: ' + escapeHtml(window.cdbPapeis.descrever(papel)) + (imp.midiaConfirmada === false ? ' · <b>confirme o papel</b>' : '') + '</div>';
+    const acoes = document.createElement('div');
+    acoes.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px';
+    const botao = (texto, fn) => { const b = document.createElement('button'); b.className = 'btn-ajustes-printer subtle'; b.textContent = texto; b.onclick = fn; acoes.appendChild(b); };
+    botao('Ajustar', () => { openPrinterPicker(); escolherNoSeletor(imp.address, imp.nome); });
+    botao('Testar', () => testPrint(imp.address));
+    const acoesImp = acoesTspl(legadoDaV2(imp));
+    if (acoesImp.calibrar) botao('Calibrar', () => calibrarImpressora(imp.address));
+    if (acoesImp.alinhar) botao('Teste de alinhamento', () => alinharImpressora(imp.address));
+    botao('Esquecer', () => esquecerImpressora(imp.address));
+    card.appendChild(acoes);
+    host.appendChild(card);
+  });
+}
+function midiaTspl(imp) {
+  const m = imp.midia || {};
+  return { larguraMm: m.larguraMm, alturaMm: m.alturaMm, gapMm: m.gapMm, continuo: m.tipo !== 'etiqueta', densidade: imp.densidade, velocidade: imp.velocidade };
+}
+// Recortada: GAPDETECT mede etiqueta e gap. Contínua: grava GAP 0,0 para a
+// Oasis parar de procurar o recorte.
+// O printViaBluetooth já explica falha de conexão e permissão; aqui só
+// falta o caso sem Bluetooth (PWA no navegador).
+function semBluetoothNoAjuste() {
+  if (!window.bluetoothSerial) showToast('Bluetooth indisponível neste aparelho');
+}
+function tsplAtual(funcao) {
+  if (window.cdbTspl && typeof window.cdbTspl[funcao] === 'function') return true;
+  showToast('Feche e abra o app para atualizar a impressão');
+  return false;
+}
+// Sem mac, a impressora de etiqueta salva.
+function impressoraDoAjuste(mac) {
+  const v2 = impressorasV2();
+  if (!v2) return null;
+  return v2.impressoras[mac || v2.papeis.etiqueta || v2.papeis.cupom] || null;
+}
+function calibrarImpressora(mac) {
+  const I = window.cdbImpressoras;
+  const imp = impressoraDoAjuste(mac);
+  if (!imp || !acoesTspl(legadoDaV2(imp)).calibrar || !tsplAtual('calibracao')) return;
+  printViaBluetooth(window.cdbTspl.calibracao(midiaTspl(imp)), semBluetoothNoAjuste, null, legadoDaV2(imp), () => {
+    const atual = I.ler(localStorage);
+    I.salvar(localStorage, I.cadastrar(atual, { address: imp.address, calibradaEm: new Date().toISOString(), midiaConfirmada: true }));
+    renderPrinterStatus();
+  });
+}
+function alinharImpressora(mac) {
+  const imp = impressoraDoAjuste(mac);
+  if (!imp || !acoesTspl(legadoDaV2(imp)).alinhar || !tsplAtual('alinhamento')) return;
+  printViaBluetooth(window.cdbTspl.alinhamento(midiaTspl(imp)), semBluetoothNoAjuste, null, legadoDaV2(imp));
+}
+function esquecerImpressora(mac) {
+  const I = window.cdbImpressoras;
+  if (!confirm('Esquecer esta impressora neste aparelho?')) return;
+  I.salvar(localStorage, I.esquecer(I.ler(localStorage), mac));
+  renderPrinterStatus();
+}
+
+// Seletor em 3 passos: qual impressora, o que ela imprime, qual papel.
+let seletorEscolha = null;
+function irPassoSeletor(n) {
+  [1, 2, 3].forEach(i => { const el = document.getElementById('printerPickerPasso' + i); if (el) el.style.display = i === n ? '' : 'none'; });
+  const titulo = document.getElementById('printerPickerTitle');
+  if (titulo) titulo.textContent = ['', 'Passo 1 de 3 · Qual impressora?', 'Passo 2 de 3 · O que ela imprime?', 'Passo 3 de 3 · Qual papel está nela?'][n];
+}
+function linguagemDoSeletor() {
+  const escolha = (document.getElementById('printerProfile') || {}).value || 'auto';
+  return escolha === 'auto' ? perfilPorNome(seletorEscolha && seletorEscolha.name) : escolha;
+}
+function escolherNoSeletor(addr, name) {
+  const v2 = impressorasV2();
+  const imp = v2 && v2.impressoras[addr];
+  seletorEscolha = { addr, name, imp };
+  const perfil = document.getElementById('printerProfile');
+  if (perfil) perfil.value = imp && imp.linguagemManual ? imp.linguagem : 'auto';
+  const inverter = document.getElementById('printerInvert');
+  if (inverter) inverter.checked = !!(imp && imp.inverter);
+  const usos = v2 ? window.cdbImpressoras.PAPEIS.filter(p => v2.papeis[p] === addr) : [];
+  const padrao = usos.length === 2 ? 'ambos' : usos[0] || (linguagemDoSeletor() === 'tspl' ? 'etiqueta' : 'cupom');
+  document.querySelectorAll('#printerPickerPasso2 [data-uso]').forEach(b => { b.className = 'np-btn ' + (b.dataset.uso === padrao ? 'np-primary' : 'np-secondary'); });
+  irPassoSeletor(2);
+}
+function escolherUso(uso) {
+  if (!seletorEscolha) return;
+  seletorEscolha.uso = uso;
+  preencherPapeisSeletor();
+  irPassoSeletor(3);
+}
+function preencherPapeisSeletor() {
+  const sel = document.getElementById('printerLabelSize');
+  if (!sel || !window.cdbPapeis || !seletorEscolha) return;
+  const P = window.cdbPapeis;
+  const tspl = linguagemDoSeletor() === 'tspl';
+  const papeis = tspl ? P.lista({ classe: 'etiqueta' }) : [P.porId(P.PADRAO_ESCPOS)];
+  const atual = seletorEscolha.imp && P.daMidia(seletorEscolha.imp.midia);
+  const escolhido = atual && papeis.some(p => p.id === atual.id) ? atual.id : (tspl ? P.PADRAO_TSPL : P.PADRAO_ESCPOS);
+  sel.innerHTML = papeis.map(p => '<option value="' + escapeHtml(p.id) + '"' + (p.id === escolhido ? ' selected' : '') + '>' + escapeHtml(p.rotulo) + '</option>').join('');
+  const dica = document.getElementById('printerPapelDica');
+  if (dica) dica.textContent = tspl ? 'Escolha o papel que está na impressora. Rolo contínuo gasta só o tamanho da etiqueta. Etiqueta recortada: depois de salvar, toque Calibrar no cartão dela em Ajustes.' : 'Bobina de cupom de 58 mm, a mesma da maquininha.';
+}
+function salvarSeletor() {
+  const e = seletorEscolha;
+  if (!e) return;
+  const papeis = e.uso === 'ambos' ? ['etiqueta', 'cupom'] : [e.uso || 'etiqueta'];
+  selectPrinter(impressoraDoSeletor(e.addr, e.name), papeis);
 }
 // Callback chamado apos o operador selecionar uma impressora no modal.
 // Usado tanto pra Ajustes > Buscar impressora (callback null = so salvar)
@@ -15467,7 +15663,8 @@ function pickPrinter() {
 function openPrinterPicker() {
   const modal = document.getElementById('printerPickerModal');
   modal.classList.add('show');
-  preencherSeletor(getSavedPrinter());
+  seletorEscolha = null;
+  irPassoSeletor(1);
   renderSavedPrinters();
   loadPrinterDevices();
 }
@@ -15534,7 +15731,7 @@ function loadPrinterDevices() {
           row.style.textAlign = 'left';
           row.innerHTML = (isSaved ? '✓ ' : '') + escapeHtml(name)
                         + '<br><span style="font-size:11px;opacity:.7">' + escapeHtml(addr) + ' · ' + escapeHtml(avisoDispositivo(d, name)) + '</span>';
-          row.onclick = () => selectPrinter(impressoraDoSeletor(addr, name));
+          row.onclick = () => escolherNoSeletor(addr, name);
           list.appendChild(row);
         });
       }, (err) => showError('list', err));
@@ -15567,7 +15764,7 @@ function loadPrinterDevices() {
 const DIAG_KNOWN_KEYS = [
   'cdb-products', 'cdb-orders', 'cdb-clients', 'cdb-cash', 'cdb-cash-closings',
   'cdb-batches', 'cdb-audit-log', 'cdb-audit-log-archive', 'cdb-sync-queue',
-  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-printers', 'cdb-operator-name',
+  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-printers', 'cdb-impressoras.v2', 'cdb-regra-impressao.v1', 'cdb-operator-name',
   'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-device-id',
   'cdb-last-sync', 'cdb-theme', 'cdb-prod-scan-mode', 'cdb-demo-mode', 'cdb-schema-version',
   'cdb-pre-reset-backup'
@@ -16720,99 +16917,30 @@ function avisoDispositivo(d, name) {
   if (d && d.spp === false) return perfil + ' · sem serviço serial anunciado, pode falhar';
   return perfil + (d && d.printerClass ? ' · impressora' : '');
 }
-// #2202 (F0): o seletor abre com o papel, a linguagem e a inversão da
-// impressora selecionada (antes abria sempre em 80 x 40 recortada e gravava
-// isso de novo). Ao tocar numa impressora, vale o que o operador mudou aqui;
-// o que ele não mexeu vem do perfil salvo dela.
-let seletorMexido = {};
-let seletorLinguagem = null;
-function mexeuNoSeletor(campo) { seletorMexido[campo] = true; }
-function inversaoSalva(p) { return !!(p && (p.inverter || (p.etiqueta && p.etiqueta.inverter))); }
-function preencherSeletor(p) {
-  seletorMexido = {};
-  seletorLinguagem = p && p.address ? perfilImpressora(p) : null;
-  const perfil = document.getElementById('printerProfile');
-  if (perfil) perfil.value = p && p.perfilManual ? perfilImpressora(p) : 'auto';
-  const inverter = document.getElementById('printerInvert');
-  if (inverter) inverter.checked = inversaoSalva(p);
-  preencherPapeisSeletor(p && p.address ? papelDaImpressora(p) : null);
-}
-// Lista do select pela linguagem: etiqueta e rolo para TSPL, bobina de 58 mm
-// para ESC/POS (o cupom só sai em 58 mm hoje). Sem linguagem, as duas.
-function papeisDaLinguagem(lingua) {
-  const P = window.cdbPapeis;
-  const etiqueta = P.lista({ classe: 'etiqueta' });
-  const cupom = [P.porId(P.PADRAO_ESCPOS)];
-  return lingua === 'tspl' ? etiqueta : lingua === 'escpos' ? cupom : etiqueta.concat(cupom);
-}
-function preencherPapeisSeletor(escolhido) {
-  const sel = document.getElementById('printerLabelSize');
-  const P = window.cdbPapeis;
-  if (!sel || !P) return;
-  const escolha = (document.getElementById('printerProfile') || {}).value || 'auto';
-  const lingua = escolha !== 'auto' ? escolha : seletorLinguagem;
-  // No automático a lista traz os dois tipos: a impressora tocada decide a linguagem.
-  const papeis = papeisDaLinguagem(escolha !== 'auto' ? escolha : null);
-  const atual = escolhido || sel.value;
-  const id = papeis.some(p => p.id === atual) ? atual : (lingua === 'escpos' ? P.PADRAO_ESCPOS : P.PADRAO_TSPL);
-  sel.innerHTML = papeis.map(p => '<option value="' + escapeHtml(p.id) + '"' + (p.id === id ? ' selected' : '') + '>' + escapeHtml(p.rotulo) + '</option>').join('');
-  sel.value = id;
-  const dica = document.getElementById('printerPapelDica');
-  if (dica) dica.textContent = lingua === 'escpos'
-    ? 'Toque na impressora abaixo para salvar.'
-    : 'Escolha o papel que está na impressora e toque nela abaixo para salvar. Rolo contínuo gasta só o tamanho da etiqueta. Etiqueta recortada: depois de salvar, toque Calibrar etiqueta em Ajustes.';
-}
+// #2202 (F0): o papel vem do catálogo único (impressao-papeis.js). Sem
+// escolha, o padrão da linguagem: rolo contínuo de 80 mm ou bobina de 58 mm.
 function impressoraDoSeletor(addr, name) {
-  const salva = getPrinterProfiles().find(p => p.address === addr) || null;
-  const campo = id => document.getElementById(id) || {};
-  const escolha = seletorMexido.perfil ? (campo('printerProfile').value || 'auto') : (salva && salva.perfilManual ? perfilImpressora(salva) : 'auto');
+  const escolha = (document.getElementById('printerProfile') || {}).value || 'auto';
+  const preset = (document.getElementById('printerLabelSize') || {}).value || '';
+  const inverter = !!(document.getElementById('printerInvert') || {}).checked;
   const profile = escolha === 'auto' ? perfilPorNome(name) : escolha;
-  const inverter = seletorMexido.inverter ? !!campo('printerInvert').checked : inversaoSalva(salva);
   const P = window.cdbPapeis;
-  const tspl = profile === 'tspl';
-  const serve = papel => !!papel && (papel.tipo !== 'bobina') === tspl;
-  let papel = P && seletorMexido.papel ? P.porId(campo('printerLabelSize').value) : null;
-  if (P && !serve(papel) && salva && perfilImpressora(salva) === profile) papel = P.porId(papelDaImpressora(salva));
-  if (P && !serve(papel)) papel = P.porId(tspl ? P.PADRAO_TSPL : P.PADRAO_ESCPOS);
+  // Papel que não serve à linguagem (etiqueta na de cupom) cai no padrão dela.
+  const serve = x => !!x && (x.tipo !== 'bobina') === (profile === 'tspl');
+  const escolhido = P ? P.porId(preset) : null;
+  const papel = P ? (serve(escolhido) ? escolhido : P.porId(profile === 'tspl' ? P.PADRAO_TSPL : P.PADRAO_ESCPOS)) : null;
   const etiqueta = papel && papel.tipo === 'etiqueta'
     ? { larguraMm: papel.larguraMm, alturaMm: papel.alturaMm, gapMm: papel.gapMm, continuo: false, inverter }
-    : { larguraMm: papel && papel.tipo === 'continuo' ? papel.larguraMm : 80, alturaMm: 0, gapMm: 0, continuo: true, inverter };
-  const out = Object.assign({}, salva, { address: addr, name, profile, perfilManual: escolha !== 'auto', etiqueta, inverter });
-  if (papel) out.midia = P.paraMidia(papel);
+    : { larguraMm: papel ? papel.larguraMm : 80, alturaMm: 0, gapMm: 0, continuo: true, inverter };
+  const out = { address: addr, name, profile, perfilManual: escolha !== 'auto', etiqueta, inverter };
+  if (papel) { out.midia = P.paraMidia(papel); out.midiaConfirmada = serve(escolhido); }
   return out;
 }
-// Ações da Oasis em Ajustes: alinhamento para qualquer papel TSPL; calibrar
-// só na etiqueta recortada (rolo contínuo não tem recorte para medir).
-function acoesTspl(p) {
-  const tspl = !!p && !!p.address && perfilImpressora(p) === 'tspl';
-  return { alinhar: tspl, calibrar: tspl && !tsplConfig(p).continuo };
-}
-function midiaTsplSalva(p) {
-  const c = tsplConfig(p);
-  return { larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm, continuo: c.continuo };
-}
-// O printViaBluetooth já explica falha de conexão e permissão; aqui só
-// falta o caso sem Bluetooth (PWA no navegador).
-function semBluetoothNoAjuste() {
-  if (!window.bluetoothSerial) showToast('Bluetooth indisponível neste aparelho');
-}
-function calibrarImpressora() {
-  const p = getSavedPrinter();
-  if (!acoesTspl(p).calibrar) return;
-  if (!window.cdbTspl || typeof window.cdbTspl.calibracao !== 'function') { showToast('Feche e abra o app para atualizar a impressão'); return; }
-  printViaBluetooth(window.cdbTspl.calibracao(midiaTsplSalva(p)), semBluetoothNoAjuste);
-}
-function alinharImpressora() {
-  const p = getSavedPrinter();
-  if (!acoesTspl(p).alinhar) return;
-  if (!window.cdbTspl || typeof window.cdbTspl.alinhamento !== 'function') { showToast('Feche e abra o app para atualizar a impressão'); return; }
-  printViaBluetooth(window.cdbTspl.alinhamento(midiaTsplSalva(p)), semBluetoothNoAjuste);
-}
 
-function selectPrinter(printer) {
+function selectPrinter(printer, papeis) {
   btStep('select:start ' + (printer && printer.address));
   try {
-    setSavedPrinter(printer);
+    setSavedPrinter(printer, papeis);
     btStep('select:saved');
     showToast('Impressora selecionada: ' + printer.name + ' (' + descreverPerfil(printer) + '). Toque Imprimir novamente.');
     logAction({
@@ -16832,8 +16960,10 @@ function selectPrinter(printer) {
     showToast('Erro ao salvar: ' + (e.message || e));
   }
 }
-function testPrint() {
-  const printer = getSavedPrinter();
+// Sem mac: a impressora selecionada (a de etiqueta, senão a de cupom).
+function testPrint(mac) {
+  const v2 = mac ? impressorasV2() : null;
+  const printer = v2 && v2.impressoras[mac] ? legadoDaV2(v2.impressoras[mac]) : getSavedPrinter();
   const nome = (printer && printer.name) || 'Impressora';
   const linhas = [getEmpresaName() || 'Easy Stock Mobile', nome + ' · ' + descreverPerfil(printer),
     'Impressão OK ' + new Date().toLocaleTimeString('pt-BR').slice(0,5)];
@@ -16843,10 +16973,12 @@ function testPrint() {
       ? tsplBytesDoCanvas(window.cdbTspl.linhasParaCanvas('TESTE', linhas), printer)
       : escPosTextLines('TESTE', linhas);
   } catch (e) { showToast('Falha ao montar o teste: ' + ((e && e.message) || e)); return; }
-  printViaBluetooth(bytes, () => {
+  // Falha já explicada (conexão, permissão): o erro fica na tela, sem impressão do sistema.
+  printViaBluetooth(bytes, explicado => {
+    if (explicado) return;
     showToast('Bluetooth indisponível — usando impressão do sistema');
     printAreaHtml('<div class="pa-title">TESTE</div><div class="pa-center">' + linhas.map(escapeHtml).join('<br>') + '</div>');
-  });
+  }, null, printer);
 }
 
 // ================================================================
@@ -19529,32 +19661,62 @@ function printWriteTimeoutMs(length) {
   return 15000 + Math.ceil((length || 0) / 8000) * 1000;
 }
 
-function printViaBluetooth(bytes, onFallback, printJob) {
+// #2202 (F1): printerArg escolhe a impressora do documento. Trabalho para
+// outra impressora enquanto uma imprime entra na fila (até 4) e sai em
+// seguida: desconecta uma, conecta a outra. Impressora já ocupada (a que
+// imprime ou uma que espera na fila) segue descartada: toque duplo não
+// gera dois trabalhos. onFallback(explicado): true quando o erro já foi
+// mostrado ao operador; false quando não há Bluetooth nem impressora.
+const FILA_IMPRESSAO_MAX = 4;
+function printViaBluetooth(bytes, onFallback, printJob, printerArg, onSent) {
   btStep('print:start');
   const bs = window.bluetoothSerial;
-  const printer = getSavedPrinter();
+  const printer = printerArg || getSavedPrinter();
   if (!bs || !printer || !printer.address) {
     btStep('print:no-printer-or-bs bs=' + !!bs + ' p=' + !!printer);
-    if (typeof onFallback === 'function') onFallback();
+    if (typeof onFallback === 'function') onFallback(false);
     return;
   }
-  if (isPrinting) { showToast('Impressão em andamento, aguarda…'); return; }
+  // drenando: o próximo da fila já tem a vez, nos 300 ms até ele começar.
+  if (isPrinting || printViaBluetooth.drenando) {
+    const fila = printViaBluetooth.fila || (printViaBluetooth.fila = []);
+    const ocupada = printViaBluetooth.ativa === printer.address || fila.some(t => t[3] && t[3].address === printer.address);
+    if (!ocupada && fila.length < FILA_IMPRESSAO_MAX) {
+      fila.push([bytes, onFallback, printJob, printer, onSent]);
+      showToast('Na fila: imprime em seguida na ' + (printer.apelido || printer.name || 'outra impressora'));
+      return;
+    }
+    showToast(ocupada ? 'Impressão em andamento: toque de novo quando terminar' : 'Fila cheia: toque de novo em instantes'); return;
+  }
 
   // Reserva o envio antes do diálogo Android: dois toques não geram dois trabalhos.
   const job = {};
   printViaBluetooth.activeJob = job;
+  printViaBluetooth.ativa = printer.address;
   isPrinting = true;
   const active = () => isPrinting && printViaBluetooth.activeJob === job;
   const finish = () => {
     if (!active()) return;
     printViaBluetooth.activeJob = null;
+    printViaBluetooth.ativa = null;
     releasePrinting();
+    const fila = printViaBluetooth.fila;
+    if (fila && fila.length) {
+      const proximo = fila.shift();
+      printViaBluetooth.ativa = proximo[3].address;
+      printViaBluetooth.drenando = true;
+      setTimeout(() => {
+        printViaBluetooth.drenando = false;
+        printViaBluetooth.ativa = null;
+        printViaBluetooth.apply(null, proximo);
+      }, 300);
+    }
   };
   const failed = (err, fallback) => {
     if (!active()) return;
     showError(err, 'print');
     finish();
-    if (fallback && typeof onFallback === 'function') onFallback();
+    if (fallback && typeof onFallback === 'function') onFallback(true);
   };
   printWatchdog = setTimeout(() => {
     if (!active()) return;
@@ -19569,7 +19731,7 @@ function printViaBluetooth(bytes, onFallback, printJob) {
     if (!granted) {
       showToast('Permissão Bluetooth negada. Ative Dispositivos próximos nas permissões deste app.');
       finish();
-      if (typeof onFallback === 'function') onFallback();
+      if (typeof onFallback === 'function') onFallback(true);
       return;
     }
     if (printWatchdog) clearTimeout(printWatchdog);
@@ -19591,6 +19753,7 @@ function printViaBluetooth(bytes, onFallback, printJob) {
             btStep('print:write-ok');
             showToast('Enviado pra impressora');
             finish();
+            if (typeof onSent === 'function') { try { onSent(); } catch (e) { console.warn('onSent falhou:', e); } }
             if (printJob && printJob.entityId) {
               logAction({
                 action: 'etiqueta.print', entityType: printJob.entityType, entityId: printJob.entityId,
@@ -19751,6 +19914,8 @@ function etiquetasFromBatch(batch) {
         idxStr,
         codigoBarras: `${sku}-${lote}-${idxStr}`,
         codigoBarrasLegado: `${sku}-${loteLegado}-${idxStr}`,
+        // #2202 (D4): Code128 C só com o número curto do lote; sem ele, sem barra.
+        chaveCurta: batch.numeroCurto ? String(batch.numeroCurto).replace(/\D/g, '') + idxStr : null,
         weightG: it.weightG ?? null,
         productionDate: batch.createdAt,
         expiresAt: it.expiresAt ?? null,
@@ -19850,11 +20015,68 @@ async function canvasDoBlob(blob) {
   if (typeof bmp.close === 'function') bmp.close();
   return c;
 }
+// #2202 (F2): etiqueta de produção na TSPL pelo LayoutJson no tamanho final
+// (etiqueta-canvas.js). Não cabe: recusa com o motivo, sem encolher.
+function camposDaEtiqueta(et, nota) {
+  return {
+    empresa: et.empresa || getEmpresaName(),
+    nome: et.productName + (et.unit ? ' (' + et.unit + ')' : ''),
+    validade: et.expiresAt ? fmtDateBR(et.expiresAt) : '',
+    fabricacao: et.productionDate ? fmtDateBR(et.productionDate) : '',
+    lote: et.lote || '',
+    peso: et.weightG ? 'PESO ' + fmtPesoG(et.weightG) : '',
+    nota: nota || '',
+    qr: et.codigoBarras,
+    barras: et.chaveCurta || ''
+  };
+}
+function midiaDaImpressora(printer) {
+  if (printer && printer.midia && printer.midia.tipo !== 'bobina' && Number(printer.midia.larguraMm) > 0) return printer.midia;
+  const c = tsplConfig(printer);
+  return { tipo: c.continuo ? 'continuo' : 'etiqueta', larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm };
+}
+// undefined: módulos novos ausentes (segue o caminho antigo). null: recusa.
+function etiquetaProducaoTsplV2(et, nota, printer, copias) {
+  const C = window.cdbEtiquetaCanvas, P = window.cdbPapeis, I = window.cdbImpressoras;
+  if (!C || !P || !I || !window.cdbResolverEtiqueta) return undefined;
+  const regra = I.regra(localStorage, 'etiqueta-producao');
+  const r = C.tspl({
+    campos: camposDaEtiqueta(et, nota), papel: P.daMidia(midiaDaImpressora(printer)),
+    orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, copias, document
+  });
+  if (r.recusa) { etiquetasTspl.recusa = r.recusa; return null; }
+  if (!etiquetasTspl.aviso) etiquetasTspl.aviso = window.cdbResolverEtiqueta.resumo ? window.cdbResolverEtiqueta.resumo(r) : '';
+  return r.bytes;
+}
+// Frase do envio: o que mudou na etiqueta e, com papel nunca confirmado, o
+// papel que o app está usando para o operador conferir.
+function avisoDaImpressao(printer, aviso) {
+  const partes = aviso ? [aviso] : [];
+  const P = window.cdbPapeis;
+  if (printer && printer.midiaConfirmada === false && P) {
+    const papel = P.daMidia(midiaDaImpressora(printer));
+    if (papel) partes.push('Confira o papel em Ajustes: o app usa ' + P.descrever(papel) + '.');
+  }
+  return partes.join(' ');
+}
+// A recusa já diz o motivo e o que fazer; o toast começa pelo que fazer.
+function avisoDaRecusa(recusa) {
+  const acao = 'Escolha um papel maior em Ajustes';
+  const motivo = String(recusa || '').replace('. ' + acao, '');
+  return acao + '. ' + motivo.charAt(0).toUpperCase() + motivo.slice(1) + '.';
+}
 async function etiquetasTspl(etiquetas, kind, nota, printer, copias) {
   if (!window.cdbTspl) return null;
+  etiquetasTspl.recusa = null;
+  etiquetasTspl.aviso = '';
   const partes = [];
   for (const et of etiquetas) {
     let canvas = null;
+    if (kind !== 'order') {
+      const v2 = etiquetaProducaoTsplV2(et, nota, printer, copias);
+      if (v2 === null) return null;
+      if (v2) { partes.push(v2); continue; }
+    }
     if (kind === 'order') {
       const blob = await etiquetasToPng([et], 'order', nota);
       if (blob) canvas = await canvasDoBlob(blob);
@@ -20807,6 +21029,7 @@ function closeEtiquetasPreview() {
 let _etqLastPrintBytes = null;
 let _etqLastPrintKind  = null;
 let _etqLastPrintJob = null;
+let _etqLastPrinter = null;
 function etiquetaPrintJob(etiquetas, kind, copies) {
   const first = etiquetas[0];
   return first ? {
@@ -20824,13 +21047,16 @@ function _etqHideRetry() {
   const btn = document.getElementById('etqRetryBtn');
   if (btn) btn.style.display = 'none';
 }
+// Falha de envio: com o erro já explicado (permissão, conexão) o toast dele
+// fica; sem Bluetooth ou impressora, sugere salvar ou compartilhar.
+function _etqSemConexao(explicado) {
+  if (!explicado) showToast('Sem conexão BT — use Salvar ou Compartilhar');
+  _etqShowRetry();
+}
 function etqRetry() {
   if (!_etqLastPrintBytes) { showToast('Nada para reimprimir'); return; }
   _etqHideRetry();
-  printViaBluetooth(_etqLastPrintBytes, function () {
-    showToast('Sem conexão BT — use Salvar ou Compartilhar');
-    _etqShowRetry();
-  }, _etqLastPrintJob);
+  printViaBluetooth(_etqLastPrintBytes, _etqSemConexao, _etqLastPrintJob, _etqLastPrinter);
 }
 
 function getEtqCopies() {
@@ -20992,7 +21218,9 @@ async function etqAction(action) {
       try { if (typeof window.cdbInstallThermalShim === 'function') window.cdbInstallThermalShim(); } catch (_) {}
 
       let bs = window.bluetoothSerial;
-      const printer = getSavedPrinter();
+      // #2202 (F1): produção vai para a impressora de etiqueta; pedido, para a de cupom.
+      const printer = impressoraPara(currentEtiquetasKind === 'order' ? 'etiqueta-pedido' : 'etiqueta-producao') || getSavedPrinter();
+      _etqLastPrinter = printer;
       const hasCapacitor = !!(window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() !== 'web');
       const hasNativePlugin = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter);
 
@@ -21019,18 +21247,16 @@ async function etqAction(action) {
         openPrinterPicker();
         return;
       }
-      if (!printerReady(printer)) { showToast('Driver TSPL não carregou: feche e reabra o app'); return; }
+      if (!printerReady(printer)) { showToast('A impressão de etiqueta não carregou: feche e reabra o app'); return; }
       if (perfilImpressora(printer) === 'tspl') {
         const copiasTspl = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
         _etqHideRetry();
         _etqLastPrintJob = etiquetaPrintJob(currentEtiquetas, currentEtiquetasKind, copiasTspl);
         const bytesTspl = await etiquetasTspl(currentEtiquetas, currentEtiquetasKind, getEtqNota() || null, printer, copiasTspl);
-        if (!bytesTspl) { showToast('Falha ao montar a etiqueta TSPL'); return; }
+        if (!bytesTspl) { showToast(etiquetasTspl.recusa ? avisoDaRecusa(etiquetasTspl.recusa) : 'Falha ao montar a etiqueta'); return; }
         _etqLastPrintBytes = bytesTspl;
-        printViaBluetooth(bytesTspl, function () {
-          showToast('Sem conexão BT — use Salvar ou Compartilhar');
-          _etqShowRetry();
-        }, _etqLastPrintJob);
+        const avisoEnvio = avisoDaImpressao(printer, etiquetasTspl.aviso);
+        printViaBluetooth(bytesTspl, _etqSemConexao, _etqLastPrintJob, printer, avisoEnvio ? () => showToast('Enviado. ' + avisoEnvio) : undefined);
         return;
       }
       // #437: cópias (1/2/5/10) e retry
@@ -21045,10 +21271,7 @@ async function etqAction(action) {
         const totalBytes = new Uint8Array(oneShot.length * copies);
         for (let ci = 0; ci < copies; ci++) totalBytes.set(oneShot, ci * oneShot.length);
         _etqLastPrintBytes = totalBytes;
-        printViaBluetooth(totalBytes, function () {
-          showToast('Sem conexão BT — use Salvar ou Compartilhar');
-          _etqShowRetry();
-        }, _etqLastPrintJob);
+        printViaBluetooth(totalBytes, _etqSemConexao, _etqLastPrintJob, printer);
       } else {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
@@ -21072,10 +21295,7 @@ async function etqAction(action) {
         const totalBytes = new Uint8Array(singleLen * copies);
         for (let ci = 0; ci < copies; ci++) totalBytes.set(singleRun, ci * singleLen);
         _etqLastPrintBytes = totalBytes;
-        printViaBluetooth(totalBytes, function () {
-          showToast('Sem conexão BT — use Salvar ou Compartilhar');
-          _etqShowRetry();
-        }, _etqLastPrintJob);
+        printViaBluetooth(totalBytes, _etqSemConexao, _etqLastPrintJob, printer);
       }
       return;
     }
@@ -23402,8 +23622,11 @@ window.cdbApp = {
 
 <script src="qrcode.min.js?v=20260429a"></script>
 <script src="etiqueta-termica.js?v=20261028a"></script>
-<script src="impressao-papeis.js?v=20261104a"></script>
-<script src="impressora-tspl.js?v=20261104a"></script>
+<script src="impressao-papeis.js?v=20261104b"></script>
+<script src="impressoras.js?v=20261104c"></script>
+<script src="etiqueta-resolver.js?v=20261104c"></script>
+<script src="etiqueta-canvas.js?v=20261104c"></script>
+<script src="impressora-tspl.js?v=20261104b"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
 <script src="upload-photos.js?v=20260514b"></script>
