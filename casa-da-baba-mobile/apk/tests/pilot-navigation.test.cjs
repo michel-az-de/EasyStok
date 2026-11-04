@@ -102,7 +102,6 @@ test('atalho Impressoras abre o mesmo lugar de Configurações > Etiquetas', () 
   assert.doesNotMatch(action, /openPrinterPicker/);
   assert.match(action, /openPrinterSettings\(\)/);
   const helper = pilot.slice(pilot.indexOf('function openPrinterSettings()'), pilot.indexOf('\n  }', pilot.indexOf('function openPrinterSettings()')));
-  assert.match(helper, /root\.openAjustes\(\)/);
-  assert.match(helper, /root\.setAjustesTab\('eq'\)/);
+  assert.match(helper, /root\.cdbOpenAjustesAt\('eq'\)/);
   assert.match(helper, /impressorasLista/);
 });

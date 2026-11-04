@@ -337,6 +337,8 @@
   rail.innerHTML = '<button type="button" id="pilotHomeButton" aria-label="Casa da Baba, início"><img class="pilot-brand-mark" src="casa-da-baba.png" alt="" width="48" height="40"><span class="pilot-wordmark">Casa da Baba<span id="pilotRailVersion">Piloto</span></span></button><div id="pilotRailActions">' + bell('pilotNoticeBell', 'pilotNoticeCount') + '</div><span id="pilotRailStatus" role="status">Conferindo conexão</span>';
   doc.body.prepend(rail);
   doc.body.classList.add('pilot-app');
+  // Um só nome para a área: o filtro do histórico acompanha o título Configurações.
+  doc.querySelectorAll?.('#histFilter [data-f="settings"]').forEach(button => { button.textContent = 'Configurações'; });
   if (root.ResizeObserver) new root.ResizeObserver(() => {
     doc.body.style.setProperty('--pilot-rail-height', Math.ceil(rail.getBoundingClientRect().height) + 'px');
   }).observe(rail);
@@ -601,8 +603,7 @@
   function closeHome() { home.close(); }
   // Impressoras tem um único lugar: Configurações > Etiquetas, seção Impressoras.
   function openPrinterSettings() {
-    root.openAjustes();
-    root.setAjustesTab('eq');
+    root.cdbOpenAjustesAt('eq');
     doc.getElementById('impressorasLista')?.closest('.ajustes-section')?.scrollIntoView({ block: 'start' });
   }
   root.cdbHandleNativeBack = function () {
