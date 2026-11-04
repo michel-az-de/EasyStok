@@ -56,11 +56,11 @@
     return !(Number(o.gapMm) > 0);
   }
 
-  // Cabeçalho comum: SIZE, GAP (e TEAR no recortado), direção e CLS.
+  // Cabeçalho comum: SIZE, GAP, TEAR, direção e CLS. TEAR vai nos dois papéis
+  // para a etiqueta parar na serrilha qualquer que seja o estado gravado na Oasis.
   function cabecalho(o, larguraMm, alturaMm) {
     const linhas = [`SIZE ${larguraMm} mm,${alturaMm} mm`];
-    if (ehContinuo(o)) linhas.push('GAP 0,0');
-    else linhas.push(`GAP ${num(o.gapMm, 2)} mm,0 mm`, 'SET TEAR ON');
+    linhas.push(ehContinuo(o) ? 'GAP 0,0' : `GAP ${num(o.gapMm, 2)} mm,0 mm`, 'SET TEAR ON');
     linhas.push('DIRECTION 1', 'REFERENCE 0,0', `DENSITY ${num(o.densidade, 8)}`, `SPEED ${num(o.velocidade, 4)}`, 'CLS');
     return linhas;
   }
@@ -99,7 +99,7 @@
     return ascii([`SIZE ${larguraMm} mm,${num(m.alturaMm, 40)} mm`, `GAP ${num(m.gapMm, 2)} mm,0 mm`, 'SET TEAR ON', 'GAPDETECT', ''].join('\r\n'));
   }
 
-  // Teste de alinhamento com comandos nativos: moldura a 0,5 mm da borda,
+  // Teste de alinhamento com comandos nativos: moldura a 1 mm da borda,
   // cruz no centro e régua de 10 mm com traço a cada 1 mm. Moldura cortada ou
   // régua fora de 10 mm indicam mídia errada.
   function alinhamento(midia, opts) {
@@ -108,7 +108,7 @@
     const larguraMm = num(m.larguraMm, 80);
     const alturaMm = continuo ? 30 : num(m.alturaMm, 40);
     const W = Math.round(larguraMm * PONTOS_MM), H = Math.round(alturaMm * PONTOS_MM);
-    const borda = 4;
+    const borda = 8;
     const cx = Math.round(W / 2), cy = Math.round(H / 2);
     const braco = Math.min(40, Math.floor(Math.min(W, H) / 4));
     const linhas = cabecalho(Object.assign({}, m, opts || {}, { continuo }), larguraMm, alturaMm);
@@ -120,7 +120,7 @@
       const alto = i % 5 === 0 ? 22 : 12;
       linhas.push(`BAR ${rx + i * PONTOS_MM},${base - alto},1,${alto}`);
     }
-    const rotulo = `${larguraMm} x ${continuo ? 'continuo' : alturaMm + ' mm'}`;
+    const rotulo = continuo ? `ROLO ${larguraMm} mm` : `${larguraMm} x ${alturaMm} mm`;
     linhas.push(`TEXT 16,16,"2",0,1,1,"${rotulo}"`, 'PRINT 1,1', '');
     return ascii(linhas.join('\r\n'));
   }

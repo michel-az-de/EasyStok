@@ -25,11 +25,33 @@ module.exports = function ({ test, runInSandbox, assert }) {
   test('#2202 F0 papel salvo: o papel de cada impressora sai do catálogo, contínuo quando não há altura', () => {
     const r = run(`return JSON.stringify({
       semMidia: papelDaImpressora(${JSON.stringify(OASIS)}),
-      recortada: papelDaImpressora(${JSON.stringify(com(OASIS, { etiqueta: { larguraMm: 80, alturaMm: 40, gapMm: 2, continuo: false } }))}),
+      recortada: papelDaImpressora(${JSON.stringify(com(OASIS, { etiqueta: { larguraMm: 50, alturaMm: 30, gapMm: 2, continuo: false } }))}),
+      escolhida: papelDaImpressora(${JSON.stringify(com(OASIS, { midia: { preset: 'etiqueta-80x40', tipo: 'etiqueta', larguraMm: 80, alturaMm: 40, gapMm: 2 }, etiqueta: { larguraMm: 80, alturaMm: 40, gapMm: 2, continuo: false } }))}),
       continua: papelDaImpressora(${JSON.stringify(com(OASIS, { etiqueta: { larguraMm: 80, alturaMm: 0, gapMm: 0, continuo: true } }))}),
       preset: papelDaImpressora(${JSON.stringify(com(OASIS, { midia: { preset: 'continuo-52', tipo: 'continuo', larguraMm: 52 } }))}),
       cupom: papelDaImpressora(${JSON.stringify(MTP)}) });`);
-    assert.deepStrictEqual(r, { semMidia: 'continuo-80', recortada: 'etiqueta-80x40', continua: 'continuo-80', preset: 'continuo-52', cupom: 'bobina-58' });
+    assert.deepStrictEqual(r, { semMidia: 'continuo-80', recortada: 'etiqueta-50x30', escolhida: 'etiqueta-80x40', continua: 'continuo-80', preset: 'continuo-52', cupom: 'bobina-58' });
+  });
+
+  // O master abria o seletor sempre em 80 x 40 recortada e gravava isso sem o
+  // operador escolher. Sem midia, esse registro vale o padrão D1.
+  test('#2202 F0 Oasis gravada pelo master em 80 x 40 sem escolha imprime em rolo contínuo', () => {
+    const legado = com(OASIS, { etiqueta: { larguraMm: 80, alturaMm: 40, gapMm: 2, continuo: false, inverter: false } });
+    const r = run(`${salvar(legado)}
+      const cfg=tsplConfig(${JSON.stringify(legado)});const acoes=acoesTspl(${JSON.stringify(legado)});
+      openPrinterPicker();
+      return JSON.stringify({cfg,acoes,papel:document.getElementById('printerLabelSize').value});`);
+    assert.deepStrictEqual(r.cfg, { larguraMm: 80, alturaMm: 0, gapMm: 0, continuo: true, inverter: false });
+    assert.deepStrictEqual(r.acoes, { alinhar: true, calibrar: false });
+    assert.equal(r.papel, 'continuo-80');
+  });
+
+  test('#2202 F0 seletor no modo automático lista etiqueta e bobina, mesmo com a MTP salva', () => {
+    const r = run(`${salvar(MTP)}
+      openPrinterPicker();
+      const sel=document.getElementById('printerLabelSize');
+      return JSON.stringify({opcoes:(sel.innerHTML.match(/value="[^"]+"/g)||[]).length,papel:sel.value});`);
+    assert.deepStrictEqual(r, { opcoes: 14, papel: 'bobina-58' });
   });
 
   test('#2202 F0 seletor: abrir mostra o papel, a linguagem e a inversão salvos, e salvar de novo não muda nada', () => {

@@ -5177,6 +5177,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   background: var(--bg-card, #2a2520); color: var(--ink, #f4eee5);
   border: 1px solid var(--line, #3d362e); border-radius: 16px;
   padding: 28px 24px; max-width: 360px; width: 100%;
+  max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow-y: auto;
   text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
   animation: upd-pop 0.25s ease-out;
 }
@@ -8390,8 +8391,8 @@ body.ux-calm [data-screen="producao"] .section-label {
           <button class="btn-ajustes-printer success-soft" onclick="testPrint()" style="flex:1">Testar impressão</button>
         </div>
         <div class="ajustes-actions-row" id="printerTsplAcoes" style="display:none;margin-top:8px">
-          <button class="btn-ajustes-printer subtle" onclick="alinharImpressora()" style="flex:1">Teste de alinhamento</button>
-          <button class="btn-ajustes-printer subtle" id="printerCalibrar" onclick="calibrarImpressora()" style="flex:1">Calibrar etiqueta</button>
+          <button class="btn-ajustes-printer primary-soft" onclick="alinharImpressora()" style="flex:1">Teste de alinhamento</button>
+          <button class="btn-ajustes-printer primary-soft" id="printerCalibrar" onclick="calibrarImpressora()" style="flex:1">Calibrar etiqueta</button>
         </div>
         <p class="hint" id="printerTsplDica" style="display:none">O teste de alinhamento imprime uma moldura, uma cruz no centro e uma régua de 10 mm. Calibrar mede a etiqueta recortada e o espaço entre uma e outra.</p>
         <button class="btn-ajustes-printer subtle" onclick="printerDiagnostics()" style="margin-top:8px;width:100%;font-size:12px">Diagnóstico</button>
@@ -15362,7 +15363,10 @@ function tsplConfig(p) {
     const cont = m.tipo !== 'etiqueta';
     return { larguraMm: Number(m.larguraMm), alturaMm: cont ? 0 : Number(m.alturaMm), gapMm: cont ? 0 : (Number(m.gapMm) || 2), continuo: cont, inverter: !!(p.inverter || e.inverter) };
   }
-  const continuo = e.continuo === true || !(Number(e.alturaMm) > 0);
+  // O master gravava 80 x 40 recortada sem o operador escolher (era o padrão
+  // do seletor). Sem midia, esse registro vale o padrão D1: rolo contínuo.
+  const padraoDoMaster = !m && Number(e.larguraMm) === 80 && Number(e.alturaMm) === 40 && (e.gapMm == null || Number(e.gapMm) === 2) && e.continuo !== true;
+  const continuo = padraoDoMaster || e.continuo === true || !(Number(e.alturaMm) > 0);
   return { larguraMm: e.larguraMm || 80, alturaMm: continuo ? 0 : e.alturaMm, gapMm: continuo ? 0 : (e.gapMm === 0 ? 0 : (e.gapMm || 2)), continuo, inverter: !!e.inverter };
 }
 // Papel do catálogo que a impressora salva usa. Sem papel salvo, o padrão da
@@ -15429,6 +15433,9 @@ function renderPrinterStatus() {
     const alvo = document.getElementById(id);
     if (alvo) alvo.style.display = ver ? '' : 'none';
   });
+  const dicaTspl = document.getElementById('printerTsplDica');
+  if (dicaTspl && acoes.alinhar) dicaTspl.textContent = 'O teste de alinhamento imprime uma moldura na borda do papel, uma cruz no centro e uma régua de 10 mm. Moldura cortada: confira o papel em Buscar impressora.'
+    + (acoes.calibrar ? ' Calibrar mede a etiqueta recortada e o espaço entre uma e outra.' : '');
 
   const bs = window.bluetoothSerial;
   if (!bs) {
@@ -16744,13 +16751,16 @@ function preencherPapeisSeletor(escolhido) {
   if (!sel || !P) return;
   const escolha = (document.getElementById('printerProfile') || {}).value || 'auto';
   const lingua = escolha !== 'auto' ? escolha : seletorLinguagem;
-  const papeis = papeisDaLinguagem(lingua);
+  // No automático a lista traz os dois tipos: a impressora tocada decide a linguagem.
+  const papeis = papeisDaLinguagem(escolha !== 'auto' ? escolha : null);
   const atual = escolhido || sel.value;
   const id = papeis.some(p => p.id === atual) ? atual : (lingua === 'escpos' ? P.PADRAO_ESCPOS : P.PADRAO_TSPL);
   sel.innerHTML = papeis.map(p => '<option value="' + escapeHtml(p.id) + '"' + (p.id === id ? ' selected' : '') + '>' + escapeHtml(p.rotulo) + '</option>').join('');
   sel.value = id;
   const dica = document.getElementById('printerPapelDica');
-  if (dica) dica.textContent = 'Rolo contínuo não tem recorte e gasta só o tamanho da etiqueta. Etiqueta recortada tem um espaço entre uma e outra: depois de escolher, toque Calibrar etiqueta em Ajustes.';
+  if (dica) dica.textContent = lingua === 'escpos'
+    ? 'Toque na impressora abaixo para salvar.'
+    : 'Escolha o papel que está na impressora e toque nela abaixo para salvar. Rolo contínuo gasta só o tamanho da etiqueta. Etiqueta recortada: depois de salvar, toque Calibrar etiqueta em Ajustes.';
 }
 function impressoraDoSeletor(addr, name) {
   const salva = getPrinterProfiles().find(p => p.address === addr) || null;
@@ -16781,15 +16791,22 @@ function midiaTsplSalva(p) {
   const c = tsplConfig(p);
   return { larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm, continuo: c.continuo };
 }
+// O printViaBluetooth já explica falha de conexão e permissão; aqui só
+// falta o caso sem Bluetooth (PWA no navegador).
+function semBluetoothNoAjuste() {
+  if (!window.bluetoothSerial) showToast('Bluetooth indisponível neste aparelho');
+}
 function calibrarImpressora() {
   const p = getSavedPrinter();
-  if (!acoesTspl(p).calibrar || !window.cdbTspl) return;
-  printViaBluetooth(window.cdbTspl.calibracao(midiaTsplSalva(p)), () => showToast('Sem conexão com a impressora'));
+  if (!acoesTspl(p).calibrar) return;
+  if (!window.cdbTspl || typeof window.cdbTspl.calibracao !== 'function') { showToast('Feche e abra o app para atualizar a impressão'); return; }
+  printViaBluetooth(window.cdbTspl.calibracao(midiaTsplSalva(p)), semBluetoothNoAjuste);
 }
 function alinharImpressora() {
   const p = getSavedPrinter();
-  if (!acoesTspl(p).alinhar || !window.cdbTspl) return;
-  printViaBluetooth(window.cdbTspl.alinhamento(midiaTsplSalva(p)), () => showToast('Sem conexão com a impressora'));
+  if (!acoesTspl(p).alinhar) return;
+  if (!window.cdbTspl || typeof window.cdbTspl.alinhamento !== 'function') { showToast('Feche e abra o app para atualizar a impressão'); return; }
+  printViaBluetooth(window.cdbTspl.alinhamento(midiaTsplSalva(p)), semBluetoothNoAjuste);
 }
 
 function selectPrinter(printer) {
