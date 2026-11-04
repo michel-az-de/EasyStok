@@ -23,7 +23,7 @@ public class MercadoPagoPixOrdemClientTests
         http.Quando(HttpMethod.Get, "/v1/payments/search").Responde(HttpStatusCode.OK,
             JsonSerializer.Serialize(new { results = resultados }));
         return (new MercadoPagoClient(http.CriarClient(), Options.Create(new MercadoPagoOptions { AccessToken = "fake" }),
-            NullLogger<MercadoPagoClient>.Instance), http);
+            PipelinesDeTeste.Reais(), NullLogger<MercadoPagoClient>.Instance), http);
     }
 
     private static object Pix(long id, string? e2e, string status = "approved", Guid? pedido = null) => new {

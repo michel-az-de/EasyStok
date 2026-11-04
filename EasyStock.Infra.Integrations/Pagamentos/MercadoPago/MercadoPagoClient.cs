@@ -154,8 +154,7 @@ public sealed partial class MercadoPagoClient(
     {
         if (string.IsNullOrWhiteSpace(ordemId) || !FormatoOrdemId().IsMatch(ordemId))
             throw new ArgumentException("Id de ordem Mercado Pago invalido.", nameof(ordemId));
-        using var request = Requisicao(HttpMethod.Get, $"v1/orders/{Uri.EscapeDataString(ordemId)}");
-        using var response = await httpClient.SendAsync(request, ct);
+        using var response = await EnviarAsync(HttpMethod.Get, $"v1/orders/{Uri.EscapeDataString(ordemId)}", ct);
         if (response.StatusCode == HttpStatusCode.NotFound) return [];
         await GarantirSucessoAsync(response, ct);
         using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
