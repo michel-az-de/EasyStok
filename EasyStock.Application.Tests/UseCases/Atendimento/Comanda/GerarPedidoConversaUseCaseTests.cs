@@ -43,11 +43,11 @@ public class GerarPedidoConversaUseCaseTests
         public GerarPedidoConversaUseCase UseCase { get; }
         public Guid EmpresaId => Checkout.Storefront.EmpresaId;
 
-        public Cenario(bool comEndereco = true, bool janelaFechada = false)
+        public Cenario(bool comEndereco = true, bool janelaFechada = false, string cep = "01310-100")
         {
             Cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Maria" };
             if (comEndereco)
-                Cliente.Enderecos.Add(new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = Cliente.Id, Cep = "01310-100", Padrao = true });
+                Cliente.Enderecos.Add(new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = Cliente.Id, Cep = cep, Padrao = true });
             var clienteRepo = Substitute.For<IClienteRepository>();
             clienteRepo.GetByIdWithDetailsAsync(EmpresaId, Cliente.Id).Returns(Cliente);
 
@@ -244,6 +244,32 @@ public class GerarPedidoConversaUseCaseTests
         await c.Checkout.VagaRepo.Received(1).LiberarPorPedidoAsync(
             pedido.Id, Arg.Is<string>(m => m.Contains("mercado_pago_indisponivel")), Arg.Any<CancellationToken>());
         await c.Canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task CepForaDaArea_SemFreteCombinado_RecusaComoAntes()
+    {
+        var c = new Cenario(cep: "99999-999");
+
+        var act = () => c.UseCase.ExecuteAsync(c.Input());
+
+        await act.Should().ThrowAsync<EasyStock.Domain.Exceptions.Storefront.CepSemCoberturaException>();
+        c.Checkout.PedidosAdicionados.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CepForaDaArea_ComFreteCombinado_CriaPedidoECobraComOValorDaEquipe()
+    {
+        // #2219: fora da área a atendente combina R$ 8,00 com o cliente e a cobrança sai pelo console.
+        var c = new Cenario(cep: "99999-999");
+
+        var resultado = await c.UseCase.ExecuteAsync(c.Input() with { FreteCombinado = 8m });
+
+        resultado.Total.Should().Be(28m, "2 x R$ 10,00 + frete combinado de R$ 8,00");
+        resultado.Cobranca!.LinkPagamento.Should().Be("https://mp.test/pref-1");
+        c.Conversa.PedidoEmAndamentoId.Should().Be(resultado.PedidoId);
+        await c.Canal.Received(1).EnviarTextoAsync(WaId,
+            Arg.Is<string>(t => t.Contains("28,00") && t.Contains("https://mp.test/pref-1")), Arg.Any<CancellationToken>());
     }
 
     [Fact]

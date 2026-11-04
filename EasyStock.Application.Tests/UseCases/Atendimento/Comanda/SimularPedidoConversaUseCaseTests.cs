@@ -121,6 +121,23 @@ public class SimularPedidoConversaUseCaseTests
     }
 
     [Fact]
+    public async Task CepForaDaArea_ComFreteCombinado_CalculaTotalESinalComOValorDaEquipe()
+    {
+        // #2219: a equipe combinou R$ 12,50 com o cliente: 2 x R$ 10,00 + R$ 12,50 = R$ 32,50; sinal R$ 16,25.
+        var c = new Cenario(cep: "99999-999");
+
+        var r = await c.UseCase.ExecuteAsync(c.Input() with { FreteCombinado = 12.50m });
+
+        r.FreteACombinar.Should().BeFalse();
+        r.Frete.Should().Be(12.50m);
+        r.Total.Should().Be(32.50m);
+        r.Encomenda.Should().BeTrue();
+        r.Sinal.Should().Be(16.25m);
+        r.Restante.Should().Be(16.25m);
+        await c.ConferirSemEfeitoColateralAsync();
+    }
+
+    [Fact]
     public async Task SemEndereco_PedeOCadastroComAMesmaMensagemDoPedido()
     {
         var c = new Cenario(comEndereco: false);

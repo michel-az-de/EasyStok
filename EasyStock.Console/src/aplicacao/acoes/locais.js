@@ -10,6 +10,9 @@ export function criarAcoesDaTela(despachar) {
     // J2 (#1990): troco do dinheiro na entrega, em reais (null = não informado).
     definirTroco: (id, trocoPara) => despachar({ tipo: acao.DEFINIR_TROCO, id, trocoPara }),
 
+    // #2219: frete combinado com o cliente, em reais (null = usa a cotação).
+    definirFreteCombinado: (id, freteCombinado) => despachar({ tipo: acao.DEFINIR_FRETE_COMBINADO, id, freteCombinado }),
+
     marcarCanhotoImpresso: (numero) => despachar({ tipo: acao.MARCAR_CANHOTO_IMPRESSO, numero }),
 
     // #1443: o gesto da loja só é pedido no modo API; fechar o modal é só da tela.
