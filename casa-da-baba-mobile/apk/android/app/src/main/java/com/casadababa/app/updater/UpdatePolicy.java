@@ -128,6 +128,11 @@ public final class UpdatePolicy {
         return trial && !recreatedInSameProcess && trialBoots >= MAX_TRIAL_BOOTS;
     }
 
+    /** Avisa uma vez por conteúdo preparado em segundo plano; o mesmo pacote nunca gera duas notificações. */
+    public static boolean shouldAnnounceContent(String pendingVersion, String alreadyAnnounced) {
+        return pendingVersion != null && !pendingVersion.isEmpty() && !pendingVersion.equals(alreadyAnnounced);
+    }
+
     public static boolean isUpdateAnnouncement(String sender, String kind, String sequence) {
         if (!"/topics/casa-da-baba-piloto-updates".equals(sender) || !"ota-update".equals(kind)
                 || sequence == null || !sequence.matches("[1-9][0-9]{0,18}")) return false;
