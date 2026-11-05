@@ -1,5 +1,6 @@
 import { corpoDaPerda, estornarSaida, lancarPerda, obterPerdas, obterVencidos, resumoDePerdasDaApi, vencidoDaApi } from '../infra/api/producaoApi'
 import { criarChaveDeEnvio } from './chaveDeEnvio'
+import { moeda } from '../dominio/formato'
 
 // Perdas no modo API (M2.6, #1511). D-M2-02: o motivo vem da lista e "Outro" pede texto; acima de
 // R$ 50 o EasyStok devolve 403 e a tela avisa que é do Gerente (D-M2-06). Desfazer é o estorno de
@@ -28,6 +29,40 @@ export function textoDaPerda(l) {
   return [rotulo, ...resto].filter(Boolean).join(' · ')
 }
 export const lerVencidos = async () => ((await obterVencidos()) ?? []).map(vencidoDaApi)
+
+// #2235 (banca B2): o prato aparece com o nome do Cardápio, como nas outras telas. A API de perdas
+// devolve o nome do produto de estoque, que nasce em minúsculas para o prato avulso.
+export function comNomeDoCardapio(itens = [], pratos = []) {
+  const nomes = new Map(pratos.filter((p) => p.produtoId && p.nome).map((p) => [p.produtoId, p.nome]))
+  return itens.map((i) => (nomes.has(i.produtoId) ? { ...i, nome: nomes.get(i.produtoId), ehPrato: true } : i))
+}
+
+// #2235 (banca 4): o mesmo código de lote em dois tamanhos vira duas linhas; o tamanho as separa.
+export function comPorcaoDoLote(vencidos = [], pratos = []) {
+  const porcoes = new Map(pratos.flatMap((p) => p.lotes ?? []).filter((l) => l.itemEstoqueId && l.porcao).map((l) => [l.itemEstoqueId, l.porcao]))
+  return vencidos.map((v) => (porcoes.has(v.itemEstoqueId) ? { ...v, porcao: porcoes.get(v.itemEstoqueId) } : v))
+}
+
+// #2235 (banca B3): "LOT-1 · 600 g · 1 porção · venceu em 17/10 · custo do lote não registrado". Antes era
+// "· 1 · venceu há 18 dias · R$ 0,00": número sem unidade e custo zero que parecia de graça.
+const dataCurta = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
+export function detalheDoVencido(v) {
+  const n = Number(v.quantidade ?? 0)
+  const quanto = v.ehPrato ? `${n.toLocaleString('pt-BR')} ${n === 1 ? 'porção' : 'porções'}` : n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })
+  const quando = v.validade ? `venceu em ${dataCurta(v.validade)}` : `venceu há ${v.diasVencido} ${v.diasVencido === 1 ? 'dia' : 'dias'}`
+  const custo = Number(v.valor ?? 0) > 0
+    ? moeda(Number(v.valor))
+    : 'custo do lote não registrado'
+  return [v.lote ?? 'sem lote', v.porcao, quanto, quando, custo].filter(Boolean).join(' · ')
+}
+
+export function mensagemDoVencido(v) {
+  const n = Number(v.quantidade ?? 0)
+  const quanto = v.ehPrato ? `${n.toLocaleString('pt-BR')} ${n === 1 ? 'porção' : 'porções'}` : n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })
+  const deQue = v.nome ? ` de ${v.nome}${v.porcao ? ` (${v.porcao})` : ''}` : ''
+  const lote = v.lote ? `, lote ${v.lote}` : ''
+  return `Perda por vencimento registrada: ${quanto}${deQue}${lote}.`
+}
 
 const numero = (texto) => (String(texto ?? '').trim() === '' ? NaN : Number(String(texto).replace(',', '.')))
 
@@ -86,7 +121,7 @@ export function criarGestaoPerdas({ recarregar, aoErro, aoFeito = () => {}, gera
     // Sugestão de lote vencido: lança o lote inteiro como Vencido, só quando ela confirma.
     lancarVencido: (v) => gravar(
       () => enviar({ produtoId: v.produtoId, itemEstoqueId: v.itemEstoqueId, quantidade: v.quantidade, motivo: 'Vencido' }),
-      () => `Lote ${v.lote ?? ''} lançado como vencido.`),
+      () => mensagemDoVencido(v)),
     desfazer: (lancamento) => gravar(
       () => estornarSaida(lancamento.id, 'Perda desfeita pelo console'),
       () => `Perda de ${lancamento.nome} desfeita.`),

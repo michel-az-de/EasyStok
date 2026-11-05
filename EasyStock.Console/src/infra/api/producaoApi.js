@@ -12,6 +12,9 @@ const loteDaApi = (l) => ({
   diasParaVencer: l.diasParaVencer ?? null,
   vencendo: l.vencendo === true,
   vencido: l.vencido === true,
+  // #2235 (banca T1-4/T1-5): o tamanho da porção do lote e o item de estoque para lançar a perda.
+  itemEstoqueId: l.itemEstoqueId ?? null,
+  porcao: l.porcao ?? null,
 })
 
 export const estoqueDoDiaDaApi = (r) => ({
@@ -134,13 +137,18 @@ export const salvarReceita = (produtoId, { rendimentoBase, rendimentoUnidade, un
     },
   })
 
+// #2235 (banca A1): a receita vem antes da produção. O prato ainda sem estoque é ligado ao montar a
+// receita (Gerente); o prato já ligado devolve o produto que tem.
+export const ligarPratoAoEstoque = async (cardapioItemId) =>
+  (await chamarApi(`${PRODUCAO}/receitas/pratos/${cardapioItemId}/ligar`, { metodo: 'POST' }))?.produtoId ?? null
+
 // D-M2-01 (#1499): produzir o prato baixa os insumos da receita (Gerente liga e desliga).
 export const marcarBaixaAutomatica = (produtoId, ligada) =>
   chamarApi(`${PRODUCAO}/receitas/${produtoId}/baixa-automatica`, { metodo: 'PUT', corpo: { ligada } })
 
 export const receitaDaApi = (r) => ({
   sku: r.cardapioItemId,
-  produtoId: r.produtoId,
+  produtoId: r.produtoId ?? null,
   nome: r.nome,
   rendimento: r.rendimentoBase,
   unidadeRendimento: r.rendimentoUnidade,

@@ -544,12 +544,13 @@ await confere('os textos de Estoque do dia, Receitas e Planejamento têm link pa
   const PRODUCAO_DO_DIA = [hashDoModulo('producao', 'producao'), 'Produção do dia']
   assert.equal(rotaDaHash(PRODUCAO_DO_DIA[0], { fonteApi: true }).aba, 'producao-do-dia')
   assert.equal(rotaDaHash(hashDoModulo('producao', 'perdas'), { fonteApi: true }).aba, 'perdas')
-  // Sem prato ligado ao estoque, as três telas mandam lançar a primeira produção.
+  // Sem prato ligado ao estoque, Estoque e Planejamento mandam lançar a primeira produção. Receitas
+  // vem antes da produção (#2235, banca A1): sem prato no cardápio, ela manda cadastrar os itens.
   montarFetch()
   const vazia = async (nome) => { const t = montar(await tela(nome)); await t.assentar(); return links(t.arvore) }
   assert.deepEqual(await vazia('AbaEstoqueDoDiaApi'), [PRODUCAO_DO_DIA])
   assert.deepEqual(await vazia('AbaPlanejamentoApi'), [PRODUCAO_DO_DIA])
-  assert.deepEqual(await vazia('AbaReceitasApi'), [PRODUCAO_DO_DIA, PRODUCAO_DO_DIA])
+  assert.deepEqual(await vazia('AbaReceitasApi'), [[hashDoModulo('cardapio', 'itens'), 'Itens do cardápio']])
   // Contagem de prato com porção vencida guardada: o texto manda lançar em Perdas, com link.
   montarFetch([[(m, u) => m === 'GET' && u.endsWith('/producao/estoque-do-dia'), { data: { alertas: [], pratos: [{
     cardapioItemId: 'i-1', produtoId: 'p-1', nome: 'Ravióli', saldo: 3, fisico: 5, descoberto: 0, lotes: [], porcoes: [] }] } }]])
@@ -583,7 +584,7 @@ await confere('Planejamento: consulta de outra data preserva o formulário, bloq
   await calcular().props.onClick()
   t.renderizar()
   assert.ok(texto(t.arvore).includes('Custo estimado'))
-  andar(t.arvore, (n) => n.type === 'input' && n.props.type === 'date')[0].props.onChange(digitar('2026-10-13'))
+  andar(t.arvore, (n) => (n.type === 'input' && n.props.type === 'date') || (n.type === 'CampoTexto' && n.props.tipo === 'date'))[0].props.onChange(digitar('2026-10-13'))
   await t.assentar()
   assert.equal(porcoes().props.value, '99', 'a consulta não desmonta nem apaga o formulário')
   assert.equal(porcoes().props.disabled, true)
@@ -614,7 +615,7 @@ await confere('Planejamento: falha da nova data conserva as porções e permite 
   await t.assentar()
   campos(t.arvore, 'CampoTexto', 'Porções')[0].props.onChange(digitar('99'))
   t.renderizar()
-  andar(t.arvore, (n) => n.type === 'input' && n.props.type === 'date')[0].props.onChange(digitar(''))
+  andar(t.arvore, (n) => (n.type === 'input' && n.props.type === 'date') || (n.type === 'CampoTexto' && n.props.tipo === 'date'))[0].props.onChange(digitar(''))
   await t.assentar()
   assert.equal(consultas, 2, 'consulta vazia igual à inicial ainda inicia nova leitura')
   assert.equal(campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value, '99')

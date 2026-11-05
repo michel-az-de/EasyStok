@@ -182,6 +182,34 @@ public class AtendimentoProducaoController(
         }
     }
 
+    [SwaggerOperation(Summary = "Link a menu dish without stock to a stock product, so its recipe can be built before the first production (#2235; Gerente)",
+        Description = "Prato já ligado devolve o produto que tem.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Gerente")]
+    [HttpPost("receitas/pratos/{cardapioItemId:guid}/ligar")]
+    public async Task<IActionResult> LigarPrato(Guid cardapioItemId, [FromServices] LigarPratoAoEstoqueUseCase ligar, CancellationToken ct)
+    {
+        try
+        {
+            var produtoId = await ligar.ExecuteAsync(currentUser.EmpresaId, cardapioItemId, currentUser.UsuarioId, ct);
+            return DataOk(new { produtoId });
+        }
+        catch (StorefrontNaoEncontradoException)
+        {
+            return DataNotFound("A empresa não tem vitrine ativa.");
+        }
+        catch (CardapioItemNaoEncontradoException)
+        {
+            return DataNotFound("Prato do cardápio não encontrado.");
+        }
+        catch (Exception ex) when (ex is UseCaseValidationException or RegraDeDominioVioladaException)
+        {
+            return DataBadRequest(ex.Message);
+        }
+    }
+
     [SwaggerOperation(Summary = "Turn the automatic supply deduction on producing this dish on or off (D-M2-01; Gerente)")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
