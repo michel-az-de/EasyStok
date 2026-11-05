@@ -26,17 +26,9 @@ const SAIDA = path.resolve(opt('saida', path.join(__dirname, 'saida', 'depois'))
 const GOLDEN = opt('golden', null);
 const ATUALIZAR = process.argv.includes('--atualizar-golden');
 
-// Papel que sai da impressora: largura física, etiqueta ancorada à esquerda.
+// #2247 (v3): o papel sai centralizado na cabeça de 104 mm (guias da Oasis).
 function noPapel(et, fisica) {
-  const W = Math.round(fisica.larguraMm * 8);
-  const h = et.altura;
-  const tinta = new Uint8Array(W * h);
-  let perdidos = 0;
-  for (let y = 0; y < h; y++) for (let x = 0; x < et.largura; x++) {
-    const v = et.tinta[y * et.largura + x];
-    if (x < W) tinta[y * W + x] = v; else if (v) perdidos++;
-  }
-  return { tinta, w: W, h, perdidos };
+  return tspl.papelNaCabeca(et, fisica.larguraMm, 'centro');
 }
 
 function fontes(log, r, et) {
@@ -62,7 +54,7 @@ async function rodarCaso(env, caso) {
   const r = { id: caso.id, caso, novo: g.novo, recusa: g.recusa || null, asserts: [] };
   const ok = (id, passou, detalhe, problema) => r.asserts.push({ id, ok: !!passou, detalhe, problema });
   if (!g.bytes) { ok('gerou', false, 'o app não gerou bytes: ' + (g.recusa || 'sem motivo'), 'P3'); return r; }
-  const lido = tspl.interpretar(g.bytes, { cabecaMm: 104 });
+  const lido = tspl.interpretar(g.bytes, { cabecaMm: 104, origem: 'cabeca' });
   r.comandos = lido.comandos.filter(c => !/^BITMAP/.test(c)).slice(0, 12);
   r.bitmap = lido.comandos.find(c => /^BITMAP/.test(c)) || null;
   const etq = lido.etiquetas[0];

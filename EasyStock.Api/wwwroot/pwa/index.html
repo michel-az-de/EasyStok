@@ -5431,6 +5431,10 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 .etq-termica { flex: 0 0 auto; width: 100%; max-width: 384px; }
+.etq-recusa {
+  width: 100%; max-width: 384px; padding: 14px 16px; border-radius: 8px;
+  background: #fff; color: #7c2d12; font-size: 15px; font-weight: 700; line-height: 1.4;
+}
 .etq-termica canvas {
   display: block; width: 100%; height: auto;
   background: #fff; border-radius: 6px;
@@ -20061,16 +20065,35 @@ function midiaDaImpressora(printer) {
   const c = tsplConfig(printer);
   return { tipo: c.continuo ? 'continuo' : 'etiqueta', larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm };
 }
-// undefined: módulos novos ausentes (segue o caminho antigo). null: recusa.
-function etiquetaProducaoTsplV2(et, nota, printer, copias) {
+// Entrada do motor para a etiqueta de produção. A prévia e a impressão usam a
+// mesma, então a tela mostra o que a térmica recebe. undefined: módulos novos
+// ausentes. { recusa }: a regra pede barra e a chave não cabe nela.
+function entradaDaEtiquetaV2(et, nota, printer) {
   const C = window.cdbEtiquetaCanvas, P = window.cdbPapeis, I = window.cdbImpressoras;
   if (!C || !P || !I || !window.cdbResolverEtiqueta) return undefined;
   const regra = I.regra(localStorage, 'etiqueta-producao');
-  if (et.barraExcedida && regra.codigos.indexOf('barras') >= 0) { etiquetasTspl.recusa = RECUSA_BARRA_EXCEDIDA; return null; }
-  const r = C.tspl({
+  if (et.barraExcedida && regra.codigos.indexOf('barras') >= 0) return { recusa: RECUSA_BARRA_EXCEDIDA };
+  return {
     campos: camposDaEtiqueta(et, nota), papel: P.daMidia(midiaDaImpressora(printer)),
-    orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, copias, document
-  });
+    orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, document
+  };
+}
+// #2247 (v3): prévia da produção. Na TSPL é o canvas do motor; fora dela, a
+// térmica de 58 mm, que imprime o etiquetaTermica. Devolve { canvas } ou { recusa }.
+function previaDaEtiquetaProducao(et, nota) {
+  const printer = impressoraPara('etiqueta-producao');
+  const entrada = printer && perfilImpressora(printer) === 'tspl' ? entradaDaEtiquetaV2(et, nota, printer) : undefined;
+  if (entrada === undefined) return etiquetaTermica(Object.assign({}, et, { _nota: nota || null }));
+  if (entrada.recusa) return entrada;
+  const r = window.cdbEtiquetaCanvas.previa(entrada);
+  return r.recusa ? { recusa: r.recusa } : { canvas: r.canvas };
+}
+// undefined: módulos novos ausentes (segue o caminho antigo). null: recusa.
+function etiquetaProducaoTsplV2(et, nota, printer, copias) {
+  const entrada = entradaDaEtiquetaV2(et, nota, printer);
+  if (entrada === undefined) return undefined;
+  if (entrada.recusa) { etiquetasTspl.recusa = entrada.recusa; return null; }
+  const r = window.cdbEtiquetaCanvas.tspl(Object.assign(entrada, { copias }));
   if (r.recusa) { etiquetasTspl.recusa = r.recusa; return null; }
   if (!etiquetasTspl.aviso) etiquetasTspl.aviso = window.cdbResolverEtiqueta.resumo ? window.cdbResolverEtiqueta.resumo(r) : '';
   return r.bytes;
@@ -20951,8 +20974,14 @@ function refreshEtqPreview() {
       `<div class="etq-card-wrap"><div class="${cls}">${orderLabelHtml(et.order, horiz, nota)}</div></div>`
     ).join('');
   } else {
-    const termicas = currentEtiquetas.map(et => etiquetaTermica(Object.assign({}, et, { _nota: nota || null })));
-    if (termicas.every(Boolean)) {
+    const termicas = currentEtiquetas.map(et => previaDaEtiquetaProducao(et, nota));
+    // A térmica recusa: a tela mostra o motivo, não uma etiqueta que não vai sair.
+    const recusa = termicas.find(t => t && t.recusa);
+    if (recusa) {
+      body.innerHTML = `<div class="etq-recusa" role="alert">${escapeHtml(avisoDaRecusa(recusa.recusa))}</div>`;
+      return;
+    }
+    if (termicas.every(t => t && t.canvas)) {
       body.innerHTML = '';
       termicas.forEach((t, i) => {
         const wrap = document.createElement('div');
@@ -23687,8 +23716,8 @@ window.cdbApp = {
 <script src="impressao-papeis.js?v=20261104b"></script>
 <script src="impressoras.js?v=20261104c"></script>
 <script src="etiqueta-resolver.js?v=20261104c"></script>
-<script src="etiqueta-canvas.js?v=20261104c"></script>
-<script src="impressora-tspl.js?v=20261104b"></script>
+<script src="etiqueta-canvas.js?v=20261105a"></script>
+<script src="impressora-tspl.js?v=20261105a"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
 <script src="upload-photos.js?v=20260514b"></script>

@@ -174,10 +174,15 @@
     return { canvas: c, layout: r.layout, recusa: null, avisos: r.avisos, omitidos: r.omitidos, papel, continuo: area.continuo, orientacao: r.orientacao };
   }
 
+  // #2247 (v3): a prévia da tela é o próprio canvas que vai para a térmica,
+  // no tamanho do papel. Sem o ajuste fino, que só corrige a impressora.
+  function previa(entrada) { return desenhar(entrada); }
+
   function rgba(c) { return c.getContext('2d').getImageData(0, 0, c.width, c.height).data; }
 
-  // TSPL na largura do papel, BITMAP na coluna 0. Contínuo: SIZE com a altura
-  // do conteúdo e GAP 0,0. Recortado: SIZE da etiqueta, gap e SET TEAR ON.
+  // TSPL: o canvas tem a largura do papel e vai onde o papel está na cabeça,
+  // mais o ajuste fino da impressora. Contínuo: altura do conteúdo e GAP 0,0.
+  // Recortado: SIZE da etiqueta, gap e SET TEAR ON.
   function tspl(entrada) {
     const e = entrada || {};
     const r = desenhar(e);
@@ -185,6 +190,7 @@
     const imp = e.impressora || {};
     const off = imp.offsetMm || {};
     const c = r.canvas;
+    const P = global.cdbPapeis || {};
     const bytes = global.cdbTspl.etiqueta(rgba(c), c.width, c.height, {
       larguraMm: r.papel.larguraMm,
       alturaMm: r.continuo ? c.height / PONTOS_MM : r.papel.alturaMm,
@@ -194,8 +200,10 @@
       velocidade: imp.velocidade,
       inverter: !!imp.inverter,
       copias: e.copias || 1,
-      x: Math.max(0, px(Number(off.x) || 0)),
-      y: Math.max(0, px(Number(off.y) || 0))
+      cabecaMm: Number(imp.cabecaMm) || P.CABECA_MM || 104,
+      posicao: r.papel.posicaoNaCabeca || 'centro',
+      x: 0,
+      ajusteMm: { x: Number(off.x) || 0, y: Number(off.y) || 0 }
     });
     return Object.assign(r, { bytes });
   }
@@ -217,5 +225,5 @@
     return Object.assign(r, { bytes: out });
   }
 
-  global.cdbEtiquetaCanvas = { PONTOS_MM, rasterizar, girar90, aparar, areaDoPapel, resolverNoPapel, desenhar, tspl, escpos, code128C };
+  global.cdbEtiquetaCanvas = { PONTOS_MM, rasterizar, girar90, aparar, areaDoPapel, resolverNoPapel, desenhar, previa, tspl, escpos, code128C };
 })(typeof window !== 'undefined' ? window : globalThis);
