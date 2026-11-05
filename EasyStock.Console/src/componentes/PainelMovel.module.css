@@ -1,4 +1,4 @@
-.painel { position: fixed; display: flex; flex-direction: column; min-width: 0; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border: 0; border-radius: 0; background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-media); animation: aparecer var(--dur-curta) var(--ease-padrao); }
+.painel { position: fixed; display: flex; flex-direction: column; min-width: 0; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border: 0; border-radius: var(--r-3); background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-media); animation: aparecer var(--dur-curta) var(--ease-padrao); }
 .cabecalho { display: flex; align-items: center; gap: var(--e-1); padding: 0 var(--e-1); flex: none; }
 .mover { display: flex; align-items: center; gap: var(--e-1); flex: 1; min-width: 0; min-height: var(--toque); padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--tinta-2); font: inherit; font-size: var(--t-minimo); text-align: left; touch-action: none; cursor: grab; }
 .mover span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

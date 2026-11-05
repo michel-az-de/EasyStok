@@ -1,8 +1,8 @@
-/* Contador numérico único (#2232, L2/T4). Quadrado: raio 0 (PR #2143). Neutro para quantidade,
+/* Contador numérico único (#2232, L2/T4). Pílula (#2246). Neutro para quantidade,
    carmim para o que pede ação. Quem posiciona (canto do ícone) passa a própria classe. */
 .contador {
   display: inline-grid; place-items: center; box-sizing: border-box;
-  min-width: 20px; height: 20px; padding: 0 var(--e-1); border-radius: 0;
+  min-width: 20px; height: 20px; padding: 0 var(--e-1); border-radius: var(--r-pilula);
   background: var(--preenchimento-forte); color: var(--tinta);
   font-family: var(--f-dado); font-size: var(--t-minimo); font-weight: 700;
   font-variant-numeric: tabular-nums; line-height: 1;
