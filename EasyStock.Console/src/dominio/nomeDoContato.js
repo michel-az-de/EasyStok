@@ -9,6 +9,8 @@ export function nomeDoContato(nome) {
   if (!/^\+?[\d\s().-]+$/.test(texto)) return texto
   const digitos = texto.replace(/\D/g, '')
   if (/^55\d{10,11}$/.test(digitos)) return `+55 ${mascaraTelefone(digitos.slice(2))}`
+  // Com "+" o país vem escrito: fora do 55, o número estrangeiro fica como veio.
+  if (texto.startsWith('+')) return texto
   if (/^\d{10,11}$/.test(digitos)) return mascaraTelefone(digitos)
   return texto
 }

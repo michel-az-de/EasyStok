@@ -102,6 +102,10 @@ confere('L10 telefone cru vira máscara', () => {
   assert.equal(nomeDoContato('555434619500'), '+55 (54) 3461-9500')
   assert.equal(nomeDoContato('5511987654321'), '+55 (11) 98765-4321')
   assert.equal(nomeDoContato('Thais Regina'), 'Thais Regina')
+  // Revisão 5: com "+" e país que não é o 55, o número fica como veio; a máscara do Brasil não se aplica.
+  assert.equal(nomeDoContato('+1 415 555 2671'), '+1 415 555 2671')
+  assert.equal(nomeDoContato('+14155552671'), '+14155552671')
+  assert.equal(nomeDoContato('+55 54 3461-9500'), '+55 (54) 3461-9500')
   assert.equal(cartao.nomeDoCartao({ nome: '555434619500' }).principal, '+55 (54) 3461-9500')
 })
 
