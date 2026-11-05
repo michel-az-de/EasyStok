@@ -121,6 +121,8 @@ export function AbaInsumosApi() {
     Promise.resolve(gestao.criar(novo)).then((ok) => { if (ok !== false) { setNovo({ nome: '', unidade: novo.unidade, minimo: '', custo: '', embalagem: novo.embalagem }); setCadastroAberto(false) } }).finally(() => setCriando(false))
   }
 
+  const semInsumo = gestao.insumos.length === 0
+  const abrirCadastro = <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setCadastroAberto(true) }}>Cadastrar insumo</Botao>
   return (
     <div className={css.aba}>
       {gestao.estado === 'erro' && <p className={css.aviso} role="alert">
@@ -134,22 +136,29 @@ export function AbaInsumosApi() {
       )}
 
       {/* #2081 (E11): a ação principal é um botão do tamanho do texto no topo, não uma barra da largura da tela. */}
+      {/* #2235 (banca B1-B3): sem insumo, a tela é um estado vazio com exemplo e o botão junto da frase;
+          "Comprar" só aparece quando há insumo para comparar com o mínimo. */}
       <div className={css.topo}>
         <p className={css.descricao}>Saldo, estoque mínimo e uso nas receitas.</p>
-        {podeEditar && <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setCadastroAberto(true) }}>Cadastrar insumo</Botao>}
+        {podeEditar && semInsumo === false && abrirCadastro}
       </div>
 
+      {!semInsumo && (
       <section className={css.secao} aria-labelledby="insumos-comprar">
         <h3 id="insumos-comprar" className={css.tituloSecao}>Comprar</h3>
         {comprar.length === 0
           ? <p className={css.descricao}>Nenhum insumo abaixo do mínimo.</p>
           : <p className={css.descricao}>{comprar.map((i) => `${i.nome} (tem ${formatar(i.saldo)} ${i.unidade}, mínimo ${i.minimo})`).join(' · ')}</p>}
       </section>
+      )}
 
       <section className={css.secao} aria-labelledby="insumos-lista">
         <h3 id="insumos-lista" className={css.tituloSecao}>Insumos cadastrados</h3>
-        {gestao.insumos.length === 0 ? (
-          <p className={css.descricao}>Nenhum insumo cadastrado.{podeEditar && ' Use Cadastrar insumo para incluir molho, recheio ou embalagem.'}</p>
+        {semInsumo ? (
+          <Vazio icone="nota" titulo="Nenhum insumo cadastrado" acao={podeEditar ? abrirCadastro : null}>
+            Insumo é o que entra na receita: molho de tomate em gramas, massa fresca em quilos, embalagem em unidades.
+            {podeEditar ? ' Com eles, a receita calcula o custo por porção.' : ' Quem gerencia a produção cadastra os insumos.'}
+          </Vazio>
         ) : (
           <ul className={css.lista}>
             {gestao.insumos.map((i) => <LinhaInsumo key={i.id} insumo={i} gestao={gestao} podeEditar={podeEditar}

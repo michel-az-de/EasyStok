@@ -172,8 +172,8 @@ await confere('A10: lote ativo diz de onde veio, quem registrou e quando foi fab
   const { lerEstoqueDoDia, podeReimprimir } = await import('../src/aplicacao/estoqueDoDia.js')
   montarFetch([[ESTOQUE, estoque], [LOTES, lotes]])
   const [doAparelho, doConsole] = (await lerEstoqueDoDia()).pratos[0].lotes
-  assert.equal(doAparelho.origem, 'Aparelho · Rosa · fab. 25/10', '01:30 UTC é 22:30 do dia 25 em Brasília')
-  assert.equal(doConsole.origem, 'Console · você · fab. 26/10')
+  assert.equal(doAparelho.origem, 'Lançado no aparelho por Rosa · fab. 25/10', '01:30 UTC é 22:30 do dia 25 em Brasília')
+  assert.equal(doConsole.origem, 'Lançado por você · fab. 26/10')
   assert.equal(doConsole.id, 'l-con')
   assert.equal(podeReimprimir(doConsole), true)
   assert.equal(podeReimprimir(doAparelho), false, 'a etiqueta do aparelho não existe no EasyStok')
@@ -404,11 +404,13 @@ await confere('A8/A10: Estoque do dia mostra a origem e reimprime o lote do cons
   const t = montar(await tela('AbaEstoqueDoDiaApi'))
   await t.assentar()
   const linhas = andar(t.arvore, (n) => n.type === 'li' && /LOT-/.test(texto(n)))
-  assert.match(texto(linhas.find((l) => /LOT-251026-200000/.test(texto(l)))), /Aparelho · Rosa · fab\. 25\/10/)
-  assert.match(texto(linhas.find((l) => /LOT-261026-001/.test(texto(l)))), /Console · você · fab\. 26\/10/)
-  const reimprimir = doTipo(t.arvore, 'BotaoIcone').filter((b) => b.props.rotulo?.startsWith('Etiquetas do lote '))
+  assert.match(texto(linhas.find((l) => /LOT-251026-200000/.test(texto(l)))), /Lançado no aparelho por Rosa · fab\. 25\/10/)
+  assert.match(texto(linhas.find((l) => /LOT-261026-001/.test(texto(l)))), /Lançado por você · fab\. 26\/10/)
+  // #2235 (banca T1-3): o botão diz "Etiquetas" na tela, não só no ícone.
+  const reimprimir = andar(t.arvore, (n) => n.props?.icone === 'printer' && String(n.props['aria-label']).startsWith('Etiquetas do lote '))
   assert.equal(reimprimir.length, 1, 'só o lote do console')
-  assert.equal(reimprimir[0].props.rotulo, 'Etiquetas do lote LOT-261026-001')
+  assert.equal(reimprimir[0].props['aria-label'], 'Etiquetas do lote LOT-261026-001 de Lasanha Bolonhesa Clássica 1 kg')
+  assert.equal(texto(reimprimir[0]), 'Etiquetas')
   await reimprimir[0].props.onClick()
   await new Promise((r) => setTimeout(r, 80))
   const folha = doTipo(t.renderizar(), 'FolhaImpressao')[0]
@@ -439,13 +441,27 @@ await confere('A5/E7/E11: Perdas mostra o total em destaque, "sem custo" na linh
   assert.ok(doTipo(topo, 'Botao').some((b) => texto(b) === 'Lançar perda'), 'o botão fica no topo, ao lado do texto')
 })
 
+const insumoDaLista = { produtoId: 's-1', nome: 'Molho sugo', unidade: 'G', saldo: 500, minimo: null, custo: null, abaixoDoMinimo: false, receitas: 0, porcoes: 0, embalagem: false }
 await confere('E11: Insumos tem "Cadastrar insumo" no topo, não uma barra solta no fim', async () => {
-  montarFetch([[(m, u) => m === 'GET' && u.includes('/producao/insumos'), { data: [] }]])
+  montarFetch([[(m, u) => m === 'GET' && u.includes('/producao/insumos'), { data: [insumoDaLista] }]])
   const t = montar(await tela('AbaInsumosApi'))
   await t.assentar()
   const topo = daClasse(t.arvore, 'topo')[0]
   assert.ok(doTipo(topo, 'Botao').some((b) => texto(b) === 'Cadastrar insumo'))
   assert.equal(doTipo(t.arvore, 'Botao').filter((b) => texto(b) === 'Cadastrar insumo').length, 1)
+})
+
+// #2235 (banca B1-B3): sem insumo, o botão mora no estado vazio com o exemplo, e "Comprar" some.
+await confere('#2235: Insumos vazio mostra exemplo e o botão no próprio bloco, sem "Comprar"', async () => {
+  montarFetch([[(m, u) => m === 'GET' && u.includes('/producao/insumos'), { data: [] }]])
+  const t = montar(await tela('AbaInsumosApi'))
+  await t.assentar()
+  const vazio = doTipo(t.arvore, 'Vazio')[0]
+  assert.ok(vazio, 'estado vazio')
+  assert.equal(texto(vazio.props.acao), 'Cadastrar insumo')
+  assert.match(texto(vazio), /molho de tomate/)
+  assert.equal(doTipo(daClasse(t.arvore, 'topo')[0], 'Botao').length, 0, 'sem botão repetido no topo')
+  assert.ok(!texto(t.arvore).includes('Comprar'), 'sem seção Comprar')
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

@@ -8,6 +8,24 @@
 .resumoOperacao > div + div { padding-left: var(--e-4); border-left: 0; }
 .resumoOperacao dt { color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-compacto); }
 .resumoOperacao dd { order: -1; margin: 0; color: var(--tinta); font-size: var(--t-valor); font-weight: 750; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: var(--ls-display); }
+/* #2235 (banca T1-1): o número que pede ação ganha fundo e cor do estado; o texto diz o que fazer. */
+.resumoOperacao > .resumoPerigo, .resumoOperacao > .resumoAtencao { padding: var(--e-2) var(--e-3); border-radius: var(--r-2); }
+.resumoOperacao > .resumoPerigo + div, .resumoOperacao > .resumoAtencao + div { padding-left: var(--e-4); }
+.resumoPerigo { background: var(--erro-pastel); }
+.resumoPerigo dd, .resumoPerigo dt { color: var(--erro); }
+.resumoAtencao { background: var(--alerta-pastel); }
+.resumoAtencao dd, .resumoAtencao dt { color: var(--alerta); }
+.resumoOperacao dd.dicaDoResumo { order: 0; font-size: var(--t-micro); font-weight: 600; letter-spacing: 0; line-height: var(--lh-compacto); }
+.resumoPerigo dd.dicaDoResumo { color: var(--erro); }
+.resumoAtencao dd.dicaDoResumo { color: var(--alerta); }
+/* Região viva sempre montada; vazia, não ocupa lugar na tela. */
+.vivo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.rodapeForm.acoesDireita { justify-content: flex-end; }
+.saibaMais { font-size: var(--t-apoio); color: var(--tinta-2); max-width: 70ch; }
+.saibaMais summary { width: fit-content; min-height: var(--toque); display: flex; align-items: center; color: var(--marca); font-weight: 600; cursor: pointer; }
+.saibaMais[open] summary { margin-bottom: var(--e-1); }
+.semQuebra { white-space: nowrap; }
+.acoesDireita { display: flex; justify-content: flex-end; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 
 .topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .acoesFormulario { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding-top: var(--e-4); border-top: var(--b-1) solid var(--linha); }
@@ -77,7 +95,7 @@
 .ajusteInsumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ajusteEstoque { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 .lancamentoPerda { grid-template-columns: minmax(0, 2fr) minmax(0, .8fr) minmax(0, 1.2fr); }
-.linhaCompleta { grid-column: 1 / -1; }
+.linhaCompleta { grid-column: 1 / -1; flex-basis: 100%; }
 .ajudaEmbalagem { display: block; max-width: 44ch; color: var(--tinta-2); font-size: var(--t-micro); }
 .dataPlanejamento { display: grid; gap: var(--e-2); width: min(100%, 280px); }
 .rodapeForm { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-2); padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }

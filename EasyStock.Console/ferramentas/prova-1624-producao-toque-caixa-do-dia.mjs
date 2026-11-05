@@ -273,11 +273,15 @@ await confere('Produção do dia: a tela abre com a grade e o saldo; nada no lot
   assert.equal(doTipo(t.arvore, 'form').length, 0, 'o lote só aparece na revisão explícita')
   assert.match(texto(cartoesDaTela(t.arvore)[0]), /Talharim.*500 g.*4 no estoque/)
   assert.match(texto(cartoesDaTela(t.arvore)[2]), /Lasanha.*Família.*0 no estoque/)
-  assert.doesNotMatch(texto(cartoesDaTela(t.arvore)[3]), /no estoque/, 'prato sem estoque ligado não mostra saldo inventado')
+  assert.doesNotMatch(texto(cartoesDaTela(t.arvore)[3]), /\d+ no estoque/, 'prato sem estoque ligado não mostra saldo inventado')
+  // #2235 (banca T3-6): mas tem a mesma linha dos outros, dizendo que ainda não há estoque.
+  assert.match(texto(cartoesDaTela(t.arvore)[3]), /Ainda sem estoque/)
   const botaoDe = (indice) => doTipo(cartoesDaTela(t.arvore)[indice], 'button')[0]
   const descricao = andar(cartoesDaTela(t.arvore)[0], (n) => n.props?.id === botaoDe(0).props['aria-describedby'])[0]
   assert.match(texto(descricao), /4 no estoque/, 'o saldo é a descrição do botão, para o leitor de tela')
-  assert.equal(botaoDe(3).props['aria-describedby'], undefined)
+  const semEstoque = andar(cartoesDaTela(t.arvore)[3], (n) => n.props?.id === botaoDe(3).props['aria-describedby'])[0]
+  assert.equal(texto(semEstoque), 'Ainda sem estoque')
+  assert.equal(doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Limpar'), undefined, '#2235 (T3-8): sem nada no lote, não há Limpar')
   assert.equal(itensDoLote(t.arvore).length, 0)
   assert.equal(doTipo(t.arvore, 'CampoSelecao').filter((c) => c.props.rotulo === 'Prato').length, 0, 'não há mais lista suspensa de pratos')
   assert.equal(doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Conferir produção').props.disabled, true)
@@ -377,7 +381,7 @@ await confere('Produção do dia: o filtro por categoria muda a grade; a linha d
   await t.assentar()
   const filtro = (rotulo) => doTipo(t.renderizar(), 'Chip').find((c) => c.props.papel === 'filtro' && texto(c) === rotulo)
   filtro('Molhos').props.onClick()
-  assert.deepEqual(cartoesDaTela(t.renderizar()).map((c) => texto(doTipo(c, 'button')[0])), ['Molho sugo300 g'])
+  assert.deepEqual(cartoesDaTela(t.renderizar()).map((c) => texto(doTipo(c, 'button')[0])), ['Molho sugo300 gAinda sem estoque'])
   filtro('Todos').props.onClick()
   assert.equal(cartoesDaTela(t.renderizar()).length, 4)
   revisar(t)

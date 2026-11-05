@@ -77,13 +77,15 @@ function resumoDaLinha(linha, faltaPorcao) {
 // lugar fica reservado com o desenho de imagem: o cartão não muda de altura e a grade não pula.
 // #2081 (A14): quando nenhum prato da grade tem foto, a reserva some e o cartão fica compacto; no
 // tablet eram 43 cartões de 250 px com o mesmo desenho vazio.
-function FotoDoCartao({ foto }) {
+// #2235 (banca T3-5): 600 g, 800 g e 1 kg usam a mesma foto; o tamanho vai em selo grande sobre ela.
+function FotoDoCartao({ foto, selo }) {
   const [falhou, setFalhou] = useState(null)
   return (
     <span className={grade.fotoDoPrato}>
       {foto && falhou !== foto
         ? <img src={foto} alt="" loading="lazy" decoding="async" onError={() => setFalhou(foto)} />
         : <Icone nome="imagem" tamanho={24} />}
+      {selo && <span className={grade.seloDoTamanho} aria-hidden="true">{selo}</span>}
     </span>
   )
 }
@@ -265,15 +267,24 @@ export function AbaProducaoDoDiaApi() {
       {/* #1809: o caminho em três passos, à vista, para quem abre a tela pela primeira vez.
           #2081 (A14): depois do primeiro lote eles recolhem; ao lado, o pareamento do aparelho (A6). */}
       <div className={grade.topoDaProducao}>
-        <details className={grade.ajudaDosPassos} open={passosAbertos} onToggle={(e) => setPassosAbertos(e.currentTarget.open)}>
-          <summary>Como registrar a produção</summary>
+        {/* #2235 (banca P2-1): uma linha de dica; o passo a passo abre a pedido. Fechar à mão também conta como visto.
+            A dica e o aparelho dividem a primeira linha; o "Ver passo a passo" vem embaixo, só com o rótulo. */}
+        <div className={grade.linhaDoTopo}>
+          <p className={grade.dicaDosPassos}>Toque nos pratos prontos, confira e confirme. O estoque só muda ao confirmar.</p>
+          <div className={grade.acoesDoTopo}><ConectarAparelho /></div>
+        </div>
+        <details className={grade.ajudaDosPassos} open={passosAbertos} onToggle={(e) => {
+          const aberto = e.currentTarget.open
+          setPassosAbertos(aberto)
+          if (!aberto) marcarPassosVistos()
+        }}>
+          <summary><span className={grade.verPassos}>{passosAbertos ? 'Esconder o passo a passo' : 'Ver passo a passo'}</span></summary>
           <ol className={grade.passos} aria-label="Como registrar a produção">
             <li><span className={grade.numeroDoPasso} aria-hidden="true">1</span><span><strong>Toque nos pratos que ficaram prontos.</strong> Cada toque soma uma porção; o − tira.</span></li>
             <li><span className={grade.numeroDoPasso} aria-hidden="true">2</span><span><strong>Confira</strong> porções, validade e peso em Conferir produção.</span></li>
             <li><span className={grade.numeroDoPasso} aria-hidden="true">3</span><span><strong>Registre a produção</strong> em Confirmar produção. O estoque só muda nessa hora.</span></li>
           </ol>
         </details>
-        <div className={grade.acoesDoTopo}><ConectarAparelho /></div>
       </div>
 
       {falta.length > 0 && (
@@ -300,7 +311,11 @@ export function AbaProducaoDoDiaApi() {
       <div className={grade.palco}>
         <div className={grade.bancada}>
           <section className={grade.cardapio} aria-label="Pratos para produzir">
+            {/* #2235 (banca T3-4): buscar é o atalho mais rápido e vem antes dos filtros. */}
             <div className={grade.filtros}>
+              <div className={grade.busca}>
+                <CampoTexto rotulo="Buscar prato" rotuloOculto tipo="search" placeholder="Buscar prato" value={busca} onChange={(e) => setBusca(e.target.value)} />
+              </div>
               {categorias.length > 1 && (
                 <div className={grade.chips}>
                   <Chip papel="filtro" ativo={!categoria} onClick={() => setCategoria(null)}>Todos</Chip>
@@ -309,9 +324,6 @@ export function AbaProducaoDoDiaApi() {
                   ))}
                 </div>
               )}
-              <div className={grade.busca}>
-                <CampoTexto rotulo="Buscar prato" rotuloOculto tipo="search" placeholder="Buscar prato" value={busca} onChange={(e) => setBusca(e.target.value)} />
-              </div>
             </div>
             {estoque.estado === 'erro' && (
               <p className={css.aviso}>
@@ -337,7 +349,10 @@ export function AbaProducaoDoDiaApi() {
                   const tamanho = cartao.tamanho?.trim() ?? ''
                   const nomeVisual = tamanho && !tamanhoNoCartao(cartao) ? cartao.nome.trimEnd().slice(0, -tamanho.length).trimEnd() : cartao.nome
                   // O rótulo do botão diz a ação; saldo e quantidade no lote vêm como descrição, para o leitor de tela também.
-                  const idDoSaldo = cartao.saldo == null ? undefined : `saldo-${cartao.chave}`
+                  // #2235 (banca T3-6): todo cartão tem a linha do estoque. Sem estoque ligado, diz isso em vez
+                  // de inventar um zero; com o saldo fora do ar, nenhum cartão mostra (o aviso acima explica).
+                  const semEstoqueLigado = cartao.saldo == null && estoque.estado === 'ok'
+                  const idDoSaldo = cartao.saldo == null && !semEstoqueLigado ? undefined : `saldo-${cartao.chave}`
                   const idDaContagem = noLote > 0 ? `lote-${cartao.chave}` : undefined
                   const naSelecao = `${plural(noLote, 'porção', 'porções')} de ${nome} no lote`
                   return (
@@ -345,14 +360,15 @@ export function AbaProducaoDoDiaApi() {
                       <button type="button" className={grade.tocar} disabled={enviando} aria-label={`Somar 1 porção de ${nome}`}
                         title={`Adicionar 1 porção de ${nome} ao lote. O estoque só muda ao confirmar.`}
                         aria-describedby={[idDoSaldo, idDaContagem].filter(Boolean).join(' ') || undefined} onClick={() => somar(cartao, 1)}>
-                        {gradeComFoto && <FotoDoCartao foto={cartao.foto} />}
+                        {gradeComFoto && <FotoDoCartao foto={cartao.foto} selo={tamanho} />}
                         <span className={grade.nomeDoPrato}>{nomeVisual}</span>
-                        {tamanho && <span className={grade.tamanho}>{tamanho}</span>}
+                        {tamanho && <span className={gradeComFoto ? grade.tamanhoComFoto : grade.tamanho}>{tamanho}</span>}
                         {cartao.saldo != null && (
                           <span id={idDoSaldo} className={grade.saldo}>
                             {cartao.saldo} no estoque{noLote > 0 && <strong> · {cartao.saldo + noLote} depois</strong>}
                           </span>
                         )}
+                        {semEstoqueLigado && <span id={idDoSaldo} className={grade.saldo}>Ainda sem estoque</span>}
                       </button>
                       {noLote > 0 && (
                         <div className={grade.passo}>
@@ -475,10 +491,11 @@ export function AbaProducaoDoDiaApi() {
           ) : (
             <>
               <p className={grade.resumoDoLote} aria-live="polite">
-                {resumo.pratos === 0 ? 'Nenhum prato no lote' : `${plural(resumo.porcoes, 'porção', 'porções')} · ${plural(resumo.pratos, 'prato', 'pratos')}`}
+                {resumo.pratos === 0 ? 'Lote vazio: toque nos pratos que ficaram prontos' : `No lote: ${plural(resumo.porcoes, 'porção', 'porções')} · ${plural(resumo.pratos, 'prato', 'pratos')}`}
               </p>
               <div className={grade.acoesDoLote}>
-                <Botao variante="texto" disabled={enviando || semLote} onClick={() => setConfirmandoLimpar(true)}>Limpar</Botao>
+                {/* #2235 (banca T3-8): sem nada no lote, não há o que limpar. */}
+                {!semLote && <Botao variante="texto" disabled={enviando} onClick={() => setConfirmandoLimpar(true)}>Limpar</Botao>}
                 <Botao variante="primario" icone="check" disabled={semLote}
                   onClick={() => setRevisando(true)}>Conferir produção</Botao>
               </div>

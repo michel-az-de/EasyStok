@@ -104,3 +104,7 @@
 }
 .detalheDoCodigo { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); font-variant-numeric: tabular-nums; }
 .avisoDoCodigo { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-2); background: var(--alerta-pastel); color: var(--alerta); font-size: var(--t-apoio); }
+
+/* #2235 (banca P2-2): o estado do aparelho fica ao lado do botão que o conecta. */
+.aparelho { display: inline-flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; justify-content: flex-end; }
+.estadoDoAparelho { color: var(--tinta-2); font-size: var(--t-apoio); overflow-wrap: anywhere; }

@@ -118,19 +118,28 @@ public class ReceitasDaProducaoUseCaseTests
     }
 
     [Fact]
-    public async Task Listar_SoPratosLigadosAoEstoque()
+    public async Task Listar_TrazTodoPratoDoCardapio_OAvulsoSemProdutoESemReceita()
     {
+        // #2235 (banca A1): a receita vem antes da produção. O prato ainda sem estoque aparece, sem
+        // produto e sem linhas; montar a receita é que o liga ao estoque.
         var lasanha = Prato(6);
         Receita(lasanha);
         var p = (Produto)Activator.CreateInstance(typeof(Produto), nonPublic: true)!;
         typeof(Produto).GetProperty("Id")!.SetValue(p, lasanha.Id);
         var ligado = CardapioItem.CriarAPartirDeProduto(_vitrine.Id, p);
         var avulso = CardapioItem.CriarAvulso(_vitrine.Id, "Bolo", 20m);
-        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([ligado, avulso]);
+        var arquivado = CardapioItem.CriarAvulso(_vitrine.Id, "Torta", 30m);
+        arquivado.Arquivar(DateTime.UtcNow);
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([ligado, avulso, arquivado]);
 
         var lista = await Sut().ListarAsync(EmpresaId);
 
-        lista.Should().ContainSingle().Which.ProdutoId.Should().Be(lasanha.Id);
+        lista.Select(r => r.ProdutoId).Should().Equal(lasanha.Id, null);
+        var bolo = lista[1];
+        bolo.CardapioItemId.Should().Be(avulso.Id);
+        bolo.Nome.Should().Be("Bolo");
+        bolo.Linhas.Should().Be(0);
+        bolo.CustoPorRendimento.Should().BeNull();
     }
 
     [Fact]
