@@ -2,7 +2,8 @@
 // Rodar após npm run build. PLAYWRIGHT_MODULE pode apontar para o runtime já instalado.
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { pathToFileURL, fileURLToPath } from 'node:url'
+import { fileURLToPath } from 'node:url'
+import { servirDist } from './servirDist.mjs'
 import { resolve } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { build } from 'vite'
@@ -11,13 +12,15 @@ const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODUL
 const raiz = fileURLToPath(new URL('..', import.meta.url)).replaceAll('\\', '/')
 const artefatos = resolve(raiz, '../.build/harmonia-ux')
 const fatos = { tipo: 'Console em demonstração e componentes reais com respostas controladas; sem API real', etapas: [], requisicoesHttpBloqueadas: 0, passou: false }
-const bloquearRede = pagina => pagina.route(/^https?:\/\//, rota => { fatos.requisicoesHttpBloqueadas++; return rota.abort() })
+// O dist/ local é servido por HTTP (#2254); só ele passa, o resto da rede é bloqueado.
+const dist = await servirDist(raiz)
+const bloquearRede = pagina => pagina.route(rota => /^https?:\/\//.test(rota.href) && !rota.href.startsWith(dist.url), rota => { fatos.requisicoesHttpBloqueadas++; return rota.abort() })
 const navegador = await chromium.launch({ headless: true })
 try {
   const pagina = await navegador.newPage({ viewport: { width: 1440, height: 1000 } })
   await bloquearRede(pagina)
   pagina.setDefaultTimeout(5000)
-  await pagina.goto(pathToFileURL(resolve(raiz, 'dist/index.html')).href)
+  await pagina.goto(dist.url)
   await pagina.getByText('Abrir Atendimento', { exact: true }).click()
   await pagina.getByRole('button', { name: /Renan Okamoto/ }).click()
   await pagina.getByRole('button', { name: 'Adicionar nota', exact: true }).click()
@@ -155,4 +158,5 @@ React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cli
   await mkdir(artefatos, { recursive: true })
   await writeFile(resolve(artefatos, 'prova-1847-nota-resumo.json'), JSON.stringify(fatos, null, 2))
   await navegador.close()
+  await dist.fechar()
 }

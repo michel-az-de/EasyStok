@@ -18,13 +18,15 @@ import { createRequire, registerHooks } from 'node:module'
 import { transformWithOxc } from 'vite'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
+import { servirDist } from './servirDist.mjs'
 
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const raiz = fileURLToPath(new URL('..', import.meta.url))
 const indice = resolve(raiz, 'dist/index.html')
 assert.ok(existsSync(indice), 'rode npm run build antes: falta dist/index.html')
+const dist = await servirDist(raiz)
 const evidencias = process.env.EVIDENCIAS_2145
 if (evidencias) mkdirSync(evidencias, { recursive: true })
 
@@ -85,7 +87,7 @@ try {
   pagina.setDefaultTimeout(8000)
   const falhasDePagina = []
   pagina.on('pageerror', (erro) => falhasDePagina.push(erro.message))
-  await pagina.goto(pathToFileURL(indice).href)
+  await pagina.goto(dist.url)
 
   await pagina.getByText('Abrir Atendimento', { exact: true }).waitFor()
   await conferirTela(pagina, 'Hall', { minimo: 3 })
@@ -146,7 +148,7 @@ try {
   const celular = await navegador.newPage({ viewport: { width: 390, height: 844 } })
   celular.setDefaultTimeout(8000)
   celular.on('pageerror', (erro) => falhasDePagina.push(erro.message))
-  await celular.goto(pathToFileURL(indice).href)
+  await celular.goto(dist.url)
   await celular.getByText('Abrir Atendimento', { exact: true }).click()
   await celular.getByRole('button', { name: 'Mais', exact: true }).waitFor()
   const noCelular = await conferirTela(celular, 'Celular', { minimo: 3 })
@@ -159,6 +161,7 @@ try {
   await confere('nenhum erro de página durante o roteiro', async () => assert.deepEqual(falhasDePagina, []))
 } finally {
   await navegador.close()
+  await dist.fechar()
 }
 
 console.log(`\n${passou} ok, ${erros.length} falha(s)`)
