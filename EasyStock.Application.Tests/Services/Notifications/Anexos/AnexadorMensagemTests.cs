@@ -89,6 +89,22 @@ public class AnexadorMensagemTests
     }
 
     [Fact]
+    public async Task ModeloNovoEntraSoPeloCatalogoSemMexerNoMotor()
+    {
+        var novo = Substitute.For<IModeloAnexoNotificacao>();
+        novo.Codigo.Returns("etiqueta");
+        novo.GerarAsync(_empresaId, Arg.Any<IDictionary<string, object?>>(), FormatoAnexo.Png, Arg.Any<CancellationToken>())
+            .Returns(new AnexoGerado([9], "image/png", "png"));
+        var sut = new AnexadorMensagem([_modelo, novo], _storage, NullLogger<AnexadorMensagem>.Instance);
+
+        var r = Ler(await sut.AnexarAsync(Evento(), """{"anexo":"etiqueta"}""", _vars));
+
+        r.Should().ContainKey("imagem").WhoseValue.Should().EndWith(".png");
+        await novo.Received(1).GerarAsync(_empresaId, Arg.Any<IDictionary<string, object?>>(), FormatoAnexo.Png, Arg.Any<CancellationToken>());
+        await _modelo.DidNotReceiveWithAnyArgs().GerarAsync(default, default!, default, default);
+    }
+
+    [Fact]
     public async Task ModeloDesconhecidoMandaOTextoSemAnexo()
     {
         var r = Ler(await Criar().AnexarAsync(Evento(), """{"anexo":"inexistente"}""", _vars));
