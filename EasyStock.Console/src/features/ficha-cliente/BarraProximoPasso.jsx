@@ -138,14 +138,17 @@ export function BarraProximoPasso({
     if (chave === 'desfazer') { setMotivoDesfazer(''); setErroDesfazer(null) }
     if (chave === 'cancelar') { setMotivoCancelar(''); setErroCancelar(null) }
     setErroCorrecao(null)
+    setAbrindoBaixa(false)
     setConfirmando(chave)
   }
   // #2232 (F7): as ações do pedido (cancelar, estornar, voltar etapa, desfazer pagamento) saíram do ⋮
   // ao lado de "Marcar pago" e moram no menu "Ações da ficha" do cabeçalho; ele pede por aqui a mesma
   // confirmação em linha. `n` muda a cada pedido, então escolher a mesma ação duas vezes reabre.
+  // A escolha no menu encerra o "Desfazer · N": a confirmação aparece na hora, não sozinha 10 s depois.
   const [acaoVista, setAcaoVista] = useState(pedidoDeAcao?.n ?? 0)
   if (pedidoDeAcao && pedidoDeAcao.n !== acaoVista) {
     setAcaoVista(pedidoDeAcao.n)
+    setRestam(0)
     iniciarConfirmacao(pedidoDeAcao.chave)
   }
 

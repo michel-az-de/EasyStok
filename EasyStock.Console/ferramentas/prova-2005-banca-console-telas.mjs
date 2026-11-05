@@ -553,6 +553,56 @@ await confere('04. estorno da Barra do pedido: "Valor a devolver" nasce com o pa
   })
 })
 
+// #2232 (revisão 2): com as ações no menu do cabeçalho, a Barra pode receber o pedido em qualquer estado dela.
+// A escolha vale na hora: durante o "Desfazer · N" a confirmação aparece já (não 10 s depois, sozinha), e com
+// "Marcar pago" aberto o formulário dele dá lugar ao da ação (nunca dois formulários empilhados).
+const fichaComMenu = (pedido, extra = {}) => {
+  const FichaComMenu = () => {
+    const [pedidoDeAcao, setPedidoDeAcao] = useState({ chave: null, n: 0 })
+    const itens = itensDoMenuDaFicha({ acoes: acoesDoPedido({ pedido, fonteApi: false }), comPedido: true })
+    return h('div', null,
+      h(MenuDaFicha, { itens, aoEscolher: (chave) => setPedidoDeAcao(({ n }) => ({ chave, n: n + 1 })) }),
+      h(BarraProximoPasso, {
+        pedido, conversaId: 'c1', nomeCliente: 'Ana', agora: AGORA, emDesfazer: false, aoAvancar() {}, aoDesfazer() {},
+        pedidoDeAcao: pedidoDeAcao.chave ? pedidoDeAcao : null, aoMarcarEstorno() {}, ...extra,
+      }))
+  }
+  return h(ContextoAcessoModulos.Provider, { value: { acoes: {} } },
+    h(ContextoEstado.Provider, { value: { agora: AGORA, fonteApi: false, conversas: [], selecionada: null } },
+      h(ContextoCatalogo.Provider, { value: { entregadores: [], cardapio: [], meiosDePagamento: [] } },
+        h(ContextoAcoes.Provider, { value: {} }, h(FichaComMenu)))))
+}
+const formularios = (tela) => descendentes(tela.recipiente).filter((no) => no.localName === 'form').length
+
+await confere('05. ação do menu durante o "Desfazer · N": a confirmação aparece na hora', async () => {
+  const pedido = {
+    estado: 'pago', itens: [], pagamentos: [], meio: 'pix', numero: '1',
+    cobranca: { id: 'cb', meio: 'pix', pagaEm: 1, valor: 100, valorPago: 100, criadaEm: 1, expiraEm: 2 },
+  }
+  await comTela(fichaComMenu(pedido, { emDesfazer: true }), async (tela) => {
+    assert.match(textoDe(tela), /Desfazer · \d+/)
+    clicar(tela, 'Marcar estorno')
+    assert.equal(valorDe(tela, 'Valor a devolver'), '100,00')
+    assert.doesNotMatch(textoDe(tela), /Desfazer · \d+/)
+  })
+})
+
+await confere('05. ação do menu com "Marcar pago" aberto: um formulário só, o da ação', async () => {
+  const pedido = {
+    estado: 'aguardando', itens: [], pagamentos: [], meio: 'pix', numero: '1',
+    cobranca: { id: 'cb', meio: 'pix', valor: 100, criadaEm: AGORA - 60000, expiraEm: AGORA + 3600000 },
+  }
+  await comTela(fichaComMenu(pedido, { aoMarcarPago() {} }), async (tela) => {
+    const marcarPago = descendentes(tela.recipiente).find((no) => no.localName === 'button' && /^Marcar pago/.test(no.textContent.trim()))
+    assert.ok(marcarPago, 'sem botão "Marcar pago": ' + descendentes(tela.recipiente).filter((no) => no.localName === 'button').map((b) => b.textContent.trim()).join(' | '))
+    flushSync(() => propsDe(marcarPago).onClick({ preventDefault() {} }))
+    const comBaixa = formularios(tela)
+    assert.ok(comBaixa >= 1, 'o "Marcar pago" não abriu formulário')
+    clicar(tela, 'Cancelar pedido')
+    assert.equal(formularios(tela), 1, `formulários na tela: ${formularios(tela)}`)
+  })
+})
+
 console.log(`\n${passou} passaram, ${falhas.length} falharam.`)
 if (falhas.length > 0) {
   console.log('Falhas:\n  - ' + falhas.join('\n  - '))
