@@ -89,6 +89,23 @@ module.exports = function ({ test }) {
     assert.ok(!/PRINT/.test(cont + rec));
   });
 
+  // #2247 (v3): o teste de alinhamento vai para onde o papel está na cabeça,
+  // com o ajuste fino salvo, como a etiqueta.
+  test('alinhamento na cabeça: moldura no papel de 52 mm e ajuste fino', () => {
+    const T = carregar();
+    const midia = { larguraMm: 52, alturaMm: 30, gapMm: 2, continuo: false };
+    const centro = Buffer.from(T.alinhamento(midia, { cabecaMm: 104 })).toString('latin1');
+    assert.ok(centro.startsWith('SIZE 104 mm,30 mm\r\n'), centro);
+    assert.match(centro, /\r\nBOX 216,8,615,231,2\r\n/);
+    assert.match(centro, /\r\nTEXT 224,16,"2",0,1,1,"52 x 30 mm"\r\n/);
+    assert.ok(!/SHIFT/.test(centro), centro);
+    const ajustado = Buffer.from(T.alinhamento(midia, { cabecaMm: 104, ajusteMm: { x: 1, y: -0.5 } })).toString('latin1');
+    assert.match(ajustado, /REFERENCE 0,0\r\nSHIFT -4\r\n/);
+    assert.match(ajustado, /\r\nBOX 224,8,623,231,2\r\n/);
+    const borda = Buffer.from(T.alinhamento(midia, { cabecaMm: 104, posicao: 'borda' })).toString('latin1');
+    assert.match(borda, /\r\nBOX 8,8,407,231,2\r\n/);
+  });
+
   test('alinhamento: moldura, cruz, régua de 10 mm e texto, sem bitmap', () => {
     const T = carregar();
     const txt = Buffer.from(T.alinhamento({ larguraMm: 52, alturaMm: 30, gapMm: 2, continuo: false })).toString('latin1');

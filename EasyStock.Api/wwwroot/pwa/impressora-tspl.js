@@ -118,8 +118,11 @@
   // Teste de alinhamento com comandos nativos: moldura a 1 mm da borda,
   // cruz no centro e régua de 10 mm com traço a cada 1 mm. Moldura cortada ou
   // régua fora de 10 mm indicam mídia errada.
+  // opts.cabecaMm (v3): como na etiqueta, SIZE ocupa a cabeça, o desenho vai
+  // onde o papel está (opts.posicao) mais o ajuste fino (opts.ajusteMm; y em SHIFT).
   function alinhamento(midia, opts) {
     const m = midia || {};
+    const o = opts || {};
     const continuo = ehContinuo(m);
     const larguraMm = num(m.larguraMm, 80);
     const alturaMm = continuo ? 30 : num(m.alturaMm, 40);
@@ -127,17 +130,21 @@
     const borda = 8;
     const cx = Math.round(W / 2), cy = Math.round(H / 2);
     const braco = Math.min(40, Math.floor(Math.min(W, H) / 4));
-    const linhas = cabecalho(Object.assign({}, m, opts || {}, { continuo }), larguraMm, alturaMm);
-    linhas.push(`BOX ${borda},${borda},${W - 1 - borda},${H - 1 - borda},2`);
-    linhas.push(`BAR ${cx - braco},${cy - 1},${braco * 2},2`, `BAR ${cx - 1},${cy - braco},2,${braco * 2}`);
-    const rx = 16, base = H - 16;
+    const cabecaMm = Number(o.cabecaMm) > 0 ? Number(o.cabecaMm) : 0;
+    const ajuste = o.ajusteMm || {};
+    const dx = cabecaMm ? inicioDoPapel(cabecaMm, larguraMm, o.posicao) + Math.round((Number(ajuste.x) || 0) * PONTOS_MM) : 0;
+    const extra = cabecaMm ? { shift: Math.round((Number(ajuste.y) || 0) * PONTOS_MM) } : {};
+    const linhas = cabecalho(Object.assign({}, m, o, { continuo }, extra), cabecaMm || larguraMm, alturaMm);
+    linhas.push(`BOX ${dx + borda},${borda},${dx + W - 1 - borda},${H - 1 - borda},2`);
+    linhas.push(`BAR ${dx + cx - braco},${cy - 1},${braco * 2},2`, `BAR ${dx + cx - 1},${cy - braco},2,${braco * 2}`);
+    const rx = dx + 16, base = H - 16;
     linhas.push(`BAR ${rx},${base - 2},${10 * PONTOS_MM + 1},2`);
     for (let i = 0; i <= 10; i++) {
       const alto = i % 5 === 0 ? 22 : 12;
       linhas.push(`BAR ${rx + i * PONTOS_MM},${base - alto},1,${alto}`);
     }
     const rotulo = continuo ? `ROLO ${larguraMm} mm` : `${larguraMm} x ${alturaMm} mm`;
-    linhas.push(`TEXT 16,16,"2",0,1,1,"${rotulo}"`, 'PRINT 1,1', '');
+    linhas.push(`TEXT ${dx + 16},16,"2",0,1,1,"${rotulo}"`, 'PRINT 1,1', '');
     return ascii(linhas.join('\r\n'));
   }
 

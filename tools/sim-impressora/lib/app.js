@@ -94,4 +94,17 @@ function previaProducao(env, caso) {
   return (wrap && wrap.filhos && wrap.filhos[0]) || null;
 }
 
-module.exports = { etiquetaProducao, previaProducao, configurar, batch, OASIS };
+// O "Teste de alinhamento" do cartão da impressora, pelo mesmo
+// alinharImpressora() do botão. Devolve os bytes enviados ou null.
+function testeDeAlinhamento(env, caso) {
+  configurar(env, caso);
+  env.sb.__simEnviado = null;
+  env.rodar(`(() => {
+    const orig = printViaBluetooth;
+    printViaBluetooth = bytes => { window.__simEnviado = Array.from(bytes); };
+    try { alinharImpressora(${JSON.stringify(OASIS.address)}); } finally { printViaBluetooth = orig; }
+  })()`);
+  return env.sb.__simEnviado ? Uint8Array.from(env.sb.__simEnviado) : null;
+}
+
+module.exports = { etiquetaProducao, previaProducao, testeDeAlinhamento, configurar, batch, OASIS };
