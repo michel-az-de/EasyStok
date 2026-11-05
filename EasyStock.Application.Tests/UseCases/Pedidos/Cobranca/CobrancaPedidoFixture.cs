@@ -179,7 +179,7 @@ internal sealed class CobrancaPedidoFixture
 
     public GerarCobrancaPedidoUseCase Gerar() =>
         new(PedidoRepo, StorefrontRepo, CobrancaRepo, MpClient, CheckoutCore(), Uow, Relogio,
-            NullLogger<GerarCobrancaPedidoUseCase>.Instance, Saldos());
+            NullLogger<GerarCobrancaPedidoUseCase>.Instance, Saldos(), ConversaRepo);
 
     /// <summary>Núcleo do checkout sobre a vaga e o pedido da fixture: só a reserva desfeita (#1301) passa por ele aqui.</summary>
     public CheckoutCoreService CheckoutCore() =>

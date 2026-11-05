@@ -1,8 +1,10 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.ValueObjects;
 using NSubstitute.ExceptionExtensions;
 
 namespace EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
@@ -32,7 +34,7 @@ public class GerarCobrancaPedidoUseCaseTests
         var preferencia = f.Preferencias.Should().ContainSingle().Subject;
         preferencia.ValorTotal.Should().Be(12.51m);
         preferencia.Items.Should().ContainSingle().Which.Should().BeEquivalentTo(
-            new PreferenceItemCommand("Sinal da encomenda (50%)", 1, 12.51m));
+            new PreferenceItemCommand($"Pedido {CodigoCurto.De(f.Pedido.Id)} · Casa da Babá", 1, 12.51m));
 
         f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
         var reemitida = await uc.ExecuteAsync(input);
@@ -69,6 +71,43 @@ public class GerarCobrancaPedidoUseCaseTests
         r.LinkPagamento.Should().Be("https://mp.test/pref-1");
         r.Reutilizada.Should().BeFalse();
         await f.Uow.Received().CommitAsync();
+    }
+
+    /// <summary>#2228: da conversa, o checkout devolve o cliente ao WhatsApp da loja, não ao site.</summary>
+    [Theory]
+    [InlineData("(11) 92703-2814", true, "https://wa.me/5511927032814")]
+    [InlineData("+5511927032814", true, "https://wa.me/5511927032814")]
+    [InlineData("(11) 92703-2814", false, null)]
+    [InlineData(null, true, null)]
+    [InlineData("123", true, null)]
+    public async Task RetornoDoCheckout_WhatsAppDaLojaSoNaConversa(string? whatsApp, bool daConversa, string? esperado)
+    {
+        var f = new CobrancaPedidoFixture();
+        var storefront = EasyStock.Domain.Entities.Storefront.Storefront.Criar(f.EmpresaId, "casa-da-baba", "Casa da Babá", 0m);
+        storefront.AtualizarBranding(whatsappPedidos: whatsApp);
+        f.StorefrontRepo.GetByEmpresaAsync(f.EmpresaId, Arg.Any<CancellationToken>()).Returns(storefront);
+
+        await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id, daConversa ? Guid.NewGuid() : null));
+
+        f.Preferencias.Should().ContainSingle().Which.RetornoUrl.Should().Be(esperado);
+    }
+
+    /// <summary>#2228: na conversa, o sinal leva o número da comanda que o cliente lê ("Pague por Pedido 5 · Casa da Babá").</summary>
+    [Fact]
+    public async Task SinalDaConversa_TituloComNumeroDaComandaELoja()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        var conversa = Conversa.Abrir(f.EmpresaId, "5511999998888", CobrancaPedidoFixture.Agora, "Maria");
+        typeof(Conversa).GetProperty(nameof(Conversa.NumeroComanda))!.SetValue(conversa, 5L);
+        conversa.DefinirPedidoEmAndamento(f.Pedido.Id);
+        f.ConversaRepo.ObterPorIdAsync(f.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id, conversa.Id));
+
+        f.Preferencias.Should().ContainSingle().Which.Items.Should().ContainSingle()
+            .Which.Titulo.Should().Be("Pedido 5 · Casa da Babá");
     }
 
     [Fact]
@@ -127,7 +166,7 @@ public class GerarCobrancaPedidoUseCaseTests
 
         r.Valor.Should().Be(12.5m);
         f.Preferencias.Should().ContainSingle().Which.Items.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(new PreferenceItemCommand("Restante do pedido", 1, 12.5m));
+            .Which.Should().BeEquivalentTo(new PreferenceItemCommand($"Pedido {CodigoCurto.De(f.Pedido.Id)} · Casa da Babá", 1, 12.5m));
     }
 
     // #1540: depois do estorno total a cobrança fica Estornada e o pagamento permanece. A confirmação
