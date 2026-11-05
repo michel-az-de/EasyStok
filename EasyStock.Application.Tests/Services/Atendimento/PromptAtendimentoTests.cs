@@ -59,6 +59,18 @@ public class PromptAtendimentoTests
     }
 
     [Fact]
+    public void ContatoQueNaoECliente_VaiParaAResponsavel_NuncaEDispensado()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        // #2249: fornecedor com orçamento para a loja ouviu "não temos interesse" e a conversa foi encerrada.
+        prompt.Should().Contain("Nem todo contato é cliente")
+            .And.Contain("fornecedor").And.Contain("orçamento").And.Contain("assunto pessoal")
+            .And.Contain("nunca recuse")
+            .And.Contain("use encaminhar_para_responsavel");
+    }
+
+    [Fact]
     public void Alergia_SoComAFicha_NuncaGaranteAusencia()
     {
         var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));

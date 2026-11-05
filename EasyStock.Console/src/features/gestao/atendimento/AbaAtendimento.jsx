@@ -20,7 +20,7 @@ const NIVEIS_DE_SUGESTAO = [
 const OCIOSO = { estado: 'ocioso' }
 const CAMPOS_CONFIGURACAO = [
   'ativo', 'tom', 'nivelSugestao', 'saudacaoPrimeiroContato', 'saudacaoRetorno',
-  'fraseEspera', 'mensagemForaArea', 'modeloRetomadaNome', 'respiroMinutos',
+  'fraseEspera', 'mensagemForaArea', 'mensagemEscalada', 'mensagemEncaminhamento', 'modeloRetomadaNome', 'respiroMinutos',
   'tempoPreparoPadraoMinutos', 'slaRespostaMinutos',
 ]
 const valorComparavel = (valor) => String(valor ?? '')
@@ -302,6 +302,22 @@ function ConfiguracaoDoAtendimento() {
           onChange={mudar('fraseEspera')}
         />
         <CampoArea rotulo="Mensagem para endereço fora da área" value={form.mensagemForaArea} required onChange={mudar('mensagemForaArea')} />
+        <CampoArea
+          rotulo="Ao passar o cliente para a equipe"
+          dica="Enviada quando o cliente pede uma pessoa ou o robô não sabe responder. {nome} vira o primeiro nome."
+          value={form.mensagemEscalada ?? ''}
+          required
+          maxLength={500}
+          onChange={mudar('mensagemEscalada')}
+        />
+        <CampoArea
+          rotulo="Ao encaminhar quem não é cliente"
+          dica="Fornecedor, orçamento ou assunto pessoal. O robô para de responder a pessoa até alguém devolver a conversa a ele. {nome} vira o primeiro nome."
+          value={form.mensagemEncaminhamento ?? ''}
+          required
+          maxLength={500}
+          onChange={mudar('mensagemEncaminhamento')}
+        />
         <CampoTexto
           rotulo="Modelo de retomada (WhatsApp)"
           dica="Nome do modelo aprovado pela Meta, com uma variável: primeiro nome do cliente. Retoma o contato quando um envio é bloqueado pelo limite de 24 h. A mensagem pendente segue quando o cliente responder. Vazio desativa."
