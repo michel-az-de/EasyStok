@@ -5,7 +5,13 @@
 # Microsoft.AspNetCore.App 10.0.0"). Mesma base da API.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
-USER app
+# Mesmo uid e gid do appuser da API (Dockerfile da raiz): os dois gravam no volume
+# uploads-data, que pertence a ele. Com o usuario padrao da imagem (app, 1654) o worker
+# nao grava o canhoto dos avisos (#2245). scripts/docker/uid-uploads.test.sh confere.
+RUN groupadd --system --gid 1001 appgroup \
+ && useradd  --system --uid 1001 --gid appgroup --create-home appuser \
+ && mkdir -p /app/uploaded-files && chown -R appuser:appgroup /app
+USER appuser
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
