@@ -25,17 +25,25 @@ export function useRolagemDoFio(fimRef, {
   const anterior = useRef(null)
   const eraVisivel = useRef(visivel)
   const [novas, setNovas] = useState(0)
+  // Espelho de `novas`: zerar quando já é zero não chama o `setNovas`. Mesmo sem mudar o valor, o React pode
+  // renderizar a Thread mais uma vez antes de descartar a atualização, e a pausa da digitação (#1577) custaria 2 renders.
+  const novasRef = useRef(0)
+  const zerarNovas = useCallback(() => {
+    if (novasRef.current === 0) return
+    novasRef.current = 0
+    setNovas(0)
+  }, [])
 
   useEffect(() => {
     const area = areaRolavel(fimRef.current)
     if (!area) return undefined
     const medir = () => {
       noFim.current = pertoDoFim({ alturaTotal: area.scrollHeight, topo: area.scrollTop, alturaVisivel: area.clientHeight })
-      if (noFim.current) setNovas((n) => (n === 0 ? n : 0))
+      if (noFim.current) zerarNovas()
     }
     area.addEventListener('scroll', medir, { passive: true })
     return () => area.removeEventListener('scroll', medir)
-  }, [fimRef])
+  }, [fimRef, zerarNovas])
 
   const { total, ultimaId, ultimaDaCasa } = retratoDoFio(chaveRolagem, mensagens)
   useEffect(() => {
@@ -43,28 +51,31 @@ export function useRolagemDoFio(fimRef, {
     if (deveRolarParaOFim(anterior.current, depois, noFim.current)) {
       fimRef.current?.scrollIntoView({ block: 'end' })
       noFim.current = true
-      setNovas((n) => (n === 0 ? n : 0))
+      zerarNovas()
     } else if (visivel) {
       const fora = novasForaDaVista(anterior.current, depois, false)
-      if (fora > 0) setNovas((n) => n + fora)
+      if (fora > 0) {
+        novasRef.current += fora
+        setNovas(novasRef.current)
+      }
     }
     anterior.current = depois
-  }, [fimRef, chaveRolagem, total, ultimaId, ultimaDaCasa, digitando, totalDeNotas, visivel])
+  }, [fimRef, zerarNovas, chaveRolagem, total, ultimaId, ultimaDaCasa, digitando, totalDeNotas, visivel])
 
   useEffect(() => {
     if (deveRolarAoFicarVisivel(eraVisivel.current, visivel)) {
       fimRef.current?.scrollIntoView({ block: 'end' })
       noFim.current = true
-      setNovas((n) => (n === 0 ? n : 0))
+      zerarNovas()
     }
     eraVisivel.current = visivel
-  }, [fimRef, visivel])
+  }, [fimRef, zerarNovas, visivel])
 
   const irParaNovas = useCallback(() => {
     fimRef.current?.scrollIntoView({ block: 'end' })
     noFim.current = true
-    setNovas(0)
-  }, [fimRef])
+    zerarNovas()
+  }, [fimRef, zerarNovas])
 
   return { novas, irParaNovas }
 }

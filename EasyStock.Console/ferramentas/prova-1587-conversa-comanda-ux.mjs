@@ -295,10 +295,15 @@ await confere('D "no fim" tem folga de um balão curto', () => {
 await confere('D o fio usa a regra: nada de rolar a cada mensagem', () => {
   const thread = fonte('features/atendimento/Thread.jsx')
   assert.ok(!thread.includes('scrollIntoView'), 'Thread ainda rola direto')
-  assert.match(thread, /useRolagemDoFio\(fim, \{ mensagens, chaveRolagem, digitando, totalDeNotas: notas\.length \}\)/)
+  // #2232 (A5): o hook ganhou `visivel` (painel aberto na aba). A regra segue no hook: o fio não rola por mensagem.
+  assert.match(thread, /useRolagemDoFio\(fim, \{ mensagens, chaveRolagem, digitando, totalDeNotas: notas\.length, visivel \}\)/)
   const hook = fonte('features/atendimento/useRolagemDoFio.js')
   assert.match(hook, /if \(deveRolarParaOFim\(anterior\.current, depois, noFim\.current\)\) \{\s*fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
-  assert.equal(hook.split('scrollIntoView').length - 1, 1)
+  // #2232 (A5): além da regra acima, só dois outros caminhos rolam, e nenhum é "a cada mensagem": o painel
+  // que acabou de ficar visível (aba "Conversa" abrindo) e o toque de quem pediu "Novas mensagens".
+  assert.match(hook, /if \(deveRolarAoFicarVisivel\(eraVisivel\.current, visivel\)\) \{\s*fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
+  assert.match(hook, /const irParaNovas = useCallback\(\(\) => \{\s*fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
+  assert.equal(hook.split('scrollIntoView').length - 1, 3, 'o hook rola em mais de três lugares')
   assert.match(hook, /area\.addEventListener\('scroll', medir, \{ passive: true \}\)/)
 })
 

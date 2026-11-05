@@ -84,8 +84,11 @@ confere('#1242-D1 a faixa só aparece com aviso, falha, integração parada ou s
   assert.ok(corpoDe(faixa, 'FaixaApi').includes('if (!falhou && !aviso && !integracaoParada && !vencimento) return null'))
   assert.doesNotMatch(corpoDe(faixa, 'FaixaApi'), />Sair</)
   const moldura = semComentarios(ler('app/Moldura.jsx'))
-  assert.match(corpoDe(moldura, 'MenuMais'), /chave: '__sair', titulo: sessaoPersistente \? 'Sair deste aparelho' : 'Sair'/)
-  assert.match(corpoDe(moldura, 'MenuMais'), /if \(item\.chave === '__sair'\) aoSair\?\.\(\)/)
+  // #2232 (M1, M2): os grupos do menu Mais moram em app/menuMais.js; a Moldura só despacha a chave.
+  const menuMais = semComentarios(ler('app/menuMais.js'))
+  assert.match(menuMais, /sair: '__sair'/)
+  assert.match(menuMais, /chave: CHAVES_DO_MENU\.sair,\s*titulo: sessaoPersistente \? 'Sair deste aparelho' : 'Sair'/)
+  assert.match(corpoDe(moldura, 'MenuMais'), /if \(item\.chave === CHAVES_DO_MENU\.sair\) aoSair\?\.\(\)/)
   assert.match(corpoDe(moldura, 'Cabecalho'), /\{aoSair && <MenuDaConta nome=\{atendente\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\} lado="abaixo"/)
 })
 

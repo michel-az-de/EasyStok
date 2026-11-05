@@ -62,7 +62,7 @@ const GERANDO_COBRANCA = 'Gerando cobrança…'
 export function BarraProximoPasso({
   pedido, conversaId, nomeCliente, agora, emDesfazer, simulacao = null, bloqueado = false, prerequisito = null, gerarSemEnviar = false, aoAvancar, aoDesfazer,
   alvoDoPrerequisito = null, aoIrParaMotivo = null, pedidoDeCancelar = 0, pedidoDeAcao = null,
-  aoGerarPix, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
+  aoGerarPix, aoPedirMeio, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
   aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento, aoAprovarPedido,
 }) {
   const [restam, setRestam] = useState(() => (emDesfazer ? SEGUNDOS_PARA_DESFAZER : 0))
@@ -237,7 +237,8 @@ export function BarraProximoPasso({
       linkPendenteApi: fonteApi && Boolean(pedido.cobranca?.link),
       aoAbrirBaixa: () => setAbrindoBaixa(true),
       // #1989 (#1765-3): com a forma já escolhida também abre o resumo; quem gera é o "Confirmar".
-      aoGerarPix: () => { if (!pedindoMeio) setMeioNaBarra(pedido.meio ?? null); setPedindoMeio(true) },
+      // #2231: a pergunta cresce para cima; quem a abre tira da frente o que a cobriria.
+      aoGerarPix: () => { if (!pedindoMeio) setMeioNaBarra(pedido.meio ?? null); aoPedirMeio?.(); setPedindoMeio(true) },
       aoReenviarPix: () => executar(() => aoReenviarPix()),
       aoMandarLinkNovo: fonteApi && pedido.pedidoId && esperaLinkNovoApi(pedido.cobranca, pedido.statusApi)
         ? () => executar(() => aoReenviarPix()) : null,

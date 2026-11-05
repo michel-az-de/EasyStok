@@ -8,9 +8,16 @@ import { transformWithOxc } from 'vite'
 
 const fontes = new Map()
 const base = process.argv.includes('--base') ? process.argv[process.argv.indexOf('--base') + 1] : null
-for (const nome of ['AlcaLargura', 'Popover', 'Modal', 'Chip', 'Icone', 'Campo', 'Botao', 'BarraDeAbas', 'EscolhaDeEntregador', 'EscolhaDeProvedorEntrega', 'InterruptorTema']) {
+// #2232 (L11): a BarraDeAbas usa o Contador; numa base anterior a ele o arquivo não existe e fica de fora.
+for (const nome of ['AlcaLargura', 'Popover', 'Modal', 'Chip', 'Icone', 'Campo', 'Botao', 'BarraDeAbas', 'EscolhaDeEntregador', 'EscolhaDeProvedorEntrega', 'InterruptorTema', 'Contador']) {
   const url = new URL(`../src/componentes/${nome}.jsx`, import.meta.url)
-  const fonte = base ? execFileSync('git', ['show', `${base}:EasyStock.Console/src/componentes/${nome}.jsx`], { encoding: 'utf8' }) : readFileSync(url, 'utf8')
+  let fonte
+  try {
+    fonte = base ? execFileSync('git', ['show', `${base}:EasyStock.Console/src/componentes/${nome}.jsx`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }) : readFileSync(url, 'utf8')
+  } catch (erro) {
+    if (base && nome === 'Contador') continue
+    throw erro
+  }
   fontes.set(url.href, (await transformWithOxc(fonte, url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
 const urlSeletor = new URL('../src/features/atendimento/SeletorRespostas.jsx', import.meta.url)

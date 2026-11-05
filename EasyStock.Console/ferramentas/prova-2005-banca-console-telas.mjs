@@ -170,10 +170,13 @@ registerHooks({
     return proximo(especificador, contexto)
   },
   load(url, contexto, proximo) {
-    if (url.endsWith('/features/ficha-cliente/MenuDoPedido.jsx')) {
+    // #2232 (F7): o ⋮ do pedido (MenuDoPedido) virou item do menu "Ações da ficha" (MenuDaFicha). O Popover dele mede
+    // layout (getBoundingClientRect, portal) que este DOM de prova não tem; então o menu vira uma lista de botões, um
+    // por item recebido. O menu real tem prova própria em `prova-2232-ficha.mjs`.
+    if (url.endsWith('/features/ficha-cliente/MenuDaFicha.jsx')) {
       return {
         format: 'module', shortCircuit: true,
-        source: "import { createElement as h } from 'react'\nexport const MenuDoPedido = ({ podeEstornar, aoEscolher }) => (podeEstornar ? h('button', { type: 'button', onClick: () => aoEscolher('estornar') }, 'Marcar estorno') : null)\n",
+        source: "import { createElement as h } from 'react'\nexport const MenuDaFicha = ({ itens, aoEscolher }) => h('div', null, itens.map((i) => h('button', { key: i.chave, type: 'button', onClick: () => aoEscolher(i.chave) }, i.rotulo)))\n",
       }
     }
     if (jsx.has(url)) return { format: 'module', shortCircuit: true, source: jsx.get(url) }
@@ -255,6 +258,8 @@ const { ESTADOS_OCORRENCIA } = await import('../src/dominio/ocorrencia.js')
 const { pedidoDaApi } = await import('../src/infra/api/comandaApi.js')
 const { AbaCaixaApi } = await import('../src/features/gestao/caixa/AbaCaixaApi.jsx')
 const { BarraProximoPasso } = await import('../src/features/ficha-cliente/BarraProximoPasso.jsx')
+const { MenuDaFicha } = await import('../src/features/ficha-cliente/MenuDaFicha.jsx')
+const { acoesDoPedido, itensDoMenuDaFicha } = await import('../src/features/ficha-cliente/apresentacaoDaFicha.js')
 const { CANAIS, LINHAS_PRODUTO } = await import('../src/infra/catalogo.js')
 
 // ================================================================================================
@@ -516,13 +521,25 @@ await confere('04. estorno da Barra do pedido: "Valor a devolver" nasce com o pa
     estado: 'pago', itens: [], pagamentos: [], meio: 'pix', numero: '1',
     cobranca: { id: 'cb', meio: 'pix', pagaEm: 1, valor: 100, valorPago: 100, criadaEm: 1, expiraEm: 2 },
   }
+  // #2232 (F7): o ⋮ do pedido (MenuDoPedido) saiu da Barra. "Marcar estorno" é item do menu "Ações da ficha" no
+  // cabeçalho (MenuDaFicha), que pede a confirmação em linha da Barra pela prop `pedidoDeAcao`. Esta tela de
+  // prova faz o papel do PainelFicha: o item vem de `itensDoMenuDaFicha`, o toque nele vira `pedidoDeAcao`, e
+  // a Barra segue real. Os asserts de valor abaixo não mudaram.
+  const FichaComMenu = () => {
+    const [pedidoDeAcao, setPedidoDeAcao] = useState({ chave: null, n: 0 })
+    const itens = itensDoMenuDaFicha({ acoes: acoesDoPedido({ pedido, fonteApi: false }), comPedido: true })
+    return h('div', null,
+      h(MenuDaFicha, { itens, aoEscolher: (chave) => setPedidoDeAcao(({ n }) => ({ chave, n: n + 1 })) }),
+      h(BarraProximoPasso, {
+        pedido, conversaId: 'c1', nomeCliente: 'Ana', agora: AGORA, emDesfazer: false, aoAvancar() {}, aoDesfazer() {},
+        pedidoDeAcao: pedidoDeAcao.chave ? pedidoDeAcao : null,
+        aoMarcarEstorno: (...a) => estornos.push(a),
+      }))
+  }
   const barra = h(ContextoAcessoModulos.Provider, { value: { acoes: {} } },
     h(ContextoEstado.Provider, { value: { agora: AGORA, fonteApi: false, conversas: [], selecionada: null } },
       h(ContextoCatalogo.Provider, { value: { entregadores: [], cardapio: [], meiosDePagamento: [] } },
-        h(ContextoAcoes.Provider, { value: {} }, h(BarraProximoPasso, {
-          pedido, conversaId: 'c1', nomeCliente: 'Ana', agora: AGORA, emDesfazer: false, aoAvancar() {}, aoDesfazer() {},
-          aoMarcarEstorno: (...a) => estornos.push(a),
-        })))))
+        h(ContextoAcoes.Provider, { value: {} }, h(FichaComMenu)))))
   await comTela(barra, async (tela) => {
     clicar(tela, 'Marcar estorno')
     assert.equal(valorDe(tela, 'Valor a devolver'), '100,00')

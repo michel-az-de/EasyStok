@@ -55,6 +55,7 @@ function renderizar(alteracoes = {}, fonteApi = true) {
     h(ContextoAcoes.Provider, { value: {} }, h(PainelFicha, { aoAbrirCardapio() {} }))))))
 }
 
+const { itensDoMenuDaFicha } = await import('../src/features/ficha-cliente/apresentacaoDaFicha.js')
 let total = 0
 function provar(nome, fn) { fn(); total++; console.log('ok ' + nome) }
 for (const estado of ['aguardando', 'pago', 'entregue', 'cancelado']) {
@@ -77,7 +78,9 @@ provar('contato sem cadastro abre novo pedido e aponta cadastro incompleto', () 
   assert.match(html, /<h3>Comanda/)
   assert.match(html, /Adicionar itens/)
   assert.match(html, /Contato sem cadastro/)
-  assert.match(html, /aria-label="Editar cadastro"/)
+  // #2232 (F1, F7): editar e baixar saíram dos botões só de ícone para o menu "Ações da ficha".
+  assert.match(html, /aria-label="Ações da ficha"/)
+  assert.equal(itensDoMenuDaFicha({ comPedido: false })[0].rotulo, 'Editar cadastro')
   assert.doesNotMatch(html, /Pós-venda|Revisar comanda|Pagamento completo/)
 })
 provar('pedido com sinal mostra saldo do pedido inteiro incluindo frete', () => {
