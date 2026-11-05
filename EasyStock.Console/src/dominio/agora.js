@@ -4,6 +4,7 @@
 // decide atraso e passo é `dominio/cozinha.js` (o mesmo da fila da Cozinha).
 // Com extensão nos imports: a prova carrega este arquivo direto pelo Node.
 import { motivoDePrecisar } from './automatico.js'
+import { cargaDaLista } from './cargaDaLista.js'
 import { conversaEncerrada, estaBloqueada, ordenarBalcao } from './conversa.js'
 import { pedidosNaCozinha, situacaoDoCartao } from './cozinha.js'
 import { faixaDaJanela, inicioDaFaixa } from './entrega.js'
@@ -35,11 +36,11 @@ const doPasso = (itens, passos) => itens
   .filter((i) => passos.includes(i.passo))
   .sort((a, b) => porUrgencia(a, b) || passos.indexOf(a.passo) - passos.indexOf(b.passo))
 
-// #1611: no modo API a lista começa vazia e pode nunca chegar. Zero conversa sem
-// sincronização concluída não é "ninguém esperando": a fila diz o que falta.
-export function avisoDeResponder({ fonteApi, estado, total }) {
-  if (!fonteApi || estado === 'ok' || total > 0) return null
-  return estado === 'erro'
+// #1611: zero conversa sem sincronização concluída não é "ninguém esperando": a fila diz o que falta.
+export function avisoDeResponder(leitura) {
+  const carga = cargaDaLista(leitura)
+  if (!carga) return null
+  return carga === 'erro'
     ? 'Não consegui carregar as conversas. Abra o Balcão para tentar de novo.'
     : 'Carregando as conversas…'
 }

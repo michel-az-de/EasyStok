@@ -8,6 +8,7 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { fecharMenu, useMenuDetalhes } from '../../hooks/useMenuDetalhes'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
@@ -40,6 +41,9 @@ export function PainelAtendimento({
   const reabrirLigado = useAcaoDisponivel()('reabrir')
   const podeReabrir = reabrirLigado && (!fonteApi || capacidades.reabrirConversa === true)
   const cabecalhoRef = useRef(null)
+  // #2230: o ⋮ da conversa fecha com toque fora e Escape.
+  const menuConversa = useRef(null)
+  useMenuDetalhes(menuConversa)
   const compositorPublicoRef = useRef(null)
   const contextoDaNota = useRef({ id: selecionada?.id, visivel: editorNotaVisivel })
   const reabrindoRef = useRef(false)
@@ -156,7 +160,7 @@ export function PainelAtendimento({
         </span>
         <div className={css.direita} data-ancora-assistente>
           {bloqueada && <Pilula tom="perigo"><Icone nome="bloqueio" /> Bloqueado</Pilula>}
-          {!encerrada && !bloqueada && <details key={selecionada.id} className={css.opcoesConversa} onKeyDown={(evento) => {
+          {!encerrada && !bloqueada && <details key={selecionada.id} ref={menuConversa} className={css.opcoesConversa} onKeyDown={(evento) => {
             if (evento.key !== 'Escape' || evento.defaultPrevented || evento.target.closest('dialog')) return
             evento.preventDefault(); evento.stopPropagation()
             evento.currentTarget.open = false
@@ -176,7 +180,7 @@ export function PainelAtendimento({
           {/* #1239: passar a conversa para outra atendente (só no modo API). */}
           {fonteApi && !encerrada && !bloqueada && <PassarConversa key={'passar-' + selecionada.id} conversa={selecionada} />}
           {!encerrada && !bloqueada && (
-            <Botao variante="texto" icone="circle-check" className={css.encerrar} aria-label="Concluir conversa" title="Concluir conversa" onClick={() => abrirEncerramento(selecionada.id)}>
+            <Botao variante="texto" icone="circle-check" className={css.encerrar} aria-label="Concluir conversa" title="Concluir conversa" onClick={() => { fecharMenu(menuConversa.current); abrirEncerramento(selecionada.id) }}>
               Concluir conversa
             </Botao>
           )}
