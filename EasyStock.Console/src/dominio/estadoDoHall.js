@@ -69,3 +69,10 @@ export function resumoDoDia(fontes) {
   ].filter(Boolean)
   return { emAndamento, naFila, texto: partes.length ? `Hoje · ${partes.join(' · ')}` : null }
 }
+
+// #2256 (auditoria de UX, Onda 1): 6 módulos em 4 colunas deixavam 2 vagas vazias.
+// Escolhe 3 ou 4 colunas, a que deixa menos vagas na última linha; no empate, e com 1 ou 2, fica 4.
+export function colunasDaGrade(total) {
+  const vagas = (colunas) => (colunas - (total % colunas)) % colunas
+  return total >= 3 && vagas(3) < vagas(4) ? 3 : 4
+}

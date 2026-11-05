@@ -18,7 +18,7 @@ import {
   ordenarModulosDoHall, ordenarPaineisDoHall, FOCOS_DO_HALL,
 } from '../../dominio/preferenciasHall'
 import {
-  comOrdemPorUso, estadoDoCartao, favoritosPrimeiroPorUso, MODULOS_NO_RODAPE, restaurarOrdemPorUso,
+  colunasDaGrade, comOrdemPorUso, estadoDoCartao, favoritosPrimeiroPorUso, MODULOS_NO_RODAPE, restaurarOrdemPorUso,
 } from '../../dominio/estadoDoHall'
 import { usePulsoDoHall } from '../../aplicacao/usePulsoDoHall'
 import { IconeDoModulo } from './IconeDoModulo'
@@ -267,7 +267,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             },
           }} onDragEnd={({ active, over }) => { clique.aoTerminar(); setArrastando(null); if (over) mover(active.id, over.id) }}>
           <SortableContext items={modulos.map((modulo) => modulo.id)} strategy={rectSortingStrategy}>
-            <ul className={css.grade} aria-label="Módulos" onClickCapture={clique.onClickCapture}>
+            <ul className={css.grade} data-colunas={colunasDaGrade(modulos.length)} aria-label="Módulos" onClickCapture={clique.onClickCapture}>
               {modulos.map((modulo, indice) => <CartaoModulo key={modulo.id} modulo={modulo}
                 favorito={preferencia.favoritos.includes(modulo.id)} organizar={podeOrganizar} arrastavel={!buscando} movimentos={preferencia.movimentos}
                 indice={indice} total={modulos.length} pendencia={estadoDoCartao(modulo.id, fontes)}

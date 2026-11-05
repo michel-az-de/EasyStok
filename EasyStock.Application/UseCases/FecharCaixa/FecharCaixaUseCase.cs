@@ -97,9 +97,10 @@ public class FecharCaixaUseCase(
                 var pagInter = await repo.GetTotalPagamentosPedidosNoIntervaloAsync(cmd.EmpresaId, iniInter, fimInter, cmd.LojaId);
                 if (movsInter.Any() || vendasInter != 0m || pagInter != 0m)
                 {
-                    var aviso = $"Atencao: ha lancamentos entre {dia.AddDays(1):dd/MM/yyyy} e " +
-                                $"{hoje.AddDays(-1):dd/MM/yyyy} sob esta sessao que NAO foram incluidos " +
-                                "neste fechamento (revisar/reconciliar manualmente).";
+                    // #2256: o aviso aparece na tela do fechamento; português correto e sem caixa alta.
+                    var aviso = $"Atenção: há lançamentos entre {dia.AddDays(1):dd/MM/yyyy} e " +
+                                $"{hoje.AddDays(-1):dd/MM/yyyy} nesta sessão que não entraram neste fechamento. " +
+                                "Revise e reconcilie manualmente.";
                     observacoes = string.IsNullOrWhiteSpace(observacoes) ? aviso : $"{observacoes}\n{aviso}";
                     logger.LogWarning(
                         "Fechamento {Dia} (empresa {Empresa}, loja {Loja}): lancamentos em dias intermediarios nao cobertos.",

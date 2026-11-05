@@ -246,6 +246,32 @@ public class CaixaUseCasesTests
         await _uow.Received(1).CommitAsync();
     }
 
+    [Fact]
+    public async Task FecharCaixa_AvisoDeDiasIntermediarios_DeveSairComAcentoESemCaixaAlta()
+    {
+        // #2256: o aviso fica gravado nas observações e aparece na tela do fechamento.
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var dia = hoje.AddDays(-3);
+        var abertura = MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-3));
+        var esquecido = MovimentoCaixa.Criar(empresaId, "entrada", 20m, DateTime.UtcNow.AddDays(-2));
+
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(abertura);
+        _repo.GetFechamentoDoDiaAsync(empresaId, dia, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, dia, null).Returns(new[] { abertura });
+        _repo.GetMovimentosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { esquecido });
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<FecharCaixaUseCase>>());
+
+        await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId));
+
+        var esperado = $"Atenção: há lançamentos entre {dia.AddDays(1):dd/MM/yyyy} e {hoje.AddDays(-1):dd/MM/yyyy} " +
+                       "nesta sessão que não entraram neste fechamento. Revise e reconcilie manualmente.";
+        await _repo.Received(1).AddFechamentoAsync(Arg.Is<FechamentoCaixa>(f => f.Observacoes == esperado));
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // RegistrarMovimentoCaixa
     // ════════════════════════════════════════════════════════════════════

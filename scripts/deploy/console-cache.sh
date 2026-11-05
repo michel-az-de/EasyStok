@@ -33,7 +33,7 @@ novo = (
     '\t\theader @mutavel Cache-Control "no-store, max-age=0"\n'
     '\t\t@spa {\n'
     '\t\t\tnot file\n'
-    '\t\t\tnot path_regexp \.[A-Za-z0-9]+$\n'
+    '\t\t\tnot path_regexp \\.[A-Za-z0-9]+$\n'
     '\t\t}\n'
     '\t\trewrite @spa /index.html\n'
     '\t\tfile_server\n'
