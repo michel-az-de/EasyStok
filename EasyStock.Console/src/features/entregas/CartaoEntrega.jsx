@@ -27,7 +27,8 @@ const corPeloMinuto = (minutos) => {
 const rotuloMinutos = (minutos) => {
   if (minutos == null) return '—'
   if (minutos < 0) return '+' + Math.min(Math.abs(Math.round(minutos)), 99)
-  if (minutos > 99) return '1 h'
+  // #2237: acima de 99 min, as horas inteiras que faltam, para baixo (nunca promete tempo a mais).
+  if (minutos > 99) return Math.floor(minutos / 60) + ' h'
   return String(Math.round(minutos))
 }
 
@@ -66,7 +67,11 @@ export function CartaoEntrega({
   const motivo = passo && !passo.semAcao
     && motivoParaNaoAvancar(passo.proximoEstado, { bloqueado: estaBloqueada(conversa) })
   const estado = estadoDaEntrega(pedido)
-  const minutos = passo ? (passo.quandoMs - agora) / 60000 : null
+  // #2236: pedido sem janela (nasce null, #1474) não tem marco; sem a checagem, o null virava
+  // 0 (1970) e o cartão dizia "Atrasado" e "Conferir às 21:00".
+  const temMarco = passo?.quandoMs != null
+  const minutos = temMarco ? (passo.quandoMs - agora) / 60000 : null
+  const hora = temMarco ? horaCurta(new Date(passo.quandoMs).toISOString()) : null
   const bairro = partesDoEndereco(conversa.cliente?.endereco).bairro
   const totalItens = pedido.itens.reduce((soma, l) => soma + l.qtd, 0)
   const semPagamento = !sinalVerde(pedido)
@@ -96,7 +101,8 @@ export function CartaoEntrega({
           <Anel tamanho={44} traco={5} fracao={Math.max(0, Math.min(1, minutos / 60))} tom={corPeloMinuto(minutos)}>
             <span
               className={css.anelNumero} role="timer"
-              aria-label={minutos < 0 ? `Atrasado ${Math.round(-minutos)} minutos` : `Próximo marco em ${Math.round(minutos)} minutos`}
+              aria-label={minutos == null ? 'Sem janela escolhida'
+                : minutos < 0 ? `Atrasado ${Math.round(-minutos)} minutos` : `Próximo marco em ${Math.round(minutos)} minutos`}
             >
               {rotuloMinutos(minutos)}
             </span>
@@ -173,9 +179,10 @@ export function CartaoEntrega({
           ? (
             <>
               <span>
-                {passo.chave === 'conferir' && 'Conferir às ' + horaCurta(new Date(passo.quandoMs).toISOString())}
-                {passo.chave === 'sair' && 'Sair às ' + horaCurta(new Date(passo.quandoMs).toISOString())}
-                {passo.chave === 'entregar' && 'Entregar até ' + horaCurta(new Date(passo.quandoMs).toISOString())}
+                {hora == null && 'Sem janela escolhida'}
+                {hora != null && passo.chave === 'conferir' && 'Conferir às ' + hora}
+                {hora != null && passo.chave === 'sair' && 'Sair às ' + hora}
+                {hora != null && passo.chave === 'entregar' && 'Entregar até ' + hora}
               </span>
               <Botao
                 variante="primario"
@@ -201,7 +208,7 @@ export function CartaoEntrega({
             </>
           )
           : passo?.semAcao
-            ? <span>Sai com a viagem às {horaCurta(new Date(passo.quandoMs).toISOString())}</span>
+            ? <span>{hora == null ? 'Sai com a viagem' : 'Sai com a viagem às ' + hora}</span>
             : null}
       </div>
       {motivo && <p className={css.motivoDesabilitado}>{motivo}</p>}
