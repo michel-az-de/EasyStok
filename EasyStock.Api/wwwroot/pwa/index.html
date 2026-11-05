@@ -17377,14 +17377,22 @@ function findUnitByCode(code) {
   const c = String(code || '').trim().toUpperCase();
   if (!c) return null;
   const allBatches = batches || [];
+  // #2209: o QR traz o código longo; a barra, a chave do número curto. O número só é único na
+  // loja (o lote sem loja tem contador próprio), então a chave que bate em dois lotes não escolhe
+  // um: o operador lê o QR.
+  let pelaChave = null;
+  let chaveAmbigua = false;
   for (const batch of allBatches) {
     const ets = etiquetasFromBatch(batch);
     for (const et of ets) {
-      if (String(et.codigoBarras || '').toUpperCase() === c) {
-        return { batch, et, idxStr: et.idxStr };
+      if (String(et.codigoBarras || '').toUpperCase() === c) return { batch, et, idxStr: et.idxStr };
+      if (et.chaveCurta && et.chaveCurta === c) {
+        if (!pelaChave) pelaChave = { batch, et, idxStr: et.idxStr };
+        else if (pelaChave.batch !== batch) chaveAmbigua = true;
       }
     }
   }
+  if (pelaChave) return chaveAmbigua ? null : pelaChave;
   // Etiqueta impressa antes do #1471 (sem sufixo do lote). Pode colidir entre lotes
   // do mesmo dia; devolve o primeiro, como antes.
   for (const batch of allBatches) {
@@ -19894,6 +19902,10 @@ function generateCode128Svg(data, width = 260, height = 58) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${realW}" height="${height}" viewBox="0 0 ${realW} ${height}" style="background:#fff"><rect width="100%" height="100%" fill="#fff"/>${rects}</svg>`;
 }
 
+// #2209 (F4): a unidade vai na barra com 4 dígitos, então um lote numera até 9.999.
+const UNIDADES_MAX_DA_BARRA = 9999;
+const RECUSA_BARRA_EXCEDIDA = 'Escolha só o QR em Ajustes. A barra numera até '
+  + UNIDADES_MAX_DA_BARRA.toLocaleString('pt-BR') + ' etiquetas por lote, e este lote passa disso.';
 /**
  * Expande um batch em N etiquetas (1 por unidade produzida) com todos os
  * dados que cada etiqueta precisa pra ser renderizada/impressa.
@@ -19904,6 +19916,7 @@ function etiquetasFromBatch(batch) {
   // Formato antigo (so o lote do dia): etiquetas ja impressas continuam achaveis.
   const loteLegado = batch.lote || getLoteDoDia(new Date(batch.createdAt));
   const empresa = getEmpresaName();
+  const numeroCurto = batch.numeroCurto ? String(batch.numeroCurto).replace(/\D/g, '') : '';
   let serial = 1;
   (batch.items || []).forEach(it => {
     const product = products.find(p => p.id === it.productId);
@@ -19923,7 +19936,9 @@ function etiquetasFromBatch(batch) {
         codigoBarras: `${sku}-${lote}-${idxStr}`,
         codigoBarrasLegado: `${sku}-${loteLegado}-${idxStr}`,
         // #2202 (D4): Code128 C só com o número curto do lote; sem ele, sem barra.
-        chaveCurta: batch.numeroCurto ? String(batch.numeroCurto).replace(/\D/g, '') + idxStr : null,
+        // #2209: número curto + unidade com 4 dígitos (12 ou 14 dígitos, par). O QR fica com 3.
+        chaveCurta: numeroCurto ? numeroCurto + String(serial).padStart(4, '0') : null,
+        barraExcedida: false,
         weightG: it.weightG ?? null,
         productionDate: batch.createdAt,
         expiresAt: it.expiresAt ?? null,
@@ -19936,6 +19951,9 @@ function etiquetasFromBatch(batch) {
       serial++;
     }
   });
+  // #2209: o teto conta as etiquetas geradas. Acima dele a chave não cabe, e
+  // nenhuma etiqueta leva chave truncada.
+  if (out.length > UNIDADES_MAX_DA_BARRA) out.forEach(et => { et.chaveCurta = null; et.barraExcedida = true; });
   return out;
 }
 
@@ -20048,6 +20066,7 @@ function etiquetaProducaoTsplV2(et, nota, printer, copias) {
   const C = window.cdbEtiquetaCanvas, P = window.cdbPapeis, I = window.cdbImpressoras;
   if (!C || !P || !I || !window.cdbResolverEtiqueta) return undefined;
   const regra = I.regra(localStorage, 'etiqueta-producao');
+  if (et.barraExcedida && regra.codigos.indexOf('barras') >= 0) { etiquetasTspl.recusa = RECUSA_BARRA_EXCEDIDA; return null; }
   const r = C.tspl({
     campos: camposDaEtiqueta(et, nota), papel: P.daMidia(midiaDaImpressora(printer)),
     orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, copias, document
@@ -20069,14 +20088,48 @@ function avisoDaImpressao(printer, aviso) {
 }
 // A recusa já diz o motivo e o que fazer; o toast começa pelo que fazer.
 function avisoDaRecusa(recusa) {
+  // #2209: a recusa que já começa pelo que fazer sai como está.
+  if (/^Escolha /.test(String(recusa || ''))) return String(recusa);
   const acao = 'Escolha um papel maior em Ajustes';
   const motivo = String(recusa || '').replace('. ' + acao, '');
   return acao + '. ' + motivo.charAt(0).toUpperCase() + motivo.slice(1) + '.';
+}
+// #2209: a etiqueta do lote recém-lançado é montada antes de o servidor responder ao push com o
+// número do lote. Com a barra na regra, espera o envio em andamento (até 5 s) e refaz as chaves;
+// sem resposta, a etiqueta sai só com o QR, como sem rede.
+const ESPERA_DO_NUMERO_MS = 5000;
+async function completarChavesDaBarra(etiquetas) {
+  const faltam = (etiquetas || []).filter(et => et && et.batchId && !et.chaveCurta && !et.barraExcedida);
+  const I = window.cdbImpressoras, S = window.cdbSync;
+  if (!faltam.length || !I || !S || typeof S.flush !== 'function') return;
+  if (I.regra(localStorage, 'etiqueta-producao').codigos.indexOf('barras') < 0) return;
+  const loteDe = id => (batches || []).find(b => b && b.id === id);
+  const semNumero = () => faltam.some(et => { const b = loteDe(et.batchId); return b && !b.numeroCurto; });
+  // O flush devolve o envio em andamento, que pode ser anterior ao lote: sem o número, um segundo
+  // envio dentro do mesmo prazo leva o lote.
+  const ate = Date.now() + ESPERA_DO_NUMERO_MS;
+  for (let envio = 0; envio < 2 && semNumero() && Date.now() < ate; envio++) {
+    let limite = null;
+    try {
+      await Promise.race([
+        Promise.resolve().then(() => S.flush()).catch(() => {}),
+        new Promise(r => { limite = setTimeout(r, Math.max(0, ate - Date.now())); })
+      ]);
+    } finally { clearTimeout(limite); }
+  }
+  const refeitas = {};
+  faltam.forEach(et => {
+    const b = loteDe(et.batchId);
+    if (!b || !b.numeroCurto) return;
+    const nova = (refeitas[b.id] || (refeitas[b.id] = etiquetasFromBatch(b))).find(n => n.idx === et.idx);
+    if (nova) { et.chaveCurta = nova.chaveCurta; et.barraExcedida = nova.barraExcedida; }
+  });
 }
 async function etiquetasTspl(etiquetas, kind, nota, printer, copias) {
   if (!window.cdbTspl) return null;
   etiquetasTspl.recusa = null;
   etiquetasTspl.aviso = '';
+  if (kind !== 'order') await completarChavesDaBarra(etiquetas);
   const partes = [];
   for (const et of etiquetas) {
     let canvas = null;
@@ -21284,6 +21337,7 @@ async function etqAction(action) {
         // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
         // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
         // etiqueta, travando o app pra batches de 100+ unidades).
+        // #2209: o ESC/POS imprime o código do QR, não a chave curta; não espera o número do lote.
         const prodNota = getEtqNota() || null;
         let singleLen = 0;
         const parts = currentEtiquetas.map(et => {

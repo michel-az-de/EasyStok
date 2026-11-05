@@ -16,6 +16,9 @@ node regressao.js --antes <pwa do master>        # 58 mm ESC/POS e cupom, byte a
 
 Uma PWA do master sai de `git archive origin/master EasyStock.Api/wwwroot/pwa`.
 
+O ANTES de um master anterior à F4 (#2209) reprova a barra nos 24 casos com
+código: lá a chave fica com 11 dígitos, ímpar, e o Code128 C não sai.
+
 ## O que a matriz reprova
 
 3 tamanhos (52, 80, 10x15) x 2 orientações x 3 opções de código (QR, barra,
@@ -36,7 +39,7 @@ comê-la.
 
 | Caminho | Papel |
 |---|---|
-| `casos.js` | a matriz e os dados do protótipo (mesmo QR e mesma chave curta) |
+| `casos.js` | a matriz e os dados do protótipo (mesmo QR; chave curta de 12 dígitos, #2209) |
 | `lib/ambiente.js` | carrega a PWA num `vm` com canvas real e as fontes de `fontes/` |
 | `lib/tspl.js`, `lib/escpos.js` | interpretam os bytes e devolvem a tinta por ponto |
 | `lib/leitura.js` | lê QR (jsQR e ZXing) e Code128 (ZXing) da tinta |

@@ -35,8 +35,10 @@ public class SyncController(
     IProdutoRepository produtoRepo,
     IConfiguration appConfig,
     TimeProvider relogio,
+    NumeroCurtoDosLotesMobile numerosCurtos,
     ILogger<SyncController> log) : ControllerBase
 {
+    private readonly NumeroCurtoDosLotesMobile _numerosCurtos = numerosCurtos;
     private readonly EasyStockDbContext _db = db;
     private readonly SyncMutationDispatcher _dispatcher = dispatcher;
     private readonly SyncAutoLinker _autoLinker = autoLinker;
@@ -64,6 +66,8 @@ public class SyncController(
         var autoLinkOrderIds   = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkBatchIds   = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkCashIds    = new HashSet<string>(StringComparer.Ordinal);
+        // #2209: lotes que recebem o número curto na resposta, inclusive o reenvio de quem perdeu a resposta anterior.
+        var numeroBatchIds     = new HashSet<string>(StringComparer.Ordinal);
 
         // F10-C-3 — Idempotency: pre-check mutations já processadas.
         // Dedup por MutationId GLOBAL (não por device). Os ids são UUID v4
@@ -107,7 +111,10 @@ public class SyncController(
             if (!string.IsNullOrEmpty(m.Id) && alreadyProcessed.TryGetValue(m.Id, out var prev))
             {
                 if (prev.Outcome == "accepted")
+                {
                     accepted.Add(m.Id);
+                    if (IdDoLote(m) is { } reenviado) numeroBatchIds.Add(reenviado);
+                }
                 else
                     rejected.Add(new SyncConflict(m.Id, prev.Outcome));
                 continue;
@@ -225,8 +232,23 @@ public class SyncController(
             await _eventBroker.NotifyMutationsAppliedAsync(empresaId, lojaId, req.DeviceId, accepted.Count);
         }
 
-        return Ok(new SyncPushResponse(accepted, rejected.Count > 0 ? rejected : null));
+        // #2209: o pull não devolve ao aparelho o lote que ele mesmo enviou, então o número do Lote do ERP, dado na
+        // promoção acima, volta aqui.
+        numeroBatchIds.UnionWith(autoLinkBatchIds);
+        var numeros = empresaId is { } empresaDoAparelho && lojaId is { } lojaDoAparelho && numeroBatchIds.Count > 0
+            ? await _numerosCurtos.DosLotesDoAparelhoAsync(empresaDoAparelho, lojaDoAparelho, numeroBatchIds, CancellationToken.None)
+            : null;
+
+        return Ok(new SyncPushResponse(accepted, rejected.Count > 0 ? rejected : null,
+            numeros is { Count: > 0 } ? numeros : null));
     }
+
+    private static string? IdDoLote(MutationDto m) =>
+        m.Type?.StartsWith("batch.", StringComparison.Ordinal) == true
+        && m.Payload.ValueKind == JsonValueKind.Object
+        && m.Payload.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
+            ? id.GetString()
+            : null;
 
     /// <summary>
     /// F5 — Backfill auto-link mobile→ERP de entidades pre-existentes. Idempotente.
@@ -314,10 +336,20 @@ public class SyncController(
         if (lojaId.HasValue)
             batchesQ = batchesQ.Where(b => b.LojaId == lojaId || b.LojaId == null);
         var batches = await batchesQ.ToListAsync();
+        // #2209: o número curto do Lote do ERP ligado; o lote antigo, sem número, ganha um aqui.
+        var numerosDosLotes = empresaId is { } empresaDoPull
+            ? await _numerosCurtos.DosLotesAsync(empresaDoPull,
+                batches.Where(b => b.ErpLoteId.HasValue).Select(b => b.ErpLoteId!.Value).ToList(), CancellationToken.None)
+            : new Dictionary<Guid, string>();
         foreach (var b in batches)
+        {
+            var dto = SyncDtoConverters.ToDto(b);
+            if (b.ErpLoteId is { } loteId && numerosDosLotes.TryGetValue(loteId, out var numero))
+                dto = dto with { NumeroCurto = numero };
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), b.LastDeviceId ?? "server",
-                "batch.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(b)),
+                "batch.upsert", SyncDtoConverters.Serialize(dto),
                 new DateTimeOffset(b.ServerUpdatedAt).ToUnixTimeMilliseconds()));
+        }
 
         var cashQ = _db.Set<CashEntry>().Where(c => c.EmpresaId == empresaId && c.ServerUpdatedAt > sinceDate && c.LastDeviceId != deviceId);
         if (lojaId.HasValue)
