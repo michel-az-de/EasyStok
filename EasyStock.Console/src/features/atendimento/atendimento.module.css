@@ -627,6 +627,8 @@
 .linhaPedido dt { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .linhaPedido dd { margin: 0; }
 .valorPedido { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--f-dado); white-space: nowrap; }
+/* Rodapé: texto e nota quebram no balão estreito; só o valor em R$ (span .valorPedido) fica inteiro. */
+.valorRodape { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--f-dado); min-width: 0; overflow-wrap: anywhere; }
 .rodapePedido { color: var(--tinta-2); }
 .linhaPedido:not(.rodapePedido) + .rodapePedido { border-top: var(--b-1) solid var(--linha); padding-top: var(--e-1); }
 .totalPedido { color: var(--tinta); font-weight: 700; }

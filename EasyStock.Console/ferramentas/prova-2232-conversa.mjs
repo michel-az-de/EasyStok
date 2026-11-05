@@ -267,6 +267,16 @@ await confere('C1  a bolha desenha o cartão com valores tabulares à direita e 
   assert.match(regra('.valorPedido') + regra('.cartaoPedido dd'), /font-variant-numeric:\s*tabular-nums/)
   assert.match(regra('.valorPedido') + regra('.cartaoPedido dd'), /text-align:\s*right/)
 })
+// Revisão 3: no rodapé, texto e nota quebram linha (cabem no balão de 360 px); só o valor em R$ fica inteiro.
+await confere('C1  rodapé do cartão: texto e nota quebram; o valor em R$ não parte', () => {
+  const marcado = balao({ texto: SERVIDOR })
+  const linha = (rotulo) => marcado.match(new RegExp(`<dt>${rotulo}</dt><dd[^>]*>.*?</dd>`))?.[0] ?? ''
+  assert.match(linha('Pagamento'), /<dd class="valorRodape">link online/)
+  assert.match(linha('Frete'), /<dd class="valorRodape"><span class="valorPedido">R\$ 10,00<\/span><\/dd>/)
+  assert.doesNotMatch(regra('.valorRodape'), /nowrap/)
+  assert.match(regra('.valorRodape'), /overflow-wrap:\s*anywhere/)
+  assert.match(regra('.valorPedido'), /white-space:\s*nowrap/)
+})
 
 // --- C2 -------------------------------------------------------------------------------------------
 await confere('C2  só link de pagamento da lista vira botão de pagar; o resto é texto', () => {

@@ -83,7 +83,11 @@ function CartaoDoPedido({ resumo }) {
       {resumo.rodape.map((linha, i) => (
         <div key={i} className={`${css.linhaPedido} ${css.rodapePedido} ${linha.forte ? css.totalPedido : ''}`}>
           <dt>{linha.rotulo}</dt>
-          <dd className={css.valorPedido}>{linha.tipo === 'valor' ? linha.valor + (linha.nota ? ' ' + linha.nota : '') : linha.texto}</dd>
+          <dd className={css.valorRodape}>
+            {linha.tipo === 'valor'
+              ? <><span className={css.valorPedido}>{linha.valor}</span>{linha.nota ? ' ' + linha.nota : ''}</>
+              : linha.texto}
+          </dd>
         </div>
       ))}
     </dl>

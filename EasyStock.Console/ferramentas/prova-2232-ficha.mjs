@@ -105,6 +105,17 @@ confere('F1  o menu reúne cadastro e PDF; as ações do pedido entram só com p
   const com = ficha.itensDoMenuDaFicha({ comPedido: true, acoes: { podeCancelar: true } }).map((i) => i.chave)
   assert.deepEqual(com, ['editar', 'baixar', 'cancelar', 'encerrar'])
 })
+// Revisão 3: o menu fecha ao escolher "Baixar"; a espera do PDF aparece no próprio gatilho, como no botão antigo.
+await confereAsync('F1  enquanto o PDF prepara, o gatilho "Ações" diz e anuncia a espera', async () => {
+  const { MenuDaFicha } = await import('../src/features/ficha-cliente/MenuDaFicha.jsx')
+  const itens = ficha.itensDoMenuDaFicha({ comPedido: false })
+  const ocupado = renderToStaticMarkup(h(MenuDaFicha, { itens, aoEscolher() {}, pdf: { baixando: true } }))
+  assert.match(ocupado, /aria-busy="true"/)
+  assert.match(ocupado, /Preparando PDF…/)
+  const livre = renderToStaticMarkup(h(MenuDaFicha, { itens, aoEscolher() {}, pdf: { baixando: false } }))
+  assert.doesNotMatch(livre, /aria-busy/)
+  assert.match(livre, />Ações</)
+})
 
 // --- F2 ------------------------------------------------------------------------------------------
 

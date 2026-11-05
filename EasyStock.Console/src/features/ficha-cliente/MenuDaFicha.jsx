@@ -22,10 +22,12 @@ export function MenuDaFicha({ itens, aoEscolher, pdf = null }) {
         icone="ellipsis-vertical"
         aria-haspopup="menu"
         aria-expanded={aberto}
-        aria-label={ROTULO_DO_MENU_DA_FICHA}
+        aria-label={pdf?.baixando ? `${ROTULO_DO_MENU_DA_FICHA}: preparando PDF` : ROTULO_DO_MENU_DA_FICHA}
+        aria-busy={pdf?.baixando || undefined}
         onClick={() => setAberto((v) => !v)}
       >
-        Ações
+        {/* O menu fecha ao escolher "Baixar": a espera do PDF aparece aqui, como no botão antigo. */}
+        {pdf?.baixando ? 'Preparando PDF…' : 'Ações'}
       </Botao>
       {pdf?.erro && <output role="alert" className={css.erroPdf}>{pdf.erro}</output>}
       {aberto && (
