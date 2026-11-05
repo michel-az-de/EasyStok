@@ -19,6 +19,7 @@ import {
 import { escolherFormatoGravacao } from '../../dominio/audio'
 import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
 import { useGravadorAudio } from '../../hooks/useGravadorAudio'
+import { useMenuDetalhes } from '../../hooks/useMenuDetalhes'
 import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
 import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
 import { SeletorRespostas } from './SeletorRespostas'
@@ -54,6 +55,7 @@ export function Composer({
   const campoRef = useRef(null)
   const respostasRef = useRef(null)
   const ferramentasRef = useRef(null)
+  useMenuDetalhes(ferramentasRef)
   const idListaRespostas = useId()
   const sugestoesNoCampo = visivel && barra.aberto && barra.pelaBarra && barra.itens.length > 0
   function abrirNotaInterna() {

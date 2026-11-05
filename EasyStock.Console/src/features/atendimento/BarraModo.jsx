@@ -6,6 +6,7 @@ import { MODOS } from '../../dominio/automatico'
 import { resumoDoModo } from '../../dominio/resumoDoModo'
 import { primeiroNome } from '../../dominio/mensagem'
 import { automaticoDesligadoNaConversa } from '../../dominio/motivoDeEscalada'
+import { useMenuDetalhes } from '../../hooks/useMenuDetalhes'
 import css from './atendimento.module.css'
 
 // Quem responde esta conversa. Um lugar só, no topo da thread, com os três
@@ -26,6 +27,7 @@ export function BarraModo({
 }) {
   const [confirmandoDevolver, setConfirmandoDevolver] = useState(null)
   const menu = useRef(null)
+  useMenuDetalhes(menu)
   const resumo = resumoDoModo(conversa, pausado, bloqueada)
   const encerrada = resumo.chave === MODOS.ENCERRADO
   // Assumir só faz sentido em conversa que ainda está no automático ou que
