@@ -27,7 +27,13 @@ public enum AudienciaNotificacao
     /// O convidado do <c>usuarioId</c> do payload (N9): o e-mail sempre, e o WhatsApp com o atestado da dona, sem exigir o
     /// telefone verificado, só até o aceite do convite.
     /// </summary>
-    Convidado
+    Convidado,
+
+    /// <summary>
+    /// Quem a dona marcou para receber o aviso (#2211): usuário ativo da empresa com a preferência da rotina ligada. Sem
+    /// marcação ninguém recebe. A marcação é o atestado do WhatsApp; opt-out explícito da pessoa ainda vence.
+    /// </summary>
+    Inscritos
 }
 
 /// <summary>Leitura da audiência da rotina.</summary>
@@ -56,6 +62,7 @@ public static class AudienciaDaRotina
                     "superadmins" => AudienciaNotificacao.Superadmins,
                     "convidado" => AudienciaNotificacao.Convidado,
                     "equipe" => AudienciaNotificacao.Equipe,
+                    "inscritos" => AudienciaNotificacao.Inscritos,
                     _ => null
                 };
             }

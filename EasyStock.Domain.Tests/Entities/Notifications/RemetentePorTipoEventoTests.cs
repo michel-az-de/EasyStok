@@ -49,4 +49,13 @@ public class RemetentePorTipoEventoTests
     [InlineData(TipoEventoNotificacao.FaturaVencida)]
     public void TiposDeSistemaSaoDaPlataforma(TipoEventoNotificacao tipo) =>
         RemetentePorTipoEvento.De(tipo).Should().Be(OrigemRemetente.Plataforma);
+
+    // #2211 (decisão do Felipe, 04/11/2026, emenda da ADR-0057 item 2): o aviso da equipe sobre o atendimento sai pelo
+    // número da loja já cadastrado, o mesmo que a equipe acompanha.
+    [Theory]
+    [InlineData(TipoEventoNotificacao.AvisoEquipeAtencaoAtendimento)]
+    [InlineData(TipoEventoNotificacao.AvisoEquipePedidoComCanhoto)]
+    [InlineData(TipoEventoNotificacao.AvisoEquipeProblemaPagamento)]
+    public void AvisosDaEquipeSobreOAtendimentoSaoDaLoja(TipoEventoNotificacao tipo) =>
+        RemetentePorTipoEvento.De(tipo).Should().Be(OrigemRemetente.Loja);
 }

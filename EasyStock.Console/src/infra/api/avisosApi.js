@@ -14,3 +14,13 @@ export const salvarAvisos = (avisos) => chamarApi(BASE, {
   sinal: AbortSignal.timeout(15000),
   corpo: corpoDosAvisos(avisos),
 })
+
+// #2211: quem da equipe recebe os avisos da equipe no WhatsApp. Uma pessoa por PUT, os três avisos juntos.
+export const obterEquipeAvisada = () => chamarApi(`${BASE}/equipe`, { sinal: AbortSignal.timeout(15000) })
+
+export const salvarPessoaAvisada = (usuarioId, { atencao, pedido, pagamento }) => chamarApi(`${BASE}/equipe/${encodeURIComponent(usuarioId)}`, {
+  metodo: 'PUT',
+  identidadeEsperada: identidadeDaSessao(lerSessao()),
+  sinal: AbortSignal.timeout(15000),
+  corpo: { atencao: atencao === true, pedido: pedido === true, pagamento: pagamento === true },
+})

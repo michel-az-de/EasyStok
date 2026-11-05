@@ -970,4 +970,24 @@ public class AgenteAtendimentoServiceTests
         segundo.ChamouLlm.Should().BeFalse();
         _gravadas.Select(m => m.ExternoId).Should().Contain("wamid.cardapio");
     }
+
+    [Fact]
+    public async Task ContatoDaEquipeAvisadaVaiParaAgenteSemChamarOLlm()
+    {
+        // #2211: a pessoa que recebe os avisos responde pelo número da loja; o robô não conversa com ela.
+        var equipe = Substitute.For<EasyStock.Application.Services.Notifications.IContatoDaEquipeAvisada>();
+        equipe.EhInscritoAsync(_empresaId, WaId, Arg.Any<CancellationToken>()).Returns(true);
+        var servico = new AgenteAtendimentoService(
+            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
+            [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+            _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos, equipe);
+
+        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Should().Be(new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true));
+        _requisicoes.Should().BeEmpty();
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, AgenteAtendimentoService.MotivoContatoDaEquipe,
+            Agora, Arg.Any<CancellationToken>());
+    }
 }

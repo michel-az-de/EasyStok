@@ -119,6 +119,8 @@ builder.Services.AddHostedService<IntegrationOutboxBackgroundService>();
 // Sem este registro o Worker não resolvia IFileStorage e o ReportRunner falhava em runtime
 // (gap fechado — provider lido de "FileStorage:Provider", default Local).
 builder.Services.AddEasyStockFileStorageCore(builder.Configuration);
+// #2211: anexo dos avisos (canhoto em PNG/PDF), gerado aqui porque o Worker avalia os eventos.
+builder.Services.AddAnexosDeNotificacao();
 
 // Motor de relatórios assíncrono (PR-C0 — ADR-R02/R03/R04/R06/R07)
 // Registra ReportRunnerBackgroundService + ReportWatchdogBackgroundService +
