@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { Contador } from '../../componentes/Contador'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
@@ -34,7 +35,9 @@ export function SinoDaSessao({ avisos, aparelho }) {
     <Botao variante="texto" icone="bell" aria-label={`Avisos${erro ? ', sem atualizar' : total === null ? '' : `, ${total} não lidas`}${semAvisoNoAparelho ? ', avisos neste aparelho desligados' : ''}`}
       title={semAvisoNoAparelho ? 'Avisos neste aparelho desligados: abra para ativar' : undefined}
       aria-haspopup="dialog" onClick={() => { setAberto(true); carregar() }}>
-      <span>Avisos{erro ? ' !' : total ? ` (${total})` : ''}</span>
+      {/* #2232 (H3, L2): o número sai do texto e vai para o contador único do app. */}
+      <span>Avisos{erro ? ' !' : ''}</span>
+      {!erro && total > 0 && <Contador valor={total} tom="alerta" />}
       {semAvisoNoAparelho && <span className={css.pontoAparelho} data-aparelho-desligado aria-hidden="true" />}
     </Botao>
     {aberto && <Modal titulo="Avisos" largura="min(760px, calc(100vw - 24px))" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."

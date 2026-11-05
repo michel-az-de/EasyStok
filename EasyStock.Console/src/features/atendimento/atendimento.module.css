@@ -67,8 +67,9 @@
 }
 
 .balao {
-  max-width: min(76%, 62ch); padding: var(--e-3) var(--e-4);
-  border-radius: var(--r-2); box-shadow: none;
+  /* #2232 (A6): 75% da coluna no máximo; o enviado deixa de ocupar a largura cheia. */
+  max-width: min(75%, 62ch); padding: var(--e-3) var(--e-4);
+  border-radius: var(--r-2); box-shadow: none; position: relative;
   margin-top: 4px; animation: entradaBalao var(--dur-media) var(--ease-saida);
 }
 @keyframes entradaBalao {
@@ -104,23 +105,43 @@
   border-radius: var(--r-1);
   box-shadow: none;
 }
+/* #2232 (A6): o enviado tem cor própria (verde-pastel); o do automático segue neutro, mais abaixo. */
 .saida {
-  align-self: flex-end; background: var(--preenchimento-forte); color: var(--tinta);
+  align-self: flex-end; background: var(--sucesso-pastel); color: var(--tinta);
   border-radius: var(--r-1);
   box-shadow: none;
 }
+/* #2232 (A6): a ponta indica a direção. Os cantos seguem retos (PR #2143), então a ponta é um
+   triângulo recortado por clip-path, na mesma cor do balão, só no começo de cada troca de voz. */
+.entrada::after, .saida::after {
+  content: ''; position: absolute; top: 0; width: var(--e-2); height: var(--e-3); display: none;
+}
+.trocaDeVoz.entrada::after, .trocaDeVoz.saida::after { display: block; }
+.entrada::after { right: 100%; background: inherit; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.saida::after { left: 100%; background: inherit; clip-path: polygon(0 0, 100% 0, 0 100%); }
 .saida .meta, .saida .meta * { color: var(--tinta-3); }
 /* #1761: lida se distingue de entregue pela palavra e pela cor. */
 .saida .meta .tiqueLida, .saida .meta .tiqueLida * { color: var(--info); font-weight: 600; }
+/* #2232 (C3): o tique é ícone mais palavra ("✓ entregue"), nunca só cor. */
+.tique, .tiqueLida { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .seloBotao:disabled { cursor: progress; text-decoration: none; }
+/* #2232 (B1): aviso do sistema é uma pílula central neutra, com contorno, e não parece um balão. */
 .sistema {
-  align-self: center; max-width: 94%; background: var(--elevado); color: var(--tinta-2);
-  font-size: var(--t-apoio); box-shadow: none; text-align: center; padding: var(--e-2) var(--e-3);
+  align-self: center; max-width: 80%; background: var(--preenchimento); color: var(--tinta-2);
+  border: var(--b-1) solid var(--linha);
+  font-size: var(--t-micro); box-shadow: none; text-align: center; padding: 2px var(--e-3);
   border-radius: var(--r-1);
 }
 .resumo { font-family: var(--f-dado); font-size: var(--t-apoio); }
 /* Rodada 12 (#19): link do convite do cardápio, clicável na bolha. */
-.linkCardapio { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
+/* #2232 (B2, C2): o link da comanda e o de pagamento são botões com rótulo, e a URL fica no title. */
+.linkCardapio {
+  display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque);
+  padding: 0 var(--e-3); margin-block: var(--e-1); background: var(--papel); color: var(--tinta);
+  border: var(--b-1) solid var(--linha-media); font-weight: 600; text-decoration: none;
+}
+.linkCardapio:hover { background: var(--preenchimento); }
+.linkCardapio:focus-visible { outline: 3px solid var(--halo); outline-offset: 2px; }
 
 /* Divisória entre atendimentos (decisão 46, "Encerrar" v2): encerrado nunca
    reabre o mesmo atendimento, o fio precisa mostrar onde um terminou e o
@@ -138,7 +159,13 @@
 
 /* Separador de dia (achado 8, pendência 18 da banca 64): pílula centralizada
    antes da primeira mensagem de cada dia no fio. */
-.separadorDia { display: flex; justify-content: center; margin: var(--e-3) 0; }
+/* #2232 (B3): a data fica fixa no topo enquanto o dia dela rola. O grupo do dia limita a fixação:
+   sem ele todas as datas se empilhariam no topo. */
+.grupoDia { display: flex; flex-direction: column; }
+.separadorDia {
+  display: flex; justify-content: center; margin: var(--e-3) 0;
+  position: sticky; top: var(--e-2); z-index: 1; pointer-events: none;
+}
 
 /* Composer tipo iMessage: caixa única com raio 16, --papel, --linha-media,
    sombra, focus-within com halo. */
@@ -233,7 +260,7 @@
 .modo_encerrado { border-left-color: var(--linha-forte); }
 .modo_bloqueado { border-left-color: var(--erro); }
 
-/* Estado e Assumir permanecem à vista; as ações secundárias abrem no próprio contexto. */
+/* Estado e Assumir permanecem à vista; as ações secundárias moram no ⋮ do cabeçalho (#2232, A4). */
 .modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); }
 .modoLinha > :first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .modoTexto {
@@ -241,20 +268,6 @@
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto);
 }
 .modoAcoes { margin-left: auto; display: flex; align-items: center; gap: var(--e-1); flex: none; }
-.maisAcoesModo { position: relative; }
-.maisAcoesModo > summary {
-  display: flex; align-items: center; min-height: var(--toque); padding: 0 var(--e-2);
-  list-style: none; cursor: pointer; font-size: var(--t-apoio); color: var(--tinta-2);
-}
-.maisAcoesModo > summary::-webkit-details-marker { display: none; }
-.maisAcoesModo > summary:hover, .maisAcoesModo[open] > summary { background: var(--preenchimento); }
-.maisAcoesModo > summary:focus-visible { outline: 3px solid var(--halo); outline-offset: 2px; }
-.listaAcoesModo {
-  position: absolute; right: 0; top: calc(100% + var(--e-1)); z-index: 40;
-  display: grid; gap: var(--e-1); width: min(260px, calc(100vw - 32px));
-  padding: var(--e-2); background: var(--papel); box-shadow: var(--sombra);
-}
-.listaAcoesModo > button { justify-content: flex-start; text-align: left; white-space: normal; }
 .acaoModo { min-height: var(--toque); padding-block: 0; }
 .listaEfeito { margin: 0; padding-left: 1.2em; display: grid; gap: var(--e-2); color: var(--tinta-2); }
 
@@ -380,10 +393,6 @@
 .entrada { border-radius: var(--r-2); }
 .saida { border-radius: var(--r-2); }
 .saida.doAutomatico { background: var(--preenchimento-forte); }
-.sistema {
-  background: transparent; box-shadow: none; color: var(--tinta-3);
-  font-size: var(--t-micro); padding: 2px var(--e-3); max-width: 80%;
-}
 
 /* Banca, item 13: o cabeçalho da conversa na mesma altura das colunas. */
 .cabecalho { min-height: 64px; padding-top: var(--e-2); padding-bottom: var(--e-2); }
@@ -538,7 +547,7 @@
 .sistema.sistemaPedido {
   align-self: flex-start; max-width: min(100%, 62ch); text-align: left;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-corpo);
-  padding: var(--e-2) var(--e-3); background: var(--papel);
+  padding: var(--e-2) var(--e-3); background: var(--papel); border: 0;
   border-left: 0; border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
 }
 .sistema.sistemaPedido svg { display: inline-block; vertical-align: -3px; margin-right: var(--e-1); }
@@ -589,3 +598,35 @@
   padding: var(--e-2) var(--e-3); border-top: var(--b-1) solid var(--linha);
 }
 .chamarClienteNome { min-width: 0; overflow-wrap: anywhere; font-size: var(--t-apoio); color: var(--tinta-2); }
+
+/* #2232 (A2): a transferência é uma faixa de uma linha: quem passou e por quê. A direção vem de uma
+   barra lateral (os cantos seguem retos, PR #2143). A frase longa fica no title. */
+.faixaTransferencia {
+  flex: 1 1 auto; min-width: 0; margin: 0; padding: var(--e-1) var(--e-3);
+  border-left: var(--trilho) solid var(--alerta); background: var(--alerta-pastel); color: var(--tinta);
+  font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto); overflow-wrap: anywhere;
+}
+
+/* #2232 (A5): "Novas mensagens" fica no pé da área que rola, à vista de quem está lendo mais acima. */
+.novasMensagens {
+  position: sticky; bottom: var(--e-3); align-self: center; z-index: 2; flex: none;
+}
+.novasMensagens svg { transform: rotate(180deg); }
+
+/* #2232 (A8): no modo nota o fundo muda e o aviso diz quem lê. A nota nunca vai ao cliente. */
+.modoNota { background: var(--alerta-pastel); border-top: var(--b-1) solid var(--linha); }
+.avisoNota {
+  margin: 0; padding: var(--e-2) var(--e-4) 0; display: flex; align-items: center; gap: var(--e-2);
+  color: var(--tinta); font-size: var(--t-apoio); font-weight: 600;
+}
+
+/* #2232 (C1): o resumo do pedido é um cartão: descrição à esquerda, valores à direita e tabulares. */
+.tituloPedido { margin: 0 0 var(--e-2); font-weight: 600; }
+.cartaoPedido { margin: 0 0 var(--e-2); display: grid; gap: var(--e-1); font-size: var(--t-apoio); }
+.linhaPedido { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e-3); }
+.linhaPedido dt { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.linhaPedido dd { margin: 0; }
+.valorPedido { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--f-dado); white-space: nowrap; }
+.rodapePedido { color: var(--tinta-2); }
+.linhaPedido:not(.rodapePedido) + .rodapePedido { border-top: var(--b-1) solid var(--linha); padding-top: var(--e-1); }
+.totalPedido { color: var(--tinta); font-weight: 700; }

@@ -3,21 +3,22 @@ import { AlcaLargura } from '../componentes/AlcaLargura'
 import { MenuDaConta } from '../componentes/MenuDaConta'
 import { Marca } from '../componentes/Marca'
 import { InterruptorTema } from '../componentes/InterruptorTema'
-import { trocarTema } from '../hooks/useTema'
+import { trocarTema, useTema } from '../hooks/useTema'
 import { balcaoComCardapio, fichaComCardapio } from '../hooks/larguras'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
 import { Botao } from '../componentes/Botao'
 import { BotaoIcone } from '../componentes/BotaoIcone'
 import { limitarPainelMovel } from '../hooks/estadoPainelMovel'
 import { janelaDosPaineis, observarAreaDosPaineis } from '../hooks/areaDosPaineis'
+import { Contador } from '../componentes/Contador'
 import { Icone } from '../componentes/Icone'
+import { Modal } from '../componentes/Modal'
 import { MarcaIcone } from '../componentes/MarcaIcone'
-import { Pilula } from '../componentes/Pilula'
-import { useAcoes, useAtendimento } from '../aplicacao/contextos'
+import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useAcessoModulos } from '../aplicacao/acessoModulos'
-import { contarAbertas, contarNaEsteira } from '../dominio/conversa'
 import { contarAtivas } from '../dominio/automacao'
-import { CELULAR, DESKTOP, TABLET, useTopoCompacto } from '../hooks/useTamanhoTela'
+import { contarPrecisaDeVoce } from '../dominio/automatico'
+import { CELULAR, DESKTOP, TABLET, useTamanhoTela, useTopoCompacto } from '../hooks/useTamanhoTela'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
 import { CompartilharComanda } from '../features/atendimento/CompartilharComanda'
@@ -33,6 +34,10 @@ import { moduloPorId } from '../dominio/modulos'
 import { IconeDoModulo } from '../componentes/IconeDoModulo'
 import { JANELA_COZINHA } from '../dominio/janelaAvulsa'
 import { AvisoDaAcaoApi } from './FaixaApi'
+import { CHAVES_DO_MENU, gruposDoMenuMais } from './menuMais'
+import {
+  abasDoCelular, estadoDasAutomaticas, fechamentoPedeConfirmacao, nomeDasAutomaticas,
+} from './rotulosDoTopo'
 import css from './moldura.module.css'
 import { LimiteDeErro } from '../componentes/LimiteDeErro'
 
@@ -56,77 +61,38 @@ function Coluna({ variante, titulo, contagem, semTitulo = false, children }) {
   )
 }
 
-// "Em andamento" e "na esteira" não pedem ação nenhuma sozinhos: viraram texto
-// dentro deste popover, em vez de competir com "Precisa de você" no topo.
-function grupoDoDia(emAndamento, naEsteira) {
-  return {
-    titulo: 'Hoje',
-    itens: [{
-      chave: '__hoje',
-      informativo: true,
-      titulo: `${emAndamento} em andamento`,
-      detalhe: `${naEsteira} na esteira`,
-    }],
-  }
-}
-
-// Abaixo de 1024 px o topo não comporta quatro controles: fica Automáticas,
-// que é o trabalho do dia, e o resto desce para este menu. Um gatilho, uma
-// camada, nenhuma barra quebrada em três linhas. Rodada 5 (seção 1, passo
-// zero): "Canais" saiu daqui (e do topo largo) — o canal vira chip dentro do
-// próprio Balcão, e "Dois lugares para a mesma pergunta" era exatamente o
-// problema que a direção resolveu.
+// Abaixo de 1024 px o topo não comporta todos os controles: fica Automáticas, que é o trabalho do
+// dia, e o resto desce para este menu. Um gatilho, uma camada, nenhuma barra quebrada em três linhas.
+// Rodada 5 (seção 1, passo zero): "Canais" saiu daqui (e do topo largo) — o canal vira chip dentro
+// do próprio Balcão, e "Dois lugares para a mesma pergunta" era exatamente o problema que a direção
+// resolveu.
+// #2232 (M1 a M4): navegação primeiro (Módulos, Entregas, Cozinha, Gestão, Ajuda), tema com a opção
+// ativa marcada, sem o resumo "Hoje" (o Início mostra) e, no celular, como folha inferior sem rolagem.
+// Os grupos moram em `menuMais.js` (puro, provado em `prova-2232-topo.mjs`).
 function MenuMais({
-  refBotao, aoAbrirEntregas, aoAbrirGestao, aoAbrirAjuda, emAndamento, naEsteira, atendente = null,
+  refBotao, aoAbrirEntregas, aoAbrirGestao, aoAbrirAjuda, atendente = null, celular = false,
 }) {
   const { permite, aoSair, sessaoPersistente, conta } = useAcessoModulos()
+  const [tema] = useTema()
   const [aberto, setAberto] = useState(false)
   const fechar = useCallback(() => setAberto(false), [])
 
-  const grupos = [
-    {
-      titulo: 'Tema',
-      itens: [
-        { chave: '__claro', titulo: 'Claro', detalhe: 'Fundo claro' },
-        { chave: '__escuro', titulo: 'Escuro', detalhe: 'Fundo escuro' },
-      ],
-    },
-    {
-      titulo: 'Ver',
-      itens: [
-        { chave: '__modulos', titulo: 'Módulos', detalhe: 'Escolher outra área de trabalho' },
-        {
-          chave: '__entregas',
-          titulo: 'Entregas',
-          detalhe: 'Ocupação de cada janela e quem ainda vai receber',
-        },
-        // Regressão da rodada 13 (achado da validação independente): "Gestão"
-        // tinha ganhado botão próprio no topo compacto, ao lado de
-        // Automáticas, e a 390 px isso empurrava "Mais" para fora da tela.
-        // O botão saiu do topo; o caminho para Gestão no celular/tablet
-        // estreito passa a ser só por aqui.
-        { chave: '__gestao', titulo: 'Gestão', detalhe: 'Ajustes da loja' },
-      ].filter((item) => item.chave !== '__entregas' || permite('entregas')),
-    },
-    { titulo: 'Ajuda', itens: [{ chave: '__ajuda', titulo: 'Ajuda do sistema', detalhe: 'O que cada módulo faz, primeiros passos e diagnóstico' }] },
-    grupoDoDia(emAndamento, naEsteira),
-    // #1242 (D1): a faixa de baixo saiu do celular; quem está logado e o Sair vêm para cá.
-    ...(aoSair ? [{
-      titulo: 'Conta',
-      itens: [{ chave: '__sair', titulo: sessaoPersistente ? 'Sair deste aparelho' : 'Sair', detalhe: [atendente, conta?.casa].filter(Boolean).join(' · ') || 'Encerrar a sessão' }],
-    }] : []),
-  ]
+  const grupos = gruposDoMenuMais({ tema, permite, aoSair, sessaoPersistente, atendente, casa: conta?.casa, celular })
 
   function escolher(item) {
     fechar()
-    if (['__entregas', '__gestao', '__ajuda'].includes(item.chave)) refBotao.current?.focus()
-    if (item.chave === '__modulos') window.location.hash = HASH_HALL
-    if (item.chave === '__entregas') aoAbrirEntregas()
-    if (item.chave === '__gestao') aoAbrirGestao()
-    if (item.chave === '__ajuda') aoAbrirAjuda()
-    if (item.chave === '__claro') trocarTema('light')
-    if (item.chave === '__escuro') trocarTema('dark')
-    if (item.chave === '__sair') aoSair?.()
+    if ([CHAVES_DO_MENU.entregas, CHAVES_DO_MENU.gestao, CHAVES_DO_MENU.ajuda].includes(item.chave)) refBotao.current?.focus()
+    if (item.chave === CHAVES_DO_MENU.modulos) window.location.hash = HASH_HALL
+    if (item.chave === CHAVES_DO_MENU.entregas) aoAbrirEntregas()
+    if (item.chave === CHAVES_DO_MENU.cozinha) abrirCozinha()
+    // Regressão da rodada 13 (achado da validação independente): "Gestão" tinha ganhado botão próprio
+    // no topo compacto e a 390 px isso empurrava "Mais" para fora da tela. O caminho para Gestão no
+    // celular/tablet estreito passa só por aqui.
+    if (item.chave === CHAVES_DO_MENU.gestao) aoAbrirGestao()
+    if (item.chave === CHAVES_DO_MENU.ajuda) aoAbrirAjuda()
+    if (item.chave === CHAVES_DO_MENU.claro) trocarTema('light')
+    if (item.chave === CHAVES_DO_MENU.escuro) trocarTema('dark')
+    if (item.chave === CHAVES_DO_MENU.sair) aoSair?.()
   }
 
   return (
@@ -141,11 +107,9 @@ function MenuMais({
       >
         <Icone nome="ellipsis-vertical" tamanho={20} />
       </Botao>
-      {/* `portal` (rodada 9, achado 1 da banca estética): `.topo` tem
-          backdrop-filter, que vira containing block de position:fixed. Sem
-          isso, o `.abaixo` do celular (fixed, ancorado no rodapé da tela)
-          media a partir de `.topo`, não do viewport, e Entregas nasce fora da
-          tela. */}
+      {/* `portal` (rodada 9, achado 1 da banca estética): `.topo` tem backdrop-filter, que vira
+          containing block de position:fixed. Sem isso, o `.abaixo` do celular (fixed, ancorado no
+          rodapé da tela) media a partir de `.topo`, não do viewport, e Entregas nasce fora da tela. */}
       {aberto && (
         <Popover
           rotulo="Mais controles do topo"
@@ -154,6 +118,7 @@ function MenuMais({
           aoEscolher={escolher}
           aoFechar={fechar}
           portal
+          folha
         />
       )}
     </span>
@@ -175,29 +140,25 @@ function abrirCozinha() {
   if (!janela) window.location.hash = destino
 }
 
-// Estado da loja (pedido do dono, 24/09/2026): um toque, Aberta ou Fechada,
-// sempre visível no topo. Mostra o efetivo (horário configurado combinado
-// com o estado manual, dominio/funcionamento.js), não só o que ela tocou por
-// último, porque "Estado visível sempre" é sobre o que vale agora.
+// Estado da loja (pedido do dono, 24/09/2026): um toque, sempre visível no topo. Mostra o efetivo
+// (horário configurado combinado com o estado manual, dominio/funcionamento.js), não só o que ela
+// tocou por último, porque "Estado visível sempre" é sobre o que vale agora.
 //
-// #2135: no celular o texto longo sai e entra o curto ("Aberta"/"Fechada") sob o ícone, com alvo de 44 px
-// e a dica do trilho do desktop. O nome acessível segue "Loja aberta"/"Loja fechada" (`aria-label`),
-// que contém o texto visível. Fechar dentro do horário continua pedindo justificativa (aplicacao/api/expediente.js).
+// #2232 (L1): "Aberta" sozinho não dizia de quê. O texto é "Loja aberta"/"Loja fechada" em qualquer
+// largura (no celular quebra em duas linhas curtas), com o ponto de estado; a cor nunca informa
+// sozinha. Fechar pede confirmação em `ConteudoMoldura`; abrir não.
 function ControleLoja({ aberta, aoAlternar }) {
   const nome = aberta ? 'Loja aberta' : 'Loja fechada'
   return (
     <button
       type="button"
-      className={css.controleLoja}
+      className={`${css.controleLoja} ${aberta ? css.topoAberta : css.topoFechada}`}
       aria-pressed={aberta}
-      aria-label={nome}
       title={aberta ? 'Loja aberta: toque para fechar' : 'Loja fechada: toque para abrir'}
       onClick={aoAlternar}
     >
-      <Pilula tom={aberta ? 'ok' : 'perigo'} icone={aberta ? 'circle-check' : 'lock'}>
-        <span className={css.lojaTextoLongo}>{nome}</span>
-        <span className={css.lojaTextoCurto} aria-hidden="true">{aberta ? 'Aberta' : 'Fechada'}</span>
-      </Pilula>
+      <span className={css.lojaPonto} aria-hidden="true" />
+      <span className={css.lojaTexto}>{nome}</span>
     </button>
   )
 }
@@ -205,16 +166,14 @@ function ControleLoja({ aberta, aoAlternar }) {
 // Modo API (F06): sem regra vinda da API, sem número. A massa mostrava "Automáticas 6".
 const MODULO_ATENDIMENTO = moduloPorId('atendimento')
 
-const rotuloAutomaticas = (regras) => (regras ? `Automáticas, ${contarAtivas(regras)} ligadas` : 'Automáticas')
-
 function Cabecalho({
-  conversas, regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, aoAbrirAjuda, atendente = null,
+  regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, aoAbrirAjuda, atendente = null,
 }) {
   const { permite, notificacoes, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const compacto = useTopoCompacto()
+  const celular = useTamanhoTela() === CELULAR
   const botaoMaisRef = useRef(null)
-  const emAndamento = contarAbertas(conversas)
-  const naEsteira = contarNaEsteira(conversas)
+  const estadoAuto = estadoDasAutomaticas(regras)
 
   return (
     <header className={css.topo}>
@@ -231,17 +190,20 @@ function Cabecalho({
             da direção visual). A faixa de lembretes abaixo do topo saiu. */}
         <Sininho />
         {notificacoes}
-        {permite('cozinha') && <Botao variante="texto" icone="cooking-pot" onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
+        {/* #2232 (L2): no celular a Cozinha era um ícone solto; ela passa a item com nome no Mais. */}
+        {!celular && permite('cozinha') && <Botao variante="texto" icone="cooking-pot" onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
           Cozinha
         </Botao>}
-        {/* Achado 6, P3 (banca 10): no celular a regra `.controles > button`
-            zera o font-size do texto (caber em 390 px) e só sobrava
-            ícone+número, sem palavra nenhuma. `.rotuloCurto` mostra uma
-            abreviação com font-size próprio (não herda o zero do botão). */}
-        <Botao icone="raio" onClick={aoAbrirAutomacoes} aria-label={rotuloAutomaticas(regras)}>
-          <span className={css.rotuloLongo}>Automáticas</span>
-          <span className={css.rotuloCurto} aria-hidden="true">Auto</span>
-          {regras && <span className={css.conta}>{contarAtivas(regras)}</span>}
+        {/* Achado 6, P3 (banca 10): no celular a regra `.controles > button` zera o font-size do
+            botão (caber em 390 px); `.rotuloCurto` mostra a abreviação com font-size próprio.
+            #2232 (L3): o número cedeu lugar ao estado escrito ("ligadas"/"desligadas"); a contagem
+            segue no nome acessível. Sem regras (modo API), sem estado e sem número. */}
+        <Botao icone="raio" className={css.automaticas} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)}>
+          <span className={css.autoTexto}>
+            <span className={css.rotuloLongo}>Automáticas</span>
+            <span className={css.rotuloCurto} aria-hidden="true">Auto</span>
+            {estadoAuto && <span className={css.autoEstado} aria-hidden="true">{estadoAuto}</span>}
+          </span>
         </Botao>
         {/* Casca da rodada 13 (issue das 5 frentes): mesmo lugar de
             Automáticas, ao lado dela. Rodada 13, achado da validação
@@ -261,9 +223,8 @@ function Cabecalho({
             aoAbrirEntregas={aoAbrirEntregas}
             aoAbrirGestao={aoAbrirGestao}
             aoAbrirAjuda={aoAbrirAjuda}
-            emAndamento={emAndamento}
-            naEsteira={naEsteira}
             atendente={atendente}
+            celular={celular}
           />
         ) : (
           // Rodada 2: a ocupação das janelas mora no topo, porque capacidade
@@ -341,10 +302,10 @@ function Trilho({
         <Icone nome="cooking-pot" tamanho={22} />
         <span>Cozinha</span>
       </Botao>}
-      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={rotuloAutomaticas(regras)} title="Automáticas">
+      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)} title="Automáticas">
         <Icone nome="raio" tamanho={22} />
         <span>Automáticas</span>
-        {regras && <span className={css.contaTrilho} aria-hidden="true">{contarAtivas(regras)}</span>}
+        {regras && <Contador valor={contarAtivas(regras)} className={css.contaTrilho} />}
       </Botao>
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirGestao} title="Gestão" aria-haspopup="dialog">
         <Icone nome="painel" tamanho={22} />
@@ -460,12 +421,40 @@ function ConteudoMoldura({
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, solicitacaoPainel = null,
 }) {
   const {
-    visiveis, selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
+    selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
+    funcionamento, automaticoPausado, horarioDaLoja,
   } = useAtendimento()
+  const { janelas } = useCatalogo()
   // Modo API (F06): contadores e avatar vêm da sessão e da API; da massa, nada.
   const regras = fonteApi ? null : regrasDaMassa
   const atendente = fonteApi ? (sessao?.usuario?.nome ?? null) : 'Thatiane'
   const { alternarLoja } = useAcoes()
+  // #2232 (L1): fechar a loja pede confirmação; abrir não. No modo API, dentro do horário, o gesto de
+  // fechar já é um diálogo com justificativa (aplicacao/api/expediente.js) e não se pergunta duas vezes.
+  const [confirmandoFechar, setConfirmandoFechar] = useState(false)
+  const alternarComConfirmacao = () => {
+    if (fechamentoPedeConfirmacao({ aberta, fonteApi, agora, funcionamento })) setConfirmandoFechar(true)
+    else alternarLoja(agora)
+  }
+  const confirmarFechamento = () => {
+    setConfirmandoFechar(false)
+    alternarLoja(agora)
+  }
+  const confirmacaoDeFechar = confirmandoFechar && (
+    <Modal
+      titulo="Fechar a loja?"
+      descricao="Os clientes passam a receber a mensagem de loja fechada até você abrir de novo."
+      aoFechar={() => setConfirmandoFechar(false)}
+      rodape={(
+        <>
+          <Botao variante="texto" onClick={() => setConfirmandoFechar(false)}>Cancelar</Botao>
+          <Botao variante="perigo" onClick={confirmarFechamento}>Fechar loja</Botao>
+        </>
+      )}
+    />
+  )
+  // L11: a aba Conversas conta só o que pede ação, o mesmo critério de "Precisa de você" do Balcão.
+  const precisamDeVoce = contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas, horarioDaLoja)
   const [pedidoPainelVisto, setPedidoPainelVisto] = useState(solicitacaoPainel)
   const [fichaSolicitada, setFichaSolicitada] = useState(null)
   const [gavetaAberta, setGavetaAberta] = useState(false)
@@ -532,10 +521,9 @@ function ConteudoMoldura({
   )
   const cabecalho = (
     <Cabecalho
-      conversas={conversas}
       regras={regras}
       aberta={aberta}
-      aoAlternarLoja={() => alternarLoja(agora)}
+      aoAlternarLoja={alternarComConfirmacao}
       aoAbrirAutomacoes={aoAbrirAutomacoes}
       aoAbrirGestao={aoAbrirGestao}
       aoAbrirEntregas={aoAbrirEntregas}
@@ -557,7 +545,7 @@ function ConteudoMoldura({
         <Trilho
           regras={regras}
           aberta={aberta}
-          aoAlternarLoja={() => alternarLoja(agora)}
+          aoAlternarLoja={alternarComConfirmacao}
           aoAbrirAutomacoes={aoAbrirAutomacoes}
           aoAbrirGestao={aoAbrirGestao}
           aoAbrirEntregas={aoAbrirEntregas}
@@ -598,6 +586,7 @@ function ConteudoMoldura({
             <div className={css.slotFila} data-fila-canhotos="" />
           </Coluna>
         </main>
+        {confirmacaoDeFechar}
       </div>
     )
   }
@@ -625,6 +614,7 @@ function ConteudoMoldura({
           </Botao>
         </footer>
         <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
+        {confirmacaoDeFechar}
       </div>
     )
   }
@@ -659,13 +649,10 @@ function ConteudoMoldura({
       <BarraDeAbas
         ativa={aba}
         aoTrocar={setAba}
-        abas={[
-          { id: 'balcao', rotulo: 'Conversas', contador: visiveis.length },
-          { id: 'atendimento', rotulo: 'Conversa' },
-          { id: 'ficha', rotulo: 'Ficha' },
-        ]}
+        abas={abasDoCelular(precisamDeVoce)}
       />
       <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
+      {confirmacaoDeFechar}
     </div>
   )
 }

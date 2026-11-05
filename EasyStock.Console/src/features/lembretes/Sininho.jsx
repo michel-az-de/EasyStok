@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { Contador } from '../../componentes/Contador'
 import { Icone } from '../../componentes/Icone'
 import { useEscape } from '../../hooks/useEscape'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
@@ -258,7 +259,6 @@ export function Sininho({ comRotulo = false }) {
     finally { conclusao.current = false; setConcluindo(false) }
   }
 
-  const rotuloBadge = contagem > 9 ? '9+' : String(contagem)
   const rotuloSino = contagem > 0 ? `Lembretes, ${contagem} ${contagem === 1 ? 'novo' : 'novos'}` : 'Lembretes'
 
   return (
@@ -278,7 +278,8 @@ export function Sininho({ comRotulo = false }) {
             quem clicava em "Avisos" abrir Lembretes. */}
         <Icone nome="relogio" tamanho={24} />
         {comRotulo && <span>Lembretes</span>}
-        {contagem > 0 && <span className={css.badge} aria-hidden="true">{rotuloBadge}</span>}
+        {/* #2232 (L2): o contador único do app; aqui só se posiciona no canto do sino. */}
+        <Contador valor={contagem > 0 ? contagem : null} tom="alerta" max={9} className={css.badge} />
       </Botao>
 
       {aberto && (

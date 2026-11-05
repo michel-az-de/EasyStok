@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 // Prova da issue #1442: Balcão, banner de pausa e Ficha mais simples.
-//   1. o Balcão abre em "Todas" (estado inicial do reducer);
+//   1. o Balcão abre em "Precisa de você" (estado inicial do reducer; #2232 L5 reverteu "Todas");
 //   2. a linha da conversa diz o estado em uma palavra (automático, com você,
 //      outro atendente, encerrada, bloqueado) e o motivo de precisar vence;
 //   3. o número da linha é o de mensagens sem resposta, com a API de reserva;
@@ -60,10 +60,11 @@ const conversa = (extra = {}) => ({
 })
 
 // --- 1. Todas é a aba padrão ------------------------------------------------------
-await confere('1. o Balcão abre em "Todas", não em "Precisa de você"', () => {
+// #2232 (banca UX, L5): a banca pediu a fila de ação primeiro; reverte a decisão de 07/10.
+await confere('1. o Balcão abre em "Precisa de você"', () => {
   assert.ok(estadoInicial, 'estadoInicial não exportado')
   const inicio = estadoInicial({ conversas: [], catalogo: { cardapio: [], janelas: [], canais: [] }, regras: [] })
-  assert.equal(inicio.filtros.aba, 'todas')
+  assert.equal(inicio.filtros.aba, 'precisa')
 })
 
 // --- 2. Estado da linha ---------------------------------------------------------

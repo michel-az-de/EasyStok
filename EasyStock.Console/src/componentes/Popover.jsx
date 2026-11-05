@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEscape } from '../hooks/useEscape'
 import { proximaFrentePainel } from '../hooks/estadoPainelMovel'
+import { Icone } from './Icone'
 import css from './Popover.module.css'
 
 const SELETOR_ITENS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
@@ -13,6 +14,11 @@ const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) 
 // `children` substitui `grupos`/`aoEscolher` quando o conteúdo não é lista de
 // texto (UX-05: grade de foto ou figurinha, por exemplo). Ancoragem, Esc e
 // clique fora continuam os mesmos para os dois casos.
+//
+// #2232 (M1, M4): `item.marcado` (booleano) faz do item uma opção de grupo de escolha única
+// (`menuitemradio`, `aria-checked` e a marca visível); `grupo.disposicao === 'linha'` põe os itens do
+// grupo lado a lado; `folha` faz o menu `abaixo` abrir como folha inferior de largura cheia no celular,
+// sem rolagem interna para o conteúdo atual (o chamador mantém os itens curtos).
 //
 // `portal` (achado do Composer, generalizado aqui): um ancestral com
 // overflow-y ou overflow-x diferente de `visible` recorta este popover
@@ -28,7 +34,7 @@ const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) 
 // CSS de .popover continua o mesmo (bottom/top: 100% relativo ao wrapper
 // plantado), então quem não passa `portal` renderiza exatamente como antes.
 export function Popover({
-  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu',
+  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu', folha = false,
 }) {
   const caixaRef = useRef(null)
   const marcadorRef = useRef(null)
@@ -144,7 +150,7 @@ export function Popover({
   const corpo = (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Papel explícito varia entre menu de ações e grupo com busca/listbox.
     <div
-      className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''}`}
+      className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''} ${folha ? css.folha : ''}`}
       role={papel === 'group' ? 'group' : papel === 'dialog' ? 'dialog' : 'menu'}
       tabIndex={-1}
       aria-label={rotulo}
@@ -172,29 +178,34 @@ export function Popover({
         itens[proximo]?.focus()
       }}
     >
-      {children ?? grupos.map((grupo) => (
-        <div className={css.grupo} key={grupo.titulo}>
-          <p className={css.titulo}>{grupo.titulo}</p>
-          {grupo.itens.map((item) => item.informativo ? (
-            <div className={`${css.item} ${css.informativo}`} key={item.chave}>
-              <strong>{item.titulo}</strong>
-              <span>{item.detalhe}</span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className={css.item}
-              key={item.chave}
-              onClick={() => aoEscolher(item)}
-            >
-              <strong>{item.titulo}</strong>
-              <span>{item.detalhe}</span>
-            </button>
-          ))}
-        </div>
-      ))}
+      {children ?? grupos.map((grupo) => {
+        const linhas = grupo.itens.map((item) => item.informativo ? (
+          <div className={`${css.item} ${css.informativo}`} key={item.chave}>
+            <strong>{item.titulo}</strong>
+            <span>{item.detalhe}</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            role={item.marcado === undefined ? 'menuitem' : 'menuitemradio'}
+            aria-checked={item.marcado === undefined ? undefined : item.marcado}
+            tabIndex={-1}
+            className={`${css.item} ${item.marcado ? css.ativo : ''}`}
+            key={item.chave}
+            onClick={() => aoEscolher(item)}
+          >
+            <strong>{item.titulo}</strong>
+            {item.detalhe && <span>{item.detalhe}</span>}
+            {item.marcado && <Icone nome="check" tamanho={18} className={css.marca} />}
+          </button>
+        ))
+        return (
+          <div className={css.grupo} key={grupo.titulo}>
+            <p className={css.titulo}>{grupo.titulo}</p>
+            {grupo.disposicao === 'linha' ? <div className={css.linha}>{linhas}</div> : linhas}
+          </div>
+        )
+      })}
     </div>
   )
 

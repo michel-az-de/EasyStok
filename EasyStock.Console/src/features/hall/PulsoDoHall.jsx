@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { indicadoresDoHall } from '../../dominio/pulsoDoHall'
 import { hashDoModulo } from '../../dominio/modulos'
+import { acaoDoIndicador, severidadeDoIndicador } from '../../dominio/estadoDoHall'
 import { alcaDoLink, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
 import { colisoesDoHall } from './colisoesDoHall'
 import css from './hall.module.css'
@@ -28,13 +29,18 @@ function Indicador({ item, movimentos }) {
   const aviso = item.estado === 'erro'
     ? `${item.em ? `Desatualizado · dados das ${hora(item.em)}` : 'Não foi possível atualizar'}${item.erro ? `: ${item.erro}` : ''}`
     : item.alerta
+  // #2232 (H6/H9): o que pede atenção vira estado do cartão, na cor de severidade, com a ação que resolve.
+  const severidade = severidadeDoIndicador(item)
+  const acao = acaoDoIndicador(item)
   return <li ref={setNodeRef} className={isDragging ? css.arrastando : undefined}
     style={{ transform: CSS.Transform.toString(transform), transition }}>
-    <a ref={setActivatorNodeRef} data-indicador={item.id} data-estado={item.estado} className={css.indicador}
+    <a ref={setActivatorNodeRef} data-indicador={item.id} data-estado={item.estado} data-severidade={severidade ?? undefined} className={css.indicador}
       href={hashDoModulo(item.id, frente.tela)} title={item.detalhe || undefined} {...alcaDoLink(attributes, listeners)}>
-      <span className={css.cabecaIndicador}><MarcaIcone nome={frente.icone} tamanho={20} />{item.rotulo ?? frente.nome}</span>
+      {/* #2232 (H5): o número vem primeiro e o rótulo embaixo; todos os cartões partem da mesma linha. */}
       <strong className={css.valor}>{valor}</strong>
+      <span className={css.cabecaIndicador}><MarcaIcone nome={frente.icone} tamanho={20} />{item.rotulo ?? frente.nome}</span>
       {aviso && <span className={css.frescor}><MarcaIcone nome="atencao" tamanho={16} />{aviso}</span>}
+      {acao && <span className={css.acaoIndicador}>{acao}</span>}
       <span className={css.oculto}>{frente.acao}</span>
     </a>
   </li>

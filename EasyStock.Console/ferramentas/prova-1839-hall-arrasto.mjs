@@ -158,6 +158,8 @@ provar('os oito módulos têm ilustração própria, decorativa e no tema; só o
     assert.match(svg, /var\(--il-tinta\)/, `${id} usa as cores do tema`)
     assert.doesNotMatch(svg, /#[0-9a-f]{6}/i, `${id} sem cor fixa`)
     if (moduloCongelado(id)) assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} congelado sem cartão`)
+    // #2232 (H10): Configurações sai da grade e vira link de rodapé, sem cartão ilustrado.
+    else if (id === 'configuracoes') assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} no rodapé, sem cartão`)
     else assert.match(html, new RegExp(`data-ilustracao="${id}"`), `${id} no cartão`)
   }
   assert.equal(renderToStaticMarkup(h(IlustracaoDoModulo, { id: 'privado' })), '')

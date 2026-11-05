@@ -10,10 +10,11 @@ import { contextoDaLinha, estadoDaLinha, pendentesDaLinha } from '../../dominio/
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { estadoDaJanela } from '../../dominio/janela'
 import { inicioDoPedidoAtivo } from '../../dominio/entrega'
-import { duracao, horaMono } from '../../dominio/formato'
+import { horaMono } from '../../dominio/formato'
+import { horaDaLista } from '../../dominio/horaDaLista'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
-import { marcaDoPedido, mostraEtiquetaDoEstado, nomeDoCartao, origemNoCartao, temLinhaDeContexto } from './apresentacaoDoCartao'
+import { marcaDoPedido, mostraEtiquetaDoEstado, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto } from './apresentacaoDoCartao'
 
 // Rótulo e ícone do motivo de precisar, por `chave` (dominio/automatico.js).
 // A direção 19 (seção 1) pede um texto de linha diferente do `rotulo` que o
@@ -80,7 +81,8 @@ export const CartaoConversa = memo(function CartaoConversa({
   const nomeCombinaBusca = busca?.trim() && conversa.nome.toLowerCase().includes(busca.trim().toLowerCase())
   const tagAchada = busca?.trim() && !nomeCombinaBusca ? tagCorrespondida(conversa, busca) : null
   const contexto = contextoDaLinha({
-    origem: origem?.curto ?? null,
+    // #2232 (L9): no cartão vai o chip curto do motivo; a frase inteira fica na conversa.
+    origem: origem?.chip ?? null,
     pedido: grupo ? null : marcaDoPedido(conversa, cardapio, { fonteApi }),
     entregaAte: inicioPedido != null ? horaMono(inicioPedido) : null,
     janelaFechada,
@@ -95,12 +97,18 @@ export const CartaoConversa = memo(function CartaoConversa({
   // Com você também saem da etiqueta (quem conduz está na BarraModo).
   const nome = nomeDoCartao(conversa)
   const etiqueta = mostraEtiquetaDoEstado(estado)
+  // #2232 (L8): "21:48", "ontem", "26 out"; o alerta de cor fica só para o prazo estourado.
+  const hora = horaDaLista(conversa.ultimaEm, agora)
 
   return (
     <button
       type="button"
       className={classesDoCartao(css, { motivo, slaEstourado })}
       aria-current={selecionada}
+      aria-label={rotuloDoCartao({
+        nome: nome.titulo, estado: estado.texto, pendentes, contexto: contexto.map((item) => item.texto),
+        atrasada: slaEstourado, pagamentoNaoVisto, hora, selecionada,
+      })}
       onClick={() => aoAbrir(conversa.id)}
     >
       <span className={css.avatarCartao}>
@@ -116,14 +124,11 @@ export const CartaoConversa = memo(function CartaoConversa({
           <strong className={pendentes > 0 ? css.semResposta : ''} title={nome.titulo}>
             {nome.principal}{nome.complemento && <small aria-label={nome.complemento}> · {nome.complemento.replace(/^Comanda /, '#')}</small>}
           </strong>
-          {!etiqueta && <span className="sr">, {estado.texto}</span>}
-          {selecionada && <span className="sr">, conversa aberta</span>}
-          {slaEstourado && <span className="sr">, prazo de resposta estourado</span>}
           {pagamentoNaoVisto && (
-            <span className={css.pontoNaoVisto} title="Pagamento novo, ainda não visto" aria-label="Pagamento novo, ainda não visto" />
+            <span className={css.pontoNaoVisto} title="Pagamento novo, ainda não visto" />
           )}
-          <time dateTime={conversa.ultimaEm} className={pendentes > 0 ? css.horaNova : ''}>
-            {duracao(agora - new Date(conversa.ultimaEm).getTime())}
+          <time dateTime={conversa.ultimaEm} className={slaEstourado ? css.horaAtrasada : ''}>
+            {hora}
           </time>
         </span>
         {/* #1432: assunto do e-mail, só no canal E-mail (nos outros não desenha nada). */}

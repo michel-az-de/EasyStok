@@ -1,12 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { CampoReais } from '../../componentes/CampoReais'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
 import {
-  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaDaCobranca, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
+  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaDaCobranca, situacaoDaCobranca, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
 import { saldoApi, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR, itensDoResumo, resumoDaCobrancaEscolhida } from '../../dominio/resumoPedido'
@@ -23,7 +22,6 @@ import { numeroParaEntregador, opcoesDoDespacho } from '../../dominio/despacho'
 import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { BaixaAMao } from './BlocoCobranca'
-import { MenuDoPedido } from './MenuDoPedido'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { acaoDoPix } from './acaoDoPix'
 import { criarExecucaoDaEtapa, houveAvancoConfirmado, marcoDaComanda } from './progressoDaComanda'
@@ -63,7 +61,7 @@ const GERANDO_COBRANCA = 'Gerando cobrança…'
 // listava os seis passos soltos) e da barra antiga somados.
 export function BarraProximoPasso({
   pedido, conversaId, nomeCliente, agora, emDesfazer, simulacao = null, bloqueado = false, prerequisito = null, gerarSemEnviar = false, aoAvancar, aoDesfazer,
-  alvoDoPrerequisito = null, aoIrParaMotivo = null, pedidoDeCancelar = 0,
+  alvoDoPrerequisito = null, aoIrParaMotivo = null, pedidoDeCancelar = 0, pedidoDeAcao = null,
   aoGerarPix, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
   aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento, aoAprovarPedido,
 }) {
@@ -78,7 +76,6 @@ export function BarraProximoPasso({
     setCancelarVisto(pedidoDeCancelar)
     if (pedidoDeCancelar) { setMotivoCancelar(''); setErroCancelar(null); setConfirmando('cancelar') }
   }
-  const { acoes: capacidades } = useAcessoModulos()
   const [abrindoBaixa, setAbrindoBaixa] = useState(false)
   const [pedindoMeio, setPedindoMeio] = useState(false)
   // #1875: o meio tocado na pergunta só fica marcado; criar o pedido e cobrar é o botão de confirmação.
@@ -128,6 +125,29 @@ export function BarraProximoPasso({
   // #1683: estorno e "Voltar etapa" seguem o mesmo padrão: esperam, mostram a recusa, fecham no sucesso.
   const [erroCorrecao, setErroCorrecao] = useState(null)
   const corrigindo = useRef(false)
+  const valorPago = pedido.cobranca?.valorPago ?? pedido.cobranca?.valor ?? 0
+
+  // UC-06 passo 5: o valor nasce pré-preenchido com o que foi pago, editável
+  // para um estorno parcial. Motivo some ao fechar, para não vazar de um
+  // pedido para o próximo em telas que reusam este componente.
+  const iniciarConfirmacao = (chave) => {
+    if (chave === 'estornar') {
+      setMotivoEstorno('')
+      setCentavosEstorno(Math.round(valorPago * 100))
+    }
+    if (chave === 'desfazer') { setMotivoDesfazer(''); setErroDesfazer(null) }
+    if (chave === 'cancelar') { setMotivoCancelar(''); setErroCancelar(null) }
+    setErroCorrecao(null)
+    setConfirmando(chave)
+  }
+  // #2232 (F7): as ações do pedido (cancelar, estornar, voltar etapa, desfazer pagamento) saíram do ⋮
+  // ao lado de "Marcar pago" e moram no menu "Ações da ficha" do cabeçalho; ele pede por aqui a mesma
+  // confirmação em linha. `n` muda a cada pedido, então escolher a mesma ação duas vezes reabre.
+  const [acaoVista, setAcaoVista] = useState(pedidoDeAcao?.n ?? 0)
+  if (pedidoDeAcao && pedidoDeAcao.n !== acaoVista) {
+    setAcaoVista(pedidoDeAcao.n)
+    iniciarConfirmacao(pedidoDeAcao.chave)
+  }
 
   // O retorno pertence ao pedido e à etapa que iniciaram a ação. A espera só termina
   // com a Promise, inclusive quando o rascunho ganha pedidoId durante a recarga.
@@ -399,35 +419,11 @@ export function BarraProximoPasso({
   const alocadoApi = pedido.alocadoApi ?? pedido.totalPagoApi
   const naFilaSemQuitar = Boolean(pedido.pedidoId) && saldoApi(pedido) > 0
   if (naFilaSemQuitar && pedido.estado === 'pago' && !aguardaAprovacao(pedido)) rotuloEstado = 'Na fila de preparo'
-  const podeVoltarEtapa = Boolean(anterior) && disponivel('corrigirPasso')
   const temPagamento = alocadoApi > 0 || pedido.totalPagoApi > 0 || Boolean(pedido.cobranca?.pagaEm)
-  const podeCancelar = disponivel('cancelarPedido') && (fonteApi
-    ? Boolean(pedido.pedidoId) && (!temPagamento || capacidades?.cancelarPedidoPago === true)
-    : pedido.estado === 'aguardando')
-  // Estornar é devolver dinheiro que entrou. Pedido sem cobrança paga (venda
-  // antiga, massa de teste) não tem o que devolver, e oferecer o item aqui
-  // levava a confirmar "você já devolveu R$ 0,00" (QA7, achado 1).
-  const podeEstornar = pedido.estado !== 'aguardando' && Boolean(pedido.cobranca?.pagaEm) && disponivel('marcarEstorno')
-  const valorPago = pedido.cobranca?.valorPago ?? pedido.cobranca?.valor ?? 0
-  const podeDesfazer = podeDesfazerPagamento(pedido)
   const valorParaDesfazer = ultimoPagamentoApi(pedido)?.valor ?? valorPago
   const estornoValido = motivoEstorno.trim().length >= 3
     && centavosEstorno > 0 && !moedaAltaDemais(centavosEstorno)
     && centavosEstorno <= Math.round(valorPago * 100)
-
-  // UC-06 passo 5: o valor nasce pré-preenchido com o que foi pago, editável
-  // para um estorno parcial. Motivo some ao fechar, para não vazar de um
-  // pedido para o próximo em telas que reusam este componente.
-  const iniciarConfirmacao = (chave) => {
-    if (chave === 'estornar') {
-      setMotivoEstorno('')
-      setCentavosEstorno(Math.round(valorPago * 100))
-    }
-    if (chave === 'desfazer') { setMotivoDesfazer(''); setErroDesfazer(null) }
-    if (chave === 'cancelar') { setMotivoCancelar(''); setErroCancelar(null) }
-    setErroCorrecao(null)
-    setConfirmando(chave)
-  }
 
   const confirmarCancelamento = async () => {
     if (cancelando.current) return
@@ -545,13 +541,6 @@ export function BarraProximoPasso({
       {confirmando === null && !abrindoBaixa && (
         <div className={css.linhaAcao} aria-busy={emVoo}>
           {corpoAcao}
-          <MenuDoPedido
-            podeCancelar={podeCancelar}
-            podeEstornar={podeEstornar}
-            podeVoltarEtapa={podeVoltarEtapa}
-            podeDesfazerPagamento={podeDesfazer}
-            aoEscolher={iniciarConfirmacao}
-          />
         </div>
       )}
 
