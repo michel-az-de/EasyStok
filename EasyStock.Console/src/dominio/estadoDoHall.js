@@ -33,6 +33,12 @@ export function comOrdemPorUso(preferencia) {
   return intocada ? { ...atual, ordem: ordemOriginalDoHall(atual.foco) } : atual
 }
 
+// "Restaurar ordem original": volta à ordem de uso do foco e mantém os favoritos.
+export function restaurarOrdemPorUso(preferencia) {
+  const atual = normalizarPreferenciasHall(preferencia)
+  return { ...atual, ordem: ordemOriginalDoHall(atual.foco) }
+}
+
 export function favoritosPrimeiroPorUso(preferencia) {
   const atual = normalizarPreferenciasHall(preferencia)
   const base = ordemOriginalDoHall(atual.foco)

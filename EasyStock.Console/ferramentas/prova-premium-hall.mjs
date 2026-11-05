@@ -14,9 +14,11 @@ registerHooks({
 
 const { MODULOS, filtrarModulos, modulosDoHall } = await import('../src/dominio/modulos.js')
 const {
-  alternarFavoritoDoHall, favoritosDoHall, favoritosPrimeiroNoHall, moverModuloDoHall,
-  normalizarPreferenciasHall, ordenarModulosDoHall, restaurarOrdemDoHall,
+  alternarFavoritoDoHall, favoritosDoHall, moverModuloDoHall,
+  normalizarPreferenciasHall, ordenarModulosDoHall,
 } = await import('../src/dominio/preferenciasHall.js')
+// #2232 (H10): os botões do Hall usam a ordem de uso do foco, não a do catálogo.
+const { favoritosPrimeiroPorUso, ordemOriginalDoHall, restaurarOrdemPorUso } = await import('../src/dominio/estadoDoHall.js')
 const { chaveDasPreferenciasHall, gravarPreferenciasHall, lerPreferenciasHall } = await import('../src/aplicacao/preferenciasHall.js')
 const { colisoesDoHall } = await import('../src/features/hall/colisoesDoHall.js')
 
@@ -108,17 +110,20 @@ provar('subir entre módulos permitidos não exige conhecer módulos ocultos', (
   const movida = moverModuloDoHall(inicial, 'entregas', 'atendimento')
   assert.deepEqual(ids(ordenarModulosDoHall(permitidos, movida)), ['entregas', 'atendimento'])
 })
-provar('Favoritos primeiro é explícito e segue catálogo dentro de cada grupo', () => {
+provar('Favoritos primeiro é explícito e segue a ordem de uso dentro de cada grupo', () => {
   const atual = normalizarPreferenciasHall({ ordem: [...catalogo].reverse(), favoritos: ['entregas', 'atendimento'] })
-  const proxima = favoritosPrimeiroNoHall(atual)
-  assert.deepEqual(proxima.ordem.slice(0, 2), ['atendimento', 'entregas'])
-  assert.deepEqual(proxima.ordem.slice(2), catalogo.filter((id) => !atual.favoritos.includes(id)))
+  const proxima = favoritosPrimeiroPorUso(atual)
+  const base = ordemOriginalDoHall(atual.foco)
+  assert.deepEqual(proxima.ordem.slice(0, 2), base.filter((id) => atual.favoritos.includes(id)))
+  assert.deepEqual(new Set(proxima.ordem.slice(0, 2)), new Set(['atendimento', 'entregas']))
+  assert.deepEqual(proxima.ordem.slice(2), base.filter((id) => !atual.favoritos.includes(id)))
   assert.deepEqual(atual.ordem, [...catalogo].reverse())
 })
 provar('restaurar ordem original mantém os favoritos escolhidos', () => {
   const atual = normalizarPreferenciasHall({ ordem: [...catalogo].reverse(), favoritos: ['cozinha'] })
-  const restaurada = restaurarOrdemDoHall(atual)
-  assert.deepEqual(restaurada.ordem, catalogo)
+  const restaurada = restaurarOrdemPorUso(atual)
+  assert.deepEqual(restaurada.ordem, ordemOriginalDoHall(atual.foco))
+  assert.deepEqual([...restaurada.ordem].sort(), [...catalogo].sort())
   assert.deepEqual(restaurada.favoritos, ['cozinha'])
 })
 provar('mudança de token ou nome não mistura nem perde preferências da mesma conta', () => {
@@ -155,7 +160,7 @@ provar('Desfazer persiste snapshot anterior sem perder os atalhos', () => {
   const disco = storage()
   const chave = chaveDasPreferenciasHall(sessao('empresa-a', 'usuario-a'))
   const antes = alternarFavoritoDoHall(inicial, 'atendimento')
-  gravarPreferenciasHall(chave, favoritosPrimeiroNoHall(antes), disco)
+  gravarPreferenciasHall(chave, favoritosPrimeiroPorUso(antes), disco)
   gravarPreferenciasHall(chave, antes, disco)
   assert.deepEqual(lerPreferenciasHall(chave, disco), antes)
 })

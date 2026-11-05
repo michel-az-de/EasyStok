@@ -83,14 +83,3 @@ export function moverModuloDoHall(preferencia, id, destino) {
   return { ...atual, ordem }
 }
 
-export function favoritosPrimeiroNoHall(preferencia) {
-  const atual = normalizarPreferenciasHall(preferencia)
-  return { ...atual, ordem: [
-    ...idsDoCatalogo.filter((id) => atual.favoritos.includes(id)),
-    ...idsDoCatalogo.filter((id) => !atual.favoritos.includes(id)),
-  ] }
-}
-
-export function restaurarOrdemDoHall(preferencia) {
-  return { ...normalizarPreferenciasHall(preferencia), ordem: [...idsDoCatalogo] }
-}

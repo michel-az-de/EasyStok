@@ -18,7 +18,7 @@ import {
   ordenarModulosDoHall, ordenarPaineisDoHall, FOCOS_DO_HALL,
 } from '../../dominio/preferenciasHall'
 import {
-  comOrdemPorUso, estadoDoCartao, favoritosPrimeiroPorUso, MODULOS_NO_RODAPE, ordemOriginalDoHall,
+  comOrdemPorUso, estadoDoCartao, favoritosPrimeiroPorUso, MODULOS_NO_RODAPE, restaurarOrdemPorUso,
 } from '../../dominio/estadoDoHall'
 import { usePulsoDoHall } from '../../aplicacao/usePulsoDoHall'
 import { IconeDoModulo } from './IconeDoModulo'
@@ -234,7 +234,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         </div>}
         {podeOrganizar && <div className={css.opcoesOrdem}>
           <Botao variante="texto" disabled={favoritos.length === 0} onClick={() => gravar(favoritosPrimeiroPorUso(preferencia), 'Favoritos primeiro. As outras áreas seguem a ordem original.')}>Favoritos primeiro</Botao>
-          <Botao variante="texto" onClick={() => gravar({ ...preferencia, ordem: ordemOriginalDoHall(preferencia.foco) }, 'Ordem original restaurada. Seus favoritos foram mantidos.')}>Restaurar ordem original</Botao>
+          <Botao variante="texto" onClick={() => gravar(restaurarOrdemPorUso(preferencia),'Ordem original restaurada. Seus favoritos foram mantidos.')}>Restaurar ordem original</Botao>
           <span>Teclado: Espaço para pegar, setas para mover, Espaço para soltar ou Esc para cancelar.</span>
         </div>}
         <output className={css.resultado} aria-live="polite">
