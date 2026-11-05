@@ -119,11 +119,14 @@ await confere('2. menu fechado ou ausente: nada acontece; soltar desliga os ouvi
   assert.equal(documento.ouvintes.pointerdown.size + documento.ouvintes.keydown.size, 0)
 })
 
-// --- 3. Os três menus usam a mesma regra --------------------------------------------
+// --- 3. Os menus usam a mesma regra --------------------------------------------------
 const fonte = (caminho) => readFileSync(new URL('../src/' + caminho, import.meta.url), 'utf8')
+// #2232 (A3, A4): o "Mais ações" da faixa saiu; Devolver e Concluir moram no ⋮ do cabeçalho.
+await confere('3. BarraModo.jsx: a faixa não tem menu próprio (a conversa tem um menu só)', () => {
+  assert.doesNotMatch(fonte('features/atendimento/BarraModo.jsx'), /<details/)
+})
 for (const [arquivo, ref] of [
   ['features/atendimento/PainelAtendimento.jsx', 'menuConversa'],
-  ['features/atendimento/BarraModo.jsx', 'menu'],
   ['features/atendimento/Composer.jsx', 'ferramentasRef'],
 ]) {
   await confere(`3. ${arquivo.split('/').pop()}: o <details> usa useMenuDetalhes(${ref})`, () => {

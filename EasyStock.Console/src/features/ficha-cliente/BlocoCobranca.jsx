@@ -23,7 +23,7 @@ import { totalDoPedido } from '../../dominio/pedido'
 import { encontrarCupom, validarCupom } from '../../dominio/fidelidade'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { RelogioPix } from './RelogioPix'
-import { cobrancaRepeteExtrato } from './apresentacaoDaFicha'
+import { cobrancaRepeteExtrato, perguntaDaBaixa } from './apresentacaoDaFicha'
 import { ConferirPagamento } from './ConferirPagamento'
 import css from './ficha.module.css'
 
@@ -176,6 +176,8 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
       evento.preventDefault()
       return valido && !enviando ? registrar() : undefined
     }}>
+      {/* #2232 (F6): tocar em "Marcar pago" abre a pergunta com o valor que vai ser lançado. */}
+      <p className={css.perguntaDaBaixa}>{perguntaDaBaixa(centavos / 100, { sinal: aguardaSinalManual(pedido) })}</p>
       {baixaCancelaCobrancaOnline(pedido) && (
         <div className={css.avisoDiferenca} role="note">
           <p className={css.corpoBloco}><Icone nome="alerta" /> {AVISO_BAIXA_COM_LINK}</p>

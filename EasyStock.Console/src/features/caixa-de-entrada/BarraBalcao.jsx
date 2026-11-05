@@ -90,7 +90,8 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho, semContagem = fa
   return (
     <div className={css.barra}>
       <header className={css.cabecalhoLista}>
-        <h2>Conversas {!semContagem && <span>{doUniverso.length}</span>}</h2>
+        {/* #2232 (L1): o total já está no chip "Todas"; o título não repete número. */}
+        <h2>Conversas</h2>
         <span className={css.comOrdenar}>
           <Botao ref={botaoFiltros} variante="texto" className={css.botaoOrdenar} aria-haspopup="dialog" aria-expanded={ordenarAberto}
             aria-label={filtrando ? 'Filtrar conversas, filtros ativos' : 'Filtrar conversas'} title="Filtrar e ordenar conversas"

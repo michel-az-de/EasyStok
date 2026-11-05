@@ -77,6 +77,9 @@ function balcao({ estado, conversas = [], fonteApi = true }) {
       h(ContextoAcoes.Provider, { value: acoes }, h(PainelConversas, {})))))
 }
 const cabecalho = (html) => html.match(/<h2>(.*?)<\/h2>/)?.[1] ?? ''
+// #2232 (L5, L11): a lista abre em "Precisa de você" e o total mora no chip "Todas", não no título.
+const VAZIO_DE_HOJE = /Nenhuma conversa aberta agora\.|Ninguém esperando você\./
+const totalNoChip = (html) => html.match(/Todas <span class="numeroChip">(\d+)<\/span>/)?.[1]
 
 // --- 1. Regra pura ---------------------------------------------------------------
 await confere('1. cargaDaLista: carregando, erro ou nada', async () => {
@@ -118,19 +121,19 @@ await confere('3. erro sem lista: diz que não carregou, sem contagem', () => {
 // --- 4. Lido -------------------------------------------------------------------------
 await confere('4. lido e vazio: os vazios de hoje continuam', () => {
   const html = balcao({ estado: 'ok' })
-  assert.match(html, /Nenhuma conversa aberta agora\./)
-  assert.match(cabecalho(html), /Conversas <span>0<\/span>/)
+  assert.match(html, VAZIO_DE_HOJE)
+  assert.equal(totalNoChip(html), '0')
   assert.doesNotMatch(html, /Carregando/)
 })
 await confere('4. erro com lista na tela: mostra a lista e a contagem', () => {
   const html = balcao({ estado: 'erro', conversas: [conversa] })
   assert.match(html, /Marina Souza/)
-  assert.match(cabecalho(html), /Conversas <span>1<\/span>/)
+  assert.equal(totalNoChip(html), '1')
   assert.doesNotMatch(html, /Não consegui carregar/)
 })
 await confere('4. demonstração: vazio de sempre, sem carregando', () => {
   const html = balcao({ estado: 'desligada', fonteApi: false })
-  assert.match(html, /Nenhuma conversa aberta agora\./)
+  assert.match(html, VAZIO_DE_HOJE)
   assert.doesNotMatch(html, /Carregando/)
 })
 

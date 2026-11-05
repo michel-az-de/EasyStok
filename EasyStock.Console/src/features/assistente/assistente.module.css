@@ -14,14 +14,11 @@
 /* #1868: na linha de Link de compra e Encerrar, a mesma régua deles (altura do toque, raio 1,
    ícone de 20), em vez da pílula de 48 com ícone de 26. */
 .gatilhoNoCabecalho {
-  position: relative; width: var(--toque); height: var(--toque); padding: 0; border-radius: var(--r-1);
+  position: relative; width: auto; height: var(--toque); padding: 0 var(--e-2); gap: var(--e-1); border-radius: var(--r-1);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.rotuloGatilho { display: none; }
-@media (min-width: 1180px) and (pointer: fine) {
-  .gatilhoNoCabecalho { width: auto; gap: var(--e-1); padding: 0 var(--e-2); }
-  .rotuloGatilho { display: inline; }
-}
+/* #2232 (L4): o rótulo "Assistente" aparece em qualquer tela, não só em desktop com mouse; quem
+   decide esconder é o container do cabeçalho, logo abaixo. */
 /* #1828: conversa estreita (cardápio amplo aberto em 1280) deixava o "Assistente" sozinho numa
    segunda linha do cabeçalho. Abaixo de 360 px úteis (Link de compra, Encerrar e Assistente com
    nome somam ~342) ele fica só com o ícone; o nome segue no aria-label. `topo-conversa` é o

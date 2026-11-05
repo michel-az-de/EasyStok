@@ -26,20 +26,19 @@
 .cartao:active:not(:disabled) { background: var(--preenchimento-forte); }
 /* Selecionada: fundo tinto, pastilha suave. */
 .cartao[aria-current='true'] { background: var(--preenchimento-forte); box-shadow: none; }
-/* Atenção e atraso usam marcador no avatar; o preenchimento identifica a seleção. */
+/* #2232 (banca UX, L7): atenção e atraso saem do avatar ("!" competia com as iniciais e o selo
+   do canal) e viram trilho lateral do cartão. O texto vai no nome acessível (WCAG 1.4.1). */
+.cartao { position: relative; }
+.cartao.precisa::before,
+.cartao.atrasada::before,
+.cartao.slaEstourado::before {
+  content: ''; position: absolute; inset: 8px auto 8px 0; width: 4px;
+}
+.cartao.precisa::before { background: var(--alerta); }
+.cartao.atrasada::before, .cartao.slaEstourado::before { background: var(--erro); }
 /* Avatar com o selo do canal no canto (rodada 6c). */
 .avatarCartao { position: relative; flex-shrink: 0; margin-top: 1px; }
-.cartao.precisa .avatarCartao::after,
-.cartao.atrasada .avatarCartao::after,
-.cartao.slaEstourado .avatarCartao::after {
-  content: '!'; position: absolute; inset: -3px -3px auto auto;
-  display: grid; place-items: center; width: 18px; height: 18px;
-  border-radius: var(--r-1); background: var(--alerta); color: var(--papel);
-  font-size: var(--t-minimo); font-weight: 800;
-}
-.cartao.atrasada .avatarCartao::after,
-.cartao.slaEstourado .avatarCartao::after { background: var(--erro); color: var(--sobre-erro); }
-/* O prazo vencido mantém o marcador e o texto acessível, sem piscar. */
+/* O prazo vencido mantém o trilho e o texto acessível, sem piscar. */
 .cartao.slaEstourado { box-shadow: none; }
 .cartao.slaEstourado[aria-current='true'] { box-shadow: none; }
 
@@ -48,7 +47,7 @@
 /* Linha 1: nome à esquerda, hora à direita. */
 .topo { display: flex; align-items: center; gap: var(--e-2); min-width: 0; width: 100%; }
 .topo strong {
-  font-family: var(--f-corpo); font-weight: 600; font-size: var(--t-corpo);
+  font-family: var(--f-corpo); font-weight: 600; font-size: 1rem;
   line-height: var(--lh-compacto); min-width: 0; color: var(--tinta);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
 }
@@ -60,9 +59,8 @@
   font-family: var(--f-dado); font-size: var(--t-micro); font-weight: 400;
   color: var(--tinta-3); font-variant-numeric: tabular-nums;
 }
-/* Mensagem esperando: a hora ganha a cor da marca, como o contador. */
-.topo time.horaNova { color: var(--marca); font-weight: 600; }
-.cartao[aria-current='true'] .topo time.horaNova { color: var(--tinta); }
+/* #2232 (L8): a hora é neutra; só o prazo de resposta estourado pede a cor de alerta. */
+.topo time.horaAtrasada { color: var(--erro); font-weight: 600; }
 
 /* Linha 2: prévia em largura cheia e o número de mensagens sem resposta. */
 .linhaPrevia { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -70,16 +68,16 @@
 .previa {
   flex: 1; min-width: 0; display: block;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  color: var(--tinta-2); font-size: var(--t-apoio);
+  color: var(--tinta-2); font-size: var(--t-corpo);
 }
 .prefixo { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; color: var(--tinta-3); vertical-align: -2px; }
 
-/* Contador de mensagens sem resposta: o número no círculo da marca. O texto
-   inteiro vai no rótulo acessível e no title. */
+/* Contador de mensagens sem resposta. #2232 (T3): sai da cor da marca, que fica para a ação
+   primária e a seleção; tinta cheia mantém o contraste. O texto inteiro vai no title. */
 .naoLidas {
   flex-shrink: 0; min-width: 20px; height: 20px; padding: 0 6px;
   display: inline-grid; place-items: center; border-radius: var(--r-1);
-  background: var(--acao); color: var(--sobre-acao);
+  background: var(--tinta); color: var(--papel);
   font-size: var(--t-minimo); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;
   animation: estalarPonto var(--dur-longa) var(--ease-pulo) both;
 }
@@ -128,7 +126,6 @@
 }
 .cabecalhoLista { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: 64px; }
 .cabecalhoLista h2 { margin: 0 auto 0 0; font-size: var(--t-titulo); font-weight: 700; }
-.cabecalhoLista h2 span { margin-left: var(--e-1); color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 400; }
 .painelFiltros { display: grid; gap: var(--e-3); }
 .canaisNoFiltro { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin: 0; padding: 0; border: 0; }
 .canaisNoFiltro legend { color: var(--tinta-2); font-size: var(--t-minimo); margin-bottom: var(--e-2); }
@@ -196,19 +193,18 @@
   mask-image: none;
 }
 .filtros::-webkit-scrollbar { display: none; }
-/* Mesmo alvo dos controles: parado é
-   preenchimento sem contorno, ligado ganha fundo e anel da marca. A forma
-   muda junto com a cor (WCAG 1.4.1). */
+/* #2232 (L6): parado tem contorno visível (era texto solto, não parecia tocável); ligado é a
+   cor de ação cheia. A forma muda junto com a cor (WCAG 1.4.1). */
 .chipFiltro {
   flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
   min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-1);
-  border: 0; background: transparent; color: var(--tinta-2);
+  border: var(--b-1) solid var(--linha-media); background: transparent; color: var(--tinta-2);
   font-size: var(--t-micro); font-weight: 600; white-space: nowrap;
   transition: background-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao);
 }
 .chipFiltro:hover:not(.chipLigado) { background: var(--preenchimento-forte); color: var(--tinta); }
 .chipLigado {
-  background: var(--marca-claro); color: var(--marca);
+  background: var(--acao); color: var(--sobre-acao); border-color: var(--acao);
   box-shadow: none;
 }
 .numeroChip {
@@ -260,14 +256,24 @@
 .canal_instagram { color: var(--c-instagram); }
 
 /* S59 (#1391): faixa e lista de "Não entregues". */
+/* #2232 (L11): a faixa encolhe (ocupava a altura de dois cartões), diz a ação ("Revisar") e pode
+   ser dispensada até chegar falha nova. */
 .faixaNaoEntregues {
-  display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--toque);
-  padding: 8px 16px; border: 0; border-bottom: 1px solid var(--linha);
-  background: var(--erro-pastel); color: var(--erro);
-  font: inherit; font-size: 1rem; font-weight: 600; text-align: left; cursor: pointer;
+  display: flex; align-items: center; gap: var(--e-2); width: 100%;
+  border-bottom: var(--b-1) solid var(--linha); background: var(--erro-pastel); color: var(--erro);
+  font-size: var(--t-apoio); font-weight: 600;
 }
-.faixaNaoEntregues:hover, .faixaNaoEntregues:focus-visible { text-decoration: underline; }
+.abrirNaoEntregues {
+  display: flex; align-items: center; gap: var(--e-2); flex: 1; min-width: 0; min-height: var(--toque);
+  padding: 0 0 0 var(--e-3); border: 0; background: transparent; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.abrirNaoEntregues:hover, .abrirNaoEntregues:focus-visible { text-decoration: underline; }
 .verNaoEntregues { margin-left: auto; }
+.dispensarNaoEntregues {
+  display: grid; place-items: center; width: var(--toque); height: var(--toque); flex-shrink: 0;
+  border: 0; background: transparent; color: inherit; cursor: pointer;
+}
 .listaNaoEntregues { list-style: none; margin: 0; padding: 0; }
 .itemNaoEntregue { padding-block: var(--e-4); display: grid; gap: var(--e-3); overflow-wrap: anywhere; }
 .itemNaoEntregue + .itemNaoEntregue { border-top: var(--b-1) solid var(--linha); }

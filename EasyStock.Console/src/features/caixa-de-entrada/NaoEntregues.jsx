@@ -10,6 +10,7 @@ import {
 } from '../../dominio/falhaDeEnvio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import css from './caixa.module.css'
+import { assinaturaDaDispensa, faixaDispensada, gravarDispensa, lerDispensa } from './dispensaNaoEntregues'
 
 // S59 (#1391): mensagens que não chegaram ao cliente, de todas as conversas. Só aparece no modo API
 // (a massa local não envia de verdade) e só quando há alguma: a faixa abre a lista com Reenviar e
@@ -110,7 +111,19 @@ export function NaoEntregues({ aoAbrir }) {
     }
   }, [ocupado, carregando, itens])
 
+  // #2232 (L11): dispensada vale até aparecer mensagem que não estava na lista dispensada.
+  const [vistas, setVistas] = useState(lerDispensa)
+  const dispensada = !aberto && !erro && itens.length > 0 && faixaDispensada(itens, vistas)
+
   if (!listarNaoEntregues || (itens.length === 0 && !aberto && !erro && !carregando)) return null
+
+  function dispensar() {
+    const assinatura = assinaturaDaDispensa(itens)
+    setVistas(assinatura)
+    gravarDispensa(assinatura)
+    // O botão some com a faixa: o foco volta ao início da tela em vez de cair no corpo.
+    document.querySelector('[data-inicio-tela]')?.focus()
+  }
 
   async function reenviarItem(item) {
     setOcupado(item.mensagem.id)
@@ -144,11 +157,18 @@ export function NaoEntregues({ aoAbrir }) {
 
   return (
     <>
-      <button type="button" className={css.faixaNaoEntregues} onFocus={(evento) => { focoFaixaRef.current = evento.currentTarget }} onClick={() => { setAberto(true); carregar() }}>
-        <Icone nome="message-square-warning" tamanho={20} />
-        {erro ? 'Mensagens sem atualizar' : carregando && itens.length === 0 ? 'Conferindo mensagens…' : itens.length === 1 ? '1 mensagem não entregue' : `${itens.length} mensagens não entregues`}
-        <span className={css.verNaoEntregues}>Ver</span>
-      </button>
+      {!dispensada && (
+        <div className={css.faixaNaoEntregues}>
+          <button type="button" className={css.abrirNaoEntregues} onFocus={(evento) => { focoFaixaRef.current = evento.currentTarget }} onClick={() => { setAberto(true); carregar() }}>
+            <Icone nome="message-square-warning" tamanho={20} />
+            {erro ? 'Mensagens sem atualizar' : carregando && itens.length === 0 ? 'Conferindo mensagens…' : itens.length === 1 ? '1 mensagem não entregue' : `${itens.length} mensagens não entregues`}
+            <span className={css.verNaoEntregues}>Revisar</span>
+          </button>
+          {itens.length > 0 && !erro && (
+            <Botao variante="texto" icone="x" className={css.dispensarNaoEntregues} aria-label="Dispensar aviso de não entregues" title="Dispensar até chegar outra falha" onClick={dispensar} />
+          )}
+        </div>
+      )}
       {aberto && (
         <Modal
           titulo="Não entregues"

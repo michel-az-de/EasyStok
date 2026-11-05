@@ -30,13 +30,6 @@ export function previaDaConversa(conversa) {
 
 export const conversaEncerrada = (conversa) => conversa?.estado === 'Encerrado'
 
-// Contagens do cabeçalho. Ficam aqui para o layout não conhecer estado nenhum.
-export const contarAbertas = (conversas) =>
-  conversas.filter((c) => c.estado !== 'Encerrado').length
-
-export const contarNaEsteira = (conversas) =>
-  conversas.filter((c) => c.pedido && c.pedido.estado !== 'entregue').length
-
 // --- Balcão (seção 1, rodada 5) ---------------------------------------------
 // Duas abas (Precisa de você / Todas), chips de canal que ligam mais de um ao
 // mesmo tempo (nenhum ligado é todos) e uma busca. Situação e bloqueado saíram

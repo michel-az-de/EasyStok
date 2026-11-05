@@ -13,12 +13,14 @@ import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { primeiroNome } from '../../dominio/mensagem'
+import { nomeDoContato } from '../../dominio/nomeDoContato'
 import { assistenteAtendendo } from '../../dominio/resumoDoModo'
 import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
 import { Composer } from './Composer'
 import { CompartilharComanda } from './CompartilharComanda'
+import { DevolverAoAssistente } from './DevolverAoAssistente'
 import { PassarConversa } from './PassarConversa'
 import { Thread } from './Thread'
 import css from './atendimento.module.css'
@@ -147,7 +149,7 @@ export function PainelAtendimento({
             tamanho="grande"
           />
           <h2 tabIndex={-1} ref={cabecalhoRef} data-foco-reserva>
-            <span className={css.nomeCliente} title={selecionada.nome}>{selecionada.nome}</span>
+            <span className={css.nomeCliente} title={selecionada.nome}>{nomeDoContato(selecionada.nome)}</span>
             {/* Comanda, canal e, quando pede atenção, o prazo da janela, em uma linha.
                 #1761 (L4): a quantidade de pedidos saiu (está em Histórico) e o prazo só aparece
                 perto do fim (`prazoNoCabecalho`); a linha quebrava em duas. */}
@@ -179,6 +181,8 @@ export function PainelAtendimento({
               encerrada, dá lugar ao "Reabrir conversa" que já existia. */}
           {/* #1239: passar a conversa para outra atendente (só no modo API). */}
           {fonteApi && !encerrada && !bloqueada && <PassarConversa key={'passar-' + selecionada.id} conversa={selecionada} />}
+          {/* #2232 (A4): Devolver ao Assistente veio da faixa "quem responde" para este menu: um menu só. */}
+          <DevolverAoAssistente conversa={selecionada} pausado={pausado} bloqueada={bloqueada} aoDevolver={() => devolverAutomatico(selecionada.id)} />
           {!encerrada && !bloqueada && (
             <Botao variante="texto" icone="circle-check" className={css.encerrar} aria-label="Concluir conversa" title="Concluir conversa" onClick={() => { fecharMenu(menuConversa.current); abrirEncerramento(selecionada.id) }}>
               Concluir conversa
@@ -198,8 +202,6 @@ export function PainelAtendimento({
         pausado={pausado}
         bloqueada={bloqueada}
         aoAssumir={() => assumirAtendimento(selecionada.id)}
-        aoDevolver={() => devolverAutomatico(selecionada.id)}
-        aoEncerrar={() => abrirEncerramento(selecionada.id)}
       />
       </div>
 
@@ -209,6 +211,8 @@ export function PainelAtendimento({
         <Thread
           mensagens={selecionada.mensagens}
           chaveRolagem={selecionada.id}
+          visivel={visivel}
+          numeroComanda={selecionada.numeroComanda}
           fronteiras={fronteirasDoFio(selecionada.atendimentos)}
           agora={agora}
           aoAbrirDefinicaoAutomatica={(regra) => aoAbrirBiblioteca(itemDaBibliotecaPelaRegra(regra))}
@@ -254,7 +258,12 @@ export function PainelAtendimento({
         reabrindo={reabrindo}
       />
       </div>
-      {slotEditorNota}
+      {/* #2232 (A8): o wrapper existe sempre, para o editor não remontar ao entrar no modo nota (o rascunho
+          mora nele); só ganha o fundo de nota e o aviso "Só a equipe vê" enquanto o editor está à vista. */}
+      <div className={editorNotaVisivel ? css.modoNota : undefined} style={editorNotaVisivel ? undefined : { display: 'contents' }}>
+        {editorNotaVisivel && <p className={css.avisoNota}><Icone nome="lock" tamanho={16} /> Só a equipe vê</p>}
+        {slotEditorNota}
+      </div>
       </div>
     </>
   )

@@ -12,13 +12,15 @@ import { faltaPagar } from '../../dominio/pagamento'
 import { ehLead } from '../../dominio/conversa'
 import { passoPorId } from '../../dominio/esteira'
 import { moeda } from '../../dominio/formato'
+import { nomeDoContato } from '../../dominio/nomeDoContato'
 
 export const NOME_DO_VISITANTE = 'Visitante do site'
 
 // Nome do cartão. O genérico do visitante cede o lugar à comanda, que é o que
 // distingue um visitante do outro; o nome inteiro segue no `title`.
+// #2232 (L10): telefone cru no lugar do nome sai com a máscara.
 export function nomeDoCartao(conversa) {
-  const nome = conversa?.nome ?? ''
+  const nome = nomeDoContato(conversa?.nome ?? '')
   const comanda = conversa?.numeroComanda ? `Comanda ${conversa.numeroComanda}` : null
   const titulo = comanda ? `${nome} · ${comanda}` : nome
   if (comanda && nome.trim() === NOME_DO_VISITANTE) return { principal: comanda, complemento: null, titulo }
@@ -40,6 +42,23 @@ export function origemNoCartao(passagem) {
 const ESTADOS_SEM_ETIQUETA = ['passagem', 'automatico', 'voce']
 export function mostraEtiquetaDoEstado(estado) {
   return !ESTADOS_SEM_ETIQUETA.includes(estado?.chave)
+}
+
+// #2232 (banca UX, X1, WCAG 4.1.2): nome acessível do item da lista numa frase só, na ordem em
+// que se decide: quem, quanto espera, por quê, quando. Antes o leitor de tela lia o botão inteiro,
+// prévia incluída.
+export function rotuloDoCartao({ nome, estado = null, pendentes = 0, motivo = null, contexto = [], atrasada = false, pagamentoNaoVisto = false, hora, selecionada = false }) {
+  return [
+    nome,
+    estado,
+    pendentes > 0 ? (pendentes === 1 ? '1 mensagem sem resposta' : `${pendentes} mensagens sem resposta`) : null,
+    motivo,
+    ...contexto,
+    atrasada ? 'prazo de resposta estourado' : null,
+    pagamentoNaoVisto ? 'pagamento novo' : null,
+    hora,
+    selecionada ? 'conversa aberta' : null,
+  ].filter(Boolean).join(', ')
 }
 
 // A terceira linha só existe se sobrar o que dizer nela.

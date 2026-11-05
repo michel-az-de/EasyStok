@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { nomeDoContato } from '../../dominio/nomeDoContato'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { Avatar } from '../../componentes/Avatar'
 import { Botao } from '../../componentes/Botao'
@@ -6,8 +7,36 @@ import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { ehRestricao, ordenarTags } from '../../dominio/cliente'
 import { ConsultaFreteCliente } from './ConsultaFreteCliente'
+import { copiarTexto, linkDoMapa } from './apresentacaoDaFicha'
 import css from './ficha.module.css'
 import notasCss from './NotasDoCliente.module.css'
+
+// #2232 (F2): o endereço do cartão tem ação: copiar (com retorno visível) e abrir no mapa em nova aba.
+// Fora do botão que abre o cadastro, porque botão dentro de botão não é HTML válido.
+function EnderecoDoCliente({ endereco }) {
+  const [retorno, setRetorno] = useState(null) // 'copiado' | 'falhou'
+  useEffect(() => {
+    if (!retorno) return undefined
+    const id = setTimeout(() => setRetorno(null), 2400)
+    return () => clearTimeout(id)
+  }, [retorno])
+  const copiar = async () => setRetorno(await copiarTexto(endereco) ? 'copiado' : 'falhou')
+  return (
+    <div className={css.enderecoCliente}>
+      <Icone nome="map-pin" tamanho={16} />
+      <span className={css.enderecoClienteInline}>{endereco}</span>
+      <span className={css.acoesEndereco}>
+        <Botao variante="texto" icone="copy" onClick={copiar}>Copiar</Botao>
+        <a className={css.abrirNoMapa} href={linkDoMapa(endereco)} target="_blank" rel="noopener noreferrer">
+          <Icone nome="external-link" tamanho={16} />Abrir no mapa
+        </a>
+      </span>
+      <output className={css.retornoEndereco} aria-live="polite">
+        {retorno === 'copiado' ? 'Copiado' : retorno === 'falhou' ? 'Não foi possível copiar' : ''}
+      </output>
+    </div>
+  )
+}
 
 // #1839: o que se vê sempre no Resumo, sem abrir nada: quem é o cliente (resumo da IA), quanto já
 // comprou no total, o que costuma pedir, as tags e a última nota interna como post-it. O resto
@@ -25,12 +54,12 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
         <span className={css.identidadeCliente}>
           <Avatar nome={conversa.nome} foto={fotoCadastro.url ?? foto} tamanho="grande" />
           <span className={css.dadosIdentidadeCliente}>
-            <strong className={css.nomeClienteInline}>{conversa.nome}</strong>
+            <strong className={css.nomeClienteInline}>{nomeDoContato(conversa.nome)}</strong>
           </span>
         </span>
-        {cliente.endereco && <span className={css.enderecoClienteInline}>{cliente.endereco}</span>}
         {lead && <span className={css.numerosCliente}>Contato sem cadastro</span>}
       </button>
+      {cliente.endereco && <EnderecoDoCliente endereco={cliente.endereco} />}
       {mostrarEntrega && <div className={notasCss.acoesCliente}>
         {aoVerEntrega
           ? <Botao data-foco-reserva={focoFrete} className={css.freteCliente} variante="texto" icone="moto" aria-label="Ver frete e entrega" onClick={aoConsultarFrete ?? aoVerEntrega}>Frete</Botao>

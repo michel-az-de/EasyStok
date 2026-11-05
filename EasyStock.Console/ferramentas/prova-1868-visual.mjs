@@ -79,12 +79,14 @@ confere('1  a terceira linha só existe com etiqueta ou contexto', () => {
 })
 confere('1  sem a etiqueta, o estado vai para o leitor de tela e a atenção ganha marcador no avatar', () => {
   const jsx = fonte('features/caixa-de-entrada/CartaoConversa.jsx')
-  assert.match(jsx, /\{!etiqueta && <span className="sr">, \{estado\.texto\}<\/span>\}/)
+  // #2232 (X1): o estado sem etiqueta vai no nome acessível composto do cartão.
+  assert.match(jsx, /estado: estado\.texto/)
   assert.match(jsx, /title=\{nome\.titulo\}/)
   const cssDaLista = fonte('features/caixa-de-entrada/caixa.module.css')
-  assert.match(cssDaLista, /\.cartao\.precisa \.avatarCartao::after/)
-  assert.match(cssDaLista, /content: '!'/)
-  assert.match(cssDaLista, /\.cartao\.slaEstourado \.avatarCartao::after \{ background: var\(--erro\)/)
+  // #2232 (L7): trilho lateral no lugar do "!" do avatar.
+  assert.match(cssDaLista, /\.cartao\.precisa::before \{ background: var\(--alerta\)/)
+  assert.doesNotMatch(cssDaLista, /avatarCartao::after/)
+  assert.match(cssDaLista, /\.cartao\.atrasada::before, \.cartao\.slaEstourado::before \{ background: var\(--erro\)/)
   assert.match(fonte('features/caixa-de-entrada/classesDoCartao.js'), /motivo && motivo\.tom !== 'perigo' \? css\.precisa/) // #2135: todo motivo tem trilho, não só o `aviso`
 })
 

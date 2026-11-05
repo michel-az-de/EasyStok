@@ -67,7 +67,7 @@ function PostIt({ nota }) {
 
 export function Thread({
   mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, digitando = false, notas = [],
-  temAnteriores = false, abrindoAnteriores = false, aoVerAnteriores,
+  temAnteriores = false, abrindoAnteriores = false, aoVerAnteriores, visivel = true, numeroComanda = null,
 }) {
   const fim = useRef(null)
   // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.
@@ -76,7 +76,8 @@ export function Thread({
   const abrirModelos = useChamadaEstavel(aoAbrirModelos)
 
   // #1587: não rola mais a cada mensagem; a regra está no hook.
-  useRolagemDoFio(fim, { mensagens, chaveRolagem, digitando, totalDeNotas: notas.length })
+  // #2232 (A5): `visivel` é o painel aberto na aba; ao abrir, o fio vai para a última mensagem.
+  const { novas, irParaNovas } = useRolagemDoFio(fim, { mensagens, chaveRolagem, digitando, totalDeNotas: notas.length, visivel })
 
   // Intercala as divisórias na posição certa: por ÍNDICE (`aposIndice`), não
   // por horário — o relógio simulado anda em passos e duas mensagens de
@@ -113,6 +114,34 @@ export function Thread({
     })
   }
 
+  // #2232 (B3): cada dia é um grupo, para a pílula de data ficar fixa só enquanto o dia dela rola.
+  const grupos = []
+  for (const l of linhas) {
+    const atual = grupos.at(-1)
+    if (l.tipo === 'dia') grupos.push({ chave: l.chave, itens: [l] })
+    else if (atual) atual.itens.push(l)
+    else grupos.push({ chave: l.chave, itens: [l], solto: true })
+  }
+  const desenhar = (l) => {
+    if (l.tipo === 'divisoria') return <Divisoria key={l.chave} numero={l.numero} />
+    if (l.tipo === 'dia') return <SeparadorDeDia key={l.chave} rotulo={l.rotulo} />
+    if (l.tipo === 'nota') return <PostIt key={l.chave} nota={l.nota} />
+    if (l.tipo === 'assunto') return <AssuntoEmail key={l.chave} assunto={l.assunto} noFio />
+    return (
+      <Balao
+        key={l.chave}
+        mensagem={l.mensagem}
+        trocaDeVoz={l.trocaDeVoz}
+        numeroComanda={numeroComanda}
+        aoAbrirDefinicaoAutomatica={abrirDefinicaoAutomatica}
+        // Sem a ação (demonstração) o balão não mostra o Reenviar.
+        aoReenviar={aoReenviar ? reenviar : undefined}
+        // #1761: só onde o compositor já oferece Modelos aprovados.
+        aoAbrirModelos={aoAbrirModelos ? abrirModelos : undefined}
+      />
+    )
+  }
+
   return (
     <div className={css.thread} role="log" aria-live="polite" aria-label="Mensagens da conversa">
       {/* #2005 (console-09): o fio traz as 100 mais recentes; as de antes abrem sob demanda. */}
@@ -123,25 +152,15 @@ export function Thread({
           </Botao>
         </div>
       )}
-      {linhas.map((l) => {
-        if (l.tipo === 'divisoria') return <Divisoria key={l.chave} numero={l.numero} />
-        if (l.tipo === 'dia') return <SeparadorDeDia key={l.chave} rotulo={l.rotulo} />
-        if (l.tipo === 'nota') return <PostIt key={l.chave} nota={l.nota} />
-        if (l.tipo === 'assunto') return <AssuntoEmail key={l.chave} assunto={l.assunto} noFio />
-        return (
-          <Balao
-            key={l.chave}
-            mensagem={l.mensagem}
-            trocaDeVoz={l.trocaDeVoz}
-            aoAbrirDefinicaoAutomatica={abrirDefinicaoAutomatica}
-            // Sem a ação (demonstração) o balão não mostra o Reenviar.
-            aoReenviar={aoReenviar ? reenviar : undefined}
-            // #1761: só onde o compositor já oferece Modelos aprovados.
-            aoAbrirModelos={aoAbrirModelos ? abrirModelos : undefined}
-          />
-        )
-      })}
+      {grupos.map((g) => (g.solto
+        ? g.itens.map(desenhar)
+        : <div key={g.chave} className={css.grupoDia}>{g.itens.map(desenhar)}</div>))}
       {digitando && <Digitando />}
+      {novas > 0 && (
+        <Botao variante="primario" icone="arrow-up" className={css.novasMensagens} onClick={irParaNovas}>
+          Novas mensagens ({novas})
+        </Botao>
+      )}
       <div ref={fim} />
     </div>
   )

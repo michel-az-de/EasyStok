@@ -277,6 +277,7 @@ const { ModalEncerrar } = await import('../src/features/encerramento/ModalEncerr
 const { FolhaResumo } = await import('../src/features/encerramento/FolhaResumo.jsx')
 const { CampoEmLinha } = await import('../src/features/ficha-cliente/CampoEmLinha.jsx')
 const { BarraProximoPasso } = await import('../src/features/ficha-cliente/BarraProximoPasso.jsx')
+const { acoesDoPedido, itensDoMenuDaFicha } = await import('../src/features/ficha-cliente/apresentacaoDaFicha.js')
 const { BaixaAMao } = await import('../src/features/ficha-cliente/BlocoCobranca.jsx')
 const { ModalHistorico } = await import('../src/features/ficha-cliente/ModalHistorico.jsx')
 const { ModalNota } = await import('../src/features/notas/ModalNota.jsx')
@@ -634,10 +635,12 @@ await confere('D  "Desfazer pagamento" espera, trava o segundo toque e só fecha
   const espera = pendente()
   const idas = []
   const tela = new Tela(BarraProximoPasso, propsDaBarra(pago, { aoDesfazerPagamento: (motivo) => { idas.push(motivo); return idas.length === 1 ? espera.promise : Promise.resolve(undefined) } }))
-  const menu = doTipo(tela, 'MenuDoPedido')[0]
-  assert.equal(menu.props.podeDesfazerPagamento, true)
-  menu.props.aoEscolher('desfazer')
-  tela.renderizar()
+  // #2232 (F7): o ⋮ do pedido (MenuDoPedido) saiu; "Desfazer pagamento" é item do menu "Ações da ficha" no
+  // cabeçalho (MenuDaFicha), que pede a confirmação em linha da barra pela prop `pedidoDeAcao`. A prova confere
+  // que o item é oferecido para este pedido e depois escolhe o item, como o PainelFicha faz.
+  const itens = itensDoMenuDaFicha({ acoes: acoesDoPedido({ pedido: pago, fonteApi: true }), comPedido: true })
+  assert.ok(itens.some((i) => i.chave === 'desfazer' && i.rotulo === 'Desfazer pagamento'), 'o menu da ficha oferece Desfazer pagamento')
+  tela.renderizar({ ...tela.props, pedidoDeAcao: { chave: 'desfazer', n: 1 } })
   const campo = () => doTipo(tela, 'CampoArea').find((n) => n.props.rotulo === 'Motivo')
   campo().props.onChange({ target: { value: 'Lançamento errado' } })
   tela.renderizar()

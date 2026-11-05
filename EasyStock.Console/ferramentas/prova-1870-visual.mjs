@@ -153,12 +153,16 @@ confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no 
   assert.match(barra, /<p className=\{fraseRepetida \|\| !mostrarLinha \? 'sr' : css\.modoTexto\} title=/)
   assert.match(barra, /const mostrarLinha = semAutomatico \|\| bloqueada/)
   assert.match(barra, /\{podeAssumir && \([\s\S]*?onClick=\{aoAssumir\}[\s\S]*?Assumir/)
-  assert.match(barra, /<details[^>]+className=\{css\.maisAcoesModo\}/)
-  assert.match(barra, /<summary>Mais ações<\/summary>/)
-  assert.match(barra, /evento\.key === 'Escape'/)
+  // #2232 (A3, A4): as demais ações (Devolver, Concluir) saíram do "Mais ações" da faixa para o ⋮ do
+  // cabeçalho; a conversa tem um menu só, que também fecha com Escape.
+  assert.doesNotMatch(barra, /<details/)
+  const painel = fonte('features/atendimento/PainelAtendimento.jsx')
+  assert.match(painel, /<details[^>]+ref=\{menuConversa\}[^>]+className=\{css\.opcoesConversa\}/)
+  assert.match(painel, /evento\.key !== 'Escape'/)
+  assert.match(painel, /<DevolverAoAssistente /)
   const css = fonte('features/atendimento/atendimento.module.css')
   assert.doesNotMatch(css, /\.modoTexto\s*\{[^}]*text-overflow:\s*ellipsis/)
-  assert.match(css, /\.maisAcoesModo > summary:focus-visible \{ outline: 3px solid var\(--halo\)/)
+  assert.match(css, /\.opcoesConversa > summary:focus-visible[^{]*\{ outline: 2px solid var\(--halo\)/)
 })
 confere('4  restrição de formato permanece acessível e problemas de envio continuam visíveis junto do campo', () => {
   const composer = fonte('features/atendimento/Composer.jsx')

@@ -6,9 +6,11 @@ import css from './Avatar.module.css'
 
 const MATIZES = [8, 32, 96, 150, 190, 262, 300, 338]
 
+// #2232 (banca UX, L7): só palavra que começa com letra vira inicial. Telefone no lugar do nome
+// ("555434619500") dava "5"; agora cai no "?" do contato sem nome.
 const iniciais = (nome) => nome
-  .split(' ')
-  .filter((p) => p.length > 2)
+  .split(/\s+/)
+  .filter((p) => p.length > 2 && /^\p{L}/u.test(p))
   .slice(0, 2)
   .map((p) => p[0].toUpperCase())
   .join('')
