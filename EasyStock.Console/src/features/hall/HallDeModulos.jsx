@@ -118,9 +118,11 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const noRodape = todos.filter((modulo) => MODULOS_NO_RODAPE.includes(modulo.id) && modulo.disponivel)
   const daGrade = noRodape.length < todos.length ? todos.filter((modulo) => !noRodape.includes(modulo)) : todos
   const linksDoRodape = daGrade === todos ? [] : noRodape
+  // Favorito e posição anunciada contam só o que está na grade: o link do rodapé não tem botão de favoritar.
+  const permitidosDaGrade = modulosPermitidos.filter((modulo) => !linksDoRodape.some((link) => link.id === modulo.id))
   const modulos = filtrarModulos(daGrade, busca)
   const moduloArrastando = modulos.find((modulo) => modulo.id === arrastando)
-  const favoritos = favoritosDoHall(modulosPermitidos, preferencia)
+  const favoritos = favoritosDoHall(permitidosDaGrade, preferencia)
   const buscando = Boolean(busca.trim())
   const destinos = buscarDestinosDoConsole(todos, busca)
   const foco = FOCOS_DO_HALL.find((item) => item.id === preferencia.foco)
@@ -156,7 +158,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const mover = (id, destino) => {
     if (buscando || !modulos.some((modulo) => modulo.id === id) || !modulos.some((modulo) => modulo.id === destino) || id === destino) return
     const proxima = moverModuloDoHall(preferencia, id, destino)
-    const ordenados = ordenarModulosDoHall(modulosPermitidos, proxima)
+    const ordenados = ordenarModulosDoHall(permitidosDaGrade, proxima)
     gravar(proxima, `${ordenados.find((modulo) => modulo.id === id).nome} movido para a posição ${ordenados.findIndex((modulo) => modulo.id === id) + 1} de ${ordenados.length}.`)
   }
   const moverPorBotao = (id, direcao) => {

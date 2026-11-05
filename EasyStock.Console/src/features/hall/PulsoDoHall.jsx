@@ -71,7 +71,7 @@ export function PulsoDoHall({ ids, foco, fontes, movimentos = true, aoMover }) {
         },
       }}>
       <SortableContext items={ids} strategy={rectSortingStrategy}>
-        <ul className={css.indicadores} onClickCapture={clique.onClickCapture}>
+        <ul className={css.indicadores} data-total={indicadores.length} onClickCapture={clique.onClickCapture}>
           {indicadores.map((item) => <Indicador key={item.id} item={item} movimentos={movimentos} />)}
         </ul>
       </SortableContext>

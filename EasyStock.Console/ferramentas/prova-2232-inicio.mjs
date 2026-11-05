@@ -93,6 +93,17 @@ confere('H3  o hall encaixa o sino numa faixa de altura de toque, alinhada ao ce
   const regra = corpo('.avisos')
   assert.match(regra, /align-items: center/)
   assert.match(regra, /min-height: var\(--toque\)/)
+  // Revisão 4: sem o tema na linha 2, o sino sobe para a linha 1, numa coluna própria entre Ajuda e conta.
+  const ate640 = css.slice(css.indexOf('@media (max-width: 640px)'))
+  assert.match(corpo('.avisos', ate640), /grid-row: 1; grid-column: 3/)
+  assert.doesNotMatch(corpo('.avisos', ate640), /grid-row: 2/)
+  assert.match(corpo('.topo', ate640), /grid-auto-flow: column/)
+})
+
+// Revisão 4: Configurações mora no rodapé; favorito e posição anunciada contam só as áreas da grade.
+confere('H10 favoritos e "movido para a posição N de M" contam só as áreas da grade', () => {
+  assert.match(jsxHall, /favoritosDoHall\(permitidosDaGrade, preferencia\)/)
+  assert.match(jsxHall, /ordenarModulosDoHall\(permitidosDaGrade, proxima\)/)
 })
 {
   const sino = fonte('features/notificacoes/SinoDaSessao.jsx')
@@ -120,7 +131,12 @@ confere('H5  o número do KPI fica em cima e o rótulo embaixo, na mesma linha d
 })
 
 confere('H6  KPIs em grade 2×2 e o alerta do caixa vira estado do cartão com a ação "Fechar caixa"', () => {
-  assert.match(corpo('.indicadores', celular), /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+  // Revisão 4: o 2×2 vale só com quatro números; com 1 a 3 a grade estica, sem cartão sozinho na linha.
+  assert.match(corpo('.indicadores[data-total=\'4\']', celular), /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+  assert.doesNotMatch(corpo('.indicadores', celular), /repeat\(2/)
+  assert.match(pulso({}), /<ul class="indicadores"[^>]*data-total="4"/)
+  const tres = renderToStaticMarkup(h(PulsoDoHall, { ids: ['atendimento', 'cozinha', 'financeiro'], foco: 'Cliente primeiro', fontes: {}, aoMover: () => {} }))
+  assert.match(tres, /<ul class="indicadores"[^>]*data-total="3"/)
   const comAlerta = pulso({ financeiro: caixa({ aberto: true, saldoEsperado: 40, esquecidoAberto: true }) })
   const cartaoCaixa = comAlerta.match(/<a [^>]*data-indicador="financeiro"[^>]*>[^]*?<\/a>/)[0]
   assert.match(cartaoCaixa, /data-severidade="alerta"/)
