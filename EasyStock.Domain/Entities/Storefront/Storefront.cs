@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Text.RegularExpressions;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities.Storefront;
 
@@ -58,6 +59,10 @@ public class Storefront
 
     /// <summary>Telefone WhatsApp em formato E.164 (ex: +5511997573992).</summary>
     public string? WhatsappPedidos { get; private set; }
+
+    /// <summary>#2228: a conversa com o WhatsApp de pedidos (<c>https://wa.me/55...</c>); null sem número válido.</summary>
+    public string? LinkWhatsAppPedidos() =>
+        TelefoneE164.TryFrom(WhatsappPedidos) is { } telefone ? $"https://wa.me/{telefone.Value[1..]}" : null;
 
     /// <summary>Valor mínimo para entrega. 0 = sem mínimo.</summary>
     public decimal PedidoMinimoEntrega { get; private set; }

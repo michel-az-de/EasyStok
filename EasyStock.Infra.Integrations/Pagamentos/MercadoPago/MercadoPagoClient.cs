@@ -62,11 +62,12 @@ public sealed partial class MercadoPagoClient(
             }),
             external_reference = command.PedidoId.ToString(),
             notification_url = options.Value.NotificationUrl,
+            // #2228: a cobrança da conversa volta ao WhatsApp da loja em qualquer resultado; sem ela, ao site.
             back_urls = new
             {
-                success = options.Value.BackUrlSuccess,
-                failure = options.Value.BackUrlFailure,
-                pending = options.Value.BackUrlPending,
+                success = command.RetornoUrl ?? options.Value.BackUrlSuccess,
+                failure = command.RetornoUrl ?? options.Value.BackUrlFailure,
+                pending = command.RetornoUrl ?? options.Value.BackUrlPending,
             },
             auto_return = "approved",
             // S11: o link vale 30 min (a expiração vem do use case de cobrança).
