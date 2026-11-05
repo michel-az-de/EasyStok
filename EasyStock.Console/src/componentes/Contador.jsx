@@ -1,6 +1,6 @@
 import css from './Contador.module.css'
 
-// UM desenho de contador numérico para o app todo (#2232, L2 e T4): quadrado (cantos retos, PR #2143),
+// UM desenho de contador numérico para o app todo (#2232, L2 e T4): pílula (#2246),
 // só tokens. `neutro` para quantidade; `alerta` para o que pede ação ou está vencido.
 // O número é decoração visual: quem usa põe a quantidade no nome acessível do controle
 // ("Lembretes, 3"), por isso `aria-hidden` por padrão. `anunciar` o devolve ao leitor de tela.

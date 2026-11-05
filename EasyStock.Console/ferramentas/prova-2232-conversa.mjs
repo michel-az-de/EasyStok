@@ -6,7 +6,7 @@
 //   A3  uma ação primária ("Assumir conversa"); o resto no menu ⋮
 //   A4  um menu só na conversa (o do cabeçalho)
 //   A5  a conversa abre na última mensagem (também quando o painel estava escondido) e avisa "Novas mensagens"
-//   A6  balão enviado a 75 % no máximo, cor própria e ponta na direção do remetente (geometria, sem raio)
+//   A6  balão enviado a 75 % no máximo, cor própria e ponta na direção do remetente (triângulo por clip-path; o canto do balão fica em --r-ponta, #2246)
 //   A7  microfone vira "Enviar" ao digitar (já atendia)
 //   A8  modo nota com fundo de nota e o aviso "Só a equipe vê"
 //   B1  mensagem de sistema como pílula central neutra
@@ -112,7 +112,7 @@ await confere('A2  a barra da conversa renderiza a faixa, sem a pílula "Passou 
   const marcado = barra(conversaComVoce)
   assert.match(tira(marcado), /O automático passou para você · Restrição alimentar/)
   assert.doesNotMatch(marcado, /Passou para você/)
-  assert.match(css, /\.faixaTransferencia\s*\{[^}]*border-left:/, 'a direção da faixa vem de uma barra lateral, sem raio')
+  assert.match(css, /\.faixaTransferencia\s*\{[^}]*border-left:/, 'a direção da faixa vem de uma barra lateral')
 })
 
 // --- A3 e A4 --------------------------------------------------------------------------------------

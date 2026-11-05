@@ -42,8 +42,6 @@ const regraDe = (css, seletor) => {
   const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return [...css.matchAll(new RegExp(`(?:^|\\n|\\})\\s*${escapado}\\s*\\{([^}]*)\\}`, 'g'))].map((m) => m[1]).join(' ')
 }
-const raioMaiorQueZero = (css) => [...css.matchAll(/border-radius:\s*([^;}]+)/g)]
-  .map((m) => m[1].trim()).filter((v) => v !== '0' && v !== '0px' && v !== 'var(--r-pilula)' && v !== 'var(--r-1)')
 
 let passou = 0
 const falhas = []
@@ -79,12 +77,13 @@ confere('L1  o controle diz "Loja aberta" / "Loja fechada" por escrito, com pont
   assert.ok(!/lojaTextoCurto|lojaTextoLongo/.test(molduraCss + moldura), 'o texto curto sem contexto do celular continua')
 })
 
-confere('L2  um estilo só de contador: componente Contador quadrado, neutro ou de alerta, usado no topo e nas abas', () => {
+// #2246: o contador passou de quadrado a pílula, com os cantos arredondados da banca.
+confere('L2  um estilo só de contador: componente Contador em pílula, neutro ou de alerta, usado no topo e nas abas', () => {
   assert.ok(contadorJsx, 'falta componentes/Contador.jsx')
   assert.match(contadorJsx, /export function Contador/)
   assert.match(contadorJsx, /tom/)
-  assert.deepEqual(raioMaiorQueZero(contadorCss), [], 'o contador tem canto arredondado')
-  assert.match(contadorCss, /border-radius:\s*0/)
+  const raios = [...contadorCss.matchAll(/border-radius:\s*([^;}]+)/g)].map((m) => m[1].trim())
+  assert.deepEqual(raios, ['var(--r-pilula)'], 'o contador tem um raio só, o da pílula')
   assert.match(moldura, /import \{ Contador \}/)
   assert.match(abasJsx, /import \{ Contador \}/)
   assert.ok(!/\.conta\b[^{]*\{[^}]*background/.test(molduraCss), 'o topo ainda desenha o próprio contador')

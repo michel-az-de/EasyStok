@@ -102,17 +102,17 @@
 @keyframes girarMeta { to { transform: rotate(360deg); } }
 .entrada {
   align-self: flex-start; background: var(--papel); border: 0;
-  border-radius: var(--r-1);
   box-shadow: none;
 }
 /* #2232 (A6): o enviado tem cor própria (verde-pastel); o do automático segue neutro, mais abaixo. */
 .saida {
   align-self: flex-end; background: var(--sucesso-pastel); color: var(--tinta);
-  border-radius: var(--r-1);
   box-shadow: none;
 }
-/* #2232 (A6): a ponta indica a direção. Os cantos seguem retos (PR #2143), então a ponta é um
-   triângulo recortado por clip-path, na mesma cor do balão, só no começo de cada troca de voz. */
+/* #2232 (A6): a ponta indica a direção. É um triângulo recortado por clip-path, na mesma cor do
+   balão, só no começo de cada troca de voz; ali o canto do lado da ponta fica quase reto (#2246). */
+.trocaDeVoz.entrada { border-top-left-radius: var(--r-ponta); }
+.trocaDeVoz.saida { border-top-right-radius: var(--r-ponta); }
 .entrada::after, .saida::after {
   content: ''; position: absolute; top: 0; width: var(--e-2); height: var(--e-3); display: none;
 }
@@ -130,7 +130,7 @@
   align-self: center; max-width: 80%; background: var(--preenchimento); color: var(--tinta-2);
   border: var(--b-1) solid var(--linha);
   font-size: var(--t-micro); box-shadow: none; text-align: center; padding: 2px var(--e-3);
-  border-radius: var(--r-1);
+  border-radius: var(--r-pilula);
 }
 .resumo { font-family: var(--f-dado); font-size: var(--t-apoio); }
 /* Rodada 12 (#19): link do convite do cardápio, clicável na bolha. */
@@ -600,10 +600,11 @@
 .chamarClienteNome { min-width: 0; overflow-wrap: anywhere; font-size: var(--t-apoio); color: var(--tinta-2); }
 
 /* #2232 (A2): a transferência é uma faixa de uma linha: quem passou e por quê. A direção vem de uma
-   barra lateral (os cantos seguem retos, PR #2143). A frase longa fica no title. */
+   barra lateral, com o canto dela quase reto (#2246). A frase longa fica no title. */
 .faixaTransferencia {
   flex: 1 1 auto; min-width: 0; margin: 0; padding: var(--e-1) var(--e-3);
-  border-left: var(--trilho) solid var(--alerta); background: var(--alerta-pastel); color: var(--tinta);
+  border-left: var(--trilho) solid var(--alerta); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+  background: var(--alerta-pastel); color: var(--tinta);
   font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto); overflow-wrap: anywhere;
 }
 
