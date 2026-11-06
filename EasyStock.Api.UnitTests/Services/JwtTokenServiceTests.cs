@@ -14,6 +14,27 @@ namespace EasyStock.Api.UnitTests.Services;
 /// </summary>
 public class JwtTokenServiceTests
 {
+    [Fact]
+    public void JwtNativoCarregaFamiliaAparelhoEEmpresa_MantendoExpiracaoDoAccessToken()
+    {
+        var configuracao = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Jwt:SecretKey"] = "chave-de-teste-do-jwt-com-mais-de-32-caracteres",
+            ["Jwt:ExpirationMinutes"] = "60",
+        }).Build();
+        var empresa = Guid.NewGuid();
+        var sid = Guid.NewGuid();
+        var token = new JwtTokenService(configuracao).GerarToken(new AutenticarUsuarioResult(
+            Guid.NewGuid(), empresa, "Ana", "ana@teste", NivelAcesso.Gerente, [], SessaoPersistente: true, SessaoId: sid, DispositivoId: "android-2184"));
+        var claims = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims.ToDictionary(c => c.Type, c => c.Value);
+        claims["sid"].Should().Be(sid.ToString());
+        claims["empresaId"].Should().Be(empresa.ToString());
+        claims["dispositivoId"].Should().Be("android-2184");
+        claims["sessaoNativa"].Should().Be("true");
+        claims["sessaoPersistente"].Should().Be("true");
+        (long.Parse(claims["exp"]) - long.Parse(claims["iat"])).Should().Be(3600);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

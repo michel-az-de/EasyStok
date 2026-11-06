@@ -31,6 +31,8 @@ public class WorkspaceActivity extends Activity {
     private TextView error;
     private ValueCallback<Uri[]> fileCallback;
     private PermissionRequest microphoneRequest;
+    private boolean sessionBridgeReady;
+    private final NativeSession.Listener sessionListener = (authenticated, version) -> WorkspaceSessionBridge.signal(web, authenticated, version);
 
     private boolean trustedOrigin(Uri uri) {
         return uri != null && "https".equalsIgnoreCase(uri.getScheme()) &&
@@ -99,9 +101,13 @@ public class WorkspaceActivity extends Activity {
         TextView retry = barAction("\u21bb", "Recarregar", ink);
         retry.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
         retry.setOnClickListener(view -> {
+            if (!sessionBridgeReady) {
+                sessionBridgeReady = WorkspaceSessionBridge.install(this, web);
+                if (!sessionBridgeReady) { showWebViewUpdate(); return; }
+            }
             error.setVisibility(View.GONE);
             web.setVisibility(View.VISIBLE);
-            web.reload();
+            if (web.getUrl() == null) web.loadUrl(HOME); else web.reload();
         });
         actions.addView(back, new LinearLayout.LayoutParams(-2, -1));
         actions.addView(title, new LinearLayout.LayoutParams(0, -1, 1));
@@ -123,7 +129,9 @@ public class WorkspaceActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setGeolocationEnabled(false);
         settings.setJavaScriptCanOpenWindowsAutomatically(false);
-        // Este WebView não recebe a bridge Capacitor nem interfaces JavaScript.
+        // Sem bridge Capacitor/interfaces Java. Somente comandos de sessão com origem e frame conferidos.
+        sessionBridgeReady = WorkspaceSessionBridge.install(this, web);
+        NativeSession.get(this).addListener(sessionListener);
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -186,7 +194,14 @@ public class WorkspaceActivity extends Activity {
         });
         layout.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(layout);
-        if (savedInstanceState == null || web.restoreState(savedInstanceState) == null) web.loadUrl(HOME);
+        if (!sessionBridgeReady) showWebViewUpdate();
+        else if (savedInstanceState == null || web.restoreState(savedInstanceState) == null) web.loadUrl(HOME);
+    }
+
+    private void showWebViewUpdate() {
+        error.setText("Atualize o Android System WebView na Play Store e toque em Recarregar. Seus dados continuam no aplicativo.");
+        error.setVisibility(View.VISIBLE);
+        web.setVisibility(View.GONE);
     }
 
     @Override
@@ -224,6 +239,7 @@ public class WorkspaceActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        NativeSession.get(this).removeListener(sessionListener);
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         if (microphoneRequest != null) microphoneRequest.deny();
         if (web != null) web.destroy();

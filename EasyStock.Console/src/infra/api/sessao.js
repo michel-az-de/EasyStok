@@ -40,6 +40,21 @@ export function gravarSessao(sessao) {
   return lerSessao()
 }
 
+// No APK só o proprietário nativo guarda/renova o refresh. O Console recebe JWT curto.
+export function gravarSessaoNativa(dados) {
+  if (!dados?.autenticado) { limparSessao(); return null }
+  const carga = cargaDoToken(dados.token)
+  if (carga?.sessaoNativa !== 'true' || !carga.sid || !carga.dispositivoId || !carga.empresaId
+    || carga.empresaId !== dados.empresaId || !dados.usuario?.id || carga.sub !== dados.usuario.id
+    || carga.dispositivoId !== dados.dispositivoId || dados.refreshToken) {
+    throw Object.assign(new Error('A sessão do aplicativo não pôde ser confirmada. Reabra o Atendimento.'), { status: 401, codigo: 'SESSAO_NATIVA_INVALIDA' })
+  }
+  const venceEm = vencimentoDoToken(dados.token)
+  if (!venceEm || venceEm <= Date.now()) throw Object.assign(new Error('Confira a conexão para retomar o Atendimento.'), { codigo: 'SESSAO_NATIVA_VENCIDA' })
+  return gravarSessao({ token: dados.token, usuario: dados.usuario, empresa: { id: carga.empresaId, nome: null },
+    nativa: true, persistente: false, venceEm, expiraEm: venceEm - 60000 })
+}
+
 export function limparSessao() {
   const anterior = ler('sessionStorage') ?? semStorage ?? ler('localStorage')
   remover('sessionStorage')

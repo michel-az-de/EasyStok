@@ -55,6 +55,8 @@ jobs:
       - run: node ferramentas/prova-2178-ia-contextual.mjs
       - run: node ferramentas/prova-2178-rascunhos-notas.mjs
       - run: node ferramentas/prova-2178-notas-sessao.mjs
+      - run: node ferramentas/prova-2184-sessao-nativa.mjs
+      - run: node ferramentas/prova-2184-api-sessao-nativa.mjs
       - run: node ferramentas/prova-1432-atendimento-email.mjs
       - run: node ferramentas/prova-f06-honestidade.mjs
       - run: node ferramentas/prova-f11-lote-papel.mjs

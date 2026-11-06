@@ -8,3 +8,6 @@
 # Falsos positivos: offeredKey e nome publico de localStorage para registrar a oferta de Bluetooth, nao uma credencial (#2091).
 8a574ee69318b4c19116ebf8029c7ba3d39150d0:EasyStock.Api/wwwroot/pwa/index.html:generic-api-key:23536
 8a574ee69318b4c19116ebf8029c7ba3d39150d0:tests/pwa/bluetooth-onboarding.test.js:generic-api-key:12
+# Falsos positivos #2184: placeholder de hash e texto sintetico do teste de cofre; trocados no commit seguinte.
+d12b2eaef83cc4b0bc86f6892287e56ad6ff4a4e:EasyStock.Infra.Postgre.IntegrationTests/Auth/SessoesNativasConcorrenciaTests.cs:generic-api-key:528
+d12b2eaef83cc4b0bc86f6892287e56ad6ff4a4e:casa-da-baba-mobile/apk/android/app/src/androidTest/java/com/casadababa/app/NativeSessionInstrumentacao.java:generic-api-key:31

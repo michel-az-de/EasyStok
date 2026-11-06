@@ -44,7 +44,8 @@ internal sealed class MobileApiKeyFilter(
     EasyStockDbContext db,
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
-    ILogger<MobileApiKeyFilter> logger) : IAsyncActionFilter
+    ILogger<MobileApiKeyFilter> logger,
+    EasyStock.Api.Authentication.ValidadorSessaoUsuario? sessoes = null) : IAsyncActionFilter
 {
     /// <summary>Intervalo minimo entre gravacoes de <c>last_seen_at</c> do mesmo device com o mesmo IP.</summary>
     private static readonly TimeSpan IntervaloMinimoLastSeen = TimeSpan.FromMinutes(1);
@@ -84,6 +85,13 @@ internal sealed class MobileApiKeyFilter(
                 http.Request.Path,
                 http.Connection.RemoteIpAddress,
                 device?.Revoked ?? false);
+            context.Result = new UnauthorizedResult();
+            return;
+        }
+
+        if (device.SessaoNativaId is { } sessaoId && (sessoes is null
+            || !await sessoes.ValidarNativaAsync(sessaoId, device.Id, device.EmpresaId)))
+        {
             context.Result = new UnauthorizedResult();
             return;
         }

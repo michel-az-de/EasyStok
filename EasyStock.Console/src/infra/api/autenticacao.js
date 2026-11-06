@@ -3,6 +3,7 @@ import { atualizarTokens, empresaDoToken, gravarSessao, identidadeDaSessao, lerS
 import { esquecerRascunhos } from './rascunhosDaSessao'
 import { esquecerVisitas } from './visitaDaSessao'
 import { prepararPushParaSessao } from '../pushNavegador'
+import { sairSessaoNativa, temSessaoNativa } from '../sessaoNativa'
 
 // Casa da Baba (M0.2): a API resolve a empresa ativa; nunca escolhemos uma no navegador.
 export async function entrar(email, senha) {
@@ -53,9 +54,12 @@ async function abrirSessao(dados, empresa, extra = {}) {
 // Sair é decisão dela: os rascunhos guardados para depois do novo login vão junto.
 export function sair() {
   const sessao = lerSessao()
+  // Cancela restaurações em voo antes de liberar a tela para outra pessoa.
+  const saidaNativa = temSessaoNativa() ? sairSessaoNativa() : null
   limparSessao()
   esquecerRascunhos()
   esquecerVisitas()
+  if (saidaNativa) return saidaNativa
   return sessao?.refreshToken
     ? chamarApi('/api/auth/logout', { metodo: 'POST', corpo: { refreshToken: sessao.refreshToken }, autenticado: false, sinal: AbortSignal.timeout(15000) })
     : Promise.resolve()

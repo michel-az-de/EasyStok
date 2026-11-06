@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.Services.Auth;
 
 namespace EasyStock.Application.UseCases.Logout;
@@ -8,7 +9,8 @@ public sealed class LogoutUseCase(
     RevogadorSessoes revogadorSessoes,
     IAuditLogRepository auditLogRepository,
     IUnitOfWork unitOfWork,
-    ILogger<LogoutUseCase> logger) : IUseCase<LogoutCommand, LogoutResult>
+    ILogger<LogoutUseCase> logger,
+    IRowLevelSecurityBypass? rlsBypass = null) : IUseCase<LogoutCommand, LogoutResult>
 {
     public async Task<LogoutResult> ExecuteAsync(LogoutCommand command)
     {
@@ -16,6 +18,22 @@ public sealed class LogoutUseCase(
 
         var tokenHash = TokenHashHelper.ComputeSha256Hash(command.RefreshToken);
         var refreshToken = await refreshTokenRepository.GetByTokenHashAsync(tokenHash);
+        // Mesmo o refresh consumido identifica a família: Sair durante uma renovação deve revogar o sucessor.
+        if (refreshToken?.SessaoNativaId is { } sessaoId)
+        {
+            // O segredo identifica a família antes de existir JWT/tenant; escopo termina após Commit/rollback.
+            await using var rls = rlsBypass is null ? null : await rlsBypass.BeginAsync();
+            return await unitOfWork.ExecuteInTransactionSemRetryAsync(async _ =>
+            {
+                var sessao = await refreshTokenRepository.ObterSessaoNativaComLockAsync(sessaoId);
+                if (sessao is null || sessao.UsuarioId != refreshToken.UsuarioId) return new LogoutResult(false);
+                await refreshTokenRepository.RevogarSessaoNativaAsync(sessao.Id, DateTime.UtcNow);
+                await auditLogRepository.AddAsync(AuditLog.Criar(sessao.UsuarioId, "logout_nativo", true,
+                    "Sessão do aparelho encerrada", null, null));
+                await unitOfWork.CommitAsync();
+                return new LogoutResult(true);
+            });
+        }
         if (refreshToken == null || !refreshToken.EstaValido())
         {
             logger.LogWarning("Tentativa de logout com token invalido");

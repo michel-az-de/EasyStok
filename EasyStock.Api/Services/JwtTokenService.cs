@@ -31,6 +31,13 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         if (resultado.EmpresaId.HasValue)
             claims.Add(new Claim("empresaId", resultado.EmpresaId.Value.ToString()));
 
+        if (resultado.SessaoId.HasValue && !string.IsNullOrWhiteSpace(resultado.DispositivoId))
+        {
+            claims.Add(new Claim("sid", resultado.SessaoId.Value.ToString()));
+            claims.Add(new Claim("dispositivoId", resultado.DispositivoId));
+            claims.Add(new Claim("sessaoNativa", "true"));
+        }
+
         foreach (var permissao in resultado.Permissoes.Distinct())
             claims.Add(new Claim("permissao", permissao.ToString()));
 

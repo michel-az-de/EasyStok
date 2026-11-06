@@ -38,6 +38,8 @@ public class UsuarioControllerTests
 
     public UsuarioControllerTests()
     {
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<bool>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<bool>>>()(c.Arg<CancellationToken>()));
         var criarLogger = Substitute.For<ILogger<CriarUsuarioUseCase>>();
         var atualizarLogger = Substitute.For<ILogger<AtualizarUsuarioUseCase>>();
         var alterarSenhaLogger = Substitute.For<ILogger<AlterarSenhaUsuarioUseCase>>();

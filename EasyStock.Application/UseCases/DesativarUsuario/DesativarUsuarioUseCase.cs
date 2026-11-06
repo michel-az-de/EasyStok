@@ -16,6 +16,12 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
     {
         public async Task ExecuteAsync(DesativarUsuarioCommand command)
         {
+            var revogou = await unitOfWork.ExecuteInTransactionSemRetryAsync(_ => ExecutarAsync(command));
+            if (revogou) await revogadorSessoes.ApagarCacheAsync(command.UsuarioId);
+        }
+
+        private async Task<bool> ExecutarAsync(DesativarUsuarioCommand command)
+        {
             logger.LogInformation("Desativando usuario {UsuarioId} da empresa {EmpresaId}", command.UsuarioId, command.EmpresaId);
 
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
@@ -32,7 +38,7 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
                 throw new UseCaseValidationException("Associacao do usuario com a empresa nao encontrada.");
 
             // Repetir o pedido não muda nada nem escreve outra linha de auditoria.
-            if (!linkEmpresa.Ativo) return;
+            if (!linkEmpresa.Ativo) return false;
 
             linkEmpresa.Ativo = false;
             await usuarioEmpresaRepository.UpdateAsync(linkEmpresa);
@@ -50,6 +56,7 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
                 usuario.Id, RastroDeUsuarios.Desativado, $"Acesso desativado por {autor}", currentUser, command.EmpresaId));
             await unitOfWork.CommitAsync();
+            return true;
         }
     }
 }
