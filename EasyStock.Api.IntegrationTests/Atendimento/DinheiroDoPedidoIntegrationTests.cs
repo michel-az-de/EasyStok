@@ -162,6 +162,18 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var caixa = dia.RootElement.GetProperty("data");
         caixa.GetProperty("totalPagamentosPedidos").GetDecimal().Should().Be(19m, "o Extrato e o Caixa somam a mesma entrada");
         caixa.GetProperty("totalSaidasExtras").GetDecimal().Should().Be(19m, "e a mesma saída");
+
+        // #2268: o realizado dos Relatórios e a visão geral somam o mesmo que o Extrato no período.
+        using var fluxo = JsonDocument.Parse(await client.GetStringAsync(
+            $"/api/financeiro/fluxo-caixa?periodicidade=Diario&inicio={hoje}&fim={hoje}"));
+        var linha = fluxo.RootElement.GetProperty("data").EnumerateArray().Should().ContainSingle().Subject;
+        linha.GetProperty("realizadoReceber").GetDecimal().Should().Be(19m, "o sinal do Mercado Pago entra no Recebido");
+        linha.GetProperty("realizadoPagar").GetDecimal().Should().Be(19m, "a devolução entra no Pago");
+        linha.GetProperty("realizadoReceberCaixa").GetDecimal().Should().Be(19m);
+        using var visao = JsonDocument.Parse(await client.GetStringAsync("/api/financeiro/dashboard"));
+        var resumo = visao.RootElement.GetProperty("data");
+        resumo.GetProperty("totalRecebidoMes").GetDecimal().Should().Be(19m, "o Recebido no mês inclui o sinal");
+        resumo.GetProperty("totalPagoMes").GetDecimal().Should().Be(19m, "e o Pago no mês a devolução");
     }
 
     private static async Task<List<JsonElement>> LinhasDoCaixaAsync(HttpClient client, string periodo)
