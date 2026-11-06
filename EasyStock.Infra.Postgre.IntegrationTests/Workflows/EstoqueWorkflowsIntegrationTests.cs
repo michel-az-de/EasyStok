@@ -1055,7 +1055,9 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             var analytics = new AnalyticsRepository(ctx, new CaixaSaldoCalculator(new CaixaRepository(ctx)));
             var receita = await analytics.GetReceitaPorPeriodoAsync(empresaId, meses: 12);
 
-            receita.Should().Contain(r => r.Ano == dataSaida.Year && r.Mes == dataSaida.Month && r.TotalItensVendidos == 4);
+            // O repositório agrupa pelo mês de Brasília: perto da virada do mês, UtcNow-5d pode cair no mês anterior.
+            var saidaBrasil = TimeZoneInfo.ConvertTimeFromUtc(dataSaida, EasyStock.Domain.Defaults.OperacionalFuso.Zona);
+            receita.Should().Contain(r => r.Ano == saidaBrasil.Year && r.Mes == saidaBrasil.Month && r.TotalItensVendidos == 4);
         }
     }
 
