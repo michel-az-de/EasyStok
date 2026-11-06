@@ -34,10 +34,10 @@ async function descartarDigitado(page, modal) {
   await modal.waitFor({ state: 'hidden' })
 }
 
-// #2258: o chip ativo ganha um "✓" que entra no nome acessível.
+// Chip das contas pelo nome exato; o "✓" do ativo é decorativo e fica fora do nome (#2272).
 function chip(page, nome, pressionado) {
   const grupo = page.getByRole('group', { name: 'Mostrar contas', exact: true })
-  return grupo.getByRole('button', { name: new RegExp(`^✓?${nome}$`), ...(pressionado ? { pressed: true } : {}) })
+  return grupo.getByRole('button', { name: nome, exact: true, ...(pressionado ? { pressed: true } : {}) })
 }
 
 function moduloAtivoNoTrilho(page, modulo) {

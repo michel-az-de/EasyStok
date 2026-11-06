@@ -34,7 +34,7 @@
 .chipAtivo, .chipAtivo:hover { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
 .chip[aria-pressed='true'] { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
 .chip[aria-pressed='true']:hover { background: var(--marca); color: var(--marca-contraste); }
-.chip[aria-pressed='true']::before { content: '✓'; margin-right: var(--e-1); font-weight: 700; }
+.chip[aria-pressed='true']::before { content: '✓'; content: '✓' / ''; margin-right: var(--e-1); font-weight: 700; }
 .chip:focus-visible, .cartaoVencidas:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 .verLista:focus-visible { outline: none; }
 .barra > .chips { flex: 1 1 360px; }
