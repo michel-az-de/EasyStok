@@ -454,7 +454,7 @@ public class AuthControllerTests
         var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
         google.ClientId.Returns((string?)null);
 
-        var resposta = _controller.ConfigGoogle(google);
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa("true"));
 
         var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
         var dados = DadosDaResposta(ok);
@@ -470,7 +470,7 @@ public class AuthControllerTests
         var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
         google.ClientId.Returns("cliente-123.apps.googleusercontent.com");
 
-        var resposta = _controller.ConfigGoogle(google);
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa("true"));
 
         var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
         var dados = DadosDaResposta(ok);
@@ -478,6 +478,49 @@ public class AuthControllerTests
         dados.GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeTrue();
         dados.GetProperty("clientId").GetString().Should().Be("cliente-123.apps.googleusercontent.com");
     }
+
+    [Fact]
+    public void ConfigGoogleComChaveSessaoNativaFalsaAnunciaDesligada()
+    {
+        // #2184: o deploy liga a sessão nativa; Auth__SessaoNativaHabilitada=false desliga sem novo deploy de código.
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns("cliente-123.apps.googleusercontent.com");
+
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa("false"));
+
+        var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
+        DadosDaResposta(ok).GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConfigGoogleSemChaveSessaoNativaAnunciaDesligada()
+    {
+        // Ambiente que não recebeu a configuração (produção antes do deploy) nunca promete o que não liga.
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns("cliente-123.apps.googleusercontent.com");
+
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa(null));
+
+        var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
+        DadosDaResposta(ok).GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConfigGoogleComChaveSessaoNativaInvalidaAnunciaDesligada()
+    {
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns("cliente-123.apps.googleusercontent.com");
+
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa("talvez"));
+
+        var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
+        DadosDaResposta(ok).GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeFalse();
+    }
+
+    private static IConfiguration ConfiguracaoComSessaoNativa(string? valor) =>
+        new ConfigurationBuilder().AddInMemoryCollection(valor is null
+            ? new Dictionary<string, string?>()
+            : new Dictionary<string, string?> { ["Auth:SessaoNativaHabilitada"] = valor }).Build();
 
     /// <summary>O <c>data</c> do envelope <c>{ data, meta }</c>, como o console o lê.</summary>
     private static System.Text.Json.JsonElement DadosDaResposta(Microsoft.AspNetCore.Mvc.OkObjectResult ok) =>

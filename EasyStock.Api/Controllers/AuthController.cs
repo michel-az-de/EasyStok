@@ -1,3 +1,4 @@
+using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Auth;
 using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.AlterarSenha;
@@ -89,8 +90,15 @@ public class AuthController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [HttpGet("google/config")]
     [AllowAnonymous]
-    public IActionResult ConfigGoogle([FromServices] IGoogleIdTokenValidator google) =>
-        DataOk(new { habilitado = google.ClientId is not null, clientId = google.ClientId, sessaoNativaHabilitada = true });
+    public IActionResult ConfigGoogle([FromServices] IGoogleIdTokenValidator google, [FromServices] IConfiguration configuration) =>
+        DataOk(new { habilitado = google.ClientId is not null, clientId = google.ClientId, sessaoNativaHabilitada = SessaoNativaHabilitada(configuration) });
+
+    /// <summary>
+    /// #2184: o APK só abre o seletor de contas do aparelho se a API anunciar a sessão nativa. Chave ausente ou inválida
+    /// anuncia desligada, para um ambiente sem a configuração não prometer o que não liga.
+    /// </summary>
+    private static bool SessaoNativaHabilitada(IConfiguration configuration) =>
+        bool.TryParse(configuration[ConfigurationKeys.AuthSessaoNativaHabilitada], out var habilitada) && habilitada;
 
     [SwaggerOperation(Summary = "Sign in with a Google ID token",
         Description = "Só usuário que já existe (e-mail do Google, ou alias do Gmail com uma conta só). Sem empresaId, entra na empresa ativa do usuário (#1324).")]
