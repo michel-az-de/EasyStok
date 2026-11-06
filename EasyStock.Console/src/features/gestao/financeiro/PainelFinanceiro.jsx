@@ -6,10 +6,11 @@ import { Pilula } from '../../../componentes/Pilula'
 import { IconeDoModulo } from '../../../componentes/IconeDoModulo'
 import { Vazio } from '../../../componentes/Vazio'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import { useConsultaFinanceira, listarContasFinanceiras, listarContasEmAberto, obterContaFinanceira, obterResumoFinanceiro, obterExtratoFinanceiro, obterRelatorioFinanceiro, listarCategoriasFinanceiras, listarCentrosFinanceiros, emitirContaFinanceira, cancelarContaFinanceira, estornarParcelaFinanceira, removerParcelaFinanceira, inativarCadastroFinanceiro, reativarCadastroFinanceiro } from '../../../aplicacao/useFinanceiroApi'
 import { STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
 import { moeda } from '../../../dominio/formato'
-import { nomeDoMetodoCaixa } from '../../../dominio/caixa'
+import { avisoDeDevolucoesNasTelas, nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { ModalContaFinanceira, ModalPagamentoFinanceiro, ModalConfirmacaoFinanceira, ModalCadastroFinanceiro, ModalParcelaFinanceira, ErroFinanceiro } from './ModaisFinanceiras'
 import css from './financeiro.module.css'
@@ -271,12 +272,15 @@ function ExtratoFinanceiro() {
   const consulta = useConsultaFinanceira(carregar)
   const [linha, setLinha] = useState(null)
   const linhas = consulta.dados ?? []
+  // #2267: recebimento de pedido cancelado entra nas entradas; o aviso diz que ainda há o que devolver.
+  const avisoDevolucoes = avisoDeDevolucoesNasTelas(useDevolucoesPendentes(true))
   const total = (lado) => linhas.filter((item) => !item.estornado && item.lado === lado).reduce((soma, item) => soma + Math.round(item.valor * 100), 0) / 100
   return <div className={css.painel}>
     <form className={css.filtros} onSubmit={(e) => { e.preventDefault(); setPeriodo(rascunho) }}><PeriodoFinanceiro periodo={rascunho} aoMudar={setRascunho} /><Botao tipo="submit">Consultar extrato</Botao></form>
     <EstadoFinanceiro consulta={consulta}><div className={css.painel}>
       <p className={css.aviso}>Movimentos do Caixa, recebimentos de pedidos, vendas e pagamentos das contas acessíveis ao seu perfil. Registros vinculados ao Caixa aparecem uma única vez; estornos permanecem no histórico.</p>
       <div className={css.indicadores}><Indicador nome="Entradas do período" valor={total('receber')} /><Indicador nome="Saídas do período" valor={total('pagar')} /><Indicador nome="Resultado dos movimentos" valor={total('receber') - total('pagar')} /></div>
+      {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
       {!linhas.length && <Vazio titulo="Sem movimentos no período">Escolha outro intervalo para consultar.</Vazio>}
       <ul className={css.lista}>{linhas.map((item) => <li key={item.id} className={css.linha}><div><strong>{item.descricao}</strong><p className={css.apoio}>{dataCurta(item.em)} · {nomeDoMetodoCaixa(item.metodo)} · {item.lado === 'pagar' ? 'Saída' : 'Entrada'}{item.estornado ? ' · Estornado' : ''}</p></div><span className={css.valor}>{moeda(item.valor)}</span><Botao aria-haspopup="dialog" aria-label={`Detalhes de ${item.descricao}`} onClick={() => setLinha(item)}>Detalhes</Botao></li>)}</ul>
     </div></EstadoFinanceiro>

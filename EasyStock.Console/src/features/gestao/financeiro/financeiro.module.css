@@ -85,6 +85,7 @@
 .paginacao { display: flex; align-items: center; justify-content: center; gap: var(--e-3); }
 .erro { color: var(--erro); background: var(--erro-pastel); border-radius: var(--r-1); padding: var(--e-3); margin: 0; }
 .aviso { color: var(--tinta-2); font-size: var(--t-apoio); margin: 0; }
+.avisoAtencao { display: block; margin: 0; padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--tinta); background: var(--alerta-pastel); border-radius: var(--r-1); }
 .escolha { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); }
 .parcelas { margin: 0; padding-left: var(--e-5); max-height: 180px; overflow-y: auto; }
 .tabelaRolavel { min-width: 0; overflow-x: auto; }
