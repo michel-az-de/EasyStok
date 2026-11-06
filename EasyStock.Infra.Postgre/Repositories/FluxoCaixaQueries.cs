@@ -18,8 +18,8 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
 
         var hoje = referenceDateUtc.Date;
         var mais30 = hoje.AddDays(30);
-        var inicioMes = new DateTime(hoje.Year, hoje.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var fimMes = inicioMes.AddMonths(1);
+        // #2268: pagamento e instante real; o mes e o civil de Brasilia, como no Extrato.
+        var (inicioMes, fimMes) = HorarioBrasil.JanelaMesUtc(DateOnly.FromDateTime(hoje));
 
         // Parcelas "vivas" = nao paga, nao cancelada, E de conta COMMITADA (nao Rascunho).
         // Rascunho tem parcelas mas nao e obrigacao real -> fora das projecoes (BUG-021).
@@ -187,6 +187,22 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
         }
 
         return resultado;
+    }
+
+    public async Task<IReadOnlyList<RealizadoNoCaixaDto>> MovimentosAvulsosDoCaixaAsync(
+        Guid empresaId, DateTime iniUtc, DateTime fimUtc, CancellationToken ct = default)
+    {
+        if (empresaId == Guid.Empty) throw new ArgumentException("EmpresaId obrigatorio.", nameof(empresaId));
+        var vinculados = db.PagamentosParcela.AsNoTracking()
+            .Where(pg => pg.EmpresaId == empresaId && pg.MovimentoCaixaId != null)
+            .Select(pg => pg.MovimentoCaixaId);
+        return await db.MovimentosCaixa.AsNoTracking()
+            .Where(m => m.EmpresaId == empresaId && m.EstornadoEm == null &&
+                        (m.Tipo == "entrada" || m.Tipo == "saida") &&
+                        m.DataMovimento >= iniUtc && m.DataMovimento < fimUtc &&
+                        !vinculados.Contains(m.Id))
+            .Select(m => new RealizadoNoCaixaDto(m.DataMovimento, m.Tipo == "saida" ? -m.Valor : m.Valor))
+            .ToListAsync(ct);
     }
 
     /// <summary>Teto de linhas do fluxo: um ano no diário, sete anos no semanal, trinta no mensal.</summary>

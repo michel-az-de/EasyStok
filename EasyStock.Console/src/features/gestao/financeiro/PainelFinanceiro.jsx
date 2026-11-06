@@ -83,8 +83,8 @@ function ResumoFinanceiro() {
     <div className={css.indicadores}>
       {verPagar && <Indicador nome="A pagar nos próximos 30 dias" valor={resumo.totalAVencer30dPagar} detalhe={`${resumo.qtdContasPagarAVencer30d} ${resumo.qtdContasPagarAVencer30d === 1 ? 'conta' : 'contas'}`} />}
       {verReceber && <Indicador nome="A receber nos próximos 30 dias" valor={resumo.totalAVencer30dReceber} detalhe={`${resumo.qtdContasReceberAVencer30d} ${resumo.qtdContasReceberAVencer30d === 1 ? 'conta' : 'contas'}`} />}
-      {verPagar && <Indicador nome="Pago no mês" valor={resumo.totalPagoMes} detalhe="Neste mês" />}
-      {verReceber && <Indicador nome="Recebido no mês" valor={resumo.totalRecebidoMes} detalhe="Neste mês" />}
+      {verPagar && <Indicador nome="Pago no mês" valor={resumo.totalPagoMes} detalhe="Contas, pedidos e Caixa" />}
+      {verReceber && <Indicador nome="Recebido no mês" valor={resumo.totalRecebidoMes} detalhe="Contas, pedidos e Caixa" />}
     </div>
     <div className={css.atalhos}>{ATALHOS.filter(([id]) => !['pagar', 'receber'].includes(id) || podeVer(acoes, id)).map(([id, nome]) => <a key={id} className={css.atalho} href={hashDoModulo('financeiro', id)}><IconeDoModulo modulo={MODULO_FINANCEIRO} telaId={id} tamanho={28} />{nome}</a>)}</div>
     {pagamento && <ModalPagamentoFinanceiro lado={pagamento.lado} conta={pagamento.conta} parcela={pagamento.parcela} aoFechar={() => setPagamento(null)} aoGravar={consulta.recarregar} />}
@@ -313,7 +313,7 @@ function RelatoriosFinanceiros() {
       <CampoSelecao rotulo="Centro de custo" value={rascunho.centroCustoId} onChange={(e) => campo('centroCustoId', e.target.value)} opcoes={[{ valor: '', rotulo: 'Todos' }, ...(cadastros.dados?.centros ?? []).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
       <Botao tipo="submit">Gerar relatório</Botao>
     </form><ErroFinanceiro erro={cadastros.erro} />
-    <EstadoFinanceiro consulta={consulta}><div className={css.painel}><div className={css.barra}><p className={css.aviso}>Fluxo de caixa por vencimento e pagamentos.</p><div className={css.acoes}><Botao disabled={!consulta.dados?.length} aria-haspopup="dialog" onClick={() => setAberto(true)}>Ampliar relatório</Botao><Botao disabled={!consulta.dados?.length || exportando} onClick={exportar}>Exportar CSV</Botao></div></div>{tabela}<ErroFinanceiro erro={erroExportacao} /></div></EstadoFinanceiro>
+    <EstadoFinanceiro consulta={consulta}><div className={css.painel}><div className={css.barra}><p className={css.aviso}>{filtros.categoriaId || filtros.centroCustoId ? 'Previsto por vencimento; Pago e Recebido só das contas, porque pedidos e vendas não têm categoria nem centro de custo.' : 'Previsto por vencimento. Pago e Recebido somam contas, pedidos, vendas e movimentos do Caixa, como o Extrato.'}</p><div className={css.acoes}><Botao disabled={!consulta.dados?.length} aria-haspopup="dialog" onClick={() => setAberto(true)}>Ampliar relatório</Botao><Botao disabled={!consulta.dados?.length || exportando} onClick={exportar}>Exportar CSV</Botao></div></div>{tabela}<ErroFinanceiro erro={erroExportacao} /></div></EstadoFinanceiro>
     {aberto && <Modal titulo="Relatório de fluxo de caixa" aoFechar={() => setAberto(false)} largura="min(1100px, calc(100vw - 24px))">{tabela}</Modal>}
   </div>
 }
