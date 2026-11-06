@@ -43,6 +43,13 @@ public sealed class EscalarConversaUseCase(
             ? "cliente bloqueado"
             : $"cliente bloqueado: {cliente.MotivoBloqueio}";
 
+    /// <summary>#2249: motivo interno da conversa de quem foi encaminhado à responsável (nunca vai ao contato).</summary>
+    public static string MotivoContatoPausado(EasyStock.Domain.Entities.Cliente cliente) =>
+        (string.IsNullOrWhiteSpace(cliente.MotivoPausaAtendimento)
+            ? "contato encaminhado à responsável"
+            : $"contato encaminhado à responsável ({cliente.MotivoPausaAtendimento})")
+        + "; o robô volta quando a equipe devolver a conversa";
+
     public async Task EscalarAsync(Guid empresaId, Conversa conversa, string motivo, DateTime agora, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(conversa);
