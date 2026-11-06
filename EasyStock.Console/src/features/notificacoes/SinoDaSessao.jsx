@@ -37,7 +37,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
       aria-haspopup="dialog" onClick={() => { setAberto(true); carregar() }}>
       {/* #2232 (H3, L2): o número sai do texto e vai para o contador único do app. */}
       <span>Avisos{erro ? ' !' : ''}</span>
-      {!erro && total > 0 && <Contador valor={total} tom="alerta" />}
+      {!erro && total > 0 && <Contador valor={total} tom="alerta" data-contador-sino />}
       {semAvisoNoAparelho && <span className={css.pontoAparelho} data-aparelho-desligado aria-hidden="true" />}
     </Botao>
     {aberto && <Modal titulo="Avisos" largura="min(760px, calc(100vw - 24px))" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."

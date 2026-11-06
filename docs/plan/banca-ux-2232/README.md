@@ -8,7 +8,7 @@ de fora, com o motivo.
 
 | Tema | Decisão |
 |---|---|
-| Cantos | Seguem retos (PR #2143, aprovado em 29/10). Onde a banca pede canto arredondado, a correção vem pela geometria e pela cor, sem raio. A troca de direção é pergunta ao Felipe. |
+| Cantos | Arredondados no Console inteiro (Felipe, 05/11, #2246). É a regra da banca: 8 px em controle, cartão e painel (`--r-1` a `--r-3`); 999 px em chip, avatar e contador (`--r-pilula`); e 2 px no canto da ponta do balão e no da barra lateral das faixas (`--r-ponta`). Isso substitui os cantos retos do #2143 só no Console; PWA e Android ficam como estão. Prova `ferramentas/prova-2246-cantos.mjs`. |
 | Caveat | Já está restrita a nota e comanda (`--f-manuscrita`). Sem mudança. |
 | "∴" no nome | Faz parte do nome que o cliente usa no WhatsApp. Sem mudança. |
 | Aba inicial | A banca pede abrir em "Precisa de você". Isso reverte o #1442 (homologação de 07/10), que abria em "Todas". Vale a banca, que é mais nova; a prova do #1442 muda junto. |
