@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    [Migration("20261102190754_RlsSessoesNativas")]
+    [Migration("20261106190733_RlsSessoesNativas")]
     partial class RlsSessoesNativas
     {
         /// <inheritdoc />
@@ -542,6 +542,20 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("MensagemEncaminhamento")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("Oi, {nome}! Eu sou o atendimento automático da Casa da Baba. Já passei sua mensagem para a responsável, que te responde por aqui.");
+
+                    b.Property<string>("MensagemEscalada")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.");
 
                     b.Property<string>("MensagemForaArea")
                         .IsRequired()
@@ -2074,6 +2088,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<DateTime?>("AtendimentoAutomaticoPausadoEm")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("Ativo")
                         .HasColumnType("boolean");
 
@@ -2148,6 +2165,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("MotivoBloqueio")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("MotivoPausaAtendimento")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
@@ -2582,6 +2603,17 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<bool>("GerarContaReceberAutomaticaDePedido")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ImpressaoAlteradaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImpressaoJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("ImpressaoVersao")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<bool>("KdsHabilitado")
                         .ValueGeneratedOnAdd()
@@ -4940,6 +4972,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("NumeroCurto")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<string>("Observacoes")
                         .HasColumnType("text");
 
@@ -4964,6 +5001,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("LojaId");
 
                     b.HasIndex("EmpresaId", "Codigo")
+                        .IsUnique();
+
+                    b.HasIndex("EmpresaId", "LojaId", "NumeroCurto")
                         .IsUnique();
 
                     b.HasIndex("EmpresaId", "Status", "DataProducao");
@@ -5083,6 +5123,22 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasIndex("ProdutoId");
 
                     b.ToTable("lote_itens", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.LoteNumeroContador", b =>
+                {
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("LojaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Ultimo")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("EmpresaId", "LojaId");
+
+                    b.ToTable("lote_numero_contador", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Mobile.Batch", b =>
@@ -12113,6 +12169,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Lote");
 
                     b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.LoteNumeroContador", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Mobile.BatchItem", b =>
