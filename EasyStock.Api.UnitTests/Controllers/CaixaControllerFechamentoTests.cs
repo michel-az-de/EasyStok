@@ -39,7 +39,7 @@ public class CaixaControllerFechamentoTests
         _repo.AddMovimentoAsync(Arg.Do<MovimentoCaixa>(m => _marcador = m)).Returns(Task.CompletedTask);
 
         var fechar = new FecharCaixaUseCase(_repo, _uow, Substitute.For<ILogger<FecharCaixaUseCase>>());
-        return new CaixaController(null!, fechar, null!, null!, null!, null!, null!, _currentUser)
+        return new CaixaController(null!, fechar, null!, null!, null!, null!, null!, null!, _currentUser)
         {
             ControllerContext = new ControllerContext
             {

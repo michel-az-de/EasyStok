@@ -1,3 +1,5 @@
+import { tituloDaLinhaExtra } from './caixa.js'
+
 export const STATUS_CONTAS = ['Rascunho', 'Aberta', 'ParcialmentePaga', 'Paga', 'Vencida', 'Cancelada']
 // #2095 (C10): conta a receber fala de receber.
 export function nomeStatusConta(status, lado = 'pagar') {
@@ -163,7 +165,9 @@ export function parcelasFinanceiras(centavos, quantidade, primeiroDia) {
   })
 }
 
-export function extratoFinanceiro(contas, movimentos, inicio, fim) {
+// #2262: `linhasDoCaixa` são as linhas que o Caixa soma fora dos movimentos (pagamento de pedido, venda e
+// estorno de venda), na forma de /api/caixa/linhas. Sem elas, o Pix do Mercado Pago ficava fora do Extrato.
+export function extratoFinanceiro(contas, movimentos, inicio, fim, linhasDoCaixa = []) {
   const de = Date.parse(instanteFinanceiro(inicio)), ate = Date.parse(instanteFinanceiro(fim, true))
   const vinculados = new Set()
   const linhas = contas.flatMap(({ lado, conta }) => conta.parcelas.flatMap((parcela) => parcela.pagamentos.map((pagamento) => {
@@ -174,5 +178,9 @@ export function extratoFinanceiro(contas, movimentos, inicio, fim) {
     if (vinculados.has(movimento.id) || ['abertura', 'fechamento'].includes(movimento.tipo.toLowerCase())) continue
     linhas.push({ id: movimento.id, em: movimento.dataMovimento, descricao: movimento.descricao || movimento.categoria || movimento.tipo, lado: movimento.tipo.toLowerCase() === 'saida' ? 'pagar' : 'receber', valor: movimento.valor, metodo: movimento.metodo, estornado: Boolean(movimento.estornadoEm), contaId: null })
   }
+  linhasDoCaixa.forEach((linha, indice) => linhas.push({
+    id: `caixa:${linha.tipo}:${linha.hora}:${indice}`, em: linha.hora, descricao: tituloDaLinhaExtra(linha),
+    lado: linha.valor < 0 ? 'pagar' : 'receber', valor: Math.abs(linha.valor), metodo: linha.metodo ?? null, estornado: false, contaId: null,
+  }))
   return linhas.filter((linha) => Date.parse(linha.em) >= de && Date.parse(linha.em) <= ate).sort((a, b) => Date.parse(b.em) - Date.parse(a.em))
 }

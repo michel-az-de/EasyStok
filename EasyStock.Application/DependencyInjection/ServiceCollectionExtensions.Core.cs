@@ -19,6 +19,7 @@ using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.ListarMovimentosCaixa;
+using EasyStock.Application.UseCases.ListarLinhasCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.ListarFechamentosCaixa;
 using EasyStock.Application.UseCases.Caixa;
@@ -108,6 +109,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EstornarMovimentoCaixaUseCase>();
         services.AddScoped<ListarMovimentosCaixaUseCase>();
         services.AddScoped<ObterCaixaDiaUseCase>();
+        services.AddScoped<ListarLinhasCaixaUseCase>();
         services.AddScoped<ListarFechamentosCaixaUseCase>();
 
         // Onda P5.A — Lotes

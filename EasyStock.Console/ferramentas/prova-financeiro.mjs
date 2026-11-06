@@ -27,6 +27,27 @@ pagamento.status = 'Estornado'
 assert.equal(extratoFinanceiro(contas, movimentos, '2026-10-11', '2026-10-11')[0].estornado, true)
 assert.equal(extratoFinanceiro(contas, movimentos, '2026-10-12', '2026-10-12').length, 0)
 
+// #2262: o recebimento de pedido (Mercado Pago ou baixa manual) e a venda moram nas linhas do Caixa, fora dos
+// movimentos. O Extrato mostrava a devolução do Mercado Pago como saída sem a entrada que ela devolve.
+const devolucao = { id: 'devolucao', tipo: 'saida', valor: 19, metodo: 'pix', categoria: 'Devolução de pedido', dataMovimento: '2026-11-06T01:00:00Z' }
+const linhasDoCaixa = [
+  { hora: '2026-11-06T00:39:34Z', tipo: 'pagamento', valor: 19, metodo: 'pix', origem: 'Pedido', pedidoNumeroDoDia: 5 },
+  { hora: '2026-11-05T15:00:00Z', tipo: 'venda', valor: 30, metodo: 'dinheiro', origem: 'Venda' },
+  { hora: '2026-11-05T16:00:00Z', tipo: 'estorno', valor: -30, metodo: 'dinheiro', origem: 'Venda' },
+]
+const extratoDoDia = extratoFinanceiro([], [devolucao], '2026-11-05', '2026-11-05', linhasDoCaixa)
+const sinal = extratoDoDia.find((item) => item.descricao === 'Pagamento do pedido nº 005')
+assert.ok(sinal, 'o Pix do pedido pago pelo Mercado Pago entra no Extrato')
+assert.equal(sinal.lado, 'receber')
+assert.equal(sinal.valor, 19)
+assert.equal(sinal.metodo, 'pix')
+assert.equal(extratoDoDia.find((item) => item.id === 'devolucao').lado, 'pagar', 'a devolução continua saindo')
+const estornoDeVenda = extratoDoDia.find((item) => item.descricao === 'Estorno de venda')
+assert.deepEqual([estornoDeVenda.lado, estornoDeVenda.valor], ['pagar', 30], 'o estorno de venda sai em valor positivo')
+assert.equal(extratoDoDia.length, 4)
+assert.equal(new Set(extratoDoDia.map((item) => item.id)).size, 4, 'cada linha tem id próprio para a lista')
+assert.equal(extratoFinanceiro([], [], '2026-11-04', '2026-11-04', linhasDoCaixa).length, 0, 'linha fora do período não entra')
+
 // #2095: lista orientada a vencimento, rótulos honestos, formulário e período.
 const fin = await import('../src/dominio/financeiro.js')
 const hoje = '2026-10-27'
@@ -143,6 +164,7 @@ globalThis.fetch = async (caminho, opcoes) => {
   const url = new URL(caminho, 'http://localhost'), corpo = opcoes.body && JSON.parse(opcoes.body)
   chamadas.push({ caminho: url.pathname, query: url.searchParams, metodo: opcoes.method, corpo })
   if (opcoes.method !== 'GET') { assert.equal(corpo.empresaId, empresaId); return new Response(JSON.stringify({ data: {} }), { status: 200 }) }
+  if (url.pathname === '/api/caixa/linhas') return new Response(JSON.stringify({ data: [] }), { status: 200 })
   if (url.pathname === '/api/caixa/movimentos' || url.pathname === '/api/contas-a-receber') return new Response(JSON.stringify({ data: [], meta: { total: 0 } }), { status: 200 })
   const numero = Number(url.searchParams.get('page'))
   if (numero === 2 && falharPagina) return new Response(JSON.stringify({ error: { message: 'Falha na página 2' } }), { status: 503 })
@@ -152,6 +174,9 @@ globalThis.fetch = async (caminho, opcoes) => {
 await api.obterExtratoFinanceiro({ inicio: '2026-10-01', fim: '2026-10-31' }, { visualizarContasPagar: true, visualizarContasReceber: false })
 assert.deepEqual(chamadas.filter((item) => item.caminho === '/api/contas-a-pagar').map((item) => item.query.get('page')), ['1', '2'])
 assert.equal(chamadas.some((item) => item.caminho === '/api/contas-a-receber'), false, 'não consulta o lado sem permissão')
+const pedidoDeLinhas = chamadas.find((item) => item.caminho === '/api/caixa/linhas')
+assert.ok(pedidoDeLinhas, '#2262: o Extrato lê as linhas do Caixa (recebimentos de pedido e vendas)')
+assert.deepEqual([pedidoDeLinhas.query.get('desde'), pedidoDeLinhas.query.get('ate')], ['2026-10-01T03:00:00.000Z', '2026-11-01T02:59:59.999Z'])
 falharPagina = true
 await assert.rejects(() => api.obterExtratoFinanceiro({ inicio: '2026-10-01', fim: '2026-10-31' }, { visualizarContasPagar: true }), /Falha na página 2/)
 await api.adicionarParcelaFinanceira('pagar', 'conta', { numero: 2, valor: 10, dataVencimento: parcelas[0].dataVencimento })

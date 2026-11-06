@@ -72,10 +72,14 @@ export const inativarCadastroFinanceiro = (tipo, id) => chamarApi(`/api/financei
 export const reativarCadastroFinanceiro = (tipo, id) => chamarApi(`/api/financeiro/${tipo}/${id}/reativar`, { metodo: 'POST' })
 
 export async function obterExtratoFinanceiro({ inicio, fim }, acesso) {
-  const [pagar, receber, movimentos] = await Promise.all([
+  const periodo = { desde: instanteFinanceiro(inicio), ate: instanteFinanceiro(fim, true) }
+  const [pagar, receber, movimentos, linhasDoCaixa] = await Promise.all([
     acesso.visualizarContasPagar ? todas(baseConta('pagar')) : [],
     acesso.visualizarContasReceber ? todas(baseConta('receber')) : [],
-    todas('/api/caixa/movimentos', { desde: instanteFinanceiro(inicio), ate: instanteFinanceiro(fim, true), incluirEstornados: true }),
+    todas('/api/caixa/movimentos', { ...periodo, incluirEstornados: true }),
+    // #2262: recebimentos de pedido (Mercado Pago e baixa manual) e vendas, as mesmas linhas que o Caixa soma.
+    chamarApi(`/api/caixa/linhas?${query(periodo)}`),
   ])
-  return extratoFinanceiro([...pagar.map((conta) => ({ lado: 'pagar', conta })), ...receber.map((conta) => ({ lado: 'receber', conta }))], movimentos, inicio, fim)
+  if (!Array.isArray(linhasDoCaixa)) throw new Error('As linhas do Caixa não foram recebidas por completo.')
+  return extratoFinanceiro([...pagar.map((conta) => ({ lado: 'pagar', conta })), ...receber.map((conta) => ({ lado: 'receber', conta }))], movimentos, inicio, fim, linhasDoCaixa)
 }

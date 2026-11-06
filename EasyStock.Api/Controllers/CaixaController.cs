@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.ListarFechamentosCaixa;
+using EasyStock.Application.UseCases.ListarLinhasCaixa;
 using EasyStock.Application.UseCases.ListarMovimentosCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
@@ -25,6 +26,7 @@ public class CaixaController(
     ListarMovimentosCaixaUseCase listarMovUseCase,
     ObterCaixaDiaUseCase obterDiaUseCase,
     ListarFechamentosCaixaUseCase listarFechUseCase,
+    ListarLinhasCaixaUseCase listarLinhasUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Cash summary for a day (open or closed)")]
@@ -97,6 +99,21 @@ public class CaixaController(
         var result = await listarMovUseCase.ExecuteAsync(new ListarMovimentosCaixaQuery(
             emp, p, sz, tipo, DataUtc.InicioDoPeriodoUtc(desde), DataUtc.FimDoPeriodoUtc(ate), incluirEstornados, sort, NormaliseOrder(order)));
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
+    }
+
+    // #2262: recebimentos de pedido (Mercado Pago e baixa manual), vendas e estornos de venda do período, as
+    // linhas que o /dia soma fora dos movimentos. O Extrato do Financeiro junta estas linhas aos movimentos.
+    [SwaggerOperation(Summary = "Order payments, sales and sale refunds counted by the cash outside its movements")]
+    [HttpGet("linhas")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> ListarLinhas(
+        [FromQuery] Guid? empresaId, [FromQuery] DateTime? desde = null, [FromQuery] DateTime? ate = null)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        if (desde is null || ate is null) return DataBadRequest("Informe o início e o fim do período.");
+        var result = await listarLinhasUseCase.ExecuteAsync(new ListarLinhasCaixaQuery(
+            emp, DataUtc.InicioDoPeriodoUtc(desde)!.Value, DataUtc.FimDoPeriodoUtc(ate)!.Value));
+        return DataOk(result);
     }
 
     [SwaggerOperation(Summary = "Register entry/exit (sangria, suprimento, despesa)")]
