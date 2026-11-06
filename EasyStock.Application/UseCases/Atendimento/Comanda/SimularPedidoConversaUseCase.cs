@@ -21,7 +21,7 @@ public sealed record SimularPedidoConversaInput(
 /// <param name="Frete">Frete em reais; nulo quando a entrega e o frete são combinados com a equipe.</param>
 /// <param name="FreteACombinar">CEP fora de qualquer zona ou raio: o frete não tem número.</param>
 /// <param name="Total">Itens mais frete; nulo com o frete a combinar.</param>
-/// <param name="Encomenda">Entrega em outro dia: o servidor cobra o sinal de 50% (<c>PlanoPagamentoEncomenda</c>).</param>
+/// <param name="Encomenda">Entrega com 2 dias ou mais de antecedência: o servidor cobra o sinal de 50% (<c>PlanoPagamentoEncomenda</c>).</param>
 /// <param name="Sinal">Metade do total com o frete; nulo fora da encomenda.</param>
 /// <param name="Restante">O que fica para a entrega; nulo fora da encomenda.</param>
 public sealed record SimulacaoPedidoConversaResult(

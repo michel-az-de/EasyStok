@@ -23,7 +23,7 @@ export function linhasDaSimulacao(simulacao, { combinado = false } = {}) {
   if (simulacao.encomenda && simulacao.sinal != null) {
     linhas.push({
       chave: 'sinal',
-      texto: `Encomenda para outro dia: sinal de ${moeda(simulacao.sinal)} antes da produção e ${moeda(simulacao.restante)} na entrega.`,
+      texto: `Encomenda com antecedência: sinal de ${moeda(simulacao.sinal)} antes da produção e ${moeda(simulacao.restante)} na entrega.`,
     })
   }
   return linhas
