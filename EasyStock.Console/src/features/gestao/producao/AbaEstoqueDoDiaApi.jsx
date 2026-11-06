@@ -5,7 +5,7 @@ import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
-import { contagemInicial, detalheDoLote, podeRegistrarPerda, podeReimprimir, porcaoQueNaoRepete, porcaoSugerida, porcoesParaAjuste, quandoVence, resumoDoEstoque, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
+import { contagemInicial, detalheDoLote, podeRegistrarPerda, podeReimprimir, motivoDaContagem, porcaoQueNaoRepete, porcaoSugerida, porcoesParaAjuste, quandoVence, resumoDoEstoque, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
 import { producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
@@ -42,6 +42,8 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
   const [motivo, setMotivo] = useState('')
   const [salvando, setSalvando] = useState(false)
   const vencidas = vencidasNaContagem(contado)
+  // #2258 (auditoria P6): parado, o botão diz o que falta em vez de ficar apagado sem explicação.
+  const parado = motivoDaContagem({ salvando, contagem, motivo, porPorcao, contado: Boolean(contado) })
 
   const trocarPorcao = (evento) => {
     const chave = evento.target.value
@@ -94,7 +96,7 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
       </p>}
       <div className={css.rodapeForm}>
         <Botao variante="texto" disabled={salvando} onClick={aoCancelar}>Cancelar</Botao>
-        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando || !motivo.trim() || contagem === '' || (porPorcao && !contado)}>{salvando ? 'Salvando…' : 'Salvar contagem'}</Botao>
+        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando || Boolean(parado)} motivo={parado ?? undefined}>{salvando ? 'Salvando…' : 'Salvar contagem'}</Botao>
       </div>
     </form>
   )

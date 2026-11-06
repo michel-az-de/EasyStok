@@ -30,8 +30,14 @@ export const textoDosCentavos = (centavos) => (centavos == null
   ? ''
   : (centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 
-export const horaCurta = (iso) =>
-  new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: FUSO })
+// #2258 (auditoria G1): sempre HH:MM com dois pontos, no fuso da loja. `toLocaleTimeString` troca o
+// separador conforme o navegador e o sistema ("16.23" apareceu em Canais).
+export const horaCurta = (iso) => {
+  const ms = new Date(iso).getTime()
+  if (Number.isNaN(ms)) return ''
+  const { horas, minutos } = partesNoFuso(ms)
+  return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`
+}
 
 const DIA_DA_SEMANA = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
 const PARTES = new Intl.DateTimeFormat('en-US', {

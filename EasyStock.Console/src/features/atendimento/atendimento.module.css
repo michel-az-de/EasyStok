@@ -162,10 +162,28 @@
 /* #2232 (B3): a data fica fixa no topo enquanto o dia dela rola. O grupo do dia limita a fixação:
    sem ele todas as datas se empilhariam no topo. */
 .grupoDia { display: flex; flex-direction: column; }
+/* #2258 (auditoria T3): fundo opaco, camada acima das bolhas e respiro; transparente, "26 de outubro"
+   ficava por cima do texto da mensagem que rolava por baixo. */
 .separadorDia {
-  display: flex; justify-content: center; margin: var(--e-3) 0;
-  position: sticky; top: var(--e-2); z-index: 1; pointer-events: none;
+  display: flex; justify-content: center; padding: var(--e-2) 0; margin: 0 0 var(--e-2);
+  position: sticky; top: 0; z-index: 2; pointer-events: none;
+  background: var(--chao-conversa);
 }
+
+/* #2258 (auditoria T2): esqueleto do painel da conversa enquanto a primeira leitura não chega. */
+.esqueletoConversa {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--e-3);
+  padding: var(--e-5); background: var(--chao-conversa);
+}
+.esqueleto {
+  display: block; border-radius: var(--r-2); background: var(--preenchimento-forte);
+  animation: esqueletoPulso calc(var(--dur-longa) * 4) var(--ease-padrao) infinite alternate;
+}
+.esqueletoCabecalho { height: 48px; width: 55%; margin-bottom: var(--e-3); }
+.esqueletoBalao { height: 56px; width: 60%; }
+.esqueletoBalaoSaida { align-self: flex-end; width: 45%; }
+@keyframes esqueletoPulso { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .esqueleto { animation: none; } }
 
 /* Composer tipo iMessage: caixa única com raio 16, --papel, --linha-media,
    sombra, focus-within com halo. */

@@ -25,13 +25,15 @@ import css from './entregasApi.module.css'
 // viagens (S44, RN-32), entregadores, chamados e o cadastro da loja (S45). Desde a #1440
 // "Entregas de hoje" vem organizada por janela do dia, com o roteiro para imprimir.
 // A máquina de estados e as regras são da API; a tela só mostra e chama.
-const ABAS = [['hoje', 'Do dia'], ['entregadores', 'Entregadores'], ['cadastro', 'Janelas e frete']]
+// #2258 (auditoria E1): nomes únicos. A aba da operação é "Painel do dia" ("Hoje" é só o botão que escolhe o dia)
+// e a do cadastro tem o nome do menu de Gestão, "Janelas de entrega".
+const ABAS = [['hoje', 'Painel do dia'], ['entregadores', 'Entregadores'], ['cadastro', 'Janelas de entrega']]
 
 export function ConteudoEntregasApi() {
   const [aba, setAba] = useState('hoje')
   const id = useId()
   const abasRef = useRef({})
-  // #1921: "Janelas e frete" é da policy Admin; a atendente não vê a aba nem faz as leituras dela.
+  // #1921: "Janelas de entrega" é da policy Admin; a atendente não vê a aba nem faz as leituras dela.
   const comVitrine = podeAjustarEntrega(useAcessoModulos().acoes)
   const abas = comVitrine ? ABAS : ABAS.filter(([chave]) => chave !== 'cadastro')
   const {
@@ -40,7 +42,7 @@ export function ConteudoEntregasApi() {
   const situacao = situacaoDaLista(pedidos, erro)
   const trocarAba = (proxima) => {
     // #1577: o roteiro não relê mais janelas e bloqueios a cada evento de pedido; o que ela
-    // mexeu em "Janelas e frete" volta para ele na saída da aba.
+    // mexeu em "Janelas de entrega" volta para ele na saída da aba.
     if (aba === 'cadastro' && proxima !== 'cadastro') acoes.recarregar()
     setAba(proxima)
     abasRef.current[proxima]?.focus()

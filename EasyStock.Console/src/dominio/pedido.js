@@ -21,6 +21,14 @@ export function totalDoPedido(pedido, cardapio) {
     .reduce((soma, linha) => soma + (itemPorSku(cardapio, linha.sku)?.preco ?? 0) * linha.qtd, 0)
 }
 
+// #2258 (T20): total da comanda a partir do retrato das linhas, para a Ficha mostrar o valor quando o
+// servidor não mandou `totalApi`. Linha sem preço gravado não se chuta: devolve null.
+export function totalDaComanda(pedido) {
+  const itens = pedido?.itens ?? []
+  if (!itens.length || itens.some((linha) => typeof linha.precoUnitario !== 'number')) return null
+  return itens.reduce((soma, linha) => soma + linha.precoUnitario * linha.qtd, 0)
+}
+
 // Preço da linha na Ficha: o que o pedido gravou; sem retrato (rascunho local), o do cardápio.
 export const precoDaLinha = (linha) => (linha.precoUnitario ?? linha.produto?.preco ?? 0) * linha.qtd
 

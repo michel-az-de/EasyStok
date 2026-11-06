@@ -18,6 +18,7 @@ import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useAcessoModulos } from '../aplicacao/acessoModulos'
 import { contarAtivas } from '../dominio/automacao'
 import { contarPrecisaDeVoce } from '../dominio/automatico'
+import { apresentacaoDoNome } from '../dominio/nomeDoContato'
 import { CELULAR, DESKTOP, TABLET, useTamanhoTela, useTopoCompacto } from '../hooks/useTamanhoTela'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
@@ -30,7 +31,7 @@ import { Sininho } from '../features/lembretes/Sininho'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
 import { HASH_HALL, HASH_MODULO_COZINHA } from '../dominio/rota'
-import { moduloPorId } from '../dominio/modulos'
+import { NOME_INICIO, NOME_RESPOSTAS_AUTOMATICAS, moduloPorId } from '../dominio/modulos'
 import { IconeDoModulo } from '../componentes/IconeDoModulo'
 import { JANELA_COZINHA } from '../dominio/janelaAvulsa'
 import { AvisoDaAcaoApi } from './FaixaApi'
@@ -154,7 +155,7 @@ function ControleLoja({ aberta, aoAlternar }) {
       type="button"
       className={`${css.controleLoja} ${aberta ? css.topoAberta : css.topoFechada}`}
       aria-pressed={aberta}
-      title={aberta ? 'Loja aberta: toque para fechar' : 'Loja fechada: toque para abrir'}
+      title={aberta ? 'Fechar a loja (pede confirmação)' : 'Abrir a loja'}
       onClick={aoAlternar}
     >
       <span className={css.lojaPonto} aria-hidden="true" />
@@ -165,6 +166,7 @@ function ControleLoja({ aberta, aoAlternar }) {
 
 // Modo API (F06): sem regra vinda da API, sem número. A massa mostrava "Automáticas 6".
 const MODULO_ATENDIMENTO = moduloPorId('atendimento')
+const MODULO_COZINHA = moduloPorId('cozinha')
 
 function Cabecalho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, aoAbrirAjuda, atendente = null,
@@ -179,28 +181,28 @@ function Cabecalho({
     <header className={css.topo}>
       {/* #1582: entre 1024 e 1179 px não há menu Mais nem trilho; a marca é o caminho ao hall,
           como no trilho do desktop. */}
-      <a className={css.marca} href={HASH_HALL} aria-label="Ir para os módulos" title="Módulos">
+      <a className={css.marca} href={HASH_HALL} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
         <Marca compacta />
       </a>
-      <h1 className="sr">Casa da Baba</h1>
-      {!compacto && <InterruptorTema />}
+      <h1 className="sr">Casa da Babá</h1>
       <ControleLoja aberta={aberta} aoAlternar={aoAlternarLoja} />
       <div className={css.controles}>
         {/* Sininho é o primeiro do grupo, à esquerda de Automáticas (seção 8
             da direção visual). A faixa de lembretes abaixo do topo saiu. */}
-        <Sininho />
+        <Sininho comRotulo={!compacto} />
         {notificacoes}
         {/* #2232 (L2): no celular a Cozinha era um ícone solto; ela passa a item com nome no Mais. */}
-        {!celular && permite('cozinha') && <Botao variante="texto" icone="cooking-pot" onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
-          Cozinha
+        {!celular && permite('cozinha') && <Botao variante="texto" onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
+          <IconeDoModulo modulo={MODULO_COZINHA} tamanho={20} />Cozinha
         </Botao>}
         {/* Achado 6, P3 (banca 10): no celular a regra `.controles > button` zera o font-size do
             botão (caber em 390 px); `.rotuloCurto` mostra a abreviação com font-size próprio.
             #2232 (L3): o número cedeu lugar ao estado escrito ("ligadas"/"desligadas"); a contagem
             segue no nome acessível. Sem regras (modo API), sem estado e sem número. */}
-        <Botao icone="raio" className={css.automaticas} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)}>
+        <Botao className={css.automaticas} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)}>
           <span className={css.autoTexto}>
-            <span className={css.rotuloLongo}>Automáticas</span>
+            <IconeDoModulo modulo={MODULO_ATENDIMENTO} telaId="respostas" tamanho={20} />
+            <span className={css.rotuloLongo}>{NOME_RESPOSTAS_AUTOMATICAS}</span>
             <span className={css.rotuloCurto} aria-hidden="true">Auto</span>
             {estadoAuto && <span className={css.autoEstado} aria-hidden="true">{estadoAuto}</span>}
           </span>
@@ -232,8 +234,8 @@ function Cabecalho({
           <>{permite('entregas') && <ResumoEntregas aoAbrir={aoAbrirEntregas} />}
             <Botao variante="texto" icone="ajuda" aria-haspopup="dialog" onClick={aoAbrirAjuda}>Ajuda</Botao>
             {/* #1242 (D1): no tablet largo o Sair mora no avatar, como no trilho do desktop. */}
-            {aoSair && <MenuDaConta nome={atendente} detalhe={conta?.casa} aoSair={aoSair} lado="abaixo"
-              rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'} />}</>
+            <MenuDaConta nome={atendente} detalhe={conta?.casa} aoSair={aoSair} lado="abaixo"
+              rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}><InterruptorTema /></MenuDaConta></>
         )}
       </div>
     </header>
@@ -272,10 +274,10 @@ function Trilho({
   const { permite, notificacoes, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   return (
     <nav className={css.trilho} aria-label="Navegação">
-      <a className={css.inicioTrilho} href={HASH_HALL} aria-label="Ir para os módulos" title="Módulos">
-        <Marca compacta /><span>Módulos</span>
+      <a className={css.inicioTrilho} href={HASH_HALL} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
+        <Marca compacta /><span>{NOME_INICIO}</span>
       </a>
-      <h1 className="sr">Casa da Baba</h1>
+      <h1 className="sr">Casa da Babá</h1>
       {/* Estado da loja logo abaixo da marca: é o que vale para tudo embaixo.
           Mesmo texto e mesmo nome do controle do topo da main ("Loja aberta"
           ou "Loja fechada"), que as provas procuram pelo nome exato. */}
@@ -284,7 +286,7 @@ function Trilho({
         className={`${css.itemTrilho} ${css.lojaTrilho} ${aberta ? css.lojaAberta : css.lojaFechada}`}
         aria-pressed={aberta}
         onClick={aoAlternarLoja}
-        title={aberta ? 'Loja aberta: toque para fechar' : 'Loja fechada: toque para abrir'}
+        title={aberta ? 'Fechar a loja (pede confirmação)' : 'Abrir a loja'}
       >
         <Icone nome={aberta ? 'circle-check' : 'lock'} tamanho={22} />
         <span>{aberta ? 'Loja aberta' : 'Loja fechada'}</span>
@@ -299,12 +301,12 @@ function Trilho({
         noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho}
       />}
       {permite('cozinha') && <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
-        <Icone nome="cooking-pot" tamanho={22} />
+        <IconeDoModulo modulo={MODULO_COZINHA} tamanho={22} />
         <span>Cozinha</span>
       </Botao>}
-      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)} title="Automáticas">
-        <Icone nome="raio" tamanho={22} />
-        <span>Automáticas</span>
+      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)} title={NOME_RESPOSTAS_AUTOMATICAS}>
+        <IconeDoModulo modulo={MODULO_ATENDIMENTO} telaId="respostas" tamanho={22} />
+        <span>{NOME_RESPOSTAS_AUTOMATICAS}</span>
         {regras && <Contador valor={contarAtivas(regras)} className={css.contaTrilho} />}
       </Botao>
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirGestao} title="Gestão" aria-haspopup="dialog">
@@ -316,7 +318,7 @@ function Trilho({
           Avisos logo abaixo, e quem clicava em Avisos abria Lembretes. */}
       <div className={css.avisosTrilho}>{notificacoes}</div>
       <div className={css.sinoTrilho}><Sininho comRotulo /></div>
-      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda do sistema">
+      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda">
         <MarcaIcone nome="informacao" tamanho={22} /><span>Ajuda</span>
       </Botao>
       {disposicao}
@@ -610,7 +612,7 @@ function ConteudoMoldura({
         <div className={css.slotFila} data-fila-canhotos="" />
         <footer className={css.rodape}>
           <Botao ref={botaoFichaRef} onClick={() => setGavetaAberta(true)}>
-            Ficha de {selecionada?.nome.split(' ')[0] ?? 'cliente'}
+            Ficha de {selecionada ? apresentacaoDoNome(selecionada.nome, { comanda: selecionada.numeroComanda }).rotulo : 'cliente'}
           </Botao>
         </footer>
         <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />

@@ -251,6 +251,23 @@ provar('Modal: segurarFechamento ignora Escape e fundo com valor digitado; o X e
     assert.equal(fechou, 1, 'o X é um gesto explícito e fecha')
   } finally { m.desmontar() }
 })
+// #2258 (auditoria F4, T17): com algo digitado, Esc, fundo e X perguntam antes de descartar; nenhum fecha direto.
+provar('Modal: confirmarDescarte faz Esc, fundo e X perguntarem antes de fechar', () => {
+  let fechou = 0
+  const eventos = new Map(), m = montar(Modal, { titulo: 'Nova conta', confirmarDescarte: true, aoFechar: () => fechou++ })
+  const dialogo = dialogoFalso(eventos)
+  m.elemento.props.ref.current = dialogo
+  m.efeitos()
+  try {
+    const cancelamento = tecla('Escape', dialogo)
+    eventos.get('cancel')(cancelamento)
+    assert.equal(cancelamento.prevenido, true, 'o navegador não fecha o dialog sozinho')
+    eventos.get('click')({ target: dialogo })
+    const fechar = andar(m.elemento, elemento => elemento.props['aria-label'] === 'Fechar janela')[0]
+    fechar.props.onClick()
+    assert.equal(fechou, 0, 'nenhum dos três gestos descarta sem perguntar')
+  } finally { m.desmontar() }
+})
 // #2078 (revisão R2): no Chromium o 2º Esc seguido, sem ativação do usuário, não pode ser cancelado:
 // o dialog fecha sozinho e o React não sabia. O `close` nativo agora é ouvido.
 for (const caso of ['segurando', 'livre', 'protegido']) {

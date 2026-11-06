@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { nomeDoContato } from '../../dominio/nomeDoContato'
+import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
+import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { Avatar } from '../../componentes/Avatar'
 import { Botao } from '../../componentes/Botao'
@@ -46,15 +47,19 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
   const fotoCadastro = useFotoCliente(cliente.fotoUrl)
   const [freteAberto, setFreteAberto] = useState(false)
   const lead = conversa.conta === 'lead' || !conversa.clienteId
+  // #2258 (T4): o mesmo nome do cartão da lista, do cabeçalho e dos botões "Abrir".
+  const nome = apresentacaoDoNome(conversa.nome, { comanda: conversa.numeroComanda })
   const { restricoes } = useCatalogo()
   const tags = ordenarTags(cliente.tags ?? [], restricoes).filter((tag, indice) => indice < 4 || ehRestricao(tag, restricoes))
   return (
-    <section className={css.cartaoCliente} aria-label={`Cliente ${conversa.nome}`}>
-      <button type="button" className={css.cartaoClienteAbrir} onClick={aoAbrir} aria-label={`Abrir ficha de ${conversa.nome}`}>
+    <section className={css.cartaoCliente} aria-label={`Cliente ${nome.rotulo}`}>
+      <button type="button" className={css.cartaoClienteAbrir} onClick={aoAbrir} aria-label={`Abrir ficha de ${nome.rotulo}`}>
         <span className={css.identidadeCliente}>
           <Avatar nome={conversa.nome} foto={fotoCadastro.url ?? foto} tamanho="grande" />
           <span className={css.dadosIdentidadeCliente}>
-            <strong className={css.nomeClienteInline}>{nomeDoContato(conversa.nome)}</strong>
+            <strong className={css.nomeClienteInline}>
+              <NomeDoContato completo={nome.completo} curto={nome.curto} capsula={nome.capsula} titulo={nome.titulo} />
+            </strong>
           </span>
         </span>
         {lead && <span className={css.numerosCliente}>Contato sem cadastro</span>}

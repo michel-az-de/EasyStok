@@ -1,13 +1,10 @@
-import { MODULOS } from './modulos'
+import { MODULOS, ORDEM_DOS_MODULOS } from './modulos'
 import { FOCOS_DO_HALL, normalizarPreferenciasHall } from './preferenciasHall'
-import { indicadoresDoHall, pendenciaDoModulo } from './pulsoDoHall'
+import { indicadoresDoHall, pendenciaDoModulo, precisaDeVoce } from './pulsoDoHall'
 
 // #2232 (banca UX/UI, Início): regras puras do hall que a tela só desenha.
 
 const idsDoCatalogo = MODULOS.map((modulo) => modulo.id)
-
-// Módulos com leitura própria no hall: sem dado lido não há o que afirmar no cartão.
-const MODULOS_MEDIDOS = ['atendimento', 'cozinha', 'entregas', 'financeiro', 'cardapio']
 
 // H10: Configurações não é uma área de trabalho do dia; sai da grade e vira link de rodapé.
 export const MODULOS_NO_RODAPE = ['configuracoes']
@@ -17,14 +14,18 @@ export const MODULOS_NO_RODAPE = ['configuracoes']
 export function estadoDoCartao(id, fontes) {
   const pendencia = pendenciaDoModulo(id, fontes)
   if (pendencia) return pendencia
-  return MODULOS_MEDIDOS.includes(id) ? null : { texto: 'Tudo em dia', atencao: false }
+  // #2258 (P1): "Tudo em dia" é afirmação sobre uma leitura. Módulo medido sem leitura fica sem linha, e o
+  // que não tem número a medir (Configurações, Campanhas em breve) não afirma nada.
+  return null
 }
 
 // H10: a ordem de fábrica é a ordem de uso do foco escolhido (por padrão, "Cliente primeiro").
 // A ordem do catálogo (número do módulo) só vale como "não mexi", e aí a tela usa a de uso.
 export function ordemOriginalDoHall(foco = 'atendimento') {
   const modelo = FOCOS_DO_HALL.find((item) => item.id === foco) ?? FOCOS_DO_HALL[0]
-  return [...modelo.ordem, ...idsDoCatalogo.filter((id) => !modelo.ordem.includes(id))]
+  // #2258 (A2): o que o foco não cita segue a ordem única dos módulos (`ORDEM_DOS_MODULOS`).
+  const posicao = (id) => (ORDEM_DOS_MODULOS.indexOf(id) < 0 ? ORDEM_DOS_MODULOS.length : ORDEM_DOS_MODULOS.indexOf(id))
+  return [...modelo.ordem, ...idsDoCatalogo.filter((id) => !modelo.ordem.includes(id)).sort((a, b) => posicao(a) - posicao(b))]
 }
 
 export function comOrdemPorUso(preferencia) {
@@ -54,20 +55,25 @@ export function severidadeDoIndicador(item) {
 // H6: o alerta do caixa de outro dia traz a ação que resolve, no próprio cartão.
 export const acaoDoIndicador = (item) => (item.id === 'financeiro' && item.alerta ? 'Fechar caixa' : null)
 
-// M3: "Hoje · N em andamento · N na fila", com as mesmas leituras que alimentam os números do
-// hall. Em andamento: conversa não encerrada. Na fila: pedido esperando ou em preparo (a fila da
-// Cozinha). Leitura que falhou ou não chegou fica de fora: o resumo nunca chuta.
-const lida = (fonte) => (fonte?.estado === 'erro' ? undefined : fonte)
-export function resumoDoDia(fontes) {
-  const conversas = lida(fontes?.atendimento)?.dados
-  const pedidos = lida(fontes?.pedidos)
-  const emAndamento = conversas ? conversas.itens.filter((conversa) => conversa.situacao !== 'Encerrada').length : null
-  const naFila = pedidos?.dados ? indicadoresDoHall({ pedidos }, ['cozinha'])[0].valor : null
-  const partes = [
-    emAndamento !== null && `${emAndamento}${conversas.parcial ? '+' : ''} em andamento`,
-    naFila !== null && `${naFila}${pedidos.dados.parcial ? '+' : ''} na fila`,
-  ].filter(Boolean)
-  return { emAndamento, naFila, texto: partes.length ? `Hoje · ${partes.join(' · ')}` : null }
+// #2258 (H1): o resumo é a SOMA dos números que o hall mostra nos cartões que pedem a dona (conversas
+// que precisam dela, pedidos na fila, pedidos prontos para sair), e separa o que pede ação (conversas, "precisam de você") do que só está em andamento.
+// Antes contava "conversas não encerradas", outra conta que não batia com nenhum cartão. Cartão que não
+// está na tela não entra na soma; leitura que falhou ou não chegou tira o resumo: ele nunca chuta.
+export const MODULOS_QUE_PEDEM_A_DONA = ['atendimento', 'cozinha', 'entregas']
+export function resumoDoDia(fontes, ids = MODULOS_QUE_PEDEM_A_DONA) {
+  const contados = MODULOS_QUE_PEDEM_A_DONA.filter((id) => ids.includes(id))
+  const itens = indicadoresDoHall(fontes ?? {}, contados)
+  const lidos = itens.every((item) => item.estado !== 'erro' && item.valor !== null)
+  if (!contados.length || !lidos) return { total: null, parcial: false, texto: null }
+  const total = itens.reduce((soma, item) => soma + item.valor, 0)
+  const parcial = itens.some((item) => item.parcial)
+  // #2258 (H1, banca): só conversa esperando resposta pede ação da dona; pedido na fila ou pronto para
+  // sair está em andamento. O texto separa as duas contas em vez de chamar tudo de "precisam de você".
+  const precisam = itens.filter((item) => item.id === 'atendimento').reduce((soma, item) => soma + item.valor, 0)
+  const andamento = total - precisam
+  const parteAcao = precisam || parcial ? precisaDeVoce(precisam, parcial ? '+' : '') : 'nada precisa de você'
+  const parteAndamento = andamento ? ` · ${andamento} em andamento` : ''
+  return { total, precisam, andamento, parcial, texto: `Hoje · ${parteAcao}${parteAndamento}` }
 }
 
 // #2256 (auditoria de UX, Onda 1): 6 módulos em 4 colunas deixavam 2 vagas vazias.

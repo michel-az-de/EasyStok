@@ -27,7 +27,7 @@ const REGRAS = {
   R2: { descricao: 'texto de reais montado à mão (use `textoDosCentavos`)', acha: /toFixed\(\s*2\s*\)\s*\.replace\(\s*['"]\.['"]\s*,\s*['"],['"]\s*\)/ },
   R3: { descricao: 'leitor de reais próprio (use `lerMoeda`/`lerReais`)', acha: /\.replace\(\s*['"],['"]\s*,\s*['"]\.['"]\s*\)/ },
   R4: { descricao: 'campo de reais em máscara de centavos (use `CampoReais`)', acha: /<CampoMascarado[^>]*tipo=["']moeda["']/ },
-  R5: { descricao: 'campo de reais que não é `CampoReais`', acha: /<CampoTexto[^>]*rotulo=["'](?![^"']*pontos)[^"']*(R\$|Preço|Valor|Custo)/ },
+  R5: { descricao: 'campo de reais que não é `CampoReais`', acha: /<CampoTexto[^>]*rotulo=(?:["']|\{`)(?![^"'`]*pontos)[^"'`]*(R\$|Preço|Valor|Custo)/ }, // #2258: pega também o rótulo em template literal (`Custo por ${un} (R$)`), que escapava da guarda
 }
 
 const MODULO_UNICO = 'dominio/formato.js'

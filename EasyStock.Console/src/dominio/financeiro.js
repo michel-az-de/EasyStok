@@ -138,6 +138,20 @@ export function motivoContaInvalida({ descricao, categoria, centavos, quantidade
   return null
 }
 
+// #2258 (auditoria F13): a quantidade de parcelas é texto de dígitos, nunca número do campo (o
+// <input type=number> aceitava 0 e "-3" virava "03"). Devolve o texto limpo, o número lido e o erro.
+export const LIMITE_PARCELAS = 60
+export function lerParcelas(texto) {
+  const digitos = String(texto ?? '').replace(/\D/g, '').slice(0, 3).replace(/^0+(?=\d)/, '')
+  const quantidade = digitos ? Number(digitos) : null
+  const erro = !(quantidade >= 1) ? 'Mínimo 1 parcela' : quantidade > LIMITE_PARCELAS ? `Máximo ${LIMITE_PARCELAS} parcelas` : null
+  return { texto: digitos, quantidade, erro }
+}
+
+// #2258 (auditoria F12): categoria criada na própria escolha da conta; o tipo vem do lado da conta.
+export const corpoDaNovaCategoria = (nome, lado) => ({ nome: String(nome ?? '').trim(), tipo: lado === 'receber' ? 'Receita' : 'Despesa' })
+export const motivoDaNovaCategoria = (nome) => (String(nome ?? '').trim() ? null : 'Escreva o nome da categoria.')
+
 // Mensagem técnica do servidor (Npgsql, exceção, stack) nunca vai crua para a tela (F4).
 const TECNICA = /Cannot write|Kind=|Npgsql|Exception|System\.|PostgreSQL|SQLSTATE|stack trace|\bat [A-Z][\w.]+\(|Object reference/i
 const TRADUCOES = [

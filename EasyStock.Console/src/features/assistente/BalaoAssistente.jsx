@@ -257,7 +257,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
       {/* #2232 (L4): a ilustração de uma pessoa lia como "falar com alguém"; o ícone de assistente com a
           palavra diz o que o botão é. Nome acessível segue em `aria-label`. */}
       <Icone nome="agente" tamanho={cabecalhoDoAtendimento ? 20 : 26} />
-      {cabecalhoDoAtendimento && <span className={css.rotuloGatilho}>Assistente</span>}
+      <span className={css.rotuloGatilho}>Assistente</span>
       {!aberto && pedeAtencao && <span className={css.pontoAtencao} aria-hidden="true" />}
     </Botao>
   )

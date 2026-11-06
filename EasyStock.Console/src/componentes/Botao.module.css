@@ -7,10 +7,11 @@
   font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto);
   letter-spacing: -.01em;
 }
-/* Motivo do desabilitado é texto de quem chama, escrito acima do botão; aqui
-   só o estado visual. Opacidade sai porque derruba o contraste abaixo de 3:1. */
+/* #2258 (P6): o desabilitado era o mesmo preenchimento do secundário ativo, e a pessoa clicava sem
+   resposta. Agora não tem preenchimento e ganha contorno tracejado: lê como "indisponível" sem depender
+   de opacidade, que derruba o contraste abaixo de 3:1. O motivo vem pela prop `motivo`. */
 .botao:disabled {
-  background: var(--preenchimento); border-color: transparent; color: var(--tinta-3);
+  background: transparent; border: var(--b-1) dashed var(--linha-forte); color: var(--tinta-3);
   box-shadow: none; cursor: not-allowed;
 }
 .primario {
@@ -31,7 +32,11 @@
 .texto { background: transparent; border: var(--b-1) solid transparent; color: var(--tinta-2); }
 .texto:hover:not(:disabled) { background: var(--preenchimento); color: var(--tinta); }
 .texto:active:not(:disabled) { background: var(--preenchimento-forte); color: var(--tinta); }
-.texto:disabled, .discreto:disabled { background: transparent; }
+.texto:disabled, .discreto:disabled { background: transparent; border-color: transparent; }
 .padrao { composes: secundario; }
 .discreto { composes: texto; }
 .largo { width: 100%; }
+/* Motivo do desabilitado: ao lado do botão, na mesma linha do rodapé; quebra para cima se faltar espaço. */
+.comMotivo { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--e-2); max-width: 100%; }
+.motivo { font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto); text-align: right; }
+.comMotivo:has(.largo) { width: 100%; }

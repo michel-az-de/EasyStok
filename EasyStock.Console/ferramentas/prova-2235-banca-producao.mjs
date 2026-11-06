@@ -45,7 +45,7 @@ confere('T1-1: o topo conta porções, lotes vencidos e vendas sem saldo', () =>
 
 confere('T1-5: a validade diz quando venceu ou quando vence', () => {
   assert.equal(quandoVence({}), 'Sem validade informada')
-  assert.equal(quandoVence({ validade: '2026-10-17', vencido: true }), 'Venceu em 17/10')
+  assert.equal(quandoVence({ validade: '2026-10-17', vencido: true }), 'Venceu em 17/10 · fora do saldo') // #2258 (auditoria P2): o lote vencido diz que saiu do saldo
   assert.equal(quandoVence({ validade: '2026-11-05', diasParaVencer: 0 }), 'Vence hoje')
   assert.equal(quandoVence({ validade: '2026-11-06', diasParaVencer: 1 }), 'Vence amanhã')
   assert.equal(quandoVence({ validade: '2026-11-09', diasParaVencer: 4 }), 'Vence em 09/11')

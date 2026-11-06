@@ -26,8 +26,8 @@ public sealed class NotificadorComAvisosDaLoja(
 {
     public Task PublicarEventoAsync(
         TipoEventoNotificacao tipo, Guid empresaId, Guid? usuarioDestinoId, string payloadJson,
-        IDictionary<string, object?>? varsAdicionais = null, CancellationToken ct = default) =>
-        interno.PublicarEventoAsync(tipo, empresaId, usuarioDestinoId, payloadJson, varsAdicionais, ct);
+        IDictionary<string, object?>? varsAdicionais = null, CancellationToken ct = default, Guid? refEntidadeId = null) =>
+        interno.PublicarEventoAsync(tipo, empresaId, usuarioDestinoId, payloadJson, varsAdicionais, ct, refEntidadeId);
 
     public async Task<Guid> EnfileirarEventoAsync(
         TipoEventoNotificacao tipo, Guid empresaId, string payloadJson, Guid? refEntidadeId = null,

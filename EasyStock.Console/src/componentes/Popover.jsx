@@ -9,6 +9,11 @@ const SELETOR_ITENS = '[role="menuitem"], [role="menuitemradio"], [role="menuite
 const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) ?? [])]
   .filter((item) => !item.disabled && item.getAttribute('aria-disabled') !== 'true')
 
+// #2258 (T1): `alinhamento` diz a que borda do gatilho a camada se prende. O padrão, 'direita', é o
+// do cabeçalho (gatilho no canto direito, a camada cresce para a esquerda). Gatilho que mora na
+// coluna da esquerda (o filtro das conversas) pede 'esquerda', senão a camada nasce para fora da
+// tela; em qualquer dos dois a medição do `portal` mantém a camada inteira dentro da viewport.
+//
 // `posicao` decide de que lado a camada abre. O padrão continua sendo acima,
 // que é onde o composer precisa; 'abaixo' serve para gatilho no topo da tela.
 // `children` substitui `grupos`/`aoEscolher` quando o conteúdo não é lista de
@@ -34,8 +39,9 @@ const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) 
 // CSS de .popover continua o mesmo (bottom/top: 100% relativo ao wrapper
 // plantado), então quem não passa `portal` renderiza exatamente como antes.
 export function Popover({
-  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu', folha = false,
+  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu', folha = false, alinhamento = 'direita',
 }) {
+  const aEsquerda = alinhamento === 'esquerda'
   const caixaRef = useRef(null)
   const marcadorRef = useRef(null)
   const origemRef = useRef(globalThis.document?.activeElement ?? null)
@@ -108,7 +114,8 @@ export function Popover({
     const espaco = parseFloat(estilo.getPropertyValue('--e-2'))
     const { larguraLimite, alturaLimite, inicioX, inicioY } = retangulo
     const largura = Math.max(1, Math.min(360, larguraLimite - 2 * margem))
-    const esquerda = Math.max(inicioX + margem, Math.min(retangulo.left + retangulo.width - largura, inicioX + larguraLimite - largura - margem))
+    const encosto = aEsquerda ? retangulo.left : retangulo.left + retangulo.width - largura
+    const esquerda = Math.max(inicioX + margem, Math.min(encosto, inicioX + larguraLimite - largura - margem))
     // O limite é o dialog ou a viewport. Menus do rodapé também precisam abrir para cima.
     Object.assign(caixa.style, {
       position: 'absolute', width: `${largura}px`, left: `${esquerda - retangulo.left}px`, right: 'auto',
@@ -121,9 +128,9 @@ export function Popover({
       top: inverter ? 'auto' : `${retangulo.height + espaco}px`,
       bottom: inverter ? `${retangulo.height + espaco}px` : 'auto',
       maxHeight: `${Math.max(1, inverter ? acima : abaixo)}px`,
-      transformOrigin: inverter ? 'bottom right' : 'top right',
+      transformOrigin: `${inverter ? 'bottom' : 'top'} ${aEsquerda ? 'left' : 'right'}`,
     })
-  }, [retangulo, posicao])
+  }, [retangulo, posicao, aEsquerda])
 
   // Sugestão presa ao campo de texto (atalho "/" do composer) não pode
   // roubar o foco: ela está digitando, e o Popover de clique de sempre foca
@@ -150,7 +157,7 @@ export function Popover({
   const corpo = (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Papel explícito varia entre menu de ações e grupo com busca/listbox.
     <div
-      className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''} ${folha ? css.folha : ''}`}
+      className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''} ${aEsquerda ? css.alinharEsquerda : ''} ${folha ? css.folha : ''}`}
       role={papel === 'group' ? 'group' : papel === 'dialog' ? 'dialog' : 'menu'}
       tabIndex={-1}
       aria-label={rotulo}

@@ -12,7 +12,7 @@ import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { MenuDaConta } from '../../componentes/MenuDaConta'
 import { Vazio } from '../../componentes/Vazio'
-import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
+import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, NOME_RESPOSTAS_AUTOMATICAS, saudacaoDoHall } from '../../dominio/modulos'
 import {
   alternarFavoritoDoHall, favoritosDoHall, moverModuloDoHall, moverPainelDoHall,
   ordenarModulosDoHall, ordenarPaineisDoHall, FOCOS_DO_HALL,
@@ -58,7 +58,8 @@ function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, ind
         </div>
       </div>}
       {modulo.disponivel ? <>
-        <a className={css.abrir} href={modulo.href} {...alcaNoLink}>
+        {/* #2258 (C1/P1): com pendência a ser resolvida o cartão leva ao ponto exato; sem ela, ao módulo. */}
+        <a className={css.abrir} href={pendencia?.href ?? modulo.href} {...alcaNoLink}>
           <span className={css.nome}>{modulo.nome}</span>
         </a>
         {/* #2232 (H7): o cartão inteiro é o link, então não leva seta. (H8): todo cartão tem linha de estado. */}
@@ -135,7 +136,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const permitido = (id) => modulosPermitidos.some((modulo) => modulo.id === id)
   const { fontes } = usePulsoDoHall({
     ativo: fonteApi, atendimento: permitido('atendimento'), pedidos: permitido('cozinha') || permitido('entregas'),
-    financeiro: permitido('financeiro'), cardapio: permitido('cardapio'),
+    financeiro: permitido('financeiro'), cardapio: permitido('cardapio'), producao: permitido('producao'),
   })
   const gravar = (proxima, texto, guardarAnterior = true) => {
     if (guardarAnterior && JSON.stringify(proxima) !== JSON.stringify(preferencia)) setAnterior(preferencia)
@@ -192,7 +193,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           <div className={css.cabeca}>
             <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
             {/* #2232 (M3): o resumo do dia saiu do menu do Atendimento e mora aqui. */}
-            {fonteApi && <ResumoDoDia fontes={fontes} />}
+            {fonteApi && <ResumoDoDia fontes={fontes} ids={idsDoPulso} />}
             {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada. Ao trocar de pessoa, use Sair no menu da conta.</p>}
             {modulos.length === 0 && !busca && <output>Seu perfil não tem módulos liberados. Peça à administração da loja para revisar seu acesso.</output>}
           </div>
@@ -204,7 +205,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
                 onChange={(evento) => setBusca(evento.target.value)} />
               <MarcaIcone nome="buscar" tamanho={20} className={css.lupa} />
             </div>
-            {buscando && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
+            {/* #2258 (A10): sem resultado o aviso traz o único botão de limpar. */}
+            {buscando && destinos.length > 0 && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
           </div>
         </div>
         {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos} aoMover={moverPainel} />}
@@ -225,7 +227,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         {!buscando && organizar && <div className={css.organizacao}>
           <div className={css.instrucoes}>
             <h2 className={css.subtitulo}>Organizar áreas</h2>
-            <p>Arraste pelo botão Mover ou use as setas de cada cartão. Favorite as áreas da sua rotina.</p>
+            {/* #2258 (H8): a dica de arrastar mora aqui, no modo de ajuste, e não no rodapé do Início. */}
+            <p>Arraste pelo botão Mover ou use as setas de cada cartão.{fonteApi && ' Os números do painel também arrastam.'} Favorite as áreas da sua rotina.</p>
           </div>
           <div className={css.ferramentas}>
             {anterior && <Botao variante="texto" onClick={() => desfazer(organizarRef)}>Desfazer</Botao>}
@@ -240,7 +243,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           <span>Teclado: Espaço para pegar, setas para mover, Espaço para soltar ou Esc para cancelar.</span>
         </div>}
         <output className={css.resultado} aria-live="polite">
-          {buscando ? (destinos.length === 1 ? '1 tela encontrada.' : `${destinos.length} telas encontradas.`) : mensagem}
+          {buscando ? (destinos.length === 0 ? '' : destinos.length === 1 ? '1 tela encontrada.' : `${destinos.length} telas encontradas.`) : mensagem}
         </output>
         {buscando ? <section aria-label="Resultados da busca">
           {destinos.length > 0 ? <ul className={css.destinos}>
@@ -251,7 +254,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
                 <MarcaIcone nome="proximo" tamanho={20} />
               </a>
             </li>)}
-          </ul> : <Vazio titulo="Nenhum módulo ou tela encontrado" acao={<Botao onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Ver todos os módulos</Botao>}>
+          </ul> : <Vazio como="output" titulo="Nenhum módulo ou tela encontrado" acao={<Botao onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Ver todos os módulos</Botao>}>
             Tente o nome de uma área ou tela, como insumos, caixa ou entregas.
           </Vazio>}
         </section> : <DndContext sensors={sensores} collisionDetection={colisoesDoHall}
@@ -287,14 +290,13 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           <Botao ref={ajustarRef} variante="texto" onClick={() => setPersonalizando(true)}><MarcaIcone nome="configuracoes" tamanho={20} />Ajustar tela inicial</Botao>
           {/* #1839 (F1): as automáticas só abriam pelo trilho do Balcão; fora da grade arrastável. */}
           {permite('atendimento') && <Botao variante="texto" onClick={() => { window.location.hash = hashDoModulo('atendimento', 'respostas') }}>
-            <Icone nome="raio" tamanho={20} />Automáticas
+            <Icone nome="raio" tamanho={20} />{NOME_RESPOSTAS_AUTOMATICAS}
           </Botao>}
           {/* #2232 (H10): Configurações é link de rodapé. (H2): sem menu da conta, o tema fica aqui, discreto. */}
           {linksDoRodape.map((modulo) => <a key={modulo.id} className={css.linkRodape} href={modulo.href}>
             <IconeDoModulo modulo={modulo} tamanho={20} />{modulo.nome}
           </a>)}
           {!aoSair && <InterruptorTema />}
-          <span className={css.dicaArrasto}>Arraste {fonteApi ? 'os números e os cartões' : 'os cartões'} para mudar a ordem.</span>
         </div>}
       </main>
       {personalizando && <PersonalizarHall preferencia={preferencia} modulos={modulosPermitidos} aoFechar={() => setPersonalizando(false)}
