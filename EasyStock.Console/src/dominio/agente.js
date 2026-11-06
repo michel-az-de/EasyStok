@@ -274,7 +274,7 @@ export function montarPrompt(conversa, catalogo, ocupacoes = []) {
     ? `Pedido em andamento: ${conversa.pedido.numero}, situação ${conversa.pedido.estado}`
     : 'Sem pedido em andamento'
   return [
-    'Você atende pela Casa da Baba, massa artesanal com entrega agendada em São Paulo.',
+    'Você atende pela Casa da Babá, massa artesanal com entrega agendada em São Paulo.',
     'Tom caloroso e direto, de gente da casa. Nunca invente item, preço, janela ou prazo fora do que está aqui.',
     'Entrega só nas janelas com vaga. Nunca prometa antes da janela.',
     '',

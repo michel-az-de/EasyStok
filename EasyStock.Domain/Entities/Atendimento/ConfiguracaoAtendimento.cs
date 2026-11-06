@@ -30,6 +30,29 @@ public class ConfiguracaoAtendimento
 
     public string MensagemForaArea { get; set; } = "Por enquanto a gente só entrega em algumas regiões.";
 
+    public const int MoldeTamanhoMaximo = 500;
+    public const string MensagemEscaladaPadrao = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+    public const string MensagemEncaminhamentoPadrao =
+        "Oi, {nome}! Eu sou o atendimento automático da Casa da Baba. Já passei sua mensagem para a responsável, que te responde por aqui.";
+
+    /// <summary>#2249: o que o robô diz ao passar a conversa de cliente para a equipe. Com <c>{nome}</c>.</summary>
+    public string MensagemEscalada { get; private set; } = MensagemEscaladaPadrao;
+
+    /// <summary>#2249: o que o robô diz a quem não é cliente (fornecedor, pessoal) ao encaminhar à responsável. Com <c>{nome}</c>.</summary>
+    public string MensagemEncaminhamento { get; private set; } = MensagemEncaminhamentoPadrao;
+
+    /// <summary>#2249: vazio mantém o molde atual.</summary>
+    public void DefinirMoldes(string? escalada, string? encaminhamento)
+    {
+        var escaladaLimpa = string.IsNullOrWhiteSpace(escalada) ? null : escalada.Trim();
+        var encaminhamentoLimpo = string.IsNullOrWhiteSpace(encaminhamento) ? null : encaminhamento.Trim();
+        if (escaladaLimpa?.Length > MoldeTamanhoMaximo || encaminhamentoLimpo?.Length > MoldeTamanhoMaximo)
+            throw new RegraDeDominioVioladaException($"A mensagem passa de {MoldeTamanhoMaximo} caracteres.");
+        if (escaladaLimpa is not null) MensagemEscalada = escaladaLimpa;
+        if (encaminhamentoLimpo is not null) MensagemEncaminhamento = encaminhamentoLimpo;
+        AlteradoEm = DateTime.UtcNow;
+    }
+
     /// <summary>Minutos de respiro entre uma sugestão e outra do agente — evita insistência.</summary>
     public int RespiroMinutos { get; set; } = 40;
 

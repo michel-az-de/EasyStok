@@ -4,14 +4,15 @@ import { CampoReais } from '../../../componentes/CampoReais'
 import { DiferencaDaGaveta } from '../../../componentes/DiferencaDaGaveta'
 import { Modal } from '../../../componentes/Modal'
 import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
-import { diaMes } from '../../../dominio/aberturaDaLoja'
+import { avisoAoFecharCaixa, diaMes } from '../../../dominio/aberturaDaLoja'
 import {
-  AVISO_AO_FECHAR_CAIXA, ROTULO_CONTADO_DO_ESQUECIDO, ROTULO_ENTROU_DEPOIS, ROTULO_FORA_DA_GAVETA, avisoDeDevolucoesPendentes,
+  ROTULO_CONTADO_DO_ESQUECIDO, ROTULO_ENTROU_DEPOIS, ROTULO_FORA_DA_GAVETA, avisoDeDevolucoesPendentes,
   conferenciaDoFechamento, esperadoDoEsquecido,
 } from '../../../dominio/caixa'
 import {
-  lerMoeda, moeda, moedaAltaDemais,
+  dataIsoNoFuso, lerMoeda, moedaAltaDemais,
 } from '../../../dominio/formato'
+import { valorDoResumo } from './ValorDoResumo'
 import css from './abaCaixa.module.css'
 
 // Fechar o dia com conferência (aceite): ela digita o que contou na mão, o
@@ -36,6 +37,8 @@ export function ModalFecharCaixa({
 }) {
   const esperado = gaveta ? gaveta.naGaveta : resumo.saldoEsperado
   const [centavosContado, setCentavosContado] = useState(null)
+  // O dia da loja na abertura do modal: o aviso compara com ele a data do caixa que está fechando.
+  const [hoje] = useState(() => dataIsoNoFuso(Date.now()))
   // #2113 (D1 da #2084): no caixa esquecido, confere o esperado do dia da abertura; o que entrou depois fica à parte.
   const esquecido = gaveta ? esperadoDoEsquecido(resumo) : null
   const conferencia = conferenciaDoFechamento(centavosContado, esperado, esquecido)
@@ -48,9 +51,10 @@ export function ModalFecharCaixa({
   return (
     <Modal
       titulo="Fechar o caixa"
-      descricao={AVISO_AO_FECHAR_CAIXA}
+      descricao={avisoAoFecharCaixa(resumo.abertoDesde, hoje)}
       focarCampo
-      segurarFechamento={centavosContado != null || enviando}
+      segurarFechamento={enviando}
+      confirmarDescarte={centavosContado != null}
       aoFechar={() => { if (!enviando) aoFechar() }}
       rodape={(
         <>
@@ -71,22 +75,22 @@ export function ModalFecharCaixa({
         <dl className={css.resumoLista}>
           {esquecido ? (
             <>
-              <div className={css.resumoForte}><dt>Esperado no fechamento de {diaMes(resumo.abertoDesde)}</dt><dd>{moeda(esquecido.esperado)}</dd></div>
-              <div><dt>{ROTULO_ENTROU_DEPOIS}</dt><dd>{moeda(esquecido.entrouDepois)}</dd></div>
+              <div className={css.resumoForte}><dt>Esperado no fechamento de {diaMes(resumo.abertoDesde)}</dt><dd>{valorDoResumo(esquecido.esperado)}</dd></div>
+              <div><dt>{ROTULO_ENTROU_DEPOIS}</dt><dd>{valorDoResumo(esquecido.entrouDepois)}</dd></div>
             </>
           ) : gaveta ? (
-            <div className={css.resumoForte}><dt>Na gaveta (dinheiro)</dt><dd>{moeda(gaveta.naGaveta)}</dd></div>
+            <div className={css.resumoForte}><dt>Na gaveta (dinheiro)</dt><dd>{valorDoResumo(gaveta.naGaveta)}</dd></div>
           ) : (
-            <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{moeda(resumo.saldoEsperado)}</dd></div>
+            <div className={css.resumoForte}><dt>Saldo esperado</dt><dd>{valorDoResumo(resumo.saldoEsperado)}</dd></div>
           )}
-          <div><dt>Saldo inicial</dt><dd>{moeda(resumo.saldoInicial)}</dd></div>
-          {Boolean(resumo.totalVendas) && <div><dt>Vendas</dt><dd>{moeda(resumo.totalVendas)}</dd></div>}
-          <div><dt>Outras entradas</dt><dd>{moeda(resumo.totalEntradasExtras)}</dd></div>
-          <div><dt>Outras saídas</dt><dd>{moeda(resumo.totalSaidasExtras)}</dd></div>
-          <div><dt>Pagamentos de pedidos</dt><dd>{moeda(resumo.totalPagamentosPedidos)}</dd></div>
-          {gaveta && <div><dt>{ROTULO_FORA_DA_GAVETA}</dt><dd>{moeda(gaveta.pixECartao)}</dd></div>}
+          <div><dt>Saldo inicial</dt><dd>{valorDoResumo(resumo.saldoInicial)}</dd></div>
+          {Boolean(resumo.totalVendas) && <div><dt>Vendas</dt><dd>{valorDoResumo(resumo.totalVendas)}</dd></div>}
+          <div><dt>Outras entradas</dt><dd>{valorDoResumo(resumo.totalEntradasExtras)}</dd></div>
+          <div><dt>Outras saídas</dt><dd>{valorDoResumo(resumo.totalSaidasExtras)}</dd></div>
+          <div><dt>Pagamentos de pedidos</dt><dd>{valorDoResumo(resumo.totalPagamentosPedidos)}</dd></div>
+          {gaveta && <div><dt>{ROTULO_FORA_DA_GAVETA}</dt><dd>{valorDoResumo(gaveta.pixECartao)}</dd></div>}
           {/* #1627: pode ser dinheiro que já está na gaveta (venda do pedido entregue pelo PWA, #1630). */}
-          {Boolean(gaveta?.semForma) && <div><dt>Sem forma de pagamento (confira se é dinheiro)</dt><dd>{moeda(gaveta.semForma)}</dd></div>}
+          {Boolean(gaveta?.semForma) && <div><dt>Sem forma de pagamento (confira se é dinheiro)</dt><dd>{valorDoResumo(gaveta.semForma)}</dd></div>}
         </dl>
 
         {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}

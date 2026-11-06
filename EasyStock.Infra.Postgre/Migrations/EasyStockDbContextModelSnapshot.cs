@@ -540,6 +540,20 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("MensagemEncaminhamento")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("Oi, {nome}! Eu sou o atendimento automático da Casa da Baba. Já passei sua mensagem para a responsável, que te responde por aqui.");
+
+                    b.Property<string>("MensagemEscalada")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.");
+
                     b.Property<string>("MensagemForaArea")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -2071,6 +2085,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<DateTime?>("AtendimentoAutomaticoPausadoEm")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("Ativo")
                         .HasColumnType("boolean");
 
@@ -2145,6 +2162,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("MotivoBloqueio")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("MotivoPausaAtendimento")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 

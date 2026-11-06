@@ -282,6 +282,14 @@ escritos e desliga as animações, inclusive a volta do overlay. */
 .chipsFiltro { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; flex: 1; }
 .topoPagina > .chipsFiltro { flex: none; flex-wrap: nowrap; }
 
+/* #2258 (auditoria K1): de 641 a 1100 px as cinco colunas não cabem lado a lado e a última (Saiu) ficava
+   cortada atrás da rolagem lateral. Viram grade de duas colunas e descem em linhas. Abaixo de 641 px segue
+   o carrossel de um passo por tela (regra abaixo). */
+@media (min-width: 641px) and (max-width: 1100px) {
+  .colunas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; overflow-x: hidden; }
+  .coluna { min-width: 0; }
+}
+
 @media (max-width: 640px) {
   .topoPagina { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-1) var(--e-2); padding: var(--e-2) var(--e-3); }
   .topoPagina > .chipsFiltro { justify-content: flex-end; }

@@ -103,6 +103,14 @@ public sealed class AgenteAtendimentoService(
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
 
+        // #2249: pessoa encaminhada à responsável. Fica com a equipe até alguém devolver a conversa ao robô.
+        if (cliente?.AtendimentoAutomaticoPausado == true)
+        {
+            await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoContatoPausado(cliente), agora, ct);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
+        }
+
         // #2126: o vínculo só é limpo em parte dos caminhos de cancelamento e entrega. Pedido já finalizado
         // não é atendimento em andamento: preso, a IA respondia "quero uma lasanha" com a comanda antiga e
         // não conseguia encerrar a conversa. Mesmo critério da reabertura (#1839). Solta sob a trava da
@@ -146,10 +154,15 @@ public sealed class AgenteAtendimentoService(
         }
 
         var respondeu = contexto.HouveEnvio;
-        const string encaminhamento = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+        // #2249: o texto de cada ação é molde da loja; quem não é cliente recebe o de encaminhamento.
+        var primeiroNome = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome);
+        var encaminhamento = MoldeMensagemContato.Preencher(configuracao.MensagemEscalada, primeiroNome);
         if (conversa.Situacao == SituacaoConversa.Assumida)
         {
-            respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct) || respondeu;
+            var aoContato = contexto.Encaminhou
+                ? MoldeMensagemContato.Preencher(configuracao.MensagemEncaminhamento, primeiroNome)
+                : encaminhamento;
+            respondeu = await EnviarRespostaAsync(gravacao, conversa, aoContato, ct) || respondeu;
         }
         else if (conversa.Situacao == SituacaoConversa.Encerrada && contexto.RespostaVerificada is { Length: > 0 } despedida)
             respondeu = await EnviarRespostaAsync(gravacao, conversa, despedida, ct) || respondeu;

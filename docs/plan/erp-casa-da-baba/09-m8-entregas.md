@@ -230,6 +230,7 @@ F12 paridade do painel (plano irmão) · M8.5 relatórios (independente)
 
 **D8-03 · Pagamento da encomenda**
 - **Decidido por Felipe em 10/10/2026: B, sinal de 50% na reserva e restante na entrega. Implementação e validação locais concluídas; homologação externa pendente.**
+- **Revisto por Felipe em 05/11/2026 (#2259): o sinal automático vale só para entrega com 2 dias ou mais de antecedência, contados na data de Brasília. Pedido para o mesmo dia ou para o dia seguinte paga o valor integral.**
 - A) (Recomendado) Igual ao pedido do dia: pedido e cobrança na hora (RN-23), link reemitido pelo job da S11.
 - B) Sinal na hora e o resto perto da data (cobrança em duas partes, fatia nova).
 - C) Cobrar só perto da data, com a vaga reservada sem pagamento.

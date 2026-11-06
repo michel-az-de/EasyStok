@@ -17,6 +17,22 @@ import { moduloCongelado, telaCongelada } from './congelados'
 import { podeAjustarEntrega } from './acessoModulos'
 import { partesNoFuso } from './formato'
 
+// #2258 (auditoria de UX, dicionário de nomes): um nome por conceito, em constante única. A tela
+// inicial é "Início" em todo lugar; as respostas e mensagens que saem sozinhas são "Respostas automáticas".
+export const NOME_INICIO = 'Início'
+export const NOME_RESPOSTAS_AUTOMATICAS = 'Respostas automáticas'
+// A tela de regras do Atendimento não pode se chamar "Avisos", como o sino do cabeçalho.
+export const NOME_REGRAS_DE_AVISO = 'Regras de aviso'
+
+// #2258 (A2): a ordem dos módulos segue o caminho do pedido e vale na home, na Ajuda, no Menu e na
+// Busca. A lista `MODULOS` guarda a numeração do plano (ADR-0056) e não muda; quem lista ordena por aqui.
+export const ORDEM_DOS_MODULOS = ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro', 'configuracoes', 'campanhas']
+const posicaoNaOrdem = (id) => {
+  const posicao = ORDEM_DOS_MODULOS.indexOf(id)
+  return posicao < 0 ? ORDEM_DOS_MODULOS.length : posicao
+}
+export const emOrdemDosModulos = (modulos) => [...modulos].sort((a, b) => posicaoNaOrdem(a.id) - posicaoNaOrdem(b.id))
+
 export const TELA_OPERACAO = 'operacao'
 export const TELA_AJUSTE = 'ajuste'
 
@@ -59,9 +75,9 @@ export const MODULOS = [
       { id: 'balcao', rotulo: 'Conversas', tipo: TELA_OPERACAO },
       { id: 'horarios', rotulo: 'Horários e mensagens', tipo: TELA_AJUSTE, aba: 'atendimento', soApi: true },
       // #2096: o que chama a dona e o gerente (aparelho, e-mail e sino); mesma permissão do módulo.
-      { id: 'avisos', rotulo: 'Avisos', tipo: TELA_AJUSTE, aba: 'avisos', soApi: true },
+      { id: 'avisos', rotulo: NOME_REGRAS_DE_AVISO, tipo: TELA_AJUSTE, aba: 'avisos', soApi: true },
       // #1441: criar, editar e arquivar respostas prontas; ligar e escrever as automáticas.
-      { id: 'respostas', rotulo: 'Respostas e mensagens automáticas', tipo: TELA_AJUSTE, aba: 'respostas' },
+      { id: 'respostas', rotulo: NOME_RESPOSTAS_AUTOMATICAS, tipo: TELA_AJUSTE, aba: 'respostas' },
     ],
   },
   {
@@ -147,7 +163,7 @@ export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
 // Cartões do hall: disponível = tem pelo menos uma tela no modo atual. Módulo congelado
 // (#1891) não vira cartão; `MODULOS` segue inteiro para quem precisa do catálogo.
 export function modulosDoHall({ fonteApi = false, acoes = null } = {}) {
-  return MODULOS.filter((modulo) => !moduloCongelado(modulo.id)).map((modulo) => {
+  return emOrdemDosModulos(MODULOS.filter((modulo) => !moduloCongelado(modulo.id))).map((modulo) => {
     const telas = telasDoMenu(modulo, { fonteApi, acoes })
     const disponivel = telas.length > 0
     return {

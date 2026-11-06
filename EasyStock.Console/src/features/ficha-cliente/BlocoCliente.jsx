@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Avatar } from '../../componentes/Avatar'
 import { AvatarAssistente } from '../../componentes/AvatarAssistente'
 import { Bloco } from '../../componentes/Bloco'
@@ -12,6 +13,7 @@ import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import {
   bloqueioDe, conversasDoCadastro, ehLead, estaBloqueada, resumoDoBloqueio,
 } from '../../dominio/conversa'
+import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import {
   listaEmPortugues, mascaraCep, mascaraTelefone, partesDoEndereco, moeda,
@@ -25,6 +27,7 @@ import {
 import { SELO_CAPTADO, automaticoConduzindo } from '../../dominio/captura'
 import { historicoElegivelParaFidelidade, saldoDePontos } from '../../dominio/fidelidade'
 import { notasRecentes } from '../../dominio/notas'
+import { LIMITE_DO_NOME, erroDoNome, erroDoTelefone, validarCadastro } from '../../dominio/validacaoDoCadastro'
 import { mostraHistorico, resumoDasTags } from '../../dominio/ficha'
 import { CampoEmLinha } from './CampoEmLinha'
 import { TagsDoCliente } from './TagsDoCliente'
@@ -74,7 +77,7 @@ function SecaoCliente({ integrado, titulo, chave, children, ...resto }) {
   return <section data-secao-cliente={chave}>{chave !== 'cliente' && <h3>{titulo}</h3>}{children}</section>
 }
 
-export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false }) {
+export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false, aoMudarSujo, rodapeDoCadastro }) {
   const { cliente } = conversa
   const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
   // #1474 (R2): no modo API, mudar a entrega do pedido e os pontos não têm endpoint e somem.
@@ -93,6 +96,11 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   // conversa sem remontar este bloco). A ref trava o segundo toque.
   const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null })
   const cadastrando = useRef(false)
+  // #2258 (auditoria T12 a T14, T17, T18): campos que já saíram do foco ou foram conferidos ao salvar
+  // (só eles mostram erro), a base dos ids para focar o primeiro erro e o aviso de texto digitado.
+  const [tocados, setTocados] = useState({})
+  const idDoCadastro = useId()
+  const nomeRef = useRef(null)
   const idMotivoBloqueio = useId()
 
   // Troca de conversa: recarrega o rascunho do cadastro rápido e limpa avisos
@@ -101,6 +109,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   useEffect(() => {
     setForm(estadoInicialDoForm(conversa))
     setAvisoEndereco(null)
+    setTocados({})
     setMenuAberto(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversa.id])
@@ -147,7 +156,19 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const enderecoPendente = Boolean(cliente.enderecoCapturado) && !cliente.endereco
   const situacaoCep = form.cep ? situacaoDoCep(form.cep, prefixosCepAtendidos) : SITUACOES.SEM_CEP
   const cepForaDaArea = situacaoCep === SITUACOES.FORA || situacaoCep === SITUACOES.LIMITE
-  const podeSalvarCadastro = form.nome.trim() && form.telefone.replace(/\D/g, '').length >= 10
+  // #2258 (T12, T14): as regras são do domínio; o botão nunca fica mudo, o erro aparece no próprio campo.
+  const camposDoCadastro = ['nome', ...(cliente.telefone ? [] : ['telefone']), ...(cliente.endereco ? [] : ['cep'])]
+  const { erros: errosConferidos } = validarCadastro({ campos: camposDoCadastro, nome: conversa.nome, telefone: form.telefone, cep: form.cep })
+  const errosDoCadastro = Object.fromEntries(Object.entries(errosConferidos).filter(([campo]) => tocados[campo]))
+  const formularioInicial = estadoInicialDoForm(conversa)
+  // #2258 (T17): o rascunho dos campos em linha (nome, telefone, endereço) também conta como digitado.
+  const [emLinhaSujos, setEmLinhaSujos] = useState({})
+  const sujoEmLinha = useMemo(() => Object.fromEntries(['nome', 'telefone', 'endereco'].map((campo) => [campo,
+    (sujo) => setEmLinhaSujos((antes) => (Boolean(antes[campo]) === sujo ? antes : { ...antes, [campo]: sujo }))])), [])
+  const cadastroSujo = (precisaCadastro && ['telefone', 'enderecoSemCep', 'cep'].some((campo) => form[campo] !== formularioInicial[campo]))
+    || Object.values(emLinhaSujos).some(Boolean)
+  useEffect(() => { aoMudarSujo?.(cadastroSujo) }, [aoMudarSujo, cadastroSujo])
+  useEffect(() => () => aoMudarSujo?.(false), [aoMudarSujo])
   const salvandoCadastro = cadastro.salvando && cadastro.id === conversa.id
   const erroCadastro = cadastro.id === conversa.id ? cadastro.erro : null
   // #1586: lead sem cadastro no modo API não tem o que bloquear; o item nasce desabilitado.
@@ -163,7 +184,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
     setCadastro({ id, salvando: true, erro: null })
     let erro = null
     try {
-      const resultado = await salvarCadastroRapido(id, { nome: form.nome, telefone: form.telefone, endereco }, agora)
+      const resultado = await salvarCadastroRapido(id, { nome: conversa.nome, telefone: form.telefone, endereco }, agora)
       erro = resultado?.erro ?? null
     } catch (falha) {
       erro = falha.message || 'Não foi possível salvar o cadastro. Tente de novo.'
@@ -173,8 +194,26 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
     setCadastro({ id, salvando: false, erro })
   }
 
-  const validarNome = (v) => (v.trim() ? null : 'Escreva o nome')
-  const validarTelefone = (v) => (v.replace(/\D/g, '').length >= 10 ? null : 'Telefone com DDD')
+  const validarNome = (v) => erroDoNome(v)
+  const validarTelefone = (v) => erroDoTelefone(v)
+  const idDoCampo = (campo) => idDoCadastro + '-' + campo
+  const marcarTocado = (campo) => setTocados((t) => ({ ...t, [campo]: true }))
+
+  // Clicar em "Salvar cadastro" confere tudo de uma vez e leva o foco ao primeiro campo com erro.
+  function aoPedirSalvar() {
+    if (cadastro.salvando) return
+    setTocados({ nome: true, telefone: true, cep: true })
+    const { primeiro } = validarCadastro({ campos: camposDoCadastro, nome: conversa.nome, telefone: form.telefone, cep: form.cep })
+    if (!primeiro) { aoSalvarCadastro(); return }
+    // O nome edita em linha: abrir a edição já devolve o foco ao campo.
+    if (primeiro === 'nome') nomeRef.current?.querySelector('button')?.click()
+    else document.getElementById(idDoCampo(primeiro))?.focus()
+  }
+  const botaoSalvarCadastro = (
+    <Botao largo={!rodapeDoCadastro} className={css.acaoSalvar} variante="primario" icone="user-plus" disabled={cadastro.salvando} onClick={aoPedirSalvar}>
+      {salvandoCadastro ? 'Salvando…' : 'Salvar cadastro'}
+    </Botao>
+  )
 
   function avisarDoEnderecoNoPedido() {
     // Modo API: rascunho de comanda leva o endereço do cadastro quando vira pedido, então não
@@ -205,14 +244,15 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
 
   return (
     <>
-      <SecaoCliente integrado={integrado} titulo="Cliente" chave="cliente" resumo={conversa.nome}>
+      <SecaoCliente integrado={integrado} titulo="Cliente" chave="cliente" resumo={apresentacaoDoNome(conversa.nome, { comanda: conversa.numeroComanda }).rotulo}>
         <div className={css.identidade}>
           <Avatar nome={conversa.nome} foto={fotoCadastro ?? fotoDoCliente(canal, cliente)} tamanho="enorme" />
           <div className={css.identidadeTextos}>
-            <div key={`nome-${captado.nome ?? ''}`} className={captado.nome ? css.captadoAgora : undefined}>
-              <CampoEmLinha rotulo="Nome do cliente" valor={conversa.nome} validar={validarNome}
+            <div key={`nome-${captado.nome ?? ''}`} ref={nomeRef} className={captado.nome ? css.captadoAgora : undefined}>
+              <CampoEmLinha rotulo="Nome do cliente" aoMudarSujo={sujoEmLinha.nome} valor={conversa.nome} validar={validarNome} dica="Nome e sobrenome" limite={LIMITE_DO_NOME}
                 aoSalvar={(v) => editarDadoCliente(conversa.id, 'nome', v.trim(), agora)} />
               <SeloCaptado quando={captado.nome} />
+              {errosDoCadastro.nome && <p className={css.erroEmLinha} role="alert">{errosDoCadastro.nome}</p>}
             </div>
             {lead ? (
               <span className={css.situacao}>Contato · {chegouQuando(conversa, agora)}</span>
@@ -300,7 +340,11 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
                 tipo="telefone" rotulo="Telefone"
                 valor={form.telefone}
                 aoMudarDigitos={(d) => setForm((f) => ({ ...f, telefone: mascaraTelefone(d) }))}
-                placeholder="(11) 98765-4321"
+                id={idDoCampo('telefone')}
+                placeholder="(00) 00000-0000"
+                dica="Com DDD"
+                erro={errosDoCadastro.telefone}
+                onBlur={() => marcarTocado('telefone')}
               />
             )}
             {!cliente.endereco && (
@@ -316,22 +360,23 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
                   tipo="cep" rotulo="CEP"
                   valor={form.cep}
                   aoMudarDigitos={(d) => setForm((f) => ({ ...f, cep: mascaraCep(d) }))}
+                  id={idDoCampo('cep')}
                   placeholder="00000-000"
+                  erro={errosDoCadastro.cep}
+                  onBlur={() => marcarTocado('cep')}
                   dica={dicaDoCep(cepForaDaArea, { fonteApi })}
                 />
               </div>
             )}
             {erroCadastro && <p className={css.erroEmLinha} role="alert">{erroCadastro}</p>}
-            <Botao largo variante="primario" icone="user-plus" disabled={!podeSalvarCadastro || cadastro.salvando} onClick={aoSalvarCadastro}>
-              {salvandoCadastro ? 'Salvando…' : 'Salvar cadastro'}
-            </Botao>
+            {rodapeDoCadastro ? createPortal(botaoSalvarCadastro, rodapeDoCadastro) : botaoSalvarCadastro}
           </div>
         ) : (
           <div className={css.dadosCliente} data-dados-cliente>
             <div key={`tel-${captado.telefone ?? ''}`} data-campo-ficha="telefone cadastro" className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
               <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={15} /></span>
               <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
-              <CampoEmLinha rotulo="Telefone" valor={cliente.telefone}
+              <CampoEmLinha rotulo="Telefone" aoMudarSujo={sujoEmLinha.telefone} valor={cliente.telefone}
                 vazio={automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
                 validar={validarTelefone} aoSalvar={(v) => editarDadoCliente(conversa.id, 'telefone', v, agora)} />
             </div>
@@ -342,7 +387,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
             >
               <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={15} /></span>
               <span className={css.rotuloDado}>Endereço <SeloCaptado quando={captado.endereco} /></span>
-              <CampoEmLinha rotulo="Endereço" valor={cliente.endereco}
+              <CampoEmLinha rotulo="Endereço" aoMudarSujo={sujoEmLinha.endereco} valor={cliente.endereco}
                 vazio={enderecoPendente ? 'Aguardando confirmação acima'
                   : automaticoCaptando ? 'O automático está pedindo na conversa' : 'Adicionar endereço'}
                 validar={fonteApi ? recusaDoEndereco : undefined}

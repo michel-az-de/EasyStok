@@ -25,7 +25,7 @@ registerHooks({
 })
 
 const guia = await import('../src/dominio/guiaDoConsole.js').catch((erro) => ({ erro }))
-const { MODULOS, hashDoModulo, modulosDoHall } = await import('../src/dominio/modulos.js')
+const { MODULOS, ORDEM_DOS_MODULOS, hashDoModulo, modulosDoHall } = await import('../src/dominio/modulos.js')
 const { contextoDaAjuda, diagnosticoDoConsole } = await import('../src/features/ajuda/diagnosticoDoConsole.js')
 
 let passou = 0
@@ -73,7 +73,8 @@ await confere('C. o módulo da tela atual vem primeiro e aberto', () => {
   assert.equal(lista[0].aberto, true)
   assert.ok(lista.slice(1).every((m) => !m.aberto))
   const resto = lista.slice(1).map((m) => m.id)
-  assert.deepEqual(resto, MODULOS.map((m) => m.id).filter((id) => resto.includes(id)), 'resto na ordem do catálogo')
+  // #2258 (auditoria A2): o guia da Ajuda segue a ordem única do Início, do Menu e da Busca.
+  assert.deepEqual(resto, ORDEM_DOS_MODULOS.filter((id) => resto.includes(id)), 'resto na ordem única dos módulos')
   assert.equal(guia.guiaDoConsole({ rota: rotaBalcao, fonteApi: true, permite: todos })[0].id, 'atendimento',
     'o Balcão é do Atendimento')
 })

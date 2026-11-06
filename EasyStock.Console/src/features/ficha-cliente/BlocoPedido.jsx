@@ -245,7 +245,7 @@ export function BlocoPedido({
           {linhaDe('sinal') && <p className={css.notaTotal} data-simulacao-sinal>{linhaDe('sinal')}</p>}
           {previaSinal && !linhasSimulacao && (
             <p className={css.notaTotal}>
-              Encomenda para outro dia: sinal de 50% do total com o frete antes da produção (nos itens, {moeda(previaSinal.sinal)}); o restante na entrega.
+              Encomenda com antecedência: sinal de 50% do total com o frete antes da produção (nos itens, {moeda(previaSinal.sinal)}); o restante na entrega.
             </p>
           )}
         </div>

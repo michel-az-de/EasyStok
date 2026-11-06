@@ -237,7 +237,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   return (
     <div className={css.painel}>
       <header className={css.cabecalhoFicha} data-cabecalho-ficha>
-        <h2>Ficha</h2>
+        <h2>Cliente</h2>
         <span className={css.ferramentasFicha}>
           <MenuDaFicha itens={itensDoMenuDaFicha({ acoes: acoesDoMenu, comPedido: Boolean(pedido && editavel) })} pdf={pdfDaFicha}
             aoEscolher={escolherNoMenu} />

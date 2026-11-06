@@ -29,6 +29,7 @@ import {
 } from '../../../dominio/formato'
 import { PromptEstorno } from './PromptEstorno'
 import { ModalFecharCaixa } from './ModalFecharCaixa'
+import { valorDoResumo } from './ValorDoResumo'
 import css from './abaCaixa.module.css'
 
 const OPCOES_METODO = METODOS_CAIXA.map((id) => ({ valor: id, rotulo: nomeDoMetodoCaixa(id) }))
@@ -186,7 +187,7 @@ function ModalLancamento({ executar, enviando, erro, aoFechar }) {
   const digitado = Boolean(categoria.trim() || centavos > 0 || descricao.trim())
 
   return (
-    <Modal titulo="Lançar entrada ou saída" aoFechar={enviando ? undefined : aoFechar} focarCampo segurarFechamento={digitado || enviando}>
+    <Modal titulo="Lançar entrada ou saída" aoFechar={enviando ? undefined : aoFechar} focarCampo segurarFechamento={enviando} confirmarDescarte={digitado}>
       {erro}
       <form
         className={css.formLancamento}
@@ -340,9 +341,9 @@ function ResumoDoDia({ dia, gaveta, semAbertura = false }) {
       {/* Sete itens cabem numa linha só; com outro número, quatro colunas não deixam o total sozinho. */}
       <dl className={`${css.resumoLista} ${linhas.length === 6 ? '' : css.resumoEmQuatro}`}>
         {linhas.map((l) => (
-          <div key={l.rotulo} className={l.forte ? css.resumoForte : undefined}><dt>{l.rotulo}</dt><dd>{moeda(l.valor)}</dd></div>
+          <div key={l.rotulo} className={l.forte ? css.resumoForte : undefined}><dt>{l.rotulo}</dt><dd>{valorDoResumo(l.valor)}</dd></div>
         ))}
-        <div className={css.resumoTotal}><dt>{ROTULO_TOTAL_DO_CAIXA}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
+        <div className={css.resumoTotal}><dt>{ROTULO_TOTAL_DO_CAIXA}</dt><dd>{valorDoResumo(dia.saldoEsperado)}</dd></div>
       </dl>
       <p className={css.notaGaveta}>
         {semAbertura

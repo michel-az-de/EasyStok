@@ -6,6 +6,7 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -483,6 +484,73 @@ public class AgenteAtendimentoServiceTests
         resultado.ChamouLlm.Should().BeFalse();
         await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task EncaminharParaResponsavelPausaAPessoaEEnviaOMoldeComOPrimeiroNome()
+    {
+        // #2249: fornecedor pedindo retorno de orçamento vai para a responsável; o robô para de atender a pessoa.
+        _situacaoNoBanco = SituacaoConversa.Automatica;
+        var cliente = Cliente.Criar(_empresaId, "Joao Fornecedor");
+        _clienteRepository.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        _conversa.VincularCliente(cliente.Id);
+        _escalador.When(e => e.EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>()))
+            .Do(_ => _conversa.Escalar(Agora, "encaminhado"));
+        var entrada = JsonSerializer.SerializeToElement(new { assunto = "retorno do orçamento de embalagens" });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm(RespostaLlm.StopToolUse,
+            [new BlocoTextoLlm("Não trabalhamos com isso."), new BlocoUsoFerramentaLlm("enc", "encaminhar_para_responsavel", entrada)], 1, 1));
+
+        var resultado = await CriarServico(new EncaminharParaResponsavelFerramenta(_escalador, _clienteRepository))
+            .ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        cliente.AtendimentoAutomaticoPausado.Should().BeTrue();
+        cliente.MotivoPausaAtendimento.Should().Be("retorno do orçamento de embalagens");
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            "encaminhado à responsável: retorno do orçamento de embalagens", Agora, Arg.Any<CancellationToken>());
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId,
+            "Oi, Joao! Eu sou o atendimento automático da Casa da Baba. Já passei sua mensagem para a responsável, que te responde por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EscaladaComumUsaOMoldeDaLoja()
+    {
+        // #2249: o texto de cada ação é da loja, editável na aba Atendimento.
+        _situacaoNoBanco = SituacaoConversa.Automatica;
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        configuracao.Ativo = true;
+        configuracao.DefinirMoldes("Já chamei a equipe, {nome}. Respondemos por aqui.", null);
+        _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns(configuracao);
+        _escalador.When(e => e.EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>()))
+            .Do(_ => _conversa.Escalar(Agora, "quer falar com gente"));
+        var entrada = JsonSerializer.SerializeToElement(new { motivo = "quer falar com gente" });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm(RespostaLlm.StopToolUse,
+            [new BlocoUsoFerramentaLlm("esc", "escalar_para_dona", entrada)], 1, 1));
+
+        await CriarServico(new EscalarParaDonaFerramenta(_escalador)).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Já chamei a equipe, Maria. Respondemos por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ContatoPausadoNaoChamaLlmNemRespondeEFicaComAEquipe()
+    {
+        var cliente = Cliente.Criar(_empresaId, "Joao Fornecedor");
+        cliente.PausarAtendimentoAutomatico("orçamento", Agora.AddDays(-1));
+        _clienteRepository.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        _conversa.VincularCliente(cliente.Id);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeFalse();
+        resultado.Escalou.Should().BeTrue();
+        await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            EscalarConversaUseCase.MotivoContatoPausado(cliente), Agora, Arg.Any<CancellationToken>());
     }
 
     [Fact]

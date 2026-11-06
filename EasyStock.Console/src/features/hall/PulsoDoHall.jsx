@@ -2,19 +2,22 @@ import { DndContext } from '@dnd-kit/core'
 import { rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
-import { indicadoresDoHall } from '../../dominio/pulsoDoHall'
+import { indicadoresDoHall, ROTULO_PRECISA_DE_VOCE } from '../../dominio/pulsoDoHall'
 import { hashDoModulo } from '../../dominio/modulos'
 import { acaoDoIndicador, severidadeDoIndicador } from '../../dominio/estadoDoHall'
 import { alcaDoLink, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
 import { colisoesDoHall } from './colisoesDoHall'
+import { IconeDoModulo } from './IconeDoModulo'
 import css from './hall.module.css'
 
+// #2258 (H2/H3): o rótulo do cartão vem do domínio (`item.rotulo`, no número certo); `nome` só anuncia o
+// movimento. O ícone é o do mapa único dos módulos (`IconeDoModulo`), o mesmo do cartão da grade.
 const frentes = {
-  atendimento: { nome: 'Atendimento pendente', icone: 'mensagem', acao: 'Abrir Atendimento', tela: 'balcao' },
-  cozinha: { nome: 'Em preparo ou na fila', icone: 'producao', acao: 'Ver fila de preparo', tela: 'fila' },
-  entregas: { nome: 'Prontos para sair', icone: 'entrega', acao: 'Organizar entregas', tela: 'painel' },
+  atendimento: { nome: ROTULO_PRECISA_DE_VOCE, acao: 'Abrir Atendimento', tela: 'balcao' },
+  cozinha: { nome: 'Em preparo ou na fila', acao: 'Ver fila de preparo', tela: 'fila' },
+  entregas: { nome: 'Prontos para sair', acao: 'Organizar entregas', tela: 'painel' },
   // #2078: o rótulo do número que o Caixa do dia destaca; sem abrir o caixa vira "Em dinheiro" (`item.rotulo`).
-  financeiro: { nome: 'Na gaveta (dinheiro)', icone: 'caixa', acao: 'Conferir caixa', tela: 'caixa' },
+  financeiro: { nome: 'Na gaveta (dinheiro)', acao: 'Conferir caixa', tela: 'caixa' },
 }
 const hora = (em) => new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(em)
 const dinheiro = (valor) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -38,10 +41,11 @@ function Indicador({ item, movimentos }) {
       href={hashDoModulo(item.id, frente.tela)} title={item.detalhe || undefined} {...alcaDoLink(attributes, listeners)}>
       {/* #2232 (H5): o número vem primeiro e o rótulo embaixo; todos os cartões partem da mesma linha. */}
       <strong className={css.valor}>{valor}</strong>
-      <span className={css.cabecaIndicador}><MarcaIcone nome={frente.icone} tamanho={20} />{item.rotulo ?? frente.nome}</span>
+      <span className={css.cabecaIndicador}><IconeDoModulo modulo={{ id: item.id }} tamanho={20} />{item.rotulo ?? frente.nome}</span>
       {aviso && <span className={css.frescor}><MarcaIcone nome="atencao" tamanho={16} />{aviso}</span>}
       {acao && <span className={css.acaoIndicador}>{acao}</span>}
-      <span className={css.oculto}>{frente.acao}</span>
+      {/* #2258 (H4): com a ação à vista ("Fechar caixa") o texto lido é esse; o oculto só entra sem ela. */}
+      {!acao && <span className={css.oculto}>{frente.acao}</span>}
     </a>
   </li>
 }

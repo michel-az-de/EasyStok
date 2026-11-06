@@ -39,7 +39,7 @@ public class CaixaControllerOrigemTests
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         // Apenas RegistrarMovimento e exercitado; os demais UCs nao sao tocados neste teste.
-        return new CaixaController(null!, null!, registrar, null!, null!, null!, null!, _currentUser);
+        return new CaixaController(null!, null!, registrar, null!, null!, null!, null!, null!, _currentUser);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class CaixaControllerOrigemTests
         await _repo.AddMovimentoAsync(Arg.Do<MovimentoCaixa>(m => persistido = m));
         CriarController();
         var abrir = new AbrirCaixaUseCase(_repo, _uow, Substitute.For<ILogger<AbrirCaixaUseCase>>());
-        var controller = new CaixaController(abrir, null!, null!, null!, null!, null!, null!, _currentUser);
+        var controller = new CaixaController(abrir, null!, null!, null!, null!, null!, null!, null!, _currentUser);
 
         await controller.Abrir(new AbrirCaixaCommand(_empresaId, 0m, DataMovimento: DateTime.UtcNow.AddYears(50)));
 

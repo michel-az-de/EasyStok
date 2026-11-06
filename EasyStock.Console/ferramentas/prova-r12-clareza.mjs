@@ -132,7 +132,7 @@ assert.deepEqual(resumo.porMeio.map((m) => [m.nome, m.valor]), [['Pix', 85], ['m
 ok('resumo soma só os entregues, separa por meio e mostra o que falta receber')
 
 const texto = textoDoResumoDoDia(resumo, AGORA)
-assert.match(texto, /^Casa da Baba · resumo do dia 22\/09\/2026/)
+assert.match(texto, /^Casa da Babá · resumo do dia 22\/09\/2026/)
 assert.match(texto, /Entregues: 3 pedidos/)
 assert.match(texto, /0181 Ana Souza/)
 assert.doesNotMatch(texto, /Davi|Eva|Lead/)

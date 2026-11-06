@@ -112,12 +112,15 @@
   border: 0; border-radius: var(--r-1);
   background: var(--papel); color: var(--tinta); font-size: var(--t-corpo); font-family: inherit;
 }
-.controleComErro { border-width: var(--b-2); border-color: var(--erro); }
+/* #2258 (T12): o campo com erro continua visível; `border: 0` acima anulava a borda. */
+.controleComErro { background: var(--preenchimento); box-shadow: inset 0 0 0 2px var(--erro); }
 .botaoIconeEdicao {
   display: inline-flex; align-items: center; justify-content: center;
   width: var(--toque); height: var(--toque); flex-shrink: 0;
   background: none; border: 0; color: var(--tinta-2);
 }
+/* #2258 (T18): no rodapé do modal o "Salvar cadastro" é a ação principal e fecha a fileira, à direita. */
+.acaoSalvar { margin-left: auto; justify-self: end; }
 .erroEmLinha { margin: var(--e-1) 0 0; color: var(--erro); font-size: var(--t-apoio); }
 .salvandoEmLinha { display: block; margin: var(--e-1) 0 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 

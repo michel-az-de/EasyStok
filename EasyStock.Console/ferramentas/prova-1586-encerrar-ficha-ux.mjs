@@ -578,7 +578,8 @@ await confere('C  "Salvar cadastro" espera a resposta, trava o segundo toque e m
   const fonte = readFileSync(new URL('features/ficha-cliente/BlocoCliente.jsx', src), 'utf8')
   assert.match(fonte, /async function aoSalvarCadastro\(\) \{\s+if \(cadastrando\.current\) return\s+cadastrando\.current = true/)
   assert.match(fonte, /const resultado = await salvarCadastroRapido\(/)
-  assert.match(fonte, /disabled=\{!podeSalvarCadastro \|\| cadastro\.salvando\}/)
+  // #2258 (auditoria T14): o botão só para durante o envio; telefone ou CEP inválido vira erro no campo.
+  assert.match(fonte, /disabled=\{cadastro\.salvando\} onClick=\{aoPedirSalvar\}/)
   assert.match(fonte, /\{salvandoCadastro \? 'Salvando…' : 'Salvar cadastro'\}/)
   assert.match(fonte, /\{erroCadastro && <p className=\{css\.erroEmLinha\} role="alert">\{erroCadastro\}<\/p>\}/)
 })

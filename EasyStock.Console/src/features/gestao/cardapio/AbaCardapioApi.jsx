@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
@@ -6,7 +6,8 @@ import { Icone } from '../../../componentes/Icone'
 import { MarcaIcone } from '../../../componentes/MarcaIcone'
 import { useGestaoCardapioApi } from '../../../aplicacao/useGestaoCardapioApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { FILTROS_DO_CARDAPIO, contagensDoCardapio, filtrarCardapio, podeReordenar } from '../../../dominio/filtroDoCardapio'
+import { FILTROS_DO_CARDAPIO, contagensDoCardapio, filtrarCardapio, filtroDaHash, hashDoFiltro, podeReordenar, rotuloDaCategoria } from '../../../dominio/filtroDoCardapio'
+import { ehNovidade } from '../../../dominio/cardapio'
 import { moeda } from '../../../dominio/formato'
 import { EXPLICACAO_DOS_CONTROLES as EXPLICA, dicaEstatica } from '../../../dominio/dicasDoCardapio'
 import css from './gestaoCardapio.module.css'
@@ -51,13 +52,22 @@ export function AbaCardapioApi({ renderizarEditor }) {
   const podeEditar = acoes.editarCardapio === true
   const gestao = useGestaoCardapioApi()
   const [busca, setBusca] = useState('')
-  const [filtro, setFiltro] = useState('todos')
+  // #2258 (auditoria C1): a home leva a `#/m/cardapio/itens/pendencia`; o filtro nasce da rota e a acompanha.
+  const [filtro, setFiltro] = useState(() => filtroDaHash(globalThis.location?.hash) ?? 'todos')
   // #1808: a categoria combina com a disponibilidade e com a busca; nula é "Todas".
   const [categoria, setCategoria] = useState(null)
   const buscaRef = useRef(null)
   const [ocupado, setOcupado] = useState(null)
   const [editor, setEditor] = useState(null)
   const temEditor = podeEditar && typeof renderizarEditor === 'function'
+  useEffect(() => {
+    const aoMudarHash = () => {
+      const doLink = filtroDaHash(window.location.hash)
+      if (doLink) { setFiltro(doLink); setCategoria(null); setBusca('') }
+    }
+    window.addEventListener('hashchange', aoMudarHash)
+    return () => window.removeEventListener('hashchange', aoMudarHash)
+  }, [])
 
   const recorte = useMemo(() => ({ filtro, categoria, busca }), [filtro, categoria, busca])
   const contagens = useMemo(() => contagensDoCardapio(gestao.itens, recorte), [gestao.itens, recorte])
@@ -68,7 +78,12 @@ export function AbaCardapioApi({ renderizarEditor }) {
     Promise.resolve(acao()).finally(() => setOcupado(null))
   }
   const abrirEditor = (item = null, focoInicial = null) => setEditor({ item, focoInicial })
-  const limpar = () => { setBusca(''); setFiltro('todos'); setCategoria(null); buscaRef.current?.focus() }
+  // O filtro escolhido volta para a rota só quando ela já é a desta lista; assim o link da home, aberto de novo, reaplica.
+  const escolherFiltro = (id) => {
+    setFiltro(id)
+    try { if (window.location.hash.startsWith('#/m/cardapio/itens')) history.replaceState(null, '', hashDoFiltro(id)) } catch { /* a rota segue a mesma */ }
+  }
+  const limpar = () => { setBusca(''); escolherFiltro('todos'); setCategoria(null); buscaRef.current?.focus() }
   const ordenando = podeReordenar(recorte)
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando o cardápio…</output>
@@ -100,13 +115,13 @@ export function AbaCardapioApi({ renderizarEditor }) {
             onChange={(e) => setCategoria(e.target.value || null)}
             opcoes={[
               { valor: '', rotulo: `Todas (${contagens.todas})` },
-              ...contagens.categorias.map((c) => ({ valor: c.nome, rotulo: `${c.nome} (${c.total})` })),
+              ...contagens.categorias.map((c) => ({ valor: c.nome, rotulo: `${rotuloDaCategoria(c.nome)} (${c.total})` })),
             ]} />}
         </div>
         <div className={css.faixaFiltros}><fieldset className={css.filtros}>
           <legend>Filtrar pratos</legend>
           {FILTROS_DO_CARDAPIO.map((f) => (
-            <button type="button" key={f.id} aria-pressed={filtro === f.id} className={css.filtro} title={EXPLICA.filtros} onClick={() => setFiltro(f.id)}>
+            <button type="button" key={f.id} aria-pressed={filtro === f.id} className={css.filtro} title={EXPLICA.filtros} onClick={() => escolherFiltro(f.id)}>
               {f.rotulo}{' '}<span className={css.contagem}>{contagens.filtros[f.id]}</span>
             </button>
           ))}
@@ -149,26 +164,35 @@ export function AbaCardapioApi({ renderizarEditor }) {
                   </button>
                 ) : <div className={css.abrirFoto}><FotoDoPrato item={item} /></div>}
                 <div className={css.resumo}>
-                  {item.categoria && <span className={css.categoria}>{item.categoria}</span>}
+                  {item.categoria && <span className={css.categoria}>{rotuloDaCategoria(item.categoria)}</span>}
                   <h3 className={css.nome}>{item.nome}</h3>
                   <p className={css.detalhe}>{[LINHA[item.linha], item.porcoes > 0 ? `${item.porcoes} ${item.porcoes === 1 ? 'porção' : 'porções'}` : item.porcao].filter(Boolean).join(' · ')}</p>
-                  {(item.arquivado || item.emValidacao || !item.noSite || item.novidadeAte) && (
+                  {(item.arquivado || item.emValidacao || !item.noSite || ehNovidade(item, Date.now())) && (
                     <p className={css.situacao}>{[
                       item.arquivado && 'Fora do cardápio',
                       item.emValidacao && 'Em validação',
                       !item.noSite && 'Oculto no site',
-                      item.novidadeAte && `Novidade até ${dataCurta(item.novidadeAte)}`,
+                      // #2258 (auditoria C3): o selo some quando a data passa.
+                      ehNovidade(item, Date.now()) && `Novidade até ${dataCurta(item.novidadeAte)}`,
                     ].filter(Boolean).join(' · ')}</p>
                   )}
                   <DicaDoPrato item={item} pedirDica={podeEditar ? gestao.dicaDoPrato : null} />
                 </div>
                 <div className={css.valor}>
                   <span className={css.preco}>{item.porcoes > 0 && <small>A partir de </small>}{moeda(item.preco)}</span>
-                  <label className={css.hoje} title={EXPLICA.hoje}>
-                    <input type="checkbox" checked={item.hoje} disabled={ocupado === item.sku}
-                      aria-label={`Disponível hoje: ${item.nome}`} onChange={() => fazer(item.sku, () => gestao.alternarHoje(item.sku))} />
-                    {item.hoje ? 'Hoje' : 'Fora de hoje'}
-                  </label>
+                  {/* #2258 (auditoria C2): os dois interruptores lado a lado; "No site" não fica escondido no menu. */}
+                  <div className={css.interruptores}>
+                    <label className={css.hoje} title={EXPLICA.hoje}>
+                      <input type="checkbox" checked={item.hoje} disabled={ocupado === item.sku}
+                        aria-label={`Disponível hoje: ${item.nome}`} onChange={() => fazer(item.sku, () => gestao.alternarHoje(item.sku))} />
+                      {item.hoje ? 'Hoje' : 'Fora de hoje'}
+                    </label>
+                    <label className={css.hoje} title={EXPLICA.noSite}>
+                      <input type="checkbox" checked={item.noSite} disabled={!podeEditar || ocupado === item.sku}
+                        aria-label={`No site: ${item.nome}`} onChange={() => fazer(item.sku, () => gestao.alternarNoSite(item.sku))} />
+                      No site
+                    </label>
+                  </div>
                 </div>
               </div>
               <div className={css.rodapePrato}>
@@ -178,11 +202,6 @@ export function AbaCardapioApi({ renderizarEditor }) {
                 <details className={css.outrasAcoes}>
                   <summary title={EXPLICA.maisAcoes} aria-label={`Mais ações para ${item.nome}`}><Icone nome="ellipsis-vertical" tamanho={20} /></summary>
                   <div className={css.painelAcoes}>
-                    <label className={css.chave} title={EXPLICA.noSite}>
-                      <input type="checkbox" checked={item.noSite} disabled={!podeEditar || ocupado === item.sku}
-                        aria-label={`No site: ${item.nome}`} onChange={() => fazer(item.sku, () => gestao.alternarNoSite(item.sku))} />
-                      No site
-                    </label>
                     {item.emValidacao && <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku} title={EXPLICA.validar}
                       aria-label={`Validar ${item.nome}`} onClick={() => fazer(item.sku, () => gestao.validar(item.sku))}><MarcaIcone nome="confirmar" tamanho={18} />Validar</Botao>}
                     <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku} title={EXPLICA.arquivar}

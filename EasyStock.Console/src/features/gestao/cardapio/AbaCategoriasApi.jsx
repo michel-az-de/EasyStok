@@ -60,7 +60,6 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
               {secao.visivel ? 'Ocultar no site' : 'Mostrar no site'}
             </Botao>
             <Botao
-              className={css.acaoDiscreta}
               variante="texto"
               icone="lixeira"
               disabled={ocupado || secao.itens > 0}
@@ -71,9 +70,9 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
               Excluir
             </Botao>
             <span className={css.ordem}>
-              <Botao className={css.acaoDiscreta} variante="texto" icone="chevron-up" aria-label={`Subir ${secao.nome}`}
+              <Botao variante="texto" icone="chevron-up" aria-label={`Subir ${secao.nome}`}
                 disabled={primeira || ocupado} onClick={() => fazer(() => gestao.mover(secao.id, 'subir'))} />
-              <Botao className={css.acaoDiscreta} variante="texto" icone="chevron-down" aria-label={`Descer ${secao.nome}`}
+              <Botao variante="texto" icone="chevron-down" aria-label={`Descer ${secao.nome}`}
                 disabled={ultima || ocupado} onClick={() => fazer(() => gestao.mover(secao.id, 'descer'))} />
             </span>
           </>

@@ -13,7 +13,9 @@ import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { primeiroNome } from '../../dominio/mensagem'
-import { nomeDoContato } from '../../dominio/nomeDoContato'
+import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
+import { cargaDaLista } from '../../dominio/cargaDaLista'
+import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { assistenteAtendendo } from '../../dominio/resumoDoModo'
 import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
@@ -31,7 +33,7 @@ export function PainelAtendimento({
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, visivel = true,
 }) {
   const {
-    selecionada, visiveis, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi,
+    selecionada, visiveis, conversas, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi, sincronizacao,
   } = useAtendimento()
   const {
     enviar, reabrir, definirRascunho, assumirAtendimento, devolverAutomatico,
@@ -99,12 +101,28 @@ export function PainelAtendimento({
 
   if (!selecionada) {
     const primeira = visiveis[0]
+    // #2258 (auditoria T2): no modo API a lista começa vazia até a primeira leitura. Nesse intervalo o
+    // painel mostra o esqueleto (ou o erro), nunca "Nenhuma conversa para exibir".
+    const carga = cargaDaLista({ fonteApi, estado: sincronizacao?.estado, total: conversas?.length ?? 0 })
+    if (carga === 'carregando') {
+      return (
+        <div className={css.esqueletoConversa} role="status" aria-busy="true" aria-label="Carregando a conversa">
+          <span className={`${css.esqueleto} ${css.esqueletoCabecalho}`} aria-hidden="true" />
+          <span className={`${css.esqueleto} ${css.esqueletoBalao}`} aria-hidden="true" />
+          <span className={`${css.esqueleto} ${css.esqueletoBalao} ${css.esqueletoBalaoSaida}`} aria-hidden="true" />
+          <span className={`${css.esqueleto} ${css.esqueletoBalao}`} aria-hidden="true" />
+        </div>
+      )
+    }
+    if (carga === 'erro') {
+      return <Vazio titulo="Não consegui carregar as conversas">A próxima tentativa é automática.</Vazio>
+    }
     return (
       <Vazio
         titulo={primeira ? 'Escolha uma conversa' : 'Nenhuma conversa para exibir'}
         acao={primeira && (
           <Botao variante="primario" onClick={() => selecionar(primeira.id)}>
-            Abrir {primeira.nome.split(' ')[0]}
+            Abrir {apresentacaoDoNome(primeira.nome, { comanda: primeira.numeroComanda }).rotulo}
           </Botao>
         )}
       >
@@ -116,6 +134,8 @@ export function PainelAtendimento({
   }
 
   const canal = canalDaConversa(canais, selecionada)
+  // #2258 (T4): o mesmo nome do cartão, do cabeçalho, da ficha e dos botões "Abrir".
+  const apresentacao = apresentacaoDoNome(selecionada.nome, { comanda: selecionada.numeroComanda })
   const { pode, ofereceModelo, janela, motivo } = permissaoDeEscrita(selecionada, agora, canal)
   // Valor CRU, não booleano: a marca PAUSA_POR_ASSUMIR é o que separa "pausado
   // porque você escreveu" de "pausado porque você assumiu". O Boolean() de
@@ -149,12 +169,14 @@ export function PainelAtendimento({
             tamanho="grande"
           />
           <h2 tabIndex={-1} ref={cabecalhoRef} data-foco-reserva>
-            <span className={css.nomeCliente} title={selecionada.nome}>{nomeDoContato(selecionada.nome)}</span>
+            <span className={css.nomeCliente}>
+              <NomeDoContato completo={apresentacao.completo} curto={apresentacao.curto} capsula={apresentacao.capsula} titulo={apresentacao.titulo} />
+            </span>
             {/* Comanda, canal e, quando pede atenção, o prazo da janela, em uma linha.
                 #1761 (L4): a quantidade de pedidos saiu (está em Histórico) e o prazo só aparece
                 perto do fim (`prazoNoCabecalho`); a linha quebrava em duas. */}
             <small>
-              {selecionada.numeroComanda && <>Comanda {selecionada.numeroComanda} · </>}
+              {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>Comanda {selecionada.numeroComanda} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
               {prazo && <>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></>}
             </small>

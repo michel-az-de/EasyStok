@@ -22,8 +22,8 @@ import assert from 'node:assert/strict'
 import { transformWithOxc } from 'vite'
 
 const telasCompiladas = new Map()
-// #2078: o modal do fechamento e o gesto da loja também rodam de verdade (avisos, foco, Esc, permissão).
-for (const caminho of ['features/gestao/producao/AbaProducaoDoDiaApi', 'features/gestao/caixa/AbaCaixaApi', 'features/gestao/caixa/ModalFecharCaixa', 'features/loja/GestoLoja']) {
+// #2078: o modal do fechamento e o gesto da loja também rodam de verdade (avisos, foco, Esc, permissão). // #2258 (F3): ValorDoResumo roda de verdade, senão virava só um nome na árvore
+for (const caminho of ['features/gestao/producao/AbaProducaoDoDiaApi', 'features/gestao/caixa/AbaCaixaApi', 'features/gestao/caixa/ModalFecharCaixa', 'features/gestao/caixa/ValorDoResumo', 'features/loja/GestoLoja']) {
   const url = new URL(`../src/${caminho}.jsx`, import.meta.url)
   telasCompiladas.set(url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
@@ -974,10 +974,13 @@ await confere('#2078 B11/E4: Lançamento abre com foco no valor e não fecha por
   const modal = () => doTipo(t.renderizar(), 'Modal')[0]
   assert.equal(modal().props.titulo, 'Lançar entrada ou saída')
   assert.equal(modal().props.focarCampo, true)
-  assert.equal(modal().props.segurarFechamento, false, 'vazio, Esc fecha como antes')
+  // #2258 (auditoria F4, T17): o valor digitado não segura mais o Esc em silêncio; ele pergunta
+  // "Descartar o que foi digitado?". `segurarFechamento` ficou só para o envio em andamento.
+  assert.equal(modal().props.segurarFechamento, false, 'sem envio, nada trava a janela')
+  assert.equal(modal().props.confirmarDescarte, false, 'vazio, Esc fecha como antes')
   assert.equal(andar(modal(), (n) => n.type === 'CampoReais' && n.props.rotulo === 'Valor')[0].props['data-foco-inicial'], '')
   andar(modal(), (n) => n.type === 'CampoReais' && n.props.rotulo === 'Valor')[0].props.aoMudar(1250)
-  assert.equal(modal().props.segurarFechamento, true, 'com valor digitado, Esc e fundo não perdem o que ela digitou')
+  assert.equal(modal().props.confirmarDescarte, true, 'com valor digitado, Esc, fundo e X perguntam antes de descartar')
   assert.equal(typeof modal().props.aoFechar, 'function', 'o X continua fechando')
 })
 
@@ -991,10 +994,11 @@ await confere('#2078 B11/E4/E5: Fechar o caixa abre no contado, segura o valor e
   assert.equal(modal().props.titulo, 'Fechar o caixa')
   assert.equal(modal().props.focarCampo, true)
   assert.equal(modal().props.segurarFechamento, false)
+  assert.equal(modal().props.confirmarDescarte, false)
   const contado = () => andar(modal(), (n) => n.type === 'CampoReais')[0]
   assert.equal(contado().props['data-foco-inicial'], '')
   contado().props.aoMudar(22210)
-  assert.equal(modal().props.segurarFechamento, true)
+  assert.equal(modal().props.confirmarDescarte, true, '#2258: com o contado digitado, fechar pergunta antes')
   const diferenca = doTipo(modal(), 'DiferencaDaGaveta')[0]
   assert.equal(diferenca.props.conferencia.texto.replace(/ /g, ' '), 'Faltam R$ 40,00')
   assert.equal(diferenca.props.conferencia.gravidade, 'Diferença grande: conte de novo antes de fechar.')

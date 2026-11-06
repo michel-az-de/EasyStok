@@ -34,7 +34,8 @@ public class FecharCaixaUseCase(
     ICaixaRepository repo,
     IUnitOfWork uow,
     ILogger<FecharCaixaUseCase> logger,
-    ObterCaixaDiaUseCase? caixaDia = null)
+    ObterCaixaDiaUseCase? caixaDia = null,
+    INotificacaoRepository? avisos = null)
 {
     public async Task<FechamentoCaixaResult> ExecuteAsync(FecharCaixaCommand cmd)
     {
@@ -151,7 +152,23 @@ public class FecharCaixaUseCase(
 
         logger.LogInformation("Caixa {Data} fechado (saldo final={Saldo}, vendas={Vendas}).",
             dia, fechamento.SaldoFinal, totalVendas);
+        await ResolverAvisosDoSinoAsync(cmd.EmpresaId);
         return Map(fechamento);
+    }
+
+    // #2258 (F1): o aviso "caixa aberto desde ..." do sino sai de circulação quando o caixa fecha. O fechamento já está
+    // gravado; se resolver o aviso falhar, o job diário varre de novo, então nunca desfaz nem falha o fechamento.
+    private async Task ResolverAvisosDoSinoAsync(Guid empresaId)
+    {
+        if (avisos is null) return;
+        try
+        {
+            await avisos.ResolverAvisosDeCaixaFechadoAsync(empresaId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Caixa fechado, mas os avisos do sino não foram resolvidos (empresa {Empresa}).", empresaId);
+        }
     }
 
     /// <summary>

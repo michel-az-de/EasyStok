@@ -53,7 +53,7 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
       <section className={css.cartao} aria-labelledby="titulo-login">
         <Marca />
         <div>
-          <h1 id="titulo-login" className={css.titulo}>Entrar na Casa da Baba</h1>
+          <h1 id="titulo-login" className={css.titulo}>Entrar na Casa da Babá</h1>
         </div>
         {avisoSaida && <p className={css.aviso} role="status">{avisoSaida}</p>}
         {erro && <p className={css.erro} role="alert">{erro}</p>}

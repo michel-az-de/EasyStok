@@ -1,3 +1,5 @@
+import { tituloDaLinhaExtra } from './caixa.js'
+
 export const STATUS_CONTAS = ['Rascunho', 'Aberta', 'ParcialmentePaga', 'Paga', 'Vencida', 'Cancelada']
 // #2095 (C10): conta a receber fala de receber.
 export function nomeStatusConta(status, lado = 'pagar') {
@@ -138,6 +140,20 @@ export function motivoContaInvalida({ descricao, categoria, centavos, quantidade
   return null
 }
 
+// #2258 (auditoria F13): a quantidade de parcelas é texto de dígitos, nunca número do campo (o
+// <input type=number> aceitava 0 e "-3" virava "03"). Devolve o texto limpo, o número lido e o erro.
+export const LIMITE_PARCELAS = 60
+export function lerParcelas(texto) {
+  const digitos = String(texto ?? '').replace(/\D/g, '').slice(0, 3).replace(/^0+(?=\d)/, '')
+  const quantidade = digitos ? Number(digitos) : null
+  const erro = !(quantidade >= 1) ? 'Mínimo 1 parcela' : quantidade > LIMITE_PARCELAS ? `Máximo ${LIMITE_PARCELAS} parcelas` : null
+  return { texto: digitos, quantidade, erro }
+}
+
+// #2258 (auditoria F12): categoria criada na própria escolha da conta; o tipo vem do lado da conta.
+export const corpoDaNovaCategoria = (nome, lado) => ({ nome: String(nome ?? '').trim(), tipo: lado === 'receber' ? 'Receita' : 'Despesa' })
+export const motivoDaNovaCategoria = (nome) => (String(nome ?? '').trim() ? null : 'Escreva o nome da categoria.')
+
 // Mensagem técnica do servidor (Npgsql, exceção, stack) nunca vai crua para a tela (F4).
 const TECNICA = /Cannot write|Kind=|Npgsql|Exception|System\.|PostgreSQL|SQLSTATE|stack trace|\bat [A-Z][\w.]+\(|Object reference/i
 const TRADUCOES = [
@@ -163,7 +179,20 @@ export function parcelasFinanceiras(centavos, quantidade, primeiroDia) {
   })
 }
 
-export function extratoFinanceiro(contas, movimentos, inicio, fim) {
+// #2262: /api/caixa/linhas não pagina e aceita até 366 dias por consulta. O período do Extrato é livre, então
+// vira janelas de até 366 dias; período invertido não tem janela (nada a consultar).
+export function janelasDoPeriodo(inicio, fim, dias = 366) {
+  const janelas = []
+  for (let de = inicio; de <= fim; de = diaMais(de, dias)) {
+    const ate = diaMais(de, dias - 1)
+    janelas.push({ inicio: de, fim: ate < fim ? ate : fim })
+  }
+  return janelas
+}
+
+// #2262: `linhasDoCaixa` são as linhas que o Caixa soma fora dos movimentos (pagamento de pedido, venda e
+// estorno de venda), na forma de /api/caixa/linhas. Sem elas, o Pix do Mercado Pago ficava fora do Extrato.
+export function extratoFinanceiro(contas, movimentos, inicio, fim, linhasDoCaixa = []) {
   const de = Date.parse(instanteFinanceiro(inicio)), ate = Date.parse(instanteFinanceiro(fim, true))
   const vinculados = new Set()
   const linhas = contas.flatMap(({ lado, conta }) => conta.parcelas.flatMap((parcela) => parcela.pagamentos.map((pagamento) => {
@@ -174,5 +203,9 @@ export function extratoFinanceiro(contas, movimentos, inicio, fim) {
     if (vinculados.has(movimento.id) || ['abertura', 'fechamento'].includes(movimento.tipo.toLowerCase())) continue
     linhas.push({ id: movimento.id, em: movimento.dataMovimento, descricao: movimento.descricao || movimento.categoria || movimento.tipo, lado: movimento.tipo.toLowerCase() === 'saida' ? 'pagar' : 'receber', valor: movimento.valor, metodo: movimento.metodo, estornado: Boolean(movimento.estornadoEm), contaId: null })
   }
+  linhasDoCaixa.forEach((linha, indice) => linhas.push({
+    id: `caixa:${linha.tipo}:${linha.hora}:${indice}`, em: linha.hora, descricao: tituloDaLinhaExtra(linha),
+    lado: linha.valor < 0 ? 'pagar' : 'receber', valor: Math.abs(linha.valor), metodo: linha.metodo ?? null, estornado: false, contaId: null,
+  }))
   return linhas.filter((linha) => Date.parse(linha.em) >= de && Date.parse(linha.em) <= ate).sort((a, b) => Date.parse(b.em) - Date.parse(a.em))
 }

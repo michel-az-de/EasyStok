@@ -45,7 +45,8 @@ await provar('pagamento já recebido ao montar entra recolhido: reabrir a modal 
 
 await provar('a Ficha mantém o cliente, identifica a comanda ativa e abre o extrato no pagamento', () => {
   const painel = ler('features/ficha-cliente/PainelFicha.jsx')
-  assert.match(painel, /<h2>Ficha<\/h2>/)
+  // #2258 (auditoria T11): o painel lateral passou de "Ficha" para "Cliente".
+  assert.match(painel, /<h2>Cliente<\/h2>/)
   assert.match(painel, /editavel && numero && <small>Comanda \{numero\}<\/small>/)
   assert.match(painel, /<CartaoDoCliente conversa=\{selecionada\}/)
   assert.match(painel, /\{secao === 'pagamento' && editavel && pedido && <Modal[\s\S]*?\{fonteApi && <ExtratoDoPedido pedido=\{pedido\} aDevolver=\{aDevolver\} \/>\}/)

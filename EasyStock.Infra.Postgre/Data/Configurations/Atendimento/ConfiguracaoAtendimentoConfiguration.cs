@@ -18,6 +18,11 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
         builder.Property(x => x.SaudacaoRetorno).IsRequired().HasMaxLength(500);
         builder.Property(x => x.FraseEspera).IsRequired().HasMaxLength(200);
         builder.Property(x => x.MensagemForaArea).IsRequired().HasMaxLength(500);
+        // #2249: moldes das ações do robô; linha antiga ganha o texto padrão.
+        builder.Property(x => x.MensagemEscalada).IsRequired().HasMaxLength(ConfiguracaoAtendimento.MoldeTamanhoMaximo)
+            .HasDefaultValue(ConfiguracaoAtendimento.MensagemEscaladaPadrao);
+        builder.Property(x => x.MensagemEncaminhamento).IsRequired().HasMaxLength(ConfiguracaoAtendimento.MoldeTamanhoMaximo)
+            .HasDefaultValue(ConfiguracaoAtendimento.MensagemEncaminhamentoPadrao);
         builder.Property(x => x.NivelSugestao).HasConversion<int>();
         builder.Property(x => x.RespiroMinutos).HasDefaultValue(40);
         builder.Property(x => x.TempoPreparoPadraoMinutos).HasDefaultValue(60);

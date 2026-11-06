@@ -42,10 +42,13 @@ caso('grade: o Início marca as colunas e o CSS só as aplica no desktop', () =>
   assert.match(hall, /@media \(min-width: 1280px\) \{\s*\.grade\[data-colunas='3'\] \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/)
 })
 
-caso('cartões de número na altura do próprio conteúdo', () => {
+caso('cartões de número: mesma altura na mesma linha, sem esticar até o maior da grade', () => {
   const hall = ler('features/hall/hall.module.css')
   assert.doesNotMatch(regra(hall, '.indicador'), /height:\s*100%/)
-  assert.match(regra(hall, '.indicadores'), /align-items:\s*start/)
+  // #2258 (auditoria H5): a #2256 usava align-items:start (cada cartão na própria altura) e deixava cartões
+  // da mesma linha com alturas diferentes. Agora a linha estica (stretch) e o cartão preenche o item (flex:1),
+  // sem altura fixa: cada linha pesa só o próprio conteúdo.
+  assert.match(regra(hall, '.indicadores'), /align-items:\s*stretch/)
 })
 
 caso('contadores de Avisos e Lembretes ancorados no canto do ícone do trilho', () => {

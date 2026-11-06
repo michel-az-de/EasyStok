@@ -74,7 +74,7 @@ const confere = (descricao, fn) => {
 }
 
 confere('H1  uma marca só no canto: o logo da loja, sem o "EasyStok" ao lado', () => {
-  assert.match(topo(html), /alt="Casa da Baba"/)
+  assert.match(topo(html), /alt="Casa da Babá"/)
   assert.doesNotMatch(topo(html).replace(/<[^>]*>/g, ' '), /EasyStok/)
   assert.match(jsxHall, /<Marca compacta \/>/)
 })
@@ -160,12 +160,14 @@ confere('H7  o cartão todo clicável perde a seta ">"', () => {
   assert.doesNotMatch(jsxHall.slice(jsxHall.indexOf('<a className={css.abrir}'), jsxHall.indexOf('</a>', jsxHall.indexOf('<a className={css.abrir}'))), /MarcaIcone/)
 })
 
-confere('H8  cartão sem leitura própria mostra "Tudo em dia" neutro; o medido mostra o que leu ou nada', () => {
-  assert.deepEqual(estado.estadoDoCartao('producao', {}), { texto: 'Tudo em dia', atencao: false })
+confere('H8  cartão sem leitura não afirma "Tudo em dia"; o medido mostra o que leu ou nada', () => {
+  // #2258 (auditoria P1): "Tudo em dia" é afirmação sobre uma leitura; sem leitura o cartão fica sem linha.
+  assert.equal(estado.estadoDoCartao('producao', {}), null)
   assert.equal(estado.estadoDoCartao('atendimento', {}), null, 'leitura que não chegou não vira "Tudo em dia"')
   const lido = { atendimento: { estado: 'ok', dados: { itens: [{ situacao: 'Assumida', aguardaResposta: true, assumidaPorUsuarioId: 'u' }] } } }
-  assert.deepEqual(estado.estadoDoCartao('atendimento', lido), { texto: '1 conversa sem resposta', atencao: true })
-  assert.match(html, /<span class="pendencia"[^>]*>Tudo em dia<\/span>/)
+  // #2258 (auditoria H2/H3): o mesmo nome do cartão de número, no plural certo.
+  assert.deepEqual(estado.estadoDoCartao('atendimento', lido), { texto: '1 conversa precisa de você', atencao: true })
+  assert.doesNotMatch(html, /Tudo em dia/)
 })
 
 confere('H9  severidade usa as cores de estado; a marca fica para a ação primária e a seleção', () => {
@@ -183,7 +185,8 @@ confere('H9  severidade usa as cores de estado; a marca fica para a ação prim�
 
 confere('H10  módulos na ordem de uso, grade sem órfão e Configurações como link de rodapé', () => {
   const ordem = estado.comOrdemPorUso(null).ordem
-  assert.deepEqual(ordem.slice(0, 3), ['atendimento', 'entregas', 'cozinha'])
+  // #2258 (auditoria A2): atender, preparar, entregar; depois cardápio, produção e dinheiro.
+  assert.deepEqual(ordem.slice(0, 3), ['atendimento', 'cozinha', 'entregas'])
   assert.equal(ordem.length, 8, 'a ordem continua completa')
   const movida = { ordem: ['financeiro', ...ordem.filter((id) => id !== 'financeiro')] }
   assert.equal(estado.comOrdemPorUso(movida).ordem[0], 'financeiro', 'a ordem que a dona escolheu vale')
@@ -191,23 +194,24 @@ confere('H10  módulos na ordem de uso, grade sem órfão e Configurações como
   assert.deepEqual(estado.favoritosPrimeiroPorUso({ favoritos: ['producao'] }).ordem.slice(0, 2), ['producao', 'atendimento'])
   const grade = html.slice(html.indexOf('aria-label="Módulos"'), html.indexOf('</ul>', html.indexOf('aria-label="Módulos"')))
   const ids = [...grade.matchAll(/data-modulo="([^"]+)"/g)].map((m) => m[1])
-  assert.deepEqual(ids, ['atendimento', 'entregas', 'cozinha', 'cardapio', 'financeiro', 'producao'])
+  assert.deepEqual(ids, ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro'])
   assert.equal(ids.length % 2, 0, 'duas colunas fecham sem órfão')
   assert.match(rodape(html), /<a [^>]*href="#\/m\/configuracoes"[^>]*>[^]*?Configurações<\/a>/)
 })
 
-confere('M3  o Início mostra "Hoje · N em andamento · N na fila" com as leituras do hall', () => {
+confere('M3  o Início mostra "Hoje · N precisam de você" com as leituras do hall (#2258, auditoria H1)', () => {
   const fontes = {
     atendimento: { estado: 'ok', dados: { itens: [{ situacao: 'Assumida' }, { situacao: 'Automatica' }, { situacao: 'Encerrada' }] } },
     pedidos: { estado: 'ok', dados: { itens: [{ status: 'aguardando' }, { status: 'preparando' }, { status: 'pronto' }, { status: 'entregue' }] } },
   }
-  assert.equal(estado.resumoDoDia(fontes).texto, 'Hoje · 2 em andamento · 2 na fila')
+  // #2258 (auditoria H1): o resumo é a soma dos cartões (1 conversa + 2 na fila + 1 pronto).
+  assert.equal(estado.resumoDoDia(fontes).texto, 'Hoje · 1 precisa de você · 3 em andamento')
   assert.equal(estado.resumoDoDia({}).texto, null, 'sem leitura não há resumo')
-  assert.equal(estado.resumoDoDia({ ...fontes, pedidos: { estado: 'erro', dados: fontes.pedidos.dados } }).texto, 'Hoje · 2 em andamento', 'leitura que falhou fica de fora')
-  assert.equal(estado.resumoDoDia({ atendimento: { ...fontes.atendimento, dados: { ...fontes.atendimento.dados, parcial: true } } }).texto, 'Hoje · 2+ em andamento')
-  assert.match(renderToStaticMarkup(h(ResumoDoDia, { fontes })), /Hoje · 2 em andamento · 2 na fila/)
+  assert.equal(estado.resumoDoDia({ ...fontes, pedidos: { estado: 'erro', dados: fontes.pedidos.dados } }).texto, null, 'leitura que falhou tira o resumo')
+  assert.equal(estado.resumoDoDia({ atendimento: { ...fontes.atendimento, dados: { ...fontes.atendimento.dados, parcial: true } } }, ['atendimento']).texto, 'Hoje · 1+ precisa de você')
+  assert.match(renderToStaticMarkup(h(ResumoDoDia, { fontes })), /Hoje · 1 precisa de você · 3 em andamento/)
   assert.equal(renderToStaticMarkup(h(ResumoDoDia, { fontes: {} })), '')
-  assert.match(jsxHall, /<ResumoDoDia fontes=\{fontes\} \/>/)
+  assert.match(jsxHall, /<ResumoDoDia fontes=\{fontes\} ids=\{idsDoPulso\} \/>/)
   assert.doesNotMatch(fonte('features/hall/ResumoDoDia.jsx') + fonte('dominio/estadoDoHall.js').replace(/\/\/[^\n]*/g, ''), /esteira/i)
 })
 

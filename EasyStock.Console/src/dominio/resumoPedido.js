@@ -1,5 +1,5 @@
 import { itensDetalhados, totalDoPedido } from './pedido'
-import { dataIsoNoFuso, horaCurta, moeda } from './formato'
+import { dataIsoNoFuso, horaCurta, moeda, somarDiasIso } from './formato'
 import { faixaDepoisDeEntre } from './entrega'
 import { nomeDoMeio, sinalDeEncomenda } from './cobranca'
 
@@ -41,18 +41,19 @@ export function caminhoParaTrocarItem(pedido) {
 export const podeCancelarParaRefazer = (pedido, { fonteApi = false } = {}) =>
   fonteApi && Boolean(pedido?.pedidoId) && pedido.estado === 'aguardando' && !pedido.cobranca?.pagaEm
 
-// Pedido ainda não criado, no modo API, com janela de um dia depois de hoje: é encomenda e tem sinal.
-function ehEncomendaDeOutroDia(pedido, { fonteApi, agora }) {
+// Pedido ainda não criado, no modo API, com janela 2 dias ou mais depois de hoje: é encomenda e tem sinal.
+// #2259: a mesma regra do servidor (PlanoPagamentoEncomenda.TemSinal); o pedido para amanhã paga o valor integral.
+function ehEncomendaComSinal(pedido, { fonteApi, agora }) {
   if (!fonteApi || pedido?.pedidoId || pedido?.cobranca || pedido?.estado !== 'aguardando' || !pedido.itens?.length) return false
   const [janelaId, data] = String(pedido.janela ?? '').split('|')
   return Boolean(janelaId) && /^\d{4}-\d{2}-\d{2}$/.test(data) && Number.isFinite(Date.parse(data + 'T12:00:00Z'))
-    && data > dataIsoNoFuso(agora)
+    && data >= somarDiasIso(dataIsoNoFuso(agora), 2)
 }
 
 export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Date.now(), meio = pedido?.meio } = {}) {
   // J2 (#1990): dinheiro na entrega é a mesma forma da maquininha no EasyStok; a encomenda pede sinal igual.
-  if ((meio && meio !== 'maquininha' && meio !== 'dinheiro-entrega') || !ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
-  return 'Encomenda para outro dia: sinal de 50% antes da produção. Restante na entrega.'
+  if ((meio && meio !== 'maquininha' && meio !== 'dinheiro-entrega') || !ehEncomendaComSinal(pedido, { fonteApi, agora })) return null
+  return 'Encomenda com antecedência: sinal de 50% antes da produção. Restante na entrega.'
 }
 
 // #1875 ("Quanto fica?"): o que o console já sabe antes de gerar a cobrança. O frete depende da zona do
@@ -60,7 +61,7 @@ export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Dat
 // dos itens, um piso, e a tela diz isso.
 // Vale para qualquer meio: o servidor cobra o sinal da encomenda também no Pix e no cartão por link.
 export function previaDoSinal(pedido, { fonteApi = false, agora = Date.now(), total = 0 } = {}) {
-  if (!ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
+  if (!ehEncomendaComSinal(pedido, { fonteApi, agora })) return null
   const sinal = sinalDeEncomenda(total)
   return { sinal, restante: Math.round((total - sinal) * 100) / 100 }
 }
@@ -75,13 +76,13 @@ export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi 
   if (simulacao && !simulacao.freteACombinar) {
     const base = `Pedido de ${moeda(simulacao.total)} com o frete de ${moeda(simulacao.frete)}`
     if (simulacao.encomenda && simulacao.sinal != null)
-      return `${base}. Encomenda para outro dia: sinal de ${moeda(simulacao.sinal)} por ${rotuloMeio}; ${moeda(simulacao.restante)} ficam para a entrega.`
+      return `${base}. Encomenda com antecedência: sinal de ${moeda(simulacao.sinal)} por ${rotuloMeio}; ${moeda(simulacao.restante)} ficam para a entrega.`
     return `${base}, cobrança por ${rotuloMeio}.`
   }
   const itens = `Pedido de ${moeda(total)}${fonteApi && !pedido?.pedidoId ? ' nos itens (o frete entra ao gerar)' : ''}`
   const previa = previaDoSinal(pedido, { fonteApi, agora, total })
   if (!previa) return `${itens}, cobrança por ${rotuloMeio}.`
-  return `${itens}. Encomenda para outro dia: sinal de 50% do total com o frete por ${rotuloMeio} (nos itens, ${moeda(previa.sinal)}); o restante fica para a entrega.`
+  return `${itens}. Encomenda com antecedência: sinal de 50% do total com o frete por ${rotuloMeio} (nos itens, ${moeda(previa.sinal)}); o restante fica para a entrega.`
 }
 
 // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que a dona resolve, para o

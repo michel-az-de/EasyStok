@@ -20,6 +20,7 @@
 .controle::placeholder { color: var(--tinta-3); }
 .area { min-height: 96px; resize: vertical; }
 .dica { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
-.controle[aria-invalid='true'] { box-shadow: inset 0 -2px 0 var(--erro); }
+.controle[aria-invalid='true'] { box-shadow: inset 0 0 0 2px var(--erro); }
+.erro { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--erro); font-weight: 600; }
 .controle[aria-invalid='true'] ~ .dica { color: var(--erro); font-weight: 600; }
 @media (max-width: 759px), (pointer: coarse) { .controle { font-size: 1rem; } }

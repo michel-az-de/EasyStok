@@ -44,9 +44,10 @@ public sealed class NotificadorService(
         Guid? usuarioDestinoId,
         string payloadJson,
         IDictionary<string, object?>? varsAdicionais = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Guid? refEntidadeId = null)
     {
-        var evento = EventoNotificacao.Criar(tipo, empresaId, payloadJson);
+        var evento = EventoNotificacao.Criar(tipo, empresaId, payloadJson, refEntidadeId);
         await eventoRepository.AddAsync(evento, ct);
 
         await ProcessarEventoInternoAsync(evento, usuarioDestinoId, varsAdicionais, ct);
