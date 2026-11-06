@@ -8,6 +8,7 @@ import { Botao } from '../../../componentes/Botao'
 import {
   GRUPOS_DE_AVISOS, avisoLigado, avisosMudaram, ligarAviso, mudarPrazo, textoDaFaixa, textoDoSla, validarAvisos,
 } from '../../../dominio/avisosDaOperacao'
+import { EquipeNoWhatsApp } from './EquipeNoWhatsApp'
 import css from './abaAvisos.module.css'
 
 function LinhaDoAviso({ aviso, avisos, erro, desabilitado, aoMudar }) {
@@ -172,7 +173,7 @@ export function AbaAvisos() {
         {' '}&lsquo;Ativar avisos neste aparelho&rsquo; no sino.
       </p>
       {acoes.editarAtendimento === true
-        ? <FormularioDeAvisos />
+        ? <><FormularioDeAvisos /><EquipeNoWhatsApp /></>
         : <p className={css.descricao}>A configuração dos avisos fica com a administração da loja.</p>}
     </div>
   )

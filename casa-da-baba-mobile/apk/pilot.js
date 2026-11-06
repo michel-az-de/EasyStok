@@ -225,7 +225,7 @@
     ]) for (const element of document.querySelectorAll('#moreMenu button[onclick="' + action + '"] .more-menu-icon')) element.innerHTML = pilotIcon(name);
   }
 
-  function installAppChrome(environment, openHome) {
+  function installAppChrome(environment, openHome, closeHome) {
     const document = environment.document;
     const header = document.querySelector?.('.phone > .header');
     if (!header) return;
@@ -240,6 +240,7 @@
     if (typeof navigate === 'function') environment.go = function (screen, options) {
       const result = navigate.call(this, screen, options);
       if (screen === 'home') openHome();
+      else closeHome?.();
       return result;
     };
   }
@@ -336,6 +337,8 @@
   rail.innerHTML = '<button type="button" id="pilotHomeButton" aria-label="Casa da Baba, início"><img class="pilot-brand-mark" src="casa-da-baba.png" alt="" width="48" height="40"><span class="pilot-wordmark">Casa da Baba<span id="pilotRailVersion">Piloto</span></span></button><div id="pilotRailActions">' + bell('pilotNoticeBell', 'pilotNoticeCount') + '</div><span id="pilotRailStatus" role="status">Conferindo conexão</span>';
   doc.body.prepend(rail);
   doc.body.classList.add('pilot-app');
+  // Um só nome para a área: o filtro do histórico acompanha o título Configurações.
+  doc.querySelectorAll?.('#histFilter [data-f="settings"]').forEach(button => { button.textContent = 'Configurações'; });
   if (root.ResizeObserver) new root.ResizeObserver(() => {
     doc.body.style.setProperty('--pilot-rail-height', Math.ceil(rail.getBoundingClientRect().height) + 'px');
   }).observe(rail);
@@ -361,7 +364,6 @@
         ${tileButton('pair', 'Conectar', 'link', 'support', 'pilotPairButton')}
         ${tileButton('printers', 'Impressoras', 'printer')}
         ${tileButton('settings', 'Configurações', 'settings')}
-        ${tileButton('migration-guide', 'Sistema Antigo', 'ajuda')}
         ${tileButton('update', 'Atualizar', 'refresh-cw', 'support', 'pilotUpdateButton')}
       </div>
       <div class="pilot-home-support" hidden>
@@ -378,7 +380,7 @@
     </div>`;
   doc.body.append(home);
   root.addEventListener('cdb-session-state', showConnection);
-  installAppChrome(root, openHome);
+  installAppChrome(root, openHome, closeHome);
   installLabelWorkspace(root);
   if (doc.querySelector && root.MutationObserver) {
     for (const id of ['newProductModal', 'productionConfirmModal']) {
@@ -600,6 +602,11 @@
     refreshOtaStatus();
   }
   function closeHome() { home.close(); }
+  // Impressoras tem um único lugar: Configurações > Etiquetas, seção Impressoras.
+  function openPrinterSettings() {
+    root.cdbOpenAjustesAt('eq');
+    doc.getElementById('impressorasLista')?.closest('.ajustes-section')?.scrollIntoView({ block: 'start' });
+  }
   root.cdbHandleNativeBack = function () {
     if (root.cdbIsPrinting?.()) return root.cdbHandleBack?.() === true;
     if (notices.open) {
@@ -881,7 +888,7 @@
         try { if (root.cdbAuth?.available?.()) await root.cdbAuth.ensureSignedIn(); await app.openWorkspace(); }
         finally { openingWorkspace = false; button.disabled = false; }
       }
-      if (action === 'printers') { closeHome(); root.openPrinterPicker(); }
+      if (action === 'printers') { closeHome(); openPrinterSettings(); }
       if (action === 'settings') { closeHome(); root.openAjustes(); }
       if (action === 'import-pwa') {
         const input = doc.getElementById('backupFileInput');

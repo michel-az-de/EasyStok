@@ -72,6 +72,11 @@ public sealed class PoliticaValidadeNotificacao
             // #2096: encomenda chegando ou cliente reclamando não serve horas depois.
             [TipoEventoNotificacao.AlertaOperacao] = TimeSpan.FromHours(2),
             [TipoEventoNotificacao.ResumoDiario] = TimeSpan.FromHours(4),
+
+            // #2211: avisos da equipe. Conversa e canhoto perdem o sentido no mesmo turno; pagamento vale o turno.
+            [TipoEventoNotificacao.AvisoEquipeAtencaoAtendimento] = TimeSpan.FromHours(1),
+            [TipoEventoNotificacao.AvisoEquipePedidoComCanhoto] = TimeSpan.FromHours(2),
+            [TipoEventoNotificacao.AvisoEquipeProblemaPagamento] = TimeSpan.FromHours(12),
         };
 
     private readonly Dictionary<TipoEventoNotificacao, TimeSpan> _prazos;

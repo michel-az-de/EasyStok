@@ -1,7 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
+import { limitarPainelMovel, proximaFrentePainel } from '../../hooks/estadoPainelMovel'
+import { janelaDosPaineis, observarAreaDosPaineis } from '../../hooks/areaDosPaineis'
 import css from './ModalNota.module.css'
+
+const focoDoCompositor = () => globalThis.document?.querySelector?.('[data-area-envio] textarea:not(:disabled)')
+  ?? globalThis.document?.querySelector?.('[data-area-envio] button:not(:disabled)')
 
 // #1839: a nota abre como um post-it pequeno logo acima do composer, sem cobrir a conversa. Esc fecha,
 // Ctrl+Enter salva. Salva, ela fica fixa no topo do Resumo, junto das tags e do cadastro.
@@ -10,9 +15,11 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, aoComanda, aoGuarda
   const [texto, setTexto] = useState(rascunho?.texto ?? textoInicial)
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState(null)
+  const [frente, setFrente] = useState(proximaFrentePainel)
   const salvando = useRef(false)
   const campo = useRef(null)
   const postit = useRef(null)
+  const [geometria, setGeometria] = useState(null)
   // Antes do commit: o efeito de abertura ainda não transferiu o foco ao campo.
   const abridor = useRef(globalThis.document?.activeElement ?? null)
   const montada = useRef(true)
@@ -37,7 +44,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, aoComanda, aoGuarda
     const contexto = contextoAtual.current
     const devolver = montada.current && contexto.visivel && !contexto.outraConversa && interno()
     aoFechar()
-    const destino = abridor.current
+    const destino = abridor.current?.isConnected ? abridor.current : focoDoCompositor()
     // O callback pode focar outro controle. Não disputa esse foco nem o de uma ação externa.
     if (devolver && (interno() || document.activeElement === document.body)
       && destino?.isConnected && destino !== document.body && destino !== document.documentElement
@@ -96,6 +103,20 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, aoComanda, aoGuarda
     campo.current.setSelectionRange(salva.inicio, salva.fim)
     campo.current.scrollTop = salva.rolagem
   }, [visivel])
+  useLayoutEffect(() => {
+    if (!visivel || embutida) return
+    const ajustar = () => {
+      const janela = janelaDosPaineis()
+      const altura = postit.current?.scrollHeight ?? 205
+      const proxima = limitarPainelMovel({ x: (janela.largura - 360) / 2, y: (janela.reserva?.y ?? janela.altura - 104) - altura - 8 }, { largura: 360, altura }, janela)
+      if (proxima.altura < 48 && postit.current?.contains(globalThis.document?.activeElement)) {
+        focoDoCompositor()?.focus({ preventScroll: true })
+      }
+      setGeometria(atual => atual && Object.keys(proxima).every(chave => proxima[chave] === atual[chave]) ? atual : proxima)
+    }
+    ajustar()
+    return observarAreaDosPaineis(ajustar, postit.current)
+  }, [visivel, embutida])
   useEffect(() => {
     montada.current = true
     return () => { montada.current = false; animacao.current?.cancel() }
@@ -104,7 +125,8 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, aoComanda, aoGuarda
   const aoTeclar = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.stopPropagation(); fechar() } }
 
   return (
-    <dialog ref={postit} open={visivel} className={`${css.postit} ${embutida ? css.embutida : ''}`} aria-label={`Nota interna de ${nomeCliente}`} onKeyDown={aoTeclar}>
+    <dialog ref={postit} open={visivel} className={`${css.postit} ${embutida ? css.embutida : ''}`} style={embutida ? undefined : { zIndex: frente, ...(geometria ? { left: geometria.x, top: geometria.y, bottom: 'auto', transform: 'none', width: geometria.largura, maxHeight: geometria.altura, visibility: geometria.altura < 48 ? 'hidden' : undefined } : {}) }} aria-label={`Nota interna de ${nomeCliente}`} onKeyDown={aoTeclar}
+      onFocusCapture={() => setFrente(proximaFrentePainel())} onPointerDownCapture={() => setFrente(proximaFrentePainel())}>
       <p className={css.titulo}>Nota interna <span>· só para a equipe</span></p>
       {outraConversa && <p role="status">Esta nota continua na ficha de {nomeCliente}.</p>}
       <CampoArea

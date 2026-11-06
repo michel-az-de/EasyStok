@@ -184,4 +184,65 @@ public class AtualizarCobrancaPorPagamentoUseCaseTests
         r.Should().Be(SituacaoAtualizacaoCobranca.Ignorada);
         cobranca.Motivo.Should().BeNull();
     }
+
+    // #2211: problema no pagamento avisa a equipe inscrita uma vez por pagamento e desfecho.
+    private static Task AvisouAEquipe(CobrancaPedidoFixture f, int vezes, string? problema = null) =>
+        f.Notificador.Received(vezes).EnfileirarEventoAsync(TipoEventoNotificacao.AvisoEquipeProblemaPagamento, f.EmpresaId,
+            Arg.Is<string>(p => problema == null || p.Contains(problema)), f.Pedido.Id,
+            Arg.Any<CancellationToken>(), Arg.Any<string?>());
+
+    [Theory]
+    [InlineData("rejected", "o pagamento foi recusado")]
+    [InlineData("cancelled", "o pagamento foi cancelado")]
+    public async Task RecusaAvisaAEquipeUmaVez(string status, string problema)
+    {
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline(conversaId: Guid.NewGuid());
+        var uc = f.AtualizarPorPagamento();
+
+        await uc.ExecuteAsync(Input(f.Pedido.Id, status));
+        await uc.ExecuteAsync(Input(f.Pedido.Id, status));
+
+        await AvisouAEquipe(f, 1, problema);
+        await f.Notificador.Received(1).EnfileirarEventoAsync(TipoEventoNotificacao.AvisoEquipeProblemaPagamento, f.EmpresaId,
+            Arg.Any<string>(), f.Pedido.Id, Arg.Any<CancellationToken>(), $"aviso-equipe-pagamento:pay-9:{status}");
+    }
+
+    [Theory]
+    [InlineData("refunded", "o pagamento foi estornado")]
+    [InlineData("charged_back", "o cliente contestou")]
+    public async Task EstornoAvisaAEquipe(string status, string problema)
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        f.AdicionarOnline().MarcarPaga("pay-9", 25m, "credito", CobrancaPedidoFixture.Agora);
+
+        await f.AtualizarPorPagamento().ExecuteAsync(Input(f.Pedido.Id, status));
+
+        await AvisouAEquipe(f, 1, problema);
+    }
+
+    [Fact]
+    public async Task MediacaoAvisaAEquipeUmaVez()
+    {
+        var f = new CobrancaPedidoFixture(StatusPedidoMapper.Aguardando);
+        f.AdicionarOnline().MarcarPaga("pay-9", 25m, "credito", CobrancaPedidoFixture.Agora);
+        var uc = f.AtualizarPorPagamento();
+
+        await uc.ExecuteAsync(Input(f.Pedido.Id, "in_mediation"));
+        await uc.ExecuteAsync(Input(f.Pedido.Id, "in_mediation"));
+
+        await AvisouAEquipe(f, 1, "disputa");
+    }
+
+    [Fact]
+    public async Task PixVencidoNaoAvisaProblemaNoPagamento()
+    {
+        // O job do vencimento já avisa a equipe; o cancelled do Mercado Pago no mesmo instante não repete.
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline(conversaId: Guid.NewGuid(), expiraEm: CobrancaPedidoFixture.Agora);
+
+        await f.AtualizarPorPagamento().ExecuteAsync(Input(f.Pedido.Id, "cancelled"));
+
+        await AvisouAEquipe(f, 0);
+    }
 }

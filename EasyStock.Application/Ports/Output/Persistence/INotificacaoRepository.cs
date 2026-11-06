@@ -36,6 +36,15 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task AddAsync(Notificacao notificacao);
         Task UpdateAsync(Notificacao notificacao);
         Task MarcarTodasComoLidasAsync(Guid empresaId, Guid? usuarioId = null);
+
+        /// <summary>
+        /// #2258 (F1): marca como lidos os avisos do sino sobre caixa aberto (<c>CaixaAbertoEsquecido</c> e o
+        /// <c>PrazoEstourado</c> de caixa) cuja abertura já tem fechamento posterior na mesma empresa/loja, para o sino
+        /// não mostrar um caixa que já fechou. Acha a abertura pelo <c>RefEntidadeId</c> do evento ou, nos avisos
+        /// antigos, pelo <c>aberturaId</c> do payload. <paramref name="empresaId"/> nulo varre todas (job, sob o bypass de
+        /// RLS). Escrita direta, fora da unidade de trabalho. Devolve quantos avisos foram resolvidos.
+        /// </summary>
+        Task<int> ResolverAvisosDeCaixaFechadoAsync(Guid? empresaId = null, CancellationToken ct = default);
         Task DeleteAsync(Guid empresaId, Guid id);
     }
 

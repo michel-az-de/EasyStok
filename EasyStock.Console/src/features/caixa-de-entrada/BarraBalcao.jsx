@@ -54,7 +54,8 @@ function ChipCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
 // Linha A (busca e ordenar) e linha B (filtros) da seção 1. #1442
 // (homologação de 07/10): o Balcão abre em "Todas"; "Precisa de você" virou
 // filtro com contador e os três cartões de canal viraram chips na mesma linha.
-export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
+// #2227: `semContagem` enquanto a lista não chegou da API; 0 ali seria "não há conversa".
+export function BarraBalcao({ filtros, aoMudar, acoesCabecalho, semContagem = false }) {
   const [ordenarAberto, setOrdenarAberto] = useState(false)
   const botaoFiltros = useRef(null)
   const { canais, janelas } = useCatalogo()
@@ -89,7 +90,8 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
   return (
     <div className={css.barra}>
       <header className={css.cabecalhoLista}>
-        <h2>Conversas <span>{doUniverso.length}</span></h2>
+        {/* #2232 (L1): o total já está no chip "Todas"; o título não repete número. */}
+        <h2>Conversas</h2>
         <span className={css.comOrdenar}>
           <Botao ref={botaoFiltros} variante="texto" className={css.botaoOrdenar} aria-haspopup="dialog" aria-expanded={ordenarAberto}
             aria-label={filtrando ? 'Filtrar conversas, filtros ativos' : 'Filtrar conversas'} title="Filtrar e ordenar conversas"
@@ -97,7 +99,7 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
             <Icone nome="list-filter" tamanho={20} />
             {filtrando && <span className={css.pontoOrdem} aria-hidden="true" />}
           </Botao>
-          {ordenarAberto && <Popover rotulo="Filtros das conversas" papel="dialog" posicao="abaixo" aoFechar={() => setOrdenarAberto(false)}>
+          {ordenarAberto && <Popover rotulo="Filtros das conversas" papel="dialog" posicao="abaixo" portal alinhamento="esquerda" aoFechar={() => setOrdenarAberto(false)}>
             <div className={css.painelFiltros}>
               <FiltroResponsavel valor={filtros.responsavel ?? 'todas'} aoMudar={valor => aoMudar('responsavel', valor)} />
               <fieldset className={css.canaisNoFiltro}>
@@ -140,11 +142,11 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
       <fieldset className={css.filtros}>
         <legend className="sr">Filtros das conversas</legend>
         <button type="button" aria-pressed={filtros.aba !== 'precisa'} className={`${css.chipFiltro} ${filtros.aba !== 'precisa' ? css.chipLigado : ''}`} onClick={() => aoMudar('aba', 'todas')}>
-          Todas <span className={css.numeroChip}>{doUniverso.length}</span>
+          Todas {!semContagem && <span className={css.numeroChip}>{doUniverso.length}</span>}
         </button>
         <button type="button" aria-pressed={filtros.aba === 'precisa'} className={`${css.chipFiltro} ${filtros.aba === 'precisa' ? css.chipLigado : ''}`}
           onClick={() => aoMudar('aba', filtros.aba === 'precisa' ? 'todas' : 'precisa')}>
-          Precisa de você <span className={css.numeroChip}>{quantasPrecisam}</span>
+          Precisa de você {!semContagem && <span className={css.numeroChip}>{quantasPrecisam}</span>}
         </button>
       </fieldset>
     </div>

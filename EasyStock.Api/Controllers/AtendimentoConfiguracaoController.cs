@@ -59,7 +59,9 @@ public class AtendimentoConfiguracaoController(
                 body.RespiroMinutos,
                 body.TempoPreparoPadraoMinutos,
                 body.Ativo,
-                body.SlaRespostaMinutos));
+                body.SlaRespostaMinutos,
+                body.MensagemEscalada,
+                body.MensagemEncaminhamento));
 
             return DataOk(resultado);
         }
@@ -80,6 +82,8 @@ public sealed record AtualizarConfiguracaoAtendimentoBody(
     int? RespiroMinutos,
     int? TempoPreparoPadraoMinutos,
     bool? Ativo,
-    int? SlaRespostaMinutos = null);
+    int? SlaRespostaMinutos = null,
+    string? MensagemEscalada = null,
+    string? MensagemEncaminhamento = null);
 
 public sealed record ModeloRetomadaBody(string? Nome, string? Idioma);

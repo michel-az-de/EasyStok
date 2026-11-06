@@ -14,11 +14,9 @@ button.sino {
   75% { transform: rotate(-12deg); }
 }
 
+/* #2232 (L2): o desenho do número é o do Contador; aqui só a posição e a entrada. */
 .badge {
-  position: absolute; top: -4px; right: -4px; min-width: 26px; height: 26px;
-  padding: 0 var(--e-1); border-radius: var(--r-1); background: var(--erro);
-  color: var(--sobre-erro); font-size: var(--t-corpo); font-weight: 700;
-  line-height: 26px; text-align: center; font-variant-numeric: tabular-nums;
+  position: absolute; top: 4px; right: 6px; box-shadow: 0 0 0 2px var(--fundo);
   animation: estalar var(--dur-curta) var(--ease-pulo);
 }
 @keyframes estalar {
@@ -68,7 +66,7 @@ button.botaoVistos {
 @keyframes realce { 0% { background: var(--sucesso-pastel); } 100% { background: var(--elevado); } }
 
 .ponto {
-  flex-shrink: 0; width: 10px; height: 10px; border-radius: var(--r-1); background: var(--erro);
+  flex-shrink: 0; width: 10px; height: 10px; border-radius: var(--r-pilula); background: var(--erro);
 }
 
 .alvo {
@@ -118,7 +116,7 @@ button.acaoItem { flex-shrink: 0; padding: 0; width: var(--toque); height: var(-
 }
 .grupoPilulas { border: 0; margin: 0; padding: 0; }
 .pilulas { display: flex; gap: var(--e-2); flex-wrap: wrap; }
-button.pilula { border-radius: var(--r-1); min-height: var(--toque); }
+button.pilula { border-radius: var(--r-pilula); min-height: var(--toque); }
 .horarioManual { margin-top: var(--e-2); }
 
 @media (max-width: 759px) {
@@ -131,6 +129,4 @@ button.pilula { border-radius: var(--r-1); min-height: var(--toque); }
   to { opacity: 1; transform: none; }
 }
 
-/* Contador único (banca, item 4): mesmo desenho do trilho, carmim por ser
-   lembrete vencido esperando. */
-.badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pilula); display: inline-grid; place-items: center; font-size: var(--t-minimo); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; background: var(--preenchimento-forte); color: var(--tinta-2); background: var(--erro); color: var(--sobre-erro); position: absolute; top: 4px; right: 6px; box-shadow: 0 0 0 2px var(--fundo); }
+

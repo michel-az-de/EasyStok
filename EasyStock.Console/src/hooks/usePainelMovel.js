@@ -9,6 +9,7 @@ export function usePainelMovel(escopoId, painelId, { posicaoInicial } = {}) {
     return { chave, ...(salvo ?? (legado ? { solto: true, ...legado } : { solto: false })) }
   })
   const [erro, setErro] = useState(null)
+  const [foco, setFoco] = useState(0)
   const atual = useRef(estado)
   const abridor = useRef(null)
   useEffect(() => {
@@ -18,6 +19,7 @@ export function usePainelMovel(escopoId, painelId, { posicaoInicial } = {}) {
       abridor.current = null
       setEstado(proximo)
       setErro(null)
+      setFoco(0)
     }
   }, [chave, escopoId, painelId])
   const guardar = useCallback((mudanca) => {
@@ -34,6 +36,7 @@ export function usePainelMovel(escopoId, painelId, { posicaoInicial } = {}) {
     const posicao = r ? { x: r.left, y: r.top } : Object.fromEntries(['x', 'y', 'largura', 'altura']
       .filter((campo) => Number.isFinite(origem?.[campo])).map((campo) => [campo, origem[campo]]))
     guardar({ ...posicao, solto: true })
+    setFoco(n => n + 1)
   }, [guardar])
   const recolher = useCallback(() => guardar({ solto: false }), [guardar])
   const devolverFoco = useCallback(() => {
@@ -41,13 +44,15 @@ export function usePainelMovel(escopoId, painelId, { posicaoInicial } = {}) {
       && (!no.getClientRects || no.getClientRects().length > 0)
     const reserva = [...(globalThis.document?.querySelectorAll?.('[data-foco-reserva]') ?? [])]
       .find(no => no.getAttribute('data-foco-reserva') === chave && podeFocar(no))
-    const destino = podeFocar(abridor.current) ? abridor.current : reserva
+    const destino = (podeFocar(abridor.current) ? abridor.current : reserva)
+      ?? ['[data-area-envio] textarea:not(:disabled)', '[data-area-envio] button:not(:disabled)']
+        .flatMap(seletor => [...(globalThis.document?.querySelectorAll?.(seletor) ?? [])]).find(podeFocar)
     if (!destino) return false
     destino.focus({ preventScroll: true })
     return true
   }, [chave])
   return {
     ...(estado.chave === chave ? estado : { chave, solto: false }),
-    escopoId, painelId, erro, guardar, soltar, recolher, devolverFoco,
+    escopoId, painelId, erro, foco: estado.chave === chave ? foco : 0, guardar, soltar, recolher, devolverFoco,
   }
 }

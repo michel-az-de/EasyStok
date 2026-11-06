@@ -8,9 +8,16 @@ import { transformWithOxc } from 'vite'
 
 const fontes = new Map()
 const base = process.argv.includes('--base') ? process.argv[process.argv.indexOf('--base') + 1] : null
-for (const nome of ['AlcaLargura', 'Popover', 'Modal', 'Chip', 'Icone', 'Campo', 'Botao', 'BarraDeAbas', 'EscolhaDeEntregador', 'EscolhaDeProvedorEntrega', 'InterruptorTema']) {
+// #2232 (L11): a BarraDeAbas usa o Contador; numa base anterior a ele o arquivo não existe e fica de fora.
+for (const nome of ['AlcaLargura', 'Popover', 'Modal', 'Chip', 'Icone', 'Campo', 'Botao', 'BarraDeAbas', 'EscolhaDeEntregador', 'EscolhaDeProvedorEntrega', 'InterruptorTema', 'Contador']) {
   const url = new URL(`../src/componentes/${nome}.jsx`, import.meta.url)
-  const fonte = base ? execFileSync('git', ['show', `${base}:EasyStock.Console/src/componentes/${nome}.jsx`], { encoding: 'utf8' }) : readFileSync(url, 'utf8')
+  let fonte
+  try {
+    fonte = base ? execFileSync('git', ['show', `${base}:EasyStock.Console/src/componentes/${nome}.jsx`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }) : readFileSync(url, 'utf8')
+  } catch (erro) {
+    if (base && nome === 'Contador') continue
+    throw erro
+  }
   fontes.set(url.href, (await transformWithOxc(fonte, url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
 const urlSeletor = new URL('../src/features/atendimento/SeletorRespostas.jsx', import.meta.url)
@@ -242,6 +249,23 @@ provar('Modal: segurarFechamento ignora Escape e fundo com valor digitado; o X e
     assert.equal(Boolean(fechar.props.disabled), false)
     fechar.props.onClick()
     assert.equal(fechou, 1, 'o X é um gesto explícito e fecha')
+  } finally { m.desmontar() }
+})
+// #2258 (auditoria F4, T17): com algo digitado, Esc, fundo e X perguntam antes de descartar; nenhum fecha direto.
+provar('Modal: confirmarDescarte faz Esc, fundo e X perguntarem antes de fechar', () => {
+  let fechou = 0
+  const eventos = new Map(), m = montar(Modal, { titulo: 'Nova conta', confirmarDescarte: true, aoFechar: () => fechou++ })
+  const dialogo = dialogoFalso(eventos)
+  m.elemento.props.ref.current = dialogo
+  m.efeitos()
+  try {
+    const cancelamento = tecla('Escape', dialogo)
+    eventos.get('cancel')(cancelamento)
+    assert.equal(cancelamento.prevenido, true, 'o navegador não fecha o dialog sozinho')
+    eventos.get('click')({ target: dialogo })
+    const fechar = andar(m.elemento, elemento => elemento.props['aria-label'] === 'Fechar janela')[0]
+    fechar.props.onClick()
+    assert.equal(fechou, 0, 'nenhum dos três gestos descarta sem perguntar')
   } finally { m.desmontar() }
 })
 // #2078 (revisão R2): no Chromium o 2º Esc seguido, sem ativação do usuário, não pode ser cancelado:

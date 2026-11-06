@@ -47,11 +47,12 @@ public class MercadoPagoClientTests
         }
         """;
 
-    private static (MercadoPagoClient, HttpFalso) Criar(HttpStatusCode status = HttpStatusCode.Created, string? resposta = null)
+    private static (MercadoPagoClient, HttpFalso) Criar(
+        HttpStatusCode status = HttpStatusCode.Created, string? resposta = null, MercadoPagoOptions? configuracao = null)
     {
         var handler = Falso(status, resposta);
         var http = handler.CriarClient("https://api.mp.test/");
-        var opcoes = Options.Create(new MercadoPagoOptions { AccessToken = "fake" });
+        var opcoes = Options.Create(configuracao ?? new MercadoPagoOptions { AccessToken = "fake" });
         return (new MercadoPagoClient(http, opcoes, PipelinesDeTeste.Reais(), NullLogger<MercadoPagoClient>.Instance), handler);
     }
 
@@ -89,6 +90,45 @@ public class MercadoPagoClientTests
         json.RootElement.GetProperty("expires").GetBoolean().Should().BeFalse();
         json.RootElement.TryGetProperty("expiration_date_to", out _).Should().BeFalse();
         json.RootElement.TryGetProperty("date_of_expiration", out _).Should().BeFalse();
+    }
+
+    private static readonly MercadoPagoOptions ComRetornoDoSite = new()
+    {
+        AccessToken = "fake",
+        BackUrlSuccess = "https://loja.test/pedido?resultado=sucesso",
+        BackUrlFailure = "https://loja.test/pedido?resultado=falha",
+        BackUrlPending = "https://loja.test/pedido?resultado=pendente",
+    };
+
+    /// <summary>#2228: a cobrança da conversa volta o cliente ao WhatsApp da loja, aprovado ou não.</summary>
+    [Fact]
+    public async Task ComRetorno_AsTresBackUrlsVoltamParaEle()
+    {
+        var (client, handler) = Criar(configuracao: ComRetornoDoSite);
+
+        await client.CriarPreferenceAsync(new CriarPreferenceCommand(
+            Guid.NewGuid(), Guid.NewGuid(), "Loja", 10m, [new PreferenceItemCommand("Item", 1, 10m)],
+            RetornoUrl: "https://wa.me/5511927032814"));
+
+        using var json = JsonDocument.Parse(handler.UltimaChamada!.Corpo!);
+        var back = json.RootElement.GetProperty("back_urls");
+        foreach (var resultado in new[] { "success", "failure", "pending" })
+            back.GetProperty(resultado).GetString().Should().Be("https://wa.me/5511927032814", resultado);
+    }
+
+    [Fact]
+    public async Task SemRetorno_BackUrlsDaConfiguracao()
+    {
+        var (client, handler) = Criar(configuracao: ComRetornoDoSite);
+
+        await client.CriarPreferenceAsync(new CriarPreferenceCommand(
+            Guid.NewGuid(), Guid.NewGuid(), "Loja", 10m, [new PreferenceItemCommand("Item", 1, 10m)]));
+
+        using var json = JsonDocument.Parse(handler.UltimaChamada!.Corpo!);
+        var back = json.RootElement.GetProperty("back_urls");
+        back.GetProperty("success").GetString().Should().Be("https://loja.test/pedido?resultado=sucesso");
+        back.GetProperty("failure").GetString().Should().Be("https://loja.test/pedido?resultado=falha");
+        back.GetProperty("pending").GetString().Should().Be("https://loja.test/pedido?resultado=pendente");
     }
 
     [Fact]

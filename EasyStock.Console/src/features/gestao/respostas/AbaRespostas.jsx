@@ -10,6 +10,7 @@ import {
 } from '../../../dominio/automacao'
 import { plural } from '../../../dominio/formato'
 import { gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
+import { NOME_RESPOSTAS_AUTOMATICAS } from '../../../dominio/modulos'
 import css from './abaRespostas.module.css'
 
 // Mesmo editor na janela contextual do Balcão e na rota direta de Atendimento.
@@ -247,7 +248,7 @@ function SecaoAutomaticas({ focoInicial }) {
     <section className={css.secao} aria-labelledby="gestao-automaticas">
       <header className={css.topo}>
         <div>
-          <h3 id="gestao-automaticas">Mensagens automáticas</h3>
+          <h3 id="gestao-automaticas">{NOME_RESPOSTAS_AUTOMATICAS}</h3>
           <p className={css.descricao}>
             Saem sozinhas, só até 24 h depois da última mensagem do cliente e nunca para cliente bloqueado.
             Na conversa aparecem com a etiqueta automática.

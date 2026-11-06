@@ -4,6 +4,11 @@ import { atualizarInsumo, criarInsumo, insumoDaApi, listarInsumos } from '../inf
 // para `aoErro`. Separado do hook para a prova rodar sem React.
 export const UNIDADES_INSUMO = ['G', 'Kg', 'Ml', 'L', 'Un']
 
+// #2258 (auditoria P7): o valor enviado à API segue como está (`G`, `Kg`...); na tela a unidade
+// aparece como se escreve: g, kg, ml, L, un. Unidade que não está na lista passa como veio.
+const UNIDADE_NA_TELA = { G: 'g', Kg: 'kg', Ml: 'ml', L: 'L', Un: 'un' }
+export const rotuloDaUnidade = (unidade) => UNIDADE_NA_TELA[unidade] ?? String(unidade ?? '')
+
 export const lerInsumos = async () => ((await listarInsumos()) ?? []).map(insumoDaApi)
 
 // Onde o insumo é usado. M1.4e (#1552): a embalagem escolhida numa porção não entra em receita, mas

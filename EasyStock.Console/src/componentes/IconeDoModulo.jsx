@@ -1,25 +1,14 @@
 import { Icone } from './Icone'
 import { MarcaIcone } from './MarcaIcone'
+import { iconeDaTela, iconeDoModulo, partirIcone, tamanhoMinimoDoIcone } from './iconesDoConsole'
 
-const MODULOS = {
-  cardapio: 'produto', producao: 'producao', atendimento: 'mensagem', cozinha: 'pedido-em-preparo',
-  financeiro: 'financeiro', campanhas: 'cupom', configuracoes: 'configuracoes', entregas: 'entrega',
-}
-const TELAS = {
-  itens: 'produto', categorias: 'grade', estoque: 'estoque', producao: 'producao',
-  insumos: 'ingredientes', receitas: 'receita', calculadora: 'financeiro', planejamento: 'horarios', perdas: 'atencao',
-  balcao: 'mensagem', horarios: 'horarios', avisos: 'atencao', respostas: 'mensagem', fila: 'pedido-em-preparo',
-  caixa: 'caixa', fidelidade: 'cupom', canais: 'mensagem', integracoes: 'link',
-  painel: 'entrega', janelas: 'horarios',
-  'visao-geral': 'financeiro', pagar: 'caixa', receber: 'financeiro', extrato: 'receita',
-  relatorios: 'grade', 'centros-custo': 'configuracoes',
-}
-
-// Os desenhos de preparo exigem 32 px no manifesto V4 para manter os detalhes.
+// #2258 (A1): o mapa de ícones mora em `componentes/iconesDoConsole.js`; aqui só se desenha.
 export function IconeDoModulo({ modulo, telaId, tamanho = 24 }) {
-  const nome = TELAS[telaId] ?? MODULOS[modulo.id]
-  if (!nome) return <Icone nome={modulo.icone} tamanho={tamanho} />
-  const minimo = nome === 'producao' || nome === 'pedido-em-preparo' ? 32 : 24
-  return <MarcaIcone nome={nome} tamanho={Math.max(tamanho, minimo)} />
+  const especificacao = telaId ? iconeDaTela(modulo.id, telaId) : iconeDoModulo(modulo.id)
+  const icone = partirIcone(especificacao)
+  if (!icone) return <Icone nome={modulo.icone} tamanho={tamanho} />
+  const medida = Math.max(tamanho, tamanhoMinimoDoIcone(especificacao))
+  return icone.familia === 'marca'
+    ? <MarcaIcone nome={icone.nome} tamanho={medida} />
+    : <Icone nome={icone.nome} tamanho={medida === 32 ? 32 : tamanho} />
 }
-

@@ -15,13 +15,16 @@ public sealed record AvisosOperacaoResult(
     int EstoqueParadoDias,
     bool ReclamacaoCliente,
     bool SuspeitaAtendimento,
-    int SlaRespostaMinutos)
+    int SlaRespostaMinutos,
+    bool EquipeAtencao,
+    bool EquipePedido,
+    bool EquipePagamento)
 {
     public static AvisosOperacaoResult De(ConfiguracaoAtendimento c) => new(
         c.Avisos.ClienteSemResposta, c.Avisos.PedidoAtrasado, c.Avisos.ImpressaoTravada, c.Avisos.CaixaEsquecido,
         c.Avisos.ProntoSemEntregadorMinutos, c.Avisos.EncomendaProximaHoras, c.Avisos.EncomendaSemConfirmacaoHoras,
         c.Avisos.EstoqueVencendoDias, c.Avisos.EstoqueParadoDias, c.Avisos.ReclamacaoCliente, c.Avisos.SuspeitaAtendimento,
-        c.SlaRespostaMinutos);
+        c.SlaRespostaMinutos, c.Avisos.EquipeAtencao, c.Avisos.EquipePedido, c.Avisos.EquipePagamento);
 }
 
 public sealed class ObterAvisosOperacaoUseCase(IConfiguracaoAtendimentoRepository repository)

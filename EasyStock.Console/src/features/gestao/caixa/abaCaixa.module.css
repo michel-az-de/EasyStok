@@ -196,3 +196,12 @@
   .caixaApi > .resumoLista .resumoForte { grid-column: 1 / -1; }
   .caixaApi > .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; gap: var(--e-1); }
 }
+
+/* #2258 (F3): esqueleto do valor do resumo enquanto o dado não chegou (mesmos tokens do T2 do Atendimento). */
+.esqueletoValor {
+  display: inline-block; width: 6ch; height: 1em; vertical-align: middle; border-radius: var(--r-2);
+  background: var(--preenchimento-forte);
+  animation: esqueletoValorPulso calc(var(--dur-longa) * 4) var(--ease-padrao) infinite alternate;
+}
+@keyframes esqueletoValorPulso { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .esqueletoValor { animation: none; } }

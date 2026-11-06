@@ -23,9 +23,9 @@ export function estadoInicial({
     selecionadaId: null,
     // Balcão (seção 1, rodada 5): duas abas, canais que ligam mais de um ao
     // mesmo tempo e uma ordem só. `MUDAR_FILTRO` é genérico (chave/valor), a
-    // forma nova só muda o que mora em cada chave. #1442: abre em "Todas";
-    // "Precisa de você" virou filtro com contador.
-    filtros: { busca: '', aba: 'todas', canais: [], ordenacao: 'urgencia', responsavel: 'todas' },
+    // forma nova só muda o que mora em cada chave. #2232 (banca UX, L5): abre em "Precisa de você",
+    // o que pede ação; "Todas" fica a um toque. Revê o #1442, que abria em "Todas".
+    filtros: { busca: '', aba: 'precisa', canais: [], ordenacao: 'urgencia', responsavel: 'todas' },
     rascunhos: {},
     // #1577: quantas vezes cada rascunho foi escrito de fora do campo (ver rascunhoLocal.js).
     escritasDeFora: {},

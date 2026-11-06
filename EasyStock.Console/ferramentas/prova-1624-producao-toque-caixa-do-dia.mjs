@@ -22,8 +22,8 @@ import assert from 'node:assert/strict'
 import { transformWithOxc } from 'vite'
 
 const telasCompiladas = new Map()
-// #2078: o modal do fechamento e o gesto da loja também rodam de verdade (avisos, foco, Esc, permissão).
-for (const caminho of ['features/gestao/producao/AbaProducaoDoDiaApi', 'features/gestao/caixa/AbaCaixaApi', 'features/gestao/caixa/ModalFecharCaixa', 'features/loja/GestoLoja']) {
+// #2078: o modal do fechamento e o gesto da loja também rodam de verdade (avisos, foco, Esc, permissão). // #2258 (F3): ValorDoResumo roda de verdade, senão virava só um nome na árvore
+for (const caminho of ['features/gestao/producao/AbaProducaoDoDiaApi', 'features/gestao/caixa/AbaCaixaApi', 'features/gestao/caixa/ModalFecharCaixa', 'features/gestao/caixa/ValorDoResumo', 'features/loja/GestoLoja']) {
   const url = new URL(`../src/${caminho}.jsx`, import.meta.url)
   telasCompiladas.set(url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
@@ -273,11 +273,15 @@ await confere('Produção do dia: a tela abre com a grade e o saldo; nada no lot
   assert.equal(doTipo(t.arvore, 'form').length, 0, 'o lote só aparece na revisão explícita')
   assert.match(texto(cartoesDaTela(t.arvore)[0]), /Talharim.*500 g.*4 no estoque/)
   assert.match(texto(cartoesDaTela(t.arvore)[2]), /Lasanha.*Família.*0 no estoque/)
-  assert.doesNotMatch(texto(cartoesDaTela(t.arvore)[3]), /no estoque/, 'prato sem estoque ligado não mostra saldo inventado')
+  assert.doesNotMatch(texto(cartoesDaTela(t.arvore)[3]), /\d+ no estoque/, 'prato sem estoque ligado não mostra saldo inventado')
+  // #2235 (banca T3-6): mas tem a mesma linha dos outros, dizendo que ainda não há estoque.
+  assert.match(texto(cartoesDaTela(t.arvore)[3]), /Ainda sem estoque/)
   const botaoDe = (indice) => doTipo(cartoesDaTela(t.arvore)[indice], 'button')[0]
   const descricao = andar(cartoesDaTela(t.arvore)[0], (n) => n.props?.id === botaoDe(0).props['aria-describedby'])[0]
   assert.match(texto(descricao), /4 no estoque/, 'o saldo é a descrição do botão, para o leitor de tela')
-  assert.equal(botaoDe(3).props['aria-describedby'], undefined)
+  const semEstoque = andar(cartoesDaTela(t.arvore)[3], (n) => n.props?.id === botaoDe(3).props['aria-describedby'])[0]
+  assert.equal(texto(semEstoque), 'Ainda sem estoque')
+  assert.equal(doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Limpar'), undefined, '#2235 (T3-8): sem nada no lote, não há Limpar')
   assert.equal(itensDoLote(t.arvore).length, 0)
   assert.equal(doTipo(t.arvore, 'CampoSelecao').filter((c) => c.props.rotulo === 'Prato').length, 0, 'não há mais lista suspensa de pratos')
   assert.equal(doTipo(t.arvore, 'Botao').find((b) => texto(b) === 'Conferir produção').props.disabled, true)
@@ -377,7 +381,7 @@ await confere('Produção do dia: o filtro por categoria muda a grade; a linha d
   await t.assentar()
   const filtro = (rotulo) => doTipo(t.renderizar(), 'Chip').find((c) => c.props.papel === 'filtro' && texto(c) === rotulo)
   filtro('Molhos').props.onClick()
-  assert.deepEqual(cartoesDaTela(t.renderizar()).map((c) => texto(doTipo(c, 'button')[0])), ['Molho sugo300 g'])
+  assert.deepEqual(cartoesDaTela(t.renderizar()).map((c) => texto(doTipo(c, 'button')[0])), ['Molho sugo300 gAinda sem estoque'])
   filtro('Todos').props.onClick()
   assert.equal(cartoesDaTela(t.renderizar()).length, 4)
   revisar(t)
@@ -970,10 +974,13 @@ await confere('#2078 B11/E4: Lançamento abre com foco no valor e não fecha por
   const modal = () => doTipo(t.renderizar(), 'Modal')[0]
   assert.equal(modal().props.titulo, 'Lançar entrada ou saída')
   assert.equal(modal().props.focarCampo, true)
-  assert.equal(modal().props.segurarFechamento, false, 'vazio, Esc fecha como antes')
+  // #2258 (auditoria F4, T17): o valor digitado não segura mais o Esc em silêncio; ele pergunta
+  // "Descartar o que foi digitado?". `segurarFechamento` ficou só para o envio em andamento.
+  assert.equal(modal().props.segurarFechamento, false, 'sem envio, nada trava a janela')
+  assert.equal(modal().props.confirmarDescarte, false, 'vazio, Esc fecha como antes')
   assert.equal(andar(modal(), (n) => n.type === 'CampoReais' && n.props.rotulo === 'Valor')[0].props['data-foco-inicial'], '')
   andar(modal(), (n) => n.type === 'CampoReais' && n.props.rotulo === 'Valor')[0].props.aoMudar(1250)
-  assert.equal(modal().props.segurarFechamento, true, 'com valor digitado, Esc e fundo não perdem o que ela digitou')
+  assert.equal(modal().props.confirmarDescarte, true, 'com valor digitado, Esc, fundo e X perguntam antes de descartar')
   assert.equal(typeof modal().props.aoFechar, 'function', 'o X continua fechando')
 })
 
@@ -987,10 +994,11 @@ await confere('#2078 B11/E4/E5: Fechar o caixa abre no contado, segura o valor e
   assert.equal(modal().props.titulo, 'Fechar o caixa')
   assert.equal(modal().props.focarCampo, true)
   assert.equal(modal().props.segurarFechamento, false)
+  assert.equal(modal().props.confirmarDescarte, false)
   const contado = () => andar(modal(), (n) => n.type === 'CampoReais')[0]
   assert.equal(contado().props['data-foco-inicial'], '')
   contado().props.aoMudar(22210)
-  assert.equal(modal().props.segurarFechamento, true)
+  assert.equal(modal().props.confirmarDescarte, true, '#2258: com o contado digitado, fechar pergunta antes')
   const diferenca = doTipo(modal(), 'DiferencaDaGaveta')[0]
   assert.equal(diferenca.props.conferencia.texto.replace(/ /g, ' '), 'Faltam R$ 40,00')
   assert.equal(diferenca.props.conferencia.gravidade, 'Diferença grande: conte de novo antes de fechar.')

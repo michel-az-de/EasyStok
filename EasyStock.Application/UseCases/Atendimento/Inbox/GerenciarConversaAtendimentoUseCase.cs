@@ -23,7 +23,7 @@ public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid Co
 public sealed class GerenciarConversaAtendimentoUseCase(
     IConversaRepository conversaRepository, IUnitOfWork unitOfWork, IPublicadorEventoIntegracao? publicador = null,
     IQueueService? fila = null, ResolvedorCanal? resolvedorCanal = null,
-    ILogger<GerenciarConversaAtendimentoUseCase>? logger = null)
+    ILogger<GerenciarConversaAtendimentoUseCase>? logger = null, IClienteRepository? clientes = null)
 {
     public const string PrefixoLiberacao = "atendimento automático retomado por ";
 
@@ -38,11 +38,15 @@ public sealed class GerenciarConversaAtendimentoUseCase(
     public async Task<ConversaSituacaoResult> LiberarAutomaticoAsync(AcaoConversaCommand command, CancellationToken ct = default)
     {
         var retomou = false;
-        var resultado = await ExecutarAsync(command, (conversa, agora) =>
+        var resultado = await ExecutarAsync(command, async (conversa, agora) =>
         {
             retomou = conversa.Situacao != SituacaoConversa.Automatica;
             conversa.LiberarAutomatico();
-            return conversaRepository.AddMensagemAsync(
+            // #2249: devolver ao robô também devolve a pessoa encaminhada à responsável.
+            if (clientes is not null && conversa.ClienteId is { } clienteId
+                && await clientes.GetByIdAsync(command.EmpresaId, clienteId) is { AtendimentoAutomaticoPausado: true } cliente)
+                cliente.RetomarAtendimentoAutomatico(agora);
+            await conversaRepository.AddMensagemAsync(
                 Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
                     TipoConteudoMensagem.Texto, PrefixoLiberacao + command.QuemAgiu),
                 ct);

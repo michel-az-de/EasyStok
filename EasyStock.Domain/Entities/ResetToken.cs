@@ -11,6 +11,12 @@ namespace EasyStock.Domain.Entities
 
         /// <summary>Link de convite de primeiro acesso (N9): 32 bytes em base64url, 72 h, 1 uso, 1 por canal (e-mail e WhatsApp).</summary>
         public const string Convite = "Convite";
+
+        /// <summary>
+        /// Chave de acesso de uso único (#2201): empresa + 32 bytes aleatórios em base64url, 30 dias, 1 uso. Troca-se uma
+        /// vez por uma sessão de aparelho; nunca redefine senha nem aceita convite.
+        /// </summary>
+        public const string Ativacao = "Ativacao";
     }
 
     public class ResetToken

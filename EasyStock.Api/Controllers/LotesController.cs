@@ -4,6 +4,7 @@ using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.Etiquetas;
 using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
+using EasyStock.Application.UseCases.Lotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Application.UseCases.RemoverItemLote;
@@ -26,6 +27,7 @@ public class LotesController(
     ObterLoteDetalhesUseCase obterUseCase,
     MontarPayloadRenderUseCase montarRenderUseCase,
     MarcarEtiquetasImpressasUseCase marcarImpressasUseCase,
+    GarantirNumeroCurtoLoteUseCase numeroCurtoUseCase,
     ILoteRepository loteRepo,
     IProdutoRepository produtoRepo,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
@@ -129,6 +131,18 @@ public class LotesController(
         var result = await montarRenderUseCase.ExecuteAsync(
             new MontarPayloadRenderQuery(emp, id, templateOrigem, templateId));
         return result == null ? DataNotFound("Lote não encontrado ou sem etiquetas.") : DataOk(result);
+    }
+
+    [SwaggerOperation(
+        Summary = "Número curto do lote (código de barras)",
+        Description = "#2199: lote criado antes do número curto ganha o dele aqui; repetir devolve o mesmo número.")]
+    [HttpPost("{id:guid}/numero-curto")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> GarantirNumeroCurto(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        var result = await numeroCurtoUseCase.ExecuteAsync(new GarantirNumeroCurtoLoteCommand(emp, id), ct);
+        return result is null ? DataNotFound("Lote não encontrado.") : DataOk(result);
     }
 
     [SwaggerOperation(Summary = "Mark labels as printed (writes snapshot on first call, idempotent on repeat)")]

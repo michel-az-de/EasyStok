@@ -83,6 +83,7 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
             _db, dispatcher,
             new SyncAutoLinker(_db, semAutoLink, NullLogger<SyncAutoLinker>.Instance, null!, null!, null!, null!, null!),
             null!, broker, produtoRepo, semAutoLink, TimeProvider.System,
+            new EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile(_db, NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Persistence.ILoteNumeroCurtoRepository>(), NullLogger<EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile>.Instance),
             NullLogger<SyncController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = _http }

@@ -61,7 +61,7 @@ await context.route('**/api/**', async route => {
 const page = await context.newPage()
 page.setDefaultTimeout(10000)
 page.on('pageerror', erro => erros.push(erro.message))
-const aviso = page.getByText('Maquininha na entrega: Encomenda para outro dia: sinal de 50% antes da produção. Restante na entrega.', { exact: true })
+const aviso = page.getByText('Maquininha na entrega: Encomenda com antecedência: sinal de 50% antes da produção. Restante na entrega.', { exact: true })
 const escolherDia = async data => {
   await Promise.all([
     page.waitForResponse(r => r.url().includes('/comanda/janelas?') && new URL(r.url()).searchParams.get('dataInicio') === data),

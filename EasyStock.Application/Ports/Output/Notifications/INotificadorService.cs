@@ -8,6 +8,8 @@ public interface INotificadorService
     /// <summary>
     /// Publica evento + cria entradas no outbox na mesma transação.
     /// Chamado por use cases da API para notificações event-driven imediatas.
+    /// <paramref name="refEntidadeId"/> (#2258): a entidade do fato (ex.: a abertura do caixa), para achar o aviso depois
+    /// e resolvê-lo quando o fato deixa de valer. Vai depois do <c>ct</c> para os call-sites posicionais seguirem compilando.
     /// </summary>
     Task PublicarEventoAsync(
         TipoEventoNotificacao tipo,
@@ -15,7 +17,8 @@ public interface INotificadorService
         Guid? usuarioDestinoId,
         string payloadJson,
         IDictionary<string, object?>? varsAdicionais = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        Guid? refEntidadeId = null);
 
     /// <summary>
     /// Outbox transacional (ADR-0030): enfileira um EventoNotificacao (Status=Pendente) na

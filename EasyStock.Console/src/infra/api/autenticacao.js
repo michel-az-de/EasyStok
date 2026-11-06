@@ -11,7 +11,7 @@ export async function entrar(email, senha) {
     metodo: 'POST', corpo: { email, senha, empresaId: null }, autenticado: false,
   })
   const empresaId = empresaDoToken(dados.token)
-  if (!empresaId) throw new Error('Este usuário precisa de uma empresa ativa única para entrar na Casa da Baba. Peça à responsável para conferir o acesso.')
+  if (!empresaId) throw new Error('Este usuário precisa de uma empresa ativa única para entrar na Casa da Babá. Peça à responsável para conferir o acesso.')
   return abrirSessao(dados, { id: empresaId, nome: null })
 }
 
@@ -36,9 +36,19 @@ export async function entrarComGoogle(idToken) {
   return abrirSessao(dados, empresaId ? { id: empresaId, nome: null } : null)
 }
 
-async function abrirSessao(dados, empresa) {
+// #2201: código de acesso de uso único, gerado pela responsável. A sessão fica guardada no aparelho.
+export async function entrarComChave(chave) {
+  const dados = await chamarApi('/api/auth/chave-acesso', {
+    metodo: 'POST', corpo: { chave: String(chave ?? '').trim() }, autenticado: false,
+  })
+  const empresaId = empresaDoToken(dados.token)
+  if (!empresaId) throw new Error('Este código não abriu uma empresa. Peça um novo à responsável.')
+  return abrirSessao(dados, { id: empresaId, nome: null }, { dispositivo: true })
+}
+
+async function abrirSessao(dados, empresa, extra = {}) {
   await prepararPushParaSessao(identidadeDaSessao({ usuario: dados.usuario, empresa }))
-  return gravarSessao(atualizarTokens({ usuario: dados.usuario, empresa }, dados))
+  return gravarSessao(atualizarTokens({ usuario: dados.usuario, empresa, ...extra }, dados))
 }
 
 // Sair é decisão dela: os rascunhos guardados para depois do novo login vão junto.

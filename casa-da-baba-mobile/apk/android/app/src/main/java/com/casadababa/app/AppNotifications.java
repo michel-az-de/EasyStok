@@ -120,6 +120,21 @@ public final class AppNotifications {
             NoticeManager.get(context).acceptPush(envelope);
         } catch (Exception ignored) { /* Unverified data is never presented or acknowledged. */ }
     }
+    /** Conteúdo OTA preparado em segundo plano. Devolve true só quando o Android aceitou mostrar. */
+    public static boolean contentReady(Context context, String version) {
+        initialize(context);
+        if (!enabled(context)) return false;
+        Intent open = new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent tap = PendingIntent.getActivity(context, 1, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        String body = "Versão " + version + " preparada. Feche e abra o app para aplicar. Seu trabalho atual continua salvo.";
+        Notification.Builder builder = Build.VERSION.SDK_INT >= 26
+            ? new Notification.Builder(context, NoticePolicy.CHANNEL) : new Notification.Builder(context);
+        builder.setSmallIcon(R.drawable.ic_stat_notice).setContentTitle("Conteúdo novo da Casa da Baba").setContentText(body)
+            .setStyle(new Notification.BigTextStyle().bigText(body)).setContentIntent(tap).setAutoCancel(true)
+            .setVisibility(Notification.VISIBILITY_PUBLIC);
+        try { context.getSystemService(NotificationManager.class).notify("content-ready", 2093, builder.build()); return true; }
+        catch (SecurityException denied) { return false; }
+    }
     static void display(Context context, JSONObject notice) throws Exception {
         initialize(context);
         if (!enabled(context)) return;

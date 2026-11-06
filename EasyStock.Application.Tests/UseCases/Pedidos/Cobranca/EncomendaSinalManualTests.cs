@@ -266,7 +266,8 @@ public class EncomendaSinalManualTests
     private static CobrancaPedidoFixture ReservaNoDiaDaEntrega()
     {
         var f = new CobrancaPedidoFixture();
-        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora.AddDays(-1);
+        // #2259: encomenda feita com 2 dias de antecedência, cobrada no dia da entrega.
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora.AddDays(-2);
         f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora;
         return f;
     }

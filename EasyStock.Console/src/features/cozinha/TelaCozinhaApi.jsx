@@ -152,8 +152,8 @@ export function TelaCozinhaApi({ linhas }) {
       <header className={css.topoPagina}>
         <h1>Cozinha</h1>
         <div className={css.chipsFiltro} role="radiogroup" aria-label="Dia da fila">
-          <Chip papel="escolha" reservarIcone ativo={!amanha} onClick={() => setAmanhaDesde(null)}>Hoje</Chip>
-          <Chip papel="escolha" reservarIcone ativo={amanha} onClick={() => setAmanhaDesde(dataIsoNoFuso(agora))}>Amanhã</Chip>
+          <Chip papel="escolha" ativo={!amanha} onClick={() => setAmanhaDesde(null)}>Hoje</Chip>
+          <Chip papel="escolha" ativo={amanha} onClick={() => setAmanhaDesde(dataIsoNoFuso(agora))}>Amanhã</Chip>
         </div>
         <span className={`${css.aoVivo} ${aoVivo ? css.aoVivoLigado : ''}`}>
           <span className={css.pontoVivo} aria-hidden="true" />

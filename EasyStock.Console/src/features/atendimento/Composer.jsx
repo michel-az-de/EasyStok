@@ -19,6 +19,7 @@ import {
 import { escolherFormatoGravacao } from '../../dominio/audio'
 import { useArquivoComoDataUrl } from '../../hooks/useArquivoComoDataUrl'
 import { useGravadorAudio } from '../../hooks/useGravadorAudio'
+import { useMenuDetalhes } from '../../hooks/useMenuDetalhes'
 import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
 import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
 import { SeletorRespostas } from './SeletorRespostas'
@@ -54,6 +55,7 @@ export function Composer({
   const campoRef = useRef(null)
   const respostasRef = useRef(null)
   const ferramentasRef = useRef(null)
+  useMenuDetalhes(ferramentasRef)
   const idListaRespostas = useId()
   const sugestoesNoCampo = visivel && barra.aberto && barra.pelaBarra && barra.itens.length > 0
   function abrirNotaInterna() {
@@ -199,7 +201,7 @@ export function Composer({
   // amarela e o campo apagado com Programar e Nota ativos). Fica uma linha neutra no lugar do campo.
   if (motivo?.acao === 'reabrir') {
     return (
-      <div className={css.composer}>
+      <div className={css.composer} data-area-envio>
         <p className={css.linhaEncerrada}>
           <span>Conversa encerrada</span>
           {aoReabrir && <Botao disabled={reabrindo} onClick={aoReabrir}>{reabrindo ? 'Reabrindo…' : 'Reabrir conversa'}</Botao>}
@@ -209,7 +211,7 @@ export function Composer({
   }
 
   return (
-    <div className={css.composer}>
+    <div className={css.composer} data-area-envio>
       {motivo && (
         <p className={`${css.bloqueio} ${motivo.acao === 'bloqueio' ? css.bloqueioGrave : ''}`}>
           <Icone nome={motivo.acao === 'bloqueio' ? 'bloqueio' : 'alerta'} />
@@ -384,7 +386,7 @@ export function Composer({
                 className={`${css.acaoComRotulo} ${complementoLigado ? css.chaveLigada : ''}`}
                 onClick={alternarComplemento}
               >
-                <Icone nome="sparkles" /><span className={css.rotuloAcao}>Sugestões de IA</span>
+                <Icone nome="dica" /><span className={css.rotuloAcao}>Sugestões de IA</span>
               </Botao></Tooltip>}
                 </div>
               </details>

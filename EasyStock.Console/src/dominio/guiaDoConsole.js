@@ -4,11 +4,25 @@
 import { moduloDaRota } from './acessoModulos'
 import { hashDoModulo, modulosDoHall } from './modulos'
 
+const PASSOS_POR_TELA = {
+  entregas: {
+    painel: 'No Painel de entregas, acompanhe os pedidos e as viagens do dia.',
+    agenda: 'Na Agenda de encomendas, veja as reservas dos próximos sete dias.',
+    janelas: 'Em Janelas de entrega, ajuste horários e capacidade antes de combinar com o cliente.',
+  },
+  financeiro: {
+    caixa: 'No Caixa do dia, confira os lançamentos e os totais.',
+    pagar: 'Em Contas a pagar, confira os compromissos da loja.',
+    receber: 'Em Contas a receber, acompanhe os valores a receber.',
+    relatorios: 'Em Relatórios, escolha o período; Exportar CSV leva os dados para a planilha.',
+  },
+}
+
 export const GUIA_POR_MODULO = {
   atendimento: {
-    faz: 'Conversas com os clientes, a ficha de cada um e a comanda do pedido, tudo no Balcão.',
+    faz: 'Conversas com os clientes, a ficha de cada um e a comanda do pedido, tudo na tela Conversas.',
     passos: [
-      'No Balcão, escolha a conversa na lista. As que precisam de você aparecem marcadas e tocam um som.',
+      'Em Conversas, escolha o cliente na lista. As conversas que precisam de você aparecem marcadas e tocam um som.',
       'Responda no campo da mensagem; / busca uma resposta pronta. Confira o texto antes de enviar.',
       'No sino de Avisos, use Ativar avisos neste aparelho para saber de contato novo, pagamento e etapa do pedido mesmo com o console fechado.',
     ],
@@ -33,25 +47,17 @@ export const GUIA_POR_MODULO = {
     faz: 'A fila de preparo dos pedidos do dia, na ordem em que precisam sair.',
     passos: [
       'Confira o dia selecionado antes de começar.',
-      'Na Fila de preparo, inicie e conclua cada pedido; o Balcão vê a etapa na hora.',
+      'Na Fila de preparo, inicie e conclua cada pedido; o Atendimento vê a etapa na hora.',
       'Se a fila não carregar, use Tentar novamente: lista vazia durante uma falha não quer dizer que não há pedidos.',
     ],
   },
   entregas: {
-    faz: 'Os pedidos a entregar, as viagens, a agenda de encomendas e as janelas de entrega.',
-    passos: [
-      'No Painel de entregas, acompanhe os pedidos e as viagens do dia.',
-      'Na Agenda de encomendas, veja as reservas dos próximos sete dias.',
-      'Em Janelas de entrega, ajuste horários e capacidade antes de combinar com o cliente.',
-    ],
+    faz: 'Acompanhe os pedidos, as viagens e a agenda de entregas da loja.',
+    passos: Object.values(PASSOS_POR_TELA.entregas),
   },
   financeiro: {
-    faz: 'Caixa do dia, contas a pagar e a receber, extrato, relatórios e categorias.',
-    passos: [
-      'Abra o Caixa do dia e confira os lançamentos antes de fechar.',
-      'Lance compromissos em Contas a pagar e Contas a receber.',
-      'Em Relatórios, escolha o período; Exportar CSV leva os dados para a planilha.',
-    ],
+    faz: 'O caixa e o acompanhamento financeiro da loja.',
+    passos: Object.values(PASSOS_POR_TELA.financeiro),
   },
   campanhas: {
     faz: 'Fidelidade e cupons para trazer o cliente de volta.',
@@ -67,15 +73,18 @@ export const GUIA_POR_MODULO = {
 }
 
 // Módulos que o perfil abre no modo atual, com o da tela atual primeiro e aberto.
-export function guiaDoConsole({ rota, fonteApi, permite }) {
+export function guiaDoConsole({ rota, fonteApi, permite, acoes = null }) {
   const atual = moduloDaRota(rota ?? {})
-  const lista = modulosDoHall({ fonteApi })
+  const lista = modulosDoHall({ fonteApi, acoes })
     .filter((modulo) => modulo.disponivel && permite(modulo.id) && GUIA_POR_MODULO[modulo.id])
     .map((modulo) => ({
       id: modulo.id,
       nome: modulo.nome,
       icone: modulo.icone,
       ...GUIA_POR_MODULO[modulo.id],
+      passos: PASSOS_POR_TELA[modulo.id]
+        ? modulo.telas.map((tela) => PASSOS_POR_TELA[modulo.id][tela.id]).filter(Boolean)
+        : GUIA_POR_MODULO[modulo.id].passos,
       telas: modulo.telas.map((tela) => ({ id: tela.id, rotulo: tela.rotulo, href: hashDoModulo(modulo.id, tela.id) })),
       aberto: modulo.id === atual,
     }))

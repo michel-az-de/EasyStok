@@ -309,6 +309,49 @@ public class StorefrontTests
         s.CorPrimaria.Should().Be(cor);
     }
 
+    private static EasyStock.Domain.Entities.Storefront.Storefront ComBrandingCompleto()
+    {
+        var s = NovoStorefrontValido();
+        s.AtualizarBranding(
+            subtituloPublico: "Massas frescas artesanais",
+            logoUrl: "https://example.com/logo.png",
+            corPrimaria: "#5C2E0D",
+            whatsappPedidos: "+5511997573992",
+            mensagemForaArea: "Por enquanto entregamos só no Butantã.");
+        return s;
+    }
+
+    [Fact]
+    public void AtualizarBranding_com_um_campo_so_mantem_os_demais()
+    {
+        // #2244: o PUT parcial mandava só o WhatsApp e apagava subtítulo, logo, cor e mensagem.
+        var s = ComBrandingCompleto();
+
+        s.AtualizarBranding(whatsappPedidos: " 5511988887777 ");
+
+        s.WhatsappPedidos.Should().Be("5511988887777");
+        s.SubtituloPublico.Should().Be("Massas frescas artesanais");
+        s.LogoUrl.Should().Be("https://example.com/logo.png");
+        s.CorPrimaria.Should().Be("#5C2E0D");
+        s.MensagemForaArea.Should().Be("Por enquanto entregamos só no Butantã.");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AtualizarBranding_com_string_vazia_limpa_o_campo(string vazio)
+    {
+        var s = ComBrandingCompleto();
+
+        s.AtualizarBranding(subtituloPublico: vazio, logoUrl: vazio, corPrimaria: vazio);
+
+        s.SubtituloPublico.Should().BeNull();
+        s.LogoUrl.Should().BeNull();
+        s.CorPrimaria.Should().BeNull("string vazia limpa a cor em vez de ser rejeitada como hex inválido");
+        s.WhatsappPedidos.Should().Be("+5511997573992");
+        s.MensagemForaArea.Should().Be("Por enquanto entregamos só no Butantã.");
+    }
+
     [Fact]
     public void AjustarPedidoMinimo_atualiza_e_marca_data()
     {

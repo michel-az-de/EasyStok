@@ -85,6 +85,27 @@ public class EstoqueDoDiaUseCaseTests
     }
 
     [Fact]
+    public async Task Lote_DizOTamanhoDaPorcao_EOItemDeEstoque_ParaRastrearERegistrarAPerda()
+    {
+        // #2235 (banca T1-4/T1-5): o mesmo código de lote leva 600 g e 800 g; a linha diz o tamanho, e o
+        // item de estoque deixa lançar a perda do lote vencido na própria linha.
+        var lasanhaId = Guid.NewGuid();
+        var lasanha = Prato(lasanhaId, "Lasanha");
+        var v600 = Guid.NewGuid();
+        lasanha.AdicionarVariacao(CardapioItemVariacao.Criar(lasanha.Id, "600 g", 40m, ordemExibicao: 0, produtoVariacaoId: v600));
+        _cardapio.GetTodosDoStorefrontAsync(_vitrine.Id, Arg.Any<CancellationToken>()).Returns([lasanha]);
+        var de600 = Lote(lasanhaId, 1, new DateTime(2026, 10, 7), codigo: "LOT-261012-001");
+        de600.ProdutoVariacaoId = v600;
+        var semPorcao = Lote(lasanhaId, 2, new DateTime(2026, 10, 20), codigo: "LOT-261012-001");
+        _itens.GetByProdutosAsync(EmpresaId, Arg.Any<IEnumerable<Guid>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, IReadOnlyCollection<ItemEstoque>> { [lasanhaId] = [de600, semPorcao] });
+
+        var lotes = (await Sut().ExecuteAsync(EmpresaId)).Pratos.Single().Lotes;
+
+        lotes.Select(l => (l.ItemEstoqueId, l.Porcao)).Should().Equal((de600.Id, "600 g"), (semPorcao.Id, (string?)null));
+    }
+
+    [Fact]
     public async Task PratoComPorcoes_MostraOndeEstaAVendaSemSaldo()
     {
         // #1542: o alerta é do prato; a contagem que o fecha é da porção, então a tela precisa saber qual.

@@ -109,6 +109,7 @@ builder.Services.AddReportingApi();
 builder.Services.Configure<EasyStock.Application.Services.PedidoEstoqueOptions>(
     builder.Configuration.GetSection("Pedidos"));
 builder.Services.AddEasyStockAsyncInfrastructure(builder.Configuration);
+builder.Services.AddAnexosDeNotificacao(); // #2211: anexo dos avisos publicados na própria requisição
 
 // ── Storefront — WhatsApp OTP provider ────────────────────────────────────────
 // O stub exige opt-in em Production e não envia mensagens reais. Sem provider configurado,

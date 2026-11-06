@@ -53,10 +53,11 @@ provar('sem ordem própria, os números seguem o foco (como antes)', () => {
 
 provar('arrastar um número grava a ordem livre e a tela a respeita', () => {
   const movida = moverPainelDoHall({ foco: 'atendimento' }, 'financeiro', 'atendimento')
-  assert.deepEqual(movida.ordemPaineis, ['financeiro', 'atendimento', 'entregas', 'cozinha'])
-  assert.deepEqual(ordenarPaineisDoHall(movida, todos), ['financeiro', 'atendimento', 'entregas', 'cozinha'])
+  // #2258 (auditoria A2): a ordem de uso é atender, preparar, entregar; a Cozinha vem antes das Entregas.
+  assert.deepEqual(movida.ordemPaineis, ['financeiro', 'atendimento', 'cozinha', 'entregas'])
+  assert.deepEqual(ordenarPaineisDoHall(movida, todos), ['financeiro', 'atendimento', 'cozinha', 'entregas'])
   const devolta = moverPainelDoHall(movida, 'financeiro', 'cozinha')
-  assert.deepEqual(devolta.ordemPaineis, ['atendimento', 'entregas', 'cozinha', 'financeiro'])
+  assert.deepEqual(devolta.ordemPaineis, ['atendimento', 'cozinha', 'financeiro', 'entregas'])
 })
 
 provar('a ordem livre sobrevive a gravar e ler, e lixo vira ordem válida', () => {
@@ -101,11 +102,11 @@ const cardapio = { estado: 'ok', dados: { itens: [
 const fontes = { atendimento: conversas, pedidos, financeiro: { estado: 'ok', dados: { saldoEsperado: 10, saldoInicial: 10, aberto: true } }, cardapio }
 
 provar('cada módulo com fonte diz o que pede atenção, com o mesmo número de cima', () => {
-  assert.deepEqual(pendenciaDoModulo('atendimento', fontes), { texto: '2 conversas sem resposta', atencao: true })
+  assert.deepEqual(pendenciaDoModulo('atendimento', fontes), { texto: '2 conversas precisam de você', atencao: true }) // #2258 (auditoria H2/H3): o nome do cartão de número
   assert.deepEqual(pendenciaDoModulo('cozinha', fontes), { texto: '2 pedidos no preparo', atencao: true })
   assert.deepEqual(pendenciaDoModulo('entregas', fontes), { texto: '1 pedido pronto para sair', atencao: true })
   assert.deepEqual(pendenciaDoModulo('financeiro', fontes), { texto: 'Caixa aberto', atencao: false })
-  assert.deepEqual(pendenciaDoModulo('cardapio', fontes), { texto: '1 prato com pendência', atencao: true })
+  assert.deepEqual(pendenciaDoModulo('cardapio', fontes), { texto: '1 prato com pendência', atencao: true, href: '#/m/cardapio/itens/pendencia' }) // #2258 (auditoria C1)
   assert.deepEqual(indicadoresDoHall(fontes, PAINEIS).map((i) => i.valor), [2, 2, 1, 10])
 })
 
@@ -127,7 +128,7 @@ provar('zero numa leitura parcial não declara fila vazia', () => {
 
 provar('contagens positivas parciais preservam o aviso de mais itens', () => {
   const parciais = Object.fromEntries(Object.entries(fontes).map(([id, fonte]) => [id, { ...fonte, dados: { ...fonte.dados, parcial: true } }]))
-  assert.deepEqual(pendenciaDoModulo('atendimento', parciais), { texto: '2+ conversas sem resposta', atencao: true })
+  assert.deepEqual(pendenciaDoModulo('atendimento', parciais), { texto: '2+ conversas precisam de você', atencao: true })
   assert.deepEqual(pendenciaDoModulo('cozinha', parciais), { texto: '2+ pedidos no preparo', atencao: true })
   assert.deepEqual(pendenciaDoModulo('entregas', parciais), { texto: '1+ pedido pronto para sair', atencao: true })
 })
@@ -158,6 +159,8 @@ provar('os oito módulos têm ilustração própria, decorativa e no tema; só o
     assert.match(svg, /var\(--il-tinta\)/, `${id} usa as cores do tema`)
     assert.doesNotMatch(svg, /#[0-9a-f]{6}/i, `${id} sem cor fixa`)
     if (moduloCongelado(id)) assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} congelado sem cartão`)
+    // #2232 (H10): Configurações sai da grade e vira link de rodapé, sem cartão ilustrado.
+    else if (id === 'configuracoes') assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} no rodapé, sem cartão`)
     else assert.match(html, new RegExp(`data-ilustracao="${id}"`), `${id} no cartão`)
   }
   assert.equal(renderToStaticMarkup(h(IlustracaoDoModulo, { id: 'privado' })), '')
@@ -168,7 +171,8 @@ provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue send
   const links = html.match(/<a [^>]*href="#\/[^"]*"[^>]*>/g) ?? []
   assert.ok(links.length >= 8, `${links.length} links`)
   for (const link of links.filter((l) => /data-modulo|class="abrir"/.test(l))) assert.match(link, /draggable="false"/)
-  assert.match(html, /Arraste os números e os cartões para mudar a ordem\./)
+  // #2258 (auditoria H8): a dica de arrastar saiu do rodapé do Início; mora só no modo "Organizar áreas".
+  assert.doesNotMatch(html, /Arraste os números e os cartões para mudar a ordem\./)
 })
 
 provar('#1810 continua valendo: até 20 controles na primeira vista', () => {

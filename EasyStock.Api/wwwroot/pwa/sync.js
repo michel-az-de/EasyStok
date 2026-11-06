@@ -1011,6 +1011,10 @@
         saveQueue(remaining);
       }
       // Se acceptedIds ausente, mantém a fila intacta (melhor reenviar do que perder).
+      // #2209: o pull nunca devolve a este aparelho o lote que ele lançou; o número vem aqui.
+      if (result.numerosCurtos && typeof result.numerosCurtos === 'object') {
+        try { _gravarNumerosCurtos(result.numerosCurtos); } catch (e) { console.warn('[sync] número do lote:', e && e.message); }
+      }
       // F4 — feedback visual: avisa o app pra mostrar toast com qtd sincronizada.
       if (acceptedCount > 0) {
         try {
@@ -1197,6 +1201,31 @@
   const _MARCAS_DE_LOTE = ['deleted', 'deletedAt', 'deletedBy', 'discarded', 'discardedAt', 'discardedBy', 'discardReason', 'legacyImported'];
   let _consecutiveApplyFailures = 0;
 
+  // #2209: número curto do lote (#2199), o da chave de 12 dígitos da barra. Só o servidor o dá
+  // (8 dígitos, 10 depois de 99.999.999). Gravá-lo não é mudança do aparelho: o snapshot também
+  // o recebe, para o próximo save não devolver o lote ao servidor, e a tela não recarrega.
+  const _NUMERO_CURTO = /^(\d{8}|\d{10})$/;
+  function _numeroCurtoValido(n) { return typeof n === 'string' && _NUMERO_CURTO.test(n); }
+  function _numeroNoSnapshot(id, n) {
+    const s = lastSnapshot && Array.isArray(lastSnapshot.batches) ? lastSnapshot.batches.find(x => x && x.id === id) : null;
+    if (s) s.numeroCurto = n;
+  }
+  function _gravarNumerosCurtos(numeros) {
+    if (!window.cdbApp) return;
+    const state = window.cdbApp.getState();
+    if (!state || !Array.isArray(state.batches)) return;
+    let mudou = false;
+    state.batches.forEach(b => {
+      if (!b || !Object.prototype.hasOwnProperty.call(numeros, b.id)) return;
+      const n = numeros[b.id];
+      if (!_numeroCurtoValido(n) || b.numeroCurto === n) return;
+      b.numeroCurto = n;
+      _numeroNoSnapshot(b.id, n);
+      mudou = true;
+    });
+    if (mudou) localStorage.setItem(_SERVER_MUTATION_MAP.batch.storage, JSON.stringify(state.batches));
+  }
+
   function applyServerMutations(mutations, unresolved = []) {
     _pullDeferred = syncHeldForImport();
     if (_pullDeferred) return false;
@@ -1236,8 +1265,18 @@
             if (novo === undefined) delete coll[idx][k]; else coll[idx][k] = novo;
             changed = true;
           });
+          // #2209: o número entra sem recarregar; o servidor antigo, sem o campo, não o apaga.
+          const numero = m.payload.numeroCurto;
+          if (_numeroCurtoValido(numero) && coll[idx].numeroCurto !== numero) {
+            coll[idx].numeroCurto = numero;
+            _numeroNoSnapshot(coll[idx].id, numero);
+          }
           localStorage.setItem(map.storage, JSON.stringify(coll));
           return;
+        }
+        if (type === 'batch' && op === 'upsert' && m.payload.numeroCurto != null && !_numeroCurtoValido(m.payload.numeroCurto)) {
+          m.payload = Object.assign({}, m.payload);
+          delete m.payload.numeroCurto;
         }
 
         if (op === 'upsert') {
@@ -1371,6 +1410,8 @@
       try {
         status = (await flush()) || 'ok';
         fetchAndProcessCommands();
+        // #2209: a regra de impressão da loja; o próprio atualizar segura o intervalo de 10 min.
+        atualizarRegraImpressao();
       } catch (e) {
         try { console.warn('[sync] tick falhou:', e && e.message); } catch (_) {}
         status = 'retry';
@@ -1457,7 +1498,8 @@
         else if (fila === 'degraded') resolveLocalReady({ ready: true, degraded: true });
         else resolveLocalReady({ ready: false, reason: 'local-storage-unavailable' });
       });
-      flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
+      flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup)
+        .then(function () { atualizarRegraImpressao(); });
       // Loop self-rescheduling com backoff exponencial em erro (substitui o
       // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
       // longo do server escala ate 10min entre tentativas, economizando
@@ -1858,6 +1900,59 @@
     } finally { clearTimeout(timeoutId); }
   }
 
+  // #2209 (F4): regra de impressão da loja do pareamento, por GET api/mobile/impressao. O servidor
+  // acha a loja pela chave do aparelho; aqui só se confere que a resposta é da loja pareada. Sem
+  // rede, 404 ou resposta de outra loja, fica a regra guardada; a loja sem regra (null) volta ao
+  // padrão do aparelho. Uma busca por vez e no máximo uma a cada 10 min, salvo forcar; a que
+  // falhou tenta de novo em 1 min. A forçada durante outra espera a outra acabar e busca de novo,
+  // para a troca de loja não ficar com a resposta da loja antiga.
+  const REGRA_IMPRESSAO_KEY = 'cdb-regra-impressao.v1';
+  const REGRA_IMPRESSAO_INTERVALO_MS = 10 * 60 * 1000;
+  const REGRA_IMPRESSAO_RETRY_MS = 60 * 1000;
+  let _regraImpressaoProxima = 0;
+  let _regraImpressaoPromise = null;
+  function esquecerRegraImpressao() {
+    _regraImpressaoProxima = 0;
+    try { localStorage.removeItem(REGRA_IMPRESSAO_KEY); } catch (_) {}
+  }
+  function atualizarRegraImpressao(opts) {
+    const forcar = !!(opts && opts.forcar);
+    if (_regraImpressaoPromise) return forcar ? _regraImpressaoPromise.then(() => atualizarRegraImpressao(opts)) : _regraImpressaoPromise;
+    if (!forcar && Date.now() < _regraImpressaoProxima) return Promise.resolve(false);
+    _regraImpressaoProxima = Date.now() + REGRA_IMPRESSAO_RETRY_MS;
+    _regraImpressaoPromise = _buscarRegraImpressao()
+      .then(ok => { if (ok) _regraImpressaoProxima = Date.now() + REGRA_IMPRESSAO_INTERVALO_MS; return ok; })
+      .catch(e => { console.warn('[impressao] regra da loja:', e && e.message); return false; })
+      .finally(() => { _regraImpressaoPromise = null; });
+    return _regraImpressaoPromise;
+  }
+  async function _buscarRegraImpressao() {
+    const pareamento = loadPairing();
+    if (!pareamento || !pareamento.apiKey || !pareamento.lojaId) return false;
+    // A loja é a do pareamento de agora, não a do começo da busca: o switchLoja pode trocá-la no meio.
+    const mesmaLoja = id => { const atual = loadPairing(); return !!(atual && atual.lojaId) && String(id || '').toLowerCase() === String(atual.lojaId).toLowerCase(); };
+    try {
+      const guardada = JSON.parse(localStorage.getItem(REGRA_IMPRESSAO_KEY) || 'null');
+      if (guardada && guardada.lojaId && !mesmaLoja(guardada.lojaId)) localStorage.removeItem(REGRA_IMPRESSAO_KEY);
+    } catch (_) {}
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const limite = ctrl ? setTimeout(() => ctrl.abort(), 10000) : null;
+    let resp;
+    try {
+      resp = await fetch(API_BASE_URL + API_PREFIX + '/impressao', { method: 'GET', headers: baseHeaders(), signal: ctrl ? ctrl.signal : undefined });
+    } finally { if (limite) clearTimeout(limite); }
+    if (!resp || !resp.ok) return false;
+    const corpo = await resp.json();
+    const d = corpo && corpo.data;
+    if (!d || !mesmaLoja(d.lojaId)) return false;
+    if (d.impressao == null) { localStorage.removeItem(REGRA_IMPRESSAO_KEY); return true; }
+    const I = window.cdbImpressoras;
+    if (!I || typeof I.normalizarRegra !== 'function') return false;
+    localStorage.setItem(REGRA_IMPRESSAO_KEY, JSON.stringify(Object.assign({}, I.normalizarRegra(d.impressao),
+      { lojaId: d.lojaId, versao: d.versao, alteradoEm: d.alteradoEm || null })));
+    return true;
+  }
+
   async function switchLoja(lojaId) {
     if (!navigator.onLine) throw new Error('sem rede');
     if (!getApiKey()) throw new Error('nao pareado');
@@ -1908,11 +2003,14 @@
         p.label = p.label; // preserva
         savePairing(p);
       }
+      // #2209: a regra de impressão era da loja antiga; a da nova vem logo depois do pull.
+      esquecerRegraImpressao();
       // #1474: loja nova = pull completo, nao a partir do cursor da antiga.
       resetPullCursor();
       // Drena fila atual + pega dados da loja nova
       try { await flush(); } catch (_) {}
       try { await pull(); } catch (_) {}
+      atualizarRegraImpressao({ forcar: true });
       // Reinicia SSE pra pegar grupo da nova loja
       try { stopRealtime(); startRealtime(); } catch (_) {}
     }
@@ -2954,6 +3052,7 @@
     startRealtime, stopRealtime,
     realtimeConnected: () => _sseSource && _sseSource.readyState === 1,
     listLojasDisponiveis, switchLoja,
+    atualizarRegraImpressao, esquecerRegraImpressao,
     uploadBackup, maybeAutoBackup,
     localBackupToFile, readLocalBackup, scheduleLocalBackup,
     pickBackupViaSAF,

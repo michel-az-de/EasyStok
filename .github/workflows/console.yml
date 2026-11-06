@@ -1,17 +1,19 @@
 name: console
 
 # Console do operador (ADR-0054): lint (oxlint), fronteira de camadas e build.
-# Roda só quando a pasta do console muda; o gate .NET fica no ci.yml.
+# Inclui a guarda da publicação do Console; o gate .NET fica no ci.yml.
 on:
   pull_request:
     paths:
       - 'EasyStock.Console/**'
       - '.github/workflows/console.yml'
+      - 'scripts/deploy/console-deploy*.sh'
   push:
     branches: [master]
     paths:
       - 'EasyStock.Console/**'
       - '.github/workflows/console.yml'
+      - 'scripts/deploy/console-deploy*.sh'
   workflow_dispatch:
 
 permissions:
@@ -30,6 +32,7 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: EasyStock.Console/package-lock.json
+      - run: bash ../scripts/deploy/console-deploy.test.sh
       - run: npm ci
       - run: npm run qualidade
       - run: node ferramentas/prova-2146-componentes-gramatica.mjs
@@ -145,4 +148,5 @@ jobs:
       - run: node ferramentas/prova-1806-lead-cadastro.mjs
       - run: node ferramentas/prova-1807-avisos.mjs
       - run: node ferramentas/prova-1810-entrada-google.mjs
+      - run: node ferramentas/prova-2225-google-celular.mjs
       - run: node ferramentas/prova-r11-impressao.mjs

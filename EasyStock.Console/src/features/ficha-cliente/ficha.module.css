@@ -125,6 +125,9 @@
   padding: var(--e-2); font-size: var(--t-apoio); color: var(--tinta);
 }
 .itemMenu:hover { background: var(--elevado); }
+.itemMenu[aria-disabled='true'] { color: var(--tinta-3); cursor: not-allowed; }
+.itemMenu { flex-wrap: wrap; }
+.motivoItemMenu { flex-basis: 100%; padding-left: calc(20px + var(--e-2)); color: var(--tinta-2); font-size: var(--t-minimo); }
 
 /* Confirmação em linha, no lugar do botão, nunca em modal (secao 4). Mesmo
    par pergunta/ação em toda ação destrutiva: voltar etapa, cancelar pedido,
@@ -157,6 +160,8 @@
 
 .tags { display: flex; gap: var(--e-3); flex-wrap: wrap; margin-top: var(--e-3); }
 .rodapeBloco { margin: var(--e-3) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
+/* #2232 (F6): a pergunta da baixa com o valor, em tinta cheia sobre o formulário. */
+.perguntaDaBaixa { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); font-variant-numeric: tabular-nums; }
 .corpoBloco { margin: 0 0 var(--e-3); font-size: var(--t-apoio); color: var(--tinta-2); }
 .enderecoCapturado { margin: 0 0 var(--e-1); font-size: var(--t-apoio); }
 
@@ -164,9 +169,8 @@
 .cabecalhoFicha { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: 64px; padding: var(--e-2) var(--e-4); flex-shrink: 0; }
 .cabecalhoFicha h2 { margin: 0; font-size: var(--t-titulo); font-weight: 700; }
 .ferramentasFicha { display: flex; align-items: center; }
-.iconeFicha { width: var(--toque); height: var(--toque); padding: 0; }
-.iconeFicha[aria-busy='true'] { cursor: progress; color: var(--tinta-3); }
-.pdfDaFicha { display: inline-flex; position: relative; }
+/* #2232 (F1, F7): o menu "Ações da ficha" do cabeçalho, com texto à vista. */
+.gatilhoAcoes { min-height: var(--toque); padding-inline: var(--e-3); gap: var(--e-1); }
 .erroPdf { position: absolute; top: 100%; right: 0; z-index: 20; width: min(280px, 80vw); padding: var(--e-3); background: var(--erro-pastel); color: var(--erro); font-size: var(--t-minimo); }
 .notasDaFicha { padding-inline: var(--e-4); }
 .linkCompartilhado { margin: 0 var(--e-4); }
@@ -181,7 +185,7 @@
   padding: 0 0 var(--e-3);
 }
 
-.resumoAtual { padding: var(--e-3); margin: 0 var(--e-4); background: var(--elevado); }
+.resumoAtual { padding: 0; margin: 0 var(--e-4); background: transparent; }
 .resumoAtual[data-recebendo-prato] { outline: 2px solid var(--marca); outline-offset: -2px; background: var(--fundo); }
 .resumoAtual h3 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2); margin: 0 0 var(--e-2); font-size: var(--t-corpo); }
 .resumoAtual h3 small { color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 400; }
@@ -195,7 +199,7 @@
 .acessosFicha { padding: 0 var(--e-4); }
 .acessoFicha {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
-  width: 100%; min-height: var(--toque); padding: var(--e-3); border: 0; border-radius: var(--r-1);
+  width: 100%; min-height: var(--toque); padding: var(--e-2) 0; border: 0; border-radius: var(--r-1);
   background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer;
 }
 .acessoFicha span { min-width: 0; }
@@ -529,6 +533,18 @@
 .nomeClienteInline { font-size: var(--t-forte); font-weight: 700; overflow-wrap: anywhere; }
 .contatoClienteInline, .enderecoClienteInline { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: 1.5; overflow-wrap: anywhere; }
 .notasCliente { display: grid; gap: var(--e-2); }
+/* #2232 (F2): endereço com ícone de local e as duas ações; as ações descem para a linha de baixo quando falta largura. */
+.enderecoCliente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); color: var(--tinta-2); }
+.enderecoCliente > svg { flex: none; }
+.enderecoCliente .enderecoClienteInline { flex: 1 1 12ch; min-width: 0; font-size: var(--t-apoio); }
+.acoesEndereco { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-3); }
+.abrirNoMapa {
+  display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding-inline: var(--e-2);
+  color: var(--marca); font-size: var(--t-apoio); font-weight: 600; text-decoration: underline; text-underline-offset: 2px;
+}
+.abrirNoMapa:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+.retornoEndereco { flex-basis: 100%; min-height: 0; color: var(--sucesso); font-size: var(--t-apoio); font-weight: 600; }
+.retornoEndereco:empty { display: none; }
 .notaCliente { margin: 0; padding: var(--e-3); background: var(--alerta-pastel); color: var(--tinta); border-radius: var(--r-1); font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6; overflow-wrap: anywhere; }
 .notaCliente small { display: block; font-family: var(--f-corpo); color: var(--tinta-2); font-size: var(--t-minimo); }
 .cartaoClienteAbrir { all: unset; display: grid; text-align: left; gap: var(--e-1); cursor: pointer; border-radius: var(--r-1); }
@@ -537,7 +553,9 @@
 .resumoIaCarregando { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .numerosCliente { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .tagsCliente { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1); }
-.tagsCliente li { padding: 2px var(--e-2); border-radius: var(--r-1); background: var(--preenchimento); font-size: var(--t-apoio); }
+.tagsCliente li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 2px var(--e-2); border-radius: var(--r-pilula); background: var(--preenchimento); font-size: var(--t-apoio); }
+.tagsCliente li.tagRestricao { display: flex; align-items: center; gap: var(--e-1); background: var(--alerta-pastel); color: var(--alerta); }
+.tagRestricao svg { flex: none; }
 .postitResumo {
   margin: 0; padding: var(--e-2) var(--e-3); background: var(--alerta-pastel); color: var(--tinta);
   font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6;

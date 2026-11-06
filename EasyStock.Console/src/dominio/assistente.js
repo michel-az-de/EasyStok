@@ -299,7 +299,7 @@ export function montarPromptLivre(pergunta, conversa, historico) {
     .map((m) => (m.dir === 'in' ? 'Cliente: ' : 'Casa: ') + m.texto)
     .join('\n')
   return [
-    'Você é o assistente interno da Casa da Baba, uma rotisseria de massa artesanal em São Paulo.',
+    'Você é o assistente interno da Casa da Babá, uma rotisseria de massa artesanal em São Paulo.',
     'Fala só com a atendente Thatiane, nunca com o cliente. Responda direto, em português do Brasil, sem travessão, em poucas frases.',
     '',
     'Cliente: ' + (conversa?.nome ?? 'sem conversa selecionada') + tags,

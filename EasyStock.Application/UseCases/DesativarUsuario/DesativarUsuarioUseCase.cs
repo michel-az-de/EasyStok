@@ -49,6 +49,8 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
 
             // #1753: convite aberto cai junto. Sem isso a pessoa desativada ainda criava a senha pelo link e só o login recusava.
             await convites.RevogarAbertosAsync(usuario.Id);
+            // #2201: a chave de acesso também, para reativar depois não ressuscitar uma chave antiga.
+            await convites.RevogarChavesDeAcessoAbertasAsync(usuario.Id);
 
             var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { configGoogle, entrar, entrarComGoogle, sair } from '../infra/api/autenticacao'
+import { configGoogle, entrar, entrarComChave, entrarComGoogle, sair } from '../infra/api/autenticacao'
 import { EVENTO_SESSAO_EXPIRADA, garantirSessao } from '../infra/api/cliente'
 import { EVENTO_FALHA_SAIDA_PUSH, EVENTO_SESSAO_ALTERADA, gravarSessaoNativa, lerSessao, limparSessao } from '../infra/api/sessao'
 import { entrarGoogleNativo, obterSessaoNativa, temSessaoNativa } from '../infra/sessaoNativa'
@@ -107,6 +107,12 @@ export function useSessaoApi() {
     setSessao(gravarSessaoNativa(dados))
   }, [])
 
+  // #2201: código de acesso de uso único, gerado pela responsável em Gestão > Usuários.
+  const entrarPorCodigo = useCallback(async (chave) => {
+    setAvisoSaida(null)
+    setSessao(await entrarComChave(chave))
+  }, [])
+
   const encerrarSessao = useCallback(() => {
     versaoLocal.current++
     // #1810: sair não pode virar entrar de novo pelo One Tap.
@@ -119,5 +125,5 @@ export function useSessaoApi() {
   // #1354: identidade estável; um objeto novo a cada render redesenhava o botão do Google.
   const google = useMemo(() => ({ buscarClientId: configGoogle, entrar: entrarGoogle, opcoes: opcoesDaEntradaGoogle,
     nativo: temSessaoNativa(), entrarNativo, retomarNativa }), [entrarGoogle, entrarNativo, retomarNativa])
-  return { sessao, entrarNaEmpresa, google, encerrarSessao, avisoSaida, retomando, erroRetomada }
+  return { sessao, entrarNaEmpresa, entrarPorCodigo, google, encerrarSessao, avisoSaida, retomando, erroRetomada }
 }

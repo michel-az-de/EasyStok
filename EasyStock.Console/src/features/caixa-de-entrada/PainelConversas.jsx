@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
 import { CELULAR, useTamanhoTela } from '../../hooks/useTamanhoTela'
 import { CartaoConversa } from './CartaoConversa'
@@ -58,7 +59,7 @@ function VazioEmLinha({ texto, acao, aoAgir }) {
 export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = null, acoesCabecalho }) {
   const {
     conversas, visiveis, encerradasDoBalcao, bloqueadasDoBalcao, selecionadaId, filtros, agora,
-    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos, fonteApi,
+    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos, fonteApi, sincronizacao,
   } = useAtendimento()
   const { mudarFiltro, selecionar } = useAcoes()
   const [gruposAbertos, setGruposAbertos] = useState({ encerradas: false, bloqueados: false })
@@ -127,10 +128,13 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
 
   const semCanal = filtros.canais.length === 0
   const semBusca = !filtros.busca.trim()
+  // #2227: antes da primeira leitura a lista vazia não é "nenhuma conversa".
+  const carga = cargaDaLista({ fonteApi, estado: sincronizacao?.estado, total: conversas.length })
+  const vazia = lista.length === 0 && !carga
 
   return (
     <>
-      <BarraBalcao filtros={filtros} aoMudar={mudarFiltro} acoesCabecalho={acoesCabecalho} />
+      <BarraBalcao filtros={filtros} aoMudar={mudarFiltro} acoesCabecalho={acoesCabecalho} semContagem={Boolean(carga)} />
       <NaoEntregues aoAbrir={aoAbrir} />
       <div
         className={css.rolagem}
@@ -139,26 +143,31 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
         onFocusCapture={travar}
         onBlurCapture={destravarComAtraso}
       >
+        {carga && (
+          <VazioEmLinha texto={carga === 'erro'
+            ? 'Não consegui carregar as conversas. A próxima tentativa é automática.'
+            : 'Carregando as conversas…'} />
+        )}
         {/* #1442: vazio em uma linha, com o atalho certo. O bloco grande
             "Ninguém esperando você" ocupava a coluna e escondia o resto. */}
-        {lista.length === 0 && !semBusca
+        {vazia && !semBusca
           && (filtros.aba === 'precisa' || encerradasDoBalcao.length + bloqueadasDoBalcao.length === 0) && (
           <VazioEmLinha texto={`Nada com "${filtros.busca.trim()}".`} acao="Limpar busca" aoAgir={() => mudarFiltro('busca', '')} />
         )}
-        {lista.length === 0 && semBusca && !semCanal && (
+        {vazia && semBusca && !semCanal && (
           <VazioEmLinha
             texto={`${filtros.aba === 'precisa' ? 'Ninguém esperando você' : 'Nada aberto'} no ${filtros.canais.join(', ')}.`}
             acao="Ver todos os canais"
             aoAgir={() => mudarFiltro('canais', [])}
           />
         )}
-        {lista.length === 0 && semBusca && semCanal && filtros.aba === 'precisa' && (
+        {vazia && semBusca && semCanal && filtros.aba === 'precisa' && (
           <VazioEmLinha texto="Ninguém esperando você." acao="Ver todas" aoAgir={() => mudarFiltro('aba', 'todas')} />
         )}
-        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && filtros.responsavel && filtros.responsavel !== 'todas' && (
+        {vazia && semBusca && semCanal && filtros.aba !== 'precisa' && filtros.responsavel && filtros.responsavel !== 'todas' && (
           <VazioEmLinha texto={filtros.responsavel === 'minhas' ? 'Nenhuma conversa sua aberta agora.' : 'Nenhuma conversa sem dono aberta agora.'} acao="Ver todas" aoAgir={() => mudarFiltro('responsavel', 'todas')} />
         )}
-        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && (!filtros.responsavel || filtros.responsavel === 'todas') && (
+        {vazia && semBusca && semCanal && filtros.aba !== 'precisa' && (!filtros.responsavel || filtros.responsavel === 'todas') && (
           <VazioEmLinha texto="Nenhuma conversa aberta agora." />
         )}
         {lista.map((conversa) => (

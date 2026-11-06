@@ -179,7 +179,7 @@ internal sealed class CobrancaPedidoFixture
 
     public GerarCobrancaPedidoUseCase Gerar() =>
         new(PedidoRepo, StorefrontRepo, CobrancaRepo, MpClient, CheckoutCore(), Uow, Relogio,
-            NullLogger<GerarCobrancaPedidoUseCase>.Instance, Saldos());
+            NullLogger<GerarCobrancaPedidoUseCase>.Instance, Saldos(), ConversaRepo);
 
     /// <summary>Núcleo do checkout sobre a vaga e o pedido da fixture: só a reserva desfeita (#1301) passa por ele aqui.</summary>
     public CheckoutCoreService CheckoutCore() =>
@@ -195,7 +195,7 @@ internal sealed class CobrancaPedidoFixture
         new(new Lazy<IMercadoPagoClient>(() => MpClient), Relogio, NullLogger<ExpiracaoPreferenciaMercadoPago>.Instance);
 
     private QuitacaoPedido Quitacao() => QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, ConversaRepo, ImpressaoRepo, Publicador,
-        OperacaoEventos, PrazoQueries, Expiracao(), Saldos());
+        OperacaoEventos, PrazoQueries, Expiracao(), Saldos(), Notificador);
 
     /// <summary>Baixa manual pelo console (Pix, dinheiro, maquininha) sobre o mesmo pedido.</summary>
     public RegistrarPagamentoPedidoUseCase RegistrarManual() =>

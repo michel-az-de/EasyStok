@@ -1,9 +1,9 @@
 import { moduloDaRota } from '../../dominio/acessoModulos'
-import { moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { NOME_INICIO, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 
 const GUIAS = {
   atendimento: [
-    'Escolha a conversa no Balcão. Atendimento reúne as mensagens; a Ficha guarda os dados do cliente e a comanda.',
+    'Escolha o cliente em Conversas. A conversa reúne as mensagens; a Ficha guarda os dados do cliente e a comanda.',
     'Use Respostas para inserir um texto pronto. Confira o destinatário e o texto antes de enviar.',
     'Peça sugestões ao Assistente. Revise cada proposta antes de usar ou enviar ao cliente.',
   ],
@@ -20,11 +20,11 @@ const GUIAS = {
     'Se a fila não carregar, use Tentar novamente na própria tela. A ausência de dados durante uma falha não significa que não há pedidos.',
   ],
   entregas: [
-    'No Painel de entregas, acompanhe os pedidos e viagens. Janelas de entrega reúne horários e capacidade.',
+    'No Painel de entregas, acompanhe os pedidos e viagens.',
     'Depois de uma falha, confira se a ação já foi confirmada antes de repeti-la. Os campos preservados permitem corrigir e tentar de novo.',
   ],
   financeiro: [
-    'Confira os valores e lançamentos no Caixa do dia antes de fechar.',
+    'Confira os valores e lançamentos no Caixa do dia.',
     'As ações disponíveis dependem do seu perfil. Se faltar uma ação necessária, peça à dona para revisar seu acesso.',
   ],
   campanhas: [
@@ -51,16 +51,17 @@ const TELAS = {
   'entregas/janelas': ['Confira o dia da semana, o horário e a capacidade antes de salvar uma janela.', 'A pausa interrompe a oferta da janela. Confira as vagas antes de combiná-la com o cliente.'],
 }
 
-export function contextoDaAjuda(rota, fonteApi) {
+export function contextoDaAjuda(rota, fonteApi, { acoes = null, permite = () => true } = {}) {
   const modulo = moduloPorId(moduloDaRota(rota ?? {}))
-  const telas = telasDoMenu(modulo, { fonteApi })
+  const telas = telasDoMenu(modulo, { fonteApi, acoes })
   const tela = telas.find(t => t.id === rota?.tela) ?? telas[0]
   const producaoNaoLigada = fonteApi && modulo?.id === 'cozinha' && tela?.id === 'producao'
   return {
-    titulo: tela ? `${modulo.nome} · ${tela.rotulo}` : modulo?.nome ?? 'Módulos',
+    titulo: tela ? `${modulo.nome} · ${tela.rotulo}` : modulo?.nome ?? NOME_INICIO,
     passos: producaoNaoLigada ? ['Esta tela ainda não está disponível.', 'Para registrar o preparo, abra Produção e escolha Produção do dia.'] : TELAS[`${modulo?.id}/${tela?.id}`] ?? GUIAS[modulo?.id] ?? [
+      // #2258 (auditoria A3): a home não é "voltar" para lugar nenhum; o passo diz como chegar às conversas.
       'Busque um módulo ou uma função pelo nome.',
-      'Os módulos disponíveis seguem seu perfil. Para voltar ao atendimento, abra Atendimento e escolha Balcão.',
+      ...(permite('atendimento') ? ['Para ver as conversas, abra Atendimento e escolha Conversas.'] : []),
     ],
     atalho: producaoNaoLigada ? { modulo: 'producao', tela: 'producao', rotulo: 'Ir para Produção do dia' } : null,
   }

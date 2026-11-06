@@ -62,11 +62,12 @@ public sealed partial class MercadoPagoClient(
             }),
             external_reference = command.PedidoId.ToString(),
             notification_url = options.Value.NotificationUrl,
+            // #2228: a cobrança da conversa volta ao WhatsApp da loja em qualquer resultado; sem ela, ao site.
             back_urls = new
             {
-                success = options.Value.BackUrlSuccess,
-                failure = options.Value.BackUrlFailure,
-                pending = options.Value.BackUrlPending,
+                success = command.RetornoUrl ?? options.Value.BackUrlSuccess,
+                failure = command.RetornoUrl ?? options.Value.BackUrlFailure,
+                pending = command.RetornoUrl ?? options.Value.BackUrlPending,
             },
             auto_return = "approved",
             // S11: o link vale 30 min (a expiração vem do use case de cobrança).
@@ -145,6 +146,44 @@ public sealed partial class MercadoPagoClient(
             return [];
 
         return results.EnumerateArray().Select(LerPagamento).ToList();
+    }
+
+    [GeneratedRegex("^ORD[A-Z0-9]{1,60}$")]
+    private static partial Regex FormatoOrdemId();
+
+    public async Task<IReadOnlyList<PagamentoMercadoPago>> BuscarPagamentosPixDaOrdemAsync(string ordemId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(ordemId) || !FormatoOrdemId().IsMatch(ordemId))
+            throw new ArgumentException("Id de ordem Mercado Pago invalido.", nameof(ordemId));
+        using var response = await EnviarAsync(HttpMethod.Get, $"v1/orders/{Uri.EscapeDataString(ordemId)}", ct);
+        if (response.StatusCode == HttpStatusCode.NotFound) return [];
+        await GarantirSucessoAsync(response, ct);
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        var ordem = doc.RootElement;
+        if (Texto(ordem, "id") != ordemId)
+            throw new InvalidOperationException("Mercado Pago devolveu outra ordem.");
+        if (!Guid.TryParse(Texto(ordem, "external_reference"), out var pedidoId)
+            || !ordem.TryGetProperty("transactions", out var transacoes) || transacoes.ValueKind != JsonValueKind.Object
+            || !transacoes.TryGetProperty("payments", out var pagamentos) || pagamentos.ValueKind != JsonValueKind.Array)
+            return [];
+        var e2es = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var pagamento in pagamentos.EnumerateArray())
+        {
+            if (pagamento.ValueKind != JsonValueKind.Object
+                || !pagamento.TryGetProperty("payment_method", out var metodo) || metodo.ValueKind != JsonValueKind.Object
+                || Texto(metodo, "id") != "pix") continue;
+            var e2e = Texto(metodo, "e2e_id");
+            if (string.IsNullOrWhiteSpace(e2e)) return [];
+            e2es.Add(e2e);
+        }
+        if (e2es.Count == 0) return [];
+        var encontrados = await BuscarPagamentosPorReferenciaAsync(pedidoId.ToString(), ct);
+        var candidatos = encontrados.Where(p => Guid.TryParse(p.ExternalReference, out var referencia) && referencia == pedidoId
+            && p.PaymentMethodId == "pix" && !string.IsNullOrWhiteSpace(p.TransactionId) && e2es.Contains(p.TransactionId))
+            .DistinctBy(p => p.Id).ToArray();
+        // Uma busca ainda incompleta ou ambigua deve ser reenviada, nunca substituida por pagamento antigo.
+        return e2es.SetEquals(candidatos.Select(p => p.TransactionId!))
+            && candidatos.GroupBy(p => p.TransactionId).All(g => g.Count() == 1) ? candidatos : [];
     }
 
     public async Task<EstornoMercadoPagoResult> EstornarAsync(
@@ -276,7 +315,11 @@ public sealed partial class MercadoPagoClient(
         TransactionAmountRefunded: Numero(p, "transaction_amount_refunded") ?? 0,
         // collector_id no nível do pagamento; em respostas que só trazem o objeto, collector.id.
         CollectorId: Texto(p, "collector_id")
-                     ?? (p.TryGetProperty("collector", out var collector) && collector.ValueKind == JsonValueKind.Object ? Texto(collector, "id") : null));
+                     ?? (p.TryGetProperty("collector", out var collector) && collector.ValueKind == JsonValueKind.Object ? Texto(collector, "id") : null))
+    {
+        TransactionId = p.TryGetProperty("transaction_details", out var detalhes) && detalhes.ValueKind == JsonValueKind.Object
+            ? Texto(detalhes, "transaction_id") : null,
+    };
 
     /// <summary>String ou número (o Mercado Pago devolve ids numéricos) como texto; null/ausente = null.</summary>
     private static string? Texto(JsonElement e, string campo)

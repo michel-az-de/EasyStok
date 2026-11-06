@@ -6,7 +6,10 @@ using EasyStock.Domain.Exceptions.Storefront;
 namespace EasyStock.Application.UseCases.Atendimento.Producao;
 
 /// <param name="DiasParaVencer">Negativo = já venceu. Null = lote sem validade.</param>
-public sealed record LoteDoDia(string? Codigo, decimal Quantidade, DateTime? ValidadeEm, int? DiasParaVencer, bool Vencendo, bool Vencido);
+/// <param name="ItemEstoqueId">#2235 (banca T1-5): deixa lançar a perda do lote vencido na própria linha.</param>
+/// <param name="Porcao">#2235 (banca T1-4): o tamanho da porção do lote. O mesmo código leva vários tamanhos.</param>
+public sealed record LoteDoDia(string? Codigo, decimal Quantidade, DateTime? ValidadeEm, int? DiasParaVencer, bool Vencendo, bool Vencido,
+    Guid? ItemEstoqueId = null, string? Porcao = null);
 
 /// <param name="Saldo">Porções em lotes com saldo e não vencidos (mesmo critério do cardápio, #1171).</param>
 /// <param name="Descoberto">Porções vendidas sem saldo (S22), à espera de contagem.</param>
@@ -67,7 +70,7 @@ public sealed class EstoqueDoDiaUseCase(
             var comSaldo = lotes
                 .Where(i => i.QuantidadeAtual.Value > 0)
                 .OrderBy(i => i.ValidadeEm?.DataValidade ?? DateTime.MaxValue).ThenBy(i => i.EntradaEm)
-                .Select(i => Lote(i, hoje))
+                .Select(i => Lote(i, hoje, p))
                 .ToList();
             var (saldo, descoberto) = SaldoEDescoberto(lotes, hoje);
             return new EstoqueDoPrato(
@@ -122,12 +125,17 @@ public sealed class EstoqueDoDiaUseCase(
         return (saldo, lista.Sum(i => i.QuantidadeDescoberta.Value));
     }
 
-    private static LoteDoDia Lote(ItemEstoque i, DateOnly hoje)
+    private static LoteDoDia Lote(ItemEstoque i, DateOnly hoje, CardapioItem prato)
     {
         int? dias = i.ValidadeEm?.DiasAteVencimento(hoje);
+        var porcao = i.ProdutoVariacaoId is { } variacao
+            ? prato.Variacoes.FirstOrDefault(v => v.ProdutoVariacaoId == variacao)?.Rotulo
+            : null;
         return new LoteDoDia(
             i.CodigoLote?.Value, i.QuantidadeAtual.Value, i.ValidadeEm?.DataValidade, dias,
             Vencendo: dias is >= 0 and <= DiasVencendo,
-            Vencido: dias is < 0);
+            Vencido: dias is < 0,
+            ItemEstoqueId: i.Id,
+            Porcao: porcao);
     }
 }
