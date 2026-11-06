@@ -164,8 +164,10 @@ public sealed partial class PedidoConversaConcorrenciaTests
         caixa.GetProperty("totalSaidasExtras").GetDecimal().Should().Be(19m, "e a mesma saída");
 
         // #2268: o realizado dos Relatórios e a visão geral somam o mesmo que o Extrato no período.
+        // Como o Console: início e fim do dia de Brasília em UTC.
+        var (iniDia, fimDia) = EasyStock.Application.Common.HorarioBrasil.JanelaDiaUtc();
         using var fluxo = JsonDocument.Parse(await client.GetStringAsync(
-            $"/api/financeiro/fluxo-caixa?periodicidade=Diario&inicio={hoje}&fim={hoje}"));
+            $"/api/financeiro/fluxo-caixa?periodicidade=Diario&inicio={iniDia:yyyy-MM-ddTHH:mm:ss.fffZ}&fim={fimDia.AddMilliseconds(-1):yyyy-MM-ddTHH:mm:ss.fffZ}"));
         var linha = fluxo.RootElement.GetProperty("data").EnumerateArray().Should().ContainSingle().Subject;
         linha.GetProperty("realizadoReceber").GetDecimal().Should().Be(19m, "o sinal do Mercado Pago entra no Recebido");
         linha.GetProperty("realizadoPagar").GetDecimal().Should().Be(19m, "a devolução entra no Pago");
