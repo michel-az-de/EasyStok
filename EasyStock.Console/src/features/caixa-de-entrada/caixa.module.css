@@ -287,3 +287,8 @@
 /* #1899: <output> de situação em bloco, como o <p> que substituiu. */
 .bloco { display: block; }
 .resumoNaoEntregues strong { color: var(--tinta); font-size: var(--t-titulo); }
+
+/* #2258 (T7): ícone ao lado da hora. A cor do trilho lateral não é o único sinal do prazo estourado
+   (vermelho) nem da vez da equipe (âmbar). */
+.sinalPrazo { flex-shrink: 0; display: inline-grid; place-items: center; color: var(--erro); line-height: 0; }
+.sinalAtencao { color: var(--alerta); }

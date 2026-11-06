@@ -3,7 +3,7 @@
 // motivo da retificação. Fechar a loja dentro do horário pede justificativa (a API recusa sem).
 // Puro: o caixa chega já traduzido (`infra/api/caixaApi.js`) e "agora" chega por parâmetro.
 
-import { conferenciaDaGaveta, esperadoDoEsquecido, gavetaDoDia } from './caixa.js'
+import { AVISO_AO_FECHAR_CAIXA, conferenciaDaGaveta, esperadoDoEsquecido, gavetaDoDia } from './caixa.js'
 import { moeda } from './formato.js'
 import { dentroDoHorario } from './funcionamento.js'
 
@@ -14,6 +14,15 @@ export const justificativaValida = (texto) => (texto ?? '').trim().length >= JUS
 
 // "2026-10-04" -> "04/10".
 export const diaMes = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : '')
+
+// #2258 (auditoria F2): o aviso do modal fala do caixa que está fechando. Caixa esquecido de outro dia
+// diz a data dele (não "hoje", que desmentia o resumo ao lado); o de hoje, ou sem data, mantém o texto de sempre.
+// Fechar um dia antigo não fecha a loja de hoje: o aviso da loja fica de fora.
+export function avisoAoFecharCaixa(abertoDesde, hoje) {
+  if (!abertoDesde || abertoDesde.slice(0, 10) === String(hoje ?? '').slice(0, 10)) return AVISO_AO_FECHAR_CAIXA
+  const dia = diaMes(abertoDesde)
+  return `O caixa de ${dia} não reabre depois de fechado. Os lançamentos de ${dia} não podem mais ser estornados.`
+}
 
 // O que a dona precisa saber antes de abrir:
 //   esquecido    o caixa de um dia anterior ficou aberto; fecha (conferindo) antes de abrir o de hoje;

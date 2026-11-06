@@ -99,7 +99,7 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho, semContagem = fa
             <Icone nome="list-filter" tamanho={20} />
             {filtrando && <span className={css.pontoOrdem} aria-hidden="true" />}
           </Botao>
-          {ordenarAberto && <Popover rotulo="Filtros das conversas" papel="dialog" posicao="abaixo" aoFechar={() => setOrdenarAberto(false)}>
+          {ordenarAberto && <Popover rotulo="Filtros das conversas" papel="dialog" posicao="abaixo" portal alinhamento="esquerda" aoFechar={() => setOrdenarAberto(false)}>
             <div className={css.painelFiltros}>
               <FiltroResponsavel valor={filtros.responsavel ?? 'todas'} aoMudar={valor => aoMudar('responsavel', valor)} />
               <fieldset className={css.canaisNoFiltro}>

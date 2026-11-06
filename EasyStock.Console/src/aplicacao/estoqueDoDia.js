@@ -61,10 +61,22 @@ export function resumoDoEstoque(pratos = [], alertas = []) {
 const dataCurta = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
 export function quandoVence(lote) {
   if (!lote?.validade) return 'Sem validade informada'
-  if (lote.vencido) return `Venceu em ${dataCurta(lote.validade)}`
+  // #2258 (auditoria P2): o lote vencido não entra no saldo do prato; sem isso o "1 porção" do lote
+  // e o "0 porções" do prato pareciam números sem relação.
+  if (lote.vencido) return `Venceu em ${dataCurta(lote.validade)} · fora do saldo`
   if (lote.diasParaVencer === 0) return 'Vence hoje'
   if (lote.diasParaVencer === 1) return 'Vence amanhã'
   return `Vence em ${dataCurta(lote.validade)}`
+}
+
+// #2258 (auditoria P6): "Salvar contagem" parado diz o que falta, em vez de ficar apagado sem explicação.
+// Nulo: pode salvar (ou já está salvando).
+export function motivoDaContagem({ salvando = false, contagem = '', motivo = '', porPorcao = false, contado = true } = {}) {
+  if (salvando) return null
+  if (porPorcao && !contado) return 'Escolha a porção que você contou.'
+  if (String(contagem).trim() === '') return 'Informe quantas porções você contou.'
+  if (!String(motivo).trim()) return 'Informe o motivo do ajuste.'
+  return null
 }
 
 // #2235 (banca T1-4): o mesmo código leva vários tamanhos; a linha diz qual é.

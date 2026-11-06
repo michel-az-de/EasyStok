@@ -5,7 +5,9 @@
   background: var(--fundo); color: var(--tinta); font-family: var(--f-corpo);
 }
 
+/* #2258 (H10): o topo (marca, ajuda, sino, conta) fica à vista ao rolar a tela inicial. */
 .topo {
+  position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
   gap: var(--e-4); flex-wrap: wrap;
   padding: var(--e-3) var(--e-5);
@@ -105,7 +107,8 @@
 .posicao { margin-left: auto; font-size: var(--t-micro); color: var(--tinta-2); white-space: nowrap; }
 .cartao.organizando:hover { transform: none; }
 .cartao.arrastando { border-color: var(--marca); border-style: dashed; box-shadow: none; background: var(--marca-claro); }
-.indicadores > li { min-width: 0; }
+/* #2258 (H5): na mesma linha os cartões têm a mesma altura; cada linha pesa só o próprio conteúdo. */
+.indicadores > li { min-width: 0; display: flex; }
 .indicadores > li.arrastando { position: relative; z-index: 1; }
 .indicadores > li.arrastando .indicador { border-color: var(--marca); border-style: dashed; background: var(--marca-claro); box-shadow: var(--sombra-media); cursor: grabbing; }
 .dicaArrasto { flex-basis: 100%; text-align: center; font-size: var(--t-micro); color: var(--tinta-2); }
@@ -176,8 +179,8 @@
 .acaoDestaque:hover { background: var(--acao-forte); }
 .pulso { margin-block: var(--e-2) var(--e-5); }
 .oculto { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); align-items: start; gap: var(--e-3); margin: 0; padding: 0; list-style: none; }
-.indicador { display: flex; flex-direction: column; justify-content: flex-start; gap: var(--e-1); padding: var(--e-3) var(--e-4); border: 1px solid transparent; border-radius: var(--r-2); background: var(--papel); color: var(--tinta); text-decoration: none; min-width: 0; }
+.indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); align-items: stretch; gap: var(--e-3); margin: 0; padding: 0; list-style: none; }
+.indicador { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: flex-start; gap: var(--e-1); padding: var(--e-3) var(--e-4); border: 1px solid transparent; border-radius: var(--r-2); background: var(--papel); color: var(--tinta); text-decoration: none; min-width: 0; }
 .indicador:hover { border-color: var(--marca); background: var(--preenchimento); }
 .indicador:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .cabecaIndicador { display: flex; align-items: center; gap: var(--e-2); min-width: 0; overflow-wrap: anywhere; font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }

@@ -46,15 +46,18 @@ const confere = (descricao, fn) => {
 
 confere('1  visitante genérico com comanda: a comanda vira o nome e o nome inteiro fica no title', () => {
   const nome = cartao.nomeDoCartao({ nome: 'Visitante do site', numeroComanda: 16 })
-  assert.deepEqual(nome, { principal: 'Comanda 16', complemento: null, titulo: 'Visitante do site · Comanda 16' })
+  // #2258 (auditoria T4): o visitante é "Visitante" e a comanda vira a cápsula "#16", a mesma do cabeçalho e da ficha.
+  assert.deepEqual(nome, { principal: 'Visitante', curto: 'Visitante', capsula: { texto: '#16', tom: 'neutro' }, complemento: null, titulo: 'Visitante do site · Comanda 16' })
 })
 confere('1  cliente com nome de verdade mantém o nome e a comanda ao lado', () => {
+  // #2258 (auditoria T4 e T5): o objeto ganhou `curto` (forma abreviada) e `capsula`.
   assert.deepEqual(cartao.nomeDoCartao({ nome: 'Felipel Azevedo', numeroComanda: 3 }),
-    { principal: 'Felipel Azevedo', complemento: 'Comanda 3', titulo: 'Felipel Azevedo · Comanda 3' })
-  assert.deepEqual(cartao.nomeDoCartao({ nome: 'Ana Souza' }), { principal: 'Ana Souza', complemento: null, titulo: 'Ana Souza' })
+    { principal: 'Felipel Azevedo', curto: 'Felipel A.', capsula: null, complemento: 'Comanda 3', titulo: 'Felipel Azevedo · Comanda 3' })
+  assert.deepEqual(cartao.nomeDoCartao({ nome: 'Ana Souza' }), { principal: 'Ana Souza', curto: 'Ana S.', capsula: null, complemento: null, titulo: 'Ana Souza' })
 })
 confere('1  visitante sem comanda continua "Visitante do site" (não inventa número)', () => {
-  assert.equal(cartao.nomeDoCartao({ nome: 'Visitante do site', numeroComanda: null }).principal, 'Visitante do site')
+  // #2258 (auditoria T4): "Visitante do site" passa a ser "Visitante" (o "do site" fica no title).
+  assert.equal(cartao.nomeDoCartao({ nome: 'Visitante do site', numeroComanda: null }).principal, 'Visitante')
 })
 confere('1  "Chat do site" sai da origem (o selo do avatar já diz); as outras origens dizem o porquê', () => {
   assert.equal(cartao.origemNoCartao({ origem: 'chat-site', motivo: 'Visitante do site aguardando atendimento da equipe.' }), null)
@@ -81,7 +84,8 @@ confere('1  sem a etiqueta, o estado vai para o leitor de tela e a atenção gan
   const jsx = fonte('features/caixa-de-entrada/CartaoConversa.jsx')
   // #2232 (X1): o estado sem etiqueta vai no nome acessível composto do cartão.
   assert.match(jsx, /estado: estado\.texto/)
-  assert.match(jsx, /title=\{nome\.titulo\}/)
+  // #2258 (auditoria T4): o title do nome sai do NomeDoContato (prop `titulo`).
+  assert.match(jsx, /titulo=\{nome\.titulo\}/)
   const cssDaLista = fonte('features/caixa-de-entrada/caixa.module.css')
   // #2232 (L7): trilho lateral no lugar do "!" do avatar.
   assert.match(cssDaLista, /\.cartao\.precisa::before \{ background: var\(--alerta\)/)

@@ -542,7 +542,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.InApp,
             tipoEvento: TipoEventoNotificacao.CaixaAbertoEsquecido,
             assuntoTemplate: "Caixa aberto desde {{ data_abertura }}",
-            corpoTemplate: "O caixa segue aberto desde {{ data_abertura }} (saldo de abertura {{ valor_abertura }}). Feche-o para nao acumular vendas no dia errado.");
+            corpoTemplate: "Saldo de abertura {{ valor_abertura }}. Feche o caixa para não acumular vendas no dia errado.")
+            .ComVersao(2); // #2258: o corpo não repete a data do título e o valor sai em reais ("R$ 300,03").
 
         // ===== Atendimento por WhatsApp (S07): o agente escalou a conversa para a dona. Push para todas
         // as subscriptions da empresa (payload sem usuarioId => destinatario "empresa:{id}"). =====
@@ -951,7 +952,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.InApp,
             tipoEvento: TipoEventoNotificacao.PrazoEstourado,
             assuntoTemplate: "{{ tipo_legivel }} há {{ atraso_texto }}",
-            corpoTemplate: """{{ if cliente && cliente != "" }}{{ cliente }} está esperando: {{ end }}{{ tipo_legivel }} há {{ atraso_texto }} (referência {{ referencia }}).""");
+            corpoTemplate: """{{ if detalhe && detalhe != "" }}{{ detalhe }}{{ else }}{{ if cliente && cliente != "" }}{{ cliente }} está esperando: {{ end }}{{ tipo_legivel }} há {{ atraso_texto }} (referência {{ referencia }}).{{ end }}""")
+            .ComVersao(2); // #2258: o caixa esquecido manda o texto pronto (detalhe), sem repetir o título nem o código técnico.
 
         // ===== #2096: prazo estourado e avisos da operação no aparelho da dona e do gerente. O Push aparece na tela de
         // bloqueio: só o tipo, o primeiro nome e o tempo; o texto completo fica no e-mail e no sino. Interno. =====

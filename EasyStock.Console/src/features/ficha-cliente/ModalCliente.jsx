@@ -7,6 +7,7 @@ import { useResumoDoCliente } from '../../aplicacao/useResumoDoCliente'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { enviarFotoCliente, removerFotoCliente } from '../../aplicacao/fotoCliente'
 import { gerarFichaClientePdf } from '../../aplicacao/fichaClientePdf'
+import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
 import { BlocoCliente } from './BlocoCliente'
 import { ModalHistorico } from './ModalHistorico'
 import css from './ModalCliente.module.css'
@@ -19,6 +20,9 @@ export function ModalCliente({ conversa, aoFechar, children }) {
   const [alterandoFoto, setAlterandoFoto] = useState(false)
   const arquivoFoto = useRef(null)
   const [erro, setErro] = useState(null)
+  // #2258 (auditoria T17, T18): o cadastro avisa quando há texto digitado e entrega o lugar do botão principal.
+  const [cadastroSujo, setCadastroSujo] = useState(false)
+  const [rodapeDoCadastro, setRodapeDoCadastro] = useState(null)
   const [consultadaEm] = useState(() => new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }))
   const { cliente } = conversa
   const foto = useFotoCliente(cliente.fotoUrl)
@@ -52,20 +56,25 @@ export function ModalCliente({ conversa, aoFechar, children }) {
     } finally { setAlterandoFoto(false) }
   }
 
-  return <Modal titulo="Ficha" largura="820px" className={css.modal} aoFechar={ocupado ? undefined : aoFechar}
+  // O Fechar do rodapé passa pela mesma pergunta do Esc e do X (Modal.confirmarDescarte).
+  const pedirFechamento = (evento) => evento.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
+
+  return <Modal titulo="Cadastro do cliente" largura="820px" className={css.modal} aoFechar={ocupado ? undefined : aoFechar}
+    confirmarDescarte={cadastroSujo}
     rodape={<div className={css.acoes}>
       {!podeBaixarPdf && <small>{!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}
-      <Botao variante="texto" disabled={ocupado} onClick={aoFechar}>Fechar</Botao>
-      <Botao icone="download" disabled={ocupado || !podeBaixarPdf} onClick={baixarFicha}>{baixandoPdf ? 'Preparando PDF…' : 'Baixar PDF'}</Botao>
+      <Botao variante="texto" disabled={ocupado} onClick={pedirFechamento}>Fechar</Botao>
+      <Botao variante="secundario" icone="download" disabled={ocupado || !podeBaixarPdf} onClick={baixarFicha}>{baixandoPdf ? 'Preparando PDF…' : 'Baixar PDF'}</Botao>
+      <span ref={setRodapeDoCadastro} className={css.lugarDoSalvar} />
     </div>}>
-    <article className={css.papel} aria-label={`Ficha de ${conversa.nome}`}>
+    <article className={css.papel} aria-label={`Ficha de ${apresentacaoDoNome(conversa.nome, { comanda: conversa.numeroComanda }).rotulo}`}>
       <div className={css.carimbo}><span>{cadastro ? `Cadastro ${String(cadastro).slice(0, 8)}` : 'Contato sem cadastro'}</span><time>Consulta em {consultadaEm}</time></div>
       {(erro || foto.erro) && <p role="alert" className={css.erro}>{erro || foto.erro}</p>}
       {alterandoFoto && <output role="status">Salvando foto…</output>}
       <input ref={arquivoFoto} type="file" hidden accept="image/jpeg,image/png,image/webp" aria-label="Foto do cliente"
         onChange={(e) => { const arquivo = e.target.files?.[0]; e.target.value = ''; if (arquivo) alterarFoto(arquivo) }} />
       {children}
-      <div className={css.cadastro}><BlocoCliente conversa={conversa} integrado resumoIa={resumo.texto} fotoCadastro={foto.url}
+      <div className={css.cadastro}><BlocoCliente conversa={conversa} integrado aoMudarSujo={setCadastroSujo} rodapeDoCadastro={rodapeDoCadastro} resumoIa={resumo.texto} fotoCadastro={foto.url}
         aoEscolherFoto={fonteApi && conversa.clienteId ? () => arquivoFoto.current?.click() : undefined}
         aoRemoverFoto={fonteApi && conversa.clienteId && cliente.fotoUrl ? () => alterarFoto() : undefined}
         alterandoFoto={alterandoFoto} /></div>

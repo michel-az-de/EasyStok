@@ -1,5 +1,5 @@
 import { moduloDaRota } from '../../dominio/acessoModulos'
-import { moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { NOME_INICIO, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 
 const GUIAS = {
   atendimento: [
@@ -57,10 +57,11 @@ export function contextoDaAjuda(rota, fonteApi, { acoes = null, permite = () => 
   const tela = telas.find(t => t.id === rota?.tela) ?? telas[0]
   const producaoNaoLigada = fonteApi && modulo?.id === 'cozinha' && tela?.id === 'producao'
   return {
-    titulo: tela ? `${modulo.nome} · ${tela.rotulo}` : modulo?.nome ?? 'Módulos',
+    titulo: tela ? `${modulo.nome} · ${tela.rotulo}` : modulo?.nome ?? NOME_INICIO,
     passos: producaoNaoLigada ? ['Esta tela ainda não está disponível.', 'Para registrar o preparo, abra Produção e escolha Produção do dia.'] : TELAS[`${modulo?.id}/${tela?.id}`] ?? GUIAS[modulo?.id] ?? [
+      // #2258 (auditoria A3): a home não é "voltar" para lugar nenhum; o passo diz como chegar às conversas.
       'Busque um módulo ou uma função pelo nome.',
-      ...(permite('atendimento') ? ['Para voltar ao atendimento, abra Atendimento e escolha Conversas.'] : []),
+      ...(permite('atendimento') ? ['Para ver as conversas, abra Atendimento e escolha Conversas.'] : []),
     ],
     atalho: producaoNaoLigada ? { modulo: 'producao', tela: 'producao', rotulo: 'Ir para Produção do dia' } : null,
   }

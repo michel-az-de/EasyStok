@@ -111,7 +111,7 @@ await provar('cada tela real recebe ajuda com título do catálogo e passos', ()
 await provar('hash/histórico usam rotas existentes; origem inválida volta ao catálogo seguro', () => {
   const destinos = ['#/', '#/m/atendimento/balcao', '#/m/cozinha', '#/m/entregas', '#/m/atendimento/balcao', '#/']
   assert.deepEqual(destinos.map(hash => rotaDaHash(hash, { fonteApi: true }).tipo), ['hall', 'principal', 'cozinha', 'entregas', 'principal', 'hall'])
-  assert.equal(contextoDaAjuda({ tipo: 'foo', modulo: 'https://invalido/?token=secreto' }, true).titulo, 'Módulos')
+  assert.equal(contextoDaAjuda({ tipo: 'foo', modulo: 'https://invalido/?token=secreto' }, true).titulo, 'Início') // #2258 (auditoria T9): a home se chama Início
 })
 // #1891: a produção antiga da Cozinha (Em preparação) está congelada; a rota cai na Fila de preparo
 // e a ajuda é a da Fila, sem atalho para outro módulo.
@@ -132,7 +132,7 @@ await provar('diagnóstico usa allowlist e nunca inclui sessão, URL ou erro arb
 })
 await provar('diagnóstico recusa versão não canônica e distingue offline, serviço e rede ausente', () => {
   assert.match(diagnosticoDoConsole({ rota, fonteApi: true, versao: 'valor-pessoal', onLine: false }), /Versão: não informada[\s\S]*offline indicado/)
-  assert.match(diagnosticoDoConsole({ rota: null, fonteApi: false }), /Tela: Módulos[\s\S]*demonstração[\s\S]*não informada/)
+  assert.match(diagnosticoDoConsole({ rota: null, fonteApi: false }), /Tela: Início[\s\S]*demonstração[\s\S]*não informada/)
 })
 await provar('cópia só confirma depois de writeText resolver', async () => {
   let resolver, enviado

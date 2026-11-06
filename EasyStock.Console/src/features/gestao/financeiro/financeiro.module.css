@@ -5,7 +5,8 @@
 .barra { justify-content: space-between; }
 .acoes { justify-content: flex-end; }
 .grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
-.indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--e-3); }
+/* #2258 (F8): quatro números em 2x2, sempre; auto-fit deixava 3+1 conforme a largura. */
+.indicadores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
 .indicador { display: grid; gap: var(--e-2); padding: var(--e-4); border: 0; border-radius: var(--r-2); background: var(--preenchimento); }
 .indicador > span { color: var(--tinta-2); font-size: var(--t-apoio); }
 .indicador > strong { font-family: var(--f-dado); font-size: var(--t-titulo); }
@@ -26,11 +27,16 @@
 .valorLinha > small { color: var(--tinta-2); font-size: var(--t-apoio); }
 .acoesLinha { display: flex; gap: var(--e-2); justify-content: flex-end; }
 .selecionar small { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e-1); }
-.chips { border: 0; margin: 0; min-width: 0; display: flex; gap: var(--e-2); overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+/* #2258 (F10): os chips quebram linha, sem barra de rolagem escondendo o "Em aberto". */
+.chips { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--e-2); }
 .chip { flex: none; min-height: var(--toque); padding: 0 var(--e-4); border-radius: var(--r-pilula); border: var(--b-1) solid transparent; background: var(--preenchimento); color: var(--tinta); font: inherit; font-weight: 600; cursor: pointer; }
 .chip:hover { background: var(--preenchimento); }
 .chipAtivo, .chipAtivo:hover { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
-.chip:focus-visible, .verLista:focus-visible, .cartaoVencidas:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.chip[aria-pressed='true'] { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
+.chip[aria-pressed='true']:hover { background: var(--marca); color: var(--marca-contraste); }
+.chip[aria-pressed='true']::before { content: '✓'; margin-right: var(--e-1); font-weight: 700; }
+.chip:focus-visible, .cartaoVencidas:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.verLista:focus-visible { outline: none; }
 .barra > .chips { flex: 1 1 360px; }
 .ferramentas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-4); }
 .ferramentas > .aviso { margin-left: auto; }
@@ -38,7 +44,10 @@
 .maisFiltros[open] { flex-basis: 100%; order: 3; }
 .maisFiltros > summary { cursor: pointer; min-height: var(--toque); display: flex; align-items: center; color: var(--tinta-2); font-weight: 600; }
 .maisFiltros[open] > summary { margin-bottom: var(--e-3); }
-.motivo { margin-right: auto; color: var(--tinta-2); font-size: var(--t-apoio); }
+/* #2258 (F12): categoria nova criada ali mesmo, ao lado da escolha. */
+.categoria { display: grid; align-content: start; justify-items: start; gap: var(--e-1); min-width: 0; }
+.novaCategoria { border: 0; margin: 0; display: flex; flex-wrap: wrap; align-items: end; gap: var(--e-3); padding: var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); }
+.novaCategoria > :nth-child(2) { flex: 1 1 220px; }
 .dia { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--e-4); }
 .ladoDia { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: 0; border-radius: var(--r-2); }
 .ladoDia h2 { margin: 0; font-size: var(--t-forte); }
@@ -48,7 +57,13 @@
 .cartaoVencidas > small { grid-column: 1 / -1; color: var(--tinta-2); }
 .temVencida { background: var(--erro-pastel); }
 .temVencida > strong, .temVencida > span { color: var(--erro); }
+/* #2258 (F9): o bloco todo leva à lista por este link (cobre o bloco; "Pagar" fica acima dele). */
+.blocoDia { position: relative; display: grid; gap: var(--e-2); }
+.blocoDia:hover .verLista { text-decoration: underline; }
+.blocoDia .itemDia button { position: relative; z-index: 1; }
 .verLista { color: var(--marca); font-weight: 600; font-size: var(--t-apoio); }
+.verLista::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-2); }
+.verLista:focus-visible::after { outline: 2px solid var(--marca); outline-offset: 2px; }
 .itensDia { display: grid; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
 .itemDia { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--e-3); padding: var(--e-2) 0; border-top: var(--b-1) solid var(--linha); }
 .itemDia > div { display: grid; min-width: 0; }

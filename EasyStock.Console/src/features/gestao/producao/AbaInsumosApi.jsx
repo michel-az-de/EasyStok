@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { NomeInsumoPesquisado } from './PesquisaProducao'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
@@ -7,7 +7,7 @@ import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useInsumosApi } from '../../../aplicacao/useInsumosApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { ondeOInsumoEUsado, rotuloDaEmbalagem, UNIDADES_INSUMO } from '../../../aplicacao/insumos'
+import { ondeOInsumoEUsado, rotuloDaEmbalagem, rotuloDaUnidade, UNIDADES_INSUMO } from '../../../aplicacao/insumos'
 import { moeda } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
 
@@ -28,6 +28,7 @@ function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
   const [minimo, setMinimo] = useState(insumo.minimo ?? '')
   const [custo, setCusto] = useState(() => custoNoCampo(insumo.custo))
   const [ocupado, setOcupado] = useState(false)
+  const un = rotuloDaUnidade(insumo.unidade)
 
   const fazer = async (acao) => {
     if (ocupado) return false
@@ -47,20 +48,20 @@ function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
         <span className={css.nome}>{insumo.nome}</span>
         <span className={css.detalhe}>
           {ondeOInsumoEUsado(insumo)}
-          {insumo.custo != null ? ` · custo ${moeda(insumo.custo)} por ${insumo.unidade}` : ''}
+          {insumo.custo != null ? ` · custo ${moeda(insumo.custo)} por ${un}` : ''}
         </span>
       </div>
-      <span className={css.preco}>{formatar(insumo.saldo)} {insumo.unidade}</span>
+      <span className={css.preco}>{formatar(insumo.saldo)} {un}</span>
       <div className={css.estados}>
-        {insumo.comprar && <Pilula tom="aviso" fina>Abaixo do mínimo ({insumo.minimo} {insumo.unidade})</Pilula>}
-        {!insumo.comprar && insumo.minimo != null && <Pilula tom="neutro" fina>Mínimo {insumo.minimo} {insumo.unidade}</Pilula>}
+        {insumo.comprar && <Pilula tom="aviso" fina>Abaixo do mínimo ({insumo.minimo} {un})</Pilula>}
+        {!insumo.comprar && insumo.minimo != null && <Pilula tom="neutro" fina>Mínimo {insumo.minimo} {un}</Pilula>}
         {insumo.embalagem && <Pilula tom="marca" fina>{rotuloDaEmbalagem(insumo)}</Pilula>}
       </div>
       {podeEditar && editando && (
         <Modal titulo={`Ajustar ${insumo.nome}`} aoFechar={ocupado ? undefined : () => { avisarEm(null); setEditando(false) }}>
         <form className={`${css.campos} ${css.formulario} ${css.ajusteInsumo}`} onSubmit={salvar}>
-          <CampoTexto disabled={ocupado} inputMode="numeric" rotulo={`Mínimo (${insumo.unidade})`} aria-label={`Mínimo de ${insumo.nome}`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
-          <CampoTexto disabled={ocupado} inputMode="decimal" rotulo={`Custo por ${insumo.unidade} (R$)`} aria-label={`Custo de ${insumo.nome}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
+          <CampoTexto disabled={ocupado} inputMode="numeric" rotulo={`Mínimo (${un})`} aria-label={`Mínimo de ${insumo.nome}`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
+          <CampoTexto disabled={ocupado} inputMode="decimal" rotulo={`Custo por ${un} (R$)`} aria-label={`Custo de ${insumo.nome}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
           {aviso && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">
             Não foi possível salvar o ajuste. {aviso}
             {' '}<Botao variante="texto" onClick={() => avisarEm(null)}>Fechar aviso</Botao>
@@ -94,6 +95,9 @@ export function AbaInsumosApi() {
   const [criando, setCriando] = useState(false)
   const [cadastroAberto, setCadastroAberto] = useState(false)
   const [origemDoAviso, setOrigemDoAviso] = useState(null)
+  // #2258 (auditoria P6): o nome vazio não apaga o botão; o clique mostra o erro sob o campo e foca nele.
+  const [erroDoNome, setErroDoNome] = useState(null)
+  const nomeRef = useRef(null)
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando os insumos…</output>
   if (gestao.estado === 'erro' && gestao.insumos.length === 0) {
@@ -112,17 +116,22 @@ export function AbaInsumosApi() {
   }
   // Sem formulário para receber o aviso (o insumo saiu da lista), ele volta ao topo.
   const avisoNoFormulario = origemDoAviso === CADASTRO ? podeEditar && cadastroAberto : gestao.insumos.some((i) => i.id === origemDoAviso)
-  const mudarNovo = (campo) => (e) => setNovo((atual) => ({ ...atual, [campo]: e.target.value }))
+  const mudarNovo = (campo) => (e) => {
+    if (campo === 'nome') setErroDoNome(null)
+    setNovo((atual) => ({ ...atual, [campo]: e.target.value }))
+  }
+  const fecharCadastro = () => { avisarEm(null); setErroDoNome(null); setCadastroAberto(false) }
   const cadastrar = (evento) => {
     evento.preventDefault()
     if (criando) return
+    if (!novo.nome.trim()) { setErroDoNome('Informe o nome do insumo.'); nomeRef.current?.focus(); return }
     avisarEm(CADASTRO)
     setCriando(true)
     Promise.resolve(gestao.criar(novo)).then((ok) => { if (ok !== false) { setNovo({ nome: '', unidade: novo.unidade, minimo: '', custo: '', embalagem: novo.embalagem }); setCadastroAberto(false) } }).finally(() => setCriando(false))
   }
 
   const semInsumo = gestao.insumos.length === 0
-  const abrirCadastro = <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setCadastroAberto(true) }}>Cadastrar insumo</Botao>
+  const abrirCadastro = <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setErroDoNome(null); setCadastroAberto(true) }}>Cadastrar insumo</Botao>
   return (
     <div className={css.aba}>
       {gestao.estado === 'erro' && <p className={css.aviso} role="alert">
@@ -148,7 +157,7 @@ export function AbaInsumosApi() {
         <h3 id="insumos-comprar" className={css.tituloSecao}>Comprar</h3>
         {comprar.length === 0
           ? <p className={css.descricao}>Nenhum insumo abaixo do mínimo.</p>
-          : <p className={css.descricao}>{comprar.map((i) => `${i.nome} (tem ${formatar(i.saldo)} ${i.unidade}, mínimo ${i.minimo})`).join(' · ')}</p>}
+          : <p className={css.descricao}>{comprar.map((i) => `${i.nome} (tem ${formatar(i.saldo)} ${rotuloDaUnidade(i.unidade)}, mínimo ${i.minimo})`).join(' · ')}</p>}
       </section>
       )}
 
@@ -168,21 +177,23 @@ export function AbaInsumosApi() {
       </section>
 
       {podeEditar ? <>
-      {cadastroAberto && <Modal titulo="Cadastrar insumo" aoFechar={criando ? undefined : () => { avisarEm(null); setCadastroAberto(false) }} largura="min(720px, calc(100vw - 24px))"><form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
-        <NomeInsumoPesquisado disabled={criando} value={novo.nome} onChange={mudarNovo('nome')} />
-        <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: u }))} />
+      {cadastroAberto && <Modal titulo="Cadastrar insumo" aoFechar={criando ? undefined : fecharCadastro} largura="min(720px, calc(100vw - 24px))"><form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
+        <NomeInsumoPesquisado inputRef={nomeRef} erroDoCampo={erroDoNome} disabled={criando} value={novo.nome} onChange={mudarNovo('nome')} />
+        <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: rotuloDaUnidade(u) }))} />
         <CampoTexto disabled={criando} inputMode="numeric" rotulo="Mínimo (opcional)" value={novo.minimo} onChange={mudarNovo('minimo')} />
-        <CampoTexto disabled={criando} inputMode="decimal" rotulo="Custo por unidade (R$)" aria-label="Custo por unidade" value={novo.custo} onChange={mudarNovo('custo')} />
+        <CampoTexto disabled={criando} inputMode="decimal" rotulo={`Custo por ${rotuloDaUnidade(novo.unidade)} (R$)`} value={novo.custo} onChange={mudarNovo('custo')} />
+        <label className={`${css.chave} ${css.linhaCompleta}`}>
+          <input type="checkbox" disabled={criando} checked={novo.embalagem} onChange={(e) => setNovo((atual) => ({ ...atual, embalagem: e.target.checked }))} />
+          <span>É embalagem<span className={css.ajudaEmbalagem}>Bandeja, selo ou pote. Conta por unidade e é descontada em toda produção.</span></span>
+        </label>
         {origemDoAviso === CADASTRO && gestao.aviso && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">
           Não foi possível cadastrar o insumo. {gestao.aviso}
           {' '}<Botao variante="texto" onClick={gestao.fecharAviso}>Fechar aviso</Botao>
         </p>}
+        {/* Mesmo rodapé da edição: Cancelar à esquerda, o primário à direita. */}
         <div className={css.rodapeForm}>
-          <label className={css.chave}>
-            <input type="checkbox" disabled={criando} checked={novo.embalagem} onChange={(e) => setNovo((atual) => ({ ...atual, embalagem: e.target.checked }))} />
-            <span>É embalagem<span className={css.ajudaEmbalagem}>Bandeja, selo ou pote. Conta por unidade e é descontada em toda produção.</span></span>
-          </label>
-          <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !novo.nome.trim()}>{criando ? 'Cadastrando…' : 'Cadastrar insumo'}</Botao>
+          <Botao variante="texto" disabled={criando} onClick={fecharCadastro}>Cancelar</Botao>
+          <Botao tipo="submit" variante="primario" icone="check" disabled={criando}>{criando ? 'Cadastrando…' : 'Salvar insumo'}</Botao>
         </div>
       </form></Modal>}</> : <p className={css.descricao}>Seu perfil permite apenas consultar os insumos.</p>}
     </div>

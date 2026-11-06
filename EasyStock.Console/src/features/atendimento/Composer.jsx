@@ -386,7 +386,7 @@ export function Composer({
                 className={`${css.acaoComRotulo} ${complementoLigado ? css.chaveLigada : ''}`}
                 onClick={alternarComplemento}
               >
-                <Icone nome="sparkles" /><span className={css.rotuloAcao}>Sugestões de IA</span>
+                <Icone nome="dica" /><span className={css.rotuloAcao}>Sugestões de IA</span>
               </Botao></Tooltip>}
                 </div>
               </details>

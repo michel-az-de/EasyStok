@@ -64,7 +64,7 @@ function TelaCardapioLinkPronta({ estado, conversaId, acoes }) {
   if (!conversa) {
     return (
       <PaginaAviso titulo="Esse link não é mais válido">
-        Peça um cardápio novo pelo WhatsApp da Casa da Baba.
+        Peça um cardápio novo pelo WhatsApp da Casa da Babá.
       </PaginaAviso>
     )
   }
@@ -88,7 +88,7 @@ function Cabecalho({ etapa }) {
         <div className={css.marca}>
           <span className={css.marcaIcone}><Icone nome="cardapio" tamanho={22} /></span>
           <div>
-            <strong>Casa da Baba</strong>
+            <strong>Casa da Babá</strong>
             <span className={css.marcaSub}>Massa artesanal</span>
           </div>
         </div>

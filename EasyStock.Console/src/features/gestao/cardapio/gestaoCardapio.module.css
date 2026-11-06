@@ -42,25 +42,24 @@ button.abrirFoto:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--marca-claro)
 .valor { display: grid; justify-items: end; gap: var(--e-1); }
 .preco { display: grid; text-align: right; font-family: var(--f-dado); font-size: var(--t-forte); font-weight: 750; letter-spacing: var(--ls-titulo); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .preco small { font-family: var(--f-corpo); font-size: var(--t-micro); font-weight: 400; color: var(--tinta-2); }
+.interruptores { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-1) var(--e-4); flex-wrap: wrap; }
 .hoje { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--e-2); min-height: var(--toque); font-size: var(--t-micro); color: var(--tinta); cursor: pointer; }
 .hoje input { appearance: none; width: 34px; height: 20px; margin: 0; border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-pilula); background: var(--preenchimento); flex: none; }
 .hoje input::before { content: ''; display: block; width: 14px; height: 14px; margin: 2px; border-radius: var(--r-1); background: var(--tinta-3); transition: transform var(--dur-micro) var(--ease-padrao), background var(--dur-micro) var(--ease-padrao); }
 .hoje input:checked { border-color: var(--marca); background: var(--marca); }
 .hoje input:checked::before { background: var(--marca-contraste); transform: translateX(14px); }
 .hoje input:disabled { cursor: wait; }
-.rodapePrato { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-1) var(--e-3); flex-wrap: wrap; padding-left: calc(64px + var(--e-4)); }
+/* #2258 (auditoria C5): lápis e ⋮ juntos à direita, não um em cada ponta da linha. */
+.rodapePrato { display: flex; align-items: flex-start; justify-content: flex-end; gap: var(--e-1) var(--e-3); flex-wrap: wrap; padding-left: calc(64px + var(--e-4)); }
 .acoesCadastro { display: flex; gap: var(--e-1); flex-wrap: wrap; }
 .acoesCadastro > button { min-width: var(--toque); padding-inline: var(--e-2); font-size: var(--t-micro); }
-.outrasAcoes { flex: 1; min-width: min(100%, 180px); text-align: right; }
+.outrasAcoes { flex: 0 1 auto; min-width: 0; text-align: right; }
 .outrasAcoes summary { display: inline-flex; align-items: center; justify-content: center; gap: var(--e-2); min-width: var(--toque); min-height: var(--toque); padding-inline: var(--e-2); color: var(--tinta-2); font-size: var(--t-micro); border-radius: var(--r-1); cursor: pointer; list-style: none; }
 .outrasAcoes summary::-webkit-details-marker { display: none; }
 .outrasAcoes summary:hover { background: var(--preenchimento); color: var(--tinta); }
 .outrasAcoes[open] summary > svg { transform: rotate(180deg); }
 .painelAcoes { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; padding-top: var(--e-2); text-align: left; }
 .painelAcoes > button { padding-inline: var(--e-2); }
-.painelAcoes > button:disabled, .ordem > button:disabled { background: transparent; }
-.chave { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); font-size: var(--t-apoio); }
-.chave input { width: 18px; height: 18px; margin: 0; accent-color: var(--marca); }
 .ordem { display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
 .ordem > button { padding-inline: var(--e-2); }
 

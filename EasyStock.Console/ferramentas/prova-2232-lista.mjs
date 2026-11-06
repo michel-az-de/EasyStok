@@ -71,7 +71,8 @@ confere('L6  faixa de não entregues compacta, com "Revisar" e dispensável', ()
 
 confere('L7  avatar sem "!" e iniciais só de letras', () => {
   assert.doesNotMatch(css, /avatarCartao::after/)
-  assert.match(jsxAvatar, /\\p\{L\}/u, 'iniciais filtram letra')
+  // #2258 (auditoria T8): as iniciais saem de componentes/iniciaisDoNome.js, não mais do Avatar.
+  assert.match(fonte('componentes/iniciaisDoNome.js'), /\\p\{L\}/u, 'iniciais filtram letra')
   assert.match(regra('.cartao.precisa::before'), /background:\s*var\(--alerta\)/)
   assert.match(regra('.cartao.atrasada::before, .cartao.slaEstourado::before'), /background:\s*var\(--erro\)/)
 })
@@ -106,7 +107,8 @@ confere('L10 telefone cru vira máscara', () => {
   assert.equal(nomeDoContato('+1 415 555 2671'), '+1 415 555 2671')
   assert.equal(nomeDoContato('+14155552671'), '+14155552671')
   assert.equal(nomeDoContato('+55 54 3461-9500'), '+55 (54) 3461-9500')
-  assert.equal(cartao.nomeDoCartao({ nome: '555434619500' }).principal, '+55 (54) 3461-9500')
+  // #2258 (auditoria T4 e T5): no cartão o +55 sai (todos os contatos são do Brasil) e a cápsula diz "Sem nome".
+  assert.equal(cartao.nomeDoCartao({ nome: '555434619500' }).principal, '(54) 3461-9500')
 })
 
 confere('L11 cabeçalho sem número repetido; o contador mora no segmento', () => {

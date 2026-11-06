@@ -8,6 +8,16 @@ const naFila = (dados) => dados.itens.filter((p) => ['aguardando', 'preparando']
 const prontos = (dados) => dados.itens.filter((p) => p.status === 'pronto').length
 const plural = (n, um, varios, mais = '') => `${n}${mais} ${n === 1 ? um : varios}`
 
+// #2258 (H2/H3): um nome só para o que pede a dona, no cartão, na linha de baixo e no leitor de tela, e
+// no número certo ("1 pronto para sair", "6 prontos para sair").
+export const ROTULO_PRECISA_DE_VOCE = 'Precisa de você'
+export const precisaDeVoce = (n, mais = '') => `${n}${mais} ${n === 1 ? 'precisa' : 'precisam'} de você`
+export { plural }
+
+// #2258 (P1): `href` leva o alerta ao ponto exato do módulo; sem ele o cartão abre o módulo.
+export const HASH_LOTES_VENCIDOS = '#/m/producao/estoque'
+export const HASH_PRATOS_COM_PENDENCIA = '#/m/cardapio/itens/pendencia'
+
 // #1839 D: a linha viva do cartão de cada módulo. Só módulo com fonte lida tem linha; leitura que
 // falhou some do cartão (o contador de cima já avisa). `atencao` pede o olhar da dona.
 export function pendenciaDoModulo(id, fontes) {
@@ -18,7 +28,7 @@ export function pendenciaDoModulo(id, fontes) {
   if (id === 'atendimento') {
     const n = aguardandoResposta(dados)
     if (!n && dados.parcial) return null
-    return n ? { texto: `${plural(n, 'conversa', 'conversas', mais)} sem resposta`, atencao: true } : { texto: 'Nenhuma conversa esperando', atencao: false }
+    return n ? { texto: `${plural(n, 'conversa', 'conversas', mais)} ${n === 1 ? 'precisa' : 'precisam'} de você`, atencao: true } : { texto: 'Nenhuma conversa esperando', atencao: false }
   }
   if (id === 'cozinha') {
     const n = naFila(dados)
@@ -38,8 +48,13 @@ export function pendenciaDoModulo(id, fontes) {
   if (id === 'cardapio' && Array.isArray(dados.itens)) {
     const ativos = dados.itens.filter((item) => !item.arquivado)
     const pendentes = ativos.filter((item) => item.pendencias?.length).length
-    if (pendentes) return { texto: `${plural(pendentes, 'prato', 'pratos')} com pendência`, atencao: true }
+    if (pendentes) return { texto: `${plural(pendentes, 'prato', 'pratos')} com pendência`, atencao: true, href: HASH_PRATOS_COM_PENDENCIA }
     return { texto: `${plural(ativos.filter((item) => item.hoje).length, 'prato', 'pratos')} no cardápio de hoje`, atencao: false }
+  }
+  // #2258 (P1): lotes vencidos são o que a dona precisa tirar do estoque; sem a leitura não há linha.
+  if (id === 'producao' && Array.isArray(dados.vencidos)) {
+    const n = dados.vencidos.length
+    return n ? { texto: plural(n, 'lote vencido', 'lotes vencidos'), atencao: true, href: HASH_LOTES_VENCIDOS } : { texto: 'Nenhum lote vencido', atencao: false }
   }
   return null
 }
@@ -54,13 +69,16 @@ export function indicadoresDoHall(fontes, ids) {
     let alerta = null
     let rotulo = null
     if (id === 'atendimento') {
+      rotulo = ROTULO_PRECISA_DE_VOCE
       if (dados) valor = aguardandoResposta(dados)
       detalhe = 'Assumidas com resposta pendente ou sem responsável.'
     } else if (id === 'cozinha') {
+      rotulo = 'Em preparo ou na fila'
       if (dados) valor = naFila(dados)
       detalhe = 'Fila de hoje e pendências de ontem.'
     } else if (id === 'entregas') {
       if (dados) valor = prontos(dados)
+      rotulo = valor === 1 ? 'Pronto para sair' : 'Prontos para sair'
       detalhe = 'Pedidos prontos na fila de hoje e de ontem.'
     } else {
       // #2078 (B7/E3/D7): o número é o que a tela do Caixa destaca, com o mesmo rótulo: o dinheiro da

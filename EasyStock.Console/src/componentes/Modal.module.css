@@ -72,3 +72,13 @@
 @media (max-width: 759px) {
   .fecharCanto { top: calc(var(--e-4) + var(--t-titulo) * var(--lh-compacto) / 2 - var(--toque) / 2); right: var(--e-3); }
 }
+
+/* #2258 (F4, T17): a pergunta de descarte fica no topo do miolo, colada ao título, e não some ao rolar. */
+.descarte {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2);
+  margin: 0 0 var(--e-3); padding: var(--e-3); border-radius: var(--r-2);
+  background: var(--erro-pastel); color: var(--tinta);
+}
+.descarte p { margin: 0; font-weight: 600; }
+.descarteAcoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }

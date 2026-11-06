@@ -1,4 +1,6 @@
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 
@@ -125,6 +127,73 @@ namespace EasyStock.Infra.Postgre.Repositories
                     && tipos.Contains(n.TipoAlerta)
                     && ((n.Lida && n.CriadaEm < lidosAntesDeUtc) || n.CriadaEm < qualquerAntesDeUtc))
                 .ExecuteDeleteAsync(ct);
+
+        // #2258 (F1). Cross-tenant quando empresaId é nulo (job, sob o bypass de RLS): IgnoreQueryFilters desliga o filtro
+        // do EF e o resto é escopo explícito. Parte dos avisos NÃO LIDOS (poucos) e só depois pergunta quais aberturas
+        // fecharam, em vez de varrer todas as aberturas já avisadas.
+        public async Task<int> ResolverAvisosDeCaixaFechadoAsync(Guid? empresaId = null, CancellationToken ct = default)
+        {
+            var prefixoPrazo = PrazoEstouradoEvento.PrefixoCorrelationId(TipoPrazo.CaixaEsquecido);
+
+            var candidatos = await (
+                from n in dbContext.Notificacoes.IgnoreQueryFilters().AsNoTracking()
+                join o in dbContext.NotifOutboxMensagens.IgnoreQueryFilters() on n.OutboxMensagemId equals (Guid?)o.Id
+                join e in dbContext.NotifEventos.IgnoreQueryFilters() on o.EventoId equals e.Id
+                where !n.Lida && (empresaId == null || n.EmpresaId == empresaId)
+                      && (e.Tipo == TipoEventoNotificacao.CaixaAbertoEsquecido
+                          || (e.Tipo == TipoEventoNotificacao.PrazoEstourado && e.CorrelationId.StartsWith(prefixoPrazo)))
+                select new { AvisoId = n.Id, n.EmpresaId, e.RefEntidadeId, e.PayloadJson })
+                .ToListAsync(ct);
+
+            // Aviso antigo do sino não guardava a abertura no evento: ela vem no payload.
+            var avisos = candidatos
+                .Select(c => (c.AvisoId, c.EmpresaId, AberturaId: c.RefEntidadeId ?? LerAberturaId(c.PayloadJson)))
+                .Where(c => c.AberturaId is not null)
+                .ToList();
+            if (avisos.Count == 0) return 0;
+
+            var aberturaIds = avisos.Select(a => a.AberturaId!.Value).Distinct().ToList();
+            var fechadas = (await dbContext.MovimentosCaixa.IgnoreQueryFilters().AsNoTracking()
+                    // #2258 (banca): a abertura tem de ser da mesma empresa do aviso, além do RLS da sessão.
+                    .Where(a => a.Tipo == "abertura" && aberturaIds.Contains(a.Id)
+                             && (empresaId == null || a.EmpresaId == empresaId)
+                             && dbContext.MovimentosCaixa.IgnoreQueryFilters().Any(f =>
+                                    f.Tipo == "fechamento" && f.EstornadoEm == null
+                                    && f.EmpresaId == a.EmpresaId && f.LojaId == a.LojaId
+                                    && f.DataMovimento > a.DataMovimento))
+                    .Select(a => new { a.Id, a.EmpresaId })
+                    .ToListAsync(ct))
+                .Select(a => (a.Id, a.EmpresaId))
+                .ToHashSet();
+
+            var resolver = avisos.Where(a => fechadas.Contains((a.AberturaId!.Value, a.EmpresaId))).Select(a => a.AvisoId).ToList();
+            if (resolver.Count == 0) return 0;
+
+            var agora = DateTime.UtcNow;
+            return await dbContext.Notificacoes.IgnoreQueryFilters()
+                .Where(n => resolver.Contains(n.Id) && !n.Lida)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(n => n.Lida, true)
+                    .SetProperty(n => n.LidaEm, agora), ct);
+        }
+
+        private static Guid? LerAberturaId(string payloadJson)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(payloadJson);
+                return doc.RootElement.ValueKind == JsonValueKind.Object
+                       && doc.RootElement.TryGetProperty("aberturaId", out var v)
+                       && v.ValueKind == JsonValueKind.String
+                       && Guid.TryParse(v.GetString(), out var id)
+                    ? id
+                    : null;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
 
         public Task<int> CountNaoLidasAsync(Guid empresaId, Guid? usuarioId = null) =>
             dbContext.Notificacoes.CountAsync(n => n.EmpresaId == empresaId && !n.Lida
