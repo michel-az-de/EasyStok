@@ -238,7 +238,7 @@
    (base.css) corta o realce; o selo continua. */
 .seloCaptado {
   display: inline-flex; align-items: center; gap: 3px; margin-left: var(--e-1);
-  padding: 1px 7px; border-radius: var(--r-1); vertical-align: middle;
+  padding: 1px 7px; border-radius: var(--r-pilula); vertical-align: middle;
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5; white-space: nowrap;
   color: var(--sucesso); background: var(--sucesso-pastel);
 }
@@ -254,7 +254,7 @@
    "sem sujar a UX atual"), mesmo tom pastel do selo captado acima. */
 .seloPontos {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px;
-  border-radius: var(--r-1); font-size: var(--t-micro); font-weight: 600;
+  border-radius: var(--r-pilula); font-size: var(--t-micro); font-weight: 600;
   color: var(--marca); background: var(--marca-claro);
 }
 .linhaFidelidade {
@@ -284,7 +284,7 @@
   background: var(--info-fundo); border-radius: var(--r-2);
 }
 .seloInformado {
-  justify-self: start; padding: 1px 8px; border-radius: var(--r-1);
+  justify-self: start; padding: 1px 8px; border-radius: var(--r-pilula);
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5;
   color: var(--info); background: var(--elevado);
 }

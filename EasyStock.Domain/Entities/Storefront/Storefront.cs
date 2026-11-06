@@ -171,6 +171,10 @@ public class Storefront
         AlteradoEm = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Edição parcial do branding (#2244): null mantém o valor atual, string vazia ou só
+    /// espaços limpa o campo, qualquer outro valor troca (com trim).
+    /// </summary>
     public void AtualizarBranding(
         string? subtituloPublico = null,
         string? logoUrl = null,
@@ -178,16 +182,21 @@ public class Storefront
         string? whatsappPedidos = null,
         string? mensagemForaArea = null)
     {
-        if (corPrimaria is not null)
+        if (!string.IsNullOrWhiteSpace(corPrimaria))
             ValidarCorHex(corPrimaria);
 
-        SubtituloPublico = subtituloPublico?.Trim();
-        LogoUrl = logoUrl?.Trim();
-        CorPrimaria = corPrimaria?.Trim();
-        WhatsappPedidos = whatsappPedidos?.Trim();
-        MensagemForaArea = mensagemForaArea?.Trim();
+        SubtituloPublico = NovoValorDeBranding(SubtituloPublico, subtituloPublico);
+        LogoUrl = NovoValorDeBranding(LogoUrl, logoUrl);
+        CorPrimaria = NovoValorDeBranding(CorPrimaria, corPrimaria);
+        WhatsappPedidos = NovoValorDeBranding(WhatsappPedidos, whatsappPedidos);
+        MensagemForaArea = NovoValorDeBranding(MensagemForaArea, mensagemForaArea);
         AlteradoEm = DateTime.UtcNow;
     }
+
+    private static string? NovoValorDeBranding(string? atual, string? informado) =>
+        informado is null ? atual
+        : string.IsNullOrWhiteSpace(informado) ? null
+        : informado.Trim();
 
     public void AjustarPedidoMinimo(decimal valor)
     {

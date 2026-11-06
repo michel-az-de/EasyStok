@@ -279,7 +279,7 @@ export function Sininho({ comRotulo = false }) {
         <Icone nome="relogio" tamanho={24} />
         {comRotulo && <span>Lembretes</span>}
         {/* #2232 (L2): o contador único do app; aqui só se posiciona no canto do sino. */}
-        <Contador valor={contagem > 0 ? contagem : null} tom="alerta" max={9} className={css.badge} />
+        <Contador valor={contagem > 0 ? contagem : null} tom="alerta" max={9} className={css.badge} data-contador-sino />
       </Botao>
 
       {aberto && (
