@@ -1,6 +1,6 @@
 import { chamarApi } from './cliente'
 import { lerSessao } from './sessao'
-import { instanteFinanceiro, extratoFinanceiro, STATUS_EM_ABERTO } from '../../dominio/financeiro'
+import { instanteFinanceiro, extratoFinanceiro, janelasDoPeriodo, STATUS_EM_ABERTO } from '../../dominio/financeiro'
 
 const baseConta = (lado) => {
   if (!['pagar', 'receber'].includes(lado)) throw new Error('Tipo de conta inválido.')
@@ -71,15 +71,20 @@ export const salvarCadastroFinanceiro = (tipo, corpo, id) => escrever(`/api/fina
 export const inativarCadastroFinanceiro = (tipo, id) => chamarApi(`/api/financeiro/${tipo}/${id}/inativar`, { metodo: 'POST' })
 export const reativarCadastroFinanceiro = (tipo, id) => chamarApi(`/api/financeiro/${tipo}/${id}/reativar`, { metodo: 'POST' })
 
+// #2262: recebimentos de pedido (Mercado Pago e baixa manual) e vendas, as mesmas linhas que o Caixa soma.
+async function linhasDoCaixaNoPeriodo(inicio, fim) {
+  const partes = await Promise.all(janelasDoPeriodo(inicio, fim).map((janela) =>
+    chamarApi(`/api/caixa/linhas?${query({ desde: instanteFinanceiro(janela.inicio), ate: instanteFinanceiro(janela.fim, true) })}`)))
+  if (!partes.every(Array.isArray)) throw new Error('As linhas do Caixa não foram recebidas por completo.')
+  return partes.flat()
+}
+
 export async function obterExtratoFinanceiro({ inicio, fim }, acesso) {
-  const periodo = { desde: instanteFinanceiro(inicio), ate: instanteFinanceiro(fim, true) }
   const [pagar, receber, movimentos, linhasDoCaixa] = await Promise.all([
     acesso.visualizarContasPagar ? todas(baseConta('pagar')) : [],
     acesso.visualizarContasReceber ? todas(baseConta('receber')) : [],
-    todas('/api/caixa/movimentos', { ...periodo, incluirEstornados: true }),
-    // #2262: recebimentos de pedido (Mercado Pago e baixa manual) e vendas, as mesmas linhas que o Caixa soma.
-    chamarApi(`/api/caixa/linhas?${query(periodo)}`),
+    todas('/api/caixa/movimentos', { desde: instanteFinanceiro(inicio), ate: instanteFinanceiro(fim, true), incluirEstornados: true }),
+    linhasDoCaixaNoPeriodo(inicio, fim),
   ])
-  if (!Array.isArray(linhasDoCaixa)) throw new Error('As linhas do Caixa não foram recebidas por completo.')
   return extratoFinanceiro([...pagar.map((conta) => ({ lado: 'pagar', conta })), ...receber.map((conta) => ({ lado: 'receber', conta }))], movimentos, inicio, fim, linhasDoCaixa)
 }

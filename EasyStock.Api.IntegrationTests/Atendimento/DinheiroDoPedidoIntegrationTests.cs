@@ -158,6 +158,10 @@ public sealed partial class PedidoConversaConcorrenciaTests
         saida.GetProperty("valor").GetDecimal().Should().Be(19m);
         (await LinhasDoCaixaAsync(client, periodo)).Should().ContainSingle("a devolução sai à parte e a entrada fica no histórico")
             .Which.GetProperty("valor").GetDecimal().Should().Be(19m);
+        using var dia = JsonDocument.Parse(await client.GetStringAsync("/api/caixa/dia"));
+        var caixa = dia.RootElement.GetProperty("data");
+        caixa.GetProperty("totalPagamentosPedidos").GetDecimal().Should().Be(19m, "o Extrato e o Caixa somam a mesma entrada");
+        caixa.GetProperty("totalSaidasExtras").GetDecimal().Should().Be(19m, "e a mesma saída");
     }
 
     private static async Task<List<JsonElement>> LinhasDoCaixaAsync(HttpClient client, string periodo)

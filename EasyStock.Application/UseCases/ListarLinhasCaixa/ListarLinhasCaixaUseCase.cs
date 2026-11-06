@@ -10,7 +10,8 @@ public sealed record ListarLinhasCaixaQuery(Guid EmpresaId, DateTime Desde, Date
 /// #2262: as linhas que o Caixa soma fora dos movimentos (pagamento de pedido, venda e estorno de venda) num
 /// período. O recebimento de pedido, inclusive o confirmado pelo webhook do Mercado Pago, não grava movimento de
 /// caixa (#926): sem esta leitura, o Extrato do Financeiro mostrava a devolução sem o recebimento que ela devolve.
-/// Mesma fonte do <c>GET api/caixa/dia</c>, para as somas das duas telas baterem.
+/// Mesma fonte do <c>GET api/caixa/dia</c>. O <c>/dia</c> corta no fechamento do caixa; aqui vale o período inteiro,
+/// então o recebido depois do fechamento entra no Extrato e não no dia fechado.
 /// </summary>
 public class ListarLinhasCaixaUseCase(ICaixaSaldoCalculator calc)
 {
@@ -23,7 +24,11 @@ public class ListarLinhasCaixaUseCase(ICaixaSaldoCalculator calc)
         if (q.Ate < q.Desde) throw new UseCaseValidationException("O fim do período vem antes do início.");
         if (q.Ate - q.Desde > TimeSpan.FromDays(DiasNoMaximo))
             throw new UseCaseValidationException($"Consulte no máximo {DiasNoMaximo} dias por vez.");
-        // As linhas usam fim exclusivo; o período chega com fim inclusivo (23:59:59.999999 do último dia).
-        return calc.GetLinhasExtrasAsync(q.EmpresaId, q.Desde, q.Ate.AddTicks(10));
+        // As linhas usam fim exclusivo e o período chega com fim inclusivo: 1 µs antes do dia seguinte para data pura,
+        // o milissegundo .999 quando vem com fuso (Console). Nesse caso sobra menos de 1 ms, como em /movimentos.
+        return calc.GetLinhasExtrasAsync(q.EmpresaId, q.Desde, FimExclusivo(q.Ate));
     }
+
+    private static DateTime FimExclusivo(DateTime ate) =>
+        ate.Ticks > DateTime.MaxValue.Ticks - 10 ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc) : ate.AddTicks(10);
 }

@@ -10,7 +10,7 @@ registerHooks({
     return proximo(url, contexto)
   },
 })
-const { parcelasFinanceiras, diaFinanceiro, extratoFinanceiro } = await import('../src/dominio/financeiro.js')
+const { parcelasFinanceiras, diaFinanceiro, extratoFinanceiro, janelasDoPeriodo } = await import('../src/dominio/financeiro.js')
 const parcelas = parcelasFinanceiras(10001, 3, '2026-01-31')
 assert.equal(parcelas.reduce((total, item) => total + Math.round(item.valor * 100), 0), 10001)
 assert.deepEqual(parcelas.map((item) => diaFinanceiro(item.dataVencimento)), ['2026-01-31', '2026-02-28', '2026-03-31'])
@@ -47,6 +47,10 @@ assert.deepEqual([estornoDeVenda.lado, estornoDeVenda.valor], ['pagar', 30], 'o 
 assert.equal(extratoDoDia.length, 4)
 assert.equal(new Set(extratoDoDia.map((item) => item.id)).size, 4, 'cada linha tem id próprio para a lista')
 assert.equal(extratoFinanceiro([], [], '2026-11-04', '2026-11-04', linhasDoCaixa).length, 0, 'linha fora do período não entra')
+// /api/caixa/linhas aceita até 366 dias por consulta: o período livre do Extrato vira janelas que se encostam.
+assert.deepEqual(janelasDoPeriodo('2026-11-05', '2026-11-05'), [{ inicio: '2026-11-05', fim: '2026-11-05' }])
+assert.deepEqual(janelasDoPeriodo('2025-01-01', '2026-12-31'), [{ inicio: '2025-01-01', fim: '2026-01-01' }, { inicio: '2026-01-02', fim: '2026-12-31' }])
+assert.deepEqual(janelasDoPeriodo('2026-11-06', '2026-11-05'), [], 'período invertido não consulta')
 
 // #2095: lista orientada a vencimento, rótulos honestos, formulário e período.
 const fin = await import('../src/dominio/financeiro.js')
@@ -177,6 +181,13 @@ assert.equal(chamadas.some((item) => item.caminho === '/api/contas-a-receber'), 
 const pedidoDeLinhas = chamadas.find((item) => item.caminho === '/api/caixa/linhas')
 assert.ok(pedidoDeLinhas, '#2262: o Extrato lê as linhas do Caixa (recebimentos de pedido e vendas)')
 assert.deepEqual([pedidoDeLinhas.query.get('desde'), pedidoDeLinhas.query.get('ate')], ['2026-10-01T03:00:00.000Z', '2026-11-01T02:59:59.999Z'])
+const linhasAntes = chamadas.length
+await api.obterExtratoFinanceiro({ inicio: '2025-01-01', fim: '2026-12-31' }, {})
+assert.deepEqual(chamadas.slice(linhasAntes).filter((item) => item.caminho === '/api/caixa/linhas').map((item) => [item.query.get('desde'), item.query.get('ate')]),
+  [['2025-01-01T03:00:00.000Z', '2026-01-02T02:59:59.999Z'], ['2026-01-02T03:00:00.000Z', '2027-01-01T02:59:59.999Z']], 'dois anos viram duas consultas de até 366 dias')
+const invertidoAntes = chamadas.length
+await api.obterExtratoFinanceiro({ inicio: '2026-11-06', fim: '2026-11-05' }, {})
+assert.equal(chamadas.slice(invertidoAntes).some((item) => item.caminho === '/api/caixa/linhas'), false, 'período invertido não chama as linhas')
 falharPagina = true
 await assert.rejects(() => api.obterExtratoFinanceiro({ inicio: '2026-10-01', fim: '2026-10-31' }, { visualizarContasPagar: true }), /Falha na página 2/)
 await api.adicionarParcelaFinanceira('pagar', 'conta', { numero: 2, valor: 10, dataVencimento: parcelas[0].dataVencimento })

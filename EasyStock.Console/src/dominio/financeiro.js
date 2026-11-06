@@ -165,6 +165,17 @@ export function parcelasFinanceiras(centavos, quantidade, primeiroDia) {
   })
 }
 
+// #2262: /api/caixa/linhas não pagina e aceita até 366 dias por consulta. O período do Extrato é livre, então
+// vira janelas de até 366 dias; período invertido não tem janela (nada a consultar).
+export function janelasDoPeriodo(inicio, fim, dias = 366) {
+  const janelas = []
+  for (let de = inicio; de <= fim; de = diaMais(de, dias)) {
+    const ate = diaMais(de, dias - 1)
+    janelas.push({ inicio: de, fim: ate < fim ? ate : fim })
+  }
+  return janelas
+}
+
 // #2262: `linhasDoCaixa` são as linhas que o Caixa soma fora dos movimentos (pagamento de pedido, venda e
 // estorno de venda), na forma de /api/caixa/linhas. Sem elas, o Pix do Mercado Pago ficava fora do Extrato.
 export function extratoFinanceiro(contas, movimentos, inicio, fim, linhasDoCaixa = []) {

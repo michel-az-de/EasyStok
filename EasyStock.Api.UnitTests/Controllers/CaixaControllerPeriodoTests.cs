@@ -84,6 +84,37 @@ public class CaixaControllerPeriodoTests
         fim.Should().Be(new DateTime(2026, 11, 6, 3, 0, 0, DateTimeKind.Utc));
     }
 
+    // O Console manda o instante com Z e fim .999; janela de 366 dias é o máximo e ainda consulta.
+    [Fact]
+    public async Task ListarLinhas_InstanteComFusoNoLimiteDe366Dias_ConsultaOInstanteRecebido()
+    {
+        DateTime? ini = null, fim = null;
+        _calc.GetLinhasExtrasAsync(_empresaId, Arg.Do<DateTime>(d => ini = d), Arg.Do<DateTime>(d => fim = d), null)
+            .Returns((IReadOnlyList<CaixaLinhaExtraResult>)[]);
+        var desde = new DateTime(2025, 1, 1, 3, 0, 0, DateTimeKind.Utc);
+        var ate = new DateTime(2026, 1, 2, 2, 59, 59, 999, DateTimeKind.Utc);
+
+        await CriarController().ListarLinhas(_empresaId, desde: desde, ate: ate);
+
+        ini.Should().Be(desde);
+        fim.Should().Be(ate.AddTicks(10));
+    }
+
+    // Data pura de 31/12/9999 vira DateTime.MaxValue: o fim exclusivo satura em vez de estourar em 500.
+    [Fact]
+    public async Task ListarLinhas_UltimoDiaRepresentavel_NaoEstoura()
+    {
+        DateTime? fim = null;
+        _calc.GetLinhasExtrasAsync(_empresaId, Arg.Any<DateTime>(), Arg.Do<DateTime>(d => fim = d), null)
+            .Returns((IReadOnlyList<CaixaLinhaExtraResult>)[]);
+
+        await CriarController().ListarLinhas(_empresaId,
+            desde: new DateTime(9999, 6, 1, 0, 0, 0, DateTimeKind.Unspecified),
+            ate: new DateTime(9999, 12, 31, 0, 0, 0, DateTimeKind.Unspecified));
+
+        fim.Should().Be(DateTime.MaxValue);
+    }
+
     [Fact]
     public async Task ListarLinhas_SemPeriodo_Responde400SemConsultar()
     {
