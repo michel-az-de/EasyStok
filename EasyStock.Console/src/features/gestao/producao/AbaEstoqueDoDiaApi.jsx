@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
-import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
@@ -9,8 +8,7 @@ import { contagemInicial, detalheDoLote, podeRegistrarPerda, podeReimprimir, por
 import { producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
-import { EtiquetaDeProducao } from './etiqueta/EtiquetaDeProducao'
-import etq from './etiqueta/etiqueta.module.css'
+import { PreviaDasEtiquetas } from './etiqueta/PreviaDasEtiquetas'
 
 // M2 › Estoque do dia (M2.1, #1490). O que a Thati usa todo dia, lido do EasyStok: os alertas de
 // venda sem saldo (avisa, não trava; RN-48), o saldo em porções por prato e os lotes com o
@@ -127,22 +125,23 @@ export function AbaEstoqueDoDiaApi() {
     if (alvo) document.getElementById(alvo)?.focus()
   }, [perdaDoLote])
   // #2081 (A8): reimprimir as etiquetas de um lote ativo. { loteId } buscando, com `folha` pronta, com `erro` falhou.
+  // #2247 (v3): a reimpressão abre a mesma prévia da Produção do dia; quem imprime é o botão dela.
   const [impressao, setImpressao] = useState(null)
+  const [previa, setPrevia] = useState(null)
   const montada = useRef(true)
   useEffect(() => {
     montada.current = true
     return () => { montada.current = false }
   }, [])
 
-  async function reimprimir(loteId) {
-    setImpressao({ loteId })
+  async function reimprimir(lote) {
+    setPrevia({ loteId: lote.id, codigo: lote.codigo, quantas: lote.quantidade })
+    setImpressao({ loteId: lote.id })
     try {
-      const folha = await producaoDoDia.folhaDeEtiquetas(loteId)
-      if (!montada.current) return
-      setImpressao({ loteId, folha })
-      setTimeout(() => { if (montada.current) window.print() }, 50)
+      const folha = await producaoDoDia.folhaDeEtiquetas(lote.id)
+      if (montada.current) setImpressao({ loteId: lote.id, folha })
     } catch (e) {
-      if (montada.current) setImpressao({ loteId, erro: e.message })
+      if (montada.current) setImpressao({ loteId: lote.id, erro: e.message })
     }
   }
 
@@ -291,7 +290,7 @@ export function AbaEstoqueDoDiaApi() {
                     )}
                     {podeReimprimir(l) && (
                       <Botao variante="texto" icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
-                        aria-label={`Etiquetas do lote ${l.codigo} de ${l.prato}`} onClick={() => reimprimir(l.id)}>Etiquetas</Botao>
+                        aria-label={`Etiquetas do lote ${l.codigo} de ${l.prato}`} onClick={() => reimprimir(l)}>Etiquetas</Botao>
                     )}
                   </div>
                 )}
@@ -312,13 +311,8 @@ export function AbaEstoqueDoDiaApi() {
         )}
       </section>
 
-      {impressao?.folha && impressao.folha.etiquetas.length > 0 && (
-        <FolhaImpressao>
-          <div className={etq.folha}>
-            {impressao.folha.etiquetas.map((e) => <EtiquetaDeProducao key={e.id} etiqueta={e} empresa={impressao.folha.empresa} total={impressao.folha.etiquetas.length} />)}
-          </div>
-        </FolhaImpressao>
-      )}
+      {previa && <PreviaDasEtiquetas loteId={previa.loteId} codigo={previa.codigo} quantas={previa.quantas}
+        impressao={impressao} aoFechar={() => setPrevia(null)} />}
     </div>
   )
 }

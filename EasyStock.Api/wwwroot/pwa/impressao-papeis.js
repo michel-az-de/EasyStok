@@ -88,5 +88,46 @@
     return p ? p.rotulo : 'Papel não informado';
   }
 
-  global.cdbPapeis = { PAPEIS: lista(), PADRAO_TSPL, PADRAO_ESCPOS, CABECA_MM, porId, lista, daMidia, paraMidia, area, descrever };
+  // #2247 (v3, G1 item 6): os papéis da regra da loja (RegraImpressaoCatalogo.Papeis
+  // no servidor), o papel do aparelho que serve cada um e a folha do bilhete
+  // (classe do bilhete.css). Folha (A4, A5) não tem papel no aparelho.
+  const PAPEIS_LOJA = [
+    { id: 'cupom-58', aparelho: 'bobina-58', folha: 's-58' },
+    { id: 'cupom-80', aparelho: 'bobina-80', folha: 's-80' },
+    { id: 'etiqueta-52', aparelho: 'continuo-52', folha: null },
+    { id: 'etiqueta-80', aparelho: 'continuo-80', folha: null },
+    { id: 'etiqueta-10x15', aparelho: 'etiqueta-100x150', folha: 's-1015' },
+    { id: 'a4', classe: 'folha', larguraMm: 210, alturaMm: 297, folha: 's-a4' },
+    { id: 'a5', classe: 'folha', larguraMm: 148, alturaMm: 210, folha: 's-a5' }
+  ];
+
+  function papelDaLoja(l) {
+    const a = l.aparelho ? porId(l.aparelho) : null;
+    const largura = a ? a.larguraMm : l.larguraMm;
+    return {
+      id: l.id,
+      classe: a ? a.classe : l.classe,
+      larguraMm: largura,
+      alturaMm: (a ? (a.tipo === 'etiqueta' ? a.alturaMm : null) : l.alturaMm) || null,
+      utilMm: a && a.tipo === 'bobina' ? a.utilMm : largura,
+      aparelho: a ? a.id : null,
+      folha: l.folha || null
+    };
+  }
+
+  // O conteúdo de docs/contracts/papeis.v1.json (node tools/contratos/gerar-papeis.js).
+  function contrato() {
+    return {
+      contrato: 'Catálogo de papéis v1 (#2247, impressão v3, G1 item 6). Gerado; não edite à mão.',
+      fonte: 'EasyStock.Api/wwwroot/pwa/impressao-papeis.js',
+      gerar: 'node tools/contratos/gerar-papeis.js',
+      v: 1,
+      cabecaMm: CABECA_MM,
+      padroes: { tspl: PADRAO_TSPL, escpos: PADRAO_ESCPOS },
+      aparelho: lista(),
+      loja: PAPEIS_LOJA.map(papelDaLoja)
+    };
+  }
+
+  global.cdbPapeis = { PAPEIS: lista(), PADRAO_TSPL, PADRAO_ESCPOS, CABECA_MM, porId, lista, daMidia, paraMidia, area, descrever, contrato };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -23824,8 +23824,15 @@ window.cdbApp = {
 <script src="etiqueta-termica.js?v=20261028a"></script>
 <script src="impressao-papeis.js?v=20261104b"></script>
 <script src="impressoras.js?v=20261105b"></script>
-<script src="etiqueta-resolver.js?v=20261104c"></script>
-<script src="etiqueta-canvas.js?v=20261105a"></script>
+<script src="etiqueta-resolver.js?v=20261105b"></script>
+<script src="etiqueta-canvas.js?v=20261105b"></script>
+<script>
+// #2247 (v3): o motor da etiqueta só desenha com a sua fonte. Carrega já no
+// boot (woff2 local, no cache do service worker) e refaz a miniatura de Ajustes.
+window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.carregarFonte({ base: 'fontes/' }).then(function (ok) {
+  if (ok && typeof redrawAjustesEtqThumb === 'function') { try { redrawAjustesEtqThumb(); } catch (e) { /* tela fechada */ } }
+});
+</script>
 <script src="impressora-tspl.js?v=20261105b"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>

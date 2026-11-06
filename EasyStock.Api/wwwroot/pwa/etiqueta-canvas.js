@@ -155,6 +155,8 @@
     const doc = e.document || global.document;
     const papel = typeof e.papel === 'string' ? global.cdbPapeis.porId(e.papel) : e.papel;
     if (!papel) return { canvas: null, layout: null, recusa: 'papel não informado', avisos: [], omitidos: [] };
+    // #2247 (v3): sem a fonte do motor, nada é medido nem desenhado.
+    if (R().fontePronta && !R().fontePronta()) return { canvas: null, layout: null, recusa: R().RECUSA_FONTE, avisos: [], omitidos: [], papel };
     const r = resolverNoPapel(e.campos, papel, e.orientacao, { codigos: e.codigos || ['qr'], medir: e.medir, document: doc });
     const area = r.area;
     if (r.recusa) return { canvas: null, layout: null, recusa: r.recusa, avisos: r.avisos, omitidos: r.omitidos, papel, continuo: area.continuo, orientacao: r.orientacao };

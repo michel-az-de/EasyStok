@@ -325,6 +325,6 @@
   global.cdbImpressoras = {
     CHAVE, REGRA, PAPEIS: PAPEIS.slice(),
     linguagemPorNome, deLegado, paraLegado, migrar, ler, salvar, cadastrar, esquecer, definirPapel, resolver, papelDoDocumento, regra, regraEfetiva, modoDosCodigos, ajusteFino, AJUSTE_MAX_MM,
-    normalizarRegra
+    normalizarRegra, CATALOGO_REGRA
   };
 })(typeof window !== 'undefined' ? window : globalThis);

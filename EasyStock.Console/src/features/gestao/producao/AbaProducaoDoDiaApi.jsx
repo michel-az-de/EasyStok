@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { BotaoIcone } from '../../../componentes/BotaoIcone'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Chip } from '../../../componentes/Chip'
-import { FolhaImpressao } from '../../../componentes/FolhaImpressao'
 import { Icone } from '../../../componentes/Icone'
 import { Modal } from '../../../componentes/Modal'
 import { Vazio } from '../../../componentes/Vazio'
@@ -23,8 +22,7 @@ import { linhaComPorcao } from '../../../dominio/porcoes'
 import css from '../cardapio/abaCardapio.module.css'
 import grade from './producaoDoDia.module.css'
 import { ConectarAparelho } from './ConectarAparelho'
-import { EtiquetaDeProducao } from './etiqueta/EtiquetaDeProducao'
-import etq from './etiqueta/etiqueta.module.css'
+import { PreviaDasEtiquetas } from './etiqueta/PreviaDasEtiquetas'
 
 // M2 › Produção do dia (M2.2, #1491). #1624: a dona produz como no PWA. Toca no prato para somar uma
 // porção, vê o saldo no cartão e o que falta para os pedidos, confere validade e peso no lote e
@@ -90,33 +88,6 @@ function FotoDoCartao({ foto, selo }) {
   )
 }
 
-// #2081 (A4): a prévia abre sozinha depois do lote, como no APK: a etiqueta de verdade (80x40, QR e
-// barras) e um botão para imprimir todas. Fechar não perde nada: o aviso do lote continua imprimindo.
-function PreviaDasEtiquetas({ lote, impressao, aoImprimir, aoFechar }) {
-  const folha = impressao?.loteId === lote.loteId ? impressao.folha : null
-  const erro = impressao?.loteId === lote.loteId ? impressao.erro : null
-  const quantas = folha?.etiquetas.length ?? lote.etiquetas
-  const rotulo = `Imprimir ${quantas} ${quantas === 1 ? 'etiqueta' : 'etiquetas'}`
-  return (
-    <Modal titulo={`Etiquetas do lote ${lote.codigo}`} largura="min(520px, calc(100vw - 24px))" aoFechar={aoFechar}
-      descricao="Uma etiqueta por porção, no papel de 80 x 40 mm."
-      rodape={<>
-        <Botao variante="texto" onClick={aoFechar}>Fechar</Botao>
-        <Botao variante="primario" icone="printer" disabled={!folha || folha.etiquetas.length === 0} onClick={aoImprimir}>{rotulo}</Botao>
-      </>}>
-      {erro ? <p className={css.aviso} role="alert">Não foi possível carregar as etiquetas deste lote. {erro}</p>
-        : !folha ? <p className={css.descricao}>Buscando as etiquetas…</p>
-          : folha.etiquetas.length === 0 ? <p className={css.descricao}>Este lote não tem etiquetas para imprimir.</p>
-            : (
-              <div className={etq.previa}>
-                <div className={etq.moldura}><EtiquetaDeProducao etiqueta={folha.etiquetas[0]} empresa={folha.empresa} total={folha.etiquetas.length} /></div>
-                {folha.etiquetas.length > 1 && <p className={css.descricao}>E mais {folha.etiquetas.length - 1}, numeradas até {folha.etiquetas.length}/{folha.etiquetas.length}.</p>}
-              </div>
-            )}
-    </Modal>
-  )
-}
-
 export function AbaProducaoDoDiaApi() {
   const { cardapio } = useCatalogo()
   const pratos = useMemo(() => (cardapio ?? []).filter((i) => !estaRemovido(i)), [cardapio])
@@ -144,27 +115,24 @@ export function AbaProducaoDoDiaApi() {
   const [busca, setBusca] = useState('')
   const [confirmandoLimpar, setConfirmandoLimpar] = useState(false)
   const [revisando, setRevisando] = useState(false)
-  const montada = useRef(true)
-
-  useEffect(() => {
-    montada.current = true
-    return () => { montada.current = false }
-  }, [])
   // #1585: cada lote imprime as próprias etiquetas. A folha esvazia antes de buscar: se a busca
   // falhar, não sobra a do lote anterior, e o erro aparece junto do botão do lote.
-  // #1627: se ela saiu da tela antes de as etiquetas chegarem, a impressão não abre sobre outra tela.
-  // #2081 (A4): a folha traz a empresa e as etiquetas, que saem no papel de 80x40 com QR e barras.
-  async function buscarEtiquetas(loteId, imprimirAoChegar) {
+  // #2081 (A4): a folha traz a empresa e as etiquetas. #2247 (v3): nada imprime sozinho; quem
+  // imprime é o botão da prévia, depois que a etiqueta aparece.
+  async function buscarEtiquetas(loteId) {
     setImpressao({ loteId })
     try {
       const folha = await producaoDoDia.folhaDeEtiquetas(loteId)
       setImpressao({ loteId, folha })
-      if (imprimirAoChegar) setTimeout(() => { if (montada.current) window.print() }, 50)
     } catch (e) {
       setImpressao({ loteId, erro: e.message })
     }
   }
-  const imprimir = (loteId) => buscarEtiquetas(loteId, true)
+  // #2247 (v3): todo caminho para o papel passa pela prévia, que mostra a etiqueta que sai.
+  const abrirPrevia = (loteId) => {
+    setPrevia(loteId)
+    buscarEtiquetas(loteId)
+  }
   useEffect(() => producaoDoDia.aoMudarEnvio(setEnviando), [])
   useEffect(() => { guardarRascunho(linhas) }, [linhas])
   // O lote gravado entra na lista e as linhas dele saem, mesmo quando o envio partiu antes de ela
@@ -179,8 +147,7 @@ export function AbaProducaoDoDiaApi() {
     setLeitura((n) => n + 1)
     recarregarEstoque()
     marcarPassosVistos()
-    setPrevia(lote.loteId)
-    buscarEtiquetas(lote.loteId, false)
+    abrirPrevia(lote.loteId)
   }), [recarregarEstoque])
   // O campo inválido ganha foco dentro da revisão; falha da API anuncia o erro sem perder o lote.
   useEffect(() => {
@@ -393,7 +360,7 @@ export function AbaProducaoDoDiaApi() {
                   <output key={lote.loteId} className={css.aviso}>
                     <strong>Lote {lote.codigo}</strong> lançado: {lote.pratos.map((p) => `${p.porcoes}× ${p.nome}${p.sobraG ? ` (sobra ${p.sobraG} g)` : ''}`).join(', ')}.
                     <span className={grade.acoesDoAviso}>
-                      <BotaoIcone icone="printer" disabled={buscandoEtiquetas} rotulo={`Etiquetas do lote ${lote.codigo}`} dica="Etiquetas" onClick={() => imprimir(lote.loteId)} />
+                      <BotaoIcone icone="printer" disabled={buscandoEtiquetas} rotulo={`Etiquetas do lote ${lote.codigo}`} dica="Etiquetas" onClick={() => abrirPrevia(lote.loteId)} />
                       <Botao variante="texto" disabled={buscandoEtiquetas} aria-label={`Fechar o aviso do lote ${lote.codigo}`} onClick={() => dispensar(lote.loteId)}>Fechar aviso</Botao>
                     </span>
                     {impressao?.loteId === lote.loteId && impressao.erro && <>{' '}<strong>Não foi possível carregar as etiquetas deste lote. {impressao.erro}</strong></>}
@@ -504,17 +471,8 @@ export function AbaProducaoDoDiaApi() {
         </div>
       </div>
 
-      {loteDaPrevia && <PreviaDasEtiquetas lote={loteDaPrevia} impressao={impressao}
-        aoImprimir={() => window.print()} aoFechar={() => setPrevia(null)} />}
-
-      {/* #2081 (A4): a etiqueta do APK, 80x40 mm com QR e barras, uma por página. */}
-      {impressao?.folha && impressao.folha.etiquetas.length > 0 && (
-        <FolhaImpressao>
-          <div className={etq.folha}>
-            {impressao.folha.etiquetas.map((e) => <EtiquetaDeProducao key={e.id} etiqueta={e} empresa={impressao.folha.empresa} total={impressao.folha.etiquetas.length} />)}
-          </div>
-        </FolhaImpressao>
-      )}
+      {loteDaPrevia && <PreviaDasEtiquetas loteId={loteDaPrevia.loteId} codigo={loteDaPrevia.codigo} quantas={loteDaPrevia.etiquetas}
+        impressao={impressao} aoFechar={() => setPrevia(null)} />}
     </div>
   )
 }

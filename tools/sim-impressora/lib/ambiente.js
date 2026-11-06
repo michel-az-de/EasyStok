@@ -15,6 +15,9 @@ function registrarFontes() {
   // estáticas reproduzem o peso que o WebView aplica.
   for (const w of [400, 500, 600, 700, 800]) GlobalFonts.registerFromPath(path.join(FONTES, `Manrope-${w}.ttf`), 'Manrope');
   GlobalFonts.registerFromPath(path.join(FONTES, 'Fraunces-700.ttf'), 'Fraunces');
+  // #2247 (v3): a fonte do motor da etiqueta, dos mesmos woff2 que a PWA carrega.
+  const pwaFontes = path.join(__dirname, '..', '..', '..', 'EasyStock.Api', 'wwwroot', 'pwa', 'fontes');
+  for (const w of [400, 700]) GlobalFonts.registerFromPath(path.join(pwaFontes, `NunitoSans-${w}.woff2`), 'Nunito Sans Etiqueta');
   fontesProntas = true;
 }
 
@@ -121,6 +124,8 @@ function carregarPwa(pwaDir) {
     catch (e) { erros.push((s.nome || 'inline') + ': ' + (e && e.message)); }
   }
   const rodar = codigo => vm.runInContext(codigo, sb, { timeout: 20000, filename: 'sim' });
+  // A fonte do motor já está no GlobalFonts; a cópia do master não tem a função.
+  rodar('window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.usarFonteRegistrada && window.cdbResolverEtiqueta.usarFonteRegistrada()');
   for (const f of ['etiquetasTspl', 'etiquetasFromBatch', 'escPosEtiquetaProducao']) {
     if (rodar(`typeof ${f}`) !== 'function') throw new Error(`PWA em ${pwaDir} sem ${f}(): ${erros.join(' | ')}`);
   }

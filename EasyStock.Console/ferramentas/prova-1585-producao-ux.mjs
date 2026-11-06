@@ -17,7 +17,8 @@ import { transformWithOxc } from 'vite'
 
 const pastaDasTelas = new URL('../src/features/gestao/producao/', import.meta.url)
 const telasCompiladas = new Map()
-for (const nome of readdirSync(pastaDasTelas).filter((n) => n.endsWith('Api.jsx'))) {
+// #2247 (v3): a prévia das etiquetas é a mesma nas duas telas e roda de verdade aqui.
+for (const nome of [...readdirSync(pastaDasTelas).filter((n) => n.endsWith('Api.jsx')), 'etiqueta/PreviaDasEtiquetas.jsx']) {
   const url = new URL(nome, pastaDasTelas)
   telasCompiladas.set(url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
@@ -44,7 +45,7 @@ const hooks = {
     atual.efeitos.push(() => { antes?.limpar?.(); atual.valores[i].limpar = fn() })
   },
 }
-globalThis.__prova1585 = { hooks, catalogo: { cardapio: [] } }
+globalThis.__prova1585 = { motor: { png: 'data:image/png;base64,', larguraMm: 80, alturaMm: 40, recusa: null }, hooks, catalogo: { cardapio: [] } }
 const inline = (source) => ({ format: 'module', shortCircuit: true, source })
 
 registerHooks({
@@ -61,6 +62,8 @@ registerHooks({
     if (url.endsWith('/infra/fonteDados.js')) return inline("export const FONTE_API = true\nexport const API_BASE = ''\n")
     if (url.endsWith('/aplicacao/contextos.js')) return inline('export const useCatalogo=()=>globalThis.__prova1585.catalogo')
     if (url.includes('/aplicacao/acessoModulos.')) return inline('export const useAcessoModulos=()=>({acoes:{editarProducao:true},permite:()=>true})')
+    // #2247 (v3): o motor da etiqueta pede canvas e fonte, que só o navegador tem; aqui ele devolve a imagem pronta.
+    if (url.includes('/aplicacao/etiquetaDoMotor.')) return inline('export const useEtiquetaDoMotor=(e)=>(e?globalThis.__prova1585.motor:{png:null,recusa:null})')
     if (url.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>String(p)})')
     if (url.endsWith('.json')) return inline('export default ' + readFileSync(new URL(url), 'utf8'))
     // Componente de fora das telas (Botao, CampoTexto, Vazio) vira o próprio nome: aparece na árvore sem rodar.
@@ -289,6 +292,11 @@ const andar = (no, fn, achados = []) => {
 }
 const texto = (no) => (no == null ? '' : typeof no !== 'object' ? String(no) : Array.isArray(no) ? no.map(texto).join('') : texto(no.props?.children))
 const botoes = (no, rotulo) => andar(no, (n) => n.type === 'Botao' && texto(n).includes(rotulo))
+// #2247 (v3): o botão do lote abre a prévia; quem imprime é o "Imprimir" dela.
+const imprimirNaPrevia = async (t) => {
+  const previa = andar(t.renderizar(), (n) => n.type === 'Modal' && String(n.props.titulo).startsWith('Etiquetas do lote '))[0]
+  await andar(previa.props.rodape, (n) => n.type === 'Botao' && /^Imprimir /.test(texto(n)))[0].props.onClick()
+}
 const botoesEtiquetas = (no, codigo) => andar(no, (n) => n.type === 'BotaoIcone' && n.props.rotulo === `Etiquetas do lote ${codigo}`)
 const campos = (no, tipo, rotulo) => andar(no, (n) => n.type === tipo && n.props.rotulo === rotulo)
 const alertas = (no) => andar(no, (n) => n.props?.role === 'alert')
@@ -395,6 +403,8 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   await botoesEtiquetas(t.renderizar(), 'LOT-261011-002')[0].props.onClick()
   await esperar(80)
   assert.match(etiquetasDaFolha(folha(t)[0]), /Lote LOT-261011-002 · 6\/6/)
+  assert.equal(impressoes, 0, 'abrir a prévia não imprime')
+  await imprimirNaPrevia(t)
   assert.equal(impressoes, 1)
   // Lote 1 com a rede fora: a folha do lote 2 sai, nada imprime e o erro aparece no aviso do lote 1.
   cair = true
@@ -410,6 +420,7 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   await botoesEtiquetas(t.arvore, 'LOT-261011-001')[0].props.onClick()
   await esperar(80)
   assert.match(etiquetasDaFolha(folha(t)[0]), /Lote LOT-261011-001 · 2\/2/)
+  await imprimirNaPrevia(t)
   assert.equal(impressoes, 2)
   assert.equal(chamadas.filter((c) => c.url.includes('/etiquetas/')).length, 3)
   // Dispensar o lote 1 leva a folha dele; o lote 2 continua.
