@@ -926,6 +926,24 @@
   let _consecutiveFlushFailures = 0;
   const FLUSH_DELAY_NORMAL_MS = 30000;   // 30s — delay padrao
   const FLUSH_DELAY_CAP_MS = 600000;     // 10min — cap maximo do backoff
+  // #2184: backup 'pre-sync' antes de enviar a fila (ver _flushInner).
+  let _chaveBackupPreSync = null;
+  let _ultimoAvisoBackupFalhou = 0;
+  function _temCanalDeBackupNativo() {
+    return !!(_getPublicBackupPlugin() || _getFilesystemPlugin());
+  }
+  function _avisarBackupFalhou() {
+    // O flush de 30s repete a falha: avisa no maximo a cada 5 min.
+    const agora = Date.now();
+    if (agora - _ultimoAvisoBackupFalhou < 300000) return;
+    _ultimoAvisoBackupFalhou = agora;
+    try {
+      if (window.cdbApp && window.cdbApp.showToast) {
+        window.cdbApp.showToast('Não foi possível salvar o backup deste aparelho. Nada foi enviado; as alterações continuam na fila.');
+      }
+    } catch (_) {}
+  }
+
   async function flush() {
     // F10-C-1: re-entry retorna a MESMA promise pendente. Sem race.
     if (flushPromise) return flushPromise;
@@ -943,6 +961,22 @@
       return 'empty';
     }
     if (!navigator.onLine) return 'offline';
+
+    // #2184: backup local antes de qualquer envio. Sem canal nativo (navegador)
+    // nao ha onde gravar, entao segue como antes. A mesma fila ja coberta pelo
+    // ultimo backup pre-sync (ex: retry) nao grava de novo.
+    if (_temCanalDeBackupNativo()) {
+      const chaveFila = queue.map((m) => m.id).join('|');
+      if (chaveFila !== _chaveBackupPreSync) {
+        let backup = null;
+        try { backup = await localBackupToFile('pre-sync'); } catch (_) { backup = null; }
+        if (!backup || !backup.ok) {
+          _avisarBackupFalhou();
+          return 'backup-failed';
+        }
+        _chaveBackupPreSync = chaveFila;
+      }
+    }
 
     try {
       const url = API_BASE_URL + API_PREFIX + '/sync';
@@ -1350,7 +1384,7 @@
   //   ok / empty     → 30s (normal)
   //   retry          → 30s * 2^(failures-1), cap 10min (60/120/240/480/600)
   //   auth           → 10min (so re-pareamento destrava; loop checa de vez em quando)
-  //   offline / busy → 30s (sem mudar contador — proximo tick vai tentar)
+  //   offline / busy / backup-failed → 30s (sem mudar contador — proximo tick vai tentar)
   function computeFlushDelay(status) {
     if (status === 'auth') return FLUSH_DELAY_CAP_MS;
     if (status === 'retry') {
