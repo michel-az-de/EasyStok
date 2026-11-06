@@ -242,17 +242,43 @@
   // Regra da loja (do servidor desde a F4, guardada pelo sync.js). Códigos: a regra; senão o
   // modo de leitura salvo; senão só o QR (D4: a barra espera o número curto do lote).
   function regra(storage, documento) {
+    const r = regraEfetiva(storage, documento);
+    delete r.daLoja;
+    return r;
+  }
+
+  // #2247 (v3): a mesma regra, dizendo o que veio da loja. A prévia, o papel e a
+  // tela Ajustes leem daqui; o que a loja define não se troca no aparelho.
+  function regraEfetiva(storage, documento) {
     const r = json(cru(storage, REGRA));
     const d = (r && r.documentos && r.documentos[documento]) || {};
     let codigos = Array.isArray(d.codigos) ? d.codigos.filter(c => c === 'qr' || c === 'barras') : null;
+    const codigosDaLoja = !!codigos;
     if (!codigos) { const modo = cru(storage, 'cdb-prod-scan-mode'); codigos = MODOS[modo] ? MODOS[modo].slice() : ['qr']; }
-    const orient = d.orientacao || cru(storage, 'cdb-etq-orient');
+    const orientDaLoja = d.orientacao === 'vertical' || d.orientacao === 'horizontal';
+    const orient = orientDaLoja ? d.orientacao : cru(storage, 'cdb-etq-orient');
     return {
       papel: classeDoPapel(d.papel, documento),
       orientacao: orient === 'horizontal' ? 'horizontal' : 'vertical',
       codigos,
-      copias: Math.max(1, Math.floor(positivo(d.copias, 1)))
+      copias: Math.max(1, Math.floor(positivo(d.copias, 1))),
+      daLoja: { codigos: codigosDaLoja, orientacao: orientDaLoja }
     };
+  }
+
+  // #2247 (v3): ajuste fino da impressora, em mm. Passos de 0,5 mm, ±10 mm.
+  const AJUSTE_MAX_MM = 10;
+  function ajusteFino(atual, dx, dy) {
+    const a = atual || {};
+    const passo = v => Math.max(-AJUSTE_MAX_MM, Math.min(AJUSTE_MAX_MM, Math.round(v * 2) / 2));
+    const x = passo((Number(a.x) || 0) + (Number(dx) || 0)), y = passo((Number(a.y) || 0) + (Number(dy) || 0));
+    return { x: x || 0, y: y || 0 };
+  }
+
+  // Lista de códigos -> modo da tela (both, barcode, qr, none).
+  function modoDosCodigos(codigos) {
+    const qr = codigos.indexOf('qr') >= 0, barras = codigos.indexOf('barras') >= 0;
+    return qr && barras ? 'both' : barras ? 'barcode' : qr ? 'qr' : 'none';
   }
 
   // #2209 (F4): a forma canônica do servidor (RegraImpressaoNormalizador). Documentos
@@ -298,7 +324,7 @@
 
   global.cdbImpressoras = {
     CHAVE, REGRA, PAPEIS: PAPEIS.slice(),
-    linguagemPorNome, deLegado, paraLegado, migrar, ler, salvar, cadastrar, esquecer, definirPapel, resolver, papelDoDocumento, regra,
-    normalizarRegra
+    linguagemPorNome, deLegado, paraLegado, migrar, ler, salvar, cadastrar, esquecer, definirPapel, resolver, papelDoDocumento, regra, regraEfetiva, modoDosCodigos, ajusteFino, AJUSTE_MAX_MM,
+    normalizarRegra, CATALOGO_REGRA
   };
 })(typeof window !== 'undefined' ? window : globalThis);

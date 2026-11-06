@@ -13,7 +13,50 @@
     barraModulo: 2, barraModuloMax: 3, barraQuieta: 10, // em pontos e módulos (ISO 15417)
     barraAlturaMm: 8
   };
-  const FONTE = "Manrope, 'Noto Sans', Roboto, Arial, sans-serif";
+  // #2247 (v3): uma fonte só, a Nunito Sans dos woff2 locais, com nome próprio
+  // para não depender do CSS da tela. Sem reserva: fonte trocada mede uma
+  // largura e desenha outra, e o texto sai cortado.
+  const FAMILIA_FONTE = 'Nunito Sans Etiqueta';
+  const FONTE = `'${FAMILIA_FONTE}'`;
+  const PESOS_FONTE = [400, 700];
+  const RECUSA_FONTE = 'a fonte da etiqueta não carregou. Feche e abra de novo; se repetir, atualize o app';
+  const fonte = { pronta: false, motivo: 'ainda não carregada', carga: null };
+
+  function fontePronta() { return fonte.pronta; }
+  function motivoFonte() { return fonte.motivo; }
+  // Ambiente que registra a fonte por fora (simulador em Node) ou teste.
+  function usarFonteRegistrada(pronta) {
+    fonte.pronta = pronta !== false;
+    fonte.motivo = fonte.pronta ? null : 'ainda não carregada';
+    fonte.carga = null;
+  }
+  // opcoes: { document?, base: pasta dos woff2 com '/', urls?: { 400, 700 }, FontFace? }.
+  // urls vence base: o Console (Vite) serve os woff2 com hash no nome.
+  // Devolve Promise<boolean>; nunca lança.
+  function carregarFonte(opcoes) {
+    if (fonte.pronta) return Promise.resolve(true);
+    if (fonte.carga) return fonte.carga;
+    const o = opcoes || {};
+    const doc = o.document || global.document;
+    const FF = o.FontFace || global.FontFace;
+    const base = o.base == null ? 'fontes/' : o.base;
+    if (!FF || !doc || !doc.fonts) {
+      fonte.motivo = 'este aparelho não carrega fonte própria';
+      return Promise.resolve(false);
+    }
+    fonte.carga = Promise.all(PESOS_FONTE.map(p =>
+      new FF(FAMILIA_FONTE, `url('${(o.urls && o.urls[p]) || base + 'NunitoSans-' + p + '.woff2'}') format('woff2')`, { weight: String(p), style: 'normal' }).load()
+    )).then(faces => {
+      faces.forEach(f => doc.fonts.add(f));
+      fonte.pronta = true;
+      fonte.motivo = null;
+      return true;
+    }, e => {
+      fonte.motivo = (e && e.message) || String(e);
+      return false;
+    }).then(ok => { fonte.carga = null; return ok; });
+    return fonte.carga;
+  }
   // Nível Q (25%): aguenta borrão e risco da térmica. No simulador, o nível M
   // deixou 1 em 120 códigos sem leitura no ZXing; o Q leu todos.
   const QR_NIVEL = 'Q';
@@ -290,5 +333,8 @@
     return partes.length ? partes.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('. ') + '.' : '';
   }
 
-  global.cdbResolverEtiqueta = { resolver, resumo, MIN, FONTE, PT_MM, PONTO, QR_NIVEL, modulosBarras, modulosQr };
+  global.cdbResolverEtiqueta = {
+    resolver, resumo, MIN, FONTE, FAMILIA_FONTE, RECUSA_FONTE, PT_MM, PONTO, QR_NIVEL, modulosBarras, modulosQr,
+    carregarFonte, fontePronta, motivoFonte, usarFonteRegistrada
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

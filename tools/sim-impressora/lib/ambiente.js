@@ -15,6 +15,9 @@ function registrarFontes() {
   // estáticas reproduzem o peso que o WebView aplica.
   for (const w of [400, 500, 600, 700, 800]) GlobalFonts.registerFromPath(path.join(FONTES, `Manrope-${w}.ttf`), 'Manrope');
   GlobalFonts.registerFromPath(path.join(FONTES, 'Fraunces-700.ttf'), 'Fraunces');
+  // #2247 (v3): a fonte do motor da etiqueta, dos mesmos woff2 que a PWA carrega.
+  const pwaFontes = path.join(__dirname, '..', '..', '..', 'EasyStock.Api', 'wwwroot', 'pwa', 'fontes');
+  for (const w of [400, 700]) GlobalFonts.registerFromPath(path.join(pwaFontes, `NunitoSans-${w}.woff2`), 'Nunito Sans Etiqueta');
   fontesProntas = true;
 }
 
@@ -23,7 +26,7 @@ function elementoFalso(id) {
     id, value: '', textContent: '', innerHTML: '', style: {}, dataset: {}, checked: false, options: [],
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
     addEventListener() {}, removeEventListener() {}, focus() {}, click() {},
-    appendChild() {}, removeChild() {}, querySelector() { return null; }, querySelectorAll() { return []; },
+    filhos: [], appendChild(f) { this.filhos.push(f); return f; }, removeChild() {}, querySelector() { return null; }, querySelectorAll() { return []; },
     setAttribute() {}, getAttribute() { return null; }, removeAttribute() {},
     closest() { return null; }, contains() { return false; }
   };
@@ -36,6 +39,9 @@ const VIVOS = [];
 function novoCanvas() {
   const c = createCanvas(300, 150);
   c.style = {};
+  // A prévia marca o canvas com role e aria-label.
+  c.setAttribute = function () {};
+  c.getAttribute = () => null;
   VIVOS.push(c);
   return c;
 }
@@ -65,6 +71,8 @@ function carregarPwa(pwaDir) {
   registrarFontes();
   const html = fs.readFileSync(path.join(pwaDir, 'index.html'), 'utf8');
   const storage = {};
+  const porId = {};
+  const elemento = id => (porId[id] = porId[id] || elementoFalso(id));
   const localStorage = {
     getItem: k => (Object.prototype.hasOwnProperty.call(storage, k) ? storage[k] : null),
     setItem: (k, v) => { storage[k] = String(v); },
@@ -78,7 +86,8 @@ function carregarPwa(pwaDir) {
     body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, appendChild() {}, removeChild() {}, style: {}, addEventListener() {}, removeEventListener() {} },
     head: { appendChild() {}, removeChild() {} },
     fonts: { load: () => Promise.resolve([]), ready: Promise.resolve(), check: () => true },
-    getElementById: id => elementoFalso(id),
+    // Um elemento por id: o simulador lê o que a tela anexou (a prévia).
+    getElementById: id => elemento(id),
     querySelector: () => null,
     querySelectorAll: () => [],
     createElement: tag => (String(tag).toLowerCase() === 'canvas' ? novoCanvas() : elementoFalso('virtual')),
@@ -115,10 +124,12 @@ function carregarPwa(pwaDir) {
     catch (e) { erros.push((s.nome || 'inline') + ': ' + (e && e.message)); }
   }
   const rodar = codigo => vm.runInContext(codigo, sb, { timeout: 20000, filename: 'sim' });
+  // A fonte do motor já está no GlobalFonts; a cópia do master não tem a função.
+  rodar('window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.usarFonteRegistrada && window.cdbResolverEtiqueta.usarFonteRegistrada()');
   for (const f of ['etiquetasTspl', 'etiquetasFromBatch', 'escPosEtiquetaProducao']) {
     if (rodar(`typeof ${f}`) !== 'function') throw new Error(`PWA em ${pwaDir} sem ${f}(): ${erros.join(' | ')}`);
   }
-  return { sb, rodar, storage, erros };
+  return { sb, rodar, storage, erros, elemento };
 }
 
 module.exports = { carregarPwa, registrarFontes, createCanvas };

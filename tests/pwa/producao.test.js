@@ -2,10 +2,11 @@
 'use strict';
 
 module.exports = function ({ test, runInSandbox, sandbox, assert }) {
-  test('producao: getProdScanMode default = both', () => {
+  // #2247: o padrão é o da regra (D4 da v2: só QR até o número curto do lote).
+  test('producao: getProdScanMode default = qr', () => {
     sandbox.localStorage.removeItem('cdb-prod-scan-mode');
     const r = runInSandbox(`getProdScanMode()`);
-    assert.strictEqual(r, 'both');
+    assert.strictEqual(r, 'qr');
   });
 
   test('producao: getProdScanMode retorna valor valido', () => {
@@ -15,9 +16,9 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.strictEqual(runInSandbox(`getProdScanMode()`), 'barcode');
   });
 
-  test('producao: getProdScanMode normaliza valor invalido pra both', () => {
+  test('producao: getProdScanMode normaliza valor invalido pra qr', () => {
     sandbox.localStorage.setItem('cdb-prod-scan-mode', 'lixo');
-    assert.strictEqual(runInSandbox(`getProdScanMode()`), 'both');
+    assert.strictEqual(runInSandbox(`getProdScanMode()`), 'qr');
   });
 
   test('producao: scanModeFlags reflete cada modo', () => {

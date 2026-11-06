@@ -34,17 +34,19 @@ function texto(rotulo) { return String(rotulo || '').replace(/^"|"$/g, ''); }
 function interpretar(bytes, opts) {
   const o = Object.assign({ cabecaMm: 104 }, opts || {});
   const dec = b => String.fromCharCode.apply(null, Array.from(b));
-  const estado = { larguraMm: 0, alturaMm: 0, gapMm: null, gapOffsetMm: 0, direcao: 0, ref: [0, 0], densidade: null, velocidade: null, rasgo: null, gapdetect: false, autodetect: false, limitfeedMm: null };
+  const estado = { larguraMm: 0, alturaMm: 0, gapMm: null, gapOffsetMm: 0, direcao: 0, ref: [0, 0], shift: [0, 0], densidade: null, velocidade: null, rasgo: null, gapdetect: false, autodetect: false, limitfeedMm: null };
   const etiquetas = []; const comandos = []; const avisos = [];
   let tinta = null; let largura = 0; let altura = 0; let cortados = 0; let elementos = [];
+  // origem 'cabeca': o raster tem a largura da cabeça e x=0 é a borda da
+  // cabeça, não a do papel. Quem recorta o papel é o papelNaCabeca().
   function limpar() {
-    largura = Math.round(estado.larguraMm * PONTOS_MM);
+    largura = Math.round((o.origem === 'cabeca' ? o.cabecaMm : estado.larguraMm) * PONTOS_MM);
     altura = Math.round(estado.alturaMm * PONTOS_MM);
     tinta = new Uint8Array(Math.max(1, largura * Math.max(1, altura)));
     cortados = 0; elementos = [];
   }
   function ponto(x, y, modo) {
-    x += estado.ref[0]; y += estado.ref[1];
+    x += estado.ref[0] + estado.shift[0]; y += estado.ref[1] + estado.shift[1];
     if (x < 0 || y < 0 || x >= largura || y >= altura) { cortados++; return; }
     const i = y * largura + x;
     if (modo === 2) tinta[i] ^= 1; else tinta[i] = 1;
@@ -86,6 +88,8 @@ function interpretar(bytes, opts) {
       case 'BLINE': estado.gapMm = mm(a[0]); estado.marca = true; break;
       case 'DIRECTION': estado.direcao = Number(a[0]) || 0; break;
       case 'REFERENCE': estado.ref = [Number(a[0]) || 0, Number(a[1]) || 0]; break;
+      // SHIFT y ou SHIFT x,y: desloca a impressão em pontos.
+      case 'SHIFT': estado.shift = a.length > 1 ? [Number(a[0]) || 0, Number(a[1]) || 0] : [0, Number(a[0]) || 0]; break;
       case 'DENSITY': estado.densidade = Number(a[0]); break;
       case 'SPEED': estado.velocidade = Number(a[0]); break;
       case 'GAPDETECT': estado.gapdetect = true; break;
@@ -176,4 +180,21 @@ function papel(et, midia, opts) {
   return r;
 }
 
-module.exports = { interpretar, papel, PONTOS_MM };
+// O papel como ele sai da cabeça. Pede uma etiqueta interpretada com
+// origem 'cabeca'. posicao: 'centro' (guias centralizam o papel) ou 'borda'
+// (papel encostado em x=0). Tinta fora do papel não sai: conta em perdidos.
+function papelNaCabeca(et, larguraPapelMm, posicao) {
+  const W = Math.round(larguraPapelMm * PONTOS_MM);
+  const x0 = posicao === 'borda' ? 0 : Math.round((et.largura - W) / 2);
+  const h = et.altura;
+  const tinta = new Uint8Array(W * h);
+  let perdidos = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < et.largura; x++) {
+    const v = et.tinta[y * et.largura + x];
+    const xp = x - x0;
+    if (xp >= 0 && xp < W) tinta[y * W + xp] = v; else if (v) perdidos++;
+  }
+  return { tinta, w: W, h, x0, perdidos: perdidos + et.cortados };
+}
+
+module.exports = { interpretar, papel, papelNaCabeca, PONTOS_MM };

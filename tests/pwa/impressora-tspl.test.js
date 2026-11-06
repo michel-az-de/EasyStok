@@ -65,6 +65,22 @@ module.exports = function ({ test }) {
     assert.match(cabeca, /BITMAP 0,0,52,8,0,$/);
   });
 
+  // #2247 (v3): com a cabeça informada, SIZE ocupa a cabeça e o BITMAP começa
+  // onde as guias põem o papel (centro), mais o ajuste fino (y em SHIFT).
+  test('cabeça: papel de 52 mm centralizado na de 104 mm, com ajuste fino', () => {
+    const T = carregar();
+    const centro = separar(T.etiqueta(rgbaBranco(416, 8), 416, 8, { larguraMm: 52, alturaMm: 30, gapMm: 2, cabecaMm: 104, x: 0 })).cabeca;
+    assert.ok(centro.startsWith('SIZE 104 mm,30 mm\r\n'), centro);
+    assert.match(centro, /BITMAP 208,0,52,8,0,$/);
+    // Revisão da PR #2265: SHIFT 0 sempre, para zerar o deslocamento que a impressora guardou do ajuste anterior.
+    assert.match(centro, /REFERENCE 0,0\r\nSHIFT 0\r\n/);
+    const ajustado = separar(T.etiqueta(rgbaBranco(416, 8), 416, 8, { larguraMm: 52, alturaMm: 30, cabecaMm: 104, x: 0, ajusteMm: { x: -1.5, y: 1 } })).cabeca;
+    assert.match(ajustado, /REFERENCE 0,0\r\nSHIFT 8\r\n/);
+    assert.match(ajustado, /BITMAP 196,0,52,8,0,$/);
+    const borda = separar(T.etiqueta(rgbaBranco(416, 8), 416, 8, { larguraMm: 52, cabecaMm: 104, posicao: 'borda', x: 0 })).cabeca;
+    assert.match(borda, /BITMAP 0,0,52,8,0,$/);
+  });
+
   test('calibração: contínua só grava GAP 0,0; recortada mede com GAPDETECT', () => {
     const T = carregar();
     const cont = Buffer.from(T.calibracao({ tipo: 'continuo', larguraMm: 80, continuo: true })).toString('latin1');
@@ -72,6 +88,23 @@ module.exports = function ({ test }) {
     const rec = Buffer.from(T.calibracao({ larguraMm: 100, alturaMm: 150, gapMm: 3, continuo: false })).toString('latin1');
     assert.equal(rec, 'SIZE 100 mm,150 mm\r\nGAP 3 mm,0 mm\r\nSET TEAR ON\r\nGAPDETECT\r\n');
     assert.ok(!/PRINT/.test(cont + rec));
+  });
+
+  // #2247 (v3): o teste de alinhamento vai para onde o papel está na cabeça,
+  // com o ajuste fino salvo, como a etiqueta.
+  test('alinhamento na cabeça: moldura no papel de 52 mm e ajuste fino', () => {
+    const T = carregar();
+    const midia = { larguraMm: 52, alturaMm: 30, gapMm: 2, continuo: false };
+    const centro = Buffer.from(T.alinhamento(midia, { cabecaMm: 104 })).toString('latin1');
+    assert.ok(centro.startsWith('SIZE 104 mm,30 mm\r\n'), centro);
+    assert.match(centro, /\r\nBOX 216,8,615,231,2\r\n/);
+    assert.match(centro, /\r\nTEXT 224,16,"2",0,1,1,"52 x 30 mm"\r\n/);
+    assert.match(centro, /REFERENCE 0,0\r\nSHIFT 0\r\n/);
+    const ajustado = Buffer.from(T.alinhamento(midia, { cabecaMm: 104, ajusteMm: { x: 1, y: -0.5 } })).toString('latin1');
+    assert.match(ajustado, /REFERENCE 0,0\r\nSHIFT -4\r\n/);
+    assert.match(ajustado, /\r\nBOX 224,8,623,231,2\r\n/);
+    const borda = Buffer.from(T.alinhamento(midia, { cabecaMm: 104, posicao: 'borda' })).toString('latin1');
+    assert.match(borda, /\r\nBOX 8,8,407,231,2\r\n/);
   });
 
   test('alinhamento: moldura, cruz, régua de 10 mm e texto, sem bitmap', () => {

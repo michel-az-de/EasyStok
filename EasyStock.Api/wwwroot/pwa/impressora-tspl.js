@@ -61,23 +61,41 @@
   function cabecalho(o, larguraMm, alturaMm) {
     const linhas = [`SIZE ${larguraMm} mm,${alturaMm} mm`];
     linhas.push(ehContinuo(o) ? 'GAP 0,0' : `GAP ${num(o.gapMm, 2)} mm,0 mm`, 'SET TEAR ON');
-    linhas.push('DIRECTION 1', 'REFERENCE 0,0', `DENSITY ${num(o.densidade, 8)}`, `SPEED ${num(o.velocidade, 4)}`, 'CLS');
+    linhas.push('DIRECTION 1', 'REFERENCE 0,0');
+    // Com a cabeça (v3), SHIFT vai sempre, inclusive 0: a impressora guarda o
+    // último SHIFT, e o ajuste zerado precisa desfazer o anterior.
+    if (o.shift || Number(o.cabecaMm) > 0) linhas.push(`SHIFT ${o.shift || 0}`);
+    linhas.push(`DENSITY ${num(o.densidade, 8)}`, `SPEED ${num(o.velocidade, 4)}`, 'CLS');
     return linhas;
   }
 
+  // #2247 (v3): onde o papel começa na cabeça, em pontos. As guias da Oasis
+  // centralizam o papel; 'borda' é papel encostado no lado do x=0.
+  function inicioDoPapel(cabecaMm, larguraMm, posicao) {
+    if (!(cabecaMm > larguraMm) || posicao === 'borda') return 0;
+    return Math.round((cabecaMm - larguraMm) * PONTOS_MM / 2);
+  }
+
   // Etiqueta completa: cabeçalho ASCII, BITMAP binário e PRINT.
-  // opts.x fixa a coluna do BITMAP (o backend novo desenha na largura do papel).
+  // opts.x fixa a coluna do BITMAP dentro do papel; sem ele, o desenho é centralizado no papel.
+  // opts.cabecaMm (v3): SIZE ocupa a cabeça toda e o BITMAP começa onde o papel está
+  // (opts.posicao), mais o ajuste fino (opts.ajusteMm {x, y}; o y vai em SHIFT).
+  // Assim o desenho cai no papel qualquer que seja a origem que a impressora usa.
   function etiqueta(rgba, larguraPx, alturaPx, opts) {
     const o = opts || {};
     const larguraMm = num(o.larguraMm, 104);
     const alturaMm = num(o.alturaMm, Math.ceil(alturaPx / PONTOS_MM) + 2);
     const copias = Math.max(1, Math.floor(num(o.copias, 1)));
     const porLinha = Math.ceil(larguraPx / 8);
-    const x = o.x !== undefined && o.x !== null && Number.isFinite(Number(o.x))
-      ? Math.max(0, Math.floor(Number(o.x)))
-      : Math.max(0, Math.floor((larguraMm * PONTOS_MM - larguraPx) / 2));
+    const cabecaMm = Number(o.cabecaMm) > 0 ? Number(o.cabecaMm) : 0;
+    const ajuste = o.ajusteMm || {};
+    const dentro = o.x !== undefined && o.x !== null && Number.isFinite(Number(o.x))
+      ? Math.floor(Number(o.x))
+      : Math.floor((larguraMm * PONTOS_MM - larguraPx) / 2);
+    const x = Math.max(0, inicioDoPapel(cabecaMm, larguraMm, o.posicao) + dentro + Math.round((Number(ajuste.x) || 0) * PONTOS_MM));
     const y = Math.max(0, Math.floor(num(o.y, 0)));
-    const cabeca = ascii(cabecalho(o, larguraMm, alturaMm).concat(`BITMAP ${x},${y},${porLinha},${alturaPx},0,`).join('\r\n'));
+    const cab = Object.assign({}, o, { shift: Math.round((Number(ajuste.y) || 0) * PONTOS_MM) });
+    const cabeca = ascii(cabecalho(cab, cabecaMm || larguraMm, alturaMm).concat(`BITMAP ${x},${y},${porLinha},${alturaPx},0,`).join('\r\n'));
     const dados = dadosBitmap(rgba, larguraPx, alturaPx);
     // Se a etiqueta sair em negativo no aparelho, o perfil liga a inversão.
     if (o.inverter) for (let i = 0; i < dados.length; i++) dados[i] = ~dados[i] & 0xFF;
@@ -102,8 +120,11 @@
   // Teste de alinhamento com comandos nativos: moldura a 1 mm da borda,
   // cruz no centro e régua de 10 mm com traço a cada 1 mm. Moldura cortada ou
   // régua fora de 10 mm indicam mídia errada.
+  // opts.cabecaMm (v3): como na etiqueta, SIZE ocupa a cabeça, o desenho vai
+  // onde o papel está (opts.posicao) mais o ajuste fino (opts.ajusteMm; y em SHIFT).
   function alinhamento(midia, opts) {
     const m = midia || {};
+    const o = opts || {};
     const continuo = ehContinuo(m);
     const larguraMm = num(m.larguraMm, 80);
     const alturaMm = continuo ? 30 : num(m.alturaMm, 40);
@@ -111,17 +132,21 @@
     const borda = 8;
     const cx = Math.round(W / 2), cy = Math.round(H / 2);
     const braco = Math.min(40, Math.floor(Math.min(W, H) / 4));
-    const linhas = cabecalho(Object.assign({}, m, opts || {}, { continuo }), larguraMm, alturaMm);
-    linhas.push(`BOX ${borda},${borda},${W - 1 - borda},${H - 1 - borda},2`);
-    linhas.push(`BAR ${cx - braco},${cy - 1},${braco * 2},2`, `BAR ${cx - 1},${cy - braco},2,${braco * 2}`);
-    const rx = 16, base = H - 16;
+    const cabecaMm = Number(o.cabecaMm) > 0 ? Number(o.cabecaMm) : 0;
+    const ajuste = o.ajusteMm || {};
+    const dx = cabecaMm ? inicioDoPapel(cabecaMm, larguraMm, o.posicao) + Math.round((Number(ajuste.x) || 0) * PONTOS_MM) : 0;
+    const extra = cabecaMm ? { shift: Math.round((Number(ajuste.y) || 0) * PONTOS_MM) } : {};
+    const linhas = cabecalho(Object.assign({}, m, o, { continuo }, extra), cabecaMm || larguraMm, alturaMm);
+    linhas.push(`BOX ${dx + borda},${borda},${dx + W - 1 - borda},${H - 1 - borda},2`);
+    linhas.push(`BAR ${dx + cx - braco},${cy - 1},${braco * 2},2`, `BAR ${dx + cx - 1},${cy - braco},2,${braco * 2}`);
+    const rx = dx + 16, base = H - 16;
     linhas.push(`BAR ${rx},${base - 2},${10 * PONTOS_MM + 1},2`);
     for (let i = 0; i <= 10; i++) {
       const alto = i % 5 === 0 ? 22 : 12;
       linhas.push(`BAR ${rx + i * PONTOS_MM},${base - alto},1,${alto}`);
     }
     const rotulo = continuo ? `ROLO ${larguraMm} mm` : `${larguraMm} x ${alturaMm} mm`;
-    linhas.push(`TEXT 16,16,"2",0,1,1,"${rotulo}"`, 'PRINT 1,1', '');
+    linhas.push(`TEXT ${dx + 16},16,"2",0,1,1,"${rotulo}"`, 'PRINT 1,1', '');
     return ascii(linhas.join('\r\n'));
   }
 

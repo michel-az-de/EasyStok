@@ -38,7 +38,7 @@ function configurar(env, caso) {
     versao: 2,
     impressoras: { [OASIS.address]: { address: OASIS.address, nome: OASIS.name, apelido: 'Oasis', linguagem: 'tspl', linguagemManual: false,
       midia: { preset: f.preset, tipo: f.tipo === 'continuo' ? 'continuo' : 'etiqueta', larguraMm: f.larguraMm, alturaMm: f.alturaMm || 0, gapMm: f.gapMm || 0 },
-      densidade: 8, velocidade: 4, inverter: false, calibradaEm: f.tipo === 'continuo' ? null : '2026-11-03T20:00:00.000Z', offsetMm: { x: 0, y: 0 } } },
+      densidade: 8, velocidade: 4, inverter: false, calibradaEm: f.tipo === 'continuo' ? null : '2026-11-03T20:00:00.000Z', offsetMm: caso.offsetMm || { x: 0, y: 0 } } },
     papeis: { etiqueta: OASIS.address, cupom: null }
   });
   s['cdb-regra-impressao.v1'] = JSON.stringify({ v: 1, documentos: { 'etiqueta-producao': { papel: 'etiqueta', template: null, orientacao: caso.orientacao, codigos: caso.lista, copias: 1 } } });
@@ -80,4 +80,31 @@ async function etiquetaProducao(env, caso) {
   return { bytes: bytes ? Uint8Array.from(bytes) : null, log, layout: r.layout || null, recusa: r.recusa || erro, et, novo: !!backend };
 }
 
-module.exports = { etiquetaProducao, configurar, batch, OASIS };
+// A prévia que a tela de produção mostra, pelo mesmo refreshEtqPreview() da
+// tela. Devolve o canvas anexado ao #etqBody ou null.
+function previaProducao(env, caso) {
+  configurar(env, caso);
+  env.sb.__simBatch = batch();
+  const corpo = env.elemento('etqBody');
+  corpo.filhos = [];
+  env.rodar(`currentEtiquetas = [etiquetasFromBatch(window.__simBatch)[0]];
+    currentEtiquetasKind = 'production';
+    refreshEtqPreview();`);
+  const wrap = corpo.filhos[0];
+  return (wrap && wrap.filhos && wrap.filhos[0]) || null;
+}
+
+// O "Teste de alinhamento" do cartão da impressora, pelo mesmo
+// alinharImpressora() do botão. Devolve os bytes enviados ou null.
+function testeDeAlinhamento(env, caso) {
+  configurar(env, caso);
+  env.sb.__simEnviado = null;
+  env.rodar(`(() => {
+    const orig = printViaBluetooth;
+    printViaBluetooth = bytes => { window.__simEnviado = Array.from(bytes); };
+    try { alinharImpressora(${JSON.stringify(OASIS.address)}); } finally { printViaBluetooth = orig; }
+  })()`);
+  return env.sb.__simEnviado ? Uint8Array.from(env.sb.__simEnviado) : null;
+}
+
+module.exports = { etiquetaProducao, previaProducao, testeDeAlinhamento, configurar, batch, OASIS };

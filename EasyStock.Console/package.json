@@ -12,7 +12,8 @@
     "gramatica": "node ferramentas/verificar-gramatica.mjs",
     "reais": "node ferramentas/verificar-reais.mjs && node ferramentas/prova-2080-reais.mjs",
     "contraste": "node ferramentas/verificar-contraste.mjs",
-    "qualidade": "npm run lint && npm run camadas && npm run gramatica && npm run reais && npm run contraste && npm run build",
+    "etiqueta": "node ferramentas/prova-2247-etiqueta-motor.mjs",
+    "qualidade": "npm run lint && npm run camadas && npm run gramatica && npm run reais && npm run contraste && npm run etiqueta && npm run build",
     "agente": "node servidor/agente.mjs",
     "local": "npm run build && node servidor/agente.mjs"
   },

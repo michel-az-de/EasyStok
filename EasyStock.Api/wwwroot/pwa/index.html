@@ -3936,6 +3936,13 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   background: var(--gold);
   border-color: var(--gold);
 }
+.scan-mode-card:disabled { cursor: not-allowed; opacity: .6; }
+.scan-mode-card.active:disabled { opacity: 1; }
+.scan-mode-da-loja { margin-top: 8px; font-weight: 600; }
+.ajuste-fino { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ajuste-fino-texto { font-weight: 600; }
+.ajuste-fino-setas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ajustes-section .ajuste-fino-setas button { min-width: 44px; min-height: 44px; font-size: 18px; border-color: var(--border-strong); }
 .ajustes-section .printer-status {
   padding: 12px 13px; border-radius: 12px;
   background: var(--bg-elev-2); font-size: 12px;
@@ -5431,6 +5438,10 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
   display: flex; flex-direction: column; align-items: center; gap: 12px;
 }
 .etq-termica { flex: 0 0 auto; width: 100%; max-width: 384px; }
+.etq-recusa {
+  width: 100%; max-width: 384px; padding: 14px 16px; border-radius: 8px;
+  background: #fff; color: #7c2d12; font-size: 15px; font-weight: 700; line-height: 1.4;
+}
 .etq-termica canvas {
   display: block; width: 100%; height: auto;
   background: #fff; border-radius: 6px;
@@ -8328,6 +8339,7 @@ body.ux-calm [data-screen="producao"] .section-label {
               <span class="scan-mode-check">✓</span>
             </button>
           </div>
+          <p class="hint scan-mode-da-loja" id="scanModeDaLoja" hidden>Definido pela loja no Console, em Configurações › Impressão.</p>
         </div>
         <div class="field" style="margin-top:12px">
           <label>Orientação da etiqueta</label>
@@ -8349,6 +8361,7 @@ body.ux-calm [data-screen="producao"] .section-label {
               <span class="scan-mode-check">✓</span>
             </button>
           </div>
+          <p class="hint scan-mode-da-loja" id="orientDaLoja" hidden>Definido pela loja no Console, em Configurações › Impressão.</p>
         </div>
         <div class="etq-thumb-wrap" style="margin-top:12px;display:flex;align-items:center;gap:12px">
           <span class="hint" style="margin:0">Prévia:</span>
@@ -14633,11 +14646,20 @@ const DEFAULT_EMPRESA_CIDADE = 'São Paulo';
 function getEmpresaCidade() { try { return localStorage.getItem('cdb-empresa-cidade') || DEFAULT_EMPRESA_CIDADE; } catch (e) { return DEFAULT_EMPRESA_CIDADE; } }
 function getStoreLogo()   { try { return localStorage.getItem('cdb-store-logo') || ''; } catch (e) { return ''; } }
 const SCAN_MODES = ['both', 'barcode', 'qr', 'none'];
+// #2247 (v3): a regra efetiva da produção (loja, senão aparelho, senão só QR,
+// D4 da v2). A 58 mm, a TSPL e Ajustes leem a mesma.
+function regraDaProducao() {
+  const I = window.cdbImpressoras;
+  try { if (I && I.regraEfetiva) return I.regraEfetiva(localStorage, 'etiqueta-producao'); } catch (e) {}
+  return null;
+}
 function getProdScanMode() {
+  const r = regraDaProducao();
+  if (r) return window.cdbImpressoras.modoDosCodigos(r.codigos);
   try {
-    const mode = localStorage.getItem('cdb-prod-scan-mode') || 'both';
-    return SCAN_MODES.includes(mode) ? mode : 'both';
-  } catch (e) { return 'both'; }
+    const mode = localStorage.getItem('cdb-prod-scan-mode') || 'qr';
+    return SCAN_MODES.includes(mode) ? mode : 'qr';
+  } catch (e) { return 'qr'; }
 }
 // Helper: dado um modo, retorna { showQr, showBars }. Centraliza a logica
 // usada em 3 paths de render (HTML do recibo, canvas do recibo, canvas/HTML
@@ -14995,6 +15017,8 @@ let ajustesListenersBound = false;
 
 // Getter centralizado com whitelist + warn (problema N do plano)
 function getEtqOrient() {
+  const r = regraDaProducao();
+  if (r) return r.orientacao;
   const raw = localStorage.getItem('cdb-etq-orient');
   if (raw && raw !== 'vertical' && raw !== 'horizontal') {
     console.warn('cdb-etq-orient invalido, fallback para vertical:', raw);
@@ -15010,13 +15034,12 @@ function showToastEtiquetaState() {
   showToast('Etiquetas: ' + prodScanModeLabel(mode) + ', ' + (orient === 'horizontal' ? 'horizontal' : 'vertical'));
 }
 
-// Mini-thumb live em Ajustes (anti-retrabalho do ciclo "fecha-testa-reabre")
+// Miniatura em Ajustes: a mesma prévia da produção (#2247), reduzida para caber.
 function redrawAjustesEtqThumb() {
   const canvas = document.getElementById('ajustesEtqThumb');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 160, 80);
-  // Sample com weightG (problema O) e tipos number consistente com fmtDateBR(ms) (problema P)
   const sample = {
     productName: 'Bolo de Cenoura',
     unit: '500g',
@@ -15026,26 +15049,45 @@ function redrawAjustesEtqThumb() {
     codigoBarras: '7891234567890',
     weightG: 480
   };
-  ctx.save();
-  ctx.scale(0.42, 0.42);
-  drawProducaoEtiquetaCanvas(ctx, sample, 384, 0, 190, null);
-  ctx.restore();
+  let p = null;
+  try { p = previaDaEtiquetaProducao(sample, null); } catch (e) { p = null; }
+  const src = p && p.canvas;
+  if (!src || !src.width || !src.height) return;
+  const k = Math.min(160 / src.width, 80 / src.height);
+  const w = Math.round(src.width * k), h = Math.round(src.height * k);
+  ctx.drawImage(src, Math.round((160 - w) / 2), Math.round((80 - h) / 2), w, h);
 }
+
+// O que a regra da loja define aparece marcado e travado, com o aviso.
+function travarPelaLoja(cards, controle, avisoId, daLoja) {
+  cards.forEach(card => {
+    card.disabled = daLoja;
+    if (daLoja) card.setAttribute('aria-disabled', 'true'); else card.removeAttribute('aria-disabled');
+  });
+  if (controle) controle.disabled = daLoja;
+  const aviso = document.getElementById(avisoId);
+  if (aviso) { aviso.textContent = AVISO_DA_LOJA; aviso.hidden = !daLoja; }
+}
+const AVISO_DA_LOJA = 'Definido pela loja no Console, em Configurações › Impressão.';
 
 function setScanModeChoice(mode, persistNow = false) {
   const prev = getProdScanMode();
-  const normalized = SCAN_MODES.includes(mode) ? mode : 'both';
+  const daLoja = !!(regraDaProducao()?.daLoja.codigos);
+  if (daLoja && persistNow) { showToast(AVISO_DA_LOJA); mode = prev; persistNow = false; }
+  const normalized = SCAN_MODES.includes(mode) ? mode : 'qr';
   const select = document.getElementById('ajusteProdScanMode');
   if (select) select.value = normalized;
   // Escopo: so os cards de scan mode, nao os de orientacao (bug A)
-  document.querySelectorAll('#scanModeOptions .scan-mode-card').forEach(card => {
+  const cards = Array.from(document.querySelectorAll('#scanModeOptions .scan-mode-card'));
+  cards.forEach(card => {
     const isActive = card.dataset.mode === normalized;
     card.classList.toggle('active', isActive);
     card.setAttribute('aria-checked', isActive ? 'true' : 'false');
   });
+  travarPelaLoja(cards, select, 'scanModeDaLoja', daLoja);
+  if (persistNow) { try { localStorage.setItem('cdb-prod-scan-mode', normalized); } catch (e) {} }
   redrawAjustesEtqThumb();
   if (persistNow) {
-    try { localStorage.setItem('cdb-prod-scan-mode', normalized); } catch (e) {}
     const modeChip = document.getElementById('etqModeChip');
     if (modeChip && currentEtiquetasKind === 'producao') modeChip.textContent = prodScanModeLabel(normalized);
     const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
@@ -15065,21 +15107,25 @@ function setScanModeChoice(mode, persistNow = false) {
 
 function setOrientChoice(orient, persistNow = false) {
   const prev = currentEtqOrient;
+  const daLoja = !!(regraDaProducao()?.daLoja.orientacao);
+  if (daLoja && persistNow) { showToast(AVISO_DA_LOJA); orient = getEtqOrient(); persistNow = false; }
   const normalized = ['vertical','horizontal'].includes(orient) ? orient : 'vertical';
   currentEtqOrient = normalized;
   // Atualiza cards em Ajustes (escopo: #orientModeOptions)
-  document.querySelectorAll('#orientModeOptions .scan-mode-card').forEach(card => {
+  const cards = Array.from(document.querySelectorAll('#orientModeOptions .scan-mode-card'));
+  cards.forEach(card => {
     const isActive = card.dataset.orient === normalized;
     card.classList.toggle('active', isActive);
     card.setAttribute('aria-checked', isActive ? 'true' : 'false');
   });
+  travarPelaLoja(cards, null, 'orientDaLoja', daLoja);
+  if (persistNow) { try { localStorage.setItem('cdb-etq-orient', normalized); } catch (e) {} }
   // Atualiza chips na Preview overlay
   document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b =>
     b.classList.toggle('active', b.textContent.trim() === (normalized === 'horizontal' ? 'Horizontal' : 'Vertical'))
   );
   redrawAjustesEtqThumb();
   if (persistNow) {
-    try { localStorage.setItem('cdb-etq-orient', normalized); } catch (e) {}
     const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
     if (previewOpen && currentEtiquetas.length) refreshEtqPreview();
     showToastEtiquetaState();
@@ -15562,8 +15608,42 @@ function renderImpressorasLista(v2) {
     if (acoesImp.alinhar) botao('Teste de alinhamento', () => alinharImpressora(imp.address));
     botao('Esquecer', () => esquecerImpressora(imp.address));
     card.appendChild(acoes);
+    // Depois do botão Teste de alinhamento, que a dica do painel cita.
+    if (acoesImp.alinhar) card.appendChild(painelDeAjuste(imp));
     host.appendChild(card);
   });
+}
+// Linha do ajuste fino no cartão: o valor salvo e as setas de 0,5 mm.
+function painelDeAjuste(imp) {
+  const box = document.createElement('div');
+  box.className = 'ajuste-fino';
+  const texto = document.createElement('div');
+  texto.className = 'ajuste-fino-texto';
+  texto.textContent = descreverAjuste(imp.offsetMm);
+  box.appendChild(texto);
+  const setas = document.createElement('div');
+  setas.className = 'ajuste-fino-setas';
+  const seta = (simbolo, rotulo, dx, dy) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn-ajustes-printer'; b.textContent = simbolo;
+    b.setAttribute('aria-label', rotulo);
+    b.onclick = () => ajustarPosicao(imp.address, dx, dy);
+    setas.appendChild(b);
+  };
+  seta('←', 'Mover 0,5 mm para a esquerda', -0.5, 0);
+  seta('→', 'Mover 0,5 mm para a direita', 0.5, 0);
+  seta('↑', 'Mover 0,5 mm para cima', 0, -0.5);
+  seta('↓', 'Mover 0,5 mm para baixo', 0, 0.5);
+  const zerar = document.createElement('button');
+  zerar.type = 'button'; zerar.className = 'btn-ajustes-printer subtle'; zerar.textContent = 'Zerar';
+  zerar.onclick = () => zerarAjuste(imp.address);
+  setas.appendChild(zerar);
+  box.appendChild(setas);
+  const dica = document.createElement('p');
+  dica.className = 'hint';
+  dica.textContent = 'Imprima o Teste de alinhamento. Moldura fora do centro: mova até ela ficar centrada e teste de novo. Vale para tudo o que esta impressora imprime.';
+  box.appendChild(dica);
+  return box;
 }
 function midiaTspl(imp) {
   const m = imp.midia || {};
@@ -15597,11 +15677,44 @@ function calibrarImpressora(mac) {
     renderPrinterStatus();
   });
 }
+// #2247 (v3): o teste sai como a etiqueta, onde o papel está na cabeça e com
+// o ajuste fino salvo. Moldura torta aqui = etiqueta torta.
 function alinharImpressora(mac) {
   const imp = impressoraDoAjuste(mac);
   if (!imp || !acoesTspl(legadoDaV2(imp)).alinhar || !tsplAtual('alinhamento')) return;
-  printViaBluetooth(window.cdbTspl.alinhamento(midiaTspl(imp)), semBluetoothNoAjuste, null, legadoDaV2(imp));
+  const P = window.cdbPapeis || {};
+  const papel = P.daMidia ? P.daMidia(imp.midia) : null;
+  const off = imp.offsetMm || {};
+  printViaBluetooth(window.cdbTspl.alinhamento(midiaTspl(imp), {
+    cabecaMm: Number(imp.cabecaMm) || P.CABECA_MM || 104,
+    posicao: (papel && papel.posicaoNaCabeca) || 'centro',
+    ajusteMm: { x: Number(off.x) || 0, y: Number(off.y) || 0 }
+  }), semBluetoothNoAjuste, null, legadoDaV2(imp));
 }
+// Ajuste fino: setas de 0,5 mm no cartão, salvo na impressora deste aparelho.
+function mmTexto(v) { return String(Math.abs(v)).replace('.', ','); }
+function descreverAjuste(off) {
+  const x = Number(off && off.x) || 0, y = Number(off && off.y) || 0;
+  const partes = [];
+  if (x) partes.push(mmTexto(x) + ' mm ' + (x > 0 ? 'à direita' : 'à esquerda'));
+  if (y) partes.push(mmTexto(y) + ' mm ' + (y > 0 ? 'para baixo' : 'para cima'));
+  return 'Ajuste fino: ' + (partes.length ? partes.join(', ') : 'nenhum');
+}
+function gravarAjuste(mac, offsetMm) {
+  const I = window.cdbImpressoras;
+  const imp = impressoraDoAjuste(mac);
+  if (!I || !imp) return;
+  I.salvar(localStorage, I.cadastrar(I.ler(localStorage), { address: imp.address, offsetMm }));
+  renderPrinterStatus();
+}
+function ajustarPosicao(mac, dx, dy) {
+  const imp = impressoraDoAjuste(mac);
+  if (!imp) return;
+  const novo = window.cdbImpressoras.ajusteFino(imp.offsetMm, dx, dy);
+  gravarAjuste(mac, novo);
+  showToast(descreverAjuste(novo));
+}
+function zerarAjuste(mac) { gravarAjuste(mac, { x: 0, y: 0 }); showToast(descreverAjuste(null)); }
 function esquecerImpressora(mac) {
   const I = window.cdbImpressoras;
   if (!confirm('Esquecer esta impressora neste aparelho?')) return;
@@ -20061,16 +20174,35 @@ function midiaDaImpressora(printer) {
   const c = tsplConfig(printer);
   return { tipo: c.continuo ? 'continuo' : 'etiqueta', larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm };
 }
-// undefined: módulos novos ausentes (segue o caminho antigo). null: recusa.
-function etiquetaProducaoTsplV2(et, nota, printer, copias) {
+// Entrada do motor para a etiqueta de produção. A prévia e a impressão usam a
+// mesma, então a tela mostra o que a térmica recebe. undefined: módulos novos
+// ausentes. { recusa }: a regra pede barra e a chave não cabe nela.
+function entradaDaEtiquetaV2(et, nota, printer) {
   const C = window.cdbEtiquetaCanvas, P = window.cdbPapeis, I = window.cdbImpressoras;
   if (!C || !P || !I || !window.cdbResolverEtiqueta) return undefined;
   const regra = I.regra(localStorage, 'etiqueta-producao');
-  if (et.barraExcedida && regra.codigos.indexOf('barras') >= 0) { etiquetasTspl.recusa = RECUSA_BARRA_EXCEDIDA; return null; }
-  const r = C.tspl({
+  if (et.barraExcedida && regra.codigos.indexOf('barras') >= 0) return { recusa: RECUSA_BARRA_EXCEDIDA };
+  return {
     campos: camposDaEtiqueta(et, nota), papel: P.daMidia(midiaDaImpressora(printer)),
-    orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, copias, document
-  });
+    orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, document
+  };
+}
+// #2247 (v3): prévia da produção. Na TSPL é o canvas do motor; fora dela, a
+// térmica de 58 mm, que imprime o etiquetaTermica. Devolve { canvas } ou { recusa }.
+function previaDaEtiquetaProducao(et, nota) {
+  const printer = impressoraPara('etiqueta-producao');
+  const entrada = printer && perfilImpressora(printer) === 'tspl' ? entradaDaEtiquetaV2(et, nota, printer) : undefined;
+  if (entrada === undefined) return etiquetaTermica(Object.assign({}, et, { _nota: nota || null }));
+  if (entrada.recusa) return entrada;
+  const r = window.cdbEtiquetaCanvas.previa(entrada);
+  return r.recusa ? { recusa: r.recusa } : { canvas: r.canvas };
+}
+// undefined: módulos novos ausentes (segue o caminho antigo). null: recusa.
+function etiquetaProducaoTsplV2(et, nota, printer, copias) {
+  const entrada = entradaDaEtiquetaV2(et, nota, printer);
+  if (entrada === undefined) return undefined;
+  if (entrada.recusa) { etiquetasTspl.recusa = entrada.recusa; return null; }
+  const r = window.cdbEtiquetaCanvas.tspl(Object.assign(entrada, { copias }));
   if (r.recusa) { etiquetasTspl.recusa = r.recusa; return null; }
   if (!etiquetasTspl.aviso) etiquetasTspl.aviso = window.cdbResolverEtiqueta.resumo ? window.cdbResolverEtiqueta.resumo(r) : '';
   return r.bytes;
@@ -20951,8 +21083,14 @@ function refreshEtqPreview() {
       `<div class="etq-card-wrap"><div class="${cls}">${orderLabelHtml(et.order, horiz, nota)}</div></div>`
     ).join('');
   } else {
-    const termicas = currentEtiquetas.map(et => etiquetaTermica(Object.assign({}, et, { _nota: nota || null })));
-    if (termicas.every(Boolean)) {
+    const termicas = currentEtiquetas.map(et => previaDaEtiquetaProducao(et, nota));
+    // A térmica recusa: a tela mostra o motivo, não uma etiqueta que não vai sair.
+    const recusa = termicas.find(t => t && t.recusa);
+    if (recusa) {
+      body.innerHTML = `<div class="etq-recusa" role="alert">${escapeHtml(avisoDaRecusa(recusa.recusa))}</div>`;
+      return;
+    }
+    if (termicas.every(t => t && t.canvas)) {
       body.innerHTML = '';
       termicas.forEach((t, i) => {
         const wrap = document.createElement('div');
@@ -23685,10 +23823,17 @@ window.cdbApp = {
 <script src="qrcode.min.js?v=20260429a"></script>
 <script src="etiqueta-termica.js?v=20261028a"></script>
 <script src="impressao-papeis.js?v=20261104b"></script>
-<script src="impressoras.js?v=20261104c"></script>
-<script src="etiqueta-resolver.js?v=20261104c"></script>
-<script src="etiqueta-canvas.js?v=20261104c"></script>
-<script src="impressora-tspl.js?v=20261104b"></script>
+<script src="impressoras.js?v=20261105b"></script>
+<script src="etiqueta-resolver.js?v=20261105b"></script>
+<script src="etiqueta-canvas.js?v=20261105b"></script>
+<script>
+// #2247 (v3): o motor da etiqueta só desenha com a sua fonte. Carrega já no
+// boot (woff2 local, no cache do service worker) e refaz a miniatura de Ajustes.
+window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.carregarFonte({ base: 'fontes/' }).then(function (ok) {
+  if (ok && typeof redrawAjustesEtqThumb === 'function') { try { redrawAjustesEtqThumb(); } catch (e) { /* tela fechada */ } }
+});
+</script>
+<script src="impressora-tspl.js?v=20261105b"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
 <script src="upload-photos.js?v=20260514b"></script>

@@ -103,11 +103,13 @@ module.exports = function ({ test, runInSandbox, assert }) {
       calibrarImpressora(); alinharImpressora();
       return JSON.stringify({rec,cont:enviados.slice(),acoesRec:acoesTspl(${JSON.stringify(recortada)}),acoesCont:acoesTspl(${JSON.stringify(continua)}),acoesCupom:acoesTspl(${JSON.stringify(MTP)})});`);
     assert.match(r.rec[0], /SIZE 52 mm,30 mm\r\nGAP 2 mm,0 mm\r\nSET TEAR ON\r\nGAPDETECT/);
-    assert.match(r.rec[1], /SIZE 52 mm,30 mm\r\nGAP 2 mm,0 mm\r\nSET TEAR ON/);
-    assert.match(r.rec[1], /BOX /);
+    // #2247 (v3): o teste sai na cabeça de 104 mm, com a moldura no papel centralizado.
+    assert.match(r.rec[1], /SIZE 104 mm,30 mm\r\nGAP 2 mm,0 mm\r\nSET TEAR ON/);
+    assert.match(r.rec[1], /BOX 216,8,615,231,2/);
     assert.match(r.rec[1], /PRINT 1,1/);
     assert.equal(r.cont.length, 1, 'contínuo não calibra: só o alinhamento sai');
-    assert.match(r.cont[0], /SIZE 80 mm,30 mm\r\nGAP 0,0/);
+    assert.match(r.cont[0], /SIZE 104 mm,30 mm\r\nGAP 0,0/);
+    assert.match(r.cont[0], /BOX 104,8,727,231,2/);
     assert.deepStrictEqual(r.acoesRec, { alinhar: true, calibrar: true });
     assert.deepStrictEqual(r.acoesCont, { alinhar: true, calibrar: false }, 'contínuo não precisa medir recorte');
     assert.deepStrictEqual(r.acoesCupom, { alinhar: false, calibrar: false });
