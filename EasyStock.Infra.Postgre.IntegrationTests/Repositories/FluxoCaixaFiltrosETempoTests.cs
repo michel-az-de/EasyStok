@@ -13,7 +13,7 @@ public sealed class FluxoCaixaFiltrosETempoTests(PostgreSqlDatabaseFixture fixtu
 {
     // #2095 (F13): as linhas do fluxo são dias civis de Brasília; 03:00Z é a meia-noite de Brasília de 01/06.
     private static readonly DateTime Inicio = new(2026, 6, 1, 3, 0, 0, DateTimeKind.Utc);
-    // O KPI do mês continua no mês UTC (fora do escopo da #2095).
+    // #2268: o KPI do mês usa o mês civil de Brasília (como o Extrato); a referência é a data civil 00:00Z.
     private static readonly DateTime InicioMesUtc = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
 
     [SkippableTheory]
@@ -88,7 +88,7 @@ public sealed class FluxoCaixaFiltrosETempoTests(PostgreSqlDatabaseFixture fixtu
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason);
         await using var db = fixture.CreateDbContext();
         var (empresaId, categoriaId, centroCustoId) = Preparar(db, lado);
-        var virada = InicioMesUtc.AddMonths(1);
+        var virada = Inicio.AddMonths(1); // 01/07 03:00Z, meia-noite de Brasília
         AdicionarPagamento(db, lado, empresaId, categoriaId, centroCustoId, virada.AddMilliseconds(-500), 10m);
         AdicionarPagamento(db, lado, empresaId, categoriaId, centroCustoId, virada, 20m);
         await db.SaveChangesAsync();
@@ -96,6 +96,38 @@ public sealed class FluxoCaixaFiltrosETempoTests(PostgreSqlDatabaseFixture fixtu
         var kpis = await new FluxoCaixaQueries(db).KpisDashboardAsync(empresaId, InicioMesUtc);
 
         (lado == TipoLadoFinanceiro.Pagar ? kpis.TotalPagoMes : kpis.TotalRecebidoMes).Should().Be(10m);
+    }
+
+    /// <summary>
+    /// #2268: o realizado soma o movimento avulso do Caixa; o que um pagamento de parcela referencia já conta como
+    /// pagamento de conta e não entra de novo. Estornado, abertura e outra empresa ficam fora.
+    /// </summary>
+    [SkippableFact]
+    public async Task Movimentos_avulsos_do_caixa_excluem_o_vinculado_a_parcela()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason);
+        await using var db = fixture.CreateDbContext();
+        var (empresaId, categoriaId, centroCustoId) = Preparar(db, TipoLadoFinanceiro.Receber);
+        var vinculado = MovimentoCaixa.Criar(empresaId, "entrada", 10m, Inicio.AddHours(1));
+        var estornado = MovimentoCaixa.Criar(empresaId, "entrada", 100m, Inicio.AddHours(1));
+        estornado.EstornadoEm = Inicio.AddHours(2);
+        db.MovimentosCaixa.AddRange(vinculado, estornado,
+            MovimentoCaixa.Criar(empresaId, "entrada", 7m, Inicio.AddHours(1)),
+            MovimentoCaixa.Criar(empresaId, "saida", 3m, Inicio.AddHours(2)),
+            MovimentoCaixa.Criar(empresaId, "abertura", 50m, Inicio.AddMinutes(1)),
+            MovimentoCaixa.Criar(empresaId, "entrada", 5m, Inicio.AddDays(1)));
+        AdicionarPagamento(db, TipoLadoFinanceiro.Receber, empresaId, categoriaId, centroCustoId, Inicio.AddHours(1), 10m);
+        await db.SaveChangesAsync();
+        var pagamento = db.PagamentosParcela.Local.Single(p => p.EmpresaId == empresaId);
+        pagamento.MovimentoCaixaId = vinculado.Id;
+        var (outraEmpresa, _, _) = Preparar(db, TipoLadoFinanceiro.Receber);
+        db.MovimentosCaixa.Add(MovimentoCaixa.Criar(outraEmpresa, "entrada", 999m, Inicio.AddHours(1)));
+        await db.SaveChangesAsync();
+        db.SetMobileTenantContext(empresaId);
+
+        var linhas = await new FluxoCaixaQueries(db).MovimentosAvulsosDoCaixaAsync(empresaId, Inicio, Inicio.AddDays(1));
+
+        linhas.Select(l => l.Valor).Should().BeEquivalentTo([7m, -3m]);
     }
 
     [SkippableFact]
