@@ -16,12 +16,13 @@ import { useConfirmacaoDaAbertura } from '../../../aplicacao/useConfirmacaoDaAbe
 import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
 import { relerParaFechar } from '../../../aplicacao/fechamentoDoCaixa'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import {
   ROTULO_GAVETA_CONTADA_AGORA, avisoDaAberturaAConfirmar, diaMes, dicaDoSaldoInicial, gavetaDoFechamento, observacaoDaAbertura,
   observacaoDaConfirmacao, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
-  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, avisoDeDevolucoesNasTelas, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
   nomeDoMetodoCaixa, temMovimentoNoDia, tituloDaLinhaExtra, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
@@ -435,6 +436,9 @@ export function AbaCaixaApi() {
   const { agora } = useAtendimento()
   const { fecharCaixa } = useAcoes()
   const caixa = useCaixaDoDiaApi({ fechamentos: 7 })
+  // #2267: o pagamento do pedido cancelado está nos totais; o aviso diz que ele não é da loja.
+  const avisoDevolucoes = avisoDeDevolucoesNasTelas(useDevolucoesPendentes(true))
+  const devolucoesPendentes = avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>
   const [acao, executar, limparErro] = useAcaoComRecarga(caixa.recarregar)
   const [fecharAberto, setFecharAberto] = useState(false)
   const [lancamentoAberto, setLancamentoAberto] = useState(false)
@@ -513,6 +517,7 @@ export function AbaCaixaApi() {
             ? <p className={css.corpoBloco}>Já tem dinheiro no dia, mesmo sem abrir o caixa. Ao abrir, informe só o troco: o que entrou hoje já está na conta.</p>
             : <p className={css.corpoBloco}>Nada entrou nem saiu hoje ainda.</p>}
           {comMovimento && <ResumoDoDia dia={dia} gaveta={gaveta} semAbertura />}
+          {devolucoesPendentes}
         </>
       ) : (
         <>
@@ -560,6 +565,7 @@ export function AbaCaixaApi() {
           )}
 
           <ResumoDoDia dia={dia} gaveta={gaveta} />
+          {devolucoesPendentes}
           {!fecharAberto && avisoDoFechamento && <p className={css.avisoFechado} role="alert">{avisoDoFechamento}</p>}
           {!(podeLancar && lancamentoAberto) && acao.origem !== 'abertura' && erro}
           {avisoDePermissao}
