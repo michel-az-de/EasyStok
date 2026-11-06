@@ -1,10 +1,10 @@
 .pilot-app { padding-top: 58px !important; }
-.pilot-account { width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; box-sizing: border-box; padding: 24px; border: 0; border-radius: 20px; background: var(--bg); color: var(--ink); font-family: inherit; }
+.pilot-account { width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; box-sizing: border-box; padding: 24px; border: 0; border-radius: var(--pilot-r-lg); background: var(--bg); color: var(--ink); font-family: inherit; }
 .pilot-account::backdrop { background: #291f1b99; }
 .pilot-account-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .pilot-account-heading h2 { margin: 0; font-size: 24px; }
 .pilot-account-heading [data-account=close] { flex: 0 0 auto; width: auto; white-space: nowrap; }
-.pilot-account button, .pilot-account select { min-height: 48px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-elev); color: var(--ink); font: inherit; }
+.pilot-account button, .pilot-account select { min-height: 48px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--pilot-r-md); background: var(--bg-elev); color: var(--ink); font: inherit; }
 .pilot-account-actions { display: grid; gap: 12px; }
 .pilot-account-actions [data-account=login], .pilot-account-actions [data-account=confirm], .pilot-account-actions [data-account=shop] { background: var(--fill-basil); border-color: var(--fill-basil); color: #fff; font-weight: 700; }
 .pilot-account [hidden] { display: none !important; }
