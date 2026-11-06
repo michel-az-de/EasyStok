@@ -62,7 +62,9 @@
     const linhas = [`SIZE ${larguraMm} mm,${alturaMm} mm`];
     linhas.push(ehContinuo(o) ? 'GAP 0,0' : `GAP ${num(o.gapMm, 2)} mm,0 mm`, 'SET TEAR ON');
     linhas.push('DIRECTION 1', 'REFERENCE 0,0');
-    if (o.shift) linhas.push(`SHIFT ${o.shift}`);
+    // Com a cabeça (v3), SHIFT vai sempre, inclusive 0: a impressora guarda o
+    // último SHIFT, e o ajuste zerado precisa desfazer o anterior.
+    if (o.shift || Number(o.cabecaMm) > 0) linhas.push(`SHIFT ${o.shift || 0}`);
     linhas.push(`DENSITY ${num(o.densidade, 8)}`, `SPEED ${num(o.velocidade, 4)}`, 'CLS');
     return linhas;
   }

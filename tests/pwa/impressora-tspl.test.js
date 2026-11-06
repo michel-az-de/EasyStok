@@ -72,7 +72,8 @@ module.exports = function ({ test }) {
     const centro = separar(T.etiqueta(rgbaBranco(416, 8), 416, 8, { larguraMm: 52, alturaMm: 30, gapMm: 2, cabecaMm: 104, x: 0 })).cabeca;
     assert.ok(centro.startsWith('SIZE 104 mm,30 mm\r\n'), centro);
     assert.match(centro, /BITMAP 208,0,52,8,0,$/);
-    assert.ok(!/SHIFT/.test(centro), centro);
+    // Revisão da PR #2265: SHIFT 0 sempre, para zerar o deslocamento que a impressora guardou do ajuste anterior.
+    assert.match(centro, /REFERENCE 0,0\r\nSHIFT 0\r\n/);
     const ajustado = separar(T.etiqueta(rgbaBranco(416, 8), 416, 8, { larguraMm: 52, alturaMm: 30, cabecaMm: 104, x: 0, ajusteMm: { x: -1.5, y: 1 } })).cabeca;
     assert.match(ajustado, /REFERENCE 0,0\r\nSHIFT 8\r\n/);
     assert.match(ajustado, /BITMAP 196,0,52,8,0,$/);
@@ -98,7 +99,7 @@ module.exports = function ({ test }) {
     assert.ok(centro.startsWith('SIZE 104 mm,30 mm\r\n'), centro);
     assert.match(centro, /\r\nBOX 216,8,615,231,2\r\n/);
     assert.match(centro, /\r\nTEXT 224,16,"2",0,1,1,"52 x 30 mm"\r\n/);
-    assert.ok(!/SHIFT/.test(centro), centro);
+    assert.match(centro, /REFERENCE 0,0\r\nSHIFT 0\r\n/);
     const ajustado = Buffer.from(T.alinhamento(midia, { cabecaMm: 104, ajusteMm: { x: 1, y: -0.5 } })).toString('latin1');
     assert.match(ajustado, /REFERENCE 0,0\r\nSHIFT -4\r\n/);
     assert.match(ajustado, /\r\nBOX 224,8,623,231,2\r\n/);
