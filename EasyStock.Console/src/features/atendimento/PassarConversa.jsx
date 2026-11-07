@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
-import { primeiroNome } from '../../dominio/mensagem'
+import { primeiroNomeDaConversa } from '../../dominio/nomeDoContato'
 import { atendentesParaPassar } from './apresentacaoDaConversa'
 import css from './atendimento.module.css'
 
@@ -64,7 +64,7 @@ export function PassarConversa({ conversa }) {
       </Botao>
       {aberto && (
         <Modal
-          titulo={`Passar a conversa de ${primeiroNome(conversa.nome)}`}
+          titulo={`Passar a conversa de ${primeiroNomeDaConversa(conversa)}`}
           descricao="Quem você escolher passa a responder esta conversa. Fica uma nota interna de quem passou para quem."
           aoFechar={enviando ? undefined : () => setAberto(false)}
           rodape={<Botao disabled={Boolean(enviando)} onClick={() => setAberto(false)}>Voltar</Botao>}

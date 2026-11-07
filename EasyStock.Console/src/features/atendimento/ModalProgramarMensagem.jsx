@@ -7,7 +7,7 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { respostasEditaveis } from '../../dominio/acessoModulos'
 import { dataHora } from '../../dominio/formato'
-import { primeiroNome } from '../../dominio/mensagem'
+import { primeiroNomeDaConversa } from '../../dominio/nomeDoContato'
 import {
   FINALIDADES, SITUACOES, faltaParaProgramar, horarioLocalPadrao, horarioLocalParaUtc,
   parametrosDoTexto, podeCancelar,
@@ -117,7 +117,7 @@ export function ModalProgramarMensagem({
     <Modal
       titulo="Programar mensagem"
       largura="480px"
-      descricao={`Tentaremos enviar para ${primeiroNome(conversa.nome)} pelo ${canal.nome}, mesmo com o console fechado.`}
+      descricao={`Tentaremos enviar para ${primeiroNomeDaConversa(conversa)} pelo ${canal.nome}, mesmo com o console fechado.`}
       aoFechar={fechar}
       rodape={(
         <>

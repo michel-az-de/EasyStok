@@ -18,7 +18,7 @@ import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useAcessoModulos } from '../aplicacao/acessoModulos'
 import { contarAtivas } from '../dominio/automacao'
 import { contarPrecisaDeVoce } from '../dominio/automatico'
-import { apresentacaoDoNome } from '../dominio/nomeDoContato'
+import { apresentacaoDoNome, nomeDaConversa } from '../dominio/nomeDoContato'
 import { CELULAR, DESKTOP, TABLET, useTamanhoTela, useTopoCompacto } from '../hooks/useTamanhoTela'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
@@ -612,7 +612,7 @@ function ConteudoMoldura({
         <div className={css.slotFila} data-fila-canhotos="" />
         <footer className={css.rodape}>
           <Botao ref={botaoFichaRef} onClick={() => setGavetaAberta(true)}>
-            Ficha de {selecionada ? apresentacaoDoNome(selecionada.nome, { comanda: selecionada.numeroComanda }).rotulo : 'cliente'}
+            Ficha de {selecionada ? apresentacaoDoNome(nomeDaConversa(selecionada), { comanda: selecionada.numeroComanda }).rotulo : 'cliente'}
           </Botao>
         </footer>
         <BotaoSimular ativo={simulando} aoAlternar={aoAlternarSimulacoes} />
