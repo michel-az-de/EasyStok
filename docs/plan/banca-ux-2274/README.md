@@ -47,9 +47,9 @@ O relatório numera as telas de 01 a 19. Quatro cuidados na contagem:
 
 | Estado | Itens |
 |---|---|
-| C corrige | 92 |
+| C corrige | 93 |
 | J já atende | 1 |
-| F fica de fora | 16 |
+| F fica de fora | 15 |
 | V verificar | 12 |
 | **Total** | **121** (5 críticos, 27 altos, 57 médios, 32 baixos: fecha com o resumo do relatório) |
 
@@ -82,7 +82,7 @@ O relatório numera as telas de 01 a 19. Quatro cuidados na contagem:
 
 | # | Sev. | Achado | Estado | Pacote | Correção/motivo |
 |---|---|---|---|---|---|
-| 03·0 | Média | Modal central bloqueante, longe do sino | F | P9 | Popover ou drawer ancorado é a "central de avisos" do P9 (`SinoDaSessao.jsx:55`; `componentes/Popover.jsx:41` existe, mas o desenho do drawer pede spec) |
+| 03·0 | Média | Modal central bloqueante, longe do sino | C | P7 | Trocar o modal por popover ancorado ao sino (`SinoDaSessao.jsx:55`; `componentes/Popover.jsx:41` já existe). Só o tempo real (03·7) e a lista completa (03·3) ficam no P9 |
 | 03·1 | Baixa | Regra de negócio como subtítulo permanente | C | P8 | Vira tooltip de ajuda (`SinoDaSessao.jsx:55`) |
 | 03·2 | Média | "1 aviso não lido" pesa mais que o título | C | P8 | Contador como badge ao lado do título (`SinoDaSessao.jsx:61`) |
 | 03·3 | Baixa | "Mostrando 1 de 1" esconde a fila | F | P9 | Lista completa com abas Não lidos e Todos é recurso novo (`SinoDaSessao.jsx:62`) |
@@ -113,7 +113,7 @@ O relatório numera as telas de 01 a 19. Quatro cuidados na contagem:
 | 05·5 | Baixa | Bolinha e badge sobrepostos no sino | C | P8 | Mesmo conserto do 01·2 |
 | 05·6 | Média | "3 mensagens não entregues" rosa sobre rosa, em 2 linhas | V | P8 | Faixa compacta com "Revisar" e dispensa já existe (#2232 L6; `caixa-de-entrada/NaoEntregues.jsx:160-168`). Verificar: conversa com falha, 1440 px, texto em 1 linha e contraste do texto sobre o fundo >= 4,5:1; se falhar, vira C no P8 |
 | 05·7 | Alta | Coluna de 260 px, nomes truncados | C | P8 | O padrão da coluna é 320 px (`tokens.css:151`), mas no layout de três colunas ela encolhe até 260 (`app/moldura.module.css:74`). Subir o mínimo e pôr o nome em linha própria (`componentes/NomeDoContato.module.css:8`) |
-| 05·8 | Alta | Tag "Restrição alimentar" em disparo de marketing | F | domínio | Classificador de tags é domínio e pede spec própria (`dominio/agente.js:8,28`, `dominio/automatico.js:154,398`, `Domain/Entities/ClienteTag.cs:20`). O gatilho exato da campanha não foi reproduzido (inferido pelo código) |
+| 05·8 | Alta | Tag "Restrição alimentar" em disparo de marketing | F | domínio | Falso positivo do detector; a trava de restrição prefere o falso positivo por segurança (não disparar marketing a quem tem restrição). Trocar o critério muda essa garantia e pede spec própria de domínio (`dominio/agente.js:8,28`, `dominio/automatico.js:154,398`, `Domain/Entities/ClienteTag.cs:20`). O gatilho exato da campanha não foi reproduzido (inferido pelo código) |
 | 05·9 | Média | Chip "Sem nom" e "· #9" órfão | C | P8 | Telefone formatado quando não houver nome (`dominio/nomeDoContato.js:32`, `componentes/NomeDoContato.jsx:5`) |
 | 05·10 | Baixa | Prévia cortada em ~15 caracteres | V | P8 | O componente da prévia não foi localizado em `caixa-de-entrada`. Verificar em 1440 px a largura da prévia da lista; se a causa for a coluna estreita, o 05·7 resolve |
 
@@ -194,7 +194,7 @@ O relatório numera as telas de 01 a 19. Quatro cuidados na contagem:
 | 12·2 | Média | Quantidades em colunas diferentes; tabelas sem cabeçalho | C | P8 | Colunas fixas e cabeçalho (sem `<table>` nem `<thead>` em `AbaEstoqueDoDiaApi.jsx`; as posições x=800 e x=727 não foram medidas) |
 | 12·3 | Alta | Mesmo código LOT para dois produtos; vencidos pendentes | J | P3 | `detalheDoLote` mostra código e porção na linha (#2235; `aplicacao/estoqueDoDia.js:82-86`, `AbaEstoqueDoDiaApi.jsx:279`). Um lote por registro é por desenho (`RegistrarProducaoUseCase.cs:118-159`, unicidade por empresa e código em `LoteConfiguration.cs:19`). "Escalonar vencidos" não é ajuste de tela e fica de fora |
 | 12·4 | Média | Três estilos de botão; lixeira em "Registrar perda" | C | P6 | Ícone de perda no lugar da lixeira; uma variante por nível (`AbaEstoqueDoDiaApi.jsx:290-291`, `AbaPerdasApi.jsx:97,101`, `AbaPlanejamentoApi.jsx:163-164`) |
-| 12·5 | Baixa | Chips "Sem saldo" e "Lote vencido" repetem os KPIs | C | P8 | Só na linha (`AbaEstoqueDoDiaApi.jsx:244,246` x KPIs `:181-182`) |
+| 12·5 | Baixa | Chips "Sem saldo" e "Lote vencido" repetem os KPIs | C | P8 | Antes de mexer, conferir com a banca #2235 qual lado sai (o chip ou o KPI). Só na linha (`AbaEstoqueDoDiaApi.jsx:244,246` x KPIs `:181-182`) |
 
 ### 13 Produção, Planejamento, 4 itens
 
@@ -305,7 +305,7 @@ Há dois caminhos de envio e o problema está nos dois:
 
 | Caminho | Hoje | Mudança |
 |---|---|---|
-| Regra salva (`ModeloTextoAtendimento`) | A lista de variáveis é nome, pedido e faixa (`EasyStock.Domain/Entities/Atendimento/ModeloTextoAtendimento.cs:11`); o regex `[a-z]+` não casa camelCase (`:28`) e a chave fora da lista sai crua (`:21`) | O servidor resolve `{linkCardapio}` e `{abre}` na hora do envio (`EasyStock.Application/UseCases/Atendimento/Automacoes/DispararAutomacaoUseCase.cs` por volta de `:232-241`; `EasyStock.Domain/Entities/ExpedienteLoja.cs:35` já tem `MarcadorAbre`) |
+| Regra salva (`ModeloTextoAtendimento`) | A lista de variáveis é nome, pedido e faixa (`EasyStock.Domain/Entities/Atendimento/ModeloTextoAtendimento.cs:11`); o regex `[a-z]+` não casa camelCase (`:28`) e a chave fora da lista sai crua (`:21`) | O servidor resolve `{linkCardapio}` e `{abre}` na hora do envio (`EasyStock.Application/UseCases/Atendimento/Automacoes/DispararAutomacaoUseCase.cs` por volta de `:232-241`; `EasyStock.Domain/Entities/Storefront/ExpedienteLoja.cs:35` já tem `MarcadorAbre`) |
 | Saudação de reserva (`SaudacaoAtendimento`) | Só troca `{nome}` e `{link}` (`EasyStock.Application/Services/Atendimento/SaudacaoAtendimento.cs:30-60`) | Mesma resolução. Trocar a chave por `{link}` no texto padrão (`dominio/automacao.js:39`) não basta, porque a regra salva continua com a chave antiga |
 
 Em cima disso: ao salvar, o validador rejeita chave fora da lista; a chave que ficar sem valor na hora
@@ -316,7 +316,8 @@ salvas com a chave crua só mudam com GO (ver "Ações em produção").
 ## Pacotes
 
 Um PR por funcionalidade. Tier: com esta spec aprovada, P5 a P8 deixam de ser "feat/refactor sem
-spec" e passam a tier baixo. Segue alto, por natureza, o que tocar migração, processo ou `*.csproj`.
+spec" e passam a tier baixo, salvo o P7. Segue alto, por natureza, o que tocar migração, processo ou `*.csproj`.
+A regra só vale depois do aceite explícito do Felipe nesta spec (label `aprovado` ou comentário na issue #2274).
 
 | Pacote | Itens (ids) | Depende de | Tier | Tam. |
 |---|---|---|---|---|
@@ -326,7 +327,7 @@ spec" e passam a tier baixo. Segue alto, por natureza, o que tocar migração, p
 | P4 Entregas e dados de teste | 08·5, 09·4, 06·1 | nada; dado exige GO | baixo (código) | P |
 | P5 Tokens | 01·6, 04·2, 04·3, 04·4, 16·2, observação do 01 | esta spec aprovada | baixo com a spec | M |
 | P6 Componentes | 02·1, 06·5, 06·8, 08·3, 08·4, 08·6, 09·2, 10·7, 11·1, 11·2, 12·4, 13·3, 16·3, 17·2 | P5 (token antes de componente) | baixo com a spec | G |
-| P7 Shell | 01·1, 01·9-10, 05·0, 05·2, 07·1, 07·2, 08·1, 08·2, 10·1, 10·2, 17·1, 18·3, 18·6, observação do 04 | P6 (componente antes do shell) | baixo com a spec; dividir por tela se o diff crescer | G |
+| P7 Shell | 01·1, 01·9-10, 03·0, 05·0, 05·2, 07·1, 07·2, 08·1, 08·2, 10·1, 10·2, 17·1, 18·3, 18·6, observação do 04 | P6 (componente antes do shell) | alto: reestrutura `App.jsx` e as duas molduras; dividir por tela se o diff crescer | G |
 | P8 Microcopy e polimento | os 58 itens restantes (coluna Pacote das tabelas) | P5 e P6 | baixo | G (dois lotes de telas) |
 | P9 Premium | ⌘K, Home cockpit, central e tempo real de avisos, gráficos, kanban com SLA, agrupar variações, densidade, lint de tokens, classificador de tags | spec própria | alto | fora |
 
