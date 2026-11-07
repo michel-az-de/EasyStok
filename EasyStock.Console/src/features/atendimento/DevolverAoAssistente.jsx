@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { acoesDoModo } from '../../dominio/acoesDoModo'
-import { primeiroNome } from '../../dominio/mensagem'
+import { primeiroNomeDaConversa } from '../../dominio/nomeDoContato'
 import css from './atendimento.module.css'
 
 // #2232 (A4): "Devolver ao Assistente" saiu da faixa "quem responde" e mora no ⋮ do cabeçalho, junto de
@@ -25,7 +25,7 @@ export function DevolverAoAssistente({ conversa, pausado = false, bloqueada = fa
       {aberto && (
         <Modal
           titulo="Devolver ao Assistente?"
-          descricao={`O Assistente volta a responder as próximas mensagens de ${primeiroNome(conversa.nome)}.`}
+          descricao={`O Assistente volta a responder as próximas mensagens de ${primeiroNomeDaConversa(conversa)}.`}
           aoFechar={() => setAberto(false)}
           rodape={(
             <>

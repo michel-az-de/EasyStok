@@ -7,6 +7,7 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { podeVerIntegracoes } from '../../dominio/acessoModulos'
 import { erroDoModelo } from '../../dominio/falhaDeEnvio'
 import { hashDoModulo } from '../../dominio/modulos'
+import { nomeDaConversa } from '../../dominio/nomeDoContato'
 import css from './atendimento.module.css'
 
 // #1408: com `cliente` no lugar de `conversa`, é o "Chamar no WhatsApp" de quem nunca escreveu: a API abre (ou
@@ -80,7 +81,7 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
   return (
     <Modal titulo={cliente ? 'Chamar no WhatsApp' : 'Enviar modelo aprovado'} descricao={cliente
       ? `Primeira mensagem para ${cliente.nome}: sem conversa recente, só sai modelo aprovado. Enviado, a conversa abre no Balcão.`
-      : `Confira a prévia antes de enviar para ${conversa.nome}. Este modelo é enviado diretamente pelo canal; não entra no rascunho de respostas rápidas.`}
+      : `Confira a prévia antes de enviar para ${nomeDaConversa(conversa)}. Este modelo é enviado diretamente pelo canal; não entra no rascunho de respostas rápidas.`}
       aoFechar={fechar} rodape={<>
         <Botao disabled={enviando} onClick={fechar}>Fechar</Botao>
         <Botao variante="primario" disabled={enviando || Boolean(falta) || bloqueado || Boolean(resultado)} onClick={enviar}>

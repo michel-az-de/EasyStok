@@ -27,6 +27,7 @@ import { ModalProgramarMensagem } from './ModalProgramarMensagem'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
 import { acoesDoComposer } from './apresentacaoDaConversa'
 import { revisaoDoContexto } from '../../dominio/contextoDaSugestao'
+import { primeiroNomeDaConversa } from '../../dominio/nomeDoContato'
 import css from './atendimento.module.css'
 
 export function Composer({
@@ -277,7 +278,7 @@ export function Composer({
                     // O atalho / continua valendo, mas a dica não o repete: o botão
                     // Respostas, com rótulo, já mostra o caminho, e a frase longa
                     // quebrava em três linhas no campo (rodada 10, integração).
-                    : `Escreva para ${conversa.nome.split(' ')[0]}`}
+                    : `Escreva para ${primeiroNomeDaConversa(conversa)}`}
                 onChange={(e) => { digitar(e.target.value); setAssumiu(false); setErroAssumir(null) }}
                 onFocus={sugestao.aoFocar}
                 onBlur={() => { sugestao.aoSair(); descarregar() }}
