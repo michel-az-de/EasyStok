@@ -48,7 +48,7 @@ const abaCaixa = ler('features/gestao/caixa/AbaCaixaApi.jsx')
 const painel = ler('features/gestao/financeiro/PainelFinanceiro.jsx')
 for (const [nome, fonte] of [['Caixa do dia', abaCaixa], ['Extrato', painel]]) {
   caso(`${nome} lê a soma do fechamento`, () => assert.match(fonte, /useDevolucoesPendentes\(/))
-  caso(`${nome} mostra o aviso`, () => assert.match(fonte, /avisoDeDevolucoesNasTelas\(/))
+  caso(`${nome} mostra o aviso`, () => assert.match(fonte, /avisoDeDevolucoesN(asTelas|oExtrato)\(/))
 }
 
 console.log(`\n${ok} ok, ${falhas.length} falha(s)`)
