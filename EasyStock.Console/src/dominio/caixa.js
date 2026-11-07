@@ -49,15 +49,26 @@ export const avisoDeDevolucoesPendentes = (leitura) =>
 export const avisoDeDevolucoesNasTelas = (leitura) =>
   avisoDeDevolucoes(leitura, 'Esse dinheiro entrou e está nos totais, mas não é da loja: registre a devolução no Pós-venda do pedido.')
 
-// #2275: o aviso do Caixa do dia conta só o que está nos totais do dia: o pagamento que entrou no
-// dia (o mesmo recorte de `pagamentosDoDia`), limitado ao que ainda falta devolver. Cancelado de outro
-// dia não some: segue no Pós-venda e no Extrato. `dia` é o "AAAA-MM-DD" do caixa.
-export function aDevolverDoDia(dados, dia) {
+// #2275: o Extrato lê os cancelados dos últimos 90 dias, não o período da tela: o aviso diz isso e não
+// afirma que o valor está nos totais.
+export const avisoDeDevolucoesNoExtrato = (leitura) =>
+  avisoDeDevolucoes(leitura, 'São pedidos cancelados dos últimos 90 dias: registre a devolução no Pós-venda de cada pedido.')
+
+// #2275: o aviso do Caixa do dia conta só o que está nos totais: o pagamento que entrou no período
+// (o mesmo recorte dos totais), sem o que já foi devolvido dele, limitado ao que ainda falta devolver.
+// Período é "AAAA-MM-DD" de `de` a `ate` (o dia; ou desde a abertura, no caixa esquecido aberto).
+// Cancelado de fora do período não some: segue no Pós-venda e no Extrato. Pagamento sem data válida não conta.
+export function aDevolverDoDia(dados, de, ate = de) {
   const aDevolver = aDevolverDe(dados)
-  const entrouNoDia = (dados?.pagamentos ?? [])
-    .filter((p) => dataIsoNoFuso(Date.parse(p.pagoEm)) === dia)
-    .reduce((soma, p) => soma + (Number(p.valor) || 0), 0)
-  return Math.round(Math.min(aDevolver, entrouNoDia) * 100) / 100
+  const noPeriodo = (dados?.pagamentos ?? [])
+    .filter((p) => {
+      const ms = Date.parse(p.pagoEm)
+      if (!Number.isFinite(ms)) return false
+      const dia = dataIsoNoFuso(ms)
+      return dia >= de && dia <= ate
+    })
+    .reduce((soma, p) => soma + Math.max(0, (Number(p.valor) || 0) - (Number(p.devolvido) || 0)), 0)
+  return Math.round(Math.min(aDevolver, noPeriodo) * 100) / 100
 }
 
 // #2275: um token só para o status do caixa, no topo e na tabela. O caixa esquecido aberto é aviso.

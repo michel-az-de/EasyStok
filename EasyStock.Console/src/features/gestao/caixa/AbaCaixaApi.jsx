@@ -437,14 +437,16 @@ export function AbaCaixaApi() {
   const { agora } = useAtendimento()
   const { fecharCaixa } = useAcoes()
   const caixa = useCaixaDoDiaApi({ fechamentos: 7 })
+  // #2275: o aviso soma o mesmo período dos totais: o dia, ou desde a abertura no caixa esquecido aberto.
+  const inicioDevolucoes = caixa.dia?.esquecidoAberto && caixa.dia?.abertoDesde ? caixa.dia.abertoDesde : caixa.dia?.data
   // #2267: o pagamento do pedido cancelado está nos totais; o aviso diz que ele não é da loja.
-  const avisoDevolucoes = avisoDeDevolucoesNasTelas(useDevolucoesPendentes(Boolean(caixa.dia?.data), caixa.dia?.data))
+  const avisoDevolucoes = avisoDeDevolucoesNasTelas(useDevolucoesPendentes(Boolean(caixa.dia?.data), inicioDevolucoes, caixa.dia?.data))
   // #2275: alerta com ícone e título curto; o corpo é o aviso de sempre.
   const devolucoesPendentes = avisoDevolucoes && (
-    <output className={`${css.alerta} ${css.alertaAtencao}`}>
+    <p className={`${css.alerta} ${css.alertaAtencao}`} role="status">
       <Icone nome="alerta" tamanho={20} className={css.alertaIcone} />
       <span className={css.alertaCorpo}><strong className={css.alertaTitulo}>Devolução a fazer.</strong> {avisoDevolucoes}</span>
-    </output>
+    </p>
   )
   const [acao, executar, limparErro] = useAcaoComRecarga(caixa.recarregar)
   const [fecharAberto, setFecharAberto] = useState(false)
@@ -537,7 +539,7 @@ export function AbaCaixaApi() {
             </div>
             <div className={css.acoesTopo}>
               {podeGerenciar && dia.aberto && !dia.fechado && (
-                <Botao variante={dia.esquecidoAberto ? 'primario' : 'texto'} icone="lock" disabled={acao.enviando || conferindo} onClick={abrirFechamento}>
+                <Botao variante="texto" icone="lock" disabled={acao.enviando || conferindo} onClick={abrirFechamento}>
                   {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
                 </Botao>
               )}
@@ -551,7 +553,7 @@ export function AbaCaixaApi() {
 
           {dia.esquecidoAberto && (
             // #2275: alerta com ícone, título curto e a ação dele; quem não gerencia só lê.
-            <output className={`${css.alerta} ${css.alertaErro}`}>
+            <p className={`${css.alerta} ${css.alertaErro}`} role="alert">
               <Icone nome="alerta" tamanho={20} className={css.alertaIcone} />
               <span className={css.alertaCorpo}>
                 <strong className={css.alertaTitulo}>Caixa de {diaMes(dia.abertoDesde)} ainda aberto.</strong>{' '}
@@ -562,7 +564,7 @@ export function AbaCaixaApi() {
                   Fechar o caixa de {diaMes(dia.abertoDesde)}
                 </Botao>
               )}
-            </output>
+            </p>
           )}
           {dia.fechado && dia.fechamento && (
             <p className={css.corpoBloco}>

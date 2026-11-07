@@ -48,17 +48,37 @@ caso('devolução parcial de hoje não passa do que falta devolver', () => {
 caso('sem nada a devolver vale zero', () => {
   assert.equal(caixa.aDevolverDoDia({ aDevolver: 0, pagamentos: [{ pagoEm: hoje, valor: 50 }] }, DIA), 0)
 })
+// Conselho 5 (MÉDIA): o que já foi devolvido de um pagamento de hoje não conta como a devolver de hoje.
+caso('devolvido por pagamento: o que já saiu de hoje não conta como a devolver de hoje', () => {
+  assert.equal(caixa.aDevolverDoDia({ aDevolver: 30, pagamentos: [{ pagoEm: hoje, valor: 50, devolvido: 50 }, { pagoEm: ontem, valor: 30, devolvido: 0 }] }, DIA), 0)
+})
+// Conselho 5 (MÉDIA): caixa esquecido aberto soma desde a abertura, como os totais.
+caso('caixa esquecido soma o intervalo abertoDesde..data, não só o dia', () => {
+  const dados = { aDevolver: 70, pagamentos: [{ pagoEm: '2026-11-05T12:00:00-03:00', valor: 40 }, { pagoEm: hoje, valor: 30 }] }
+  assert.equal(caixa.aDevolverDoDia(dados, '2026-11-05', DIA), 70)
+})
+// Conselho 5 (BAIXA): pagoEm inválido não lança e não conta.
+caso('pagoEm inválido não lança e não conta', () => {
+  assert.equal(caixa.aDevolverDoDia({ aDevolver: 19, pagamentos: [{ pagoEm: 'nao-e-data', valor: 19 }] }, DIA), 0)
+})
 
 const hook = ler('aplicacao/useDevolucoesPendentes.js')
 const abaCaixa = ler('features/gestao/caixa/AbaCaixaApi.jsx')
 const css = ler('features/gestao/caixa/abaCaixa.module.css')
 
 caso('o Caixa do dia lê a soma do dia, não a dos 90 dias', () => {
-  assert.match(abaCaixa, /useDevolucoesPendentes\(\s*Boolean\(caixa\.dia\?\.data\),\s*caixa\.dia\?\.data\s*\)/)
+  assert.match(abaCaixa, /useDevolucoesPendentes\(\s*Boolean\(caixa\.dia\?\.data\),\s*inicioDevolucoes,\s*caixa\.dia\?\.data\s*\)/)
+  assert.match(abaCaixa, /const inicioDevolucoes = .*abertoDesde/)
   assert.match(hook, /aDevolverDoDia\(/)
 })
-caso('o Extrato segue lendo o pool dos 90 dias (não muda aqui)', () => {
-  assert.match(ler('features/gestao/financeiro/PainelFinanceiro.jsx'), /useDevolucoesPendentes\(true\)/)
+// Conselho 5 (ALTA): o Extrato lê o pool de 90 dias e não afirma que o valor está nos totais.
+caso('o Extrato lê o pool dos 90 dias e não diz "nos totais"', () => {
+  const extrato = ler('features/gestao/financeiro/PainelFinanceiro.jsx')
+  assert.match(extrato, /useDevolucoesPendentes\(true\)/)
+  assert.match(extrato, /avisoDeDevolucoesNoExtrato\(/)
+  const texto = caixa.avisoDeDevolucoesNoExtrato({ total: 246, pedidos: 2 })
+  assert.doesNotMatch(texto, /totais/)
+  assert.match(texto, /90 dias/)
 })
 
 // 14·1: o status "Aberto" tem um token só, no topo e na tabela.
@@ -75,6 +95,15 @@ caso('topo e linha "Desde" da tabela usam o mesmo tomDoCaixa', () => {
 caso('os alertas do topo têm ícone de alerta e título curto', () => {
   assert.match(abaCaixa, /alertaTitulo/)
   assert.match(abaCaixa, /nome="alerta"|icone="alerta"/)
+})
+// Conselho 5 (BAIXA): um botão primário de fechar; alertas anunciam por role, não por <output>.
+caso('o caixa esquecido tem um só botão primário de fechar (no alerta)', () => {
+  assert.doesNotMatch(abaCaixa, /variante=\{dia\.esquecidoAberto \? 'primario' : 'texto'\}/)
+})
+caso('os alertas do Caixa usam role, não <output>', () => {
+  assert.doesNotMatch(abaCaixa, /<output className=\{`\$\{css\.alerta\}/)
+  assert.match(abaCaixa, /css\.alertaAtencao\}`\} role="status"/)
+  assert.match(abaCaixa, /css\.alertaErro\}`\} role="alert"/)
 })
 
 // 14·3: rótulos do resumo numa linha só, com tooltip; valores alinhados.

@@ -10,7 +10,7 @@ import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendente
 import { useConsultaFinanceira, listarContasFinanceiras, listarContasEmAberto, obterContaFinanceira, obterResumoFinanceiro, obterExtratoFinanceiro, obterRelatorioFinanceiro, listarCategoriasFinanceiras, listarCentrosFinanceiros, emitirContaFinanceira, cancelarContaFinanceira, estornarParcelaFinanceira, removerParcelaFinanceira, inativarCadastroFinanceiro, reativarCadastroFinanceiro } from '../../../aplicacao/useFinanceiroApi'
 import { STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
 import { moeda } from '../../../dominio/formato'
-import { avisoDeDevolucoesNasTelas, nomeDoMetodoCaixa } from '../../../dominio/caixa'
+import { avisoDeDevolucoesNoExtrato, nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { ModalContaFinanceira, ModalPagamentoFinanceiro, ModalConfirmacaoFinanceira, ModalCadastroFinanceiro, ModalParcelaFinanceira, ErroFinanceiro } from './ModaisFinanceiras'
 import css from './financeiro.module.css'
@@ -273,7 +273,7 @@ function ExtratoFinanceiro() {
   const [linha, setLinha] = useState(null)
   const linhas = consulta.dados ?? []
   // #2267: recebimento de pedido cancelado entra nas entradas; o aviso diz que ainda há o que devolver.
-  const avisoDevolucoes = avisoDeDevolucoesNasTelas(useDevolucoesPendentes(true))
+  const avisoDevolucoes = avisoDeDevolucoesNoExtrato(useDevolucoesPendentes(true))
   const total = (lado) => linhas.filter((item) => !item.estornado && item.lado === lado).reduce((soma, item) => soma + Math.round(item.valor * 100), 0) / 100
   return <div className={css.painel}>
     <form className={css.filtros} onSubmit={(e) => { e.preventDefault(); setPeriodo(rascunho) }}><PeriodoFinanceiro periodo={rascunho} aoMudar={setRascunho} /><Botao tipo="submit">Consultar extrato</Botao></form>
