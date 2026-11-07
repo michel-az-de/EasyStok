@@ -13,7 +13,7 @@ import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { primeiroNome } from '../../dominio/mensagem'
-import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
+import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { assistenteAtendendo } from '../../dominio/resumoDoModo'
@@ -122,7 +122,7 @@ export function PainelAtendimento({
         titulo={primeira ? 'Escolha uma conversa' : 'Nenhuma conversa para exibir'}
         acao={primeira && (
           <Botao variante="primario" onClick={() => selecionar(primeira.id)}>
-            Abrir {apresentacaoDoNome(primeira.nome, { comanda: primeira.numeroComanda }).rotulo}
+            Abrir {apresentacaoDoNome(nomeDaConversa(primeira), { comanda: primeira.numeroComanda }).rotulo}
           </Botao>
         )}
       >
@@ -135,7 +135,7 @@ export function PainelAtendimento({
 
   const canal = canalDaConversa(canais, selecionada)
   // #2258 (T4): o mesmo nome do cartão, do cabeçalho, da ficha e dos botões "Abrir".
-  const apresentacao = apresentacaoDoNome(selecionada.nome, { comanda: selecionada.numeroComanda })
+  const apresentacao = apresentacaoDoNome(nomeDaConversa(selecionada), { comanda: selecionada.numeroComanda })
   const { pode, ofereceModelo, janela, motivo } = permissaoDeEscrita(selecionada, agora, canal)
   // Valor CRU, não booleano: a marca PAUSA_POR_ASSUMIR é o que separa "pausado
   // porque você escreveu" de "pausado porque você assumiu". O Boolean() de

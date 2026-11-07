@@ -12,7 +12,7 @@ import { faltaPagar } from '../../dominio/pagamento'
 import { ehLead } from '../../dominio/conversa'
 import { passoPorId } from '../../dominio/esteira'
 import { moeda } from '../../dominio/formato'
-import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
+import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 
 export const NOME_DO_VISITANTE = 'Visitante do site'
 
@@ -21,7 +21,7 @@ export const NOME_DO_VISITANTE = 'Visitante do site'
 // Telefone cru no lugar do nome sai com a máscara (#2232, L10) e a cápsula "Sem nome". O nome
 // inteiro segue no `title`, e `curto` é a forma que a tela usa quando o espaço aperta.
 export function nomeDoCartao(conversa) {
-  const apresentacao = apresentacaoDoNome(conversa?.nome ?? '', { comanda: conversa?.numeroComanda })
+  const apresentacao = apresentacaoDoNome(nomeDaConversa(conversa), { comanda: conversa?.numeroComanda })
   const comanda = conversa?.numeroComanda ? `Comanda ${conversa.numeroComanda}` : null
   const visitante = apresentacao.completo === 'Visitante'
   const titulo = visitante || !comanda ? apresentacao.titulo : `${apresentacao.titulo} · ${comanda}`

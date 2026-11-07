@@ -65,10 +65,12 @@ export const situacaoDaLista = (pedidos, erro) => {
 
 // Divide em painéis. Pedido pronto que já está numa viagem montando não aparece
 // de novo solto; viagens concluídas e desfeitas saem da tela do dia.
-export function paineisDeEntregas(pedidos, viagens) {
+// #2276 (08·5): viagem montando sem pedido é do dia em que foi criada; a de outro dia some.
+export function paineisDeEntregas(pedidos, viagens, dia) {
   const lista = pedidos ?? []
   const vs = viagens ?? []
-  const montando = vs.filter((v) => v.situacao === 'Montando')
+  const deOutroDiaESemPedido = (v) => v.paradas.length === 0 && dataIsoNoFuso(Date.parse(v.criadaEm)) !== dia
+  const montando = vs.filter((v) => v.situacao === 'Montando' && !deOutroDiaESemPedido(v))
   const emViagem = new Set(montando.flatMap((v) => v.paradas.map((p) => p.pedidoId)))
   return {
     aprovacao: lista.filter((p) => p.status === 'aguardando_aprovacao_baba'),

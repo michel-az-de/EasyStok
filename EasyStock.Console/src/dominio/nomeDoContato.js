@@ -15,6 +15,17 @@ export function nomeDoContato(nome) {
   return texto
 }
 
+// #2276 (06·1): o padrão do lead sem nome de perfil ("Cliente WhatsApp") não é nome de ninguém. Quando o
+// contato é telefone, a tela mostra o número formatado; sem telefone, o nome segue como veio.
+const NOME_PADRAO_DO_LEAD = 'cliente whatsapp'
+export function nomeDaConversa(conversa) {
+  const nome = String(conversa?.nome ?? '')
+  if (nome.trim().toLowerCase() !== NOME_PADRAO_DO_LEAD) return nome
+  const contato = String(conversa?.contato ?? '').trim()
+  const telefone = /^\+?[\d\s().-]+$/.test(contato) && /^\d{10,13}$/.test(contato.replace(/\D/g, ''))
+  return telefone ? nomeDoContato(contato) : nome
+}
+
 // #2258 (auditoria de UX, T4 e T5): o nome do contato em três tamanhos e com a cápsula que explica
 // o que falta nele. Puro, para a cápsula da tela e a prova lerem a mesma regra.
 //
