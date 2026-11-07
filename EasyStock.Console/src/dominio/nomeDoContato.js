@@ -26,6 +26,13 @@ export function nomeDaConversa(conversa) {
   return telefone ? nomeDoContato(contato) : nome
 }
 
+// #2276: o primeiro nome para frases ao usuário ("Passar a conversa de Maria"). Contato que é só telefone sai
+// inteiro: o primeiro pedaço do número ("+55") não diz quem é.
+export function primeiroNomeDaConversa(conversa) {
+  const nome = nomeDaConversa(conversa)
+  return /^\+?[\d\s().-]+$/.test(nome) ? nome : nome.split(' ')[0]
+}
+
 // #2258 (auditoria de UX, T4 e T5): o nome do contato em três tamanhos e com a cápsula que explica
 // o que falta nele. Puro, para a cápsula da tela e a prova lerem a mesma regra.
 //

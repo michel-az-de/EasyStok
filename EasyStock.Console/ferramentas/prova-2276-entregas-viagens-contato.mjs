@@ -67,10 +67,52 @@ confere('08·5: viagem criada à noite no fuso da loja conta como do dia', () =>
   assert.deepEqual(outroDia.montando, [])
 })
 
+// A referência é o dia de HOJE, não o dia escolhido na tela: a vazia de hoje segue visível mesmo que o
+// operador esteja olhando amanhã, e a de ontem some. O terceiro parâmetro é só "hoje" (default: agora).
+confere('08·5: vazia criada hoje segue visível quando hoje = 07/11', () => {
+  const p = paineisDeEntregas([], [viagens[1]], DIA)
+  assert.deepEqual(p.montando.map((v) => v.id), ['vazia-de-hoje'])
+})
+
+confere('08·5: chamada sem o 3º parâmetro usa hoje (agora): vazia criada agora aparece', () => {
+  const agora = new Date().toISOString()
+  const p = paineisDeEntregas([], [{ id: 'agora', situacao: 'Montando', criadaEm: agora, paradas: [] }])
+  assert.deepEqual(p.montando.map((v) => v.id), ['agora'])
+})
+
+confere('08·5: chamada sem o 3º parâmetro esconde a vazia de dois dias atrás', () => {
+  const antes = new Date(Date.now() - 2 * 86400000).toISOString()
+  const p = paineisDeEntregas([], [{ id: 'antiga', situacao: 'Montando', criadaEm: antes, paradas: [] }])
+  assert.deepEqual(p.montando, [])
+})
+
+// criadaEm ausente ou inválido não pode derrubar a tela (RangeError do fuso) nem sumir com a viagem.
+confere('08·5: criadaEm inválido ou ausente não lança erro e não esconde a viagem', () => {
+  const sujas = [
+    { id: 'invalida', situacao: 'Montando', criadaEm: 'nao-e-data', paradas: [] },
+    { id: 'ausente', situacao: 'Montando', paradas: [] },
+  ]
+  let p
+  assert.doesNotThrow(() => { p = paineisDeEntregas([], sujas, DIA) })
+  assert.deepEqual(p.montando.map((v) => v.id), ['invalida', 'ausente'])
+})
+
+// A tela de Entregas não pode mais passar o dia escolhido como referência.
+confere('08·5: a tela de Entregas não usa o dia escolhido como hoje', () => {
+  const fonte = readFileSync(new URL('../src/features/entregas/ConteudoEntregasApi.jsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(fonte, /paineisDeEntregas\(pedidos, viagens, dia\)/)
+})
+
 confere('06·1: contato "Cliente WhatsApp" sem nome mostra o telefone formatado', () => {
   assert.equal(typeof nomes.nomeDaConversa, 'function', 'nomeDaConversa precisa existir em dominio/nomeDoContato.js')
   assert.equal(nomes.nomeDaConversa({ nome: 'Cliente WhatsApp', contato: '555434619500' }), '+55 (54) 3461-9500')
   assert.equal(nomes.nomeDaConversa({ nome: 'Cliente WhatsApp', contato: '5511987654321' }), '+55 (11) 98765-4321')
+})
+
+confere('06·1: primeiro nome do contato sem nome mostra o telefone inteiro, não o "+55"', () => {
+  assert.equal(typeof nomes.primeiroNomeDaConversa, 'function', 'primeiroNomeDaConversa precisa existir')
+  assert.equal(nomes.primeiroNomeDaConversa({ nome: 'Cliente WhatsApp', contato: '555434619500' }), '+55 (54) 3461-9500')
+  assert.equal(nomes.primeiroNomeDaConversa({ nome: 'Maria Souza', contato: '555434619500' }), 'Maria')
 })
 
 confere('06·1: nome real passa intacto, mesmo com telefone no contato', () => {
@@ -87,11 +129,16 @@ confere('06·1: as telas que mostram o contato leem o nome pela mesma regra', ()
     'src/features/atendimento/PainelAtendimento.jsx',
     'src/features/caixa-de-entrada/apresentacaoDoCartao.js',
     'src/app/Moldura.jsx',
+    'src/features/atendimento/Composer.jsx',
+    'src/features/atendimento/DevolverAoAssistente.jsx',
+    'src/features/atendimento/PassarConversa.jsx',
+    'src/features/atendimento/ModalProgramarMensagem.jsx',
+    'src/features/atendimento/ModalEnviarModelo.jsx',
   ]
   const base = new URL('../', import.meta.url)
   for (const tela of telas) {
     const fonte = readFileSync(new URL(tela, base), 'utf8')
-    assert.match(fonte, /nomeDaConversa\(/, `${tela} precisa usar nomeDaConversa`)
+    assert.match(fonte, /(primeiroNomeDaConversa|nomeDaConversa)\(/, `${tela} precisa usar nomeDaConversa ou primeiroNomeDaConversa`)
   }
 })
 

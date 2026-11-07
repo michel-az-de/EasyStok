@@ -89,7 +89,7 @@ export function ConteudoEntregasApi() {
 
 function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia, aoAbrirCadastro }) {
   const viagensRef = useRef(null)
-  const p = paineisDeEntregas(pedidos, viagens, dia)
+  const p = paineisDeEntregas(pedidos, viagens)
   const roteiro = useMemo(() => (doDia ? roteiroDoDia({ ...doDia, viagens, entregadores }) : null), [doDia, viagens, entregadores])
   // Prontos que o dia escolhido não mostra (de outro dia), para nenhum ficar sem viagem.
   const prontosFora = roteiro ? p.prontos.filter((x) => !roteiro.ids.has(x.id)) : []
