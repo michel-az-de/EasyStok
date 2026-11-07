@@ -11,7 +11,8 @@
 // `dominio/pagamento.js: pagamentosDoPedido` já devolve) e o resumo do caixa
 // SOMA os dois mundos sem misturar os dados de um dentro do outro.
 
-import { inicioDoDiaNoFuso, moeda, plural } from './formato.js'
+import { dataIsoNoFuso, inicioDoDiaNoFuso, moeda, plural } from './formato.js'
+import { aDevolverDe } from './cobranca.js'
 import { pagamentosDoPedido } from './pagamento.js'
 import { itemPorSku } from './cardapio.js'
 import { numeroDoDiaNaTela } from './pedido.js'
@@ -47,6 +48,20 @@ export const avisoDeDevolucoesPendentes = (leitura) =>
 // #2267: no Caixa do dia e no Extrato o pagamento do pedido cancelado parecia receita comum.
 export const avisoDeDevolucoesNasTelas = (leitura) =>
   avisoDeDevolucoes(leitura, 'Esse dinheiro entrou e está nos totais, mas não é da loja: registre a devolução no Pós-venda do pedido.')
+
+// #2275: o aviso do Caixa do dia conta só o que está nos totais do dia: o pagamento que entrou no
+// dia (o mesmo recorte de `pagamentosDoDia`), limitado ao que ainda falta devolver. Cancelado de outro
+// dia não some: segue no Pós-venda e no Extrato. `dia` é o "AAAA-MM-DD" do caixa.
+export function aDevolverDoDia(dados, dia) {
+  const aDevolver = aDevolverDe(dados)
+  const entrouNoDia = (dados?.pagamentos ?? [])
+    .filter((p) => dataIsoNoFuso(Date.parse(p.pagoEm)) === dia)
+    .reduce((soma, p) => soma + (Number(p.valor) || 0), 0)
+  return Math.round(Math.min(aDevolver, entrouNoDia) * 100) / 100
+}
+
+// #2275: um token só para o status do caixa, no topo e na tabela. O caixa esquecido aberto é aviso.
+export const tomDoCaixa = ({ fechado = false, esquecido = false } = {}) => (fechado ? 'neutro' : esquecido ? 'aviso' : 'ok')
 
 // #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada
 // rotulada Sangria. A sugerida do outro tipo sai; a que a dona digitou fica.
