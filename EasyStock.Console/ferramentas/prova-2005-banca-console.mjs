@@ -508,21 +508,23 @@ await confere('07. selecionar uma conversa que o estado ainda não conhece esper
   assert.equal(estado.selecaoPendente ?? null, null, 'a espera acaba quando a conversa aparece')
 })
 
-await confere('07. conversa que nunca aparece não prende a seleção: depois de 3 voltas volta para a primeira', () => {
+// #2135: sem a escolhida, nenhuma. A primeira do servidor não é a primeira da fila exibida.
+await confere('07. conversa que nunca aparece não prende a seleção: depois de 3 voltas fica sem conversa escolhida', () => {
   let estado = reducer(estadoCom(resumo('a'), resumo('b')), { tipo: acao.SELECIONAR_CONVERSA, id: 'fantasma' })
   for (let volta = 1; volta <= 3; volta += 1) {
     estado = sincronizar(estado, [resumo('a'), resumo('b')])
     assert.equal(estado.selecionadaId, 'fantasma', `volta ${volta}`)
   }
   estado = sincronizar(estado, [resumo('a'), resumo('b')])
-  assert.equal(estado.selecionadaId, 'a')
+  assert.equal(estado.selecionadaId, null, 'a espera expirou e a seleção solta')
+  assert.equal(estado.selecaoPendente ?? null, null, 'sem espera sobrando')
 })
 
 await confere('07. selecionar uma conversa que existe não deixa espera nenhuma', () => {
   const estado = reducer(estadoCom(resumo('a'), resumo('b')), { tipo: acao.SELECIONAR_CONVERSA, id: 'b' })
   assert.equal(estado.selecionadaId, 'b')
   assert.equal(estado.selecaoPendente ?? null, null)
-  assert.equal(sincronizar(estado, [resumo('a')]).selecionadaId, 'a', 'conversa que sumiu da lista continua saindo da seleção')
+  assert.equal(sincronizar(estado, [resumo('a')]).selecionadaId, null, 'conversa que sumiu da lista sai da seleção, sem espera')
 })
 
 // ================================================================================================
