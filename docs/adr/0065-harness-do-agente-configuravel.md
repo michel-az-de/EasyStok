@@ -1,6 +1,6 @@
 # ADR-0065 · Harness do agente configurável por arquivo, com eval antes de mudar
 
-- Status: Proposto (2026-11-11)
+- Status: Aceito (2026-11-11; Felipe aprovou no chat da sessão da #2281)
 - Data: 2026-11-11
 - Decisor: Felipe
 - Relacionados: issue #2281, plano `docs/plan/atendimento-whatsapp/18-harness-do-agente.md` (Onda 13,
