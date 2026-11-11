@@ -246,7 +246,9 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // #1792: a conversa fica travada até o commit; outro webhook ou o marcar-lida não grava não lidas velhas por cima.
             (conversa, mensagemEntidade, configuracao, identificacao) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
                 token => GravarEntradaAsync(empresaId, entrada, msg, enviadaEm, token), ct);
-            await webhookRecebidoRepository.MarcarProcessadoAsync(registro!.Id, sucesso: true, ct: ct);
+            // #2280: gravada a entrada, nada mais depende da requisição. A Meta desiste em poucos segundos e a reentrega
+            // acha a mensagem e não refaz os efeitos: com o token dela, o turno do agente se perdia.
+            await webhookRecebidoRepository.MarcarProcessadoAsync(registro!.Id, sucesso: true, ct: CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -255,14 +257,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // O que ficou rastreado reenviaria os mesmos inserts no próximo commit do lote.
             unitOfWork.DescartarAlteracoesPendentes();
             if (registro is not null)
-                await webhookRecebidoRepository.MarcarProcessadoAsync(registro.Id, sucesso: false, ex.Message, ct);
+                await webhookRecebidoRepository.MarcarProcessadoAsync(registro.Id, sucesso: false, ex.Message, CancellationToken.None);
 
             // Regra de domínio (ex.: wa_id inválido) não passa num reenvio: pedir retry travaria o
             // payload por dias. O resto (concorrência, banco) passa.
             return ex is RegraDeDominioVioladaException;
         }
 
-        await DispararEfeitosAposGravarAsync(empresaId, conversa, mensagemEntidade, msg, configuracao, identificacao, ct);
+        await DispararEfeitosAposGravarAsync(empresaId, conversa, mensagemEntidade, msg, configuracao, identificacao, CancellationToken.None);
         return true;
     }
 

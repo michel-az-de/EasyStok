@@ -132,8 +132,11 @@ public class MensagemProgramada
         AlteradaEm = Utc(em);
     }
 
+    /// <summary>#2280: só o envio em curso falha; o que já saiu não volta a "Falhou" (a dona reenviaria em dobro).</summary>
     public void RegistrarFalha(string motivo, DateTime em)
     {
+        if (Situacao != SituacaoMensagemProgramada.Enviando)
+            throw new RegraDeDominioVioladaException($"Falha registrada fora de hora (situação: {Situacao}).");
         Situacao = SituacaoMensagemProgramada.Falhou;
         var limpo = string.IsNullOrWhiteSpace(motivo) ? "falha sem detalhe" : motivo.Trim();
         Erro = limpo.Length > ErroTamanhoMaximo ? limpo[..ErroTamanhoMaximo] : limpo;
