@@ -3,7 +3,8 @@
 //   1. a sincronização de 5 s com a mesma leitura devolve o MESMO estado (nada re-renderiza);
 //   2. recarga silenciosa de lembretes e notificações não troca a situação;
 //   3. recarga ao vivo: polling só com o SSE caído, eventos em rajada viram uma recarga;
-//   4. GET sem resposta desiste sozinho.
+//   4. GET sem resposta desiste sozinho;
+//   5. SSE caído em seguida reconecta com espera crescente, com teto e variação (#2287).
 //
 //   node ferramentas/prova-1565-console-ocioso.mjs
 
@@ -166,11 +167,12 @@ await confere('2. novidade, erro e pedido de quem está na tela trocam a situaç
 const { mock } = await import('node:test')
 const { ligarRecargaAoVivo } = await import('../src/aplicacao/recargaAoVivo.js')
 
-function montarAoVivo() {
+function montarAoVivo({ aleatorio } = {}) {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
   let recargas = 0
   const conexoes = []
   const desligar = ligarRecargaAoVivo({
+    aleatorio,
     recarregar: () => { recargas += 1 },
     recarregaCom: (evento) => evento.startsWith('pedido.'),
     conectar: (ouvinte) => {
@@ -237,6 +239,69 @@ await confere('3. antes do primeiro ready e depois de desligar', () => {
   assert.equal(conexao.fechada, true)
   conexao.aoCair()
   assert.equal(t.conexoes.length, 1, 'queda depois de desligar não reconecta')
+})
+
+// --- 5. Reconexão do SSE com espera crescente (#2287) ----------------------------------------
+const { criarEsperaDeReconexao, RECONECTAR_TETO_MS } = await import('../src/aplicacao/recargaAoVivo.js')
+
+await confere('5. a espera dobra a cada queda seguida, até o teto de 60 s', () => {
+  assert.equal(RECONECTAR_TETO_MS, 60000)
+  const espera = criarEsperaDeReconexao({ base: 10000, aleatorio: () => 0 })
+  const esperas = Array.from({ length: 6 }, () => espera.proxima())
+  assert.deepEqual(esperas, [10000, 20000, 40000, 60000, 60000, 60000])
+})
+
+await confere('5. a espera varia de 75% a 100%, para as abas não baterem juntas', () => {
+  assert.equal(criarEsperaDeReconexao({ base: 10000, aleatorio: () => 1 }).proxima(), 7500)
+  assert.equal(criarEsperaDeReconexao({ base: 10000, aleatorio: () => 0.5 }).proxima(), 8750)
+  const noTeto = criarEsperaDeReconexao({ base: 5000, aleatorio: () => 1 })
+  const ultima = Array.from({ length: 10 }, () => noTeto.proxima()).at(-1)
+  assert.equal(ultima, 45000, 'no teto a variação também vale')
+})
+
+await confere('5. o ready zera: a queda depois de uma conexão boa volta à base', () => {
+  const espera = criarEsperaDeReconexao({ base: 5000, aleatorio: () => 0 })
+  espera.proxima(); espera.proxima(); espera.proxima()
+  espera.zerar()
+  assert.equal(espera.proxima(), 5000)
+})
+
+await confere('5. recarga ao vivo: quedas seguidas espaçam a reconexão; o ready volta à base', () => {
+  const t = montarAoVivo({ aleatorio: () => 0 })
+  try {
+    t.conexao().aoCair()
+    t.andar(10000)
+    assert.equal(t.conexoes.length, 2, 'a primeira queda reconecta em 10 s')
+    t.conexao().aoCair()
+    t.andar(19999)
+    assert.equal(t.conexoes.length, 2, 'a segunda queda seguida espera mais que 10 s')
+    t.andar(1)
+    assert.equal(t.conexoes.length, 3, 'e reconecta em 20 s')
+    t.conexao().aoCair()
+    t.andar(39999)
+    assert.equal(t.conexoes.length, 3)
+    t.andar(1)
+    assert.equal(t.conexoes.length, 4, 'a terceira, em 40 s')
+    t.conexao().aoEvento({ evento: 'ready' })
+    t.conexao().aoCair()
+    t.andar(10000)
+    assert.equal(t.conexoes.length, 5, 'depois do ready a queda volta a reconectar em 10 s')
+  } finally { t.desligar() }
+})
+
+await confere('5. todo ponto que abre o SSE da operação reconecta pela espera crescente', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs')
+  const raiz = new URL('../src/', import.meta.url)
+  const abremSse = readdirSync(raiz, { recursive: true })
+    .filter((arquivo) => /\.jsx?$/.test(arquivo))
+    .map((arquivo) => ({ arquivo, fonte: readFileSync(new URL(arquivo.replaceAll('\\', '/'), raiz), 'utf8') }))
+    .filter(({ fonte }) => /conectar(EventosOperacao)?\(\{/.test(fonte) && /aoCair/.test(fonte))
+    .filter(({ arquivo }) => !arquivo.replaceAll('\\', '/').endsWith('infra/api/eventosOperacao.js'))
+  assert.ok(abremSse.length >= 5, `achou só ${abremSse.length} pontos que abrem o SSE`)
+  const fixos = abremSse.filter(({ fonte }) => /setTimeout\(\s*(conectar|ouvir)\s*,\s*(RECONECTAR_MS|INTERVALO_MS|\d+)\s*\)/.test(fonte))
+  assert.deepEqual(fixos.map(({ arquivo }) => arquivo), [], 'reconexão com espera fixa')
+  const semEspera = abremSse.filter(({ fonte }) => !/criarEsperaDeReconexao\(/.test(fonte) || !/\.zerar\(\)/.test(fonte))
+  assert.deepEqual(semEspera.map(({ arquivo }) => arquivo), [], 'ponto sem a espera crescente ou sem zerar no ready')
 })
 
 // --- 4. Leitura com prazo --------------------------------------------------------------------

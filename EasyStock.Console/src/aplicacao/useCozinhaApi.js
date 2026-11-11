@@ -3,7 +3,7 @@ import {
   confirmarImpressao, listarImpressoesPendentes, listarPedidosKds, mudarStatusKds, reimprimirCanhoto,
 } from '../infra/api/kdsApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
-import { CONFERENCIA_AO_VIVO_MS, POLLING_SEM_SSE_MS, RECONECTAR_MS } from './recargaAoVivo'
+import { CONFERENCIA_AO_VIVO_MS, POLLING_SEM_SSE_MS, RECONECTAR_MS, criarEsperaDeReconexao } from './recargaAoVivo'
 import { transicaoDaFila } from '../dominio/kds'
 import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { criarRecargaDeAcao } from './recargaDeAcao'
@@ -136,6 +136,7 @@ export function useCozinhaApi({ data = null } = {}) {
     let reconexao = null
     let polling = null
     let noAr = false
+    const esperaDeReconexao = criarEsperaDeReconexao({ base: RECONECTAR_MS })
     // #1577: o evento da própria ação já relê a fila; a ação não relê de novo na resposta.
     const recarga = criarRecargaDeAcao({ recarregar: () => recarregar(), aoVivo: () => noAr })
     recargaRef.current = recarga
@@ -146,6 +147,7 @@ export function useCozinhaApi({ data = null } = {}) {
           if (evento === 'ready') {
             noAr = true
             setAoVivo(true)
+            esperaDeReconexao.zerar()
             // #2005 (console-20): SSE vivo e mudo não avisa o que não vira evento; a fila é conferida a cada 30 s.
             clearInterval(polling)
             polling = setInterval(recarregar, CONFERENCIA_AO_VIVO_MS)
@@ -158,7 +160,7 @@ export function useCozinhaApi({ data = null } = {}) {
           setAoVivo(false)
           clearInterval(polling)
           polling = setInterval(recarregar, POLLING_SEM_SSE_MS)
-          reconexao = setTimeout(conectar, RECONECTAR_MS)
+          reconexao = setTimeout(conectar, esperaDeReconexao.proxima())
         },
       })
     }
