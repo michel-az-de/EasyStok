@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration.Crypto;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Admin.VincularWhatsAppTenant;
 using EasyStock.Domain.Integration;
 
@@ -128,7 +129,9 @@ public sealed class ConectarWhatsAppCoexistenciaUseCase(
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Coexistência: a sincronização {Tipo} do número {PhoneNumberId} falhou; a conexão segue.", tipo, phoneNumberId);
-            return new SincronizacaoWhatsAppResultado(false, null, ex.Message);
+            // #2285: o texto da Meta já sai higienizado do adaptador; outra exceção (driver, serialização) fica no log.
+            return new SincronizacaoWhatsAppResultado(false, null,
+                ex is WhatsAppCloudException ? ex.Message : ClassificadorFalhaEnvio.Motivo(ex));
         }
     }
 

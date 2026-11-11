@@ -5,10 +5,13 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Campanhas;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Campanhas;
+using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.AdicionarCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleDisponibilidadeCardapioItemAdmin;
 using EasyStock.Application.UseCases.Admin.Storefront.Cardapio.ToggleVisibilidadeCardapioItemAdmin;
 using EasyStock.Domain.Entities.Storefront;
+using System.Text.Json;
 using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
@@ -37,13 +40,13 @@ public class TenantVitrineCardapioControllerTests
         _cardapio.GetByIdAndScopeAsync(_vitrine.Id, _item.Id, _empresaId, Arg.Any<CancellationToken>()).Returns(_item);
     }
 
-    private TenantVitrineCardapioController Controller()
+    private TenantVitrineCardapioController Controller(AdicionarCardapioItemAdminUseCase? adicionar = null)
     {
         var usuario = Substitute.For<ICurrentUserAccessor>();
         usuario.EmpresaId.Returns(_empresaId);
         var aviso = new AvisoItemComInteresse(_vitrines, Substitute.For<IInteresseItemRepository>(), Substitute.For<IOperacaoEventPublisher>());
         var uow = Substitute.For<IUnitOfWork>();
-        return new TenantVitrineCardapioController(_vitrines, null!, null!, null!, null!, null!,
+        return new TenantVitrineCardapioController(_vitrines, null!, null!, null!, adicionar!, null!,
             new ToggleVisibilidadeCardapioItemAdminUseCase(_cardapio, uow, aviso),
             new ToggleDisponibilidadeCardapioItemAdminUseCase(_cardapio, uow, aviso),
             null!, null!, usuario, NullLogger<TenantVitrineCardapioController>.Instance, _publico);
@@ -65,6 +68,24 @@ public class TenantVitrineCardapioControllerTests
 
         _item.Visivel.Should().BeFalse();
         _publico.Received(1).Invalidar("casa-da-baba");
+    }
+
+    [Fact]
+    public async Task FalhaInesperadaAoAdicionar_NaoDevolveODetalheDaExcecao()
+    {
+        // #2285: o 500 devolvia ex.Message (texto do driver ou do banco) ao console. O detalhe fica no log.
+        var vitrinesQueFalham = Substitute.For<IStorefrontRepository>();
+        vitrinesQueFalham.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns<StorefrontEntity?>(_ => throw new InvalidOperationException("Host=10.0.0.5;Password=segredo"));
+        var adicionar = new AdicionarCardapioItemAdminUseCase(
+            vitrinesQueFalham, _cardapio, Substitute.For<IProdutoRepository>(), Substitute.For<IUnitOfWork>());
+
+        var resposta = await Controller(adicionar).Adicionar(new(null, "Lasanha", null, 1, true, null, null, null, null,
+            null, null, 35m, null, null, null, null, null));
+
+        var problema = resposta.Should().BeAssignableTo<ObjectResult>().Subject;
+        problema.StatusCode.Should().Be(500);
+        JsonSerializer.Serialize(problema.Value).Should().NotContain("segredo").And.NotContain("10.0.0.5");
     }
 
     [Fact]

@@ -269,9 +269,36 @@ public class ProcessarMidiaWhatsAppJobUseCaseTests
         await processador.ExecuteAsync(new ArmazenarMidiaWhatsAppJob(empresaId, mensagem.ConversaId, "wamid.f", "media-f"));
 
         mensagem.TentativasMidia.Should().Be(1);
-        mensagem.ErroMidia.Should().Contain("Meta fora");
+        // #2285: o console mostra o erro; o texto da exceção fica só no log.
+        mensagem.ErroMidia.Should().Be("Sem conexão com o canal (CANAL_SEM_CONEXAO).");
         mensagem.ProximaTentativaMidiaEm.Should().NotBeNull("a varredura tenta de novo");
         await unitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task FalhaAoGuardarNoStorage_NaoMostraOCaminhoInterno()
+    {
+        // #2285: a exceção do storage traz caminho e bucket internos; o console recebe só a frase estável.
+        var empresaId = Guid.NewGuid();
+        var mensagem = Domain.Entities.Atendimento.Mensagem.Entrada(
+            empresaId, Guid.NewGuid(), DateTime.UtcNow, TipoConteudoMensagem.Imagem, externoId: "wamid.s");
+        mensagem.AguardarMidia("media-s", DateTime.UtcNow);
+        var conversaRepository = Substitute.For<IConversaRepository>();
+        conversaRepository.ObterMensagemPorExternoIdAsync(empresaId, "wamid.s", Arg.Any<CancellationToken>()).Returns(mensagem);
+        var cloudClient = Substitute.For<IWhatsAppCloudClient>();
+        cloudClient.BaixarMidiaAsync("media-s", Arg.Any<CancellationToken>())
+            .Returns(((Stream)new MemoryStream([1, 2, 3]), "image/jpeg"));
+        var fileStorage = Substitute.For<IFileStorage>();
+        fileStorage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns<StoredFileResult>(_ => throw new UnauthorizedAccessException("Access to the path '/var/easystok/uploads/x' is denied."));
+        var processador = new ProcessarMidiaWhatsAppJobUseCase(
+            conversaRepository, new ArmazenadorMidiaWhatsApp(cloudClient, fileStorage),
+            Substitute.For<ITenantContextAccessor>(), Substitute.For<IUnitOfWork>(), TimeProvider.System,
+            NullLogger<ProcessarMidiaWhatsAppJobUseCase>.Instance);
+
+        await processador.ExecuteAsync(new ArmazenarMidiaWhatsAppJob(empresaId, mensagem.ConversaId, "wamid.s", "media-s"));
+
+        mensagem.ErroMidia.Should().NotBeNullOrWhiteSpace().And.NotContain("/var/");
     }
 
     [Fact]
