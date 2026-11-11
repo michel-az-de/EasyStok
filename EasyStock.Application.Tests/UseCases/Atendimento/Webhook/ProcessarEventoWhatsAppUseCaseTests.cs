@@ -285,6 +285,29 @@ public class ProcessarEventoWhatsAppUseCaseTests
     }
 
     [Fact]
+    public async Task RequisicaoCanceladaDepoisDeGravarAindaEnfileiraOAgente()
+    {
+        // #2280: a Meta desiste da requisição enquanto a entrada grava. A reentrega acha a mensagem e não refaz os
+        // efeitos, então o turno do agente, o "processado" e o aviso ao console não podem depender do token da requisição.
+        using var requisicao = new CancellationTokenSource();
+        _conversaRepository.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { requisicao.Cancel(); return Task.CompletedTask; });
+        _webhookRecebidoRepository.MarcarProcessadoAsync(Arg.Any<Guid>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(ci => { ci.ArgAt<CancellationToken>(3).ThrowIfCancellationRequested(); return Task.CompletedTask; });
+        _eventPublisher.PublicarAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<object>(), Arg.Any<CancellationToken>())
+            .Returns(ci => { ci.ArgAt<CancellationToken>(3).ThrowIfCancellationRequested(); return Task.CompletedTask; });
+
+        await _useCase.ExecuteAsync(PayloadTexto("wamid.cancelada1", "Oi, tudo bem?"), requisicao.Token);
+
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _webhookRecebidoRepository.Received(1).MarcarProcessadoAsync(
+            Arg.Any<Guid>(), sucesso: true, Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        // O catch dos efeitos engole a exceção do publicador; só o token recebido prova que ele não veio cancelado.
+        await _eventPublisher.Received(1).PublicarAsync("conversa.mensagem_recebida", _empresaId, Arg.Any<object>(),
+            Arg.Is<CancellationToken>(t => !t.IsCancellationRequested));
+    }
+
+    [Fact]
     public async Task TextoAcimaDoLimiteEGravadoCortado()
     {
         // #1615: o texto longo estourava a regra do domínio, o webhook respondia 200 e a mensagem sumia.

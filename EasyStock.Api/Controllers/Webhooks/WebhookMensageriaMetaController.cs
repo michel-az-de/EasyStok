@@ -39,6 +39,7 @@ public class WebhookMensageriaMetaController(
     }
 
     [HttpPost]
+    [RequestSizeLimit(2_000_000)] // #2280: anônimo; sem teto o Kestrel aceita 30 MB antes da assinatura.
     // Mesmo balde do webhook do WhatsApp: a Meta entrega em rajada de poucos IPs (issue 1105/1285).
     [EnableRateLimiting("webhook-meta")]
     public async Task<IActionResult> Receber(CancellationToken ct)

@@ -10,6 +10,8 @@
 export const TIPOS_IMAGEM_ACEITOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 export const TIPO_PDF = 'application/pdf'
 export const LIMITE_ARQUIVO_BYTES = 8 * 1024 * 1024
+// #2280: a foto que sai pela API do EasyStok tem teto de 6 MB no servidor; recusar na escolha poupa o envio perdido.
+export const LIMITE_IMAGEM_ENVIO_BYTES = 6 * 1024 * 1024
 
 // 'imagem' reaproveita a bolha que a carta de cardápio já usa (miniatura com
 // legenda); 'pdf' vira o cartão do arquivo (seção B da pesquisa: "Prévia com
@@ -30,6 +32,7 @@ export function validarArquivo({ tipo, tamanho, soImagem = false }) {
   if (soImagem && reconhecido !== 'imagem') return { aceito: false, motivo: SO_FOTO_NO_EASYSTOK }
   if (!reconhecido) return { aceito: false, motivo: 'Envie uma imagem (JPG, PNG, WEBP, GIF) ou um PDF.' }
   if (tamanho <= 0) return { aceito: false, motivo: 'Arquivo vazio.' }
+  if (soImagem && tamanho > LIMITE_IMAGEM_ENVIO_BYTES) return { aceito: false, motivo: 'Foto muito grande. O limite é 6 MB.' }
   if (tamanho > LIMITE_ARQUIVO_BYTES) return { aceito: false, motivo: 'Arquivo muito grande. O limite é 8 MB.' }
   return { aceito: true, motivo: null }
 }

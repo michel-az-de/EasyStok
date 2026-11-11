@@ -351,7 +351,7 @@ export function Composer({
                 disabled={!podeEscrever || !podeAnexar}
                 descritoPor={!podeAnexar && restricao ? idRestricao : undefined}
                 soImagem={fonteApi}
-                titulo={!podeAnexar ? restricao : fonteApi ? 'Anexar foto do computador (imagem, até 8 MB)' : 'Anexar arquivo do computador: foto, cardápio em PDF ou comprovante (imagem ou PDF, até 8 MB)'}
+                titulo={!podeAnexar ? restricao : fonteApi ? 'Anexar foto do computador (imagem, até 6 MB)' : 'Anexar arquivo do computador: foto, cardápio em PDF ou comprovante (imagem ou PDF, até 8 MB)'}
                 rotulo="Anexar"
                 classeRotulo={css.rotuloAcao}
                 aoEscolher={aoEscolherArquivo}

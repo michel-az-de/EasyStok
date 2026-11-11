@@ -201,6 +201,11 @@ await confere('C no modo API só a foto no WhatsApp passa; o resto é recusado c
   assert.deepEqual(validarArquivo({ tipo: 'application/pdf', tamanho: 10, soImagem: true }), { aceito: false, motivo: SO_FOTO_NO_EASYSTOK })
   assert.deepEqual(validarArquivo({ tipo: 'text/plain', tamanho: 10, soImagem: true }), { aceito: false, motivo: SO_FOTO_NO_EASYSTOK })
   assert.deepEqual(validarArquivo({ tipo: 'image/png', tamanho: 10, soImagem: true }), { aceito: true, motivo: null })
+  // #2280: a API recusa foto acima de 6 MB; o console aceitava até 8 MB e a dona só via o erro depois de enviar.
+  const MB = 1024 * 1024
+  assert.deepEqual(validarArquivo({ tipo: 'image/jpeg', tamanho: 6 * MB, soImagem: true }), { aceito: true, motivo: null })
+  assert.deepEqual(validarArquivo({ tipo: 'image/jpeg', tamanho: 7 * MB, soImagem: true }), { aceito: false, motivo: 'Foto muito grande. O limite é 6 MB.' })
+  assert.deepEqual(validarArquivo({ tipo: 'image/jpeg', tamanho: 7 * MB }), { aceito: true, motivo: null }, 'fora do envio pela API o limite segue 8 MB')
   assert.ok(!/PDF/.test(SO_FOTO_NO_EASYSTOK.split('.')[0]), 'a frase não oferece PDF')
 })
 
@@ -225,7 +230,7 @@ await confere('C o composer recusa ao escolher e não promete PDF no modo API', 
   assert.match(composer, /const bloqueioCanal = motivoDeAnexo\(canal, tipo, \{ fonteApi \}\)/)
   assert.match(composer, /soImagem=\{fonteApi\}/)
   // #1761: canal que não aceita anexo mostra a restrição no lugar; o resto segue igual.
-  assert.match(composer, /titulo=\{!podeAnexar \? restricao : fonteApi \? 'Anexar foto do computador \(imagem, até 8 MB\)' : /)
+  assert.match(composer, /titulo=\{!podeAnexar \? restricao : fonteApi \? 'Anexar foto do computador \(imagem, até 6 MB\)' : /)
   const anexos = fonte('features/atendimento/ComposerAnexos.jsx')
   assert.match(anexos, /accept=\{`image\/jpeg,image\/png,image\/webp,image\/gif\$\{soImagem \? '' : ',application\/pdf'\}`\}/)
 })
