@@ -10,7 +10,8 @@ import {
 } from '../../dominio/falhaDeEnvio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import css from './caixa.module.css'
-import { assinaturaDaDispensa, faixaDispensada, gravarDispensa, lerDispensa } from './dispensaNaoEntregues'
+import { useChaveDaSessao } from '../../aplicacao/useChaveDaSessao'
+import { assinaturaDaDispensa, chaveDaDispensa, faixaDispensada, gravarDispensa, lerDispensa } from './dispensaNaoEntregues'
 
 // S59 (#1391): mensagens que não chegaram ao cliente, de todas as conversas. Só aparece no modo API
 // (a massa local não envia de verdade) e só quando há alguma: a faixa abre a lista com Reenviar e
@@ -111,16 +112,19 @@ export function NaoEntregues({ aoAbrir }) {
     }
   }, [ocupado, carregando, itens])
 
+  // #2285: a troca de usuário na mesma aba muda a chave e, com ela, a dispensa lida.
   // #2232 (L11): dispensada vale até aparecer mensagem que não estava na lista dispensada.
-  const [vistas, setVistas] = useState(lerDispensa)
+  const chaveDispensa = useChaveDaSessao(chaveDaDispensa)
+  const [guardada, setGuardada] = useState(() => ({ chave: chaveDispensa, vistas: lerDispensa(chaveDispensa) }))
+  const vistas = guardada.chave === chaveDispensa ? guardada.vistas : lerDispensa(chaveDispensa)
   const dispensada = !aberto && !erro && itens.length > 0 && faixaDispensada(itens, vistas)
 
   if (!listarNaoEntregues || (itens.length === 0 && !aberto && !erro && !carregando)) return null
 
   function dispensar() {
     const assinatura = assinaturaDaDispensa(itens)
-    setVistas(assinatura)
-    gravarDispensa(assinatura)
+    setGuardada({ chave: chaveDispensa, vistas: assinatura })
+    gravarDispensa(assinatura, chaveDispensa)
     // O botão some com a faixa: o foco volta ao início da tela em vez de cair no corpo.
     document.querySelector('[data-inicio-tela]')?.focus()
   }

@@ -409,5 +409,65 @@ await confere('E texto multilinha mantém semântica nativa e aponta para a opç
   assert.match(seletor, /aria-expanded=\{itens.length > 0\}/)
 })
 
+// --- #2285: limite do texto, dispensa por empresa e usuário, código morto do painel ------------------
+const { LIMITE_TEXTO_MENSAGEM, avisoDeLimiteDoTexto } = await import('../src/dominio/limiteDoTexto.js')
+
+await confere('F o limite do texto é o da API e o campo avisa perto e acima dele, sem cortar o que foi colado', () => {
+  const api = readFileSync(new URL('../../EasyStock.Domain/Entities/Atendimento/Mensagem.cs', import.meta.url), 'utf8')
+  assert.equal(LIMITE_TEXTO_MENSAGEM, Number(api.match(/TextoTamanhoMaximo\s*=\s*(\d+)/)[1]), 'o número do console é o do domínio')
+  assert.equal(avisoDeLimiteDoTexto('a'.repeat(100)), null, 'texto curto não avisa')
+  const perto = avisoDeLimiteDoTexto('a'.repeat(LIMITE_TEXTO_MENSAGEM - 100))
+  assert.equal(perto.acima, false)
+  assert.match(perto.texto, /100/, 'diz quantos caracteres ainda cabem')
+  const acima = avisoDeLimiteDoTexto('a'.repeat(LIMITE_TEXTO_MENSAGEM + 25))
+  assert.equal(acima.acima, true)
+  assert.match(acima.texto, /25/, 'diz quantos caracteres passam')
+  assert.equal(avisoDeLimiteDoTexto('a'.repeat(LIMITE_TEXTO_MENSAGEM)).acima, false, 'no limite ainda cabe')
+  assert.equal(avisoDeLimiteDoTexto(' '.repeat(50) + 'a'.repeat(LIMITE_TEXTO_MENSAGEM)).acima, false, 'a API apara as pontas antes de contar')
+  assert.match(composer, /avisoDeLimiteDoTexto\(rascunho\)/)
+  assert.match(composer, /if \(variavelSobrando \|\| excedeLimite \|\| assumindoRef\.current\) return/, 'Enter não envia acima do limite')
+  assert.match(composer, /disabled=\{!podeEscrever \|\| assumindo \|\| excedeLimite \|\|/, 'o Enviar desliga acima do limite')
+  const campo = composer.slice(composer.indexOf('<CampoArea'), composer.indexOf('/>', composer.indexOf('<CampoArea')))
+  assert.doesNotMatch(campo, /maxLength/, 'maxLength cortaria o texto colado sem avisar')
+})
+
+await confere('G a dispensa da faixa de não entregues é de uma empresa e de um usuário', async () => {
+  const armazem = new Map()
+  const antes = globalThis.sessionStorage
+  globalThis.sessionStorage = {
+    getItem: (c) => armazem.get(c) ?? null, setItem: (c, v) => armazem.set(c, v), removeItem: (c) => armazem.delete(c),
+  }
+  try {
+    const { chaveDaDispensa, gravarDispensa, lerDispensa } = await import('../src/features/caixa-de-entrada/dispensaNaoEntregues.js')
+    const ana = chaveDaDispensa({ empresa: { id: 'e1' }, usuario: { id: 'u1' } })
+    const bia = chaveDaDispensa({ empresa: { id: 'e1' }, usuario: { id: 'u2' } })
+    const outraEmpresa = chaveDaDispensa({ empresa: { id: 'e2' }, usuario: { id: 'u1' } })
+    assert.equal(new Set([ana, bia, outraEmpresa]).size, 3, 'empresa e usuário entram na chave')
+    assert.equal(chaveDaDispensa({}), null, 'sem sessão não há chave')
+    gravarDispensa(['m1', 'm2'], ana)
+    assert.deepEqual(lerDispensa(ana), ['m1', 'm2'])
+    assert.equal(lerDispensa(bia), null, 'outro usuário no mesmo navegador não herda a dispensa')
+    assert.equal(lerDispensa(outraEmpresa), null, 'outra empresa não herda a dispensa')
+    assert.equal(lerDispensa(null), null)
+    armazem.set('easystok.naoEntreguesDispensadas', JSON.stringify(['velha']))
+    assert.equal(lerDispensa(bia), null, 'a chave antiga não vale para ninguém')
+    assert.equal(armazem.has('easystok.naoEntreguesDispensadas'), false, 'e é descartada')
+  } finally { globalThis.sessionStorage = antes }
+  const jsx = fonte('features/caixa-de-entrada/NaoEntregues.jsx')
+  assert.match(jsx, /useChaveDaSessao\(chaveDaDispensa\)/)
+  assert.doesNotMatch(jsx, /useState\(lerDispensa\)/, 'o estado inicial não lê sem escopo')
+})
+
+await confere('H o painel não passa ao Composer o que ele não recebe, nem repete a guarda do menu', () => {
+  const painel = fonte('features/atendimento/PainelAtendimento.jsx')
+  const bloco = painel.slice(painel.indexOf('<Composer'), painel.indexOf('/>', painel.indexOf('<Composer')))
+  const passadas = [...bloco.matchAll(/^\s+(\w+)=/gm)].map((m) => m[1]).filter((n) => n !== 'key')
+  const assinatura = composer.slice(composer.indexOf('export function Composer({'), composer.indexOf('}) {', composer.indexOf('export function Composer({')))
+  const orfas = passadas.filter((nome) => !new RegExp(`\\b${nome}\\b`).test(assinatura))
+  assert.deepEqual(orfas, [], 'props passadas que o Composer não declara: ' + orfas.join(', '))
+  const menu = painel.slice(painel.indexOf('<details key={selecionada.id}'), painel.indexOf('</details>', painel.indexOf('<details key={selecionada.id}')))
+  assert.doesNotMatch(menu, /\{!encerrada && !bloqueada && /, 'o menu já só existe sem encerrada e sem bloqueio')
+})
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length) process.exit(1)
