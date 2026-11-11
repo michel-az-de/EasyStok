@@ -56,7 +56,7 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
         {
             logger.LogError(ex, "Fila de mídia WhatsApp: falha ao armazenar mídia do wamid {Wamid}.", job.Wamid);
             // #1397: o erro fica na mensagem (o console mostra) e a varredura tenta de novo até o limite.
-            mensagem.RegistrarFalhaMidia(ex.Message, relogio.GetUtcNow().UtcDateTime);
+            mensagem.RegistrarFalhaMidia(MotivoFalhaMidia(ex), relogio.GetUtcNow().UtcDateTime);
             await unitOfWork.CommitAsync();
             if (mensagem.TentativasMidia == 1) await DispararTurnoDoAudioAsync(job, mensagem);
             return;
@@ -75,4 +75,13 @@ public sealed class ProcessarMidiaWhatsAppJobUseCase(
     /// <summary>Regra única (#1406): áudio com transcritor disponível tem o turno disparado pelo job de mídia.</summary>
     public static bool AguardaTranscricao(Domain.Enums.Atendimento.TipoConteudoMensagem tipo, bool transcritorDisponivel) =>
         tipo == Domain.Enums.Atendimento.TipoConteudoMensagem.Audio && transcritorDisponivel;
+
+    /// <summary>
+    /// #2285: o console mostra <c>ErroMidia</c>. Falha do canal sai na frase estável do <see cref="ClassificadorFalhaEnvio"/>;
+    /// a do storage não leva caminho nem bucket. O texto da exceção fica só no log.
+    /// </summary>
+    private static string MotivoFalhaMidia(Exception ex) =>
+        ex is WhatsAppCloudException or HttpRequestException or TimeoutException or TaskCanceledException
+            ? ClassificadorFalhaEnvio.Motivo(ex)
+            : "Não foi possível guardar o anexo (MIDIA_ERRO).";
 }

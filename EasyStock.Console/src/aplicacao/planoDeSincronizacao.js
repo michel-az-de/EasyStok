@@ -130,3 +130,18 @@ export function alvoDoEvento(evento, dados) {
   if (evento === 'conversa.atualizada' && dados?.conversaId) return { tipo: 'conversa', conversaId: dados.conversaId }
   return null
 }
+
+// #2285: o SSE da operação não repete o que passou enquanto ficou caído (`Last-Event-ID` é ignorado na API).
+// O `ready` que chega depois de uma queda é o aviso de que pode ter faltado evento: aí o laço relê a conversa
+// aberta e varre a inbox, sem esperar o ritmo de sempre. O primeiro `ready` da visita não perdeu nada.
+export function criarRastroDaConexao() {
+  let caiu = false
+  return {
+    aoCair() { caiu = true },
+    aoReady() {
+      const precisaRele = caiu
+      caiu = false
+      return precisaRele
+    },
+  }
+}

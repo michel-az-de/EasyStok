@@ -157,7 +157,7 @@ public static class GeracaoAgenteAtendimento
             var papel = msg.Autor == AutorMensagem.Cliente ? MensagemLlm.Usuario : MensagemLlm.Assistente;
             var texto = msg.Autor switch
             {
-                AutorMensagem.Cliente => TextoDoCliente(msg),
+                AutorMensagem.Cliente => TextoExternoPrompt.Neutralizar(TextoDoCliente(msg)),
                 AutorMensagem.Dona => $"(dona) {msg.Texto}",
                 AutorMensagem.Atendente => $"(equipe) {msg.Texto}",
                 _ => msg.Texto ?? string.Empty
@@ -229,8 +229,10 @@ public static class GeracaoAgenteAtendimento
         sb.AppendLine("Dossiê desta conversa (contexto para você, não para citar):");
         sb.AppendLine($"- Agora: {HorarioBrasil.ConverterParaBrasilia(agora):dd/MM/yyyy HH:mm} (horário de Brasília).");
 
-        var nome = cliente?.Nome is { } n && n != IdentificarClientePorTelefoneUseCase.NomePadraoLead ? n : conversa.ContatoNome;
-        sb.AppendLine($"- Nome: {(string.IsNullOrWhiteSpace(nome) ? "não informado" : nome)}.");
+        // #2280: o nome do perfil é escrito pelo cliente; numa linha só, não abre item novo no dossiê.
+        var nome = TextoExternoPrompt.Linha(
+            cliente?.Nome is { } n && n != IdentificarClientePorTelefoneUseCase.NomePadraoLead ? n : conversa.ContatoNome);
+        sb.AppendLine($"- Nome: {(nome.Length == 0 ? "não informado" : nome)}.");
         sb.AppendLine(cliente is null || cliente.OrderCount == 0
             ? "- Situação: lead (ainda não comprou)."
             : $"- Situação: cliente com {cliente.OrderCount} pedido(s).");
@@ -238,7 +240,7 @@ public static class GeracaoAgenteAtendimento
             ? $"- Pedido vinculado à conversa: {pedidoId}. Consulte consultar_pedido para saber a situação atual; o vínculo não comprova pedido em andamento."
             : "- Pedido em andamento: nenhum registrado nesta conversa.");
         if (conversa.ContextoJson != "{}")
-            sb.AppendLine($"- Contexto salvo: {conversa.ContextoJson}");
+            sb.AppendLine($"- Contexto salvo: {TextoExternoPrompt.Linha(conversa.ContextoJson)}");
         if (!string.IsNullOrWhiteSpace(cliente?.Observacoes))
             sb.AppendLine($"- {interno} Observações do cadastro: {cliente.Observacoes}");
 

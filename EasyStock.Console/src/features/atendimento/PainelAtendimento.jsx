@@ -12,12 +12,10 @@ import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
-import { primeiroNome } from '../../dominio/mensagem'
 import { Pilula } from '../../componentes/Pilula'
 import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
-import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
 import { Composer } from './Composer'
@@ -36,10 +34,10 @@ export function PainelAtendimento({
     selecionada, visiveis, conversas, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi, sincronizacao,
   } = useAtendimento()
   const {
-    enviar, reabrir, definirRascunho, assumirAtendimento, devolverAutomatico,
+    enviar, reabrir, assumirAtendimento, devolverAutomatico,
     selecionar, abrirEncerramento, reenviar, carregarMensagensAnteriores, transferirConversa,
   } = useAcoes()
-  const { janelas, canais } = useCatalogo()
+  const { canais } = useCatalogo()
   const fotoCadastrada = useFotoCliente(selecionada?.cliente?.fotoUrl)
   const { acoes: capacidades } = useAcessoModulos()
   const reabrirLigado = useAcaoDisponivel()('reabrir')
@@ -141,7 +139,7 @@ export function PainelAtendimento({
   const canal = canalDaConversa(canais, selecionada)
   // #2258 (T4): o mesmo nome do cartão, do cabeçalho, da ficha e dos botões "Abrir".
   const apresentacao = apresentacaoDoNome(nomeDaConversa(selecionada), { comanda: selecionada.numeroComanda })
-  const { pode, ofereceModelo, janela, motivo } = permissaoDeEscrita(selecionada, agora, canal)
+  const { pode, janela, motivo } = permissaoDeEscrita(selecionada, agora, canal)
   // Valor CRU, não booleano: a marca PAUSA_POR_ASSUMIR é o que separa "pausado
   // porque você escreveu" de "pausado porque você assumiu". O Boolean() de
   // antes apagava a diferença e a barra dizia a frase errada.
@@ -157,18 +155,11 @@ export function PainelAtendimento({
   // Rodada 11 (registro 92): resposta automática na fila e automático ainda
   // conduzindo. Assumir apaga o "digitando" no mesmo toque.
   const digitando = Boolean(selecionada.respostaPendente?.length) && !pausado && !bloqueada
-  const faixa = faixaDaJanela(janelas, selecionada.pedido?.janela)
   // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
   // #2185 (E19): o modelo aprovado vai para um cliente cadastrado (o EasyStok exige o `clienteId`); sem
   // cadastro o botão abria uma janela com tudo desligado.
   const podeEnviarModelo = fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada && Boolean(selecionada.clienteId)
   const prazo = prazoNoCabecalho(janela)
-
-  const aplicarTemplate = (template) => definirRascunho(
-    selecionada.id,
-    preencherFaixa(template.texto, faixa ?? 'o horário combinado')
-      .replace('{nome}', primeiroNome(selecionada.nome)),
-  )
 
   return (
     <>
@@ -254,7 +245,6 @@ export function PainelAtendimento({
         canal={canal}
         podeEscrever={pode}
         motivo={motivo}
-        ofereceModelo={ofereceModelo}
         // #1577: o texto digitado mora no campo; daqui desce o rascunho global e o carimbo de quem
         // escreveu nele de fora (sugestão, assistente, limpar do envio).
         rascunho={rascunho}
@@ -268,7 +258,6 @@ export function PainelAtendimento({
         modeloAberto={modelosDe === selecionada.id}
         aoAbrirModelos={() => setModelosDe(selecionada.id)}
         aoFecharModelos={() => setModelosDe(null)}
-        aoAplicarTemplate={aplicarTemplate}
         aoAbrirNota={aoAbrirNota}
         notaEmRascunho={notaEmRascunho}
         visivel={visivel && !editorNotaVisivel}
