@@ -24,8 +24,9 @@ public sealed class RecuperarTurnosPerdidosUseCase(
             await fila.EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, new ProcessarTurnoAgenteJob(turno.EmpresaId, turno.ConversaId));
 
         // A contagem mede a frequência da perda: zero em todo deploy diz que a fila durável (opção B) não é necessária.
-        if (pendentes.Count > 0)
-            logger.LogWarning("Turnos do agente recuperados no start: {Quantidade}.", pendentes.Count);
+        // Warning mesmo com zero: produção só grava de Warning para cima, e a linha é uma por start.
+        logger.LogWarning("Turnos do agente recuperados no start: {Quantidade} (janela de {JanelaMinutos} min).",
+            pendentes.Count, janela.TotalMinutes);
         return pendentes.Count;
     }
 }
