@@ -12,12 +12,10 @@ import { fecharMenu, useMenuDetalhes } from '../../hooks/useMenuDetalhes'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
-import { primeiroNome } from '../../dominio/mensagem'
 import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { assistenteAtendendo } from '../../dominio/resumoDoModo'
-import { faixaDaJanela, preencherFaixa } from '../../dominio/entrega'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
 import { Composer } from './Composer'
@@ -36,10 +34,10 @@ export function PainelAtendimento({
     selecionada, visiveis, conversas, agora, automaticoPausado, rascunho, escritaDeFora, fonteApi, sincronizacao,
   } = useAtendimento()
   const {
-    enviar, reabrir, definirRascunho, assumirAtendimento, devolverAutomatico,
+    enviar, reabrir, assumirAtendimento, devolverAutomatico,
     selecionar, abrirEncerramento, reenviar, carregarMensagensAnteriores,
   } = useAcoes()
-  const { janelas, canais } = useCatalogo()
+  const { canais } = useCatalogo()
   const fotoCadastrada = useFotoCliente(selecionada?.cliente?.fotoUrl)
   const { acoes: capacidades } = useAcessoModulos()
   const reabrirLigado = useAcaoDisponivel()('reabrir')
@@ -136,7 +134,7 @@ export function PainelAtendimento({
   const canal = canalDaConversa(canais, selecionada)
   // #2258 (T4): o mesmo nome do cartão, do cabeçalho, da ficha e dos botões "Abrir".
   const apresentacao = apresentacaoDoNome(nomeDaConversa(selecionada), { comanda: selecionada.numeroComanda })
-  const { pode, ofereceModelo, janela, motivo } = permissaoDeEscrita(selecionada, agora, canal)
+  const { pode, janela, motivo } = permissaoDeEscrita(selecionada, agora, canal)
   // Valor CRU, não booleano: a marca PAUSA_POR_ASSUMIR é o que separa "pausado
   // porque você escreveu" de "pausado porque você assumiu". O Boolean() de
   // antes apagava a diferença e a barra dizia a frase errada.
@@ -148,16 +146,9 @@ export function PainelAtendimento({
   // Rodada 11 (registro 92): resposta automática na fila e automático ainda
   // conduzindo. Assumir apaga o "digitando" no mesmo toque.
   const digitando = Boolean(selecionada.respostaPendente?.length) && !pausado && !bloqueada
-  const faixa = faixaDaJanela(janelas, selecionada.pedido?.janela)
   // #1551: modelo aprovado só existe com a API; na demonstração o botão só devolvia erro.
   const podeEnviarModelo = fonteApi && podeReabrir && canal.aceitaModelo && !encerrada && !bloqueada
   const prazo = prazoNoCabecalho(janela)
-
-  const aplicarTemplate = (template) => definirRascunho(
-    selecionada.id,
-    preencherFaixa(template.texto, faixa ?? 'o horário combinado')
-      .replace('{nome}', primeiroNome(selecionada.nome)),
-  )
 
   return (
     <>
@@ -194,7 +185,7 @@ export function PainelAtendimento({
             <div className={css.menuConversa} role="group" aria-label="Ações da conversa">
           {/* #1989: irmãos com a mesma chave (o id da conversa) faziam o React perder a conta e
               deixar um "Link de compra" velho a cada troca de conversa. Cada um tem o seu prefixo. */}
-          {!encerrada && !bloqueada && <CompartilharComanda key={'compartilhar-' + selecionada.id} conversa={selecionada} canalNome={canal.nome} podeEnviar={pode} />}
+          <CompartilharComanda key={'compartilhar-' + selecionada.id} conversa={selecionada} canalNome={canal.nome} podeEnviar={pode} />
           {/* Assumir e devolver ao automático moram na BarraModo, um lugar só.
               Aqui em cima fica o que é estado da conversa: bloqueio, encerrar
               e reabrir. */}
@@ -202,14 +193,12 @@ export function PainelAtendimento({
               resumo (vazia até a F5 construir o conteúdo); com a conversa já
               encerrada, dá lugar ao "Reabrir conversa" que já existia. */}
           {/* #1239: passar a conversa para outra atendente (só no modo API). */}
-          {fonteApi && !encerrada && !bloqueada && <PassarConversa key={'passar-' + selecionada.id} conversa={selecionada} />}
+          {fonteApi && <PassarConversa key={'passar-' + selecionada.id} conversa={selecionada} />}
           {/* #2232 (A4): Devolver ao Assistente veio da faixa "quem responde" para este menu: um menu só. */}
           <DevolverAoAssistente conversa={selecionada} pausado={pausado} bloqueada={bloqueada} aoDevolver={() => devolverAutomatico(selecionada.id)} />
-          {!encerrada && !bloqueada && (
-            <Botao variante="texto" icone="circle-check" className={css.encerrar} aria-label="Concluir conversa" title="Concluir conversa" onClick={() => { fecharMenu(menuConversa.current); abrirEncerramento(selecionada.id) }}>
-              Concluir conversa
-            </Botao>
-          )}
+          <Botao variante="texto" icone="circle-check" className={css.encerrar} onClick={() => { fecharMenu(menuConversa.current); abrirEncerramento(selecionada.id) }}>
+            Concluir conversa
+          </Botao>
             </div>
           </details>}
         </div>
@@ -257,7 +246,6 @@ export function PainelAtendimento({
         canal={canal}
         podeEscrever={pode}
         motivo={motivo}
-        ofereceModelo={ofereceModelo}
         // #1577: o texto digitado mora no campo; daqui desce o rascunho global e o carimbo de quem
         // escreveu nele de fora (sugestão, assistente, limpar do envio).
         rascunho={rascunho}
@@ -270,7 +258,6 @@ export function PainelAtendimento({
         modeloAberto={modelosDe === selecionada.id}
         aoAbrirModelos={() => setModelosDe(selecionada.id)}
         aoFecharModelos={() => setModelosDe(null)}
-        aoAplicarTemplate={aplicarTemplate}
         aoAbrirNota={aoAbrirNota}
         notaEmRascunho={notaEmRascunho}
         visivel={visivel && !editorNotaVisivel}

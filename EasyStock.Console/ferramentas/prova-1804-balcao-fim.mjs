@@ -163,7 +163,7 @@ await confere('#1239 "Passar para…": a conversa vai ao atendente escolhido e a
   resposta = () => new Response(JSON.stringify({ error: { message: 'O usuário não atende conversas nesta empresa.' } }), { status: 422 })
   assert.deepEqual(await api.transferirConversa('c1', 'ze'), { erro: 'O usuário não atende conversas nesta empresa.' })
   assert.deepEqual(atendentesParaPassar([{ usuarioId: 'eu', nome: 'Eu' }, { usuarioId: 'ana', nome: 'Ana' }, { usuarioId: 'bia', nome: 'Bia' }], { usuarioId: 'eu', responsavelId: 'bia' }).map((a) => a.nome), ['Ana'])
-  assert.match(fonte('features/atendimento/PainelAtendimento.jsx'), /\{fonteApi && !encerrada && !bloqueada && <PassarConversa key=\{'passar-' \+ selecionada\.id\} conversa=\{selecionada\} \/>\}/)
+  assert.match(fonte('features/atendimento/PainelAtendimento.jsx'), /\{fonteApi && <PassarConversa key=\{'passar-' \+ selecionada\.id\} conversa=\{selecionada\} \/>\}/)
   assert.match(fonte('features/atendimento/PassarConversa.jsx'), /Passar para…/)
 })
 

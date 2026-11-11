@@ -22,6 +22,7 @@ import { useGravadorAudio } from '../../hooks/useGravadorAudio'
 import { useMenuDetalhes } from '../../hooks/useMenuDetalhes'
 import { BotaoAnexarArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
 import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
+import { avisoDeLimiteDoTexto } from '../../dominio/limiteDoTexto'
 import { SeletorRespostas } from './SeletorRespostas'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
@@ -123,7 +124,7 @@ export function Composer({
   async function enviarComposer() {
     // #1474: {pedido} sem valor sairia literal para o cliente (texto ou legenda); o aviso está
     // acima do campo e o Enviar fica desligado até ela trocar.
-    if (variavelSobrando || assumindoRef.current) return
+    if (variavelSobrando || excedeLimite || assumindoRef.current) return
     // Enter com o campo vazio não manda balão vazio (#1287).
     if (!anexo && !rascunho.trim()) return
     if (!(await assumirSePreciso())) return
@@ -181,6 +182,9 @@ export function Composer({
 
   const temTexto = rascunho.trim().length > 0
   const variavelSobrando = avisoDeVariaveisNaoResolvidas(rascunho)
+  // #2285: a API recusa texto acima do teto; o campo avisa antes e o Enviar espera o texto caber.
+  const limite = avisoDeLimiteDoTexto(rascunho)
+  const excedeLimite = Boolean(limite?.acima)
 
   // O canal manda no que o composer oferece. Botão que o canal não entrega
   // fica desabilitado com o motivo escrito, em vez de mandar e cair calado.
@@ -252,6 +256,7 @@ export function Composer({
 
           {erroAnexo && <p className={css.restricao} role="alert">{erroAnexo}</p>}
           {variavelSobrando && <p className={css.restricao} role="alert">{variavelSobrando}</p>}
+          {limite && <p className={css.restricao} role={limite.acima ? 'alert' : undefined}>{limite.texto}</p>}
           <SugestaoDeTexto
             sugestao={{ complemento: proativa.sugestao?.texto, aceitar: usarProposta, dispensar: proativa.dispensar }}
             rotuloAcao="Usar no rascunho" atalho={null} compacta
@@ -395,7 +400,7 @@ export function Composer({
                   não há anexo em espera (mesmo gesto do WhatsApp): campo vazio
                   não tem o que enviar como texto, mas tem o que gravar. */}
               {temTexto || anexo || !acoes.audio ? (
-                <Tooltip texto={variavelSobrando ?? (temTexto || anexo ? 'Enviar mensagem' : restricao ?? 'Escreva a mensagem para enviar')}
+                <Tooltip texto={variavelSobrando ?? (excedeLimite ? limite.texto : temTexto || anexo ? 'Enviar mensagem' : restricao ?? 'Escreva a mensagem para enviar')}
                   atalho={temTexto || anexo ? 'Enter' : undefined}>
                 <Botao
                   variante="primario"
@@ -403,7 +408,7 @@ export function Composer({
                   aria-label="Enviar mensagem"
                   icone="enviar"
                   aria-keyshortcuts={temTexto || anexo ? 'Enter' : undefined}
-                  disabled={!podeEscrever || assumindo || Boolean(variavelSobrando) || !(temTexto || anexo)}
+                  disabled={!podeEscrever || assumindo || excedeLimite || Boolean(variavelSobrando) || !(temTexto || anexo)}
                   onClick={enviarComposer}
                 >Enviar</Botao>
                 </Tooltip>

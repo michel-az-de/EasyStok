@@ -1,0 +1,2 @@
+### Fixed
+- **Console do atendimento: limite do texto, dispensa por usuário e releitura na reconexão** (#2285): o campo da mensagem avisa quando o texto chega perto do limite da API (4096) e desliga o Enviar acima dele, sem cortar o que foi colado. A dispensa da faixa de não entregues passa a valer por empresa e usuário. Depois de uma queda do SSE, o `ready` relê a conversa aberta e a inbox, já que a API não repete o que passou. Sai código morto do painel da conversa.
