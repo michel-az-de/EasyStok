@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -14,20 +15,53 @@ public static partial class TextoExternoPrompt
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
     private static partial Regex MarcaReservada();
 
-    /// <summary>Troca cada marca reservada por uma citação explícita; o resto do texto fica como veio.</summary>
+    /// <summary>
+    /// Troca cada marca reservada por uma citação explícita. Sem marca, o texto fica como veio. #2285: a busca é feita no
+    /// texto como o modelo o lê (NFKC, sem caractere de formatação), senão "[in\u200Bterno]" ou "［interno］" passariam.
+    /// Com marca, devolve-se essa forma normalizada. Homóglifo de outro alfabeto (o cirílico "о") não é coberto.
+    /// </summary>
     public static string Neutralizar(string? texto)
     {
         if (string.IsNullOrEmpty(texto)) return string.Empty;
+        var lido = ComoOModeloLe(texto);
         try
         {
-            return MarcaReservada().Replace(texto, m =>
+            if (!MarcaReservada().IsMatch(lido)) return texto;
+            return MarcaReservada().Replace(lido, m =>
                 $"(marca \"{(m.Groups[1].Success ? m.Groups[1].Value : m.Groups[3].Value).ToLowerInvariant()}\" citada no texto)");
         }
         catch (RegexMatchTimeoutException)
         {
             // Texto patológico: sem colchete nem parêntese não há marca a forjar.
-            return texto.Replace('[', '(').Replace(']', ')');
+            return lido.Replace('[', '(').Replace(']', ')');
         }
+    }
+
+    /// <summary>Formas de compatibilidade unificadas (NFKC) e sem caractere invisível de formatação (categoria Cf).</summary>
+    private static string ComoOModeloLe(string texto)
+    {
+        var normalizado = SemSurrogateSolto(texto).Normalize(NormalizationForm.FormKC);
+        var sb = new StringBuilder(normalizado.Length);
+        foreach (var c in normalizado)
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.Format)
+                sb.Append(c);
+        return sb.ToString();
+    }
+
+    /// <summary><see cref="string.Normalize()"/> lança com surrogate solto; ele vira U+FFFD.</summary>
+    private static string SemSurrogateSolto(string texto)
+    {
+        if (!texto.Any(char.IsSurrogate)) return texto;
+        var sb = new StringBuilder(texto.Length);
+        for (var i = 0; i < texto.Length; i++)
+        {
+            var c = texto[i];
+            if (char.IsHighSurrogate(c) && i + 1 < texto.Length && char.IsLowSurrogate(texto[i + 1]))
+                sb.Append(c).Append(texto[++i]);
+            else
+                sb.Append(char.IsSurrogate(c) ? '\uFFFD' : c);
+        }
+        return sb.ToString();
     }
 
     /// <summary>Uma linha só: quebra de linha e caractere de controle viram um espaço; as marcas reservadas são neutralizadas.</summary>
