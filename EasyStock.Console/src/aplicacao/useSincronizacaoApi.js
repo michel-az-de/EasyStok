@@ -4,6 +4,7 @@ import { lerAlertasDeEstoque, lerCardapio } from './api/cardapio'
 import { abaVisivel, alvoDoEvento, avisoDoCardapio, deveVarrerAoVoltar } from './planoDeSincronizacao'
 import { criarCicloDeSincronizacao, criarMemoriaDoLaco } from './cicloDeSincronizacao'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
+import { criarEsperaDeReconexao } from './recargaAoVivo'
 
 // Polling da inbox (F01), com releitura dirigida pelos eventos de pedido (S18).
 // A volta está em `cicloDeSincronizacao.js` e o que ela relê em
@@ -57,6 +58,7 @@ export function useSincronizacaoApi({
     let reconexao = null
     let ocultaDesde = null
     let fecharEventos = () => {}
+    const esperaDeReconexao = criarEsperaDeReconexao({ base: INTERVALO_MS })
     const sincronizar = criarCicloDeSincronizacao({
       despachar, comConversas, memoria: memoria ?? criarMemoriaDoLaco(), dono: usuarioId,
       lerSelecionada: () => selecionadaRef.current, lerUsuario: () => usuarioRef.current, estaVivo: () => vivo,
@@ -122,6 +124,7 @@ export function useSincronizacaoApi({
     function conectar() {
       fecharEventos = conectarEventosOperacao({
         aoEvento: ({ evento, dados }) => {
+          if (evento === 'ready') esperaDeReconexao.zerar()
           const alvo = alvoDoEvento(evento, dados)
           if (!vivo || !alvo) return
           // #1966: a volta seguinte (no ritmo de sempre) lê até a página da conversa e traz o nome. O contato
@@ -136,7 +139,7 @@ export function useSincronizacaoApi({
           clearTimeout(esperaPedidos)
           esperaPedidos = setTimeout(() => ciclo(true), AGRUPAR_EVENTOS_MS)
         },
-        aoCair: () => { if (vivo) reconexao = setTimeout(conectar, INTERVALO_MS) },
+        aoCair: () => { if (vivo) reconexao = setTimeout(conectar, esperaDeReconexao.proxima()) },
       })
     }
 

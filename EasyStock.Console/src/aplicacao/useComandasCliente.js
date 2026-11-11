@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { listarComandasCliente, confirmarComandaCliente, salvarComandaCliente, combinarFreteComanda, encaminharEntregaComanda, confirmarPedidoComanda } from '../infra/api/comandasClienteApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
+import { criarEsperaDeReconexao } from './recargaAoVivo'
 export { idDaJanela, janelaDoId } from '../infra/api/comandaApi'
+
+const RECONECTAR_COMANDAS_MS = 5000
 
 export function useComandasCliente(conversaId, ativo) {
   const [dados, setDados] = useState([])
@@ -19,6 +22,7 @@ export function useComandasCliente(conversaId, ativo) {
     let novamente = false
     let fechar = null
     let reconectar = null
+    const esperaDeReconexao = criarEsperaDeReconexao({ base: RECONECTAR_COMANDAS_MS })
     async function carregar() {
       if (lendo) { novamente = true; return }
       lendo = true
@@ -28,8 +32,9 @@ export function useComandasCliente(conversaId, ativo) {
     }
     function conectar() {
       fechar = conectarEventosOperacao({ aoEvento: evento => {
+        if (evento.evento === 'ready') esperaDeReconexao.zerar()
         if (evento.evento === 'ready' || evento.evento?.startsWith('conversa.') || evento.evento?.startsWith('pedido.')) carregar()
-      }, aoCair: () => { if (vivo) reconectar = setTimeout(conectar, 5000) } })
+      }, aoCair: () => { if (vivo) reconectar = setTimeout(conectar, esperaDeReconexao.proxima()) } })
     }
     carregar(); conectar()
     const intervalo = setInterval(carregar, 15000)
