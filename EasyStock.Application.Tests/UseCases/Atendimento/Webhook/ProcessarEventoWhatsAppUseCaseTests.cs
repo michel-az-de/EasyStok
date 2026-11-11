@@ -302,7 +302,9 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
         await _webhookRecebidoRepository.Received(1).MarcarProcessadoAsync(
             Arg.Any<Guid>(), sucesso: true, Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await _eventPublisher.Received(1).PublicarAsync("conversa.mensagem_recebida", _empresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+        // O catch dos efeitos engole a exceção do publicador; só o token recebido prova que ele não veio cancelado.
+        await _eventPublisher.Received(1).PublicarAsync("conversa.mensagem_recebida", _empresaId, Arg.Any<object>(),
+            Arg.Is<CancellationToken>(t => !t.IsCancellationRequested));
     }
 
     [Fact]
