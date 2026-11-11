@@ -77,7 +77,8 @@ public static class GeracaoAgenteAtendimento
             RespostaLlm resposta;
             try
             {
-                resposta = await llm.EnviarAsync(new RequisicaoLlm(system, [.. mensagens], definicoes), ct);
+                resposta = await EnviarComUmaNovaTentativaAsync(
+                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes), contexto.Conversa.Id, logger, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -113,6 +114,28 @@ public static class GeracaoAgenteAtendimento
 
         return new GeracaoAgente(null, tokens, false, null);
     }
+
+    /// <summary>
+    /// #2285: um blip do LLM (reset de conexão, 5xx, timeout) não manda a conversa para a dona: 1 nova tentativa da mesma
+    /// chamada. Só a chamada ao LLM se repete: a ferramenta que o turno já executou não roda de novo, porque o laço segue
+    /// adiante a partir da resposta e não de volta. O desligamento (<paramref name="ct"/> cancelado) sobe sem tentar.
+    /// </summary>
+    private static async Task<RespostaLlm> EnviarComUmaNovaTentativaAsync(
+        IAgenteLlmClient llm, RequisicaoLlm requisicao, Guid conversaId, ILogger logger, CancellationToken ct)
+    {
+        try
+        {
+            return await llm.EnviarAsync(requisicao, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Agente de atendimento: a chamada ao LLM falhou na conversa {ConversaId}; tenta de novo uma vez.", conversaId);
+            await Task.Delay(EsperaAntesDaNovaTentativa, ct);
+            return await llm.EnviarAsync(requisicao, ct);
+        }
+    }
+
+    private static readonly TimeSpan EsperaAntesDaNovaTentativa = TimeSpan.FromMilliseconds(300);
 
     private static async Task<BlocoResultadoFerramentaLlm> ExecutarFerramentaAsync(
         IReadOnlyDictionary<string, IFerramentaAgente> ferramentas, ContextoTurnoAgente contexto,
