@@ -5,7 +5,6 @@ import { Botao } from '../../componentes/Botao'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
-import { AvatarAssistente } from '../../componentes/AvatarAssistente'
 import { Vazio } from '../../componentes/Vazio'
 import { useEscape } from '../../hooks/useEscape'
 import { CELULAR, useTamanhoTela } from '../../hooks/useTamanhoTela'
@@ -275,8 +274,10 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
       aria-controls={aberto ? painelId : undefined}
       onClick={() => aberto ? fechar() : setAberto(true)}
     >
-      <AvatarAssistente tamanho={cabecalhoDoAtendimento ? 28 : 36} decorativo />
-      {cabecalhoDoAtendimento && <span className={css.rotuloGatilho}>Assistente</span>}
+      {/* #2232 (L4): a ilustração de uma pessoa lia como "falar com alguém"; o ícone de assistente com a
+          palavra diz o que o botão é. Nome acessível segue em `aria-label`. */}
+      <Icone nome="agente" tamanho={cabecalhoDoAtendimento ? 20 : 26} />
+      <span className={css.rotuloGatilho}>Assistente</span>
       {!aberto && pedeAtencao && <span className={css.pontoAtencao} aria-hidden="true" />}
     </Botao>
   )
@@ -291,7 +292,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
           <div className={css.colunaPainel}>
           <div className={`${css.cabecalho} ${solto ? css.cabecalhoArrastavel : ''}`} onPointerDown={aoDescerNoCabecalho}>
             <div className={css.identidade}>
-              <h2 id={tituloId}><AvatarAssistente tamanho={28} decorativo /> Assistente</h2>
+              <h2 id={tituloId}><Icone nome="agente" tamanho={20} /> Assistente</h2>
               {selecionada && <p className={css.clienteDoPainel}>{selecionada.nome}</p>}
             </div>
             {!celular && (

@@ -256,7 +256,6 @@ export function Sininho({ comRotulo = false }) {
     finally { conclusao.current = false; setConcluindo(false) }
   }
 
-  const rotuloBadge = contagem > 9 ? '9+' : String(contagem)
   const rotuloSino = contagem > 0 ? `Lembretes, ${contagem} ${contagem === 1 ? 'novo' : 'novos'}` : 'Lembretes'
 
   return (
@@ -276,7 +275,8 @@ export function Sininho({ comRotulo = false }) {
             quem clicava em "Avisos" abrir Lembretes. */}
         <Icone nome="relogio" tamanho={24} />
         {comRotulo && <span>Lembretes</span>}
-        {contagem > 0 && <Pilula contagem={rotuloBadge} tom="perigo" className={css.badge} aria-hidden="true" />}
+        {/* #2232 (L2) + #2185 (R04): o contador unico do app e a Pilula contagem; `data-contador-sino` leva o posicionamento do trilho. */}
+        {contagem > 0 && <Pilula contagem={contagem > 9 ? '9+' : contagem} tom="perigo" className={css.badge} data-contador-sino aria-hidden="true" />}
       </Botao>
 
       {aberto && (

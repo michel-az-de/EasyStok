@@ -25,6 +25,14 @@
   border-radius: var(--r-1); padding: var(--e-2) var(--e-3); min-height: var(--toque);
 }
 .item:hover:not(.informativo) { background: var(--preenchimento-forte); }
+/* #2232 (M1): opção ativa de um grupo de escolha única (tema): fundo de seleção e marca visível,
+   além do `aria-checked`. A marca, que é de seleção, é a única cor de marca do menu. */
+.item { position: relative; }
+.item.ativo, .item.ativo:hover { background: var(--marca-claro); color: var(--marca-forte); }
+.ativo { padding-right: var(--e-6); }
+.marca { position: absolute; right: var(--e-3); top: 50%; transform: translateY(-50%); }
+/* Itens do grupo lado a lado (o par Claro e Escuro numa linha só). */
+.linha { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-1); }
 .informativo { cursor: default; }
 .item strong { display: block; font-size: var(--t-apoio); font-weight: 600; }
 .item span { display: block; font-size: var(--t-micro); color: var(--tinta-2); margin-top: var(--e-0); }
@@ -40,6 +48,8 @@
   max-height: min(70dvh, 560px);
   transform-origin: top right;
 }
+/* #2258 (T1): gatilho na coluna da esquerda; a camada cresce para a direita. */
+.alinharEsquerda { left: 0; right: auto; transform-origin: top left; }
 /* Na tela estreita o gatilho pode estar em qualquer canto da barra, então a
    camada vira folha presa embaixo, sempre inteira e sempre no alcance do dedo. */
 @media (max-width: 759px) {
@@ -53,5 +63,14 @@
        `.popover`) segue como rede de segurança para o dia em que a lista
        crescer mais do que isso couber. */
     max-height: min(calc(100dvh - 96px), 640px);
+  }
+  /* #2232 (M4): folha inferior de largura cheia, colada na borda; o conteúdo cabe sem rolar (o
+     `overflow-y` herdado do `.popover` fica só como rede de segurança). */
+  .folha {
+    left: 0; right: 0; bottom: 0; width: auto;
+    padding-bottom: calc(var(--e-2) + env(safe-area-inset-bottom, 0px));
+    border-top: var(--b-1) solid var(--linha); box-shadow: var(--sombra-alta);
+    max-height: calc(100dvh - 96px);
+    transform-origin: bottom center;
   }
 }

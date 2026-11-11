@@ -24,6 +24,12 @@ public static class ConfigurationKeys
     /// </summary>
     public const string AuthSessoesRevogaveis   = "Auth:SessoesRevogaveis";
 
+    /// <summary>
+    /// #2184: anuncia ao APK, em <c>GET api/auth/google/config</c>, que a API aceita o login Google nativo (<c>dispositivoId</c>).
+    /// Padrão <c>false</c> quando a chave não existe; o <c>appsettings.json</c> liga e <c>Auth__SessaoNativaHabilitada=false</c> desliga.
+    /// </summary>
+    public const string AuthSessaoNativaHabilitada = "Auth:SessaoNativaHabilitada";
+
     // ── CORS ─────────────────────────────────────────────────────────────────
     public const string CorsAllowedOrigins      = "Cors:AllowedOrigins";
 

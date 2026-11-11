@@ -47,6 +47,8 @@ const hooks = {
     atual.efeitos.push(() => { antes?.limpar?.(); atual.valores[i].limpar = fn() })
   },
 }
+// #2258 (auditoria C1): a aba Itens do cardápio escuta `hashchange` (link da home); o Node não tem `window`.
+globalThis.window ??= { location: { hash: '' }, addEventListener() {}, removeEventListener() {} }
 const g = globalThis.__prova1809 = { hooks, catalogo: { cardapio: [] }, gestao: null, acesso: { acoes: { editarCardapio: true, editarProducao: true }, permite: () => true } }
 const DE_FORA = 'globalThis.__prova1809'
 const inline = (source) => ({ format: 'module', shortCircuit: true, source })
@@ -201,11 +203,11 @@ await confere('cardápio: categoria combina com a disponibilidade e com a busca'
 await confere('cardápio: cada contagem aplica os outros recortes; as categorias não somem do lugar', async () => {
   const { contagensDoCardapio } = await import('../src/dominio/filtroDoCardapio.js')
   const emMassas = contagensDoCardapio(ITENS, { categoria: 'Massas' })
-  assert.deepEqual(emMassas.filtros, { todos: 2, hoje: 1, fora: 1, 'sem-foto': 1 })
+  assert.deepEqual(emMassas.filtros, { todos: 2, hoje: 1, fora: 1, 'sem-foto': 1, pendencia: 0 }) // #2258 (auditoria C1): o filtro "Com pendência" entrou na contagem
   assert.deepEqual(emMassas.categorias, [{ nome: 'Massas', total: 2 }, { nome: 'Molhos', total: 1 }, { nome: 'Sobremesas', total: 1 }])
   assert.equal(emMassas.todas, 5)
   const hoje = contagensDoCardapio(ITENS, { filtro: 'hoje' })
-  assert.deepEqual(hoje.filtros, { todos: 5, hoje: 3, fora: 2, 'sem-foto': 3 })
+  assert.deepEqual(hoje.filtros, { todos: 5, hoje: 3, fora: 2, 'sem-foto': 3, pendencia: 0 })
   assert.deepEqual(hoje.categorias.map((c) => c.total), [1, 1, 1])
   assert.equal(hoje.todas, 3)
   const pudim = contagensDoCardapio(ITENS, { filtro: 'sem-foto', busca: 'pudim' })
@@ -327,7 +329,7 @@ await confere('Itens do cardápio: categoria, disponibilidade e busca combinam; 
   const t = abrirCardapio()
   escolherCategoria(t, 'Massas')
   assert.deepEqual(pratosNaTela(t), ['Lasanha', 'Talharim'])
-  assert.deepEqual(chips(t, 'Filtrar pratos').map(([r]) => r), ['Todos 2', 'Disponíveis hoje 1', 'Fora de hoje 1', 'Sem foto 1'])
+  assert.deepEqual(chips(t, 'Filtrar pratos').map(([r]) => r), ['Todos 2', 'Disponíveis hoje 1', 'Fora de hoje 1', 'Sem foto 1', 'Com pendência 0']) // #2258 (auditoria C1): chip novo
   tocarChip(t, 'Filtrar pratos', 'Disponíveis hoje')
   assert.deepEqual(pratosNaTela(t), ['Lasanha'])
   assert.equal(categoriaNaTela(t).props.value, 'Massas', 'o filtro ativo permanece visível no seletor')

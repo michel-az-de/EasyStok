@@ -100,7 +100,15 @@
   border: 0; border-radius: var(--r-1);
   background: var(--papel); color: var(--tinta); font-size: var(--t-corpo); font-family: inherit;
 }
-.controleComErro { border-width: var(--b-2); border-color: var(--erro); }
+/* #2258 (T12): o campo com erro continua visível; `border: 0` acima anulava a borda. */
+.controleComErro { background: var(--preenchimento); box-shadow: inset 0 0 0 var(--b-2) var(--erro); }
+.botaoIconeEdicao {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--toque); height: var(--toque); flex-shrink: 0;
+  background: none; border: 0; color: var(--tinta-2);
+}
+/* #2258 (T18): no rodapé do modal o "Salvar cadastro" é a ação principal e fecha a fileira, à direita. */
+.acaoSalvar { margin-left: auto; justify-self: end; }
 .erroEmLinha { margin: var(--e-1) 0 0; color: var(--erro); font-size: var(--t-apoio); }
 .salvandoEmLinha { display: block; margin: var(--e-1) 0 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 
@@ -118,7 +126,12 @@
 }
 .chipRestricao { border-color: var(--alerta); color: var(--tinta); background: var(--alerta-pastel); }
 .chipTexto { background: none; border: 0; padding: var(--e-1) 0; font: inherit; color: inherit; min-width: var(--toque); min-height: var(--toque); overflow-wrap: anywhere; text-align: left; }
-.chipRemover { color: var(--tinta-3); }
+.chipRemover {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--toque); height: var(--toque); flex: none; margin: 0; border-radius: var(--r-pilula);
+  background: none; border: 0; color: var(--tinta-3);
+}
+.chipRemover:hover { background: var(--preenchimento-forte); color: var(--tinta); }
 .chipEdicao {
   min-height: var(--toque); min-width: 96px; max-width: 100%; padding: 0 var(--e-3);
   border-radius: var(--r-pilula); border: var(--b-2) solid var(--marca);
@@ -216,7 +229,7 @@
    (base.css) corta o realce; o selo continua. */
 .seloCaptado {
   display: inline-flex; align-items: center; gap: 3px; margin-left: var(--e-1);
-  padding: 1px 7px; border-radius: var(--r-1); vertical-align: middle;
+  padding: 1px 7px; border-radius: var(--r-pilula); vertical-align: middle;
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5; white-space: nowrap;
   color: var(--sucesso); background: var(--sucesso-pastel);
 }
@@ -232,7 +245,7 @@
    "sem sujar a UX atual"), mesmo tom pastel do selo captado acima. */
 .seloPontos {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px;
-  border-radius: var(--r-1); font-size: var(--t-micro); font-weight: 600;
+  border-radius: var(--r-pilula); font-size: var(--t-micro); font-weight: 600;
   color: var(--marca); background: var(--marca-claro);
 }
 .linhaFidelidade {
@@ -262,7 +275,7 @@
   background: var(--info-pastel); border-radius: var(--r-2);
 }
 .seloInformado {
-  justify-self: start; padding: 1px 8px; border-radius: var(--r-1);
+  justify-self: start; padding: 1px 8px; border-radius: var(--r-pilula);
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5;
   color: var(--info); background: var(--elevado);
 }

@@ -214,6 +214,8 @@ Com o plano aprovado e versionado, as PRs das ondas 1 a 3 viram "spec de plano a
 | 5 | #1766 (6 itens de 13/10) | **aceitar todos dentro da Onda 2** | decidir item a item |
 | 6 | Completar com Tab | **manter, com chave de desligar e aviso de privacidade** | fundir com o rascunho só sob demanda |
 
+Decidido pelo Felipe em 11/11/2026 (#2185): enviar numa conversa atendida por colega assume a conversa sem pedir confirmação e sem avisar o colega. Só o botão Assumir pede confirmação. O servidor também não barra (`EnviarMensagemConsoleUseCase` chama `Assumir` em todo envio humano).
+
 ## 10. Sprint transversal de linguagem e controles (#2140)
 
 Pedido do Felipe em 28/10/2026: revisar a harmonia do sistema inteiro com banca e contrabanca, tomando Produtos e Pedidos do piloto PWA como referência. Esta execução não encerra as ondas anteriores nem substitui seus aceites.

@@ -296,12 +296,16 @@ await confere('D "no fim" tem folga de um balão curto', () => {
 await confere('D o fio usa a regra: nada de rolar a cada mensagem', () => {
   const thread = fonte('features/atendimento/Thread.jsx')
   assert.ok(!thread.includes('scrollIntoView'), 'Thread ainda rola direto')
-  // #2185 (F31): o painel escondido (aba do celular) avisa o hook com `visivel`.
+  // #2185 (F31) e #2232 (A5): o hook recebe `visivel` (painel escondido na aba do celular). A regra segue no hook: o fio não rola por mensagem.
   assert.match(thread, /useRolagemDoFio\(fim, \{ mensagens, chaveRolagem, digitando, totalDeNotas: notas\.length, visivel \}\)/)
   const hook = fonte('features/atendimento/useRolagemDoFio.js')
   assert.match(hook, /if \(deveRolarParaOFim\(anterior\.current, depois, noFim\.current\)\) \{\s*fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
-  // Uma rolagem pela regra e outra (#2185 F31) quando o painel escondido reaparece com a leitura no fim.
-  assert.equal(hook.split('scrollIntoView').length - 1, 2)
+  // Os outros caminhos que rolam, e nenhum é "a cada mensagem": quem estava no fim e o painel escondido reaparece (#2185 F31),
+  // o painel que acabou de ficar visível (#2232 A5) e o toque de quem pediu "Novas mensagens".
+  assert.match(hook, /if \(visivel && noFim\.current\) fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
+  assert.match(hook, /if \(deveRolarAoFicarVisivel\(eraVisivel\.current, visivel\)\) \{\s*fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
+  assert.match(hook, /const irParaNovas = useCallback\(\(\) => \{\s*fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
+  assert.equal(hook.split('scrollIntoView').length - 1, 4, 'o hook rola em mais de quatro lugares')
   assert.match(hook, /area\.addEventListener\('scroll', medir, \{ passive: true \}\)/)
 })
 

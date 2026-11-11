@@ -13,6 +13,8 @@ namespace EasyStock.Api.Controllers;
 public class AtendimentoAvisosController(
     ObterAvisosOperacaoUseCase obter,
     SalvarAvisosOperacaoUseCase salvar,
+    ListarInscricoesAvisosEquipeUseCase listarEquipe,
+    SalvarInscricaoAvisosEquipeUseCase salvarEquipe,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Get the store's operation alerts (Admin only)",
@@ -37,7 +39,35 @@ public class AtendimentoAvisosController(
             return DataBadRequest(ex);
         }
     }
+
+    [SwaggerOperation(Summary = "List who receives the team alerts on WhatsApp (Admin only)",
+        Description = "#2211: a equipe ativa da loja e os três avisos da equipe de cada pessoa. Sem telefone confirmado nada chega.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpGet("equipe")]
+    public async Task<IActionResult> GetEquipe(CancellationToken ct) =>
+        DataOk(await listarEquipe.ExecuteAsync(currentUser.EmpresaId, ct));
+
+    [SwaggerOperation(Summary = "Save which team alerts a person receives on WhatsApp (Admin only)",
+        Description = "#2211: grava os três de uma vez. Pessoa fora da equipe ativa da loja devolve 400.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPut("equipe/{usuarioId:guid}")]
+    public async Task<IActionResult> PutEquipe(Guid usuarioId, [FromBody] InscricaoAvisosEquipeBody body, CancellationToken ct)
+    {
+        try
+        {
+            return DataOk(await salvarEquipe.ExecuteAsync(
+                currentUser.EmpresaId, usuarioId, body.Atencao, body.Pedido, body.Pagamento, ct));
+        }
+        catch (UseCaseValidationException ex)
+        {
+            return DataBadRequest(ex);
+        }
+    }
 }
+
+/// <summary>#2211: os três avisos da equipe de uma pessoa.</summary>
+public sealed record InscricaoAvisosEquipeBody(bool Atencao, bool Pedido, bool Pagamento);
 
 public sealed record AvisosOperacaoBody(
     bool ClienteSemResposta = true,
@@ -50,7 +80,10 @@ public sealed record AvisosOperacaoBody(
     int EstoqueVencendoDias = AvisosOperacao.EstoqueVencendoPadrao,
     int EstoqueParadoDias = AvisosOperacao.EstoqueParadoPadrao,
     bool ReclamacaoCliente = true,
-    bool SuspeitaAtendimento = true)
+    bool SuspeitaAtendimento = true,
+    bool EquipeAtencao = true,
+    bool EquipePedido = true,
+    bool EquipePagamento = true)
 {
     public AvisosOperacao ParaDominio() => new()
     {
@@ -65,5 +98,8 @@ public sealed record AvisosOperacaoBody(
         EstoqueParadoDias = EstoqueParadoDias,
         ReclamacaoCliente = ReclamacaoCliente,
         SuspeitaAtendimento = SuspeitaAtendimento,
+        EquipeAtencao = EquipeAtencao,
+        EquipePedido = EquipePedido,
+        EquipePagamento = EquipePagamento,
     };
 }

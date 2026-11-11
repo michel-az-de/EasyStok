@@ -108,5 +108,15 @@ public enum TipoEventoNotificacao
     PagamentoSemAvisoAoCliente = 90,
 
     /// <summary>#2096: aviso da operação para dona e gerente (encomenda, estoque, IA do atendimento). Interno.</summary>
-    AlertaOperacao = 91
+    AlertaOperacao = 91,
+
+    // #2211: avisos da equipe sobre o atendimento, pelo WhatsApp da loja, para quem a dona inscreveu. Internos.
+    /// <summary>O atendimento automático passou a conversa para uma pessoa (dúvida, limite, falha ou pedido do cliente).</summary>
+    AvisoEquipeAtencaoAtendimento = 92,
+
+    /// <summary>Pedido pago com o canhoto de produção anexado (modelo de anexo <c>canhoto</c>).</summary>
+    AvisoEquipePedidoComCanhoto = 93,
+
+    /// <summary>Pagamento do pedido recusado, expirado, estornado ou estorno automático que falhou.</summary>
+    AvisoEquipeProblemaPagamento = 94
 }

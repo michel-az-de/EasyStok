@@ -45,4 +45,7 @@ public interface IRowLevelSecurityBypass
     /// restaura o valor anterior (composavel se aninhado).
     /// </summary>
     IDisposable Begin();
+
+    /// <summary>Também aplica e restaura o estado em conexão já aberta. Deve abranger o commit das escritas diferidas.</summary>
+    ValueTask<IAsyncDisposable> BeginAsync(CancellationToken ct = default);
 }

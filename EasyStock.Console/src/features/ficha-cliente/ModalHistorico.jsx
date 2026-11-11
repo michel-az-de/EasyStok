@@ -11,7 +11,7 @@ import { ehLead } from '../../dominio/conversa'
 import { enviosAutomaticos } from '../../dominio/automacao'
 import { diasEntre, quandoRelativo, resumoFinanceiro } from '../../dominio/cliente'
 import { FUSO, diaMesHora, moeda } from '../../dominio/formato'
-import { rotuloDoEstado } from '../../dominio/pedido'
+import { pedidoEncerrado, rotuloDoEstado, totalDaComanda } from '../../dominio/pedido'
 import { numeroParaEntregador, textoDoEntregador } from '../../dominio/despacho'
 import css from './cliente.module.css'
 
@@ -30,11 +30,22 @@ function AvaliacaoCliente({ avaliacao }) {
   return <span className={css.avaliacaoVazia}>Sem avaliação</span>
 }
 
-function AbaPedidos({ historico, pedidosAnteriores }) {
+// #2258 (T20): a ficha dizia "Nenhum pedido ainda" com a Comanda 6 de R$ 495,00 aberta na conversa. Comanda
+// com itens e sem encerrar conta como aberta; o total só aparece quando o servidor o calculou (`totalApi`).
+function comandaAberta(conversa) {
+  const pedido = conversa.pedido
+  if (!pedido || pedido.itens.length === 0 || pedidoEncerrado(pedido)) return null
+  // #2258 (T20, banca): sem `totalApi`, o total calculado das linhas.
+  return { total: typeof pedido.totalApi === 'number' ? pedido.totalApi : totalDaComanda(pedido) }
+}
+
+const textoDaComandaAberta = (aberta) => `1 comanda aberta${aberta.total == null ? '' : ` · ${moeda(aberta.total)}`}`
+
+function AbaPedidos({ historico, pedidosAnteriores, aberta }) {
   if (historico.length === 0) {
     return (
-      <Vazio titulo="Nenhum pedido ainda">
-        {pedidosAnteriores > 0
+      <Vazio titulo={aberta ? textoDaComandaAberta(aberta) : 'Nenhum pedido ainda'}>
+        {aberta ? 'Ela entra no histórico quando o pedido for concluído.' : pedidosAnteriores > 0
           ? `${pedidosAnteriores} ${pedidosAnteriores === 1 ? 'pedido anterior' : 'pedidos anteriores'}, sem detalhe salvo neste protótipo.`
           : 'Primeira vez na casa.'}
       </Vazio>
@@ -216,12 +227,13 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido 
   const lead = ehLead(conversa)
   const financeiro = resumoFinanceiro(historico)
   const automaticas = enviosAutomaticos(conversa.mensagens)
+  const aberta = comandaAberta(conversa)
 
   const conteudo = (
     <>
       {lead ? (
         <p className={css.faixaLead}>
-          Contato desde {quandoRelativo(diasEntre(conversa.mensagens[0]?.em ?? agora, agora))} · nenhum pedido
+          Contato {quandoRelativo(diasEntre(conversa.mensagens[0]?.em ?? agora, agora))} · {aberta ? textoDaComandaAberta(aberta) : 'nenhum pedido'}
         </p>
       ) : (
         <div className={css.faixaNumeros}>
@@ -247,7 +259,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido 
       />
 
       <div role="tabpanel" id={`${id}-painel`} aria-labelledby={`${id}-aba-${aba}`} tabIndex={0} className={css.painelAba}>
-        {aba === 'pedidos' && <AbaPedidos historico={historico} pedidosAnteriores={cliente.pedidos} />}
+        {aba === 'pedidos' && <AbaPedidos historico={historico} pedidosAnteriores={cliente.pedidos} aberta={aberta} />}
         {aba === 'atendimentos' && (
           <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />
         )}

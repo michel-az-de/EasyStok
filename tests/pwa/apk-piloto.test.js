@@ -171,19 +171,70 @@ module.exports = function ({ test, runInSandbox, assert }) {
     assert.strictEqual(result.blank, null);
   });
 
-  test('#2063 impressoras: seleção preserva as duas e Oasis permanece indisponível para envio', () => {
+  test('#2063 #2193 impressoras: seleção preserva as duas e a Oasis salva como pendente vira TSPL pronta', () => {
     const result = run(`
       const keys=['cdb-printer','cdb-printers']; const old=keys.map(k=>localStorage.getItem(k));
       try {
         keys.forEach(k=>localStorage.removeItem(k));
         setSavedPrinter({name:'Atual',address:'A',profile:'escpos'});
         setSavedPrinter({name:'Oasis',address:'B',profile:'oasis-pending'});
-        const pending = !printerReady(getSavedPrinter());
+        const oasis = getSavedPrinter();
         setSavedPrinter(getPrinterProfiles().find(p=>p.address==='A'));
-        return JSON.stringify({total:getPrinterProfiles().length,pending,selected:getSavedPrinter().address});
+        return JSON.stringify({total:getPrinterProfiles().length,ready:printerReady(oasis),profile:oasis.profile,selected:getSavedPrinter().address});
       } finally { keys.forEach((k,i)=>old[i]===null?localStorage.removeItem(k):localStorage.setItem(k,old[i])); }
     `);
-    assert.deepStrictEqual(result,{total:2,pending:true,selected:'A'});
+    assert.deepStrictEqual(result,{total:2,ready:true,profile:'tspl',selected:'A'});
+  });
+
+  test('#2193 impressoras: perfil detectado pelo nome, escolha manual respeitada', () => {
+    const result = run(`
+      const n = name => normalizarImpressora({name,address:'X',profile:'escpos'}).profile;
+      return JSON.stringify({
+        oasis:n('OIA-8381-B'), oasis2:n('Oasis Label'), mtp:n('MTP-II_DC53'), wtp:n('WTP05'), xp:n('XP-420B'), vazio:n(''),
+        manual:normalizarImpressora({name:'OIA-8381-B',address:'X',profile:'escpos',perfilManual:true}).profile,
+        desconhecido:normalizarImpressora({name:'Qualquer',address:'X',profile:'zpl'}).profile,
+        sem:printerReady({name:'Sem endereço',profile:'tspl'}),
+        desc:descreverPerfil({name:'OIA',address:'X',profile:'tspl',etiqueta:{larguraMm:100,alturaMm:50}}),
+        cont:descreverPerfil({name:'OIA',address:'X',profile:'tspl',etiqueta:{continuo:true}}),
+        esc:descreverPerfil({name:'MTP-II',address:'X'})
+      });
+    `);
+    assert.deepStrictEqual(result, { oasis:'tspl', oasis2:'tspl', mtp:'escpos', wtp:'escpos', xp:'tspl', vazio:'escpos',
+      manual:'escpos', desconhecido:'escpos', sem:false, desc:'TSPL 100 x 50 mm', cont:'TSPL bobina contínua', esc:'ESC/POS 58 mm' });
+  });
+
+  test('#2193 impressoras: aviso do seletor usa a classificação do plugin nativo', () => {
+    const result = run(`
+      return JSON.stringify({
+        le:avisoDispositivo({supported:false},'MTP-II'),
+        semSpp:avisoDispositivo({spp:false,supported:true},'MTP-II_DC53'),
+        tspl:avisoDispositivo({printerClass:true,spp:true,supported:true},'OIA-8381-B'),
+        antigo:avisoDispositivo({},'WTP05')
+      });
+    `);
+    assert.match(result.le, /Bluetooth LE/);
+    assert.match(result.semSpp, /^ESC\/POS · sem serviço serial/);
+    assert.strictEqual(result.tspl, 'TSPL · impressora');
+    assert.strictEqual(result.antigo, 'ESC/POS');
+  });
+
+  test('#2193 teste de impressão na Oasis envia TSPL, não ESC/POS', () => {
+    const result = run(`
+      const old={print:printViaBluetooth,printer:getSavedPrinter,tspl:window.cdbTspl};
+      let enviado=null, recebido=null;
+      try {
+        getSavedPrinter=()=>({name:'OIA-8381-B',address:'C',profile:'tspl',etiqueta:{larguraMm:80,alturaMm:40}});
+        window.cdbTspl=Object.assign({},old.tspl,{
+          linhasParaCanvas:(t,l)=>({titulo:t,linhas:l}),
+          paraEtiqueta:(c,cfg)=>{recebido={c,cfg};return new Uint8Array([84,83,80,76]);}
+        });
+        printViaBluetooth=b=>{enviado=Array.from(b);};
+        testPrint();
+        return JSON.stringify({enviado,titulo:recebido.c.titulo,linhas:recebido.c.linhas.length,larg:recebido.cfg.larguraMm,alt:recebido.cfg.alturaMm,copias:recebido.cfg.copias});
+      } finally { printViaBluetooth=old.print; getSavedPrinter=old.printer; window.cdbTspl=old.tspl; }
+    `);
+    // 80 x 40 sem midia era o padrão silencioso do master: vira rolo contínuo (#2202, D1).
+    assert.deepStrictEqual(result, { enviado:[84,83,80,76], titulo:'TESTE', linhas:3, larg:80, alt:0, copias:1 });
   });
 
   test('#2063 impressão: log usa lote e impressora capturados, somente após envio; falha e teste não registram etiqueta', () => {
@@ -207,14 +258,14 @@ module.exports = function ({ test, runInSandbox, assert }) {
         const count=loadAuditLog().filter(e=>e.action==='etiqueta.print').length;
         localStorage.setItem('cdb-printer',JSON.stringify({name:'Oasis',address:'C',profile:'oasis-pending'}));
         const prior=disconnected; printViaBluetooth(new Uint8Array([4]),null,job);
-        return JSON.stringify({before,count,id:logged.entityId,printer:logged.diff.printer.address,copies:logged.diff.copies,address,blocked:disconnected===prior});
+        return JSON.stringify({before,count,id:logged.entityId,printer:logged.diff.printer.address,copies:logged.diff.copies,address,oasisEnviou:disconnected>prior});
       } finally {
         releasePrinting(); window.bluetoothSerial=old.bs; ensureBluetoothPermission=old.permission; showError=old.error;
         if(old.printer===null)localStorage.removeItem('cdb-printer');else localStorage.setItem('cdb-printer',old.printer);
         if(old.logs===null)localStorage.removeItem(AUDIT_LOG_KEY);else localStorage.setItem(AUDIT_LOG_KEY,old.logs);
       }
     `);
-    assert.deepStrictEqual(result,{before:0,count:1,id:'lote-real',printer:'A',copies:2,address:'B',blocked:true});
+    assert.deepStrictEqual(result,{before:0,count:1,id:'lote-real',printer:'A',copies:2,address:'C',oasisEnviou:true});
   });
 
   test('#2063 piloto: pedido salvo abre cobrança; PWA normal conserva a ação manual', () => {

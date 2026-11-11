@@ -3,6 +3,7 @@ import { atualizarTokens, empresaDoToken, gravarSessao, identidadeDaSessao, lerS
 import { esquecerRascunhos } from './rascunhosDaSessao'
 import { esquecerVisitas } from './visitaDaSessao'
 import { prepararPushParaSessao } from '../pushNavegador'
+import { sairSessaoNativa, temSessaoNativa } from '../sessaoNativa'
 
 // Casa da Baba (M0.2): a API resolve a empresa ativa; nunca escolhemos uma no navegador.
 export async function entrar(email, senha) {
@@ -10,7 +11,7 @@ export async function entrar(email, senha) {
     metodo: 'POST', corpo: { email, senha, empresaId: null }, autenticado: false,
   })
   const empresaId = empresaDoToken(dados.token)
-  if (!empresaId) throw new Error('Este usuário precisa de uma empresa ativa única para entrar na Casa da Baba. Peça à responsável para conferir o acesso.')
+  if (!empresaId) throw new Error('Este usuário precisa de uma empresa ativa única para entrar na Casa da Babá. Peça à responsável para conferir o acesso.')
   return abrirSessao(dados, { id: empresaId, nome: null })
 }
 
@@ -35,17 +36,30 @@ export async function entrarComGoogle(idToken) {
   return abrirSessao(dados, empresaId ? { id: empresaId, nome: null } : null)
 }
 
-async function abrirSessao(dados, empresa) {
+// #2201: código de acesso de uso único, gerado pela responsável. A sessão fica guardada no aparelho.
+export async function entrarComChave(chave) {
+  const dados = await chamarApi('/api/auth/chave-acesso', {
+    metodo: 'POST', corpo: { chave: String(chave ?? '').trim() }, autenticado: false,
+  })
+  const empresaId = empresaDoToken(dados.token)
+  if (!empresaId) throw new Error('Este código não abriu uma empresa. Peça um novo à responsável.')
+  return abrirSessao(dados, { id: empresaId, nome: null }, { dispositivo: true })
+}
+
+async function abrirSessao(dados, empresa, extra = {}) {
   await prepararPushParaSessao(identidadeDaSessao({ usuario: dados.usuario, empresa }))
-  return gravarSessao(atualizarTokens({ usuario: dados.usuario, empresa }, dados))
+  return gravarSessao(atualizarTokens({ usuario: dados.usuario, empresa, ...extra }, dados))
 }
 
 // Sair é decisão dela: os rascunhos guardados para depois do novo login vão junto.
 export function sair() {
   const sessao = lerSessao()
+  // Cancela restaurações em voo antes de liberar a tela para outra pessoa.
+  const saidaNativa = temSessaoNativa() ? sairSessaoNativa() : null
   limparSessao()
   esquecerRascunhos()
   esquecerVisitas()
+  if (saidaNativa) return saidaNativa
   return sessao?.refreshToken
     ? chamarApi('/api/auth/logout', { metodo: 'POST', corpo: { refreshToken: sessao.refreshToken }, autenticado: false, sinal: AbortSignal.timeout(15000) })
     : Promise.resolve()

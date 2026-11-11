@@ -1,12 +1,10 @@
 import { useTema } from '../hooks/useTema'
 import { Botao } from './Botao'
 import { Icone } from './Icone'
+import { OPCOES_DE_TEMA } from './contaDoMenu'
 import css from './InterruptorTema.module.css'
 
-const OPCOES = [
-  { valor: 'light', rotulo: 'Claro', icone: 'sun' },
-  { valor: 'dark', rotulo: 'Escuro', icone: 'moon' },
-]
+const OPCOES = OPCOES_DE_TEMA
 
 export function InterruptorTema({ vertical = false }) {
   const [tema, trocarTema] = useTema()

@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { lerCaixaDoHub, lerCardapioDoHub, lerInboxDoHub, lerPedidosDoHub } from '../infra/api/hubApi'
+import { obterVencidos } from '../infra/api/producaoApi'
 import { combinarSinais } from '../infra/api/sinais'
 
-export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro, cardapio = false }) {
+// #2258 (P1): a Produção é medida pelos lotes vencidos; sem essa leitura o cartão não afirma nada.
+const lerProducaoDoHub = async () => ({ vencidos: (await obterVencidos()) ?? [] })
+
+export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro, cardapio = false, producao = false }) {
   const [fontes, setFontes] = useState({})
   const [tentativa, setTentativa] = useState(0)
   useEffect(() => {
@@ -10,7 +14,7 @@ export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro, cardap
     let encerrado = false
     let lendo = false
     let controle
-    const leitores = [atendimento && ['atendimento', lerInboxDoHub], pedidos && ['pedidos', lerPedidosDoHub], financeiro && ['financeiro', lerCaixaDoHub], cardapio && ['cardapio', lerCardapioDoHub]].filter(Boolean)
+    const leitores = [atendimento && ['atendimento', lerInboxDoHub], pedidos && ['pedidos', lerPedidosDoHub], financeiro && ['financeiro', lerCaixaDoHub], cardapio && ['cardapio', lerCardapioDoHub], producao && ['producao', lerProducaoDoHub]].filter(Boolean)
     const atualizar = async () => {
       if (encerrado || lendo || document.visibilityState === 'hidden') return
       lendo = true
@@ -39,6 +43,6 @@ export function usePulsoDoHall({ ativo, atendimento, pedidos, financeiro, cardap
       window.removeEventListener('focus', aoVoltar)
       document.removeEventListener('visibilitychange', aoVoltar)
     }
-  }, [ativo, atendimento, pedidos, financeiro, cardapio, tentativa])
+  }, [ativo, atendimento, pedidos, financeiro, cardapio, producao, tentativa])
   return { fontes, atualizar: () => setTentativa((valor) => valor + 1) }
 }

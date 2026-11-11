@@ -13,8 +13,10 @@ namespace EasyStock.Api.Mobile.Services;
 public class SyncReversePullService(
     EasyStockDbContext db,
     IConfiguration config,
-    ILogger<SyncReversePullService> log)
+    ILogger<SyncReversePullService> log,
+    NumeroCurtoDosLotesMobile numerosCurtos)
 {
+    private readonly NumeroCurtoDosLotesMobile _numerosCurtos = numerosCurtos;
     private readonly EasyStockDbContext _db = db;
     private readonly IConfiguration _config = config;
     private readonly ILogger<SyncReversePullService> _log = log;
@@ -129,6 +131,9 @@ public class SyncReversePullService(
                 && (l.MobileBatchId == null || l.MobileBatchId == ""));
         if (lojaId.HasValue) lotesQ = lotesQ.Where(l => l.LojaId == lojaId || l.LojaId == null);
         var lotes = await lotesQ.ToListAsync();
+        // #2209: o lote web anterior ao #2199, sem número curto, ganha um aqui.
+        var semNumero = lotes.Where(l => l.NumeroCurto is null).Select(l => l.Id).ToList();
+        var numerosDados = await _numerosCurtos.DosLotesAsync(empresaId, semNumero, CancellationToken.None);
         foreach (var l in lotes)
         {
             var items = l.Itens.Select(it => new BatchItemDto(
@@ -148,7 +153,8 @@ public class SyncReversePullService(
                 Items: items,
                 BatchPhoto: null,
                 CreatedAt: new DateTimeOffset(l.DataProducao).ToUnixTimeMilliseconds(),
-                Lote: l.Codigo);
+                Lote: l.Codigo,
+                NumeroCurto: l.NumeroCurto ?? numerosDados.GetValueOrDefault(l.Id));
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                 "batch.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(l.AlteradoEm).ToUnixTimeMilliseconds()));
         }

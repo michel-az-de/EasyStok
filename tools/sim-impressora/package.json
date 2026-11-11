@@ -1,0 +1,15 @@
+{
+  "name": "sim-impressora",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Simulador de impressora térmica (TSPL e ESC/POS) para o gate 4 da impressão v2 (#2197).",
+  "scripts": {
+    "matriz": "node matriz.js",
+    "prancha": "node prancha.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "0.1.65",
+    "@zxing/library": "0.21.3",
+    "jsqr": "1.4.0"
+  }
+}

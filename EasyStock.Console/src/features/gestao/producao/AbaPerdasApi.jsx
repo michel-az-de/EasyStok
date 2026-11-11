@@ -6,7 +6,7 @@ import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { usePerdasApi } from '../../../aplicacao/usePerdasApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { MOTIVOS_PERDA, perdasSemCusto, semCusto, textoDaPerda } from '../../../aplicacao/perdas'
+import { detalheDoVencido, MOTIVOS_PERDA, perdasSemCusto, semCusto, textoDaPerda } from '../../../aplicacao/perdas'
 import { moeda } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
 import producao from './producao.module.css'
@@ -66,10 +66,15 @@ export function AbaPerdasApi() {
       </p>}
       {/* #2081 (E11): a ação principal fica no topo, do tamanho do texto, como "Lançamento" no Caixa. */}
       <div className={css.topo}>
-        <p className={css.descricao}>
-          O que se perdeu e por quê. A baixa segue a validade dos lotes e considera o custo de cada lote. Acima de {moeda(50)} quem
-          lança é o Gerente. Ajuste de contagem não é perda e não entra aqui.
-        </p>
+        {/* #2235 (banca B1): uma linha de resumo; as regras da loja ficam em "Saiba mais". */}
+        <div className={css.resumo}>
+          <p className={css.descricao}>O que se perdeu e por quê.</p>
+          <details className={css.saibaMais}>
+            <summary>Saiba mais</summary>
+            A baixa segue a validade dos lotes e considera o custo de cada lote. Acima de {moeda(50)} quem
+            lança é o Gerente. Ajuste de contagem não é perda e não entra aqui.
+          </details>
+        </div>
         <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { gestao.fecharAviso(); setLancamentoAberto(true) }}>Lançar perda</Botao>
       </div>
       {gestao.aviso && <p className={css.aviso} role="alert">{gestao.aviso} <Botao variante="texto" onClick={gestao.fecharAviso}>Fechar</Botao></p>}
@@ -83,17 +88,17 @@ export function AbaPerdasApi() {
               <li key={v.itemEstoqueId} className={css.linha}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{v.nome}</span>
-                  <span className={css.detalhe}>{v.lote ?? 'sem lote'} · {qtd(v.quantidade)} · venceu há {v.diasVencido} {v.diasVencido === 1 ? 'dia' : 'dias'} · {moeda(v.valor)}</span>
+                  <span className={css.detalhe}>{detalheDoVencido(v)}</span>
                 </div>
                 <div className={css.acoes}>
                   {confirmando === `vencido:${v.itemEstoqueId}` ? (
                     <>
                       <span className={css.descricao}>Lançar o lote inteiro como perda por vencimento?</span>
-                      <Botao variante="secundario" disabled={enviando} onClick={() => confirmar(() => gestao.lancarVencido(v))}>Registrar perda</Botao>
+                      <Botao variante="perigo" icone="lixeira" disabled={enviando} onClick={() => confirmar(() => gestao.lancarVencido(v))}>Registrar perda</Botao>
                       <Botao variante="texto" disabled={enviando} onClick={() => setConfirmando(null)}>Manter lote</Botao>
                     </>
                   ) : (
-                    <Botao variante="texto" disabled={enviando} aria-label={`Registrar perda de todo o lote ${v.lote ?? ''} de ${v.nome}`} onClick={() => setConfirmando(`vencido:${v.itemEstoqueId}`)}>Registrar perda do lote</Botao>
+                    <Botao variante="secundario" icone="lixeira" disabled={enviando} aria-label={`Registrar perda do lote ${v.lote ?? ''} de ${v.nome}`} onClick={() => setConfirmando(`vencido:${v.itemEstoqueId}`)}>Registrar perda do lote</Botao>
                   )}
                 </div>
               </li>
@@ -138,6 +143,10 @@ export function AbaPerdasApi() {
         {/* #2081 (A5/E7): o total perdido é o número da tela; perda sem custo não entra como R$ 0,00. */}
         <dl className={`${css.resumoOperacao} ${producao.resumoDasPerdas}`} aria-label="Total do período">
           <div><dt>Perdido no período</dt><dd>{moeda(resumo?.valor ?? 0)}</dd></div>
+          {/* #2235 (banca B6): o total ao lado do que ainda espera baixa, para o zero não parecer "nada perdido". */}
+          {gestao.vencidos.length > 0 && (
+            <div className={css.resumoAtencao}><dt>{gestao.vencidos.length === 1 ? 'lote vencido sem baixa' : 'lotes vencidos sem baixa'}</dt><dd>{gestao.vencidos.length}</dd></div>
+          )}
           {semCustoNoPeriodo > 0 && (
             <div><dt>{semCustoNoPeriodo === 1 ? 'perda sem custo cadastrado, fora do total' : 'perdas sem custo cadastrado, fora do total'}</dt><dd>{semCustoNoPeriodo}</dd></div>
           )}

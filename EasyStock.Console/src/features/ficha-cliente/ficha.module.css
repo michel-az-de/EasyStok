@@ -112,9 +112,10 @@
 .marcaEstorno { color: var(--erro); font-weight: 600; }
 .motivoDesabilitado { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
-/* Ação: botão primário largo e o gatilho do menu ⋯ ao lado (secao 5, item 3). */
+/* Ação: botão primário largo (secao 5, item 3). O menu da Ficha é o MenuDeAcoes do cabeçalho (#2232, F7). */
 .linhaAcao { display: flex; gap: var(--e-2); align-items: flex-end; }
 .botoesPrimarios { flex: 1; display: grid; gap: var(--e-2); }
+.comMenu { position: relative; display: inline-flex; flex-shrink: 0; }
 
 /* Confirmação em linha, no lugar do botão, nunca em modal (secao 4). Mesmo
    par pergunta/ação em toda ação destrutiva: voltar etapa, cancelar pedido,
@@ -138,6 +139,8 @@
 
 .tags { display: flex; gap: var(--e-3); flex-wrap: wrap; margin-top: var(--e-3); }
 .rodapeBloco { margin: var(--e-3) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
+/* #2232 (F6): a pergunta da baixa com o valor, em tinta cheia sobre o formulário. */
+.perguntaDaBaixa { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); font-variant-numeric: tabular-nums; }
 .corpoBloco { margin: 0 0 var(--e-3); font-size: var(--t-apoio); color: var(--tinta-2); }
 .enderecoCapturado { margin: 0 0 var(--e-1); font-size: var(--t-apoio); }
 
@@ -145,8 +148,8 @@
 .cabecalhoFicha { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: var(--altura-regiao); padding: var(--e-2) var(--e-4); flex-shrink: 0; }
 .cabecalhoFicha h2 { margin: 0; font-size: var(--t-titulo); font-weight: 700; }
 .ferramentasFicha { display: flex; align-items: center; }
-.iconeFicha { width: var(--toque); height: var(--toque); padding: 0; }
-.iconeFicha[aria-busy='true'] { cursor: progress; color: var(--tinta-3); }
+/* #2232 (F1, F7): o menu "Ações da ficha" do cabeçalho, com texto à vista. */
+.gatilhoAcoes { min-height: var(--toque); padding-inline: var(--e-3); gap: var(--e-1); }
 .pdfDaFicha { display: inline-flex; position: relative; }
 .erroPdf { position: absolute; top: 100%; right: 0; z-index: 20; width: min(280px, 80vw); padding: var(--e-3); background: var(--erro-pastel); color: var(--erro); font-size: var(--t-micro); }
 .notasDaFicha { padding-inline: var(--e-4); }
@@ -446,7 +449,7 @@
   border: var(--b-1) solid var(--linha-media);
 }
 .passoMarca {
-  width: 16px; height: 16px; border-radius: var(--r-circulo); display: grid; place-items: center;
+  width: 16px; height: 16px; border-radius: var(--r-pilula); display: grid; place-items: center;
   border: var(--b-1) solid var(--linha-forte);
 }
 .capturaPassos .passoFeito { color: var(--sucesso); border-color: transparent; background: var(--sucesso-pastel); }
@@ -482,15 +485,37 @@
 .identidadeCliente { display: flex; align-items: center; gap: var(--e-3); min-width: 0; }
 .dadosIdentidadeCliente { display: grid; gap: var(--e-1); min-width: 0; }
 .nomeClienteInline { font-size: var(--t-forte); font-weight: 700; overflow-wrap: anywhere; }
-.enderecoClienteInline { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: 1.5; overflow-wrap: anywhere; }
+.contatoClienteInline, .enderecoClienteInline { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: 1.5; overflow-wrap: anywhere; }
+.notasCliente { display: grid; gap: var(--e-2); }
+/* #2232 (F2): endereço com ícone de local e as duas ações; as ações descem para a linha de baixo quando falta largura. */
+.enderecoCliente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); color: var(--tinta-2); }
+.enderecoCliente > svg { flex: none; }
+.enderecoCliente .enderecoClienteInline { flex: 1 1 12ch; min-width: 0; font-size: var(--t-apoio); }
+.acoesEndereco { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-3); }
+.abrirNoMapa {
+  display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding-inline: var(--e-2);
+  color: var(--marca); font-size: var(--t-apoio); font-weight: 600; text-decoration: underline; text-underline-offset: 2px;
+}
+.abrirNoMapa:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+.retornoEndereco { flex-basis: 100%; min-height: 0; color: var(--sucesso); font-size: var(--t-apoio); font-weight: 600; }
+.retornoEndereco:empty { display: none; }
+.notaCliente { margin: 0; padding: var(--e-3); background: var(--alerta-pastel); color: var(--tinta); border-radius: var(--r-1); font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6; overflow-wrap: anywhere; }
+.notaCliente small { display: block; font-family: var(--f-corpo); color: var(--tinta-2); font-size: var(--t-micro); }
 .cartaoClienteAbrir { all: unset; display: grid; text-align: left; gap: var(--e-1); cursor: pointer; border-radius: var(--r-1); }
 .cartaoClienteAbrir:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
 .resumoIa { display: block; margin: 0; color: var(--tinta); line-height: 1.45; }
 .numerosCliente { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .tagsCliente { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1); }
-.tagsCliente li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 2px var(--e-2); border-radius: var(--r-1); background: var(--preenchimento); font-size: var(--t-apoio); }
+.tagsCliente li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 2px var(--e-2); border-radius: var(--r-pilula); background: var(--preenchimento); font-size: var(--t-apoio); }
 .tagsCliente li.tagRestricao { display: flex; align-items: center; gap: var(--e-1); background: var(--alerta-pastel); color: var(--alerta); }
 .tagRestricao svg { flex: none; }
+.postitResumo {
+  margin: 0; padding: var(--e-2) var(--e-3); background: var(--alerta-pastel); color: var(--tinta);
+  font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6;
+  border-left: 0; border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.rotuloPostit { display: block; color: var(--alerta); font-weight: 600; font-size: var(--t-apoio); }
 .extrato { margin-bottom: var(--e-4); }
 .extrato h3 { margin: 0 0 var(--e-2); font-size: var(--t-forte); }
 .extrato dl { margin: 0; display: grid; gap: var(--e-1); }

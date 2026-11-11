@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { AssuntoEmail } from '../../componentes/AssuntoEmail'
+import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { Avatar } from '../../componentes/Avatar'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
@@ -11,41 +12,25 @@ import { contextoDaLinha, estadoDaLinha, pendentesDaLinha } from '../../dominio/
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { estadoDaJanela } from '../../dominio/janela'
 import { inicioDoPedidoAtivo } from '../../dominio/entrega'
-import { duracao, horaMono } from '../../dominio/formato'
+import { horaMono } from '../../dominio/formato'
+import { horaDaLista } from '../../dominio/horaDaLista'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
-import { marcaDoPedido, mostraEtiquetaDoEstado, nomeDoCartao, origemNoCartao, temLinhaDeContexto } from './apresentacaoDoCartao'
-
-// Rótulo e ícone do motivo de precisar, por `chave` (dominio/automatico.js).
-// A direção 19 (seção 1) pede um texto de linha diferente do `rotulo` que o
-// domínio usa em outro lugar ("Precisa de você" é o nome do filtro, não do
-// estado de quem passou para ela): a apresentação mora aqui, o domínio
-// continua falando só com quem já falava com ele.
-const APRESENTACAO_DO_MOTIVO = {
-  reclamacao: { texto: 'Reclamação', icone: 'message-square-warning' },
-  passagem: { texto: 'Passou para você', icone: 'hand' },
-  esperando: { texto: 'Esperando você', icone: 'relogio' },
-  cobranca: { texto: 'Cobrança venceu', icone: 'dollar-sign' },
-  // #1474 (R12): o cliente escreveu fora do horário; "Loja abriu" parecia aviso da loja.
-  'aguardando-abertura': { texto: 'Escreveu com a loja fechada', icone: 'relogio' },
-  // Rodada 10, itens 3 e 4: pedido atrasado (ainda na cozinha) e entrega
-  // atrasada (já em rota) ganham marca própria, mesmo padrão das outras.
-  'pedido-atrasado': { texto: 'Pedido atrasado', icone: 'cooking-pot' },
-  'atraso-entrega': { texto: 'Entrega atrasada', icone: 'moto' },
-}
+import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto } from './apresentacaoDoCartao'
 
 // DEN-06: cobrança vencida repete o aviso do pedido e do lembrete de
 // pagamento em outro lugar da tela, então não pede o vermelho de alarme aqui
 // dentro: vira estado neutro, com o rótulo escrito.
 function motivoDaLinha(motivo, origem) {
   if (!motivo) return null
-  const apresentacao = motivo.chave === 'passagem' && origem === 'chat-site'
-    ? { texto: 'Aguardando equipe', icone: 'relogio' } : APRESENTACAO_DO_MOTIVO[motivo.chave]
+  // #2258 (T6): rótulo de até 18 caracteres; a frase inteira segue no `title` (estado.titulo).
+  const resumido = motivoResumido(motivo.chave, origem)
   return {
     ...motivo,
     tom: motivo.chave === 'cobranca' ? 'neutro' : motivo.tom,
-    rotulo: apresentacao?.texto ?? motivo.rotulo,
-    icone: apresentacao?.icone ?? null,
+    rotulo: resumido?.texto ?? motivo.rotulo,
+    icone: resumido?.icone ?? null,
+    texto: motivo.texto ?? resumido?.titulo ?? null,
   }
 }
 
@@ -81,7 +66,8 @@ export const CartaoConversa = memo(function CartaoConversa({
   const nomeCombinaBusca = busca?.trim() && conversa.nome.toLowerCase().includes(busca.trim().toLowerCase())
   const tagAchada = busca?.trim() && !nomeCombinaBusca ? tagCorrespondida(conversa, busca) : null
   const contexto = contextoDaLinha({
-    origem: origem?.curto ?? null,
+    // #2232 (L9): no cartão vai o chip curto do motivo; a frase inteira fica na conversa.
+    origem: origem?.chip ?? null,
     pedido: grupo ? null : marcaDoPedido(conversa, cardapio, { fonteApi }),
     entregaAte: inicioPedido != null ? horaMono(inicioPedido) : null,
     janelaFechada,
@@ -96,12 +82,18 @@ export const CartaoConversa = memo(function CartaoConversa({
   // Com você também saem da etiqueta (quem conduz está na BarraModo).
   const nome = nomeDoCartao(conversa)
   const etiqueta = mostraEtiquetaDoEstado(estado)
+  // #2232 (L8): "21:48", "ontem", "26 out"; o alerta de cor fica só para o prazo estourado.
+  const hora = horaDaLista(conversa.ultimaEm, agora)
 
   return (
     <button
       type="button"
       className={classesDoCartao(css, { motivo, slaEstourado })}
       aria-current={selecionada}
+      aria-label={rotuloDoCartao({
+        nome: nome.titulo, estado: estado.texto, pendentes, contexto: contexto.map((item) => item.texto),
+        atrasada: slaEstourado, pagamentoNaoVisto, hora, selecionada,
+      })}
       onClick={() => aoAbrir(conversa.id)}
     >
       <span className={css.avatarCartao}>
@@ -114,17 +106,28 @@ export const CartaoConversa = memo(function CartaoConversa({
       </span>
       <span className={css.corpo}>
         <span className={css.topo}>
-          <strong className={pendentes > 0 ? css.semResposta : ''} title={nome.titulo}>
-            {nome.principal}{nome.complemento && <small aria-label={nome.complemento}> · {nome.complemento.replace(/^Comanda /, '#')}</small>}
+          <strong className={pendentes > 0 ? css.semResposta : ''}>
+            <NomeDoContato
+              completo={nome.principal} curto={nome.curto} capsula={nome.capsula} titulo={nome.titulo}
+              complemento={nome.complemento && <small aria-label={nome.complemento}> · {nome.complemento.replace(/^Comanda /, '#')}</small>}
+            />
           </strong>
-          {!etiqueta && <span className="sr">, {estado.texto}</span>}
-          {selecionada && <span className="sr">, conversa aberta</span>}
-          {slaEstourado && <span className="sr">, prazo de resposta estourado</span>}
-          {pagamentoNaoVisto && (
-            <span className={css.pontoNaoVisto} title="Pagamento novo, ainda não visto" aria-label="Pagamento novo, ainda não visto" />
+          {/* #2258 (T7): a cor da borda não é o único sinal; o prazo estourado e a vez da equipe têm ícone e texto. */}
+          {slaEstourado && (
+            <span className={css.sinalPrazo} title="Prazo de resposta estourado" role="img" aria-label="Prazo de resposta estourado">
+              <Icone nome="relogio" tamanho={16} />
+            </span>
           )}
-          <time dateTime={conversa.ultimaEm} className={pendentes > 0 ? css.horaNova : ''}>
-            {duracao(agora - new Date(conversa.ultimaEm).getTime())}
+          {!slaEstourado && motivo && !etiqueta && (
+            <span className={`${css.sinalPrazo} ${css.sinalAtencao}`} title={estado.texto} role="img" aria-label={estado.texto}>
+              <Icone nome={estado.icone ?? 'hand'} tamanho={16} />
+            </span>
+          )}
+          {pagamentoNaoVisto && (
+            <span className={css.pontoNaoVisto} title="Pagamento novo, ainda não visto" />
+          )}
+          <time dateTime={conversa.ultimaEm} className={slaEstourado ? css.horaAtrasada : ''}>
+            {hora}
           </time>
         </span>
         {/* #1432: assunto do e-mail, só no canal E-mail (nos outros não desenha nada). */}

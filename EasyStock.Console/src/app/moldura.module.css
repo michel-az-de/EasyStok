@@ -26,14 +26,24 @@
 /* Grupo de controles com prioridade. margin-left:auto empurra pro fim do
    topo, sempre à direita, sem precisar de um irmão espaçador antes dele. */
 .controles { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin-left: auto; }
-
-/* Estado da loja: um toque, Aberta ou Fechada, sempre visível no topo
-   (pedido do dono, 24/09/2026). Botão sem casca própria, a Pilula já dá cor
-   e texto; só precisa de área de toque e cursor de botão. */
+/* Estado da loja: um toque, sempre visível no topo (pedido do dono, 24/09/2026).
+   #2232 (L1): "Loja aberta"/"Loja fechada" por escrito, com o ponto de estado. A cor do ponto
+   acompanha o texto, nunca o substitui. Botão sem casca própria; área de toque de --toque. */
 .controleLoja {
-  display: inline-flex; min-height: var(--toque); padding: 0;
-  border: 0; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); padding: 0 var(--e-2);
+  border: 0; background: none; cursor: pointer; color: var(--tinta); font: inherit;
+  font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto);
 }
+.lojaPonto { flex-shrink: 0; width: var(--ponto); height: var(--ponto); background: var(--tinta-3); }
+.topoAberta .lojaPonto { background: var(--sucesso); }
+.topoFechada .lojaPonto { background: var(--erro); }
+.lojaTexto { white-space: nowrap; }
+
+/* Automáticas (#2232, L3): o estado vem escrito. Desktop: "Automáticas · ligadas" numa linha.
+   Celular (regra mais abaixo): "Auto" sobre "ligadas", em duas linhas curtas. */
+.autoTexto { display: inline-flex; align-items: baseline; gap: var(--e-1); }
+.autoEstado { font-weight: 400; color: var(--tinta-2); }
+.autoEstado::before { content: '·'; margin-right: var(--e-1); }
 
 /* Palco: nas três colunas, os painéis flutuam sobre o fundo com raio de
    painel e sombra curta; o vão entre eles é a própria alça de largura. */
@@ -93,7 +103,7 @@
 /* Tablet: a ficha vira gaveta sobre o atendimento, deslizando da direita. */
 .gaveta.gaveta {
   position: fixed; inset: auto; margin: 0; padding: 0; z-index: 110;
-  max-height: calc(100dvh - 16px); max-width: calc(100vw - 16px); border: 0; border-radius: 0;
+  max-height: calc(100dvh - 16px); max-width: calc(100vw - 16px); border: 0; border-radius: var(--r-3);
   display: flex; flex-direction: column; background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-alta);
 }
 .gaveta.gaveta[open] { animation: gavetaEntra var(--dur-media) var(--ease-saida) both; }
@@ -168,7 +178,7 @@
   }
 @media (max-width: 759px) {
   .controles > button { font-size: 0; gap: 6px; padding: 0 10px; }
-    /* O aviso do aparelho fica no sino sem alargar o cabeçalho e empurrar Mais para fora. */
+  /* O aviso do aparelho fica no sino sem alargar o cabeçalho e empurrar Mais para fora. */
   .controles > button:has([data-aparelho-desligado]) { position: relative; }
   .controles > button > [data-aparelho-desligado] { position: absolute; top: 6px; right: 6px; margin-left: 0; }
 }
@@ -218,23 +228,16 @@
 .lojaAberta:hover:not(:disabled) { color: var(--sucesso); background: var(--sucesso-pastel); filter: brightness(.97); }
 .lojaFechada:hover:not(:disabled) { color: var(--erro); background: var(--erro-pastel); filter: brightness(.97); }
 
-/* Integração: no celular o controle da loja troca o texto longo pelo curto, sob o ícone, para a linha
-   de cima caber em 390 px; o nome acessível segue inteiro no `aria-label`.
-   #2135: o alvo tem 44 x 44 px (eram 32 x 44, só o ícone) e a palavra aparece. Abaixo de 390 px não
-   sobra largura para ela: fica o ícone, no mesmo alvo, com a dica no `title`. */
-.lojaTextoCurto { display: none; }
+/* Celular (#2232, L1 e L3): o texto da loja e o estado das automáticas quebram em duas linhas curtas
+   ("Loja" sobre "aberta"; "Auto" sobre "ligadas") para a linha de cima caber em 390 px com o "Mais"
+   dentro da tela. O alvo de toque segue com --toque de altura. */
 @media (max-width: 759px) {
-  .controleLoja { min-width: var(--toque); }
-  .controleLoja > span {
-    flex-direction: column; justify-content: center; gap: 0; padding: 0 var(--e-1); min-width: var(--toque);
-    border-radius: var(--r-1); font-size: var(--t-micro);
-  }
-  .controleLoja svg { width: 20px; height: 20px; }
-  .lojaTextoLongo { display: none; }
-  .lojaTextoCurto { display: block; }
-}
-@media (min-width: 375px) and (max-width: 389px) {
-  .lojaTextoCurto { display: none; }
+  .controleLoja { gap: var(--e-1); padding: 0 var(--e-1); font-size: var(--t-micro); }
+  .lojaTexto { width: min-content; white-space: normal; }
+  .automaticas > svg { display: none; }
+  .autoTexto { display: grid; justify-items: start; gap: 0; line-height: var(--lh-compacto); }
+  .autoEstado::before { content: none; }
+  .autoEstado { font-size: var(--t-micro); }
 }
 
 /* #2185 (R04): o número é a `Pilula contagem`; aqui só o lugar dele sobre o ícone do trilho. */

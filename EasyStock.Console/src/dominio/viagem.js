@@ -176,7 +176,8 @@ export function ordenarEntregas(entregas, modo, { janelas, agora, constantes, vi
   const comChave = entregas.map((conversa) => {
     const grupo = conversa.pedido.viagem ? viagensPorId.get(conversa.pedido.viagem.id) : null
     const passo = proximoPassoDeEntrega(conversa, grupo, janelas, agora, constantes)
-    const minutos = passo ? Math.round((passo.quandoMs - agora) / 60000) : Number.POSITIVE_INFINITY
+    // #2236: sem marco (pedido sem janela) conta como sem prazo; o null virava 0 (1970) e subia ao topo.
+    const minutos = passo?.quandoMs != null ? Math.round((passo.quandoMs - agora) / 60000) : Number.POSITIVE_INFINITY
     const bairro = partesDoEndereco(conversa.cliente?.endereco).bairro || 'Sem bairro'
     return { conversa, minutos, bairro }
   })

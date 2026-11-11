@@ -60,9 +60,9 @@ confere('1  o Sair mora no menu do avatar: trilho do Balcão, trilho dos módulo
 })
 confere('1  com o trilho à vista a barra do módulo não repete Sair nem os links do trilho; sem ele, o Sair fica na barra', () => {
   const css = fonte('features/hall/moldura.module.css')
-  assert.match(css, /@media \(min-width: 1101px\) \{\s*\.barra \.sair, \.contexto > a\.voltar \{ display: none; \}/)
+  assert.match(css, /@media \(min-width: 1101px\) \{\s*\.barra \.contaNaBarra, \.contexto > a\.voltar \{ display: none; \}/) // #2258 (auditoria A9): a conta da barra substitui o Sair solto
   assert.match(css, /@media \(max-width: 1100px\) \{\s*\.lateral > \.trilho \{ display: none; \}/)
-  assert.match(fonte('features/hall/MolduraDoModulo.jsx'), /\{aoSair && <Botao className=\{css\.sair\}/)
+  assert.match(fonte('features/hall/MolduraDoModulo.jsx'), /<div className=\{css\.contaNaBarra\}>\s*<MenuDaConta/)
 })
 confere('1  o tema do trilho do Balcão vai para o menu da conta (em 1280x720 o trilho passava de 720 px)', () => {
   const moldura = fonte('app/Moldura.jsx')
@@ -78,12 +78,12 @@ confere('2  módulo com tela de operação mostra as telas na barra e esconde o 
   const moldura = fonte('features/hall/MolduraDoModulo.jsx')
   assert.match(moldura, /const telasNaBarra = telas\.length > 1 && telas\.some\(\(t\) => t\.tipo === TELA_OPERACAO\)/)
   assert.match(moldura, /<nav className=\{css\.telasNaBarra\} aria-label=\{`Telas de \$\{modulo\.nome\}`\} ref=\{abasRef\}>/)
-  assert.equal((moldura.match(/semMenu=\{telasNaBarra\}/g) ?? []).length, 2, 'lateral e menu do tablet')
+  assert.equal((moldura.match(/semMenu=\{semMenu\}/g) ?? []).length, 2, 'lateral e menu do tablet')
   assert.match(fonte('features/hall/MenuDosModulos.jsx'), /\{!semMenu && <nav className=\{css\.menu\}/)
 })
 confere('2  Entregas: o título fica para o leitor de tela e a aba não repete o nome do módulo', () => {
   assert.match(fonte('features/entregas/TelaEntregasApi.jsx'), /<h1 className="sr">\{agenda \? 'Agenda de encomendas' : 'Entregas'\}<\/h1>/)
-  assert.match(fonte('features/entregas/ConteudoEntregasApi.jsx'), /const ABAS = \[\['hoje', 'Do dia'\],/)
+  assert.match(fonte('features/entregas/ConteudoEntregasApi.jsx'), /const ABAS = \[\['hoje', 'Painel do dia'\],/) // #2258 (auditoria E1): "Do dia" virou "Painel do dia" (nome único em Entregas)
 })
 
 // --- 3. Trilho e escala ------------------------------------------------------------------------
@@ -158,6 +158,8 @@ confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no 
   const css = fonte('features/atendimento/atendimento.module.css')
   assert.doesNotMatch(css, /\.modoTexto\s*\{[^}]*text-overflow:\s*ellipsis/)
   assert.doesNotMatch(css, /maisAcoesModo|listaAcoesModo/)
+  // #2232 (A4): o foco visível do item do menu ⋮ da conversa vale no MenuDeAcoes, o único menu de ações.
+  assert.match(fonte('componentes/MenuDeAcoes.module.css'), /\.item:focus-visible\s*\{[^}]*outline: 2px solid var\(--halo\)/)
 })
 confere('4  restrição de formato permanece acessível e problemas de envio continuam visíveis junto do campo', () => {
   const composer = fonte('features/atendimento/Composer.jsx')

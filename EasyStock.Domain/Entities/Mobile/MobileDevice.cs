@@ -57,6 +57,10 @@ public class MobileDevice
     [Column("paired_by_user_id")]
     public Guid? PairedByUserId { get; set; }
 
+    /// <summary>Vínculo autenticado pelo login do app; distinto de quem autorizou um código legado.</summary>
+    [Column("sessao_nativa_id")]
+    public Guid? SessaoNativaId { get; set; }
+
     /// <summary>Nome amigável (ex: "iPhone 13 Cozinha", "Tablet caixa"). Operador define no pareamento.</summary>
     [MaxLength(120)]
     [Column("label")]

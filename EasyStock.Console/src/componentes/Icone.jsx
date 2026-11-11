@@ -1,14 +1,14 @@
 import {
-  Archive, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen,
-  Camera, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
-  Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink,
+  Archive, ArrowDown, ArrowDownToLine, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen,
+  Calendar, Camera, ChartColumn, ChartLine, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
+  ClipboardList, Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink,
   FlaskConical, Frown, Gift, Globe, GripVertical, Hand, History, Hourglass, House, Image, Inbox,
   LayoutDashboard, LayoutTemplate, Lightbulb, Link, ListFilter, Lock, LogOut, Mail, MapPin,
-  Maximize2, Meh, MessageSquareText, MessageSquareWarning, Mic, Minimize2, Minus, Moon, Package,
-  PanelLeft, PanelRight, Paperclip, Pause, Pencil, Phone, PictureInPicture2, Play, Plus, Printer,
-  RefreshCw, Search, SendHorizontal, Settings, ShoppingCart, Smile, Sparkles, Star, Sticker,
-  StickyNote, Sun, Thermometer, ThumbsDown, ThumbsUp, Trash, TriangleAlert, Undo2, UserRound,
-  UserRoundPlus, X, Zap,
+  Maximize2, Meh, MessageSquareText, MessageSquareWarning, Mic, Minimize2, Minus, Moon, NotepadText, Package,
+  PanelLeft, PanelRight, Paperclip, Pause, Pencil, Phone, PictureInPicture2, Play, Plug, Plus, Printer, Radio, Receipt,
+  RefreshCw, ScrollText, Search, SendHorizontal, Settings, ShoppingCart, Smile, Sparkles, Star, Sticker,
+  StickyNote, Sun, Tag, Target, Thermometer, ThumbsDown, ThumbsUp, Trash, TriangleAlert, Undo2, UserRound,
+  UserRoundPlus, Users, X, Zap,
   createLucideIcon,
 } from 'lucide-react'
 import css from './Icone.module.css'
@@ -91,6 +91,13 @@ const ICONES = {
   'flask-conical': FlaskConical,
   hourglass: Hourglass,
   historico: History,
+  // #2258 (A1, G2): um ícone por tela do Financeiro e de Configurações (componentes/iconesDoConsole.js).
+  'folha-cardapio': NotepadText,
+  'grafico-barras': ChartColumn, 'grafico-linha': ChartLine,
+  recibo: Receipt, entrada: ArrowDownToLine, extrato: ScrollText,
+  etiqueta: Tag, alvo: Target,
+  usuarios: Users, plug: Plug, canal: Radio,
+  agenda: Calendar, planejamento: ClipboardList,
 
   // Estado e confirmação.
   check: Check,

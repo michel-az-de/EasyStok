@@ -5,12 +5,16 @@ import android.net.Uri;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.JSObject;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import org.json.JSONObject;
 
 @CapacitorPlugin(name = "PilotApp")
 public class PilotAppPlugin extends Plugin {
+    private final NativeSession.Listener sessionListener = (authenticated, version) -> notifyListeners("sessionChanged", new JSObject().put("autenticado", authenticated).put("versao", version));
     private final NoticeManager.Listener noticeListener = value -> notifyListeners("noticeStatus", value);
     @Override public void load() {
+        NativeSession.get(getContext()).addListener(sessionListener);
         try { NoticeManager.get(getContext()).setListener(noticeListener); }
         catch (Exception ignored) { /* noticeStatus returns a safe diagnostic. */ }
     }
@@ -19,6 +23,7 @@ public class PilotAppPlugin extends Plugin {
         catch (Exception ignored) { }
     }
     @Override protected void handleOnDestroy() {
+        NativeSession.get(getContext()).removeListener(sessionListener);
         try { NoticeManager.get(getContext()).removeListener(noticeListener); }
         catch (Exception ignored) { }
     }
@@ -48,6 +53,34 @@ public class PilotAppPlugin extends Plugin {
     @PluginMethod
     public void migrationGuide(PluginCall call) {
         getActivity().runOnUiThread(() -> { AppNotifications.showGuide(getActivity()); call.resolve(); });
+    }
+
+    @PluginMethod
+    public void authStatus(PluginCall call) { NativeSession.get(getContext()).status(sessionReply(call)); }
+
+    @PluginMethod
+    public void authLogin(PluginCall call) { NativeSession.get(getContext()).signIn(getActivity(), call.getData(), sessionReply(call)); }
+
+    @PluginMethod
+    public void authPair(PluginCall call) { NativeSession.get(getContext()).pairing(call.getData(), sessionReply(call)); }
+
+    @PluginMethod
+    public void authLogout(PluginCall call) { NativeSession.get(getContext()).signOut(sessionReply(call)); }
+
+    private NativeSession.Callback sessionReply(PluginCall call) {
+        return (data, failure) -> {
+            if (failure != null) {
+                JSObject details = new JSObject();
+                try { if (failure.details.has("lojas")) details.put("lojas", failure.details.getJSONArray("lojas")); } catch (Exception ignored) { }
+                call.reject(failure.getMessage(), failure.code, null, details);
+                return;
+            }
+            try {
+                JSONObject safe = new JSONObject(data.toString());
+                safe.remove("token"); safe.remove("refreshToken");
+                call.resolve(new JSObject(safe.toString()));
+            } catch (Exception invalid) { call.reject("Não foi possível confirmar a conta.", "SESSAO_INVALIDA"); }
+        };
     }
 
     @PluginMethod

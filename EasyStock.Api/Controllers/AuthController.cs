@@ -1,4 +1,6 @@
+using EasyStock.Api.Configuration;
 using EasyStock.Application.Ports.Output.Auth;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.AlterarSenha;
 using Microsoft.AspNetCore.RateLimiting;
 using EasyStock.Application.UseCases.AnonimizarMeusDados;
@@ -20,7 +22,7 @@ using IJwtTokenService = EasyStock.Api.Services.IJwtTokenService;
 
 namespace EasyStock.Api.Controllers;
 
-public sealed record LoginGoogleRequest(string? IdToken, Guid? EmpresaId);
+public sealed record LoginGoogleRequest(string? IdToken, Guid? EmpresaId, string? DispositivoId = null);
 
 public sealed record LoginRequest(
     [Required, EmailAddress] string Email,
@@ -42,6 +44,9 @@ public sealed record AceitarConviteRequest([Required] string Token, [Required] s
 
 /// <summary>Reset pelo código de 6 dígitos do WhatsApp (N8).</summary>
 public sealed record ResetarSenhaPorCodigoRequest([Required] string Email, [Required] string Codigo, [Required] string NovaSenha);
+
+/// <summary>Chave de acesso de uso único (#2201). IP e agente saem da conexão.</summary>
+public sealed record LoginChaveAcessoRequest(string? Chave);
 
 public sealed record LoginUsuarioInfo(Guid id, string nome, string email, string nivel);
 public sealed record LoginResponse(string token, string refreshToken, int expiresIn, LoginUsuarioInfo usuario);
@@ -66,7 +71,8 @@ public class AuthController(
     AtualizarUsuarioAtualUseCase atualizarUsuarioAtualUseCase,
     AlterarSenhaUseCase alterarSenhaUseCase,
     ExportarMeusDadosUseCase exportarMeusDadosUseCase,
-    AnonimizarMeusDadosUseCase anonimizarMeusDadosUseCase) : EasyStockControllerBase
+    AnonimizarMeusDadosUseCase anonimizarMeusDadosUseCase,
+    IRowLevelSecurityBypass? rlsBypass = null) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Authenticate and obtain JWT token", Description = "Validates email+password and returns JWT access token and refresh token. Rate limited by IP.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -84,8 +90,15 @@ public class AuthController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [HttpGet("google/config")]
     [AllowAnonymous]
-    public IActionResult ConfigGoogle([FromServices] IGoogleIdTokenValidator google) =>
-        DataOk(new { habilitado = google.ClientId is not null, clientId = google.ClientId });
+    public IActionResult ConfigGoogle([FromServices] IGoogleIdTokenValidator google, [FromServices] IConfiguration configuration) =>
+        DataOk(new { habilitado = google.ClientId is not null, clientId = google.ClientId, sessaoNativaHabilitada = SessaoNativaHabilitada(configuration) });
+
+    /// <summary>
+    /// #2184: o APK só abre o seletor de contas do aparelho se a API anunciar a sessão nativa. Chave ausente ou inválida
+    /// anuncia desligada, para um ambiente sem a configuração não prometer o que não liga.
+    /// </summary>
+    private static bool SessaoNativaHabilitada(IConfiguration configuration) =>
+        bool.TryParse(configuration[ConfigurationKeys.AuthSessaoNativaHabilitada], out var habilitada) && habilitada;
 
     [SwaggerOperation(Summary = "Sign in with a Google ID token",
         Description = "Só usuário que já existe (e-mail do Google, ou alias do Gmail com uma conta só). Sem empresaId, entra na empresa ativa do usuário (#1324).")]
@@ -103,10 +116,28 @@ public class AuthController(
         CancellationToken ct)
     {
         if (google.ClientId is null) return DataNotFound("Login com Google desligado.");
+        if (request.DispositivoId is not null && (string.IsNullOrWhiteSpace(request.DispositivoId)
+            || request.DispositivoId.Length > 64 || request.DispositivoId.Any(char.IsControl)))
+            return BadRequest(new { error = new { code = "DISPOSITIVO_INVALIDO", message = "dispositivoId inválido." } });
         try
         {
+            // O corte de Usuario.RevogarSessoes tem resolução de segundos; frações não podem ultrapassá-lo.
+            var agora = DateTime.UtcNow;
+            var inicioAutenticacao = new DateTime(agora.Ticks - agora.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc);
             var usuario = await identificar.ExecuteAsync(request.IdToken ?? string.Empty, ct);
             var empresaPadrao = await empresaPadraoResolver.ResolverAsync(ct);
+            if (request.DispositivoId is { } dispositivo)
+            {
+                // Pré-auth: ainda não existe tenant JWT. Inclui o INSERT diferido da família até Commit.
+                await using var rls = rlsBypass is null ? null : await rlsBypass.BeginAsync(ct);
+                return await unitOfWork.ExecuteInTransactionSemRetryAsync(async _ =>
+                {
+                    await refreshTokenRepository.TravarDispositivoAsync(dispositivo);
+                    var atual = await autenticarUseCase.RevalidarLoginGoogleNativoAsync(
+                        usuario, request.EmpresaId, empresaPadrao, inicioAutenticacao);
+                    return await GravarSessaoAsync(atual, "login_google", dispositivo, inicioAutenticacao);
+                });
+            }
             var resultado = await autenticarUseCase.ConcluirLoginGoogleAsync(usuario, request.EmpresaId, empresaPadrao);
             return await EmitirSessaoAsync(resultado, "login_google");
         }
@@ -116,21 +147,68 @@ public class AuthController(
         }
     }
 
-    /// <summary>Revoga as sessões anteriores, emite JWT + refresh token e audita. Credencial já conferida.</summary>
-    private async Task<IActionResult> EmitirSessaoAsync(AutenticarUsuarioResult resultado, string acao)
+    [SwaggerOperation(Summary = "Sign in with a single-use access key",
+        Description = "Anônimo (#2201). A chave vem da dona pelo Console, vale 30 dias e morre no primeiro uso. Toda recusa responde " +
+                      "igual (401). Limite por IP da N8 (429). Devolve a mesma sessão do login.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [EnableRateLimiting("auth")]
+    [HttpPost("chave-acesso")]
+    [AllowAnonymous]
+    public async Task<IActionResult> LoginChaveAcesso(
+        [FromBody] LoginChaveAcessoRequest request,
+        [FromServices] EasyStock.Application.UseCases.ChaveDeAcesso.AtivarComChaveUseCase ativar)
+    {
+        try
+        {
+            var identificado = await ativar.ExecuteAsync(new EasyStock.Application.UseCases.ChaveDeAcesso.AtivarComChaveCommand(
+                request.Chave ?? string.Empty, ClientIp(), ClientUserAgent()));
+            var resultado = await autenticarUseCase.ConcluirLoginPorChaveAsync(identificado.Usuario, identificado.EmpresaId);
+            return await EmitirSessaoAsync(resultado, ChavesDeAcesso.AcaoUsada);
+        }
+        catch (LimitePedidosAcessoExcedidoException ex)
+        {
+            return TooManyRequests(ex);
+        }
+        catch (Exception ex) when (ex is Domain.Exceptions.RegraDeDominioVioladaException or CredenciaisInvalidasException)
+        {
+            return Unauthorized(new { error = new { code = "INVALID_ACCESS_KEY",
+                message = EasyStock.Application.UseCases.ChaveDeAcesso.AtivarComChaveUseCase.MensagemDeRecusa } });
+        }
+    }
+
+    private Task<IActionResult> EmitirSessaoAsync(AutenticarUsuarioResult resultado, string acao) =>
+        GravarSessaoAsync(resultado, acao, null, default);
+
+    /// <summary>Emite JWT + refresh token e audita. Login nativo fica isolado dos refresh web.</summary>
+    private async Task<IActionResult> GravarSessaoAsync(AutenticarUsuarioResult resultado, string acao, string? dispositivoId, DateTime inicioAutenticacao)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = HttpContext.Request.Headers.UserAgent.ToString();
 
-        // Revogar sessões anteriores (login em novo dispositivo força logout nos outros).
-        // Um único UPDATE em batch — antes era N updates via change tracker.
-        var sessoesRevogadas = await refreshTokenRepository.RevogarSessoesAtivasAsync(
-            resultado.UsuarioId, DateTime.UtcNow);
+        SessaoNativa? sessaoNativa = null;
+        if (dispositivoId is not null)
+        {
+            if (resultado.EmpresaId is not { } empresa || empresa == Guid.Empty)
+                return BadRequest(new { error = new { code = "EMPRESA_REQUIRED", message = "Escolha a empresa para este aparelho." } });
+            if (await refreshTokenRepository.DispositivoRevogadoAsync(dispositivoId))
+                return StatusCode(403, new { error = new { code = "DISPOSITIVO_REVOGADO", message = "Aparelho revogado pelo administrador." } });
+            sessaoNativa = new SessaoNativa { UsuarioId = resultado.UsuarioId, EmpresaId = empresa,
+                // Um corte concorrente nunca pode ser ultrapassado por um INSERT atrasado.
+                DispositivoId = dispositivoId, CriadaEm = inicioAutenticacao };
+            await refreshTokenRepository.AdicionarSessaoNativaAsync(sessaoNativa);
+            resultado = resultado with { SessaoId = sessaoNativa.Id, DispositivoId = dispositivoId, SessaoPersistente = true };
+        }
+
+        // Login nativo não derruba o PC; login web mantém sua regra anterior somente para outras sessões web.
+        var sessoesRevogadas = sessaoNativa is null
+            ? await refreshTokenRepository.RevogarSessoesWebAsync(resultado.UsuarioId, DateTime.UtcNow) : 0;
 
         var token = jwtService.GerarToken(resultado);
         var refreshTokenValue = jwtService.GerarRefreshToken();
         var refreshTokenHash = TokenHashHelper.ComputeSha256Hash(refreshTokenValue);
-        var expiraEm = DateTime.UtcNow.AddDays(30);
+        var expiraEm = sessaoNativa is null ? DateTime.UtcNow.AddDays(30) : DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc);
 
         var refreshToken = RefreshTokenEntity.Criar(
             resultado.UsuarioId,
@@ -138,6 +216,7 @@ public class AuthController(
             expiraEm,
             ip,
             userAgent);
+        refreshToken.SessaoNativaId = sessaoNativa?.Id;
 
         await refreshTokenRepository.AddAsync(refreshToken);
 

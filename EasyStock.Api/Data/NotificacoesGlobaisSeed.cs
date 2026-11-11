@@ -1,4 +1,5 @@
-﻿using EasyStock.Domain.Entities.Notifications;
+﻿using EasyStock.Application.Services.Notifications;
+using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 
@@ -541,7 +542,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.InApp,
             tipoEvento: TipoEventoNotificacao.CaixaAbertoEsquecido,
             assuntoTemplate: "Caixa aberto desde {{ data_abertura }}",
-            corpoTemplate: "O caixa segue aberto desde {{ data_abertura }} (saldo de abertura {{ valor_abertura }}). Feche-o para nao acumular vendas no dia errado.");
+            corpoTemplate: "Saldo de abertura {{ valor_abertura }}. Feche o caixa para não acumular vendas no dia errado.")
+            .ComVersao(2); // #2258: o corpo não repete a data do título e o valor sai em reais ("R$ 300,03").
 
         // ===== Atendimento por WhatsApp (S07): o agente escalou a conversa para a dona. Push para todas
         // as subscriptions da empresa (payload sem usuarioId => destinatario "empresa:{id}"). =====
@@ -950,7 +952,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.InApp,
             tipoEvento: TipoEventoNotificacao.PrazoEstourado,
             assuntoTemplate: "{{ tipo_legivel }} há {{ atraso_texto }}",
-            corpoTemplate: """{{ if cliente && cliente != "" }}{{ cliente }} está esperando: {{ end }}{{ tipo_legivel }} há {{ atraso_texto }} (referência {{ referencia }}).""");
+            corpoTemplate: """{{ if detalhe && detalhe != "" }}{{ detalhe }}{{ else }}{{ if cliente && cliente != "" }}{{ cliente }} está esperando: {{ end }}{{ tipo_legivel }} há {{ atraso_texto }} (referência {{ referencia }}).{{ end }}""")
+            .ComVersao(2); // #2258: o caixa esquecido manda o texto pronto (detalhe), sem repetir o título nem o código técnico.
 
         // ===== #2096: prazo estourado e avisos da operação no aparelho da dona e do gerente. O Push aparece na tela de
         // bloqueio: só o tipo, o primeiro nome e o tempo; o texto completo fica no e-mail e no sino. Interno. =====
@@ -997,6 +1000,38 @@ public static class NotificacoesGlobaisSeed
 
         // ===== #2074: contas a pagar e a receber. O ContaFinanceiraVencimentoJob publicava e nenhuma rotina existia, então
         // o evento fechava em silêncio. Sino e e-mail dos donos; o payload já leva os textos prontos. Interno. =====
+        // ===== #2211: avisos da equipe pelo WhatsApp da loja. Texto livre dentro da janela de 24 h; fora dela, o modelo
+        // aprovado na Meta com o mesmo nome. Só o primeiro nome do cliente; nada de telefone ou endereço. =====
+        yield return TemplateNotificacao.Criar(
+            codigo: AvisosDaEquipe.AtencaoNoAtendimento.TemplateCodigo,
+            nome: "Atendimento Precisa de Atenção · WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: AvisosDaEquipe.AtencaoNoAtendimento.Tipo,
+            assuntoTemplate: "",
+            corpoTemplate: "Atendimento precisa de você: {{ cliente ?? \"um cliente\" }}, {{ motivo }}. Abra a conversa no EasyStok.")
+            .ComMetadados(
+                """{"template":"aviso_equipe_atencao","idioma":"pt_BR","param1":"{{ cliente ?? \"um cliente\" }}","param2":"{{ motivo }}"}""");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: AvisosDaEquipe.PedidoComCanhoto.TemplateCodigo,
+            nome: "Pedido Pago com o Canhoto · WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: AvisosDaEquipe.PedidoComCanhoto.Tipo,
+            assuntoTemplate: "",
+            corpoTemplate: "Pedido {{ numero }} pago: {{ cliente ?? \"cliente\" }}, {{ total }}. O canhoto segue na imagem.")
+            .ComMetadados(
+                """{"template":"aviso_equipe_pedido","idioma":"pt_BR","param1":"{{ numero }}","param2":"{{ cliente ?? \"cliente\" }}","param3":"{{ total }}","anexo":"canhoto","anexoFormato":"png"}""");
+
+        yield return TemplateNotificacao.Criar(
+            codigo: AvisosDaEquipe.ProblemaNoPagamento.TemplateCodigo,
+            nome: "Problema no Pagamento · WhatsApp",
+            canal: CanalNotificacao.WhatsApp,
+            tipoEvento: AvisosDaEquipe.ProblemaNoPagamento.Tipo,
+            assuntoTemplate: "",
+            corpoTemplate: "Problema no pagamento do pedido {{ numero }} ({{ cliente ?? \"cliente\" }}): {{ problema }}. Confira no EasyStok.")
+            .ComMetadados(
+                """{"template":"aviso_equipe_pagamento","idioma":"pt_BR","param1":"{{ numero }}","param2":"{{ cliente ?? \"cliente\" }}","param3":"{{ problema }}"}""");
+
         foreach (var (tipo, codigo, nome) in ContasVencimento)
         {
             yield return TemplateNotificacao.Criar(
@@ -1236,6 +1271,7 @@ public static class NotificacoesGlobaisSeed
             TipoEventoNotificacao.PagamentoSemAvisoAoCliente, "pagamento_sem_aviso_ao_cliente_inapp_v1",
             CategoriaConteudoNotificacao.Operacional, "[\"InApp\"]", ModoTodos("gestores"));
 
+
         // ===== Avisos de status do pedido ao cliente (S13): transacionais, so WhatsApp, sem janela de horario
         // (aviso de status nao espera). Rollback: desativar a rotina (Ativa=false). =====
         yield return MakeRotina("pedido_pago_confirmado_global", "Pedido Pago — Aviso ao Cliente",
@@ -1308,6 +1344,12 @@ public static class NotificacoesGlobaisSeed
             """{"modoCanais":"todos","audiencia":"admins","agenda":{"horario":"20:00"}}""");
         resumoDiario.Desativar("system");
         yield return resumoDiario;
+
+        // #2211: avisos da equipe. Ativas, só WhatsApp, audiência "inscritos": sem ninguém inscrito pela dona, nada sai.
+        // O interruptor por loja é a tela Avisos (AvisosOperacao). Rollback: Ativa=false.
+        foreach (var aviso in AvisosDaEquipe.Todos)
+            yield return MakeRotina(aviso.RotinaCodigo, aviso.Nome, aviso.Tipo, aviso.TemplateCodigo,
+                CategoriaConteudoNotificacao.Operacional, "[\"WhatsApp\"]", ModoTodos("inscritos"));
 
         foreach (var (tipo, codigo, nome) in ContasVencimento)
             yield return MakeRotina($"{codigo}_global", nome, tipo, $"{codigo}_inapp_v1",

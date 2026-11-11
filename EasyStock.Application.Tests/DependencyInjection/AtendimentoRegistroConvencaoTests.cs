@@ -41,7 +41,7 @@ public class AtendimentoRegistroConvencaoTests
         ferramentas.Should().OnlyHaveUniqueItems();
         ferramentas.Should().Contain([
             "ConsultarCardapioFerramenta", "ConsultarPedidoFerramenta", "CriarPedidoFerramenta",
-            "EncerrarConversaFerramenta", "EnviarCardapioImagemFerramenta", "EscalarParaDonaFerramenta",
+            "EncaminharParaResponsavelFerramenta", "EncerrarConversaFerramenta", "EnviarCardapioImagemFerramenta", "EscalarParaDonaFerramenta",
             "ListarJanelasFerramenta", "RegistrarNotaFerramenta", "RegistrarRestricaoFerramenta",
         ]);
         ferramentas.Should().HaveCount(TiposDaApplication().Count(typeof(IFerramentaAgente).IsAssignableFrom));

@@ -26,8 +26,8 @@ namespace EasyStock.ArchitectureTests;
 [Trait("Category", "Architecture")]
 public class RlsBypassAllowlistTests
 {
-    private static readonly Regex BypassPortRegex = new(
-        @"\bIRowLevelSecurityBypass\b",
+    private static readonly Regex BypassCapabilityRegex = new(
+        @"\b(?:IRowLevelSecurityBypass|UseRowLevelSecurityBypassAsync)\b",
         RegexOptions.Compiled);
 
     /// <summary>
@@ -38,16 +38,24 @@ public class RlsBypassAllowlistTests
     /// quem mantem o codigo a engordar a allowlist ate calar o teste, e ai a lista para de
     /// significar "quem pode burlar RLS".
     /// </summary>
-    private static bool ReferenciaOPortEmCodigo(string conteudo)
+    private static bool ReferenciaCapacidadeEmCodigo(string conteudo)
     {
         foreach (var linha in conteudo.Split('\n'))
         {
             var t = linha.TrimStart();
             if (t.StartsWith("//") || t.StartsWith("*") || t.StartsWith("/*")) continue;
-            if (BypassPortRegex.IsMatch(linha)) return true;
+            if (BypassCapabilityRegex.IsMatch(linha)) return true;
         }
         return false;
     }
+
+    [Theory]
+    [InlineData("await db.UseRowLevelSecurityBypassAsync();", true)]
+    [InlineData("await RowLevelSecurityScope.UseRowLevelSecurityBypassAsync(db);", true)]
+    [InlineData("IRowLevelSecurityBypass bypass;", true)]
+    [InlineData("// await db.UseRowLevelSecurityBypassAsync();", false)]
+    public void GuardaReconheceCapacidadeAsyncInclusiveChamadaEstatica(string codigo, bool esperado) =>
+        ReferenciaCapacidadeEmCodigo(codigo).Should().Be(esperado);
 
     /// <summary>
     /// Projetos varridos. Caminhos relativos a raiz do repo, forward slash. Projetos de teste
@@ -75,7 +83,19 @@ public class RlsBypassAllowlistTests
         // Definicao do port, implementacao e registro no container.
         "EasyStock.Application/Ports/Output/Security/IRowLevelSecurityBypass.cs",
         "EasyStock.Infra.Postgre/Security/RowLevelSecurityBypass.cs",
+        // #2184: implementação restaurável em conexão aberta, inclusive transação já iniciada.
+        "EasyStock.Infra.Postgre/Security/RowLevelSecurityScope.cs",
+        // #2184: acesso por sid/segredo pré-auth e revogação global por usuário; não é leitura tenant genérica.
+        "EasyStock.Infra.Postgre/Repositories/RefreshTokenRepository.cs",
+        // #2184: após autorização de SuperAdmin, revoga só famílias do aparelho+empresa alvo.
+        "EasyStock.Api/Mobile/Controllers/DevicePairingController.cs",
         "EasyStock.Infra.Postgre/DependencyInjection/ServiceCollectionExtensions.cs",
+
+        // #2184: login Google nativo, renovação e logout são pré-auth; o tenant vem da identidade/segredo
+        // validado. O escopo cobre a transação e o INSERT diferido da família, nunca uma requisição tenant genérica.
+        "EasyStock.Api/Controllers/AuthController.cs",
+        "EasyStock.Application/UseCases/RefreshToken/RefreshTokenUseCase.cs",
+        "EasyStock.Application/UseCases/Logout/LogoutUseCase.cs",
 
         // issue #1024: registrar empresa e cross-tenant por definicao, porque cria o tenant. A
         // requisicao e anonima e nao existe app.empresa_id no contexto, entao a policy
@@ -132,13 +152,13 @@ public class RlsBypassAllowlistTests
                 var rel = Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/');
                 if (Allowlist.Contains(rel)) continue;
 
-                if (ReferenciaOPortEmCodigo(File.ReadAllText(file)))
+                if (ReferenciaCapacidadeEmCodigo(File.ReadAllText(file)))
                     offenders.Add(rel);
             }
         }
 
         offenders.Should().BeEmpty(
-            "IRowLevelSecurityBypass burla a segunda camada de defesa do ADR-0010 e so vale para " +
+            "IRowLevelSecurityBypass/UseRowLevelSecurityBypassAsync burlam a segunda camada de defesa do ADR-0010 e so vale para " +
             "operacoes cross-tenant POR NATUREZA. Se a sua query voltou vazia, o defeito esta no " +
             "contexto de tenant, nao na RLS — bypass ali vira vazamento entre clientes. Se o caso " +
             "for legitimo mesmo, adicione o arquivo a Allowlist com o numero da issue e o porque, " +
@@ -146,7 +166,7 @@ public class RlsBypassAllowlistTests
     }
 
     [Fact]
-    public void Allowlist_NaoDeveConterArquivosQueJaNaoUsamOPort()
+    public void Allowlist_NaoDeveConterArquivosQueJaNaoUsamBypass()
     {
         var root = RepoPaths.FindRepoRoot();
         var stale = new List<string>();
@@ -156,8 +176,8 @@ public class RlsBypassAllowlistTests
             var fullPath = Path.Combine(root, entry.Replace('/', Path.DirectorySeparatorChar));
             if (!File.Exists(fullPath))
                 stale.Add($"{entry} (arquivo nao existe)");
-            else if (!ReferenciaOPortEmCodigo(File.ReadAllText(fullPath)))
-                stale.Add($"{entry} (nao referencia mais o port; remova da Allowlist)");
+            else if (!ReferenciaCapacidadeEmCodigo(File.ReadAllText(fullPath)))
+                stale.Add($"{entry} (nao referencia mais a capacidade; remova da Allowlist)");
         }
 
         stale.Should().BeEmpty(
@@ -198,7 +218,7 @@ public class RlsBypassAllowlistTests
                 var chamaDireto = File.ReadAllText(file).Split('\n')
                     .Select(l => l.TrimStart())
                     .Any(l => !l.StartsWith("//") && !l.StartsWith("*") && !l.StartsWith("/*")
-                              && l.Contains("UseRowLevelSecurityBypass(", StringComparison.Ordinal));
+                              && Regex.IsMatch(l, @"\bUseRowLevelSecurityBypass(?:Async)?\s*\("));
                 if (chamaDireto)
                     offenders.Add(Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/'));
             }

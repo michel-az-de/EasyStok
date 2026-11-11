@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { mascaraTelefone, telefoneDoE164 } from '../../dominio/formato'
@@ -17,9 +17,15 @@ const FALHA_AO_SALVAR = 'Não foi possível salvar. Tente de novo.'
 // #1586: `aoSalvar` pode devolver a promessa da ida ao EasyStok. O campo espera
 // ("Salvando…") e só então mostra "Salvo"; recusa (`false` ou `{ erro }`) fica no
 // próprio campo, com o texto digitado. Sem promessa (demonstração), vale como salvo.
+//
+// #2258 (auditoria T12, T13): com erro o campo continua visível (contorno vermelho),
+// recebe o foco de volta e a mensagem fica ligada a ele por aria-describedby.
+// `dica` vira o placeholder e `limite` o maxLength (nome: "Nome e sobrenome", 80).
 export function CampoEmLinha({
-  rotulo, valor, vazio = 'Sem valor', tipo = 'texto', validar, aoSalvar,
+  rotulo, valor, vazio = 'Sem valor', tipo = 'texto', validar, aoSalvar, dica, limite, aoMudarSujo,
 }) {
+  const idCampo = useId()
+  const idErro = `${idCampo}-erro`
   const [editando, setEditando] = useState(false)
   const [rascunho, setRascunho] = useState('')
   const [erro, setErro] = useState(null)
@@ -32,11 +38,22 @@ export function CampoEmLinha({
   // por cima dele ao editar virava "(55) 11987-6541". Mostra, edita e compara já na máscara da tela.
   const exibido = tipo === 'telefone' && valor ? telefoneDoE164(valor) : (valor ?? '')
 
+  // #2258 (T17): rascunho diferente do valor salvo conta como digitado; o modal pergunta antes de descartar.
+  const sujo = editando && rascunho !== exibido
+  // Efeito de layout, como o do cadastro (BlocoCliente): o aviso chega à janela antes do próximo evento.
+  useLayoutEffect(() => { aoMudarSujo?.(sujo) }, [aoMudarSujo, sujo])
+  useLayoutEffect(() => () => aoMudarSujo?.(false), [aoMudarSujo])
+
   useEffect(() => {
     if (!editando) return
     inputRef.current?.focus()
     inputRef.current?.select()
   }, [editando])
+
+  // O erro devolve o foco ao campo: quem digitou corrige sem caçar onde está.
+  useEffect(() => {
+    if (erro && editando) inputRef.current?.focus()
+  }, [erro, editando])
 
   useEffect(() => {
     if (!salvou) return undefined
@@ -107,9 +124,9 @@ export function CampoEmLinha({
   return (
     <div className={css.campoEmLinha}>
       <div className={css.edicaoEmLinha}>
-        <label className="sr" htmlFor={`campo-${rotulo}`}>{rotulo}</label>
+        <label className="sr" htmlFor={idCampo}>{rotulo}</label>
         <input
-          id={`campo-${rotulo}`}
+          id={idCampo}
           ref={inputRef}
           className={[css.controleEmLinha, erro ? css.controleComErro : ''].filter(Boolean).join(' ')}
           value={rascunho}
@@ -119,12 +136,15 @@ export function CampoEmLinha({
           readOnly={salvando}
           aria-busy={salvando || undefined}
           aria-invalid={Boolean(erro) || undefined}
+          aria-describedby={erro ? idErro : undefined}
+          placeholder={dica}
+          maxLength={limite}
         />
         <BotaoIcone rotulo="Salvar" icone="check" disabled={salvando} onClick={confirmar} />
         <BotaoIcone rotulo="Desfazer" icone="x" disabled={salvando} onMouseDown={(e) => e.preventDefault()} onClick={cancelar} />
       </div>
       {salvando && <output className={css.salvandoEmLinha}>Salvando…</output>}
-      {erro && <p className={css.erroEmLinha} role="alert">{erro}</p>}
+      {erro && <p id={idErro} className={css.erroEmLinha} role="alert">{erro}</p>}
     </div>
   )
 }

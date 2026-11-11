@@ -14,10 +14,10 @@
     return { ...data, available: data.versionCode > config.versionCode };
   }
 
-  function connectionStatus({ health, paired, invalid, pending, importPending }) {
+  function connectionStatus({ health, paired, invalid, pending, importPending, googleSession = false }) {
     const status = health === 'online' ? 'EasyStok acessível' : health === 'checking' ? 'Conferindo conexão' : 'Sem conexão confirmada';
     const pairing = invalid ? 'Conexão do aparelho inválida. Conecte novamente.'
-      : paired ? 'Aparelho vinculado ao EasyStok.' : 'Produção só neste aparelho. Conecte com o código de pareamento para sincronizar.';
+      : paired ? 'Aparelho vinculado ao EasyStok.' : googleSession ? 'Produção só neste aparelho. Entre com Google para sincronizar.' : 'Produção só neste aparelho. Conecte com o código de pareamento para sincronizar.';
     const queue = pending > 0 ? pending + (pending === 1 ? ' alteração aguardando envio.' : ' alterações aguardando envio.')
       : 'Nenhuma alteração na fila de envio deste aparelho.';
     const syncState = invalid ? 'invalid' : importPending ? 'pending' : !paired ? 'local' : health === 'online' && pending > 0 ? 'pending' : health;
@@ -225,7 +225,7 @@
     ]) for (const element of document.querySelectorAll('#moreMenu button[onclick="' + action + '"] .more-menu-icon')) element.innerHTML = pilotIcon(name);
   }
 
-  function installAppChrome(environment, openHome) {
+  function installAppChrome(environment, openHome, closeHome) {
     const document = environment.document;
     const header = document.querySelector?.('.phone > .header');
     if (!header) return;
@@ -240,6 +240,7 @@
     if (typeof navigate === 'function') environment.go = function (screen, options) {
       const result = navigate.call(this, screen, options);
       if (screen === 'home') openHome();
+      else closeHome?.();
       return result;
     };
   }
@@ -336,6 +337,8 @@
   rail.innerHTML = '<button type="button" id="pilotHomeButton" aria-label="Casa da Baba, início"><img class="pilot-brand-mark" src="casa-da-baba.png" alt="" width="48" height="40"><span class="pilot-wordmark">Casa da Baba<span id="pilotRailVersion">Piloto</span></span></button><div id="pilotRailActions">' + bell('pilotNoticeBell', 'pilotNoticeCount') + '</div><span id="pilotRailStatus" role="status">Conferindo conexão</span>';
   doc.body.prepend(rail);
   doc.body.classList.add('pilot-app');
+  // Um só nome para a área: o filtro do histórico acompanha o título Configurações.
+  doc.querySelectorAll?.('#histFilter [data-f="settings"]').forEach(button => { button.textContent = 'Configurações'; });
   if (root.ResizeObserver) new root.ResizeObserver(() => {
     doc.body.style.setProperty('--pilot-rail-height', Math.ceil(rail.getBoundingClientRect().height) + 'px');
   }).observe(rail);
@@ -361,7 +364,6 @@
         ${tileButton('pair', 'Conectar', 'link', 'support', 'pilotPairButton')}
         ${tileButton('printers', 'Impressoras', 'printer')}
         ${tileButton('settings', 'Configurações', 'settings')}
-        ${tileButton('migration-guide', 'Sistema Antigo', 'ajuda')}
         ${tileButton('update', 'Atualizar', 'refresh-cw', 'support', 'pilotUpdateButton')}
       </div>
       <div class="pilot-home-support" hidden>
@@ -377,7 +379,8 @@
       <button type="button" id="pilotDownload" data-action="download" hidden>Atualizar APK</button>
     </div>`;
   doc.body.append(home);
-  installAppChrome(root, openHome);
+  root.addEventListener('cdb-session-state', showConnection);
+  installAppChrome(root, openHome, closeHome);
   installLabelWorkspace(root);
   if (doc.querySelector && root.MutationObserver) {
     for (const id of ['newProductModal', 'productionConfirmModal']) {
@@ -599,6 +602,11 @@
     refreshOtaStatus();
   }
   function closeHome() { home.close(); }
+  // Impressoras tem um único lugar: Configurações > Etiquetas, seção Impressoras.
+  function openPrinterSettings() {
+    root.cdbOpenAjustesAt('eq');
+    doc.getElementById('impressorasLista')?.closest('.ajustes-section')?.scrollIntoView({ block: 'start' });
+  }
   root.cdbHandleNativeBack = function () {
     if (root.cdbIsPrinting?.()) return root.cdbHandleBack?.() === true;
     if (notices.open) {
@@ -621,7 +629,9 @@
     const pairing = root.cdbSync?.getPairing?.();
     const review = root.cdbSync?.importReview?.();
     const invalid = !!root.cdbSync?.isPairingInvalid?.();
-    const state = connectionStatus({ health, paired: !!pairing, invalid, pending: root.cdbSync?.queueSize?.() || 0, importPending: !!review });
+    const googleSession = root.cdbAuth?.available?.() === true;
+    const state = connectionStatus({ health, paired: !!pairing, invalid, pending: root.cdbSync?.queueSize?.() || 0, importPending: !!review, googleSession });
+    doc.getElementById('pilotPairHint').textContent = googleSession ? 'Sua conta Google conecta este aparelho à sua empresa e loja.' : 'Solicite o código de conexão à equipe da Casa da Baba.';
     doc.getElementById('pilotRailStatus').textContent = state.rail;
     doc.getElementById('pilotConnection').textContent = review ? 'Envio pausado · revise a importação' : state.rail;
     doc.getElementById('pilotConnectionDetail').textContent = state.status + '. ' + state.pairing + ' ' + state.queue;
@@ -633,7 +643,8 @@
     reconnect.setAttribute('title', checkingConnection ? 'Conferindo conexão' : 'Verificar conexão');
     const pairButton = doc.getElementById('pilotPairButton');
     const pairLabel = pairButton.querySelector?.('span') || pairButton;
-    pairLabel.textContent = state.syncState === 'invalid' ? 'Reconectar' : root.cdbSync?.getPairing?.() ? 'Conexão' : 'Conectar';
+    pairLabel.textContent = root.cdbAuth?.available?.() ? (root.cdbAuth.current()?.autenticado ? 'Conta' : 'Entrar')
+      : state.syncState === 'invalid' ? 'Reconectar' : root.cdbSync?.getPairing?.() ? 'Conexão' : 'Conectar';
     rail.dataset.sync = state.syncState;
     doc.getElementById('pilotImportReview').hidden = !review;
     const confirm = doc.getElementById('pilotConfirmImport');
@@ -874,10 +885,10 @@
         if (!app?.openWorkspace) throw new Error('Atualize o APK para abrir o Atendimento neste aparelho.');
         const button = doc.getElementById('pilotWorkspaceButton');
         openingWorkspace = true; button.disabled = true;
-        try { await app.openWorkspace(); }
+        try { if (root.cdbAuth?.available?.()) await root.cdbAuth.ensureSignedIn(); await app.openWorkspace(); }
         finally { openingWorkspace = false; button.disabled = false; }
       }
-      if (action === 'printers') { closeHome(); root.openPrinterPicker(); }
+      if (action === 'printers') { closeHome(); openPrinterSettings(); }
       if (action === 'settings') { closeHome(); root.openAjustes(); }
       if (action === 'import-pwa') {
         const input = doc.getElementById('backupFileInput');
@@ -891,7 +902,7 @@
         if (!app?.[method]) throw new Error('Atualize o APK para usar notificações e o guia no Android.');
         await app[method]();
       }
-      if (action === 'pair') await connectProduction();
+      if (action === 'pair') { if (root.cdbAuth?.available?.()) root.cdbAuth.open(); else await connectProduction(); }
       if (action === 'confirm-import') await confirmImport();
       if (action === 'undo-import') await undoImport();
       if (action === 'migrate-import') await migrateImport();

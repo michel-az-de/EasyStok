@@ -532,7 +532,9 @@ async function montar(filhos) {
     // #2135: a tela abre sem conversa escolhida; a prova começa com a primeira aberta, como a atendente faria.
     inicial: () => {
       const conversas = carregarConversas()
-      return { ...estadoInicial({ conversas, catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' }), selecionadaId: conversas[0].id }
+      const base = estadoInicial({ conversas, catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' })
+      // #2232 (L5): a lista abre em "Precisa de você"; a prova mede o re-render com a massa inteira, em "Todas".
+      return { ...base, filtros: { ...base.filtros, aba: 'todas' }, selecionadaId: conversas[0].id }
     },
   }
   const recipiente = documento.body.appendChild(new Elemento('div'))
@@ -738,7 +740,8 @@ await confere('B. mudou uma conversa: só o cartão dela re-renderiza', naTela(b
 
 await confere('B. pagamento novo de uma conversa: só o cartão dela ganha o selo', naTela(balcao, async (t) => {
   const alvo = t.estado.conversas[1]
-  const comSelo = () => todos(t.recipiente, (no) => no.atributos?.get('aria-label') === 'Pagamento novo, ainda não visto').length
+  // #2232 (X1): o aviso falado mora no nome acessível do cartão; o selo visual guarda o title.
+  const comSelo = () => todos(t.recipiente, (no) => no.atributos?.get('title') === 'Pagamento novo, ainda não visto').length
   assert.equal(comSelo(), 0)
   renders.cartoes.length = 0
   t.agir(() => t.setPagamentosNaoVistos(new Set([alvo.id])))

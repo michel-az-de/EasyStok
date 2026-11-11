@@ -60,7 +60,7 @@ button.botaoVistos {
 @keyframes realce { 0% { background: var(--sucesso-pastel); } 100% { background: var(--elevado); } }
 
 .ponto {
-  flex-shrink: 0; width: var(--ponto); height: var(--ponto); border-radius: var(--r-1); background: var(--erro);
+  flex-shrink: 0; width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula); background: var(--erro);
 }
 
 .alvo {
@@ -109,7 +109,7 @@ button.botaoVistos {
 }
 .grupoPilulas { border: 0; margin: 0; padding: 0; }
 .pilulas { display: flex; gap: var(--e-2); flex-wrap: wrap; }
-button.pilula { border-radius: var(--r-1); min-height: var(--toque); }
+button.pilula { border-radius: var(--r-pilula); min-height: var(--toque); }
 .horarioManual { margin-top: var(--e-2); }
 
 @media (max-width: 759px) {

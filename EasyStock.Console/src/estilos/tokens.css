@@ -130,14 +130,13 @@
   --e-24: 24px;
   --e-0: var(--e-1);
 
-  /* raio por papel: controle, cartão, painel */
-  --r-1: 0px;
-  --r-2: 0px;
-  --r-3: 0px;
-  --r-pilula: 0px;
-  --r-ponta: 0px;
-  /* #2185 (R17): o que é redondo de verdade (spinner, ponto, botão de gravar) usa este; o resto é reto. */
-  --r-circulo: 50%;
+  /* raio por papel (banca UX/UI de 04/11, #2246): 8 px em controle, cartão e painel; pílula em
+     chip, avatar e contador; ponta é o canto de direção do balão. */
+  --r-1: 8px;
+  --r-2: 8px;
+  --r-3: 8px;
+  --r-pilula: 999px;
+  --r-ponta: 2px;
 
   --b-1: 1px;
   --b-2: 2px;

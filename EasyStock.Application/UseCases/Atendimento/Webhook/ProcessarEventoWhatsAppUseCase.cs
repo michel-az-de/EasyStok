@@ -266,6 +266,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         return true;
     }
 
+    /// <summary>S24 e #2249: bloqueado ou encaminhado à responsável não recebe nada automático.</summary>
+    private static bool SemAutomatico(IdentificacaoCliente? identificacao) =>
+        identificacao?.Cliente is { Bloqueado: true } or { AtendimentoAutomaticoPausado: true };
+
     private async Task<(Conversa, Mensagem, ConfiguracaoAtendimento, IdentificacaoCliente?)> GravarEntradaAsync(
         Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, DateTime enviadaEm, CancellationToken ct)
     {
@@ -320,11 +324,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         // dona (Assumir + nota interna + aviso). O evento entra no outbox deste mesmo commit (ADR-0030).
         if (identificacao?.Cliente.Bloqueado == true)
             await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(identificacao.Cliente), DateTime.UtcNow, ct);
+        // #2249: quem foi encaminhado à responsável também nasce com a equipe, sem saudação de cliente.
+        else if (identificacao?.Cliente.AtendimentoAutomaticoPausado == true)
+            await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoContatoPausado(identificacao.Cliente), DateTime.UtcNow, ct);
 
         // S42: conversa nova dispara a automática de entrada (primeiro contato, fora do horário ou loja
         // fechada) pelo outbox deste mesmo commit. Cliente bloqueado não recebe nada automático (S24),
         // nem entrada que o agente não vai responder (botão "acao:", reação; issue 1285).
-        if (existenteConversa is null && identificacao?.Cliente.Bloqueado != true
+        if (existenteConversa is null && !SemAutomatico(identificacao)
             && !SemRespostaAutomatica(msg.Tipo, botaoId) && publicadorEventos is not null)
             await publicadorEventos.PublicarAsync(empresaId, ConversaAbertaEvent.TipoEvento, "Conversa", conversa.Id,
                 new ConversaAbertaEvent(conversa.Id, conversa.ClienteId), ct: ct);
@@ -382,7 +389,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             }
 
             // S24: conversa de cliente bloqueado já nasceu com a dona; nada automático responde.
-            if (identificacao?.Cliente.Bloqueado == true)
+            if (SemAutomatico(identificacao))
             {
                 await eventPublisher.PublicarAsync("conversa.mensagem_recebida", empresaId,
                     new { conversaId = conversa.Id, mensagemId = mensagem.Id }, ct);

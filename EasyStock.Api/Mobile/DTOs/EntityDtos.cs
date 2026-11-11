@@ -108,7 +108,9 @@ public record BatchDto(
     long? DiscardedAt = null,
     string? DiscardedBy = null,
     string? DiscardReason = null,
-    bool? LegacyImported = null
+    bool? LegacyImported = null,
+    // #2209: número curto do Lote do ERP, o da barra Code128 C. Só o servidor preenche; no push ele é ignorado.
+    string? NumeroCurto = null
 );
 
 public record CashEntryDto(

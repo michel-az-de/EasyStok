@@ -109,6 +109,21 @@ await confere('salvar grava a receita inteira pelo PUT da composição e relê',
   assert.equal(m.relidas(), 1)
 })
 
+await confere('#2235 banca 4: prato sem produto é ligado ao estoque só ao salvar, depois da validação', async () => {
+  const m = montar([
+    [(mt, u) => mt === 'POST' && u.endsWith('/receitas/pratos/i-9/ligar'), { data: { produtoId: 'p-9' } }],
+    [(mt, u) => mt === 'PUT' && u.endsWith('/api/produtos/p-9/composicao'), { status: 204 }],
+  ])
+  const prato = { sku: 'i-9', produtoId: null, nome: 'Bolo' }
+  assert.equal(await m.gestao.salvar(null, { rendimento: '0', linhas: [] }, prato), false)
+  assert.equal(m.chamadas.length, 0, 'receita inválida não cria produto no estoque')
+  assert.equal(await m.gestao.salvar(null, { rendimento: '1', linhas: [] }, prato), false)
+  assert.match(m.erros.at(-1), /ao menos um insumo/)
+  assert.equal(m.chamadas.length, 0, 'receita vazia não cria produto no estoque')
+  assert.equal(await m.gestao.salvar(null, { rendimento: '8', linhas: [{ insumoId: 's-1', quantidade: '1', unidade: 'G' }] }, prato), true)
+  assert.deepEqual(m.chamadas.map((c) => c.metodo), ['POST', 'PUT'])
+})
+
 await confere('sem ser Gerente, o 403 vira aviso e relê', async () => {
   const m = montar([[(mt) => mt === 'PUT', { status: 403 }]])
   assert.equal(await m.gestao.salvar('p-1', { rendimento: '6', linhas: [{ insumoId: 's-1', quantidade: '1', unidade: 'G' }] }), false)

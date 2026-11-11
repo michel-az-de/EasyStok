@@ -72,6 +72,13 @@ public static class HorarioBrasil
         return (InicioRealDoDiaUtc(d), InicioRealDoDiaUtc(d.AddDays(1)));
     }
 
+    /// <summary>#2268: janela UTC [ini, fim) do mes civil de Brasilia que contem o dia, para colunas de instante real.</summary>
+    public static (DateTime IniUtc, DateTime FimUtc) JanelaMesUtc(DateOnly dia)
+    {
+        var primeiro = new DateOnly(dia.Year, dia.Month, 1);
+        return (InicioRealDoDiaUtc(primeiro), InicioRealDoDiaUtc(primeiro.AddMonths(1)));
+    }
+
     /// <summary>
     /// Instante UTC real correspondente a meia-noite (00:00) de Brasilia do dia informado.
     /// DST-safe: se a meia-noite cair no gap de mola (inexistente, como era em SP a meia-noite),

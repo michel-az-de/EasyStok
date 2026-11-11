@@ -175,6 +175,59 @@ public class CaixaUseCasesTests
     }
 
     [Fact]
+    public async Task FecharCaixa_ResolveOsAvisosDoSinoDoCaixaQueFechou()
+    {
+        // #2258 (F1): fechou o caixa, o sino não pode seguir dizendo que ele está aberto.
+        var empresaId = Guid.NewGuid();
+        var data = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var avisos = Substitute.For<INotificacaoRepository>();
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(MovimentoCaixa.Criar(empresaId, "abertura", 100m));
+        _repo.GetFechamentoDoDiaAsync(empresaId, data, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, data, null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow, Substitute.For<ILogger<FecharCaixaUseCase>>(), null, avisos);
+        await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId, data));
+
+        await avisos.Received(1).ResolverAvisosDeCaixaFechadoAsync(empresaId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FecharCaixa_FalhaAoResolverAvisosNaoDesfazOFechamento()
+    {
+        var empresaId = Guid.NewGuid();
+        var data = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var avisos = Substitute.For<INotificacaoRepository>();
+        avisos.ResolverAvisosDeCaixaFechadoAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<int>(new InvalidOperationException("banco")));
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(MovimentoCaixa.Criar(empresaId, "abertura", 100m));
+        _repo.GetFechamentoDoDiaAsync(empresaId, data, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, data, null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow, Substitute.For<ILogger<FecharCaixaUseCase>>(), null, avisos);
+        var result = await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId, data));
+
+        result.EmpresaId.Should().Be(empresaId);
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task FecharCaixa_Idempotente_NaoMexeNosAvisos()
+    {
+        var empresaId = Guid.NewGuid();
+        var data = DateOnly.FromDateTime(DateTime.UtcNow);
+        var avisos = Substitute.For<INotificacaoRepository>();
+        _repo.GetFechamentoDoDiaAsync(empresaId, data, null)
+            .Returns(FechamentoCaixa.Criar(empresaId, data, 100, 500, 0, 0, 0));
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow, Substitute.For<ILogger<FecharCaixaUseCase>>(), null, avisos);
+        await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId, data));
+
+        await avisos.DidNotReceiveWithAnyArgs().ResolverAvisosDeCaixaFechadoAsync(default, default);
+    }
+
+    [Fact]
     public async Task FecharCaixa_MarcadorFechamento_DeveUsarDataMovimentoUtc()
     {
         // Regressao #615: data.ToDateTime(TimeOnly.MaxValue) gerava Kind=Unspecified, que o
@@ -244,6 +297,32 @@ public class CaixaUseCasesTests
         result.Data.Should().Be(ontem);
         await _repo.Received(1).AddFechamentoAsync(Arg.Is<FechamentoCaixa>(f => f.Data == ontem));
         await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task FecharCaixa_AvisoDeDiasIntermediarios_DeveSairComAcentoESemCaixaAlta()
+    {
+        // #2256: o aviso fica gravado nas observações e aparece na tela do fechamento.
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var dia = hoje.AddDays(-3);
+        var abertura = MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-3));
+        var esquecido = MovimentoCaixa.Criar(empresaId, "entrada", 20m, DateTime.UtcNow.AddDays(-2));
+
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(abertura);
+        _repo.GetFechamentoDoDiaAsync(empresaId, dia, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, dia, null).Returns(new[] { abertura });
+        _repo.GetMovimentosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { esquecido });
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<FecharCaixaUseCase>>());
+
+        await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId));
+
+        var esperado = $"Atenção: há lançamentos entre {dia.AddDays(1):dd/MM/yyyy} e {hoje.AddDays(-1):dd/MM/yyyy} " +
+                       "nesta sessão que não entraram neste fechamento. Revise e reconcilie manualmente.";
+        await _repo.Received(1).AddFechamentoAsync(Arg.Is<FechamentoCaixa>(f => f.Observacoes == esperado));
     }
 
     // ════════════════════════════════════════════════════════════════════

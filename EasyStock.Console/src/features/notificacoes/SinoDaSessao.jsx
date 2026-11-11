@@ -30,12 +30,26 @@ export function SinoDaSessao({ avisos, aparelho }) {
   }, [lendo, recentes])
   // #1989: quem ainda não ativou neste aparelho vê um ponto discreto no sino; o caminho fica dentro.
   const semAvisoNoAparelho = ['desligado', 'bloqueado'].includes(aparelho?.estado)
+  // #2258 (auditoria A8, H11, A12): o caminho para ligar os avisos do aparelho vem ANTES da lista quando
+  // eles estão desligados, e os dois botões ganham ícone e cara de botão.
+  const secaoDoAparelho = aparelho && (
+      <section className={css.aparelho} aria-label="Avisos neste aparelho">
+        <div>
+          <h3>Avisos neste aparelho</h3>
+          <p role={aparelho.estado === 'erro' ? 'alert' : 'status'}>{aparelho.mensagem ?? textoAparelho[aparelho.estado]}</p>
+        </div>
+        {['desligado', 'bloqueado', 'erro', 'sem-chave', 'ativando'].includes(aparelho.estado) && <Botao icone="bell" onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar avisos neste aparelho</Botao>}
+        {['ativo', 'desativando'].includes(aparelho.estado) && <Botao onClick={aparelho.desligar} disabled={aparelho.estado === 'desativando'}>Desativar avisos neste aparelho</Botao>}
+      </section>
+  )
   return <>
-    <Botao variante="texto" icone="bell" aria-label={`Avisos${erro ? ', sem atualizar' : total === null ? '' : `, ${total} não lidas`}${semAvisoNoAparelho ? ', avisos neste aparelho desligados' : ''}`}
-      title={semAvisoNoAparelho ? 'Avisos neste aparelho desligados: abra para ativar' : undefined}
+    <Botao variante="texto" icone="bell" aria-label={`Avisos${erro ? ', sem atualizar' : total === null ? '' : `, ${total} não lidas`}${semAvisoNoAparelho ? ', avisos desligados neste aparelho' : ''}`}
+      title={semAvisoNoAparelho ? 'Avisos desligados neste aparelho: abra e toque em Ativar' : undefined}
       aria-haspopup="dialog" onClick={() => { setAberto(true); carregar() }}>
-      <span>Avisos{erro ? ' !' : total ? ` (${total})` : ''}</span>
-      {semAvisoNoAparelho && <span className={css.pontoAparelho} data-aparelho-desligado aria-hidden="true" />}
+      {/* #2232 (H3, L2): o número sai do texto e vai para o contador único do app. */}
+      <span>Avisos{erro ? ' !' : ''}</span>
+      {!erro && total > 0 && <Pilula contagem={total > 99 ? '99+' : total} tom="perigo" aria-hidden="true" data-contador-sino />}
+      {semAvisoNoAparelho && <span className={css.pontoAparelho} data-aparelho-desligado aria-hidden="true" title="Avisos desligados neste aparelho" />}
     </Botao>
     {aberto && <Modal titulo="Avisos" largura="md" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."
       aoFechar={() => setAberto(false)} rodape={<><Botao ref={atualizarRef} onClick={() => carregar()} disabled={carregando || Boolean(lendo)}>Atualizar avisos</Botao><Botao onClick={() => setAberto(false)}>Fechar</Botao></>}>
@@ -46,6 +60,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
         <strong>{total} {total === 1 ? 'aviso não lido' : 'avisos não lidos'}</strong>
         <span>Mostrando {recentes.length} de {total}. Os próximos aparecem conforme você marca como lidos.</span>
       </div>}
+      {semAvisoNoAparelho && secaoDoAparelho}
       <ul className={css.lista} aria-label="Avisos não lidos" aria-busy={carregando || Boolean(lendo)}>
         {recentes.map((aviso) => <li key={aviso.id} className={css.aviso}>
           <div className={css.texto}>
@@ -53,7 +68,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
             <h3>{aviso.titulo || 'Aviso'}</h3>
             <p>{aviso.mensagem}</p>
           </div>
-          <Botao variante="texto" onClick={(evento) => {
+          <Botao icone="check" onClick={(evento) => {
             leituraRef.current = evento.currentTarget
             marcarLida(aviso.id)
           }} disabled={carregando || Boolean(lendo)} aria-label={`Marcar como lido: ${aviso.titulo || 'Aviso'}`}>
@@ -61,14 +76,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
           </Botao>
         </li>)}
       </ul>
-      {aparelho && <section className={css.aparelho} aria-label="Avisos neste aparelho">
-        <div>
-          <h3>Avisos neste aparelho</h3>
-          <p role={aparelho.estado === 'erro' ? 'alert' : 'status'}>{aparelho.mensagem ?? textoAparelho[aparelho.estado]}</p>
-        </div>
-        {['desligado', 'bloqueado', 'erro', 'sem-chave', 'ativando'].includes(aparelho.estado) && <Botao onClick={aparelho.ativar} disabled={aparelho.estado === 'ativando'}>Ativar avisos neste aparelho</Botao>}
-        {['ativo', 'desativando'].includes(aparelho.estado) && <Botao onClick={aparelho.desligar} disabled={aparelho.estado === 'desativando'}>Desativar avisos neste aparelho</Botao>}
-      </section>}
+      {!semAvisoNoAparelho && secaoDoAparelho}
     </Modal>}
   </>
 }

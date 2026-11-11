@@ -81,6 +81,7 @@ public sealed class SyncPullServerTimeTests : IDisposable
             Substitute.For<IProdutoRepository>(),
             new ConfigurationBuilder().Build(),
             relogio,
+            new EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile(_db, NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Persistence.ILoteNumeroCurtoRepository>(), NullLogger<EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile>.Instance),
             NullLogger<SyncController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = http }

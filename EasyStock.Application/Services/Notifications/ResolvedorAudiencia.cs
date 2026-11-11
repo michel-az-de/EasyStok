@@ -52,6 +52,9 @@ public sealed class ResolvedorAudiencia(
     /// <summary>WhatsApp de plataforma (N6). Sem ele, a audiência nunca entrega WhatsApp.</summary>
     public const string ChaveWhatsAppPlataforma = "Notifications:WhatsApp:Plataforma:PhoneNumberId";
 
+    private static readonly NivelAcesso[] TodosOsNiveisDaLoja =
+        [NivelAcesso.Admin, NivelAcesso.Gerente, NivelAcesso.Operador, NivelAcesso.Visualizador];
+
     public async Task<IReadOnlyList<DestinatarioAudiencia>?> ResolverAsync(
         RotinaNotificacao rotina, Guid empresaId, Guid? usuarioIdPayload, CancellationToken ct = default)
     {
@@ -95,6 +98,9 @@ public sealed class ResolvedorAudiencia(
                     // Quem atende conversas, pela mesma regra do JWT: a cozinha (Operador sem atender) fica de fora.
                     candidatos = await usuarios.ListarComPermissaoAsync(empresaId, Permissao.AtenderConversas, ct);
                     break;
+                case AudienciaNotificacao.Inscritos:
+                    candidatos = await usuarios.ListarDaEmpresaAsync(empresaId, TodosOsNiveisDaLoja, ct);
+                    break;
                 default:
                     candidatos = await superAdmins.ListarAsync(ct);
                     break;
@@ -108,18 +114,23 @@ public sealed class ResolvedorAudiencia(
         var consentimentosPorUsuario = (await consentimentos.ListarPorUsuariosAsync(ids, ct))
             .GroupBy(c => c.UsuarioId)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<ConsentimentoNotificacao>)g.ToList());
-        var desligadas = rotina.Categoria == CategoriaConteudoNotificacao.Seguranca
-            ? new HashSet<Guid>()
-            : (await preferencias.ListarDaRotinaAsync(empresaId, rotina.Codigo, ids, ct))
-                .Where(p => !p.Habilitada)
-                .Select(p => p.UsuarioId)
-                .ToHashSet();
-        var whatsAppDePlataforma = !string.IsNullOrWhiteSpace(configuration[ChaveWhatsAppPlataforma]);
+        var inscritos = audiencia == AudienciaNotificacao.Inscritos;
+        var preferenciasDaRotina = rotina.Categoria == CategoriaConteudoNotificacao.Seguranca && !inscritos
+            ? []
+            : await preferencias.ListarDaRotinaAsync(empresaId, rotina.Codigo, ids, ct);
+        var desligadas = preferenciasDaRotina.Where(p => !p.Habilitada).Select(p => p.UsuarioId).ToHashSet();
+        // #2211: na audiência inscritos a preferência é opt-in: sem linha ligada a pessoa não recebe.
+        var ligadas = preferenciasDaRotina.Where(p => p.Habilitada).Select(p => p.UsuarioId).ToHashSet();
+        // #2211: aviso a inscrito com remetente loja (N6) sai pelo número do atendimento, sem o WhatsApp de plataforma.
+        // As demais audiências seguem exigindo o 2º número, sem mudar o que já está em produção.
+        var pelaLoja = inscritos && RemetentePorTipoEvento.De(rotina.TipoEvento) == OrigemRemetente.Loja;
+        var whatsAppDisponivel = pelaLoja || !string.IsNullOrWhiteSpace(configuration[ChaveWhatsAppPlataforma]);
 
         var destinatarios = new List<DestinatarioAudiencia>(ativos.Count);
         foreach (var u in ativos)
         {
             if (desligadas.Contains(u.Id)) continue;
+            if (inscritos && !ligadas.Contains(u.Id)) continue;
 
             var consentimentosDele = consentimentosPorUsuario.GetValueOrDefault(u.Id) ?? [];
             var email = !string.IsNullOrWhiteSpace(u.Email) && (!coletiva || u.EmailConfirmado) ? u.Email : null;
@@ -127,11 +138,17 @@ public sealed class ResolvedorAudiencia(
             // da dona. A relaxacao vale so para a audiencia convidado e so enquanto o convite esta pendente.
             var telefoneVerificadoOuConvidado = u.TelefoneVerificadoEm is not null
                                                 || (audiencia == AudienciaNotificacao.Convidado && u.ConvitePendente);
-            var whatsApp = whatsAppDePlataforma
+            var consentimentoWhatsApp = consentimentosDele
+                .Where(c => c.Canal == CanalNotificacao.WhatsApp && c.Categoria == rotina.Categoria)
+                .ToList();
+            // Inscrito: a marcação da dona vale como opt-in, mas o opt-out explícito dele vence.
+            var aceitaWhatsApp = inscritos
+                ? !consentimentoWhatsApp.Any(c => !c.OptIn)
+                : consentimentoWhatsApp.Any(c => c.OptIn);
+            var whatsApp = whatsAppDisponivel
                            && !string.IsNullOrWhiteSpace(u.Telefone)
                            && telefoneVerificadoOuConvidado
-                           && consentimentosDele.Any(c => c.Canal == CanalNotificacao.WhatsApp
-                                                          && c.Categoria == rotina.Categoria && c.OptIn)
+                           && aceitaWhatsApp
                 ? u.Telefone
                 : null;
 

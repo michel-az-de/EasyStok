@@ -233,6 +233,8 @@ export function corpoDoPedido(pedido) {
     janelaId: janela?.janelaId ?? null,
     dataEntrega: janela?.data ?? null,
     forma: formaDoMeio(pedido?.meio),
+    // #2219: frete combinado com o cliente (CEP fora da área). Zero é frete grátis combinado.
+    ...(pedido?.freteCombinado != null ? { freteCombinado: pedido.freteCombinado } : {}),
   }
 }
 
@@ -241,8 +243,8 @@ export const gerarPedido = (conversaId, corpo) =>
 
 // #1884 ("Quanto fica?"): o corpo do pedido sem forma de pagamento nem envio.
 export function corpoDaSimulacao(pedido) {
-  const { itens, janelaId, dataEntrega } = corpoDoPedido(pedido)
-  return { itens, janelaId, dataEntrega }
+  const { itens, janelaId, dataEntrega, freteCombinado } = corpoDoPedido(pedido)
+  return { itens, janelaId, dataEntrega, ...(freteCombinado != null ? { freteCombinado } : {}) }
 }
 
 // Só lê: o servidor calcula frete, total, sinal e restante com as regras do pedido e não cria nada.

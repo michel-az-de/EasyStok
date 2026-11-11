@@ -40,7 +40,8 @@ public sealed class AgenteAtendimentoService(
     ObterDossieClienteUseCase dossieUseCase,
     ICadernoRepository caderno,
     ILogger<AgenteAtendimentoService> logger,
-    IPedidoRepository? pedidos = null)
+    IPedidoRepository? pedidos = null,
+    Notifications.IContatoDaEquipeAvisada? equipe = null)
 {
     public const int MaximoIteracoes = 6;
     public const int UltimasMensagens = 20;
@@ -50,6 +51,7 @@ public sealed class AgenteAtendimentoService(
 
     public const string MotivoAgenteDesligado = "agente desligado (LLM indisponível)";
     public const string MotivoAtendimentoAutomaticoDesligado = "atendimento automático desligado na configuração";
+    public const string MotivoContatoDaEquipe = "contato da equipe que recebe os avisos: o robô não responde";
 
     public async Task<ResultadoTurnoAgente> ProcessarTurnoAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
     {
@@ -71,9 +73,11 @@ public sealed class AgenteAtendimentoService(
         // (Anthropic:Enabled=false ou sem chave) ou canal sem agente (o agente envia pelo cliente do WhatsApp;
         // em outro canal sairia pelo canal errado). Passa de fato para a dona, senão a conversa fica
         // Automatica sem ninguém e fora do lembrete (#1288).
+        // #2211: quem recebe os avisos pelo número da loja e responde a eles fala com gente, nunca com o robô.
         var motivoSemAgente = !configuracao.Ativo ? MotivoAtendimentoAutomaticoDesligado
             : !llm.Disponivel ? MotivoAgenteDesligado
             : !conversa.TemAgente ? $"o canal {conversa.Canal} não tem agente"
+            : equipe is not null && await equipe.EhInscritoAsync(empresaId, conversa.ContatoIdExterno, ct) ? MotivoContatoDaEquipe
             : null;
         if (motivoSemAgente is not null)
         {
@@ -95,6 +99,14 @@ public sealed class AgenteAtendimentoService(
         if (cliente?.Bloqueado == true)
         {
             await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(cliente), agora, ct);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
+        }
+
+        // #2249: pessoa encaminhada à responsável. Fica com a equipe até alguém devolver a conversa ao robô.
+        if (cliente?.AtendimentoAutomaticoPausado == true)
+        {
+            await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoContatoPausado(cliente), agora, ct);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
@@ -142,10 +154,15 @@ public sealed class AgenteAtendimentoService(
         }
 
         var respondeu = contexto.HouveEnvio;
-        const string encaminhamento = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+        // #2249: o texto de cada ação é molde da loja; quem não é cliente recebe o de encaminhamento.
+        var primeiroNome = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome);
+        var encaminhamento = MoldeMensagemContato.Preencher(configuracao.MensagemEscalada, primeiroNome);
         if (conversa.Situacao == SituacaoConversa.Assumida)
         {
-            respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct) || respondeu;
+            var aoContato = contexto.Encaminhou
+                ? MoldeMensagemContato.Preencher(configuracao.MensagemEncaminhamento, primeiroNome)
+                : encaminhamento;
+            respondeu = await EnviarRespostaAsync(gravacao, conversa, aoContato, ct) || respondeu;
         }
         else if (conversa.Situacao == SituacaoConversa.Encerrada && contexto.RespostaVerificada is { Length: > 0 } despedida)
             respondeu = await EnviarRespostaAsync(gravacao, conversa, despedida, ct) || respondeu;

@@ -12,7 +12,7 @@ const bundleVersion = process.env.CDB_BUNDLE_VERSION || version.version;
 if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(bundleVersion)) throw new Error('Versão do conteúdo inválida.');
 const apiBaseUrl = process.env.CDB_API_BASE_URL || 'https://api.easystok.online';
 if (new URL(apiBaseUrl).protocol !== 'https:') throw new Error('A API do piloto precisa de HTTPS.');
-for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot.css']) {
+for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot-auth.js', 'pilot.css']) {
   if (!fs.existsSync(path.join(root, name))) throw new Error('Arquivo obrigatório ausente: ' + name);
 }
 if (!fs.existsSync(path.join(source, 'index.html'))) throw new Error('PWA fonte ausente.');
@@ -23,12 +23,13 @@ if (path.dirname(target) !== root || path.basename(target) !== 'web') throw new 
 fs.rmSync(target, { recursive: true, force: true });
 fs.cpSync(source, target, { recursive: true });
 fs.cpSync(fonts, path.join(target, 'fonts'), { recursive: true });
-for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot.css']) fs.copyFileSync(path.join(root, name), path.join(target, name));
+for (const name of ['pilot.js', 'pilot-ui.js', 'pilot-settings.js', 'pilot-auth.js', 'pilot.css']) fs.copyFileSync(path.join(root, name), path.join(target, name));
 fs.cpSync(path.join(root, 'assets/guia'), path.join(target, 'guia'), { recursive: true });
 fs.copyFileSync(path.resolve(root, '../../EasyStock.Console/src/assets/casa-da-baba.png'), path.join(target, 'casa-da-baba.png'));
 const config = {
   apiBaseUrl: apiBaseUrl.replace(/\/+$/, ''),
   isPilot: true,
+  requiresGoogleSession: true,
   appId: contract.APP,
   version: version.version,
   pilotVersion: version.version,
@@ -63,7 +64,7 @@ html = html.replace('O app costuma se atualizar sozinho ao reabrir. Se precisar,
 html = html.replace('</head>', '<link rel="stylesheet" href="pilot.css">\n</head>');
 html = html.replaceAll('PWA antigo', 'Sistema Antigo').replaceAll('PWA de origem', 'Sistema Antigo');
 html = html.replaceAll('Forçar flush', 'Sincronizar').replaceAll('Forçar pull', 'Atualizar');
-html = html.replace('</body>', '<script src="pilot.js"></script>\n<script src="pilot-ui.js"></script>\n<script src="pilot-settings.js"></script>\n</body>');
+html = html.replace('</body>', '<script src="pilot-auth.js"></script>\n<script src="pilot.js"></script>\n<script src="pilot-ui.js"></script>\n<script src="pilot-settings.js"></script>\n</body>');
 html = html.replaceAll('__APP_VERSION__', 'piloto-' + version.version)
   .replaceAll('"__APP_RELEASE_NOTES__"', JSON.stringify('Piloto integrado ao EasyStok'));
 // WebViews e previews podem conservar scripts da versão anterior após atualizar.

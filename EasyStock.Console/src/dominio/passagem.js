@@ -30,18 +30,32 @@ export function passagemPendente(conversa) {
 
 const minuscula = (texto) => texto.charAt(0).toLowerCase() + texto.slice(1)
 
+// #2232 (banca UX, L9): o cartão do Balcão leva só o assunto do motivo, em chip curto ("Restrição
+// alimentar"). A frase inteira fica na barra da conversa (`longo`). Corta na primeira vírgula ou
+// ponto e, se ainda passar de 28 letras, na última palavra que cabe.
+const LIMITE_DO_CHIP = 28
+export function chipDoMotivo(motivo) {
+  const assunto = String(motivo ?? '').split(/[,.;:(]/)[0].trim()
+  if (!assunto) return null
+  const inicial = assunto.charAt(0).toUpperCase() + assunto.slice(1)
+  if (inicial.length <= LIMITE_DO_CHIP) return inicial
+  const corte = inicial.slice(0, LIMITE_DO_CHIP + 1).replace(/\s+\S*$/, '')
+  return `${corte || inicial.slice(0, LIMITE_DO_CHIP)}…`
+}
+
 export function origemDaPassagem(passagem) {
   if (!passagem) return null
   const motivo = passagem.motivo ?? MOTIVO_PADRAO
   const hora = passagem.em ? horaCurta(passagem.em) : null
-  if (passagem.origem === 'chat-site') return { motivo, hora, curto: 'Chat do site', longo: motivo }
+  if (passagem.origem === 'chat-site') return { motivo, hora, curto: 'Chat do site', longo: motivo, chip: null }
   // #2185: canal sem Assistente ninguém "não soube responder": a conversa é da equipe desde o início.
-  if (passagem.origem === 'fila') return { motivo, hora, curto: AGUARDANDO_EQUIPE, longo: motivo }
-  if (passagem.origem === 'reabertura') return { motivo, hora, curto: motivo, longo: motivo }
+  if (passagem.origem === 'fila') return { motivo, hora, curto: AGUARDANDO_EQUIPE, longo: motivo, chip: null }
+  if (passagem.origem === 'reabertura') return { motivo, hora, curto: motivo, longo: motivo, chip: chipDoMotivo(motivo) }
   // #1761: com o automático desligado ninguém "não soube responder": a conversa só veio para a equipe.
   if (motivo === AUTOMATICO_DESLIGADO) {
     return {
       motivo, hora,
+      chip: 'Sem automático',
       // O cartão e o lembrete já dizem "Passou para você" na linha de estado: aqui vai só o porquê.
       curto: `Sem Assistente${hora ? ` (${hora})` : ''}`,
       longo: `A conversa passou para você${hora ? ` às ${hora}` : ''} porque ${motivo}.`,
@@ -50,6 +64,7 @@ export function origemDaPassagem(passagem) {
   return {
     motivo,
     hora,
+    chip: chipDoMotivo(motivo),
     // Cartão do Balcão e lembrete: uma linha que cabe em duas no cartão.
     curto: `Assistente não soube responder${hora ? ` (${hora})` : ''}: ${minuscula(motivo)}`,
     // Barra da conversa: a frase inteira, com espaço para ler.

@@ -3,7 +3,8 @@
 .abrirNotas { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); min-width: var(--toque); padding: 0; border: 0; background: transparent; font: inherit; font-size: var(--t-apoio); cursor: pointer; }
 .abrirNotas span { color: var(--tinta-2); }
 .abrirNotas[aria-expanded='true'] svg { transform: rotate(180deg); }
-.lista { display: grid; gap: var(--e-2); max-height: min(32dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
+/* #2232 (F5): a lista de notas cresce com o conteúdo; quem rola é a Ficha (.conteudo), não uma caixa dentro dela. */
+.lista { display: grid; gap: var(--e-2); }
 .lista[hidden] { display: none; }
 .acoesCliente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
 .nota, .solto { border: 0; border-radius: 0; color: var(--tinta); }

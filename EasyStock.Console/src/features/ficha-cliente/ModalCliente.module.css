@@ -25,6 +25,7 @@
 .historico li { border: 0; box-shadow: none; background: transparent; }
 .historico textarea { background: var(--papel-ficha, var(--elevado)); }
 .acoes { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; width: 100%; }
+.lugarDoSalvar { display: contents; }
 .acoes small { flex: 1 1 220px; color: var(--tinta-2); font-size: var(--t-micro); }
 .erro { margin: 0; color: var(--erro); }
 .consultaFrete { display: grid; gap: var(--e-3); padding-bottom: var(--e-4); }

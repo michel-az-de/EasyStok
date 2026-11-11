@@ -43,5 +43,35 @@ export function tempoRestante(expiraEm, agora = Date.now()) {
   return `${Math.floor(segundos / 60)}:${String(segundos % 60).padStart(2, '0')}`
 }
 
+// #2235 (banca P2-2): o botão diz qual aparelho está ligado e quando apareceu pela última vez.
+// Conta só o pareado e não revogado; o código gerado e ainda não usado não é aparelho.
+export function estadoDosAparelhos(aparelhos = [], agora = Date.now()) {
+  const ativos = aparelhos.filter((a) => !a.revoked && !a.pendingPair)
+  if (ativos.length === 0) return 'Nenhum aparelho conectado'
+  if (ativos.length > 1) return `${ativos.length} aparelhos conectados`
+  const [a] = ativos
+  // O pareamento automático grava o rótulo técnico "auto-provisioned": não é nome de aparelho.
+  const rotulo = a.label?.trim() === 'auto-provisioned' ? '' : a.label?.trim()
+  const nome = rotulo || a.defaultOperatorName?.trim() || 'Aparelho'
+  return `${nome} · ${vistoEm(a.lastSeenAt, agora)}`
+}
+
+function vistoEm(iso, agora) {
+  const visto = iso ? Date.parse(iso) : NaN
+  if (!Number.isFinite(visto)) return 'conectado'
+  const minutos = Math.max(0, Math.floor((agora - visto) / 60000))
+  if (minutos < 15) return 'ativo agora'
+  if (minutos < 60) return `visto há ${minutos} min`
+  const horas = Math.floor(minutos / 60)
+  if (horas < 24) return `visto há ${horas} h`
+  return `visto em ${new Date(visto).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })}`
+}
+
+export async function lerEstadoDosAparelhos() {
+  const empresaId = lerSessao()?.empresa?.id
+  if (!empresaId) return null
+  return estadoDosAparelhos((await listarAparelhos(empresaId)) ?? [])
+}
+
 // "123 456": dois grupos de três, mais fácil de ditar e de digitar no celular.
 export const codigoEmGrupos = (codigo) => `${codigo.slice(0, 3)} ${codigo.slice(3)}`

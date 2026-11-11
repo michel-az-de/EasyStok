@@ -48,8 +48,11 @@ public class CheckoutCoreServiceTests
         public EasyStock.Application.Ports.Output.Persistence.IConfiguracaoAtendimentoRepository ConfiguracaoAtendimentoRepo { get; } =
             Substitute.For<EasyStock.Application.Ports.Output.Persistence.IConfiguracaoAtendimentoRepository>();
 
-        /// <summary>Véspera da entrega, 12:00 em Brasília: qualquer janela do dia seguinte atende o prazo.</summary>
-        public FakeTimeProvider Relogio { get; } = new(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero));
+        /// <summary>
+        /// Por padrão, véspera da entrega, 12:00 em Brasília: qualquer janela do dia seguinte atende o prazo.
+        /// Quem precisa de encomenda com sinal (#2259, 2 dias ou mais) passa outro instante no construtor.
+        /// </summary>
+        public FakeTimeProvider Relogio { get; }
         public StorefrontEntity Storefront { get; }
         public CardapioItem CardapioItem { get; }
         public Guid JanelaId => CheckoutCoreServiceTests.JanelaId;
@@ -69,8 +72,9 @@ public class CheckoutCoreServiceTests
             StorefrontRepo, FreteZonaRepo, Substitute.For<ICepLookupClient>(), Geocoding, Rotas,
             NullLogger<CalcularFreteUseCase>.Instance);
 
-        public Cenario()
+        public Cenario(DateTimeOffset? agora = null)
         {
+            Relogio = new(agora ?? new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero));
             Storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Babá", 0m);
             Storefront.Ativar();
             ConfiguracaoAtendimentoRepo.GetOrDefaultAsync(Storefront.EmpresaId)

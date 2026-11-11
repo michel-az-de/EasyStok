@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react'
+import { Botao } from './Botao'
 import { BotaoIcone } from './BotaoIcone'
 import { Icone } from './Icone'
 import { Popover } from './Popover'
@@ -13,9 +14,13 @@ import css from './MenuDeAcoes.module.css'
 // marcado }. `motivo` diz por que não dá; `detalhe`, o que o item aceita ou faz (o primeiro manda).
 // Condição falsa (`cond && {...}`) fica de fora, e sem item nenhum o gatilho não existe:
 // menu que não leva a lugar nenhum não aparece. `marcado` (booleano) faz do item uma chave de ligar.
-// `grupos`/`aoEscolherGrupo` é a lista com título e detalhe do Popover, para o menu do topo.
+// `grupos`/`aoEscolherGrupo` é a lista com título e detalhe do Popover, para o menu do topo, que no
+// celular abre como folha inferior de largura cheia (#2232, M4).
+// `texto` põe o nome visível no gatilho, como o "Ações" da Ficha (#2232, F1); `ocupado` anuncia a espera
+// (aria-busy) enquanto um item ainda trabalha depois de o menu fechar.
 export function MenuDeAcoes({
-  rotulo = 'Mais opções', itens, grupos, aoEscolherGrupo, icone = 'ellipsis-vertical', tom = 'texto', alinhar = 'fim', dica, refGatilho, ...resto
+  rotulo = 'Mais opções', itens, grupos, aoEscolherGrupo, icone = 'ellipsis-vertical', tom = 'texto', alinhamento = 'direita', dica, refGatilho,
+  texto, ocupado = false, ...resto
 }) {
   const [aberto, setAberto] = useState(false)
   const prefixo = useId()
@@ -25,17 +30,19 @@ export function MenuDeAcoes({
   useEffect(() => { if (vazio) setAberto(false) }, [vazio])
   if (vazio) return null
   const fechar = () => setAberto(false)
+  const gatilho = {
+    'aria-haspopup': 'menu', 'aria-expanded': aberto, 'aria-busy': ocupado || undefined, onClick: () => setAberto((v) => !v), ...resto,
+  }
 
   return (
     <span className={css.menu}>
-      <BotaoIcone
-        ref={refGatilho} rotulo={rotulo} dica={dica} icone={icone} tom={tom}
-        aria-haspopup="menu" aria-expanded={aberto} onClick={() => setAberto((v) => !v)} {...resto}
-      />
+      {texto
+        ? <Botao ref={refGatilho} variante="secundario" icone={icone} aria-label={rotulo} title={dica} {...gatilho}>{texto}</Botao>
+        : <BotaoIcone ref={refGatilho} rotulo={rotulo} dica={dica} icone={icone} tom={tom} {...gatilho} />}
       {aberto && (
         <Popover
-          rotulo={rotulo} posicao="abaixo" alinhar={alinhar} largura={grupos ? undefined : LARGURA} portal aoFechar={fechar}
-          grupos={grupos} aoEscolher={grupos ? (item) => { fechar(); aoEscolherGrupo?.(item) } : undefined}
+          rotulo={rotulo} posicao="abaixo" alinhamento={alinhamento} largura={grupos ? undefined : LARGURA} portal aoFechar={fechar}
+          folha={Boolean(grupos)} grupos={grupos} aoEscolher={grupos ? (item) => { fechar(); aoEscolherGrupo?.(item) } : undefined}
         >
           {grupos ? undefined : (
             <div className={css.lista}>

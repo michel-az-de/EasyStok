@@ -20,6 +20,12 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -88,20 +94,22 @@ public class ThermalPrinterPlugin extends Plugin {
                 return;
             }
             Set<BluetoothDevice> bonded = adapter.getBondedDevices();
-            JSArray devices = new JSArray();
+            List<JSObject> rows = new ArrayList<>();
             if (bonded != null) {
                 for (BluetoothDevice d : bonded) {
-                    if (!looksLikePrinter(d)) continue;
-                    JSObject dev = new JSObject();
-                    String addr = d.getAddress();
-                    String name = null;
-                    try { name = d.getName(); } catch (SecurityException ignore) {}
-                    dev.put("address", addr);
-                    dev.put("id", addr);
-                    dev.put("name", name != null ? name : addr);
-                    devices.put(dev);
+                    JSObject dev = describe(d);
+                    if (dev != null) rows.add(dev);
                 }
             }
+            Collections.sort(rows, new Comparator<JSObject>() {
+                @Override public int compare(JSObject a, JSObject b) {
+                    return PrinterClassifier.compare(
+                        a.optBoolean("printerClass"), a.optBoolean("supported"), a.optString("name"),
+                        b.optBoolean("printerClass"), b.optBoolean("supported"), b.optString("name"));
+                }
+            });
+            JSArray devices = new JSArray();
+            for (JSObject row : rows) devices.put(row);
             JSObject ret = new JSObject();
             ret.put("devices", devices);
             call.resolve(ret);
@@ -113,33 +121,41 @@ public class ThermalPrinterPlugin extends Plugin {
     }
 
     /**
-     * Heurística pra filtrar dispositivos que claramente não são impressoras.
-     * - Se UUIDs estão disponíveis: exige SPP (00001101-...).
-     * - Se UUIDs não foram cacheados: exclui apenas pela classe (audio/wearable/peripheral).
-     * Mantém impressora térmica genérica visível e tira fones BLE-only que crashavam connect.
+     * #2193: devolve todo pareado plausível com o tipo, em vez de esconder
+     * térmica sem UUID SPP em cache (caso da MTP-II). Só fone e relógio somem.
      */
-    private boolean looksLikePrinter(BluetoothDevice d) {
+    private JSObject describe(BluetoothDevice d) {
+        int major = -1;
+        try {
+            BluetoothClass bc = d.getBluetoothClass();
+            if (bc != null) major = bc.getMajorDeviceClass();
+        } catch (Exception ignore) {}
+        if (PrinterClassifier.hidden(major)) return null;
+        String addr = d.getAddress();
+        String name = null;
+        try { name = d.getName(); } catch (SecurityException ignore) {}
+        int type = PrinterClassifier.DEVICE_TYPE_UNKNOWN;
+        try { type = d.getType(); } catch (Exception ignore) {}
+        Boolean spp = null;
         try {
             ParcelUuid[] uuids = d.getUuids();
             if (uuids != null && uuids.length > 0) {
+                spp = false;
                 for (ParcelUuid pu : uuids) {
-                    if (pu != null && pu.getUuid().equals(SPP_UUID)) return true;
+                    if (pu != null && SPP_UUID.equals(pu.getUuid())) { spp = true; break; }
                 }
-                return false;
             }
-            BluetoothClass bc = d.getBluetoothClass();
-            if (bc != null) {
-                int major = bc.getMajorDeviceClass();
-                if (major == BluetoothClass.Device.Major.AUDIO_VIDEO) return false;
-                if (major == BluetoothClass.Device.Major.PERIPHERAL) return false;
-                if (major == BluetoothClass.Device.Major.WEARABLE) return false;
-                if (major == BluetoothClass.Device.Major.PHONE) return false;
-                if (major == BluetoothClass.Device.Major.COMPUTER) return false;
-            }
-            return true;
-        } catch (Exception ex) {
-            return true;
-        }
+        } catch (Exception ignore) {}
+        JSObject dev = new JSObject();
+        dev.put("address", addr);
+        dev.put("id", addr);
+        dev.put("name", name != null ? name : addr);
+        dev.put("type", PrinterClassifier.typeName(type));
+        if (spp == null) dev.put("spp", JSONObject.NULL); else dev.put("spp", spp.booleanValue());
+        dev.put("majorClass", major);
+        dev.put("printerClass", PrinterClassifier.printerClass(major, name));
+        dev.put("supported", PrinterClassifier.supported(type));
+        return dev;
     }
 
     @PluginMethod
@@ -153,9 +169,11 @@ public class ThermalPrinterPlugin extends Plugin {
             BluetoothAdapter adapter = getAdapter();
             if (adapter == null) { call.reject("Bluetooth não suportado"); return; }
             if (!adapter.isEnabled()) { call.reject("Bluetooth desligado"); return; }
-            try { adapter.cancelDiscovery(); } catch (Exception ignore) {}
             BluetoothDevice device = adapter.getRemoteDevice(address);
-            impl.connect(device, SPP_UUID, new ThermalPrinterImpl.ResultCallback() {
+            int type = PrinterClassifier.DEVICE_TYPE_UNKNOWN;
+            try { type = device.getType(); } catch (Exception ignore) {}
+            if (!PrinterClassifier.supported(type)) { call.reject(PrinterClassifier.LE_ONLY_MESSAGE); return; }
+            impl.connect(adapter, device, SPP_UUID, new ThermalPrinterImpl.ResultCallback() {
                 @Override public void onSuccess() {
                     JSObject ret = new JSObject();
                     ret.put("connected", true);

@@ -19,6 +19,7 @@ using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.ListarMovimentosCaixa;
+using EasyStock.Application.UseCases.ListarLinhasCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.ListarFechamentosCaixa;
 using EasyStock.Application.UseCases.Caixa;
@@ -30,6 +31,7 @@ using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.ListarLotes;
 using EasyStock.Application.UseCases.ObterLoteDetalhes;
 using EasyStock.Application.UseCases.Etiquetas;
+using EasyStock.Application.UseCases.Etiquetas.Folha;
 using EasyStock.Application.UseCases.ListasCompras;
 using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.GerenciarProduto;
@@ -107,6 +109,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EstornarMovimentoCaixaUseCase>();
         services.AddScoped<ListarMovimentosCaixaUseCase>();
         services.AddScoped<ObterCaixaDiaUseCase>();
+        services.AddScoped<ListarLinhasCaixaUseCase>();
         services.AddScoped<ListarFechamentosCaixaUseCase>();
 
         // Onda P5.A — Lotes
@@ -130,6 +133,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<MontarPayloadRenderUseCase>();
         services.AddScoped<MarcarEtiquetasImpressasUseCase>();
         services.AddScoped<SalvarFichaTecnicaUseCase>();
+        services.AddScoped<GerarFolhaEtiquetasPdfUseCase>(); // #2200: folha A4 em PDF
+        services.AddSingleton(_ => new VagasDeFolhaPdf()); // #2200: teto de folhas em PDF ao mesmo tempo, no processo
 
         // Onda P5.B — Listas de Compras
         services.AddScoped<ListarListasComprasUseCase>();

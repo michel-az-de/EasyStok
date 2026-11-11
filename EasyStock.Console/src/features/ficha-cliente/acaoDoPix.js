@@ -61,7 +61,8 @@ export function acaoDoPix(situacaoCob, {
       if (linkPendenteApi && situacaoCob.chave === 'aguardando') {
         return {
           rotuloEstado: 'Aguardando pagamento',
-          nota: 'O Mercado Pago confirma sozinho quando o cliente pagar. Use Marcar pago só se o dinheiro entrou por fora.',
+          // #2232 (F6): a ajuda cabe em uma linha; o valor vem na pergunta da baixa.
+          nota: 'O Mercado Pago confirma sozinho. Só marque se pagou por fora.',
           botoes: [{ rotulo: 'Marcar pago', icone: 'dollar-sign', onClick: aoAbrirBaixa, secundario: true }],
         }
       }
