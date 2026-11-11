@@ -6,6 +6,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Operacao;
 using EasyStock.Application.UseCases.Atendimento;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -51,6 +52,13 @@ public static partial class ServiceCollectionExtensions
 
         // S06: agente de atendimento (LLM com ferramentas) e roteador de botões sem LLM.
         services.AddScoped<AgenteAtendimentoService>();
+        // #2285: anti-loop de custo; o padrão (20 por hora) vale sem a chave na configuração.
+        services.AddOptions<LimiteRespostasAgenteOptions>()
+            .Configure<IConfiguration>((opcoes, configuracao) =>
+            {
+                if (int.TryParse(configuracao[LimiteRespostasAgenteOptions.ChaveMaximoPorHora], out var maximo))
+                    opcoes.MaximoPorHora = maximo;
+            });
         services.AddScoped<IEscaladorConversa, EscalarConversaUseCase>(); // S07: Assumir + nota + Push + SSE
 
         services.AddScoped<RoteadorAcoesBotao>();

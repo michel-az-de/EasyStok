@@ -89,6 +89,9 @@ public interface IConversaRepository
     /// </summary>
     Task<Conversa?> ObterUltimaEncerradaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default);
 
+    /// <summary>#2285: respostas do agente (saída, autor Agente) na conversa desde <paramref name="desde"/>; base do anti-loop.</summary>
+    Task<int> ContarRespostasDoAgenteDesdeAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default);
+
     Task<ConversaComMensagens?> ObterComMensagensAsync(Guid empresaId, Guid id, int ultimasN, CancellationToken ct = default);
 
     /// <summary>Mais recentes primeiro (por <c>UltimaMensagemEm</c>), paginado.</summary>

@@ -80,6 +80,52 @@ public class AgenteAtendimentoServiceTests
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos);
 
+    private AgenteAtendimentoService CriarServicoComLimite(int maximoPorHora) => new(
+        _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
+        [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+        new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
+        limiteRespostas: Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions { MaximoPorHora = maximoPorHora }));
+
+    private void RespostasDoAgenteNaUltimaHora(int total) =>
+        _conversaRepository.ContarRespostasDoAgenteDesdeAsync(_empresaId, _conversa.Id, Agora.AddHours(-1), Arg.Any<CancellationToken>())
+            .Returns(total);
+
+    [Fact]
+    public async Task NoLimiteDeRespostasDaHora_NaoChamaOLlmEPassaParaADona()
+    {
+        // #2285: anti-loop de custo. Outro robô do lado do cliente faria o agente responder (e gastar) sem fim.
+        RespostasDoAgenteNaUltimaHora(LimiteRespostasAgenteOptions.PadraoPorHora);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Should().Be(new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true));
+        _requisicoes.Should().BeEmpty();
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            AgenteAtendimentoService.MotivoLimiteRespostas(LimiteRespostasAgenteOptions.PadraoPorHora), Agora, Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task AbaixoDoLimite_RespondeNormalmente()
+    {
+        RespostasDoAgenteNaUltimaHora(LimiteRespostasAgenteOptions.PadraoPorHora - 1);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task LimiteVemDaConfiguracao_EZeroDesliga()
+    {
+        RespostasDoAgenteNaUltimaHora(5);
+
+        (await CriarServicoComLimite(5).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeFalse();
+        (await CriarServicoComLimite(0).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeTrue();
+    }
+
     private static RespostaLlm Texto(string texto) =>
         new("end_turn", [new BlocoTextoLlm(texto)], 100, 20);
 
