@@ -278,10 +278,36 @@ public class SyncMutationDispatcher(
         }
     }
 
+    // #2343 (R2-API-11): campos que, ausentes, estouravam NullReferenceException no meio do apply.
+    private static readonly string[] CamposObrigatoriosDoPedido = ["id", "clientSnapshot", "items"];
+
+    private static OrderDto DeserializarOrderUpsert(MutationDto m)
+    {
+        if (m.Payload.ValueKind != System.Text.Json.JsonValueKind.Object)
+            throw new ArgumentException("order.upsert: o payload precisa ser um objeto.");
+        // #2343: campo nulo conta como ausente; tipo errado vira motivo legivel, nao NullReference/JsonException.
+        var ausentes = CamposObrigatoriosDoPedido
+            .Where(c => !m.Payload.TryGetProperty(c, out var v) || v.ValueKind is System.Text.Json.JsonValueKind.Null)
+            .ToList();
+        if (ausentes.Count > 0)
+            throw new ArgumentException($"order.upsert sem campos obrigatorios: {string.Join(", ", ausentes)}.");
+        ExigirTipo(m.Payload, "id", System.Text.Json.JsonValueKind.String, "texto");
+        ExigirTipo(m.Payload, "clientSnapshot", System.Text.Json.JsonValueKind.Object, "objeto");
+        ExigirTipo(m.Payload, "items", System.Text.Json.JsonValueKind.Array, "lista");
+        return m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)
+            ?? throw new ArgumentException("order.upsert: payload invalido.");
+    }
+
+    private static void ExigirTipo(System.Text.Json.JsonElement payload, string campo, System.Text.Json.JsonValueKind tipo, string nome)
+    {
+        if (payload.GetProperty(campo).ValueKind != tipo)
+            throw new ArgumentException($"order.upsert: campo {campo} deve ser {nome}.");
+    }
+
     private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = CaberNasColunas(m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)!);
+        var dto = CaberNasColunas(DeserializarOrderUpsert(m));
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Order>().Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == dto.Id && o.EmpresaId == empresaId);
