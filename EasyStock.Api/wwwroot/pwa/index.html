@@ -12769,7 +12769,7 @@ function openProductionConfirm(productIds = null) {
   // Código do batch fica em variável — não aparece mais na tela de revisão.
   // É usado só internamente pra identificar o batch no banco.
   currentBatchCode = buildBatchCode(items);
-  currentBatchId = 'b-' + Date.now();
+  currentBatchId = 'b-' + calcGerarUuid() + '-' + Date.now();
 
   const summary = document.getElementById('prodSummary');
   summary.innerHTML = items.map(i => {
@@ -21956,7 +21956,7 @@ function confirmProduction() {
   });
 
   const code = currentBatchCode || buildBatchCode(itemsRaw);
-  const batchId = currentBatchId || ('b-' + nowMs);
+  const batchId = currentBatchId || ('b-' + calcGerarUuid() + '-' + nowMs);
   // #1474 W6: mesmo lote/codigo do batch e da etiqueta, mesmo virando o dia.
   try { document.getElementById('batchDate').textContent = subtituloDoLote(new Date(nowMs), batchId); } catch (_) {}
   const batch = {
