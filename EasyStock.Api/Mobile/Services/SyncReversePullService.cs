@@ -43,12 +43,13 @@ public class SyncReversePullService(
     /// do app. Se o pull normal ja mandou um client.upsert desse id, a mutacao e mesclada, nunca duplicada.
     /// Campo vazio no ERP nao apaga o dado do app.
     /// </summary>
-    private async Task AppendClientesEspelhadosAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId)
+    private async Task AppendClientesEspelhadosAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId, Guid? lojaId)
     {
         var espelhados = await (
             from m in _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
             join c in _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking() on m.ErpClienteId equals c.Id
             where m.EmpresaId == empresaId && c.EmpresaId == empresaId && c.Ativo && c.AlteradoEm > sinceDate
+                && (!lojaId.HasValue || m.LojaId == lojaId || m.LojaId == null)
             select new { Espelho = m, Erp = c }).ToListAsync();
         foreach (var par in espelhados)
         {
@@ -187,7 +188,7 @@ public class SyncReversePullService(
                 "client.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(c.AlteradoEm).ToUnixTimeMilliseconds()));
         }
 
-        await AppendClientesEspelhadosAsync(mutations, sinceDate, empresaId);
+        await AppendClientesEspelhadosAsync(mutations, sinceDate, empresaId, lojaId);
 
         // Pedidos web sem MobileOrderId (criados via /api/pedidos).
         var pedidosQ = _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()

@@ -112,6 +112,33 @@ public sealed class ClienteDocumentoSyncTests : IDisposable
         p.GetProperty("document").GetString().Should().Be("12345678909");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task EdicaoNoConsole_ClienteEspelhado_RespeitaLojaEEmpresa(bool filtrarLoja)
+    {
+        var lojaId = Guid.NewGuid();
+        var erp = Erp("Cliente atualizado", "12345678909");
+        App("c-loja-a", "Cliente antigo", erp.Id).LojaId = lojaId;
+        App("c-loja-b", "Cliente antigo", erp.Id).LojaId = Guid.NewGuid();
+        App("c-global", "Cliente antigo", erp.Id);
+
+        var outroErp = Erp("Cliente de outra empresa", "98765432100");
+        outroErp.EmpresaId = Guid.NewGuid();
+        var outroApp = App("c-outra-empresa", "Cliente de outra empresa", outroErp.Id);
+        outroApp.EmpresaId = outroErp.EmpresaId;
+        outroApp.LojaId = lojaId;
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await Pull().AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, filtrarLoja ? lojaId : null);
+
+        var clientes = mutations.Where(m => m.Type == "client.upsert").ToList();
+        var idsEsperados = filtrarLoja ? new[] { "c-loja-a", "c-global" } : ["c-loja-a", "c-loja-b", "c-global"];
+        clientes.Select(m => m.Payload.GetProperty("id").GetString()).Should().BeEquivalentTo(idsEsperados);
+        clientes.Should().OnlyContain(m => m.Payload.GetProperty("document").GetString() == "12345678909");
+    }
+
     [Fact]
     public async Task EdicaoNoConsole_JaNoPullNormal_MesclaSemDuplicar()
     {

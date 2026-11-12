@@ -4,6 +4,14 @@ using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.GerenciarProduto.Comandos;
+using EasyStock.Application.UseCases.GerenciarProduto.Queries;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Infra.Async;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using FluentAssertions;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
@@ -11,7 +19,7 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
     [SkippableFact]
-    public async Task AtualizarLimiares_deve_preservar_xmin_e_restringir_empresa()
+    public async Task AtualizarLimiares_deve_preservar_xmin_invalidar_cache_e_restringir_empresa()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
@@ -32,17 +40,32 @@ public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture
         context.ChangeTracker.Clear();
         context.SetMobileTenantContext(empresaId);
         var repository = new ProdutoRepository(context);
-        var useCase = new AtualizarLimiaresProdutoUseCase(repository, context);
+        var cache = new RedisCacheService(
+            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
+            NullLogger<RedisCacheService>.Instance);
+        using var services = new ServiceCollection().AddSingleton<ICacheService>(cache).BuildServiceProvider();
+        var useCase = ActivatorUtilities.CreateInstance<AtualizarLimiaresProdutoUseCase>(services, repository, context);
+        var consulta = new ObterDetalheProdutoUseCase(repository, new ItemEstoqueRepository(context), new ProdutoVariacaoRepository(context), cache);
+        var antes = await consulta.ExecuteAsync(empresaId, produtoId);
+        antes.QuantidadeMinima.Should().BeNull();
+        antes.QuantidadeCritica.Should().BeNull();
 
         await useCase.ExecuteAsync(empresaId, produtoId, 7, 1);
+        var depois = await consulta.ExecuteAsync(empresaId, produtoId);
+        depois.QuantidadeMinima.Should().Be(7);
+        depois.QuantidadeCritica.Should().Be(1);
+        await useCase.ExecuteAsync(empresaId, produtoId, 9, 2);
+        var segundaAlteracao = await consulta.ExecuteAsync(empresaId, produtoId);
+        segundaAlteracao.QuantidadeMinima.Should().Be(9);
+        segundaAlteracao.QuantidadeCritica.Should().Be(2);
         var alterarOutraEmpresa = () => useCase.ExecuteAsync(Guid.NewGuid(), produtoId, 99, 3);
         await alterarOutraEmpresa.Should().ThrowAsync<UseCaseValidationException>();
 
         context.ChangeTracker.Clear();
         var persistido = await repository.GetByIdAsync(empresaId, produtoId);
         persistido.Should().NotBeNull();
-        persistido!.QuantidadeMinima.Should().Be(7);
-        persistido.QuantidadeCritica.Should().Be(1);
+        persistido!.QuantidadeMinima.Should().Be(9);
+        persistido.QuantidadeCritica.Should().Be(2);
     }
 
     [SkippableFact]
