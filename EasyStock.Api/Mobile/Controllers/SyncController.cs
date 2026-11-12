@@ -53,6 +53,10 @@ public class SyncController(
     private readonly TimeProvider _relogio = relogio;
     private readonly ILogger<SyncController> _log = log;
 
+    // deviceId, type e id vêm do corpo do push: sem CR e LF não dá para forjar uma linha de log (CodeQL cs/log-forging).
+    private static string SemQuebraDeLinha(string? valor) =>
+        (valor ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+
     // #2317 (SYNC-9): erro transitório no push volta para a fila; não é rejeição permanente.
     // Classificação estreita: só falha de rede, timeout e SqlState transitório (40001, 40P01, 57P01...).
     // Erro permanente do banco (22P02, 23505, 23503...) segue como rejeição, senão o aparelho reenvia para sempre.
@@ -177,7 +181,7 @@ public class SyncController(
                 // inteiro é abandonado sem SaveChanges; o aparelho trata 5xx como 'retry' e reenvia a fila toda.
                 _log.LogWarning(ex,
                     "SyncMutation erro transitorio deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}: lote abandonado, sera reenviado",
-                    req.DeviceId, empresaId, m.Type, m.Id);
+                    SemQuebraDeLinha(req.DeviceId), empresaId, SemQuebraDeLinha(m.Type), SemQuebraDeLinha(m.Id));
                 _db.ChangeTracker.Clear();
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, "Falha transitória ao sincronizar; reenvie.");
             }
