@@ -446,12 +446,62 @@ await confere('lote: a linha do Planejamento ganha o peso do prato e, sem porç�
   assert.equal(linhasIniciais([{ id: 'a', sku: 'i-1', variacaoId: '', porcoes: '2', pesoPorPorcaoG: '', pesoRealG: '', validadeDias: '7' }], apoio)[0].pesoPorPorcaoG, '')
 })
 
-await confere('campo: porções e validade só guardam dígitos, até 4', async () => {
-  const { soDigitos } = await import('../src/dominio/gradeDeProducao.js')
-  assert.deepEqual(['12a', '-3', 'abc', '0x10', '1e2', ' 7 ', '123456'].map((t) => soDigitos(t)), ['12', '3', '', '010', '12', '7', '1234'])
-})
+for (const [rotulo, valor, erro] of [
+  ['Porções', '1,5', 'Informe porções inteiras maiores que zero.'],
+  ['Porções', '-2', 'Informe porções inteiras maiores que zero.'],
+  ['Porções', '0', 'Informe porções inteiras maiores que zero.'],
+  ['Porções', '10000', 'O lote aceita até 9.999 porções.'],
+  ['Validade (dias)', '1,5', 'Validade em dias inteiros.'],
+  ['Validade (dias)', '-2', 'Validade em dias inteiros.'],
+  ['Validade (dias)', '3651', 'Validade de até 3.650 dias.'],
+  ['Validade (dias)', '10000', 'Validade de até 3.650 dias.'],
+  ['Peso real total (g)', '1500,5', 'Peso real em gramas inteiros.'],
+]) {
+  await confere(`Produção do dia: ${rotulo} preserva "${valor}" e impede envio inválido`, async () => {
+    zerarProducao()
+    const chamadas = montarFetch(rotasDaProducao())
+    const t = montar(AbaProducaoDoDiaApi)
+    await t.assentar()
+    tocar(t, 'Talharim 500 g')
+    revisar(t)
+    campos(t.arvore, rotulo)[0].props.onChange(digitar(valor))
+    assert.equal(campos(t.renderizar(), rotulo)[0].props.value, valor, 'não muda o número digitado')
+    await doTipo(t.arvore, 'form')[0].props.onSubmit(evento)
+    const campo = campos(t.renderizar(), rotulo)[0]
+    assert.equal(chamadas.filter((c) => c.metodo === 'POST').length, 0, 'não registra uma produção diferente da digitada')
+    const alerta = andar(t.arvore, (n) => n.props?.role === 'alert')[0]
+    assert.ok(texto(alerta).includes(erro))
+    assert.equal(campo.props['aria-invalid'], true)
+    assert.equal(campo.props['aria-describedby'], alerta.props.id)
+    assert.equal(doTipo(itensDoLote(t.arvore)[0], 'details')[0].props.open, true, 'o campo inválido fica exposto para correção')
+  })
+}
 
 const enviarDaTela = (t) => doTipo(t.arvore, 'Botao').filter((b) => b.props.tipo === 'submit')
+for (const [rotulo, correto] of [['Validade (dias)', '7'], ['Peso real total (g)', '500']]) {
+  await confere(`Produção do dia: corrigir ${rotulo} mantém o ajuste aberto até ela recolher`, async () => {
+    zerarProducao()
+    const chamadas = montarFetch(rotasDaProducao())
+    const t = montar(AbaProducaoDoDiaApi)
+    await t.assentar()
+    tocar(t, 'Talharim 500 g')
+    revisar(t)
+    const campo = () => campos(t.renderizar(), rotulo)[0]
+    const ajuste = () => doTipo(itensDoLote(t.renderizar())[0], 'details')[0]
+    campo().props.onChange(digitar('1,5'))
+    await doTipo(t.renderizar(), 'form')[0].props.onSubmit(evento)
+    assert.equal(ajuste().props.open, true)
+    campo().props.onChange(digitar(''))
+    assert.equal(ajuste().props.open, true, 'apagar a entrada inválida não esconde o campo focado')
+    campo().props.onChange(digitar(correto))
+    assert.equal(ajuste().props.open, true, 'continua aberto ao terminar de digitar')
+    assert.equal(campo().props.value, correto)
+    assert.equal(andar(t.arvore, (n) => n.props?.role === 'alert').length, 0)
+    assert.equal(chamadas.filter((c) => c.metodo === 'POST').length, 0)
+    ajuste().props.onToggle({ currentTarget: { open: false } })
+    assert.notEqual(ajuste().props.open, true, 'a usuária ainda pode recolher o ajuste')
+  })
+}
 const respostaJson = (data, status = 200) => new Response(JSON.stringify({ data }), { status })
 // Só o POST da produção fica em voo; as leituras respondem na hora.
 function fetchComEnvioEmVoo() {
@@ -528,19 +578,23 @@ await confere('Produção do dia: o aviso de erro some quando ela mexe no lote',
   assert.equal(alertas().length, 0, 'ela corrigiu: o aviso antigo não fica na tela')
 })
 
-await confere('Produção do dia: o campo de porções ignora o que não é dígito e o toque soma em cima do digitado', async () => {
+await confere('Produção do dia: o toque soma em cima das porções digitadas e envia a contagem e validade sem alteração', async () => {
   zerarProducao()
-  montarFetch(rotasDaProducao())
+  const chamadas = montarFetch(rotasDaProducao())
   const t = montar(AbaProducaoDoDiaApi)
   await t.assentar()
   tocar(t, 'Talharim 500 g')
   revisar(t)
-  campos(t.arvore, 'Porções')[0].props.onChange(digitar('12a'))
+  campos(t.arvore, 'Porções')[0].props.onChange(digitar('12'))
   assert.equal(campos(t.renderizar(), 'Porções')[0].props.value, '12')
   tocar(t, 'Talharim 500 g')
   assert.equal(campos(t.arvore, 'Porções')[0].props.value, '13', 'somou em cima do 12, não trocou por 1')
-  campos(t.arvore, 'Validade (dias)')[0].props.onChange(digitar('7 dias'))
+  campos(t.arvore, 'Validade (dias)')[0].props.onChange(digitar('7'))
   assert.equal(campos(t.renderizar(), 'Validade (dias)')[0].props.value, '7')
+  await doTipo(t.arvore, 'form')[0].props.onSubmit(evento)
+  const [post] = chamadas.filter((c) => c.metodo === 'POST')
+  assert.equal(post.corpo.pratos[0].porcoes, 13)
+  assert.equal(post.corpo.pratos[0].validadeDias, 7)
 })
 
 await confere('Produção do dia: Limpar pede confirmação antes de apagar o lote', async () => {

@@ -75,6 +75,9 @@ function adaptProduction(html) {
 }
 
 function adaptOrders(html) {
+  const itemTitle = '<div class="modal-title">Adicionar <span class="accent">item</span></div>';
+  uniqueIndex(html, itemTitle);
+  html = html.replace(itemTitle, '<div class="pilot-item-picker-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px">' + itemTitle + '<button type="button" class="cta-btn" onclick="closeItemPicker()">Fechar</button></div>');
   const tabs = /<div class="screen-tabs">\s*<button class="screen-tab" data-tab="novo" onclick="goPedidosTab\('novo'\)">\+ Novo<\/button>\s*<button class="screen-tab active" data-tab="andamento" onclick="goPedidosTab\('andamento'\)">\s*Andamento <span class="screen-tab-badge" id="pedidosTabBadge">0<\/span>\s*<\/button>\s*<\/div>/g;
   const matches = [...html.matchAll(tabs)];
   if (matches.length !== 1) throw new Error('Navegação de pedidos incompatível com o APK.');
@@ -94,6 +97,9 @@ function adaptOrders(html) {
 }
 
 function adaptBilling(html) {
+  const pixHint = 'Dados PIX não configurados. Você pode copiar o resumo. Configure o PIX em Ajustes ou use o Atendimento online para cobrar.';
+  uniqueIndex(html, pixHint);
+  html = html.replace(pixHint, pixHint.replace('em Ajustes', 'em Configurações'));
   const before = '<span>📤</span> Compartilhar no WhatsApp';
   uniqueIndex(html, before);
   // Fonte: EasyStock.Console/src/componentes/Icone.jsx, whatsapp, grid24/traço1.75.
@@ -106,6 +112,9 @@ function adaptBilling(html) {
 function adaptAppMarkup(html) {
   if (typeof html !== 'string') throw new TypeError('HTML do aplicativo precisa ser texto.');
   if (html.includes(ADAPTED)) throw new Error('Formulário de produto já adaptado para o aplicativo.');
+  const backupHint = 'Recomendo fazer um backup. Em Ajustes > Backup, toque em "Exportar".';
+  uniqueIndex(html, backupHint);
+  html = html.replace(backupHint, backupHint.replace('Ajustes > Backup', 'Configurações > Backup'));
   const start = uniqueIndex(html, START);
   const end = uniqueIndex(html, END);
   if (end <= start) throw new Error('Delimitadores do formulário de produto fora de ordem.');
@@ -127,7 +136,10 @@ function adaptAppMarkup(html) {
   let header = modal.slice(0, name);
   uniqueIndex(header, intro);
   header = header.replace(intro, '<div class="modal-sub">Dados do produto e validade.</div>');
-  const essentials = modal.slice(name, emoji) + modal.slice(price, cost);
+  const productionHelp = 'Criar e usar registra esta produção e abre as etiquetas para impressão.';
+  uniqueIndex(modal, productionHelp);
+  const essentials = (modal.slice(name, emoji) + modal.slice(price, cost)).replace(productionHelp,
+    'Criar e etiquetar cadastra o produto, registra esta produção e abre as etiquetas para impressão.');
   const options = modal.slice(cost, actions).replace(
     'alerta quando stock ≤ este valor (padrão: 2)',
     'avisa quando o estoque chegar a esta quantidade (padrão: 2)'

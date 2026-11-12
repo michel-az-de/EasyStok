@@ -26,11 +26,11 @@
   };
   // Exceções de duas palavras: a ação perde o objeto se encurtada.
   // Cancelar pedido é destrutivo e não pode parecer o X de fechar.
-  const PHRASES = { 'Novo pedido': 'plus', 'Cancelar pedido': 'circle-x' };
+  const PHRASES = { 'Novo pedido': 'plus', 'Cancelar pedido': 'circle-x', 'Criar e etiquetar': 'printer' };
   const SHORT_LABELS = {
     '+ Novo pedido': 'Novo pedido', 'Criar pedido': 'Novo pedido',
     'Cadastrar produto': 'Cadastrar', 'Cadastrar cliente': 'Cadastrar',
-    'Criar e usar': 'Etiquetar', 'Criar e adicionar': 'Adicionar',
+    'Criar e usar': 'Criar e etiquetar', 'Criar e adicionar': 'Adicionar',
     'Salvar produto': 'Salvar', 'Salvar cliente': 'Salvar', 'Salvar pedido': 'Salvar', 'Salvar PNG': 'Salvar',
     'Confirmar e abrir etiquetas': 'Etiquetar', 'Conferir produção': 'Produzir',
     'Iniciar preparo': 'Preparar', 'Marcar pronto': 'Pronto', 'Conferir entrega': 'Entregar',
@@ -113,6 +113,16 @@
     const doc = environment.document;
     const icon = environment.cdbPilotIcon;
     function refresh() {
+      const fab = doc.getElementById('fab');
+      const fabAction = { Cliente: 'Novo cliente', Pedido: 'Novo pedido' }[doc.getElementById('fabLabel')?.textContent.trim()];
+      if (fab && fabAction && fab.getAttribute('aria-label') !== fabAction) fab.setAttribute('aria-label', fabAction);
+      for (const [id, label] of [['orderNotes', 'Observação (opcional)'], ['orderChannel', 'Canal (opcional)'], ['itemSearch', 'Buscar item do cardápio']]) {
+        const field = doc.getElementById(id);
+        if (field && field.getAttribute('aria-label') !== label) field.setAttribute('aria-label', label);
+      }
+      doc.querySelectorAll('#clientSelected .cp-clear[onclick="clearClient()"]').forEach(button => {
+        if (button.getAttribute('aria-label') !== 'Trocar cliente do pedido') button.setAttribute('aria-label', 'Trocar cliente do pedido');
+      });
       doc.querySelectorAll(EXCLUDED).forEach(node => {
         if (!node.classList.contains('pilot-out-of-scope')) node.classList.add('pilot-out-of-scope');
       });

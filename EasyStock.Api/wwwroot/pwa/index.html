@@ -18192,7 +18192,7 @@ function batchCardHtml(batch) {
   return `<div class="batch-card${isClosed ? ' closed' : ''}" id="bc-${batch.id}">
     <div class="batch-card-head" ${pilot ? '' : `onclick="document.getElementById('bc-${batch.id}').classList.toggle('open')"`}>
       <div class="bc-info">
-        <div class="bc-lote">${escapeHtml(batch.lote || batch.code || batch.id)} · ${escapeHtml(dateStr)} ${statusBadge}</div>
+        <div class="bc-lote">${escapeHtml(codigoDoLote(batch))} · ${escapeHtml(dateStr)} ${statusBadge}</div>
         <div class="bc-summary">${escapeHtml(items)}</div>
         ${validadeHtml ? '<div class="bc-progress">' + validadeHtml + '</div>' : ''}
         ${progress ? `<div class="bc-progress">${escapeHtml(progress)}</div>` : ''}
