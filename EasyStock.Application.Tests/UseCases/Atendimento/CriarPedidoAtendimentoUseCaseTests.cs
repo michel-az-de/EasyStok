@@ -75,6 +75,44 @@ public class CriarPedidoAtendimentoUseCaseTests
     }
 
     [Fact]
+    public async Task OrigemDoPedidoDoChatDoSiteSegueOCanalDaConversa()
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true,
+            Logradouro = "Rua escolhida", Numero = "42", Bairro = "Centro", Cidade = "São Paulo", Estado = "SP" };
+        cliente.Endereco = "Rua do cadastro antigo, 10";
+        c.EntregaGeocoding.GeocodificarAsync(Arg.Any<EasyStock.Application.Ports.Output.Lookup.GeocodeQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new EasyStock.Application.Ports.Output.Lookup.GeocodeResultado(-23.55, -46.63, true));
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "visitante-chat-1", Agora, "Maria", cliente.Id, EasyStock.Domain.Enums.Atendimento.CanalConversa.ChatSite);
+        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
+
+        var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 3, "sem granulado") },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id,
+            Observacoes: "tocar a campainha"));
+
+        var pedido = reservado.Pedido;
+        pedido.Origem.Should().Be(OrigemPedido.Storefront).And.Be("storefront");
+    }
+
+    [Fact]
     public async Task PedidoNasceComNomeTelefoneEAptoDoCliente()
     {
         // #1474 B4: sem o retrato do cliente, o KDS e as Entregas mostravam "Cliente sem nome".

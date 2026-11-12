@@ -24,7 +24,7 @@ export function previaDaConversa(conversa) {
   // Modo API: conversa encerrada não carrega mensagens na inbox; o resumo traz o texto (#1287).
   if (!ultima) return { prefixo: '', corpo: conversa.ultimaMensagemTexto || 'Sem mensagens' }
   const prefixo = ultima.dir === 'out'
-    ? (ultima.automatica ? 'Assistente: ' : 'Você: ')
+    ? (ultima.automatica ? 'Assistente: ' : ultima.autoraNome ? `${ultima.autoraNome}: ` : 'Você: ')
     : ''
   return { prefixo, corpo: ROTULO_DO_FORMATO[ultima.formato] ?? ultima.texto }
 }
