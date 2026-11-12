@@ -65,6 +65,7 @@
 .noLote { border-color: var(--marca); background: var(--marca-claro); }
 .noLote .tamanho { background: var(--papel); }
 .tocar {
+  -webkit-touch-callout: none; user-select: none; /* #2364: segurar o cartão abre a quantidade, não o menu do aparelho */
   display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: var(--e-1);
   min-width: 0; width: 100%; padding: var(--e-3); padding-bottom: calc(var(--toque) + var(--e-3));
   border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
@@ -105,10 +106,14 @@
   position: absolute; inset: auto var(--e-2) var(--e-2) var(--e-2);
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); pointer-events: none;
 }
+/* #2364: o contador é botão (abre o campo da quantidade), com a mesma área de toque do "−". */
 .contagem {
-  min-width: 2.25em; padding: var(--e-1) var(--e-2); border-radius: var(--r-pilula); background: var(--acao); color: var(--sobre-acao);
+  min-width: max(2.25em, var(--toque)); min-height: var(--toque); padding: var(--e-1) var(--e-2); pointer-events: auto;
+  border: 0; border-radius: var(--r-pilula); background: var(--acao); color: var(--sobre-acao); cursor: pointer; font-family: inherit;
   font-size: var(--t-forte); font-weight: 750; line-height: var(--lh-compacto); text-align: center; font-variant-numeric: tabular-nums;
 }
+.contagem:focus-visible { outline: var(--b-2) solid var(--tinta); outline-offset: 2px; }
+.contagem:disabled { cursor: default; opacity: .6; }
 .menos {
   display: grid; place-items: center; min-width: var(--toque); min-height: var(--toque); pointer-events: auto;
   border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); background: var(--papel); color: var(--tinta); cursor: pointer;
