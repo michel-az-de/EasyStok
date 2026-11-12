@@ -250,6 +250,15 @@ public class RegistrarPagamentoPedidoUseCase(
             var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
             if (movimentos.Any(m => m.Tipo == "abertura")) return;
 
+            // #2341: a abertura da empresa (sem loja), feita no console sem loja corrente, vale para o pedido da loja,
+            // como o fechamento da empresa já vale (#1598). Sem isso o pix abria uma segunda sessão "auto-pagamento"
+            // da loja com a gaveta herdada, e o saldo inicial do dia somava as duas.
+            if (pedido.LojaId.HasValue)
+            {
+                var daEmpresa = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data);
+                if (daEmpresa.Any(m => m.Tipo == "abertura" && m.LojaId == null)) return;
+            }
+
             // #1506: sessao de dia anterior ainda aberta: nao abre o dia por cima (a antiga ficaria
             // orfa, sem fechamento). O pagamento ja esta gravado e entra no caixa do dia dele.
             var pendente = await caixaRepo.GetAberturaPendenteAsync(cmd.EmpresaId, pedido.LojaId);

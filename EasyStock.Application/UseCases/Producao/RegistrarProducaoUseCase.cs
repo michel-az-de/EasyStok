@@ -61,13 +61,25 @@ public class RegistrarProducaoUseCase(
     IProdutoRepository produtoRepository,
     IUnitOfWork uow,
     ILogger<RegistrarProducaoUseCase> logger,
-    BaixaDeInsumosDaProducao? baixaDeInsumos = null)
+    BaixaDeInsumosDaProducao? baixaDeInsumos = null,
+    ILojaRepository? lojas = null)
 {
+    /// <summary>#2343 (R2-API-7): o FinalizarLote gera uma etiqueta por porcao com sequencial GLOBAL no lote, entao o
+    /// teto vale para a soma das porcoes de todos os itens. Limite operacional de etiquetas por lote, nao de formato:
+    /// <c>{seq:D4}</c> nao trunca acima de 9.999.</summary>
+    public const int TetoPorcoesPorLote = 9_999;
+
+    /// <summary>#2343 (R2-API-7): 10 anos e teto de sanidade para validade de producao propria (dias).</summary>
+    public const int TetoValidadeDias = 3650;
+
     public async Task<RegistrarProducaoResult> ExecuteAsync(RegistrarProducaoCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (cmd.Itens is null || cmd.Itens.Count == 0)
             throw new UseCaseValidationException("Informe pelo menos 1 item produzido.");
+        // #2343 (R2-API-8): loja de outra empresa ou inexistente vira 400, nao FK (500) no insert do lote.
+        if (cmd.LojaId is { } lojaId && lojas is not null && await lojas.GetByIdAsync(cmd.EmpresaId, lojaId) is null)
+            throw new UseCaseValidationException("Loja nao encontrada nesta empresa.");
 
         foreach (var it in cmd.Itens)
         {
@@ -77,6 +89,9 @@ public class RegistrarProducaoUseCase(
                 throw new UseCaseValidationException("Porcoes deve ser maior que zero.");
             if (it.ValidadeDias <= 0)
                 throw new UseCaseValidationException("Validade em dias deve ser maior que zero.");
+            if (it.ValidadeDias > TetoValidadeDias)
+                throw new UseCaseValidationException(
+                    $"Limite de validade em dias: {TetoValidadeDias} (10 anos).");
             if (it.PesoPorPorcaoG is <= 0)
                 throw new UseCaseValidationException("Peso por porcao deve ser maior que zero.");
             if (it.CustoUnitario is < 0)
@@ -87,6 +102,9 @@ public class RegistrarProducaoUseCase(
                 throw new UseCaseValidationException(
                     "O peso real nao fecha as porcoes: confira o peso ou o numero de porcoes.");
         }
+        if (cmd.Itens.Sum(i => (long)i.Porcoes) > TetoPorcoesPorLote)
+            throw new UseCaseValidationException(
+                $"Limite de porcoes por lote: {TetoPorcoesPorLote} somando todos os itens (uma etiqueta por porcao).");
 
         // Antecipa a regra RDC 727 do FinalizarLote: Embalado sem peso e rejeitado antes de gravar.
         var produtoIds = cmd.Itens.Select(i => i.ProdutoId).Distinct().ToList();

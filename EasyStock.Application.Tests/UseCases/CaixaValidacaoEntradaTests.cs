@@ -91,4 +91,43 @@ public class CaixaValidacaoEntradaTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*999.999.999*");
     }
+
+    [Theory]
+    [InlineData("entrada")]
+    [InlineData("saida")]
+    public async Task RegistrarMovimento_Manual_SemCaixaAberto_PedeParaAbrir(string tipo)
+    {
+        var empresaId = Guid.NewGuid();
+        _repo.GetAberturaPendenteAsync(empresaId, Arg.Any<Guid?>()).Returns((MovimentoCaixa?)null);
+
+        var act = () => Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(
+            empresaId, tipo, 10m, "teste", Metodo: "dinheiro", ExigirCaixaAberto: true));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("Abra o caixa antes de lançar*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_Manual_ComCaixaAberto_Grava()
+    {
+        var empresaId = Guid.NewGuid();
+        _repo.GetAberturaPendenteAsync(empresaId, Arg.Any<Guid?>())
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 50m, DateTime.UtcNow, null));
+
+        await Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(
+            empresaId, "entrada", 10m, Metodo: "dinheiro", ExigirCaixaAberto: true));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_Automatico_SemCaixaAberto_ContinuaGravando()
+    {
+        var empresaId = Guid.NewGuid();
+        _repo.GetAberturaPendenteAsync(empresaId, Arg.Any<Guid?>()).Returns((MovimentoCaixa?)null);
+
+        await Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 10m, Origem: "mobile"));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
 }

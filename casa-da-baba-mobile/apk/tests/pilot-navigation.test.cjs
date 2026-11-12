@@ -97,6 +97,11 @@ test('Início não duplica entradas que já moram em Configurações', () => {
   assert.match(controls, /tileButton\('printers', 'Impressoras'/);
 });
 
+test('#2321 Início tem a entrada Clientes, que leva à tela liberada', () => {
+  assert.match(pilot, /tileButton\('clients', 'Clientes', 'ficha'/);
+  assert.match(pilot, /if \(action === 'clients'\) \{ closeHome\(\); root\.go\('clientes'\); \}/);
+});
+
 test('atalho Impressoras abre o mesmo lugar de Configurações > Etiquetas', () => {
   const action = pilot.match(/if \(action === 'printers'\) \{([^}]*)\}/)[1];
   assert.doesNotMatch(action, /openPrinterPicker/);

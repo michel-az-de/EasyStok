@@ -40,6 +40,36 @@ public class CaixaUseCasesTests
         await act.Should().ThrowAsync<UseCaseValidationException>();
     }
 
+    // #2343 (R2-API-8): loja que nao e da empresa vira 400, nao DbUpdateException de FK (500).
+    [Fact]
+    public async Task AbrirCaixa_DeveLancarValidation_QuandoLojaNaoEhDaEmpresa()
+    {
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns((EasyStock.Domain.Entities.Loja?)null);
+        var useCase = new AbrirCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<AbrirCaixaUseCase>>(), null, lojas);
+
+        var act = () => useCase.ExecuteAsync(new AbrirCaixaCommand(Guid.NewGuid(), 100m, LojaId: Guid.NewGuid()));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*encontrada*");
+    }
+
+    [Fact]
+    public async Task AbrirCaixa_LojaExistenteNaEmpresa_NaoEhRecusada()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(empresaId, lojaId).Returns(EasyStock.Domain.Entities.Loja.Criar(empresaId, "Centro"));
+        var useCase = new AbrirCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<AbrirCaixaUseCase>>(), null, lojas);
+
+        var ex = await Record.ExceptionAsync(() => useCase.ExecuteAsync(new AbrirCaixaCommand(empresaId, 100m, LojaId: lojaId)));
+
+        (ex is UseCaseValidationException { Message: var msg } && msg.Contains("encontrada")).Should().BeFalse();
+        await lojas.Received(1).GetByIdAsync(empresaId, lojaId);
+    }
+
     [Fact]
     public async Task AbrirCaixa_DeveLancarValidation_QuandoSaldoInicialNegativo()
     {

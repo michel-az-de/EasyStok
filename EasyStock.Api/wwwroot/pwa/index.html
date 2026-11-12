@@ -7725,7 +7725,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div id="cashDetailsActions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
         <button class="np-btn np-secondary" id="cashDetailsAddBtn" onclick="openCashModal()">+ Lançamento manual</button>
-        <button class="np-btn np-primary" id="cashDetailsCloseDayBtn" onclick="openCashCloseModal()">🔒 Fechar caixa do dia</button>
+        <!-- #2319: "Fechar caixa" local removido: o servidor ignora este fechamento. O fechamento real é feito no Console. -->
         <button class="np-btn np-tertiary" id="cashDetailsReopenBtn" onclick="reopenCashDay()" style="display:none">🔓 Reabrir caixa</button>
         <button class="np-btn np-tertiary" onclick="printCashClosing()">📤 Compartilhar fechamento</button>
       </div>
@@ -9080,12 +9080,22 @@ function toggleUxDensity(ev) {
 }
 applyUxDensity();
 
-let products = load('cdb-products', null);
-if (!products) products = window.CDB_CONFIG?.isPilot ? [] : defaultProducts.map(p => ({...p}));
-// Garante que o catálogo oficial sempre está presente mesmo após limpar custom
-if (!window.CDB_CONFIG?.isPilot) defaultProducts.forEach(dp => {
-  if (!products.find(p => p.id === dp.id)) products.unshift({...dp});
-});
+// #2316 (SYNC-4): aparelho pareado com o ERP recebe o catalogo pelo pull; semear o
+// catalogo local duplicava os produtos (7 sementes + 9 do ERP).
+function catalogoLocalInicial(armazenado, sementes, ctx) {
+  const lista = armazenado ? armazenado : (ctx.isPilot || ctx.paired ? [] : sementes.map(p => ({...p})));
+  // Garante que o catálogo oficial sempre está presente mesmo após limpar custom
+  if (!ctx.isPilot && !ctx.paired) sementes.forEach(dp => {
+    if (!lista.find(p => p.id === dp.id)) lista.unshift({...dp});
+  });
+  return lista;
+}
+function aparelhoPareadoComErp() {
+  try { const pr = JSON.parse(localStorage.getItem('cdb-pairing') || 'null'); return !!(pr && pr.apiKey); }
+  catch (_) { return false; }
+}
+let products = catalogoLocalInicial(load('cdb-products', null), defaultProducts,
+  { isPilot: !!window.CDB_CONFIG?.isPilot, paired: aparelhoPareadoComErp() });
 products = products.map(p => ({...p, count: 0, photo: null, stock: p.stock || 0}));
 
 let clients = load('cdb-clients', window.CDB_CONFIG?.isPilot ? [] : defaultClients);
@@ -11240,26 +11250,8 @@ function _buildAttentionItemsImpl() {
   try {
     const now = Date.now();
 
-    // 1. CAIXA DE DIA ANTERIOR EM ABERTO — severidade ERR (urgente: regulariza
-    // antes de fechar mais um dia em cima).
-    if (typeof getOpenPriorDays === 'function') {
-      const priorDays = getOpenPriorDays();
-      if (priorDays.length) {
-        const dayList = priorDays.slice(0, 2).map(k => typeof fmtDateKey === 'function' ? fmtDateKey(k) : k).join(', ');
-        items.push({
-          kind: 'cash-prior',
-          severity: 'err',
-          icon: '🔓',
-          title: 'Caixa de dia anterior aberto',
-          reason: priorDays.length === 1
-            ? 'Dia ' + dayList + ' ainda nao foi fechado'
-            : priorDays.length + ' dias em aberto: ' + dayList + (priorDays.length > 2 ? '…' : ''),
-          count: priorDays.length,
-          cta: 'Caixa',
-          action: function () { go('caixa'); }
-        });
-      }
-    }
+    // 1. #2319: sem "Fechar caixa" no PWA, o card de caixa de dia anterior em
+    // aberto levaria a uma tela sem acao. O fechamento fica no console.
 
     // 2. ESTOQUE CRITICO — mostra produtos especificos pra dar contexto util
     const lowStock = getCriticalProducts();
@@ -12092,7 +12084,7 @@ function renderHomeChecklist() {
   // 3. Estoque
   const estoqueOk = getCriticalProducts().length === 0;
   const items = [
-    { ok: cashOk,    icon: cashFechado ? '🔒' : '🟡', label: 'Caixa do dia',    sub: cashFechado ? 'fechado' : (temMovimento ? 'aberto' : 'sem movimento'), cta: cashFechado ? null : function () { openCashCloseModal(); }, ctaLabel: 'Fechar' },
+    { ok: cashOk,    icon: cashFechado ? '🔒' : '🟡', label: 'Caixa do dia',    sub: cashFechado ? 'fechado' : (temMovimento ? 'aberto' : 'sem movimento'), cta: null, ctaLabel: '' },
     { ok: pedidosOk, icon: pedidosOk ? '✅' : '⏱',   label: 'Pedidos fluindo', sub: pedidosOk ? 'sem travados' : stuck.length + ' parado' + (stuck.length > 1 ? 's' : '') + ' >30min', cta: pedidosOk ? null : function () { go('pedidos'); }, ctaLabel: 'Ver' },
     { ok: estoqueOk, icon: estoqueOk ? '📦' : '⚠',   label: 'Estoque',         sub: estoqueOk ? 'sem críticos' : getCriticalProducts().length + ' item(ns) crítico(s)', cta: estoqueOk ? null : function () { go('producao'); }, ctaLabel: 'Produção' }
   ];
@@ -12144,7 +12136,8 @@ function renderHomeOpsDisclosure() {
 function renderOpenCashDaysBanner() {
   const banner = document.getElementById('openCashDaysBanner');
   if (!banner) return;
-  const days = getOpenPriorDays();
+  // #2319: sem botão local de fechar caixa, o aviso de dias em aberto não teria ação.
+  const days = [];
   if (!days.length) {
     banner.style.display = 'none';
     banner.innerHTML = '';
@@ -12339,7 +12332,7 @@ function renderCash() {
       closeDayBtn.style.display = 'none';
       reopenDayBtn.style.display = 'block';
     } else {
-      closeDayBtn.style.display = 'block';
+      closeDayBtn.style.display = 'none';
       reopenDayBtn.style.display = 'none';
     }
   }
@@ -12424,7 +12417,6 @@ function cancelOrder(id) {
       summary: `Pedido cancelado · ${money(o.total)} · vinha de ${prev}` + (wasDelivered ? ' (caixa estornado)' : '')
     });
     persistAll();
-    pendingSync++;
     updateSync();
     renderHome();
     renderOrdersFeed();
@@ -12465,7 +12457,6 @@ function cancelOrder(id) {
     },
     {
       onCommit: function () {
-        pendingSync++;
         updateSync();
         logAction({
           action: 'order.delete', entityType: 'order', entityId: id,
@@ -18789,7 +18780,6 @@ function adicionarFaltantesNaCompra(faltantes) {
   });
   if (added === 0) { showToast('Os faltantes já estão na lista de Compras.'); return 0; }
   persistAll();
-  pendingSync++;
   updateSync();
   if (typeof renderShoppingList === 'function') renderShoppingList();
   if (typeof renderHomeShopping === 'function') renderHomeShopping();
@@ -19304,7 +19294,6 @@ function confirmBatchDiscard() {
   const lote = batch.lote || batch.code || batch.id;
   logAction({ action: 'batch.discard', entityType: 'batch', entityId: batch.id, summary: 'Descarte: lote ' + lote + ' · ' + reason + (note ? ' · ' + note : '') });
   persistAll();
-  pendingSync++;
   updateSync();
   closeBatchDiscardModal();
   if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
@@ -19322,7 +19311,6 @@ function revertBatchDiscard(batchId) {
   ajustarSaldoDoLote(batch, contavaAntes);
   logAction({ action: 'batch.discard_revert', entityType: 'batch', entityId: batch.id, summary: 'Descarte revertido: lote ' + (batch.lote || batch.code || batch.id) });
   persistAll();
-  pendingSync++;
   updateSync();
   if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
   if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
@@ -19500,7 +19488,6 @@ function _proceedAdvance(id, nextStatus) {
   o.lastOperatorName = operatorName || null;
   addHistoryEvent(o, nextStatus, prev + ' → ' + nextStatus);
   persistAll();
-  pendingSync++;
   updateSync();
   renderHome();
   renderOrdersFeed();
@@ -22002,7 +21989,6 @@ function confirmProduction() {
 
   clearProduction(productionSelectionIds);
   closeProductionConfirm();
-  pendingSync += items.length;
   updateSync();
 
   // Audit log: produção registrada
@@ -22709,8 +22695,6 @@ function saveOrder() {
   setTimeout(() => { highlightOrderId = null; renderKanban(); }, 3200);
   // Apos salvar, vai automatico pra aba Andamento (kanban com o card novo)
   if (typeof goPedidosTab === 'function') goPedidosTab('andamento');
-
-  pendingSync++;
   updateSync();
 
   // Toast com próximas ações — cobrar é destaque no pedido normal.
@@ -23297,7 +23281,6 @@ function saveCashEntry() {
     entry.metodo = cashMetodo;
     entry.lastOperatorName = operatorName || null;
     persistAll();
-    pendingSync++;
     updateSync();
     logAction({
       action: 'cash.entry_edit', entityType: 'cash', entityId: entry.id,
@@ -23323,7 +23306,6 @@ function saveCashEntry() {
   };
   cashEntries.push(entry);
   persistAll();
-  pendingSync++;
   updateSync();
 
   // Audit log: lancamento manual no caixa
@@ -23375,7 +23357,6 @@ function deleteCashEntry(id) {
       onCommit: function () {
         // Sync e audit log so' depois do delay (commit definitivo)
         try { window.cdbSync.confirmarExclusaoLancamento(id); } catch (_) {}
-        pendingSync++;
         updateSync();
         logAction({
           action: 'cash.entry_delete', entityType: 'cash', entityId: id,
@@ -23419,7 +23400,6 @@ function addShop(forcedName) {
   });
   persistAll();
   if (input) input.value = '';
-  pendingSync++;
   updateSync();
   renderShoppingList();
   renderHomeShopping();
@@ -23820,7 +23800,7 @@ try {
 window.cdbApp = {
   getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
-  bumpPendingSync: (n = 1) => { pendingSync += n; updateSync(); },
+  bumpPendingSync: () => { updateSync(); }, // #2316: contador deriva so da fila (sync.js)
   markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },
   getOperator: () => operatorName,
   showToast: function (msg) { if (typeof showToast === 'function') showToast(msg); },
@@ -23861,7 +23841,7 @@ window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.carregarFonte({ base: '
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
 <script src="upload-photos.js?v=20260514b"></script>
-<script src="sync.js?v=20260514b"></script>
+<script src="sync.js?v=20261112a"></script>
 <script>
 // LiveUpdater (@capgo/capacitor-updater): notifica que o bundle subiu OK.
 // Sem isso, o plugin faz rollback automatico apos appReadyTimeout (30s).

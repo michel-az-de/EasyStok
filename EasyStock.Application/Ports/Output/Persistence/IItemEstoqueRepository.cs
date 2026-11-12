@@ -42,7 +42,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// que recalcula a velocidade de saída (#2016): o rastreador grava só o que mudou, sem reescrever o produto.
         /// </summary>
         Task<IReadOnlyList<ItemEstoque>> GetLotesComSaldoRastreadosAsync(Guid empresaId, int page, int pageSize, CancellationToken ct = default);
-        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null);
+        Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null, Guid? lojaId = null);
 
         /// <summary>
         /// Contadores rapidos para o cabecalho de /estoque, batendo com o mesmo
@@ -51,7 +51,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// exibir os dois numeros sem confusao com o KPI "Unidades em estoque"
         /// do dashboard (que conta unidades, nao linhas).
         /// </summary>
-        Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null);
+        Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null, Guid? lojaId = null);
 
         Task<(int QuantidadeEmEstoque, decimal ValorTotalEstoque, decimal TicketMedioSugerido)> GetResumoEstoqueAsync(Guid empresaId);
         Task<IReadOnlyCollection<ItemEstoque>> GetByProdutoAsync(Guid empresaId, Guid produtoId);
