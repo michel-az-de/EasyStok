@@ -4,6 +4,7 @@
 #
 # Uso:
 #   scripts/deploy/observabilidade-deploy.sh subir     # copia a stack, gera segredos (se faltarem), sobe ez-openobserve e ez-otel
+#                                                      # e troca o root do collector por um token só de ingestão (#2376)
 #   scripts/deploy/observabilidade-deploy.sh ligar     # liga o EasyStok: override no COMPOSE_FILE e recria api, web e worker
 #   scripts/deploy/observabilidade-deploy.sh desligar  # tira o override e recria api, web e worker sem telemetria
 #   scripts/deploy/observabilidade-deploy.sh status    # containers e quanto chegou na última hora
@@ -51,13 +52,39 @@ REMOTO
     remoto "cd '$DESTINO' && docker compose pull -q && docker compose up -d"
 
     echo "==> Esperando o OpenObserve responder"
+    ok=""
     for _ in $(seq 1 40); do
-      [ "$(remoto "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORTA/healthz" || true)" = 200 ] && { "$0" status; exit 0; }
+      [ "$(remoto "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORTA/healthz" || true)" = 200 ] && { ok=1; break; }
       sleep 3
     done
-    echo "ERRO: ez-openobserve não respondeu" >&2
-    remoto "cd '$DESTINO' && docker compose logs --tail 30" >&2 || true
-    exit 4
+    if [ -z "$ok" ]; then
+      echo "ERRO: ez-openobserve não respondeu" >&2
+      remoto "cd '$DESTINO' && docker compose logs --tail 30" >&2 || true
+      exit 4
+    fi
+
+    # #2376: o collector deixa de usar o root. O token de ingestão só escreve em /v1/logs, /v1/traces e /v1/metrics
+    # (401 em _search e /users, provado no OpenObserve v1.1.2). Gerado uma vez; o token não é impresso.
+    echo "==> Token só de ingestão para o collector"
+    remoto bash -s -- "$DESTINO" "$PORTA" <<'REMOTO' || exit 4
+set -euo pipefail
+env="$1/.env"
+grep -q '^OO_INGEST_NOME=' "$env" && { echo "    já existe"; exit 0; }
+. "$env"
+nome=coletor-otel
+resp=$(printf 'user = "%s:%s"\n' "$ZO_ROOT_USER_EMAIL" "$ZO_ROOT_USER_PASSWORD" | curl -s -m 10 -K - \
+  -H 'Content-Type: application/json' "http://127.0.0.1:$2/api/default/ingestion-tokens" \
+  -d "{\"name\":\"$nome\",\"description\":\"ez-otel (#2376)\"}")
+token=$(printf '%s' "$resp" | sed -n 's/.*"token":"\(o2oi_[^"]*\)".*/\1/p')
+[ -n "$token" ] || { echo "ERRO: OpenObserve não devolveu o token de ingestão" >&2; exit 1; }
+auth=$(printf '%s:%s' "$nome" "$token" | base64 -w0)
+tmp=$(mktemp "$1/.env.XXXX"); chmod 600 "$tmp"
+grep -v '^OO_AUTH=' "$env" >"$tmp"; printf 'OO_AUTH=%s\nOO_INGEST_NOME=%s\n' "$auth" "$nome" >>"$tmp"
+mv "$tmp" "$env"
+echo "    criado; OO_AUTH não deriva mais do root"
+REMOTO
+    remoto "cd '$DESTINO' && docker compose up -d otel"
+    "$0" status
     ;;
 
   ligar|desligar)

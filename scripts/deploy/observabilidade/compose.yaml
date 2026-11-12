@@ -1,5 +1,6 @@
 # Observabilidade da produção (#2107, F2): OpenObserve guarda logs, traces e métricas por 30 dias; o collector recebe
-# OTLP sem senha na rede "edge" e repassa ao OpenObserve com autenticação. As aplicações só conhecem http://ez-otel:4317.
+# OTLP sem senha na rede "ez-telemetria" e repassa ao OpenObserve com um token só de ingestão. As aplicações só conhecem
+# http://ez-otel:4317. #2376: fora da "edge" (WAHA, Whisper); o OpenObserve fica só na rede interna desta stack.
 # Stack própria em /opt/stacks/observabilidade. UI só no loopback da VPS, pelo túnel SSH:
 #   ssh -L 5080:127.0.0.1:5080 hostinger   e abra http://localhost:5080
 # Segredos em /opt/stacks/observabilidade/.env (chmod 600), gerados por scripts/deploy/observabilidade-deploy.sh.
@@ -26,7 +27,7 @@ services:
     logging: &logs
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-    networks: [edge]
+    networks: [default]
 
   otel:
     image: otel/opentelemetry-collector:0.164.0
@@ -41,10 +42,12 @@ services:
     cpus: "0.5"
     mem_limit: 192m
     logging: *logs
-    networks: [edge]
+    networks: [default, telemetria]
 
 volumes:
   dados:
 networks:
-  edge:
-    external: true
+  default:
+  # Criada aqui; api, web e worker entram nela pelo compose.easystok.yaml (external). Só o ez-otel a divide com eles.
+  telemetria:
+    name: ez-telemetria
