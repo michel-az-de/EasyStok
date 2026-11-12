@@ -267,10 +267,11 @@ public class SyncMutationDispatcher(
                     .FirstOrDefaultAsync(c => c.Id == erpId && c.EmpresaId == empresaId.Value);
                 if (erp != null)
                 {
-                    erp.Nome = dto.Name;
-                    erp.Telefone = dto.Phone;
-                    erp.Apt = dto.Apt;
-                    erp.Endereco = dto.Address;
+                    // Campo vazio no app nao apaga o dado do ERP: o app nem sempre o recebeu.
+                    if (!string.IsNullOrWhiteSpace(dto.Name)) erp.Nome = dto.Name;
+                    if (!string.IsNullOrWhiteSpace(dto.Phone)) erp.Telefone = dto.Phone;
+                    if (!string.IsNullOrWhiteSpace(dto.Apt)) erp.Apt = dto.Apt;
+                    if (!string.IsNullOrWhiteSpace(dto.Address)) erp.Endereco = dto.Address;
                 }
             }
         }

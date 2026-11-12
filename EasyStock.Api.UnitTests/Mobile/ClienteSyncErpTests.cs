@@ -126,6 +126,27 @@ public sealed class ClienteSyncErpTests : IDisposable
         outra.Nome.Should().Be("Maria Silva");
     }
 
+    [Fact]
+    public async Task EdicaoNoApp_CampoVazio_NaoApagaODadoDoErp()
+    {
+        // O app nem sempre recebeu o endereco do ERP (CLI-3): vazio no app nao e "apague".
+        var erp = Erp("Maria Silva", "11988887777");
+        erp.Apt = "Apto 7"; erp.Endereco = "Rua A, 10";
+        var app = App("c-6", "Maria Silva", "11988887777");
+        app.ErpClienteId = erp.Id;
+        await _db.SaveChangesAsync();
+
+        await Dispatcher().ApplyMutationAsync(Mutacao("c-6", "Maria S. Silva", null, "", "  "),
+            "dev-a", null, _empresaId, Guid.NewGuid());
+        await _db.SaveChangesAsync();
+
+        var atual = await _db.Set<Cliente>().IgnoreQueryFilters().SingleAsync(c => c.Id == erp.Id);
+        atual.Nome.Should().Be("Maria S. Silva");
+        atual.Telefone.Should().Be("11988887777");
+        atual.Apt.Should().Be("Apto 7");
+        atual.Endereco.Should().Be("Rua A, 10");
+    }
+
     private SyncMutationDispatcher Dispatcher()
         => new(
             _db,
