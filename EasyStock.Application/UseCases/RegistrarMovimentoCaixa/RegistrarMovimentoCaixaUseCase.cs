@@ -47,7 +47,7 @@ public class RegistrarMovimentoCaixaUseCase(
         if (origem == "mobile") cmd = cmd with { Valor = decimal.Round(cmd.Valor, 2, MidpointRounding.AwayFromZero) };
         ValidacaoCaixa.ExigirValorMonetario(cmd.Valor, "Valor");
 
-        var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;   // timestamp do movimento (UTC, armazenado)
+        var dataMov = DataUtc.ParaUtc(cmd.DataMovimento ?? DateTime.UtcNow);
         var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
 
         // O mobile promove fatos já gravados no aparelho: não recusa forma antiga, só normaliza a conhecida.
@@ -60,8 +60,16 @@ public class RegistrarMovimentoCaixaUseCase(
         if (origem != "mobile" && dataMov > DateTime.UtcNow.Add(ToleranciaDeRelogio))
             throw new UseCaseValidationException("Data do lançamento não pode estar no futuro.");
 
-        if (cmd.ExigirCaixaAberto && await repo.GetAberturaPendenteAsync(cmd.EmpresaId, cmd.LojaId) is null)
-            throw new UseCaseValidationException(CaixaAbertoMensagem);
+        if (cmd.ExigirCaixaAberto)
+        {
+            var abertura = await repo.GetAberturaPendenteAsync(cmd.EmpresaId, cmd.LojaId)
+                ?? throw new UseCaseValidationException(CaixaAbertoMensagem);
+            // ADR-0034: o fechamento cobre o dia da abertura; movimentos de hoje ficam no caixa de hoje.
+            var diaDaAbertura = HorarioBrasil.DataOperacional(abertura.DataMovimento);
+            if (data != diaDaAbertura && data != HorarioBrasil.Hoje())
+                throw new UseCaseValidationException(
+                    $"O lançamento manual deve usar o dia da abertura ({diaDaAbertura:dd/MM/yyyy}) ou hoje. Revise a data informada.");
+        }
 
         // Bloquear lançamento em dia já fechado (preserva integridade do snapshot).
         await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId,

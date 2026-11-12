@@ -217,10 +217,12 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
     private sealed class DispatcherQueGravaEFalha(EasyStockDbContext db, Action depoisDeGravar)
         : SyncMutationDispatcher(db, null!, null!, null!, null!, null!, null!, NullLogger<SyncMutationDispatcher>.Instance)
     {
+        private readonly EasyStockDbContext _context = db;
+
         public override async Task ApplyMutationAsync(MutationDto mutation, string deviceId, string? operatorName, Guid? empresaId, Guid? lojaId)
         {
-            db.Add(new Product { Id = mutation.Payload.GetProperty("id").GetString()!, Name = "Rollback", EmpresaId = empresaId, LojaId = lojaId });
-            await db.SaveChangesAsync();
+            _context.Add(new Product { Id = mutation.Payload.GetProperty("id").GetString()!, Name = "Rollback", EmpresaId = empresaId, LojaId = lojaId });
+            await _context.SaveChangesAsync();
             depoisDeGravar();
             throw new TimeoutException("Falha sintetica depois do SaveChanges intermediario");
         }
