@@ -13,7 +13,7 @@ const ROTULO_DO_FORMATO = {
 
 // Prefixo em 600 diz quem escreveu por último sem abrir a conversa:
 // "Assistente:" quando foi automático, "Você:" quando o usuário enviou,
-// "Equipe:" para outro autor humano, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
+// Nome confirmado ou "Equipe:" para outro autor humano, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
 // string só porque só o prefixo é 600 (seção 1); quem monta o texto plano
 // (título, aria-label) faz `prefixo + corpo`.
 //
@@ -26,8 +26,11 @@ export function previaDaConversa(conversa, usuario = null) {
   const deOutro = ultima.enviadaPorUsuarioId
     ? ultima.enviadaPorUsuarioId !== usuario?.id
     : Boolean(conversa.situacaoApi)
+  const nomeDaAutora = usuario?.id && ultima.enviadaPorUsuarioId && deOutro
+    && ultima.enviadaPorUsuarioId === conversa.assumidaPorUsuarioId
+    ? conversa.assumidaPorNome : null
   const prefixo = ultima.dir === 'out'
-    ? (ultima.automatica ? 'Assistente: ' : deOutro ? 'Equipe: ' : 'Você: ')
+    ? (ultima.automatica ? 'Assistente: ' : deOutro ? `${nomeDaAutora || 'Equipe'}: ` : 'Você: ')
     : ''
   return { prefixo, corpo: ROTULO_DO_FORMATO[ultima.formato] ?? ultima.texto }
 }

@@ -206,6 +206,8 @@ public class MobileProductsController(
         var oldStock = product.Stock;
         product.Stock = (int)(item.QuantidadeAtual?.Value ?? 0m);
         product.UpdatedAt = DateTime.UtcNow;
+        // Alteração do servidor deve chegar também ao aparelho que gravou o saldo anterior.
+        product.LastDeviceId = null;
         await _db.SaveChangesAsync(ct);
 
         _log.LogInformation(

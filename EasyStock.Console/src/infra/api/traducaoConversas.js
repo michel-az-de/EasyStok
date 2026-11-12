@@ -122,6 +122,7 @@ export function situacaoConversaDaApi(resumo, usuario) {
     estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
     situacaoApi: resumo.situacao,
     assumidaPorUsuarioId: resumo.assumidaPorUsuarioId ?? null,
+    assumidaPorNome: resumo.assumidaPorNome?.trim() || null,
     responsavel: resumo.assumidaPorUsuarioId ? (resumo.assumidaPorNome?.trim() || (minha ? usuario.nome : 'Outro atendente')) : null,
     pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
     passagem: passagemDaApi(resumo),
