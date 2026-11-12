@@ -29,6 +29,11 @@ public sealed class BatchLinker(
 {
     internal static string CodigoDoLote(Batch batch)
     {
+        // #2317: só o namespace novo usa UUID integral. Não altera códigos dos lotes legados.
+        if (batch.Id.Length == 39 && batch.Id.StartsWith("b2-", StringComparison.Ordinal)
+            && Guid.TryParseExact(batch.Id[3..], "D", out var uuid))
+            return uuid.ToString("N").ToUpperInvariant();
+
         var codigoBase = !string.IsNullOrWhiteSpace(batch.Lote) ? batch.Lote
             : !string.IsNullOrWhiteSpace(batch.Code) ? batch.Code : $"LOT-{batch.CreatedAt:yyMMdd}";
         var sufixo = new string(batch.Id.TakeLast(6).Where(char.IsLetterOrDigit).ToArray());

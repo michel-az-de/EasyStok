@@ -59,6 +59,21 @@ function render(T, et, opts = {}) {
 }
 
 module.exports = function ({ test, assert }) {
+  test('#2317: termica 58 preserva lote inteiro sem cortar nem invadir o rotulo', () => {
+    const T = load(), canvas = fakeCanvas(T.LARGURA, 1600);
+    canvas.ctx.measureText = t => ({ width: [...String(t)].reduce((s, c) => s + (c === 'D' ? 0.78 : 0.56), 0) * px(canvas.ctx.font) });
+    const lote = 'DDDDDDDDDDDD4DDDBDDDDDDDDDDDDDDD';
+    const codigoBarras = 'NHOQUE01-' + lote + '-001';
+    T.desenhar(canvas.ctx, { ...ET, lote, codigoBarras }, { formatar: fmt, codigos: 'qr' });
+    const i = canvas.texts.findIndex(x => x.t === 'Lote'), peso = canvas.texts.findIndex(x => x.t === 'Peso');
+    const linhas = canvas.texts.slice(i + 1, peso);
+    assert.equal(linhas.map(x => x.t).join(''), lote);
+    assert.equal(linhas.length, 2);
+    for (const linha of linhas) assert.ok(linha.left >= canvas.texts[i].right + 12 && linha.right <= T.LARGURA - 12);
+    assert.equal(canvas.texts.slice(-2).map(x => x.t).join(''), codigoBarras);
+    for (const linha of canvas.texts.slice(-2)) assert.ok(linha.left >= 12 && linha.right <= T.LARGURA - 12);
+  });
+
   test('Etiqueta térmica: raster GS v 0 empacota 8 pixels por byte, preto = 1', () => {
     const T = load();
     const rgba = new Uint8ClampedArray(16 * 2 * 4).fill(255);

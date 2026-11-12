@@ -32,6 +32,39 @@ const fim = e => e.y_mm + e.h_mm;
 module.exports = function ({ test, runInSandbox, assert }) {
   const run = body => JSON.parse(runInSandbox(`(function(){ ${body} })()`));
 
+  test('#2317: lote inteiro cabe em duas linhas sem perder marca, peso ou codigos', () => {
+    const R = resolvedor().cdbResolverEtiqueta;
+    const lote = 'DDDDDDDDDDDD4DDDBDDDDDDDDDDDDDDD';
+    const campos = { empresa: 'Casa da Baba', nome: 'Nhoque (un)', validade: '19/11/2026',
+      fabricacao: '12/11/2026', lote, peso: 'PESO 500 g', qr: 'NHOQUE01-' + lote + '-001', barras: '123456780001' };
+    const medidaLarga = (t, pt) => String(t).length * pt * PT_MM * 0.7;
+    for (const area of [{ w_mm: 52, h_mm: 75, continuo: true, girar: false }, { w_mm: 80, h_mm: 40 }]) {
+      const r = R.resolver(campos, area, { codigos: ['qr', 'barras'], medir: medidaLarga });
+      assert.strictEqual(r.recusa, null);
+      assert.deepStrictEqual(puro(r.omitidos), []);
+      const els = r.layout.elements, linhas = els.filter(e => e.id === 'lote');
+      assert.strictEqual(linhas.map(e => e.content).join(''), 'LOTE ' + lote);
+      assert.ok(linhas.length <= 2 && linhas.every(e => e.size_pt >= 7.5));
+      for (const id of ['nome', 'val', 'fab', 'peso', 'empresa']) assert.ok(els.some(e => e.id === id), id);
+      assert.strictEqual(els.find(e => e.id === 'qr').content, campos.qr);
+      assert.strictEqual(els.find(e => e.id === 'barras').content, campos.barras);
+      const marca = els.filter(e => e.id === 'empresa');
+      assert.strictEqual(marca.map(e => e.content).join(' '), campos.empresa);
+      const barra = els.find(e => e.id === 'barras'), qr = r.qrCaixa;
+      const sobrepoe = (a, b) => a.x_mm < b.x_mm + b.w_mm && a.x_mm + a.w_mm > b.x_mm
+        && a.y_mm < b.y_mm + b.h_mm && fim(a) > b.y_mm;
+      for (const e of marca) {
+        assert.ok(e.size_pt >= 8);
+        assert.ok(!sobrepoe(e, barra), 'marca fora da barra e sua zona quieta');
+        assert.ok(!sobrepoe(e, { x_mm: qr.x_mm, y_mm: qr.y_mm, w_mm: qr.lado_mm, h_mm: qr.lado_mm }), 'marca fora da zona quieta do QR');
+      }
+      for (const e of els.filter(e => e.type === 'text')) {
+        assert.ok(medidaLarga(e.content, e.size_pt) <= e.w_mm + 0.01, e.content);
+        assert.ok(e.x_mm >= 0 && e.y_mm >= 0 && fim(e) <= area.h_mm, e.content);
+      }
+    }
+  });
+
   // Achado 1 (Critical): "só barras" sem número curto saía sem código nenhum.
   test('#2202 banca 1: só barras sem número curto imprime o QR no lugar e avisa', () => {
     const R = resolvedor().cdbResolverEtiqueta;

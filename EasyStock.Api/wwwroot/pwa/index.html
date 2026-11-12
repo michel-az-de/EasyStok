@@ -12769,7 +12769,7 @@ function openProductionConfirm(productIds = null) {
   // Código do batch fica em variável — não aparece mais na tela de revisão.
   // É usado só internamente pra identificar o batch no banco.
   currentBatchCode = buildBatchCode(items);
-  currentBatchId = 'b-' + Date.now();
+  currentBatchId = 'b2-' + calcGerarUuid();
 
   const summary = document.getElementById('prodSummary');
   summary.innerHTML = items.map(i => {
@@ -14777,12 +14777,14 @@ function subtituloDoLote(now, batchId) {
   return `lote ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')} às ${timeOf(now.getTime())} · ${codigo}`;
 }
 
-// #1471: codigo do lote igual ao do ERP (BatchLinker): lote do dia + '-' + ultimos 6
-// caracteres do id do batch, so letras e digitos. Deterministico, funciona offline e
-// distingue dois lotes do mesmo dia.
+// Código igual ao ERP (BatchLinker). O formato legado #1471 mantém dia e sufixo;
+// b2 preserva o UUID inteiro sem alterar reimpressões antigas.
 function codigoDoLote(batch) {
-  const base = batch.lote || batch.code || getLoteDoDia(new Date(batch.createdAt));
   const id = String(batch.id || '');
+  // #2317: o namespace novo preserva o UUID inteiro; etiquetas antigas mantêm seu código.
+  const uuid = id.length === 39 && id.match(/^b2-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+  if (uuid) return uuid[1].replace(/-/g, '').toUpperCase();
+  const base = batch.lote || batch.code || getLoteDoDia(new Date(batch.createdAt));
   const sufixo = (id.length >= 6 ? id.slice(-6) : id).replace(/[^\p{L}\p{N}]/gu, '');
   return sufixo ? base + '-' + sufixo : base;
 }
@@ -21956,7 +21958,7 @@ function confirmProduction() {
   });
 
   const code = currentBatchCode || buildBatchCode(itemsRaw);
-  const batchId = currentBatchId || ('b-' + nowMs);
+  const batchId = currentBatchId || ('b2-' + calcGerarUuid());
   // #1474 W6: mesmo lote/codigo do batch e da etiqueta, mesmo virando o dia.
   try { document.getElementById('batchDate').textContent = subtituloDoLote(new Date(nowMs), batchId); } catch (_) {}
   const batch = {
@@ -23825,10 +23827,10 @@ window.cdbApp = {
 </script>
 
 <script src="qrcode.min.js?v=20260429a"></script>
-<script src="etiqueta-termica.js?v=20261028a"></script>
+<script src="etiqueta-termica.js?v=20261112a"></script>
 <script src="impressao-papeis.js?v=20261104b"></script>
 <script src="impressoras.js?v=20261105b"></script>
-<script src="etiqueta-resolver.js?v=20261105b"></script>
+<script src="etiqueta-resolver.js?v=20261112a"></script>
 <script src="etiqueta-canvas.js?v=20261105b"></script>
 <script>
 // #2247 (v3): o motor da etiqueta só desenha com a sua fonte. Carrega já no
