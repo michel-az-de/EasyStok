@@ -45,6 +45,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// RLS). Escrita direta, fora da unidade de trabalho. Devolve quantos avisos foram resolvidos.
         /// </summary>
         Task<int> ResolverAvisosDeCaixaFechadoAsync(Guid? empresaId = null, CancellationToken ct = default);
+        /// <summary>
+        /// #2303: marca como lidos os avisos do sino de <c>PrazoEstourado</c> de cliente sem resposta cujo lembrete
+        /// (o <c>RefEntidadeId</c> do evento) não está mais aberto na mesma empresa: a dona respondeu, a conversa fechou ou
+        /// o lembrete sumiu. <paramref name="empresaId"/> nulo varre todas (job, sob o bypass de RLS). Escrita direta,
+        /// fora da unidade de trabalho. Devolve quantos avisos foram resolvidos.
+        /// </summary>
+        Task<int> ResolverAvisosDeClienteAtendidoAsync(Guid? empresaId = null, CancellationToken ct = default);
         Task DeleteAsync(Guid empresaId, Guid id);
     }
 

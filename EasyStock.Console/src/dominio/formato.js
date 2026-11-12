@@ -127,6 +127,20 @@ export function haQuantoTempo(iso, agora) {
   return Math.floor(horas / 24) + ' d'
 }
 
+// #2303: a idade de um aviso do sino, por extenso. Sem data válida devolve null: melhor não dizer do
+// que inventar que é novo.
+export function idadeDoAviso(iso, agora) {
+  const instante = iso ? new Date(iso).getTime() : NaN
+  if (Number.isNaN(instante)) return null
+  const minutos = Math.floor((agora - instante) / 60000)
+  if (minutos < 1) return 'agora'
+  if (minutos < 60) return `há ${minutos} min`
+  const horas = Math.floor(minutos / 60)
+  if (horas < 24) return `há ${horas} h`
+  const dias = Math.floor(horas / 24)
+  return dias === 1 ? 'há 1 dia' : `há ${dias} dias`
+}
+
 // Rodada 2 · plural. "1 porções" é o tipo de descuido que faz a tela parecer
 // rascunho, e aparece em toda contagem do painel de entregas.
 export const plural = (n, singular, plural_) => n + ' ' + (n === 1 ? singular : plural_)

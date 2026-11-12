@@ -50,9 +50,10 @@ public sealed class AvaliadorLembretesBackgroundService(
         await sp.GetRequiredService<PostgresAdvisoryLock>().TentarExecutarAsync(LockKeys.AvaliadorLembretes, async token =>
         {
             var resultado = await sp.GetRequiredService<AvaliarLembretesUseCase>().ExecuteAsync(token);
-            if (resultado.Criados + resultado.Resolvidos + resultado.Avisados > 0)
-                logger.LogInformation("Lembretes: criados={Criados} resolvidos={Resolvidos} avisados={Avisados}.",
-                    resultado.Criados, resultado.Resolvidos, resultado.Avisados);
+            if (resultado.Criados + resultado.Resolvidos + resultado.Avisados + resultado.AvisosResolvidos > 0)
+                logger.LogInformation(
+                    "Lembretes: criados={Criados} resolvidos={Resolvidos} avisados={Avisados} avisosResolvidos={AvisosResolvidos}.",
+                    resultado.Criados, resultado.Resolvidos, resultado.Avisados, resultado.AvisosResolvidos);
         }, ct);
     }
 }

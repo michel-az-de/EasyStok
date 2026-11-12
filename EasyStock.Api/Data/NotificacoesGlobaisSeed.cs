@@ -951,9 +951,11 @@ public static class NotificacoesGlobaisSeed
             nome: "Prazo Estourado · In-App",
             canal: CanalNotificacao.InApp,
             tipoEvento: TipoEventoNotificacao.PrazoEstourado,
-            assuntoTemplate: "{{ tipo_legivel }} há {{ atraso_texto }}",
-            corpoTemplate: """{{ if detalhe && detalhe != "" }}{{ detalhe }}{{ else }}{{ if cliente && cliente != "" }}{{ cliente }} está esperando: {{ end }}{{ tipo_legivel }} há {{ atraso_texto }} (referência {{ referencia }}).{{ end }}""")
-            .ComVersao(2); // #2258: o caixa esquecido manda o texto pronto (detalhe), sem repetir o título nem o código técnico.
+            assuntoTemplate: "{{ tipo_legivel }}",
+            corpoTemplate: """{{ if detalhe && detalhe != "" }}{{ detalhe }}{{ else }}Atraso de {{ atraso_texto }} no momento do aviso{{ if cliente && cliente != "" }}, cliente {{ cliente }}{{ end }} (referência {{ referencia }}).{{ end }}""")
+            // #2258: o caixa esquecido manda o texto pronto (detalhe), sem repetir o título nem o código técnico.
+            // #2302: o sino guarda o aviso por dias, então nada de "há X" congelado; a idade vem da data do modal.
+            .ComVersao(3);
 
         // ===== #2096: prazo estourado e avisos da operação no aparelho da dona e do gerente. O Push aparece na tela de
         // bloqueio: só o tipo, o primeiro nome e o tempo; o texto completo fica no e-mail e no sino. Interno. =====

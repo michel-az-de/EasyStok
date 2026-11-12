@@ -38,7 +38,8 @@ public class AvaliarLembretesPrazoEstouradoTests
     }
 
     private AvaliarLembretesUseCase Avaliador() =>
-        new(_repo, _candidatos, _notificador, _publisher, _uow, _relogio, Options.Create(_opcoes));
+        new(_repo, _candidatos, _notificador, _publisher, _uow, _relogio, Options.Create(_opcoes),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.INotificacaoRepository>());
 
     private Lembrete Vencido(TipoLembrete tipo, Guid? atendente = null)
     {
@@ -149,6 +150,21 @@ public class AvaliarLembretesPrazoEstouradoTests
 
         _vencidos.Should().ContainSingle().Which.Texto.Should().Be("Fulana está há 15 min sem resposta.");
         Payload(Prazos().Single()).GetProperty("prazo_texto").GetString().Should().Be("15 minutos");
+    }
+
+    // #2302: o atraso é a espera medida no disparo, não o SLA repetido.
+    [Fact]
+    public async Task AtrasoDoPrazoEstouradoEAEsperaRealDoCliente()
+    {
+        EsperandoDesde(47, slaDaLoja: 15);
+        _repo.When(r => r.AddAsync(Arg.Any<Lembrete>(), Arg.Any<CancellationToken>()))
+            .Do(c => _vencidos.Add(c.Arg<Lembrete>()));
+
+        await Avaliador().ExecuteAsync();
+
+        var payload = Payload(Prazos().Single());
+        payload.GetProperty("prazo_texto").GetString().Should().Be("15 minutos");
+        payload.GetProperty("atraso_texto").GetString().Should().Be("47 minutos");
     }
 
     [Fact]

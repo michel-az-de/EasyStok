@@ -171,7 +171,7 @@ public class LembretesPedidoAgendadoIntegrationTests(PostgreSqlDatabaseFixture f
         using var bypass = db.UseRowLevelSecurityBypass();
         return await new AvaliarLembretesUseCase(new LembreteRepository(db), new CandidatosLembreteQuery(db),
             Substitute.For<INotificadorService>(), publisher ?? Substitute.For<IOperacaoEventPublisher>(), db,
-            new RelogioFixo(instante), Options.Create(new PrazosOptions())).ExecuteAsync();
+            new RelogioFixo(instante), Options.Create(new PrazosOptions()), new EasyStock.Infra.Postgre.Repositories.NotificacaoRepository(db)).ExecuteAsync();
     }
 
     private static Pedido NovoPedido(Guid empresaId, string status, DateTime? entrega) => new()
