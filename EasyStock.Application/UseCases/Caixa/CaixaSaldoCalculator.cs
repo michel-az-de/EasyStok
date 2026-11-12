@@ -69,11 +69,13 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
         var movimentos = await repo.GetMovimentosDoDiaAsync(empresaId, data, lojaId);
         var movList = movimentos.ToList();
         // Mesmo criterio de GetAberturaPendenteAsync: uma abertura anterior nao mantem a
-        // sessao aberta depois de fechar, inclusive quando o resumo agrega varias lojas.
+        // sessao aberta depois de fechar. #2401: o estado e por loja (o resumo de varias lojas
+        // fica aberto se QUALQUER uma esta aberta) e o empate de instante desempata pelo Id.
         var aberturaNoDia = movList
             .Where(m => m.Tipo is "abertura" or "fechamento")
-            .OrderByDescending(m => m.DataMovimento)
-            .FirstOrDefault()?.Tipo == "abertura";
+            .GroupBy(m => m.LojaId)
+            .Any(g => g.OrderByDescending(m => m.DataMovimento).ThenByDescending(m => m.Id)
+                .First().Tipo == "abertura");
 
         var (iniDia, fimDia) = HorarioBrasil.JanelaDiaUtc(data);
         var janelaInicio = iniDia;

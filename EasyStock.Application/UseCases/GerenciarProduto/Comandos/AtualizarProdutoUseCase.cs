@@ -122,6 +122,12 @@ public sealed class AtualizarProdutoUseCase(
         produto.ControlaValidade = command.ControlaValidade;
         produto.Dimensoes = command.Dimensoes.ToValueObjectOrNull();
         produto.CustoReferencia = command.CustoReferencia.HasValue ? Dinheiro.FromDecimal(command.CustoReferencia.Value) : null;
+        // #2401: custo editado não pode deixar o de 6 casas velho: a ficha (CustoDaFicha) o prefere.
+        if (command.CustoReferencia != custoAntes)
+        {
+            if (produto.EhInsumo) produto.DefinirCustoDoInsumo(command.CustoReferencia);
+            else produto.CustoUnitarioInsumo = null;
+        }
         produto.PrecoReferencia = command.PrecoReferencia.HasValue ? Dinheiro.FromDecimal(command.PrecoReferencia.Value) : null;
         produto.MargemEstimada = command.MargemEstimada;
         // Preserva ficha tecnica quando o command omite AtributosJson. Form.cshtml de

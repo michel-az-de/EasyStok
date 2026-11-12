@@ -1,0 +1,2 @@
+### Fixed
+- **Custo do insumo, caixa de várias lojas e IA do acervo** (#2401): editar o custo de um produto ou sincronizá-lo do PWA não deixa mais o custo de 6 casas velho na ficha técnica e no cálculo de produção; o resumo do caixa com várias lojas fica "aberto" se qualquer loja estiver aberta, com desempate estável; as sugestões e a dica de prato da IA do acervo têm prazo de 120 s em vez de 30 s.

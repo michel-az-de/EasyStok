@@ -1001,6 +1001,50 @@ public class CaixaUseCasesTests
     }
 
     [Fact]
+    public async Task CaixaSaldoCalculator_ResumoDeTodasAsLojas_LojaAbertaEOutraFechadaDepois_ContinuaAberto()
+    {
+        // #2401 C: sem lojaId o Aberto vinha do último evento de TODAS as lojas; a loja B fechando
+        // depois da A abrir mostrava "fechado" com a A ainda aberta.
+        var empresaId = Guid.NewGuid();
+        var lojaA = Guid.NewGuid();
+        var lojaB = Guid.NewGuid();
+        var hoje = HorarioBrasil.Hoje();
+        var t = DateTime.UtcNow.AddMinutes(-30);
+        _repo.GetFechamentoDoDiaAsync(empresaId, hoje, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, hoje, null).Returns(new[]
+        {
+            MovimentoCaixa.Criar(empresaId, "abertura", 100m, t, lojaB),
+            MovimentoCaixa.Criar(empresaId, "abertura", 100m, t.AddMinutes(10), lojaA),
+            MovimentoCaixa.Criar(empresaId, "fechamento", 0m, t.AddMinutes(20), lojaB),
+        });
+
+        var b = await new CaixaSaldoCalculator(_repo).CalcularAsync(empresaId, hoje);
+
+        b.Aberto.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CaixaSaldoCalculator_AberturaEFechamentoNoMesmoInstante_DesempataPeloId()
+    {
+        // #2401 C: empate em DataMovimento era não determinístico (dependia da ordem da lista).
+        var empresaId = Guid.NewGuid();
+        var hoje = HorarioBrasil.Hoje();
+        var t = DateTime.UtcNow.AddMinutes(-30);
+        var abertura = MovimentoCaixa.Criar(empresaId, "abertura", 100m, t);
+        var fechamento = MovimentoCaixa.Criar(empresaId, "fechamento", 0m, t);
+        abertura.Id = new Guid("00000000-0000-0000-0000-000000000001");
+        fechamento.Id = new Guid("00000000-0000-0000-0000-000000000002");
+        _repo.GetFechamentoDoDiaAsync(empresaId, hoje, null).Returns((FechamentoCaixa?)null);
+
+        foreach (var lista in new[] { new[] { abertura, fechamento }, new[] { fechamento, abertura } })
+        {
+            _repo.GetMovimentosDoDiaAsync(empresaId, hoje, null).Returns(lista);
+            var b = await new CaixaSaldoCalculator(_repo).CalcularAsync(empresaId, hoje);
+            b.Aberto.Should().BeFalse("o maior Id é o último evento, qualquer que seja a ordem da lista");
+        }
+    }
+
+    [Fact]
     public async Task GetLinhasExtras_ListaVendasEPagamentos_OrdenadasPorHora_ComSomaIgualAoTotal()
     {
         // AC-4 (#755): as Vendas e os Pagamentos de pedido entram no saldo esperado mas viviam
