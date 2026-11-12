@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Api.Mobile.Services;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 
@@ -154,17 +155,14 @@ public class MobileProductsController(
             .Where(i => i.EmpresaId == emp && produtoIds.Contains(i.ProdutoId))
             .ToListAsync(ct);
 
-        // Match (ProdutoId, LojaId) — se LojaId é null no ItemEstoque, casa
-        // com qualquer mobile. Senão exige loja igual.
+        // Match (ProdutoId, LojaId) estrito: item sem loja nao entra na soma de loja nenhuma.
         var divergences = new List<StockDivergence>();
         foreach (var mp in mobileLinked)
         {
             // PROD-4 (#2318): compara a soma do estoque da loja, nao um unico lote.
-            var itensDaLoja = itensEstoque.Where(i =>
-                i.ProdutoId == mp.ErpProductId &&
-                (i.LojaId == null || i.LojaId == mp.LojaId)).ToList();
+            var itensDaLoja = EstoqueDaLojaMobile.ItensDaLoja(itensEstoque, mp.ErpProductId!.Value, mp.LojaId).ToList();
             var item = itensDaLoja.FirstOrDefault();
-            var erpStock = itensDaLoja.Sum(i => (decimal)i.QuantidadeAtual);
+            var erpStock = EstoqueDaLojaMobile.Soma(itensDaLoja, mp.ErpProductId!.Value, mp.LojaId);
             if (mp.Stock == erpStock) continue; // bate, sem divergência
             divergences.Add(new StockDivergence(
                 MobileProductId: mp.Id,
@@ -197,22 +195,24 @@ public class MobileProductsController(
         if (product.ErpProductId == null)
             return BadRequest(new { error = "Produto não está linkado ao ERP" });
 
-        var item = await _db.Set<ItemEstoque>().AsNoTracking().FirstOrDefaultAsync(i =>
-            i.EmpresaId == product.EmpresaId &&
-            i.ProdutoId == product.ErpProductId &&
-            (i.LojaId == null || i.LojaId == product.LojaId), ct);
+        // PROD-4 (#2318): mesma soma por (ProdutoId, LojaId) da lista de divergencias.
+        var itensDaLoja = await _db.Set<ItemEstoque>().AsNoTracking()
+            .Where(i => i.EmpresaId == product.EmpresaId &&
+                        i.ProdutoId == product.ErpProductId &&
+                        i.LojaId == product.LojaId)
+            .ToListAsync(ct);
 
-        if (item == null)
+        if (itensDaLoja.Count == 0)
             return BadRequest(new { error = "ItemEstoque não existe no ERP. Crie o estoque inicial primeiro." });
 
         var oldStock = product.Stock;
-        product.Stock = (int)(item.QuantidadeAtual?.Value ?? 0m);
+        product.Stock = (int)EstoqueDaLojaMobile.Soma(itensDaLoja, product.ErpProductId.Value, product.LojaId);
         product.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
         _log.LogInformation(
-            "Reconcile stock: mobile_product {Id} {Old}→{New} (ERP item={ItemId})",
-            id, oldStock, product.Stock, item.Id);
+            "Reconcile stock: mobile_product {Id} {Old}→{New} (ERP itens={Itens})",
+            id, oldStock, product.Stock, itensDaLoja.Count);
 
         return Ok(new { mobileStock = product.Stock, previousStock = oldStock });
     }
