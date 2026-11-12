@@ -176,8 +176,11 @@ public class CriarPedidoUseCase(
         {
             // Pedido balcão: tenta associar ao cliente cadastrado com o mesmo nome.
             var matches = await clienteRepo.SearchAsync(cmd.EmpresaId, cmd.ClienteNomeAdHoc, maxResults: 1);
-            var clienteAdHoc = matches.FirstOrDefault(c =>
+            var encontrado = matches.FirstOrDefault(c =>
                 string.Equals(c.Nome, cmd.ClienteNomeAdHoc, StringComparison.OrdinalIgnoreCase));
+            // SearchAsync e somente leitura; o sync pode ja ter este cliente rastreado pelo ClientLinker.
+            var clienteAdHoc = encontrado is null ? null
+                : await clienteRepo.GetByIdAsync(cmd.EmpresaId, encontrado.Id);
             if (clienteAdHoc != null)
             {
                 clienteAdHoc.RegistrarPedido(pedido.CriadoEm);

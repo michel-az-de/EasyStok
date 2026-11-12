@@ -119,7 +119,8 @@ public sealed class ClienteSyncErpTests : IDisposable
 
         var atual = await _db.Set<Cliente>().IgnoreQueryFilters().SingleAsync(c => c.Id == erp.Id);
         atual.Nome.Should().Be("Maria Souza");
-        atual.Telefone.Should().Be("(11) 95555-4444");
+        atual.Telefone.Should().Be("11955554444");
+        app.Phone.Should().Be("11955554444");
         atual.Apt.Should().Be("Apto 12");
         atual.Endereco.Should().Be("Rua B, 20");
         var outra = await _db.Set<Cliente>().IgnoreQueryFilters().SingleAsync(c => c.Id == outraEmpresa.Id);
@@ -145,6 +146,23 @@ public sealed class ClienteSyncErpTests : IDisposable
         atual.Telefone.Should().Be("11988887777");
         atual.Apt.Should().Be("Apto 7");
         atual.Endereco.Should().Be("Rua A, 10");
+    }
+
+    [Theory]
+    [InlineData("(11) 98888-7766", "11988887766")]
+    [InlineData("+55 (11) 98888-7766", "+5511988887766")]
+    [InlineData("123", "123")]
+    [InlineData(null, null)]
+    public async Task NovoClienteDoApp_NormalizaTelefoneComoConsoleSemRejeitarLegado(string? telefone, string? esperado)
+    {
+        await Dispatcher().ApplyMutationAsync(Mutacao("c-novo", "Cliente novo", telefone, null, null),
+            "dev-a", null, _empresaId, Guid.NewGuid());
+        await Vincular("c-novo");
+
+        var app = await _db.Set<Client>().SingleAsync(c => c.Id == "c-novo");
+        app.Phone.Should().Be(esperado);
+        var erp = await _db.Set<Cliente>().SingleAsync(c => c.Id == app.ErpClienteId);
+        erp.Telefone.Should().Be(esperado);
     }
 
     private SyncMutationDispatcher Dispatcher()

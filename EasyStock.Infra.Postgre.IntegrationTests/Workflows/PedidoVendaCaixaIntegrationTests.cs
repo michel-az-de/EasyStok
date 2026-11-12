@@ -388,6 +388,51 @@ public class PedidoVendaCaixaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         }
     }
 
+    [SkippableFact]
+    public async Task Pedido_mobile_com_cliente_ja_rastreado_persiste_metricas_sem_tocar_outra_empresa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var empresaId = Guid.NewGuid();
+        var outraEmpresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var cliente = Cliente.Criar(empresaId, "Cliente criado pelo app");
+        var outroCliente = Cliente.Criar(outraEmpresaId, cliente.Nome);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.AddRange(new Empresa { Id = empresaId, Nome = "Empresa mobile" },
+                new Empresa { Id = outraEmpresaId, Nome = "Outra empresa" },
+                new Loja { Id = lojaId, EmpresaId = empresaId, Nome = "Loja mobile", Ativa = true },
+                outroCliente);
+            await seed.SaveChangesAsync();
+        }
+
+        Guid pedidoId;
+        await using var provider = BuildProductionProvider();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+            // ClientLinker acabou de salvar o cliente neste mesmo contexto antes do OrderLinker.
+            db.Add(cliente);
+            await db.SaveChangesAsync();
+            var pedido = await scope.ServiceProvider.GetRequiredService<CriarPedidoUseCase>().ExecuteAsync(
+                new CriarPedidoCommand(empresaId, LojaId: lojaId, ClienteNomeAdHoc: cliente.Nome,
+                    Origem: "mobile", MobileOrderId: "o-2348-rastreado",
+                    Itens: [new CriarPedidoItemInput("Produto avulso", 1, 25m)]));
+            pedidoId = pedido.Id;
+            cliente.OrderCount.Should().Be(1);
+            db.ChangeTracker.Entries<Cliente>().Should().ContainSingle(e => e.Entity.Id == cliente.Id);
+        }
+        await using var check = fixture.CreateDbContext();
+        var salvo = await check.Set<Pedido>().IgnoreQueryFilters().SingleAsync(p => p.Id == pedidoId);
+        salvo.EmpresaId.Should().Be(empresaId);
+        salvo.LojaId.Should().Be(lojaId);
+        salvo.Origem.Should().Be("mobile");
+        (await check.Set<Cliente>().IgnoreQueryFilters().SingleAsync(c => c.Id == cliente.Id)).OrderCount.Should().Be(1);
+        (await check.Set<Cliente>().IgnoreQueryFilters().SingleAsync(c => c.Id == outroCliente.Id)).OrderCount.Should().Be(0);
+    }
+
     private ServiceProvider BuildProductionProvider()
     {
         var config = new ConfigurationBuilder().Build();

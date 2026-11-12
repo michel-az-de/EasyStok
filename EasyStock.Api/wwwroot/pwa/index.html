@@ -16603,7 +16603,7 @@ function openDiagnostics() {
           + (p
               ? '<button class="diag-action danger" onclick="unpairDevice()">Desparear</button>'
               : '<button class="diag-action" onclick="diagForcePairNow()">Forçar pareamento agora</button>'
-              + '<button class="diag-action" onclick="pairDevicePrompt()">Parear com código</button>')
+              + '<button class="diag-action" onclick="pairDevicePrompt().catch(e => showToast(\'Falha: \' + (e && e.message ? e.message : \'erro desconhecido\')))">Parear com código</button>')
         , '');
       })()
     + section('Erros do sistema', d.errors.length ? 'warn' : 'ok', ''

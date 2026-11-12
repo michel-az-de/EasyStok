@@ -13,11 +13,57 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using FluentAssertions;
+using EasyStock.Api.Mobile.Services;
+using EasyStock.Api.Mobile.Services.Linkers;
+using EasyStock.Application.Ports.Output.Persistence;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
 public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
+    [SkippableFact]
+    public async Task Produto_criado_pelo_app_deve_aparecer_na_listagem_com_cache_aquecido()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var outraEmpresaId = Guid.NewGuid();
+        context.Empresas.AddRange(
+            new Empresa { Id = empresaId, Nome = "Empresa app", Documento = "2348-a", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow },
+            new Empresa { Id = outraEmpresaId, Nome = "Outra empresa", Documento = "2348-b", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        var mobile = new EasyStock.Domain.Entities.Mobile.Product
+        {
+            Id = "custom-2348-cache", EmpresaId = empresaId, Name = "Produto novo do app", Price = 25, Stock = 10, IsCustom = true,
+        };
+        var estrangeiro = new EasyStock.Domain.Entities.Mobile.Product
+        {
+            Id = "custom-2348-outra", EmpresaId = outraEmpresaId, Name = mobile.Name, Price = 25, Stock = 10, IsCustom = true,
+        };
+        context.AddRange(mobile, estrangeiro);
+        await context.SaveChangesAsync();
+        context.SetMobileTenantContext(empresaId);
+        var cache = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
+        var repository = new ProdutoRepository(context, cache);
+        (await repository.GetProdutosPaginadosAsync(empresaId)).Produtos.Should().BeEmpty();
+        (await repository.GetProdutosPaginadosAsync(empresaId, sort: "nome")).Produtos.Should().BeEmpty();
+        using var services = new ServiceCollection().AddSingleton<IProdutoRepository>(repository).BuildServiceProvider();
+        var linker = ActivatorUtilities.CreateInstance<ProductLinker>(services, context,
+            new MobileSystemUserResolver(context), NullLogger<ProductLinker>.Instance);
+
+        await linker.ExecuteAsync([mobile.Id, estrangeiro.Id], empresaId);
+        await context.SaveChangesAsync();
+
+        mobile.ErpProductId.Should().NotBeNull();
+        estrangeiro.ErpProductId.Should().BeNull();
+        foreach (var ordem in new[] { "criadoem", "nome" })
+        {
+            var (produtos, total) = await repository.GetProdutosPaginadosAsync(empresaId, sort: ordem);
+            total.Should().Be(1);
+            produtos.Should().ContainSingle().Which.Id.Should().Be(mobile.ErpProductId.Value);
+        }
+    }
+
     [SkippableFact]
     public async Task AtualizarLimiares_deve_preservar_xmin_invalidar_cache_e_restringir_empresa()
     {

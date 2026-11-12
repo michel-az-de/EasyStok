@@ -15,7 +15,8 @@ namespace EasyStock.Api.Mobile.Services.Linkers;
 public sealed class ProductLinker(
     EasyStockDbContext db,
     MobileSystemUserResolver systemUserResolver,
-    ILogger<ProductLinker> log)
+    ILogger<ProductLinker> log,
+    IProdutoRepository produtoRepository)
 {
     public async Task ExecuteAsync(IEnumerable<string> mobileProductIds, Guid? empresaId)
     {
@@ -105,7 +106,7 @@ public sealed class ProductLinker(
                     CriadoEm = DateTime.UtcNow,
                     AlteradoEm = DateTime.UtcNow
                 };
-                db.Add(novoProd);
+                await produtoRepository.InsertAsync(novoProd);
                 mobileP.ErpProductId = novoProd.Id;
                 cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId.Value);
                 db.Add(new ProdutoAlteracao
