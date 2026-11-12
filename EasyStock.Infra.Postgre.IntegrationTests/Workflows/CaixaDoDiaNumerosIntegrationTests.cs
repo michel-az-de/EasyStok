@@ -87,7 +87,10 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
+        // #2324: o estorno vai em agora+1min; no último minuto do dia ele cairia no dia seguinte.
         var agora = DateTime.UtcNow;
+        if (HorarioBrasil.DataOperacional(agora.AddMinutes(1)) != HorarioBrasil.DataOperacional(agora))
+            agora = agora.AddMinutes(-2);
         var dia = HorarioBrasil.DataOperacional(agora);
         var vendaQueFica = NovaVenda(empresaId, 100m, agora, "dinheiro");
         var vendaEstornada = NovaVenda(empresaId, 50m, agora, "dinheiro");
