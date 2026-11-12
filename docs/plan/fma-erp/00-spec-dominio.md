@@ -31,7 +31,8 @@ Uso **interno**. Não é produto à venda (alinhamento comercial, itens 16 e 35)
 | Lead, Proposta, Contrato | Não existem | Greenfield |
 | Enum `Modulo` | Fixo em 8 módulos de varejo | Precisa de módulo novo |
 | Liga e desliga de módulo | `TenantFeatureFlag` existe mas **não é lido** em runtime | Falta mecanismo |
-| Front | Console (React 19 + Vite) é o front vivo; Web em saída | Front novo FMA (este protótipo) ou rota no Console |
+| Front | Console (React 19 + Vite) é o front vivo; Web em saída | Front novo FMA: caixa de conversas, copiloto e funil, não CRUD (este protótipo) |
+| E-mail, WhatsApp, LLM | `SmtpEmailCanal`, `CanalWhatsApp` (Cloud API e WppConnect), `AnthropicMessagesClient` | **Reaproveitar** (seção 6) |
 
 Governança vigente: o ADR-0048 (FMA como 2º tenant) foi **substituído** pelo ADR-0056 (ERP da Casa
 da Babá, tenant único, front único). Qualquer opção abaixo que reabra a FMA dentro do EasyStok
@@ -137,13 +138,35 @@ não a entidade `Pedido` (ADR-0042 mantém o pedido de varejo canônico).
 - A confirmar com o contador: fato gerador (aprovação ou entrega), sinal e parcelamento dentro da
   etapa, multa, juros e reajuste de contrato longo.
 
-## 6. Fora do escopo do protótipo
+## 6. Integrações e IA (v3)
 
-Backend, migração, auth, emissão de NFS-e, envio de e-mail ou WhatsApp, assinatura eletrônica,
-deploy. O protótipo é estático em `prototipos/fma-erp/`, com dados **fictícios** (nenhum cliente,
+O ERP parte da conversa, não do formulário. Felipe reprovou a v2 por parecer CRUD; a v3 troca a tela
+de cadastro por fila do que pede decisão.
+
+| Integração | No protótipo | No produto (reaproveita) |
+|---|---|---|
+| WhatsApp | Conversas, cobrança Pix e lembrete simulados | `Infra.Integrations/WhatsApp` (`CanalWhatsApp`, `WhatsAppCloudClient`, `WppConnectClient`) |
+| E-mail | Envio de proposta e NFS-e simulado, com prévia | `Infra.Notifications/Email/SmtpEmailCanal` |
+| LLM | Leitura da conversa, rascunho de resposta, proposta montada, briefing e copiloto, todos por regra local | `Infra.Integrations/Ia/AnthropicMessagesClient` |
+
+| Fluxo | Comportamento |
+|---|---|
+| Conversa → proposta | A IA lê a mensagem, sugere etapas e custos; Felipe revisa e envia |
+| Automações | Follow-up de proposta parada, cobrança no vencimento, lembrete de NFS-e pendente; cada uma liga e desliga |
+| Copiloto | Responde sobre caixa, notas pendentes e funil com os dados do próprio ERP |
+| Regra de ouro | IA rascunha, Felipe aprova: nada sai para cliente sem clique |
+
+Decisões do Felipe antes da fatia real: enviar conversa de cliente a um LLM externo é decisão de
+**privacidade** (consentimento, LGPD, retenção); número de WhatsApp oficial (Cloud API) ou WppConnect;
+remetente de e-mail com SPF e DKIM.
+
+## 7. Fora do escopo do protótipo
+
+Backend, migração, auth, emissão de NFS-e, envio real de e-mail ou WhatsApp, chamada real a LLM,
+assinatura eletrônica, deploy. O protótipo é estático em `prototipos/fma-erp/`, com dados **fictícios** (nenhum cliente,
 CNPJ ou preço real).
 
-## 7. Blog do Felipe
+## 8. Blog do Felipe
 
 | Item | Estado |
 |---|---|
@@ -155,9 +178,9 @@ CNPJ ou preço real).
 Não foram consultados: Hostinger, Google Drive, GitLab, repos fora de `michel-az-de`. O ERP
 **não** inclui blog: o protótipo só mostra o estado e o link, para não duplicar o Levante.
 
-## 8. Próximos passos
+## 9. Próximos passos
 
-1. Felipe escolhe A, B, C ou D e onde fica o blog da FMA.
+1. Felipe escolhe A, B, C ou D, onde fica o blog da FMA e a política de envio de dados ao LLM.
 2. ADR da opção escolhida; spec da fatia 1 (Lead → Proposta → Contrato), tier alto.
 3. Validar com o contador: retenções, competência, fato gerador, imposto.
 4. As regras do protótipo têm teste executável: `node prototipos/fma-erp/tests/regras.test.cjs`.
