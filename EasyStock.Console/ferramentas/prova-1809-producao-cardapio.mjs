@@ -4,7 +4,7 @@
 //   Produção do dia:
 //   - o cartão traz a foto do prato (a mesma do cardápio), com reserva quando não há foto ou ela falha;
 //   - passos visíveis no topo: tocar, conferir, registrar;
-//   - o "−" e o contador do cartão têm tooltip e rótulo;
+//   - o "−" e o contador do cartão têm tooltip e rótulo (#2364: o contador abre a quantidade);
 //   - sem pratos, a tela diz o que fazer e onde.
 //   Itens do cardápio:
 //   - categorias distintas, com contagem, combinando com a disponibilidade e com a busca;
@@ -284,9 +284,12 @@ await confere('Produção do dia: o "−" e o contador do cartão têm tooltip e
   assert.ok(menos, 'o "−" existe')
   assert.equal(menos.props.title, 'Tirar 1 porção de Talharim 500 g')
   const contador = daClasse(cartao, 'contagem')[0]
-  assert.equal(contador.props.title, '2 porções de Talharim 500 g no lote')
-  assert.equal(contador.props['aria-label'], '2 porções de Talharim 500 g no lote')
+  // #2364: o contador virou botão que abre a quantidade; a contagem segue como descrição do cartão.
+  assert.equal(contador.props.title, '2 porções de Talharim 500 g no lote. Toque para digitar a quantidade.')
+  assert.equal(contador.props['aria-label'], 'Digitar a quantidade de Talharim 500 g')
   assert.match(limpo(contador), /^2/)
+  const descricao = andar(cartao, (n) => n.props?.id === comRotulo(cartao, 'Somar 1 porção de Talharim 500 g')[0].props['aria-describedby'].split(' ').at(-1))[0]
+  assert.equal(texto(descricao), '2 porções de Talharim 500 g no lote')
 })
 
 await confere('Produção do dia: sem pratos, o estado vazio explica e leva aos Itens do cardápio', async () => {
