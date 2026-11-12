@@ -88,6 +88,7 @@ export function caixaDiaDaApi(d) {
       em: l.hora, tipo: l.tipo, valor: l.valor, descricao: l.descricao ?? '', meio: normalizarMetodoCaixa(l.metodo) ?? null, origem: l.origem,
       // #2098: só no pagamento de pedido.
       pedidoNumeroDoDia: l.pedidoNumeroDoDia ?? null, clienteNome: l.clienteNome ?? null,
+      ...(l.registradoPorNome ? { autorNome: l.registradoPorNome } : {}),
     })),
   }
 }

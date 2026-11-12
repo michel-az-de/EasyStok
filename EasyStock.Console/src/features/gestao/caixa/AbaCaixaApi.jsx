@@ -249,7 +249,7 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
             <li key={`${m.origem}-${m.tipo}-${m.em}-${m.valor}-${indice}`} className={css.linha}>
               <span className={css.linhaInfo}>
                 <strong>{tituloDaLinhaExtra(m)}</strong>
-                <span className={css.dicaItem}>{horaCurta(m.em)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.clienteNome && ` · ${m.clienteNome}`}{m.tipo !== 'estorno' && m.descricao && ` · ${m.descricao}`}</span>
+                <span className={css.dicaItem}>{horaCurta(m.em)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.clienteNome && ` · ${m.clienteNome}`}{m.tipo !== 'estorno' && m.descricao && ` · ${m.descricao}`}{m.autorNome && ` · ${m.autorNome}`}</span>
               </span>
               <span className={m.valor < 0 ? `${css.linhaValor} ${css.valorSaida}` : css.linhaValor}>{m.valor < 0 ? '−' : '+'} {moeda(Math.abs(m.valor))}</span>
             </li>
@@ -275,6 +275,7 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
                   {horaCurta(m.em)}
                   {m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}
                   {m.descricao && ` · ${m.descricao}`}
+                  {m.autorNome && ` · ${m.autorNome}`}
                 </span>
                 {m.estornadoEm && <span className={css.dicaItem}>Estornado{m.estornadoPorNome ? ` por ${m.estornadoPorNome}` : ''} · {m.motivoEstorno}</span>}
               </span>

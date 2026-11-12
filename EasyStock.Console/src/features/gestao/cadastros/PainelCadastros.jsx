@@ -111,7 +111,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   return <section className={css.painel} aria-label={TITULOS_CADASTROS[tela]}>
     <header className={css.cabecalho}>
       <div><p className={css.eyebrow}>CADASTROS</p><h2>{TITULOS_CADASTROS[tela]}</h2><p>{({ clientes: 'Pessoas, contatos e histórico de relacionamento.', produtos: 'Dados dos produtos usados no cardápio e na operação.', fornecedores: 'Contatos e condições de compra.', bancos: 'Contas usadas pela loja.' })[tela]}</p></div>
-      {podeEditar && !soLeads && <Botao variante="primario" icone="mais" onClick={novo}>Novo {({ clientes: 'cliente', produtos: 'produto', fornecedores: 'fornecedor', bancos: 'cadastro' })[tela]}</Botao>}
+      {podeEditar && !soLeads && <Botao variante="primario" icone="mais" onClick={novo}>{tela === 'clientes' && conversa && !conversa.clienteId ? 'Cadastrar pessoa da conversa' : `Novo ${({ clientes: 'cliente', produtos: 'produto', fornecedores: 'fornecedor', bancos: 'cadastro' })[tela]}`}</Botao>}
     </header>
     {conversa && <div className={css.contexto}><Icone nome="conversa" tamanho={20} /><span>Atendimento de <strong>{nome(conversa)}</strong></span>
       <Botao variante="texto" onClick={() => abrirConversa(conversa.id)}>Voltar à conversa</Botao>

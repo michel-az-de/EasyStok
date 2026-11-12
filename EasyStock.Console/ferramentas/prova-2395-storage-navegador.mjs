@@ -11,8 +11,9 @@ const contexto = await browser.newContext({ viewport: { width: 1280, height: 900
 await contexto.addInitScript(() => {
   sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture-controlada', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa', nome: 'Loja de teste' }, usuario: { id: 'dona', nome: 'Dona de teste' } }))
   const gravar = Storage.prototype.setItem
+  globalThis.__r4QuotaBloqueada = sessionStorage.getItem('r4-storage-restaurado') !== 'sim'
   Storage.prototype.setItem = function(chave, valor) {
-    if (chave.startsWith('easystok.visita:')) throw new DOMException('Quota de teste', 'QuotaExceededError')
+    if (globalThis.__r4QuotaBloqueada && chave.startsWith('easystok.visita:')) throw new DOMException('Quota de teste', 'QuotaExceededError')
     return gravar.call(this, chave, valor)
   }
 })
@@ -50,9 +51,36 @@ try {
   await pagina.getByText('Cliente da quota', { exact: true }).first().click()
   await pagina.getByRole('button', { name: 'Adicionar itens', exact: true }).waitFor()
   assert.equal(await pagina.getByText('1 na comanda', { exact: true }).count(), 0, 'Sem armazenamento a proposta não foi restaurada após reload')
+  // Uma nova proposta permanece aberta quando o armazenamento volta a funcionar.
+  await pagina.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
+  await pagina.getByRole('button', { name: /^Lasanha da quota/ }).click()
+  await aviso.waitFor()
+  await pagina.getByRole('button', { name: /^Revisar comanda/ }).click()
+  await pagina.getByRole('button', { name: 'Anotação para Lasanha da quota', exact: true }).click()
+  const observacao = 'Proposta mantida durante a quota: sem queijo, molho à parte.'
+  await pagina.getByRole('textbox', { name: 'Observação de Lasanha da quota', exact: true }).fill(observacao)
+  await pagina.evaluate(() => {
+    sessionStorage.setItem('r4-storage-restaurado', 'sim')
+    globalThis.__r4QuotaBloqueada = false
+  })
+  // A sincronização normal tenta persistir novamente, sem reconstruir a proposta.
+  await pagina.waitForFunction(texto => Object.keys(sessionStorage).some(k => {
+    if (!k.startsWith('easystok.visita:')) return false
+    const itens = JSON.parse(sessionStorage.getItem(k)).comandas?.conversa?.itens
+    return itens?.length === 1 && itens[0].qtd === 1 && itens[0].obs === texto
+  }), observacao, { timeout: 30000 })
+  await aviso.waitFor({ state: 'hidden' })
+  await pagina.reload()
+  await pagina.getByRole('button', { name: /^Todas/ }).click()
+  await pagina.getByText('Cliente da quota', { exact: true }).first().click()
+  if (!await pagina.getByRole('button', { name: 'Anotação para Lasanha da quota', exact: true }).isVisible())
+    await pagina.getByRole('button', { name: /^Revisar comanda/ }).click()
+  await pagina.getByRole('button', { name: 'Anotação para Lasanha da quota', exact: true }).click()
+  assert.equal(await pagina.getByRole('textbox', { name: 'Observação de Lasanha da quota', exact: true }).inputValue(), observacao)
+  await pagina.screenshot({ path: resolve(pasta, 'quota-restaurada.png'), fullPage: true })
   assert.ok(chamadas.every(c => c.metodo === 'GET' || c.path.endsWith('/marcar-lida')), 'Nenhum pedido/cadastro foi gravado')
   assert.deepEqual(erros, [])
-  writeFileSync(resolve(pasta, 'resultado.json'), JSON.stringify({ appReal: true, httpControlado: true, quotaBloqueada: true, propostaPreservadaNaPagina: true, avisoVisivel: true, restauradaAposReload: false }, null, 2))
-  console.log('Quota bloqueada: App preserva proposta na página, avisa limitação e não alega restauração após reload.')
+  writeFileSync(resolve(pasta, 'resultado.json'), JSON.stringify({ appReal: true, httpControlado: true, quotaBloqueada: true, propostaPreservadaNaPagina: true, avisoVisivel: true, restauradaAposReloadSemArmazenamento: false, armazenamentoRestaurado: true, propostaOriginalPersistida: true, quantidadeEObservacaoRestauradasAposReload: true }, null, 2))
+  console.log('Quota bloqueada e restaurada: aviso honesto; proposta mantida é persistida e recuperada integralmente após reload.')
 } catch (erro) { await pagina.screenshot({ path: resolve(pasta, 'falha.png'), fullPage: true }); throw erro }
 finally { await contexto.close(); await browser.close() }

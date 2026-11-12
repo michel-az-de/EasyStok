@@ -45,7 +45,7 @@ try {
   await page.getByRole('button', { name: 'Gestão', exact: true }).tap()
   const gestao = page.getByRole('dialog', { name: 'Gestão da loja', exact: true })
   await gestao.getByRole('button', { name: 'Leads e clientes', exact: true }).tap()
-  await gestao.getByRole('button', { name: 'Novo cliente', exact: true }).tap()
+  await gestao.getByRole('button', { name: 'Cadastrar pessoa da conversa', exact: true }).tap()
   const editor = page.getByRole('dialog', { name: 'Novo cliente', exact: true })
   await editor.getByRole('textbox', { name: 'Nome', exact: true }).fill('Regressão R4 retorno mobile')
   await editor.getByRole('button', { name: 'Salvar cadastro', exact: true }).tap()

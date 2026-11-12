@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 
 assert.equal(process.env.R4_EXECUTAR_MENSAGEM, '1', 'Execute somente após liberação da raiz, com R4_EXECUTAR_MENSAGEM=1')
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
@@ -13,13 +15,20 @@ assert.ok(origem && fixture.conversaConferenciaId)
 for (const url of [origem, fixture.api]) assert.ok(['localhost', '127.0.0.1'].includes(new URL(url).hostname))
 assert.match(fixture.provedores, /controlados/)
 const conversaId = fixture.conversaConferenciaId
+const fase = process.env.R4_FASE_M01
+assert.ok(['red', 'green'].includes(fase), 'Informe R4_FASE_M01=red ou green')
+const rodada = process.env.R4_RODADA_M01 ?? ''
+assert.match(rodada, /^[a-z0-9-]*$/, 'Rodada opcional deve ser um identificador simples')
+assert.ok(process.env.R4_BACKEND_REVISAO, 'Registre a revisão do binário servido em R4_BACKEND_REVISAO')
+assert.match(process.env.R4_BACKEND_SHA256 ?? '', /^[0-9a-f]{64}$/i, 'Registre o SHA256 do binário servido em R4_BACKEND_SHA256')
 const rotaMensagens = `/api/atendimento/conversas/${conversaId}/mensagens`
 const texto = `Conferência de mensagem R4 ${new Date().toISOString()}: confirme o recebimento desta mensagem de teste.`
-const pasta = resolve(import.meta.dirname, '../.build/2395/real')
+const pasta = resolve(import.meta.dirname, `../.build/2395/real/m01-intermediario/${fase}${rodada ? `-${rodada}` : ''}`)
 mkdirSync(pasta, { recursive: true })
-const prova = { conversaId, falhaControlada: 'Resposta HTTP perdida depois do 200 real da API', resultados: [], envios: [], erros: [] }
+const sha256 = dados => createHash('sha256').update(dados).digest('hex')
+const prova = { fase, conversaId, texto, versao: { head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), roteiroSha256: sha256(readFileSync(import.meta.filename)), backend: process.env.R4_BACKEND_REVISAO, backendSha256: process.env.R4_BACKEND_SHA256, fixtureSha256: sha256(readFileSync(process.env.R4_FIXTURE ?? '../.build/r4-browser.json')) }, falhaControlada: 'Resposta perdida depois do 200 real; ACK da retentativa retido, GET/sync naturais ativos', resultados: [], envios: [], sincronizacoes: [], violacoes: [], erros: [] }
 const salvar = () => writeFileSync(resolve(pasta, 'mensagem-ui.json'), JSON.stringify(prova, null, 2))
-const registrar = (caso, dados = {}) => { prova.resultados.push({ caso, ...dados }); salvar(); console.log(`ok ${caso}`) }
+const registrar = (caso, dados = {}) => { prova.resultados.push({ caso, ...dados }); salvar(); console.log(`${dados.esperados != null && dados.observados !== dados.esperados ? 'falhou' : 'ok'} ${caso}`) }
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'pt-BR', reducedMotion: 'reduce' })
 const page = await context.newPage()
@@ -27,10 +36,41 @@ page.setDefaultTimeout(25000)
 page.on('pageerror', erro => prova.erros.push(erro.message))
 let etapa = 'login'
 let perderResposta = false
+let reterResposta = false
+let liberarAck, confirmarRetencao, recusarRetencao
+const liberar = new Promise(resolve => { liberarAck = resolve })
+const retida = new Promise((resolve, reject) => { confirmarRetencao = resolve; recusarRetencao = reject }); retida.catch(() => {})
 let confirmarPerda, recusarPerda
 const perda = new Promise((resolve, reject) => { confirmarPerda = resolve; recusarPerda = reject })
 // A rejeição é observada no passo de envio; evita unhandled rejection enquanto o clique termina.
 perda.catch(() => {})
+const modulos = ['src/aplicacao/acoesApi.js', 'src/aplicacao/chavesDeMensagem.js', 'src/aplicacao/casos/atendimento.js', 'src/aplicacao/casos/api.js', 'src/aplicacao/reducer/mesclaDoServidor.js', 'src/infra/api/traducaoConversas.js']
+async function hashesServidos() {
+  const resultado = {}
+  for (const modulo of modulos) {
+    const r = await page.request.get(`${origem}/${modulo}`); assert.ok(r.ok())
+    resultado[modulo] = { servido: sha256(await r.body()), fonte: sha256(readFileSync(modulo)) }
+  }
+  return resultado
+}
+page.on('response', async r => {
+  const u = new URL(r.url())
+  if (r.request().method() !== 'GET' || u.pathname !== rotaMensagens || u.searchParams.get('limite') !== '100' || !r.ok()) return
+  try { const j = await r.json(); prova.sincronizacoes.push({ em: Date.now(), ids: j.data.map(m => m.id), chaves: j.data.map(m => m.chaveEnvio ?? null) }); salvar() } catch { /* Aba pode fechar durante leitura. */ }
+})
+async function esperarSync(mensagemId, desde) {
+  const limite = Date.now() + 45000
+  while (!prova.sincronizacoes.some(s => s.em > desde && s.ids.includes(mensagemId)) && Date.now() < limite) await page.waitForTimeout(250)
+  assert.ok(prova.sincronizacoes.some(s => s.em > desde && s.ids.includes(mensagemId)), 'GET natural da aplicação trouxe a intenção persistida')
+  await page.waitForTimeout(250)
+}
+async function conferirBaloes(nome, esperados) {
+  const baloes = await page.getByText(texto, { exact: true }).evaluateAll(nos => nos.map(no => ({ texto: no.textContent, estado: no.parentElement.innerText })))
+  const dado = { etapa: nome, esperados, observados: baloes.length, baloes }
+  if (baloes.length !== esperados) prova.violacoes.push(dado)
+  registrar(nome, dado)
+  await page.screenshot({ path: resolve(pasta, `${nome}.png`), fullPage: true })
+}
 async function ler(caminho) {
   return page.evaluate(async caminho => {
     const s = JSON.parse(sessionStorage.getItem('easystok.sessao') ?? localStorage.getItem('easystok.sessao'))
@@ -49,14 +89,22 @@ await page.route('**/api/atendimento/conversas/*/mensagens', async route => {
   }
   const envio = { chave: request.headers()['idempotency-key'], corpo: request.postDataJSON() }
   prova.envios.push(envio)
-  if (!perderResposta) return route.continue()
+  if (!perderResposta && !reterResposta) return route.continue()
+  const retendo = reterResposta
   perderResposta = false
+  reterResposta = false
   try {
     const resposta = await route.fetch()
     const corpo = await resposta.json()
     assert.equal(resposta.status(), 200, JSON.stringify(corpo))
     assert.equal(corpo.data.texto, texto)
     assert.ok(corpo.data.id)
+    if (retendo) {
+      prova.ackRetido = { status: resposta.status(), replay: resposta.headers()['x-idempotent-replay'], mensagem: corpo.data }
+      salvar(); confirmarRetencao(corpo.data)
+      await liberar
+      return route.fulfill({ response: resposta })
+    }
     prova.respostaPerdida = { status: resposta.status(), mensagem: corpo.data }
     salvar()
     await route.abort('failed')
@@ -64,9 +112,11 @@ await page.route('**/api/atendimento/conversas/*/mensagens', async route => {
   } catch (erro) {
     await route.abort('failed').catch(() => {})
     recusarPerda(erro)
+    recusarRetencao(erro)
   }
 })
 try {
+  prova.versao.inicial = await hashesServidos(); salvar()
   const dona = fixture.identidades.find(i => i.perfil === 'Dona' && i.empresaId === fixture.empresaId)
   assert.ok(dona)
   await page.goto(origem + '/#/m/atendimento/balcao')
@@ -84,7 +134,7 @@ try {
   assert.equal(await ler(`/api/atendimento/conversas/${conversaId}/pedido`), null, 'Massa isolada sem pedido em andamento')
   const antes = await ler(`${rotaMensagens}?limite=200`)
   assert.equal(antes.length, Number(process.env.R4_MENSAGENS_ANTES ?? 0), 'Informe a contagem real autorizada antes de repetir a prova')
-  await page.getByPlaceholder('Buscar conversa', { exact: true }).fill(conversa.contatoNome || conversa.contatoIdExterno)
+  await page.getByPlaceholder('Buscar conversa', { exact: true }).fill(`comanda ${conversa.numeroComanda}`)
   const cartao = page.locator('button[aria-current]')
   await cartao.first().waitFor()
   assert.equal(await cartao.count(), 1, 'Busca pelo nome real do contato deve selecionar uma única conversa')
@@ -112,20 +162,36 @@ try {
   registrar('Texto e destinatário visíveis antes do envio', prova.destinatario)
 
   etapa = 'resposta perdida após commit'
+  const inicioPerda = Date.now()
   perderResposta = true
   await enviar.click()
   const primeira = await perda
-  await page.getByRole('alert').filter({ hasText: 'Não enviada: Sem conexão com o EasyStok.' }).first().waitFor()
+  if (fase === 'green') assert.equal(primeira.chaveEnvio, prova.envios[0].chave, 'POST real expõe a correlação durável da intenção')
+  await page.getByText(texto, { exact: true }).first().waitFor()
   await page.screenshot({ path: resolve(pasta, 'mensagem-resposta-perdida.png'), fullPage: true })
   const depoisDaPerda = await ler(`${rotaMensagens}?limite=200`)
   assert.equal(depoisDaPerda.filter(m => m.texto === texto && m.direcao === 'Saida').length, 1)
   assert.equal(depoisDaPerda.find(m => m.texto === texto).id, primeira.id)
   registrar('API gravou uma mensagem antes da perda controlada da resposta', { mensagemId: primeira.id })
+  await esperarSync(primeira.id, inicioPerda)
+  await conferirBaloes('apos-perda-e-sync', 1)
 
   etapa = 'repetição pela UI'
+  reterResposta = true
   await campo.fill(texto)
-  const repetindo = page.waitForResponse(r => new URL(r.url()).pathname === rotaMensagens && r.request().method() === 'POST')
+  const repetindo = page.waitForResponse(r => new URL(r.url()).pathname === rotaMensagens && r.request().method() === 'POST', { timeout: 60000 })
+  repetindo.catch(() => {})
   await enviar.click()
+  const ack = await retida
+  assert.equal(ack.id, primeira.id)
+  assert.equal(prova.ackRetido.replay, 'true')
+  await conferirBaloes('retry-ack-retido', 1)
+  const inicioSyncRetido = Date.now()
+  await esperarSync(primeira.id, inicioSyncRetido)
+  const duranteRetencao = await ler(`${rotaMensagens}?limite=200`)
+  assert.equal(duranteRetencao.filter(m => m.texto === texto).length, 1)
+  await conferirBaloes('retry-ack-retido-apos-sync', 1)
+  liberarAck()
   const repetida = await repetindo
   const segunda = await repetida.json()
   assert.equal(repetida.status(), 200, JSON.stringify(segunda))
@@ -145,30 +211,84 @@ try {
     'O replay confirmado resolve o aviso da tentativa cuja resposta foi perdida')
   await page.screenshot({ path: resolve(pasta, 'mensagem-repeticao-confirmada.png'), fullPage: true })
   registrar('Repetição conserva Idempotency-Key, retorna mesmo ID e deixa uma única mensagem persistida', { mensagemId: primeira.id })
+  await conferirBaloes('apos-ack', 1)
+
+  etapa = 'mensagem legítima com texto igual'
+  await campo.fill(texto)
+  const novaResposta = page.waitForResponse(r => new URL(r.url()).pathname === rotaMensagens && r.request().method() === 'POST')
+  await enviar.click()
+  const nova = await novaResposta; assert.equal(nova.status(), 200)
+  const novaMensagem = (await nova.json()).data
+  assert.notEqual(novaMensagem.id, primeira.id)
+  assert.notEqual(prova.envios[2].chave, prova.envios[0].chave)
+  await esperarSync(novaMensagem.id, inicioSyncRetido)
+  const iguais = (await ler(`${rotaMensagens}?limite=200`)).filter(m => m.texto === texto)
+  assert.equal(iguais.length, 2)
+  await conferirBaloes('duas-intencoes-texto-igual', 2)
+  prova.mensagensIguais = iguais.map(m => ({ id: m.id, chaveEnvio: m.chaveEnvio ?? null }))
 
   etapa = 'disponibilidade de modelos'
-  const modelos = page.getByRole('button', { name: 'Modelos aprovados', exact: true })
-  if (await modelos.count() && await modelos.first().isVisible()) {
+  if (fase === 'green') assert.ok(fixture.conversaModeloId, 'Green exige conversa isolada com janela encerrada para modelos')
+  if (fixture.conversaModeloId) {
+    const inbox = await ler('/api/atendimento/conversas?limite=100&pagina=1')
+    const fechada = inbox.find(c => c.id === fixture.conversaModeloId); assert.ok(fechada)
+    await page.getByPlaceholder('Buscar conversa', { exact: true }).fill(`comanda ${fechada.numeroComanda}`)
+    await page.getByRole('button', { name: new RegExp(`Comanda ${fechada.numeroComanda},`) }).click()
+    assert.equal(await campo.isDisabled(), true, 'Janela encerrada não autoriza texto livre')
+    const mensagensModeloAntes = await ler(`/api/atendimento/conversas/${fechada.id}/mensagens?limite=200`)
+    const catalogoRota = '**/api/atendimento/modelos?*'
+    let catalogosAbortados = 0, modelosEnviados = 0
+    page.on('request', r => { if (r.method() === 'POST' && new URL(r.url()).pathname.endsWith('/mensagens/modelo')) modelosEnviados++ })
+    await page.route(catalogoRota, route => { catalogosAbortados++; return route.abort('failed') })
+    await page.getByRole('button', { name: 'Respostas', exact: true }).click()
+    const modal = page.getByRole('dialog', { name: 'Enviar modelo aprovado', exact: true })
+    await modal.getByRole('alert').first().waitFor()
+    assert.equal(await modal.getByRole('button', { name: 'Enviar modelo', exact: true }).isDisabled(), true)
+    assert.equal(catalogosAbortados, 1); assert.equal(modelosEnviados, 0)
+    prova.falhaCatalogo = { mecanismo: 'Falha de transporte controlada exclusivamente no GET real /api/atendimento/modelos', mensagem: await modal.getByRole('alert').allTextContents() }
+    await page.screenshot({ path: resolve(pasta, 'modelo-catalogo-indisponivel.png'), fullPage: true })
+    registrar('Janela real encerrada bloqueia texto; catálogo indisponível informa erro sem autorizar modelo', prova.falhaCatalogo)
+    await page.unroute(catalogoRota)
     const consultando = page.waitForResponse(r => new URL(r.url()).pathname === '/api/atendimento/modelos' && r.request().method() === 'GET')
-    await modelos.first().click()
-    const resposta = await consultando
-    const catalogo = await resposta.json()
-    prova.catalogo = { status: resposta.status(), codigo: catalogo.error?.code, quantidade: catalogo.data?.length }
-    await page.getByRole('dialog', { name: 'Enviar modelo aprovado', exact: true }).waitFor()
-    if (!resposta.ok() || catalogo.data?.length === 0) {
-      assert.equal(await page.getByRole('button', { name: 'Enviar modelo', exact: true }).isDisabled(), true)
-      registrar('Catálogo realmente indisponível/vazio impede enviar modelo', prova.catalogo)
-    } else prova.limitacaoModelos = 'Catálogo disponível: não há massa controlada de envio/modelo para esta jornada; nenhum modelo enviado.'
-    await page.screenshot({ path: resolve(pasta, 'mensagem-modelos.png'), fullPage: true })
-  } else prova.limitacaoModelos = 'Conversa com janela aberta não oferece modelo neste estado. Exige massa de janela encerrada ou próxima do limite e catálogo/provider controlados.'
+    await modal.getByRole('button', { name: 'Atualizar modelos', exact: true }).click()
+    const r = await consultando; const catalogo = await r.json()
+    prova.catalogo = { status: r.status(), codigo: catalogo.error?.code, quantidade: catalogo.data?.length }
+    if (!r.ok() || catalogo.data?.length === 0) {
+      if (!r.ok()) await modal.getByRole('alert').first().waitFor()
+      else await modal.getByText('Nenhum modelo aprovado nesta conta. Crie e aprove o modelo no Gerenciador da Meta.', { exact: true }).waitFor()
+      assert.equal(await modal.getByRole('button', { name: 'Enviar modelo', exact: true }).isDisabled(), true)
+      registrar('Atualização real do catálogo mantém indisponibilidade/vazio explícitos', prova.catalogo)
+    } else {
+      const indisponivel = catalogo.data.findIndex(m => m.indisponivel)
+      if (indisponivel >= 0) {
+        await modal.getByLabel('Modelo aprovado', { exact: true }).selectOption(String(indisponivel))
+        await modal.getByText(catalogo.data[indisponivel].indisponivel, { exact: true }).waitFor()
+        assert.equal(await modal.getByRole('button', { name: 'Enviar modelo', exact: true }).isDisabled(), true)
+        registrar('Modelo listado mas indisponível no canal permanece bloqueado')
+      }
+      prova.limitacaoModelos = 'Nenhum envio de modelo foi executado; falha de catálogo é controlada e atualização usa API real. Publicação editorial tem prova separada e não autoriza canal.'
+    }
+    assert.equal(modelosEnviados, 0)
+    assert.deepEqual(await ler(`/api/atendimento/conversas/${fechada.id}/mensagens?limite=200`), mensagensModeloAntes)
+    await page.screenshot({ path: resolve(pasta, 'modelo-catalogo-atualizado.png'), fullPage: true })
+  } else prova.limitacaoModelos = 'RED sem conversa separada para canal; somente intermediários do envio de texto exercitados.'
+  prova.versao.final = await hashesServidos()
+  assert.deepEqual(prova.versao.final, prova.versao.inicial, 'A fonte servida deve permanecer congelada durante a rodada')
   assert.deepEqual(prova.erros, [])
+  assert.deepEqual(prova.violacoes, [], 'Cada intenção deve ter um balão em todos os estados intermediários')
   prova.sucesso = true
   salvar()
 } catch (erro) {
+  prova.sucesso = false
+  if (prova.versao.inicial) {
+    prova.versao.final = await hashesServidos().catch(() => null)
+    prova.versao.fonteEstavel = JSON.stringify(prova.versao.inicial) === JSON.stringify(prova.versao.final)
+  }
   prova.falha = { etapa, mensagem: erro.message }
   salvar()
   await page.screenshot({ path: resolve(pasta, 'mensagem-falha.png'), fullPage: true }).catch(() => {})
   throw erro
 } finally {
+  liberarAck()
   await browser.close()
 }

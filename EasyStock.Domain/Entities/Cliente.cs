@@ -17,6 +17,7 @@ using EasyStock.Domain.ValueObjects;
     {
         public Guid Id { get; set; }
         public Guid EmpresaId { get; set; }
+        public uint Revisao { get; set; }
 
         public string Nome { get; set; } = null!;
         public string? FotoChave { get; set; }

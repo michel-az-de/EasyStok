@@ -23,6 +23,8 @@ public class Mensagem
     public const int MidiaMimeTamanhoMaximo = 100;
     public const int ErroTamanhoMaximo = 500;
     public const int AssuntoTamanhoMaximo = 300;
+    // Mesmo limite do header no IdempotencyMiddleware e da coluna IdempotencyKey.Key.
+    public const int ChaveEnvioTamanhoMaximo = 120;
 
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
@@ -35,6 +37,7 @@ public class Mensagem
     public AutorMensagem Autor { get; private set; }
     public TipoConteudoMensagem TipoConteudo { get; private set; }
     public string? Texto { get; private set; }
+    public string? ChaveEnvio { get; private set; }
 
     /// <summary>#1432: assunto do e-mail recebido, como veio. Nulo nos outros canais.</summary>
     public string? Assunto { get; private set; }
@@ -359,6 +362,18 @@ public class Mensagem
         if (usuarioId == Guid.Empty)
             throw new RegraDeDominioVioladaException("Usuario que enviou e obrigatorio.");
         EnviadaPorUsuarioId = usuarioId;
+    }
+
+    public void RegistrarChaveEnvio(string? chave)
+    {
+        if (chave is null) return;
+        var normalizada = chave.Trim();
+        if (normalizada.Length is 0 or > ChaveEnvioTamanhoMaximo
+            || Direcao != DirecaoMensagem.Saida || !Autor.EhHumanoDaEmpresa()
+            || TipoConteudo != TipoConteudoMensagem.Texto
+            || (ChaveEnvio is not null && ChaveEnvio != normalizada))
+            throw new RegraDeDominioVioladaException("Chave do envio de texto inválida.");
+        ChaveEnvio = normalizada;
     }
 
     /// <summary>Autoria de ação humana registrada como nota interna, sem envio ao canal.</summary>

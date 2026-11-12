@@ -31,6 +31,7 @@ registerHooks({
 const acao = await import('../src/aplicacao/acoes.js')
 const { comApi } = await import('../src/aplicacao/acoesApi.js')
 const { reducer } = await import('../src/aplicacao/reducer.js')
+const { mensagemDaApi } = await import('../src/infra/api/traducaoConversas.js')
 const plano = await import('../src/aplicacao/planoDeSincronizacao.js')
 
 let passou = 0
@@ -97,6 +98,68 @@ for (const sincronizarAntes of [false, true]) await confere(`M01. replay deixa u
   assert.equal(await api.enviar('conv-1', 'x'), true)
   assert.deepEqual(estadoRef.current.conversas[0].mensagens.map(m => m.id), ['anterior-legitima', 'srv-1', 'srv-2'])
   assert.notEqual(chamadas[2].chave, chamadas[0].chave)
+})
+
+await confere('M01. retry com ACK retido reutiliza o balão da intenção antes da resposta', async () => {
+  const original = { id: 'anterior-legitima', dir: 'out', texto: 'x', status: 'enviada', em: '2026-10-14T11:00:00Z' }
+  const estadoRef = { current: { conversas: [{ id: 'conv-1', canal: 'WhatsApp', estado: 'Em atendimento', pausaApi: true, mensagens: [original] }], catalogo: { canais: [] }, rascunhos: {}, sincronizacao: {}, selecionadaId: 'conv-1', selecaoPendente: null } }
+  const despachar = a => { estadoRef.current = reducer(estadoRef.current, a) }
+  const api = comApi({}, { despachar, agoraRef: { current: Date.now() }, estadoRef })
+  let resolverAck
+  const ack = new Promise(resolve => { resolverAck = resolve })
+  const chamadas = rede(['cair', ack])
+  assert.equal(await api.enviar('conv-1', 'x'), false)
+  const tentativaOriginal = estadoRef.current.conversas[0].mensagens.at(-1).id
+  const retry = api.enviar('conv-1', 'x')
+  try {
+    await new Promise(resolve => setImmediate(resolve))
+    const antesAck = estadoRef.current.conversas[0].mensagens
+    assert.deepEqual(antesAck.map(m => m.id), ['anterior-legitima', tentativaOriginal], 'Retry não cria um terceiro balão')
+    assert.equal(antesAck.at(-1).status, 'enviando')
+    assert.equal(chamadas[0].chave, chamadas[1].chave)
+  } finally { resolverAck(json(enviada())); await retry }
+})
+
+await confere('M01. mapper conserva a chave de envio de saída, sem atribuí-la à entrada', () => {
+  assert.equal(mensagemDaApi({ ...enviada(), chaveEnvio: 'intencao-1' }).chaveEnvio, 'intencao-1')
+  assert.equal(mensagemDaApi({ ...enviada(), direcao: 'Entrada', chaveEnvio: 'intencao-1' }).chaveEnvio, undefined)
+})
+
+for (const syncAntes of [false, true]) await confere(`M01. sync antes do ACK concilia pela intenção, mantendo texto igual legítimo (syncAntesRetry=${syncAntes})`, async () => {
+  const original = { id: 'anterior-legitima', dir: 'out', texto: 'x', chaveEnvio: 'outra-intencao', status: 'enviada', em: '2026-10-14T11:00:00Z' }
+  const estadoRef = { current: { conversas: [{ id: 'conv-1', canal: 'WhatsApp', estado: 'Em atendimento', pausaApi: true, mensagens: [original] }], catalogo: { canais: [] }, rascunhos: {}, sincronizacao: {}, selecionadaId: 'conv-1', selecaoPendente: null } }
+  const despachar = a => { estadoRef.current = reducer(estadoRef.current, a) }
+  const api = comApi({}, { despachar, agoraRef: { current: Date.now() }, estadoRef })
+  let resolverAck
+  const ack = new Promise(resolve => { resolverAck = resolve })
+  const chamadas = rede(['cair', ack, json(enviada('srv-2'))])
+  assert.equal(await api.enviar('conv-1', 'x'), false)
+  const servidora = { ...enviada(), chaveEnvio: chamadas[0].chave, status: 'Lida' }
+  const sincronizar = () => despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [{ ...estadoRef.current.conversas[0], mensagens: [original, mensagemDaApi(servidora)] }] })
+  const conferir = () => {
+    const mensagens = estadoRef.current.conversas[0].mensagens
+    assert.deepEqual(mensagens.map(m => m.id), ['anterior-legitima', 'srv-1'], 'Sync resolve a intenção antes do ACK, sem deduplicar pelo texto')
+    assert.equal(mensagens.at(-1).status, 'lida', 'Retry ou ACK atrasado não rebaixa a confirmação sincronizada')
+  }
+  if (syncAntes) { sincronizar(); conferir() }
+  const retry = api.enviar('conv-1', 'x')
+  try {
+    await new Promise(resolve => setImmediate(resolve))
+    if (syncAntes) conferir()
+    sincronizar(); conferir()
+    assert.equal(chamadas[0].chave, chamadas[1].chave)
+  } finally { resolverAck(json({ ...enviada(), chaveEnvio: chamadas[0].chave })); await retry }
+  conferir()
+  assert.equal(await api.enviar('conv-1', 'x'), true)
+  assert.deepEqual(estadoRef.current.conversas[0].mensagens.map(m => m.id), ['anterior-legitima', 'srv-1', 'srv-2'])
+  assert.notEqual(chamadas[2].chave, chamadas[0].chave)
+})
+
+await confere('M01. falha de rede atrasada não desfaz mensagem confirmada pela sincronização', () => {
+  const mensagem = { id: 'srv-confirmada', dir: 'out', texto: 'x', chaveEnvio: 'intencao-confirmada', status: 'enviada' }
+  const estado = { conversas: [{ id: 'conv-1', mensagens: [mensagem] }] }
+  const depois = reducer(estado, { tipo: acao.FALHAR_ENVIO_API, id: 'conv-1', mensagemId: mensagem.id, semIdServidor: true, erro: 'Não enviada' })
+  assert.deepEqual(depois.conversas[0].mensagens, [mensagem])
 })
 
 await confere('1. texto: depois de confirmado, o mesmo texto é outra mensagem e ganha outra chave', async () => {

@@ -13,8 +13,16 @@ export const filtrarSemCadastro = (conversas, busca) => {
 export const relacionamentoCadastro = (cliente) => !Number.isInteger(cliente.orderCount) || cliente.orderCount < 0 ? 'Histórico não informado' : cliente.orderCount === 0 ? 'Lead' : 'Cliente'
 
 export function corpoCliente(dados, empresaId) {
+  if (dados.id && (!Number.isInteger(dados.revisao) || dados.revisao < 0)) throw new Error('Reabra o cadastro para conferir a versão antes de salvar.')
   return { ...campos(dados, ['nome', 'apt', 'endereco', 'telefone', 'email', 'documento', 'observacoes', 'nomeFantasia', 'inscricaoEstadual']), empresaId,
-    ...(dados.id ? { id: dados.id } : {}), pessoaJuridica: dados.tipoPessoa === 'juridica', origem: 'console' }
+    ...(dados.id ? { id: dados.id, revisao: dados.revisao } : {}), pessoaJuridica: dados.tipoPessoa === 'juridica', origem: 'console' }
+}
+export const CAMPOS_CLIENTE = { nome: 'Nome', tipoPessoa: 'Tipo de pessoa', telefone: 'Telefone', email: 'E-mail', documento: 'Documento', nomeFantasia: 'Nome fantasia', inscricaoEstadual: 'Inscrição estadual', endereco: 'Endereço', apt: 'Apartamento ou referência', observacoes: 'Observações' }
+export function reconferirCadastroCliente(editor, atual) {
+  if (!editor.dados.id || atual?.id !== editor.dados.id || !Number.isInteger(atual.revisao) || atual.revisao < 0)
+    throw new Error('Não foi possível conferir a versão deste cadastro. Tente carregar novamente.')
+  const alterados = Object.keys(CAMPOS_CLIENTE).filter(campo => texto(editor.dados[campo]) !== texto(editor.inicial[campo]))
+  return { ...editor, inicial: atual, dados: { ...atual, ...Object.fromEntries(alterados.map(campo => [campo, editor.dados[campo]])) }, conflito: false, reconferido: true }
 }
 export function corpoFornecedor(dados, empresaId) {
   return { ...campos(dados, ['nome', 'documento', 'email', 'telefone', 'contato', 'categoria', 'tipo', 'siteUrl', 'pedidoMinimo', 'fretePadrao', 'observacoes']),

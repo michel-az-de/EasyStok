@@ -63,10 +63,12 @@ const carregar = () => ({
   som: lerPreferenciaSom(),
 })
 
-export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco = null, children }) {
+export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, lerComandasDaVisita, aoGuardarComandas, lerFiltrosDaVisita, aoGuardarFiltros, lerRascunhosDaVisita, aoGuardarRascunhos, memoriaDoLaco = null, children }) {
   const reduzir = (atual, evento) => reducer(restaurarComandasDaVisita(atual, evento, lerComandasDaVisita?.()), evento)
-  const [estado, despachar] = useReducer(reduzir, null, () => ({
-    ...estadoInicial(carregar()),
+  const [estado, despachar] = useReducer(reduzir, null, () => {
+    const inicial = estadoInicial(carregar())
+    return {
+    ...inicial,
     // Modo API (F01): a lista nasce vazia e chega pelo polling.
     sincronizacao: { estado: FONTE_API ? 'carregando' : 'desligada', mensagem: null, aviso: null },
     // Modo API (F02): mensagens do expediente (S40); horário e controle vivem em
@@ -75,12 +77,23 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     // #1474: carregando, ok ou erro das automáticas da API, para a tela não confundir com vazio.
     cargaDasRegras: { estado: FONTE_API ? 'carregando' : 'ok', mensagem: null },
     // F07, item 6: o rascunho de antes do 401 volta depois do novo login.
-    ...(FONTE_API ? { rascunhos: lerRascunhos(sessao) } : {}),
-  }))
+    ...(FONTE_API ? { rascunhos: lerRascunhosDaVisita?.() ?? lerRascunhos(sessao), filtros: { ...inicial.filtros, ...lerFiltrosDaVisita?.() } } : {}),
+  } })
+  const [rascunhosSoNaMemoria, avisarRascunhos] = useState(false)
+  const rascunhosAtuais = useRef(estado.rascunhos)
+  const persistirRascunhos = useCallback(rascunhos => {
+    rascunhosAtuais.current = rascunhos
+    aoGuardarRascunhos?.(rascunhos)
+    const gravados = gravarRascunhos(sessao, rascunhos)
+    avisarRascunhos(Object.values(rascunhos).some(t => typeof t === 'string' && t.trim()) && !gravados)
+    return gravados
+  }, [sessao, aoGuardarRascunhos])
+  const tentarGuardarRascunhos = useCallback(() => persistirRascunhos(rascunhosAtuais.current), [persistirRascunhos])
+  useLayoutEffect(() => { if (FONTE_API) aoGuardarFiltros?.(estado.filtros) }, [aoGuardarFiltros, estado.filtros])
   useLayoutEffect(() => {
     if (estado.sincronizacao.estado === 'ok' || estado.conversas.length) aoGuardarComandas?.(comandasLocaisDaVisita(estado.conversas))
   }, [aoGuardarComandas, estado.conversas, estado.sincronizacao.estado])
-  useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
+  useEffect(() => { if (FONTE_API) persistirRascunhos(estado.rascunhos) }, [persistirRascunhos, estado.rascunhos])
   const { acoes: acoesDoPerfil } = useAcessoModulos()
   const comItensFora = podeVerItensFora(acoesDoPerfil)
   const comItensForaRef = useRef(comItensFora)
@@ -125,11 +138,9 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
 
   // #1577: o campo de escrever descarrega com a tela saindo (401, ida ao Hall, aba oculta). O despacho pode
   // não render mais e o efeito de `gravarRascunhos` lá em cima não roda; aqui o texto vai direto ao storage.
-  const sessaoRef = useRef(sessao)
-  useEffect(() => { sessaoRef.current = sessao }, [sessao])
   const guardarRascunhoJa = useCallback((despacho) => {
-    if (FONTE_API) gravarRascunhos(sessaoRef.current, comRascunhoDoCampo(estadoRef.current, despacho).rascunhos)
-  }, [])
+    if (FONTE_API) persistirRascunhos(comRascunhoDoCampo(estadoRef.current, despacho).rascunhos)
+  }, [persistirRascunhos])
 
   // Sincronia com a janela de Entregas (seção 6): esta janela é sempre a
   // "principal" do canal. Sem nenhuma janela de Entregas aberta, o canal só
@@ -394,6 +405,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       automaticoPausado: estado.automaticoPausado,
       alertasEstoque: estado.alertasEstoque,
       rascunho: estado.rascunhos[estado.selecionadaId] ?? '',
+      rascunhosSoNaMemoria, tentarGuardarRascunhos,
       // #1577: carimbo de escrita de fora do campo; é por ele que o campo adota o rascunho global.
       escritaDeFora: estado.escritasDeFora?.[estado.selecionadaId] ?? 0,
       // Ordenado aqui, uma vez só: quem lê `visiveis` (Balcão e o "abrir
@@ -472,7 +484,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       cargaDasRegras: estado.cargaDasRegras,
       sessao,
     }
-  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes, filaDeAvisos.avisos, filaDeAvisos.dispensar, filaDeAvisos.pausar, filaDeAvisos.retomar])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes, filaDeAvisos.avisos, filaDeAvisos.dispensar, filaDeAvisos.pausar, filaDeAvisos.retomar, rascunhosSoNaMemoria, tentarGuardarRascunhos])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>

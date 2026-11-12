@@ -37,6 +37,47 @@ public class ClienteCadastroUseCaseTests
     // ── criar ────────────────────────────────────────────────────────
 
     [Fact]
+    public async Task Atualizar_revisao_antiga_preserva_campos_e_nao_grava_auditoria()
+    {
+        var cliente = ClienteEntity.Criar(Empresa, "Ana atual");
+        cliente.Email = "confirmado@exemplo.test";
+        cliente.Telefone = "11999998888";
+        cliente.Revisao = 9;
+        _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
+        var salvar = () => Atualizar().ExecuteAsync(new(Empresa, cliente.Id, "Ana da aba antiga",
+            Email: null, Telefone: "11988887777", Revisao: 8));
+
+        await salvar.Should().ThrowAsync<ClienteCadastroAlteradoException>();
+        cliente.Nome.Should().Be("Ana atual");
+        cliente.Email.Should().Be("confirmado@exemplo.test");
+        cliente.Telefone.Should().Be("11999998888");
+        await _repo.DidNotReceiveWithAnyArgs().UpdateAsync(default!);
+        await _repo.DidNotReceiveWithAnyArgs().AddAlteracaoAsync(default!);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Atualizar_sem_revisao_recusa_antes_de_ler_ou_escrever()
+    {
+        var salvar = () => Atualizar().ExecuteAsync(new(Empresa, Guid.NewGuid(), "Ana"));
+        await salvar.Should().ThrowAsync<UseCaseValidationException>();
+        await _repo.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Atualizar_nao_escreve_cliente_de_outra_empresa_retornado_pelo_repositorio()
+    {
+        var alheio = ClienteEntity.Criar(Guid.NewGuid(), "Outra pessoa");
+        _repo.GetByIdAsync(Empresa, alheio.Id).Returns(alheio);
+        var resultado = await Atualizar().ExecuteAsync(new(Empresa, alheio.Id, "Não deve mudar", Revisao: alheio.Revisao));
+        resultado.Should().BeNull();
+        alheio.Nome.Should().Be("Outra pessoa");
+        await _repo.DidNotReceiveWithAnyArgs().UpdateAsync(default!);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
     public async Task Criar_pessoa_fisica_com_o_minimo_funciona()
     {
         var r = await Criar().ExecuteAsync(new CriarClienteCommand(Empresa, "Ana Beatriz Costa"));
@@ -129,7 +170,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, Arg.Any<Guid>()).Returns((ClienteEntity?)null);
 
         var r = await Atualizar().ExecuteAsync(
-            new AtualizarClienteCommand(Empresa, Guid.NewGuid(), "Ana"));
+            new AtualizarClienteCommand(Empresa, Guid.NewGuid(), "Ana", Revisao: 0));
 
         r.Should().BeNull();
     }
@@ -142,7 +183,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Ana Beatriz", Documento: CpfValidoDigitos));
+            Empresa, cliente.Id, "Ana Beatriz", Documento: CpfValidoDigitos, Revisao: cliente.Revisao));
 
         // Só o Nome mudou — documento igual não pode virar linha de auditoria.
         await _repo.Received(1).AddAlteracaoAsync(
@@ -159,7 +200,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         var act = () => Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Ana", Documento: "111.111.111-11"));
+            Empresa, cliente.Id, "Ana", Documento: "111.111.111-11", Revisao: cliente.Revisao));
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
     }
@@ -175,7 +216,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         var r = await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Legado Corrigido", Documento: "11111111111"));
+            Empresa, cliente.Id, "Legado Corrigido", Documento: "11111111111", Revisao: cliente.Revisao));
 
         r.Should().NotBeNull();
         r!.Nome.Should().Be("Legado Corrigido");
@@ -185,7 +226,7 @@ public class ClienteCadastroUseCaseTests
     public async Task Atualizar_recusa_empresa_vazia()
     {
         var act = () => Atualizar().ExecuteAsync(
-            new AtualizarClienteCommand(Guid.Empty, Guid.NewGuid(), "Ana"));
+            new AtualizarClienteCommand(Guid.Empty, Guid.NewGuid(), "Ana", Revisao: 0));
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
     }
@@ -249,7 +290,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         var r = await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Joao da Silva", PessoaJuridica: false));
+            Empresa, cliente.Id, "Joao da Silva", PessoaJuridica: false, Revisao: cliente.Revisao));
 
         r!.TipoPessoa.Should().Be("fisica");
         r.NomeFantasia.Should().BeNull(because: "corrigir para PF não pode deixar dado de PJ para trás");
@@ -263,7 +304,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Distribuidora Sul", PessoaJuridica: true, InscricaoEstadual: "999"));
+            Empresa, cliente.Id, "Distribuidora Sul", PessoaJuridica: true, InscricaoEstadual: "999", Revisao: cliente.Revisao));
 
         await _repo.Received(1).AddAlteracaoAsync(
             Arg.Is<Domain.Entities.ClienteAlteracao>(a => a.Campo == "TipoPessoa" && a.ValorNovo == "juridica"));
@@ -277,7 +318,7 @@ public class ClienteCadastroUseCaseTests
         var cliente = ClienteEntity.Criar(Empresa, "Ana");
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
-        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(Empresa, cliente.Id, "Ana Beatriz"));
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(Empresa, cliente.Id, "Ana Beatriz", Revisao: cliente.Revisao));
 
         await _repo.DidNotReceive().AddAlteracaoAsync(
             Arg.Is<Domain.Entities.ClienteAlteracao>(a => a.Campo == "TipoPessoa"));

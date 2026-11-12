@@ -89,13 +89,13 @@ export const casosApi = {
   // mesmo id (#1287).
   [acao.CONFIRMAR_ENVIO_API]: (estado, { id, mensagemId, mensagem, chaveEnvio }) =>
     mapear(estado, id, (c) => {
-      // Resposta perdida deixa um balão local sem ID do servidor. Só o replay da MESMA intenção o resolve.
-      const mensagens = c.mensagens.filter(m => !chaveEnvio || m.chaveEnvio !== chaveEnvio || m.id === mensagemId)
-      const jaVeio = mensagens.some((m) => m.id === mensagem.id && m.id !== mensagemId)
+      // A sincronização pode confirmar a intenção antes do ACK. Preserve esse balão e seu estado mais recente.
+      const mensagens = c.mensagens.filter(m => !chaveEnvio || m.chaveEnvio !== chaveEnvio || m.id === mensagemId || m.id === mensagem.id)
+      const jaVeio = mensagens.some((m) => m.id === mensagem.id && (m.id !== mensagemId || ['enviada', 'entregue', 'lida'].includes(m.status)))
       return {
         ...c,
         mensagens: jaVeio
-          ? mensagens.filter((m) => m.id !== mensagemId)
+          ? mensagens.filter((m) => m.id !== mensagemId || m.id === mensagem.id)
           : mensagens.map((m) => (m.id === mensagemId ? { ...mensagem, aguardandoSync: true } : m)),
       }
     }),
@@ -110,7 +110,7 @@ export const casosApi = {
     mapear(estado, id, (c) => ({
       ...c,
       mensagens: c.mensagens.map((m) => {
-        if (m.id !== mensagemId) return m
+        if (m.id !== mensagemId || ['enviada', 'entregue', 'lida'].includes(m.status)) return m
         if (mensagem) return { ...m, ...mensagem, status: 'falhou', erro }
         return { ...m, status: 'falhou', erro, ...(semIdServidor ? { semIdServidor: true } : {}) }
       }),

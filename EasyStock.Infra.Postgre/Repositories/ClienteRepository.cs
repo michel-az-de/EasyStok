@@ -96,16 +96,16 @@ namespace EasyStock.Infra.Postgre.Repositories
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
 
-            var pattern = $"%{termo}%";
-            var digitos = new string(termo.Where(char.IsAsciiDigit).ToArray());
-            if (digitos.Length is 12 or 13 && digitos.StartsWith("55", StringComparison.Ordinal)) digitos = digitos[2..];
+            var pattern = $"%{BuscaTextual.Normalizar(termo)}%";
+            var digitos = BuscaTextual.DigitosTelefone(termo);
+            var buscaId = Guid.TryParse(termo, out var id);
             return await db.Clientes.AsNoTracking()
                 .Where(c => c.EmpresaId == empresaId && c.Ativo &&
-                    (EF.Functions.ILike(c.Nome, pattern) ||
-                     (c.NomeFantasia != null && EF.Functions.ILike(c.NomeFantasia, pattern)) ||
+                    ((buscaId && c.Id == id) || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Nome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern) ||
+                     (c.NomeFantasia != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.NomeFantasia.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern)) ||
                      (c.Telefone != null && EF.Functions.ILike(c.Telefone, pattern)) ||
-                     (digitos.Length >= 3 && c.Telefone != null && c.Telefone.Replace("(", "").Replace(")", "").Replace(" ", "").Replace("-", "").Replace("+", "").Contains(digitos)) ||
-                     (digitos.Length >= 3 && c.Telefones.Any(t => t.Numero.Replace("(", "").Replace(")", "").Replace(" ", "").Replace("-", "").Replace("+", "").Contains(digitos))) ||
+                     (digitos.Length >= 3 && c.Telefone != null && EasyStockDbContext.TraduzirTexto(c.Telefone, BuscaTextual.MascaraTelefone, "").Contains(digitos)) ||
+                     (digitos.Length >= 3 && c.Telefones.Any(t => EasyStockDbContext.TraduzirTexto(t.Numero, BuscaTextual.MascaraTelefone, "").Contains(digitos))) ||
                      (c.Documento != null && EF.Functions.ILike(c.Documento, pattern))))
                 .OrderBy(c => c.Nome)
                 .Take(maxResults)
@@ -135,25 +135,32 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task AddEnderecoAsync(ClienteEndereco e) { db.Set<ClienteEndereco>().Add(e); return Task.CompletedTask; }
         public async Task<bool> RemoveEnderecoAsync(Guid empresaId, Guid clienteId, Guid enderecoId)
         {
-            // Defesa em profundidade contra IDOR cross-tenant: valida endereço∈cliente∈empresa
-            // numa única query, mesmo que o caller já tenha validado upstream.
-            var rows = await db.Set<ClienteEndereco>()
+            // A revisão da raiz e a exclusão participam do mesmo SaveChanges.
+            var endereco = await db.Set<ClienteEndereco>().Include(e => e.Cliente)
                 .Where(e => e.Id == enderecoId
                             && e.ClienteId == clienteId
                             && db.Clientes.Any(c => c.Id == clienteId && c.EmpresaId == empresaId))
-                .ExecuteDeleteAsync();
-            return rows > 0;
+                .SingleOrDefaultAsync();
+            if (endereco is null) return false;
+            endereco.Cliente!.AlteradoEm = DateTime.UtcNow;
+            db.Entry(endereco.Cliente!).Property(c => c.AlteradoEm).IsModified = true;
+            db.Remove(endereco);
+            return true;
         }
 
         public Task AddTelefoneAsync(ClienteTelefone t) { db.Set<ClienteTelefone>().Add(t); return Task.CompletedTask; }
         public async Task<bool> RemoveTelefoneAsync(Guid empresaId, Guid clienteId, Guid telefoneId)
         {
-            var rows = await db.Set<ClienteTelefone>()
+            var telefone = await db.Set<ClienteTelefone>().Include(t => t.Cliente)
                 .Where(t => t.Id == telefoneId
                             && t.ClienteId == clienteId
                             && db.Clientes.Any(c => c.Id == clienteId && c.EmpresaId == empresaId))
-                .ExecuteDeleteAsync();
-            return rows > 0;
+                .SingleOrDefaultAsync();
+            if (telefone is null) return false;
+            telefone.Cliente!.AlteradoEm = DateTime.UtcNow;
+            db.Entry(telefone.Cliente!).Property(c => c.AlteradoEm).IsModified = true;
+            db.Remove(telefone);
+            return true;
         }
 
         public Task AddDocumentoAsync(ClienteDocumento d) { db.Set<ClienteDocumento>().Add(d); return Task.CompletedTask; }

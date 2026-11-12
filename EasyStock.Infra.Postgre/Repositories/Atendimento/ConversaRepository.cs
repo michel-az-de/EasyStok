@@ -168,9 +168,15 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
 
         if (!string.IsNullOrWhiteSpace(busca))
         {
-            var padrao = $"%{busca.Trim()}%";
-            query = query.Where(c => EF.Functions.ILike(c.ContatoNome ?? string.Empty, padrao)
-                                     || EF.Functions.ILike(c.ContatoIdExterno, padrao));
+            var termo = busca.Trim();
+            var padrao = $"%{BuscaTextual.Normalizar(termo)}%";
+            var digitos = BuscaTextual.DigitosTelefone(termo);
+            var buscaId = Guid.TryParse(termo, out var id);
+            var buscaNumero = long.TryParse(termo.TrimStart('#'), out var numero);
+            query = query.Where(c => (buscaId && c.Id == id) || (buscaNumero && c.NumeroComanda == numero)
+                                     || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto((c.ContatoNome ?? string.Empty).ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao)
+                                     || EF.Functions.ILike(c.ContatoIdExterno, padrao)
+                                     || (digitos.Length >= 3 && EasyStockDbContext.TraduzirTexto(c.ContatoIdExterno, BuscaTextual.MascaraTelefone, "").Contains(digitos)));
         }
 
         // #1575: só as colunas do resumo. O ContextoJson (jsonb do carrinho) fica no banco: a inbox faz polling.

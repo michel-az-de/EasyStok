@@ -13,6 +13,31 @@ namespace EasyStock.Domain.Tests.Entities.Atendimento;
 /// </summary>
 public class MensagemTests
 {
+    [Fact]
+    public void ChaveDoEnvioPreservaLegadoEAceitaLimiteRealSemTrocarAIdentidade()
+    {
+        var mensagem = Mensagem.Saida(Empresa, Conversa, AutorMensagem.Dona, Em, TipoConteudoMensagem.Texto, "Oi");
+        mensagem.RegistrarChaveEnvio(null);
+        mensagem.ChaveEnvio.Should().BeNull();
+        var chave = new string('a', 120);
+        mensagem.RegistrarChaveEnvio(" " + chave + " ");
+        mensagem.ChaveEnvio.Should().Be(chave);
+        var trocar = () => mensagem.RegistrarChaveEnvio("outra-intencao");
+        trocar.Should().Throw<RegraDeDominioVioladaException>();
+        mensagem.ChaveEnvio.Should().Be(chave);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(121)]
+    public void ChaveDoEnvioRecusaVaziaOuMaiorQueContrato(int tamanho)
+    {
+        var mensagem = Mensagem.Saida(Empresa, Conversa, AutorMensagem.Atendente, Em, TipoConteudoMensagem.Texto, "Oi");
+        var registrar = () => mensagem.RegistrarChaveEnvio(new string('a', tamanho));
+        registrar.Should().Throw<RegraDeDominioVioladaException>();
+        mensagem.ChaveEnvio.Should().BeNull();
+    }
+
     private static readonly Guid Empresa = Guid.NewGuid();
     private static readonly Guid Conversa = Guid.NewGuid();
     private static readonly DateTime Em = new(2026, 9, 22, 12, 0, 0, DateTimeKind.Utc);

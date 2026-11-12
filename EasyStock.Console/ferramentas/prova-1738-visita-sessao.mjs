@@ -15,6 +15,9 @@ globalThis.sessionStorage = {
 }
 const sessao = { empresa: { id: 'empresa-a' }, usuario: { id: 'usuario-a' } }
 const vazio = { ultimaConversa: null, comandas: {} }
+const filtros = { busca: 'João', aba: 'todas', canais: ['WhatsApp'], ordenacao: 'recentes', responsavel: 'minhas', posicao: 720 }
+gravarVisita(sessao, { filtros, comandas: {} })
+assert.deepEqual(lerVisita(sessao).filtros, filtros, 'Busca, filtros e posição da lista sobrevivem ao reload')
 gravarVisita(sessao, { ultimaConversa: 'conversa-a', comandas: { 'conversa-a': {
   numero: 72, itens: [{ sku: 'prato', qtd: 2, obs: 'Molho à parte', nome: 'Não guardar nome' }],
   janela: 'janela-dia', meio: 'pix', observacoes: 'Sem talheres',

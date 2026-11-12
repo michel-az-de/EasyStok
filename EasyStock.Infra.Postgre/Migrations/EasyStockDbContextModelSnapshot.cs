@@ -1302,6 +1302,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("ChaveEnvio")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<Guid>("ConversaId")
                         .HasColumnType("uuid");
 
@@ -2256,6 +2260,12 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<int>("OrderCount")
                         .HasColumnType("integer");
+
+                    b.Property<uint>("Revisao")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.Property<string>("Telefone")
                         .HasMaxLength(32)

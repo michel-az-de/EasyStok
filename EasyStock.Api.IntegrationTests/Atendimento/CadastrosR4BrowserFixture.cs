@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using EasyStock.Api.Configuration;
@@ -37,6 +39,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var arquivo = Environment.GetEnvironmentVariable("EASYSTOK_R4_BROWSER_FIXTURE");
         Skip.If(string.IsNullOrWhiteSpace(arquivo), "Fixture opt-in: informe EASYSTOK_R4_BROWSER_FIXTURE.");
         Skip.If(!_isAvailable, "Docker/PostgreSQL indisponível.");
+        var iniciadoEm = DateTime.UtcNow;
+        var expiraEm = iniciadoEm.AddMinutes(120);
         var cloud = Substitute.For<IWhatsAppCloudClient>();
         cloud.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(_ => new EnvioWhatsAppResult("wamid.r4.controlado." + Guid.NewGuid().ToString("N")));
@@ -75,17 +79,33 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using var client = factory.CreateClient();
         var cenario = await SemearAsync(factory, "casa-da-baba", EasyStock.Application.Common.HorarioBrasil.Hoje().AddDays(1));
         var outraEmpresa = Guid.NewGuid();
+        // Combinações explícitas somente desta fixture. Os três perfis do produto continuam canônicos.
+        var modelosPerfis = PerfisCasaDaBaba.Iniciais.Concat(new[]
+        {
+            new PerfilCasaDaBaba("Consulta R4", NivelAcesso.Visualizador, "cardapio", [Permissao.AcessarModuloCardapio]),
+            new PerfilCasaDaBaba("Entrega R4", NivelAcesso.Operador, "entregas", [Permissao.AcessarModuloEntregas])
+        }).ToDictionary(p => p.Nome);
+        var perfis = new Dictionary<(Guid EmpresaId, string Nome), Perfil>();
         var identidades = new[]
         {
             new IdentidadeR4(UsuarioId, EmpresaId, "Dona R4", "dona.r4@fixture.test", "R4-Dona-2026!", "Dona"),
             new IdentidadeR4(Guid.NewGuid(), EmpresaId, "Atendimento R4", "atendimento.r4@fixture.test", "R4-Atende-2026!", "Atendimento"),
-            new IdentidadeR4(Guid.NewGuid(), outraEmpresa, "Dona de outra empresa", "outra.r4@fixture.test", "R4-Outra-2026!", "Dona")
+            new IdentidadeR4(Guid.NewGuid(), outraEmpresa, "Dona de outra empresa", "outra.r4@fixture.test", "R4-Outra-2026!", "Dona"),
+            new IdentidadeR4(Guid.NewGuid(), EmpresaId, "Cozinha R4", "cozinha.r4@fixture.test", "R4-Cozinha-2026!", "Cozinha"),
+            new IdentidadeR4(Guid.NewGuid(), EmpresaId, "Consulta R4", "consulta.r4@fixture.test", "R4-Consulta-2026!", "Consulta R4"),
+            new IdentidadeR4(Guid.NewGuid(), EmpresaId, "Entrega R4", "entrega.r4@fixture.test", "R4-Entrega-2026!", "Entrega R4"),
+            new IdentidadeR4(Guid.NewGuid(), EmpresaId, "Revogável R4", "revogavel.r4@fixture.test", "R4-Revogar-2026!", "Atendimento")
         };
         Guid conversaSemCadastroId;
         Guid conversaConferenciaId;
+        Guid conversaModeloId;
+        Guid conversaOperacionalId;
+        Guid conversaExcecoesId;
         Guid conversaOutraEmpresaId;
         Guid janelaAlternativaId;
         var produtos = new List<object>();
+        object? i01 = null;
+        var conversasFila = new List<Conversa>();
         using (var scope = factory.Services.CreateScope())
         {
             scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(EmpresaId);
@@ -100,12 +120,16 @@ public sealed partial class PedidoConversaConcorrenciaTests
                     SenhaHash = hasher.Hash(identidade.Senha), Ativo = true, EmailConfirmado = true, CriadoEm = agora, AlteradoEm = agora });
                 db.UsuariosEmpresas.Add(new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = identidade.UsuarioId,
                     EmpresaId = identidade.EmpresaId, Ativo = true, CriadoEm = agora });
-                var modelo = PerfisCasaDaBaba.Iniciais.Single(p => p.Nome == identidade.Perfil);
-                var perfil = new Perfil { Id = Guid.NewGuid(), EmpresaId = identidade.EmpresaId, Nome = modelo.Nome,
-                    Nivel = modelo.Nivel, ModuloInicial = modelo.ModuloInicial, PermissoesExplicitas = true, CriadoEm = agora };
-                foreach (var permissao in modelo.Permissoes)
-                    perfil.Permissoes.Add(new PerfilPermissao { Id = Guid.NewGuid(), PerfilId = perfil.Id, Permissao = permissao });
-                db.Perfis.Add(perfil);
+                var modelo = modelosPerfis[identidade.Perfil];
+                if (!perfis.TryGetValue((identidade.EmpresaId, identidade.Perfil), out var perfil))
+                {
+                    perfil = new Perfil { Id = Guid.NewGuid(), EmpresaId = identidade.EmpresaId, Nome = modelo.Nome,
+                        Nivel = modelo.Nivel, ModuloInicial = modelo.ModuloInicial, PermissoesExplicitas = true, CriadoEm = agora };
+                    foreach (var permissao in modelo.Permissoes)
+                        perfil.Permissoes.Add(new PerfilPermissao { Id = Guid.NewGuid(), PerfilId = perfil.Id, Permissao = permissao });
+                    db.Perfis.Add(perfil);
+                    perfis.Add((identidade.EmpresaId, identidade.Perfil), perfil);
+                }
                 db.UsuariosPerfis.Add(new UsuarioPerfil { Id = Guid.NewGuid(), UsuarioId = identidade.UsuarioId,
                     EmpresaId = identidade.EmpresaId, PerfilId = perfil.Id, AtribuidoEm = agora });
             }
@@ -139,6 +163,87 @@ public sealed partial class PedidoConversaConcorrenciaTests
             db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, conferencia.Id, agora, TipoConteudoMensagem.Texto,
                 "Mensagem sintética recebida para conferir as exceções R4.", "wamid.r4.conferencia"));
             conversaConferenciaId = conferencia.Id;
+            var pessoaModelo = Cliente.Criar(EmpresaId, "Pessoa dos modelos R4");
+            pessoaModelo.Ativo = true;
+            pessoaModelo.Telefone = "+5511912345680";
+            db.Clientes.Add(pessoaModelo);
+            var entradaHistorica = agora.AddDays(-2);
+            var modeloConversa = Conversa.Abrir(EmpresaId, "5511912345680", entradaHistorica,
+                pessoaModelo.Nome, pessoaModelo.Id);
+            modeloConversa.RegistrarEntrada(entradaHistorica);
+            modeloConversa.Assumir(entradaHistorica, UsuarioId);
+            db.AtendimentoConversas.Add(modeloConversa);
+            db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, modeloConversa.Id, entradaHistorica,
+                TipoConteudoMensagem.Texto, "Mensagem sintética histórica para conferir modelos R4.", "wamid.r4.modelo"));
+            conversaModeloId = modeloConversa.Id;
+            var enderecoOriginal = await db.Set<ClienteEndereco>().AsNoTracking()
+                .FirstAsync(e => e.ClienteId == clienteOriginal.Id && e.Padrao);
+            conversaOperacionalId = ConversaDedicada("Operação R4", "5511912345681", "operacional");
+            conversaExcecoesId = ConversaDedicada("Exceções R4", "5511912345682", "excecoes");
+
+            var pessoaI01 = ClienteI01("I01 Pessoa original", "+5511912345690");
+            var pessoaAlternativa = ClienteI01("I01 Pessoa alternativa", pessoaI01.Telefone);
+            var pessoaInativa = ClienteI01("I01 Pessoa inativa", pessoaI01.Telefone, false);
+            var pessoaOutroTelefone = ClienteI01("I01 Pessoa outro telefone", "+5511912345691");
+            var pessoaSemTelefone = ClienteI01("I01 Pessoa sem telefone", null);
+            var conversaI01 = ConversaI01(pessoaI01, "5511912345690");
+            var conversaSemTelefone = ConversaI01(pessoaSemTelefone, "5511912345692");
+            i01 = new { conversaId = conversaI01.Id, conversaSemTelefoneId = conversaSemTelefone.Id,
+                clienteOriginalId = pessoaI01.Id, clienteAlternativoId = pessoaAlternativa.Id,
+                clienteInativoId = pessoaInativa.Id, clienteOutroTelefoneId = pessoaOutroTelefone.Id,
+                clienteSemTelefoneId = pessoaSemTelefone.Id, telefone = pessoaI01.Telefone,
+                telefoneDiferente = pessoaOutroTelefone.Telefone };
+            for (var indice = 1; indice <= 32; indice++)
+            {
+                var em = agora.AddMinutes(-20 - indice);
+                var fila = Conversa.Abrir(EmpresaId, "551192000" + indice.ToString("D4"), em, $"R01 Fila {indice:D2}");
+                fila.RegistrarEntrada(em);
+                fila.Escalar(em, "Conferência sintética da fila R01");
+                conversasFila.Add(fila);
+                db.AtendimentoConversas.Add(fila);
+                db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, fila.Id, em, TipoConteudoMensagem.Texto,
+                    $"Entrada sintética R01 número {indice:D2}.", $"wamid.r4.fila.{indice}"));
+            }
+
+            Cliente ClienteI01(string nome, string? telefone, bool ativo = true)
+            {
+                var pessoa = Cliente.Criar(EmpresaId, nome);
+                pessoa.Ativo = ativo;
+                pessoa.Telefone = telefone;
+                db.Clientes.Add(pessoa);
+                return pessoa;
+            }
+            Conversa ConversaI01(Cliente pessoa, string contato)
+            {
+                var conversaIdentidade = Conversa.Abrir(EmpresaId, contato, agora, pessoa.Nome, pessoa.Id);
+                conversaIdentidade.Assumir(agora, UsuarioId);
+                conversaIdentidade.RegistrarEntrada(agora);
+                db.AtendimentoConversas.Add(conversaIdentidade);
+                db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, conversaIdentidade.Id, agora,
+                    TipoConteudoMensagem.Texto, "Entrada sintética exclusiva para conferir a identidade I01.", "wamid.r4.i01." + contato));
+                return conversaIdentidade;
+            }
+
+            Guid ConversaDedicada(string nome, string telefone, string origem)
+            {
+                var pessoa = Cliente.Criar(EmpresaId, "Pessoa da " + nome);
+                pessoa.Ativo = true;
+                pessoa.Telefone = "+" + telefone;
+                pessoa.Endereco = clienteOriginal.Endereco;
+                pessoa.Enderecos.Add(new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = pessoa.Id,
+                    Logradouro = enderecoOriginal.Logradouro, Numero = enderecoOriginal.Numero,
+                    Cep = enderecoOriginal.Cep, Bairro = enderecoOriginal.Bairro, Cidade = enderecoOriginal.Cidade,
+                    Estado = enderecoOriginal.Estado, Complemento = enderecoOriginal.Complemento, Padrao = true,
+                    CriadoEm = agora, AlteradoEm = agora });
+                db.Clientes.Add(pessoa);
+                var dedicada = Conversa.Abrir(EmpresaId, telefone, agora, nome, pessoa.Id);
+                dedicada.Assumir(agora, UsuarioId);
+                dedicada.RegistrarEntrada(agora);
+                db.AtendimentoConversas.Add(dedicada);
+                db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, dedicada.Id, agora,
+                    TipoConteudoMensagem.Texto, "Mensagem sintética recebida para " + nome + ".", "wamid.r4." + origem));
+                return dedicada.Id;
+            }
             var estrangeiro = Cliente.Criar(outraEmpresa, "Cliente isolado R4");
             estrangeiro.Telefone = clienteOriginal.Telefone;
             db.Clientes.Add(estrangeiro);
@@ -154,9 +259,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
                 new TimeOnly(13, 0), new TimeOnly(16, 0), 10, "Tarde R4");
             db.JanelasEntrega.Add(janelaAlternativa);
             janelaAlternativaId = janelaAlternativa.Id;
-            foreach (var nome in new[] { "Lasanha bolonhesa R4", "Lasanha de legumes R4", "Lasanha da prova de falta R4" })
+            foreach (var nome in new[] { "Lasanha bolonhesa R4", "Lasanha de legumes R4", "Lasanha da prova de falta R4", "Lasanha sem estoque R4" })
             {
-                var saldo = nome == "Lasanha da prova de falta R4" ? 1 : 8;
+                var saldo = nome switch { "Lasanha da prova de falta R4" => 1, "Lasanha sem estoque R4" => 0, _ => 8 };
                 var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, CategoriaId = categoria.Id,
                     Nome = nome, Status = StatusProduto.Ativo, PrecoReferencia = Dinheiro.FromDecimal(32m), CriadoEm = agora, AlteradoEm = agora };
                 db.Produtos.Add(produto);
@@ -176,6 +281,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         }
         // Prova a autenticação da fixture: o header não forja claims e acesso anônimo é recusado.
         using (var anonimo = await client.GetAsync("api/auth/me/modulos")) Assert.Equal(HttpStatusCode.Unauthorized, anonimo.StatusCode);
+        var autorizacoes = new List<object>();
         foreach (var identidade in identidades)
         {
             using var login = await client.PostAsJsonAsync("api/auth/login", new { identidade.Email, identidade.Senha, identidade.EmpresaId });
@@ -184,19 +290,37 @@ public sealed partial class PedidoConversaConcorrenciaTests
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", json.RootElement.GetProperty("data").GetProperty("token").GetString());
             using var me = await client.GetAsync("api/auth/me/modulos");
             Assert.True(me.IsSuccessStatusCode, $"JWT de {identidade.Perfil}: {(int)me.StatusCode} {await me.Content.ReadAsStringAsync()}");
+            using var capacidades = JsonDocument.Parse(await me.Content.ReadAsStringAsync());
+            var modelo = modelosPerfis[identidade.Perfil];
+            autorizacoes.Add(new { identidade.UsuarioId, identidade.EmpresaId, identidade.Perfil,
+                perfilId = perfis[(identidade.EmpresaId, identidade.Perfil)].Id,
+                nivel = modelo.Nivel.ToString(), permissoes = modelo.Permissoes.Select(p => p.ToString()).ToArray(),
+                capacidades = capacidades.RootElement.GetProperty("data").Clone() });
             client.DefaultRequestHeaders.Authorization = null;
         }
+        var assemblyApi = typeof(Program).Assembly;
+        string sha256Api;
+        await using (var binarioApi = File.OpenRead(assemblyApi.Location))
+            sha256Api = Convert.ToHexStringLower(await SHA256.HashDataAsync(binarioApi));
         var destino = Path.GetFullPath(arquivo!);
         Directory.CreateDirectory(Path.GetDirectoryName(destino)!);
         await File.WriteAllTextAsync(destino, JsonSerializer.Serialize(new
         {
             api = client.BaseAddress!.ToString().TrimEnd('/'), empresaId = EmpresaId, outraEmpresaId = outraEmpresa,
-            conversaId = cenario.ConversaId, clienteId = cenario.ClienteId, conversaSemCadastroId, conversaConferenciaId, conversaOutraEmpresaId,
-            janelaId = cenario.JanelaId, janelaAlternativaId, dataEntrega = cenario.DataEntrega, produtos, produtoExcecao = produtos[2], identidades,
+            conversaId = cenario.ConversaId, clienteId = cenario.ClienteId, conversaSemCadastroId, conversaConferenciaId, conversaModeloId,
+            conversaOperacionalId, conversaExcecoesId, conversaOutraEmpresaId,
+            janelaId = cenario.JanelaId, janelaAlternativaId, dataEntrega = cenario.DataEntrega, produtos,
+            produtoExcecao = produtos[2], produtoSemEstoque = produtos[3], identidades, autorizacoes, i01,
+            filaR01 = conversasFila.Select(c => new { c.Id, c.NumeroComanda, c.ContatoNome }).ToArray(),
+            perfis = perfis.Values.Select(p => new { p.Id, p.EmpresaId, p.Nome, nivel = p.Nivel.ToString(),
+                p.ModuloInicial, permissoes = p.Permissoes.Select(x => x.Permissao.ToString()).ToArray() }).ToArray(),
+            iniciadoEm, expiraEm,
+            versaoApi = new { assemblyInformationalVersion = assemblyApi.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion,
+                sha256 = sha256Api, caminhoBinario = assemblyApi.Location },
             autenticacao = "POST api/auth/login, JWT Bearer e CurrentUserAccessor reais",
             provedores = "MP, Meta e LLM controlados; nenhuma homologação externa; workers desativados"
         }, ComandaClienteUseCase.Json));
-        using var limite = new CancellationTokenSource(TimeSpan.FromMinutes(60));
+        using var limite = new CancellationTokenSource(expiraEm - DateTime.UtcNow);
         while (!File.Exists(destino + ".stop") && !limite.IsCancellationRequested) await Task.Delay(500);
     }
 

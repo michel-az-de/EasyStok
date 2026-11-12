@@ -3,6 +3,7 @@ import {
   closestCenter, DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { AtendimentoProvider } from '../aplicacao/AtendimentoProvider'
+import { anunciarAberturaDeConversa } from '../aplicacao/aberturaDeConversa'
 import { criarMemoriaDoLaco } from '../aplicacao/cicloDeSincronizacao'
 import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '../aplicacao/rascunhosDosAjustes'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
@@ -53,6 +54,8 @@ import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
 import { ModalHorariosDaSemana } from '../features/automacoes/ModalHorariosDaSemana'
 import { ModalGestao, PainelDeAjuste } from '../features/gestao/ModalGestao'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
+import { BuscaNaCasa } from '../features/busca/BuscaNaCasa'
+import { EditorCadastro } from '../features/gestao/cadastros/EditorCadastro'
 import { PainelAgora } from '../features/agora/PainelAgora'
 import { avisoDeResponder, filasDoAgora } from '../dominio/agora'
 import { hashDoModulo } from '../dominio/modulos'
@@ -503,13 +506,27 @@ function RestaurarConversa({ ultimaConversa, aoLembrarConversa }) {
   return null
 }
 
-function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco, visitaSoNaMemoria }) {
+function AbrirConversaEncontrada({ solicitacao, aoConsumir }) {
+  const { selecionar } = useAcoes()
+  const recebida = useRef(null)
+  useEffect(() => {
+    if (!solicitacao || recebida.current === solicitacao) return
+    recebida.current = solicitacao
+    selecionar(solicitacao.id, solicitacao)
+    anunciarAberturaDeConversa(solicitacao.id)
+    aoConsumir?.()
+  }, [solicitacao, selecionar, aoConsumir])
+  return null
+}
+
+function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComandasDaVisita, aoGuardarComandas, lerFiltrosDaVisita, aoGuardarFiltros, lerRascunhosDaVisita, aoGuardarRascunhos, memoriaDoLaco, visitaSoNaMemoria, conversaEncontrada, aoConsumirConversa }) {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
   const { permite } = useAcessoModulos()
   return (
     // `key`: trocar de usuário ou empresa recomeça o estado, sem conversa de outra empresa na tela.
-    <AtendimentoProvider key={identidadeDaSessao(sessao)} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={aoGuardarComandas} memoriaDoLaco={memoriaDoLaco}>
+    <AtendimentoProvider key={identidadeDaSessao(sessao)} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={aoGuardarComandas} lerFiltrosDaVisita={lerFiltrosDaVisita} aoGuardarFiltros={aoGuardarFiltros} lerRascunhosDaVisita={lerRascunhosDaVisita} aoGuardarRascunhos={aoGuardarRascunhos} memoriaDoLaco={memoriaDoLaco}>
       {ultimaConversa && <RestaurarConversa ultimaConversa={ultimaConversa} aoLembrarConversa={aoLembrarConversa} />}
+      <AbrirConversaEncontrada solicitacao={conversaEncontrada} aoConsumir={aoConsumirConversa} />
       <LimparAvisoAoNavegar />
       <AvisosDoDispositivo visitaSoNaMemoria={visitaSoNaMemoria}><TelaDaRota rota={rota} /></AvisosDoDispositivo>
       {permite('atendimento') && <PilhaDeAvisos />}
@@ -594,8 +611,25 @@ export function App() {
 function AppComAcesso({ rota, sessao, aoSair }) {
   const [visitaInicial] = useState(() => lerVisita(sessao))
   const [visitaSoNaMemoria, definirVisitaSoNaMemoria] = useState(false)
+  const [buscaAberta, abrirBusca] = useState(false)
+  const [conversaEncontrada, guardarConversaEncontrada] = useState(null)
+  const consumirConversaEncontrada = useCallback(() => guardarConversaEncontrada(null), [])
+  useEffect(() => {
+    const atalho = evento => {
+      if ((evento.ctrlKey || evento.metaKey) && evento.key.toLowerCase() === 'k' && !evento.altKey) {
+        evento.preventDefault(); abrirBusca(true)
+      }
+    }
+    window.addEventListener('keydown', atalho)
+    return () => window.removeEventListener('keydown', atalho)
+  }, [])
   const ultimaConversa = useRef(visitaInicial.ultimaConversa)
   const comandasDaVisita = useRef(visitaInicial.comandas)
+  const filtrosDaVisita = useRef(visitaInicial.filtros)
+  const rascunhosDaVisita = useRef(null)
+  const lerFiltrosDaVisita = useCallback(() => filtrosDaVisita.current, [])
+  const lerRascunhosDaVisita = useCallback(() => rascunhosDaVisita.current, [])
+  const guardarRascunhosDaVisita = useCallback(rascunhos => { rascunhosDaVisita.current = rascunhos }, [])
   const [rascunhosDosAjustes, setRascunhosDosAjustes] = useState({})
   const gravacoesDosAjustes = useGravacoesDosAjustes()
   const [confirmandoSaida, setConfirmandoSaida] = useState(false)
@@ -627,18 +661,24 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   const lerComandasDaVisita = useCallback(() => comandasDaVisita.current, [])
   const guardarComandas = useCallback((comandas) => {
     comandasDaVisita.current = comandas
-    const gravada = gravarVisita(sessao, { comandas, ultimaConversa: ultimaConversa.current })
+    const gravada = gravarVisita(sessao, { comandas, ultimaConversa: ultimaConversa.current, filtros: filtrosDaVisita.current })
     definirVisitaSoNaMemoria(Object.keys(comandas).length > 0 && !gravada)
   }, [sessao])
   const lembrarConversa = useCallback((id) => {
     ultimaConversa.current = id
-    const gravada = gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: id })
+    const gravada = gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: id, filtros: filtrosDaVisita.current })
+    definirVisitaSoNaMemoria(Object.keys(comandasDaVisita.current).length > 0 && !gravada)
+  }, [sessao])
+  const guardarFiltrosDaVisita = useCallback(filtros => {
+    filtrosDaVisita.current = filtros
+    const gravada = gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: ultimaConversa.current, filtros })
     definirVisitaSoNaMemoria(Object.keys(comandasDaVisita.current).length > 0 && !gravada)
   }, [sessao])
   const avisos = useNotificacoesDaSessao()
   const avisosNoAparelho = useAvisosNoAparelho({ sessao })
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: true })
   const { dados, erro, tentarNovamente } = useModulosDaSessao(sessao)
+  const permitirModulo = useCallback(id => permiteModulo(dados, id), [dados])
   if (!dados) return (
     <><main className={css.estadoAcesso} tabIndex={-1} data-inicio-tela id="conteudo-principal" aria-label={erro ? 'Falha ao carregar acesso' : 'Carregando módulos'} aria-busy={!erro}>
     <Vazio titulo={erro ? 'Não foi possível carregar seu acesso' : 'Carregando seus módulos'}
@@ -647,7 +687,8 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     </Vazio>
     </main>{confirmacaoSaida}</>
   )
-  const acesso = { permite: (id) => permiteModulo(dados, id), acoes: dados.acoes ?? {}, aoSair: sair, sessaoPersistente: sessao.persistente,
+  const acesso = { permite: permitirModulo, acoes: dados.acoes ?? {}, aoSair: sair, sessaoPersistente: sessao.persistente,
+    busca: <Botao variante="texto" icone="search" aria-label="Buscar na Casa" aria-haspopup="dialog" onClick={() => abrirBusca(true)}>Buscar</Botao>,
     conta: { nome: sessao.usuario?.nome ?? null, casa: sessao.empresa?.nome ?? null },
     notificacoes: <SinoDaSessao avisos={avisos} aparelho={avisosNoAparelho} /> }
   let tela
@@ -662,10 +703,17 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />
-  else tela = <AppPrincipal rota={rota} sessao={sessao} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} memoriaDoLaco={memoriaDoLaco} visitaSoNaMemoria={visitaSoNaMemoria} />
+  else tela = <AppPrincipal rota={rota} sessao={sessao} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} lerFiltrosDaVisita={lerFiltrosDaVisita} aoGuardarFiltros={guardarFiltrosDaVisita} lerRascunhosDaVisita={lerRascunhosDaVisita} aoGuardarRascunhos={guardarRascunhosDaVisita} memoriaDoLaco={memoriaDoLaco} visitaSoNaMemoria={visitaSoNaMemoria} conversaEncontrada={conversaEncontrada} aoConsumirConversa={consumirConversaEncontrada} />
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
       {tela}{confirmacaoSaida}
+      {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={props => <EditorCadastro {...props} />} aoAbrirConversa={resumo => {
+        memoriaDoLaco.dono = sessao.usuario?.id ?? null
+        memoriaDoLaco.resumos.set(resumo.id, resumo)
+        guardarConversaEncontrada(resumo)
+        lembrarConversa(resumo.id)
+        window.location.hash = hashDoModulo('atendimento', 'balcao')
+      }} />}
       {/* #2096: o canhoto sai sozinho no aparelho em que a dona ligou, em qualquer tela. */}
       <ImpressaoAutomatica />
     </ContextoRascunhosDosAjustes.Provider>

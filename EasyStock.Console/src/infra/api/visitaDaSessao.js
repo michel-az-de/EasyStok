@@ -22,7 +22,17 @@ function comandaLocal(pedido) {
 
 function visitaDe(salva) {
   const comandas = salva?.comandas && typeof salva.comandas === 'object' && !Array.isArray(salva.comandas) ? salva.comandas : {}
+  const f = salva?.filtros
+  const filtros = f && typeof f === 'object' && !Array.isArray(f) ? {
+    busca: typeof f.busca === 'string' ? f.busca : '',
+    aba: ['precisa', 'todas'].includes(f.aba) ? f.aba : 'precisa',
+    canais: Array.isArray(f.canais) ? f.canais.filter(c => typeof c === 'string') : [],
+    ordenacao: ['urgencia', 'recentes', 'entrega'].includes(f.ordenacao) ? f.ordenacao : 'urgencia',
+    responsavel: ['todas', 'minhas', 'sem-dono'].includes(f.responsavel) ? f.responsavel : 'todas',
+    posicao: Number.isFinite(f.posicao) && f.posicao >= 0 ? f.posicao : 0,
+  } : null
   return { ultimaConversa: typeof salva?.ultimaConversa === 'string' ? salva.ultimaConversa : null,
+    ...(filtros ? { filtros } : {}),
     comandas: Object.fromEntries(Object.entries(comandas).map(([id, p]) => [id, comandaLocal(p)]).filter(([, p]) => p)) }
 }
 

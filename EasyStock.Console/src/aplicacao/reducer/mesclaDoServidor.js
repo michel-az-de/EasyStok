@@ -70,16 +70,18 @@ export function mesclarDoServidor(local, lida, semMensagens = false, lidaEm = un
     ...(leituraAtrasada ? situacaoLocal(local) : null),
   }
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
+  const chavesDoServidor = new Set(doServidor.mensagens.filter(m => m.dir === 'out' && m.chaveEnvio).map(m => m.chaveEnvio))
+  const veioDoServidor = m => doServidorIds.has(m.id) || (m.dir === 'out' && m.chaveEnvio && chavesDoServidor.has(m.chaveEnvio))
   // #2005 (console-09): quem abriu as mensagens anteriores não as perde na volta de 5 s, que traz só a página mais
   // recente: o que já estava na tela e é mais velho que essa página fica (inclusive o trecho que a janela deslizou).
   // Vale para qualquer mensagem velha, também a saída que o servidor guarda como Falhou ou Pendente: ela já é do
   // servidor e fica no topo, em vez de virar "só local" no fim do fio com o Reenviar.
   const inicioDaPagina = semMensagens || !local.anterioresCarregadas ? null : Date.parse(doServidor.mensagens[0]?.em)
   const retidas = inicioDaPagina
-    ? local.mensagens.filter((m) => !doServidorIds.has(m.id) && Date.parse(m.em) < inicioDaPagina)
+    ? local.mensagens.filter((m) => !veioDoServidor(m) && Date.parse(m.em) < inicioDaPagina)
     : []
   const idsRetidos = new Set(retidas.map((m) => m.id))
-  const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id) && !idsRetidos.has(m.id))
+  const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !veioDoServidor(m) && !idsRetidos.has(m.id))
   const mantido = clienteDaApiMantido(local, doServidor)
   const rascunhoDoNome = local.nomeDaDona && !doServidor.clienteId
   const lido = pedidoMesclado(local.pedido, doServidor.pedido)

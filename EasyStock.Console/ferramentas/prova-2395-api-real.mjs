@@ -113,7 +113,7 @@ try {
   await link(page, '#/m/cadastros')
   await page.getByRole('button', { name: 'Conferir cadastro', exact: true }).click()
   const editor = page.getByRole('dialog').last()
-  await editor.getByText('Usa até 20 mensagens de texto recentes recebidas nesta conversa para sugerir nome, telefone e e-mail.', { exact: true }).waitFor()
+  await editor.getByText('Usa até 20 mensagens recentes recebidas com texto nesta conversa para sugerir nome, telefone e e-mail.', { exact: true }).waitFor()
   const inferencia = page.waitForResponse(r => r.url().endsWith('/assistente/cadastro') && r.request().method() === 'POST')
   await editor.getByRole('button', { name: 'Consultar com IA', exact: true }).click()
   assert.equal((await inferencia).status(), 200)

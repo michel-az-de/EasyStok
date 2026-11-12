@@ -1,14 +1,29 @@
 import assert from 'node:assert/strict'
-import { corpoCliente, corpoFornecedor, corpoProduto, emailCadastro, filtrarSemCadastro, relacionamentoCadastro, chaveContextoCadastro, telefoneCadastro, termoBuscaCadastro } from '../src/dominio/cadastros.js'
+import { corpoCliente, corpoFornecedor, corpoProduto, emailCadastro, filtrarSemCadastro, relacionamentoCadastro, chaveContextoCadastro, telefoneCadastro, termoBuscaCadastro, reconferirCadastroCliente } from '../src/dominio/cadastros.js'
 
-const original = { id: 'c1', nome: 'Ana', tipoPessoa: 'juridica', nomeFantasia: 'Loja', inscricaoEstadual: '123', apt: '4', documento: 'legado', observacoes: 'Preservar' }
+const original = { id: 'c1', revisao: 41, nome: 'Ana', tipoPessoa: 'juridica', nomeFantasia: 'Loja', inscricaoEstadual: '123', apt: '4', documento: 'legado', observacoes: 'Preservar' }
 const cliente = corpoCliente({ ...original, nome: 'Ana Maria' }, 'empresa')
+assert.equal(cliente.revisao, 41, 'Edição envia a revisão do cadastro capturada na abertura')
+assert.equal(Object.hasOwn(corpoCliente({ nome: 'Novo' }, 'empresa'), 'revisao'), false, 'Criação não inventa revisão')
+assert.throws(() => corpoCliente({ id: 'c1', nome: 'Sem revisão' }, 'empresa'), /versão/, 'Edição legada exige reler o cadastro')
 assert.equal(cliente.pessoaJuridica, true)
 assert.equal(cliente.inscricaoEstadual, '123')
 assert.equal(cliente.apt, '4')
 assert.equal(cliente.empresaId, 'empresa')
 assert.equal(cliente.nome, 'Ana Maria')
 assert.equal(cliente.observacoes, 'Preservar')
+const draft = { inicial: original, dados: { ...original, nome: 'Ana digitada' }, conflito: true }
+const atual = { ...original, revisao: 42, nome: 'Ana atual', telefone: '11912345678', observacoes: 'Outra aba alterou' }
+const conferido = reconferirCadastroCliente(draft, atual)
+assert.equal(conferido.dados.nome, 'Ana digitada', 'Decisão explícita mantém o campo editado')
+assert.equal(conferido.dados.telefone, atual.telefone, 'Campo não editado acompanha a versão atual')
+assert.equal(conferido.dados.observacoes, atual.observacoes)
+assert.equal(conferido.dados.revisao, 42)
+assert.equal(conferido.inicial, atual)
+assert.equal(conferido.conflito, false)
+assert.equal(draft.dados.revisao, 41, 'Reconferir não modifica o snapshot original')
+assert.throws(() => reconferirCadastroCliente(draft, { ...atual, id: 'outra-pessoa' }), /conferir/)
+assert.throws(() => reconferirCadastroCliente(draft, { ...atual, revisao: undefined }), /conferir/)
 const produto = corpoProduto({ produtoId: 'p1', nome: 'Lasanha', categoriaId: 'cat', tipo: 'Alimento', status: 'Ativo', precoReferencia: 32.5, atributosJson: '{"nutricao":"preservada"}', variacoes: [{ variacaoId: 'v1' }] }, 'empresa')
 assert.equal(produto.variacoes, null, 'Edição cadastral não recria variações com saldo')
 assert.equal(produto.embalagens, null)

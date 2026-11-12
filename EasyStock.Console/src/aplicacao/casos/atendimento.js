@@ -17,7 +17,7 @@ export const casosAtendimento = {
   }),
 
   [acao.MUDAR_FILTRO]: (estado, { chave, valor }) => ({
-    ...estado, filtros: { ...estado.filtros, [chave]: valor },
+    ...estado, filtros: { ...estado.filtros, ...('posicao' in estado.filtros ? { posicao: 0 } : {}), [chave]: valor },
   }),
 
   // O rascunho vive no estado da conversa, não dentro do componente. Assim o
@@ -28,14 +28,18 @@ export const casosAtendimento = {
 
   [acao.ENVIAR_MENSAGEM]: (estado, { id, texto, agora, mensagemId, chaveEnvio, modelo = false, automatica = false, regra = null }) => {
     if (recusaEnvio(estado, id, agora)) return estado
-    const base = mapear(estado, id, (c) => ({
-      ...comMensagem(c, {
+    const base = mapear(estado, id, (c) => {
+      const anterior = chaveEnvio && c.mensagens?.find(m => m.dir === 'out' && m.chaveEnvio === chaveEnvio)
+      const conversa = anterior ? { ...c, mensagens: c.mensagens.map(m => m === anterior && !['enviada', 'entregue', 'lida'].includes(m.status)
+        ? { ...m, status: 'enviando', erro: undefined } : m) } : comMensagem(c, {
         dir: 'out', texto, automatica, modelo, regra, ...(chaveEnvio ? { chaveEnvio } : {}),
         status: automatica ? 'lida' : 'enviando',
-      }, { id: mensagemId, agora }),
-      estado: c.estado === 'Aberto' ? 'Em atendimento' : c.estado,
-      responsavel: c.responsavel ?? ATENDENTE,
-    }))
+      }, { id: mensagemId, agora })
+      return { ...conversa,
+        estado: c.estado === 'Aberto' ? 'Em atendimento' : c.estado,
+        responsavel: c.responsavel ?? ATENDENTE,
+      }
+    })
     // #2185 (F2): só o envio do próprio rascunho esvazia o campo. Cardápio, Assistente e despedida mandam
     // outro texto, e o que ela estava digitando continua lá.
     const doRascunho = (estado.rascunhos?.[id] ?? '').trim() === (texto ?? '').trim()

@@ -122,7 +122,9 @@ public class AtendimentoConversasController(
     [HttpPost("{id:guid}/mensagens")]
     public Task<IActionResult> EnviarMensagem(Guid id, [FromBody] EnviarMensagemConsoleBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await enviarUseCase.EnviarTextoAsync(
-            new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty, currentUser.Nivel, body?.Confirmar ?? false), ct)));
+            new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty,
+                currentUser.Nivel, body?.Confirmar ?? false,
+                HttpContext is { } http && http.Request.Headers.TryGetValue("Idempotency-Key", out var chave) ? chave.ToString() : null), ct)));
 
     [HttpGet("~/api/atendimento/modelos")]
     [ValidateEmpresaId]

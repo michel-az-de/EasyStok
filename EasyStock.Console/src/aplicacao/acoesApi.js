@@ -3,7 +3,7 @@ import {
   assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
   transferir,
 } from '../infra/api/conversasApi'
-import { mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
+import { conversaDaApi, mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
 import { lerSessao } from '../infra/api/sessao'
 import { proximoId } from '../infra/numeracao'
 import { avisoDeVariaveisNaoResolvidas } from '../dominio/respostas'
@@ -140,10 +140,11 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       if (envioRecusado(id)) return false
       // #2185 (F12): cardápio, Assistente e campo assumem antes de falar; sem o que assumir, sai na hora.
       return assumirDaConversa.antesDeEnviar(id, () => {
-        const mensagemId = proximoId('msg')
+        let mensagemId = proximoId('msg')
         let chaveEnvio
         return chaves.enviar(id, { texto }, (chave) => {
           chaveEnvio = chave
+          mensagemId = estadoRef.current?.conversas.find(c => c.id === id)?.mensagens?.find(m => m.dir === 'out' && m.chaveEnvio === chave)?.id ?? mensagemId
           despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, chaveEnvio, agora: agoraRef.current })
           return enviarTexto(id, texto, { chave })
         })
@@ -179,7 +180,11 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       }),
     // S59: painel "Não entregues", direto da API (não passa pelo reducer).
     listarNaoEntregues: () => listarNaoEntregues().then((linhas) => (linhas ?? []).map(naoEntregueDaApi)),
-    selecionar: (id) => {
+    selecionar: (id, resumoEncontrado = null) => {
+      if (resumoEncontrado?.id === id && !estadoRef.current.conversas.some(c => c.id === id)) {
+        const encontrada = conversaDaApi(resumoEncontrado, null, lerSessao()?.usuario)
+        despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [...estadoRef.current.conversas, encontrada], semMensagens: [id] })
+      }
       despachar({ tipo: acao.SELECIONAR_CONVERSA, id })
       marcarLida(id).catch(() => {})
       // Conversa com cliente e Ficha ainda não lida do EasyStok: o dossiê preenche (#1276).

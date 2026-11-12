@@ -86,7 +86,7 @@ try {
     await page.setViewportSize({ width: largura, height: largura === 390 ? 844 : 900 })
     const tamanho = await page.evaluate(() => ({ conteudo: document.documentElement.scrollWidth, tela: innerWidth }))
     assert.ok(tamanho.conteudo <= tamanho.tela, `Sem overflow em ${largura}: ${JSON.stringify(tamanho)}`)
-    await page.getByRole('button', { name: 'Novo cliente', exact: true }).click()
+    await page.getByRole('button', { name: 'Cadastrar pessoa da conversa', exact: true }).click()
     const altura = await page.getByRole('combobox', { name: 'Tipo de pessoa' }).evaluate(e => e.getBoundingClientRect().height)
     assert.ok(altura >= (largura === 390 ? 48 : 40))
     await page.screenshot({ path: resolve(pasta, `cadastro-${largura}.png`), fullPage: true })

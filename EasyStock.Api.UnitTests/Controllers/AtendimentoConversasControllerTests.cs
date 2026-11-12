@@ -120,6 +120,32 @@ public partial class AtendimentoConversasControllerTests
     }
 
     [Fact]
+    public async Task ChaveDoEnvioVemDoHeaderEPermanenceNoPostENaListagem()
+    {
+        var conversa = ConversaComClienteAgora();
+        var chave = new string('a', 120);
+        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        _controller.Request.Headers["Idempotency-Key"] = chave;
+        var enviada = Dados<MensagemAtendimentoResult>(await _controller.EnviarMensagem(conversa.Id, new("Oi")));
+        enviada.ChaveEnvio.Should().Be(chave);
+        var listadas = Dados<IReadOnlyList<MensagemAtendimentoResult>>(await _controller.ListarMensagens(conversa.Id, null));
+        listadas.Should().ContainSingle(m => m.Id == enviada.Id && m.ChaveEnvio == chave);
+        _repositorio.Mensagens.Single(m => m.Id == enviada.Id).ChaveEnvio.Should().Be(chave);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(121)]
+    public async Task ChaveDoEnvioInvalidaNaoChamaCanal(int tamanho)
+    {
+        var conversa = ConversaComClienteAgora();
+        var enviar = () => _enviarUseCase.EnviarTextoAsync(new(_empresaId, _usuarioId, conversa.Id, "Oi",
+            ChaveEnvio: new string('a', tamanho)));
+        await enviar.Should().ThrowAsync<EasyStock.Domain.Exceptions.RegraDeDominioVioladaException>();
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task EnviarMarcaAssumida()
     {
         var conversa = ConversaComClienteAgora();
@@ -127,6 +153,7 @@ public partial class AtendimentoConversasControllerTests
         var result = await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("Oi Maria, é a Baba!"), default);
 
         result.Should().BeOfType<OkObjectResult>();
+        Dados<MensagemAtendimentoResult>(result).ChaveEnvio.Should().BeNull();
         await _canal.Received(1).EnviarTextoAsync(WaId, "Oi Maria, é a Baba!", Arg.Any<CancellationToken>());
         conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
         conversa.AssumidaPorUsuarioId.Should().Be(_usuarioId);

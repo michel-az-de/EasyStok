@@ -99,14 +99,21 @@ public class ClientesController(
         if (!TryResolveEmpresaId(currentUser, command.EmpresaId, out var emp, out var err)) return err!;
         if (id != command.Id) return DataBadRequest("Id da rota difere do corpo.");
 
-        var result = await atualizarUseCase.ExecuteAsync(command with
+        try
         {
-            EmpresaId = emp,
-            Id = id,
-            AlteradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            Origem = command.Origem ?? "web"
-        });
-        return result == null ? DataNotFound("Cliente não encontrado.") : DataOk(result);
+            var result = await atualizarUseCase.ExecuteAsync(command with
+            {
+                EmpresaId = emp,
+                Id = id,
+                AlteradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+                Origem = command.Origem ?? "web"
+            });
+            return result == null ? DataNotFound("Cliente não encontrado.") : DataOk(result);
+        }
+        catch (ClienteCadastroAlteradoException ex)
+        {
+            return Conflict(new ApiErrorResponse(new ApiError(ClienteCadastroAlteradoException.Codigo, ex.Message, null, null)));
+        }
     }
 
     [SwaggerOperation(Summary = "Deactivate client")]
