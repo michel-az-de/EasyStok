@@ -64,9 +64,10 @@ public class RegistrarProducaoUseCase(
     BaixaDeInsumosDaProducao? baixaDeInsumos = null,
     ILojaRepository? lojas = null)
 {
-    /// <summary>#2343 (R2-API-7): uma etiqueta por porcao no FinalizarLote; 9.999 e o maior sequencial de 4 digitos
-    /// do rotulo (<c>{Codigo}-{seq:D4}</c>). A venda aceita 99.999 unidades, mas um lote de producao nao precisa disso.</summary>
-    public const int TetoPorcoesPorItem = 9_999;
+    /// <summary>#2343 (R2-API-7): o FinalizarLote gera uma etiqueta por porcao com sequencial GLOBAL no lote, entao o
+    /// teto vale para a soma das porcoes de todos os itens. Limite operacional de etiquetas por lote, nao de formato:
+    /// <c>{seq:D4}</c> nao trunca acima de 9.999.</summary>
+    public const int TetoPorcoesPorLote = 9_999;
 
     /// <summary>#2343 (R2-API-7): 10 anos e teto de sanidade para validade de producao propria (dias).</summary>
     public const int TetoValidadeDias = 3650;
@@ -86,9 +87,6 @@ public class RegistrarProducaoUseCase(
                 throw new UseCaseValidationException("Item produzido precisa estar vinculado a um produto.");
             if (it.Porcoes <= 0)
                 throw new UseCaseValidationException("Porcoes deve ser maior que zero.");
-            if (it.Porcoes > TetoPorcoesPorItem)
-                throw new UseCaseValidationException(
-                    $"Limite de porcoes por item: {TetoPorcoesPorItem} (uma etiqueta por porcao).");
             if (it.ValidadeDias <= 0)
                 throw new UseCaseValidationException("Validade em dias deve ser maior que zero.");
             if (it.ValidadeDias > TetoValidadeDias)
@@ -104,6 +102,9 @@ public class RegistrarProducaoUseCase(
                 throw new UseCaseValidationException(
                     "O peso real nao fecha as porcoes: confira o peso ou o numero de porcoes.");
         }
+        if (cmd.Itens.Sum(i => (long)i.Porcoes) > TetoPorcoesPorLote)
+            throw new UseCaseValidationException(
+                $"Limite de porcoes por lote: {TetoPorcoesPorLote} somando todos os itens (uma etiqueta por porcao).");
 
         // Antecipa a regra RDC 727 do FinalizarLote: Embalado sem peso e rejeitado antes de gravar.
         var produtoIds = cmd.Itens.Select(i => i.ProdutoId).Distinct().ToList();

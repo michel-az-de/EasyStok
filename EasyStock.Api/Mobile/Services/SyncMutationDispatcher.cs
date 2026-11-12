@@ -285,11 +285,23 @@ public class SyncMutationDispatcher(
     {
         if (m.Payload.ValueKind != System.Text.Json.JsonValueKind.Object)
             throw new ArgumentException("order.upsert: o payload precisa ser um objeto.");
-        var ausentes = CamposObrigatoriosDoPedido.Where(c => !m.Payload.TryGetProperty(c, out _)).ToList();
+        // #2343: campo nulo conta como ausente; tipo errado vira motivo legivel, nao NullReference/JsonException.
+        var ausentes = CamposObrigatoriosDoPedido
+            .Where(c => !m.Payload.TryGetProperty(c, out var v) || v.ValueKind is System.Text.Json.JsonValueKind.Null)
+            .ToList();
         if (ausentes.Count > 0)
             throw new ArgumentException($"order.upsert sem campos obrigatorios: {string.Join(", ", ausentes)}.");
+        ExigirTipo(m.Payload, "id", System.Text.Json.JsonValueKind.String, "texto");
+        ExigirTipo(m.Payload, "clientSnapshot", System.Text.Json.JsonValueKind.Object, "objeto");
+        ExigirTipo(m.Payload, "items", System.Text.Json.JsonValueKind.Array, "lista");
         return m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)
             ?? throw new ArgumentException("order.upsert: payload invalido.");
+    }
+
+    private static void ExigirTipo(System.Text.Json.JsonElement payload, string campo, System.Text.Json.JsonValueKind tipo, string nome)
+    {
+        if (payload.GetProperty(campo).ValueKind != tipo)
+            throw new ArgumentException($"order.upsert: campo {campo} deve ser {nome}.");
     }
 
     private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName,

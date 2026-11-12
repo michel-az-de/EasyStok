@@ -34,6 +34,12 @@ public sealed class SyncOrderUpsertIncompletoTests : IDisposable
     [Theory]
     [InlineData("{\"id\":\"o-1\"}", "clientSnapshot")]
     [InlineData("{\"clientSnapshot\":{\"name\":\"Ana\"},\"items\":[]}", "id")]
+    [InlineData("{\"id\":\"o-1\",\"clientSnapshot\":{\"name\":\"Ana\"}}", "items")]
+    [InlineData("{\"id\":\"o-1\",\"clientSnapshot\":null,\"items\":null}", "clientSnapshot")]
+    [InlineData("{\"id\":\"o-1\",\"clientSnapshot\":{\"name\":\"Ana\"},\"items\":null}", "items")]
+    [InlineData("{\"id\":5,\"clientSnapshot\":{\"name\":\"Ana\"},\"items\":[]}", "campo id deve ser texto")]
+    [InlineData("{\"id\":\"o-1\",\"clientSnapshot\":{\"name\":\"Ana\"},\"items\":\"x\"}", "campo items deve ser lista")]
+    [InlineData("{\"id\":\"o-1\",\"clientSnapshot\":\"Ana\",\"items\":[]}", "campo clientSnapshot deve ser objeto")]
     public async Task OrderUpsertIncompleto_EhRecusadoComMotivoLegivel(string payloadJson, string campo)
     {
         var payload = JsonDocument.Parse(payloadJson).RootElement.Clone();

@@ -102,6 +102,41 @@ public class RegistrarProducaoUseCaseTests
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*encontrada*");
     }
 
+    // #2343 (R2-API-7): o seq de etiqueta e global no lote; o teto vale para a soma das porcoes, nao por item.
+    [Fact]
+    public async Task SomaDasPorcoesDoLoteAcimaDoTeto_eRecusadaMesmoComItensPequenos()
+    {
+        var a = NovoProduto(TipoEmbalagem.Embalado);
+        var b = NovoProduto(TipoEmbalagem.Embalado);
+
+        var act = () => Sut().ExecuteAsync(new RegistrarProducaoCommand(
+            _empresaId, null, _dataProducao,
+            [
+                new RegistrarProducaoItemInput(a.Id, Porcoes: 6_000, PesoPorPorcaoG: 500, ValidadeDias: 5, CustoUnitario: 12m),
+                new RegistrarProducaoItemInput(b.Id, Porcoes: 6_000, PesoPorPorcaoG: 500, ValidadeDias: 5, CustoUnitario: 12m),
+            ]));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*porcoes*");
+    }
+
+    [Fact]
+    public async Task LojaExistenteNaEmpresa_NaoEhRecusada()
+    {
+        var produto = NovoProduto(TipoEmbalagem.Embalado);
+        var lojaId = Guid.NewGuid();
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(_empresaId, lojaId).Returns(EasyStock.Domain.Entities.Loja.Criar(_empresaId, "Centro"));
+        _loteRepo.FindByCodigoAsync(_empresaId, Arg.Any<string>()).Returns(_ => _loteGravado);
+
+        var ex = await Record.ExceptionAsync(() => Sut(lojas: lojas).ExecuteAsync(new RegistrarProducaoCommand(
+            _empresaId, lojaId, _dataProducao,
+            [new RegistrarProducaoItemInput(produto.Id, Porcoes: 2, PesoPorPorcaoG: 500, ValidadeDias: 5, CustoUnitario: 12m)])));
+
+        // A loja existe: a validacao passa (o que vier depois, como a configuracao da loja, nao e deste teste).
+        (ex is UseCaseValidationException { Message: var msg } && msg.Contains("encontrada")).Should().BeFalse();
+        await lojas.Received(1).GetByIdAsync(_empresaId, lojaId);
+    }
+
     [Fact]
     public async Task CriaLoteEEstoqueNaMesmaTransacao()
     {

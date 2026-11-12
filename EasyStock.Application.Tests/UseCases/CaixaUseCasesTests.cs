@@ -55,6 +55,22 @@ public class CaixaUseCasesTests
     }
 
     [Fact]
+    public async Task AbrirCaixa_LojaExistenteNaEmpresa_NaoEhRecusada()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(empresaId, lojaId).Returns(EasyStock.Domain.Entities.Loja.Criar(empresaId, "Centro"));
+        var useCase = new AbrirCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<AbrirCaixaUseCase>>(), null, lojas);
+
+        var ex = await Record.ExceptionAsync(() => useCase.ExecuteAsync(new AbrirCaixaCommand(empresaId, 100m, LojaId: lojaId)));
+
+        (ex is UseCaseValidationException { Message: var msg } && msg.Contains("encontrada")).Should().BeFalse();
+        await lojas.Received(1).GetByIdAsync(empresaId, lojaId);
+    }
+
+    [Fact]
     public async Task AbrirCaixa_DeveLancarValidation_QuandoSaldoInicialNegativo()
     {
         var useCase = new AbrirCaixaUseCase(_repo, _uow,
