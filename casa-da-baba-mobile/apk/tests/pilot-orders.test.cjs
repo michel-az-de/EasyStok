@@ -28,6 +28,7 @@ function fixture(orders = [], pilot = true) {
         return null;
       } },
     updatePedidosTabBadge() {}, escapeHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
+    jsString: value => ctx.escapeHtml(JSON.stringify(String(value == null ? '' : value))),
     getConferStatus: () => 'pendente', CONFER_STATUS: { PENDENTE: 'pendente' }, conferStatusLabel: value => value,
     safeRefDisplay: value => value || '', money: value => 'R$ ' + value, timeOf: () => '10:30', renderProgressDots: () => '',
     renderScheduledBadge: value => '<span class="scheduled">' + value + '</span>', channelLabel: value => value,
@@ -100,7 +101,7 @@ test('card APK preserva avisos, ações, segurança dos textos e filtro de quant
   assert.doesNotMatch(card, /Conferência|openConfer|openCestaCalc/); assert.match(card, /pilot-order-meta/); assert.match(card, /10:30/);
   assert.match(card, /&lt;img>/); assert.match(card, /&lt;script>/); assert.match(card, /&lt;faltou>/); assert.match(card, /&lt;canal>/);
   assert.doesNotMatch(card, /invisivel|class="apt"|class="k-time"/);
-  for (const handler of ['advanceOrder', 'openCobranca', 'printEtiqueta', 'openHistorico', 'cancelOrder']) assert.ok(card.includes(handler + "('a')"));
+  for (const handler of ['advanceOrder', 'openCobranca', 'printEtiqueta', 'openHistorico', 'cancelOrder']) assert.ok(card.includes(handler + "(&quot;a&quot;)"));
 });
 test('card de total zero não oferece cobrança e metadados ausentes não criam slots vazios', () => {
   const o = order('', 'pronto', 0); o.total = 0; const f = fixture([o]); f.ctx.renderKanban();

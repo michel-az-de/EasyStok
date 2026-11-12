@@ -8411,7 +8411,7 @@ body.ux-calm [data-screen="producao"] .section-label {
         <h4>Catálogo de produtos</h4>
         <p class="hint">Cadastre, edite ou arquive produtos sem afetar pedidos e lotes antigos.</p>
         <div id="catalogList" class="catalog-list"></div>
-        <button class="btn-ajustes-printer primary-soft" onclick="closeAjustes(); openProductModal()">+ Novo produto</button>
+        <button class="btn-ajustes-printer primary-soft" onclick="if (closeAjustes() !== false) openProductModal()">+ Novo produto</button>
       </div>
 
       <div class="ajustes-section" data-group="manut">
@@ -8441,7 +8441,7 @@ body.ux-calm [data-screen="producao"] .section-label {
         <h4>🩺 Diagnóstico</h4>
         <p class="hint">Estado completo do app: sync, storage, integridade, impressora, câmera. Útil quando algo parece travado — copie o relatório e mande pra suporte.</p>
         <div class="ajustes-actions-stack">
-          <button class="btn-ajustes-printer" onclick="closeAjustes(); openDiagnostics()">Abrir diagnóstico</button>
+          <button class="btn-ajustes-printer" onclick="if (closeAjustes() !== false) openDiagnostics()">Abrir diagnóstico</button>
         </div>
       </div>
 
@@ -11970,12 +11970,12 @@ function renderShoppingList() {
   }
   list.innerHTML = rows.map(r => `
     <div class="shop-row${r.done ? ' done' : ''}">
-      <button class="check" onclick="toggleShop('${escapeHtml(r.id)}')" aria-label="Marcar item">
+      <button class="check" onclick="toggleShop(${jsString(r.id)})" aria-label="Marcar item">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
       <div class="name-field">${escapeHtml(r.name)}</div>
       <div class="meta">${r.done ? '✓ ' + timeOf(r.doneAt || r.createdAt) : timeOf(r.createdAt)}</div>
-      <button class="shop-del" onclick="removeShopItem('${escapeHtml(r.id)}')" aria-label="Remover">×</button>
+      <button class="shop-del" onclick="removeShopItem(${jsString(r.id)})" aria-label="Remover">×</button>
     </div>
   `).join('');
 }
@@ -12153,7 +12153,7 @@ function renderOpenCashDaysBanner() {
         <div class="od-date">${escapeHtml(fmtDateKey(k))}</div>
         <div class="od-meta">${movs} movimento(s) · saldo ${money(sum.balance)}</div>
       </div>
-      <button class="od-btn" onclick="openCashCloseModal('${k}')">Fechar</button>
+      <button class="od-btn" onclick="openCashCloseModal(${jsString(k)})">Fechar</button>
     </div>`;
   }).join('');
   const moreHint = days.length > 5 ? `<div style="font-size:11px;color:var(--ink-mute);margin-top:6px">+ ${days.length - 5} dia(s) anteriores também em aberto</div>` : '';
@@ -12236,8 +12236,8 @@ function renderOpenOrders() {
         : `advanceOrder('${o.id}')`;
       const secondaryActions = calm
         ? `<button class="open-full" onclick="go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)">Abrir</button>`
-        : `${pedidoQuitado(o) ? '' : `<button onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>`}
-          <button onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Etiqueta</button>`;
+        : `${pedidoQuitado(o) ? '' : `<button onclick="openCobranca(${jsString(o.id)})" title="Preparar cobrança">Preparar cobrança</button>`}
+          <button onclick="printEtiqueta(${jsString(o.id)})" title="Imprimir etiqueta">Etiqueta</button>`;
       card.innerHTML = `
         <div class="home-order-top">
           <div class="home-order-who">
@@ -12248,7 +12248,7 @@ function renderOpenOrders() {
         </div>
         <div class="home-order-items">${itemsLine || '<span style="font-style:italic;color:var(--ink-mute)">sem itens estruturados</span>'}</div>
         <div class="home-order-actions">
-          ${advanceLabel ? `<button class="primary" onclick="${advanceClick}">${advanceLabel}</button>` : `<button class="primary" onclick="openHistorico('${o.id}')">Abrir</button>`}
+          ${advanceLabel ? `<button class="primary" onclick="${advanceClick}">${advanceLabel}</button>` : `<button class="primary" onclick="openHistorico(${jsString(o.id)})">Abrir</button>`}
           ${secondaryActions}
         </div>
       `;
@@ -12634,16 +12634,16 @@ function renderProductGrid() {
           </div>
         </div>
         <div class="qty-controls">
-          <button class="qty-btn minus" ${p.count <= 0 ? 'disabled' : ''} onclick="event.stopPropagation(); decProduct('${p.id}')" aria-label="Diminuir">−</button>
+          <button class="qty-btn minus" ${p.count <= 0 ? 'disabled' : ''} onclick="event.stopPropagation(); decProduct(${jsString(p.id)})" aria-label="Diminuir">−</button>
           <span class="qty-readout">${p.count || 0}</span>
-          <button class="qty-btn plus" onclick="event.stopPropagation(); incProduct('${p.id}')" aria-label="Aumentar">+</button>
+          <button class="qty-btn plus" onclick="event.stopPropagation(); incProduct(${jsString(p.id)})" aria-label="Aumentar">+</button>
         </div>
         <div class="prod-tile-actions">
-          <button class="prod-tile-action" onclick="event.stopPropagation(); openProductModalForEdit('${p.id}')">Editar</button>
-          <button class="prod-tile-action danger" onclick="event.stopPropagation(); archiveProduct('${p.id}')">Excluir</button>
+          <button class="prod-tile-action" onclick="event.stopPropagation(); openProductModalForEdit(${jsString(p.id)})">Editar</button>
+          <button class="prod-tile-action danger" onclick="event.stopPropagation(); archiveProduct(${jsString(p.id)})">Excluir</button>
         </div>
         <div class="pcount">${p.count}</div>
-        <button class="camera-btn${hasPhoto}" onclick="event.stopPropagation(); pickPhotoFor('${p.id}')" aria-label="Foto">
+        <button class="camera-btn${hasPhoto}" onclick="event.stopPropagation(); pickPhotoFor(${jsString(p.id)})" aria-label="Foto">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </button>
       `;
@@ -13324,12 +13324,12 @@ function renderHistoricoScreen() {
       if (batch) {
         const btns = [];
         if (!batch.deleted) {
-          btns.push(`<button class="hist-action" onclick="reprintFromBatchId('${e.entityId}')"><span data-op-icon="printer" aria-hidden="true">🖨️</span> Reimprimir</button>`);
-          btns.push(`<button class="hist-action" onclick="openBatchDetails('${e.entityId}')"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
-          btns.push(`<button class="hist-action danger" onclick="deleteBatch('${e.entityId}')"><span data-op-icon="lixeira" aria-hidden="true">🗑️</span> Excluir lote</button>`);
+          btns.push(`<button class="hist-action" onclick="reprintFromBatchId(${jsString(e.entityId)})"><span data-op-icon="printer" aria-hidden="true">🖨️</span> Reimprimir</button>`);
+          btns.push(`<button class="hist-action" onclick="openBatchDetails(${jsString(e.entityId)})"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
+          btns.push(`<button class="hist-action danger" onclick="deleteBatch(${jsString(e.entityId)})"><span data-op-icon="lixeira" aria-hidden="true">🗑️</span> Excluir lote</button>`);
         } else {
-          btns.push(`<button class="hist-action" onclick="restoreBatch('${e.entityId}')"><span data-op-icon="undo-2" aria-hidden="true">↩️</span> Recuperar lote</button>`);
-          btns.push(`<button class="hist-action" onclick="openBatchDetails('${e.entityId}')"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
+          btns.push(`<button class="hist-action" onclick="restoreBatch(${jsString(e.entityId)})"><span data-op-icon="undo-2" aria-hidden="true">↩️</span> Recuperar lote</button>`);
+          btns.push(`<button class="hist-action" onclick="openBatchDetails(${jsString(e.entityId)})"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
         }
         actions = `<div class="mov-actions">${btns.join('')}</div>`;
       }
@@ -13698,8 +13698,8 @@ function renderCashDetails() {
       const color = e.type === 'expense' ? 'var(--accent)' : 'var(--basil)';
       const time = new Date(e.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
       const acoes = closed ? ''
-        : `<button class="fin-action" onclick="openCashModal('${e.id}')" aria-label="Editar lançamento" title="Editar">✏️</button>
-           <button class="fin-action danger" onclick="deleteCashEntry('${e.id}')" aria-label="Excluir lançamento" title="Excluir">🗑️</button>`;
+        : `<button class="fin-action" onclick="openCashModal(${jsString(e.id)})" aria-label="Editar lançamento" title="Editar">✏️</button>
+           <button class="fin-action danger" onclick="deleteCashEntry(${jsString(e.id)})" aria-label="Excluir lançamento" title="Excluir">🗑️</button>`;
       return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-elev);border-radius:10px">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700">${escapeHtml(e.description)}</div>
@@ -13783,8 +13783,8 @@ function renderFinalizadosScreen() {
       ? '<span class="fin-badge entregue">Entregue</span>'
       : '<span class="fin-badge cancelado">Cancelado</span>';
     const acoes = o.status === STATUS.ENTREGUE
-      ? `<button class="fin-action danger" onclick="cancelOrder('${o.id}')">Cancelar</button>`
-      : `<button class="fin-action danger" onclick="purgeOrderRecord('${o.id}')">Excluir do registro</button>`;
+      ? `<button class="fin-action danger" onclick="cancelOrder(${jsString(o.id)})">Cancelar</button>`
+      : `<button class="fin-action danger" onclick="purgeOrderRecord(${jsString(o.id)})">Excluir do registro</button>`;
     return `<div class="fin-card ${o.status}">
       <div class="fin-row">
         <div class="fin-info">
@@ -13795,7 +13795,7 @@ function renderFinalizadosScreen() {
         ${statusBadge}
       </div>
       <div class="fin-actions">
-        <button class="fin-action" onclick="openHistorico('${o.id}')">Ver detalhes</button>
+        <button class="fin-action" onclick="openHistorico(${jsString(o.id)})">Ver detalhes</button>
         ${acoes}
       </div>
     </div>`;
@@ -14459,7 +14459,7 @@ function renderKanban() {
     const selected = KANBAN_COLS.find(col => col.key === pilotOrderStatus) || KANBAN_COLS[0];
     const list = byStatus[selected.key];
     root.innerHTML = `<div class="pilot-order-filters" role="group" aria-label="Etapas dos pedidos">${KANBAN_COLS.map(col =>
-      `<button type="button" data-order-status="${col.key}" aria-pressed="${col.key === selected.key}" onclick="selectPilotOrderStatus('${col.key}')"><span>${col.label}</span><strong>${byStatus[col.key].length}</strong></button>`).join('')}</div>`
+      `<button type="button" data-order-status="${col.key}" aria-pressed="${col.key === selected.key}" onclick="selectPilotOrderStatus(${jsString(col.key)})"><span>${col.label}</span><strong>${byStatus[col.key].length}</strong></button>`).join('')}</div>`
       + `<div class="pilot-order-list" aria-label="Pedidos: ${selected.label}">${list.length
         ? list.map(o => renderKanbanCard(o, selected)).join('')
         : `<div class="pilot-order-empty">${openItems.length ? 'Nenhum pedido nesta etapa.' : 'Nenhum pedido em aberto.'}</div>`}</div>`;
@@ -14468,7 +14468,7 @@ function renderKanban() {
 
   const overview = `
     <div class="kanban-overview" aria-label="Resumo da esteira">
-      ${KANBAN_COLS.map(col => `<button type="button" data-kjump="${col.key}" onclick="jumpKanban('${col.key}')"><strong>${byStatus[col.key].length}</strong><span>${col.label}</span></button>`).join('')}
+      ${KANBAN_COLS.map(col => `<button type="button" data-kjump="${col.key}" onclick="jumpKanban(${jsString(col.key)})"><strong>${byStatus[col.key].length}</strong><span>${col.label}</span></button>`).join('')}
     </div>`;
 
   root.innerHTML = overview + KANBAN_COLS.map(col => {
@@ -14554,18 +14554,18 @@ function renderKanbanCard(o, col) {
       <div class="k-progress">${renderProgressDots(o.status, { small: true, showLabel: false })}</div>
       <div class="k-foot">
         <div class="k-primary-actions">
-          <button type="button" class="k-advance" onclick="advanceOrder('${o.id}')">${pilot ? (o.status === 'pronto' ? 'Entregar' : o.status === 'preparando' ? 'Finalizar' : 'Preparar') : o.status === 'pronto' ? 'Conferir entrega' : col.next}</button>
+          <button type="button" class="k-advance" onclick="advanceOrder(${jsString(o.id)})">${pilot ? (o.status === 'pronto' ? 'Entregar' : o.status === 'preparando' ? 'Finalizar' : 'Preparar') : o.status === 'pronto' ? 'Conferir entrega' : col.next}</button>
         </div>
         <div class="k-support-actions">
-          ${(Number(o.total) || 0) > 0 && !pedidoQuitado(o) ? `<button type="button" class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>` : ''}
+          ${(Number(o.total) || 0) > 0 && !pedidoQuitado(o) ? `<button type="button" class="btn-cobrar" onclick="openCobranca(${jsString(o.id)})" title="Preparar cobrança">Preparar cobrança</button>` : ''}
           <details class="k-more-actions">
             <summary aria-label="Mais ações do pedido ${escapeHtml((o.id || '').slice(-8))}">Mais ações</summary>
             <div class="k-secondary-actions">
-              ${!pilot ? `<button type="button" class="k-confer-btn" onclick="openConfer('${o.id}')" title="Conferência">${conferBtnLabel}</button>` : ''}
-              ${!pilot && (o.status === 'aguardando' || o.status === 'preparando') ? `<button type="button" class="k-confer-btn" onclick="openCestaCalcFromOrder('${o.id}')" title="Conferir insumos">Insumos</button>` : ''}
-              <button type="button" class="btn-imprimir" onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Imprimir etiqueta</button>
-              <button type="button" class="btn-historico" onclick="openHistorico('${o.id}')" title="Histórico">Histórico</button>
-              <button type="button" class="k-cancel" onclick="cancelOrder('${o.id}')">Cancelar pedido</button>
+              ${!pilot ? `<button type="button" class="k-confer-btn" onclick="openConfer(${jsString(o.id)})" title="Conferência">${conferBtnLabel}</button>` : ''}
+              ${!pilot && (o.status === 'aguardando' || o.status === 'preparando') ? `<button type="button" class="k-confer-btn" onclick="openCestaCalcFromOrder(${jsString(o.id)})" title="Conferir insumos">Insumos</button>` : ''}
+              <button type="button" class="btn-imprimir" onclick="printEtiqueta(${jsString(o.id)})" title="Imprimir etiqueta">Imprimir etiqueta</button>
+              <button type="button" class="btn-historico" onclick="openHistorico(${jsString(o.id)})" title="Histórico">Histórico</button>
+              <button type="button" class="k-cancel" onclick="cancelOrder(${jsString(o.id)})">Cancelar pedido</button>
             </div>
           </details>
         </div>
@@ -15217,8 +15217,8 @@ function renderCatalogList() {
     ].filter(Boolean).join(' · ');
     const archivedTag = p.archived ? ' <span style="color:#e87a7a">(arquivado)</span>' : '';
     const archiveBtn = p.archived
-      ? `<button class="cat-btn" title="Restaurar" aria-label="Restaurar produto ${escapeHtml(p.name)}" onclick="restoreProduct('${p.id}')">↺</button>`
-      : `<button class="cat-btn danger" title="Arquivar" aria-label="Arquivar produto ${escapeHtml(p.name)}" onclick="archiveProduct('${p.id}')">🗑️</button>`;
+      ? `<button class="cat-btn" title="Restaurar" aria-label="Restaurar produto ${escapeHtml(p.name)}" onclick="restoreProduct(${jsString(p.id)})">↺</button>`
+      : `<button class="cat-btn danger" title="Arquivar" aria-label="Arquivar produto ${escapeHtml(p.name)}" onclick="archiveProduct(${jsString(p.id)})">🗑️</button>`;
     return `
       <div class="cat-row">
         <div class="cat-emoji">${p.emoji || '📦'}</div>
@@ -15227,7 +15227,7 @@ function renderCatalogList() {
           <div class="cat-meta">${escapeHtml(meta)}</div>
         </div>
         <div class="cat-actions">
-          <button class="cat-btn" title="Editar" aria-label="Editar produto ${escapeHtml(p.name)}" onclick="closeAjustes(); openProductModalForEdit('${p.id}')">✏️</button>
+          <button class="cat-btn" title="Editar" aria-label="Editar produto ${escapeHtml(p.name)}" onclick="if (closeAjustes() !== false) openProductModalForEdit(${jsString(p.id)})">✏️</button>
           ${archiveBtn}
         </div>
       </div>
@@ -16171,6 +16171,8 @@ function unpairDevice() {
   if (!confirm('Desparear este dispositivo?\n\nApós desparear o app não vai conseguir sincronizar até parear de novo.')) return;
   if (window.cdbSync && typeof window.cdbSync.clearPairing === 'function') {
     window.cdbSync.clearPairing();
+    // #2401: o render de etiqueta autenticado fica no cache do SW; sai junto com o pareamento.
+    try { if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'LOGOUT_CLEAR' }); } catch (_) {}
     showToast('Dispositivo despareado');
     if (typeof openDiagnostics === 'function') openDiagnostics();
   }
@@ -17049,7 +17051,7 @@ function openMapsPedidoRef(ref) {
 // Compat com botao existente em Ajustes > Equipamento.
 // Antes era alert(); agora abre o modal completo (operador encontra a
 // secao Impressora rolando, mas tambem ve o resto do estado do app).
-function printerDiagnostics() { if (window.CDB_CONFIG?.isPilot) closeAjustes(); openDiagnostics(); }
+function printerDiagnostics() { if (window.CDB_CONFIG?.isPilot) if (closeAjustes() !== false) openDiagnostics(); }
 
 // Step logger persistente — sobrevive a native crash (JNI), permite ver
 // onde o app morreu reabrindo Ajustes > Diagnóstico apos restart.
@@ -17584,9 +17586,10 @@ function openConferProducao(batchId, idxStr) {
 
   // Foto se houver
   const photoWrap = document.getElementById('conferProdPhoto');
-  if (et.photo) {
+  const fotoSegura = et.photo ? safePhotoUrl(et.photo) : '';
+  if (fotoSegura) {
     photoWrap.style.display = 'block';
-    photoWrap.innerHTML = '<img src="' + et.photo + '" alt="Foto" style="max-width:100%;max-height:180px;object-fit:contain;border:1px solid var(--line);border-radius:8px"/>';
+    photoWrap.innerHTML = '<img src="' + escapeHtml(fotoSegura) + '" alt="Foto" style="max-width:100%;max-height:180px;object-fit:contain;border:1px solid var(--line);border-radius:8px"/>';
   } else {
     photoWrap.style.display = 'none';
   }
@@ -18175,7 +18178,7 @@ function batchCardHtml(batch) {
       <span class="u-idx">${escapeHtml(et.idxStr)}</span>
       <span style="flex:1;font-size:13px">${escapeHtml(et.codigoBarras)}</span>
       ${statusBadge}
-      <button class="u-action" onclick="event.stopPropagation();openConferProducao('${batch.id}','${et.idxStr}')">${actionLabel}</button>
+      <button class="u-action" onclick="event.stopPropagation();openConferProducao(${jsString(batch.id)},${jsString(et.idxStr)})">${actionLabel}</button>
     </div>`;
   }).join('');
   const isDiscarded = !!batch.discarded;
@@ -18186,23 +18189,23 @@ function batchCardHtml(batch) {
       : `<span class="u-status conferido">Aberto</span>`;
   // #441 — botao Descartar/Reverter em todas as acoes
   const discardBtn = isDiscarded
-    ? `<button class="batch-action" onclick="event.stopPropagation();revertBatchDiscard('${batch.id}')">↩ Reverter</button>`
-    : `<button class="batch-action" style="color:var(--accent)" onclick="event.stopPropagation();openBatchDiscardModal('${batch.id}')"><span data-op-icon="lixeira" aria-hidden="true">⛔</span> Descartar</button>`;
+    ? `<button class="batch-action" onclick="event.stopPropagation();revertBatchDiscard(${jsString(batch.id)})">↩ Reverter</button>`
+    : `<button class="batch-action" style="color:var(--accent)" onclick="event.stopPropagation();openBatchDiscardModal(${jsString(batch.id)})"><span data-op-icon="lixeira" aria-hidden="true">⛔</span> Descartar</button>`;
   const actionsHtml = isDiscarded ? `
     <div class="batch-actions closed-actions">
       <span style="font-size:12px;color:var(--ink-mute);flex:1">${escapeHtml(batch.discardReason || 'descartado')}</span>
       ${discardBtn}
     </div>` : isClosed ? `
     <div class="batch-actions closed-actions">
-      <button class="batch-action primary" onclick="event.stopPropagation();toggleBatchStatus('${batch.id}')">Reabrir</button>
-      <button class="batch-action info" onclick="event.stopPropagation();openBatchHistory('${batch.id}')">Histórico</button>
-      <button class="batch-action" onclick="event.stopPropagation();openBatchDetails('${batch.id}')">Detalhes</button>
+      <button class="batch-action primary" onclick="event.stopPropagation();toggleBatchStatus(${jsString(batch.id)})">Reabrir</button>
+      <button class="batch-action info" onclick="event.stopPropagation();openBatchHistory(${jsString(batch.id)})">Histórico</button>
+      <button class="batch-action" onclick="event.stopPropagation();openBatchDetails(${jsString(batch.id)})">Detalhes</button>
       ${discardBtn}
     </div>` : `
     <div class="batch-actions">
-      <button class="batch-action primary" onclick="event.stopPropagation();appendProductionToBatch('${batch.id}')">+ Produção</button>
-      <button class="batch-action info" onclick="event.stopPropagation();editBatchFlow('${batch.id}')">Editar</button>
-      <button class="batch-action" onclick="event.stopPropagation();toggleBatchStatus('${batch.id}')">Fechar</button>
+      <button class="batch-action primary" onclick="event.stopPropagation();appendProductionToBatch(${jsString(batch.id)})">+ Produção</button>
+      <button class="batch-action info" onclick="event.stopPropagation();editBatchFlow(${jsString(batch.id)})">Editar</button>
+      <button class="batch-action" onclick="event.stopPropagation();toggleBatchStatus(${jsString(batch.id)})">Fechar</button>
       ${discardBtn}
     </div>`;
   return `<div class="batch-card${isClosed ? ' closed' : ''}" id="bc-${batch.id}">
@@ -19374,8 +19377,8 @@ function openBatchDetails(batchId) {
       </div>
     </div>
     <div class="detail-actions">
-      <button class="hist-action" onclick="reprintFromBatchId('${batch.id}')">Reimprimir</button>
-      <button class="hist-action danger" onclick="deleteBatch('${batch.id}')">Excluir</button>
+      <button class="hist-action" onclick="reprintFromBatchId(${jsString(batch.id)})">Reimprimir</button>
+      <button class="hist-action danger" onclick="deleteBatch(${jsString(batch.id)})">Excluir</button>
       <button class="hist-action" onclick="go('estoque'); setStockFilter('batch'); closeBatchDetails()">Ir ao estoque</button>
     </div>
   `;
@@ -19400,7 +19403,7 @@ function conferRowHtml(o) {
       <div class="cr-name">${escapeHtml(cliente)}${escapeHtml(ref)}</div>
       <div class="cr-meta">${escapeHtml(meta)}</div>
     </div>
-    <button class="cr-action" onclick="openConfer('${o.id}')">${status === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Ver'}</button>
+    <button class="cr-action" onclick="openConfer(${jsString(o.id)})">${status === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Ver'}</button>
   </div>`;
 }
 function onConferScreenInput() {
@@ -22207,7 +22210,7 @@ function renderSelectedClient() {
             return n ? ' · ' + n + ' ' + (n === 1 ? 'pedido' : 'pedidos') : '';
           })()}</div>
         </div>
-        <button class="cp-edit" onclick="openClientModal({editId: '${c.id}'})" title="Editar cliente" aria-label="Editar">
+        <button class="cp-edit" onclick="openClientModal({editId: ${jsString(c.id)}})" title="Editar cliente" aria-label="Editar">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/></svg>
         </button>
         <button class="cp-clear" onclick="clearClient()">&times;</button>
@@ -23139,7 +23142,7 @@ function renderFormaPills(hostId, selected, onPick) {
   if (!host) return;
   host.innerHTML = FORMAS_PAGAMENTO.map(f =>
     `<button type="button" class="forma-pill${f.key === selected ? ' active' : ''}" role="radio"` +
-    ` aria-checked="${f.key === selected}" onclick="${onPick}('${f.key}')">${f.label}</button>`
+    ` aria-checked="${f.key === selected}" onclick="${onPick}(${jsString(f.key)})">${f.label}</button>`
   ).join('');
 }
 
@@ -23844,8 +23847,8 @@ window.cdbApp = {
 
 <script src="qrcode.min.js?v=20260429a"></script>
 <script src="etiqueta-termica.js?v=20261112a"></script>
-<script src="impressao-papeis.js?v=20261104b"></script>
-<script src="impressoras.js?v=20261105b"></script>
+<script src="impressao-papeis.js?v=20261112b"></script>
+<script src="impressoras.js?v=20261112b"></script>
 <script src="etiqueta-resolver.js?v=20261112a"></script>
 <script src="etiqueta-canvas.js?v=20261112a"></script>
 <script>
@@ -23858,7 +23861,7 @@ window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.carregarFonte({ base: '
 <script src="impressora-tspl.js?v=20261112a"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
-<script src="upload-photos.js?v=20260514b"></script>
+<script src="upload-photos.js?v=20261112b"></script>
 <script src="sync.js?v=20261112a"></script>
 <script>
 // LiveUpdater (@capgo/capacitor-updater): notifica que o bundle subiu OK.
@@ -24534,7 +24537,7 @@ document.addEventListener('DOMContentLoaded', function () {
   </div>
 </div>
 
-<script type="module" src="etiqueta/imprimir.js?v=2"></script>
+<script type="module" src="etiqueta/imprimir.js?v=20261112b"></script>
 
 <!-- ── Editor visual de etiquetas (F5) ──────────────────────────────────── -->
 <link rel="stylesheet" href="etiqueta/editor/editor.css">

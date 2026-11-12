@@ -102,15 +102,15 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
       const details = html.match(/<details class="k-more-actions">([\s\S]*?)<\/details>/);
       assert.ok(details, 'ações secundárias ficam em disclosure nativo');
       const visible = html.slice(0, details.index);
-      assert.match(visible, new RegExp(`onclick="advanceOrder\\('pedido-densidade'\\)">${expected}</button>`));
-      assert.match(visible, /onclick="openCobranca\('pedido-densidade'\)"/);
+      assert.match(visible, new RegExp(`onclick="advanceOrder\\(&quot;pedido-densidade&quot;\\)">${expected}</button>`));
+      assert.match(visible, /onclick="openCobranca\(&quot;pedido-densidade&quot;\)"/);
       assert.match(visible, /Conf\. pendente/, 'conferência pendente continua visível sem abrir o menu');
       for (const handler of ['openConfer', 'printEtiqueta', 'openHistorico', 'cancelOrder']) {
-        assert.ok(details[1].includes(`${handler}('pedido-densidade')`), handler + ' permanece disponível');
-        assert.ok(!visible.includes(`${handler}('pedido-densidade')`), handler + ' não compete com a próxima etapa');
+        assert.ok(details[1].includes(`${handler}(&quot;pedido-densidade&quot;)`), handler + ' permanece disponível');
+        assert.ok(!visible.includes(`${handler}(&quot;pedido-densidade&quot;)`), handler + ' não compete com a próxima etapa');
       }
       assert.match(details[1], />Cancelar pedido<\/button>/, 'cancelamento tem rótulo explícito');
-      assert.strictEqual(details[1].includes("openCestaCalcFromOrder('pedido-densidade')"), status !== 'pronto');
+      assert.strictEqual(details[1].includes("openCestaCalcFromOrder(&quot;pedido-densidade&quot;)"), status !== 'pronto');
     }
   });
 
@@ -121,8 +121,8 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     }, { key: 'aguardando', label: 'Aguardando', next: 'Iniciar preparo' });`);
     assert.ok(!html.includes('openCobranca('));
     assert.match(html, /<summary aria-label="Mais ações do pedido ido-zero">Mais ações<\/summary>/);
-    assert.match(html, /onclick="advanceOrder\('pedido-zero'\)"/);
-    assert.match(html, /onclick="cancelOrder\('pedido-zero'\)"/);
+    assert.match(html, /onclick="advanceOrder\(&quot;pedido-zero&quot;\)"/);
+    assert.match(html, /onclick="cancelOrder\(&quot;pedido-zero&quot;\)"/);
   });
 
   // #2307: pedido quitado no console ou no Mercado Pago nao oferece cobranca de novo.
@@ -141,13 +141,13 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
 
   test('actions: pedido com sinal mostra quanto falta e mantém a cobrança', () => {
     const html = cardPago(20.9);
-    assert.match(html, /onclick="openCobranca\('pedido-pago'\)"/);
+    assert.match(html, /onclick="openCobranca\(&quot;pedido-pago&quot;\)"/);
     assert.match(html, /Falta R\$\s?20,90/);
   });
 
   test('actions: pedido sem aReceber (servidor antigo) segue como hoje', () => {
     const html = cardPago('undefined');
-    assert.match(html, /onclick="openCobranca\('pedido-pago'\)"/);
+    assert.match(html, /onclick="openCobranca\(&quot;pedido-pago&quot;\)"/);
     assert.ok(!html.includes('>Pago</span>'));
   });
 };
