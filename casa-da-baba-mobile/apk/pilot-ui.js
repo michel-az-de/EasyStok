@@ -31,7 +31,7 @@
     '+ Novo pedido': 'Novo pedido', 'Criar pedido': 'Novo pedido',
     'Cadastrar produto': 'Cadastrar', 'Cadastrar cliente': 'Cadastrar',
     'Criar e usar': 'Etiquetar', 'Criar e adicionar': 'Adicionar',
-    'Salvar produto': 'Salvar', 'Salvar pedido': 'Salvar', 'Salvar PNG': 'Salvar',
+    'Salvar produto': 'Salvar', 'Salvar cliente': 'Salvar', 'Salvar pedido': 'Salvar', 'Salvar PNG': 'Salvar',
     'Confirmar e abrir etiquetas': 'Etiquetar', 'Conferir produção': 'Produzir',
     'Iniciar preparo': 'Preparar', 'Marcar pronto': 'Pronto', 'Conferir entrega': 'Entregar',
     'Preparar cobrança': 'Cobrar',
