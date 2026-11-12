@@ -11241,26 +11241,8 @@ function _buildAttentionItemsImpl() {
   try {
     const now = Date.now();
 
-    // 1. CAIXA DE DIA ANTERIOR EM ABERTO — severidade ERR (urgente: regulariza
-    // antes de fechar mais um dia em cima).
-    if (typeof getOpenPriorDays === 'function') {
-      const priorDays = getOpenPriorDays();
-      if (priorDays.length) {
-        const dayList = priorDays.slice(0, 2).map(k => typeof fmtDateKey === 'function' ? fmtDateKey(k) : k).join(', ');
-        items.push({
-          kind: 'cash-prior',
-          severity: 'err',
-          icon: '🔓',
-          title: 'Caixa de dia anterior aberto',
-          reason: priorDays.length === 1
-            ? 'Dia ' + dayList + ' ainda nao foi fechado'
-            : priorDays.length + ' dias em aberto: ' + dayList + (priorDays.length > 2 ? '…' : ''),
-          count: priorDays.length,
-          cta: 'Caixa',
-          action: function () { go('caixa'); }
-        });
-      }
-    }
+    // 1. #2319: sem "Fechar caixa" no PWA, o card de caixa de dia anterior em
+    // aberto levaria a uma tela sem acao. O fechamento fica no console.
 
     // 2. ESTOQUE CRITICO — mostra produtos especificos pra dar contexto util
     const lowStock = getCriticalProducts();
