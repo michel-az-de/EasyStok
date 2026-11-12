@@ -89,6 +89,23 @@ public sealed class EstoqueELotesPorLojaRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task Lote_sem_loja_aparece_na_visao_de_qualquer_loja_e_sem_lojaId_vem_a_empresa()
+    {
+        _db.Add(Lote.Criar(_empresaId, "LOT-A", lojaId: _lojaA));
+        _db.Add(Lote.Criar(_empresaId, "LOT-B", lojaId: _lojaB));
+        _db.Add(Lote.Criar(_empresaId, "LOT-SEM", lojaId: null));
+        await _db.SaveChangesAsync();
+        var repo = new LoteRepository(_db);
+
+        var (daLoja, totalLoja) = await repo.ListAsync(_empresaId, 1, 20, lojaId: _lojaA);
+        var (_, totalEmpresa) = await repo.ListAsync(_empresaId, 1, 20);
+
+        totalLoja.Should().Be(2);
+        daLoja.Select(l => l.Codigo).Should().BeEquivalentTo("LOT-A", "LOT-SEM");
+        totalEmpresa.Should().Be(3);
+    }
+
+    [Fact]
     public async Task Lotes_filtram_pela_loja()
     {
         _db.Add(Lote.Criar(_empresaId, "LOT-A", lojaId: _lojaA));

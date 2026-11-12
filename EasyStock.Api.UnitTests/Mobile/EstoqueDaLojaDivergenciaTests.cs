@@ -1,7 +1,9 @@
 using EasyStock.Api.Mobile.Controllers;
+using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Enums;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -142,6 +144,25 @@ public sealed class EstoqueDaLojaDivergenciaTests : IDisposable
         Item(null, 5);
         await _db.SaveChangesAsync();
 
+        (await Divergencias()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Venda_na_loja_baixa_item_sem_loja_e_a_divergencia_zera()
+    {
+        _db.Add(new Produto { Id = _erpProdutoId, EmpresaId = _empresaId, Nome = "Marmita", Status = StatusProduto.Ativo });
+        var p = Mobile(_lojaA, stock: 10);
+        Item(null, 10);
+        await _db.SaveChangesAsync();
+
+        // O app vende 3 e baixa seu espelho para 7; o ERP tem de baixar o mesmo 3 do item sem loja.
+        var reconciler = new MobileStockReconciler(
+            _db, new MobileSystemUserResolver(_db), NullLogger<MobileStockReconciler>.Instance);
+        (await reconciler.BaixarVendaAsync(p, 3, "pedido-1", _lojaA, "Venda")).Should().BeTrue();
+        p.Stock = 7;
+        await _db.SaveChangesAsync();
+
+        (await _db.Set<ItemEstoque>().SingleAsync()).QuantidadeAtual.Value.Should().Be(7);
         (await Divergencias()).Should().BeEmpty();
     }
 

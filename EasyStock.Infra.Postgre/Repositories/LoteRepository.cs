@@ -31,7 +31,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(l => l.Etiquetas)
                 .AsNoTracking()
                 .Where(l => l.EmpresaId == empresaId);
-            if (lojaId.HasValue) q = q.Where(l => l.LojaId == lojaId.Value);
+            // #2318: lote sem loja vale para qualquer loja da empresa (mesma regra de EstoqueDaLoja); sem lojaId, a empresa toda.
+            if (lojaId.HasValue && lojaId.Value != Guid.Empty) q = q.Where(l => l.LojaId == lojaId.Value || l.LojaId == null);
             if (!string.IsNullOrWhiteSpace(status)) q = q.Where(l => l.Status == status);
             if (desde.HasValue) q = q.Where(l => l.DataProducao >= desde.Value);
             if (ate.HasValue)   q = q.Where(l => l.DataProducao <= ate.Value);
