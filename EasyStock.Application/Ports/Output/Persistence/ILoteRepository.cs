@@ -16,7 +16,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
             DateTime? ate = null,
             string? search = null,
             string? sort = "dataproducao",
-            string? order = "desc");
+            string? order = "desc", Guid? lojaId = null);
 
         Task<int> GetNextSequencialDoDiaAsync(Guid empresaId, DateOnly data);
 

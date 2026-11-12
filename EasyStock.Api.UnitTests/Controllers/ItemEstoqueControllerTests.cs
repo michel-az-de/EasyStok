@@ -115,6 +115,23 @@ public class ItemEstoqueControllerTests
     }
 
     [Fact]
+    public async Task GetAll_DeveFiltrarPorLoja_QuandoLojaInformada()
+    {
+        // #2318 (PROD-2): sem lojaId o estoque soma as duas lojas. Com ele, o repositorio recebe a loja.
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        _itemEstoqueRepository
+            .GetItensEstoquePaginadosAsync(empresaId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<string?>(), lojaId)
+            .Returns((new List<ItemEstoque>(), 0));
+
+        var result = await _controller.GetAll(empresaId, lojaId: lojaId);
+
+        result.Should().BeOfType<OkObjectResult>();
+        await _itemEstoqueRepository.Received(1)
+            .GetItensEstoquePaginadosAsync(empresaId, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<string?>(), lojaId);
+    }
+
+    [Fact]
     public async Task GetAll_DeveRepassarTermoDeBusca_AoRepositorio()
     {
         // #454: trava o contrato de que o termo de busca chega ao repositorio. Sem isso,

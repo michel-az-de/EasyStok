@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using EasyStock.Api.Mobile.Security;
+using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Common;
@@ -121,11 +122,8 @@ public class OperationController(
 
         var divergences = linkedProducts.Count(p =>
         {
-            var item = itensEstoque.FirstOrDefault(i =>
-                i.ProdutoId == p.ErpId &&
-                (i.LojaId == null || i.LojaId == p.LojaId));
-            var erpStock = item?.QuantidadeAtual?.Value ?? 0;
-            return p.Stock != erpStock;
+            // #2318: mesma soma por (ProdutoId, LojaId) da lista de divergencias.
+            return p.Stock != EstoqueDaLojaMobile.Soma(itensEstoque, p.ErpId, p.LojaId);
         });
 
         // Produtos custom pendentes de aprovação
