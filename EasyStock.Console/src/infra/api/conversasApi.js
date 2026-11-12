@@ -52,10 +52,23 @@ export const reenviarMensagem = (conversaId, mensagemId) =>
 // Mensagens que não chegaram ao cliente, de todas as conversas (S59).
 export const listarNaoEntregues = ({ limite = 50 } = {}) => chamarApi(`${BASE}/nao-entregues?limite=${limite}`)
 
-export const assumir = (id) => chamarApi(`${BASE}/${id}/assumir`, { metodo: 'POST' })
+// ATD-1 (#2305): assumir ou transferir conversa de outra atendente pede confirmação. A API responde 409
+// CONVERSA_DE_OUTRA; a dona confirma aqui e a mesma ação repete com `confirmar`.
+const comConfirmacaoDeOutra = async (chamada) => {
+  try {
+    return await chamada(false)
+  } catch (erro) {
+    if (erro?.codigo !== 'CONVERSA_DE_OUTRA' || !window.confirm(erro.message)) throw erro
+    return chamada(true)
+  }
+}
+
+export const assumir = (id) => comConfirmacaoDeOutra((confirmar) =>
+  chamarApi(`${BASE}/${id}/assumir${confirmar ? '?confirmar=true' : ''}`, { metodo: 'POST' }))
 export const liberarAutomatico = (id) => chamarApi(`${BASE}/${id}/liberar-automatico`, { metodo: 'POST' })
 // #1239 (S41): passa a conversa para outro atendente da empresa.
-export const transferir = (id, paraUsuarioId) => chamarApi(`${BASE}/${id}/transferir`, { metodo: 'POST', corpo: { paraUsuarioId } })
+export const transferir = (id, paraUsuarioId) => comConfirmacaoDeOutra((confirmar) =>
+  chamarApi(`${BASE}/${id}/transferir`, { metodo: 'POST', corpo: { paraUsuarioId, confirmar } }))
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })
 export const reabrir = (id) => chamarApi(`${BASE}/${id}/reabrir`, { metodo: 'POST' })
 export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metodo: 'POST' })

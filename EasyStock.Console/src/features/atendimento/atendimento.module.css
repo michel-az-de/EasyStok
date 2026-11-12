@@ -516,7 +516,7 @@
 /* #1868: o pedido do site no fio (itens, total, endereço) se lê como documento, à esquerda,
    no corpo de apoio e com o trilho do post-it; o aviso curto segue miúdo e centralizado. */
 .sistema.sistemaPedido {
-  align-self: flex-start; max-width: min(100%, 62ch); text-align: left;
+  align-self: flex-start; max-width: min(100%, 62ch); text-align: left; white-space: pre-wrap;
   font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-corpo);
   padding: var(--e-2) var(--e-3); background: var(--papel); border: 0;
   border-left: 0; border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
