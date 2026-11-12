@@ -54,10 +54,31 @@ Veredito: a recomendação B da v1 **só se sustenta em parte**.
 | Baixo | Município e campos de retenção por tipo | Na spec (NfseAnexada) |
 | Baixo | RLS por tabela nova | Invariante 6 da spec |
 
-## Prova da v2
+## Prova da v2 (substituída pela v3)
 
 - `node prototipos/fma-erp/tests/regras.test.cjs`: 4 testes, todos passando (fluxo completo com
   retenção, cancelamento e substituta, nova versão, cancelamento de contrato).
 - Navegador: fluxo L2 → proposta → contrato → assinatura → etapa → NFS-e com retenção de R$ 82,50
   → líquido R$ 1.417,50; erros de valor, arquivo e divergência exibidos no campo; 375 px sem
   rolagem horizontal. Prints em `prints/`.
+
+## v3: reprovação do Felipe e redesenho
+
+Veredito do Felipe sobre a v2: visual quadrado e com cara de CRUD; pediu UX de verdade e integração
+com e-mail, WhatsApp e LLM. Resposta da v3:
+
+| Achado | Resposta |
+|---|---|
+| Cara de CRUD | Telas viram fila de decisão: Hoje (briefing da IA, "Pede você", caixa, "Feito sozinho"), Conversas, Negócios em kanban |
+| Visual quadrado | Raios de 12 a 32 px, sombras suaves, trilho navy com marcador mostarda, paleta FMA |
+| Sem integração | Caixa de conversas WhatsApp e e-mail, rascunho e proposta montados pela IA, automações, copiloto; tudo **simulado** e marcado como tal |
+| Acoplamento | Regras isoladas em `dominio.js` (sem DOM); `app.js` só desenha |
+
+## Prova da v3
+
+- `node prototipos/fma-erp/tests/regras.test.cjs`: 7 testes, todos passando.
+- Navegador, sem erro no console: conversa → proposta montada pela IA → envio → aceite → contrato
+  assinado ("Gama Varejo agora é cliente") → etapa aprovada gera parcela de R$ 1.200,00 → NFS-e sem
+  arquivo recusada ("Anexe o XML e o PDF da NFS-e.") → retenção de R$ 82,50 → líquido R$ 1.117,50 →
+  cobrança Pix simulada → recebido.
+- 375 px sem rolagem horizontal em todas as telas. Prints `01` a `09` em `prints/`.
