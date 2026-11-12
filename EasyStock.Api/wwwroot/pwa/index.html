@@ -4846,7 +4846,7 @@ body.modal-open .fab { opacity: 0; pointer-events: none; }
 }
 .retroactive-fields.show { display: block; }
 .retroactive-fields label { display: block; font-size: 11px; color: var(--ink-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
-.retroactive-fields input {
+.retroactive-fields input, .retroactive-fields select {
   width: 100%; padding: 10px 12px;
   background: var(--bg-elev); border: 1px solid var(--line);
   border-radius: 8px; color: var(--ink); font-size: 14px;
@@ -7663,14 +7663,14 @@ body.ux-calm [data-screen="producao"] .section-label {
           </select>
         </div>
 
-        <button class="retroactive-toggle" id="retroToggle" onclick="toggleRetroactive()">
+        <button class="retroactive-toggle" id="retroToggle" aria-pressed="false" onclick="toggleRetroactive()">
           🕐 <span id="retroToggleLabel">Pedido já realizado? (cadastrar retroativo)</span>
         </button>
-        <button class="schedule-toggle" id="scheduleToggle" onclick="toggleAgendamento()">
+        <button class="schedule-toggle" id="scheduleToggle" aria-pressed="false" onclick="toggleAgendamento()">
           📅 <span id="scheduleToggleLabel">Agendar para depois? (entrega futura)</span>
         </button>
         <div class="retroactive-fields" id="retroFields">
-          <label>Quando aconteceu?</label>
+          <label for="retroDatetime">Quando aconteceu?</label>
           <input type="datetime-local" id="retroDatetime" />
           <label for="retroMetodo">Como foi pago?</label>
           <select id="retroMetodo">
@@ -7682,12 +7682,12 @@ body.ux-calm [data-screen="producao"] .section-label {
             <option value="transferencia">Transferência</option>
             <option value="outro">Outro</option>
           </select>
-          <div class="hint">Pedido será criado já como <b>entregue</b>, descontando do estoque sem passar pela esteira.</div>
+          <div class="hint">Pedido será registrado como <b>entregue</b>, com o pagamento informado e a baixa no estoque.</div>
         </div>
         <div class="schedule-fields" id="scheduleFields">
-          <label>Entregar em</label>
+          <label for="scheduleDatetime">Entregar em</label>
           <input type="datetime-local" id="scheduleDatetime" />
-          <div class="hint">Pedido entra na esteira como <b>aguardando</b>; aparece com badge <b>📅</b> e ordenado pela data agendada.</div>
+          <div class="hint">Pedido fica <b>aguardando</b> e aparece na lista com a data de entrega agendada.</div>
         </div>
 
         <div class="cta-row">
@@ -7747,15 +7747,15 @@ body.ux-calm [data-screen="producao"] .section-label {
         </div>
       </div>
       <div class="mov-filter" id="finFilter">
-        <button data-f="hoje" class="active" onclick="setFinFilter('hoje')">Hoje</button>
-        <button data-f="7d"   onclick="setFinFilter('7d')">7 dias</button>
-        <button data-f="30d"  onclick="setFinFilter('30d')">30 dias</button>
-        <button data-f="all"  onclick="setFinFilter('all')">Tudo</button>
+        <button data-f="hoje" class="active" aria-pressed="true" onclick="setFinFilter('hoje')">Hoje</button>
+        <button data-f="7d"   aria-pressed="false" onclick="setFinFilter('7d')">7 dias</button>
+        <button data-f="30d"  aria-pressed="false" onclick="setFinFilter('30d')">30 dias</button>
+        <button data-f="all"  aria-pressed="false" onclick="setFinFilter('all')">Tudo</button>
       </div>
       <div class="mov-filter" id="finStatus">
-        <button data-s="todos"     class="active" onclick="setFinStatus('todos')">Todos</button>
-        <button data-s="entregue"  onclick="setFinStatus('entregue')">Entregues</button>
-        <button data-s="cancelado" onclick="setFinStatus('cancelado')">Cancelados</button>
+        <button data-s="todos"     class="active" aria-pressed="true" onclick="setFinStatus('todos')">Todos</button>
+        <button data-s="entregue"  aria-pressed="false" onclick="setFinStatus('entregue')">Entregues</button>
+        <button data-s="cancelado" aria-pressed="false" onclick="setFinStatus('cancelado')">Cancelados</button>
       </div>
       <div id="finList"></div>
     </div>
@@ -13737,8 +13737,22 @@ function renderCashDetails() {
 // registro um cancelado (hard delete + audit).
 let finPeriod = 'hoje';
 let finStatusFilter = 'todos';
-function setFinFilter(p) { finPeriod = p; document.querySelectorAll('#finFilter button').forEach(b => b.classList.toggle('active', b.dataset.f === p)); renderFinalizadosScreen(); }
-function setFinStatus(s) { finStatusFilter = s; document.querySelectorAll('#finStatus button').forEach(b => b.classList.toggle('active', b.dataset.s === s)); renderFinalizadosScreen(); }
+function setFinFilter(p) {
+  finPeriod = p;
+  document.querySelectorAll('#finFilter button').forEach(b => {
+    b.classList.toggle('active', b.dataset.f === p);
+    b.setAttribute('aria-pressed', String(b.dataset.f === p));
+  });
+  renderFinalizadosScreen();
+}
+function setFinStatus(s) {
+  finStatusFilter = s;
+  document.querySelectorAll('#finStatus button').forEach(b => {
+    b.classList.toggle('active', b.dataset.s === s);
+    b.setAttribute('aria-pressed', String(b.dataset.s === s));
+  });
+  renderFinalizadosScreen();
+}
 function renderFinalizadosScreen() {
   const host = document.getElementById('finList');
   if (!host) return;
@@ -17166,8 +17180,8 @@ function renderHistorico(order) {
 // ================================================================
 // RETROATIVO — toggle de pedido já realizado
 // ================================================================
-const RETRO_LABEL_OFF = '🕐 Pedido já realizado? (cadastrar retroativo)';
-const RETRO_LABEL_ON  = '🕐 Pedido retroativo ATIVO — clique para desativar';
+const RETRO_LABEL_OFF = 'Pedido já realizado? (cadastrar retroativo)';
+const RETRO_LABEL_ON  = 'Pedido retroativo ativo (desativar)';
 
 function setRetroActive(active) {
   const fields = document.getElementById('retroFields');
@@ -17176,6 +17190,7 @@ function setRetroActive(active) {
   if (!fields || !toggle) return;
   fields.classList.toggle('show', active);
   toggle.classList.toggle('active', active);
+  toggle.setAttribute('aria-pressed', String(active));
   if (label) label.textContent = active ? RETRO_LABEL_ON : RETRO_LABEL_OFF;
   if (active) {
     const dt = document.getElementById('retroDatetime');
@@ -17212,8 +17227,8 @@ function resetRetroToggle() { setRetroActive(false); }
 // ================================================================
 // F5 — AGENDAMENTO (data/hora futura) — espelho do retroativo
 // ================================================================
-const SCHED_LABEL_OFF = '📅 Agendar para depois? (entrega futura)';
-const SCHED_LABEL_ON  = '📅 Agendamento ATIVO — clique para desativar';
+const SCHED_LABEL_OFF = 'Agendar para depois? (entrega futura)';
+const SCHED_LABEL_ON  = 'Agendamento ativo (desativar)';
 
 function setAgendaActive(active) {
   const fields = document.getElementById('scheduleFields');
@@ -17222,6 +17237,7 @@ function setAgendaActive(active) {
   if (!fields || !toggle) return;
   fields.classList.toggle('show', active);
   toggle.classList.toggle('active', active);
+  toggle.setAttribute('aria-pressed', String(active));
   if (label) label.textContent = active ? SCHED_LABEL_ON : SCHED_LABEL_OFF;
   if (active) {
     const dt = document.getElementById('scheduleDatetime');
