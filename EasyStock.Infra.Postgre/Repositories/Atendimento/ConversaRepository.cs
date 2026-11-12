@@ -328,6 +328,11 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
             .IgnoreQueryFilters()
             .ToListAsync(ct);
 
+    // #2285: usa o índice (ConversaId, EnviadaEm).
+    public Task<int> ContarRespostasDoAgenteDesdeAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default) =>
+        db.AtendimentoMensagens.CountAsync(m => m.EmpresaId == empresaId && m.ConversaId == conversaId
+            && m.Direcao == DirecaoMensagem.Saida && m.Autor == AutorMensagem.Agente && m.EnviadaEm >= desde, ct);
+
     public Task<bool> ExisteAguardandoClienteAsync(
         Guid empresaId, CanalConversa canal, string contatoIdExterno, Guid? clienteId, DateTime desde, CancellationToken ct = default) =>
         db.AtendimentoMensagens

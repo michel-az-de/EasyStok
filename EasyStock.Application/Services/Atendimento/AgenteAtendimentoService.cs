@@ -6,6 +6,7 @@ using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -41,7 +42,8 @@ public sealed class AgenteAtendimentoService(
     ICadernoRepository caderno,
     ILogger<AgenteAtendimentoService> logger,
     IPedidoRepository? pedidos = null,
-    Notifications.IContatoDaEquipeAvisada? equipe = null)
+    Notifications.IContatoDaEquipeAvisada? equipe = null,
+    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null)
 {
     public const int MaximoIteracoes = 6;
     public const int UltimasMensagens = 20;
@@ -52,6 +54,9 @@ public sealed class AgenteAtendimentoService(
     public const string MotivoAgenteDesligado = "agente desligado (LLM indisponível)";
     public const string MotivoAtendimentoAutomaticoDesligado = "atendimento automático desligado na configuração";
     public const string MotivoContatoDaEquipe = "contato da equipe que recebe os avisos: o robô não responde";
+
+    public static string MotivoLimiteRespostas(int maximo) =>
+        $"o robô respondeu {maximo} vezes nesta conversa na última hora; parou para não gastar sem limite (possível loop)";
 
     public async Task<ResultadoTurnoAgente> ProcessarTurnoAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
     {
@@ -107,6 +112,19 @@ public sealed class AgenteAtendimentoService(
         if (cliente?.AtendimentoAutomaticoPausado == true)
         {
             await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoContatoPausado(cliente), agora, ct);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
+        }
+
+        // #2285: anti-loop de custo. Outro robô do lado do cliente (ou um loop de mensagens) faria o agente
+        // responder e gastar sem fim; no limite da hora, a conversa para nele e a escalada avisa a dona.
+        var maximoPorHora = limiteRespostas?.Value.MaximoPorHora ?? LimiteRespostasAgenteOptions.PadraoPorHora;
+        if (maximoPorHora > 0
+            && await conversaRepository.ContarRespostasDoAgenteDesdeAsync(empresaId, conversaId, agora.AddHours(-1), ct) >= maximoPorHora)
+        {
+            logger.LogWarning("Agente: conversa {ConversaId} chegou a {Maximo} respostas do robô na última hora; fica para a dona.",
+                conversaId, maximoPorHora);
+            await escalador.EscalarAsync(empresaId, conversa, MotivoLimiteRespostas(maximoPorHora), agora, ct);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
