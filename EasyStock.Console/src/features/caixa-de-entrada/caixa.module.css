@@ -24,18 +24,12 @@
 }
 .cartao:hover { background: var(--preenchimento); }
 .cartao:active:not(:disabled) { background: var(--preenchimento-forte); }
-/* Selecionada: fundo tinto, pastilha suave. */
-.cartao[aria-current='true'] { background: var(--preenchimento-forte); box-shadow: none; }
-/* #2232 (banca UX, L7): atenção e atraso saem do avatar ("!" competia com as iniciais e o selo
-   do canal) e viram trilho lateral do cartão. O texto vai no nome acessível (WCAG 1.4.1). */
+/* #2420: selecionada no âmbar claro da marca, sem traço lateral. */
+.cartao[aria-current='true'] { background: var(--marca-claro); box-shadow: none; }
+/* #2420 (pedido do Felipe, 12/11): o trilho lateral de atenção e atraso saiu do cartão. O sinal fica
+   no ícone ao lado da hora (`.sinalPrazo` em erro, `.sinalAtencao` em alerta, #2258 T7), na hora em
+   vermelho do prazo estourado e no nome acessível (WCAG 1.4.1). */
 .cartao { position: relative; }
-.cartao.precisa::before,
-.cartao.atrasada::before,
-.cartao.slaEstourado::before {
-  content: ''; position: absolute; inset: 8px auto 8px 0; width: 4px;
-}
-.cartao.precisa::before { background: var(--alerta); }
-.cartao.atrasada::before, .cartao.slaEstourado::before { background: var(--erro); }
 /* Avatar com o selo do canal no canto (rodada 6c). */
 .avatarCartao { position: relative; flex-shrink: 0; margin-top: 1px; }
 /* O prazo vencido mantém o trilho e o texto acessível, sem piscar. */
@@ -192,9 +186,11 @@
 /* S59 (#1391): faixa e lista de "Não entregues". */
 /* #2232 (L11): a faixa encolhe (ocupava a altura de dois cartões), diz a ação ("Revisar") e pode
    ser dispensada até chegar falha nova. */
+/* #2420: alerta separado dos estados de atendimento, numa caixa própria acima da lista. */
 .faixaNaoEntregues {
-  display: flex; align-items: center; gap: var(--e-2); width: 100%;
-  border-bottom: var(--b-1) solid var(--linha); background: var(--erro-pastel); color: var(--erro);
+  display: flex; align-items: center; gap: var(--e-2); width: calc(100% - 2 * var(--e-2));
+  margin: var(--e-2); border: var(--b-1) solid color-mix(in srgb, var(--erro) 24%, transparent); border-radius: var(--r-1);
+  background: var(--erro-pastel); color: var(--erro);
   font-size: var(--t-apoio); font-weight: 600;
 }
 .abrirNaoEntregues {

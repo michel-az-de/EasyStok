@@ -116,7 +116,9 @@ await confere('A2  a barra da conversa renderiza a faixa, sem a pílula "Passou 
   const marcado = barra(conversaComVoce)
   assert.match(tira(marcado), /O automático passou para você · Restrição alimentar/)
   assert.doesNotMatch(marcado, /Passou para você/)
-  assert.match(css, /\.faixaTransferencia\s*\{[^}]*border-left:/, 'a direção da faixa vem de uma barra lateral')
+  // #2420: sem traço lateral; o cartão tem ícone, título em negrito e o motivo embaixo.
+  assert.doesNotMatch(regra('.faixaTransferencia'), /border-left:/, 'a faixa não tem traço lateral')
+  assert.match(marcado, /<strong>O automático passou para você<\/strong>/)
 })
 
 // --- A3 e A4 --------------------------------------------------------------------------------------

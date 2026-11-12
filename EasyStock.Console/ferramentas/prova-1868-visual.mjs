@@ -87,10 +87,10 @@ confere('1  sem a etiqueta, o estado vai para o leitor de tela e a atenção gan
   // #2258 (auditoria T4): o title do nome sai do NomeDoContato (prop `titulo`).
   assert.match(jsx, /titulo=\{nome\.titulo\}/)
   const cssDaLista = fonte('features/caixa-de-entrada/caixa.module.css')
-  // #2232 (L7): trilho lateral no lugar do "!" do avatar.
-  assert.match(cssDaLista, /\.cartao\.precisa::before \{ background: var\(--alerta\)/)
+  // #2420: sem traço lateral e sem "!" no avatar; atenção e atraso são ícones ao lado da hora.
+  assert.doesNotMatch(cssDaLista, /\.cartao[^{}]*::before/)
   assert.doesNotMatch(cssDaLista, /avatarCartao::after/)
-  assert.match(cssDaLista, /\.cartao\.atrasada::before, \.cartao\.slaEstourado::before \{ background: var\(--erro\)/)
+  assert.match(cssDaLista, /\.sinalAtencao\s*\{[^}]*color:\s*var\(--alerta\)/)
   assert.match(fonte('features/caixa-de-entrada/classesDoCartao.js'), /motivo && motivo\.tom !== 'perigo' \? css\.precisa/) // #2135: todo motivo tem trilho, não só o `aviso`
 })
 

@@ -74,8 +74,9 @@ confere('L7  avatar sem "!" e iniciais só de letras', () => {
   assert.doesNotMatch(css, /avatarCartao::after/)
   // #2258 (auditoria T8): as iniciais saem de componentes/iniciaisDoNome.js, não mais do Avatar.
   assert.match(fonte('componentes/iniciaisDoNome.js'), /\\p\{L\}/u, 'iniciais filtram letra')
-  assert.match(regra('.cartao.precisa::before'), /background:\s*var\(--alerta\)/)
-  assert.match(regra('.cartao.atrasada::before, .cartao.slaEstourado::before'), /background:\s*var\(--erro\)/)
+  // #2420: o traço lateral saiu; atenção e atraso ficam nos ícones ao lado da hora.
+  assert.doesNotMatch(css, /\.cartao[^{}]*::before/)
+  assert.match(regra('.sinalAtencao'), /color:\s*var\(--alerta\)/)
 })
 
 confere('L8  hora da lista: "21:48" hoje, "ontem", "26 out"', () => {

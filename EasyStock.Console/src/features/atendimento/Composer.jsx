@@ -239,12 +239,19 @@ export function Composer({
 
   return (
     <div className={css.composer} data-area-envio>
+      {/* #2420: a explicação fica junto do campo, com a saída direta quando a janela fechou. */}
       {motivo && (
-        <p className={`${css.bloqueio} ${motivo.acao === 'bloqueio' ? css.bloqueioGrave : ''}`}>
-          <Icone nome={motivo.acao === 'bloqueio' ? 'bloqueio' : 'alerta'} />
-          <strong>{motivo.titulo}</strong>
-          <span>{motivo.detalhe}</span>
-        </p>
+        <div className={`${css.bloqueio} ${motivo.acao === 'bloqueio' ? css.bloqueioGrave : ''}`}>
+          <Icone nome={motivo.acao === 'bloqueio' ? 'bloqueio' : motivo.acao === 'janela' ? 'lock' : 'alerta'} className={css.bloqueioIcone} />
+          <p className={css.bloqueioTexto}>
+            <strong>{motivo.titulo}</strong> <span>{motivo.detalhe}</span>
+          </p>
+          {motivo.acao === 'janela' && podeEnviarModelo && aoAbrirModelos && (
+            <Botao className={css.escolherModelo} aria-haspopup="dialog" onClick={aoAbrirModelos}>
+              <Icone nome="modelo" /> Escolher modelo
+            </Botao>
+          )}
+        </div>
       )}
 
       {/* #1761 (L9): fixo acima do campo só perto do fim da janela de 24 h ou com ela fechada. */}
