@@ -120,6 +120,87 @@ public class CaixaValidacaoEntradaTests
         await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
+    [Theory]
+    [InlineData(-4)]
+    [InlineData(-2)]
+    public async Task RegistrarMovimento_Manual_RecusaDiaForaDoFechamentoEDoDiaAtual(int dias)
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var agora = DateTime.UtcNow;
+        _repo.GetAberturaPendenteAsync(empresaId, lojaId)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 50m, agora.AddDays(-3), lojaId));
+
+        var act = () => Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(
+            empresaId, "entrada", 10m, LojaId: lojaId, Metodo: "dinheiro",
+            DataMovimento: agora.AddDays(dias), ExigirCaixaAberto: true));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*dia da abertura*hoje*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Theory]
+    [InlineData(-3)]
+    [InlineData(0)]
+    public async Task RegistrarMovimento_Manual_PreservaRetroativoDaAberturaEHoje(int dias)
+    {
+        var empresaId = Guid.NewGuid();
+        var agora = DateTime.UtcNow;
+        var instante = agora.AddDays(dias);
+        _repo.GetAberturaPendenteAsync(empresaId, Arg.Any<Guid?>())
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 50m, agora.AddDays(-3), null));
+
+        await Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(
+            empresaId, "entrada", 10m, Metodo: "dinheiro", DataMovimento: instante, ExigirCaixaAberto: true));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.DataMovimento == instante));
+    }
+
+    [Theory]
+    [InlineData(2, 59, true)]
+    [InlineData(3, 0, false)]
+    public async Task RegistrarMovimento_Manual_UsaLimiteDoDiaEmBrasilia(int horaUtc, int minuto, bool permitido)
+    {
+        var empresaId = Guid.NewGuid();
+        var abertura = DateTime.UtcNow.Date.AddDays(-3).AddHours(12);
+        var instante = abertura.Date.AddDays(1).AddHours(horaUtc).AddMinutes(minuto);
+        _repo.GetAberturaPendenteAsync(empresaId, Arg.Any<Guid?>())
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 50m, abertura, null));
+        var act = () => Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(
+            empresaId, "entrada", 10m, Metodo: "dinheiro", DataMovimento: instante, ExigirCaixaAberto: true));
+
+        if (permitido)
+        {
+            await act();
+            await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.DataMovimento == instante));
+        }
+        else
+        {
+            await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*dia da abertura*hoje*");
+            await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+        }
+    }
+
+    [Theory]
+    [InlineData("2026-06-01T23:30:00Z")]
+    [InlineData("2026-06-01T20:30:00-03:00")]
+    [InlineData("2026-06-02T01:30:00+02:00")]
+    [InlineData("2026-06-01T23:30:00")]
+    public async Task RegistrarMovimento_Manual_NormalizaInstanteJsonAntesDeValidarEGravar(string dataJson)
+    {
+        var empresaId = Guid.NewGuid();
+        var instante = System.Text.Json.JsonSerializer.Deserialize<DateTime>($"\"{dataJson}\"");
+        var esperado = new DateTime(2026, 6, 1, 23, 30, 0, DateTimeKind.Utc);
+        _repo.GetAberturaPendenteAsync(empresaId, Arg.Any<Guid?>())
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 50m, esperado.Date.AddHours(12), null));
+
+        await Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(
+            empresaId, "entrada", 10m, Metodo: "dinheiro", DataMovimento: instante, ExigirCaixaAberto: true));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m =>
+            m.DataMovimento.Kind == DateTimeKind.Utc && m.DataMovimento == esperado));
+    }
+
     [Fact]
     public async Task RegistrarMovimento_Automatico_SemCaixaAberto_ContinuaGravando()
     {

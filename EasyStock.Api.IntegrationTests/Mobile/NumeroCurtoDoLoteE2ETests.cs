@@ -37,6 +37,32 @@ public class NumeroCurtoDoLoteE2ETests(MobileE2EFixture fixture)
     }
 
     [SkippableFact]
+    public async Task LotesComUuidDistintoEMesmoSufixo_SaoPromovidosSemColisaoDeCodigo()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (a, b) = await DoisAparelhosAsync();
+        const string loteA = "b2-11111111-1111-4111-8111-111111123456";
+        const string loteB = "b2-22222222-2222-4222-8222-222222123456";
+        var instante = DateTime.UtcNow.AddMinutes(-1);
+
+        var primeira = await PushAsync(a, Cadastro(Produto), Lote(loteA, produzidoEm: instante));
+        var segunda = await PushAsync(b, Lote(loteB, produzidoEm: instante));
+
+        primeira.Rejeitadas.Should().BeEmpty();
+        segunda.Rejeitadas.Should().BeEmpty();
+        primeira.Numeros.Should().ContainKey(loteA);
+        segunda.Numeros.Should().ContainKey(loteB, "o segundo lote tambem deve chegar ao ERP");
+        (await NumeroNoBancoAsync(loteA)).Should().NotBe(await NumeroNoBancoAsync(loteB));
+        using var scope = fixture.Factory!.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var codigos = await db.Set<Lote>().IgnoreQueryFilters().AsNoTracking()
+            .Where(l => l.EmpresaId == a.EmpresaId && (l.MobileBatchId == loteA || l.MobileBatchId == loteB))
+            .Select(l => l.Codigo).ToListAsync();
+        codigos.Should().HaveCount(2).And.OnlyHaveUniqueItems();
+        codigos.Should().OnlyContain(c => c.Length <= 40);
+    }
+
+    [SkippableFact]
     public async Task Push_RespostaPerdida_OReenvioDaMesmaMutacaoDevolveONumero()
     {
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
@@ -226,13 +252,13 @@ public class NumeroCurtoDoLoteE2ETests(MobileE2EFixture fixture)
     private static Envio Cadastro(string id) => new("mut_" + Guid.NewGuid(), "product.upsert", JsonSerializer.SerializeToElement(
         new { id, name = "Lasanha", category = "massa", unit = "300g", price = 30m, stock = 3, custom = true }, Json), Ms(DateTime.UtcNow));
 
-    private Envio Lote(string id, bool descartado = false, string? numeroCurto = null, string? produto = null)
+    private Envio Lote(string id, bool descartado = false, string? numeroCurto = null, string? produto = null, DateTime? produzidoEm = null)
     {
         var payload = new Dictionary<string, object?>
         {
             ["id"] = id, ["code"] = "LOT-" + id[^6..], ["lote"] = "LOT-261104",
             ["items"] = new[] { new { productId = produto ?? Produto, name = "Lasanha", emoji = (string?)null, unit = "300g", qty = 3, photo = (string?)null, weightG = 300 } },
-            ["batchPhoto"] = null, ["createdAt"] = Ms(DateTime.UtcNow.AddMinutes(-1)),
+            ["batchPhoto"] = null, ["createdAt"] = Ms(produzidoEm ?? DateTime.UtcNow.AddMinutes(-1)),
         };
         if (descartado)
         {

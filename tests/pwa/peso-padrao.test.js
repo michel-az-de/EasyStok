@@ -36,7 +36,7 @@ module.exports = function ({ test, runInSandbox, assert }) {
       return JSON.stringify({ previsto, gravado: b && codigoDoLote(b), resto: currentBatchId });
       } finally { document.getElementById = getOriginal; }
     })()`));
-    assert.match(r.gravado, /^LOT-\d{6}-\d{6}$/, 'codigo com sufixo do id');
+    assert.match(r.gravado, /^[0-9A-F]{32}$/, 'codigo novo preserva o UUID inteiro');
     assert.strictEqual(r.previsto, r.gravado, 'modal mostra o codigo final');
     assert.strictEqual(r.resto, '', 'id consumido, nao reaproveita');
   });
@@ -75,10 +75,16 @@ module.exports = function ({ test, runInSandbox, assert }) {
       })()`));
       assert.strictEqual(lotes.length, 2, 'as duas producoes foram gravadas');
       assert.notStrictEqual(lotes[0].id, lotes[1].id, 'o instante nao pode ser a identidade do lote');
+      assert.notStrictEqual(lotes[0].codigo, lotes[1].codigo, 'o ERP exige codigo unico por empresa');
       for (const lote of lotes) {
         assert.ok(lote.id.length <= 64, 'cabe no contrato mobile e ERP');
-        assert.match(lote.codigo, /^LOT-\d{6}-\d{6}$/, 'preserva o codigo numerico da etiqueta');
+        assert.match(lote.codigo, /^[0-9A-F]{32}$/, 'codigo novo preserva o UUID inteiro');
       }
     });
   }
+
+  test('#2317 lote: UUID legado conserva o codigo anterior para reimpressao', () => {
+    assert.strictEqual(runInSandbox("codigoDoLote({ id: 'b-11111111-1111-4111-8111-111111123456', lote: 'LOT-261008' })"),
+      'LOT-261008-123456');
+  });
 };
