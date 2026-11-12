@@ -24,7 +24,7 @@ public sealed record CriarPedidoAtendimentoInput(
 /// <summary>
 /// Cria o pedido da conversa pelo mesmo núcleo do site (<see cref="CheckoutCoreService"/>): itens com
 /// snapshot do cardápio e observação por item, frete pelo CEP do endereço escolhido, vaga ocupada e
-/// pedido em <c>AguardandoPagamento</c> com <c>Origem</c> do canal da conversa (<see cref="OrigemPedido.DoCanal"/>). Grava
+/// pedido em <c>AguardandoPagamento</c> com a origem do canal da conversa (<see cref="OrigemPedido.DoCanal"/>). Grava
 /// <c>Conversa.PedidoEmAndamentoId</c>. A cobrança fica com a S11, que recebe o
 /// <see cref="PedidoReservado"/> devolvido aqui. O núcleo revalida o prazo mínimo (S16, RN-21) com o preparo
 /// padrão e o respiro de <c>ConfiguracaoAtendimento</c>.

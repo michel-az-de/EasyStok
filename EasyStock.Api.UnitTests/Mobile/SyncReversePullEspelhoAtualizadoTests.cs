@@ -149,5 +149,52 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         upsert.Payload.GetProperty("stock").GetInt32().Should().Be(3);
     }
 
+    [Fact]
+    public async Task ProdutoErpComDoisEspelhos_AtualizaAmbosEContinuaOPull()
+    {
+        var lojaId = Guid.NewGuid();
+        var produto = ProdutoErpComEspelho("Nome novo do console", DateTime.UtcNow);
+        _db.Add(new Product
+        {
+            Id = "outro-espelho",
+            Name = "Outro nome antigo",
+            EmpresaId = _empresaId,
+            LojaId = lojaId,
+            ErpProductId = produto.Id,
+        });
+        _db.Add(new Product
+        {
+            Id = "outra-empresa",
+            Name = "Produto de outra empresa",
+            EmpresaId = Guid.NewGuid(),
+            LojaId = lojaId,
+            ErpProductId = produto.Id,
+        });
+        _db.Add(new Product
+        {
+            Id = "outra-loja",
+            Name = "Produto de outra loja",
+            EmpresaId = _empresaId,
+            LojaId = Guid.NewGuid(),
+            ErpProductId = produto.Id,
+        });
+        ItemEstoqueDoErp(produto.Id, lojaId, 7m);
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m);
+        var cliente = Cliente.Criar(_empresaId, "Cliente novo no console");
+        _db.Add(cliente);
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, lojaId);
+
+        var produtos = mutations.Where(m => m.Type == "product.upsert").ToList();
+        produtos.Select(m => m.Payload.GetProperty("id").GetString())
+            .Should().BeEquivalentTo("mob-" + produto.Id, "outro-espelho");
+        produtos.Should().OnlyContain(m => m.Payload.GetProperty("name").GetString() == "Nome novo do console"
+            && m.Payload.GetProperty("stock").GetInt32() == 7);
+        mutations.Should().ContainSingle(m => m.Type == "client.upsert"
+            && m.Payload.GetProperty("id").GetString() == cliente.Id.ToString());
+    }
+
     public void Dispose() => _db.Dispose();
 }

@@ -6,8 +6,10 @@ using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Data.Interceptors;
 using FluentAssertions;
@@ -150,6 +152,52 @@ public sealed class SyncPullCarimboServidorTests : IDisposable
     }
 
     [Fact]
+    public async Task EstoqueReconciliado_ChegaAoMesmoAparelhoSemRepetirNemVazarEmpresaOuLoja()
+    {
+        var produtoId = Guid.NewGuid();
+        var outraEmpresa = Guid.NewGuid();
+        var outraLoja = Guid.NewGuid();
+        Semear(new Produto { Id = produtoId, EmpresaId = _empresaId, Nome = "Lasanha", Status = StatusProduto.Ativo, CriadoEm = _ontem, AlteradoEm = _ontem });
+        Semear(new Product { Id = "p-reconciliar", ErpProductId = produtoId, Name = "Lasanha", Stock = 3, UpdatedAt = _ontem, ServerUpdatedAt = _ontem, LastDeviceId = "dev-a", EmpresaId = _empresaId, LojaId = _lojaId });
+        Semear(new Product { Id = "p-outra-empresa", Name = "Outra empresa", Stock = 90, ServerUpdatedAt = DateTime.UtcNow, EmpresaId = outraEmpresa, LojaId = _lojaId });
+        Semear(new Product { Id = "p-outra-loja", Name = "Outra loja", Stock = 90, ServerUpdatedAt = DateTime.UtcNow, EmpresaId = _empresaId, LojaId = outraLoja });
+        foreach (var (empresa, loja, saldo) in new[] { (outraEmpresa, _lojaId, 90), (_empresaId, outraLoja, 90), (_empresaId, _lojaId, 8) })
+            Semear(new ItemEstoque
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresa, LojaId = loja, ProdutoId = produtoId,
+                QuantidadeInicial = Quantidade.From(saldo), QuantidadeAtual = Quantidade.From(saldo), CustoUnitario = Dinheiro.FromDecimal(1m)
+            });
+
+        var usuario = Substitute.For<ICurrentUserAccessor>();
+        usuario.IsAuthenticated.Returns(true);
+        usuario.EmpresaId.Returns(_empresaId);
+        var produtos = new MobileProductsController(_db, usuario, NullLogger<MobileProductsController>.Instance);
+        var cursor = HaCincoMinutos();
+        (await produtos.ReconcileStock("p-outra-empresa", _empresaId, CancellationToken.None)).Should().BeOfType<NotFoundResult>();
+        (await produtos.ReconcileStock("p-reconciliar", _empresaId, CancellationToken.None)).Should().BeOfType<OkObjectResult>();
+        _db.ChangeTracker.Clear();
+
+        var reconciliado = await _db.Set<Product>().SingleAsync(p => p.Id == "p-reconciliar");
+        reconciliado.Stock.Should().Be(8);
+        reconciliado.ServerUpdatedAt.Should().BeAfter(DateTimeOffset.FromUnixTimeMilliseconds(cursor).UtcDateTime);
+        // O pull ocorre depois da gravação, com relógio fixo para não depender da precisão em milissegundos.
+        var sync = Controller("dev-a", new RelogioFixo(DateTimeOffset.UtcNow.AddSeconds(1)), pullReverso: true);
+        var resultado = await sync.Pull(cursor, "dev-a");
+        var resposta = (resultado.Result as OkObjectResult)!.Value.Should().BeOfType<SyncPullResponse>().Subject;
+        var mutacao = resposta.Mutations.Should().ContainSingle().Subject;
+        Id(mutacao).Should().Be("p-reconciliar");
+        mutacao.DeviceId.Should().Be("server");
+        mutacao.Payload.GetProperty("stock").GetInt32().Should().Be(8);
+        mutacao.Ts.Should().BeGreaterThan(cursor).And.BeLessThan(resposta.ServerTime);
+        _db.ChangeTracker.Clear();
+
+        var seguinte = await sync.Pull(resposta.ServerTime, "dev-a");
+        (seguinte.Result as OkObjectResult)!.Value.Should().BeOfType<SyncPullResponse>().Subject.Mutations.Should().BeEmpty();
+        (await _db.Set<Product>().SingleAsync(p => p.Id == "p-outra-empresa")).Stock.Should().Be(90);
+        (await _db.Set<Product>().SingleAsync(p => p.Id == "p-outra-loja")).Stock.Should().Be(90);
+    }
+
+    [Fact]
     public async Task RegistroQueNaoMudou_NaoVoltaNoPull()
     {
         Semear(new Product { Id = "p-1", Name = "Lasanha", UpdatedAt = _ontem, ServerUpdatedAt = _ontem, LastDeviceId = "dev-a", EmpresaId = _empresaId, LojaId = _lojaId });
@@ -226,7 +274,7 @@ public sealed class SyncPullCarimboServidorTests : IDisposable
         semCarimbo.SaveChanges();
     }
 
-    private SyncController Controller(string deviceId)
+    private SyncController Controller(string deviceId, TimeProvider? relogio = null, bool pullReverso = false)
     {
         var produtoRepo = Substitute.For<IProdutoRepository>();
         produtoRepo.GetTipoEmbalagemMapAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<Guid>>())
@@ -245,18 +293,19 @@ public sealed class SyncPullCarimboServidorTests : IDisposable
         {
             ["MobileSync:AutoLink:Product"] = "false", ["MobileSync:AutoLink:Client"] = "false",
             ["MobileSync:AutoLink:Order"] = "false", ["MobileSync:AutoLink:Batch"] = "false",
-            ["MobileSync:AutoLink:CashEntry"] = "false", ["MobileSync:PullReverse:Enabled"] = "false"
+            ["MobileSync:AutoLink:CashEntry"] = "false", ["MobileSync:PullReverse:Enabled"] = pullReverso.ToString()
         }).Build();
         var http = new DefaultHttpContext();
         http.Items[MobileAuth.HttpContextItemDevice] = new MobileDevice
         {
             Id = deviceId, ApiKeyHash = "h", EmpresaId = _empresaId, LojaId = _lojaId
         };
+        var numerosCurtos = new NumeroCurtoDosLotesMobile(_db, Substitute.For<ILoteNumeroCurtoRepository>(), NullLogger<NumeroCurtoDosLotesMobile>.Instance);
         return new SyncController(
             _db, dispatcher,
             new SyncAutoLinker(_db, config, NullLogger<SyncAutoLinker>.Instance, null!, null!, null!, null!, null!),
-            null!, broker, produtoRepo, config, TimeProvider.System,
-            new EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile(_db, NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Persistence.ILoteNumeroCurtoRepository>(), NullLogger<EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile>.Instance),
+            new SyncReversePullService(_db, config, NullLogger<SyncReversePullService>.Instance, numerosCurtos), broker, produtoRepo, config, relogio ?? TimeProvider.System,
+            numerosCurtos,
             NullLogger<SyncController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = http }
@@ -288,4 +337,9 @@ public sealed class SyncPullCarimboServidorTests : IDisposable
     private static string? Id(MutationDto m) => m.Payload.GetProperty("id").GetString();
     private static long Ms(DateTime utc) => new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
     private static long HaCincoMinutos() => Ms(DateTime.UtcNow.AddMinutes(-5));
+
+    private sealed class RelogioFixo(DateTimeOffset agora) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => agora;
+    }
 }

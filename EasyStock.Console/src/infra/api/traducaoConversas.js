@@ -65,6 +65,7 @@ export function mensagemDaApi(m, conversaId = null) {
   const avaliacao = !saida && m.tipoConteudo === 'Botao' ? BOTAO_DE_AVALIACAO.exec(m.botaoId ?? '')?.[1].toLowerCase() : null
   return {
     id: m.id,
+    ...(m.enviadaPorUsuarioId ? { enviadaPorUsuarioId: m.enviadaPorUsuarioId } : {}),
     dir: saida ? 'out' : 'in',
     texto: m.texto?.trim() ? m.texto : avaliacao ? `Avaliação ${avaliacao}` : ROTULO_DO_CONTEUDO[m.tipoConteudo] || 'Conteúdo não disponível nesta mensagem.',
     ...(avaliacao ? { formato: 'avaliacaoResposta', valor: avaliacao } : {}),
@@ -75,8 +76,6 @@ export function mensagemDaApi(m, conversaId = null) {
     ...(saida && m.autor === 'Sistema' ? { automatica: true, origemAutomatica: 'sistema' } : {}),
     // #1424: saiu pelo disparo da mensagem programada; o balão mostra o selo.
     ...(saida && m.programada ? { programada: true } : {}),
-    // #2320: quem enviou, para a prévia do cartão distinguir a outra atendente de "Você".
-    ...(saida && m.enviadaPorUsuarioId ? { enviadaPorUsuarioId: m.enviadaPorUsuarioId } : {}),
     ...(m.modelo ? { modelo: true, modeloNome: m.modelo.nome } : {}),
     ...(m.erro ? { erro: m.erro } : {}),
     // S58/S60 (#1391): espera o cliente responder ao modelo de retomada; ou saiu pela reserva por SMS.
@@ -117,20 +116,13 @@ function passagemDaApi(resumo) {
   }
 }
 
-// #2320: mensagem de outra atendente leva o nome (quando é quem está com a conversa) ou "Equipe" (mesmo rótulo da #2338).
-function comAutoraDeOutra(m, resumo, usuario) {
-  const por = m.enviadaPorUsuarioId
-  if (m.dir !== 'out' || !por || !usuario?.id || por === usuario.id) return m
-  const nome = por === resumo.assumidaPorUsuarioId ? resumo.assumidaPorNome?.trim() : ''
-  return { ...m, autoraNome: nome || 'Equipe' }
-}
-
 export function situacaoConversaDaApi(resumo, usuario) {
   const minha = resumo.assumidaPorUsuarioId && resumo.assumidaPorUsuarioId === usuario?.id
   return {
     estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
     situacaoApi: resumo.situacao,
     assumidaPorUsuarioId: resumo.assumidaPorUsuarioId ?? null,
+    assumidaPorNome: resumo.assumidaPorNome?.trim() || null,
     responsavel: resumo.assumidaPorUsuarioId ? (resumo.assumidaPorNome?.trim() || (minha ? usuario.nome : 'Outro atendente')) : null,
     pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
     passagem: passagemDaApi(resumo),
@@ -142,7 +134,7 @@ export function situacaoConversaDaApi(resumo, usuario) {
 // cada 5 s), no relógio inteiro. O cartão recalcula a cada tique com o
 // expediente da loja (`respostaAtrasada`, dominio/automatico.js).
 export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now()) {
-  const mensagens = (mensagensDaApi ?? []).map((m) => comAutoraDeOutra(mensagemDaApi(m, resumo.id), resumo, usuario)).sort(cronologica)
+  const mensagens = (mensagensDaApi ?? []).map((m) => mensagemDaApi(m, resumo.id)).sort(cronologica)
   const conversa = {
     id: resumo.id,
     numeroComanda: resumo.numeroComanda || null,

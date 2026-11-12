@@ -95,6 +95,34 @@ public sealed class SyncReversePullProdutoInativoTests : IDisposable
         mutations.Should().NotContain(m => m.Type == "product.delete");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ProdutoInativado_ComEspelhos_RespeitaEmpresaELoja(bool filtrarLoja)
+    {
+        var lojaA = Guid.NewGuid();
+        var lojaB = Guid.NewGuid();
+        var produto = Produto("Descontinuado", StatusProduto.Inativo, DateTime.UtcNow, comEspelho: false);
+        foreach (var (id, empresa, loja) in new (string, Guid, Guid?)[]
+        {
+            ("inativo-a", _empresaId, lojaA),
+            ("inativo-b", _empresaId, lojaB),
+            ("inativo-global", _empresaId, null),
+            ("inativo-outra-empresa", Guid.NewGuid(), lojaA)
+        })
+            _db.Add(new Product { Id = id, Name = "Descontinuado", EmpresaId = empresa, LojaId = loja, ErpProductId = produto.Id });
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, filtrarLoja ? lojaA : null);
+
+        mutations.Should().OnlyContain(m => m.Type == "product.delete");
+        var esperados = filtrarLoja
+            ? new[] { "inativo-a", "inativo-global" }
+            : new[] { "inativo-a", "inativo-b", "inativo-global" };
+        mutations.Select(m => m.Payload.GetProperty("id").GetString()).Should().BeEquivalentTo(esperados);
+    }
+
     [Fact]
     public async Task ProdutoReativado_ComEspelho_VoltaComoUpsertENaoComoDelete()
     {

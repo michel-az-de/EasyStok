@@ -14,10 +14,7 @@ public static class OrigemPedido
     /// <summary>Pedido fechado na conversa pelo agente do atendimento (S10).</summary>
     public const string WhatsApp = "whatsapp";
 
-    /// <summary>
-    /// Origem do pedido fechado numa conversa: o chat do site vale como site (<see cref="Storefront"/>, o que
-    /// "Meus pedidos" lista); os demais canais ficam com <see cref="WhatsApp"/>.
-    /// </summary>
+    /// <summary>O chat do site conserva a origem do storefront; os demais canais mantêm a origem do atendimento.</summary>
     public static string DoCanal(EasyStock.Domain.Enums.Atendimento.CanalConversa canal) =>
         canal == EasyStock.Domain.Enums.Atendimento.CanalConversa.ChatSite ? Storefront : WhatsApp;
 }

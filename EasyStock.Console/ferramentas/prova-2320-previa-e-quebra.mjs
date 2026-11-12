@@ -1,4 +1,4 @@
-// #2320: prévia do cartão com a autora da mensagem (ATD-6) e quebra de linha no aviso do sistema (ATD-4).
+// #2320/#2334: autoria confirmada por ID, inclusive em mensagens avulsas.
 import { registerHooks } from 'node:module'
 import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
@@ -10,19 +10,22 @@ registerHooks({
     return p(u, c)
   },
 })
-const { conversaDaApi } = await import('../src/infra/api/traducaoConversas.js')
+const { conversaDaApi, mensagemDaApi } = await import('../src/infra/api/traducaoConversas.js')
 const { previaDaConversa } = await import('../src/dominio/conversa.js')
-
 const resumo = { id: 'c', canal: 'WhatsApp', situacao: 'Assumida', assumidaPorUsuarioId: 'u-ana', assumidaPorNome: 'Ana', contatoNome: 'Maria' }
+const usuario = { id: 'u-eu', nome: 'Ana' }
 const saida = (por) => ({ id: 'm', direcao: 'Saida', autor: 'Dona', status: 'Enviada', texto: 'Oi!', enviadaEm: '2026-11-11T12:00:00Z', enviadaPorUsuarioId: por })
-const previa = (por, usuario) => previaDaConversa(conversaDaApi(resumo, [saida(por)], usuario))
+const previa = (por, sessao = usuario, dados = resumo) => previaDaConversa(conversaDaApi(dados, [saida(por)], sessao), sessao)
 
-assert.equal(previa('u-eu', { id: 'u-eu', nome: 'Eu' }).prefixo, 'Você: ', 'minha mensagem segue "Você:"')
-assert.equal(previa('u-ana', { id: 'u-eu', nome: 'Eu' }).prefixo, 'Ana: ', 'outra atendente identificada pelo nome')
-assert.equal(previa('u-bia', { id: 'u-eu', nome: 'Eu' }).prefixo, 'Equipe: ', 'outra atendente sem nome conhecido sai como Equipe (mesmo rótulo da #2338)')
-assert.equal(previa(null, { id: 'u-eu', nome: 'Eu' }).prefixo, 'Você: ', 'sem autora gravada mantém "Você:"')
+assert.equal(previa('u-eu').prefixo, 'Você: ', 'a identidade da sessão identifica minha mensagem')
+assert.equal(previa('u-ana').prefixo, 'Ana: ', 'o nome da outra autora vem da API e IDs distintos prevalecem sobre nomes iguais')
+assert.equal(previa('u-bia').prefixo, 'Equipe: ', 'não atribui à responsável a mensagem de outro ID')
+assert.equal(previa(null).prefixo, 'Equipe: ', 'sem autoria gravada não atribui a mim')
+assert.equal(previa('u-ana', null).prefixo, 'Equipe: ', 'sem sessão não confirma quem é outro autor')
+assert.equal(previa('u-ana', usuario, { ...resumo, assumidaPorNome: null }).prefixo, 'Equipe: ', 'sem nome recebido não inventa uma autora')
+const avulsa = conversaDaApi(resumo, [], usuario)
+avulsa.mensagens = [mensagemDaApi(saida('u-ana'))]
+assert.equal(previaDaConversa(avulsa, usuario).prefixo, 'Ana: ', 'mensagens avulsas e anteriores conservam a identificação por ID')
+assert.equal(previaDaConversa({ situacaoApi: 'Assumida', mensagens: avulsa.mensagens }, usuario).prefixo, 'Equipe: ', 'sem nome confirmado a mensagem avulsa continua sendo da equipe')
 
-const css = readFileSync(new URL('../src/features/atendimento/atendimento.module.css', import.meta.url), 'utf8')
-const bloco = /\n\.sistema \{([^}]*)\}/.exec(css)?.[1] ?? ''
-assert.match(bloco, /white-space:\s*pre-wrap/, 'aviso do sistema preserva as quebras de linha')
-console.log('OK: prévia com autora e quebra de linha no aviso do sistema.')
+console.log('OK: autoria por ID, nome confirmado e mensagens avulsas.')

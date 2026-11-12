@@ -12,19 +12,25 @@ const ROTULO_DO_FORMATO = {
 }
 
 // Prefixo em 600 diz quem escreveu por último sem abrir a conversa:
-// "Automático:" quando foi a regra que respondeu, "Você:" quando foi a mão da
-// dona, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
+// "Assistente:" quando foi automático, "Você:" quando o usuário enviou,
+// Nome confirmado ou "Equipe:" para outro autor humano, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
 // string só porque só o prefixo é 600 (seção 1); quem monta o texto plano
 // (título, aria-label) faz `prefixo + corpo`.
 //
 // #1474 (R11): nota de sistema ("escalado para a dona", "retomado pelo usuário") é evento da
 // conversa, não fala. A prévia mostra a última mensagem do cliente ou da loja.
-export function previaDaConversa(conversa) {
+export function previaDaConversa(conversa, usuario = null) {
   const ultima = conversa.mensagens.findLast((m) => m.dir !== 'sistema')
   // Modo API: conversa encerrada não carrega mensagens na inbox; o resumo traz o texto (#1287).
   if (!ultima) return { prefixo: '', corpo: conversa.ultimaMensagemTexto || 'Sem mensagens' }
+  const deOutro = ultima.enviadaPorUsuarioId
+    ? ultima.enviadaPorUsuarioId !== usuario?.id
+    : Boolean(conversa.situacaoApi)
+  const nomeDaAutora = usuario?.id && ultima.enviadaPorUsuarioId && deOutro
+    && ultima.enviadaPorUsuarioId === conversa.assumidaPorUsuarioId
+    ? conversa.assumidaPorNome : null
   const prefixo = ultima.dir === 'out'
-    ? (ultima.automatica ? 'Assistente: ' : ultima.autoraNome ? `${ultima.autoraNome}: ` : 'Você: ')
+    ? (ultima.automatica ? 'Assistente: ' : deOutro ? `${nomeDaAutora || 'Equipe'}: ` : 'Você: ')
     : ''
   return { prefixo, corpo: ROTULO_DO_FORMATO[ultima.formato] ?? ultima.texto }
 }
