@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Notifications;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Postgre.Data;
 
@@ -167,6 +168,42 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .ToHashSet();
 
             var resolver = avisos.Where(a => fechadas.Contains((a.AberturaId!.Value, a.EmpresaId))).Select(a => a.AvisoId).ToList();
+            if (resolver.Count == 0) return 0;
+
+            var agora = DateTime.UtcNow;
+            return await dbContext.Notificacoes.IgnoreQueryFilters()
+                .Where(n => resolver.Contains(n.Id) && !n.Lida)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(n => n.Lida, true)
+                    .SetProperty(n => n.LidaEm, agora), ct);
+        }
+
+        // #2303: mesmo desenho do caixa. Parte dos avisos NÃO LIDOS de cliente sem resposta e pergunta quais lembretes
+        // ainda estão abertos; o resto (concluído, cancelado ou apagado) sai do sino.
+        public async Task<int> ResolverAvisosDeClienteAtendidoAsync(Guid? empresaId = null, CancellationToken ct = default)
+        {
+            var prefixoPrazo = PrazoEstouradoEvento.PrefixoCorrelationId(TipoPrazo.ClienteSemResposta);
+
+            var avisos = await (
+                from n in dbContext.Notificacoes.IgnoreQueryFilters().AsNoTracking()
+                join o in dbContext.NotifOutboxMensagens.IgnoreQueryFilters() on n.OutboxMensagemId equals (Guid?)o.Id
+                join e in dbContext.NotifEventos.IgnoreQueryFilters() on o.EventoId equals e.Id
+                where !n.Lida && (empresaId == null || n.EmpresaId == empresaId)
+                      && e.Tipo == TipoEventoNotificacao.PrazoEstourado && e.CorrelationId.StartsWith(prefixoPrazo)
+                      && e.RefEntidadeId != null
+                select new { AvisoId = n.Id, n.EmpresaId, LembreteId = e.RefEntidadeId!.Value })
+                .ToListAsync(ct);
+            if (avisos.Count == 0) return 0;
+
+            var lembreteIds = avisos.Select(a => a.LembreteId).Distinct().ToList();
+            var abertos = (await dbContext.Lembretes.IgnoreQueryFilters().AsNoTracking()
+                    .Where(l => lembreteIds.Contains(l.Id) && l.Situacao == SituacaoLembrete.Aberto)
+                    .Select(l => new { l.Id, l.EmpresaId })
+                    .ToListAsync(ct))
+                .Select(l => (l.Id, l.EmpresaId))
+                .ToHashSet();
+
+            var resolver = avisos.Where(a => !abertos.Contains((a.LembreteId, a.EmpresaId))).Select(a => a.AvisoId).ToList();
             if (resolver.Count == 0) return 0;
 
             var agora = DateTime.UtcNow;

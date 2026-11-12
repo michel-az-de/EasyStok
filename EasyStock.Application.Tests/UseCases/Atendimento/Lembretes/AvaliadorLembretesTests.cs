@@ -32,8 +32,23 @@ public class AvaliadorLembretesTests
         _candidatos.ListarConversasSemRespostaAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns([]);
     }
 
+    private readonly EasyStock.Application.Ports.Output.Persistence.INotificacaoRepository _avisos =
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.INotificacaoRepository>();
+
     private AvaliarLembretesUseCase Avaliador() => new(_repo, _candidatos, _notificador, _publisher, _uow, _relogio,
-        Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions()));
+        Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions()), _avisos);
+
+    // #2303: a cada rodada, o aviso de cliente sem resposta cujo lembrete fechou sai do sino.
+    [Fact]
+    public async Task RodadaResolveOsAvisosDeClienteJaAtendido()
+    {
+        _avisos.ResolverAvisosDeClienteAtendidoAsync(null, Arg.Any<CancellationToken>()).Returns(2);
+
+        var resultado = await Avaliador().ExecuteAsync();
+
+        await _avisos.Received(1).ResolverAvisosDeClienteAtendidoAsync(null, Arg.Any<CancellationToken>());
+        resultado.AvisosResolvidos.Should().Be(2);
+    }
 
     private PedidoAgendadoLembrete Agendado(DateTime entrega, DateTime? inicio = null,
         EasyStock.Domain.Entities.Storefront.ExpedienteLoja? expediente = null) =>

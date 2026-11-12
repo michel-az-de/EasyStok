@@ -3,6 +3,7 @@ import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
+import { diaMesHora, idadeDoAviso } from '../../dominio/formato'
 import css from './notificacoes.module.css'
 
 const gravidade = { Critica: 'Crítica', Alta: 'Alta', Media: 'Média', Informativa: 'Informativa' }
@@ -62,9 +63,13 @@ export function SinoDaSessao({ avisos, aparelho }) {
       </div>}
       {semAvisoNoAparelho && secaoDoAparelho}
       <ul className={css.lista} aria-label="Avisos não lidos" aria-busy={carregando || Boolean(lendo)}>
-        {recentes.map((aviso) => <li key={aviso.id} className={css.aviso}>
+        {recentes.map((aviso) => { const idade = idadeDoAviso(aviso.createdAt, Date.now()); return <li key={aviso.id} className={css.aviso}>
           <div className={css.texto}>
-            <Pilula tom={tom[aviso.severidade] ?? 'neutro'} fina>{gravidade[aviso.severidade] ?? aviso.severidade}</Pilula>
+            <div className={css.cabecaAviso}>
+              <Pilula tom={tom[aviso.severidade] ?? 'neutro'} fina>{gravidade[aviso.severidade] ?? aviso.severidade}</Pilula>
+              {/* #2303: o aviso diz quando nasceu; o de 14 dias não se passa por novo. */}
+              {idade && <time className={css.quando} dateTime={aviso.createdAt} title={diaMesHora(aviso.createdAt)}>{idade}</time>}
+            </div>
             <h3>{aviso.titulo || 'Aviso'}</h3>
             <p>{aviso.mensagem}</p>
           </div>
@@ -74,7 +79,7 @@ export function SinoDaSessao({ avisos, aparelho }) {
           }} disabled={carregando || Boolean(lendo)} aria-label={`Marcar como lido: ${aviso.titulo || 'Aviso'}`}>
             {lendo === aviso.id ? 'Salvando…' : 'Marcar como lido'}
           </Botao>
-        </li>)}
+        </li> })}
       </ul>
       {!semAvisoNoAparelho && secaoDoAparelho}
     </Modal>}
