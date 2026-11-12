@@ -240,6 +240,25 @@ public class RegistrarPagamentoPedidoUseCaseTests
         await _caixaRepo.DidNotReceiveWithAnyArgs().TryAddMovimentoAsync(default!, default);
     }
 
+    [Fact]
+    public async Task Caixa_aberto_de_hoje_impede_abertura_automatica_no_mesmo_dia()
+    {
+        // #2341 (R2-API-1): com o caixa de hoje aberto (abertura R$20), um pagamento de pedido criou uma segunda
+        // abertura "auto-pagamento" com a gaveta herdada. Sessão aberta absorve o pagamento; não abre outra.
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId);
+        _caixaRepo.GetFechamentoDoDiaAsync(empresaId, Arg.Any<DateOnly>(), pedido.LojaId).Returns((FechamentoCaixa?)null);
+        _caixaRepo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), pedido.LojaId)
+            .Returns(Array.Empty<MovimentoCaixa>());
+        _caixaRepo.GetAberturaPendenteAsync(empresaId, pedido.LojaId)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 20m, DateTime.UtcNow, pedido.LojaId));
+
+        await UC().ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 29.80m));
+
+        pedido.Pagamentos.Should().ContainSingle();
+        await _caixaRepo.DidNotReceiveWithAnyArgs().TryAddMovimentoAsync(default!, default);
+    }
+
     // #1598: o Caixa da empresa (sem loja) fechado vale para o pedido que tem loja. O pagamento
     // continua sendo gravado; só não reabre o dia com uma abertura da loja.
     [Fact]

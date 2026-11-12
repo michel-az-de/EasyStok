@@ -253,9 +253,11 @@ public class RegistrarPagamentoPedidoUseCase(
             // #1506: sessao de dia anterior ainda aberta: nao abre o dia por cima (a antiga ficaria
             // orfa, sem fechamento). O pagamento ja esta gravado e entra no caixa do dia dele.
             var pendente = await caixaRepo.GetAberturaPendenteAsync(cmd.EmpresaId, pedido.LojaId);
-            if (pendente != null && HorarioBrasil.DataOperacional(pendente.DataMovimento) < data)
+            // #2341: qualquer sessão ainda aberta absorve o pagamento, inclusive a de hoje. Antes só a de dia anterior
+            // barrava; uma sessão de hoje que a consulta do dia não enxergava gerava segunda abertura "auto-pagamento".
+            if (pendente != null)
             {
-                logger.LogInformation("Caixa de {Pendente} ainda aberto; pagamento {PedidoId} não abre o caixa de {Data}.",
+                logger.LogInformation("Caixa de {Pendente} ainda aberto; pagamento {PedidoId} não abre outra sessão para {Data}.",
                     HorarioBrasil.DataOperacional(pendente.DataMovimento), pedido.Id, data);
                 return;
             }
