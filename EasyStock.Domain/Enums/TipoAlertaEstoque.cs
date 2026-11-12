@@ -10,6 +10,9 @@ namespace EasyStock.Domain.Enums
         PedidoRecebido = 6,
         ProdutoVencido = 7,
 
+        /// <summary>#2301: aviso do pipeline de notificações (prazo, caixa, segurança), sem relação com validade.</summary>
+        AvisoOperacional = 8,
+
         EstoqueBaixo = EstoqueCritico,
         ProximoVencimento = ValidadeProxima,
         Reposicao = ReposicaoSugerida

@@ -20,6 +20,7 @@ public record Notificacao
         "ReposicaoSugerida" or "Reposicao" => $"/entradas/reposicao?item={ReferenciaId}",
         "PedidoAtrasado" => "/fornecedores",
         "PedidoRecebido" => "/fornecedores",
+        "AvisoOperacional" => "/notificacoes",
         _ => "/estoque"
     };
 
@@ -32,6 +33,7 @@ public record Notificacao
         "ReposicaoSugerida" or "Reposicao" => "Repor estoque",
         "PedidoAtrasado" => "Ver pedido",
         "PedidoRecebido" => "Ver pedido",
+        "AvisoOperacional" => "Ver avisos",
         _ => "Ver detalhes"
     };
 }
