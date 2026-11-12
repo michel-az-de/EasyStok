@@ -6,6 +6,7 @@ using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Mobile.Services;
@@ -628,7 +629,7 @@ public class SyncMutationDispatcher(
     private static ClientDto CaberNasColunas(ClientDto d) => d with
     {
         Name = Cortar(d.Name, 120)!, Apt = Cortar(d.Apt, 32), Address = Cortar(d.Address, 255),
-        Phone = Cortar(d.Phone, 32), Document = Cortar(d.Document, 32)
+        Phone = Cortar(Telefone.TryFrom(d.Phone)?.Value ?? d.Phone, 32), Document = Cortar(d.Document, 32)
     };
 
     private static OrderDto CaberNasColunas(OrderDto d) => d with

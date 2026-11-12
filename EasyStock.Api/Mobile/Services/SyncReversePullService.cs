@@ -134,7 +134,10 @@ public class SyncReversePullService(
             foreach (var p in produtosEspelhados)
             foreach (var espelho in espelhos[p.Id])
             {
-                var saldo = itensEstoque.Where(i => i.ProdutoId == p.Id).Sum(i => i.QuantidadeAtual?.Value ?? 0m);
+                var itensDoProduto = itensEstoque.Where(i => i.ProdutoId == p.Id).ToList();
+                // Sem estoque ERP, o produto criado no app conserva seu saldo, inclusive no pull do criador.
+                var saldo = itensDoProduto.Count > 0
+                    ? itensDoProduto.Sum(i => i.QuantidadeAtual?.Value ?? 0m) : espelho.Stock;
                 var dto = new ProductDto(
                     Id: espelho.Id,
                     Name: p.Nome,

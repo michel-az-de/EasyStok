@@ -110,6 +110,30 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         mutations.Should().NotContain(m => m.Type == "product.upsert");
     }
 
+    [Theory]
+    [InlineData(false, 7)]
+    [InlineData(true, 0)]
+    public async Task CriadorDoProduto_SemUpsertNormal_PreservaSaldoMobileSemEstoqueErp(bool temEstoqueErp, int saldoEsperado)
+    {
+        var loja = Guid.NewGuid();
+        var produto = ProdutoErpComEspelho("Produto criado pelo app", DateTime.UtcNow);
+        var espelho = _db.Set<Product>().Local.Single(p => p.ErpProductId == produto.Id);
+        espelho.LojaId = loja;
+        espelho.LastDeviceId = "criador";
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m);
+        if (temEstoqueErp) ItemEstoqueDoErp(produto.Id, loja, 0m);
+        await _db.SaveChangesAsync();
+
+        // O pull normal exclui LastDeviceId == criador, portanto o reverse recebe a lista vazia.
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, loja);
+
+        var upsert = mutations.Should().ContainSingle(m => m.Type == "product.upsert").Subject;
+        upsert.Payload.GetProperty("id").GetString().Should().Be(espelho.Id);
+        upsert.Payload.GetProperty("stock").GetInt32().Should().Be(saldoEsperado);
+        espelho.Stock.Should().Be(7, "o pull nao altera o saldo persistido do aparelho");
+    }
+
     [Fact]
     public async Task ProdutoErpAlterado_EstoqueVemDosItensDaLojaDoDevice()
     {
@@ -123,6 +147,51 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, lojaDevice);
 
         mutations.Single(m => m.Type == "product.upsert").Payload.GetProperty("stock").GetInt32().Should().Be(4);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EstoqueErpPosteriorAoCursor_ChegaAoCriadorEAOutroDevice(bool outroDevice)
+    {
+        var criadoEm = DateTime.UtcNow.AddMinutes(-3);
+        var cursorInicial = criadoEm.AddMinutes(1);
+        var alteradoEm = cursorInicial.AddMinutes(1);
+        var cursorFinal = alteradoEm.AddSeconds(1);
+        var loja = Guid.NewGuid();
+        var produto = ProdutoErpComEspelho("Produto do app", criadoEm);
+        var espelho = _db.Set<Product>().Local.Single(p => p.ErpProductId == produto.Id);
+        espelho.LojaId = loja;
+        espelho.LastDeviceId = "criador";
+        await _db.SaveChangesAsync();
+
+        var primeiroPull = new List<MutationDto>();
+        if (outroDevice)
+            primeiroPull.Add(new MutationDto("mobile", "criador", "product.upsert",
+                System.Text.Json.JsonSerializer.SerializeToElement(
+                    new ProductDto(espelho.Id, espelho.Name, null, "extra", null, 0m, espelho.Stock, false),
+                    new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)),
+                new DateTimeOffset(criadoEm).ToUnixTimeMilliseconds()));
+        await _servico.AppendAsync(primeiroPull, criadoEm.AddSeconds(-1), _empresaId, loja);
+        primeiroPull.Should().ContainSingle().Which.Payload.GetProperty("stock").GetInt32().Should().Be(7);
+
+        // Depois do cursor, o cadastro ERP mudou e ha saldo real da loja e global.
+        produto.Nome = "Produto atualizado no ERP";
+        produto.AlteradoEm = alteradoEm;
+        ItemEstoqueDoErp(produto.Id, loja, 4m);
+        ItemEstoqueDoErp(produto.Id, null, 2m);
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m);
+        await _db.SaveChangesAsync();
+        var incremental = new List<MutationDto>();
+        await _servico.AppendAsync(incremental, cursorInicial, _empresaId, loja);
+        var atualizacao = incremental.Should().ContainSingle().Which;
+        atualizacao.Payload.GetProperty("stock").GetInt32().Should().Be(6);
+        atualizacao.Payload.GetProperty("name").GetString().Should().Be(produto.Nome);
+        atualizacao.Ts.Should().Be(new DateTimeOffset(alteradoEm).ToUnixTimeMilliseconds());
+
+        var repetido = new List<MutationDto>();
+        await _servico.AppendAsync(repetido, cursorFinal, _empresaId, loja);
+        repetido.Should().BeEmpty();
     }
 
     [Fact]
