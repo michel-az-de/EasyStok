@@ -79,7 +79,9 @@ public class InsumosDaProducaoUseCaseTests
         farinha.CustoDaFicha.Should().Be(0.0045m);
 
         await Sut().AtualizarAsync(EmpresaId, farinha.Id, new InsumoInput(null, null, null, null, LimparCusto: true));
-        (farinha.CustoUnitarioInsumo, farinha.CustoReferencia, farinha.CustoDaFicha).Should().Be((null, null, null));
+        farinha.CustoUnitarioInsumo.Should().BeNull();
+        farinha.CustoReferencia.Should().BeNull();
+        farinha.CustoDaFicha.Should().BeNull();
     }
 
     [Fact]
