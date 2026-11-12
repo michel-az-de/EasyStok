@@ -66,16 +66,19 @@ O console é o log do contêiner em produção e o OTLP sai da máquina; o Worke
 
 Decisão de 12/11/2026: os logs continuam no OpenObserve (#2107 F2), sem Loki. Estudo e banca na issue #2376.
 
-### Redação também nos traces
+### Redação também nos traces e nos logs OTLP
 
 | Peça | O que faz |
 |---|---|
-| `SpanQueRedige` (`EasyStock.Infra.Async/Logging`) | Processador de span: passa o nome e toda tag de texto (`url.path`, `url.full`, `db.query.text`...) por `SensitivePatterns.Redact` antes do exporter. Tag numérica não muda. Eventos de span ficam de fora |
-| API e Worker | `.AddProcessor(new SpanQueRedige())` antes do `.AddOtlpExporter(...)` |
-| `TodoSinkRedigeTests.Trace_exportado_passa_pelo_SpanQueRedige` | Reprova o `WithTracing` que exporta sem o processador antes |
+| `SpanQueRedige` (`EasyStock.Observabilidade`) | Processador de span: passa o nome e toda tag de texto (`url.path`, `url.full`, `db.query.text`...) por `SensitivePatterns.Redact` antes do exporter. Tag numérica não muda. Eventos de span ficam de fora |
+| `LogQueRedige` (`EasyStock.Observabilidade`, #2390) | Processador de log do host sem Serilog (Web): redige a mensagem formatada, o corpo e todo atributo de texto. Troca a exceção por `exception.type`, `exception.message` e `exception.stacktrace` redigidos |
+| API, Worker e Web | `.AddProcessor(new SpanQueRedige())` antes do `.AddOtlpExporter(...)` |
+| Web | `.AddProcessor(new LogQueRedige())` antes do exporter de log e `IncludeScopes = false`: o escopo do `ILogger` não é editável e levaria o `RequestPath` cru. A correlação vem da Activity |
+| `TodoSinkRedigeTests.Trace_exportado_passa_pelo_SpanQueRedige` | Reprova o `WithTracing` que exporta sem o processador antes, nos 3 hosts |
+| `TodoSinkRedigeTests.Log_OTLP_do_Web_passa_pelo_LogQueRedige` | Reprova o log OTLP do Web sem o processador antes ou com `IncludeScopes = true` |
 | `SensitivePatterns` | Ganhou e-mail, celular brasileiro e CPF (formatado ou 11 dígitos isolados). Não mascara chave de NF-e, unix em ms, GUID, CNPJ formatado |
 
-Fora: o EasyStock.Web (console Blazor) não referencia o Infra.Async e exporta trace sem redação. Follow-up.
+O `EasyStock.Observabilidade` é leve de propósito (Application + SDK do OpenTelemetry): o console Web referencia só ele, sem o EF, o S3 e o PDF do Infra.Async (#2390).
 
 ### Coletor
 

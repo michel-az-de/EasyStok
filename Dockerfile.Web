@@ -11,6 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 
 # .csproj e package.json primeiro (cache de dependencias)
 COPY EasyStock.Web/EasyStock.Web.csproj EasyStock.Web/
+# #2390: redação da telemetria (Observabilidade -> Application -> Domain).
+COPY EasyStock.Observabilidade/EasyStock.Observabilidade.csproj EasyStock.Observabilidade/
+COPY EasyStock.Application/EasyStock.Application.csproj         EasyStock.Application/
+COPY EasyStock.Domain/EasyStock.Domain.csproj                   EasyStock.Domain/
 COPY EasyStock.Web/package.json         EasyStock.Web/
 
 # Restore com cache mount BuildKit
@@ -22,6 +26,9 @@ RUN --mount=type=cache,target=/root/.npm,id=npm \
 
 # Codigo fonte do Web apenas
 COPY EasyStock.Web/ EasyStock.Web/
+COPY EasyStock.Observabilidade/ EasyStock.Observabilidade/
+COPY EasyStock.Application/     EasyStock.Application/
+COPY EasyStock.Domain/          EasyStock.Domain/
 
 # Tokens de design compartilhados — tailwind.config.js faz require('../design/tokens.colors')
 COPY design/ design/

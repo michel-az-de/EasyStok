@@ -2,10 +2,10 @@ using System.Diagnostics;
 using EasyStock.Application.Seguranca;
 using OpenTelemetry;
 
-namespace EasyStock.Infra.Async.Logging;
+namespace EasyStock.Observabilidade;
 
 /// <summary>
-/// Redige o span antes do exporter (#2376), com o mesmo <see cref="SensitivePatterns"/> do <see cref="SinkQueRedige"/>.
+/// Redige o span antes do exporter (#2376), com o mesmo <see cref="SensitivePatterns"/> do <c>SinkQueRedige</c>.
 /// Sem ele, o trace levava ao OpenObserve o caminho com telefone ou CPF, a URL das integrações que não estão no
 /// <c>EnderecoForaDaTelemetria</c> (WAHA, Mercado Pago, e-mail, SMS) e o texto do SQL.
 ///
