@@ -16,7 +16,7 @@ public sealed class AtualizarLimiaresProdutoUseCase(
         UseCaseGuards.EnsureEmpresaId(empresaId);
         UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
 
-        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
+        var produto = await produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
         if (quantidadeMinima.HasValue && quantidadeMinima.Value < 0)

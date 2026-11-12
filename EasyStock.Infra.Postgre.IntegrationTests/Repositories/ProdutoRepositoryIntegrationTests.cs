@@ -2,12 +2,49 @@ using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Repositories;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.GerenciarProduto.Comandos;
 using FluentAssertions;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
 public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
+    [SkippableFact]
+    public async Task AtualizarLimiares_deve_preservar_xmin_e_restringir_empresa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa limiar", Documento = "2334", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Limiar", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Produtos.Add(new Produto
+        {
+            Id = produtoId, EmpresaId = empresaId, CategoriaId = categoriaId,
+            Nome = "Produto limiar", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+        });
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        context.SetMobileTenantContext(empresaId);
+        var repository = new ProdutoRepository(context);
+        var useCase = new AtualizarLimiaresProdutoUseCase(repository, context);
+
+        await useCase.ExecuteAsync(empresaId, produtoId, 7, 1);
+        var alterarOutraEmpresa = () => useCase.ExecuteAsync(Guid.NewGuid(), produtoId, 99, 3);
+        await alterarOutraEmpresa.Should().ThrowAsync<UseCaseValidationException>();
+
+        context.ChangeTracker.Clear();
+        var persistido = await repository.GetByIdAsync(empresaId, produtoId);
+        persistido.Should().NotBeNull();
+        persistido!.QuantidadeMinima.Should().Be(7);
+        persistido.QuantidadeCritica.Should().Be(1);
+    }
+
     [SkippableFact]
     public async Task SearchAsync_deve_buscar_por_nome_sku_e_marca_respeitando_empresa()
     {
