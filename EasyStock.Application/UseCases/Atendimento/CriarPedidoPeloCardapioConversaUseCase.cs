@@ -102,15 +102,31 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
 
         await linkService.ConsumirAsync(link, agora, ct);
         PedidoReservado reservado;
+        Mensagem? resumo = null;
         try
         {
-            if (endereco is not null)
-                enderecoId = await confirmarEndereco.ExecuteAsync(new ConfirmarEnderecoClienteCommand(
-                    link.EmpresaId, clienteId, endereco.Normalizado()), ct)
-                    ?? throw new RegraDeDominioVioladaException("Não foi possível confirmar o endereço de entrega.");
-            reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
-                link.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId!.Value,
-                endereco?.Snapshot(input.Observacoes) ?? input.Observacoes, FreteCombinado: freteCombinado), ct);
+            // #2368: pedido e resumo na mesma transação. Com dois commits, uma falha no segundo deixava o pedido
+            // criado sem o resumo na conversa; agora tudo se desfaz e o link volta para o cliente reenviar.
+            reservado = await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+            {
+                if (endereco is not null)
+                    enderecoId = await confirmarEndereco.ExecuteAsync(new ConfirmarEnderecoClienteCommand(
+                        link.EmpresaId, clienteId, endereco.Normalizado()), token)
+                        ?? throw new RegraDeDominioVioladaException("Não foi possível confirmar o endereço de entrega.");
+                var criado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
+                    link.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId!.Value,
+                    endereco?.Snapshot(input.Observacoes) ?? input.Observacoes, FreteCombinado: freteCombinado), token);
+
+                conversa.RegistrarSaida(agora);
+                resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+                    // #2007: aqui a encomenda na entrega ainda cobra o sinal pelo link (CobrancaDoPedidoReservado); o resumo diz o mesmo.
+                    ResumoPedidoConversa.Texto(criado, input.DataEntrega,
+                        CobrancaDoPedidoReservado.FormaEfetiva(forma, criado.Pedido, QuemCobra.ClientePeloLink),
+                        peloAtendimento ? "Pedido confirmado pelo atendimento a partir da seleção compartilhada:" : "Pedido montado pelo cliente no cardápio do site:"));
+                await conversaRepository.AddMensagemAsync(resumo, token);
+                await unitOfWork.CommitAsync();
+                return criado;
+            }, ct);
         }
         catch
         {
@@ -118,15 +134,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
             throw;
         }
 
-        conversa.RegistrarSaida(agora);
-        var resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
-            // #2007: aqui a encomenda na entrega ainda cobra o sinal pelo link (CobrancaDoPedidoReservado); o resumo diz o mesmo.
-            ResumoPedidoConversa.Texto(reservado, input.DataEntrega,
-                CobrancaDoPedidoReservado.FormaEfetiva(forma, reservado.Pedido, QuemCobra.ClientePeloLink),
-                peloAtendimento ? "Pedido confirmado pelo atendimento a partir da seleção compartilhada:" : "Pedido montado pelo cliente no cardápio do site:"));
-        await conversaRepository.AddMensagemAsync(resumo, ct);
-        await unitOfWork.CommitAsync();
-        if (!input.SemCobranca) await AvisarConsoleAsync(reservado, resumo, ct);
+        if (!input.SemCobranca) await AvisarConsoleAsync(reservado, resumo!, ct);
 
         if (input.SemCobranca)
             return new PedidoPeloCardapioConversaResult(reservado.Pedido.Id, reservado.Total, forma, null, null);

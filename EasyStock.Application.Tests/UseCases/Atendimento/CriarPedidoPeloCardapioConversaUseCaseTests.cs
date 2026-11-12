@@ -244,6 +244,44 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
     }
 
     [Fact]
+    public async Task PedidoEResumo_NaMesmaTransacao()
+    {
+        // #2368: com dois commits, uma falha no segundo deixava o pedido criado sem o resumo na conversa.
+        var c = new Cenario();
+        var token = await c.GerarTokenAsync();
+        var profundidade = 0;
+        c.Uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<PedidoReservado>>>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                if (profundidade++ == 0) c.Linha.Add("tx:abre");
+                try { return await call.Arg<Func<CancellationToken, Task<PedidoReservado>>>()(call.Arg<CancellationToken>()); }
+                finally { if (--profundidade == 0) c.Linha.Add("tx:fecha"); }
+            });
+
+        await c.UseCase.ExecuteAsync(c.Input(token));
+
+        var abre = c.Linha.IndexOf("tx:abre");
+        var fecha = c.Linha.IndexOf("tx:fecha");
+        c.Linha.IndexOf("mensagem").Should().BeGreaterThan(abre).And.BeLessThan(fecha,
+            "o resumo é gravado na mesma transação que cria o pedido");
+        c.Linha.Count(l => l == "tx:abre").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ResumoFalha_DevolveOLink()
+    {
+        var c = new Cenario();
+        var token = await c.GerarTokenAsync();
+        c.ConversaRepo.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("banco caiu")));
+
+        var act = () => c.UseCase.ExecuteAsync(c.Input(token));
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        c.Links.Links.Single().UsadoEm.Should().BeNull("o pedido foi desfeito junto, o cliente reenvia pelo mesmo link");
+    }
+
+    [Fact]
     public async Task AvisoAoConsoleFalha_PedidoSegue()
     {
         var c = new Cenario();
