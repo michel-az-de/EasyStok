@@ -131,7 +131,9 @@ public class CaixaController(
             // Origem server-side, NUNCA do body: origem="mobile" no corpo burlaria as
             // guardas FIN-003 (metodo/justificativa + anti-caixa-negativo), que so sao
             // puladas no caminho mobile legitimo (MobileCashController seta "mobile"). #766
-            Origem = "web"
+            Origem = "web",
+            // #2319: lançamento manual exige caixa aberto; a abertura posterior não absorve mais entrada solta.
+            ExigirCaixaAberto = true
         });
         return DataCreated($"/api/caixa/movimentos/{result.Id}", result);
     }

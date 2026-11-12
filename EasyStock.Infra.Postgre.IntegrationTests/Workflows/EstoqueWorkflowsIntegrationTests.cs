@@ -11,13 +11,18 @@ using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 
 public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    [SkippableFact]
-    public async Task RegistrarEntrada_deve_persistir_item_e_movimentacao()
+    [SkippableTheory]
+    [InlineData("2026-04-03T23:30:00Z")]
+    [InlineData("2026-04-03T20:30:00-03:00")]
+    [InlineData("2026-04-04T01:30:00+02:00")]
+    [InlineData("2026-04-03T23:30:00")]
+    public async Task RegistrarEntrada_deve_persistir_item_e_movimentacao(string dataIso)
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await fixture.ResetDatabaseAsync();
@@ -41,7 +46,8 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 new MovimentacaoEstoqueRepository(context),
                 context,
                 NullLogger<RegistrarEntradaEstoqueUseCase>.Instance,
-                publicadorEventos: PublicadorNoOp);
+                publicadorEventos: PublicadorNoOp,
+                loteRepository: new LoteRepository(context));
 
             var result = await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
                 empresaId,
@@ -50,7 +56,7 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
                 10,
                 250m,
                 399.90m,
-                new DateTime(2026, 4, 3, 12, 0, 0, DateTimeKind.Utc),
+                JsonSerializer.Deserialize<DateTime>(JsonSerializer.Serialize(dataIso)),
                 NaturezaMovimentacaoEstoque.Compra,
                 "CAP3426",
                 "LOTE-01",
@@ -74,6 +80,15 @@ public class EstoqueWorkflowsIntegrationTests(PostgreSqlDatabaseFixture fixture)
             assertContext.SetMobileTenantContext(empresaId);
             var item = await assertContext.ItensEstoque.SingleAsync();
             var movimentacao = await assertContext.MovimentacoesEstoque.SingleAsync();
+            var lote = await assertContext.Lotes.SingleAsync();
+            var instanteUtc = new DateTime(2026, 4, 3, 23, 30, 0, DateTimeKind.Utc);
+
+            item.EntradaEm.Should().Be(instanteUtc);
+            item.EntradaEm.Kind.Should().Be(DateTimeKind.Utc);
+            movimentacao.DataMovimentacao.Should().Be(instanteUtc);
+            movimentacao.DataMovimentacao.Kind.Should().Be(DateTimeKind.Utc);
+            lote.DataProducao.Should().Be(instanteUtc);
+            lote.DataProducao.Kind.Should().Be(DateTimeKind.Utc);
 
             item.CodigoInterno.Should().Be("CAP3426");
             item.CodigoLote!.Value.Should().Be("LOTE-01");

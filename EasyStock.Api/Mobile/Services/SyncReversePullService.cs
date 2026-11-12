@@ -37,6 +37,45 @@ public class SyncReversePullService(
         return "extra";
     }
 
+    /// <summary>
+    /// CLI-3 (#2321): Cliente do ERP editado no console que ja tem espelho em mobile_clients. O bloco
+    /// acima os exclui; aqui o espelho recebe a edicao (nome, contato, endereco e documento) com o Id
+    /// do app. Se o pull normal ja mandou um client.upsert desse id, a mutacao e mesclada, nunca duplicada.
+    /// Campo vazio no ERP nao apaga o dado do app.
+    /// </summary>
+    private async Task AppendClientesEspelhadosAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId, Guid? lojaId)
+    {
+        var espelhados = await (
+            from m in _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
+            join c in _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking() on m.ErpClienteId equals c.Id
+            where m.EmpresaId == empresaId && c.EmpresaId == empresaId && c.Ativo && c.AlteradoEm > sinceDate
+                && (!lojaId.HasValue || m.LojaId == lojaId || m.LojaId == null)
+            select new { Espelho = m, Erp = c }).ToListAsync();
+        foreach (var par in espelhados)
+        {
+            var (m, c) = (par.Espelho, par.Erp);
+            var indice = mutations.FindIndex(x => x.Type == "client.upsert"
+                && x.Payload.ValueKind == System.Text.Json.JsonValueKind.Object
+                && x.Payload.TryGetProperty("id", out var id) && id.GetString() == m.Id);
+            var dto = indice >= 0
+                ? System.Text.Json.JsonSerializer.Deserialize<ClientDto>(mutations[indice].Payload, SyncDtoConverters.JsonOpts)!
+                : SyncDtoConverters.ToDto(m);
+            dto = dto with
+            {
+                Name = string.IsNullOrWhiteSpace(c.Nome) ? dto.Name : c.Nome,
+                Apt = string.IsNullOrWhiteSpace(c.Apt) ? dto.Apt : c.Apt,
+                Address = string.IsNullOrWhiteSpace(c.Endereco) ? dto.Address : c.Endereco,
+                Phone = string.IsNullOrWhiteSpace(c.Telefone) ? dto.Phone : c.Telefone,
+                Document = string.IsNullOrWhiteSpace(c.Documento) ? dto.Document : c.Documento
+            };
+            var ts = new DateTimeOffset(c.AlteradoEm).ToUnixTimeMilliseconds();
+            if (indice >= 0)
+                mutations[indice] = mutations[indice] with { Payload = SyncDtoConverters.Serialize(dto), Ts = Math.Max(mutations[indice].Ts, ts) };
+            else
+                mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web", "client.upsert", SyncDtoConverters.Serialize(dto), ts));
+        }
+    }
+
     public async Task AppendAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId, Guid? lojaId)
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -85,7 +124,7 @@ public class SyncReversePullService(
             var espelhosQ = _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId && m.ErpProductId != null && idsErp.Contains(m.ErpProductId!.Value));
             if (lojaId.HasValue) espelhosQ = espelhosQ.Where(m => m.LojaId == lojaId || m.LojaId == null);
-            var espelhos = (await espelhosQ.ToListAsync()).ToDictionary(m => m.ErpProductId!.Value);
+            var espelhos = (await espelhosQ.ToListAsync()).ToLookup(m => m.ErpProductId!.Value);
 
             var estoqueQ = _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId && idsErp.Contains(i.ProdutoId));
@@ -93,9 +132,12 @@ public class SyncReversePullService(
             var itensEstoque = await estoqueQ.ToListAsync();
 
             foreach (var p in produtosEspelhados)
+            foreach (var espelho in espelhos[p.Id])
             {
-                if (!espelhos.TryGetValue(p.Id, out var espelho)) continue;
-                var saldo = itensEstoque.Where(i => i.ProdutoId == p.Id).Sum(i => i.QuantidadeAtual?.Value ?? 0m);
+                var itensDoProduto = itensEstoque.Where(i => i.ProdutoId == p.Id).ToList();
+                // Sem estoque ERP, o produto criado no app conserva seu saldo, inclusive no pull do criador.
+                var saldo = itensDoProduto.Count > 0
+                    ? itensDoProduto.Sum(i => i.QuantidadeAtual?.Value ?? 0m) : espelho.Stock;
                 var dto = new ProductDto(
                     Id: espelho.Id,
                     Name: p.Nome,
@@ -126,6 +168,36 @@ public class SyncReversePullService(
             }
         }
 
+        // SYNC-3 (#2316): produto inativado no ERP depois do cursor sai do app. O PWA ja
+        // entende "product.delete" (applyServerMutations); o id e o do espelho quando existe.
+        // Cursor zerado (instalacao nova): o aparelho nao tem o que remover, entao nao reemite o
+        // delete de todos os inativos historicos. Aparelho com cache e cursor zerado e caso aceito:
+        // o upsert do inativo ja e omitido (SyncController), e o splice do delete e idempotente.
+        var inativos = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
+                && sinceDate > DateTime.UnixEpoch
+                && p.Status != StatusProduto.Ativo)
+            .Select(p => new { p.Id, p.AlteradoEm })
+            .ToListAsync();
+        if (inativos.Count > 0)
+        {
+            var idsInativos = inativos.Select(p => p.Id).ToList();
+            var espelhosInativos = (await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId && m.ErpProductId != null && idsInativos.Contains(m.ErpProductId!.Value)
+                    && (!lojaId.HasValue || m.LojaId == lojaId || m.LojaId == null))
+                .Select(m => new { ErpId = m.ErpProductId!.Value, m.Id })
+                .ToListAsync())
+                .GroupBy(m => m.ErpId).ToDictionary(g => g.Key, g => g.Select(m => m.Id).ToList());
+            foreach (var p in inativos)
+            {
+                var ids = espelhosInativos.TryGetValue(p.Id, out var espelhos) ? espelhos : new List<string> { p.Id.ToString() };
+                foreach (var idApp in ids)
+                    mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+                        "product.delete", SyncDtoConverters.Serialize(new { id = idApp }),
+                        new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
+            }
+        }
+
         // Clientes web sem mobile_client correspondente.
         var mobileLinkedClientes = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
             .Where(c => c.EmpresaId == empresaId && c.ErpClienteId != null)
@@ -143,10 +215,13 @@ public class SyncReversePullService(
                 Address: c.Endereco,
                 Phone: c.Telefone,
                 LastOrder: c.LastOrderAt.HasValue ? new DateTimeOffset(c.LastOrderAt.Value).ToUnixTimeMilliseconds() : 0,
-                OrderCount: c.OrderCount);
+                OrderCount: c.OrderCount,
+                Document: c.Documento);
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                 "client.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(c.AlteradoEm).ToUnixTimeMilliseconds()));
         }
+
+        await AppendClientesEspelhadosAsync(mutations, sinceDate, empresaId, lojaId);
 
         // Pedidos web sem MobileOrderId (criados via /api/pedidos).
         var pedidosQ = _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()

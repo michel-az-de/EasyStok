@@ -24,7 +24,14 @@
   border: 0; border-radius: var(--r-1); background: transparent; color: var(--tinta-2); box-shadow: none;
   font-size: .75rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.2; text-align: center; text-decoration: none;
 }
-.item > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* #2326: rótulo longo quebra em até 2 linhas, com hifenização do pt-BR, em vez de virar
+   "Configuraç…" e "Respostas …". Sem dicionário de hifenização (WebKit no Windows), a palavra
+   não quebra no meio ("Configuraçõe / s") e sai cortada na borda. O `title` tem o nome inteiro. */
+.item > span {
+  max-width: 100%; overflow: hidden; white-space: normal; overflow-wrap: normal; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  -webkit-hyphens: auto; hyphens: auto;
+}
 .item > svg { flex: none; }
 .item:hover:not(:disabled), .filhos > button:hover:not(:disabled), .filhos > div > button:hover:not(:disabled) {
   background: var(--preenchimento); color: var(--tinta);

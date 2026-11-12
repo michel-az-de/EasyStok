@@ -41,12 +41,13 @@ public class LotesController(
         [FromQuery] string? status = null,
         [FromQuery] DateTime? desde = null, [FromQuery] DateTime? ate = null,
         [FromQuery] string? search = null,
-        [FromQuery] string? sort = "dataproducao", [FromQuery] string? order = "desc")
+        [FromQuery] string? sort = "dataproducao", [FromQuery] string? order = "desc",
+        [FromQuery] Guid? lojaId = null)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
         var (p, sz) = NormalisePage(page, pageSize);
         var result = await listarUseCase.ExecuteAsync(new ListarLotesQuery(
-            emp, p, sz, status, desde, ate, search, sort, NormaliseOrder(order)));
+            emp, p, sz, status, desde, ate, search, sort, NormaliseOrder(order), lojaId));
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
     }
 

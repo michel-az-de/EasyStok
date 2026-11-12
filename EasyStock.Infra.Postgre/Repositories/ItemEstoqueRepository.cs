@@ -1,3 +1,4 @@
+using EasyStock.Domain.Specifications;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Defaults;
@@ -72,7 +73,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoff);
 
             if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             var totalCount = await query.CountAsync();
             var items = await query
@@ -94,7 +95,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
 
             if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             var totalCount = await query.CountAsync();
             var items = await query
@@ -107,11 +108,14 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null, Guid? lojaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
+
+            if (lojaId.HasValue)
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             var vencendo = IsFiltroVencendo(status);
             if (vencendo)
@@ -156,11 +160,14 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null)
+        public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null, Guid? lojaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
+
+            if (lojaId.HasValue)
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             if (IsFiltroVencendo(status))
                 query = AplicarFiltroVencendo(query);
@@ -253,7 +260,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(i => i.EmpresaId == empresaId && ids.Contains(i.ProdutoId));
 
             if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             // #1575: lote zerado e sem descoberto soma zero no saldo e no descoberto; fica no banco.
             if (apenasComSaldoOuDescoberto)

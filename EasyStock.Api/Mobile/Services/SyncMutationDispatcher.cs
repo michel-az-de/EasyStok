@@ -6,6 +6,7 @@ using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Mobile.Services;
@@ -48,7 +49,7 @@ public class SyncMutationDispatcher(
         finally { _snapshotImport = false; }
     }
 
-    public async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
+    public virtual async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
         var parts = m.Type.Split('.');
@@ -146,7 +147,8 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix): tenant guard.
         // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
         var existing = await _db.Set<Product>().FindAsync(dto.Id);
-        if (existing != null && existing.EmpresaId != empresaId) existing = null;
+        if (existing != null && existing.EmpresaId != empresaId)
+            throw new CadastroDeOutraEmpresaException();
 
         // Onda 5: conflict detection. Tolerância de 2s pra clock skew.
         // #1520: compara com o carimbo do servidor (quando ele gravou), nao com UpdatedAt.
@@ -233,6 +235,9 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Client>()
             .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
+        // Id global: verifica apenas a existencia, sem carregar dados de outro tenant.
+        if (existing is null && await _db.Set<Client>().AnyAsync(c => c.Id == dto.Id && c.EmpresaId != empresaId))
+            throw new CadastroDeOutraEmpresaException();
         var lastOrderDate = DateTimeOffset.FromUnixTimeMilliseconds(dto.LastOrder).UtcDateTime;
         if (existing == null)
         {
@@ -272,15 +277,42 @@ public class SyncMutationDispatcher(
                     if (!string.IsNullOrWhiteSpace(dto.Phone)) erp.Telefone = dto.Phone;
                     if (!string.IsNullOrWhiteSpace(dto.Apt)) erp.Apt = dto.Apt;
                     if (!string.IsNullOrWhiteSpace(dto.Address)) erp.Endereco = dto.Address;
+                    if (DocumentoClienteMobile.Normalizar(dto.Document) is { } documento) erp.Documento = documento;
                 }
             }
         }
     }
 
+    // #2343 (R2-API-11): campos que, ausentes, estouravam NullReferenceException no meio do apply.
+    private static readonly string[] CamposObrigatoriosDoPedido = ["id", "clientSnapshot", "items"];
+
+    private static OrderDto DeserializarOrderUpsert(MutationDto m)
+    {
+        if (m.Payload.ValueKind != System.Text.Json.JsonValueKind.Object)
+            throw new ArgumentException("order.upsert: o payload precisa ser um objeto.");
+        // #2343: campo nulo conta como ausente; tipo errado vira motivo legivel, nao NullReference/JsonException.
+        var ausentes = CamposObrigatoriosDoPedido
+            .Where(c => !m.Payload.TryGetProperty(c, out var v) || v.ValueKind is System.Text.Json.JsonValueKind.Null)
+            .ToList();
+        if (ausentes.Count > 0)
+            throw new ArgumentException($"order.upsert sem campos obrigatorios: {string.Join(", ", ausentes)}.");
+        ExigirTipo(m.Payload, "id", System.Text.Json.JsonValueKind.String, "texto");
+        ExigirTipo(m.Payload, "clientSnapshot", System.Text.Json.JsonValueKind.Object, "objeto");
+        ExigirTipo(m.Payload, "items", System.Text.Json.JsonValueKind.Array, "lista");
+        return m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)
+            ?? throw new ArgumentException("order.upsert: payload invalido.");
+    }
+
+    private static void ExigirTipo(System.Text.Json.JsonElement payload, string campo, System.Text.Json.JsonValueKind tipo, string nome)
+    {
+        if (payload.GetProperty(campo).ValueKind != tipo)
+            throw new ArgumentException($"order.upsert: campo {campo} deve ser {nome}.");
+    }
+
     private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = CaberNasColunas(m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)!);
+        var dto = CaberNasColunas(DeserializarOrderUpsert(m));
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Order>().Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == dto.Id && o.EmpresaId == empresaId);
@@ -601,7 +633,7 @@ public class SyncMutationDispatcher(
     private static ClientDto CaberNasColunas(ClientDto d) => d with
     {
         Name = Cortar(d.Name, 120)!, Apt = Cortar(d.Apt, 32), Address = Cortar(d.Address, 255),
-        Phone = Cortar(d.Phone, 32)
+        Phone = Cortar(Telefone.TryFrom(d.Phone)?.Value ?? d.Phone, 32), Document = Cortar(d.Document, 32)
     };
 
     private static OrderDto CaberNasColunas(OrderDto d) => d with

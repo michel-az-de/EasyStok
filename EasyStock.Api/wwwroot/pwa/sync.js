@@ -924,6 +924,7 @@
   // server caido por 1h causaria ~120 reqs/h por device — com backoff cai
   // pra ~6 reqs/h apos 5 falhas consecutivas.
   let _consecutiveFlushFailures = 0;
+  const PERIODIC_PULL_MIN_INTERVAL_MS = 60000; // #2347: mínimo entre pulls do laço (não dobra com o SSE)
   const FLUSH_DELAY_NORMAL_MS = 30000;   // 30s — delay padrao
   const FLUSH_DELAY_CAP_MS = 600000;     // 10min — cap maximo do backoff
   // #2184: backup 'pre-sync' antes de enviar a fila (ver _flushInner).
@@ -1152,6 +1153,7 @@
   // F7: contador de falhas consecutivas — abre ticket auto apos 5.
   let _consecutivePullFailures = 0;
   let pullPromise = null;
+  let _lastPullAt = 0;
   let _pullDeferred = false;
   async function pull() {
     if (pullPromise) return pullPromise;
@@ -1159,6 +1161,7 @@
     return pullPromise;
   }
   async function _pullInner() {
+    _lastPullAt = Date.now();
     if (syncHeldForImport() || (window.CDB_CONFIG?.isPilot && !getApiKey())) return;
     if (!navigator.onLine) return;
     if (_pairingInvalid) return;
@@ -1442,10 +1445,7 @@
     flushIntervalId = setTimeout(async function flushTick() {
       let status = 'ok';
       try {
-        status = (await flush()) || 'ok';
-        fetchAndProcessCommands();
-        // #2209: a regra de impressão da loja; o próprio atualizar segura o intervalo de 10 min.
-        atualizarRegraImpressao();
+        status = await runSyncCycle();
       } catch (e) {
         try { console.warn('[sync] tick falhou:', e && e.message); } catch (_) {}
         status = 'retry';
@@ -1453,6 +1453,19 @@
         scheduleNextFlush(computeFlushDelay(status));
       }
     }, delay);
+  }
+  // Um ciclo do laço: flush, comandos remotos, regra de impressão e, passado o intervalo mínimo, pull.
+  async function runSyncCycle() {
+    const status = (await flush()) || 'ok';
+    fetchAndProcessCommands();
+    // #2209: a regra de impressão da loja; o próprio atualizar segura o intervalo de 10 min.
+    atualizarRegraImpressao();
+    // #2347: mudança feita no servidor (console, site, pagamento) não gera SSE para este aparelho.
+    // Sem 'review'/'auth' (import ou pareamento inválido); falha do pull não vira retry do flush.
+    if (status !== 'review' && status !== 'auth' && Date.now() - _lastPullAt >= PERIODIC_PULL_MIN_INTERVAL_MS) {
+      pull().catch(() => {});
+    }
+    return status;
   }
   function stop() {
     if (flushIntervalId) { clearTimeout(flushIntervalId); flushIntervalId = null; }
@@ -1973,7 +1986,9 @@
     const limite = ctrl ? setTimeout(() => ctrl.abort(), 10000) : null;
     let resp;
     try {
-      resp = await fetch(API_BASE_URL + API_PREFIX + '/impressao', { method: 'GET', headers: baseHeaders(), signal: ctrl ? ctrl.signal : undefined });
+      // #2321: a carga chama antes do login Google; baseHeaders() então sai sem a chave e o servidor responde 401.
+      // A chave é a do pareamento, a mesma credencial do aparelho nas outras chamadas mobile.
+      resp = await fetch(API_BASE_URL + API_PREFIX + '/impressao', { method: 'GET', headers: { 'X-Device-Id': deviceId, 'X-Mobile-Api-Key': pareamento.apiKey }, signal: ctrl ? ctrl.signal : undefined });
     } finally { if (limite) clearTimeout(limite); }
     if (!resp || !resp.ok) return false;
     const corpo = await resp.json();
@@ -2789,7 +2804,7 @@
     // do periodo offline / sem pairing.
     try { flush(); } catch (_) {}
     // Pull inicial pra trazer produtos/clientes/pedidos. Sem isso a UI
-    // fica vazia ate o ciclo de 30s do sync loop disparar o proximo pull.
+    // fica vazia ate o laço periódico (a cada 60s no minimo) puxar de novo.
     try { await pull(); } catch (_) {}
     if (typeof window !== 'undefined') {
       try {
@@ -3060,7 +3075,7 @@
   window.cdbSync = {
     flush, pull, stop, localReady,
     pingVersion, uploadErrorLog,
-    pairWithCode, pairAuto, applySessionPairing,
+    pairWithCode, pairAuto, applySessionPairing, runSyncCycle,
     getDeviceId: () => deviceId,
     getDataContext: pilotDataContext,
     openTicketAuto,

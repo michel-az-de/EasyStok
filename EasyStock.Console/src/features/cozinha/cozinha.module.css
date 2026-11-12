@@ -57,13 +57,17 @@
 .contagem { font-family: var(--f-dado); }
 
 /* Entregue recolhido (RN-30/UC-04): mesmo desenho tipográfico de "coluna h2",
-   só que em botão, porque a coluna vira contagem que abre com um toque. */
+   só que em botão, porque a coluna vira contagem que abre com um toque. #2326: o texto alinha no
+   topo, na linha dos outros títulos; centralizado nos 40 px do toque, descia 10 px. */
 .tituloRecolhivel {
   margin: 0; padding: 0; width: 100%; min-height: var(--toque);
   font: inherit; font-size: var(--t-apoio); text-transform: uppercase; letter-spacing: .04em;
   color: var(--tinta-3); font-weight: 700; display: flex; align-items: center; gap: var(--e-1);
   background: none; border: 0; text-align: left; cursor: pointer;
 }
+/* #2326: o alvo de toque fica com 40 px, mas o texto sobe para a linha dos outros títulos
+   (centralizado, "ENTREGUE" ficava 10 px abaixo de "PAGO" e "PRONTO"). */
+.tituloRecolhivel { align-items: flex-start; }
 .chevronAberto { transform: rotate(90deg); }
 .listaColuna { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); min-height: 60px; overflow-y: auto; }
 

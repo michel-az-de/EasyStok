@@ -54,7 +54,8 @@ public sealed class ProdutoMobileCustoMinimoTests : IDisposable
             Substitute.For<IProdutoRepository>(),
             DispatcherDeTeste.EstornoDeCaixa(_db),
             NullLogger<SyncMutationDispatcher>.Instance);
-        _linker = new ProductLinker(_db, sysUser, NullLogger<ProductLinker>.Instance);
+        _linker = new ProductLinker(_db, sysUser, NullLogger<ProductLinker>.Instance,
+            new EasyStock.Infra.Postgre.Repositories.ProdutoRepository(_db));
     }
 
     private async Task PushAsync(JsonObject produto)

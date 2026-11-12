@@ -192,6 +192,34 @@ module.exports = function ({ test, sandbox, runInSandbox, assert }) {
     }
   });
 
+  test('#2321 regra da loja: busca antes do login Google leva a chave do pareamento (sem 401 na carga)', async () => {
+    const pareamento = sandbox.localStorage.getItem('cdb-pairing');
+    const configOriginal = sandbox.window.CDB_CONFIG;
+    const authOriginal = sandbox.window.cdbAuth;
+    const lojaId = 'aaaaaaaa-0000-0000-0000-000000000001';
+    sandbox.localStorage.setItem('cdb-pairing', JSON.stringify({ apiKey: 'tk-teste', empresaId: 'eeeeeeee-0000-0000-0000-000000000001', lojaId }));
+    sandbox.localStorage.removeItem(REGRA);
+    sandbox.window.CDB_CONFIG = Object.assign({}, configOriginal, { requiresGoogleSession: true });
+    sandbox.window.cdbAuth = { canSync: () => false };
+    const chaves = [];
+    try {
+      await comServidor(estado([]), async (url, opts) => {
+        if (url.indexOf('/api/mobile/impressao') >= 0) {
+          chaves.push(opts.headers && opts.headers['X-Mobile-Api-Key']);
+          return resp({ data: { lojaId, versao: 1, alteradoEm: '2026-11-04T15:00:00Z', impressao: null } });
+        }
+        return resp({}, 404);
+      }, async (cdbSync) => {
+        assert.strictEqual(await cdbSync.atualizarRegraImpressao({ forcar: true }), true);
+      });
+      assert.deepStrictEqual(chaves, ['tk-teste'], 'a chave do pareamento vai no cabeçalho mesmo sem sessão Google');
+    } finally {
+      sandbox.window.CDB_CONFIG = configOriginal;
+      sandbox.window.cdbAuth = authOriginal;
+      if (pareamento === null) sandbox.localStorage.removeItem('cdb-pairing'); else sandbox.localStorage.setItem('cdb-pairing', pareamento);
+    }
+  });
+
   test('#2209 regra da loja: nula apaga o cache; de outra loja, 404 ou erro mantêm o cache', async () => {
     const pareamento = sandbox.localStorage.getItem('cdb-pairing');
     const lojaId = 'aaaaaaaa-0000-0000-0000-000000000002';

@@ -227,11 +227,24 @@
     // Linhas dos dados no corpo pt; a nota quebra em até 2 linhas na largura
     // dada (a coluna toda, acima do QR, ou a parte ao lado dele). null: a
     // nota não cabe nesse corpo.
-    function linhasNoCorpo(linhas, pt, largura) {
+    function quebrarLote(texto, largura, pt, peso) {
+      const partes = []; let linha = '';
+      for (const letra of texto) {
+        if (linha && medir(linha + letra, pt, peso) > largura) {
+          partes.push(linha); linha = letra;
+          if (partes.length >= 2) return null;
+        } else linha += letra;
+      }
+      if (linha) partes.push(linha);
+      return partes;
+    }
+    function linhasNoCorpo(linhas, pt, largura, permitirQuebraLote) {
       const out = [];
       for (const d of linhas) {
         const corpo = d.id === 'val' ? Math.max(pt + 1, d.min) : Math.max(pt, d.min);
-        const partes = d.quebra && medir(d.texto, corpo, d.peso) > largura ? quebrar(medir, d.texto, largura, corpo, d.peso, d.quebra) : [d.texto];
+        const partes = permitirQuebraLote && d.id === 'lote' && medir(d.texto, corpo, d.peso) > largura
+          ? quebrarLote(d.texto, largura, corpo, d.peso)
+          : d.quebra && medir(d.texto, corpo, d.peso) > largura ? quebrar(medir, d.texto, largura, corpo, d.peso, d.quebra) : [d.texto];
         if (!partes) return null;
         partes.forEach(t => out.push({ id: d.id, texto: t, peso: d.peso, corpo, h: corpo * PT_MM * 1.3 }));
       }
@@ -239,7 +252,7 @@
     }
     const larguras = estreita === colTexto ? [colTexto] : [colTexto, estreita];
 
-    function montar(incluidas) {
+    function montar(incluidas, permitirQuebraLote = false) {
       const fixos = [];
       let y0 = m;
       const emp = incluidas.find(l => l.topo);
@@ -261,7 +274,7 @@
           if (melhor && nota <= melhor.nota) break;
           let els = null;
           for (const larg of larguras) {
-            const fila = els ? null : linhasNoCorpo(linhas, pt, larg);
+            const fila = els ? null : linhasNoCorpo(linhas, pt, larg, permitirQuebraLote);
             if (!fila) continue;
             const bloco = fila.reduce((s, l) => s + l.h, 0);
             // Sem código, na altura fixa: os dados descem até o fundo; se não
@@ -291,14 +304,25 @@
     }
 
     let incluidas = dados.slice();
-    let elementos = montar(incluidas);
+    // Preserva o desenho anterior quando cabe; o codigo inteiro pode ocupar duas linhas.
+    let elementos = montar(incluidas) || montar(incluidas, true);
     for (const pri of [4, 3, 2]) {
       if (elementos) break;
       omitidos.push.apply(omitidos, incluidas.filter(l => l.pri === pri).map(l => l.id));
       incluidas = incluidas.filter(l => l.pri < pri);
-      elementos = montar(incluidas);
+      elementos = montar(incluidas) || montar(incluidas, true);
     }
     if (!elementos) return recusar(`nome, validade, fabricação e lote não cabem em ${W} x ${H} mm com letra legível (nome ${MIN.nomePt} pt, dados ${MIN.dadoPt} pt)`);
+
+    // Na etiqueta deitada, a area abaixo do QR fica livre das barras e de sua zona quieta.
+    if (horiz && qrBox && querBarras && omitidos.includes('empresa')) {
+      const partes = quebrar(medir, campos.empresa, qrBox.lado, EMPRESA_PT, 600, 2);
+      const h = EMPRESA_PT * PT_MM * 1.25, y = qrBox.y + qrBox.lado + 1;
+      if (partes && y + partes.length * h <= H - m) {
+        partes.forEach((p, i) => elementos.push(texto('empresa', p, qrBox.x, y + i * h, qrBox.lado, h, EMPRESA_PT, 600)));
+        omitidos.splice(omitidos.indexOf('empresa'), 1);
+      }
+    }
 
     // 4. Rolo contínuo: sobe os códigos até o texto e corta a altura no conteúdo.
     let altura = H;

@@ -110,6 +110,30 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         mutations.Should().NotContain(m => m.Type == "product.upsert");
     }
 
+    [Theory]
+    [InlineData(false, 7)]
+    [InlineData(true, 0)]
+    public async Task CriadorDoProduto_SemUpsertNormal_PreservaSaldoMobileSemEstoqueErp(bool temEstoqueErp, int saldoEsperado)
+    {
+        var loja = Guid.NewGuid();
+        var produto = ProdutoErpComEspelho("Produto criado pelo app", DateTime.UtcNow);
+        var espelho = _db.Set<Product>().Local.Single(p => p.ErpProductId == produto.Id);
+        espelho.LojaId = loja;
+        espelho.LastDeviceId = "criador";
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m);
+        if (temEstoqueErp) ItemEstoqueDoErp(produto.Id, loja, 0m);
+        await _db.SaveChangesAsync();
+
+        // O pull normal exclui LastDeviceId == criador, portanto o reverse recebe a lista vazia.
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, loja);
+
+        var upsert = mutations.Should().ContainSingle(m => m.Type == "product.upsert").Subject;
+        upsert.Payload.GetProperty("id").GetString().Should().Be(espelho.Id);
+        upsert.Payload.GetProperty("stock").GetInt32().Should().Be(saldoEsperado);
+        espelho.Stock.Should().Be(7, "o pull nao altera o saldo persistido do aparelho");
+    }
+
     [Fact]
     public async Task ProdutoErpAlterado_EstoqueVemDosItensDaLojaDoDevice()
     {
@@ -123,6 +147,51 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, lojaDevice);
 
         mutations.Single(m => m.Type == "product.upsert").Payload.GetProperty("stock").GetInt32().Should().Be(4);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EstoqueErpPosteriorAoCursor_ChegaAoCriadorEAOutroDevice(bool outroDevice)
+    {
+        var criadoEm = DateTime.UtcNow.AddMinutes(-3);
+        var cursorInicial = criadoEm.AddMinutes(1);
+        var alteradoEm = cursorInicial.AddMinutes(1);
+        var cursorFinal = alteradoEm.AddSeconds(1);
+        var loja = Guid.NewGuid();
+        var produto = ProdutoErpComEspelho("Produto do app", criadoEm);
+        var espelho = _db.Set<Product>().Local.Single(p => p.ErpProductId == produto.Id);
+        espelho.LojaId = loja;
+        espelho.LastDeviceId = "criador";
+        await _db.SaveChangesAsync();
+
+        var primeiroPull = new List<MutationDto>();
+        if (outroDevice)
+            primeiroPull.Add(new MutationDto("mobile", "criador", "product.upsert",
+                System.Text.Json.JsonSerializer.SerializeToElement(
+                    new ProductDto(espelho.Id, espelho.Name, null, "extra", null, 0m, espelho.Stock, false),
+                    new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)),
+                new DateTimeOffset(criadoEm).ToUnixTimeMilliseconds()));
+        await _servico.AppendAsync(primeiroPull, criadoEm.AddSeconds(-1), _empresaId, loja);
+        primeiroPull.Should().ContainSingle().Which.Payload.GetProperty("stock").GetInt32().Should().Be(7);
+
+        // Depois do cursor, o cadastro ERP mudou e ha saldo real da loja e global.
+        produto.Nome = "Produto atualizado no ERP";
+        produto.AlteradoEm = alteradoEm;
+        ItemEstoqueDoErp(produto.Id, loja, 4m);
+        ItemEstoqueDoErp(produto.Id, null, 2m);
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m);
+        await _db.SaveChangesAsync();
+        var incremental = new List<MutationDto>();
+        await _servico.AppendAsync(incremental, cursorInicial, _empresaId, loja);
+        var atualizacao = incremental.Should().ContainSingle().Which;
+        atualizacao.Payload.GetProperty("stock").GetInt32().Should().Be(6);
+        atualizacao.Payload.GetProperty("name").GetString().Should().Be(produto.Nome);
+        atualizacao.Ts.Should().Be(new DateTimeOffset(alteradoEm).ToUnixTimeMilliseconds());
+
+        var repetido = new List<MutationDto>();
+        await _servico.AppendAsync(repetido, cursorFinal, _empresaId, loja);
+        repetido.Should().BeEmpty();
     }
 
     [Fact]
@@ -147,6 +216,53 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         upsert.DeviceId.Should().Be("aparelho-a");
         upsert.Payload.GetProperty("name").GetString().Should().Be("Nome novo do console");
         upsert.Payload.GetProperty("stock").GetInt32().Should().Be(3);
+    }
+
+    [Fact]
+    public async Task ProdutoErpComDoisEspelhos_AtualizaAmbosEContinuaOPull()
+    {
+        var lojaId = Guid.NewGuid();
+        var produto = ProdutoErpComEspelho("Nome novo do console", DateTime.UtcNow);
+        _db.Add(new Product
+        {
+            Id = "outro-espelho",
+            Name = "Outro nome antigo",
+            EmpresaId = _empresaId,
+            LojaId = lojaId,
+            ErpProductId = produto.Id,
+        });
+        _db.Add(new Product
+        {
+            Id = "outra-empresa",
+            Name = "Produto de outra empresa",
+            EmpresaId = Guid.NewGuid(),
+            LojaId = lojaId,
+            ErpProductId = produto.Id,
+        });
+        _db.Add(new Product
+        {
+            Id = "outra-loja",
+            Name = "Produto de outra loja",
+            EmpresaId = _empresaId,
+            LojaId = Guid.NewGuid(),
+            ErpProductId = produto.Id,
+        });
+        ItemEstoqueDoErp(produto.Id, lojaId, 7m);
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m);
+        var cliente = Cliente.Criar(_empresaId, "Cliente novo no console");
+        _db.Add(cliente);
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, lojaId);
+
+        var produtos = mutations.Where(m => m.Type == "product.upsert").ToList();
+        produtos.Select(m => m.Payload.GetProperty("id").GetString())
+            .Should().BeEquivalentTo("mob-" + produto.Id, "outro-espelho");
+        produtos.Should().OnlyContain(m => m.Payload.GetProperty("name").GetString() == "Nome novo do console"
+            && m.Payload.GetProperty("stock").GetInt32() == 7);
+        mutations.Should().ContainSingle(m => m.Type == "client.upsert"
+            && m.Payload.GetProperty("id").GetString() == cliente.Id.ToString());
     }
 
     public void Dispose() => _db.Dispose();

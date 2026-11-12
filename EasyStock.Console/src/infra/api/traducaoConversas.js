@@ -65,6 +65,7 @@ export function mensagemDaApi(m, conversaId = null) {
   const avaliacao = !saida && m.tipoConteudo === 'Botao' ? BOTAO_DE_AVALIACAO.exec(m.botaoId ?? '')?.[1].toLowerCase() : null
   return {
     id: m.id,
+    ...(m.enviadaPorUsuarioId ? { enviadaPorUsuarioId: m.enviadaPorUsuarioId } : {}),
     dir: saida ? 'out' : 'in',
     texto: m.texto?.trim() ? m.texto : avaliacao ? `Avaliação ${avaliacao}` : ROTULO_DO_CONTEUDO[m.tipoConteudo] || 'Conteúdo não disponível nesta mensagem.',
     ...(avaliacao ? { formato: 'avaliacaoResposta', valor: avaliacao } : {}),
@@ -121,6 +122,7 @@ export function situacaoConversaDaApi(resumo, usuario) {
     estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
     situacaoApi: resumo.situacao,
     assumidaPorUsuarioId: resumo.assumidaPorUsuarioId ?? null,
+    assumidaPorNome: resumo.assumidaPorNome?.trim() || null,
     responsavel: resumo.assumidaPorUsuarioId ? (resumo.assumidaPorNome?.trim() || (minha ? usuario.nome : 'Outro atendente')) : null,
     pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
     passagem: passagemDaApi(resumo),
