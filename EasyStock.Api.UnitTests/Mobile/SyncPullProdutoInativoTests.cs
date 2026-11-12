@@ -99,4 +99,16 @@ public sealed class SyncPullProdutoInativoTests : IDisposable
 
         mutations.Should().ContainSingle(m => m.Type == "product.upsert");
     }
+
+    [Fact]
+    public async Task EspelhoApontandoParaProdutoInativoDeOutraEmpresa_SaiComoUpsert()
+    {
+        // A consulta dos inativos ignora o filtro global; o filtro por empresa dela e o que impede
+        // um Produto de outra empresa de esconder o espelho deste aparelho.
+        await ProdutoComEspelhoTocadoPeloAparelhoB(StatusProduto.Inativo, empresaDoProduto: Guid.NewGuid());
+
+        var mutations = await PullDoAparelhoAAsync();
+
+        mutations.Should().ContainSingle(m => m.Type == "product.upsert");
+    }
 }
