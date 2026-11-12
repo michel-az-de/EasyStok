@@ -357,6 +357,7 @@
       <div class="pilot-actions">
         ${tileButton('production', 'Produção', 'producao', 'production')}
         ${tileButton('local-orders', 'Pedidos', 'pedido-em-preparo', 'orders')}
+        ${tileButton('clients', 'Clientes', 'ficha', 'orders')}
       </div>
       <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p></div>
       <div class="pilot-home-controls">
@@ -878,6 +879,7 @@
       if (action === 'notices') openNotices();
       if (action === 'production') { closeHome(); root.go('producao'); }
       if (action === 'local-orders') { closeHome(); root.go('pedidos'); }
+      if (action === 'clients') { closeHome(); root.go('clientes'); }
       if (action === 'workspace') {
         if (openingWorkspace) return;
         if (root.navigator?.onLine === false) throw new Error('Atendimento precisa de conexão. Confira a internet e tente novamente.');
