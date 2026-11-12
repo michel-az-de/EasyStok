@@ -14,7 +14,7 @@ import { estaRemovido } from '../../../dominio/cardapio'
 import { plural } from '../../../dominio/formato'
 import {
   VALIDADES_RAPIDAS, cartoesDaGrade, categoriasDaGrade, definirNoLote, faltaProduzir, filtrarGrade, linhasIniciais, nomeDoCartao,
-  ordenarPeloCardapio, porcoesNoLote, quantidadeDigitada, resumoDoLote, soDigitos, somarNoLote, tamanhoNoCartao,
+  ordenarPeloCardapio, porcoesNoLote, quantidadeDigitada, resumoDoLote, somarNoLote, tamanhoNoCartao,
 } from '../../../dominio/gradeDeProducao'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { erroDaLinha, sobraDaLinha } from '../../../dominio/producao'
@@ -39,7 +39,10 @@ const diaCurto = (iso) => (iso ? iso.split('-').reverse().slice(0, 2).join('/') 
 const CAMPO_DO_ERRO = {
   'Escolha a porção produzida.': 'variacaoId',
   'Quantas porções saíram?': 'porcoes',
+  'Informe porções inteiras maiores que zero.': 'porcoes',
+  'O lote aceita até 9.999 porções.': 'porcoes',
   'Validade em dias inteiros.': 'validadeDias',
+  'Validade de até 3.650 dias.': 'validadeDias',
   'Peso da porção em gramas inteiros.': 'pesoPorPorcaoG',
   'Peso real em gramas inteiros.': 'pesoRealG',
   'O peso real não fecha as porções.': 'pesoRealG',
@@ -103,6 +106,7 @@ export function AbaProducaoDoDiaApi() {
   // confirmar de novo nem mexer num lote que já foi.
   const [enviando, setEnviando] = useState(() => producaoDoDia.enviando())
   const [erro, setErro] = useState(null)
+  const [ajustesAbertos, setAjustesAbertos] = useState({})
   const [lotes, setLotes] = useState(lotesLancados)
   // O que está na folha, de qual lote: { loteId } buscando, com `folha` pronta, com `erro` falhou.
   const [impressao, setImpressao] = useState(null)
@@ -149,6 +153,7 @@ export function AbaProducaoDoDiaApi() {
     setLotes(lotesLancados())
     setLinhas([])
     setErro(null)
+    setAjustesAbertos({})
     setRevisando(false)
     setLeitura((n) => n + 1)
     recarregarEstoque()
@@ -237,9 +242,10 @@ export function AbaProducaoDoDiaApi() {
     setBusca(item.nome)
   }
   const mudar = (id, campo) => (e) => naLinha(id, (l) => ({ ...l, [campo]: e.target.value }))
-  // Porções e dias são contagem: o campo só guarda dígitos. Peso continua como ela digitou, porque
-  // "350,5" tem de virar aviso, não 3505.
-  const mudarContagem = (id, campo) => (e) => naLinha(id, (l) => ({ ...l, [campo]: soDigitos(e.target.value) }))
+  const alternarAjustes = (id) => (e) => {
+    const aberto = e.currentTarget.open
+    setAjustesAbertos((atual) => ({ ...atual, [id]: aberto }))
+  }
   const definirValidade = (id, dias) => naLinha(id, (l) => ({ ...l, validadeDias: String(dias) }))
   // M1.4e (#1552): escolher a porção traz o peso dela, que é o que faz a receita em peso baixar o
   // insumo certo; o que ela digitou fica.
@@ -253,7 +259,10 @@ export function AbaProducaoDoDiaApi() {
     setConfirmandoLimpar(false)
     // Gravou: quem mostra o lote e zera as linhas é o `aoLancarLote` acima.
     const r = await producaoDoDia.produzir(linhas.map((l) => paraEnviar(l, pratos)))
-    if (!r.ok) setErro(r.erro)
+    if (!r.ok) {
+      setErro(r.erro)
+      setAjustesAbertos(Object.fromEntries(linhas.map((l) => [l.id, true])))
+    }
   }
 
 
@@ -445,10 +454,10 @@ export function AbaProducaoDoDiaApi() {
                       <li key={l.id} className={grade.itemDoLote}>
                         {/* #2081 (A11): as porções à vista, ao lado do nome; validade e peso ficam em "Ajustar". */}
                         <div className={grade.porcoesDoItem}>
-                          <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" aria-label={`Porções de ${nome}`} value={l.porcoes} onChange={mudarContagem(l.id, 'porcoes')} {...validacao('porcoes')} />
+                          <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Porções" aria-label={`Porções de ${nome}`} value={l.porcoes} onChange={mudar(l.id, 'porcoes')} {...validacao('porcoes')} />
                         </div>
                         {/* Abre sozinho quando o prato pede decisão dela ou quando o envio foi recusado. */}
-                        <details open={faltaPorcao || !prato || Boolean(erro) || undefined}>
+                        <details open={faltaPorcao || !prato || ajustesAbertos[l.id] || undefined} onToggle={alternarAjustes(l.id)}>
                           <summary className={grade.resumoDoItem}>
                             <span className={css.numeroPrato}>{String(indice + 1).padStart(2, '0')}</span>
                             <span className={grade.textoDoItem}>
@@ -463,7 +472,7 @@ export function AbaProducaoDoDiaApi() {
                                 opcoes={[{ valor: '', rotulo: 'Escolha a porção' }, ...porcoesDoPrato.map((v) => ({ valor: v.id, rotulo: v.rotulo }))]} />
                             )}
                             <div className={grade.camposDoItem}>
-                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Validade (dias)" aria-label={`Validade em dias de ${nome}`} value={l.validadeDias} onChange={mudarContagem(l.id, 'validadeDias')} {...validacao('validadeDias')} />
+                              <CampoTexto disabled={enviando} inputMode="numeric" rotulo="Validade (dias)" aria-label={`Validade em dias de ${nome}`} value={l.validadeDias} onChange={mudar(l.id, 'validadeDias')} {...validacao('validadeDias')} />
                             </div>
                             <div className={grade.chips} role="radiogroup" aria-label={`Validade de ${nome}`}>
                               {VALIDADES_RAPIDAS.map((dias) => (

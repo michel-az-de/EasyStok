@@ -33,6 +33,8 @@ public class DevicePairingController(
     private readonly ICurrentUserAccessor _currentUser = currentUser;
     private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<DevicePairingController> _log = log;
+    private const int TamanhoMinimoSegredo = 32;
+    private static readonly TimeSpan IntervaloMinimoRotacao = TimeSpan.FromMinutes(10);
 
     /// <summary>Pareia somente o aparelho da sessão Google nativa atual, com a autorização Gerente existente.</summary>
     [HttpPost("pair-session")]
@@ -218,14 +220,14 @@ public class DevicePairingController(
 
         if (device == null)
         {
-            _log.LogWarning("Pair tentado com código inválido. code={Code} ip={IP}",
-                code, HttpContext.Connection.RemoteIpAddress);
+            _log.LogWarning("Pair tentado com código inválido. ip={IP}",
+                HttpContext.Connection.RemoteIpAddress);
             return Unauthorized(new { error = "código inválido ou já usado" });
         }
 
         if (device.PairingExpiresAt == null || device.PairingExpiresAt < DateTime.UtcNow)
         {
-            _log.LogWarning("Pair tentado com código expirado. code={Code}", code);
+            _log.LogWarning("Pair tentado com código expirado. ip={IP}", HttpContext.Connection.RemoteIpAddress);
             return Unauthorized(new { error = "código expirado, gere um novo no painel" });
         }
 
@@ -333,12 +335,14 @@ public class DevicePairingController(
     ///
     /// Server precisa de 3 env vars (ou seção `AppProvisioning` em
     /// appsettings):
-    ///   <c>AppProvisioning:Secret</c>     — token compartilhado (>= 16 chars)
+    ///   <c>AppProvisioning:Secret</c>     — token compartilhado (>= 32 chars; mais curto desliga o endpoint)
     ///   <c>AppProvisioning:EmpresaId</c>  — Guid da empresa default
     ///   <c>AppProvisioning:LojaId</c>     — Guid da loja default
     /// Se qualquer uma faltar, retorna 503. Comparação do secret é
     /// time-constant. Rate limit `mobile-anonymous` cobre brute-force.
-    /// Idempotente: mesmo deviceId chamando 2x rotaciona apiKey sem duplicar.
+    /// Idempotente: mesmo deviceId chamando 2x rotaciona apiKey sem duplicar (o "Desparear" do
+    /// Diagnóstico depende disso). #2367: como o secret vem embutido no APK, a rotação de um aparelho
+    /// ativo fica limitada a 1 a cada 10 min (429) e avisa a dona no sino.
     /// </summary>
     [HttpPost("pair-auto")]
     [AllowAnonymous]
@@ -362,6 +366,12 @@ public class DevicePairingController(
             || string.IsNullOrWhiteSpace(lojaIdStr))
         {
             _log.LogWarning("pair-auto chamado mas AppProvisioning não configurado no server");
+            return StatusCode(503, new { error = "auto-provisioning desabilitado neste servidor" });
+        }
+
+        if (expectedSecret.Trim().Length < TamanhoMinimoSegredo)
+        {
+            _log.LogWarning("pair-auto desligado: AppProvisioning:Secret tem menos de {Minimo} caracteres", TamanhoMinimoSegredo);
             return StatusCode(503, new { error = "auto-provisioning desabilitado neste servidor" });
         }
 
@@ -412,6 +422,13 @@ public class DevicePairingController(
                 return Conflict(new { error = "dispositivo já pertence a outra empresa" });
             if (existing.Revoked)
                 return Conflict(new { error = "dispositivo revogado, gere um novo código no painel" });
+            if (existing.PairedAt > now - IntervaloMinimoRotacao)
+            {
+                _log.LogWarning("pair-auto: rotação recusada, aparelho {DeviceId} pareado há menos de {Minutos} min",
+                    existing.Id, IntervaloMinimoRotacao.TotalMinutes);
+                return StatusCode(StatusCodes.Status429TooManyRequests,
+                    new { error = "aparelho pareado há pouco, aguarde alguns minutos e tente de novo" });
+            }
 
             existing.ApiKeyHash = apiKeyHash;
             existing.EmpresaId = empresaId;
@@ -422,8 +439,17 @@ public class DevicePairingController(
             existing.LastSeenAt = now;
             existing.LastSeenIp = HttpContext.Connection.RemoteIpAddress?.ToString();
             existing.UpdatedAt = now;
+            var nomeAntesDaTroca = existing.Label ?? existing.Id;
             if (!string.IsNullOrWhiteSpace(req.Label)) existing.Label = req.Label;
-            await _db.SaveChangesAsync(ct);
+            _db.Set<Notificacao>().Add(Notificacao.Criar(
+                empresaId,
+                TipoAlertaEstoque.AvisoOperacional,
+                "Aparelho reconectado",
+                $"A chave do aparelho '{nomeAntesDaTroca}' foi trocada pelo pareamento automático. Se não foi você, revogue o aparelho no painel.",
+                SeveridadeNotificacao.Alta));
+            // Endpoint anônimo: sem tenant na conexão, a policy RLS da notificação recusaria o INSERT.
+            using (_db.UseRowLevelSecurityBypass())
+                await _db.SaveChangesAsync(ct);
 
             _log.LogInformation("Device re-auto-pareado: id={DeviceId} empresa={EmpresaId} loja={LojaId}",
                 existing.Id, empresaId, lojaId);
