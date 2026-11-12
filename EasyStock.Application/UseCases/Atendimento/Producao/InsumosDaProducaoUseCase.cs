@@ -77,6 +77,13 @@ public sealed class InsumosDaProducaoUseCase(
         if (string.IsNullOrWhiteSpace(dados.Nome)) throw new UseCaseValidationException("Informe o nome do insumo.");
         Validar(dados);
 
+        // #2408: categoria, produto, custo e saldo inicial gravam juntos. Se a entrada do saldo falhar, o cadastro é
+        // desfeito em vez de deixar o insumo sem o saldo digitado. Sem retry: o cadastro cria Guid novo.
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(_ => GravarNovoAsync(empresaId, usuarioId, dados), ct);
+    }
+
+    private async Task<Guid> GravarNovoAsync(Guid empresaId, Guid usuarioId, InsumoInput dados)
+    {
         var embalagem = dados.Embalagem == true;
         var categoriaId = embalagem
             ? await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, empresaId,
