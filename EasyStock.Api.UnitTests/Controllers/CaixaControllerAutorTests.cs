@@ -26,6 +26,9 @@ public class CaixaControllerAutorTests
         currentUser.Nivel.Returns(NivelAcesso.Operador);
         currentUser.EmpresaId.Returns(empresaId);
         repo.GetFechamentoDoDiaAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid?>()).Returns((FechamentoCaixa?)null);
+        // #2319: o lançamento manual exige caixa aberto.
+        repo.GetAberturaPendenteAsync(Arg.Any<Guid>(), Arg.Any<Guid?>())
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 0m, DateTime.UtcNow, null));
         var registrar = new RegistrarMovimentoCaixaUseCase(repo, Substitute.For<IUnitOfWork>(),
             new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
