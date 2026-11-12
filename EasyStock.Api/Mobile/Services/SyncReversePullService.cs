@@ -128,8 +128,12 @@ public class SyncReversePullService(
 
         // SYNC-3 (#2316): produto inativado no ERP depois do cursor sai do app. O PWA ja
         // entende "product.delete" (applyServerMutations); o id e o do espelho quando existe.
+        // Cursor zerado (instalacao nova): o aparelho nao tem o que remover, entao nao reemite o
+        // delete de todos os inativos historicos. Aparelho com cache e cursor zerado e caso aceito:
+        // o upsert do inativo ja e omitido (SyncController), e o splice do delete e idempotente.
         var inativos = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
             .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
+                && sinceDate > DateTime.UnixEpoch
                 && p.Status != StatusProduto.Ativo)
             .Select(p => new { p.Id, p.AlteradoEm })
             .ToListAsync();

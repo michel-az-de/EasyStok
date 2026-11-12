@@ -94,4 +94,47 @@ public sealed class SyncReversePullProdutoInativoTests : IDisposable
 
         mutations.Should().NotContain(m => m.Type == "product.delete");
     }
+
+    [Fact]
+    public async Task ProdutoReativado_ComEspelho_VoltaComoUpsertENaoComoDelete()
+    {
+        var produto = Produto("Voltou", StatusProduto.Ativo, DateTime.UtcNow, comEspelho: true);
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, null);
+
+        mutations.Should().NotContain(m => m.Type == "product.delete");
+        mutations.Should().ContainSingle(m => m.Type == "product.upsert")
+            .Which.Payload.GetProperty("id").GetString().Should().Be("mob-" + produto.Id);
+    }
+
+    [Fact]
+    public async Task ProdutoInativoDeOutraEmpresa_NaoGeraEvento()
+    {
+        var outraEmpresa = Guid.NewGuid();
+        _db.Add(new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = outraEmpresa, Nome = "De outro", Tipo = TipoProduto.Alimento,
+            Status = StatusProduto.Inativo, CriadoEm = DateTime.UtcNow.AddDays(-10), AlteradoEm = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, null);
+
+        mutations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CursorZerado_NaoReemiteDeleteDosInativosHistoricos()
+    {
+        Produto("Historico", StatusProduto.Inativo, DateTime.UtcNow.AddDays(-30), comEspelho: true);
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UnixEpoch, _empresaId, null);
+
+        mutations.Should().NotContain(m => m.Type == "product.delete");
+    }
 }
