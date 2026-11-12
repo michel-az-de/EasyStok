@@ -10868,8 +10868,31 @@ const STATE_LABEL = {
 // Renderizadores usam as primeiras 1-2 acoes; o resto fica disponivel
 // pelos botoes/menus existentes (cobrar, imprimir, historico, cancelar).
 // Status desconhecido → retorna [] (callers caem no layout antigo).
+// #2307: o servidor manda quanto falta receber (aReceber). Sem o campo (servidor antigo), nada muda.
+function saldoAReceber(o) {
+  if (!o || o.aReceber === undefined || o.aReceber === null) return null;
+  const n = Number(o.aReceber);
+  return Number.isFinite(n) ? Math.max(0, n) : null;
+}
+function pedidoQuitado(o) {
+  const falta = saldoAReceber(o);
+  return falta !== null && falta < 0.005 && (Number(o.total) || 0) > 0;
+}
+function seloPagamentoPedido(o) {
+  const falta = saldoAReceber(o);
+  if (falta === null || (Number(o.total) || 0) <= 0) return '';
+  if (falta < 0.005) return '<span class="k-confer-badge conferido" title="Pagamento recebido">Pago</span>';
+  if (falta < (Number(o.total) || 0) - 0.005) return `<span class="k-confer-badge pendente" title="Parte já paga">Falta ${money(falta)}</span>`;
+  return '';
+}
+
 function getOrderPrimaryActions(o) {
   if (!o || typeof o !== 'object') return [];
+  const acoes = acoesDoPedidoPorEtapa(o);
+  return pedidoQuitado(o) ? acoes.filter(a => a.key !== 'charge') : acoes;
+}
+
+function acoesDoPedidoPorEtapa(o) {
   const id = o.id;
   switch (o.status) {
     case 'aguardando':
@@ -12239,7 +12262,7 @@ function renderOpenOrders() {
         : `advanceOrder('${o.id}')`;
       const secondaryActions = calm
         ? `<button class="open-full" onclick="go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)">Abrir</button>`
-        : `<button onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>
+        : `${pedidoQuitado(o) ? '' : `<button onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>`}
           <button onclick="printEtiqueta('${o.id}')" title="Imprimir etiqueta">Etiqueta</button>`;
       card.innerHTML = `
         <div class="home-order-top">
@@ -14524,7 +14547,7 @@ function renderKanbanCard(o, col) {
   return `
     <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
       <div class="k-topline">
-        ${pilot ? '' : `<span class="k-status">${col.label}</span>`}${conferBadge}${o.channel ? `<span class="k-confer-badge" title="Canal">${escapeHtml(channelLabel(o.channel))}</span>` : ''}
+        ${pilot ? '' : `<span class="k-status">${col.label}</span>`}${conferBadge}${seloPagamentoPedido(o)}${o.channel ? `<span class="k-confer-badge" title="Canal">${escapeHtml(channelLabel(o.channel))}</span>` : ''}
         ${pilot ? '' : `<div class="k-time">${timeOf(o.createdAt)}</div>`}
       </div>
       <div class="k-head">
@@ -14546,7 +14569,7 @@ function renderKanbanCard(o, col) {
           <button type="button" class="k-advance" onclick="advanceOrder('${o.id}')">${pilot ? (o.status === 'pronto' ? 'Entregar' : o.status === 'preparando' ? 'Finalizar' : 'Preparar') : o.status === 'pronto' ? 'Conferir entrega' : col.next}</button>
         </div>
         <div class="k-support-actions">
-          ${(Number(o.total) || 0) > 0 ? `<button type="button" class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>` : ''}
+          ${(Number(o.total) || 0) > 0 && !pedidoQuitado(o) ? `<button type="button" class="btn-cobrar" onclick="openCobranca('${o.id}')" title="Preparar cobrança">Preparar cobrança</button>` : ''}
           <details class="k-more-actions">
             <summary aria-label="Mais ações do pedido ${escapeHtml((o.id || '').slice(-8))}">Mais ações</summary>
             <div class="k-secondary-actions">

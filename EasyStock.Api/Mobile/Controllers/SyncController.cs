@@ -3,6 +3,7 @@ using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Services.Operacao;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 
@@ -36,8 +37,10 @@ public class SyncController(
     IConfiguration appConfig,
     TimeProvider relogio,
     NumeroCurtoDosLotesMobile numerosCurtos,
-    ILogger<SyncController> log) : ControllerBase
+    ILogger<SyncController> log,
+    SaldoFinanceiroPedido? saldos = null) : ControllerBase
 {
+    private readonly SaldoFinanceiroPedido? _saldos = saldos;
     private readonly NumeroCurtoDosLotesMobile _numerosCurtos = numerosCurtos;
     private readonly EasyStockDbContext _db = db;
     private readonly SyncMutationDispatcher _dispatcher = dispatcher;
@@ -275,6 +278,19 @@ public class SyncController(
         });
     }
 
+    private async Task<Dictionary<Guid, decimal>> AReceberDosPedidosAsync(List<Guid> pedidoIds)
+    {
+        var resultado = new Dictionary<Guid, decimal>();
+        if (pedidoIds.Count == 0) return resultado;
+        var pedidos = await _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .Include(p => p.Pagamentos)
+            .Where(p => pedidoIds.Contains(p.Id))
+            .ToListAsync();
+        foreach (var p in pedidos)
+            resultado[p.Id] = await AReceberDoPedidoMobile.CalcularAsync(p, _saldos, CancellationToken.None);
+        return resultado;
+    }
+
     [HttpGet("pull")]
     public async Task<ActionResult<SyncPullResponse>> Pull([FromQuery] long since, [FromQuery] string deviceId)
     {
@@ -326,10 +342,19 @@ public class SyncController(
         if (lojaId.HasValue)
             ordersQ = ordersQ.Where(o => o.LojaId == lojaId || o.LojaId == null);
         var orders = await ordersQ.ToListAsync();
+        // #2307: pedido pago no console ou no Mercado Pago chega ao app com o saldo a receber, para o
+        // card nao oferecer cobranca de novo.
+        var aReceberPorPedido = await AReceberDosPedidosAsync(
+            orders.Where(o => o.ErpPedidoId.HasValue).Select(o => o.ErpPedidoId!.Value).Distinct().ToList());
         foreach (var o in orders)
+        {
+            var dto = SyncDtoConverters.ToDto(o);
+            if (o.ErpPedidoId is { } pedidoId && aReceberPorPedido.TryGetValue(pedidoId, out var aReceber))
+                dto = dto with { AReceber = aReceber };
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), o.LastDeviceId ?? "server",
-                "order.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(o)),
+                "order.upsert", SyncDtoConverters.Serialize(dto),
                 new DateTimeOffset(o.ServerUpdatedAt).ToUnixTimeMilliseconds()));
+        }
 
         var batchesQ = _db.Set<Batch>().Include(b => b.Items)
             .Where(b => b.EmpresaId == empresaId && b.ServerUpdatedAt > sinceDate && b.LastDeviceId != deviceId);
