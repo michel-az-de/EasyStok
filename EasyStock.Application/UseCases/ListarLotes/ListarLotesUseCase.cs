@@ -12,7 +12,8 @@ public sealed record ListarLotesQuery(
     DateTime? Ate = null,
     string? Search = null,
     string? Sort = "dataproducao",
-    string? Order = "desc");
+    string? Order = "desc",
+    Guid? LojaId = null);
 
 public sealed record ListarLotesResult(
     IReadOnlyList<LoteResult> Items,
@@ -29,7 +30,7 @@ public class ListarLotesUseCase(ILoteRepository repo)
         var size = Math.Clamp(q.PageSize, 1, 200);
 
         var (items, total) = await repo.ListAsync(q.EmpresaId, page, size,
-            q.Status, q.Desde, q.Ate, q.Search, q.Sort, q.Order);
+            q.Status, q.Desde, q.Ate, q.Search, q.Sort, q.Order, q.LojaId);
 
         return new ListarLotesResult(
             items.Select(CriarLoteUseCase.Map).ToList(), total, page, size);

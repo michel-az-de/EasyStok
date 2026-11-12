@@ -49,6 +49,42 @@ public class GerenciarProdutoUseCaseTests
     }
 
     [Fact]
+    public async Task Atualizar_carrega_produto_rastreado_para_preservar_xmin()
+    {
+        // SYNC-5 (#2318): red. Carregar sem rastreio zera o xmin e o UPDATE vira 409 sempre.
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Produto Original",
+            Status = StatusProduto.Ativo
+        });
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId,
+            EmpresaId = empresaId,
+            Nome = "Categoria"
+        });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, null, "Produto Atualizado",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            null, null, null, null, StatusProduto.Ativo,
+            null, null, null);
+
+        await useCase.AtualizarAsync(command);
+
+        await _produtoRepository.Received(1).GetByIdParaAtualizarAsync(empresaId, produtoId);
+        await _produtoRepository.DidNotReceive().GetByIdAsync(empresaId, produtoId);
+    }
+
+    [Fact]
     public async Task Deve_atualizar_produto_com_caracteristicas_e_embalagens()
     {
         var useCase = CriarUseCase();
@@ -56,7 +92,7 @@ public class GerenciarProdutoUseCaseTests
         var produtoId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -149,7 +185,7 @@ public class GerenciarProdutoUseCaseTests
         var produtoId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -194,7 +230,7 @@ public class GerenciarProdutoUseCaseTests
         var produtoId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -243,7 +279,7 @@ public class GerenciarProdutoUseCaseTests
         var categoriaId = Guid.NewGuid();
         const string fichaJsonOriginal = """{"nutricional":{"kcal":250,"porcao_g":100}}""";
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -280,7 +316,7 @@ public class GerenciarProdutoUseCaseTests
         var produtoId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -320,7 +356,7 @@ public class GerenciarProdutoUseCaseTests
         var categoriaId = Guid.NewGuid();
         const decimal precoLegado = 150_000_000m; // acima do teto, dado legado
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,

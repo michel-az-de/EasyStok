@@ -159,10 +159,12 @@ public class MobileProductsController(
         var divergences = new List<StockDivergence>();
         foreach (var mp in mobileLinked)
         {
-            var item = itensEstoque.FirstOrDefault(i =>
+            // PROD-4 (#2318): compara a soma do estoque da loja, nao um unico lote.
+            var itensDaLoja = itensEstoque.Where(i =>
                 i.ProdutoId == mp.ErpProductId &&
-                (i.LojaId == null || i.LojaId == mp.LojaId));
-            var erpStock = item?.QuantidadeAtual?.Value ?? 0;
+                (i.LojaId == null || i.LojaId == mp.LojaId)).ToList();
+            var item = itensDaLoja.FirstOrDefault();
+            var erpStock = itensDaLoja.Sum(i => (decimal)i.QuantidadeAtual);
             if (mp.Stock == erpStock) continue; // bate, sem divergência
             divergences.Add(new StockDivergence(
                 MobileProductId: mp.Id,

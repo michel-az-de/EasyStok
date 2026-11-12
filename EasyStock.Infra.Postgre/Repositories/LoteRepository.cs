@@ -24,13 +24,14 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<(IEnumerable<Lote> items, int total)> ListAsync(
             Guid empresaId, int page, int pageSize,
             string? status = null, DateTime? desde = null, DateTime? ate = null,
-            string? search = null, string? sort = "dataproducao", string? order = "desc")
+            string? search = null, string? sort = "dataproducao", string? order = "desc", Guid? lojaId = null)
         {
             var q = db.Lotes
                 .Include(l => l.Itens)
                 .Include(l => l.Etiquetas)
                 .AsNoTracking()
                 .Where(l => l.EmpresaId == empresaId);
+            if (lojaId.HasValue) q = q.Where(l => l.LojaId == lojaId.Value);
             if (!string.IsNullOrWhiteSpace(status)) q = q.Where(l => l.Status == status);
             if (desde.HasValue) q = q.Where(l => l.DataProducao >= desde.Value);
             if (ate.HasValue)   q = q.Where(l => l.DataProducao <= ate.Value);

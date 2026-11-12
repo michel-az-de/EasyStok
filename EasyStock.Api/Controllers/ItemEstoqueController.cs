@@ -33,13 +33,14 @@ public class ItemEstoqueController(
         [FromQuery] int pageSize = 20,
         [FromQuery] string? status = null,
         [FromQuery] Guid? categoriaId = null,
-        [FromQuery] string? termo = null)
+        [FromQuery] string? termo = null,
+        [FromQuery] Guid? lojaId = null)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
         var (p, ps) = NormalisePage(page, pageSize);
-        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, p, ps, status, categoriaId, termo);
+        var (itens, totalCount) = await itemEstoqueRepository.GetItensEstoquePaginadosAsync(resolvedEmpresaId, p, ps, status, categoriaId, termo, lojaId);
 
         var dtos = itens.Select(MapItemToDto);
 
@@ -53,12 +54,13 @@ public class ItemEstoqueController(
     public async Task<IActionResult> GetContadores(
         [FromQuery] Guid empresaId,
         [FromQuery] string? status = null,
-        [FromQuery] Guid? categoriaId = null)
+        [FromQuery] Guid? categoriaId = null,
+        [FromQuery] Guid? lojaId = null)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var (cadastrados, comSaldo) = await itemEstoqueRepository.GetContadoresEstoqueAsync(resolvedEmpresaId, status, categoriaId);
+        var (cadastrados, comSaldo) = await itemEstoqueRepository.GetContadoresEstoqueAsync(resolvedEmpresaId, status, categoriaId, lojaId);
         return DataOk(new { cadastrados, comSaldo });
     }
 

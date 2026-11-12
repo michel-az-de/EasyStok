@@ -41,7 +41,8 @@ public sealed class AtualizarProdutoUseCase(
         if (!string.IsNullOrWhiteSpace(command.DescricaoBase))
             UseCaseGuards.EnsureSemTagsHtml(command.DescricaoBase, "Descrição do produto");
 
-        var produto = await produtoRepository.GetByIdAsync(command.EmpresaId, command.ProdutoId)
+        // SYNC-5 (#2318): o xmin (RowVersion) so entra no UPDATE com o produto rastreado; AsNoTracking zerava a versao e dava 409 sempre.
+        var produto = await produtoRepository.GetByIdParaAtualizarAsync(command.EmpresaId, command.ProdutoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
         // Captura estado anterior para auditoria

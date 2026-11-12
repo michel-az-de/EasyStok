@@ -107,11 +107,14 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null, Guid? lojaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
+
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             var vencendo = IsFiltroVencendo(status);
             if (vencendo)
@@ -156,11 +159,14 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null)
+        public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null, Guid? lojaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
+
+            if (lojaId.HasValue)
+                query = query.Where(i => i.LojaId == lojaId.Value);
 
             if (IsFiltroVencendo(status))
                 query = AplicarFiltroVencendo(query);
