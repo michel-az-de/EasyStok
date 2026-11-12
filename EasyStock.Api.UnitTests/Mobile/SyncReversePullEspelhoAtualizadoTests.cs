@@ -133,8 +133,7 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         await _db.SaveChangesAsync();
 
         var idEspelho = "mob-" + produto.Id;
-        var doMobile = new ProductDto(idEspelho, "Nome antigo", null, "extra", null, 10m, 3, false,
-            null, null, null, null, null);
+        var doMobile = new ProductDto(idEspelho, "Nome antigo", null, "extra", null, 10m, 3, false);
         var mutations = new List<MutationDto>
         {
             new("m1", "aparelho-a", "product.upsert", System.Text.Json.JsonSerializer.SerializeToElement(doMobile, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)), 123),
