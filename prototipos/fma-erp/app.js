@@ -392,7 +392,7 @@
   var POR_COLECAO = { qualificarLead: "leads", perderLead: "leads", reabrirLead: "leads", criarProposta: "leads", enviarProposta: "propostas", aceitarProposta: "propostas", recusarProposta: "propostas", novaVersao: "propostas",
     receber: "receber", cobrar: "receber", pagar: "pagar", concluirLembrete: "lembretes", cancelarNota: "notas", propostaDaConversa: "conversas",
     rascunharPost: "posts", aprovarPost: "posts", desagendar: "posts", publicarAgora: "posts", virarLead: "interacoes", ignorar: "interacoes" };
-  function botoes(ok) { return '<div class="acoes direita"><button class="btn suave" type="button" data-fechar>Cancelar</button><button class="btn primario" type="submit">' + ok + "</button></div>"; }
+  function botoes(ok, travado) { return '<div class="acoes direita"><button class="btn suave" type="button" data-fechar>Cancelar</button><button class="btn primario" type="submit"' + (travado ? ' aria-disabled="true"' : "") + ">" + ok + "</button></div>"; }
   function executarJa(acao, id) {
     var ids = (id || "").split("|");
     if (acao === "restaurar") { st = F.restaurar(); abaFin = "receber"; if (location.hash === "#/conteudo") render(true); else location.hash = "#/conteudo"; avisar("Dados de exemplo restaurados."); return; }
@@ -406,7 +406,7 @@
       return abrirDialogo('<form class="dialogo-corpo" data-form="abordar" data-id="' + ld.id + '" novalidate><h2>Abordar ' + esc(ld.contato) + " · " + esc(ld.empresa) + "</h2>" +
         '<p class="contador-msg' + (cheio ? " cheio" : "") + '">' + n + " de " + lim + " mensagens hoje</p>" +
         '<div class="campo"><label for="ab-texto">Mensagem (rascunho da IA, edite à vontade)</label><textarea id="ab-texto" name="texto" rows="6" aria-describedby="ab-texto-erro">' + esc(sug) + '</textarea><small id="ab-texto-erro" class="erro-campo" role="alert" hidden></small></div>' +
-        '<p class="dica">O sistema não envia nada. Copie e mande você mesmo pelo LinkedIn; aqui fica só o registro.</p>' + botoes(cheio ? "Limite de hoje atingido" : "Registrar envio") + "</form>");
+        '<p class="dica">O sistema não envia nada. Copie e mande você mesmo pelo LinkedIn; aqui fica só o registro.</p>' + botoes(cheio ? "Limite de hoje atingido" : "Registrar envio", cheio) + "</form>");
     }
     if (acao === "rascunhar") { var cv = por(st.conversas, id), ta = document.getElementById("resposta"); if (ta && cv && cv.ia) escrever(ta, cv.ia.resposta); return; }
     if (acao === "rascunharPost") {
