@@ -5,7 +5,7 @@ import { baixarPdf } from '../../componentes/pdfNoNavegador'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useResumoDoCliente } from '../../aplicacao/useResumoDoCliente'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
-import { useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
+import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { enviarFotoCliente, removerFotoCliente } from '../../aplicacao/fotoCliente'
 import { gerarFichaClientePdf } from '../../aplicacao/fichaClientePdf'
 import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
@@ -25,13 +25,20 @@ export function ModalCliente({ conversa, aoFechar, children }) {
   const [cadastroSujo, setCadastroSujo] = useState(false)
   const [notaSuja, setNotaSuja] = useState(false)
   const [, definirNota] = useRascunhoDoAjuste(`nota-cadastro:${conversa.clienteId ?? conversa.cadastroId ?? conversa.id}`)
+  const chaveCadastro = `cadastro:${conversa.clienteId ?? conversa.cadastroId ?? conversa.id}`
+  const [, definirNome] = useRascunhoDoAjuste(`${chaveCadastro}:nome`)
+  const [, definirTelefone] = useRascunhoDoAjuste(`${chaveCadastro}:telefone`)
+  const [, definirEndereco] = useRascunhoDoAjuste(`${chaveCadastro}:endereco`)
+  const [salvandoNome] = useGravacaoDoAjuste(`${chaveCadastro}:nome`)
+  const [salvandoTelefone] = useGravacaoDoAjuste(`${chaveCadastro}:telefone`)
+  const [salvandoEndereco] = useGravacaoDoAjuste(`${chaveCadastro}:endereco`)
   const [rodapeDoCadastro, setRodapeDoCadastro] = useState(null)
   const [consultadaEm] = useState(() => new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }))
   const { cliente } = conversa
   const foto = useFotoCliente(cliente.fotoUrl)
   const notas = (cliente.notas ?? []).map((n) => `${n.id}:${n.criadoEm}`).join(',')
   const resumo = useResumoDoCliente(conversa.id, `${cliente.pedidos ?? 0}|${notas}`, fonteApi && Boolean(conversa.clienteId) && cliente.totalGasto !== undefined)
-  const ocupado = salvandoNota || baixandoPdf || alterandoFoto
+  const ocupado = salvandoNota || salvandoNome || salvandoTelefone || salvandoEndereco || baixandoPdf || alterandoFoto
   const cadastro = conversa.clienteId ?? conversa.cadastroId
   const podeBaixarPdf = fonteApi && Boolean(conversa.clienteId)
 
@@ -61,7 +68,7 @@ export function ModalCliente({ conversa, aoFechar, children }) {
 
   // O Fechar do rodapé passa pela mesma pergunta do Esc e do X (Modal.confirmarDescarte).
   const pedirFechamento = (evento) => evento.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
-  const fechar = () => { definirNota(null); aoFechar() }
+  const fechar = () => { definirNota(null); definirNome(null); definirTelefone(null); definirEndereco(null); aoFechar() }
 
   // Um só caminho para "texto não salvo": confirmarDescarte (a pergunta do Modal), o mesmo do resto do sistema.
   // O segurarFechamento da PR (que travava Esc e fundo sem perguntar) saiu: a pergunta já protege o digitado.

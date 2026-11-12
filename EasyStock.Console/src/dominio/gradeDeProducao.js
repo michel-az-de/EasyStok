@@ -45,10 +45,6 @@ const porcoesDaLinha = (linha) => {
   return Number.isInteger(n) && n > 0 ? n : 0
 }
 
-// Campo de quantidade (porções, dias de validade): só dígitos, até 4. O toque no cartão soma em
-// cima do que está no campo; texto como "12a" contava zero e o toque seguinte trocava por 1.
-export const soDigitos = (texto, maximo = 4) => String(texto ?? '').replace(/\D/g, '').slice(0, maximo)
-
 // O lote segue a ordem do cardápio, não a dos toques: ela acha o prato onde ele está na grade, e
 // o corpo enviado é o mesmo para o mesmo lote. Com a ordem dos toques, refazer o lote depois de
 // uma resposta perdida mudava o corpo, a chave de idempotência e gravava em dobro.

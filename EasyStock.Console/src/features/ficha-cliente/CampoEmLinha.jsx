@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { mascaraTelefone, telefoneDoE164 } from '../../dominio/formato'
+import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import css from './cliente.module.css'
 
 const SEGUNDOS_SALVOU = 2
@@ -22,17 +23,20 @@ const FALHA_AO_SALVAR = 'Não foi possível salvar. Tente de novo.'
 // recebe o foco de volta e a mensagem fica ligada a ele por aria-describedby.
 // `dica` vira o placeholder e `limite` o maxLength (nome: "Nome e sobrenome", 80).
 export function CampoEmLinha({
-  rotulo, valor, vazio = 'Sem valor', tipo = 'texto', validar, aoSalvar, dica, limite, aoMudarSujo,
+  rotulo, valor, vazio = 'Sem valor', tipo = 'texto', validar, aoSalvar, dica, limite, aoMudarSujo, chaveRascunho,
 }) {
   const idCampo = useId()
   const idErro = `${idCampo}-erro`
-  const [editando, setEditando] = useState(false)
-  const [rascunho, setRascunho] = useState('')
-  const [erro, setErro] = useState(null)
+  const chave = chaveRascunho ?? idCampo
+  const [edicao, setEdicao] = useRascunhoDoAjuste(chave)
+  const editando = edicao !== null
+  const rascunho = edicao?.valor ?? ''
+  const erro = edicao?.erro ?? null
+  const setRascunho = (valor) => setEdicao(valor === null ? null : { valor, erro: null })
+  const setErro = (mensagem) => setEdicao({ valor: rascunho, erro: mensagem })
   const [salvou, setSalvou] = useState(false)
-  const [salvando, setSalvando] = useState(false)
-  // Enter, sair do campo e o botão chamam o mesmo `confirmar`: a ref trava o segundo.
-  const ocupado = useRef(false)
+  // #2365: texto e trava pertencem ao cliente/campo, inclusive após remontar no celular.
+  const [salvando, iniciarGravacao, estaGravando] = useGravacaoDoAjuste(chave)
   const inputRef = useRef(null)
   // #1920: a API guarda o telefone em E.164 ("+5511987654321"). Mostrado cru, e a máscara aplicada
   // por cima dele ao editar virava "(55) 11987-6541". Mostra, edita e compara já na máscara da tela.
@@ -46,6 +50,8 @@ export function CampoEmLinha({
 
   useEffect(() => {
     if (!editando) return
+    // No remonte, showModal ainda dará o foco inicial; antecipá-lo dispara o onBlur e salva sozinho.
+    if (inputRef.current?.closest('dialog')?.open === false) return
     inputRef.current?.focus()
     inputRef.current?.select()
   }, [editando])
@@ -63,36 +69,29 @@ export function CampoEmLinha({
 
   function abrir() {
     setRascunho(exibido)
-    setErro(null)
-    setEditando(true)
   }
 
   function cancelar() {
-    if (ocupado.current) return
-    setEditando(false)
-    setErro(null)
+    if (estaGravando()) return
+    setRascunho(null)
   }
 
   function concluir(resultado) {
-    ocupado.current = false
-    setSalvando(false)
     if (resultado === false || resultado?.erro) { setErro(resultado?.erro || FALHA_AO_SALVAR); return }
-    setEditando(false)
-    setErro(null)
+    setRascunho(null)
     setSalvou(true)
   }
 
   function confirmar() {
-    if (ocupado.current) return
+    if (estaGravando()) return
     const mensagem = validar?.(rascunho) ?? null
     if (mensagem) { setErro(mensagem); return }
-    if (rascunho === exibido) { setEditando(false); setErro(null); return }
+    if (rascunho === exibido) { setRascunho(null); return }
     const ida = aoSalvar(rascunho)
     if (!ida?.then) { concluir(ida); return }
-    ocupado.current = true
-    setSalvando(true)
+    const liberar = iniciarGravacao()
     setErro(null)
-    ida.then(concluir, (falha) => concluir({ erro: falha?.message || FALHA_AO_SALVAR }))
+    ida.then((resultado) => { liberar?.(); concluir(resultado) }, (falha) => { liberar?.(); concluir({ erro: falha?.message || FALHA_AO_SALVAR }) })
   }
 
   function aoDigitar(evento) {
