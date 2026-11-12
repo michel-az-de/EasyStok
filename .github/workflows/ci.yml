@@ -23,8 +23,8 @@ jobs:
   build-and-test:
     name: Build + dotnet test
     runs-on: ubuntu-latest
-    # O gate atingiu 20 min no post-cache após testes aprovados; reserve tempo para finalizar o job.
-    timeout-minutes: 30
+    # Em 11/11/2026 os runs verdes levaram 29:45 a 29:56 e o limite de 30 cortou jobs sem teste falhando (#2299).
+    timeout-minutes: 45
     # Postgres efemero para os testes de integracao (EasyStock.Inventario.IntegrationTests,
     # ADR Inventario/Fatia 0). O fixture le a conn string de EASYSTOCK_IT_PG (setada no
     # step Test) e cria o role NOSUPERUSER rls_test_client sujeito a RLS. Sem este service,
@@ -119,7 +119,8 @@ jobs:
   api-integration:
     name: Api.IntegrationTests (Postgres real)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Cortado em exatos 30 min na etapa Test no master (fbda77c1f, 11/11/2026), sem teste falhando (#2299).
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
