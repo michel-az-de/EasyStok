@@ -66,6 +66,8 @@ public class SyncController(
         var rejected = new List<SyncConflict>();
         var autoLinkProductIds = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkClientIds  = new HashSet<string>(StringComparer.Ordinal);
+        // CLI-5 (#2321): CPF/CNPJ do client.upsert; mobile_clients nao tem coluna, o linker o leva ao ERP.
+        var documentosDosClientes = new Dictionary<string, string>(StringComparer.Ordinal);
         var autoLinkOrderIds   = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkBatchIds   = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkCashIds    = new HashSet<string>(StringComparer.Ordinal);
@@ -139,7 +141,14 @@ public class SyncController(
                             if (!string.IsNullOrEmpty(payloadId))
                             {
                                 if (typePrefix == "product")        autoLinkProductIds.Add(payloadId);
-                                else if (typePrefix == "client")    autoLinkClientIds.Add(payloadId);
+                                else if (typePrefix == "client")
+                                {
+                                    autoLinkClientIds.Add(payloadId);
+                                    if (m.Payload.TryGetProperty("document", out var docEl)
+                                        && docEl.ValueKind == System.Text.Json.JsonValueKind.String
+                                        && !string.IsNullOrWhiteSpace(docEl.GetString()))
+                                        documentosDosClientes[payloadId] = docEl.GetString()!;
+                                }
                                 else if (typePrefix == "order")     autoLinkOrderIds.Add(payloadId);
                                 else if (typePrefix == "batch")     autoLinkBatchIds.Add(payloadId);
                                 else                                 autoLinkCashIds.Add(payloadId);
@@ -212,7 +221,7 @@ public class SyncController(
                 await _autoLinker.RunAsync(
                     autoLinkProductIds, autoLinkClientIds,
                     autoLinkOrderIds, autoLinkBatchIds, autoLinkCashIds,
-                    empresaId);
+                    empresaId, documentosDosClientes);
             }
             catch (Exception ex)
             {
