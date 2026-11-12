@@ -115,7 +115,7 @@ const semResposta = (metodo) => new ErroApi(0, 'SEM_RESPOSTA',
   metodo === 'GET' ? MENSAGEM_LEITURA_SEM_RESPOSTA : MENSAGEM_ESCRITA_SEM_RESPOSTA)
 
 export async function chamarApi(caminho, {
-  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null, keepalive = false, repetida = false,
+  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null, keepalive = false, repetida = false, prazoMs = null,
 } = {}) {
   const sessao = autenticado ? await garantirSessao() : null
   // Uma operação em etapas pertence à conta que a iniciou, mesmo durante a renovação do token.
@@ -123,7 +123,7 @@ export async function chamarApi(caminho, {
     throw new ErroApi(401, 'SESSAO_ALTERADA', 'A sessão foi encerrada ou trocada.')
   }
   // Conta a partir daqui: a renovação da sessão não gasta o prazo da leitura.
-  const ms = prazoDaChamada({ metodo, arquivo, keepalive, formulario, sinal, prazoComCancelamento })
+  const ms = prazoDaChamada({ metodo, arquivo, keepalive, formulario, sinal, prazoComCancelamento, prazoMs })
   const prazo = ms ? AbortSignal.timeout(ms) : null
   const cabecalhos = { Accept: arquivo ? '*/*' : 'application/json' }
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
@@ -164,7 +164,7 @@ export async function chamarApi(caminho, {
     let renovada = null
     try { renovada = lerSessao()?.token !== sessao.token ? lerSessao() : await garantirSessao({ forcar: true }) } catch { /* cai no 401 abaixo */ }
     if (renovada?.token && renovada.token !== sessao.token) {
-      return chamarApi(caminho, { metodo, corpo, formulario, autenticado, texto, arquivo, chave, sinal, envelope, prazoComCancelamento, identidadeEsperada, keepalive, repetida: true })
+      return chamarApi(caminho, { metodo, corpo, formulario, autenticado, texto, arquivo, chave, sinal, envelope, prazoComCancelamento, identidadeEsperada, keepalive, repetida: true, prazoMs })
     }
   }
   if (resposta.status === 401 && autenticado) {

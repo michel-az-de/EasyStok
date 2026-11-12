@@ -125,6 +125,21 @@ public sealed class ProdutoMobileCustoMinimoTests : IDisposable
     }
 
     [Fact]
+    public async Task EditarCustoNoPwa_NaoDeixaOCustoDe6CasasVelhoNaFicha()
+    {
+        // #2401 A: o espelho gravava só CustoReferencia e CustoDaFicha seguia no CustoUnitarioInsumo antigo.
+        await PushAsync(Produto());
+        var erp = Erp();
+        erp.EhInsumo = true;
+        erp.DefinirCustoDoInsumo(0.0045m);
+        await _db.SaveChangesAsync();
+
+        await PushAsync(Produto(custo: 9m, minimo: 4));
+
+        Erp().CustoDaFicha.Should().Be(9m);
+    }
+
+    [Fact]
     public async Task PayloadSemOsCampos_NaoApagaOQueJaExiste()
     {
         await PushAsync(Produto());

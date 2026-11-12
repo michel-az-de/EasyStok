@@ -157,7 +157,13 @@ public sealed class ProductLinker(
         if (mobileP.Cost is { } custo && custo > 0 && produto.CustoReferencia?.Valor != custo)
         {
             mudancas.Add($"{{\"campo\":\"custo\",\"de\":{Json(produto.CustoReferencia?.Valor)},\"para\":{Json(custo)}}}");
-            produto.CustoReferencia = Dinheiro.FromDecimal(custo);
+            // #2401: o custo de 6 casas do insumo acompanha, senão a ficha segue no valor velho.
+            if (produto.EhInsumo) produto.DefinirCustoDoInsumo(custo);
+            else
+            {
+                produto.CustoReferencia = Dinheiro.FromDecimal(custo);
+                produto.CustoUnitarioInsumo = null;
+            }
         }
         if (mobileP.MinStock is { } minimo && produto.QuantidadeMinima != minimo)
         {

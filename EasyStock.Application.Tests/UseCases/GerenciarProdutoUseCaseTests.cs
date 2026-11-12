@@ -84,6 +84,39 @@ public class GerenciarProdutoUseCaseTests
         await _produtoRepository.DidNotReceive().GetByIdAsync(empresaId, produtoId);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Atualizar_custo_nao_deixa_o_custo_de_6_casas_velho_na_ficha(bool insumo)
+    {
+        // #2401 A: a edição gravava só CustoReferencia; CustoDaFicha seguia no CustoUnitarioInsumo antigo.
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produto = new Produto
+        {
+            Id = produtoId, EmpresaId = empresaId, CategoriaId = categoriaId,
+            Nome = "Farinha", Status = StatusProduto.Ativo, EhInsumo = insumo,
+        };
+        produto.DefinirCustoDoInsumo(0.0045m);
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(produto);
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria"
+        });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, null, "Farinha",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            7.5m, null, null, null, StatusProduto.Ativo,
+            null, null, null);
+
+        await useCase.AtualizarAsync(command);
+
+        produto.CustoDaFicha.Should().Be(7.5m);
+    }
+
     [Fact]
     public async Task Deve_atualizar_produto_com_caracteristicas_e_embalagens()
     {

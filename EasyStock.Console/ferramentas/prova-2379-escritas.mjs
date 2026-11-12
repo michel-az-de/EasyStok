@@ -73,6 +73,22 @@ await confere('prazo: leitura 20 s, escrita 30 s, sem prazo para keepalive, arqu
   assert.equal(prazoDaChamada({ metodo: 'POST', sinal: new AbortController().signal, prazoComCancelamento: true }), 30000)
 })
 
+// #2401: rotas que chamam o modelo de linguagem passam de 30 s e eram abortadas.
+await confere('prazo: chamada com prazoMs usa o prazo próprio e as rotas de IA do acervo pedem mais que 30 s', async () => {
+  const prazoDaChamada = exige(prazo, 'prazoDaChamada')
+  assert.equal(prazoDaChamada({ metodo: 'POST', prazoMs: 120000 }), 120000)
+  assert.equal(prazoDaChamada({ metodo: 'POST' }), 30000)
+  const { sugerirAssociacoes, dicaDoPrato } = await import('../src/infra/api/acervoApi.js')
+  for (const chamar of [() => sugerirAssociacoes(), () => dicaDoPrato('i1')]) {
+    const pedidos = []
+    const original = AbortSignal.timeout
+    AbortSignal.timeout = (ms) => { pedidos.push(ms); return original.call(AbortSignal, ms) }
+    globalThis.fetch = async () => new Response(JSON.stringify({ data: {} }))
+    try { await chamar() } finally { AbortSignal.timeout = original }
+    assert.ok(pedidos.length === 1 && pedidos[0] > 30000, `prazo ${pedidos}`)
+  }
+})
+
 await confere('escrita sem resposta no prazo vira erro status 0 com a frase da casa', async () => {
   const original = AbortSignal.timeout
   const pedidos = []
