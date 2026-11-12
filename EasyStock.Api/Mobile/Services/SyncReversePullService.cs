@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Domain.Entities.Mobile;
@@ -15,8 +16,10 @@ public class SyncReversePullService(
     EasyStockDbContext db,
     IConfiguration config,
     ILogger<SyncReversePullService> log,
-    NumeroCurtoDosLotesMobile numerosCurtos)
+    NumeroCurtoDosLotesMobile numerosCurtos,
+    SaldoFinanceiroPedido? saldos = null)
 {
+    private readonly SaldoFinanceiroPedido? _saldos = saldos;
     private readonly NumeroCurtoDosLotesMobile _numerosCurtos = numerosCurtos;
     private readonly EasyStockDbContext _db = db;
     private readonly IConfiguration _config = config;
@@ -148,6 +151,7 @@ public class SyncReversePullService(
         // Pedidos web sem MobileOrderId (criados via /api/pedidos).
         var pedidosQ = _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
             .Include(p => p.Itens)
+            .Include(p => p.Pagamentos)
             .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
                 && (p.MobileOrderId == null || p.MobileOrderId == ""));
         if (lojaId.HasValue) pedidosQ = pedidosQ.Where(p => p.LojaId == lojaId || p.LojaId == null);
@@ -175,7 +179,8 @@ public class SyncReversePullService(
                 UpdatedAt: new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds(),
                 ScheduledDeliveryAt: p.AgendadoParaEm.HasValue
                     ? new DateTimeOffset(p.AgendadoParaEm.Value).ToUnixTimeMilliseconds()
-                    : null);
+                    : null,
+                AReceber: await AReceberDoPedidoMobile.CalcularAsync(p, _saldos, CancellationToken.None));
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                 "order.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
         }
