@@ -8444,6 +8444,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<decimal?>("CustoReferencia")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal?>("CustoUnitarioInsumo")
+                        .HasColumnType("decimal(18,6)");
+
                     b.Property<string>("DescricaoBase")
                         .HasColumnType("text");
 

@@ -19,8 +19,10 @@ public sealed record PerdaRequest(
 public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
 
 /// <param name="Unidade">G, Kg, Ml, L, Un...; null = não mexe (no cadastro, Un).</param>
+/// <param name="Custo">Por unidade-base, até 6 casas (#2363: R$ 45 por 10 kg = 0,0045 por g).</param>
+/// <param name="SaldoInicial">#2363: só no cadastro. Quanto tem hoje, na unidade-base; vira entrada de ajuste.</param>
 public sealed record InsumoRequest(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null,
-    bool LimparMinimo = false, bool LimparCusto = false);
+    bool LimparMinimo = false, bool LimparCusto = false, decimal? SaldoInicial = null);
 
 /// <summary>
 /// Produção pelo console (M2, plano docs/plan/erp-casa-da-baba/03-m2-producao.md). D-M2-06 (Felipe,
@@ -248,7 +250,7 @@ public class AtendimentoProducaoController(
         try
         {
             var id = await insumos.CriarAsync(currentUser.EmpresaId, currentUser.UsuarioId,
-                new InsumoInput(req.Nome, req.Unidade, req.Minimo, req.Custo, req.Embalagem), ct);
+                new InsumoInput(req.Nome, req.Unidade, req.Minimo, req.Custo, req.Embalagem, SaldoInicial: req.SaldoInicial), ct);
             return DataCreated($"/api/produtos/{id}", new { produtoId = id });
         }
         catch (Exception ex) when (ex is UseCaseValidationException or RegraDeDominioVioladaException)

@@ -479,7 +479,7 @@ await confere('Insumos: o aviso sai no formulário que o causou; sem formulário
   botoes(t.arvore, 'Cadastrar insumo')[0].props.onClick()
   t.renderizar()
   // Cadastro com mínimo inválido: o aviso fica dentro do formulário, antes do botão, e nada é enviado.
-  andar(cadastro(), (n) => n.type === 'NomeInsumoPesquisado')[0].props.onChange(digitar('Massa'))
+  campos(cadastro(), 'CampoTexto', 'Nome do insumo')[0].props.onChange(digitar('Massa'))
   t.renderizar()
   campos(cadastro(), 'CampoTexto', 'Mínimo (opcional)')[0].props.onChange(digitar('1,5'))
   t.renderizar()
