@@ -154,7 +154,7 @@ confere('H6  KPIs em grade 2×2 e o alerta do caixa vira estado do cartão com a
 
 confere('H7  o cartão todo clicável perde a seta ">"', () => {
   const abrir = html.match(/<a [^>]*class="abrir"[^>]*>[^]*?<\/a>/g) ?? []
-  assert.equal(abrir.length, 6)
+  assert.equal(abrir.length, 7)
   for (const link of abrir) assert.doesNotMatch(link, /<svg/, link.slice(0, 80))
   assert.doesNotMatch(css, /\.abrir > svg/)
   assert.doesNotMatch(jsxHall.slice(jsxHall.indexOf('<a className={css.abrir}'), jsxHall.indexOf('</a>', jsxHall.indexOf('<a className={css.abrir}'))), /MarcaIcone/)
@@ -183,19 +183,19 @@ confere('H9  severidade usa as cores de estado; a marca fica para a ação prim�
   assert.doesNotMatch(css, /border-radius: *[1-9]/)
 })
 
-confere('H10  módulos na ordem de uso, grade sem órfão e Configurações como link de rodapé', () => {
+confere('H10  módulos na ordem de uso, grade completa e Configurações como link de rodapé', () => {
   const ordem = estado.comOrdemPorUso(null).ordem
   // #2258 (auditoria A2): atender, preparar, entregar; depois cardápio, produção e dinheiro.
   assert.deepEqual(ordem.slice(0, 3), ['atendimento', 'cozinha', 'entregas'])
-  assert.equal(ordem.length, 8, 'a ordem continua completa')
+  assert.equal(ordem.length, 9, 'a ordem inclui Cadastros')
   const movida = { ordem: ['financeiro', ...ordem.filter((id) => id !== 'financeiro')] }
   assert.equal(estado.comOrdemPorUso(movida).ordem[0], 'financeiro', 'a ordem que a dona escolheu vale')
   assert.equal(estado.comOrdemPorUso({ foco: 'gestao' }).ordem[0], 'financeiro', 'o foco escolhido manda na ordem de fábrica')
   assert.deepEqual(estado.favoritosPrimeiroPorUso({ favoritos: ['producao'] }).ordem.slice(0, 2), ['producao', 'atendimento'])
   const grade = html.slice(html.indexOf('aria-label="Módulos"'), html.indexOf('</ul>', html.indexOf('aria-label="Módulos"')))
   const ids = [...grade.matchAll(/data-modulo="([^"]+)"/g)].map((m) => m[1])
-  assert.deepEqual(ids, ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro'])
-  assert.equal(ids.length % 2, 0, 'duas colunas fecham sem órfão')
+  assert.deepEqual(ids, ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro', 'cadastros'])
+  assert.equal(new Set(ids).size, ids.length, 'cada área aparece uma vez')
   assert.match(rodape(html), /<a [^>]*href="#\/m\/configuracoes"[^>]*>[^]*?Configurações<\/a>/)
 })
 

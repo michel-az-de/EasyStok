@@ -223,3 +223,43 @@ Provas reproduzíveis: `prova-2395-cadastros.mjs`, `prova-2395-vinculo.mjs` e
 Somente provedores externos são substituídos nessa fixture. `CadastroClaudeCliRealTests` é uma prova
 opt-in separada do provedor real com dados sintéticos; não equivale à homologação de mensagens ou
 pagamentos. Evidências de execução e aceite ficam na issue e na PR.
+
+Auditoria factual dos 25 casos da matriz externa `aceites.json`, em 12/11/2026: as provas abaixo
+demonstram os recortes descritos, não uma aprovação integral de 25/25. Artefatos locais estão em
+`EasyStock.Console/.build/2395/` e não são versionados. `real/` usa UI, JWT, API e PostgreSQL reais,
+com provedores de mensagem, pagamento e LLM controlados; resultados de componentes com HTTP
+controlado e testes de contrato são identificados separadamente. A leitura desta tabela não reexecuta
+as baterias anteriores ao rebase.
+
+| Caso | Evidência existente e limite observado |
+|---|---|
+| J01 | `real/resultado.json`: retirada/restauração, três candidatos, escolha explícita e rascunho preservado. `real/excecoes/resultado.json`: transferência confirmada e retomada pela atendente. Não equivale a testar todos os estados da fila. |
+| J02 | `real/jornada-ui-{1,2}-estado.json`: duas unidades, subtotal 64 + frete 5 = 69, endereço/janela e pedido persistido. Duplo gesto de criação e janela lotada não foram repetidos nessas jornadas Chromium. |
+| J03 | Mesmas jornadas: KDS inicia preparo sem baixa; Pronto altera saldo 8→6 uma vez, confirmado após recarga. Estoque foi reconciliado por GET, sem operação pela tela Estoque. |
+| J04 | Jornadas iniciais usam KDS. Complemento `real/entregas/resultado.json`: novo pedido, responsável cadastrado e atribuído, viagem despachada e entregue pelo módulo Entregas, recebimento na porta e reconciliação após reload. Não exercita todos os impedimentos de despacho. |
+| J05 | Mesmas jornadas: um recebimento de 69, mensagem, encerramento e leitura posterior sem perda de histórico. Não foi percorrida toda a administração de custos/taxas/Caixa. |
+| E01 | `real/excecoes/resultado.json`: falta visível, política padrão de descoberta, saldo 1→0 sem negativo; decisão de cancelar devolve só uma saída real e elimina a descoberta. Substituição/reposição e conselho de IA sobre estoque não foram exercitados. |
+| E02 | Mesmo artefato: ocorrência, falha offline preservando vaga, troca Manhã→Tarde com capacidade reconciliada e comunicação posterior. Complemento `real/entregas/resultado.json` reagenda novo pedido pela própria tela Entregas e confere Tarde também em Cozinha e Atendimento antes de comunicar. |
+| E03 | Mesmo artefato: atendente sem cancelamento pago, nota contextual, dona confere e cancela com motivo, atendente reassume e comunica. É solicitação por nota e ação autorizada, sem workflow formal de aprovação; ramo de recusa gerencial não executado. |
+| E04 | Mesmo artefato: cancelamento e devolução total de 69 separados, recebimento preservado, estoque/capacidade liberados e uma devolução após reload. `real/jornada-api.json` complementa repetição idempotente; não é replay financeiro pelo Chromium nem inspeção visual do Caixa. |
+| M01 | `real/mensagem-ui.json`: variável de pedido ausente bloqueia envio; perda da resposta de um 200 real e repetição mantêm ID/chave e um balão. `concorrencia/resultado.json`: prévia e publicação editorial persistidas. Envio de modelo Meta e indisponibilidade do catálogo/canal têm provas de contrato, sem jornada Chromium equivalente. |
+| I01 | `real/resultado.json`: três pessoas no telefone, escolha, retirada/restauração e histórico. Guardas de revisão/ABA e tenant têm provas focais/backend. Não há bateria Chromium final completa para pessoa inativa e telefone divergente. |
+| S01 | `real/resultado.json`: autocomplete real e telefone formatado em Sem cadastro; normalização tem prova de domínio/repositório. Busca global/local por todas as formas, acentos, IDs e papéis não foi inteiramente percorrida no navegador. |
+| R01 | `real/resultado.json` e `resultado.json`: retorno, rascunho e filtros; componente real cobre contexto restaurado após clique/edição. Jornadas finais conferem Clientes/Leads após reload. Não há medição completa de posição de rolagem em todos os módulos. |
+| R02 | `real/excecoes/resultado.json`: zero retira item, comanda vazia não confirma; vazio/zero/negativo/acima do limite recusados, 69 recebido e persistido. `recebimento-invalido/resultado.json` cobre moeda negativa e correção decimal; quantidade usa controles inteiros, sem campo livre fracionário. |
+| R03 | `concorrencia/resultado.json`: Instituição bancária com 149/150/151 caracteres retorna 200/200/400, sem truncamento. Não substitui a prova limite−1/limite/limite+1 de resposta e observação pedida na matriz. |
+| R04 | `concorrencia/resultado.json` e `real/resultado-financeiro.json`: rede indisponível preserva edição e retentativa grava uma revisão. `storage/resultado.json`: App real/HTTP controlado, quota local bloqueada, aviso e memória preservados; reload não restaura, conforme aviso. |
+| C01 | `concorrencia/resultado.json`: contas distintas em duas abas preservadas; mesma conta obsoleta recebe 409 com proposta mantida. Não generalizar esse controle de revisão a todos os cadastros legados. |
+| C02 | `desfazer-conta-real/resultado.json`: Desfazer A preserva B, A posterior recusa 409, resultado confirmado por GET/reload, ator/operação registrados. Reversão limitada à conta; efeitos financeiros usam compensação, não restauração de base. |
+| P01 | `concorrencia/resultado.json`, `real/resultado-financeiro.json` e `real/jornada-api.json`: Dona/Atendimento, link direto, GET/escrita 403 e isolamento entre empresas. Não comprovam todas as combinações de papéis, busca ou revogação durante edição. |
+| A01 | `real/resultado.json`: endpoint/harness real com LLM controlado e aplicação individual com evidência. Provas focais invalidam contexto obsoleto; CLI real opt-in é separada. Apoio operacional completo de IA a pedido com impedimento não foi percorrido nessa bateria Chromium. |
+| A02 | Mesmo artefato: aviso de até 20 mensagens recebidas, três campos e aplicação individual; bancos não oferecem IA. Contrato minimiza entrada e não envia formulário. Não é homologação de provedor externo. |
+| U01 | Capturas das jornadas e Cadastros, mapa real de ícones e provas de gramática; estados lead/cliente/sem cadastro, recebido/devolvido separados. Não houve medição exaustiva de contraste e tipografia de todos os módulos. |
+| U02 | Jornadas reais 390/1440; complemento Entregas em 320/768 sem overflow global e com setas alterando aba/foco; componentes reais cobrem combobox e alvo 48 px mobile. Retorno de Gestão e aviso do aparelho têm provas focais. Sem teclado virtual físico, zoom/orientação ou auditoria integral de foco de todos os diálogos. |
+| N01 | `real/resultado-financeiro.json`: módulo/tela inválidos mostram aviso e recuperação; acesso financeiro negado testado. Não foi percorrido todo link antigo ou entidade removida. |
+| Q01 | Duas jornadas UI com produtos/pedidos distintos na mesma conversa, saldos 8→6, pagamentos únicos de 69, entrega e encerramento; exceção própria paga/cancelada/devolvida com saldo final 1. Complemento pelo módulo Entregas gera pedido de 37, uma baixa 2→1, um recebimento e viagem entregue com responsável. Leituras reconciliam IDs/valores; permanecem os limites dos demais casos acima. |
+
+O complemento Entregas usou pedido `a26446ef-ecb6-437b-b92a-b021c4f6b5ba`, viagem
+`a4f7f974-b993-41eb-9908-b1b0ea6ce8e3` e entregador `7d2c3e39-9ac4-45ef-ab4c-986fdadd2c56`.
+Foi executado antes da integração posterior do fix de status/estoque #2403; não prova por si uma
+versão futura do backend. Não houve mutação HTTP direta nas jornadas UI.
