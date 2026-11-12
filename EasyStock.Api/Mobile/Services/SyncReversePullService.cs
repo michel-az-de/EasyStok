@@ -85,7 +85,7 @@ public class SyncReversePullService(
             var espelhosQ = _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId && m.ErpProductId != null && idsErp.Contains(m.ErpProductId!.Value));
             if (lojaId.HasValue) espelhosQ = espelhosQ.Where(m => m.LojaId == lojaId || m.LojaId == null);
-            var espelhos = (await espelhosQ.ToListAsync()).ToDictionary(m => m.ErpProductId!.Value);
+            var espelhos = (await espelhosQ.ToListAsync()).ToLookup(m => m.ErpProductId!.Value);
 
             var estoqueQ = _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId && idsErp.Contains(i.ProdutoId));
@@ -93,8 +93,8 @@ public class SyncReversePullService(
             var itensEstoque = await estoqueQ.ToListAsync();
 
             foreach (var p in produtosEspelhados)
+            foreach (var espelho in espelhos[p.Id])
             {
-                if (!espelhos.TryGetValue(p.Id, out var espelho)) continue;
                 var saldo = itensEstoque.Where(i => i.ProdutoId == p.Id).Sum(i => i.QuantidadeAtual?.Value ?? 0m);
                 var dto = new ProductDto(
                     Id: espelho.Id,

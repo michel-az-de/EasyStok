@@ -43,7 +43,7 @@ function motivoDaLinha(motivo, origem) {
 // já resolvido, senão a mudança de UMA conversa re-renderizava a lista inteira.
 export const CartaoConversa = memo(function CartaoConversa({
   conversa, selecionada, agora, pausado = false, pagamentoNaoVisto = false, aberta = true, expediente = null,
-  grupo, busca, aoAbrir, fonteApi = false,
+  grupo, busca, aoAbrir, fonteApi = false, usuario = null,
 }) {
   const { canais, janelas, cardapio } = useCatalogo()
   const fotoCadastrada = useFotoCliente(conversa.cliente?.fotoUrl)
@@ -73,7 +73,7 @@ export const CartaoConversa = memo(function CartaoConversa({
     janelaFechada,
     tagAchada,
   })
-  const previa = previaDaConversa(conversa)
+  const previa = previaDaConversa(conversa, usuario)
   // Mensagens do cliente depois da última resposta de verdade (issue #41):
   // aviso de esteira e nota não zeram a contagem.
   const pendentes = pendentesDaLinha(conversa)

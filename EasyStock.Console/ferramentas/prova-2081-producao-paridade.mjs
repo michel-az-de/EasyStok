@@ -310,6 +310,15 @@ const evento = { preventDefault() {} }
 globalThis.window = { print: () => {} }
 const tela = async (nome) => (await import(new URL(`${nome}.jsx`, pastaDasTelas).href))[nome]
 
+await confere('#2305: a primeira visita mostra a grade com o passo a passo recolhido', async () => {
+  montarFetch()
+  const t = montar(await tela('AbaProducaoDoDiaApi'))
+  await t.assentar()
+  const ajuda = doTipo(t.arvore, 'details').find((no) => texto(no).includes('passo a passo'))
+  assert.equal(ajuda.props.open, false)
+  assert.ok(texto(ajuda).includes('Ver passo a passo'))
+})
+
 // === R1/R2 da revisão: alérgenos na etiqueta e o mesmo código nos três lugares =============
 const renderizarEtiqueta = async (props) => {
   const { EtiquetaDeProducao } = await import(`${urlDaEtiqueta.href}?real`)

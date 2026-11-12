@@ -2,6 +2,11 @@
 
 .chips { display: flex; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
 
+@media (max-width: 600px) {
+  .filtros .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: var(--e-2); }
+  .filtros .chips > * { flex-shrink: 0; }
+}
+
 /* #1809: os três passos à vista, lado a lado no computador e empilhados na tela estreita. */
 .passos {
   list-style: none; margin: 0; padding: var(--e-3) var(--e-4); display: grid; gap: var(--e-2) var(--e-4);
@@ -40,7 +45,7 @@
 .palco { display: block; min-width: 0; }
 .bancada { display: grid; gap: var(--e-5); grid-template-columns: minmax(0, 1fr); align-items: start; }
 .cardapio, .colunaDoLote { display: grid; gap: var(--e-3); min-width: 0; }
-.filtros { display: flex; align-items: center; justify-content: flex-start; gap: var(--e-3); flex-wrap: wrap; }
+.filtros { display: flex; align-items: center; justify-content: flex-start; gap: var(--e-3); flex-wrap: wrap; min-width: 0; }
 .busca { flex: 0 1 320px; min-width: 0; }
 
 /* O foco do teclado não pode parar atrás da barra fixa: quem recebe foco rola com folga embaixo. */
