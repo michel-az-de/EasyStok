@@ -7,11 +7,12 @@ require(path.join(__dirname, "..", "dominio.js"));
 const FMA = globalThis.FMA;
 FMA.carregar();
 const { Regras: R, lerValor, estado } = FMA;
-const st = estado();
+let st = estado();
 const por = (arr, id) => arr.find(x => x.id === id);
 const pend = chave => st.lembretes.some(m => m.chave === chave && m.status === "Pendente");
 let ok = 0;
-function t(nome, fn) { fn(); ok++; console.log("ok - " + nome); }
+// Cada teste parte da semente: nenhum depende do que o anterior deixou.
+function t(nome, fn) { st = FMA.restaurar(); fn(); ok++; console.log("ok - " + nome); }
 
 t("lerValor aceita formatos BR e recusa ambíguo", () => {
   assert.strictEqual(lerValor("1.500,50"), 1500.5);
@@ -134,6 +135,18 @@ t("abordagem manual respeita o limite de 5 por dia", () => {
 t("hoje traz no máximo 5 itens, urgentes primeiro", () => {
   const h = FMA.Consultas.hoje();
   assert.ok(h.length > 0 && h.length <= 5); assert.strictEqual(h[0].urgencia, "alta");
+});
+
+t("NFS-e com retenção depois do recebimento pelo bruto é recusada", () => {
+  const c = por(st.contratos, "C1"); const e = por(c.etapas, "E2"); const r = por(st.receber, e.receberId);
+  R.receber(r);
+  assert.strictEqual(r.valorPago, 2000);
+  const base = { numero: "950", valor: 2000, retencoes: 150, competencia: "2026-11", xml: "b.xml", pdf: "b.pdf" };
+  const res = R.anexarNota(c, e, base);
+  assert.strictEqual(res && res.erro, "retencoes", "retenção após pagamento bruto não fecha");
+  assert.ok(!e.notaId);
+  R.anexarNota(c, e, { ...base, retencoes: 0 });
+  assert.ok(e.notaId); assert.strictEqual(r.retencoes, 0); assert.strictEqual(r.valorPago, r.valor);
 });
 
 console.log(ok + " testes passaram");
