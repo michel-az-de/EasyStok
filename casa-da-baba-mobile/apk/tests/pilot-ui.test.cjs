@@ -108,3 +108,26 @@ test('rótulo atualizado pelo renderizador é normalizado sem trocar handler nem
   content = markup = 'Salvar'; ui.refresh();
   assert.equal(attrs['aria-label'], 'Salvar', 'nome gerado acompanha a ação do formulário reutilizado');
 });
+
+test('Clientes não destaca Pedidos na barra inferior', () => {
+  const navButton = nav => {
+    const classes = new Set();
+    return {
+      dataset: { nav },
+      classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: c => classes.has(c) },
+      setAttribute() {}, removeAttribute() {},
+      isActive: () => classes.has('active')
+    };
+  };
+  const navs = [navButton('producao'), navButton('pedidos')];
+  const environment = {
+    document: { body: {}, querySelectorAll: selector => (selector === '.nav-btn' ? navs : []), querySelector: () => null, getElementById: () => null },
+    go(screen) { return screen; }
+  };
+  installProductionOrdersUI(environment);
+  environment.go('clientes');
+  assert.equal(navs[0].isActive(), false);
+  assert.equal(navs[1].isActive(), false);
+  environment.go('pedidos');
+  assert.equal(navs[1].isActive(), true);
+});

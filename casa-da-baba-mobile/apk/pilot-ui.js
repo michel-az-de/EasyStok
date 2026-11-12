@@ -139,7 +139,8 @@
       const target = ALLOWED_SCREENS.has(screen) ? screen : 'producao';
       const result = navigate.call(this, target, options);
       if (target !== 'home') doc.querySelectorAll('.nav-btn').forEach(button => {
-        const active = button.dataset.nav === (['pedidos', 'finalizados', 'clientes'].includes(target) ? 'pedidos' : 'producao');
+        const owner = { pedidos: 'pedidos', finalizados: 'pedidos', clientes: '' }[target] ?? 'producao';
+        const active = button.dataset.nav === owner;
         button.classList.toggle('active', active);
         if (active) button.setAttribute('aria-current', 'page');
         else button.removeAttribute('aria-current');

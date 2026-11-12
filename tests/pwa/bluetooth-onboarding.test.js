@@ -11,7 +11,7 @@ module.exports = function ({ test, assert }) {
   const source = html.slice(start, end);
   const offeredKey = 'cdb-bluetooth-initial-offer-v1';
 
-  function boot(store = new Map(), nativeReady = true) {
+  function boot(store = new Map([['cdb-onboarding-done', '1']]), nativeReady = true) {
     const listeners = {}, timers = [], callbacks = [];
     let requests = 0;
     const context = {
@@ -44,6 +44,13 @@ module.exports = function ({ test, assert }) {
     }
   });
 
+  test('Bluetooth: sem onboarding concluído, nada é pedido nem gravado', () => {
+    const app = boot(new Map([]));
+    app.deviceReady(); app.load();
+    assert.equal(app.requests, 0);
+    assert.equal(app.store.has(offeredKey), false);
+  });
+
   test('Bluetooth: reiniciar após recusa não repete oferta, mas ação explícita continua disponível', () => {
     const first = boot();
     first.deviceReady(); first.callbacks[0](false);
@@ -55,7 +62,7 @@ module.exports = function ({ test, assert }) {
   });
 
   test('Bluetooth: bridge ausente não consome a oferta e fallback pode atender bridge tardio', () => {
-    const app = boot(new Map(), false);
+    const app = boot(new Map([['cdb-onboarding-done', '1']]), false);
     app.deviceReady();
     assert.equal(app.requests, 0);
     assert.equal(app.store.has(offeredKey), false);
