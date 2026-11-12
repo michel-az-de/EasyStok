@@ -47,13 +47,14 @@ function ProvaCadastro(){
  const conversa={id:cliente,clienteId:'cadastro-'+cliente,cadastroId:'cadastro-'+cliente,nome:cliente,canal:'WhatsApp',estado:'Aberto',conta:'cliente',
  cliente:{tags:[],notas:[],pedidos:0,pontos:0,telefone:'(11) 90000-0000',endereco:'Rua de teste, 100'},pedido:null,mensagens:[]};
  const estado={fonteApi:true,conversas:[conversa],historico:[],agora:Date.now(),automaticoPausado:{},fidelidade:{recompensas:[],sorteios:[],resgatesPorCadastro:{}}};
- const acoes={salvarNota:async(id,texto)=>{window.gravacoesCadastro.push({id,texto});return new Promise(resolve=>{window.responderCadastro=resolve})}};
+ const acoes={salvarNota:async(id,texto)=>{window.gravacoesCadastro.push({id,texto});return new Promise(resolve=>{window.responderCadastro=resolve})},
+ editarDadoCliente:async(id,campo,texto)=>{window.gravacoesCampos.push({id,campo,texto});return new Promise(resolve=>{window.responderCampo=resolve})}};
  return <ContextoRascunhosDosAjustes value={{rascunhos,definir:guardar,...gravacoes}}><ContextoEstado value={estado}><ContextoAcoes value={acoes}><ContextoCatalogo value={{canais:CANAIS,motivosBloqueio:[],prefixosCepAtendidos:[],restricoes:[]}}>
  {aberto&&<ModalCliente key={cliente} conversa={conversa} aoFechar={()=>mostrar(false)}/>}
  </ContextoCatalogo></ContextoAcoes></ContextoEstado></ContextoRascunhosDosAjustes>
 }
 const raizReact=createRoot(document.getElementById('root'));raizReact.render(<Prova/>);window.mostrarPainelReal=()=>raizReact.render(<ProvaFoco/>);
-window.mostrarCadastroReal=()=>{window.gravacoesCadastro=[];raizReact.render(<ProvaCadastro/>)};`
+window.mostrarCadastroReal=()=>{window.gravacoesCadastro=[];window.gravacoesCampos=[];raizReact.render(<ProvaCadastro/>)};`
 const arquivoEntrada = join(tmpdir(), `easystok-prova-2178-${process.pid}.jsx`)
 await writeFile(arquivoEntrada, entrada)
 let compilado
@@ -205,7 +206,47 @@ try {
   await cadastroCliente.waitFor({ state: 'detached' })
   await pagina.evaluate(() => window.montarCadastro(true)); await abrirNotas()
   assert.equal(await notaCadastro.inputValue(), '', 'descarte explícito limpa a memória do rascunho')
+  // #2365: os campos do cadastro também sobrevivem à troca de composição, sem vazar entre clientes.
+  const nomeCadastro = cadastroCliente.getByRole('textbox', { name: 'Nome do cliente', exact: true })
+  const remontarCadastro = async () => {
+    await pagina.evaluate(() => window.montarCadastro(false)); await cadastroCliente.waitFor({ state: 'detached' })
+    await pagina.evaluate(() => window.montarCadastro(true)); await cadastroCliente.waitFor({ state: 'visible' })
+  }
+  await cadastroCliente.getByRole('button', { name: 'Editar Nome do cliente', exact: true }).click()
+  await nomeCadastro.fill('Marina revisada')
+  await remontarCadastro()
+  assert.equal(await nomeCadastro.count(), 1, 'remonte mantém o editor de nome aberto')
+  assert.equal(await nomeCadastro.inputValue(), 'Marina revisada')
+  assert.equal(await pagina.evaluate(() => window.gravacoesCampos.length), 0, 'reabrir o rascunho não salva por mudança automática de foco')
+  await pagina.evaluate(() => window.trocarClienteCadastro('Carlos'))
+  await cadastroCliente.getByRole('button', { name: 'Editar Nome do cliente', exact: true }).waitFor()
+  assert.equal(await nomeCadastro.count(), 0, 'outro cliente não herda a edição')
+  await pagina.evaluate(() => window.trocarClienteCadastro('Marina'))
+  await nomeCadastro.waitFor(); assert.equal(await nomeCadastro.inputValue(), 'Marina revisada')
+  await nomeCadastro.press('Enter')
+  await pagina.waitForFunction(() => window.gravacoesCampos.length === 1)
+  await remontarCadastro()
+  await nomeCadastro.press('Enter')
+  assert.equal(await pagina.evaluate(() => window.gravacoesCampos.length), 1, 'remonte durante a ida não permite reenvio')
+  assert.equal(await cadastroCliente.getByRole('button', { name: 'Fechar', exact: true }).isDisabled(), true)
+  await pagina.evaluate(() => window.responderCampo(false))
+  await cadastroCliente.getByRole('alert').filter({ hasText: 'Não foi possível salvar' }).waitFor()
+  assert.equal(await nomeCadastro.inputValue(), 'Marina revisada', 'recusa preserva o texto')
+  await remontarCadastro(); assert.equal(await nomeCadastro.inputValue(), 'Marina revisada')
+  await nomeCadastro.press('Enter')
+  await pagina.waitForFunction(() => window.gravacoesCampos.length === 2)
+  await pagina.evaluate(() => window.responderCampo(true))
+  await cadastroCliente.getByRole('button', { name: 'Editar Nome do cliente', exact: true }).waitFor()
+  await remontarCadastro(); assert.equal(await nomeCadastro.count(), 0, 'sucesso limpa o rascunho')
+  await cadastroCliente.getByRole('button', { name: 'Editar Nome do cliente', exact: true }).click()
+  await nomeCadastro.fill('Marina descartada')
+  await cadastroCliente.getByRole('button', { name: 'Desfazer', exact: true }).click()
+  await remontarCadastro(); assert.equal(await nomeCadastro.count(), 0, 'Desfazer limpa o rascunho')
+  assert.deepEqual(await pagina.evaluate(() => window.gravacoesCampos), [
+    { id: 'Marina', campo: 'nome', texto: 'Marina revisada' }, { id: 'Marina', campo: 'nome', texto: 'Marina revisada' },
+  ])
   assert.deepEqual(erros, [])
   console.log('ok #2178: DOM/seleção/scroll/Undo, portal oculto preservado, falha e confirmação por dono; nenhuma escrita pública')
   console.log('ok #2360: cadastro real confirma descarte e preserva nota no remonte, por cliente e após falha; confirmação limpa')
+  console.log('ok #2365: edição por cliente sobrevive ao remonte pendente sem reenvio, mantém falha visível e limpa após salvar ou Desfazer')
 } finally { await navegador.close() }

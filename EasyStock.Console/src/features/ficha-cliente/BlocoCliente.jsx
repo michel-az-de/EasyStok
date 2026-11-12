@@ -80,6 +80,7 @@ function SecaoCliente({ integrado, titulo, chave, children, ...resto }) {
 
 export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false, aoMudarSujo, rodapeDoCadastro }) {
   const { cliente } = conversa
+  const chaveCadastro = `cadastro:${conversa.clienteId ?? conversa.cadastroId ?? conversa.id}`
   const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
   // #1474 (R2): no modo API, mudar a entrega do pedido e os pontos não têm endpoint e somem.
   const disponivel = useAcaoDisponivel()
@@ -256,7 +257,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
           <Avatar nome={conversa.nome} foto={fotoCadastro ?? fotoDoCliente(canal, cliente)} tamanho="enorme" />
           <div className={css.identidadeTextos}>
             <div key={`nome-${captado.nome ?? ''}`} ref={nomeRef} className={captado.nome ? css.captadoAgora : undefined}>
-              <CampoEmLinha rotulo="Nome do cliente" aoMudarSujo={sujoEmLinha.nome} valor={conversa.nome} validar={validarNome} dica="Nome e sobrenome" limite={LIMITE_DO_NOME}
+              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:nome`} rotulo="Nome do cliente" aoMudarSujo={sujoEmLinha.nome} valor={conversa.nome} validar={validarNome} dica="Nome e sobrenome" limite={LIMITE_DO_NOME}
                 aoSalvar={(v) => editarDadoCliente(conversa.id, 'nome', v.trim(), agora)} />
               <SeloCaptado quando={captado.nome} />
               {errosDoCadastro.nome && <p className={css.erroEmLinha} role="alert">{errosDoCadastro.nome}</p>}
@@ -362,7 +363,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
             <div key={`tel-${captado.telefone ?? ''}`} data-campo-ficha="telefone cadastro" className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
               <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={16} /></span>
               <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
-              <CampoEmLinha rotulo="Telefone" aoMudarSujo={sujoEmLinha.telefone} valor={cliente.telefone}
+              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:telefone`} rotulo="Telefone" aoMudarSujo={sujoEmLinha.telefone} valor={cliente.telefone}
                 vazio={automaticoCaptando ? 'O Assistente está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
                 validar={validarTelefone} aoSalvar={(v) => editarDadoCliente(conversa.id, 'telefone', v, agora)} />
             </div>
@@ -373,7 +374,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
             >
               <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={16} /></span>
               <span className={css.rotuloDado}>Endereço <SeloCaptado quando={captado.endereco} /></span>
-              <CampoEmLinha rotulo="Endereço" aoMudarSujo={sujoEmLinha.endereco} valor={cliente.endereco}
+              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:endereco`} rotulo="Endereço" aoMudarSujo={sujoEmLinha.endereco} valor={cliente.endereco}
                 vazio={enderecoPendente ? 'Aguardando confirmação acima'
                   : automaticoCaptando ? 'O Assistente está pedindo na conversa' : 'Adicionar endereço'}
                 validar={fonteApi ? recusaDoEndereco : undefined}

@@ -6,7 +6,7 @@ const { pilotIcon } = require('../pilot.js');
 
 test('ações curtas conservam seu significado e sempre usam um ícone disponível', () => {
   for (const [text, label] of [
-    ['🗑️ Excluir lote', 'Excluir'], ['Criar e usar', 'Etiquetar'],
+    ['🗑️ Excluir lote', 'Excluir'], ['Criar e usar', 'Criar e etiquetar'],
     ['Conferir 12 unidades', 'Produzir 12'], ['Conferir 1 unidade', 'Produzir 1'], ['Salvar R$ 34,00', 'Salvar'],
     ['Preparar cobrança', 'Cobrar'], ['Copiar mensagem toda', 'Copiar'],
     ['Agendar para depois? (entrega futura)', 'Agendar'],
@@ -104,7 +104,7 @@ test('rótulo atualizado pelo renderizador é normalizado sem trocar handler nem
   assert.equal(button.dataset.command, 'Excluir');
   delete attrs['aria-label'];
   content = markup = 'Criar e usar'; ui.refresh();
-  assert.equal(attrs['aria-label'], 'Etiquetar');
+  assert.equal(attrs['aria-label'], 'Criar e etiquetar');
   content = markup = 'Salvar'; ui.refresh();
   assert.equal(attrs['aria-label'], 'Salvar', 'nome gerado acompanha a ação do formulário reutilizado');
 });
@@ -130,4 +130,47 @@ test('Clientes não destaca Pedidos na barra inferior', () => {
   assert.equal(navs[1].isActive(), false);
   environment.go('pedidos');
   assert.equal(navs[1].isActive(), true);
+});
+
+test('FAB anuncia criar cliente ou pedido conforme o texto atual, preservando a ação', () => {
+  const attrs = { 'aria-label': 'Ação rápida', onclick: 'onFabClick()' };
+  let escritas = 0;
+  const fab = { getAttribute: key => attrs[key], setAttribute: (key, value) => { attrs[key] = value; escritas++; } };
+  const label = { textContent: 'Cliente' };
+  const environment = {
+    document: {
+      getElementById: id => ({ fab, fabLabel: label })[id] ?? null,
+      querySelectorAll: () => [], querySelector: () => null
+    },
+    cdbPilotIcon: pilotIcon, go() {}, goProducaoTab() {}
+  };
+  const ui = installProductionOrdersUI(environment);
+  assert.equal(attrs['aria-label'], 'Novo cliente');
+  label.textContent = 'Pedido'; ui.refresh();
+  assert.equal(attrs['aria-label'], 'Novo pedido');
+  ui.refresh();
+  assert.equal(escritas, 2, 'uma escrita por mudança de ação');
+  assert.equal(attrs.onclick, 'onFabClick()');
+  assert.equal(label.textContent, 'Pedido', 'o texto visual continua vindo do fluxo existente');
+});
+
+test('campos do pedido e troca de cliente têm nomes acessíveis sem alterar valores ou ação', () => {
+  const campo = (valor, attrs = {}) => ({ value: valor, getAttribute: key => attrs[key], setAttribute: (key, value) => { attrs[key] = value; } });
+  const campos = { orderNotes: campo('Sem cebola'), orderChannel: campo('balcao'), itemSearch: campo('Lasanha') };
+  const trocar = campo('', { onclick: 'clearClient()' });
+  const environment = {
+    document: {
+      getElementById: id => campos[id] ?? null,
+      querySelectorAll: selector => selector === '#clientSelected .cp-clear[onclick="clearClient()"]' ? [trocar] : [],
+      querySelector: () => null
+    },
+    cdbPilotIcon: pilotIcon, go() {}, goProducaoTab() {}
+  };
+  const ui = installProductionOrdersUI(environment); ui.refresh();
+  assert.equal(campos.orderNotes.getAttribute('aria-label'), 'Observação (opcional)');
+  assert.equal(campos.orderChannel.getAttribute('aria-label'), 'Canal (opcional)');
+  assert.equal(campos.itemSearch.getAttribute('aria-label'), 'Buscar item do cardápio');
+  assert.equal(trocar.getAttribute('aria-label'), 'Trocar cliente do pedido');
+  assert.equal(trocar.getAttribute('onclick'), 'clearClient()');
+  assert.deepEqual(Object.values(campos).map(c => c.value), ['Sem cebola', 'balcao', 'Lasanha']);
 });
