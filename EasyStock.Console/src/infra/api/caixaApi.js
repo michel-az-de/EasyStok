@@ -18,8 +18,10 @@ export const abrirCaixa = ({ saldoInicial, observacoes }) =>
 export const registrarMovimento = ({ tipo, valor, categoria, metodo, descricao }, chave = null) =>
   chamarApi(`${BASE}/movimentos`, { metodo: 'POST', chave, corpo: { tipo, valor, categoria, metodo, descricao } })
 
-export const estornarMovimento = (id, motivo) =>
-  chamarApi(`${BASE}/movimentos/${id}/estornar`, { metodo: 'POST', corpo: { motivo } })
+// #2378: `/api/caixa/movimentos` está no IdempotencyMiddleware (por prefixo), então o estorno honra a chave.
+// `abrir` e `fechar` ficam de fora: a API não as cobre (pendência na #2378); mandar chave ali não faria nada.
+export const estornarMovimento = (id, motivo, chave = null) =>
+  chamarApi(`${BASE}/movimentos/${id}/estornar`, { metodo: 'POST', chave, corpo: { motivo } })
 
 // Sem data: a API fecha a sessão aberta, que pode ser de um dia anterior (#640).
 // #2113 (B3 da #2084): o contado vai em campo próprio; a abertura seguinte parte dele.
