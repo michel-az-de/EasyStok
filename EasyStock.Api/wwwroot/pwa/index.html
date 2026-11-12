@@ -7725,7 +7725,7 @@ body.ux-calm [data-screen="producao"] .section-label {
 
       <div id="cashDetailsActions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
         <button class="np-btn np-secondary" id="cashDetailsAddBtn" onclick="openCashModal()">+ Lançamento manual</button>
-        <button class="np-btn np-primary" id="cashDetailsCloseDayBtn" onclick="openCashCloseModal()">🔒 Fechar caixa do dia</button>
+        <!-- #2319: "Fechar caixa" local removido: o servidor ignora este fechamento. O fechamento real é feito no Console. -->
         <button class="np-btn np-tertiary" id="cashDetailsReopenBtn" onclick="reopenCashDay()" style="display:none">🔓 Reabrir caixa</button>
         <button class="np-btn np-tertiary" onclick="printCashClosing()">📤 Compartilhar fechamento</button>
       </div>
@@ -12093,7 +12093,7 @@ function renderHomeChecklist() {
   // 3. Estoque
   const estoqueOk = getCriticalProducts().length === 0;
   const items = [
-    { ok: cashOk,    icon: cashFechado ? '🔒' : '🟡', label: 'Caixa do dia',    sub: cashFechado ? 'fechado' : (temMovimento ? 'aberto' : 'sem movimento'), cta: cashFechado ? null : function () { openCashCloseModal(); }, ctaLabel: 'Fechar' },
+    { ok: cashOk,    icon: cashFechado ? '🔒' : '🟡', label: 'Caixa do dia',    sub: cashFechado ? 'fechado' : (temMovimento ? 'aberto' : 'sem movimento'), cta: null, ctaLabel: '' },
     { ok: pedidosOk, icon: pedidosOk ? '✅' : '⏱',   label: 'Pedidos fluindo', sub: pedidosOk ? 'sem travados' : stuck.length + ' parado' + (stuck.length > 1 ? 's' : '') + ' >30min', cta: pedidosOk ? null : function () { go('pedidos'); }, ctaLabel: 'Ver' },
     { ok: estoqueOk, icon: estoqueOk ? '📦' : '⚠',   label: 'Estoque',         sub: estoqueOk ? 'sem críticos' : getCriticalProducts().length + ' item(ns) crítico(s)', cta: estoqueOk ? null : function () { go('producao'); }, ctaLabel: 'Produção' }
   ];
@@ -12145,7 +12145,8 @@ function renderHomeOpsDisclosure() {
 function renderOpenCashDaysBanner() {
   const banner = document.getElementById('openCashDaysBanner');
   if (!banner) return;
-  const days = getOpenPriorDays();
+  // #2319: sem botão local de fechar caixa, o aviso de dias em aberto não teria ação.
+  const days = [];
   if (!days.length) {
     banner.style.display = 'none';
     banner.innerHTML = '';
@@ -12340,7 +12341,7 @@ function renderCash() {
       closeDayBtn.style.display = 'none';
       reopenDayBtn.style.display = 'block';
     } else {
-      closeDayBtn.style.display = 'block';
+      closeDayBtn.style.display = 'none';
       reopenDayBtn.style.display = 'none';
     }
   }

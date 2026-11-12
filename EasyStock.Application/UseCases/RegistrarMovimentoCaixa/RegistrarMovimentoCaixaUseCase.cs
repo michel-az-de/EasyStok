@@ -17,7 +17,10 @@ public sealed record RegistrarMovimentoCaixaCommand(
     DateTime? DataMovimento = null,
     Guid? RegistradoPorUserId = null,
     [property: MaxLength(120)] string? RegistradoPorNome = null,
-    [property: MaxLength(20)] string? Origem = "web");
+    [property: MaxLength(20)] string? Origem = "web",
+    // #2319: só o lançamento manual do operador liga isto (o controller força, nunca vem do body). Pagamento de pedido,
+    // webhook, estorno e sync do app seguem sem exigir caixa aberto.
+    bool ExigirCaixaAberto = false);
 
 public class RegistrarMovimentoCaixaUseCase(
     ICaixaRepository repo,
@@ -25,6 +28,8 @@ public class RegistrarMovimentoCaixaUseCase(
     ObterCaixaDiaUseCase obterCaixaDia,
     ILogger<RegistrarMovimentoCaixaUseCase> logger)
 {
+    public const string CaixaAbertoMensagem = "Abra o caixa antes de lançar.";
+
     private static readonly TimeSpan ToleranciaDeRelogio = TimeSpan.FromMinutes(5);
 
     public async Task<MovimentoCaixaResult> ExecuteAsync(RegistrarMovimentoCaixaCommand cmd)
@@ -54,6 +59,9 @@ public class RegistrarMovimentoCaixaUseCase(
         // dia que ainda não abriu. O mobile fica de fora: a hora vem do relógio do aparelho.
         if (origem != "mobile" && dataMov > DateTime.UtcNow.Add(ToleranciaDeRelogio))
             throw new UseCaseValidationException("Data do lançamento não pode estar no futuro.");
+
+        if (cmd.ExigirCaixaAberto && await repo.GetAberturaPendenteAsync(cmd.EmpresaId, cmd.LojaId) is null)
+            throw new UseCaseValidationException(CaixaAbertoMensagem);
 
         // Bloquear lançamento em dia já fechado (preserva integridade do snapshot).
         await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId,
