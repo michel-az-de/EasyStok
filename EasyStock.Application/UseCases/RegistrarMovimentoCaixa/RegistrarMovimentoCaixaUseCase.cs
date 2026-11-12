@@ -37,11 +37,13 @@ public class RegistrarMovimentoCaixaUseCase(
 
         if (cmd.Valor <= 0)
             throw new UseCaseValidationException("Valor deve ser maior que zero.");
+        var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
+        // O mobile envia fato já gravado no aparelho: arredonda em vez de recusar, para a mutação não virar rejeição permanente.
+        if (origem == "mobile") cmd = cmd with { Valor = decimal.Round(cmd.Valor, 2, MidpointRounding.AwayFromZero) };
         ValidacaoCaixa.ExigirValorMonetario(cmd.Valor, "Valor");
 
         var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;   // timestamp do movimento (UTC, armazenado)
         var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
-        var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
 
         // O mobile promove fatos já gravados no aparelho: não recusa forma antiga, só normaliza a conhecida.
         cmd = cmd with { Metodo = origem == "mobile"

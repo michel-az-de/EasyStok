@@ -56,6 +56,16 @@ public class CaixaValidacaoEntradaTests
     }
 
     [Fact]
+    public async Task RegistrarMovimento_MobileComTresCasasGravaArredondadoSemRecusar()
+    {
+        // A mutação do app é fato já gravado no aparelho: recusar vira perda permanente na fila de sync.
+        await Registrar().ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(Guid.NewGuid(), "entrada", 12.345m, Origem: "mobile"));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Valor == 12.35m));
+    }
+
+    [Fact]
     public async Task RegistrarMovimento_RecusaValorAcimaDoTeto()
     {
         var act = () => Registrar().ExecuteAsync(
