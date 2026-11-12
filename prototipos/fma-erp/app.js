@@ -1,586 +1,485 @@
-/* FMA Gestão: protótipo estático do ERP interno da FMA Software (issue #2387).
-   Dados fictícios em memória, persistidos só no navegador.
+/* FMA Gestão: interface do protótipo (issue #2387). Regras e dados em dominio.js.
    Spec: docs/plan/fma-erp/00-spec-dominio.md. Banca: docs/plan/fma-erp/01-banca.md */
 (function () {
   "use strict";
+  var F = window.FMA, U = F.util, R = F.Regras, Q = F.Consultas;
+  var brl = U.brl, data = U.data, por = U.por, soma = U.soma;
+  var st = F.carregar();
+  var reduzir = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  var CHAVE = "fma-gestao-prototipo-v2";
-  var HOJE = new Date();
-  HOJE.setHours(0, 0, 0, 0);
-
-  // ---------- utilidades ----------
-  function dias(n) { var d = new Date(HOJE); d.setDate(d.getDate() + n); return iso(d); }
-  function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
-  function brl(v) { return (v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
-  function data(s) { if (!s) return "sem data"; var p = s.split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
-  function mes(s) { var p = s.split("-"); return p[1] + "/" + p[0]; }
-  function diasAte(s) { return Math.round((new Date(s + "T00:00:00") - HOJE) / 86400000); }
+  function ic(n, cls) { return '<svg class="ic ' + (cls || "") + '" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
+  function iniciais(nome) { return String(nome).split(/[\s:]+/).filter(Boolean).slice(0, 2).map(function (p) { return p.charAt(0); }).join("").toUpperCase(); }
+  function quando(s) {
+    var n = U.diasAte(s);
+    if (n === 0) return "hoje"; if (n === -1) return "ontem"; if (n === 1) return "amanhã";
+    return n < 0 ? "há " + (-n) + " dias" : "em " + n + " dias";
+  }
   function prazo(s) {
-    var n = diasAte(s);
-    if (n < 0) return '<span class="selo erro">vencida há ' + (-n) + " d</span>";
-    if (n === 0) return '<span class="selo alerta">hoje</span>';
-    if (n <= 3) return '<span class="selo alerta">em ' + n + " d</span>";
-    return '<span class="selo">em ' + n + " d</span>";
+    var n = U.diasAte(s);
+    return '<span class="pilula ' + (n < 0 ? "erro" : n <= 3 ? "alerta" : "") + '">' + (n < 0 ? "venceu " : "vence ") + quando(s) + "</span>";
   }
-  function soma(arr, f) { return arr.reduce(function (t, x) { return t + f(x); }, 0); }
-  function por(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
-  function r2(v) { return Math.round(v * 100) / 100; }
-  // Aceita "1.500,50", "1500,50", "1500.50" e "1500". Ambíguo ou inválido devolve NaN.
-  function lerValor(txt) {
-    var s = String(txt || "").replace(/[R$\s]/g, "");
-    if (!s) return NaN;
-    if (s.indexOf(",") >= 0) { if (!/^\d{1,3}(\.\d{3})*,\d{1,2}$|^\d+,\d{1,2}$/.test(s)) return NaN; s = s.replace(/\./g, "").replace(",", "."); }
-    else if (/^\d+\.\d{1,2}$/.test(s)) { /* ponto decimal */ }
-    else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
-    else if (!/^\d+$/.test(s)) return NaN;
-    var v = Number(s); return isFinite(v) ? r2(v) : NaN;
+  var CANAL = { whatsapp: { n: "WhatsApp", i: "whatsapp" }, email: { n: "E-mail", i: "email" }, ia: { n: "IA", i: "ia" }, sistema: { n: "Sistema", i: "sistema" } };
+  function canal(c) { var k = CANAL[c] || CANAL.sistema; return '<span class="canal ' + (CANAL[c] ? c : "sistema") + '" title="' + k.n + '">' + ic(k.i) + '<span class="sr">' + k.n + "</span></span>"; }
+  var ROT = { AguardandoAssinatura: "Aguardando assinatura", EmExecucao: "Em execução", Substituida: "Substituída" };
+  var TOM = { Enviada: "alerta", Aceita: "ok", Recusada: "erro", Expirada: "erro", AguardandoAssinatura: "alerta", Vigente: "info", Encerrado: "ok", Cancelado: "erro",
+    EmExecucao: "info", Entregue: "alerta", Aprovada: "alerta", Faturada: "ok", Paga: "ok", Aberta: "alerta", Anexada: "ok", Cancelada: "erro" };
+  function pilula(s) { return '<span class="pilula ' + (TOM[s] || "") + '">' + esc(ROT[s] || s) + "</span>"; }
+  function botao(txt, acao, id, estilo, extra) {
+    return '<button type="button" class="btn ' + (estilo || "suave") + '" data-acao="' + acao + '" data-id="' + esc(id || "") + '"' + (extra || "") + ">" + txt + "</button>";
   }
-  function valorEmCampo(v) { return v.toFixed(2).replace(".", ","); }
+  function cabeca(titulo, sub, direita, volta) {
+    return '<header class="cabeca">' + (volta ? '<a class="voltar" href="' + volta[0] + '">' + ic("voltar") + esc(volta[1]) + "</a>" : "") +
+      '<div class="cabeca-linha"><div><h1 tabindex="-1">' + titulo + "</h1>" + (sub ? '<p class="sub">' + sub + "</p>" : "") + "</div>" +
+      (direita ? '<div class="cabeca-acoes">' + direita + "</div>" : "") + "</div></header>";
+  }
+  function numero(rot, val, det, href) { return '<a class="numero" href="' + href + '"><span>' + rot + "</span><strong>" + val + "</strong><small>" + det + "</small></a>"; }
 
-  var CLASSE_STATUS = {
-    Novo: "", Qualificado: "alerta", Proposta: "ativo", Ganho: "ok", Perdido: "erro",
-    Rascunho: "", Enviada: "alerta", Aceita: "ok", Recusada: "erro", Expirada: "erro", Substituida: "",
-    AguardandoAssinatura: "alerta", Vigente: "ativo", Encerrado: "ok", Cancelado: "erro",
-    Planejada: "", EmExecucao: "ativo", Entregue: "alerta", Aprovada: "alerta", Faturada: "ok", Paga: "ok",
-    Aberta: "alerta", Pendente: "alerta", Feito: "ok", Anexada: "ok", Cancelada: "erro", Ativo: "ok"
-  };
-  var ROTULO = { AguardandoAssinatura: "Aguardando assinatura", EmExecucao: "Em execução", Substituida: "Substituída" };
-  function selo(s) { return '<span class="selo ' + (CLASSE_STATUS[s] || "") + '">' + esc(ROTULO[s] || s) + "</span>"; }
-
-  // ---------- dados fictícios ----------
-  function semente() {
-    return {
-      seq: 100,
-      leads: [
-        { id: "L1", empresa: "Alfa Logística", contato: "Contato A", origem: "Indicação", interesse: "Painel de rastreio de entregas", status: "Proposta", criadoEm: dias(-20) },
-        { id: "L2", empresa: "Beta Clínica", contato: "Contato B", origem: "LinkedIn", interesse: "Agenda online integrada", status: "Qualificado", criadoEm: dias(-9) },
-        { id: "L3", empresa: "Gama Varejo", contato: "Contato C", origem: "Site", interesse: "Integração de pedidos", status: "Novo", criadoEm: dias(-2) },
-        { id: "L4", empresa: "Delta Educação", contato: "Contato D", origem: "Evento", interesse: "Portal do aluno", status: "Ganho", criadoEm: dias(-60) },
-        { id: "L5", empresa: "Épsilon Serviços", contato: "Contato E", origem: "Site", interesse: "App de campo", status: "Perdido", criadoEm: dias(-45) }
-      ],
-      propostas: [
-        { id: "P1", leadId: "L1", versao: 1, status: "Enviada", validade: dias(10), enviadaEm: dias(-4),
-          etapas: [
-            { escopo: "Descoberta e protótipo navegável", valor: 1000 },
-            { escopo: "Etapa 1: rastreio e mapa", valor: 2000 },
-            { escopo: "Etapa 2: painel e relatórios", valor: 2000 }
-          ],
-          custos: [{ descricao: "Licença de mapas", valor: 300 }] },
-        { id: "P2", leadId: "L4", versao: 2, status: "Aceita", validade: dias(-40), enviadaEm: dias(-50),
-          etapas: [
-            { escopo: "Descoberta e protótipo navegável", valor: 1000 },
-            { escopo: "Etapa 1: matrícula e login", valor: 2000 },
-            { escopo: "Etapa 2: notas e frequência", valor: 2000 }
-          ],
-          custos: [] }
-      ],
-      clientes: [
-        { id: "K1", nome: "Delta Educação", tipo: "PJ", documento: "CNPJ fictício", leadId: "L4", status: "Ativo", desde: dias(-37) }
-      ],
-      contratos: [
-        { id: "C1", propostaId: "P2", leadId: "L4", clienteId: "K1", status: "Vigente", assinadoEm: dias(-37), anexo: "contrato-delta-assinado.pdf",
-          etapas: [
-            { id: "E1", escopo: "Descoberta e protótipo navegável", valor: 1000, status: "Paga", aprovadaEm: dias(-20), receberId: "R1", notaId: "N1" },
-            { id: "E2", escopo: "Etapa 1: matrícula e login", valor: 2000, status: "Aprovada", aprovadaEm: dias(-3), receberId: "R2", notaId: null },
-            { id: "E3", escopo: "Etapa 2: notas e frequência", valor: 2000, status: "EmExecucao", aprovadaEm: null, receberId: null, notaId: null }
-          ],
-          eventos: [
-            { em: dias(-38), texto: "Contrato criado a partir da proposta P2 v2 aceita" },
-            { em: dias(-37), texto: "Assinatura registrada (contrato-delta-assinado.pdf); cliente Delta Educação ativo" },
-            { em: dias(-20), texto: "Etapa E1 aprovada pelo cliente; parcela R1 emitida" },
-            { em: dias(-18), texto: "NFS-e 101 anexada à etapa E1" },
-            { em: dias(-12), texto: "Recebimento da parcela R1 registrado" },
-            { em: dias(-3), texto: "Etapa E2 aprovada pelo cliente; parcela R2 emitida" }
-          ] }
-      ],
-      receber: [
-        { id: "R1", descricao: "Delta: Descoberta e protótipo", clienteId: "K1", contratoId: "C1", etapaId: "E1", bruto: 1000, retencoes: 0, valor: 1000, valorPago: 1000, vencimento: dias(-12), status: "Paga" },
-        { id: "R2", descricao: "Delta: Etapa 1", clienteId: "K1", contratoId: "C1", etapaId: "E2", bruto: 2000, retencoes: 0, valor: 2000, valorPago: null, vencimento: dias(12), status: "Aberta" }
-      ],
-      pagar: [
-        { id: "G1", descricao: "Contabilidade mensal", contratoId: null, valor: 400, vencimento: dias(5), status: "Aberta", categoria: "Administrativo" },
-        { id: "G2", descricao: "Hospedagem de homologação", contratoId: "C1", valor: 150, vencimento: dias(2), status: "Aberta", categoria: "Custo de projeto" },
-        { id: "G3", descricao: "Imposto do mês", contratoId: null, valor: 250, vencimento: dias(-1), status: "Aberta", categoria: "Tributos" }
-      ],
-      notas: [
-        { id: "N1", numero: "101", contratoId: "C1", etapaId: "E1", receberId: "R1", valor: 1000, retencoes: 0, competencia: dias(-20).slice(0, 7), xml: "nfse-101.xml", pdf: "nfse-101.pdf", status: "Anexada", substitui: null }
-      ],
-      lembretes: [
-        { id: "M1", texto: "Follow-up da proposta P1 (Alfa Logística)", alvo: "#/propostas/P1", chave: "followup:P1", quando: dias(0), status: "Pendente" },
-        { id: "M2", texto: "Emitir e anexar NFS-e da etapa E2 (Delta Educação)", alvo: "#/contratos/C1", chave: "nfse:E2", quando: dias(0), status: "Pendente" },
-        { id: "M3", texto: "Parcela R2 vence em 3 dias: confirmar com o cliente", alvo: "#/receber", chave: "vencimento:R2", quando: dias(9), status: "Pendente" }
-      ]
-    };
+  // Gráfico de caixa projetado (SVG puro).
+  var gid = 0;
+  function grafico(pontos, alto) {
+    var W = 640, H = alto || 200, P = 10, id = "gArea" + (++gid);
+    var vals = pontos.map(function (p) { return p.v; });
+    var max = Math.max.apply(null, vals.concat([0])), min = Math.min.apply(null, vals.concat([0]));
+    if (max === min) max = min + 1;
+    var x = function (i) { return P + i * (W - 2 * P) / (pontos.length - 1); };
+    var y = function (v) { return P + (max - v) * (H - 2 * P) / (max - min); };
+    var linha = pontos.map(function (p, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1); }).join(" ");
+    var area = linha + " L" + x(pontos.length - 1).toFixed(1) + " " + y(min).toFixed(1) + " L" + x(0).toFixed(1) + " " + y(min).toFixed(1) + " Z";
+    var ultimo = pontos[pontos.length - 1];
+    var marcas = pontos.map(function (p, i) {
+      return i && p.v !== pontos[i - 1].v ? '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="4" class="marca-ponto"><title>' + data(p.d) + ": " + brl(p.v) + "</title></circle>" : "";
+    }).join("");
+    return '<figure class="grafico"><svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" style="height:' + H + 'px" role="img" aria-label="Saldo projetado em 30 dias: ' + esc(brl(ultimo.v)) + '">' +
+      '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D4A215" stop-opacity=".38"/><stop offset="1" stop-color="#D4A215" stop-opacity="0"/></linearGradient></defs>' +
+      '<line x1="' + P + '" x2="' + (W - P) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '" class="zero"/>' +
+      '<path d="' + area + '" fill="url(#' + id + ')"/><path d="' + linha + '" class="traco"/>' + marcas +
+      '<circle cx="' + x(pontos.length - 1).toFixed(1) + '" cy="' + y(ultimo.v).toFixed(1) + '" r="6" class="ponto-final"/></svg>' +
+      '<figcaption><span>hoje</span><span>+15 dias</span><span>+30 dias: <strong>' + brl(ultimo.v) + "</strong></span></figcaption></figure>";
   }
 
-  var st;
-  function carregar() {
-    try { var bruto = localStorage.getItem(CHAVE); if (bruto) { st = JSON.parse(bruto); return; } } catch (e) { /* sem storage */ }
-    st = semente();
-  }
-  function salvar() { try { localStorage.setItem(CHAVE, JSON.stringify(st)); } catch (e) { /* sem storage */ } }
-  function novoId(prefixo) { st.seq += 1; return prefixo + st.seq; }
-  function avisar(msg) {
-    var t = document.getElementById("toast");
-    t.textContent = msg; t.classList.add("visivel");
-    clearTimeout(avisar._t); avisar._t = setTimeout(function () { t.classList.remove("visivel"); }, 4200);
-  }
-  // Lembretes têm chave estável: o fluxo os abre e os fecha pela chave, sem depender do texto.
-  function lembrar(chave, texto, alvo, quando) {
-    var ja = st.lembretes.filter(function (m) { return m.chave === chave && m.status === "Pendente"; })[0];
-    if (ja) return;
-    st.lembretes.push({ id: novoId("M"), chave: chave, texto: texto, alvo: alvo, quando: quando, status: "Pendente" });
-  }
-  function fechar(chave) { st.lembretes.forEach(function (m) { if (m.chave === chave && m.status === "Pendente") m.status = "Feito"; }); }
-  function evento(contrato, texto) { contrato.eventos.push({ em: dias(0), texto: texto }); }
-  function totalProposta(p) { return soma(p.etapas, function (e) { return e.valor; }); }
-  function leadDe(p) { return por(st.leads, p.leadId) || { empresa: "?" }; }
-  // Antes da assinatura o contrato ainda não tem cliente: mostra o nome do lead.
-  function clienteDe(c) { return por(st.clientes, c.clienteId) || { nome: (por(st.leads, c.leadId) || { empresa: "?" }).empresa }; }
+  var Telas = {};
 
-  // ---------- regras do domínio (spec seção 3) ----------
-  var Regras = {
-    criarLead: function (dados) {
-      st.leads.push({ id: novoId("L"), empresa: dados.empresa, contato: dados.contato || "não informado", origem: dados.origem || "Outro", interesse: dados.interesse || "a qualificar", status: "Novo", criadoEm: dias(0) });
-      return "Lead " + dados.empresa + " criado.";
-    },
-    qualificarLead: function (l) { if (l.status !== "Novo") return; l.status = "Qualificado"; return "Lead qualificado."; },
-    perderLead: function (l) { if (l.status === "Ganho" || l.status === "Perdido") return; l.status = "Perdido"; return "Lead marcado como perdido. Dá para reabrir."; },
-    reabrirLead: function (l) { if (l.status !== "Perdido") return; l.status = "Qualificado"; return "Lead reaberto como qualificado."; },
-    criarProposta: function (l) {
-      if (l.status !== "Qualificado") return;
-      var p = { id: novoId("P"), leadId: l.id, versao: 1, status: "Rascunho", validade: dias(15), enviadaEm: null, etapas: [], custos: [] };
-      st.propostas.push(p); l.status = "Proposta";
-      location.hash = "#/propostas/" + p.id;
-      return "Proposta " + p.id + " criada em rascunho. Inclua as etapas.";
-    },
-    removerEtapa: function (p, i) { if (p.status !== "Rascunho") return; p.etapas.splice(i, 1); return "Etapa removida."; },
-    removerCusto: function (p, i) { if (p.status !== "Rascunho") return; p.custos.splice(i, 1); return "Custo removido."; },
-    enviarProposta: function (p) {
-      if (p.status !== "Rascunho") return;
-      if (!p.etapas.length) return "Inclua ao menos uma etapa antes de enviar.";
-      p.status = "Enviada"; p.enviadaEm = dias(0);
-      lembrar("followup:" + p.id, "Follow-up da proposta " + p.id + " (" + leadDe(p).empresa + ")", "#/propostas/" + p.id, dias(3));
-      return "Proposta enviada. Lembrete de follow-up criado para daqui a 3 dias.";
-    },
-    recusarProposta: function (p) {
-      if (p.status !== "Enviada") return;
-      p.status = "Recusada"; leadDe(p).status = "Perdido"; fechar("followup:" + p.id);
-      return "Proposta recusada; lead marcado como perdido.";
-    },
-    // Invariante 1: proposta enviada não muda; ajuste gera versão nova.
-    novaVersao: function (p) {
-      if (["Enviada", "Expirada", "Recusada"].indexOf(p.status) < 0) return;
-      var n = { id: novoId("P"), leadId: p.leadId, versao: p.versao + 1, status: "Rascunho", validade: dias(15), enviadaEm: null,
-        etapas: p.etapas.map(function (e) { return { escopo: e.escopo, valor: e.valor }; }),
-        custos: p.custos.map(function (k) { return { descricao: k.descricao, valor: k.valor }; }) };
-      if (p.status === "Enviada") p.status = "Substituida";
-      fechar("followup:" + p.id);
-      st.propostas.push(n); leadDe(p).status = "Proposta";
-      location.hash = "#/propostas/" + n.id;
-      return "Versão " + n.versao + " criada em rascunho a partir da " + p.id + ".";
-    },
-    // Invariante 2: contrato só nasce de proposta aceita.
-    aceitarProposta: function (p) {
-      if (p.status !== "Enviada") return;
-      if (diasAte(p.validade) < 0) { p.status = "Expirada"; fechar("followup:" + p.id); return "Proposta expirada: gere uma nova versão."; }
-      p.status = "Aceita"; fechar("followup:" + p.id);
-      var c = { id: novoId("C"), propostaId: p.id, leadId: p.leadId, clienteId: null, status: "AguardandoAssinatura", assinadoEm: null, anexo: null,
-        etapas: p.etapas.map(function (e) { return { id: novoId("E"), escopo: e.escopo, valor: e.valor, status: "Planejada", aprovadaEm: null, receberId: null, notaId: null }; }),
-        eventos: [] };
-      evento(c, "Contrato criado a partir da proposta " + p.id + " v" + p.versao + " aceita");
-      st.contratos.push(c);
-      lembrar("assinatura:" + c.id, "Colher assinatura do contrato " + c.id + " (" + leadDe(p).empresa + ")", "#/contratos/" + c.id, dias(2));
-      location.hash = "#/contratos/" + c.id;
-      return "Proposta aceita: contrato " + c.id + " aguardando assinatura.";
-    },
-    // O lead vira cliente na assinatura; custos previstos viram contas a pagar.
-    assinar: function (c) {
-      if (c.status !== "AguardandoAssinatura") return;
-      var lead = por(st.leads, c.leadId); var p = por(st.propostas, c.propostaId);
-      var cli = st.clientes.filter(function (k) { return k.leadId === c.leadId; })[0];
-      if (!cli) { cli = { id: novoId("K"), nome: lead.empresa, tipo: "PJ", documento: "a preencher", leadId: lead.id, status: "Ativo", desde: dias(0) }; st.clientes.push(cli); }
-      c.clienteId = cli.id; lead.status = "Ganho";
-      c.status = "Vigente"; c.assinadoEm = dias(0); c.anexo = "contrato-" + c.id.toLowerCase() + "-assinado.pdf";
-      evento(c, "Assinatura registrada (" + c.anexo + "); cliente " + cli.nome + " ativo");
-      (p ? p.custos : []).forEach(function (k) {
-        st.pagar.push({ id: novoId("G"), descricao: k.descricao, contratoId: c.id, valor: k.valor, vencimento: dias(30), status: "Aberta", categoria: "Custo de projeto" });
-        evento(c, "Custo previsto lançado em contas a pagar: " + k.descricao);
-      });
-      fechar("assinatura:" + c.id);
-      return "Contrato vigente e " + cli.nome + " agora é cliente.";
-    },
-    cancelarContrato: function (c) {
-      if (c.status !== "AguardandoAssinatura") return;
-      c.status = "Cancelado"; evento(c, "Contrato cancelado antes da assinatura"); fechar("assinatura:" + c.id);
-      var l = por(st.leads, c.leadId); if (l) l.status = "Qualificado";
-      return "Contrato cancelado; lead volta a qualificado.";
-    },
-    iniciar: function (c, e) {
-      if (c.status !== "Vigente" || e.status !== "Planejada") return;
-      e.status = "EmExecucao"; evento(c, "Etapa " + e.id + " iniciada"); return "Etapa em execução.";
-    },
-    entregar: function (c, e) {
-      if (e.status !== "EmExecucao") return;
-      e.status = "Entregue"; evento(c, "Etapa " + e.id + " entregue ao cliente para aprovação");
-      lembrar("aprovacao:" + e.id, "Cobrar aprovação da etapa " + e.id + " (" + clienteDe(c).nome + ")", "#/contratos/" + c.id, dias(3));
-      return "Etapa entregue. Lembrete de aprovação criado.";
-    },
-    pedirAjuste: function (c, e) {
-      if (e.status !== "Entregue") return;
-      e.status = "EmExecucao"; fechar("aprovacao:" + e.id);
-      evento(c, "Cliente pediu ajuste na etapa " + e.id + "; volta para execução");
-      return "Etapa voltou para execução.";
-    },
-    // Invariantes 3 e 4: cobrança nasce na aprovação; aprovação gera os lembretes de NFS-e e de vencimento.
-    aprovar: function (c, e) {
-      if (e.status !== "Entregue") return;
-      e.status = "Aprovada"; e.aprovadaEm = dias(0);
-      var r = { id: novoId("R"), descricao: clienteDe(c).nome + ": " + e.escopo, clienteId: c.clienteId, contratoId: c.id, etapaId: e.id, bruto: e.valor, retencoes: 0, valor: e.valor, valorPago: null, vencimento: dias(15), status: "Aberta" };
-      st.receber.push(r); e.receberId = r.id;
-      evento(c, "Etapa " + e.id + " aprovada pelo cliente; parcela " + r.id + " emitida");
-      fechar("aprovacao:" + e.id);
-      lembrar("nfse:" + e.id, "Emitir e anexar NFS-e da etapa " + e.id + " (" + clienteDe(c).nome + ")", "#/contratos/" + c.id, dias(0));
-      lembrar("vencimento:" + r.id, "Parcela " + r.id + " vence em 3 dias: confirmar com o cliente", "#/receber", dias(12));
-      return "Etapa aprovada: parcela " + r.id + " de " + brl(e.valor) + " emitida e lembretes de NFS-e e vencimento criados.";
-    },
-    // Invariante 5: valor do serviço da nota = valor bruto da etapa. Retenções reduzem o líquido a receber.
-    anexarNota: function (c, e, d) {
-      if (e.notaId) return;
-      if (e.status !== "Aprovada" && e.status !== "Paga") return;
-      if (!d.numero) return { erro: "numero", msg: "Informe o número da NFS-e." };
-      if (!(d.valor > 0)) return { erro: "valor", msg: "Valor inválido. Use o formato 1.500,00." };
-      if (Math.abs(d.valor - e.valor) > 0.004) return { erro: "valor", msg: "Valor do serviço na nota (" + brl(d.valor) + ") diferente do valor bruto da etapa (" + brl(e.valor) + "). Corrija a nota no emissor ou cancele e emita outra antes de anexar." };
-      if (!(d.retencoes >= 0) || d.retencoes >= d.valor) return { erro: "retencoes", msg: "Retenções devem ser zero ou menores que o valor da nota." };
-      if (!/^\d{4}-\d{2}$/.test(d.competencia || "")) return { erro: "competencia", msg: "Informe a competência (mês da prestação)." };
-      if (!d.xml || !d.pdf) return { erro: "arquivo", msg: "Anexe o XML e o PDF da NFS-e." };
-      var r = por(st.receber, e.receberId);
-      var anterior = st.notas.filter(function (x) { return x.etapaId === e.id && x.status === "Cancelada"; }).pop();
-      var n = { id: novoId("N"), numero: d.numero, contratoId: c.id, etapaId: e.id, receberId: e.receberId, valor: d.valor, retencoes: d.retencoes, competencia: d.competencia, xml: d.xml, pdf: d.pdf, status: "Anexada", substitui: anterior ? anterior.numero : null };
-      st.notas.push(n); e.notaId = n.id;
-      if (r && r.status === "Aberta") { r.retencoes = d.retencoes; r.valor = r2(r.bruto - d.retencoes); }
-      e.status = r && r.status === "Paga" ? "Paga" : "Faturada";
-      evento(c, "NFS-e " + d.numero + " anexada à etapa " + e.id + (anterior ? " (substitui a " + anterior.numero + ")" : "") + (d.retencoes ? "; retenções de " + brl(d.retencoes) : ""));
-      fechar("nfse:" + e.id);
-      lembrar("imposto:" + d.competencia, "Provisionar imposto da competência " + mes(d.competencia + "-01") + " (regime e alíquota com o contador)", "#/pagar", dias(5));
-      encerrarSeConcluido(c);
-      return "NFS-e " + d.numero + " anexada. " + (d.retencoes ? "Líquido a receber: " + brl(r2(e.valor - d.retencoes)) + ". " : "") + "Lembrete de imposto da competência criado.";
-    },
-    cancelarNota: function (n) {
-      if (n.status !== "Anexada") return;
-      var c = por(st.contratos, n.contratoId); var e = por(c.etapas, n.etapaId); var r = por(st.receber, n.receberId);
-      n.status = "Cancelada"; e.notaId = null;
-      if (e.status === "Faturada") e.status = "Aprovada";
-      if (r && r.status === "Aberta") { r.retencoes = 0; r.valor = r.bruto; }
-      if (c.status === "Encerrado") c.status = "Vigente";
-      evento(c, "NFS-e " + n.numero + " cancelada; etapa " + e.id + " aguarda nova nota");
-      lembrar("nfse:" + e.id, "Emitir NFS-e substituta da etapa " + e.id + " (" + clienteDe(c).nome + ")", "#/contratos/" + c.id, dias(0));
-      return "NFS-e " + n.numero + " cancelada. Lembrete para emitir a substituta criado.";
-    },
-    receber: function (r) {
-      if (r.status !== "Aberta") return;
-      r.status = "Paga"; r.valorPago = r.valor; fechar("vencimento:" + r.id);
-      var c = por(st.contratos, r.contratoId);
-      if (c) {
-        var e = por(c.etapas, r.etapaId);
-        evento(c, "Recebimento de " + brl(r.valor) + " da parcela " + r.id + " registrado");
-        if (e && e.status === "Faturada") e.status = "Paga";
-        encerrarSeConcluido(c);
-        if (e && !e.notaId) return "Recebimento registrado. Atenção: a etapa " + e.id + " ainda não tem NFS-e anexada.";
-      }
-      return "Recebimento de " + brl(r.valor) + " registrado.";
-    },
-    criarPagar: function (d) {
-      st.pagar.push({ id: novoId("G"), descricao: d.descricao, contratoId: null, valor: d.valor, vencimento: d.vencimento, status: "Aberta", categoria: d.categoria });
-      return "Conta a pagar criada.";
-    },
-    pagar: function (g) { if (g.status !== "Aberta") return; g.status = "Paga"; return "Pagamento de " + brl(g.valor) + " registrado."; },
-    concluirLembrete: function (m) { if (m.status !== "Pendente") return; m.status = "Feito"; return "Lembrete concluído."; }
-  };
-  function encerrarSeConcluido(c) {
-    if (c.status === "Vigente" && c.etapas.every(function (e) { return e.status === "Paga" && e.notaId; })) {
-      c.status = "Encerrado"; evento(c, "Todas as etapas pagas e com NFS-e: contrato encerrado");
-    }
-  }
-
-  // Ações que criam ou desfazem compromisso pedem confirmação.
-  var CONFIRMAR = {
-    aceitarProposta: "Registrar o aceite cria o contrato. Continuar?",
-    recusarProposta: "Registrar a recusa marca o lead como perdido. Continuar?",
-    perderLead: "Marcar este lead como perdido?",
-    cancelarContrato: "Cancelar este contrato antes da assinatura?",
-    cancelarNota: "Cancelar esta NFS-e? Confirme antes que ela já foi cancelada no emissor.",
-    restaurar: "Isso apaga tudo o que você fez aqui e volta aos dados de exemplo. Continuar?"
-  };
-
-  // ---------- telas ----------
-  function topo(titulo, sub, acao, migalha) {
-    return (migalha ? '<p class="migalha">' + migalha + "</p>" : "") +
-      '<div class="topo"><div><h1 tabindex="-1">' + esc(titulo) + "</h1>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (acao || "") + "</div>";
-  }
-  function botao(texto, acao, id, estilo, rotulo) {
-    return '<button type="button" class="btn ' + (estilo || "contorno") + ' pequeno" data-acao="' + acao + '" data-id="' + esc(id) + '"' + (rotulo ? ' aria-label="' + esc(rotulo) + '"' : "") + ">" + esc(texto) + "</button>";
-  }
-  function campo(id, rotulo, extra, dica) {
-    return '<div><label for="' + id + '">' + rotulo + "</label><input id=\"" + id + '" ' + extra + ' aria-describedby="' + id + '-erro">' + (dica ? '<p class="dica">' + dica + "</p>" : "") + '<p id="' + id + '-erro" class="erro-campo" role="alert" hidden></p></div>';
-  }
-  function tabela(cab, linhas) {
-    return '<div class="tabela-rolagem" tabindex="0" role="region" aria-label="Tabela, role para o lado se precisar"><table><thead><tr>' + cab.map(function (h) {
-      return '<th' + (h.charAt(0) === "#" ? ' class="num">' + h.slice(1) : ">" + h) + "</th>";
-    }).join("") + "</tr></thead><tbody>" + linhas.join("") + "</tbody></table></div>";
-  }
-
-  var Telas = {
-    painel: function () {
-      var aReceber = st.receber.filter(function (r) { return r.status === "Aberta"; });
-      var aPagar = st.pagar.filter(function (g) { return g.status === "Aberta"; });
-      var abertas = st.propostas.filter(function (p) { return p.status === "Enviada" || p.status === "Rascunho"; });
-      var lemb = st.lembretes.filter(function (m) { return m.status === "Pendente"; }).sort(function (a, b) { return a.quando < b.quando ? -1 : 1; });
-      var semNota = pendentesNota();
-      var etapasFunil = ["Novo", "Qualificado", "Proposta", "Ganho", "Perdido"];
-      return topo("Painel", "Hoje, " + HOJE.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) + ".") +
-        '<section class="grade kpis" aria-label="Indicadores">' +
-          kpi("A receber em aberto", brl(soma(aReceber, function (r) { return r.valor; })), aReceber.length + " parcela(s)", "#/receber") +
-          kpi("A pagar em aberto", brl(soma(aPagar, function (g) { return g.valor; })), aPagar.length + " conta(s)", "#/pagar") +
-          kpi("Propostas abertas", String(abertas.length), brl(soma(abertas, totalProposta)) + " em jogo", "#/propostas") +
-          kpi("NFS-e pendentes", String(semNota.length), semNota.length ? "etapa aprovada sem nota" : "tudo anexado", "#/notas") +
-        "</section>" +
-        '<section class="card bloco"><h2>Funil de leads</h2><div class="funil">' +
-          etapasFunil.map(function (s) { return "<div><strong>" + st.leads.filter(function (l) { return l.status === s; }).length + "</strong><span>" + s + "</span></div>"; }).join("") +
+  // Hoje: o que a IA leu e o que pede o Felipe, em ordem de urgência.
+  Telas.hoje = function () {
+    var b = Q.briefing(), ar = Q.aReceber(), proj = Q.projecao(30);
+    var abertas = st.propostas.filter(function (p) { return p.status === "Enviada" || p.status === "Rascunho"; });
+    var h = new Date().getHours(), saud = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+    var atv = st.atividades.slice(-6).reverse();
+    var lemb = st.lembretes.filter(function (m) { return m.status === "Pendente"; }).sort(function (a, c) { return a.quando < c.quando ? -1 : 1; }).slice(0, 4);
+    return '<section class="hero">' +
+        '<div class="hero-texto"><p class="hero-data">' + esc(new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })) + "</p>" +
+        '<h1 tabindex="-1">' + saud + ", Felipe.</h1>" +
+        '<p class="hero-ia">' + ic("ia") + "<span>Li " + st.conversas.length + " conversas, o caixa e os contratos. <strong>" + b.length + (b.length === 1 ? " coisa pede" : " coisas pedem") + " você hoje.</strong></span></p></div>" +
+        '<div class="hero-numeros">' +
+          numero("A receber", brl(soma(ar, function (r) { return r.valor; })), ar.length + " parcela(s)", "#/financeiro") +
+          numero("Caixa em 30 dias", brl(proj[proj.length - 1].v), "projetado", "#/financeiro") +
+          numero("Em negociação", brl(soma(abertas, U.totalProposta)), abertas.length + " proposta(s)", "#/funil") +
         "</div></section>" +
-        '<div class="grade duas">' +
-          '<section class="card"><h2>Lembretes</h2>' + (lemb.length ? '<ul class="lista">' + lemb.slice(0, 6).map(function (m) {
-            return '<li><div><a href="' + esc(m.alvo) + '">' + esc(m.texto) + '</a><div class="sub">' + data(m.quando) + "</div></div>" + prazo(m.quando) + "</li>";
-          }).join("") + "</ul>" : '<p class="vazio">Nenhum lembrete pendente.</p>') + "</section>" +
-          '<section class="card"><h2>Vencimentos próximos</h2>' + vencimentos(aReceber, aPagar) + "</section>" +
-        "</div>";
-    },
-    leads: function () {
-      return topo("Leads", "Quem demonstrou interesse. Lead qualificado vira proposta; vira cliente na assinatura do contrato.") +
-        '<section class="card bloco"><h2>Novo lead</h2><form class="form-grade" data-form="lead" novalidate>' +
-          campo("l-empresa", "Empresa", 'name="empresa" required maxlength="80"') +
-          campo("l-contato", "Contato", 'name="contato" maxlength="60"') +
-          campo("l-interesse", "Interesse", 'name="interesse" maxlength="120"') +
-          '<div><label for="l-origem">Origem</label><select id="l-origem" name="origem"><option>Indicação</option><option>Site</option><option>LinkedIn</option><option>Evento</option><option>Outro</option></select></div>' +
-          '<div class="form-acao"><button class="btn secundario" type="submit">Criar lead</button></div></form></section>' +
-        '<section class="card">' + tabela(["Empresa", "Interesse", "Origem", "Status", "Ações"], st.leads.map(function (l) {
-          var a = "";
-          if (l.status === "Novo") a += botao("Qualificar", "qualificarLead", l.id, "contorno", "Qualificar " + l.empresa);
-          if (l.status === "Qualificado") a += botao("Criar proposta", "criarProposta", l.id, "secundario", "Criar proposta para " + l.empresa);
-          if (l.status === "Proposta") { var p = st.propostas.filter(function (x) { return x.leadId === l.id; }).pop(); if (p) a += '<a class="btn contorno pequeno" href="#/propostas/' + p.id + '" aria-label="Ver proposta de ' + esc(l.empresa) + '">Ver proposta</a>'; }
-          if (l.status === "Perdido") a += botao("Reabrir", "reabrirLead", l.id, "contorno", "Reabrir " + l.empresa);
-          else if (l.status !== "Ganho") a += botao("Marcar como perdido", "perderLead", l.id, "perigo", "Marcar " + l.empresa + " como perdido");
-          return "<tr><td><strong>" + esc(l.empresa) + '</strong><div class="dica">' + esc(l.contato) + " · desde " + data(l.criadoEm) + "</div></td><td>" + esc(l.interesse) + "</td><td>" + esc(l.origem) + "</td><td>" + selo(l.status) + '</td><td><div class="acoes">' + a + "</div></td></tr>";
-        })) + "</section>";
-    },
-    propostas: function (id) {
-      if (id) return detalheProposta(por(st.propostas, id));
-      return topo("Propostas", "Escopo por etapa, com pagamento vinculado à etapa aprovada.") +
-        '<section class="card">' + tabela(["Proposta", "Lead", "#Total", "Validade", "Status"], st.propostas.map(function (p) {
-          return '<tr><td><a href="#/propostas/' + p.id + '"><strong>' + p.id + "</strong> v" + p.versao + "</a></td><td>" + esc(leadDe(p).empresa) + '</td><td class="num">' + brl(totalProposta(p)) + "</td><td>" + data(p.validade) + "</td><td>" + selo(p.status) + "</td></tr>";
-        })) + "</section>";
-    },
-    contratos: function (id) {
-      if (id) return detalheContrato(por(st.contratos, id));
-      return topo("Contratos", "Nascem de proposta aceita. Cada etapa aprovada gera cobrança e NFS-e.") +
-        '<section class="card">' + tabela(["Contrato", "Cliente", "Andamento", "#Valor", "Status"], st.contratos.map(function (c) {
-          var pagas = c.etapas.filter(function (e) { return e.status === "Paga"; }).length;
-          return '<tr><td><a href="#/contratos/' + c.id + '"><strong>' + c.id + "</strong></a></td><td>" + esc(clienteDe(c).nome) + "</td><td>" + pagas + " de " + c.etapas.length + ' etapas pagas</td><td class="num">' + brl(soma(c.etapas, function (e) { return e.valor; })) + "</td><td>" + selo(c.status) + "</td></tr>";
-        })) + "</section>";
-    },
-    clientes: function () {
-      return topo("Clientes", "Lead vira cliente quando o contrato é assinado. Documento real só no sistema definitivo.") +
-        '<section class="card">' + tabela(["Cliente", "Tipo", "Documento", "Contratos", "#Recebido", "Status"], st.clientes.map(function (k) {
-          var cs = st.contratos.filter(function (c) { return c.clienteId === k.id; });
-          var rec = soma(st.receber.filter(function (r) { return r.clienteId === k.id && r.status === "Paga"; }), function (r) { return r.valorPago || 0; });
-          return "<tr><td><strong>" + esc(k.nome) + '</strong><div class="dica">cliente desde ' + data(k.desde) + "</div></td><td>" + k.tipo + "</td><td>" + esc(k.documento) + "</td><td>" + cs.map(function (c) { return '<a href="#/contratos/' + c.id + '">' + c.id + "</a>"; }).join(", ") + '</td><td class="num">' + brl(rec) + "</td><td>" + selo(k.status) + "</td></tr>";
-        })) + "</section>";
-    },
-    receber: function () {
-      return topo("Contas a receber", "Uma parcela por etapa aprovada. Valor líquido = bruto menos retenções da NFS-e.") +
-        '<section class="card">' + tabela(["Parcela", "Origem", "NFS-e", "Vencimento", "#Bruto", "#Líquido", "Status", "Ações"], st.receber.map(function (r) {
-          var n = st.notas.filter(function (x) { return x.receberId === r.id && x.status === "Anexada"; })[0];
-          return "<tr><td><strong>" + r.id + "</strong> " + esc(r.descricao) + '</td><td><a href="#/contratos/' + r.contratoId + '">' + r.contratoId + "</a> · " + r.etapaId + "</td><td>" + (n ? selo("Anexada") + " " + esc(n.numero) : '<span class="selo erro">sem nota</span>') + "</td><td>" + data(r.vencimento) + (r.status === "Aberta" ? " " + prazo(r.vencimento) : "") + '</td><td class="num">' + brl(r.bruto) + '</td><td class="num">' + brl(r.valor) + "</td><td>" + selo(r.status) + "</td><td>" + (r.status === "Aberta" ? botao("Registrar recebimento", "receber", r.id, "secundario", "Registrar recebimento da parcela " + r.id) : "") + "</td></tr>";
-        })) + "</section>";
-    },
-    pagar: function () {
-      return topo("Contas a pagar", "Custos gerais e custos previstos de contrato.") +
-        '<section class="card bloco"><h2>Nova conta a pagar</h2><form class="form-grade" data-form="pagar" novalidate>' +
-          campo("g-desc", "Descrição", 'name="descricao" required maxlength="80"') +
-          campo("g-valor", "Valor (R$)", 'name="valor" inputmode="decimal" required', "Ex.: 1.500,00") +
-          campo("g-venc", "Vencimento", 'name="vencimento" type="date" required value="' + dias(10) + '"') +
-          '<div><label for="g-cat">Categoria</label><select id="g-cat" name="categoria"><option>Administrativo</option><option>Custo de projeto</option><option>Tributos</option><option>Ferramentas</option></select></div>' +
-          '<div class="form-acao"><button class="btn secundario" type="submit">Criar conta</button></div></form></section>' +
-        '<section class="card">' + tabela(["Conta", "Categoria", "Contrato", "Vencimento", "#Valor", "Status", "Ações"], st.pagar.map(function (g) {
-          return "<tr><td><strong>" + g.id + "</strong> " + esc(g.descricao) + "</td><td>" + esc(g.categoria) + "</td><td>" + (g.contratoId ? '<a href="#/contratos/' + g.contratoId + '">' + g.contratoId + "</a>" : "geral") + "</td><td>" + data(g.vencimento) + (g.status === "Aberta" ? " " + prazo(g.vencimento) : "") + '</td><td class="num">' + brl(g.valor) + "</td><td>" + selo(g.status) + "</td><td>" + (g.status === "Aberta" ? botao("Registrar pagamento", "pagar", g.id, "secundario", "Registrar pagamento de " + g.descricao) : "") + "</td></tr>";
-        })) + "</section>";
-    },
-    notas: function () {
-      var pend = pendentesNota();
-      return topo("NFS-e", "Emitida no emissor nacional ou no portal do município e anexada aqui, com XML e PDF.") +
-        (pend.length ? '<section class="card bloco"><h2>Pendentes de emissão</h2><ul class="lista">' + pend.map(function (x) {
-          return "<li><div><strong>" + x.e.id + "</strong> " + esc(x.e.escopo) + '<div class="sub">' + esc(clienteDe(x.c).nome) + " · " + brl(x.e.valor) + " · aprovada em " + data(x.e.aprovadaEm) + '</div></div><a class="btn secundario pequeno" href="#/contratos/' + x.c.id + '" aria-label="Anexar NFS-e da etapa ' + x.e.id + '">Anexar</a></li>';
-        }).join("") + "</ul></section>" : "") +
-        '<section class="card"><h2>Notas registradas</h2>' + tabela(["Número", "Contrato e etapa", "Competência", "Arquivos", "#Serviço", "#Retenções", "Status", "Ações"], st.notas.map(function (n) {
-          return "<tr><td><strong>" + esc(n.numero) + "</strong>" + (n.substitui ? '<div class="dica">substitui ' + esc(n.substitui) + "</div>" : "") + '</td><td><a href="#/contratos/' + n.contratoId + '">' + n.contratoId + "</a> · " + n.etapaId + "</td><td>" + mes(n.competencia + "-01") + "</td><td>" + esc(n.xml) + ", " + esc(n.pdf) + '</td><td class="num">' + brl(n.valor) + '</td><td class="num">' + brl(n.retencoes) + "</td><td>" + selo(n.status) + "</td><td>" + (n.status === "Anexada" ? botao("Cancelar", "cancelarNota", n.id, "perigo", "Cancelar NFS-e " + n.numero) : "") + "</td></tr>";
-        })) + "</section>";
-    },
-    lembretes: function () {
-      var ord = st.lembretes.slice().sort(function (a, b) { return (a.status === b.status ? 0 : a.status === "Pendente" ? -1 : 1) || (a.quando < b.quando ? -1 : 1); });
-      return topo("Lembretes", "Gerados pelo fluxo: follow-up, assinatura, aprovação, NFS-e, vencimento e imposto. Fecham sozinhos quando o passo acontece.") +
-        '<section class="card"><ul class="lista">' + ord.map(function (m) {
-          return '<li><div><a href="' + esc(m.alvo) + '">' + esc(m.texto) + '</a><div class="sub">' + data(m.quando) + '</div></div><div class="acoes">' + (m.status === "Pendente" ? prazo(m.quando) + " " + botao("Concluir", "concluirLembrete", m.id, "contorno", "Concluir: " + m.texto) : selo("Feito")) + "</div></li>";
-        }).join("") + "</ul></section>";
-    },
-    blog: function () {
-      return topo("Blog", "Estado levantado em 12/11/2026. O ERP só acompanha; os artigos vivem no Levante.") +
-        '<div class="grade duas">' +
-        '<section class="card"><h2>Levante (felipemichel.com)</h2><ul class="lista">' +
-          '<li><div>Plataforma pessoal e blog técnico<div class="sub">.NET, Next.js e MongoDB; artigos geridos no /admin</div></div><span class="selo ativo">existe</span></li>' +
-          '<li><div>Último commit no repositório<div class="sub">13/08/2026</div></div><span class="selo alerta">parado</span></li>' +
-          '<li><div>Cutover do domínio (D0)<div class="sub">falta e-mail transacional, redirect do www e flags de indexação</div></div><span class="selo alerta">em curso</span></li>' +
-          '<li><div>Artigos publicados<div class="sub">ficam no banco do Levante; não contados neste levantamento</div></div><span class="selo">a medir</span></li>' +
-        "</ul></section>" +
-        '<section class="card"><h2>Blog da FMA Software</h2><ul class="lista">' +
-          '<li><div>Site ou blog da empresa<div class="sub">nenhum repositório, domínio ou plano editorial encontrado</div></div><span class="selo erro">não existe</span></li>' +
-          '<li><div>Decisão pendente<div class="sub">blog da FMA dentro do Levante ou blog próprio da empresa</div></div><span class="selo alerta">Felipe</span></li>' +
-        "</ul></section></div>";
-    }
+      '<div class="grade-hoje">' +
+        '<section class="painel"><div class="painel-topo"><h2>Pede você</h2><span class="dica">por urgência</span></div>' +
+          (b.length ? '<ol class="fila">' + b.map(function (x, i) {
+            return '<li class="fila-item' + (x.urgencia === "alta" ? " urgente" : "") + '" style="--i:' + i + '">' + canal(x.canal) +
+              '<div class="fila-texto"><strong>' + esc(x.titulo) + "</strong><span>" + esc(x.det) + "</span></div>" +
+              '<a class="btn ' + (i === 0 ? "primario" : "suave") + '" href="' + x.alvo + '">' + esc(x.acao) + ic("seta") + "</a></li>";
+          }).join("") + "</ol>" : '<div class="vazio">' + ic("check") + "<p>Nada pendente. Bom momento para prospectar.</p></div>") +
+        "</section>" +
+        '<div class="coluna">' +
+          '<section class="painel"><div class="painel-topo"><h2>Caixa, próximos 30 dias</h2><a href="#/financeiro" class="link">Detalhes</a></div>' + grafico(proj, 170) + "</section>" +
+          '<section class="painel"><div class="painel-topo"><h2>Feito sozinho</h2><a href="#/integracoes" class="link">Automações</a></div><ul class="feed">' +
+            atv.map(function (a) { return "<li>" + canal(a.canal) + '<div><a href="' + esc(a.alvo || "#/hoje") + '">' + esc(a.texto) + "</a><small>" + quando(a.em) + "</small></div></li>"; }).join("") +
+          "</ul></section>" +
+          (lemb.length ? '<section class="painel"><div class="painel-topo"><h2>Agenda</h2></div><ul class="agenda">' + lemb.map(function (m) {
+            return '<li><a href="' + esc(m.alvo) + '">' + esc(m.texto) + "</a>" + prazo(m.quando) + botao(ic("check") + '<span class="sr">Concluir: ' + esc(m.texto) + "</span>", "concluirLembrete", m.id, "icone") + "</li>";
+          }).join("") + "</ul></section>" : "") +
+        "</div></div>";
   };
 
-  function pendentesNota() {
-    var out = [];
-    st.contratos.forEach(function (c) { c.etapas.forEach(function (e) { if ((e.status === "Aprovada" || e.status === "Paga") && !e.notaId) out.push({ c: c, e: e }); }); });
-    return out;
-  }
-  function kpi(rotulo, valor, det, href) { return '<a class="card kpi" href="' + href + '"><span class="rotulo">' + rotulo + '</span><span class="valor">' + valor + '</span><span class="det">' + det + "</span></a>"; }
-  function vencimentos(aReceber, aPagar) {
-    var itens = aReceber.map(function (r) { return { t: "Receber", d: r.descricao, v: r.valor, q: r.vencimento, h: "#/receber" }; })
-      .concat(aPagar.map(function (g) { return { t: "Pagar", d: g.descricao, v: g.valor, q: g.vencimento, h: "#/pagar" }; }))
-      .sort(function (a, b) { return a.q < b.q ? -1 : 1; }).slice(0, 6);
-    if (!itens.length) return '<p class="vazio">Nada em aberto.</p>';
-    return '<ul class="lista">' + itens.map(function (i) {
-      return '<li><div><a href="' + i.h + '">' + esc(i.d) + '</a><div class="sub">' + i.t + " · " + data(i.q) + '</div></div><div class="acoes"><strong>' + (i.t === "Pagar" ? "−" : "+") + brl(i.v) + "</strong> " + prazo(i.q) + "</div></li>";
-    }).join("") + "</ul>";
-  }
-  function esteira(passos, atual) {
-    var idx = passos.indexOf(atual);
-    return '<ol class="esteira" aria-label="Situação">' + passos.map(function (p, i) {
-      var cls = i < idx ? "feito" : i === idx ? "atual" : "";
-      var sr = i < idx ? " (concluído)" : i === idx ? " (atual)" : "";
-      return '<li class="' + cls + '"' + (i === idx ? ' aria-current="step"' : "") + ">" + esc(ROTULO[p] || p) + '<span class="sr">' + sr + "</span></li>";
-    }).join("") + "</ol>";
+  // Conversas: WhatsApp e e-mail numa caixa só, com a leitura da IA no topo da conversa.
+  var filtroInbox = "todos";
+  Telas.inbox = function (id) {
+    var lista = st.conversas.slice().sort(function (a, b) { return (b.naoLida - a.naoLida) || (a.atualizadaEm < b.atualizadaEm ? 1 : -1); })
+      .filter(function (c) { return filtroInbox === "todos" || c.canal === filtroInbox; });
+    var atual = id ? por(st.conversas, id) : null;
+    if (atual && atual.naoLida) { atual.naoLida = false; F.salvar(); }
+    return '<div class="inbox' + (atual ? " com-conversa" : "") + '">' +
+      '<section class="inbox-lista" aria-label="Lista de conversas"><div class="inbox-topo"><h1 tabindex="-1">Conversas</h1>' +
+        '<div class="segmentos" role="group" aria-label="Filtrar por canal">' + ["todos", "whatsapp", "email"].map(function (k) {
+          return '<button type="button" data-filtro="' + k + '" aria-pressed="' + (filtroInbox === k) + '">' + ({ todos: "Todas", whatsapp: "WhatsApp", email: "E-mail" })[k] + "</button>";
+        }).join("") + "</div></div><ul>" +
+        lista.map(function (c) {
+          var ult = c.mensagens[c.mensagens.length - 1], ativa = atual && atual.id === c.id;
+          return '<li><a href="#/inbox/' + c.id + '" class="conversa' + (c.naoLida ? " nao-lida" : "") + (ativa ? " ativa" : "") + '"' + (ativa ? ' aria-current="true"' : "") + ">" +
+            '<span class="avatar">' + iniciais(c.nome) + canal(c.canal) + "</span>" +
+            '<span class="conversa-texto"><span class="conversa-linha"><strong>' + esc(c.nome) + "</strong><small>" + quando(c.atualizadaEm) + "</small></span>" +
+            (c.assunto ? '<span class="assunto">' + esc(c.assunto) + "</span>" : "") +
+            '<span class="previa">' + (ult.de === "nos" ? "Você: " : "") + esc(ult.texto) + "</span>" +
+            (c.ia ? '<span class="intencao">' + ic("ia") + esc(c.ia.intencao) + "</span>" : "") + "</span>" +
+            (c.naoLida ? '<span class="ponto-novo"><span class="sr">não lida</span></span>' : "") + "</a></li>";
+        }).join("") + "</ul></section>" +
+      '<section class="inbox-conversa" aria-label="Conversa aberta">' + (atual ? conversa(atual) : '<div class="vazio grande">' + ic("inbox") + "<p>Escolha uma conversa. A IA já leu todas e marcou o que cada uma pede.</p></div>") + "</section></div>";
+  };
+  function conversa(c) {
+    var lead = c.leadId ? por(st.leads, c.leadId) : null;
+    var cliente = lead && st.clientes.filter(function (k) { return k.leadId === lead.id; })[0];
+    var vinculo = cliente ? '<a class="pilula ok" href="#/clientes">Cliente</a>' : lead ? '<a class="pilula alerta" href="#/funil">Lead · ' + esc(lead.status) + "</a>" : '<span class="pilula">Contato novo</span>';
+    var prop = lead && st.propostas.filter(function (p) { return p.leadId === lead.id; }).pop();
+    var acoesIa = "";
+    if (!cliente && c.ia && c.ia.etapas && !prop) acoesIa += botao(ic("ia") + "Montar proposta com IA", "propostaDaConversa", c.id, "primario");
+    if (prop) acoesIa += '<a class="btn suave" href="#/propostas/' + prop.id + '">' + ic("doc") + "Proposta " + prop.id + "</a>";
+    if (cliente && cliente.id) { var ct = st.contratos.filter(function (k) { return k.clienteId === cliente.id; }).pop(); if (ct) acoesIa += '<a class="btn suave" href="#/contratos/' + ct.id + '">' + ic("doc") + "Contrato " + ct.id + "</a>"; }
+    if (c.ia) acoesIa += botao(ic("ia") + "Rascunhar resposta", "rascunhar", c.id, acoesIa ? "suave" : "primario");
+    return '<header class="conversa-topo"><a class="voltar so-celular" href="#/inbox">' + ic("voltar") + "Conversas</a>" +
+        '<div class="conversa-quem"><span class="avatar grande">' + iniciais(c.nome) + '</span><div class="conversa-nome"><h2>' + esc(c.nome) + "</h2><p>" + canal(c.canal) + esc(c.contato) + (c.assunto ? " · " + esc(c.assunto) : "") + "</p></div>" + vinculo + "</div></header>" +
+      '<div class="conversa-rolagem">' +
+      (c.ia ? '<div class="leitura-ia"><div class="leitura-topo"><span class="orbe pequena">' + ic("ia") + "</span><strong>Leitura da IA</strong><span class=\"intencao\">" + esc(c.ia.intencao) + '</span><span class="pilula ' + (c.ia.urgencia === "alta" ? "erro" : c.ia.urgencia === "média" ? "alerta" : "") + '">urgência ' + esc(c.ia.urgencia) + "</span></div>" +
+        "<ul>" + c.ia.resumo.map(function (r) { return "<li>" + esc(r) + "</li>"; }).join("") + "</ul>" +
+        '<div class="acoes">' + acoesIa + "</div></div>" : "") +
+      '<ol class="mensagens">' + c.mensagens.map(function (m) {
+        return '<li class="msg ' + (m.de === "nos" ? "nos" : "eles") + '"><p>' + esc(m.texto).replace(/\n/g, "<br>") + "</p><small>" + (m.de === "nos" ? "Você · " : "") + quando(m.em) + "</small></li>";
+      }).join("") + "</ol></div>" +
+      '<form class="compor" data-form="responder" data-id="' + c.id + '"><label class="sr" for="resposta">Responder por ' + CANAL[c.canal].n + "</label>" +
+        '<textarea id="resposta" name="texto" rows="3" placeholder="Responder por ' + CANAL[c.canal].n + '…"></textarea>' +
+        '<div class="compor-acoes"><span class="dica">' + ic(CANAL[c.canal].i) + "Envio simulado</span><button class=\"btn primario\" type=\"submit\">" + ic("enviar") + "Enviar</button></div></form>";
   }
 
-  function detalheProposta(p) {
-    if (!p) return topo("Proposta não encontrada", "", "", '<a href="#/propostas">Propostas</a>');
-    var lead = leadDe(p);
+  // Negócios: arrastar o card para a coluna seguinte executa a regra. "Avançar" faz o mesmo pelo teclado.
+  var COLUNAS = [["lead", "Leads"], ["proposta", "Proposta"], ["assinatura", "Assinatura"], ["execucao", "Execução"], ["concluido", "Concluído"]];
+  var DESTINO = { lead: "proposta", proposta: "assinatura", contrato: "execucao" };
+  Telas.funil = function () {
+    var cards = Q.funil();
+    return cabeca("Negócios", "Arraste para avançar. Cada passo dispara o seguinte: proposta, contrato, cobrança e nota.", botao(ic("mais") + "Novo lead", "abrirNovoLead", "", "primario")) +
+      '<div class="kanban">' + COLUNAS.map(function (col, ci) {
+        var cs = cards.filter(function (c) { return c.col === col[0]; });
+        var total = soma(cs, function (c) { return c.valor || 0; });
+        return '<section class="coluna-k" data-col="' + col[0] + '" aria-label="' + col[1] + '"><header><h2>' + col[1] + '</h2><span class="contagem">' + cs.length + "</span>" + (total ? "<small>" + brl(total) + "</small>" : "") + "</header>" +
+          '<ul class="zona">' + cs.map(function (c) {
+            var href = c.tipo === "lead" ? (c.lead.conversaId ? "#/inbox/" + c.lead.conversaId : "#/funil") : c.tipo === "proposta" ? "#/propostas/" + c.id : "#/contratos/" + c.id;
+            var pode = (c.tipo === "lead") || (c.tipo === "proposta" && c.p.status === "Enviada") || (c.tipo === "contrato" && c.col === "assinatura");
+            var rotulo = c.tipo === "proposta" && c.p.status === "Rascunho" ? '<span class="pilula">rascunho</span>' : "";
+            return '<li class="card-k" draggable="' + pode + '" data-tipo="' + c.tipo + '" data-id="' + c.id + '">' +
+              '<a href="' + href + '" class="card-k-corpo" draggable="false"><span class="avatar pequeno">' + iniciais(c.nome) + "</span><span><strong>" + esc(c.nome) + "</strong><small>" + esc(c.sub) + "</small></span></a>" +
+              '<div class="card-k-pe">' + (c.valor ? "<b>" + brl(c.valor) + "</b>" : '<span class="dica">sem valor</span>') + rotulo +
+              (pode ? botao(ic("seta") + '<span class="sr">Avançar ' + esc(c.nome) + " para " + COLUNAS[ci + 1][1] + "</span>", "avancar", c.tipo + "|" + c.id, "icone", ' title="Avançar para ' + COLUNAS[ci + 1][1] + '"') : "") + "</div></li>";
+          }).join("") + (cs.length ? "" : '<li class="zona-vazia">Nada aqui</li>') + "</ul></section>";
+      }).join("") + "</div>";
+  };
+  function avancar(tipo, id) {
+    if (tipo === "lead") return R.criarProposta(por(st.leads, id));
+    if (tipo === "proposta") {
+      var p = por(st.propostas, id);
+      if (p.status !== "Enviada") return "Envie a proposta antes de registrar o aceite.";
+      return confirmar("Cliente aceitou a " + p.id + "?", "Cria o contrato e envia para assinatura de " + U.leadDe(p).empresa + ".", "Registrar aceite").then(function (ok) { return ok ? R.aceitarProposta(p) : null; });
+    }
+    if (tipo === "contrato") {
+      var c = por(st.contratos, id);
+      return c.status === "AguardandoAssinatura" ? R.assinar(c) : "Abra o contrato para avançar as etapas.";
+    }
+  }
+
+  // Proposta: documento em papel à esquerda, edição e o e-mail da IA à direita.
+  Telas.propostas = function (id) {
+    var p = por(st.propostas, id);
+    if (!p) { setTimeout(function () { location.hash = "#/funil"; }); return ""; }
+    var lead = U.leadDe(p), rasc = p.status === "Rascunho";
     var contrato = st.contratos.filter(function (c) { return c.propostaId === p.id && c.status !== "Cancelado"; })[0];
     var acoes = "";
-    if (p.status === "Rascunho") acoes = botao("Enviar ao cliente", "enviarProposta", p.id, "primario");
-    if (p.status === "Enviada") acoes = botao("Registrar aceite", "aceitarProposta", p.id, "primario") + botao("Nova versão", "novaVersao", p.id, "contorno") + botao("Registrar recusa", "recusarProposta", p.id, "perigo");
+    if (rasc) acoes = botao(ic("enviar") + "Enviar por e-mail", "enviarProposta", p.id, "primario");
+    if (p.status === "Enviada") acoes = botao("Nova versão", "novaVersao", p.id, "suave") + botao("Recusada", "recusarProposta", p.id, "suave perigo") + botao(ic("check") + "Cliente aceitou", "aceitarProposta", p.id, "primario");
     if (p.status === "Expirada" || p.status === "Recusada") acoes = botao("Gerar nova versão", "novaVersao", p.id, "primario");
-    if (contrato) acoes = '<a class="btn secundario" href="#/contratos/' + contrato.id + '">Ver contrato ' + contrato.id + "</a>";
-    var rasc = p.status === "Rascunho";
-    var fora = ["Recusada", "Expirada", "Substituida"].indexOf(p.status) >= 0;
-    return topo("Proposta " + p.id + " v" + p.versao, esc(lead.empresa) + " · validade " + data(p.validade), '<div class="acoes">' + acoes + "</div>", '<a href="#/propostas">Propostas</a> / ' + p.id) +
-      (fora ? "<p>" + selo(p.status) + "</p>" : esteira(["Rascunho", "Enviada", "Aceita"], p.status)) +
-      '<div class="grade duas"><section class="card"><h2>Etapas e valores</h2>' +
-        (p.etapas.length ? tabela(["Etapa", "Escopo", "#Valor"].concat(rasc ? [""] : []), p.etapas.map(function (e, i) {
-          return "<tr><td>" + (i + 1) + "</td><td>" + esc(e.escopo) + '</td><td class="num">' + brl(e.valor) + "</td>" + (rasc ? "<td>" + botao("Remover", "removerEtapa", p.id + "|" + i, "contorno", "Remover etapa " + (i + 1)) + "</td>" : "") + "</tr>";
-        }).concat(['<tr><td></td><td><strong>Total</strong></td><td class="num"><strong>' + brl(totalProposta(p)) + "</strong></td>" + (rasc ? "<td></td>" : "") + "</tr>"])) : '<p class="vazio">Nenhuma etapa ainda.</p>') +
-        (rasc ? '<form class="form-grade" data-form="etapa" data-id="' + p.id + '" novalidate>' +
-          campo("f-escopo", "Escopo da etapa", 'name="escopo" required maxlength="120"') +
-          campo("f-valor", "Valor (R$)", 'name="valor" inputmode="decimal" required', "Ex.: 1.500,00") +
-          '<div class="form-acao"><button class="btn secundario" type="submit">Incluir etapa</button></div></form>' : "") +
-        '<p class="dica">Pagamento por etapa aprovada. Proposta enviada não muda: ajuste gera nova versão.</p>' +
-      "</section>" +
-      '<section class="card"><h2>Custos previstos</h2>' +
-        (p.custos.length ? '<ul class="lista">' + p.custos.map(function (k, i) { return "<li><span>" + esc(k.descricao) + '</span><span class="acoes"><strong>' + brl(k.valor) + "</strong>" + (rasc ? botao("Remover", "removerCusto", p.id + "|" + i, "contorno", "Remover custo " + k.descricao) : "") + "</span></li>"; }).join("") + "</ul>" : '<p class="vazio">Nenhum custo previsto.</p>') +
-        (rasc ? '<form class="form-grade" data-form="custo" data-id="' + p.id + '" novalidate>' +
-          campo("k-desc", "Descrição do custo", 'name="descricao" required maxlength="80"') +
-          campo("k-valor", "Valor (R$)", 'name="valor" inputmode="decimal" required') +
-          '<div class="form-acao"><button class="btn contorno" type="submit">Incluir custo</button></div></form>' : "") +
-        '<p class="dica">Na assinatura do contrato, cada custo vira conta a pagar ligada a ele.</p>' +
-      "</section></div>";
-  }
+    if (contrato) acoes = '<a class="btn primario" href="#/contratos/' + contrato.id + '">Contrato ' + contrato.id + ic("seta") + "</a>";
+    var conv = lead.conversaId ? por(st.conversas, lead.conversaId) : null;
+    var lado = "";
+    if (rasc) {
+      lado = '<section class="painel"><h2>Etapas</h2>' + (p.ia ? '<p class="aviso-ia">' + ic("ia") + "<span>A IA montou estas etapas a partir da conversa. Os valores são sugestão: revise antes de enviar.</span></p>" : "") +
+        '<ul class="editaveis">' + p.etapas.map(function (e, i) { return "<li><span>" + esc(e.escopo) + "</span><b>" + brl(e.valor) + "</b>" + botao(ic("fechar") + '<span class="sr">Remover etapa ' + (i + 1) + "</span>", "removerEtapa", p.id + "|" + i, "icone") + "</li>"; }).join("") + "</ul>" +
+        '<form class="form-linha" data-form="etapa" data-id="' + p.id + '" novalidate>' + campo("f-escopo", "Nova etapa", 'name="escopo" maxlength="120" placeholder="Ex.: relatórios"') + campo("f-valor", "Valor", 'name="valor" inputmode="decimal" placeholder="1.500,00"') + '<button class="btn suave" type="submit">' + ic("mais") + "Incluir</button></form>" +
+        '<h3>Custos previstos</h3><ul class="editaveis">' + p.custos.map(function (k, i) { return "<li><span>" + esc(k.descricao) + "</span><b>" + brl(k.valor) + "</b>" + botao(ic("fechar") + '<span class="sr">Remover custo ' + esc(k.descricao) + "</span>", "removerCusto", p.id + "|" + i, "icone") + "</li>"; }).join("") + "</ul>" +
+        '<form class="form-linha" data-form="custo" data-id="' + p.id + '" novalidate>' + campo("k-desc", "Novo custo", 'name="descricao" maxlength="80" placeholder="Ex.: licença"') + campo("k-valor", "Valor", 'name="valor" inputmode="decimal" placeholder="300,00"') + '<button class="btn suave" type="submit">' + ic("mais") + "Incluir</button></form></section>" +
+        '<section class="painel"><h2>' + ic("email") + 'E-mail que vai junto</h2><div class="email-previa"><p><b>Para:</b> ' + esc(lead.contato) + " · " + esc(lead.empresa) + "</p><p><b>Assunto:</b> Proposta FMA Software: " + esc(lead.interesse) + "</p><hr><p>Oi " + esc(lead.contato) + ",</p><p>Segue a proposta em PDF, com o trabalho dividido em " + p.etapas.length + " etapa(s). Você só paga cada etapa depois de aprovar a entrega.</p><p>Fico à disposição para ajustar o que precisar.</p><p>Felipe</p></div><p class=\"dica\">" + ic("ia") + "Rascunho da IA, editável no sistema real.</p></section>";
+    } else if (p.status === "Enviada") {
+      lado = '<section class="painel"><h2>' + ic("ia") + "Follow-up pronto</h2><p class=\"dica\">Enviada " + quando(p.enviadaEm) + ". Sem resposta em 3 dias, a IA manda este texto pelo canal da conversa.</p>" +
+        '<blockquote class="rascunho">Oi ' + esc(lead.contato) + ", conseguiu ver a proposta? Se ajudar, explico as etapas numa chamada de 15 minutos.</blockquote>" +
+        (conv ? '<a class="btn suave" href="#/inbox/' + conv.id + '">' + ic(CANAL[conv.canal].i) + "Abrir conversa</a>" : "") + "</section>";
+    } else {
+      lado = '<section class="painel"><h2>Situação</h2><p>' + pilula(p.status) + "</p>" + (contrato ? '<p class="dica">Virou o contrato ' + contrato.id + ".</p>" : "") + "</section>";
+    }
+    return cabeca("Proposta " + p.id + ' <span class="versao">v' + p.versao + "</span>", esc(lead.empresa) + " · válida até " + data(p.validade) + " · " + pilula(p.status), acoes, ["#/funil", "Negócios"]) +
+      '<div class="grade-proposta"><article class="papel" aria-label="Prévia do documento">' +
+        '<header><img src="assets/fma-horizontal-reversa.svg" alt="FMA Software" width="150" height="34"><div><small>Proposta comercial</small><strong>' + p.id + " · v" + p.versao + "</strong></div></header>" +
+        '<div class="papel-corpo"><p class="papel-para">Para <strong>' + esc(lead.empresa) + "</strong><br>" + esc(lead.interesse) + "</p>" +
+        '<ol class="papel-etapas">' + (p.etapas.length ? p.etapas.map(function (e, i) { return '<li><span class="n">' + (i + 1) + "</span><span>" + esc(e.escopo) + "</span><b>" + brl(e.valor) + "</b></li>"; }).join("") : '<li class="dica">Nenhuma etapa ainda.</li>') + "</ol>" +
+        '<div class="papel-total"><span>Total</span><strong>' + brl(U.totalProposta(p)) + "</strong></div>" +
+        '<p class="papel-cond">Pagamento por etapa aprovada: cada parcela só é cobrada depois que você aprova a entrega. NFS-e a cada pagamento.</p></div>' +
+      '</article><div class="coluna">' + lado + "</div></div>";
+  };
 
-  function detalheContrato(c) {
-    if (!c) return topo("Contrato não encontrado", "", "", '<a href="#/contratos">Contratos</a>');
-    var cli = clienteDe(c);
-    var acao = c.status === "AguardandoAssinatura" ? botao("Registrar assinatura", "assinar", c.id, "primario") + botao("Cancelar contrato", "cancelarContrato", c.id, "perigo") : "";
-    var passosEtapa = ["Planejada", "EmExecucao", "Entregue", "Aprovada", "Faturada", "Paga"];
-    return topo("Contrato " + c.id, esc(cli.nome) + ' · proposta <a href="#/propostas/' + c.propostaId + '">' + c.propostaId + "</a>" + (c.anexo ? " · " + esc(c.anexo) : ""), '<div class="acoes">' + selo(c.status) + acao + "</div>", '<a href="#/contratos">Contratos</a> / ' + c.id) +
-      '<div class="grade contrato"><section class="card"><h2>Etapas</h2>' +
-        c.etapas.map(function (e) {
-          var r = e.receberId ? por(st.receber, e.receberId) : null;
-          var n = e.notaId ? por(st.notas, e.notaId) : null;
-          var a = "";
-          if (c.status === "Vigente" && e.status === "Planejada") a = botao("Iniciar", "iniciar", c.id + "|" + e.id, "contorno", "Iniciar etapa " + e.id);
-          if (e.status === "EmExecucao") a = botao("Marcar entregue", "entregar", c.id + "|" + e.id, "contorno", "Marcar etapa " + e.id + " como entregue");
-          if (e.status === "Entregue") a = botao("Registrar aprovação do cliente", "aprovar", c.id + "|" + e.id, "primario", "Registrar aprovação da etapa " + e.id) + botao("Cliente pediu ajuste", "pedirAjuste", c.id + "|" + e.id, "contorno", "Cliente pediu ajuste na etapa " + e.id);
-          var precisaNota = (e.status === "Aprovada" || e.status === "Paga") && !e.notaId;
-          var pagaSemNota = e.status === "Paga" && !e.notaId;
-          return '<article class="etapa"><div class="etapa-cab"><h3>' + e.id + " · " + esc(e.escopo) + "</h3><strong>" + brl(e.valor) + "</strong></div>" +
-            esteira(passosEtapa, pagaSemNota ? "Aprovada" : e.status) +
-            '<p class="etapa-info">' + (r ? "Parcela " + r.id + ": " + r.status + (r.status === "Aberta" ? ", vence " + data(r.vencimento) : "") + (r.retencoes ? ", líquido " + brl(r.valor) : "") : "Sem cobrança até a aprovação.") + " · " + (n ? "NFS-e " + esc(n.numero) + " anexada" : precisaNota ? '<span class="selo erro">NFS-e pendente</span>' : "NFS-e após aprovação") + "</p>" +
-            (a ? '<div class="acoes">' + a + "</div>" : "") +
-            (precisaNota ? formNota(c, e) : "") +
-          "</article>";
-        }).join("") +
-      "</section>" +
-      '<section class="card"><h2>Linha do tempo</h2><ol class="linha-tempo">' + c.eventos.slice().reverse().map(function (ev) {
-        return "<li><time>" + data(ev.em) + "</time>" + esc(ev.texto) + "</li>";
+  // Contrato: jornada das etapas, com a NFS-e anexada no ponto em que ela é exigida.
+  var PASSOS = ["Planejada", "EmExecucao", "Entregue", "Aprovada", "Faturada", "Paga"];
+  Telas.contratos = function (id) {
+    var c = por(st.contratos, id);
+    if (!c) { setTimeout(function () { location.hash = "#/funil"; }); return ""; }
+    var cli = U.clienteDe(c);
+    var total = soma(c.etapas, function (e) { return e.valor; });
+    var pago = soma(c.etapas.filter(function (e) { return e.status === "Paga"; }), function (e) { return e.valor; });
+    var acao = c.status === "AguardandoAssinatura" ? botao("Cancelar", "cancelarContrato", c.id, "suave perigo") + botao(ic("check") + "Assinatura recebida", "assinar", c.id, "primario") : "";
+    var linha = c.eventos.map(function (e) { return { em: e.em, texto: e.texto, canal: "sistema" }; })
+      .concat(st.atividades.filter(function (a) { return a.alvo && a.alvo.indexOf("/" + c.id) >= 0; }))
+      .sort(function (a, b) { return a.em < b.em ? 1 : a.em > b.em ? -1 : 0; });
+    return cabeca("Contrato " + c.id, '<a href="#/clientes">' + esc(cli.nome) + '</a> · proposta <a href="#/propostas/' + c.propostaId + '">' + c.propostaId + "</a> · " + pilula(c.status), acao, ["#/funil", "Negócios"]) +
+      '<div class="progresso-contrato"><div><span>Recebido</span><strong>' + brl(pago) + "</strong><small>de " + brl(total) + '</small></div><div class="barra-prog" role="progressbar" aria-label="Recebido do contrato" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + pago + '" aria-valuetext="' + esc(brl(pago) + " de " + brl(total)) + '"><span style="width:' + (total ? pago / total * 100 : 0) + '%"></span></div></div>' +
+      '<div class="grade-contrato"><section aria-label="Etapas"><ol class="jornada">' + c.etapas.map(function (e) {
+        var idx = PASSOS.indexOf(e.status);
+        var r = e.receberId ? por(st.receber, e.receberId) : null;
+        var precisaNota = (e.status === "Aprovada" || e.status === "Paga") && !e.notaId;
+        var a = "";
+        if (c.status === "Vigente" && e.status === "Planejada") a = botao("Começar etapa", "iniciar", c.id + "|" + e.id, "suave");
+        if (e.status === "EmExecucao") a = botao(ic("enviar") + "Entregar para aprovação", "entregar", c.id + "|" + e.id, "primario");
+        if (e.status === "Entregue") a = botao("Cliente pediu ajuste", "pedirAjuste", c.id + "|" + e.id, "suave") + botao(ic("check") + "Cliente aprovou", "aprovar", c.id + "|" + e.id, "primario");
+        return '<li class="etapa-j' + (e.status === "Paga" ? " feita" : idx >= 1 ? " andando" : "") + (precisaNota ? " pede-nota" : "") + '">' +
+          '<div class="etapa-j-topo"><span class="etapa-num">' + (e.status === "Paga" ? ic("check") : esc(e.id)) + '</span><div class="etapa-j-titulo"><h3>' + esc(e.escopo) + "</h3><p>" + pilula(e.status) +
+            (r ? ' <span class="dica">parcela ' + r.id + " · " + (r.status === "Paga" ? "recebida" : "vence " + quando(r.vencimento)) + (r.retencoes ? " · líquido " + brl(r.valor) : "") + "</span>" : "") + "</p></div><b>" + brl(e.valor) + "</b></div>" +
+          '<ol class="passos" aria-label="Situação da etapa">' + PASSOS.map(function (s, i) { return '<li class="' + (i < idx ? "ok" : i === idx ? "agora" : "") + '"' + (i === idx ? ' aria-current="step"' : "") + "><span>" + (ROT[s] || s) + "</span></li>"; }).join("") + "</ol>" +
+          (a ? '<div class="acoes">' + a + "</div>" : "") +
+          (precisaNota ? formNota(c, e) : "") + "</li>";
+      }).join("") + "</ol></section>" +
+      '<section class="painel"><h2>Histórico</h2><ol class="historico">' + linha.map(function (x) {
+        return "<li>" + canal(x.canal) + "<div><span>" + esc(x.texto) + "</span><small>" + data(x.em) + "</small></div></li>";
       }).join("") + "</ol></section></div>";
+  };
+  function campo(id, rotulo, extra, dica) {
+    return '<div class="campo"><label for="' + id + '">' + rotulo + '</label><input id="' + id + '" ' + extra + ' aria-describedby="' + id + "-erro" + (dica ? " " + id + "-dica" : "") + '">' +
+      (dica ? '<small id="' + id + '-dica" class="dica">' + dica + "</small>" : "") + '<small id="' + id + '-erro" class="erro-campo" role="alert" hidden></small></div>';
   }
   function formNota(c, e) {
     var p = "n-" + e.id;
-    var comp = (e.aprovadaEm || dias(0)).slice(0, 7);
-    return '<form class="form-grade nota" data-form="nota" data-id="' + c.id + "|" + e.id + '" novalidate>' +
-      '<p class="form-titulo">Anexar NFS-e emitida</p>' +
-      campo(p + "-num", "Número da NFS-e", 'name="numero" required maxlength="20"') +
-      campo(p + "-val", "Valor do serviço (R$)", 'name="valor" inputmode="decimal" required value="' + valorEmCampo(e.valor) + '"', "Igual ao bruto da etapa") +
-      campo(p + "-ret", "Retenções (R$)", 'name="retencoes" inputmode="decimal" value="0,00"', "ISS, IRRF, CSRF retidos pelo tomador") +
-      campo(p + "-comp", "Competência", 'name="competencia" type="month" required value="' + comp + '"', "Mês da prestação") +
-      campo(p + "-arq", "XML e PDF", 'name="arquivo" type="file" accept=".xml,.pdf" multiple required', "Selecione os dois arquivos") +
-      '<div class="form-acao"><button class="btn primario" type="submit">Anexar NFS-e</button></div></form>';
+    return '<form class="form-nota" data-form="nota" data-id="' + c.id + "|" + e.id + '" novalidate><div class="form-nota-topo">' + ic("doc") + "<div><strong>Anexar a NFS-e desta etapa</strong><small>Emita no emissor nacional e anexe aqui. Ela segue por e-mail ao cliente.</small></div></div>" +
+      '<div class="form-nota-grade">' +
+      campo(p + "-num", "Número", 'name="numero" maxlength="20"') +
+      campo(p + "-val", "Valor do serviço", 'name="valor" inputmode="decimal" value="' + e.valor.toFixed(2).replace(".", ",") + '"', "Igual ao bruto da etapa") +
+      campo(p + "-ret", "Retenções", 'name="retencoes" inputmode="decimal" value="0,00"', "ISS, IRRF, CSRF retidos") +
+      campo(p + "-comp", "Competência", 'name="competencia" type="month" value="' + (e.aprovadaEm || U.dias(0)).slice(0, 7) + '"', "Mês da prestação") +
+      '<div class="campo largo"><label for="' + p + '-arq">XML e PDF</label><input id="' + p + '-arq" name="arquivo" type="file" accept=".xml,.pdf" multiple aria-describedby="' + p + '-arq-erro"><small id="' + p + '-arq-erro" class="erro-campo" role="alert" hidden></small></div>' +
+      '</div><div class="acoes"><button class="btn primario" type="submit">' + ic("check") + "Anexar e enviar</button></div></form>";
   }
 
-  // ---------- roteamento e eventos ----------
+  // Dinheiro: entra, sai e notas, em cartões de linha com a ação ao lado.
+  var abaFin = "receber";
+  Telas.financeiro = function () {
+    var ar = Q.aReceber(), ap = Q.aPagar(), pn = Q.pendentesNota(), proj = Q.projecao(30);
+    var abas = { receber: "A receber", pagar: "A pagar", notas: "Notas fiscais" };
+    var corpo = "";
+    if (abaFin === "receber") corpo = '<ul class="linhas">' + st.receber.slice().reverse().map(function (r) {
+      var n = st.notas.filter(function (x) { return x.receberId === r.id && x.status === "Anexada"; })[0];
+      return '<li><span class="avatar pequeno">' + iniciais(U.clienteDe({ clienteId: r.clienteId }).nome) + '</span><div class="linha-texto"><strong>' + esc(r.descricao) + "</strong><small>" + r.id + ' · <a href="#/contratos/' + r.contratoId + '">' + r.contratoId + "</a> · " + (n ? "NFS-e " + esc(n.numero) : '<span class="txt-erro">sem NFS-e</span>') + (r.retencoes ? " · bruto " + brl(r.bruto) : "") + "</small></div>" +
+        '<div class="linha-valor"><b>' + brl(r.valor) + "</b>" + (r.status === "Aberta" ? prazo(r.vencimento) : pilula("Paga")) + "</div>" +
+        '<div class="acoes">' + (r.status === "Aberta" ? botao(ic("whatsapp") + "Cobrar", "cobrar", r.id, "suave", ' title="Lembrete com Pix pelo WhatsApp (simulado)"') + botao(ic("check") + "Recebi", "receber", r.id, "primario") : "") + "</div></li>";
+    }).join("") + "</ul>";
+    if (abaFin === "pagar") corpo = '<div class="acoes direita">' + botao(ic("mais") + "Nova conta", "abrirNovaConta", "", "suave") + '</div><ul class="linhas">' + st.pagar.slice().reverse().map(function (g) {
+      return '<li><span class="avatar pequeno escuro">' + iniciais(g.descricao) + '</span><div class="linha-texto"><strong>' + esc(g.descricao) + "</strong><small>" + esc(g.categoria) + (g.contratoId ? ' · <a href="#/contratos/' + g.contratoId + '">' + g.contratoId + "</a>" : "") + "</small></div>" +
+        '<div class="linha-valor"><b>−' + brl(g.valor) + "</b>" + (g.status === "Aberta" ? prazo(g.vencimento) : pilula("Paga")) + "</div>" +
+        '<div class="acoes">' + (g.status === "Aberta" ? botao(ic("check") + "Paguei", "pagar", g.id, "suave") : "") + "</div></li>";
+    }).join("") + "</ul>";
+    if (abaFin === "notas") corpo = (pn.length ? '<div class="alerta-faixa">' + ic("sistema") + "<span>" + pn.length + " etapa(s) aprovada(s) sem nota: " + pn.map(function (x) { return '<a href="#/contratos/' + x.c.id + '">' + x.e.id + " · " + esc(U.clienteDe(x.c).nome) + "</a>"; }).join(", ") + "</span></div>" : "") +
+      '<ul class="linhas">' + st.notas.slice().reverse().map(function (n) {
+        return '<li><span class="avatar pequeno">' + ic("doc") + '</span><div class="linha-texto"><strong>NFS-e ' + esc(n.numero) + (n.substitui ? ' <small class="dica">substitui ' + esc(n.substitui) + "</small>" : "") + "</strong><small>" + '<a href="#/contratos/' + n.contratoId + '">' + n.contratoId + "</a> · " + n.etapaId + " · competência " + U.mes(n.competencia + "-01") + " · " + esc(n.xml) + ", " + esc(n.pdf) + "</small></div>" +
+          '<div class="linha-valor"><b>' + brl(n.valor) + "</b>" + (n.retencoes ? '<small class="dica">retido ' + brl(n.retencoes) + "</small>" : "") + pilula(n.status) + "</div>" +
+          '<div class="acoes">' + (n.status === "Anexada" ? botao("Cancelar", "cancelarNota", n.id, "suave perigo") : "") + "</div></li>";
+      }).join("") + "</ul>";
+    return cabeca("Dinheiro", "O que entra, o que sai e as notas. A cobrança nasce quando o cliente aprova a etapa.") +
+      '<div class="faixa-numeros">' +
+        numero("A receber", brl(soma(ar, function (r) { return r.valor; })), ar.length + " parcela(s)", "#/financeiro") +
+        numero("A pagar", brl(soma(ap, function (g) { return g.valor; })), ap.length + " conta(s)", "#/financeiro") +
+        numero("Saldo em 30 dias", brl(proj[proj.length - 1].v), "projeção", "#/financeiro") +
+        numero("Notas pendentes", String(pn.length), pn.length ? "travam recebimento" : "tudo em dia", "#/financeiro") +
+      "</div>" +
+      '<section class="painel"><div class="painel-topo"><h2>Caixa projetado</h2><span class="dica">vencimentos em aberto</span></div>' + grafico(proj, 210) + "</section>" +
+      '<section class="painel"><div class="abas" role="tablist" aria-label="Lançamentos">' + Object.keys(abas).map(function (k) {
+        return '<button type="button" role="tab" id="aba-' + k + '" data-aba="' + k + '" aria-selected="' + (abaFin === k) + '" tabindex="' + (abaFin === k ? 0 : -1) + '">' + abas[k] + "</button>";
+      }).join("") + '</div><div role="tabpanel" aria-labelledby="aba-' + abaFin + '">' + corpo + "</div></section>";
+  };
+
+  Telas.clientes = function () {
+    var perdidos = st.leads.filter(function (l) { return l.status === "Perdido"; });
+    return cabeca("Clientes", "Lead vira cliente quando assina o contrato.") +
+      '<div class="cartoes">' + st.clientes.map(function (k) {
+        var cs = st.contratos.filter(function (c) { return c.clienteId === k.id; });
+        var rec = soma(st.receber.filter(function (r) { return r.clienteId === k.id && r.status === "Paga"; }), function (r) { return r.valorPago || 0; });
+        var aberto = soma(st.receber.filter(function (r) { return r.clienteId === k.id && r.status === "Aberta"; }), function (r) { return r.valor; });
+        var conv = U.conversaDoLead(k.leadId);
+        return '<article class="cartao-cli"><header><span class="avatar grande">' + iniciais(k.nome) + "</span><div><h2>" + esc(k.nome) + "</h2><small>cliente desde " + data(k.desde) + " · " + esc(k.documento) + "</small></div></header>" +
+          "<dl><div><dt>Recebido</dt><dd>" + brl(rec) + "</dd></div><div><dt>Em aberto</dt><dd>" + brl(aberto) + "</dd></div><div><dt>Contratos</dt><dd>" + cs.length + "</dd></div></dl>" +
+          '<div class="acoes">' + cs.map(function (c) { return '<a class="btn suave" href="#/contratos/' + c.id + '">' + ic("doc") + c.id + "</a>"; }).join("") + (conv ? '<a class="btn suave" href="#/inbox/' + conv.id + '">' + ic(CANAL[conv.canal].i) + "Conversa</a>" : "") + "</div></article>";
+      }).join("") + "</div>" +
+      (perdidos.length ? '<section class="painel"><h2>Leads perdidos</h2><ul class="linhas">' + perdidos.map(function (l) {
+        return '<li><span class="avatar pequeno escuro">' + iniciais(l.empresa) + '</span><div class="linha-texto"><strong>' + esc(l.empresa) + "</strong><small>" + esc(l.interesse) + " · " + esc(l.origem) + '</small></div><div class="acoes">' + botao("Reabrir", "reabrirLead", l.id, "suave") + "</div></li>";
+      }).join("") + "</ul></section>" : "");
+  };
+
+  var AUTOS = [
+    ["triagemIa", "ia", "Ler cada conversa nova", "A IA resume, marca intenção e urgência e sugere o próximo passo."],
+    ["propostaEmail", "email", "Enviar a proposta por e-mail", "PDF da proposta com o texto rascunhado pela IA."],
+    ["followupIa", "ia", "Follow-up em 3 dias", "Sem resposta, a IA escreve e manda pelo canal da conversa."],
+    ["cobrancaWhatsApp", "whatsapp", "Avisar a parcela pelo WhatsApp", "Quando o cliente aprova a etapa, recebe valor, vencimento e Pix."],
+    ["lembreteNfse", "sistema", "Lembrar de emitir a NFS-e", "Etapa aprovada sem nota sobe para o topo do dia."],
+    ["agradecimento", "whatsapp", "Agradecer o pagamento", "Mensagem curta quando a parcela é recebida."]
+  ];
+  Telas.integracoes = function () {
+    var conexoes = [
+      ["email", "E-mail", "SMTP da FMA", "Reaproveita o SmtpEmailCanal do EasyStok"],
+      ["whatsapp", "WhatsApp", "API oficial ou WPPConnect", "Reaproveita o CanalWhatsApp do EasyStok"],
+      ["ia", "IA", "Claude", "Reaproveita o AnthropicMessagesClient do EasyStok"]
+    ];
+    return cabeca("Conexões", "Os canais que o sistema usa sozinho. No protótipo tudo é simulado: nada sai deste navegador.") +
+      '<div class="conexoes">' + conexoes.map(function (x) {
+        return '<article class="conexao ' + x[0] + '">' + canal(x[0]) + "<h2>" + x[1] + "</h2><p>" + x[2] + "</p><small>" + x[3] + '</small><span class="pilula alerta">Simulado</span></article>';
+      }).join("") + "</div>" +
+      '<section class="painel"><h2>Automações</h2><ul class="automacoes">' + AUTOS.map(function (a) {
+        var on = !!st.automacoes[a[0]];
+        return "<li>" + canal(a[1]) + '<div><strong id="au-' + a[0] + '">' + a[2] + "</strong><small>" + a[3] + '</small></div><button type="button" class="chave" role="switch" aria-checked="' + on + '" aria-labelledby="au-' + a[0] + '" data-acao="alternarAutomacao" data-id="' + a[0] + '"><span></span></button></li>';
+      }).join("") + "</ul></section>" +
+      '<section class="painel"><h2>Blog</h2><p class="sub">Levantado em 12/11/2026. Os artigos vivem no Levante; aqui só o estado.</p><ul class="linhas">' +
+        '<li><span class="avatar pequeno">LV</span><div class="linha-texto"><strong>Levante</strong><small>Blog pessoal técnico (.NET, Next.js, MongoDB). Último commit em 13/08/2026. Cutover do domínio em curso: faltam e-mail, redirect do www e indexação.</small></div><div class="linha-valor"><span class="pilula alerta">parado</span></div></li>' +
+        '<li><span class="avatar pequeno escuro">FS</span><div class="linha-texto"><strong>Blog da FMA Software</strong><small>Não existe: nenhum repositório, domínio ou plano editorial. Decisão do Felipe: dentro do Levante ou próprio.</small></div><div class="linha-valor"><span class="pilula erro">não existe</span></div></li>' +
+      "</ul></section>";
+  };
+
+  // ---------- diálogos ----------
+  var dlg = document.getElementById("dialogo");
+  function abrirDialogo(html) { dlg.innerHTML = html; dlg.returnValue = ""; dlg.showModal(); var f = dlg.querySelector("input,textarea,select,button"); if (f) f.focus(); }
+  function confirmar(titulo, texto, ok) {
+    return new Promise(function (res) {
+      abrirDialogo('<form method="dialog" class="dialogo-corpo"><h2>' + esc(titulo) + "</h2><p>" + esc(texto) + '</p><div class="acoes direita"><button class="btn suave" value="nao">Voltar</button><button class="btn primario" value="sim">' + esc(ok || "Confirmar") + "</button></div></form>");
+      dlg.addEventListener("close", function f() { dlg.removeEventListener("close", f); res(dlg.returnValue === "sim"); });
+    });
+  }
+  var CONFIRMAR = {
+    aceitarProposta: ["Cliente aceitou?", "Cria o contrato e envia para assinatura.", "Registrar aceite"],
+    recusarProposta: ["Proposta recusada?", "O lead vai para perdidos. Dá para reabrir depois.", "Registrar recusa"],
+    cancelarContrato: ["Cancelar o contrato?", "Só antes da assinatura. O lead volta a qualificado.", "Cancelar contrato"],
+    cancelarNota: ["Cancelar esta NFS-e?", "Cancele primeiro no emissor. A etapa volta a pedir nota.", "Cancelar nota"],
+    restaurar: ["Restaurar os dados de exemplo?", "Apaga o que você fez neste navegador.", "Restaurar"]
+  };
+
+  // ---------- copiloto ----------
+  var copLog = document.getElementById("copiloto-log");
+  var CHIPS = ["Como está o caixa?", "O que vence esta semana?", "Quais notas faltam?", "Rascunhe o follow-up da Alfa"];
+  function abrirCopiloto(abrir) {
+    document.body.classList.toggle("copiloto-aberto", abrir);
+    document.getElementById("alternar-copiloto").setAttribute("aria-expanded", String(abrir));
+  }
+  function balao(de, texto) {
+    var el = document.createElement("div"); el.className = "bolha " + de; copLog.appendChild(el);
+    if (de === "ia" && !reduzir) {
+      var i = 0; el.classList.add("digitando");
+      (function passo() { i += 3; el.textContent = texto.slice(0, i); copLog.scrollTop = copLog.scrollHeight; if (i < texto.length) setTimeout(passo, 12); else el.classList.remove("digitando"); })();
+    } else { el.textContent = texto; }
+    copLog.scrollTop = copLog.scrollHeight;
+  }
+  function perguntar(q) {
+    abrirCopiloto(true); balao("eu", q);
+    var pensando = document.createElement("div"); pensando.className = "bolha ia pensando"; pensando.innerHTML = '<span></span><span></span><span></span><span class="sr">Pensando</span>'; copLog.appendChild(pensando);
+    setTimeout(function () { pensando.remove(); balao("ia", F.perguntar(q)); }, reduzir ? 0 : 600);
+  }
+  function iniciarCopiloto() {
+    balao("ia", "Oi, Felipe. Pergunte sobre caixa, propostas e notas, ou peça um rascunho. Respondo com o que está no sistema.");
+    document.getElementById("copiloto-chips").innerHTML = CHIPS.map(function (c) { return '<button type="button" data-pergunta="' + esc(c) + '">' + esc(c) + "</button>"; }).join("");
+  }
+
+  // ---------- paleta de comandos (Ctrl K) ----------
+  var pal = document.getElementById("paleta"), palQ = document.getElementById("paleta-q"), palL = document.getElementById("paleta-lista"), palSel = 0, palItens = [];
+  function comandos(q) {
+    var t = q.toLowerCase().trim();
+    var base = [
+      { r: "Ir para Hoje", h: "#/hoje", i: "hoje" }, { r: "Ir para Conversas", h: "#/inbox", i: "inbox" }, { r: "Ir para Negócios", h: "#/funil", i: "funil" },
+      { r: "Ir para Dinheiro", h: "#/financeiro", i: "financeiro" }, { r: "Ir para Clientes", h: "#/clientes", i: "clientes" }, { r: "Ir para Conexões", h: "#/integracoes", i: "integracoes" },
+      { r: "Criar lead", a: "abrirNovoLead", i: "mais" }, { r: "Criar conta a pagar", a: "abrirNovaConta", i: "mais" }
+    ];
+    st.conversas.forEach(function (c) { base.push({ r: "Conversa com " + c.nome, h: "#/inbox/" + c.id, i: CANAL[c.canal].i }); });
+    st.propostas.forEach(function (p) { base.push({ r: "Proposta " + p.id + " · " + U.leadDe(p).empresa, h: "#/propostas/" + p.id, i: "doc" }); });
+    st.contratos.forEach(function (c) { base.push({ r: "Contrato " + c.id + " · " + U.clienteDe(c).nome, h: "#/contratos/" + c.id, i: "doc" }); });
+    var achados = t ? base.filter(function (x) { return x.r.toLowerCase().indexOf(t) >= 0; }) : base.slice(0, 8);
+    if (t) achados.unshift({ r: "Perguntar à IA: " + q.trim(), p: q.trim(), i: "ia" });
+    return achados.slice(0, 9);
+  }
+  function desenharPaleta() {
+    palItens = comandos(palQ.value); palSel = Math.max(0, Math.min(palSel, palItens.length - 1));
+    palL.innerHTML = palItens.map(function (x, i) { return '<li role="option" id="op-' + i + '" aria-selected="' + (i === palSel) + '" data-i="' + i + '">' + ic(x.i) + "<span>" + esc(x.r) + "</span></li>"; }).join("");
+    palQ.setAttribute("aria-activedescendant", palItens.length ? "op-" + palSel : "");
+    var sel = palL.querySelector('[aria-selected="true"]'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: "nearest" });
+  }
+  function executarComando(x) {
+    pal.close();
+    if (!x) return;
+    if (x.h) location.hash = x.h; else if (x.a) executar(x.a, ""); else if (x.p) perguntar(x.p);
+  }
+  function abrirPaleta() { palQ.value = ""; palSel = 0; desenharPaleta(); pal.showModal(); palQ.focus(); }
+
+  // ---------- roteamento e render ----------
   function rota() {
-    var partes = (location.hash || "#/painel").replace(/^#\//, "").split("/");
-    return { nome: Telas[partes[0]] ? partes[0] : "painel", id: partes[1] || null };
+    var partes = (location.hash || "#/hoje").replace(/^#\//, "").split("/");
+    return { nome: Telas[partes[0]] ? partes[0] : "hoje", id: partes[1] || null };
+  }
+  function contador() {
+    var n = st.conversas.filter(function (c) { return c.naoLida; }).length, el = document.getElementById("contador-inbox");
+    el.hidden = !n; el.textContent = n; el.setAttribute("aria-label", n + " não lidas");
   }
   function render(focar) {
-    var r = rota();
-    var main = document.getElementById("conteudo");
+    var r = rota(), main = document.getElementById("conteudo");
     main.innerHTML = Telas[r.nome](r.id);
-    document.querySelectorAll("nav a").forEach(function (a) {
-      if (a.getAttribute("data-rota") === r.nome) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    main.setAttribute("data-tela", r.nome);
+    var ativo = r.nome === "propostas" || r.nome === "contratos" ? "funil" : r.nome;
+    document.querySelectorAll(".trilho a[data-rota]").forEach(function (a) {
+      if (a.getAttribute("data-rota") === ativo) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
     var h1 = main.querySelector("h1");
-    document.title = (h1 ? h1.textContent + " · " : "") + "FMA Gestão";
-    if (focar && h1) h1.focus();
+    document.title = (h1 ? h1.textContent.trim() + " · " : "") + "FMA Gestão";
+    contador();
+    if (focar) { window.scrollTo(0, 0); if (h1) h1.focus({ preventScroll: true }); }
   }
-  function executar(acao, id) {
-    if (CONFIRMAR[acao] && !window.confirm(CONFIRMAR[acao])) return;
-    var msg;
-    if (acao === "restaurar") { st = semente(); salvar(); location.hash = "#/painel"; render(true); avisar("Dados de exemplo restaurados."); return; }
-    var mapa = { qualificarLead: "leads", perderLead: "leads", reabrirLead: "leads", criarProposta: "leads", enviarProposta: "propostas", aceitarProposta: "propostas", recusarProposta: "propostas", novaVersao: "propostas", receber: "receber", pagar: "pagar", concluirLembrete: "lembretes", cancelarNota: "notas" };
+  F.navegar = function (h) { location.hash = h; };
+
+  function avisar(msg) {
+    var t = document.getElementById("toast");
+    t.innerHTML = ic("check") + "<span>" + esc(msg) + "</span>"; t.classList.add("visivel");
+    clearTimeout(avisar._t); avisar._t = setTimeout(function () { t.classList.remove("visivel"); }, 4200);
+  }
+  function concluir(resultado) {
     var antes = location.hash;
-    if (mapa[acao]) {
-      msg = Regras[acao](por(st[mapa[acao]], id));
-    } else if (acao === "removerEtapa" || acao === "removerCusto") {
-      var pr = id.split("|"); msg = Regras[acao](por(st.propostas, pr[0]), Number(pr[1]));
-    } else {
-      var ids = id.split("|"); var c = por(st.contratos, ids[0]);
-      msg = ids[1] ? Regras[acao](c, por(c.etapas, ids[1])) : Regras[acao](c);
-    }
-    salvar();
-    if (location.hash === antes) render(true); // se a regra navegou, o hashchange renderiza
-    if (msg) avisar(msg);
+    Promise.resolve(resultado).then(function (m) { F.salvar(); render(location.hash !== antes); if (m) avisar(m); });
   }
+
+  function executar(acao, id) {
+    if (CONFIRMAR[acao]) {
+      var c = CONFIRMAR[acao];
+      return confirmar(c[0], c[1], c[2]).then(function (ok) { if (ok) executarJa(acao, id); });
+    }
+    executarJa(acao, id);
+  }
+  var POR_COLECAO = { qualificarLead: "leads", perderLead: "leads", reabrirLead: "leads", enviarProposta: "propostas", aceitarProposta: "propostas", recusarProposta: "propostas", novaVersao: "propostas",
+    receber: "receber", cobrar: "receber", pagar: "pagar", concluirLembrete: "lembretes", cancelarNota: "notas", propostaDaConversa: "conversas" };
+  function executarJa(acao, id) {
+    var ids = (id || "").split("|");
+    if (acao === "restaurar") { st = F.restaurar(); filtroInbox = "todos"; abaFin = "receber"; if (location.hash === "#/hoje") render(true); else location.hash = "#/hoje"; avisar("Dados de exemplo restaurados."); return; }
+    if (acao === "abrirNovoLead") return abrirDialogo('<form class="dialogo-corpo" data-form="lead" novalidate><h2>Novo lead</h2>' + campo("l-empresa", "Empresa", 'name="empresa" maxlength="80" autocomplete="off"') + campo("l-contato", "Contato", 'name="contato" maxlength="60" autocomplete="off"') + campo("l-interesse", "O que precisa", 'name="interesse" maxlength="120" autocomplete="off"') + '<div class="acoes direita"><button class="btn suave" type="button" data-fechar>Cancelar</button><button class="btn primario" type="submit">Criar lead</button></div></form>');
+    if (acao === "abrirNovaConta") return abrirDialogo('<form class="dialogo-corpo" data-form="pagar" novalidate><h2>Nova conta a pagar</h2>' + campo("g-desc", "Descrição", 'name="descricao" maxlength="80" autocomplete="off"') + campo("g-valor", "Valor", 'name="valor" inputmode="decimal" placeholder="1.500,00"') + campo("g-venc", "Vencimento", 'name="vencimento" type="date" value="' + U.dias(10) + '"') + '<div class="campo"><label for="g-cat">Categoria</label><select id="g-cat" name="categoria"><option>Administrativo</option><option>Custo de projeto</option><option>Tributos</option><option>Ferramentas</option></select></div><div class="acoes direita"><button class="btn suave" type="button" data-fechar>Cancelar</button><button class="btn primario" type="submit">Criar conta</button></div></form>');
+    if (acao === "rascunhar") { var cv = por(st.conversas, id), ta = document.getElementById("resposta"); if (ta && cv && cv.ia) escrever(ta, cv.ia.resposta); return; }
+    if (acao === "avancar") return concluir(avancar(ids[0], ids[1]));
+    var msg;
+    if (acao === "alternarAutomacao") msg = R.alternarAutomacao(id);
+    else if (POR_COLECAO[acao]) msg = R[acao](por(st[POR_COLECAO[acao]], id));
+    else if (acao === "removerEtapa" || acao === "removerCusto") msg = R[acao](por(st.propostas, ids[0]), Number(ids[1]));
+    else { var ct = por(st.contratos, ids[0]); msg = ids[1] ? R[acao](ct, por(ct.etapas, ids[1])) : R[acao](ct); }
+    concluir(msg);
+  }
+  function escrever(ta, texto) {
+    ta.focus();
+    if (reduzir) { ta.value = texto; return; }
+    var i = 0; ta.value = ""; ta.classList.add("escrevendo");
+    (function passo() { i += 4; ta.value = texto.slice(0, i); ta.scrollTop = ta.scrollHeight; if (i < texto.length) setTimeout(passo, 10); else ta.classList.remove("escrevendo"); })();
+  }
+
+  // ---------- eventos ----------
   function erroCampo(f, nome, msg) {
     var el = f.elements[nome]; el.setAttribute("aria-invalid", "true");
     var p = document.getElementById(el.id + "-erro"); p.textContent = msg; p.hidden = false; el.focus();
@@ -589,59 +488,116 @@
     f.querySelectorAll("[aria-invalid]").forEach(function (x) { x.removeAttribute("aria-invalid"); });
     f.querySelectorAll(".erro-campo").forEach(function (x) { x.hidden = true; x.textContent = ""; });
   }
-  function depois(msg, focoId) { salvar(); render(); avisar(msg); var el = focoId && document.getElementById(focoId); if (el) el.focus(); }
-
   document.addEventListener("click", function (ev) {
     var b = ev.target.closest("[data-acao]");
-    if (b) executar(b.getAttribute("data-acao"), b.getAttribute("data-id"));
+    if (b) { ev.preventDefault(); executar(b.getAttribute("data-acao"), b.getAttribute("data-id")); return; }
+    var fil = ev.target.closest("[data-filtro]"); if (fil) { filtroInbox = fil.getAttribute("data-filtro"); render(); document.querySelector('[data-filtro="' + filtroInbox + '"]').focus(); return; }
+    var aba = ev.target.closest("[data-aba]"); if (aba) { abaFin = aba.getAttribute("data-aba"); render(); document.querySelector('[data-aba="' + abaFin + '"]').focus(); return; }
+    var per = ev.target.closest("[data-pergunta]"); if (per) { perguntar(per.getAttribute("data-pergunta")); return; }
+    if (ev.target.closest("[data-fechar]")) { dlg.close(); return; }
+    var op = ev.target.closest("#paleta-lista li"); if (op) { executarComando(palItens[+op.getAttribute("data-i")]); return; }
+    if (ev.target === pal) { pal.close(); return; }
     if (ev.target.closest(".pular")) { ev.preventDefault(); var h1 = document.querySelector("main h1"); if (h1) h1.focus(); }
-    if (ev.target.closest("nav a")) { document.getElementById("nav").classList.remove("aberto"); document.querySelector(".menu-toggle").setAttribute("aria-expanded", "false"); }
   });
-  document.querySelector(".menu-toggle").addEventListener("click", function () {
-    var nav = document.getElementById("nav"); var aberto = nav.classList.toggle("aberto");
-    this.setAttribute("aria-expanded", String(aberto));
+  // Setas entre abas (padrão WAI-ARIA de tabs).
+  document.addEventListener("keydown", function (ev) {
+    var aba = ev.target.closest && ev.target.closest("[role=tab]"); if (!aba || (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft")) return;
+    var todas = Array.prototype.slice.call(aba.parentNode.querySelectorAll("[role=tab]")), i = todas.indexOf(aba);
+    var prox = todas[(i + (ev.key === "ArrowRight" ? 1 : -1) + todas.length) % todas.length];
+    ev.preventDefault(); prox.click();
   });
   document.addEventListener("submit", function (ev) {
-    var f = ev.target; ev.preventDefault(); limparErros(f);
-    var tipo = f.getAttribute("data-form"); var v;
+    var f = ev.target; if (f.getAttribute("method") === "dialog") return;
+    ev.preventDefault(); limparErros(f);
+    var tipo = f.getAttribute("data-form"), v;
+    if (f.id === "copiloto-form") { var q = f.q.value.trim(); if (q) { perguntar(q); f.q.value = ""; } return; }
+    if (tipo === "responder") {
+      var conv = por(st.conversas, f.getAttribute("data-id")), txt = f.texto.value.trim();
+      if (!txt) { f.texto.focus(); return; }
+      return concluir(R.responder(conv, txt));
+    }
     if (tipo === "lead") {
       var empresa = f.empresa.value.trim();
       if (!empresa) return erroCampo(f, "empresa", "Informe o nome da empresa.");
-      return depois(Regras.criarLead({ empresa: empresa, contato: f.contato.value.trim(), interesse: f.interesse.value.trim(), origem: f.origem.value }), "l-empresa");
-    }
-    if (tipo === "etapa" || tipo === "custo") {
-      var p = por(st.propostas, f.getAttribute("data-id"));
-      var nomeTxt = tipo === "etapa" ? "escopo" : "descricao";
-      var txt = f[nomeTxt].value.trim(); v = lerValor(f.valor.value);
-      if (!txt) return erroCampo(f, nomeTxt, tipo === "etapa" ? "Descreva o escopo da etapa." : "Descreva o custo.");
-      if (!(v > 0)) return erroCampo(f, "valor", "Informe um valor maior que zero, por exemplo 1.500,00.");
-      if (tipo === "etapa") p.etapas.push({ escopo: txt, valor: v }); else p.custos.push({ descricao: txt, valor: v });
-      return depois(tipo === "etapa" ? "Etapa incluída." : "Custo incluído.", tipo === "etapa" ? "f-escopo" : "k-desc");
+      R.criarLead({ empresa: empresa, contato: f.contato.value.trim(), interesse: f.interesse.value.trim() });
+      dlg.close(); return concluir("Lead " + empresa + " criado na coluna Leads.");
     }
     if (tipo === "pagar") {
-      var desc = f.descricao.value.trim(); v = lerValor(f.valor.value);
+      var desc = f.descricao.value.trim(); v = U.lerValor(f.valor.value);
       if (!desc) return erroCampo(f, "descricao", "Descreva a conta.");
-      if (!(v > 0)) return erroCampo(f, "valor", "Informe um valor maior que zero, por exemplo 1.500,00.");
+      if (!(v > 0)) return erroCampo(f, "valor", "Use um valor maior que zero, como 1.500,00.");
       if (!f.vencimento.value) return erroCampo(f, "vencimento", "Informe o vencimento.");
-      return depois(Regras.criarPagar({ descricao: desc, valor: v, vencimento: f.vencimento.value, categoria: f.categoria.value }), "g-desc");
+      var mm = R.criarPagar({ descricao: desc, valor: v, vencimento: f.vencimento.value, categoria: f.categoria.value });
+      dlg.close(); abaFin = "pagar";
+      if (location.hash !== "#/financeiro") location.hash = "#/financeiro";
+      return concluir(mm);
+    }
+    if (tipo === "etapa" || tipo === "custo") {
+      var p = por(st.propostas, f.getAttribute("data-id")), nome = tipo === "etapa" ? "escopo" : "descricao";
+      var t = f[nome].value.trim(); v = U.lerValor(f.valor.value);
+      if (!t) return erroCampo(f, nome, tipo === "etapa" ? "Descreva a etapa." : "Descreva o custo.");
+      if (!(v > 0)) return erroCampo(f, "valor", "Use um valor maior que zero, como 1.500,00.");
+      if (tipo === "etapa") p.etapas.push({ escopo: t, valor: v }); else p.custos.push({ descricao: t, valor: v });
+      F.salvar(); render(); var foco = document.getElementById(tipo === "etapa" ? "f-escopo" : "k-desc"); if (foco) foco.focus(); return;
     }
     if (tipo === "nota") {
-      var ids = f.getAttribute("data-id").split("|"); var c = por(st.contratos, ids[0]); var e = por(c.etapas, ids[1]);
+      var ids = f.getAttribute("data-id").split("|"), c = por(st.contratos, ids[0]), e = por(c.etapas, ids[1]);
       var arqs = Array.prototype.slice.call(f.arquivo.files || []);
-      var xml = arqs.filter(function (a) { return /\.xml$/i.test(a.name); })[0];
-      var pdf = arqs.filter(function (a) { return /\.pdf$/i.test(a.name); })[0];
-      var ret = f.retencoes.value.trim() ? lerValor(f.retencoes.value) : 0;
-      var res = Regras.anexarNota(c, e, { numero: f.numero.value.trim(), valor: lerValor(f.valor.value), retencoes: ret, competencia: f.competencia.value, xml: xml && xml.name, pdf: pdf && pdf.name });
-      if (res && res.erro) return erroCampo(f, res.erro === "arquivo" ? "arquivo" : res.erro, res.msg);
-      salvar(); render(true); if (res) avisar(res);
+      var xml = arqs.filter(function (a) { return /\.xml$/i.test(a.name); })[0], pdf = arqs.filter(function (a) { return /\.pdf$/i.test(a.name); })[0];
+      var ret = f.retencoes.value.trim() ? U.lerValor(f.retencoes.value) : 0;
+      var res = R.anexarNota(c, e, { numero: f.numero.value.trim(), valor: U.lerValor(f.valor.value), retencoes: ret, competencia: f.competencia.value, xml: xml && xml.name, pdf: pdf && pdf.name });
+      if (res && res.erro) return erroCampo(f, res.erro, res.msg);
+      concluir(res);
     }
   });
-  window.addEventListener("hashchange", function () { if (/^#\//.test(location.hash) || !location.hash) render(true); });
+
+  // Arrastar e soltar no funil.
+  var arrastando = null;
+  document.addEventListener("dragstart", function (ev) {
+    var c = ev.target.closest && ev.target.closest(".card-k"); if (!c) return;
+    arrastando = { tipo: c.getAttribute("data-tipo"), id: c.getAttribute("data-id") };
+    ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", arrastando.id);
+    c.classList.add("arrastando"); document.body.classList.add("modo-arraste");
+    var alvo = document.querySelector('.coluna-k[data-col="' + DESTINO[arrastando.tipo] + '"]'); if (alvo) alvo.classList.add("pode");
+  });
+  document.addEventListener("dragend", function () {
+    arrastando = null; document.body.classList.remove("modo-arraste");
+    document.querySelectorAll(".arrastando,.pode,.sobre").forEach(function (x) { x.classList.remove("arrastando", "pode", "sobre"); });
+  });
+  document.addEventListener("dragover", function (ev) {
+    var col = ev.target.closest && ev.target.closest(".coluna-k"); if (!col || !arrastando) return;
+    ev.preventDefault();
+    document.querySelectorAll(".sobre").forEach(function (x) { if (x !== col) x.classList.remove("sobre"); }); col.classList.add("sobre");
+  });
+  document.addEventListener("drop", function (ev) {
+    var col = ev.target.closest && ev.target.closest(".coluna-k"); if (!col || !arrastando) return;
+    ev.preventDefault();
+    var a = arrastando;
+    if (col.getAttribute("data-col") === DESTINO[a.tipo]) concluir(avancar(a.tipo, a.id));
+    else avisar("Um passo por vez: solte na coluna destacada.");
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key && ev.key.toLowerCase() === "k") { ev.preventDefault(); if (pal.open) pal.close(); else abrirPaleta(); }
+    if (ev.key === "Escape" && document.body.classList.contains("copiloto-aberto") && !pal.open && !dlg.open && window.innerWidth < 1280) abrirCopiloto(false);
+  });
+  palQ.addEventListener("input", function () { palSel = 0; desenharPaleta(); });
+  palQ.addEventListener("keydown", function (ev) {
+    if (!palItens.length) return;
+    if (ev.key === "ArrowDown") { ev.preventDefault(); palSel = (palSel + 1) % palItens.length; desenharPaleta(); }
+    if (ev.key === "ArrowUp") { ev.preventDefault(); palSel = (palSel - 1 + palItens.length) % palItens.length; desenharPaleta(); }
+    if (ev.key === "Enter") { ev.preventDefault(); executarComando(palItens[palSel]); }
+  });
+  document.getElementById("abrir-paleta").addEventListener("click", abrirPaleta);
+  document.getElementById("alternar-copiloto").addEventListener("click", function () {
+    var abrir = !document.body.classList.contains("copiloto-aberto"); abrirCopiloto(abrir);
+    if (abrir) document.getElementById("copiloto-q").focus();
+  });
+  document.getElementById("fechar-copiloto").addEventListener("click", function () { abrirCopiloto(false); document.getElementById("alternar-copiloto").focus(); });
   document.getElementById("restaurar").addEventListener("click", function () { executar("restaurar", ""); });
+  window.addEventListener("hashchange", function () { if (/^#\//.test(location.hash) || !location.hash) render(true); });
 
-  // Exposto só para o teste de regras (tests/regras.test.cjs roda este arquivo num DOM falso).
-  window.__fmaGestao = { Regras: Regras, lerValor: lerValor, estado: function () { return st; }, semente: semente };
-
-  carregar();
+  iniciarCopiloto();
+  abrirCopiloto(window.innerWidth >= 1280);
   render();
 })();
