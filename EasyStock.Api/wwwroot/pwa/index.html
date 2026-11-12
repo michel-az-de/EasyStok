@@ -14355,7 +14355,9 @@ function applyImportedMutations(mutations) {
       case 'client.upsert':
         upsertById(clients, {
           id: p.id, name: p.name, apt: p.apt, address: p.address,
-          phone: p.phone, lastOrder: p.lastOrder, orderCount: p.orderCount || 0
+          phone: p.phone, lastOrder: p.lastOrder, orderCount: p.orderCount || 0,
+          // CLI-3/5: so leva o documento quando o servidor mandou; ausente nao apaga o do aparelho.
+          ...(p.document ? { document: p.document } : {})
         }, (cur, inc) => (inc.lastOrder || 0) >= (cur.lastOrder || 0));
         break;
       case 'order.upsert':

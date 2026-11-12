@@ -37,6 +37,44 @@ public class SyncReversePullService(
         return "extra";
     }
 
+    /// <summary>
+    /// CLI-3 (#2321): Cliente do ERP editado no console que ja tem espelho em mobile_clients. O bloco
+    /// acima os exclui; aqui o espelho recebe a edicao (nome, contato, endereco e documento) com o Id
+    /// do app. Se o pull normal ja mandou um client.upsert desse id, a mutacao e mesclada, nunca duplicada.
+    /// Campo vazio no ERP nao apaga o dado do app.
+    /// </summary>
+    private async Task AppendClientesEspelhadosAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId)
+    {
+        var espelhados = await (
+            from m in _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
+            join c in _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking() on m.ErpClienteId equals c.Id
+            where m.EmpresaId == empresaId && c.EmpresaId == empresaId && c.Ativo && c.AlteradoEm > sinceDate
+            select new { Espelho = m, Erp = c }).ToListAsync();
+        foreach (var par in espelhados)
+        {
+            var (m, c) = (par.Espelho, par.Erp);
+            var indice = mutations.FindIndex(x => x.Type == "client.upsert"
+                && x.Payload.ValueKind == System.Text.Json.JsonValueKind.Object
+                && x.Payload.TryGetProperty("id", out var id) && id.GetString() == m.Id);
+            var dto = indice >= 0
+                ? System.Text.Json.JsonSerializer.Deserialize<ClientDto>(mutations[indice].Payload, SyncDtoConverters.JsonOpts)!
+                : SyncDtoConverters.ToDto(m);
+            dto = dto with
+            {
+                Name = string.IsNullOrWhiteSpace(c.Nome) ? dto.Name : c.Nome,
+                Apt = string.IsNullOrWhiteSpace(c.Apt) ? dto.Apt : c.Apt,
+                Address = string.IsNullOrWhiteSpace(c.Endereco) ? dto.Address : c.Endereco,
+                Phone = string.IsNullOrWhiteSpace(c.Telefone) ? dto.Phone : c.Telefone,
+                Document = string.IsNullOrWhiteSpace(c.Documento) ? dto.Document : c.Documento
+            };
+            var ts = new DateTimeOffset(c.AlteradoEm).ToUnixTimeMilliseconds();
+            if (indice >= 0)
+                mutations[indice] = mutations[indice] with { Payload = SyncDtoConverters.Serialize(dto), Ts = Math.Max(mutations[indice].Ts, ts) };
+            else
+                mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web", "client.upsert", SyncDtoConverters.Serialize(dto), ts));
+        }
+    }
+
     public async Task AppendAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId, Guid? lojaId)
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -143,10 +181,13 @@ public class SyncReversePullService(
                 Address: c.Endereco,
                 Phone: c.Telefone,
                 LastOrder: c.LastOrderAt.HasValue ? new DateTimeOffset(c.LastOrderAt.Value).ToUnixTimeMilliseconds() : 0,
-                OrderCount: c.OrderCount);
+                OrderCount: c.OrderCount,
+                Document: c.Documento);
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                 "client.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(c.AlteradoEm).ToUnixTimeMilliseconds()));
         }
+
+        await AppendClientesEspelhadosAsync(mutations, sinceDate, empresaId);
 
         // Pedidos web sem MobileOrderId (criados via /api/pedidos).
         var pedidosQ = _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
