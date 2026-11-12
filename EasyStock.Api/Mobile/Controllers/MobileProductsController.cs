@@ -210,9 +210,11 @@ public class MobileProductsController(
         product.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
+        // id vem da rota: sem quebra de linha para nao forjar entrada de log.
+        var idLog = id.Replace("\r", string.Empty).Replace("\n", string.Empty);
         _log.LogInformation(
             "Reconcile stock: mobile_product {Id} {Old}→{New} (ERP itens={Itens})",
-            id, oldStock, product.Stock, itensDaLoja.Count);
+            idLog, oldStock, product.Stock, itensDaLoja.Count);
 
         return Ok(new { mobileStock = product.Stock, previousStock = oldStock });
     }
