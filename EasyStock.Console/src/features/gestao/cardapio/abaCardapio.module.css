@@ -132,3 +132,4 @@
   .estados { flex-basis: 100%; }
   .acoes > button { padding-inline: var(--e-2); }
 }
+.linkBotao { text-decoration: none; }

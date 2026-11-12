@@ -28,6 +28,7 @@ import { AbaReceitasApi } from './producao/AbaReceitasApi'
 import { AbaCalculadoraApi } from './producao/AbaCalculadoraApi'
 import { AbaPlanejamentoApi } from './producao/AbaPlanejamentoApi'
 import { AbaPerdasApi } from './producao/AbaPerdasApi'
+import { ChecklistConfiguracao } from './producao/ChecklistConfiguracao'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -305,5 +306,9 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />
+  // #2362: toda tela da Produção mostra no topo o que falta configurar, nas duas casas (rota e Gestão).
+  if (fonteApi && ABAS_DA_PRODUCAO.has(aba)) return <><ChecklistConfiguracao key={aba} />{painel}</>
   return painel
 }
+
+const ABAS_DA_PRODUCAO = new Set(moduloPorId('producao')?.telas.map((t) => t.aba) ?? [])
