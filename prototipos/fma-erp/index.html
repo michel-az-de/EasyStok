@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FMA Gestão</title>
+  <link rel="icon" href="assets/fma-simbolo-reversa.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+  <div class="casca">
+    <header class="lateral">
+      <a class="marca" href="#/painel" aria-label="FMA Gestão, painel">
+        <img src="assets/fma-horizontal-reversa.svg" alt="FMA Software" width="180" height="40">
+      </a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
+      <nav id="nav" aria-label="Módulos">
+        <a href="#/painel" data-rota="painel">Painel</a>
+        <p class="nav-grupo">Comercial</p>
+        <a href="#/leads" data-rota="leads">Leads</a>
+        <a href="#/propostas" data-rota="propostas">Propostas</a>
+        <a href="#/contratos" data-rota="contratos">Contratos</a>
+        <a href="#/clientes" data-rota="clientes">Clientes</a>
+        <p class="nav-grupo">Financeiro</p>
+        <a href="#/receber" data-rota="receber">A receber</a>
+        <a href="#/pagar" data-rota="pagar">A pagar</a>
+        <a href="#/notas" data-rota="notas">NFS-e</a>
+        <p class="nav-grupo">Rotina</p>
+        <a href="#/lembretes" data-rota="lembretes">Lembretes</a>
+        <a href="#/blog" data-rota="blog">Blog</a>
+      </nav>
+      <div class="aviso-ficticio">
+        <p>Protótipo com dados fictícios. Nada aqui é real.</p>
+        <button id="restaurar" type="button" class="btn pequeno">Restaurar dados de exemplo</button>
+      </div>
+    </header>
+    <main id="conteudo" tabindex="-1"></main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
