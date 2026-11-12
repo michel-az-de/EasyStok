@@ -76,7 +76,9 @@ public record OrderDto(
     long? ScheduledDeliveryAt = null,
     // #1493 — forma de pagamento escolhida no PWA ao entregar. NULL = aparelho antigo.
     string? Metodo = null,
-    string? LegacyHistoryStatus = null
+    string? LegacyHistoryStatus = null,
+    // #2307: quanto falta receber do Pedido ERP (desconta estorno e cupom). NULL = o servidor nao sabe.
+    decimal? AReceber = null
 );
 
 public record BatchItemDto(

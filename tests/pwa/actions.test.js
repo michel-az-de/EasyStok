@@ -124,4 +124,30 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.match(html, /onclick="advanceOrder\('pedido-zero'\)"/);
     assert.match(html, /onclick="cancelOrder\('pedido-zero'\)"/);
   });
+
+  // #2307: pedido quitado no console ou no Mercado Pago nao oferece cobranca de novo.
+  const cardPago = (aReceber, status) => runInSandbox(`renderKanbanCard({
+      id: 'pedido-pago', status: '${status || 'aguardando'}', total: 45.9, aReceber: ${aReceber}, items: [],
+      clientSnapshot: { name: 'Cliente' }, createdAt: Date.now()
+    }, { key: 'aguardando', label: 'Aguardando', next: 'Iniciar preparo' });`);
+
+  test('actions: pedido quitado mostra Pago e não oferece cobrança', () => {
+    const html = cardPago(0);
+    assert.ok(!html.includes('openCobranca('), 'cobrança some do card quitado');
+    assert.match(html, />Pago<\/span>/);
+    const acoes = JSON.parse(runInSandbox(`JSON.stringify(getOrderPrimaryActions({ id: 'p', status: 'pronto', total: 45.9, aReceber: 0, confirmedAt: null }))`));
+    assert.ok(!acoes.some(a => a.key === 'charge'), 'ação de cobrança some do pedido quitado');
+  });
+
+  test('actions: pedido com sinal mostra quanto falta e mantém a cobrança', () => {
+    const html = cardPago(20.9);
+    assert.match(html, /onclick="openCobranca\('pedido-pago'\)"/);
+    assert.match(html, /Falta R\$\s?20,90/);
+  });
+
+  test('actions: pedido sem aReceber (servidor antigo) segue como hoje', () => {
+    const html = cardPago('undefined');
+    assert.match(html, /onclick="openCobranca\('pedido-pago'\)"/);
+    assert.ok(!html.includes('>Pago</span>'));
+  });
 };
