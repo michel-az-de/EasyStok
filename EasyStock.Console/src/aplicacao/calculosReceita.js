@@ -32,4 +32,4 @@ export function rascunhoDaSugestao(sugestao, insumos) {
   }
 }
 
-export { pesquisarInsumosWeb, pesquisarReceitaIa, calcularReceita } from '../infra/api/producaoPesquisaApi'
+export { pesquisarReceitaIa, calcularReceita } from '../infra/api/producaoPesquisaApi'
