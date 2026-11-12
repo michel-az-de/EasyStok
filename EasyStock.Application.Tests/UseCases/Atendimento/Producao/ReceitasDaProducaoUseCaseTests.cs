@@ -63,6 +63,21 @@ public class ReceitasDaProducaoUseCaseTests
     }
 
     [Fact]
+    public async Task CustoPorGrama_ComSeisCasas_FechaALinhaSemArredondarParaZero()
+    {
+        // #2363: farinha a R$ 45 por 10 kg (R$ 0,0045/g); 350 g na receita custam R$ 1,575.
+        var lasanha = Prato(1);
+        var farinha = Insumo("Farinha", UnidadeMedida.G, null);
+        farinha.CustoUnitarioInsumo = 0.0045m;
+        Receita(lasanha, (farinha, 350, UnidadeMedida.G));
+
+        var linha = (await Sut().ObterAsync(EmpresaId, lasanha.Id)).Linhas.Should().ContainSingle().Subject;
+
+        linha.Custo.Should().Be(1.575m);
+        linha.CustoReferencia.Should().Be(0.0045m);
+    }
+
+    [Fact]
     public async Task InsumoSemCusto_NaoFechaOCusto()
     {
         var lasanha = Prato(6);

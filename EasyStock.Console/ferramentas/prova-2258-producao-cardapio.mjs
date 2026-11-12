@@ -82,9 +82,9 @@ caso('P5: Cadastrar insumo tem rótulos alinhados, "Salvar insumo" à direita e 
 
 caso('P6: o cadastro de insumo valida no clique e mostra o erro sob o campo', () => {
   assert.doesNotMatch(insumosJsx, /disabled=\{criando \|\| !novo\.nome\.trim\(\)\}/)
-  assert.match(insumosJsx, /<NomeInsumoPesquisado[^>]*erroDoCampo=\{erroDoNome\}/)
+  // #2363: o nome do insumo é um campo comum (as sugestões da Wikipédia saíram).
+  assert.match(insumosJsx, /<CampoTexto ref=\{nomeRef\} erro=\{erroDoNome\}[^>]*rotulo="Nome do insumo"/)
   assert.match(insumosJsx, /Informe o nome do insumo/)
-  assert.match(ler('features/gestao/producao/PesquisaProducao.jsx'), /<CampoTexto[^>]*erro=\{erroDoCampo\}/)
 })
 
 caso('P6: "Salvar contagem" parado diz por quê', () => {
@@ -111,7 +111,8 @@ caso('P7: unidades de insumo aparecem como g, kg, ml, L, un e o custo cita a uni
   assert.deepEqual(insumos.UNIDADES_INSUMO.map(insumos.rotuloDaUnidade), ['g', 'kg', 'ml', 'L', 'un'])
   assert.equal(insumos.rotuloDaUnidade('Xis'), 'Xis', 'unidade desconhecida passa como veio')
   assert.equal(insumos.rotuloDaUnidade(null), '')
-  assert.match(insumosJsx, /rotulo=\{`Custo por \$\{rotuloDaUnidade\(novo\.unidade\)\} \(R\$\)`\}/)
+  // #2363: o custo vem do preço de compra, na unidade da família do insumo.
+  assert.match(insumosJsx, /unidadesDeCompra\(unidade\)\.map\(\(u\) => \(\{ valor: u, rotulo: rotuloDaUnidade\(u\) \}\)\)/)
   assert.match(insumosJsx, /rotulo: rotuloDaUnidade\(u\)/)
 })
 

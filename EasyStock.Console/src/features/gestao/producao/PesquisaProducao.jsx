@@ -2,34 +2,12 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Modal } from '../../../componentes/Modal'
-import { pesquisarInsumosWeb, pesquisarReceitaIa } from '../../../aplicacao/calculosReceita'
+import { pesquisarReceitaIa } from '../../../aplicacao/calculosReceita'
 import { combinarSinais } from '../../../aplicacao/sinais'
 import css from './pesquisaProducao.module.css'
 
 function Fontes({ fontes }) {
   return <ul className={css.fontes}>{fontes.map((fonte) => <li key={fonte.url}><a href={fonte.url} target="_blank" rel="noopener noreferrer">{fonte.titulo}</a> · consultada em {new Date(fonte.consultadaEm).toLocaleDateString('pt-BR')}</li>)}</ul>
-}
-
-export function NomeInsumoPesquisado({ value, onChange, disabled, erroDoCampo, inputRef }) {
-  const id = useId()
-  const [fontes, setFontes] = useState([])
-  const [erro, setErro] = useState(null)
-  useEffect(() => {
-    setFontes([]); setErro(null)
-    if (disabled || value.trim().length < 3 || value.trim().length > 100) return undefined
-    const controle = new AbortController()
-    const tempo = setTimeout(() => {
-      pesquisarInsumosWeb(value.trim(), combinarSinais([controle.signal, AbortSignal.timeout(15000)]))
-        .then((dados) => { if (!controle.signal.aborted) setFontes(dados) })
-        .catch(() => { if (!controle.signal.aborted) setErro('Pesquisa indisponível. Você pode continuar escrevendo o nome.') })
-    }, 700)
-    return () => { clearTimeout(tempo); controle.abort() }
-  }, [value, disabled])
-  return <div className={css.nome}><CampoTexto ref={inputRef} erro={erroDoCampo} disabled={disabled} rotulo="Nome do insumo" dica="Sugestões da Wikipédia" placeholder="Ex.: farinha de trigo" maxLength={180} value={value} onChange={onChange} list={id} autoComplete="off" />
-    <datalist id={id}>{fontes.map((fonte) => <option key={fonte.url} value={fonte.titulo} />)}</datalist>
-    {erro && <p role="status">{erro}</p>}
-    {!!fontes.length && <Fontes fontes={fontes} />}
-  </div>
 }
 
 export function PesquisaReceitaIa({ nome, aoAplicar, disabled }) {

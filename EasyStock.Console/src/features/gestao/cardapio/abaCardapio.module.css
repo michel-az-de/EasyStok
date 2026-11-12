@@ -97,6 +97,10 @@
 .ajusteEstoque { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 .lancamentoPerda { grid-template-columns: minmax(0, 2fr) minmax(0, .8fr) minmax(0, 1.2fr); }
 .linhaCompleta { grid-column: 1 / -1; flex-basis: 100%; }
+/* #2363: "Paguei R$ __ por __ [kg]" numa linha; em tela estreita o preço fica sozinho em cima. */
+.compra { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr) minmax(0, 1fr); gap: var(--e-3); align-items: end; min-width: 0; margin: 0; padding: 0; border: 0; }
+.compra > legend { padding: 0; margin-bottom: var(--e-2); color: var(--tinta); font-size: var(--t-corpo); font-weight: 650; }
+@container (max-width: 420px) { .compra { grid-template-columns: repeat(2, minmax(0, 1fr)); } .compra > :nth-child(2) { grid-column: 1 / -1; } }
 .ajudaEmbalagem { display: block; max-width: 44ch; color: var(--tinta-2); font-size: var(--t-micro); }
 .dataPlanejamento { display: grid; gap: var(--e-2); width: min(100%, 280px); }
 .rodapeForm { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-2); padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
@@ -132,3 +136,4 @@
   .estados { flex-basis: 100%; }
   .acoes > button { padding-inline: var(--e-2); }
 }
+.linkBotao { text-decoration: none; }

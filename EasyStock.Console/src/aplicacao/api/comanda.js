@@ -55,6 +55,9 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
   // aqui e volta ao pedido a cada recarga desta tela. A troca de forma
   // tira a marca: a recarga leva `false` para o reducer não herdar a antiga.
   const semResumo = new Set()
+  // #2379: timeout ou 5xx numa escrita não diz se o EasyStok gravou. Relê o pedido para a tela mostrar o que ficou.
+  const semConfirmacao = (erro) => !erro.status || erro.status >= 500
+  const conferir = (id) => recarregar(id).catch(() => {})
   async function recarregar(id) {
     const tinhaMarca = Boolean(pedidoDe(id)?.resumoNaoEnviado)
     const lido = pedidoDaApi(await obterPedido(id), pedidoDe(id))
@@ -248,9 +251,10 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
         },
         (erro) => {
           const naoRegistrado = erro.codigo === 'pedido_ja_pago' ? erro.message
-            : !erro.status || erro.status >= 500
-              ? 'Não foi possível confirmar o registro do pagamento. Confira o pedido antes de tentar novamente.'
+            : semConfirmacao(erro)
+              ? 'Não foi possível confirmar o registro do pagamento. Conferindo o pedido; veja o saldo antes de tentar novamente.'
               : `Pagamento não registrado: ${erro.message}`
+          if (!cancelarLink && semConfirmacao(erro)) { avisar(naoRegistrado); return conferir(id).then(() => ({ erro: naoRegistrado })) }
           const recusar = (mensagem) => { avisar(mensagem); return { erro: mensagem } }
           if (!cancelarLink) return recusar(naoRegistrado)
           // O link pode já ter sido cancelado: a tela mostra o pedido como o EasyStok ficou. Sem
@@ -299,6 +303,11 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
     return umaPorConversa(id, 'desfazer', () => desfazerPagamentoManual(pedidoCriado(id), motivo, pagamentoId).then(
       () => { limparAviso(); return recarregar(id).catch(() => avisar('Pagamento desfeito. Atualizando a tela…')) },
       (erro) => {
+        if (semConfirmacao(erro)) {
+          const mensagem = 'Não foi possível confirmar se o pagamento foi desfeito. Conferindo o pedido.'
+          avisar(mensagem)
+          return conferir(id).then(() => ({ erro: mensagem }))
+        }
         const mensagem = `Pagamento não desfeito: ${erro.message}`
         avisar(mensagem)
         return { erro: mensagem }
@@ -324,7 +333,10 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
         try {
           await cancelarPedido(pedidoCriado(id), motivo.trim())
         } catch (erro) {
-          avisar(`Não foi possível confirmar o cancelamento: ${erro.message}`)
+          if (semConfirmacao(erro)) {
+            avisar('Não foi possível confirmar o cancelamento. Conferindo o pedido.')
+            await conferir(id)
+          } else avisar(`Não foi possível confirmar o cancelamento: ${erro.message}`)
           return { erro: erro.message }
         }
         limparAviso()

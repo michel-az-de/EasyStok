@@ -520,6 +520,8 @@ body.pilot-app #cobrancaModal .msg-template-btn.active { background: var(--fill-
 body.pilot-app #cobrancaModal .cobranca-actions button { min-height: 52px; font-size: 16px; line-height: 1.4; }
 body.pilot-app #cobrancaModal .btn-share { background: var(--fill-basil); color: #fffaf2; }
 body.pilot-app #cobrancaModal .pilot-billing-whatsapp { flex-shrink: 0; width: 24px; height: 24px; }
+/* O resumo já oferece as próximas ações; o aviso flutuante não deve cobrir o PIX nem os botões. */
+body.pilot-app:has(#cobrancaModal.show) #actionToast { display: none; }
 
 /* Alertas participam do layout: o banner offline não pode cobrir o cabeçalho. */
 body.pilot-app { flex-direction: column; align-items: stretch; justify-content: flex-start; }
@@ -879,6 +881,7 @@ body.pilot-app #pilotHome .pilot-tile:nth-child(5) { animation-delay: var(--pilo
 body.pilot-app #pilotHome .pilot-tile:nth-child(6) { animation-delay: var(--pilot-fast); }
 @keyframes pilot-tile-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (hover: hover) and (pointer: fine) { body.pilot-app #pilotHome .pilot-tile:hover { translate: 0 -2px; box-shadow: 0 6px 18px #352d2510; } }
+@media (min-width: 768px) { body.pilot-app .pilot-home .pilot-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 359px) { body.pilot-app #pilotHome .pilot-home-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { body.pilot-app #pilotHome .pilot-tile:active { scale: 1; } body.pilot-app #pilotHome .pilot-tile:hover { translate: 0; } }
 body.pilot-app .pilot-home .pilot-connection { margin: 0 0 12px; padding: 0; border: 0; }

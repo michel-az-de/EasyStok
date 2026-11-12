@@ -14,7 +14,9 @@
     "contraste": "node ferramentas/verificar-contraste.mjs",
     "etiqueta": "node ferramentas/prova-2247-etiqueta-motor.mjs",
     "impressaoHonesta": "node ferramentas/prova-2377-impressao-honesta.mjs",
-    "qualidade": "npm run lint && npm run camadas && npm run gramatica && npm run reais && npm run contraste && npm run etiqueta && npm run impressaoHonesta && npm run build",
+    "escritas": "node ferramentas/prova-2379-escritas.mjs",
+    "caixa-ao-vivo": "node ferramentas/prova-2378-caixa-ao-vivo.mjs",
+    "qualidade": "npm run lint && npm run camadas && npm run gramatica && npm run reais && npm run contraste && npm run etiqueta && npm run impressaoHonesta && npm run caixa-ao-vivo && npm run escritas && npm run build",
     "agente": "node servidor/agente.mjs",
     "local": "npm run build && node servidor/agente.mjs"
   },

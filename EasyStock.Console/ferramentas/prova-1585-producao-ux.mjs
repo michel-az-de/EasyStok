@@ -208,7 +208,7 @@ await confere('quem está na tela é avisado quando o lote grava, e só enquanto
 await confere('o erro da linha traz o número do cartão e o nome do prato, sem chamar a API', async () => {
   const chamadas = montarFetch()
   const producao = criarProducaoDoDia()
-  assert.equal((await producao.produzir([linha(), linha({ nome: 'Lasanha', porcoes: 0 })])).erro, 'Prato 02 (Lasanha): Quantas porções saíram?')
+  assert.equal((await producao.produzir([linha(), linha({ nome: 'Lasanha', porcoes: 0 })])).erro, 'Prato 02 (Lasanha): Informe porções inteiras maiores que zero.')
   assert.equal((await producao.produzir([linha({ sku: '', nome: null })])).erro, 'Prato 01: Escolha o prato.')
   assert.equal((await producao.produzir([linha(), linha(), linha({ nome: 'Nhoque', pesoRealG: 900 })])).erro, 'Prato 03 (Nhoque): O peso real não fecha as porções.')
   assert.equal((await producao.produzir([])).erro, 'Adicione ao menos um prato.')
@@ -479,7 +479,7 @@ await confere('Insumos: o aviso sai no formulário que o causou; sem formulário
   botoes(t.arvore, 'Cadastrar insumo')[0].props.onClick()
   t.renderizar()
   // Cadastro com mínimo inválido: o aviso fica dentro do formulário, antes do botão, e nada é enviado.
-  andar(cadastro(), (n) => n.type === 'NomeInsumoPesquisado')[0].props.onChange(digitar('Massa'))
+  campos(cadastro(), 'CampoTexto', 'Nome do insumo')[0].props.onChange(digitar('Massa'))
   t.renderizar()
   campos(cadastro(), 'CampoTexto', 'Mínimo (opcional)')[0].props.onChange(digitar('1,5'))
   t.renderizar()
