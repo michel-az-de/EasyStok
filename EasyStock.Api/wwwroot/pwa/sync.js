@@ -1973,7 +1973,9 @@
     const limite = ctrl ? setTimeout(() => ctrl.abort(), 10000) : null;
     let resp;
     try {
-      resp = await fetch(API_BASE_URL + API_PREFIX + '/impressao', { method: 'GET', headers: baseHeaders(), signal: ctrl ? ctrl.signal : undefined });
+      // #2321: a carga chama antes do login Google; baseHeaders() então sai sem a chave e o servidor responde 401.
+      // A chave é a do pareamento, a mesma credencial do aparelho nas outras chamadas mobile.
+      resp = await fetch(API_BASE_URL + API_PREFIX + '/impressao', { method: 'GET', headers: { 'X-Device-Id': deviceId, 'X-Mobile-Api-Key': pareamento.apiKey }, signal: ctrl ? ctrl.signal : undefined });
     } finally { if (limite) clearTimeout(limite); }
     if (!resp || !resp.ok) return false;
     const corpo = await resp.json();
