@@ -113,7 +113,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
       {orientacoes.map((texto) => <p key={texto} className={css.aviso}>{texto}</p>)}
       <section aria-label="Custo estimado do rascunho">
         <p className={css.descricao}>{custos.total == null ? 'Custo incompleto: escolha os insumos e confira as quantidades, unidades e custos cadastrados.' : `Custo estimado da receita: ${moeda(custos.total)}`}
-          {custos.porRendimento != null && ` · ${moeda(custos.porRendimento)} por ${rotuloDoRendimento(unidade)}`}</p>
+          {custos.porRendimento != null && ` · ${moeda(custos.porRendimento)} por ${unidade === 'Un' ? 'porção' : rotuloDoRendimento(unidade)}`}</p>
       </section>
       <ul className={css.listaFormularios}>
         {linhas.map((l, i) => (

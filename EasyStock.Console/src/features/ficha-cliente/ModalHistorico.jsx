@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { BarraDeAbas } from '../../componentes/BarraDeAbas'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
@@ -7,6 +7,7 @@ import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { ehLead } from '../../dominio/conversa'
 import { enviosAutomaticos } from '../../dominio/automacao'
 import { diasEntre, quandoRelativo, resumoFinanceiro } from '../../dominio/cliente'
@@ -133,32 +134,29 @@ function AbaAtendimentos({ conversaId, atendimentos }) {
   )
 }
 
-function AbaNotas({ conversa, ocupado, aoOcupar }) {
+function AbaNotas({ conversa, ocupado, iniciarGravacao, texto, aoMudarTexto }) {
   const { salvarNota } = useAcoes()
-  const [texto, setTexto] = useState('')
   const [aviso, setAviso] = useState(null)
-  const salvando = useRef(false)
   const campo = useRef(null)
   const notas = conversa.cliente.notas
 
   async function salvar() {
-    if (!texto.trim() || salvando.current) return
-    salvando.current = true
+    if (!texto.trim()) return
+    const concluirGravacao = iniciarGravacao()
+    if (!concluirGravacao) return
     campo.current?.focus()
-    aoOcupar(true)
     setAviso(null)
     try {
       if (await salvarNota(conversa.id, texto.trim()) === false) {
         setAviso({ erro: true, texto: 'Sem confirmação da nota. Seu texto continua aqui. Confira a ficha antes de tentar de novo.' })
       } else {
-        setTexto('')
+        aoMudarTexto('')
         setAviso({ erro: false, texto: 'Nota salva.' })
       }
     } catch (erro) {
       setAviso({ erro: true, texto: erro.message || 'Não foi possível salvar a nota. Seu texto continua aqui.' })
     } finally {
-      salvando.current = false
-      aoOcupar(false)
+      concluirGravacao()
     }
   }
 
@@ -172,7 +170,7 @@ function AbaNotas({ conversa, ocupado, aoOcupar }) {
           ref={campo}
           readOnly={ocupado}
           aria-busy={ocupado}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => aoMudarTexto(e.target.value)}
           placeholder="Nunca chega ao cliente."
         />
         <Botao variante="primario" disabled={!texto.trim() || ocupado} onClick={salvar}>{ocupado ? 'Salvando…' : 'Salvar nota'}</Botao>
@@ -216,10 +214,16 @@ function AbaAutomaticas({ envios }) {
   )
 }
 
-export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido = false, aoOcupar }) {
+export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido = false, aoOcupar, aoMudarSujo }) {
   const id = useId()
   const [aba, setAba] = useState('pedidos')
-  const [salvandoNota, setSalvandoNota] = useState(false)
+  const chaveNota = `nota-cadastro:${conversa.clienteId ?? conversa.cadastroId ?? conversa.id}`
+  const [rascunhoNota, definirNota] = useRascunhoDoAjuste(chaveNota)
+  const [salvandoNota, iniciarGravacao] = useGravacaoDoAjuste(chaveNota)
+  const textoNota = rascunhoNota?.texto ?? ''
+  useEffect(() => { aoMudarSujo?.(Boolean(textoNota)) }, [aoMudarSujo, textoNota])
+  useEffect(() => { aoOcupar?.(salvandoNota) }, [aoOcupar, salvandoNota])
+  const fechar = () => { definirNota(null); aoFechar() }
   // #1586: o resumo de cada encerramento só existe na demonstração; no modo API o EasyStok não
   // guarda, e a aba ficaria sempre vazia.
   const { fonteApi } = useAtendimento()
@@ -264,14 +268,15 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido 
           <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />
         )}
         <div hidden={aba !== 'notas'}>
-          <AbaNotas conversa={conversa} ocupado={salvandoNota} aoOcupar={(ocupado) => { setSalvandoNota(ocupado); aoOcupar?.(ocupado) }} />
+          <AbaNotas conversa={conversa} ocupado={salvandoNota} iniciarGravacao={iniciarGravacao}
+            texto={textoNota} aoMudarTexto={(texto) => definirNota(texto ? { texto } : null)} />
         </div>
         {aba === 'automaticas' && <AbaAutomaticas envios={automaticas} />}
       </div>
     </>
   )
   if (embutido) return <section data-historico-cliente aria-label="Histórico do cliente">{conteudo}</section>
-  return <Modal titulo={`Histórico · ${conversa.nome}`} aoFechar={salvandoNota ? undefined : aoFechar}
-    largura="lg"
-    rodape={<Botao disabled={salvandoNota} onClick={aoFechar}>Fechar</Botao>}>{conteudo}</Modal>
+  return <Modal titulo={`Histórico · ${conversa.nome}`} aoFechar={salvandoNota ? undefined : fechar}
+    largura="lg" confirmarDescarte={Boolean(textoNota)}
+    rodape={<Botao disabled={salvandoNota} onClick={(evento) => evento.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))}>Fechar</Botao>}>{conteudo}</Modal>
 }

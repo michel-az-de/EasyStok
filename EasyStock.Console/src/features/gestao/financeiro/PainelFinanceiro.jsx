@@ -8,7 +8,7 @@ import { Vazio } from '../../../componentes/Vazio'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import { useConsultaFinanceira, listarContasFinanceiras, listarContasEmAberto, obterContaFinanceira, obterResumoFinanceiro, obterExtratoFinanceiro, obterRelatorioFinanceiro, listarCategoriasFinanceiras, listarCentrosFinanceiros, emitirContaFinanceira, cancelarContaFinanceira, estornarParcelaFinanceira, removerParcelaFinanceira, inativarCadastroFinanceiro, reativarCadastroFinanceiro } from '../../../aplicacao/useFinanceiroApi'
-import { STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
+import { STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, cancelamentoExigeEstorno, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
 import { moeda } from '../../../dominio/formato'
 import { avisoDeDevolucoesNoExtrato, nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { hashDoModulo } from '../../../dominio/modulos'
@@ -230,12 +230,13 @@ function ModalDetalheConta({ lado, id, cadastros, podeGerenciar, aoFechar, aoGra
   const atualizado = async () => { await Promise.all([consulta.recarregar(), aoGravar()]) }
   const confirmar = (titulo, descricao, acao, exigirMotivo = false, rotulos = {}) => setModal({ tipo: 'confirmar', titulo, descricao, acao, exigirMotivo, ...rotulos })
   const cancelada = conta?.status === 'Cancelada'
+  const motivoCancelamento = cancelamentoExigeEstorno(conta) ? `Estorne o ${palavras.registro} parcial antes de cancelar a conta.` : null
   return <Modal titulo={conta?.descricao ?? 'Detalhes da conta'} aoFechar={aoFechar} largura="min(900px, calc(100vw - 24px))">
     <EstadoFinanceiro consulta={consulta}>{conta && <div className={css.painel}>
       <div className={css.barra}><SituacaoConta status={statusDaConta(conta)} lado={lado} /><div className={css.acoes}>{podeGerenciar && <>
         {podeEditarConta(conta, podeGerenciar) && <Botao aria-haspopup="dialog" onClick={() => setModal({ tipo: 'editar' })}>Editar conta</Botao>}
         {conta.status === 'Rascunho' && <><Botao aria-haspopup="dialog" onClick={() => setModal({ tipo: 'parcela' })}>Adicionar parcela</Botao><Botao variante="primario" aria-haspopup="dialog" onClick={() => confirmar('Emitir conta', 'A conta emitida passa a compor os vencimentos do financeiro.', () => emitirContaFinanceira(lado, id))}>Emitir conta</Botao></>}
-        {!['Cancelada', 'Paga'].includes(conta.status) && <Botao aria-haspopup="dialog" onClick={() => confirmar('Cancelar conta', `A conta sai dos vencimentos e deixa de aceitar ${palavras.registros}. O que já foi ${palavras.feito.toLowerCase()} continua no histórico; para devolver um valor, estorne o registro na parcela. Escreva o motivo do cancelamento.`, (motivo) => cancelarContaFinanceira(lado, id, motivo), true, { salvar: 'Cancelar a conta', fechar: 'Voltar' })}>Cancelar conta</Botao>}
+        {!['Cancelada', 'Paga'].includes(conta.status) && <Botao aria-haspopup="dialog" disabled={Boolean(motivoCancelamento)} motivo={motivoCancelamento} onClick={() => confirmar('Cancelar conta', `A conta sai dos vencimentos e deixa de aceitar ${palavras.registros}. O que já foi ${palavras.feito.toLowerCase()} continua no histórico; para devolver um valor, estorne o registro na parcela. Escreva o motivo do cancelamento.`, (motivo) => cancelarContaFinanceira(lado, id, motivo), true, { salvar: 'Cancelar a conta', fechar: 'Voltar' })}>Cancelar conta</Botao>}
       </>}</div></div>
       <dl className={css.detalhes}>{cancelada
         ? <><div><dt>Valor lançado</dt><dd>{moeda(valorLancado(conta))}</dd></div><div><dt>Situação</dt><dd>Cancelada: nada mais a {lado}</dd></div></>

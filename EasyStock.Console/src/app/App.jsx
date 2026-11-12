@@ -598,7 +598,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   }, [temRascunhos])
   const sair = () => temRascunhos ? setConfirmandoSaida(true) : aoSair()
   const confirmacaoSaida = confirmandoSaida && <Modal titulo="Sair sem salvar os ajustes?"
-    descricao="Há ajustes não concluídos em Horários e mensagens. Você pode continuar trabalhando e voltar a eles. Sair descarta os rascunhos; uma gravação já enviada pode ser concluída. Confira os valores ao entrar novamente."
+    descricao="Há alterações ou notas não salvas nesta sessão. Você pode continuar trabalhando e voltar a elas. Sair descarta os rascunhos; uma gravação já enviada pode ser concluída. Confira os valores ao entrar novamente."
     aoFechar={() => setConfirmandoSaida(false)}
     rodape={<><Botao onClick={() => setConfirmandoSaida(false)}>Continuar trabalhando</Botao><Botao variante="texto" onClick={aoSair}>Sair e descartar ajustes</Botao></>} />
   // #1576: mensagens e pedidos já lidos ficam aqui enquanto a dona está no Hall, na Cozinha ou nas

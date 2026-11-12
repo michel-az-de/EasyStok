@@ -118,6 +118,9 @@ export const paginaValida = (pagina, total, tamanho = TAMANHO_PAGINA) => pagina 
 
 // A API só edita rascunho (C5) e, desde a #476, registrar pagamento exige gerenciar.
 export const podeEditarConta = (conta, podeGerenciar) => podeGerenciar === true && conta?.status === 'Rascunho'
+// #2360: Conta.Cancelar preserva as quitadas; Parcela.Cancelar exige estorno das parciais.
+export const cancelamentoExigeEstorno = (conta) => (conta?.parcelas ?? []).some((parcela) =>
+  !['Paga', 'Cancelada'].includes(parcela.status) && (parcela.valorPago > 0 || parcela.pagamentos?.some((pagamento) => pagamento.status === 'Confirmado')))
 export const podeRegistrarNaConta = (conta, podeGerenciar) => podeGerenciar === true && !['Rascunho', 'Cancelada'].includes(conta?.status) && Boolean(proximaParcela(conta ?? {}))
 
 // Visão geral leva à lista já filtrada: `#/m/financeiro/<lado>/<chip>`.

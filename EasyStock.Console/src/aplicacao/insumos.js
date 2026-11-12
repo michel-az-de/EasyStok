@@ -29,8 +29,8 @@ export const rotuloDaEmbalagem = ({ receitas = 0, porcoes = 0 }) =>
 const numeroOuNulo = (texto) => (String(texto ?? '').trim() === '' ? null : Number(String(texto).replace(',', '.')))
 
 // #2081 (E9): o custo segue a leitura do campo de dinheiro (`lerMoeda`, #1510): "1.500" é mil e
-// quinhentos, não 1,5 como antes. A vírgula é sempre a decimal e não arredonda para centavos, porque
-// o custo de um grama precisa de mais casas ("0,005").
+// quinhentos, não 1,5 como antes. A leitura não arredonda: a validação abaixo impede que o ERP
+// grave em centavos um custo diferente do que foi digitado.
 export function lerCusto(texto) {
   const limpo = String(texto ?? '').replace(/[R$\s]/g, '')
   if (limpo === '') return null
@@ -58,6 +58,7 @@ export function criarGestaoInsumos({ recarregar, aoErro }) {
   const validar = (minimo, custo) => {
     if (minimo != null && (!Number.isInteger(minimo) || minimo < 0)) return 'Mínimo em número inteiro, sem negativo.'
     if (custo != null && (!Number.isFinite(custo) || custo < 0)) return 'Custo inválido.'
+    if (custo != null && Math.round(custo * 100) / 100 !== custo) return 'Informe o custo com até duas casas decimais. O sistema salva valores em centavos.'
     return null
   }
 

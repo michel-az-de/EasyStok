@@ -111,7 +111,7 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
   return <FormularioFinanceiro titulo={conta ? 'Editar conta' : `Nova conta a ${lado}`} aoFechar={fechar} operacao={operacao} aoEnviar={salvar} valido={valido} motivo={motivo} digitado={digitado} salvar={travada ? `Registrar ${palavras.registro}` : 'Salvar'}>
     {travada && <output className={css.aviso}>A conta já foi criada e aparece na lista. Falta só registrar o {palavras.registro}; para mudar a conta, feche e abra o detalhe.</output>}
     <fieldset disabled={travada} className={css.campos}>
-    <CampoTexto rotulo="Descrição" required maxLength={300} erro={descricao && !descricao.trim() ? 'Escreva a descrição da conta.' : null} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+    <CampoTexto rotulo="Descrição" required maxLength={200} dica="Até 200 caracteres." erro={descricao && !descricao.trim() ? 'Escreva a descrição da conta.' : null} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
     <div className={css.grade}>
       <div className={css.categoria}>
         <CampoSelecao rotulo="Categoria financeira" required value={categoria} onChange={(e) => setCategoria(e.target.value)} opcoes={[{ valor: '', rotulo: 'Escolha a categoria' }, ...categorias.map((item) => ({ valor: item.id, rotulo: item.nome }))]} />

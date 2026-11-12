@@ -5,6 +5,7 @@ import { baixarPdf } from '../../componentes/pdfNoNavegador'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useResumoDoCliente } from '../../aplicacao/useResumoDoCliente'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
+import { useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { enviarFotoCliente, removerFotoCliente } from '../../aplicacao/fotoCliente'
 import { gerarFichaClientePdf } from '../../aplicacao/fichaClientePdf'
 import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
@@ -22,6 +23,8 @@ export function ModalCliente({ conversa, aoFechar, children }) {
   const [erro, setErro] = useState(null)
   // #2258 (auditoria T17, T18): o cadastro avisa quando há texto digitado e entrega o lugar do botão principal.
   const [cadastroSujo, setCadastroSujo] = useState(false)
+  const [notaSuja, setNotaSuja] = useState(false)
+  const [, definirNota] = useRascunhoDoAjuste(`nota-cadastro:${conversa.clienteId ?? conversa.cadastroId ?? conversa.id}`)
   const [rodapeDoCadastro, setRodapeDoCadastro] = useState(null)
   const [consultadaEm] = useState(() => new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }))
   const { cliente } = conversa
@@ -58,11 +61,12 @@ export function ModalCliente({ conversa, aoFechar, children }) {
 
   // O Fechar do rodapé passa pela mesma pergunta do Esc e do X (Modal.confirmarDescarte).
   const pedirFechamento = (evento) => evento.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
+  const fechar = () => { definirNota(null); aoFechar() }
 
   // Um só caminho para "texto não salvo": confirmarDescarte (a pergunta do Modal), o mesmo do resto do sistema.
   // O segurarFechamento da PR (que travava Esc e fundo sem perguntar) saiu: a pergunta já protege o digitado.
-  return <Modal titulo="Cadastro do cliente" largura="lg" className={css.modal} aoFechar={ocupado ? undefined : aoFechar}
-    confirmarDescarte={cadastroSujo}
+  return <Modal titulo="Cadastro do cliente" largura="lg" className={css.modal} aoFechar={ocupado ? undefined : fechar}
+    confirmarDescarte={cadastroSujo || notaSuja}
     rodape={<div className={css.acoes}>
       {!podeBaixarPdf && <small>{!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}
       <Botao variante="texto" disabled={ocupado} onClick={pedirFechamento}>Fechar</Botao>
@@ -82,7 +86,7 @@ export function ModalCliente({ conversa, aoFechar, children }) {
         alterandoFoto={alterandoFoto} /></div>
       <div className={css.historico}>
         <h3>Histórico e notas</h3>
-        <ModalHistorico conversa={conversa} historico={historico} agora={agora} embutido aoOcupar={setSalvandoNota} />
+        <ModalHistorico conversa={conversa} historico={historico} agora={agora} embutido aoOcupar={setSalvandoNota} aoMudarSujo={setNotaSuja} />
       </div>
     </article>
   </Modal>

@@ -9,7 +9,7 @@ public class ReposicaoFormViewModel
     public string? ProdutoId { get; set; }
     public string? ProdutoNome { get; set; }
     public string? VariacaoNome { get; set; }
-    public int EstoqueAtual { get; set; }
+    public decimal EstoqueAtual { get; set; }
 
     [Required(ErrorMessage = "Quantidade é obrigatória")]
     [Range(1, int.MaxValue, ErrorMessage = "Quantidade deve ser maior que zero")]

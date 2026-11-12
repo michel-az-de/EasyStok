@@ -349,7 +349,7 @@
                                         </svg>
                                         Repor
                                     </a>
-                                    <button @@click="openModal('@item.Id', '@(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(item.Produto?.Nome ?? item.Sku ?? ""))', @item.Qty, @(item.PrecoVendaSugerido?.Valor.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) ?? "null"))"
+                                    <button @@click="openModal('@item.Id', '@(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(item.Produto?.Nome ?? item.Sku ?? ""))', @item.Qty.ToString(System.Globalization.CultureInfo.InvariantCulture), @(item.PrecoVendaSugerido?.Valor.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) ?? "null"))"
                                             class="grid-action-btn grid-action-btn--warning"
                                             aria-label="Registrar saída de @(item.Produto?.Nome ?? item.Sku)">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
