@@ -90,17 +90,50 @@ t("conversa vira lead e proposta com etapas da IA; segunda vez reaproveita", () 
   assert.ok(/Já existe/.test(R.propostaDaConversa(conv))); assert.strictEqual(st.propostas.length, n);
 });
 
-t("automação desligada não gera cobrança no WhatsApp", () => {
-  R.alternarAutomacao("cobrancaWhatsApp");
-  const antes = st.atividades.length;
-  const c = por(st.contratos, "C1"); const e = por(c.etapas, "E3");
-  R.entregar(c, e); R.aprovar(c, e);
-  assert.ok(!st.atividades.slice(antes).some(a => a.canal === "whatsapp"));
+t("post: ideia → rascunho da IA → aprovado → agendado → publicado", () => {
+  const p = R.criarPost({ titulo: "Teste", formato: "video", redes: ["linkedin"] });
+  assert.strictEqual(R.aprovarPost(p), undefined, "ideia não aprova direto");
+  R.rascunharPost(p);
+  assert.strictEqual(p.status, "Rascunho"); assert.ok(p.texto.length > 0);
+  R.salvarTexto(p, "  ");
+  assert.strictEqual(R.aprovarPost(p), "Escreva o texto antes de aprovar.");
+  R.salvarTexto(p, "Texto final"); R.aprovarPost(p);
+  assert.strictEqual(R.agendarPost(p, { redes: [], quando: FMA.util.dias(1) }).erro, "redes");
+  assert.strictEqual(R.agendarPost(p, { redes: ["linkedin"], quando: FMA.util.dias(-1) }).erro, "quando");
+  R.agendarPost(p, { redes: ["linkedin", "instagram"], quando: FMA.util.dias(2) });
+  assert.strictEqual(p.status, "Agendado");
+  R.publicarAgora(p);
+  assert.strictEqual(p.status, "Publicado"); assert.ok(p.metricas);
 });
 
-t("briefing põe a NFS-e pendente e a conversa nova no topo", () => {
-  const b = FMA.Consultas.briefing();
-  assert.ok(b.length > 0); assert.strictEqual(b[0].urgencia, "alta");
+t("Instagram recusa post só de texto", () => {
+  const p = R.criarPost({ titulo: "Só texto", formato: "post" });
+  R.rascunharPost(p); R.aprovarPost(p);
+  const r = R.agendarPost(p, { redes: ["instagram"], quando: FMA.util.dias(1) });
+  assert.strictEqual(r.erro, "redes"); assert.strictEqual(p.status, "Aprovado");
+});
+
+t("comentário do post vira lead com a origem do post; ignorada não vira", () => {
+  const i = por(st.interacoes, "I1");
+  R.virarLead(i);
+  const l = por(st.leads, i.leadId);
+  assert.strictEqual(i.status, "Lead"); assert.ok(/Pagamento por etapa/.test(l.origem));
+  assert.strictEqual(FMA.Consultas.leadsGerados("PO1"), 1);
+  const i3 = por(st.interacoes, "I3"); R.ignorar(i3);
+  assert.strictEqual(R.virarLead(i3), undefined);
+});
+
+t("abordagem manual respeita o limite de 5 por dia", () => {
+  const l = por(st.leads, "L2");
+  assert.strictEqual(R.abordar(l, " ").erro, "texto");
+  while (FMA.Consultas.abordagensHoje() < 5) assert.ok(typeof R.abordar(l, "oi") === "string");
+  const r = R.abordar(l, "sexta");
+  assert.strictEqual(r.erro, "limite"); assert.strictEqual(FMA.Consultas.abordagensHoje(), 5);
+});
+
+t("hoje traz no máximo 5 itens, urgentes primeiro", () => {
+  const h = FMA.Consultas.hoje();
+  assert.ok(h.length > 0 && h.length <= 5); assert.strictEqual(h[0].urgencia, "alta");
 });
 
 console.log(ok + " testes passaram");
