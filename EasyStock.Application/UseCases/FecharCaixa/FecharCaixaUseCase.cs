@@ -42,6 +42,7 @@ public class FecharCaixaUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (cmd.ValorContado is { } contado && (contado < 0 || contado != decimal.Round(contado, 2)))
             throw new UseCaseValidationException("O valor contado deve ser positivo e ter até duas casas decimais.");
+        if (cmd.ValorContado is { } contadoMax) ValidacaoCaixa.ExigirValorMonetario(contadoMax, "O valor contado");
 
         var hoje = HorarioBrasil.Hoje();   // dia operacional em Brasilia (alinha com o card; BUG-09)
 
