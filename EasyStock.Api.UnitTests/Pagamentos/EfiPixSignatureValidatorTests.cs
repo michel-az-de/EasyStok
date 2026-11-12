@@ -41,13 +41,28 @@ public class EfiPixSignatureValidatorTests
     }
 
     [Fact]
-    public void Validar_HmacCorretoSemTimestamp_RetornaTrue()
+    public void Validar_HmacCorretoSemTimestamp_RetornaFalse()
     {
+        // #2370: sem timestamp não há anti-replay; o mesmo POST capturado valeria para sempre. Espelha o WebhookPixController.
         var v = BuildValidator();
         var body = "{\"pix\":[]}";
         var sig = ComputeHmac(Secret, body);
         var ok = v.Validar(body, new Dictionary<string, string?> { ["X-Efi-Signature"] = sig });
-        ok.Should().BeTrue();
+        ok.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Validar_TimestampInvalido_RetornaFalse()
+    {
+        var v = BuildValidator();
+        var body = "{}";
+        var sig = ComputeHmac(Secret, $"abc.{body}");
+        var ok = v.Validar(body, new Dictionary<string, string?>
+        {
+            ["X-Efi-Timestamp"] = "abc",
+            ["X-Efi-Signature"] = sig
+        });
+        ok.Should().BeFalse();
     }
 
     [Fact]
