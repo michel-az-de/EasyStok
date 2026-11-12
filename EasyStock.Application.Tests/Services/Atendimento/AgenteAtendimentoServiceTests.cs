@@ -675,6 +675,37 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task BlipDoLlmNaoEscala_TentaDeNovoUmaVezEResponde()
+    {
+        // #2285: uma queda de rede no POST do LLM não pode mandar a conversa para a dona; 1 nova tentativa antes de escalar.
+        VerificarConsulta("Seu pedido fica pronto por volta das 15h40.");
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new HttpRequestException("connection reset"),
+                _ => UsoFerramenta("consultar_pedido"), _ => Texto("Seu pedido fica pronto por volta das 15h40."));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeFalse();
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+        await _llm.Received(3).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LlmQueFalhaNasDuasTentativasEscalaSemTerceira()
+    {
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new HttpRequestException("fora do ar"));
+        _escalador.When(e => e.EscalarAsync(Arg.Any<Guid>(), Arg.Any<Conversa>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()))
+            .Do(ci => ci.Arg<Conversa>().Assumir(ci.Arg<DateTime>()));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _llm.Received(2).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task CancelamentoDoTurnoPropaga()
     {
         using var cts = new CancellationTokenSource();
