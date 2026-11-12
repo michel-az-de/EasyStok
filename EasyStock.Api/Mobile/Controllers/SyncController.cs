@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Security;
@@ -51,6 +52,10 @@ public class SyncController(
     private readonly IConfiguration _appConfig = appConfig;
     private readonly TimeProvider _relogio = relogio;
     private readonly ILogger<SyncController> _log = log;
+
+    // #2317 (SYNC-9): erro transitório no push volta para a fila; não é rejeição permanente.
+    public static bool EhErroTransitorio(Exception ex) =>
+        ex is DbUpdateException or DbException or TimeoutException or IOException;
 
     [HttpPost]
     public async Task<ActionResult<SyncPushResponse>> Push([FromBody] SyncPushRequest req)
@@ -155,6 +160,14 @@ public class SyncController(
                 _log.LogInformation(
                     "SyncMutation REJECTED conflict deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}: {Mensagem}",
                     req.DeviceId, empresaId, m.Type, m.Id, cex.Message);
+            }
+            // #2317 (SYNC-9): falha transitória (banco, timeout, rede) não entra em accepted nem em rejected;
+            // a mutação segue na fila do aparelho e volta no próximo envio.
+            catch (Exception ex) when (EhErroTransitorio(ex))
+            {
+                _log.LogWarning(ex,
+                    "SyncMutation erro transitorio deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}: sera reenviada",
+                    req.DeviceId, empresaId, m.Type, m.Id);
             }
             catch (Exception ex)
             {
