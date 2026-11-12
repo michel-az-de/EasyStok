@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Domain.Entities.Mobile;
@@ -106,6 +107,17 @@ public class SyncReversePullService(
                     DefaultValidityDays: espelho.DefaultValidityDays,
                     Cost: p.CustoReferencia?.Valor,
                     MinStock: p.QuantidadeMinima);
+                // O pull de mobile_products ja trouxe este espelho: mescla o cadastro do ERP
+                // e mantem o estoque do app, para nao mandar dois upserts do mesmo produto.
+                var idx = mutations.FindIndex(m => m.Type == "product.upsert"
+                    && m.Payload.TryGetProperty("id", out var id) && id.GetString() == espelho.Id);
+                if (idx >= 0)
+                {
+                    var doApp = mutations[idx].Payload.Deserialize<ProductDto>(SyncDtoConverters.JsonOpts);
+                    if (doApp is not null) dto = dto with { Stock = doApp.Stock };
+                    mutations[idx] = mutations[idx] with { Payload = SyncDtoConverters.Serialize(dto) };
+                    continue;
+                }
                 mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                     "product.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
             }

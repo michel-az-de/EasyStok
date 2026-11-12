@@ -125,5 +125,30 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         mutations.Single(m => m.Type == "product.upsert").Payload.GetProperty("stock").GetInt32().Should().Be(4);
     }
 
+    [Fact]
+    public async Task EspelhoJaNoPullDoMobile_NaoDuplicaUpsert_MesclaCadastroDoErpEMantemEstoqueDoApp()
+    {
+        var produto = ProdutoErpComEspelho("Nome novo do console", DateTime.UtcNow);
+        ItemEstoqueDoErp(produto.Id, null, 7m);
+        await _db.SaveChangesAsync();
+
+        var idEspelho = "mob-" + produto.Id;
+        var doMobile = new ProductDto(idEspelho, "Nome antigo", null, "extra", null, 10m, 3, false,
+            null, null, null, null, null);
+        var mutations = new List<MutationDto>
+        {
+            new("m1", "aparelho-a", "product.upsert", System.Text.Json.JsonSerializer.SerializeToElement(doMobile, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)), 123),
+        };
+
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, null);
+
+        var upsert = mutations.Should().ContainSingle(m => m.Type == "product.upsert"
+            && m.Payload.GetProperty("id").GetString() == idEspelho).Subject;
+        upsert.Id.Should().Be("m1");
+        upsert.DeviceId.Should().Be("aparelho-a");
+        upsert.Payload.GetProperty("name").GetString().Should().Be("Nome novo do console");
+        upsert.Payload.GetProperty("stock").GetInt32().Should().Be(3);
+    }
+
     public void Dispose() => _db.Dispose();
 }
