@@ -1,12 +1,14 @@
 import { FUNCIONAMENTO_PADRAO } from '../../dominio/funcionamento'
 import { REGRA_FIDELIDADE_PADRAO } from '../../dominio/fidelidade'
-import { FIDELIDADE_SEMENTE } from '../../infra/fidelidadeSemente'
+
 
 export const ATENDENTE = 'Thatiane'
 
 export function estadoInicial({
   conversas, catalogo, regras, modoAgente, som = true,
   funcionamento = FUNCIONAMENTO_PADRAO, lojaAberta = null,
+  // Exemplos de fidelidade vêm só da demonstração (#2391); produção nasce vazia.
+  fidelidadeSemente = { cupons: [], recompensas: [], sorteios: [] },
 }) {
   return {
     conversas,
@@ -72,10 +74,10 @@ export function estadoInicial({
     // cadastro (pontos GANHOS são derivados do histórico, não moram aqui, ver
     // dominio/fidelidade.js).
     fidelidade: {
-      cupons: FIDELIDADE_SEMENTE.cupons,
+      cupons: fidelidadeSemente.cupons,
       config: REGRA_FIDELIDADE_PADRAO,
-      recompensas: FIDELIDADE_SEMENTE.recompensas,
-      sorteios: FIDELIDADE_SEMENTE.sorteios,
+      recompensas: fidelidadeSemente.recompensas,
+      sorteios: fidelidadeSemente.sorteios,
       resgatesPorCadastro: {},
     },
   }
