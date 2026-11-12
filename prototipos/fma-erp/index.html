@@ -39,22 +39,22 @@
 
   <a class="pular" href="#conteudo">Pular para o conteúdo</a>
   <div class="app">
-    <nav class="trilho" aria-label="Principal">
-      <a class="trilho-marca" href="#/conteudo" aria-label="FMA Gestão, início"><img src="assets/fma-simbolo-reversa.svg" alt="" width="40" height="40"></a>
-      <a href="#/conteudo" data-rota="conteudo"><svg aria-hidden="true"><use href="#i-conteudo"/></svg><span>Conteúdo</span></a>
-      <a href="#/contatos" data-rota="contatos"><svg aria-hidden="true"><use href="#i-clientes"/></svg><span>Contatos</span><b class="contador" id="contador-contatos" hidden></b></a>
-      <a href="#/contratos" data-rota="contratos"><svg aria-hidden="true"><use href="#i-doc"/></svg><span>Contratos</span></a>
-      <a href="#/contas" data-rota="contas"><svg aria-hidden="true"><use href="#i-financeiro"/></svg><span>Contas</span></a>
-      <button id="restaurar" class="trilho-rodape" type="button" title="Restaurar dados de exemplo"><svg aria-hidden="true"><use href="#i-restaurar"/></svg><span>Restaurar</span></button>
-    </nav>
-
-    <div class="palco">
-      <header class="barra">
-        <span class="selo-prototipo" title="Nada aqui é real: contatos, valores, métricas e envios são simulados">Protótipo · dados fictícios</span>
-      </header>
-      <main id="conteudo" tabindex="-1"></main>
-    </div>
-
+    <header class="appbar">
+      <div class="appbar-dentro">
+        <a class="marca" href="#/conteudo" aria-label="FMA Gestão, início"><img src="assets/fma-simbolo-reversa.svg" alt="" width="32" height="32"><span>FMA Gestão</span></a>
+        <nav class="trilho" aria-label="Principal">
+          <a href="#/conteudo" data-rota="conteudo"><svg aria-hidden="true"><use href="#i-conteudo"/></svg><span>Conteúdo</span></a>
+          <a href="#/contatos" data-rota="contatos"><svg aria-hidden="true"><use href="#i-clientes"/></svg><span>Contatos</span><b class="contador" id="contador-contatos" hidden></b></a>
+          <a href="#/contratos" data-rota="contratos"><svg aria-hidden="true"><use href="#i-doc"/></svg><span>Contratos</span></a>
+          <a href="#/contas" data-rota="contas"><svg aria-hidden="true"><use href="#i-financeiro"/></svg><span>Contas</span></a>
+        </nav>
+        <div class="appbar-fim">
+          <span class="selo-prototipo" title="Nada aqui é real: contatos, valores, métricas e envios são simulados">Protótipo · dados fictícios</span>
+          <button id="restaurar" class="trilho-rodape" type="button" title="Restaurar dados de exemplo"><svg aria-hidden="true"><use href="#i-restaurar"/></svg><span class="sr">Restaurar dados de exemplo</span></button>
+        </div>
+      </div>
+    </header>
+    <main id="conteudo" tabindex="-1"></main>
   </div>
 
   <dialog id="dialogo" class="dialogo"></dialog>
