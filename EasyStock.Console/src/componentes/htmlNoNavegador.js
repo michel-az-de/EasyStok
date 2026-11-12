@@ -1,4 +1,5 @@
 import { prepararGeometriaImpresso } from './geometriaImpresso.js'
+import { medirPrint } from './medirPrint.js'
 
 // Manda imprimir uma página HTML pronta (#1632, impressos servidos pela API). A página já traz
 // o `@page` da folha; a bobina recebe aqui o comprimento medido (#1756), então o diálogo abre no
@@ -82,8 +83,9 @@ export function imprimirHtml(html, { sinal, semAbaNova = false } = {}) {
         if (raiz) paraImprimir = '<!DOCTYPE html>' + raiz.outerHTML
         quadro.contentWindow.addEventListener('afterprint', () => removerQuadro(quadro), { once: true })
         quadro.contentWindow.focus()
-        quadro.contentWindow.print()
-        concluir('dialogo')
+        // #2377: `print()` lento = diálogo humano; só a impressão sem clique distingue, a manual já pergunta "Saiu certo?".
+        const destino = medirPrint(() => quadro.contentWindow.print())
+        concluir(semAbaNova ? destino : 'dialogo')
       } catch (erro) {
         removerQuadro(quadro)
         if (sinal?.aborted) falhar(erro)
