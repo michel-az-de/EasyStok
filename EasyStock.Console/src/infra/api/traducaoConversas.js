@@ -117,12 +117,12 @@ function passagemDaApi(resumo) {
   }
 }
 
-// #2320: mensagem de outra atendente leva o nome (quando é quem está com a conversa) ou "Outra atendente".
+// #2320: mensagem de outra atendente leva o nome (quando é quem está com a conversa) ou "Equipe" (mesmo rótulo da #2338).
 function comAutoraDeOutra(m, resumo, usuario) {
   const por = m.enviadaPorUsuarioId
   if (m.dir !== 'out' || !por || !usuario?.id || por === usuario.id) return m
   const nome = por === resumo.assumidaPorUsuarioId ? resumo.assumidaPorNome?.trim() : ''
-  return { ...m, autoraNome: nome || 'Outra atendente' }
+  return { ...m, autoraNome: nome || 'Equipe' }
 }
 
 export function situacaoConversaDaApi(resumo, usuario) {

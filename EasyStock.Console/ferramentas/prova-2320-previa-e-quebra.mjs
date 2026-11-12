@@ -19,7 +19,7 @@ const previa = (por, usuario) => previaDaConversa(conversaDaApi(resumo, [saida(p
 
 assert.equal(previa('u-eu', { id: 'u-eu', nome: 'Eu' }).prefixo, 'Você: ', 'minha mensagem segue "Você:"')
 assert.equal(previa('u-ana', { id: 'u-eu', nome: 'Eu' }).prefixo, 'Ana: ', 'outra atendente identificada pelo nome')
-assert.equal(previa('u-bia', { id: 'u-eu', nome: 'Eu' }).prefixo, 'Outra atendente: ', 'outra atendente sem nome conhecido')
+assert.equal(previa('u-bia', { id: 'u-eu', nome: 'Eu' }).prefixo, 'Equipe: ', 'outra atendente sem nome conhecido sai como Equipe (mesmo rótulo da #2338)')
 assert.equal(previa(null, { id: 'u-eu', nome: 'Eu' }).prefixo, 'Você: ', 'sem autora gravada mantém "Você:"')
 
 const css = readFileSync(new URL('../src/features/atendimento/atendimento.module.css', import.meta.url), 'utf8')
