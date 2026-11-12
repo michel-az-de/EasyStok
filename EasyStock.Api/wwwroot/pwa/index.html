@@ -15474,8 +15474,13 @@ function descreverPerfil(p) {
   const c = tsplConfig(p);
   return 'TSPL ' + (c.continuo ? 'bobina contínua' : c.larguraMm + ' x ' + c.alturaMm + ' mm');
 }
+// #2329: pedido, teste e recibo saem na cabeça como a produção (SIZE da
+// cabeça, papel onde está, ajuste fino e SHIFT sempre). Sem o SHIFT, a Oasis
+// usava o do último trabalho.
 function tsplBytesDoCanvas(canvas, printer, copias) {
-  return window.cdbTspl.paraEtiqueta(canvas, Object.assign(tsplConfig(printer), { copias: copias || 1 }));
+  const T = window.cdbTspl, P = window.cdbPapeis;
+  const posicao = T.posicaoNaCabeca ? T.posicaoNaCabeca(printer, P && printer && printer.midia ? P.daMidia(printer.midia) : null) : {};
+  return T.paraEtiqueta(canvas, Object.assign(tsplConfig(printer), posicao, { copias: copias || 1 }));
 }
 // #2202 (F1): impressoras no modelo v2 (impressoras.js): cada papel tem a sua.
 // cdb-printer e cdb-printers seguem espelhadas para quem ainda as lê.
@@ -15698,15 +15703,10 @@ function calibrarImpressora(mac) {
 // o ajuste fino salvo. Moldura torta aqui = etiqueta torta.
 function alinharImpressora(mac) {
   const imp = impressoraDoAjuste(mac);
-  if (!imp || !acoesTspl(legadoDaV2(imp)).alinhar || !tsplAtual('alinhamento')) return;
+  if (!imp || !acoesTspl(legadoDaV2(imp)).alinhar || !tsplAtual('alinhamento') || !tsplAtual('posicaoNaCabeca')) return;
   const P = window.cdbPapeis || {};
   const papel = P.daMidia ? P.daMidia(imp.midia) : null;
-  const off = imp.offsetMm || {};
-  printViaBluetooth(window.cdbTspl.alinhamento(midiaTspl(imp), {
-    cabecaMm: Number(imp.cabecaMm) || P.CABECA_MM || 104,
-    posicao: (papel && papel.posicaoNaCabeca) || 'centro',
-    ajusteMm: { x: Number(off.x) || 0, y: Number(off.y) || 0 }
-  }), semBluetoothNoAjuste, null, legadoDaV2(imp));
+  printViaBluetooth(window.cdbTspl.alinhamento(midiaTspl(imp), window.cdbTspl.posicaoNaCabeca(imp, papel)), semBluetoothNoAjuste, null, legadoDaV2(imp));
 }
 // Ajuste fino: setas de 0,5 mm no cartão, salvo na impressora deste aparelho.
 function mmTexto(v) { return String(Math.abs(v)).replace('.', ','); }
@@ -23831,7 +23831,7 @@ window.cdbApp = {
 <script src="impressao-papeis.js?v=20261104b"></script>
 <script src="impressoras.js?v=20261105b"></script>
 <script src="etiqueta-resolver.js?v=20261112a"></script>
-<script src="etiqueta-canvas.js?v=20261105b"></script>
+<script src="etiqueta-canvas.js?v=20261112a"></script>
 <script>
 // #2247 (v3): o motor da etiqueta só desenha com a sua fonte. Carrega já no
 // boot (woff2 local, no cache do service worker) e refaz a miniatura de Ajustes.
@@ -23839,7 +23839,7 @@ window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.carregarFonte({ base: '
   if (ok && typeof redrawAjustesEtqThumb === 'function') { try { redrawAjustesEtqThumb(); } catch (e) { /* tela fechada */ } }
 });
 </script>
-<script src="impressora-tspl.js?v=20261105b"></script>
+<script src="impressora-tspl.js?v=20261112a"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
 <script src="upload-photos.js?v=20260514b"></script>

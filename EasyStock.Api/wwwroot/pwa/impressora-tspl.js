@@ -76,6 +76,20 @@
     return Math.round((cabecaMm - larguraMm) * PONTOS_MM / 2);
   }
 
+  // #2329: onde a impressora desenha (cabeça, papel na cabeça e ajuste fino).
+  // Produção, pedido, teste e alinhamento leem daqui, para todos saírem no
+  // mesmo lugar e o SHIFT nunca ficar herdado do último trabalho.
+  function posicaoNaCabeca(imp, papel) {
+    const i = imp || {};
+    const off = i.offsetMm || {};
+    const P = global.cdbPapeis || {};
+    return {
+      cabecaMm: Number(i.cabecaMm) || P.CABECA_MM || 104,
+      posicao: (papel && papel.posicaoNaCabeca) || 'centro',
+      ajusteMm: { x: Number(off.x) || 0, y: Number(off.y) || 0 }
+    };
+  }
+
   // Etiqueta completa: cabeçalho ASCII, BITMAP binário e PRINT.
   // opts.x fixa a coluna do BITMAP dentro do papel; sem ele, o desenho é centralizado no papel.
   // opts.cabecaMm (v3): SIZE ocupa a cabeça toda e o BITMAP começa onde o papel está
@@ -251,5 +265,5 @@
     return canvas;
   }
 
-  global.cdbTspl = { DPI, PONTOS_MM, etiqueta, doCanvas, paraEtiqueta, linhasParaCanvas, dadosBitmap, calibracao, alinhamento, ehContinuo };
+  global.cdbTspl = { DPI, PONTOS_MM, etiqueta, doCanvas, paraEtiqueta, linhasParaCanvas, dadosBitmap, calibracao, alinhamento, ehContinuo, posicaoNaCabeca };
 })(typeof window !== 'undefined' ? window : globalThis);
