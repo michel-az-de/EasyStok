@@ -9,6 +9,7 @@ import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { criarRecargaDeAcao } from './recargaDeAcao'
 import { criarEnvioComDesfazer, enviarPendentesAoSair } from './envioComDesfazer'
 import { criarChaveDeEnvio } from './chaveDeEnvio'
+import { criarGeracao } from './geracaoDeLeitura'
 import { receberEEntregar as receberNaPortaEEntregar } from './recebimentoNaEntrega'
 import { registrarPagamentoManual } from '../infra/api/pagamentosPedidoApi'
 
@@ -34,16 +35,7 @@ const comId = (conjunto, id, liga) => {
   return novo
 }
 
-// Geração da leitura (#1474): cada troca de dia abre uma geração nova; a resposta que chega de
-// uma geração velha (Hoje respondendo depois de Amanhã) é descartada em vez de sobrescrever.
-export function criarGeracao() {
-  let atual = 0
-  return {
-    nova: () => { atual += 1; return atual },
-    agora: () => atual,
-    vale: (geracao) => geracao === atual,
-  }
-}
+export { criarGeracao }
 
 // `data` (YYYY-MM-DD ou null para hoje, #1474): o dia da fila. Trocar o dia relê e não anima
 // a troca como se os pedidos tivessem entrado ou saído.

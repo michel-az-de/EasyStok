@@ -13,7 +13,8 @@
     "reais": "node ferramentas/verificar-reais.mjs && node ferramentas/prova-2080-reais.mjs",
     "contraste": "node ferramentas/verificar-contraste.mjs",
     "etiqueta": "node ferramentas/prova-2247-etiqueta-motor.mjs",
-    "qualidade": "npm run lint && npm run camadas && npm run gramatica && npm run reais && npm run contraste && npm run etiqueta && npm run build",
+    "escritas": "node ferramentas/prova-2379-escritas.mjs",
+    "qualidade": "npm run lint && npm run camadas && npm run gramatica && npm run reais && npm run contraste && npm run etiqueta && npm run escritas && npm run build",
     "agente": "node servidor/agente.mjs",
     "local": "npm run build && node servidor/agente.mjs"
   },
