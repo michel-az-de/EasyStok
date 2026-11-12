@@ -4,7 +4,7 @@
 (function (raiz) {
   "use strict";
 
-  var CHAVE = "fma-gestao-prototipo-v3";
+  var CHAVE = "fma-gestao-prototipo-v4";
   var HOJE = new Date(); HOJE.setHours(0, 0, 0, 0);
 
   // ---------- utilidades ----------
@@ -88,7 +88,7 @@
       lembretes: [
         { id: "M1", texto: "Follow-up da proposta P1 (Alfa Logística)", alvo: "#/propostas/P1", chave: "followup:P1", quando: dias(0), status: "Pendente" },
         { id: "M2", texto: "Emitir e anexar NFS-e da etapa E2 (Delta Educação)", alvo: "#/contratos/C1", chave: "nfse:E2", quando: dias(0), status: "Pendente" },
-        { id: "M3", texto: "Parcela R2 vence em 3 dias: confirmar com o cliente", alvo: "#/financeiro", chave: "vencimento:R2", quando: dias(9), status: "Pendente" }
+        { id: "M3", texto: "Parcela R2 vence em 3 dias: confirmar com o cliente", alvo: "#/contas", chave: "vencimento:R2", quando: dias(9), status: "Pendente" }
       ],
       // Caixa de entrada unificada. Textos fictícios; a "ia" é o que o modelo devolveria (pré-calculado no protótipo).
       conversas: [
@@ -135,9 +135,38 @@
       atividades: [
         { em: dias(-12), canal: "whatsapp", texto: "Agradecimento enviado à Delta pelo pagamento da R1", alvo: "#/contratos/C1" },
         { em: dias(-4), canal: "email", texto: "Proposta P1 enviada por e-mail para Alfa Logística", alvo: "#/propostas/P1" },
-        { em: dias(-3), canal: "whatsapp", texto: "Aviso de parcela R2 emitida enviado à Delta", alvo: "#/financeiro" }
+        { em: dias(-3), canal: "whatsapp", texto: "Aviso de parcela R2 emitida enviado à Delta", alvo: "#/contas" }
       ],
-      automacoes: { propostaEmail: true, followupIa: true, cobrancaWhatsApp: true, lembreteNfse: true, agradecimento: true, triagemIa: true }
+      // Conteúdo: o centro da v4. Publicação real só por API oficial (Metricool); aqui é simulada.
+      posts: [
+        { id: "PO1", formato: "artigo", titulo: "Pagamento por etapa aprovada: por que cobro assim", redes: ["linkedin", "blog"], status: "Publicado", publicadoEm: dias(-6), agendadoPara: dias(-6),
+          texto: "Todo projeto de software que deu errado comigo tinha uma coisa em comum: o cliente pagava antes de ver.\n\nHoje eu divido o trabalho em etapas pequenas. Cada uma termina numa entrega que você testa. Só depois de aprovar, a parcela é cobrada e a NFS-e sai.\n\nParece detalhe de contrato. Na prática muda a conversa inteira: você para de comprar promessa e começa a comprar entrega.",
+          metricas: { alcance: 1840, reacoes: 63, comentarios: 9 } },
+        { id: "PO2", formato: "video", titulo: "Protótipo navegável primeiro: por que começo assim", redes: ["linkedin", "instagram"], status: "Agendado", agendadoPara: dias(1), publicadoEm: null,
+          texto: "Antes de escrever a primeira linha do sistema, eu entrego um protótipo que você clica. Em 60 segundos mostro um de verdade e o que ele evita: retrabalho, escopo que cresce sozinho e a frase \"não era isso que eu pedi\".", metricas: null },
+        { id: "PO3", formato: "carrossel", titulo: "3 sinais de que o sistema legado está cobrando juros", redes: ["linkedin", "instagram"], status: "Rascunho", agendadoPara: null, publicadoEm: null,
+          texto: "1. Toda mudança pequena leva semanas.\n2. Só uma pessoa sabe mexer.\n3. A planilha paralela virou o sistema de verdade.", metricas: null },
+        { id: "PO4", formato: "post", titulo: "IA no código, revisão humana na entrega", redes: ["linkedin"], status: "Ideia", agendadoPara: null, publicadoEm: null, texto: "",
+          iaTexto: "Uso IA para escrever código mais rápido. Não uso IA para decidir o que vai para o seu sistema.\n\nCada entrega passa por teste e por revisão minha antes de chegar até você. A velocidade é da ferramenta; a responsabilidade continua sendo de quem assina.", metricas: null },
+        { id: "PO5", formato: "artigo", titulo: "O que sistema financeiro ensina sobre projeto pequeno", redes: ["linkedin", "blog"], status: "Ideia", agendadoPara: null, publicadoEm: null, texto: "",
+          iaTexto: "Em sistema financeiro, um centavo errado é incidente. Esse rigor parece exagero para um projeto pequeno, mas três hábitos valem para qualquer tamanho: teste antes de mudar, registro de quem fez o quê, e nada vai para produção sem alguém olhar.", metricas: null }
+      ],
+      // Comentários e mensagens que vieram dos posts. A IA marca a intenção; o Felipe decide.
+      interacoes: [
+        { id: "I1", postId: "PO1", rede: "linkedin", tipo: "comentário", nome: "Patrícia", empresa: "Zeta Contábil", em: dias(-5), status: "Nova", leadId: null,
+          texto: "Faz sentido para um sistema interno pequeno? Hoje controlamos tudo em planilha.",
+          ia: { intencao: "Interesse comercial", interesse: "Sair da planilha para um sistema interno" } },
+        { id: "I2", postId: "PO1", rede: "linkedin", tipo: "mensagem", nome: "Otávio", empresa: "Eta Transportes", em: dias(-2), status: "Nova", leadId: null,
+          texto: "Li seu artigo. Temos um app de motorista que trava toda semana. Dá para conversar?",
+          ia: { intencao: "Pedido de conversa", interesse: "Estabilizar o app dos motoristas" } },
+        { id: "I3", postId: "PO1", rede: "linkedin", tipo: "comentário", nome: "Luiza", empresa: "", em: dias(-6), status: "Nova", leadId: null,
+          texto: "Ótimo texto, parabéns!", ia: { intencao: "Sem intenção comercial", interesse: "" } }
+      ],
+      // Mensagens de prospecção que o próprio Felipe envia. O sistema só registra e conta (até 5 por dia).
+      abordagens: [
+        { em: dias(0), leadId: "L2", texto: "Rafael, vi que a Beta Clínica abriu a segunda unidade." },
+        { em: dias(-1), leadId: "L1", texto: "Marina, separei a etapa 2 como a diretoria pediu." }
+      ]
     };
   }
 
@@ -188,9 +217,9 @@
       if (p.status !== "Rascunho") return;
       if (!p.etapas.length) return "Inclua ao menos uma etapa antes de enviar.";
       p.status = "Enviada"; p.enviadaEm = dias(0);
-      if (st.automacoes.propostaEmail) atividade("email", "Proposta " + p.id + " enviada em PDF para " + leadDe(p).empresa, "#/propostas/" + p.id);
+      atividade("email", "Proposta " + p.id + " enviada em PDF para " + leadDe(p).empresa, "#/propostas/" + p.id);
       lembrar("followup:" + p.id, "Follow-up da proposta " + p.id + " (" + leadDe(p).empresa + ")", "#/propostas/" + p.id, dias(3));
-      if (st.automacoes.followupIa) atividade("ia", "Follow-up da " + p.id + " agendado; a IA rascunha a mensagem em 3 dias", "#/propostas/" + p.id);
+      atividade("ia", "Follow-up da " + p.id + " agendado; a IA rascunha a mensagem em 3 dias", "#/propostas/" + p.id);
       return "Proposta enviada a " + leadDe(p).empresa + ". Follow-up agendado para daqui a 3 dias.";
     },
     recusarProposta: function (p) {
@@ -273,9 +302,9 @@
       st.receber.push(r); e.receberId = r.id;
       evento(c, "Etapa " + e.id + " aprovada; parcela " + r.id + " emitida");
       fechar("aprovacao:" + e.id);
-      if (st.automacoes.lembreteNfse) lembrar("nfse:" + e.id, "Emitir e anexar NFS-e da etapa " + e.id + " (" + clienteDe(c).nome + ")", "#/contratos/" + c.id, dias(0));
-      lembrar("vencimento:" + r.id, "Parcela " + r.id + " vence em 3 dias: confirmar com o cliente", "#/financeiro", dias(12));
-      if (st.automacoes.cobrancaWhatsApp) atividade("whatsapp", "Parcela " + r.id + " de " + brl(e.valor) + " avisada a " + clienteDe(c).nome + " com Pix", "#/financeiro");
+      lembrar("nfse:" + e.id, "Emitir e anexar NFS-e da etapa " + e.id + " (" + clienteDe(c).nome + ")", "#/contratos/" + c.id, dias(0));
+      lembrar("vencimento:" + r.id, "Parcela " + r.id + " vence em 3 dias: confirmar com o cliente", "#/contas", dias(12));
+      atividade("whatsapp", "Parcela " + r.id + " de " + brl(e.valor) + " avisada a " + clienteDe(c).nome + " com Pix", "#/contas");
       return "Etapa aprovada: parcela " + r.id + " de " + brl(e.valor) + " emitida e cliente avisado.";
     },
     // Invariante 5: serviço da nota = bruto da etapa; retenções reduzem o líquido.
@@ -296,7 +325,7 @@
       e.status = r && r.status === "Paga" ? "Paga" : "Faturada";
       evento(c, "NFS-e " + d.numero + " anexada à etapa " + e.id + (anterior ? " (substitui a " + anterior.numero + ")" : "") + (d.retencoes ? "; retenções de " + brl(d.retencoes) : ""));
       fechar("nfse:" + e.id);
-      lembrar("imposto:" + d.competencia, "Provisionar imposto da competência " + mes(d.competencia + "-01"), "#/financeiro", dias(5));
+      lembrar("imposto:" + d.competencia, "Provisionar imposto da competência " + mes(d.competencia + "-01"), "#/contas", dias(5));
       atividade("email", "NFS-e " + d.numero + " (XML e PDF) enviada a " + clienteDe(c).nome, "#/contratos/" + c.id);
       encerrarSeConcluido(c);
       return "NFS-e " + d.numero + " anexada e enviada ao cliente." + (d.retencoes ? " Líquido a receber: " + brl(r2(e.valor - d.retencoes)) + "." : "");
@@ -316,7 +345,7 @@
       if (r.status !== "Aberta") return;
       r.status = "Paga"; r.valorPago = r.valor; fechar("vencimento:" + r.id);
       var c = por(st.contratos, r.contratoId);
-      if (st.automacoes.agradecimento) atividade("whatsapp", "Agradecimento pelo pagamento da " + r.id + " enviado", "#/financeiro");
+      atividade("whatsapp", "Agradecimento pelo pagamento da " + r.id + " enviado", "#/contas");
       if (c) {
         var e = por(c.etapas, r.etapaId);
         evento(c, "Recebimento de " + brl(r.valor) + " da parcela " + r.id);
@@ -328,7 +357,7 @@
     },
     cobrar: function (r) {
       if (r.status !== "Aberta") return;
-      atividade("whatsapp", "Lembrete da parcela " + r.id + " (" + brl(r.valor) + ") com Pix enviado", "#/financeiro");
+      atividade("whatsapp", "Lembrete da parcela " + r.id + " (" + brl(r.valor) + ") com Pix enviado", "#/contas");
       return "Lembrete com Pix enviado pelo WhatsApp (simulado).";
     },
     criarPagar: function (d) {
@@ -342,7 +371,7 @@
     responder: function (conv, texto) {
       if (!texto) return;
       conv.mensagens.push({ de: "nos", em: dias(0), texto: texto }); conv.naoLida = false; conv.atualizadaEm = dias(0);
-      atividade(conv.canal, "Resposta enviada a " + conv.nome, "#/inbox/" + conv.id);
+      atividade(conv.canal, "Resposta enviada a " + conv.nome, "#/conversa/" + conv.id);
       return "Enviado por " + (conv.canal === "whatsapp" ? "WhatsApp" : "e-mail") + " (simulado).";
     },
     // Conversa vira lead e proposta com as etapas que a IA extraiu. Valores são sugestão: o Felipe revisa antes de enviar.
@@ -353,11 +382,65 @@
       if (aberta) { navegar("#/propostas/" + aberta.id); return "Já existe a proposta " + aberta.id + " para " + l.empresa + "."; }
       if (l.status === "Perdido") l.status = "Qualificado";
       if (l.status === "Ganho") return "Este contato já é cliente.";
-      atividade("ia", "IA montou a proposta de " + l.empresa + " a partir da conversa", "#/inbox/" + conv.id);
+      atividade("ia", "IA montou a proposta de " + l.empresa + " a partir da conversa", "#/conversa/" + conv.id);
       return Regras.criarProposta(l, conv.ia && conv.ia.etapas);
     },
-    alternarAutomacao: function (k) { st.automacoes[k] = !st.automacoes[k]; return st.automacoes[k] ? "Automação ligada." : "Automação desligada."; }
+
+    // ---------- conteúdo ----------
+    criarPost: function (d) {
+      var p = { id: novoId("PO"), formato: d.formato || "post", titulo: d.titulo, redes: d.redes && d.redes.length ? d.redes : ["linkedin"], status: "Ideia", agendadoPara: null, publicadoEm: null, texto: "", iaTexto: null, metricas: null };
+      st.posts.push(p); return p;
+    },
+    // A IA escreve o rascunho a partir do título. No protótipo o texto vem pronto (iaTexto) ou de um molde.
+    rascunharPost: function (p) {
+      if (p.status !== "Ideia") return;
+      p.texto = p.iaTexto || ("Rascunho sobre \"" + p.titulo + "\": comece pelo problema do cliente, mostre um caso e feche com o próximo passo.");
+      p.status = "Rascunho"; atividade("ia", "IA rascunhou \"" + p.titulo + "\"", "#/conteudo/" + p.id);
+      return "Rascunho pronto. Revise o texto antes de aprovar.";
+    },
+    salvarTexto: function (p, texto) { if (p.status !== "Rascunho" && p.status !== "Aprovado") return; p.texto = texto; if (p.status === "Aprovado") p.status = "Rascunho"; return "Texto salvo."; },
+    aprovarPost: function (p) {
+      if (p.status !== "Rascunho") return;
+      if (!String(p.texto || "").trim()) return "Escreva o texto antes de aprovar.";
+      p.status = "Aprovado"; return "Aprovado. Agora escolha quando publicar.";
+    },
+    // Instagram não publica só texto; agendamento nunca no passado.
+    agendarPost: function (p, d) {
+      if (p.status !== "Aprovado") return { erro: "status", msg: "Aprove o texto antes de agendar." };
+      var redes = d.redes || [];
+      if (!redes.length) return { erro: "redes", msg: "Escolha ao menos uma rede." };
+      if (!d.quando) return { erro: "quando", msg: "Escolha o dia." };
+      if (d.quando < dias(0)) return { erro: "quando", msg: "Escolha hoje ou um dia futuro." };
+      if (redes.indexOf("instagram") >= 0 && (p.formato === "post" || p.formato === "artigo")) return { erro: "redes", msg: "O Instagram não publica só texto: use vídeo ou carrossel, ou tire o Instagram." };
+      p.redes = redes; p.agendadoPara = d.quando; p.status = "Agendado";
+      atividade("metricool", "\"" + p.titulo + "\" agendado para " + data(d.quando), "#/conteudo/" + p.id);
+      return "Agendado para " + data(d.quando) + " (simulado pelo Metricool).";
+    },
+    desagendar: function (p) { if (p.status !== "Agendado") return; p.status = "Aprovado"; p.agendadoPara = null; return "Agendamento cancelado."; },
+    publicarAgora: function (p) {
+      if (p.status !== "Agendado") return;
+      p.status = "Publicado"; p.publicadoEm = dias(0); p.agendadoPara = dias(0); p.metricas = { alcance: 0, reacoes: 0, comentarios: 0 };
+      atividade("metricool", "\"" + p.titulo + "\" publicado em " + p.redes.join(", "), "#/conteudo/" + p.id);
+      return "Publicado (simulado).";
+    },
+    // ---------- contatos ----------
+    virarLead: function (i) {
+      if (i.status !== "Nova") return;
+      var post = por(st.posts, i.postId);
+      var l = Regras.criarLead({ empresa: i.empresa || i.nome, contato: i.nome, origem: "LinkedIn · " + (post ? post.titulo : "post"), interesse: i.ia.interesse || "a qualificar" });
+      i.status = "Lead"; i.leadId = l.id;
+      return i.nome + " virou lead.";
+    },
+    ignorar: function (i) { if (i.status !== "Nova") return; i.status = "Ignorada"; return "Interação arquivada."; },
+    abordar: function (l, texto) {
+      if (!String(texto || "").trim()) return { erro: "texto", msg: "Escreva a mensagem." };
+      if (Consultas.abordagensHoje() >= LIMITE_DIA) return { erro: "limite", msg: "Você já mandou " + LIMITE_DIA + " mensagens hoje. Volte amanhã." };
+      st.abordagens.push({ em: dias(0), leadId: l.id, texto: texto });
+      if (l.status === "Novo") l.status = "Qualificado";
+      return "Registrado: " + Consultas.abordagensHoje() + " de " + LIMITE_DIA + " hoje. Envie você mesmo pelo LinkedIn.";
+    }
   };
+  var LIMITE_DIA = 5;
   function encerrarSeConcluido(c) {
     if (c.status === "Vigente" && c.etapas.every(function (e) { return e.status === "Paga" && e.notaId; })) {
       c.status = "Encerrado"; evento(c, "Todas as etapas pagas e com NFS-e: contrato encerrado");
@@ -373,85 +456,35 @@
     },
     aReceber: function () { return st.receber.filter(function (r) { return r.status === "Aberta"; }); },
     aPagar: function () { return st.pagar.filter(function (g) { return g.status === "Aberta"; }); },
-    // Projeção de caixa: saldo acumulado dia a dia pelos vencimentos em aberto (janela de n dias).
-    projecao: function (n) {
-      var pontos = [], saldo = 0;
-      for (var i = 0; i <= n; i++) {
-        var d = dias(i);
-        st.receber.forEach(function (r) { if (r.status === "Aberta" && (i === 0 ? r.vencimento <= d : r.vencimento === d)) saldo += r.valor; });
-        st.pagar.forEach(function (g) { if (g.status === "Aberta" && (i === 0 ? g.vencimento <= d : g.vencimento === d)) saldo -= g.valor; });
-        pontos.push({ d: d, v: saldo });
-      }
-      return pontos;
-    },
-    // Coluna do funil para cada negócio: Lead → Proposta → Assinatura → Execução → Concluído.
-    funil: function () {
-      var cards = [];
-      st.leads.forEach(function (l) {
-        if (l.status === "Novo" || l.status === "Qualificado") cards.push({ col: "lead", tipo: "lead", id: l.id, nome: l.empresa, sub: l.interesse, valor: null, lead: l });
-      });
-      st.propostas.forEach(function (p) {
-        if (p.status === "Rascunho" || p.status === "Enviada") cards.push({ col: "proposta", tipo: "proposta", id: p.id, nome: leadDe(p).empresa, sub: p.id + " v" + p.versao + " · " + (p.status === "Rascunho" ? "rascunho" : "enviada"), valor: totalProposta(p), p: p });
-      });
-      st.contratos.forEach(function (c) {
-        var col = c.status === "AguardandoAssinatura" ? "assinatura" : c.status === "Vigente" ? "execucao" : c.status === "Encerrado" ? "concluido" : null;
-        if (!col) return;
-        var pagas = c.etapas.filter(function (e) { return e.status === "Paga"; }).length;
-        cards.push({ col: col, tipo: "contrato", id: c.id, nome: clienteDe(c).nome, sub: c.id + " · " + pagas + "/" + c.etapas.length + " etapas pagas", valor: soma(c.etapas, function (e) { return e.valor; }), c: c });
-      });
-      return cards;
-    },
-    // O que pede o Felipe hoje, em ordem: o "briefing" que a IA monta na abertura.
-    briefing: function () {
+    abordagensHoje: function () { return st.abordagens.filter(function (a) { return a.em === dias(0); }).length; },
+    limiteDia: function () { return LIMITE_DIA; },
+    leadsGerados: function (postId) { return st.interacoes.filter(function (i) { return i.postId === postId && i.status === "Lead"; }).length; },
+    // O que pede o Felipe hoje, no máximo 5 itens, em ordem de urgência.
+    hoje: function () {
       var itens = [];
+      st.interacoes.filter(function (i) { return i.status === "Nova" && i.ia.intencao !== "Sem intenção comercial"; }).forEach(function (i) {
+        itens.push({ area: "contatos", titulo: i.nome + (i.empresa ? " (" + i.empresa + ")" : "") + " " + (i.tipo === "mensagem" ? "mandou mensagem" : "comentou"), det: "“" + i.texto + "”", alvo: "#/contatos", acao: "Responder", urgencia: "alta" });
+      });
       st.conversas.filter(function (c) { return c.naoLida; }).forEach(function (c) {
-        itens.push({ tipo: "conversa", canal: c.canal, titulo: c.nome + ": " + (c.ia ? c.ia.intencao.toLowerCase() : "mensagem nova"), det: c.ia ? c.ia.resumo[c.ia.resumo.length - 1] : "", alvo: "#/inbox/" + c.id, acao: "Abrir conversa", urgencia: c.ia ? c.ia.urgencia : "média" });
+        itens.push({ area: "contatos", titulo: c.nome + ": " + (c.ia ? c.ia.intencao.toLowerCase() : "mensagem nova"), det: c.ia ? c.ia.resumo[c.ia.resumo.length - 1] : "", alvo: "#/conversa/" + c.id, acao: "Abrir", urgencia: "alta" });
       });
       Consultas.pendentesNota().forEach(function (x) {
-        itens.push({ tipo: "nfse", canal: "sistema", titulo: "Emitir NFS-e da " + x.e.id + " (" + clienteDe(x.c).nome + ")", det: brl(x.e.valor) + " aprovada em " + data(x.e.aprovadaEm) + "; o cliente espera a nota para pagar", alvo: "#/contratos/" + x.c.id, acao: "Anexar nota", urgencia: "alta" });
+        itens.push({ area: "contratos", titulo: "Anexar NFS-e da " + x.e.id + " (" + clienteDe(x.c).nome + ")", det: brl(x.e.valor) + " aprovado; o cliente espera a nota para pagar", alvo: "#/contratos/" + x.c.id, acao: "Anexar", urgencia: "alta" });
       });
-      st.propostas.filter(function (p) { return p.status === "Enviada"; }).forEach(function (p) {
-        var n = -diasAte(p.enviadaEm);
-        if (n >= 3) itens.push({ tipo: "followup", canal: "ia", titulo: "Follow-up da " + p.id + " (" + leadDe(p).empresa + ")", det: "Enviada há " + n + " dias; rascunho pronto", alvo: "#/propostas/" + p.id, acao: "Ver rascunho", urgencia: "média" });
+      st.posts.filter(function (p) { return p.status === "Agendado" && diasAte(p.agendadoPara) <= 1; }).forEach(function (p) {
+        itens.push({ area: "conteudo", titulo: "“" + p.titulo + "” sai " + (diasAte(p.agendadoPara) === 0 ? "hoje" : "amanhã"), det: p.redes.join(" e "), alvo: "#/conteudo/" + p.id, acao: "Revisar", urgencia: "média" });
       });
       Consultas.aPagar().filter(function (g) { return diasAte(g.vencimento) < 0; }).forEach(function (g) {
-        itens.push({ tipo: "atraso", canal: "sistema", titulo: g.descricao + " está vencida", det: brl(g.valor) + " desde " + data(g.vencimento), alvo: "#/financeiro", acao: "Pagar", urgencia: "alta" });
+        itens.push({ area: "contas", titulo: g.descricao + " vencida", det: brl(g.valor) + " desde " + data(g.vencimento), alvo: "#/contas", acao: "Pagar", urgencia: "alta" });
       });
       var ordem = { alta: 0, "média": 1, baixa: 2 };
-      return itens.sort(function (a, b) { return ordem[a.urgencia] - ordem[b.urgencia]; });
+      return itens.sort(function (a, b) { return ordem[a.urgencia] - ordem[b.urgencia]; }).slice(0, 5);
     }
   };
 
-  // Copiloto simulado: responde sobre o estado com regras fixas. No sistema real, a pergunta e um resumo do
-  // estado vão ao Claude pelo AnthropicMessagesClient que o EasyStok já tem.
-  function perguntar(q) {
-    var t = String(q || "").toLowerCase();
-    if (/receb|caixa|entrar|saldo/.test(t)) {
-      var ar = Consultas.aReceber(), ap = Consultas.aPagar();
-      var proj = Consultas.projecao(30);
-      return "Você tem " + brl(soma(ar, function (r) { return r.valor; })) + " a receber em " + ar.length + " parcela(s) e " + brl(soma(ap, function (g) { return g.valor; })) + " a pagar. Projeção de caixa em 30 dias: " + brl(proj[proj.length - 1].v) + ". " + (Consultas.pendentesNota().length ? "A parcela da Delta só entra depois da NFS-e: é o que mais destrava caixa agora." : "");
-    }
-    if (/venc|atras|pagar/.test(t)) {
-      var v = Consultas.aPagar().filter(function (g) { return diasAte(g.vencimento) <= 7; });
-      return v.length ? "Vence em até 7 dias: " + v.map(function (g) { return g.descricao + " (" + brl(g.valor) + ", " + data(g.vencimento) + ")"; }).join("; ") + "." : "Nada vence nos próximos 7 dias.";
-    }
-    if (/follow|alfa|rascunh/.test(t)) {
-      return "Rascunho para a Alfa Logística:\n\n\"Oi Marina! Separei a Etapa 2 em duas entregas, como a diretoria pediu: painel e relatórios, cada uma com aprovação e pagamento próprios. Segue a versão 2. Se fizer sentido, já reservo o início para a próxima segunda.\"";
-    }
-    if (/proposta|funil|negoc/.test(t)) {
-      var abertas = st.propostas.filter(function (p) { return p.status === "Enviada" || p.status === "Rascunho"; });
-      return abertas.length + " proposta(s) em aberto somando " + brl(soma(abertas, totalProposta)) + ". " + st.conversas.filter(function (c) { return c.naoLida && c.ia && c.ia.intencao === "Pedido de proposta"; }).map(function (c) { return c.nome + " pediu proposta e ainda não tem uma."; }).join(" ");
-    }
-    if (/nota|nfs/.test(t)) {
-      var pn = Consultas.pendentesNota();
-      return pn.length ? pn.length + " etapa(s) aprovada(s) sem NFS-e: " + pn.map(function (x) { return x.e.id + " da " + clienteDe(x.c).nome + " (" + brl(x.e.valor) + ")"; }).join(", ") + "." : "Todas as etapas aprovadas têm NFS-e.";
-    }
-    return "No protótipo eu respondo sobre caixa, vencimentos, propostas, notas e follow-ups. Na versão real a pergunta vai ao Claude com o contexto do seu negócio.";
-  }
-
   var api = {
     carregar: carregar, salvar: salvar, restaurar: restaurar, estado: function () { return st; }, semente: semente,
-    Regras: Regras, Consultas: Consultas, perguntar: perguntar,
+    Regras: Regras, Consultas: Consultas,
     util: { dias: dias, brl: brl, data: data, mes: mes, diasAte: diasAte, soma: soma, por: por, lerValor: lerValor, totalProposta: totalProposta, leadDe: leadDe, clienteDe: clienteDe, conversaDoLead: conversaDoLead },
     lerValor: lerValor, navegar: null
   };
