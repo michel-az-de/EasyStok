@@ -54,6 +54,7 @@ public class CaixaController(
         {
             EmpresaId = emp,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            RegistradoPorNome = NomeDaSessao(),
             // Origem server-side (trilha de auditoria), NUNCA do body — o caminho mobile
             // legitimo abre caixa via MobileCashController. #766
             Origem = "web",
@@ -126,6 +127,7 @@ public class CaixaController(
         {
             EmpresaId = emp,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            RegistradoPorNome = NomeDaSessao(),
             // Origem server-side, NUNCA do body: origem="mobile" no corpo burlaria as
             // guardas FIN-003 (metodo/justificativa + anti-caixa-negativo), que so sao
             // puladas no caminho mobile legitimo (MobileCashController seta "mobile"). #766
@@ -164,5 +166,12 @@ public class CaixaController(
         var result = await listarFechUseCase.ExecuteAsync(new ListarFechamentosCaixaQuery(
             emp, p, sz, desde, ate));
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
+    }
+
+    // A coluna do autor aceita 120 caracteres; o nome da sessão, 150.
+    private string? NomeDaSessao()
+    {
+        var nome = User?.FindFirst("nome")?.Value;
+        return nome is { Length: > 120 } ? nome[..120] : nome;
     }
 }
