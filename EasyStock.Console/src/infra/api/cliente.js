@@ -2,6 +2,7 @@ import { API_BASE } from '../fonteDados'
 import { atualizarTokens, empresaDoToken, gravarSessao, gravarSessaoNativa, identidadeDaSessao, lerSessao, limparSessao } from './sessao'
 import { obterSessaoNativa, temSessaoNativa } from '../sessaoNativa'
 import { combinarSinais } from './sinais'
+import { MENSAGEM_ESCRITA_SEM_RESPOSTA, MENSAGEM_LEITURA_SEM_RESPOSTA, prazoDaChamada } from './prazo'
 
 // Erro de chamada à API com o que a tela precisa para falar com a dona:
 // status HTTP, código da API (`error.code` ou `erro`), mensagem legível e o detalhe
@@ -107,10 +108,11 @@ const comoJson = (texto) => {
 // `arquivo`: binário fora do envelope (mídia da conversa, #1287); devolve o Blob.
 // `chave` (#1491): Idempotency-Key das rotas que criam algo caro de duplicar (produção, pedido).
 // #1565: leitura sem prazo ficava pendurada em rede ruim; a polling de 5 s parava calada e as de intervalo
-// fixo empilhavam requisição. Arquivo (mídia, PDF) pode demorar e fica sem prazo, como as escritas.
+// fixo empilhavam requisição. Arquivo (mídia, PDF) pode demorar e fica sem prazo.
+// #2379: a escrita também tem prazo (`prazo.js`) e a mensagem pede para conferir antes de repetir.
 // O prazo estourado tem código próprio: a internet pode estar lá, então não é a queda que liga o papel.
-const PRAZO_DE_LEITURA_MS = 20000
-const semResposta = () => new ErroApi(0, 'SEM_RESPOSTA', 'O EasyStok demorou a responder.')
+const semResposta = (metodo) => new ErroApi(0, 'SEM_RESPOSTA',
+  metodo === 'GET' ? MENSAGEM_LEITURA_SEM_RESPOSTA : MENSAGEM_ESCRITA_SEM_RESPOSTA)
 
 export async function chamarApi(caminho, {
   metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null, keepalive = false,
@@ -121,7 +123,8 @@ export async function chamarApi(caminho, {
     throw new ErroApi(401, 'SESSAO_ALTERADA', 'A sessão foi encerrada ou trocada.')
   }
   // Conta a partir daqui: a renovação da sessão não gasta o prazo da leitura.
-  const prazo = (!sinal || prazoComCancelamento) && metodo === 'GET' && !arquivo ? AbortSignal.timeout(PRAZO_DE_LEITURA_MS) : null
+  const ms = prazoDaChamada({ metodo, arquivo, keepalive, formulario, sinal, prazoComCancelamento })
+  const prazo = ms ? AbortSignal.timeout(ms) : null
   const cabecalhos = { Accept: arquivo ? '*/*' : 'application/json' }
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
   if (chave) cabecalhos['Idempotency-Key'] = chave
@@ -139,7 +142,7 @@ export async function chamarApi(caminho, {
       keepalive: keepalive || undefined,
     })
   } catch {
-    if (prazo?.aborted && !sinal?.aborted) throw semResposta()
+    if (prazo?.aborted && !sinal?.aborted) throw semResposta(metodo)
     throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
   }
   if (resposta.ok && arquivo) return resposta.blob()
@@ -148,7 +151,7 @@ export async function chamarApi(caminho, {
     bruto = await resposta.text()
   } catch {
     // Cortou no meio do corpo: mesmo erro de quando a resposta nem chegou.
-    if (prazo?.aborted && !sinal?.aborted) throw semResposta()
+    if (prazo?.aborted && !sinal?.aborted) throw semResposta(metodo)
     throw new ErroApi(0, 'SEM_CONEXAO', 'Sem conexão com o EasyStok.')
   }
   if (resposta.ok && texto) return bruto

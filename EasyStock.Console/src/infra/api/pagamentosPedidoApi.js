@@ -4,7 +4,9 @@ import { lerSessao } from './sessao'
 // Baixa à mão do pedido (`POST /api/pedidos/{id}/pagamentos`): o "Marcar pago" do Balcão e, desde a
 // J2 (#1990), o "Recebi R$ X" das Entregas. Um lugar só para a rota e o corpo.
 // Com a `chave` (Idempotency-Key), repetir logo depois de uma queda não lança duas vezes.
+// `keepalive` (#2379): o "Recebi" pendente sai ao esconder ou fechar a aba (`enviarPendentesAoSair`); sem
+// ele o POST era cancelado e o dinheiro recebido ficava sem registro.
 export const registrarPagamentoManual = (pedidoId, valor, metodo, chave = null) =>
   chamarApi(`/api/pedidos/${pedidoId}/pagamentos`, {
-    metodo: 'POST', chave, corpo: { empresaId: lerSessao()?.empresa?.id, pedidoId, valor, metodo },
+    metodo: 'POST', chave, keepalive: true, corpo: { empresaId: lerSessao()?.empresa?.id, pedidoId, valor, metodo },
   })
