@@ -52,10 +52,9 @@ git -C "$REPO" archive "$SHA" EasyStock.Console | tar -x -C "$TMP"
 (
   cd "$TMP/EasyStock.Console"
   npm ci --no-audit --no-fund --loglevel=error >/dev/null
-  VITE_FONTE_DADOS=api VITE_API_BASE= npm run build >/dev/null
+  CONSOLE_SHA="$SHA" VITE_FONTE_DADOS=api VITE_API_BASE= npm run build >/dev/null
 )
 DIST="$TMP/EasyStock.Console/dist"
-sed -i "0,/<head>/s##<head><meta name=\"easystok-console-sha\" content=\"$SHA\">#" "$DIST/index.html"
 printf '{"sha":"%s"}\n' "$SHA" > "$DIST/versao.json"
 
 # Desde a #2254 o JS fica em assets/ com hash no nome; as marcas são procuradas no dist inteiro.
