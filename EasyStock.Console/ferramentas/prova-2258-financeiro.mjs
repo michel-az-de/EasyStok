@@ -107,7 +107,7 @@ caso('F12: "+ Nova categoria" existe na escolha, só para quem gerencia categori
 caso('F15: opcionais marcados e erros no próprio campo', () => {
   assert.match(modais, /rotulo="Centro de custo \(opcional\)"/)
   assert.match(modais, /rotulo="Observações \(opcional\)"/)
-  assert.match(modais, /rotulo="Descrição" required maxLength=\{300\}[^>]*erro=/)
+  assert.match(modais, /rotulo="Descrição" required maxLength=\{200\}[^>]*erro=/)
 })
 
 caso('F14: erro do vencimento fica colado ao campo de vencimento', () => {

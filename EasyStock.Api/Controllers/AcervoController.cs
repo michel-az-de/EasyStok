@@ -71,25 +71,25 @@ public sealed class AcervoController(AcervoUseCase acervo, ICurrentUserAccessor 
     [RequestSizeLimit(AcervoUseCase.LimiteArquivo + 65536)]
     public async Task<IActionResult> Adicionar(IFormFile file, [FromForm] string dados, CancellationToken ct)
     {
-        if (file is null || file.Length == 0 || file.Length > AcervoUseCase.LimiteArquivo) return BadRequest("Envie uma imagem de até 6 MB.");
+        if (file is null || file.Length == 0 || file.Length > AcervoUseCase.LimiteArquivo) return DataBadRequest("Envie uma imagem de até 6 MB.");
         DadosImagem entrada;
         try { entrada = JsonSerializer.Deserialize<DadosImagem>(dados, new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? throw new JsonException(); }
-        catch (JsonException) { return BadRequest("Dados da imagem inválidos."); }
+        catch (JsonException) { return DataBadRequest("Dados da imagem inválidos."); }
         await using var stream = new MemoryStream(); await file.CopyToAsync(stream, ct);
         var bytes = stream.ToArray();
         // Tipo e assinatura antes de decodificar: GIF ou BMP eram decodificados inteiros na memória
         // só para depois serem recusados, e a recusa dizia "até 8.192 pixels" em vez do tipo aceito.
-        if (file.ContentType is not ("image/png" or "image/jpeg" or "image/webp")) return BadRequest("Use PNG, JPEG ou WebP.");
+        if (file.ContentType is not ("image/png" or "image/jpeg" or "image/webp")) return DataBadRequest("Use PNG, JPEG ou WebP.");
         try { EasyStock.Application.UseCases.GerenciarUploads.UploadSecurityValidator.EnsureContentMatchesDeclaredType(bytes, file.ContentType); }
-        catch (InvalidOperationException e) { return BadRequest(e.Message); }
+        catch (InvalidOperationException e) { return DataBadRequest(e.Message); }
         using var data = SkiaSharp.SKData.CreateCopy(bytes);
         using var codec = SkiaSharp.SKCodec.Create(data);
         if (codec is null || codec.Info.Width <= 0 || codec.Info.Height <= 0 ||
             codec.Info.Width > 8192 || codec.Info.Height > 8192 || (long)codec.Info.Width * codec.Info.Height > 32000000)
-            return BadRequest("Imagem inválida. Use até 8.192 pixels por lado e 32 megapixels.");
+            return DataBadRequest("Imagem inválida. Use até 8.192 pixels por lado e 32 megapixels.");
         using var bitmap = new SkiaSharp.SKBitmap(codec.Info);
         if (codec.GetPixels(bitmap.Info, bitmap.GetPixels()) != SkiaSharp.SKCodecResult.Success)
-            return BadRequest("Não foi possível decodificar a imagem completa.");
+            return DataBadRequest("Não foi possível decodificar a imagem completa.");
         return DataOk(await acervo.AdicionarAsync(usuario.EmpresaId, usuario.UsuarioId,
             entrada with { Largura = codec.Info.Width, Altura = codec.Info.Height }, file.ContentType, bytes, ct));
     }

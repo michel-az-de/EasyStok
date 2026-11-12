@@ -237,7 +237,7 @@ await confere('A5: perda sem custo é "sem custo", não R$ 0,00, e conta à part
 })
 
 // === E9: custo do insumo ================================================================
-await confere('E9: o custo lê "1.500" como mil e quinhentos e guarda as casas do grama', async () => {
+await confere('E9: o custo lê "1.500" como mil e quinhentos sem arredondar antes de validar', async () => {
   const { lerCusto, criarGestaoInsumos } = await import('../src/aplicacao/insumos.js')
   assert.equal(lerCusto('1.500'), 1500)
   assert.equal(lerCusto('1.500,25'), 1500.25)

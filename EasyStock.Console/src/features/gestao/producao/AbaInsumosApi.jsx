@@ -61,7 +61,7 @@ function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
         <Modal titulo={`Ajustar ${insumo.nome}`} aoFechar={ocupado ? undefined : () => { avisarEm(null); setEditando(false) }}>
         <form className={`${css.campos} ${css.formulario} ${css.ajusteInsumo}`} onSubmit={salvar}>
           <CampoTexto disabled={ocupado} inputMode="numeric" rotulo={`Mínimo (${un})`} aria-label={`Mínimo de ${insumo.nome}`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
-          <CampoTexto disabled={ocupado} inputMode="decimal" rotulo={`Custo por ${un} (R$)`} aria-label={`Custo de ${insumo.nome}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
+          <CampoTexto disabled={ocupado} inputMode="decimal" rotulo={`Custo por ${un} (R$)`} dica="Até duas casas decimais" aria-label={`Custo de ${insumo.nome}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
           {aviso && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">
             Não foi possível salvar o ajuste. {aviso}
             {' '}<Botao variante="texto" onClick={() => avisarEm(null)}>Fechar aviso</Botao>
@@ -181,7 +181,7 @@ export function AbaInsumosApi() {
         <NomeInsumoPesquisado inputRef={nomeRef} erroDoCampo={erroDoNome} disabled={criando} value={novo.nome} onChange={mudarNovo('nome')} />
         <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: rotuloDaUnidade(u) }))} />
         <CampoTexto disabled={criando} inputMode="numeric" rotulo="Mínimo (opcional)" value={novo.minimo} onChange={mudarNovo('minimo')} />
-        <CampoTexto disabled={criando} inputMode="decimal" rotulo={`Custo por ${rotuloDaUnidade(novo.unidade)} (R$)`} value={novo.custo} onChange={mudarNovo('custo')} />
+        <CampoTexto disabled={criando} inputMode="decimal" rotulo={`Custo por ${rotuloDaUnidade(novo.unidade)} (R$)`} dica="Até duas casas decimais" value={novo.custo} onChange={mudarNovo('custo')} />
         <label className={`${css.chave} ${css.linhaCompleta}`}>
           <input type="checkbox" disabled={criando} checked={novo.embalagem} onChange={(e) => setNovo((atual) => ({ ...atual, embalagem: e.target.checked }))} />
           <span>É embalagem<span className={css.ajudaEmbalagem}>Bandeja, selo ou pote. Conta por unidade e é descontada em toda produção.</span></span>

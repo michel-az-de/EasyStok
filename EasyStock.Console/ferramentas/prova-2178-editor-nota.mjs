@@ -9,9 +9,11 @@ import { build } from 'vite'
 import react from '@vitejs/plugin-react'
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const raiz = fileURLToPath(new URL('..', import.meta.url)).replaceAll('\\', '/')
-const entrada = `import React,{useState,useSyncExternalStore}from '${raiz}/node_modules/react/index.js';
+const entrada = `import React,{useCallback,useState,useSyncExternalStore}from '${raiz}/node_modules/react/index.js';
 import{createRoot}from '${raiz}/node_modules/react-dom/client.js';
 import{ModalNota}from '${raiz}/src/features/notas/ModalNota.jsx';
+import{ModalCliente}from '${raiz}/src/features/ficha-cliente/ModalCliente.jsx';
+import{ContextoRascunhosDosAjustes,useGravacoesDosAjustes}from '${raiz}/src/aplicacao/rascunhosDosAjustes.js';
 import{PainelMovel}from '${raiz}/src/componentes/PainelMovel.jsx';
 import{PainelAtendimento}from '${raiz}/src/features/atendimento/PainelAtendimento.jsx';
 import{ContextoAcoes,ContextoCatalogo,ContextoEstado}from '${raiz}/src/aplicacao/contextos.js';
@@ -38,7 +40,20 @@ return <ContextoEstado value={estado}><ContextoAcoes value={acoes}><ContextoCata
 <PainelAtendimento focarAoTrocar={mobile} visivel={visivel} editorNotaVisivel={nota&&mobile} aoAbrirNota={()=>anotar(true)} aoAbrirGaleria={noop} aoAbrirBiblioteca={noop}
 slotEditorNota={<ModalNota embutida={mobile} visivel={nota} nomeCliente={cliente} aoFechar={()=>anotar(false)} aoComanda={()=>{anotar(false);mostrar(false)}} aoSalvar={async()=>false}/>}/>
 </section></ContextoCatalogo></ContextoAcoes></ContextoEstado>}
-const raizReact=createRoot(document.getElementById('root'));raizReact.render(<Prova/>);window.mostrarPainelReal=()=>raizReact.render(<ProvaFoco/>);`
+function ProvaCadastro(){
+ const[cliente,trocar]=useState('Marina');const[aberto,mostrar]=useState(true);const[rascunhos,definir]=useState({});const gravacoes=useGravacoesDosAjustes();
+ const guardar=useCallback((chave,valor)=>definir(antes=>{const depois={...antes};if(valor===null)delete depois[chave];else depois[chave]=valor;return depois}),[]);
+ window.montarCadastro=mostrar;window.trocarClienteCadastro=trocar;
+ const conversa={id:cliente,clienteId:'cadastro-'+cliente,cadastroId:'cadastro-'+cliente,nome:cliente,canal:'WhatsApp',estado:'Aberto',conta:'cliente',
+ cliente:{tags:[],notas:[],pedidos:0,pontos:0,telefone:'(11) 90000-0000',endereco:'Rua de teste, 100'},pedido:null,mensagens:[]};
+ const estado={fonteApi:true,conversas:[conversa],historico:[],agora:Date.now(),automaticoPausado:{},fidelidade:{recompensas:[],sorteios:[],resgatesPorCadastro:{}}};
+ const acoes={salvarNota:async(id,texto)=>{window.gravacoesCadastro.push({id,texto});return new Promise(resolve=>{window.responderCadastro=resolve})}};
+ return <ContextoRascunhosDosAjustes value={{rascunhos,definir:guardar,...gravacoes}}><ContextoEstado value={estado}><ContextoAcoes value={acoes}><ContextoCatalogo value={{canais:CANAIS,motivosBloqueio:[],prefixosCepAtendidos:[],restricoes:[]}}>
+ {aberto&&<ModalCliente key={cliente} conversa={conversa} aoFechar={()=>mostrar(false)}/>}
+ </ContextoCatalogo></ContextoAcoes></ContextoEstado></ContextoRascunhosDosAjustes>
+}
+const raizReact=createRoot(document.getElementById('root'));raizReact.render(<Prova/>);window.mostrarPainelReal=()=>raizReact.render(<ProvaFoco/>);
+window.mostrarCadastroReal=()=>{window.gravacoesCadastro=[];raizReact.render(<ProvaCadastro/>)};`
 const arquivoEntrada = join(tmpdir(), `easystok-prova-2178-${process.pid}.jsx`)
 await writeFile(arquivoEntrada, entrada)
 let compilado
@@ -153,6 +168,44 @@ try {
   await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
   await pagina.getByRole('button', { name: 'Recolher', exact: true }).click()
   assert.equal(await publico.evaluate(no => document.activeElement === no), false, 'desktop mantém seu retorno de foco existente')
+  // #2360: o cadastro usa o modal e o contexto reais; remontar simula a troca de composição no celular.
+  await pagina.evaluate(() => window.mostrarCadastroReal())
+  const cadastroCliente = pagina.getByRole('dialog', { name: 'Cadastro do cliente', exact: true })
+  await cadastroCliente.waitFor({ timeout: 5000 }).catch(erro => { assert.deepEqual(erros, []); throw erro })
+  const abrirNotas = () => cadastroCliente.getByRole('tab', { name: /^Notas/ }).click()
+  const notaCadastro = pagina.getByRole('textbox', { name: 'Nova nota', exact: true })
+  await abrirNotas(); await notaCadastro.fill('Privada da Marina')
+  await cadastroCliente.getByRole('button', { name: 'Fechar', exact: true }).click()
+  await cadastroCliente.getByText('Descartar o que foi digitado?', { exact: true }).waitFor()
+  await cadastroCliente.getByRole('button', { name: 'Continuar editando', exact: true }).click()
+  assert.equal(await notaCadastro.inputValue(), 'Privada da Marina')
+  await pagina.evaluate(() => window.montarCadastro(false)); await cadastroCliente.waitFor({ state: 'detached' })
+  await pagina.setViewportSize({ width: 1440, height: 900 })
+  await pagina.evaluate(() => window.montarCadastro(true)); await abrirNotas()
+  assert.equal(await notaCadastro.inputValue(), 'Privada da Marina', 'remonte recupera o texto do contexto da visita')
+  await pagina.evaluate(() => window.trocarClienteCadastro('Carlos')); await abrirNotas()
+  assert.equal(await notaCadastro.inputValue(), '', 'outro cliente não recebe o rascunho')
+  await pagina.evaluate(() => window.trocarClienteCadastro('Marina')); await abrirNotas()
+  assert.equal(await notaCadastro.inputValue(), 'Privada da Marina')
+  await cadastroCliente.getByRole('button', { name: 'Salvar nota', exact: true }).click()
+  await pagina.waitForFunction(() => [...document.querySelectorAll('button')].some(botao => botao.textContent === 'Fechar' && botao.disabled))
+  assert.equal(await cadastroCliente.getByRole('button', { name: 'Fechar', exact: true }).isDisabled(), true)
+  await pagina.evaluate(() => window.responderCadastro(false))
+  await cadastroCliente.getByRole('alert').filter({ hasText: 'Sem confirmação da nota' }).waitFor()
+  assert.equal(await notaCadastro.inputValue(), 'Privada da Marina', 'falha preserva o rascunho')
+  await cadastroCliente.getByRole('button', { name: 'Salvar nota', exact: true }).click()
+  await pagina.evaluate(() => window.responderCadastro(true))
+  await pagina.waitForFunction(() => document.querySelector('textarea').value === '')
+  assert.deepEqual(await pagina.evaluate(() => window.gravacoesCadastro), [
+    { id: 'Marina', texto: 'Privada da Marina' }, { id: 'Marina', texto: 'Privada da Marina' },
+  ])
+  await notaCadastro.fill('Descartar somente esta nota')
+  await cadastroCliente.getByRole('button', { name: 'Fechar', exact: true }).click()
+  await cadastroCliente.getByRole('button', { name: 'Descartar', exact: true }).click()
+  await cadastroCliente.waitFor({ state: 'detached' })
+  await pagina.evaluate(() => window.montarCadastro(true)); await abrirNotas()
+  assert.equal(await notaCadastro.inputValue(), '', 'descarte explícito limpa a memória do rascunho')
   assert.deepEqual(erros, [])
   console.log('ok #2178: DOM/seleção/scroll/Undo, portal oculto preservado, falha e confirmação por dono; nenhuma escrita pública')
+  console.log('ok #2360: cadastro real confirma descarte e preserva nota no remonte, por cliente e após falha; confirmação limpa')
 } finally { await navegador.close() }

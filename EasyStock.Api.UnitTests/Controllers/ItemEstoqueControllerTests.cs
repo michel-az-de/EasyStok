@@ -17,6 +17,8 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using System.Globalization;
+using System.Text.Json;
 
 namespace EasyStock.Api.UnitTests.Controllers;
 
@@ -192,7 +194,7 @@ public class ItemEstoqueControllerTests
 
         var qtyProp = dto.GetType().GetProperty("qty");
         qtyProp.Should().NotBeNull("o DTO deve ter campo 'qty'");
-        qtyProp!.GetValue(dto).Should().Be(10);
+        qtyProp!.GetValue(dto).Should().Be(10m);
 
         var statusProp = dto.GetType().GetProperty("status");
         statusProp.Should().NotBeNull("o DTO deve ter campo 'status'");
@@ -209,6 +211,42 @@ public class ItemEstoqueControllerTests
         var result = await _controller.GetById(id, empresaId);
 
         result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Theory]
+    [InlineData("0.5")]
+    [InlineData("1.5")]
+    [InlineData("2.125")]
+    [InlineData("10")]
+    public async Task Leituras_DeEstoque_PreservamQuantidadeNoJson(string saldo)
+    {
+        var quantidade = decimal.Parse(saldo, CultureInfo.InvariantCulture);
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var item = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(quantidade),
+            CustoUnitario = Dinheiro.FromDecimal(12.5m), EntradaEm = DateTime.UtcNow
+        };
+        _itemEstoqueRepository.GetItemComProdutoAsync(empresaId, item.Id).Returns(item);
+        _itemEstoqueRepository.GetByProdutoAsync(empresaId, produtoId).Returns(new List<ItemEstoque> { item });
+        _itemEstoqueRepository.GetItensEstoquePaginadosAsync(empresaId, 1, 20)
+            .Returns((new List<ItemEstoque> { item }, 1));
+
+        foreach (var resultado in new[]
+        {
+            await _controller.GetById(item.Id, empresaId),
+            await _controller.GetAll(empresaId),
+            await _controller.GetByProduto(produtoId, empresaId)
+        })
+        {
+            var ok = resultado.Should().BeOfType<OkObjectResult>().Subject;
+            var json = JsonSerializer.SerializeToElement(ok.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var data = json.GetProperty("data");
+            var dto = data.ValueKind == JsonValueKind.Array ? data[0] : data;
+            dto.GetProperty("qty").GetDecimal().Should().Be(quantidade);
+        }
     }
 
     [Fact]
