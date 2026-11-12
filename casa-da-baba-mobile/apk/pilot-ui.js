@@ -31,7 +31,7 @@
     '+ Novo pedido': 'Novo pedido', 'Criar pedido': 'Novo pedido',
     'Cadastrar produto': 'Cadastrar', 'Cadastrar cliente': 'Cadastrar',
     'Criar e usar': 'Etiquetar', 'Criar e adicionar': 'Adicionar',
-    'Salvar produto': 'Salvar', 'Salvar pedido': 'Salvar', 'Salvar PNG': 'Salvar',
+    'Salvar produto': 'Salvar', 'Salvar cliente': 'Salvar', 'Salvar pedido': 'Salvar', 'Salvar PNG': 'Salvar',
     'Confirmar e abrir etiquetas': 'Etiquetar', 'Conferir produção': 'Produzir',
     'Iniciar preparo': 'Preparar', 'Marcar pronto': 'Pronto', 'Conferir entrega': 'Entregar',
     'Preparar cobrança': 'Cobrar',
@@ -139,7 +139,8 @@
       const target = ALLOWED_SCREENS.has(screen) ? screen : 'producao';
       const result = navigate.call(this, target, options);
       if (target !== 'home') doc.querySelectorAll('.nav-btn').forEach(button => {
-        const active = button.dataset.nav === (['pedidos', 'finalizados', 'clientes'].includes(target) ? 'pedidos' : 'producao');
+        const owner = { pedidos: 'pedidos', finalizados: 'pedidos', clientes: '' }[target] ?? 'producao';
+        const active = button.dataset.nav === owner;
         button.classList.toggle('active', active);
         if (active) button.setAttribute('aria-current', 'page');
         else button.removeAttribute('aria-current');
