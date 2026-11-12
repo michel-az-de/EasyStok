@@ -190,10 +190,8 @@
     const r = desenhar(e);
     if (r.recusa) return Object.assign(r, { bytes: null });
     const imp = e.impressora || {};
-    const off = imp.offsetMm || {};
     const c = r.canvas;
-    const P = global.cdbPapeis || {};
-    const bytes = global.cdbTspl.etiqueta(rgba(c), c.width, c.height, {
+    const bytes = global.cdbTspl.etiqueta(rgba(c), c.width, c.height, Object.assign({
       larguraMm: r.papel.larguraMm,
       alturaMm: r.continuo ? c.height / PONTOS_MM : r.papel.alturaMm,
       continuo: r.continuo,
@@ -202,11 +200,8 @@
       velocidade: imp.velocidade,
       inverter: !!imp.inverter,
       copias: e.copias || 1,
-      cabecaMm: Number(imp.cabecaMm) || P.CABECA_MM || 104,
-      posicao: r.papel.posicaoNaCabeca || 'centro',
-      x: 0,
-      ajusteMm: { x: Number(off.x) || 0, y: Number(off.y) || 0 }
-    });
+      x: 0
+    }, global.cdbTspl.posicaoNaCabeca(imp, r.papel)));
     return Object.assign(r, { bytes });
   }
 

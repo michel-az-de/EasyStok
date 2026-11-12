@@ -69,9 +69,17 @@
     if (opcoes && typeof opcoes.medir === 'function') return opcoes.medir;
     const doc = (opcoes && opcoes.document) || global.document;
     const ctx = doc.createElement('canvas').getContext('2d');
+    // #2329: a largura é linear no corpo; mede cada texto uma vez por peso, a 100 px.
+    const cache = new Map();
     return (texto, pt, peso) => {
-      ctx.font = `${peso} 100px ${FONTE}`;
-      return ctx.measureText(texto).width / 100 * pt * PT_MM;
+      const chave = peso + '|' + texto;
+      let w = cache.get(chave);
+      if (w === undefined) {
+        ctx.font = `${peso} 100px ${FONTE}`;
+        w = ctx.measureText(texto).width;
+        cache.set(chave, w);
+      }
+      return w / 100 * pt * PT_MM;
     };
   }
 
@@ -107,9 +115,11 @@
   // peso, tenta módulos menores, até o mínimo legível, antes de desistir.
   function resolver(campos, area, opcoes) {
     const perde = r => (r.recusa ? 2 : r.omitidos.indexOf('peso') >= 0 ? 1 : 0);
-    let melhor = resolverCom(campos, area, opcoes, 0);
+    // Um medidor para todas as tentativas: o cache dele vale para a resolução inteira.
+    const o = Object.assign({}, opcoes, { medir: medidor(opcoes) });
+    let melhor = resolverCom(campos, area, o, 0);
     for (let d = Math.round(melhor._qrMod / PONTO) - 1; perde(melhor) && d >= MIN.qrModulo; d--) {
-      const r = resolverCom(campos, area, opcoes, d * PONTO);
+      const r = resolverCom(campos, area, o, d * PONTO);
       if (perde(r) < perde(melhor)) melhor = r;
     }
     delete melhor._qrMod;
