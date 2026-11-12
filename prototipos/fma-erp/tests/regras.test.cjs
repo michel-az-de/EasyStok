@@ -1,26 +1,12 @@
 // Teste das regras do protótipo FMA Gestão sem navegador: node tests/regras.test.cjs
 "use strict";
-const fs = require("fs");
 const path = require("path");
 const assert = require("assert");
 
-function el() {
-  return { innerHTML: "", textContent: "", classList: { add() {}, remove() {}, toggle() { return false; } },
-    addEventListener() {}, setAttribute() {}, removeAttribute() {}, getAttribute() { return null; },
-    querySelector() { return null; }, querySelectorAll() { return []; }, focus() {} };
-}
-const ctx = {
-  document: { getElementById: el, querySelector: el, querySelectorAll: () => [], addEventListener() {}, title: "" },
-  location: { hash: "#/painel" },
-  localStorage: { getItem() { throw new Error("sem storage"); }, setItem() { throw new Error("sem storage"); } },
-  confirm: () => true,
-  addEventListener() {},
-  setTimeout, clearTimeout
-};
-ctx.window = ctx;
-const src = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
-new Function("window", "document", "location", "localStorage", "setTimeout", "clearTimeout", src)(ctx, ctx.document, ctx.location, ctx.localStorage, setTimeout, clearTimeout);
-const { Regras: R, lerValor, estado } = ctx.__fmaGestao;
+require(path.join(__dirname, "..", "dominio.js"));
+const FMA = globalThis.FMA;
+FMA.carregar();
+const { Regras: R, lerValor, estado } = FMA;
 const st = estado();
 const por = (arr, id) => arr.find(x => x.id === id);
 const pend = chave => st.lembretes.some(m => m.chave === chave && m.status === "Pendente");
@@ -85,12 +71,36 @@ t("nova versão substitui a enviada e copia etapas", () => {
 });
 
 t("cancelar contrato antes da assinatura devolve lead a qualificado", () => {
-  const l = por(st.leads, "L3"); R.qualificarLead(l); R.criarProposta(l);
+  const l = R.criarLead({ empresa: "Teste" }); R.qualificarLead(l); R.criarProposta(l);
   const p = st.propostas[st.propostas.length - 1]; p.etapas.push({ escopo: "x", valor: 100 });
   R.enviarProposta(p); R.aceitarProposta(p);
   const c = st.contratos[st.contratos.length - 1];
   R.cancelarContrato(c);
   assert.strictEqual(c.status, "Cancelado"); assert.strictEqual(l.status, "Qualificado"); assert.ok(!pend("assinatura:" + c.id));
+});
+
+t("conversa vira lead e proposta com etapas da IA; segunda vez reaproveita", () => {
+  const conv = por(st.conversas, "W1");
+  R.propostaDaConversa(conv);
+  const l = por(st.leads, conv.leadId);
+  const p = st.propostas[st.propostas.length - 1];
+  assert.strictEqual(l.empresa, "Gama Varejo"); assert.strictEqual(l.status, "Proposta");
+  assert.strictEqual(p.status, "Rascunho"); assert.strictEqual(p.etapas.length, 3); assert.ok(p.ia);
+  const n = st.propostas.length;
+  assert.ok(/Já existe/.test(R.propostaDaConversa(conv))); assert.strictEqual(st.propostas.length, n);
+});
+
+t("automação desligada não gera cobrança no WhatsApp", () => {
+  R.alternarAutomacao("cobrancaWhatsApp");
+  const antes = st.atividades.length;
+  const c = por(st.contratos, "C1"); const e = por(c.etapas, "E3");
+  R.entregar(c, e); R.aprovar(c, e);
+  assert.ok(!st.atividades.slice(antes).some(a => a.canal === "whatsapp"));
+});
+
+t("briefing põe a NFS-e pendente e a conversa nova no topo", () => {
+  const b = FMA.Consultas.briefing();
+  assert.ok(b.length > 0); assert.strictEqual(b[0].urgencia, "alta");
 });
 
 console.log(ok + " testes passaram");
