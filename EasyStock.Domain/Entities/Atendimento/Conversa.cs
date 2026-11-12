@@ -265,7 +265,7 @@ public class Conversa
     {
         GarantirAberta("liberar o automatico de");
         if (!TemAgente)
-            throw new RegraDeDominioVioladaException($"O canal {Canal} nao tem agente: a conversa fica com a dona.");
+            throw new RegraDeDominioVioladaException($"O canal {Canal} não tem atendimento automático: a conversa continua com você.");
         Situacao = SituacaoConversa.Automatica;
         AssumidaPorUsuarioId = null;
         MotivoEscalada = null;

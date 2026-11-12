@@ -30,6 +30,7 @@ public class AbrirCaixaUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (cmd.SaldoInicial < 0)
             throw new UseCaseValidationException("Saldo inicial não pode ser negativo.");
+        ValidacaoCaixa.ExigirValorMonetario(cmd.SaldoInicial, "Saldo inicial");
 
         var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;   // timestamp do movimento (UTC, armazenado)
         var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)

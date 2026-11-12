@@ -9,7 +9,7 @@ using EasyStock.Domain.ValueObjects;
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 // #2007 (item 10): `Nivel` de quem envia decide o autor (Dona ou Atendente); sem ele, Dona, como antes.
-public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string Texto, NivelAcesso? Nivel = null);
+public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string Texto, NivelAcesso? Nivel = null, bool Confirmada = false);
 
 public sealed record EnviarImagemConsoleCommand(
     Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda, NivelAcesso? Nivel = null);
@@ -33,7 +33,8 @@ public sealed class EnviarMensagemConsoleUseCase(
     ResolvedorCanal resolvedorCanal,
     GerenciarUploadsUseCase uploads,
     IUnitOfWork unitOfWork,
-    ILogger<EnviarMensagemConsoleUseCase>? logger = null)
+    ILogger<EnviarMensagemConsoleUseCase>? logger = null,
+    IAtendenteRepository? atendentes = null)
 {
     /// <summary>Código da Cloud API para mensagem fora da janela de 24 h sem modelo.</summary>
     public const int CodigoMetaForaDaJanela = WhatsAppCloudException.CodigoForaDaJanela;
@@ -49,6 +50,9 @@ public sealed class EnviarMensagemConsoleUseCase(
         var agora = DateTime.UtcNow;
         var conversa = await ObterAbertaAsync(command.EmpresaId, command.ConversaId, ct);
         var canal = resolvedorCanal.Obter(conversa.Canal);
+
+        // ATD-1 (#2305): responder na conversa de outra atendente pede confirmação antes de sair.
+        await GuardaAtribuicaoConversa.GarantirAsync(atendentes, conversa, command.UsuarioId, command.Confirmada, ct);
 
         // Fora da janela, Instagram e Messenger aceitam resposta humana com HUMAN_AGENT (S35). O console
         // é humano; o domínio confere se a tag vale e se ainda está no prazo dela.
