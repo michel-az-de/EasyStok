@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Atendimento.Producao;
 using EasyStock.Application.UseCases.CadastrarProduto;
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.ValueObjects;
@@ -31,6 +32,7 @@ public class InsumosDaProducaoUseCaseTests
         _produtos.When(r => r.InsertAsync(Arg.Any<Produto>())).Do(c => _gravados[c.Arg<Produto>().Id] = c.Arg<Produto>());
         _produtos.GetByIdAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _gravados.GetValueOrDefault(c.ArgAt<Guid>(1)));
         _produtos.GetByIdParaAtualizarAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _gravados.GetValueOrDefault(c.ArgAt<Guid>(1)));
+        _uow.SetupExecuteInTransactionSemRetry<Guid>();
     }
 
     private readonly IStorefrontRepository _storefronts = Substitute.For<IStorefrontRepository>();
@@ -93,6 +95,34 @@ public class InsumosDaProducaoUseCaseTests
         await _entrada.Received(1).ExecuteAsync(Arg.Is<RegistrarEntradaEstoqueCommand>(c =>
             c.EmpresaId == EmpresaId && c.ProdutoId == id && c.Quantidade == 2500m
             && c.Natureza == NaturezaMovimentacaoEstoque.Ajuste && c.Observacoes == "Saldo inicial do insumo"));
+    }
+
+    [Fact]
+    public async Task Criar_ComSaldoInicial_GravaInsumoEEntradaNaMesmaTransacao_EFalhaDaEntradaDesfazOCadastro()
+    {
+        // #2408: o insumo e o saldo inicial são uma gravação só. Se a entrada falhar, a transação desfaz o cadastro
+        // em vez de deixar o insumo sem o saldo que ela digitou.
+        var dentro = false;
+        var gravadoDentro = new List<string>();
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Guid>>>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                dentro = true;
+                try { return await call.Arg<Func<CancellationToken, Task<Guid>>>()(call.Arg<CancellationToken>()); }
+                finally { dentro = false; }
+            });
+        _produtos.When(r => r.InsertAsync(Arg.Any<Produto>())).Do(_ => gravadoDentro.Add($"insumo:{dentro}"));
+        _entrada.ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>())
+            .Returns<Task<RegistrarEntradaEstoqueResult>>(_ =>
+            {
+                gravadoDentro.Add($"entrada:{dentro}");
+                throw new InvalidOperationException("estoque indisponível");
+            });
+
+        var acao = () => Sut().CriarAsync(EmpresaId, Guid.NewGuid(), new InsumoInput("Farinha", UnidadeMedida.G, null, 0.0045m, SaldoInicial: 2500m));
+
+        await acao.Should().ThrowAsync<InvalidOperationException>();
+        gravadoDentro.Should().Equal("insumo:True", "entrada:True");
     }
 
     [Theory]
