@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
+using EasyStock.Domain.Financeiro;
 
 namespace EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 
@@ -36,10 +37,16 @@ public class RegistrarMovimentoCaixaUseCase(
 
         if (cmd.Valor <= 0)
             throw new UseCaseValidationException("Valor deve ser maior que zero.");
+        ValidacaoCaixa.ExigirValorMonetario(cmd.Valor, "Valor");
 
         var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;   // timestamp do movimento (UTC, armazenado)
         var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
         var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
+
+        // O mobile promove fatos já gravados no aparelho: não recusa forma antiga, só normaliza a conhecida.
+        cmd = cmd with { Metodo = origem == "mobile"
+            ? MetodosPagamentoCaixa.Normalizar(cmd.Metodo) ?? cmd.Metodo
+            : ValidacaoCaixa.NormalizarMetodo(cmd.Metodo) };
 
         // #1615: lançamento retroativo é uso legítimo; no futuro ele some do caixa de hoje e cai num
         // dia que ainda não abriu. O mobile fica de fora: a hora vem do relógio do aparelho.

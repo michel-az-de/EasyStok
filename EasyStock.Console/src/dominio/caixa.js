@@ -85,11 +85,15 @@ export function categoriaAoTrocarTipo(categoria, novoTipo) {
 // meio da cobrança por conversa: pix/dinheiro/credito/debito/transferencia/outro).
 export const METODOS_CAIXA = ['pix', 'dinheiro', 'credito', 'debito', 'transferencia', 'outro']
 
+// #2305: o servidor compara a forma sem caixa e sem espaço nas pontas (`MetodosPagamentoCaixa.Normalizar`);
+// comparar estrito aqui dava gaveta diferente da do servidor com "Dinheiro " gravado.
+export const normalizarMetodoCaixa = (metodo) => (typeof metodo === 'string' ? metodo.trim().toLowerCase() : metodo)
+
 const NOME_DO_METODO_CAIXA = {
   pix: 'Pix', dinheiro: 'Dinheiro', credito: 'Crédito', debito: 'Débito',
   transferencia: 'Transferência', outro: 'Outro',
 }
-export const nomeDoMetodoCaixa = (metodo) => NOME_DO_METODO_CAIXA[metodo] ?? 'Outro'
+export const nomeDoMetodoCaixa = (metodo) => NOME_DO_METODO_CAIXA[normalizarMetodoCaixa(metodo)] ?? 'Outro'
 
 // Proposta ajustável para a Thati: o protótipo nasceu antes deste caixa
 // existir e a cobrança por conversa (F4, `dominio/cobranca.js`) guarda um meio
@@ -355,7 +359,7 @@ export function fecharCaixaMovimento(resumo, contado, agora, autorNome) {
 // não conta. Movimento sem método é do caixa físico (nasceu antes de o método existir);
 // pagamento sem método fica fora da gaveta, porque ninguém sabe onde ele caiu.
 const centavos = (v) => Math.round((Number(v) || 0) * 100)
-const ehDinheiro = (meio, semMetodoEhDinheiro) => meio === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
+const ehDinheiro = (meio, semMetodoEhDinheiro) => normalizarMetodoCaixa(meio) === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
 const sinalDoMovimento = (tipo) => (tipo === TIPOS_MOVIMENTO.ENTRADA ? 1 : tipo === TIPOS_MOVIMENTO.SAIDA ? -1 : 0)
 
 // #1627: o que veio sem forma de pagamento fica à parte (`semForma`). A venda do pedido entregue

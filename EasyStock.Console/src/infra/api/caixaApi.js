@@ -1,4 +1,5 @@
 import { chamarApi } from './cliente'
+import { normalizarMetodoCaixa } from '../../dominio/caixa'
 
 // Caixa do dia (#1443): `api/caixa` do EasyStok. O resumo e o saldo esperado são calculados pela
 // API (a mesma fonte do card do painel), nunca pelo console. A empresa sai do token.
@@ -46,7 +47,7 @@ const movimentoDaApi = (m) => ({
   tipo: m.tipo,
   valor: m.valor,
   categoria: m.categoria || (m.tipo === 'abertura' ? 'Abertura de caixa' : m.tipo === 'fechamento' ? 'Fechamento' : m.tipo),
-  meio: m.metodo ?? null,
+  meio: normalizarMetodoCaixa(m.metodo) ?? null,
   descricao: m.descricao ?? '',
   em: m.dataMovimento,
   autorNome: m.registradoPorNome ?? null,
@@ -82,7 +83,7 @@ export function caixaDiaDaApi(d) {
     dinheiroPosFechamento: d.dinheiroPosFechamento ?? 0,
     movimentos: (d.movimentos ?? []).map(movimentoDaApi),
     linhasExtras: (d.linhasExtras ?? []).map((l) => ({
-      em: l.hora, tipo: l.tipo, valor: l.valor, descricao: l.descricao ?? '', meio: l.metodo ?? null, origem: l.origem,
+      em: l.hora, tipo: l.tipo, valor: l.valor, descricao: l.descricao ?? '', meio: normalizarMetodoCaixa(l.metodo) ?? null, origem: l.origem,
       // #2098: só no pagamento de pedido.
       pedidoNumeroDoDia: l.pedidoNumeroDoDia ?? null, clienteNome: l.clienteNome ?? null,
     })),
