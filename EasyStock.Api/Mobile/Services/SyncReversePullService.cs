@@ -164,6 +164,35 @@ public class SyncReversePullService(
             }
         }
 
+        // SYNC-3 (#2316): produto inativado no ERP depois do cursor sai do app. O PWA ja
+        // entende "product.delete" (applyServerMutations); o id e o do espelho quando existe.
+        // Cursor zerado (instalacao nova): o aparelho nao tem o que remover, entao nao reemite o
+        // delete de todos os inativos historicos. Aparelho com cache e cursor zerado e caso aceito:
+        // o upsert do inativo ja e omitido (SyncController), e o splice do delete e idempotente.
+        var inativos = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
+                && sinceDate > DateTime.UnixEpoch
+                && p.Status != StatusProduto.Ativo)
+            .Select(p => new { p.Id, p.AlteradoEm })
+            .ToListAsync();
+        if (inativos.Count > 0)
+        {
+            var idsInativos = inativos.Select(p => p.Id).ToList();
+            var espelhosInativos = (await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId && m.ErpProductId != null && idsInativos.Contains(m.ErpProductId!.Value))
+                .Select(m => new { ErpId = m.ErpProductId!.Value, m.Id })
+                .ToListAsync())
+                .GroupBy(m => m.ErpId).ToDictionary(g => g.Key, g => g.Select(m => m.Id).ToList());
+            foreach (var p in inativos)
+            {
+                var ids = espelhosInativos.TryGetValue(p.Id, out var espelhos) ? espelhos : new List<string> { p.Id.ToString() };
+                foreach (var idApp in ids)
+                    mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+                        "product.delete", SyncDtoConverters.Serialize(new { id = idApp }),
+                        new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
+            }
+        }
+
         // Clientes web sem mobile_client correspondente.
         var mobileLinkedClientes = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
             .Where(c => c.EmpresaId == empresaId && c.ErpClienteId != null)

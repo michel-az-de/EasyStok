@@ -326,6 +326,20 @@ public class SyncController(
         if (lojaId.HasValue)
             productsQ = productsQ.Where(p => p.LojaId == lojaId || p.LojaId == null);
         var products = await productsQ.ToListAsync();
+        // SYNC-3 (#2316): espelho de Produto inativado no ERP nunca sai como upsert, mesmo que um
+        // aparelho tenha mexido nele (venda, ajuste) depois da inativacao. O product.delete sai do
+        // pull reverso; aqui o espelho so e omitido, senao o produto ressuscitaria no outro aparelho.
+        var erpIdsDosEspelhos = products.Where(p => p.ErpProductId.HasValue)
+            .Select(p => p.ErpProductId!.Value).Distinct().ToList();
+        if (erpIdsDosEspelhos.Count > 0)
+        {
+            var inativosErp = (await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && erpIdsDosEspelhos.Contains(p.Id)
+                    && p.Status != StatusProduto.Ativo)
+                .Select(p => p.Id).ToListAsync()).ToHashSet();
+            if (inativosErp.Count > 0)
+                products = products.Where(p => !p.ErpProductId.HasValue || !inativosErp.Contains(p.ErpProductId.Value)).ToList();
+        }
         // C2 (RDC 727): batch lookup TipoEmbalagem dos Produtos ERP linkados.
         var erpProductIds = products.Where(p => p.ErpProductId.HasValue)
             .Select(p => p.ErpProductId!.Value).Distinct().ToList();
