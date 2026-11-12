@@ -67,6 +67,50 @@ public class SyncReversePullService(
                 "product.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
         }
 
+        // SYNC-2/SYNC-1 (#2306): Produto ERP ja espelhado e alterado depois do cursor.
+        // Reenvia o cadastro com o Id do espelho e o saldo de itens_estoque da loja do device.
+        var produtosEspelhados = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+            .Include(p => p.Categoria)
+            .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
+                && p.Status == StatusProduto.Ativo
+                && mobileLinkedProdutos.Contains(p.Id))
+            .ToListAsync();
+        if (produtosEspelhados.Count > 0)
+        {
+            var idsErp = produtosEspelhados.Select(p => p.Id).ToList();
+            var espelhosQ = _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId && m.ErpProductId != null && idsErp.Contains(m.ErpProductId!.Value));
+            if (lojaId.HasValue) espelhosQ = espelhosQ.Where(m => m.LojaId == lojaId || m.LojaId == null);
+            var espelhos = (await espelhosQ.ToListAsync()).ToDictionary(m => m.ErpProductId!.Value);
+
+            var estoqueQ = _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
+                .Where(i => i.EmpresaId == empresaId && idsErp.Contains(i.ProdutoId));
+            if (lojaId.HasValue) estoqueQ = estoqueQ.Where(i => i.LojaId == lojaId || i.LojaId == null);
+            var itensEstoque = await estoqueQ.ToListAsync();
+
+            foreach (var p in produtosEspelhados)
+            {
+                if (!espelhos.TryGetValue(p.Id, out var espelho)) continue;
+                var saldo = itensEstoque.Where(i => i.ProdutoId == p.Id).Sum(i => i.QuantidadeAtual?.Value ?? 0m);
+                var dto = new ProductDto(
+                    Id: espelho.Id,
+                    Name: p.Nome,
+                    Emoji: espelho.Emoji,
+                    Category: CategoriaDoPwa(p.Categoria?.Nome),
+                    Unit: espelho.Unit,
+                    Price: p.PrecoReferencia?.Valor ?? 0m,
+                    Stock: (int)saldo,
+                    Custom: espelho.IsCustom,
+                    Sku: p.CodigoBarras,
+                    DefaultWeightG: espelho.DefaultWeightG,
+                    DefaultValidityDays: espelho.DefaultValidityDays,
+                    Cost: p.CustoReferencia?.Valor,
+                    MinStock: p.QuantidadeMinima);
+                mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+                    "product.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
+            }
+        }
+
         // Clientes web sem mobile_client correspondente.
         var mobileLinkedClientes = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
             .Where(c => c.EmpresaId == empresaId && c.ErpClienteId != null)
