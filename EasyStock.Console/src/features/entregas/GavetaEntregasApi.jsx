@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { useEscape } from '../../hooks/useEscape'
 import { HASH_MODULO_ENTREGAS } from '../../dominio/rota'
@@ -31,17 +31,16 @@ export function GavetaEntregasApi({ aoFechar }) {
     <>
       <button type="button" className={css.cortina} aria-label="Fechar entregas" onClick={aoFechar} />
       <aside className={css.gaveta} aria-label="Entregas de hoje">
-        <header className={css.topoGaveta}>
-          <Icone nome="moto" />
-          <h2 tabIndex={-1} ref={tituloRef}>Entregas</h2>
-          <Botao variante="secundario" icone="external-link" onClick={abrirEmOutraJanela}>
-            Abrir em outra janela
-          </Botao>
-          <Botao variante="texto" onClick={aoFechar}>
-            <Icone nome="fechar" /> Fechar
-          </Botao>
-        </header>
-        <ConteudoEntregasApi />
+        {/* #2418: o selo "Ao vivo" mora ao lado do título; o conteúdo é quem sabe se a leitura está viva. */}
+        <ConteudoEntregasApi topo={(selo) => (
+          <header className={css.topoGaveta}>
+            <Icone nome="moto" tamanho={24} />
+            <h2 tabIndex={-1} ref={tituloRef}>Entregas</h2>
+            {selo}
+            <BotaoIcone rotulo="Abrir em outra janela" icone="external-link" tom="secundario" className={css.empurra} onClick={abrirEmOutraJanela} />
+            <BotaoIcone rotulo="Fechar" icone="fechar" tom="secundario" onClick={aoFechar} />
+          </header>
+        )} />
       </aside>
     </>
   )

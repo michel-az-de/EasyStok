@@ -7,7 +7,7 @@ import {
   Maximize2, Meh, MessageSquareText, MessageSquareWarning, Mic, Minimize2, Minus, Moon, NotepadText, Package,
   PanelLeft, PanelRight, Paperclip, Pause, Pencil, Phone, PictureInPicture2, Play, Plug, Plus, Printer, Radio, Receipt,
   RefreshCw, ScrollText, Search, SendHorizontal, Settings, ShoppingCart, Smile, Sparkles, Star, Sticker,
-  StickyNote, Sun, Tag, Target, Thermometer, ThumbsDown, ThumbsUp, Trash, TriangleAlert, Undo2, UserRound,
+  StickyNote, Sun, Sunset, Tag, Target, Thermometer, ThumbsDown, ThumbsUp, Trash, TriangleAlert, Truck, Undo2, UserRound,
   UserRoundPlus, Users, X, Zap,
   createLucideIcon,
 } from 'lucide-react'
@@ -87,6 +87,8 @@ const ICONES = {
   panela: CookingPot, 'cooking-pot': CookingPot,
   house: House,
   'map-pin': MapPin,
+  // #2418: carro de entrega (viagem vazia) e o fim da tarde (janela da tarde).
+  caminhao: Truck,
   printer: Printer,
   'flask-conical': FlaskConical,
   hourglass: Hourglass,
@@ -119,7 +121,7 @@ const ICONES = {
   download: Download,
   'external-link': ExternalLink,
   play: Play, pause: Pause,
-  sun: Sun, moon: Moon,
+  sun: Sun, sunset: Sunset, moon: Moon,
 
   // Navegação e ordem.
   'arrow-up': ArrowUp,
