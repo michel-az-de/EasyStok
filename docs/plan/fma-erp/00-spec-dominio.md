@@ -9,10 +9,10 @@
 A FMA Software (engenharia de software, empresa do Felipe) não tem onde acompanhar o próprio
 ciclo comercial. Leads ficam soltos, propostas não viram contrato rastreável, o contrato não gera
 sozinho as parcelas a receber nem os custos a pagar, e não há lembrete de emitir e anexar a NFS-e
-de cada etapa. O alinhamento comercial de 29/09/2026 exige **pagamento por etapa aprovada**, então
+de cada etapa. O alinhamento comercial da FMA exige **pagamento por etapa aprovada**, então
 o sistema precisa ligar etapa aprovada, cobrança e nota.
 
-Uso **interno**. Não é produto à venda (alinhamento comercial, itens 16 e 35).
+Uso **interno**. Não é produto à venda (alinhamento comercial).
 
 ## 2. Decisão de arquitetura
 
@@ -30,7 +30,7 @@ Uso **interno**. Não é produto à venda (alinhamento comercial, itens 16 e 35)
 | NF-e | Só NFC-e modelo 65 de produto | **Não serve**: serviço de software é NFS-e |
 | Lead, Proposta, Contrato | Não existem | Greenfield |
 | Enum `Modulo` | Fixo em 8 módulos de varejo | Precisa de módulo novo |
-| Liga e desliga de módulo | `TenantFeatureFlag` existe mas **não é lido** em runtime | Falta mecanismo |
+| Liga e desliga de módulo | `TenantFeatureFlag` é lido **só pelo atendimento** (chat do site, webhook do WhatsApp, caixa de e-mail, WppConnect) | Falta gate genérico de módulo |
 | Front | Console (React 19 + Vite) é o front vivo; Web em saída | Front novo FMA: caixa de conversas, copiloto e funil, não CRUD (este protótipo) |
 | E-mail, WhatsApp, LLM | `SmtpEmailCanal`, `CanalWhatsApp` (Cloud API e WppConnect), `AnthropicMessagesClient` | **Reaproveitar** (seção 6) |
 
@@ -59,7 +59,7 @@ recebe merge e deploy de várias sessões por dia, e não depende de reverter o 
 manter correções por cherry-pick. A **B** vale se o Felipe preferir uma base só, desde que antes
 exista:
 
-- [ ] mecanismo de flag lido em runtime (o `TenantFeatureFlag` não é);
+- [ ] gate genérico de módulo (hoje o `TenantFeatureFlag` só é consultado pelos casos de uso de atendimento);
 - [ ] checklist da instância FMA desligando `PerfisCasaDaBabaSeed`, `NotificacoesGlobaisSeed`,
       `MobileSchemaInitializer` e os jobs de fundo ligados por padrão;
 - [ ] ADR emendando o ADR-0056 (tenant único **por instância**) e mantendo o Cliente PJ;
@@ -191,17 +191,10 @@ Backend, migração, auth, emissão de NFS-e, envio real de e-mail ou WhatsApp, 
 assinatura eletrônica, deploy. O protótipo é estático em `prototipos/fma-erp/`, com dados **fictícios** (nenhum cliente,
 CNPJ ou preço real).
 
-## 9. Blog do Felipe
+## 9. Blog
 
-| Item | Estado |
-|---|---|
-| Blog da FMA | **Não existe** (nenhum repo, site ou plano editorial FMA encontrado) |
-| Levante (`C:\rep\levante`, `michel-az-de/levante`) | Blog pessoal técnico; .NET + Next.js + MongoDB; artigos no banco via `/admin`; último commit 2026-08-13 |
-| Domínio `felipemichel.com` | Comprado (ADR 0007 do Levante); cutover D0 em curso; falta e-mail, redirect `www` e flags de indexação |
-| Rigor Sistemas | Blog de outra empresa (6 artigos em código), não é da FMA |
-
-Não foram consultados: Hostinger, Google Drive, GitLab, repos fora de `michel-az-de`. O ERP
-**não** hospeda o blog: na v4 o blog é só um canal de publicação (simulado), para não duplicar o Levante.
+O ERP **não** hospeda blog: na v4 o blog é só um canal de publicação (simulado). Onde o blog da FMA
+vai morar é decisão do Felipe, registrada fora deste repositório.
 
 ## 10. Próximos passos
 
