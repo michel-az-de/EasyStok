@@ -17,7 +17,7 @@ import css from './caixa.module.css'
 // um com sua própria lista e sua própria memória de aberto/fechado — abrir um
 // não deve fechar o outro.
 function GrupoRecolhido({
-  titulo, conversas, aberto, aoAlternar, agora, automaticoPausado, pagamentosNaoVistos, aoAbrir, chave, busca, selecionadaId,
+  titulo, conversas, aberto, aoAlternar, agora, automaticoPausado, pagamentosNaoVistos, aoAbrir, chave, busca, selecionadaId, usuario,
 }) {
   if (conversas.length === 0) return null
   return (
@@ -40,6 +40,7 @@ function GrupoRecolhido({
           pausado={automaticoPausado?.[conversa.id] ?? false}
           pagamentoNaoVisto={pagamentosNaoVistos?.has(conversa.id) ?? false}
           grupo={chave}
+          usuario={usuario}
           busca={busca}
           aoAbrir={aoAbrir}
         />
@@ -57,7 +58,7 @@ function VazioEmLinha({ texto, acao, aoAgir }) {
 export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = null, acoesCabecalho }) {
   const {
     conversas, visiveis, encerradasDoBalcao, bloqueadasDoBalcao, selecionadaId, filtros, agora,
-    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos, fonteApi, sincronizacao,
+    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos, fonteApi, sincronizacao, sessao,
   } = useAtendimento()
   const { mudarFiltro, selecionar } = useAcoes()
   const [gruposAbertos, setGruposAbertos] = useState({ encerradas: false, bloqueados: false })
@@ -187,12 +188,14 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
             busca={filtros.busca}
             aoAbrir={abrir}
             fonteApi={fonteApi}
+            usuario={sessao?.usuario}
           />
         ))}
         {filtros.aba === 'todas' && (
           <>
             <GrupoRecolhido
               chave="encerradas"
+              usuario={sessao?.usuario}
               titulo="Concluídas"
               conversas={encerradasDoBalcao}
               aberto={gruposAbertos.encerradas}
@@ -206,6 +209,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
             />
             <GrupoRecolhido
               chave="bloqueados"
+              usuario={sessao?.usuario}
               titulo="Bloqueados"
               conversas={bloqueadasDoBalcao}
               aberto={gruposAbertos.bloqueados}

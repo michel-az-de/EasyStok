@@ -8,7 +8,7 @@ import { Modal } from '../../../componentes/Modal'
 import { Vazio } from '../../../componentes/Vazio'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
-import { aoLancarLote, dispensarLote, guardarRascunho, linhasDoRascunho, lotesLancados, marcarPassosVistos, passosRecolhidos, producaoDoDia } from '../../../aplicacao/producaoDoDia'
+import { aoLancarLote, dispensarLote, guardarRascunho, linhasDoRascunho, lotesLancados, marcarPassosVistos, producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { lerSugestao, retirarProducaoPlanejada } from '../../../aplicacao/planejamento'
 import { estaRemovido } from '../../../dominio/cardapio'
 import { plural } from '../../../dominio/formato'
@@ -106,8 +106,8 @@ export function AbaProducaoDoDiaApi() {
   const [impressao, setImpressao] = useState(null)
   // #2081 (A4): o lote cuja prévia de etiquetas está aberta.
   const [previa, setPrevia] = useState(null)
-  // #2081 (A14): os passos começam abertos e recolhem depois do primeiro lote.
-  const [passosAbertos, setPassosAbertos] = useState(() => !passosRecolhidos())
+  // A ajuda abre a pedido para manter a grade à vista também na primeira visita pelo celular.
+  const [passosAbertos, setPassosAbertos] = useState(false)
   // "Falta produzir": a sugestão do planejamento. Sem permissão ou sem rede, o bloco não aparece.
   const [sugestao, setSugestao] = useState(null)
   const [leitura, setLeitura] = useState(0)
@@ -231,8 +231,7 @@ export function AbaProducaoDoDiaApi() {
 
   return (
     <div className={css.aba}>
-      {/* #1809: o caminho em três passos, à vista, para quem abre a tela pela primeira vez.
-          #2081 (A14): depois do primeiro lote eles recolhem; ao lado, o pareamento do aparelho (A6). */}
+      {/* #2235: orientação em uma linha e detalhes a pedido; ao lado, o pareamento do aparelho. */}
       <div className={grade.topoDaProducao}>
         {/* #2235 (banca P2-1): uma linha de dica; o passo a passo abre a pedido. Fechar à mão também conta como visto.
             A dica e o aparelho dividem a primeira linha; o "Ver passo a passo" vem embaixo, só com o rótulo. */}

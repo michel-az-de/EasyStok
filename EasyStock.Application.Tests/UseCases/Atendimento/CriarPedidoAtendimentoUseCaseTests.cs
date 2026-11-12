@@ -8,6 +8,7 @@ using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento;
@@ -16,8 +17,10 @@ public class CriarPedidoAtendimentoUseCaseTests
 {
     private static readonly DateTime Agora = new(2026, 6, 1, 15, 0, 0, DateTimeKind.Utc);
 
-    [Fact]
-    public async Task OrigemWhatsappEObservacaoPorItem()
+    [Theory]
+    [InlineData(CanalConversa.WhatsApp, OrigemPedido.WhatsApp)]
+    [InlineData(CanalConversa.ChatSite, OrigemPedido.Storefront)]
+    public async Task OrigemDoCanalEObservacaoPorItem(CanalConversa canal, string origem)
     {
         var c = new CheckoutCoreServiceTests.Cenario();
         var empresaId = c.Storefront.EmpresaId;
@@ -32,7 +35,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         var clienteRepo = Substitute.For<IClienteRepository>();
         clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
 
-        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id, canal);
         var conversaRepo = Substitute.For<IConversaRepository>();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
@@ -51,7 +54,7 @@ public class CriarPedidoAtendimentoUseCaseTests
             Observacoes: "tocar a campainha"));
 
         var pedido = reservado.Pedido;
-        pedido.Origem.Should().Be(OrigemPedido.WhatsApp).And.Be("whatsapp");
+        pedido.Origem.Should().Be(origem);
         pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
         pedido.ClienteId.Should().Be(cliente.Id);
         pedido.Observacoes.Should().Be("tocar a campainha");

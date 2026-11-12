@@ -43,12 +43,13 @@ public class SyncReversePullService(
     /// do app. Se o pull normal ja mandou um client.upsert desse id, a mutacao e mesclada, nunca duplicada.
     /// Campo vazio no ERP nao apaga o dado do app.
     /// </summary>
-    private async Task AppendClientesEspelhadosAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId)
+    private async Task AppendClientesEspelhadosAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId, Guid? lojaId)
     {
         var espelhados = await (
             from m in _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
             join c in _db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking() on m.ErpClienteId equals c.Id
             where m.EmpresaId == empresaId && c.EmpresaId == empresaId && c.Ativo && c.AlteradoEm > sinceDate
+                && (!lojaId.HasValue || m.LojaId == lojaId || m.LojaId == null)
             select new { Espelho = m, Erp = c }).ToListAsync();
         foreach (var par in espelhados)
         {
@@ -123,7 +124,7 @@ public class SyncReversePullService(
             var espelhosQ = _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
                 .Where(m => m.EmpresaId == empresaId && m.ErpProductId != null && idsErp.Contains(m.ErpProductId!.Value));
             if (lojaId.HasValue) espelhosQ = espelhosQ.Where(m => m.LojaId == lojaId || m.LojaId == null);
-            var espelhos = (await espelhosQ.ToListAsync()).ToDictionary(m => m.ErpProductId!.Value);
+            var espelhos = (await espelhosQ.ToListAsync()).ToLookup(m => m.ErpProductId!.Value);
 
             var estoqueQ = _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId && idsErp.Contains(i.ProdutoId));
@@ -131,8 +132,8 @@ public class SyncReversePullService(
             var itensEstoque = await estoqueQ.ToListAsync();
 
             foreach (var p in produtosEspelhados)
+            foreach (var espelho in espelhos[p.Id])
             {
-                if (!espelhos.TryGetValue(p.Id, out var espelho)) continue;
                 var saldo = itensEstoque.Where(i => i.ProdutoId == p.Id).Sum(i => i.QuantidadeAtual?.Value ?? 0m);
                 var dto = new ProductDto(
                     Id: espelho.Id,
@@ -179,7 +180,8 @@ public class SyncReversePullService(
         {
             var idsInativos = inativos.Select(p => p.Id).ToList();
             var espelhosInativos = (await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
-                .Where(m => m.EmpresaId == empresaId && m.ErpProductId != null && idsInativos.Contains(m.ErpProductId!.Value))
+                .Where(m => m.EmpresaId == empresaId && m.ErpProductId != null && idsInativos.Contains(m.ErpProductId!.Value)
+                    && (!lojaId.HasValue || m.LojaId == lojaId || m.LojaId == null))
                 .Select(m => new { ErpId = m.ErpProductId!.Value, m.Id })
                 .ToListAsync())
                 .GroupBy(m => m.ErpId).ToDictionary(g => g.Key, g => g.Select(m => m.Id).ToList());
@@ -216,7 +218,7 @@ public class SyncReversePullService(
                 "client.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(c.AlteradoEm).ToUnixTimeMilliseconds()));
         }
 
-        await AppendClientesEspelhadosAsync(mutations, sinceDate, empresaId);
+        await AppendClientesEspelhadosAsync(mutations, sinceDate, empresaId, lojaId);
 
         // Pedidos web sem MobileOrderId (criados via /api/pedidos).
         var pedidosQ = _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
