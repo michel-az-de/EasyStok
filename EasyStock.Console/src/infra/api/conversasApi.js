@@ -68,7 +68,7 @@ export const assumir = (id) => comConfirmacaoDeOutra((confirmar) =>
 export const liberarAutomatico = (id) => chamarApi(`${BASE}/${id}/liberar-automatico`, { metodo: 'POST' })
 // #1239 (S41): passa a conversa para outro atendente da empresa.
 export const transferir = (id, paraUsuarioId) => comConfirmacaoDeOutra((confirmar) =>
-  chamarApi(`${BASE}/${id}/transferir`, { metodo: 'POST', corpo: { paraUsuarioId, confirmar } }))
+  chamarApi(`${BASE}/${id}/transferir`, { metodo: 'POST', corpo: confirmar ? { paraUsuarioId, confirmar } : { paraUsuarioId } }))
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })
 export const reabrir = (id) => chamarApi(`${BASE}/${id}/reabrir`, { metodo: 'POST' })
 export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metodo: 'POST' })
