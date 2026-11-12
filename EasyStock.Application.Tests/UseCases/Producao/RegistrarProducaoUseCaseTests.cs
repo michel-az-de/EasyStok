@@ -47,7 +47,7 @@ public class RegistrarProducaoUseCaseTests
         return p;
     }
 
-    private RegistrarProducaoUseCase Sut(RegistrarEntradaEstoqueUseCase? entrada = null) => new(
+    private RegistrarProducaoUseCase Sut(RegistrarEntradaEstoqueUseCase? entrada = null, ILojaRepository? lojas = null) => new(
         new CriarLoteUseCase(_loteRepo, _produtoRepo, _uow, Substitute.For<ILogger<CriarLoteUseCase>>()),
         new FinalizarLoteUseCase(_loteRepo, _produtoRepo, _uow, Substitute.For<ILogger<FinalizarLoteUseCase>>()),
         entrada ?? new RegistrarEntradaEstoqueUseCase(_produtoRepo, _variacaoRepo, _itemRepo, _movRepo, _uow,
@@ -56,7 +56,51 @@ public class RegistrarProducaoUseCaseTests
             loteRepository: _loteRepo),
         _produtoRepo,
         _uow,
-        Substitute.For<ILogger<RegistrarProducaoUseCase>>());
+        Substitute.For<ILogger<RegistrarProducaoUseCase>>(),
+        null,
+        lojas);
+
+    // #2343 (R2-API-7): sem teto, 1.000.000 porcoes geravam 1 etiqueta por unidade e travavam a API.
+    [Fact]
+    public async Task PorcoesAcimaDoTeto_SaoRecusadasAntesDeGerarEtiquetas()
+    {
+        var produto = NovoProduto(TipoEmbalagem.Embalado);
+
+        var act = () => Sut().ExecuteAsync(new RegistrarProducaoCommand(
+            _empresaId, null, _dataProducao,
+            [new RegistrarProducaoItemInput(produto.Id, Porcoes: 10_000, PesoPorPorcaoG: 500, ValidadeDias: 5, CustoUnitario: 12m)]));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*porcoes*");
+        await _loteRepo.DidNotReceiveWithAnyArgs().AddEtiquetaAsync(default!);
+    }
+
+    [Fact]
+    public async Task ValidadeAcimaDoTeto_eRecusada()
+    {
+        var produto = NovoProduto(TipoEmbalagem.Embalado);
+
+        var act = () => Sut().ExecuteAsync(new RegistrarProducaoCommand(
+            _empresaId, null, _dataProducao,
+            [new RegistrarProducaoItemInput(produto.Id, Porcoes: 2, PesoPorPorcaoG: 500, ValidadeDias: 3651, CustoUnitario: 12m)]));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*validade*");
+    }
+
+    // #2343 (R2-API-8): loja de outra empresa ou inexistente virava 500 (FK) em vez de 400.
+    [Fact]
+    public async Task LojaInexistenteNaEmpresa_eRecusadaComoValidacao()
+    {
+        var produto = NovoProduto(TipoEmbalagem.Embalado);
+        var lojaId = Guid.NewGuid();
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(_empresaId, lojaId).Returns((EasyStock.Domain.Entities.Loja?)null);
+
+        var act = () => Sut(lojas: lojas).ExecuteAsync(new RegistrarProducaoCommand(
+            _empresaId, lojaId, _dataProducao,
+            [new RegistrarProducaoItemInput(produto.Id, Porcoes: 2, PesoPorPorcaoG: 500, ValidadeDias: 5, CustoUnitario: 12m)]));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*encontrada*");
+    }
 
     [Fact]
     public async Task CriaLoteEEstoqueNaMesmaTransacao()

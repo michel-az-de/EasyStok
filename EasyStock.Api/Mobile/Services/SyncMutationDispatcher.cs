@@ -278,10 +278,24 @@ public class SyncMutationDispatcher(
         }
     }
 
+    // #2343 (R2-API-11): campos que, ausentes, estouravam NullReferenceException no meio do apply.
+    private static readonly string[] CamposObrigatoriosDoPedido = ["id", "clientSnapshot", "items"];
+
+    private static OrderDto DeserializarOrderUpsert(MutationDto m)
+    {
+        if (m.Payload.ValueKind != System.Text.Json.JsonValueKind.Object)
+            throw new ArgumentException("order.upsert: o payload precisa ser um objeto.");
+        var ausentes = CamposObrigatoriosDoPedido.Where(c => !m.Payload.TryGetProperty(c, out _)).ToList();
+        if (ausentes.Count > 0)
+            throw new ArgumentException($"order.upsert sem campos obrigatorios: {string.Join(", ", ausentes)}.");
+        return m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)
+            ?? throw new ArgumentException("order.upsert: payload invalido.");
+    }
+
     private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = CaberNasColunas(m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)!);
+        var dto = CaberNasColunas(DeserializarOrderUpsert(m));
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Order>().Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == dto.Id && o.EmpresaId == empresaId);

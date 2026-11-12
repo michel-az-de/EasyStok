@@ -23,11 +23,15 @@ public class AbrirCaixaUseCase(
     ICaixaRepository repo,
     IUnitOfWork uow,
     ILogger<AbrirCaixaUseCase> logger,
-    ObterCaixaDiaUseCase? caixaDia = null)
+    ObterCaixaDiaUseCase? caixaDia = null,
+    ILojaRepository? lojas = null)
 {
     public async Task<MovimentoCaixaResult> ExecuteAsync(AbrirCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        // #2343 (R2-API-8): loja de outra empresa ou inexistente vira 400, nao FK (500) no insert.
+        if (cmd.LojaId is { } lojaId && lojas is not null && await lojas.GetByIdAsync(cmd.EmpresaId, lojaId) is null)
+            throw new UseCaseValidationException("Loja nao encontrada nesta empresa.");
         if (cmd.SaldoInicial < 0)
             throw new UseCaseValidationException("Saldo inicial não pode ser negativo.");
         ValidacaoCaixa.ExigirValorMonetario(cmd.SaldoInicial, "Saldo inicial");

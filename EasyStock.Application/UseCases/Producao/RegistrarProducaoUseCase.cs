@@ -61,13 +61,24 @@ public class RegistrarProducaoUseCase(
     IProdutoRepository produtoRepository,
     IUnitOfWork uow,
     ILogger<RegistrarProducaoUseCase> logger,
-    BaixaDeInsumosDaProducao? baixaDeInsumos = null)
+    BaixaDeInsumosDaProducao? baixaDeInsumos = null,
+    ILojaRepository? lojas = null)
 {
+    /// <summary>#2343 (R2-API-7): uma etiqueta por porcao no FinalizarLote; 9.999 e o maior sequencial de 4 digitos
+    /// do rotulo (<c>{Codigo}-{seq:D4}</c>). A venda aceita 99.999 unidades, mas um lote de producao nao precisa disso.</summary>
+    public const int TetoPorcoesPorItem = 9_999;
+
+    /// <summary>#2343 (R2-API-7): 10 anos e teto de sanidade para validade de producao propria (dias).</summary>
+    public const int TetoValidadeDias = 3650;
+
     public async Task<RegistrarProducaoResult> ExecuteAsync(RegistrarProducaoCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (cmd.Itens is null || cmd.Itens.Count == 0)
             throw new UseCaseValidationException("Informe pelo menos 1 item produzido.");
+        // #2343 (R2-API-8): loja de outra empresa ou inexistente vira 400, nao FK (500) no insert do lote.
+        if (cmd.LojaId is { } lojaId && lojas is not null && await lojas.GetByIdAsync(cmd.EmpresaId, lojaId) is null)
+            throw new UseCaseValidationException("Loja nao encontrada nesta empresa.");
 
         foreach (var it in cmd.Itens)
         {
@@ -75,8 +86,14 @@ public class RegistrarProducaoUseCase(
                 throw new UseCaseValidationException("Item produzido precisa estar vinculado a um produto.");
             if (it.Porcoes <= 0)
                 throw new UseCaseValidationException("Porcoes deve ser maior que zero.");
+            if (it.Porcoes > TetoPorcoesPorItem)
+                throw new UseCaseValidationException(
+                    $"Limite de porcoes por item: {TetoPorcoesPorItem} (uma etiqueta por porcao).");
             if (it.ValidadeDias <= 0)
                 throw new UseCaseValidationException("Validade em dias deve ser maior que zero.");
+            if (it.ValidadeDias > TetoValidadeDias)
+                throw new UseCaseValidationException(
+                    $"Limite de validade em dias: {TetoValidadeDias} (10 anos).");
             if (it.PesoPorPorcaoG is <= 0)
                 throw new UseCaseValidationException("Peso por porcao deve ser maior que zero.");
             if (it.CustoUnitario is < 0)
