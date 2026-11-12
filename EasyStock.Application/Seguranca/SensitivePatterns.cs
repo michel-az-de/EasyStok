@@ -70,6 +70,19 @@ public static class SensitivePatterns
         new Regex(
             @"(?i)(/api/storefront/cardapio-conversa/)[^/\s?""'<>]+",
             RegexOptions.Compiled),
+
+        // #2376: dado pessoal. E-mail; celular brasileiro (DDI 55 opcional, DDD, 9 e 8 dígitos) antes do CPF, porque
+        // o celular sem DDI também tem 11 dígitos; CPF formatado ou 11 dígitos isolados. As fronteiras de dígito
+        // poupam número maior (chave da NF-e, unix em ms) e o CNPJ formatado não casa com o molde do CPF.
+        new Regex(
+            @"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}",
+            RegexOptions.Compiled),
+        new Regex(
+            @"(?<![\d+])(?:\+?55\s?)?\(?[1-9]{2}\)?\s?9\d{4}-?\d{4}(?!\d)",
+            RegexOptions.Compiled),
+        new Regex(
+            @"(?<!\d)(?:\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})(?!\d)",
+            RegexOptions.Compiled),
     };
 
     /// <summary>
@@ -108,6 +121,10 @@ public static class SensitivePatterns
         // Padrao 7 (token da comanda no caminho): preserva a rota, troca o token pelo molde.
         result = Patterns[6].Replace(result, m => m.Value.EndsWith("{token}", StringComparison.Ordinal)
             ? m.Value : $"{m.Groups[1].Value}{{token}}");
+        // Padroes 8 a 10 (e-mail, celular, CPF): substitui o match inteiro.
+        result = Patterns[7].Replace(result, RedactedToken);
+        result = Patterns[8].Replace(result, RedactedToken);
+        result = Patterns[9].Replace(result, RedactedToken);
         return result;
     }
 }

@@ -60,4 +60,45 @@ O console é o log do contêiner em produção e o OTLP sai da máquina; o Worke
 
 **Sink novo.** Sempre dentro de `Redigido`. `TodoSinkRedigeTests` (arquitetura) reprova sink solto em `WriteTo`, no `appsettings` ou no `Program.cs`.
 
-**O que isto não cobre.** Métrica e auditoria não passam pelo Serilog: não recebem corpo de provedor hoje e seguem sem redação automática. Span de cliente HTTP só tem a URL ocultada para os provedores de mapa (I8.2). Redação por regex é a última barreira, não a primeira: o código não deve registrar segredo.
+**O que isto não cobre.** Métrica e auditoria não passam pelo Serilog: não recebem corpo de provedor hoje e seguem sem redação automática. Span: ver a seção 7. Redação por regex é a última barreira, não a primeira: o código não deve registrar segredo.
+
+## 7. Telemetria no OpenObserve (#2376)
+
+Decisão de 12/11/2026: os logs continuam no OpenObserve (#2107 F2), sem Loki. Estudo e banca na issue #2376.
+
+### Redação também nos traces
+
+| Peça | O que faz |
+|---|---|
+| `SpanQueRedige` (`EasyStock.Infra.Async/Logging`) | Processador de span: passa o nome e toda tag de texto (`url.path`, `url.full`, `db.query.text`...) por `SensitivePatterns.Redact` antes do exporter. Tag numérica não muda. Eventos de span ficam de fora |
+| API e Worker | `.AddProcessor(new SpanQueRedige())` antes do `.AddOtlpExporter(...)` |
+| `TodoSinkRedigeTests.Trace_exportado_passa_pelo_SpanQueRedige` | Reprova o `WithTracing` que exporta sem o processador antes |
+| `SensitivePatterns` | Ganhou e-mail, celular brasileiro e CPF (formatado ou 11 dígitos isolados). Não mascara chave de NF-e, unix em ms, GUID, CNPJ formatado |
+
+Fora: o EasyStock.Web (console Blazor) não referencia o Infra.Async e exporta trace sem redação. Follow-up.
+
+### Coletor
+
+| Decisão | Motivo |
+|---|---|
+| Rede própria `ez-telemetria` | O OTLP não tem senha. Na `edge` ele ficava ao alcance do WAHA e do Whisper, imagens de terceiros. Só api, web, worker e ez-otel estão nela; o OpenObserve fica na rede interna da stack |
+| Token só de ingestão | O `observabilidade-deploy.sh subir` cria o token `coletor-otel` e troca o `OO_AUTH` do root por ele. O token escreve em `/v1/*` e recebe 401 em `_search` e `/users` (provado no v1.1.2). O root segue no `.env` só para o OpenObserve e para o `status` |
+| Sem fila em disco (`sending_queue` + `file_storage`) | Com o OpenObserve fora do ar, a telemetria do intervalo se perde e o app não trava. A cópia json-file de cada container (10 MB x 5) continua na VPS. Fila persistente só se essa perda passar a importar |
+
+Ordem do deploy: `subir` (o coletor sai da `edge`) e logo depois `ligar` (api, web e worker entram na `ez-telemetria`). Entre os dois, a telemetria não chega.
+
+### Disco
+
+A retenção limita só por tempo (30 dias) e o disco é o mesmo do Postgres. O `/health/disco` da API responde 503 abaixo de `Observabilidade:Disco:MinimoLivrePercentual` (padrão 15%) e o vigia externo (`scripts/uptime/alvos.txt`) abre a issue `uptime`. Não tira a API do balanceador: fica fora de `/health` e de `/health/ready`. Mede a raiz do container, que fica no disco do Docker na VPS.
+
+### Riscos aceitos
+
+| Risco | Decisão |
+|---|---|
+| Mesma VPS: se ela cair, somem a UI e o histórico | Aceito. O vigia externo (F1) roda fora e detecta a queda |
+| Sem backup do volume `observabilidade_dados` | Logs e traces são descartáveis. O que precisa sobreviver vai para o banco (auditoria) |
+
+### LGPD
+
+- Base legal dos 30 dias: legítimo interesse (art. 7º, IX) para segurança, diagnóstico e prevenção de fraude, com a redação acima minimizando o dado pessoal (art. 6º, III). A confirmar pelo responsável pelo tratamento.
+- Eliminação sob demanda (art. 18): o OpenObserve v1.1 não apaga registro por titular. Resposta padrão: o dado expira sozinho em até 30 dias. Se a eliminação imediata for exigida, apague o stream `easystok` na UI (perde-se toda a telemetria, aceitável por ser descartável) e registre o pedido.

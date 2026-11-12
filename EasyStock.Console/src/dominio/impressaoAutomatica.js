@@ -1,6 +1,7 @@
 // Impressão automática do canhoto (#2096): o PC da cozinha imprime sozinho cada pedido que entra
 // na fila de impressão da API (S20). Aqui só as regras puras; o laço mora em
 // `aplicacao/useImpressaoAutomatica.js` e o papel em `componentes/htmlNoNavegador.js`.
+import { horaCurta } from './formato.js'
 
 // Uma aba só imprime: as outras esperam este nome na Locks API.
 export const NOME_DA_TRAVA = 'easystok-impressao-automatica'
@@ -31,3 +32,16 @@ export const textoDaContagem = (total) => (total === 1 ? '1 canhoto hoje' : `${t
 // Atalho do Windows que abre o console sem o diálogo de impressão.
 export const CAMINHO_DO_CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 export const atalhoDoChrome = (endereco) => `"${CAMINHO_DO_CHROME}" --kiosk-printing --app=${endereco}`
+
+// #2377: a medição do `print()` mora em `componentes/medirPrint.js`; aqui o que o indicador diz.
+export const textoDeConferir = ({ numero } = {}) => (numero
+  ? `Confira se a folha do pedido ${numero} saiu`
+  : 'Confira se a folha do canhoto saiu')
+export const AVISO_SEM_IMPRESSAO_SILENCIOSA = 'A impressão silenciosa não está ativa: abra o Chrome pelo atalho com --kiosk-printing.'
+
+// Fila de impressão que não responde (rede, 401/403): falhas seguidas e desde quando.
+export const FILA_SAUDAVEL = { falhas: 0, desde: null }
+export const registrarListagem = (estado, ok, agora) => (ok
+  ? FILA_SAUDAVEL
+  : { falhas: (estado?.falhas ?? 0) + 1, desde: estado?.desde ?? agora })
+export const textoFilaParada = (desde) => `Fila parada desde ${horaCurta(new Date(desde).toISOString())}`

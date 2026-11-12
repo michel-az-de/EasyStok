@@ -47,4 +47,21 @@ public class TodoSinkRedigeTests
         diretos.Should().OnlyContain(n => SinksQueRedigem.Contains(n),
             "use WriteTo.Redigido(w => w.<Sink>(...)) para o sink receber o evento ja redigido");
     }
+
+    // #2376: o trace também sai da máquina. Todo WithTracing que exporta por OTLP registra o SpanQueRedige antes.
+    // O EasyStock.Web fica de fora: não referencia o Infra.Async e não usa o Serilog (follow-up da #2376).
+    [Theory]
+    [InlineData("EasyStock.Api/Configuration/ApiServiceCollectionExtensions.cs")]
+    [InlineData("EasyStock.Worker/DependencyInjection/TelemetrySetup.cs")]
+    public void Trace_exportado_passa_pelo_SpanQueRedige(string arquivo)
+    {
+        var codigo = ComentarioDeLinha.Replace(File.ReadAllText(Path.Combine(RepoPaths.FindRepoRoot(), arquivo)), string.Empty);
+        var tracing = codigo[codigo.IndexOf(".WithTracing(", StringComparison.Ordinal)..codigo.IndexOf(".WithMetrics(", StringComparison.Ordinal)];
+
+        var processador = tracing.IndexOf(".AddProcessor(new SpanQueRedige())", StringComparison.Ordinal);
+        var exporter = tracing.IndexOf(".AddOtlpExporter(", StringComparison.Ordinal);
+        exporter.Should().BeGreaterThan(-1, "o bloco de tracing exporta por OTLP");
+        processador.Should().BeInRange(0, exporter,
+            "registre .AddProcessor(new SpanQueRedige()) antes do .AddOtlpExporter: processador roda na ordem do registro");
+    }
 }

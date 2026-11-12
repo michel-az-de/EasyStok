@@ -38,8 +38,8 @@ test('histórico chama de Configurações o filtro de configurações', () => {
 });
 
 function settings() {
-  const handlers = new Map(); const title = {}, sheet = { scrollTop: 0 };
-  const modal = { dataset: {}, classList: { contains: () => true }, addEventListener(k, fn) { handlers.set(k, fn); },
+  const handlers = new Map(); const title = { setAttribute() {}, focus() {} }, sheet = { scrollTop: 0 };
+  const modal = { dataset: {}, setAttribute() {}, classList: { contains: () => true }, addEventListener(k, fn) { handlers.set(k, fn); },
     querySelector: s => ({ '.ajustes-head h3': title, '.ajustes-tabs': { querySelectorAll: () => [], after() {} }, '.ajustes-head': { prepend() {} }, '.ajustes-sheet': sheet })[s], querySelectorAll: () => [] };
   const calls = [];
   const environment = { cdbPilotIcon: pilotIcon, cdbMenuButton: () => '',
