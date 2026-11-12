@@ -74,6 +74,7 @@ public class AtualizarStatusPedidoUseCase(
         // recebimento e do cancelamento), relê, desconta e grava tudo junto; eventos de UI e CAR só depois do commit.
         Domain.Entities.Pedido? pedido = null;
         var mudou = false;
+        var trocarParaNaEntrega = false;
         string statusAntigoStr = "", statusNovoStr = "";
         var resultado = await uow.ExecuteInTransactionSemRetryAsync(async ct =>
         {
@@ -109,17 +110,8 @@ public class AtualizarStatusPedidoUseCase(
                 && cobrancas is not null && trocarForma is not null
                 && (await cobrancas.ListarDoPedidoAsync(cmd.EmpresaId, pedido.Id)).Any(c => c.EstaPendente && c.EhOnline))
             {
-                try
-                {
-                    await trocarForma.Value.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(cmd.EmpresaId, pedido.Id,
-                        TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, cmd.UsuarioId, cmd.UsuarioNome));
-                }
-                catch (CobrancaPedidoConflitoException ex)
-                {
-                    // Mesmo contrato das transições inválidas: 400, não erro interno.
-                    throw new UseCaseValidationException(ex.Message);
-                }
-                return CriarPedidoUseCase.Map(pedido);
+                trocarParaNaEntrega = true;
+                return null;
             }
 
             // #1776 (item 19): o toque de "Marcar entregue" do console (Cozinha, Balcão) confere o saldo; com valor a
@@ -188,6 +180,25 @@ public class AtualizarStatusPedidoUseCase(
             mudou = true;
             return CriarPedidoUseCase.Map(pedido);
         });
+
+        if (trocarParaNaEntrega)
+        {
+            // A conferência pode conciliar dinheiro e depois recusar a troca. Sua transação própria
+            // precisa terminar antes dessa recusa; nenhuma escrita foi feita na decisão acima.
+            try
+            {
+                await trocarForma!.Value.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(cmd.EmpresaId, cmd.Id,
+                    TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, cmd.UsuarioId, cmd.UsuarioNome));
+            }
+            catch (CobrancaPedidoConflitoException ex)
+            {
+                // Mesmo contrato das transições inválidas: 400, não erro interno.
+                throw new UseCaseValidationException(ex.Message);
+            }
+            // A conciliação pode limpar o tracker. Não devolva a instância anterior à troca.
+            pedido = await pedidoRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.Id);
+            return pedido?.EmpresaId == cmd.EmpresaId ? CriarPedidoUseCase.Map(pedido) : null;
+        }
 
         if (!mudou || pedido is null) return resultado;
 

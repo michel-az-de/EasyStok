@@ -217,6 +217,10 @@ incluindo Atendimento; o contador legado não determina se a pessoa continua sen
 - Modelos de notificação mantêm a versão publicada enquanto a próxima é rascunho. Aprovar a versão
   atual publica e desativa a anterior na mesma transação; `apenasAtuais=true` filtra antes da paginação.
 
+Ao liberar pedido com cobrança online, a decisão é tomada sob lock, mas a troca de forma e a
+conciliação usam suas próprias transações. A recusa de troca por pagamento já confirmado não pode
+desfazer o recebimento. O caminho normal mantém status, estoque, auditoria e outbox atômicos.
+
 Provas reproduzíveis: `prova-2395-cadastros.mjs`, `prova-2395-vinculo.mjs` e
 `prova-2395-navegador.mjs` cobrem regras e componentes. `prova-2395-api-real.mjs` e
 `prova-2395-jornada-api.mjs` usam a fixture opt-in `R4_FixtureLocalComLoginReal` com PostgreSQL e JWT.
