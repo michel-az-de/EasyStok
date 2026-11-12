@@ -6,6 +6,7 @@ using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
+using Npgsql;
 
 namespace EasyStock.Api.Mobile.Controllers;
 
@@ -51,6 +52,22 @@ public class SyncController(
     private readonly IConfiguration _appConfig = appConfig;
     private readonly TimeProvider _relogio = relogio;
     private readonly ILogger<SyncController> _log = log;
+
+    // deviceId, type e id vêm do corpo do push: sem CR e LF não dá para forjar uma linha de log (CodeQL cs/log-forging).
+    private static string SemQuebraDeLinha(string? valor) =>
+        (valor ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+
+    // #2317 (SYNC-9): erro transitório no push volta para a fila; não é rejeição permanente.
+    // Classificação estreita: só falha de rede, timeout e SqlState transitório (40001, 40P01, 57P01...).
+    // Erro permanente do banco (22P02, 23505, 23503...) segue como rejeição, senão o aparelho reenvia para sempre.
+    public static bool EhErroTransitorio(Exception ex) => ex switch
+    {
+        DbUpdateConcurrencyException => true,
+        NpgsqlException npgsql => npgsql.IsTransient,
+        TimeoutException or IOException => true,
+        DbUpdateException or InvalidOperationException => ex.InnerException is { } inner && EhErroTransitorio(inner),
+        _ => false,
+    };
 
     [HttpPost]
     public async Task<ActionResult<SyncPushResponse>> Push([FromBody] SyncPushRequest req)
@@ -164,6 +181,18 @@ public class SyncController(
                 _log.LogInformation(
                     "SyncMutation REJECTED conflict deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}: {Mensagem}",
                     req.DeviceId, empresaId, m.Type, m.Id, cex.Message);
+            }
+            // #2317 (SYNC-9): falha transitória (banco, timeout, rede) não é rejeição permanente.
+            catch (Exception ex) when (EhErroTransitorio(ex))
+            {
+                // A mutação que falhou pode ter deixado entidades rastreadas no DbContext. Gravá-las sem o
+                // MutationId reaplicaria o efeito no reenvio (ex.: baixa de estoque em dobro). Por isso o lote
+                // inteiro é abandonado sem SaveChanges; o aparelho trata 5xx como 'retry' e reenvia a fila toda.
+                _log.LogWarning(ex,
+                    "SyncMutation erro transitorio deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}: lote abandonado, sera reenviado",
+                    SemQuebraDeLinha(req.DeviceId), empresaId, SemQuebraDeLinha(m.Type), SemQuebraDeLinha(m.Id));
+                _db.ChangeTracker.Clear();
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, "Falha transitória ao sincronizar; reenvie.");
             }
             catch (Exception ex)
             {

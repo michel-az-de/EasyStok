@@ -48,7 +48,7 @@ public class SyncMutationDispatcher(
         finally { _snapshotImport = false; }
     }
 
-    public async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
+    public virtual async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
         var parts = m.Type.Split('.');

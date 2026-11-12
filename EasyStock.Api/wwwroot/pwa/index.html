@@ -16197,7 +16197,7 @@ function showConflictModal(conflicts) {
     return `
       <div class="diag-section">
         <div class="diag-section-head">
-          <div class="diag-section-title">⚠ ${escapeHtml((c.id || '').slice(-12))}</div>
+          <div class="diag-section-title">⚠ ${escapeHtml((c.mutationId || c.id || '').slice(-12))}</div>
           <span class="diag-status warn">conflito</span>
         </div>
         <div style="font-size:12px;color:var(--ink-dim);line-height:1.5;padding:6px 0">
@@ -22630,7 +22630,7 @@ function saveOrder() {
 
   const nowMs = Date.now();
   const order = {
-    id: 'o-' + nowMs,
+    id: 'o-' + calcGerarUuid(),
     clientId: selectedClient === 'avulso' ? null : selectedClient.id,
     clientSnapshot: snapshot,
     items: currentOrderItems.map(i => ({...i})),
@@ -23814,7 +23814,7 @@ window.cdbApp = {
   // dos conflitos + opção de "Recarregar do servidor" pra alinhar UI.
   onSyncConflict: function (conflicts) {
     (conflicts || []).forEach(c => {
-      try { logError(new Error(c.reason || 'conflict'), 'sync.conflict:' + (c.id || '?')); } catch (_) {}
+      try { logError(new Error(c.reason || 'conflict'), 'sync.conflict:' + (c.mutationId || c.id || '?')); } catch (_) {}
     });
     try { showConflictModal(conflicts); } catch (e) {
       const n = (conflicts || []).length;
