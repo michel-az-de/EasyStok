@@ -33,14 +33,14 @@ export class LimiteDeErro extends Component {
   }
 
   render() {
-    const { parte, children } = this.props
+    const { parte, children, recarregarPagina } = this.props
     if (this.state.erro) {
       return (
         <Vazio
           como="output"
           icone="alerta"
           titulo={parte ? `${parte}: não deu para mostrar` : 'Não deu para mostrar esta parte'}
-          acao={<Botao variante="primario" icone="refresh-cw" onClick={this.recarregar}>Recarregar esta parte</Botao>}
+          acao={<Botao variante="primario" icone="refresh-cw" onClick={recarregarPagina ? () => window.location.reload() : this.recarregar}>{recarregarPagina ? 'Recarregar' : 'Recarregar esta parte'}</Botao>}
         >
           {TEXTO_DO_LIMITE}
         </Vazio>

@@ -28,6 +28,7 @@ import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModul
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
 import { Modal } from '../componentes/Modal'
+import { LimiteDeErro } from '../componentes/LimiteDeErro'
 import { TelaLogin } from '../features/login/TelaLogin'
 import { TelaConvite } from '../features/login/TelaConvite'
 import { ehRotaDeConvite, tokenDoConvite } from '../dominio/usuarios'
@@ -69,6 +70,7 @@ import { PainelAgente } from '../features/agente/PainelAgente'
 import { BalaoAssistente } from '../features/assistente/BalaoAssistente'
 import { Moldura } from './Moldura'
 import { PilhaDeAvisos } from './PilhaDeAvisos'
+import { AvisosDoDispositivo } from './AvisosDoDispositivo'
 import { AjudaDoConsole } from '../features/ajuda/AjudaDoConsole'
 import { NavegacaoDoConsole } from './NavegacaoDoConsole'
 import css from './moldura.module.css'
@@ -308,6 +310,8 @@ function Composicao({ rota }) {
 
       {/* Rodada 7 · frente Anexos: substitui o antigo "Prato" do composer
           (registro em auditoria/decisoes/61-anexos.md). */}
+      {/* #2393: janela que quebra no render não derruba o Balcão inteiro. */}
+      <LimiteDeErro parte="Janela aberta">
       {modal === 'galeria' && selecionada && <PainelGaleria aoFechar={fechar} />}
       {modal === 'cardapio' && selecionada && (
         <PainelCardapio
@@ -371,6 +375,7 @@ function Composicao({ rota }) {
       {encerrando && (
         <ModalEncerrar conversaId={encerrando} numeroAtendimento={encerrandoNumero} aoFechar={fecharEncerramento} />
       )}
+      </LimiteDeErro>
 
       {/* Rodada 5, seção 7 (passo zero): painel vazio, a F7 constrói os
           cenários. Só existe para o botão "Simular" ter o que abrir. */}
@@ -429,7 +434,7 @@ function TelaDaRota({ rota }) {
   return (
     <>
       {rota.tipo === ROTA_HALL
-        ? <HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} painel={<AgoraDoHall />} />
+        ? <LimiteDeErro parte="Início"><HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} painel={<AgoraDoHall />} /></LimiteDeErro>
         : (
           <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} ajuda={<ControleAjuda rota={rota} />}>
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
@@ -494,6 +499,7 @@ function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComa
       <LimparAvisoAoNavegar />
       <TelaDaRota rota={rota} />
       {permite('atendimento') && <PilhaDeAvisos />}
+      <AvisosDoDispositivo />
     </AtendimentoProvider>
   )
 }
@@ -636,7 +642,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     </Vazio>
     </main>
   )
-  else if (rota.tipo === ROTA_HALL) tela = <HallDeModulos fonteApi sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} />
+  else if (rota.tipo === ROTA_HALL) tela = <LimiteDeErro parte="Início"><HallDeModulos fonteApi sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} /></LimiteDeErro>
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />

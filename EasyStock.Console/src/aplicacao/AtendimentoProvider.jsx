@@ -27,7 +27,7 @@ import { lembretesAutomaticos, listaDeLembretes } from '../dominio/lembrete'
 import { useAvisoSonoro } from './useAvisoSonoro'
 import { useFilaDeAvisos } from './useFilaDeAvisos'
 import { semOPagamentoDaAberta } from './pagamentosNaoVistos'
-import { audioDestravado, destravarAudio } from '../infra/som'
+import { audioDestravado, destravarAudio, observarAudio } from '../infra/som'
 import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom'
 import { demonstracao } from '../infra/demonstracao'
 import { FONTE_API } from '../infra/fonteDados'
@@ -226,6 +226,12 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // Provider, não do reducer: `Notification.permission` não é dado do
   // atendimento, e a promessa do pedido resolve fora do fluxo de ações.
   const [permissaoNotificacao, setPermissaoNotificacao] = useState(() => permissaoDeNotificacao())
+  useEffect(() => {
+    // #2393: a dona pode reativar a permissão pelo cadeado do navegador; relê na volta de foco.
+    const reler = () => setPermissaoNotificacao(permissaoDeNotificacao())
+    window.addEventListener('focus', reler)
+    return () => window.removeEventListener('focus', reler)
+  }, [])
   const pedirNotificacaoDoNavegador = useCallback(async () => {
     setPermissaoNotificacao(await pedirPermissaoDeNotificacao())
   }, [])
@@ -296,6 +302,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     window.addEventListener('pointerdown', aoGesto)
     return () => window.removeEventListener('pointerdown', aoGesto)
   }, [audioBloqueado])
+  // #2393: depois de hibernar o áudio volta suspenso; re-arma e atualiza o aviso visível.
+  useEffect(() => observarAudio(() => setAudioBloqueado(!audioDestravado())), [])
 
   // Lembrete que nasce sozinho: conversa devolvida sem resposta e pedido
   // gerado sem pagamento. O reducer devolve o mesmo estado quando nada muda,
