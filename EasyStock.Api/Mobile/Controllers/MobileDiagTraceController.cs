@@ -1,6 +1,4 @@
 using System.Text.Json;
-using EasyStock.Domain.Entities.Mobile;
-using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace EasyStock.Api.Mobile.Controllers;
@@ -20,9 +18,7 @@ namespace EasyStock.Api.Mobile.Controllers;
 [ApiController]
 [Route("api/mobile/diag")]
 [AllowAnonymous]
-public class MobileDiagTraceController(
-    EasyStockDbContext db,
-    ILogger<MobileDiagTraceController> log) : ControllerBase
+public class MobileDiagTraceController(ILogger<MobileDiagTraceController> log) : ControllerBase
 {
     public sealed record TraceUploadRequest(
         string DeviceId,
@@ -38,9 +34,10 @@ public class MobileDiagTraceController(
     [HttpPost("trace")]
     [EnableRateLimiting("mobile-anonymous")]
     [RequestSizeLimit(200_000)]
-    public async Task<IActionResult> UploadTrace([FromBody] TraceUploadRequest req, CancellationToken ct)
+    public Task<IActionResult> UploadTrace([FromBody] TraceUploadRequest req, CancellationToken ct)
     {
-        if (req is null) return BadRequest(new { error = "payload obrigatório" });
+        ct.ThrowIfCancellationRequested();
+        if (req is null) return Task.FromResult<IActionResult>(BadRequest(new { error = "payload obrigatório" }));
 
         // Limita tamanho do trace pra evitar abuse (200 entries x ~500B = 100KB max).
         var traceJson = req.Trace.ValueKind == JsonValueKind.Array
@@ -52,21 +49,11 @@ public class MobileDiagTraceController(
             traceJson = traceJson.Substring(0, 150_000) + "...[truncado]";
         }
 
-        // Tenta vincular ao device pareado (se existir) so pra contexto. Sem
-        // throw se nao achar — endpoint anonimo intencionalmente nao exige auth.
-        MobileDevice? device = null;
-        if (!string.IsNullOrWhiteSpace(req.DeviceId))
-        {
-            device = await db.Set<MobileDevice>().AsNoTracking()
-                .FirstOrDefaultAsync(d => d.Id == req.DeviceId, ct);
-        }
-
-        // #2367: endpoint anônimo. O log não leva empresa/loja e a resposta não diz se o aparelho existe,
+        // #2367: endpoint anônimo. Nada do cadastro do aparelho entra no log nem na resposta,
         // para não servir de oráculo. Campos livres perdem quebra de linha para não forjar linhas de log.
         log.LogInformation(
-            "MobileDiagTrace recebido | device={DeviceId} conhecido={Conhecido} apiBaseUrl={ApiBaseUrl} hasConfig={HasConfig} hasProvisioning={HasProvisioning} hasPairing={HasPairing} ua={UserAgent} notes={Notes} trace={Trace}",
+            "MobileDiagTrace recebido | device={DeviceId} apiBaseUrl={ApiBaseUrl} hasConfig={HasConfig} hasProvisioning={HasProvisioning} hasPairing={HasPairing} ua={UserAgent} notes={Notes} trace={Trace}",
             ParaLog(req.DeviceId, 100),
-            device != null,
             ParaLog(req.ApiBaseUrl, 200),
             req.HasConfig?.ToString() ?? "?",
             req.HasProvisioning?.ToString() ?? "?",
@@ -75,7 +62,7 @@ public class MobileDiagTraceController(
             ParaLog(req.Notes, 2_000),
             traceJson);
 
-        return Ok(new { received = true });
+        return Task.FromResult<IActionResult>(Ok(new { received = true }));
     }
 
     /// <summary>Prepara texto vindo do cliente para o log: troca CR/LF por espaço e corta em <paramref name="max"/>.</summary>

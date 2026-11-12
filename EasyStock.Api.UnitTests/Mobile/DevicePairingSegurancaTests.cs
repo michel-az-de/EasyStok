@@ -119,7 +119,7 @@ public sealed class DevicePairingSegurancaTests : IDisposable
     public async Task DiagTrace_nao_revela_se_o_aparelho_existe()
     {
         await AparelhoAtivoAsync(DateTime.UtcNow.AddHours(-1));
-        var controller = new MobileDiagTraceController(_db, NullLogger<MobileDiagTraceController>.Instance);
+        var controller = new MobileDiagTraceController(NullLogger<MobileDiagTraceController>.Instance);
         var trace = JsonDocument.Parse("[]").RootElement;
 
         var result = await controller.UploadTrace(
