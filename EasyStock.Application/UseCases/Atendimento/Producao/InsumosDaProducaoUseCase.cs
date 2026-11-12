@@ -79,10 +79,11 @@ public sealed class InsumosDaProducaoUseCase(
 
         // #2408: categoria, produto, custo e saldo inicial gravam juntos. Se a entrada do saldo falhar, o cadastro é
         // desfeito em vez de deixar o insumo sem o saldo digitado. Sem retry: o cadastro cria Guid novo.
-        return await unitOfWork.ExecuteInTransactionSemRetryAsync(_ => GravarNovoAsync(empresaId, usuarioId, dados), ct);
+        var nome = dados.Nome.Trim();
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(_ => GravarNovoAsync(empresaId, usuarioId, nome, dados), ct);
     }
 
-    private async Task<Guid> GravarNovoAsync(Guid empresaId, Guid usuarioId, InsumoInput dados)
+    private async Task<Guid> GravarNovoAsync(Guid empresaId, Guid usuarioId, string nome, InsumoInput dados)
     {
         var embalagem = dados.Embalagem == true;
         var categoriaId = embalagem
@@ -91,7 +92,7 @@ public sealed class InsumosDaProducaoUseCase(
             : await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, empresaId,
                 CategoriaInsumos, "Insumos da produção (criada pelo console)");
         var r = await cadastrarProduto.ExecuteAsync(new CadastrarProdutoCommand(
-            empresaId, categoriaId, null, dados.Nome.Trim(), null, null, TipoProduto.Alimento,
+            empresaId, categoriaId, null, nome, null, null, TipoProduto.Alimento,
             null, null, true, null, dados.Custo, null, null, null, null, null, null, null, usuarioId,
             EhInsumo: true, UnidadeMedidaBase: dados.Unidade ?? UnidadeMedida.Un, QuantidadeMinima: dados.Minimo,
             EhEmbalagem: embalagem));
