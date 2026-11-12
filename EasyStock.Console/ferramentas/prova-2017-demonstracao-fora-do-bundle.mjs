@@ -19,7 +19,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { build } from 'vite'
+import { compilarAlcancavel } from './bundle-alcancavel.mjs'
 
 const raiz = fileURLToPath(new URL('../', import.meta.url))
 const src = join(raiz, 'src')
@@ -53,6 +53,7 @@ const SO_DA_DEMONSTRACAO = [
   'features/gestao/janelas/AbaJanelas.jsx', 'features/gestao/producao/AbaProducao.jsx',
   'features/simulacoes/PainelSimulacoes.jsx', 'features/simulacoes/useRoteiro.js',
   'infra/atendimentosAntigos.js', 'infra/avaliacaoSemente.js', 'infra/canalEntreJanelas.js', 'infra/conversasSemente.js',
+  'infra/entregadoresSemente.js', 'infra/fidelidadeSemente.js',
   'infra/historicoPedidos.js', 'infra/massaClientesGerados.js', 'infra/massaConversas.js', 'infra/provedoresDeEntrega.js',
   'infra/roteirosSimulacao.js',
 ]
@@ -183,19 +184,7 @@ await confere('nada que a demonstração importa importa uma porta (o await de m
 
 // ------------------------------------------------------------------------------------------------
 // 3. Bundle. O build roda em memória; `minify: false` deixa o `//#region src/...` de cada módulo.
-async function compilar({ api, minify }) {
-  const anterior = process.env.VITE_FONTE_DADOS
-  if (api) process.env.VITE_FONTE_DADOS = 'api'
-  else delete process.env.VITE_FONTE_DADOS
-  try {
-    const saida = await build({ root: raiz, logLevel: 'silent', build: { write: false, minify, reportCompressedSize: false } })
-    const html = (Array.isArray(saida) ? saida[0] : saida).output.find((item) => item.fileName === 'index.html')
-    return String(html.source)
-  } finally {
-    if (anterior === undefined) delete process.env.VITE_FONTE_DADOS
-    else process.env.VITE_FONTE_DADOS = anterior
-  }
-}
+const compilar = ({ api, minify }) => compilarAlcancavel({ raiz, api, minify })
 const regioes = (html) => new Set([...html.matchAll(/\/\/#region (src\/[^\r\n]+)/g)].map((m) => m[1].trim().replace(/^src\//, '')))
 
 let producao

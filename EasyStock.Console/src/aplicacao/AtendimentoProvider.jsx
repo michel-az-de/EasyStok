@@ -45,7 +45,9 @@ import { comandasLocaisDaVisita, restaurarComandasDaVisita } from './comandasDaV
 const carregar = () => ({
   conversas: carregarConversas(),
   // #1441: no modo API as respostas prontas são as do EasyStok, nunca as da demonstração.
-  catalogo: FONTE_API ? { ...carregarCatalogo(), respostasProntas: [] } : carregarCatalogo(),
+  catalogo: FONTE_API ? { ...carregarCatalogo(), respostasProntas: [] } : { ...carregarCatalogo(), entregadores: demonstracao.ENTREGADORES_CADASTRADOS },
+  // #2391: cupons, recompensas e entregadores de exemplo são da demonstração; produção nasce vazia.
+  fidelidadeSemente: demonstracao?.FIDELIDADE_SEMENTE,
   // #1441: no modo API as automáticas chegam do EasyStok; até lá, nenhuma (não as da demonstração).
   regras: FONTE_API ? [] : REGRAS_PADRAO,
   funcionamento: FUNCIONAMENTO_PADRAO,
