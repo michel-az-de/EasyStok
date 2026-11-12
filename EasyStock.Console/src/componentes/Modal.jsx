@@ -1,12 +1,13 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { Botao } from './Botao'
-import { Icone } from './Icone'
+import { BotaoIcone } from './BotaoIcone'
 import css from './Modal.module.css'
 
 // Camada sobreposta. Usa <dialog>.showModal(), que entrega trap de foco e
 // fundo inerte pelo próprio navegador, em vez de imitar isso na mão.
-// `largura` é opcional (F2, ModalHistorico pede 880px): sem ela, o CSS padrão
-// de 560px de `Modal.module.css` continua valendo para todo o resto da tela.
+// `largura` é opcional e vale um de três nomes (#2185, R14): `sm` (560, a padrão), `md` (760) e `lg` (880),
+// definidos em `estilos/tokens.css`. Sem ela, o CSS padrão de `Modal.module.css` continua valendo. Um
+// valor CSS qualquer ainda é aceito para as telas fora do Atendimento que ainda não migraram.
 //
 // `aoFechar` fica numa ref (rodada 8, defeito 65 "fora do escopo"): o efeito
 // que chama showModal() só roda no mount, nunca de novo quando o pai
@@ -32,6 +33,8 @@ import css from './Modal.module.css'
 //   dado digitado, Esc, clique no fundo e o X não fecham calados nem descartam calados: o modal pergunta
 //   ali mesmo, e o foco vai para "Continuar editando". Esc na pergunta volta para a edição.
 //   `segurarFechamento` segue para o caso em que nem descartar pode (envio em andamento).
+export const LARGURAS_DO_MODAL = Object.freeze({ sm: 'var(--modal-sm)', md: 'var(--modal-md)', lg: 'var(--modal-lg)' })
+
 export function Modal({
   titulo, descricao, aoFechar, rodape, largura, className, focarCampo = false, segurarFechamento = false, confirmarDescarte = false, children,
 }) {
@@ -129,16 +132,14 @@ export function Modal({
     <dialog
       ref={dialogoRef}
       className={[css.caixa, className].filter(Boolean).join(' ')}
-      style={largura ? { width: largura } : undefined}
+      style={largura ? { width: LARGURAS_DO_MODAL[largura] ?? largura } : undefined}
       aria-labelledby={`${id}-titulo`}
       aria-describedby={descricao ? `${id}-descricao` : undefined}
       aria-modal="true"
     >
       {/* Distingue fechar a janela de sair da sessão e do botão do rodapé. */}
-      <button type="button" className={css.fecharCanto} aria-label="Fechar janela" title="Fechar (Esc)" disabled={!aoFechar}
-        onClick={() => { if (confirmarDescarte && !segurarFechamento) abrirPergunta(); else aoFechar?.() }}>
-        <Icone nome="x" tamanho={18} />
-      </button>
+      <BotaoIcone rotulo="Fechar janela" dica="Fechar (Esc)" icone="x" tom="secundario" className={css.fecharCanto} disabled={!aoFechar}
+        onClick={() => { if (confirmarDescarte && !segurarFechamento) abrirPergunta(); else aoFechar?.() }} />
       {/* Integração: título e rodapé fora da rolagem. Folha comprida (resumo
           do Encerrar, canhoto) rolava o título para fora e escondia o botão de
           ação lá embaixo; agora só o miolo rola. */}

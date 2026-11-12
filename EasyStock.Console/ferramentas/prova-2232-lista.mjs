@@ -58,7 +58,8 @@ confere('L5  segmento ligado em alto contraste; parado com contorno de botão', 
 
 confere('L6  faixa de não entregues compacta, com "Revisar" e dispensável', () => {
   assert.match(jsxNaoEntregues, />Revisar</)
-  assert.match(jsxNaoEntregues, /aria-label="Dispensar aviso de não entregues"/)
+  // #2185: o X é o BotaoIcone, que faz do `rotulo` o nome acessível (aria-label) e a dica.
+  assert.match(jsxNaoEntregues, /<BotaoIcone icone="x" rotulo="Dispensar aviso de não entregues"/)
   assert.doesNotMatch(regra('.faixaNaoEntregues'), /font-size:\s*1rem/)
   assert.equal(typeof dispensa.faixaDispensada, 'function')
   const itens = [{ mensagem: { id: 'm1' } }, { mensagem: { id: 'm2' } }]
@@ -128,8 +129,10 @@ confere('X1  nome acessível composto do item da lista', () => {
   assert.match(jsxCartao, /aria-label=\{rotuloDoCartao\(/)
 })
 
-confere('T1  nome a 16 px e prévia a 15 px', () => {
-  assert.match(regra('.topo strong'), /font-size:\s*1rem/)
+// #2185: a fonte sai só da escala por token (verificar-gramatica, fonteForaDaEscala). O nome fica no degrau
+// logo acima da prévia (--t-forte, 17 px), que era a intenção dos 16 px literais.
+confere('T1  nome um degrau acima da prévia (--t-forte sobre --t-corpo)', () => {
+  assert.match(regra('.topo strong'), /font-size:\s*var\(--t-forte\)/)
   assert.match(regra('.previa'), /font-size:\s*var\(--t-corpo\)/)
 })
 confere('T3  contador sem a cor da marca', () => {

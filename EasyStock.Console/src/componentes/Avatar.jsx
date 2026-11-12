@@ -27,9 +27,9 @@ export function Avatar({ nome, foto, tamanho = 'medio', selo }) {
       {mostrarFoto
         ? <img className={css.foto} src={foto} alt={'Foto de ' + nomeDoContato} onError={() => setFalhou(foto)} />
         : (
-          <span className={css.inicial} style={estilo} aria-hidden="true">
+          <span className={selo ? `${css.inicial} ${css.inicialComSelo}` : css.inicial} style={estilo} aria-hidden="true">
             {/* #2258 (T8): sem letra no nome (só telefone), o ícone de pessoa no lugar do "?". */}
-            {iniciais || <Icone nome="ficha" tamanho="1.1em" />}
+            {iniciais || <Icone nome="ficha" tamanho={20} />}
           </span>
         )}
       {selo && <span className={css.selo} title={selo.titulo}>{selo.icone}</span>}

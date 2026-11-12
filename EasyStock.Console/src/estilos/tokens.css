@@ -103,7 +103,6 @@
   --brilho: inset 0 1px 0 light-dark(rgba(255, 255, 255, .7), rgba(255, 255, 255, .05));
 
   /* Escala por papel. */
-  --t-minimo: .8125rem;
   --t-micro: .8125rem;
   --t-apoio: .875rem;
   --t-corpo: .9375rem;
@@ -145,6 +144,10 @@
 
   --trilho: var(--b-3);
   --ponto: 8px;
+  /* #2185 (R10): o cabeçalho de toda região (topo, lista, conversa, ficha) tem a mesma altura, e o título dele, 20/700. */
+  --altura-regiao: 64px;
+  /* #2185 (R04): altura do contador (`Pilula contagem`). */
+  --contagem: 18px;
 
   /* Controles compactos no desktop; no toque, o alvo mínimo é 48 px. */
   --toque: 40px;
@@ -157,6 +160,10 @@
   --largura-item-trilho: calc(var(--largura-trilho) - 2 * var(--respiro-trilho));
   --altura-item-trilho: 54px;
   --gaveta: 400px;
+  /* #2185 (R14): as três larguras do Modal. `sm` é a padrão. */
+  --modal-sm: min(560px, calc(100vw - var(--e-6)));
+  --modal-md: min(760px, calc(100vw - var(--e-6)));
+  --modal-lg: min(880px, calc(100vw - var(--e-6)));
 
   /* A mesma família na operação. Caveat é opt-in nos papéis de nota/comanda. */
   --f-corpo: 'Nunito Sans', 'Segoe UI', system-ui, sans-serif;

@@ -37,7 +37,9 @@ import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
 import { TITULO_BASE, tituloDaAba } from '../dominio/tituloDaAba'
 import { pedidoAcabouDeNascer } from '../dominio/pedido'
 import { canalDaConversa } from '../dominio/canal'
-import { envioBloqueado } from '../dominio/janela'
+import { permissaoDeEscrita } from '../dominio/janela'
+import { juntarAoRascunho } from '../dominio/rascunho'
+import { conversaEncerrada } from '../dominio/conversa'
 import {
   HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, rotaDaHash,
 } from '../dominio/rota'
@@ -87,7 +89,7 @@ const abasDaDemonstracao = { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas
 function Composicao({ rota }) {
   const {
     selecionada, regras, encerrando, encerrandoNumero, agente, modoAgente, agora, aberta, horarioDaLoja,
-    conversas, automaticoPausado, sessao,
+    conversas, automaticoPausado, sessao, rascunho,
   } = useAtendimento()
   const {
     salvarNota, adicionarItem, ajustarQuantidade, alternarRegra, fecharEncerramento,
@@ -237,7 +239,8 @@ function Composicao({ rota }) {
     <PainelAgente
       key={selecionada.id}
       passouParaVoce={precisaDeVoce(selecionada, agora, automaticoPausado[selecionada.id] ?? false, aberta, janelas, horarioDaLoja)}
-      bloqueada={envioBloqueado(selecionada, agora, canalDaConversa(canais, selecionada))}
+      // #2185 (E11): "Usar no rascunho" também não vale com o campo fechado (janela de 24 h, concluída, bloqueio).
+      bloqueada={!permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).pode}
       modo={FONTE_API ? 'api' : modoAgente}
       estado={agente.conversaId === selecionada.id ? agente.estado : 'ocioso'}
       sugestao={agente.conversaId === selecionada.id ? agente.sugestao : null}
@@ -245,7 +248,7 @@ function Composicao({ rota }) {
       esperado={selecionada.esperado ?? null}
       aoConsultar={() => consultarAgente(selecionada.id)}
       aoTrocarModo={trocarModoAgente}
-      aoUsar={(texto) => { definirRascunho(selecionada.id, texto); limparAgente() }}
+      aoUsar={(texto) => { definirRascunho(selecionada.id, juntarAoRascunho(rascunho, texto)); limparAgente() }}
       aoDescartar={limparAgente}
     />
   ) : null
@@ -253,12 +256,12 @@ function Composicao({ rota }) {
   // #1445: "abrir o cardápio/comanda" pedido ao assistente, só depois do clique no cartão.
   // A comanda mora na Ficha (`#comanda-pedido`); sem ela na tela (sem pedido ainda, ou Ficha
   // em gaveta fechada), abre o cardápio, que é por onde a comanda começa.
+  // #2185 (E10): a comanda abre pelo mesmo pedido de painel da Ficha (`solicitarPainel`), que a solta nas três
+  // larguras; procurar `#comanda-pedido` só achava a comanda com o painel solto e, fora disso, abria o Cardápio.
+  // Conversa concluída não monta comanda.
   const abrirTelaDoAssistente = (tela) => {
-    const comanda = tela === 'comanda' ? document.getElementById('comanda-pedido') : null
-    if (comanda) {
-      comanda.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' })
-      return
-    }
+    if (conversaEncerrada(selecionada)) return
+    if (tela === 'comanda' && selecionada?.pedido) { solicitarPainel('ficha', 'comanda'); return }
     setModal('cardapio')
   }
 
@@ -283,7 +286,7 @@ function Composicao({ rota }) {
         editorNotaVisivel={editorNotaVisivel}
         notaEmRascunho={Boolean(notaSelecionada)}
         solicitacaoPainel={solicitacaoPainel}
-        aoRascunho={(texto) => { if (selecionada && typeof texto === 'string') definirRascunho(selecionada.id, texto) }}
+        aoRascunho={(texto) => { if (selecionada && typeof texto === 'string') definirRascunho(selecionada.id, juntarAoRascunho(rascunho, texto)) }}
         aoAbrirGaleria={() => setModal('galeria')}
         aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
         aoAbrirCardapio={() => setModal('cardapio')}
@@ -351,7 +354,7 @@ function Composicao({ rota }) {
       {modal === 'respostas' && (
         <Modal
           titulo="Respostas e automáticas"
-          largura="min(880px, calc(100vw - 24px))"
+          largura="lg"
           aoFechar={fechar}
           rodape={<><AvisoDaAcaoApi /><Botao onClick={fechar}>Fechar</Botao></>}
         >

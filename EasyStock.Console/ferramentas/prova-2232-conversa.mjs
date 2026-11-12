@@ -66,7 +66,9 @@ const novo = async (caminho) => import(caminho).catch(() => ({}))
 const existe = (modulo, nome) => assert.equal(typeof modulo[nome], 'function', `${nome} ainda não existe`)
 const conteudo = await novo('../src/dominio/conteudoDaMensagem.js')
 const transferencia = await novo('../src/dominio/faixaDeTransferencia.js')
-const modo = await novo('../src/dominio/acoesDoModo.js')
+// #2185: o que cada estado oferece é uma conta só, `acoesDaConversa`, para a faixa, o ⋮, a Ficha e o balão.
+// O `acoesDoModo` da #2232 era a segunda conta do mesmo conceito e saiu no merge com a #2185.
+const modo = await novo('../src/dominio/acoesDaConversa.js')
 const rolagem = await import('../src/dominio/rolagemDoFio.js')
 const { tiqueDaMensagem } = await import('../src/dominio/mensagem.js')
 const { Balao } = await import('../src/features/atendimento/Balao.jsx')
@@ -92,8 +94,10 @@ const mensagem = (extra) => ({ id: 'm1', dir: 'out', texto: 'oi', em: EM, status
 const balao = (extra, props = {}) => html(h(Balao, { mensagem: mensagem(extra), ...props }))
 const passagem = { motivo: 'Restrição alimentar', origem: 'agente', em: EM }
 const conversaComVoce = { id: 'c1', nome: 'Thais Regina', estado: 'Aberto', passagem, mensagens: [], pedido: null }
+const COM_ASSISTENTE = { temAssistente: true }
+const acoesDe = (conversa, pausado = false, bloqueada = false) => modo.acoesDaConversa({ conversa, pausado, bloqueada, canal: COM_ASSISTENTE })
 const barra = (conversa, pausado = false, bloqueada = false) => html(h(BarraModo, {
-  conversa, pausado, bloqueada, aoAssumir() {}, aoDevolver() {}, aoEncerrar() {},
+  conversa, pausado, bloqueada, acoes: acoesDe(conversa, pausado, bloqueada), aoAssumir() {},
 }))
 
 const SERVIDOR = 'Resumo do seu pedido:\n- 2x Lasanha 600 g (sem cebola): R$ 76,00\n- 1x Suco de uva: R$ 12,00\n'
@@ -117,23 +121,25 @@ await confere('A2  a barra da conversa renderiza a faixa, sem a pílula "Passou 
 
 // --- A3 e A4 --------------------------------------------------------------------------------------
 await confere('A3  uma ação primária: "Assumir conversa"; Devolver e o resto não ficam na faixa', () => {
-  existe(modo, 'acoesDoModo')
+  existe(modo, 'acoesDaConversa')
   const marcado = barra(conversaComVoce)
   assert.match(marcado, />Assumir conversa</)
   assert.equal((marcado.match(/<button/g) ?? []).length, 1, 'um botão só na faixa')
   assert.doesNotMatch(marcado, /Devolver ao Assistente|Concluir conversa|Mais ações/)
-  const acoes = modo.acoesDoModo(conversaComVoce)
-  assert.equal(acoes.podeAssumir, true)
-  assert.equal(acoes.podeDevolver, true)
+  const acoes = acoesDe(conversaComVoce)
+  assert.equal(acoes.assumir, true)
+  assert.equal(acoes.devolver, true)
 })
 await confere('A4  um menu só: a faixa não abre menu e o ⋮ do cabeçalho leva Devolver ao Assistente', () => {
   assert.doesNotMatch(barra(conversaComVoce), /<details/)
   const painel = fonte('features/atendimento/PainelAtendimento.jsx')
-  assert.equal((painel.match(/<details/g) ?? []).length, 1, 'um <details> só na conversa')
-  assert.match(painel, /<DevolverAoAssistente[^>]*conversa=\{selecionada\}/)
+  assert.doesNotMatch(painel, /<details/, 'o menu da conversa é o MenuDeAcoes, sem <details> próprio')
+  assert.equal((painel.match(/<MenuDeAcoes\b/g) ?? []).length, 1, 'um menu só na conversa')
+  assert.match(painel, /acoesTela\.devolver && \{ chave: 'devolver', rotulo: 'Devolver ao Assistente'/)
+  assert.match(painel, /<ModalDevolverAssistente conversa=\{selecionada\}/)
   assert.doesNotMatch(fonte('features/atendimento/BarraModo.jsx'), /maisAcoesModo|Mais ações/)
-  const bloqueada = modo.acoesDoModo?.({ ...conversaComVoce, estado: 'Aberto' }, false, true)
-  assert.deepEqual([bloqueada?.podeAssumir, bloqueada?.podeDevolver], [false, false], 'bloqueada não oferece nada')
+  const bloqueada = acoesDe({ ...conversaComVoce, estado: 'Aberto' }, false, true)
+  assert.deepEqual([bloqueada.assumir, bloqueada.devolver], [false, false], 'bloqueada não oferece assumir nem devolver')
 })
 
 // --- A5 -------------------------------------------------------------------------------------------
@@ -184,7 +190,8 @@ await confere('A7  já atende: com texto ou anexo o botão é "Enviar"; vazio, �
   const composer = fonte('features/atendimento/Composer.jsx')
   assert.match(composer, /\{temTexto \|\| anexo \|\| !acoes\.audio \? \(/)
   assert.match(composer, /aria-label="Enviar mensagem"[\s\S]*?>Enviar<\/Botao>/)
-  assert.match(composer, /rotulo="Gravar áudio"[\s\S]*?icone="mic"/)
+  // #2185 (R15): o microfone tem ícone e palavra ("Gravar"), na largura do Enviar; o nome acessível segue.
+  assert.match(composer, /aria-label="Gravar áudio"[\s\S]*?icone="mic"[\s\S]*?>Gravar<\/Botao>/)
 })
 
 // --- A8 -------------------------------------------------------------------------------------------

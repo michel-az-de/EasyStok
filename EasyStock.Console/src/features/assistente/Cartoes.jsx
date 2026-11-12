@@ -1,4 +1,5 @@
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Chip } from '../../componentes/Chip'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
@@ -13,9 +14,7 @@ function Cartao({ icone, titulo, tom, aoDispensar, children }) {
     <article className={`${css.cartao} ${tom ? css[tom] : ''}`}>
       <div className={css.cartaoTopo}>
         <h3><Icone nome={icone} tamanho={20} /> {titulo}</h3>
-        <Botao variante="texto" className={css.dispensar} aria-label={`Dispensar ${titulo.toLowerCase()}`} title="Ok, entendi" onClick={aoDispensar}>
-          <Icone nome="check" tamanho={18} />
-        </Botao>
+        <BotaoIcone rotulo={`Dispensar ${titulo.toLowerCase()}`} dica="Ok, entendi" icone="check" onClick={aoDispensar} />
       </div>
       <div className={css.cartaoCorpo}>{children}</div>
     </article>

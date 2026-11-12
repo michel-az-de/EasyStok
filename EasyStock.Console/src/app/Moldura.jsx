@@ -10,7 +10,7 @@ import { Botao } from '../componentes/Botao'
 import { BotaoIcone } from '../componentes/BotaoIcone'
 import { limitarPainelMovel } from '../hooks/estadoPainelMovel'
 import { janelaDosPaineis, observarAreaDosPaineis } from '../hooks/areaDosPaineis'
-import { Contador } from '../componentes/Contador'
+import { Pilula } from '../componentes/Pilula'
 import { Icone } from '../componentes/Icone'
 import { Modal } from '../componentes/Modal'
 import { MarcaIcone } from '../componentes/MarcaIcone'
@@ -20,6 +20,7 @@ import { contarAtivas } from '../dominio/automacao'
 import { contarPrecisaDeVoce } from '../dominio/automatico'
 import { apresentacaoDoNome, nomeDaConversa } from '../dominio/nomeDoContato'
 import { CELULAR, DESKTOP, TABLET, useTamanhoTela, useTopoCompacto } from '../hooks/useTamanhoTela'
+import { useAoAbrirConversa } from '../aplicacao/aberturaDeConversa'
 import { PainelConversas } from '../features/caixa-de-entrada/PainelConversas'
 import { PainelAtendimento } from '../features/atendimento/PainelAtendimento'
 import { CompartilharComanda } from '../features/atendimento/CompartilharComanda'
@@ -28,6 +29,7 @@ import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
 import { MesaDeNotas } from '../features/ficha-cliente/MesaDeNotas'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
+import { MenuDeAcoes } from '../componentes/MenuDeAcoes'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
 import { HASH_HALL, HASH_MODULO_COZINHA } from '../dominio/rota'
@@ -75,13 +77,10 @@ function MenuMais({
 }) {
   const { permite, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const [tema] = useTema()
-  const [aberto, setAberto] = useState(false)
-  const fechar = useCallback(() => setAberto(false), [])
 
   const grupos = gruposDoMenuMais({ tema, permite, aoSair, sessaoPersistente, atendente, casa: conta?.casa, celular })
 
   function escolher(item) {
-    fechar()
     if ([CHAVES_DO_MENU.entregas, CHAVES_DO_MENU.gestao, CHAVES_DO_MENU.ajuda].includes(item.chave)) refBotao.current?.focus()
     if (item.chave === CHAVES_DO_MENU.modulos) window.location.hash = HASH_HALL
     if (item.chave === CHAVES_DO_MENU.entregas) aoAbrirEntregas()
@@ -96,41 +95,11 @@ function MenuMais({
     if (item.chave === CHAVES_DO_MENU.sair) aoSair?.()
   }
 
-  return (
-    <span className={css.comPopover}>
-      <Botao
-        ref={refBotao}
-        aria-haspopup="menu"
-        aria-expanded={aberto}
-        onClick={() => setAberto((v) => !v)}
-        aria-label="Mais"
-        title="Mais"
-      >
-        <Icone nome="ellipsis-vertical" tamanho={20} />
-      </Botao>
-      {/* `portal` (rodada 9, achado 1 da banca estética): `.topo` tem backdrop-filter, que vira
-          containing block de position:fixed. Sem isso, o `.abaixo` do celular (fixed, ancorado no
-          rodapé da tela) media a partir de `.topo`, não do viewport, e Entregas nasce fora da tela. */}
-      {aberto && (
-        <Popover
-          rotulo="Mais controles do topo"
-          posicao="abaixo"
-          grupos={grupos}
-          aoEscolher={escolher}
-          aoFechar={fechar}
-          portal
-          folha
-        />
-      )}
-    </span>
-  )
+  // `portal` (rodada 9, achado 1 da banca estética) vem do MenuDeAcoes: `.topo` tem backdrop-filter,
+  // que vira containing block de position:fixed e fazia o menu nascer fora da tela no celular.
+  return <MenuDeAcoes refGatilho={refBotao} rotulo="Mais opções" tom="secundario" grupos={grupos} aoEscolherGrupo={escolher} />
 }
 
-// Abre a Cozinha (US-037, US-038) numa janela própria, o tablet da parede
-// (D6). Botão discreto e fixo, fora do `compacto ? MenuMais : ResumoEntregas`
-// que já existe: assim ela sempre acha o mesmo controle, larga ou estreita a
-// tela, sem duplicar o item em dois menus.
-//
 // Mantém o atendimento aberto. O KDS da API continua usando a rota protegida do módulo.
 function abrirCozinha() {
   const destino = FONTE_API ? HASH_MODULO_COZINHA : '#/cozinha'
@@ -249,7 +218,7 @@ function DisposicaoConversas({ larguras, padrao, aoRedimensionar }) {
   const [aberto, setAberto] = useState(false)
   return <span className={css.disposicao}>
     <Botao variante="texto" className={css.itemTrilho} aria-expanded={aberto} aria-haspopup="dialog" onClick={() => setAberto(!aberto)}>
-      <Icone nome="painel" tamanho={22} /><span>Disposição</span>
+      <Icone nome="painel" tamanho={24} /><span>Disposição</span>
     </Botao>
     {aberto && <Popover rotulo="Disposição das conversas" papel="dialog" portal posicao="acima" aoFechar={() => setAberto(false)}>
       <div className={css.ajusteDisposicao}>
@@ -288,7 +257,7 @@ function Trilho({
         onClick={aoAlternarLoja}
         title={aberta ? 'Fechar a loja (pede confirmação)' : 'Abrir a loja'}
       >
-        <Icone nome={aberta ? 'circle-check' : 'lock'} tamanho={22} />
+        <Icone nome={aberta ? 'circle-check' : 'lock'} tamanho={24} />
         <span>{aberta ? 'Loja aberta' : 'Loja fechada'}</span>
       </button>
       {/* #1870: o mesmo nome e o mesmo ícone do trilho dos módulos; a tela continua sendo o Balcão. */}
@@ -301,16 +270,16 @@ function Trilho({
         noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho}
       />}
       {permite('cozinha') && <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
-        <IconeDoModulo modulo={MODULO_COZINHA} tamanho={22} />
+        <IconeDoModulo modulo={MODULO_COZINHA} tamanho={24} />
         <span>Cozinha</span>
       </Botao>}
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)} title={NOME_RESPOSTAS_AUTOMATICAS}>
-        <IconeDoModulo modulo={MODULO_ATENDIMENTO} telaId="respostas" tamanho={22} />
+        <IconeDoModulo modulo={MODULO_ATENDIMENTO} telaId="respostas" tamanho={24} />
         <span>{NOME_RESPOSTAS_AUTOMATICAS}</span>
-        {regras && <Contador valor={contarAtivas(regras)} className={css.contaTrilho} />}
+        {regras && <Pilula contagem={contarAtivas(regras)} className={css.contaTrilho} aria-hidden="true" />}
       </Botao>
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirGestao} title="Gestão" aria-haspopup="dialog">
-        <Icone nome="painel" tamanho={22} />
+        <Icone nome="painel" tamanho={24} />
         <span>Gestão</span>
       </Botao>
       {/* #1807: Avisos (sino) e Lembretes (relógio) com ícone e rótulo próprios, cada rótulo
@@ -319,13 +288,13 @@ function Trilho({
       <div className={css.avisosTrilho}>{notificacoes}</div>
       <div className={css.sinoTrilho}><Sininho comRotulo /></div>
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda">
-        <MarcaIcone nome="informacao" tamanho={22} /><span>Ajuda</span>
+        <MarcaIcone nome="informacao" tamanho={24} /><span>Ajuda</span>
       </Botao>
       {disposicao}
       <span className={css.espacoTrilho} />
       {aoAlternarSimulacoes && !simularEscondido() && (
         <Botao variante="texto" className={css.itemTrilho} aria-pressed={simulando} onClick={aoAlternarSimulacoes} title="Simular (F2)">
-          <Icone nome="flask-conical" tamanho={22} />
+          <Icone nome="flask-conical" tamanho={24} />
           <span>Simular</span>
         </Botao>
       )}
@@ -423,7 +392,7 @@ function ConteudoMoldura({
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, solicitacaoPainel = null,
 }) {
   const {
-    selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao,
+    selecionada, conversas, regras: regrasDaMassa, agora, aberta, fonteApi, sessao, marcarPainelDaConversa,
     funcionamento, automaticoPausado, horarioDaLoja,
   } = useAtendimento()
   const { janelas } = useCatalogo()
@@ -463,6 +432,15 @@ function ConteudoMoldura({
   const botaoFichaRef = useRef(null)
 
   const irParaAtendimento = useCallback(() => setAba('atendimento'), [setAba])
+  // #2185 (F8): sino, aviso na tela e "Não entregues" abrem a conversa por fora da lista; no celular a tela
+  // da conversa é uma aba, e sem este passo a atendente seguia na lista com a conversa só marcada.
+  useAoAbrirConversa(() => { if (tamanho === CELULAR) setAba('atendimento') })
+  // #2185 (F24): pagamento só conta como visto com o painel da conversa na tela.
+  const painelDaConversaNaTela = tamanho !== CELULAR || aba === 'atendimento'
+  useEffect(() => {
+    marcarPainelDaConversa?.(painelDaConversaNaTela)
+    return () => marcarPainelDaConversa?.(false)
+  }, [painelDaConversaNaTela, marcarPainelDaConversa])
 
   // Rodada 11 (issue #8, registro 92): o cenário do Simular abre a conversa
   // nova (SIMULAR_CONVERSA seleciona a `sim-…`), mas no celular a aba ficava
@@ -492,11 +470,14 @@ function ConteudoMoldura({
   // F2 abre e fecha o painel de simulações de qualquer lugar da tela (seção
   // 7): Ctrl+Shift+S é captura de tela no Edge, F2 não tem dono em navegador
   // nenhum.
+  // #2185 (E29): no modo API não há Simular; o F2 só é capturado onde existe o que abrir, senão o atalho
+  // do navegador (renomear, editar) ficava mudo.
   useEffect(() => {
+    if (!aoAlternarSimulacoes) return undefined
     function aoTeclar(evento) {
       if (evento.key !== 'F2') return
       evento.preventDefault()
-      aoAlternarSimulacoes?.()
+      aoAlternarSimulacoes()
     }
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)

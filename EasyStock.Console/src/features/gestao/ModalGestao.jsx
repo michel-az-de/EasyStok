@@ -121,7 +121,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
           {avisosApi && <div className={css.avisosGestao}>{avisosApi}</div>}
           <div className={css.acoesGestao}>
             <a className={css.verModulos} href={HASH_HALL} onClick={aoFechar}>
-              <Icone nome="painel" tamanho={18} /> {NOME_INICIO}
+              <Icone nome="painel" tamanho={20} /> {NOME_INICIO}
             </a>
             <Botao onClick={aoFechar}>Fechar</Botao>
           </div>

@@ -10,7 +10,7 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { ehLead } from '../../dominio/conversa'
 import { enviosAutomaticos } from '../../dominio/automacao'
 import { diasEntre, quandoRelativo, resumoFinanceiro } from '../../dominio/cliente'
-import { moeda } from '../../dominio/formato'
+import { FUSO, diaMesHora, moeda } from '../../dominio/formato'
 import { pedidoEncerrado, rotuloDoEstado, totalDaComanda } from '../../dominio/pedido'
 import { numeroParaEntregador, textoDoEntregador } from '../../dominio/despacho'
 import css from './cliente.module.css'
@@ -83,7 +83,7 @@ function AbaPedidos({ historico, pedidosAnteriores, aberta }) {
 // atendimento que a direção pede visível aqui. `desfecho` só existe a partir
 // desta decisão: atendimento antigo (nenhum nesta massa) cairia no rótulo
 // padrão "manual" em vez de quebrar.
-const ROTULO_DESFECHO = { manual: 'encerrado por', tempo: 'encerrado por tempo, sem mensagem —' }
+const ROTULO_DESFECHO = { manual: 'concluído por', tempo: 'concluído por tempo, sem mensagem —' }
 
 function LogDeEncerramento({ atendimento }) {
   const desfecho = atendimento.desfecho ?? 'manual'
@@ -107,7 +107,7 @@ function LogDeEncerramento({ atendimento }) {
 function AbaAtendimentos({ conversaId, atendimentos }) {
   const { abrirEncerramento } = useAcoes()
   if (atendimentos.length === 0) {
-    return <Vazio titulo="Nenhum atendimento registrado">Aparece aqui a cada encerramento.</Vazio>
+    return <Vazio titulo="Nenhum atendimento registrado">Aparece aqui a cada conversa concluída.</Vazio>
   }
   return (
     <ul className={css.listaPedidos}>
@@ -116,7 +116,7 @@ function AbaAtendimentos({ conversaId, atendimentos }) {
           <header>
             {/* `encerradoEm` é o relógio da tela em ms (casos/encerramento.js). */}
             <time dateTime={new Date(a.encerradoEm).toISOString()}>
-              {new Date(a.encerradoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              {new Date(a.encerradoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', timeZone: FUSO })}
             </time>
             <span>{a.numero} · {a.faixaHorario} · {a.duracaoTexto}</span>
             <b className={css.totalPedido}>{a.receita ? moeda(a.receita.liquido) : '—'}</b>
@@ -197,17 +197,17 @@ function AbaNotas({ conversa, ocupado, aoOcupar }) {
 // #1441: o que a casa mandou sozinha nesta conversa (automáticas do EasyStok, avisos do
 // pedido e o agente). A API grava cada envio como mensagem; o gatilho de cada uma e os
 // disparos que não saíram (fora da janela, desligada) ainda não ficam registrados.
-const ROTULO_ORIGEM = { agente: 'Agente', sistema: 'Automática' }
-const horaCompleta = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+const ROTULO_ORIGEM = { agente: 'Assistente', sistema: 'Assistente' }
+const horaCompleta = diaMesHora
 
 function AbaAutomaticas({ envios }) {
-  if (envios.length === 0) return <p className={css.corpoBloco}>Nada automático nesta conversa.</p>
+  if (envios.length === 0) return <p className={css.corpoBloco}>Nada do Assistente nesta conversa.</p>
   return (
     <ul className={css.listaNotas}>
       {envios.map((m) => (
         <li key={m.id} className={css.linhaNota}>
           <span className={css.quemNota}>
-            {ROTULO_ORIGEM[m.origemAutomatica] ?? 'Automática'} · {horaCompleta(m.em)}{m.status === 'falhou' ? ' · não entregue' : ''}
+            {ROTULO_ORIGEM[m.origemAutomatica] ?? 'Assistente'} · {horaCompleta(m.em)}{m.status === 'falhou' ? ' · não entregue' : ''}
           </span>
           {m.texto}
         </li>
@@ -252,7 +252,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido 
           { id: 'pedidos', rotulo: 'Pedidos', contador: cliente.pedidos },
           ...(fonteApi ? [] : [{ id: 'atendimentos', rotulo: 'Atendimentos', contador: (conversa.atendimentos ?? []).length }]),
           { id: 'notas', rotulo: 'Notas', contador: cliente.notas.length },
-          { id: 'automaticas', rotulo: 'Respostas automáticas', contador: automaticas.length },
+          { id: 'automaticas', rotulo: 'Assistente', contador: automaticas.length },
         ]}
         ativa={aba}
         aoTrocar={(novaAba) => { if (!salvandoNota) setAba(novaAba) }}
@@ -272,6 +272,6 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido 
   )
   if (embutido) return <section data-historico-cliente aria-label="Histórico do cliente">{conteudo}</section>
   return <Modal titulo={`Histórico · ${conversa.nome}`} aoFechar={salvandoNota ? undefined : aoFechar}
-    largura="min(880px, calc(100vw - 32px))"
+    largura="lg"
     rodape={<Botao disabled={salvandoNota} onClick={aoFechar}>Fechar</Botao>}>{conteudo}</Modal>
 }

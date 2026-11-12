@@ -45,6 +45,12 @@ export function useRolagemDoFio(fimRef, {
     return () => area.removeEventListener('scroll', medir)
   }, [fimRef, zerarNovas])
 
+  // #2185 (F31): no celular o painel da conversa fica `display:none` nas outras abas. A mensagem que chega
+  // com ele escondido rola sem layout nenhum; ao voltar, quem estava no fim volta para o fim.
+  useEffect(() => {
+    if (visivel && noFim.current) fimRef.current?.scrollIntoView({ block: 'end' })
+  }, [fimRef, visivel])
+
   const { total, ultimaId, ultimaDaCasa } = retratoDoFio(chaveRolagem, mensagens)
   useEffect(() => {
     const depois = { conversaId: chaveRolagem, total, ultimaId, ultimaDaCasa }

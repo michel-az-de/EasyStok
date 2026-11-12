@@ -73,7 +73,8 @@ caso('T12/T13: o nome em edição não some no erro, recebe o foco e tem dica e 
   assert.match(emLinha, /placeholder=\{dica\}/)
   assert.match(emLinha, /maxLength=\{limite\}/)
   const comErro = regra(ler('features/ficha-cliente/cliente.module.css'), '.controleComErro')
-  assert.match(comErro, /box-shadow: inset 0 0 0 2px var\(--erro\)/)
+  // #2185 (R17): os 2 px da borda vêm do token --b-2.
+  assert.match(comErro, /box-shadow: inset 0 0 0 var\(--b-2\) var\(--erro\)/)
 })
 
 caso('T15: telefone e CEP à esquerda, só dinheiro à direita', () => {

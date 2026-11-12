@@ -140,7 +140,8 @@ caso('C1: filtro "Com pendência" filtra e conta, e o link da home abre nele', (
 caso('C2: o interruptor "No site" está ao lado de "Hoje", fora do menu ⋮', () => {
   const noSite = cardapioJsx.indexOf('aria-label={`No site: ${item.nome}`}')
   assert.ok(noSite > cardapioJsx.indexOf('className={css.valor}'))
-  assert.ok(noSite < cardapioJsx.indexOf('<details className={css.outrasAcoes}>'), 'antes do menu de ações')
+  // #2185: o menu ⋮ do prato é o MenuDeAcoes.
+  assert.ok(noSite < cardapioJsx.indexOf('<MenuDeAcoes'), 'antes do menu de ações')
   assert.ok(noSite < cardapioJsx.indexOf('className={css.rodapePrato}'))
 })
 
@@ -160,7 +161,9 @@ caso('C4: categoria começa com maiúscula na exibição e no select (o filtro s
 
 caso('C5: lápis e ⋮ ficam juntos à direita', () => {
   assert.match(regra(cardapioCss, '.rodapePrato'), /justify-content:\s*flex-end/)
-  assert.match(regra(cardapioCss, '.outrasAcoes'), /flex:\s*0 1 auto/)
+  // #2185: o ⋮ é o MenuDeAcoes, logo depois do lápis no rodapé; o <details> e seu CSS saíram.
+  assert.match(cardapioJsx, /<div className=\{css\.rodapePrato\}>[\s\S]*?icone="lapis"[\s\S]*?<\/div>\}\s*<MenuDeAcoes\b/)
+  assert.doesNotMatch(cardapioCss, /\.outrasAcoes|\.painelAcoes/)
 })
 
 // ---- Entregas, Cozinha, Canais ----------------------------------------------------------------

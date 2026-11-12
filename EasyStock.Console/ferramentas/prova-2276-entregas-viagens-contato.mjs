@@ -130,7 +130,7 @@ confere('06·1: as telas que mostram o contato leem o nome pela mesma regra', ()
     'src/features/caixa-de-entrada/apresentacaoDoCartao.js',
     'src/app/Moldura.jsx',
     'src/features/atendimento/Composer.jsx',
-    'src/features/atendimento/DevolverAoAssistente.jsx',
+    'src/features/atendimento/ModalDevolverAssistente.jsx',
     'src/features/atendimento/PassarConversa.jsx',
     'src/features/atendimento/ModalProgramarMensagem.jsx',
     'src/features/atendimento/ModalEnviarModelo.jsx',

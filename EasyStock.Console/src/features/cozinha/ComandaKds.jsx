@@ -79,7 +79,7 @@ export function ComandaKds({
             const estado = i < atual ? 'feita' : i === atual ? 'atual' : 'futura'
             return (
               <li key={etapa.status} className={css[`etapa-${estado}`]} aria-current={estado === 'atual' ? 'step' : undefined}>
-                <span className={css.marcaEtapa}>{estado === 'feita' ? <Icone nome="check" tamanho={14} /> : i + 1}</span>
+                <span className={css.marcaEtapa}>{estado === 'feita' ? <Icone nome="check" tamanho={16} /> : i + 1}</span>
                 {etapa.rotulo}
               </li>
             )

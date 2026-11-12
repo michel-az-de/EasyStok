@@ -230,7 +230,9 @@ await confere('C o composer recusa ao escolher e não promete PDF no modo API', 
   assert.match(composer, /const bloqueioCanal = motivoDeAnexo\(canal, tipo, \{ fonteApi \}\)/)
   assert.match(composer, /soImagem=\{fonteApi\}/)
   // #1761: canal que não aceita anexo mostra a restrição no lugar; o resto segue igual.
-  assert.match(composer, /titulo=\{!podeAnexar \? restricao : fonteApi \? 'Anexar foto do computador \(imagem, até 6 MB\)' : /)
+  // #2185: Anexar virou item do MenuDeAcoes; a explicação continua escrita, agora embaixo do item.
+  // #2280: pela API a foto vai até 6 MB.
+  assert.match(composer, /motivo: !podeAnexar \? restricao : null,\s+detalhe: fonteApi \? 'Foto do computador \(imagem, até 6 MB\)' : /)
   const anexos = fonte('features/atendimento/ComposerAnexos.jsx')
   assert.match(anexos, /accept=\{`image\/jpeg,image\/png,image\/webp,image\/gif\$\{soImagem \? '' : ',application\/pdf'\}`\}/)
 })
@@ -300,15 +302,16 @@ await confere('D "no fim" tem folga de um balão curto', () => {
 await confere('D o fio usa a regra: nada de rolar a cada mensagem', () => {
   const thread = fonte('features/atendimento/Thread.jsx')
   assert.ok(!thread.includes('scrollIntoView'), 'Thread ainda rola direto')
-  // #2232 (A5): o hook ganhou `visivel` (painel aberto na aba). A regra segue no hook: o fio não rola por mensagem.
+  // #2185 (F31) e #2232 (A5): o hook recebe `visivel` (painel escondido na aba do celular). A regra segue no hook: o fio não rola por mensagem.
   assert.match(thread, /useRolagemDoFio\(fim, \{ mensagens, chaveRolagem, digitando, totalDeNotas: notas\.length, visivel \}\)/)
   const hook = fonte('features/atendimento/useRolagemDoFio.js')
   assert.match(hook, /if \(deveRolarParaOFim\(anterior\.current, depois, noFim\.current\)\) \{\s*fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
-  // #2232 (A5): além da regra acima, só dois outros caminhos rolam, e nenhum é "a cada mensagem": o painel
-  // que acabou de ficar visível (aba "Conversa" abrindo) e o toque de quem pediu "Novas mensagens".
+  // Os outros caminhos que rolam, e nenhum é "a cada mensagem": quem estava no fim e o painel escondido reaparece (#2185 F31),
+  // o painel que acabou de ficar visível (#2232 A5) e o toque de quem pediu "Novas mensagens".
+  assert.match(hook, /if \(visivel && noFim\.current\) fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
   assert.match(hook, /if \(deveRolarAoFicarVisivel\(eraVisivel\.current, visivel\)\) \{\s*fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
   assert.match(hook, /const irParaNovas = useCallback\(\(\) => \{\s*fimRef\.current\?\.scrollIntoView\(\{ block: 'end' \}\)/)
-  assert.equal(hook.split('scrollIntoView').length - 1, 3, 'o hook rola em mais de três lugares')
+  assert.equal(hook.split('scrollIntoView').length - 1, 4, 'o hook rola em mais de quatro lugares')
   assert.match(hook, /area\.addEventListener\('scroll', medir, \{ passive: true \}\)/)
 })
 

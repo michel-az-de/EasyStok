@@ -86,7 +86,7 @@ function Cabecalho({ etapa }) {
     <header className={css.cabecalho}>
       <div className={css.cabecalhoMiolo}>
         <div className={css.marca}>
-          <span className={css.marcaIcone}><Icone nome="cardapio" tamanho={22} /></span>
+          <span className={css.marcaIcone}><Icone nome="cardapio" tamanho={24} /></span>
           <div>
             <strong>Casa da Babá</strong>
             <span className={css.marcaSub}>Massa artesanal</span>

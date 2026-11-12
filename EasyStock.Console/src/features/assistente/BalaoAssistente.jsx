@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AlcaLargura } from '../../componentes/AlcaLargura'
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { Vazio } from '../../componentes/Vazio'
@@ -13,11 +14,13 @@ import {
 } from '../../dominio/paineis'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { canalDaConversa } from '../../dominio/canal'
-import { permissaoDeEscrita } from '../../dominio/janela'
+import { conversaEncerrada } from '../../dominio/conversa'
+import { MOTIVO_BLOQUEIO, permissaoDeEscrita } from '../../dominio/janela'
 import {
   analisarFotoSuspeita, dicaCDC, padraoDeCompra, resumoCliente, revisarOrtografia, sentimentoDaConversa,
 } from '../../dominio/assistente'
-import { executarAcaoDoAssistente } from '../../dominio/acoesDoAssistente'
+import { acoesDaConversa } from '../../dominio/acoesDaConversa'
+import { acoesPropostasVisiveis, executarAcaoDoAssistente } from '../../dominio/acoesDoAssistente'
 import {
   CartaoCDC, CartaoCliente, CartaoFotoSuspeita, CartaoOrtografia, CartaoPadraoDeCompra, CartaoSentimento,
 } from './Cartoes'
@@ -44,7 +47,7 @@ const PASSO_MOVER = 16
 const PASSO_MOVER_GRANDE = 64
 
 export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
-  const { selecionada, agora, historico, rascunho, fonteApi } = useAtendimento()
+  const { selecionada, agora, historico, rascunho, fonteApi, automaticoPausado } = useAtendimento()
   const { canais } = useCatalogo()
   const { definirRascunho, perguntarAssistente, obterLinkCardapio, enviar, salvarNota, devolverAutomatico } = useAcoes()
 
@@ -75,6 +78,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
         enviar: (...args) => { conferirContexto(); return enviar(...args) },
         salvarNota: (...args) => { conferirContexto(); return salvarNota(...args) },
         definirRascunho: (...args) => { conferirContexto(); return definirRascunho(...args) },
+        // #2185 (F13): "Usar no rascunho" soma ao que ela já escreveu em vez de apagar.
+        rascunhoAtual: () => rascunho,
         abrirTela: (tela) => { conferirContexto(); return aoAbrirTela?.(tela) },
       })
     },
@@ -103,12 +108,20 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
     setDispensados(new Set())
   }
 
+  // #2185 (F6): fechar só devolve o foco ao gatilho quando ele estava no painel (ou perdido). Quem digita no
+  // campo de mensagem com o Assistente aberto ao lado não pode ter o foco roubado.
   function fechar() {
+    const foco = document.activeElement
+    const emOutroLugar = foco && foco !== document.body && foco !== botaoRef.current && !painelRef.current?.contains(foco)
     setAberto(false)
-    botaoRef.current?.focus()
+    if (!emOutroLugar) botaoRef.current?.focus()
   }
+  // Esc de quem está no painel ou no gatilho. Esc no campo de mensagem é da atendente (fechar sugestão,
+  // desistir) e não fecha o Assistente, que ela deixou aberto de propósito.
   useEscape(aberto, (evento) => {
     if (document.querySelector('dialog[open]')) return
+    const foco = document.activeElement
+    if (!(painelRef.current?.contains(foco) || foco === botaoRef.current || foco === document.body)) return
     evento.preventDefault()
     fechar()
   })
@@ -133,6 +146,11 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   const ortografia = selecionada && rascunho?.trim() ? revisarOrtografia(rascunho) : null
   const permissao = permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada))
   const motivoDeEnvio = permissao.pode ? null : [permissao.motivo?.titulo, permissao.motivo?.detalhe].filter(Boolean).join(' ')
+  // #2185: a mesma conta da barra e do menu ⋮. O modelo propõe sem saber quem está respondendo.
+  const acoesDaTela = acoesDaConversa({
+    conversa: selecionada, pausado: selecionada ? automaticoPausado?.[selecionada.id] ?? false : false,
+    bloqueada: permissao.motivo?.acao === MOTIVO_BLOQUEIO, canal: canalDaConversa(canais, selecionada),
+  })
 
   const sentimentoNotavel = sentimento && sentimento.classificacao !== 'neutro'
   const pedeAtencao = Boolean(cdc || foto || (sentimento && sentimento.classificacao === 'negativo'))
@@ -147,13 +165,15 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
   // acessível sem cobrir as ações fixas da Cobrança.
   const [cabecalhoDoAtendimento, setCabecalhoDoAtendimento] = useState(null)
   useEffect(() => {
-    const achar = () => document.querySelector('[data-ancora-assistente]')
+    // #2185: no celular há uma âncora por aba e as outras ficam `hidden`. A primeira do DOM era a
+    // da lista: na aba Conversa o botão do Assistente nascia dentro de um painel oculto.
+    const achar = () => [...document.querySelectorAll('[data-ancora-assistente]')].find((n) => !n.closest('[hidden]')) ?? null
     setCabecalhoDoAtendimento(achar())
     const observador = new MutationObserver(() => {
       const novo = achar()
       setCabecalhoDoAtendimento((atual) => (atual === novo ? atual : novo))
     })
-    observador.observe(document.body, { childList: true, subtree: true })
+    observador.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] })
     return () => observador.disconnect()
   }, [])
 
@@ -272,7 +292,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
           <div className={css.colunaPainel}>
           <div className={`${css.cabecalho} ${solto ? css.cabecalhoArrastavel : ''}`} onPointerDown={aoDescerNoCabecalho}>
             <div className={css.identidade}>
-              <h2 id={tituloId}><Icone nome="agente" tamanho={22} /> Assistente</h2>
+              <h2 id={tituloId}><Icone nome="agente" tamanho={20} /> Assistente</h2>
               {selecionada && <p className={css.clienteDoPainel}>{selecionada.nome}</p>}
             </div>
             {!celular && (
@@ -293,17 +313,10 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                   </button>
                 )}
                 {POSICOES.map((p) => (
-                  <button
-                    type="button"
-                    key={p.lado}
-                    className={css.botaoPosicao}
-                    aria-label={p.rotulo}
-                    title={p.rotulo}
-                    aria-pressed={lado === p.lado}
+                  <BotaoIcone
+                    key={p.lado} rotulo={p.rotulo} icone={p.icone} pressionado={lado === p.lado}
                     onClick={() => definirPosicaoPainel({ lado: p.lado })}
-                  >
-                    <Icone nome={p.icone} />
-                  </button>
+                  />
                 ))}
               </fieldset>
             )}
@@ -311,9 +324,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 rótulo (alterna Abrir/Fechar assistente), e o landmark
                 aria-label="Assistente" do painel já dá o contexto para quem
                 usa leitor de tela, sem repetir a palavra em dois controles. */}
-            <Botao variante="texto" aria-label="Fechar" onClick={fechar}>
-              <Icone nome="fechar" tamanho={20} />
-            </Botao>
+            <BotaoIcone rotulo="Fechar" icone="x" onClick={fechar} />
           </div>
 
           <div className={css.corpo} ref={corpoRef}>
@@ -359,12 +370,13 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                         <div key={t.id} className={css.troca}>
                           <div className={css.perguntaDaThatiane}><span className={css.autor}>Você</span><p>{t.pergunta}</p></div>
                           {t.resposta && <div className={css.respostaDoAssistente}><span className={css.autor}>Assistente</span><p>{t.resposta}</p></div>}
-                          {t.acoes.length > 0 && <p className={css.tituloAcoes}>Ações para confirmar</p>}
+                          {acoesPropostasVisiveis(t.acoes, acoesDaTela).length > 0 && <p className={css.tituloAcoes}>Ações para confirmar</p>}
                           <AcoesPropostas
-                            acoes={t.acoes}
+                            acoes={acoesPropostasVisiveis(t.acoes, acoesDaTela)}
                             nomeCliente={selecionada.nome}
                             motivoDeEnvio={motivoDeEnvio}
                             semCadastro={fonteApi && !selecionada.clienteId}
+                            encerrada={conversaEncerrada(selecionada)}
                             aoExecutar={(acaoProposta) => aoExecutarAcao(t.id, acaoProposta)}
                           />
                           {t.erro && (
@@ -402,12 +414,8 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent?.isComposing) enviarPergunta(e)
                 }}
               />
-              <Botao
-                tipo="submit"
-                variante="primario"
-                className={css.botaoEnviar}
-                icone="enviar"
-                aria-label="Perguntar"
+              <BotaoIcone
+                tipo="submit" tom="primario" className={css.botaoEnviar} rotulo="Perguntar" icone="enviar"
                 disabled={perguntando || !pergunta.trim()}
               />
             </form>

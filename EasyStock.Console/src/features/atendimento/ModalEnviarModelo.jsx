@@ -82,7 +82,7 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
     <Modal titulo={cliente ? 'Chamar no WhatsApp' : 'Enviar modelo aprovado'} descricao={cliente
       ? `Primeira mensagem para ${cliente.nome}: sem conversa recente, só sai modelo aprovado. Enviado, a conversa abre no Balcão.`
       : `Confira a prévia antes de enviar para ${nomeDaConversa(conversa)}. Este modelo é enviado diretamente pelo canal; não entra no rascunho de respostas rápidas.`}
-      aoFechar={fechar} rodape={<>
+      aoFechar={fechar} segurarFechamento={!resultado && (escolha !== '' || parametros.some((p) => p.trim()))} rodape={<>
         <Botao disabled={enviando} onClick={fechar}>Fechar</Botao>
         <Botao variante="primario" disabled={enviando || Boolean(falta) || bloqueado || Boolean(resultado)} onClick={enviar}>
           {enviando ? 'Enviando…' : 'Enviar modelo'}

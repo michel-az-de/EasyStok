@@ -5,7 +5,7 @@
 //
 // Frente C da #1889 (restos do atendimento, 22/10), no fim do arquivo:
 //   #1765-10 "Não entregues" anda sozinha; #1940-2 cartão sem "Falta" na montagem; contenção de erro
-//   por coluna e por tela; #1239 "Passar para…"; #1686-3/4 nova comanda e caminho para trocar item;
+//   por coluna e por tela; #1239 "Passar conversa"; #1686-3/4 nova comanda e caminho para trocar item;
 //   #1686-9 motivo da barra leva ao campo; #1686-10 devolução em dinheiro sem referência.
 //
 //   node ferramentas/prova-1804-balcao-fim.mjs
@@ -145,7 +145,7 @@ await confere('contenção de erro: cada coluna do Balcão e cada tela de módul
   assert.match(modulo, /<LimiteDeErro parte=\{tela\.rotulo\}>\{children\}<\/LimiteDeErro>/)
 })
 
-await confere('#1239 "Passar para…": a conversa vai ao atendente escolhido e a tela recebe o novo dono', async () => {
+await confere('#1239 "Passar conversa": a conversa vai ao atendente escolhido e a tela recebe o novo dono', async () => {
   const acao = await import('../src/aplicacao/acoes.js')
   const { comApi } = await import('../src/aplicacao/acoesApi.js')
   const { atendentesParaPassar } = await import('../src/features/atendimento/apresentacaoDaConversa.js')
@@ -163,8 +163,10 @@ await confere('#1239 "Passar para…": a conversa vai ao atendente escolhido e a
   resposta = () => new Response(JSON.stringify({ error: { message: 'O usuário não atende conversas nesta empresa.' } }), { status: 422 })
   assert.deepEqual(await api.transferirConversa('c1', 'ze'), { erro: 'O usuário não atende conversas nesta empresa.' })
   assert.deepEqual(atendentesParaPassar([{ usuarioId: 'eu', nome: 'Eu' }, { usuarioId: 'ana', nome: 'Ana' }, { usuarioId: 'bia', nome: 'Bia' }], { usuarioId: 'eu', responsavelId: 'bia' }).map((a) => a.nome), ['Ana'])
-  assert.match(fonte('features/atendimento/PainelAtendimento.jsx'), /\{fonteApi && <PassarConversa key=\{'passar-' \+ selecionada\.id\} conversa=\{selecionada\} \/>\}/)
-  assert.match(fonte('features/atendimento/PassarConversa.jsx'), /Passar para…/)
+  const painel = fonte('features/atendimento/PainelAtendimento.jsx')
+  assert.match(painel, /acoesTela\.passar && \{ chave: 'passar', rotulo: 'Passar conversa'/)
+  assert.match(painel, /permitePassar: Boolean\(transferirConversa\)/)
+  assert.match(painel, /modalAberto === 'passar' && <ModalPassarConversa conversa=\{selecionada\}/)
 })
 
 await confere('#1686-3 nova comanda na mesma conversa depois do pedido entregue ou cancelado', async () => {
@@ -310,12 +312,12 @@ await confere('#1989-7 respondeu no meio da venda: a faixa não sugere encerrar'
 
 await confere('#1989-4 cabeçalho da conversa: um "Link de compra" e nenhuma chave repetida entre irmãos', () => {
   const painel = fonte('features/atendimento/PainelAtendimento.jsx')
-  const de = painel.indexOf('<div className={css.direita} data-ancora-assistente>')
+  const de = painel.indexOf('<div className={css.direita}>')
   const direita = painel.slice(de, painel.indexOf('</header>', de))
   assert.ok(de >= 0 && direita.length > 0, 'cabeçalho não encontrado')
   const chaves = [...direita.matchAll(/key=\{([^}]+)\}/g)].map((m) => m[1].trim())
   assert.equal(new Set(chaves).size, chaves.length, `chaves repetidas entre irmãos: ${chaves.join(' | ')}`)
-  assert.equal((direita.match(/<CompartilharComanda\b/g) ?? []).length, 1, 'um botão só no cabeçalho')
+  assert.equal((direita.match(/chave: 'cardapio'/g) ?? []).length, 1, 'um item só no cabeçalho')
   // O botão que a Moldura passa à Ficha também não usa o id puro como chave.
   assert.doesNotMatch(fonte('app/Moldura.jsx'), /<CompartilharComanda key=\{selecionada\.id\}/)
 })

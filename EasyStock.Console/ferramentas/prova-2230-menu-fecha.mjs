@@ -1,13 +1,15 @@
 /* eslint-disable no-console */
-// Prova da issue #2230: os menus <details> do Atendimento (⋮ da conversa, "Mais ações" da faixa de
-// quem responde e "Mais ferramentas" do campo) fecham com toque fora e com Escape, mesmo com o foco
-// fora deles. A janela aberta de dentro do menu conta como dentro. Sem DOM no Node: documento e
-// menu falsos, com o mesmo contrato que o navegador entrega.
+// Prova da issue #2230: os menus do Atendimento (⋮ da conversa e "Mais ferramentas" do campo) fecham
+// com toque fora e com Escape, mesmo com o foco fora deles, e o item fecha o menu antes de agir.
+//
+// #2185 (menu único): os dois <details> com useMenuDetalhes viraram MenuDeAcoes, e o fechamento é do
+// Popover. Esta prova confere que o Atendimento usa o menu único e que o Popover guarda o contrato da
+// #2230; o comportamento no navegador está na prova-2185-menu-de-acoes (casos 3: escolher, Esc e fora).
 //
 //   node ferramentas/prova-2230-menu-fecha.mjs
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 let passou = 0
 const falhas = []
@@ -21,123 +23,49 @@ const confere = async (descricao, fn) => {
     console.log(`FALHA ${descricao}\n      ${erro.message.split('\n').filter(Boolean).slice(0, 3).join(' ')}`)
   }
 }
+const url = (caminho) => new URL('../src/' + caminho, import.meta.url)
+const fonte = (caminho) => readFileSync(url(caminho), 'utf8')
 
-// Nó falso: `contains` pela cadeia de pais, `closest('dialog')` pelo nome.
-function no(nome, pai = null) {
-  return {
-    nome, pai, focado: false,
-    contains(outro) { for (let n = outro; n; n = n.pai) if (n === this) return true; return false },
-    closest(seletor) { for (let n = this; n; n = n.pai) if (seletor === 'dialog' && n.nome === 'dialog') return n; return null },
-    focus() { documento.activeElement = this },
-  }
-}
-const documento = {
-  activeElement: null, ouvintes: {},
-  addEventListener(tipo, fn) { (this.ouvintes[tipo] ??= new Set()).add(fn) },
-  removeEventListener(tipo, fn) { this.ouvintes[tipo]?.delete(fn) },
-  disparar(tipo, evento) { for (const fn of this.ouvintes[tipo] ?? []) fn(evento) },
-}
-function cena() {
-  const corpo = no('body')
-  const menu = no('details', corpo)
-  menu.open = true
-  const resumo = no('summary', menu)
-  const item = no('button', menu)
-  const janela = no('dialog', menu)
-  janela.open = false
-  const campoDaJanela = no('input', janela)
-  menu.querySelector = (s) => (s === 'summary' ? resumo : s === 'dialog[open]' && janela.open ? janela : null)
-  const fora = no('main', corpo)
-  return { menu, resumo, item, janela, campoDaJanela, fora }
-}
-const tecla = (key, target, extra = {}) => ({
-  key, target, defaultPrevented: false, preventDefault() { this.defaultPrevented = true }, ...extra,
-})
-
-let mod = {}
-try { mod = await import('../src/hooks/menuDetalhes.js') } catch (erro) { console.log('      (sem src/hooks/menuDetalhes.js: ' + erro.code + ')') }
-const ligar = (menu) => {
-  assert.equal(typeof mod.ligarMenuDetalhes, 'function', 'falta ligarMenuDetalhes')
-  return mod.ligarMenuDetalhes(documento, () => menu)
-}
-
-// --- 1. Toque -------------------------------------------------------------------
-await confere('1. toque fora fecha o menu', () => {
-  const c = cena(); const soltar = ligar(c.menu)
-  documento.disparar('pointerdown', { target: c.fora })
-  soltar()
-  assert.equal(c.menu.open, false)
-})
-await confere('1. toque dentro (item, resumo ou janela aberta dele) não fecha', () => {
-  const c = cena(); const soltar = ligar(c.menu)
-  c.janela.open = true
-  for (const alvo of [c.item, c.resumo, c.campoDaJanela]) documento.disparar('pointerdown', { target: alvo })
-  soltar()
-  assert.equal(c.menu.open, true)
-})
-
-// --- 2. Escape ------------------------------------------------------------------
-await confere('2. Escape com o foco fora fecha o menu, sem roubar o foco', () => {
-  const c = cena(); const soltar = ligar(c.menu)
-  c.fora.focus()
-  documento.disparar('keydown', tecla('Escape', c.fora))
-  soltar()
-  assert.equal(c.menu.open, false)
-  assert.equal(documento.activeElement, c.fora)
-})
-await confere('2. Escape com o foco num item fecha e devolve o foco ao ⋮', () => {
-  const c = cena(); const soltar = ligar(c.menu)
-  c.item.focus()
-  documento.disparar('keydown', tecla('Escape', c.item))
-  soltar()
-  assert.equal(c.menu.open, false)
-  assert.equal(documento.activeElement, c.resumo)
-})
-await confere('2. Escape de uma janela aberta de dentro do menu fecha só a janela', () => {
-  const c = cena(); const soltar = ligar(c.menu)
-  c.janela.open = true
-  documento.disparar('keydown', tecla('Escape', c.campoDaJanela))
-  soltar()
-  assert.equal(c.menu.open, true)
-})
-await confere('2. Escape já tratado por outra camada não fecha; outra tecla também não', () => {
-  const c = cena(); const soltar = ligar(c.menu)
-  documento.disparar('keydown', tecla('Escape', c.fora, { defaultPrevented: true }))
-  documento.disparar('keydown', tecla('Enter', c.fora))
-  soltar()
-  assert.equal(c.menu.open, true)
-})
-await confere('2. menu fechado ou ausente: nada acontece; soltar desliga os ouvintes', () => {
-  const c = cena(); c.menu.open = false
-  const soltar = ligar(c.menu)
-  documento.disparar('pointerdown', { target: c.fora })
-  soltar()
-  assert.equal(c.menu.open, false)
-  const soltarVazio = mod.ligarMenuDetalhes(documento, () => null)
-  documento.disparar('pointerdown', { target: c.fora })
-  soltarVazio()
-  assert.equal(documento.ouvintes.pointerdown.size + documento.ouvintes.keydown.size, 0)
-})
-
-// --- 3. Os menus usam a mesma regra --------------------------------------------------
-const fonte = (caminho) => readFileSync(new URL('../src/' + caminho, import.meta.url), 'utf8')
+// --- 1. O Atendimento usa o menu único -------------------------------------------------
 // #2232 (A3, A4): o "Mais ações" da faixa saiu; Devolver e Concluir moram no ⋮ do cabeçalho.
-await confere('3. BarraModo.jsx: a faixa não tem menu próprio (a conversa tem um menu só)', () => {
-  assert.doesNotMatch(fonte('features/atendimento/BarraModo.jsx'), /<details/)
+await confere('1. BarraModo.jsx: a faixa não tem menu próprio (a conversa tem um menu só)', () => {
+  assert.doesNotMatch(fonte('features/atendimento/BarraModo.jsx'), /<details|<MenuDeAcoes/)
 })
-for (const [arquivo, ref] of [
-  ['features/atendimento/PainelAtendimento.jsx', 'menuConversa'],
-  ['features/atendimento/Composer.jsx', 'ferramentasRef'],
-]) {
-  await confere(`3. ${arquivo.split('/').pop()}: o <details> usa useMenuDetalhes(${ref})`, () => {
+for (const arquivo of ['features/atendimento/PainelAtendimento.jsx', 'features/atendimento/Composer.jsx']) {
+  await confere(`1. ${arquivo.split('/').pop()}: o menu é o MenuDeAcoes, sem <details>`, () => {
     const codigo = fonte(arquivo)
-    assert.match(codigo, new RegExp(`useMenuDetalhes\\(${ref}\\)`))
-    assert.match(codigo, new RegExp(`<details[^>]*ref=\\{${ref}\\}`))
+    assert.doesNotMatch(codigo, /<details/)
+    assert.match(codigo, /<MenuDeAcoes\b/)
   })
 }
-await confere('3. "Concluir conversa" do ⋮ fecha o menu ao abrir o resumo', () => {
-  const codigo = fonte('features/atendimento/PainelAtendimento.jsx')
-  assert.match(codigo, /fecharMenu\(menuConversa\.current\);\s*abrirEncerramento\(/)
+await confere('1. o fechamento do <details> saiu junto com o último <details> de menu', () => {
+  assert.equal(existsSync(url('hooks/useMenuDetalhes.js')), false)
+  assert.equal(existsSync(url('hooks/menuDetalhes.js')), false)
+})
+
+// --- 2. O item fecha o menu antes de agir ------------------------------------------------
+await confere('2. MenuDeAcoes: escolher fecha o menu e só então faz a ação', () => {
+  assert.match(fonte('componentes/MenuDeAcoes.jsx'), /onClick=\{\(\) => \{ fechar\(\); item\.aoEscolher\(\) \}\}/)
+})
+await confere('2. "Concluir conversa" do ⋮ abre o resumo pelo item do menu', () => {
+  assert.match(fonte('features/atendimento/PainelAtendimento.jsx'),
+    /chave: 'concluir', rotulo: 'Concluir conversa'[^\n]*aoEscolher: \(\) => abrirEncerramento\(/)
+})
+
+// --- 3. O Popover guarda o contrato da #2230 ---------------------------------------------
+const popover = fonte('componentes/Popover.jsx')
+await confere('3. toque fora fecha: pointerdown no documento, fora da caixa', () => {
+  assert.match(popover, /document\.addEventListener\('pointerdown', aoClicarFora\)/)
+  assert.match(popover, /if \(!caixaRef\.current\?\.contains\(evento\.target\)\) aoFechar\(\)/)
+})
+await confere('3. Escape no documento fecha com o foco em qualquer lugar e devolve o foco ao gatilho', () => {
+  assert.match(popover, /useEscape\(true, \(evento\) => \{[\s\S]*?aoFechar\(\)\s*\n\s*if \(origemRef\.current\?\.isConnected\) origemRef\.current\.focus\(\)/)
+  assert.match(popover, /\{ capturar: true \}\)/)
+  assert.match(fonte('hooks/useEscape.js'), /document\.addEventListener\('keydown', aoTeclar, capturar\)/)
+})
+await confere('3. Escape de uma janela aberta sobre o menu é dela; Escape já tratado não fecha', () => {
+  assert.match(popover, /if \(janelaDoMenu !== janelaDoFoco\) return/)
+  assert.match(fonte('hooks/useEscape.js'), /evento\.key === 'Escape' && !evento\.defaultPrevented/)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

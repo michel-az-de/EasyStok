@@ -98,6 +98,14 @@ export const horaMono = (ms) => {
   return `${horas}h${String(minutos).padStart(2, '0')}`
 }
 
+// #2185 (F27): nota, post-it e histórico no fuso da casa, o mesmo do balão ao lado (#1600). O aparelho da
+// atendente pode estar em outro fuso.
+export const diaMesHora = (iso) =>
+  new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: FUSO })
+
+export const diaMes = (iso) =>
+  new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: FUSO })
+
 export const dataHora = (ms) =>
   new Date(ms).toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: FUSO,

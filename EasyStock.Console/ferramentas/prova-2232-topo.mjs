@@ -35,8 +35,11 @@ const popoverJsx = fonte('componentes/Popover.jsx')
 const popoverCss = fonte('componentes/Popover.module.css')
 const balaoJsx = fonte('features/assistente/BalaoAssistente.jsx')
 const balaoCss = fonte('features/assistente/assistente.module.css')
-const contadorJsx = lerOuVazio('componentes/Contador.jsx')
-const contadorCss = lerOuVazio('componentes/Contador.module.css')
+// #2185 (R04): o contador único do app é a `Pilula contagem`; o `Contador` próprio da #2232 foi
+// fundido nela para não haver dois desenhos do mesmo número.
+const pilulaJsx = fonte('componentes/Pilula.jsx')
+const pilulaCss = fonte('componentes/Pilula.module.css')
+const contadorProprio = lerOuVazio('componentes/Contador.jsx')
 
 const regraDe = (css, seletor) => {
   const escapado = seletor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -78,14 +81,14 @@ confere('L1  o controle diz "Loja aberta" / "Loja fechada" por escrito, com pont
 })
 
 // #2246: o contador passou de quadrado a pílula, com os cantos arredondados da banca.
-confere('L2  um estilo só de contador: componente Contador em pílula, neutro ou de alerta, usado no topo e nas abas', () => {
-  assert.ok(contadorJsx, 'falta componentes/Contador.jsx')
-  assert.match(contadorJsx, /export function Contador/)
-  assert.match(contadorJsx, /tom/)
-  const raios = [...contadorCss.matchAll(/border-radius:\s*([^;}]+)/g)].map((m) => m[1].trim())
+confere('L2  um estilo só de contador: Pilula contagem em pílula, neutro ou de perigo, usado no topo e nas abas', () => {
+  assert.equal(contadorProprio, '', 'voltou um componente Contador paralelo à Pilula contagem')
+  assert.match(pilulaJsx, /contagem/)
+  assert.match(pilulaJsx, /perigo/)
+  const raios = [...regraDe(pilulaCss, '.contagem').matchAll(/border-radius:\s*([^;}]+)/g)].map((m) => m[1].trim())
   assert.deepEqual(raios, ['var(--r-pilula)'], 'o contador tem um raio só, o da pílula')
-  assert.match(moldura, /import \{ Contador \}/)
-  assert.match(abasJsx, /import \{ Contador \}/)
+  assert.match(moldura, /<Pilula contagem=/)
+  assert.match(abasJsx, /<Pilula[^>]*contagem=/)
   assert.ok(!/\.conta\b[^{]*\{[^}]*background/.test(molduraCss), 'o topo ainda desenha o próprio contador')
   assert.ok(!/\.contador\s*\{[^}]*background/.test(abasCss), 'as abas ainda desenham o próprio contador')
 })
@@ -179,7 +182,9 @@ confere('M3  "Hoje · N em andamento · N na esteira" sai do menu', () => {
 })
 
 confere('M4  no celular o menu abre como folha inferior, sem rolagem interna para o conteúdo atual', () => {
-  assert.match(moldura, /<Popover[^>]*\bfolha\b/)
+  // #2185: o Mais do topo é o MenuDeAcoes com grupos, que abre o Popover como folha.
+  assert.match(moldura, /<MenuDeAcoes[^>]*\bgrupos=/)
+  assert.match(fonte('componentes/MenuDeAcoes.jsx'), /<Popover[^>]*\bfolha=\{Boolean\(grupos\)\}/)
   assert.match(popoverJsx, /css\.folha/)
   const folha = regraDe(popoverCss, '.folha')
   assert.match(folha, /bottom:\s*0/)

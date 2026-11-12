@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
-import { Contador } from '../../componentes/Contador'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
@@ -49,10 +48,10 @@ export function SinoDaSessao({ avisos, aparelho }) {
       aria-haspopup="dialog" onClick={() => { setAberto(true); carregar() }}>
       {/* #2232 (H3, L2): o número sai do texto e vai para o contador único do app. */}
       <span>Avisos{erro ? ' !' : ''}</span>
-      {!erro && total > 0 && <Contador valor={total} tom="alerta" data-contador-sino />}
+      {!erro && total > 0 && <Pilula contagem={total > 99 ? '99+' : total} tom="perigo" aria-hidden="true" data-contador-sino />}
       {semAvisoNoAparelho && <span className={css.pontoAparelho} data-aparelho-desligado aria-hidden="true" title="Avisos desligados neste aparelho" />}
     </Botao>
-    {aberto && <Modal titulo="Avisos" largura="min(760px, calc(100vw - 24px))" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."
+    {aberto && <Modal titulo="Avisos" largura="md" descricao="Avisos para você e para a equipe. A leitura de um aviso geral vale para toda a equipe."
       aoFechar={() => setAberto(false)} rodape={<><Botao ref={atualizarRef} onClick={() => carregar()} disabled={carregando || Boolean(lendo)}>Atualizar avisos</Botao><Botao onClick={() => setAberto(false)}>Fechar</Botao></>}>
       {erro && <p role="alert" className={css.erro}>Sem atualizar: {erro}</p>}
       {carregando && <p role="status" className={css.resumo}>Atualizando avisos…</p>}

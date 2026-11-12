@@ -14,7 +14,8 @@ import { AUTOMATICO_DESLIGADO } from './motivoDeEscalada'
 import { pedidoEncerrado } from './pedido'
 import { ultimaFala } from './mensagem'
 
-export const MOTIVO_PADRAO = 'O agente preferiu não responder sozinho'
+export const MOTIVO_PADRAO = 'O Assistente preferiu não responder sozinho'
+export const AGUARDANDO_EQUIPE = 'Aguardando equipe'
 
 // #1804: reabrir a conversa de um pedido já entregue ou cancelado não cria pendência. Ela só
 // volta a "Precisa de você" quando a última fala é do cliente; antes disso, é só encerrar. Sem
@@ -47,6 +48,8 @@ export function origemDaPassagem(passagem) {
   const motivo = passagem.motivo ?? MOTIVO_PADRAO
   const hora = passagem.em ? horaCurta(passagem.em) : null
   if (passagem.origem === 'chat-site') return { motivo, hora, curto: 'Chat do site', longo: motivo, chip: null }
+  // #2185: canal sem Assistente ninguém "não soube responder": a conversa é da equipe desde o início.
+  if (passagem.origem === 'fila') return { motivo, hora, curto: AGUARDANDO_EQUIPE, longo: motivo, chip: null }
   if (passagem.origem === 'reabertura') return { motivo, hora, curto: motivo, longo: motivo, chip: chipDoMotivo(motivo) }
   // #1761: com o automático desligado ninguém "não soube responder": a conversa só veio para a equipe.
   if (motivo === AUTOMATICO_DESLIGADO) {
@@ -54,7 +57,7 @@ export function origemDaPassagem(passagem) {
       motivo, hora,
       chip: 'Sem automático',
       // O cartão e o lembrete já dizem "Passou para você" na linha de estado: aqui vai só o porquê.
-      curto: `Sem automático${hora ? ` (${hora})` : ''}`,
+      curto: `Sem Assistente${hora ? ` (${hora})` : ''}`,
       longo: `A conversa passou para você${hora ? ` às ${hora}` : ''} porque ${motivo}.`,
     }
   }
@@ -62,10 +65,10 @@ export function origemDaPassagem(passagem) {
     motivo,
     hora,
     chip: chipDoMotivo(motivo),
-    // Lembrete: uma linha que cabe em duas no cartão.
-    curto: `Automático não soube responder${hora ? ` (${hora})` : ''}: ${minuscula(motivo)}`,
+    // Cartão do Balcão e lembrete: uma linha que cabe em duas no cartão.
+    curto: `Assistente não soube responder${hora ? ` (${hora})` : ''}: ${minuscula(motivo)}`,
     // Barra da conversa: a frase inteira, com espaço para ler.
-    longo: `O atendimento automático não soube responder e passou para você${hora ? ` às ${hora}` : ''}. `
+    longo: `O Assistente não soube responder e passou para você${hora ? ` às ${hora}` : ''}. `
       + `Motivo: ${minuscula(motivo)}.`,
   }
 }

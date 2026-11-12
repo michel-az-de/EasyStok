@@ -88,9 +88,9 @@ await provar('montagem só acontece no clique explícito; espera, evita duplica�
   assert.match(texto(h.arvore), /Proposta das 12h20|Proposta das 12:20/)
   h.render({ ...h.props, blocosSoltos: [`${geracao}:nota-1`] })
   assert.deepEqual(doTipo(h, BlocoColaborativoIa).map(b => b.props.bloco.tipo), ['comanda', 'frete', 'acao'])
-  assert.equal(botao(h, 'Organizar com IA').props['data-organizar-ficha-ia'], conversa, 'retorno de foco permanece disponível após retirar o bloco da área')
-  assert.equal(texto(botao(h, 'Organizar com IA')), 'Organizar', 'ação curta mantém o nome acessível completo')
-  assert.equal(botao(h, 'Organizar com IA').props.disabled, false)
+  assert.equal(botao(h, 'Organizar com o Assistente').props['data-organizar-ficha-ia'], conversa, 'retorno de foco permanece disponível após retirar o bloco da área')
+  assert.equal(texto(botao(h, 'Organizar com o Assistente')), 'Organizar', 'ação curta mantém o nome acessível completo')
+  assert.equal(botao(h, 'Organizar com o Assistente').props.disabled, false)
   h.desmontar()
 })
 
@@ -139,7 +139,7 @@ await provar('resposta atrasada é abortada e não aparece na conversa seguinte;
   const falha = enviar(h); g.proxima.recusar(new Error('IA indisponível nesta loja.')); await falha; h.render()
   assert.match(texto(h.arvore), /IA indisponível/)
   assert.equal(doTipo(h, 'CampoTexto')[0].props.value, 'Conferir entrega')
-  assert.equal(botao(h, 'Organizar com IA').props.disabled, false)
+  assert.equal(botao(h, 'Organizar com o Assistente').props.disabled, false)
   h.desmontar(); g.estado = { ...g.estado, selecionada: { ...g.estado.selecionada, id: conversa } }
 })
 

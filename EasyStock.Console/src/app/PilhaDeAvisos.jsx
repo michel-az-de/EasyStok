@@ -3,6 +3,7 @@ import { Botao } from '../componentes/Botao'
 import { useAcoes, useAtendimento } from '../aplicacao/contextos'
 import { TIPOS_DE_AVISO } from '../dominio/aviso'
 import { hashDoModulo } from '../dominio/modulos'
+import { anunciarAberturaDeConversa } from '../aplicacao/aberturaDeConversa'
 import css from './pilhaDeAvisos.module.css'
 
 // #1807: os avisos do Balcão (contato novo, passou para você, mensagem nova, pagamento e etapa
@@ -16,11 +17,12 @@ const DESENHO = {
 }
 
 export function PilhaDeAvisos() {
-  const { avisosNaTela = [], dispensarAviso, permissaoNotificacao } = useAtendimento()
+  const { avisosNaTela = [], dispensarAviso, pausarAvisos, retomarAvisos, permissaoNotificacao } = useAtendimento()
   const { selecionar, pedirNotificacaoDoNavegador } = useAcoes()
   const itens = avisosNaTela.map((aviso) => ({ ...aviso, ...DESENHO[aviso.tipo], abrivel: Boolean(aviso.conversaId) }))
   const abrir = (aviso) => {
     selecionar(aviso.conversaId)
+    anunciarAberturaDeConversa(aviso.conversaId)
     const balcao = hashDoModulo('atendimento', 'balcao')
     if (window.location.hash !== balcao) window.location.hash = balcao
     dispensarAviso(aviso.id)
@@ -30,5 +32,5 @@ export function PilhaDeAvisos() {
   const rodape = permissaoNotificacao === 'default' && pedirNotificacaoDoNavegador
     ? <Botao variante="secundario" className={css.permissao} onClick={pedirNotificacaoDoNavegador}>Avisar também com o console minimizado</Botao>
     : null
-  return <Toast itens={itens} aoFechar={dispensarAviso} aoAbrir={abrir} rotulo="Avisos do atendimento" rodape={rodape} />
+  return <Toast itens={itens} aoFechar={dispensarAviso} aoAbrir={abrir} aoPausar={pausarAvisos} aoRetomar={retomarAvisos} rotulo="Avisos do atendimento" rodape={rodape} />
 }

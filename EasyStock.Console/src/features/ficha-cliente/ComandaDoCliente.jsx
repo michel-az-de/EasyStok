@@ -310,7 +310,7 @@ function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompar
         </div>
       })}
     </>}
-    {aberta && <Modal titulo={`${etapaDaSelecao(aberta).titulo}${nomeCliente ? ` · ${nomeCliente}` : ''}`} largura="760px"
+    {aberta && <Modal titulo={`${etapaDaSelecao(aberta).titulo}${nomeCliente ? ` · ${nomeCliente}` : ''}`} largura="md"
       aoFechar={ocupado ? undefined : () => setLinkAberto(null)}>
       {erro && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar comanda</Botao></>}
       {selecaoDe(aberta)}

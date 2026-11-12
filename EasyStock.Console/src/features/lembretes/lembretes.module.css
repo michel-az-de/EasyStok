@@ -14,11 +14,6 @@ button.sino {
   75% { transform: rotate(-12deg); }
 }
 
-/* #2232 (L2): o desenho do número é o do Contador; aqui só a posição e a entrada. */
-.badge {
-  position: absolute; top: 4px; right: 6px; box-shadow: 0 0 0 2px var(--fundo);
-  animation: estalar var(--dur-curta) var(--ease-pulo);
-}
 @keyframes estalar {
   0% { transform: scale(.4); }
   70% { transform: scale(1.12); }
@@ -33,7 +28,7 @@ button.sino {
   animation: abrirPainel var(--dur-media) var(--ease-mola) both;
   background: var(--papel); backdrop-filter: none;
   border: 0; border-radius: var(--r-2);
-  box-shadow: var(--sombra); padding: var(--e-3);
+  box-shadow: var(--sombra-media); padding: var(--e-3);
   z-index: 20;
 }
 
@@ -42,7 +37,6 @@ button.sino {
   gap: var(--e-2); margin-bottom: var(--e-2);
 }
 .cabecalho h2 { margin: 0; font-size: var(--t-titulo); font-weight: 700; }
-button.mais { padding: 0; width: var(--toque); height: var(--toque); display: grid; place-items: center; }
 
 .secao { margin-top: var(--e-3); }
 .secao:first-child { margin-top: 0; }
@@ -66,7 +60,7 @@ button.botaoVistos {
 @keyframes realce { 0% { background: var(--sucesso-pastel); } 100% { background: var(--elevado); } }
 
 .ponto {
-  flex-shrink: 0; width: 10px; height: 10px; border-radius: var(--r-pilula); background: var(--erro);
+  flex-shrink: 0; width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula); background: var(--erro);
 }
 
 .alvo {
@@ -90,7 +84,6 @@ button.botaoVistos {
 }
 .legendaPonto .ponto { width: 8px; height: 8px; }
 
-button.acaoItem { flex-shrink: 0; padding: 0; width: var(--toque); height: var(--toque); display: grid; place-items: center; }
 
 .itemProgramado {
   display: flex; align-items: center; gap: var(--e-2);
@@ -130,3 +123,5 @@ button.pilula { border-radius: var(--r-pilula); min-height: var(--toque); }
 }
 
 
+/* #2185 (R04): o número é a `Pilula contagem`; aqui só o lugar dele no canto do relógio. */
+.badge { position: absolute; top: 4px; right: 6px; box-shadow: 0 0 0 2px var(--fundo); animation: estalar var(--dur-curta) var(--ease-pulo); }

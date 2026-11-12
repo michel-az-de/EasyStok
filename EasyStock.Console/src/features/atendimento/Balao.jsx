@@ -118,6 +118,12 @@ function LinkDePagamento({ url, rotulo }) {
   )
 }
 
+// #2185 (R08): quem responde sozinho é o Assistente, qualquer que seja a origem. O `title` só diz de onde veio.
+const TITULO_DO_ASSISTENTE = Object.freeze({
+  agente: 'Escrita pelo Assistente',
+  regra: 'Enviada pelo Assistente, por uma regra de Automáticas',
+})
+
 // #1577: em `memo`. Mensagem nova na conversa não re-renderiza os balões antigos (até 100, cada um com a
 // regex de link). A mensagem compara por conteúdo: a leitura da API a devolve como objeto novo sem ter mudado.
 export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, numeroComanda = null }) {
@@ -164,21 +170,26 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
         {/* Item D (banca 10, pedido 24/09 04h12 "editar ali na hora"): a
             etiqueta que já marcava "automática" vira um botão que abre a
             definição correspondente na biblioteca de Respostas. */}
-        {mensagem.automatica && !mensagem.modelo && (
+        {/* #2185 (E25): sem regra (fala do agente, aviso do sistema) não há definição a abrir; o selo só informa. */}
+        {mensagem.automatica && !mensagem.modelo && (mensagem.regra ? (
           <button
             type="button"
             className={`${css.selo} ${css.seloBotao}`}
-            title={mensagem.origemAutomatica === 'agente' ? 'Escrita pelo agente do EasyStok' : 'Mensagem automática do sistema'}
+            title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}
             onClick={() => aoAbrirDefinicaoAutomatica?.(mensagem.regra)}
           >
-            <Icone nome="raio" /> automática
+            <Icone nome="sparkles" /> Assistente
           </button>
-        )}
+        ) : (
+          <span className={css.selo} title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}>
+            <Icone nome="sparkles" /> Assistente
+          </span>
+        ))}
         {mensagem.modelo && <span className={css.selo} title={mensagem.modeloNome}><Icone nome="modelo" /> modelo</span>}
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
         {mensagem.status === 'falhou' && (
-          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={14} /> {falha.texto}</span>
+          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={16} /> {falha.texto}</span>
         )}
         {falha?.tipo === TIPOS_DE_FALHA.FORA_DA_JANELA && mensagem.dir === 'out' && aoAbrirModelos && (
           <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-haspopup="dialog" onClick={aoAbrirModelos}>
@@ -189,7 +200,7 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
         {mensagem.porSms && <span className={css.selo}><Icone nome="check" /> saiu por SMS</span>}
         {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.modelo && !mensagem.semIdServidor && !mensagem.midia && !mensagem.aguardaCliente && (
           <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} disabled={reenvio === 'indo'} onClick={reenviar}>
-            <Icone nome="raio" /> {reenvio === 'indo' ? 'Reenviando…' : 'Reenviar'}
+            <Icone nome="refresh-cw" /> {reenvio === 'indo' ? 'Reenviando…' : 'Reenviar'}
           </button>
         )}
         {mensagem.status === 'falhou' && reenvio === 'falhou' && (

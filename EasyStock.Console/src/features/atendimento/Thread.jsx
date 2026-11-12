@@ -18,7 +18,7 @@ import css from './atendimento.module.css'
 function Divisoria({ numero }) {
   return (
     <div className={css.divisoriaAtendimento} role="separator">
-      <span>Atendimento {numero} encerrado · novo atendimento a seguir</span>
+      <span>Atendimento {numero} concluído · novo atendimento a seguir</span>
     </div>
   )
 }
@@ -38,14 +38,14 @@ function SeparadorDeDia({ rotulo }) {
 // Rodada 11 (issue #8, registro 92): a casa "digitando" antes da resposta
 // automática sair, do lado de quem responde, com o mesmo selo "automática"
 // da bolha que vem a seguir. Sem isto a resposta caía pronta junto da fala do
-// cliente e ninguém via o automático trabalhar. Os três pontos animam; com
+// cliente e ninguém via o Assistente trabalhar. Os três pontos animam; com
 // movimento reduzido (base.css) ficam parados e o texto continua dizendo.
 function Digitando() {
   return (
     <div className={`${css.balao} ${css.saida} ${css.doAutomatico} ${css.digitando}`}>
       <span className={css.pontos} aria-hidden="true"><i /><i /><i /></span>
       <span className={css.meta}>
-        <span className={css.selo}><Icone nome="raio" /> automática digitando</span>
+        <span className={css.selo}><Icone nome="sparkles" /> Assistente digitando</span>
       </span>
     </div>
   )
@@ -66,8 +66,8 @@ function PostIt({ nota }) {
 }
 
 export function Thread({
-  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, digitando = false, notas = [],
-  temAnteriores = false, abrindoAnteriores = false, aoVerAnteriores, visivel = true, numeroComanda = null,
+  mensagens, chaveRolagem, fronteiras = [], agora, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, digitando = false, notas = [], visivel = true,
+  temAnteriores = false, abrindoAnteriores = false, aoVerAnteriores, numeroComanda = null,
 }) {
   const fim = useRef(null)
   // #1577: o pai recria os dois handlers a cada render; com identidade fixa o `memo` do balão segura.

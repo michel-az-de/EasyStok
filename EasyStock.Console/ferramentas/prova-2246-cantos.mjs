@@ -39,7 +39,10 @@ confere('balão: arredondado, com o canto da ponta em --r-ponta só na troca de 
 })
 
 confere('contador numérico em pílula', () => {
-  assert.match(regra(fonte('componentes/Contador.module.css'), '.contador'), /border-radius:\s*var\(--r-pilula\)/)
+  // #2185 (R04): o contador único do app é a Pilula contagem, e o "não lidas" do cartão é ela.
+  assert.match(regra(fonte('componentes/Pilula.module.css'), '.contagem'), /border-radius:\s*var\(--r-pilula\)/)
+  assert.match(fonte('features/caixa-de-entrada/CartaoConversa.jsx'), /<Pilula\s+contagem=\{pendentes\}[^>]*className=\{css\.naoLidas\}/)
+  assert.doesNotMatch(regra(fonte('features/caixa-de-entrada/caixa.module.css'), '.naoLidas'), /border-radius/, '.naoLidas não redesenha o contador')
 })
 
 confere('avatar e chip seguem em pílula', () => {
@@ -49,7 +52,7 @@ confere('avatar e chip seguem em pílula', () => {
 
 confere('contadores, pontos, chips, selos e tags dos módulos em pílula', () => {
   const pilulas = [
-    ['features/caixa-de-entrada/caixa.module.css', ['.naoLidas', '.pontoOrdem', '.chipFiltro', '.pontoPrecisa']],
+    ['features/caixa-de-entrada/caixa.module.css', ['.pontoOrdem', '.chipFiltro', '.pontoPrecisa']],
     ['features/cozinha/cozinha.module.css', ['.pontoVivo', '.aoVivoLigado .pontoVivo::after']],
     ['features/ficha-cliente/cliente.module.css', ['.seloCaptado', '.seloPontos', '.seloInformado']],
     ['features/ficha-cliente/ficha.module.css', ['.tagsCliente li']],
@@ -92,7 +95,7 @@ confere('--r-ponta só no balão, nas faixas com barra lateral e na tecla de ata
 })
 
 confere('nenhum comentário do Console promete cantos retos', () => {
-  for (const caminho of ['componentes/Contador.jsx', 'componentes/Contador.module.css', 'features/atendimento/atendimento.module.css']) {
+  for (const caminho of ['componentes/Pilula.jsx', 'componentes/Pilula.module.css', 'features/atendimento/atendimento.module.css']) {
     assert.doesNotMatch(fonte(caminho), /cantos? (seguem )?retos|Quadrado: raio 0/i, caminho)
   }
 })

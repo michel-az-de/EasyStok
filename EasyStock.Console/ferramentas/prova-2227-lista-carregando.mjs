@@ -79,7 +79,8 @@ function balcao({ estado, conversas = [], fonteApi = true }) {
 const cabecalho = (html) => html.match(/<h2>(.*?)<\/h2>/)?.[1] ?? ''
 // #2232 (L5, L11): a lista abre em "Precisa de você" e o total mora no chip "Todas", não no título.
 const VAZIO_DE_HOJE = /Nenhuma conversa aberta agora\.|Ninguém esperando você\./
-const totalNoChip = (html) => html.match(/Todas <span class="numeroChip">(\d+)<\/span>/)?.[1]
+// #2185 (R04): o número do chip é a Pilula contagem, o contador único do app.
+const totalNoChip = (html) => html.match(/Todas <span class="contagem[^"]*"[^>]*>(\d+)<\/span>/)?.[1]
 
 // --- 1. Regra pura ---------------------------------------------------------------
 await confere('1. cargaDaLista: carregando, erro ou nada', async () => {

@@ -3,9 +3,10 @@ import { useDraggable } from '@dnd-kit/core'
 import { Anel } from '../../componentes/Anel'
 import { Botao } from '../../componentes/Botao'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
+import { MenuDeAcoes } from '../../componentes/MenuDeAcoes'
 import { Pilula } from '../../componentes/Pilula'
-import { Popover } from '../../componentes/Popover'
 import { itensDetalhados, numeroCurto } from '../../dominio/pedido'
 import { numeroParaEntregador, textoDoEntregador } from '../../dominio/despacho'
 import { estaBloqueada } from '../../dominio/conversa'
@@ -34,29 +35,19 @@ const rotuloMinutos = (minutos) => {
 
 // Cartão de entrega (seção 6): anel de quanto falta para o PRÓXIMO marco,
 // nome, pílula de estado, e o botão do marco que a leva ao passo seguinte da
-// esteira. O menu ⋯ é a alternativa de um ponteiro só ao arrasto (WCAG
+// esteira. O menu ⋮ é a alternativa de um ponteiro só ao arrasto (WCAG
 // 2.5.7): tudo que dá para arrastar também dá para escolher por aqui.
 export function CartaoEntrega({
   conversa, grupoDaViagem, janelas, agora, constantes, cardapio, viagensDisponiveis, acoes,
   aoAbrirAgendamento, destacado = false, opcoesDespacho,
 }) {
   const [aberto, setAberto] = useState(false)
-  const [menuAberto, setMenuAberto] = useState(false)
   const [confirmando, setConfirmando] = useState(null)
   const [pedindoEntregador, setPedindoEntregador] = useState(false)
   const cardRef = useRef(null)
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: conversa.id, data: { type: 'entrega' },
   })
-  // Popover.jsx não é portal: se o cartão está perto da borda da lista que
-  // rola (`dashboard.module.css: .listaColuna`), o menu nasce recortado e o
-  // clique nem chega a registrar (achado da própria prova). Centralizar o
-  // cartão na lista ao abrir garante espaço para o menu embaixo.
-  const abrirMenu = () => {
-    cardRef.current?.scrollIntoView({ block: 'center' })
-    setMenuAberto(true)
-  }
-
   const pedido = conversa.pedido
   const passo = proximoPassoDeEntrega(conversa, grupoDaViagem, janelas, agora, constantes)
   // US-040: só a entrega solta (sem viagem) despacha por aqui sem já ter
@@ -82,21 +73,16 @@ export function CartaoEntrega({
     ? textoDoEntregador(pedido.entregador ?? entregadorResolvido(pedido))
     : null
 
-  const fecharMenu = () => setMenuAberto(false)
-  const escolher = (fn) => { fecharMenu(); fn() }
-
   return (
     <li
       ref={(node) => { setNodeRef(node); cardRef.current = node }}
       className={`${css.cartao} ${isDragging ? css.arrastando : ''} ${destacado ? css.cartaoNovo : ''}`}
     >
       <div className={css.linha1}>
-        <button
-          type="button" className={css.alcaArrasto} aria-label={'Arrastar entrega de ' + conversa.nome}
+        <BotaoIcone
+          className={css.alcaArrasto} rotulo={'Arrastar entrega de ' + conversa.nome} icone="grip-vertical"
           {...attributes} {...listeners}
-        >
-          <Icone nome="grip-vertical" tamanho={20} />
-        </button>
+        />
         {passo && (
           <Anel tamanho={44} traco={5} fracao={Math.max(0, Math.min(1, minutos / 60))} tom={corPeloMinuto(minutos)}>
             <span
@@ -116,52 +102,19 @@ export function CartaoEntrega({
             <Icone nome={estado.icone} tamanho={16} /> {estado.rotulo}
           </Pilula>
         </span>
-        <span className={css.comMenu}>
-          <Botao
-            variante="secundario" className={css.gatilhoMenu} aria-haspopup="menu" aria-expanded={menuAberto}
-            aria-label={'Mais ações da entrega de ' + conversa.nome}
-            onClick={() => (menuAberto ? fecharMenu() : abrirMenu())}
-          >
-            <Icone nome="ellipsis-vertical" tamanho={20} />
-          </Botao>
-          {menuAberto && (
-            <Popover rotulo="Mais ações da entrega" posicao="abaixo" aoFechar={fecharMenu}>
-              <div className={css.menuAcoes}>
-                <button type="button" role="menuitem" className={css.itemMenu} onClick={() => escolher(() => aoAbrirAgendamento(conversa))}>
-                  <Icone nome="relogio" /> Alterar agendamento
-                </button>
-                {viagensDisponiveis.map((v) => (
-                  <button
-                    key={v.id} type="button" role="menuitem" className={css.itemMenu}
-                    onClick={() => escolher(() => acoes.porNaViagem(v.id, conversa.id))}
-                  >
-                    <Icone nome="moto" /> Pôr na viagem {v.rotulo}
-                  </button>
-                ))}
-                <button
-                  type="button" role="menuitem" className={css.itemMenu}
-                  onClick={() => escolher(() => acoes.criarViagem(conversa.id, 'entregador'))}
-                >
-                  <Icone nome="plus" /> Nova viagem
-                </button>
-                {pedido.viagem && (
-                  <button type="button" role="menuitem" className={css.itemMenu} onClick={() => escolher(() => acoes.tirarDaViagem(conversa.id))}>
-                    <Icone nome="x" /> Tirar da viagem
-                  </button>
-                )}
-                <button type="button" role="menuitem" className={css.itemMenu} onClick={() => escolher(() => acoes.selecionar(conversa.id))}>
-                  <Icone nome="conversa" /> Abrir conversa
-                </button>
-                <button
-                  type="button" role="menuitem" className={`${css.itemMenu} ${css.perigo}`}
-                  onClick={() => { fecharMenu(); setConfirmando('cancelar') }}
-                >
-                  <Icone nome="circle-x" /> Cancelar entrega
-                </button>
-              </div>
-            </Popover>
-          )}
-        </span>
+        <MenuDeAcoes
+          rotulo={'Mais opções da entrega de ' + conversa.nome}
+          itens={[
+            { chave: 'agendamento', rotulo: 'Alterar agendamento', icone: 'relogio', abreJanela: true, aoEscolher: () => aoAbrirAgendamento(conversa) },
+            ...viagensDisponiveis.map((v) => ({
+              chave: 'viagem-' + v.id, rotulo: 'Pôr na viagem ' + v.rotulo, icone: 'moto', aoEscolher: () => acoes.porNaViagem(v.id, conversa.id),
+            })),
+            { chave: 'nova-viagem', rotulo: 'Nova viagem', icone: 'plus', aoEscolher: () => acoes.criarViagem(conversa.id, 'entregador') },
+            pedido.viagem && { chave: 'tirar-da-viagem', rotulo: 'Tirar da viagem', icone: 'x', aoEscolher: () => acoes.tirarDaViagem(conversa.id) },
+            { chave: 'conversa', rotulo: 'Abrir conversa', icone: 'conversa', aoEscolher: () => acoes.selecionar(conversa.id) },
+            { chave: 'cancelar', rotulo: 'Cancelar entrega', icone: 'circle-x', tom: 'perigo', aoEscolher: () => setConfirmando('cancelar') },
+          ]}
+        />
       </div>
 
       <div className={css.linha2}>

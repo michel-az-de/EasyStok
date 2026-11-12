@@ -10,14 +10,14 @@
   line-height: var(--lh-compacto);
 }
 .ativa { color: var(--marca); border-top-color: var(--marca); }
-/* #2232 (L2): o desenho do contador é o `Contador` único (componentes/Contador.module.css); aqui só o
+/* #2232 (L2): o desenho do contador é o da `Pilula contagem` (o contador único do app); aqui só o
    lugar dele dentro da aba. */
 
 /* Rodada 6d (banca, item 6): ícone de 24 com rótulo embaixo, como a tab bar
    do iOS; ativa em tinta cheia, as outras em cinza. Contador no canto do ícone. */
 .aba {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  border-top: 0; min-height: 54px; font-size: var(--t-minimo); font-weight: 600; color: var(--tinta-3);
+  border-top: 0; min-height: 54px; font-size: var(--t-micro); font-weight: 600; color: var(--tinta-3);
 }
 .aba:active:not(:disabled) { background: var(--preenchimento); }
 .ativa { color: var(--marca-forte); background: var(--marca-claro); }
@@ -31,3 +31,6 @@
 .aba:has(> svg) .contador { position: absolute; top: 5px; left: calc(50% + 6px); box-shadow: 0 0 0 2px var(--papel); }
 .aba:not(:has(> svg)) .contador { margin-left: 0; }
 .aba:not(:has(> svg)) { flex-direction: row; gap: 6px; font-size: var(--t-apoio); min-height: var(--toque); }
+
+/* #2185 (R04): o número é a `Pilula contagem`; aqui só o lugar dele ao lado do rótulo. */
+.contador { margin-left: 0; }

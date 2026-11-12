@@ -116,7 +116,8 @@ export function itensDoMenuDaFicha({ acoes = {}, comPedido = false } = {}) {
       acoes.podeDesfazerPagamento && { chave: 'desfazer', rotulo: 'Desfazer pagamento', icone: 'undo-2' },
       acoes.podeEstornar && { chave: 'estornar', rotulo: 'Marcar estorno', icone: 'undo-2' },
       acoes.podeVoltarEtapa && { chave: 'voltar', rotulo: 'Voltar etapa', icone: 'arrow-left' },
-      { chave: 'encerrar', rotulo: 'Encerrar atendimento', icone: 'log-out' },
+      // #2185: o mesmo nome e ícone do ⋮ da conversa. O item só aparece com a conversa aberta (`editavel`).
+      { chave: 'encerrar', rotulo: 'Concluir conversa', icone: 'circle-check' },
     ].filter(Boolean) : []),
   ]
 }

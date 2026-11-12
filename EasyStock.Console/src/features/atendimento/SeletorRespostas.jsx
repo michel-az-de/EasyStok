@@ -1,5 +1,8 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { Popover } from '../../componentes/Popover'
+import { useAtendimento } from '../../aplicacao/contextos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { respostasEditaveis } from '../../dominio/acessoModulos'
 import css from './seletorRespostas.module.css'
 
 // Lista compacta de respostas prontas acima do compositor (#1441). Uma linha por
@@ -12,6 +15,10 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
   const idLista = idInformado ?? idGerado
   const idDe = (indice) => `${idLista}-${indice}`
   const { itens, destaque } = seletor
+  const { fonteApi } = useAtendimento()
+  const { acoes } = useAcessoModulos()
+  // #2185: quem não edita abre a biblioteca só para consultar.
+  const editavel = respostasEditaveis({ fonteApi, acoes })
   const opcaoAtiva = useRef(null)
   useLayoutEffect(() => {
     const opcao = opcaoAtiva.current
@@ -80,7 +87,7 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => { seletor.fechar(); aoGerenciar?.() }}
           >
-            Gerenciar respostas
+            {editavel ? 'Gerenciar respostas' : 'Ver respostas'}
           </button>
         </div>
       </div>

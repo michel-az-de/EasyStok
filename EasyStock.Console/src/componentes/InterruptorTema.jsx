@@ -23,7 +23,7 @@ export function InterruptorTema({ vertical = false }) {
         <Botao key={opcao.valor} role="radio" aria-checked={tema === opcao.valor}
           tabIndex={tema === opcao.valor ? 0 : -1} data-tema={opcao.valor}
           onClick={() => { if (tema !== opcao.valor) trocarTema(opcao.valor) }}>
-          <Icone nome={opcao.icone} tamanho={18} />
+          <Icone nome={opcao.icone} tamanho={20} />
           <span>{opcao.rotulo}</span>
         </Botao>
       ))}

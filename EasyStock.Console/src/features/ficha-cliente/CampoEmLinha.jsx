@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { mascaraTelefone, telefoneDoE164 } from '../../dominio/formato'
 import css from './cliente.module.css'
@@ -39,8 +40,9 @@ export function CampoEmLinha({
 
   // #2258 (T17): rascunho diferente do valor salvo conta como digitado; o modal pergunta antes de descartar.
   const sujo = editando && rascunho !== exibido
-  useEffect(() => { aoMudarSujo?.(sujo) }, [aoMudarSujo, sujo])
-  useEffect(() => () => aoMudarSujo?.(false), [aoMudarSujo])
+  // Efeito de layout, como o do cadastro (BlocoCliente): o aviso chega à janela antes do próximo evento.
+  useLayoutEffect(() => { aoMudarSujo?.(sujo) }, [aoMudarSujo, sujo])
+  useLayoutEffect(() => () => aoMudarSujo?.(false), [aoMudarSujo])
 
   useEffect(() => {
     if (!editando) return
@@ -138,25 +140,8 @@ export function CampoEmLinha({
           placeholder={dica}
           maxLength={limite}
         />
-        <button
-          type="button"
-          className={css.botaoIconeEdicao}
-          aria-label="Salvar"
-          disabled={salvando}
-          onClick={confirmar}
-        >
-          <Icone nome="check" tamanho={20} />
-        </button>
-        <button
-          type="button"
-          className={css.botaoIconeEdicao}
-          aria-label="Desfazer"
-          disabled={salvando}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={cancelar}
-        >
-          <Icone nome="x" tamanho={20} />
-        </button>
+        <BotaoIcone rotulo="Salvar" icone="check" disabled={salvando} onClick={confirmar} />
+        <BotaoIcone rotulo="Desfazer" icone="x" disabled={salvando} onMouseDown={(e) => e.preventDefault()} onClick={cancelar} />
       </div>
       {salvando && <output className={css.salvandoEmLinha}>Salvando…</output>}
       {erro && <p id={idErro} className={css.erroEmLinha} role="alert">{erro}</p>}

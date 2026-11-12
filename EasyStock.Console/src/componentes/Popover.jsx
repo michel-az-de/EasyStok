@@ -39,7 +39,8 @@ const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) 
 // CSS de .popover continua o mesmo (bottom/top: 100% relativo ao wrapper
 // plantado), então quem não passa `portal` renderiza exatamente como antes.
 export function Popover({
-  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu', folha = false, alinhamento = 'direita',
+  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu', folha = false,
+  alinhamento = 'direita', largura: larguraPedida = 360,
 }) {
   const aEsquerda = alinhamento === 'esquerda'
   const caixaRef = useRef(null)
@@ -113,7 +114,8 @@ export function Popover({
     const margem = parseFloat(estilo.getPropertyValue('--e-4'))
     const espaco = parseFloat(estilo.getPropertyValue('--e-2'))
     const { larguraLimite, alturaLimite, inicioX, inicioY } = retangulo
-    const largura = Math.max(1, Math.min(360, larguraLimite - 2 * margem))
+    const largura = Math.max(1, Math.min(larguraPedida, larguraLimite - 2 * margem))
+    // O menu cresce a partir da borda do gatilho que fica do lado de dentro da tela.
     const encosto = aEsquerda ? retangulo.left : retangulo.left + retangulo.width - largura
     const esquerda = Math.max(inicioX + margem, Math.min(encosto, inicioX + larguraLimite - largura - margem))
     // O limite é o dialog ou a viewport. Menus do rodapé também precisam abrir para cima.
@@ -130,7 +132,7 @@ export function Popover({
       maxHeight: `${Math.max(1, inverter ? acima : abaixo)}px`,
       transformOrigin: `${inverter ? 'bottom' : 'top'} ${aEsquerda ? 'left' : 'right'}`,
     })
-  }, [retangulo, posicao, aEsquerda])
+  }, [retangulo, posicao, aEsquerda, larguraPedida])
 
   // Sugestão presa ao campo de texto (atalho "/" do composer) não pode
   // roubar o foco: ela está digitando, e o Popover de clique de sempre foca
@@ -203,7 +205,7 @@ export function Popover({
           >
             <strong>{item.titulo}</strong>
             {item.detalhe && <span>{item.detalhe}</span>}
-            {item.marcado && <Icone nome="check" tamanho={18} className={css.marca} />}
+            {item.marcado && <Icone nome="check" tamanho={16} className={css.marca} />}
           </button>
         ))
         return (

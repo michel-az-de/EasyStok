@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { BotaoIcone } from '../../../componentes/BotaoIcone'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
 import { MarcaIcone } from '../../../componentes/MarcaIcone'
+import { MenuDeAcoes } from '../../../componentes/MenuDeAcoes'
 import { useGestaoCardapioApi } from '../../../aplicacao/useGestaoCardapioApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { FILTROS_DO_CARDAPIO, contagensDoCardapio, filtrarCardapio, filtroDaHash, hashDoFiltro, podeReordenar, rotuloDaCategoria } from '../../../dominio/filtroDoCardapio'
@@ -19,7 +21,7 @@ function FotoDoPrato({ item }) {
   const [falhou, setFalhou] = useState(null)
   return item.foto && falhou !== item.foto
     ? <img className={css.foto} src={item.foto} alt="" loading="lazy" onError={() => setFalhou(item.foto)} />
-    : <span className={css.semFoto}><Icone nome="imagem" tamanho={28} /><span>{item.foto ? 'Foto indisponível' : 'Sem foto'}</span></span>
+    : <span className={css.semFoto}><Icone nome="imagem" tamanho={32} /><span>{item.foto ? 'Foto indisponível' : 'Sem foto'}</span></span>
 }
 
 // #1808: o que falta no prato (foto, categoria, descrição). Quem edita pede a dica da IA; sem IA o
@@ -153,7 +155,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
             // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Atalho opcional; o botão Editar mantém o acesso por teclado.
             <li key={item.sku} className={css.prato} aria-busy={ocupado === item.sku}
               onDoubleClick={(e) => {
-                if (temEditor && ocupado !== item.sku && !e.target.closest('button, input, label, a, summary, select, textarea')) abrirEditor(item)
+                if (temEditor && ocupado !== item.sku && !e.target.closest('button, input, label, a, summary, select, textarea, [role="menu"]')) abrirEditor(item)
               }}>
               <div className={css.cabecalhoPrato}>
                 {temEditor ? (
@@ -197,26 +199,35 @@ export function AbaCardapioApi({ renderizarEditor }) {
               </div>
               <div className={css.rodapePrato}>
                 {temEditor && <div className={css.acoesCadastro}>
-                  <Botao variante="texto" disabled={ocupado === item.sku} title={EXPLICA.editar} aria-label={`Editar prato ${item.nome}`} onClick={() => abrirEditor(item)}><MarcaIcone nome="editar" tamanho={20} /></Botao>
+                  <BotaoIcone rotulo={`Editar prato ${item.nome}`} dica={EXPLICA.editar} icone="lapis" disabled={ocupado === item.sku} onClick={() => abrirEditor(item)} />
                 </div>}
-                <details className={css.outrasAcoes}>
-                  <summary title={EXPLICA.maisAcoes} aria-label={`Mais ações para ${item.nome}`}><Icone nome="ellipsis-vertical" tamanho={20} /></summary>
-                  <div className={css.painelAcoes}>
-                    {item.emValidacao && <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku} title={EXPLICA.validar}
-                      aria-label={`Validar ${item.nome}`} onClick={() => fazer(item.sku, () => gestao.validar(item.sku))}><MarcaIcone nome="confirmar" tamanho={18} />Validar</Botao>}
-                    <Botao variante="texto" disabled={!podeEditar || ocupado === item.sku} title={EXPLICA.arquivar}
-                      aria-label={`${item.arquivado ? 'Repor' : 'Arquivar'} ${item.nome}`} onClick={() => fazer(item.sku, () => gestao.alternarArquivado(item.sku))}>
-                      {item.arquivado ? 'Repor no cardápio' : 'Arquivar'}
-                    </Botao>
-                    {podeEditar && (ordenando ? (
-                      <span className={css.ordem} title={EXPLICA.ordem}>
-                        <span>Ordem</span>
-                        <Botao variante="texto" aria-label={`Subir ${item.nome}`} disabled={indice === 0 || ocupado === item.sku} onClick={() => fazer(item.sku, () => gestao.mover(item.sku, 'subir'))}><MarcaIcone nome="acima" tamanho={18} /></Botao>
-                        <Botao variante="texto" aria-label={`Descer ${item.nome}`} disabled={indice === itens.length - 1 || ocupado === item.sku} onClick={() => fazer(item.sku, () => gestao.mover(item.sku, 'descer'))}><MarcaIcone nome="abaixo" tamanho={18} /></Botao>
-                      </span>
-                    ) : <span className={css.detalhe}>Para mudar a ordem, escolha Todos e Todas as categorias e limpe a busca.</span>)}
-                  </div>
-                </details>
+                <MenuDeAcoes
+                  rotulo={`Mais opções de ${item.nome}`} dica={EXPLICA.maisAcoes}
+                  itens={[
+                    item.emValidacao && {
+                      chave: 'validar', rotulo: 'Validar', icone: 'check', detalhe: EXPLICA.validar,
+                      desabilitado: !podeEditar || ocupado === item.sku, aoEscolher: () => fazer(item.sku, () => gestao.validar(item.sku)),
+                    },
+                    {
+                      chave: 'arquivar', rotulo: item.arquivado ? 'Repor no cardápio' : 'Arquivar', icone: 'archive', detalhe: EXPLICA.arquivar,
+                      desabilitado: !podeEditar || ocupado === item.sku, aoEscolher: () => fazer(item.sku, () => gestao.alternarArquivado(item.sku)),
+                    },
+                    ...(podeEditar && ordenando ? [
+                      {
+                        chave: 'subir', rotulo: 'Subir na ordem', icone: 'arrow-up',
+                        desabilitado: indice === 0 || ocupado === item.sku, aoEscolher: () => fazer(item.sku, () => gestao.mover(item.sku, 'subir')),
+                      },
+                      {
+                        chave: 'descer', rotulo: 'Descer na ordem', icone: 'arrow-down',
+                        desabilitado: indice === itens.length - 1 || ocupado === item.sku, aoEscolher: () => fazer(item.sku, () => gestao.mover(item.sku, 'descer')),
+                      },
+                    ] : []),
+                    podeEditar && !ordenando && {
+                      chave: 'ordem', rotulo: 'Mudar a ordem', icone: 'arrow-up-down', desabilitado: true,
+                      motivo: 'Para mudar a ordem, escolha Todos e Todas as categorias e limpe a busca.',
+                    },
+                  ]}
+                />
               </div>
             </li>
           ))}

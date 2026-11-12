@@ -324,8 +324,9 @@ caso('T19 T20 A4  textos do histórico', () => {
   const historico = ler('features/ficha-cliente/ModalHistorico.jsx')
   assert.doesNotMatch(historico, /Contato desde/)
   assert.match(historico, /Contato \{quandoRelativo/) // quandoRelativo já devolve "há 10 dias", "hoje" ou "ontem"
-  assert.match(historico, /rotulo: 'Respostas automáticas'/)
-  assert.doesNotMatch(historico, /rotulo: 'Automáticas'/)
+  // #2185: o ator tem um nome só no Atendimento, "Assistente" (guarda atorForaDoVocabulario).
+  assert.match(historico, /\{ id: 'automaticas', rotulo: 'Assistente'/)
+  assert.doesNotMatch(historico, /rotulo: '(?:Respostas )?[Aa]utom[áà]ticas'/)
   assert.match(historico, /comandaAberta\(/)
 })
 

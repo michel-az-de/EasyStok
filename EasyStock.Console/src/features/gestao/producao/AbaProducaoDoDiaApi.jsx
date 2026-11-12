@@ -432,7 +432,7 @@ export function AbaProducaoDoDiaApi() {
                             </div>
                             {sobra != null && <p className={css.detalhe}>{sobra < 0 ? 'Peso real menor que as porções' : `Sobra ${sobra} g`}</p>}
                             <div>
-                              <Botao className={css.acaoDiscreta} variante="texto" icone="lixeira" aria-label={`Tirar ${nome} do lote`} disabled={enviando} onClick={() => tirar(l.id)}>Tirar do lote</Botao>
+                              <Botao variante="texto" icone="lixeira" aria-label={`Tirar ${nome} do lote`} disabled={enviando} onClick={() => tirar(l.id)}>Tirar do lote</Botao>
                             </div>
                           </div>
                         </details>

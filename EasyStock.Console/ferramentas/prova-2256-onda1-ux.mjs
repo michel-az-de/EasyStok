@@ -52,8 +52,9 @@ caso('cartões de número: mesma altura na mesma linha, sem esticar até o maior
 })
 
 caso('contadores de Avisos e Lembretes ancorados no canto do ícone do trilho', () => {
-  assert.match(ler('features/notificacoes/SinoDaSessao.jsx'), /<Contador valor=\{total\} tom="alerta" data-contador-sino \/>/)
-  assert.match(ler('features/lembretes/Sininho.jsx'), /className=\{css\.badge\} data-contador-sino \/>/)
+  // #2185 (R04): o contador é a Pilula contagem; o número vai no nome acessível do botão.
+  assert.match(ler('features/notificacoes/SinoDaSessao.jsx'), /<Pilula contagem=\{[^}]*total[^}]*\} tom="perigo" aria-hidden="true" data-contador-sino \/>/)
+  assert.match(ler('features/lembretes/Sininho.jsx'), /className=\{css\.badge\} data-contador-sino aria-hidden="true" \/>/)
   const trilho = ler('componentes/Trilho.module.css')
   assert.match(regra(trilho, '.filhos [data-contador-sino]'), /position:\s*absolute;[^}]*left:\s*calc\(50% \+ 6px\);[^}]*right:\s*auto/)
   assert.match(regra(trilho, '.filhos [data-aparelho-desligado]'), /position:\s*absolute/)

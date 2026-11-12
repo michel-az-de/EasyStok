@@ -67,8 +67,8 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
       {cliente.endereco && <EnderecoDoCliente endereco={cliente.endereco} />}
       {mostrarEntrega && <div className={notasCss.acoesCliente}>
         {aoVerEntrega
-          ? <Botao data-foco-reserva={focoFrete} className={css.freteCliente} variante="texto" icone="moto" aria-label="Ver frete e entrega" onClick={aoConsultarFrete ?? aoVerEntrega}>Frete</Botao>
-          : fonteApi && conversa.clienteId && cliente.endereco ? <Botao data-foco-reserva={focoFrete} className={css.freteCliente} variante="texto" icone="moto" aria-label="Consultar frete" onClick={aoConsultarFrete ?? (() => setFreteAberto(true))}>Frete</Botao>
+          ? <Botao data-foco-reserva={focoFrete} variante="texto" icone="moto" aria-label="Ver frete e entrega" onClick={aoConsultarFrete ?? aoVerEntrega}>Frete</Botao>
+          : fonteApi && conversa.clienteId && cliente.endereco ? <Botao data-foco-reserva={focoFrete} variante="texto" icone="moto" aria-label="Consultar frete" onClick={aoConsultarFrete ?? (() => setFreteAberto(true))}>Frete</Botao>
             : fonteApi && conversa.clienteId && <Botao variante="texto" icone="map-pin" onClick={aoAbrir}>Adicionar endereço</Botao>}
       </div>}
       {tags.length > 0 && (

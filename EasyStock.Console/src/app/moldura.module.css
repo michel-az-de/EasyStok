@@ -15,7 +15,7 @@
 .topo {
   position: relative; z-index: 10;
   display: flex; align-items: center; gap: var(--e-16); flex-wrap: wrap;
-  min-height: 64px;
+  min-height: var(--altura-regiao);
   padding: var(--e-2) var(--e-4); padding-top: calc(var(--e-2) + env(safe-area-inset-top, 0px));
   background: var(--vidro);
   border-bottom: 0; flex-shrink: 0;
@@ -111,13 +111,9 @@
 .conteudoGaveta { flex: 1; min-height: 0; overflow: hidden; }
 @keyframes gavetaEntra { from { transform: translateX(100%); } to { transform: none; } }
 .espaco { margin-left: auto; }
-/* Âncora do popover do topo. Sem isto a camada se posiciona pela barra toda. */
-.comPopover { position: relative; display: inline-flex; }
 /* Abaixo de 1024 px o topo já está compacto no JSX, com Lembretes e Automáticas
    visíveis e o resto no menu Mais. Aqui a assinatura sai, para os controles
    caberem na MESMA linha da marca. */
-@media (max-width: 1023px) {
-}
 /* Celular: gap mais apertado, o resto do topo já empurra sozinho pra direita. */
 @media (max-width: 759px) {
   .topo { gap: var(--e-1); padding-inline: var(--e-2); }
@@ -165,17 +161,6 @@
 .itemAtual { composes: ativo from '../componentes/Trilho.module.css'; cursor: default; }
 .itemAtual::before { left: 0; }
 .itemTrilho[aria-pressed='true'] { color: var(--tinta); background: var(--preenchimento-forte); }
-/* #2232 (L2): o desenho do contador mora em `componentes/Contador.module.css`; aqui só a posição no
-   canto do ícone do trilho. */
-.contaTrilho, .seloTrilho {
-  position: absolute; top: 4px; left: calc(50% + 6px);
-  box-shadow: 0 0 0 2px var(--fundo);
-}
-.contaTrilho { composes: contador from '../componentes/Contador.module.css'; }
-.seloTrilho {
-  composes: contador alerta from '../componentes/Contador.module.css';
-  left: calc(50% + 2px); white-space: nowrap; animation: seloPulso 2.4s var(--ease-padrao) infinite;
-}
 @keyframes seloPulso {
   0% { box-shadow: 0 0 0 2px var(--fundo), 0 0 0 2px color-mix(in srgb, var(--erro) 50%, transparent); }
   70% { box-shadow: 0 0 0 2px var(--fundo), 0 0 0 9px transparent; }
@@ -190,8 +175,7 @@
 @media (max-width: 759px) {
   .topo { flex-wrap: nowrap; }
   .controles { flex-wrap: nowrap; gap: var(--e-1); }
-  .controles > .comPopover > button { padding: 0; width: var(--toque); }
-}
+  }
 @media (max-width: 759px) {
   .controles > button { font-size: 0; gap: 6px; padding: 0 10px; }
   /* O aviso do aparelho fica no sino sem alargar o cabeçalho e empurrar Mais para fora. */
@@ -219,12 +203,13 @@
 .rotuloCurto { display: none; }
 @media (max-width: 759px) {
   .rotuloLongo { display: none; }
-  .rotuloCurto { display: inline; font-size: var(--t-minimo); }
+  .rotuloCurto { display: inline; font-size: var(--t-micro); }
 }
+
 
 /* Rodada 6d (banca estética, itens 13, 15 e 12). */
 /* 13: as três colunas com a mesma faixa de título, de 64 px, e ícone antes. */
-.tituloColuna { min-height: 64px; gap: 10px; }
+.tituloColuna { min-height: var(--altura-regiao); gap: 10px; }
 .tituloColuna > svg { color: var(--tinta-3); }
 /* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
 .espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
@@ -247,10 +232,14 @@
    ("Loja" sobre "aberta"; "Auto" sobre "ligadas") para a linha de cima caber em 390 px com o "Mais"
    dentro da tela. O alvo de toque segue com --toque de altura. */
 @media (max-width: 759px) {
-  .controleLoja { gap: var(--e-1); padding: 0 var(--e-1); font-size: var(--t-minimo); }
+  .controleLoja { gap: var(--e-1); padding: 0 var(--e-1); font-size: var(--t-micro); }
   .lojaTexto { width: min-content; white-space: normal; }
   .automaticas > svg { display: none; }
   .autoTexto { display: grid; justify-items: start; gap: 0; line-height: var(--lh-compacto); }
   .autoEstado::before { content: none; }
-  .autoEstado { font-size: var(--t-minimo); }
+  .autoEstado { font-size: var(--t-micro); }
 }
+
+/* #2185 (R04): o número é a `Pilula contagem`; aqui só o lugar dele sobre o ícone do trilho. */
+.contaTrilho, .seloTrilho { position: absolute; top: 4px; left: calc(50% + 6px); box-shadow: 0 0 0 2px var(--fundo); }
+.seloTrilho { white-space: nowrap; animation: seloPulso 2.4s var(--ease-padrao) infinite; }

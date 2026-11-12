@@ -59,7 +59,9 @@ export function ModalCliente({ conversa, aoFechar, children }) {
   // O Fechar do rodapé passa pela mesma pergunta do Esc e do X (Modal.confirmarDescarte).
   const pedirFechamento = (evento) => evento.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
 
-  return <Modal titulo="Cadastro do cliente" largura="820px" className={css.modal} aoFechar={ocupado ? undefined : aoFechar}
+  // Um só caminho para "texto não salvo": confirmarDescarte (a pergunta do Modal), o mesmo do resto do sistema.
+  // O segurarFechamento da PR (que travava Esc e fundo sem perguntar) saiu: a pergunta já protege o digitado.
+  return <Modal titulo="Cadastro do cliente" largura="lg" className={css.modal} aoFechar={ocupado ? undefined : aoFechar}
     confirmarDescarte={cadastroSujo}
     rodape={<div className={css.acoes}>
       {!podeBaixarPdf && <small>{!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}

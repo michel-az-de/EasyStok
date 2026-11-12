@@ -125,7 +125,7 @@
   .resumoOperacao { gap: var(--e-2); }
   .resumoOperacao > div { padding: var(--e-2); }
   .resumoOperacao dd { font-size: var(--t-titulo); }
-  .resumoOperacao dt { font-size: var(--t-minimo); }
+  .resumoOperacao dt { font-size: var(--t-micro); }
   .formulario, .linha { padding: var(--e-3); }
   .cadastroInsumo { grid-template-columns: minmax(0, 1fr); }
   .resumo { flex-basis: 100%; }
