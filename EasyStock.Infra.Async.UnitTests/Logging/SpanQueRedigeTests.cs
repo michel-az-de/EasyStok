@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using EasyStock.Application.Seguranca;
-using EasyStock.Infra.Async.Logging;
+using EasyStock.Observabilidade;
 using FluentAssertions;
 
 namespace EasyStock.Infra.Async.UnitTests.Logging;

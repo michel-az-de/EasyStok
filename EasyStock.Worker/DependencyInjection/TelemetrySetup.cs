@@ -1,4 +1,4 @@
-using EasyStock.Infra.Async.Logging;
+using EasyStock.Observabilidade;
 using Npgsql;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
